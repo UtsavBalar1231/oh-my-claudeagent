@@ -1,0 +1,29 @@
+{
+  "name": "omca",
+  "owner": {
+    "name": "UtsavBalar1231",
+    "email": "utsavbalar1231@gmail.com"
+  },
+  "metadata": {
+    "description": "Multi-agent orchestration plugins for Claude Code",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "oh-my-claudeagent",
+      "source": ".",
+      "description": "Intelligent multi-agent orchestration layer for Claude Code. Pure-markdown plugin with specialist agents, skills, and hook-driven automation.",
+      "version": "1.0.0",
+      "author": {
+        "name": "UtsavBalar1231",
+        "email": "utsavbalar1231@gmail.com"
+      },
+      "homepage": "https://github.com/UtsavBalar1231/oh-my-claudeagent",
+      "repository": "https://github.com/UtsavBalar1231/oh-my-claudeagent",
+      "license": "MIT",
+      "keywords": ["agents", "orchestration", "multi-agent", "skills", "hooks", "greek-mythology"],
+      "category": "productivity",
+      "tags": ["multi-agent", "orchestration", "automation", "claude-code"]
+    }
+  ]
+}

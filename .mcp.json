@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "ast-grep": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/scripts/start-ast-grep-server.sh",
+      "args": [],
+      "env": {}
+    }
+  }
+}

@@ -1,0 +1,31 @@
+# Python venv
+.venv/
+
+# oh-my-claudeagent runtime state
+.omc/
+.omca/
+state/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+
+# Temporary files
+tmp/
+*.tmp
+TODO.md
+
+# AI context files
+AGENTS.md
+CLAUDE.md
+docs/adr
