@@ -1,0 +1,7 @@
+[
+  "ast_grep_search",
+  "ast_grep_replace",
+  "find_code_by_rule",
+  "dump_syntax_tree",
+  "test_match_code_rule"
+]

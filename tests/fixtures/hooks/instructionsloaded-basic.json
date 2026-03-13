@@ -1,0 +1,8 @@
+{
+  "session_id": "ses_fixture",
+  "cwd": "/tmp/project",
+  "hook_event_name": "InstructionsLoaded",
+  "file_path": "/tmp/project/CLAUDE.md",
+  "memory_type": "Project",
+  "load_reason": "session_start"
+}
