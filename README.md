@@ -42,6 +42,32 @@ Add to your project's `.claude/settings.json` so team members get the plugin aut
 }
 ```
 
+`/oh-my-claudeagent:omca-setup` helps with the local `~/.claude/CLAUDE.md` block, dependency checks, and setup inspection. It does not run marketplace install commands for the user or enforce org-wide Claude Code policy settings.
+
+### Enterprise Rollout
+
+For centrally managed deployments, keep plugin enrollment and policy in Claude Code settings and treat `omca-setup` as a local helper rather than an installer.
+
+- `strictKnownMarketplaces` limits installs to marketplaces your admins explicitly approve.
+- `blockedMarketplaces` denies specific marketplace sources even if a user or project adds them elsewhere.
+- `allowManagedHooksOnly` restricts hook execution to entries defined in managed settings.
+- `allowManagedPermissionRulesOnly` restricts allow/deny permission rules to managed settings.
+- `allowManagedMcpServersOnly` restricts MCP server definitions to managed settings.
+
+Those keys belong in managed settings when you need non-overridable enterprise policy. Project `.claude/settings.json` is still the right place for shared defaults like `extraKnownMarketplaces` and `enabledPlugins`.
+
+Marketplace installs run from `~/.claude/plugins/cache`. The bundled `ast-grep` MCP launcher bootstraps a plugin-local `.venv` inside the active plugin root on first use, so enterprise packaging needs to allow that cache copy to persist and create its runtime environment.
+
+See `docs/audit/enterprise-policy-guide.md` for the rollout split between managed settings, project settings, and the local `omca-setup` helper.
+
+### Development and Packaging Notes
+
+- `claude --plugin-dir ./path/to/plugin` loads a local checkout in place for the current session, while marketplace installs copy the plugin into `~/.claude/plugins/cache`.
+- Because marketplace installs run from that cached copy, packaged plugin files must not rely on sibling or parent-directory references outside the plugin root.
+- The bundled `ast-grep` MCP launcher creates its `.venv` inside the active plugin root, which means local `--plugin-dir` runs and cached marketplace installs each maintain their own bootstrap environment.
+- For contributors maintaining `.claude-plugin/marketplace.json`, local string sources must stay `./`-prefixed. This repo uses `./` because the plugin lives at the marketplace root.
+- If both `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` declare a version, Claude Code uses the manifest version from `plugin.json` as the installed version authority. Keep the two values in sync.
+
 ### Staying Up to Date
 
 ```bash
@@ -60,8 +86,8 @@ Add to your project's `.claude/settings.json` so team members get the plugin aut
 
 - Claude Code CLI
 - `jq` — hook scripts parse JSON payloads with it
-- `python3` — runs the ast-grep MCP server
-- `sg` / [ast-grep](https://ast-grep.github.io) CLI — optional, enables structural code search
+- `python3` (3.10+) — required by the ast-grep MCP launcher, which bootstraps a plugin-local `.venv` on first run
+- `ast-grep` CLI (`ast-grep` or `sg`) — required for structural code-search tools exposed by the ast-grep MCP server
 
 ---
 
@@ -106,7 +132,7 @@ Invoke with `/oh-my-claudeagent:<skill>` in any Claude Code session.
 | `frontend-ui-ux` | Production-quality UI/UX design patterns |
 | `git-master` | Advanced git operations, atomic commits, clean history |
 | `playwright` | Browser automation via MCP |
-| `omca-setup` | Configure `~/.claude/` for oh-my-claudeagent |
+| `omca-setup` | Update `~/.claude/CLAUDE.md`, check deps, and inspect setup state |
 | `dev-browser` | Browser with persistent state for dev workflows |
 
 ---
@@ -126,25 +152,42 @@ Type these anywhere in a prompt to auto-activate modes without the slash command
 
 ## Runtime State
 
-All state is written to `.omca/` in your project directory (add it to `.gitignore`):
+Plugin-managed state lives in `.omca/` in your project directory (add it to `.gitignore`). Core files are created automatically; mode-specific files appear only when those workflows run:
 
 ```
 .omca/
-├── state/          # Session and mode state files
-├── plans/          # Prometheus-generated work plans
-├── logs/           # Edit audit trail and agent spawn events
-├── notepad.md      # Session scratch pad
-└── project-memory.json  # Persistent project context
+├── state/
+│   ├── session.json
+│   ├── agent-usage.json
+│   ├── injected-context-dirs.json
+│   ├── subagents.json
+│   ├── compaction-context.md
+│   ├── verification-evidence.json
+│   ├── ralph-state.json
+│   ├── ultrawork-state.json
+│   ├── boulder.json
+│   ├── team-state.json
+│   └── worktrees/
+├── plans/          # Plan artifacts used by planning/execution skills
+└── logs/
+    ├── sessions.jsonl
+    ├── edits.jsonl
+    ├── instructions-loaded.jsonl
+    ├── subagents.jsonl
+    ├── errors.jsonl
+    ├── agent-spawns.log
+    └── config-changes.log
 ```
 
 ---
 
 ## Architecture
 
-- **No build step** — pure markdown. Agents are `.md` files, skills are `SKILL.md` files.
+- **Markdown-first, no TypeScript build step** — agents are `.md` files, skills are `SKILL.md` files, and hook/runtime wiring is shell+JSON.
+- **Owned runtime bootstrap** — the bundled ast-grep MCP launcher creates and reuses a plugin-local `.venv` for Python dependencies.
 - **Hook-driven** — Hook events in `hooks/hooks.json` drive all automation.
 - **MCP server** — `servers/ast-grep-server.py` provides structural code search via the `sg` CLI.
-- **Plugin manifest** — `.claude-plugin/plugin.json` and `marketplace.json` declare metadata for marketplace distribution and discovery.
+- **Plugin manifest** — `.claude-plugin/plugin.json` and `marketplace.json` declare metadata for marketplace distribution and discovery. Marketplace-local sources stay `./`-relative and installed plugins resolve from the cache copy, not the original checkout.
 
 See [`docs/adr/README.md`](docs/adr/README.md) for architectural decision records.
 

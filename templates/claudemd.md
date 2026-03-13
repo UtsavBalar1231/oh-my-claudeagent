@@ -13,10 +13,11 @@ Coordinate specialist agents, tools, and skills for accurate, efficient work.
 
 The plugin loads via the Claude Code marketplace (or `--plugin-dir` for development). On session start:
 
-1. **Hooks activate** — `session-init.sh` initializes session state in `.omca/state/`
-2. **Keyword detection** — `keyword-detector.sh` listens for trigger phrases on every user prompt (e.g., "ralph", "ultrawork") and activates skills via `[MAGIC KEYWORD: ...]` context injection
-3. **Context injection** — hooks inject AGENTS.md/README.md context when files are read, recover from errors, track edits, and manage agent lifecycles
-4. **Agent orchestration** — the default agent (`sisyphus`) delegates to specialists via `Agent(subagent_type="oh-my-claudeagent:NAME")`
+1. **Hooks activate** - `session-init.sh` initializes session state in `.omca/state/` and injects this runtime spec.
+2. **Keyword detection** - `keyword-detector.sh` listens for trigger phrases on every user prompt (for example `ralph`, `ultrawork`, or `handoff`) and emits `[... DETECTED]` additional context when a mode should activate.
+3. **Observability** - `instructions-loaded-audit.sh` records `InstructionsLoaded` events in `.omca/logs/instructions-loaded.jsonl` without changing runtime behavior.
+4. **Context injection and lifecycle tracking** - hooks inject nearby `AGENTS.md`/`README.md` content on reads, recover from edit/delegation errors, audit edits, and track spawned subagents.
+5. **Agent orchestration** - the default agent (`sisyphus`) delegates to specialists via `Agent(subagent_type="oh-my-claudeagent:NAME")`.
 
 ## Source of Truth
 
@@ -26,7 +27,7 @@ The canonical feature lists are ONLY what exists on disk in this repository:
 |-------|-------------------|------|
 | Agents | `agents/*.md` | YAML frontmatter defines model, tools, role |
 | Skills | `skills/*/SKILL.md` | Directory without `SKILL.md` = nonexistent |
-| Scripts | `scripts/*.sh` | Must be registered in `hooks/hooks.json` (except MCP launchers) |
+| Scripts | `scripts/*.sh` | `hooks/hooks.json` registers 24 hook commands; `start-ast-grep-server.sh`, `validate-plugin.sh`, and the two worktree helpers remain utilities |
 | Hooks | `hooks/hooks.json` | Single registry mapping events to scripts |
 | MCP Servers | `.mcp.json` + `servers/` | Server config and implementation |
 
@@ -77,11 +78,27 @@ Invoke via `/oh-my-claudeagent:NAME` or keyword triggers.
 | dev-browser | browser tasks | Browser with persistent state |
 | playwright | browser automation | Playwright MCP integration |
 
-## Tools
+## Capability Provenance
 
-MCP tools: ast_grep_search, ast_grep_replace, find_code_by_rule, test_match_code_rule, dump_syntax_tree, lsp_hover,
-lsp_goto_definition, lsp_find_references, lsp_diagnostics, lsp_rename,
-notepad_read/write, state_read/write, project_memory_read/write, python_repl.
+Classify capability claims before relying on them:
+
+| Classification | What it covers here | Ownership boundary |
+|---------------|---------------------|--------------------|
+| Bundled by this plugin | `agents/*.md`, `skills/*/SKILL.md`, hook registrations in `hooks/hooks.json`, repo hook/runtime scripts in `scripts/`, plugin-managed `.omca/` bootstrap state, and the bundled `ast-grep` MCP server/tools | Verify against on-disk files in this repo; do not expand from memory |
+| Claude-native | `Agent(...)`, slash-command execution, hook/event semantics, todo/task primitives, managed instruction loading, and any LSP surfaces Claude Code itself exposes | Claude Code owns these primitives; this repo only orchestrates around them |
+| Optional external/host-provided | Host binaries such as `jq`, `python3`, `ast-grep`/`sg`; Playwright/browser runtimes; any `.lsp.json`, language-server packaging, or extra notepad/project-memory/state/Python helper tools from other plugins or local setup | This repo does not bundle those runtimes, configs, or extra tool surfaces |
+
+If your environment exposes `lsp_*`, notepad/project-memory/state helpers, or a Python REPL, treat them as Claude-native or separately installed capabilities. This plugin does not ship `.lsp.json` or any extra LSP/notepad/project-memory/state/Python tool bundle.
+
+## Bundled MCP Tools
+
+This repo bundles one MCP server, `ast-grep`, via `.mcp.json`. Its shipped tools are:
+
+- `ast_grep_search`
+- `ast_grep_replace`
+- `find_code_by_rule`
+- `test_match_code_rule`
+- `dump_syntax_tree`
 
 ## Hook System
 
@@ -89,14 +106,15 @@ notepad_read/write, state_read/write, project_memory_read/write, python_repl.
 
 1. Claude Code emits an **event** (e.g., `PostToolUse`)
 2. `hooks/hooks.json` maps events to scripts, optionally filtered by a **matcher** (tool name pattern)
-3. The script receives a JSON payload on **stdin**, processes it, and may return JSON on **stdout**
-4. Response types: `additionalContext` (inject text), `permissionDecision` (allow/block), `decision` (block stop)
+3. The script receives a JSON payload on **stdin**, processes it, and may return JSON on **stdout**.
+4. Hook responses are wrapped under `hookSpecificOutput`, most often with `additionalContext`, `permissionDecision`, or `decision` fields.
 
 ### Hook Events
 
 | Event | Scripts | Matchers |
 |-------|---------|----------|
 | SessionStart | `session-init.sh`, `post-compact-inject.sh` | (none), `compact` |
+| InstructionsLoaded | `instructions-loaded-audit.sh` | (none) |
 | UserPromptSubmit | `keyword-detector.sh` | (none) |
 | SubagentStart | `subagent-start.sh` | (none) |
 | PreToolUse | `track-subagent-spawn.sh`, `write-guard.sh` | `Task\|Agent`, `Write` |
@@ -111,37 +129,41 @@ notepad_read/write, state_read/write, project_memory_read/write, python_repl.
 | TaskCompleted | `task-completed-verify.sh` | (none) |
 | TeammateIdle | `teammate-idle-guard.sh` | (none) |
 | ConfigChange | `config-change-audit.sh` | (none) |
-| WorktreeCreate | `worktree-setup.sh` | (none) |
-| WorktreeRemove | `worktree-cleanup.sh` | (none) |
+
+Claude Code native git worktree behavior is authoritative; `worktree-setup.sh` and `worktree-cleanup.sh` remain unregistered utilities rather than active hook overrides.
 
 Hooks inject context via `<system-reminder>` tags:
-- `hook success: Success` — proceed normally
-- `hook additional context: ...` — read it, relevant to your task
-- `[NAME DETECTED]` — keyword trigger activated a skill/mode
+- `hook success: Success` - proceed normally
+- `hook additional context: ...` - read it, relevant to your task
+- `[NAME DETECTED]` - keyword trigger activated a skill or mode
 
 ## State Management
 
-All runtime state in `.omca/` (gitignored):
+Plugin-managed runtime state lives in `.omca/` (gitignored). Core files are created automatically; mode-specific files appear only when those workflows run:
 
 ```
 .omca/
   state/
-    session.json              # Current session metadata
-    ralph-state.json          # Ralph persistence tracking
-    team-state.json           # Team coordination state
-    boulder.json              # Continuation tracking
-    ultrawork-state.json      # Parallel execution state
-    subagents.json            # Active/completed agent tracking
-    agent-usage.json          # Tool call counting
+    session.json               # Current session metadata
+    agent-usage.json           # Direct-tool usage and delegation tracking
     injected-context-dirs.json # Context injection cache
-  plans/                      # Prometheus-generated work plans
+    subagents.json             # Active/completed subagent tracking
+    compaction-context.md      # Single-use restore payload for compact starts
+    verification-evidence.json # Fresh verification evidence for TaskCompleted
+    ralph-state.json           # Ralph persistence state, when active
+    ultrawork-state.json       # Ultrawork state, when active
+    boulder.json               # Active plan/continuation state, when present
+    team-state.json            # Team coordination state, when present
+    worktrees/                 # Worktree tracking metadata for helper utilities
+  plans/                       # Plan artifacts used by planning/execution skills
   logs/
     sessions.jsonl            # Session lifecycle audit
     edits.jsonl               # File edit audit trail
-    subagents.jsonl           # Agent spawn/complete events
-    notifications.jsonl       # Notification audit trail
-  notepad.md                  # Session scratchpad (via MCP tools)
-  project-memory.json         # Persistent project context (via MCP tools)
+    instructions-loaded.jsonl # InstructionsLoaded observability log
+    subagents.jsonl           # Structured subagent spawn/complete events
+    errors.jsonl              # Edit-failure recovery log
+    agent-spawns.log          # Human-readable spawned-agent log
+    config-changes.log        # ConfigChange audit trail
 ```
 
 ## Rules
