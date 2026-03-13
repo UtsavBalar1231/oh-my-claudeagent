@@ -42,4 +42,4 @@ if [[ -f "${SESSION_STATE}" ]]; then
 fi
 
 ESCAPED=$(printf '%s' "Subagent ${SUBAGENT_TYPE} (${SPAWN_ID}) spawned with model ${SUBAGENT_MODEL}" | jq -Rs .)
-printf '%s\n' "{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"permissionDecision\": \"allow\", \"additionalContext\": ${ESCAPED}}}"
+printf '%s\n' "{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"additionalContext\": ${ESCAPED}}}"

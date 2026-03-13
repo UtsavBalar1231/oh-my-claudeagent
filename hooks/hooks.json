@@ -19,6 +19,16 @@
 				]
 			}
 		],
+		"InstructionsLoaded": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/instructions-loaded-audit.sh"
+					}
+				]
+			}
+		],
 		"UserPromptSubmit": [
 			{
 				"hooks": [
@@ -224,26 +234,6 @@
 						"type": "command",
 						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/config-change-audit.sh",
 						"async": true
-					}
-				]
-			}
-		],
-		"WorktreeCreate": [
-			{
-				"hooks": [
-					{
-						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/worktree-setup.sh"
-					}
-				]
-			}
-		],
-		"WorktreeRemove": [
-			{
-				"hooks": [
-					{
-						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/worktree-cleanup.sh"
 					}
 				]
 			}

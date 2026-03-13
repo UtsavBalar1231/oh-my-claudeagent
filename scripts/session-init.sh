@@ -39,11 +39,6 @@ if [[ "${SOURCE}" != "compact" ]]; then
 	fi
 fi
 
-if [[ -f "${STATE_DIR}/compaction-context.md" ]]; then
-	echo "{\"hookSpecificOutput\": {\"hookEventName\": \"SessionStart\", \"additionalContext\": \"Post-compaction state detected. Context will be re-injected.\"}}"
-	exit 0
-fi
-
 PLUGIN_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PLUGIN_MD="${PLUGIN_ROOT}/templates/claudemd.md"
 
