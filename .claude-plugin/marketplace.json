@@ -11,7 +11,7 @@
   "plugins": [
     {
       "name": "oh-my-claudeagent",
-      "source": ".",
+      "source": "./",
       "description": "Intelligent multi-agent orchestration layer for Claude Code. Pure-markdown plugin with specialist agents, skills, and hook-driven automation.",
       "version": "1.0.0",
       "author": {
