@@ -40,7 +40,7 @@ Performs intelligent, deterministic refactoring with full codebase awareness:
 2. **Maps the codebase** - Builds a definitive codemap before touching anything
 3. **Assesses risk** - Evaluates test coverage and determines verification strategy
 4. **Plans meticulously** - Creates a detailed plan with Plan agent
-5. **Executes precisely** - Step-by-step refactoring with LSP diagnostics and ast-grep MCP tools
+5. **Executes precisely** - Step-by-step refactoring with host-provided LSP diagnostics when available and bundled ast-grep MCP tools
 6. **Verifies constantly** - Runs tests after each change to ensure zero regression
 
 ---
@@ -126,7 +126,7 @@ Agent(
 For EACH step:
 
 1. **Pre-Step**: Mark task in_progress, verify baseline
-2. **Execute**: Use ast-grep MCP tools for structural replacement, or Edit for targeted changes. For symbol renaming, use the `lsp_rename` MCP tool if available.
+2. **Execute**: Use ast-grep MCP tools for structural replacement, or Edit for targeted changes. For symbol renaming, use `lsp_rename` only if the current Claude environment exposes it.
 3. **Post-Step Verification**: Run typecheck + run tests
 4. **Complete**: Mark task completed if verification passes
 
@@ -140,7 +140,7 @@ For EACH step:
 - Type check
 - Lint check
 - Build verification
-- Final diagnostics on all changed files
+- Final diagnostics on all changed files (using LSP/tooling support when available)
 
 ---
 

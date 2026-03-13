@@ -215,14 +215,14 @@ User: "ulw fix all TypeScript errors in src/"
 
 Before claiming done, answer honestly:
 
-1. Did I run `lsp_diagnostics` and see ZERO errors? (not "I'm sure there are none")
+1. If `lsp_diagnostics` is available in this Claude environment, did I run it and see ZERO errors? (not "I'm sure there are none")
 2. Did I run the tests and see them PASS? (not "they should pass")
 3. Did I read the actual output of every command? (not skim)
 4. Is EVERY requirement from the request actually implemented? (re-read the request NOW)
 
 **If ANY answer is no → GO BACK AND DO IT. Do not claim completion.**
 
-**lsp_diagnostics catches type errors, NOT functional bugs. Your work is NOT verified until you MANUALLY test it.**
+**Host-provided `lsp_diagnostics` catches type errors, NOT functional bugs. Your work is NOT verified until you MANUALLY test it.**
 
 | If your change... | YOU MUST... |
 |---|---|
@@ -236,7 +236,7 @@ Before claiming done, answer honestly:
 **Unacceptable QA claims:**
 - "This should work" → RUN IT.
 - "The types check out" → Types don't catch logic bugs. RUN IT.
-- "lsp_diagnostics is clean" → That's a TYPE check, not a FUNCTIONAL check. RUN IT.
+- "If available, lsp_diagnostics is clean" → That's a TYPE check, not a FUNCTIONAL check. RUN IT.
 - "Tests pass" → Tests cover known cases. Does the ACTUAL FEATURE work? RUN IT.
 
 **You have Bash, you have tools. There is ZERO excuse for not running manual QA.**

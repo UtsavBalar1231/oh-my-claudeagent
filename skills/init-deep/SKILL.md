@@ -76,7 +76,7 @@ If `--create-new`: Read all existing first (preserve context) → then delete al
 
 #### 3. LSP Codemap (if available)
 
-Check if LSP MCP tools are available and use them to map entry points:
+Check whether Claude Code or another installed plugin exposes LSP tools, and use them to map entry points:
 
 ```
 lsp_servers()                                          # Check what's running
@@ -85,8 +85,8 @@ lsp_workspace_symbols(query="class")                   # All classes
 lsp_workspace_symbols(query="interface")               # All interfaces
 ```
 
-These are LSP tools provided by the plugin's language server configuration — NOT `lsp_diagnostics`.
-If LSP tools unavailable, rely on explore agents and bash analysis only.
+These are optional Claude-native or separately installed LSP capabilities, not something this plugin bundles or configures.
+If LSP tools are unavailable, rely on explore agents and bash analysis only.
 
 #### 4. Dynamic Agent Spawning
 

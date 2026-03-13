@@ -1,6 +1,6 @@
 ---
 name: omca-setup
-description: Configure ~/.claude/ for oh-my-claudeagent — injects orchestration block, checks deps, verifies marketplace registration
+description: Configure ~/.claude/ for oh-my-claudeagent — injects orchestration block, checks deps, inspects setup state
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep
 user-invocable: true
 disable-model-invocation: true
@@ -9,8 +9,10 @@ argument-hint: "[--uninstall | --check]"
 
 # omca-setup — Plugin Configuration
 
-One-command setup for oh-my-claudeagent. Injects the orchestration block into `~/.claude/CLAUDE.md`,
-checks dependencies, and registers the plugin in `~/.claude/settings.json`.
+One-command setup for oh-my-claudeagent. Updates the orchestration block in `~/.claude/CLAUDE.md`,
+checks dependencies, inspects current plugin registration state, and prints rollout guidance.
+
+This skill does not run marketplace install commands on the user's behalf, does not auto-edit shared or managed Claude Code settings, and does not claim to enforce enterprise policy keys such as `strictKnownMarketplaces`, `blockedMarketplaces`, `allowManagedHooksOnly`, `allowManagedPermissionRulesOnly`, or `allowManagedMcpServersOnly`.
 
 ---
 
@@ -40,9 +42,9 @@ command -v python3 && python3 --version
 → PASS/WARN (needed for ast-grep MCP server; venv auto-bootstraps on first use)
 
 ```bash
-command -v ast-grep && ast-grep --version 2>&1 | head -1
+if command -v ast-grep >/dev/null 2>&1; then ast-grep --version 2>&1 | head -1; else command -v sg >/dev/null 2>&1 && sg --version 2>&1 | head -1; fi
 ```
-→ PASS/WARN (optional — needed for structural code search MCP tools)
+→ PASS/WARN (optional — needed for structural code search MCP tools; accepts either `ast-grep` or `sg`)
 
 Record each result (binary path + version or "not found") for the health report.
 
@@ -125,28 +127,48 @@ Write the composed content to `~/.claude/CLAUDE.md`.
 
 ---
 
-### Phase 5: Plugin Registration
+### Phase 5: Registration Inspection and Rollout Guidance
 
-1. Read `~/.claude/settings.json` (if it doesn't exist, start with `{}`)
+1. Read `~/.claude/settings.json` if it exists; otherwise treat user-scope settings as absent.
 
-2. **Auto-detect install method:**
-   - Check if `enabledPlugins` object has any key starting with `oh-my-claudeagent` → already registered via marketplace, **skip**
-   - Check if the current session was loaded via `--plugin-dir` (e.g., `CLAUDE_PLUGIN_ROOT` is not under `~/.claude/plugins/cache/`) → development mode, **skip** with note: "Running via --plugin-dir (development mode) — no persistent registration needed."
-   - If neither found → print instructions:
-     ```
-     Plugin not registered. Run these commands to install via marketplace:
+2. Inspect setup state without modifying settings:
+   - Check whether `enabledPlugins` contains a key starting with `oh-my-claudeagent` → report "already enabled in user settings"
+   - Check whether the active plugin root lives under `~/.claude/plugins/cache/` → report "running from marketplace cache copy"
+   - Check whether the current session was loaded via `--plugin-dir` or another checkout outside the cache → report "running from local checkout / development mode"
+   - Check whether a legacy `plugins` array entry contains `oh-my-claudeagent` → report "legacy git-clone install detected"
 
-       /plugin marketplace add UtsavBalar1231/oh-my-claudeagent
-       /plugin install oh-my-claudeagent@omca
-     ```
-   - If a `plugins` array entry containing `oh-my-claudeagent` is found → legacy git clone install detected. Print:
-     ```
-     Legacy git-clone installation detected in plugins array.
-     To migrate to marketplace, remove the plugins array entry and run:
+3. If the plugin is not already enabled in user settings, print install guidance instead of writing settings:
+   ```
+   Plugin not enabled in user settings. Use one of these Claude Code-supported paths:
 
-       /plugin marketplace add UtsavBalar1231/oh-my-claudeagent
-       /plugin install oh-my-claudeagent@omca
-     ```
+     /plugin marketplace add UtsavBalar1231/oh-my-claudeagent
+     /plugin install oh-my-claudeagent@omca
+
+   Or add the shared-team snippet to .claude/settings.json:
+
+   {
+     "extraKnownMarketplaces": {
+       "omca": {
+         "source": {
+           "source": "github",
+           "repo": "UtsavBalar1231/oh-my-claudeagent"
+         }
+       }
+     },
+     "enabledPlugins": {
+       "oh-my-claudeagent@omca": true
+     }
+   }
+   ```
+
+4. Print enterprise rollout guidance (inspection only; do not write or enforce it):
+   - `strictKnownMarketplaces` → allow only marketplaces your admins approve
+   - `blockedMarketplaces` → explicitly deny marketplaces that should never resolve
+   - `allowManagedHooksOnly` → allow only hooks defined in managed settings
+   - `allowManagedPermissionRulesOnly` → allow only managed permission rules
+   - `allowManagedMcpServersOnly` → allow only managed MCP server definitions
+
+   Explain that these keys belong in managed settings when the organization needs non-overridable policy, and that this skill can only point the user/admin at them.
 
 ---
 
@@ -164,12 +186,13 @@ Dependencies:
 
 Files:
   ~/.claude/CLAUDE.md      — Block injected v0.1.0 (backup: CLAUDE.md.bak)
-  ~/.claude/settings.json  — Marketplace: registered | Dev mode: --plugin-dir | Not registered (see above)
+  ~/.claude/settings.json  — Inspected only: enabled | local checkout / dev mode | legacy config detected | not configured in user scope
+  Plugin root              — ~/.claude/plugins/cache/... | local checkout path
 
 State:
   .omca/state/  — Verified
   .omca/logs/   — Verified
-  .venv/               — [Present | Auto-created on first MCP server start]
+  Plugin-local .venv    — [Present | Auto-created on first ast-grep MCP server start in the active plugin root]
   .gitignore   — .omca/ entry present
 
 Restart Claude Code to activate changes.
@@ -206,17 +229,22 @@ For the State section:
 
 ---
 
-### Phase 2: Deregister from settings.json
+### Phase 2: Settings and Policy Cleanup Guidance
 
-1. Read `~/.claude/settings.json`
+1. Read `~/.claude/settings.json` if it exists.
 
-2. Remove any key starting with `oh-my-claudeagent` from `enabledPlugins` object
+2. Report any user-scope references to `oh-my-claudeagent` in:
+   - `enabledPlugins`
+   - `extraKnownMarketplaces`
+   - legacy `plugins` array entries
 
-3. Remove any legacy path containing `oh-my-claudeagent` from `plugins` array (if present, from old git clone installs)
+3. Print supported cleanup commands instead of editing shared settings automatically:
+   ```
+   /plugin uninstall oh-my-claudeagent@omca
+   /plugin marketplace remove omca
+   ```
 
-4. Write back the modified JSON (preserve all other settings)
-
-5. Print note: "To fully remove the marketplace source, run: `/plugin marketplace remove omca`"
+4. If the plugin is enabled through project or managed settings, explain that those scopes must be cleaned up by editing the appropriate settings file or managed policy deployment. Do not claim this skill can remove enterprise policy on the user's behalf.
 
 ---
 
@@ -224,7 +252,7 @@ For the State section:
 
 1. Ask the user:
    ```
-   Remove .omca/ state directory? This deletes logs, plans, and project memory. [y/N]
+    Remove .omca/ state directory? This deletes logs, plans, and any optional local context files stored there. [y/N]
    ```
 
 2. If user confirms:
@@ -236,13 +264,12 @@ For the State section:
    ```
    === oh-my-claudeagent Uninstalled ===
 
-   Removed:
-     ~/.claude/CLAUDE.md      — Block removed (or file deleted)
-     ~/.claude/settings.json  — Plugin deregistered
-     .omca/                    — [Removed | Kept]
+Removed:
+  ~/.claude/CLAUDE.md      — Block removed (or file deleted)
+  ~/.claude/settings.json  — Cleanup guidance printed; manual scope-specific removal may still be needed
+  .omca/                    — [Removed | Kept]
 
-   The plugin files remain at their install location.
-   To fully remove, delete the plugin directory.
+   The plugin files remain at their install location or cache copy until Claude Code uninstall/remove commands run.
    ```
 
 ---
@@ -259,7 +286,8 @@ Non-destructive health check — no files are modified.
    - No block found? Report "not configured — run omca-setup"
 
 3. Check `~/.claude/settings.json`:
-   - Is the plugin registered? Report method (marketplace via enabledPlugins / dev mode via --plugin-dir / legacy plugins array / not registered)
+    - Is the plugin enabled in user settings? Report method (marketplace via enabledPlugins / dev mode via --plugin-dir / legacy plugins array / not registered)
+    - Remind the user that managed policy keys such as `strictKnownMarketplaces`, `blockedMarketplaces`, `allowManagedHooksOnly`, `allowManagedPermissionRulesOnly`, and `allowManagedMcpServersOnly` are outside this skill's enforcement scope
 
 4. Check `.omca/` state:
    - Do state directories exist?
@@ -273,6 +301,8 @@ Non-destructive health check — no files are modified.
 
 - ALWAYS backup `~/.claude/CLAUDE.md` before any write (Phase 3)
 - NEVER modify files outside `~/.claude/` and `.omca/` (plus `.gitignore`)
+- NEVER claim marketplace installation or managed policy enforcement unless existing Claude Code settings prove it
+- NEVER auto-edit shared or managed Claude Code settings during setup; print guidance instead
 - Idempotent: running setup multiple times with the same version is a no-op
 - Template is read from disk, not generated — ensures deterministic output
 - Migration handles both `<!-- OMCA:START -->` and `<\!-- OMCA:START -->` (escaped and unescaped)
