@@ -89,7 +89,7 @@ Use the right tool for the job:
 
 | Need | Tool |
 |------|------|
-| Semantic search (definitions, references) | LSP tools |
+| Semantic search (definitions, references) | Claude-native or separately installed LSP tools, if available |
 | Structural patterns (function shapes, class structures) | ast_grep_search |
 | Text patterns (strings, comments, logs) | grep |
 | File patterns (find by name/extension) | glob |

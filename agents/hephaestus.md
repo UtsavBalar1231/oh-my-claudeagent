@@ -41,7 +41,7 @@ You are NOT for:
 | Read error context | Read |
 | Fix code | Edit (prefer over Write) |
 | Find related files | Grep, Glob |
-| Check type definitions | LSP hover, goto_definition |
+| Check type definitions | Host-provided `LSP hover` / `goto_definition`, if available |
 
 ## Critical Rules
 

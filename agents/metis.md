@@ -48,8 +48,7 @@ Confirm:
 **Your Mission**: Ensure zero regressions, behavior preservation.
 
 **Tool Guidance** (recommend to prometheus):
-- `lsp_find_references`: Map all usages before changes
-- `lsp_rename`: Safe symbol renames
+- If the current Claude environment exposes them: `lsp_find_references` to map usages before changes, `lsp_rename` for safe symbol renames
 - `ast_grep_search`: Find structural patterns to preserve
 
 **Questions to Ask**:
@@ -197,4 +196,3 @@ Consult oracle agent for architecture consultation with full context.
 - Be specific ("Should this change UserService only, or also AuthService?")
 - Explore before asking (for Build/Research intents)
 - Provide actionable directives for prometheus
-
