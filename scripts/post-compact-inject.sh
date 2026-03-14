@@ -15,7 +15,7 @@ fi
 
 trap 'rm -f "${CLAIM_FILE}"' EXIT
 
-CONTEXT=$(head -c 4000 "${CLAIM_FILE}" 2>/dev/null)
+CONTEXT=$(head -n 100 "${CLAIM_FILE}" 2>/dev/null)
 
 if [[ -z "${CONTEXT}" ]]; then
 	exit 0

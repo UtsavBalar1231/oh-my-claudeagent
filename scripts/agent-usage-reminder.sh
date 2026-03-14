@@ -16,8 +16,13 @@ if [[ "${AGENT_USED}" == "true" ]]; then
 fi
 
 TMP=$(mktemp)
-RESULT=$(jq -r '.toolCallCount += 1 | if .toolCallCount >= 3 then .toolCallCount as $c | .toolCallCount = 0 | "\($c)" else "below" end' "${USAGE_FILE}" 2>/dev/null)
 jq '.toolCallCount += 1 | if .toolCallCount >= 3 then .toolCallCount = 0 else . end' "${USAGE_FILE}" >"${TMP}" && mv "${TMP}" "${USAGE_FILE}"
+RESULT=$(jq -r '.toolCallCount' "${USAGE_FILE}" 2>/dev/null)
+if [[ "${RESULT}" == "0" ]]; then
+	RESULT="3"
+else
+	RESULT="below"
+fi
 
 if [[ "${RESULT}" != "below" ]]; then
 	MSG="[DELEGATION REMINDER] You've made ${RESULT} direct search/fetch calls without delegating to an agent. Consider using Task tool with explore, librarian, or other specialized agents for better results and to follow the delegation-first philosophy."

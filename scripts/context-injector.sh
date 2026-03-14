@@ -22,8 +22,7 @@ CONTEXT_PARTS=""
 
 CURRENT_DIR="${FILE_DIR}"
 while true; do
-	DIR_KEY=$(echo "${CURRENT_DIR}" | jq -Rs .)
-	ALREADY_INJECTED=$(jq -r ".[${DIR_KEY}] // \"false\"" "${CACHE_FILE}" 2>/dev/null)
+	ALREADY_INJECTED=$(jq -r --arg dir "${CURRENT_DIR}" '.[$dir] // "false"' "${CACHE_FILE}" 2>/dev/null)
 
 	if [[ "${ALREADY_INJECTED}" == "false" ]]; then
 		if [[ -f "${CURRENT_DIR}/AGENTS.md" ]]; then

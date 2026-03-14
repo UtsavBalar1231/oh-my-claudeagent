@@ -1,5 +1,7 @@
-# Python venv
+# Python
 .venv/
+__pycache__/
+servers/__pycache__/
 
 # oh-my-claudeagent runtime state
 .omc/
@@ -28,4 +30,9 @@ TODO.md
 # AI context files
 AGENTS.md
 CLAUDE.md
+.sisyphus/
+
+# Docs
 docs/adr
+docs/audit
+docs/research
