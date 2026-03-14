@@ -46,5 +46,6 @@ if [[ -f "${PLUGIN_MD}" ]]; then
 	FULL_CONTEXT=$(printf "Session %s initialized.\n\n%s%b" "${SESSION_ID}" "$(cat "${PLUGIN_MD}")" "${SETUP_NOTICE}" | jq -Rs .)
 	echo "{\"hookSpecificOutput\": {\"hookEventName\": \"SessionStart\", \"additionalContext\": ${FULL_CONTEXT}}}"
 else
-	echo "{\"hookSpecificOutput\": {\"hookEventName\": \"SessionStart\", \"additionalContext\": \"Session ${SESSION_ID} initialized. State directory: ${STATE_DIR}${SETUP_NOTICE}\"}}"
+	FALLBACK_CONTEXT=$(printf 'Session %s initialized. State directory: %s%b' "${SESSION_ID}" "${STATE_DIR}" "${SETUP_NOTICE}" | jq -Rs .)
+	echo "{\"hookSpecificOutput\": {\"hookEventName\": \"SessionStart\", \"additionalContext\": ${FALLBACK_CONTEXT}}}"
 fi

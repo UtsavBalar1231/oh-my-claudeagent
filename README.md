@@ -62,10 +62,10 @@ See `docs/audit/enterprise-policy-guide.md` for the rollout split between manage
 
 ### Development and Packaging Notes
 
-- `claude --plugin-dir ./path/to/plugin` loads a local checkout in place for the current session, while marketplace installs copy the plugin into `~/.claude/plugins/cache`.
+- `claude --plugin-dir ./path/to/plugin` loads a local checkout in place for the current session. It accepts one path per flag; use repeated `--plugin-dir` flags for multiple directories. Marketplace installs copy the plugin into `~/.claude/plugins/cache`.
 - Because marketplace installs run from that cached copy, packaged plugin files must not rely on sibling or parent-directory references outside the plugin root.
 - The bundled `ast-grep` MCP launcher creates its `.venv` inside the active plugin root, which means local `--plugin-dir` runs and cached marketplace installs each maintain their own bootstrap environment.
-- For contributors maintaining `.claude-plugin/marketplace.json`, local string sources must stay `./`-prefixed. This repo uses `./` because the plugin lives at the marketplace root.
+- For contributors maintaining `.claude-plugin/marketplace.json`, plugin sources can be `./`-prefixed local paths or structured GitHub objects (`{"source": "github", "repo": "owner/repo"}`). This repo uses the GitHub source format because the plugin IS the marketplace root (self-referencing `"./"` fails schema validation).
 - If both `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` declare a version, Claude Code uses the manifest version from `plugin.json` as the installed version authority. Keep the two values in sync.
 
 ### Staying Up to Date
@@ -134,6 +134,11 @@ Invoke with `/oh-my-claudeagent:<skill>` in any Claude Code session.
 | `playwright` | Browser automation via MCP |
 | `omca-setup` | Update `~/.claude/CLAUDE.md`, check deps, and inspect setup state |
 | `dev-browser` | Browser with persistent state for dev workflows |
+| `atlas` | Execute work plans via Atlas orchestrator |
+| `metis` | Pre-planning analysis and gap detection |
+| `prometheus-plan` | Strategic planning via Prometheus interview workflow |
+| `hephaestus` | Fix build failures, type errors, toolchain issues |
+| `sisyphus-orchestrate` | Master orchestration via Sisyphus |
 
 ---
 
@@ -147,6 +152,11 @@ Type these anywhere in a prompt to auto-activate modes without the slash command
 | `ulw`, `ultrawork` | Parallel execution |
 | `handoff`, `context is getting long` | Session handoff summary |
 | `stop continuation`, `pause automation` | Stop all continuation mechanisms |
+| `run atlas`, `atlas execute` | Atlas plan execution |
+| `run metis`, `metis analyze`, `pre-plan` | Metis pre-planning analysis |
+| `run prometheus`, `create plan` | Prometheus strategic planning |
+| `fix build`, `build broken` | Hephaestus build fixing |
+| `run sisyphus`, `orchestrate this` | Sisyphus master orchestration |
 
 ---
 
@@ -187,9 +197,7 @@ Plugin-managed state lives in `.omca/` in your project directory (add it to `.gi
 - **Owned runtime bootstrap** — the bundled ast-grep MCP launcher creates and reuses a plugin-local `.venv` for Python dependencies.
 - **Hook-driven** — Hook events in `hooks/hooks.json` drive all automation.
 - **MCP server** — `servers/ast-grep-server.py` provides structural code search via the `sg` CLI.
-- **Plugin manifest** — `.claude-plugin/plugin.json` and `marketplace.json` declare metadata for marketplace distribution and discovery. Marketplace-local sources stay `./`-relative and installed plugins resolve from the cache copy, not the original checkout.
-
-See [`docs/adr/README.md`](docs/adr/README.md) for architectural decision records.
+- **Plugin manifest** — `.claude-plugin/plugin.json` and `marketplace.json` declare metadata for marketplace distribution and discovery. Plugin sources use structured GitHub objects or `./`-relative paths. Installed plugins resolve from the cache copy, not the original checkout.
 
 ---
 

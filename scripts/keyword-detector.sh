@@ -33,11 +33,6 @@ if [[ "${PROMPT_LOWER}" =~ ^(stop|cancel|abort)$ ]] || [[ "${PROMPT_LOWER}" =~ (
 	ADDITIONAL_CONTEXT+="[CANCEL DETECTED] User wants to stop current operation. Invoke cancel skill. "
 fi
 
-if [[ "${PROMPT_LOWER}" =~ (research|analyze[[:space:]]+data|statistics) ]]; then
-	DETECTED_KEYWORDS+=("research")
-	ADDITIONAL_CONTEXT+="[RESEARCH MODE DETECTED] Activate parallel scientist orchestration. "
-fi
-
 if [[ "${PROMPT_LOWER}" =~ (handoff|context[[:space:]]+is[[:space:]]+getting[[:space:]]+long|start[[:space:]]+fresh[[:space:]]+session) ]]; then
 	DETECTED_KEYWORDS+=("handoff")
 	ADDITIONAL_CONTEXT+="[HANDOFF MODE DETECTED] Create session handoff summary for new-session continuity. "
@@ -46,6 +41,31 @@ fi
 if [[ "${PROMPT_LOWER}" =~ (setup[[:space:]]+omca|omca[[:space:]]+setup) ]]; then
 	DETECTED_KEYWORDS+=("omca-setup")
 	ADDITIONAL_CONTEXT+="[OMCA-SETUP DETECTED] Run /oh-my-claudeagent:omca-setup to configure the environment. "
+fi
+
+if [[ "${PROMPT_LOWER}" =~ (run[[:space:]]+atlas|atlas[[:space:]]+execute|atlas[[:space:]]+plan) ]]; then
+	DETECTED_KEYWORDS+=("atlas")
+	ADDITIONAL_CONTEXT+="[ATLAS DETECTED] Invoke /oh-my-claudeagent:atlas to execute work plans via the Atlas orchestrator. "
+fi
+
+if [[ "${PROMPT_LOWER}" =~ (run[[:space:]]+metis|metis[[:space:]]+analyze|pre-plan) ]]; then
+	DETECTED_KEYWORDS+=("metis")
+	ADDITIONAL_CONTEXT+="[METIS DETECTED] Invoke /oh-my-claudeagent:metis for pre-planning analysis. "
+fi
+
+if [[ "${PROMPT_LOWER}" =~ (run[[:space:]]+prometheus|prometheus[[:space:]]+plan|create[[:space:]]+plan) ]]; then
+	DETECTED_KEYWORDS+=("prometheus-plan")
+	ADDITIONAL_CONTEXT+="[PROMETHEUS DETECTED] Invoke /oh-my-claudeagent:prometheus-plan for strategic planning. "
+fi
+
+if [[ "${PROMPT_LOWER}" =~ (run[[:space:]]+hephaestus|hephaestus[[:space:]]+fix|fix[[:space:]]+build|build[[:space:]]+broken) ]]; then
+	DETECTED_KEYWORDS+=("hephaestus")
+	ADDITIONAL_CONTEXT+="[HEPHAESTUS DETECTED] Invoke /oh-my-claudeagent:hephaestus to fix build failures. "
+fi
+
+if [[ "${PROMPT_LOWER}" =~ (run[[:space:]]+sisyphus|sisyphus[[:space:]]+orchestrate|orchestrate[[:space:]]+this) ]]; then
+	DETECTED_KEYWORDS+=("sisyphus-orchestrate")
+	ADDITIONAL_CONTEXT+="[SISYPHUS DETECTED] Invoke /oh-my-claudeagent:sisyphus-orchestrate for master orchestration. "
 fi
 
 if [[ ${#DETECTED_KEYWORDS[@]} -gt 0 ]]; then

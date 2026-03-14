@@ -41,7 +41,7 @@ if [[ -f "${SESSION_STATE}" ]]; then
       if $match != null then
         .subagents[$match.key].status = $status
       else
-        .subagents[-1].status = $status
+        .
       end
     else
       .
