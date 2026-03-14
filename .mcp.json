@@ -1,12 +1,12 @@
 {
   "mcpServers": {
     "ast-grep": {
-      "command": "${CLAUDE_PLUGIN_ROOT}/scripts/start-ast-grep-server.sh",
+      "command": "${CLAUDE_PLUGIN_ROOT:-.}/scripts/start-ast-grep-server.sh",
       "args": [],
       "env": {}
     },
     "omca-state": {
-      "command": "${CLAUDE_PLUGIN_ROOT}/scripts/start-omca-state-server.sh",
+      "command": "${CLAUDE_PLUGIN_ROOT:-.}/scripts/start-omca-state-server.sh",
       "args": [],
       "env": {}
     }
