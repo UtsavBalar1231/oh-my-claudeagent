@@ -15,7 +15,7 @@
         "source": "github",
         "repo": "UtsavBalar1231/oh-my-claudeagent"
       },
-      "description": "Intelligent multi-agent orchestration layer for Claude Code. Pure-markdown plugin with specialist agents, skills, and hook-driven automation.",
+      "description": "Turn Claude Code into a multi-agent system. Specialist agents handle planning, execution, code review, debugging, and research — with persistence modes, parallel execution, and natural language activation.",
       "version": "1.0.0",
       "author": {
         "name": "UtsavBalar1231",
@@ -24,9 +24,9 @@
       "homepage": "https://github.com/UtsavBalar1231/oh-my-claudeagent",
       "repository": "https://github.com/UtsavBalar1231/oh-my-claudeagent",
       "license": "MIT",
-      "keywords": ["agents", "orchestration", "multi-agent", "skills", "hooks", "greek-mythology"],
+      "keywords": ["agents", "orchestration", "multi-agent", "planning", "delegation", "parallel-execution"],
       "category": "productivity",
-      "tags": ["multi-agent", "orchestration", "automation", "claude-code"]
+      "tags": ["multi-agent", "orchestration", "automation", "claude-code", "workflow"]
     }
   ]
 }
