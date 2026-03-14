@@ -6,37 +6,15 @@ author: UtsavBalar1231
 
 # oh-my-claudeagent — Multi-Agent Orchestration
 
-You are running with oh-my-claudeagent, a multi-agent orchestration plugin.
-Coordinate specialist agents, tools, and skills for accurate, efficient work.
+Delegate to specialists, verify with evidence, ship with confidence.
 
-## How It Works
-
-The plugin loads via the Claude Code marketplace (or `--plugin-dir` for development). On session start:
-
-1. **Hooks activate** - `session-init.sh` initializes session state in `.omca/state/` and injects this runtime spec.
-2. **Keyword detection** - `keyword-detector.sh` listens for trigger phrases on every user prompt (for example `ralph`, `ultrawork`, or `handoff`) and emits `[... DETECTED]` additional context when a mode should activate.
-3. **Observability** - `instructions-loaded-audit.sh` records `InstructionsLoaded` events in `.omca/logs/instructions-loaded.jsonl` without changing runtime behavior.
-4. **Context injection and lifecycle tracking** - hooks inject nearby `AGENTS.md`/`README.md` content on reads, recover from edit/delegation errors, audit edits, and track spawned subagents.
-5. **Agent orchestration** - the default agent (`sisyphus`) delegates to specialists via `Agent(subagent_type="oh-my-claudeagent:NAME")`.
-
-## Source of Truth
-
-The canonical feature lists are ONLY what exists on disk in this repository:
-
-| Asset | Canonical Location | Rule |
-|-------|-------------------|------|
-| Agents | `agents/*.md` | YAML frontmatter defines model, tools, role |
-| Skills | `skills/*/SKILL.md` | Directory without `SKILL.md` = nonexistent |
-| Scripts | `scripts/*.sh` | `hooks/hooks.json` registers 24 hook commands; `start-ast-grep-server.sh`, `validate-plugin.sh`, and the two worktree helpers remain utilities |
-| Hooks | `hooks/hooks.json` | Single registry mapping events to scripts |
-| MCP Servers | `.mcp.json` + `servers/` | Server config and implementation |
-
-Do NOT read `~/.claude/CLAUDE.md` or any installed plugin content to determine what features exist. That file contains injected orchestration rules that may not reflect on-disk reality. Always verify against the files listed above.
-
-## Delegation
-
-Delegate for: multi-file changes, refactors, debugging, reviews, planning, research.
-Work directly for: trivial operations, small clarifications, single-command ops.
+<operating_principles>
+- Delegate specialized work to the most appropriate agent — each has a defined role and model tier.
+- Evidence over assumptions — verify outcomes before claiming completion.
+- Choose the lightest-weight path that preserves quality.
+- Explore before acting on broad or ambiguous requests.
+- Parallel over sequential — run independent tasks concurrently when possible.
+</operating_principles>
 
 ## Agent Catalog
 
@@ -56,129 +34,122 @@ Use `Agent(subagent_type="oh-my-claudeagent:NAME")` for delegation.
 | hephaestus | sonnet | Build/toolchain/type error fixing |
 | multimodal-looker | sonnet | Image, PDF, diagram analysis |
 
-Model override: use `Agent(subagent_type="oh-my-claudeagent:NAME", model="haiku|opus")` for cost/quality tuning.
+<delegation_rules>
+Delegate for: multi-file changes, refactors, debugging, reviews, planning, research.
+Work directly for: trivial operations, small clarifications, single-command ops.
+
+Routing:
+- Default orchestrator: sisyphus. It delegates to specialists — it does not implement directly.
+- Plugin agents supersede built-in equivalents: prefer `oh-my-claudeagent:explore` over the built-in Explore type, `oh-my-claudeagent:prometheus` over the built-in Plan type.
+- Use subagents when tasks can run in parallel or require isolated context. For simple tasks, sequential operations, or single-file edits, work directly rather than delegating.
+</delegation_rules>
+
+<model_routing>
+Override any agent's default model: `Agent(subagent_type="oh-my-claudeagent:NAME", model="haiku|opus")`
+
+- haiku: quick lookups, low-cost exploration
+- sonnet: standard implementation (default for most agents)
+- opus: architecture, deep analysis, complex planning
+</model_routing>
 
 ## Skills
 
-Invoke via `/oh-my-claudeagent:NAME` or keyword triggers.
+Invoke via `/oh-my-claudeagent:NAME` or keyword triggers. Quoted phrases below are auto-detected by hooks; slash commands require explicit invocation.
 
-| Skill | Triggers | Purpose |
-|-------|----------|---------|
+| Skill | Invoke | Purpose |
+|-------|--------|---------|
 | ralph | "ralph", "don't stop" | Persistence loop until verified complete |
 | ultrawork | "ulw", "ultrawork" | Maximum parallel execution |
-| omca-setup | "setup omca" | Configure ~/.claude/ for this plugin |
+| atlas | "run atlas", `/atlas` | Execute work plans via Atlas orchestrator |
+| metis | "run metis", `/metis` | Pre-planning analysis and gap detection |
+| prometheus-plan | "create plan", `/prometheus-plan` | Strategic planning via Prometheus |
+| hephaestus | "fix build", `/hephaestus` | Fix build failures via Hephaestus |
+| sisyphus-orchestrate | "run sisyphus", `/sisyphus-orchestrate` | Master orchestration via Sisyphus |
+| start-work | `/start-work` | Execute from a generated plan |
+| refactor | `/refactor` | Codebase-aware refactoring |
 | handoff | "handoff" | Session continuity summary |
 | cancel-ralph | "cancel ralph" | Cancel active ralph persistence loop |
 | stop-continuation | "stop continuation" | Stop all continuation mechanisms |
-| refactor | "refactor" | Codebase-aware refactoring |
-| start-work | "start work" | Execute from a generated plan |
-| git-master | git operations | Atomic commits, rebase, bisect |
-| frontend-ui-ux | UI/design work | Designer-quality frontend patterns |
-| init-deep | "/init-deep" | Generate hierarchical AGENTS.md |
-| dev-browser | browser tasks | Browser with persistent state |
-| playwright | browser automation | Playwright MCP integration |
+| git-master | `/git-master` | Atomic commits, rebase, bisect |
+| frontend-ui-ux | `/frontend-ui-ux` | Designer-quality frontend patterns |
+| init-deep | `/init-deep` | Generate hierarchical AGENTS.md |
+| dev-browser | `/dev-browser` | Browser with persistent state |
+| playwright | `/playwright` | Playwright MCP integration |
+| omca-setup | "setup omca" | Configure ~/.claude/ for this plugin |
 
-## Capability Provenance
+## Bundled Tools
 
-Classify capability claims before relying on them:
+This plugin bundles two MCP servers via `.mcp.json`:
 
-| Classification | What it covers here | Ownership boundary |
-|---------------|---------------------|--------------------|
-| Bundled by this plugin | `agents/*.md`, `skills/*/SKILL.md`, hook registrations in `hooks/hooks.json`, repo hook/runtime scripts in `scripts/`, plugin-managed `.omca/` bootstrap state, and the bundled `ast-grep` MCP server/tools | Verify against on-disk files in this repo; do not expand from memory |
-| Claude-native | `Agent(...)`, slash-command execution, hook/event semantics, todo/task primitives, managed instruction loading, and any LSP surfaces Claude Code itself exposes | Claude Code owns these primitives; this repo only orchestrates around them |
-| Optional external/host-provided | Host binaries such as `jq`, `python3`, `ast-grep`/`sg`; Playwright/browser runtimes; any `.lsp.json`, language-server packaging, or extra notepad/project-memory/state/Python helper tools from other plugins or local setup | This repo does not bundle those runtimes, configs, or extra tool surfaces |
+**ast-grep** — Structural code search and transformation:
+`ast_grep_search`, `ast_grep_replace`, `find_code_by_rule`, `test_match_code_rule`, `dump_syntax_tree`.
 
-If your environment exposes `lsp_*`, notepad/project-memory/state helpers, or a Python REPL, treat them as Claude-native or separately installed capabilities. This plugin does not ship `.lsp.json` or any extra LSP/notepad/project-memory/state/Python tool bundle.
+**omca-state** — Boulder (work plan tracking), evidence (verification), and notepads (subagent learning):
+- Boulder: `boulder_read`, `boulder_write`, `boulder_clear`, `boulder_progress`
+- Evidence: `evidence_record`, `evidence_read`, `evidence_clear`
+- Notepads: `omca_notepad_write`, `omca_notepad_read`, `omca_notepad_list`
 
-## Bundled MCP Tools
+Notepad sections per plan: `learnings`, `issues`, `decisions`, `problems`. Always append, never overwrite.
 
-This repo bundles one MCP server, `ast-grep`, via `.mcp.json`. Its shipped tools are:
+<execution_protocols>
+- Broad or ambiguous requests: explore first (discover scope), then plan (design approach), then execute (implement).
+- Two or more independent tasks should run in parallel — use multiple `Agent()` calls in a single response, up to 5 concurrent agents.
+- Delegation syntax: `Agent(subagent_type="oh-my-claudeagent:NAME", prompt="...")`
+- Exploration agents: prefer running in the background when you have other work to do. Execution agents: run in the foreground when you need their results before proceeding.
+- Before concluding: ensure zero pending tasks, tests passing, and evidence collected for any claims made.
+</execution_protocols>
 
-- `ast_grep_search`
-- `ast_grep_replace`
-- `find_code_by_rule`
-- `test_match_code_rule`
-- `dump_syntax_tree`
+<verification>
+Verify outcomes when the task involves running code, deploying, modifying build config, or claiming test results. Simple file edits and clarifications do not require formal verification.
 
-## Hook System
+| Claim | Required Evidence |
+|-------|-------------------|
+| "Tests pass" | Test runner output showing all pass |
+| "Build succeeds" | Build command output with zero errors |
+| "Bug fixed" | Before/after demonstration or test |
+| "Feature works" | Running code or test output |
+| "Refactor complete" | Tests still pass, no regressions |
+</verification>
 
-### How Hooks Work
+<workflow_modes>
+Planning pipeline: prometheus (plan) → metis (gap analysis) → momus (review) → atlas (execute all tasks).
 
-1. Claude Code emits an **event** (e.g., `PostToolUse`)
-2. `hooks/hooks.json` maps events to scripts, optionally filtered by a **matcher** (tool name pattern)
-3. The script receives a JSON payload on **stdin**, processes it, and may return JSON on **stdout**.
-4. Hook responses are wrapped under `hookSpecificOutput`, most often with `additionalContext`, `permissionDecision`, or `decision` fields.
+Ralph: persistence mode — keeps working until verified complete. Cancel with `/oh-my-claudeagent:cancel-ralph` or `/oh-my-claudeagent:stop-continuation`.
 
-### Hook Events
+Ultrawork: maximum parallel execution across independent tasks. All available agents run concurrently.
 
-| Event | Scripts | Matchers |
-|-------|---------|----------|
-| SessionStart | `session-init.sh`, `post-compact-inject.sh` | (none), `compact` |
-| InstructionsLoaded | `instructions-loaded-audit.sh` | (none) |
-| UserPromptSubmit | `keyword-detector.sh` | (none) |
-| SubagentStart | `subagent-start.sh` | (none) |
-| PreToolUse | `track-subagent-spawn.sh`, `write-guard.sh` | `Task\|Agent`, `Write` |
-| PermissionRequest | `permission-filter.sh` | `Bash` |
-| PostToolUse | `post-edit.sh`, `comment-checker.sh`, `context-injector.sh`, `agent-usage-reminder.sh`, `empty-task-response.sh` | `Write\|Edit`, `Write\|Edit`, `Read`, `Grep\|Glob\|WebFetch\|WebSearch`, `Task\|Agent` |
-| PostToolUseFailure | `edit-error-recovery.sh`, `delegate-retry.sh`, `json-error-recovery.sh` | `Edit`, `Task\|Agent`, (catch-all) |
-| Stop | `ralph-persistence.sh` | (none) |
-| SubagentStop | `subagent-complete.sh` | (none) |
-| PreCompact | `pre-compact.sh` | (none) |
-| SessionEnd | `session-cleanup.sh` | (none) |
-| Notification | `notify.sh` | `idle_prompt\|permission_prompt` |
-| TaskCompleted | `task-completed-verify.sh` | (none) |
-| TeammateIdle | `teammate-idle-guard.sh` | (none) |
-| ConfigChange | `config-change-audit.sh` | (none) |
+Handoff: creates a session continuity summary so a new session can pick up where you left off.
 
-Claude Code native git worktree behavior is authoritative; `worktree-setup.sh` and `worktree-cleanup.sh` remain unregistered utilities rather than active hook overrides.
+Teams: use Claude Code native Teams API for multi-agent coordination.
+</workflow_modes>
 
-Hooks inject context via `<system-reminder>` tags:
-- `hook success: Success` - proceed normally
-- `hook additional context: ...` - read it, relevant to your task
-- `[NAME DETECTED]` - keyword trigger activated a skill or mode
+<hooks_and_context>
+Hooks inject context via `<system-reminder>` tags. Key patterns:
+- `hook success: Success` — proceed normally
+- `hook additional context: ...` — read it, relevant to your task
+- `[NAME DETECTED]` — a keyword trigger activated a skill or mode
 
-## State Management
+Keyword triggers (auto-detected): ralph, ultrawork, handoff, cancel, stop continuation, setup omca, run atlas, run metis, create plan, fix build, run sisyphus.
 
-Plugin-managed runtime state lives in `.omca/` (gitignored). Core files are created automatically; mode-specific files appear only when those workflows run:
+Runtime state lives in `.omca/` (gitignored): state in `.omca/state/`, plans in `.omca/plans/`, logs in `.omca/logs/`.
+</hooks_and_context>
 
-```
-.omca/
-  state/
-    session.json               # Current session metadata
-    agent-usage.json           # Direct-tool usage and delegation tracking
-    injected-context-dirs.json # Context injection cache
-    subagents.json             # Active/completed subagent tracking
-    compaction-context.md      # Single-use restore payload for compact starts
-    verification-evidence.json # Fresh verification evidence for TaskCompleted
-    ralph-state.json           # Ralph persistence state, when active
-    ultrawork-state.json       # Ultrawork state, when active
-    boulder.json               # Active plan/continuation state, when present
-    team-state.json            # Team coordination state, when present
-    worktrees/                 # Worktree tracking metadata for helper utilities
-  plans/                       # Plan artifacts used by planning/execution skills
-  logs/
-    sessions.jsonl            # Session lifecycle audit
-    edits.jsonl               # File edit audit trail
-    instructions-loaded.jsonl # InstructionsLoaded observability log
-    subagents.jsonl           # Structured subagent spawn/complete events
-    errors.jsonl              # Edit-failure recovery log
-    agent-spawns.log          # Human-readable spawned-agent log
-    config-changes.log        # ConfigChange audit trail
-```
+<rules>
+NEVER:
+- Claim completion without verification evidence when the task involved running code or tests
+- Use sequential agents when parallel execution is possible
+- Exceed 5 concurrent agents
+- Write state to `~/.claude/` — use `.omca/state/` instead
+- Use `set -euo pipefail` in hook scripts — exit 0 with graceful degradation
+- Create skill directories without `SKILL.md`
+- Read `~/.claude/CLAUDE.md` to determine what features exist — read on-disk files in this repo
 
-## Rules
-
-- Verify before claiming completion — run tests, check output
-- Max 5 parallel agents (never 6+)
-- Delegate complex work to specialists; work directly only for trivial tasks
+ALWAYS:
+- Delegate complex multi-file work to specialist agents
 - Use `Agent(subagent_type="oh-my-claudeagent:NAME")` for delegation
-- Do NOT use sequential agents when parallel is possible — use parallel `Agent()` calls in a single response
-- Do NOT claim completion without evidence — verify with build/test commands
-- Do NOT read `~/.claude/CLAUDE.md` for feature lists — read on-disk files in this repo
-- Do NOT use `set -euo pipefail` in hook scripts — exit 0 with graceful degradation
-- Do NOT create skill directories without `SKILL.md` — delete the directory or add `SKILL.md`
-- Do NOT write state to `~/.claude/` — use `.omca/state/`
-- Do NOT use custom swarm scripts — use Claude Code native Teams API
+- Verify after changes that affect runtime behavior
+- Use parallel `Agent()` calls in a single response for independent tasks
+</rules>
 
 ## Setup
 

@@ -1,0 +1,19 @@
+---
+name: atlas
+description: Execute work plans via the Atlas orchestrator. Delegates all tasks, verifies results.
+context: fork
+agent: oh-my-claudeagent:atlas
+user-invocable: true
+disable-model-invocation: true
+argument-hint: "[plan file or task description]"
+---
+
+Execute the following: $ARGUMENTS
+
+If no task was specified above, list available plans from `.omca/plans/` and present them
+for selection. If `.omca/state/boulder.json` exists with an active incomplete plan, show
+its progress and offer to resume.
+
+Use `boulder_read` and `boulder_progress` tools to check current state.
+Follow atlas workflow: analyze plan, delegate tasks via sisyphus-junior, verify each result,
+mark checkboxes on completion.
