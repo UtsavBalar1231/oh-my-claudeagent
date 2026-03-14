@@ -24,7 +24,7 @@ fi
 INCOMPLETE=$(jq '[.tasks[]? | select(.status != "completed" and .status != "verified")] | length' "${RALPH_STATE}" 2>/dev/null || echo "0")
 
 if [[ "${INCOMPLETE}" -gt 0 ]]; then
-	echo '{"decision": "block", "reason": "[RALPH PERSISTENCE] Ralph mode is active with incomplete tasks. Continue working until oracle verification passes."}'
+	echo '{"hookSpecificOutput": {"hookEventName": "Stop", "decision": {"behavior": "block"}, "reason": "[RALPH PERSISTENCE] Ralph mode is active with incomplete tasks. Continue working until oracle verification passes."}}'
 fi
 
 exit 0
