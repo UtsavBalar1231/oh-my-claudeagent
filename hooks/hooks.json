@@ -185,6 +185,16 @@
 				]
 			}
 		],
+		"PostCompact": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/post-compact-log.sh"
+					}
+				]
+			}
+		],
 		"SessionEnd": [
 			{
 				"hooks": [
