@@ -1,4 +1,5 @@
 #!/bin/bash
+# Standalone development utility — not a hook script (ADR-009 does not apply)
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
