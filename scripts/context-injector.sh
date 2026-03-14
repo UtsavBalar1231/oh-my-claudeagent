@@ -3,6 +3,9 @@
 INPUT=$(cat)
 
 FILE_PATH=$(echo "${INPUT}" | jq -r '.tool_input.file_path // ""' 2>/dev/null)
+TOOL_NAME=$(echo "${INPUT}" | jq -r '.tool_name // ""' 2>/dev/null)
+IS_READ_EVENT=false
+[[ "${TOOL_NAME}" == "Read" ]] && IS_READ_EVENT=true
 
 if [[ -z "${FILE_PATH}" ]] || [[ ! -f "${FILE_PATH}" ]]; then
 	exit 0
@@ -20,6 +23,7 @@ fi
 FILE_DIR=$(dirname "${FILE_PATH}")
 CONTEXT_PARTS=""
 
+if [[ "${IS_READ_EVENT}" == "true" ]]; then
 CURRENT_DIR="${FILE_DIR}"
 while true; do
 	ALREADY_INJECTED=$(jq -r --arg dir "${CURRENT_DIR}" '.[$dir] // "false"' "${CACHE_FILE}" 2>/dev/null)
@@ -44,6 +48,7 @@ while true; do
 	fi
 	CURRENT_DIR=$(dirname "${CURRENT_DIR}")
 done
+fi
 
 RULES_DIR="${PROJECT_ROOT}/.omca/rules"
 if [[ -d "${RULES_DIR}" ]]; then

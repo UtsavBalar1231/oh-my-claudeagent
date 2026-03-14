@@ -100,7 +100,7 @@
 				]
 			},
 			{
-				"matcher": "Read",
+				"matcher": "Read|Write|Edit",
 				"hooks": [
 					{
 						"type": "command",

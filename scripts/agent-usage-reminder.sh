@@ -25,7 +25,10 @@ else
 fi
 
 if [[ "${RESULT}" != "below" ]]; then
-	MSG="[DELEGATION REMINDER] You've made ${RESULT} direct search/fetch calls without delegating to an agent. Consider using Task tool with explore, librarian, or other specialized agents for better results and to follow the delegation-first philosophy."
+	MSG="[DELEGATION REMINDER] You've made ${RESULT} direct search/fetch calls without delegating.
+Available agents: explore (codebase search), librarian (docs research), hephaestus (build fixes), momus (plan review), oracle (architecture advice).
+Relevant skills: /refactor, /git-master, /playwright, /frontend-ui-ux.
+Use Agent(subagent_type=\"oh-my-claudeagent:NAME\", prompt=\"...\") to delegate."
 	ESCAPED=$(echo "${MSG}" | jq -Rs .)
 	echo "{\"hookSpecificOutput\": {\"hookEventName\": \"PostToolUse\", \"additionalContext\": ${ESCAPED}}}"
 else

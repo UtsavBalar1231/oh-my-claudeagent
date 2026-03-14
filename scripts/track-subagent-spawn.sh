@@ -29,6 +29,10 @@ jq --arg id "${SPAWN_ID}" \
 	'.active += [{"id": $id, "type": $type, "model": $model, "promptPreview": $prompt, "startedAt": $ts, "status": "running"}]' \
 	"${SUBAGENTS_FILE}" >"${TMP_FILE}" && mv "${TMP_FILE}" "${SUBAGENTS_FILE}"
 
+# Signal to agent-usage-reminder that delegation has occurred
+AGENT_USAGE="${STATE_DIR}/agent-usage.json"
+[[ -f "${AGENT_USAGE}" ]] && { TMP2=$(mktemp); jq '.agentUsed = true' "${AGENT_USAGE}" >"${TMP2}" && mv "${TMP2}" "${AGENT_USAGE}"; }
+
 LOG_FILE="${LOG_DIR}/subagents.jsonl"
 jq -nc --arg id "${SPAWN_ID}" --arg type "${SUBAGENT_TYPE}" --arg model "${SUBAGENT_MODEL}" --arg ts "${TIMESTAMP}" \
 	'{event: "subagent_spawn", id: $id, type: $type, model: $model, timestamp: $ts}' >>"${LOG_FILE}"
