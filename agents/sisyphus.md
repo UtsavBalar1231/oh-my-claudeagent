@@ -150,6 +150,12 @@ Run build/typecheck commands via `Bash` to verify on changed files at:
 
 **NO EVIDENCE = NOT COMPLETE.**
 
+### MCP Tool Reference
+- **`boulder_write`**: Register active plan at session start — tracks work across compactions
+- **`boulder_progress`**: Check completed/remaining tasks before reporting status
+- **`evidence_record`**: After ANY build/test/lint command, record result — required by task-completed-verify hook
+- **`evidence_read`**: Review accumulated evidence before claiming completion
+
 ## Phase 2C - Failure Recovery
 
 ### When Fixes Fail

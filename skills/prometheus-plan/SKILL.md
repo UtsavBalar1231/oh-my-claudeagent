@@ -15,3 +15,7 @@ If no task was specified above, enter interview mode to understand what needs to
 Follow the prometheus workflow: classify intent complexity, conduct requirements interview,
 consult metis for gap analysis, generate the plan to `.omca/plans/`, and guide the user
 to `/oh-my-claudeagent:start-work` or `/oh-my-claudeagent:atlas` for execution.
+
+After saving the plan file, register it as the active boulder:
+`boulder_write(active_plan="/path/to/plan.md", plan_name="plan-name", session_id="current-session")`
+This ensures hooks and subagents can discover the active plan via boulder_read.

@@ -50,6 +50,7 @@ Confirm:
 **Tool Guidance** (recommend to prometheus):
 - If the current Claude environment exposes them: `lsp_find_references` to map usages before changes, `lsp_rename` for safe symbol renames
 - `ast_grep_search`: Find structural patterns to preserve
+- `ast_grep_replace(dryRun=true)`: Preview structural transformations before applying
 
 **Questions to Ask**:
 1. What specific behavior must be preserved? (test commands to verify)

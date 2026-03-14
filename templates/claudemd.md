@@ -91,6 +91,21 @@ This plugin bundles two MCP servers via `.mcp.json`:
 
 Notepad sections per plan: `learnings`, `issues`, `decisions`, `problems`. Always append, never overwrite.
 
+<tool_routing>
+**Search tool routing**: Use `ast_grep_search` for structural code patterns (function signatures, class shapes, import patterns). Use `Grep` for text/string search (log messages, comments, config values). Use `find_code_by_rule` for advanced structural queries with YAML combinators.
+
+**Verification workflow**: After running any build, test, or lint command, call `evidence_record(type, command, exit_code, output_snippet)` to create `.omca/state/verification-evidence.json`. The `task-completed-verify` hook BLOCKS task completion if this file is missing or stale (>5 min). Example:
+`evidence_record(type="test", command="npm test", exit_code=0, output_snippet="42 tests passed")`
+
+**Boulder lifecycle**: When starting plan execution, call `boulder_write(active_plan, plan_name, session_id)` to register the active plan. Use `boulder_progress` to check completed vs remaining tasks. Hooks and subagents discover the active plan via `boulder_read`.
+
+**Notepad usage**: Use `omca_notepad_write(plan_name, section, content)` to record discoveries during execution. Sections: learnings, issues, decisions, problems. Always append, never overwrite. Subagents receive notepad instructions automatically via the SubagentStart hook.
+
+**Project rules**: `.omca/rules/*.md` files with `# pattern: <glob>` headers auto-inject when matching files are read or edited. Check for injected `[Rule: ...]` context and follow project-specific conventions.
+
+MCP tools are self-describing via the protocol — this section highlights key integration points, not an exhaustive guide.
+</tool_routing>
+
 <execution_protocols>
 - Broad or ambiguous requests: explore first (discover scope), then plan (design approach), then execute (implement).
 - Two or more independent tasks should run in parallel — use multiple `Agent()` calls in a single response, up to 5 concurrent agents.

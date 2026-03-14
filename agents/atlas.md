@@ -227,6 +227,12 @@ You are the QA gate. Subagents can make mistakes. Verify EVERYTHING.
 
 **No evidence = not complete.**
 
+### MCP Tool Reference
+- **`boulder_progress`**: Check task completion counts before and after delegation batches
+- **`evidence_record`**: After EVERY verification command (build/test/lint), record the result
+- **`evidence_read`**: Before final report, review all accumulated evidence
+- **`omca_notepad_write`**: Record blockers or unexpected findings during orchestration
+
 ## What You Do vs Delegate
 
 **YOU DO**:

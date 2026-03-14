@@ -43,6 +43,11 @@ You are NOT for:
 | Find related files | Grep, Glob |
 | Check type definitions | Host-provided `LSP hover` / `goto_definition`, if available |
 
+### MCP Tool Reference
+- **`evidence_record`**: After each build attempt, record exit code and output — proves fix worked
+- **`ast_grep_search`**: Find structural patterns causing build errors (mismatched signatures, missing imports)
+- **`ast_grep_replace`**: Apply structural fixes across multiple files (e.g., rename a type everywhere)
+
 ## Critical Rules
 
 - **MINIMAL DIFFS**: Fix only what's broken. Never refactor while fixing.

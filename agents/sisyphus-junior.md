@@ -64,6 +64,12 @@ Before saying "done", "fixed", or "complete":
 | "Refactored" | All tests still pass |
 | "Debugged" | Root cause identified with file:line |
 
+### MCP Tool Reference
+- **`evidence_record`**: After EVERY build/test/lint command, record result — hook blocks completion without this
+- **`ast_grep_search`**: Find structural code patterns (function signatures, class shapes) instead of text grep
+- **`ast_grep_replace`**: Structural find-and-replace for safe refactoring transforms (use `dryRun=true` to preview)
+- **`omca_notepad_write`**: Record discoveries or issues found during implementation
+
 ## Communication Style
 
 - Start immediately. No acknowledgments.

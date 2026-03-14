@@ -95,6 +95,7 @@ After all tasks complete:
 2. Check for linter errors
 3. Verify functionality
 4. Get oracle approval
+5. Record evidence: `evidence_record(type, command, exit_code, output_snippet)` for every verification step
 
 ---
 
@@ -110,6 +111,7 @@ VERIFICATION CHECKLIST:
 [ ] LINT: No linter errors
 [ ] FUNCTIONALITY: All features work
 [ ] ORACLE: Verification passed
+[ ] EVIDENCE: All verification results recorded via evidence_record
 
 IF ANY UNCHECKED -> CONTINUE WORKING
 ```

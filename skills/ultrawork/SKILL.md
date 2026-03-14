@@ -169,6 +169,7 @@ After all parallel work completes:
 3. Run integration tests
 4. Verify combined functionality
 5. Architect review if complex
+6. Record all results via evidence_record(type, command, exit_code, output_snippet)
 ```
 
 ---
@@ -219,6 +220,7 @@ Before claiming done, answer honestly:
 2. Did I run the tests and see them PASS? (not "they should pass")
 3. Did I read the actual output of every command? (not skim)
 4. Is EVERY requirement from the request actually implemented? (re-read the request NOW)
+5. Did I record evidence for every verification with `evidence_record`? (not "I verified it mentally")
 
 **If ANY answer is no → GO BACK AND DO IT. Do not claim completion.**
 

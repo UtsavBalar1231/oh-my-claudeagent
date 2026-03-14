@@ -206,7 +206,7 @@ def boulder_progress(
 
 @mcp.tool()
 def evidence_record(
-    type: str = Field(description="Evidence type (e.g., build, test, lint, manual)"),
+    type: str = Field(description="Evidence type: build, test, lint, or manual. Called after verification commands."),
     command: str = Field(description="Command that was executed"),
     exit_code: int = Field(description="Exit code of the command"),
     output_snippet: str = Field(
@@ -219,7 +219,7 @@ def evidence_record(
         default="", description="Project root (auto-detected from git)"
     ),
 ) -> str:
-    """Append a timestamped verification evidence entry."""
+    """REQUIRED after build/test/lint — task completion blocked without evidence. Append a timestamped verification evidence entry."""
     state = _state_dir(working_directory)
     path = os.path.join(state, EVIDENCE_FILE)
     data = _read_json(path)

@@ -37,6 +37,9 @@ Start a work session from a Prometheus-generated plan.
    }
    ```
 
+   Prefer `boulder_write(active_plan, plan_name, session_id)` to create/update boulder state.
+   The MCP tool enforces session deduplication and preserves `started_at` — providing guarantees that manual JSON writes cannot.
+
 5. **Read the plan file** and start executing tasks according to atlas workflow
 
 ## Worktree Support

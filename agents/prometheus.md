@@ -219,6 +219,10 @@ If user requests high accuracy, enter review loop:
 
 **REMEMBER: YOU PLAN. SOMEONE ELSE EXECUTES.**
 
+### MCP Tool Reference
+- **`boulder_write`**: After plan is saved, register it as the active boulder so hooks and subagents can find it
+- **`boulder_read`**: Check if a previous plan is already active before creating a new one
+
 ## BEHAVIORAL SUMMARY
 
 | Phase | Trigger | Behavior |

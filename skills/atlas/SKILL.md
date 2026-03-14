@@ -17,3 +17,9 @@ its progress and offer to resume.
 Use `boulder_read` and `boulder_progress` tools to check current state.
 Follow atlas workflow: analyze plan, delegate tasks via sisyphus-junior, verify each result,
 mark checkboxes on completion.
+
+After each delegation verification, record evidence:
+`evidence_record(type="test", command="...", exit_code=0, output_snippet="...")`
+
+Use `omca_notepad_write(plan_name, "issues", content)` to record blockers or unexpected findings.
+Use `evidence_read` before final completion report to summarize all verification results.
