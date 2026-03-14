@@ -21,7 +21,7 @@ TEMPLATE
 			BOULDER_FILE="$STATE_DIR/boulder.json"
 			if [[ -f "$BOULDER_FILE" ]]; then
 				printf '\n## Active Plan Reference\n'
-				jq -r '.planFile // "No plan file"' "$BOULDER_FILE" 2>/dev/null || true
+				jq -r '.active_plan // "No plan file"' "$BOULDER_FILE" 2>/dev/null || true
 			fi
 		fi
 	fi

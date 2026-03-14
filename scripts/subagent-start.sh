@@ -43,9 +43,14 @@ fi
 
 BOULDER_FILE="${STATE_DIR}/boulder.json"
 if [[ -f "${BOULDER_FILE}" ]]; then
-	PLAN_FILE=$(jq -r '.planFile // empty' "${BOULDER_FILE}" 2>/dev/null || echo "")
+	PLAN_FILE=$(jq -r '.active_plan // empty' "${BOULDER_FILE}" 2>/dev/null || echo "")
+	PLAN_NAME=$(jq -r '.plan_name // empty' "${BOULDER_FILE}" 2>/dev/null || echo "")
 	if [[ -n "${PLAN_FILE}" ]]; then
 		CONTEXT_PARTS+=" [ACTIVE PLAN] Refer to: ${PLAN_FILE}"
+		CONTEXT_PARTS+=" CRITICAL: The plan file at ${PLAN_FILE} is READ-ONLY. NEVER modify the plan file directly. Use omca_notepad_write to record issues or decisions instead."
+	fi
+	if [[ -n "${PLAN_NAME}" ]]; then
+		CONTEXT_PARTS+=" [NOTEPAD AVAILABLE] Plan: ${PLAN_NAME}. Use omca_notepad_write('${PLAN_NAME}', section, content) to record discoveries. Sections: learnings, issues, decisions, problems. Always APPEND — never overwrite."
 	fi
 fi
 
