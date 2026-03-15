@@ -7,6 +7,10 @@ argument-hint: "[url or browser task]"
 
 # Playwright Browser Automation
 
+**Task**: $ARGUMENTS
+
+If no task was specified above, ask the user what browser task to perform.
+
 Browser automation via the Playwright MCP server for web testing, scraping, verification, and interaction.
 
 ## Prerequisites

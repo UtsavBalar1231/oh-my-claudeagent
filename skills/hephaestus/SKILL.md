@@ -15,3 +15,6 @@ current failures, then diagnose and fix them.
 
 Follow the hephaestus workflow: reproduce the failure, diagnose root cause, make minimal
 fixes, verify the build passes. Repeat until exit code 0.
+
+After the build passes, record verification evidence:
+`evidence_record(type="build", command="<build command>", exit_code=0, output_snippet="<relevant output>")`

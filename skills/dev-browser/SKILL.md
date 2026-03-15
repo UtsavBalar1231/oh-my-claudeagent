@@ -7,6 +7,10 @@ argument-hint: "[url or automation task]"
 
 # Dev Browser Skill
 
+**Task**: $ARGUMENTS
+
+If no task was specified above, ask the user what they'd like to automate in the browser.
+
 Browser automation that maintains page state across script executions. Write small, focused scripts to accomplish tasks incrementally. Once you've proven out part of a workflow and there is repeated work to be done, you can write a script to do the repeated work in a single execution.
 
 ## Choosing Your Approach

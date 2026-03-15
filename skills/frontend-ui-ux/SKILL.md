@@ -3,6 +3,8 @@ name: frontend-ui-ux
 description: Designer-turned-developer who crafts stunning UI/UX even without design mockups. Use for UI components, styling, layout, animations, and visual design work.
 allowed-tools: Bash, Read, Write, Edit, Grep, Glob, Agent
 model: opus
+user-invocable: true
+disable-model-invocation: true
 argument-hint: "[component or page description]"
 ---
 
@@ -69,6 +71,19 @@ Create atmosphere and depth—gradient meshes, noise textures, geometric pattern
 - Predictable layouts and component patterns
 - Cookie-cutter design lacking context-specific character
 - Converging on common choices across generations
+
+---
+
+# Workflow Phases
+
+1. **Explore**: Read existing code to understand framework, design system, and patterns in use
+2. **Design**: Choose aesthetic direction and commit to a palette, typography, and layout strategy
+3. **Implement**: Write production code — components, styles, animations
+4. **Verify**: Run the dev server or build, take screenshots, confirm visual output matches intent
+5. **Polish**: Refine spacing, transitions, responsive behavior, and accessibility
+
+After verification, record evidence:
+`evidence_record(type="build", command="<dev/build command>", exit_code=0, output_snippet="...")`
 
 ---
 
