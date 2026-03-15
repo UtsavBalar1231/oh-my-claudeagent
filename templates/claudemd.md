@@ -14,6 +14,7 @@ Delegate to specialists, verify with evidence, ship with confidence.
 - Choose the lightest-weight path that preserves quality.
 - Explore before acting on broad or ambiguous requests.
 - Parallel over sequential — run independent tasks concurrently when possible.
+- Use AskUserQuestion for clarification when requirements are ambiguous — foreground subagents pass prompts through to the user.
 </operating_principles>
 
 ## Agent Catalog
@@ -33,6 +34,7 @@ Use `Agent(subagent_type="oh-my-claudeagent:NAME")` for delegation.
 | librarian | sonnet | External docs and SDK research |
 | hephaestus | sonnet | Build/toolchain/type error fixing |
 | multimodal-looker | sonnet | Image, PDF, diagram analysis |
+| socrates | opus | Deep research interview — iterative dialogue with follow-up investigation |
 
 <delegation_rules>
 Delegate for: multi-file changes, refactors, debugging, reviews, planning, research.
@@ -42,6 +44,12 @@ Routing:
 - Default orchestrator: sisyphus. It delegates to specialists — it does not implement directly.
 - Plugin agents supersede built-in equivalents: prefer `oh-my-claudeagent:explore` over the built-in Explore type, `oh-my-claudeagent:prometheus` over the built-in Plan type.
 - Use subagents when tasks can run in parallel or require isolated context. For simple tasks, sequential operations, or single-file edits, work directly rather than delegating.
+
+Escalation:
+- Subagents that discover out-of-scope work report recommendations in their output text — they do not spawn orchestrators themselves.
+- sisyphus-junior escalates to: explore (research), oracle (architecture), hephaestus (build fixes).
+- hephaestus escalates to: oracle (architecture changes beyond minimal fixes).
+- explore suggests: sisyphus (multi-file changes), oracle (architecture questions).
 </delegation_rules>
 
 <model_routing>
@@ -79,7 +87,7 @@ Invoke via `/oh-my-claudeagent:NAME` or keyword triggers. Quoted phrases below a
 
 ## Bundled Tools
 
-This plugin bundles two MCP servers via `.mcp.json`:
+This plugin bundles three MCP servers via `.mcp.json`:
 
 **ast-grep** — Structural code search and transformation:
 `ast_grep_search`, `ast_grep_replace`, `find_code_by_rule`, `test_match_code_rule`, `dump_syntax_tree`.
@@ -89,10 +97,15 @@ This plugin bundles two MCP servers via `.mcp.json`:
 - Evidence: `evidence_record`, `evidence_read`, `evidence_clear`
 - Notepads: `omca_notepad_write`, `omca_notepad_read`, `omca_notepad_list`
 
+**grep.app** — Public GitHub repository code search (via Vercel):
+Search across ~1M public repos with language, repository, and file path filters. Use for finding real-world usage examples of libraries, patterns, and APIs.
+
 Notepad sections per plan: `learnings`, `issues`, `decisions`, `problems`. Always append, never overwrite.
 
 <tool_routing>
 **Search tool routing**: Use `ast_grep_search` for structural code patterns (function signatures, class shapes, import patterns). Use `Grep` for text/string search (log messages, comments, config values). Use `find_code_by_rule` for advanced structural queries with YAML combinators.
+
+**Public code search**: Use `grep.app` MCP tools to search public GitHub repositories for real-world usage examples, library patterns, and API implementations. Use local `Grep` for searching the current project. Use `ast_grep_search` for structural patterns in the current project.
 
 **Verification workflow**: After running any build, test, or lint command, call `evidence_record(type, command, exit_code, output_snippet)` to create `.omca/state/verification-evidence.json`. The `task-completed-verify` hook BLOCKS task completion if this file is missing or stale (>5 min). Example:
 `evidence_record(type="test", command="npm test", exit_code=0, output_snippet="42 tests passed")`
@@ -128,6 +141,8 @@ Verify outcomes when the task involves running code, deploying, modifying build 
 
 <workflow_modes>
 Planning pipeline: prometheus (plan) → metis (gap analysis) → momus (review) → atlas (execute all tasks).
+
+Execution entry point: After plan approval, run `/oh-my-claudeagent:atlas` (preferred) or `/oh-my-claudeagent:start-work`. The main session agent must NEVER implement plan tasks directly — always delegate to atlas.
 
 Ralph: persistence mode — keeps working until verified complete. Cancel with `/oh-my-claudeagent:cancel-ralph` or `/oh-my-claudeagent:stop-continuation`.
 
