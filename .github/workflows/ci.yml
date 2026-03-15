@@ -1,0 +1,68 @@
+name: CI
+
+permissions: {}
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  validate:
+    name: Validate Plugin
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run validation suites
+        run: bash scripts/validate-plugin.sh --check claims --check hooks
+
+  lint-python:
+    name: Lint Python
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Install ruff
+        run: uv tool install ruff
+
+      - name: Check formatting
+        run: ruff format --check servers/
+
+      - name: Lint
+        run: ruff check servers/
+
+  lint-shell:
+    name: Lint Shell
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: ShellCheck
+        run: shellcheck scripts/*.sh
