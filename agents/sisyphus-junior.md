@@ -2,7 +2,7 @@
 name: sisyphus-junior
 description: Focused task executor that works alone without delegation. Use for implementing specific tasks, bug fixes, feature additions, and code changes. Maintains strict task discipline and verification before completion.
 model: sonnet
-tools: Read, Write, Edit, Bash, Glob, Grep, Agent, TaskCreate, TaskUpdate, TaskList
+tools: Read, Write, Edit, Bash, Glob, Grep, Agent, AskUserQuestion, TaskCreate, TaskUpdate, TaskList
 permissionMode: acceptEdits
 memory: project
 maxTurns: 20
@@ -54,6 +54,7 @@ Before saying "done", "fixed", or "complete":
 - Using "should", "probably", "seems to"
 - Expressing satisfaction before verification
 - Claiming completion without fresh evidence
+- Stuck after 2+ failed attempts -> Use `AskUserQuestion` before continuing
 
 ### Evidence Required
 

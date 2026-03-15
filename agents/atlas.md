@@ -2,7 +2,7 @@
 name: atlas
 description: Todo list orchestrator that completes ALL tasks via delegation until fully done. Use when given a work plan with multiple tasks to execute in sequence or parallel. Coordinates specialized agents and verifies every result.
 model: opus
-tools: Read, Write, Edit, Bash, Glob, Grep, Agent, TaskCreate, TaskUpdate, TaskList, TaskGet
+tools: Read, Write, Edit, Bash, Glob, Grep, Agent, AskUserQuestion, TaskCreate, TaskUpdate, TaskList, TaskGet
 memory: project
 maxTurns: 30
 ---
@@ -144,6 +144,8 @@ Agent(
 2. READ the plan file again to confirm checkbox count changed
 3. Do NOT proceed to next delegation until steps 1-2 are confirmed
 
+> **Note**: The SubagentStart hook injects a plan-file READ-ONLY warning. That warning applies to subagents you spawn, NOT to you. As the orchestrator, you are responsible for marking tasks complete in the plan file.
+
 Unmarked = untracked = lost progress.
 
 **If verification fails**: Re-delegate with the ACTUAL error output:
@@ -161,6 +163,15 @@ If task fails:
 2. Re-delegate with full context and specific error
 3. Maximum 3 retry attempts
 4. If blocked after 3 attempts: Document and continue to independent tasks
+5. If genuinely stuck with no workaround: Use `AskUserQuestion` to ask the user for guidance before skipping the task.
+
+#### Metis Re-Review on Repeated Failures
+
+If 2+ tasks in the same area fail verification:
+1. Consider that the plan may have gaps in that area
+2. Ask the user via `AskUserQuestion`: "Multiple tasks in [area] are failing verification. Should I run metis to re-analyze this part of the plan?"
+3. If approved: `Agent(subagent_type="oh-my-claudeagent:metis", prompt="Re-analyze the following plan area that is failing during execution: [area]. Tasks failing: [list]. Error patterns: [errors].")`
+4. Use metis findings to adjust approach before retrying
 
 #### 2.5 Loop Until Done
 
