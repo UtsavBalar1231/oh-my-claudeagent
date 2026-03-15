@@ -9,6 +9,10 @@
       "command": "${CLAUDE_PLUGIN_ROOT:-.}/scripts/start-omca-state-server.sh",
       "args": [],
       "env": {}
+    },
+    "grep": {
+      "type": "http",
+      "url": "https://mcp.grep.app"
     }
   }
 }
