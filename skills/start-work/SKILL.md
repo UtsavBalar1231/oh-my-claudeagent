@@ -104,6 +104,22 @@ Started: {timestamp}
 Reading plan and beginning execution...
 ```
 
+## Atlas Delegation (MANDATORY)
+
+**You MUST delegate execution to atlas. Do NOT implement directly.**
+
+After reading the plan and setting up boulder state, delegate immediately:
+```
+Agent(subagent_type="oh-my-claudeagent:atlas", prompt="Execute the work plan at {plan_path}. Read the plan, analyze tasks, delegate each via sisyphus-junior, and verify results. Mark checkboxes as tasks complete.")
+```
+
+The start-work skill's job is to:
+1. Find/select the plan
+2. Set up boulder state
+3. Hand off to atlas for execution
+
+You are a launcher, not an executor.
+
 ## Critical
 
 - Always update `.omca/state/boulder.json` BEFORE starting work
