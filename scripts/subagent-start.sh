@@ -21,7 +21,22 @@ if [[ -f "${TEAM_STATE}" ]]; then
 	fi
 fi
 
-CONTEXT_PARTS="Make autonomous decisions. Never ask questions — if unclear, choose the most reasonable option and proceed."
+AGENT_TYPE=$(echo "${INPUT}" | jq -r '.agent_type // "unknown"')
+
+case "${AGENT_TYPE}" in
+	*prometheus*|*metis*|*socrates*)
+		CONTEXT_PARTS="Ask clarifying questions using AskUserQuestion when requirements are ambiguous or critical information is missing."
+		;;
+	*sisyphus|*atlas*)
+		CONTEXT_PARTS="Ask the user via AskUserQuestion when a task is ambiguous, blocked, or requires a decision between significantly different approaches."
+		;;
+	*explore*|*librarian*|*hephaestus*|*sisyphus-junior*|*multimodal*|*oracle*|*momus*)
+		CONTEXT_PARTS="Make autonomous decisions. If unclear, choose the most reasonable option and proceed. Use AskUserQuestion only when genuinely blocked after 2+ failed attempts."
+		;;
+	*)
+		CONTEXT_PARTS="Make autonomous decisions. If unclear, choose the most reasonable option and proceed."
+		;;
+esac
 
 for MODE_FILE in ralph-state.json ultrawork-state.json autopilot-state.json team-state.json; do
 	if [[ -f "${STATE_DIR}/${MODE_FILE}" ]]; then
