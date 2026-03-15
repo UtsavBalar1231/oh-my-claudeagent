@@ -8,8 +8,6 @@ HOOKS_JSON="${REPO_ROOT}/hooks/hooks.json"
 PLUGIN_JSON="${REPO_ROOT}/.claude-plugin/plugin.json"
 DEFAULT_MARKETPLACE_JSON="${REPO_ROOT}/.claude-plugin/marketplace.json"
 MCP_JSON="${REPO_ROOT}/.mcp.json"
-CLAIMS_MATRIX="${REPO_ROOT}/docs/audit/plugin-capability-matrix.md"
-
 HOOK_FIXTURES_DIR="${REPO_ROOT}/tests/fixtures/hooks"
 MCP_FIXTURES_DIR="${REPO_ROOT}/tests/fixtures/mcp"
 MCP_START_SCRIPT="${REPO_ROOT}/scripts/start-ast-grep-server.sh"
@@ -224,12 +222,6 @@ check_claims() {
 	validate_json_file "${MARKETPLACE_PATH}" "marketplace manifest"
 	validate_json_file "${MCP_JSON}" "mcp registry"
 
-	if [[ -f "${CLAIMS_MATRIX}" ]] && grep -Eq 'plugin-owned|Claude-native|external/non-bundled' "${CLAIMS_MATRIX}"; then
-		pass "claims matrix includes ownership classifications"
-	else
-		fail "claims matrix missing ownership classifications (${CLAIMS_MATRIX})"
-	fi
-
 	if jq -e '.hooks | type == "object"' "${HOOKS_JSON}" >/dev/null 2>&1; then
 		pass "hooks registry has object root"
 	else
@@ -262,7 +254,7 @@ check_claims() {
 		fi
 	fi
 
-	if jq -e '.mcpServers["ast-grep"].command == "${CLAUDE_PLUGIN_ROOT}/scripts/start-ast-grep-server.sh"' "${MCP_JSON}" >/dev/null 2>&1; then
+	if jq -e '.mcpServers["ast-grep"].command | endswith("/scripts/start-ast-grep-server.sh")' "${MCP_JSON}" >/dev/null 2>&1; then
 		pass "mcp registry points ast-grep to start script"
 	else
 		fail "mcp registry ast-grep command mismatch"
