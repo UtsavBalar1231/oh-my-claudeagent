@@ -11,7 +11,7 @@ import signal
 import subprocess
 import sys
 import time
-from typing import Literal, Optional
+from typing import Literal
 
 from mcp.server.fastmcp import FastMCP
 from pydantic import Field
@@ -183,7 +183,7 @@ def boulder_progress(
         with open(plan_path) as f:
             content = f.read()
     except FileNotFoundError:
-        raise ToolError(f"Plan file not found: {plan_path}")
+        raise ToolError(f"Plan file not found: {plan_path}") from None
 
     total = content.count("- [ ]") + content.count("- [x]")
     completed = content.count("- [x]")
@@ -206,15 +206,15 @@ def boulder_progress(
 
 @mcp.tool()
 def evidence_record(
-    type: str = Field(description="Evidence type: build, test, lint, or manual. Called after verification commands."),
+    type: str = Field(
+        description="Evidence type: build, test, lint, or manual. Called after verification commands."
+    ),
     command: str = Field(description="Command that was executed"),
     exit_code: int = Field(description="Exit code of the command"),
     output_snippet: str = Field(
         description="Relevant output snippet (truncated if needed)"
     ),
-    verified_by: str = Field(
-        default="", description="Agent or user who verified"
-    ),
+    verified_by: str = Field(default="", description="Agent or user who verified"),
     working_directory: str = Field(
         default="", description="Project root (auto-detected from git)"
     ),
@@ -313,7 +313,7 @@ def omca_notepad_write(
 @mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
 def omca_notepad_read(
     plan_name: str = Field(description="Plan name"),
-    section: Optional[Literal["learnings", "issues", "decisions", "problems"]] = Field(
+    section: Literal["learnings", "issues", "decisions", "problems"] | None = Field(
         default=None, description="Section to read (all if omitted)"
     ),
     working_directory: str = Field(

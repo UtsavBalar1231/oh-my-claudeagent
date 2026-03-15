@@ -10,7 +10,7 @@ import shutil
 import signal
 import subprocess
 import sys
-from typing import Literal, Optional
+from typing import Literal
 
 import yaml
 from mcp.server.fastmcp import FastMCP
@@ -185,9 +185,9 @@ def run_command(
             timeout=TIMEOUT,
         )
     except subprocess.TimeoutExpired:
-        raise ToolError(f"Command timed out after {TIMEOUT}s")
+        raise ToolError(f"Command timed out after {TIMEOUT}s") from None
     except FileNotFoundError:
-        raise ToolError(f"Binary not found: {cmd[0]}")
+        raise ToolError(f"Binary not found: {cmd[0]}") from None
 
     # ast-grep run returns exit 1 on no-match (normal), 0 on match.
     # ast-grep scan returns 0 in both cases.
@@ -287,7 +287,7 @@ def validate_yaml_rule(yaml_str: str) -> dict:
     try:
         parsed = yaml.safe_load(yaml_str)
     except yaml.YAMLError as e:
-        raise ToolError(f"Invalid YAML: {e}")
+        raise ToolError(f"Invalid YAML: {e}") from e
     if not isinstance(parsed, dict):
         raise ToolError(
             "YAML rule must be a mapping with id, language, and rule fields"
@@ -327,13 +327,13 @@ def ast_grep_search(
         description="AST pattern with meta-variables ($VAR for single node, $$$ for multiple). Must be a complete AST node."
     ),
     lang: SupportedLang = Field(description="Target language"),
-    paths: Optional[list[str]] = Field(
+    paths: list[str] | None = Field(
         default=None, description="Paths to search (default: ['.'])"
     ),
-    globs: Optional[list[str]] = Field(
+    globs: list[str] | None = Field(
         default=None, description="Include/exclude globs (prefix ! to exclude)"
     ),
-    context: Optional[int] = Field(
+    context: int | None = Field(
         default=None, description="Context lines around each match"
     ),
     max_results: int = Field(
@@ -376,10 +376,8 @@ def ast_grep_replace(
         description="Replacement pattern (can use $VAR from the match pattern)"
     ),
     lang: SupportedLang = Field(description="Target language"),
-    paths: Optional[list[str]] = Field(default=None, description="Paths to search"),
-    globs: Optional[list[str]] = Field(
-        default=None, description="Include/exclude globs"
-    ),
+    paths: list[str] | None = Field(default=None, description="Paths to search"),
+    globs: list[str] | None = Field(default=None, description="Include/exclude globs"),
     dryRun: bool = Field(
         default=True, description="Preview changes without applying (default: true)"
     ),
@@ -431,7 +429,7 @@ def find_code_by_rule(
             "to search the entire subtree, not just direct children."
         )
     ),
-    paths: Optional[list[str]] = Field(
+    paths: list[str] | None = Field(
         default=None, description="Paths to search (default: ['.'])"
     ),
     max_results: int = Field(
