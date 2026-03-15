@@ -3,7 +3,7 @@
 
 SCRIPT_PATH="${BASH_SOURCE[0]:-$0}"
 SCRIPT_DIR="${SCRIPT_PATH%/*}"
-if [ "${SCRIPT_DIR}" = "${SCRIPT_PATH}" ]; then
+if [[ "${SCRIPT_DIR}" = "${SCRIPT_PATH}" ]]; then
 	SCRIPT_DIR="."
 fi
 PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -18,7 +18,7 @@ log() {
 
 die() {
 	printf '[omca-state-mcp] ERROR: %s\n' "$1" >&2
-	if [ -n "${2:-}" ]; then
+	if [[ -n "${2:-}" ]]; then
 		printf '[omca-state-mcp] Recovery: %s\n' "$2" >&2
 	fi
 	exit 1
@@ -45,22 +45,23 @@ require_python() {
 }
 
 needs_bootstrap=0
-if [ ! -f "${MARKER}" ] || [ "$(cat "${MARKER}" 2>/dev/null)" != "${EXPECTED_VERSION}" ]; then
+marker_content="$(cat "${MARKER}" 2>/dev/null || true)"
+if [[ ! -f "${MARKER}" ]] || [[ "${marker_content}" != "${EXPECTED_VERSION}" ]]; then
 	needs_bootstrap=1
 fi
-if [ ! -x "${VENV}/bin/python3" ]; then
+if [[ ! -x "${VENV}/bin/python3" ]]; then
 	needs_bootstrap=1
 fi
 
 require_python
 
-if [ ! -f "${SERVER_SCRIPT}" ]; then
+if [[ ! -f "${SERVER_SCRIPT}" ]]; then
 	die \
 		"MCP server entrypoint missing at ${SERVER_SCRIPT}." \
 		"Reinstall or restore the plugin files, then rerun."
 fi
 
-if [ "${needs_bootstrap}" -eq 1 ]; then
+if [[ "${needs_bootstrap}" -eq 1 ]]; then
 	log "Bootstrapping omca-state MCP virtualenv at ${VENV}"
 	rm -rf "${VENV}"
 

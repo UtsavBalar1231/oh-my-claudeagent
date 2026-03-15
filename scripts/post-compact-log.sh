@@ -16,10 +16,12 @@ TRIGGER=$(echo "${INPUT}" | jq -r '.trigger // "unknown"' 2>/dev/null)
 COMPACT_SUMMARY=$(echo "${INPUT}" | jq -r '.compact_summary // ""' 2>/dev/null)
 
 # Log compaction event
+TS=$(date -Iseconds)
+[[ -n "${COMPACT_SUMMARY}" ]] && HAS_SUMMARY="true" || HAS_SUMMARY="false"
 jq -nc \
-	--arg ts "$(date -Iseconds)" \
+	--arg ts "${TS}" \
 	--arg trigger "${TRIGGER}" \
-	--arg has_summary "$( [ -n "${COMPACT_SUMMARY}" ] && echo "true" || echo "false" )" \
+	--arg has_summary "${HAS_SUMMARY}" \
 	'{event: "post_compact", timestamp: $ts, trigger: $trigger, hasSummary: $has_summary}' \
 	>>"${LOG_DIR}/sessions.jsonl"
 

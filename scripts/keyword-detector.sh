@@ -73,7 +73,7 @@ if [[ ${#DETECTED_KEYWORDS[@]} -gt 0 ]]; then
 	STATE_FILE="${PROJECT_ROOT}/.omca/state/session.json"
 
 	if [[ -f "${STATE_FILE}" ]]; then
-		KEYWORDS_JSON=$(printf '%s\n' "${DETECTED_KEYWORDS[@]}" | jq -R . | jq -s .)
+		KEYWORDS_JSON=$(printf '%s\n' "${DETECTED_KEYWORDS[@]}" | jq -R . | jq -s . || true)
 		TMP_FILE=$(mktemp)
 		jq --argjson keywords "${KEYWORDS_JSON}" '.detectedKeywords = $keywords' "${STATE_FILE}" >"${TMP_FILE}" && mv "${TMP_FILE}" "${STATE_FILE}"
 	fi

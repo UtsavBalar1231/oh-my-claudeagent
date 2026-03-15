@@ -54,12 +54,14 @@ RULES_DIR="${PROJECT_ROOT}/.omca/rules"
 if [[ -d "${RULES_DIR}" ]]; then
 	for RULE_FILE in "${RULES_DIR}"/*.md; do
 		if [[ -f "${RULE_FILE}" ]]; then
-			PATTERN=$(head -1 "${RULE_FILE}" | sed -n 's/^# pattern: //p')
+			RULE_FIRST_LINE=$(head -1 "${RULE_FILE}")
+			PATTERN=$(printf '%s' "${RULE_FIRST_LINE}" | sed -n 's/^# pattern: //p')
 			if [[ -n "${PATTERN}" ]]; then
 				BASENAME=$(basename "${FILE_PATH}")
 				# shellcheck disable=SC2053
 				if [[ "${BASENAME}" == ${PATTERN} ]]; then
-					RULE_CONTENT=$(tail -n +2 "${RULE_FILE}" | head -c 1000)
+					RULE_TAIL=$(tail -n +2 "${RULE_FILE}")
+					RULE_CONTENT="${RULE_TAIL:0:1000}"
 					CONTEXT_PARTS+="[Rule: ${PATTERN}]: ${RULE_CONTENT} "
 				fi
 			fi

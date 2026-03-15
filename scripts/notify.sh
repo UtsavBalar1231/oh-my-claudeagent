@@ -15,6 +15,8 @@ permission_prompt)
 	TITLE="Claude Code - Permission Required"
 	MESSAGE="Claude Code needs permission to proceed"
 	;;
+*)
+	;;
 esac
 
 send_notification() {
@@ -57,7 +59,7 @@ LOG_DIR="${PROJECT_ROOT}/.omca/logs"
 mkdir -p "${LOG_DIR}"
 
 LOG_FILE="${LOG_DIR}/notifications.jsonl"
-jq -nc --arg type "${NOTIFICATION_TYPE}" --arg title "${TITLE}" --arg msg "${MESSAGE}" --arg ts "$(date -Iseconds)" \
+jq -nc --arg type "${NOTIFICATION_TYPE}" --arg title "${TITLE}" --arg msg "${MESSAGE}" --arg ts "$(date -Iseconds || true)" \
 	'{event: "notification", type: $type, title: $title, message: $msg, timestamp: $ts}' >>"${LOG_FILE}"
 
 exit 0

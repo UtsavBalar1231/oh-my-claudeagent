@@ -3,7 +3,8 @@
 INPUT=$(cat)
 
 SUBAGENT_TYPE=$(echo "${INPUT}" | jq -r '.tool_input.subagent_type // "unknown"' 2>/dev/null)
-SUBAGENT_PROMPT=$(echo "${INPUT}" | jq -r '.tool_input.prompt // ""' 2>/dev/null | head -c 200)
+SUBAGENT_PROMPT_FULL=$(echo "${INPUT}" | jq -r '.tool_input.prompt // ""' 2>/dev/null)
+SUBAGENT_PROMPT="${SUBAGENT_PROMPT_FULL:0:200}"
 SUBAGENT_MODEL=$(echo "${INPUT}" | jq -r '.tool_input.model // "default"' 2>/dev/null)
 
 PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$(pwd)}"
@@ -13,7 +14,8 @@ LOG_DIR="${PROJECT_ROOT}/.omca/logs"
 mkdir -p "${STATE_DIR}" "${LOG_DIR}"
 
 TIMESTAMP=$(date -Iseconds)
-SPAWN_ID="spawn-$(date +%s%N | cut -c1-13)"
+SPAWN_EPOCH=$(date +%s%N)
+SPAWN_ID="spawn-${SPAWN_EPOCH:0:13}"
 
 SUBAGENTS_FILE="${STATE_DIR}/subagents.json"
 if [[ ! -f "${SUBAGENTS_FILE}" ]]; then

@@ -3,7 +3,7 @@
 
 SCRIPT_PATH="${BASH_SOURCE[0]:-$0}"
 SCRIPT_DIR="${SCRIPT_PATH%/*}"
-if [ "${SCRIPT_DIR}" = "${SCRIPT_PATH}" ]; then
+if [[ "${SCRIPT_DIR}" = "${SCRIPT_PATH}" ]]; then
 	SCRIPT_DIR="."
 fi
 PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -18,7 +18,7 @@ log() {
 
 die() {
 	printf '[ast-grep-mcp] ERROR: %s\n' "$1" >&2
-	if [ -n "${2:-}" ]; then
+	if [[ -n "${2:-}" ]]; then
 		printf '[ast-grep-mcp] Recovery: %s\n' "$2" >&2
 	fi
 	exit 1
@@ -26,26 +26,26 @@ die() {
 
 resolve_binary() {
 	local candidate="$1"
-	if [[ "$candidate" == */* ]]; then
-		if [ -x "$candidate" ]; then
-			printf '%s\n' "$candidate"
+	if [[ "${candidate}" == */* ]]; then
+		if [[ -x "${candidate}" ]]; then
+			printf '%s\n' "${candidate}"
 			return 0
 		fi
 		return 1
 	fi
 
-	command -v "$candidate" 2>/dev/null
+	command -v "${candidate}" 2>/dev/null
 }
 
 is_ast_grep_binary() {
 	local candidate="$1"
 	local resolved
-	resolved="$(resolve_binary "$candidate")" || return 1
+	resolved="$(resolve_binary "${candidate}")" || return 1
 
 	local version_out
-	version_out="$($resolved --version 2>/dev/null || true)"
+	version_out="$("${resolved}" --version 2>/dev/null || true)"
 	if [[ "${version_out,,}" == *"ast-grep"* ]]; then
-		printf '%s\n' "$resolved"
+		printf '%s\n' "${resolved}"
 		return 0
 	fi
 
@@ -75,7 +75,7 @@ require_python() {
 }
 
 detect_ast_grep() {
-	if [ -n "${AST_GREP_BIN:-}" ]; then
+	if [[ -n "${AST_GREP_BIN:-}" ]]; then
 		if AST_GREP_RESOLVED="$(is_ast_grep_binary "${AST_GREP_BIN}")"; then
 			return 0
 		fi
@@ -86,7 +86,7 @@ detect_ast_grep() {
 
 	local candidate
 	for candidate in ast-grep sg; do
-		if AST_GREP_RESOLVED="$(is_ast_grep_binary "$candidate")"; then
+		if AST_GREP_RESOLVED="$(is_ast_grep_binary "${candidate}")"; then
 			return 0
 		fi
 	done
@@ -97,23 +97,24 @@ detect_ast_grep() {
 }
 
 needs_bootstrap=0
-if [ ! -f "${MARKER}" ] || [ "$(cat "${MARKER}" 2>/dev/null)" != "${EXPECTED_VERSION}" ]; then
+marker_content="$(cat "${MARKER}" 2>/dev/null || true)"
+if [[ ! -f "${MARKER}" ]] || [[ "${marker_content}" != "${EXPECTED_VERSION}" ]]; then
 	needs_bootstrap=1
 fi
-if [ ! -x "${VENV}/bin/python3" ]; then
+if [[ ! -x "${VENV}/bin/python3" ]]; then
 	needs_bootstrap=1
 fi
 
 require_python
 detect_ast_grep
 
-if [ ! -f "${SERVER_SCRIPT}" ]; then
+if [[ ! -f "${SERVER_SCRIPT}" ]]; then
 	die \
 		"MCP server entrypoint missing at ${SERVER_SCRIPT}." \
 		"Reinstall or restore the plugin files, then rerun."
 fi
 
-if [ "${needs_bootstrap}" -eq 1 ]; then
+if [[ "${needs_bootstrap}" -eq 1 ]]; then
 	log "Bootstrapping ast-grep MCP virtualenv at ${VENV}"
 	rm -rf "${VENV}"
 

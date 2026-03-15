@@ -9,6 +9,8 @@ case "${TOOL_NAME}" in
 Bash | Read | Grep | Glob | WebFetch | WebSearch)
 	exit 0
 	;;
+*)
+	;;
 esac
 
 if echo "${ERROR_MSG}" | grep -qiE '(invalid JSON|malformed JSON|parse error|SyntaxError|Unexpected token|JSON\.parse)'; then

@@ -12,15 +12,17 @@ SESSION_ID="${CLAUDE_SESSION_ID:-$(date +%s)-$$}"
 
 SESSION_STATE="${STATE_DIR}/session.json"
 TMP_FILE=$(mktemp)
+TS=$(date -Iseconds)
 jq -n \
 	--arg sid "${SESSION_ID}" \
-	--arg ts "$(date -Iseconds)" \
+	--arg ts "${TS}" \
 	--arg root "${PROJECT_ROOT}" \
 	'{sessionId: $sid, startedAt: $ts, projectRoot: $root, subagents: [], edits: [], activeMode: null}' \
 	>"${TMP_FILE}" && mv "${TMP_FILE}" "${SESSION_STATE}"
 
 LOG_FILE="${LOG_DIR}/sessions.jsonl"
-jq -nc --arg sid "${SESSION_ID}" --arg ts "$(date -Iseconds)" --arg cwd "${PROJECT_ROOT}" \
+TS2=$(date -Iseconds)
+jq -nc --arg sid "${SESSION_ID}" --arg ts "${TS2}" --arg cwd "${PROJECT_ROOT}" \
 	'{event: "session_start", sessionId: $sid, timestamp: $ts, cwd: $cwd}' >>"${LOG_FILE}"
 
 echo '{}' >"${STATE_DIR}/injected-context-dirs.json"
@@ -43,7 +45,8 @@ PLUGIN_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PLUGIN_MD="${PLUGIN_ROOT}/templates/claudemd.md"
 
 if [[ -f "${PLUGIN_MD}" ]]; then
-	FULL_CONTEXT=$(printf "Session %s initialized.\n\n%s%b" "${SESSION_ID}" "$(cat "${PLUGIN_MD}")" "${SETUP_NOTICE}" | jq -Rs .)
+	PLUGIN_MD_CONTENT=$(cat "${PLUGIN_MD}")
+	FULL_CONTEXT=$(printf "Session %s initialized.\n\n%s%b" "${SESSION_ID}" "${PLUGIN_MD_CONTENT}" "${SETUP_NOTICE}" | jq -Rs .)
 	echo "{\"hookSpecificOutput\": {\"hookEventName\": \"SessionStart\", \"additionalContext\": ${FULL_CONTEXT}}}"
 else
 	FALLBACK_CONTEXT=$(printf 'Session %s initialized. State directory: %s%b' "${SESSION_ID}" "${STATE_DIR}" "${SETUP_NOTICE}" | jq -Rs .)
