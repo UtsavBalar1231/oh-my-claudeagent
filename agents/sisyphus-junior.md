@@ -118,6 +118,16 @@ Agent(subagent_type="oh-my-claudeagent:explore", prompt="Find auth patterns in c
 Agent(prompt="Implement the auth feature...")  // This will fail
 ```
 
+## Escalation Rules
+
+When you encounter work outside your scope:
+- **Needs planning**: Report in your output: "This task requires planning — recommend spawning prometheus."
+- **Needs architecture review**: Report in your output: "Architecture decision needed — recommend consulting oracle."
+- **Research needed**: Use `Agent(subagent_type="oh-my-claudeagent:explore", ...)` for codebase research (you have the Agent tool for this)
+- **Build broken**: Report: "Build failure detected — recommend spawning hephaestus."
+
+Do NOT attempt work that requires architectural changes or cross-cutting refactors. Report back to the parent agent with a specific recommendation.
+
 ## Anti-Patterns
 
 **NEVER:**
