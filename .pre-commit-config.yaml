@@ -1,0 +1,47 @@
+ci:
+  autofix_commit_msg: "ci: auto-fix from pre-commit hooks"
+  autofix_prs: true
+  autoupdate_commit_msg: "ci: pre-commit autoupdate"
+  autoupdate_schedule: weekly
+  skip: [zizmor]
+
+repos:
+  # General hygiene
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-merge-conflict
+      - id: check-json
+      - id: check-yaml
+      - id: check-toml
+      - id: check-added-large-files
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
+
+  # Shell
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1
+    hooks:
+      - id: shellcheck
+
+  # Python
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.6
+    hooks:
+      - id: ruff-format
+      - id: ruff-check
+        args: [--fix, --exit-non-zero-on-fix]
+
+  # GHA workflow validation
+  - repo: https://github.com/python-jsonschema/check-jsonschema
+    rev: 0.37.0
+    hooks:
+      - id: check-github-workflows
+
+  # GHA security scanning
+  - repo: https://github.com/zizmorcore/zizmor-pre-commit
+    rev: v1.23.1
+    hooks:
+      - id: zizmor
