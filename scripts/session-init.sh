@@ -33,11 +33,24 @@ mkdir -p "${STATE_DIR}/worktrees"
 SETUP_NOTICE=""
 SOURCE=$(echo "${INPUT}" | jq -r '.source // "startup"' 2>/dev/null)
 if [[ "${SOURCE}" != "compact" ]]; then
+	GLOBAL_CLAUDE_MD="${HOME}/.claude/CLAUDE.md"
 	PROJECT_CLAUDE_MD="${PROJECT_ROOT}/CLAUDE.md"
-	if [[ -f "${PROJECT_CLAUDE_MD}" ]] && ! grep -q "OMC:START\|omca-setup" "${PROJECT_CLAUDE_MD}" 2>/dev/null; then
+	OMCA_CONFIGURED=0
+
+	# Check global ~/.claude/CLAUDE.md first (primary config location)
+	if [[ -f "${GLOBAL_CLAUDE_MD}" ]] && grep -q "omca-setup" "${GLOBAL_CLAUDE_MD}" 2>/dev/null; then
+		OMCA_CONFIGURED=1
+	fi
+
+	# Check project CLAUDE.md as secondary signal
+	if [[ "${OMCA_CONFIGURED}" -eq 0 ]] && [[ -f "${PROJECT_CLAUDE_MD}" ]] && grep -q "OMC:START\|omca-setup" "${PROJECT_CLAUDE_MD}" 2>/dev/null; then
+		OMCA_CONFIGURED=1
+	fi
+
+	if [[ "${OMCA_CONFIGURED}" -eq 0 ]]; then
 		PLUGIN_ROOT_CHECK="$(cd "$(dirname "$0")/.." && pwd)"
 		VERSION=$(jq -r '.version // "unknown"' "${PLUGIN_ROOT_CHECK}/.claude-plugin/plugin.json" 2>/dev/null)
-		SETUP_NOTICE="\n[OMCA] Plugin behavioral spec not detected in CLAUDE.md. Run /oh-my-claudeagent:omca-setup to configure (v${VERSION})."
+		SETUP_NOTICE="\n[OMCA] Plugin not configured. Run /oh-my-claudeagent:omca-setup to set up orchestration (v${VERSION})."
 	fi
 fi
 
