@@ -60,8 +60,7 @@ test-mcp:
 # Install dev tools and pre-commit hooks
 [group('dev')]
 setup:
-	python3 -m venv .venv
-	.venv/bin/pip install --upgrade pip ruff pre-commit
+	uv sync --group dev
 	just install-hooks
 
 # Install pre-commit git hooks
