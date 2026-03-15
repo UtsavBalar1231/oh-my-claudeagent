@@ -37,9 +37,14 @@ command -v jq && jq --version
 → PASS/FAIL. If jq is missing, **STOP** — hooks will not work without it.
 
 ```bash
+command -v uv && uv --version
+```
+→ PASS/FAIL. If uv is missing, **STOP** — MCP servers will not start without it.
+
+```bash
 command -v python3 && python3 --version
 ```
-→ PASS/WARN (needed for ast-grep MCP server; venv auto-bootstraps on first use)
+→ PASS/WARN (needed for ast-grep MCP server; uv manages the Python environment)
 
 ```bash
 if command -v ast-grep >/dev/null 2>&1; then ast-grep --version 2>&1 | head -1; else command -v sg >/dev/null 2>&1 && sg --version 2>&1 | head -1; fi
@@ -172,9 +177,45 @@ Write the composed content to `~/.claude/CLAUDE.md`.
 
 ---
 
+### Phase 5.5: Settings Suggestions
+
+Inspect `~/.claude/settings.json` and suggest beneficial settings additions. Print commands — do NOT auto-edit.
+
+1. Read `~/.claude/settings.json` (if it exists) to check current settings.
+
+2. **Suggested settings** (print as a copyable `jq` merge command):
+
+   ```
+   Recommended settings for optimal oh-my-claudeagent experience:
+
+   jq '. + {
+     "teammateMode": "auto"
+   } | .permissions.allow += [
+     "Edit(.omca/**)",
+     "Read(.omca/**)",
+     "mcp__omca-state__*",
+     "mcp__ast-grep__*",
+     "mcp__grep__*",
+     "Bash(jq *)",
+     "Bash(uv *)"
+   ]' ~/.claude/settings.json > /tmp/claude-settings-tmp.json && mv /tmp/claude-settings-tmp.json ~/.claude/settings.json
+   ```
+
+3. Explain each setting:
+   - `teammateMode: "auto"` — enables agent teams with best available UI (tmux/iTerm2 split panes)
+   - `Edit(.omca/**)` / `Read(.omca/**)` — auto-allow plugin state file access
+   - `mcp__omca-state__*` / `mcp__ast-grep__*` / `mcp__grep__*` — auto-allow bundled MCP tool usage
+   - `Bash(jq *)` / `Bash(uv *)` — auto-allow common plugin utility commands
+
+4. Note: "These settings are suggestions only. Review and apply as needed. If `~/.claude/settings.json` doesn't exist, create it first with `echo '{}' > ~/.claude/settings.json`."
+
+---
+
 ### Phase 6: Health Report
 
 Print a summary to the user:
+
+Get the current plugin git commit SHA: `cd "${PLUGIN_ROOT}" && git rev-parse --short HEAD 2>/dev/null || echo "unknown"`
 
 ```
 === oh-my-claudeagent Setup Complete ===
@@ -188,6 +229,7 @@ Files:
   ~/.claude/CLAUDE.md      — Block injected v0.1.0 (backup: CLAUDE.md.bak)
   ~/.claude/settings.json  — Inspected only: enabled | local checkout / dev mode | legacy config detected | not configured in user scope
   Plugin root              — ~/.claude/plugins/cache/... | local checkout path
+  Git commit            — [short SHA from plugin root]
 
 State:
   .omca/state/  — Verified
