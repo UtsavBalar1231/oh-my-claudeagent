@@ -211,6 +211,22 @@ command  # Expected: output
 | **MINOR** | FIX silently, note in summary |
 | **AMBIGUOUS** | Apply default, DISCLOSE in summary |
 
+### When Agents Return No Results
+
+If explore or librarian agents return empty or unusable results:
+1. **Broaden the query** and retry once (wider search terms, different file scope)
+2. **If still empty after retry**: do NOT block plan generation
+   - State the information gap explicitly in the plan's Interview Summary section
+   - Document what was attempted (queries run, paths searched)
+   - Proceed with an explicit unknown — flag it as an assumption for the implementer
+
+### When User Answers Don't Resolve Gaps
+
+If `AskUserQuestion` returns an answer that does not resolve a CRITICAL clearance item:
+1. **Mark the gap as UNRESOLVED** in the plan (use bold label: `**UNRESOLVED:**`)
+2. **Proceed with an explicit assumption** — document it clearly in the plan's Context section
+3. **Flag the assumption for revisiting** during implementation so the executor can confirm before acting
+
 ### Momus Review (MANDATORY)
 
 After generating the plan, MUST submit to momus for review:
