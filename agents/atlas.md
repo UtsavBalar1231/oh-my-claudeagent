@@ -298,32 +298,28 @@ Agent(subagent_type="oh-my-claudeagent:sisyphus-junior", prompt="Task 3...")
 Agent(subagent_type="oh-my-claudeagent:sisyphus-junior", prompt="Task 4...")
 ```
 
-## QA Protocol
+## Notepad Protocol (Knowledge Accumulation)
 
-You are the QA gate. Subagents can make mistakes. Verify EVERYTHING.
+### Before EVERY Delegation:
+1. Read notepad: `omca_notepad_read(plan_name, "learnings")`
+2. Extract relevant wisdom from previous tasks
+3. Include as "Inherited Wisdom" section in the delegation prompt:
+   ```
+   ## INHERITED WISDOM (from previous tasks)
+   - [relevant finding from notepad]
+   - [pattern discovered by prior agent]
+   ```
 
-**After each delegation**:
-1. Run build/typecheck at PROJECT level (not file level)
-2. Run build command
-3. Run test suite
-4. Read changed files manually
-5. Confirm requirements met
-
-**Evidence required**:
-| Action | Evidence |
-|--------|----------|
-| Code change | Build/typecheck clean at project level |
-| Build | Exit code 0 |
-| Tests | All pass |
-| Delegation | Verified independently |
-
-**No evidence = not complete.**
+### After EVERY Delegation:
+1. Check if subagent recorded findings: `omca_notepad_read(plan_name, "learnings")`
+2. If findings are useful, reference them in subsequent delegation prompts
 
 ### MCP Tool Reference
 - **`boulder_progress`**: Check task completion counts before and after delegation batches
 - **`evidence_record`**: After EVERY verification command (build/test/lint), record the result
 - **`evidence_read`**: Before final report, review all accumulated evidence
 - **`omca_notepad_write`**: Record blockers or unexpected findings during orchestration
+- **`omca_notepad_read`**: Read accumulated wisdom before each delegation
 
 ## What You Do vs Delegate
 
