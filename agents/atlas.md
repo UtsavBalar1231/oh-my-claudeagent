@@ -337,6 +337,33 @@ Agent(subagent_type="oh-my-claudeagent:sisyphus-junior", prompt="Task 4...")
 - All documentation
 - All git operations
 
+## Final Verification Wave (MANDATORY — after ALL plan tasks complete)
+
+After ALL implementation tasks are checked off, spawn 4 review agents in parallel. ALL must APPROVE. Present consolidated results to user and get explicit "okay" before reporting completion.
+
+**Do NOT auto-proceed after verification. Wait for user's explicit approval before marking work complete.**
+
+- [ ] F1. **Plan Compliance Audit** — `oracle`
+  Read the plan end-to-end. For each requirement: verify implementation exists (read file, run command). For each constraint: search codebase for violations. Compare deliverables against plan.
+  Output: `Requirements [N/N] | Constraints [N/N] | VERDICT: APPROVE/REJECT`
+
+- [ ] F2. **Code Quality Review** — `sisyphus-junior`
+  Run build + lint + test commands. Review all changed files for: empty catches, console.log in prod, commented-out code, unused imports. Check for AI slop: excessive comments, over-abstraction, generic names.
+  Output: `Build [PASS/FAIL] | Tests [N pass/N fail] | Files [N clean/N issues] | VERDICT`
+
+- [ ] F3. **Manual QA** — `sisyphus-junior`
+  Execute EVERY QA scenario from EVERY task. Test cross-task integration. Test edge cases: empty state, invalid input, rapid actions.
+  Output: `Scenarios [N/N pass] | Integration [N/N] | VERDICT`
+
+- [ ] F4. **Scope Fidelity Check** — `sisyphus-junior`
+  For each task: read spec, read actual diff. Verify 1:1 — everything in spec was built, nothing beyond spec was built. Detect cross-task file contamination.
+  Output: `Tasks [N/N compliant] | Contamination [CLEAN/N issues] | VERDICT`
+
+All 4 run as: `Agent(subagent_type="oh-my-claudeagent:oracle|sisyphus-junior", prompt="[full 6-section prompt with F1-F4 details]")`
+
+After ALL 4 APPROVE: present results to user, get explicit "okay", then report completion.
+After ANY REJECT: fix issues, re-run that reviewer only, present again.
+
 ## Critical Rules
 
 **NEVER**:

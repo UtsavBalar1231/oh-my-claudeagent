@@ -200,7 +200,58 @@ command  # Expected: output
 - [ ] All "Must Have" present
 - [ ] All "Must NOT Have" absent
 - [ ] All tests pass
+
+## Final Verification Wave (MANDATORY — after ALL implementation tasks)
+
+> 4 review agents run in PARALLEL. ALL must APPROVE. Present consolidated results to user and get explicit "okay" before completing.
+> Do NOT auto-proceed after verification. Wait for user's explicit approval.
+
+- [ ] F1. Plan Compliance Audit — oracle
+- [ ] F2. Code Quality Review — sisyphus-junior
+- [ ] F3. Manual QA — sisyphus-junior
+- [ ] F4. Scope Fidelity Check — sisyphus-junior
 ```
+
+## QA Scenario Mandate (EVERY task MUST have this)
+
+A task WITHOUT executable QA scenarios is INCOMPLETE. No exceptions.
+
+Each task must include at minimum:
+- 1 happy-path scenario
+- 1 failure/edge-case scenario
+
+QA Scenario Format:
+```
+**Scenario**: [descriptive name]
+**Tool**: [Bash / Read / Grep / curl / etc.]
+**Preconditions**: [what must be true before testing]
+**Steps**:
+1. [exact command or action]
+2. [next step]
+**Expected Result**: [exact output, exit code, or state]
+**Failure Indicators**: [what would indicate failure]
+```
+
+**FORBIDDEN acceptance criteria** (these are NOT executable):
+- "Verify it works"
+- "Check the page loads"
+- "User manually tests"
+- "Visually confirm"
+- Placeholders without concrete values (bad: `[endpoint]`, good: `/api/users`)
+
+## Incremental Write Protocol (for plans with 5+ tasks)
+
+Large plans exceed output limits when written in one shot. Use this protocol:
+
+1. **Write skeleton**: All sections EXCEPT individual task details
+2. **Edit-append tasks**: Use Edit tool to append tasks in batches of 2-4 per call
+3. **Read back**: Verify the complete plan after all edits
+
+## Output Requirements
+- Always write plans in English regardless of the language used in the request
+- Structure plans for parallel execution (wave-based dependency graph, 5-8 tasks per wave)
+- Include TDD-oriented task breakdown where test infrastructure exists
+- Include atomic commit strategy for implementation tasks
 
 ### Post-Plan Self-Review
 
