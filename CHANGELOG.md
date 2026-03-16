@@ -5,6 +5,82 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-03-17
+
+### Added
+
+- **Statusline usage bars**: OAuth usage API client (`statusline/usage.py`) fetches
+  five-hour and seven-day utilization percentages from the Anthropic API with disk
+  cache (300s TTL), circuit breaker with exponential backoff (caps at 3600s), and
+  opt-out via `CLAUDE_STATUSLINE_NO_USAGE`. Rendered as a third statusline row with
+  ▰/▱ bars, color-coded thresholds, and local reset timestamps. Daemon caches usage
+  in a background thread; direct and client modes call inline
+- **New skills**: github-triage (read-only issue/PR triage with per-item background
+  agents and evidence-backed reports) and ulw-loop (ralph + ultrawork + oracle
+  verification persistence loop)
+- **Plan mode support**: prometheus-plan, sisyphus-orchestrate, and start-work skills
+  detect plan mode and document behavior. ExitPlanMode tool added to atlas, sisyphus,
+  and prometheus. Atlas and metis gain `permissionMode: acceptEdits` for execution
+  from plan mode
+- **Ralph stagnation detection**: tracks task-state hash across stop attempts; allows
+  exit after 3 consecutive identical checks to prevent infinite loops
+- **Ralph question-aware stopping**: allows stop when an AskUserQuestion is pending
+  (within 5 minutes) so the user can respond
+- **Pending-question tracking**: new `track-question.sh` PostToolUse hook records
+  AskUserQuestion calls to `.omca/state/pending-question.json`
+- **Keyword detector i18n**: Korean, Japanese, and Chinese pattern matching for ralph
+  and ultrawork keyword triggers
+- **Keyword detector subagent skip**: skips keyword detection when running inside a
+  subagent session (checks `agent_id` in hook payload)
+- **Pre-compact agent resume**: includes recently spawned agents in compaction context
+  with `RESUME, DON'T RESTART` directive to prevent duplicate spawns after compaction
+- **Delegate-retry retryable errors**: detects rate limits, timeouts, and capacity
+  errors and suggests retry instead of oracle escalation
+
+### Changed
+
+- **atlas**: replaced QA protocol with notepad protocol; added anti-duplication rule,
+  auto-continue policy (no user approval between tasks), verification evidence table,
+  and mandatory manual code review step
+- **prometheus**: added anti-duplication rule, draft-as-memory system
+  (`.omca/drafts/` as working memory across turns), and turn termination rules
+  (every response must end with a question, draft update, wait, or transition)
+- **sisyphus**: added anti-duplication rule and intent verbalization step (Step 1.5:
+  verbalize intent before routing)
+- **sisyphus-junior**: added structured escalation format and background agent results
+  handling
+- **metis**: added QA automation directives (agent-executable criteria only) and
+  AI-slop pattern detection (scope inflation, premature abstraction, over-validation)
+- **momus**: added approval bias philosophy (approve when 80% clear), max 3 issues
+  per rejection, and file-path invocation requirement
+- **oracle**: added output verbosity limits (≤7 action steps, ≤4 bullets) and
+  high-risk self-check (unstated assumptions, overly strong language)
+- **socrates**: added plan context awareness (boulder_read, notepad) and evidence
+  quality rules (2+ sources, confidence tagging)
+- **librarian**: added plan context awareness and escalation guidance (recommend
+  implementation agents for code changes, oracle for architecture)
+- Simplified agent-usage-reminder counter logic (modulo-3 instead of reset-to-zero)
+- Reformatted type annotations in omca-state-server
+- Refactored statusline progress bars from graduated blocks to uniform ▰/▱ symbols
+  with shared `_render_bar()` helper
+
+### Fixed
+
+- Removed stale `mcp__pgs__*` permission entries from omca-setup skill
+- Hardened permission-filter regex to catch `rm -fr`, `sudo rm` variants (was only
+  matching `rm -rf` and `rm -r`)
+- Fixed notify.sh multiline string handling (strips newlines before passing to
+  osascript `display notification`)
+- Added macOS/BSD portability for `stat` and `date` commands; suppressed SC2312
+  shellcheck warnings
+- Fixed git-master skill phase numbering gap (renumbered phases)
+- Fixed delegate-retry missing `hookEventName` field and `ERROR_TEXT` fallback chain
+- Removed fallback default from plugin root path configuration
+- Set valid SHA in marketplace plugin source for schema validation
+- Made `track-question.sh` executable
+
+[1.1.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.0.0...v1.1.0
+
 ## [1.0.0] - 2026-03-15
 
 Initial public release of oh-my-claudeagent — a markdown-first Claude Code plugin
@@ -12,8 +88,9 @@ for multi-agent orchestration.
 
 ### Added
 
-- 11 specialist agents (Greek mythology names): sisyphus, atlas, prometheus, metis,
-  momus, oracle, sisyphus-junior, explore, librarian, hephaestus, multimodal-looker
+- 12 specialist agents (Greek mythology names): sisyphus, atlas, prometheus, metis,
+  momus, oracle, sisyphus-junior, explore, librarian, hephaestus, multimodal-looker,
+  socrates
 - 18 skills including ralph persistence, ultrawork parallel execution, handoff,
   git-master, frontend-ui-ux, and agent command skills (atlas, metis, prometheus-plan,
   hephaestus, sisyphus-orchestrate)
