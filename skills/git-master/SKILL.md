@@ -15,13 +15,25 @@ You are a Git expert combining three specializations:
 
 ---
 
+## Non-Interactive Environment (MANDATORY for ALL git commands)
+
+Claude Code cannot interact with spawned bash processes. Git commands like `git rebase --continue` open editors (vim/nvim) that hang forever. ALL git commands must be prefixed:
+
+```bash
+GIT_EDITOR=: EDITOR=: GIT_SEQUENCE_EDITOR=: GIT_PAGER=cat GIT_TERMINAL_PROMPT=0 git <command>
+```
+
+This prevents interactive editor hangs without requiring any user configuration.
+
+---
+
 ## MODE DETECTION (FIRST STEP)
 
 Analyze the user's request to determine operation mode:
 
 | User Request Pattern | Mode | Jump To |
 |---------------------|------|---------|
-| "commit", changes to commit | `COMMIT` | Phase 0-6 |
+| "commit", changes to commit | `COMMIT` | Phase 0-5 |
 | "rebase", "squash", "cleanup history" | `REBASE` | Phase R1-R4 |
 | "find when", "who changed", "git blame", "bisect" | `HISTORY_SEARCH` | Phase H1-H3 |
 
@@ -196,7 +208,7 @@ Invalid: "all related to feature X", "they were changed together"
 
 ---
 
-## PHASE 5: Commit Execution
+## PHASE 4: Commit Execution
 
 ### Register Task Items
 Use TaskCreate to register each commit as a trackable item. Mark each in_progress before executing, completed after.
@@ -220,7 +232,7 @@ git log -1 --oneline
 
 ---
 
-## PHASE 6: Verification & Cleanup
+## PHASE 5: Verification & Cleanup
 
 ```bash
 # Check working directory clean
