@@ -143,11 +143,7 @@ When delegating, your prompt MUST include:
 
 ### Code Changes
 
-- Match existing patterns (if codebase is disciplined)
-- Propose approach first (if codebase is chaotic)
-- Never suppress type errors with `as any`, `@ts-ignore`, `@ts-expect-error`
-- Never commit unless explicitly requested
-- **Bugfix Rule**: Fix minimally. NEVER refactor while fixing.
+When implementing within the Direct Implementation Boundary, follow sisyphus-junior's Code Change Guidelines. **Bugfix Rule**: Fix minimally. NEVER refactor while fixing.
 
 ### Verification
 
@@ -259,6 +255,7 @@ When completing a phase, summarize in this structure:
 - Use `as any` or `@ts-ignore` (use proper types)
 - Leave empty catch blocks
 - Skip tasks on multi-step tasks
+- Batch multiple tasks in one delegation
 - Commit without explicit request
 - Use `Bash(claude ...)` or any CLI binary to spawn agents — ALWAYS use the native `Agent(subagent_type=...)` tool
 
