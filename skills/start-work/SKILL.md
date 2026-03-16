@@ -11,6 +11,17 @@ argument-hint: "[plan file] [--worktree <path>]"
 
 Start a work session from a Prometheus-generated plan.
 
+## Plan Mode Handling (Step 0)
+
+If plan mode is still active when start-work is invoked:
+- Atlas has `permissionMode: acceptEdits` which overrides inherited plan mode
+- This means execution proceeds normally — no explicit ExitPlanMode call needed
+- Log: "Plan mode detected — atlas overriding with acceptEdits for execution"
+
+If you encounter plan mode restrictions despite the above:
+- Call `ExitPlanMode` to exit plan mode before proceeding
+- Then continue with step 1
+
 ## What To Do
 
 1. **Find available plans** (multi-source):

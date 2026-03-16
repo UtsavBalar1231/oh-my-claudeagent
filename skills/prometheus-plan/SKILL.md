@@ -14,6 +14,23 @@ If no task was specified above, enter interview mode to understand what needs to
 Follow the prometheus workflow: classify intent complexity, conduct requirements interview,
 consult metis for gap analysis, generate the plan to `.omca/plans/`, and present the plan.
 
+## Plan Mode Awareness
+
+**Why prometheus can write in plan mode**: Plan mode allows writing to the native plan file path
+(`~/.claude/plans/<name>.md`) — this is by design. Prometheus also writes to `.omca/plans/` which
+is the plugin's state directory. The `Edit` tool on the plan file is explicitly permitted in plan mode.
+
+If plan mode is active (detectable from system context mentioning a plan file at `~/.claude/plans/`):
+1. Write the plan to BOTH locations:
+   - The native plan file path from the plan mode context (`~/.claude/plans/<name>.md`) — **presentation copy** for plan mode UI
+   - The standard `.omca/plans/<name>.md` location — **authoritative copy** for atlas/boulder execution
+2. After the plan is finalized and momus-reviewed, call `ExitPlanMode` to present the plan for user approval
+3. Once approved, plan mode exits and the user can run `/start-work`
+
+If plan mode is NOT active:
+- Write the plan to `.omca/plans/` only (existing behavior)
+- Skip ExitPlanMode (not applicable)
+
 **Handoff**: After plan completion, guide the user:
 1. **Primary**: "Run `/oh-my-claudeagent:start-work` to execute this plan (handles plan discovery, boulder setup, worktree)."
 2. **Alternative**: "Or run `/oh-my-claudeagent:atlas [plan path]` for direct atlas execution."
