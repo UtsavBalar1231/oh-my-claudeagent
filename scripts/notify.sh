@@ -29,7 +29,11 @@ send_notification() {
 	fi
 
 	if command -v osascript &>/dev/null; then
-		osascript -e "display notification \"$(printf '%s' "${message}" | sed 's/["\\]/\\&/g')\" with title \"$(printf '%s' "${title}" | sed 's/["\\]/\\&/g')\"" 2>/dev/null || true
+		# Strip newlines — osascript breaks on multiline strings in display notification
+		local safe_msg safe_title
+		safe_msg=$(printf '%s' "${message}" | tr '\n' ' ' | sed 's/["\\]/\\&/g')
+		safe_title=$(printf '%s' "${title}" | tr '\n' ' ' | sed 's/["\\]/\\&/g')
+		osascript -e "display notification \"${safe_msg}\" with title \"${safe_title}\"" 2>/dev/null || true
 		return 0
 	fi
 

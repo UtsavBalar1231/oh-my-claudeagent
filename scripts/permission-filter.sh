@@ -12,7 +12,8 @@ fi
 # shellcheck disable=SC2001
 TRIMMED_CMD=$(echo "${COMMAND}" | sed 's/^[[:space:]]*//')
 
-if [[ "${TRIMMED_CMD}" == rm\ -rf\ * ]] || [[ "${TRIMMED_CMD}" == rm\ -r\ * ]]; then
+# Catch rm -rf, rm -r, rm -fr, sudo rm variants
+if [[ "${TRIMMED_CMD}" =~ ^(sudo[[:space:]]+)?rm[[:space:]]+-[a-zA-Z]*r[a-zA-Z]*[[:space:]] ]]; then
 	echo '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"deny","message":"Destructive rm -rf operation blocked. Use explicit file deletion instead."}}}'
 	exit 0
 fi
