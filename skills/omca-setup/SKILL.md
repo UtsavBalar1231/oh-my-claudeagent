@@ -176,37 +176,161 @@ Write the composed content to `~/.claude/CLAUDE.md`.
 
 ---
 
-### Phase 5.5: Settings Suggestions
+### Phase 5.5: Settings Configuration
 
-Inspect `~/.claude/settings.json` and suggest beneficial settings additions. Print commands — do NOT auto-edit.
+Apply permission and settings changes to `~/.claude/settings.json` with user confirmation.
 
-1. Read `~/.claude/settings.json` (if it exists) to check current settings.
+1. Read `~/.claude/settings.json` (if exists; if not, start with `{}`)
 
-2. **Suggested settings** (print as a copyable `jq` merge command):
+2. Compute missing permissions against the required set:
+   - `Write(.omca/**)`, `Edit(.omca/**)`, `Read(.omca/**)`
+   - `mcp__omca-state__*`, `mcp__ast-grep__*`, `mcp__grep__*`, `mcp__context7__*`, `mcp__pgs__*`
+   - `Bash(jq *)`, `Bash(uv run *)`, `Bash(uv sync *)`
 
+3. Compute missing top-level: `teammateMode: "auto"`
+
+4. If all present: "Settings already configured" — skip
+
+5. If changes needed: show diff, use `AskUserQuestion` to confirm
+
+6. On confirm: read-merge-write with `jq` (handle nonexistent file)
+
+7. On decline: print raw jq command as fallback:
    ```
-   Recommended settings for optimal oh-my-claudeagent experience:
-
    jq '. + {
      "teammateMode": "auto"
    } | .permissions.allow += [
+     "Write(.omca/**)",
      "Edit(.omca/**)",
      "Read(.omca/**)",
      "mcp__omca-state__*",
      "mcp__ast-grep__*",
      "mcp__grep__*",
+     "mcp__context7__*",
+     "mcp__pgs__*",
      "Bash(jq *)",
-     "Bash(uv *)"
+     "Bash(uv run *)",
+     "Bash(uv sync *)"
    ]' ~/.claude/settings.json > /tmp/claude-settings-tmp.json && mv /tmp/claude-settings-tmp.json ~/.claude/settings.json
    ```
 
-3. Explain each setting:
+8. Explain each setting:
    - `teammateMode: "auto"` — enables agent teams with best available UI (tmux/iTerm2 split panes)
-   - `Edit(.omca/**)` / `Read(.omca/**)` — auto-allow plugin state file access
-   - `mcp__omca-state__*` / `mcp__ast-grep__*` / `mcp__grep__*` — auto-allow bundled MCP tool usage
-   - `Bash(jq *)` / `Bash(uv *)` — auto-allow common plugin utility commands
+   - `Write(.omca/**)` / `Edit(.omca/**)` / `Read(.omca/**)` — auto-allow plugin state file access
+   - `mcp__omca-state__*` / `mcp__ast-grep__*` / `mcp__grep__*` / `mcp__context7__*` / `mcp__pgs__*` — auto-allow bundled MCP tool usage
+   - `Bash(jq *)` / `Bash(uv run *)` / `Bash(uv sync *)` — auto-allow common plugin utility commands (narrowed from `Bash(uv *)`)
 
-4. Note: "These settings are suggestions only. Review and apply as needed. If `~/.claude/settings.json` doesn't exist, create it first with `echo '{}' > ~/.claude/settings.json`."
+---
+
+### Phase 5.6: Statusline Setup
+
+Configure the Claude Code statusline to use the oh-my-claudeagent statusline package.
+
+1. Read `~/.claude/settings.json` (if it exists; otherwise treat as `{}`).
+
+2. Check if `statusLine` is already configured:
+   - If `settings.statusLine` is present → print "statusLine already configured — skipping" and skip this phase.
+
+3. If not configured: use `AskUserQuestion` to ask:
+   ```
+   Enable the oh-my-claudeagent statusline? It shows model, context bar, cost, duration, git status, and more in your terminal.
+   [y/N]
+   ```
+
+4. On decline: skip this phase silently.
+
+5. On confirm:
+
+   a. **Resolve the plugin root** (Python):
+      ```python
+      import glob, os
+      candidates = glob.glob(os.path.expanduser("~/.claude/plugins/cache/omca/oh-my-claudeagent/*/"))
+      plugin_root = sorted(candidates)[-1] if candidates else None
+      ```
+      If no candidates found (development mode), fall back to the git root:
+      ```python
+      import subprocess
+      result = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True)
+      plugin_root = result.stdout.strip() if result.returncode == 0 else None
+      ```
+      If `plugin_root` is still `None`, report an error and skip the phase.
+
+   b. **Create the deployment structure** at `~/.claude/statusline/`:
+
+      The layout mirrors the standard Python package layout:
+      ```
+      ~/.claude/statusline/
+        pyproject.toml              ← copied from <plugin-root>/statusline/pyproject.toml
+        statusline/                 ← copied from <plugin-root>/statusline/*.py
+          __init__.py
+          core.py
+          git.py
+          daemon.py
+          client.py
+          direct.py
+      ```
+
+      Run these commands:
+      ```bash
+      mkdir -p ~/.claude/statusline/statusline
+      cp <plugin-root>/statusline/pyproject.toml ~/.claude/statusline/pyproject.toml
+      cp <plugin-root>/statusline/*.py ~/.claude/statusline/statusline/
+      ```
+      Replace `<plugin-root>` with the path resolved in step (a).
+
+   c. **Run `uv sync`** to create the venv and install entry points:
+      ```bash
+      uv sync --project ~/.claude/statusline
+      ```
+
+   d. **Ask user for mode selection** using `AskUserQuestion`:
+      ```
+      Statusline mode?
+        1. Daemon (fastest, <1ms warm response) [recommended]
+        2. Direct (simpler, ~20ms response)
+      ```
+      Default to daemon (option 1) if the user picks 1 or confirms without a specific choice.
+
+   e. **Set the settings.json command** based on mode:
+      - Daemon: `~/.claude/statusline/.venv/bin/cc-statusline`
+      - Direct: `~/.claude/statusline/.venv/bin/cc-statusline-direct`
+
+      Use jq to merge atomically (read-merge-write):
+      ```bash
+      jq --arg cmd "<chosen-command>" '. + {"statusLine": {"type": "command", "command": $cmd, "padding": 1}}' \
+        ~/.claude/settings.json > /tmp/claude-settings-statusline.json \
+        && mv /tmp/claude-settings-statusline.json ~/.claude/settings.json
+      ```
+      If `~/.claude/settings.json` does not exist, create it from `{}`:
+      ```bash
+      echo '{}' | jq --arg cmd "<chosen-command>" '. + {"statusLine": {"type": "command", "command": $cmd, "padding": 1}}' \
+        > ~/.claude/settings.json
+      ```
+
+   f. **For daemon mode only**: start the daemon:
+      ```bash
+      ~/.claude/statusline/.venv/bin/cc-statusline-daemon start
+      ```
+
+   g. Report to user:
+      ```
+      Statusline configured:
+        ~/.claude/statusline/pyproject.toml       — package manifest
+        ~/.claude/statusline/statusline/          — package files (copied from plugin)
+        ~/.claude/statusline/.venv/               — uv-managed venv with entry points
+        ~/.claude/settings.json                   — statusLine added (mode: daemon|direct)
+
+      For daemon mode: daemon started (auto-starts on first request if not running)
+      Restart Claude Code to activate the statusline.
+
+      Note: After plugin updates, re-copy the files and re-run uv sync to pick up changes:
+        cp <plugin-root>/statusline/pyproject.toml ~/.claude/statusline/pyproject.toml
+        cp <plugin-root>/statusline/*.py ~/.claude/statusline/statusline/
+        uv sync --project ~/.claude/statusline
+      Or simply re-run /oh-my-claudeagent:omca-setup (it will skip already-configured phases).
+      ```
+
+   h. **Note**: If an old `~/.claude/statusline.py` wrapper script exists, it can be removed — it is superseded by this copy-based deployment.
 
 ---
 
@@ -344,6 +468,7 @@ Non-destructive health check — no files are modified.
 - NEVER modify files outside `~/.claude/` and `.omca/` (plus `.gitignore`)
 - NEVER claim marketplace installation or managed policy enforcement unless existing Claude Code settings prove it
 - NEVER auto-edit shared or managed Claude Code settings during setup; print guidance instead
+- Apply settings changes with explicit user confirmation via AskUserQuestion; print jq fallback on decline
 - Idempotent: running setup multiple times with the same version is a no-op
 - Template is read from disk, not generated — ensures deterministic output
 - Migration handles both `<!-- OMCA:START -->` and `<\!-- OMCA:START -->` (escaped and unescaped)
