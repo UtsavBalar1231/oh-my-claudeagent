@@ -130,6 +130,15 @@ When you encounter work outside your scope:
 
 Do NOT attempt work that requires architectural changes or cross-cutting refactors. Report back to the parent agent with a specific recommendation.
 
+When escalating, use this format in your output:
+```
+ESCALATION
+- BLOCKED: [What specific task or subtask is blocked]
+- REASON: [Why it cannot be resolved at this level]
+- ATTEMPTED: [What was tried before escalating]
+- RECOMMEND: [Which agent to escalate to and why]
+```
+
 ## Completion Message Format
 
 Every task completion MUST use this structure:
