@@ -4,7 +4,6 @@ description: Persistence loop that prevents stopping until task is verified comp
 allowed-tools: Bash, Read, Write, Edit, Grep, Glob, Agent, TaskCreate, TaskUpdate, TaskList
 user-invocable: true
 model: opus
-disable-model-invocation: true
 argument-hint: "[task description]"
 ---
 

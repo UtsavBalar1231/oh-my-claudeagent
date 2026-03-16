@@ -4,7 +4,6 @@ description: Create a detailed context summary for continuing work in a new sess
 allowed-tools: Bash, Read, Glob, TaskList
 user-invocable: true
 argument-hint: optional notes about what to include
-disable-model-invocation: true
 ---
 
 # Handoff - Session Context Summarization

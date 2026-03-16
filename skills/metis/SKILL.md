@@ -4,7 +4,6 @@ description: Pre-planning analysis via the Metis consultant. Catches gaps, ident
 context: fork
 agent: oh-my-claudeagent:metis
 user-invocable: true
-disable-model-invocation: true
 argument-hint: "[request to analyze]"
 ---
 

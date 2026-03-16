@@ -3,7 +3,6 @@ name: stop-continuation
 description: Stop ALL continuation mechanisms for the current session — ralph loop, boulder state, and auto-continuation. Use when you need to pause automated work and take manual control.
 allowed-tools: Bash
 user-invocable: true
-disable-model-invocation: true
 argument-hint: "[optional: reason]"
 ---
 

@@ -3,7 +3,6 @@ name: cancel-ralph
 description: Cancel the currently active Ralph Loop.
 allowed-tools: Bash, Read, Write
 user-invocable: true
-disable-model-invocation: true
 argument-hint: "[optional: reason]"
 ---
 

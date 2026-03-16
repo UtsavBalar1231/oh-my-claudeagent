@@ -3,7 +3,6 @@ name: init-deep
 description: Generate hierarchical AGENTS.md files. Root + complexity-scored subdirectories.
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent, TaskCreate, TaskUpdate, TaskList
 user-invocable: true
-disable-model-invocation: true
 argument-hint: "[project path]"
 ---
 

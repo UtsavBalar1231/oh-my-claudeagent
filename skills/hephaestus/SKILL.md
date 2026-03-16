@@ -4,7 +4,6 @@ description: Fix build failures, type errors, and toolchain issues via the Hepha
 context: fork
 agent: oh-my-claudeagent:hephaestus
 user-invocable: true
-disable-model-invocation: true
 argument-hint: "[build command or error description]"
 ---
 

@@ -4,7 +4,6 @@ description: Strategic planning via the Prometheus consultant. Interviews, resea
 context: fork
 agent: oh-my-claudeagent:prometheus
 user-invocable: true
-disable-model-invocation: true
 argument-hint: "[feature or task to plan]"
 ---
 

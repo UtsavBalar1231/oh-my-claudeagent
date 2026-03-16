@@ -4,7 +4,6 @@ description: Execute work plans via the Atlas orchestrator. Delegates all tasks,
 context: fork
 agent: oh-my-claudeagent:atlas
 user-invocable: true
-disable-model-invocation: true
 argument-hint: "[plan file or task description]"
 ---
 

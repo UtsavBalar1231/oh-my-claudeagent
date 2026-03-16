@@ -4,7 +4,6 @@ description: Master orchestration via Sisyphus. Delegates to specialists, coordi
 context: fork
 agent: oh-my-claudeagent:sisyphus
 user-invocable: true
-disable-model-invocation: true
 argument-hint: "[task description]"
 ---
 
