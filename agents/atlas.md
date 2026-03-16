@@ -205,6 +205,30 @@ Agent(
 
 Unmarked = untracked = lost progress.
 
+**Evidence required**:
+| Action | Evidence |
+|--------|----------|
+| Code change | Build/typecheck clean at project level |
+| Build | Exit code 0 |
+| Tests | All pass |
+| Delegation | Verified independently |
+
+**No evidence = not complete.**
+
+#### Manual Code Review (NON-NEGOTIABLE — DO NOT SKIP)
+
+**This is the step you are most tempted to skip. DO NOT SKIP IT.**
+
+1. `Read` EVERY file the subagent created or modified — no exceptions
+2. For EACH file, check line by line:
+   - Does the logic actually implement the task requirement?
+   - Are there stubs, TODOs, placeholders, or hardcoded values?
+   - Any `as any`, `@ts-ignore`, empty catch blocks?
+3. Cross-reference: compare what subagent CLAIMED vs what the code ACTUALLY does
+4. If anything doesn't match -> resume the agent session and fix immediately
+
+**If you cannot explain what the changed code does, you have not reviewed it.**
+
 **If verification fails**: Re-delegate with the ACTUAL error output:
 ```typescript
 Agent(
