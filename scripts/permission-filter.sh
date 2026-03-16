@@ -25,4 +25,15 @@ if [[ "${TRIMMED_CMD}" == npm\ * ]] ||
 	exit 0
 fi
 
+# Auto-allow jq (used by hook scripts)
+if [[ "${TRIMMED_CMD}" == jq\ * ]]; then
+	echo '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}'
+	exit 0
+fi
+# Auto-allow uv run/sync (MCP server startup + dependency management)
+if [[ "${TRIMMED_CMD}" == uv\ run\ * ]] || [[ "${TRIMMED_CMD}" == uv\ sync ]] || [[ "${TRIMMED_CMD}" == uv\ sync\ * ]]; then
+	echo '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}'
+	exit 0
+fi
+
 exit 0

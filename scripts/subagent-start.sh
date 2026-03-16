@@ -25,13 +25,13 @@ AGENT_TYPE=$(echo "${INPUT}" | jq -r '.agent_type // "unknown"')
 
 case "${AGENT_TYPE}" in
 	*prometheus*|*metis*|*socrates*)
-		CONTEXT_PARTS="Ask clarifying questions using AskUserQuestion when requirements are ambiguous or critical information is missing."
+		CONTEXT_PARTS="AskUserQuestion is unavailable in subagents. When you need user input, write the question to the notepad questions section and return. The orchestrator will relay to the user and resume you."
 		;;
 	*sisyphus|*atlas*)
-		CONTEXT_PARTS="Ask the user via AskUserQuestion when a task is ambiguous, blocked, or requires a decision between significantly different approaches."
+		CONTEXT_PARTS="AskUserQuestion is unavailable in subagents. When you need user input, write the question to the notepad questions section and return. The orchestrator will relay to the user and resume you."
 		;;
 	*explore*|*librarian*|*hephaestus*|*sisyphus-junior*|*multimodal*|*oracle*|*momus*)
-		CONTEXT_PARTS="Make autonomous decisions. If unclear, choose the most reasonable option and proceed. Use AskUserQuestion only when genuinely blocked after 2+ failed attempts."
+		CONTEXT_PARTS="AskUserQuestion is unavailable in subagents. Make autonomous decisions when possible. If genuinely blocked, write the question to the notepad questions section and return."
 		;;
 	*)
 		CONTEXT_PARTS="Make autonomous decisions. If unclear, choose the most reasonable option and proceed."
@@ -65,7 +65,7 @@ if [[ -f "${BOULDER_FILE}" ]]; then
 		CONTEXT_PARTS+=" CRITICAL: The plan file at ${PLAN_FILE} is READ-ONLY. NEVER modify the plan file directly. Use omca_notepad_write to record issues or decisions instead."
 	fi
 	if [[ -n "${PLAN_NAME}" ]]; then
-		CONTEXT_PARTS+=" [NOTEPAD AVAILABLE] Plan: ${PLAN_NAME}. Use omca_notepad_write('${PLAN_NAME}', section, content) to record discoveries. Sections: learnings, issues, decisions, problems. Always APPEND — never overwrite."
+		CONTEXT_PARTS+=" [NOTEPAD AVAILABLE] Plan: ${PLAN_NAME}. Use omca_notepad_write('${PLAN_NAME}', section, content) to record discoveries. Sections: learnings, issues, decisions, problems, questions. Use 'questions' when you need user input (AskUserQuestion is unavailable in subagents). Always APPEND — never overwrite."
 	fi
 fi
 

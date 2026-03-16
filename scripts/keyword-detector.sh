@@ -13,12 +13,12 @@ PROMPT_LOWER=$(echo "${PROMPT}" | tr '[:upper:]' '[:lower:]')
 DETECTED_KEYWORDS=()
 ADDITIONAL_CONTEXT=""
 
-if [[ "${PROMPT_LOWER}" =~ (ralph|don\'t[[:space:]]+stop|must[[:space:]]+complete|until[[:space:]]+done) ]]; then
+if [[ "${PROMPT_LOWER}" =~ (ralph|don\'t[[:space:]]+stop|must[[:space:]]+complete|until[[:space:]]+done|keep[[:space:]]+going[[:space:]]+until|finish[[:space:]]+this[[:space:]]+no[[:space:]]+matter) ]]; then
 	DETECTED_KEYWORDS+=("ralph")
 	ADDITIONAL_CONTEXT+="[RALPH MODE DETECTED] Activate persistence mode - do not stop until verified complete. "
 fi
 
-if [[ "${PROMPT_LOWER}" =~ (ulw|ultrawork) ]]; then
+if [[ "${PROMPT_LOWER}" =~ (ulw|ultrawork|as[[:space:]]+fast[[:space:]]+as[[:space:]]+possible|run[[:space:]]+in[[:space:]]+parallel|simultaneously) ]]; then
 	DETECTED_KEYWORDS+=("ultrawork")
 	ADDITIONAL_CONTEXT+="[ULTRAWORK MODE DETECTED] Activate maximum parallel execution. "
 fi
