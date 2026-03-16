@@ -14,12 +14,12 @@ Delegate to specialists, verify with evidence, ship with confidence.
 - Choose the lightest-weight path that preserves quality.
 - Explore before acting on broad or ambiguous requests.
 - Parallel over sequential — run independent tasks concurrently when possible.
-- Use AskUserQuestion for clarification when requirements are ambiguous — foreground subagents pass prompts through to the user.
+- Use AskUserQuestion for clarification when requirements are ambiguous. In subagent contexts where AskUserQuestion is unavailable, write questions to the notepad `questions` section and return — the orchestrator will relay to the user.
 </operating_principles>
 
 ## Agent Catalog
 
-Use `Agent(subagent_type="oh-my-claudeagent:NAME")` for delegation.
+Use `Agent(subagent_type="oh-my-claudeagent:NAME")` for worker agent delegation. Invoke orchestrators (atlas, sisyphus) via their `/oh-my-claudeagent:NAME` skill.
 
 | Agent | Model | When to use |
 |-------|-------|-------------|
@@ -50,6 +50,12 @@ Escalation:
 - sisyphus-junior escalates to: explore (research), oracle (architecture), hephaestus (build fixes).
 - hephaestus escalates to: oracle (architecture changes beyond minimal fixes).
 - explore suggests: sisyphus (multi-file changes), oracle (architecture questions).
+
+Nesting constraint:
+- Subagents CANNOT spawn other subagents — the Agent tool is stripped at depth 1+.
+- Orchestrators (atlas, sisyphus) MUST be invoked via their `context: fork` skill, not via `Agent()`.
+- The delegation chain is: main session → orchestrator (depth 0, via fork) → worker (depth 1, terminal).
+- Workers (sisyphus-junior, explore, etc.) at depth 1 can use all tools EXCEPT Agent.
 </delegation_rules>
 
 <model_routing>
@@ -87,7 +93,7 @@ Invoke via `/oh-my-claudeagent:NAME` or keyword triggers. Quoted phrases below a
 
 ## Bundled Tools
 
-This plugin bundles three MCP servers via `.mcp.json`:
+This plugin bundles four MCP servers via `.mcp.json`:
 
 **ast-grep** — Structural code search and transformation:
 `ast_grep_search`, `ast_grep_replace`, `find_code_by_rule`, `test_match_code_rule`, `dump_syntax_tree`.
@@ -100,19 +106,24 @@ This plugin bundles three MCP servers via `.mcp.json`:
 **grep.app** — Public GitHub repository code search (via Vercel):
 Search across ~1M public repos with language, repository, and file path filters. Use for finding real-world usage examples of libraries, patterns, and APIs.
 
-Notepad sections per plan: `learnings`, `issues`, `decisions`, `problems`. Always append, never overwrite.
+**context7** — Library documentation lookup (via context7.com):
+`context7_resolve-library-id`, `context7_query-docs`. Two-step flow: resolve library ID first, then query docs.
+
+Notepad sections per plan: `learnings`, `issues`, `decisions`, `problems`, `questions`. Always append, never overwrite.
 
 <tool_routing>
 **Search tool routing**: Use `ast_grep_search` for structural code patterns (function signatures, class shapes, import patterns). Use `Grep` for text/string search (log messages, comments, config values). Use `find_code_by_rule` for advanced structural queries with YAML combinators.
 
 **Public code search**: Use `grep.app` MCP tools to search public GitHub repositories for real-world usage examples, library patterns, and API implementations. Use local `Grep` for searching the current project. Use `ast_grep_search` for structural patterns in the current project.
 
+**Library documentation**: Use `context7` MCP tools for looking up library docs — `context7_resolve-library-id` to find the library, then `context7_query-docs` for specific documentation. Prefer context7 over WebFetch for well-known libraries. Fall back to WebFetch/librarian for niche or very recent libraries.
+
 **Verification workflow**: After running any build, test, or lint command, call `evidence_record(type, command, exit_code, output_snippet)` to create `.omca/state/verification-evidence.json`. The `task-completed-verify` hook BLOCKS task completion if this file is missing or stale (>5 min). Example:
 `evidence_record(type="test", command="npm test", exit_code=0, output_snippet="42 tests passed")`
 
 **Boulder lifecycle**: When starting plan execution, call `boulder_write(active_plan, plan_name, session_id)` to register the active plan. Use `boulder_progress` to check completed vs remaining tasks. Hooks and subagents discover the active plan via `boulder_read`.
 
-**Notepad usage**: Use `omca_notepad_write(plan_name, section, content)` to record discoveries during execution. Sections: learnings, issues, decisions, problems. Always append, never overwrite. Subagents receive notepad instructions automatically via the SubagentStart hook.
+**Notepad usage**: Use `omca_notepad_write(plan_name, section, content)` to record discoveries during execution. Sections: learnings, issues, decisions, problems, questions. The `questions` section is used by subagents that need user input (AskUserQuestion workaround) — orchestrators check it after each delegation. Always append, never overwrite.
 
 **Project rules**: `.omca/rules/*.md` files with `# pattern: <glob>` headers auto-inject when matching files are read or edited. Check for injected `[Rule: ...]` context and follow project-specific conventions.
 
@@ -123,7 +134,8 @@ MCP tools are self-describing via the protocol — this section highlights key i
 - Broad or ambiguous requests: explore first (discover scope), then plan (design approach), then execute (implement).
 - Two or more independent tasks should run in parallel — use multiple `Agent()` calls in a single response, up to 5 concurrent agents.
 - Delegation syntax: `Agent(subagent_type="oh-my-claudeagent:NAME", prompt="...")`
-- Exploration agents: prefer running in the background when you have other work to do. Execution agents: run in the foreground when you need their results before proceeding.
+- Exploration agents (explore, librarian): ALWAYS use `run_in_background=true` when you have other independent work to do. Example: `Agent(subagent_type="oh-my-claudeagent:explore", prompt="...", run_in_background=true)`
+- Task execution agents (sisyphus-junior): run in foreground — you need their results before proceeding.
 - Before concluding: ensure zero pending tasks, tests passing, and evidence collected for any claims made.
 </execution_protocols>
 
@@ -142,7 +154,7 @@ Verify outcomes when the task involves running code, deploying, modifying build 
 <workflow_modes>
 Planning pipeline: prometheus (plan) → metis (gap analysis) → momus (review) → atlas (execute all tasks).
 
-Execution entry point: After plan approval, run `/oh-my-claudeagent:atlas` (preferred) or `/oh-my-claudeagent:start-work`. The main session agent must NEVER implement plan tasks directly — always delegate to atlas.
+Execution entry point: After plan approval, run `/oh-my-claudeagent:start-work` (handles plan discovery, boulder setup, worktree) or `/oh-my-claudeagent:atlas [plan path]` (direct atlas execution). Both fork atlas at depth 0. The main session agent must NEVER implement plan tasks directly.
 
 Ralph: persistence mode — keeps working until verified complete. Cancel with `/oh-my-claudeagent:cancel-ralph` or `/oh-my-claudeagent:stop-continuation`.
 
@@ -173,12 +185,15 @@ NEVER:
 - Use `set -euo pipefail` in hook scripts — exit 0 with graceful degradation
 - Create skill directories without `SKILL.md`
 - Read `~/.claude/CLAUDE.md` to determine what features exist — read on-disk files in this repo
+- Use `Bash(claude ...)` or any CLI binary to spawn agents — ALWAYS use the native `Agent(subagent_type=...)` tool
+- Spawn orchestrators (atlas, sisyphus) via `Agent()` — invoke them via their `/oh-my-claudeagent:NAME` skill instead
 
 ALWAYS:
 - Delegate complex multi-file work to specialist agents
-- Use `Agent(subagent_type="oh-my-claudeagent:NAME")` for delegation
+- Use `Agent(subagent_type="oh-my-claudeagent:NAME")` for worker agents (sisyphus-junior, explore, librarian, hephaestus, oracle)
+- Invoke orchestrators (atlas, sisyphus) via `/oh-my-claudeagent:atlas` or `/oh-my-claudeagent:sisyphus-orchestrate` skill — they need `context: fork` to retain Agent tool access
 - Verify after changes that affect runtime behavior
-- Use parallel `Agent()` calls in a single response for independent tasks
+- Use parallel `Agent()` calls in a single response for independent worker tasks
 </rules>
 
 ## Setup
