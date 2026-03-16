@@ -32,6 +32,14 @@ LOG_FILE="${LOG_DIR}/subagents.jsonl"
 jq -nc --arg id "${SUBAGENT_ID}" --arg status "${EXIT_STATUS}" --arg ts "${TIMESTAMP}" \
 	'{event: "subagent_complete", id: $id, status: $status, timestamp: $ts}' >>"${LOG_FILE}"
 
+# Log subagent final message summary and transcript path for audit
+LAST_MSG=$(echo "${INPUT}" | jq -r '.last_assistant_message // ""' 2>/dev/null | head -c 500)
+TRANSCRIPT=$(echo "${INPUT}" | jq -r '.agent_transcript_path // ""' 2>/dev/null)
+if [[ -n "${LAST_MSG}" ]]; then
+	jq -nc --arg id "${SUBAGENT_ID}" --arg msg "${LAST_MSG}" --arg transcript "${TRANSCRIPT}" --arg ts "${TIMESTAMP}" \
+		'{event: "subagent_summary", id: $id, last_message_preview: $msg, transcript_path: $transcript, timestamp: $ts}' >>"${LOG_FILE}"
+fi
+
 SESSION_STATE="${STATE_DIR}/session.json"
 if [[ -f "${SESSION_STATE}" ]]; then
 	TMP_FILE=$(mktemp)

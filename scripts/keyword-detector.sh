@@ -2,6 +2,13 @@
 
 INPUT=$(cat)
 
+# Skip keyword detection for subagent sessions
+# All hook payloads include agent_id when firing inside a subagent
+AGENT_ID=$(echo "${INPUT}" | jq -r '.agent_id // ""' 2>/dev/null)
+if [[ -n "${AGENT_ID}" ]]; then
+	exit 0  # Skip keyword detection for subagent sessions
+fi
+
 PROMPT=$(echo "${INPUT}" | jq -r '.prompt // empty' 2>/dev/null || echo "")
 
 if [[ -z "${PROMPT}" ]]; then
@@ -13,12 +20,14 @@ PROMPT_LOWER=$(echo "${PROMPT}" | tr '[:upper:]' '[:lower:]')
 DETECTED_KEYWORDS=()
 ADDITIONAL_CONTEXT=""
 
-if [[ "${PROMPT_LOWER}" =~ (ralph|don\'t[[:space:]]+stop|must[[:space:]]+complete|until[[:space:]]+done|keep[[:space:]]+going[[:space:]]+until|finish[[:space:]]+this[[:space:]]+no[[:space:]]+matter) ]]; then
+if [[ "${PROMPT_LOWER}" =~ (ralph|don\'t[[:space:]]+stop|must[[:space:]]+complete|until[[:space:]]+done|keep[[:space:]]+going[[:space:]]+until|finish[[:space:]]+this[[:space:]]+no[[:space:]]+matter) ]] \
+	|| [[ "${PROMPT}" =~ (멈추지|止まるな|不要停) ]]; then
 	DETECTED_KEYWORDS+=("ralph")
 	ADDITIONAL_CONTEXT+="[RALPH MODE DETECTED] Activate persistence mode - do not stop until verified complete. "
 fi
 
-if [[ "${PROMPT_LOWER}" =~ (ulw|ultrawork|as[[:space:]]+fast[[:space:]]+as[[:space:]]+possible|run[[:space:]]+in[[:space:]]+parallel|simultaneously) ]]; then
+if [[ "${PROMPT_LOWER}" =~ (ulw|ultrawork|as[[:space:]]+fast[[:space:]]+as[[:space:]]+possible|run[[:space:]]+in[[:space:]]+parallel|simultaneously) ]] \
+	|| [[ "${PROMPT}" =~ (울트라워크|ウルトラワーク|极限工作) ]]; then
 	DETECTED_KEYWORDS+=("ultrawork")
 	ADDITIONAL_CONTEXT+="[ULTRAWORK MODE DETECTED] Activate maximum parallel execution. "
 fi

@@ -2,6 +2,7 @@
 
 PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$(pwd)}"
 STATE_DIR="${PROJECT_ROOT}/.omca/state"
+LOG_DIR="${PROJECT_ROOT}/.omca/logs"
 mkdir -p "${STATE_DIR}"
 
 CONTEXT_FILE="${STATE_DIR}/compaction-context.md"
@@ -35,6 +36,21 @@ TEMPLATE
 			fi
 		fi
 	done
+
+	# Include subagent session data for RESUME, DON'T RESTART directive
+	SUBAGENT_LOG="${LOG_DIR}/subagents.jsonl"
+	ACTIVE_AGENTS=""
+	if [[ -f "${SUBAGENT_LOG}" ]]; then
+		ACTIVE_AGENTS=$(tail -50 "${SUBAGENT_LOG}" | jq -s '[.[] | select(.event == "subagent_spawn")] | .[-10:] | .[] | "- Agent: \(.type // "unknown"), SpawnID: \(.id // "unknown"), Model: \(.model // "default")"' 2>/dev/null | tr -d '"')
+	fi
+
+	printf '\n## Recently Spawned Agents\n'
+	if [[ -n "${ACTIVE_AGENTS}" ]]; then
+		printf '%s\n' "${ACTIVE_AGENTS}"
+	else
+		printf '%s\n' "No recent agent spawns recorded."
+	fi
+	printf '%s\n' "RESUME, DON'T RESTART: If an agent was working on a task before compaction, resume it with Agent(resume=\"<agentId>\") rather than spawning a new one. Check subagent completion status before re-delegating."
 
 	printf '\n## Pending Tasks\n'
 
