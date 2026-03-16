@@ -16,16 +16,12 @@ if [[ "${AGENT_USED}" == "true" ]]; then
 fi
 
 TMP=$(mktemp)
-jq '.toolCallCount += 1 | if .toolCallCount >= 3 then .toolCallCount = 0 else . end' "${USAGE_FILE}" >"${TMP}" && mv "${TMP}" "${USAGE_FILE}"
-RESULT=$(jq -r '.toolCallCount' "${USAGE_FILE}" 2>/dev/null)
-if [[ "${RESULT}" == "0" ]]; then
-	RESULT="3"
-else
-	RESULT="below"
-fi
+jq '.toolCallCount += 1' "${USAGE_FILE}" >"${TMP}" && mv "${TMP}" "${USAGE_FILE}"
+COUNT=$(jq -r '.toolCallCount' "${USAGE_FILE}" 2>/dev/null)
 
-if [[ "${RESULT}" != "below" ]]; then
-	MSG="[DELEGATION REMINDER] You've made ${RESULT} direct search/fetch calls without delegating.
+# Nudge every 3rd direct tool call
+if [[ $((COUNT % 3)) -eq 0 ]]; then
+	MSG="[DELEGATION REMINDER] You've made ${COUNT} direct search/fetch calls without delegating.
 Available agents: explore (codebase search), librarian (docs research), hephaestus (build fixes), momus (plan review), oracle (architecture advice).
 Relevant skills: /refactor, /git-master, /playwright, /frontend-ui-ux.
 Use Agent(subagent_type=\"oh-my-claudeagent:NAME\", prompt=\"...\") to delegate."
