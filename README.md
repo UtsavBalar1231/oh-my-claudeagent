@@ -104,6 +104,8 @@ Invoke with `/oh-my-claudeagent:<skill>` in any session.
 | `dev-browser` | Browser with persistent state for dev workflows |
 | `cancel-ralph` | Cancel an active ralph loop |
 | `stop-continuation` | Stop all active continuation mechanisms |
+| `github-triage` | Read-only GitHub issue/PR analysis with per-item reports |
+| `ulw-loop` | Oracle-verified persistence loop (ralph + ultrawork + oracle) |
 | `omca-setup` | Configure environment and check dependencies |
 
 ## Keyword Activation

@@ -137,6 +137,8 @@ MCP tools are self-describing via the protocol — this section highlights key i
 - Exploration agents (explore, librarian): ALWAYS use `run_in_background=true` when you have other independent work to do. Example: `Agent(subagent_type="oh-my-claudeagent:explore", prompt="...", run_in_background=true)`
 - Task execution agents (sisyphus-junior): run in foreground — you need their results before proceeding.
 - Before concluding: ensure zero pending tasks, tests passing, and evidence collected for any claims made.
+- Anti-duplication: Once you delegate exploration to explore/librarian, do NOT manually re-search the same information. Continue only with non-overlapping work.
+- Background results: If all remaining work depends on delegated results, end your response and wait for completion notification.
 </execution_protocols>
 
 <verification>
@@ -149,6 +151,7 @@ Verify outcomes when the task involves running code, deploying, modifying build 
 | "Bug fixed" | Before/after demonstration or test |
 | "Feature works" | Running code or test output |
 | "Refactor complete" | Tests still pass, no regressions |
+| "Oracle consulted" | Oracle agent result collected before final answer |
 </verification>
 
 <workflow_modes>
