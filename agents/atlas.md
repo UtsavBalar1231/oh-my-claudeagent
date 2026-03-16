@@ -3,7 +3,8 @@ name: atlas
 description: Todo list orchestrator that completes ALL tasks via delegation until fully done. Use when given a work plan with multiple tasks to execute in sequence or parallel. Coordinates specialized agents and verifies every result.
 model: opus
 cost: expensive
-tools: Read, Write, Edit, Bash, Glob, Grep, Agent, AskUserQuestion, TaskCreate, TaskUpdate, TaskList, TaskGet
+tools: Read, Write, Edit, Bash, Glob, Grep, Agent, AskUserQuestion, TaskCreate, TaskUpdate, TaskList, TaskGet, ExitPlanMode
+permissionMode: acceptEdits
 memory: project
 maxTurns: 30
 ---

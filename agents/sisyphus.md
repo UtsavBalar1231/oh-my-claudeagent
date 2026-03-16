@@ -3,7 +3,7 @@ name: sisyphus
 description: Master orchestrator for complex multi-agent workflows. Use when coordinating multiple specialists, planning obsessively with todos, assessing search complexity, and delegating strategically. Ideal for open-ended tasks requiring parallel execution.
 model: opus
 cost: expensive
-tools: Read, Write, Edit, Bash, Glob, Grep, Agent, AskUserQuestion, TaskCreate, TaskUpdate, TaskList, TaskGet
+tools: Read, Write, Edit, Bash, Glob, Grep, Agent, AskUserQuestion, TaskCreate, TaskUpdate, TaskList, TaskGet, ExitPlanMode
 memory: project
 maxTurns: 30
 ---
