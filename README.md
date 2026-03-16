@@ -56,7 +56,8 @@ Add to your project's `.claude/settings.json` so team members get the plugin aut
 
 - Claude Code CLI
 - `jq`
-- `python3` 3.10+ with `venv` support
+- `uv`
+- `python3` 3.10+
 - `ast-grep` CLI (`ast-grep` or `sg`)
 
 ## Agents
@@ -76,6 +77,7 @@ A master orchestrator delegates to specialists based on task type. Every agent h
 | **librarian** | External research — SDK docs, API references | sonnet |
 | **hephaestus** | Build and toolchain fixer | sonnet |
 | **multimodal-looker** | Vision, PDF, and image analysis | sonnet |
+| **socrates** | Deep research interview using Socratic method | opus |
 
 Override any agent's default model with `Agent(model="haiku")` or `Agent(model="opus")` for cost or quality tuning.
 
