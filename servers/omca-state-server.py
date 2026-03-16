@@ -288,9 +288,9 @@ def _notepad_dir(state: str, plan_name: str) -> str:
 @mcp.tool()
 def omca_notepad_write(
     plan_name: str = Field(description="Plan name (matches boulder plan_name)"),
-    section: Literal["learnings", "issues", "decisions", "problems", "questions"] = Field(
-        description="Notepad section to write to"
-    ),
+    section: Literal[
+        "learnings", "issues", "decisions", "problems", "questions"
+    ] = Field(description="Notepad section to write to"),
     content: str = Field(description="Content to append (markdown)"),
     working_directory: str = Field(
         default="", description="Project root (auto-detected from git)"
@@ -313,9 +313,8 @@ def omca_notepad_write(
 @mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
 def omca_notepad_read(
     plan_name: str = Field(description="Plan name"),
-    section: Literal["learnings", "issues", "decisions", "problems", "questions"] | None = Field(
-        default=None, description="Section to read (all if omitted)"
-    ),
+    section: Literal["learnings", "issues", "decisions", "problems", "questions"]
+    | None = Field(default=None, description="Section to read (all if omitted)"),
     working_directory: str = Field(
         default="", description="Project root (auto-detected from git)"
     ),
