@@ -14,8 +14,9 @@ LOG_DIR="${PROJECT_ROOT}/.omca/logs"
 mkdir -p "${STATE_DIR}" "${LOG_DIR}"
 
 TIMESTAMP=$(date -Iseconds)
-SPAWN_EPOCH=$(date +%s%N)
-SPAWN_ID="spawn-${SPAWN_EPOCH:0:13}"
+# Portable millisecond epoch — %N is GNU-only (broken on macOS BSD date)
+SPAWN_EPOCH="$(date +%s)$(printf '%03d' $((RANDOM % 1000)))"
+SPAWN_ID="spawn-${SPAWN_EPOCH}"
 
 SUBAGENTS_FILE="${STATE_DIR}/subagents.json"
 if [[ ! -f "${SUBAGENTS_FILE}" ]]; then

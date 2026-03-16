@@ -37,7 +37,12 @@ fi
 
 # Stagnation detection
 MAX_STAGNATION=3
-TASK_HASH=$(jq -r '[.tasks[]? | .status] | sort | join(",")' "${RALPH_STATE}" 2>/dev/null | md5sum | cut -d' ' -f1)
+# Portable hash — md5sum (GNU/Linux) vs md5 (macOS BSD)
+if command -v md5sum &>/dev/null; then
+	TASK_HASH=$(jq -r '[.tasks[]? | .status] | sort | join(",")' "${RALPH_STATE}" 2>/dev/null | md5sum | cut -d' ' -f1)
+else
+	TASK_HASH=$(jq -r '[.tasks[]? | .status] | sort | join(",")' "${RALPH_STATE}" 2>/dev/null | md5 | cut -d' ' -f4)
+fi
 
 LAST_HASH=$(jq -r '.last_task_hash // ""' "${RALPH_STATE}" 2>/dev/null)
 STAGNATION=$(jq -r '.stagnation_count // 0' "${RALPH_STATE}" 2>/dev/null)

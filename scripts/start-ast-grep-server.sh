@@ -41,7 +41,10 @@ is_ast_grep_binary() {
 
 	local version_out
 	version_out="$("${resolved}" --version 2>/dev/null || true)"
-	if [[ "${version_out,,}" == *"ast-grep"* ]]; then
+	# Use tr for lowercase — ${var,,} requires bash 4+ (macOS ships bash 3.2)
+	local version_lower
+	version_lower="$(printf '%s' "${version_out}" | tr '[:upper:]' '[:lower:]')"
+	if [[ "${version_lower}" == *"ast-grep"* ]]; then
 		printf '%s\n' "${resolved}"
 		return 0
 	fi

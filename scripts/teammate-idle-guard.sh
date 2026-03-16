@@ -44,8 +44,10 @@ if [[ -f "${SUBAGENTS_FILE}" ]]; then
 	fi
 
 	if [[ -n "${STARTED_AT}" && "${STARTED_AT}" != "null" ]]; then
-		# Convert ISO timestamp to epoch; fall back to treating as epoch if conversion fails
-		STARTED_EPOCH=$(date -d "${STARTED_AT}" +%s 2>/dev/null || echo "${STARTED_AT}")
+		# Portable ISO-to-epoch — date -d is GNU-only; python3 works on macOS + Linux
+		STARTED_EPOCH=$(python3 -c "from datetime import datetime,timezone; print(int(datetime.fromisoformat('${STARTED_AT}'.replace('Z','+00:00')).timestamp()))" 2>/dev/null \
+			|| date -d "${STARTED_AT}" +%s 2>/dev/null \
+			|| echo "${STARTED_AT}")
 		if [[ "${STARTED_EPOCH}" =~ ^[0-9]+$ ]]; then
 			ELAPSED=$(( NOW - STARTED_EPOCH ))
 			if [[ "${ELAPSED}" -gt "${TIMEOUT_SECS}" ]]; then
