@@ -11,6 +11,7 @@ import sys
 
 from statusline.core import FALLBACK, render
 from statusline.git import get_git_info
+from statusline.usage import get_usage
 
 
 def main() -> None:
@@ -28,8 +29,9 @@ def main() -> None:
         workspace = data.get("workspace", {})
         project_dir = workspace.get("project_dir", data.get("cwd", ""))
         git_info = get_git_info(project_dir) if project_dir else {}
+        usage = get_usage()
 
-        output = render(data, git_info)
+        output = render(data, git_info, usage)
         print(output)
     except Exception:
         print("[claude]")

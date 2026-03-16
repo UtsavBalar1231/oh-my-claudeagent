@@ -7,6 +7,7 @@ scripts/statusline.py. The public entry point is render(data, git_info).
 from __future__ import annotations
 
 import os
+from datetime import datetime, timezone
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -26,9 +27,9 @@ MAGENTA = "\033[35m"
 BLUE = "\033[34m"
 BOLD = "\033[1m"
 
-# Graduated block characters (index 0 = thinnest, 7 = full block)
-GRAD_BLOCKS = "\u258f\u258e\u258d\u258c\u258b\u258a\u2589\u2588"
-EMPTY_BLOCK = "\u2591"
+# Filled/empty block characters for progress bars
+FILLED_BLOCK = "\u25b0"  # ▰
+EMPTY_BLOCK = "\u25b1"  # ▱
 
 # Dim mid-dot separator
 SEP = f" {DIM}\u00b7{RST} "
@@ -68,6 +69,8 @@ def build_glyphs(nerd: bool) -> dict[str, str]:
             "agent": "\uf544",  # nf-mdi-robot
             "worktree": "\ue728",  # nf-dev-git_merge
             "style": "\uf10c",  # nf-fa-circle_o
+            "five_hour": "\uf251",  # nf-fa-hourglass_half
+            "weekly": "\uf073",  # nf-fa-calendar
         }
     return {
         "branch": "*",
@@ -81,6 +84,8 @@ def build_glyphs(nerd: bool) -> dict[str, str]:
         "agent": "A:",
         "worktree": "W:",
         "style": "S:",
+        "five_hour": "5h",
+        "weekly": "7d",
     }
 
 
@@ -96,6 +101,16 @@ def _threshold_color(pct: float) -> str:
     if pct >= 60:
         return YELLOW
     return GREEN
+
+
+def _render_bar(pct: float, bar_width: int = 10, color: str = GREEN) -> str:
+    """Render a filled/empty block progress bar for the given percentage (0-100)."""
+    pct = max(0.0, min(100.0, pct))
+    filled = round(pct / 100.0 * bar_width)
+    bar_chars = [f"{color}{FILLED_BLOCK}{RST}"] * filled + [
+        f"{DIM}{EMPTY_BLOCK}{RST}"
+    ] * (bar_width - filled)
+    return "".join(bar_chars)
 
 
 def _render_context_bar(
@@ -129,24 +144,7 @@ def _render_context_bar(
 
     color = _threshold_color(effective_pct)
 
-    # Build graduated bar
-    fill_exact = effective_pct / 100.0 * bar_width
-    full_blocks = int(fill_exact)
-    remainder = fill_exact - full_blocks
-
-    bar_chars = []
-    for i in range(bar_width):
-        if i < full_blocks:
-            bar_chars.append(f"{color}\u2588{RST}")  # full block
-        elif i == full_blocks and remainder > 0:
-            # Graduated partial block (8 levels)
-            grad_idx = int(remainder * 8)
-            grad_idx = min(grad_idx, 7)
-            bar_chars.append(f"{color}{GRAD_BLOCKS[grad_idx]}{RST}")
-        else:
-            bar_chars.append(f"{DIM}{EMPTY_BLOCK}{RST}")
-
-    bar_str = "".join(bar_chars)
+    bar_str = _render_bar(effective_pct, bar_width, color)
 
     # Percentage text
     pct_text = f"{color}{effective_pct:.0f}%{RST}"
@@ -341,15 +339,82 @@ def _compose_line2(
     return SEP.join(parts)
 
 
+def _format_reset_time(iso_str: str | None) -> str:
+    """Format an ISO 8601 reset timestamp to a human-readable local time string.
+
+    Returns "" for None/empty input or on parse error.
+    Same day: "5pm" / "11am". Different day: "thu 5pm".
+    """
+    if not iso_str:
+        return ""
+    try:
+        # Python 3.10 compat: fromisoformat() doesn't handle trailing "Z"
+        normalized = iso_str.replace("Z", "+00:00")
+        utc_dt = datetime.fromisoformat(normalized)
+        local_dt = utc_dt.astimezone()
+        now_local = datetime.now(timezone.utc).astimezone()  # noqa: UP017
+        time_str = local_dt.strftime("%-I%p").lower()
+        if local_dt.date() == now_local.date():
+            return time_str
+        day_str = local_dt.strftime("%a").lower()
+        return f"{day_str} {time_str}"
+    except (ValueError, OSError):
+        return ""
+
+
+def _compose_line3(usage: dict, glyphs: dict[str, str]) -> str | None:
+    """Compose the usage bars line (Line 3).
+
+    Returns None if all usage data is None (five_hour_pct and seven_day_pct).
+    Layout per bar: ``{bar} {pct}% {glyph} (resets {time})``.
+    """
+    five_pct = usage.get("five_hour_pct")
+    seven_pct = usage.get("seven_day_pct")
+
+    if five_pct is None and seven_pct is None:
+        return None
+
+    parts: list[str] = []
+
+    if five_pct is not None:
+        color = _threshold_color(five_pct)
+        bar = _render_bar(five_pct, bar_width=10, color=color)
+        pct_text = f"{color}{five_pct:.0f}%{RST}"
+        glyph = glyphs["five_hour"]
+        reset_time = _format_reset_time(usage.get("five_hour_resets_at"))
+        resets_str = f" (resets {reset_time})" if reset_time else ""
+        parts.append(f"{bar} {pct_text} {DIM}{glyph}{RST}{resets_str}")
+
+    if seven_pct is not None:
+        color = _threshold_color(seven_pct)
+        bar = _render_bar(seven_pct, bar_width=10, color=color)
+        pct_text = f"{color}{seven_pct:.0f}%{RST}"
+        glyph = glyphs["weekly"]
+        reset_time = _format_reset_time(usage.get("seven_day_resets_at"))
+        resets_str = f" (resets {reset_time})" if reset_time else ""
+        extra = ""
+        if usage.get("extra_usage_enabled"):
+            extra = " +"
+        parts.append(f"{bar} {pct_text} {DIM}{glyph}{RST}{resets_str}{extra}")
+
+    return SEP.join(parts)
+
+
 # ---------------------------------------------------------------------------
 # Public render function
 # ---------------------------------------------------------------------------
 
 
-def render(data: dict, git_info: dict) -> str:
+def render(data: dict, git_info: dict, usage: dict | None = None) -> str:
     """Render the statusline from parsed JSON data and git info.
 
-    Returns a string of 1 or 2 lines joined by newline.
+    Args:
+        data: Parsed JSON payload from Claude Code.
+        git_info: Git metadata dict from get_git_info().
+        usage: Optional usage data from get_usage(). When provided and the
+               layout is two-line, a third line with usage bars is appended.
+
+    Returns a string of 1, 2, or 3 lines joined by newline.
     The caller decides whether to print or send over socket.
     """
     nerd = detect_nerd_font()
@@ -368,6 +433,9 @@ def render(data: dict, git_info: dict) -> str:
     use_two_lines = is_git or has_agent or has_worktree or has_vim or has_extra
 
     if use_two_lines:
+        line3 = _compose_line3(usage, glyphs) if usage else None
+        if line3:
+            return f"{line1}\n{line2}\n{line3}"
         return f"{line1}\n{line2}"
 
     # Single line: model + bar + cost + duration
