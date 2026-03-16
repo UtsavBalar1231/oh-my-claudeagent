@@ -24,7 +24,7 @@ OMCA_STATE_DIR = ".omca/state"
 BOULDER_FILE = "boulder.json"
 EVIDENCE_FILE = "verification-evidence.json"
 NOTEPADS_DIR = "notepads"
-VALID_SECTIONS = ("learnings", "issues", "decisions", "problems")
+VALID_SECTIONS = ("learnings", "issues", "decisions", "problems", "questions")
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -288,7 +288,7 @@ def _notepad_dir(state: str, plan_name: str) -> str:
 @mcp.tool()
 def omca_notepad_write(
     plan_name: str = Field(description="Plan name (matches boulder plan_name)"),
-    section: Literal["learnings", "issues", "decisions", "problems"] = Field(
+    section: Literal["learnings", "issues", "decisions", "problems", "questions"] = Field(
         description="Notepad section to write to"
     ),
     content: str = Field(description="Content to append (markdown)"),
@@ -313,7 +313,7 @@ def omca_notepad_write(
 @mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
 def omca_notepad_read(
     plan_name: str = Field(description="Plan name"),
-    section: Literal["learnings", "issues", "decisions", "problems"] | None = Field(
+    section: Literal["learnings", "issues", "decisions", "problems", "questions"] | None = Field(
         default=None, description="Section to read (all if omitted)"
     ),
     working_directory: str = Field(
