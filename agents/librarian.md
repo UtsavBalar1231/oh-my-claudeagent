@@ -2,6 +2,7 @@
 name: librarian
 description: External documentation and open-source code researcher. Use when looking up library usage, finding implementation examples in OSS, retrieving official documentation, or researching best practices for unfamiliar packages.
 model: sonnet
+cost: free
 tools: Read, Grep, Glob, Bash, WebFetch, WebSearch
 permissionMode: plan
 disallowedTools:
@@ -110,7 +111,7 @@ https://github.com/<owner>/<repo>/blob/<commit-sha>/<filepath>#L<start>-L<end>
 
 | Purpose | Approach |
 |---------|----------|
-| **Official Docs** | Web search for official documentation |
+| **Official Docs** | context7 first (`context7_resolve-library-id` -> `context7_query-docs`), fall back to web search |
 | **Sitemap Discovery** | Fetch docs_url + "/sitemap.xml" |
 | **Read Doc Page** | Fetch specific documentation pages |
 | **Fast Code Search** | GitHub code search |

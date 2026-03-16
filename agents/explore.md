@@ -2,6 +2,7 @@
 name: explore
 description: Codebase search specialist for finding files, patterns, and implementations. Use when asking "Where is X?", "Which file has Y?", or "Find the code that does Z". Fire multiple in parallel for broad searches.
 model: sonnet
+cost: free
 tools: Read, Grep, Glob, Bash
 permissionMode: plan
 memory: project
@@ -142,6 +143,12 @@ The main entry point is login.ts:authenticateUser()
 NEXT STEPS:
 Ready to proceed - these files contain all auth logic. Start with login.ts for the main flow.
 ```
+
+## When Nothing Is Found
+
+If all searches return zero results:
+1. State explicitly: "No matches found for [query]. Tools used: [list]. Suggest: [broader query or alternative approach]."
+2. During plan execution, record the negative finding via `omca_notepad_write(plan_name, "learnings", "Searched for X — not found in codebase. Implications: ...")` so other agents don't repeat the search.
 
 ## Thoroughness Levels
 
