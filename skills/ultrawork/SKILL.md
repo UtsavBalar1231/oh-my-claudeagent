@@ -169,6 +169,7 @@ After all parallel work completes:
 4. Verify combined functionality
 5. Architect review if complex
 6. Record all results via evidence_record(type, command, exit_code, output_snippet)
+7. Review all evidence via `evidence_read` before reporting completion
 ```
 
 ---
@@ -220,6 +221,7 @@ Before claiming done, answer honestly:
 3. Did I read the actual output of every command? (not skim)
 4. Is EVERY requirement from the request actually implemented? (re-read the request NOW)
 5. Did I record evidence for every verification with `evidence_record`? (not "I verified it mentally")
+6. Did I record key learnings or issues via `omca_notepad_write`?
 
 **If ANY answer is no → GO BACK AND DO IT. Do not claim completion.**
 

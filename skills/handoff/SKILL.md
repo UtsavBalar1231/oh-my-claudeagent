@@ -42,9 +42,8 @@ git log --oneline -5
 Also gather:
 - `TaskList()` — current task progress and pending items
 - `Read(".omca/state/boulder.json")` — active plan state if it exists
-- Optional local context files, only if they already exist and your environment maintains them:
-  - `Read(".omca/notepad.md")` — session scratch pad notes
-  - `Read(".omca/project-memory.json")` — persistent project context
+- If an active plan exists (from boulder state), read notepad data:
+  - `Read(".omca/state/notepads/{plan-name}/")` — per-plan notepad sections (learnings, issues, decisions, problems)
 - `Glob(".omca/plans/*.md")` — recent plan files
 
 ---

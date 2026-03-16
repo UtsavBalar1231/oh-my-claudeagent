@@ -95,6 +95,7 @@ After all tasks complete:
 3. Verify functionality
 4. Get oracle approval
 5. Record evidence: `evidence_record(type, command, exit_code, output_snippet)` for every verification step
+6. Review accumulated evidence via `evidence_read` before claiming final completion
 
 ---
 
@@ -111,6 +112,7 @@ VERIFICATION CHECKLIST:
 [ ] FUNCTIONALITY: All features work
 [ ] ORACLE: Verification passed
 [ ] EVIDENCE: All verification results recorded via evidence_record
+[ ] NOTEPAD: Key discoveries recorded via omca_notepad_write
 
 IF ANY UNCHECKED -> CONTINUE WORKING
 ```

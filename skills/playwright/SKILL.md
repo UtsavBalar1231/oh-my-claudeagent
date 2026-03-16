@@ -97,6 +97,14 @@ When the Playwright MCP server is running, these tools become available:
 3. Use `browser_snapshot` after each navigation to understand new page
 4. Continue until flow complete
 
+## Fallback
+
+If Playwright MCP server is not configured (no `mcp__playwright__*` tools available), fall back to `/oh-my-claudeagent:dev-browser`.
+
+## MCP Tool Interaction
+
+Primary interaction is via Playwright MCP tools (`mcp__playwright__*`), not via Bash. Use the MCP tools directly for all browser operations.
+
 ## Important Notes
 
 - **Prefer `browser_snapshot` over `browser_screenshot`** — snapshots return structured accessibility data that is easier to parse and act on

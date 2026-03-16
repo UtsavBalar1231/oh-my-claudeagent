@@ -1,9 +1,9 @@
 ---
 name: start-work
 description: Start a work session from a Prometheus-generated plan.
-allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent
+context: fork
+agent: oh-my-claudeagent:atlas
 user-invocable: true
-disable-model-invocation: true
 argument-hint: "[plan file] [--worktree <path>]"
 ---
 
@@ -13,7 +13,12 @@ Start a work session from a Prometheus-generated plan.
 
 ## What To Do
 
-1. **Find available plans**: Search for Prometheus-generated plan files at `.omca/plans/`
+1. **Find available plans** (multi-source):
+   a. Check `.omca/state/boulder.json` first — if `active_plan` field exists and points to a valid file, use it directly
+   b. If no active boulder, search BOTH locations:
+      - `.omca/plans/*.md` (plugin-generated plans from prometheus)
+      - `~/.claude/plans/*.md` (Claude Code native plan mode plans)
+   c. Merge results, deduplicated by filename, with source labels: `[omca]` or `[native]`
 
 2. **Check for active state**: Read `.omca/state/boulder.json` if it exists
 
@@ -104,24 +109,21 @@ Started: {timestamp}
 Reading plan and beginning execution...
 ```
 
-## Atlas Delegation (MANDATORY)
+## Execute Plan
 
-**You MUST delegate execution to atlas. Do NOT implement directly.**
+After completing plan discovery and boulder setup above, execute the plan:
 
-After reading the plan and setting up boulder state, delegate immediately:
-```
-Agent(subagent_type="oh-my-claudeagent:atlas", prompt="Execute the work plan at {plan_path}. Read the plan, analyze tasks, delegate each via sisyphus-junior, and verify results. Mark checkboxes as tasks complete.")
-```
+1. Read the FULL plan file
+2. Analyze task structure: identify waves, dependencies, parallelizable groups
+3. Delegate tasks via `Agent(subagent_type="oh-my-claudeagent:sisyphus-junior")` — one task per agent
+4. Run independent tasks in parallel (up to 5 concurrent agents)
+5. Verify each task's output before marking complete
+6. Record evidence: `evidence_record(type, command, exit_code, output_snippet)`
 
-The start-work skill's job is to:
-1. Find/select the plan
-2. Set up boulder state
-3. Hand off to atlas for execution
-
-You are a launcher, not an executor.
+Follow atlas workflow: delegate, verify, mark checkboxes, repeat until done.
 
 ## Critical
 
 - Always update `.omca/state/boulder.json` BEFORE starting work
 - Read the FULL plan file before delegating any tasks
-- Follow atlas delegation protocols (6-section format)
+- Follow atlas 6-section delegation prompt format

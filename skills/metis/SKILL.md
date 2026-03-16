@@ -14,3 +14,5 @@ proceeding to planning.
 
 Follow the metis workflow: classify intent, explore the codebase for relevant patterns,
 identify risks and gaps, provide actionable directives for the planner.
+
+**Expected output**: Metis produces a structured analysis covering: hidden intentions behind the request, scope boundaries and gaps, risk factors, technical constraints, and actionable directives for the planner. This output feeds directly into prometheus for plan generation.

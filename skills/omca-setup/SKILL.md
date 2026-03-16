@@ -467,7 +467,6 @@ Non-destructive health check — no files are modified.
 - ALWAYS backup `~/.claude/CLAUDE.md` before any write (Phase 3)
 - NEVER modify files outside `~/.claude/` and `.omca/` (plus `.gitignore`)
 - NEVER claim marketplace installation or managed policy enforcement unless existing Claude Code settings prove it
-- NEVER auto-edit shared or managed Claude Code settings during setup; print guidance instead
 - Apply settings changes with explicit user confirmation via AskUserQuestion; print jq fallback on decline
 - Idempotent: running setup multiple times with the same version is a no-op
 - Template is read from disk, not generated — ensures deterministic output

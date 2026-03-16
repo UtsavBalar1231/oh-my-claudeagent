@@ -31,4 +31,7 @@ Run `/cancel-ralph` when you want to stop an active Ralph Loop.
 Ralph Loop state is stored in:
 - `.omca/state/ralph-state.json`
 
-If it exists, clear it to cancel the loop.
+If it exists, clear it to cancel the loop:
+```bash
+rm -f "${CLAUDE_PROJECT_ROOT}/.omca/state/ralph-state.json"
+```
