@@ -31,6 +31,7 @@ mkdir -p "${STATE_DIR}/worktrees"
 
 # Check if CLAUDE.md has OMCA configuration (only on fresh startup, not compact)
 SETUP_NOTICE=""
+OMCA_CONFIGURED=0
 SOURCE=$(echo "${INPUT}" | jq -r '.source // "startup"' 2>/dev/null)
 if [[ "${SOURCE}" != "compact" ]]; then
 	GLOBAL_CLAUDE_MD="${HOME}/.claude/CLAUDE.md"
@@ -57,7 +58,12 @@ fi
 PLUGIN_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PLUGIN_MD="${PLUGIN_ROOT}/templates/claudemd.md"
 
-if [[ -f "${PLUGIN_MD}" ]]; then
+if [[ "${OMCA_CONFIGURED}" -eq 1 ]]; then
+	# CLAUDE.md already has the behavioral spec — just emit session metadata
+	SHORT_CONTEXT=$(printf 'Session %s initialized.%b' "${SESSION_ID}" "${SETUP_NOTICE}" | jq -Rs .)
+	echo "{\"hookSpecificOutput\": {\"hookEventName\": \"SessionStart\", \"additionalContext\": ${SHORT_CONTEXT}}}"
+elif [[ -f "${PLUGIN_MD}" ]]; then
+	# No CLAUDE.md setup — inject full template as fallback
 	PLUGIN_MD_CONTENT=$(cat "${PLUGIN_MD}")
 	FULL_CONTEXT=$(printf "Session %s initialized.\n\n%s%b" "${SESSION_ID}" "${PLUGIN_MD_CONTENT}" "${SETUP_NOTICE}" | jq -Rs .)
 	echo "{\"hookSpecificOutput\": {\"hookEventName\": \"SessionStart\", \"additionalContext\": ${FULL_CONTEXT}}}"
