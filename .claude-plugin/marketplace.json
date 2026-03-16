@@ -15,7 +15,7 @@
         "source": "github",
         "repo": "UtsavBalar1231/oh-my-claudeagent",
         "ref": "main",
-        "sha": "0bb8bdd846297bf32efd05d5aeaf70c820e3006b"
+        "sha": "bffc76797de509295074ac1f8580029cb1a4c112"
       },
       "description": "Turn Claude Code into a multi-agent system. Specialist agents handle planning, execution, code review, debugging, and research — with persistence modes, parallel execution, and natural language activation.",
       "version": "1.1.0",
@@ -26,9 +26,22 @@
       "homepage": "https://github.com/UtsavBalar1231/oh-my-claudeagent",
       "repository": "https://github.com/UtsavBalar1231/oh-my-claudeagent",
       "license": "MIT",
-      "keywords": ["agents", "orchestration", "multi-agent", "planning", "delegation", "parallel-execution"],
+      "keywords": [
+        "agents",
+        "orchestration",
+        "multi-agent",
+        "planning",
+        "delegation",
+        "parallel-execution"
+      ],
       "category": "productivity",
-      "tags": ["multi-agent", "orchestration", "automation", "claude-code", "workflow"]
+      "tags": [
+        "multi-agent",
+        "orchestration",
+        "automation",
+        "claude-code",
+        "workflow"
+      ]
     }
   ]
 }

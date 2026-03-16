@@ -84,7 +84,9 @@ ci: fmt-check lint test
 # Stamp current HEAD SHA into marketplace.json for deterministic installs
 [group('release')]
 release:
-	@SHA=$$(git rev-parse HEAD) && \
-	jq --arg sha "$$SHA" '.plugins[0].source.sha = $$sha' .claude-plugin/marketplace.json > /tmp/marketplace-tmp.json && \
-	mv /tmp/marketplace-tmp.json .claude-plugin/marketplace.json && \
-	echo "Stamped SHA: $$SHA"
+	#!/usr/bin/env bash
+	set -euo pipefail
+	SHA=$(git rev-parse HEAD)
+	jq --arg sha "$SHA" '.plugins[0].source.sha = $sha' .claude-plugin/marketplace.json > /tmp/marketplace-tmp.json
+	mv /tmp/marketplace-tmp.json .claude-plugin/marketplace.json
+	echo "Stamped SHA: $SHA"
