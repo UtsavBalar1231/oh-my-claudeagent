@@ -184,7 +184,7 @@ Apply permission and settings changes to `~/.claude/settings.json` with user con
 
 2. Compute missing permissions against the required set:
    - `Write(.omca/**)`, `Edit(.omca/**)`, `Read(.omca/**)`
-   - `mcp__omca-state__*`, `mcp__ast-grep__*`, `mcp__grep__*`, `mcp__context7__*`, `mcp__pgs__*`
+   - `mcp__omca-state__*`, `mcp__ast-grep__*`, `mcp__grep__*`, `mcp__context7__*`
    - `Bash(jq *)`, `Bash(uv run *)`, `Bash(uv sync *)`
 
 3. Compute missing top-level: `teammateMode: "auto"`
@@ -207,7 +207,6 @@ Apply permission and settings changes to `~/.claude/settings.json` with user con
      "mcp__ast-grep__*",
      "mcp__grep__*",
      "mcp__context7__*",
-     "mcp__pgs__*",
      "Bash(jq *)",
      "Bash(uv run *)",
      "Bash(uv sync *)"
@@ -217,7 +216,7 @@ Apply permission and settings changes to `~/.claude/settings.json` with user con
 8. Explain each setting:
    - `teammateMode: "auto"` — enables agent teams with best available UI (tmux/iTerm2 split panes)
    - `Write(.omca/**)` / `Edit(.omca/**)` / `Read(.omca/**)` — auto-allow plugin state file access
-   - `mcp__omca-state__*` / `mcp__ast-grep__*` / `mcp__grep__*` / `mcp__context7__*` / `mcp__pgs__*` — auto-allow bundled MCP tool usage
+   - `mcp__omca-state__*` / `mcp__ast-grep__*` / `mcp__grep__*` / `mcp__context7__*` — auto-allow bundled MCP tool usage
    - `Bash(jq *)` / `Bash(uv run *)` / `Bash(uv sync *)` — auto-allow common plugin utility commands (narrowed from `Bash(uv *)`)
 
 ---
