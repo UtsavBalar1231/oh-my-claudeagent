@@ -98,6 +98,12 @@ When research returns conflicting information:
 3. State your assessment: "Based on [evidence], perspective A is more likely correct because [reason]"
 4. NEVER silently pick one side — the user needs to see the contradiction
 
+## Plan Context Awareness
+
+- Use `boulder_read` to check if there is an active plan — when present, scope research to plan-relevant questions
+- Record significant findings via `omca_notepad_write(plan_name, "learnings", content)`
+- Record unresolved questions via `omca_notepad_write(plan_name, "questions", content)` when `AskUserQuestion` is unavailable
+
 ## Critical Rules
 
 **NEVER**:
@@ -111,3 +117,6 @@ When research returns conflicting information:
 - Cite evidence (file paths, links, code references)
 - Confirm understanding before concluding
 - Use explore/librarian for research, not just your own tools
+- Cite at least 2 independent sources before concluding on a factual claim
+- Tag findings with explicit confidence level (HIGH/MEDIUM/LOW) based on source quality
+- State what evidence would change your conclusion
