@@ -82,6 +82,15 @@
 		],
 		"PostToolUse": [
 			{
+				"matcher": "AskUserQuestion",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/track-question.sh"
+					}
+				]
+			},
+			{
 				"matcher": "Write|Edit",
 				"hooks": [
 					{
