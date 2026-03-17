@@ -21,8 +21,7 @@ jq -n \
 	>"${TMP_FILE}" && mv "${TMP_FILE}" "${SESSION_STATE}"
 
 LOG_FILE="${LOG_DIR}/sessions.jsonl"
-TS2=$(date -Iseconds)
-jq -nc --arg sid "${SESSION_ID}" --arg ts "${TS2}" --arg cwd "${PROJECT_ROOT}" \
+jq -nc --arg sid "${SESSION_ID}" --arg ts "${TS}" --arg cwd "${PROJECT_ROOT}" \
 	'{event: "session_start", sessionId: $sid, timestamp: $ts, cwd: $cwd}' >>"${LOG_FILE}"
 
 echo '{}' >"${STATE_DIR}/injected-context-dirs.json"
@@ -36,8 +35,6 @@ SOURCE=$(echo "${INPUT}" | jq -r '.source // "startup"' 2>/dev/null)
 if [[ "${SOURCE}" != "compact" ]]; then
 	GLOBAL_CLAUDE_MD="${HOME}/.claude/CLAUDE.md"
 	PROJECT_CLAUDE_MD="${PROJECT_ROOT}/CLAUDE.md"
-	OMCA_CONFIGURED=0
-
 	# Check global ~/.claude/CLAUDE.md first (primary config location)
 	if [[ -f "${GLOBAL_CLAUDE_MD}" ]] && grep -q "omca-setup" "${GLOBAL_CLAUDE_MD}" 2>/dev/null; then
 		OMCA_CONFIGURED=1

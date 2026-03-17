@@ -17,7 +17,7 @@ fi
 
 if [[ "${NEEDS_VERIFICATION}" == "true" ]]; then
 	if [[ ! -f "${EVIDENCE_FILE}" ]]; then
-		echo "Task requires verification evidence. Use the evidence_record MCP tool (NOT manual file writes). Example: evidence_record(type=\"test\", command=\"just test\", exit_code=0, output_snippet=\"10 passed\")" >&2
+		echo "Task requires verification evidence. Use the evidence_record MCP tool (NOT manual file writes). Example: evidence_record(evidence_type=\"test\", command=\"just test\", exit_code=0, output_snippet=\"10 passed\")" >&2
 		exit "${BLOCK_EXIT_CODE}"
 	fi
 

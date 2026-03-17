@@ -48,7 +48,7 @@ find "${STATE_DIR}" -name "*.json" -mtime +1 \
 	-not -name 'team-state.json' \
 	-not -name 'boulder.json' \
 	-not -name 'ultrawork-state.json' \
-	-not -name 'autopilot-state.json' \
+	-not -name 'verification-evidence.json' \
 	-delete 2>/dev/null || true
 
 find "${LOG_DIR}" -name "*.jsonl" -mtime +7 -delete 2>/dev/null || true

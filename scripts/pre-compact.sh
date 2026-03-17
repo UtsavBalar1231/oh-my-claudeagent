@@ -27,7 +27,7 @@ TEMPLATE
 		fi
 	fi
 
-	for MODE_FILE in autopilot-state.json ultrawork-state.json team-state.json; do
+	for MODE_FILE in ultrawork-state.json team-state.json; do
 		if [[ -f "${STATE_DIR}/${MODE_FILE}" ]]; then
 			MODE_NAME="${MODE_FILE%-state.json}"
 			STATUS=$(jq -r '.status // "inactive"' "${STATE_DIR}/${MODE_FILE}" 2>/dev/null)

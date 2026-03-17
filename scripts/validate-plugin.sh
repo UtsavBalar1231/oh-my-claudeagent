@@ -271,7 +271,6 @@ check_hook_fixtures_exist() {
 		"instructionsloaded-basic.json"
 		"taskcompleted-basic.json"
 		"teammateidle-basic.json"
-		"worktreecreate-basic.json"
 	)
 
 	local file_name
@@ -405,15 +404,10 @@ check_hooks() {
 	local instructions_payload="${HOOK_FIXTURES_DIR}/instructionsloaded-basic.json"
 	local task_payload="${HOOK_FIXTURES_DIR}/taskcompleted-basic.json"
 	local teammate_payload="${HOOK_FIXTURES_DIR}/teammateidle-basic.json"
-	local worktree_payload="${tmp_root}/worktreecreate.runtime.json"
 
 	local existing_file="${tmp_root}/existing.txt"
 	touch "${existing_file}"
 	jq --arg file "${existing_file}" '.tool_input.file_path = $file' "${HOOK_FIXTURES_DIR}/pretooluse-write.json" >"${pretool_write_payload}"
-
-	local worktree_path="${tmp_root}/worktree"
-	mkdir -p "${worktree_path}"
-	jq --arg worktree "${worktree_path}" '.worktree_path = $worktree' "${HOOK_FIXTURES_DIR}/worktreecreate-basic.json" >"${worktree_payload}"
 
 	run_registered_hooks "PreToolUse Task|Agent" "PreToolUse" "Task|Agent" "${pretool_task_payload}" "${tmp_root}" "json-required"
 	run_registered_hooks "PreToolUse Write" "PreToolUse" "Write" "${pretool_write_payload}" "${tmp_root}" "json-required"
@@ -425,7 +419,6 @@ check_hooks() {
 
 	run_registered_hooks "TaskCompleted default" "TaskCompleted" "" "${task_payload}" "${tmp_root}" "empty"
 	run_registered_hooks "TeammateIdle default" "TeammateIdle" "" "${teammate_payload}" "${tmp_root}" "empty"
-	run_registered_hooks "WorktreeCreate default" "WorktreeCreate" "" "${worktree_payload}" "${tmp_root}" "text-any"
 
 	run_registered_hooks "InstructionsLoaded default" "InstructionsLoaded" "" "${instructions_payload}" "${tmp_root}" "json-optional"
 

@@ -18,9 +18,9 @@ if [[ -f "${SUBAGENTS_FILE}" ]]; then
 	TMP_FILE=$(mktemp)
 
 	jq --arg ts "${TIMESTAMP}" --arg status "${EXIT_STATUS}" --arg id "${SUBAGENT_ID}" '
-    (.active | to_entries | map(select(.value.id == $id)) | first // null) as $match |
-    if $match != null then
-      .completed += [($match.value + {"completedAt": $ts, "status": $status})] |
+    (first(.active[] | select(.id == $id)) // null) as $match |
+    if $match then
+      .completed += [($match + {"completedAt": $ts, "status": $status})] |
       .active = [.active[] | select(.id != $id)]
     else
       .completed += [{"id": $id, "completedAt": $ts, "status": $status}]
