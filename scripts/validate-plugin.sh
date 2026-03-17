@@ -10,7 +10,7 @@ DEFAULT_MARKETPLACE_JSON="${REPO_ROOT}/.claude-plugin/marketplace.json"
 MCP_JSON="${REPO_ROOT}/.mcp.json"
 HOOK_FIXTURES_DIR="${REPO_ROOT}/tests/fixtures/hooks"
 MCP_FIXTURES_DIR="${REPO_ROOT}/tests/fixtures/mcp"
-MCP_START_SCRIPT="${REPO_ROOT}/scripts/start-ast-grep-server.sh"
+MCP_SERVER_PROJECT="${REPO_ROOT}/servers"
 
 PASS_COUNT=0
 FAIL_COUNT=0
@@ -254,10 +254,10 @@ check_claims() {
 		fi
 	fi
 
-	if jq -e '.mcpServers["ast-grep"].command | endswith("/scripts/start-ast-grep-server.sh")' "${MCP_JSON}" >/dev/null 2>&1; then
-		pass "mcp registry points ast-grep to start script"
+	if jq -e '.mcpServers["ast-grep"].command == "uv"' "${MCP_JSON}" >/dev/null 2>&1; then
+		pass "mcp registry uses uv for ast-grep server"
 	else
-		fail "mcp registry ast-grep command mismatch"
+		fail "mcp registry ast-grep command should be 'uv'"
 	fi
 }
 
@@ -452,8 +452,8 @@ check_mcp() {
 	validate_json_file "${MCP_FIXTURES_DIR}/tools-list.json" "mcp fixture tools/list"
 	validate_json_file "${MCP_FIXTURES_DIR}/expected-tools.json" "mcp fixture expected tools"
 
-	if [[ ! -f "${MCP_START_SCRIPT}" ]]; then
-		fail "mcp launcher script missing at ${MCP_START_SCRIPT}"
+	if [[ ! -d "${MCP_SERVER_PROJECT}" ]]; then
+		fail "mcp server project directory missing at ${MCP_SERVER_PROJECT}"
 		return 1
 	fi
 
@@ -469,7 +469,7 @@ check_mcp() {
 		printf '\n'
 		cat "${MCP_FIXTURES_DIR}/tools-list.json" || true
 		printf '\n'
-	} | timeout 45 bash "${MCP_START_SCRIPT}" >"${stdout_file}" 2>"${stderr_file}"
+	} | timeout 45 uv run --project "${MCP_SERVER_PROJECT}" python "${MCP_SERVER_PROJECT}/ast-grep-server.py" >"${stdout_file}" 2>"${stderr_file}"
 	local mcp_status=$?
 
 	if [[ "${mcp_status}" -ne 0 ]]; then
