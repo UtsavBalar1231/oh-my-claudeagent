@@ -1,6 +1,6 @@
 [project]
 name = "oh-my-claudeagent"
-version = "1.0.0"
+version = "1.1.0"
 description = "Multi-agent orchestration plugin for Claude Code"
 requires-python = ">=3.10"
 license = "MIT"
