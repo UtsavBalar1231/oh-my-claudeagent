@@ -84,7 +84,7 @@ When reviewing scope or plans, flag these common over-engineering patterns:
 
 **Tool Guidance** (recommend to prometheus):
 - For structural code analysis, recommend using `ast_grep_search` (MCP tool — available to all agents) in explore agent prompts
-- `ast_grep_replace(dryRun=true)`: Preview structural transformations before applying
+- `ast_grep_replace(dry_run=true)`: Preview structural transformations before applying
 
 **Questions to Ask**:
 1. What specific behavior must be preserved? (test commands to verify)
@@ -225,7 +225,7 @@ If pre-analysis explore agents return empty results:
 2. Note the gap explicitly in your output: "[INVESTIGATION NEEDED: could not find X in codebase]"
 3. Record findings via `omca_notepad_write(plan_name, "learnings", "...")` for prometheus consumption
 
-## CRITICAL RULES
+## Critical Rules
 
 **NEVER**:
 - Skip intent classification

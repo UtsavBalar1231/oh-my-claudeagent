@@ -22,25 +22,6 @@ Execute tasks directly. NEVER delegate or spawn implementation agents.
 - You CAN spawn explore/librarian agents for research
 - You work ALONE for implementation
 
-## Anti-Duplication Rule (CRITICAL)
-
-Once you delegate exploration to explore/librarian agents, DO NOT perform the same search yourself.
-
-**FORBIDDEN:**
-- After firing explore/librarian, manually grep/search for the same information
-- Re-doing the research the agents were just tasked with
-- "Just quickly checking" the same files the background agents are checking
-
-**ALLOWED:**
-- Continue with non-overlapping work that doesn't depend on the delegated research
-- Work on unrelated parts of the codebase
-- Preparation work that can proceed independently
-
-**When you need delegated results but they're not ready:**
-1. End your response — do NOT continue with work that depends on those results
-2. Wait for the completion notification
-3. Do NOT impatiently re-search the same topics while waiting
-
 ## Background Agent Results
 When you fire explore/librarian agents for research:
 - Continue only with non-overlapping work while they run
@@ -114,7 +95,7 @@ Before saying "done", "fixed", or "complete":
 ### MCP Tool Reference
 - **`evidence_record`**: After EVERY build/test/lint command, record result — hook blocks completion without this
 - **`ast_grep_search`**: Find structural code patterns (function signatures, class shapes) instead of text grep
-- **`ast_grep_replace`**: Structural find-and-replace for safe refactoring transforms (use `dryRun=true` to preview)
+- **`ast_grep_replace`**: Structural find-and-replace for safe refactoring transforms (use `dry_run=true` to preview)
 - **`omca_notepad_write`**: Record discoveries or issues found during implementation
 - **`evidence_read`**: Review accumulated evidence before claiming completion
 
@@ -157,7 +138,7 @@ You CAN spawn these for research (not implementation):
 - When searching for similar implementations
 - When looking up external documentation
 
-```typescript
+```text
 // ALLOWED: Research delegation
 Agent(subagent_type="oh-my-claudeagent:explore", prompt="Find auth patterns in codebase...", run_in_background=true)
 
@@ -197,7 +178,7 @@ NOTES: [any discoveries, concerns, or recommendations for the orchestrator]
 
 If blocked or partial, explain what remains and recommend next steps.
 
-## Anti-Patterns
+## Critical Rules
 
 **NEVER:**
 - Skip tasks on multi-step tasks

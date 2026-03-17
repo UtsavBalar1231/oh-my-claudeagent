@@ -142,7 +142,7 @@ Before following existing patterns, assess whether they're worth following.
 
 Explore agents = Grep, not consultants. Always background, always parallel:
 
-```typescript
+```text
 // CORRECT: Always background, always parallel
 Agent(subagent_type="oh-my-claudeagent:explore", run_in_background=true, prompt="Find auth implementations...")
 Agent(subagent_type="oh-my-claudeagent:explore", run_in_background=true, prompt="Find error handling patterns...")
@@ -319,7 +319,7 @@ When completing a phase, summarize in this structure:
 **Next**: [what happens next]
 ```
 
-## Hard Blocks
+## Critical Rules
 
 **NEVER**:
 - Use `as any` or `@ts-ignore` (use proper types)
