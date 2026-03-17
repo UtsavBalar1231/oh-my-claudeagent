@@ -81,18 +81,26 @@ ci: fmt-check lint test
 
 # ── Release ──────────────────────────────────────────────────────
 
-# Stamp current HEAD SHA and sync version into marketplace.json, pyproject.toml, and claudemd.md
+# Stamp HEAD SHA and sync version across all manifests. Usage: just release [version]
 [group('release')]
-release:
+release version="":
 	#!/usr/bin/env bash
 	set -euo pipefail
 	SHA=$(git rev-parse HEAD)
-	VERSION=$(jq -r '.version' .claude-plugin/plugin.json)
+	VERSION="{{ version }}"
+	if [[ -z "${VERSION}" ]]; then
+		VERSION=$(jq -r '.version' .claude-plugin/plugin.json)
+	else
+		# Update plugin.json with provided version
+		jq --arg v "${VERSION}" '.version = $v' .claude-plugin/plugin.json > /tmp/plugin-tmp.json
+		mv /tmp/plugin-tmp.json .claude-plugin/plugin.json
+		echo "Updated plugin.json: $VERSION"
+	fi
 	# Stamp SHA into marketplace.json
 	jq --arg sha "$SHA" '.plugins[0].source.sha = $sha' .claude-plugin/marketplace.json > /tmp/marketplace-tmp.json
 	mv /tmp/marketplace-tmp.json .claude-plugin/marketplace.json
 	echo "Stamped SHA: $SHA"
-	# Sync version from plugin.json into pyproject.toml and claudemd.md
+	# Sync version into pyproject.toml and claudemd.md
 	sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" pyproject.toml
 	sed -i "s/^version: .*/version: ${VERSION}/" templates/claudemd.md
 	echo "Synced version: $VERSION"
