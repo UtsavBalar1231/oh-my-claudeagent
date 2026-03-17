@@ -78,6 +78,15 @@
 						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh"
 					}
 				]
+			},
+			{
+				"matcher": "ExitPlanMode",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/plan-mode-handler.sh"
+					}
+				]
 			}
 		],
 		"PostToolUse": [
