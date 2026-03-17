@@ -48,14 +48,6 @@ for MODE_FILE in ralph-state.json ultrawork-state.json autopilot-state.json team
 	fi
 done
 
-MEMORY_FILE="${PROJECT_ROOT}/.omca/project-memory.json"
-if [[ -f "${MEMORY_FILE}" ]]; then
-	CONVENTIONS=$(jq -r '.conventions // empty | to_entries | map("\(.key): \(.value)") | join(". ")' "${MEMORY_FILE}" 2>/dev/null || echo "")
-	if [[ -n "${CONVENTIONS}" ]]; then
-		CONTEXT_PARTS+=" [PROJECT CONVENTIONS] ${CONVENTIONS}"
-	fi
-fi
-
 BOULDER_FILE="${STATE_DIR}/boulder.json"
 if [[ -f "${BOULDER_FILE}" ]]; then
 	PLAN_FILE=$(jq -r '.active_plan // empty' "${BOULDER_FILE}" 2>/dev/null || echo "")
