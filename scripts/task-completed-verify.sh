@@ -17,7 +17,7 @@ fi
 
 if [[ "${NEEDS_VERIFICATION}" == "true" ]]; then
 	if [[ ! -f "${EVIDENCE_FILE}" ]]; then
-		echo "Task requires verification evidence before completion. Run tests/build and record results in .omca/state/verification-evidence.json" >&2
+		echo "Task requires verification evidence. Use the evidence_record MCP tool (NOT manual file writes). Example: evidence_record(type=\"test\", command=\"just test\", exit_code=0, output_snippet=\"10 passed\")" >&2
 		exit "${BLOCK_EXIT_CODE}"
 	fi
 
@@ -32,6 +32,20 @@ if [[ "${NEEDS_VERIFICATION}" == "true" ]]; then
 			echo "Verification evidence is stale (${EVIDENCE_AGE}s old). Run fresh verification before completing this task." >&2
 			exit "${BLOCK_EXIT_CODE}"
 		fi
+	fi
+
+	# Schema validation — reject manually-written files
+	if ! jq -e '
+	  .entries
+	  | if type != "array" then error else . end
+	  | if length == 0 then error else . end
+	  | map(
+	      .type and .command and (.exit_code != null) and .output_snippet and .timestamp
+	    )
+	  | all
+	' "${EVIDENCE_FILE}" >/dev/null 2>&1; then
+		echo "Verification evidence has invalid schema. Use the evidence_record MCP tool (NOT manual file writes). Required: entries[] with type, command, exit_code, output_snippet, timestamp fields." >&2
+		exit "${BLOCK_EXIT_CODE}"
 	fi
 fi
 
