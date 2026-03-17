@@ -19,19 +19,19 @@ lint-shell:
 # Lint Python with ruff
 [group('lint')]
 lint-python:
-	ruff check servers/
+	uv run --project servers ruff check servers/
 
 # ── Format ────────────────────────────────────────────────────────
 
 # Format Python with ruff
 [group('format')]
 fmt:
-	ruff format servers/
+	uv run --project servers ruff format servers/
 
 # Check Python formatting without changes
 [group('format')]
 fmt-check:
-	ruff format --check servers/
+	uv run --project servers ruff format --check servers/
 
 # ── Test ──────────────────────────────────────────────────────────
 
@@ -60,7 +60,7 @@ test-mcp:
 # Install dev tools and pre-commit hooks
 [group('dev')]
 setup:
-	uv sync --group dev
+	uv sync --project servers --group dev
 	just install-hooks
 
 # Install pre-commit git hooks
@@ -100,7 +100,7 @@ release version="":
 	jq --arg sha "$SHA" '.plugins[0].source.sha = $sha' .claude-plugin/marketplace.json > /tmp/marketplace-tmp.json
 	mv /tmp/marketplace-tmp.json .claude-plugin/marketplace.json
 	echo "Stamped SHA: $SHA"
-	# Sync version into pyproject.toml and claudemd.md
-	sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" pyproject.toml
+	# Sync version into servers/pyproject.toml and claudemd.md
+	sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" servers/pyproject.toml
 	sed -i "s/^version: .*/version: ${VERSION}/" templates/claudemd.md
 	echo "Synced version: $VERSION"
