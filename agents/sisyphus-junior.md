@@ -2,7 +2,6 @@
 name: sisyphus-junior
 description: Focused task executor that works alone without delegation. Use for implementing specific tasks, bug fixes, feature additions, and code changes. Maintains strict task discipline and verification before completion.
 model: sonnet
-cost: cheap
 tools: Read, Write, Edit, Bash, Glob, Grep, Agent, AskUserQuestion, TaskCreate, TaskUpdate, TaskList
 permissionMode: acceptEdits
 memory: project

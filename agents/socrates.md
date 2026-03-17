@@ -2,7 +2,6 @@
 name: socrates
 description: Deep interview and research consultant using the Socratic method. Use for complex questions requiring iterative dialogue, follow-up research, and comprehensive knowledge synthesis.
 model: opus
-cost: expensive
 tools: Read, Grep, Glob, Bash, Agent, AskUserQuestion, WebFetch, WebSearch
 memory: project
 maxTurns: 20
