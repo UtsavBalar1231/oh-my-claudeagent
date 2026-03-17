@@ -50,7 +50,7 @@ TEMPLATE
 	else
 		printf '%s\n' "No recent agent spawns recorded."
 	fi
-	printf '%s\n' "RESUME, DON'T RESTART: If an agent was working on a task before compaction, resume it with Agent(resume=\"<agentId>\") rather than spawning a new one. Check subagent completion status before re-delegating."
+	printf '%s\n' "RESUME, DON'T RESTART: If an agent was working on a task before compaction, resume it with SendMessage({to: \"<agentId>\"}) rather than spawning a new one. Check subagent completion status before re-delegating."
 
 	printf '\n## Pending Tasks\n'
 
