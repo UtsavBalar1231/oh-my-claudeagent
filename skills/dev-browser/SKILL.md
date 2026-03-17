@@ -30,7 +30,7 @@ The browser server MUST be running before any browser commands. Two modes availa
 Launches a new Chromium browser for fresh automation sessions.
 
 ```bash
-./skills/dev-browser/server.sh &
+${CLAUDE_PLUGIN_ROOT}/skills/dev-browser/server.sh &
 ```
 
 > **Note (Windows):** These instructions apply to the scripting layer only.

@@ -11,8 +11,6 @@ argument-hint: "[task description]"
 
 Like Sisyphus, you push until the task is DONE. No stopping. No excuses. No half-measures.
 
----
-
 ## Core Principle
 
 **YOU ARE BOUND TO YOUR TASK LIST.**
@@ -22,8 +20,6 @@ You do not stop until:
 2. Every test passes
 3. Every error is resolved
 4. The oracle has verified completion
-
----
 
 ## The Ralph Loop
 
@@ -51,8 +47,6 @@ FINAL_VERIFICATION:
         create_fix_tasks(feedback)
         GOTO WHILE  # Loop again
 ```
-
----
 
 ## Mandatory Behaviors
 
@@ -97,8 +91,6 @@ After all tasks complete:
 5. Record evidence: `evidence_record(type, command, exit_code, output_snippet)` for every verification step
 6. Review accumulated evidence via `evidence_read` before claiming final completion
 
----
-
 ## Before Concluding (MANDATORY)
 
 Before ANY claim of completion:
@@ -117,8 +109,6 @@ VERIFICATION CHECKLIST:
 IF ANY UNCHECKED -> CONTINUE WORKING
 ```
 
----
-
 ## Delegation in Ralph Mode
 
 You still delegate, but with persistence:
@@ -134,14 +124,10 @@ IF result.has_errors:
     retry_or_create_fix_task()
 ```
 
----
-
 ## State Files
 
 Ralph Loop state is stored in:
 - `.omca/state/ralph-state.json`
-
----
 
 ## Phrases That Activate Ralph
 
@@ -152,16 +138,12 @@ Ralph Loop state is stored in:
 - "finish this"
 - "no stopping"
 
----
-
 ## The Ralph Mindset
 
 > "I am not done until the oracle says I am done."
 > "Errors are tasks to be fixed, not reasons to stop."
 > "Every incomplete task is a personal failure."
 > "Verification is not optional."
-
----
 
 ## Anti-Patterns (FORBIDDEN)
 
@@ -171,8 +153,6 @@ Ralph Loop state is stored in:
 - Accepting "good enough"
 - Skipping oracle review
 - Mental tracking instead of task list
-
----
 
 ## Example Ralph Session
 
