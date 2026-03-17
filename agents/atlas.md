@@ -90,7 +90,7 @@ If you are running as a subagent (not via `/atlas` or `/start-work`), the Agent 
 
 After each delegation, check the notepad `questions` section via `omca_notepad_read(plan_name, "questions")`. If a worker wrote a question:
 1. Ask the user — use `AskUserQuestion` if available, otherwise present as text
-2. Resume the worker with the answer: `Agent(resume="<agent_id>", prompt="User answered: <answer>. Continue.")`
+2. Resume the worker with the answer: `SendMessage({to: "<agent_id>", prompt: "User answered: <answer>. Continue."})`
 
 ## 6-Section Prompt Structure (MANDATORY)
 
