@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 ast-grep MCP Server — Structural code search and transformation.
-Uses FastMCP with 5 tools: search, replace, find-by-rule, dump-tree, test-match.
+Uses FastMCP for search, replace, find-by-rule, dump-tree, and test-match.
 """
 
 import json
@@ -10,17 +10,15 @@ import shutil
 import signal
 import subprocess
 import sys
-from typing import Literal
+from typing import Literal, get_args
 
 import yaml
 from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
+# --- Constants ---
 
-SUPPORTED_LANGUAGES = [
+SupportedLang = Literal[
     "bash",
     "c",
     "cpp",
@@ -47,6 +45,8 @@ SUPPORTED_LANGUAGES = [
     "tsx",
     "yaml",
 ]
+
+SUPPORTED_LANGUAGES: list[str] = list(get_args(SupportedLang))
 
 LANG_EXTENSIONS = {
     ".bash": "bash",
@@ -94,39 +94,9 @@ LANG_EXTENSIONS = {
 TIMEOUT = 300
 MAX_RESULTS_DEFAULT = 500
 
-SupportedLang = Literal[
-    "bash",
-    "c",
-    "cpp",
-    "csharp",
-    "css",
-    "elixir",
-    "go",
-    "haskell",
-    "html",
-    "java",
-    "javascript",
-    "json",
-    "kotlin",
-    "lua",
-    "nix",
-    "php",
-    "python",
-    "ruby",
-    "rust",
-    "scala",
-    "solidity",
-    "swift",
-    "typescript",
-    "tsx",
-    "yaml",
-]
+# --- Binary discovery ---
 
-# ---------------------------------------------------------------------------
-# Binary discovery
-# ---------------------------------------------------------------------------
-
-SG_BIN: str = ""
+SG_BIN: str | None = None
 
 
 def discover_binary() -> str:
@@ -165,9 +135,7 @@ def discover_binary() -> str:
     sys.exit(1)
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+# --- Helpers ---
 
 
 def run_command(
@@ -177,6 +145,8 @@ def run_command(
     allow_exit_1: bool = False,
 ) -> subprocess.CompletedProcess[bytes]:
     """Run a subprocess with timeout. Raises ToolError on failure."""
+    if SG_BIN is None:
+        raise ToolError("ast-grep binary not initialized")
     try:
         result = subprocess.run(
             cmd,
@@ -239,7 +209,7 @@ def format_run_results(
         lines.append("")
 
     if is_replace and is_dry_run:
-        lines.append("Use dryRun=false to apply changes")
+        lines.append("Use dry_run=false to apply changes")
 
     return "\n".join(lines)
 
@@ -252,7 +222,7 @@ def format_scan_results(matches: list[dict], max_results: int) -> str:
         matches = matches[:max_results]
 
     if not matches:
-        return ""
+        return "No matches found"
 
     lines: list[str] = []
     if truncated:
@@ -295,26 +265,14 @@ def validate_yaml_rule(yaml_str: str) -> dict:
     return parsed
 
 
-def validate_language(lang: str) -> None:
-    """Raise ToolError if language is unsupported."""
-    if lang not in SUPPORTED_LANGUAGES:
-        raise ToolError(
-            f"Unsupported language '{lang}'. Supported: {', '.join(SUPPORTED_LANGUAGES)}"
-        )
-
-
-# ---------------------------------------------------------------------------
-# ToolError — FastMCP catches this and returns it as a tool error response
-# ---------------------------------------------------------------------------
+# --- ToolError — FastMCP catches this and returns it as a tool error response ---
 
 
 class ToolError(Exception):
     pass
 
 
-# ---------------------------------------------------------------------------
-# Server
-# ---------------------------------------------------------------------------
+# --- Server ---
 
 mcp = FastMCP("ast-grep")
 
@@ -344,8 +302,6 @@ def ast_grep_search(
     ),
 ) -> str:
     """Search code patterns across the filesystem using AST-aware structural matching. Supports 25 languages."""
-    validate_language(lang)
-
     cmd = [SG_BIN, "run", "-p", pattern, "--lang", lang, "--json=compact"]
     if context and context > 0:
         cmd.extend(["-C", str(context)])
@@ -378,13 +334,11 @@ def ast_grep_replace(
     lang: SupportedLang = Field(description="Target language"),
     paths: list[str] | None = Field(default=None, description="Paths to search"),
     globs: list[str] | None = Field(default=None, description="Include/exclude globs"),
-    dryRun: bool = Field(
+    dry_run: bool = Field(
         default=True, description="Preview changes without applying (default: true)"
     ),
 ) -> str:
     """Replace code patterns across the filesystem with AST-aware rewriting. Dry-run by default."""
-    validate_language(lang)
-
     cmd = [
         SG_BIN,
         "run",
@@ -396,7 +350,7 @@ def ast_grep_replace(
         lang,
         "--json=compact",
     ]
-    if not dryRun:
+    if not dry_run:
         cmd.append("--update-all")
     if globs:
         for g in globs:
@@ -410,7 +364,7 @@ def ast_grep_replace(
 
     matches = json.loads(stdout)
     return format_run_results(
-        matches, MAX_RESULTS_DEFAULT, is_replace=True, is_dry_run=dryRun
+        matches, MAX_RESULTS_DEFAULT, is_replace=True, is_dry_run=dry_run
     )
 
 
@@ -418,7 +372,7 @@ def ast_grep_replace(
     annotations={"readOnlyHint": True, "idempotentHint": True},
 )
 def find_code_by_rule(
-    yaml: str = Field(
+    rule_yaml: str = Field(
         description=(
             "YAML rule with id, language, and rule fields. Example:\n"
             "  id: find-imports\n"
@@ -440,9 +394,9 @@ def find_code_by_rule(
     ),
 ) -> str:
     """Search code using a YAML rule with advanced combinators (kind, has, inside, follows, precedes, all, any, not). More powerful than pattern-only search."""
-    validate_yaml_rule(yaml)
+    validate_yaml_rule(rule_yaml)
 
-    cmd = [SG_BIN, "scan", "--inline-rules", yaml, "--json=compact"]
+    cmd = [SG_BIN, "scan", "--inline-rules", rule_yaml, "--json=compact"]
     cmd.extend(paths if paths else ["."])
 
     result = run_command(cmd)
@@ -472,8 +426,6 @@ def dump_syntax_tree(
     ),
 ) -> str:
     """Dump the syntax tree of a code snippet. Use 'cst' to inspect target code, 'pattern' to debug why a pattern doesn't match, 'ast' for a simplified view."""
-    validate_language(language)
-
     # --debug-query outputs the tree to stderr, not stdout.
     cmd = [
         SG_BIN,
@@ -500,7 +452,7 @@ def dump_syntax_tree(
 )
 def test_match_code_rule(
     code: str = Field(description="Code snippet to test against"),
-    yaml: str = Field(
+    rule_yaml: str = Field(
         description=(
             "YAML rule to test. Must include id, language, and rule fields. Example:\n"
             "  id: test\n"
@@ -511,9 +463,9 @@ def test_match_code_rule(
     ),
 ) -> str:
     """Test whether a YAML rule matches a code snippet. Use this to validate rules before running them across the codebase."""
-    validate_yaml_rule(yaml)
+    validate_yaml_rule(rule_yaml)
 
-    cmd = [SG_BIN, "scan", "--inline-rules", yaml, "--stdin", "--json=compact"]
+    cmd = [SG_BIN, "scan", "--inline-rules", rule_yaml, "--stdin", "--json=compact"]
 
     result = run_command(cmd, input_data=code.encode())
     stdout = result.stdout.decode("utf-8", errors="replace").strip()
@@ -534,9 +486,7 @@ def test_match_code_rule(
     return format_scan_results(matches, MAX_RESULTS_DEFAULT)
 
 
-# ---------------------------------------------------------------------------
-# Signal handling & entry point
-# ---------------------------------------------------------------------------
+# --- Signal handling & entry point ---
 
 signal.signal(signal.SIGINT, signal.SIG_IGN)
 
