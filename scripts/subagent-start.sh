@@ -61,5 +61,13 @@ if [[ -f "${BOULDER_FILE}" ]]; then
 	fi
 fi
 
+# Inject evidence_record guidance for execution agents
+case "${AGENT_TYPE}" in
+	*sisyphus-junior*|*hephaestus*|*atlas*|*sisyphus*)
+		CONTEXT_PARTS+=" [VERIFICATION] After running build/test/lint commands, you MUST use the evidence_record MCP tool to record results. Do NOT manually write or cat to .omca/state/verification-evidence.json — the TaskCompleted hook validates schema and will reject manual writes. Example: evidence_record(type=\"test\", command=\"just test\", exit_code=0, output_snippet=\"10 passed\")"
+		;;
+	*) ;;
+esac
+
 ESCAPED=$(printf '%s' "${CONTEXT_PARTS}" | jq -Rs .)
 printf '%s\n' "{\"hookSpecificOutput\": {\"hookEventName\": \"SubagentStart\", \"additionalContext\": ${ESCAPED}}}"
