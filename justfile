@@ -81,12 +81,18 @@ ci: fmt-check lint test
 
 # ── Release ──────────────────────────────────────────────────────
 
-# Stamp current HEAD SHA into marketplace.json for deterministic installs
+# Stamp current HEAD SHA and sync version into marketplace.json, pyproject.toml, and claudemd.md
 [group('release')]
 release:
 	#!/usr/bin/env bash
 	set -euo pipefail
 	SHA=$(git rev-parse HEAD)
+	VERSION=$(jq -r '.version' .claude-plugin/plugin.json)
+	# Stamp SHA into marketplace.json
 	jq --arg sha "$SHA" '.plugins[0].source.sha = $sha' .claude-plugin/marketplace.json > /tmp/marketplace-tmp.json
 	mv /tmp/marketplace-tmp.json .claude-plugin/marketplace.json
 	echo "Stamped SHA: $SHA"
+	# Sync version from plugin.json into pyproject.toml and claudemd.md
+	sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" pyproject.toml
+	sed -i "s/^version: .*/version: ${VERSION}/" templates/claudemd.md
+	echo "Synced version: $VERSION"
