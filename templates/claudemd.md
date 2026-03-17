@@ -118,8 +118,8 @@ Notepad sections per plan: `learnings`, `issues`, `decisions`, `problems`, `ques
 
 **Library documentation**: Use `context7` MCP tools for looking up library docs — `context7_resolve-library-id` to find the library, then `context7_query-docs` for specific documentation. Prefer context7 over WebFetch for well-known libraries. Fall back to WebFetch/librarian for niche or very recent libraries.
 
-**Verification workflow**: After running any build, test, or lint command, call `evidence_record(type, command, exit_code, output_snippet)` to create `.omca/state/verification-evidence.json`. The `task-completed-verify` hook BLOCKS task completion if this file is missing or stale (>5 min). Example:
-`evidence_record(type="test", command="npm test", exit_code=0, output_snippet="42 tests passed")`
+**Verification workflow**: After running any build, test, or lint command, call `evidence_record(evidence_type, command, exit_code, output_snippet)` to create `.omca/state/verification-evidence.json`. The `task-completed-verify` hook BLOCKS task completion if this file is missing or stale (>5 min). Example:
+`evidence_record(evidence_type="test", command="npm test", exit_code=0, output_snippet="42 tests passed")`
 
 **Boulder lifecycle**: When starting plan execution, call `boulder_write(active_plan, plan_name, session_id)` to register the active plan. Use `boulder_progress` to check completed vs remaining tasks. Hooks and subagents discover the active plan via `boulder_read`.
 
@@ -164,8 +164,6 @@ Ralph: persistence mode — keeps working until verified complete. Cancel with `
 Ultrawork: maximum parallel execution across independent tasks. All available agents run concurrently.
 
 Handoff: creates a session continuity summary so a new session can pick up where you left off.
-
-Teams: use Claude Code native Teams API for multi-agent coordination.
 </workflow_modes>
 
 <hooks_and_context>
@@ -181,8 +179,6 @@ Runtime state lives in `.omca/` (gitignored): state in `.omca/state/`, plans in 
 
 <rules>
 NEVER:
-- Claim completion without verification evidence when the task involved running code or tests
-- Use sequential agents when parallel execution is possible
 - Exceed 5 concurrent agents
 - Write state to `~/.claude/` — use `.omca/state/` instead
 - Use `set -euo pipefail` in hook scripts — exit 0 with graceful degradation

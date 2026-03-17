@@ -96,8 +96,12 @@ release version="":
 		mv /tmp/plugin-tmp.json .claude-plugin/plugin.json
 		echo "Updated plugin.json: $VERSION"
 	fi
-	# Stamp SHA into marketplace.json
-	jq --arg sha "$SHA" '.plugins[0].source.sha = $sha' .claude-plugin/marketplace.json > /tmp/marketplace-tmp.json
+	# Stamp SHA and sync version into marketplace.json
+	jq --arg sha "$SHA" --arg v "${VERSION}" '
+		.plugins[0].source.sha = $sha |
+		.metadata.version = $v |
+		.plugins[0].version = $v
+	' .claude-plugin/marketplace.json > /tmp/marketplace-tmp.json
 	mv /tmp/marketplace-tmp.json .claude-plugin/marketplace.json
 	echo "Stamped SHA: $SHA"
 	# Sync version into servers/pyproject.toml and claudemd.md

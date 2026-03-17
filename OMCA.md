@@ -750,7 +750,7 @@ Structural code search and transformation using the `sg` (ast-grep) CLI. Launche
 | Tool | Purpose |
 |------|---------|
 | `ast_grep_search` | Find code patterns by structure (function signatures, class shapes, import patterns) |
-| `ast_grep_replace` | Structural find-and-replace; use `dryRun=true` to preview before applying |
+| `ast_grep_replace` | Structural find-and-replace; use `dry_run=true` to preview before applying |
 | `find_code_by_rule` | Advanced structural queries with YAML combinators |
 | `test_match_code_rule` | Test a rule pattern against a code snippet |
 | `dump_syntax_tree` | Dump the AST of a code snippet for rule development |
@@ -871,7 +871,7 @@ is gitignored by default (omca-setup adds `.omca/` to `.gitignore`).
 
 After every build, test, or lint command:
 ```
-evidence_record(type="build", command="just ci", exit_code=0, output_snippet="all checks passed")
+evidence_record(evidence_type="build", command="just ci", exit_code=0, output_snippet="all checks passed")
 ```
 
 The `task-completed-verify` hook reads `verification-evidence.json` on TaskCompleted
