@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 omca-state MCP Server — Boulder, Evidence, and Notepad management.
-Uses FastMCP with 10 tools for work plan tracking, verification evidence,
+Uses FastMCP for work plan tracking, verification evidence,
 and subagent learning notepads.
 """
 
@@ -16,9 +16,7 @@ from typing import Literal
 from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
+# --- Constants ---
 
 OMCA_STATE_DIR = ".omca/state"
 BOULDER_FILE = "boulder.json"
@@ -26,9 +24,7 @@ EVIDENCE_FILE = "verification-evidence.json"
 NOTEPADS_DIR = "notepads"
 VALID_SECTIONS = ("learnings", "issues", "decisions", "problems", "questions")
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+# --- Helpers ---
 
 
 class ToolError(Exception):
@@ -54,11 +50,9 @@ def _find_git_root(working_directory: str) -> str:
 
 
 def _state_dir(working_directory: str) -> str:
-    """Return the .omca/state/ directory path, creating it if needed."""
+    """Return the .omca/state/ directory path."""
     root = _find_git_root(working_directory)
-    state = os.path.join(root, OMCA_STATE_DIR)
-    os.makedirs(state, exist_ok=True)
-    return state
+    return os.path.join(root, OMCA_STATE_DIR)
 
 
 def _read_json(path: str) -> dict:
@@ -80,16 +74,12 @@ def _write_json(path: str, data: dict) -> None:
     os.replace(tmp, path)
 
 
-# ---------------------------------------------------------------------------
-# Server
-# ---------------------------------------------------------------------------
+# --- Server ---
 
 mcp = FastMCP("omca-state")
 
 
-# ---------------------------------------------------------------------------
-# Boulder tools
-# ---------------------------------------------------------------------------
+# --- Boulder tools ---
 
 
 @mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
@@ -199,14 +189,12 @@ def boulder_progress(
     return json.dumps(result, indent=2)
 
 
-# ---------------------------------------------------------------------------
-# Evidence tools
-# ---------------------------------------------------------------------------
+# --- Evidence tools ---
 
 
 @mcp.tool()
 def evidence_record(
-    type: str = Field(
+    evidence_type: str = Field(
         description="Evidence type: build, test, lint, or manual. Called after verification commands."
     ),
     command: str = Field(description="Command that was executed"),
@@ -228,7 +216,7 @@ def evidence_record(
         data["entries"] = []
 
     entry = {
-        "type": type,
+        "type": evidence_type,
         "command": command,
         "exit_code": exit_code,
         "output_snippet": output_snippet[:2000],
@@ -239,7 +227,7 @@ def evidence_record(
 
     data["entries"].append(entry)
     _write_json(path, data)
-    return f"Evidence recorded: {type} (exit {exit_code}), {len(data['entries'])} total entries"
+    return f"Evidence recorded: {evidence_type} (exit {exit_code}), {len(data['entries'])} total entries"
 
 
 @mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
@@ -273,9 +261,7 @@ def evidence_clear(
         return "No evidence to clear."
 
 
-# ---------------------------------------------------------------------------
-# Notepad tools
-# ---------------------------------------------------------------------------
+# --- Notepad tools ---
 
 
 def _notepad_dir(state: str, plan_name: str) -> str:
@@ -283,6 +269,12 @@ def _notepad_dir(state: str, plan_name: str) -> str:
     d = os.path.join(state, NOTEPADS_DIR, plan_name)
     os.makedirs(d, exist_ok=True)
     return d
+
+
+def _list_notepad_sections(directory: str) -> list[str]:
+    """List notepad section names in a directory."""
+    files = sorted(f for f in os.listdir(directory) if f.endswith(".md"))
+    return [f.removesuffix(".md") for f in files]
 
 
 @mcp.tool()
@@ -362,8 +354,7 @@ def omca_notepad_list(
         d = os.path.join(notepads_root, plan_name)
         if not os.path.isdir(d):
             return f"No notepad found for plan: {plan_name}"
-        files = sorted(f for f in os.listdir(d) if f.endswith(".md"))
-        sections = [f.removesuffix(".md") for f in files]
+        sections = _list_notepad_sections(d)
         return f"Plan: {plan_name}\nSections: {', '.join(sections) if sections else 'empty'}"
 
     plans = sorted(
@@ -377,16 +368,13 @@ def omca_notepad_list(
     lines = ["Available notepads:\n"]
     for p in plans:
         d = os.path.join(notepads_root, p)
-        files = sorted(f for f in os.listdir(d) if f.endswith(".md"))
-        sections = [f.removesuffix(".md") for f in files]
+        sections = _list_notepad_sections(d)
         lines.append(f"- {p}: {', '.join(sections) if sections else 'empty'}")
 
     return "\n".join(lines)
 
 
-# ---------------------------------------------------------------------------
-# Signal handling & entry point
-# ---------------------------------------------------------------------------
+# --- Signal handling & entry point ---
 
 signal.signal(signal.SIGINT, signal.SIG_IGN)
 
