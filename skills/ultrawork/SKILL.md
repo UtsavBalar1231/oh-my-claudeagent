@@ -11,8 +11,6 @@ argument-hint: "[task or list of parallel tasks]"
 
 Speed through parallelism. Launch multiple agents. Work on everything at once.
 
----
-
 ## Core Philosophy
 
 > "If tasks are independent, they should run simultaneously."
@@ -21,8 +19,6 @@ Ultrawork is about **aggressive parallelization**:
 - Multiple agents working concurrently
 - No waiting when waiting isn't necessary
 - Maximum throughput
-
----
 
 ## When to Parallelize
 
@@ -36,8 +32,6 @@ Ultrawork is about **aggressive parallelization**:
 - Task B depends on Task A's output
 - Tasks modify the same file
 - Sequential order matters for correctness
-
----
 
 ## Certainty Protocol
 
@@ -55,8 +49,6 @@ Before writing code, you MUST:
 - You don't understand how existing code works
 - Your plan has "probably" or "maybe" in it
 - You can't explain the exact steps you'll take
-
----
 
 ## Parallel Execution Pattern
 
@@ -104,8 +96,6 @@ Agent(subagent_type="oh-my-claudeagent:sisyphus-junior", prompt="Add auth tests.
 Agent(subagent_type="oh-my-claudeagent:sisyphus-junior", prompt="Update API routes...")
 ```
 
----
-
 ## Agent Selection for Speed
 
 | Task | Best Agent | Why |
@@ -118,8 +108,6 @@ Agent(subagent_type="oh-my-claudeagent:sisyphus-junior", prompt="Update API rout
 **Tip**: Use `model=haiku` for simple tasks, `model=opus` for complex ones. Sonnet is the default.
 
 **Default behavior: DELEGATE. Do not work yourself unless the task is trivially simple (1-2 lines, obvious change) and you have all context already loaded.**
-
----
 
 ## Ultrawork Tracking Format
 
@@ -135,8 +123,6 @@ TaskCreate(subject="Verification - Run all tests")
 TaskCreate(subject="Verification - Build check")
 ```
 
----
-
 ## Handling Parallel Failures
 
 When one parallel agent fails:
@@ -147,16 +133,12 @@ When one parallel agent fails:
 4. **Create fix tasks** - Add to next batch
 5. **Continue** - Don't let one failure block everything
 
----
-
 ## Maximum Concurrency
 
 Recommended limits:
 - **5 agents** maximum simultaneously
 - More agents = more coordination overhead
 - Quality matters more than quantity
-
----
 
 ## Verification in Ultrawork
 
@@ -172,8 +154,6 @@ After all parallel work completes:
 7. Review all evidence via `evidence_read` before reporting completion
 ```
 
----
-
 ## Phrases That Activate Ultrawork
 
 - "ulw"
@@ -182,8 +162,6 @@ After all parallel work completes:
 - "parallel"
 - "as fast as possible"
 - "simultaneously"
-
----
 
 ## Example Ultrawork Session
 
@@ -210,22 +188,17 @@ User: "ulw fix all TypeScript errors in src/"
 7. Verify: Zero errors, tests pass
 ```
 
----
-
 ## Anti-Optimism Checkpoint
 
 Before claiming done, answer honestly:
 
-1. If `lsp_diagnostics` is available in this Claude environment, did I run it and see ZERO errors? (not "I'm sure there are none")
-2. Did I run the tests and see them PASS? (not "they should pass")
-3. Did I read the actual output of every command? (not skim)
-4. Is EVERY requirement from the request actually implemented? (re-read the request NOW)
-5. Did I record evidence for every verification with `evidence_record`? (not "I verified it mentally")
-6. Did I record key learnings or issues via `omca_notepad_write`?
+1. Did I run the tests and see them PASS? (not "they should pass")
+2. Did I read the actual output of every command? (not skim)
+3. Is EVERY requirement from the request actually implemented? (re-read the request NOW)
+4. Did I record evidence for every verification with `evidence_record`? (not "I verified it mentally")
+5. Did I record key learnings or issues via `omca_notepad_write`?
 
 **If ANY answer is no → GO BACK AND DO IT. Do not claim completion.**
-
-**Host-provided `lsp_diagnostics` catches type errors, NOT functional bugs. Your work is NOT verified until you MANUALLY test it.**
 
 | If your change... | YOU MUST... |
 |---|---|
@@ -239,12 +212,9 @@ Before claiming done, answer honestly:
 **Unacceptable QA claims:**
 - "This should work" → RUN IT.
 - "The types check out" → Types don't catch logic bugs. RUN IT.
-- "If available, lsp_diagnostics is clean" → That's a TYPE check, not a FUNCTIONAL check. RUN IT.
 - "Tests pass" → Tests cover known cases. Does the ACTUAL FEATURE work? RUN IT.
 
 **You have Bash, you have tools. There is ZERO excuse for not running manual QA.**
-
----
 
 ## Anti-Patterns (NEVER)
 

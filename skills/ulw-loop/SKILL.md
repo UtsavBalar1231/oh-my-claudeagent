@@ -3,6 +3,7 @@ name: ulw-loop
 description: "Ultrawork persistence loop. Like ralph, but requires Oracle verification before the loop exits. No iteration limit — only oracle-verified completion exits. Triggers: 'ulw-loop', 'ultrawork loop', 'oracle loop'."
 allowed-tools: Bash, Read, Grep, Glob, Agent
 model: sonnet
+user-invocable: true
 ---
 
 # ULW Loop — Oracle-Verified Persistence

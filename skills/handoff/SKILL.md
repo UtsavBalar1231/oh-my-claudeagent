@@ -10,8 +10,6 @@ argument-hint: optional notes about what to include
 
 Creates a self-contained handoff summary so work can continue seamlessly in a new session.
 
----
-
 ## Activation Phrases
 
 - "handoff"
@@ -19,14 +17,10 @@ Creates a self-contained handoff summary so work can continue seamlessly in a ne
 - "start fresh"
 - "summarize for new session"
 
----
-
 ## PHASE 0: VALIDATE
 
 Confirm there is meaningful work in this session to preserve. If the session is nearly empty,
 inform the user there is nothing to hand off.
-
----
 
 ## PHASE 1: GATHER CONTEXT
 
@@ -46,8 +40,6 @@ Also gather:
   - `Read(".omca/state/notepads/{plan-name}/")` — per-plan notepad sections (learnings, issues, decisions, problems)
 - `Glob(".omca/plans/*.md")` — recent plan files
 
----
-
 ## PHASE 2: EXTRACT
 
 Write the summary from first person ("I did...", "I told you..."). Focus on:
@@ -55,8 +47,6 @@ Write the summary from first person ("I did...", "I told you..."). Focus on:
 - KEY FILES (max 10, workspace-relative paths)
 - USER REQUESTS must be verbatim — do not paraphrase
 - EXPLICIT CONSTRAINTS must be verbatim — do not invent
-
----
 
 ## PHASE 3: FORMAT OUTPUT
 
@@ -115,8 +105,6 @@ Rules:
 - Only include what matters for continuation
 - USER REQUESTS and EXPLICIT CONSTRAINTS: verbatim only
 
----
-
 ## PHASE 4: INSTRUCT
 
 ```
@@ -126,8 +114,6 @@ TO CONTINUE IN A NEW SESSION:
 2. Paste the HANDOFF CONTEXT above as your first message
 3. Add: "Continue from the handoff context above. [Your next task]"
 ```
-
----
 
 ## Constraints
 

@@ -83,7 +83,7 @@ Create atmosphere and depth—gradient meshes, noise textures, geometric pattern
 5. **Polish**: Refine spacing, transitions, responsive behavior, and accessibility
 
 After verification, record evidence:
-`evidence_record(type="build", command="<dev/build command>", exit_code=0, output_snippet="...")`
+`evidence_record(evidence_type="build", command="<dev/build command>", exit_code=0, output_snippet="...")`
 
 ---
 
