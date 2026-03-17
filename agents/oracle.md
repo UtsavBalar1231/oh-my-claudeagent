@@ -2,7 +2,6 @@
 name: oracle
 description: Read-only strategic advisor for architecture decisions, debugging hard problems, and code reviews. Use after 2+ failed fix attempts, for multi-system tradeoffs, unfamiliar patterns, or when completing significant work that needs verification.
 model: opus
-cost: expensive
 tools: Read, Grep, Glob, Bash
 permissionMode: plan
 disallowedTools:
