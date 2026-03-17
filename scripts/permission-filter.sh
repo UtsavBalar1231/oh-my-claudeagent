@@ -8,7 +8,7 @@ if [[ -z "${COMMAND}" ]]; then
 	exit 0
 fi
 
-# Leading whitespace strip has no clean parameter expansion equivalent
+# Strip leading whitespace (sed for readability over parameter expansion)
 # shellcheck disable=SC2001
 TRIMMED_CMD=$(echo "${COMMAND}" | sed 's/^[[:space:]]*//')
 

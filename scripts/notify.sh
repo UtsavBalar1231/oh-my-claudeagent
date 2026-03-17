@@ -38,17 +38,25 @@ send_notification() {
 	fi
 
 	if command -v notify-send &>/dev/null; then
-		notify-send "${title}" "${message}" 2>/dev/null || true
+		local safe_notify_msg safe_notify_title
+		safe_notify_msg=$(printf '%s' "${message}" | tr '\n' ' ')
+		safe_notify_title=$(printf '%s' "${title}" | tr '\n' ' ')
+		notify-send "${safe_notify_title}" "${safe_notify_msg}" 2>/dev/null || true
 		return 0
 	fi
 
 	if command -v zenity &>/dev/null; then
-		zenity --notification --text="${title}: ${message}" 2>/dev/null || true
+		local safe_zenity_text
+		safe_zenity_text=$(printf '%s: %s' "${title}" "${message}" | tr '\n' ' ')
+		zenity --notification --text="${safe_zenity_text}" 2>/dev/null || true
 		return 0
 	fi
 
 	if [[ -f /proc/version ]] && grep -qi microsoft /proc/version 2>/dev/null; then
-		powershell.exe -Command "[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null; \$template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02); \$textNodes = \$template.GetElementsByTagName('text'); \$textNodes.Item(0).AppendChild(\$template.CreateTextNode('${title}')); \$textNodes.Item(1).AppendChild(\$template.CreateTextNode('${message}')); \$toast = [Windows.UI.Notifications.ToastNotification]::new(\$template); [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('Claude Code').Show(\$toast)" 2>/dev/null || true
+		local safe_ps_title safe_ps_msg
+		safe_ps_title=$(printf '%s' "${title}" | sed "s/'/''/g" | tr '\n' ' ')
+		safe_ps_msg=$(printf '%s' "${message}" | sed "s/'/''/g" | tr '\n' ' ')
+		powershell.exe -Command "[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null; \$template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02); \$textNodes = \$template.GetElementsByTagName('text'); \$textNodes.Item(0).AppendChild(\$template.CreateTextNode('${safe_ps_title}')); \$textNodes.Item(1).AppendChild(\$template.CreateTextNode('${safe_ps_msg}')); \$toast = [Windows.UI.Notifications.ToastNotification]::new(\$template); [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('Claude Code').Show(\$toast)" 2>/dev/null || true
 		return 0
 	fi
 

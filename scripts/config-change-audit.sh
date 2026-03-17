@@ -14,8 +14,4 @@ TIMESTAMP=$(date -Iseconds)
 jq -nc --arg src "${SOURCE}" --arg file "${FILE_PATH}" --arg ts "${TIMESTAMP}" \
 	'{event: "config_change", source: $src, file: $file, timestamp: $ts}' >>"${LOG_DIR}/config-changes.log"
 
-if [[ "${SOURCE}" == "policy_settings" ]]; then
-	exit 0
-fi
-
 exit 0

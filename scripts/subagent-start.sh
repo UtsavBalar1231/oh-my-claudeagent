@@ -2,15 +2,12 @@
 
 INPUT=$(cat)
 AGENT_ID=$(echo "${INPUT}" | jq -r '.agent_id // "unknown"')
-TIMESTAMP=$(date -Iseconds)
 
 PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$(pwd)}"
 STATE_DIR="${PROJECT_ROOT}/.omca/state"
 LOG_DIR="${PROJECT_ROOT}/.omca/logs"
 mkdir -p "${STATE_DIR}" "${LOG_DIR}"
 
-LOG_FILE="${LOG_DIR}/agent-spawns.log"
-echo "${TIMESTAMP} - Agent spawned: ${AGENT_ID}" >>"${LOG_FILE}"
 
 TEAM_STATE="${STATE_DIR}/team-state.json"
 if [[ -f "${TEAM_STATE}" ]]; then
@@ -24,21 +21,18 @@ fi
 AGENT_TYPE=$(echo "${INPUT}" | jq -r '.agent_type // "unknown"')
 
 case "${AGENT_TYPE}" in
-	*prometheus*|*metis*|*socrates*)
-		CONTEXT_PARTS="AskUserQuestion is unavailable in subagents. When you need user input, write the question to the notepad questions section and return. The orchestrator will relay to the user and resume you."
-		;;
-	*sisyphus|*atlas*)
-		CONTEXT_PARTS="AskUserQuestion is unavailable in subagents. When you need user input, write the question to the notepad questions section and return. The orchestrator will relay to the user and resume you."
-		;;
 	*explore*|*librarian*|*hephaestus*|*sisyphus-junior*|*multimodal*|*oracle*|*momus*)
 		CONTEXT_PARTS="AskUserQuestion is unavailable in subagents. Make autonomous decisions when possible. If genuinely blocked, write the question to the notepad questions section and return."
+		;;
+	*prometheus*|*metis*|*socrates*|*sisyphus*|*atlas*)
+		CONTEXT_PARTS="AskUserQuestion is unavailable in subagents. When you need user input, write the question to the notepad questions section and return. The orchestrator will relay to the user and resume you."
 		;;
 	*)
 		CONTEXT_PARTS="Make autonomous decisions. If unclear, choose the most reasonable option and proceed."
 		;;
 esac
 
-for MODE_FILE in ralph-state.json ultrawork-state.json autopilot-state.json team-state.json; do
+for MODE_FILE in ralph-state.json ultrawork-state.json team-state.json; do
 	if [[ -f "${STATE_DIR}/${MODE_FILE}" ]]; then
 		MODE_STATUS=$(jq -r '.status // "inactive"' "${STATE_DIR}/${MODE_FILE}" 2>/dev/null)
 		if [[ "${MODE_STATUS}" == "active" ]]; then
@@ -64,7 +58,7 @@ fi
 # Inject evidence_record guidance for execution agents
 case "${AGENT_TYPE}" in
 	*sisyphus-junior*|*hephaestus*|*atlas*|*sisyphus*)
-		CONTEXT_PARTS+=" [VERIFICATION] After running build/test/lint commands, you MUST use the evidence_record MCP tool to record results. Do NOT manually write or cat to .omca/state/verification-evidence.json — the TaskCompleted hook validates schema and will reject manual writes. Example: evidence_record(type=\"test\", command=\"just test\", exit_code=0, output_snippet=\"10 passed\")"
+		CONTEXT_PARTS+=" [VERIFICATION] After running build/test/lint commands, you MUST use the evidence_record MCP tool to record results. Do NOT manually write or cat to .omca/state/verification-evidence.json — the TaskCompleted hook validates schema and will reject manual writes. Example: evidence_record(evidence_type=\"test\", command=\"just test\", exit_code=0, output_snippet=\"10 passed\")"
 		;;
 	*) ;;
 esac
