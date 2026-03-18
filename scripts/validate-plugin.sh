@@ -271,6 +271,9 @@ check_hook_fixtures_exist() {
 		"instructionsloaded-basic.json"
 		"taskcompleted-basic.json"
 		"teammateidle-basic.json"
+		"userpromptsubmit-ralph.json"
+		"userpromptsubmit-ultrawork.json"
+		"stop-basic.json"
 	)
 
 	local file_name
@@ -421,6 +424,44 @@ check_hooks() {
 	run_registered_hooks "TeammateIdle default" "TeammateIdle" "" "${teammate_payload}" "${tmp_root}" "empty"
 
 	run_registered_hooks "InstructionsLoaded default" "InstructionsLoaded" "" "${instructions_payload}" "${tmp_root}" "json-optional"
+
+	# UserPromptSubmit: keyword-detector should produce JSON with additionalContext
+	local ralph_payload="${HOOK_FIXTURES_DIR}/userpromptsubmit-ralph.json"
+	local ultrawork_payload="${HOOK_FIXTURES_DIR}/userpromptsubmit-ultrawork.json"
+	run_registered_hooks "UserPromptSubmit ralph" "UserPromptSubmit" "" "${ralph_payload}" "${tmp_root}" "json-required"
+	# Verify keyword-detector creates ralph-state.json
+	if [[ -f "${tmp_root}/.omca/state/ralph-state.json" ]]; then
+		if jq -e '.status == "active"' "${tmp_root}/.omca/state/ralph-state.json" >/dev/null 2>&1; then
+			pass "keyword-detector creates ralph-state.json with active status"
+		else
+			fail "keyword-detector created ralph-state.json but status is not active"
+		fi
+	else
+		fail "keyword-detector should create ralph-state.json on ralph keyword"
+	fi
+
+	run_registered_hooks "UserPromptSubmit ultrawork" "UserPromptSubmit" "" "${ultrawork_payload}" "${tmp_root}" "json-required"
+	# Verify keyword-detector creates ultrawork-state.json
+	if [[ -f "${tmp_root}/.omca/state/ultrawork-state.json" ]]; then
+		if jq -e '.status == "active"' "${tmp_root}/.omca/state/ultrawork-state.json" >/dev/null 2>&1; then
+			pass "keyword-detector creates ultrawork-state.json with active status"
+		else
+			fail "keyword-detector created ultrawork-state.json but status is not active"
+		fi
+	else
+		fail "keyword-detector should create ultrawork-state.json on ultrawork keyword"
+	fi
+
+	# Stop: ralph-persistence allows stop when no state files (clean state after keyword tests)
+	rm -f "${tmp_root}/.omca/state/ralph-state.json" "${tmp_root}/.omca/state/ultrawork-state.json"
+	local stop_payload="${HOOK_FIXTURES_DIR}/stop-basic.json"
+	run_registered_hooks "Stop default (no state)" "Stop" "" "${stop_payload}" "${tmp_root}" "empty"
+
+	# Stop: ralph-persistence blocks stop when ralph state exists
+	printf '{"status":"active","tasks":[{"id":"1","status":"pending"}],"last_task_hash":"","stagnation_count":0}\n' \
+		>"${tmp_root}/.omca/state/ralph-state.json"
+	run_registered_hooks "Stop with ralph active" "Stop" "" "${stop_payload}" "${tmp_root}" "json-required"
+	rm -f "${tmp_root}/.omca/state/ralph-state.json"
 
 	if [[ -n "${HOOK_CASE}" ]]; then
 		case "${HOOK_CASE}" in

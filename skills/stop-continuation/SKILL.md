@@ -25,6 +25,7 @@ Stops all continuation mechanisms for the current session.
 
 1. **Ralph Loop** — Clears `.omca/state/ralph-state.json`
 2. **Boulder State** — Clears `.omca/state/boulder.json` (active work plan)
+3. **Ultrawork Mode** — Clears `.omca/state/ultrawork-state.json`
 
 ---
 
@@ -49,6 +50,15 @@ if [[ -f "${BOULDER_STATE}" ]]; then
   rm -f "${BOULDER_STATE}"
 else
   echo "- Boulder State: not active"
+fi
+
+ULTRAWORK_STATE="${PROJECT_ROOT}/.omca/state/ultrawork-state.json"
+
+if [[ -f "${ULTRAWORK_STATE}" ]]; then
+  echo "- Ultrawork Mode: ACTIVE — clearing"
+  rm -f "${ULTRAWORK_STATE}"
+else
+  echo "- Ultrawork Mode: not active"
 fi
 
 echo "Done."

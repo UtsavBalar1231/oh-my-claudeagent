@@ -35,3 +35,5 @@ If it exists, clear it to cancel the loop:
 ```bash
 rm -f "${CLAUDE_PROJECT_ROOT}/.omca/state/ralph-state.json"
 ```
+
+**Note**: This only cancels ralph mode. To also cancel ultrawork mode, use `/oh-my-claudeagent:stop-continuation`.
