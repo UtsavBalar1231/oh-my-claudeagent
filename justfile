@@ -86,11 +86,21 @@ ci: fmt-check lint test
 release version="":
 	#!/usr/bin/env bash
 	set -euo pipefail
+	# Guard: abort if working tree is dirty
+	if ! git diff --quiet || ! git diff --cached --quiet; then
+		echo "ERROR: working tree has uncommitted changes. Commit or stash first." >&2
+		exit 1
+	fi
 	SHA=$(git rev-parse HEAD)
 	VERSION="{{ version }}"
 	if [[ -z "${VERSION}" ]]; then
 		VERSION=$(jq -r '.version' .claude-plugin/plugin.json)
 	else
+		# Validate CHANGELOG has an entry for this version
+		if ! grep -q "## \[${VERSION}\]" CHANGELOG.md; then
+			echo "ERROR: no CHANGELOG.md entry for version ${VERSION}. Add one first." >&2
+			exit 1
+		fi
 		# Update plugin.json with provided version
 		jq --arg v "${VERSION}" '.version = $v' .claude-plugin/plugin.json > /tmp/plugin-tmp.json
 		mv /tmp/plugin-tmp.json .claude-plugin/plugin.json
@@ -104,7 +114,22 @@ release version="":
 	' .claude-plugin/marketplace.json > /tmp/marketplace-tmp.json
 	mv /tmp/marketplace-tmp.json .claude-plugin/marketplace.json
 	echo "Stamped SHA: $SHA"
-	# Sync version into servers/pyproject.toml and claudemd.md
-	sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" servers/pyproject.toml
-	sed -i "s/^version: .*/version: ${VERSION}/" templates/claudemd.md
+	# Sync version into servers/pyproject.toml and claudemd.md (portable sed)
+	if sed --version >/dev/null 2>&1; then
+		sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" servers/pyproject.toml
+		sed -i "s/^version: .*/version: ${VERSION}/" templates/claudemd.md
+	else
+		sed -i '' "s/^version = \".*\"/version = \"${VERSION}\"/" servers/pyproject.toml
+		sed -i '' "s/^version: .*/version: ${VERSION}/" templates/claudemd.md
+	fi
 	echo "Synced version: $VERSION"
+	# Update lockfile after pyproject.toml version change
+	uv lock --project servers
+	echo "Updated uv.lock"
+	# Remind about next steps
+	echo ""
+	echo "Release ${VERSION} stamped. Next steps:"
+	echo "  git add CHANGELOG.md .claude-plugin/ servers/pyproject.toml templates/claudemd.md servers/uv.lock"
+	echo "  git commit -m 'chore(release): bump version to ${VERSION}'"
+	echo "  git tag v${VERSION}"
+	echo "  git push origin main --tags"
