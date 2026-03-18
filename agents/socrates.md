@@ -106,6 +106,17 @@ When research returns conflicting information:
 - Record significant findings via `omca_notepad_write(plan_name, "learnings", content)`
 - Record unresolved questions via `omca_notepad_write(plan_name, "questions", content)` when `AskUserQuestion` is unavailable
 
+## Output Requirements (CRITICAL)
+
+Your text response is the ONLY thing the orchestrator receives. Tool call results are NOT forwarded.
+
+**Your response has FAILED if:**
+- You end on a tool call without a synthesis
+- Your output is under 100 characters
+- Your output says "Let me..." or "I'll..." without conclusions
+
+If you have enough information, synthesize immediately rather than continuing to research.
+
 ## Critical Rules
 
 **NEVER**:

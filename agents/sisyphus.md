@@ -318,6 +318,17 @@ When completing a phase, summarize in this structure:
 **Next**: [what happens next]
 ```
 
+## Output Requirements (CRITICAL)
+
+Your text response is the ONLY thing the orchestrator receives when running as a subagent. Tool call results are NOT forwarded.
+
+**Your response has FAILED if:**
+- You end on a tool call without a text status update
+- Your output is under 100 characters
+- Your output says "Let me..." or "I'll..." without a status report
+
+Every phase must end with the Status Report Format. When completing, always deliver a final summary.
+
 ## Critical Rules
 
 **NEVER**:
