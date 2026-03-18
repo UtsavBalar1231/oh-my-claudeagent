@@ -5,6 +5,69 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-03-18
+
+### Added
+
+- **Subagent output mandate**: SubagentStart hook injects `[OUTPUT MANDATE]` into all
+  depth-1 agents, telling them their text response is the only output the orchestrator
+  receives. Prevents agents from exhausting turns on tool calls without synthesizing
+- **Output failure conditions**: 7 agents (oracle, metis, momus, librarian, socrates,
+  atlas, sisyphus) gain "Output Requirements (CRITICAL)" sections with explicit failure
+  conditions modeled on explore's pattern — the only agent that reliably produced output
+- **ExitPlanMode permission hook**: new `plan-mode-handler.sh` auto-transitions session
+  to `acceptEdits` on plan approval, enabling execution agents to write files after
+  plan mode exit
+- **OMCA.md comprehensive guide**: 1200+ line operational guide consolidating plugin
+  architecture, agent catalog, skill reference, and hook documentation
+- **Statusline package docs**: added `statusline/README.md` with installation,
+  configuration, and architecture documentation
+- **Release version argument**: `just release [version]` accepts optional version to
+  bump all manifests in one command
+- **ExitPlanMode test fixture**: added `permissionrequest-exitplanmode.json` for hook
+  validation
+
+### Changed
+
+- **Removed maxTurns from all 12 agents**: agents manage their own turn budget instead
+  of hard cutoffs; output mandate and failure conditions provide the safety net
+- **Improved empty-task-response detection**: threshold raised from 10 to 50 chars,
+  added transitional pattern regex (detects "Let me...", "I'll...", etc. in short
+  responses), improved warning with SendMessage resumption guidance
+- **Code quality sweep across agents**: normalized content headers, MCP param names
+  (`type` → `evidence_type`, `yaml` → `rule_yaml`, `dryRun` → `dry_run`), removed
+  deprecated `cost` frontmatter from all agent definitions
+- **Code quality sweep across scripts**: hardened hook scripts with consistent error
+  handling, fixed delegate-retry `hookEventName` field, improved notify.sh multiline
+  handling
+- **Skills cleanup**: removed redundant separators, fixed param names, trimmed content
+  across atlas, dev-browser, frontend-ui-ux, git-master, handoff, hephaestus, ralph,
+  refactor, ultrawork, ulw-loop skills
+- **MCP server simplification**: refactored ast-grep and omca-state servers for clarity,
+  reformatted type annotations
+- **MCP consolidation**: merged root `pyproject.toml` into `servers/pyproject.toml`,
+  removed launcher scripts (`start-ast-grep-server.sh`, `start-omca-state-server.sh`),
+  updated `.mcp.json` to use `uv run --project servers` directly
+- **README trimmed to landing page**: moved detailed docs to OMCA.md, README now serves
+  as quick-start entry point
+- **Updated SendMessage API**: replaced deprecated `Agent(resume=)` with
+  `SendMessage({to: agentId})` across agent definitions
+- **Evidence enforcement**: `write-guard.sh` and `task-completed-verify.sh` now reject
+  manual writes to `verification-evidence.json`, requiring `evidence_record` MCP tool
+- **CI workflow updates**: bumped the all-actions group (checkout, setup-python,
+  cache) via Dependabot
+
+### Fixed
+
+- Removed dead `.omca/project-memory.json` reference from subagent-start hook
+- Added executable permission to `plan-mode-handler.sh`
+- Synced pyproject.toml and claudemd.md versions to match plugin.json (were out of
+  sync after v1.1.0 release)
+- Fixed release recipe to sync version into `servers/pyproject.toml` and
+  `templates/claudemd.md`
+
+[1.2.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.1.0...v1.2.0
+
 ## [1.1.0] - 2026-03-17
 
 ### Added
