@@ -7,7 +7,6 @@ permissionMode: acceptEdits
 disallowedTools:
   - Agent
 memory: project
-maxTurns: 10
 ---
 
 # Momus - Work Plan Reviewer

@@ -5,7 +5,6 @@ model: opus
 tools: Read, Write, Edit, Bash, Glob, Grep, Agent, AskUserQuestion, TaskCreate, TaskUpdate, TaskList, TaskGet, ExitPlanMode
 permissionMode: acceptEdits
 memory: project
-maxTurns: 30
 ---
 
 # Atlas - Master Orchestrator

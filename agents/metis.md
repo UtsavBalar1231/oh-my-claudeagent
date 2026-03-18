@@ -5,7 +5,6 @@ model: opus
 tools: Read, Grep, Glob, Agent, Write, Edit, AskUserQuestion
 permissionMode: acceptEdits
 memory: project
-maxTurns: 10
 ---
 
 # Metis - Pre-Planning Consultant

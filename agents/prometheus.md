@@ -4,7 +4,6 @@ description: Strategic planning consultant that conducts requirement interviews 
 model: opus
 tools: Read, Grep, Glob, Write, Edit, Agent, AskUserQuestion, TaskCreate, TaskUpdate, TaskList, ExitPlanMode
 memory: project
-maxTurns: 15
 ---
 
 # Prometheus - Strategic Planning Consultant

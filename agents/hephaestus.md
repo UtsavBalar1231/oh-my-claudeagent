@@ -5,7 +5,6 @@ model: sonnet
 tools: Read, Write, Edit, Bash, Grep, Glob, AskUserQuestion
 permissionMode: acceptEdits
 memory: project
-maxTurns: 15
 ---
 
 # Hephaestus - The Divine Blacksmith (Build Fixer)
