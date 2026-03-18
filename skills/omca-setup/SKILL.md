@@ -3,7 +3,7 @@ name: omca-setup
 description: Configure ~/.claude/ for oh-my-claudeagent — injects orchestration block, checks deps, inspects setup state
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep
 user-invocable: true
-argument-hint: "[--uninstall | --check]"
+argument-hint: "[--uninstall | --check | --doctor]"
 ---
 
 # omca-setup — Plugin Configuration
@@ -20,6 +20,7 @@ This skill does not run marketplace install commands on the user's behalf, does 
 Parse `$ARGUMENTS` for flags:
 - `--uninstall` → jump to UNINSTALL MODE
 - `--check` → jump to CHECK MODE
+- `--doctor` → jump to DOCTOR MODE
 - No flag → SETUP MODE (default)
 
 ---
@@ -184,7 +185,7 @@ Apply permission and settings changes to `~/.claude/settings.json` with user con
 
 2. Compute missing permissions against the required set:
    - `Write(.omca/**)`, `Edit(.omca/**)`, `Read(.omca/**)`
-   - `mcp__omca-state__*`, `mcp__ast-grep__*`, `mcp__grep__*`, `mcp__context7__*`
+   - `mcp__plugin_oh-my-claudeagent_omca-state__*`, `mcp__plugin_oh-my-claudeagent_ast-grep__*`, `mcp__grep__*`, `mcp__context7__*`
    - `Bash(jq *)`, `Bash(uv run *)`, `Bash(uv sync *)`
 
 3. Compute missing top-level: `teammateMode: "auto"`
@@ -203,8 +204,8 @@ Apply permission and settings changes to `~/.claude/settings.json` with user con
      "Write(.omca/**)",
      "Edit(.omca/**)",
      "Read(.omca/**)",
-     "mcp__omca-state__*",
-     "mcp__ast-grep__*",
+     "mcp__plugin_oh-my-claudeagent_omca-state__*",
+     "mcp__plugin_oh-my-claudeagent_ast-grep__*",
      "mcp__grep__*",
      "mcp__context7__*",
      "Bash(jq *)",
@@ -216,7 +217,7 @@ Apply permission and settings changes to `~/.claude/settings.json` with user con
 8. Explain each setting:
    - `teammateMode: "auto"` — enables agent teams with best available UI (tmux/iTerm2 split panes)
    - `Write(.omca/**)` / `Edit(.omca/**)` / `Read(.omca/**)` — auto-allow plugin state file access
-   - `mcp__omca-state__*` / `mcp__ast-grep__*` / `mcp__grep__*` / `mcp__context7__*` — auto-allow bundled MCP tool usage
+   - `mcp__plugin_oh-my-claudeagent_omca-state__*` / `mcp__plugin_oh-my-claudeagent_ast-grep__*` / `mcp__grep__*` / `mcp__context7__*` — auto-allow bundled MCP tool usage
    - `Bash(jq *)` / `Bash(uv run *)` / `Bash(uv sync *)` — auto-allow common plugin utility commands (narrowed from `Bash(uv *)`)
 
 ---
@@ -458,6 +459,57 @@ Non-destructive health check — no files are modified.
    - Is `.omca/` in `.gitignore`?
 
 5. Print the Phase 6 health report format with findings (but no "Setup Complete" header — use "Health Check" instead)
+
+---
+
+## DOCTOR MODE (`--doctor`)
+
+Extended diagnostic — superset of `--check` with deeper health verification. No files are modified.
+
+### Check 1: Dependencies
+Run Phase 1 (Dependency Check) — report PASS/WARN/FAIL for jq, uv, python3, ast-grep.
+
+### Check 2: CLAUDE.md Block
+- Does own block exist in `~/.claude/CLAUDE.md`? Report version if found.
+- Does old format block exist? Report "migration needed".
+- No block? Report "not configured — run omca-setup".
+
+### Check 3: Permission Namespace Audit
+Read `~/.claude/settings.json` and verify the required permission patterns are present:
+- `mcp__plugin_oh-my-claudeagent_omca-state__*` — PASS if present, FAIL if missing or has old bare `mcp__omca-state__*`
+- `mcp__plugin_oh-my-claudeagent_ast-grep__*` — PASS if present, FAIL if missing or has old bare `mcp__ast-grep__*`
+- `mcp__grep__*` — PASS if present (HTTP server, bare name is correct)
+- `mcp__context7__*` — PASS if present (HTTP server, bare name is correct)
+- `Write(.omca/**)`, `Edit(.omca/**)`, `Read(.omca/**)` — PASS if all present
+- `Bash(jq *)`, `Bash(uv run *)`, `Bash(uv sync *)` — PASS if all present
+- Check for stale entries: `mcp__pgs__*`, `mcp__omca-state__*`, `mcp__ast-grep__*` — WARN if found ("stale permission — run omca-setup to update")
+
+### Check 4: MCP Server Health
+For each command-type MCP server, verify it can start and respond:
+```bash
+echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | timeout 5 uv run --project ${PLUGIN_ROOT}/servers ast-grep-server.py 2>/dev/null
+echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | timeout 5 uv run --project ${PLUGIN_ROOT}/servers omca-state-server.py 2>/dev/null
+```
+- PASS if response contains `"result"` with tool definitions
+- FAIL if timeout, error, or no response
+- Note: HTTP servers (grep.app, context7) are external — skip or ping-only
+
+### Check 5: State Directory Health
+- `.omca/state/` exists — PASS/FAIL
+- `.omca/logs/` exists — PASS/FAIL
+- `.omca/` in `.gitignore` — PASS/FAIL
+
+### Check 6: Settings Validation
+- `teammateMode` is `"auto"` — PASS/WARN
+- Plugin enabled in `enabledPlugins` — PASS/FAIL
+- Marketplace configured in `extraKnownMarketplaces` — PASS/FAIL
+
+### Check 7: Statusline Health
+- `~/.claude/statusline/.venv/bin/cc-statusline` exists — PASS/FAIL
+- `statusLine` configured in `~/.claude/settings.json` — PASS/WARN
+- If daemon mode: check if daemon is running (`cc-statusline-daemon status`) — PASS/WARN
+
+Print the Phase 6 health report format with all findings. Use "Doctor Report" header instead of "Health Check".
 
 ---
 
