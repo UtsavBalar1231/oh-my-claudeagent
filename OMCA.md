@@ -123,7 +123,7 @@ Four MCP servers are bundled via `.mcp.json` and launched by Claude Code:
 - **grep.app** — HTTP-based public GitHub code search
 - **context7** — HTTP-based library documentation lookup
 
-MCP tools are available to all agents regardless of their frontmatter `tools` list.
+MCP tools are inherited by agents that do not declare a `tools:` allowlist in frontmatter. Use `disallowedTools:` instead of `tools:` to preserve MCP tool inheritance.
 
 ---
 
@@ -739,8 +739,8 @@ When context is long and session quality is degrading:
 ## MCP Tools
 
 Four MCP servers are wired in `.mcp.json` and launched by Claude Code when the plugin
-is loaded. MCP tools are available to all agents regardless of their frontmatter `tools`
-list.
+is loaded. MCP tools are inherited by agents that do not declare a `tools:` allowlist in
+frontmatter. Use `disallowedTools:` instead of `tools:` to preserve MCP tool inheritance.
 
 ### ast-grep (local Python server)
 
