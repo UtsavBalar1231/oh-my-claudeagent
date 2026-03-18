@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2026-03-19
+
+### Fixed
+
+- **Deterministic persistence state files**: `keyword-detector.sh` now creates
+  `ralph-state.json` and `ultrawork-state.json` atomically on keyword detection,
+  removing the dependency on Claude voluntarily following skill instructions
+- **Unified Stop blocking for ultrawork**: `ralph-persistence.sh` now checks both
+  `ralph-state.json` and `ultrawork-state.json` — ultrawork mode previously had
+  zero Stop-event enforcement
+- **Boulder fallback for task tracking gap**: when `ralph-state.json` has no tasks
+  (Claude used native TaskCreate instead of syncing), the Stop hook falls back to
+  `boulder.json` active plan detection with a 15-minute staleness guard
+- **Variable stagnation threshold**: empty task arrays use threshold 5 (more runway)
+  vs 3 for populated arrays, preventing premature stop when tasks are tracked natively
+
+### Added
+
+- **Persistence test fixtures**: `userpromptsubmit-ralph.json`,
+  `userpromptsubmit-ultrawork.json`, `stop-basic.json` with 6 new validation
+  assertions in `validate-plugin.sh`
+- **State file sync instructions in ralph SKILL**: explicit jq commands for syncing
+  `TaskCreate`/`TaskUpdate` to `ralph-state.json`
+- **State files section in ultrawork SKILL**: documents `ultrawork-state.json`
+  lifecycle and cleanup
+
+### Changed
+
+- **stop-continuation now clears ultrawork state**: previously only cleared
+  `ralph-state.json` and `boulder.json`, leaving `ultrawork-state.json` orphaned
+- **cancel-ralph documents scope**: added note that it only cancels ralph mode,
+  directing users to `stop-continuation` for ultrawork cleanup
+
 ## [1.2.0] - 2026-03-18
 
 ### Added
