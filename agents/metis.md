@@ -2,8 +2,9 @@
 name: metis
 description: Pre-planning consultant that analyzes requests before planning. Use when requirements are ambiguous, scope is unclear, or you need to identify hidden intentions, potential AI-slop patterns, and gaps before creating a work plan.
 model: opus
-tools: Read, Grep, Glob, Agent, Write, Edit, AskUserQuestion
 permissionMode: acceptEdits
+disallowedTools:
+  - Bash
 memory: project
 ---
 

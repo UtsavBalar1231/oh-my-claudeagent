@@ -2,8 +2,9 @@
 name: prometheus
 description: Strategic planning consultant that conducts requirement interviews and generates detailed work plans. Use when starting a new feature, refactoring project, or any work that needs structured planning before implementation.
 model: opus
-tools: Read, Grep, Glob, Write, Edit, Agent, AskUserQuestion, TaskCreate, TaskUpdate, TaskList, ExitPlanMode
 memory: project
+disallowedTools:
+  - Bash
 ---
 
 # Prometheus - Strategic Planning Consultant
