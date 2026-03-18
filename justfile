@@ -81,7 +81,7 @@ ci: fmt-check lint test
 
 # ── Release ──────────────────────────────────────────────────────
 
-# Stamp HEAD SHA and sync version across all manifests. Usage: just release [version]
+# Bump version, commit, stamp SHA, and tag. Usage: just release [version]
 [group('release')]
 release version="":
 	#!/usr/bin/env bash
@@ -91,7 +91,6 @@ release version="":
 		echo "ERROR: working tree has uncommitted changes. Commit or stash first." >&2
 		exit 1
 	fi
-	SHA=$(git rev-parse HEAD)
 	VERSION="{{ version }}"
 	if [[ -z "${VERSION}" ]]; then
 		VERSION=$(jq -r '.version' .claude-plugin/plugin.json)
@@ -106,14 +105,12 @@ release version="":
 		mv /tmp/plugin-tmp.json .claude-plugin/plugin.json
 		echo "Updated plugin.json: $VERSION"
 	fi
-	# Stamp SHA and sync version into marketplace.json
-	jq --arg sha "$SHA" --arg v "${VERSION}" '
-		.plugins[0].source.sha = $sha |
+	# Sync version into marketplace.json (SHA stamped in a separate commit below)
+	jq --arg v "${VERSION}" '
 		.metadata.version = $v |
 		.plugins[0].version = $v
 	' .claude-plugin/marketplace.json > /tmp/marketplace-tmp.json
 	mv /tmp/marketplace-tmp.json .claude-plugin/marketplace.json
-	echo "Stamped SHA: $SHA"
 	# Sync version into servers/pyproject.toml and claudemd.md (portable sed)
 	if sed --version >/dev/null 2>&1; then
 		sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" servers/pyproject.toml
@@ -126,10 +123,25 @@ release version="":
 	# Update lockfile after pyproject.toml version change
 	uv lock --project servers
 	echo "Updated uv.lock"
-	# Remind about next steps
+	# Commit 1: version bump across all manifests
+	git add .claude-plugin/plugin.json .claude-plugin/marketplace.json \
+		servers/pyproject.toml templates/claudemd.md servers/uv.lock
+	git commit -m "chore(release): bump version to ${VERSION}"
+	echo "Committed version bump"
+	# Commit 2: stamp the version-bump commit SHA into marketplace.json
+	# (A commit can't contain its own SHA, so this must be a separate commit.
+	#  Claude Code reads marketplace.json from HEAD but fetches the plugin tree
+	#  at the stamped SHA — which is commit 1 with the correct version.)
+	RELEASE_SHA=$(git rev-parse HEAD)
+	jq --arg sha "$RELEASE_SHA" '.plugins[0].source.sha = $sha' \
+		.claude-plugin/marketplace.json > /tmp/marketplace-tmp.json
+	mv /tmp/marketplace-tmp.json .claude-plugin/marketplace.json
+	git add .claude-plugin/marketplace.json
+	git commit -m "chore(release): stamp v${VERSION} SHA"
+	echo "Stamped SHA: $RELEASE_SHA"
+	# Tag the version-bump commit (not the SHA-stamp commit)
+	git tag -f "v${VERSION}" "$RELEASE_SHA"
+	echo "Tagged v${VERSION} at ${RELEASE_SHA:0:7}"
 	echo ""
-	echo "Release ${VERSION} stamped. Next steps:"
-	echo "  git add CHANGELOG.md .claude-plugin/ servers/pyproject.toml templates/claudemd.md servers/uv.lock"
-	echo "  git commit -m 'chore(release): bump version to ${VERSION}'"
-	echo "  git tag v${VERSION}"
+	echo "Release ${VERSION} ready. Push with:"
 	echo "  git push origin main --tags"
