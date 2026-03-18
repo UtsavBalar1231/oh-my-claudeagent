@@ -11,6 +11,10 @@ fi
 
 PROMPT=$(echo "${INPUT}" | jq -r '.prompt // empty' 2>/dev/null || echo "")
 
+STATE_DIR="${CLAUDE_PROJECT_ROOT:-$(pwd)}/.omca/state"
+RALPH_STATE="${STATE_DIR}/ralph-state.json"
+ULTRAWORK_STATE="${STATE_DIR}/ultrawork-state.json"
+
 if [[ -z "${PROMPT}" ]]; then
 	exit 0
 fi
@@ -75,6 +79,21 @@ fi
 if [[ "${PROMPT_LOWER}" =~ (run[[:space:]]+sisyphus|sisyphus[[:space:]]+orchestrate|orchestrate[[:space:]]+this) ]]; then
 	DETECTED_KEYWORDS+=("sisyphus-orchestrate")
 	ADDITIONAL_CONTEXT+="[SISYPHUS DETECTED] Invoke /oh-my-claudeagent:sisyphus-orchestrate for master orchestration. "
+fi
+
+# Create persistence state files for detected modes
+if [[ " ${DETECTED_KEYWORDS[*]} " =~ " ralph " ]] && [[ ! " ${DETECTED_KEYWORDS[*]} " =~ " stop-continuation " ]]; then
+	mkdir -p "${STATE_DIR}"
+	NOW_ISO=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+	printf '{"status":"active","activatedAt":"%s","tasks":[],"last_task_hash":"","stagnation_count":0}\n' \
+		"${NOW_ISO}" > "${RALPH_STATE}.tmp" && mv "${RALPH_STATE}.tmp" "${RALPH_STATE}"
+fi
+
+if [[ " ${DETECTED_KEYWORDS[*]} " =~ " ultrawork " ]] && [[ ! " ${DETECTED_KEYWORDS[*]} " =~ " stop-continuation " ]]; then
+	mkdir -p "${STATE_DIR}"
+	NOW_ISO=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+	printf '{"status":"active","activatedAt":"%s"}\n' \
+		"${NOW_ISO}" > "${ULTRAWORK_STATE}.tmp" && mv "${ULTRAWORK_STATE}.tmp" "${ULTRAWORK_STATE}"
 fi
 
 if [[ ${#DETECTED_KEYWORDS[@]} -gt 0 ]]; then
