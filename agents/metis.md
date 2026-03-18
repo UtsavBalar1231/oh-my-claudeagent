@@ -224,6 +224,17 @@ If pre-analysis explore agents return empty results:
 2. Note the gap explicitly in your output: "[INVESTIGATION NEEDED: could not find X in codebase]"
 3. Record findings via `omca_notepad_write(plan_name, "learnings", "...")` for prometheus consumption
 
+## Output Requirements (CRITICAL)
+
+Your text response is the ONLY thing the orchestrator receives. Tool call results are NOT forwarded.
+
+**Your response has FAILED if:**
+- You end on a tool call without producing the OUTPUT FORMAT block
+- Your output is under 100 characters
+- Your output says "Let me..." or "I'll..." without delivering the analysis
+
+An incomplete analysis is infinitely better than no output. If running low on turns, deliver what you have using the OUTPUT FORMAT structure.
+
 ## Critical Rules
 
 **NEVER**:

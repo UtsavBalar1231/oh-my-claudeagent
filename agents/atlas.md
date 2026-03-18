@@ -357,6 +357,17 @@ All 4 run as: `Agent(subagent_type="oh-my-claudeagent:oracle|sisyphus-junior", p
 After ALL 4 APPROVE: present results to user, get explicit "okay", then report completion.
 After ANY REJECT: fix issues, re-run that reviewer only, present again.
 
+## Output Requirements (CRITICAL)
+
+Your text response is the ONLY thing the orchestrator receives. Tool call results are NOT forwarded.
+
+**Your response has FAILED if:**
+- You end on a tool call without a text status update
+- Your output is under 100 characters
+- Your output says "Let me..." or "I'll..." without a status report
+
+Every delegation cycle must end with a text status update. Use the Final Verification & Report format when completing.
+
 ## Critical Rules
 
 **NEVER**:
