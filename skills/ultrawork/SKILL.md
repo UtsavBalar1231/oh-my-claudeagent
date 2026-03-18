@@ -216,6 +216,18 @@ Before claiming done, answer honestly:
 
 **You have Bash, you have tools. There is ZERO excuse for not running manual QA.**
 
+## State Files
+
+Ultrawork mode state is stored in `.omca/state/ultrawork-state.json`.
+This file is created automatically by the keyword detector when "ulw" or "ultrawork" is typed.
+
+**Do NOT delete this file until all work is verified complete.**
+
+To deactivate ultrawork, use `/oh-my-claudeagent:stop-continuation` which clears all persistence state.
+
+The Stop hook checks this file alongside ralph-state.json — while either is active, Claude will
+be prevented from stopping prematurely.
+
 ## Anti-Patterns (NEVER)
 
 - Running tasks sequentially when they could be parallel

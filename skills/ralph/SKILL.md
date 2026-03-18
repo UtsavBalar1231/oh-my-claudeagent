@@ -64,6 +64,30 @@ TaskUpdate(taskId="...", status="completed")
 
 **No mental tracking. Everything in the task list.**
 
+### 1b. State File Sync is Non-Negotiable
+
+The Stop hook reads `.omca/state/ralph-state.json` to decide whether to block stopping.
+The keyword detector creates this file automatically, but YOU must sync task state to it.
+
+After EVERY `TaskCreate`, sync to ralph-state.json:
+```bash
+jq --arg id "<taskId>" --arg subject "<subject>" \
+  '.tasks += [{"id": $id, "status": "pending", "subject": $subject}]' \
+  .omca/state/ralph-state.json > .omca/state/ralph-state.json.tmp && \
+  mv .omca/state/ralph-state.json.tmp .omca/state/ralph-state.json
+```
+
+After EVERY `TaskUpdate` status change, sync:
+```bash
+jq --arg id "<taskId>" --arg status "<newStatus>" \
+  '(.tasks[] | select(.id == $id)).status = $status' \
+  .omca/state/ralph-state.json > .omca/state/ralph-state.json.tmp && \
+  mv .omca/state/ralph-state.json.tmp .omca/state/ralph-state.json
+```
+
+**Why**: The Stop hook cannot see Claude's native task list. If you only use `TaskCreate`/`TaskUpdate`
+without syncing to ralph-state.json, the hook sees empty tasks and allows stopping after 5 attempts.
+
 ### 2. Error Resilience
 
 When an error occurs:
