@@ -32,6 +32,8 @@ case "${AGENT_TYPE}" in
 		;;
 esac
 
+CONTEXT_PARTS+=" [OUTPUT MANDATE] Your text response is the ONLY output the orchestrator receives. Before stopping, you MUST produce a structured text synthesis of your findings or actions. Tool call results, file contents, and intermediate reasoning are NOT forwarded — only your final text. If you are running low on turns, STOP making tool calls and synthesize what you have."
+
 for MODE_FILE in ralph-state.json ultrawork-state.json team-state.json; do
 	if [[ -f "${STATE_DIR}/${MODE_FILE}" ]]; then
 		MODE_STATUS=$(jq -r '.status // "inactive"' "${STATE_DIR}/${MODE_FILE}" 2>/dev/null)
