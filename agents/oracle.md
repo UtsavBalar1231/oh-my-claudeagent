@@ -9,7 +9,6 @@ disallowedTools:
   - Edit
   - Agent
 memory: project
-maxTurns: 3
 ---
 
 # Oracle - Strategic Technical Advisor

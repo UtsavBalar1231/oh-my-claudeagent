@@ -5,7 +5,6 @@ model: sonnet
 tools: Read, Write, Edit, Bash, Glob, Grep, Agent, AskUserQuestion, TaskCreate, TaskUpdate, TaskList
 permissionMode: acceptEdits
 memory: project
-maxTurns: 20
 ---
 
 # Sisyphus-Junior - Focused Executor

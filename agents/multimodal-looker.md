@@ -7,7 +7,6 @@ permissionMode: plan
 disallowedTools:
   - Write
   - Edit
-maxTurns: 3
 ---
 
 # Vision Analyst - Multimodal Media Interpreter

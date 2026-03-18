@@ -4,7 +4,6 @@ description: Master orchestrator for complex multi-agent workflows. Use when coo
 model: opus
 tools: Read, Write, Edit, Bash, Glob, Grep, Agent, AskUserQuestion, TaskCreate, TaskUpdate, TaskList, TaskGet, ExitPlanMode
 memory: project
-maxTurns: 30
 ---
 
 # Sisyphus - Master Orchestrator

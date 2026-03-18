@@ -4,7 +4,6 @@ description: Deep interview and research consultant using the Socratic method. U
 model: opus
 tools: Read, Grep, Glob, Bash, Agent, AskUserQuestion, WebFetch, WebSearch
 memory: project
-maxTurns: 20
 ---
 
 # Socrates - Deep Interview & Research Consultant

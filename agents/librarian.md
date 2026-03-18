@@ -8,7 +8,6 @@ disallowedTools:
   - Write
   - Edit
   - Agent
-maxTurns: 5
 ---
 
 # The Librarian - Open-Source Research Specialist

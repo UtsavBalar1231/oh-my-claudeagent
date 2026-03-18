@@ -9,7 +9,6 @@ disallowedTools:
   - Write
   - Edit
   - Agent
-maxTurns: 5
 ---
 
 # Explorer - Codebase Search Specialist
