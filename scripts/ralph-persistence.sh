@@ -87,7 +87,7 @@ if [[ "${RALPH_ACTIVE}" == "true" ]]; then
 					BOULDER_MTIME=$(stat -c %Y "${BOULDER_FILE}" 2>/dev/null || stat -f %m "${BOULDER_FILE}" 2>/dev/null || echo 0)
 					BOULDER_AGE=$(( $(date +%s) - BOULDER_MTIME ))
 					if [[ ${BOULDER_AGE} -lt 900 ]]; then
-						echo '{"hookSpecificOutput":{"hookEventName":"Stop","decision":{"behavior":"block"},"additionalContext":"[PERSISTENCE] Active work plan detected via boulder. Continue working on tasks."}}'
+						echo '{"decision":"block","reason":"[PERSISTENCE] Active work plan detected via boulder. Continue working on tasks."}'
 						exit 0
 					fi
 				fi
@@ -105,12 +105,12 @@ if [[ "${RALPH_ACTIVE}" == "true" ]]; then
 fi
 
 if [[ "${INCOMPLETE}" -gt 0 ]]; then
-	echo '{"hookSpecificOutput":{"hookEventName":"Stop","decision":{"behavior":"block"},"additionalContext":"[RALPH PERSISTENCE] Ralph mode is active with incomplete tasks. Continue working until oracle verification passes."}}'
+	echo '{"decision":"block","reason":"[RALPH PERSISTENCE] Ralph mode is active with incomplete tasks. Continue working until oracle verification passes."}'
 	exit 0
 fi
 
 if [[ "${ULTRAWORK_ACTIVE}" == "true" ]]; then
-	echo '{"hookSpecificOutput":{"hookEventName":"Stop","decision":{"behavior":"block"},"additionalContext":"[ULTRAWORK PERSISTENCE] Ultrawork mode is active. Continue parallel execution of remaining tasks."}}'
+	echo '{"decision":"block","reason":"[ULTRAWORK PERSISTENCE] Ultrawork mode is active. Continue parallel execution of remaining tasks."}'
 	exit 0
 fi
 
@@ -123,7 +123,7 @@ if [[ -f "${BOULDER_FILE}" ]]; then
 			BOULDER_MTIME=$(stat -c %Y "${BOULDER_FILE}" 2>/dev/null || stat -f %m "${BOULDER_FILE}" 2>/dev/null || echo 0)
 			BOULDER_AGE=$(( $(date +%s) - BOULDER_MTIME ))
 			if [[ ${BOULDER_AGE} -lt 900 ]]; then
-				echo '{"hookSpecificOutput":{"hookEventName":"Stop","decision":{"behavior":"block"},"additionalContext":"[PERSISTENCE] Active work plan detected via boulder. Continue working on tasks."}}'
+				echo '{"decision":"block","reason":"[PERSISTENCE] Active work plan detected via boulder. Continue working on tasks."}'
 				exit 0
 			fi
 		fi
