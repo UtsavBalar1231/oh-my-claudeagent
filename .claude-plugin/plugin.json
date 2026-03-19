@@ -1,6 +1,6 @@
 {
   "name": "oh-my-claudeagent",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Turn Claude Code into a multi-agent system. Specialist agents handle planning, execution, code review, debugging, and research — with persistence modes, parallel execution, and natural language activation.",
   "author": {
     "name": "UtsavBalar1231",
