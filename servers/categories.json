@@ -1,0 +1,29 @@
+{
+	"categories": {
+		"quick": {
+			"model": "haiku",
+			"description": "Fast lookups, simple searches",
+			"prompt_append": "Be concise. Return results quickly."
+		},
+		"standard": {
+			"model": "sonnet",
+			"description": "Normal implementation work",
+			"prompt_append": ""
+		},
+		"deep": {
+			"model": "opus",
+			"description": "Complex analysis, architecture decisions",
+			"prompt_append": "Think deeply. Consider edge cases."
+		},
+		"readonly": {
+			"model": "sonnet",
+			"description": "Read-only exploration and research",
+			"prompt_append": "You are in read-only mode."
+		}
+	},
+	"concurrency_limits": {
+		"opus": 2,
+		"sonnet": 5,
+		"haiku": 10
+	}
+}

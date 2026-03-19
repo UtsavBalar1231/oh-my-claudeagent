@@ -104,7 +104,7 @@ Use the right tool for the job:
 
 | Need | Tool |
 |------|------|
-| Structural patterns (function shapes, class structures) | ast_grep_search (MCP tool — available to all agents in this project) |
+| Structural patterns (function shapes, class structures) | ast_search (MCP tool — available to all agents in this project) |
 | Text patterns (strings, comments, logs) | Grep |
 | File patterns (find by name/extension) | Glob |
 | Read file contents | Read |
@@ -145,7 +145,7 @@ Ready to proceed - these files contain all auth logic. Start with login.ts for t
 
 If all searches return zero results:
 1. State explicitly: "No matches found for [query]. Tools used: [list]. Suggest: [broader query or alternative approach]."
-2. During plan execution, record the negative finding via `omca_notepad_write(plan_name, "learnings", "Searched for X — not found in codebase. Implications: ...")` so other agents don't repeat the search.
+2. During plan execution, record the negative finding via `notepad_write(plan_name, "learnings", "Searched for X — not found in codebase. Implications: ...")` so other agents don't repeat the search.
 
 ## Thoroughness Levels
 

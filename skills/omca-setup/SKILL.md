@@ -185,7 +185,7 @@ Apply permission and settings changes to `~/.claude/settings.json` with user con
 
 2. Compute missing permissions against the required set:
    - `Write(.omca/**)`, `Edit(.omca/**)`, `Read(.omca/**)`
-   - `mcp__plugin_oh-my-claudeagent_omca-state__*`, `mcp__plugin_oh-my-claudeagent_ast-grep__*`, `mcp__grep__*`, `mcp__context7__*`
+   - `mcp__plugin_oh-my-claudeagent_omca__*`, `mcp__grep__*`, `mcp__context7__*`
    - `Bash(jq *)`, `Bash(uv run *)`, `Bash(uv sync *)`
 
 3. Compute missing top-level: `teammateMode: "auto"`
@@ -204,8 +204,7 @@ Apply permission and settings changes to `~/.claude/settings.json` with user con
      "Write(.omca/**)",
      "Edit(.omca/**)",
      "Read(.omca/**)",
-     "mcp__plugin_oh-my-claudeagent_omca-state__*",
-     "mcp__plugin_oh-my-claudeagent_ast-grep__*",
+     "mcp__plugin_oh-my-claudeagent_omca__*",
      "mcp__grep__*",
      "mcp__context7__*",
      "Bash(jq *)",
@@ -217,7 +216,7 @@ Apply permission and settings changes to `~/.claude/settings.json` with user con
 8. Explain each setting:
    - `teammateMode: "auto"` — enables agent teams with best available UI (tmux/iTerm2 split panes)
    - `Write(.omca/**)` / `Edit(.omca/**)` / `Read(.omca/**)` — auto-allow plugin state file access
-   - `mcp__plugin_oh-my-claudeagent_omca-state__*` / `mcp__plugin_oh-my-claudeagent_ast-grep__*` / `mcp__grep__*` / `mcp__context7__*` — auto-allow bundled MCP tool usage
+   - `mcp__plugin_oh-my-claudeagent_omca__*` / `mcp__grep__*` / `mcp__context7__*` — auto-allow bundled MCP tool usage
    - `Bash(jq *)` / `Bash(uv run *)` / `Bash(uv sync *)` — auto-allow common plugin utility commands (narrowed from `Bash(uv *)`)
 
 ---
@@ -476,8 +475,7 @@ Run Phase 1 (Dependency Check) — report PASS/WARN/FAIL for jq, uv, python3, as
 
 ### Check 3: Permission Namespace Audit
 Read `~/.claude/settings.json` and verify the required permission patterns are present:
-- `mcp__plugin_oh-my-claudeagent_omca-state__*` — PASS if present, FAIL if missing or has old bare `mcp__omca-state__*`
-- `mcp__plugin_oh-my-claudeagent_ast-grep__*` — PASS if present, FAIL if missing or has old bare `mcp__ast-grep__*`
+- `mcp__plugin_oh-my-claudeagent_omca__*` — PASS if present, FAIL if missing or has old bare `mcp__omca-state__*` or `mcp__ast-grep__*`
 - `mcp__grep__*` — PASS if present (HTTP server, bare name is correct)
 - `mcp__context7__*` — PASS if present (HTTP server, bare name is correct)
 - `Write(.omca/**)`, `Edit(.omca/**)`, `Read(.omca/**)` — PASS if all present
@@ -487,8 +485,7 @@ Read `~/.claude/settings.json` and verify the required permission patterns are p
 ### Check 4: MCP Server Health
 For each command-type MCP server, verify it can start and respond:
 ```bash
-echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | timeout 5 uv run --project ${PLUGIN_ROOT}/servers ast-grep-server.py 2>/dev/null
-echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | timeout 5 uv run --project ${PLUGIN_ROOT}/servers omca-state-server.py 2>/dev/null
+echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | timeout 5 uv run --project ${PLUGIN_ROOT}/servers omca-mcp.py 2>/dev/null
 ```
 - PASS if response contains `"result"` with tool definitions
 - FAIL if timeout, error, or no response

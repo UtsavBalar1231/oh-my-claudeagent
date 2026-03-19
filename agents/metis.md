@@ -83,8 +83,8 @@ When reviewing scope or plans, flag these common over-engineering patterns:
 **Your Mission**: Ensure zero regressions, behavior preservation.
 
 **Tool Guidance** (recommend to prometheus):
-- For structural code analysis, recommend using `ast_grep_search` (MCP tool — available to all agents) in explore agent prompts
-- `ast_grep_replace(dry_run=true)`: Preview structural transformations before applying
+- For structural code analysis, recommend using `ast_search` (MCP tool — available to all agents) in explore agent prompts
+- `ast_replace(dry_run=true)`: Preview structural transformations before applying
 
 **Questions to Ask**:
 1. What specific behavior must be preserved? (test commands to verify)
@@ -223,7 +223,7 @@ Consult oracle agent for architecture consultation with full context.
 If pre-analysis explore agents return empty results:
 1. Broaden the search scope (different file patterns, adjacent directories)
 2. Note the gap explicitly in your output: "[INVESTIGATION NEEDED: could not find X in codebase]"
-3. Record findings via `omca_notepad_write(plan_name, "learnings", "...")` for prometheus consumption
+3. Record findings via `notepad_write(plan_name, "learnings", "...")` for prometheus consumption
 
 ## Output Requirements (CRITICAL)
 

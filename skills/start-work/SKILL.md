@@ -129,7 +129,7 @@ After completing plan discovery and boulder setup above, execute the plan:
 3. Delegate tasks via `Agent(subagent_type="oh-my-claudeagent:sisyphus-junior")` — one task per agent
 4. Run independent tasks in parallel (up to 5 concurrent agents)
 5. Verify each task's output before marking complete
-6. Record evidence: `evidence_record(type, command, exit_code, output_snippet)`
+6. Record evidence: `evidence_log(type, command, exit_code, output_snippet)`
 
 Follow atlas workflow: delegate, verify, mark checkboxes, repeat until done.
 

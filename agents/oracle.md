@@ -61,11 +61,11 @@ Exhaust provided context and attached files before reaching for tools. External 
 | Search for patterns across codebase | Grep |
 | Find files by name/extension | Glob |
 | Git history, blame, show | Bash |
-| Structural code patterns | ast_grep_search (MCP tool — available to all agents) |
+| Structural code patterns | ast_search (MCP tool — available to all agents) |
 
 When giving advice during active plan execution:
 - Check `boulder_read` for plan context if available
-- Recommend `evidence_record` in your action plans for verification steps
+- Recommend `evidence_log` in your action plans for verification steps
 
 ## Output Verbosity (STRICT)
 

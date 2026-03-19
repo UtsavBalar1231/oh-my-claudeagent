@@ -381,7 +381,7 @@ After generating the plan, MUST submit to momus for review:
 ### MCP Tool Reference
 - **`boulder_write`**: After plan is saved, register it as the active boulder so hooks and subagents can find it
 - **`boulder_read`**: Check if a previous plan is already active before creating a new one
-- **`omca_notepad_write`**: Record planning decisions, blockers, or key findings during requirements interview
+- **`notepad_write`**: Record planning decisions, blockers, or key findings during requirements interview
 
 **Note on TaskCreate vs plan files**: Use `TaskCreate/TaskUpdate/TaskList` for tracking your own internal planning sub-tasks (e.g., "interview user", "research auth patterns"). The deliverable work plan goes to `.omca/plans/{name}.md` as markdown — these are separate systems.
 

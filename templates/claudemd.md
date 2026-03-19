@@ -93,15 +93,14 @@ Invoke via `/oh-my-claudeagent:NAME` or keyword triggers. Quoted phrases below a
 
 ## Bundled Tools
 
-This plugin bundles four MCP servers via `.mcp.json`:
+This plugin bundles three MCP servers via `.mcp.json`:
 
-**ast-grep** — Structural code search and transformation:
-`ast_grep_search`, `ast_grep_replace`, `find_code_by_rule`, `test_match_code_rule`, `dump_syntax_tree`.
+**omca** — Structural code search, state management, and notepad tracking:
+`ast_search`, `ast_replace`, `ast_find_rule`, `ast_test_rule`, `ast_dump_tree`.
 
-**omca-state** — Boulder (work plan tracking), evidence (verification), and notepads (subagent learning):
 - Boulder: `boulder_read`, `boulder_write`, `boulder_clear`, `boulder_progress`
-- Evidence: `evidence_record`, `evidence_read`, `evidence_clear`
-- Notepads: `omca_notepad_write`, `omca_notepad_read`, `omca_notepad_list`
+- Evidence: `evidence_log`, `evidence_read`, `evidence_clear`
+- Notepads: `notepad_write`, `notepad_read`, `notepad_list`
 
 **grep.app** — Public GitHub repository code search (via Vercel):
 Search across ~1M public repos with language, repository, and file path filters. Use for finding real-world usage examples of libraries, patterns, and APIs.
@@ -112,18 +111,18 @@ Search across ~1M public repos with language, repository, and file path filters.
 Notepad sections per plan: `learnings`, `issues`, `decisions`, `problems`, `questions`. Always append, never overwrite.
 
 <tool_routing>
-**Search tool routing**: Use `ast_grep_search` for structural code patterns (function signatures, class shapes, import patterns). Use `Grep` for text/string search (log messages, comments, config values). Use `find_code_by_rule` for advanced structural queries with YAML combinators.
+**Search tool routing**: Use `ast_search` for structural code patterns (function signatures, class shapes, import patterns). Use `Grep` for text/string search (log messages, comments, config values). Use `ast_find_rule` for advanced structural queries with YAML combinators.
 
-**Public code search**: Use `grep.app` MCP tools to search public GitHub repositories for real-world usage examples, library patterns, and API implementations. Use local `Grep` for searching the current project. Use `ast_grep_search` for structural patterns in the current project.
+**Public code search**: Use `grep.app` MCP tools to search public GitHub repositories for real-world usage examples, library patterns, and API implementations. Use local `Grep` for searching the current project. Use `ast_search` for structural patterns in the current project.
 
 **Library documentation**: Use `context7` MCP tools for looking up library docs — `context7_resolve-library-id` to find the library, then `context7_query-docs` for specific documentation. Prefer context7 over WebFetch for well-known libraries. Fall back to WebFetch/librarian for niche or very recent libraries.
 
-**Verification workflow**: After running any build, test, or lint command, call `evidence_record(evidence_type, command, exit_code, output_snippet)` to create `.omca/state/verification-evidence.json`. The `task-completed-verify` hook BLOCKS task completion if this file is missing or stale (>5 min). Example:
-`evidence_record(evidence_type="test", command="npm test", exit_code=0, output_snippet="42 tests passed")`
+**Verification workflow**: After running any build, test, or lint command, call `evidence_log(evidence_type, command, exit_code, output_snippet)` to create `.omca/state/verification-evidence.json`. The `task-completed-verify` hook BLOCKS task completion if this file is missing or stale (>5 min). Example:
+`evidence_log(evidence_type="test", command="npm test", exit_code=0, output_snippet="42 tests passed")`
 
 **Boulder lifecycle**: When starting plan execution, call `boulder_write(active_plan, plan_name, session_id)` to register the active plan. Use `boulder_progress` to check completed vs remaining tasks. Hooks and subagents discover the active plan via `boulder_read`.
 
-**Notepad usage**: Use `omca_notepad_write(plan_name, section, content)` to record discoveries during execution. Sections: learnings, issues, decisions, problems, questions. The `questions` section is used by subagents that need user input (AskUserQuestion workaround) — orchestrators check it after each delegation. Always append, never overwrite.
+**Notepad usage**: Use `notepad_write(plan_name, section, content)` to record discoveries during execution. Sections: learnings, issues, decisions, problems, questions. The `questions` section is used by subagents that need user input (AskUserQuestion workaround) — orchestrators check it after each delegation. Always append, never overwrite.
 
 **Project rules**: `.omca/rules/*.md` files with `# pattern: <glob>` headers auto-inject when matching files are read or edited. Check for injected `[Rule: ...]` context and follow project-specific conventions.
 

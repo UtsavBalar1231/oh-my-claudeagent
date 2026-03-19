@@ -407,7 +407,7 @@ wheels = [
 ]
 
 [[package]]
-name = "oh-my-claudeagent-servers"
+name = "oh-my-claudeagent-server"
 version = "1.2.2"
 source = { virtual = "." }
 dependencies = [

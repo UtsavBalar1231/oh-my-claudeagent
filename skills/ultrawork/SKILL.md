@@ -150,7 +150,7 @@ After all parallel work completes:
 3. Run integration tests
 4. Verify combined functionality
 5. Architect review if complex
-6. Record all results via evidence_record(type, command, exit_code, output_snippet)
+6. Record all results via evidence_log(type, command, exit_code, output_snippet)
 7. Review all evidence via `evidence_read` before reporting completion
 ```
 
@@ -195,8 +195,8 @@ Before claiming done, answer honestly:
 1. Did I run the tests and see them PASS? (not "they should pass")
 2. Did I read the actual output of every command? (not skim)
 3. Is EVERY requirement from the request actually implemented? (re-read the request NOW)
-4. Did I record evidence for every verification with `evidence_record`? (not "I verified it mentally")
-5. Did I record key learnings or issues via `omca_notepad_write`?
+4. Did I record evidence for every verification with `evidence_log`? (not "I verified it mentally")
+5. Did I record key learnings or issues via `notepad_write`?
 
 **If ANY answer is no → GO BACK AND DO IT. Do not claim completion.**
 

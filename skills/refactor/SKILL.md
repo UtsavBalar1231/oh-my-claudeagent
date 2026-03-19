@@ -129,7 +129,7 @@ For EACH step:
 1. **Pre-Step**: Mark task in_progress, verify baseline
 2. **Execute**: Use ast-grep MCP tools for structural replacement, or Edit for targeted changes. For symbol renaming, use `lsp_rename` only if the current Claude environment exposes it.
 3. **Post-Step Verification**: Run typecheck + run tests
-4. **Record Evidence**: After each verification, call `evidence_record(evidence_type="typecheck", command="<cmd>", exit_code=<code>, output_snippet="<output>")`
+4. **Record Evidence**: After each verification, call `evidence_log(evidence_type="typecheck", command="<cmd>", exit_code=<code>, output_snippet="<output>")`
 5. **Complete**: Mark task completed if verification passes
 
 **If ANY verification fails**: STOP, REVERT, DIAGNOSE.
@@ -144,7 +144,7 @@ For EACH step:
 - Build verification
 - Final diagnostics on all changed files (using LSP/tooling support when available)
 
-After EACH verification command above, call `evidence_record(type, command, exit_code, output_snippet)`. The task-completed-verify hook BLOCKS task completion without fresh evidence.
+After EACH verification command above, call `evidence_log(type, command, exit_code, output_snippet)`. The task-completed-verify hook BLOCKS task completion without fresh evidence.
 
 ---
 

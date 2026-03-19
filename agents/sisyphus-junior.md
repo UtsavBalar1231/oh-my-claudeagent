@@ -91,10 +91,10 @@ Before saying "done", "fixed", or "complete":
 | "Debugged" | Root cause identified with file:line |
 
 ### MCP Tool Reference
-- **`evidence_record`**: After EVERY build/test/lint command, record result — hook blocks completion without this
-- **`ast_grep_search`**: Find structural code patterns (function signatures, class shapes) instead of text grep
-- **`ast_grep_replace`**: Structural find-and-replace for safe refactoring transforms (use `dry_run=true` to preview)
-- **`omca_notepad_write`**: Record discoveries or issues found during implementation
+- **`evidence_log`**: After EVERY build/test/lint command, record result — hook blocks completion without this
+- **`ast_search`**: Find structural code patterns (function signatures, class shapes) instead of text grep
+- **`ast_replace`**: Structural find-and-replace for safe refactoring transforms (use `dry_run=true` to preview)
+- **`notepad_write`**: Record discoveries or issues found during implementation
 - **`evidence_read`**: Review accumulated evidence before claiming completion
 
 ## Communication Style

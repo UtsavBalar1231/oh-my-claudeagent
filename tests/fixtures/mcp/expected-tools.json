@@ -1,7 +1,20 @@
 [
-  "ast_grep_search",
-  "ast_grep_replace",
-  "find_code_by_rule",
-  "dump_syntax_tree",
-  "test_match_code_rule"
+  "ast_search",
+  "ast_replace",
+  "ast_find_rule",
+  "ast_dump_tree",
+  "ast_test_rule",
+  "boulder_read",
+  "boulder_write",
+  "boulder_clear",
+  "boulder_progress",
+  "evidence_log",
+  "evidence_read",
+  "evidence_clear",
+  "notepad_write",
+  "notepad_read",
+  "notepad_list",
+  "agents_list",
+  "categories_list",
+  "concurrency_status"
 ]

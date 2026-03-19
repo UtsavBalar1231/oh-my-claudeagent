@@ -1,0 +1,91 @@
+{
+	"explore": {
+		"agent_category": "exploration",
+		"cost_tier": "free",
+		"preferred_category": "quick",
+		"key_trigger": "2+ modules involved → fire explore background",
+		"when_to_use": "Finding files and patterns, searching code, answering 'where is X?', discovering cross-module patterns, unfamiliar module structure",
+		"when_not_to_use": "Implementation work, writing files, complex analysis, single known-location lookups (use grep/glob directly)"
+	},
+	"librarian": {
+		"agent_category": "exploration",
+		"cost_tier": "free",
+		"preferred_category": "quick",
+		"key_trigger": "External library/source mentioned → fire librarian background",
+		"when_to_use": "Library docs, SDK research, finding OSS examples, best practices for unfamiliar packages",
+		"when_not_to_use": "Internal codebase search (use explore), known APIs, trivial lookups"
+	},
+	"multimodal-looker": {
+		"agent_category": "exploration",
+		"cost_tier": "cheap",
+		"preferred_category": "readonly",
+		"when_to_use": "Image analysis, PDF extraction, diagram interpretation, screenshot review",
+		"when_not_to_use": "Text-only files, code that can be read directly"
+	},
+	"sisyphus-junior": {
+		"agent_category": "specialist",
+		"cost_tier": "cheap",
+		"preferred_category": "standard",
+		"key_trigger": "Specific implementation task with clear scope",
+		"when_to_use": "Bug fixes, feature additions, code changes, specific task execution",
+		"when_not_to_use": "Planning, architecture, multi-agent coordination, research"
+	},
+	"hephaestus": {
+		"agent_category": "specialist",
+		"cost_tier": "cheap",
+		"preferred_category": "standard",
+		"key_trigger": "Build failure, type error, dependency issue",
+		"when_to_use": "Build failures, type errors, toolchain issues, dependency problems",
+		"when_not_to_use": "Feature work, refactoring, architecture changes"
+	},
+	"oracle": {
+		"agent_category": "advisor",
+		"cost_tier": "expensive",
+		"preferred_category": "deep",
+		"key_trigger": "2+ failed fix attempts, architecture decision, code review",
+		"when_to_use": "Architecture decisions, after 2+ failed fixes, unfamiliar patterns, security/performance concerns, multi-system tradeoffs",
+		"when_not_to_use": "Simple file ops, first attempt at any fix, questions answerable from code you've read, trivial decisions"
+	},
+	"prometheus": {
+		"agent_category": "advisor",
+		"cost_tier": "expensive",
+		"preferred_category": "deep",
+		"when_to_use": "Strategic planning, requirement interviews, structured work plans",
+		"when_not_to_use": "Execution, simple tasks, research without planning need"
+	},
+	"metis": {
+		"agent_category": "advisor",
+		"cost_tier": "expensive",
+		"preferred_category": "deep",
+		"when_to_use": "Pre-planning gap analysis, risk identification, hidden requirement detection",
+		"when_not_to_use": "Execution, straightforward tasks, post-implementation review"
+	},
+	"momus": {
+		"agent_category": "advisor",
+		"cost_tier": "expensive",
+		"preferred_category": "deep",
+		"when_to_use": "Plan review, critique, catching gaps and ambiguities before execution",
+		"when_not_to_use": "Execution, research, planning (use prometheus instead)"
+	},
+	"socrates": {
+		"agent_category": "advisor",
+		"cost_tier": "expensive",
+		"preferred_category": "deep",
+		"when_to_use": "Deep research requiring iterative dialogue, complex questions, knowledge synthesis",
+		"when_not_to_use": "Simple lookups, implementation, straightforward questions"
+	},
+	"sisyphus": {
+		"agent_category": "orchestrator",
+		"cost_tier": "expensive",
+		"preferred_category": "deep",
+		"when_to_use": "Multi-agent coordination, complex workflows, parallel execution",
+		"when_not_to_use": "Simple tasks, single-file edits, direct execution"
+	},
+	"atlas": {
+		"agent_category": "orchestrator",
+		"cost_tier": "expensive",
+		"preferred_category": "deep",
+		"when_to_use": "Todo list execution, completing ALL tasks via delegation",
+		"when_not_to_use": "Planning, research, single tasks"
+	}
+}

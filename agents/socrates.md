@@ -89,7 +89,7 @@ Use specialized agents for parallel research:
 | Library documentation | context7 MCP tools | Two-step: resolve-library-id -> query-docs. Prefer over WebFetch for known libraries |
 | Deep GitHub source investigation | librarian agent | Cloning repos, git blame, PR history |
 | Codebase patterns | explore agent | Local file search, grep, glob |
-| Structural code patterns | ast_grep_search | MCP tool — available for all agents in this project |
+| Structural code patterns | ast_search | MCP tool — available for all agents in this project |
 | Follow-up questions | AskUserQuestion | If unavailable: at depth 0, ask as text; at depth 1, write to notepad `questions` section and return |
 
 **Prefer direct WebFetch/WebSearch** for documentation pages, blog posts, and API references. Reserve librarian delegation for tasks requiring repository cloning or deep Git history analysis.
@@ -105,8 +105,8 @@ When research returns conflicting information:
 ## Plan Context Awareness
 
 - Use `boulder_read` to check if there is an active plan — when present, scope research to plan-relevant questions
-- Record significant findings via `omca_notepad_write(plan_name, "learnings", content)`
-- Record unresolved questions via `omca_notepad_write(plan_name, "questions", content)` when `AskUserQuestion` is unavailable
+- Record significant findings via `notepad_write(plan_name, "learnings", content)`
+- Record unresolved questions via `notepad_write(plan_name, "questions", content)` when `AskUserQuestion` is unavailable
 
 ## Output Requirements (CRITICAL)
 

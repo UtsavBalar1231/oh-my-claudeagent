@@ -112,7 +112,7 @@ After all tasks complete:
 2. Check for linter errors
 3. Verify functionality
 4. Get oracle approval
-5. Record evidence: `evidence_record(type, command, exit_code, output_snippet)` for every verification step
+5. Record evidence: `evidence_log(type, command, exit_code, output_snippet)` for every verification step
 6. Review accumulated evidence via `evidence_read` before claiming final completion
 
 ## Before Concluding (MANDATORY)
@@ -127,8 +127,8 @@ VERIFICATION CHECKLIST:
 [ ] LINT: No linter errors
 [ ] FUNCTIONALITY: All features work
 [ ] ORACLE: Verification passed
-[ ] EVIDENCE: All verification results recorded via evidence_record
-[ ] NOTEPAD: Key discoveries recorded via omca_notepad_write
+[ ] EVIDENCE: All verification results recorded via evidence_log
+[ ] NOTEPAD: Key discoveries recorded via notepad_write
 
 IF ANY UNCHECKED -> CONTINUE WORKING
 ```

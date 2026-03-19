@@ -64,8 +64,8 @@ verify dependencies. Then try:
 
 12 specialist agents (sisyphus, atlas, prometheus, metis, momus, oracle, sisyphus-junior,
 explore, librarian, hephaestus, multimodal-looker, socrates), 20 skills invokable via
-slash commands or keyword triggers, 4 bundled MCP servers (ast-grep structural search,
-omca-state plan/evidence tracking, grep.app public code search, context7 library docs),
+slash commands or keyword triggers, 3 bundled MCP servers (omca: structural search +
+state tracking, grep.app public code search, context7 library docs),
 and 27 hook scripts for session persistence, context injection, and auto-approval.
 
 ## Requirements

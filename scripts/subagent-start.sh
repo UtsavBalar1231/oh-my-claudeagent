@@ -50,17 +50,66 @@ if [[ -f "${BOULDER_FILE}" ]]; then
 	PLAN_NAME=$(jq -r '.plan_name // empty' "${BOULDER_FILE}" 2>/dev/null || echo "")
 	if [[ -n "${PLAN_FILE}" ]]; then
 		CONTEXT_PARTS+=" [ACTIVE PLAN] Refer to: ${PLAN_FILE}"
-		CONTEXT_PARTS+=" CRITICAL: The plan file at ${PLAN_FILE} is READ-ONLY. NEVER modify the plan file directly. Use omca_notepad_write to record issues or decisions instead."
+		CONTEXT_PARTS+=" CRITICAL: The plan file at ${PLAN_FILE} is READ-ONLY. NEVER modify the plan file directly. Use notepad_write to record issues or decisions instead."
 	fi
 	if [[ -n "${PLAN_NAME}" ]]; then
-		CONTEXT_PARTS+=" [NOTEPAD AVAILABLE] Plan: ${PLAN_NAME}. Use omca_notepad_write('${PLAN_NAME}', section, content) to record discoveries. Sections: learnings, issues, decisions, problems, questions. Use 'questions' when you need user input (AskUserQuestion is unavailable in subagents). Always APPEND — never overwrite."
+		CONTEXT_PARTS+=" [NOTEPAD AVAILABLE] Plan: ${PLAN_NAME}. Use notepad_write('${PLAN_NAME}', section, content) to record discoveries. Sections: learnings, issues, decisions, problems, questions. Use 'questions' when you need user input (AskUserQuestion is unavailable in subagents). Always APPEND — never overwrite."
 	fi
 fi
 
-# Inject evidence_record guidance for execution agents
+# Inject evidence_log guidance for execution agents
 case "${AGENT_TYPE}" in
 	*sisyphus-junior*|*hephaestus*|*atlas*|*sisyphus*)
-		CONTEXT_PARTS+=" [VERIFICATION] After running build/test/lint commands, you MUST use the evidence_record MCP tool to record results. Do NOT manually write or cat to .omca/state/verification-evidence.json — the TaskCompleted hook validates schema and will reject manual writes. Example: evidence_record(evidence_type=\"test\", command=\"just test\", exit_code=0, output_snippet=\"10 passed\")"
+		CONTEXT_PARTS+=" [VERIFICATION] After running build/test/lint commands, you MUST use the evidence_log MCP tool to record results. Do NOT manually write or cat to .omca/state/verification-evidence.json — the TaskCompleted hook validates schema and will reject manual writes. Example: evidence_log(evidence_type=\"test\", command=\"just test\", exit_code=0, output_snippet=\"10 passed\")"
+		;;
+	*) ;;
+esac
+
+# --- Concurrency registration (atomic read-modify-write) ---
+ACTIVE_FILE="${STATE_DIR}/active-agents.json"
+CATALOG_FILE="${STATE_DIR}/agent-catalog.json"
+
+AGENT_MODEL="sonnet"
+if [[ -f "${CATALOG_FILE}" ]]; then
+	AGENT_NAME=$(echo "${AGENT_TYPE##*:}" | tr '[:upper:]' '[:lower:]')
+	CATALOG_MODEL=$(jq -r --arg name "${AGENT_NAME}" \
+		'.[] | select(.name == $name) | .default_model // "sonnet"' \
+		"${CATALOG_FILE}" 2>/dev/null)
+	[[ -n "${CATALOG_MODEL}" ]] && AGENT_MODEL="${CATALOG_MODEL}"
+fi
+
+# Register — atomic mktemp+mv (no flock — POSIX portable)
+ACTIVE=$(cat "${ACTIVE_FILE}" 2>/dev/null || echo '[]')
+STARTED_EPOCH=$(date +%s)
+TMP_ACTIVE=$(mktemp)
+echo "${ACTIVE}" | jq --arg id "${AGENT_ID}" --arg agent "${AGENT_TYPE}" \
+	--arg model "${AGENT_MODEL}" --arg ts "$(date -Iseconds)" --argjson epoch "${STARTED_EPOCH}" \
+	'. += [{"id": $id, "agent": $agent, "model": $model, "started": $ts, "started_epoch": $epoch}]' \
+	>"${TMP_ACTIVE}" && mv "${TMP_ACTIVE}" "${ACTIVE_FILE}"
+
+# --- Catalog injection for orchestrators ---
+case "${AGENT_TYPE}" in
+	*sisyphus*|*atlas*)
+		if [[ -f "${CATALOG_FILE}" ]]; then
+			DELEGATION_TABLE=$(jq -r '
+				sort_by(.cost_tier) |
+				.[] | "- \(.name) [\(.cost_tier)] — \(.when_to_use | if . == "" then "general" else (split(",")[0] | ltrimstr(" ")) end)"
+			' "${CATALOG_FILE}" 2>/dev/null || echo "")
+			CATEGORIES_FILE="$(dirname "$0")/../servers/categories.json"
+			CATEGORY_TABLE=""
+			if [[ -f "${CATEGORIES_FILE}" ]]; then
+				CATEGORY_TABLE=$(jq -r '
+					.categories | to_entries[] |
+					"- \(.key): model=\(.value.model) — \(.value.description)"
+				' "${CATEGORIES_FILE}" 2>/dev/null || echo "")
+			fi
+			if [[ -n "${DELEGATION_TABLE}" ]]; then
+				CONTEXT_PARTS+=" [DYNAMIC AGENT CATALOG] ${DELEGATION_TABLE}"
+				[[ -n "${CATEGORY_TABLE}" ]] && CONTEXT_PARTS+=" [CATEGORIES] ${CATEGORY_TABLE} Use Agent(model=<category_model>) to route to the right model tier."
+			fi
+		else
+			CONTEXT_PARTS+=" [CATALOG STALE] No agent-catalog.json found. Call agents_list() to generate the catalog for routing hints."
+		fi
 		;;
 	*) ;;
 esac
