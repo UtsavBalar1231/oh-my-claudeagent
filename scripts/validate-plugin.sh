@@ -254,10 +254,26 @@ check_claims() {
 		fi
 	fi
 
-	if jq -e '.mcpServers["ast-grep"].command == "uv"' "${MCP_JSON}" >/dev/null 2>&1; then
-		pass "mcp registry uses uv for ast-grep server"
+	if jq -e '.mcpServers["omca"].command == "uv"' "${MCP_JSON}" >/dev/null 2>&1; then
+		pass "mcp registry uses uv for omca server"
 	else
-		fail "mcp registry ast-grep command should be 'uv'"
+		fail "mcp registry omca command should be 'uv'"
+	fi
+
+	# Validate config files
+	validate_json_file "${REPO_ROOT}/servers/categories.json" "categories config"
+	validate_json_file "${REPO_ROOT}/servers/agent-metadata.json" "agent metadata"
+
+	# Verify old server files were removed
+	if [[ ! -f "${REPO_ROOT}/servers/ast-grep-server.py" ]]; then
+		pass "ast-grep-server.py removed"
+	else
+		fail "ast-grep-server.py still exists (should have been removed)"
+	fi
+	if [[ ! -f "${REPO_ROOT}/servers/omca-state-server.py" ]]; then
+		pass "omca-state-server.py removed"
+	else
+		fail "omca-state-server.py still exists (should have been removed)"
 	fi
 }
 
@@ -274,6 +290,8 @@ check_hook_fixtures_exist() {
 		"userpromptsubmit-ralph.json"
 		"userpromptsubmit-ultrawork.json"
 		"stop-basic.json"
+		"subagentstart-basic.json"
+		"subagentstopcomplete-basic.json"
 	)
 
 	local file_name
@@ -463,6 +481,20 @@ check_hooks() {
 	run_registered_hooks "Stop with ralph active" "Stop" "" "${stop_payload}" "${tmp_root}" "json-required"
 	rm -f "${tmp_root}/.omca/state/ralph-state.json"
 
+	# SubagentStart / SubagentStop
+	local subagentstart_payload="${HOOK_FIXTURES_DIR}/subagentstart-basic.json"
+	local subagentstopcomplete_payload="${HOOK_FIXTURES_DIR}/subagentstopcomplete-basic.json"
+
+	run_registered_hooks "SubagentStart basic" "SubagentStart" "" "${subagentstart_payload}" "${tmp_root}" "json-required"
+	run_registered_hooks "SubagentStop basic" "SubagentStop" "" "${subagentstopcomplete_payload}" "${tmp_root}" "json-optional"
+
+	# Verify active-agents.json was created by SubagentStart hook
+	if [[ -f "${tmp_root}/.omca/state/active-agents.json" ]]; then
+		pass "SubagentStart created active-agents.json"
+	else
+		fail "SubagentStart did not create active-agents.json"
+	fi
+
 	if [[ -n "${HOOK_CASE}" ]]; then
 		case "${HOOK_CASE}" in
 		compaction-race)
@@ -503,7 +535,7 @@ check_mcp() {
 		printf '\n'
 		cat "${MCP_FIXTURES_DIR}/tools-list.json" || true
 		printf '\n'
-	} | timeout 45 uv run --project "${MCP_SERVER_PROJECT}" python "${MCP_SERVER_PROJECT}/ast-grep-server.py" >"${stdout_file}" 2>"${stderr_file}"
+	} | timeout 45 uv run --project "${MCP_SERVER_PROJECT}" python "${MCP_SERVER_PROJECT}/omca-mcp.py" >"${stdout_file}" 2>"${stderr_file}"
 	local mcp_status=$?
 
 	if [[ "${mcp_status}" -ne 0 ]]; then
