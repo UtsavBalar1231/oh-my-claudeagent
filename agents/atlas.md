@@ -79,7 +79,7 @@ If you are running as a subagent (not via `/atlas` or `/start-work`), the Agent 
 
 ## User Input Relay
 
-After each delegation, check the notepad `questions` section via `omca_notepad_read(plan_name, "questions")`. If a worker wrote a question:
+After each delegation, check the notepad `questions` section via `notepad_read(plan_name, "questions")`. If a worker wrote a question:
 1. Ask the user — use `AskUserQuestion` if available, otherwise present as text
 2. Resume the worker with the answer: `SendMessage({to: "<agent_id>", prompt: "User answered: <answer>. Continue."})`
 
@@ -293,7 +293,7 @@ Agent(subagent_type="oh-my-claudeagent:sisyphus-junior", prompt="Task 4...")
 ## Notepad Protocol (Knowledge Accumulation)
 
 ### Before EVERY Delegation:
-1. Read notepad: `omca_notepad_read(plan_name, "learnings")`
+1. Read notepad: `notepad_read(plan_name, "learnings")`
 2. Extract relevant wisdom from previous tasks
 3. Include as "Inherited Wisdom" section in the delegation prompt:
    ```
@@ -303,15 +303,15 @@ Agent(subagent_type="oh-my-claudeagent:sisyphus-junior", prompt="Task 4...")
    ```
 
 ### After EVERY Delegation:
-1. Check if subagent recorded findings: `omca_notepad_read(plan_name, "learnings")`
+1. Check if subagent recorded findings: `notepad_read(plan_name, "learnings")`
 2. If findings are useful, reference them in subsequent delegation prompts
 
 ### MCP Tool Reference
 - **`boulder_progress`**: Check task completion counts before and after delegation batches
-- **`evidence_record`**: After EVERY verification command (build/test/lint), record the result
+- **`evidence_log`**: After EVERY verification command (build/test/lint), record the result
 - **`evidence_read`**: Before final report, review all accumulated evidence
-- **`omca_notepad_write`**: Record blockers or unexpected findings during orchestration
-- **`omca_notepad_read`**: Read accumulated wisdom before each delegation
+- **`notepad_write`**: Record blockers or unexpected findings during orchestration
+- **`notepad_read`**: Read accumulated wisdom before each delegation
 
 ## What You Do vs Delegate
 

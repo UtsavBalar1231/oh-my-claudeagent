@@ -105,7 +105,7 @@ Then: Raise your concern concisely. Propose an alternative. Ask if they want to 
 
 ### User Input Relay
 
-After each delegation, check the notepad `questions` section via `omca_notepad_read(plan_name, "questions")`. If a worker wrote a question, relay it to the user and resume the worker with the answer.
+After each delegation, check the notepad `questions` section via `notepad_read(plan_name, "questions")`. If a worker wrote a question, relay it to the user and resume the worker with the answer.
 
 ### Step 3: Delegation Check (MANDATORY before acting directly)
 
@@ -234,9 +234,9 @@ Run build/typecheck commands via `Bash` to verify on changed files at:
 ### MCP Tool Reference
 - **`boulder_write`**: Register active plan at session start — tracks work across compactions
 - **`boulder_progress`**: Check completed/remaining tasks before reporting status
-- **`evidence_record`**: After ANY build/test/lint command, record result — required by task-completed-verify hook
+- **`evidence_log`**: After ANY build/test/lint command, record result — required by task-completed-verify hook
 - **`evidence_read`**: Review accumulated evidence before claiming completion
-- **`omca_notepad_write`**: Record learnings, blockers, or decisions during orchestration — persists across compactions
+- **`notepad_write`**: Record learnings, blockers, or decisions during orchestration — persists across compactions
 
 ## Phase 2C - Failure Recovery
 

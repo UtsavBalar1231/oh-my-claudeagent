@@ -17,7 +17,7 @@ fi
 
 if [[ "${NEEDS_VERIFICATION}" == "true" ]]; then
 	if [[ ! -f "${EVIDENCE_FILE}" ]]; then
-		echo "Task requires verification evidence. Use the evidence_record MCP tool (NOT manual file writes). Example: evidence_record(evidence_type=\"test\", command=\"just test\", exit_code=0, output_snippet=\"10 passed\")" >&2
+		echo "Task requires verification evidence. Use the evidence_log MCP tool (NOT manual file writes). Example: evidence_log(evidence_type=\"test\", command=\"just test\", exit_code=0, output_snippet=\"10 passed\")" >&2
 		exit "${BLOCK_EXIT_CODE}"
 	fi
 
@@ -44,7 +44,7 @@ if [[ "${NEEDS_VERIFICATION}" == "true" ]]; then
 	    )
 	  | all
 	' "${EVIDENCE_FILE}" >/dev/null 2>&1; then
-		echo "Verification evidence has invalid schema. Use the evidence_record MCP tool (NOT manual file writes). Required: entries[] with type, command, exit_code, output_snippet, timestamp fields." >&2
+		echo "Verification evidence has invalid schema. Use the evidence_log MCP tool (NOT manual file writes). Required: entries[] with type, command, exit_code, output_snippet, timestamp fields." >&2
 		exit "${BLOCK_EXIT_CODE}"
 	fi
 fi

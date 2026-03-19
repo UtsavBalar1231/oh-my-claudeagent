@@ -27,7 +27,7 @@ Follow atlas workflow: analyze plan, delegate tasks via sisyphus-junior, verify 
 mark checkboxes on completion.
 
 After each delegation verification, record evidence:
-`evidence_record(evidence_type="test", command="...", exit_code=0, output_snippet="...")`
+`evidence_log(evidence_type="test", command="...", exit_code=0, output_snippet="...")`
 
-Use `omca_notepad_write(plan_name, "issues", content)` to record blockers or unexpected findings.
+Use `notepad_write(plan_name, "issues", content)` to record blockers or unexpected findings.
 Use `evidence_read` before final completion report to summarize all verification results.

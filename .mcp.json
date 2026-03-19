@@ -1,13 +1,8 @@
 {
   "mcpServers": {
-    "ast-grep": {
+    "omca": {
       "command": "uv",
-      "args": ["run", "--project", "${CLAUDE_PLUGIN_ROOT}/servers", "python", "${CLAUDE_PLUGIN_ROOT}/servers/ast-grep-server.py"],
-      "env": {}
-    },
-    "omca-state": {
-      "command": "uv",
-      "args": ["run", "--project", "${CLAUDE_PLUGIN_ROOT}/servers", "python", "${CLAUDE_PLUGIN_ROOT}/servers/omca-state-server.py"],
+      "args": ["run", "--project", "${CLAUDE_PLUGIN_ROOT}/servers", "python", "${CLAUDE_PLUGIN_ROOT}/servers/omca-mcp.py"],
       "env": {}
     },
     "grep": {

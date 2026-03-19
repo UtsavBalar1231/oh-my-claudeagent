@@ -42,11 +42,11 @@ You are NOT for:
 | Check type definitions | Host-provided `LSP hover` / `goto_definition`, if available |
 
 ### MCP Tool Reference
-- **`evidence_record`**: After each build attempt, record exit code and output — proves fix worked
-- **`ast_grep_search`**: Find structural patterns causing build errors (mismatched signatures, missing imports)
-- **`ast_grep_replace`**: Apply structural fixes across multiple files (e.g., rename a type everywhere)
+- **`evidence_log`**: After each build attempt, record exit code and output — proves fix worked
+- **`ast_search`**: Find structural patterns causing build errors (mismatched signatures, missing imports)
+- **`ast_replace`**: Apply structural fixes across multiple files (e.g., rename a type everywhere)
 - **`evidence_read`**: Review evidence before claiming fix complete
-- **`omca_notepad_write`**: Record diagnosis findings or workarounds discovered
+- **`notepad_write`**: Record diagnosis findings or workarounds discovered
 
 ## Critical Rules
 
