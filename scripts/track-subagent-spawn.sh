@@ -48,5 +48,43 @@ if [[ -f "${SESSION_STATE}" ]]; then
 		"${SESSION_STATE}" >"${TMP_FILE}" && mv "${TMP_FILE}" "${SESSION_STATE}"
 fi
 
-ESCAPED=$(printf '%s' "Subagent ${SUBAGENT_TYPE} (${SPAWN_ID}) spawned with model ${SUBAGENT_MODEL}" | jq -Rs .)
+# --- Routing validation (advisory only) ---
+ROUTING_CONTEXT=""
+
+# Read cached catalog (written by agents_list() MCP tool)
+CATALOG_FILE="${STATE_DIR}/agent-catalog.json"
+CATEGORIES_FILE="$(dirname "$0")/../servers/categories.json"
+
+if [[ -f "${CATALOG_FILE}" ]] && [[ -f "${CATEGORIES_FILE}" ]]; then
+	# Extract agent name, normalize to lowercase
+	AGENT_NAME=$(echo "${SUBAGENT_TYPE##*:}" | tr '[:upper:]' '[:lower:]')
+
+	# Look up agent's preferred_category → expected model
+	PREFERRED_CAT=$(jq -r --arg name "${AGENT_NAME}" \
+		'.[] | select(.name == $name) | .preferred_category // "standard"' \
+		"${CATALOG_FILE}" 2>/dev/null)
+	EXPECTED_MODEL=$(jq -r --arg cat "${PREFERRED_CAT}" \
+		'.categories[$cat].model // "sonnet"' \
+		"${CATEGORIES_FILE}" 2>/dev/null)
+
+	# Warn on model mismatch (advisory only — NOT blocking)
+	if [[ "${SUBAGENT_MODEL}" != "default" ]] && [[ -n "${EXPECTED_MODEL}" ]] && [[ "${EXPECTED_MODEL}" != "${SUBAGENT_MODEL}" ]]; then
+		ROUTING_CONTEXT+=" [ROUTING WARNING] Agent ${AGENT_NAME} prefers category '${PREFERRED_CAT}' (model=${EXPECTED_MODEL}), but spawned with model=${SUBAGENT_MODEL}."
+	fi
+
+	# Check concurrency limits
+	ACTIVE_FILE="${STATE_DIR}/active-agents.json"
+	if [[ -f "${ACTIVE_FILE}" ]]; then
+		CURRENT_MODEL="${SUBAGENT_MODEL}"
+		[[ "${CURRENT_MODEL}" == "default" ]] && CURRENT_MODEL="${EXPECTED_MODEL}"
+		MODEL_COUNT=$(jq --arg m "${CURRENT_MODEL}" '[.[] | select(.model == $m)] | length' "${ACTIVE_FILE}" 2>/dev/null || echo 0)
+		MODEL_LIMIT=$(jq -r --arg m "${CURRENT_MODEL}" '.concurrency_limits[$m] // 999' "${CATEGORIES_FILE}" 2>/dev/null)
+		if [[ "${MODEL_COUNT}" -ge "${MODEL_LIMIT}" ]]; then
+			ROUTING_CONTEXT+=" [CONCURRENCY WARNING] ${MODEL_COUNT}/${MODEL_LIMIT} ${CURRENT_MODEL} agents active."
+		fi
+	fi
+fi
+
+SPAWN_MSG="Subagent ${SUBAGENT_TYPE} (${SPAWN_ID}) spawned with model ${SUBAGENT_MODEL}${ROUTING_CONTEXT}"
+ESCAPED=$(printf '%s' "${SPAWN_MSG}" | jq -Rs .)
 printf '%s\n' "{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"additionalContext\": ${ESCAPED}}}"
