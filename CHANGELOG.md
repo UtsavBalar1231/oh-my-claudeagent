@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.2] - 2026-03-19
+
+### Fixed
+
+- **Stop hook JSON schema validation**: `ralph-persistence.sh` now uses top-level
+  `{"decision":"block","reason":"..."}` instead of the `hookSpecificOutput` wrapper.
+  Claude Code only accepts `hookSpecificOutput` for PreToolUse, UserPromptSubmit, and
+  PostToolUse events — Stop events require top-level fields. This was causing
+  `Hook JSON output validation failed: Invalid input` errors that silently broke
+  ralph/ultrawork persistence
+
+### Changed
+
+- **Hook Script Conventions docs**: CLAUDE.md now documents format-by-event-type
+  (hookSpecificOutput vs top-level decision/reason vs exit code 2) instead of
+  implying all hooks use the same output wrapper
+
+[1.2.2]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.2.1...v1.2.2
+
 ## [1.2.1] - 2026-03-19
 
 ### Fixed
