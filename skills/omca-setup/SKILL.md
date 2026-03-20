@@ -190,16 +190,23 @@ Apply permission and settings changes to `~/.claude/settings.json` with user con
 
 3. Compute missing top-level: `teammateMode: "auto"`
 
-4. If all present: "Settings already configured" — skip
+4. Compute missing env vars against the required set:
+   - `ANTHROPIC_DEFAULT_OPUS_MODEL`: `"claude-opus-4-6[1m]"` — routes opus-tier agents to extended-thinking model
+   - `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`: `"1"` — enables agent teams (required for `teammateMode: "auto"`)
 
-5. If changes needed: show diff, use `AskUserQuestion` to confirm
+5. If all present: "Settings already configured" — skip
 
-6. On confirm: read-merge-write with `jq` (handle nonexistent file)
+6. If changes needed: show diff, use `AskUserQuestion` to confirm
 
-7. On decline: print raw jq command as fallback:
+7. On confirm: read-merge-write with `jq` (handle nonexistent file)
+
+8. On decline: print raw jq command as fallback:
    ```
    jq '. + {
      "teammateMode": "auto"
+   } | .env += {
+     "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4-6[1m]",
+     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
    } | .permissions.allow += [
      "Write(.omca/**)",
      "Edit(.omca/**)",
@@ -213,8 +220,10 @@ Apply permission and settings changes to `~/.claude/settings.json` with user con
    ]' ~/.claude/settings.json > /tmp/claude-settings-tmp.json && mv /tmp/claude-settings-tmp.json ~/.claude/settings.json
    ```
 
-8. Explain each setting:
+9. Explain each setting:
    - `teammateMode: "auto"` — enables agent teams with best available UI (tmux/iTerm2 split panes)
+   - `ANTHROPIC_DEFAULT_OPUS_MODEL` — routes opus-tier agents (oracle, prometheus, metis, atlas, sisyphus, momus) to `claude-opus-4-6[1m]` for extended thinking
+   - `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` — enables the experimental agent teams feature, required for `teammateMode: "auto"` to function
    - `Write(.omca/**)` / `Edit(.omca/**)` / `Read(.omca/**)` — auto-allow plugin state file access
    - `mcp__plugin_oh-my-claudeagent_omca__*` / `mcp__grep__*` / `mcp__context7__*` — auto-allow bundled MCP tool usage
    - `Bash(jq *)` / `Bash(uv run *)` / `Bash(uv sync *)` — auto-allow common plugin utility commands (narrowed from `Bash(uv *)`)
@@ -451,6 +460,7 @@ Non-destructive health check — no files are modified.
 
 3. Check `~/.claude/settings.json`:
     - Is the plugin enabled in user settings? Report method (marketplace via enabledPlugins / dev mode via --plugin-dir / legacy plugins array / not registered)
+    - Are required env vars configured (`ANTHROPIC_DEFAULT_OPUS_MODEL`, `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`)? Report each as PASS/WARN
     - Remind the user that managed policy keys such as `strictKnownMarketplaces`, `blockedMarketplaces`, `allowManagedHooksOnly`, `allowManagedPermissionRulesOnly`, and `allowManagedMcpServersOnly` are outside this skill's enforcement scope
 
 4. Check `.omca/` state:
@@ -498,6 +508,8 @@ echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | timeout 5 uv run --proje
 
 ### Check 6: Settings Validation
 - `teammateMode` is `"auto"` — PASS/WARN
+- `env.ANTHROPIC_DEFAULT_OPUS_MODEL` is `"claude-opus-4-6[1m]"` — PASS/WARN ("opus agents may use non-extended model")
+- `env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is `"1"` — PASS/WARN ("agent teams disabled — teammateMode won't function")
 - Plugin enabled in `enabledPlugins` — PASS/FAIL
 - Marketplace configured in `extraKnownMarketplaces` — PASS/FAIL
 
