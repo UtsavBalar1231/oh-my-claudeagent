@@ -90,6 +90,8 @@ Invoke via `/oh-my-claudeagent:NAME` or keyword triggers. Quoted phrases below a
 | dev-browser | `/dev-browser` | Browser with persistent state |
 | playwright | `/playwright` | Playwright MCP integration |
 | omca-setup | "setup omca" | Configure ~/.claude/ for this plugin |
+| github-triage | "triage", "triage issues", "triage PRs" | Unified GitHub issue and PR triage |
+| ulw-loop | "ulw-loop", "ultrawork loop", "oracle loop" | Ultrawork persistence loop with oracle verification |
 
 ## Bundled Tools
 

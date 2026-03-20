@@ -24,9 +24,9 @@ oh-my-claudeagent adds a multi-agent layer on top of Claude Code:
 
 - **12 specialist agents** with distinct roles and model tiers (opus, sonnet, haiku)
 - **20 skills** invokable via slash commands or keyword triggers
-- **27 hook scripts** wired to 17 event types for session persistence, context injection,
-  auto-approval, and error recovery
-- **4 MCP servers** for structural code search, state tracking, public code search, and
+- **27 hook commands** wired to 17 event types for session persistence, context injection,
+  auto-approval, and error recovery (28 scripts on disk: 27 hook + `validate-plugin.sh` utility)
+- **3 MCP servers** for structural code search, state tracking, public code search, and
   library documentation
 
 ### Philosophy
@@ -116,11 +116,10 @@ Hooks communicate via stdout JSON. The most common patterns:
 
 ### MCP Tools
 
-Four MCP servers are bundled via `.mcp.json` and launched by Claude Code:
+Three MCP servers are bundled via `.mcp.json` and launched by Claude Code:
 
-- **ast-grep** — Structural code search and transformation using the `sg` CLI
-- **omca-state** — Boulder (plan tracking), evidence (verification records), notepads
-- **grep.app** — HTTP-based public GitHub code search
+- **omca** — Unified local server: structural code search (ast-grep), boulder (plan tracking), evidence (verification records), notepads, and agent catalog tools
+- **grep** — HTTP-based public GitHub code search
 - **context7** — HTTP-based library documentation lookup
 
 MCP tools are inherited by agents that do not declare a `tools:` allowlist in frontmatter. Use `disallowedTools:` instead of `tools:` to preserve MCP tool inheritance.
@@ -371,7 +370,7 @@ Codebase search specialist. Finds files, patterns, and implementations. Always r
 background (`run_in_background=true`). Returns structured output: FILES list with
 absolute paths, ANSWER addressing the actual need, and NEXT STEPS.
 
-Uses ast_grep_search for structural patterns, Grep for text, Glob for filename patterns,
+Uses ast_search for structural patterns, Grep for text, Glob for filename patterns,
 Bash for git history. Floods with parallel tool calls.
 
 **When to use:** "Where is X?", "Which file has Y?", "Find the code that does Z". Fire
@@ -713,7 +712,7 @@ Ralph mode prevents the session from ending until work is verified complete.
 4. Final verification:
    -> Aggregate all results
    -> Run integration tests
-   -> Record evidence via evidence_record
+   -> Record evidence via evidence_log
 ```
 
 ### Session Handoff
@@ -738,30 +737,31 @@ When context is long and session quality is degrading:
 
 ## MCP Tools
 
-Four MCP servers are wired in `.mcp.json` and launched by Claude Code when the plugin
+Three MCP servers are wired in `.mcp.json` and launched by Claude Code when the plugin
 is loaded. MCP tools are inherited by agents that do not declare a `tools:` allowlist in
 frontmatter. Use `disallowedTools:` instead of `tools:` to preserve MCP tool inheritance.
 
-### ast-grep (local Python server)
+### omca (local Python FastMCP server)
 
-Structural code search and transformation using the `sg` (ast-grep) CLI. Launched via
-`uv run --project servers` from the servers directory.
+Unified server for structural code search, plan tracking, verification evidence, notepads,
+and agent catalog. Launched via `uv run --project servers` from the servers directory.
+Implements all tool groups below.
+
+**AST tools** — Structural code search and transformation using the `sg` (ast-grep) CLI:
 
 | Tool | Purpose |
 |------|---------|
-| `ast_grep_search` | Find code patterns by structure (function signatures, class shapes, import patterns) |
-| `ast_grep_replace` | Structural find-and-replace; use `dry_run=true` to preview before applying |
-| `find_code_by_rule` | Advanced structural queries with YAML combinators |
-| `test_match_code_rule` | Test a rule pattern against a code snippet |
-| `dump_syntax_tree` | Dump the AST of a code snippet for rule development |
+| `ast_search` | Find code patterns by structure (function signatures, class shapes, import patterns) |
+| `ast_replace` | Structural find-and-replace; use `dry_run=true` to preview before applying |
+| `ast_find_rule` | Advanced structural queries with YAML combinators |
+| `ast_test_rule` | Test a rule pattern against a code snippet |
+| `ast_dump_tree` | Dump the AST of a code snippet for rule development |
 
-**When to use:** Structural patterns. Use Grep for text/string search, ast_grep_search
+**When to use AST tools:** Structural patterns. Use Grep for text/string search, ast_search
 for code structure (e.g., "all functions with a specific parameter type").
 
-### omca-state (local Python FastMCP server)
-
-Plugin state management: boulder (plan tracking), evidence (verification), notepads
-(inter-agent learning). Also launched via `uv run --project servers`.
+**State tools** — Plugin state management: boulder (plan tracking), evidence (verification), notepads
+(inter-agent learning).
 
 **Boulder tools** — Track the active work plan across sessions and compactions:
 
@@ -776,7 +776,7 @@ Plugin state management: boulder (plan tracking), evidence (verification), notep
 
 | Tool | Purpose |
 |------|---------|
-| `evidence_record` | Record a verification result: `evidence_record(type, command, exit_code, output_snippet)` |
+| `evidence_log` | Record a verification result: `evidence_log(evidence_type, command, exit_code, output_snippet)` |
 | `evidence_read` | Read accumulated verification evidence |
 | `evidence_clear` | Clear evidence records |
 
@@ -788,25 +788,25 @@ implies verification (words like "test", "verify", "fix", "implement").
 
 | Tool | Purpose |
 |------|---------|
-| `omca_notepad_write` | Append to a section: `omca_notepad_write(plan_name, section, content)` |
-| `omca_notepad_read` | Read a section: `omca_notepad_read(plan_name, section)` |
-| `omca_notepad_list` | List available plans and sections |
+| `notepad_write` | Append to a section: `notepad_write(plan_name, section, content)` |
+| `notepad_read` | Read a section: `notepad_read(plan_name, section)` |
+| `notepad_list` | List available plans and sections |
 
 Sections: `learnings`, `issues`, `decisions`, `problems`, `questions`.
 
 The `questions` section is the AskUserQuestion workaround for subagents: when a subagent
 cannot ask the user directly (AskUserQuestion is stripped at depth 1), it writes to
-`omca_notepad_write(plan_name, "questions", "...")` and returns. The orchestrator checks
+`notepad_write(plan_name, "questions", "...")` and returns. The orchestrator checks
 this section after each delegation and relays the question to the user.
 
-### grep.app (HTTP, via Vercel)
+### grep (HTTP, via Vercel — grep.app)
 
 Public GitHub code search across approximately 1 million repositories.
 
 Use for: finding real-world usage examples of libraries, discovering how a pattern is used
 in practice across OSS, exploring API implementations.
 
-Use local Grep for the current project. Use grep.app for external reference.
+Use local Grep for the current project. Use grep for external reference.
 
 ### context7 (HTTP, via context7.com)
 
@@ -871,7 +871,7 @@ is gitignored by default (omca-setup adds `.omca/` to `.gitignore`).
 
 After every build, test, or lint command:
 ```
-evidence_record(evidence_type="build", command="just ci", exit_code=0, output_snippet="all checks passed")
+evidence_log(evidence_type="build", command="just ci", exit_code=0, output_snippet="all checks passed")
 ```
 
 The `task-completed-verify` hook reads `verification-evidence.json` on TaskCompleted
@@ -965,7 +965,7 @@ When `.omca/state/boulder.json` has an active plan, `subagent-start.sh` (Subagen
 event) injects two directives into every spawned agent:
 
 1. A READ-ONLY warning for the plan file (prevents subagents from modifying the plan)
-2. Notepad availability instructions with the plan name and `omca_notepad_write` syntax
+2. Notepad availability instructions with the plan name and `notepad_write` syntax
 
 ---
 
@@ -1036,7 +1036,7 @@ nesting-specific guidance.
 
 ### MCP Tools Not Available
 
-If `ast_grep_search`, `boulder_read`, or other MCP tools are not responding:
+If `ast_search`, `boulder_read`, or other MCP tools are not responding:
 
 1. Check that `ast-grep` or `sg` is installed: `command -v ast-grep || command -v sg`
 2. Check that `uv` is installed: `command -v uv`
@@ -1060,9 +1060,9 @@ AskUserQuestion is stripped from subagents at depth 1+ (platform bug, tracked at
 GitHub #34592). The workaround:
 
 - Subagents write questions to the notepad `questions` section:
-  `omca_notepad_write(plan_name, "questions", "Need clarification on X because Y")`
+  `notepad_write(plan_name, "questions", "Need clarification on X because Y")`
 - Subagents return without waiting
-- The orchestrator checks `omca_notepad_read(plan_name, "questions")` after each delegation
+- The orchestrator checks `notepad_read(plan_name, "questions")` after each delegation
 - The orchestrator relays the question to the user and resumes the worker with the answer
   via `SendMessage({to: agentId, prompt: "User answered: ..."})`
 
@@ -1174,7 +1174,7 @@ and the registration are required.
    name: agent-name
    description: One-line role description
    model: opus|sonnet|haiku
-   tools: Read, Glob, Grep, ...
+   disallowedTools: Write, Edit  # use disallowedTools, never tools: (blocks MCP inheritance)
    maxTurns: 30
    ---
    ```
@@ -1217,11 +1217,10 @@ Hook fixture payloads live in `tests/fixtures/hooks/`.
 |------|---------|
 | `agents/*.md` | 12 agent definitions |
 | `skills/*/SKILL.md` | 20 skill definitions |
-| `scripts/*.sh` | 27 hook scripts |
+| `scripts/*.sh` | 28 scripts: 27 hook commands + `validate-plugin.sh` utility |
 | `hooks/hooks.json` | Hook registration (canonical source for hook map) |
-| `servers/ast-grep-server.py` | Python async MCP server wrapping `sg` CLI |
-| `servers/omca-state-server.py` | Python FastMCP server for boulder/evidence/notepads |
-| `.mcp.json` | Wires 4 MCP servers |
+| `servers/omca-mcp.py` | Unified Python FastMCP server (ast-grep, boulder, evidence, notepads, catalog) |
+| `.mcp.json` | Wires 3 MCP servers: omca (local), grep (HTTP), context7 (HTTP) |
 | `settings.json` | Sets default agent to `oh-my-claudeagent:sisyphus` |
 | `templates/claudemd.md` | Runtime behavioral spec, injected into ~/.claude/CLAUDE.md |
 | `statusline/` | Separate Python package (cc-statusline) for terminal status rendering |

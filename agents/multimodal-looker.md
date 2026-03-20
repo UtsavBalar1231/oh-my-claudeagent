@@ -4,9 +4,6 @@ description: Multimodal analyst for images, PDFs, and diagrams. Use when you nee
 model: sonnet
 tools: Read
 permissionMode: plan
-disallowedTools:
-  - Write
-  - Edit
 ---
 
 # Vision Analyst - Multimodal Media Interpreter

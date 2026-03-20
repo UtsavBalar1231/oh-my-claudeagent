@@ -105,7 +105,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Updated SendMessage API**: replaced deprecated `Agent(resume=)` with
   `SendMessage({to: agentId})` across agent definitions
 - **Evidence enforcement**: `write-guard.sh` and `task-completed-verify.sh` now reject
-  manual writes to `verification-evidence.json`, requiring `evidence_record` MCP tool
+  manual writes to `verification-evidence.json`, requiring `evidence_log` MCP tool
 - **CI workflow updates**: bumped the all-actions group (checkout, setup-python,
   cache) via Dependabot
 
