@@ -66,7 +66,7 @@ verify dependencies. Then try:
 explore, librarian, hephaestus, multimodal-looker, socrates), 20 skills invokable via
 slash commands or keyword triggers, 3 bundled MCP servers (omca: structural search +
 state tracking, grep.app public code search, context7 library docs),
-and 27 hook scripts for session persistence, context injection, and auto-approval.
+and 27 hook commands for session persistence, context injection, and auto-approval.
 
 ## Requirements
 
