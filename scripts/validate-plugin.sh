@@ -292,6 +292,7 @@ check_hook_fixtures_exist() {
 		"stop-basic.json"
 		"subagentstart-basic.json"
 		"subagentstopcomplete-basic.json"
+		"stopfailure-ratelimit.json"
 	)
 
 	local file_name
@@ -511,6 +512,19 @@ check_hooks() {
 		pass "SubagentStart created active-agents.json"
 	else
 		fail "SubagentStart did not create active-agents.json"
+	fi
+
+	# StopFailure: handler logs to stop-failures.jsonl and exits 0 (no stdout)
+	local stopfailure_payload="${HOOK_FIXTURES_DIR}/stopfailure-ratelimit.json"
+	run_registered_hooks "StopFailure rate_limit" "StopFailure" "" "${stopfailure_payload}" "${tmp_root}" "empty"
+	if [[ -f "${tmp_root}/.omca/logs/stop-failures.jsonl" ]]; then
+		if jq -e '.event == "stop_failure"' "${tmp_root}/.omca/logs/stop-failures.jsonl" >/dev/null 2>&1; then
+			pass "StopFailure handler logged stop_failure event to stop-failures.jsonl"
+		else
+			fail "StopFailure handler created stop-failures.jsonl but missing stop_failure event"
+		fi
+	else
+		fail "StopFailure handler did not create stop-failures.jsonl"
 	fi
 
 	if [[ -n "${HOOK_CASE}" ]]; then
