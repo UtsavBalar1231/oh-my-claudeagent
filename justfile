@@ -73,6 +73,14 @@ install-hooks:
 run-hooks:
 	pre-commit run --all-files
 
+# ── Validate ─────────────────────────────────────────────────────
+
+# Validate plugin structure with claude CLI (requires claude in PATH)
+[group('validate')]
+validate-plugin:
+	command -v claude >/dev/null 2>&1 || { echo "claude CLI not found, skipping"; exit 0; }
+	claude plugin validate .
+
 # ── CI ────────────────────────────────────────────────────────────
 
 # Run full CI pipeline (format check + lint + test)
