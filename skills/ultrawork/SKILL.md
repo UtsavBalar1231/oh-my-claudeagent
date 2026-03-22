@@ -228,6 +228,13 @@ To deactivate ultrawork, use `/oh-my-claudeagent:stop-continuation` which clears
 The Stop hook checks this file alongside ralph-state.json — while either is active, Claude will
 be prevented from stopping prematurely.
 
+## When All Work Is Delegated
+
+When ALL outstanding work is in running background agents:
+- END YOUR RESPONSE and wait for task-notifications
+- Do NOT read log files, parse transcripts, or poll state directories
+- The stop hook recognizes active agent execution and allows stopping
+
 ## Anti-Patterns (NEVER)
 
 - Running tasks sequentially when they could be parallel
