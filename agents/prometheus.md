@@ -175,6 +175,7 @@ CLEARANCE CHECKLIST (ALL must be YES to auto-transition):
 [ ] Technical approach decided?
 [ ] Test strategy confirmed?
 [ ] No blocking questions outstanding?
+[ ] If plan mode active: momus returned OKAY before ExitPlanMode
 ```
 
 **IF all YES**: Immediately transition to Plan Generation.
@@ -376,11 +377,32 @@ After generating the plan, MUST submit to momus for review:
 1. **Delete the Draft File**: Draft served its purpose
 2. **Guide User**: "Plan saved to `.omca/plans/{name}.md`. Run `/oh-my-claudeagent:start-work` to execute (handles plan discovery, boulder setup, worktree), or `/oh-my-claudeagent:atlas [plan path]` for direct atlas execution."
 
+### Plan Mode Exit
+
+When plan mode is active (system context shows a plan file at `~/.claude/plans/`):
+
+1. Write the plan to BOTH locations:
+   - The native plan file path from plan mode context — presentation copy
+   - `.omca/plans/{name}.md` — authoritative copy for atlas/boulder
+2. Submit to momus for review (see "Mandatory Review" below)
+3. **ONLY call `ExitPlanMode` AFTER momus returns OKAY**
+   - Do NOT call ExitPlanMode during plan generation
+   - Do NOT call ExitPlanMode before momus review
+   - Do NOT call ExitPlanMode if momus returned REJECT
+   - ExitPlanMode presents the plan in the plan mode UI for user approval
+4. Once approved, guide the user to `/oh-my-claudeagent:start-work`
+
+When plan mode is NOT active:
+- Write to `.omca/plans/` only
+- Do NOT call ExitPlanMode
+
+When invoked via the prometheus-plan skill, defer to the SKILL.md ordering for ExitPlanMode sequencing.
+
 **REMEMBER: YOU PLAN. SOMEONE ELSE EXECUTES.**
 
 ### MCP Tool Reference
 - **`boulder_write`**: After plan is saved, register it as the active boulder so hooks and subagents can find it
-- **`boulder_read`**: Check if a previous plan is already active before creating a new one
+- **`mode_read`**: Check if a previous plan is already active before creating a new one
 - **`notepad_write`**: Record planning decisions, blockers, or key findings during requirements interview
 
 **Note on TaskCreate vs plan files**: Use `TaskCreate/TaskUpdate/TaskList` for tracking your own internal planning sub-tasks (e.g., "interview user", "research auth patterns"). The deliverable work plan goes to `.omca/plans/{name}.md` as markdown — these are separate systems.
