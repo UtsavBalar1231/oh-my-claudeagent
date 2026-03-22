@@ -32,22 +32,18 @@ if [[ -f "${SUBAGENTS_FILE}" ]]; then
 	TEAMMATE_NAME=$(echo "${INPUT}" | jq -r '.teammate_name // .agent_name // ""' 2>/dev/null)
 	NOW=$(date +%s)
 
-	# Find the most recent active agent matching the teammate (or any active agent)
+	# Find the oldest active agent matching the teammate (or any active agent)
 	if [[ -n "${TEAMMATE_NAME}" ]]; then
-		STARTED_AT=$(jq -r --arg name "${TEAMMATE_NAME}" \
-			'[.active[]? | select(.name == $name or .agent_type == $name) | .startedAt // .timestamp // ""] | last // ""' \
+		STARTED_EPOCH=$(jq -r --arg name "${TEAMMATE_NAME}" \
+			'[.active[]? | select(.type == $name or .type == ("oh-my-claudeagent:" + $name))] | .[0] | .started_epoch // 0' \
 			"${SUBAGENTS_FILE}" 2>/dev/null)
 	else
-		STARTED_AT=$(jq -r \
-			'[.active[]? | .startedAt // .timestamp // ""] | last // ""' \
+		STARTED_EPOCH=$(jq -r \
+			'[.active[]? | .started_epoch // 0] | .[0] // 0' \
 			"${SUBAGENTS_FILE}" 2>/dev/null)
 	fi
 
-	if [[ -n "${STARTED_AT}" && "${STARTED_AT}" != "null" ]]; then
-		# Portable ISO-to-epoch — date -d is GNU-only; python3 works on macOS + Linux
-		STARTED_EPOCH=$(python3 -c "from datetime import datetime,timezone; print(int(datetime.fromisoformat('${STARTED_AT}'.replace('Z','+00:00')).timestamp()))" 2>/dev/null \
-			|| date -d "${STARTED_AT}" +%s 2>/dev/null \
-			|| echo "${STARTED_AT}")
+	if [[ -n "${STARTED_EPOCH}" && "${STARTED_EPOCH}" != "null" && "${STARTED_EPOCH}" != "0" ]]; then
 		if [[ "${STARTED_EPOCH}" =~ ^[0-9]+$ ]]; then
 			ELAPSED=$(( NOW - STARTED_EPOCH ))
 			if [[ "${ELAPSED}" -gt "${TIMEOUT_SECS}" ]]; then
