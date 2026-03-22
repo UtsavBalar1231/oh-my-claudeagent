@@ -87,6 +87,28 @@ echo "${ACTIVE}" | jq --arg id "${AGENT_ID}" --arg agent "${AGENT_TYPE}" \
 	'. += [{"id": $id, "agent": $agent, "model": $model, "started": $ts, "started_epoch": $epoch}]' \
 	>"${TMP_ACTIVE}" && mv "${TMP_ACTIVE}" "${ACTIVE_FILE}"
 
+# Bridge spawn-ID to platform agent_id in subagents.json
+SUBAGENTS_FILE="${STATE_DIR}/subagents.json"
+if [[ -f "${SUBAGENTS_FILE}" ]]; then
+	AGENT_TYPE_SHORT="${AGENT_TYPE##*:}"  # strip "oh-my-claudeagent:" prefix
+	TMP_SUB=$(mktemp)
+	jq --arg platform_id "${AGENT_ID}" \
+	   --arg agent_type "${AGENT_TYPE_SHORT}" \
+	   --argjson epoch "$(date +%s)" \
+	   '
+	   # Find first .active[] entry with spawn-* ID matching this agent type
+	   (.active | to_entries | map(select(
+	       .value.id | startswith("spawn-")
+	   )) | map(select(
+	       .value.type == $agent_type or .value.type == ("oh-my-claudeagent:" + $agent_type)
+	   )) | .[0]) as $match |
+	   if $match != null then
+	       .active[$match.key].id = $platform_id |
+	       .active[$match.key].started_epoch = $epoch
+	   else . end
+	   ' "${SUBAGENTS_FILE}" > "${TMP_SUB}" && mv "${TMP_SUB}" "${SUBAGENTS_FILE}"
+fi
+
 # --- Catalog injection for orchestrators ---
 case "${AGENT_TYPE}" in
 	*sisyphus*|*atlas*)
