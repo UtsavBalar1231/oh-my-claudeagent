@@ -308,10 +308,13 @@ Agent(subagent_type="oh-my-claudeagent:sisyphus-junior", prompt="Task 4...")
 
 ### MCP Tool Reference
 - **`boulder_progress`**: Check task completion counts before and after delegation batches
+- **`mode_read()`**: Check which persistence modes are active (ralph, ultrawork, boulder, evidence)
+- **`mode_clear()`**: Deactivate all persistence modes (default). Use `mode_clear(mode="ralph")` for selective clearing
 - **`evidence_log`**: After EVERY verification command (build/test/lint), record the result
 - **`evidence_read`**: Before final report, review all accumulated evidence
 - **`notepad_write`**: Record blockers or unexpected findings during orchestration
 - **`notepad_read`**: Read accumulated wisdom before each delegation
+- Never use `rm -f` on `.omca/state/` files — always use the corresponding MCP tool
 
 ## What You Do vs Delegate
 

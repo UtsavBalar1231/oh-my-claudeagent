@@ -104,7 +104,7 @@ When research returns conflicting information:
 
 ## Plan Context Awareness
 
-- Use `boulder_read` to check if there is an active plan — when present, scope research to plan-relevant questions
+- Use `mode_read` to check if there is an active plan — when present, scope research to plan-relevant questions
 - Record significant findings via `notepad_write(plan_name, "learnings", content)`
 - Record unresolved questions via `notepad_write(plan_name, "questions", content)` when `AskUserQuestion` is unavailable
 

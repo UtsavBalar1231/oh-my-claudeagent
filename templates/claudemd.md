@@ -100,8 +100,8 @@ This plugin bundles three MCP servers via `.mcp.json`:
 **omca** — Structural code search, state management, and notepad tracking:
 `ast_search`, `ast_replace`, `ast_find_rule`, `ast_test_rule`, `ast_dump_tree`.
 
-- Boulder: `boulder_read`, `boulder_write`, `boulder_clear`, `boulder_progress`
-- Evidence: `evidence_log`, `evidence_read`, `evidence_clear`
+- Boulder: `boulder_write`, `boulder_progress`, `mode_read`, `mode_clear`
+- Evidence: `evidence_log`, `evidence_read`
 - Notepads: `notepad_write`, `notepad_read`, `notepad_list`
 
 **grep.app** — Public GitHub repository code search (via Vercel):
@@ -122,7 +122,9 @@ Notepad sections per plan: `learnings`, `issues`, `decisions`, `problems`, `ques
 **Verification workflow**: After running any build, test, or lint command, call `evidence_log(evidence_type, command, exit_code, output_snippet)` to create `.omca/state/verification-evidence.json`. The `task-completed-verify` hook BLOCKS task completion if this file is missing or stale (>5 min). Example:
 `evidence_log(evidence_type="test", command="npm test", exit_code=0, output_snippet="42 tests passed")`
 
-**Boulder lifecycle**: When starting plan execution, call `boulder_write(active_plan, plan_name, session_id)` to register the active plan. Use `boulder_progress` to check completed vs remaining tasks. Hooks and subagents discover the active plan via `boulder_read`.
+**Boulder lifecycle**: When starting plan execution, call `boulder_write(active_plan, plan_name, session_id)` to register the active plan. Use `boulder_progress` to check completed vs remaining tasks. Hooks and subagents discover the active plan via `mode_read`.
+
+**State management**: Use `mode_read` to check active modes (ralph, ultrawork, boulder, evidence). Use `mode_clear` to deactivate modes — defaults to "all" (ralph + ultrawork + boulder). Never use `rm -f` on `.omca/state/` files when an MCP tool exists.
 
 **Notepad usage**: Use `notepad_write(plan_name, section, content)` to record discoveries during execution. Sections: learnings, issues, decisions, problems, questions. The `questions` section is used by subagents that need user input (AskUserQuestion workaround) — orchestrators check it after each delegation. Always append, never overwrite.
 

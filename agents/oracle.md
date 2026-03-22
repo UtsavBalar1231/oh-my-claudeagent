@@ -64,7 +64,7 @@ Exhaust provided context and attached files before reaching for tools. External 
 | Structural code patterns | ast_search (MCP tool — available to all agents) |
 
 When giving advice during active plan execution:
-- Check `boulder_read` for plan context if available
+- Check `mode_read` for plan context if available
 - Recommend `evidence_log` in your action plans for verification steps
 
 ## Output Verbosity (STRICT)
