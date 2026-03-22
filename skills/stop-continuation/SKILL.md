@@ -1,7 +1,6 @@
 ---
 name: stop-continuation
 description: Stop ALL continuation mechanisms for the current session — ralph loop, boulder state, and auto-continuation. Use when you need to pause automated work and take manual control.
-allowed-tools: Bash
 user-invocable: true
 argument-hint: "[optional: reason]"
 ---
@@ -31,38 +30,13 @@ Stops all continuation mechanisms for the current session.
 
 ## Process
 
+Use the `mode_clear` MCP tool with default mode ("all"):
+
 ```bash
-PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$(pwd)}"
-RALPH_STATE="${PROJECT_ROOT}/.omca/state/ralph-state.json"
-BOULDER_STATE="${PROJECT_ROOT}/.omca/state/boulder.json"
-
-echo "Checking active continuation mechanisms..."
-
-if [[ -f "${RALPH_STATE}" ]]; then
-  echo "- Ralph Loop: ACTIVE — clearing"
-  rm -f "${RALPH_STATE}"
-else
-  echo "- Ralph Loop: not active"
-fi
-
-if [[ -f "${BOULDER_STATE}" ]]; then
-  echo "- Boulder State: ACTIVE — clearing"
-  rm -f "${BOULDER_STATE}"
-else
-  echo "- Boulder State: not active"
-fi
-
-ULTRAWORK_STATE="${PROJECT_ROOT}/.omca/state/ultrawork-state.json"
-
-if [[ -f "${ULTRAWORK_STATE}" ]]; then
-  echo "- Ultrawork Mode: ACTIVE — clearing"
-  rm -f "${ULTRAWORK_STATE}"
-else
-  echo "- Ultrawork Mode: not active"
-fi
-
-echo "Done."
+mode_clear()
 ```
+
+This clears ralph-state.json, ultrawork-state.json, and boulder.json in one call.
 
 After running, report which mechanisms were stopped and confirm:
 "Session will not auto-continue. Resume with `/oh-my-claudeagent:ralph` or `/oh-my-claudeagent:start-work`."
