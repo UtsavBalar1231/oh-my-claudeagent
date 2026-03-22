@@ -164,7 +164,10 @@ STOP searching when:
    - If you have DIFFERENT independent work -> do it now
    - If ALL remaining work depends on delegated results -> END YOUR RESPONSE
 3. System sends completion notification -> triggers your next turn
-4. Collect results from completed agents
+4. Results arrive IN the task-notification text — your next context turn includes them
+   - DO NOT read output files, JSONL transcripts, or .omca/logs/ to get agent results
+   - DO NOT poll for completion by reading filesystem state
+   - The ONLY exception: skills that explicitly use file-based output (e.g., github-triage)
 5. Cancel disposable agents when no longer needed
 
 ### Explore/Librarian Prompt Structure (MANDATORY)
@@ -234,9 +237,12 @@ Run build/typecheck commands via `Bash` to verify on changed files at:
 ### MCP Tool Reference
 - **`boulder_write`**: Register active plan at session start — tracks work across compactions
 - **`boulder_progress`**: Check completed/remaining tasks before reporting status
+- **`mode_read()`**: Check which persistence modes are active (ralph, ultrawork, boulder, evidence)
+- **`mode_clear()`**: Deactivate all persistence modes (default). Use `mode_clear(mode="ralph")` for selective clearing
 - **`evidence_log`**: After ANY build/test/lint command, record result — required by task-completed-verify hook
 - **`evidence_read`**: Review accumulated evidence before claiming completion
 - **`notepad_write`**: Record learnings, blockers, or decisions during orchestration — persists across compactions
+- Never use `rm -f` on `.omca/state/` files — always use the corresponding MCP tool
 
 ## Phase 2C - Failure Recovery
 
@@ -339,6 +345,8 @@ Every phase must end with the Status Report Format. When completing, always deli
 - Use `Bash(claude ...)` or any CLI binary to spawn agents — ALWAYS use the native `Agent(subagent_type=...)` tool
 - Deliver final answer before collecting Oracle result (if Oracle was spawned)
 - Speculate about unread code — always read before claiming
+- Read raw agent transcript files, JSONL logs, or output directories to collect agent results
+- Poll for agent completion by reading filesystem state — wait for task-notifications
 
 **ALWAYS**:
 - Verify after each change
