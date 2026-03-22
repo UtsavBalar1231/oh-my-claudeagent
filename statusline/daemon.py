@@ -28,7 +28,6 @@ import threading
 
 from statusline.core import FALLBACK, render
 from statusline.git import get_git_info
-from statusline.usage import get_usage
 
 # ---------------------------------------------------------------------------
 # Protocol
@@ -89,8 +88,7 @@ class StatuslineHandler(socketserver.StreamRequestHandler):
             workspace = data.get("workspace", {})
             project_dir = workspace.get("project_dir", data.get("cwd", ""))
             git_info = get_git_info(project_dir) if project_dir else {}
-            usage = self.server.get_cached_usage()
-            output = render(data, git_info, usage)
+            output = render(data, git_info)
             self.wfile.write(f"{PROTOCOL_VERSION}\tOK\n{output}\n".encode())
         except Exception:
             self.wfile.write(f"{PROTOCOL_VERSION}\tERR\n{FALLBACK}\n".encode())
@@ -121,11 +119,6 @@ class StatuslineDaemon(socketserver.ThreadingUnixStreamServer):
         self._idle_timer: threading.Timer | None = None
         self._lock = threading.Lock()
         self.reset_idle_timer()
-        # Usage data: background thread refreshes, handler reads
-        self._usage_data: dict | None = None
-        self._usage_lock = threading.Lock()
-        self._usage_thread: threading.Timer | None = None
-        self._refresh_usage()
 
     def reset_idle_timer(self) -> None:
         """Reset the idle shutdown timer."""
@@ -140,28 +133,8 @@ class StatuslineDaemon(socketserver.ThreadingUnixStreamServer):
         """Shut down the server after idle timeout."""
         self.shutdown()
 
-    def _refresh_usage(self) -> None:
-        """Fetch usage data and schedule next refresh."""
-        try:
-            data = get_usage()
-            with self._usage_lock:
-                self._usage_data = data
-        except Exception:
-            pass
-        self._usage_thread = threading.Timer(300.0, self._refresh_usage)
-        self._usage_thread.daemon = True
-        self._usage_thread.start()
-
-    def get_cached_usage(self) -> dict | None:
-        """Thread-safe read of cached usage data."""
-        with self._usage_lock:
-            return self._usage_data
-
     def server_close(self) -> None:
         """Clean up timer and socket resources."""
-        if self._usage_thread is not None:
-            self._usage_thread.cancel()
-            self._usage_thread = None
         with self._lock:
             if self._idle_timer is not None:
                 self._idle_timer.cancel()

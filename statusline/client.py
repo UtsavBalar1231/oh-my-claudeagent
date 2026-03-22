@@ -137,7 +137,6 @@ def _render_direct(payload: str) -> str:
     """Render statusline inline (fallback when daemon is unavailable)."""
     from statusline.core import FALLBACK, render
     from statusline.git import get_git_info
-    from statusline.usage import get_usage
 
     data = json.loads(payload)
     if not isinstance(data, dict) or not data.get("model"):
@@ -146,8 +145,7 @@ def _render_direct(payload: str) -> str:
     workspace = data.get("workspace", {})
     project_dir = workspace.get("project_dir", data.get("cwd", ""))
     git_info = get_git_info(project_dir) if project_dir else {}
-    usage = get_usage()
-    return render(data, git_info, usage)
+    return render(data, git_info)
 
 
 # ---------------------------------------------------------------------------

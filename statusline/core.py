@@ -339,18 +339,22 @@ def _compose_line2(
     return SEP.join(parts)
 
 
-def _format_reset_time(iso_str: str | None) -> str:
-    """Format an ISO 8601 reset timestamp to a human-readable local time string.
+def _format_reset_time(resets_at: int | str | None) -> str:
+    """Format a reset timestamp to a human-readable local time string.
 
+    Accepts Unix epoch seconds (int) from the v2.1.80+ payload.
     Returns "" for None/empty input or on parse error.
     Same day: "5pm" / "11am". Different day: "thu 5pm".
     """
-    if not iso_str:
+    if resets_at is None:
         return ""
     try:
-        # Python 3.10 compat: fromisoformat() doesn't handle trailing "Z"
-        normalized = iso_str.replace("Z", "+00:00")
-        utc_dt = datetime.fromisoformat(normalized)
+        if isinstance(resets_at, (int, float)):
+            utc_dt = datetime.fromtimestamp(resets_at, tz=timezone.utc)  # noqa: UP017
+        else:
+            # Legacy ISO 8601 string fallback
+            normalized = str(resets_at).replace("Z", "+00:00")
+            utc_dt = datetime.fromisoformat(normalized)
         local_dt = utc_dt.astimezone()
         now_local = datetime.now(timezone.utc).astimezone()  # noqa: UP017
         time_str = local_dt.strftime("%-I%p").lower()
@@ -358,7 +362,7 @@ def _format_reset_time(iso_str: str | None) -> str:
             return time_str
         day_str = local_dt.strftime("%a").lower()
         return f"{day_str} {time_str}"
-    except (ValueError, OSError):
+    except (ValueError, OSError, TypeError):
         return ""
 
 
@@ -392,12 +396,41 @@ def _compose_line3(usage: dict, glyphs: dict[str, str]) -> str | None:
         glyph = glyphs["weekly"]
         reset_time = _format_reset_time(usage.get("seven_day_resets_at"))
         resets_str = f" (resets {reset_time})" if reset_time else ""
-        extra = ""
-        if usage.get("extra_usage_enabled"):
-            extra = " +"
-        parts.append(f"{bar} {pct_text} {DIM}{glyph}{RST}{resets_str}{extra}")
+        parts.append(f"{bar} {pct_text} {DIM}{glyph}{RST}{resets_str}")
 
     return SEP.join(parts)
+
+
+# ---------------------------------------------------------------------------
+# Rate limit extraction
+# ---------------------------------------------------------------------------
+
+
+def _extract_rate_limits(data: dict) -> dict | None:
+    """Extract rate limits from the statusline payload (v2.1.80+).
+
+    The ``rate_limits`` key is only present for Claude.ai Pro/Max subscribers
+    after the first API response. Each window may be independently absent.
+
+    Returns a flat dict with ``five_hour_pct``, ``five_hour_resets_at``,
+    ``seven_day_pct``, ``seven_day_resets_at`` keys (values may be None),
+    or None when no rate_limits data is present at all.
+    """
+    rate_limits = data.get("rate_limits")
+    if not rate_limits:
+        return None
+    five_hour = rate_limits.get("five_hour", {})
+    seven_day = rate_limits.get("seven_day", {})
+    result = {
+        "five_hour_pct": five_hour.get("used_percentage"),
+        "five_hour_resets_at": five_hour.get("resets_at"),
+        "seven_day_pct": seven_day.get("used_percentage"),
+        "seven_day_resets_at": seven_day.get("resets_at"),
+    }
+    # Return None if all values are None
+    if all(v is None for v in result.values()):
+        return None
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -405,20 +438,22 @@ def _compose_line3(usage: dict, glyphs: dict[str, str]) -> str | None:
 # ---------------------------------------------------------------------------
 
 
-def render(data: dict, git_info: dict, usage: dict | None = None) -> str:
+def render(data: dict, git_info: dict) -> str:
     """Render the statusline from parsed JSON data and git info.
 
     Args:
-        data: Parsed JSON payload from Claude Code.
+        data: Parsed JSON payload from Claude Code. Rate limits are extracted
+              directly from ``data["rate_limits"]`` when present (v2.1.80+).
         git_info: Git metadata dict from get_git_info().
-        usage: Optional usage data from get_usage(). When provided and the
-               layout is two-line, a third line with usage bars is appended.
 
     Returns a string of 1, 2, or 3 lines joined by newline.
     The caller decides whether to print or send over socket.
     """
     nerd = detect_nerd_font()
     glyphs = build_glyphs(nerd)
+
+    # Extract rate limits from payload
+    usage = _extract_rate_limits(data)
 
     # Compose lines
     line1, has_extra = _compose_line1(data, glyphs, git_info)
