@@ -1,7 +1,6 @@
 ---
 name: cancel-ralph
 description: Cancel the currently active Ralph Loop.
-allowed-tools: Bash, Read, Write
 user-invocable: true
 argument-hint: "[optional: reason]"
 ---
@@ -28,12 +27,12 @@ Run `/cancel-ralph` when you want to stop an active Ralph Loop.
 
 ## State Files
 
-Ralph Loop state is stored in:
-- `.omca/state/ralph-state.json`
+Ralph Loop state is stored in `.omca/state/ralph-state.json`.
 
-If it exists, clear it to cancel the loop:
-```bash
-rm -f "${CLAUDE_PROJECT_ROOT}/.omca/state/ralph-state.json"
+Use the `mode_clear` MCP tool to clear it:
+
+```
+mode_clear(mode="ralph")
 ```
 
-**Note**: This only cancels ralph mode. To also cancel ultrawork mode, use `/oh-my-claudeagent:stop-continuation`.
+**Note**: This only cancels ralph mode. For a full reset (ralph + ultrawork + boulder), use `/oh-my-claudeagent:stop-continuation`.
