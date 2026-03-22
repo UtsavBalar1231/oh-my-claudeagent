@@ -24,8 +24,7 @@ If plan mode is active (detectable from system context mentioning a plan file at
 1. Write the plan to BOTH locations:
    - The native plan file path from the plan mode context (`~/.claude/plans/<name>.md`) — **presentation copy** for plan mode UI
    - The standard `.omca/plans/<name>.md` location — **authoritative copy** for atlas/boulder execution
-2. After the plan is finalized and momus-reviewed, call `ExitPlanMode` to present the plan for user approval
-3. Once approved, plan mode exits and the user can run `/start-work`
+2. ExitPlanMode is called as part of the momus completion sequence below — NOT here
 
 If plan mode is NOT active:
 - Write the plan to `.omca/plans/` only (existing behavior)
@@ -42,6 +41,7 @@ After generating the plan, submit to momus for mandatory review:
 If momus returns REJECT, fix all issues and resubmit. Maximum 3 iterations.
 If still REJECTED after 3: Present plan + momus feedback to user, ask for direction.
 
-After saving the plan file, register it as the active boulder:
-`boulder_write(active_plan="/path/to/plan.md", plan_name="plan-name", session_id="current-session")`
-This ensures hooks and subagents can discover the active plan via boulder_read.
+**After momus returns OKAY** (and ONLY then):
+1. Register as active boulder: `boulder_write(active_plan="/path/to/plan.md", plan_name="plan-name", session_id="current-session")`
+2. If plan mode is active: call `ExitPlanMode` to present the plan for user approval
+3. If plan mode is NOT active: guide user to `/oh-my-claudeagent:start-work`
