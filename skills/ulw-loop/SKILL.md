@@ -4,6 +4,7 @@ description: "Ultrawork persistence loop. Like ralph, but requires Oracle verifi
 allowed-tools: Bash, Read, Grep, Glob, Agent
 model: sonnet
 user-invocable: true
+effort: high
 ---
 
 # ULW Loop — Oracle-Verified Persistence

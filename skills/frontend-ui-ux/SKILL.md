@@ -6,6 +6,7 @@ model: opus
 user-invocable: true
 disable-model-invocation: true
 argument-hint: "[component or page description]"
+effort: medium
 ---
 
 # Role: Designer-Turned-Developer

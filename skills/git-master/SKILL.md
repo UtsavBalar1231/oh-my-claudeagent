@@ -4,6 +4,7 @@ description: "MUST USE for ANY git operations. Atomic commits, rebase/squash, hi
 allowed-tools: Bash, Read, Grep, Glob, TaskCreate, TaskUpdate, TaskList
 model: sonnet
 argument-hint: "[commit | rebase | blame | bisect]"
+effort: medium
 ---
 
 # Git Master Agent

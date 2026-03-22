@@ -4,6 +4,7 @@ description: "Unified GitHub triage for issues AND PRs. 1 item = 1 background Ag
 allowed-tools: Bash, Read, Grep, Glob, Agent, TaskCreate, TaskUpdate, TaskList
 model: sonnet
 argument-hint: "[repo] [--issues-only | --prs-only]"
+effort: medium
 ---
 
 # GitHub Triage — Unified Issue & PR Processor

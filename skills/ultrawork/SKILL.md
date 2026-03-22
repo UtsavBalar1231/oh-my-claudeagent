@@ -5,6 +5,7 @@ allowed-tools: Bash, Read, Write, Edit, Grep, Glob, Agent
 user-invocable: true
 model: sonnet
 argument-hint: "[task or list of parallel tasks]"
+effort: high
 ---
 
 # Ultrawork Mode - Maximum Parallelism

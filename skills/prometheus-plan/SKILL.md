@@ -5,6 +5,7 @@ context: fork
 agent: oh-my-claudeagent:prometheus
 user-invocable: true
 argument-hint: "[feature or task to plan]"
+effort: high
 ---
 
 Create a work plan for: $ARGUMENTS

@@ -5,6 +5,7 @@ context: fork
 agent: oh-my-claudeagent:atlas
 user-invocable: true
 argument-hint: "[plan file] [--worktree <path>]"
+effort: high
 ---
 
 # Start Work Session
