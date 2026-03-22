@@ -5,6 +5,27 @@ INPUT=$(cat)
 PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$(pwd)}"
 STATE_DIR="${PROJECT_ROOT}/.omca/state"
 
+# Boulder fallback: block stop if a fresh work plan exists
+# NOTE: exit 0 here exits the script, not just the function
+check_boulder_fallback() {
+	local boulder_file="${STATE_DIR}/boulder.json"
+	if [[ -f "${boulder_file}" ]]; then
+		local active_plan
+		active_plan=$(jq -r '.active_plan // ""' "${boulder_file}" 2>/dev/null)
+		if [[ -n "${active_plan}" && "${active_plan}" != "null" ]]; then
+			if command -v stat &>/dev/null; then
+				local boulder_mtime boulder_age
+				boulder_mtime=$(stat -c %Y "${boulder_file}" 2>/dev/null || stat -f %m "${boulder_file}" 2>/dev/null || echo 0)
+				boulder_age=$(( $(date +%s) - boulder_mtime ))
+				if [[ ${boulder_age} -lt 900 ]]; then
+					echo '{"decision":"block","reason":"[PERSISTENCE] Active work plan detected via boulder. Continue working on tasks."}'
+					exit 0
+				fi
+			fi
+		fi
+	fi
+}
+
 # Recursion guard — stop_hook_active prevents infinite Stop hook loops
 STOP_HOOK_ACTIVE=$(echo "${INPUT}" | jq -r '.stop_hook_active // false' 2>/dev/null)
 if [[ "${STOP_HOOK_ACTIVE}" == "true" ]]; then
@@ -79,20 +100,7 @@ if [[ "${RALPH_ACTIVE}" == "true" ]]; then
 
 	if [[ ${STAGNATION} -ge ${MAX_STAGNATION} ]]; then
 		# No progress — try boulder fallback before allowing stop
-		BOULDER_FILE="${STATE_DIR}/boulder.json"
-		if [[ -f "${BOULDER_FILE}" ]]; then
-			ACTIVE_PLAN=$(jq -r '.active_plan // ""' "${BOULDER_FILE}" 2>/dev/null)
-			if [[ -n "${ACTIVE_PLAN}" && "${ACTIVE_PLAN}" != "null" ]]; then
-				if command -v stat &>/dev/null; then
-					BOULDER_MTIME=$(stat -c %Y "${BOULDER_FILE}" 2>/dev/null || stat -f %m "${BOULDER_FILE}" 2>/dev/null || echo 0)
-					BOULDER_AGE=$(( $(date +%s) - BOULDER_MTIME ))
-					if [[ ${BOULDER_AGE} -lt 900 ]]; then
-						echo '{"decision":"block","reason":"[PERSISTENCE] Active work plan detected via boulder. Continue working on tasks."}'
-						exit 0
-					fi
-				fi
-			fi
-		fi
+		check_boulder_fallback
 		# Allow stop — no progress after threshold attempts and no fresh boulder plan
 		exit 0
 	fi
@@ -109,25 +117,51 @@ if [[ "${INCOMPLETE}" -gt 0 ]]; then
 	exit 0
 fi
 
+# Stagnation detection for ultrawork (no tasks array — use subagent activity as signal)
 if [[ "${ULTRAWORK_ACTIVE}" == "true" ]]; then
+	SUBAGENTS_FILE="${STATE_DIR}/subagents.json"
+	UW_STAGNATION=$(jq -r '.stagnation_count // 0' "${ULTRAWORK_STATE}" 2>/dev/null || echo "0")
+
+	# Check if any agents are currently running
+	UW_NOW=$(date +%s)
+	UW_ACTIVE_AGENTS=0
+	if [[ -f "${SUBAGENTS_FILE}" ]]; then
+		UW_ACTIVE_AGENTS=$(jq --argjson now "${UW_NOW}" \
+			'[.active[]? | select(.status == "running") | select(
+				(.started_epoch // 0) > ($now - 900)
+			)] | length' \
+			"${SUBAGENTS_FILE}" 2>/dev/null || echo "0")
+	fi
+
+	# Increment stagnation when no agents running; reset when agents are active
+	if [[ "${UW_ACTIVE_AGENTS}" -eq 0 ]]; then
+		UW_STAGNATION=$((UW_STAGNATION + 1))
+	else
+		UW_STAGNATION=0
+	fi
+
+	# Update ultrawork-state.json atomically
+	jq --argjson count "${UW_STAGNATION}" '.stagnation_count = $count' \
+		"${ULTRAWORK_STATE}" > "${ULTRAWORK_STATE}.tmp" && \
+		mv "${ULTRAWORK_STATE}.tmp" "${ULTRAWORK_STATE}"
+
+	if [[ ${UW_STAGNATION} -ge 5 ]]; then
+		# No agent activity — try boulder fallback before allowing stop
+		check_boulder_fallback
+		# No progress after threshold attempts and no fresh boulder plan — allow stop
+		exit 0
+	fi
+
+	# Agent-aware check: if agents are running, allow stop (Claude should wait for them)
+	if [[ "${UW_ACTIVE_AGENTS}" -gt 0 ]]; then
+		exit 0  # Allow stop — waiting for background agents to complete
+	fi
+
 	echo '{"decision":"block","reason":"[ULTRAWORK PERSISTENCE] Ultrawork mode is active. Continue parallel execution of remaining tasks."}'
 	exit 0
 fi
 
 # No incomplete tasks and ultrawork not active — try boulder fallback
-BOULDER_FILE="${STATE_DIR}/boulder.json"
-if [[ -f "${BOULDER_FILE}" ]]; then
-	ACTIVE_PLAN=$(jq -r '.active_plan // ""' "${BOULDER_FILE}" 2>/dev/null)
-	if [[ -n "${ACTIVE_PLAN}" && "${ACTIVE_PLAN}" != "null" ]]; then
-		if command -v stat &>/dev/null; then
-			BOULDER_MTIME=$(stat -c %Y "${BOULDER_FILE}" 2>/dev/null || stat -f %m "${BOULDER_FILE}" 2>/dev/null || echo 0)
-			BOULDER_AGE=$(( $(date +%s) - BOULDER_MTIME ))
-			if [[ ${BOULDER_AGE} -lt 900 ]]; then
-				echo '{"decision":"block","reason":"[PERSISTENCE] Active work plan detected via boulder. Continue working on tasks."}'
-				exit 0
-			fi
-		fi
-	fi
-fi
+check_boulder_fallback
 
 exit 0

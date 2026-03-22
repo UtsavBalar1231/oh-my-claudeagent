@@ -92,7 +92,7 @@ fi
 if [[ " ${DETECTED_KEYWORDS[*]} " =~ " ultrawork " ]] && [[ ! " ${DETECTED_KEYWORDS[*]} " =~ " stop-continuation " ]]; then
 	mkdir -p "${STATE_DIR}"
 	NOW_ISO=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-	printf '{"status":"active","activatedAt":"%s"}\n' \
+	printf '{"status":"active","activatedAt":"%s","stagnation_count":0}\n' \
 		"${NOW_ISO}" > "${ULTRAWORK_STATE}.tmp" && mv "${ULTRAWORK_STATE}.tmp" "${ULTRAWORK_STATE}"
 fi
 
