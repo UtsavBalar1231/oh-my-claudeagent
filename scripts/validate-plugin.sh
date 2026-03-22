@@ -481,6 +481,24 @@ check_hooks() {
 	run_registered_hooks "Stop with ralph active" "Stop" "" "${stop_payload}" "${tmp_root}" "json-required"
 	rm -f "${tmp_root}/.omca/state/ralph-state.json"
 
+	# Stop: ultrawork active + running agents → allows stop (exit 0, empty stdout)
+	local uw_epoch
+	uw_epoch=$(date +%s)
+	printf '{"status":"active","activatedAt":"2026-03-22T12:00:00Z","stagnation_count":0}\n' \
+		>"${tmp_root}/.omca/state/ultrawork-state.json"
+	printf '{"active":[{"id":"test-agent-1","type":"explore","status":"running","startedAt":"2026-03-22T12:00:00Z","started_epoch":%s}],"completed":[]}\n' \
+		"${uw_epoch}" >"${tmp_root}/.omca/state/subagents.json"
+	run_registered_hooks "Stop ultrawork active + running agents (allow)" "Stop" "" "${stop_payload}" "${tmp_root}" "empty"
+	rm -f "${tmp_root}/.omca/state/ultrawork-state.json" "${tmp_root}/.omca/state/subagents.json"
+
+	# Stop: ultrawork active + no running agents → blocks stop (exit 0, JSON with decision:block)
+	printf '{"status":"active","activatedAt":"2026-03-22T12:00:00Z","stagnation_count":0}\n' \
+		>"${tmp_root}/.omca/state/ultrawork-state.json"
+	printf '{"active":[],"completed":[]}\n' \
+		>"${tmp_root}/.omca/state/subagents.json"
+	run_registered_hooks "Stop ultrawork active + no agents (block)" "Stop" "" "${stop_payload}" "${tmp_root}" "json-required"
+	rm -f "${tmp_root}/.omca/state/ultrawork-state.json" "${tmp_root}/.omca/state/subagents.json"
+
 	# SubagentStart / SubagentStop
 	local subagentstart_payload="${HOOK_FIXTURES_DIR}/subagentstart-basic.json"
 	local subagentstopcomplete_payload="${HOOK_FIXTURES_DIR}/subagentstopcomplete-basic.json"
