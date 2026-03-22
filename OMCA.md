@@ -24,8 +24,8 @@ oh-my-claudeagent adds a multi-agent layer on top of Claude Code:
 
 - **12 specialist agents** with distinct roles and model tiers (opus, sonnet, haiku)
 - **20 skills** invokable via slash commands or keyword triggers
-- **27 hook commands** wired to 17 event types for session persistence, context injection,
-  auto-approval, and error recovery (28 scripts on disk: 27 hook + `validate-plugin.sh` utility)
+- **28 hook commands** wired to 18 event types for session persistence, context injection,
+  auto-approval, and error recovery (29 scripts on disk: 28 hook + `validate-plugin.sh` utility)
 - **3 MCP servers** for structural code search, state tracking, public code search, and
   library documentation
 
@@ -165,6 +165,25 @@ After installing, run `/oh-my-claudeagent:omca-setup`. This skill:
 
 Run `/oh-my-claudeagent:omca-setup --check` for a read-only health check.
 Run `/oh-my-claudeagent:omca-setup --uninstall` to remove the plugin block.
+
+### Inline Settings Install
+
+As an alternative to the marketplace, declare the plugin directly in `settings.json`
+using `source: 'settings'`. This avoids a separate marketplace registration step:
+
+```json
+{
+  "plugins": {
+    "oh-my-claudeagent": {
+      "source": "settings",
+      "repo": "UtsavBalar1231/oh-my-claudeagent"
+    }
+  }
+}
+```
+
+This method is useful for locked-down environments where marketplace commands are
+restricted but settings file edits are allowed.
 
 ### Team Setup
 
@@ -899,6 +918,20 @@ The `keyword-detector.sh` hook fires on `UserPromptSubmit`. It lowercases the pr
 pattern-matches against known phrases, then injects `additionalContext` announcing the
 detected mode. Claude reads the injection and invokes the corresponding skill.
 
+### @-Mention Syntax
+
+Type `@agent-oh-my-claudeagent:<name>` in any prompt to guarantee delegation to that
+agent, bypassing the default routing decision. Examples:
+
+```
+@agent-oh-my-claudeagent:sisyphus please refactor this module
+@agent-oh-my-claudeagent:oracle what's the right architecture here?
+@agent-oh-my-claudeagent:explore find all usages of the auth middleware
+```
+
+This is the user-facing equivalent of `Agent(subagent_type="oh-my-claudeagent:NAME")`
+in code. Use it when you want a specific specialist without invoking a skill.
+
 ### Full Keyword Map
 
 | Keyword / Phrase | Activates |
@@ -959,6 +992,22 @@ If ralph mode is active, it returns `{"decision": {"behavior": "block"}}` to pre
 session from ending. The session continues until the oracle approves and ralph writes its
 completed state.
 
+### StopFailure Event
+
+The `StopFailure` event fires when the session ends due to an API error (rate limit, auth
+failure, network timeout, etc.). Unlike `Stop`, `StopFailure` is **logging-only**: Claude
+Code ignores all output and exit codes from StopFailure hook scripts.
+
+The plugin registers `stop-failure-handler.sh` (StopFailure event) which logs the error
+type and details to `.omca/logs/stop-failures.jsonl`. This provides an audit trail but
+**cannot block** the session from ending.
+
+**Known limitation**: ralph mode has an unrecoverable gap for API errors. If a rate limit
+or auth failure occurs during an active ralph or ultrawork session, the session ends and
+the loop cannot continue. The user must manually resume by starting a new session and
+running `/oh-my-claudeagent:start-work` (which reads boulder state to resume from the
+last completed task).
+
 ### Notepad Injection for Subagents
 
 When `.omca/state/boulder.json` has an active plan, `subagent-start.sh` (SubagentStart
@@ -996,6 +1045,19 @@ Any agent's model can be overridden per call:
 Agent(subagent_type="oh-my-claudeagent:explore", model="haiku")  # cheapest
 Agent(subagent_type="oh-my-claudeagent:sisyphus-junior", model="opus")  # highest quality
 ```
+
+### Overriding the Effort Level
+
+The `effort` field controls the thinking token budget. Override per call or set as a
+default in agent/skill frontmatter:
+
+```
+Agent(subagent_type="oh-my-claudeagent:oracle", effort="max")     # maximum thinking budget
+Agent(subagent_type="oh-my-claudeagent:sisyphus-junior", effort="low")  # minimal thinking
+```
+
+Values: `max`, `high`, `medium`, `low`. Default is determined by the session's global
+effort setting. Use `effort: max` for oracle on critical architecture reviews.
 
 ### Cost-Conscious Patterns
 
@@ -1054,6 +1116,32 @@ Hook changes in `hooks/hooks.json` are NOT auto-reloaded by the file watcher. Ru
 Changes to `.claude/settings.json` and `~/.claude/settings.json` are normally auto-
 reloaded. If they have not appeared after a few seconds, restart the session.
 
+### Global Config Split (v2.1.78+)
+
+Several display/UI settings moved from `~/.claude/settings.json` to `~/.claude.json`
+(a new per-user global config file separate from the project settings hierarchy):
+
+- `showTurnDuration` — show elapsed time per turn
+- `terminalProgressBarEnabled` — enable the terminal progress bar
+- `editorMode` — terminal editor integration mode
+
+If you previously set these in `~/.claude/settings.json`, move them to `~/.claude.json`.
+The plugin does not write to `~/.claude.json` — use Claude Code's settings UI or edit
+the file directly.
+
+### Environment Variables
+
+New Claude Code env vars relevant to this plugin:
+
+| Variable | Purpose |
+|----------|---------|
+| `ANTHROPIC_CUSTOM_MODEL_OPTION` | Add a custom entry to the model picker. Companion vars: `ANTHROPIC_CUSTOM_MODEL_OPTION_NAME` (display name) and `ANTHROPIC_CUSTOM_MODEL_OPTION_DESCRIPTION` (tooltip text) |
+| `CLAUDE_CODE_NEW_INIT=true` | Enable the interactive multi-phase `/init` flow (project initialization wizard) |
+| `DISABLE_FEEDBACK_COMMAND` | Suppress the feedback/bug-report command. Replaces the old `DISABLE_BUG_COMMAND` name (old name still accepted for backwards compatibility) |
+
+These are set in your shell environment before launching Claude Code and are not written
+by omca-setup.
+
 ### AskUserQuestion Not Available in Subagents
 
 AskUserQuestion is stripped from subagents at depth 1+ (platform bug, tracked at
@@ -1089,9 +1177,50 @@ cat /path/outside/project/file.py
 This bypasses the plan mode scope restriction. multimodal-looker has no Bash access —
 it cannot access external files at all.
 
+### bypassPermissions Behavior (Refined)
+
+`bypassPermissions` mode now prompts for writes to sensitive directories: `.git`, `.claude`,
+`.vscode`, `.idea`. Writes to `.claude/commands`, `.claude/agents`, and `.claude/skills` are
+exempt from the prompt (they are considered safe plugin artifact destinations).
+
+If your workflows write plugin components programmatically to `.claude/agents/` or similar
+paths, these writes will still succeed without a prompt. Writes directly to `.git` or `.claude`
+at the root level will now request confirmation even in bypassPermissions mode.
+
+### Read/Edit Deny Rules vs Bash Subprocesses
+
+Read and Edit deny rules apply to Claude's built-in file tools only — not to Bash
+subprocesses. A `Read(./.env)` deny rule blocks the Read tool but does not prevent
+`cat .env` in a Bash call.
+
+For OS-level enforcement, enable the sandbox. Deny rules without the sandbox are a
+convenience guardrail, not a security boundary. The `permission-filter.sh` hook operates
+on the `PermissionRequest` event, which fires for Claude's built-in Bash tool calls — it
+does not intercept reads or writes inside scripts that Bash then executes.
+
+### Scripted `-p` Calls and the `--bare` Flag
+
+`--bare` flag (v2.1.81): Scripted `-p` calls with `--bare` skip hooks, LSP, plugin sync,
+and skill directory walks. The oh-my-claudeagent plugin is entirely bypassed in this mode.
+Requires `ANTHROPIC_API_KEY`. Auto-memory is disabled. Use `--bare` only when you need raw
+Claude API access without any plugin behavior.
+
+### Sandbox Path Prefix Changes
+
+Sandbox path prefixes changed in v2.1.78: `/path` is now absolute (standard convention).
+`./path` is relative to the project root. The older `//path` prefix for absolute paths still
+works. If your omca-setup configured sandbox paths with `//`, consider migrating to single `/`.
+
 ---
 
 ## Enterprise Rollout
+
+### Channels (v2.1.80, Research Preview)
+
+MCP servers can push events into running sessions (Telegram, Discord integrations). Requires
+the `--channels` flag when starting Claude Code and the `channelsEnabled` managed setting for
+Team/Enterprise deployments. See upstream docs for setup. This is a research preview — the API
+may change before general availability.
 
 ### Managed Settings Keys
 
@@ -1105,9 +1234,38 @@ managed Claude Code settings. The relevant keys:
 | `allowManagedHooksOnly` | Allow only hooks defined in managed settings |
 | `allowManagedPermissionRulesOnly` | Allow only managed permission rules |
 | `allowManagedMcpServersOnly` | Allow only managed MCP server definitions |
+| `channelsEnabled` | Managed setting for Team/Enterprise channel access (required alongside `--channels` flag) |
+| `sandbox.filesystem.allowRead` | Re-allow reads within a broader `denyRead` region |
+| `sandbox.filesystem.allowManagedReadPathsOnly` | Managed-only setting; prevents user overrides of read paths |
 
 omca-setup inspects and reports on these keys but does not write them — managed policy
 is set by your admin tooling, not by this plugin.
+
+**Removed managed key:** `allow_remote_sessions` is no longer a managed settings key — it
+is now controlled via the admin UI instead of settings files.
+
+### Plugin Seed and Inline Install
+
+`CLAUDE_CODE_PLUGIN_SEED_DIR` now supports multiple paths separated by `:` on Unix or `;`
+on Windows. This allows seeding multiple plugin directories in enterprise images without
+requiring marketplace commands:
+
+```bash
+export CLAUDE_CODE_PLUGIN_SEED_DIR=/opt/company-plugins:/opt/shared-plugins
+```
+
+As an alternative to a hosted marketplace, declare the plugin inline using `source: 'settings'`
+in `settings.json`. This is already documented in the "Inline Settings Install" section above.
+
+### Plugin Validation
+
+`claude plugin validate` now checks both YAML frontmatter syntax (in agent/skill/hook files)
+and `hooks.json` schema. Run this after modifying plugin files to catch structural errors
+before committing:
+
+```bash
+claude plugin validate /path/to/oh-my-claudeagent
+```
 
 ### Install Path
 
@@ -1155,6 +1313,14 @@ All hook scripts in `scripts/*.sh` follow these conventions:
 A script not registered in `hooks/hooks.json` is dead code (ADR-009). Both the script
 and the registration are required.
 
+**Compound command permission splitting:** When a user approves a compound Bash command
+(e.g., `git status && npm test`) with "Yes, don't ask again", Claude Code now saves
+separate permission rules per subcommand — up to 5 subcommands per approval. This means
+approving `git status && npm test` saves an independent rule for `npm test`. The
+`permission-filter.sh` hook auto-approves known-safe commands; this splitting means
+previously-approved compound commands may now generate individual approval records for
+each subcommand, which is expected behavior.
+
 ### Adding New Components
 
 **Hook script:**
@@ -1174,10 +1340,16 @@ and the registration are required.
    name: agent-name
    description: One-line role description
    model: opus|sonnet|haiku
+   effort: max|high|medium|low  # optional: override session effort level (thinking budget)
    disallowedTools: Write, Edit  # use disallowedTools, never tools: (blocks MCP inheritance)
+   background: true              # optional: run in background by default
+   isolation: worktree           # optional: run in an isolated git worktree
    maxTurns: 30
    ---
    ```
+   If both `disallowedTools` and `tools` are set, `disallowedTools` is applied first (to the
+   full inherited tool set), then `tools` creates a further allowlist. Prefer `disallowedTools`
+   alone — never use `tools:` only, as it blocks MCP tool inheritance.
 
 **Skill:**
 1. Create `skills/name/SKILL.md` — a skill directory without `SKILL.md` is ignored
@@ -1217,7 +1389,7 @@ Hook fixture payloads live in `tests/fixtures/hooks/`.
 |------|---------|
 | `agents/*.md` | 12 agent definitions |
 | `skills/*/SKILL.md` | 20 skill definitions |
-| `scripts/*.sh` | 28 scripts: 27 hook commands + `validate-plugin.sh` utility |
+| `scripts/*.sh` | 29 scripts: 28 hook commands + `validate-plugin.sh` utility |
 | `hooks/hooks.json` | Hook registration (canonical source for hook map) |
 | `servers/omca-mcp.py` | Unified Python FastMCP server (ast-grep, boulder, evidence, notepads, catalog) |
 | `.mcp.json` | Wires 3 MCP servers: omca (local), grep (HTTP), context7 (HTTP) |

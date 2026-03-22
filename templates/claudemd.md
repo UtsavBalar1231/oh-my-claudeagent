@@ -44,6 +44,7 @@ Routing:
 - Default orchestrator: sisyphus. It delegates to specialists — it does not implement directly.
 - Plugin agents supersede built-in equivalents: prefer `oh-my-claudeagent:explore` over the built-in Explore type, `oh-my-claudeagent:prometheus` over the built-in Plan type.
 - Use subagents when tasks can run in parallel or require isolated context. For simple tasks, sequential operations, or single-file edits, work directly rather than delegating.
+- @-mention syntax: users can type `@agent-oh-my-claudeagent:sisyphus` (or any agent name) in a prompt to guarantee delegation to that agent. This is the user-facing equivalent of `Agent(subagent_type=...)` and bypasses the default routing decision.
 
 Escalation:
 - Subagents that discover out-of-scope work report recommendations in their output text — they do not spawn orchestrators themselves.
@@ -64,6 +65,8 @@ Override any agent's default model: `Agent(subagent_type="oh-my-claudeagent:NAME
 - haiku: quick lookups, low-cost exploration
 - sonnet: standard implementation (default for most agents)
 - opus: architecture, deep analysis, complex planning
+
+Override effort level: `Agent(subagent_type="oh-my-claudeagent:NAME", effort="max|high|medium|low")` — controls thinking token budget. The `effort` field is also declarable in agent and skill frontmatter as a default.
 </model_routing>
 
 ## Skills
@@ -178,6 +181,13 @@ Hooks inject context via `<system-reminder>` tags. Key patterns:
 Keyword triggers (auto-detected): ralph, ultrawork, handoff, cancel, stop continuation, setup omca, run atlas, run metis, create plan, fix build, run sisyphus.
 
 Runtime state lives in `.omca/` (gitignored): state in `.omca/state/`, plans in `.omca/plans/`, logs in `.omca/logs/`.
+
+Hook event notes:
+- `StopFailure` fires when the session ends due to an API error (rate limit, auth failure, etc.). Output and exit code are ignored — this is a logging-only event. Ralph/ultrawork mode has an unrecoverable gap here: if an API error ends the session, the user must manually resume.
+- `InstructionsLoaded` matcher values: `session_start`, `nested_traversal`, `path_glob_match`, `include`, `compact`
+- `PostCompact` matcher values: `manual`, `auto`
+- `SessionEnd` reason values include: `normal`, `timeout`, `error`, `resume`
+- `Elicitation` / `ElicitationResult` matcher: MCP server name (e.g., `omca`)
 </hooks_and_context>
 
 <rules>
@@ -189,6 +199,7 @@ NEVER:
 - Read `~/.claude/CLAUDE.md` to determine what features exist — read on-disk files in this repo
 - Use `Bash(claude ...)` or any CLI binary to spawn agents — ALWAYS use the native `Agent(subagent_type=...)` tool
 - Spawn orchestrators (atlas, sisyphus) via `Agent()` — invoke them via their `/oh-my-claudeagent:NAME` skill instead
+- Declare `tools:` in agent frontmatter — use `disallowedTools:` instead. If both are set, `disallowedTools` is applied first (to the inherited set), then the `tools` allowlist further restricts it, which blocks MCP inheritance
 
 ALWAYS:
 - Delegate complex multi-file work to specialist agents
