@@ -5,6 +5,65 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-03-22
+
+### Added
+
+- **StopFailure hook event handler**: new `stop-failure-handler.sh` logs API errors
+  (rate limit, auth failure, billing, server error) to `.omca/logs/stop-failures.jsonl`.
+  Emits warning when ralph/ultrawork persistence mode was interrupted. StopFailure output
+  and exit code are ignored by Claude Code — this is a permanent known limitation for
+  persistence modes (users must manually resume after API errors)
+- **Effort frontmatter for agents**: all 12 agents gain `effort:` field — oracle=max,
+  opus agents=high, sonnet agents=medium. Overrides session effort level per agent for
+  cost/quality tuning
+- **Effort frontmatter for skills**: 14 of 20 skills gain `effort:` field — 9 high
+  (planning/execution skills), 5 medium (moderate complexity)
+- **CLAUDE_PLUGIN_DATA venv migration**: MCP server Python dependencies now persist across
+  plugin updates via `UV_PROJECT_ENVIRONMENT` in `.mcp.json` env and diff-based sync in
+  `session-init.sh`. Falls back to in-plugin venv on older Claude Code versions
+- **validate-plugin justfile recipe**: `just validate-plugin` runs `claude plugin validate .`
+  with `command -v claude` guard. Standalone recipe, not part of `just ci`
+- **ADR-017**: upstream port assessment for Claude Code v2.1.78-v2.1.81 documenting all
+  22 action items from the 47 changed upstream doc files
+- **Ultrawork Stop hook test scenarios**: additional test assertions for ralph-persistence
+  behavior under ultrawork mode
+- **SessionEnd test fixtures**: `sessionend-resume.json` and `sessionend-normal.json`
+- **Documentation updates**: StopFailure in hook map (18 event types, 28 hook commands,
+  29 scripts), `@-mention` subagent invocation syntax, channels feature awareness,
+  `--bare` flag, sandbox path prefix changes, enterprise settings, compound command
+  permission splitting, new env vars, global config split to `~/.claude.json`,
+  `disallowedTools` + `tools` interaction, `source: 'settings'` inline marketplace
+
+### Changed
+
+- **Statusline: OAuth API replaced by upstream payload**: deleted `usage.py` (288 LOC) —
+  the custom OAuth API client with HTTP fetch, caching, circuit breaker, and keychain
+  token extraction. Rate limit data now comes free from Claude Code's statusline JSON
+  payload (`rate_limits.five_hour.used_percentage`, `rate_limits.seven_day.used_percentage`).
+  Trade-off: lost `seven_day_sonnet` and `extra_usage.is_enabled` (minor)
+- **MCP tool renames**: `boulder_read`/`boulder_clear`/`evidence_clear` replaced by
+  unified `mode_read`/`mode_clear`
+- **ADR-012 adoption roadmap**: 6 new entries (effort, PLUGIN_DATA, StopFailure,
+  InstructionsLoaded matchers, PostCompact matchers, background). maxTurns corrected
+  from "Adopted (all agents)" to "Available but not adopted — causes subagent issues"
+- **SessionEnd cleanup**: `session-cleanup.sh` now reads stdin JSON and skips heavy
+  cleanup (log pruning, old file deletion) when `reason == "resume"` — lighter behavior
+  for session switching via interactive `/resume`
+
+### Fixed
+
+- **Spawn-ID bridging**: `track-subagent-spawn.sh` now bridges spawn-ID to platform
+  `agent_id` in subagent tracking
+- **teammate-idle-guard**: corrected field names and use `started_epoch` for staleness
+- **Ultrawork stagnation**: improved detection and agent-aware idle stop behavior
+- **Sisyphus background results**: added collection guidance for background agent results
+- **Plan Mode Exit**: agents gain guidance to prevent premature ExitPlanMode calls
+- **ExitPlanMode sequencing**: restructured in skills after momus review
+- **State cleanup**: replaced `rm -f` with `mode_clear` MCP tool in skill scripts
+
+[1.3.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.2.2...v1.3.0
+
 ## [1.2.2] - 2026-03-19
 
 ### Fixed
