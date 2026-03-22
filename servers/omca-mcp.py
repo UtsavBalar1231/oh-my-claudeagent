@@ -107,6 +107,8 @@ SG_BIN: str | None = None
 OMCA_STATE_DIR = ".omca/state"
 BOULDER_FILE = "boulder.json"
 EVIDENCE_FILE = "verification-evidence.json"
+RALPH_STATE_FILE = "ralph-state.json"
+ULTRAWORK_STATE_FILE = "ultrawork-state.json"
 NOTEPADS_DIR = "notepads"
 VALID_SECTIONS = ("learnings", "issues", "decisions", "problems", "questions")
 AGENT_CATALOG_FILE = "agent-catalog.json"
@@ -560,22 +562,7 @@ def ast_test_rule(
     return format_scan_results(matches, MAX_RESULTS_DEFAULT)
 
 
-# === BOULDER TOOLS (4) ===
-
-
-@mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
-def boulder_read(
-    working_directory: str = Field(
-        default="", description="Project root (auto-detected from git)"
-    ),
-) -> str:
-    """Read current boulder state from .omca/state/boulder.json"""
-    state = _state_dir(working_directory)
-    path = os.path.join(state, BOULDER_FILE)
-    data = _read_json(path)
-    if not data:
-        return "No active boulder state found."
-    return json.dumps(data, indent=2)
+# === BOULDER TOOLS (2) ===
 
 
 @mcp.tool()
@@ -616,22 +603,6 @@ def boulder_write(
     return f"Boulder state written: plan={plan_name}, sessions={len(session_ids)}"
 
 
-@mcp.tool(annotations={"destructiveHint": True})
-def boulder_clear(
-    working_directory: str = Field(
-        default="", description="Project root (auto-detected from git)"
-    ),
-) -> str:
-    """Remove boulder state file."""
-    state = _state_dir(working_directory)
-    path = os.path.join(state, BOULDER_FILE)
-    try:
-        os.remove(path)
-        return "Boulder state cleared."
-    except FileNotFoundError:
-        return "No boulder state to clear."
-
-
 @mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
 def boulder_progress(
     plan_path: str = Field(
@@ -670,7 +641,116 @@ def boulder_progress(
     return json.dumps(result, indent=2)
 
 
-# === EVIDENCE TOOLS (3) ===
+# === MODE TOOLS (2) ===
+
+
+@mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
+def mode_read(
+    working_directory: str = Field(
+        default="", description="Project root (auto-detected from git)"
+    ),
+) -> str:
+    """Read all active mode state: ralph, ultrawork, boulder, and evidence. Returns a unified dashboard."""
+    state = _state_dir(working_directory)
+
+    # Ralph
+    ralph_data = _read_json(os.path.join(state, RALPH_STATE_FILE))
+    ralph_section: dict = {"active": bool(ralph_data)}
+    if ralph_data:
+        ralph_section.update(ralph_data)
+
+    # Ultrawork
+    ultrawork_data = _read_json(os.path.join(state, ULTRAWORK_STATE_FILE))
+    ultrawork_section: dict = {"active": bool(ultrawork_data)}
+    if ultrawork_data:
+        ultrawork_section.update(ultrawork_data)
+
+    # Boulder
+    boulder_data = _read_json(os.path.join(state, BOULDER_FILE))
+    boulder_section: dict = {"active": bool(boulder_data)}
+    if boulder_data:
+        boulder_section.update(boulder_data)
+
+    # Evidence
+    evidence_data = _read_json(os.path.join(state, EVIDENCE_FILE))
+    entries = evidence_data.get("entries", [])
+    evidence_section: dict = {
+        "active": bool(entries),
+        "entry_count": len(entries),
+    }
+    if entries:
+        evidence_section["latest"] = entries[-1]
+
+    result = {
+        "ralph": ralph_section,
+        "ultrawork": ultrawork_section,
+        "boulder": boulder_section,
+        "evidence": evidence_section,
+    }
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool(annotations={"destructiveHint": True})
+def mode_clear(
+    mode: Literal["ralph", "ultrawork", "boulder", "evidence", "all"] = Field(
+        default="all",
+        description=(
+            "Which state to clear: "
+            "'ralph' (ralph-state.json), "
+            "'ultrawork' (ultrawork-state.json), "
+            "'boulder' (boulder.json), "
+            "'evidence' (verification-evidence.json), "
+            "'all' (ralph + ultrawork + boulder, NOT evidence)"
+        ),
+    ),
+    working_directory: str = Field(
+        default="", description="Project root (auto-detected from git)"
+    ),
+) -> str:
+    """Clear active mode state files. 'all' clears ralph + ultrawork + boulder but NOT evidence."""
+    state = _state_dir(working_directory)
+
+    targets: list[tuple[str, str]] = []
+    if mode == "ralph":
+        targets = [("ralph", RALPH_STATE_FILE)]
+    elif mode == "ultrawork":
+        targets = [("ultrawork", ULTRAWORK_STATE_FILE)]
+    elif mode == "boulder":
+        targets = [("boulder", BOULDER_FILE)]
+    elif mode == "evidence":
+        targets = [("evidence", EVIDENCE_FILE)]
+    else:  # all
+        targets = [
+            ("ralph", RALPH_STATE_FILE),
+            ("ultrawork", ULTRAWORK_STATE_FILE),
+            ("boulder", BOULDER_FILE),
+        ]
+
+    cleared: list[str] = []
+    skipped: list[str] = []
+
+    for label, filename in targets:
+        path = os.path.join(state, filename)
+        try:
+            # Check if active before removing
+            data = _read_json(path)
+            was_active = bool(data)
+            os.remove(path)
+            status = "was active" if was_active else "was inactive"
+            cleared.append(f"{label} ({status})")
+        except FileNotFoundError:
+            skipped.append(f"{label} (not found)")
+
+    parts: list[str] = []
+    if cleared:
+        parts.append(f"Cleared: {', '.join(cleared)}.")
+    if skipped:
+        parts.append(f"Skipped: {', '.join(skipped)}.")
+
+    return " ".join(parts) if parts else "Nothing to clear."
+
+
+# === EVIDENCE TOOLS (2) ===
 
 
 @mcp.tool()
@@ -724,22 +804,6 @@ def evidence_read(
     if not data or not data.get("entries"):
         return "No verification evidence recorded."
     return json.dumps(data, indent=2)
-
-
-@mcp.tool(annotations={"destructiveHint": True})
-def evidence_clear(
-    working_directory: str = Field(
-        default="", description="Project root (auto-detected from git)"
-    ),
-) -> str:
-    """Clear all verification evidence."""
-    state = _state_dir(working_directory)
-    path = os.path.join(state, EVIDENCE_FILE)
-    try:
-        os.remove(path)
-        return "Verification evidence cleared."
-    except FileNotFoundError:
-        return "No evidence to clear."
 
 
 # === NOTEPAD TOOLS (3) ===
