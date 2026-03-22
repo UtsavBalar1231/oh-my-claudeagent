@@ -8,6 +8,16 @@ LOG_DIR="${PROJECT_ROOT}/.omca/logs"
 
 mkdir -p "${STATE_DIR}" "${LOG_DIR}"
 
+# PLUGIN_DATA venv sync (v2.1.78+) — ensure MCP server dependencies persist across updates
+if [[ -n "${CLAUDE_PLUGIN_DATA:-}" ]]; then
+	PLUGIN_ROOT_SYNC="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
+	if ! diff -q "${PLUGIN_ROOT_SYNC}/servers/pyproject.toml" "${CLAUDE_PLUGIN_DATA}/pyproject.toml" >/dev/null 2>&1; then
+		mkdir -p "${CLAUDE_PLUGIN_DATA}"
+		cp "${PLUGIN_ROOT_SYNC}/servers/pyproject.toml" "${CLAUDE_PLUGIN_DATA}/pyproject.toml" 2>/dev/null
+		UV_PROJECT_ENVIRONMENT="${CLAUDE_PLUGIN_DATA}/.venv" uv sync --project "${PLUGIN_ROOT_SYNC}/servers" --quiet 2>/dev/null || true
+	fi
+fi
+
 SESSION_ID="${CLAUDE_SESSION_ID:-$(date +%s)-$$}"
 
 SESSION_STATE="${STATE_DIR}/session.json"
