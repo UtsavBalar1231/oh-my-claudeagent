@@ -5,6 +5,7 @@ context: fork
 agent: oh-my-claudeagent:metis
 user-invocable: true
 argument-hint: "[request to analyze]"
+effort: high
 ---
 
 Analyze the following request: $ARGUMENTS

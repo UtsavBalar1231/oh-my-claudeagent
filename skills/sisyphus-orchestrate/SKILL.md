@@ -5,6 +5,7 @@ context: fork
 agent: oh-my-claudeagent:sisyphus
 user-invocable: true
 argument-hint: "[task description]"
+effort: high
 ---
 
 Execute the following: $ARGUMENTS

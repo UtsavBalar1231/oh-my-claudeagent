@@ -4,6 +4,7 @@ description: Intelligent refactoring with codebase awareness, test verification,
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent
 user-invocable: true
 argument-hint: "[target file or module]"
+effort: high
 ---
 
 # Intelligent Refactor Command

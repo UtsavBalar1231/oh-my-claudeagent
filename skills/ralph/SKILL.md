@@ -5,6 +5,7 @@ allowed-tools: Bash, Read, Write, Edit, Grep, Glob, Agent, TaskCreate, TaskUpdat
 user-invocable: true
 model: opus
 argument-hint: "[task description]"
+effort: high
 ---
 
 # Ralph Mode - Persistence Until Verified Complete
