@@ -130,7 +130,7 @@ APPROVAL BIAS: When in doubt, APPROVE. A plan that's 80% clear is good enough â€
 
 ## Plan Context Awareness
 
-- Use `boulder_read` to check if reviewing an active plan (vs. a draft)
+- Use `mode_read` to check if reviewing an active plan (vs. a draft)
 - Record critical review findings via `notepad_write(plan_name, "issues", "...")` for the orchestrator
 
 ## Review Process

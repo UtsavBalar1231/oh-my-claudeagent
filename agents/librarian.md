@@ -171,7 +171,7 @@ This bypasses plan mode's read-only file system scope restriction.
 
 ## Plan Context Awareness
 
-- Use `boulder_read` to check if an active plan exists
+- Use `mode_read` to check if an active plan exists
 - When an active plan exists, record significant findings via `notepad_write(plan_name, "learnings", content)`:
   - Useful documentation links and key API details
   - Surprising behaviors or version-specific gotchas

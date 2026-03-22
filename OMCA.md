@@ -768,8 +768,8 @@ for code structure (e.g., "all functions with a specific parameter type").
 | Tool | Purpose |
 |------|---------|
 | `boulder_write` | Register active plan: `boulder_write(active_plan, plan_name, session_id)` |
-| `boulder_read` | Read current boulder state (active plan path, session IDs, progress) |
-| `boulder_clear` | Remove the active boulder state |
+| `mode_read` | Read unified state dashboard (active modes: ralph, ultrawork, boulder, evidence) |
+| `mode_clear` | Deactivate modes — defaults to "all" (ralph + ultrawork + boulder). Use `mode_clear(mode="ralph")` for selective clearing |
 | `boulder_progress` | Check completed vs remaining tasks in the active plan |
 
 **Evidence tools** — Record verification results for the task-completed-verify hook:
@@ -778,7 +778,7 @@ for code structure (e.g., "all functions with a specific parameter type").
 |------|---------|
 | `evidence_log` | Record a verification result: `evidence_log(evidence_type, command, exit_code, output_snippet)` |
 | `evidence_read` | Read accumulated verification evidence |
-| `evidence_clear` | Clear evidence records |
+| `mode_clear` | Clear evidence records: `mode_clear(mode="evidence")` |
 
 The `task-completed-verify.sh` hook (TaskCompleted event) exits 2 to block task completion
 if `verification-evidence.json` is missing or older than 5 minutes when the task text
@@ -864,8 +864,8 @@ is gitignored by default (omca-setup adds `.omca/` to `.gitignore`).
 1. Prometheus creates a plan at `.omca/plans/{name}.md`
 2. Prometheus calls `boulder_write(active_plan, plan_name, session_id)` to register it
 3. `/start-work` reads boulder state and resumes from the last incomplete task
-4. Atlas reads boulder state via `boulder_read`, uses `boulder_progress` to check counts
-5. When all tasks are complete, `/stop-continuation` or manual `boulder_clear` clears it
+4. Atlas reads boulder state via `mode_read`, uses `boulder_progress` to check counts
+5. When all tasks are complete, `/stop-continuation` or manual `mode_clear` clears it
 
 ### Evidence Workflow
 
@@ -1036,7 +1036,7 @@ nesting-specific guidance.
 
 ### MCP Tools Not Available
 
-If `ast_search`, `boulder_read`, or other MCP tools are not responding:
+If `ast_search`, `mode_read`, or other MCP tools are not responding:
 
 1. Check that `ast-grep` or `sg` is installed: `command -v ast-grep || command -v sg`
 2. Check that `uv` is installed: `command -v uv`

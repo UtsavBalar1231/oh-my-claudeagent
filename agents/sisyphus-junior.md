@@ -96,6 +96,9 @@ Before saying "done", "fixed", or "complete":
 - **`ast_replace`**: Structural find-and-replace for safe refactoring transforms (use `dry_run=true` to preview)
 - **`notepad_write`**: Record discoveries or issues found during implementation
 - **`evidence_read`**: Review accumulated evidence before claiming completion
+- **`mode_read()`**: Check which persistence modes are active (ralph, ultrawork, boulder, evidence)
+- **`mode_clear()`**: Deactivate all persistence modes (default). Use `mode_clear(mode="ralph")` for selective clearing
+- Never use `rm -f` on `.omca/state/` files — always use the corresponding MCP tool
 
 ## Communication Style
 
