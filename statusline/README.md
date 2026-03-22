@@ -26,7 +26,8 @@ style, vim mode.
 cost, total duration, lines added/removed.
 
 **Line 3 — usage limits**: 5-hour and 7-day utilization bars with reset times. Omitted when
-usage data is unavailable or `CLAUDE_STATUSLINE_NO_USAGE` is set.
+the `rate_limits` field is absent from the statusline JSON payload (only present for Claude.ai
+Pro/Max subscribers after the first API response).
 
 **Single-line fallback**: when there is no git repo, no agent, no worktree, and no vim mode,
 lines 1 and 2 are merged into a single compact line.
@@ -58,8 +59,8 @@ cc-statusline (client)
 ```
 
 **Daemon mode** (default): The client connects to a long-running daemon process over a Unix
-domain socket. The daemon keeps the Python interpreter and usage cache warm, eliminating the
-~19ms startup + import cost per render.
+domain socket. The daemon keeps the Python interpreter warm, eliminating the ~19ms startup +
+import cost per render.
 
 **Auto-start**: On the first failed connection attempt, the client uses a file lock
 (`/tmp/cc-statusline-{uid}.lock`) to start the daemon exactly once, then retries. Subsequent
@@ -121,7 +122,6 @@ All configuration is via environment variables. No config files.
 | `CLAUDE_STATUSLINE_MODE` | `daemon`, `direct` | `daemon` | `daemon`: try daemon, auto-start, fall back to direct. `direct`: always render inline, never contact daemon. |
 | `CLAUDE_STATUSLINE_NERD_FONT` | `1`, `0` | `1` | Override Nerd Font glyph usage. Takes precedence over `NERD_FONT`. |
 | `NERD_FONT` | `1`, `0` | `1` | Fallback Nerd Font preference when `CLAUDE_STATUSLINE_NERD_FONT` is not set. |
-| `CLAUDE_STATUSLINE_NO_USAGE` | any non-empty value | unset | Disable OAuth usage API calls entirely. Line 3 is never rendered. |
 
 When neither `CLAUDE_STATUSLINE_NERD_FONT` nor `NERD_FONT` is set, Nerd Font glyphs are
 enabled by default. Set either variable to `0` to use ASCII fallbacks (`*` for branch,
@@ -163,9 +163,6 @@ direct rendering.
 
 - **Idle shutdown**: The daemon shuts itself down after 1800 seconds (30 minutes) of
   inactivity. Each successful request resets the idle timer.
-- **Usage refresh**: Usage data is fetched from the Anthropic OAuth API once on startup and
-  then refreshed in a background thread every 300 seconds (5 minutes). The cached value is
-  served to all render requests between refreshes.
 - **Stale socket cleanup** (macOS only): On startup, the daemon checks for a stale filesystem
   socket from a previous crashed run and removes it before binding.
 - **Graceful shutdown**: SIGTERM and SIGINT both trigger a clean shutdown, cancelling timers
@@ -173,42 +170,40 @@ direct rendering.
 
 ---
 
-## Usage API
+## Rate limits
 
-Line 3 (usage limits) is populated by `statusline.usage.get_usage()`, which calls the
-Anthropic OAuth usage endpoint.
+Line 3 (usage limits) is populated directly from the `rate_limits` field in the Claude Code
+statusline JSON payload (available since v2.1.80+).
 
-**Endpoint**: `https://api.anthropic.com/api/oauth/usage`
+**Payload structure**:
 
-**Credential sources** (tried in order):
-1. `~/.claude/.credentials.json` — reads `claudeAiOauth.accessToken`, checks `expiresAt`
-2. macOS Keychain — `security find-generic-password -s "Claude Code-credentials" -w`
+```json
+{
+  "rate_limits": {
+    "five_hour": {
+      "used_percentage": 23.5,
+      "resets_at": 1738425600
+    },
+    "seven_day": {
+      "used_percentage": 41.2,
+      "resets_at": 1738857600
+    }
+  }
+}
+```
 
-**Caching**: Responses are cached to `/tmp/cc-statusline-usage-{uid}` with a 300-second TTL.
-The daemon pre-fetches and refreshes this cache in the background; the client reads from cache
-and skips the fetch when a fresh cached entry exists.
+The `rate_limits` key is only present for Claude.ai Pro/Max subscribers after the first API
+response. Each window (`five_hour`, `seven_day`) may be independently absent. When
+`rate_limits` is absent or empty, Line 3 is omitted.
 
-**Circuit breaker**: After 3 consecutive API failures, the client backs off exponentially
-starting at 300 seconds and doubling on each subsequent failure, capped at 3600 seconds.
-During backoff, the cached value (if available) is returned; otherwise `_NONE_RESULT` is
-returned (all fields None, Line 3 is omitted).
+**Internal field mapping** (extracted by `core._extract_rate_limits()`):
 
-**Beta header**: Requests include `anthropic-beta: oauth-2025-04-20`. If the API returns
-HTTP 400 with this header, it is stripped and the request is retried once without it.
-
-**Response fields parsed**:
-
-| Field | Source in API response |
+| Internal field | Source in payload |
 |---|---|
-| `five_hour_pct` | `five_hour.utilization` |
-| `five_hour_resets_at` | `five_hour.resets_at` |
-| `seven_day_pct` | `seven_day.utilization` |
-| `seven_day_resets_at` | `seven_day.resets_at` |
-| `seven_day_sonnet_pct` | `seven_day_sonnet.utilization` |
-| `seven_day_sonnet_resets_at` | `seven_day_sonnet.resets_at` |
-| `extra_usage_enabled` | `extra_usage.is_enabled` |
-
-When `extra_usage_enabled` is true, a `+` suffix appears after the 7-day usage bar.
+| `five_hour_pct` | `rate_limits.five_hour.used_percentage` |
+| `five_hour_resets_at` | `rate_limits.five_hour.resets_at` (Unix epoch seconds) |
+| `seven_day_pct` | `rate_limits.seven_day.used_percentage` |
+| `seven_day_resets_at` | `rate_limits.seven_day.resets_at` (Unix epoch seconds) |
 
 ---
 
@@ -235,12 +230,11 @@ are converted to HTTPS for the OSC 8 hyperlink in Line 1.
 
 | Module | Key exports | Purpose |
 |---|---|---|
-| `statusline.core` | `render(data, git_info, usage)` | Main rendering function; also exports `FALLBACK`, `GIT_CACHE_TTL`, `detect_nerd_font()`, `build_glyphs()` |
+| `statusline.core` | `render(data, git_info)` | Main rendering function; also exports `FALLBACK`, `GIT_CACHE_TTL`, `detect_nerd_font()`, `build_glyphs()`, `_extract_rate_limits()` |
 | `statusline.client` | `main()` | CLI entry for `cc-statusline`; handles mode dispatch, daemon auto-start, direct fallback |
 | `statusline.daemon` | `main()`, `StatuslineDaemon`, `StatuslineHandler` | Unix socket server; CLI for `cc-statusline-daemon` |
 | `statusline.direct` | `main()` | CLI entry for `cc-statusline-direct`; inline render, no daemon |
 | `statusline.git` | `get_git_info(project_dir)` | Git metadata with 5s disk cache |
-| `statusline.usage` | `get_usage()` | OAuth usage API with 300s cache and circuit breaker |
 | `statusline.__init__` | `__version__` | Package version (`1.0.0`) |
 
 ---
