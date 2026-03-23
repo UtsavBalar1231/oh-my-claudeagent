@@ -1,0 +1,7 @@
+{
+  "name": "research",
+  "prompt": "Research how other Claude Code plugins handle the SubagentStart hook to inject context into subagents. Look at public repositories on GitHub and summarize: (1) what context injection patterns are most common, (2) how they differ from oh-my-claudeagent's approach in scripts/subagent-start.sh, (3) any patterns worth adopting.",
+  "expected_tools": ["WebSearch", "WebFetch", "Read"],
+  "success_criteria": "Response cites at least 2 real external sources or repositories. Comparison with oh-my-claudeagent's subagent-start.sh is grounded in actual file content (not hallucinated). At least one concrete actionable finding is identified.",
+  "category": "research"
+}

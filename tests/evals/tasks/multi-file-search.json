@@ -1,0 +1,7 @@
+{
+  "name": "multi-file-search",
+  "prompt": "Find all hook scripts that write to .omca/logs/ and list them with the log file name each writes to. Search the scripts/ directory.",
+  "expected_tools": ["Grep", "Read", "Bash"],
+  "success_criteria": "Response lists at least 3 scripts with their corresponding log file targets. Results are accurate based on the actual file contents.",
+  "category": "search"
+}
