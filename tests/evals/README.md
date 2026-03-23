@@ -1,15 +1,17 @@
 # oh-my-claudeagent Eval Harness
 
-This directory contains task definitions and tooling for evaluating agent behavior.
-Automated execution is future work — the current harness documents expected behavior
-and enables manual and semi-automated verification.
+> **Status: scaffolding — execution engine not yet implemented.**
+
+This directory contains task definitions for evaluating agent behavior.
+`run-eval.sh` lists available tasks. Automated execution, scoring, and results
+aggregation are future work.
 
 ## Directory Structure
 
 ```
 tests/evals/
   README.md          — this file
-  run-eval.sh        — harness script (reports task inventory)
+  run-eval.sh        — lists available task definitions
   tasks/             — task definition files (JSON)
     single-file-edit.json
     multi-file-search.json
@@ -32,9 +34,9 @@ Each task file is a JSON object:
 }
 ```
 
-## Running Evals
+## Running Tasks Manually
 
-List all tasks:
+List all available tasks:
 
 ```bash
 bash tests/evals/run-eval.sh
@@ -46,41 +48,10 @@ Run a single task manually:
 claude --plugin-dir . -p "$(jq -r '.prompt' tests/evals/tasks/single-file-edit.json)" | tee output.log
 ```
 
-## pass^k Methodology
+Evaluate the output against the task's `success_criteria` field by hand.
 
-To measure consistency, each task should be run k=3 times independently.
+## Writing New Tasks
 
-- **pass@1**: task passes on at least one of the 3 runs
-- **pass^3**: task passes on all 3 runs (strict consistency)
-
-A task that passes pass@1 but not pass^3 indicates flaky behavior worth investigating.
-
-### Running consistency checks
-
-```
-just eval-consistency
-```
-
-This prints methodology guidance. Automated multi-run execution is future work — for now,
-run tasks manually and record pass/fail per trial in a results file.
-
-### Recording results (manual)
-
-Create a `results/` directory under `tests/evals/` and add files named
-`<task-name>-trial-N.json` with structure:
-
-```json
-{
-  "task": "task-name",
-  "trial": 1,
-  "passed": true,
-  "notes": "optional notes"
-}
-```
-
-Aggregate with:
-
-```bash
-jq -s 'group_by(.task) | map({task: .[0].task, trials: length, passed: map(select(.passed)) | length})' \
-  tests/evals/results/*.json
-```
+Add a new `.json` file to `tests/evals/tasks/` following the schema above.
+Keep prompts realistic and `success_criteria` observable — avoid criteria that
+require automated scoring to verify.
