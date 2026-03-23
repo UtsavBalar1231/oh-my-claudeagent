@@ -10,7 +10,7 @@ disallowedTools:
   - Edit
   - Agent
 costTier: free
-category: quick
+category: standard
 triggers: ["external library mentioned", "library docs", "SDK research", "OSS examples"]
 escalation: [explore, sisyphus-junior]
 ---

@@ -161,7 +161,7 @@ CLEARANCE CHECKLIST (ALL must be YES to auto-transition):
 [ ] Technical approach decided?
 [ ] Test strategy confirmed?
 [ ] No blocking questions outstanding?
-[ ] If plan mode active: momus returned OKAY before ExitPlanMode
+[ ] If plan mode active: momus returned OKAY before ExitPlanMode (only applicable after plan generation)
 ```
 
 **IF all YES**: Immediately transition to Plan Generation.
@@ -271,16 +271,9 @@ command  # Expected: output
 - [ ] All "Must NOT Have" absent
 - [ ] All tests pass
 
-## Final Verification Wave (MANDATORY — after ALL implementation tasks)
-
-> 4 review agents run in PARALLEL. ALL must APPROVE. Present consolidated results to user and get explicit "okay" before completing.
-> Do NOT auto-proceed after verification. Wait for user's explicit approval.
-
-- [ ] F1. Plan Compliance Audit — oracle
-- [ ] F2. Code Quality Review — sisyphus-junior
-- [ ] F3. Manual QA — sisyphus-junior
-- [ ] F4. Scope Fidelity Check — sisyphus-junior
 ```
+
+> **Note**: Atlas runs its own Final Verification Wave (F1-F4) after all tasks complete — do not include verification tasks in the plan.
 
 ## QA Scenario Mandate (Every Task)
 

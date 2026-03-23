@@ -10,7 +10,7 @@ disallowedTools:
   - Edit
   - Agent
 costTier: free
-category: quick
+category: standard
 triggers: ["2+ modules involved", "find X", "where is X", "which file has"]
 escalation: [sisyphus, oracle]
 ---
@@ -26,9 +26,9 @@ Answer questions like:
 - "Which files contain Y?"
 - "Find the code that does Z"
 
-## What to Deliver
+## CRITICAL: What You Must Deliver
 
-Every response must include:
+Every response MUST include:
 
 ### 1. Intent Analysis (Required)
 

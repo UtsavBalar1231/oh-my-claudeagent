@@ -10,10 +10,12 @@ maxTurns: 5
 costTier: free
 category: quick
 triggers: ["ambiguous request scope", "unclear request"]
-escalation: [sisyphus, sisyphus-junior]
+escalation: [sisyphus, sisyphus-junior, prometheus]
 ---
 
 # Triage Agent
+
+> **Status: Experimental** — This agent has no active caller. It exists as a prototype for future request classification. Escalation and routing tables may be incomplete.
 
 Classify the incoming request into one of these categories and respond with ONLY the classification:
 
