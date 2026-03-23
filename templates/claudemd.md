@@ -32,6 +32,7 @@ Use `Agent(subagent_type="oh-my-claudeagent:NAME")` for workers; invoke orchestr
 | hephaestus | Build/toolchain/type errors |
 | multimodal-looker | Image, PDF, diagram analysis |
 | socrates | Deep research interview |
+| triage | Lightweight request classifier (optional pre-routing) |
 
 <delegation_rules>
 Delegate for: multi-file changes, refactors, debugging, reviews, planning, research.
@@ -42,6 +43,7 @@ Routing:
 - Plugin agents supersede built-in equivalents: prefer `oh-my-claudeagent:explore` over the built-in Explore type, `oh-my-claudeagent:prometheus` over the built-in Plan type.
 - Use subagents when tasks can run in parallel or require isolated context. For simple tasks, sequential operations, or single-file edits, work directly rather than delegating.
 - @-mention syntax: users can type `@agent-oh-my-claudeagent:sisyphus` (or any agent name) in a prompt to guarantee delegation to that agent. This is the user-facing equivalent of `Agent(subagent_type=...)` and bypasses the default routing decision.
+- For ambiguous requests where the right route is unclear, optionally pre-classify with triage (`Agent(subagent_type="oh-my-claudeagent:triage")`) before routing to sisyphus or sisyphus-junior. Triage is stateless and cheap (haiku, maxTurns 5) — it classifies only, never implements.
 
 Nesting constraint:
 - Subagents CANNOT spawn other subagents — the Agent tool is stripped at depth 1+.

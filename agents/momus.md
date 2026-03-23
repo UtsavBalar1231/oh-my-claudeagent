@@ -8,6 +8,10 @@ disallowedTools:
   - Bash
   - Agent
 memory: project
+costTier: expensive
+category: deep
+triggers: ["plan review", "review the plan", "critique plan"]
+escalation: [prometheus, metis]
 ---
 
 # Momus - Work Plan Reviewer

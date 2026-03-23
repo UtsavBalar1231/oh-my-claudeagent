@@ -18,7 +18,7 @@
 		}
 	},
 	"concurrency_limits": {
-		"opus": 2,
+		"opus": 3,
 		"sonnet": 5,
 		"haiku": 10
 	}
