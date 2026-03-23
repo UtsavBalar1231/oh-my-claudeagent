@@ -275,6 +275,45 @@ check_claims() {
 	else
 		fail "omca-state-server.py still exists (should have been removed)"
 	fi
+
+	# Validate agent metadata consistency: every agents/*.md must have an entry in agent-metadata.json
+	local agent_metadata_json="${REPO_ROOT}/servers/agent-metadata.json"
+	if [[ -f "${agent_metadata_json}" ]]; then
+		local disk_count metadata_count
+		disk_count=$(find "${REPO_ROOT}/agents" -maxdepth 1 -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
+		metadata_count=$(jq 'keys | length' "${agent_metadata_json}" 2>/dev/null || echo 0)
+		if [[ "${disk_count}" -eq "${metadata_count}" ]]; then
+			pass "agent metadata count matches agents/ directory (${disk_count} agents)"
+		else
+			fail "agent metadata mismatch: ${disk_count} .md files in agents/ but ${metadata_count} entries in agent-metadata.json"
+		fi
+
+		local agent_file agent_name
+		while IFS= read -r agent_file; do
+			agent_name="$(basename "${agent_file}" .md)"
+			if jq -e --arg name "${agent_name}" 'has($name)' "${agent_metadata_json}" >/dev/null 2>&1; then
+				pass "agent-metadata.json contains entry for ${agent_name}"
+			else
+				fail "agent-metadata.json missing entry for ${agent_name} (found in agents/)"
+			fi
+		done < <(find "${REPO_ROOT}/agents" -maxdepth 1 -name "*.md" 2>/dev/null)
+	else
+		fail "agent-metadata.json not found at ${agent_metadata_json}"
+	fi
+
+	# Validate version consistency: plugin.json must match marketplace.json
+	local plugin_version marketplace_version
+	plugin_version=$(jq -r '.version // ""' "${PLUGIN_JSON}" 2>/dev/null)
+	marketplace_version=$(jq -r '.plugins[0].version // ""' "${MARKETPLACE_PATH}" 2>/dev/null)
+	if [[ -z "${plugin_version}" ]]; then
+		fail "version consistency: plugin.json has no version field"
+	elif [[ -z "${marketplace_version}" ]]; then
+		fail "version consistency: marketplace.json has no plugins[0].version field"
+	elif [[ "${plugin_version}" == "${marketplace_version}" ]]; then
+		pass "version consistency: plugin.json and marketplace.json both at ${plugin_version}"
+	else
+		fail "version consistency: plugin.json=${plugin_version} does not match marketplace.json=${marketplace_version}"
+	fi
 }
 
 check_hook_fixtures_exist() {
@@ -286,6 +325,8 @@ check_hook_fixtures_exist() {
 		"sessionstart-compact.json"
 		"instructionsloaded-basic.json"
 		"taskcompleted-basic.json"
+		"taskcompleted-with-evidence.json"
+		"taskcompleted-with-edits-no-evidence.json"
 		"teammateidle-basic.json"
 		"userpromptsubmit-ralph.json"
 		"userpromptsubmit-ultrawork.json"
@@ -293,6 +334,8 @@ check_hook_fixtures_exist() {
 		"subagentstart-basic.json"
 		"subagentstopcomplete-basic.json"
 		"stopfailure-ratelimit.json"
+		"posttoolusefailure-bash.json"
+		"posttoolusefailure-read.json"
 	)
 
 	local file_name

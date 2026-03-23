@@ -55,6 +55,42 @@ test-hooks:
 test-mcp:
 	bash scripts/validate-plugin.sh --check mcp
 
+# ── Scaffold ──────────────────────────────────────────────────────
+
+# Scaffold a new agent
+[group('scaffold')]
+new-agent name:
+	@echo "---" > agents/{{name}}.md
+	@echo "name: {{name}}" >> agents/{{name}}.md
+	@echo "description: TODO" >> agents/{{name}}.md
+	@echo "model: sonnet" >> agents/{{name}}.md
+	@echo "disallowedTools: Write, Edit" >> agents/{{name}}.md
+	@echo "effort: medium" >> agents/{{name}}.md
+	@echo "memory: project" >> agents/{{name}}.md
+	@echo "maxTurns: 30" >> agents/{{name}}.md
+	@echo "---" >> agents/{{name}}.md
+	@echo "" >> agents/{{name}}.md
+	@echo "# {{name}}" >> agents/{{name}}.md
+	@echo "Created agents/{{name}}.md — update description, model, and disallowedTools"
+	@echo "Remember to update: agent-metadata.json, categories.json, templates/claudemd.md"
+
+# Scaffold a new hook script
+[group('scaffold')]
+new-hook event script-name:
+	@echo '#!/usr/bin/env bash' > scripts/{{script-name}}.sh
+	@echo '# {{event}} hook: {{script-name}}' >> scripts/{{script-name}}.sh
+	@echo '' >> scripts/{{script-name}}.sh
+	@echo 'INPUT=$$(cat)' >> scripts/{{script-name}}.sh
+	@echo 'PROJECT_ROOT=$$(echo "$$INPUT" | jq -r '"'"'.project_root // ""'"'"' 2>/dev/null)' >> scripts/{{script-name}}.sh
+	@echo 'STATE_DIR="$${PROJECT_ROOT:-.}/.omca/state"' >> scripts/{{script-name}}.sh
+	@echo 'mkdir -p "$$STATE_DIR"' >> scripts/{{script-name}}.sh
+	@echo '' >> scripts/{{script-name}}.sh
+	@echo '# TODO: Add hook logic here' >> scripts/{{script-name}}.sh
+	@echo '' >> scripts/{{script-name}}.sh
+	@echo 'exit 0' >> scripts/{{script-name}}.sh
+	@chmod +x scripts/{{script-name}}.sh
+	@echo "Created scripts/{{script-name}}.sh — register in hooks/hooks.json under {{event}}"
+
 # ── Dev ───────────────────────────────────────────────────────────
 
 # Install dev tools and pre-commit hooks
@@ -73,6 +109,34 @@ install-hooks:
 run-hooks:
 	pre-commit run --all-files
 
+# Check development prerequisites
+[group('dev')]
+doctor:
+	@echo "=== oh-my-claudeagent Doctor ==="
+	@which jq >/dev/null 2>&1 && echo "jq: $(jq --version)" || echo "jq: NOT FOUND (required)"
+	@which uv >/dev/null 2>&1 && echo "uv: $(uv --version)" || echo "uv: NOT FOUND (required)"
+	@python3 --version 2>/dev/null || echo "python3: NOT FOUND (required)"
+	@which ast-grep >/dev/null 2>&1 && echo "ast-grep: $(ast-grep --version 2>&1 | head -1)" || (which sg >/dev/null 2>&1 && echo "ast-grep (sg): $(sg --version 2>&1 | head -1)" || echo "ast-grep: NOT FOUND (required)")
+	@which shellcheck >/dev/null 2>&1 && echo "shellcheck: $(shellcheck --version | grep version: | head -1)" || echo "shellcheck: NOT FOUND (recommended)"
+	@which pre-commit >/dev/null 2>&1 && echo "pre-commit: $(pre-commit --version)" || echo "pre-commit: NOT FOUND (recommended)"
+
+# Watch all OMCA log files in real-time
+[group('dev')]
+watch-logs:
+	@tail -f .omca/logs/*.jsonl 2>/dev/null || echo "No log files found in .omca/logs/"
+
+# ── Dev tools ────────────────────────────────────────────────────
+
+# Analyze current session logs
+[group('dev')]
+analyze-session:
+	@echo "=== Session Analysis ==="
+	@echo "Agents spawned: $(cat .omca/logs/subagents.jsonl 2>/dev/null | wc -l)"
+	@echo "Edits made: $(cat .omca/logs/edits.jsonl 2>/dev/null | wc -l)"
+	@echo "Evidence entries: $(jq '.entries | length' .omca/state/verification-evidence.json 2>/dev/null || echo 0)"
+	@echo "Error counts: $(jq 'to_entries | map(.value) | add // 0' .omca/state/error-counts.json 2>/dev/null || echo 0)"
+	@echo "Hook errors: $(cat .omca/logs/hook-errors.jsonl 2>/dev/null | wc -l)"
+
 # ── Validate ─────────────────────────────────────────────────────
 
 # Validate plugin structure with claude CLI (requires claude in PATH)
@@ -81,11 +145,44 @@ validate-plugin:
 	command -v claude >/dev/null 2>&1 || { echo "claude CLI not found, skipping"; exit 0; }
 	claude plugin validate .
 
+# Smoke test — verify plugin loads correctly (requires claude CLI)
+[group('validate')]
+smoke-test:
+	@echo "=== Plugin Smoke Test ==="
+	@echo "Checking plugin structure..."
+	@just test-claims
+	@echo "Checking hook scripts..."
+	@just test-hooks
+	@echo "Checking MCP tools..."
+	@just test-mcp
+	@echo ""
+	@echo "All structural checks passed."
+	@echo "For full integration test: claude --plugin-dir . -p 'What agents are available?'"
+
+# ── Eval ──────────────────────────────────────────────────────────
+
+# List available eval tasks and explain pass^k methodology
+[group('eval')]
+eval-consistency:
+	@echo "=== oh-my-claudeagent Eval Consistency (pass^k) ==="
+	@echo ""
+	@echo "Methodology:"
+	@echo "  Run each task k=3 times independently."
+	@echo "  pass@1  — passes on at least 1 of 3 runs (any success)"
+	@echo "  pass^3  — passes on all 3 runs (strict consistency)"
+	@echo ""
+	@echo "Available tasks:"
+	@bash tests/evals/run-eval.sh
+	@echo ""
+	@echo "To run a task: claude -p \"\$$(jq -r '.prompt' tests/evals/tasks/<name>.json)\" --plugin-dir . | tee output.log"
+	@echo "Record results in tests/evals/results/<task>-trial-N.json"
+	@echo "Automated multi-run execution is future work."
+
 # ── CI ────────────────────────────────────────────────────────────
 
-# Run full CI pipeline (format check + lint + test)
+# Run full CI pipeline (format check + lint + test + mcp)
 [group('ci')]
-ci: fmt-check lint test
+ci: fmt-check lint test test-mcp
 
 # ── Release ──────────────────────────────────────────────────────
 
