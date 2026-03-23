@@ -1,5 +1,4 @@
 {
-	"_deprecated": "Metadata now lives in agent frontmatter (costTier, category, triggers, escalation fields). This file is kept for backward compatibility only.",
 	"explore": {
 		"agent_category": "exploration",
 		"cost_tier": "free",
