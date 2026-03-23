@@ -1,0 +1,7 @@
+{
+  "name": "planning",
+  "prompt": "Create a plan to add a new 'scribe' agent to oh-my-claudeagent. The scribe agent should specialize in writing documentation — README files, changelogs, and inline code comments. The plan should cover: agent definition file, integration with the agent catalog, any required hook or skill changes, and testing approach.",
+  "expected_tools": ["Read", "Bash", "Write"],
+  "success_criteria": "Plan includes at minimum: (1) agents/scribe.md frontmatter outline, (2) integration steps for agent-metadata.json, (3) at least one hook or skill that would benefit from scribe delegation, (4) a test strategy. Plan is written to a file, not just printed.",
+  "category": "planning"
+}

@@ -62,6 +62,23 @@ GOAL
 ----
 [One sentence: what should be done next]
 
+PROGRESS
+--------
+Tasks completed: X / Y total
+- [x] [Completed task name]
+- [ ] [Pending task name]
+(Use TaskList() counts and checkboxes — do not invent)
+
+NOTEPAD SUMMARY
+---------------
+[Only include if an active plan with notepad data exists]
+Plan: [plan-name]
+- learnings: N entries — [one-line summary of key insight]
+- issues: N entries — [one-line summary of open issue if any]
+- decisions: N entries — [list verbatim from notepad decisions section, one per line]
+- problems: N entries — [summary if non-zero]
+- questions: N entries — [list open questions if non-zero]
+
 WORK COMPLETED
 --------------
 - [First person bullets of what was done]
@@ -72,11 +89,11 @@ CURRENT STATE
 - [Current state of codebase or task]
 - [Build/test status if applicable]
 
-PENDING TASKS
--------------
-- [Planned but incomplete tasks]
-- [Next logical steps]
-- [Current TaskList() state]
+REMAINING WORK
+--------------
+- [ ] [Unchecked plan task — copy exact task text]
+- [ ] [Next logical step if not in plan]
+(Pull from plan file checkboxes and TaskList() state)
 
 KEY FILES
 ---------
@@ -85,7 +102,7 @@ KEY FILES
 
 IMPORTANT DECISIONS
 -------------------
-- [Technical decisions and why]
+- [Technical decisions and why — pull from notepad decisions section if available]
 - [Trade-offs considered]
 
 EXPLICIT CONSTRAINTS
@@ -104,6 +121,9 @@ Rules:
 - No bold/italic/code fences within content fields
 - Only include what matters for continuation
 - USER REQUESTS and EXPLICIT CONSTRAINTS: verbatim only
+- PROGRESS: use actual TaskList() counts, not estimates
+- NOTEPAD SUMMARY: omit section if no active plan or no notepad data
+- REMAINING WORK: copy task text verbatim from the plan file — do not paraphrase
 
 ## PHASE 4: INSTRUCT
 

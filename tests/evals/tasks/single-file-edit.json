@@ -1,0 +1,7 @@
+{
+  "name": "single-file-edit",
+  "prompt": "In scripts/session-init.sh, add a comment on the line after the shebang that says '# Session initialization hook — fires on SessionStart events'. Do not change any other lines.",
+  "expected_tools": ["Read", "Edit"],
+  "success_criteria": "The comment is present on line 2 of scripts/session-init.sh. No other lines changed. Build passes.",
+  "category": "edit"
+}

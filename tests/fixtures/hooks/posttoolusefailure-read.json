@@ -1,0 +1,9 @@
+{
+  "session_id": "test",
+  "hook_event_name": "PostToolUseFailure",
+  "tool_name": "Read",
+  "tool_input": {
+    "file_path": "/nonexistent/path/file.txt"
+  },
+  "error": "File not found: /nonexistent/path/file.txt"
+}

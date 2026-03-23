@@ -1,0 +1,9 @@
+{
+  "session_id": "test",
+  "hook_event_name": "PostToolUseFailure",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "just build"
+  },
+  "error": "Command failed with exit code 1: just build"
+}
