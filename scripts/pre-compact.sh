@@ -27,15 +27,12 @@ TEMPLATE
 		fi
 	fi
 
-	for MODE_FILE in ultrawork-state.json team-state.json; do
-		if [[ -f "${STATE_DIR}/${MODE_FILE}" ]]; then
-			MODE_NAME="${MODE_FILE%-state.json}"
-			STATUS=$(jq -r '.status // "inactive"' "${STATE_DIR}/${MODE_FILE}" 2>/dev/null)
-			if [[ "${STATUS}" == "active" ]]; then
-				printf '%s\n' "${MODE_NAME} mode is ACTIVE. Continue working."
-			fi
+	if [[ -f "${STATE_DIR}/ultrawork-state.json" ]]; then
+		STATUS=$(jq -r '.status // "inactive"' "${STATE_DIR}/ultrawork-state.json" 2>/dev/null)
+		if [[ "${STATUS}" == "active" ]]; then
+			printf '%s\n' "ultrawork mode is ACTIVE. Continue working."
 		fi
-	done
+	fi
 
 	# Include subagent session data for RESUME, DON'T RESTART directive
 	SUBAGENT_LOG="${LOG_DIR}/subagents.jsonl"
@@ -53,16 +50,34 @@ TEMPLATE
 	printf '%s\n' "RESUME, DON'T RESTART: If an agent was working on a task before compaction, resume it with SendMessage({to: \"<agentId>\"}) rather than spawning a new one. Check subagent completion status before re-delegating."
 
 	printf '\n## Pending Tasks\n'
+	printf '%s\n' "Check boulder.json for active plan and remaining tasks."
 
-	if [[ -f "${STATE_DIR}/team-state.json" ]]; then
-		PENDING=$(jq -r '[.tasks[]? | select(.status == "pending" or .status == "claimed") | "- \(.name // .id): \(.status)"] | join("\n")' "${STATE_DIR}/team-state.json" 2>/dev/null || echo "")
-		if [[ -n "${PENDING}" ]]; then
-			printf '%s\n' "${PENDING}"
+	# Notepad section summaries
+	NOTEPADS_DIR="${STATE_DIR}/notepads"
+	if [[ -d "${NOTEPADS_DIR}" ]]; then
+		printf '\n## Notepad Summaries\n'
+		for PLAN_DIR in "${NOTEPADS_DIR}"/*/; do
+			PLAN_NAME=$(basename "${PLAN_DIR}")
+			printf '### Plan: %s\n' "${PLAN_NAME}"
+			for SECTION_FILE in "${PLAN_DIR}"*.md; do
+				[[ -f "${SECTION_FILE}" ]] || continue
+				SECTION_NAME=$(basename "${SECTION_FILE}" .md)
+				LINE_COUNT=$(wc -l <"${SECTION_FILE}" 2>/dev/null || echo 0)
+				printf '- %s: %s lines\n' "${SECTION_NAME}" "${LINE_COUNT}"
+			done
+		done
+	fi
+
+	# Latest verification evidence
+	EVIDENCE_FILE="${STATE_DIR}/verification-evidence.json"
+	if [[ -f "${EVIDENCE_FILE}" ]]; then
+		printf '\n## Latest Verification Evidence\n'
+		LATEST=$(jq -r '.entries | last | "type=\(.type) cmd=\(.command) exit=\(.exit_code) ts=\(.timestamp)"' "${EVIDENCE_FILE}" 2>/dev/null || echo "")
+		if [[ -n "${LATEST}" ]]; then
+			printf '%s\n' "${LATEST}"
 		else
-			printf '%s\n' "No pending team tasks."
+			printf '%s\n' "No evidence entries."
 		fi
-	else
-		printf '%s\n' "No team state found."
 	fi
 } >"${TMP_CONTEXT}"
 

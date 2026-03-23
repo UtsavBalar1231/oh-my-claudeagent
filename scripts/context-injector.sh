@@ -1,9 +1,10 @@
 #!/bin/bash
 
+_HOOK_START=$(date +%s%N 2>/dev/null || date +%s)
+
 INPUT=$(cat)
 
-FILE_PATH=$(echo "${INPUT}" | jq -r '.tool_input.file_path // ""' 2>/dev/null)
-TOOL_NAME=$(echo "${INPUT}" | jq -r '.tool_name // ""' 2>/dev/null)
+read -r FILE_PATH TOOL_NAME < <(echo "${INPUT}" | jq -r '[.tool_input.file_path // "", .tool_name // ""] | @tsv' 2>/dev/null)
 IS_READ_EVENT=false
 [[ "${TOOL_NAME}" == "Read" ]] && IS_READ_EVENT=true
 
@@ -71,7 +72,13 @@ fi
 
 if [[ -n "${CONTEXT_PARTS}" ]]; then
 	ESCAPED=$(echo "${CONTEXT_PARTS}" | jq -Rs .)
+	_HOOK_END=$(date +%s%N 2>/dev/null || date +%s)
+	_HOOK_MS=$(( (_HOOK_END - _HOOK_START) / 1000000 ))
+	echo "{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"hook\":\"$(basename "$0")\",\"ms\":${_HOOK_MS}}" >> "${STATE_DIR}/../logs/hook-timing.jsonl" 2>/dev/null
 	echo "{\"hookSpecificOutput\": {\"hookEventName\": \"PostToolUse\", \"additionalContext\": ${ESCAPED}}}"
 else
+	_HOOK_END=$(date +%s%N 2>/dev/null || date +%s)
+	_HOOK_MS=$(( (_HOOK_END - _HOOK_START) / 1000000 ))
+	echo "{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"hook\":\"$(basename "$0")\",\"ms\":${_HOOK_MS}}" >> "${STATE_DIR}/../logs/hook-timing.jsonl" 2>/dev/null
 	exit 0
 fi

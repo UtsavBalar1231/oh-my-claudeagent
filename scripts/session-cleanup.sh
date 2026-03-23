@@ -15,10 +15,14 @@ fi
 
 TIMESTAMP=$(date -Iseconds)
 
+ERROR_COUNT=$(wc -l <"${LOG_DIR}/hook-errors.jsonl" 2>/dev/null || echo 0)
+AGENT_COUNT=$(wc -l <"${LOG_DIR}/subagents.jsonl" 2>/dev/null || echo 0)
+
 mkdir -p "${LOG_DIR}"
 LOG_FILE="${LOG_DIR}/sessions.jsonl"
 jq -nc --arg sid "${SESSION_ID}" --arg ts "${TIMESTAMP}" \
-	'{event: "session_end", sessionId: $sid, timestamp: $ts}' >>"${LOG_FILE}"
+	--argjson err "${ERROR_COUNT}" --argjson agents "${AGENT_COUNT}" \
+	'{event: "session_end", sessionId: $sid, timestamp: $ts, hook_errors: $err, agents_spawned: $agents}' >>"${LOG_FILE}"
 
 if [[ "${REASON}" != "resume" ]]; then
 	TEMP_FILES=(

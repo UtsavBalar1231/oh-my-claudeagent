@@ -1,5 +1,7 @@
 #!/bin/bash
 
+_HOOK_START=$(date +%s%N 2>/dev/null || date +%s)
+
 INPUT=$(cat)
 AGENT_ID=$(echo "${INPUT}" | jq -r '.agent_id // "unknown"')
 
@@ -8,15 +10,12 @@ STATE_DIR="${PROJECT_ROOT}/.omca/state"
 LOG_DIR="${PROJECT_ROOT}/.omca/logs"
 mkdir -p "${STATE_DIR}" "${LOG_DIR}"
 
+_log_hook_error() {
+	local msg="$1"
+	local hook_name="$2"
+	echo "{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"hook\":\"${hook_name}\",\"error\":\"${msg}\"}" >>"${LOG_DIR}/hook-errors.jsonl"
+}
 
-TEAM_STATE="${STATE_DIR}/team-state.json"
-if [[ -f "${TEAM_STATE}" ]]; then
-	STATUS=$(jq -r '.status // "inactive"' "${TEAM_STATE}")
-	if [[ "${STATUS}" == "active" ]]; then
-		TMP=$(mktemp)
-		jq --arg aid "${AGENT_ID}" '.agents += [$aid]' "${TEAM_STATE}" >"${TMP}" && mv "${TMP}" "${TEAM_STATE}"
-	fi
-fi
 
 AGENT_TYPE=$(echo "${INPUT}" | jq -r '.agent_type // "unknown"')
 
@@ -32,9 +31,9 @@ case "${AGENT_TYPE}" in
 		;;
 esac
 
-CONTEXT_PARTS+=" [OUTPUT MANDATE] Your text response is the ONLY output the orchestrator receives. Before stopping, you MUST produce a structured text synthesis of your findings or actions. Tool call results, file contents, and intermediate reasoning are NOT forwarded — only your final text. If you are running low on turns, STOP making tool calls and synthesize what you have."
+CONTEXT_PARTS+=" [OUTPUT MANDATE] Your text response is the ONLY output the orchestrator receives. Tool call results and intermediate reasoning are NOT forwarded. Structure your response as: 1. CRITICAL FACTS: Key findings, decisions, or results (bullet points) 2. DETAILS: Supporting context if needed Target length: 1,000-2,000 tokens. If running low on turns, stop tool calls and synthesize immediately."
 
-for MODE_FILE in ralph-state.json ultrawork-state.json team-state.json; do
+for MODE_FILE in ralph-state.json ultrawork-state.json; do
 	if [[ -f "${STATE_DIR}/${MODE_FILE}" ]]; then
 		MODE_STATUS=$(jq -r '.status // "inactive"' "${STATE_DIR}/${MODE_FILE}" 2>/dev/null)
 		if [[ "${MODE_STATUS}" == "active" ]]; then
@@ -61,6 +60,14 @@ fi
 case "${AGENT_TYPE}" in
 	*sisyphus-junior*|*hephaestus*|*atlas*|*sisyphus*)
 		CONTEXT_PARTS+=" [VERIFICATION] After running build/test/lint commands, you MUST use the evidence_log MCP tool to record results. Do NOT manually write or cat to .omca/state/verification-evidence.json — the TaskCompleted hook validates schema and will reject manual writes. Example: evidence_log(evidence_type=\"test\", command=\"just test\", exit_code=0, output_snippet=\"10 passed\")"
+		;;
+	*) ;;
+esac
+
+# Inject anti-duplication rule for orchestrator agents
+case "${AGENT_TYPE}" in
+	*sisyphus*|*atlas*|*metis*|*prometheus*)
+		CONTEXT_PARTS+=" [ANTI-DUPLICATION] Once you delegate exploration to explore/librarian agents, do not perform the same search yourself. Avoid after delegating: manually grep/searching for the same information; re-doing research agents are handling; 'just quickly checking' the same files. Continue only with non-overlapping work. When delegated results are needed but not ready: end your response and wait for the completion notification — do not re-search the same topics while waiting."
 		;;
 	*) ;;
 esac
@@ -130,11 +137,16 @@ case "${AGENT_TYPE}" in
 				[[ -n "${CATEGORY_TABLE}" ]] && CONTEXT_PARTS+=" [CATEGORIES] ${CATEGORY_TABLE} Use Agent(model=<category_model>) to route to the right model tier."
 			fi
 		else
+			_log_hook_error "agent-catalog.json missing — catalog stale for agent ${AGENT_TYPE}" "subagent-start.sh"
 			CONTEXT_PARTS+=" [CATALOG STALE] No agent-catalog.json found. Call agents_list() to generate the catalog for routing hints."
 		fi
 		;;
 	*) ;;
 esac
+
+_HOOK_END=$(date +%s%N 2>/dev/null || date +%s)
+_HOOK_MS=$(( (_HOOK_END - _HOOK_START) / 1000000 ))
+echo "{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"hook\":\"$(basename "$0")\",\"ms\":${_HOOK_MS}}" >> "${LOG_DIR}/hook-timing.jsonl" 2>/dev/null
 
 ESCAPED=$(printf '%s' "${CONTEXT_PARTS}" | jq -Rs .)
 printf '%s\n' "{\"hookSpecificOutput\": {\"hookEventName\": \"SubagentStart\", \"additionalContext\": ${ESCAPED}}}"
