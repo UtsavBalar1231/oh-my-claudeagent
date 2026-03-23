@@ -4,18 +4,52 @@ INPUT=$(cat)
 
 FILE_PATH=$(echo "${INPUT}" | jq -r '.tool_input.file_path // "unknown"' 2>/dev/null)
 ERROR_MSG=$(echo "${INPUT}" | jq -r '.error // .tool_result.error // "Unknown error"' 2>/dev/null)
+TOOL_NAME=$(echo "${INPUT}" | jq -r '.tool_name // "Edit"' 2>/dev/null)
 
 PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$(pwd)}"
 LOG_DIR="${PROJECT_ROOT}/.omca/logs"
+STATE_DIR="${PROJECT_ROOT}/.omca/state"
 
-mkdir -p "${LOG_DIR}"
+mkdir -p "${LOG_DIR}" "${STATE_DIR}"
 
 TIMESTAMP=$(date -Iseconds)
 
+# Unified error log (errors.jsonl)
 LOG_FILE="${LOG_DIR}/errors.jsonl"
 jq -nc --arg file "${FILE_PATH}" --arg err "${ERROR_MSG}" --arg ts "${TIMESTAMP}" \
 	'{event: "edit_error", file: $file, error: $err, timestamp: $ts}' >>"${LOG_FILE}"
 
+# Task 2.2 — Error classification
+ERROR_TEXT="${ERROR_MSG}"
+if echo "${ERROR_TEXT}" | grep -qiE 'rate.limit|429|timeout|ECONNRESET|ETIMEDOUT'; then
+	ERROR_CLASS="transient"
+elif echo "${ERROR_TEXT}" | grep -qiE 'not.found|permission|EACCES|ENOENT|invalid.*schema'; then
+	ERROR_CLASS="deterministic"
+else
+	ERROR_CLASS="unknown"
+fi
+
+# Task 2.1 — Retry count tracking
+ERROR_COUNTS_FILE="${STATE_DIR}/error-counts.json"
+ERROR_KEY="${TOOL_NAME}:edit_error"
+
+if [[ -f "${ERROR_COUNTS_FILE}" ]]; then
+	CURRENT_COUNT=$(jq -r --arg key "${ERROR_KEY}" '.[$key] // 0' "${ERROR_COUNTS_FILE}" 2>/dev/null || echo "0")
+else
+	CURRENT_COUNT=0
+fi
+
+NEW_COUNT=$((CURRENT_COUNT + 1))
+
+TMP_COUNTS=$(mktemp)
+if [[ -f "${ERROR_COUNTS_FILE}" ]]; then
+	jq --arg key "${ERROR_KEY}" --argjson count "${NEW_COUNT}" '.[$key] = $count' "${ERROR_COUNTS_FILE}" >"${TMP_COUNTS}" 2>/dev/null || echo "{\"${ERROR_KEY}\": ${NEW_COUNT}}" >"${TMP_COUNTS}"
+else
+	echo "{\"${ERROR_KEY}\": ${NEW_COUNT}}" >"${TMP_COUNTS}"
+fi
+mv "${TMP_COUNTS}" "${ERROR_COUNTS_FILE}"
+
+# Task 2.3 — Recovery guidance based on error patterns
 RECOVERY_SUGGESTION=""
 
 if echo "${ERROR_MSG}" | grep -qi "not unique"; then
@@ -30,5 +64,15 @@ else
 	RECOVERY_SUGGESTION="Edit failed. Re-read the file to verify current contents match your old_string exactly, including whitespace and indentation."
 fi
 
-ESCAPED=$(echo "[EDIT ERROR RECOVERY] ${RECOVERY_SUGGESTION}" | jq -Rs .)
+# Circuit-breaker at 3+ retries
+CIRCUIT_BREAKER=""
+if [[ "${NEW_COUNT}" -ge 3 ]]; then
+	CIRCUIT_BREAKER=" This error has occurred 3+ times. Stop retrying the same approach. Escalate to oracle for architectural guidance or try a fundamentally different approach."
+fi
+
+# Task 2.3 — Structured output format
+MSG="[ERROR RECOVERY] Type: ${ERROR_CLASS} | Tool: ${TOOL_NAME} | Retry: ${NEW_COUNT}/3
+${RECOVERY_SUGGESTION}${CIRCUIT_BREAKER}"
+
+ESCAPED=$(echo "${MSG}" | jq -Rs .)
 echo "{\"hookSpecificOutput\": {\"hookEventName\": \"PostToolUseFailure\", \"additionalContext\": ${ESCAPED}}}"
