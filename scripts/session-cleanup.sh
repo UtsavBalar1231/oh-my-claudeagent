@@ -1,11 +1,12 @@
 #!/bin/bash
+# shellcheck source=lib/common.sh
+source "$(dirname "$0")/lib/common.sh"
 
-INPUT=$(cat)
+INPUT="${HOOK_INPUT}"
+STATE_DIR="${HOOK_STATE_DIR}"
+LOG_DIR="${HOOK_LOG_DIR}"
+
 REASON=$(echo "${INPUT}" | jq -r '.reason // "other"' 2>/dev/null)
-
-PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$(pwd)}"
-STATE_DIR="${PROJECT_ROOT}/.omca/state"
-LOG_DIR="${PROJECT_ROOT}/.omca/logs"
 
 SESSION_STATE="${STATE_DIR}/session.json"
 SESSION_ID="unknown"
@@ -18,7 +19,6 @@ TIMESTAMP=$(date -Iseconds)
 ERROR_COUNT=$(wc -l <"${LOG_DIR}/hook-errors.jsonl" 2>/dev/null || echo 0)
 AGENT_COUNT=$(wc -l <"${LOG_DIR}/subagents.jsonl" 2>/dev/null || echo 0)
 
-mkdir -p "${LOG_DIR}"
 LOG_FILE="${LOG_DIR}/sessions.jsonl"
 jq -nc --arg sid "${SESSION_ID}" --arg ts "${TIMESTAMP}" \
 	--argjson err "${ERROR_COUNT}" --argjson agents "${AGENT_COUNT}" \

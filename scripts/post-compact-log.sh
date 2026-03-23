@@ -4,13 +4,12 @@
 # Enriches compaction-context.md with the compact_summary if available,
 # and logs the compaction event to sessions.jsonl.
 
-INPUT=$(cat)
+# shellcheck source=lib/common.sh
+source "$(dirname "$0")/lib/common.sh"
 
-PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$(pwd)}"
-STATE_DIR="${PROJECT_ROOT}/.omca/state"
-LOG_DIR="${PROJECT_ROOT}/.omca/logs"
-
-mkdir -p "${STATE_DIR}" "${LOG_DIR}"
+INPUT="${HOOK_INPUT}"
+STATE_DIR="${HOOK_STATE_DIR}"
+LOG_DIR="${HOOK_LOG_DIR}"
 
 TRIGGER=$(echo "${INPUT}" | jq -r '.trigger // "unknown"' 2>/dev/null)
 COMPACT_SUMMARY=$(echo "${INPUT}" | jq -r '.compact_summary // ""' 2>/dev/null)

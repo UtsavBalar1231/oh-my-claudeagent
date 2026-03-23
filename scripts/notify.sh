@@ -1,6 +1,9 @@
 #!/bin/bash
+# shellcheck source=lib/common.sh
+source "$(dirname "$0")/lib/common.sh"
 
-INPUT=$(cat)
+INPUT="${HOOK_INPUT}"
+LOG_DIR="${HOOK_LOG_DIR}"
 
 NOTIFICATION_TYPE=$(echo "${INPUT}" | jq -r '.type // "notification"' 2>/dev/null)
 MESSAGE=$(echo "${INPUT}" | jq -r '.message // "Claude Code needs attention"' 2>/dev/null)
@@ -65,10 +68,6 @@ send_notification() {
 }
 
 send_notification "${TITLE}" "${MESSAGE}"
-
-PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$(pwd)}"
-LOG_DIR="${PROJECT_ROOT}/.omca/logs"
-mkdir -p "${LOG_DIR}"
 
 LOG_FILE="${LOG_DIR}/notifications.jsonl"
 jq -nc --arg type "${NOTIFICATION_TYPE}" --arg title "${TITLE}" --arg msg "${MESSAGE}" --arg ts "$(date -Iseconds || true)" \

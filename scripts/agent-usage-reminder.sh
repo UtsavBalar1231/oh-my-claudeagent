@@ -1,8 +1,8 @@
 #!/bin/bash
+# shellcheck source=lib/common.sh
+source "$(dirname "$0")/lib/common.sh"
 
-PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$(pwd)}"
-STATE_DIR="${PROJECT_ROOT}/.omca/state"
-mkdir -p "${STATE_DIR}"
+STATE_DIR="${HOOK_STATE_DIR}"
 
 # Suppress delegation reminders during active agent delegations
 ACTIVE_AGENTS="${STATE_DIR}/active-agents.json"

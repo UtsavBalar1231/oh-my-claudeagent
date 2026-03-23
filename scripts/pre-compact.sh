@@ -1,9 +1,9 @@
 #!/bin/bash
+# shellcheck source=lib/common.sh
+source "$(dirname "$0")/lib/common.sh"
 
-PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$(pwd)}"
-STATE_DIR="${PROJECT_ROOT}/.omca/state"
-LOG_DIR="${PROJECT_ROOT}/.omca/logs"
-mkdir -p "${STATE_DIR}"
+STATE_DIR="${HOOK_STATE_DIR}"
+LOG_DIR="${HOOK_LOG_DIR}"
 
 CONTEXT_FILE="${STATE_DIR}/compaction-context.md"
 TMP_CONTEXT="${STATE_DIR}/compaction-context.tmp.$$"

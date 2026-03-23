@@ -1,22 +1,17 @@
 #!/bin/bash
+# shellcheck source=lib/common.sh
+source "$(dirname "$0")/lib/common.sh"
 
-INPUT=$(cat)
+INPUT="${HOOK_INPUT}"
+STATE_DIR="${HOOK_STATE_DIR}"
+LOG_DIR="${HOOK_LOG_DIR}"
+
 BLOCK_EXIT_CODE=2
 MAX_EVIDENCE_AGE_SECONDS=300
 
 TASK_DESCRIPTION=$(echo "${INPUT}" | jq -r '.task_description // .description // ""' 2>/dev/null || echo "")
 
-PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$(pwd)}"
-STATE_DIR="${PROJECT_ROOT}/.omca/state"
-LOG_DIR="${PROJECT_ROOT}/.omca/logs"
 EVIDENCE_FILE="${STATE_DIR}/verification-evidence.json"
-
-_log_hook_error() {
-	local msg="$1"
-	local hook_name="$2"
-	mkdir -p "${LOG_DIR}"
-	echo "{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"hook\":\"${hook_name}\",\"error\":\"${msg}\"}" >>"${LOG_DIR}/hook-errors.jsonl"
-}
 
 # Determine if recent evidence exists (within MAX_EVIDENCE_AGE_SECONDS)
 RECENT_EVIDENCE=false

@@ -2,20 +2,14 @@
 
 _HOOK_START=$(date +%s%N 2>/dev/null || date +%s)
 
-INPUT=$(cat)
+# shellcheck source=lib/common.sh
+source "$(dirname "$0")/lib/common.sh"
+
+INPUT="${HOOK_INPUT}"
+STATE_DIR="${HOOK_STATE_DIR}"
+LOG_DIR="${HOOK_LOG_DIR}"
+
 AGENT_ID=$(echo "${INPUT}" | jq -r '.agent_id // "unknown"')
-
-PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$(pwd)}"
-STATE_DIR="${PROJECT_ROOT}/.omca/state"
-LOG_DIR="${PROJECT_ROOT}/.omca/logs"
-mkdir -p "${STATE_DIR}" "${LOG_DIR}"
-
-_log_hook_error() {
-	local msg="$1"
-	local hook_name="$2"
-	echo "{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"hook\":\"${hook_name}\",\"error\":\"${msg}\"}" >>"${LOG_DIR}/hook-errors.jsonl"
-}
-
 
 AGENT_TYPE=$(echo "${INPUT}" | jq -r '.agent_type // "unknown"')
 

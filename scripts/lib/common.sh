@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Shared hook boilerplate — sourced by all hook scripts
+# Usage: source "$(dirname "$0")/lib/common.sh"
+# For scripts in scripts/lib/ subdir: source "$(dirname "$0")/../lib/common.sh"
+
+# Read hook payload from stdin (only if not already sourced)
+if [[ -z "${_OMCA_COMMON_SOURCED:-}" ]]; then
+	_OMCA_COMMON_SOURCED=1
+
+	# Read hook payload from stdin
+	HOOK_INPUT=$(cat)
+
+	# Project and state paths
+	HOOK_PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$(pwd)}"
+	HOOK_STATE_DIR="${HOOK_PROJECT_ROOT}/.omca/state"
+	HOOK_LOG_DIR="${HOOK_PROJECT_ROOT}/.omca/logs"
+
+	# Ensure state directories exist
+	mkdir -p "${HOOK_STATE_DIR}" "${HOOK_LOG_DIR}" 2>/dev/null
+
+	# Hook error logging helper
+	_log_hook_error() {
+		local msg="$1"
+		local hook_name="${2:-$(basename "$0")}"
+		echo "{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"hook\":\"${hook_name}\",\"error\":\"${msg}\"}" >> "${HOOK_LOG_DIR}/hook-errors.jsonl" 2>/dev/null
+	}
+fi

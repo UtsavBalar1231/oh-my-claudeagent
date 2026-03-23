@@ -1,12 +1,12 @@
 #!/bin/bash
+# shellcheck source=lib/common.sh
+source "$(dirname "$0")/lib/common.sh"
 
-INPUT=$(cat)
+INPUT="${HOOK_INPUT}"
+STATE_DIR="${HOOK_STATE_DIR}"
 
 TOOL_NAME=$(echo "${INPUT}" | jq -r '.tool_name // ""' 2>/dev/null)
 ERROR_MSG=$(echo "${INPUT}" | jq -r '.error // .tool_result.error // ""' 2>/dev/null)
-
-PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$(pwd)}"
-STATE_DIR="${PROJECT_ROOT}/.omca/state"
 
 case "${TOOL_NAME}" in
 Bash | Read | Grep | Glob | WebFetch | WebSearch)
@@ -30,7 +30,6 @@ fi
 _increment_error_count() {
 	local key="$1"
 	local counts_file="${STATE_DIR}/error-counts.json"
-	mkdir -p "${STATE_DIR}"
 	local current=0
 	if [[ -f "${counts_file}" ]]; then
 		current=$(jq -r --arg k "${key}" '.[$k] // 0' "${counts_file}" 2>/dev/null || echo "0")

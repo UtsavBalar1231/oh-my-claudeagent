@@ -31,5 +31,53 @@ else
 		TMP=$(mktemp)
 		jq '.agentUsed = true' "${USAGE_FILE}" >"${TMP}" && mv "${TMP}" "${USAGE_FILE}"
 	fi
-	exit 0
+
+	# Soft validation: check for required output sections by agent type (advisory only)
+	AGENT_TYPE=$(echo "${INPUT}" | jq -r '.agent_name // .subagent_type // ""' 2>/dev/null | sed 's/.*://')
+	MISSING_SECTIONS=""
+	case "${AGENT_TYPE}" in
+	sisyphus-junior)
+		REQUIRED="STATUS: CHANGES: EVIDENCE:"
+		for section in ${REQUIRED}; do
+			if ! echo "${RESPONSE}" | grep -qiE "^${section}"; then
+				MISSING_SECTIONS="${MISSING_SECTIONS} ${section}"
+			fi
+		done
+		;;
+	explore)
+		REQUIRED="FILES: ANSWER: NEXT STEPS:"
+		for section in FILES: ANSWER: "NEXT STEPS:"; do
+			if ! echo "${RESPONSE}" | grep -qiE "^${section}"; then
+				MISSING_SECTIONS="${MISSING_SECTIONS} ${section}"
+			fi
+		done
+		;;
+	oracle)
+		REQUIRED="RECOMMENDATION: ALTERNATIVES: RISKS:"
+		for section in ${REQUIRED}; do
+			if ! echo "${RESPONSE}" | grep -qiE "^${section}"; then
+				MISSING_SECTIONS="${MISSING_SECTIONS} ${section}"
+			fi
+		done
+		;;
+	librarian)
+		REQUIRED="SOURCES: FINDINGS: APPLICABILITY:"
+		for section in ${REQUIRED}; do
+			if ! echo "${RESPONSE}" | grep -qiE "^${section}"; then
+				MISSING_SECTIONS="${MISSING_SECTIONS} ${section}"
+			fi
+		done
+		;;
+	*)
+		# No required sections defined for this agent type
+		;;
+	esac
+
+	if [[ -n "${MISSING_SECTIONS}" ]]; then
+		WARN="[ADVISORY] Agent '${AGENT_TYPE}' output is missing expected section headers:${MISSING_SECTIONS}. The required output format specifies these sections. Output may be incomplete or hard to parse downstream."
+		ESCAPED=$(echo "${WARN}" | jq -Rs .)
+		echo "{\"hookSpecificOutput\": {\"hookEventName\": \"PostToolUse\", \"additionalContext\": ${ESCAPED}}}"
+	else
+		exit 0
+	fi
 fi
