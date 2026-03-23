@@ -52,7 +52,6 @@ else
 fi
 
 LOG_FILE="${LOG_DIR}/stop-failures.jsonl"
-TMP=$(mktemp)
-echo "${LOG_ENTRY}" >"${TMP}" && cat "${TMP}" >>"${LOG_FILE}" && rm -f "${TMP}"
+echo "${LOG_ENTRY}" >> "${LOG_FILE}"
 
 exit 0

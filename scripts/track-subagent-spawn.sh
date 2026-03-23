@@ -15,7 +15,7 @@ SUBAGENT_PROMPT="${SUBAGENT_PROMPT_FULL:0:200}"
 SUBAGENT_MODEL=$(echo "${INPUT}" | jq -r '.tool_input.model // "default"' 2>/dev/null)
 
 TIMESTAMP=$(date -Iseconds)
-# Portable millisecond epoch — %N is GNU-only (broken on macOS BSD date)
+# Portable pseudo-unique ID (seconds + random noise — not true milliseconds)
 SPAWN_EPOCH="$(date +%s)$(printf '%03d' $((RANDOM % 1000)))"
 SPAWN_ID="spawn-${SPAWN_EPOCH}"
 
