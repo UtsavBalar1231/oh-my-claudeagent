@@ -13,6 +13,7 @@ LOG_DIR="${PROJECT_ROOT}/.omca/logs"
 mkdir -p "${STATE_DIR}" "${LOG_DIR}"
 
 TIMESTAMP=$(date -Iseconds)
+CURRENT_EPOCH=$(date +%s)
 
 SUBAGENTS_FILE="${STATE_DIR}/subagents.json"
 if [[ -f "${SUBAGENTS_FILE}" ]]; then
@@ -25,13 +26,28 @@ fi
 
 # --- Concurrency deregistration (atomic mktemp+mv) ---
 ACTIVE_FILE="${STATE_DIR}/active-agents.json"
+DURATION_SECONDS=0
+AGENT_TYPE_FROM_ACTIVE=""
 if [[ -f "${ACTIVE_FILE}" ]]; then
+	STARTED_EPOCH=$(jq -r --arg id "${SUBAGENT_ID}" '.[] | select(.id == $id) | .started_epoch // 0' "${ACTIVE_FILE}" 2>/dev/null | head -1)
+	AGENT_TYPE_FROM_ACTIVE=$(jq -r --arg id "${SUBAGENT_ID}" '.[] | select(.id == $id) | .agent_type // ""' "${ACTIVE_FILE}" 2>/dev/null | head -1)
+	if [[ "${STARTED_EPOCH}" =~ ^[0-9]+$ ]] && [[ "${STARTED_EPOCH}" -gt 0 ]]; then
+		DURATION_SECONDS=$(( CURRENT_EPOCH - STARTED_EPOCH ))
+	fi
 	TMP_ACTIVE=$(mktemp)
-	CUTOFF=$(( $(date +%s) - 900 ))  # 15-min TTL
+	CUTOFF=$(( CURRENT_EPOCH - 900 ))  # 15-min TTL
 	jq --arg id "${SUBAGENT_ID}" --argjson cutoff "${CUTOFF}" \
 		'[.[] | select(.id != $id and .started_epoch > $cutoff)]' \
 		"${ACTIVE_FILE}" >"${TMP_ACTIVE}" && mv "${TMP_ACTIVE}" "${ACTIVE_FILE}"
 fi
+
+# --- Agent metrics log ---
+METRICS_FILE="${LOG_DIR}/agent-metrics.jsonl"
+RESOLVED_AGENT_TYPE="${AGENT_TYPE_FROM_ACTIVE:-$(echo "${INPUT}" | jq -r '.agent_type // ""')}"
+jq -nc --arg agent_type "${RESOLVED_AGENT_TYPE}" --arg agent_id "${SUBAGENT_ID}" \
+	--argjson duration "${DURATION_SECONDS}" --arg status "${EXIT_STATUS}" --arg ts "${TIMESTAMP}" \
+	'{agent_type: $agent_type, agent_id: $agent_id, duration_seconds: $duration, status: $status, timestamp: $ts}' \
+	>>"${METRICS_FILE}"
 
 # --- Routing audit log ---
 AUDIT_FILE="${LOG_DIR}/routing-audit.jsonl"

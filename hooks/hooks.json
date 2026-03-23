@@ -24,7 +24,8 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/instructions-loaded-audit.sh"
+						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/instructions-loaded-audit.sh",
+						"async": true
 					}
 				]
 			}
@@ -104,7 +105,8 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/post-edit.sh"
+						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/post-edit.sh",
+						"async": true
 					}
 				]
 			},
@@ -161,6 +163,24 @@
 					{
 						"type": "command",
 						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/delegate-retry.sh"
+					}
+				]
+			},
+			{
+				"matcher": "Bash",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/bash-error-recovery.sh"
+					}
+				]
+			},
+			{
+				"matcher": "Read",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/read-error-recovery.sh"
 					}
 				]
 			},

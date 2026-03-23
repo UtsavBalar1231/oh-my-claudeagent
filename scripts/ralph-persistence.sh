@@ -4,6 +4,14 @@ INPUT=$(cat)
 
 PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$(pwd)}"
 STATE_DIR="${PROJECT_ROOT}/.omca/state"
+LOG_DIR="${PROJECT_ROOT}/.omca/logs"
+
+_log_hook_error() {
+	local msg="$1"
+	local hook_name="$2"
+	mkdir -p "${LOG_DIR}"
+	echo "{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"hook\":\"${hook_name}\",\"error\":\"${msg}\"}" >>"${LOG_DIR}/hook-errors.jsonl"
+}
 
 # Boulder fallback: block stop if a fresh work plan exists
 # NOTE: exit 0 here exits the script, not just the function
@@ -99,6 +107,7 @@ if [[ "${RALPH_ACTIVE}" == "true" ]]; then
 		mv "${RALPH_STATE}.tmp" "${RALPH_STATE}"
 
 	if [[ ${STAGNATION} -ge ${MAX_STAGNATION} ]]; then
+		_log_hook_error "ralph stagnated (${STAGNATION}/${MAX_STAGNATION}) — allowing stop" "ralph-persistence.sh"
 		# No progress — try boulder fallback before allowing stop
 		check_boulder_fallback
 		# Allow stop — no progress after threshold attempts and no fresh boulder plan

@@ -1,5 +1,7 @@
 #!/bin/bash
 
+_HOOK_START=$(date +%s%N 2>/dev/null || date +%s)
+
 INPUT=$(cat)
 
 SUBAGENT_TYPE=$(echo "${INPUT}" | jq -r '.tool_input.subagent_type // "unknown"' 2>/dev/null)
@@ -36,9 +38,16 @@ jq --arg id "${SPAWN_ID}" \
 AGENT_USAGE="${STATE_DIR}/agent-usage.json"
 [[ -f "${AGENT_USAGE}" ]] && { TMP2=$(mktemp); jq '.agentUsed = true' "${AGENT_USAGE}" >"${TMP2}" && mv "${TMP2}" "${AGENT_USAGE}"; }
 
+SESSION_ID="unknown"
+SESSION_STATE="${STATE_DIR}/session.json"
+if [[ -f "${SESSION_STATE}" ]]; then
+	SESSION_ID=$(jq -r '.sessionId // "unknown"' "${SESSION_STATE}" 2>/dev/null)
+fi
+
 LOG_FILE="${LOG_DIR}/subagents.jsonl"
 jq -nc --arg id "${SPAWN_ID}" --arg type "${SUBAGENT_TYPE}" --arg model "${SUBAGENT_MODEL}" --arg ts "${TIMESTAMP}" \
-	'{event: "subagent_spawn", id: $id, type: $type, model: $model, timestamp: $ts}' >>"${LOG_FILE}"
+	--arg session_id "${SESSION_ID}" \
+	'{event: "subagent_spawn", id: $id, type: $type, model: $model, timestamp: $ts, spawned_at: $ts, parent_session_id: $session_id}' >>"${LOG_FILE}"
 
 SESSION_STATE="${STATE_DIR}/session.json"
 if [[ -f "${SESSION_STATE}" ]]; then
@@ -84,6 +93,10 @@ if [[ -f "${CATALOG_FILE}" ]] && [[ -f "${CATEGORIES_FILE}" ]]; then
 		fi
 	fi
 fi
+
+_HOOK_END=$(date +%s%N 2>/dev/null || date +%s)
+_HOOK_MS=$(( (_HOOK_END - _HOOK_START) / 1000000 ))
+echo "{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"hook\":\"$(basename "$0")\",\"ms\":${_HOOK_MS}}" >> "${LOG_DIR}/hook-timing.jsonl" 2>/dev/null
 
 SPAWN_MSG="Subagent ${SUBAGENT_TYPE} (${SPAWN_ID}) spawned with model ${SUBAGENT_MODEL}${ROUTING_CONTEXT}"
 ESCAPED=$(printf '%s' "${SPAWN_MSG}" | jq -Rs .)

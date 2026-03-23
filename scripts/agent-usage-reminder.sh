@@ -4,6 +4,15 @@ PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$(pwd)}"
 STATE_DIR="${PROJECT_ROOT}/.omca/state"
 mkdir -p "${STATE_DIR}"
 
+# Suppress delegation reminders during active agent delegations
+ACTIVE_AGENTS="${STATE_DIR}/active-agents.json"
+if [[ -f "${ACTIVE_AGENTS}" ]]; then
+	AGENT_COUNT=$(jq 'length' "${ACTIVE_AGENTS}" 2>/dev/null || echo 0)
+	if [[ "${AGENT_COUNT}" -gt 0 ]]; then
+		exit 0  # Already delegating — don't nudge
+	fi
+fi
+
 USAGE_FILE="${STATE_DIR}/agent-usage.json"
 if [[ ! -f "${USAGE_FILE}" ]]; then
 	echo '{"agentUsed": false, "toolCallCount": 0}' >"${USAGE_FILE}"
