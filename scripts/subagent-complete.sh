@@ -22,21 +22,26 @@ if [[ -f "${SUBAGENTS_FILE}" ]]; then
 		"${SUBAGENTS_FILE}" >"${TMP_FILE}" && mv "${TMP_FILE}" "${SUBAGENTS_FILE}"
 fi
 
-# --- Concurrency deregistration (atomic mktemp+mv) ---
+# --- Concurrency deregistration (flock-protected read-modify-write) ---
 ACTIVE_FILE="${STATE_DIR}/active-agents.json"
 DURATION_SECONDS=0
 AGENT_TYPE_FROM_ACTIVE=""
 if [[ -f "${ACTIVE_FILE}" ]]; then
+	# Read values outside flock so variables survive in parent shell
 	STARTED_EPOCH=$(jq -r --arg id "${SUBAGENT_ID}" '.[] | select(.id == $id) | .started_epoch // 0' "${ACTIVE_FILE}" 2>/dev/null | head -1)
-	AGENT_TYPE_FROM_ACTIVE=$(jq -r --arg id "${SUBAGENT_ID}" '.[] | select(.id == $id) | .agent_type // ""' "${ACTIVE_FILE}" 2>/dev/null | head -1)
+	AGENT_TYPE_FROM_ACTIVE=$(jq -r --arg id "${SUBAGENT_ID}" '.[] | select(.id == $id) | .agent // ""' "${ACTIVE_FILE}" 2>/dev/null | head -1)
 	if [[ "${STARTED_EPOCH}" =~ ^[0-9]+$ ]] && [[ "${STARTED_EPOCH}" -gt 0 ]]; then
 		DURATION_SECONDS=$(( CURRENT_EPOCH - STARTED_EPOCH ))
 	fi
-	TMP_ACTIVE=$(mktemp)
+	# flock-protected write to prevent concurrent deregistration races
 	CUTOFF=$(( CURRENT_EPOCH - 900 ))  # 15-min TTL
-	jq --arg id "${SUBAGENT_ID}" --argjson cutoff "${CUTOFF}" \
-		'[.[] | select(.id != $id and .started_epoch > $cutoff)]' \
-		"${ACTIVE_FILE}" >"${TMP_ACTIVE}" && mv "${TMP_ACTIVE}" "${ACTIVE_FILE}"
+	(
+		flock -w 5 200 || { _log_hook_error "flock timeout on active-agents" "subagent-complete.sh"; }
+		TMP_ACTIVE=$(mktemp)
+		jq --arg id "${SUBAGENT_ID}" --argjson cutoff "${CUTOFF}" \
+			'[.[] | select(.id != $id and .started_epoch > $cutoff)]' \
+			"${ACTIVE_FILE}" >"${TMP_ACTIVE}" && mv "${TMP_ACTIVE}" "${ACTIVE_FILE}"
+	) 200>"${STATE_DIR}/active-agents.lock"
 fi
 
 # --- Agent metrics log ---
