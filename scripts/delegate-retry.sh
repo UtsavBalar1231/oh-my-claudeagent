@@ -1,15 +1,13 @@
 #!/bin/bash
+# shellcheck source=lib/common.sh
+source "$(dirname "$0")/lib/common.sh"
 
-INPUT=$(cat)
+INPUT="${HOOK_INPUT}"
+STATE_DIR="${HOOK_STATE_DIR}"
 
 ERROR_MSG=$(echo "${INPUT}" | jq -r '.error // .tool_result.error // .output // "Unknown error"' 2>/dev/null)
 SUBAGENT_TYPE=$(echo "${INPUT}" | jq -r '.tool_input.subagent_type // "unknown"' 2>/dev/null)
 TOOL_NAME=$(echo "${INPUT}" | jq -r '.tool_name // "Task"' 2>/dev/null)
-
-PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$(pwd)}"
-STATE_DIR="${PROJECT_ROOT}/.omca/state"
-
-mkdir -p "${STATE_DIR}"
 
 # Detect subagent nesting depth violation (non-recoverable)
 # Error string observed in atlas transcript (agent-a6ece1cf5c29f1da5.jsonl)

@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # PostToolUseFailure handler for Read tool failures
+# shellcheck source=lib/common.sh
+source "$(dirname "$0")/lib/common.sh"
 
-INPUT=$(cat)
+INPUT="${HOOK_INPUT}"
 ERROR=$(echo "${INPUT}" | jq -r '.error // .tool_error // ""' 2>/dev/null)
 
 if echo "${ERROR}" | grep -qiE 'no such file|not found|ENOENT'; then

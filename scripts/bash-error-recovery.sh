@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # PostToolUseFailure handler for Bash commands
 # Classifies: compilation error, test failure, permission denied, command not found
+# shellcheck source=lib/common.sh
+source "$(dirname "$0")/lib/common.sh"
 
-INPUT=$(cat)
+INPUT="${HOOK_INPUT}"
 ERROR=$(echo "${INPUT}" | jq -r '.error // .tool_error // ""' 2>/dev/null)
 
 # Classify bash failure

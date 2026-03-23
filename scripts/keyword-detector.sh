@@ -1,6 +1,9 @@
 #!/bin/bash
+# shellcheck source=lib/common.sh
+source "$(dirname "$0")/lib/common.sh"
 
-INPUT=$(cat)
+INPUT="${HOOK_INPUT}"
+STATE_DIR="${HOOK_STATE_DIR}"
 
 # Skip keyword detection for subagent sessions
 # All hook payloads include agent_id when firing inside a subagent
@@ -10,8 +13,6 @@ if [[ -n "${AGENT_ID}" ]]; then
 fi
 
 PROMPT=$(echo "${INPUT}" | jq -r '.prompt // empty' 2>/dev/null || echo "")
-
-STATE_DIR="${CLAUDE_PROJECT_ROOT:-$(pwd)}/.omca/state"
 RALPH_STATE="${STATE_DIR}/ralph-state.json"
 ULTRAWORK_STATE="${STATE_DIR}/ultrawork-state.json"
 
@@ -96,7 +97,6 @@ if [[ "${HAS_RALPH}" -eq 1 ]] && [[ ! " ${DETECTED_KEYWORDS[*]} " =~ " stop-cont
 	if [[ "${HAS_ULTRAWORK}" -eq 1 ]] && [[ -f "${ULTRAWORK_STATE}" ]]; then
 		rm -f "${ULTRAWORK_STATE}"
 	fi
-	mkdir -p "${STATE_DIR}"
 	NOW_ISO=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 	printf '{"status":"active","activatedAt":"%s","tasks":[],"last_task_hash":"","stagnation_count":0}\n' \
 		"${NOW_ISO}" > "${RALPH_STATE}.tmp" && mv "${RALPH_STATE}.tmp" "${RALPH_STATE}"
@@ -105,15 +105,13 @@ fi
 # Only activate ultrawork if ralph is not also requested in the same prompt
 if [[ "${HAS_ULTRAWORK}" -eq 1 ]] && [[ "${HAS_RALPH}" -eq 0 ]] \
 	&& [[ ! " ${DETECTED_KEYWORDS[*]} " =~ " stop-continuation " ]]; then
-	mkdir -p "${STATE_DIR}"
 	NOW_ISO=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 	printf '{"status":"active","activatedAt":"%s","stagnation_count":0}\n' \
 		"${NOW_ISO}" > "${ULTRAWORK_STATE}.tmp" && mv "${ULTRAWORK_STATE}.tmp" "${ULTRAWORK_STATE}"
 fi
 
 if [[ ${#DETECTED_KEYWORDS[@]} -gt 0 ]]; then
-	PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$(pwd)}"
-	STATE_FILE="${PROJECT_ROOT}/.omca/state/session.json"
+	STATE_FILE="${HOOK_STATE_DIR}/session.json"
 
 	if [[ -f "${STATE_FILE}" ]]; then
 		KEYWORDS_JSON=$(printf '%s\n' "${DETECTED_KEYWORDS[@]}" | jq -R . | jq -s . || true)

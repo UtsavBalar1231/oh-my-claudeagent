@@ -4,10 +4,11 @@
 #   exit 2            → "block idle transition, keep teammate working" (ralph/ultrawork)
 #   {"continue":false} → "stop the teammate entirely" (stalled agent timeout)
 
-INPUT=$(cat)
+# shellcheck source=lib/common.sh
+source "$(dirname "$0")/lib/common.sh"
 
-PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$(pwd)}"
-STATE_DIR="${PROJECT_ROOT}/.omca/state"
+INPUT="${HOOK_INPUT}"
+STATE_DIR="${HOOK_STATE_DIR}"
 BLOCK_EXIT_CODE=2
 
 # 1. If ralph/ultrawork active → exit 2 (keep working, don't go idle)

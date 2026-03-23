@@ -1,16 +1,14 @@
 #!/bin/bash
+# shellcheck source=lib/common.sh
+source "$(dirname "$0")/lib/common.sh"
 
-INPUT=$(cat)
+INPUT="${HOOK_INPUT}"
+STATE_DIR="${HOOK_STATE_DIR}"
+LOG_DIR="${HOOK_LOG_DIR}"
 
 SUBAGENT_ID=$(echo "${INPUT}" | jq -r '.agent_id // ""' 2>/dev/null)
 LAST_MSG=$(echo "${INPUT}" | jq -r '.last_assistant_message // ""' 2>/dev/null | head -c 500)
 EXIT_STATUS="completed"  # SubagentStop only fires on completion; no exit_status field exists
-
-PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$(pwd)}"
-STATE_DIR="${PROJECT_ROOT}/.omca/state"
-LOG_DIR="${PROJECT_ROOT}/.omca/logs"
-
-mkdir -p "${STATE_DIR}" "${LOG_DIR}"
 
 TIMESTAMP=$(date -Iseconds)
 CURRENT_EPOCH=$(date +%s)

@@ -1,12 +1,10 @@
 #!/bin/bash
+# shellcheck source=lib/common.sh
+source "$(dirname "$0")/lib/common.sh"
 
-INPUT=$(cat)
-
-PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$(pwd)}"
-STATE_DIR="${PROJECT_ROOT}/.omca/state"
-LOG_DIR="${PROJECT_ROOT}/.omca/logs"
-
-mkdir -p "${LOG_DIR}"
+INPUT="${HOOK_INPUT}"
+STATE_DIR="${HOOK_STATE_DIR}"
+LOG_DIR="${HOOK_LOG_DIR}"
 
 TIMESTAMP=$(date -Iseconds)
 

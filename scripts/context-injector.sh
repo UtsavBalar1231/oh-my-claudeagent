@@ -2,7 +2,12 @@
 
 _HOOK_START=$(date +%s%N 2>/dev/null || date +%s)
 
-INPUT=$(cat)
+# shellcheck source=lib/common.sh
+source "$(dirname "$0")/lib/common.sh"
+
+INPUT="${HOOK_INPUT}"
+PROJECT_ROOT="${HOOK_PROJECT_ROOT}"
+STATE_DIR="${HOOK_STATE_DIR}"
 
 read -r FILE_PATH TOOL_NAME < <(echo "${INPUT}" | jq -r '[.tool_input.file_path // "", .tool_name // ""] | @tsv' 2>/dev/null)
 IS_READ_EVENT=false
@@ -11,10 +16,6 @@ IS_READ_EVENT=false
 if [[ -z "${FILE_PATH}" ]] || [[ ! -f "${FILE_PATH}" ]]; then
 	exit 0
 fi
-
-PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$(pwd)}"
-STATE_DIR="${PROJECT_ROOT}/.omca/state"
-mkdir -p "${STATE_DIR}"
 
 CACHE_FILE="${STATE_DIR}/injected-context-dirs.json"
 if [[ ! -f "${CACHE_FILE}" ]]; then
@@ -74,11 +75,11 @@ if [[ -n "${CONTEXT_PARTS}" ]]; then
 	ESCAPED=$(echo "${CONTEXT_PARTS}" | jq -Rs .)
 	_HOOK_END=$(date +%s%N 2>/dev/null || date +%s)
 	_HOOK_MS=$(( (_HOOK_END - _HOOK_START) / 1000000 ))
-	echo "{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"hook\":\"$(basename "$0")\",\"ms\":${_HOOK_MS}}" >> "${STATE_DIR}/../logs/hook-timing.jsonl" 2>/dev/null
+	echo "{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"hook\":\"$(basename "$0")\",\"ms\":${_HOOK_MS}}" >> "${HOOK_LOG_DIR}/hook-timing.jsonl" 2>/dev/null
 	echo "{\"hookSpecificOutput\": {\"hookEventName\": \"PostToolUse\", \"additionalContext\": ${ESCAPED}}}"
 else
 	_HOOK_END=$(date +%s%N 2>/dev/null || date +%s)
 	_HOOK_MS=$(( (_HOOK_END - _HOOK_START) / 1000000 ))
-	echo "{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"hook\":\"$(basename "$0")\",\"ms\":${_HOOK_MS}}" >> "${STATE_DIR}/../logs/hook-timing.jsonl" 2>/dev/null
+	echo "{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"hook\":\"$(basename "$0")\",\"ms\":${_HOOK_MS}}" >> "${HOOK_LOG_DIR}/hook-timing.jsonl" 2>/dev/null
 	exit 0
 fi

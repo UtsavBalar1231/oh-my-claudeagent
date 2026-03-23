@@ -2,18 +2,17 @@
 
 _HOOK_START=$(date +%s%N 2>/dev/null || date +%s)
 
-INPUT=$(cat)
+# shellcheck source=lib/common.sh
+source "$(dirname "$0")/lib/common.sh"
+
+INPUT="${HOOK_INPUT}"
+STATE_DIR="${HOOK_STATE_DIR}"
+LOG_DIR="${HOOK_LOG_DIR}"
 
 SUBAGENT_TYPE=$(echo "${INPUT}" | jq -r '.tool_input.subagent_type // "unknown"' 2>/dev/null)
 SUBAGENT_PROMPT_FULL=$(echo "${INPUT}" | jq -r '.tool_input.prompt // ""' 2>/dev/null)
 SUBAGENT_PROMPT="${SUBAGENT_PROMPT_FULL:0:200}"
 SUBAGENT_MODEL=$(echo "${INPUT}" | jq -r '.tool_input.model // "default"' 2>/dev/null)
-
-PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$(pwd)}"
-STATE_DIR="${PROJECT_ROOT}/.omca/state"
-LOG_DIR="${PROJECT_ROOT}/.omca/logs"
-
-mkdir -p "${STATE_DIR}" "${LOG_DIR}"
 
 TIMESTAMP=$(date -Iseconds)
 # Portable millisecond epoch — %N is GNU-only (broken on macOS BSD date)

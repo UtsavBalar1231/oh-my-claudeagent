@@ -1,13 +1,12 @@
 #!/bin/bash
+# shellcheck source=lib/common.sh
+source "$(dirname "$0")/lib/common.sh"
 
-INPUT=$(cat)
+INPUT="${HOOK_INPUT}"
+LOG_DIR="${HOOK_LOG_DIR}"
 
-PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$(pwd)}"
-LOG_DIR="${PROJECT_ROOT}/.omca/logs"
 LOG_FILE="${LOG_DIR}/instructions-loaded.jsonl"
 TIMESTAMP=$(date -Iseconds)
-
-mkdir -p "${LOG_DIR}"
 
 ENTRY=$(printf '%s' "${INPUT}" | jq -c --arg ts "${TIMESTAMP}" '
 	{

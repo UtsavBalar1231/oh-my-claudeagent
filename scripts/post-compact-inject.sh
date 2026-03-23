@@ -1,7 +1,8 @@
 #!/bin/bash
+# shellcheck source=lib/common.sh
+source "$(dirname "$0")/lib/common.sh"
 
-PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$(pwd)}"
-STATE_DIR="${PROJECT_ROOT}/.omca/state"
+STATE_DIR="${HOOK_STATE_DIR}"
 CONTEXT_FILE="${STATE_DIR}/compaction-context.md"
 CLAIM_FILE="${STATE_DIR}/compaction-context.restore.$$"
 

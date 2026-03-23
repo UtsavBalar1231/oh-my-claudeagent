@@ -1,17 +1,9 @@
 #!/bin/bash
+# shellcheck source=lib/common.sh
+source "$(dirname "$0")/lib/common.sh"
 
-INPUT=$(cat)
-
-PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$(pwd)}"
-STATE_DIR="${PROJECT_ROOT}/.omca/state"
-LOG_DIR="${PROJECT_ROOT}/.omca/logs"
-
-_log_hook_error() {
-	local msg="$1"
-	local hook_name="$2"
-	mkdir -p "${LOG_DIR}"
-	echo "{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"hook\":\"${hook_name}\",\"error\":\"${msg}\"}" >>"${LOG_DIR}/hook-errors.jsonl"
-}
+INPUT="${HOOK_INPUT}"
+STATE_DIR="${HOOK_STATE_DIR}"
 
 # Boulder fallback: block stop if a fresh work plan exists
 # NOTE: exit 0 here exits the script, not just the function

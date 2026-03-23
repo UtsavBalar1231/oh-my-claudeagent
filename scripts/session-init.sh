@@ -1,12 +1,11 @@
 #!/bin/bash
+# shellcheck source=lib/common.sh
+source "$(dirname "$0")/lib/common.sh"
 
-INPUT=$(cat)
-
-PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$(pwd)}"
-STATE_DIR="${PROJECT_ROOT}/.omca/state"
-LOG_DIR="${PROJECT_ROOT}/.omca/logs"
-
-mkdir -p "${STATE_DIR}" "${LOG_DIR}"
+INPUT="${HOOK_INPUT}"
+PROJECT_ROOT="${HOOK_PROJECT_ROOT}"
+STATE_DIR="${HOOK_STATE_DIR}"
+LOG_DIR="${HOOK_LOG_DIR}"
 
 # PLUGIN_DATA venv sync (v2.1.78+) — ensure MCP server dependencies persist across updates
 if [[ -n "${CLAUDE_PLUGIN_DATA:-}" ]]; then
@@ -70,9 +69,9 @@ if [[ "${OMCA_CONFIGURED}" -eq 1 ]]; then
 	SHORT_CONTEXT=$(printf 'Session %s initialized.%b' "${SESSION_ID}" "${SETUP_NOTICE}" | jq -Rs .)
 	echo "{\"hookSpecificOutput\": {\"hookEventName\": \"SessionStart\", \"additionalContext\": ${SHORT_CONTEXT}}}"
 elif [[ -f "${PLUGIN_MD}" ]]; then
-	# No CLAUDE.md setup — inject full template as fallback
-	PLUGIN_MD_CONTENT=$(cat "${PLUGIN_MD}")
-	FULL_CONTEXT=$(printf "Session %s initialized.\n\n%s%b" "${SESSION_ID}" "${PLUGIN_MD_CONTENT}" "${SETUP_NOTICE}" | jq -Rs .)
+	# No CLAUDE.md setup — inject full behavioral template so plugin works out of the box
+	TEMPLATE=$(cat "${PLUGIN_MD}")
+	FULL_CONTEXT=$(printf 'Session %s initialized.\n\n%s%b' "${SESSION_ID}" "${TEMPLATE}" "${SETUP_NOTICE}" | jq -Rs .)
 	echo "{\"hookSpecificOutput\": {\"hookEventName\": \"SessionStart\", \"additionalContext\": ${FULL_CONTEXT}}}"
 else
 	FALLBACK_CONTEXT=$(printf 'Session %s initialized. State directory: %s%b' "${SESSION_ID}" "${STATE_DIR}" "${SETUP_NOTICE}" | jq -Rs .)

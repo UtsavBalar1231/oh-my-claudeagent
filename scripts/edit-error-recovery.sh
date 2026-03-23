@@ -1,16 +1,14 @@
 #!/bin/bash
+# shellcheck source=lib/common.sh
+source "$(dirname "$0")/lib/common.sh"
 
-INPUT=$(cat)
+INPUT="${HOOK_INPUT}"
+STATE_DIR="${HOOK_STATE_DIR}"
+LOG_DIR="${HOOK_LOG_DIR}"
 
 FILE_PATH=$(echo "${INPUT}" | jq -r '.tool_input.file_path // "unknown"' 2>/dev/null)
 ERROR_MSG=$(echo "${INPUT}" | jq -r '.error // .tool_result.error // "Unknown error"' 2>/dev/null)
 TOOL_NAME=$(echo "${INPUT}" | jq -r '.tool_name // "Edit"' 2>/dev/null)
-
-PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$(pwd)}"
-LOG_DIR="${PROJECT_ROOT}/.omca/logs"
-STATE_DIR="${PROJECT_ROOT}/.omca/state"
-
-mkdir -p "${LOG_DIR}" "${STATE_DIR}"
 
 TIMESTAMP=$(date -Iseconds)
 
