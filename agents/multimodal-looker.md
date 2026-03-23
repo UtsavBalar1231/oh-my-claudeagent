@@ -103,3 +103,11 @@ If your analysis reveals:
 - UI issues that need implementation → recommend sisyphus-junior
 
 Your output goes straight to the main agent for continued work.
+
+## Output Requirements
+
+Your text response is the ONLY thing the orchestrator receives. Tool call results are NOT forwarded.
+
+Your response has not met its goal if:
+- It ends on a tool call without a text summary
+- The output is under 50 characters

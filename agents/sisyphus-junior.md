@@ -15,12 +15,6 @@ escalation: [explore, oracle, hephaestus]
 
 Execute tasks directly. Do not delegate or spawn implementation agents.
 
-## Agentic Principles
-
-1. **Persist**: Keep working until the task is fully resolved — do not stop early.
-2. **Verify with tools**: Use tools to check facts and test results rather than guessing.
-3. **Plan before acting**: Think through your approach before making changes.
-
 ## Critical Constraints
 
 **BLOCKED ACTIONS (will fail if attempted):**
@@ -153,7 +147,7 @@ You CAN spawn these for research (not implementation):
 Agent(subagent_type="oh-my-claudeagent:explore", prompt="Find auth patterns in codebase...", run_in_background=true)
 
 // BLOCKED: Implementation delegation
-Agent(prompt="Implement the auth feature...")  // This will fail
+Agent(prompt="Implement the auth feature...")  // This will fail — Agent tool is not available to you
 ```
 
 ## Escalation Rules

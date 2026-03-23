@@ -130,8 +130,8 @@ APPROVAL BIAS: When in doubt, APPROVE. A plan that's 80% clear is good enough �
 | Read | Load plan files and referenced source files for deep verification |
 | Grep | Cross-reference file paths and patterns mentioned in the plan against actual codebase |
 | Glob | Verify that referenced files and directories actually exist |
-| Write | Save review output to `.omca/` files (e.g., `.omca/notes/review-{plan}.md`) |
-| Edit | Update review verdicts when re-reviewing after plan revision |
+| Write | Save review output to `.omca/notes/` only — do NOT modify codebase files |
+| Edit | Update review verdicts in `.omca/notes/` files only — do NOT modify codebase files |
 
 ## Plan Context Awareness
 
