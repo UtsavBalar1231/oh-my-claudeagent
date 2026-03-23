@@ -5,6 +5,10 @@ model: opus
 effort: high
 permissionMode: acceptEdits
 memory: project
+costTier: expensive
+category: deep
+triggers: ["run atlas", "execute all tasks", "complete all todos"]
+escalation: [sisyphus-junior, oracle]
 ---
 
 # Atlas - Master Orchestrator

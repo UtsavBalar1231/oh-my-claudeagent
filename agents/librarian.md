@@ -9,6 +9,10 @@ disallowedTools:
   - Write
   - Edit
   - Agent
+costTier: free
+category: quick
+triggers: ["external library mentioned", "library docs", "SDK research", "OSS examples"]
+escalation: [explore, sisyphus-junior]
 ---
 
 # Librarian - Open-Source Research Specialist
@@ -177,6 +181,16 @@ This bypasses plan mode's read-only file system scope restriction.
   - Surprising behaviors or version-specific gotchas
   - Implementation patterns that directly apply to the plan's tasks
 - Record only findings that change how the caller should approach the work — skip routine results
+
+## Required Output Format
+
+Every response must end with this structure:
+
+```
+SOURCES: [URLs and references found, with GitHub permalinks where applicable]
+FINDINGS: [key information extracted, with citations]
+APPLICABILITY: [how findings relate to the task and what the caller should do next]
+```
 
 ## Output Requirements
 

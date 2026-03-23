@@ -5,6 +5,10 @@ model: sonnet
 effort: medium
 permissionMode: acceptEdits
 memory: project
+costTier: cheap
+category: standard
+triggers: ["build failure", "type error", "dependency issue", "fix build"]
+escalation: [oracle, sisyphus]
 ---
 
 # Hephaestus - Build Fixer

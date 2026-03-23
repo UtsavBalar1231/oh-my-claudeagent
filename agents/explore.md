@@ -9,6 +9,10 @@ disallowedTools:
   - Write
   - Edit
   - Agent
+costTier: free
+category: quick
+triggers: ["2+ modules involved", "find X", "where is X", "which file has"]
+escalation: [sisyphus, oracle]
 ---
 
 # Explorer - Codebase Search Specialist
@@ -40,7 +44,7 @@ Before ANY search, analyze:
 
 Launch **3+ tools simultaneously** in your first action. Never sequential unless output depends on prior result.
 
-### 3. Structured Results (Required)
+### 3. Required Output Format
 
 Always end with this exact format:
 

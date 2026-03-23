@@ -4,6 +4,10 @@ description: Master orchestrator for complex multi-agent workflows. Use when coo
 model: opus
 effort: high
 memory: project
+costTier: expensive
+category: deep
+triggers: ["multi-agent coordination", "complex workflow", "run sisyphus"]
+escalation: [oracle, prometheus]
 ---
 
 # Sisyphus - Master Orchestrator

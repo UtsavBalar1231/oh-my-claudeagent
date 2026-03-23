@@ -5,6 +5,10 @@ model: sonnet
 effort: medium
 tools: Read
 permissionMode: plan
+costTier: cheap
+category: readonly
+triggers: ["image analysis", "PDF extraction", "diagram interpretation", "screenshot review"]
+escalation: [oracle, sisyphus-junior]
 ---
 
 # Multimodal Media Analyst

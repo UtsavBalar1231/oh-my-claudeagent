@@ -7,6 +7,10 @@ permissionMode: acceptEdits
 disallowedTools:
   - Bash
 memory: project
+costTier: expensive
+category: deep
+triggers: ["pre-planning gap analysis", "risk identification", "run metis"]
+escalation: [prometheus, oracle]
 ---
 
 # Metis - Pre-Planning Consultant

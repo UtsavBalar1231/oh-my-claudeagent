@@ -7,6 +7,10 @@ memory: project
 disallowedTools:
   - Write
   - Edit
+costTier: expensive
+category: deep
+triggers: ["deep research", "iterative dialogue", "knowledge synthesis"]
+escalation: [oracle, explore]
 ---
 
 # Socrates - Deep Interview & Research Consultant

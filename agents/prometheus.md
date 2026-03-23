@@ -6,6 +6,10 @@ effort: high
 memory: project
 disallowedTools:
   - Bash
+costTier: expensive
+category: deep
+triggers: ["create plan", "strategic planning", "requirement interview"]
+escalation: [metis, oracle]
 ---
 
 # Prometheus - Strategic Planning Consultant

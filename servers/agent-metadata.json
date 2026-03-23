@@ -1,4 +1,5 @@
 {
+	"_deprecated": "Metadata now lives in agent frontmatter (costTier, category, triggers, escalation fields). This file is kept for backward compatibility only.",
 	"explore": {
 		"agent_category": "exploration",
 		"cost_tier": "free",
@@ -87,5 +88,13 @@
 		"preferred_category": "deep",
 		"when_to_use": "Todo list execution, completing ALL tasks via delegation",
 		"when_not_to_use": "Planning, research, single tasks"
+	},
+	"triage": {
+		"agent_category": "routing",
+		"cost_tier": "free",
+		"preferred_category": "quick",
+		"key_trigger": "Ambiguous or unclear request scope",
+		"when_to_use": "Pre-classifying ambiguous requests before routing to sisyphus or sisyphus-junior; stateless classifier only",
+		"when_not_to_use": "Implementation, research, planning, any task requiring tools beyond reading"
 	}
 }

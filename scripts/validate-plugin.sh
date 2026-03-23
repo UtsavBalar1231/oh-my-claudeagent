@@ -276,30 +276,25 @@ check_claims() {
 		fail "omca-state-server.py still exists (should have been removed)"
 	fi
 
-	# Validate agent metadata consistency: every agents/*.md must have an entry in agent-metadata.json
+	# Validate agent metadata consistency: every agents/*.md must have costTier and category in frontmatter
+	# Note: agent-metadata.json is DEPRECATED — metadata now lives in agent frontmatter
 	local agent_metadata_json="${REPO_ROOT}/servers/agent-metadata.json"
 	if [[ -f "${agent_metadata_json}" ]]; then
-		local disk_count metadata_count
-		disk_count=$(find "${REPO_ROOT}/agents" -maxdepth 1 -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
-		metadata_count=$(jq 'keys | length' "${agent_metadata_json}" 2>/dev/null || echo 0)
-		if [[ "${disk_count}" -eq "${metadata_count}" ]]; then
-			pass "agent metadata count matches agents/ directory (${disk_count} agents)"
-		else
-			fail "agent metadata mismatch: ${disk_count} .md files in agents/ but ${metadata_count} entries in agent-metadata.json"
-		fi
-
-		local agent_file agent_name
-		while IFS= read -r agent_file; do
-			agent_name="$(basename "${agent_file}" .md)"
-			if jq -e --arg name "${agent_name}" 'has($name)' "${agent_metadata_json}" >/dev/null 2>&1; then
-				pass "agent-metadata.json contains entry for ${agent_name}"
-			else
-				fail "agent-metadata.json missing entry for ${agent_name} (found in agents/)"
-			fi
-		done < <(find "${REPO_ROOT}/agents" -maxdepth 1 -name "*.md" 2>/dev/null)
+		pass "agent-metadata.json exists (deprecated — metadata now in frontmatter)"
 	else
-		fail "agent-metadata.json not found at ${agent_metadata_json}"
+		fail "agent-metadata.json not found at ${agent_metadata_json} (kept for backward compat)"
 	fi
+
+	local agent_file agent_name
+	while IFS= read -r agent_file; do
+		agent_name="$(basename "${agent_file}" .md)"
+		# Check that the frontmatter contains costTier and category fields
+		if grep -q "^costTier:" "${agent_file}" && grep -q "^category:" "${agent_file}"; then
+			pass "agent frontmatter has routing metadata for ${agent_name}"
+		else
+			fail "agent frontmatter missing costTier or category for ${agent_name}"
+		fi
+	done < <(find "${REPO_ROOT}/agents" -maxdepth 1 -name "*.md" 2>/dev/null)
 
 	# Validate version consistency: plugin.json must match marketplace.json
 	local plugin_version marketplace_version
