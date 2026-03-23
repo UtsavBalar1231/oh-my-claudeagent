@@ -81,15 +81,30 @@ if [[ "${PROMPT_LOWER}" =~ (run[[:space:]]+sisyphus|sisyphus[[:space:]]+orchestr
 	ADDITIONAL_CONTEXT+="[SISYPHUS DETECTED] Invoke /oh-my-claudeagent:sisyphus-orchestrate for master orchestration. "
 fi
 
+# Conflict guard: ralph and ultrawork are mutually exclusive persistence modes.
+# If both appear in the same prompt, prefer ralph (stricter — never-stop beats max-parallel).
+# A user sending only 'ultrawork' in a new prompt can activate it even if ralph.json exists
+# from a prior session — conflict prevention only applies within the same prompt.
+HAS_RALPH=0
+HAS_ULTRAWORK=0
+[[ " ${DETECTED_KEYWORDS[*]} " =~ " ralph " ]] && HAS_RALPH=1
+[[ " ${DETECTED_KEYWORDS[*]} " =~ " ultrawork " ]] && HAS_ULTRAWORK=1
+
 # Create persistence state files for detected modes
-if [[ " ${DETECTED_KEYWORDS[*]} " =~ " ralph " ]] && [[ ! " ${DETECTED_KEYWORDS[*]} " =~ " stop-continuation " ]]; then
+if [[ "${HAS_RALPH}" -eq 1 ]] && [[ ! " ${DETECTED_KEYWORDS[*]} " =~ " stop-continuation " ]]; then
+	# Ralph wins when both appear in the same prompt — clear any active ultrawork state
+	if [[ "${HAS_ULTRAWORK}" -eq 1 ]] && [[ -f "${ULTRAWORK_STATE}" ]]; then
+		rm -f "${ULTRAWORK_STATE}"
+	fi
 	mkdir -p "${STATE_DIR}"
 	NOW_ISO=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 	printf '{"status":"active","activatedAt":"%s","tasks":[],"last_task_hash":"","stagnation_count":0}\n' \
 		"${NOW_ISO}" > "${RALPH_STATE}.tmp" && mv "${RALPH_STATE}.tmp" "${RALPH_STATE}"
 fi
 
-if [[ " ${DETECTED_KEYWORDS[*]} " =~ " ultrawork " ]] && [[ ! " ${DETECTED_KEYWORDS[*]} " =~ " stop-continuation " ]]; then
+# Only activate ultrawork if ralph is not also requested in the same prompt
+if [[ "${HAS_ULTRAWORK}" -eq 1 ]] && [[ "${HAS_RALPH}" -eq 0 ]] \
+	&& [[ ! " ${DETECTED_KEYWORDS[*]} " =~ " stop-continuation " ]]; then
 	mkdir -p "${STATE_DIR}"
 	NOW_ISO=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 	printf '{"status":"active","activatedAt":"%s","stagnation_count":0}\n' \

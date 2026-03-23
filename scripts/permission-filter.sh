@@ -26,8 +26,12 @@ if [[ "${TRIMMED_CMD}" == npm\ * ]] ||
 	exit 0
 fi
 
-# Auto-allow jq (used by hook scripts)
+# Auto-allow jq (used by hook scripts for JSON parsing).
+# Risk: jq --rawfile can read arbitrary files into variables. Deny that flag; allow the rest.
 if [[ "${TRIMMED_CMD}" == jq\ * ]]; then
+	if [[ "${TRIMMED_CMD}" == *--rawfile* ]]; then
+		exit 0  # Fall through to user decision
+	fi
 	echo '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}'
 	exit 0
 fi
