@@ -72,6 +72,10 @@ When giving advice during active plan execution:
 - Check `mode_read` for plan context if available
 - Recommend `evidence_log` in your action plans for verification steps
 
+## External Directory Access
+
+When in plan mode, `Read` cannot access files outside the project root. Use `Bash(cat /path/to/file)` for external paths (documentation repos, system configs, etc). This is a platform limitation — `additionalDirectories` does not propagate to subagents.
+
 ## Output Verbosity (STRICT)
 
 - **Bottom line**: 2-3 sentences maximum. No preamble, no flattery.
