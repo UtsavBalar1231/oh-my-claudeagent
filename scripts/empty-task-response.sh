@@ -1,6 +1,8 @@
 #!/bin/bash
+# shellcheck source=lib/common.sh
+source "$(dirname "$0")/lib/common.sh"
 
-INPUT=$(cat)
+INPUT="${HOOK_INPUT}"
 
 RESPONSE=$(echo "${INPUT}" | jq -r '.tool_response // .tool_result // ""' 2>/dev/null)
 
@@ -25,8 +27,7 @@ if [[ "${IS_POOR}" == "true" ]]; then
 	ESCAPED=$(echo "${MSG}" | jq -Rs .)
 	echo "{\"hookSpecificOutput\": {\"hookEventName\": \"PostToolUse\", \"additionalContext\": ${ESCAPED}}}"
 else
-	PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$(pwd)}"
-	USAGE_FILE="${PROJECT_ROOT}/.omca/state/agent-usage.json"
+	USAGE_FILE="${HOOK_STATE_DIR}/agent-usage.json"
 	if [[ -f "${USAGE_FILE}" ]]; then
 		TMP=$(mktemp)
 		jq '.agentUsed = true' "${USAGE_FILE}" >"${TMP}" && mv "${TMP}" "${USAGE_FILE}"
@@ -39,15 +40,15 @@ else
 	sisyphus-junior)
 		REQUIRED="STATUS: CHANGES: EVIDENCE:"
 		for section in ${REQUIRED}; do
-			if ! echo "${RESPONSE}" | grep -qiE "^${section}"; then
+			if ! echo "${RESPONSE}" | grep -qiE "${section}"; then
 				MISSING_SECTIONS="${MISSING_SECTIONS} ${section}"
 			fi
 		done
 		;;
 	explore)
 		REQUIRED="FILES: ANSWER: NEXT STEPS:"
-		for section in FILES: ANSWER: "NEXT STEPS:"; do
-			if ! echo "${RESPONSE}" | grep -qiE "^${section}"; then
+		for section in ${REQUIRED}; do
+			if ! echo "${RESPONSE}" | grep -qiE "${section}"; then
 				MISSING_SECTIONS="${MISSING_SECTIONS} ${section}"
 			fi
 		done
@@ -55,7 +56,7 @@ else
 	oracle)
 		REQUIRED="RECOMMENDATION: ALTERNATIVES: RISKS:"
 		for section in ${REQUIRED}; do
-			if ! echo "${RESPONSE}" | grep -qiE "^${section}"; then
+			if ! echo "${RESPONSE}" | grep -qiE "${section}"; then
 				MISSING_SECTIONS="${MISSING_SECTIONS} ${section}"
 			fi
 		done
@@ -63,7 +64,7 @@ else
 	librarian)
 		REQUIRED="SOURCES: FINDINGS: APPLICABILITY:"
 		for section in ${REQUIRED}; do
-			if ! echo "${RESPONSE}" | grep -qiE "^${section}"; then
+			if ! echo "${RESPONSE}" | grep -qiE "${section}"; then
 				MISSING_SECTIONS="${MISSING_SECTIONS} ${section}"
 			fi
 		done
