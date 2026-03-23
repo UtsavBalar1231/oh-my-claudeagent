@@ -66,6 +66,14 @@ case "${AGENT_TYPE}" in
 	*) ;;
 esac
 
+# Inject external directory access guidance for plan-mode agents
+case "${AGENT_TYPE}" in
+	*explore*|*librarian*|*oracle*)
+		CONTEXT_PARTS+=" [EXTERNAL PATH ACCESS] You are in plan mode and cannot use Read for files outside the project root. When you need to read external files (e.g. documentation repos, system configs), use Bash(cat /path/to/file) instead of Read(/path/to/file). This is a platform limitation — additionalDirectories does not propagate to subagents."
+		;;
+	*) ;;
+esac
+
 # --- Concurrency registration (atomic read-modify-write) ---
 ACTIVE_FILE="${STATE_DIR}/active-agents.json"
 CATALOG_FILE="${STATE_DIR}/agent-catalog.json"
