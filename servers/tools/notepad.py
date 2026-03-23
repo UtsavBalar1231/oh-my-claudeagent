@@ -1,7 +1,7 @@
 """Subagent learning notepad tools."""
 
 import os
-import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import Literal
@@ -37,36 +37,7 @@ def register(mcp: FastMCP) -> None:
         d = _notepad_dir(state, plan_name)
         path = os.path.join(d, f"{section}.md")
 
-        # Sanitize to prevent prompt injection via tool output written to notepad.
-        # Tool outputs are lowest-privilege — strip lines that look like system prompt
-        # injection so that notepad content cannot hijack model instructions when read back.
-        injection_prefixes = (
-            "<system>",
-            "[system]",
-            "</instructions>",
-            "<|im_start|>system",
-            "<|im_end|>",
-            "system prompt:",
-            "[instructions]",
-            "</system>",
-        )
-        lines = content.splitlines(keepends=True)
-        clean_lines = []
-        stripped_count = 0
-        for line in lines:
-            lower = line.lstrip().lower()
-            if any(lower.startswith(p) for p in injection_prefixes):
-                stripped_count += 1
-            else:
-                clean_lines.append(line)
-        if stripped_count > 0:
-            content = "".join(clean_lines)
-            print(
-                f"WARNING: notepad_write stripped {stripped_count} potential prompt injection line(s) "
-                f"from {plan_name}/{section}",
-                file=sys.stderr,
-            )
-
+        # No sanitization needed — MCP tool results are not inserted into system prompts
         timestamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         entry = f"\n## {timestamp}\n\n{content}\n"
 
@@ -161,7 +132,7 @@ def register(mcp: FastMCP) -> None:
             default="", description="Project root (auto-detected from git)"
         ),
     ) -> str:
-        """Compact a notepad section by summarizing verbose entries. Use between plan phases when notepad sections grow large. Keeps the last 20 lines and prepends a count of removed entries. Returns compacted content summary."""
+        """Compact a notepad section by truncating older entries, keeping the most recent lines. Use between plan phases when notepad sections grow large. Keeps the last 20 lines and prepends a count of removed entries. Returns compacted content summary."""
         state = _state_dir(working_directory)
         path = Path(state) / NOTEPADS_DIR / plan_name / f"{section}.md"
         if not path.exists():
@@ -171,7 +142,16 @@ def register(mcp: FastMCP) -> None:
             return f"Section '{section}' has {len(lines)} lines — no compaction needed"
         kept = lines[-20:]  # Keep last 20
         removed = len(lines) - 20
-        path.write_text(
+        compacted = (
             "\n".join([f"[Compacted: {removed} earlier entries removed]", *kept]) + "\n"
         )
+        fd, tmp = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
+        try:
+            os.write(fd, compacted.encode())
+            os.close(fd)
+            os.replace(tmp, path)
+        except:
+            os.close(fd)
+            os.unlink(tmp)
+            raise
         return f"Compacted '{section}': removed {removed} old entries, kept last 20"

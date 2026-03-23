@@ -24,9 +24,9 @@ def register(mcp: FastMCP) -> None:
         ),
     ) -> str:
         """Return structured catalog of all agents with orchestration metadata. Use at session start for routing decisions — provides when_to_use, cost_tier, and model for each agent. Writes agent-catalog.json cache for hooks. Returns JSON array of agent entries."""
+        _env_val = os.environ.get("CLAUDE_PLUGIN_ROOT")
         plugin_root = (
-            Path(os.environ.get("CLAUDE_PLUGIN_ROOT", ""))
-            or Path(__file__).parent.parent.parent
+            Path(_env_val) if _env_val else Path(__file__).parent.parent.parent
         )
         agents_dir = plugin_root / "agents"
         metadata_path = plugin_root / "servers" / "agent-metadata.json"
@@ -91,10 +91,10 @@ def register(mcp: FastMCP) -> None:
             description="Unused — reads from plugin dir. Kept for API consistency.",
         ),
     ) -> str:
-        """Return category-to-model/prompt mapping from categories.json. Use when selecting the right model tier or prompt template for a task category. Returns JSON mapping of category names to model and prompt configuration."""
+        """Return category-to-model mapping from categories.json. Use when selecting the right model tier for a task category. Returns JSON mapping of category names to model tier."""
+        _env_val = os.environ.get("CLAUDE_PLUGIN_ROOT")
         plugin_root = (
-            Path(os.environ.get("CLAUDE_PLUGIN_ROOT", ""))
-            or Path(__file__).parent.parent.parent
+            Path(_env_val) if _env_val else Path(__file__).parent.parent.parent
         )
         config_path = plugin_root / "servers" / "categories.json"
         if not config_path.exists():
@@ -111,7 +111,7 @@ def register(mcp: FastMCP) -> None:
             default="", description="Project root (auto-detected from git)"
         ),
     ) -> str:
-        """Read active agent counts from active-agents.json. Use before spawning agents to check concurrency limits and avoid overloading. Prunes stale entries older than 15 minutes as a side effect. Returns JSON with active agent list, per-model counts, and total."""
+        """Diagnostic tool for inspecting active agent state and tracking metrics. Prunes stale entries older than 15 minutes as a side effect. Returns JSON with active agent list, per-model counts, and total."""
         state = _state_dir(working_directory)
         active_path = os.path.join(state, "active-agents.json")
 
@@ -152,7 +152,10 @@ def register(mcp: FastMCP) -> None:
         """Diagnostic health check for the omca plugin. Verify ast-grep binary, state directory, and key state files. Use when MCP tools are failing or after plugin installation to diagnose configuration issues. Returns a system status report with OK/MISSING/absent for each component."""
         results = []
         # Check ast-grep
-        binary = discover_binary() if get_sg_bin() is None else get_sg_bin()
+        try:
+            binary = discover_binary() if get_sg_bin() is None else get_sg_bin()
+        except SystemExit:
+            binary = None
         if binary:
             results.append(f"ast-grep: OK ({binary})")
         else:
