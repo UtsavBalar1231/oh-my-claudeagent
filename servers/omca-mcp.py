@@ -16,6 +16,8 @@ import time
 from pathlib import Path
 from typing import Literal, get_args
 
+# yaml is imported here for ruff isort compliance; it is only used by ast_find_rule
+# and ast_test_rule (via validate_yaml_rule) — not by the other 15 tools.
 import yaml
 from mcp.server.fastmcp import FastMCP
 from pydantic import Field
@@ -377,7 +379,7 @@ def ast_search(
         default="text", description="Output format: text (compact) or json (full)"
     ),
 ) -> str:
-    """Search code patterns across the filesystem using AST-aware structural matching. Supports 25 languages."""
+    """Search code patterns across the filesystem using AST-aware structural matching. Use instead of grep when you need structural matches (function signatures, class shapes, import patterns) rather than text search. Supports 25 languages. Returns file:line:col with matched code snippets."""
     cmd = [SG_BIN, "run", "-p", pattern, "--lang", lang, "--json=compact"]
     if context and context > 0:
         cmd.extend(["-C", str(context)])
@@ -414,7 +416,7 @@ def ast_replace(
         default=True, description="Preview changes without applying (default: true)"
     ),
 ) -> str:
-    """Replace code patterns across the filesystem with AST-aware rewriting. Dry-run by default."""
+    """Replace code patterns across the filesystem with AST-aware rewriting. Use for safe structural refactoring — renaming variables, updating function signatures, or migrating API calls. Always use dry_run=true first to preview changes. Returns list of replacements with file:line locations."""
     cmd = [
         SG_BIN,
         "run",
@@ -469,7 +471,7 @@ def ast_find_rule(
         default="text", description="Output format: text (compact) or json (full)"
     ),
 ) -> str:
-    """Search code using a YAML rule with advanced combinators (kind, has, inside, follows, precedes, all, any, not). More powerful than pattern-only search."""
+    """Search code using a YAML rule with advanced combinators (kind, has, inside, follows, precedes, all, any, not). Use when ast_search patterns are insufficient — for context-sensitive matches like "function calls inside a class" or "imports followed by usage". Returns file:line:col with matched code and rule ID."""
     validate_yaml_rule(rule_yaml)
 
     cmd = [SG_BIN, "scan", "--inline-rules", rule_yaml, "--json=compact"]
@@ -501,7 +503,7 @@ def ast_dump_tree(
         description="Tree format: cst (full concrete syntax tree), ast (omit unnamed nodes), pattern (how ast-grep interprets a pattern)",
     ),
 ) -> str:
-    """Dump the syntax tree of a code snippet. Use 'cst' to inspect target code, 'pattern' to debug why a pattern doesn't match, 'ast' for a simplified view."""
+    """Dump the syntax tree of a code snippet. Use when building or debugging AST patterns — 'cst' shows full concrete syntax (use on target code), 'pattern' shows how ast-grep interprets a pattern (use when pattern doesn't match), 'ast' gives a simplified view. Returns tree output to stderr (captured here as the return value)."""
     # --debug-query outputs the tree to stderr, not stdout.
     cmd = [
         SG_BIN,
@@ -538,7 +540,7 @@ def ast_test_rule(
         )
     ),
 ) -> str:
-    """Test whether a YAML rule matches a code snippet. Use this to validate rules before running them across the codebase."""
+    """Test whether a YAML rule matches a code snippet. Use before running ast_find_rule across the codebase to validate rule correctness on a small example. Returns matched locations and snippets, or a no-match message with debugging hints."""
     validate_yaml_rule(rule_yaml)
 
     cmd = [SG_BIN, "scan", "--inline-rules", rule_yaml, "--stdin", "--json=compact"]
@@ -578,7 +580,7 @@ def boulder_write(
         default="", description="Project root (auto-detected from git)"
     ),
 ) -> str:
-    """Create or update boulder state. Appends session_id to existing sessions."""
+    """Register an active work plan in boulder state. Use when starting plan execution to enable ralph persistence, progress tracking, and subagent context injection. Appends session_id to existing sessions so multi-session plans accumulate history. Returns confirmation with plan name and session count."""
     state = _state_dir(working_directory)
     path = os.path.join(state, BOULDER_FILE)
     existing = _read_json(path)
@@ -613,7 +615,7 @@ def boulder_progress(
         default="", description="Project root (auto-detected from git)"
     ),
 ) -> str:
-    """Parse plan file checkboxes and return progress summary."""
+    """Parse plan file checkboxes and return task progress summary. Use to check remaining work before claiming completion or to report plan status. Reads boulder.json for plan path if plan_path is omitted. Returns JSON with total, completed, remaining, is_complete, and plan_path fields."""
     if not plan_path:
         state = _state_dir(working_directory)
         boulder = _read_json(os.path.join(state, BOULDER_FILE))
@@ -650,7 +652,7 @@ def mode_read(
         default="", description="Project root (auto-detected from git)"
     ),
 ) -> str:
-    """Read all active mode state: ralph, ultrawork, boulder, and evidence. Returns a unified dashboard."""
+    """Read all active mode state: ralph, ultrawork, boulder, and evidence. Use at session start to understand current execution context, or before making decisions that depend on active modes. Returns a unified JSON dashboard with active flags and latest entries per mode."""
     state = _state_dir(working_directory)
 
     # Ralph
@@ -707,7 +709,7 @@ def mode_clear(
         default="", description="Project root (auto-detected from git)"
     ),
 ) -> str:
-    """Clear active mode state files. 'all' clears ralph + ultrawork + boulder but NOT evidence."""
+    """Clear active mode state files. Use when ending a work session, cancelling ralph/ultrawork persistence, or resetting plan state. 'all' clears ralph + ultrawork + boulder but NOT evidence (evidence is permanent audit trail). Returns summary of cleared and skipped state files."""
     state = _state_dir(working_directory)
 
     targets: list[tuple[str, str]] = []
@@ -768,7 +770,7 @@ def evidence_log(
         default="", description="Project root (auto-detected from git)"
     ),
 ) -> str:
-    """REQUIRED after build/test/lint — task completion blocked without evidence. Append a timestamped verification evidence entry."""
+    """REQUIRED after every build/test/lint command — task completion is blocked without this. Append a timestamped verification evidence entry. Use immediately after running any verification command (just test, just lint, just build, etc.). Returns confirmation with total evidence entry count."""
     state = _state_dir(working_directory)
     path = os.path.join(state, EVIDENCE_FILE)
     data = _read_json(path)
@@ -797,7 +799,7 @@ def evidence_read(
         default="", description="Project root (auto-detected from git)"
     ),
 ) -> str:
-    """Read all verification evidence records."""
+    """Read all accumulated verification evidence records. Use before claiming task completion to review what has been verified, or when an orchestrator needs to confirm subagent work. Returns full JSON evidence log or a no-evidence message."""
     state = _state_dir(working_directory)
     path = os.path.join(state, EVIDENCE_FILE)
     data = _read_json(path)
@@ -820,10 +822,40 @@ def notepad_write(
         default="", description="Project root (auto-detected from git)"
     ),
 ) -> str:
-    """Append content to a notepad section. Always appends, never overwrites."""
+    """Append content to a notepad section during plan execution. Use to record learnings, issues, decisions, problems, or questions discovered while working. Always appends, never overwrites — safe to call multiple times. Returns confirmation with the updated section path."""
     state = _state_dir(working_directory)
     d = _notepad_dir(state, plan_name)
     path = os.path.join(d, f"{section}.md")
+
+    # Sanitize to prevent prompt injection via tool output written to notepad.
+    # Tool outputs are lowest-privilege — strip lines that look like system prompt
+    # injection so that notepad content cannot hijack model instructions when read back.
+    injection_prefixes = (
+        "<system>",
+        "[system]",
+        "</instructions>",
+        "<|im_start|>system",
+        "<|im_end|>",
+        "system prompt:",
+        "[instructions]",
+        "</system>",
+    )
+    lines = content.splitlines(keepends=True)
+    clean_lines = []
+    stripped_count = 0
+    for line in lines:
+        lower = line.lstrip().lower()
+        if any(lower.startswith(p) for p in injection_prefixes):
+            stripped_count += 1
+        else:
+            clean_lines.append(line)
+    if stripped_count > 0:
+        content = "".join(clean_lines)
+        print(
+            f"WARNING: notepad_write stripped {stripped_count} potential prompt injection line(s) "
+            f"from {plan_name}/{section}",
+            file=sys.stderr,
+        )
 
     timestamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     entry = f"\n## {timestamp}\n\n{content}\n"
@@ -831,7 +863,13 @@ def notepad_write(
     with open(path, "a") as f:
         f.write(entry)
 
-    return f"Appended to {plan_name}/{section}.md"
+    # Warn if section file exceeds 50KB after write
+    size = Path(path).stat().st_size
+    result_msg = f"Appended to {plan_name}/{section}.md"
+    if size > 50 * 1024:
+        result_msg += f"\n[WARNING: section file is {size // 1024}KB — consider running notepad_compact to reduce size]"
+
+    return result_msg
 
 
 @mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
@@ -843,7 +881,7 @@ def notepad_read(
         default="", description="Project root (auto-detected from git)"
     ),
 ) -> str:
-    """Read notepad content for a plan. Returns one section or all."""
+    """Read notepad content for a plan. Use to review discoveries, open questions, or prior decisions before continuing work on a plan. Omit section to read all sections at once. Returns formatted markdown content or a not-found message."""
     state = _state_dir(working_directory)
     d = os.path.join(state, NOTEPADS_DIR, plan_name)
 
@@ -875,7 +913,7 @@ def notepad_list(
         default="", description="Project root (auto-detected from git)"
     ),
 ) -> str:
-    """List available notepads and their sections."""
+    """List available notepads and their sections. Use to discover which plans have notepad data or to verify a notepad was created. Provide plan_name to list sections for a specific plan, or omit to list all plans. Returns plan names with their available section names."""
     state = _state_dir(working_directory)
     notepads_root = os.path.join(state, NOTEPADS_DIR)
 
@@ -906,13 +944,39 @@ def notepad_list(
     return "\n".join(lines)
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
+@mcp.tool()
+def notepad_compact(
+    plan_name: str = Field(description="Plan name (matches boulder plan_name)"),
+    section: Literal[
+        "learnings", "issues", "decisions", "problems", "questions"
+    ] = Field(description="Notepad section to compact"),
+    working_directory: str = Field(
+        default="", description="Project root (auto-detected from git)"
+    ),
+) -> str:
+    """Compact a notepad section by summarizing verbose entries. Use between plan phases when notepad sections grow large. Keeps the last 20 lines and prepends a count of removed entries. Returns compacted content summary."""
+    state = _state_dir(working_directory)
+    path = Path(state) / NOTEPADS_DIR / plan_name / f"{section}.md"
+    if not path.exists():
+        return f"Section '{section}' not found for plan '{plan_name}'"
+    lines = path.read_text().strip().split("\n")
+    if len(lines) <= 20:
+        return f"Section '{section}' has {len(lines)} lines — no compaction needed"
+    kept = lines[-20:]  # Keep last 20
+    removed = len(lines) - 20
+    path.write_text(
+        "\n".join([f"[Compacted: {removed} earlier entries removed]", *kept]) + "\n"
+    )
+    return f"Compacted '{section}': removed {removed} old entries, kept last 20"
+
+
+@mcp.tool()
 def agents_list(
     working_directory: str = Field(
         default="", description="Project root (auto-detected from git)"
     ),
 ) -> str:
-    """Return structured catalog of all agents with orchestration metadata. Writes cache for hooks."""
+    """Return structured catalog of all agents with orchestration metadata. Use at session start for routing decisions — provides when_to_use, cost_tier, and model for each agent. Writes agent-catalog.json cache for hooks. Returns JSON array of agent entries."""
     plugin_root = (
         Path(os.environ.get("CLAUDE_PLUGIN_ROOT", "")) or Path(__file__).parent.parent
     )
@@ -963,7 +1027,7 @@ def categories_list(
         description="Unused — reads from plugin dir. Kept for API consistency.",
     ),
 ) -> str:
-    """Return category → model/prompt mapping from categories.json."""
+    """Return category-to-model/prompt mapping from categories.json. Use when selecting the right model tier or prompt template for a task category. Returns JSON mapping of category names to model and prompt configuration."""
     plugin_root = (
         Path(os.environ.get("CLAUDE_PLUGIN_ROOT", "")) or Path(__file__).parent.parent
     )
@@ -977,13 +1041,13 @@ def categories_list(
         return json.dumps({"error": "categories.json is malformed"})
 
 
-@mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
+@mcp.tool()
 def concurrency_status(
     working_directory: str = Field(
         default="", description="Project root (auto-detected from git)"
     ),
 ) -> str:
-    """Read active agent counts from active-agents.json. Prunes stale entries (>15 min TTL)."""
+    """Read active agent counts from active-agents.json. Use before spawning agents to check concurrency limits and avoid overloading. Prunes stale entries older than 15 minutes as a side effect. Returns JSON with active agent list, per-model counts, and total."""
     state = _state_dir(working_directory)
     active_path = os.path.join(state, "active-agents.json")
 
@@ -1014,6 +1078,34 @@ def concurrency_status(
         },
         indent=2,
     )
+
+
+@mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
+def health_check(
+    working_directory: str = Field(
+        default="", description="Project root (auto-detected from git)"
+    ),
+) -> str:
+    """Diagnostic health check for the omca plugin. Verify ast-grep binary, state directory, and key state files. Use when MCP tools are failing or after plugin installation to diagnose configuration issues. Returns a system status report with OK/MISSING/absent for each component."""
+    results = []
+    # Check ast-grep
+    binary = discover_binary() if SG_BIN is None else SG_BIN
+    if binary:
+        results.append(f"ast-grep: OK ({binary})")
+    else:
+        results.append("ast-grep: NOT FOUND")
+    # Check state dir
+    state = _state_dir(working_directory)
+    state_path = Path(state)
+    if state_path.exists():
+        results.append(f"state_dir: OK ({state})")
+    else:
+        results.append(f"state_dir: MISSING ({state})")
+    # Check key state files
+    for name in ["session.json", "boulder.json", "verification-evidence.json"]:
+        path = state_path / name
+        results.append(f"  {name}: {'exists' if path.exists() else 'absent'}")
+    return "\n".join(results)
 
 
 # --- Signal handling & entry point ---
