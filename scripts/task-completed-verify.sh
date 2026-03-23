@@ -49,6 +49,12 @@ if [[ -f "${EDITS_LOG}" ]]; then
 	fi
 fi
 
+# Only require evidence for tasks involving code/runtime changes
+NEEDS_EVIDENCE=false
+if [[ "${TASK_DESCRIPTION}" =~ (verify|test|build|typecheck|lint|validate|fix|implement|refactor|deploy) ]]; then
+	NEEDS_EVIDENCE=true
+fi
+
 # Evidence-aware logic:
 # 1. Recent evidence → ALLOW (already verified)
 # 2. Recent edits but no recent evidence → BLOCK (files were modified without verification)
@@ -69,7 +75,7 @@ if [[ "${RECENT_EVIDENCE}" == "true" ]]; then
 		exit "${BLOCK_EXIT_CODE}"
 	fi
 	# Valid recent evidence — allow
-elif [[ "${RECENT_EDITS}" == "true" ]]; then
+elif [[ "${RECENT_EDITS}" == "true" ]] && [[ "${NEEDS_EVIDENCE}" == "true" ]]; then
 	# Files were modified but no verification was run
 	_log_hook_error "edits without evidence for task: ${TASK_DESCRIPTION:0:100}" "task-completed-verify.sh"
 	echo "Files were modified but no verification evidence was recorded. Use the evidence_log MCP tool after running build/test commands. Example: evidence_log(evidence_type=\"test\", command=\"just test\", exit_code=0, output_snippet=\"10 passed\")" >&2

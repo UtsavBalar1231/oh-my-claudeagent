@@ -25,7 +25,7 @@ case "${AGENT_TYPE}" in
 		;;
 esac
 
-CONTEXT_PARTS+=" [OUTPUT MANDATE] Your text response is the ONLY output the orchestrator receives. Tool call results and intermediate reasoning are NOT forwarded. Structure your response as: 1. CRITICAL FACTS: Key findings, decisions, or results (bullet points) 2. DETAILS: Supporting context if needed Target length: 1,000-2,000 tokens. If running low on turns, stop tool calls and synthesize immediately."
+CONTEXT_PARTS+=" [OUTPUT MANDATE] Your text response is the ONLY output the orchestrator receives. Tool call results and intermediate reasoning are NOT forwarded. Structure your response according to your agent's defined output format. If running low on turns, stop tool calls and synthesize immediately."
 
 for MODE_FILE in ralph-state.json ultrawork-state.json; do
 	if [[ -f "${STATE_DIR}/${MODE_FILE}" ]]; then
@@ -87,14 +87,17 @@ if [[ -f "${CATALOG_FILE}" ]]; then
 	[[ -n "${CATALOG_MODEL}" ]] && AGENT_MODEL="${CATALOG_MODEL}"
 fi
 
-# Register — atomic mktemp+mv (no flock — POSIX portable)
-ACTIVE=$(cat "${ACTIVE_FILE}" 2>/dev/null || echo '[]')
+# Register — flock-protected read-modify-write to prevent concurrent write loss
 STARTED_EPOCH=$(date +%s)
-TMP_ACTIVE=$(mktemp)
-echo "${ACTIVE}" | jq --arg id "${AGENT_ID}" --arg agent "${AGENT_TYPE}" \
-	--arg model "${AGENT_MODEL}" --arg ts "$(date -Iseconds)" --argjson epoch "${STARTED_EPOCH}" \
-	'. += [{"id": $id, "agent": $agent, "model": $model, "started": $ts, "started_epoch": $epoch}]' \
-	>"${TMP_ACTIVE}" && mv "${TMP_ACTIVE}" "${ACTIVE_FILE}"
+(
+	flock -w 5 200 || { _log_hook_error "flock timeout on active-agents" "subagent-start.sh"; }
+	ACTIVE=$(cat "${ACTIVE_FILE}" 2>/dev/null || echo '[]')
+	TMP_ACTIVE=$(mktemp)
+	echo "${ACTIVE}" | jq --arg id "${AGENT_ID}" --arg agent "${AGENT_TYPE}" \
+		--arg model "${AGENT_MODEL}" --arg ts "$(date -Iseconds)" --argjson epoch "${STARTED_EPOCH}" \
+		'. += [{"id": $id, "agent": $agent, "model": $model, "started": $ts, "started_epoch": $epoch}]' \
+		>"${TMP_ACTIVE}" && mv "${TMP_ACTIVE}" "${ACTIVE_FILE}"
+) 200>"${STATE_DIR}/active-agents.lock"
 
 # Bridge spawn-ID to platform agent_id in subagents.json
 SUBAGENTS_FILE="${STATE_DIR}/subagents.json"
@@ -139,7 +142,6 @@ case "${AGENT_TYPE}" in
 				[[ -n "${CATEGORY_TABLE}" ]] && CONTEXT_PARTS+=" [CATEGORIES] ${CATEGORY_TABLE} Use Agent(model=<category_model>) to route to the right model tier."
 			fi
 		else
-			_log_hook_error "agent-catalog.json missing — catalog stale for agent ${AGENT_TYPE}" "subagent-start.sh"
 			CONTEXT_PARTS+=" [CATALOG STALE] No agent-catalog.json found. Call agents_list() to generate the catalog for routing hints."
 		fi
 		;;
