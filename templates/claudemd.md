@@ -48,6 +48,14 @@ Routing:
 Nesting constraint:
 - Subagents CANNOT spawn other subagents — the Agent tool is stripped at depth 1+.
 - The delegation chain is: main session → orchestrator (depth 0, via fork) → worker (depth 1, terminal).
+
+Escalation:
+- sisyphus-junior escalates to: explore (research), oracle (architecture), hephaestus (build fixes).
+- hephaestus escalates to: oracle (architecture changes beyond minimal fixes).
+- explore suggests: sisyphus (multi-file changes), oracle (architecture questions).
+
+Fork constraint:
+- Orchestrators (atlas, sisyphus) MUST be invoked via their context: fork skill, not via Agent().
 </delegation_rules>
 
 <model_routing>
@@ -70,6 +78,7 @@ Invoke via `/oh-my-claudeagent:NAME` or keyword triggers (quoted phrases auto-de
 | handoff | "handoff" | Session continuity summary |
 | cancel-ralph | "cancel ralph" | Cancel active ralph persistence loop |
 | stop-continuation | "stop continuation" | Stop all continuation mechanisms |
+| consolidate-memory | `/consolidate-memory` | Consolidate and deduplicate agent memory files |
 
 ## Bundled Tools
 
@@ -101,6 +110,8 @@ Notepad sections per plan: `learnings`, `issues`, `decisions`, `problems`, `ques
 - Two or more independent tasks should run in parallel — use multiple `Agent()` calls in a single response, up to 5 concurrent agents.
 - Exploration agents (explore, librarian): ALWAYS use `run_in_background=true` when you have other independent work to do. Example: `Agent(subagent_type="oh-my-claudeagent:explore", prompt="...", run_in_background=true)`
 - Before concluding: ensure zero pending tasks, tests passing, and evidence collected for any claims made.
+- Subagents without AskUserQuestion write questions to notepad questions section via notepad_write(plan_name, "questions", ...) and return. Orchestrators check notepad after each delegation and relay questions to the user.
+- Once you delegate exploration to explore/librarian, do NOT manually re-search the same information. Continue only with non-overlapping work.
 </execution_protocols>
 
 <verification>

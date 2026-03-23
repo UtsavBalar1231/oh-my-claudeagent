@@ -30,7 +30,6 @@ jobs:
         with:
           python-version: "3.12"
 
-      # TODO: Add CHANGELOG validation step for PRs
       - name: Run validation suites
         run: bash scripts/validate-plugin.sh --check claims --check hooks
 
