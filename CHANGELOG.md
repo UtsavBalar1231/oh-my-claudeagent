@@ -5,6 +5,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-03-24
+
+### Added
+
+- **Triage agent**: lightweight request classifier for routing simple vs complex tasks
+  (`agents/triage.md`)
+- **Eval harness**: regression fixtures and documentation for quality assurance
+  (`docs/eval/`, `tests/fixtures/`)
+- **DX scaffolding recipes**: `just new-agent NAME`, `just new-hook EVENT NAME`,
+  CI validation improvements, and `just smoke-test` shortcut
+- **Observability hooks**: async conversion for `post-edit.sh` and
+  `instructions-loaded-audit.sh`, performance instrumentation
+- **MCP improvements**: `health_check` and `notepad_compact` tools, improved tool
+  descriptions and annotations
+- **PostToolUseFailure handlers**: `bash-error-recovery.sh` and `read-error-recovery.sh`
+  for Bash and Read tool error recovery
+- **Security hardening**: improved permission filter patterns, compaction injection
+  safety, mode conflict detection
+- **Agent enhancements**: agentic reminders, effort scaling guidance, sandwich defense
+  patterns
+
+### Changed
+
+- **MCP server refactor**: split monolithic `omca-mcp.py` into domain modules
+  (`servers/tools/ast.py`, `boulder.py`, `catalog.py`, `evidence.py`, `notepad.py`)
+- **Hook boilerplate extraction**: shared utilities extracted to `scripts/lib/common.sh`
+- **Agent routing metadata**: migrated to frontmatter fields
+- **Agent tone**: softened aggressive language, removed unnecessary personas
+- **Token efficiency**: reduced `templates/claudemd.md` token footprint
+- **Error recovery**: simplified PostToolUseFailure handlers, polished hook scripts
+- **Documentation**: removed hardcoded component counts from OMCA.md and README.md for
+  maintainability
+
+### Fixed
+
+- **Agent hallucinations**: corrected factual errors in agent definitions, restored
+  guardrails and consistency checks
+- **Hook tracking**: agent tracking field mismatch, race condition in spawn tracking,
+  keyword gate reliability
+- **MCP stability**: `health_check` crash, atomic write safety, `Path` fallback, stale
+  tool descriptions
+- **Plan-mode subagents**: injected external path access guidance for plan-mode agents
+- **Documentation**: restored template sections, fixed eval docs formatting
+
 ## [1.3.0] - 2026-03-22
 
 ### Added
@@ -62,6 +106,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **ExitPlanMode sequencing**: restructured in skills after momus review
 - **State cleanup**: replaced `rm -f` with `mode_clear` MCP tool in skill scripts
 
+[1.4.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.2.2...v1.3.0
 
 ## [1.2.2] - 2026-03-19
