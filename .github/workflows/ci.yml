@@ -66,3 +66,39 @@ jobs:
 
       - name: ShellCheck
         run: shellcheck scripts/*.sh
+
+  test-bats:
+    name: BATS Hook Tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          submodules: true
+
+      - name: Run BATS behavioral tests
+        run: tests/bats/bats-core/bin/bats tests/bats/hooks/
+
+  test-pytest:
+    name: pytest MCP Tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - uses: astral-sh/setup-uv@v7
+
+      - name: Install test dependencies
+        run: uv sync --project servers --group dev
+
+      - name: Run pytest
+        run: uv run --project servers pytest servers/tests/ -v --tb=short

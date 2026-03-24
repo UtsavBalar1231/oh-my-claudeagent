@@ -55,6 +55,16 @@ test-hooks:
 test-mcp:
 	bash scripts/validate-plugin.sh --check mcp
 
+# Run pytest MCP tool tests
+[group('test')]
+test-pytest:
+	uv run --project servers pytest servers/tests/ -v
+
+# Run BATS behavioral tests for hook scripts
+[group('test')]
+test-bats:
+	tests/bats/bats-core/bin/bats tests/bats/hooks/
+
 # ── Scaffold ──────────────────────────────────────────────────────
 
 # Scaffold a new agent
@@ -119,6 +129,7 @@ doctor:
 	@which ast-grep >/dev/null 2>&1 && echo "ast-grep: $(ast-grep --version 2>&1 | head -1)" || (which sg >/dev/null 2>&1 && echo "ast-grep (sg): $(sg --version 2>&1 | head -1)" || echo "ast-grep: NOT FOUND (required)")
 	@which shellcheck >/dev/null 2>&1 && echo "shellcheck: $(shellcheck --version | grep version: | head -1)" || echo "shellcheck: NOT FOUND (recommended)"
 	@which pre-commit >/dev/null 2>&1 && echo "pre-commit: $(pre-commit --version)" || echo "pre-commit: NOT FOUND (recommended)"
+	@[[ -x tests/bats/bats-core/bin/bats ]] && echo "  bats: $(tests/bats/bats-core/bin/bats --version)" || echo "  bats: NOT FOUND (run: git submodule update --init)"
 
 # Watch all OMCA log files in real-time
 [group('dev')]
@@ -178,11 +189,15 @@ eval-consistency:
 	@echo "Record results in tests/evals/results/<task>-trial-N.json"
 	@echo "Automated multi-run execution is future work."
 
+# Run all test suites (structural + behavioral + MCP)
+[group('test')]
+test-all: test test-bats test-pytest test-mcp
+
 # ── CI ────────────────────────────────────────────────────────────
 
 # Run full CI pipeline (format check + lint + test + mcp)
 [group('ci')]
-ci: fmt-check lint test test-mcp
+ci: fmt-check lint test test-bats test-pytest test-mcp
 
 # ── Release ──────────────────────────────────────────────────────
 
