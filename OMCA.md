@@ -22,10 +22,10 @@ guarantee that a long task will run to completion.
 
 oh-my-claudeagent adds a multi-agent layer on top of Claude Code:
 
-- **12 specialist agents** with distinct roles and model tiers (opus, sonnet, haiku)
-- **20 skills** invokable via slash commands or keyword triggers
-- **28 hook commands** wired to 18 event types for session persistence, context injection,
-  auto-approval, and error recovery (29 scripts on disk: 28 hook + `validate-plugin.sh` utility)
+- **Specialist agents** with distinct roles and model tiers (opus, sonnet, haiku)
+- **Skills** invokable via slash commands or keyword triggers
+- **Hook commands** wired across event types for session persistence, context injection,
+  auto-approval, and error recovery
 - **3 MCP servers** for structural code search, state tracking, public code search, and
   library documentation
 
@@ -1387,9 +1387,9 @@ Hook fixture payloads live in `tests/fixtures/hooks/`.
 
 | File | Purpose |
 |------|---------|
-| `agents/*.md` | 12 agent definitions |
-| `skills/*/SKILL.md` | 20 skill definitions |
-| `scripts/*.sh` | 29 scripts: 28 hook commands + `validate-plugin.sh` utility |
+| `agents/*.md` | Agent definitions |
+| `skills/*/SKILL.md` | Skill definitions |
+| `scripts/*.sh` | Hook command scripts + `validate-plugin.sh` utility |
 | `hooks/hooks.json` | Hook registration (canonical source for hook map) |
 | `servers/omca-mcp.py` | Unified Python FastMCP server (ast-grep, boulder, evidence, notepads, catalog) |
 | `.mcp.json` | Wires 3 MCP servers: omca (local), grep (HTTP), context7 (HTTP) |
