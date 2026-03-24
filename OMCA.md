@@ -1167,10 +1167,12 @@ during plan mode, it cannot execute edits.
 
 ### Context Injection for External Directories
 
-Agents with `permissionMode: plan` (explore, librarian, oracle, multimodal-looker) cannot
-use Read for files outside the project root when spawned as subagents.
+Agents with `permissionMode: plan` (triage, multimodal-looker) cannot use Read for files
+outside the project root when spawned as subagents. Note: explore, librarian, and oracle
+no longer use `permissionMode: plan` — they rely on `disallowedTools: Write, Edit, Agent`
+and the Bash Usage Policy instead.
 
-**Workaround:** Use Bash with `cat` for external file access:
+**Workaround:** For agents that retain plan mode, use Bash with `cat` for external file access:
 ```bash
 cat /path/outside/project/file.py
 ```
