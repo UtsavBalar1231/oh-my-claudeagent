@@ -408,7 +408,7 @@ wheels = [
 
 [[package]]
 name = "oh-my-claudeagent-server"
-version = "1.4.0"
+version = "1.4.1"
 source = { virtual = "." }
 dependencies = [
     { name = "mcp", extra = ["cli"] },
