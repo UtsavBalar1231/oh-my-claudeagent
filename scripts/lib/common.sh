@@ -21,3 +21,9 @@ _log_hook_error() {
 	local hook_name="${2:-$(basename "$0")}"
 	echo "{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"hook\":\"${hook_name}\",\"error\":\"${msg}\"}" >> "${HOOK_LOG_DIR}/hook-errors.jsonl" 2>/dev/null
 }
+
+# Generate a decorated section header for additionalContext blocks
+_section_header() {
+	local title="$1"
+	printf '\n─── %s ─────────────────────────────────────\n' "${title}"
+}

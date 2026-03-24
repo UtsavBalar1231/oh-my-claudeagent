@@ -33,12 +33,12 @@ while true; do
 	if [[ "${ALREADY_INJECTED}" == "false" ]]; then
 		if [[ -f "${CURRENT_DIR}/AGENTS.md" ]]; then
 			AGENTS_CONTENT=$(head -c 2000 "${CURRENT_DIR}/AGENTS.md")
-			CONTEXT_PARTS+="[AGENTS.md from ${CURRENT_DIR}]: ${AGENTS_CONTENT} "
+			CONTEXT_PARTS+="[AGENTS.md from ${CURRENT_DIR}]: ${AGENTS_CONTENT}"$'\n'
 		fi
 
 		if [[ -f "${CURRENT_DIR}/README.md" ]]; then
 			README_CONTENT=$(head -c 2000 "${CURRENT_DIR}/README.md")
-			CONTEXT_PARTS+="[README.md from ${CURRENT_DIR}]: ${README_CONTENT} "
+			CONTEXT_PARTS+="[README.md from ${CURRENT_DIR}]: ${README_CONTENT}"$'\n'
 		fi
 
 		TMP=$(mktemp)
@@ -64,7 +64,7 @@ if [[ -d "${RULES_DIR}" ]]; then
 				if [[ "${BASENAME}" == ${PATTERN} ]]; then
 					RULE_TAIL=$(tail -n +2 "${RULE_FILE}")
 					RULE_CONTENT="${RULE_TAIL:0:1000}"
-					CONTEXT_PARTS+="[Rule: ${PATTERN}]: ${RULE_CONTENT} "
+					CONTEXT_PARTS+="[Rule: ${PATTERN}]: ${RULE_CONTENT}"$'\n'
 				fi
 			fi
 		fi
