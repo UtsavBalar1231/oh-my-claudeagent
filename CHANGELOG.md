@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] - 2026-03-25
+
+### Added
+
+- **Time awareness injection**: Session context now includes a `[CURRENT DATE]` block so Claude
+  knows the current date and doesn't default to stale training data. Date survives compaction
+  via fresh re-injection, and subagents receive a lightweight date-only variant. Uses `LC_TIME=C`
+  for POSIX-portable, locale-independent output with graceful degradation
+  (`session-init.sh`, `post-compact-inject.sh`, `subagent-start.sh`)
+
+### Changed
+
+- **Hook output markers and section headers**: Multi-block `additionalContext` output now uses
+  `─── Section ─────` headers and `$'\n'` newline separators instead of space concatenation.
+  `subagent-start.sh` groups its 10+ context blocks into scannable sections (Agent Protocol,
+  Active Modes, Plan Context, Execution Guidance, External Access, Agent Catalog). Added
+  `_section_header()` utility to `scripts/lib/common.sh` for consistent formatting.
+  `keyword-detector.sh` and `context-injector.sh` also use newline separation
+
+### Fixed
+
+- **Explore agent Bash permissions**: Removed `permissionMode: plan` from explore, librarian,
+  and oracle agents to fix Bash being blocked for external file access. Read-only safety is
+  now enforced via `disallowedTools: Write, Edit, Agent` plus an explicit Bash Usage Policy
+  section in each agent. Triage and multimodal-looker retain `permissionMode: plan`
+
+[1.4.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.4.0...v1.4.1
+
 ## [1.4.0] - 2026-03-24
 
 ### Added
@@ -48,6 +76,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tool descriptions
 - **Plan-mode subagents**: injected external path access guidance for plan-mode agents
 - **Documentation**: restored template sections, fixed eval docs formatting
+
+[1.4.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.3.0...v1.4.0
 
 ## [1.3.0] - 2026-03-22
 
@@ -106,7 +136,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **ExitPlanMode sequencing**: restructured in skills after momus review
 - **State cleanup**: replaced `rm -f` with `mode_clear` MCP tool in skill scripts
 
-[1.4.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.2.2...v1.3.0
 
 ## [1.2.2] - 2026-03-19
@@ -160,6 +189,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ralph-state.json` and `boulder.json`, leaving `ultrawork-state.json` orphaned
 - **cancel-ralph documents scope**: added note that it only cancels ralph mode,
   directing users to `stop-continuation` for ultrawork cleanup
+
+[1.2.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.2.0...v1.2.1
 
 ## [1.2.0] - 2026-03-18
 
