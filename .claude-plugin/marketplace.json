@@ -15,7 +15,7 @@
         "source": "github",
         "repo": "UtsavBalar1231/oh-my-claudeagent",
         "ref": "main",
-        "sha": "a993c44b050402982b6b9c22c6393872c351a36a"
+        "sha": "a79797aff825faf16ecccd91e1b25587c7cb8ed7"
       },
       "description": "Turn Claude Code into a multi-agent system. Specialist agents handle planning, execution, code review, debugging, and research — with persistence modes, parallel execution, and natural language activation.",
       "version": "1.4.0",
