@@ -28,58 +28,58 @@ ADDITIONAL_CONTEXT=""
 if [[ "${PROMPT_LOWER}" =~ (ralph|don\'t[[:space:]]+stop|must[[:space:]]+complete|until[[:space:]]+done|keep[[:space:]]+going[[:space:]]+until|finish[[:space:]]+this[[:space:]]+no[[:space:]]+matter) ]] \
 	|| [[ "${PROMPT}" =~ (멈추지|止まるな|不要停) ]]; then
 	DETECTED_KEYWORDS+=("ralph")
-	ADDITIONAL_CONTEXT+="[RALPH MODE DETECTED] Activate persistence mode - do not stop until verified complete. "
+	ADDITIONAL_CONTEXT+="[RALPH MODE DETECTED] Activate persistence mode - do not stop until verified complete."$'\n'
 fi
 
 if [[ "${PROMPT_LOWER}" =~ (ulw|ultrawork|as[[:space:]]+fast[[:space:]]+as[[:space:]]+possible|run[[:space:]]+in[[:space:]]+parallel|simultaneously) ]] \
 	|| [[ "${PROMPT}" =~ (울트라워크|ウルトラワーク|极限工作) ]]; then
 	DETECTED_KEYWORDS+=("ultrawork")
-	ADDITIONAL_CONTEXT+="[ULTRAWORK MODE DETECTED] Activate maximum parallel execution. "
+	ADDITIONAL_CONTEXT+="[ULTRAWORK MODE DETECTED] Activate maximum parallel execution."$'\n'
 fi
 
 if [[ "${PROMPT_LOWER}" =~ (stop[[:space:]]+continuation|pause[[:space:]]+automation|take[[:space:]]+manual[[:space:]]+control) ]]; then
 	DETECTED_KEYWORDS+=("stop-continuation")
-	ADDITIONAL_CONTEXT+="[STOP CONTINUATION DETECTED] Halt all automated work — ralph and boulder state. "
+	ADDITIONAL_CONTEXT+="[STOP CONTINUATION DETECTED] Halt all automated work — ralph and boulder state."$'\n'
 fi
 
 if [[ "${PROMPT_LOWER}" =~ ^(stop|cancel|abort)$ ]] || [[ "${PROMPT_LOWER}" =~ (^stop[[:space:]]|[[:space:]]stop$|^cancel[[:space:]]|[[:space:]]cancel$|^abort[[:space:]]|[[:space:]]abort$) ]]; then
 	DETECTED_KEYWORDS+=("cancel")
-	ADDITIONAL_CONTEXT+="[CANCEL DETECTED] User wants to stop current operation. Invoke cancel skill. "
+	ADDITIONAL_CONTEXT+="[CANCEL DETECTED] User wants to stop current operation. Invoke cancel skill."$'\n'
 fi
 
 if [[ "${PROMPT_LOWER}" =~ (handoff|context[[:space:]]+is[[:space:]]+getting[[:space:]]+long|start[[:space:]]+fresh[[:space:]]+session) ]]; then
 	DETECTED_KEYWORDS+=("handoff")
-	ADDITIONAL_CONTEXT+="[HANDOFF MODE DETECTED] Create session handoff summary for new-session continuity. "
+	ADDITIONAL_CONTEXT+="[HANDOFF MODE DETECTED] Create session handoff summary for new-session continuity."$'\n'
 fi
 
 if [[ "${PROMPT_LOWER}" =~ (setup[[:space:]]+omca|omca[[:space:]]+setup) ]]; then
 	DETECTED_KEYWORDS+=("omca-setup")
-	ADDITIONAL_CONTEXT+="[OMCA-SETUP DETECTED] Run /oh-my-claudeagent:omca-setup to configure the environment. "
+	ADDITIONAL_CONTEXT+="[OMCA-SETUP DETECTED] Run /oh-my-claudeagent:omca-setup to configure the environment."$'\n'
 fi
 
 if [[ "${PROMPT_LOWER}" =~ (run[[:space:]]+atlas|atlas[[:space:]]+execute|atlas[[:space:]]+plan) ]]; then
 	DETECTED_KEYWORDS+=("atlas")
-	ADDITIONAL_CONTEXT+="[ATLAS DETECTED] Invoke /oh-my-claudeagent:atlas to execute work plans via the Atlas orchestrator. "
+	ADDITIONAL_CONTEXT+="[ATLAS DETECTED] Invoke /oh-my-claudeagent:atlas to execute work plans via the Atlas orchestrator."$'\n'
 fi
 
 if [[ "${PROMPT_LOWER}" =~ (run[[:space:]]+metis|metis[[:space:]]+analyze|pre-plan) ]]; then
 	DETECTED_KEYWORDS+=("metis")
-	ADDITIONAL_CONTEXT+="[METIS DETECTED] Invoke /oh-my-claudeagent:metis for pre-planning analysis. "
+	ADDITIONAL_CONTEXT+="[METIS DETECTED] Invoke /oh-my-claudeagent:metis for pre-planning analysis."$'\n'
 fi
 
 if [[ "${PROMPT_LOWER}" =~ (run[[:space:]]+prometheus|prometheus[[:space:]]+plan|create[[:space:]]+plan) ]]; then
 	DETECTED_KEYWORDS+=("prometheus-plan")
-	ADDITIONAL_CONTEXT+="[PROMETHEUS DETECTED] Invoke /oh-my-claudeagent:prometheus-plan for strategic planning. "
+	ADDITIONAL_CONTEXT+="[PROMETHEUS DETECTED] Invoke /oh-my-claudeagent:prometheus-plan for strategic planning."$'\n'
 fi
 
 if [[ "${PROMPT_LOWER}" =~ (run[[:space:]]+hephaestus|hephaestus[[:space:]]+fix|fix[[:space:]]+build|build[[:space:]]+broken) ]]; then
 	DETECTED_KEYWORDS+=("hephaestus")
-	ADDITIONAL_CONTEXT+="[HEPHAESTUS DETECTED] Invoke /oh-my-claudeagent:hephaestus to fix build failures. "
+	ADDITIONAL_CONTEXT+="[HEPHAESTUS DETECTED] Invoke /oh-my-claudeagent:hephaestus to fix build failures."$'\n'
 fi
 
 if [[ "${PROMPT_LOWER}" =~ (run[[:space:]]+sisyphus|sisyphus[[:space:]]+orchestrate|orchestrate[[:space:]]+this) ]]; then
 	DETECTED_KEYWORDS+=("sisyphus-orchestrate")
-	ADDITIONAL_CONTEXT+="[SISYPHUS DETECTED] Invoke /oh-my-claudeagent:sisyphus-orchestrate for master orchestration. "
+	ADDITIONAL_CONTEXT+="[SISYPHUS DETECTED] Invoke /oh-my-claudeagent:sisyphus-orchestrate for master orchestration."$'\n'
 fi
 
 # Conflict guard: ralph and ultrawork are mutually exclusive persistence modes.
