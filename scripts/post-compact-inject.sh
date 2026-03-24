@@ -56,5 +56,13 @@ if [[ -z "${CONTEXT}" ]]; then
 	exit 0
 fi
 
-ESCAPED=$(printf '[POST-COMPACTION CONTEXT RESTORE] %s' "${CONTEXT}" | jq -Rs .)
+# Fresh date after compaction (time may have passed)
+DATE_FRESH=$(LC_TIME=C date '+%A %B %d %Y %H' 2>/dev/null || echo "")
+if [[ -n "${DATE_FRESH}" ]]; then
+	read -r DOW MON DAY YEAR HOUR <<< "${DATE_FRESH}"
+	DATE_BLOCK="[CURRENT DATE] Today is ${DOW}, ${MON} ${DAY}, ${YEAR}. Current hour: ${HOUR} (local)."
+	ESCAPED=$(printf '%s\n[POST-COMPACTION CONTEXT RESTORE] %s' "${DATE_BLOCK}" "${CONTEXT}" | jq -Rs .)
+else
+	ESCAPED=$(printf '[POST-COMPACTION CONTEXT RESTORE] %s' "${CONTEXT}" | jq -Rs .)
+fi
 echo "{\"hookSpecificOutput\": {\"hookEventName\": \"SessionStart\", \"additionalContext\": ${ESCAPED}}}"

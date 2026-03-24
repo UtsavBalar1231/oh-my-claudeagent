@@ -22,6 +22,16 @@ SESSION_ID="${CLAUDE_SESSION_ID:-$(date +%s)-$$}"
 SESSION_STATE="${STATE_DIR}/session.json"
 TMP_FILE=$(mktemp)
 TS=$(date -Iseconds)
+
+# Time awareness — prevents defaulting to stale training data
+DATE_CONTEXT=$(LC_TIME=C date '+%A %B %d %Y %H' 2>/dev/null || echo "")
+if [[ -n "${DATE_CONTEXT}" ]]; then
+	read -r DOW MON DAY YEAR HOUR <<< "${DATE_CONTEXT}"
+	DATE_BLOCK="[CURRENT DATE] Today is ${DOW}, ${MON} ${DAY}, ${YEAR}. Current hour: ${HOUR} (local)."
+else
+	DATE_BLOCK=""
+fi
+
 jq -n \
 	--arg sid "${SESSION_ID}" \
 	--arg ts "${TS}" \
@@ -66,14 +76,26 @@ PLUGIN_MD="${PLUGIN_ROOT}/templates/claudemd.md"
 
 if [[ "${OMCA_CONFIGURED}" -eq 1 ]]; then
 	# CLAUDE.md already has the behavioral spec — just emit session metadata
-	SHORT_CONTEXT=$(printf 'Session %s initialized.%b' "${SESSION_ID}" "${SETUP_NOTICE}" | jq -Rs .)
+	if [[ -n "${DATE_BLOCK}" ]]; then
+		SHORT_CONTEXT=$(printf '%s\nSession %s initialized.%b' "${DATE_BLOCK}" "${SESSION_ID}" "${SETUP_NOTICE}" | jq -Rs .)
+	else
+		SHORT_CONTEXT=$(printf 'Session %s initialized.%b' "${SESSION_ID}" "${SETUP_NOTICE}" | jq -Rs .)
+	fi
 	echo "{\"hookSpecificOutput\": {\"hookEventName\": \"SessionStart\", \"additionalContext\": ${SHORT_CONTEXT}}}"
 elif [[ -f "${PLUGIN_MD}" ]]; then
 	# No CLAUDE.md setup — inject full behavioral template so plugin works out of the box
 	TEMPLATE=$(cat "${PLUGIN_MD}")
-	FULL_CONTEXT=$(printf 'Session %s initialized.\n\n%s%b' "${SESSION_ID}" "${TEMPLATE}" "${SETUP_NOTICE}" | jq -Rs .)
+	if [[ -n "${DATE_BLOCK}" ]]; then
+		FULL_CONTEXT=$(printf '%s\nSession %s initialized.\n\n%s%b' "${DATE_BLOCK}" "${SESSION_ID}" "${TEMPLATE}" "${SETUP_NOTICE}" | jq -Rs .)
+	else
+		FULL_CONTEXT=$(printf 'Session %s initialized.\n\n%s%b' "${SESSION_ID}" "${TEMPLATE}" "${SETUP_NOTICE}" | jq -Rs .)
+	fi
 	echo "{\"hookSpecificOutput\": {\"hookEventName\": \"SessionStart\", \"additionalContext\": ${FULL_CONTEXT}}}"
 else
-	FALLBACK_CONTEXT=$(printf 'Session %s initialized. State directory: %s%b' "${SESSION_ID}" "${STATE_DIR}" "${SETUP_NOTICE}" | jq -Rs .)
+	if [[ -n "${DATE_BLOCK}" ]]; then
+		FALLBACK_CONTEXT=$(printf '%s\nSession %s initialized. State directory: %s%b' "${DATE_BLOCK}" "${SESSION_ID}" "${STATE_DIR}" "${SETUP_NOTICE}" | jq -Rs .)
+	else
+		FALLBACK_CONTEXT=$(printf 'Session %s initialized. State directory: %s%b' "${SESSION_ID}" "${STATE_DIR}" "${SETUP_NOTICE}" | jq -Rs .)
+	fi
 	echo "{\"hookSpecificOutput\": {\"hookEventName\": \"SessionStart\", \"additionalContext\": ${FALLBACK_CONTEXT}}}"
 fi
