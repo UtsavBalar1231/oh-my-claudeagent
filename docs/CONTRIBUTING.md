@@ -49,6 +49,7 @@ memory: project                   # optional; enables persistent project memory
 Key rules:
 - Use `disallowedTools:` to restrict capabilities — never `tools:` (blocks MCP inheritance, [Known Limitations](../CLAUDE.md#agent-tools-allowlist-blocks-mcp-tool-inheritance))
 - Execution agents that are fork targets need `permissionMode: acceptEdits`
+- `permissionMode: plan` is now only used for triage and multimodal-looker; explore/librarian/oracle use `disallowedTools: Write, Edit, Agent` instead
 - Add the agent to the catalog table in `templates/claudemd.md`
 
 ## Adding a Skill
