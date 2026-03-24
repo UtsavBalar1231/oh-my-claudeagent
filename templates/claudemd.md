@@ -1,6 +1,6 @@
 --- omca-setup
 plugin: oh-my-claudeagent
-version: 1.3.0
+version: 1.4.0
 author: UtsavBalar1231
 ---
 
