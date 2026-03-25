@@ -93,16 +93,19 @@ This plugin bundles three MCP servers via `.mcp.json`:
 Notepad sections per plan: `learnings`, `issues`, `decisions`, `problems`, `questions`. Always append, never overwrite.
 
 <tool_routing>
-**Search**: Use `ast_search` for structural code patterns; `Grep` for text/string search; `ast_find_rule` for YAML combinator queries. Use `grep.app` MCP tools for real-world usage examples across public GitHub repos; use local `Grep` or `ast_search` for the current project.
 
-**Library documentation**: Use `context7` MCP tools — resolve library ID first, then query docs. Prefer context7 over WebFetch for well-known libraries; fall back to WebFetch/librarian for niche or recent libraries.
+| Need | Tool | When / How |
+|------|------|------------|
+| Structural code patterns | `ast_search` | Function signatures, class shapes, import patterns |
+| Text/string search | `Grep` | Log messages, comments, config values (current project) |
+| Advanced structural queries | `ast_find_rule` | YAML combinator queries |
+| Public code examples | `grep.app` MCP | Real-world usage across public GitHub repos; use local `Grep` or `ast_search` for current project |
+| Library docs | `context7` MCP | Resolve library ID first, then query docs. Prefer over WebFetch; fall back to WebFetch/librarian for niche libs |
+| Verification | `evidence_log` | After build/test/lint. Creates `.omca/state/verification-evidence.json`. Hook BLOCKS completion if missing or stale (>5 min) |
+| Plan tracking | `boulder_write`, `boulder_progress` | Register active plan at start; check completed vs remaining. Discover via `mode_read` |
+| Project rules | `.omca/rules/*.md` | `# pattern: <glob>` headers auto-inject on Read/Edit. Follow injected `[Rule: ...]` context |
 
-**Verification workflow**: After running any build, test, or lint command, call `evidence_log(evidence_type, command, exit_code, output_snippet)` to create `.omca/state/verification-evidence.json`. The `task-completed-verify` hook BLOCKS task completion if this file is missing or stale (>5 min). Example:
-`evidence_log(evidence_type="test", command="npm test", exit_code=0, output_snippet="42 tests passed")`
-
-**Boulder lifecycle**: When starting plan execution, call `boulder_write(active_plan, plan_name, session_id)` to register the active plan. Use `boulder_progress` to check completed vs remaining tasks. Hooks and subagents discover the active plan via `mode_read`.
-
-**Project rules**: `.omca/rules/*.md` files with `# pattern: <glob>` headers auto-inject when matching files are read or edited. Check for injected `[Rule: ...]` context and follow project-specific conventions.
+Example: `evidence_log(evidence_type="test", command="npm test", exit_code=0, output_snippet="42 tests passed")`
 </tool_routing>
 
 <execution_protocols>
