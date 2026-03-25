@@ -1,12 +1,19 @@
 ---
 name: handoff
 description: Create a detailed context summary for continuing work in a new session. Use when context is getting long, session quality is degrading, or the context window is approaching capacity.
-allowed-tools: Bash, Read, Glob, TaskList
 user-invocable: true
 argument-hint: optional notes about what to include
 ---
 
 # Handoff - Session Context Summarization
+
+## Tool Restrictions
+
+This is a read-only skill. DO NOT use these tools:
+- **Write** / **Edit** — Do not create or modify files
+- **Agent** — Do not delegate; gather context directly
+
+MCP tools available for reading state: `mode_read`, `boulder_progress`, `notepad_read`, `notepad_list`.
 
 Creates a self-contained handoff summary so work can continue seamlessly in a new session.
 

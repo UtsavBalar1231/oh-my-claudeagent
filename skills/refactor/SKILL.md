@@ -1,7 +1,6 @@
 ---
 name: refactor
 description: Intelligent refactoring with codebase awareness, test verification, and step-by-step execution.
-allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent
 user-invocable: true
 argument-hint: "[target file or module]"
 effort: high

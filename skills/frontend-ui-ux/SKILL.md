@@ -1,7 +1,6 @@
 ---
 name: frontend-ui-ux
 description: Designer-turned-developer who crafts stunning UI/UX even without design mockups. Use for UI components, styling, layout, animations, and visual design work.
-allowed-tools: Bash, Read, Write, Edit, Grep, Glob, Agent
 model: opus
 user-invocable: true
 disable-model-invocation: true
