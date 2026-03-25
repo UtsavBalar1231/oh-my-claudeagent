@@ -1,7 +1,6 @@
 ---
 name: ultrawork
 description: Maximum parallel execution mode. Spawns multiple agents simultaneously for fastest completion. Use for "ulw", "ultrawork", "fast", "parallel".
-allowed-tools: Bash, Read, Write, Edit, Grep, Glob, Agent
 user-invocable: true
 model: sonnet
 argument-hint: "[task or list of parallel tasks]"

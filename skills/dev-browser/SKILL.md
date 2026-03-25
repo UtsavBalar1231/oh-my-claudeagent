@@ -1,7 +1,6 @@
 ---
 name: dev-browser
 description: "Browser automation with persistent page state. Use when users ask to navigate websites, fill forms, take screenshots, extract web data, test web apps, or automate browser workflows. Trigger phrases: 'go to [url]', 'click on', 'fill out the form', 'take a screenshot', 'scrape', 'automate', 'test the website', 'log into'."
-allowed-tools: Bash, Read, Write, Edit
 user-invocable: true
 disable-model-invocation: true
 argument-hint: "[url or automation task]"

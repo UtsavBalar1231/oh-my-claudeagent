@@ -1,7 +1,6 @@
 ---
 name: playwright
 description: MUST USE for any browser-related tasks. Browser automation via Playwright MCP - verification, browsing, information gathering, web scraping, testing, screenshots, and all browser interactions.
-allowed-tools: Bash, Read, Write
 argument-hint: "[url or browser task]"
 user-invocable: true
 ---

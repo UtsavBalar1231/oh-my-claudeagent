@@ -1,13 +1,19 @@
 ---
 name: ulw-loop
 description: "Ultrawork persistence loop. Like ralph, but requires Oracle verification before the loop exits. No iteration limit — only oracle-verified completion exits. Triggers: 'ulw-loop', 'ultrawork loop', 'oracle loop'."
-allowed-tools: Bash, Read, Grep, Glob, Agent
 model: sonnet
 user-invocable: true
 effort: high
 ---
 
 # ULW Loop — Oracle-Verified Persistence
+
+## Tool Restrictions
+
+This is an orchestration loop. DO NOT implement directly:
+- **Write** / **Edit** — Delegate all implementation to agents
+
+MCP tools available: `mode_read`, `mode_clear`, `boulder_progress`, `evidence_log`, `evidence_read`.
 
 ## Activation
 

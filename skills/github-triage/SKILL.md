@@ -1,13 +1,19 @@
 ---
 name: github-triage
 description: "Unified GitHub triage for issues AND PRs. 1 item = 1 background Agent (sisyphus-junior). Issues: answer questions from codebase, analyze bugs, assess features. PRs: review changes, assess merge safety. All parallel, all background. Triggers: 'triage', 'triage issues', 'triage PRs', 'github triage'."
-allowed-tools: Bash, Read, Grep, Glob, Agent, TaskCreate, TaskUpdate, TaskList
 model: sonnet
 argument-hint: "[repo] [--issues-only | --prs-only]"
 effort: medium
 ---
 
 # GitHub Triage — Unified Issue & PR Processor
+
+## Tool Restrictions
+
+This is a read-only analysis skill. DO NOT use:
+- **Write** / **Edit** — Do not modify any files; report findings only
+
+MCP tools available: `notepad_write` (record findings), `evidence_log` (after verification), `ast_search` (structural code search).
 
 You are a GitHub triage orchestrator. Fetch all open issues and PRs, classify each one, then spawn exactly 1 background sisyphus-junior subagent per item. Each subagent analyzes its item, produces a report, and writes it to `/tmp/{datetime}/`. Never take destructive action on GitHub items.
 

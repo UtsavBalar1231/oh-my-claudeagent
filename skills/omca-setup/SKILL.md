@@ -1,7 +1,6 @@
 ---
 name: omca-setup
 description: Configure ~/.claude/ for oh-my-claudeagent — injects orchestration block, checks deps, inspects setup state
-allowed-tools: Bash, Read, Write, Edit, Glob, Grep
 user-invocable: true
 argument-hint: "[--uninstall | --check | --doctor]"
 ---

@@ -1,7 +1,6 @@
 ---
 name: ralph
 description: Persistence loop that prevents stopping until task is verified complete by oracle. Use for "don't stop", "must complete", "ralph", or any task requiring guaranteed completion.
-allowed-tools: Bash, Read, Write, Edit, Grep, Glob, Agent, TaskCreate, TaskUpdate, TaskList
 user-invocable: true
 model: opus
 argument-hint: "[task description]"
