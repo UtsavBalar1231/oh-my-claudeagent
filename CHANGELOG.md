@@ -5,6 +5,66 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-04-02
+
+### Added
+
+- **Background agent barrier**: SubagentStop hook now injects `additionalContext` when
+  other agents are still running, telling the orchestrator to wait instead of acting on
+  partial results. Barrier instructions added to all agents and skills that launch
+  background agents (`subagent-complete.sh`, `sisyphus.md`, `atlas.md`, `socrates.md`,
+  `sisyphus-junior.md`, `github-triage`, `init-deep`, `ultrawork`)
+- **New hook events**: `TaskCreated`, `CwdChanged`, `FileChanged`, `WorktreeCreate`,
+  `WorktreeRemove` — lifecycle tracking via `lifecycle-state.sh`
+- **If-filtered permission handlers**: `PermissionRequest` hooks for `rm`, `npm`, `jq`,
+  `uv` with argument-level `if` field filtering to reduce process spawning overhead
+- **Output styles**: plugin-level output style system with `pluginConfigs` defaults and
+  `userConfig` schema
+- **Filesystem read tool**: `file_read` MCP tool for subagent path access outside project
+  root, bypassing sandbox scoping
+- **Claude-Native Orchestration Contract**: sisyphus and atlas agents now document the
+  boundary between OMCA policy and Claude-native surfaces (TaskCreated/TaskCompleted/
+  TeammateIdle governance)
+- **Mode state helpers**: `_mode_is_active`, `_mode_state_name`, `_mode_state_path` in
+  `common.sh` — shared boilerplate for mode detection across hook scripts
+- **Skill enhancements**: `paths:` frontmatter field, `shell:` field for atlas/handoff/
+  start-work, updated prometheus-plan and omca-setup for Claude-native planning
+- **Behavioral testing**: BATS + pytest infrastructure with fixtures for hook events,
+  permission filtering, and MCP tool validation
+
+### Changed
+
+- **Agent metadata migration**: all 13 agents moved cost/category/escalation metadata
+  from YAML frontmatter to HTML comments, eliminating platform-visible noise
+- **Prometheus/Metis/Momus**: migrated to Claude-native planning surfaces — plans and
+  review state use native plan files, not `.omca/` wrappers
+- **Subagent-start.sh restructure**: refactored context injection with section headers,
+  catalog injection for orchestrators, anti-duplication guidance, and external access
+  guidance
+- **Task-completed-verify.sh**: enhanced validation with stricter evidence schema checking
+- **Write-guard.sh**: improved evidence file handling
+- **PreToolUse matcher**: narrowed from `Task|Agent` to `Agent` only (Task tool was
+  renamed to Agent in Claude Code v2.1.63)
+- **Agent catalog simplification**: removed legacy `agent-metadata.json` server file;
+  catalog is now generated dynamically from agent frontmatter
+- **Mode state refactor**: `teammate-idle-guard.sh`, `stop-failure-handler.sh`,
+  `pre-compact.sh`, `session-cleanup.sh` refactored to use shared `_mode_is_active`
+  helper
+
+### Fixed
+
+- **Background agent notification stalls**: orchestrator agents now correctly wait for
+  all background agent notifications instead of acting on partial results — the "Esc to
+  flush" bug where queued task-notifications wouldn't trigger new turns
+- **MCP tool inheritance**: removed `allowed-tools` from skills that was blocking MCP
+  tool inheritance in subagents
+- **Read error recovery**: updated advice to reference `file_read` MCP tool instead of
+  `Bash(cat ...)`
+- **Multimodal-looker constraints**: added binary and device file constraints to prevent
+  invalid file reads
+
+[1.5.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.4.1...v1.5.0
+
 ## [1.4.1] - 2026-03-25
 
 ### Added
