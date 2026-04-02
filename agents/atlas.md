@@ -3,13 +3,12 @@ name: atlas
 description: Todo list orchestrator that completes ALL tasks via delegation until fully done. Use when given a work plan with multiple tasks to execute in sequence or parallel. Coordinates specialized agents and verifies every result.
 model: opus
 effort: high
-permissionMode: acceptEdits
 memory: project
-costTier: expensive
-category: deep
-triggers: ["run atlas", "execute all tasks", "complete all todos"]
-escalation: [sisyphus-junior, oracle]
 ---
+<!-- OMCA Metadata
+Cost: expensive | Category: deep | Escalation: sisyphus-junior, oracle
+Triggers: run atlas, execute all tasks, complete all todos
+-->
 
 # Atlas - Master Orchestrator
 
