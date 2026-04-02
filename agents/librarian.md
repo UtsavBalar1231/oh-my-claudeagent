@@ -8,11 +8,11 @@ disallowedTools:
   - Write
   - Edit
   - Agent
-costTier: free
-category: standard
-triggers: ["external library mentioned", "library docs", "SDK research", "OSS examples"]
-escalation: [explore, sisyphus-junior]
 ---
+<!-- OMCA Metadata
+Cost: free | Category: standard | Escalation: explore, sisyphus-junior
+Triggers: external library mentioned, library docs, SDK research, OSS examples
+-->
 
 # Librarian - Open-Source Research Specialist
 
