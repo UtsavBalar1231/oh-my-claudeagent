@@ -1,3 +1,11 @@
 {
-  "agent": "oh-my-claudeagent:sisyphus"
+  "agent": "oh-my-claudeagent:sisyphus",
+  "pluginConfigs": {
+    "oh-my-claudeagent@omca": {
+      "options": {
+        "enableKeywordTriggers": false,
+        "statuslineMode": "direct"
+      }
+    }
+  }
 }

@@ -17,5 +17,26 @@
     "planning",
     "delegation",
     "parallel-execution"
-  ]
+  ],
+  "outputStyles": "./output-styles/",
+  "userConfig": {
+    "enableKeywordTriggers": {
+      "title": "Enable keyword triggers",
+      "type": "boolean",
+      "description": "Optional compatibility setting for legacy keyword-trigger workflows (default: false).",
+      "sensitive": false
+    },
+    "statuslineMode": {
+      "title": "Statusline mode",
+      "type": "string",
+      "description": "Preferred OMCA statusline mode: off, direct, or daemon (default: direct).",
+      "sensitive": false
+    },
+    "defaultOrchestrator": {
+      "title": "Default orchestrator",
+      "type": "string",
+      "description": "Preferred orchestrator: sisyphus (default) or atlas.",
+      "sensitive": false
+    }
+  }
 }
