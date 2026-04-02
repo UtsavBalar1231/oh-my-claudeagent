@@ -76,6 +76,22 @@
 				"hooks": [
 					{
 						"type": "command",
+						"if": "Bash(rm *)",
+						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh"
+					},
+					{
+						"type": "command",
+						"if": "Bash(npm *)",
+						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh"
+					},
+					{
+						"type": "command",
+						"if": "Bash(jq *)",
+						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh"
+					},
+					{
+						"type": "command",
+						"if": "Bash(uv *)",
 						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh"
 					}
 				]
