@@ -28,6 +28,8 @@ Two steps are required — skipping either step produces dead code ([ADR-009](ad
    }
    ```
 
+Use the `if` field for argument-level filtering on tool events (`PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `PermissionRequest`): `"if": "Bash(git *)"` — permission rule syntax, reduces process spawning. Do not use on security-critical or dual-purpose hooks where a narrow filter would silently disable coverage.
+
 Plugin hook changes require `/reload-plugins` to take effect (not auto-reloaded).
 
 ## Adding an Agent
@@ -41,16 +43,15 @@ description: One-line role description
 model: opus|sonnet|haiku
 effort: max|high|medium|low
 disallowedTools: Write, Edit  # use disallowedTools, NOT tools:
-permissionMode: plan|acceptEdits  # optional; note: stripped from plugin agents (v2.1.77+)
 memory: project                   # optional; enables persistent project memory
 ---
 ```
 
 Key rules:
 - Use `disallowedTools:` to restrict capabilities — never `tools:` (blocks MCP inheritance, [Known Limitations](../CLAUDE.md#agent-tools-allowlist-blocks-mcp-tool-inheritance))
-- Execution agents that are fork targets need `permissionMode: acceptEdits`
-- `permissionMode: plan` is now only used for triage and multimodal-looker; explore/librarian/oracle use `disallowedTools: Write, Edit, Agent` instead
+- Do not declare `permissionMode:` — it is stripped from plugin agents by Claude Code for security
 - Add the agent to the catalog table in `templates/claudemd.md`
+- **`CLAUDE_CODE_SUBAGENT_MODEL` env var overrides ALL agent model declarations** — warn users if they set this, as it affects every spawned agent regardless of frontmatter.
 
 ## Adding a Skill
 
@@ -58,6 +59,7 @@ Key rules:
 2. Follow existing frontmatter format (`name`, `description`, `argument-hint` if applicable)
 3. If the skill should be keyword-activated, add a detection pattern to `scripts/keyword-detector.sh`
 4. Skills with `context: fork` run at depth 0 — use for orchestrators that need the `Agent` tool
+5. **Skill descriptions must be ≤250 characters** (Claude Code truncates at this limit). Move longer trigger phrases or usage notes into the SKILL.md body.
 
 ## Testing
 
@@ -73,6 +75,10 @@ just fmt-check       # format check without changes
 Add fixture payloads to `tests/fixtures/hooks/` for new hook scripts. The claims check
 validates counts declared in CLAUDE.md against on-disk reality — update counts when adding
 agents or skills.
+
+## Plugin Configuration
+
+**Custom paths replace defaults**: `commands`, `agents`, `skills`, and `outputStyles` fields in `plugin.json` replace the platform's default directories — they are not additive. To keep the default directory alongside a custom one, include the default path explicitly in the array.
 
 ## Release Process
 
