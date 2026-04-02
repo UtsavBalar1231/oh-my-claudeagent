@@ -7,11 +7,11 @@ memory: project
 disallowedTools:
   - Write
   - Edit
-costTier: expensive
-category: deep
-triggers: ["deep research", "iterative dialogue", "knowledge synthesis"]
-escalation: [oracle, explore]
 ---
+<!-- OMCA Metadata
+Cost: expensive | Category: deep | Escalation: oracle, explore
+Triggers: deep research, iterative dialogue, knowledge synthesis
+-->
 
 # Socrates - Deep Interview & Research Consultant
 
