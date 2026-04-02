@@ -8,12 +8,11 @@ disallowedTools:
   - Edit
   - Agent
 memory: project
-costTier: expensive
-category: deep
-triggers: ["2+ failed fix attempts", "architecture decision", "code review"]
-# Terminal advisor — no further escalation target
-escalation: []
 ---
+<!-- OMCA Metadata
+Cost: expensive | Category: deep | Escalation: (terminal — no further escalation target)
+Triggers: 2+ failed fix attempts, architecture decision, code review
+-->
 
 # Oracle - Strategic Technical Advisor
 
