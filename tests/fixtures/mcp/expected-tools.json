@@ -13,7 +13,10 @@
   "notepad_write",
   "notepad_read",
   "notepad_list",
+  "notepad_compact",
   "agents_list",
+  "health_check",
   "categories_list",
-  "concurrency_status"
+  "concurrency_status",
+  "file_read"
 ]
