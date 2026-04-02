@@ -6,11 +6,11 @@ effort: high
 memory: project
 disallowedTools:
   - Bash
-costTier: expensive
-category: deep
-triggers: ["create plan", "strategic planning", "requirement interview"]
-escalation: [metis, oracle]
 ---
+<!-- OMCA Metadata
+Cost: expensive | Category: deep | Escalation: metis, oracle
+Triggers: create plan, strategic planning, requirement interview
+-->
 
 # Prometheus - Strategic Planning Consultant
 
