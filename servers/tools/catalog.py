@@ -1,6 +1,5 @@
 """Agent catalog, categories, and concurrency status tools."""
 
-import contextlib
 import json
 import os
 import time
@@ -17,6 +16,12 @@ from tools.ast import discover_binary, get_sg_bin
 def register(mcp: FastMCP) -> None:
     """Register all catalog and concurrency tools on the given FastMCP instance."""
 
+    _MODEL_COST_TIER = {
+        "opus": "expensive",
+        "haiku": "free",
+        "sonnet": "cheap",
+    }
+
     @mcp.tool()
     def agents_list(
         working_directory: str = Field(
@@ -29,13 +34,6 @@ def register(mcp: FastMCP) -> None:
             Path(_env_val) if _env_val else Path(__file__).parent.parent.parent
         )
         agents_dir = plugin_root / "agents"
-        metadata_path = plugin_root / "servers" / "agent-metadata.json"
-
-        # Load legacy metadata as fallback for agents without frontmatter fields
-        legacy_metadata: dict = {}
-        if metadata_path.exists():
-            with contextlib.suppress(json.JSONDecodeError):
-                legacy_metadata = json.loads(metadata_path.read_text())
 
         catalog = []
         if agents_dir.is_dir():
@@ -46,36 +44,14 @@ def register(mcp: FastMCP) -> None:
                     if len(parts) >= 3:
                         fm = yaml.safe_load(parts[1]) or {}
                         name = fm.get("name", md_file.stem)
-                        # Prefer frontmatter fields; fall back to legacy JSON metadata
-                        meta = legacy_metadata.get(name, {})
-                        triggers = fm.get("triggers", [])
-                        key_trigger = (
-                            triggers[0]
-                            if isinstance(triggers, list) and triggers
-                            else (
-                                triggers
-                                if isinstance(triggers, str)
-                                else meta.get("key_trigger", "")
-                            )
-                        )
+                        model = fm.get("model", "sonnet")
+                        cost_tier = _MODEL_COST_TIER.get(model, "cheap")
                         catalog.append(
                             {
                                 "name": name,
                                 "description": fm.get("description", ""),
-                                "default_model": fm.get("model", "sonnet"),
-                                "agent_category": meta.get(
-                                    "agent_category", "specialist"
-                                ),
-                                "cost_tier": fm.get(
-                                    "costTier", meta.get("cost_tier", "cheap")
-                                ),
-                                "preferred_category": fm.get(
-                                    "category",
-                                    meta.get("preferred_category", "standard"),
-                                ),
-                                "when_to_use": meta.get("when_to_use", ""),
-                                "when_not_to_use": meta.get("when_not_to_use", ""),
-                                "key_trigger": key_trigger,
+                                "default_model": model,
+                                "cost_tier": cost_tier,
                             }
                         )
 
