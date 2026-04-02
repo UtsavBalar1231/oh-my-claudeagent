@@ -1,7 +1,5 @@
 """Tests for notepad MCP tools."""
 
-import os
-
 import pytest
 
 import tools.notepad as notepad_module
