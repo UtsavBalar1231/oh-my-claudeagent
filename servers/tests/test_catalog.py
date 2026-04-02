@@ -9,7 +9,6 @@ import pytest
 
 import tools.catalog as catalog_module
 
-
 REPO_ROOT = Path(__file__).parent.parent.parent
 
 
