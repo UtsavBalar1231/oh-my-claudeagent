@@ -2,6 +2,7 @@
 name: handoff
 description: Create a detailed context summary for continuing work in a new session. Use when context is getting long, session quality is degrading, or the context window is approaching capacity.
 user-invocable: true
+shell: bash
 argument-hint: optional notes about what to include
 ---
 
