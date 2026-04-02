@@ -3,15 +3,14 @@ name: metis
 description: Pre-planning consultant that analyzes requests before planning. Use when requirements are ambiguous, scope is unclear, or you need to identify hidden intentions, potential AI-slop patterns, and gaps before creating a work plan.
 model: opus
 effort: high
-permissionMode: acceptEdits
 disallowedTools:
   - Bash
 memory: project
-costTier: expensive
-category: deep
-triggers: ["pre-planning gap analysis", "risk identification", "run metis"]
-escalation: [prometheus, oracle]
 ---
+<!-- OMCA Metadata
+Cost: expensive | Category: deep | Escalation: prometheus, oracle
+Triggers: pre-planning gap analysis, risk identification, run metis
+-->
 
 # Metis - Pre-Planning Consultant
 
