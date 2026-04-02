@@ -15,23 +15,17 @@ TMP_CONTEXT="${STATE_DIR}/compaction-context.tmp.$$"
 ## Active Mode
 TEMPLATE
 
-	if [[ -f "${STATE_DIR}/ralph-state.json" ]]; then
-		STATUS=$(jq -r '.status // "inactive"' "${STATE_DIR}/ralph-state.json" 2>/dev/null)
-		if [[ "${STATUS}" == "active" ]]; then
-			printf '%s\n' "Ralph mode is ACTIVE. The boulder never stops. Continue working on incomplete tasks."
-			BOULDER_FILE="${STATE_DIR}/boulder.json"
-			if [[ -f "${BOULDER_FILE}" ]]; then
-				printf '\n## Active Plan Reference\n'
-				jq -r '.active_plan // "No plan file"' "${BOULDER_FILE}" 2>/dev/null || true
-			fi
+	if _mode_is_active "ralph" "${STATE_DIR}"; then
+		printf '%s\n' "Ralph mode is ACTIVE. The boulder never stops. Continue working on incomplete tasks."
+		BOULDER_FILE="${STATE_DIR}/boulder.json"
+		if [[ -f "${BOULDER_FILE}" ]]; then
+			printf '\n## Active Plan Reference\n'
+			jq -r '.active_plan // "No plan file"' "${BOULDER_FILE}" 2>/dev/null || true
 		fi
 	fi
 
-	if [[ -f "${STATE_DIR}/ultrawork-state.json" ]]; then
-		STATUS=$(jq -r '.status // "inactive"' "${STATE_DIR}/ultrawork-state.json" 2>/dev/null)
-		if [[ "${STATUS}" == "active" ]]; then
-			printf '%s\n' "ultrawork mode is ACTIVE. Continue working."
-		fi
+	if _mode_is_active "ultrawork" "${STATE_DIR}"; then
+		printf '%s\n' "Ultrawork mode is ACTIVE. Continue parallel work."
 	fi
 
 	# Include subagent session data for RESUME, DON'T RESTART directive
