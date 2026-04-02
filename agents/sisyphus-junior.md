@@ -149,6 +149,8 @@ Agent(subagent_type="oh-my-claudeagent:explore", prompt="Find auth patterns in c
 Agent(prompt="Implement the auth feature...")  // This will fail — Agent tool is not available to you
 ```
 
+**Background Agent Barrier**: When you launch background explore/librarian agents and receive a completion notification while other agents are still running, acknowledge briefly and END your response. Wait for all agents to complete before acting on their results.
+
 ## Escalation Rules
 
 When you encounter work outside your scope:

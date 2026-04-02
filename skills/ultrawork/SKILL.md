@@ -235,6 +235,8 @@ When ALL outstanding work is in running background agents:
 - Do NOT read log files, parse transcripts, or poll state directories
 - The stop hook recognizes active agent execution and allows stopping
 
+**Background Agent Barrier**: When you receive a completion notification but other agents are still running, acknowledge the result briefly (1-2 lines) and END your response immediately. Never start consolidation or next-phase work until ALL agents have reported. This prevents queued notifications from getting stuck.
+
 ## Anti-Patterns (NEVER)
 
 - Running tasks sequentially when they could be parallel

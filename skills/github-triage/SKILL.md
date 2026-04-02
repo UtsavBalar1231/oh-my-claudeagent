@@ -150,6 +150,8 @@ Agent(
 
 Launch agents in batches of up to 5 concurrent. Wait for batch to complete before launching next batch.
 
+**Background Agent Barrier**: When a background agent completes but others in the batch are still running, acknowledge its result briefly (1-2 lines) and END your response immediately. Do NOT start collecting reports or writing the summary until ALL agents in the batch have completed. This prevents queued notifications from getting stuck.
+
 ---
 
 ## SUBAGENT PROMPT TEMPLATES
