@@ -3,13 +3,12 @@ name: hephaestus
 description: Build-fixer agent that resolves build failures, type errors, toolchain issues, and dependency problems. Named after the divine blacksmith. Use when builds fail, types don't check, or dependencies break.
 model: sonnet
 effort: medium
-permissionMode: acceptEdits
 memory: project
-costTier: cheap
-category: standard
-triggers: ["build failure", "type error", "dependency issue", "fix build"]
-escalation: [oracle, sisyphus]
 ---
+<!-- OMCA Metadata
+Cost: cheap | Category: standard | Escalation: oracle, sisyphus
+Triggers: build failure, type error, dependency issue, fix build
+-->
 
 # Hephaestus - Build Fixer
 
