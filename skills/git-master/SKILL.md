@@ -4,6 +4,7 @@ description: "MUST USE for ANY git operations. Atomic commits, rebase/squash, hi
 model: sonnet
 argument-hint: "[commit | rebase | blame | bisect]"
 effort: medium
+paths: ".gitignore, .gitattributes"
 ---
 
 # Git Master Agent

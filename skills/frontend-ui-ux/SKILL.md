@@ -6,6 +6,7 @@ user-invocable: true
 disable-model-invocation: true
 argument-hint: "[component or page description]"
 effort: medium
+paths: "*.css, *.scss, *.tsx, *.jsx, *.vue, *.svelte, *.html"
 ---
 
 # Role: Designer-Turned-Developer
