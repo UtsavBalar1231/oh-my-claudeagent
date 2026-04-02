@@ -1,6 +1,6 @@
 [project]
 name = "oh-my-claudeagent-server"
-version = "1.4.1"
+version = "1.5.0"
 description = "MCP server for oh-my-claudeagent plugin"
 requires-python = ">=3.10"
 license = "MIT"
