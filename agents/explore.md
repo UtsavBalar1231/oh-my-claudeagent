@@ -8,11 +8,11 @@ disallowedTools:
   - Write
   - Edit
   - Agent
-costTier: free
-category: standard
-triggers: ["2+ modules involved", "find X", "where is X", "which file has"]
-escalation: [sisyphus, oracle]
 ---
+<!-- OMCA Metadata
+Cost: free | Category: standard | Escalation: sisyphus, oracle
+Triggers: 2+ modules involved, find X, where is X, which file has
+-->
 
 # Explorer - Codebase Search Specialist
 
