@@ -27,13 +27,12 @@ _write_fresh_evidence() {
 	assert_success
 }
 
-# ─── c. Evidence missing, task claims verification → allow (no edits) ────────
-# Script logic: block only when RECENT_EDITS=true AND NEEDS_EVIDENCE=true and no evidence.
-# With no edits log, even a verification-sounding task is allowed (informational fallback).
+# ─── c. Evidence missing, task claims verification → block ────────────────────
 
-@test "no evidence, no edits log, verification task: exits 0 (informational fallback)" {
+@test "no evidence, no edits log, verification task: exits 2 (block)" {
 	run_hook "task-completed-verify.sh" "$TASK_VERIFY"
-	assert_success
+	[ "$status" -eq 2 ]
+	assert_output --partial "requires verification evidence"
 }
 
 # ─── d. Recent edits + no evidence + verification task → block ────────────────
