@@ -16,18 +16,8 @@ LAST_MSG=$(echo "${INPUT}" | jq -r '.last_assistant_message // ""' 2>/dev/null)
 RALPH_ACTIVE=false
 ULTRAWORK_ACTIVE=false
 
-RALPH_STATE="${STATE_DIR}/ralph-state.json"
-ULTRAWORK_STATE="${STATE_DIR}/ultrawork-state.json"
-
-if [[ -f "${RALPH_STATE}" ]]; then
-	STATUS=$(jq -r '.status // "inactive"' "${RALPH_STATE}" 2>/dev/null)
-	[[ "${STATUS}" == "active" ]] && RALPH_ACTIVE=true
-fi
-
-if [[ -f "${ULTRAWORK_STATE}" ]]; then
-	STATUS=$(jq -r '.status // "inactive"' "${ULTRAWORK_STATE}" 2>/dev/null)
-	[[ "${STATUS}" == "active" ]] && ULTRAWORK_ACTIVE=true
-fi
+_mode_is_active "ralph" "${STATE_DIR}" && RALPH_ACTIVE=true
+_mode_is_active "ultrawork" "${STATE_DIR}" && ULTRAWORK_ACTIVE=true
 
 # Build log entry
 if [[ "${RALPH_ACTIVE}" == "true" || "${ULTRAWORK_ACTIVE}" == "true" ]]; then
@@ -52,6 +42,6 @@ else
 fi
 
 LOG_FILE="${LOG_DIR}/stop-failures.jsonl"
-echo "${LOG_ENTRY}" >> "${LOG_FILE}"
+echo "${LOG_ENTRY}" >>"${LOG_FILE}"
 
 exit 0
