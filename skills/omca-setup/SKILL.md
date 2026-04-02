@@ -2,6 +2,7 @@
 name: omca-setup
 description: Configure ~/.claude/ for oh-my-claudeagent — injects orchestration block, checks deps, inspects setup state
 user-invocable: true
+shell: bash
 argument-hint: "[--uninstall | --check | --doctor]"
 ---
 
@@ -10,7 +11,29 @@ argument-hint: "[--uninstall | --check | --doctor]"
 One-command setup for oh-my-claudeagent. Updates the orchestration block in `~/.claude/CLAUDE.md`,
 checks dependencies, inspects current plugin registration state, and prints rollout guidance.
 
-This skill does not run marketplace install commands on the user's behalf, does not auto-edit shared or managed Claude Code settings, and does not claim to enforce enterprise policy keys such as `strictKnownMarketplaces`, `blockedMarketplaces`, `allowManagedHooksOnly`, `allowManagedPermissionRulesOnly`, or `allowManagedMcpServersOnly`.
+This skill does not run marketplace install commands on the user's behalf, does not auto-register the plugin in `~/.claude/settings.json`, does not auto-edit shared or managed Claude Code settings, and does not claim to enforce enterprise policy keys such as `strictKnownMarketplaces`, `blockedMarketplaces`, `allowManagedHooksOnly`, `allowManagedPermissionRulesOnly`, or `allowManagedMcpServersOnly`.
+
+Policy baseline: Claude Code native settings are authoritative. Keep `teammateMode: "auto"` as the normal operating mode, treat managed settings as the non-overridable policy layer, and remember `permission-filter.sh` is guardrail-only (it does not auto-allow command execution).
+
+Latest install/update flow reminders:
+
+- Install: `/plugin marketplace add UtsavBalar1231/oh-my-claudeagent` then `/plugin install oh-my-claudeagent@omca`
+- Update: `/plugin marketplace update omca` then `/plugin install oh-my-claudeagent@omca`
+- Apply changes in-session: `/reload-plugins`
+
+`--bare` caveat: `claude --bare` skips plugin, hooks, skills, MCP, and CLAUDE.md auto-discovery. Run setup/install guidance in normal (non-`--bare`) Claude Code sessions.
+
+Plugin options baseline:
+
+- `enableKeywordTriggers`: boolean, default `false` (keyword triggers remain optional/off by default)
+- `statuslineMode`: enum `off|direct|daemon`, default `direct`
+
+Sandbox expectation baseline:
+
+- For fail-closed environments, use `sandbox.failIfUnavailable: true` in managed settings.
+- This skill can explain/report sandbox posture; it does not bypass or relax host sandbox enforcement.
+
+Bundled output style: `output-styles/omca-default.md` (manifest path `"outputStyles": "./output-styles/"`).
 
 ---
 
@@ -162,8 +185,10 @@ Write the composed content to `~/.claude/CLAUDE.md`.
      "enabledPlugins": {
        "oh-my-claudeagent@omca": true
      }
-   }
-   ```
+    }
+    ```
+
+   Make the ownership boundary explicit: this skill can inspect `~/.claude/settings.json` and print the supported install snippets, but it must not register the plugin automatically in that file.
 
 4. Print enterprise rollout guidance (inspection only; do not write or enforce it):
    - `strictKnownMarketplaces` → allow only marketplaces your admins approve
@@ -171,35 +196,39 @@ Write the composed content to `~/.claude/CLAUDE.md`.
    - `allowManagedHooksOnly` → allow only hooks defined in managed settings
    - `allowManagedPermissionRulesOnly` → allow only managed permission rules
    - `allowManagedMcpServersOnly` → allow only managed MCP server definitions
+   - `sandbox.failIfUnavailable` → fail closed if the sandbox cannot be applied
 
    Explain that these keys belong in managed settings when the organization needs non-overridable policy, and that this skill can only point the user/admin at them.
+   Also explain that marketplace-installed copies run from `~/.claude/plugins/cache/...`, and that the local `omca` MCP server bootstraps its ast-grep Python environment inside the active plugin root or cache copy rather than inside shared global state.
 
 ---
 
 ### Phase 5.5: Settings Configuration
 
-Apply permission and settings changes to `~/.claude/settings.json` with user confirmation.
+Apply optional user-scope helper settings to `~/.claude/settings.json` with user confirmation.
 
 1. Read `~/.claude/settings.json` (if exists; if not, start with `{}`)
 
-2. Compute missing permissions against the required set:
+2. Detect managed-policy lock keys in current scope (`allowManagedHooksOnly`, `allowManagedPermissionRulesOnly`, `allowManagedMcpServersOnly`). If present and true, do not propose local permission-rule writes; report that managed policy owns permission enforcement.
+
+3. Compute missing optional helper permissions against the recommended set:
    - `Write(.omca/**)`, `Edit(.omca/**)`, `Read(.omca/**)`
    - `mcp__plugin_oh-my-claudeagent_omca__*`, `mcp__grep__*`, `mcp__context7__*`
    - `Bash(jq *)`, `Bash(uv run *)`, `Bash(uv sync *)`
 
-3. Compute missing top-level: `teammateMode: "auto"`
+4. Compute missing top-level: `teammateMode: "auto"`
 
-4. Compute missing env vars against the required set:
+5. Compute missing env vars against the required set:
    - `ANTHROPIC_DEFAULT_OPUS_MODEL`: `"claude-opus-4-6[1m]"` — routes opus-tier agents to extended-thinking model
    - `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`: `"1"` — enables agent teams (required for `teammateMode: "auto"`)
 
-5. If all present: "Settings already configured" — skip
+6. If all present: "Settings already configured" — skip
 
-6. If changes needed: show diff, use `AskUserQuestion` to confirm
+7. If changes needed: show diff, use `AskUserQuestion` to confirm
 
-7. On confirm: read-merge-write with `jq` (handle nonexistent file)
+8. On confirm: read-merge-write with `jq` (handle nonexistent file)
 
-8. On decline: print raw jq command as fallback:
+9. On decline: print raw jq command as fallback:
    ```
    jq '. + {
      "teammateMode": "auto"
@@ -219,13 +248,14 @@ Apply permission and settings changes to `~/.claude/settings.json` with user con
    ]' ~/.claude/settings.json > /tmp/claude-settings-tmp.json && mv /tmp/claude-settings-tmp.json ~/.claude/settings.json
    ```
 
-9. Explain each setting:
+10. Explain each setting:
    - `teammateMode: "auto"` — enables agent teams with best available UI (tmux/iTerm2 split panes)
    - `ANTHROPIC_DEFAULT_OPUS_MODEL` — routes opus-tier agents (oracle, prometheus, metis, atlas, sisyphus, momus) to `claude-opus-4-6[1m]` for extended thinking
    - `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` — enables the experimental agent teams feature, required for `teammateMode: "auto"` to function
-   - `Write(.omca/**)` / `Edit(.omca/**)` / `Read(.omca/**)` — auto-allow plugin state file access
-   - `mcp__plugin_oh-my-claudeagent_omca__*` / `mcp__grep__*` / `mcp__context7__*` — auto-allow bundled MCP tool usage
-   - `Bash(jq *)` / `Bash(uv run *)` / `Bash(uv sync *)` — auto-allow common plugin utility commands (narrowed from `Bash(uv *)`)
+    - `Write(.omca/**)` / `Edit(.omca/**)` / `Read(.omca/**)` — auto-allow plugin state file access
+    - `mcp__plugin_oh-my-claudeagent_omca__*` / `mcp__grep__*` / `mcp__context7__*` — auto-allow bundled MCP tool usage
+    - `Bash(jq *)` / `Bash(uv run *)` / `Bash(uv sync *)` — auto-allow common plugin utility commands (narrowed from `Bash(uv *)`)
+    - These are optional local helper allowances; managed settings remain the policy authority.
 
 ---
 
@@ -460,7 +490,7 @@ Non-destructive health check — no files are modified.
 3. Check `~/.claude/settings.json`:
     - Is the plugin enabled in user settings? Report method (marketplace via enabledPlugins / dev mode via --plugin-dir / legacy plugins array / not registered)
     - Are required env vars configured (`ANTHROPIC_DEFAULT_OPUS_MODEL`, `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`)? Report each as PASS/WARN
-    - Remind the user that managed policy keys such as `strictKnownMarketplaces`, `blockedMarketplaces`, `allowManagedHooksOnly`, `allowManagedPermissionRulesOnly`, and `allowManagedMcpServersOnly` are outside this skill's enforcement scope
+    - Remind the user that managed policy keys such as `strictKnownMarketplaces`, `blockedMarketplaces`, `allowManagedHooksOnly`, `allowManagedPermissionRulesOnly`, `allowManagedMcpServersOnly`, and `sandbox.failIfUnavailable` are outside this skill's enforcement scope
 
 4. Check `.omca/` state:
    - Do state directories exist?
