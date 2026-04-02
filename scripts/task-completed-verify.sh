@@ -10,6 +10,13 @@ BLOCK_EXIT_CODE=2
 MAX_EVIDENCE_AGE_SECONDS=300
 
 TASK_DESCRIPTION=$(echo "${INPUT}" | jq -r '.task_description // .description // ""' 2>/dev/null || echo "")
+TEAMMATE_NAME=$(echo "${INPUT}" | jq -r '.teammate_name // ""' 2>/dev/null || echo "")
+TEAM_NAME=$(echo "${INPUT}" | jq -r '.team_name // ""' 2>/dev/null || echo "")
+
+# Log agent identity for audit trail when present
+if [[ -n "${TEAMMATE_NAME}" ]] || [[ -n "${TEAM_NAME}" ]]; then
+	echo "{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"hook\":\"task-completed-verify.sh\",\"teammate_name\":\"${TEAMMATE_NAME}\",\"team_name\":\"${TEAM_NAME}\",\"task\":\"${TASK_DESCRIPTION:0:100}\"}" >>"${LOG_DIR}/task-verify-audit.jsonl" 2>/dev/null
+fi
 
 EVIDENCE_FILE="${STATE_DIR}/verification-evidence.json"
 
@@ -55,10 +62,11 @@ if [[ "${TASK_DESCRIPTION}" =~ (verify|test|build|typecheck|lint|validate|fix|im
 	NEEDS_EVIDENCE=true
 fi
 
-# Evidence-aware logic:
-# 1. Recent evidence → ALLOW (already verified)
-# 2. Recent edits but no recent evidence → BLOCK (files were modified without verification)
-# 3. No recent edits and no recent evidence → ALLOW (informational task, nothing to verify)
+# Explore/librarian agents perform research only — no build evidence required
+if [[ "${TEAMMATE_NAME}" == "explore" || "${TEAMMATE_NAME}" == "librarian" ]]; then
+	NEEDS_EVIDENCE=false
+fi
+
 if [[ "${RECENT_EVIDENCE}" == "true" ]]; then
 	# Schema validation — reject manually-written files
 	if ! jq -e '
@@ -74,13 +82,14 @@ if [[ "${RECENT_EVIDENCE}" == "true" ]]; then
 		echo "Verification evidence has invalid schema. Use the evidence_log MCP tool (NOT manual file writes). Required: entries[] with type, command, exit_code, output_snippet, timestamp fields." >&2
 		exit "${BLOCK_EXIT_CODE}"
 	fi
-	# Valid recent evidence — allow
-elif [[ "${RECENT_EDITS}" == "true" ]] && [[ "${NEEDS_EVIDENCE}" == "true" ]]; then
-	# Files were modified but no verification was run
-	_log_hook_error "edits without evidence for task: ${TASK_DESCRIPTION:0:100}" "task-completed-verify.sh"
-	echo "Files were modified but no verification evidence was recorded. Use the evidence_log MCP tool after running build/test commands. Example: evidence_log(evidence_type=\"test\", command=\"just test\", exit_code=0, output_snippet=\"10 passed\")" >&2
+elif [[ "${NEEDS_EVIDENCE}" == "true" ]]; then
+	_log_hook_error "missing verification evidence for task: ${TASK_DESCRIPTION:0:100}" "task-completed-verify.sh"
+	if [[ "${RECENT_EDITS}" == "true" ]]; then
+		echo "Files were modified but no verification evidence was recorded. Use the evidence_log MCP tool after running build/test commands. Example: evidence_log(evidence_type=\"test\", command=\"just test\", exit_code=0, output_snippet=\"10 passed\")" >&2
+	else
+		echo "Task completion requires verification evidence, but no recent verification evidence was recorded. Use the evidence_log MCP tool after running the relevant build/test/lint command. Example: evidence_log(evidence_type=\"test\", command=\"just test\", exit_code=0, output_snippet=\"10 passed\")" >&2
+	fi
 	exit "${BLOCK_EXIT_CODE}"
 fi
-# else: no recent edits, no recent evidence → informational task, allow silently
 
 exit 0
