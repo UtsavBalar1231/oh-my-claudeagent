@@ -3,7 +3,6 @@
 # TeammateIdle hook — two distinct response mechanisms:
 #   exit 2            → "block idle transition, keep teammate working" (ralph/ultrawork)
 #   {"continue":false} → "stop the teammate entirely" (stalled agent timeout)
-
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
@@ -12,16 +11,10 @@ STATE_DIR="${HOOK_STATE_DIR}"
 BLOCK_EXIT_CODE=2
 
 # 1. If ralph/ultrawork active → exit 2 (keep working, don't go idle)
-for MODE_FILE in ralph-state.json ultrawork-state.json; do
-	if [[ -f "${STATE_DIR}/${MODE_FILE}" ]]; then
-		STATUS=$(jq -r '.status // "inactive"' "${STATE_DIR}/${MODE_FILE}" 2>/dev/null || echo "")
-		if [[ -z "${STATUS}" ]]; then
-			continue
-		fi
-		if [[ "${STATUS}" == "active" ]]; then
-			echo "Persistence mode is active. Continue working." >&2
-			exit "${BLOCK_EXIT_CODE}"
-		fi
+for MODE_NAME in ralph ultrawork; do
+	if _mode_is_active "${MODE_NAME}" "${STATE_DIR}"; then
+		echo "Persistence mode is active. Continue working." >&2
+		exit "${BLOCK_EXIT_CODE}"
 	fi
 done
 
@@ -46,7 +39,7 @@ if [[ -f "${SUBAGENTS_FILE}" ]]; then
 
 	if [[ -n "${STARTED_EPOCH}" && "${STARTED_EPOCH}" != "null" && "${STARTED_EPOCH}" != "0" ]]; then
 		if [[ "${STARTED_EPOCH}" =~ ^[0-9]+$ ]]; then
-			ELAPSED=$(( NOW - STARTED_EPOCH ))
+			ELAPSED=$((NOW - STARTED_EPOCH))
 			if [[ "${ELAPSED}" -gt "${TIMEOUT_SECS}" ]]; then
 				printf '{"continue": false, "stopReason": "Agent exceeded timeout (%ds elapsed, %ds limit)"}\n' \
 					"${ELAPSED}" "${TIMEOUT_SECS}"
