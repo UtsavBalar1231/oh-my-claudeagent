@@ -2,7 +2,8 @@
 """
 omca-mcp — MCP server for oh-my-claudeagent.
 Provides structural code search (ast-grep), work plan tracking (boulder),
-verification evidence, and subagent learning notepads.
+verification evidence, subagent learning notepads, and filesystem access
+for sandbox-scoped subagents.
 """
 
 import signal
@@ -10,13 +11,14 @@ import sys
 
 from mcp.server.fastmcp import FastMCP
 
-from tools import ast as ast_tools, boulder, catalog, evidence, notepad
+from tools import ast as ast_tools, boulder, catalog, evidence, filesystem, notepad
 
 mcp = FastMCP("omca")
 
 ast_tools.register(mcp)
 boulder.register(mcp)
 evidence.register(mcp)
+filesystem.register(mcp)
 notepad.register(mcp)
 catalog.register(mcp)
 
