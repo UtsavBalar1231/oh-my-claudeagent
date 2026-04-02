@@ -104,14 +104,14 @@ If your findings reveal work that exceeds search scope, include a recommendation
 
 ## External Directory Access
 
-Use `Bash` with `cat` for files outside the project root:
+The built-in `Read` tool is scoped to the project root for subagents. For files outside the project root, use the `file_read` MCP tool (available via ToolSearch):
 
-```bash
-# Instead of Read("/external/path/file.py")
-cat /external/path/file.py
+```
+# Instead of Read("/external/path/file.py"):
+file_read(path="/external/path/file.py")
 ```
 
-The `Read` tool is scoped to the project root for subagents. `Bash(cat ...)` bypasses this scope restriction.
+This bypasses sandbox scoping and works in all contexts including plan mode. Fallback: `Bash(cat /path)` when not in plan mode.
 
 ## Tool Strategy
 
