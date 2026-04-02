@@ -1,12 +1,19 @@
 ---
 name: github-triage
-description: "Unified GitHub triage for issues AND PRs. 1 item = 1 background Agent (sisyphus-junior). Issues: answer questions from codebase, analyze bugs, assess features. PRs: review changes, assess merge safety. All parallel, all background. Triggers: 'triage', 'triage issues', 'triage PRs', 'github triage'."
+description: "Unified GitHub triage for issues AND PRs. 1 item = 1 background Agent (sisyphus-junior). Issues: answer questions from codebase, analyze bugs, assess features. PRs: review changes, assess merge safety. All parallel, all background."
 model: sonnet
 argument-hint: "[repo] [--issues-only | --prs-only]"
 effort: medium
 ---
 
 # GitHub Triage — Unified Issue & PR Processor
+
+## Trigger Phrases
+
+- "triage"
+- "triage issues"
+- "triage PRs"
+- "github triage"
 
 ## Tool Restrictions
 
