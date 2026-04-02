@@ -4,14 +4,13 @@ description: Lightweight request classifier. Routes simple tasks to direct execu
 model: haiku
 effort: low
 disallowedTools: Write, Edit, Agent
-permissionMode: plan
 memory: project
 maxTurns: 5
-costTier: free
-category: quick
-triggers: ["ambiguous request scope", "unclear request"]
-escalation: [sisyphus, sisyphus-junior, prometheus]
 ---
+<!-- OMCA Metadata
+Cost: free | Category: quick | Escalation: sisyphus, sisyphus-junior, prometheus
+Triggers: ambiguous request scope, unclear request
+-->
 
 # Triage Agent
 
