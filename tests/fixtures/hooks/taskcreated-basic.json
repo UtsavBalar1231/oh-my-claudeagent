@@ -1,0 +1,8 @@
+{
+  "session_id": "ses_fixture",
+  "cwd": "/tmp/project",
+  "hook_event_name": "TaskCreated",
+  "task_id": "task-001",
+  "task_subject": "Refresh hook lifecycle coverage",
+  "task_description": "Add lifecycle support for the latest upstream events"
+}

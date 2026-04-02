@@ -1,0 +1,7 @@
+{
+  "session_id": "ses_fixture",
+  "cwd": "/tmp/project/hooks",
+  "hook_event_name": "CwdChanged",
+  "old_cwd": "/tmp/project",
+  "new_cwd": "/tmp/project/hooks"
+}

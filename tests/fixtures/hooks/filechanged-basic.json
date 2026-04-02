@@ -1,0 +1,7 @@
+{
+  "session_id": "ses_fixture",
+  "cwd": "/tmp/project",
+  "hook_event_name": "FileChanged",
+  "file_path": "/tmp/project/.claude/settings.json",
+  "event": "change"
+}
