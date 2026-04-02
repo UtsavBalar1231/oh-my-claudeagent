@@ -3,16 +3,15 @@ name: momus
 description: Rigorous work plan reviewer that catches gaps, ambiguities, and missing context. Use after creating a work plan to validate clarity, verifiability, and completeness before execution. Ruthlessly critical to prevent implementation failures.
 model: opus
 effort: high
-permissionMode: acceptEdits
 disallowedTools:
   - Bash
   - Agent
 memory: project
-costTier: expensive
-category: deep
-triggers: ["plan review", "review the plan", "critique plan"]
-escalation: [prometheus, metis]
 ---
+<!-- OMCA Metadata
+Cost: expensive | Category: deep | Escalation: prometheus, metis
+Triggers: plan review, review the plan, critique plan
+-->
 
 # Momus - Work Plan Reviewer
 
