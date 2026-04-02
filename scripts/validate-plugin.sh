@@ -11,10 +11,18 @@ MCP_JSON="${REPO_ROOT}/.mcp.json"
 HOOK_FIXTURES_DIR="${REPO_ROOT}/tests/fixtures/hooks"
 MCP_FIXTURES_DIR="${REPO_ROOT}/tests/fixtures/mcp"
 MCP_SERVER_PROJECT="${REPO_ROOT}/servers"
+OMCA_MD="${REPO_ROOT}/OMCA.md"
+TEMPLATE_CLAUDEMD_MD="${REPO_ROOT}/templates/claudemd.md"
+OMCA_SETUP_SKILL_MD="${REPO_ROOT}/skills/omca-setup/SKILL.md"
+
+AGENTS_DIR="${VALIDATE_PLUGIN_AGENTS_DIR:-${REPO_ROOT}/agents}"
+FORCE_HARD_CUTOVER="${VALIDATE_PLUGIN_FORCE_HARD_CUTOVER:-0}"
 
 PASS_COUNT=0
 FAIL_COUNT=0
 SKIP_COUNT=0
+WARN_COUNT=0
+HARD_CUTOVER_ACTIVE=0
 
 MARKETPLACE_PATH="${DEFAULT_MARKETPLACE_JSON}"
 MARKETPLACE_OVERRIDE=0
@@ -41,13 +49,18 @@ skip() {
 	log "SKIP: $1"
 }
 
+warn() {
+	WARN_COUNT=$((WARN_COUNT + 1))
+	log "WARN: $1"
+}
+
 usage() {
 	cat <<'USAGE'
 Usage: bash scripts/validate-plugin.sh [options]
 
 Options:
   --check <claims|hooks|mcp>   Run a specific check (repeatable)
-  --case <name>                Named hook scenario (supports: compaction-race)
+  --case <name>                Named hook scenario (supports: compaction-race, worktree-output-missing)
   --marketplace <path>         Override marketplace JSON path
   --help                       Show this help text
 
@@ -84,6 +97,249 @@ validate_json_file() {
 
 	fail "${label}: invalid JSON (${file_path})"
 	return 1
+}
+
+semver_major() {
+	local version="$1"
+
+	if [[ "${version}" =~ ^([0-9]+)\. ]]; then
+		printf '%s' "${BASH_REMATCH[1]}"
+		return 0
+	fi
+
+	return 1
+}
+
+set_hard_cutover_mode() {
+	local plugin_version="$1"
+	local marketplace_version="$2"
+	local plugin_major=""
+	local marketplace_major=""
+
+	HARD_CUTOVER_ACTIVE=0
+
+	if [[ "${FORCE_HARD_CUTOVER}" == "1" ]]; then
+		HARD_CUTOVER_ACTIVE=1
+		pass "migration marker: forced hard-cutover mode via VALIDATE_PLUGIN_FORCE_HARD_CUTOVER=1"
+		return 0
+	fi
+
+	if ! plugin_major="$(semver_major "${plugin_version}")"; then
+		fail "migration marker: plugin version '${plugin_version}' is not semver-compatible"
+		return 1
+	fi
+
+	if ! marketplace_major="$(semver_major "${marketplace_version}")"; then
+		fail "migration marker: marketplace version '${marketplace_version}' is not semver-compatible"
+		return 1
+	fi
+
+	if [[ "${plugin_major}" -ge 2 || "${marketplace_major}" -ge 2 ]]; then
+		if [[ "${plugin_major}" -ge 2 && "${marketplace_major}" -ge 2 ]]; then
+			HARD_CUTOVER_ACTIVE=1
+			pass "migration marker: hard-cutover mode active at plugin=${plugin_version}, marketplace=${marketplace_version}"
+		else
+			fail "migration marker: plugin/marketplace major versions diverge (${plugin_version} vs ${marketplace_version})"
+		fi
+	else
+		pass "migration marker: pre-2.0.0 mode at plugin=${plugin_version}, marketplace=${marketplace_version}"
+	fi
+
+	return 0
+}
+
+check_latest_hook_lifecycle_coverage() {
+	local latest_lifecycle_events=(
+		"ConfigChange"
+		"InstructionsLoaded"
+		"Notification"
+		"PermissionRequest"
+		"PostCompact"
+		"PostToolUse"
+		"PostToolUseFailure"
+		"PreCompact"
+		"PreToolUse"
+		"SessionEnd"
+		"SessionStart"
+		"Stop"
+		"StopFailure"
+		"SubagentStart"
+		"SubagentStop"
+		"TaskCompleted"
+		"TeammateIdle"
+		"UserPromptSubmit"
+	)
+	local post_cutover_events=(
+		"TaskCreated"
+		"CwdChanged"
+		"FileChanged"
+		"WorktreeCreate"
+	)
+	local event_name
+
+	for event_name in "${latest_lifecycle_events[@]}"; do
+		if jq -e --arg event "${event_name}" '.hooks | has($event)' "${HOOKS_JSON}" >/dev/null 2>&1; then
+			pass "latest hook lifecycle coverage includes ${event_name}"
+		else
+			fail "latest hook lifecycle coverage missing ${event_name}"
+		fi
+	done
+
+	for event_name in "${post_cutover_events[@]}"; do
+		if jq -e --arg event "${event_name}" '.hooks | has($event)' "${HOOKS_JSON}" >/dev/null 2>&1; then
+			pass "post-cutover hook lifecycle coverage includes ${event_name}"
+		elif [[ "${HARD_CUTOVER_ACTIVE}" -eq 1 ]]; then
+			fail "post-cutover hook lifecycle coverage missing ${event_name}"
+		else
+			skip "post-cutover hook lifecycle marker ${event_name} not required before 2.0.0"
+		fi
+	done
+}
+
+frontmatter_has_key() {
+	local file_path="$1"
+	local key="$2"
+	local in_frontmatter=0
+	local frontmatter_seen=0
+	local line
+
+	while IFS= read -r line; do
+		if [[ "${line}" == "---" ]]; then
+			if [[ "${frontmatter_seen}" -eq 0 ]]; then
+				frontmatter_seen=1
+				in_frontmatter=1
+				continue
+			fi
+			if [[ "${in_frontmatter}" -eq 1 ]]; then
+				in_frontmatter=0
+				break
+			fi
+		fi
+
+		if [[ "${in_frontmatter}" -eq 1 ]] && [[ "${line}" =~ ^${key}: ]]; then
+			return 0
+		fi
+	done <"${file_path}"
+
+	return 1
+}
+
+collect_frontmatter_key_matches() {
+	local key="$1"
+	local agent_file
+
+	while IFS= read -r agent_file; do
+		[[ -z "${agent_file}" ]] && continue
+		if frontmatter_has_key "${agent_file}" "${key}"; then
+			printf '%s\n' "${agent_file}"
+		fi
+	done < <(find "${AGENTS_DIR}" -maxdepth 1 -name "*.md" -print 2>/dev/null)
+}
+
+check_agent_frontmatter_hygiene() {
+	local agent_count
+	agent_count="$(find "${AGENTS_DIR}" -maxdepth 1 -name "*.md" -print 2>/dev/null | wc -l | tr -d ' ')"
+	if [[ "${agent_count}" -eq 0 ]]; then
+		fail "agent frontmatter hygiene: no agent files found in ${AGENTS_DIR}"
+		return 1
+	fi
+
+	local tools_matches=()
+	mapfile -t tools_matches < <(collect_frontmatter_key_matches "tools")
+	if [[ "${#tools_matches[@]}" -eq 0 ]]; then
+		pass "agent frontmatter hygiene: no top-level tools allowlists detected"
+	else
+		local allowed_tools_exception="${REPO_ROOT}/agents/multimodal-looker.md"
+		local unexpected_tools=()
+		local tools_file
+		for tools_file in "${tools_matches[@]}"; do
+			if [[ "${tools_file}" != "${allowed_tools_exception}" ]]; then
+				unexpected_tools+=("${tools_file}")
+			fi
+		done
+
+		if [[ "${#unexpected_tools[@]}" -eq 0 ]] && [[ "${#tools_matches[@]}" -eq 1 ]] &&
+			grep -Fq "repository's only top-level" "${allowed_tools_exception}"; then
+			pass "agent frontmatter hygiene: only documented multimodal-looker tools allowlist remains"
+		elif [[ "${HARD_CUTOVER_ACTIVE}" -eq 1 ]]; then
+			fail "agent frontmatter hygiene: top-level tools allowlists are forbidden after 2.0.0 marker (${unexpected_tools[*]:-${tools_matches[*]}})"
+		else
+			skip "agent frontmatter hygiene: top-level tools allowlists still present pre-2.0.0 (${unexpected_tools[*]:-${tools_matches[*]}})"
+		fi
+	fi
+
+	local permission_matches=()
+	mapfile -t permission_matches < <(collect_frontmatter_key_matches "permissionMode")
+	if [[ "${#permission_matches[@]}" -eq 0 ]]; then
+		pass "agent frontmatter hygiene: no legacy permissionMode holdouts detected"
+	elif [[ "${HARD_CUTOVER_ACTIVE}" -eq 1 ]]; then
+		fail "agent frontmatter hygiene: legacy permissionMode holdouts are forbidden after 2.0.0 marker (${permission_matches[*]})"
+	else
+		skip "agent frontmatter hygiene: legacy permissionMode holdouts still present pre-2.0.0 (${permission_matches[*]})"
+	fi
+}
+
+relative_path() {
+	local path="$1"
+	if [[ "${path}" == "${REPO_ROOT}/"* ]]; then
+		printf '%s' "${path:${#REPO_ROOT}+1}"
+	else
+		printf '%s' "${path}"
+	fi
+}
+
+check_policy_marker_in_file() {
+	local file_path="$1"
+	local marker="$2"
+	local label="$3"
+	local rel_path
+
+	if [[ ! -f "${file_path}" ]]; then
+		fail "policy posture: missing file ${file_path}"
+		return 1
+	fi
+
+	rel_path="$(relative_path "${file_path}")"
+	if grep -Fq "${marker}" "${file_path}"; then
+		pass "policy posture: ${rel_path} includes ${label} marker"
+	else
+		fail "policy posture: ${rel_path} missing ${label} marker (${marker})"
+	fi
+}
+
+check_policy_phrase_in_file() {
+	local file_path="$1"
+	local regex="$2"
+	local label="$3"
+	local rel_path
+
+	if [[ ! -f "${file_path}" ]]; then
+		fail "policy posture: missing file ${file_path}"
+		return 1
+	fi
+
+	rel_path="$(relative_path "${file_path}")"
+	if grep -Eiq "${regex}" "${file_path}"; then
+		pass "policy posture: ${rel_path} includes ${label} guidance"
+	else
+		fail "policy posture: ${rel_path} missing ${label} guidance"
+	fi
+}
+
+check_policy_posture_alignment() {
+	local policy_docs=(
+		"${OMCA_MD}"
+		"${TEMPLATE_CLAUDEMD_MD}"
+		"${OMCA_SETUP_SKILL_MD}"
+	)
+	local doc_path
+
+	for doc_path in "${policy_docs[@]}"; do
+		check_policy_marker_in_file "${doc_path}" 'teammateMode: "auto"' 'auto mode'
+		check_policy_marker_in_file "${doc_path}" 'allowManagedPermissionRulesOnly' 'managed settings boundary'
+		check_policy_marker_in_file "${doc_path}" 'sandbox.failIfUnavailable' 'sandbox fail-closed'
+		check_policy_phrase_in_file "${doc_path}" 'does not auto-allow|never auto-allow|no auto-allow' 'non-bypassing permission filter'
+	done
 }
 
 resolve_hook_commands() {
@@ -162,6 +418,52 @@ run_script_with_payload() {
 	text-any)
 		pass "${label}: script succeeded"
 		;;
+	worktree-path)
+		if [[ ! -s "${stdout_file}" ]]; then
+			fail "${label}: expected worktree path output but received empty stdout"
+			rm -rf "${run_dir}"
+			return 1
+		fi
+
+		local worktree_path
+		worktree_path="$(sed -n '1p' "${stdout_file}" | tr -d '\r')"
+		local extra_output
+		extra_output="$(sed -n '2,$p' "${stdout_file}" | tr -d '\r')"
+		if [[ -z "${worktree_path}" ]] || [[ -n "${extra_output}" ]]; then
+			fail "${label}: worktree output must be exactly one absolute path"
+			rm -rf "${run_dir}"
+			return 1
+		fi
+
+		if [[ "${worktree_path}" != /* ]]; then
+			fail "${label}: worktree path is not absolute (${worktree_path})"
+			rm -rf "${run_dir}"
+			return 1
+		fi
+
+		if [[ ! -d "${worktree_path}" ]]; then
+			fail "${label}: worktree path does not exist (${worktree_path})"
+			rm -rf "${run_dir}"
+			return 1
+		fi
+
+		local worktree_name
+		worktree_name="$(jq -r '.name // ""' "${payload_path}" 2>/dev/null)"
+		local tracking_file="${project_root}/.omca/state/worktrees/${worktree_name}.json"
+		if [[ ! -f "${tracking_file}" ]]; then
+			fail "${label}: missing structured worktree tracking file (${tracking_file})"
+			rm -rf "${run_dir}"
+			return 1
+		fi
+
+		if jq -e --arg worktree_path "${worktree_path}" '.worktreePath == $worktree_path' "${tracking_file}" >/dev/null 2>&1; then
+			pass "${label}: script returned tracked absolute worktree path"
+		else
+			fail "${label}: structured tracking file missing matching worktreePath"
+			rm -rf "${run_dir}"
+			return 1
+		fi
+		;;
 	empty)
 		if [[ -s "${stdout_file}" ]]; then
 			fail "${label}: expected empty stdout"
@@ -214,6 +516,78 @@ run_registered_hooks() {
 	return 0
 }
 
+check_skill_description_lengths() {
+	local skill_file
+	local max_len=250
+	local found_any=0
+
+	while IFS= read -r skill_file; do
+		[[ -z "${skill_file}" ]] && continue
+		found_any=1
+
+		# Extract description from YAML frontmatter, including continuation lines
+		# A continuation line starts with whitespace (indented) or is a plain value on the same key line
+		local desc=""
+		local in_frontmatter=0
+		local frontmatter_seen=0
+		local capturing=0
+		local line
+
+		while IFS= read -r line; do
+			if [[ "${line}" == "---" ]]; then
+				if [[ "${frontmatter_seen}" -eq 0 ]]; then
+					frontmatter_seen=1
+					in_frontmatter=1
+					continue
+				fi
+				if [[ "${in_frontmatter}" -eq 1 ]]; then
+					break
+				fi
+			fi
+
+			if [[ "${in_frontmatter}" -eq 0 ]]; then
+				continue
+			fi
+
+			if [[ "${capturing}" -eq 1 ]]; then
+				# Continuation line: starts with whitespace
+				if [[ "${line}" =~ ^[[:space:]]+ ]]; then
+					local cont_value
+					cont_value="${line#"${line%%[! ]*}"}"
+					desc="${desc} ${cont_value}"
+					continue
+				else
+					capturing=0
+				fi
+			fi
+
+			if [[ "${line}" =~ ^description:[[:space:]]*(.*) ]]; then
+				desc="${BASH_REMATCH[1]}"
+				capturing=1
+			fi
+		done <"${skill_file}"
+
+		local skill_name
+		skill_name="$(basename "$(dirname "${skill_file}")")"
+
+		if [[ -z "${desc}" ]]; then
+			pass "skill description length: ${skill_name} has description field"
+			continue
+		fi
+
+		local desc_len="${#desc}"
+		if [[ "${desc_len}" -gt "${max_len}" ]]; then
+			warn "skill description length: ${skill_name} description is ${desc_len} chars (limit ${max_len}) — Claude Code v2.1.84+ may truncate it"
+		else
+			pass "skill description length: ${skill_name} description is ${desc_len} chars (within ${max_len} limit)"
+		fi
+	done < <(find "${REPO_ROOT}/skills" -name "SKILL.md" -print 2>/dev/null | sort)
+
+	if [[ "${found_any}" -eq 0 ]]; then
+		skip "skill description length: no SKILL.md files found under skills/"
+	fi
+}
+
 check_claims() {
 	log "Running claims checks"
 
@@ -262,7 +636,6 @@ check_claims() {
 
 	# Validate config files
 	validate_json_file "${REPO_ROOT}/servers/categories.json" "categories config"
-	validate_json_file "${REPO_ROOT}/servers/agent-metadata.json" "agent metadata"
 
 	# Verify old server files were removed
 	if [[ ! -f "${REPO_ROOT}/servers/ast-grep-server.py" ]]; then
@@ -276,25 +649,12 @@ check_claims() {
 		fail "omca-state-server.py still exists (should have been removed)"
 	fi
 
-	# Validate agent metadata consistency: every agents/*.md must have costTier and category in frontmatter
-	# Note: agent-metadata.json is DEPRECATED — metadata now lives in agent frontmatter
-	local agent_metadata_json="${REPO_ROOT}/servers/agent-metadata.json"
-	if [[ -f "${agent_metadata_json}" ]]; then
-		pass "agent-metadata.json exists (deprecated — metadata now in frontmatter)"
+	# Verify agent-metadata.json was removed (OMCA-internal fields removed in v2.0.0)
+	if [[ ! -f "${REPO_ROOT}/servers/agent-metadata.json" ]]; then
+		pass "agent-metadata.json removed (OMCA-internal metadata fields deprecated)"
 	else
-		fail "agent-metadata.json not found at ${agent_metadata_json} (kept for backward compat)"
+		fail "agent-metadata.json still exists (should have been removed with costTier/category fields)"
 	fi
-
-	local agent_file agent_name
-	while IFS= read -r agent_file; do
-		agent_name="$(basename "${agent_file}" .md)"
-		# Check that the frontmatter contains costTier and category fields
-		if grep -q "^costTier:" "${agent_file}" && grep -q "^category:" "${agent_file}"; then
-			pass "agent frontmatter has routing metadata for ${agent_name}"
-		else
-			fail "agent frontmatter missing costTier or category for ${agent_name}"
-		fi
-	done < <(find "${REPO_ROOT}/agents" -maxdepth 1 -name "*.md" 2>/dev/null)
 
 	# Validate version consistency: plugin.json must match marketplace.json
 	local plugin_version marketplace_version
@@ -309,6 +669,12 @@ check_claims() {
 	else
 		fail "version consistency: plugin.json=${plugin_version} does not match marketplace.json=${marketplace_version}"
 	fi
+
+	set_hard_cutover_mode "${plugin_version}" "${marketplace_version}"
+	check_latest_hook_lifecycle_coverage
+	check_agent_frontmatter_hygiene
+	check_skill_description_lengths
+	check_policy_posture_alignment
 }
 
 check_hook_fixtures_exist() {
@@ -319,10 +685,14 @@ check_hook_fixtures_exist() {
 		"permissionrequest-exitplanmode.json"
 		"sessionstart-compact.json"
 		"instructionsloaded-basic.json"
+		"taskcreated-basic.json"
 		"taskcompleted-basic.json"
 		"taskcompleted-with-evidence.json"
 		"taskcompleted-with-edits-no-evidence.json"
 		"teammateidle-basic.json"
+		"cwdchanged-basic.json"
+		"filechanged-basic.json"
+		"worktreecreate-basic.json"
 		"userpromptsubmit-ralph.json"
 		"userpromptsubmit-ultrawork.json"
 		"stop-basic.json"
@@ -337,6 +707,91 @@ check_hook_fixtures_exist() {
 	for file_name in "${fixtures[@]}"; do
 		validate_json_file "${HOOK_FIXTURES_DIR}/${file_name}" "hook fixture ${file_name}"
 	done
+}
+
+prepare_hook_fixture_repo() {
+	local repo_root="$1"
+
+	mkdir -p "${repo_root}/.claude" "${repo_root}/.claude-plugin" "${repo_root}/hooks"
+	touch \
+		"${repo_root}/.claude/settings.json" \
+		"${repo_root}/.mcp.json" \
+		"${repo_root}/AGENTS.md" \
+		"${repo_root}/CLAUDE.md" \
+		"${repo_root}/hooks/hooks.json" \
+		"${repo_root}/.claude-plugin/plugin.json" \
+		"${repo_root}/settings.json"
+
+	git -C "${repo_root}" init -q >/dev/null 2>&1 || {
+		fail "hook fixture repo setup: git init failed for ${repo_root}"
+		return 1
+	}
+
+	printf 'fixture repo\n' >"${repo_root}/fixture.txt"
+	git -C "${repo_root}" add fixture.txt >/dev/null 2>&1 || {
+		fail "hook fixture repo setup: git add failed for ${repo_root}"
+		return 1
+	}
+
+	GIT_AUTHOR_NAME="OMCA Fixture" \
+		GIT_AUTHOR_EMAIL="fixture@example.com" \
+		GIT_COMMITTER_NAME="OMCA Fixture" \
+		GIT_COMMITTER_EMAIL="fixture@example.com" \
+		git -C "${repo_root}" commit -q -m "fixture" >/dev/null 2>&1 || {
+		fail "hook fixture repo setup: git commit failed for ${repo_root}"
+		return 1
+	}
+
+	pass "hook fixture repo setup: initialized git repo at ${repo_root}"
+	return 0
+}
+
+check_repo_state_file() {
+	local state_file="$1"
+	local repo_root="$2"
+	local event_name="$3"
+	local changed_path="${4:-}"
+
+	if [[ ! -f "${state_file}" ]]; then
+		fail "repo-state check: missing ${state_file} after ${event_name}"
+		return 1
+	fi
+
+	if jq -e \
+		--arg root "${repo_root}" \
+		--arg event_name "${event_name}" \
+		--arg changed_path "${changed_path}" '
+			.repoRoot == $root
+			and .lastEvent == $event_name
+			and .watchPaths == [
+				$root + "/.claude/settings.json",
+				$root + "/.mcp.json",
+				$root + "/AGENTS.md",
+				$root + "/CLAUDE.md",
+				$root + "/hooks/hooks.json",
+				$root + "/.claude-plugin/plugin.json",
+				$root + "/settings.json"
+			]
+			and (if $changed_path == "" then (.changedFile | not) else .changedFile.path == $changed_path end)
+		' "${state_file}" >/dev/null 2>&1; then
+		pass "repo-state check: ${event_name} stored expected repo root and watchPaths"
+	else
+		fail "repo-state check: ${event_name} state missing expected watchPaths or metadata"
+	fi
+}
+
+run_worktree_output_missing_case() {
+	local payload_path="$1"
+	local project_root="$2"
+	local fake_script
+
+	fake_script="$(mktemp)"
+	printf '#!/bin/bash\nexit 0\n' >"${fake_script}"
+	chmod +x "${fake_script}"
+
+	run_script_with_payload "WorktreeCreate missing output case" "${fake_script}" "${payload_path}" "${project_root}" "worktree-path"
+
+	rm -f "${fake_script}"
 }
 
 run_compaction_race_case() {
@@ -455,6 +910,7 @@ check_hooks() {
 	local tmp_root
 	tmp_root="$(mktemp -d)"
 	mkdir -p "${tmp_root}/.omca/state" "${tmp_root}/.omca/logs"
+	prepare_hook_fixture_repo "${tmp_root}"
 
 	local pretool_task_payload="${HOOK_FIXTURES_DIR}/pretooluse-task-agent.json"
 	local pretool_write_payload="${tmp_root}/pretooluse-write.runtime.json"
@@ -462,12 +918,21 @@ check_hooks() {
 	local exitplanmode_payload="${HOOK_FIXTURES_DIR}/permissionrequest-exitplanmode.json"
 	local session_compact_payload="${HOOK_FIXTURES_DIR}/sessionstart-compact.json"
 	local instructions_payload="${HOOK_FIXTURES_DIR}/instructionsloaded-basic.json"
+	local taskcreated_payload="${tmp_root}/taskcreated-basic.runtime.json"
 	local task_payload="${HOOK_FIXTURES_DIR}/taskcompleted-basic.json"
 	local teammate_payload="${HOOK_FIXTURES_DIR}/teammateidle-basic.json"
+	local cwdchanged_payload="${tmp_root}/cwdchanged-basic.runtime.json"
+	local filechanged_payload="${tmp_root}/filechanged-basic.runtime.json"
+	local worktree_payload="${tmp_root}/worktreecreate-basic.runtime.json"
+	local filechanged_matcher='.mcp.json|AGENTS.md|CLAUDE.md|hooks.json|plugin.json|settings.json|pyproject.toml|justfile'
 
 	local existing_file="${tmp_root}/existing.txt"
 	touch "${existing_file}"
 	jq --arg file "${existing_file}" '.tool_input.file_path = $file' "${HOOK_FIXTURES_DIR}/pretooluse-write.json" >"${pretool_write_payload}"
+	jq --arg cwd "${tmp_root}" '.cwd = $cwd' "${HOOK_FIXTURES_DIR}/taskcreated-basic.json" >"${taskcreated_payload}"
+	jq --arg cwd "${tmp_root}/hooks" --arg old_cwd "${tmp_root}" --arg new_cwd "${tmp_root}/hooks" '.cwd = $cwd | .old_cwd = $old_cwd | .new_cwd = $new_cwd' "${HOOK_FIXTURES_DIR}/cwdchanged-basic.json" >"${cwdchanged_payload}"
+	jq --arg cwd "${tmp_root}" --arg file_path "${tmp_root}/.claude/settings.json" '.cwd = $cwd | .file_path = $file_path' "${HOOK_FIXTURES_DIR}/filechanged-basic.json" >"${filechanged_payload}"
+	jq --arg cwd "${tmp_root}" '.cwd = $cwd' "${HOOK_FIXTURES_DIR}/worktreecreate-basic.json" >"${worktree_payload}"
 
 	run_registered_hooks "PreToolUse Task|Agent" "PreToolUse" "Task|Agent" "${pretool_task_payload}" "${tmp_root}" "json-required"
 	run_registered_hooks "PreToolUse Write" "PreToolUse" "Write" "${pretool_write_payload}" "${tmp_root}" "json-required"
@@ -477,66 +942,87 @@ check_hooks() {
 	printf 'compact fixture context' >"${tmp_root}/.omca/state/compaction-context.md"
 	run_registered_hooks "SessionStart compact" "SessionStart" "compact" "${session_compact_payload}" "${tmp_root}" "json-required"
 
+	run_registered_hooks "TaskCreated default" "TaskCreated" "" "${taskcreated_payload}" "${tmp_root}" "empty"
+	if [[ -f "${tmp_root}/.omca/logs/tasks.jsonl" ]]; then
+		if jq -e '.event == "task_created"' "${tmp_root}/.omca/logs/tasks.jsonl" >/dev/null 2>&1; then
+			pass "TaskCreated hook logged task_created event to tasks.jsonl"
+		else
+			fail "TaskCreated hook created tasks.jsonl but missing task_created event"
+		fi
+	else
+		fail "TaskCreated hook did not create tasks.jsonl"
+	fi
+
 	run_registered_hooks "TaskCompleted default" "TaskCompleted" "" "${task_payload}" "${tmp_root}" "empty"
 	run_registered_hooks "TeammateIdle default" "TeammateIdle" "" "${teammate_payload}" "${tmp_root}" "empty"
 
 	run_registered_hooks "InstructionsLoaded default" "InstructionsLoaded" "" "${instructions_payload}" "${tmp_root}" "json-optional"
+	run_registered_hooks "CwdChanged default" "CwdChanged" "" "${cwdchanged_payload}" "${tmp_root}" "json-required"
+	check_repo_state_file "${tmp_root}/.omca/state/repo-state.json" "${tmp_root}" "CwdChanged"
+
+	run_registered_hooks "FileChanged watchPaths" "FileChanged" "${filechanged_matcher}" "${filechanged_payload}" "${tmp_root}" "json-required"
+	check_repo_state_file "${tmp_root}/.omca/state/repo-state.json" "${tmp_root}" "FileChanged" "${tmp_root}/.claude/settings.json"
+
+	run_registered_hooks "WorktreeCreate default" "WorktreeCreate" "" "${worktree_payload}" "${tmp_root}" "worktree-path"
 
 	# UserPromptSubmit: keyword-detector should produce JSON with additionalContext
 	local ralph_payload="${HOOK_FIXTURES_DIR}/userpromptsubmit-ralph.json"
 	local ultrawork_payload="${HOOK_FIXTURES_DIR}/userpromptsubmit-ultrawork.json"
-	run_registered_hooks "UserPromptSubmit ralph" "UserPromptSubmit" "" "${ralph_payload}" "${tmp_root}" "json-required"
-	# Verify keyword-detector creates ralph-state.json
-	if [[ -f "${tmp_root}/.omca/state/ralph-state.json" ]]; then
-		if jq -e '.status == "active"' "${tmp_root}/.omca/state/ralph-state.json" >/dev/null 2>&1; then
-			pass "keyword-detector creates ralph-state.json with active status"
+	local userpromptsubmit_commands
+	local state_suffix="-state.json"
+	local ralph_wrapper_state="${tmp_root}/.omca/state/ralph${state_suffix}"
+	local ultrawork_wrapper_state="${tmp_root}/.omca/state/ultrawork${state_suffix}"
+	userpromptsubmit_commands="$(resolve_hook_commands "UserPromptSubmit" "")"
+	if [[ -n "${userpromptsubmit_commands}" ]]; then
+		run_registered_hooks "UserPromptSubmit ralph" "UserPromptSubmit" "" "${ralph_payload}" "${tmp_root}" "json-required"
+		if [[ -f "${ralph_wrapper_state}" ]]; then
+			if jq -e '.status == "active"' "${ralph_wrapper_state}" >/dev/null 2>&1; then
+				pass "keyword-detector creates Ralph wrapper state with active status"
+			else
+				fail "keyword-detector created Ralph wrapper state but status is not active"
+			fi
 		else
-			fail "keyword-detector created ralph-state.json but status is not active"
+			fail "keyword-detector should create Ralph wrapper state on ralph keyword"
+		fi
+
+		run_registered_hooks "UserPromptSubmit ultrawork" "UserPromptSubmit" "" "${ultrawork_payload}" "${tmp_root}" "json-required"
+		if [[ -f "${ultrawork_wrapper_state}" ]]; then
+			if jq -e '.status == "active"' "${ultrawork_wrapper_state}" >/dev/null 2>&1; then
+				pass "keyword-detector creates ultrawork wrapper state with active status"
+			else
+				fail "keyword-detector created ultrawork wrapper state but status is not active"
+			fi
+		else
+			fail "keyword-detector should create ultrawork wrapper state on ultrawork keyword"
 		fi
 	else
-		fail "keyword-detector should create ralph-state.json on ralph keyword"
+		skip "UserPromptSubmit keyword-detector validations: no matching hook command registered"
 	fi
 
-	run_registered_hooks "UserPromptSubmit ultrawork" "UserPromptSubmit" "" "${ultrawork_payload}" "${tmp_root}" "json-required"
-	# Verify keyword-detector creates ultrawork-state.json
-	if [[ -f "${tmp_root}/.omca/state/ultrawork-state.json" ]]; then
-		if jq -e '.status == "active"' "${tmp_root}/.omca/state/ultrawork-state.json" >/dev/null 2>&1; then
-			pass "keyword-detector creates ultrawork-state.json with active status"
-		else
-			fail "keyword-detector created ultrawork-state.json but status is not active"
-		fi
-	else
-		fail "keyword-detector should create ultrawork-state.json on ultrawork keyword"
-	fi
-
-	# Stop: ralph-persistence allows stop when no state files (clean state after keyword tests)
-	rm -f "${tmp_root}/.omca/state/ralph-state.json" "${tmp_root}/.omca/state/ultrawork-state.json"
+	rm -f "${ralph_wrapper_state}" "${ultrawork_wrapper_state}"
 	local stop_payload="${HOOK_FIXTURES_DIR}/stop-basic.json"
 	run_registered_hooks "Stop default (no state)" "Stop" "" "${stop_payload}" "${tmp_root}" "empty"
 
-	# Stop: ralph-persistence blocks stop when ralph state exists
-	printf '{"status":"active","tasks":[{"id":"1","status":"pending"}],"last_task_hash":"","stagnation_count":0}\n' \
-		>"${tmp_root}/.omca/state/ralph-state.json"
+	printf '{"status":"active","activatedAt":"2026-03-22T12:00:00Z","tasks":[{"id":"t1","status":"in_progress"}],"last_task_hash":"","stagnation_count":0}\n' \
+		>"${ralph_wrapper_state}"
 	run_registered_hooks "Stop with ralph active" "Stop" "" "${stop_payload}" "${tmp_root}" "json-required"
-	rm -f "${tmp_root}/.omca/state/ralph-state.json"
+	rm -f "${ralph_wrapper_state}"
 
-	# Stop: ultrawork active + running agents → allows stop (exit 0, empty stdout)
 	local uw_epoch
 	uw_epoch=$(date +%s)
-	printf '{"status":"active","activatedAt":"2026-03-22T12:00:00Z","stagnation_count":0}\n' \
-		>"${tmp_root}/.omca/state/ultrawork-state.json"
+	printf '{"status":"active","activatedAt":"2026-03-22T12:00:00Z","wrapper":"stop-hook","mode":"ultrawork"}\n' \
+		>"${ultrawork_wrapper_state}"
 	printf '{"active":[{"id":"test-agent-1","type":"explore","status":"running","startedAt":"2026-03-22T12:00:00Z","started_epoch":%s}],"completed":[]}\n' \
 		"${uw_epoch}" >"${tmp_root}/.omca/state/subagents.json"
 	run_registered_hooks "Stop ultrawork active + running agents (allow)" "Stop" "" "${stop_payload}" "${tmp_root}" "empty"
-	rm -f "${tmp_root}/.omca/state/ultrawork-state.json" "${tmp_root}/.omca/state/subagents.json"
+	rm -f "${ultrawork_wrapper_state}" "${tmp_root}/.omca/state/subagents.json"
 
-	# Stop: ultrawork active + no running agents → blocks stop (exit 0, JSON with decision:block)
-	printf '{"status":"active","activatedAt":"2026-03-22T12:00:00Z","stagnation_count":0}\n' \
-		>"${tmp_root}/.omca/state/ultrawork-state.json"
+	printf '{"status":"active","activatedAt":"2026-03-22T12:00:00Z","wrapper":"stop-hook","mode":"ultrawork"}\n' \
+		>"${ultrawork_wrapper_state}"
 	printf '{"active":[],"completed":[]}\n' \
 		>"${tmp_root}/.omca/state/subagents.json"
 	run_registered_hooks "Stop ultrawork active + no agents (block)" "Stop" "" "${stop_payload}" "${tmp_root}" "json-required"
-	rm -f "${tmp_root}/.omca/state/ultrawork-state.json" "${tmp_root}/.omca/state/subagents.json"
+	rm -f "${ultrawork_wrapper_state}" "${tmp_root}/.omca/state/subagents.json"
 
 	# SubagentStart / SubagentStop
 	local subagentstart_payload="${HOOK_FIXTURES_DIR}/subagentstart-basic.json"
@@ -570,8 +1056,11 @@ check_hooks() {
 		compaction-race)
 			run_compaction_race_case "${session_compact_payload}" "${tmp_root}"
 			;;
+		worktree-output-missing)
+			run_worktree_output_missing_case "${worktree_payload}" "${tmp_root}"
+			;;
 		*)
-			fail "Unsupported hook case '${HOOK_CASE}'. Supported: compaction-race"
+			fail "Unsupported hook case '${HOOK_CASE}'. Supported: compaction-race, worktree-output-missing"
 			;;
 		esac
 	fi
@@ -739,7 +1228,7 @@ for local_check in "${CHECKS[@]}"; do
 	esac
 done
 
-log "Summary: ${PASS_COUNT} passed, ${FAIL_COUNT} failed, ${SKIP_COUNT} skipped"
+log "Summary: ${PASS_COUNT} passed, ${FAIL_COUNT} failed, ${SKIP_COUNT} skipped, ${WARN_COUNT} warned"
 
 if [[ "${FAIL_COUNT}" -ne 0 ]]; then
 	exit 1
