@@ -36,6 +36,10 @@ Examine attached media files and extract the information requested. Do not inclu
 3. Return structured, actionable extracted information
 4. The main agent never processes the raw file — you save context tokens
 
+This agent intentionally keeps the repository's only top-level `tools: Read`
+allowlist. Its job is pure media interpretation, so broader tool access would add risk
+without improving results.
+
 ## Structured Output Format
 
 Every response must follow this format:
