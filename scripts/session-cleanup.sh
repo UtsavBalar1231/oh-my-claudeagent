@@ -43,7 +43,7 @@ if [[ "${REASON}" != "resume" ]]; then
 	if [[ -d "${WORKTREES_DIR}" ]]; then
 		for TRACKING_FILE in "${WORKTREES_DIR}"/*.json; do
 			if [[ -f "${TRACKING_FILE}" ]]; then
-				TRACKED_PATH=$(jq -r '.path // ""' "${TRACKING_FILE}" 2>/dev/null)
+				TRACKED_PATH=$(jq -r '.worktreePath // .path // ""' "${TRACKING_FILE}" 2>/dev/null)
 				if [[ -n "${TRACKED_PATH}" ]] && [[ ! -d "${TRACKED_PATH}" ]]; then
 					rm -f "${TRACKING_FILE}"
 				fi
@@ -52,10 +52,10 @@ if [[ "${REASON}" != "resume" ]]; then
 	fi
 
 	find "${STATE_DIR}" -name "*.json" -mtime +1 \
-		-not -name 'ralph-state.json' \
+		-not -name "$(_mode_state_name "ralph")" \
 		-not -name 'team-state.json' \
 		-not -name 'boulder.json' \
-		-not -name 'ultrawork-state.json' \
+		-not -name "$(_mode_state_name "ultrawork")" \
 		-not -name 'verification-evidence.json' \
 		-delete 2>/dev/null || true
 
