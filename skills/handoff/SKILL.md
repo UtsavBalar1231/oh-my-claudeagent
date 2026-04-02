@@ -18,12 +18,9 @@ MCP tools available for reading state: `mode_read`, `boulder_progress`, `notepad
 
 Creates a self-contained handoff summary so work can continue seamlessly in a new session.
 
-## Activation Phrases
+## Slash entrypoint
 
-- "handoff"
-- "context is getting long"
-- "start fresh"
-- "summarize for new session"
+- `/oh-my-claudeagent:handoff`
 
 ## PHASE 0: VALIDATE
 
@@ -46,7 +43,7 @@ Also gather:
 - `Read(".omca/state/boulder.json")` — active plan state if it exists
 - If an active plan exists (from boulder state), read notepad data:
   - `Read(".omca/state/notepads/{plan-name}/")` — per-plan notepad sections (learnings, issues, decisions, problems)
-- `Glob(".omca/plans/*.md")` — recent plan files
+- `Glob(".claude/plans/*.md")` — recent native plan files
 
 ## PHASE 2: EXTRACT
 

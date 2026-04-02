@@ -17,9 +17,10 @@ where the plan emerges during execution.
 
 If no task was specified, find plans by priority:
 1. Check boulder state via `mode_read` — if an active plan exists, resume it
-2. Search `.omca/plans/*.md` for plugin-generated plans
-3. Search `~/.claude/plans/*.md` for Claude Code native plan mode plans
-4. Merge and present both lists for selection, labeled with source
+2. Search both plan locations:
+   - `.omca/plans/*.md` — prometheus-generated plans
+   - `.claude/plans/*.md` — Claude-native plan files
+3. Merge and present candidates for selection, deduplicated by absolute path, labeled with source (`[omca]` or `[native]`)
 
 Register the active plan before delegating:
 `boulder_write(active_plan="path/to/plan.md", plan_name="plan-name", session_id="current-session")`
@@ -31,5 +32,5 @@ mark checkboxes on completion.
 After each delegation verification, record evidence:
 `evidence_log(evidence_type="test", command="...", exit_code=0, output_snippet="...")`
 
-Use `notepad_write(plan_name, "issues", content)` to record blockers or unexpected findings.
+Use `notepad_write(plan_name, "issues", content)` to record blockers or audit breadcrumbs that need to survive handoff. Do not treat notepad as your primary working memory.
 Use `evidence_read` before final completion report to summarize all verification results.

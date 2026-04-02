@@ -20,4 +20,4 @@ Consolidate knowledge from the current session into persistent memory.
 - Only persist stable patterns confirmed across multiple interactions
 - Remove session-specific context (in-progress tasks, temporary state)
 - Organize semantically by topic, not chronologically
-- Keep MEMORY.md under 200 lines (first 200 are injected into system prompt)
+- MEMORY.md is loaded into every session — first 200 lines or 25KB, whichever comes first. Consolidate when approaching either limit.
