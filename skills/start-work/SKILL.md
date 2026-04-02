@@ -16,24 +16,21 @@ Start a work session from a Prometheus-generated plan.
 ## Plan Mode Handling (Step 0)
 
 If plan mode is still active when start-work is invoked:
-- Atlas has `permissionMode: acceptEdits` which overrides inherited plan mode
-- This means execution proceeds normally — no explicit ExitPlanMode call needed
-- Log: "Plan mode detected — atlas overriding with acceptEdits for execution"
-
-If you encounter plan mode restrictions despite the above:
-- Call `ExitPlanMode` to exit plan mode before proceeding
+- Plugin agents have `permissionMode` stripped by Claude Code for security — atlas does NOT override plan mode
+- Atlas inherits the parent session's permission context
+- Call `ExitPlanMode` to exit plan mode before proceeding with execution
 - Then continue with step 1
 
 ## What To Do
 
-1. **Find available plans** (multi-source):
-   a. Check `.omca/state/boulder.json` first — if `active_plan` field exists and points to a valid file, use it directly
-   b. If no active boulder, search BOTH locations:
-      - `.omca/plans/*.md` (plugin-generated plans from prometheus)
-      - `~/.claude/plans/*.md` (Claude Code native plan mode plans)
-   c. Merge results, deduplicated by filename, with source labels: `[omca]` or `[native]`
+1. **Find available plans** (both surfaces are valid):
+   a. Check `.omca/state/boulder.json` first — if `active_plan` exists and points to a valid file, use it directly. Treat boulder as execution metadata only; it stores a pointer to the authoritative plan file.
+   b. If no active boulder, search both plan locations:
+      - `.omca/plans/*.md` — prometheus-generated plans (primary output location)
+      - `.claude/plans/*.md` — Claude-native plan files (if the current session already surfaced a native plan-mode file path, prefer that exact path)
+   c. Merge results, deduplicated by absolute path, with clear source labels such as `[active]`, `[omca]`, or `[native]`
 
-2. **Check for active state**: Read `.omca/state/boulder.json` if it exists
+2. **Check for active execution metadata**: Read `.omca/state/boulder.json` if it exists
 
 3. **Decision logic**:
    - If `.omca/state/boulder.json` exists AND plan is NOT complete (has unchecked boxes):
@@ -44,7 +41,7 @@ If you encounter plan mode restrictions despite the above:
      - If ONE plan: auto-select it
      - If MULTIPLE plans: show list with timestamps, ask user to select
 
-4. **Create/Update `.omca/state/boulder.json`**:
+4. **Create/Update `.omca/state/boulder.json` execution metadata**:
    ```json
    {
      "active_plan": "/absolute/path/to/plan.md",
@@ -57,6 +54,7 @@ If you encounter plan mode restrictions despite the above:
 
    Prefer `boulder_write(active_plan, plan_name, session_id)` to create/update boulder state.
    The MCP tool enforces session deduplication and preserves `started_at` — providing guarantees that manual JSON writes cannot.
+   The plan body stays at its authoritative location (`.omca/plans/` or `.claude/plans/`) — boulder only stores a pointer.
 
 5. **Read the plan file** and start executing tasks according to atlas workflow
 
@@ -137,6 +135,6 @@ Follow atlas workflow: delegate, verify, mark checkboxes, repeat until done.
 
 ## Critical
 
-- Always update `.omca/state/boulder.json` BEFORE starting work
+- Always update `.omca/state/boulder.json` BEFORE starting work — it tracks execution metadata, not plan ownership
 - Read the FULL plan file before delegating any tasks
 - Follow atlas 6-section delegation prompt format

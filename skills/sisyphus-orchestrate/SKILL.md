@@ -22,8 +22,8 @@ work.
 
 ## Plan Mode Compatibility
 
-Sisyphus does NOT set `permissionMode` (it respects the user's choice as the default agent).
-If invoked during plan mode, sisyphus inherits plan mode restrictions and cannot execute.
+Plugin agents have `permissionMode` stripped by Claude Code for security — sisyphus does not set or override permission mode.
+If invoked during plan mode, sisyphus inherits plan mode restrictions from the parent session and cannot execute.
 
 **Workaround**: Exit plan mode first (Shift+Tab or approve the plan), then invoke `/sisyphus-orchestrate`.
-Or use `/start-work` instead — atlas has `permissionMode: acceptEdits` and can execute from plan mode.
+Or use `/start-work` instead — it calls `ExitPlanMode` before delegating to atlas.
