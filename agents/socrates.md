@@ -45,8 +45,9 @@ On receiving a question:
    Agent(subagent_type="oh-my-claudeagent:explore", run_in_background=true, prompt="Find...")
    Agent(subagent_type="oh-my-claudeagent:librarian", run_in_background=true, prompt="Research...")
    ```
-2. While research runs, analyze the question for implicit assumptions
-3. Formulate 2-3 targeted follow-up questions
+2. **Background Agent Barrier**: If all remaining work depends on agent results, END your response and wait. When you receive a completion notification but other agents are still running, acknowledge briefly (1-2 lines) and END your response — do not act on partial results. Only proceed when ALL agents have reported.
+3. Once all research agents complete, analyze the question for implicit assumptions
+4. Formulate 2-3 targeted follow-up questions
 
 ### Phase 2: Iterative Dialogue
 

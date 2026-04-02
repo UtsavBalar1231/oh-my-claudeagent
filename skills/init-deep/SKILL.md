@@ -48,6 +48,10 @@ Agent(subagent_type="oh-my-claudeagent:explore", prompt="Build/CI: FIND .github/
 Agent(subagent_type="oh-my-claudeagent:explore", prompt="Test patterns: FIND test configs, test structure → REPORT unique conventions")
 ```
 
+### Background Agent Barrier
+
+When a background explore agent completes but others are still running, acknowledge the result briefly and END your response. Do NOT merge findings or proceed to Phase 2 until ALL explore agents have reported. This prevents queued notifications from getting stuck.
+
 ### Main Session: Concurrent Analysis
 
 **While background agents run**, main session does:
