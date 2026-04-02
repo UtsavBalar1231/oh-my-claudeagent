@@ -88,4 +88,18 @@ if [[ -f "${SESSION_STATE}" ]]; then
   ' "${SESSION_STATE}" >"${TMP_FILE}" && mv "${TMP_FILE}" "${SESSION_STATE}"
 fi
 
+# --- Background Agent Barrier: inject remaining-agents context into parent session ---
+# When other agents are still running, return additionalContext so the orchestrator
+# knows to wait instead of acting on partial results.
+REMAINING_ACTIVE=0
+if [[ -f "${SUBAGENTS_FILE}" ]]; then
+	REMAINING_ACTIVE=$(jq '[.active[]? | select(.status == "running")] | length' "${SUBAGENTS_FILE}" 2>/dev/null || echo "0")
+fi
+
+if [[ "${REMAINING_ACTIVE}" -gt 0 ]]; then
+	REMAINING_NAMES=$(jq -r '[.active[]? | select(.status == "running") | .type] | join(", ")' "${SUBAGENTS_FILE}" 2>/dev/null || echo "unknown")
+	jq -nc --arg ctx "[BACKGROUND AGENTS PENDING] ${REMAINING_ACTIVE} agent(s) still running: ${REMAINING_NAMES}. Do NOT proceed with implementation — END your response and wait for remaining agent notifications." \
+		'{hookSpecificOutput: {hookEventName: "SubagentStop", additionalContext: $ctx}}'
+fi
+
 exit 0
