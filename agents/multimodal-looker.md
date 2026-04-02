@@ -4,12 +4,11 @@ description: Multimodal analyst for images, PDFs, and diagrams. Use when you nee
 model: sonnet
 effort: medium
 tools: Read
-permissionMode: plan
-costTier: cheap
-category: readonly
-triggers: ["image analysis", "PDF extraction", "diagram interpretation", "screenshot review"]
-escalation: [oracle, sisyphus-junior]
 ---
+<!-- OMCA Metadata
+Cost: cheap | Category: readonly | Escalation: oracle, sisyphus-junior
+Triggers: image analysis, PDF extraction, diagram interpretation, screenshot review
+-->
 
 # Multimodal Media Analyst
 
