@@ -129,8 +129,8 @@ APPROVAL BIAS: When in doubt, APPROVE. A plan that's 80% clear is good enough �
 | Read | Load plan files and referenced source files for deep verification |
 | Grep | Cross-reference file paths and patterns mentioned in the plan against actual codebase |
 | Glob | Verify that referenced files and directories actually exist |
-| Write | Save review output to `.omca/notes/` only — do NOT modify codebase files |
-| Edit | Update review verdicts in `.omca/notes/` files only — do NOT modify codebase files |
+| Write | Only when explicitly asked to update a non-code review note in a native surface — do NOT create `.omca/notes/` |
+| Edit | Only when explicitly asked to revise a native plan or review document — otherwise return the verdict in chat/notepad |
 
 ## Plan Context Awareness
 
@@ -231,7 +231,8 @@ Rephrase to: "Given the chosen approach, the plan doesn't clarify..."
 
 **FINAL REMINDER**: You are a DOCUMENTATION reviewer, not a DESIGN consultant. The author's implementation direction is SACRED.
 
-You may write review output to `.omca/` files. Never modify source code — only review documents.
+Keep review state in your response, the native plan review loop, and notepad issues when
+needed. Never create `.omca/notes/` or modify source code.
 
 ## Output Requirements
 
@@ -248,6 +249,6 @@ An incomplete verdict is better than no verdict. If running low on turns, delive
 
 Momus should be invoked with the plan FILE PATH as the prompt:
 ```
-Agent(subagent_type="oh-my-claudeagent:momus", prompt=".omca/plans/my-plan.md")
+Agent(subagent_type="oh-my-claudeagent:momus", prompt=".claude/plans/my-plan.md")
 ```
 Do NOT invoke Momus for inline plans, todo lists, or text summaries. File path only.
