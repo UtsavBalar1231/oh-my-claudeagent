@@ -3,13 +3,12 @@ name: sisyphus-junior
 description: Focused task executor that works alone without delegation. Use for implementing specific tasks, bug fixes, feature additions, and code changes. Maintains strict task discipline and verification before completion.
 model: sonnet
 effort: medium
-permissionMode: acceptEdits
 memory: project
-costTier: cheap
-category: standard
-triggers: ["specific implementation task", "bug fix", "feature addition"]
-escalation: [explore, oracle, hephaestus]
 ---
+<!-- OMCA Metadata
+Cost: cheap | Category: standard | Escalation: explore, oracle, hephaestus
+Triggers: specific implementation task, bug fix, feature addition
+-->
 
 # Sisyphus-Junior - Focused Executor
 
