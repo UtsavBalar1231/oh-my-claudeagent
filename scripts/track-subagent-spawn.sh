@@ -35,7 +35,10 @@ jq --arg id "${SPAWN_ID}" \
 
 # Signal to agent-usage-reminder that delegation has occurred
 AGENT_USAGE="${STATE_DIR}/agent-usage.json"
-[[ -f "${AGENT_USAGE}" ]] && { TMP2=$(mktemp); jq '.agentUsed = true' "${AGENT_USAGE}" >"${TMP2}" && mv "${TMP2}" "${AGENT_USAGE}"; }
+[[ -f "${AGENT_USAGE}" ]] && {
+	TMP2=$(mktemp)
+	jq '.agentUsed = true' "${AGENT_USAGE}" >"${TMP2}" && mv "${TMP2}" "${AGENT_USAGE}"
+}
 
 SESSION_ID="unknown"
 SESSION_STATE="${STATE_DIR}/session.json"
@@ -94,9 +97,8 @@ if [[ -f "${CATALOG_FILE}" ]] && [[ -f "${CATEGORIES_FILE}" ]]; then
 fi
 
 _HOOK_END=$(date +%s%N 2>/dev/null || date +%s)
-_HOOK_MS=$(( (_HOOK_END - _HOOK_START) / 1000000 ))
-echo "{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"hook\":\"$(basename "$0")\",\"ms\":${_HOOK_MS}}" >> "${LOG_DIR}/hook-timing.jsonl" 2>/dev/null
+_HOOK_MS=$(((_HOOK_END - _HOOK_START) / 1000000))
+echo "{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"hook\":\"$(basename "$0")\",\"ms\":${_HOOK_MS}}" >>"${LOG_DIR}/hook-timing.jsonl" 2>/dev/null
 
 SPAWN_MSG="Subagent ${SUBAGENT_TYPE} (${SPAWN_ID}) spawned with model ${SUBAGENT_MODEL}${ROUTING_CONTEXT}"
-ESCAPED=$(printf '%s' "${SPAWN_MSG}" | jq -Rs .)
-printf '%s\n' "{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"additionalContext\": ${ESCAPED}}}"
+jq -nc --arg msg "${SPAWN_MSG}" '{hookSpecificOutput: {hookEventName: "PreToolUse", additionalContext: $msg}}'
