@@ -239,6 +239,16 @@
 				]
 			}
 		],
+		"TaskCreated": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/lifecycle-state.sh"
+					}
+				]
+			}
+		],
 		"PreCompact": [
 			{
 				"hooks": [
@@ -308,6 +318,47 @@
 						"type": "command",
 						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/config-change-audit.sh",
 						"async": true
+					}
+				]
+			}
+		],
+		"CwdChanged": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/lifecycle-state.sh"
+					}
+				]
+			}
+		],
+		"FileChanged": [
+			{
+				"matcher": ".mcp.json|AGENTS.md|CLAUDE.md|hooks.json|plugin.json|settings.json|pyproject.toml|justfile",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/lifecycle-state.sh"
+					}
+				]
+			}
+		],
+		"WorktreeCreate": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/lifecycle-state.sh"
+					}
+				]
+			}
+		],
+		"WorktreeRemove": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/lifecycle-state.sh"
 					}
 				]
 			}
