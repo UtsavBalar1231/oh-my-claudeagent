@@ -392,8 +392,9 @@ agent per item in parallel. Zero-action policy: never merges, closes, or edits i
 ```
 1. Type "create plan for [your task]"
    -> Prometheus interviews, consults metis, generates plan, runs momus review
+   -> After momus approval, prometheus asks: start implementation or run metis review?
 
-2. Run /oh-my-claudeagent:start-work
+2. Run /oh-my-claudeagent:start-work (or prometheus starts it after user confirms)
    -> Finds active plan, sets up boulder state, forks atlas
 
 3. Atlas executes:

@@ -75,6 +75,12 @@ Keywords trigger skills automatically. Slash commands are also supported:
 - `.omca/state/` is execution metadata, not the primary plan or memory store.
 - Background agent barrier: when multiple background agents are running and you receive the first completion notification, END your response immediately if other agents are still pending. Never act on partial results — wait for all notifications.
 
+## Workflow
+
+Planning pipeline: prometheus (plan) → metis (gap analysis) → momus (review) → **user approval** → atlas (execute all tasks via /start-work).
+
+After plan approval, the user runs `/oh-my-claudeagent:start-work` (handles plan discovery, boulder setup, worktree) or `/oh-my-claudeagent:atlas [plan path]` (direct atlas execution). Both fork atlas at depth 0. The main session agent must NEVER implement plan tasks directly — the user must explicitly invoke execution.
+
 ## Managed settings boundary
 
 Managed settings stay outside plugin ownership. Important keys include `allowManagedHooksOnly`, `allowManagedPermissionRulesOnly`, `allowManagedMcpServersOnly`, and `sandbox.failIfUnavailable`.
