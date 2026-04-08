@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] - 2026-04-08
+
+### Changed
+
+- **Platform sync for Claude Code v2.1.83–v2.1.94**: Template, rules, and README updated
+  with new platform features — `dontAsk` permission mode, `opusplan`/`best` model aliases,
+  `ENABLE_TOOL_SEARCH` env var, 10K hook output cap, `plansDirectory` setting,
+  `CLAUDE.local.md` scope, `sessionTitle` hook output, `disableSkillShellExecution` managed
+  setting, GHES plugin marketplace git URL syntax (`templates/claudemd.md`, `README.md`,
+  `scripts/session-init.sh`)
+- **OMCA guide rewrite**: Condensed `OMCA.md` from ~1,400 lines to a focused runtime
+  reference aligned with v1.5.0 hard-cutover model (`OMCA.md`, `templates/claudemd.md`)
+- **Pipeline hardening**: Added user-approval gate to planning pipeline documentation and
+  safety logging to ExitPlanMode hook (`scripts/plan-mode-handler.sh`)
+
+### Fixed
+
+- **ExitPlanMode safety gate**: Prometheus and momus agents now gate ExitPlanMode behind
+  AskUserQuestion to prevent plan auto-approval without user consent
+  (`agents/prometheus.md`, `skills/prometheus-plan/SKILL.md`)
+
 ## [1.5.0] - 2026-04-02
 
 ### Added
@@ -63,6 +84,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Multimodal-looker constraints**: added binary and device file constraints to prevent
   invalid file reads
 
+[1.5.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.4.1...v1.5.0
 
 ## [1.4.1] - 2026-03-25
