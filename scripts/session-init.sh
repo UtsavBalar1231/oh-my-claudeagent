@@ -64,6 +64,12 @@ if [[ "${SOURCE}" != "compact" ]]; then
 		OMCA_CONFIGURED=1
 	fi
 
+	# Check CLAUDE.local.md (v2.1.85+ personal project instructions, not checked into git)
+	PROJECT_CLAUDE_LOCAL_MD="${PROJECT_ROOT}/CLAUDE.local.md"
+	if [[ "${OMCA_CONFIGURED}" -eq 0 ]] && [[ -f "${PROJECT_CLAUDE_LOCAL_MD}" ]] && grep -q "OMC:START\|omca-setup" "${PROJECT_CLAUDE_LOCAL_MD}" 2>/dev/null; then
+		OMCA_CONFIGURED=1
+	fi
+
 	if [[ "${OMCA_CONFIGURED}" -eq 0 ]]; then
 		PLUGIN_ROOT_CHECK="$(cd "$(dirname "$0")/.." && pwd)"
 		VERSION=$(jq -r '.version // "unknown"' "${PLUGIN_ROOT_CHECK}/.claude-plugin/plugin.json" 2>/dev/null)

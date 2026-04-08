@@ -38,6 +38,21 @@ Add to your project's `.claude/settings.json` so team members get the plugin aut
 }
 ```
 
+For GitHub Enterprise Server, use full git URLs in the source:
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "omca": {
+      "source": {
+        "source": "git",
+        "url": "git@github.example.com:org/oh-my-claudeagent.git"
+      }
+    }
+  }
+}
+```
+
 ### Update
 
 ```bash
