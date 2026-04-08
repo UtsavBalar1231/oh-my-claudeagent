@@ -36,12 +36,6 @@ If plan mode is NOT active:
 - Optionally mirror to `.claude/plans/<name>.md` if the user prefers Claude-native plan surfacing
 - Skip ExitPlanMode (not applicable)
 
-**Handoff**: After plan completion, guide the user:
-1. **Primary**: "Run `/oh-my-claudeagent:start-work` to execute this plan (handles plan discovery, boulder setup, worktree)."
-2. **Alternative**: "Or run `/oh-my-claudeagent:atlas [plan path]` for direct atlas execution."
-
-Both fork atlas at depth 0. Recommend `/start-work` first — it adds boulder/worktree setup on top of atlas orchestration.
-
 After generating the plan, submit to momus for mandatory review:
 `Agent(subagent_type="oh-my-claudeagent:momus", prompt="Review the plan at {plan_path}")`
 If momus returns REJECT, fix all issues and resubmit. Maximum 3 iterations.
@@ -51,5 +45,9 @@ If still REJECTED after 3: Present plan + momus feedback to user, ask for direct
 1. Register as active boulder: `boulder_write(active_plan="/path/to/plan.md", plan_name="plan-name", session_id="current-session")`
    - Use the `.omca/plans/<name>.md` path when plan mode is not active
    - Use the native plan file path when plan mode is active (boulder just stores a pointer)
-2. If plan mode is active: call `ExitPlanMode` to present the plan for user approval
-3. If plan mode is NOT active: guide user to `/oh-my-claudeagent:start-work`
+
+2. **Ask the user what to do next** using `AskUserQuestion`. Frame the question as: "Plan approved by momus. What would you like to do? (you can also type a custom response to modify the plan or stop here)". Present these options:
+   - **"Start implementation"** → If plan mode is active: call `ExitPlanMode` to present the plan for approval, then guide user to `/oh-my-claudeagent:start-work`. If plan mode is NOT active: guide user to run `/oh-my-claudeagent:start-work` (handles plan discovery, boulder setup, worktree) or `/oh-my-claudeagent:atlas [plan path]` for direct atlas execution.
+   - **"Run metis review"** → Invoke metis for deeper gap analysis on the plan before proceeding
+
+3. **CRITICAL**: Do NOT call `ExitPlanMode` or invoke `/oh-my-claudeagent:start-work` without the user explicitly choosing "Start implementation". The user MUST confirm before any implementation begins.

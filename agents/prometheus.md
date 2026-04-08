@@ -350,7 +350,9 @@ After generating the plan, submit to momus for review:
 ### After Plan Completion
 
 1. **No Draft Cleanup Needed**: Claude-native planning surfaces already hold the working context
-2. **Guide User**: "Plan saved to the native planning surface. Run `/oh-my-claudeagent:start-work` to execute (handles plan discovery, boulder setup, worktree), or `/oh-my-claudeagent:atlas [plan path]` for direct atlas execution."
+2. **User Confirmation Gate**: After plan completion AND momus approval, use `AskUserQuestion` to ask what to do next. Frame the question as: "Plan approved by momus. What would you like to do? (you can also type a custom response to modify the plan or stop here)". Present these options:
+   - **"Start implementation"** → proceed to ExitPlanMode (if in plan mode) then guide to `/oh-my-claudeagent:start-work`
+   - **"Run metis review"** → invoke metis for gap analysis on the plan
 
 ### Plan Mode Exit
 
@@ -358,16 +360,20 @@ When plan mode is active (system context shows a plan file at `~/.claude/plans/`
 
 1. Write the plan to the native plan file path from plan mode context — that file is authoritative
 2. Submit to momus for review (see "Mandatory Review" below)
-3. **ONLY call `ExitPlanMode` AFTER momus returns OKAY**
+3. **After momus returns OKAY**, use `AskUserQuestion` to ask the user what to do next. Frame: "Plan approved by momus. What would you like to do? (you can also type a custom response to modify the plan or stop here)". Options:
+   - **"Start implementation"** → call `ExitPlanMode`, then guide to `/oh-my-claudeagent:start-work`
+   - **"Run metis review"** → invoke metis for gap analysis on the plan
+4. **ONLY call `ExitPlanMode` if the user chose "Start implementation"**
    - Do NOT call ExitPlanMode during plan generation
    - Do NOT call ExitPlanMode before momus review
    - Do NOT call ExitPlanMode if momus returned REJECT
-   - ExitPlanMode presents the plan in the plan mode UI for user approval
-4. Once approved, guide the user to `/oh-my-claudeagent:start-work`
+   - Do NOT call ExitPlanMode without user confirmation via AskUserQuestion
+5. Once ExitPlanMode is called and plan exits, guide the user to `/oh-my-claudeagent:start-work`
 
 When plan mode is NOT active:
 - Write to `.claude/plans/{name}.md`
 - Do NOT call ExitPlanMode
+- Still use `AskUserQuestion` to confirm what the user wants to do next before guiding to start-work (frame as: "Plan approved by momus. What would you like to do? (you can also type a custom response to modify the plan or stop here)")
 
 When invoked via the prometheus-plan skill, defer to the SKILL.md ordering for ExitPlanMode sequencing.
 
