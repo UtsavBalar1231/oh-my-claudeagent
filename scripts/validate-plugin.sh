@@ -12,7 +12,6 @@ HOOK_FIXTURES_DIR="${REPO_ROOT}/tests/fixtures/hooks"
 MCP_FIXTURES_DIR="${REPO_ROOT}/tests/fixtures/mcp"
 MCP_SERVER_PROJECT="${REPO_ROOT}/servers"
 OMCA_MD="${REPO_ROOT}/OMCA.md"
-TEMPLATE_CLAUDEMD_MD="${REPO_ROOT}/templates/claudemd.md"
 OMCA_SETUP_SKILL_MD="${REPO_ROOT}/skills/omca-setup/SKILL.md"
 
 AGENTS_DIR="${VALIDATE_PLUGIN_AGENTS_DIR:-${REPO_ROOT}/agents}"
@@ -327,9 +326,11 @@ check_policy_phrase_in_file() {
 }
 
 check_policy_posture_alignment() {
+	# Policy posture markers live in OMCA.md and the omca-setup skill.
+	# templates/claudemd.md is the session-injected runtime prompt — it
+	# intentionally omits managed-settings trivia, so it is NOT enforced here.
 	local policy_docs=(
 		"${OMCA_MD}"
-		"${TEMPLATE_CLAUDEMD_MD}"
 		"${OMCA_SETUP_SKILL_MD}"
 	)
 	local doc_path

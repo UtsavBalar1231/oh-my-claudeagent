@@ -50,7 +50,7 @@ memory: project                   # optional; enables persistent project memory
 Key rules:
 - Use `disallowedTools:` to restrict capabilities — never `tools:` (blocks MCP inheritance, [Known Limitations](../CLAUDE.md#agent-tools-allowlist-blocks-mcp-tool-inheritance))
 - Do not declare `permissionMode:` — it is stripped from plugin agents by Claude Code for security
-- Add the agent to the catalog table in `templates/claudemd.md`
+- Add the agent to the `<agent_catalog>` block in `templates/claudemd.md`
 - **`CLAUDE_CODE_SUBAGENT_MODEL` env var overrides ALL agent model declarations** — warn users if they set this, as it affects every spawned agent regardless of frontmatter.
 
 ## Adding a Skill
