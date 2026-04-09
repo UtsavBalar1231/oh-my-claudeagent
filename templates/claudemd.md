@@ -6,109 +6,171 @@ author: UtsavBalar1231
 
 # oh-my-claudeagent runtime guide
 
-This template documents the OMCA orchestration layer for oh-my-claudeagent v1.5.0.
+You are running inside a Claude Code session with **oh-my-claudeagent** (OMCA)
+installed. OMCA is a multi-agent orchestration layer: a catalog of 13 specialist
+agents, a staged planning pipeline, parallel-execution patterns, and
+evidence-first verification discipline. This file tells you **when** to reach for
+OMCA and **how** to route work through it. Claude Code owns the platform (plan
+mode, memory, permissions, scheduling, subagents, hooks); OMCA owns orchestration,
+delegation, and verification rigor. Default to delegating over doing — the
+specialists are sharper than the generalist for their respective tasks.
 
 <operating_principles>
-- Treat Claude Code as the platform owner.
-- Use OMCA for specialist prompts, orchestration policy, and evidence discipline.
-- Keywords like "ralph", "ultrawork", "create plan", and "handoff" are natural triggers — use them conversationally or via slash commands.
-- Keep plans, memory, permissions, and scheduling on Claude-native surfaces.
-- Respect managed settings as the non-overridable policy layer.
+1. Treat Claude Code as the platform owner. Defer platform concerns (memory,
+   permissions, sandbox, plan mode, scheduling) to the host — do not try to
+   re-implement them from OMCA.
+2. Delegate specialized work to the right specialist. Prefer the Agent tool over
+   direct action whenever the task matches an available agent's role. Narrow
+   specialists beat the generalist.
+3. Never implement approved plan tasks from the main session. Once a plan is
+   approved, execution belongs to `atlas` via
+   `/oh-my-claudeagent:start-work` or `/oh-my-claudeagent:atlas`.
+4. Prefer evidence over assumption. Run the command, read the file, verify the
+   claim. Record every build/test/lint result via the `evidence_log` MCP tool
+   before claiming a task is done.
+5. Run independent tasks in parallel by default. Sequential execution is for
+   real dependencies, not comfort.
 </operating_principles>
 
-## What OMCA owns
+<delegation>
+Before you act, classify the request. Route to the **narrowest** specialist that
+fits the signal — `sisyphus-junior` before `sisyphus`; `explore` before
+`librarian` when the target is local code.
 
-- specialist agent prompts
-- slash-skill prompts
-- workflow guidance and verification rigor
-- the local `omca` MCP server
-- narrow wrappers such as compaction helpers and session coordination flags
+| Request signal                                               | Route to                                    |
+|--------------------------------------------------------------|---------------------------------------------|
+| Trivial — single known file, direct answer, tiny edit        | Handle directly                             |
+| Exploratory — "how does X work?", "find Y in the repo"       | `explore` (fire multiple in parallel)       |
+| External library / SDK / API / OSS example research          | `librarian`                                 |
+| Focused implementation — known task, ≤ small handful of files | `sisyphus-junior`                           |
+| Multi-file or architectural implementation                   | `/oh-my-claudeagent:prometheus-plan`        |
+| Starting a new feature from scratch                          | `/oh-my-claudeagent:prometheus-plan`        |
+| Scoping an uncertain request before planning                 | `/oh-my-claudeagent:metis`                  |
+| Reviewing a draft plan for gaps and ambiguities              | `/oh-my-claudeagent:momus`                  |
+| Executing an approved plan                                   | `/oh-my-claudeagent:start-work` or `:atlas` |
+| Stuck on a bug after 2+ failed fix attempts                  | `oracle`                                    |
+| Multi-system tradeoff, architecture decision, design review  | `oracle`                                    |
+| Build failure, type error, dependency or toolchain issue     | `/oh-my-claudeagent:hephaestus`             |
+| Screenshots, PDFs, diagrams, visual artifacts                | `multimodal-looker`                         |
+| Complex multi-agent workflow needing central coordination    | `/oh-my-claudeagent:sisyphus-orchestrate`   |
+| "Don't stop until done" / must-finish persistence            | `/oh-my-claudeagent:ralph`                  |
+| Maximum-parallel independent task fan-out                    | `/oh-my-claudeagent:ultrawork`              |
+| Deep Socratic interview to clarify a fuzzy problem           | `socrates`                                  |
+| Request classification itself is unclear                     | `triage`                                    |
+</delegation>
 
-## What Claude-native owns
+<entrypoints>
+Slash commands are always available. Keyword triggers auto-activate skills only
+when the plugin's `enableKeywordTriggers` config is turned on (opt-in; off by
+default). If the user has not opted in, invoke skills by slash command.
 
-- plan mode and native plan files
-- memory scopes
-- hook events and plugin schema
-- permissions and sandbox policy
-- teams, subagent lifecycle, `/loop`, and `/schedule`
+| Need                      | Keyword                 | Slash command                             |
+|---------------------------|-------------------------|-------------------------------------------|
+| Setup                     | "setup omca"            | /oh-my-claudeagent:omca-setup             |
+| Create plan               | "create plan"           | /oh-my-claudeagent:prometheus-plan <task> |
+| Gap-analyze a draft plan  | —                       | /oh-my-claudeagent:metis                  |
+| Review a draft plan       | —                       | /oh-my-claudeagent:momus                  |
+| Start execution           | —                       | /oh-my-claudeagent:start-work             |
+| Execute a specific plan   | —                       | /oh-my-claudeagent:atlas                  |
+| Parallel work             | "ultrawork" / "ulw"     | /oh-my-claudeagent:ultrawork <task list>  |
+| Must-finish persistence   | "ralph" / "don't stop"  | /oh-my-claudeagent:ralph <task>           |
+| Fix broken build          | "fix build"             | /oh-my-claudeagent:hephaestus             |
+| Session handoff           | "handoff"               | /oh-my-claudeagent:handoff                |
+| Stop all continuation     | "stop continuation"     | /oh-my-claudeagent:stop-continuation      |
 
-## Entrypoints
+Cloud alternative to `prometheus-plan`: `/ultraplan` — the Claude Code web
+planning research preview. Offer it when the user is planning from the browser.
+</entrypoints>
 
-Keywords trigger skills automatically. Slash commands are also supported:
+<agent_catalog>
+| Agent             | Model  | Use when                                                |
+|-------------------|--------|---------------------------------------------------------|
+| sisyphus          | opus   | Master orchestration across complex multi-agent flows  |
+| atlas             | opus   | Executing an approved plan; delegates and verifies     |
+| prometheus        | opus   | Interviewing the user and producing a structured plan  |
+| metis             | opus   | Pre-execution gap analysis on a draft plan             |
+| momus             | opus   | Critical review of a draft plan for clarity and risk   |
+| sisyphus-junior   | sonnet | Focused implementation of a known, scoped task         |
+| explore           | sonnet | Finding code and patterns inside the local repo        |
+| librarian         | sonnet | External docs, library usage, OSS examples, research   |
+| oracle            | opus   | Architecture, tradeoffs, stuck debugging, craft review |
+| hephaestus        | sonnet | Build failures, type errors, toolchain/dep fixes       |
+| multimodal-looker | sonnet | Screenshots, PDFs, diagrams, visual inputs             |
+| socrates          | opus   | Deep Socratic interview on an underspecified problem   |
+| triage            | haiku  | Cheap routing help when the right specialist is unclear |
+</agent_catalog>
 
-| Need | Keyword | Slash command |
-|---|---|---|
-| Setup | "setup omca" | `/oh-my-claudeagent:omca-setup` |
-| Plan | "create plan" | `/oh-my-claudeagent:prometheus-plan <task>` |
-| Start execution | — | `/oh-my-claudeagent:start-work` |
-| Must-finish mode | "ralph" / "don't stop" | `/oh-my-claudeagent:ralph <task>` |
-| Parallel work | "ultrawork" / "ulw" | `/oh-my-claudeagent:ultrawork <task list>` |
-| Handoff | "handoff" | `/oh-my-claudeagent:handoff` |
-| Stop all modes | "stop continuation" | `/oh-my-claudeagent:stop-continuation` |
+<workflow>
+Planning pipeline: **prometheus → metis → momus → user approval → atlas.**
 
-Claude Code also offers /ultraplan (cloud-based planning, research preview) as an alternative to prometheus-plan for users on Claude Code on the web.
+1. `prometheus` interviews the user and drafts the plan file.
+2. `metis` performs pre-execution gap analysis on the draft.
+3. `momus` reviews the plan for clarity, verifiability, and completeness.
+4. **User explicitly approves** the plan (ExitPlanMode or direct confirmation).
+5. `atlas` executes the approved plan end to end, delegating every task and
+   verifying every result.
 
-## Agent catalog
+After approval, the user runs `/oh-my-claudeagent:start-work` or
+`/oh-my-claudeagent:atlas [plan path]`. Both fork `atlas` at depth 0 — `atlas`
+is the only agent authorized to touch the plan. Wait for the user to invoke one
+of those commands; do not auto-start execution.
+</workflow>
 
-| Agent | Role |
-|---|---|
-| `sisyphus` | Master orchestrator |
-| `atlas` | Plan execution orchestrator |
-| `prometheus` | Planning and interview flow |
-| `metis` | Gap analysis before planning |
-| `momus` | Plan review and critique |
-| `sisyphus-junior` | Focused implementation |
-| `explore` | Codebase discovery |
-| `librarian` | External docs and research |
-| `oracle` | Architecture guidance |
-| `hephaestus` | Build and toolchain fixes |
-| `multimodal-looker` | Image and PDF analysis |
-| `socrates` | Deep research interview |
-| `triage` | Lightweight routing help |
+<critical_rules>
+**IMPORTANT — main session must never implement plan tasks.** Once a plan is
+approved, delegate execution to `atlas`. Do not open the plan file and start
+editing code from the main session. Direct implementation bypasses the
+verification pipeline, skips evidence logging, and produces untested work. Only
+`atlas` (and the sub-specialists it spawns) may execute plan tasks.
 
-## Runtime notes
+**IMPORTANT — background-agent barrier.** When you launch N background agents
+and receive the first completion notification, acknowledge the result briefly
+and **END your response immediately** if other agents are still pending. Claude
+Code delivers one task-notification per turn; acting on partial results causes
+subsequent notifications to queue until the user presses Esc. Correct pattern:
 
-- `hooks/hooks.json` currently contains 23 hook events and 38 registered command hooks. Includes: `TaskCreated`, `CwdChanged`, `FileChanged`, `WorktreeRemove` (added in v1.5.0).
-- Hook handlers support `if` field with permission rule syntax (e.g., `Bash(git *)`) for argument-level filtering on tool events.
-- Keyword triggers (ralph, ultrawork, handoff, create plan, run atlas, fix build, etc.) are the natural interaction model — they auto-activate skills without requiring slash commands.
-- Skills support `paths:` frontmatter (glob list) for file-specific activation (e.g., `paths: "*.css, *.tsx"`).
-- `CLAUDE_CODE_SUBAGENT_MODEL` env var overrides all subagent model declarations.
-- Model aliases: opus, sonnet, haiku, best (most capable), opusplan (Opus for planning, Sonnet for execution), sonnet[1m], opus[1m] (1M context).
-- `ENABLE_TOOL_SEARCH` controls MCP tool deferred loading. Values: true (always defer), auto (threshold-based), auto:N (custom %), false (load all upfront).
-- `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` enables SendMessage, TeamCreate, TeamDelete tools.
-- `CLAUDE_CODE_NO_FLICKER=1` enables fullscreen flicker-free rendering.
-- `TASK_MAX_OUTPUT_LENGTH` controls subagent output truncation (default: 32,000 chars, max: 160,000).
-- `ANTHROPIC_SMALL_FAST_MODEL` is deprecated; use `ANTHROPIC_DEFAULT_HAIKU_MODEL`.
-- Hook output injected into context is capped at 10,000 characters. Excess is saved to disk with a file path reference.
-- Plans directory customizable via `plansDirectory` setting (default: ~/.claude/plans).
-- `CLAUDE.local.md` at project root provides personal instructions not checked into git. Loads alongside CLAUDE.md.
-- `UserPromptSubmit` hooks can set session title via `hookSpecificOutput.sessionTitle`.
-- Skill frontmatter name must match directory basename for stable invocation across installs.
-- Both `.omca/plans/` and Claude-native plan files are valid planning surfaces.
-- `.omca/state/` is execution metadata, not the primary plan or memory store.
-- Background agent barrier: when multiple background agents are running and you receive the first completion notification, END your response immediately if other agents are still pending. Never act on partial results — wait for all notifications.
+- Agent 1 of 3 returns → "Got result 1. Waiting for 2 more." → END turn.
+- Agent 2 of 3 returns → "Got result 2. Waiting for 1 more." → END turn.
+- Agent 3 of 3 returns → synthesize and proceed.
 
-## Workflow
+**IMPORTANT — evidence before completion.** After every build, test, or lint
+command, record the result via the `evidence_log` MCP tool with evidence_type,
+command, exit_code, and an output snippet. The `task-completed-verify.sh` hook
+blocks task completion without matching evidence. No evidence, no done.
+</critical_rules>
 
-Planning pipeline: prometheus (plan) → metis (gap analysis) → momus (review) → **user approval** → atlas (execute all tasks via /start-work).
+<parallel_execution>
+Launch multiple background agents when tasks are genuinely independent — one
+agent's output is not another's input:
 
-After plan approval, the user runs `/oh-my-claudeagent:start-work` (handles plan discovery, boulder setup, worktree) or `/oh-my-claudeagent:atlas [plan path]` (direct atlas execution). Both fork atlas at depth 0. The main session agent must NEVER implement plan tasks directly — the user must explicitly invoke execution.
+1. Send a single message containing multiple `Agent` tool-use blocks, each with
+   `run_in_background=true`. Batching them in one message is what makes the
+   fan-out parallel.
+2. After launching, if the remaining work depends on the delegated results, end
+   your response. Do not poll state files — wait for task-notifications to
+   arrive as new context turns.
+3. Apply the background-agent barrier above on every partial completion.
+4. Synthesize only after all N results are in.
 
-## Managed settings boundary
+Sequence instead of parallelizing when one task's output feeds the next, when
+you need to see one result before you know how to frame another, or when a
+downstream agent needs context the upstream one is still producing.
+</parallel_execution>
 
-Managed settings stay outside plugin ownership. Important keys include `allowManagedHooksOnly`, `allowManagedPermissionRulesOnly`, `allowManagedMcpServersOnly`, and `sandbox.failIfUnavailable`.
+<verification>
+Verify before you claim. Record every build / test / lint command via the
+`evidence_log` MCP tool before marking a task complete — this is enforced by
+the task-completion hook, not a suggestion.
 
-Keep `teammateMode: "auto"` as the default collaboration baseline unless org policy says otherwise.
-Valid `permissionMode` values: `"default"`, `"acceptEdits"`, `"plan"`, `"dontAsk"`, `"bypassPermissions"`, `"auto"`. Plugin agents have `permissionMode` stripped by Claude Code — do not declare it in agent frontmatter.
-`"dontAsk"` auto-denies all tools unless pre-approved via allow rules. For CI/headless environments.
-`permission-filter.sh` is guardrail-only and does not auto-allow commands.
-Managed setting `disableSkillShellExecution: true` blocks inline shell in skills from user, project, and plugin sources. Bundled and managed skills unaffected.
+Escalate to `oracle` after **2+ failed fix attempts** on the same issue. Stop
+shotgun-debugging — random changes hoping something sticks waste context and
+breed regressions. Oracle's job is to step back from your tunnel and call the
+real root cause.
 
-## Verification reminder
+For multi-system tradeoffs, unfamiliar architectural patterns, or decisions
+that touch multiple modules, get an independent read from `oracle` before
+committing to an approach. Early oracle review is cheap; late oracle review
+after you've already painted yourself into a corner is not.
+</verification>
 
-Before claiming docs or runtime contract changes are done, run:
-
-```bash
-bash scripts/validate-plugin.sh
-just test-hooks
-```
+--- /omca-setup ---
