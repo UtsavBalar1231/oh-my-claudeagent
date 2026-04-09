@@ -14,7 +14,7 @@
       "source": {
         "source": "github",
         "repo": "UtsavBalar1231/oh-my-claudeagent",
-        "sha": "43bfa813c0a7807c61a54805afeb6dbefb8a2c8d"
+        "sha": "7c9981eeb521d9ac641ff17d903206626985852b"
       },
       "description": "Multi-agent orchestration for Claude Code. Specialist agents handle planning, execution, code review, debugging, and research with evidence-based verification.",
       "version": "1.5.2",
