@@ -19,12 +19,22 @@ repos:
       - id: check-added-large-files
       - id: check-executables-have-shebangs
       - id: check-shebang-scripts-are-executable
+        # Bats test files carry `#!/usr/bin/env bats` shebangs by convention
+        # but are invoked via `bats file.bats` / `just test-bats`, not run
+        # directly. All existing bats files follow this pattern.
+        exclude: '\.bats$'
 
   # Shell
   - repo: https://github.com/shellcheck-py/shellcheck-py
     rev: v0.11.0.1
     hooks:
       - id: shellcheck
+        # Scope shellcheck to match `just lint-shell`, which only lints
+        # scripts/*.sh. Bats files use shell-like syntax but follow test-file
+        # style conventions (unbraced vars are idiomatic) that SC2250 flags
+        # noisily. Linting bats is out of scope for this project's lint
+        # boundary — see justfile `lint-shell` recipe.
+        exclude: '\.bats$'
 
   # Python
   - repo: https://github.com/astral-sh/ruff-pre-commit
