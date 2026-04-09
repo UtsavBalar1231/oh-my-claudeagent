@@ -5,6 +5,72 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.2] - 2026-04-09
+
+### Changed
+
+- **Prompt-engineered rewrite of `templates/claudemd.md`**: The session-injected runtime
+  guide has been completely rewritten as an orchestration-focused prompt. The previous
+  file mixed orchestration policy with Claude Code platform trivia (env vars,
+  `permissionMode` values, managed-settings reference tables, model alias lists, hook
+  contracts) that Claude already knows from its host. The new file is scoped strictly to
+  OMCA's responsibility — orchestration, harness, and delegation — and deletes everything
+  the platform already communicates (`templates/claudemd.md`, 114 → 182 lines).
+  - **New structure**: 8 XML-tagged sections — `operating_principles`, `delegation`
+    decision tree, `entrypoints`, `agent_catalog`, `workflow`, `critical_rules`,
+    `parallel_execution`, `verification`
+  - **Second-person imperative voice** throughout; exactly 3 `IMPORTANT` markers reserved
+    for true invariants (main-session must never implement plan tasks, background-agent
+    barrier, evidence before completion)
+  - **Delegation block** is a 17-row request-classification decision tree with an
+    explicit "narrowest specialist wins" tiebreaker
+  - **Agent catalog** lists all 13 specialists with model tier (opus/sonnet/haiku) and
+    concrete use-when signals
+  - **Fixed factual bugs**: prose version drift (old file had `v1.5.0` prose next to
+    `1.5.1` frontmatter), keyword-trigger "natural interaction model" framing (contradicted
+    `plugin.json`'s `enableKeywordTriggers: false` default), and unverified model aliases
+    (`best`, `opusplan`, `sonnet[1m]`, `opus[1m]` not documented in Claude Code docs)
+  - **Inline HTML canary markers** alongside `<agent_catalog>` and "Treat Claude Code as
+    the platform owner" point future rewriters at the bats tests that depend on those
+    load-bearing strings — a durable guardrail against the same rot recurring
+  - Users receive the new template on their next `omca-setup` run after upgrading; the
+    version-mismatch detection in `skills/omca-setup/SKILL.md` Phase 3 Step 4 handles the
+    replacement automatically without manual intervention
+- **Policy-marker enforcement relocated out of `templates/claudemd.md`**: The 4
+  managed-settings markers (`teammateMode: "auto"`, `allowManagedPermissionRulesOnly`,
+  `sandbox.failIfUnavailable`, permission-filter non-bypass disclosure) are no longer
+  enforced in the template — they live only in `OMCA.md` (user-facing reference) and
+  `skills/omca-setup/SKILL.md` (install-time guidance), where the managed-settings
+  posture actually belongs. The now-unused `TEMPLATE_CLAUDEMD_MD` constant is also
+  removed (`scripts/validate-plugin.sh`)
+- **Contributor docs synced with new template structure**: `docs/CONTRIBUTING.md`
+  agent-addition instructions updated from "catalog table" → "`<agent_catalog>` block";
+  `justfile` `new-agent` recipe echo cleaned of the stale `agent-metadata.json`
+  reference (that file was already removed per `validate-plugin.sh:652-657`)
+- **Pre-commit hook scope aligned with `just lint-shell`**: `.bats` files are now
+  excluded from the `check-shebang-scripts-are-executable` and `shellcheck` pre-commit
+  hooks. `just lint-shell` only lints `scripts/*.sh`; the pre-commit hooks previously
+  over-reached by running shellcheck on bats files (detected via the `#!/usr/bin/env bats`
+  shebang), which would flag pre-existing style patterns — SC2250 unbraced variables and
+  SC2002 useless-cat — that the project has consistently accepted across all 11 bats
+  files. Bats files are still validated at test time by `bats` itself and via
+  `just test-bats` (`.pre-commit-config.yaml`)
+
+### Fixed
+
+- **Dead bats canary in `tests/bats/hooks/session_lifecycle.bats`**: The
+  "skips full template when CLAUDE.md has omca-setup" test was keyed to `## Agent Catalog`,
+  a markdown header that existed in the old `templates/claudemd.md`. When the
+  prompt-engineered rewrite replaced that header with `<agent_catalog>` XML tags, the
+  canary silently weakened: the assertion still passed, but only because the string it
+  was checking for no longer existed anywhere in the codebase — the test was no longer
+  verifying what it was designed to verify. Replaced with two orthogonal canary
+  assertions keyed to structurally stable signals in the new template (`<agent_catalog>`
+  XML tag and the "Treat Claude Code as the platform owner" operating principle). Using
+  two keys means a future template rewrite would have to kill BOTH strings to silently
+  rot the canary again. Found by retrospective oracle review of the template rewrite via
+  the prometheus workflow (`tests/bats/hooks/session_lifecycle.bats`)
+
 ## [1.5.1] - 2026-04-08
 
 ### Changed
@@ -84,6 +150,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Multimodal-looker constraints**: added binary and device file constraints to prevent
   invalid file reads
 
+[1.5.2]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.5.1...v1.5.2
 [1.5.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.4.1...v1.5.0
 
