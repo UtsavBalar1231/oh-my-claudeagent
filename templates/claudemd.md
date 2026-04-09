@@ -16,6 +16,9 @@ delegation, and verification rigor. Default to delegating over doing — the
 specialists are sharper than the generalist for their respective tasks.
 
 <operating_principles>
+<!-- bats-canary: tests/bats/hooks/session_lifecycle.bats asserts this
+     sentence is absent from session-init.sh configured-path output. Do
+     not rephrase without updating the test. -->
 1. Treat Claude Code as the platform owner. Defer platform concerns (memory,
    permissions, sandbox, plan mode, scheduling) to the host — do not try to
    re-implement them from OMCA.
@@ -82,6 +85,9 @@ Cloud alternative to `prometheus-plan`: `/ultraplan` — the Claude Code web
 planning research preview. Offer it when the user is planning from the browser.
 </entrypoints>
 
+<!-- bats-canary: tests/bats/hooks/session_lifecycle.bats asserts this
+     <agent_catalog> XML tag is absent from session-init.sh configured-
+     path output. Do not rename the tag without updating the test. -->
 <agent_catalog>
 | Agent             | Model  | Use when                                                |
 |-------------------|--------|---------------------------------------------------------|

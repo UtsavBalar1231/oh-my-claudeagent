@@ -39,8 +39,11 @@ STOPFAILURE_PAYLOAD='{"session_id":"test-session","hook_event_name":"StopFailure
 	assert_success
 	local context
 	context=$(get_context)
-	# Configured path emits short context — should NOT contain the full behavioral template marker
-	[[ "$context" != *"## Agent Catalog"* ]]
+	# Configured path emits short context — the full behavioral template MUST NOT
+	# leak into the output. Key two canaries to orthogonal template signals so a
+	# future template rewrite cannot silently rot both at once.
+	[[ "$context" != *"<agent_catalog>"* ]]
+	[[ "$context" != *"Treat Claude Code as the platform owner"* ]]
 	# But it should still have the date and session info
 	[[ "$context" == *"[CURRENT DATE]"* ]]
 }
