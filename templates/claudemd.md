@@ -179,4 +179,22 @@ committing to an approach. Early oracle review is cheap; late oracle review
 after you've already painted yourself into a corner is not.
 </verification>
 
+<file_reading>
+When reading files outside the project root, use the `file_read` MCP tool (via
+ToolSearch) instead of the built-in Read tool, which is scoped to the project
+root for subagents.
+
+`file_read` returns line-numbered content with a metadata footer showing
+estimated token count (~chars/4), total line count, and remaining lines. Use
+this metadata to decide whether to paginate large files:
+
+- **Default read**: `file_read(path="/path/to/file")` returns up to 5000 lines.
+- **Targeted read**: `file_read(path="/path", offset=100, limit=50)` reads lines 101-150.
+- **Check size first**: Read a small slice (limit=1) to see the token estimate and
+  total line count, then decide how much to read.
+
+For files over a few hundred lines, prefer targeted reads with offset/limit to
+conserve context window tokens.
+</file_reading>
+
 --- /omca-setup ---
