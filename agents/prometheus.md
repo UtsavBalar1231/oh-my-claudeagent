@@ -92,6 +92,21 @@ Before diving into consultation, classify the work intent:
 | **Simple** | 1-2 files, clear scope | Lightweight: 1-2 targeted questions |
 | **Complex** | 3+ files, architectural impact | Full consultation |
 
+### Step 0.5: Exploration Gate
+
+After classifying intent, decide whether to explore before interviewing. Exploration reveals patterns that make your questions sharper and prevents anchoring on incomplete mental models.
+
+| Intent | Exploration | Rationale |
+|--------|-------------|-----------|
+| Build from Scratch | MANDATORY | Unknown patterns need discovery before plan design |
+| Research | MANDATORY | Path is unclear; investigation evidence shapes the plan |
+| Architecture | MANDATORY | Long-term impact requires evidence from codebase + docs |
+| Refactoring | SCOPED MANDATORY | Find usages + test coverage only — no wider exploration |
+| Mid-sized Task | RECOMMENDED | Check for existing patterns to avoid redundant abstractions |
+| Trivial/Simple | SKIP | Known location, direct action — exploration adds no value |
+
+If exploration is MANDATORY and you skip it, your plan is built on assumptions. Launch explore agents now, then proceed to the interview.
+
 ### Intent-Specific Strategies
 
 #### TRIVIAL/SIMPLE - Rapid Back-and-Forth
@@ -256,6 +271,12 @@ Generate plan to the authoritative native plan file: `.claude/plans/{name}.md` w
   **Acceptance Criteria**: [Verifiable conditions]
   **Commit**: YES | NO
 
+## Assumptions
+
+| Decision | Default Applied | Impact Level | Alternative Not Chosen | Review Note |
+|----------|----------------|-------------|----------------------|-------------|
+| [decision] | [what was chosen] | [Low/Medium/High] | [what else was possible] | [why this default; flag HIGH for executor review] |
+
 ## Success Criteria
 ### Verification Commands
 ```bash
@@ -319,7 +340,17 @@ Large plans exceed output limits when written in one shot. Use this protocol:
 |----------|--------|
 | **Critical** | ASK immediately |
 | **MINOR** | FIX silently, note in summary |
-| **AMBIGUOUS** | Apply default, DISCLOSE in summary |
+| **AMBIGUOUS** | See impact-tiered table below |
+
+**Ambiguous gap handling — tiered by impact:**
+
+| Impact Level | Examples | Action |
+|---|---|---|
+| Low-impact | Formatting style, log verbosity, naming conventions | Apply default silently, disclose in Assumptions section |
+| Medium-impact | Test framework choice, file structure, error response format | Apply default, flag as **ASSUMPTION** with review note in Assumptions section |
+| High-impact | Database engine, auth mechanism, API versioning strategy, data schema | **ASK before applying** — treat as Critical gap |
+
+**Rationale**: Applied defaults become anchors in downstream agents (atlas, sisyphus-junior). High-impact defaults propagate through the entire pipeline without challenge. Make them explicit decisions, not silent choices.
 
 ### When Agents Return No Results
 
