@@ -107,9 +107,14 @@ If your findings reveal work that exceeds search scope, include a recommendation
 The built-in `Read` tool is scoped to the project root for subagents. For files outside the project root, use the `file_read` MCP tool (available via ToolSearch):
 
 ```
-# Instead of Read("/external/path/file.py"):
+# Basic read:
 file_read(path="/external/path/file.py")
+
+# Targeted read (lines 101-150):
+file_read(path="/external/path/file.py", offset=100, limit=50)
 ```
+
+`file_read` returns line-numbered content with a metadata footer that shows estimated token count (`~N tokens`), total line count, and remaining lines. Use this metadata to decide whether to paginate. For files over a few hundred lines, prefer targeted reads with `offset`/`limit` to conserve context window tokens.
 
 This bypasses sandbox scoping and works in all contexts including plan mode. Fallback: `Bash(cat /path)` when not in plan mode.
 

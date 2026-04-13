@@ -104,7 +104,7 @@ esac
 case "${AGENT_TYPE}" in
 *explore* | *librarian* | *oracle*)
 	CONTEXT_PARTS+="$(_section_header 'External Access')"
-	CONTEXT_PARTS+="[EXTERNAL PATH ACCESS] The Read tool is scoped to the project root for subagents. For files outside the project root, use the file_read MCP tool (available via ToolSearch). It bypasses sandbox scoping and works in all contexts including plan mode. Fallback: Bash(cat /path/to/file) if MCP tools are unavailable."
+	CONTEXT_PARTS+="[EXTERNAL PATH ACCESS] The Read tool is scoped to the project root for subagents. For files outside the project root, use the file_read MCP tool (available via ToolSearch). It bypasses sandbox scoping and works in all contexts including plan mode. It returns a metadata footer with token estimate (~chars/4), total line count, and remaining lines. For large files, use offset/limit to read targeted chunks (e.g. file_read(path=..., offset=100, limit=50)). Fallback: Bash(cat /path/to/file) if MCP tools are unavailable."
 	;;
 *) ;;
 esac
