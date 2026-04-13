@@ -5,6 +5,81 @@ source "$(dirname "$0")/lib/common.sh"
 INPUT="${HOOK_INPUT}"
 STATE_DIR="${HOOK_STATE_DIR}"
 
+# Plan-file-aware stagnation: track mtime + checkbox counts alongside task-hash signal.
+# Only runs when RALPH_ACTIVE=true and boulder has a fresh active_plan.
+# Updates plan_stagnation_count in ralph-state.json; escalates when >= 3 by logging
+# and feeding into the existing stagnation-allows-stop path (check_boulder_fallback → exit 0).
+# NOTE: exits the script (not just the function) when escalation threshold is reached.
+check_plan_file_progress() {
+	local boulder_file="${STATE_DIR}/boulder.json"
+	if [[ ! -f "${boulder_file}" ]]; then
+		return 0
+	fi
+
+	local active_plan
+	active_plan=$(jq -r '.active_plan // ""' "${boulder_file}" 2>/dev/null)
+	if [[ -z "${active_plan}" || "${active_plan}" == "null" ]]; then
+		return 0
+	fi
+
+	# Resolve plan path: support both absolute and relative (relative to project root)
+	local plan_file="${active_plan}"
+	if [[ ! -f "${plan_file}" ]]; then
+		# Try relative to CLAUDE_PROJECT_ROOT if set
+		local project_root="${CLAUDE_PROJECT_ROOT:-}"
+		if [[ -n "${project_root}" && -f "${project_root}/${active_plan}" ]]; then
+			plan_file="${project_root}/${active_plan}"
+		else
+			return 0
+		fi
+	fi
+
+	# Read current plan file mtime (portable: GNU stat then BSD stat)
+	local plan_mtime
+	plan_mtime=$(stat -c %Y "${plan_file}" 2>/dev/null || stat -f %m "${plan_file}" 2>/dev/null || echo "")
+	if [[ -z "${plan_mtime}" ]]; then
+		return 0
+	fi
+
+	# Count incomplete and complete checkboxes
+	local incomplete complete
+	incomplete=$(grep -c '^- \[ \] ' "${plan_file}" 2>/dev/null || true)
+	complete=$(grep -c '^- \[x\] ' "${plan_file}" 2>/dev/null || true)
+	incomplete="${incomplete:-0}"
+	complete="${complete:-0}"
+
+	# Read previous values from ralph-state.json
+	local last_mtime plan_stagnation
+	last_mtime=$(jq -r '.last_plan_mtime // ""' "${RALPH_STATE}" 2>/dev/null)
+	plan_stagnation=$(jq -r '.plan_stagnation_count // 0' "${RALPH_STATE}" 2>/dev/null)
+	last_mtime="${last_mtime:-}"
+	plan_stagnation="${plan_stagnation:-0}"
+
+	# Detect plan-level stagnation: mtime unchanged AND incomplete count > 0 AND
+	# task-hash also unchanged (STAGNATION > 0 means hash matched at least once)
+	if [[ "${incomplete}" -gt 0 && "${plan_mtime}" == "${last_mtime}" && "${STAGNATION}" -gt 0 ]]; then
+		plan_stagnation=$((plan_stagnation + 1))
+	else
+		plan_stagnation=0
+	fi
+
+	# Update ralph-state.json with plan tracking fields atomically
+	jq --arg mtime "${plan_mtime}" \
+		--argjson inc "${incomplete}" \
+		--argjson com "${complete}" \
+		--argjson psc "${plan_stagnation}" \
+		'.last_plan_mtime = $mtime | .last_plan_incomplete = $inc | .last_plan_complete = $com | .plan_stagnation_count = $psc' \
+		"${RALPH_STATE}" > "${RALPH_STATE}.tmp" && \
+		mv "${RALPH_STATE}.tmp" "${RALPH_STATE}"
+
+	if [[ ${plan_stagnation} -ge 3 ]]; then
+		_log_hook_error "ralph plan stagnated (plan_stagnation_count=${plan_stagnation}, incomplete=${incomplete}) — allowing stop" "ralph-persistence.sh"
+		# Feed into existing stagnation-allows-stop path
+		check_boulder_fallback
+		exit 0
+	fi
+}
+
 # Boulder fallback: block stop if a fresh work plan exists
 # NOTE: exit 0 here exits the script, not just the function
 check_boulder_fallback() {
@@ -105,6 +180,9 @@ if [[ "${RALPH_ACTIVE}" == "true" ]]; then
 		# Allow stop — no progress after threshold attempts and no fresh boulder plan
 		exit 0
 	fi
+
+	# Plan-file-aware stagnation: supplement task-hash signal with plan checkbox state
+	check_plan_file_progress
 fi
 
 # Count incomplete tasks in ralph-state.json

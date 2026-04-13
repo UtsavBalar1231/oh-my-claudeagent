@@ -115,3 +115,71 @@ STOP_PAYLOAD='{"stop_reason":"end_turn","stop_hook_active":false}'
 	assert_success
 	assert_output ""
 }
+
+# ─── j. Plan-file-aware stagnation: 3 unchanged invocations → escalates ──────
+
+@test "plan stagnation: mtime+hash unchanged across 3+ calls → plan_stagnation_count reaches 3" {
+	# Use no-tasks state so MAX_STAGNATION=5 (task-hash stagnation won't fire first)
+	write_state "ralph-state.json" \
+		'{"status":"active","tasks":[],"last_task_hash":"","stagnation_count":0,"plan_stagnation_count":0}'
+
+	# Create a plan file with incomplete checkboxes
+	local plan_file="$CLAUDE_PROJECT_ROOT/plans/test-plan.md"
+	mkdir -p "$CLAUDE_PROJECT_ROOT/plans"
+	printf '## TODOs\n- [ ] 1. First task\n- [ ] 2. Second task\n' > "$plan_file"
+
+	# Point boulder.json at the plan file (absolute path)
+	write_state "boulder.json" \
+		"{\"active_plan\":\"${plan_file}\",\"plan_name\":\"test-plan\"}"
+
+	# Call 1: establishes task hash and plan mtime; plan_stagnation stays 0
+	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
+
+	# Call 2: task hash matches → STAGNATION=1; plan mtime unchanged → plan_stagnation=1
+	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
+
+	# Call 3: STAGNATION=2; plan_stagnation=2
+	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
+
+	# Call 4: STAGNATION=3; plan_stagnation=3 → plan escalation fires (exits 0, allows stop)
+	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
+	assert_success
+
+	local psc
+	psc=$(read_state "ralph-state.json" | jq -r '.plan_stagnation_count')
+	[[ "$psc" -ge 3 ]]
+}
+
+# ─── k. Plan-file-aware stagnation: missing boulder → no-op ──────────────────
+
+@test "plan stagnation: no boulder.json → skips plan tracking silently" {
+	write_state "ralph-state.json" \
+		'{"status":"active","tasks":[{"id":"1","status":"pending"}],"last_task_hash":"","stagnation_count":0}'
+	# No boulder.json present — should behave exactly like baseline (blocks stop)
+	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
+	assert_success
+	assert_output --partial '"decision":"block"'
+}
+
+# ─── l. Plan-file-aware stagnation: all checkboxes complete → no increment ───
+
+@test "plan stagnation: all checkboxes complete → plan_stagnation_count stays 0" {
+	write_state "ralph-state.json" \
+		'{"status":"active","tasks":[],"last_task_hash":"","stagnation_count":0,"plan_stagnation_count":0}'
+
+	local plan_file="$CLAUDE_PROJECT_ROOT/plans/complete-plan.md"
+	mkdir -p "$CLAUDE_PROJECT_ROOT/plans"
+	printf '## TODOs\n- [x] 1. Done task\n- [x] 2. Also done\n' > "$plan_file"
+
+	write_state "boulder.json" \
+		"{\"active_plan\":\"${plan_file}\",\"plan_name\":\"complete-plan\"}"
+
+	# Multiple calls — no incomplete checkboxes, so plan_stagnation must not increment
+	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
+	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
+	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
+
+	local psc
+	psc=$(read_state "ralph-state.json" | jq -r '.plan_stagnation_count // 0')
+	[[ "$psc" -eq 0 ]]
+}
