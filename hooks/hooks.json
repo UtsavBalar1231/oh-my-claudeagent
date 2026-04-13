@@ -68,6 +68,15 @@
 						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/write-guard.sh"
 					}
 				]
+			},
+			{
+				"matcher": "Write",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/plan-checkbox-verify.sh"
+					}
+				]
 			}
 		],
 		"PermissionRequest": [
