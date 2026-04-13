@@ -9,6 +9,9 @@ from __future__ import annotations
 import os
 from datetime import datetime, timezone
 
+from statusline.config import config
+from statusline.types import GitInfo, StatuslinePayload
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -34,8 +37,8 @@ EMPTY_BLOCK = "\u25b1"  # ▱
 # Dim mid-dot separator
 SEP = f" {DIM}\u00b7{RST} "
 
-# Git cache TTL in seconds
-GIT_CACHE_TTL = 5
+# Git cache TTL in seconds -- kept for backward compatibility; sourced from config
+GIT_CACHE_TTL = config.cache_ttl
 
 
 # ---------------------------------------------------------------------------
@@ -96,9 +99,9 @@ def build_glyphs(nerd: bool) -> dict[str, str]:
 
 def _threshold_color(pct: float) -> str:
     """Return ANSI color based on percentage thresholds."""
-    if pct >= 85:
+    if pct >= config.threshold_crit:
         return RED
-    if pct >= 60:
+    if pct >= config.threshold_warn:
         return YELLOW
     return GREEN
 
@@ -117,9 +120,11 @@ def _render_context_bar(
     pct: float | None,
     ctx_window: dict,
     exceeds_200k: bool,
-    bar_width: int = 20,
+    bar_width: int | None = None,
 ) -> str:
     """Render the context usage bar with graduated blocks."""
+    if bar_width is None:
+        bar_width = config.bar_width
     ctx_size = ctx_window.get("context_window_size", 200000)
     size_label = "1M" if ctx_size >= 1000000 else "200k"
 
@@ -195,15 +200,24 @@ def _format_duration(ms: int | None) -> str:
     return f"{minutes}m {seconds}s"
 
 
+def _format_tokens(n: int) -> str:
+    """Format a token count to a compact human-readable string."""
+    if n >= 1_000_000:
+        return f"{n / 1_000_000:.1f}M"
+    if n >= 1_000:
+        return f"{n / 1_000:.1f}k"
+    return str(n)
+
+
 # ---------------------------------------------------------------------------
 # Line composers
 # ---------------------------------------------------------------------------
 
 
 def _compose_line1(
-    data: dict,
+    data: StatuslinePayload,
     glyphs: dict[str, str],
-    git_info: dict[str, str],
+    git_info: GitInfo,
 ) -> tuple[str, bool]:
     """Compose info line (Line 1). Returns (line_str, has_extra_info)."""
     parts: list[str] = []
@@ -213,6 +227,25 @@ def _compose_line1(
     model = data.get("model", {})
     display_name = model.get("display_name", "Claude")
     parts.append(f"{CYAN}{glyphs['model']} {display_name}{RST}")
+
+    # Session identifier (session_name or first 8 chars of session_id)
+    session_name = data.get("session_name")
+    session_id = data.get("session_id")
+    if session_name is not None:
+        transcript_path = data.get("transcript_path")
+        if transcript_path:
+            linked_name = _osc8_link(f"file://{transcript_path}", session_name)
+            parts.append(f"{DIM}{linked_name}{RST}")
+        else:
+            parts.append(f"{DIM}{session_name}{RST}")
+    elif session_id is not None:
+        short_id = str(session_id)[:8]
+        transcript_path = data.get("transcript_path")
+        if transcript_path:
+            linked_id = _osc8_link(f"file://{transcript_path}", short_id)
+            parts.append(f"{DIM}{linked_id}{RST}")
+        else:
+            parts.append(f"{DIM}{short_id}{RST}")
 
     # Git branch (or worktree branch override)
     worktree = data.get("worktree") if "worktree" in data else None
@@ -294,12 +327,17 @@ def _compose_line1(
             short = vim_mode[0] if vim_mode else "?"
             parts.append(f"{YELLOW}{glyphs['vim']} {short}{RST}")
 
+    # Version (dim, always last)
+    version = data.get("version")
+    if version is not None:
+        parts.append(f"{DIM}v{version}{RST}")
+
     line = SEP.join(parts)
     return line, has_extra
 
 
 def _compose_line2(
-    data: dict,
+    data: StatuslinePayload,
     glyphs: dict[str, str],
 ) -> str:
     """Compose metrics line (Line 2)."""
@@ -335,6 +373,19 @@ def _compose_line2(
         line_parts.append(f"{RED}{glyphs['removed']}{lines_removed}{RST}")
     if line_parts:
         parts.append("/".join(line_parts))
+
+    # Token count (total_input_tokens + total_output_tokens)
+    total_input = data.get("total_input_tokens")
+    total_output = data.get("total_output_tokens")
+    if total_input is not None or total_output is not None:
+        tok_sum = (total_input or 0) + (total_output or 0)
+        parts.append(f"{DIM}{_format_tokens(tok_sum)} tok{RST}")
+
+    # API time
+    api_duration_ms = data.get("total_api_duration_ms")
+    if api_duration_ms is not None:
+        api_s = api_duration_ms // 1000
+        parts.append(f"{DIM}api {api_s}s{RST}")
 
     return SEP.join(parts)
 
@@ -406,7 +457,7 @@ def _compose_line3(usage: dict, glyphs: dict[str, str]) -> str | None:
 # ---------------------------------------------------------------------------
 
 
-def _extract_rate_limits(data: dict) -> dict | None:
+def _extract_rate_limits(data: StatuslinePayload) -> dict | None:
     """Extract rate limits from the statusline payload (v2.1.80+).
 
     The ``rate_limits`` key is only present for Claude.ai Pro/Max subscribers
@@ -438,7 +489,7 @@ def _extract_rate_limits(data: dict) -> dict | None:
 # ---------------------------------------------------------------------------
 
 
-def render(data: dict, git_info: dict) -> str:
+def render(data: StatuslinePayload, git_info: GitInfo) -> str:
     """Render the statusline from parsed JSON data and git info.
 
     Args:

@@ -13,7 +13,10 @@ import subprocess
 import tempfile
 import time
 
-from statusline.core import GIT_CACHE_TTL
+from statusline.config import config
+
+# Remote URL is re-fetched only when this sub-TTL (seconds) has elapsed.
+_REMOTE_TTL = 60
 
 # ---------------------------------------------------------------------------
 # Internal helpers
@@ -54,7 +57,7 @@ def _run_git(project_dir: str, args: list[str]) -> str:
             ["git", "-C", project_dir, *args],
             capture_output=True,
             text=True,
-            timeout=3,
+            timeout=config.git_timeout,
             env=env,
         )
         return r.stdout.strip() if r.returncode == 0 else ""
@@ -116,11 +119,14 @@ def _parse_porcelain_v2(output: str) -> tuple[str | None, int, int, int]:
     return branch_header, staged, modified, untracked
 
 
-def _fetch_git_info(project_dir: str) -> dict[str, str]:
+def _fetch_git_info(project_dir: str, cached: dict[str, str] | None = None) -> dict[str, str]:
     """Fetch fresh git info using optimized approach.
 
     Uses direct .git/HEAD read for branch + single porcelain v2 status command,
     reducing subprocess calls from 5 to 2.
+
+    If ``cached`` is provided, the remote URL is only re-fetched when its
+    sub-TTL (_REMOTE_TTL) has expired; otherwise the cached value is reused.
     """
     git_dir = resolve_git_dir(project_dir)
     if git_dir is None:
@@ -151,7 +157,7 @@ def _fetch_git_info(project_dir: str) -> dict[str, str]:
             ],
             capture_output=True,
             text=True,
-            timeout=3,
+            timeout=config.git_timeout,
             env=env,
         )
         if r.returncode == 0:
@@ -167,8 +173,24 @@ def _fetch_git_info(project_dir: str) -> dict[str, str]:
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
         staged, modified, untracked = 0, 0, 0
 
-    # 3. Remote URL (subprocess -- handles url.insteadOf, includeIf, etc.)
-    remote = _run_git(project_dir, ["remote", "get-url", "origin"])
+    # 3. Remote URL -- reuse from cache when sub-TTL is still fresh
+    now = time.time()
+    remote = ""
+    if cached is not None:
+        remote_fetched_at = cached.get("remote_fetched_at")
+        if remote_fetched_at is not None:
+            try:
+                age = now - float(remote_fetched_at)
+                if age < _REMOTE_TTL:
+                    remote = cached.get("remote", "")
+                else:
+                    remote = _run_git(project_dir, ["remote", "get-url", "origin"])
+            except (TypeError, ValueError):
+                remote = _run_git(project_dir, ["remote", "get-url", "origin"])
+        else:
+            remote = _run_git(project_dir, ["remote", "get-url", "origin"])
+    else:
+        remote = _run_git(project_dir, ["remote", "get-url", "origin"])
 
     return {
         "is_git": "1",
@@ -178,26 +200,24 @@ def _fetch_git_info(project_dir: str) -> dict[str, str]:
         "modified": str(modified),
         "untracked": str(untracked),
         "remote": remote,
+        "remote_fetched_at": str(now),
     }
 
 
-def _get_git_info(project_dir: str) -> dict[str, str]:
-    """Get git info, using cache when fresh."""
-    cache_path = _git_cache_path(project_dir)
-
-    # Check cache freshness
+def _read_cache(cache_path: str) -> dict[str, str] | None:
+    """Read the cache file. Returns None on any error."""
     try:
-        mtime = os.path.getmtime(cache_path)
-        if (time.time() - mtime) < GIT_CACHE_TTL:
-            with open(cache_path) as f:
-                return json.load(f)
+        with open(cache_path) as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            return data  # type: ignore[return-value]
     except (OSError, json.JSONDecodeError, ValueError):
         pass
+    return None
 
-    # Fetch fresh
-    info = _fetch_git_info(project_dir)
 
-    # Atomic write
+def _write_cache(cache_path: str, info: dict[str, str]) -> None:
+    """Atomically write info dict to cache_path."""
     try:
         cache_dir = os.path.dirname(cache_path)
         fd, tmp_path = tempfile.mkstemp(dir=cache_dir, prefix=".statusline-")
@@ -207,7 +227,42 @@ def _get_git_info(project_dir: str) -> dict[str, str]:
     except OSError:
         pass
 
-    return info
+
+def _get_git_info(project_dir: str) -> dict[str, str]:
+    """Get git info, using cache when fresh.
+
+    Fallback chain:
+      1. Return cached data if it is within the cache TTL.
+      2. Attempt a fresh fetch; on success write cache and return fresh data.
+      3. On fetch failure (timeout, exception), return stale cached data.
+      4. If no cache exists at all, return {"is_git": "0"}.
+    """
+    cache_path = _git_cache_path(project_dir)
+
+    # 1. Check cache freshness
+    cached = _read_cache(cache_path)
+    if cached is not None:
+        try:
+            mtime = os.path.getmtime(cache_path)
+            if (time.time() - mtime) < config.cache_ttl:
+                return cached
+        except OSError:
+            pass
+
+    # 2. Attempt fresh fetch
+    try:
+        info = _fetch_git_info(project_dir, cached=cached)
+        _write_cache(cache_path, info)
+        return info
+    except Exception:
+        pass
+
+    # 3. Stale cache fallback
+    if cached is not None:
+        return cached
+
+    # 4. No cache at all
+    return {"is_git": "0"}
 
 
 # ---------------------------------------------------------------------------

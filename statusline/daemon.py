@@ -26,33 +26,10 @@ import socketserver
 import sys
 import threading
 
+from statusline.config import config
 from statusline.core import FALLBACK, render
 from statusline.git import get_git_info
-
-# ---------------------------------------------------------------------------
-# Protocol
-# ---------------------------------------------------------------------------
-
-PROTOCOL_VERSION = "1"
-
-# ---------------------------------------------------------------------------
-# Socket path
-# ---------------------------------------------------------------------------
-
-
-def _socket_path() -> str:
-    """Return the platform-appropriate Unix socket path."""
-    uid = os.getuid()
-    if sys.platform == "linux":
-        # Abstract namespace socket -- auto-cleanup on process exit
-        return f"\0cc-statusline-{uid}"
-    # macOS / other: filesystem socket
-    return f"/tmp/cc-statusline-{uid}.sock"
-
-
-def _pid_path() -> str:
-    return f"/tmp/cc-statusline-{os.getuid()}.pid"
-
+from statusline.protocol import PROTOCOL_VERSION, _pid_path, _socket_path
 
 # ---------------------------------------------------------------------------
 # Request handler
@@ -62,7 +39,7 @@ def _pid_path() -> str:
 class StatuslineHandler(socketserver.StreamRequestHandler):
     """Handle a single statusline request per connection."""
 
-    server: StatuslineDaemon
+    server: StatuslineDaemon  # type: ignore[assignment]  # intentional narrowing
 
     def handle(self) -> None:
         raw = self.rfile.readline()
@@ -112,8 +89,10 @@ class StatuslineDaemon(socketserver.ThreadingUnixStreamServer):
         self,
         addr: str,
         handler: type[socketserver.BaseRequestHandler],
-        idle_timeout: int = 1800,
+        idle_timeout: int | None = None,
     ) -> None:
+        if idle_timeout is None:
+            idle_timeout = config.idle_timeout
         super().__init__(addr, handler)
         self._idle_timeout = idle_timeout
         self._idle_timer: threading.Timer | None = None
@@ -125,7 +104,7 @@ class StatuslineDaemon(socketserver.ThreadingUnixStreamServer):
         with self._lock:
             if self._idle_timer is not None:
                 self._idle_timer.cancel()
-            self._idle_timer = threading.Timer(self._idle_timeout, self._idle_shutdown)
+            self._idle_timer = threading.Timer(float(self._idle_timeout or 0), self._idle_shutdown)
             self._idle_timer.daemon = True
             self._idle_timer.start()
 

@@ -20,23 +20,7 @@ import subprocess
 import sys
 import time
 
-# ---------------------------------------------------------------------------
-# Protocol (shared with daemon)
-# ---------------------------------------------------------------------------
-
-PROTOCOL_VERSION = "1"
-
-# ---------------------------------------------------------------------------
-# Socket path (must match daemon.py)
-# ---------------------------------------------------------------------------
-
-
-def _socket_path() -> str:
-    """Return the platform-appropriate Unix socket path."""
-    uid = os.getuid()
-    if sys.platform == "linux":
-        return f"\0cc-statusline-{uid}"
-    return f"/tmp/cc-statusline-{uid}.sock"
+from statusline.protocol import PROTOCOL_VERSION, _socket_path
 
 
 # ---------------------------------------------------------------------------
