@@ -1002,7 +1002,7 @@ check_hooks() {
 
 	rm -f "${ralph_wrapper_state}" "${ultrawork_wrapper_state}"
 	local stop_payload="${HOOK_FIXTURES_DIR}/stop-basic.json"
-	run_registered_hooks "Stop default (no state)" "Stop" "" "${stop_payload}" "${tmp_root}" "empty"
+	run_registered_hooks "Stop default (no state)" "Stop" "" "${stop_payload}" "${tmp_root}" "json-optional"
 
 	printf '{"status":"active","activatedAt":"2026-03-22T12:00:00Z","tasks":[{"id":"t1","status":"in_progress"}],"last_task_hash":"","stagnation_count":0}\n' \
 		>"${ralph_wrapper_state}"
@@ -1015,7 +1015,7 @@ check_hooks() {
 		>"${ultrawork_wrapper_state}"
 	printf '{"active":[{"id":"test-agent-1","type":"explore","status":"running","startedAt":"2026-03-22T12:00:00Z","started_epoch":%s}],"completed":[]}\n' \
 		"${uw_epoch}" >"${tmp_root}/.omca/state/subagents.json"
-	run_registered_hooks "Stop ultrawork active + running agents (allow)" "Stop" "" "${stop_payload}" "${tmp_root}" "empty"
+	run_registered_hooks "Stop ultrawork active + running agents (allow)" "Stop" "" "${stop_payload}" "${tmp_root}" "json-optional"
 	rm -f "${ultrawork_wrapper_state}" "${tmp_root}/.omca/state/subagents.json"
 
 	printf '{"status":"active","activatedAt":"2026-03-22T12:00:00Z","wrapper":"stop-hook","mode":"ultrawork"}\n' \

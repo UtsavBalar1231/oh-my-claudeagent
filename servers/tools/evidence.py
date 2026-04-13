@@ -16,7 +16,7 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool()
     def evidence_log(
         evidence_type: str = Field(
-            description="Evidence type: build, test, lint, or manual. Called after verification commands."
+            description="Evidence type: build, test, lint, manual, or final_verification_f1..f4 (final verification wave: F1 plan compliance, F2 code quality, F3 manual QA, F4 scope fidelity). Called after verification commands."
         ),
         command: str = Field(description="Command that was executed"),
         exit_code: int = Field(description="Exit code of the command"),

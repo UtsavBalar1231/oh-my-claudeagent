@@ -226,6 +226,14 @@
 						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/ralph-persistence.sh"
 					}
 				]
+			},
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/final-verification-evidence.sh"
+					}
+				]
 			}
 		],
 		"StopFailure": [
