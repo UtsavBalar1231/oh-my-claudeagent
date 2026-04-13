@@ -36,11 +36,11 @@ native agent teams only when workers need the shared task list or direct
 teammate-to-teammate messaging. Do not invent a second task board, control plane, or
 teammate protocol on top of those native surfaces.
 
-Treat the team lifecycle hooks as one contract:
+Treat the team lifecycle events as one contract:
 - `TaskCreated` gates task creation quality before teammates claim work. If it blocks,
   rewrite the task so scope, owner, and dependencies are explicit.
 - `TaskCompleted` gates completion quality. A task stays open until verification
-  evidence exists and the hook accepts the completion.
+  evidence exists and the completion gate accepts it.
 - `TeammateIdle` guards against silent stalls. Reassign or unblock the teammate when
   more work exists; otherwise let the team wind down cleanly.
 
@@ -314,7 +314,7 @@ Run build/typecheck commands via `Bash` to verify on changed files at:
 - **`boulder_progress`**: Check completed/remaining tasks before reporting status
 - **`mode_read()`**: Check which persistence modes are active (ralph, ultrawork, boulder, evidence)
 - **`mode_clear()`**: Deactivate all persistence modes (default). Use `mode_clear(mode="ralph")` for selective clearing
-- **`evidence_log`**: After ANY build/test/lint command, record result — required by task-completed-verify hook
+- **`evidence_log`**: After ANY build/test/lint command, record result — task completion is blocked by the platform verification layer without matching evidence
 - **`evidence_read`**: Review accumulated evidence before claiming completion
 - **`notepad_write`**: Record learnings, blockers, or decisions during orchestration — persists across compactions
 - Never use `rm -f` on `.omca/state/` files — always use the corresponding MCP tool

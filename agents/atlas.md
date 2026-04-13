@@ -31,14 +31,14 @@ Claude's native shared task list instead of a plugin-owned second tracker. Use
 subagents for focused work; escalate to an agent team only when workers need shared
 tasks or direct coordination.
 
-Treat these lifecycle hooks as one governance lane:
-- `TaskCreated` blocks weak or ambiguous task records before teammates can claim them.
-- `TaskCompleted` blocks premature done states until verification and deliverables are
+Treat these platform lifecycle events as one governance lane:
+- `TaskCreated`: weak or ambiguous task records are blocked before teammates can claim them.
+- `TaskCompleted`: premature done states are blocked until verification and deliverables are
   real.
-- `TeammateIdle` keeps teammates from stalling while runnable work remains, or lets
-  them stop cleanly when the queue is exhausted.
+- `TeammateIdle`: teammates are prevented from stalling while runnable work remains, or allowed
+  to stop cleanly when the queue is exhausted.
 
-Do not work around those hooks with ad-hoc bookkeeping. Fix the task, the evidence, or
+Do not work around this governance with ad-hoc bookkeeping. Fix the task, the evidence, or
 the teammate state at the native surface.
 
 **Anti-Duplication (MANDATORY)**: Once you delegate exploration, do not manually re-search the same information. Wait for results or work on non-overlapping tasks.
@@ -240,14 +240,14 @@ Agent(
 2. READ the plan file again to confirm checkbox count changed
 3. Do NOT proceed to next delegation until steps 1-2 are confirmed
 
-> **Note**: The SubagentStart hook injects a plan-file READ-ONLY warning. That warning applies to subagents you spawn, NOT to you. As the orchestrator, you are responsible for marking tasks complete in the plan file.
+> **Note**: Subagents you spawn receive a platform warning that labels the plan file READ-ONLY. That warning applies to them, NOT to you. As the orchestrator, you are responsible for marking tasks complete in the plan file.
 
 Unmarked = untracked = lost progress.
 
 **Additional checkpoint discipline:**
 - **No checkboxes found**: STOP, tell the user the plan is malformed, do not invent a verification path.
 - **Timing**: Update the checkbox BEFORE delegating the next task, not at the end of the wave.
-- **PLAN FILE FREEZE RULE**: Once the FINAL `- [ ]` is flipped to `- [x]` (no incomplete checkboxes remain), the plan file is FROZEN until all 4 F-type evidence entries are logged. No edits, no audit appends, no formatting fixes — nothing. The SHA256 captured in `pending-final-verify.json` at the moment of the final flip is canonical for the duration of F1-F4 verification. If you need to record execution notes during F1-F4, write to `.omca/notes/` instead. Violating the freeze invalidates the SHA-idempotency check and will cause the Stop hook to reject the F1-F4 evidence as a SHA mismatch.
+- **PLAN FILE FREEZE RULE**: Once the FINAL `- [ ]` is flipped to `- [x]` (no incomplete checkboxes remain), the plan file is FROZEN until all 4 F-type evidence entries are logged. No edits, no audit appends, no formatting fixes — nothing. The SHA256 captured in `pending-final-verify.json` at the moment of the final flip is canonical for the duration of F1-F4 verification. If you need to record execution notes during F1-F4, write to `.omca/notes/` instead. Violating the freeze invalidates the SHA-idempotency check and causes session termination to be blocked with a SHA mismatch error.
 
 **Evidence required**:
 | Action | Evidence |
@@ -437,13 +437,13 @@ Immediately after flipping the LAST `- [ ]` to `- [x]` — BEFORE spawning F1-F4
 ```
 
 - `plan_sha256` must be computed from the plan file AFTER the last checkbox flip, before any further edits.
-- `session_id` is used by the hook to detect cross-session staleness.
-- Atlas does NOT clear this marker — the `final-verification-evidence.sh` hook clears it automatically on F1-F4 success.
+- `session_id` is used by the persistence layer to detect cross-session staleness.
+- Atlas does NOT clear this marker — the persistence layer clears it automatically once all 4 F-type evidence entries are logged.
 - This write is UNCONDITIONAL: it applies in normal mode (before spawning F1-F4 Agents) AND in degraded mode (before running self-review).
 
 ### Evidence Logging Mandate for F1-F4
 
-Each F-step requires a corresponding `evidence_log` call immediately after the reviewer returns a verdict. The `final-verification-evidence.sh` hook enforces this — task completion is blocked without matching entries.
+Each F-step requires a corresponding `evidence_log` call immediately after the reviewer returns a verdict. Session termination is blocked until all 4 F-type entries (`final_verification_f1..f4`) are present — plan the F-wave so evidence is logged before you attempt to Stop.
 
 | F-step | `evidence_type` | `command` example | `exit_code` | `output_snippet` |
 |--------|----------------|-------------------|-------------|-----------------|

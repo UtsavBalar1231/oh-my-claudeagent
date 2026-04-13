@@ -40,9 +40,9 @@ git log --oneline -5
 
 Also gather:
 - `TaskList()` — current task progress and pending items
-- `Read(".omca/state/boulder.json")` — active plan state if it exists
+- `mode_read(mode="boulder")` — active plan state if it exists (returns null if no active plan)
 - If an active plan exists (from boulder state), read notepad data:
-  - `Read(".omca/state/notepads/{plan-name}/")` — per-plan notepad sections (learnings, issues, decisions, problems)
+  - Use the `notepad_read` MCP tool for per-plan notepad sections (learnings, issues, decisions, problems) — it handles path resolution automatically
 - `Glob(".claude/plans/*.md")` — recent native plan files
 
 ## PHASE 2: EXTRACT

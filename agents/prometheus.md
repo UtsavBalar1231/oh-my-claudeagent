@@ -55,7 +55,7 @@ plan-mode file, not in a plugin-owned planning store. If planning needs multiple
 workers, use Claude-native teammates or subagents rather than inventing a second
 coordination layer.
 
-When planning work is split across workers, treat the lifecycle hooks as one contract:
+When planning work is split across workers, treat the lifecycle events as one contract:
 - `TaskCreated` validates shared planning or research tasks before they enter the
   queue.
 - `TaskCompleted` prevents a planning task from closing until its findings are
@@ -63,8 +63,8 @@ When planning work is split across workers, treat the lifecycle hooks as one con
 - `TeammateIdle` tells you when a planning teammate needs another task, more
   direction, or a clean shutdown.
 
-Use those hooks to govern planning quality instead of creating extra planner-side
-status files.
+Use these lifecycle events to govern planning quality instead of creating extra
+planner-side status files.
 
 ## PHASE 1: INTERVIEW MODE (DEFAULT)
 
@@ -370,7 +370,7 @@ If `AskUserQuestion` returns an answer that does not resolve a critical clearanc
 
 ### Plan Structure Self-Check (defense-in-depth)
 
-> **Note**: This self-check is a soft early-bail. The load-bearing enforcement is the `plan-checkbox-verify.sh` PostToolUse hook (Task 2 of the orchestration-discipline-fix plan) — it will hard-block any plan write that is missing checkboxes. This section is defense-in-depth so you catch the problem before the hook does.
+> **Note**: This self-check is a soft early-bail. Plan writes missing a `- [ ]` task pattern are hard-blocked at write time by the platform's validation layer — this section is defense-in-depth so you catch the problem yourself before the block fires.
 
 After writing the plan file, grep it for the checkbox pattern before proceeding:
 
@@ -431,7 +431,7 @@ When invoked via the prometheus-plan skill, defer to the SKILL.md ordering for E
 **REMEMBER: YOU PLAN. SOMEONE ELSE EXECUTES.**
 
 ### MCP Tool Reference
-- **`boulder_write`**: After plan is saved, register it as the active boulder so hooks and subagents can find it
+- **`boulder_write`**: After plan is saved, register it as the active boulder so downstream executors and subagents can find it
 - **`mode_read`**: Check if a previous plan is already active before creating a new one
 - **`notepad_write`**: Use only for audit breadcrumbs or question-relay fallback when another agent must see the note later
 

@@ -27,8 +27,6 @@ Run `/cancel-ralph` when you want to stop an active Ralph Loop.
 
 ## State Files
 
-Ralph Loop state is stored in `.omca/state/ralph-state.json`.
-
 Use the `mode_clear` MCP tool to clear it:
 
 ```

@@ -52,6 +52,7 @@ Key rules:
 - Do not declare `permissionMode:` — it is stripped from plugin agents by Claude Code for security
 - Add the agent to the `<agent_catalog>` block in `templates/claudemd.md`
 - **`CLAUDE_CODE_SUBAGENT_MODEL` env var overrides ALL agent model declarations** — warn users if they set this, as it affects every spawned agent regardless of frontmatter.
+- **Do not leak hook internals into agent prompts.** State the behavioral rule, not the enforcement mechanism. Agent prompts must NOT mention: hook script names (`plan-checkbox-verify.sh`, `final-verification-evidence.sh`, `task-completed-verify.sh`, `ralph-persistence.sh`, etc.), "X hook" as a noun (`SubagentStart hook`, `Stop hook`, `the final-verification hook`), raw `.omca/state/*.json` file paths, or cross-references to specific plan names/task numbers for enforcement rationale. Describe the behavior instead: *"session termination is blocked until F1-F4 evidence is present"* not *"the `final-verification-evidence.sh` hook blocks Stop"*. Exception: platform event names like `TaskCreated`, `TaskCompleted`, `TeammateIdle` may appear as API contract references, but do not frame them as "lifecycle hooks" — use "lifecycle events" or "platform lifecycle gates". Rationale: naming internal scripts in agent prose creates stale prompts whenever hooks are renamed, refactored, or replaced with MCP tools.
 
 ## Adding a Skill
 
@@ -60,6 +61,7 @@ Key rules:
 3. If the skill should be keyword-activated, add a detection pattern to `scripts/keyword-detector.sh`
 4. Skills with `context: fork` run at depth 0 — use for orchestrators that need the `Agent` tool
 5. **Skill descriptions must be ≤250 characters** (Claude Code truncates at this limit). Move longer trigger phrases or usage notes into the SKILL.md body.
+6. **Do not leak hook internals.** Skills describe WHAT users do; hooks automate HOW. Unless the skill's primary purpose IS hook configuration or diagnosis, skills must NOT mention: raw `.omca/state/*.json` file paths (use the `mode_read`, `mode_clear`, `boulder_write`, `boulder_progress` MCP tools from the omca server instead), hook script names (`ralph-persistence.sh`, `task-completed-verify.sh`, etc.), hook event names (`PreToolUse`, `Stop`, etc.), or hook env vars (`HOOK_INPUT`, `HOOK_STATE_DIR`, `OMCA_HOOK_DISABLE_FINAL_VERIFY`). Recognized exceptions: `omca-setup` (installs hooks), `stop-continuation` (clears hook-managed state), `ralph` (is the persistence loop; coupled to `ralph-state.json` until a task-sync MCP tool lands). Rationale: exposing file paths forces users to understand internal layouts they can't control and forces every future hook refactor to update skill prose.
 
 ## Testing
 

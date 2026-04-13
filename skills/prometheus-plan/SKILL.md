@@ -21,14 +21,14 @@ and present the plan.
 
 **Why prometheus can write in plan mode**: Plan mode allows writing to the native plan file path
 Claude provides — this is by design. That native plan file is authoritative, while
-`.omca/state/boulder.json` only tracks execution metadata. The `Edit` tool on the plan file is
+boulder state (the execution metadata layer) only tracks a pointer to the plan. The `Edit` tool on the plan file is
 explicitly permitted in plan mode.
 
 Both `.omca/plans/` and native plan files are valid. They coexist — neither replaces the other.
 
 If plan mode is active (detectable from system context mentioning a plan file at `~/.claude/plans/`):
 1. Write the plan to the native plan file path from the plan mode context — that is the authoritative copy for this session
-2. Also write a copy to `.omca/plans/<name>.md` so boulder tracking works (boulder_write requires a file path)
+2. Also write a copy to `.omca/plans/<name>.md` so boulder tracking works (call boulder_write with the plan path after momus approves)
 3. ExitPlanMode is called as part of the momus completion sequence below — NOT here
 
 If plan mode is NOT active:

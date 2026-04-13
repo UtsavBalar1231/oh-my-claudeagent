@@ -17,15 +17,15 @@ MCP tools available: `mode_read`, `mode_clear`, `boulder_progress`, `evidence_lo
 
 ## Activation
 
-Sets both ralph mode AND ultrawork mode. Activation writes `.omca/state/ralph-state.json` and `.omca/state/ultrawork-state.json`. See `/oh-my-claudeagent:ralph` and `/oh-my-claudeagent:ultrawork` skills for the state file format and keyword triggers. The session persists until:
+Activation registers both ralph (persistence) and ultrawork (parallelism) modes via the keyword detector. The session persists until:
 1. ALL tasks are complete
 2. Oracle has verified the work
 3. Oracle verdict is APPROVE
 
 ## Workflow
 
-1. Activate ralph mode (`.omca/state/ralph-state.json`)
-2. Activate ultrawork mode (`.omca/state/ultrawork-state.json`)
+1. Activate ralph mode (persistence)
+2. Activate ultrawork mode (parallelism)
 3. Execute tasks with maximum parallelism
 4. When all tasks appear complete:
    - Spawn Oracle: `Agent(subagent_type="oh-my-claudeagent:oracle", prompt="Verify all completed work...")`

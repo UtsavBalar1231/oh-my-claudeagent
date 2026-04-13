@@ -64,10 +64,10 @@ TaskUpdate(taskId="...", status="completed")
 
 **No mental tracking. Everything in the task list.**
 
-### 1b. State File Sync is Non-Negotiable
+### 1b. Task State Sync (persistence-loop specific)
 
-The Stop hook reads `.omca/state/ralph-state.json` to decide whether to block stopping.
-The keyword detector creates this file automatically, but YOU must sync task state to it.
+The persistence layer (managed internally) reads task state from a file written by this skill.
+The keyword detector creates that file automatically, but YOU must keep task state in sync with the `TaskCreate`/`TaskUpdate` discipline above. **A future omca MCP tool will make this sync automatic. Until then, the jq commands below are the load-bearing mechanism for this skill — scoped to the ralph persistence loop only.**
 
 After EVERY `TaskCreate`, sync to ralph-state.json:
 ```bash
@@ -85,8 +85,8 @@ jq --arg id "<taskId>" --arg status "<newStatus>" \
   mv .omca/state/ralph-state.json.tmp .omca/state/ralph-state.json
 ```
 
-**Why**: The Stop hook cannot see Claude's native task list. If you only use `TaskCreate`/`TaskUpdate`
-without syncing to ralph-state.json, the hook sees empty tasks and allows stopping after 5 attempts.
+**Why**: The persistence layer cannot see Claude's native task list. If you only use `TaskCreate`/`TaskUpdate`
+without syncing, the persistence check sees empty tasks and allows stopping after 5 attempts.
 
 ### 2. Error Resilience
 
@@ -147,11 +147,6 @@ IF result.has_errors:
     analyze_and_fix()  # Don't accept failure
     retry_or_create_fix_task()
 ```
-
-## State Files
-
-Ralph Loop state is stored in:
-- `.omca/state/ralph-state.json`
 
 ## Phrases That Activate Ralph
 

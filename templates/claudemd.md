@@ -141,8 +141,8 @@ subsequent notifications to queue until the user presses Esc. Correct pattern:
 
 **IMPORTANT — evidence before completion.** After every build, test, or lint
 command, record the result via the `evidence_log` MCP tool with evidence_type,
-command, exit_code, and an output snippet. The `task-completed-verify.sh` hook
-blocks task completion without matching evidence. No evidence, no done.
+command, exit_code, and an output snippet. Task completion is blocked by the
+platform verification layer when matching evidence is missing. No evidence, no done.
 </critical_rules>
 
 <parallel_execution>
@@ -166,7 +166,7 @@ downstream agent needs context the upstream one is still producing.
 <verification>
 Verify before you claim. Record every build / test / lint command via the
 `evidence_log` MCP tool before marking a task complete — this is enforced by
-the task-completion hook, not a suggestion.
+the platform verification layer, not a suggestion.
 
 Escalate to `oracle` after **2+ failed fix attempts** on the same issue. Stop
 shotgun-debugging — random changes hoping something sticks waste context and

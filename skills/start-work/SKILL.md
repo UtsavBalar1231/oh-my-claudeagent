@@ -24,16 +24,16 @@ If plan mode is still active when start-work is invoked:
 ## What To Do
 
 1. **Find available plans** (both surfaces are valid):
-   a. Check `.omca/state/boulder.json` first — if `active_plan` exists and points to a valid file, use it directly. Treat boulder as execution metadata only; it stores a pointer to the authoritative plan file.
+   a. Check boulder state first via `mode_read(mode="boulder")` — if the returned state contains `active_plan` pointing to a valid file, use it directly. Treat boulder as execution metadata only; it stores a pointer to the authoritative plan file.
    b. If no active boulder, search both plan locations:
       - `.omca/plans/*.md` — prometheus-generated plans (primary output location)
       - `.claude/plans/*.md` — Claude-native plan files (if the current session already surfaced a native plan-mode file path, prefer that exact path)
    c. Merge results, deduplicated by absolute path, with clear source labels such as `[active]`, `[omca]`, or `[native]`
 
-2. **Check for active execution metadata**: Read `.omca/state/boulder.json` if it exists
+2. **Check for active execution metadata**: Call `mode_read(mode="boulder")` to fetch active execution metadata
 
 3. **Decision logic**:
-   - If `.omca/state/boulder.json` exists AND plan is NOT complete (has unchecked boxes):
+   - If `mode_read` returns active boulder state AND plan is NOT complete (has unchecked boxes):
      - **APPEND** current session to session_ids
      - Continue work on existing plan
    - If no active plan OR plan is complete:
@@ -41,7 +41,8 @@ If plan mode is still active when start-work is invoked:
      - If ONE plan: auto-select it
      - If MULTIPLE plans: show list with timestamps, ask user to select
 
-4. **Create/Update `.omca/state/boulder.json` execution metadata**:
+4. **Create/Update boulder execution metadata**:
+   The boulder state shape (for reference only — use `boulder_write` MCP tool to create/update, do NOT hand-edit):
    ```json
    {
      "active_plan": "/absolute/path/to/plan.md",
@@ -62,7 +63,7 @@ If plan mode is still active when start-work is invoked:
 
 ### If `--worktree <path>` is provided:
 1. Validate: Run `git rev-parse --show-toplevel` inside the path
-2. If valid: Store `worktree_path` in boulder.json and inject worktree active instructions:
+2. If valid: Store `worktree_path` in the boulder state (via `boulder_write`) and inject worktree active instructions:
 
    **CRITICAL — DO NOT FORGET**: You are working inside a git worktree. ALL operations MUST target paths under the worktree directory.
    - Every file read, write, edit, and git operation MUST use worktree paths
@@ -72,15 +73,15 @@ If plan mode is still active when start-work is invoked:
 3. If invalid: Show setup instructions: `git worktree add <path> <branch>`
 
 ### If no `--worktree` flag:
-1. Check if boulder.json already has `worktree_path` (resume case) — use it
+1. Check if the boulder state already has `worktree_path` (resume case) — use it
 2. Otherwise, show worktree setup prompt:
    - `git worktree list --porcelain` — list existing worktrees
    - Create if needed: `git worktree add <path> <branch>`
-   - Store chosen path in boulder.json
+   - Store chosen path in the boulder state via `boulder_write`
 
 ### On resume with existing worktree:
-- Show the existing `worktree_path` from boulder.json
-- If user provides new `--worktree`, update boulder.json with the new path
+- Show the existing `worktree_path` from the boulder state
+- If user provides new `--worktree`, update the execution metadata via `boulder_write` with the new path
 
 ## Output Format
 
@@ -135,6 +136,6 @@ Follow atlas workflow: delegate, verify, mark checkboxes, repeat until done.
 
 ## Critical
 
-- Always update `.omca/state/boulder.json` BEFORE starting work — it tracks execution metadata, not plan ownership
+- Always update the boulder state via `boulder_write` BEFORE starting work — it tracks execution metadata, not plan ownership
 - Read the FULL plan file before delegating any tasks
 - Follow atlas 6-section delegation prompt format
