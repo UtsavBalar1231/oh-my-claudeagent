@@ -244,6 +244,11 @@ Agent(
 
 Unmarked = untracked = lost progress.
 
+**Additional checkpoint discipline:**
+- **No checkboxes found**: STOP, tell the user the plan is malformed, do not invent a verification path.
+- **Timing**: Update the checkbox BEFORE delegating the next task, not at the end of the wave.
+- **PLAN FILE FREEZE RULE**: Once the FINAL `- [ ]` is flipped to `- [x]` (no incomplete checkboxes remain), the plan file is FROZEN until all 4 F-type evidence entries are logged. No edits, no audit appends, no formatting fixes — nothing. The SHA256 captured in `pending-final-verify.json` at the moment of the final flip is canonical for the duration of F1-F4 verification. If you need to record execution notes during F1-F4, write to `.omca/notes/` instead. Violating the freeze invalidates the SHA-idempotency check and will cause the Stop hook to reject the F1-F4 evidence as a SHA mismatch.
+
 **Evidence required**:
 | Action | Evidence |
 |--------|----------|
@@ -417,6 +422,58 @@ F2-F4 (Test, QA, Scope): `Agent(subagent_type="oh-my-claudeagent:sisyphus-junior
 
 After ALL 4 APPROVE: present results to user, get explicit "okay", then report completion.
 After ANY REJECT: fix issues, re-run that reviewer only, present again.
+
+### Pending-Final-Verify Marker Write (UNCONDITIONAL — BOTH MODES)
+
+Immediately after flipping the LAST `- [ ]` to `- [x]` — BEFORE spawning F1-F4 agents (or before running self-review in degraded mode) — write `STATE_DIR/pending-final-verify.json`:
+
+```json
+{
+  "plan_path": "<absolute path to plan file>",
+  "plan_sha256": "<hex digest of the now-frozen plan file>",
+  "marked_at": <unix timestamp>,
+  "session_id": "<value of CLAUDE_SESSION_ID env var, or equivalent>"
+}
+```
+
+- `plan_sha256` must be computed from the plan file AFTER the last checkbox flip, before any further edits.
+- `session_id` is used by the hook to detect cross-session staleness.
+- Atlas does NOT clear this marker — the `final-verification-evidence.sh` hook clears it automatically on F1-F4 success.
+- This write is UNCONDITIONAL: it applies in normal mode (before spawning F1-F4 Agents) AND in degraded mode (before running self-review).
+
+### Evidence Logging Mandate for F1-F4
+
+Each F-step requires a corresponding `evidence_log` call immediately after the reviewer returns a verdict. The `final-verification-evidence.sh` hook enforces this — task completion is blocked without matching entries.
+
+| F-step | `evidence_type` | `command` example | `exit_code` | `output_snippet` |
+|--------|----------------|-------------------|-------------|-----------------|
+| F1 | `final_verification_f1` | `oracle: APPROVE` | 0 = APPROVE, 1 = REJECT | `plan_sha256:<hex> verdict:APPROVE` |
+| F2 | `final_verification_f2` | `sisyphus-junior: APPROVE` | 0 = APPROVE, 1 = REJECT | `plan_sha256:<hex> verdict:APPROVE` |
+| F3 | `final_verification_f3` | `sisyphus-junior: APPROVE` | 0 = APPROVE, 1 = REJECT | `plan_sha256:<hex> verdict:APPROVE` |
+| F4 | `final_verification_f4` | `sisyphus-junior: APPROVE` | 0 = APPROVE, 1 = REJECT | `plan_sha256:<hex> verdict:APPROVE` |
+
+### Anti-Rationalization Clauses
+
+"Direct file inspection is NOT a substitute for F1-F4. They are independent verifications by separate agents whose blind spots cannot match yours."
+
+"If you find yourself thinking 'F1-F4 wouldn't change the outcome', that is exactly when F1-F4 is most needed — the rationalization is itself a confirmation bias signal."
+
+"F1-F4 must run on EVERY plan, even short ones, even after direct verification, even in degraded mode without the Agent tool. In degraded mode, run them sequentially as a single review pass yourself if necessary."
+
+### Degraded Mode F1-F4
+
+When atlas is forked as a skill and the Agent tool is stripped by the platform, F1-F4 must still run — sequentially, in-context, as a self-review.
+
+**Procedure:**
+1. Run each F-step review yourself (read the plan, read the changed files, apply the reviewer's checklist).
+2. Log evidence with EXPLICIT labeling: `command="self-review (degraded): <verdict>"`.
+3. Acknowledge in your output: "self-review is strictly weaker than independent review and may share blind spots — flag any uncertain verdict as REJECT to err toward user escalation rather than false APPROVE. Never skip, but never claim independence."
+
+**Context budget rule**: If remaining context budget cannot accommodate 4 separate review passes, collapse to 2 combined passes:
+- Pass 1: F1+F4 combined (Plan Compliance + Scope Fidelity) — log evidence under BOTH `final_verification_f1` and `final_verification_f4`, with `command="self-review (degraded, combined-F1F4): <verdict>"`.
+- Pass 2: F2+F3 combined (Code Quality + Manual QA) — log evidence under BOTH `final_verification_f2` and `final_verification_f3`, with `command="self-review (degraded, combined-F2F3): <verdict>"`.
+
+Never collapse to 1 pass. Two combined passes is the minimum acceptable degraded-mode execution.
 
 ## Output Requirements
 
