@@ -368,6 +368,26 @@ If `AskUserQuestion` returns an answer that does not resolve a critical clearanc
 2. **Proceed with an explicit assumption** — document it clearly in the plan's Context section
 3. **Flag the assumption for revisiting** during implementation so the executor can confirm before acting
 
+### Plan Structure Self-Check (defense-in-depth)
+
+> **Note**: This self-check is a soft early-bail. The load-bearing enforcement is the `plan-checkbox-verify.sh` PostToolUse hook (Task 2 of the orchestration-discipline-fix plan) — it will hard-block any plan write that is missing checkboxes. This section is defense-in-depth so you catch the problem before the hook does.
+
+After writing the plan file, grep it for the checkbox pattern before proceeding:
+
+```bash
+grep -cP "^- \[ \] [0-9]+\." <plan-file-path>
+```
+
+**If the count is zero, you MUST NOT claim the plan is complete.** Revise the plan to add at least one `- [ ] 1.` task under `## TODOs` before moving to momus review.
+
+**Anti-rationalization clauses — none of these justify skipping checkboxes:**
+
+1. **"The request is too small for a full TODO list."** — If the user's request seems too small for checkboxes, you must STILL emit at least one `- [ ] 1.` task. There is no valid plan format without checkboxes. A one-task plan with a single checkbox is correct; a plan with prose-only TODOs is not.
+
+2. **"I already described the tasks in the Context section."** — Context prose is not a task list. Only `- [ ] N.` lines under `## TODOs` count as tasks. Atlas cannot track progress against prose.
+
+3. **"Direct inspection confirms the plan is correct."** — Structure cannot be verified by reading. Run the grep command above. Zero matches means the plan is structurally invalid regardless of how well-written it appears.
+
 ### Momus Review
 
 After generating the plan, submit to momus for review:
