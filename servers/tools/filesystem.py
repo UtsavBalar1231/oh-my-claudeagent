@@ -83,6 +83,11 @@ def _format_numbered(lines: list[str], offset: int) -> str:
     )
 
 
+def _estimate_tokens(char_count: int) -> int:
+    """Estimate token count from character count (conservative ~4 chars/token)."""
+    return char_count // 4
+
+
 def _human_size(n: int) -> str:
     """Format byte count as human-readable string."""
     for unit in ("B", "KB", "MB", "GB"):
@@ -117,21 +122,28 @@ def register(mcp: FastMCP) -> None:
     def file_read(
         path: Annotated[str, Field(description="Absolute path to the file to read")],
         offset: Annotated[
-            int, Field(description="Line offset to start from (0-based)")
+            int,
+            Field(
+                description="0-based line offset. Use with limit to paginate large files (e.g. offset=500, limit=200 reads lines 501-700)"
+            ),
         ] = 0,
         limit: Annotated[
             int,
-            Field(description="Max lines to return (default 5000, 0 = no limit)"),
+            Field(
+                description="Max lines to return. Default 5000. Set to 0 for unlimited (blocked for >3MB files). Use smaller values for targeted reads to save tokens."
+            ),
         ] = 5000,
         encoding: Annotated[
             str,
             Field(description="File encoding (default utf-8, falls back to latin-1)"),
         ] = "utf-8",
     ) -> str:
-        """Read a file from any filesystem path with line numbers.
+        """Read a file with line numbers, token estimate footer, and offset/limit chunking.
 
-        Bypasses the built-in Read tool's project-root scoping for
-        subagents. Works in all contexts including plan mode.
+        Bypasses the built-in Read tool's project-root scoping for subagents.
+        The footer shows estimated token count and file size. For large files,
+        use offset and limit to read targeted sections instead of the whole file.
+        Default limit is 5000 lines.
         """
         # 1. Resolve and validate path (rejects devices, FIFOs, sockets)
         resolved, err = _safe_resolve(path)
@@ -176,7 +188,11 @@ def register(mcp: FastMCP) -> None:
         result = _format_numbered(sliced, offset)
 
         # 7. Add metadata footer
-        footer_parts = [f"{total} lines total"]
+        est_tokens = _estimate_tokens(size)
+        footer_parts = [
+            f"~{est_tokens} tokens ({_human_size(size)})",
+            f"{total} lines total",
+        ]
         if used_enc != encoding:
             footer_parts.append(f"encoding fallback: {used_enc}")
         if limit > 0 and offset + limit < total:

@@ -180,6 +180,27 @@ def test_denied_path_returns_access_denied(tools, tmp_path):
     assert "Access denied" in result
 
 
+# --- Token estimation footer ---
+
+
+def test_token_estimate_in_footer(tools, tmp_path):
+    """file_read result contains token estimate marker (~) and 'tokens' in footer."""
+    f = tmp_path / "sample.txt"
+    f.write_text("hello world\n" * 10)
+    result = tools["file_read"](path=str(f))
+    assert "~" in result
+    assert "tokens" in result
+
+
+def test_token_estimate_uses_file_size(tools, tmp_path):
+    """file_read footer shows ~200 tokens for an ~800-byte file (800 // 4 = 200)."""
+    f = tmp_path / "sized.txt"
+    # Write exactly 800 bytes: 799 'a' chars + newline
+    f.write_bytes(b"a" * 799 + b"\n")
+    result = tools["file_read"](path=str(f))
+    assert "~200 tokens" in result
+
+
 # --- Audit log ---
 
 
