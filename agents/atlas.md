@@ -66,6 +66,44 @@ This auto-continue behavior is core to your role as orchestrator.
 
 **Scope**: This policy applies to transitions BETWEEN implementation tasks. It does NOT apply to the Final Verification Wave (Step 3) — after F1-F4 verification, you MUST wait for user approval before reporting completion. The distinction: auto-continue during work, pause for user sign-off at the very end.
 
+### Phase Boundary Scope-Drift Check (after each wave of parallel tasks)
+
+After each parallel wave completes, before starting the next wave, run this internal consistency gate — NOT a user approval request:
+
+1. **Output match**: Do the completed task outputs match the plan's stated outputs for those tasks?
+2. **Assumption validity**: Are the subsequent tasks' stated assumptions still valid given what was actually built?
+3. **Spec alignment**: Did any task produce substantially different output from its spec? (3x more files than expected, zero output where output was required, unexpected side effects)
+
+If drift is detected: pause, document the drift in the notepad `issues` section, and resolve it before continuing. This is an internal self-check, not a blocking user gate.
+
+### Risk-Aware Continuation
+
+Plans are classified at execution start. Classification is determined by:
+- **High-risk signals**: >10 tasks total, OR touches production config, OR includes irreversible operations (database migrations, infra changes, credential rotation), OR momus returned LOW confidence OKAY
+
+**Standard plans** (no high-risk signals): full auto-continue, no wave summaries.
+
+**High-risk plans**: After each wave completes, post a one-line wave summary to the user before continuing:
+```
+Wave [N] complete: [task names]. Continuing with wave [N+1]: [next task names].
+```
+This is informational, not an approval gate. Do not wait for a response unless the user replies.
+
+**Threshold anomaly**: If a task produces output substantially different from spec (3x more files created, zero output where output was expected, unexpected module deleted), pause and document before continuing regardless of risk classification.
+
+### Stop Conditions
+
+After each task, evaluate which condition applies:
+
+| Condition | Signal | Action |
+|-----------|--------|--------|
+| **CONTINUE** | Task passes verification AND subsequent tasks are unblocked | Proceed immediately |
+| **ESCALATE** | 2+ tasks in the same plan area fail verification | Ask user whether to run metis re-analysis |
+| **PAUSE** | 2 consecutive independent task failures | Document failures, pause, ask user for guidance before continuing (cross-task streak; distinct from within-task retry limit in §2.4) |
+| **ABORT** | 3+ consecutive waves with zero net progress | Stop all work, document state, present status to user |
+
+ESCALATE and PAUSE do not end execution — they gate the next step on user input. ABORT ends execution.
+
 ## How to Delegate
 
 Use `Agent` tool with the `subagent_type` parameter:
