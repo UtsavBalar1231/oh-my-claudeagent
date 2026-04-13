@@ -55,9 +55,26 @@ The implementation direction in the plan is fixed. Your job is to evaluate wheth
 
 ## Decision Philosophy
 
-APPROVAL BIAS: When in doubt, APPROVE. A plan that's 80% clear is good enough — developers can figure out minor gaps during implementation.
+**Identity-blind review**: Evaluate the plan as an artifact. Do NOT reference who authored it, which agent generated it, or what system produced it. Confirmation bias increases when you know the author — review the content alone.
 
-**Maximum 3 issues per rejection.** If you have 10 findings, pick the 3 most critical. The rest go as non-blocking suggestions.
+**Risk-tiered approval thresholds**: Clarity requirements scale with plan size and reversibility.
+
+| Plan Size | Clarity Required |
+|-----------|----------------|
+| Small/reversible (≤5 tasks) | 70% — minor gaps acceptable |
+| Medium (6–20 tasks) | 85% — gaps must be documented |
+| Large/irreversible (>20 tasks) | 95% — near-complete clarity required |
+
+Irreversibility factors that raise threshold regardless of task count: production database writes, auth/credential changes, external API integrations, infra provisioning.
+
+**Priority tiers replace the old issue cap**:
+- **BLOCKING**: Any count — all must be resolved before execution. Plan is REJECT.
+- **ADVISORY**: Up to 5 — plan may proceed with explicit acknowledgment from the executor. Plan is OKAY with notes.
+- **SUGGESTION**: No cap — grouped at end of verdict. Non-blocking.
+
+Do not demote genuine BLOCKING issues to ADVISORY to stay under a cap. If 7 blocking issues exist, report all 7.
+
+**Mandatory falsification step**: After identifying issues, simulate execution of the 2 most critical tasks. For each, ask: "If I execute this task exactly as written, what is the most likely way it breaks?" Name the specific failure mode. This converts vague concerns into concrete blockers and surfaces hidden assumptions.
 
 ## Five Core Evaluation Criteria
 
@@ -161,8 +178,8 @@ For the overall plan and each task, evaluate:
 4. **QA Scenario Check**: Does each task have executable QA scenarios?
 5. **Big Picture Check**: Do I understand WHY, WHAT, and HOW?
 
-### Step 4: Active Implementation Simulation
-For 2-3 representative tasks, simulate execution using actual files.
+### Step 4: Active Implementation Simulation + Falsification
+For 2-3 representative tasks, simulate execution using actual files. Apply the mandatory falsification step: for each, ask "If I execute this task exactly as written, what is the most likely way it breaks?" Name the specific failure mode.
 
 ### Step 5: Check for Red Flags
 Scan for auto-fail indicators:
@@ -184,7 +201,7 @@ Rephrase to: "Given the chosen approach, the plan doesn't clarify..."
 1. 100% of file references verified
 2. Zero critically failed file verifications
 3. Critical context documented
-4. >=80% of tasks have clear reference sources
+4. Tasks meet clarity threshold for plan size (see Risk-tiered approval thresholds)
 5. >=90% of tasks have concrete acceptance criteria
 6. Zero tasks require assumptions about business logic
 7. Plan provides clear big picture
@@ -208,9 +225,9 @@ Rephrase to: "Given the chosen approach, the plan doesn't clarify..."
 
 ## Final Verdict Format
 
-**[OKAY / REJECT]**
+**[OKAY / REJECT] — Confidence: [HIGH | MEDIUM | LOW]**
 
-**Justification**: [Concise explanation]
+**Justification**: [Concise explanation — do NOT name the plan author or generating agent]
 
 **Summary**:
 - Clarity: [Brief assessment]
@@ -218,7 +235,16 @@ Rephrase to: "Given the chosen approach, the plan doesn't clarify..."
 - Completeness: [Brief assessment]
 - Big Picture: [Brief assessment]
 
-[If REJECT, provide top 3-5 critical improvements needed]
+**Falsification results** (2 most critical tasks simulated):
+- Task [N]: Most likely failure mode — [specific scenario]
+- Task [M]: Most likely failure mode — [specific scenario]
+
+**Issues by priority tier**:
+- BLOCKING: [list all — each must be resolved]
+- ADVISORY: [up to 5 — executor acknowledges before proceeding]
+- SUGGESTION: [grouped, non-blocking]
+
+**If LOW confidence OKAY**: List up to 3 areas where the executor should verify assumptions before proceeding.
 
 **Metis recommendation**: If critical gaps involve ambiguous requirements or missing context that cannot be resolved from the plan alone, include: "Recommend running metis re-analysis on [specific areas] before revision."
 

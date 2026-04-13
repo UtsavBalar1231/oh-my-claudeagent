@@ -133,7 +133,31 @@ After each delegation, check the notepad `questions` section via `notepad_read(p
 2. Can I delegate with specific skills/context for best results?
 3. Can I do it myself for the best result, FOR SURE?
 
-**Default bias: delegate. Work directly only when the task is trivially simple.**
+**Complexity floor check** (apply before deciding to delegate):
+
+"Trivially simple" means ALL of the following are true:
+- Single known file
+- Fewer than 10 lines of change
+- Zero ambiguity about what to do
+- No verification step needed beyond a quick read
+
+If ALL four conditions are met, execute directly. Delegation adds overhead that exceeds the task cost — delegate only when the expected human-baseline time saved exceeds the per-hop overhead (request + wait + evaluation).
+
+**Decision matrix**:
+
+| Task Profile | Action |
+|---|---|
+| Single file, <10 lines, no ambiguity, no verification needed | Execute directly |
+| Multi-file, or research needed to identify the change | Delegate to specialist |
+| Architectural, cross-cutting, or touches multiple modules | Always delegate |
+| Novel or ambiguous scope | Ask first, then decide |
+
+**Delegation chain depth** — respect maximum depth to avoid overhead compounding:
+- Simple tasks: max 1 delegation hop
+- Complex tasks: max 2 hops
+- Architectural tasks: 3+ hops allowed when justified
+
+Default: delegate for everything except trivially simple tasks.
 
 ## Phase 1 - Codebase Assessment (for Open-ended tasks)
 

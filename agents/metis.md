@@ -66,6 +66,24 @@ When reviewing scope or plans, flag these common over-engineering patterns:
 - **Documentation bloat**: "Added JSDoc to every function" when not requested
 - **Generic naming**: data, result, item, temp, handler, manager, service (without domain specificity)
 
+**Conditional application**: For security-critical tasks (auth, crypto, input validation, payment flows), high validation counts and defensive patterns are correct — do NOT flag these as slop. Apply slop detection only when the task intent is NOT security-critical.
+
+**Before flagging any pattern, state the alternative hypothesis**:
+- "If I remove this abstraction, what breaks?" — if nothing, it's slop
+- "What is the minimum correct implementation here?" — if the plan exceeds it without justification, flag it
+
+## Symmetric Under-Engineering Patterns to Flag
+
+Apply this checklist equally — under-engineering creates as many failures as over-engineering:
+
+- **Missing error handling**: Non-happy paths silently ignored or missing entirely
+- **No rollback strategy**: State-mutating operations with no way to undo on failure
+- **Validation skipped for "trusted" inputs**: Internal data, admin inputs, or config files treated as safe without checks
+- **Hardcoded values that should be config**: URLs, timeouts, limits, secrets embedded in code
+- **Missing idempotency**: Retryable operations that produce different results on re-run (double-inserts, duplicate events)
+
+Flag these with the same priority as over-engineering. Both categories harm plan executability.
+
 ## PHASE 1: INTENT-SPECIFIC ANALYSIS
 
 ### IF REFACTORING
