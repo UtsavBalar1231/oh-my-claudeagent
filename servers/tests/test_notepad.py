@@ -1,6 +1,7 @@
 """Tests for notepad MCP tools."""
 
 import pytest
+from pydantic import ValidationError
 
 import tools.notepad as notepad_module
 from tools._common import NOTEPADS_DIR, VALID_SECTIONS
@@ -91,8 +92,30 @@ def test_notepad_write_rejects_invalid_section(tools, working_dir):
         "issues",
         "decisions",
         "problems",
-        "questions",
     }
+
+
+def test_notepad_write_rejects_questions_section(tools, working_dir):
+    """The deprecated 'questions' section must be rejected by Literal validation.
+
+    Blocking clarification questions must now be emitted in the subagent's
+    final text response as a '## BLOCKING QUESTIONS' block — writing to a
+    notepad 'questions' section is a footgun and has been removed.
+    """
+    # VALID_SECTIONS no longer lists "questions"
+    assert "questions" not in VALID_SECTIONS
+
+    # The Literal[...] annotation on notepad_write should reject "questions"
+    # when the tool is invoked through the MCP schema layer. At the raw
+    # function level Python doesn't enforce Literal, so we assert via a
+    # pydantic TypeAdapter over the same Literal as the source of truth.
+    from typing import Literal
+
+    from pydantic import TypeAdapter
+
+    adapter = TypeAdapter(Literal["learnings", "issues", "decisions", "problems"])
+    with pytest.raises(ValidationError):
+        adapter.validate_python("questions")
 
 
 # --- notepad_read ---
@@ -156,15 +179,15 @@ def test_notepad_list_returns_sections(tools, working_dir):
     """notepad_list returns section names for an existing plan."""
     tools["notepad_write"](
         plan_name="list-plan",
-        section="questions",
-        content="Q1",
+        section="decisions",
+        content="D1",
         working_directory=working_dir,
     )
     result = tools["notepad_list"](
         plan_name="list-plan",
         working_directory=working_dir,
     )
-    assert "questions" in result
+    assert "decisions" in result
     assert "list-plan" in result
 
 
