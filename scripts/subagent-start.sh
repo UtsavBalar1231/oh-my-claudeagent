@@ -19,10 +19,10 @@ AGENT_TYPE=$(echo "${INPUT}" | jq -r '.agent_type // "unknown"')
 CONTEXT_PARTS="$(_section_header 'Agent Protocol')"
 case "${AGENT_TYPE}" in
 *explore* | *librarian* | *hephaestus* | *sisyphus-junior* | *multimodal* | *oracle* | *momus*)
-	CONTEXT_PARTS+="AskUserQuestion is unavailable in subagents. Make autonomous decisions when possible. If genuinely blocked, write the question to the notepad questions section and return."
+	CONTEXT_PARTS+="AskUserQuestion is not available here. Make autonomous decisions when possible; if you need user input, emit a '## BLOCKING QUESTIONS' block at the end of your final response (Q1., Q2., lettered options A/B/C, Recommended: line) and return. The orchestrator will relay."
 	;;
 *prometheus* | *metis* | *socrates* | *sisyphus* | *atlas*)
-	CONTEXT_PARTS+="AskUserQuestion is unavailable in subagents. When you need user input, write the question to the notepad questions section and return. The orchestrator will relay to the user and resume you."
+	CONTEXT_PARTS+="AskUserQuestion is not available here. When you need user input, emit a '## BLOCKING QUESTIONS' block at the end of your final response (Q1., Q2., lettered options A/B/C, Recommended: line) and return. The orchestrator will relay and resume you with the answers."
 	;;
 *)
 	CONTEXT_PARTS+="Make autonomous decisions. If unclear, choose the most reasonable option and proceed."
@@ -59,7 +59,7 @@ if [[ -f "${BOULDER_FILE}" ]]; then
 		CONTEXT_PARTS+=$'\n'"CRITICAL: The plan file at ${PLAN_FILE} is READ-ONLY. NEVER modify the plan file directly. Use notepad_write to record issues or decisions instead."
 	fi
 	if [[ -n "${PLAN_NAME}" ]]; then
-		CONTEXT_PARTS+=$'\n'"[NOTEPAD AVAILABLE] Plan: ${PLAN_NAME}. Use notepad_write('${PLAN_NAME}', section, content) to record discoveries. Sections: learnings, issues, decisions, problems, questions. Use 'questions' when you need user input (AskUserQuestion is unavailable in subagents). Always APPEND — never overwrite."
+		CONTEXT_PARTS+=$'\n'"[NOTEPAD AVAILABLE] Plan: ${PLAN_NAME}. Use notepad_write('${PLAN_NAME}', section, content) to record discoveries. Sections: learnings, issues, decisions, problems. Always APPEND — never overwrite."
 	fi
 fi
 

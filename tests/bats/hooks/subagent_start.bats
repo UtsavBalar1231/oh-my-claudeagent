@@ -5,6 +5,7 @@ load '../test_helper'
 EXPLORE_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id":"agent-abc123","agent_type":"oh-my-claudeagent:explore"}'
 SISYPHUS_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id":"agent-abc123","agent_type":"oh-my-claudeagent:sisyphus"}'
 ATLAS_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id":"agent-abc123","agent_type":"oh-my-claudeagent:atlas"}'
+PROMETHEUS_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id":"agent-abc123","agent_type":"oh-my-claudeagent:prometheus"}'
 UNKNOWN_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id":"agent-abc123","agent_type":"custom-agent"}'
 
 # ─── a. Agent Protocol injection ─────────────────────────────────────────────
@@ -122,4 +123,57 @@ UNKNOWN_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_i
 	local ctx
 	ctx=$(get_context)
 	echo "$ctx" | grep -q "DYNAMIC AGENT CATALOG"
+}
+
+# ─── j. Blocking questions protocol injection ─────────────────────────────────
+
+@test "blocking questions: planner agents receive BLOCKING QUESTIONS protocol" {
+	run_hook "subagent-start.sh" "$PROMETHEUS_PAYLOAD"
+	assert_success
+	local ctx
+	ctx=$(get_context)
+	echo "$ctx" | grep -q "BLOCKING QUESTIONS"
+}
+
+@test "blocking questions: non-planner agents receive BLOCKING QUESTIONS protocol" {
+	run_hook "subagent-start.sh" "$EXPLORE_PAYLOAD"
+	assert_success
+	local ctx
+	ctx=$(get_context)
+	echo "$ctx" | grep -q "BLOCKING QUESTIONS"
+}
+
+@test "blocking questions: hook no longer mentions notepad questions section" {
+	# Run against both a planner (prometheus) and a non-planner (explore)
+	# to catch any regression in either branch of the case statement.
+	run_hook "subagent-start.sh" "$PROMETHEUS_PAYLOAD"
+	assert_success
+	local ctx_p
+	ctx_p=$(get_context)
+	! echo "$ctx_p" | grep -qE "notepad.*questions.*section|questions' when you need"
+
+	run_hook "subagent-start.sh" "$EXPLORE_PAYLOAD"
+	assert_success
+	local ctx_e
+	ctx_e=$(get_context)
+	! echo "$ctx_e" | grep -qE "notepad.*questions.*section|questions' when you need"
+}
+
+@test "blocking questions: notepad sections list excludes questions" {
+	# With a boulder plan set, the NOTEPAD AVAILABLE line lists sections.
+	local plan_dir="$BATS_TEST_TMPDIR/plans"
+	mkdir -p "$plan_dir"
+	local plan_file="$plan_dir/my-plan.md"
+	printf '# My Plan\n- task 1\n' >"$plan_file"
+
+	write_state "boulder.json" \
+		"{\"active_plan\":\"${plan_file}\",\"plan_name\":\"my-plan\"}"
+
+	run_hook "subagent-start.sh" "$EXPLORE_PAYLOAD"
+	assert_success
+	local ctx
+	ctx=$(get_context)
+	# The sections list should mention the 4 retained sections but not "questions"
+	echo "$ctx" | grep -q "learnings, issues, decisions, problems"
+	! echo "$ctx" | grep -q "learnings, issues, decisions, problems, questions"
 }
