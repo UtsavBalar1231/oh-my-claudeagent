@@ -488,7 +488,7 @@ Unified server for structural code search, plan tracking, verification, notepads
 | `notepad_read` | Read a section |
 | `notepad_list` | List available plans and sections |
 
-Sections: `learnings`, `issues`, `decisions`, `problems`, `questions`.
+Sections: `learnings`, `issues`, `decisions`, `problems`.
 
 **Filesystem tools** — External file access for subagents:
 
@@ -613,8 +613,10 @@ orchestrators via skills (`/oh-my-claudeagent:atlas`, not `Agent(...atlas...)`).
 
 **Hook changes not taking effect:** Run `/reload-plugins`.
 
-**AskUserQuestion unavailable in subagents:** Subagents write to
-`notepad_write(plan_name, "questions", "...")`. The orchestrator relays.
+**AskUserQuestion unavailable in subagents:** Subagents emit a `## BLOCKING QUESTIONS`
+block at the end of their final response (Q1., Q2., lettered options A/B/C, Recommended:
+line). The orchestrator hydrates `AskUserQuestion` via `ToolSearch`, relays, and resumes
+the subagent via `SendMessage`.
 
 **permissionMode stripping:** Claude Code strips `permissionMode` from plugin agents.
 Copy agent files to `~/.claude/agents/` (user-scope agents retain it).
