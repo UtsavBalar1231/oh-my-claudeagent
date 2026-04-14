@@ -81,7 +81,7 @@ Before saying "done", "fixed", or "complete":
 - Using "should", "probably", "seems to"
 - Expressing satisfaction before verification
 - Claiming completion without fresh evidence
-- Stuck after 2+ failed attempts -> Use `AskUserQuestion` if available; otherwise write your question to the notepad `questions` section and return
+- Stuck after 2+ failed attempts -> Use `AskUserQuestion` if available; otherwise emit a `## BLOCKING QUESTIONS` block at the end of your final response and return. The orchestrator will relay.
 
 ### Evidence Required
 

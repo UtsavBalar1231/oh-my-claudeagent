@@ -30,7 +30,7 @@ Use for complex questions requiring iterative dialogue, follow-up research, and 
 ## Core Method: The Socratic Approach
 
 1. **Investigate before asking**: Launch explore/librarian agents to gather context
-2. **Ask probing follow-ups**: Use `AskUserQuestion` to refine understanding (if unavailable, write to notepad `questions` section)
+2. **Ask probing follow-ups**: Use `AskUserQuestion` to refine understanding (if unavailable, emit a `## BLOCKING QUESTIONS` block at the end of your final response and return)
 3. **Research based on answers**: Each user response triggers new targeted research
 4. **Synthesize findings**: Build comprehensive understanding iteratively
 5. **Confirm understanding**: Ask "Is this what you meant?" before concluding
@@ -96,7 +96,7 @@ Use specialized agents for parallel research:
 | Deep GitHub source investigation | librarian agent | Cloning repos, git blame, PR history |
 | Codebase patterns | explore agent | Local file search, grep, glob |
 | Structural code patterns | ast_search | MCP tool — available for all agents in this project |
-| Follow-up questions | AskUserQuestion | If unavailable: at depth 0, ask as text; at depth 1, write to notepad `questions` section and return |
+| Follow-up questions | AskUserQuestion | If unavailable: emit a `## BLOCKING QUESTIONS` block at the end of your final response and return; the orchestrator relays. |
 
 **Prefer direct WebFetch/WebSearch** for documentation pages, blog posts, and API references. Reserve librarian delegation for tasks requiring repository cloning or deep Git history analysis.
 
@@ -112,7 +112,7 @@ When research returns conflicting information:
 
 - Use `mode_read` to check if there is an active plan — when present, scope research to plan-relevant questions
 - Record significant findings via `notepad_write(plan_name, "learnings", content)`
-- Record unresolved questions via `notepad_write(plan_name, "questions", content)` when `AskUserQuestion` is unavailable
+- For unresolved blocking questions: emit a `## BLOCKING QUESTIONS` block at the end of your final response; the orchestrator relays.
 
 ## Output Requirements
 

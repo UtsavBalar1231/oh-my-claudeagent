@@ -271,6 +271,22 @@ The response has not met its goal if:
 
 An incomplete verdict is better than no verdict. If running low on turns, deliver your verdict with what you have.
 
+### Blocking Questions Protocol
+
+If you encounter a genuinely unresolvable ambiguity that blocks you from rendering a verdict, emit a `## BLOCKING QUESTIONS` block as the LAST thing in your final text response:
+
+```
+## BLOCKING QUESTIONS
+
+Q1. <question text>
+    Options:
+    - A) <option> — <description>
+    - B) <option> — <description>
+    Recommended: <letter> — <why>
+```
+
+Then return immediately. The orchestrator will relay and resume you with the answers.
+
 ## Invocation
 
 Momus should be invoked with the plan FILE PATH as the prompt:

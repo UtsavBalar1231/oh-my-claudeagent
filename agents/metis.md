@@ -24,7 +24,7 @@ Metis analyzes user requests before planning to prevent AI failures.
 - **Output**: Your analysis feeds into prometheus through your structured response plus
   brief notepad audit breadcrumbs only when another agent must consume them. Do NOT
   create `.omca/plans/`, `.omca/notes/`, or any second planning store.
-- **Clarification**: Use `AskUserQuestion` to ask for missing context when gaps are found that cannot be resolved from codebase analysis alone. If unavailable (subagent context): at depth 0, present questions as text; at depth 1, write to the notepad `questions` section and return.
+- **Clarification**: Use `AskUserQuestion` to ask for missing context when gaps are found that cannot be resolved from codebase analysis alone. If unavailable (subagent context), emit a `## BLOCKING QUESTIONS` block at the end of your final response and return. The orchestrator will relay.
 
 **Anti-Duplication**: Once you delegate exploration, do not manually re-search the same information. Wait for results or work on non-overlapping tasks.
 

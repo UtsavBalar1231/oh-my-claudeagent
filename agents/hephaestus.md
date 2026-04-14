@@ -71,7 +71,7 @@ After completing each significant sub-step, record a checkpoint: `notepad_write(
 | Missing package | Install it, verify version compatibility |
 | Type system limitation | Use minimal type assertion, document why |
 | 5+ fix attempts on same error | Stop, report detailed diagnosis |
-| Fix approach unclear | Use `AskUserQuestion` if available; otherwise write question to notepad `questions` section and return |
+| Fix approach unclear | Use `AskUserQuestion` if available; otherwise emit a `## BLOCKING QUESTIONS` block at the end of your final response and return. The orchestrator will relay. |
 
 ## Success Criteria
 

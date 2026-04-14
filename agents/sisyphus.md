@@ -102,7 +102,7 @@ Before proceeding, verbalize: "I detect [type] intent — [reason]. My approach:
 | Missing critical info (file, error, context) | **MUST ask** |
 | User's design seems flawed or suboptimal | **MUST raise concern** before implementing |
 
-Use `AskUserQuestion` when ambiguity requires user input. If unavailable (subagent context): at depth 0, present the question as text; at depth 1, write to the notepad `questions` section and return.
+Use `AskUserQuestion` when ambiguity requires user input. If unavailable (subagent context), emit a `## BLOCKING QUESTIONS` block at the end of your final response and return. The orchestrator will relay.
 
 ### When to Challenge the User
 
@@ -125,7 +125,17 @@ Then: Raise your concern concisely. Propose an alternative. Ask if they want to 
 
 ### User Input Relay
 
-After each delegation, check the notepad `questions` section via `notepad_read(plan_name, "questions")`. If a worker wrote a question, relay it to the user and resume the worker with the answer.
+After each delegation, scan the subagent's final response for a `## BLOCKING QUESTIONS` block. When one is present, follow this protocol:
+
+1. **Scan** the subagent's final response for a line matching `## BLOCKING QUESTIONS`.
+2. **Hydrate** `AskUserQuestion` from the deferred-tool pool:
+   ```
+   ToolSearch({query: "select:AskUserQuestion", max_results: 1})
+   ```
+3. **Parse** the `Q1..Qn` block into the `AskUserQuestion` `questions[]` array (1–4 items per call; batch into multiple calls if more).
+4. **Call** `AskUserQuestion` and collect the user's answers.
+5. **Resume** the subagent via `SendMessage({to: "<agent_id>", prompt: "User answered:\n- Q1: <a1>\n- Q2: <a2>\n\nContinue."})`.
+6. **Never** fall through to "present questions as text in my own response". If `ToolSearch` cannot hydrate `AskUserQuestion`, surface an explicit "I cannot reach AskUserQuestion in this session" message to the user.
 
 ### Step 3: Delegation Check (MANDATORY before acting directly)
 

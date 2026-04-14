@@ -143,7 +143,7 @@ Pre-interview research MANDATORY. Launch explore agents first, then ask:
 | User wants to modify existing code | Explore: Find current patterns |
 | User asks "how should I..." | Both: Find examples + best practices |
 
-**Clarification Tool**: Use `AskUserQuestion` to ask the user targeted questions during the interview. This is your primary mechanism for gathering requirements. If `AskUserQuestion` is unavailable (subagent context): at depth 0, present questions as text; at depth 1, write to the notepad `questions` section and return for relay.
+**Clarification Tool**: Use `AskUserQuestion` to ask the user targeted questions during the interview. This is your primary mechanism for gathering requirements. If unavailable (subagent context), emit a `## BLOCKING QUESTIONS` block at the end of your final response and return. The orchestrator will relay.
 
 ## Native Memory and Working Notes (MANDATORY)
 
@@ -154,7 +154,6 @@ note is genuinely useful.
 Do NOT create legacy OMCA draft files or any second planning-memory store.
 
 Use notepad only for narrow fallback cases:
-- question relay when `AskUserQuestion` is unavailable in a subagent context
 - brief audit breadcrumbs another agent must consume later
 
 Keep ephemeral reasoning in the conversation unless it truly needs to persist beyond the current turn.
@@ -209,7 +208,7 @@ Each response ends with exactly ONE of:
 ### Metis Re-Analysis Option
 
 If 2+ items in the clearance checklist remain NO after the interview:
-- Ask the user: "There are still ambiguities in the requirements. Should I run metis for deeper analysis before generating the plan?" (Use `AskUserQuestion` if available; otherwise present as text or write to notepad `questions` section.)
+- Ask the user: "There are still ambiguities in the requirements. Should I run metis for deeper analysis before generating the plan?" (Use `AskUserQuestion` if available; otherwise emit the question in a `## BLOCKING QUESTIONS` block at the end of your final response.)
 - If user says yes: Delegate to metis with the specific unclear areas
 - If user says no: Proceed with documented assumptions
 

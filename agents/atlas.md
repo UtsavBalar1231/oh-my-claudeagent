@@ -126,9 +126,26 @@ If you are running as a subagent (not via `/atlas` or `/start-work`), the Agent 
 
 ## User Input Relay
 
-After each delegation, check the notepad `questions` section via `notepad_read(plan_name, "questions")`. If a worker wrote a question:
-1. Ask the user — use `AskUserQuestion` if available, otherwise present as text
-2. Resume the worker with the answer: `SendMessage({to: "<agent_id>", prompt: "User answered: <answer>. Continue."})`
+After each delegation, scan the subagent's final response for a `## BLOCKING QUESTIONS` block. When one is present, follow this protocol:
+
+1. **Scan** the subagent's final response for a line matching `## BLOCKING QUESTIONS`. The block format is:
+   ```
+   ## BLOCKING QUESTIONS
+
+   Q1. <question text>
+       Options:
+       - A) <option> — <description>
+       - B) <option> — <description>
+       Recommended: <letter> — <why>
+   ```
+2. **Hydrate** `AskUserQuestion` from the deferred-tool pool — it is a deferred tool in this Claude Code build and MUST be loaded before it can be called:
+   ```
+   ToolSearch({query: "select:AskUserQuestion", max_results: 1})
+   ```
+3. **Parse** the `Q1..Qn` block into the `AskUserQuestion` `questions[]` array (1–4 items per call; batch into multiple calls if the block has more than 4 questions).
+4. **Call** `AskUserQuestion` and collect the user's answers.
+5. **Resume** the subagent via `SendMessage({to: "<agent_id>", prompt: "User answered:\n- Q1: <a1>\n- Q2: <a2>\n\nContinue."})`.
+6. **Never** fall through to "present questions as text in my own response". If `ToolSearch` cannot hydrate `AskUserQuestion`, surface an explicit "I cannot reach AskUserQuestion in this session" message to the user.
 
 ## 6-Section Prompt Structure
 
@@ -358,11 +375,10 @@ Your primary working context is the plan file, current transcript, and verificat
 Notepad is a narrow fallback surface only.
 
 ### Before Delegation:
-1. Read `notepad_read(plan_name, "questions")` when a worker may need user input relayed
-2. Read `notepad_read(plan_name, "issues")` or `notepad_read(plan_name, "learnings")` only when a prior blocker or audit breadcrumb is relevant to the next task
+1. Read `notepad_read(plan_name, "issues")` or `notepad_read(plan_name, "learnings")` only when a prior blocker or audit breadcrumb is relevant to the next task
 
 ### After Delegation:
-1. Check `notepad_read(plan_name, "questions")` for relay items that must go back to the user
+1. Scan the subagent's final response for a `## BLOCKING QUESTIONS` block and relay via the protocol in the "User Input Relay" section above.
 2. If a worker surfaced a blocker or cross-task risk worth preserving, record it as an audit note — do not use notepad as your main memory store
 
 ### MCP Tool Reference
@@ -371,8 +387,8 @@ Notepad is a narrow fallback surface only.
 - **`mode_clear()`**: Deactivate all persistence modes (default). Use `mode_clear(mode="ralph")` for selective clearing
 - **`evidence_log`**: After EVERY verification command (build/test/lint), record the result
 - **`evidence_read`**: Before final report, review all accumulated evidence
-- **`notepad_write`**: Record relay questions, blockers, or audit breadcrumbs that must survive handoff
-- **`notepad_read`**: Read fallback relay/audit notes only when needed
+- **`notepad_write`**: Record blockers or audit breadcrumbs that must survive handoff (sections: learnings, issues, decisions, problems)
+- **`notepad_read`**: Read fallback audit notes only when needed
 - Never use `rm -f` on `.omca/state/` files — always use the corresponding MCP tool
 
 ## Effort Scaling and Model Routing
