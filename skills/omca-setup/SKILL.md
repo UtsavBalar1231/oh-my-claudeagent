@@ -8,32 +8,28 @@ argument-hint: "[--uninstall | --check | --doctor]"
 
 # omca-setup — Plugin Configuration
 
-One-command setup for oh-my-claudeagent. Updates the orchestration block in `~/.claude/CLAUDE.md`,
-checks dependencies, inspects current plugin registration state, and prints rollout guidance.
+One-command setup: updates the orchestration block in `~/.claude/CLAUDE.md`, checks dependencies, inspects plugin registration state, prints rollout guidance.
 
-This skill does not run marketplace install commands on the user's behalf, does not auto-register the plugin in `~/.claude/settings.json`, does not auto-edit shared or managed Claude Code settings, and does not claim to enforce enterprise policy keys such as `strictKnownMarketplaces`, `blockedMarketplaces`, `allowManagedHooksOnly`, `allowManagedPermissionRulesOnly`, or `allowManagedMcpServersOnly`.
+**Out of scope**: running marketplace install commands, auto-registering the plugin in `~/.claude/settings.json`, editing shared/managed Claude Code settings, enforcing enterprise policy keys (`strictKnownMarketplaces`, `blockedMarketplaces`, `allowManagedHooksOnly`, `allowManagedPermissionRulesOnly`, `allowManagedMcpServersOnly`).
 
-Policy baseline: Claude Code native settings are authoritative. Keep `teammateMode: "auto"` as the normal operating mode, treat managed settings as the non-overridable policy layer, and remember `permission-filter.sh` is guardrail-only (it does not auto-allow command execution).
+**Policy baseline**: Claude Code native settings are authoritative. `teammateMode: "auto"` is the normal operating mode. Managed settings are the non-overridable policy layer. `permission-filter.sh` is guardrail-only — it does not auto-allow command execution.
 
-Latest install/update flow reminders:
+**Install/update flow**:
 
 - Install: `/plugin marketplace add UtsavBalar1231/oh-my-claudeagent` then `/plugin install oh-my-claudeagent@omca`
 - Update: `/plugin marketplace update omca` then `/plugin install oh-my-claudeagent@omca`
-- Apply changes in-session: `/reload-plugins`
+- Apply in-session: `/reload-plugins`
 
-`--bare` caveat: `claude --bare` skips plugin, hooks, skills, MCP, and CLAUDE.md auto-discovery. Run setup/install guidance in normal (non-`--bare`) Claude Code sessions.
+**`--bare` caveat**: `claude --bare` skips plugin, hooks, skills, MCP, and CLAUDE.md auto-discovery. Run setup in normal (non-`--bare`) sessions.
 
-Plugin options baseline:
+**Plugin options**:
 
-- `enableKeywordTriggers`: boolean, default `false` (keyword triggers remain optional/off by default)
-- `statuslineMode`: enum `off|direct|daemon`, default `direct`
+- `enableKeywordTriggers`: bool, default `false`
+- `statuslineMode`: `off|direct|daemon`, default `direct`
 
-Sandbox expectation baseline:
+**Sandbox**: For fail-closed environments, use `sandbox.failIfUnavailable: true` in managed settings. This skill reports sandbox posture but does not bypass host enforcement.
 
-- For fail-closed environments, use `sandbox.failIfUnavailable: true` in managed settings.
-- This skill can explain/report sandbox posture; it does not bypass or relax host sandbox enforcement.
-
-Bundled output style: `output-styles/omca-default.md` (manifest path `"outputStyles": "./output-styles/"`).
+**Output style**: `output-styles/omca-default.md` (manifest `"outputStyles": "./output-styles/"`).
 
 ---
 
@@ -188,18 +184,17 @@ Write the composed content to `~/.claude/CLAUDE.md`.
     }
     ```
 
-   Make the ownership boundary explicit: this skill can inspect `~/.claude/settings.json` and print the supported install snippets, but it must not register the plugin automatically in that file.
+   Ownership boundary: this skill inspects `~/.claude/settings.json` and prints install snippets, but does not register the plugin automatically.
 
-4. Print enterprise rollout guidance (inspection only; do not write or enforce it):
-   - `strictKnownMarketplaces` → allow only marketplaces your admins approve
+4. Print enterprise rollout guidance (inspection only; do not write or enforce):
+   - `strictKnownMarketplaces` → allow only admin-approved marketplaces
    - `blockedMarketplaces` → explicitly deny marketplaces that should never resolve
    - `allowManagedHooksOnly` → allow only hooks defined in managed settings
    - `allowManagedPermissionRulesOnly` → allow only managed permission rules
    - `allowManagedMcpServersOnly` → allow only managed MCP server definitions
    - `sandbox.failIfUnavailable` → fail closed if the sandbox cannot be applied
 
-   Explain that these keys belong in managed settings when the organization needs non-overridable policy, and that this skill can only point the user/admin at them.
-   Also explain that marketplace-installed copies run from `~/.claude/plugins/cache/...`, and that the local `omca` MCP server bootstraps its ast-grep Python environment inside the active plugin root or cache copy rather than inside shared global state.
+   These keys belong in managed settings when the organization needs non-overridable policy — this skill only points the user/admin at them. Marketplace-installed copies run from `~/.claude/plugins/cache/...`; the local `omca` MCP server bootstraps its ast-grep Python environment inside the active plugin root or cache copy, not in shared global state.
 
 ---
 
@@ -294,7 +289,7 @@ Configure the Claude Code statusline to use the oh-my-claudeagent statusline pac
 
    b. **Create the deployment structure** at `~/.claude/statusline/`:
 
-      The layout mirrors the standard Python package layout:
+      Layout:
       ```
       ~/.claude/statusline/
         pyproject.toml              ← copied from <plugin-root>/statusline/pyproject.toml
@@ -307,13 +302,12 @@ Configure the Claude Code statusline to use the oh-my-claudeagent statusline pac
           direct.py
       ```
 
-      Run these commands:
+      Commands (replace `<plugin-root>` with the path from step a):
       ```bash
       mkdir -p ~/.claude/statusline/statusline
       cp <plugin-root>/statusline/pyproject.toml ~/.claude/statusline/pyproject.toml
       cp <plugin-root>/statusline/*.py ~/.claude/statusline/statusline/
       ```
-      Replace `<plugin-root>` with the path resolved in step (a).
 
    c. **Run `uv sync`** to create the venv and install entry points:
       ```bash
@@ -402,9 +396,9 @@ Restart Claude Code to activate changes.
 
 Fill in actual versions from Phase 1 results.
 
-For the State section:
-- Check if `.omca/state/` and `.omca/logs/` directories exist (they are created by `session-init.sh`) — report "Verified" if present, "Will be created on next session start" if not
-- Check if `.omca/` is in `.gitignore` — if not, add it:
+State section:
+- `.omca/state/` and `.omca/logs/` directories (auto-created on session start) — report "Verified" if present, "Will be created on next session start" if not
+- `.omca/` in `.gitignore` — if not, add it:
   ```bash
   echo '.omca/' >> .gitignore
   ```
