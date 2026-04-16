@@ -159,6 +159,21 @@ UNKNOWN_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_i
 	! echo "$ctx_e" | grep -qE "notepad.*questions.*section|questions' when you need"
 }
 
+# ─── k. Missing plan file → skip plan injection, keep notepad ────────────────
+
+@test "subagent-start skips plan injection when plan file missing" {
+	write_state "boulder.json" \
+		'{"active_plan":"/tmp/nonexistent-plan-12345.md","plan_name":"ghost-plan"}'
+	run_hook "subagent-start.sh" "$EXPLORE_PAYLOAD"
+	assert_success
+	local ctx
+	ctx=$(get_context)
+	! echo "$ctx" | grep -q '\[ACTIVE PLAN\]'
+	echo "$ctx" | grep -q '\[NOTEPAD AVAILABLE\]'
+}
+
+# ─── l. Blocking questions: notepad sections list excludes questions ─────────
+
 @test "blocking questions: notepad sections list excludes questions" {
 	# With a boulder plan set, the NOTEPAD AVAILABLE line lists sections.
 	local plan_dir="$BATS_TEST_TMPDIR/plans"

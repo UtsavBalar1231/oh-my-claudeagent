@@ -215,6 +215,105 @@ def test_mode_clear_all_removes_ralph_and_ultrawork(
     assert not (state_dir / ULTRAWORK_STATE_FILE).exists()
 
 
+# --- boulder_progress with missing plan ---
+
+
+def test_boulder_progress_missing_plan_returns_structured_error(
+    mcp_server, working_dir, tmp_path
+):
+    """boulder_progress returns structured JSON error when plan file is deleted."""
+    plan_file = tmp_path / "plan.md"
+    plan_file.write_text("- [ ] Task one\n")
+
+    call_tool(
+        mcp_server,
+        "boulder_write",
+        {
+            "active_plan": str(plan_file),
+            "plan_name": "ghost-plan",
+            "session_id": "sess-001",
+            "working_directory": working_dir,
+        },
+    )
+
+    # Simulate platform deleting the plan file
+    plan_file.unlink()
+
+    result = call_tool(
+        mcp_server,
+        "boulder_progress",
+        {"working_directory": working_dir},
+    )
+    data = json.loads(result)
+    assert data["error"] is True
+    assert data["plan_missing"] is True
+    assert "plan.md" in data["plan_path"]
+
+
+# --- mode_read with missing/valid plan ---
+
+
+def test_mode_read_detects_stale_boulder_plan(
+    mcp_server, working_dir, tmp_path, tmp_git_root
+):
+    """mode_read reports plan_exists=False when boulder points to deleted file."""
+    plan_file = tmp_path / "plan.md"
+    plan_file.write_text("- [ ] Task\n")
+
+    call_tool(
+        mcp_server,
+        "boulder_write",
+        {
+            "active_plan": str(plan_file),
+            "plan_name": "stale-plan",
+            "session_id": "sess-001",
+            "working_directory": working_dir,
+        },
+    )
+
+    plan_file.unlink()
+
+    result = call_tool(
+        mcp_server,
+        "mode_read",
+        {"working_directory": working_dir},
+    )
+    data = json.loads(result)
+    assert data["boulder"]["active"] is True
+    assert data["boulder"]["plan_exists"] is False
+
+
+def test_mode_read_reports_plan_exists_true(
+    mcp_server, working_dir, tmp_path, tmp_git_root
+):
+    """mode_read reports plan_exists=True when plan file exists."""
+    plan_file = tmp_path / "plan.md"
+    plan_file.write_text("- [ ] Task\n")
+
+    call_tool(
+        mcp_server,
+        "boulder_write",
+        {
+            "active_plan": str(plan_file),
+            "plan_name": "valid-plan",
+            "session_id": "sess-001",
+            "working_directory": working_dir,
+        },
+    )
+
+    result = call_tool(
+        mcp_server,
+        "mode_read",
+        {"working_directory": working_dir},
+    )
+    data = json.loads(result)
+    assert data["boulder"]["active"] is True
+    assert data["boulder"]["plan_exists"] is True
+
+
+# --- mode_clear ---
+
+
 def test_mode_clear_ralph_only(mcp_server, working_dir, tmp_git_root):
     """mode_clear('ralph') removes only ralph state file, leaves ultrawork."""
     state_dir = tmp_git_root / ".omca" / "state"

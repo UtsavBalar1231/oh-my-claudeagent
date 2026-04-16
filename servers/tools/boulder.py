@@ -13,7 +13,6 @@ from tools._common import (
     EVIDENCE_FILE,
     RALPH_STATE_FILE,
     ULTRAWORK_STATE_FILE,
-    ToolError,
     _read_json,
     _state_dir,
     _write_json,
@@ -82,7 +81,15 @@ def register(mcp: FastMCP) -> None:
             with open(plan_path) as f:
                 content = f.read()
         except FileNotFoundError:
-            raise ToolError(f"Plan file not found: {plan_path}") from None
+            return json.dumps(
+                {
+                    "error": True,
+                    "plan_missing": True,
+                    "plan_path": plan_path,
+                    "message": f"Plan file not found: {plan_path}. The platform may have deleted it. Clear boulder state with mode_clear(mode='boulder') and select a new plan.",
+                },
+                indent=2,
+            )
 
         total = content.count("- [ ]") + content.count("- [x]")
         completed = content.count("- [x]")
@@ -123,6 +130,10 @@ def register(mcp: FastMCP) -> None:
         boulder_section: dict = {"active": bool(boulder_data)}
         if boulder_data:
             boulder_section.update(boulder_data)
+            active_plan = boulder_data.get("active_plan", "")
+            boulder_section["plan_exists"] = bool(
+                active_plan and os.path.isfile(active_plan)
+            )
 
         # Evidence
         evidence_data = _read_json(os.path.join(state, EVIDENCE_FILE))

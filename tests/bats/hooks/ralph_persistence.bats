@@ -62,8 +62,13 @@ STOP_PAYLOAD='{"stop_reason":"end_turn","stop_hook_active":false}'
 	# Boulder fallback only fires when ralph/ultrawork IS active but has no incomplete tasks.
 	# Script exits at line 52 if neither mode is active. So we need ralph active + all complete.
 	write_state "ralph-state.json" '{"status":"active","tasks":[{"id":"1","status":"completed"}],"last_task_hash":"","stagnation_count":0}'
+	# Create a real plan file so the file-existence check passes
+	local plan_dir="$BATS_TEST_TMPDIR/plans"
+	mkdir -p "$plan_dir"
+	local plan_file="$plan_dir/my-plan.md"
+	printf '# Plan\n- [ ] Task\n' > "$plan_file"
 	local boulder_path="$CLAUDE_PROJECT_ROOT/.omca/state/boulder.json"
-	printf '%s' '{"active_plan":"my-plan","plan_name":"my-plan"}' > "$boulder_path"
+	printf '%s' "{\"active_plan\":\"${plan_file}\",\"plan_name\":\"my-plan\"}" > "$boulder_path"
 	# Boulder file is just created → mtime is now → age = 0 < 900
 	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
 	assert_success
@@ -75,8 +80,13 @@ STOP_PAYLOAD='{"stop_reason":"end_turn","stop_hook_active":false}'
 @test "boulder fallback with stale file (>15 min): allows stop" {
 	# Need ralph active + all complete to reach boulder fallback (see test f)
 	write_state "ralph-state.json" '{"status":"active","tasks":[{"id":"1","status":"completed"}],"last_task_hash":"","stagnation_count":0}'
+	# Create a real plan file so the file-existence check passes
+	local plan_dir="$BATS_TEST_TMPDIR/plans"
+	mkdir -p "$plan_dir"
+	local plan_file="$plan_dir/my-plan.md"
+	printf '# Plan\n- [ ] Task\n' > "$plan_file"
 	local boulder_path="$CLAUDE_PROJECT_ROOT/.omca/state/boulder.json"
-	printf '%s' '{"active_plan":"my-plan","plan_name":"my-plan"}' > "$boulder_path"
+	printf '%s' "{\"active_plan\":\"${plan_file}\",\"plan_name\":\"my-plan\"}" > "$boulder_path"
 	# Back-date mtime by 20 minutes (1200 seconds)
 	touch -d "20 minutes ago" "$boulder_path"
 	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
@@ -159,6 +169,30 @@ STOP_PAYLOAD='{"stop_reason":"end_turn","stop_hook_active":false}'
 	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
 	assert_success
 	assert_output --partial '"decision":"block"'
+}
+
+# ─── m. Missing plan file (plan progress path) → allow stop ─────────────────
+
+@test "ralph with boulder pointing to missing plan file: allows stop immediately (plan progress path)" {
+	write_state "ralph-state.json" \
+		'{"status":"active","tasks":[{"id":"1","status":"pending"}],"last_task_hash":"","stagnation_count":0}'
+	write_state "boulder.json" \
+		'{"active_plan":"/tmp/nonexistent-plan-12345.md","plan_name":"ghost-plan"}'
+	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
+	assert_success
+	assert_output ""
+}
+
+# ─── n. Missing plan file (boulder fallback path) → allow stop ──────────────
+
+@test "ralph with all tasks complete and boulder pointing to missing plan: allows stop (fallback path)" {
+	write_state "ralph-state.json" \
+		'{"status":"active","tasks":[{"id":"1","status":"completed"}],"last_task_hash":"","stagnation_count":0}'
+	write_state "boulder.json" \
+		'{"active_plan":"/tmp/nonexistent-plan-12345.md","plan_name":"ghost-plan"}'
+	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
+	assert_success
+	assert_output ""
 }
 
 # ─── l. Plan-file-aware stagnation: all checkboxes complete → no increment ───

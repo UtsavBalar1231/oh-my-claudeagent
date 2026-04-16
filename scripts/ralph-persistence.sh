@@ -30,7 +30,8 @@ check_plan_file_progress() {
 		if [[ -n "${project_root}" && -f "${project_root}/${active_plan}" ]]; then
 			plan_file="${project_root}/${active_plan}"
 		else
-			return 0
+			_log_hook_error "boulder active_plan references missing file: ${active_plan} — allowing stop" "ralph-persistence.sh"
+			exit 0
 		fi
 	fi
 
@@ -88,6 +89,11 @@ check_boulder_fallback() {
 		local active_plan
 		active_plan=$(jq -r '.active_plan // ""' "${boulder_file}" 2>/dev/null)
 		if [[ -n "${active_plan}" && "${active_plan}" != "null" ]]; then
+			# Plan file deleted by platform — allow stop immediately
+			if [[ ! -f "${active_plan}" ]]; then
+				_log_hook_error "boulder active_plan references missing file: ${active_plan} — allowing stop" "ralph-persistence.sh"
+				exit 0
+			fi
 			if command -v stat &>/dev/null; then
 				local boulder_mtime boulder_age
 				boulder_mtime=$(stat -c %Y "${boulder_file}" 2>/dev/null || stat -f %m "${boulder_file}" 2>/dev/null || echo 0)

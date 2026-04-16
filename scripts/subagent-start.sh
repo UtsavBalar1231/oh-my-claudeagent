@@ -51,6 +51,11 @@ BOULDER_FILE="${STATE_DIR}/boulder.json"
 if [[ -f "${BOULDER_FILE}" ]]; then
 	PLAN_FILE=$(jq -r '.active_plan // empty' "${BOULDER_FILE}" 2>/dev/null || echo "")
 	PLAN_NAME=$(jq -r '.plan_name // empty' "${BOULDER_FILE}" 2>/dev/null || echo "")
+	# Validate plan file exists — platform may have deleted it
+	if [[ -n "${PLAN_FILE}" && ! -f "${PLAN_FILE}" ]]; then
+		_log_hook_error "boulder active_plan references missing file: ${PLAN_FILE} — skipping plan injection" "subagent-start.sh"
+		PLAN_FILE=""
+	fi
 	if [[ -n "${PLAN_FILE}" || -n "${PLAN_NAME}" ]]; then
 		CONTEXT_PARTS+="$(_section_header 'Plan Context')"
 	fi
