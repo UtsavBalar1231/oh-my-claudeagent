@@ -9,24 +9,11 @@ argument-hint: "[optional: reason]"
 
 Stops all continuation mechanisms for the current session.
 
----
-
-## Activation Phrases
-
-- "stop continuation"
-- "stop everything"
-- "pause automation"
-- "take manual control"
-
----
-
 ## What This Stops
 
 1. **Ralph Loop** — Clears `.omca/state/ralph-state.json`
 2. **Boulder State** — Clears `.omca/state/boulder.json` (active work plan)
 3. **Ultrawork Mode** — Clears `.omca/state/ultrawork-state.json`
-
----
 
 ## Process
 
@@ -38,12 +25,9 @@ mode_clear()
 
 This clears ralph-state.json, ultrawork-state.json, and boulder.json in one call.
 
-After running, report which mechanisms were stopped and confirm:
-"Session will not auto-continue. Resume with `/oh-my-claudeagent:ralph` or `/oh-my-claudeagent:start-work`."
+Report which mechanisms stopped: "Session will not auto-continue. Resume with `/oh-my-claudeagent:ralph` or `/oh-my-claudeagent:start-work`."
 
-If no state files exist: "No active continuation mechanisms detected. Nothing to cancel."
-
----
+No state files: "No active continuation mechanisms detected. Nothing to cancel."
 
 ## When to Use Which
 

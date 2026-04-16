@@ -6,7 +6,7 @@ argument-hint: "[target file or module]"
 effort: high
 ---
 
-# Intelligent Refactor Command
+# Intelligent Refactor
 
 ## Usage
 
@@ -31,22 +31,11 @@ Options:
     - aggressive: Allow broader changes with adequate coverage
 ```
 
-## What This Command Does
-
-Performs intelligent, deterministic refactoring with full codebase awareness:
-
-1. **Understands your intent** - Analyzes what you actually want to achieve
-2. **Maps the codebase** - Builds a definitive codemap before touching anything
-3. **Assesses risk** - Evaluates test coverage and determines verification strategy
-4. **Plans meticulously** - Creates a detailed plan with Plan agent
-5. **Executes precisely** - Step-by-step refactoring with host-provided LSP diagnostics when available and bundled ast-grep MCP tools
-6. **Verifies constantly** - Runs tests after each change to ensure zero regression
-
----
+Deterministic refactoring with codebase awareness: understand intent, map codebase, assess risk, plan via prometheus, execute with ast-grep MCP tools, verify after each change.
 
 ## PHASE 0: INTENT GATE
 
-**BEFORE ANY ACTION, classify and validate the request.**
+Classify and validate before acting.
 
 | Signal | Classification | Action |
 |--------|----------------|--------|
@@ -55,11 +44,9 @@ Performs intelligent, deterministic refactoring with full codebase awareness:
 | "Improve", "Clean up" | Open-ended | **MUST ask**: "What specific improvement?" |
 | Ambiguous scope | Uncertain | **MUST ask**: "Which modules/files?" |
 
----
-
 ## PHASE 1: CODEBASE ANALYSIS
 
-### Launch Parallel Explore Agents
+### Parallel Explore Agents
 
 ```
 // Agent 1: Find the refactoring target
@@ -78,11 +65,9 @@ Agent(subagent_type="oh-my-claudeagent:explore", prompt="Find all test files rel
 Agent(subagent_type="oh-my-claudeagent:explore", prompt="Find architectural patterns and module organization around [TARGET]")
 ```
 
----
-
 ## PHASE 2: BUILD CODEMAP
 
-Based on Phase 1 results, build dependency graph and impact zones.
+Dependency graph and impact zones from Phase 1:
 
 ### Impact Zones
 
@@ -92,11 +77,7 @@ Based on Phase 1 results, build dependency graph and impact zones.
 | Consumers | MEDIUM | Standard verification |
 | Edge | LOW | Quick check |
 
----
-
 ## PHASE 3: TEST ASSESSMENT
-
-### Coverage Strategy
 
 | Coverage Level | Strategy |
 |----------------|----------|
@@ -105,11 +86,9 @@ Based on Phase 1 results, build dependency graph and impact zones.
 | LOW (<50%) | **PAUSE**: Propose adding tests first |
 | NONE | **BLOCK**: Refuse aggressive refactoring |
 
----
-
 ## PHASE 4: PLAN GENERATION
 
-Delegate to prometheus for a detailed refactoring plan:
+Delegate to prometheus:
 
 ```
 Agent(
@@ -120,11 +99,9 @@ Agent(
 
 > **Nesting constraint**: Prometheus runs as a subagent (depth 1) and cannot delegate to metis or explore. Supply ALL necessary context in the prompt — include the full codemap, coverage data, and specific file paths so prometheus can plan without sub-research.
 
----
-
 ## PHASE 5: EXECUTE REFACTORING
 
-For EACH step:
+Per step:
 
 1. **Pre-Step**: Mark task in_progress, verify baseline
 2. **Execute**: Use ast-grep MCP tools for structural replacement, or Edit for targeted changes. For symbol renaming, use `lsp_rename` only if the current Claude environment exposes it.
@@ -134,19 +111,9 @@ For EACH step:
 
 **If ANY verification fails**: STOP, REVERT, DIAGNOSE.
 
----
-
 ## PHASE 6: FINAL VERIFICATION
 
-- Full test suite
-- Type check
-- Lint check
-- Build verification
-- Final diagnostics on all changed files (using LSP/tooling support when available)
-
-After EACH verification command above, call `evidence_log(type, command, exit_code, output_snippet)`. The task-completed-verify hook BLOCKS task completion without fresh evidence.
-
----
+Full test suite, type check, lint, build, final diagnostics. `evidence_log` after EACH — task completion blocked without fresh evidence.
 
 ## CRITICAL RULES
 
@@ -162,11 +129,8 @@ After EACH verification command above, call `evidence_log(type, command, exit_co
 - Verify after every change
 - Follow existing codebase patterns
 
----
-
 ## Deprecated Code & Library Migration
 
-When you encounter deprecated APIs during refactoring:
-1. Use `librarian` to find the recommended modern alternative
-2. Do NOT auto-upgrade to latest version unless user explicitly requests migration
-3. If migration requested, fetch latest API docs before making changes
+1. `librarian` for recommended modern alternative
+2. No auto-upgrade unless user requests migration
+3. Migration requested → fetch latest API docs first

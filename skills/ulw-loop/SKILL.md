@@ -10,28 +10,21 @@ effort: high
 
 ## Tool Restrictions
 
-This is an orchestration loop. DO NOT implement directly:
-- **Write** / **Edit** — Delegate all implementation to agents
+Orchestration loop. No direct implementation — delegate via agents.
 
-MCP tools available: `mode_read`, `mode_clear`, `boulder_progress`, `evidence_log`, `evidence_read`.
+MCP tools: `mode_read`, `mode_clear`, `boulder_progress`, `evidence_log`, `evidence_read`.
 
 ## Activation
 
-Activation registers both ralph (persistence) and ultrawork (parallelism) modes via the keyword detector. The session persists until:
-1. ALL tasks are complete
-2. Oracle has verified the work
-3. Oracle verdict is APPROVE
+Registers ralph (persistence) + ultrawork (parallelism). Session persists until ALL tasks complete AND Oracle APPROVES.
 
 ## Workflow
 
-1. Activate ralph mode (persistence)
-2. Activate ultrawork mode (parallelism)
-3. Execute tasks with maximum parallelism
-4. When all tasks appear complete:
-   - Spawn Oracle: `Agent(subagent_type="oh-my-claudeagent:oracle", prompt="Verify all completed work...")`
-   - If Oracle APPROVES: deactivate both modes, allow session end
-   - If Oracle REJECTS: fix issues, re-verify
-5. Loop continues until Oracle approves
+1. Activate ralph + ultrawork modes
+2. Execute with maximum parallelism
+3. All tasks appear complete → spawn Oracle for verification
+4. Oracle APPROVES → deactivate modes, allow session end
+5. Oracle REJECTS → fix, re-verify. Loop until approved.
 
 ## Key Difference from Ralph
 

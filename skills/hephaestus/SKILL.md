@@ -10,11 +10,9 @@ effort: medium
 
 Fix the following build issue: $ARGUMENTS
 
-If no specific issue was provided above, run the project's build command to discover
-current failures, then diagnose and fix them.
+No issue specified → run the build command to discover failures, then diagnose and fix.
 
-Follow the hephaestus workflow: reproduce the failure, diagnose root cause, make minimal
-fixes, verify the build passes. Repeat until exit code 0.
+Hephaestus workflow: reproduce, diagnose root cause, minimal fix, verify build passes. Repeat until exit 0.
 
-After the build passes, record verification evidence:
+After build passes, record evidence:
 `evidence_log(evidence_type="build", command="<build command>", exit_code=0, output_snippet="<relevant output>")`

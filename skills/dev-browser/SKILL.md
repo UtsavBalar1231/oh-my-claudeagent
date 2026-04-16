@@ -8,36 +8,25 @@ argument-hint: "[url or automation task]"
 
 # Dev Browser Skill
 
-## Trigger Phrases
-
-- "go to [url]"
-- "click on"
-- "fill out the form"
-- "take a screenshot"
-- "scrape"
-- "automate"
-- "test the website"
-- "log into"
-
 **Task**: $ARGUMENTS
 
-If no task was specified above, ask the user what they'd like to automate in the browser.
+No task specified → ask the user what to automate.
 
-Browser automation that maintains page state across script executions. Write small, focused scripts to accomplish tasks incrementally. Once you've proven out part of a workflow and there is repeated work to be done, you can write a script to do the repeated work in a single execution.
+Browser automation with persistent page state. Small, focused scripts per action. Proven workflow → combine into single script.
 
-## Choosing Your Approach
+## Approach
 
-- **Local/source-available sites**: Read the source code first to write selectors directly
-- **Unknown page layouts**: Use `getAISnapshot()` to discover elements and `selectSnapshotRef()` to interact with them
-- **Visual feedback**: Take screenshots to see what the user sees
+- **Source-available sites**: Read source for selectors
+- **Unknown layouts**: `getAISnapshot()` → `selectSnapshotRef()`
+- **Visual feedback**: Screenshots
 
-## Setup — Phase 1 (MANDATORY)
+## Setup (MANDATORY)
 
-The browser server MUST be running before any browser commands. Two modes available. Ask the user if unclear which to use.
+Browser server must be running. Two modes — ask user if unclear.
 
 ### Standalone Mode (Default)
 
-Launches a new Chromium browser for fresh automation sessions.
+New Chromium browser for fresh sessions.
 
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/skills/dev-browser/server.sh &
@@ -50,12 +39,9 @@ Add `--headless` flag if user requests it. **Wait for the `Ready` message before
 
 ### Extension Mode
 
-Connects to user's existing Chrome browser. Use this when:
+Connect to user's existing Chrome. Use when already logged in or user requests extension.
 
-- The user is already logged into sites
-- The user asks you to use the extension
-
-**Start the relay server:**
+**Start relay:**
 
 ```bash
 cd skills/dev-browser && npm i && npm run start-extension &
@@ -63,9 +49,7 @@ cd skills/dev-browser && npm i && npm run start-extension &
 
 ## Writing Scripts
 
-> **Run all scripts from `skills/dev-browser/` directory.**
-
-Execute scripts inline using heredocs:
+Run all from `skills/dev-browser/`. Execute inline via heredocs:
 
 ```bash
 cd skills/dev-browser && npx tsx <<'EOF'
@@ -84,15 +68,15 @@ EOF
 
 ### Key Principles
 
-1. **Small scripts**: Each script does ONE thing (navigate, click, fill, check)
-2. **Evaluate state**: Log/return state at the end to decide next steps
-3. **Descriptive page names**: Use `"checkout"`, `"login"`, not `"main"`
-4. **Disconnect to exit**: `await client.disconnect()` - pages persist on server
-5. **Plain JS in evaluate**: `page.evaluate()` runs in browser - no TypeScript syntax
+1. **One thing per script** (navigate, click, fill, check)
+2. **Log state** at end for next steps
+3. **Descriptive page names** (`"checkout"`, not `"main"`)
+4. **Disconnect to exit** — pages persist
+5. **Plain JS in evaluate** — no TypeScript syntax
 
 ## No TypeScript in Browser Context
 
-`page.evaluate()` runs in the browser — TypeScript annotations fail at runtime:
+`page.evaluate()` runs in browser — TS annotations fail at runtime:
 
 ```typescript
 // Correct

@@ -9,11 +9,11 @@ effort: high
 
 # Ralph Mode - Persistence Until Verified Complete
 
-Like Sisyphus, you push until the task is DONE. No stopping. No excuses. No half-measures.
+You push until the task is DONE. No stopping. No half-measures.
 
 ## Core Principle
 
-**YOU ARE BOUND TO YOUR TASK LIST.**
+**BOUND TO YOUR TASK LIST.**
 
 You do not stop until:
 1. Every task is marked complete
@@ -52,15 +52,7 @@ FINAL_VERIFICATION:
 
 ### 1. Task Tracking is Non-Negotiable
 
-Every task gets registered with TaskCreate:
-```
-TaskCreate(subject="Task description", status="pending")
-```
-
-Every completion gets marked with TaskUpdate:
-```
-TaskUpdate(taskId="...", status="completed")
-```
+Every task registered with TaskCreate. Every completion marked with TaskUpdate.
 
 **No mental tracking. Everything in the task list.**
 
@@ -157,16 +149,9 @@ IF result.has_errors:
 - "finish this"
 - "no stopping"
 
-## The Ralph Mindset
-
-> "I am not done until the oracle says I am done."
-> "Errors are tasks to be fixed, not reasons to stop."
-> "Every incomplete task is a personal failure."
-> "Verification is not optional."
-
 ## Anti-Patterns (FORBIDDEN)
 
-- Stopping because an error occurred
+- Stopping on error
 - Claiming completion without verification
 - Leaving tasks unchecked
 - Accepting "good enough"
@@ -206,4 +191,4 @@ User: "ralph: implement authentication"
    -> NOW you may stop
 ```
 
-**Remember: The only acceptable ending is oracle approval.**
+The only acceptable ending is oracle approval.

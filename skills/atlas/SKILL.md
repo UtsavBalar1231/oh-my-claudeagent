@@ -11,26 +11,20 @@ effort: high
 
 Execute the following: $ARGUMENTS
 
-**When to use this vs `/sisyphus-orchestrate`**: Use atlas when you have a structured plan
-(from prometheus) with checkboxed tasks. Use `/sisyphus-orchestrate` for open-ended work
-where the plan emerges during execution.
+**vs `/sisyphus-orchestrate`**: Use atlas with a structured plan (from prometheus) with checkboxed tasks. Use `/sisyphus-orchestrate` for open-ended work where the plan emerges during execution.
 
-If no task was specified, find plans by priority:
-1. Check boulder state via `mode_read` — if an active plan exists, resume it
-2. Search both plan locations:
-   - `.omca/plans/*.md` — prometheus-generated plans
-   - `.claude/plans/*.md` — Claude-native plan files
-3. Merge and present candidates for selection, deduplicated by absolute path, labeled with source (`[omca]` or `[native]`)
+No task specified → find plans by priority:
+1. `mode_read` — active plan exists → resume it
+2. Search `.omca/plans/*.md` and `.claude/plans/*.md`
+3. Merge candidates, deduplicated by path, labeled `[omca]` or `[native]`
 
-Register the active plan before delegating:
+Register before delegating:
 `boulder_write(active_plan="path/to/plan.md", plan_name="plan-name", session_id="current-session")`
 
-Use `mode_read` and `boulder_progress` tools to check current state.
-Follow atlas workflow: analyze plan, delegate tasks via sisyphus-junior, verify each result,
-mark checkboxes on completion.
+Use `mode_read` and `boulder_progress` to check state. Follow atlas workflow: analyze plan, delegate via sisyphus-junior, verify, mark checkboxes.
 
-After each delegation verification, record evidence:
+After each verification, record evidence:
 `evidence_log(evidence_type="test", command="...", exit_code=0, output_snippet="...")`
 
-Use `notepad_write(plan_name, "issues", content)` to record blockers or audit breadcrumbs that need to survive handoff. Do not treat notepad as your primary working memory.
-Use `evidence_read` before final completion report to summarize all verification results.
+`notepad_write(plan_name, "issues", content)` for blockers/audit breadcrumbs. Not primary working memory.
+`evidence_read` before final report to summarize all results.

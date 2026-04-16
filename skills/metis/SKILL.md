@@ -10,10 +10,8 @@ effort: high
 
 Analyze the following request: $ARGUMENTS
 
-If no request was specified above, ask the user what they would like analyzed before
-proceeding to planning.
+No request specified → ask the user what to analyze.
 
-Follow the metis workflow: classify intent, explore the codebase for relevant patterns,
-identify risks and gaps, provide actionable directives for the planner.
+Follow metis workflow: classify intent, explore codebase for patterns, identify risks and gaps, provide directives for planner.
 
-**Expected output**: Metis produces a structured analysis covering: hidden intentions behind the request, scope boundaries and gaps, risk factors, technical constraints, and actionable directives for the planner. This output feeds directly into prometheus for plan generation.
+**Output**: Structured analysis — hidden intentions, scope boundaries/gaps, risk factors, technical constraints, actionable planner directives. Feeds directly into prometheus.

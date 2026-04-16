@@ -10,20 +10,14 @@ effort: high
 
 Execute the following: $ARGUMENTS
 
-If no task was specified above, ask the user what they would like to accomplish.
+No task specified → ask the user what to accomplish.
 
-**When to use this vs `/atlas`**: Use sisyphus-orchestrate for open-ended, adaptive tasks
-where the work plan emerges during execution. Use `/atlas` when you already have a
-structured plan (from prometheus) with checkboxed tasks to execute.
+**vs `/atlas`**: Use sisyphus-orchestrate for open-ended work where the plan emerges during execution. Use `/atlas` with a structured plan (from prometheus) with checkboxed tasks.
 
-Follow the sisyphus workflow: classify intent, assess codebase, delegate to specialist
-agents, coordinate parallel execution, verify results. Use task tracking for multi-step
-work.
+Follow sisyphus workflow: classify intent, assess codebase, delegate to specialists, coordinate parallel execution, verify results. Task tracking for multi-step work.
 
 ## Plan Mode Compatibility
 
-Plugin agents have `permissionMode` stripped by Claude Code for security — sisyphus does not set or override permission mode.
-If invoked during plan mode, sisyphus inherits plan mode restrictions from the parent session and cannot execute.
+Plugin agents have `permissionMode` stripped — sisyphus cannot override. During plan mode, inherits restrictions and cannot execute.
 
-**Workaround**: Exit plan mode first (Shift+Tab or approve the plan), then invoke `/sisyphus-orchestrate`.
-Or use `/start-work` instead — it calls `ExitPlanMode` before delegating to atlas.
+**Workaround**: Exit plan mode first (Shift+Tab or approve), then `/sisyphus-orchestrate`. Or use `/start-work` — calls `ExitPlanMode` before atlas.

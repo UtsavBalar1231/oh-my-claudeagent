@@ -10,22 +10,13 @@ argument-hint: optional notes about what to include
 
 ## Tool Restrictions
 
-This is a read-only skill. DO NOT use these tools:
-- **Write** / **Edit** — Do not create or modify files
-- **Agent** — Do not delegate; gather context directly
+Read-only. No Write/Edit/Agent. MCP tools: `mode_read`, `boulder_progress`, `notepad_read`, `notepad_list`.
 
-MCP tools available for reading state: `mode_read`, `boulder_progress`, `notepad_read`, `notepad_list`.
-
-Creates a self-contained handoff summary so work can continue seamlessly in a new session.
-
-## Slash entrypoint
-
-- `/oh-my-claudeagent:handoff`
+Self-contained handoff summary for seamless new-session continuation.
 
 ## PHASE 0: VALIDATE
 
-Confirm there is meaningful work in this session to preserve. If the session is nearly empty,
-inform the user there is nothing to hand off.
+Confirm meaningful work exists. Nearly empty session → inform user nothing to hand off.
 
 ## PHASE 1: GATHER CONTEXT
 
@@ -38,20 +29,15 @@ git branch --show-current
 git log --oneline -5
 ```
 
-Also gather:
-- `TaskList()` — current task progress and pending items
-- `mode_read(mode="boulder")` — active plan state if it exists (returns null if no active plan)
-- If an active plan exists (from boulder state), read notepad data:
-  - Use the `notepad_read` MCP tool for per-plan notepad sections (learnings, issues, decisions, problems) — it handles path resolution automatically
-- `Glob(".claude/plans/*.md")` — recent native plan files
+Also: `TaskList()`, `mode_read(mode="boulder")`, `notepad_read` for active plan sections, `Glob(".claude/plans/*.md")`.
 
 ## PHASE 2: EXTRACT
 
-Write the summary from first person ("I did...", "I told you..."). Focus on:
-- What was done and what remains
-- KEY FILES (max 10, workspace-relative paths)
-- USER REQUESTS must be verbatim — do not paraphrase
-- EXPLICIT CONSTRAINTS must be verbatim — do not invent
+First person ("I did...", "I told you..."):
+- What was done, what remains
+- KEY FILES (max 10, workspace-relative)
+- USER REQUESTS verbatim — no paraphrasing
+- EXPLICIT CONSTRAINTS verbatim — no inventing
 
 ## PHASE 3: FORMAT OUTPUT
 
@@ -122,13 +108,13 @@ CONTEXT FOR CONTINUATION
 ```
 
 Rules:
-- Plain text, no markdown `#` headers in the output
-- No bold/italic/code fences within content fields
-- Only include what matters for continuation
-- USER REQUESTS and EXPLICIT CONSTRAINTS: verbatim only
-- PROGRESS: use actual TaskList() counts, not estimates
-- NOTEPAD SUMMARY: omit section if no active plan or no notepad data
-- REMAINING WORK: copy task text verbatim from the plan file — do not paraphrase
+- Plain text, no markdown headers in output
+- No bold/italic/code fences in content fields
+- Only what matters for continuation
+- USER REQUESTS and CONSTRAINTS: verbatim only
+- PROGRESS: actual TaskList() counts
+- NOTEPAD SUMMARY: omit if no active plan/notepad data
+- REMAINING WORK: verbatim from plan file
 
 ## PHASE 4: INSTRUCT
 
@@ -142,7 +128,7 @@ TO CONTINUE IN A NEW SESSION:
 
 ## Constraints
 
-- DO NOT attempt to programmatically create new sessions
-- DO NOT include sensitive information (API keys, credentials)
-- DO NOT exceed 10 files in KEY FILES
-- DO NOT paraphrase user requests — quote verbatim
+- No programmatic session creation
+- No sensitive information (API keys, credentials)
+- Max 10 KEY FILES
+- User requests quoted verbatim

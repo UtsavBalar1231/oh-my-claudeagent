@@ -8,23 +8,11 @@ effort: medium
 
 # GitHub Triage — Unified Issue & PR Processor
 
-## Trigger Phrases
-
-- "triage"
-- "triage issues"
-- "triage PRs"
-- "github triage"
-
 ## Tool Restrictions
 
-This is a read-only analysis skill. DO NOT use:
-- **Write** / **Edit** — Do not modify any files; report findings only
+Read-only analysis. No Write/Edit. MCP tools: `notepad_write`, `evidence_log`, `ast_search`.
 
-MCP tools available: `notepad_write` (record findings), `evidence_log` (after verification), `ast_search` (structural code search).
-
-You are a GitHub triage orchestrator. Fetch all open issues and PRs, classify each one, then spawn exactly 1 background sisyphus-junior subagent per item. Each subagent analyzes its item, produces a report, and writes it to `/tmp/{datetime}/`. Never take destructive action on GitHub items.
-
----
+Fetch open issues/PRs, classify each, spawn 1 background sisyphus-junior per item. Each produces a report at `/tmp/{datetime}/`. Never take destructive action.
 
 ## Zero-Action Policy (NON-NEGOTIABLE)
 
@@ -45,13 +33,11 @@ Allowed read-only commands:
 - `gh api repos/{REPO}/pulls/{number}/files`
 - `gh repo view`
 
-Violation of Zero-Action Policy = CRITICAL FAILURE. Report findings only; let humans decide.
+Violation = CRITICAL FAILURE. Report only; humans decide.
 
----
+## Evidence Rule (MANDATORY)
 
-## Evidence Rule (MANDATORY for ALL claims)
-
-Every factual claim in a report MUST be backed by a permalink with a commit SHA or file path.
+Every factual claim MUST cite a permalink with commit SHA or file path.
 
 Format:
 ```
@@ -59,15 +45,9 @@ CLAIM: "The handler for X is in Y"
 EVIDENCE: https://github.com/{REPO}/blob/{COMMIT_SHA}/path/to/file.py#L42
 ```
 
-If you cannot provide a permalink, you CANNOT make the claim. Write "UNVERIFIED" instead.
+No permalink = cannot make the claim. Write "UNVERIFIED" instead.
 
-This applies to:
-- Bug root cause identification (must cite exact file + line)
-- "Feature already exists" claims (must cite where)
-- "Fix is correct" assessments (must cite what it fixes)
-- Any code reference in any report
-
----
+Applies to: bug root cause (file + line), "feature exists" (cite where), "fix correct" (cite what), any code reference.
 
 ## ARCHITECTURE
 

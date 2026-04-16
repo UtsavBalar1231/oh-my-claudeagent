@@ -9,46 +9,23 @@ effort: high
 
 # Ultrawork Mode - Maximum Parallelism
 
-Speed through parallelism. Launch multiple agents. Work on everything at once.
-
-## Core Philosophy
-
-> "If tasks are independent, they should run simultaneously."
-
-Ultrawork is about **aggressive parallelization**:
-- Multiple agents working concurrently
-- No waiting when waiting isn't necessary
-- Maximum throughput
+Aggressive parallelization. Multiple agents concurrent. No waiting when unnecessary.
 
 ## When to Parallelize
 
-**ALWAYS parallelize when:**
-- Tasks touch different files
-- Tasks are in different modules
-- Tasks have no data dependencies
-- Combined work > 30 seconds
+**ALWAYS**: different files, different modules, no data dependencies, combined work >30s.
 
-**DO NOT parallelize when:**
-- Task B depends on Task A's output
-- Tasks modify the same file
-- Sequential order matters for correctness
+**NEVER**: output dependency, same file, sequential order matters.
 
 ## Certainty Protocol
 
-**YOU MUST NOT START ANY IMPLEMENTATION UNTIL YOU ARE 100% CERTAIN.**
+No implementation until 100% certain. Before coding:
+- FULLY UNDERSTAND what user wants (not assumes)
+- EXPLORE codebase for patterns
+- CLEAR WORK PLAN — vague plan = failed work
+- RESOLVE ALL AMBIGUITY — unclear → ASK or INVESTIGATE
 
-Before writing code, you MUST:
-- **FULLY UNDERSTAND** what the user ACTUALLY wants (not what you ASSUME)
-- **EXPLORE** the codebase to understand existing patterns and architecture
-- **HAVE A CLEAR WORK PLAN** — if your plan is vague, your work will fail
-- **RESOLVE ALL AMBIGUITY** — if anything is unclear, ASK or INVESTIGATE
-
-**Signs you are NOT ready to implement:**
-- You're making assumptions about requirements
-- You're unsure which files to modify
-- You don't understand how existing code works
-- Your plan has "probably" or "maybe" in it
-- You can't explain the exact steps you'll take
+Not ready if: assumptions about requirements, unsure which files, don't understand existing code, "probably"/"maybe" in plan.
 
 ## Parallel Execution Pattern
 
@@ -123,45 +100,26 @@ TaskCreate(subject="Verification - Run all tests")
 TaskCreate(subject="Verification - Build check")
 ```
 
-## Handling Parallel Failures
+## Handling Failures
 
-When one parallel agent fails:
-
-1. **Don't stop others** - Let them complete
-2. **Collect all results** - Success and failures
-3. **Analyze failures** - What went wrong?
-4. **Create fix tasks** - Add to next batch
-5. **Continue** - Don't let one failure block everything
+1. Don't stop others — let them complete
+2. Collect all results
+3. Analyze failures
+4. Create fix tasks for next batch
+5. Continue — one failure doesn't block everything
 
 ## Maximum Concurrency
 
-Recommended limits:
-- **5 agents** maximum simultaneously
-- More agents = more coordination overhead
-- Quality matters more than quantity
+5 agents max. More = coordination overhead > throughput.
 
-## Verification in Ultrawork
+## Verification
 
-After all parallel work completes:
-
-```
-1. Aggregate results
-2. Check for conflicts (rare with good batching)
-3. Run integration tests
-4. Verify combined functionality
-5. Architect review if complex
-6. Record all results via evidence_log(type, command, exit_code, output_snippet)
-7. Review all evidence via `evidence_read` before reporting completion
-```
-
-## Phrases That Activate Ultrawork
-
-- "ulw"
-- "ultrawork"
-- "fast"
-- "parallel"
-- "as fast as possible"
-- "simultaneously"
+After all parallel work:
+1. Aggregate results, check conflicts
+2. Integration tests, verify combined functionality
+3. Architect review if complex
+4. `evidence_log(type, command, exit_code, output_snippet)` for all
+5. `evidence_read` before reporting completion
 
 ## Example Ultrawork Session
 
@@ -190,15 +148,15 @@ User: "ulw fix all TypeScript errors in src/"
 
 ## Anti-Optimism Checkpoint
 
-Before claiming done, answer honestly:
+Before claiming done:
 
-1. Did I run the tests and see them PASS? (not "they should pass")
-2. Did I read the actual output of every command? (not skim)
-3. Is EVERY requirement from the request actually implemented? (re-read the request NOW)
-4. Did I record evidence for every verification with `evidence_log`? (not "I verified it mentally")
-5. Did I record key learnings or issues via `notepad_write`?
+1. Tests run and PASS? (not "should pass")
+2. Read actual output of every command? (not skimmed)
+3. EVERY requirement implemented? (re-read request NOW)
+4. Evidence recorded via `evidence_log`? (not "verified mentally")
+5. Key learnings/issues via `notepad_write`?
 
-**If ANY answer is no → GO BACK AND DO IT. Do not claim completion.**
+**Any no → GO BACK. Do not claim completion.**
 
 | If your change... | YOU MUST... |
 |---|---|
@@ -218,24 +176,18 @@ Before claiming done, answer honestly:
 
 ## Persistence
 
-Ultrawork state is managed automatically by the persistence layer once the
-keyword is recognized. Do NOT attempt to clear it manually — use
-`/oh-my-claudeagent:stop-continuation` when you're done. While persistence
-is active, Claude will not stop until all delegated work is verified complete.
+State managed by persistence layer. Don't clear manually — use `/oh-my-claudeagent:stop-continuation`. While active, Claude won't stop until all work verified.
 
-## When All Work Is Delegated
+## When All Work Delegated
 
-When ALL outstanding work is in running background agents:
-- END YOUR RESPONSE and wait for task-notifications
-- Do NOT read log files, parse transcripts, or poll state directories
-- The stop hook recognizes active agent execution and allows stopping
+All work in background agents → END RESPONSE, wait for notifications. No log reading, transcript parsing, or state polling.
 
-**Background Agent Barrier**: When you receive a completion notification but other agents are still running, acknowledge the result briefly (1-2 lines) and END your response immediately. Never start consolidation or next-phase work until ALL agents have reported. This prevents queued notifications from getting stuck.
+**Background Agent Barrier**: Notification while others running → acknowledge briefly, END response. No consolidation until ALL reported.
 
 ## Anti-Patterns (NEVER)
 
-- Running tasks sequentially when they could be parallel
-- Waiting for one agent before starting independent work
-- Launching more than 5 agents at once
-- Parallelizing tasks that share files
-- Skipping verification after parallel work
+- Sequential when parallel possible
+- Waiting for one before starting independent work
+- More than 5 agents at once
+- Parallelizing shared-file tasks
+- Skipping post-parallel verification

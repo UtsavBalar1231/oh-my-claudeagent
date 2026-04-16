@@ -9,9 +9,9 @@ user-invocable: true
 
 **Task**: $ARGUMENTS
 
-If no task was specified above, ask the user what browser task to perform.
+No task specified → ask user what browser task to perform.
 
-Browser automation via the Playwright MCP server for web testing, scraping, verification, and interaction.
+Browser automation via Playwright MCP — testing, scraping, verification, interaction.
 
 ## Prerequisites
 
@@ -107,7 +107,7 @@ Primary interaction is via Playwright MCP tools (`mcp__playwright__*`), not via 
 
 ## Important Notes
 
-- **Prefer `browser_snapshot` over `browser_screenshot`** — snapshots return structured accessibility data that is easier to parse and act on
-- **Element selectors** use the accessibility tree format from `browser_snapshot` output
-- **One browser session** persists across tool calls within a conversation
-- **Error recovery**: if an element isn't found, take a new snapshot to see current page state
+- Prefer `browser_snapshot` over `browser_screenshot` — structured accessibility data
+- Element selectors from `browser_snapshot` output
+- One session persists across calls
+- Element not found → new snapshot to see current state

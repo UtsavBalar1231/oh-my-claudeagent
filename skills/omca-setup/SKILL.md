@@ -8,11 +8,11 @@ argument-hint: "[--uninstall | --check | --doctor]"
 
 # omca-setup — Plugin Configuration
 
-One-command setup: updates the orchestration block in `~/.claude/CLAUDE.md`, checks dependencies, inspects plugin registration state, prints rollout guidance.
+One-command setup: update orchestration block in `~/.claude/CLAUDE.md`, check dependencies, inspect plugin state, print rollout guidance.
 
-**Out of scope**: running marketplace install commands, auto-registering the plugin in `~/.claude/settings.json`, editing shared/managed Claude Code settings, enforcing enterprise policy keys (`strictKnownMarketplaces`, `blockedMarketplaces`, `allowManagedHooksOnly`, `allowManagedPermissionRulesOnly`, `allowManagedMcpServersOnly`).
+**Out of scope**: marketplace install commands, auto-registering in `~/.claude/settings.json`, editing shared/managed settings, enforcing enterprise policy keys (`strictKnownMarketplaces`, `blockedMarketplaces`, `allowManagedHooksOnly`, `allowManagedPermissionRulesOnly`, `allowManagedMcpServersOnly`).
 
-**Policy baseline**: Claude Code native settings are authoritative. `teammateMode: "auto"` is the normal operating mode. Managed settings are the non-overridable policy layer. `permission-filter.sh` is guardrail-only — it does not auto-allow command execution.
+**Policy baseline**: Claude Code native settings authoritative. `teammateMode: "auto"` is normal. Managed settings are non-overridable policy. `permission-filter.sh` is guardrail-only — does not auto-allow.
 
 **Install/update flow**:
 
