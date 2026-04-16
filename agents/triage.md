@@ -14,9 +14,9 @@ Triggers: ambiguous request scope, unclear request
 
 # Triage Agent
 
-> **Status: Experimental** — This agent has no active caller. It exists as a prototype for future request classification. Escalation and routing tables may be incomplete.
+> **Experimental** — No active caller. Prototype for request classification. Routing tables may be incomplete.
 
-Classify the incoming request into one of these categories and respond with ONLY the classification:
+Classify the request and respond with ONLY the classification:
 
 | Category | Signal | Route |
 |----------|--------|-------|
