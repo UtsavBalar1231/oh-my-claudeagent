@@ -1,69 +1,32 @@
 # oh-my-claudeagent — Complete Guide
 
-oh-my-claudeagent (OMCA) is a plugin for Claude Code that adds multi-agent orchestration:
-specialist agents with distinct roles, skills invokable via keywords or slash commands,
-hook-driven session persistence, and MCP servers for structural code search and state
-tracking. Version 1.5.0.
+Plugin for Claude Code adding multi-agent orchestration: specialist agents, slash-command/keyword skills, hook-driven persistence, MCP servers for structural search and state tracking.
 
-For quick install, see `README.md`. For contributor internals, see `CLAUDE.md`.
+Install: `README.md`. Contributor internals: `CLAUDE.md`.
 
 ---
 
 ## What Is This
 
-### The Problem
+Claude Code runs single-threaded. Simultaneous research + implementation, or ten files needing fixes at once, bottleneck the default session. No built-in specialist delegation or persistence guarantee.
 
-Claude Code runs as a single thread. When a task requires simultaneous research plus
-implementation, or when ten files need fixing at once, the default session becomes a
-bottleneck. There is no built-in way to delegate to specialist agents, and no persistence
-guarantee that a long task will run to completion.
-
-### The Solution
-
-oh-my-claudeagent adds a multi-agent layer on top of Claude Code:
-
-- **13 specialist agents** with distinct roles and model tiers (opus, sonnet, haiku)
-- **21 skills** invokable via slash commands or keyword triggers
-- **Hook commands** wired across lifecycle events for session persistence, context
-  injection, and error recovery
-- **3 MCP servers** for structural code search, state tracking, public code search,
-  and library documentation
+OMCA adds a multi-agent layer: specialist agents with model tiers (opus/sonnet/haiku), skills via slash commands or keywords, hooks for persistence and context injection, MCP servers for structural search and state.
 
 ### Philosophy
 
-Delegate to specialists, verify with evidence, ship with confidence.
-
-The core loop is: explore first, then plan, then execute in parallel, then verify. Every
-agent either delegates work or implements it — never both. Every completion claim requires
-evidence.
+Delegate to specialists, verify with evidence, ship with confidence. Core loop: explore → plan → execute in parallel → verify. Every agent delegates or implements — never both. Every claim requires evidence.
 
 ---
 
 ## Ownership Model
 
-### Claude-native owns
+**Claude-native**: plan mode, memory, hooks, plugin schema, permissions, sandboxing, subagents, teams.
 
-- Plan mode and native plan files
-- Memory scopes
-- Hooks and hook events
-- Plugin schema and marketplace behavior
-- Permissions, sandboxing, and teammate auto mode
-- Subagent execution and teams
+**OMCA**: agent prompts, orchestration policy, skill prompts, keyword activation, verification discipline, `omca` MCP server, session persistence (ralph, ultrawork), execution metadata in `.omca/state/` and `.omca/logs/`.
 
-### OMCA owns
+Both `.omca/plans/` and native plan files valid. Prometheus generates to `.omca/plans/`; Claude-native plan mode works alongside.
 
-- Specialist agent prompts and orchestration policy
-- Skill prompts and keyword activation
-- Workflow policy and verification discipline
-- The local `omca` MCP server
-- Session persistence via stop-hook coordination (ralph, ultrawork)
-- Execution metadata in `.omca/state/` and `.omca/logs/`
-
-Both `.omca/plans/` and native plan files are valid. OMCA can generate plans to
-`.omca/plans/` via prometheus, and Claude-native plan mode works alongside it.
-
-**Channels:** External message injection via Claude Code Channels is not used — OMCA
-focuses on in-session orchestration via hooks, subagents, and skills.
+**Channels**: Not used — OMCA focuses on in-session orchestration via hooks, subagents, skills.
 
 ---
 
@@ -71,9 +34,7 @@ focuses on in-session orchestration via hooks, subagents, and skills.
 
 ### Agents
 
-Agents are markdown files in `agents/*.md`. Each has a YAML frontmatter block defining
-its name, model, disallowedTools, and behavior. Claude Code loads them as subagent types addressable
-via `Agent(subagent_type="oh-my-claudeagent:NAME")`.
+Markdown files in `agents/*.md` with YAML frontmatter (name, model, disallowedTools, behavior). Addressable via `Agent(subagent_type="oh-my-claudeagent:NAME")`.
 
 **Model tiers:**
 
@@ -85,10 +46,7 @@ via `Agent(subagent_type="oh-my-claudeagent:NAME")`.
 
 Override any agent's model: `Agent(subagent_type="oh-my-claudeagent:explore", model="haiku")`
 
-**Delegation chain:**
-
-Subagents at depth 1 cannot spawn further subagents — the `Agent` tool is stripped at
-that depth.
+**Delegation chain:** Depth 1 subagents cannot spawn further subagents — `Agent` tool stripped.
 
 ```
 main session

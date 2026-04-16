@@ -1,10 +1,8 @@
 # oh-my-claudeagent
 
-Turn Claude Code into a multi-agent system. Specialist agents handle planning, execution, code review, debugging, and research — with persistence modes, parallel execution, and natural language activation.
+Multi-agent system for Claude Code. Specialist agents for planning, execution, review, debugging, research — with persistence, parallel execution, and natural language activation.
 
 ## Installation
-
-Add the marketplace and install:
 
 ```bash
 claude plugin marketplace add UtsavBalar1231/oh-my-claudeagent
@@ -67,21 +65,18 @@ For GitHub Enterprise Server, use full git URLs in the source:
 
 ## Quick Start
 
-After installing, run `/oh-my-claudeagent:omca-setup` to configure your environment and
-verify dependencies. Then try:
+Run `/oh-my-claudeagent:omca-setup` to configure and verify dependencies. Then:
 
-- Type "create plan for [your task]" to start the planning pipeline
-- Type "ralph don't stop" to activate persistence mode (keeps working until done)
-- Type "ultrawork" to run independent tasks across up to 5 parallel agents
-- Run `/oh-my-claudeagent:start-work` after a plan is ready to begin execution
+- "create plan for [your task]" — planning pipeline
+- "ralph don't stop" — persistence mode (works until done)
+- "ultrawork" — parallel agents (up to 5)
+- `/oh-my-claudeagent:start-work` — execute a ready plan
 
 ## What You Get
 
-Specialist agents (sisyphus, atlas, prometheus, metis, momus, oracle, sisyphus-junior,
-explore, librarian, hephaestus, multimodal-looker, socrates, triage), skills invokable via
-slash commands or keyword triggers, 3 bundled MCP servers (omca: structural search +
-state tracking, grep.app public code search, context7 library docs),
-and hook commands for session persistence, context injection, and auto-approval.
+Specialist agents, skills via slash commands or keyword triggers, bundled MCP servers
+(omca: structural search + state, grep.app: public code search, context7: library docs),
+hooks for persistence, context injection, and auto-approval.
 
 ## Requirements
 
@@ -93,10 +88,8 @@ and hook commands for session persistence, context injection, and auto-approval.
 
 ## Documentation
 
-- `OMCA.md` — Complete guide: agents, skills, workflows, MCP tools, runtime state,
-  troubleshooting, and architecture
-- `CLAUDE.md` — Contributor internals: hook map, cross-file patterns, adding components,
-  ADRs (auto-generated locally, not tracked in git)
+- `OMCA.md` — Complete guide: agents, skills, workflows, MCP tools, runtime state, troubleshooting
+- `CLAUDE.md` — Contributor internals: hook map, cross-file patterns, adding components
 
 ## Acknowledgments
 
