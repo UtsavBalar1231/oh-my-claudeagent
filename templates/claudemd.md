@@ -6,14 +6,11 @@ author: UtsavBalar1231
 
 # oh-my-claudeagent runtime guide
 
-You are running inside a Claude Code session with **oh-my-claudeagent** (OMCA)
-installed. OMCA is a multi-agent orchestration layer: a catalog of 13 specialist
-agents, a staged planning pipeline, parallel-execution patterns, and
-evidence-first verification discipline. This file tells you **when** to reach for
-OMCA and **how** to route work through it. Claude Code owns the platform (plan
-mode, memory, permissions, scheduling, subagents, hooks); OMCA owns orchestration,
-delegation, and verification rigor. Default to delegating over doing — the
-specialists are sharper than the generalist for their respective tasks.
+Claude Code session with **oh-my-claudeagent** (OMCA) installed. OMCA is a multi-agent
+orchestration layer: specialist agents, staged planning, parallel execution, evidence-first
+verification. Claude Code owns the platform (plan mode, memory, permissions, scheduling,
+subagents, hooks); OMCA owns orchestration, delegation, verification rigor. Default to
+delegating — specialists beat the generalist.
 
 <operating_principles>
 <!-- bats-canary: tests/bats/hooks/session_lifecycle.bats asserts this
@@ -36,9 +33,8 @@ specialists are sharper than the generalist for their respective tasks.
 </operating_principles>
 
 <delegation>
-Before you act, classify the request. Route to the **narrowest** specialist that
-fits the signal — `sisyphus-junior` before `sisyphus`; `explore` before
-`librarian` when the target is local code.
+Classify request. Route to **narrowest** specialist — `sisyphus-junior` before
+`sisyphus`; `explore` before `librarian` for local code.
 
 | Request signal                                               | Route to                                    |
 |--------------------------------------------------------------|---------------------------------------------|
@@ -63,9 +59,8 @@ fits the signal — `sisyphus-junior` before `sisyphus`; `explore` before
 </delegation>
 
 <entrypoints>
-Slash commands are always available. Keyword triggers auto-activate skills only
-when the plugin's `enableKeywordTriggers` config is turned on (opt-in; off by
-default). If the user has not opted in, invoke skills by slash command.
+Slash commands always available. Keyword triggers activate only when
+`enableKeywordTriggers` is on (opt-in, off by default).
 
 | Need                      | Keyword                 | Slash command                             |
 |---------------------------|-------------------------|-------------------------------------------|
@@ -81,8 +76,7 @@ default). If the user has not opted in, invoke skills by slash command.
 | Session handoff           | "handoff"               | /oh-my-claudeagent:handoff                |
 | Stop all continuation     | "stop continuation"     | /oh-my-claudeagent:stop-continuation      |
 
-Cloud alternative to `prometheus-plan`: `/ultraplan` — the Claude Code web
-planning research preview. Offer it when the user is planning from the browser.
+Cloud alternative: `/ultraplan` — Claude Code web planning research preview. Offer when planning from browser.
 </entrypoints>
 
 <!-- bats-canary: tests/bats/hooks/session_lifecycle.bats asserts this
@@ -107,94 +101,68 @@ planning research preview. Offer it when the user is planning from the browser.
 </agent_catalog>
 
 <workflow>
-Planning pipeline: **prometheus → metis → momus → user approval → atlas.**
+Pipeline: **prometheus → metis → momus → user approval → atlas.**
 
-1. `prometheus` interviews the user and drafts the plan file.
-2. `metis` performs pre-execution gap analysis on the draft.
-3. `momus` reviews the plan for clarity, verifiability, and completeness.
-4. **User explicitly approves** the plan (ExitPlanMode or direct confirmation).
-5. `atlas` executes the approved plan end to end, delegating every task and
-   verifying every result.
+1. `prometheus` interviews user, drafts plan.
+2. `metis` gap-analyzes the draft.
+3. `momus` reviews for clarity, verifiability, completeness.
+4. **User approves** (ExitPlanMode or confirmation).
+5. `atlas` executes end-to-end, delegating and verifying.
 
-After approval, the user runs `/oh-my-claudeagent:start-work` or
-`/oh-my-claudeagent:atlas [plan path]`. Both fork `atlas` at depth 0 — `atlas`
-is the only agent authorized to touch the plan. Wait for the user to invoke one
-of those commands; do not auto-start execution.
+User runs `/oh-my-claudeagent:start-work` or `:atlas [plan path]`. Both fork atlas.
+Do not auto-start execution.
 </workflow>
 
 <critical_rules>
-**IMPORTANT — main session must never implement plan tasks.** Once a plan is
-approved, delegate execution to `atlas`. Do not open the plan file and start
-editing code from the main session. Direct implementation bypasses the
-verification pipeline, skips evidence logging, and produces untested work. Only
-`atlas` (and the sub-specialists it spawns) may execute plan tasks.
+**Main session never implements plan tasks.** Approved plan → delegate to `atlas`.
+Direct implementation bypasses verification, skips evidence, produces untested work.
 
-**IMPORTANT — background-agent barrier.** When you launch N background agents
-and receive the first completion notification, acknowledge the result briefly
-and **END your response immediately** if other agents are still pending. Claude
-Code delivers one task-notification per turn; acting on partial results causes
-subsequent notifications to queue until the user presses Esc. Correct pattern:
+**Background-agent barrier.** N agents launched, first completes → acknowledge briefly,
+**END response** if others pending. One notification per turn; partial-result processing
+stalls the queue.
 
-- Agent 1 of 3 returns → "Got result 1. Waiting for 2 more." → END turn.
-- Agent 2 of 3 returns → "Got result 2. Waiting for 1 more." → END turn.
-- Agent 3 of 3 returns → synthesize and proceed.
+- Agent 1 of 3 → "Got result 1. Waiting for 2 more." → END turn.
+- Agent 2 of 3 → "Got result 2. Waiting for 1 more." → END turn.
+- Agent 3 of 3 → synthesize and proceed.
 
-**IMPORTANT — evidence before completion.** After every build, test, or lint
-command, record the result via the `evidence_log` MCP tool with evidence_type,
-command, exit_code, and an output snippet. Task completion is blocked by the
-platform verification layer when matching evidence is missing. No evidence, no done.
+**Evidence before completion.** Record every build/test/lint via `evidence_log` MCP tool.
+Task completion blocked without matching evidence. No evidence, no done.
 </critical_rules>
 
 <parallel_execution>
-Launch multiple background agents when tasks are genuinely independent — one
-agent's output is not another's input:
+Multiple background agents when tasks are independent:
 
-1. Send a single message containing multiple `Agent` tool-use blocks, each with
-   `run_in_background=true`. Batching them in one message is what makes the
-   fan-out parallel.
-2. After launching, if the remaining work depends on the delegated results, end
-   your response. Do not poll state files — wait for task-notifications to
-   arrive as new context turns.
-3. Apply the background-agent barrier above on every partial completion.
-4. Synthesize only after all N results are in.
+1. Multiple `Agent` blocks with `run_in_background=true` in ONE message → parallel fan-out.
+2. Remaining work depends on results → end response, wait for notifications.
+3. Apply background-agent barrier on every partial completion.
+4. Synthesize only after all N in.
 
-Sequence instead of parallelizing when one task's output feeds the next, when
-you need to see one result before you know how to frame another, or when a
-downstream agent needs context the upstream one is still producing.
+Sequence when: output feeds next task, need one result to frame another, downstream needs upstream context.
 </parallel_execution>
 
 <verification>
-Verify before you claim. Record every build / test / lint command via the
-`evidence_log` MCP tool before marking a task complete — this is enforced by
-the platform verification layer, not a suggestion.
+Record every build/test/lint via `evidence_log` before marking complete — enforced
+by platform, not a suggestion.
 
-Escalate to `oracle` after **2+ failed fix attempts** on the same issue. Stop
-shotgun-debugging — random changes hoping something sticks waste context and
-breed regressions. Oracle's job is to step back from your tunnel and call the
-real root cause.
+Escalate to `oracle` after **2+ failed fixes**. Stop shotgun-debugging. Oracle
+steps back and finds root cause.
 
-For multi-system tradeoffs, unfamiliar architectural patterns, or decisions
-that touch multiple modules, get an independent read from `oracle` before
-committing to an approach. Early oracle review is cheap; late oracle review
-after you've already painted yourself into a corner is not.
+Multi-system tradeoffs, unfamiliar patterns, multi-module decisions → get oracle
+read before committing. Early oracle is cheap; late oracle is not.
 </verification>
 
 <file_reading>
-When reading files outside the project root, use the `file_read` MCP tool (via
-ToolSearch) instead of the built-in Read tool, which is scoped to the project
-root for subagents.
+Files outside project root → `file_read` MCP tool (via ToolSearch). Built-in
+Read is scoped to project root for subagents.
 
-`file_read` returns line-numbered content with a metadata footer showing
-estimated token count (~chars/4), total line count, and remaining lines. Use
-this metadata to decide whether to paginate large files:
+`file_read` returns line-numbered content with token count, line count, remaining
+lines. Use for pagination:
 
-- **Default read**: `file_read(path="/path/to/file")` returns up to 5000 lines.
-- **Targeted read**: `file_read(path="/path", offset=100, limit=50)` reads lines 101-150.
-- **Check size first**: Read a small slice (limit=1) to see the token estimate and
-  total line count, then decide how much to read.
+- **Default**: `file_read(path="/path")` — up to 5000 lines.
+- **Targeted**: `file_read(path="/path", offset=100, limit=50)` — lines 101-150.
+- **Size check**: `limit=1` first to see totals.
 
-For files over a few hundred lines, prefer targeted reads with offset/limit to
-conserve context window tokens.
+Large files → targeted reads to conserve context.
 </file_reading>
 
 --- /omca-setup ---
