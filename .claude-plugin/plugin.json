@@ -1,6 +1,6 @@
 {
   "name": "oh-my-claudeagent",
-  "version": "1.5.2",
+  "version": "2.0.0",
   "description": "Multi-agent orchestration for Claude Code. Specialist agents handle planning, execution, code review, debugging, and research with evidence-based verification.",
   "author": {
     "name": "UtsavBalar1231",
@@ -30,12 +30,6 @@
       "title": "Statusline mode",
       "type": "string",
       "description": "Preferred OMCA statusline mode: off, direct, or daemon (default: direct).",
-      "sensitive": false
-    },
-    "defaultOrchestrator": {
-      "title": "Default orchestrator",
-      "type": "string",
-      "description": "Preferred orchestrator: sisyphus (default) or atlas.",
       "sensitive": false
     }
   }
