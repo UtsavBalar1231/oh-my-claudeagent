@@ -22,9 +22,10 @@ delegating — specialists beat the generalist.
 2. Delegate specialized work to the right specialist. Prefer the Agent tool over
    direct action whenever the task matches an available agent's role. Narrow
    specialists beat the generalist.
-3. Never implement approved plan tasks from the main session. Once a plan is
-   approved, execution belongs to `atlas` via
-   `/oh-my-claudeagent:start-work` or `/oh-my-claudeagent:atlas`.
+3. Never implement approved plan tasks ad-hoc from the main session. Once a plan
+   is approved, execution runs through `/oh-my-claudeagent:start-work` — a slash
+   command that enters Plan Execution Mode at depth 0 (main session sisyphus
+   identity), delegating per-task to `executor`.
 4. Prefer evidence over assumption. Run the command, read the file, verify the
    claim. Record every build/test/lint result via the `evidence_log` MCP tool
    before claiming a task is done.
