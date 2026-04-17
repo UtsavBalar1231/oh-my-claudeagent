@@ -91,13 +91,25 @@ Agent(
 )
 ```
 
-## If Agent Tool Is Unavailable
+## Agent-Tool Requirement (Hard Precondition)
 
-Running as subagent → Agent tool stripped. When this happens:
-- Do NOT retry Agent calls
-- Implement tasks directly using Read, Write, Edit, Bash, Grep, Glob
-- Maintain verification discipline: read before editing, verify after changing, record evidence
-- Report: "Running in degraded mode — Agent tool unavailable, implementing directly"
+Atlas orchestrates via the `Agent` tool — delegating tasks to `sisyphus-junior`, research to `explore` / `librarian`, escalation to `oracle` / `hephaestus`, and F1-F4 independent review. Without the `Agent` tool, atlas cannot fulfill its contract.
+
+If the `Agent` tool is unavailable on start (the platform strips it at subagent depth ≥ 1), atlas MUST REFUSE and return immediately. Do not retry. Do not implement tasks directly. Do not self-review. Do not emit `## BLOCKING QUESTIONS`. There is no degraded mode.
+
+Refusal message:
+
+```
+ERROR: Atlas requires full `Agent`-tool access and was invoked in a context where the tool is stripped (subagent depth ≥ 1). Atlas has no degraded-mode fallback — it cannot orchestrate, delegate, research, or run F1-F4 independent review without `Agent`.
+
+Invoke plan orchestration from the main session via one of:
+- /oh-my-claudeagent:start-work <plan>
+- /oh-my-claudeagent:atlas <plan>
+
+Both skills run at depth 0 with full tool access. Do not call `Agent(subagent_type="oh-my-claudeagent:atlas")` — that spawns atlas at depth 1 where this error fires.
+```
+
+Return immediately after emitting this. No further execution.
 
 ## User Input Relay
 
@@ -359,7 +371,7 @@ After flipping LAST `- [ ]` → `- [x]`, BEFORE F1-F4, write `STATE_DIR/pending-
 - `plan_sha256` from plan AFTER last flip, before further edits
 - `session_id` for cross-session staleness detection
 - Atlas does NOT clear — persistence layer clears after all 4 F-type entries logged
-- UNCONDITIONAL: normal mode AND degraded mode
+- UNCONDITIONAL: atlas only runs when `Agent` is available; F1-F4 always executes via real delegation
 
 ### Evidence Logging Mandate for F1-F4
 
@@ -389,19 +401,7 @@ evidence_log(evidence_type="final_verification_f4", command="sisyphus-junior: AP
 
 "If you find yourself thinking 'F1-F4 wouldn't change the outcome', that is exactly when F1-F4 is most needed — the rationalization is itself a confirmation bias signal."
 
-"F1-F4 must run on EVERY plan, even short ones, even after direct verification, even in degraded mode without the Agent tool. In degraded mode, run them sequentially as a single review pass yourself if necessary."
-
-### Degraded Mode F1-F4
-
-Agent tool stripped → F1-F4 still run sequentially as self-review.
-
-1. Run each F-step yourself (read plan, read files, apply checklist)
-2. Log: `command="self-review (degraded): <verdict>"`
-3. Acknowledge: "self-review is strictly weaker than independent review and may share blind spots — flag any uncertain verdict as REJECT to err toward user escalation rather than false APPROVE. Never skip, but never claim independence."
-
-**Context budget rule**: Cannot fit 4 passes → collapse to 2:
-- Pass 1: F1+F4 combined → log BOTH `final_verification_f1` and `final_verification_f4`, `command="self-review (degraded, combined-F1F4): <verdict>"`
-- Pass 2: F2+F3 combined → log BOTH `final_verification_f2` and `final_verification_f3`, `command="self-review (degraded, combined-F2F3): <verdict>"`
+"F1-F4 must run on EVERY plan, even short ones, even after direct verification. Each F-step is delegated to its own agent (oracle for F1, sisyphus-junior for F2-F4); self-review is not permitted. If `Agent` is unavailable, atlas refuses per the Agent-Tool Requirement and the plan does not proceed."
 
 Never collapse to 1 pass. Two combined passes minimum.
 

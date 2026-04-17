@@ -99,28 +99,10 @@ Started: {timestamp}
 Reading plan and beginning execution...
 ```
 
-## Step -1: Pre-Flight Agent-Tool Probe (MANDATORY)
-
-Before any other work:
-
-1. Call `ToolSearch({query: "select:Agent", max_results: 1})`.
-2. Interpret:
-   - Real Agent schema returned → `AGENT_AVAILABLE=true`. Proceed normally.
-   - `InputValidationError` or empty result → `AGENT_AVAILABLE=false`.
-   - `ToolSearch` itself stripped/unavailable → `AGENT_AVAILABLE=false`, `PROBE_DEGRADED=true`.
-
-3. Scan the plan file for capability signals:
-   - **Final Verification Wave present** (F1-F4 / "Final Verification" in TODOs)
-   - **Parallel Execution: YES** declared in plan metadata
-   - **Verification Strategy names an independent reviewer** (oracle, momus)
-   - **task_count > 3**
-
-4. Decision:
-   - `AGENT_AVAILABLE=true` → proceed normally.
-   - `AGENT_AVAILABLE=false` AND any capability signal → emit `## BLOCKING QUESTIONS` and stop.
-   - `AGENT_AVAILABLE=false` AND no signals → degraded mode with visible banner.
-
 ## Execute Plan
+
+This skill runs inline in the main session at depth 0 — the `Agent` tool is always available. No pre-flight probe, no degraded-mode fallback. If you ever see evidence that this is running at subagent depth ≥ 1, stop and report: you are in the wrong context.
+
 
 ### Step 1: Register and Analyze
 

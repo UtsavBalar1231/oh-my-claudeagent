@@ -13,8 +13,12 @@ load '../test_helper'
 	grep -qF "wouldn't change the outcome" "${CLAUDE_PLUGIN_ROOT}/agents/atlas.md"
 }
 
-@test "atlas canary: contains anti-rationalization clause 'Degraded Mode'" {
-	grep -qF "Degraded Mode" "${CLAUDE_PLUGIN_ROOT}/agents/atlas.md"
+@test "atlas canary: contains hard-refuse policy 'MUST REFUSE' for depth >= 1" {
+	grep -qF "MUST REFUSE" "${CLAUDE_PLUGIN_ROOT}/agents/atlas.md"
+}
+
+@test "atlas canary: contains 'no degraded mode' policy statement" {
+	grep -qiF "no degraded mode" "${CLAUDE_PLUGIN_ROOT}/agents/atlas.md"
 }
 
 @test "atlas canary: contains FROZEN plan discipline marker" {

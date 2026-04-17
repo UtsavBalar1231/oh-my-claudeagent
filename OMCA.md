@@ -568,10 +568,11 @@ error occurs during ralph, manually resume with `/oh-my-claudeagent:start-work`.
 
 **Subagent nesting depth:** `/oh-my-claudeagent:start-work` and `/oh-my-claudeagent:atlas`
 run at depth 0 (main session) with full `Agent`-tool access; parallel fan-out, specialist
-delegation, and independent oracle review all work. Atlas remains available as a subagent
-via `Agent(subagent_type="oh-my-claudeagent:atlas")` for invocation paths that explicitly
-want atlas's protocol in an isolated depth-1 context — the Pre-Flight Probe and Oracle
-Review Relay in those paths handle degraded-mode gracefully.
+delegation, and independent F1-F4 review via `oracle` / `sisyphus-junior` all work. These
+skills are the only valid orchestration entry points. Calling
+`Agent(subagent_type="oh-my-claudeagent:atlas", ...)` from any context spawns atlas at
+depth 1 where the `Agent` tool is stripped — atlas refuses cleanly in that state and
+returns an error pointing to the two skill paths. There is no degraded mode.
 
 **Hook changes not taking effect:** Run `/reload-plugins`.
 
