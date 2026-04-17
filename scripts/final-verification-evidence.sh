@@ -56,6 +56,11 @@ if [[ -z "${PLAN_PATH}" ]]; then
 	PLAN_PATH="${MARKER_PLAN}"
 fi
 
+CURRENT_SHA=""
+if [[ -n "${PLAN_PATH}" ]] && [[ -f "${PLAN_PATH}" ]]; then
+	CURRENT_SHA=$(sha256sum "${PLAN_PATH}" 2>/dev/null | awk '{print $1}' || echo "")
+fi
+
 # Count checkboxes only when active plan exists and plan file is readable
 INCOMPLETE=0
 COMPLETE=0
@@ -105,13 +110,19 @@ _has_ftype() {
 		return
 	fi
 	local found
-	found=$(jq -r --arg t "${ftype}" --argjson now "${NOW}" --argjson window "${MAX_EVIDENCE_AGE_SECONDS}" '
+	found=$(jq -r --arg t "${ftype}" --argjson now "${NOW}" --argjson window "${MAX_EVIDENCE_AGE_SECONDS}" --arg sha "${CURRENT_SHA}" '
 		.entries // []
 		| map(select(
 			.type == $t
 			and (
 				(now - ((.timestamp // "1970-01-01T00:00:00Z") | strptime("%Y-%m-%dT%H:%M:%SZ") | mktime))
 				<= $window
+			)
+			and (
+				($sha == "")
+				or (.plan_sha256 == $sha)
+				or ((.output_snippet // "") | test("plan_sha256:" + $sha))
+				or (.plan_sha256 == null or .plan_sha256 == "")
 			)
 		))
 		| length > 0
@@ -137,10 +148,11 @@ if [[ -n "${MISSING}" ]]; then
 	exit 2
 fi
 
-# All 4 F-types present — validate that all reference the SAME plan SHA
-SHAS=$(jq -r '
+# All 4 F-types present — validate legacy-unknown entries (no first-class plan_sha256 field) all share the same SHA
+SHAS=$(jq -r --arg sha "${CURRENT_SHA}" '
 	.entries // []
 	| map(select(.type | test("^final_verification_f[1-4]$")))
+	| map(select(.plan_sha256 == null or .plan_sha256 == ""))
 	| map(.output_snippet | capture("plan_sha256:(?<sha>[0-9a-f]+)").sha // "")
 	| unique
 	| @json
@@ -150,7 +162,7 @@ SHA_COUNT=$(echo "${SHAS}" | jq 'length' 2>/dev/null || echo "0")
 SHA_COUNT="${SHA_COUNT:-0}"
 
 if [[ "${SHA_COUNT}" -gt 1 ]]; then
-	echo "[FINAL VERIFICATION] plan_sha256 mismatch across F1-F4 evidence entries: ${SHAS}. Stale evidence from a prior run may be present. Re-run the Final Verification Wave for the current plan." >&2
+	echo "[FINAL VERIFICATION] Stale evidence from a prior plan detected. Current-plan SHA: ${CURRENT_SHA}. Use evidence_read to inspect or prune .omca/state/evidence.jsonl if confirmed stale." >&2
 	exit 2
 fi
 
