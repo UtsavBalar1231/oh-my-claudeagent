@@ -77,7 +77,7 @@ Assess complexity BEFORE deep consultation:
 | Complexity | Signals | Interview Approach |
 |------------|---------|-------------------|
 | **Trivial** | Single file, <10 lines change | Skip heavy interview. Quick confirm. |
-| **Simple** | 1-2 files, clear scope | Lightweight: 1-2 targeted questions |
+| **Simple** | 1-2 files, clear scope | Lightweight: targeted questions as needed — clearance checklist gates termination |
 | **Complex** | 3+ files, architectural impact | Full consultation |
 
 ### Step 0.5: Exploration Gate

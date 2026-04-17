@@ -103,10 +103,10 @@ Running as subagent → Agent tool stripped. When this happens:
 
 Scan subagent response for `## BLOCKING QUESTIONS`. When present:
 
-1. **Hydrate** `AskUserQuestion`: `ToolSearch({query: "select:AskUserQuestion", max_results: 1})`
-2. **Parse** `Q1..Qn` into `questions[]` (1-4 per call; batch if >4)
-3. **Call** `AskUserQuestion`, collect answers
-4. **Resume**: `SendMessage({to: "<agent_id>", prompt: "User answered:\n- Q1: <a1>\n- Q2: <a2>\n\nContinue."})`
+1. **Hydrate** `AskUserQuestion`: `ToolSearch({query: "select:AskUserQuestion", max_results: 1})` — one-time per turn
+2. **Parse** `Q1..Qn` into a `questions[]` array. Platform caps each `AskUserQuestion` call at 1-4 questions.
+3. **Call** `AskUserQuestion` with up to 4 questions. If more remain, make additional `AskUserQuestion` calls in the same turn (e.g., Q1-Q4 in call 1, Q5-Q8 in call 2). No per-turn or per-session cap — relay every question the subagent raised.
+4. **Resume**: `SendMessage({to: "<agent_id>", prompt: "User answered:\n- Q1: <a1>\n- Q2: <a2>\n\nContinue."})` — only after all answers collected
 5. Never present questions as text in your response. If hydration fails: "I cannot reach AskUserQuestion in this session"
 
 ## 6-Section Prompt Structure

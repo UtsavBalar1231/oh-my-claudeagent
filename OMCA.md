@@ -574,7 +574,9 @@ orchestrators via skills (`/oh-my-claudeagent:atlas`, not `Agent(...atlas...)`).
 **AskUserQuestion unavailable in subagents:** Subagents emit a `## BLOCKING QUESTIONS`
 block at the end of their final response (Q1., Q2., lettered options A/B/C, Recommended:
 line). The orchestrator hydrates `AskUserQuestion` via `ToolSearch`, relays, and resumes
-the subagent via `SendMessage`.
+the subagent via `SendMessage`. The platform caps each `AskUserQuestion` call at 4
+questions; when a subagent raises more, the orchestrator makes multiple sequential calls
+within the same turn to relay all of them.
 
 **permissionMode stripping:** Claude Code strips `permissionMode` from plugin agents.
 Copy agent files to `~/.claude/agents/` (user-scope agents retain it).
