@@ -147,3 +147,68 @@ def test_evidence_read_handles_missing_file(mcp_server, working_dir):
         {"working_directory": working_dir},
     )
     assert "No verification evidence" in result
+
+
+# --- plan_sha256 field ---
+
+_PLAN_SHA = "deadbeef" * 8  # valid 64-char hex sentinel
+
+
+def test_evidence_log_with_plan_sha256(mcp_server, working_dir, tmp_git_root):
+    """evidence_log stores plan_sha256 when provided."""
+    call_tool(
+        mcp_server,
+        "evidence_log",
+        {
+            "evidence_type": "test",
+            "command": "just test",
+            "exit_code": 0,
+            "output_snippet": f"plan_sha256:{_PLAN_SHA}",
+            "working_directory": working_dir,
+            "plan_sha256": _PLAN_SHA,
+        },
+    )
+    path = tmp_git_root / ".omca" / "state" / EVIDENCE_FILE
+    data = json.loads(path.read_text())
+    entry = data["entries"][0]
+    assert "plan_sha256" in entry
+    assert entry["plan_sha256"] == _PLAN_SHA
+
+
+def test_evidence_log_without_plan_sha256(mcp_server, working_dir, tmp_git_root):
+    """evidence_log omits plan_sha256 key when parameter is not supplied (legacy parity)."""
+    call_tool(
+        mcp_server,
+        "evidence_log",
+        {
+            "evidence_type": "test",
+            "command": "just test",
+            "exit_code": 0,
+            "output_snippet": f"plan_sha256:{_PLAN_SHA}",
+            "working_directory": working_dir,
+        },
+    )
+    path = tmp_git_root / ".omca" / "state" / EVIDENCE_FILE
+    data = json.loads(path.read_text())
+    entry = data["entries"][0]
+    assert "plan_sha256" not in entry
+
+
+def test_evidence_log_empty_plan_sha256(mcp_server, working_dir, tmp_git_root):
+    """evidence_log omits plan_sha256 key when passed as empty string (conditional-attach semantics)."""
+    call_tool(
+        mcp_server,
+        "evidence_log",
+        {
+            "evidence_type": "test",
+            "command": "just test",
+            "exit_code": 0,
+            "output_snippet": f"plan_sha256:{_PLAN_SHA}",
+            "working_directory": working_dir,
+            "plan_sha256": "",
+        },
+    )
+    path = tmp_git_root / ".omca" / "state" / EVIDENCE_FILE
+    data = json.loads(path.read_text())
+    entry = data["entries"][0]
+    assert "plan_sha256" not in entry
