@@ -566,8 +566,12 @@ error occurs during ralph, manually resume with `/oh-my-claudeagent:start-work`.
 **MCP tools not available:** Check `ast-grep`/`sg` and `uv` are installed. Run
 `/oh-my-claudeagent:omca-setup --check`. Run `/reload-plugins` to restart MCP servers.
 
-**Subagent nesting depth:** `Agent` tool is stripped at depth 1+. Always invoke
-orchestrators via skills (`/oh-my-claudeagent:atlas`, not `Agent(...atlas...)`).
+**Subagent nesting depth:** `/oh-my-claudeagent:start-work` and `/oh-my-claudeagent:atlas`
+run at depth 0 (main session) with full `Agent`-tool access; parallel fan-out, specialist
+delegation, and independent oracle review all work. Atlas remains available as a subagent
+via `Agent(subagent_type="oh-my-claudeagent:atlas")` for invocation paths that explicitly
+want atlas's protocol in an isolated depth-1 context — the Pre-Flight Probe and Oracle
+Review Relay in those paths handle degraded-mode gracefully.
 
 **Hook changes not taking effect:** Run `/reload-plugins`.
 
