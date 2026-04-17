@@ -365,12 +365,23 @@ After flipping LAST `- [ ]` → `- [x]`, BEFORE F1-F4, write `STATE_DIR/pending-
 
 Each F-step needs `evidence_log` immediately after verdict. Session termination blocked until all 4 F-type entries present.
 
-| F-step | `evidence_type` | `command` example | `exit_code` | `output_snippet` |
-|--------|----------------|-------------------|-------------|-----------------|
-| F1 | `final_verification_f1` | `oracle: APPROVE` | 0 = APPROVE, 1 = REJECT | `plan_sha256:<hex> verdict:APPROVE` |
-| F2 | `final_verification_f2` | `sisyphus-junior: APPROVE` | 0 = APPROVE, 1 = REJECT | `plan_sha256:<hex> verdict:APPROVE` |
-| F3 | `final_verification_f3` | `sisyphus-junior: APPROVE` | 0 = APPROVE, 1 = REJECT | `plan_sha256:<hex> verdict:APPROVE` |
-| F4 | `final_verification_f4` | `sisyphus-junior: APPROVE` | 0 = APPROVE, 1 = REJECT | `plan_sha256:<hex> verdict:APPROVE` |
+**Dual-shape convention**: Pass `plan_sha256` as an explicit parameter (preferred, structured access). Keep the `plan_sha256:<sha>` embedding in `output_snippet` for back-compat during the transition window; a future plan can deprecate it.
+
+Example calls (substitute actual plan SHA):
+
+```
+evidence_log(evidence_type="final_verification_f1", command="oracle: APPROVE", exit_code=0, plan_sha256="<hex>", output_snippet="plan_sha256:<hex> verdict:APPROVE")
+evidence_log(evidence_type="final_verification_f2", command="sisyphus-junior: APPROVE", exit_code=0, plan_sha256="<hex>", output_snippet="plan_sha256:<hex> verdict:APPROVE")
+evidence_log(evidence_type="final_verification_f3", command="sisyphus-junior: APPROVE", exit_code=0, plan_sha256="<hex>", output_snippet="plan_sha256:<hex> verdict:APPROVE")
+evidence_log(evidence_type="final_verification_f4", command="sisyphus-junior: APPROVE", exit_code=0, plan_sha256="<hex>", output_snippet="plan_sha256:<hex> verdict:APPROVE")
+```
+
+| F-step | `evidence_type` | `command` example | `exit_code` | `plan_sha256` | `output_snippet` |
+|--------|----------------|-------------------|-------------|---------------|-----------------|
+| F1 | `final_verification_f1` | `oracle: APPROVE` | 0 = APPROVE, 1 = REJECT | `<hex>` (first-class field) | `plan_sha256:<hex> verdict:APPROVE` |
+| F2 | `final_verification_f2` | `sisyphus-junior: APPROVE` | 0 = APPROVE, 1 = REJECT | `<hex>` (first-class field) | `plan_sha256:<hex> verdict:APPROVE` |
+| F3 | `final_verification_f3` | `sisyphus-junior: APPROVE` | 0 = APPROVE, 1 = REJECT | `<hex>` (first-class field) | `plan_sha256:<hex> verdict:APPROVE` |
+| F4 | `final_verification_f4` | `sisyphus-junior: APPROVE` | 0 = APPROVE, 1 = REJECT | `<hex>` (first-class field) | `plan_sha256:<hex> verdict:APPROVE` |
 
 ### Anti-Rationalization Clauses
 
