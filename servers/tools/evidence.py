@@ -27,8 +27,12 @@ def register(mcp: FastMCP) -> None:
         working_directory: str = Field(
             default="", description="Project root (auto-detected from git)"
         ),
+        plan_sha256: str = Field(
+            default="",
+            description="SHA-256 of the active plan file; attach on F1-F4 entries to scope verification evidence to the current plan run. Leave empty for build/test/lint/manual entries.",
+        ),
     ) -> str:
-        """REQUIRED after every build/test/lint command — task completion is blocked without this. Append a timestamped verification evidence entry. Use immediately after running any verification command (just test, just lint, just build, etc.). Returns confirmation with total evidence entry count."""
+        """REQUIRED after every build/test/lint command — task completion is blocked without this. Append a timestamped verification evidence entry. Use immediately after running any verification command (just test, just lint, just build, etc.). Set plan_sha256 on final_verification_f1..f4 entries to scope evidence to a specific plan run. Returns confirmation with total evidence entry count."""
         state = _state_dir(working_directory)
         path = os.path.join(state, EVIDENCE_FILE)
         data = _read_json(path)
@@ -45,6 +49,8 @@ def register(mcp: FastMCP) -> None:
         }
         if verified_by:
             entry["verified_by"] = verified_by
+        if plan_sha256:
+            entry["plan_sha256"] = plan_sha256
 
         data["entries"].append(entry)
         _write_json(path, data)
