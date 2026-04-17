@@ -1,8 +1,6 @@
 ---
 name: start-work
 description: Start a work session from a Prometheus-generated plan.
-context: fork
-agent: oh-my-claudeagent:atlas
 user-invocable: true
 argument-hint: "[plan file] [--worktree <path>]"
 shell: bash
@@ -11,11 +9,13 @@ effort: high
 
 # Start Work Session
 
+This skill runs in the main session at depth 0. The `Agent` tool is available, so orchestration is real: parallel fan-out to `sisyphus-junior`, independent F1 via `oracle`, specialist escalation via `hephaestus`/`explore`/`librarian` as needed. No depth-1 degradation.
+
 Start executing a Prometheus-generated plan.
 
 ## Plan Mode Handling (Step 0)
 
-Plan mode active → call `ExitPlanMode` first. Plugin agents have `permissionMode` stripped — atlas inherits parent session context.
+Plan mode active → call `ExitPlanMode` first. Plugin agents have `permissionMode` stripped — delegated agents inherit parent session context.
 
 ## What To Do
 
@@ -42,7 +42,7 @@ Plan mode active → call `ExitPlanMode` first. Plugin agents have `permissionMo
    ```
    `boulder_write` enforces deduplication and preserves `started_at`. Plan body stays at authoritative location — boulder stores pointer only.
 
-5. **Read plan** and execute via atlas workflow
+5. **Read plan** and execute via the orchestration protocol below.
 
 ## Worktree Support
 
@@ -99,19 +99,159 @@ Started: {timestamp}
 Reading plan and beginning execution...
 ```
 
+## Step -1: Pre-Flight Agent-Tool Probe (MANDATORY)
+
+Before any other work:
+
+1. Call `ToolSearch({query: "select:Agent", max_results: 1})`.
+2. Interpret:
+   - Real Agent schema returned → `AGENT_AVAILABLE=true`. Proceed normally.
+   - `InputValidationError` or empty result → `AGENT_AVAILABLE=false`.
+   - `ToolSearch` itself stripped/unavailable → `AGENT_AVAILABLE=false`, `PROBE_DEGRADED=true`.
+
+3. Scan the plan file for capability signals:
+   - **Final Verification Wave present** (F1-F4 / "Final Verification" in TODOs)
+   - **Parallel Execution: YES** declared in plan metadata
+   - **Verification Strategy names an independent reviewer** (oracle, momus)
+   - **task_count > 3**
+
+4. Decision:
+   - `AGENT_AVAILABLE=true` → proceed normally.
+   - `AGENT_AVAILABLE=false` AND any capability signal → emit `## BLOCKING QUESTIONS` and stop.
+   - `AGENT_AVAILABLE=false` AND no signals → degraded mode with visible banner.
+
 ## Execute Plan
 
-1. Read FULL plan file
-2. Identify waves, dependencies, parallelizable groups
-3. Delegate via `Agent(subagent_type="oh-my-claudeagent:sisyphus-junior")` — one task per agent
-4. Parallel independent tasks (up to 5 concurrent)
-5. Verify each output before marking complete
-6. `evidence_log(type, command, exit_code, output_snippet)`
+### Step 1: Register and Analyze
 
-Atlas workflow: delegate, verify, mark checkboxes, repeat.
+1. `boulder_write(active_plan="<path>", plan_name="<name>", session_id="<current>")` — BEFORE delegating.
+2. Read FULL plan file.
+3. Parse `- [ ]` checkboxes.
+4. Build parallelization map: simultaneous tasks, dependencies, file conflicts.
+
+```
+TASK ANALYSIS:
+- Total: [N], Remaining: [M]
+- Parallelizable Groups: [list]
+- Sequential Dependencies: [list]
+```
+
+### Step 2: Execute Tasks
+
+#### 2.1 Parallelization
+
+Parallel: prepare ALL prompts, invoke in ONE message, wait, verify all.
+Sequential: one at a time.
+
+#### 2.2 Invoke Delegation — 6-Section Prompt Structure
+
+Every delegation prompt MUST include ALL 6 sections:
+
+```markdown
+## 1. TASK
+[Quote EXACT checkbox item. Be obsessively specific.]
+
+## 2. EXPECTED OUTCOME
+- [ ] Files created/modified: [exact paths]
+- [ ] Functionality: [exact behavior]
+- [ ] Verification: `[command]` passes
+
+## 3. REQUIRED TOOLS
+- [tool]: [what to search/check]
+
+## 4. MUST DO
+- Follow pattern in [reference file:lines]
+- Write tests for [specific cases]
+
+## 5. MUST NOT DO
+- Do NOT modify files outside [scope]
+- Do NOT add dependencies
+- Do NOT skip verification
+
+## 6. CONTEXT
+### Dependencies
+[What previous tasks built]
+```
+
+Prompts under 30 lines are typically too thin — include full context.
+
+```text
+Agent(
+  subagent_type="oh-my-claudeagent:sisyphus-junior",
+  prompt=`[FULL 6-SECTION PROMPT]`
+)
+```
+
+For exploration: `Agent(subagent_type="oh-my-claudeagent:explore", run_in_background=true, ...)`
+For task execution: do NOT use `run_in_background=true`.
+
+#### 2.3 Verify
+
+After EVERY delegation:
+
+```
+[ ] Build/typecheck at project level — zero errors
+[ ] Build command — exit 0
+[ ] Test suite — all pass
+[ ] Files exist and match requirements
+[ ] No regressions
+```
+
+Mark completion immediately: edit plan file `- [ ]` → `- [x]`, then read to confirm.
+
+`evidence_log(evidence_type="...", command="...", exit_code=0, output_snippet="...", plan_sha256="<sha256>", verified_by="sisyphus-junior")`
+
+#### 2.4 Handle Failures
+
+Max 3 retries per task. Blocked after 3 → document in notepad `issues`, continue to independent tasks. After 2+ tasks in same area fail → ask user whether to run metis re-analysis.
+
+#### 2.5 Background Agent Barrier
+
+When N background agents launched and first completes: acknowledge, say "Waiting for N more...", END response. Synthesize only after all N results arrive.
+
+#### 2.6 Loop Until Done
+
+### Step 3: Final Verification Wave (MANDATORY — after ALL plan tasks complete)
+
+Write `STATE_DIR/pending-final-verify.json` after flipping last `- [ ]` → `- [x]`, BEFORE F1-F4:
+
+```json
+{
+  "plan_path": "<absolute path>",
+  "plan_sha256": "<hex digest of frozen plan>",
+  "marked_at": <unix timestamp>,
+  "session_id": "<CLAUDE_SESSION_ID>"
+}
+```
+
+Spawn 4 review agents. ALL must APPROVE. Present results, get explicit user "okay" before completion.
+
+- [ ] F1. **Plan Compliance Audit** — `oracle`
+  `Agent(subagent_type="oh-my-claudeagent:oracle", prompt="[6-section prompt with F1 review scope]")`
+  Output: `Requirements [N/N] | Constraints [N/N] | VERDICT: APPROVE/REJECT`
+
+- [ ] F2. **Code Quality Review** — `sisyphus-junior`
+  `Agent(subagent_type="oh-my-claudeagent:sisyphus-junior", prompt="[6-section prompt with F2 details]")`
+  Output: `Build [PASS/FAIL] | Tests [N pass/N fail] | Files [N clean/N issues] | VERDICT`
+
+- [ ] F3. **Manual QA** — `sisyphus-junior`
+  Output: `Scenarios [N/N pass] | Integration [N/N] | VERDICT`
+
+- [ ] F4. **Scope Fidelity Check** — `sisyphus-junior`
+  Output: `Tasks [N/N compliant] | Contamination [CLEAN/N issues] | VERDICT`
+
+Log each F-step immediately after verdict:
+```
+evidence_log(evidence_type="final_verification_f1", command="oracle: APPROVE", exit_code=0, plan_sha256="<hex>", output_snippet="plan_sha256:<hex> verdict:APPROVE")
+```
+
+After ANY REJECT: fix issues, re-run that reviewer only. After ALL 4 APPROVE: present results, get explicit user "okay", then report completion.
 
 ## Critical
 
-- `boulder_write` BEFORE starting — tracks execution metadata
+- `boulder_write` BEFORE delegating — tracks execution metadata
 - Read FULL plan before delegating
-- Atlas 6-section delegation prompt format
+- All 6 sections in every delegation prompt
+- `evidence_log` after EVERY verification command — task-completion hook enforces this
+- `notepad_write(plan_name, "issues", content)` for blockers/audit breadcrumbs
+- `evidence_read` before final report to summarize all results
