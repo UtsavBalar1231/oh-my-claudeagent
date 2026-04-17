@@ -282,3 +282,33 @@ To disable Nerd Font glyphs in your shell for testing ASCII fallbacks:
 ```bash
 CLAUDE_STATUSLINE_NERD_FONT=0 echo '...' | cc-statusline
 ```
+
+---
+
+## Agent thematic icons
+
+When Nerd Font glyphs are enabled, the statusline displays a thematic icon next to the active
+agent name. The icon is looked up by agent name after stripping the `oh-my-claudeagent:`
+namespace prefix (e.g. `oh-my-claudeagent:atlas` resolves to `atlas`). Any agent name not in
+the table below falls back to `nf-fa-user`.
+
+| Agent | Glyph | Theme |
+|-------|-------|-------|
+| atlas | nf-fa-globe | world-bearer |
+| explore | nf-fa-compass | exploration |
+| hephaestus | nf-fa-wrench | smith |
+| librarian | nf-fa-book | library |
+| metis | nf-fa-search | gap analysis |
+| momus | nf-fa-comment | critique |
+| multimodal-looker | nf-fa-camera | visual input |
+| oracle | nf-fa-eye | foresight |
+| prometheus | nf-fa-fire | stolen flame |
+| sisyphus | nf-fa-mountain | boulder-pushing myth |
+| socrates | nf-fa-question_circle | Socratic method |
+| sisyphus-junior, triage | nf-fa-user | default agent icon |
+
+---
+
+## Nerd Fonts compatibility
+
+All icons are chosen from the `nf-fa-*` Font Awesome range (`\uED00` – `\uF2FF`), which is stable across Nerd Fonts v2 and v3. Users on NF v3+ see identical glyphs to users on v2 — no codepoint migration required.
