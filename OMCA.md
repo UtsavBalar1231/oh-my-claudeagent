@@ -184,7 +184,7 @@ Add to `.claude/settings.json` for automatic team-wide installation:
 3. Try the planning pipeline: type "create plan for adding user authentication"
    — Prometheus opens an interview, gathers requirements, generates a work plan
 4. After plan review: run `/oh-my-claudeagent:start-work`
-   — Atlas picks up the plan and delegates tasks to sisyphus-junior in parallel
+   — Atlas picks up the plan and delegates tasks to executor in parallel
 5. For guaranteed completion: type "ralph don't stop"
    — Ralph mode activates; the session blocks on Stop until all tasks are verified
 6. For maximum speed: type "ultrawork"
@@ -206,7 +206,7 @@ Add to `.claude/settings.json` for automatic team-wide installation:
 **sisyphus** — Classifies every request, routes to the right specialist. Runs explore
 agents in the background while continuing with non-overlapping work.
 
-**atlas** — Reads a plan with checkboxed tasks, delegates one task per sisyphus-junior
+**atlas** — Reads a plan with checkboxed tasks, delegates one task per executor
 call. After all tasks complete, runs a Final Verification Wave and waits for sign-off.
 
 ### Planning and Review
@@ -248,12 +248,12 @@ parallel for broad searches.
 
 | Agent | Model | Effort | Invoke | Purpose |
 |-------|-------|--------|--------|---------|
-| sisyphus-junior | sonnet | medium | `Agent(subagent_type="oh-my-claudeagent:sisyphus-junior")` | Focused task executor — implements directly, never delegates implementation |
+| executor | sonnet | medium | `Agent(subagent_type="oh-my-claudeagent:executor")` | Focused task executor — implements directly, never delegates implementation |
 | hephaestus | sonnet | medium | `/oh-my-claudeagent:hephaestus` or "fix build" | Build and toolchain fixer — minimal-diff policy |
 | multimodal-looker | sonnet | medium | `Agent(subagent_type="oh-my-claudeagent:multimodal-looker")` | Image, PDF, diagram analysis (read-only) |
 | triage | haiku | low | `Agent(subagent_type="oh-my-claudeagent:triage")` | Lightweight request classifier — classifies only, never implements |
 
-**sisyphus-junior** — Implements one atomic task per delegation. Escalates to explore/librarian
+**executor** — Implements one atomic task per delegation. Escalates to explore/librarian
 via recommendations in output text (cannot spawn subagents at depth 1). Requires fresh
 verification evidence before claiming completion.
 
@@ -356,7 +356,7 @@ agent per item in parallel. Zero-action policy: never merges, closes, or edits i
    -> Finds active plan, sets up boulder state, forks atlas
 
 3. Atlas executes:
-   -> Delegates each task to sisyphus-junior
+   -> Delegates each task to executor
    -> Verifies with build/typecheck/tests after each
    -> Marks checkboxes in plan file
    -> Final Verification Wave (oracle + review agents)
@@ -568,7 +568,7 @@ error occurs during ralph, manually resume with `/oh-my-claudeagent:start-work`.
 
 **Subagent nesting depth:** `/oh-my-claudeagent:start-work` and `/oh-my-claudeagent:atlas`
 run at depth 0 (main session) with full `Agent`-tool access; parallel fan-out, specialist
-delegation, and independent F1-F4 review via `oracle` / `sisyphus-junior` all work. These
+delegation, and independent F1-F4 review via `oracle` / `executor` all work. These
 skills are the only valid orchestration entry points. Calling
 `Agent(subagent_type="oh-my-claudeagent:atlas", ...)` from any context spawns atlas at
 depth 1 where the `Agent` tool is stripped — atlas refuses cleanly in that state and

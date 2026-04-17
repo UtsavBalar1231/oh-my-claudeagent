@@ -305,7 +305,7 @@ the table below falls back to `nf-fa-user`.
 | prometheus | nf-fa-fire | stolen flame |
 | sisyphus | nf-fa-mountain | boulder-pushing myth |
 | socrates | nf-fa-question_circle | Socratic method |
-| sisyphus-junior, triage | nf-fa-user | default agent icon |
+| executor, triage | nf-fa-user | default agent icon |
 
 ---
 

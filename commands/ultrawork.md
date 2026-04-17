@@ -59,15 +59,15 @@ Batch 2 (parallel, after Batch 1):
 
 ```
 # Batch 1 - Launch simultaneously
-Agent(subagent_type="oh-my-claudeagent:sisyphus-junior", prompt="Implement user service...")
-Agent(subagent_type="oh-my-claudeagent:sisyphus-junior", prompt="Implement auth service...")
+Agent(subagent_type="oh-my-claudeagent:executor", prompt="Implement user service...")
+Agent(subagent_type="oh-my-claudeagent:executor", prompt="Implement auth service...")
 
 # Wait for Batch 1
 
 # Batch 2 - Launch simultaneously
-Agent(subagent_type="oh-my-claudeagent:sisyphus-junior", prompt="Add user tests...")
-Agent(subagent_type="oh-my-claudeagent:sisyphus-junior", prompt="Add auth tests...")
-Agent(subagent_type="oh-my-claudeagent:sisyphus-junior", prompt="Update API routes...")
+Agent(subagent_type="oh-my-claudeagent:executor", prompt="Add user tests...")
+Agent(subagent_type="oh-my-claudeagent:executor", prompt="Add auth tests...")
+Agent(subagent_type="oh-my-claudeagent:executor", prompt="Update API routes...")
 ```
 
 ## Agent Selection for Speed
@@ -75,9 +75,9 @@ Agent(subagent_type="oh-my-claudeagent:sisyphus-junior", prompt="Update API rout
 | Task | Best Agent | Why |
 |------|------------|-----|
 | Quick lookup | `explore` with `model=haiku` | Fast, cheap |
-| Standard implementation | `sisyphus-junior` | Good balance |
-| Complex logic | `sisyphus-junior` with `model=opus` | Gets it right first time |
-| UI work | `sisyphus-junior` + `/oh-my-claudeagent:frontend-ui-ux` skill | Frontend skill provides specialization |
+| Standard implementation | `executor` | Good balance |
+| Complex logic | `executor` with `model=opus` | Gets it right first time |
+| UI work | `executor` + `/oh-my-claudeagent:frontend-ui-ux` skill | Frontend skill provides specialization |
 
 **Tip**: Use `model=haiku` for simple tasks, `model=opus` for complex ones. Sonnet is the default.
 

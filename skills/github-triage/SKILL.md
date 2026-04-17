@@ -1,6 +1,6 @@
 ---
 name: github-triage
-description: "Unified GitHub triage for issues AND PRs. 1 item = 1 background Agent (sisyphus-junior). Issues: answer questions from codebase, analyze bugs, assess features. PRs: review changes, assess merge safety. All parallel, all background."
+description: "Unified GitHub triage for issues AND PRs. 1 item = 1 background Agent (executor). Issues: answer questions from codebase, analyze bugs, assess features. PRs: review changes, assess merge safety. All parallel, all background."
 model: sonnet
 argument-hint: "[repo] [--issues-only | --prs-only]"
 effort: medium
@@ -12,7 +12,7 @@ effort: medium
 
 Read-only analysis. No Write/Edit. MCP tools: `notepad_write`, `evidence_log`, `ast_search`.
 
-Fetch open issues/PRs, classify each, spawn 1 background sisyphus-junior per item. Each produces a report at `/tmp/{datetime}/`. Never take destructive action.
+Fetch open issues/PRs, classify each, spawn 1 background executor per item. Each produces a report at `/tmp/{datetime}/`. Never take destructive action.
 
 ## Zero-Action Policy (NON-NEGOTIABLE)
 
@@ -52,12 +52,12 @@ Applies to: bug root cause (file + line), "feature exists" (cite where), "fix co
 ## ARCHITECTURE
 
 ```
-1 issue or PR  =  1 Agent(subagent_type="oh-my-claudeagent:sisyphus-junior", run_in_background=true)
+1 issue or PR  =  1 Agent(subagent_type="oh-my-claudeagent:executor", run_in_background=true)
 ```
 
 | Rule | Value |
 |------|-------|
-| Agent type for ALL items | `oh-my-claudeagent:sisyphus-junior` |
+| Agent type for ALL items | `oh-my-claudeagent:executor` |
 | Execution mode | `run_in_background=true` |
 | Parallelism | ALL items launched simultaneously |
 | Result storage | Each subagent writes to `/tmp/{datetime}/{number}-{type}.md` |
@@ -118,11 +118,11 @@ For each item, determine its type based on title, labels, and body content:
 
 ## PHASE 4: SPAWN 1 BACKGROUND AGENT PER ITEM
 
-For EVERY classified item, spawn one sisyphus-junior agent:
+For EVERY classified item, spawn one executor agent:
 
 ```python
 Agent(
-    subagent_type="oh-my-claudeagent:sisyphus-junior",
+    subagent_type="oh-my-claudeagent:executor",
     run_in_background=True,
     prompt=SUBAGENT_PROMPT_FOR_TYPE
 )
@@ -467,7 +467,7 @@ Tell the user the output directory path when complete.
 | Making claims without Evidence Rule citations | CRITICAL |
 | Batching multiple items into one Agent call | CRITICAL |
 | Using `run_in_background=false` | HIGH |
-| Spawning any agent type other than sisyphus-junior | HIGH |
+| Spawning any agent type other than executor | HIGH |
 | Checking out PR branches via git | CRITICAL |
 | Not writing report to /tmp/{datetime}/ directory | HIGH |
 | Claiming feature exists without file:line citation | HIGH |
@@ -481,7 +481,7 @@ When invoked:
 1. Create output directory: `/tmp/github-triage-{datetime}/`
 2. Fetch all open issues + PRs via gh CLI (paginate if 500 reached)
 3. Classify each item (ISSUE_QUESTION, ISSUE_BUG, ISSUE_FEATURE, ISSUE_OTHER, PR_BUGFIX, PR_OTHER)
-4. For EACH item: `Agent(subagent_type="oh-my-claudeagent:sisyphus-junior", run_in_background=True, prompt=...)`
+4. For EACH item: `Agent(subagent_type="oh-my-claudeagent:executor", run_in_background=True, prompt=...)`
 5. Launch ALL agents in a single response — maximum parallelism
 6. Collect reports from output directory once agents complete
 7. Write `{OUTDIR}/SUMMARY.md` with aggregated findings

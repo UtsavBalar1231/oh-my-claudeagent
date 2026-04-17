@@ -20,7 +20,7 @@ Follow `agents/prometheus.md` end-to-end:
 
 ## Delegation
 
-Delegate exploration to `explore` agents (parallel when topics are independent). Delegate external research to `librarian`. Delegate implementation to `oh-my-claudeagent:sisyphus-junior` — never implement directly from this command.
+Delegate exploration to `explore` agents (parallel when topics are independent). Delegate external research to `librarian`. Delegate implementation to `oh-my-claudeagent:executor` — never implement directly from this command.
 
 ## Constraints
 
@@ -28,7 +28,7 @@ Delegate exploration to `explore` agents (parallel when topics are independent).
 - Single deliverable plan regardless of size.
 - Plans always in English.
 - No `context: fork` in any spawned agent calls.
-- Always use `oh-my-claudeagent:sisyphus-junior` as subagent_type for implementation delegation.
+- Always use `oh-my-claudeagent:executor` as subagent_type for implementation delegation.
 
 ## Socratic Interview Mode
 

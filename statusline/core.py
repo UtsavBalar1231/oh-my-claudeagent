@@ -55,7 +55,7 @@ AGENT_GLYPHS_NERD: dict[str, str] = {
     "oracle": "\uf06e",  # nf-fa-eye — foresight
     "prometheus": "\uf06d",  # nf-fa-fire — stolen flame
     "sisyphus": "\uef08",  # nf-fa-mountain — boulder-pushing myth
-    "sisyphus-junior": "\uf007",  # nf-fa-user — junior reuses default
+    "executor": "\uf085",  # nf-fa-cogs — the doer, distinct from hephaestus's wrench
     "socrates": "\uf059",  # nf-fa-question_circle — Socratic method
     "triage": "\uf007",  # nf-fa-user — lightweight, reuses default
     "__default__": "\uf007",  # nf-fa-user — unknown-agent fallback

@@ -10,7 +10,7 @@ disallowedTools:
   - Agent
 ---
 <!-- OMCA Metadata
-Cost: free | Category: standard | Escalation: explore, sisyphus-junior
+Cost: free | Category: standard | Escalation: explore, executor
 Triggers: external library mentioned, library docs, SDK research, OSS examples
 -->
 
@@ -179,7 +179,7 @@ Every response ends with structured synthesis containing citations.
 
 Research-only — reads and reports, no code modifications.
 
-- Code changes needed → recommend `sisyphus-junior`
+- Code changes needed → recommend `executor`
 - Architecture concerns → recommend `oracle`
 - Local codebase question → recommend `explore`
 - Always conclude with clear handoff statement

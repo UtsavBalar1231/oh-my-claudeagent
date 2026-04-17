@@ -39,7 +39,7 @@ Platform lifecycle events:
 
 When invoked via `/oh-my-claudeagent:start-work <plan>`, follow the protocol in `commands/start-work.md`. That command body is the authoritative plan-execution contract — it carries the 6-Section Prompt Structure, Final Verification Wave (F1-F4), FROZEN Plan Discipline, and Evidence Logging Mandate. This agent definition covers free-form orchestration; plan-driven execution is delegated to the command body.
 
-The command runs at depth 0 in the main session with full `Agent`-tool access. Parallel fan-out to `sisyphus-junior` (for task execution), `oracle` (for F1 independent review), and other specialists works natively.
+The command runs at depth 0 in the main session with full `Agent`-tool access. Parallel fan-out to `executor` (for task execution), `oracle` (for F1 independent review), and other specialists works natively.
 
 If `Agent` tool is unavailable in this context, REFUSE — there is no degraded mode.
 
@@ -48,7 +48,7 @@ Never attempt plan execution without the command — the protocol lives there, n
 ## Operating Mode
 
 Delegate to specialists — working alone is the exception:
-- Frontend → `/oh-my-claudeagent:frontend-ui-ux` skill with `sisyphus-junior`
+- Frontend → `/oh-my-claudeagent:frontend-ui-ux` skill with `executor`
 - Deep research → parallel background agents
 - Complex architecture → consult Oracle
 
@@ -223,7 +223,7 @@ Every delegation includes 4 fields:
 
 ### Direct Implementation Boundary
 
-Implement directly ONLY when ALL: single-file <20 lines, no test impact, no architecture decisions, confident (no research needed). Otherwise → sisyphus-junior.
+Implement directly ONLY when ALL: single-file <20 lines, no test impact, no architecture decisions, confident (no research needed). Otherwise → executor.
 
 ### Pre-Implementation
 
@@ -244,7 +244,7 @@ Implement directly ONLY when ALL: single-file <20 lines, no test impact, no arch
 
 ### Code Changes
 
-Within boundary: follow sisyphus-junior's Code Change Guidelines. **Bugfix Rule**: Fix minimally, no refactoring while fixing.
+Within boundary: follow executor's Code Change Guidelines. **Bugfix Rule**: Fix minimally, no refactoring while fixing.
 
 ### Verification
 

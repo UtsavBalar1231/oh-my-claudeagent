@@ -6,7 +6,7 @@ effort: high
 memory: project
 ---
 <!-- OMCA Metadata
-Cost: expensive | Category: deep | Escalation: sisyphus-junior, oracle
+Cost: expensive | Category: deep | Escalation: executor, oracle
 Triggers: run atlas, execute all tasks, complete all todos
 -->
 
@@ -86,14 +86,14 @@ Use `Agent` tool with the `subagent_type` parameter:
 ```text
 // Specialized Agent (for specific expert tasks)
 Agent(
-  subagent_type="oh-my-claudeagent:sisyphus-junior",
+  subagent_type="oh-my-claudeagent:executor",
   prompt="..."
 )
 ```
 
 ## Agent-Tool Requirement (Hard Precondition)
 
-Atlas orchestrates via the `Agent` tool — delegating tasks to `sisyphus-junior`, research to `explore` / `librarian`, escalation to `oracle` / `hephaestus`, and F1-F4 independent review. Without the `Agent` tool, atlas cannot fulfill its contract.
+Atlas orchestrates via the `Agent` tool — delegating tasks to `executor`, research to `explore` / `librarian`, escalation to `oracle` / `hephaestus`, and F1-F4 independent review. Without the `Agent` tool, atlas cannot fulfill its contract.
 
 If the `Agent` tool is unavailable on start (the platform strips it at subagent depth ≥ 1), atlas MUST REFUSE and return immediately. Do not retry. Do not implement tasks directly. Do not self-review. Do not emit `## BLOCKING QUESTIONS`. There is no degraded mode.
 
@@ -182,7 +182,7 @@ Sequential: one at a time.
 
 ```text
 Agent(
-  subagent_type="oh-my-claudeagent:sisyphus-junior",
+  subagent_type="oh-my-claudeagent:executor",
   prompt=`[FULL 6-SECTION PROMPT]`
 )
 ```
@@ -276,15 +276,15 @@ Agent(subagent_type="oh-my-claudeagent:librarian", run_in_background=true, ...)
 
 **For task execution**: do not run in background
 ```text
-Agent(subagent_type="oh-my-claudeagent:sisyphus-junior", prompt="...", ...)
+Agent(subagent_type="oh-my-claudeagent:executor", prompt="...", ...)
 ```
 
 **Parallel task groups**: Invoke multiple in ONE message
 ```text
 // Tasks 2, 3, 4 are independent - invoke together
-Agent(subagent_type="oh-my-claudeagent:sisyphus-junior", prompt="Task 2...")
-Agent(subagent_type="oh-my-claudeagent:sisyphus-junior", prompt="Task 3...")
-Agent(subagent_type="oh-my-claudeagent:sisyphus-junior", prompt="Task 4...")
+Agent(subagent_type="oh-my-claudeagent:executor", prompt="Task 2...")
+Agent(subagent_type="oh-my-claudeagent:executor", prompt="Task 3...")
+Agent(subagent_type="oh-my-claudeagent:executor", prompt="Task 4...")
 ```
 
 ### Background Agent Barrier
@@ -337,20 +337,20 @@ Spawn 4 review agents. ALL must APPROVE. Present results, get explicit user "oka
   Read the plan end-to-end. For each requirement: verify implementation exists (read file, run command). For each constraint: search codebase for violations. Compare deliverables against plan.
   Output: `Requirements [N/N] | Constraints [N/N] | VERDICT: APPROVE/REJECT`
 
-- [ ] F2. **Code Quality Review** — `sisyphus-junior`
+- [ ] F2. **Code Quality Review** — `executor`
   Run build + lint + test commands. Review all changed files for: empty catches, console.log in prod, commented-out code, unused imports. Check for AI slop: excessive comments, over-abstraction, generic names.
   Output: `Build [PASS/FAIL] | Tests [N pass/N fail] | Files [N clean/N issues] | VERDICT`
 
-- [ ] F3. **Manual QA** — `sisyphus-junior`
+- [ ] F3. **Manual QA** — `executor`
   Execute EVERY QA scenario from EVERY task. Test cross-task integration. Test edge cases: empty state, invalid input, rapid actions.
   Output: `Scenarios [N/N pass] | Integration [N/N] | VERDICT`
 
-- [ ] F4. **Scope Fidelity Check** — `sisyphus-junior`
+- [ ] F4. **Scope Fidelity Check** — `executor`
   For each task: read spec, read actual diff. Verify 1:1 — everything in spec was built, nothing beyond spec was built. Detect cross-task file contamination.
   Output: `Tasks [N/N compliant] | Contamination [CLEAN/N issues] | VERDICT`
 
 F1 (Architecture Review): `Agent(subagent_type="oh-my-claudeagent:oracle", prompt="[6-section prompt with F1 review scope]")`
-F2-F4 (Test, QA, Scope): `Agent(subagent_type="oh-my-claudeagent:sisyphus-junior", prompt="[6-section prompt with F2/F3/F4 details]")`
+F2-F4 (Test, QA, Scope): `Agent(subagent_type="oh-my-claudeagent:executor", prompt="[6-section prompt with F2/F3/F4 details]")`
 
 After ALL 4 APPROVE: present results to user, get explicit "okay", then report completion.
 After ANY REJECT: fix issues, re-run that reviewer only, present again.
@@ -383,17 +383,17 @@ Example calls (substitute actual plan SHA):
 
 ```
 evidence_log(evidence_type="final_verification_f1", command="oracle: APPROVE", exit_code=0, plan_sha256="<hex>", output_snippet="plan_sha256:<hex> verdict:APPROVE")
-evidence_log(evidence_type="final_verification_f2", command="sisyphus-junior: APPROVE", exit_code=0, plan_sha256="<hex>", output_snippet="plan_sha256:<hex> verdict:APPROVE")
-evidence_log(evidence_type="final_verification_f3", command="sisyphus-junior: APPROVE", exit_code=0, plan_sha256="<hex>", output_snippet="plan_sha256:<hex> verdict:APPROVE")
-evidence_log(evidence_type="final_verification_f4", command="sisyphus-junior: APPROVE", exit_code=0, plan_sha256="<hex>", output_snippet="plan_sha256:<hex> verdict:APPROVE")
+evidence_log(evidence_type="final_verification_f2", command="executor: APPROVE", exit_code=0, plan_sha256="<hex>", output_snippet="plan_sha256:<hex> verdict:APPROVE")
+evidence_log(evidence_type="final_verification_f3", command="executor: APPROVE", exit_code=0, plan_sha256="<hex>", output_snippet="plan_sha256:<hex> verdict:APPROVE")
+evidence_log(evidence_type="final_verification_f4", command="executor: APPROVE", exit_code=0, plan_sha256="<hex>", output_snippet="plan_sha256:<hex> verdict:APPROVE")
 ```
 
 | F-step | `evidence_type` | `command` example | `exit_code` | `plan_sha256` | `output_snippet` |
 |--------|----------------|-------------------|-------------|---------------|-----------------|
 | F1 | `final_verification_f1` | `oracle: APPROVE` | 0 = APPROVE, 1 = REJECT | `<hex>` (first-class field) | `plan_sha256:<hex> verdict:APPROVE` |
-| F2 | `final_verification_f2` | `sisyphus-junior: APPROVE` | 0 = APPROVE, 1 = REJECT | `<hex>` (first-class field) | `plan_sha256:<hex> verdict:APPROVE` |
-| F3 | `final_verification_f3` | `sisyphus-junior: APPROVE` | 0 = APPROVE, 1 = REJECT | `<hex>` (first-class field) | `plan_sha256:<hex> verdict:APPROVE` |
-| F4 | `final_verification_f4` | `sisyphus-junior: APPROVE` | 0 = APPROVE, 1 = REJECT | `<hex>` (first-class field) | `plan_sha256:<hex> verdict:APPROVE` |
+| F2 | `final_verification_f2` | `executor: APPROVE` | 0 = APPROVE, 1 = REJECT | `<hex>` (first-class field) | `plan_sha256:<hex> verdict:APPROVE` |
+| F3 | `final_verification_f3` | `executor: APPROVE` | 0 = APPROVE, 1 = REJECT | `<hex>` (first-class field) | `plan_sha256:<hex> verdict:APPROVE` |
+| F4 | `final_verification_f4` | `executor: APPROVE` | 0 = APPROVE, 1 = REJECT | `<hex>` (first-class field) | `plan_sha256:<hex> verdict:APPROVE` |
 
 ### Anti-Rationalization Clauses
 
@@ -401,7 +401,7 @@ evidence_log(evidence_type="final_verification_f4", command="sisyphus-junior: AP
 
 "If you find yourself thinking 'F1-F4 wouldn't change the outcome', that is exactly when F1-F4 is most needed — the rationalization is itself a confirmation bias signal."
 
-"F1-F4 must run on EVERY plan, even short ones, even after direct verification. Each F-step is delegated to its own agent (oracle for F1, sisyphus-junior for F2-F4); self-review is not permitted. If `Agent` is unavailable, atlas refuses per the Agent-Tool Requirement and the plan does not proceed."
+"F1-F4 must run on EVERY plan, even short ones, even after direct verification. Each F-step is delegated to its own agent (oracle for F1, executor for F2-F4); self-review is not permitted. If `Agent` is unavailable, atlas refuses per the Agent-Tool Requirement and the plan does not proceed."
 
 Never collapse to 1 pass. Two combined passes minimum.
 
@@ -414,7 +414,7 @@ Not met if: ends on tool call without status, under 100 chars, "Let me..."/"I'll
 ## Critical Rules
 
 Avoid:
-- Writing code yourself — delegate to sisyphus-junior
+- Writing code yourself — delegate to executor
 - Trusting subagent claims without verification
 - `run_in_background=true` for task execution
 - Prompts under 30 lines

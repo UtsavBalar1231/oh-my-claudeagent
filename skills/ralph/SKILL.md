@@ -131,7 +131,7 @@ You still delegate, but with persistence:
 
 ```
 result = Agent(
-    subagent_type="oh-my-claudeagent:sisyphus-junior",
+    subagent_type="oh-my-claudeagent:executor",
     prompt="Implement feature X..."
 )
 

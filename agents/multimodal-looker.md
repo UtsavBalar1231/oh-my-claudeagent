@@ -6,7 +6,7 @@ effort: medium
 tools: Read
 ---
 <!-- OMCA Metadata
-Cost: cheap | Category: readonly | Escalation: oracle, sisyphus-junior
+Cost: cheap | Category: readonly | Escalation: oracle, executor
 Triggers: image analysis, PDF extraction, diagram interpretation, screenshot review
 -->
 
@@ -87,7 +87,7 @@ LIMITATIONS:
 
 - Code fixes → hephaestus
 - Architecture → oracle
-- UI implementation → sisyphus-junior
+- UI implementation → executor
 
 Output goes straight to main agent.
 

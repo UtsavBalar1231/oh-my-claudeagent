@@ -34,4 +34,4 @@ Registers ralph (persistence) + ultrawork (parallelism). Session persists until 
 
 ## Delegation
 
-Delegate all implementation to `oh-my-claudeagent:sisyphus-junior`. Spawn agents in parallel batches per the ultrawork pattern (max 5 concurrent). Apply the Background Agent Barrier: on partial completion, acknowledge and END response; synthesize only after all agents report.
+Delegate all implementation to `oh-my-claudeagent:executor`. Spawn agents in parallel batches per the ultrawork pattern (max 5 concurrent). Apply the Background Agent Barrier: on partial completion, acknowledge and END response; synthesize only after all agents report.

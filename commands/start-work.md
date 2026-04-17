@@ -7,7 +7,7 @@ argument-hint: "[plan file] [--worktree <path>]"
 # Plan Execution Mode — start-work
 
 This command runs in the main session at depth 0. The `Agent` tool is available,
-so orchestration is real: parallel fan-out to `sisyphus-junior`, independent F1
+so orchestration is real: parallel fan-out to `executor`, independent F1
 via `oracle`, specialist escalation via `hephaestus`/`explore`/`librarian` as
 needed. No depth-1 degradation.
 
@@ -178,7 +178,7 @@ Example delegation:
 
 ```text
 Agent(
-  subagent_type="oh-my-claudeagent:sisyphus-junior",
+  subagent_type="oh-my-claudeagent:executor",
   prompt=`[FULL 6-SECTION PROMPT]`
 )
 ```
@@ -198,15 +198,15 @@ Agent(subagent_type="oh-my-claudeagent:librarian", run_in_background=true, ...)
 
 For task execution (never background):
 ```text
-Agent(subagent_type="oh-my-claudeagent:sisyphus-junior", prompt="...", ...)
+Agent(subagent_type="oh-my-claudeagent:executor", prompt="...", ...)
 ```
 
 Parallel task group (invoke in ONE message):
 ```text
 // Tasks 2, 3, 4 are independent — invoke together
-Agent(subagent_type="oh-my-claudeagent:sisyphus-junior", prompt="Task 2...")
-Agent(subagent_type="oh-my-claudeagent:sisyphus-junior", prompt="Task 3...")
-Agent(subagent_type="oh-my-claudeagent:sisyphus-junior", prompt="Task 4...")
+Agent(subagent_type="oh-my-claudeagent:executor", prompt="Task 2...")
+Agent(subagent_type="oh-my-claudeagent:executor", prompt="Task 3...")
+Agent(subagent_type="oh-my-claudeagent:executor", prompt="Task 4...")
 ```
 
 ### 2.2 Background Agent Barrier
@@ -272,18 +272,18 @@ APPROVE. Present results, get explicit user "okay" before reporting completion.
   Compare deliverables against plan.
   Output: `Requirements [N/N] | Constraints [N/N] | VERDICT: APPROVE/REJECT`
 
-- [ ] F2. **Code Quality Review** — `sisyphus-junior`
+- [ ] F2. **Code Quality Review** — `executor`
   Run build + lint + test commands. Review all changed files for: empty catches,
   console.log in prod, commented-out code, unused imports. Check for AI slop:
   excessive comments, over-abstraction, generic names.
   Output: `Build [PASS/FAIL] | Tests [N pass/N fail] | Files [N clean/N issues] | VERDICT`
 
-- [ ] F3. **Manual QA** — `sisyphus-junior`
+- [ ] F3. **Manual QA** — `executor`
   Execute EVERY QA scenario from EVERY task. Test cross-task integration. Test
   edge cases: empty state, invalid input, rapid actions.
   Output: `Scenarios [N/N pass] | Integration [N/N] | VERDICT`
 
-- [ ] F4. **Scope Fidelity Check** — `sisyphus-junior`
+- [ ] F4. **Scope Fidelity Check** — `executor`
   For each task: read spec, read actual diff. Verify 1:1 — everything in spec was
   built, nothing beyond spec was built. Detect cross-task file contamination.
   Output: `Tasks [N/N compliant] | Contamination [CLEAN/N issues] | VERDICT`
@@ -295,7 +295,7 @@ F1 (Architecture Review):
 Agent(subagent_type="oh-my-claudeagent:oracle", prompt="[6-section prompt with F1 review scope]")
 
 F2-F4 (Test, QA, Scope):
-Agent(subagent_type="oh-my-claudeagent:sisyphus-junior", prompt="[6-section prompt with F2/F3/F4 details]")
+Agent(subagent_type="oh-my-claudeagent:executor", prompt="[6-section prompt with F2/F3/F4 details]")
 ```
 
 After ALL 4 APPROVE: present results to user, get explicit "okay", then report completion.
@@ -311,7 +311,7 @@ exactly when F1-F4 is most needed — the rationalization is itself a confirmati
 bias signal."
 
 "F1-F4 must run on EVERY plan, even short ones, even after direct verification.
-Each F-step is delegated to its own agent (oracle for F1, sisyphus-junior for
+Each F-step is delegated to its own agent (oracle for F1, executor for
 F2-F4); self-review is not permitted. If `Agent` is unavailable, this command
 refuses per the Mandatory MUST REFUSE Clause and the plan does not proceed."
 
@@ -330,7 +330,7 @@ evidence_log(
   exit_code=0,
   output_snippet="plan_sha256:<sha256> ...",
   plan_sha256="<sha256>",
-  verified_by="sisyphus-junior"
+  verified_by="executor"
 )
 ```
 
@@ -346,21 +346,21 @@ evidence_log(
 )
 evidence_log(
   evidence_type="final_verification_f2",
-  command="sisyphus-junior: APPROVE",
+  command="executor: APPROVE",
   exit_code=0,
   plan_sha256="<hex>",
   output_snippet="plan_sha256:<hex> verdict:APPROVE"
 )
 evidence_log(
   evidence_type="final_verification_f3",
-  command="sisyphus-junior: APPROVE",
+  command="executor: APPROVE",
   exit_code=0,
   plan_sha256="<hex>",
   output_snippet="plan_sha256:<hex> verdict:APPROVE"
 )
 evidence_log(
   evidence_type="final_verification_f4",
-  command="sisyphus-junior: APPROVE",
+  command="executor: APPROVE",
   exit_code=0,
   plan_sha256="<hex>",
   output_snippet="plan_sha256:<hex> verdict:APPROVE"
@@ -376,9 +376,9 @@ F-step evidence table:
 | F-step | `evidence_type`          | `command` example           | `exit_code` | `plan_sha256`       | `output_snippet`                      |
 |--------|--------------------------|-----------------------------|-------------|---------------------|---------------------------------------|
 | F1     | `final_verification_f1`  | `oracle: APPROVE`           | 0=APPROVE, 1=REJECT | `<hex>` (first-class) | `plan_sha256:<hex> verdict:APPROVE` |
-| F2     | `final_verification_f2`  | `sisyphus-junior: APPROVE`  | 0=APPROVE, 1=REJECT | `<hex>` (first-class) | `plan_sha256:<hex> verdict:APPROVE` |
-| F3     | `final_verification_f3`  | `sisyphus-junior: APPROVE`  | 0=APPROVE, 1=REJECT | `<hex>` (first-class) | `plan_sha256:<hex> verdict:APPROVE` |
-| F4     | `final_verification_f4`  | `sisyphus-junior: APPROVE`  | 0=APPROVE, 1=REJECT | `<hex>` (first-class) | `plan_sha256:<hex> verdict:APPROVE` |
+| F2     | `final_verification_f2`  | `executor: APPROVE`  | 0=APPROVE, 1=REJECT | `<hex>` (first-class) | `plan_sha256:<hex> verdict:APPROVE` |
+| F3     | `final_verification_f3`  | `executor: APPROVE`  | 0=APPROVE, 1=REJECT | `<hex>` (first-class) | `plan_sha256:<hex> verdict:APPROVE` |
+| F4     | `final_verification_f4`  | `executor: APPROVE`  | 0=APPROVE, 1=REJECT | `<hex>` (first-class) | `plan_sha256:<hex> verdict:APPROVE` |
 
 Session termination is blocked until all 4 F-type entries are present.
 

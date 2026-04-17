@@ -33,7 +33,7 @@ delegating — specialists beat the generalist.
 </operating_principles>
 
 <delegation>
-Classify request. Route to **narrowest** specialist — `sisyphus-junior` before
+Classify request. Route to **narrowest** specialist — `executor` before
 `sisyphus`; `explore` before `librarian` for local code.
 
 | Request signal                                               | Route to                                    |
@@ -41,12 +41,12 @@ Classify request. Route to **narrowest** specialist — `sisyphus-junior` before
 | Trivial — single known file, direct answer, tiny edit        | Handle directly                             |
 | Exploratory — "how does X work?", "find Y in the repo"       | `explore` (fire multiple in parallel)       |
 | External library / SDK / API / OSS example research          | `librarian`                                 |
-| Focused implementation — known task, ≤ small handful of files | `sisyphus-junior`                           |
+| Focused implementation — known task, ≤ small handful of files | `executor`                           |
 | Multi-file or architectural implementation                   | `/oh-my-claudeagent:prometheus-plan`        |
 | Starting a new feature from scratch                          | `/oh-my-claudeagent:prometheus-plan`        |
 | Scoping an uncertain request before planning                 | `/oh-my-claudeagent:metis`                  |
 | Reviewing a draft plan for gaps and ambiguities              | `/oh-my-claudeagent:momus`                  |
-| Executing an approved plan                                   | `/oh-my-claudeagent:start-work` or `/oh-my-claudeagent:atlas` — runs at depth 0 with full Agent-tool access, spawns `sisyphus-junior` per task in parallel, `oracle` for F1 independent review |
+| Executing an approved plan                                   | `/oh-my-claudeagent:start-work` or `/oh-my-claudeagent:atlas` — runs at depth 0 with full Agent-tool access, spawns `executor` per task in parallel, `oracle` for F1 independent review |
 | Stuck on a bug after 2+ failed fix attempts                  | `oracle`                                    |
 | Multi-system tradeoff, architecture decision, design review  | `oracle`                                    |
 | Build failure, type error, dependency or toolchain issue     | `/oh-my-claudeagent:hephaestus`             |
@@ -90,7 +90,7 @@ Cloud alternative: `/ultraplan` — Claude Code web planning research preview. O
 | prometheus        | opus   | Interviewing the user and producing a structured plan  |
 | metis             | opus   | Pre-execution gap analysis on a draft plan             |
 | momus             | opus   | Critical review of a draft plan for clarity and risk   |
-| sisyphus-junior   | sonnet | Focused implementation of a known, scoped task         |
+| executor   | sonnet | Focused implementation of a known, scoped task         |
 | explore           | sonnet | Finding code and patterns inside the local repo        |
 | librarian         | sonnet | External docs, library usage, OSS examples, research   |
 | oracle            | opus   | Architecture, tradeoffs, stuck debugging, craft review |
@@ -107,7 +107,7 @@ Pipeline: **prometheus → metis → momus → user approval → atlas.**
 2. `metis` gap-analyzes the draft.
 3. `momus` reviews for clarity, verifiability, completeness.
 4. **User approves** (ExitPlanMode or confirmation).
-5. `/oh-my-claudeagent:start-work` or `/oh-my-claudeagent:atlas` executes the approved plan end-to-end at depth 0 — the main session spawns `sisyphus-junior` for each task (parallel where the plan declares `Parallel Execution: YES`), invokes `oracle` for F1 independent review, logs evidence per task with `plan_sha256` (first-class field from Phase 2), and reports completion back to the user. Atlas is no longer forked as a subagent by these skills; it remains available via `Agent(subagent_type="oh-my-claudeagent:atlas")` from other surfaces.
+5. `/oh-my-claudeagent:start-work` or `/oh-my-claudeagent:atlas` executes the approved plan end-to-end at depth 0 — the main session spawns `executor` for each task (parallel where the plan declares `Parallel Execution: YES`), invokes `oracle` for F1 independent review, logs evidence per task with `plan_sha256` (first-class field from Phase 2), and reports completion back to the user. Atlas is no longer forked as a subagent by these skills; it remains available via `Agent(subagent_type="oh-my-claudeagent:atlas")` from other surfaces.
 
 User runs `/oh-my-claudeagent:start-work` or `/oh-my-claudeagent:atlas [plan path]`.
 Do not auto-start execution.

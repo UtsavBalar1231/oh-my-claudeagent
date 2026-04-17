@@ -18,7 +18,7 @@ AGENT_TYPE=$(echo "${INPUT}" | jq -r '.agent_type // "unknown"')
 
 CONTEXT_PARTS="$(_section_header 'Agent Protocol')"
 case "${AGENT_TYPE}" in
-*explore* | *librarian* | *hephaestus* | *sisyphus-junior* | *multimodal* | *oracle* | *momus*)
+*explore* | *librarian* | *hephaestus* | *executor* | *multimodal* | *oracle* | *momus*)
 	CONTEXT_PARTS+="AskUserQuestion is not available here. Make autonomous decisions when possible; if you need user input, emit a '## BLOCKING QUESTIONS' block at the end of your final response (Q1., Q2., lettered options A/B/C, Recommended: line) and return. The orchestrator will relay."
 	;;
 *prometheus* | *metis* | *socrates* | *sisyphus* | *atlas*)
@@ -71,7 +71,7 @@ fi
 # Inject evidence_log guidance for execution agents
 EXEC_GUIDANCE_HEADER_ADDED=0
 case "${AGENT_TYPE}" in
-*sisyphus-junior* | *hephaestus* | *atlas* | *sisyphus*)
+*executor* | *hephaestus* | *atlas* | *sisyphus*)
 	if [[ "${EXEC_GUIDANCE_HEADER_ADDED}" -eq 0 ]]; then
 		CONTEXT_PARTS+="$(_section_header 'Execution Guidance')"
 		EXEC_GUIDANCE_HEADER_ADDED=1

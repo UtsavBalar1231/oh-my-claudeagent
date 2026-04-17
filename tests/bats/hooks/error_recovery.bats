@@ -39,7 +39,7 @@ load '../test_helper'
 
 @test "delegate-retry: nesting depth violation produces NESTING LIMIT message" {
 	local payload
-	payload='{"tool_name":"Agent","tool_input":{"subagent_type":"oh-my-claudeagent:sisyphus-junior"},"error":"No such tool available: Agent"}'
+	payload='{"tool_name":"Agent","tool_input":{"subagent_type":"oh-my-claudeagent:executor"},"error":"No such tool available: Agent"}'
 	run_hook "delegate-retry.sh" "$payload"
 	assert_success
 	local ctx

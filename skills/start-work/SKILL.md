@@ -9,7 +9,7 @@ effort: high
 
 # Start Work Session
 
-This skill runs in the main session at depth 0. The `Agent` tool is available, so orchestration is real: parallel fan-out to `sisyphus-junior`, independent F1 via `oracle`, specialist escalation via `hephaestus`/`explore`/`librarian` as needed. No depth-1 degradation.
+This skill runs in the main session at depth 0. The `Agent` tool is available, so orchestration is real: parallel fan-out to `executor`, independent F1 via `oracle`, specialist escalation via `hephaestus`/`explore`/`librarian` as needed. No depth-1 degradation.
 
 Start executing a Prometheus-generated plan.
 
@@ -159,7 +159,7 @@ Prompts under 30 lines are typically too thin — include full context.
 
 ```text
 Agent(
-  subagent_type="oh-my-claudeagent:sisyphus-junior",
+  subagent_type="oh-my-claudeagent:executor",
   prompt=`[FULL 6-SECTION PROMPT]`
 )
 ```
@@ -181,7 +181,7 @@ After EVERY delegation:
 
 Mark completion immediately: edit plan file `- [ ]` → `- [x]`, then read to confirm.
 
-`evidence_log(evidence_type="...", command="...", exit_code=0, output_snippet="...", plan_sha256="<sha256>", verified_by="sisyphus-junior")`
+`evidence_log(evidence_type="...", command="...", exit_code=0, output_snippet="...", plan_sha256="<sha256>", verified_by="executor")`
 
 #### 2.4 Handle Failures
 
@@ -212,14 +212,14 @@ Spawn 4 review agents. ALL must APPROVE. Present results, get explicit user "oka
   `Agent(subagent_type="oh-my-claudeagent:oracle", prompt="[6-section prompt with F1 review scope]")`
   Output: `Requirements [N/N] | Constraints [N/N] | VERDICT: APPROVE/REJECT`
 
-- [ ] F2. **Code Quality Review** — `sisyphus-junior`
-  `Agent(subagent_type="oh-my-claudeagent:sisyphus-junior", prompt="[6-section prompt with F2 details]")`
+- [ ] F2. **Code Quality Review** — `executor`
+  `Agent(subagent_type="oh-my-claudeagent:executor", prompt="[6-section prompt with F2 details]")`
   Output: `Build [PASS/FAIL] | Tests [N pass/N fail] | Files [N clean/N issues] | VERDICT`
 
-- [ ] F3. **Manual QA** — `sisyphus-junior`
+- [ ] F3. **Manual QA** — `executor`
   Output: `Scenarios [N/N pass] | Integration [N/N] | VERDICT`
 
-- [ ] F4. **Scope Fidelity Check** — `sisyphus-junior`
+- [ ] F4. **Scope Fidelity Check** — `executor`
   Output: `Tasks [N/N compliant] | Contamination [CLEAN/N issues] | VERDICT`
 
 Log each F-step immediately after verdict:

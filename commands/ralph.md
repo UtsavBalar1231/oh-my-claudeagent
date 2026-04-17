@@ -128,7 +128,7 @@ You still delegate, but with persistence:
 
 ```
 result = Agent(
-    subagent_type="oh-my-claudeagent:sisyphus-junior",
+    subagent_type="oh-my-claudeagent:executor",
     prompt="Implement feature X..."
 )
 
@@ -169,7 +169,7 @@ User: "ralph: implement authentication"
    TaskCreate(subject="Tests")
    TaskCreate(subject="Integration")
 
-2. Execute each task (delegate to sisyphus-junior agents)
+2. Execute each task (delegate to executor agents)
 
 3. Error on JWT middleware?
    -> Analyze, create fix task, continue

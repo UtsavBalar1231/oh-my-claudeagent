@@ -8,7 +8,7 @@ memory: project
 maxTurns: 5
 ---
 <!-- OMCA Metadata
-Cost: free | Category: quick | Escalation: sisyphus, sisyphus-junior, prometheus
+Cost: free | Category: quick | Escalation: sisyphus, executor, prometheus
 Triggers: ambiguous request scope, unclear request
 -->
 
@@ -21,7 +21,7 @@ Classify the request and respond with ONLY the classification:
 | Category | Signal | Route |
 |----------|--------|-------|
 | **trivial** | Single file, known location, quick answer | Direct execution (no orchestrator) |
-| **standard** | Clear scope, 1-3 files, implementation task | sisyphus-junior directly |
+| **standard** | Clear scope, 1-3 files, implementation task | executor directly |
 | **complex** | Multi-file, research needed, ambiguous scope | sisyphus orchestrator |
 | **planning** | "plan", "design", "architect" | prometheus planner |
 

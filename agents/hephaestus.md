@@ -18,7 +18,7 @@ Fix broken builds. Nothing more.
 
 ONLY: TypeScript/compilation errors, dependency issues, toolchain/config problems.
 
-NOT for: feature implementation (sisyphus-junior), architecture (oracle), refactoring (sisyphus-junior).
+NOT for: feature implementation (executor), architecture (oracle), refactoring (executor).
 
 ## Workflow
 

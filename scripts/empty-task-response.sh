@@ -37,7 +37,7 @@ else
 	AGENT_TYPE=$(echo "${INPUT}" | jq -r '.agent_name // .subagent_type // ""' 2>/dev/null | sed 's/.*://')
 	MISSING_SECTIONS=""
 	case "${AGENT_TYPE}" in
-	sisyphus-junior)
+	executor)
 		REQUIRED="STATUS: CHANGES: EVIDENCE:"
 		for section in ${REQUIRED}; do
 			if ! echo "${RESPONSE}" | grep -qiE "${section}"; then

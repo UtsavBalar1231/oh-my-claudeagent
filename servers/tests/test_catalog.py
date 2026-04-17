@@ -52,7 +52,7 @@ def test_agents_list_returns_known_agents(tools, monkeypatch, working_dir):
     # These agents are known to exist in the repo
     assert "atlas" in names
     assert "explore" in names
-    assert "sisyphus-junior" in names
+    assert "executor" in names
 
 
 def test_agents_list_returns_required_fields(tools, monkeypatch, working_dir):
