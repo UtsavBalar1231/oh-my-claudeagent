@@ -40,6 +40,42 @@ SEP = f" {DIM}\u00b7{RST} "
 # Git cache TTL in seconds -- kept for backward compatibility; sourced from config
 GIT_CACHE_TTL = config.cache_ttl
 
+# ---------------------------------------------------------------------------
+# Per-agent thematic glyphs (Nerd Fonts v3)
+# ---------------------------------------------------------------------------
+
+AGENT_GLYPHS_NERD: dict[str, str] = {
+    "atlas": "\uf0ac",  # nf-fa-globe — world-bearer
+    "explore": "\uf14e",  # nf-fa-compass — exploration
+    "hephaestus": "\uf0ad",  # nf-fa-wrench — smith
+    "librarian": "\uf02d",  # nf-fa-book — library
+    "metis": "\uf002",  # nf-fa-search — gap analysis
+    "momus": "\uf075",  # nf-fa-comment — critique
+    "multimodal-looker": "\uf030",  # nf-fa-camera — visual input
+    "oracle": "\uf06e",  # nf-fa-eye — foresight
+    "prometheus": "\uf06d",  # nf-fa-fire — stolen flame
+    "sisyphus": "\uef08",  # nf-fa-mountain — boulder-pushing myth
+    "sisyphus-junior": "\uf007",  # nf-fa-user — junior reuses default
+    "socrates": "\uf059",  # nf-fa-question_circle — Socratic method
+    "triage": "\uf007",  # nf-fa-user — lightweight, reuses default
+    "__default__": "\uf007",  # nf-fa-user — unknown-agent fallback
+}
+
+AGENT_GLYPH_ASCII: str = "A:"
+
+
+def agent_glyph(agent_name: str, nerd: bool) -> str:
+    """Return the thematic glyph for an agent, falling back cleanly.
+
+    Strips the `oh-my-claudeagent:` namespace prefix before lookup so
+    both bare names and namespaced names resolve identically.
+    Non-nerd terminals always receive AGENT_GLYPH_ASCII.
+    """
+    if not nerd:
+        return AGENT_GLYPH_ASCII
+    key = agent_name.removeprefix("oh-my-claudeagent:")
+    return AGENT_GLYPHS_NERD.get(key, AGENT_GLYPHS_NERD["__default__"])
+
 
 # ---------------------------------------------------------------------------
 # Nerd Font detection
@@ -69,7 +105,9 @@ def build_glyphs(nerd: bool) -> dict[str, str]:
             "added": "+",  # keep simple -- nerd plus glyphs are too wide for counts
             "removed": "-",
             "vim": "\ue7c5",  # nf-md-vim
-            "agent": "\uf544",  # nf-mdi-robot
+            "agent": AGENT_GLYPHS_NERD[
+                "__default__"
+            ],  # nf-fa-user (stable across Nerd Fonts v2 and v3)
             "worktree": "\ue728",  # nf-dev-git_merge
             "style": "\uf10c",  # nf-fa-circle_o
             "five_hour": "\uf251",  # nf-fa-hourglass_half
@@ -218,6 +256,7 @@ def _compose_line1(
     data: StatuslinePayload,
     glyphs: dict[str, str],
     git_info: GitInfo,
+    nerd: bool = True,
 ) -> tuple[str, bool]:
     """Compose info line (Line 1). Returns (line_str, has_extra_info)."""
     parts: list[str] = []
@@ -300,7 +339,7 @@ def _compose_line1(
         has_extra = True
         agent_name = data["agent"].get("name", "")
         if agent_name:
-            parts.append(f"{MAGENTA}{glyphs['agent']} {agent_name}{RST}")
+            parts.append(f"{MAGENTA}{agent_glyph(agent_name, nerd)} {agent_name}{RST}")
 
     # Worktree
     if worktree is not None:
@@ -507,7 +546,7 @@ def render(data: StatuslinePayload, git_info: GitInfo) -> str:
     usage = _extract_rate_limits(data)
 
     # Compose lines
-    line1, has_extra = _compose_line1(data, glyphs, git_info)
+    line1, has_extra = _compose_line1(data, glyphs, git_info, nerd)
     line2 = _compose_line2(data, glyphs)
 
     # Adaptive layout
