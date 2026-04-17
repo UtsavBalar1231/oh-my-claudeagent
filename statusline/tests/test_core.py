@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import pathlib
+from datetime import UTC
 from unittest.mock import patch
 
 import pytest
 
 from statusline.core import (
+    AGENT_GLYPH_ASCII,
+    AGENT_GLYPHS_NERD,
     DIM,
     GREEN,
     RED,
@@ -22,6 +26,7 @@ from statusline.core import (
     _render_bar,
     _render_context_bar,
     _threshold_color,
+    agent_glyph,
     build_glyphs,
     detect_nerd_font,
     render,
@@ -209,15 +214,15 @@ class TestFormatResetTime:
         assert _format_reset_time(None) == ""
 
     def test_unix_epoch_same_day(self) -> None:
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         # Use a fixed timestamp and mock now() to same day
-        fixed_ts = datetime(2026, 4, 11, 17, 0, 0, tzinfo=timezone.utc).timestamp()
-        now_dt = datetime(2026, 4, 11, 12, 0, 0, tzinfo=timezone.utc)
+        fixed_ts = datetime(2026, 4, 11, 17, 0, 0, tzinfo=UTC).timestamp()
+        now_dt = datetime(2026, 4, 11, 12, 0, 0, tzinfo=UTC)
 
         with patch("statusline.core.datetime") as mock_dt:
             mock_dt.fromtimestamp.return_value = datetime(
-                2026, 4, 11, 17, 0, 0, tzinfo=timezone.utc
+                2026, 4, 11, 17, 0, 0, tzinfo=UTC
             ).astimezone()
             mock_dt.fromisoformat.side_effect = datetime.fromisoformat
             mock_dt.now.return_value = now_dt.astimezone()
@@ -228,10 +233,10 @@ class TestFormatResetTime:
         assert any(c.isdigit() for c in result)
 
     def test_iso_string_input(self) -> None:
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         iso = "2026-04-11T17:00:00Z"
-        now_dt = datetime(2026, 4, 11, 12, 0, 0, tzinfo=timezone.utc)
+        now_dt = datetime(2026, 4, 11, 12, 0, 0, tzinfo=UTC)
 
         with patch("statusline.core.datetime") as mock_dt:
             local_result = datetime.fromisoformat(
@@ -247,16 +252,14 @@ class TestFormatResetTime:
         assert _format_reset_time(None) == ""
 
     def test_different_day_includes_day_prefix(self) -> None:
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         # Timestamp on a Thursday, "now" is Saturday
-        thursday_ts = datetime(2026, 4, 9, 17, 0, 0, tzinfo=timezone.utc).timestamp()
-        now_dt = datetime(2026, 4, 11, 12, 0, 0, tzinfo=timezone.utc)
+        thursday_ts = datetime(2026, 4, 9, 17, 0, 0, tzinfo=UTC).timestamp()
+        now_dt = datetime(2026, 4, 11, 12, 0, 0, tzinfo=UTC)
 
         with patch("statusline.core.datetime") as mock_dt:
-            local_thursday = datetime(
-                2026, 4, 9, 17, 0, 0, tzinfo=timezone.utc
-            ).astimezone()
+            local_thursday = datetime(2026, 4, 9, 17, 0, 0, tzinfo=UTC).astimezone()
             mock_dt.fromtimestamp.return_value = local_thursday
             mock_dt.fromisoformat.side_effect = datetime.fromisoformat
             mock_dt.now.return_value = now_dt.astimezone()
@@ -407,7 +410,7 @@ class TestComposeLine1:
             "output_style": {"name": "default"},
         }
         glyphs = self._glyphs()
-        line, has_extra = _compose_line1(data, glyphs, git_info_empty)
+        line, _has_extra = _compose_line1(data, glyphs, git_info_empty)
         assert "default" not in line
 
 
@@ -515,10 +518,10 @@ class TestComposeLine3:
         assert "80%" in result
 
     def test_resets_string_included_when_present(self) -> None:
-        from datetime import datetime, timezone
+        from datetime import datetime
 
-        ts = int(datetime(2026, 4, 11, 17, 0, 0, tzinfo=timezone.utc).timestamp())
-        now_dt = datetime(2026, 4, 11, 12, 0, 0, tzinfo=timezone.utc)
+        ts = int(datetime(2026, 4, 11, 17, 0, 0, tzinfo=UTC).timestamp())
+        now_dt = datetime(2026, 4, 11, 12, 0, 0, tzinfo=UTC)
 
         usage = {
             "five_hour_pct": 45.0,
@@ -527,9 +530,7 @@ class TestComposeLine3:
         }
 
         with patch("statusline.core.datetime") as mock_dt:
-            local_result = datetime(
-                2026, 4, 11, 17, 0, 0, tzinfo=timezone.utc
-            ).astimezone()
+            local_result = datetime(2026, 4, 11, 17, 0, 0, tzinfo=UTC).astimezone()
             mock_dt.fromtimestamp.return_value = local_result
             mock_dt.fromisoformat.side_effect = datetime.fromisoformat
             mock_dt.now.return_value = now_dt.astimezone()
@@ -750,3 +751,33 @@ class TestNewFieldsLine2:
         }
         line = _compose_line2(data, self._glyphs())
         assert "api" not in line
+
+
+# ---------------------------------------------------------------------------
+# agent_glyph
+# ---------------------------------------------------------------------------
+
+
+class TestAgentGlyph:
+    def test_agent_glyph_known_agent_sisyphus(self) -> None:
+        result = agent_glyph("oh-my-claudeagent:sisyphus", True)
+        assert result == AGENT_GLYPHS_NERD["sisyphus"]
+
+    def test_agent_glyph_unknown_agent(self) -> None:
+        result = agent_glyph("oh-my-claudeagent:nonexistent-agent-xyz", True)
+        assert result == AGENT_GLYPHS_NERD["__default__"]
+
+    def test_agent_glyph_ascii_fallback(self) -> None:
+        result = agent_glyph("oh-my-claudeagent:sisyphus", False)
+        assert result == "A:"
+        assert result == AGENT_GLYPH_ASCII
+
+    def test_agent_glyph_bare_name_works(self) -> None:
+        result = agent_glyph("sisyphus", True)
+        assert result == AGENT_GLYPHS_NERD["sisyphus"]
+
+    def test_agent_glyph_parity_with_agent_files(self) -> None:
+        agents_dir = pathlib.Path(__file__).parent.parent.parent / "agents"
+        stems = {p.stem for p in agents_dir.glob("*.md")}
+        missing = stems - set(AGENT_GLYPHS_NERD)
+        assert not missing, f"Agents missing from AGENT_GLYPHS_NERD: {missing}"
