@@ -20,6 +20,7 @@ from __future__ import annotations
 import contextlib
 import json
 import os
+import select
 import signal
 import socket
 import socketserver
@@ -175,24 +176,59 @@ def _remove_stale_socket(sock_path: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Daemonize
+# CLI commands
 # ---------------------------------------------------------------------------
 
 
-def _daemonize() -> None:
-    """Fork into background, detach from terminal."""
+def _cmd_start(foreground: bool = False) -> None:
+    """Start the daemon.
+
+    In daemon mode uses a self-pipe readiness handshake so the caller blocks
+    until the socket is bound (or times out after 2 s).  The grandchild writes
+    b'1' to the write end of the pipe after a successful socket bind + PID
+    write, or b'0' on failure.  The grandparent (original caller) waits on the
+    read end with select() and exits 0/1 accordingly.
+    """
+    sock_path = _socket_path()
+
+    # Handle stale socket on macOS
+    if sys.platform != "linux":
+        _remove_stale_socket(sock_path)
+
+    if foreground:
+        # Foreground mode: run server directly in this process.
+        _run_server(sock_path, foreground=True, write_fd=None)
+        return
+
+    # --- Self-pipe readiness handshake ---
+    read_fd, write_fd = os.pipe()
+
     pid = os.fork()
     if pid > 0:
-        # Parent exits
-        os._exit(0)
+        # ---- GRANDPARENT: wait for ready signal ----
+        os.close(write_fd)
+        ready, _, _ = select.select([read_fd], [], [], 2.0)
+        if not ready:
+            os.close(read_fd)
+            sys.stderr.write("cc-statusline-daemon: daemon failed to come up within 2s\n")
+            sys.stderr.flush()
+            # Try to kill the child if we can still find it
+            with contextlib.suppress(OSError):
+                os.kill(pid, signal.SIGTERM)
+            os._exit(1)
+        data = os.read(read_fd, 1)
+        os.close(read_fd)
+        os._exit(0 if data == b"1" else 1)
 
-    # Child becomes session leader
+    # ---- CHILD (middle parent) ----
+    os.close(read_fd)
+
+    # Second fork: detach from session so the grandchild is not a session leader
+    if os.fork() > 0:
+        os._exit(0)  # middle parent exits immediately
+
+    # ---- GRANDCHILD (actual daemon) ----
     os.setsid()
-
-    # Second fork to prevent zombie processes
-    pid = os.fork()
-    if pid > 0:
-        os._exit(0)
 
     # Redirect stdio to /dev/null
     devnull = os.open(os.devnull, os.O_RDWR)
@@ -202,29 +238,29 @@ def _daemonize() -> None:
     if devnull > 2:
         os.close(devnull)
 
-
-# ---------------------------------------------------------------------------
-# CLI commands
-# ---------------------------------------------------------------------------
+    _run_server(sock_path, foreground=False, write_fd=write_fd)
 
 
-def _cmd_start(foreground: bool = False) -> None:
-    """Start the daemon."""
-    sock_path = _socket_path()
+def _run_server(sock_path: str, *, foreground: bool, write_fd: int | None) -> None:
+    """Bind the socket, write PID, and enter serve_forever().
 
-    # Handle stale socket on macOS
-    if sys.platform != "linux":
-        _remove_stale_socket(sock_path)
+    write_fd: pipe write end used to signal readiness back to the grandparent.
+              None in foreground mode (no pipe).
+    """
 
-    if not foreground:
-        _daemonize()
+    def _signal_ready(success: bool) -> None:
+        """Write a ready byte to the grandparent and close the pipe end."""
+        if write_fd is None:
+            return
+        with contextlib.suppress(OSError):
+            os.write(write_fd, b"1" if success else b"0")
+        with contextlib.suppress(OSError):
+            os.close(write_fd)
 
-    # Set up signal handler for graceful shutdown
     server: StatuslineDaemon | None = None
 
     def _handle_sigterm(signum: int, frame: object) -> None:
         if server is not None:
-            # Run shutdown in a thread to avoid deadlock
             threading.Thread(target=server.shutdown, daemon=True).start()
 
     signal.signal(signal.SIGTERM, _handle_sigterm)
@@ -233,21 +269,33 @@ def _cmd_start(foreground: bool = False) -> None:
     try:
         server = StatuslineDaemon(sock_path, StatuslineHandler)
         _write_pid()
+        # Socket is bound and PID file written -- signal readiness BEFORE
+        # blocking in serve_forever so the grandparent can exit cleanly.
+        _signal_ready(True)
         server.serve_forever()
     except OSError as e:
-        if not foreground:
-            # Daemon mode -- can't print, just exit
+        _signal_ready(False)
+        if foreground:
+            print(f"Failed to start daemon: {e}", file=sys.stderr)
             sys.exit(1)
-        print(f"Failed to start daemon: {e}", file=sys.stderr)
-        sys.exit(1)
+        else:
+            os._exit(1)
     finally:
         if server is not None:
             server.server_close()
 
 
 def _cmd_stop() -> None:
-    """Stop a running daemon by sending SIGTERM."""
+    """Stop a running daemon by sending SIGTERM.
+
+    Before signalling, probes the Unix socket to verify the PID is not stale.
+    If the socket is unreachable the PID file is cleaned up and we return
+    without sending SIGTERM (avoids killing an unrelated process that inherited
+    the same PID after a daemon crash).
+    """
     pid_path = _pid_path()
+    sock_path = _socket_path()
+
     try:
         with open(pid_path) as f:
             pid = int(f.read().strip())
@@ -255,6 +303,18 @@ def _cmd_stop() -> None:
         print("Daemon is not running (no PID file)")
         return
 
+    # Probe the socket before signalling -- if unreachable the PID is stale.
+    probe = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        probe.settimeout(0.5)
+        probe.connect(sock_path)
+        probe.close()
+    except (ConnectionRefusedError, FileNotFoundError, OSError, TimeoutError):
+        _cleanup()
+        print("stopped (stale PID file cleaned)")
+        return
+
+    # Socket reachable -- real daemon is alive; send SIGTERM.
     try:
         os.kill(pid, signal.SIGTERM)
         print(f"Sent SIGTERM to daemon (PID {pid})")
@@ -266,8 +326,27 @@ def _cmd_stop() -> None:
 
 
 def _cmd_status() -> None:
-    """Check if daemon is running by attempting socket connect."""
+    """Check if daemon is running.
+
+    Reads the PID file first (fast path: if absent, report stopped immediately).
+    Then attempts a socket connect to confirm the process is actually listening.
+    If the PID file exists but the socket is dead, removes the stale PID file
+    and reports stopped.
+    """
+    pid_path = _pid_path()
     sock_path = _socket_path()
+
+    # Check PID file
+    try:
+        with open(pid_path) as f:
+            pid_str = f.read().strip()
+        if not pid_str:
+            raise ValueError("empty PID file")
+    except (OSError, ValueError):
+        print("stopped")
+        return
+
+    # PID file present -- verify socket is alive
     test_sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     try:
         test_sock.settimeout(0.5)
@@ -275,6 +354,9 @@ def _cmd_status() -> None:
         test_sock.close()
         print("running")
     except (ConnectionRefusedError, FileNotFoundError, OSError):
+        # Socket dead -- clean up stale PID file
+        with contextlib.suppress(OSError):
+            os.unlink(pid_path)
         print("stopped")
 
 

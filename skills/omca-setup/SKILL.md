@@ -338,9 +338,18 @@ Configure the Claude Code statusline to use the oh-my-claudeagent statusline pac
         > ~/.claude/settings.json
       ```
 
-   f. **For daemon mode only**: start the daemon:
+   f. **For daemon mode only**: start the daemon, then verify it came up:
       ```bash
       ~/.claude/statusline/.venv/bin/cc-statusline-daemon start
+      sleep 0.05
+      if ! ~/.claude/statusline/.venv/bin/cc-statusline-daemon status > /dev/null 2>&1; then
+          # retry once
+          ~/.claude/statusline/.venv/bin/cc-statusline-daemon start
+          sleep 0.1
+          if ! ~/.claude/statusline/.venv/bin/cc-statusline-daemon status > /dev/null 2>&1; then
+              echo "[omca-setup] warning: statusline daemon failed to start; client will use direct mode" >&2
+          fi
+      fi
       ```
 
    g. Report to user:
