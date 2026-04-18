@@ -86,3 +86,21 @@ CI runs all four layers on every push and pull request to `main`:
 | `lint-shell` | `shellcheck scripts/*.sh` | All pushes |
 
 Note: the `validate` job's MCP check (`--check mcp`) is excluded from CI because it requires the ast-grep CLI binary, which is not available in the standard CI runner. Run `just test-mcp` locally after changes to the MCP server.
+
+## Running Hooks Ad-hoc
+
+Hook scripts read and write state from `${CLAUDE_PROJECT_ROOT}/.omca/state/`. If `CLAUDE_PROJECT_ROOT` is unset it defaults to `$(pwd)`, so running a hook script directly (e.g. `bash scripts/keyword-detector.sh`) **without setting the variable first will mutate your real `.omca/state/` files** in the current working directory.
+
+### Preferred: use the scratch wrapper
+
+`scripts/bin/run-hook-in-scratch.sh` creates a temporary project root, sets `CLAUDE_PROJECT_ROOT` to it, pipes your JSON payload to the named hook script, and cleans up afterward:
+
+```bash
+echo '{"prompt":"ultrawork this"}' | scripts/bin/run-hook-in-scratch.sh keyword-detector.sh
+```
+
+Pass any hook script name (relative to `scripts/`) as the first argument. The wrapper accepts JSON on stdin and forwards all arguments after the script name to the hook.
+
+### Why BATS tests are already safe
+
+BATS tests isolate state automatically. `tests/bats/test_helper.bash` lines 13-22 set `CLAUDE_PROJECT_ROOT` to a per-test temp dir (`$BATS_TEST_TMPDIR/project`) and create the required subdirectories before each test. No real `.omca/state/` is ever touched during `just test-bats`.
