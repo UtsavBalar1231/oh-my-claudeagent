@@ -49,14 +49,15 @@ Override any agent's model: `Agent(subagent_type="oh-my-claudeagent:explore", mo
 **Delegation chain:** Depth 1 subagents cannot spawn further subagents — `Agent` tool stripped.
 
 ```
-main session
-  -> orchestrator (depth 0, via context:fork skill)
-       -> worker (depth 1, via Agent() — terminal)
+main session (sisyphus identity, depth 0, full Agent tool)
+  -> worker (depth 1, via Agent() — terminal)
 ```
 
-Orchestrators (atlas, sisyphus) MUST be invoked via their `context: fork` skills
-(`/oh-my-claudeagent:atlas`, `/oh-my-claudeagent:sisyphus-orchestrate`) — not via
-`Agent()`. Fork runs them at depth 0 with full tool access.
+The orchestrator (`sisyphus`) is the main-session identity injected via
+`templates/claudemd.md`. Plan-driven execution is triggered via
+`/oh-my-claudeagent:start-work` — a slash command that runs inline in the main session
+at depth 0 with full Agent-tool access (its body carries the Plan Execution Mode
+protocol). No `context: fork` skill intermediates between user and orchestrator.
 
 **Permission inheritance:** Plugin subagents inherit the parent session's permission mode,
 including auto mode. `permissionMode` in agent frontmatter is stripped by Claude Code for
@@ -196,30 +197,27 @@ Add to `.claude/settings.json` for automatic team-wide installation:
 
 ## Agent Reference
 
-### Orchestrators
+### Orchestrator
 
 | Agent | Model | Effort | Invoke | Purpose |
 |-------|-------|--------|--------|---------|
-| sisyphus | opus | high | `/oh-my-claudeagent:sisyphus-orchestrate` or "run sisyphus" | Master orchestrator — classifies requests, routes to specialists, never implements directly |
-| atlas | opus | high | `/oh-my-claudeagent:atlas` or "run atlas" | Todo-list executor — reads a plan, delegates tasks, verifies after each, runs Final Verification Wave |
+| sisyphus | opus | high | Main session (injected via `templates/claudemd.md`) or `/oh-my-claudeagent:start-work` (Plan Execution Mode) | Master orchestrator identity — classifies requests, delegates to specialists. Two modes: free-form (conversational) and plan-driven (via `/start-work` command body). Plan Execution Mode protocol lives in `commands/start-work.md`. |
 
-**sisyphus** — Classifies every request, routes to the right specialist. Runs explore
-agents in the background while continuing with non-overlapping work.
-
-**atlas** — Reads a plan with checkboxed tasks, delegates one task per executor
-call. After all tasks complete, runs a Final Verification Wave and waits for sign-off.
+**sisyphus** — The one orchestrator. Free-form mode: routes requests to specialists, runs explore agents in background. Plan Execution Mode: reads plan, delegates per-task to `executor`, runs Final Verification Wave (F1 via oracle, F2-F4 via executor), waits for sign-off.
 
 ### Planning and Review
 
 | Agent | Model | Effort | Invoke | Purpose |
 |-------|-------|--------|--------|---------|
-| prometheus | opus | high | `/oh-my-claudeagent:prometheus-plan` or "create plan" | Strategic planning with requirements interview |
+| prometheus | opus | high | `/oh-my-claudeagent:plan` or "create plan" | Strategic planning with requirements interview + optional Socratic Interview Mode |
 | metis | opus | high | `/oh-my-claudeagent:metis` or "run metis" | Pre-planning gap analysis |
 | momus | opus | high | `Agent(subagent_type="oh-my-claudeagent:momus")` | Rigorous plan review — OKAY or REJECT |
 | oracle | opus | max | `Agent(subagent_type="oh-my-claudeagent:oracle")` | Architecture advisor, read-only |
 
 **prometheus** — 9-item clearance checklist interview, consults metis, generates plan,
-submits to momus for review (up to 3 iterations).
+submits to momus for review (up to 3 iterations). Optional Socratic Interview Mode for
+ambiguous or architectural requests: iterative dialogue, synthesis stop-criterion, does NOT
+write to `.claude/plans/` (research output only).
 
 **metis** — Classifies intent, explores codebase, identifies hidden requirements and scope
 risks. Invoked automatically by prometheus.
@@ -235,14 +233,13 @@ steps max, effort estimates (Quick/Short/Medium/Large).
 |-------|-------|--------|--------|---------|
 | explore | sonnet | medium | `Agent(..., run_in_background=true)` | Codebase search — files, patterns, implementations |
 | librarian | sonnet | medium | `Agent(..., run_in_background=true)` | External docs, OSS examples, library research |
-| socrates | opus | high | `Agent(subagent_type="oh-my-claudeagent:socrates")` | Deep research interview with iterative dialogue |
 
 **explore** — Always run in background. Uses ast_search, Grep, Glob. Fire multiple in
 parallel for broad searches.
 
 **librarian** — Uses context7 for library docs, clones repos for source investigation.
 
-**socrates** — Iterative research and dialogue. Produces knowledge, not work plans.
+Socratic research interview is now part of `prometheus` (Socratic Interview Mode section).
 
 ### Execution
 
@@ -251,7 +248,6 @@ parallel for broad searches.
 | executor | sonnet | medium | `Agent(subagent_type="oh-my-claudeagent:executor")` | Focused task executor — implements directly, never delegates implementation |
 | hephaestus | sonnet | medium | `/oh-my-claudeagent:hephaestus` or "fix build" | Build and toolchain fixer — minimal-diff policy |
 | multimodal-looker | sonnet | medium | `Agent(subagent_type="oh-my-claudeagent:multimodal-looker")` | Image, PDF, diagram analysis (read-only) |
-| triage | haiku | low | `Agent(subagent_type="oh-my-claudeagent:triage")` | Lightweight request classifier — classifies only, never implements |
 
 **executor** — Implements one atomic task per delegation. Escalates to explore/librarian
 via recommendations in output text (cannot spawn subagents at depth 1). Requires fresh
@@ -283,17 +279,16 @@ Strictest completion guarantee.
 
 ### Planning Pipeline
 
-| Skill | Slash command | Keywords |
-|-------|--------------|----------|
-| prometheus-plan | `/oh-my-claudeagent:prometheus-plan` | "create plan" |
-| metis | `/oh-my-claudeagent:metis` | "run metis" |
-| atlas | `/oh-my-claudeagent:atlas` | "run atlas" |
-| start-work | `/oh-my-claudeagent:start-work` | (none) |
-| sisyphus-orchestrate | `/oh-my-claudeagent:sisyphus-orchestrate` | "run sisyphus" |
+| Entrypoint | Surface | Invocation | Keywords |
+|------------|---------|------------|----------|
+| plan | command | `/oh-my-claudeagent:plan` | "create plan" |
+| metis | skill | `/oh-my-claudeagent:metis` | "run metis" |
+| start-work | command | `/oh-my-claudeagent:start-work` | (none) |
 
 **start-work** — Finds the active plan (via boulder state, `.omca/plans/`, or
 `~/.claude/plans/`), sets up boulder state, optionally configures a git worktree,
-then forks atlas for execution.
+then enters Plan Execution Mode in the main session (sisyphus identity) at depth 0.
+The Plan Execution Mode protocol body lives in `commands/start-work.md`.
 
 ### Fixing and Development
 
@@ -353,13 +348,13 @@ agent per item in parallel. Zero-action policy: never merges, closes, or edits i
    -> After momus approval, prometheus asks: start implementation or run metis review?
 
 2. Run /oh-my-claudeagent:start-work (or prometheus starts it after user confirms)
-   -> Finds active plan, sets up boulder state, forks atlas
+   -> Finds active plan, sets up boulder state, enters Plan Execution Mode at depth 0
 
-3. Atlas executes:
+3. Main session (sisyphus identity) executes the Plan Execution Mode protocol:
    -> Delegates each task to executor
    -> Verifies with build/typecheck/tests after each
    -> Marks checkboxes in plan file
-   -> Final Verification Wave (oracle + review agents)
+   -> Final Verification Wave (F1 oracle + F2-F4 executor)
 
 4. Resume after interruption with /oh-my-claudeagent:start-work
    -> Boulder state resumes from last completed task
@@ -521,11 +516,9 @@ Keywords are the natural interaction model — type natural phrases in any promp
 | `ulw`, `ultrawork`, `run in parallel`, `simultaneously`, `as fast as possible` | ultrawork — parallel execution |
 | `handoff`, `context is getting long`, `start fresh session` | session handoff |
 | `stop continuation`, `pause automation`, `take manual control` | stop-continuation skill |
-| `run atlas`, `atlas execute` | atlas skill |
 | `run metis`, `metis analyze`, `pre-plan` | metis skill |
-| `run prometheus`, `create plan` | prometheus-plan skill |
+| `run prometheus`, `create plan` | `/oh-my-claudeagent:plan` command (prometheus planning) |
 | `fix build`, `build broken` | hephaestus skill |
-| `run sisyphus`, `orchestrate this` | sisyphus-orchestrate skill |
 | `setup omca` | omca-setup skill |
 
 ### @-Mention Syntax
@@ -566,13 +559,13 @@ error occurs during ralph, manually resume with `/oh-my-claudeagent:start-work`.
 **MCP tools not available:** Check `ast-grep`/`sg` and `uv` are installed. Run
 `/oh-my-claudeagent:omca-setup --check`. Run `/reload-plugins` to restart MCP servers.
 
-**Subagent nesting depth:** `/oh-my-claudeagent:start-work` and `/oh-my-claudeagent:atlas`
-run at depth 0 (main session) with full `Agent`-tool access; parallel fan-out, specialist
-delegation, and independent F1-F4 review via `oracle` / `executor` all work. These
-skills are the only valid orchestration entry points. Calling
-`Agent(subagent_type="oh-my-claudeagent:atlas", ...)` from any context spawns atlas at
-depth 1 where the `Agent` tool is stripped — atlas refuses cleanly in that state and
-returns an error pointing to the two skill paths. There is no degraded mode.
+**Subagent nesting depth:** `/oh-my-claudeagent:start-work` runs inline in the main
+session at depth 0 with full `Agent`-tool access. Parallel fan-out, specialist delegation,
+and independent F1-F4 review via `oracle` (F1) / `executor` (F2-F4) all work. The command
+body in `commands/start-work.md` is the authoritative Plan Execution Mode protocol. There
+is no degraded mode — orchestration only runs at depth 0 by design. The `atlas` agent was
+removed in v2.0; its plan-execution protocol migrated to the command body, its orchestrator
+role consolidated into `sisyphus` (the main-session identity).
 
 **Hook changes not taking effect:** Run `/reload-plugins`.
 
