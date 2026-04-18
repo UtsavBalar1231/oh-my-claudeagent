@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import time
 from typing import Literal
 
@@ -92,8 +93,9 @@ def register(mcp: FastMCP) -> None:
                 indent=2,
             )
 
-        total = content.count("- [ ]") + content.count("- [x]")
-        completed = content.count("- [x]")
+        matches = re.findall(r"^- \[([ x])\] \d+\.", content, re.MULTILINE)
+        total = len(matches)
+        completed = sum(1 for m in matches if m == "x")
         remaining = total - completed
 
         result = {

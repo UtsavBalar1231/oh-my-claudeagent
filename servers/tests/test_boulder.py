@@ -129,7 +129,7 @@ def test_boulder_progress_reads_plan_checkboxes(mcp_server, working_dir, tmp_pat
     """boulder_progress parses plan file checkboxes and returns task counts."""
     plan_file = tmp_path / "plan.md"
     plan_file.write_text(
-        "# My Plan\n\n- [x] Task one done\n- [ ] Task two pending\n- [ ] Task three pending\n"
+        "# My Plan\n\n- [x] 1. Task one done\n- [ ] 2. Task two pending\n- [ ] 3. Task three pending\n"
     )
 
     # Write boulder state pointing to the plan file
@@ -155,6 +155,85 @@ def test_boulder_progress_reads_plan_checkboxes(mcp_server, working_dir, tmp_pat
     assert data["remaining"] == 2
     assert data["is_complete"] is False
     assert data["plan_path"] == str(plan_file)
+
+
+def test_boulder_progress_ignores_final_checklist(mcp_server, working_dir, tmp_path):
+    """boulder_progress counts only numbered tasks; Final Checklist checkboxes are ignored."""
+    plan_file = tmp_path / "plan.md"
+    plan_file.write_text(
+        "# My Plan\n\n"
+        "## Tasks\n\n"
+        "- [x] 1. Task one done\n"
+        "- [ ] 2. Task two pending\n"
+        "- [ ] 3. Task three pending\n\n"
+        "### Final Checklist\n\n"
+        "- [x] Review docs\n"
+        "- [ ] Notify stakeholders\n"
+    )
+
+    call_tool(
+        mcp_server,
+        "boulder_write",
+        {
+            "active_plan": str(plan_file),
+            "plan_name": "checklist-plan",
+            "session_id": "sess-001",
+            "working_directory": working_dir,
+        },
+    )
+
+    result = call_tool(
+        mcp_server,
+        "boulder_progress",
+        {"working_directory": working_dir},
+    )
+    data = json.loads(result)
+    # Only the 3 numbered tasks count; the 2 Final Checklist items are ignored
+    assert data["total"] == 3
+    assert data["completed"] == 1
+    assert data["remaining"] == 2
+    # is_complete is False because numbered task 2 and 3 are still pending
+    assert data["is_complete"] is False
+
+
+def test_boulder_progress_complete_with_pending_final_checklist(
+    mcp_server, working_dir, tmp_path
+):
+    """boulder_progress reports is_complete=True when all numbered tasks are done, even with pending Final Checklist items."""
+    plan_file = tmp_path / "plan.md"
+    plan_file.write_text(
+        "# My Plan\n\n"
+        "## Tasks\n\n"
+        "- [x] 1. Task one done\n"
+        "- [x] 2. Task two done\n\n"
+        "### Final Checklist\n\n"
+        "- [ ] Review docs\n"
+        "- [ ] Notify stakeholders\n"
+    )
+
+    call_tool(
+        mcp_server,
+        "boulder_write",
+        {
+            "active_plan": str(plan_file),
+            "plan_name": "all-done-plan",
+            "session_id": "sess-001",
+            "working_directory": working_dir,
+        },
+    )
+
+    result = call_tool(
+        mcp_server,
+        "boulder_progress",
+        {"working_directory": working_dir},
+    )
+    data = json.loads(result)
+    # Both numbered tasks are complete; Final Checklist items don't count
+    assert data["total"] == 2
+    assert data["completed"] == 2
+    assert data["remaining"] == 0
+    # is_complete is True because all numbered tasks are done
+    assert data["is_complete"] is True
 
 
 # --- mode_read ---
