@@ -203,3 +203,71 @@ _write_marker() {
 	[ "$status" -eq 0 ]
 	[ "$output" = "{}" ]
 }
+
+# ---------------------------------------------------------------------------
+# (i) Sidecar write (.omca/notes/<basename>-completion.md) does not affect
+#     plan SHA or F1-F4 hook enforcement — hook must still exit 0 with '{}'
+# ---------------------------------------------------------------------------
+
+@test "final-verification: sidecar write does not affect plan SHA or hook enforcement" {
+	# Plan file with all numbered tasks checked off, no ### Final Checklist section
+	local plan_file="${BATS_TEST_TMPDIR}/sidecar-test-plan.md"
+	cat > "${plan_file}" <<'EOF'
+# Sidecar Test Plan
+
+## TODOs
+
+- [x] 1. First task
+- [x] 2. Second task
+- [x] 3. Third task
+- [x] 4. Fourth task
+EOF
+
+	# Compute plan SHA BEFORE writing any sidecar — this is what the hook will compute
+	local plan_sha
+	plan_sha=$(sha256sum "${plan_file}" | awk '{print $1}')
+
+	_write_boulder "${plan_file}"
+
+	# Write all 4 F-type evidence entries with matching plan SHA in output_snippet
+	local ts
+	ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+	local entries
+	entries=$(jq -n \
+		--arg ts "${ts}" \
+		--arg sha "${plan_sha}" \
+		'[
+			{"type":"final_verification_f1","command":"oracle: APPROVE","exit_code":0,"output_snippet":("plan_sha256:" + $sha + " verdict:APPROVE"),"timestamp":$ts},
+			{"type":"final_verification_f2","command":"oracle: APPROVE","exit_code":0,"output_snippet":("plan_sha256:" + $sha + " verdict:APPROVE"),"timestamp":$ts},
+			{"type":"final_verification_f3","command":"oracle: APPROVE","exit_code":0,"output_snippet":("plan_sha256:" + $sha + " verdict:APPROVE"),"timestamp":$ts},
+			{"type":"final_verification_f4","command":"oracle: APPROVE","exit_code":0,"output_snippet":("plan_sha256:" + $sha + " verdict:APPROVE"),"timestamp":$ts}
+		]')
+	write_state "verification-evidence.json" "{\"entries\":${entries}}"
+
+	# Write optional pending-final-verify marker (exercises Task 4c auto-clear path)
+	write_state "pending-final-verify.json" \
+		"{\"plan_path\":\"${plan_file}\",\"plan_sha256\":\"${plan_sha}\",\"marked_at\":${NOW},\"session_id\":\"bats-test-session\"}"
+
+	# Write sidecar AFTER evidence entries — at .omca/notes/<basename>-completion.md
+	# This file is intentionally OUTSIDE the plan file; its presence must NOT alter the plan SHA
+	local plan_basename
+	plan_basename=$(basename "${plan_file}" .md)
+	mkdir -p "${CLAUDE_PROJECT_ROOT}/.omca/notes"
+	cat > "${CLAUDE_PROJECT_ROOT}/.omca/notes/${plan_basename}-completion.md" <<EOF
+---
+plan: ${plan_file}
+plan_sha256: ${plan_sha}
+completed_at: ${ts}
+---
+
+Sidecar completion note written after evidence entries.
+EOF
+
+	# Run the hook — sidecar must not affect plan SHA; hook must exit 0 with '{}'
+	run_hook "final-verification-evidence.sh" '{}'
+	[ "$status" -eq 0 ]
+	[ "$output" = "{}" ]
+
+	# Auto-clear: pending-final-verify.json should have been removed by the hook
+	[ ! -f "${CLAUDE_PROJECT_ROOT}/.omca/state/pending-final-verify.json" ]
+}

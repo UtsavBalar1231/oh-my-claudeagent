@@ -273,14 +273,15 @@ Write to `.claude/plans/{name}.md` (no plan mode) or the active plan-mode file p
 command  # Expected: output
 ```
 
-### Final Checklist
-- [ ] All "Must Have" present
-- [ ] All "Must NOT Have" absent
-- [ ] All tests pass
+<!-- Plan has no completion checklist. After F1-F4 APPROVE, the start-work command writes a sidecar at .omca/notes/<plan>-completion.md. Plan file stays frozen. -->
 
 ```
 
-> **Note**: Atlas runs its own Final Verification Wave (F1-F4) after all tasks complete — do not include verification tasks in the plan.
+### Completion Signaling
+
+Do not include any completion-tracking section (Final Checklist, Done Items, Close-out, etc.) inside the plan body. Completion is signaled externally by F1-F4 APPROVE entries in `evidence_log` and by the post-verification sidecar written to `.omca/notes/<plan>-completion.md` by the start-work command (see `commands/start-work.md` Completion Sidecar section). The plan file is frozen at the final numbered-task flip; any post-flip edit to the plan would break the SHA binding required by `scripts/final-verification-evidence.sh`.
+
+> **Note**: The start-work command runs the Final Verification Wave (F1-F4) after all tasks complete and writes a completion sidecar. Do not include verification tasks or a completion checklist in the plan.
 
 ## QA Scenario Mandate (Every Task)
 

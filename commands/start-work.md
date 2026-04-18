@@ -320,6 +320,139 @@ refuses per the Mandatory MUST REFUSE Clause and the plan does not proceed."
 
 Never collapse to 1 pass. Two combined passes minimum.
 
+## Completion Sidecar
+
+<!-- SIDECAR_SPEC_V1 -->
+
+### Completion Sidecar Format Specification
+
+### Purpose
+
+The Completion Sidecar is a human-readable Markdown file written to `.omca/notes/` after all four F-type final-verification evidence entries (F1-F4) are confirmed APPROVE for a plan. It is a UX artifact that surfaces plan-completion state at a glance — it is NOT a gate. The authoritative completion signal is `evidence_log` F1-F4 APPROVE entries, not sidecar presence.
+
+---
+
+### Path Template
+
+```
+.omca/notes/<plan-basename>-completion.md
+```
+
+Where `<plan-basename>` is the filename stem of the plan file, without directory or extension.
+
+**Example:** Plan at `/home/utsav/.claude/plans/frozen-plan-discipline-fix.md` → sidecar at `.omca/notes/frozen-plan-discipline-fix-completion.md`.
+
+---
+
+### Required YAML Frontmatter
+
+The sidecar MUST open with a YAML frontmatter block containing exactly these five fields, in this order:
+
+```yaml
+---
+plan_path: <absolute path to the plan file>
+plan_sha256: <64-character lowercase hex SHA-256 of the frozen plan file>
+completed_at: <ISO-8601 UTC timestamp, e.g. 2026-04-18T14:32:00Z>
+session_id: <value of CLAUDE_SESSION_ID env var, or equivalent runtime identifier>
+verdicts:
+  f1: "APPROVE"
+  f2: "APPROVE"
+  f3: "APPROVE"
+  f4: "APPROVE"
+---
+```
+
+Field semantics:
+- `plan_path`: Absolute filesystem path to the plan file. Mirrors the `plan_path` field in `pending-final-verify.json`.
+- `plan_sha256`: The hex digest of the plan file as of the freeze moment (when the last `- [ ]` was flipped). Mirrors `plan_sha256` in `pending-final-verify.json`. Used for idempotency detection.
+- `completed_at`: ISO-8601 UTC timestamp of sidecar creation. Use `Z` suffix (not `+00:00`).
+- `session_id`: Session identifier from `CLAUDE_SESSION_ID` env var or equivalent. Mirrors `session_id` in `pending-final-verify.json`. Enables cross-session staleness detection.
+- `verdicts`: Object with exactly four keys (`f1`, `f2`, `f3`, `f4`), each set to the string `"APPROVE"`. A sidecar is only written when all four verdicts are APPROVE; partial-approval sidecars are not produced.
+
+No additional frontmatter fields are permitted.
+
+---
+
+### Required Body Sections
+
+The body (after the closing `---` of frontmatter) MUST contain these four sections, in this order:
+
+1. `## Summary` — 1-3 sentences describing what the plan accomplished and its outcome.
+2. `## Deliverables` — Bullet list of 3-5 concrete outputs (files changed, features added, bugs fixed, specs authored, etc.).
+3. `## Verification Evidence` — References the four F-type evidence entries by type and timestamp. Each line names the evidence type and when it was recorded.
+4. `## Handoff Notes` — Optional free-text notes for the next session or collaborator. May be a single sentence or empty (write `_None._` if nothing to add).
+
+---
+
+### Idempotency Contract
+
+- **Matching SHA:** If a sidecar already exists at the target path AND its `plan_sha256` frontmatter value matches the current frozen plan SHA → overwrite the file in place. This handles re-runs and agent retries safely.
+- **Mismatching SHA:** If a sidecar already exists AND its `plan_sha256` differs from the current frozen plan SHA → refuse to overwrite. Emit exactly one warning line to stderr: `WARN: sidecar SHA mismatch — existing sidecar is for a different plan revision; skipping write.` Then proceed without blocking.
+- **No existing sidecar:** Write unconditionally.
+
+---
+
+### Failure Semantics
+
+Sidecar-write failure (permission denied, disk full, path resolution error, MCP tool error) is **warn-and-proceed**, NOT a blocking error.
+
+The plan completion signal is the presence of four F-type evidence entries (F1-F4) with `verdict: APPROVE` in `verification-evidence.json`, scoped by `plan_sha256`. The sidecar is a human-readable UX surface only. Its absence never blocks task completion, CI, or any downstream hook.
+
+On write failure, emit one warning line: `WARN: sidecar write failed: <reason>; continuing.`
+
+---
+
+### Concrete Example Sidecar
+
+**Path:** `.omca/notes/frozen-plan-discipline-fix-completion.md`
+
+```markdown
+---
+plan_path: /home/utsav/.claude/plans/frozen-plan-discipline-fix.md
+plan_sha256: ad649112c6e13e3d7984a3b4ffed9c3551baf0edfdc3516dc3b573cd81b20a9d
+completed_at: 2026-04-18T14:32:00Z
+session_id: 1776502325-18122
+verdicts:
+  f1: "APPROVE"
+  f2: "APPROVE"
+  f3: "APPROVE"
+  f4: "APPROVE"
+---
+
+## Summary
+
+The frozen-plan-discipline-fix plan introduced a Completion Sidecar format, wired sidecar writes into `commands/start-work.md` and `scripts/final-verification-evidence.sh`, and validated the full pipeline end-to-end. All five tasks completed with F1-F4 evidence confirmed APPROVE.
+
+## Deliverables
+
+- Completion Sidecar format specification authored and persisted to notepad `decisions` section (Task 1).
+- `commands/start-work.md` updated with sidecar-write step after F1-F4 confirmation (Task 2).
+- `scripts/final-verification-evidence.sh` updated to call sidecar writer on 4-of-4 APPROVE (Task 3).
+- `scripts/write-completion-sidecar.sh` created implementing idempotency and failure semantics (Task 4).
+- End-to-end integration test confirming sidecar written, round-tripped, and SHA verified (Task 5).
+
+## Verification Evidence
+
+- F1 (plan compliance): recorded 2026-04-18T14:28:11Z — start-work.md changes match plan spec
+- F2 (code quality): recorded 2026-04-18T14:29:03Z — shellcheck clean on write-completion-sidecar.sh
+- F3 (manual QA): recorded 2026-04-18T14:30:44Z — sidecar file written and sentinel present
+- F4 (scope fidelity): recorded 2026-04-18T14:31:58Z — no out-of-scope files modified
+
+## Handoff Notes
+
+_None._
+```
+
+---
+
+### Sequencing
+
+After all 4 F-type APPROVE evidence entries are logged AND the user grants explicit "okay" → sisyphus writes the sidecar to `.omca/notes/<plan-basename>-completion.md` → then reports completion to the user.
+
+The sidecar replaces the former final-checklist pattern in plan files (the `Final Checklist` section that prometheus previously appended to generated plans).
+
+The plan file is read-only from marker-write through completion — the sidecar is the human-readable completion artifact.
+
 ## Evidence Logging Mandate
 
 Use `evidence_log` after EVERY verification command. The task-completion hook

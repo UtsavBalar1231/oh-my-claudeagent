@@ -63,7 +63,7 @@ test-pytest:
 # Run BATS behavioral tests for hook scripts
 [group('test')]
 test-bats:
-	tests/bats/bats-core/bin/bats tests/bats/hooks/
+	tests/bats/bats-core/bin/bats tests/bats/hooks/ tests/bats/unit/
 
 # ── Scaffold ──────────────────────────────────────────────────────
 

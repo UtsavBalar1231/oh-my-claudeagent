@@ -54,3 +54,29 @@ _mode_is_active() {
 	status=$(jq -r '.status // "inactive"' "${state_file}" 2>/dev/null || echo "")
 	[[ "${status}" == "active" ]]
 }
+
+# Compute the absolute path of the completion sidecar for a given plan file.
+# Usage: _compute_sidecar_path <plan_path>
+# Prints: $CLAUDE_PROJECT_ROOT/.omca/notes/<plan-basename-without-.md>-completion.md
+_compute_sidecar_path() {
+	local plan_path="$1"
+	local base
+	base=$(basename "${plan_path}" .md)
+	local root="${CLAUDE_PROJECT_ROOT:-$(pwd)}"
+	printf '%s/.omca/notes/%s-completion.md' "${root}" "${base}"
+}
+
+# Check whether it is safe to overwrite an existing sidecar file.
+# Returns 0 (safe) when: no existing file, no SHA field found, or SHA matches.
+# Returns 1 (refuse) when an existing SHA differs from current_sha.
+# Usage: _check_sidecar_idempotency <sidecar_path> <current_sha>
+_check_sidecar_idempotency() {
+	local sidecar_path="$1"
+	local current_sha="$2"
+	[[ -f "${sidecar_path}" ]] || return 0
+	local existing_sha
+	existing_sha=$(grep -E '^plan_sha256: *' "${sidecar_path}" | head -1 | awk '{print $2}' | tr -d '"' || echo "")
+	[[ -z "${existing_sha}" ]] && return 0
+	[[ "${existing_sha}" == "${current_sha}" ]] && return 0
+	return 1
+}
