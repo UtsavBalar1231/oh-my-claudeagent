@@ -214,7 +214,7 @@ Apply optional user-scope helper settings to `~/.claude/settings.json` with user
 4. Compute missing top-level: `teammateMode: "auto"`
 
 5. Compute missing env vars against the required set:
-   - `ANTHROPIC_DEFAULT_OPUS_MODEL`: `"claude-opus-4-6[1m]"` — routes opus-tier agents to extended-thinking model
+   - `ANTHROPIC_DEFAULT_OPUS_MODEL`: `"claude-opus-4-7[1m]"` — routes opus-tier agents to extended-thinking model
    - `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`: `"1"` — enables agent teams (required for `teammateMode: "auto"`)
 
 6. If all present: "Settings already configured" — skip
@@ -228,7 +228,7 @@ Apply optional user-scope helper settings to `~/.claude/settings.json` with user
    jq '. + {
      "teammateMode": "auto"
    } | .env += {
-     "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4-6[1m]",
+     "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4-7[1m]",
      "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
    } | .permissions.allow += [
      "Write(.omca/**)",
@@ -245,7 +245,7 @@ Apply optional user-scope helper settings to `~/.claude/settings.json` with user
 
 10. Explain each setting:
    - `teammateMode: "auto"` — enables agent teams with best available UI (tmux/iTerm2 split panes)
-   - `ANTHROPIC_DEFAULT_OPUS_MODEL` — routes opus-tier agents (oracle, prometheus, metis, atlas, sisyphus, momus) to `claude-opus-4-6[1m]` for extended thinking
+   - `ANTHROPIC_DEFAULT_OPUS_MODEL` — routes opus-tier agents (oracle, prometheus, metis, momus, sisyphus) to `claude-opus-4-7[1m]` for extended thinking
    - `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` — enables the experimental agent teams feature, required for `teammateMode: "auto"` to function
     - `Write(.omca/**)` / `Edit(.omca/**)` / `Read(.omca/**)` — auto-allow plugin state file access
     - `mcp__plugin_oh-my-claudeagent_omca__*` / `mcp__grep__*` / `mcp__context7__*` — auto-allow bundled MCP tool usage
@@ -531,7 +531,7 @@ echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | timeout 5 uv run --proje
 
 ### Check 6: Settings Validation
 - `teammateMode` is `"auto"` — PASS/WARN
-- `env.ANTHROPIC_DEFAULT_OPUS_MODEL` is `"claude-opus-4-6[1m]"` — PASS/WARN ("opus agents may use non-extended model")
+- `env.ANTHROPIC_DEFAULT_OPUS_MODEL` is `"claude-opus-4-7[1m]"` — PASS/WARN ("opus agents may use non-extended model")
 - `env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is `"1"` — PASS/WARN ("agent teams disabled — teammateMode won't function")
 - Plugin enabled in `enabledPlugins` — PASS/FAIL
 - Marketplace configured in `extraKnownMarketplaces` — PASS/FAIL
