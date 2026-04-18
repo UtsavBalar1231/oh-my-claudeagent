@@ -57,6 +57,16 @@ For GitHub Enterprise Server, use full git URLs in the source:
 /plugin marketplace update omca
 ```
 
+### Local cache rebuild
+
+Rebuild the locally-installed plugin cache from your dev tree:
+
+```bash
+bash scripts/package-plugin.sh ~/.claude/plugins/cache/omca/oh-my-claudeagent/$(jq -r .version .claude-plugin/plugin.json)/
+```
+
+Use `--dry-run` first to preview the file list. The script excludes dev artifacts (`.omca/`, `.mypy_cache/`, `UPGRADE.md`, `tests/`, etc.) that should not ship.
+
 ### Uninstall
 
 ```bash

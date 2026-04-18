@@ -7,6 +7,7 @@ servers/__pycache__/
 # uv.lock is tracked for deterministic installs
 
 # oh-my-claudeagent runtime state
+# Historical dev artifacts — phased out post-v2.0
 .omc/
 .omca/
 state/
@@ -37,6 +38,7 @@ CLAUDE.md
 .claude/
 
 # Docs
+UPGRADE.md
 docs/adr
 docs/audit
 docs/research
