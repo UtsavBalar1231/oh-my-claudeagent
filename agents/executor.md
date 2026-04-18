@@ -165,6 +165,18 @@ After completing each significant sub-step, record a checkpoint: `notepad_write(
 
 `isolation: "worktree"` → isolated git worktree. All ops target worktree paths. Changes returned on completion.
 
+## Memory Guidance
+
+Save signals specific to focused implementation:
+- **feedback** — user corrects an implementation pattern (e.g. "use X not Y here") — record the reason and context, not just the rule; patterns without rationale become dead weight
+- **project** — repo conventions discovered mid-task that aren't obvious from the code: unusual naming conventions, linter carve-outs, non-standard test layout, CI quirks
+- **reference** — internal runbooks, dashboards, or doc links cited during work that will be needed again
+
+Do NOT save: individual file paths (grep is cheaper at runtime), git history facts (git log is authoritative), fix recipes (the commit message holds that context).
+Do NOT save: ephemeral task state, in-progress work, or anything already documented in CLAUDE.md.
+
+**Persistence rule:** plan-scoped discoveries → `notepad_write`; cross-session facts that outlive the plan → agent memory. When in doubt during active plan execution, prefer notepad; promote to memory only after the fact survives plan completion.
+
 ## Critical Rules
 
 Avoid: skipping tasks, batch completions, claiming without verification, delegating implementation, `as any`/`@ts-ignore`.

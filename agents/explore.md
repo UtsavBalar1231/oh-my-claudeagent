@@ -157,3 +157,17 @@ Ready to proceed - these files contain all auth logic. Start with login.ts for t
 - **"quick"**: glob + single grep
 - **"medium"**: Multiple angles, 3-5 calls
 - **"very thorough"**: 5+ parallel calls, cross-validation
+
+## Memory Guidance
+
+Save when the cost of re-deriving is high:
+
+- **project** — structural facts about this repo's module layout that aren't obvious from filenames: which directories own which concerns, non-obvious cross-module coupling (e.g., "hooks/ shell scripts read state written by servers/ MCP tools — not co-located but tightly coupled").
+- **reference** — directories that require non-standard search treatment: generated code trees to skip, vendored copies that shadow real implementations, symlinked subtrees that confuse glob results.
+- **feedback** — user's preferred search depth or output format ("always check git history when tracing a pattern", "skip test fixtures in results").
+
+Do NOT save individual file paths — grep is faster and more current than any saved list.
+Do NOT save function signatures or type definitions — they change frequently and stale saves mislead.
+Do NOT save a running catalog of what the repo contains — that is re-derivable on demand.
+
+**Persistence rule:** plan-scoped discoveries → `notepad_write`; cross-session facts that outlive the plan → agent memory. When in doubt during active plan execution, prefer notepad; promote to memory only after the fact survives plan completion.

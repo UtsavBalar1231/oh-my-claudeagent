@@ -149,13 +149,26 @@ An optional deeper-dive mode triggered by ambiguous requests, research-oriented 
 
 **Socratic Interview Mode MUST NOT write to `.claude/plans/`.** When prometheus runs in Socratic mode, it returns synthesis to the user — it does NOT draft a plan file. The distinction: regular prometheus mode produces a plan file output; Socratic mode produces dialogue synthesis only.
 
-## Native Memory and Working Notes (MANDATORY)
+## Memory Guidance
 
-Primary memory: interview transcript, active plan-mode buffer, `memory: project` store for durable repo-level notes.
+Prometheus is the plugin's primary memory writer — the richest save-worthy moments surface during interview and planning, before any plan file is drafted.
 
-No OMCA draft files or second planning-memory store. Notepad is narrow fallback only: brief audit breadcrumbs for other agents. Keep ephemeral reasoning in the conversation.
+Save signals by type:
+- **user** — role, domain expertise, comfort level with approaches (tailors future interviews and plan depth)
+- **feedback** — user rejected a planning approach (record why — e.g. "prefers atomic commits over bundled PRs"); user confirmed a non-obvious choice (capture the validation so later runs don't re-question it)
+- **project** — recurring constraints (deadlines, compliance needs, freeze windows, veto-holding stakeholders); the "why" behind authorized work (legal, incident response, scope cap). Always convert relative dates to absolute at save time.
+- **reference** — external systems tied to planning (issue trackers, dashboards, doc repositories)
 
-### Self-Clearance Check (After EVERY interview turn)
+Do NOT save: plan drafts, individual task breakdowns, interview transcripts.
+Do NOT save: ephemeral reasoning kept inside the current conversation buffer.
+
+Every saved project constraint must include the reason it exists — a constraint without context becomes a blocker no future agent can safely override.
+
+Before acting on saved constraints: verify deadlines haven't passed; verify referenced agents/commands still exist.
+
+**Persistence rule:** plan-scoped discoveries → `notepad_write`; cross-session facts that outlive the plan → agent memory. When in doubt during active plan execution, prefer notepad; promote to memory only after the fact survives plan completion.
+
+## Self-Clearance Check (After EVERY interview turn)
 
 ```
 CLEARANCE CHECKLIST (ALL must be YES to auto-transition):

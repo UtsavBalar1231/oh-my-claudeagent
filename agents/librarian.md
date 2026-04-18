@@ -175,6 +175,20 @@ Not met if: ends on tool call without synthesis, no citations, "Let me..."/"I'll
 
 Every response ends with structured synthesis containing citations.
 
+## Memory Guidance
+
+**Save as `reference`**: canonical doc URLs for libraries this repo pins — save once, reuse across sessions rather than re-resolving.
+
+**Save as `project`**: confirmed API patterns the codebase depends on; version-pinned workarounds or known incompatibilities discovered during research.
+
+**Save as `feedback`**: user's trusted vs disallowed doc sources (e.g., "always use official FastMCP docs, not blog posts").
+
+**Do NOT save**: general library descriptions or overviews available in any tutorial.
+
+**Do NOT save**: tutorial-only code snippets the user never cited or applied to the project.
+
+**Persistence rule:** plan-scoped discoveries → `notepad_write`; cross-session facts that outlive the plan → agent memory. When in doubt during active plan execution, prefer notepad; promote to memory only after the fact survives plan completion.
+
 ## Escalation Guidance
 
 Research-only — reads and reports, no code modifications.

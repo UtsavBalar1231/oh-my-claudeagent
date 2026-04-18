@@ -126,6 +126,22 @@ Plan provides:
 - `mode_read` to check if reviewing active plan vs draft
 - `notepad_write(plan_name, "issues", "...")` for critical findings
 
+## Memory Guidance
+
+**Project signals** — recurring clarity issue patterns in this repo's plans:
+- Verification sections here often skip observability (no log assertion, no metrics check) — flag as ADVISORY when missing.
+- Plans referencing hook scripts frequently omit the stdin JSON shape — treat as a clarity issue requiring explicit schema or sample.
+
+**Feedback signals** — user rejection thresholds observed:
+- User accepts OKAY with ADVISORY notes when gaps are executor-resolvable; escalate to REJECT only when simulation reveals a hard blocker.
+- Demoting BLOCKING to ADVISORY to soften verdicts has been rejected — maintain tier discipline.
+- Review depth that surfaces a clarity issue early (before execution starts) is strongly preferred over post-execution corrections.
+
+**Do NOT save** per-plan individual OKAY/REJECT verdicts — these are ephemeral review outcomes, not durable patterns.
+**Do NOT save** generic review best-practices or checklist templates — those belong in the agent body, not memory.
+
+**Persistence rule:** plan-scoped discoveries → `notepad_write`; cross-session facts that outlive the plan → agent memory. When in doubt during active plan execution, prefer notepad; promote to memory only after the fact survives plan completion.
+
 ## Review Process
 
 ### Step 1: Read the Work Plan

@@ -337,6 +337,21 @@ Text response is the only thing the orchestrator receives. Tool call results not
 
 Not met if: ends on tool call without status, under 100 chars, "Let me..."/"I'll..." without report. Every phase ends with Status Report Format.
 
+## Memory Guidance
+
+Save memories that would change behavior in a future session. Three types matter here:
+
+**Feedback** — when the user rejects a delegation choice, corrects a parallel/sequential call, or pushes back on status report format. Record the rule, **Why:** the correction happened, and **How to apply:** when to apply it. The orchestration pattern for degraded-mode handling (`feedback_no_degraded_mode_fallbacks.md`) is the canonical example: it captures the design principle, not just the surface correction.
+
+**Project** — when an orchestration pattern in THIS repo diverges from the community default (e.g., a command that must run at depth 0, a specialist that must be invoked before a specific file type is committed). Record the fact, **Why:** the constraint exists, and **How to apply:** when it gates a delegation decision. See `project_orchestration_pattern_2026.md` for the shape.
+
+**Reference** — when the user cites an external system (Linear board, Slack channel, Grafana dashboard) to steer routing or triage decisions. Record the pointer and its purpose.
+
+Do NOT save per-task implementation details — those are executor territory, not orchestration memory.
+Do NOT save templated status boilerplate or commit message summaries — those are in git history.
+
+**Persistence rule:** plan-scoped discoveries → `notepad_write`; cross-session facts that outlive the plan → agent memory. When in doubt during active plan execution, prefer notepad; promote to memory only after the fact survives plan completion.
+
 ## Critical Rules
 
 Avoid:

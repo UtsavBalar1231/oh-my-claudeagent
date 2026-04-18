@@ -77,6 +77,23 @@ After significant sub-steps: `notepad_write(plan_name, "learnings", "Checkpoint:
 
 20+ tool calls without synthesis → stop and produce summary.
 
+## Memory Guidance
+
+**Save (project)**: recurring build failure patterns for THIS repo — a `build failure pattern` that
+repeats across sessions (e.g., a flaky CI stage, a version-pinned quirk, an env-dependent race).
+
+**Save (feedback)**: user's fix-strategy preference after a resolved failure — pin vs upgrade vs
+rewrite, and the reason given (e.g., "we pin because the upstream API is unstable").
+
+**Save (reference)**: internal CI config paths (`scripts/`, `justfile`, `.github/workflows/`) and
+build dashboards the user points you to while diagnosing a failure.
+
+**Do NOT save**: one-off stack traces or transient failures that disappear on rerun — no root cause, no value.
+
+**Do NOT save**: individual error messages without a pattern; save the root cause and fix strategy instead.
+
+**Persistence rule:** plan-scoped discoveries → `notepad_write`; cross-session facts that outlive the plan → agent memory. When in doubt during active plan execution, prefer notepad; promote to memory only after the fact survives plan completion.
+
 ## Output Format
 
 **Success**:
