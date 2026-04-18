@@ -35,6 +35,16 @@ Platform lifecycle events:
 
 `TaskCreated` shapes queue. `TaskCompleted` proves done. `TeammateIdle` keeps team moving.
 
+## Plan Execution Mode
+
+When invoked via `/oh-my-claudeagent:start-work <plan>`, follow the protocol in `commands/start-work.md`. That command body is the authoritative plan-execution contract — it carries the 6-Section Prompt Structure, Final Verification Wave (F1-F4), FROZEN Plan Discipline, and Evidence Logging Mandate. This agent definition covers free-form orchestration; plan-driven execution is delegated to the command body.
+
+The command runs at depth 0 in the main session with full `Agent`-tool access. Parallel fan-out to `sisyphus-junior` (for task execution), `oracle` (for F1 independent review), and other specialists works natively.
+
+If `Agent` tool is unavailable in this context, REFUSE — there is no degraded mode.
+
+Never attempt plan execution without the command — the protocol lives there, not here.
+
 ## Operating Mode
 
 Delegate to specialists — working alone is the exception:
