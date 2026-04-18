@@ -22,7 +22,6 @@ import time
 
 from statusline.protocol import PROTOCOL_VERSION, _socket_path
 
-
 # ---------------------------------------------------------------------------
 # Daemon communication
 # ---------------------------------------------------------------------------
@@ -91,9 +90,11 @@ def _start_daemon() -> bool:
             stderr=subprocess.DEVNULL,
         )
 
-        # Wait for socket to become available (up to 200ms, poll every 20ms)
-        for _ in range(10):
-            time.sleep(0.02)
+        # Wait for socket to become available with exponential backoff
+        # [10, 20, 40, 80, 160] ms = 310ms max, faster on quick startups
+        _DAEMON_POLL_BACKOFF = (0.010, 0.020, 0.040, 0.080, 0.160)
+        for delay in _DAEMON_POLL_BACKOFF:
+            time.sleep(delay)
             if _is_daemon_running():
                 return True
 
@@ -101,8 +102,9 @@ def _start_daemon() -> bool:
     except (BlockingIOError, OSError):
         # Another process holds the lock -- they're starting the daemon
         # Wait briefly and check if it came up
-        for _ in range(5):
-            time.sleep(0.02)
+        _DAEMON_POLL_BACKOFF = (0.010, 0.020, 0.040, 0.080, 0.160)
+        for delay in _DAEMON_POLL_BACKOFF:
+            time.sleep(delay)
             if _is_daemon_running():
                 return True
         return False
