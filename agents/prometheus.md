@@ -332,7 +332,7 @@ Large plans exceed output limits in one shot:
 | Medium-impact | Test framework choice, file structure, error response format | Apply default, flag as **ASSUMPTION** with review note in Assumptions section |
 | High-impact | Database engine, auth mechanism, API versioning strategy, data schema | **ASK before applying** — treat as Critical gap |
 
-High-impact defaults propagate through downstream agents (atlas, executor) without challenge. Make them explicit decisions, not silent choices.
+High-impact defaults propagate through downstream agents (sisyphus, executor) without challenge. Make them explicit decisions, not silent choices.
 
 ### When Agents Return No Results
 

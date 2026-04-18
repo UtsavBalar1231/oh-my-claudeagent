@@ -21,7 +21,7 @@ case "${AGENT_TYPE}" in
 *explore* | *librarian* | *hephaestus* | *executor* | *multimodal* | *oracle* | *momus*)
 	CONTEXT_PARTS+="AskUserQuestion is not available here. Make autonomous decisions when possible; if you need user input, emit a '## BLOCKING QUESTIONS' block at the end of your final response (Q1., Q2., lettered options A/B/C, Recommended: line) and return. The orchestrator will relay."
 	;;
-*prometheus* | *metis* | *socrates* | *sisyphus* | *atlas*)
+*prometheus* | *metis* | *sisyphus*)
 	CONTEXT_PARTS+="AskUserQuestion is not available here. When you need user input, emit a '## BLOCKING QUESTIONS' block at the end of your final response (Q1., Q2., lettered options A/B/C, Recommended: line) and return. The orchestrator will relay and resume you with the answers."
 	;;
 *)
@@ -71,7 +71,7 @@ fi
 # Inject evidence_log guidance for execution agents
 EXEC_GUIDANCE_HEADER_ADDED=0
 case "${AGENT_TYPE}" in
-*executor* | *hephaestus* | *atlas* | *sisyphus*)
+*executor* | *hephaestus* | *sisyphus*)
 	if [[ "${EXEC_GUIDANCE_HEADER_ADDED}" -eq 0 ]]; then
 		CONTEXT_PARTS+="$(_section_header 'Execution Guidance')"
 		EXEC_GUIDANCE_HEADER_ADDED=1
@@ -83,7 +83,7 @@ esac
 
 # Inject anti-duplication rule for orchestrator agents
 case "${AGENT_TYPE}" in
-*sisyphus* | *atlas* | *metis* | *prometheus*)
+*sisyphus* | *metis* | *prometheus*)
 	if [[ "${EXEC_GUIDANCE_HEADER_ADDED}" -eq 0 ]]; then
 		CONTEXT_PARTS+="$(_section_header 'Execution Guidance')"
 		EXEC_GUIDANCE_HEADER_ADDED=1
@@ -94,7 +94,7 @@ case "${AGENT_TYPE}" in
 esac
 
 case "${AGENT_TYPE}" in
-*sisyphus* | *atlas* | *prometheus*)
+*sisyphus* | *prometheus*)
 	if [[ "${EXEC_GUIDANCE_HEADER_ADDED}" -eq 0 ]]; then
 		CONTEXT_PARTS+="$(_section_header 'Execution Guidance')"
 		EXEC_GUIDANCE_HEADER_ADDED=1
@@ -163,7 +163,7 @@ fi
 
 # --- Catalog injection for orchestrators ---
 case "${AGENT_TYPE}" in
-*sisyphus* | *atlas*)
+*sisyphus*)
 	if [[ -f "${CATALOG_FILE}" ]]; then
 		DELEGATION_TABLE=$(jq -r '
 				sort_by(.cost_tier) |

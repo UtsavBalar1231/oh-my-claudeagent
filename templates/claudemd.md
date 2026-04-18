@@ -85,19 +85,16 @@ Cloud alternative: `/ultraplan` — Claude Code web planning research preview. O
 <agent_catalog>
 | Agent             | Model  | Use when                                                |
 |-------------------|--------|---------------------------------------------------------|
-| sisyphus          | opus   | Master orchestration across complex multi-agent flows  |
-| atlas             | opus   | Executing an approved plan; delegates and verifies     |
-| prometheus        | opus   | Interviewing the user and producing a structured plan  |
+| sisyphus          | opus   | Orchestration — free-form and plan execution (via `/start-work` command) |
+| prometheus        | opus   | Interviewing the user, Socratic deep-dive, producing structured plans  |
 | metis             | opus   | Pre-execution gap analysis on a draft plan             |
 | momus             | opus   | Critical review of a draft plan for clarity and risk   |
-| executor   | sonnet | Focused implementation of a known, scoped task         |
+| executor          | sonnet | Focused implementation of a known, scoped task         |
 | explore           | sonnet | Finding code and patterns inside the local repo        |
 | librarian         | sonnet | External docs, library usage, OSS examples, research   |
 | oracle            | opus   | Architecture, tradeoffs, stuck debugging, craft review |
 | hephaestus        | sonnet | Build failures, type errors, toolchain/dep fixes       |
 | multimodal-looker | sonnet | Screenshots, PDFs, diagrams, visual inputs             |
-| socrates          | opus   | Deep Socratic interview on an underspecified problem   |
-| triage            | haiku  | Cheap routing help when the right specialist is unclear |
 </agent_catalog>
 
 <workflow>

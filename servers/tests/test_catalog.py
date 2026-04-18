@@ -50,7 +50,7 @@ def test_agents_list_returns_known_agents(tools, monkeypatch, working_dir):
     assert len(data) > 0
     names = [entry["name"] for entry in data]
     # These agents are known to exist in the repo
-    assert "atlas" in names
+    assert "sisyphus" in names
     assert "explore" in names
     assert "executor" in names
 

@@ -90,18 +90,6 @@ load '../test_helper'
 }
 
 # ---------------------------------------------------------------------------
-# Atlas detection
-# ---------------------------------------------------------------------------
-
-@test "atlas: detects 'run atlas'" {
-	local payload='{"prompt":"run atlas"}'
-	run_hook "keyword-detector.sh" "$payload"
-	assert_success
-	ctx=$(get_context)
-	assert echo "$ctx" | grep -q "ATLAS DETECTED"
-}
-
-# ---------------------------------------------------------------------------
 # Stop-continuation detection
 # ---------------------------------------------------------------------------
 

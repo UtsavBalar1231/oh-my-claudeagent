@@ -57,11 +57,6 @@ if [[ "${PROMPT_LOWER}" =~ (setup[[:space:]]+omca|omca[[:space:]]+setup) ]]; the
 	ADDITIONAL_CONTEXT+="[OMCA-SETUP DETECTED] Run /oh-my-claudeagent:omca-setup to configure the environment."$'\n'
 fi
 
-if [[ "${PROMPT_LOWER}" =~ (run[[:space:]]+atlas|atlas[[:space:]]+execute|atlas[[:space:]]+plan) ]]; then
-	DETECTED_KEYWORDS+=("atlas")
-	ADDITIONAL_CONTEXT+="[ATLAS DETECTED] Invoke /oh-my-claudeagent:atlas to execute work plans via the Atlas orchestrator."$'\n'
-fi
-
 if [[ "${PROMPT_LOWER}" =~ (run[[:space:]]+metis|metis[[:space:]]+analyze|pre-plan) ]]; then
 	DETECTED_KEYWORDS+=("metis")
 	ADDITIONAL_CONTEXT+="[METIS DETECTED] Invoke /oh-my-claudeagent:metis for pre-planning analysis."$'\n'

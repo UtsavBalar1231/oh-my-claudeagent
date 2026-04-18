@@ -4,7 +4,6 @@ load '../test_helper'
 # Base payloads
 EXPLORE_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id":"agent-abc123","agent_type":"oh-my-claudeagent:explore"}'
 SISYPHUS_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id":"agent-abc123","agent_type":"oh-my-claudeagent:sisyphus"}'
-ATLAS_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id":"agent-abc123","agent_type":"oh-my-claudeagent:atlas"}'
 PROMETHEUS_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id":"agent-abc123","agent_type":"oh-my-claudeagent:prometheus"}'
 UNKNOWN_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id":"agent-abc123","agent_type":"custom-agent"}'
 
@@ -104,8 +103,8 @@ UNKNOWN_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_i
 
 # ─── i. Agent catalog for orchestrators ──────────────────────────────────────
 
-@test "agent catalog stale: atlas agent without catalog.json gets CATALOG STALE notice" {
-	run_hook "subagent-start.sh" "$ATLAS_PAYLOAD"
+@test "agent catalog stale: sisyphus agent without catalog.json gets CATALOG STALE notice" {
+	run_hook "subagent-start.sh" "$SISYPHUS_PAYLOAD"
 	assert_success
 	local ctx
 	ctx=$(get_context)
@@ -113,12 +112,12 @@ UNKNOWN_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_i
 	echo "$ctx" | grep -q "CATALOG STALE"
 }
 
-@test "agent catalog: atlas agent with catalog.json gets dynamic delegation table" {
+@test "agent catalog: sisyphus agent with catalog.json gets dynamic delegation table" {
 	# Write a minimal agent-catalog.json
 	write_state "agent-catalog.json" \
 		'[{"name":"explore","cost_tier":"haiku","when_to_use":"codebase search and discovery","default_model":"haiku"}]'
 
-	run_hook "subagent-start.sh" "$ATLAS_PAYLOAD"
+	run_hook "subagent-start.sh" "$SISYPHUS_PAYLOAD"
 	assert_success
 	local ctx
 	ctx=$(get_context)

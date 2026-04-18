@@ -45,7 +45,6 @@ GIT_CACHE_TTL = config.cache_ttl
 # ---------------------------------------------------------------------------
 
 AGENT_GLYPHS_NERD: dict[str, str] = {
-    "atlas": "\uf0ac",  # nf-fa-globe — world-bearer
     "explore": "\uf14e",  # nf-fa-compass — exploration
     "hephaestus": "\uf0ad",  # nf-fa-wrench — smith
     "librarian": "\uf02d",  # nf-fa-book — library
@@ -56,8 +55,6 @@ AGENT_GLYPHS_NERD: dict[str, str] = {
     "prometheus": "\uf06d",  # nf-fa-fire — stolen flame
     "sisyphus": "\uef08",  # nf-fa-mountain — boulder-pushing myth
     "executor": "\uf085",  # nf-fa-cogs — the doer, distinct from hephaestus's wrench
-    "socrates": "\uf059",  # nf-fa-question_circle — Socratic method
-    "triage": "\uf007",  # nf-fa-user — lightweight, reuses default
     "__default__": "\uf007",  # nf-fa-user — unknown-agent fallback
 }
 

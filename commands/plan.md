@@ -32,4 +32,4 @@ Delegate exploration to `explore` agents (parallel when topics are independent).
 
 ## Socratic Interview Mode
 
-If the request is underspecified or architectural in nature, invoke `socrates` for a deep Socratic interview before entering Phase 1. Socrates surfaces hidden constraints and clarifies fuzzy problem statements that prometheus would otherwise anchor on prematurely.
+If the request is underspecified or architectural in nature, enter Socratic Interview Mode (now part of prometheus — see `agents/prometheus.md` "Socratic Interview Mode" section) before entering Phase 1. Socratic mode surfaces hidden constraints and clarifies fuzzy problem statements via iterative dialogue. In Socratic mode, prometheus does NOT write to `.claude/plans/` — it returns synthesis only.

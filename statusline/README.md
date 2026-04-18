@@ -289,23 +289,21 @@ CLAUDE_STATUSLINE_NERD_FONT=0 echo '...' | cc-statusline
 
 When Nerd Font glyphs are enabled, the statusline displays a thematic icon next to the active
 agent name. The icon is looked up by agent name after stripping the `oh-my-claudeagent:`
-namespace prefix (e.g. `oh-my-claudeagent:atlas` resolves to `atlas`). Any agent name not in
-the table below falls back to `nf-fa-user`.
+namespace prefix (e.g. `oh-my-claudeagent:sisyphus` resolves to `sisyphus`). Any agent name
+not in the table below falls back to `nf-fa-user`.
 
 | Agent | Glyph | Theme |
 |-------|-------|-------|
-| atlas | nf-fa-globe | world-bearer |
-| explore | nf-fa-compass | exploration |
-| hephaestus | nf-fa-wrench | smith |
-| librarian | nf-fa-book | library |
+| sisyphus | nf-fa-mountain | boulder-pushing myth |
+| prometheus | nf-fa-fire | stolen flame |
 | metis | nf-fa-search | gap analysis |
 | momus | nf-fa-comment | critique |
-| multimodal-looker | nf-fa-camera | visual input |
 | oracle | nf-fa-eye | foresight |
-| prometheus | nf-fa-fire | stolen flame |
-| sisyphus | nf-fa-mountain | boulder-pushing myth |
-| socrates | nf-fa-question_circle | Socratic method |
-| executor, triage | nf-fa-user | default agent icon |
+| executor | nf-fa-cogs | the doer |
+| explore | nf-fa-compass | exploration |
+| librarian | nf-fa-book | library |
+| hephaestus | nf-fa-wrench | smith |
+| multimodal-looker | nf-fa-camera | visual input |
 
 ---
 

@@ -144,7 +144,7 @@ MISSING=""
 if [[ -n "${MISSING}" ]]; then
 	# Trim leading space
 	MISSING="${MISSING# }"
-	echo "[FINAL VERIFICATION] Plan complete but F1-F4 evidence missing: ${MISSING}. Run the Final Verification Wave per agents/atlas.md and call evidence_log(evidence_type=\"<type>\", command=\"oracle: APPROVE\", exit_code=0, output_snippet=\"plan_sha256:<sha> verdict:APPROVE\") for each." >&2
+	echo "[FINAL VERIFICATION] Plan complete but F1-F4 evidence missing: ${MISSING}. Run the Final Verification Wave per agents/sisyphus.md or commands/start-work.md and call evidence_log(evidence_type=\"<type>\", command=\"oracle: APPROVE\", exit_code=0, output_snippet=\"plan_sha256:<sha> verdict:APPROVE\") for each." >&2
 	exit 2
 fi
 

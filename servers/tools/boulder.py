@@ -27,7 +27,7 @@ def register(mcp: FastMCP) -> None:
         active_plan: str = Field(description="Absolute path to the plan file"),
         plan_name: str = Field(description="Short name for the plan"),
         session_id: str = Field(description="Current session ID"),
-        agent: str = Field(default="atlas", description="Agent managing this plan"),
+        agent: str = Field(default="sisyphus", description="Agent managing this plan"),
         worktree_path: str = Field(
             default="", description="Git worktree path if using worktrees"
         ),
