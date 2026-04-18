@@ -3,7 +3,17 @@ name: multimodal-looker
 description: Multimodal analyst for images, PDFs, and diagrams. Use when you need interpreted/extracted data from visual content rather than raw file contents. Analyzes screenshots, UI mockups, architecture diagrams, and document pages.
 model: sonnet
 effort: medium
-tools: Read
+disallowedTools:
+  - Agent
+  - Bash
+  - Edit
+  - Write
+  - Glob
+  - Grep
+  - NotebookEdit
+  - Skill
+  - ToolSearch
+  - TodoWrite
 ---
 <!-- OMCA Metadata
 Cost: cheap | Category: readonly | Escalation: oracle, executor
