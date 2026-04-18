@@ -5,6 +5,7 @@ model: opus
 effort: high
 disallowedTools:
   - Bash
+  - Agent
 memory: project
 ---
 <!-- OMCA Metadata
