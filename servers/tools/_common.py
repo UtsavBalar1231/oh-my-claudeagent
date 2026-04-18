@@ -11,6 +11,7 @@ BOULDER_FILE = "boulder.json"
 EVIDENCE_FILE = "verification-evidence.json"
 RALPH_STATE_FILE = "ralph-state.json"
 ULTRAWORK_STATE_FILE = "ultrawork-state.json"
+PENDING_FINAL_VERIFY_FILE = "pending-final-verify.json"
 NOTEPADS_DIR = "notepads"
 VALID_SECTIONS = ("learnings", "issues", "decisions", "problems")
 AGENT_CATALOG_FILE = "agent-catalog.json"

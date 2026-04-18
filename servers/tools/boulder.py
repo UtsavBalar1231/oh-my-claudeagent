@@ -11,6 +11,7 @@ from pydantic import Field
 from tools._common import (
     BOULDER_FILE,
     EVIDENCE_FILE,
+    PENDING_FINAL_VERIFY_FILE,
     RALPH_STATE_FILE,
     ULTRAWORK_STATE_FILE,
     _read_json,
@@ -155,7 +156,9 @@ def register(mcp: FastMCP) -> None:
 
     @mcp.tool(annotations={"destructiveHint": True})
     def mode_clear(
-        mode: Literal["ralph", "ultrawork", "boulder", "evidence", "all"] = Field(
+        mode: Literal[
+            "ralph", "ultrawork", "boulder", "evidence", "final_verify", "all"
+        ] = Field(
             default="all",
             description=(
                 "Which state to clear: "
@@ -163,14 +166,15 @@ def register(mcp: FastMCP) -> None:
                 "'ultrawork' (ultrawork-state.json), "
                 "'boulder' (boulder.json), "
                 "'evidence' (verification-evidence.json), "
-                "'all' (ralph + ultrawork + boulder, NOT evidence)"
+                "'final_verify' (pending-final-verify.json), "
+                "'all' (ralph + ultrawork + boulder + final_verify, NOT evidence)"
             ),
         ),
         working_directory: str = Field(
             default="", description="Project root (auto-detected from git)"
         ),
     ) -> str:
-        """Clear active mode state files. Use when ending a work session, cancelling ralph/ultrawork persistence, or resetting plan state. 'all' clears ralph + ultrawork + boulder but NOT evidence (evidence is permanent audit trail). Returns summary of cleared and skipped state files."""
+        """Clear active mode state files. Use when ending a work session, cancelling ralph/ultrawork persistence, or resetting plan state. 'all' clears ralph + ultrawork + boulder + final_verify but NOT evidence (evidence is permanent audit trail). Returns summary of cleared and skipped state files."""
         state = _state_dir(working_directory)
 
         targets: list[tuple[str, str]] = []
@@ -182,11 +186,14 @@ def register(mcp: FastMCP) -> None:
             targets = [("boulder", BOULDER_FILE)]
         elif mode == "evidence":
             targets = [("evidence", EVIDENCE_FILE)]
+        elif mode == "final_verify":
+            targets = [("final_verify", PENDING_FINAL_VERIFY_FILE)]
         else:  # all
             targets = [
                 ("ralph", RALPH_STATE_FILE),
                 ("ultrawork", ULTRAWORK_STATE_FILE),
                 ("boulder", BOULDER_FILE),
+                ("final_verify", PENDING_FINAL_VERIFY_FILE),
             ]
 
         cleared: list[str] = []

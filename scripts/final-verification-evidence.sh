@@ -182,4 +182,9 @@ if [[ "${SHA_COUNT}" -gt 1 ]]; then
 	exit 2
 fi
 
+# Auto-clear pending-final-verify marker on plan closure
+if [[ -f "${MARKER_FILE}" ]] && [[ -n "${CURRENT_SHA}" ]] && [[ "${SHA_COUNT}" -le 1 ]]; then
+	rm -f "${MARKER_FILE}"
+fi
+
 _noop_exit
