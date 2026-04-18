@@ -63,18 +63,13 @@ if [[ "${PROMPT_LOWER}" =~ (run[[:space:]]+metis|metis[[:space:]]+analyze|pre-pl
 fi
 
 if [[ "${PROMPT_LOWER}" =~ (run[[:space:]]+prometheus|prometheus[[:space:]]+plan|create[[:space:]]+plan) ]]; then
-	DETECTED_KEYWORDS+=("prometheus-plan")
-	ADDITIONAL_CONTEXT+="[PROMETHEUS DETECTED] Invoke /oh-my-claudeagent:prometheus-plan for strategic planning."$'\n'
+	DETECTED_KEYWORDS+=("plan")
+	ADDITIONAL_CONTEXT+="[PROMETHEUS DETECTED] Invoke /oh-my-claudeagent:plan for strategic planning via prometheus."$'\n'
 fi
 
 if [[ "${PROMPT_LOWER}" =~ (run[[:space:]]+hephaestus|hephaestus[[:space:]]+fix|fix[[:space:]]+build|build[[:space:]]+broken) ]]; then
 	DETECTED_KEYWORDS+=("hephaestus")
 	ADDITIONAL_CONTEXT+="[HEPHAESTUS DETECTED] Invoke /oh-my-claudeagent:hephaestus to fix build failures."$'\n'
-fi
-
-if [[ "${PROMPT_LOWER}" =~ (run[[:space:]]+sisyphus|sisyphus[[:space:]]+orchestrate|orchestrate[[:space:]]+this) ]]; then
-	DETECTED_KEYWORDS+=("sisyphus-orchestrate")
-	ADDITIONAL_CONTEXT+="[SISYPHUS DETECTED] Invoke /oh-my-claudeagent:sisyphus-orchestrate for master orchestration."$'\n'
 fi
 
 # Conflict guard: ralph and ultrawork are mutually exclusive persistence modes.

@@ -42,20 +42,19 @@ Classify request. Route to **narrowest** specialist — `executor` before
 | Exploratory — "how does X work?", "find Y in the repo"       | `explore` (fire multiple in parallel)       |
 | External library / SDK / API / OSS example research          | `librarian`                                 |
 | Focused implementation — known task, ≤ small handful of files | `executor`                           |
-| Multi-file or architectural implementation                   | `/oh-my-claudeagent:prometheus-plan`        |
-| Starting a new feature from scratch                          | `/oh-my-claudeagent:prometheus-plan`        |
+| Multi-file or architectural implementation                   | `/oh-my-claudeagent:plan`                   |
+| Starting a new feature from scratch                          | `/oh-my-claudeagent:plan`                   |
 | Scoping an uncertain request before planning                 | `/oh-my-claudeagent:metis`                  |
 | Reviewing a draft plan for gaps and ambiguities              | `/oh-my-claudeagent:momus`                  |
-| Executing an approved plan                                   | `/oh-my-claudeagent:start-work` or `/oh-my-claudeagent:atlas` — runs at depth 0 with full Agent-tool access, spawns `executor` per task in parallel, `oracle` for F1 independent review |
+| Executing an approved plan                                   | `/oh-my-claudeagent:start-work` — runs at depth 0 with full Agent-tool access, spawns `executor` per task in parallel, `oracle` for F1 independent review |
 | Stuck on a bug after 2+ failed fix attempts                  | `oracle`                                    |
 | Multi-system tradeoff, architecture decision, design review  | `oracle`                                    |
 | Build failure, type error, dependency or toolchain issue     | `/oh-my-claudeagent:hephaestus`             |
 | Screenshots, PDFs, diagrams, visual artifacts                | `multimodal-looker`                         |
-| Complex multi-agent workflow needing central coordination    | `/oh-my-claudeagent:sisyphus-orchestrate`   |
+| Complex multi-agent workflow needing central coordination    | Main session (sisyphus is already main-session identity) |
 | "Don't stop until done" / must-finish persistence            | `/oh-my-claudeagent:ralph`                  |
 | Maximum-parallel independent task fan-out                    | `/oh-my-claudeagent:ultrawork`              |
-| Deep Socratic interview to clarify a fuzzy problem           | `socrates`                                  |
-| Request classification itself is unclear                     | `triage`                                    |
+| Deep Socratic interview to clarify a fuzzy problem           | `prometheus` (Socratic Interview Mode)      |
 </delegation>
 
 <entrypoints>
@@ -65,11 +64,10 @@ Slash commands always available. Keyword triggers activate only when
 | Need                      | Keyword                 | Slash command                             |
 |---------------------------|-------------------------|-------------------------------------------|
 | Setup                     | "setup omca"            | /oh-my-claudeagent:omca-setup             |
-| Create plan               | "create plan"           | /oh-my-claudeagent:prometheus-plan <task> |
+| Create plan               | "create plan"           | /oh-my-claudeagent:plan <task>            |
 | Gap-analyze a draft plan  | —                       | /oh-my-claudeagent:metis                  |
 | Review a draft plan       | —                       | /oh-my-claudeagent:momus                  |
 | Start execution           | —                       | /oh-my-claudeagent:start-work             |
-| Execute a specific plan   | —                       | /oh-my-claudeagent:atlas                  |
 | Parallel work             | "ultrawork" / "ulw"     | /oh-my-claudeagent:ultrawork <task list>  |
 | Must-finish persistence   | "ralph" / "don't stop"  | /oh-my-claudeagent:ralph <task>           |
 | Fix broken build          | "fix build"             | /oh-my-claudeagent:hephaestus             |
@@ -98,20 +96,20 @@ Cloud alternative: `/ultraplan` — Claude Code web planning research preview. O
 </agent_catalog>
 
 <workflow>
-Pipeline: **prometheus → metis → momus → user approval → atlas.**
+Pipeline: **prometheus → metis → momus → user approval → `/oh-my-claudeagent:start-work`.**
 
-1. `prometheus` interviews user, drafts plan.
+1. `prometheus` interviews user (optionally in Socratic Interview Mode), drafts plan.
 2. `metis` gap-analyzes the draft.
 3. `momus` reviews for clarity, verifiability, completeness.
 4. **User approves** (ExitPlanMode or confirmation).
-5. `/oh-my-claudeagent:start-work` or `/oh-my-claudeagent:atlas` executes the approved plan end-to-end at depth 0 — the main session spawns `executor` for each task (parallel where the plan declares `Parallel Execution: YES`), invokes `oracle` for F1 independent review, logs evidence per task with `plan_sha256` (first-class field from Phase 2), and reports completion back to the user. Atlas is no longer forked as a subagent by these skills; it remains available via `Agent(subagent_type="oh-my-claudeagent:atlas")` from other surfaces.
+5. `/oh-my-claudeagent:start-work` executes the approved plan end-to-end at depth 0 — the main session (sisyphus identity) spawns `executor` for each task (parallel where the plan declares `Parallel Execution: YES`), invokes `oracle` for F1 independent review, logs evidence per task with `plan_sha256` (first-class field on `evidence_log`), and reports completion back to the user. The Plan Execution Mode protocol lives in `commands/start-work.md` body.
 
-User runs `/oh-my-claudeagent:start-work` or `/oh-my-claudeagent:atlas [plan path]`.
+User runs `/oh-my-claudeagent:start-work [plan path]`.
 Do not auto-start execution.
 </workflow>
 
 <critical_rules>
-**Main session never implements plan tasks.** Approved plan → delegate to `atlas`.
+**Main session never implements plan tasks.** Approved plan → execute via `/oh-my-claudeagent:start-work` which runs the Plan Execution Mode at depth 0, delegating tasks to `executor`.
 Direct implementation bypasses verification, skips evidence, produces untested work.
 
 **Background-agent barrier.** N agents launched, first completes → acknowledge briefly,
