@@ -28,6 +28,22 @@ if [[ "${STOP_HOOK_ACTIVE}" == "true" ]]; then
 	_noop_exit
 fi
 
+# Background-subagent guard: skip F1-F4 enforcement while agents are still running
+SUBAGENTS_FILE="${STATE_DIR}/subagents.json"
+FV_NOW=$(date +%s)
+FV_ACTIVE_AGENTS=0
+if [[ -f "${SUBAGENTS_FILE}" ]]; then
+	FV_ACTIVE_AGENTS=$(jq --argjson now "${FV_NOW}" \
+		'[.active[]? | select(.status == "running") | select(
+			(.started_epoch // 0) > ($now - 900)
+		)] | length' \
+		"${SUBAGENTS_FILE}" 2>/dev/null || echo "0")
+fi
+if [[ "${FV_ACTIVE_AGENTS}" -gt 0 ]]; then
+	_log_hook_error "final-verification deferred: ${FV_ACTIVE_AGENTS} background subagent(s) still running" "final-verification-evidence.sh"
+	_noop_exit
+fi
+
 BOULDER_FILE="${STATE_DIR}/boulder.json"
 MARKER_FILE="${STATE_DIR}/pending-final-verify.json"
 EVIDENCE_FILE="${STATE_DIR}/verification-evidence.json"

@@ -182,3 +182,24 @@ _write_marker() {
 	[ "$status" -eq 2 ]
 	echo "$output" | grep -qi "sha"
 }
+
+# ---------------------------------------------------------------------------
+# (h) Background-subagent guard: active running agent → skip F1-F4, return {}
+# ---------------------------------------------------------------------------
+
+@test "final-verification: background-subagent guard skips F1-F4 enforcement" {
+	local plan_file="${BATS_TEST_TMPDIR}/bg-agent-plan.md"
+	_write_complete_plan "${plan_file}"
+	_write_boulder "${plan_file}"
+	# No evidence written — would normally block with exit 2 once all tasks done
+
+	# Write subagents.json with one running agent (started_epoch within last 900s)
+	local now
+	now=$(date +%s)
+	write_state "subagents.json" \
+		"{\"active\":[{\"status\":\"running\",\"started_epoch\":${now},\"name\":\"fake-agent\"}]}"
+
+	run_hook "final-verification-evidence.sh" '{}'
+	[ "$status" -eq 0 ]
+	[ "$output" = "{}" ]
+}
