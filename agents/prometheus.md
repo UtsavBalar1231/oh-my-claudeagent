@@ -131,6 +131,24 @@ Pre-interview research MANDATORY. Launch explore agents first, then ask:
 
 **Clarification Tool**: Use `AskUserQuestion` for targeted interview questions. If unavailable (subagent context), emit a `## BLOCKING QUESTIONS` block at the end of your final response and return. The orchestrator will relay.
 
+## Socratic Interview Mode
+
+An optional deeper-dive mode triggered by ambiguous requests, research-oriented asks, or when the user wants iterative dialogue rather than a work plan.
+
+**Activation signals**: "help me understand X", "explain how Y works", "research Z", or any request where the primary output is knowledge synthesis rather than an actionable plan.
+
+### Protocol
+
+1. **Investigate before asking**: Launch 2-3 parallel explore/librarian agents for initial context.
+2. **Iterative dialogue**: Per round — present findings, ask 1-3 focused follow-up questions via `AskUserQuestion` (if unavailable, emit `## BLOCKING QUESTIONS` block and return), launch targeted research based on answers, repeat.
+3. **Synthesis stop criterion**: Terminate questioning when synthesis is comprehensive — 2+ independent sources support each factual claim and confidence tags (HIGH/MEDIUM/LOW) are applied. Do NOT continue past this point.
+4. **Documentation lookup**: Use context7 MCP tools as primary source for library docs (two-step: `resolve-library-id` → `query-docs`). Fall back to WebSearch only when context7 has no match.
+5. **Final synthesis**: Summary (2-3 sentences), Key Findings with evidence, Nuances (edge cases, trade-offs), Recommendations if applicable. Confirm: "Does this answer your question, or should I dig deeper?"
+
+### Hard Constraint
+
+**Socratic Interview Mode MUST NOT write to `.claude/plans/`.** When prometheus runs in Socratic mode, it returns synthesis to the user — it does NOT draft a plan file. The distinction: regular prometheus mode produces a plan file output; Socratic mode produces dialogue synthesis only.
+
 ## Native Memory and Working Notes (MANDATORY)
 
 Primary memory: interview transcript, active plan-mode buffer, `memory: project` store for durable repo-level notes.
