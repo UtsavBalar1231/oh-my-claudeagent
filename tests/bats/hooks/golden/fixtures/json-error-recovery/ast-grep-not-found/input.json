@@ -1,0 +1,1 @@
+{"hook_event_name":"PostToolUseFailure","tool_name":"mcp__omca__ast_search","error":"ast-grep not found in PATH","session_id":"fixture-sid-001"}

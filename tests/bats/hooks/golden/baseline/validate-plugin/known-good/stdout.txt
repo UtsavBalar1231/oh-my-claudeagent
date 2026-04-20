@@ -1,0 +1,154 @@
+[validate-plugin] Repository root: /home/utsav/dev/softs/oh-my-claudeagent
+[validate-plugin] Requested checks: claims hooks mcp
+[validate-plugin] Running claims checks
+[validate-plugin] PASS: hooks contract: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/hooks/hooks.json)
+[validate-plugin] PASS: plugin manifest: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/.claude-plugin/plugin.json)
+[validate-plugin] PASS: marketplace manifest: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/.claude-plugin/marketplace.json)
+[validate-plugin] PASS: mcp registry: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/.mcp.json)
+[validate-plugin] PASS: hooks registry has object root
+[validate-plugin] PASS: plugin manifest declares expected package name
+[validate-plugin] PASS: marketplace includes oh-my-claudeagent entry
+[validate-plugin] PASS: default marketplace source path is accepted by current contract
+[validate-plugin] PASS: mcp registry uses uv for omca server
+[validate-plugin] PASS: categories config: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/servers/categories.json)
+[validate-plugin] PASS: ast-grep-server.py removed
+[validate-plugin] PASS: omca-state-server.py removed
+[validate-plugin] PASS: agent-metadata.json removed (OMCA-internal metadata fields deprecated)
+[validate-plugin] PASS: version consistency: plugin.json and marketplace.json both at 2.0.0
+[validate-plugin] PASS: migration marker: hard-cutover mode active at plugin=2.0.0, marketplace=2.0.0
+[validate-plugin] PASS: latest hook lifecycle coverage includes ConfigChange
+[validate-plugin] PASS: latest hook lifecycle coverage includes InstructionsLoaded
+[validate-plugin] PASS: latest hook lifecycle coverage includes Notification
+[validate-plugin] PASS: latest hook lifecycle coverage includes PermissionRequest
+[validate-plugin] PASS: latest hook lifecycle coverage includes PostCompact
+[validate-plugin] PASS: latest hook lifecycle coverage includes PostToolUse
+[validate-plugin] PASS: latest hook lifecycle coverage includes PostToolUseFailure
+[validate-plugin] PASS: latest hook lifecycle coverage includes PreCompact
+[validate-plugin] PASS: latest hook lifecycle coverage includes PreToolUse
+[validate-plugin] PASS: latest hook lifecycle coverage includes SessionEnd
+[validate-plugin] PASS: latest hook lifecycle coverage includes SessionStart
+[validate-plugin] PASS: latest hook lifecycle coverage includes Stop
+[validate-plugin] PASS: latest hook lifecycle coverage includes StopFailure
+[validate-plugin] PASS: latest hook lifecycle coverage includes SubagentStart
+[validate-plugin] PASS: latest hook lifecycle coverage includes SubagentStop
+[validate-plugin] PASS: latest hook lifecycle coverage includes TaskCompleted
+[validate-plugin] PASS: latest hook lifecycle coverage includes TeammateIdle
+[validate-plugin] PASS: latest hook lifecycle coverage includes UserPromptSubmit
+[validate-plugin] PASS: post-cutover hook lifecycle coverage includes TaskCreated
+[validate-plugin] PASS: post-cutover hook lifecycle coverage includes CwdChanged
+[validate-plugin] PASS: post-cutover hook lifecycle coverage includes FileChanged
+[validate-plugin] PASS: post-cutover hook lifecycle coverage includes WorktreeCreate
+[validate-plugin] PASS: agent frontmatter hygiene: no top-level tools allowlists detected
+[validate-plugin] PASS: agent frontmatter hygiene: no legacy permissionMode holdouts detected
+[validate-plugin] PASS: skill description length: cancel-ralph description is 39 chars (within 250 limit)
+[validate-plugin] PASS: skill description length: consolidate-memory description is 79 chars (within 250 limit)
+[validate-plugin] PASS: skill description length: dev-browser description is 183 chars (within 250 limit)
+[validate-plugin] PASS: skill description length: frontend-ui-ux description is 156 chars (within 250 limit)
+[validate-plugin] PASS: skill description length: git-master description is 202 chars (within 250 limit)
+[validate-plugin] PASS: skill description length: github-triage description is 226 chars (within 250 limit)
+[validate-plugin] PASS: skill description length: handoff description is 182 chars (within 250 limit)
+[validate-plugin] PASS: skill description length: hephaestus description is 85 chars (within 250 limit)
+[validate-plugin] PASS: skill description length: init-deep description is 79 chars (within 250 limit)
+[validate-plugin] PASS: skill description length: metis description is 109 chars (within 250 limit)
+[validate-plugin] PASS: skill description length: omca-setup description is 109 chars (within 250 limit)
+[validate-plugin] PASS: skill description length: playwright description is 192 chars (within 250 limit)
+[validate-plugin] PASS: skill description length: refactor description is 95 chars (within 250 limit)
+[validate-plugin] PASS: skill description length: stop-continuation description is 177 chars (within 250 limit)
+[validate-plugin] PASS: policy posture: OMCA.md includes auto mode marker
+[validate-plugin] PASS: policy posture: OMCA.md includes managed settings boundary marker
+[validate-plugin] PASS: policy posture: OMCA.md includes sandbox fail-closed marker
+[validate-plugin] PASS: policy posture: OMCA.md includes non-bypassing permission filter guidance
+[validate-plugin] PASS: policy posture: skills/omca-setup/SKILL.md includes auto mode marker
+[validate-plugin] PASS: policy posture: skills/omca-setup/SKILL.md includes managed settings boundary marker
+[validate-plugin] PASS: policy posture: skills/omca-setup/SKILL.md includes sandbox fail-closed marker
+[validate-plugin] PASS: policy posture: skills/omca-setup/SKILL.md includes non-bypassing permission filter guidance
+[validate-plugin] Running hooks checks
+[validate-plugin] PASS: hooks contract: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/hooks/hooks.json)
+[validate-plugin] PASS: hook fixture pretooluse-task-agent.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/pretooluse-task-agent.json)
+[validate-plugin] PASS: hook fixture pretooluse-write.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/pretooluse-write.json)
+[validate-plugin] PASS: hook fixture permissionrequest-bash.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/permissionrequest-bash.json)
+[validate-plugin] PASS: hook fixture permissionrequest-exitplanmode.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/permissionrequest-exitplanmode.json)
+[validate-plugin] PASS: hook fixture sessionstart-compact.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/sessionstart-compact.json)
+[validate-plugin] PASS: hook fixture instructionsloaded-basic.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/instructionsloaded-basic.json)
+[validate-plugin] PASS: hook fixture taskcreated-basic.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/taskcreated-basic.json)
+[validate-plugin] PASS: hook fixture taskcompleted-basic.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/taskcompleted-basic.json)
+[validate-plugin] PASS: hook fixture taskcompleted-with-evidence.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/taskcompleted-with-evidence.json)
+[validate-plugin] PASS: hook fixture taskcompleted-with-edits-no-evidence.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/taskcompleted-with-edits-no-evidence.json)
+[validate-plugin] PASS: hook fixture teammateidle-basic.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/teammateidle-basic.json)
+[validate-plugin] PASS: hook fixture cwdchanged-basic.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/cwdchanged-basic.json)
+[validate-plugin] PASS: hook fixture filechanged-basic.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/filechanged-basic.json)
+[validate-plugin] PASS: hook fixture worktreecreate-basic.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/worktreecreate-basic.json)
+[validate-plugin] PASS: hook fixture userpromptsubmit-ralph.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/userpromptsubmit-ralph.json)
+[validate-plugin] PASS: hook fixture userpromptsubmit-ultrawork.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/userpromptsubmit-ultrawork.json)
+[validate-plugin] PASS: hook fixture stop-basic.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/stop-basic.json)
+[validate-plugin] PASS: hook fixture subagentstart-basic.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/subagentstart-basic.json)
+[validate-plugin] PASS: hook fixture subagentstopcomplete-basic.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/subagentstopcomplete-basic.json)
+[validate-plugin] PASS: hook fixture stopfailure-ratelimit.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/stopfailure-ratelimit.json)
+[validate-plugin] PASS: hook fixture posttoolusefailure-bash.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/posttoolusefailure-bash.json)
+[validate-plugin] PASS: hook fixture posttoolusefailure-read.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/posttoolusefailure-read.json)
+[validate-plugin] PASS: hook fixture repo setup: initialized git repo at <TMPFILE>
+[validate-plugin] SKIP: PreToolUse Task|Agent: no matching hook command registered
+[validate-plugin] PASS: PreToolUse Write (write-guard.sh): script succeeded with valid JSON output
+[validate-plugin] PASS: PreToolUse Write (plan-checkbox-verify.sh): script succeeded with valid JSON output
+[validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): script succeeded with valid JSON output
+[validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): script succeeded with valid JSON output
+[validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): script succeeded with valid JSON output
+[validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): script succeeded with valid JSON output
+[validate-plugin] PASS: PermissionRequest ExitPlanMode (plan-mode-handler.sh): script succeeded with valid JSON output
+[validate-plugin] FAIL: SessionStart compact (post-compact-inject.sh): expected JSON output but received empty stdout
+[validate-plugin] PASS: TaskCreated default (lifecycle-state.sh): script succeeded with empty stdout
+[validate-plugin] FAIL: TaskCreated hook did not create tasks.jsonl
+[validate-plugin] PASS: TaskCompleted default (task-completed-verify.sh): script succeeded with empty stdout
+[validate-plugin] PASS: TeammateIdle default (teammate-idle-guard.sh): script succeeded with empty stdout
+[validate-plugin] PASS: InstructionsLoaded default (instructions-loaded-audit.sh): script succeeded
+[validate-plugin] PASS: CwdChanged default (lifecycle-state.sh): script succeeded with valid JSON output
+[validate-plugin] FAIL: repo-state check: missing <TMPFILE>/.omca/state/repo-state.json after CwdChanged
+[validate-plugin] PASS: FileChanged watchPaths (lifecycle-state.sh): script succeeded with valid JSON output
+[validate-plugin] FAIL: repo-state check: missing <TMPFILE>/.omca/state/repo-state.json after FileChanged
+[validate-plugin] FAIL: WorktreeCreate default (lifecycle-state.sh): missing structured worktree tracking file (<TMPFILE>/.omca/state/worktrees/fixture-worktree.json)
+[validate-plugin] PASS: UserPromptSubmit ralph (keyword-detector.sh): script succeeded with valid JSON output
+[validate-plugin] FAIL: keyword-detector should create Ralph wrapper state on ralph keyword
+[validate-plugin] PASS: UserPromptSubmit ultrawork (keyword-detector.sh): script succeeded with valid JSON output
+[validate-plugin] FAIL: keyword-detector should create ultrawork wrapper state on ultrawork keyword
+[validate-plugin] PASS: Stop default (no state) (ralph-persistence.sh): script succeeded
+[validate-plugin] PASS: Stop default (no state) (final-verification-evidence.sh): script succeeded
+[validate-plugin] PASS: Stop with ralph active (ralph-persistence.sh): script succeeded with valid JSON output
+[validate-plugin] PASS: Stop with ralph active (final-verification-evidence.sh): script succeeded with valid JSON output
+[validate-plugin] PASS: Stop ultrawork active + running agents (allow) (ralph-persistence.sh): script succeeded
+[validate-plugin] PASS: Stop ultrawork active + running agents (allow) (final-verification-evidence.sh): script succeeded
+[validate-plugin] PASS: Stop ultrawork active + no agents (block) (ralph-persistence.sh): script succeeded with valid JSON output
+[validate-plugin] PASS: Stop ultrawork active + no agents (block) (final-verification-evidence.sh): script succeeded with valid JSON output
+[validate-plugin] PASS: SubagentStart basic (subagent-start.sh): script succeeded with valid JSON output
+[validate-plugin] PASS: SubagentStop basic (subagent-complete.sh): script succeeded
+[validate-plugin] FAIL: SubagentStart did not create active-agents.json
+[validate-plugin] PASS: StopFailure rate_limit (stop-failure-handler.sh): script succeeded with empty stdout
+[validate-plugin] FAIL: StopFailure handler did not create stop-failures.jsonl
+[validate-plugin] Running mcp checks
+[validate-plugin] PASS: mcp registry: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/.mcp.json)
+[validate-plugin] PASS: mcp fixture initialize: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/mcp/initialize.json)
+[validate-plugin] PASS: mcp fixture initialized notification: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/mcp/initialized-notification.json)
+[validate-plugin] PASS: mcp fixture tools/list: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/mcp/tools-list.json)
+[validate-plugin] PASS: mcp fixture expected tools: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/mcp/expected-tools.json)
+[validate-plugin] PASS: mcp initialize response received
+[validate-plugin] PASS: mcp tools/list response received
+[validate-plugin] PASS: mcp tools/list contains ast_search
+[validate-plugin] PASS: mcp tools/list contains ast_replace
+[validate-plugin] PASS: mcp tools/list contains ast_find_rule
+[validate-plugin] PASS: mcp tools/list contains ast_dump_tree
+[validate-plugin] PASS: mcp tools/list contains ast_test_rule
+[validate-plugin] PASS: mcp tools/list contains boulder_write
+[validate-plugin] PASS: mcp tools/list contains boulder_progress
+[validate-plugin] PASS: mcp tools/list contains mode_read
+[validate-plugin] PASS: mcp tools/list contains mode_clear
+[validate-plugin] PASS: mcp tools/list contains evidence_log
+[validate-plugin] PASS: mcp tools/list contains evidence_read
+[validate-plugin] PASS: mcp tools/list contains notepad_write
+[validate-plugin] PASS: mcp tools/list contains notepad_read
+[validate-plugin] PASS: mcp tools/list contains notepad_list
+[validate-plugin] PASS: mcp tools/list contains notepad_compact
+[validate-plugin] PASS: mcp tools/list contains agents_list
+[validate-plugin] PASS: mcp tools/list contains health_check
+[validate-plugin] PASS: mcp tools/list contains categories_list
+[validate-plugin] PASS: mcp tools/list contains concurrency_status
+[validate-plugin] PASS: mcp tools/list contains file_read
+[validate-plugin] Summary: 138 passed, 9 failed, 1 skipped, 0 warned

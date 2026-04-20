@@ -1,0 +1,1 @@
+{"hookSpecificOutput": {"hookEventName": "PostToolUseFailure", "additionalContext": "[MCP ERROR RECOVERY] ast-grep binary not found. Install via: cargo install ast-grep or brew install ast-grep.\n"}}

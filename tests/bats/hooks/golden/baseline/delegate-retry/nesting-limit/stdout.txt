@@ -1,0 +1,1 @@
+{"hookSpecificOutput": {"hookEventName": "PostToolUseFailure", "additionalContext": "[NESTING LIMIT] The Agent tool is unavailable — you are running as a subagent and cannot spawn further subagents. This is a Claude Code platform constraint. Implement the task directly using Read, Write, Edit, Bash, Grep, Glob. Do NOT retry Agent calls.\n"}}

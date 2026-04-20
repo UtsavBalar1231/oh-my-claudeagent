@@ -1,0 +1,1 @@
+{"hook_event_name":"PreToolUse","tool_name":"Write","tool_input":{"file_path":"/tmp/brand-new-file.txt","content":"content here"},"session_id":"fixture-sid-001"}

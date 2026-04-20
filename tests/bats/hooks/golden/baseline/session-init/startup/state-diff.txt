@@ -1,0 +1,4 @@
+Only in /state-after: agent-usage.json
+Only in /state-after: injected-context-dirs.json
+Only in /state-after: session.json
+Only in /state-after: worktrees

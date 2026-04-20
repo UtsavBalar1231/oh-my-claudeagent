@@ -1,0 +1,1 @@
+{"hookSpecificOutput":{"hookEventName":"CwdChanged","watchPaths":["<TMPFILE>/.claude/settings.json","<TMPFILE>/.mcp.json","<TMPFILE>/AGENTS.md","<TMPFILE>/CLAUDE.md","<TMPFILE>/hooks/hooks.json","<TMPFILE>/.claude-plugin/plugin.json","<TMPFILE>/settings.json"]}}

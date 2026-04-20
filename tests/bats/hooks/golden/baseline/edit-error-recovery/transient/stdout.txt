@@ -1,0 +1,1 @@
+{"hookSpecificOutput": {"hookEventName": "PostToolUseFailure", "additionalContext": "[ERROR RECOVERY] Type: transient | Tool: Edit | Retry: 1/3\nEdit failed. Re-read the file to verify current contents match your old_string exactly, including whitespace and indentation.\n"}}

@@ -1,0 +1,1 @@
+{"hook_event_name":"PermissionRequest","tool_name":"Bash","tool_input":{"command":"rm -rf /tmp/testdir"},"session_id":"fixture-sid-001"}

@@ -1,0 +1,1 @@
+{"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": "[STOP CONTINUATION DETECTED] Halt all automated work — ralph and boulder state.\n[CANCEL DETECTED] User wants to stop current operation. Invoke cancel skill.\n\n"}}

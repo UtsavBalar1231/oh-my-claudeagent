@@ -1,0 +1,1 @@
+Persistence mode is active. Continue working.

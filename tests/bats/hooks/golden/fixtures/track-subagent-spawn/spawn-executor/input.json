@@ -1,0 +1,1 @@
+{"hook_event_name":"PreToolUse","tool_name":"Agent","tool_input":{"subagent_type":"oh-my-claudeagent:executor","prompt":"Implement the feature","model":"claude-sonnet-4-5"},"session_id":"fixture-sid-001"}

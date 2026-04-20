@@ -1,0 +1,1 @@
+{"hook_event_name":"PostToolUseFailure","tool_name":"Agent","tool_input":{"subagent_type":"oh-my-claudeagent:executor"},"error":"No such tool available: Agent","session_id":"fixture-sid-001"}

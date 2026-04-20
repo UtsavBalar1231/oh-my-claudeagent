@@ -1,0 +1,1 @@
+{"hook_event_name":"PostToolUseFailure","tool_name":"Bash","error":"FAIL: test_login_works\nAssertionError: expected 200, got 401","session_id":"fixture-sid-001"}

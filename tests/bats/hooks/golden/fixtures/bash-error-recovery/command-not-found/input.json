@@ -1,0 +1,1 @@
+{"hook_event_name":"PostToolUseFailure","tool_name":"Bash","error":"zsh: command not found: foobar","session_id":"fixture-sid-001"}

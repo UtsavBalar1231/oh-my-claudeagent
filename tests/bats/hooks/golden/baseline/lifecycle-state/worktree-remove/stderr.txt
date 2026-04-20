@@ -1,0 +1,1 @@
+WorktreeRemove hook requires a non-empty name

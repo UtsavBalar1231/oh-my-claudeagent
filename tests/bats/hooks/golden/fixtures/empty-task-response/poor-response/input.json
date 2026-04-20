@@ -1,0 +1,1 @@
+{"hook_event_name":"PostToolUse","tool_name":"Agent","tool_input":{"subagent_type":"oh-my-claudeagent:executor"},"tool_response":"Let me check that.","session_id":"fixture-sid-001"}

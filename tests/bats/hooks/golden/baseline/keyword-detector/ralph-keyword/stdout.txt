@@ -1,0 +1,1 @@
+{"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": "[RALPH MODE DETECTED] Activate persistence mode - do not stop until verified complete.\n\n"}}

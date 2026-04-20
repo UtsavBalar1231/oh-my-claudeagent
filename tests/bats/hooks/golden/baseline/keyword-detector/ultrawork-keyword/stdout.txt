@@ -1,0 +1,1 @@
+{"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": "[ULTRAWORK MODE DETECTED] Activate maximum parallel execution.\n\n"}}

@@ -1,0 +1,1 @@
+{"hook_event_name":"PostToolUse","tool_name":"Write","tool_input":{"file_path":"/tmp/testfile.txt"},"session_id":"fixture-sid-001"}

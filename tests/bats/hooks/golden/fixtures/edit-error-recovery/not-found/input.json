@@ -1,0 +1,1 @@
+{"hook_event_name":"PostToolUseFailure","tool_name":"Edit","tool_input":{"file_path":"/project/src/main.py"},"error":"File not found: /project/src/main.py","session_id":"fixture-sid-001"}

@@ -1,0 +1,1 @@
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"Subagent oh-my-claudeagent:executor (spawn-<NUM>) spawned with model claude-sonnet-4-5"}}

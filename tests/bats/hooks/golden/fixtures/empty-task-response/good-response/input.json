@@ -1,0 +1,1 @@
+{"hook_event_name":"PostToolUse","tool_name":"Agent","tool_input":{"subagent_type":"oh-my-claudeagent:executor"},"tool_response":"TASK: Implement feature X\nSTATUS: complete\nCHANGES: Modified src/main.py to add feature\nEVIDENCE: just test passed with 15 tests\nNOTES: None","session_id":"fixture-sid-001"}

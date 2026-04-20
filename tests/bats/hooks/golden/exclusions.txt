@@ -1,0 +1,4 @@
+# Golden-replay exclusions
+# Format: <hook-name> — <rationale>
+# Empty — all 35 hook scripts have working golden fixtures.
+# Hooks requiring extra manual-diff scrutiny in Passes 2-7 are listed in NOTES.md.

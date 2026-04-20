@@ -1,0 +1,1 @@
+{"hook_event_name":"PostToolUseFailure","tool_name":"Bash","error":"Permission denied: cannot write to /etc/hosts","session_id":"fixture-sid-001"}

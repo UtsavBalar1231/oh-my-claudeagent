@@ -1,0 +1,6 @@
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PostToolUseFailure",
+    "additionalContext": "[BASH ERROR RECOVERY] Command not found. Check if the tool is installed and on PATH. Try: which <command>"
+  }
+}

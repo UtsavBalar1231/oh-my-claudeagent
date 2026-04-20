@@ -1,0 +1,1 @@
+{"hook_event_name":"PostToolUseFailure","tool_name":"Edit","tool_input":{"file_path":"/project/src/main.py"},"error":"timeout: operation timed out","session_id":"fixture-sid-001"}

@@ -1,0 +1,6 @@
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PostToolUseFailure",
+    "additionalContext": "[READ ERROR RECOVERY] Path is a directory, not a file. Use Bash(ls ...) to list contents, or Glob to find files within."
+  }
+}

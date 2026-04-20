@@ -1,0 +1,1 @@
+{"hook_event_name":"PreToolUse","tool_name":"Write","tool_input":{"file_path":"/project/.claude/plans/my-plan.md","content":"# Plan\n\n- [ ] 1. Do something\n- [ ] 2. Do another thing"},"session_id":"fixture-sid-001"}

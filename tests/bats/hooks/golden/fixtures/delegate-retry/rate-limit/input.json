@@ -1,0 +1,1 @@
+{"hook_event_name":"PostToolUseFailure","tool_name":"Agent","tool_input":{"subagent_type":"oh-my-claudeagent:executor"},"error":"rate_limit: 429 Too Many Requests","session_id":"fixture-sid-001"}

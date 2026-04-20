@@ -1,0 +1,6 @@
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PostToolUseFailure",
+    "additionalContext": "[BASH ERROR RECOVERY] Permission denied. Check file permissions or try with appropriate access."
+  }
+}

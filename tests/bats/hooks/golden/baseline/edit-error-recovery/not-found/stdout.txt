@@ -1,0 +1,1 @@
+{"hookSpecificOutput": {"hookEventName": "PostToolUseFailure", "additionalContext": "[ERROR RECOVERY] Type: deterministic | Tool: Edit | Retry: 1/3\nThe old_string was not found in the file. The file may have changed. Re-read the file to get current contents before editing.\n"}}

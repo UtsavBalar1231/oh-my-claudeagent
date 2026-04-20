@@ -1,0 +1,6 @@
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PostToolUseFailure",
+    "additionalContext": "[BASH ERROR RECOVERY] Test failure. Read the failing test assertion. Check what the test expects vs what the code produces."
+  }
+}

@@ -1,0 +1,13 @@
+diff -ru /state-before/ralph-state.json /state-after/ralph-state.json
+--- /state-before/ralph-state.json	<TS>
++++ /state-after/ralph-state.json	<TS>
+@@ -1 +1,8 @@
+-{"status":"active","tasks":[],"stagnation_count":0,"last_task_hash":"","last_plan_mtime":"","plan_stagnation_count":0}
++{
++  "status": "active",
++  "tasks": [],
++  "stagnation_count": 0,
++  "last_task_hash": "<HASH>",
++  "last_plan_mtime": "",
++  "plan_stagnation_count": 0
++}

@@ -1,0 +1,1 @@
+{"hook_event_name":"PostToolUseFailure","tool_name":"Read","error":"No such file or directory: /project/missing.txt","session_id":"fixture-sid-001"}
