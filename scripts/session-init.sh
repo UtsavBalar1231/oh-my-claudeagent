@@ -19,6 +19,19 @@ fi
 
 SESSION_ID="${CLAUDE_SESSION_ID:-$(date +%s)-$$}"
 
+# Cross-session orphan-marker sweep (Task 2 of fix-orphan-pending-final-verify-marker plan).
+# Skips on compact per Task 0 finding — CLAUDE_SESSION_ID stability across compact is unverified,
+# so the sweep would risk wiping a legitimate in-progress marker. Mirrors the SOURCE guard at line 53.
+SWEEP_SOURCE=$(echo "${INPUT}" | jq -r '.source // "startup"' 2>/dev/null || echo "startup")
+PENDING_MARKER="${STATE_DIR}/pending-final-verify.json"
+if [[ "${SWEEP_SOURCE}" != "compact" ]] && [[ -f "${PENDING_MARKER}" ]]; then
+	OLD_SID=$(jq -r '.session_id // ""' "${PENDING_MARKER}" 2>/dev/null || echo "")
+	if [[ -n "${OLD_SID}" && "${OLD_SID}" != "null" && "${OLD_SID}" != "${SESSION_ID}" ]]; then
+		rm -f "${PENDING_MARKER}"
+		_log_hook_error "cleared cross-session orphan marker (previous session_id=${OLD_SID})" "session-init.sh"
+	fi
+fi
+
 SESSION_STATE="${STATE_DIR}/session.json"
 TMP_FILE=$(mktemp)
 TS=$(date -Iseconds)

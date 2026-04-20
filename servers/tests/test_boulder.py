@@ -14,6 +14,7 @@ from mcp.server.fastmcp import FastMCP
 from tools import boulder as boulder_module
 from tools._common import (
     BOULDER_FILE,
+    PENDING_FINAL_VERIFY_FILE,
     RALPH_STATE_FILE,
     ULTRAWORK_STATE_FILE,
     _write_json,
@@ -407,3 +408,29 @@ def test_mode_clear_ralph_only(mcp_server, working_dir, tmp_git_root):
     assert "ralph" in result
     assert not (state_dir / RALPH_STATE_FILE).exists()
     assert (state_dir / ULTRAWORK_STATE_FILE).exists()
+
+
+def test_mode_clear_final_verify(mcp_server, working_dir, tmp_git_root):
+    """mode_clear('final_verify') removes pending-final-verify.json and reports it cleared."""
+    state_dir = tmp_git_root / ".omca" / "state"
+    marker_path = state_dir / PENDING_FINAL_VERIFY_FILE
+    _write_json(
+        str(marker_path),
+        {
+            "plan_path": "/tmp/fake",
+            "plan_sha256": "deadbeef",
+            "marked_at": 0,
+            "session_id": "test",
+        },
+    )
+    assert marker_path.exists()
+
+    result = call_tool(
+        mcp_server,
+        "mode_clear",
+        {"mode": "final_verify", "working_directory": working_dir},
+    )
+
+    assert "final_verify" in result
+    assert "Cleared" in result
+    assert not marker_path.exists()

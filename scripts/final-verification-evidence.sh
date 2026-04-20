@@ -66,6 +66,41 @@ if [[ -z "${ACTIVE_PLAN}" && -z "${MARKER_PLAN}" ]]; then
 	_noop_exit
 fi
 
+# Session-aware staleness short-circuits (Task 3 of fix-orphan-pending-final-verify-marker).
+# Runs after marker is read but before TTL / evidence check. Each short-circuit clears the
+# marker and noop_exits when the marker is provably stale by an independent signal.
+if [[ -n "${MARKER_PLAN}" ]]; then
+	# Short-circuit #1: session-ID mismatch.
+	CURRENT_SID=$(_resolve_session_id)
+	MARKER_SID=$(jq -r '.session_id // ""' "${MARKER_FILE}" 2>/dev/null || echo "")
+	if [[ -z "${CURRENT_SID}" ]]; then
+		_log_hook_error "session-ID unresolvable; skipping mismatch short-circuit" "final-verification-evidence.sh"
+	elif [[ -n "${MARKER_SID}" && "${MARKER_SID}" != "null" && "${MARKER_SID}" != "${CURRENT_SID}" ]]; then
+		rm -f "${MARKER_FILE}"
+		_noop_exit
+	fi
+
+	# Short-circuit #2: completion sidecar with matching SHA.
+	MARKER_SHA=$(jq -r '.plan_sha256 // ""' "${MARKER_FILE}" 2>/dev/null || echo "")
+	if [[ -n "${MARKER_PLAN}" && -n "${MARKER_SHA}" ]]; then
+		SIDECAR_PATH=$(_compute_sidecar_path "${MARKER_PLAN}")
+		if _sidecar_sha_matches "${SIDECAR_PATH}" "${MARKER_SHA}"; then
+			rm -f "${MARKER_FILE}"
+			_noop_exit
+		fi
+	fi
+
+	# Short-circuit #3: marker's plan has zero [x] — never started, stale.
+	if [[ -n "${MARKER_PLAN}" && -f "${MARKER_PLAN}" ]]; then
+		MARKER_DONE=$(grep -cE '^- \[x\] ' "${MARKER_PLAN}" 2>/dev/null || true)
+		MARKER_DONE="${MARKER_DONE:-0}"
+		if [[ "${MARKER_DONE}" -eq 0 ]]; then
+			rm -f "${MARKER_FILE}"
+			_noop_exit
+		fi
+	fi
+fi
+
 # Resolve which plan path to inspect
 PLAN_PATH="${ACTIVE_PLAN}"
 if [[ -z "${PLAN_PATH}" ]]; then
