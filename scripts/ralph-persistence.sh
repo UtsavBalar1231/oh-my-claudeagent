@@ -2,96 +2,20 @@
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
-INPUT="${HOOK_INPUT}"
 STATE_DIR="${HOOK_STATE_DIR}"
 
-# Plan-file-aware stagnation: track mtime + checkbox counts alongside task-hash signal.
-# Only runs when RALPH_ACTIVE=true and boulder has a fresh active_plan.
-# Updates plan_stagnation_count in ralph-state.json; escalates when >= 3 by logging
-# and feeding into the existing stagnation-allows-stop path (check_boulder_fallback → exit 0).
-# NOTE: exits the script (not just the function) when escalation threshold is reached.
-check_plan_file_progress() {
-	local boulder_file="${STATE_DIR}/boulder.json"
-	if [[ ! -f "${boulder_file}" ]]; then
-		return 0
-	fi
-
-	local active_plan
-	active_plan=$(jq -r '.active_plan // ""' "${boulder_file}" 2>/dev/null)
-	if [[ -z "${active_plan}" || "${active_plan}" == "null" ]]; then
-		return 0
-	fi
-
-	# Resolve plan path: support both absolute and relative (relative to project root)
-	local plan_file="${active_plan}"
-	if [[ ! -f "${plan_file}" ]]; then
-		# Try relative to CLAUDE_PROJECT_ROOT if set
-		local project_root="${CLAUDE_PROJECT_ROOT:-}"
-		if [[ -n "${project_root}" && -f "${project_root}/${active_plan}" ]]; then
-			plan_file="${project_root}/${active_plan}"
-		else
-			_log_hook_error "boulder active_plan references missing file: ${active_plan} — allowing stop" "ralph-persistence.sh"
-			exit 0
-		fi
-	fi
-
-	# Read current plan file mtime (portable: GNU stat then BSD stat)
-	local plan_mtime
-	plan_mtime=$(stat -c %Y "${plan_file}" 2>/dev/null || stat -f %m "${plan_file}" 2>/dev/null || echo "")
-	if [[ -z "${plan_mtime}" ]]; then
-		return 0
-	fi
-
-	# Count incomplete and complete checkboxes
-	local incomplete complete
-	incomplete=$(grep -c '^- \[ \] ' "${plan_file}" 2>/dev/null || true)
-	complete=$(grep -c '^- \[x\] ' "${plan_file}" 2>/dev/null || true)
-	incomplete="${incomplete:-0}"
-	complete="${complete:-0}"
-
-	# Read previous values from ralph-state.json
-	local last_mtime plan_stagnation
-	last_mtime=$(jq -r '.last_plan_mtime // ""' "${RALPH_STATE}" 2>/dev/null)
-	plan_stagnation=$(jq -r '.plan_stagnation_count // 0' "${RALPH_STATE}" 2>/dev/null)
-	last_mtime="${last_mtime:-}"
-	plan_stagnation="${plan_stagnation:-0}"
-
-	# Detect plan-level stagnation: mtime unchanged AND incomplete count > 0 AND
-	# task-hash also unchanged (STAGNATION > 0 means hash matched at least once)
-	if [[ "${incomplete}" -gt 0 && "${plan_mtime}" == "${last_mtime}" && "${STAGNATION}" -gt 0 ]]; then
-		plan_stagnation=$((plan_stagnation + 1))
-	else
-		plan_stagnation=0
-	fi
-
-	# Update ralph-state.json with plan tracking fields atomically
-	jq --arg mtime "${plan_mtime}" \
-		--argjson inc "${incomplete}" \
-		--argjson com "${complete}" \
-		--argjson psc "${plan_stagnation}" \
-		'.last_plan_mtime = $mtime | .last_plan_incomplete = $inc | .last_plan_complete = $com | .plan_stagnation_count = $psc' \
-		"${RALPH_STATE}" > "${RALPH_STATE}.tmp" && \
-		mv "${RALPH_STATE}.tmp" "${RALPH_STATE}"
-
-	if [[ ${plan_stagnation} -ge 3 ]]; then
-		_log_hook_error "ralph plan stagnated (plan_stagnation_count=${plan_stagnation}, incomplete=${incomplete}) — allowing stop" "ralph-persistence.sh"
-		# Feed into existing stagnation-allows-stop path
-		check_boulder_fallback
-		exit 0
-	fi
-}
-
-# Boulder fallback: block stop if a fresh work plan exists
-# NOTE: exit 0 here exits the script, not just the function
-check_boulder_fallback() {
+# Boulder fallback: block stop if a fresh work plan exists.
+# Emits Stop-hook allow decision and exits the script when a boulder is active.
+# NAMED WITH ACTION VERB: side-effect is intentional, see caller chains.
+allow_stop_via_boulder_fallback() {
 	local boulder_file="${STATE_DIR}/boulder.json"
 	if [[ -f "${boulder_file}" ]]; then
 		local active_plan
-		active_plan=$(jq -r '.active_plan // ""' "${boulder_file}" 2>/dev/null)
+		active_plan=$(jq_read "${boulder_file}" '.active_plan // ""')
 		if [[ -n "${active_plan}" && "${active_plan}" != "null" ]]; then
 			# Plan file deleted by platform — allow stop immediately
 			if [[ ! -f "${active_plan}" ]]; then
-				_log_hook_error "boulder active_plan references missing file: ${active_plan} — allowing stop" "ralph-persistence.sh"
+				log_hook_error "boulder active_plan references missing file: ${active_plan} — allowing stop" "ralph-persistence.sh"
 				exit 0
 			fi
 			if command -v stat &>/dev/null; then
@@ -108,7 +32,7 @@ check_boulder_fallback() {
 }
 
 # Recursion guard — stop_hook_active prevents infinite Stop hook loops
-STOP_HOOK_ACTIVE=$(echo "${INPUT}" | jq -r '.stop_hook_active // false' 2>/dev/null)
+STOP_HOOK_ACTIVE=$(jq -r '.stop_hook_active // false' <<< "${HOOK_INPUT}")
 if [[ "${STOP_HOOK_ACTIVE}" == "true" ]]; then
 	exit 0
 fi
@@ -121,12 +45,12 @@ RALPH_ACTIVE=false
 ULTRAWORK_ACTIVE=false
 
 if [[ -f "${RALPH_STATE}" ]]; then
-	STATUS=$(jq -r '.status // "inactive"' "${RALPH_STATE}" 2>/dev/null)
+	STATUS=$(jq_read "${RALPH_STATE}" '.status // "inactive"')
 	[[ "${STATUS}" == "active" ]] && RALPH_ACTIVE=true
 fi
 
 if [[ -f "${ULTRAWORK_STATE}" ]]; then
-	STATUS=$(jq -r '.status // "inactive"' "${ULTRAWORK_STATE}" 2>/dev/null)
+	STATUS=$(jq_read "${ULTRAWORK_STATE}" '.status // "inactive"')
 	[[ "${STATUS}" == "active" ]] && ULTRAWORK_ACTIVE=true
 fi
 
@@ -137,7 +61,7 @@ fi
 # Allow stop if a question is pending — user needs to answer
 QUESTION_FILE="${STATE_DIR}/pending-question.json"
 if [[ -f "${QUESTION_FILE}" ]]; then
-	Q_TS=$(jq -r '.timestamp // 0' "${QUESTION_FILE}" 2>/dev/null)
+	Q_TS=$(jq_read "${QUESTION_FILE}" '.timestamp // 0')
 	Q_TS=${Q_TS:-0}
 	NOW=$(date +%s)
 	DIFF=$((NOW - Q_TS))
@@ -150,22 +74,24 @@ fi
 
 # Stagnation detection — only runs against ralph-state.json (has tasks array)
 if [[ "${RALPH_ACTIVE}" == "true" ]]; then
-	TASK_COUNT=$(jq '[.tasks[]?] | length' "${RALPH_STATE}" 2>/dev/null || echo "0")
+	TASK_COUNT=$(jq '[.tasks[]?] | length' "${RALPH_STATE}")
 	if [[ "${TASK_COUNT}" -eq 0 ]]; then
+		# 5 attempts — free-form ralph (no tasks); harder to measure progress. UNDOCUMENTED.
 		MAX_STAGNATION=5
 	else
+		# 3 attempts — task list present; task-hash changes are reliable progress signals.
 		MAX_STAGNATION=3
 	fi
 
 	# Portable hash — md5sum (GNU/Linux) vs md5 (macOS BSD)
 	if command -v md5sum &>/dev/null; then
-		TASK_HASH=$(jq -r '[.tasks[]? | "\(.id):\(.status)"] | sort | join(",")' "${RALPH_STATE}" 2>/dev/null | md5sum | cut -d' ' -f1)
+		TASK_HASH=$(jq -r '[.tasks[]? | "\(.id):\(.status)"] | sort | join(",")' "${RALPH_STATE}" | md5sum | cut -d' ' -f1)
 	else
-		TASK_HASH=$(jq -r '[.tasks[]? | "\(.id):\(.status)"] | sort | join(",")' "${RALPH_STATE}" 2>/dev/null | md5 | cut -d' ' -f4)
+		TASK_HASH=$(jq -r '[.tasks[]? | "\(.id):\(.status)"] | sort | join(",")' "${RALPH_STATE}" | md5 | cut -d' ' -f4)
 	fi
 
-	LAST_HASH=$(jq -r '.last_task_hash // ""' "${RALPH_STATE}" 2>/dev/null)
-	STAGNATION=$(jq -r '.stagnation_count // 0' "${RALPH_STATE}" 2>/dev/null)
+	LAST_HASH=$(jq_read "${RALPH_STATE}" '.last_task_hash // ""')
+	STAGNATION=$(jq_read "${RALPH_STATE}" '.stagnation_count // 0')
 
 	if [[ "${TASK_HASH}" == "${LAST_HASH}" ]]; then
 		STAGNATION=$((STAGNATION + 1))
@@ -180,21 +106,81 @@ if [[ "${RALPH_ACTIVE}" == "true" ]]; then
 		mv "${RALPH_STATE}.tmp" "${RALPH_STATE}"
 
 	if [[ ${STAGNATION} -ge ${MAX_STAGNATION} ]]; then
-		_log_hook_error "ralph stagnated (${STAGNATION}/${MAX_STAGNATION}) — allowing stop" "ralph-persistence.sh"
+		log_hook_error "ralph stagnated (${STAGNATION}/${MAX_STAGNATION}) — allowing stop" "ralph-persistence.sh"
 		# No progress — try boulder fallback before allowing stop
-		check_boulder_fallback
+		allow_stop_via_boulder_fallback
 		# Allow stop — no progress after threshold attempts and no fresh boulder plan
 		exit 0
 	fi
 
-	# Plan-file-aware stagnation: supplement task-hash signal with plan checkbox state
-	check_plan_file_progress
+	# Plan-file-aware stagnation: supplement task-hash signal with plan checkbox state.
+	# REQUIRES RALPH_STATE to be set — see line 41 above.
+	# REQUIRES STAGNATION to be set — see line 92 above.
+	# Inlined from check_plan_file_progress (single callsite; scope-leak resolved by inlining).
+	_boulder_file_pfp="${STATE_DIR}/boulder.json"
+	if [[ -f "${_boulder_file_pfp}" ]]; then
+		_active_plan_pfp=$(jq_read "${_boulder_file_pfp}" '.active_plan // ""')
+		if [[ -n "${_active_plan_pfp}" && "${_active_plan_pfp}" != "null" ]]; then
+			# Resolve plan path: support both absolute and relative (relative to project root)
+			_plan_file_pfp="${_active_plan_pfp}"
+			if [[ ! -f "${_plan_file_pfp}" ]]; then
+				# Try relative to CLAUDE_PROJECT_ROOT if set
+				_project_root_pfp="${CLAUDE_PROJECT_ROOT:-}"
+				if [[ -n "${_project_root_pfp}" && -f "${_project_root_pfp}/${_active_plan_pfp}" ]]; then
+					_plan_file_pfp="${_project_root_pfp}/${_active_plan_pfp}"
+				else
+					log_hook_error "boulder active_plan references missing file: ${_active_plan_pfp} — allowing stop" "ralph-persistence.sh"
+					exit 0
+				fi
+			fi
+
+			# Read current plan file mtime (portable: GNU stat then BSD stat)
+			_plan_mtime_pfp=$(stat -c %Y "${_plan_file_pfp}" 2>/dev/null || stat -f %m "${_plan_file_pfp}" 2>/dev/null || echo "")
+			if [[ -n "${_plan_mtime_pfp}" ]]; then
+				# Count incomplete and complete checkboxes
+				_incomplete_pfp=$(grep -c '^- \[ \] ' "${_plan_file_pfp}" 2>/dev/null || true)
+				_complete_pfp=$(grep -c '^- \[x\] ' "${_plan_file_pfp}" 2>/dev/null || true)
+				_incomplete_pfp="${_incomplete_pfp:-0}"
+				_complete_pfp="${_complete_pfp:-0}"
+
+				# Read previous values from ralph-state.json
+				_last_mtime_pfp=$(jq_read "${RALPH_STATE}" '.last_plan_mtime // ""')
+				_plan_stagnation_pfp=$(jq_read "${RALPH_STATE}" '.plan_stagnation_count // 0')
+				_last_mtime_pfp="${_last_mtime_pfp:-}"
+				_plan_stagnation_pfp="${_plan_stagnation_pfp:-0}"
+
+				# Detect plan-level stagnation: mtime unchanged AND incomplete count > 0 AND
+				# task-hash also unchanged (STAGNATION > 0 means hash matched at least once)
+				if [[ "${_incomplete_pfp}" -gt 0 && "${_plan_mtime_pfp}" == "${_last_mtime_pfp}" && "${STAGNATION}" -gt 0 ]]; then
+					_plan_stagnation_pfp=$((_plan_stagnation_pfp + 1))
+				else
+					_plan_stagnation_pfp=0
+				fi
+
+				# Update ralph-state.json with plan tracking fields atomically
+				jq --arg mtime "${_plan_mtime_pfp}" \
+					--argjson inc "${_incomplete_pfp}" \
+					--argjson com "${_complete_pfp}" \
+					--argjson psc "${_plan_stagnation_pfp}" \
+					'.last_plan_mtime = $mtime | .last_plan_incomplete = $inc | .last_plan_complete = $com | .plan_stagnation_count = $psc' \
+					"${RALPH_STATE}" > "${RALPH_STATE}.tmp" && \
+					mv "${RALPH_STATE}.tmp" "${RALPH_STATE}"
+
+				if [[ ${_plan_stagnation_pfp} -ge 3 ]]; then
+					log_hook_error "ralph plan stagnated (plan_stagnation_count=${_plan_stagnation_pfp}, incomplete=${_incomplete_pfp}) — allowing stop" "ralph-persistence.sh"
+					# Feed into existing stagnation-allows-stop path
+					allow_stop_via_boulder_fallback
+					exit 0
+				fi
+			fi
+		fi
+	fi
 fi
 
 # Count incomplete tasks in ralph-state.json
 INCOMPLETE=0
 if [[ "${RALPH_ACTIVE}" == "true" ]]; then
-	INCOMPLETE=$(jq '[.tasks[]? | select(.status != "completed" and .status != "verified")] | length' "${RALPH_STATE}" 2>/dev/null || echo "0")
+	INCOMPLETE=$(jq '[.tasks[]? | select(.status != "completed" and .status != "verified")] | length' "${RALPH_STATE}")
 fi
 
 if [[ "${INCOMPLETE}" -gt 0 ]]; then
@@ -205,7 +191,7 @@ fi
 # Stagnation detection for ultrawork (no tasks array — use subagent activity as signal)
 if [[ "${ULTRAWORK_ACTIVE}" == "true" ]]; then
 	SUBAGENTS_FILE="${STATE_DIR}/subagents.json"
-	UW_STAGNATION=$(jq -r '.stagnation_count // 0' "${ULTRAWORK_STATE}" 2>/dev/null || echo "0")
+	UW_STAGNATION=$(jq_read "${ULTRAWORK_STATE}" '.stagnation_count // 0')
 
 	# Check if any agents are currently running
 	UW_NOW=$(date +%s)
@@ -215,7 +201,7 @@ if [[ "${ULTRAWORK_ACTIVE}" == "true" ]]; then
 			'[.active[]? | select(.status == "running") | select(
 				(.started_epoch // 0) > ($now - 900)
 			)] | length' \
-			"${SUBAGENTS_FILE}" 2>/dev/null || echo "0")
+			"${SUBAGENTS_FILE}")
 	fi
 
 	# Increment stagnation when no agents running; reset when agents are active
@@ -232,7 +218,7 @@ if [[ "${ULTRAWORK_ACTIVE}" == "true" ]]; then
 
 	if [[ ${UW_STAGNATION} -ge 5 ]]; then
 		# No agent activity — try boulder fallback before allowing stop
-		check_boulder_fallback
+		allow_stop_via_boulder_fallback
 		# No progress after threshold attempts and no fresh boulder plan — allow stop
 		exit 0
 	fi
@@ -247,6 +233,6 @@ if [[ "${ULTRAWORK_ACTIVE}" == "true" ]]; then
 fi
 
 # No incomplete tasks and ultrawork not active — try boulder fallback
-check_boulder_fallback
+allow_stop_via_boulder_fallback
 
 exit 0

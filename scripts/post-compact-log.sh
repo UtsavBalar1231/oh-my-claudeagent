@@ -7,12 +7,11 @@
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
-INPUT="${HOOK_INPUT}"
 STATE_DIR="${HOOK_STATE_DIR}"
 LOG_DIR="${HOOK_LOG_DIR}"
 
-TRIGGER=$(echo "${INPUT}" | jq -r '.trigger // "unknown"' 2>/dev/null)
-COMPACT_SUMMARY=$(echo "${INPUT}" | jq -r '.compact_summary // ""' 2>/dev/null)
+TRIGGER=$(jq -r '.trigger // "unknown"' <<< "${HOOK_INPUT}")
+COMPACT_SUMMARY=$(jq -r '.compact_summary // ""' <<< "${HOOK_INPUT}")
 
 # Log compaction event
 TS=$(date -Iseconds)

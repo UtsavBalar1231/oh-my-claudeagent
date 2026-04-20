@@ -2,13 +2,12 @@
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
-INPUT="${HOOK_INPUT}"
 STATE_DIR="${HOOK_STATE_DIR}"
 LOG_DIR="${HOOK_LOG_DIR}"
 
-FILE_PATH=$(echo "${INPUT}" | jq -r '.tool_input.file_path // .tool_input.path // "unknown"' 2>/dev/null)
-TOOL_NAME=$(echo "${INPUT}" | jq -r '.tool_name // "unknown"' 2>/dev/null)
-TOOL_RESULT=$(echo "${INPUT}" | jq -r '.tool_result.success // true' 2>/dev/null)
+FILE_PATH=$(jq -r '.tool_input.file_path // .tool_input.path // "unknown"' <<< "${HOOK_INPUT}")
+TOOL_NAME=$(jq -r '.tool_name // "unknown"' <<< "${HOOK_INPUT}")
+TOOL_RESULT=$(jq -r '.tool_result.success // true' <<< "${HOOK_INPUT}")
 
 TIMESTAMP=$(date -Iseconds)
 

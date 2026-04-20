@@ -5,11 +5,10 @@ _HOOK_START=$(date +%s%N 2>/dev/null || date +%s)
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
-INPUT="${HOOK_INPUT}"
 PROJECT_ROOT="${HOOK_PROJECT_ROOT}"
 STATE_DIR="${HOOK_STATE_DIR}"
 
-read -r FILE_PATH TOOL_NAME < <(echo "${INPUT}" | jq -r '[.tool_input.file_path // "", .tool_name // ""] | @tsv' 2>/dev/null)
+read -r FILE_PATH TOOL_NAME < <(jq -r '[.tool_input.file_path // "", .tool_name // ""] | @tsv' <<< "${HOOK_INPUT}")
 IS_READ_EVENT=false
 [[ "${TOOL_NAME}" == "Read" ]] && IS_READ_EVENT=true
 
@@ -32,11 +31,13 @@ while true; do
 
 	if [[ "${ALREADY_INJECTED}" == "false" ]]; then
 		if [[ -f "${CURRENT_DIR}/AGENTS.md" ]]; then
+			# 2000 bytes — truncate injected AGENTS.md to stay under 10k-char platform cap.
 			AGENTS_CONTENT=$(head -c 2000 "${CURRENT_DIR}/AGENTS.md")
 			CONTEXT_PARTS+="[AGENTS.md from ${CURRENT_DIR}]: ${AGENTS_CONTENT}"$'\n'
 		fi
 
 		if [[ -f "${CURRENT_DIR}/README.md" ]]; then
+			# 2000 bytes — truncate injected README.md; same cap as AGENTS.md (shared budget).
 			README_CONTENT=$(head -c 2000 "${CURRENT_DIR}/README.md")
 			CONTEXT_PARTS+="[README.md from ${CURRENT_DIR}]: ${README_CONTENT}"$'\n'
 		fi
@@ -63,6 +64,7 @@ if [[ -d "${RULES_DIR}" ]]; then
 				# shellcheck disable=SC2053
 				if [[ "${BASENAME}" == ${PATTERN} ]]; then
 					RULE_TAIL=$(tail -n +2 "${RULE_FILE}")
+					# 1000 chars — rule body cap; smaller than 2000-byte doc cap (rules are denser).
 					RULE_CONTENT="${RULE_TAIL:0:1000}"
 					CONTEXT_PARTS+="[Rule: ${PATTERN}]: ${RULE_CONTENT}"$'\n'
 				fi
@@ -73,13 +75,9 @@ fi
 
 if [[ -n "${CONTEXT_PARTS}" ]]; then
 	ESCAPED=$(echo "${CONTEXT_PARTS}" | jq -Rs .)
-	_HOOK_END=$(date +%s%N 2>/dev/null || date +%s)
-	_HOOK_MS=$(( (_HOOK_END - _HOOK_START) / 1000000 ))
-	echo "{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"hook\":\"$(basename "$0")\",\"ms\":${_HOOK_MS}}" >> "${HOOK_LOG_DIR}/hook-timing.jsonl" 2>/dev/null
+	hook_timing_log "${_HOOK_START}"
 	echo "{\"hookSpecificOutput\": {\"hookEventName\": \"PostToolUse\", \"additionalContext\": ${ESCAPED}}}"
 else
-	_HOOK_END=$(date +%s%N 2>/dev/null || date +%s)
-	_HOOK_MS=$(( (_HOOK_END - _HOOK_START) / 1000000 ))
-	echo "{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"hook\":\"$(basename "$0")\",\"ms\":${_HOOK_MS}}" >> "${HOOK_LOG_DIR}/hook-timing.jsonl" 2>/dev/null
+	hook_timing_log "${_HOOK_START}"
 	exit 0
 fi

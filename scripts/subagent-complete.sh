@@ -2,12 +2,12 @@
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
-INPUT="${HOOK_INPUT}"
 STATE_DIR="${HOOK_STATE_DIR}"
 LOG_DIR="${HOOK_LOG_DIR}"
 
-SUBAGENT_ID=$(echo "${INPUT}" | jq -r '.agent_id // ""' 2>/dev/null)
-LAST_MSG=$(echo "${INPUT}" | jq -r '.last_assistant_message // ""' 2>/dev/null | head -c 500)
+SUBAGENT_ID=$(jq -r '.agent_id // ""' <<< "${HOOK_INPUT}")
+# 500 bytes — last_assistant_message cap; enough for routing-audit without bloating log.
+LAST_MSG=$(jq -r '.last_assistant_message // ""' <<< "${HOOK_INPUT}" | head -c 500)
 EXIT_STATUS="completed"  # SubagentStop only fires on completion; no exit_status field exists
 
 TIMESTAMP=$(date -Iseconds)
@@ -22,7 +22,6 @@ if [[ -f "${SUBAGENTS_FILE}" ]]; then
 		"${SUBAGENTS_FILE}" >"${TMP_FILE}" && mv "${TMP_FILE}" "${SUBAGENTS_FILE}"
 fi
 
-# --- Concurrency deregistration (flock-protected read-modify-write) ---
 ACTIVE_FILE="${STATE_DIR}/active-agents.json"
 DURATION_SECONDS=0
 AGENT_TYPE_FROM_ACTIVE=""
@@ -34,9 +33,11 @@ if [[ -f "${ACTIVE_FILE}" ]]; then
 		DURATION_SECONDS=$(( CURRENT_EPOCH - STARTED_EPOCH ))
 	fi
 	# flock-protected write to prevent concurrent deregistration races
+	# 900s (15m) — active-agent TTL; safe upper bound for any legitimate subagent run.
 	CUTOFF=$(( CURRENT_EPOCH - 900 ))  # 15-min TTL
 	(
-		flock -w 5 200 || { _log_hook_error "flock timeout on active-agents" "subagent-complete.sh"; }
+		# 5s — flock wait; long enough for concurrent siblings, short enough to fail fast.
+		flock -w 5 200 || { log_hook_error "flock timeout on active-agents" "subagent-complete.sh"; }
 		TMP_ACTIVE=$(mktemp)
 		jq --arg id "${SUBAGENT_ID}" --argjson cutoff "${CUTOFF}" \
 			'[.[] | select(.id != $id and .started_epoch > $cutoff)]' \
@@ -44,18 +45,18 @@ if [[ -f "${ACTIVE_FILE}" ]]; then
 	) 200>"${STATE_DIR}/active-agents.lock"
 fi
 
-# --- Agent metrics log ---
 METRICS_FILE="${LOG_DIR}/agent-metrics.jsonl"
-RESOLVED_AGENT_TYPE="${AGENT_TYPE_FROM_ACTIVE:-$(echo "${INPUT}" | jq -r '.agent_type // ""')}"
+RESOLVED_AGENT_TYPE="${AGENT_TYPE_FROM_ACTIVE:-$(jq -r '.agent_type // ""' <<< "${HOOK_INPUT}")}"
 jq -nc --arg agent_type "${RESOLVED_AGENT_TYPE}" --arg agent_id "${SUBAGENT_ID}" \
 	--argjson duration "${DURATION_SECONDS}" --arg status "${EXIT_STATUS}" --arg ts "${TIMESTAMP}" \
 	'{agent_type: $agent_type, agent_id: $agent_id, duration_seconds: $duration, status: $status, timestamp: $ts}' \
 	>>"${METRICS_FILE}"
 
-# --- Routing audit log ---
+# Routing and session-state audit: write structured events to routing-audit.jsonl, subagents.jsonl, and session.json.
 AUDIT_FILE="${LOG_DIR}/routing-audit.jsonl"
+# 200 bytes — routing-audit preview; smaller than 500-byte LAST_MSG cap for scannable log.
 LAST_MSG_PREVIEW=$(echo "${LAST_MSG}" | head -c 200)
-jq -nc --arg id "${SUBAGENT_ID}" --arg agent_type "$(echo "${INPUT}" | jq -r '.agent_type // ""')" \
+jq -nc --arg id "${SUBAGENT_ID}" --arg agent_type "$(jq -r '.agent_type // ""' <<< "${HOOK_INPUT}")" \
 	--arg msg "${LAST_MSG_PREVIEW}" --arg ts "${TIMESTAMP}" \
 	'{event: "agent_complete", id: $id, agent_type: $agent_type, message_preview: $msg, timestamp: $ts}' \
 	>>"${AUDIT_FILE}"
@@ -65,7 +66,7 @@ jq -nc --arg id "${SUBAGENT_ID}" --arg status "${EXIT_STATUS}" --arg ts "${TIMES
 	'{event: "subagent_complete", id: $id, status: $status, timestamp: $ts}' >>"${LOG_FILE}"
 
 # Log subagent final message summary and transcript path for audit
-TRANSCRIPT=$(echo "${INPUT}" | jq -r '.agent_transcript_path // ""' 2>/dev/null)
+TRANSCRIPT=$(jq -r '.agent_transcript_path // ""' <<< "${HOOK_INPUT}")
 if [[ -n "${LAST_MSG}" ]]; then
 	jq -nc --arg id "${SUBAGENT_ID}" --arg msg "${LAST_MSG}" --arg transcript "${TRANSCRIPT}" --arg ts "${TIMESTAMP}" \
 		'{event: "subagent_summary", id: $id, last_message_preview: $msg, transcript_path: $transcript, timestamp: $ts}' >>"${LOG_FILE}"
@@ -88,16 +89,15 @@ if [[ -f "${SESSION_STATE}" ]]; then
   ' "${SESSION_STATE}" >"${TMP_FILE}" && mv "${TMP_FILE}" "${SESSION_STATE}"
 fi
 
-# --- Background Agent Barrier: inject remaining-agents context into parent session ---
 # When other agents are still running, return additionalContext so the orchestrator
 # knows to wait instead of acting on partial results.
 REMAINING_ACTIVE=0
 if [[ -f "${SUBAGENTS_FILE}" ]]; then
-	REMAINING_ACTIVE=$(jq '[.active[]? | select(.status == "running")] | length' "${SUBAGENTS_FILE}" 2>/dev/null || echo "0")
+	REMAINING_ACTIVE=$(jq '[.active[]? | select(.status == "running")] | length' "${SUBAGENTS_FILE}")
 fi
 
 if [[ "${REMAINING_ACTIVE}" -gt 0 ]]; then
-	REMAINING_NAMES=$(jq -r '[.active[]? | select(.status == "running") | .type] | join(", ")' "${SUBAGENTS_FILE}" 2>/dev/null || echo "unknown")
+	REMAINING_NAMES=$(jq -r '[.active[]? | select(.status == "running") | .type] | join(", ")' "${SUBAGENTS_FILE}")
 	jq -nc --arg ctx "[BACKGROUND AGENTS PENDING] ${REMAINING_ACTIVE} agent(s) still running: ${REMAINING_NAMES}. Do NOT proceed with implementation — END your response and wait for remaining agent notifications." \
 		'{hookSpecificOutput: {hookEventName: "SubagentStop", additionalContext: $ctx}}'
 fi

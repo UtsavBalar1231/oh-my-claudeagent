@@ -10,8 +10,7 @@
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
-INPUT="${HOOK_INPUT}"
-TOOL_NAME=$(echo "${INPUT}" | jq -r '.tool_name // ""' 2>/dev/null)
+TOOL_NAME=$(jq -r '.tool_name // ""' <<< "${HOOK_INPUT}")
 
 if [[ "${TOOL_NAME}" == "ExitPlanMode" ]]; then
 	echo "[plan-mode-handler] Auto-approved ExitPlanMode — upstream AskUserQuestion gate assumed" >&2

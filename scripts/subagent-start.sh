@@ -8,15 +8,13 @@ source "$(dirname "$0")/lib/common.sh"
 # Time awareness for subagents (lightweight — date only, no hour)
 DATE_CONTEXT=$(LC_TIME=C date '+%A %B %d %Y' 2>/dev/null || echo "")
 
-INPUT="${HOOK_INPUT}"
 STATE_DIR="${HOOK_STATE_DIR}"
-LOG_DIR="${HOOK_LOG_DIR}"
 
-AGENT_ID=$(echo "${INPUT}" | jq -r '.agent_id // "unknown"')
+AGENT_ID=$(jq -r '.agent_id // "unknown"' <<< "${HOOK_INPUT}")
 
-AGENT_TYPE=$(echo "${INPUT}" | jq -r '.agent_type // "unknown"')
+AGENT_TYPE=$(jq -r '.agent_type // "unknown"' <<< "${HOOK_INPUT}")
 
-CONTEXT_PARTS="$(_section_header 'Agent Protocol')"
+CONTEXT_PARTS="$(section_header 'Agent Protocol')"
 case "${AGENT_TYPE}" in
 *explore* | *librarian* | *hephaestus* | *executor* | *multimodal* | *oracle* | *momus*)
 	CONTEXT_PARTS+="AskUserQuestion is not available here. Make autonomous decisions when possible; if you need user input, emit a '## BLOCKING QUESTIONS' block at the end of your final response (Q1., Q2., lettered options A/B/C, Recommended: line) and return. The orchestrator will relay."
@@ -38,9 +36,9 @@ CONTEXT_PARTS+=$'\n'"[OUTPUT MANDATE] Your text response is the ONLY output the 
 
 MODES_HEADER_ADDED=0
 for MODE_NAME in ralph ultrawork; do
-	if _mode_is_active "${MODE_NAME}" "${STATE_DIR}"; then
+	if mode_is_active "${MODE_NAME}" "${STATE_DIR}"; then
 		if [[ "${MODES_HEADER_ADDED}" -eq 0 ]]; then
-			CONTEXT_PARTS+="$(_section_header 'Active Modes')"
+			CONTEXT_PARTS+="$(section_header 'Active Modes')"
 			MODES_HEADER_ADDED=1
 		fi
 		CONTEXT_PARTS+=$'\n'"[${MODE_NAME^^} MODE ACTIVE] Continue working in ${MODE_NAME} mode."
@@ -49,15 +47,15 @@ done
 
 BOULDER_FILE="${STATE_DIR}/boulder.json"
 if [[ -f "${BOULDER_FILE}" ]]; then
-	PLAN_FILE=$(jq -r '.active_plan // empty' "${BOULDER_FILE}" 2>/dev/null || echo "")
-	PLAN_NAME=$(jq -r '.plan_name // empty' "${BOULDER_FILE}" 2>/dev/null || echo "")
+	PLAN_FILE=$(jq_read "${BOULDER_FILE}" '.active_plan // ""')
+	PLAN_NAME=$(jq_read "${BOULDER_FILE}" '.plan_name // ""')
 	# Validate plan file exists — platform may have deleted it
 	if [[ -n "${PLAN_FILE}" && ! -f "${PLAN_FILE}" ]]; then
-		_log_hook_error "boulder active_plan references missing file: ${PLAN_FILE} — skipping plan injection" "subagent-start.sh"
+		log_hook_error "boulder active_plan references missing file: ${PLAN_FILE} — skipping plan injection" "subagent-start.sh"
 		PLAN_FILE=""
 	fi
 	if [[ -n "${PLAN_FILE}" || -n "${PLAN_NAME}" ]]; then
-		CONTEXT_PARTS+="$(_section_header 'Plan Context')"
+		CONTEXT_PARTS+="$(section_header 'Plan Context')"
 	fi
 	if [[ -n "${PLAN_FILE}" ]]; then
 		CONTEXT_PARTS+=$'\n'"[ACTIVE PLAN] Refer to: ${PLAN_FILE}"
@@ -73,7 +71,7 @@ EXEC_GUIDANCE_HEADER_ADDED=0
 case "${AGENT_TYPE}" in
 *executor* | *hephaestus* | *sisyphus*)
 	if [[ "${EXEC_GUIDANCE_HEADER_ADDED}" -eq 0 ]]; then
-		CONTEXT_PARTS+="$(_section_header 'Execution Guidance')"
+		CONTEXT_PARTS+="$(section_header 'Execution Guidance')"
 		EXEC_GUIDANCE_HEADER_ADDED=1
 	fi
 	CONTEXT_PARTS+=$'\n'"[VERIFICATION] After running build/test/lint commands, you MUST use the evidence_log MCP tool to record results. Do NOT manually write or cat to .omca/state/verification-evidence.json — the TaskCompleted hook validates schema and will reject manual writes. Example: evidence_log(evidence_type=\"test\", command=\"just test\", exit_code=0, output_snippet=\"10 passed\")"
@@ -85,7 +83,7 @@ esac
 case "${AGENT_TYPE}" in
 *sisyphus* | *metis* | *prometheus*)
 	if [[ "${EXEC_GUIDANCE_HEADER_ADDED}" -eq 0 ]]; then
-		CONTEXT_PARTS+="$(_section_header 'Execution Guidance')"
+		CONTEXT_PARTS+="$(section_header 'Execution Guidance')"
 		EXEC_GUIDANCE_HEADER_ADDED=1
 	fi
 	CONTEXT_PARTS+=$'\n'"[ANTI-DUPLICATION] Once you delegate exploration to explore/librarian agents, do not perform the same search yourself. Avoid after delegating: manually grep/searching for the same information; re-doing research agents are handling; 'just quickly checking' the same files. Continue only with non-overlapping work. When delegated results are needed but not ready: end your response and wait for the completion notification — do not re-search the same topics while waiting."
@@ -96,7 +94,7 @@ esac
 case "${AGENT_TYPE}" in
 *sisyphus* | *prometheus*)
 	if [[ "${EXEC_GUIDANCE_HEADER_ADDED}" -eq 0 ]]; then
-		CONTEXT_PARTS+="$(_section_header 'Execution Guidance')"
+		CONTEXT_PARTS+="$(section_header 'Execution Guidance')"
 		EXEC_GUIDANCE_HEADER_ADDED=1
 	fi
 	CONTEXT_PARTS+=$'\n'"[TEAM CONTRACT] OMCA agents are thin wrappers over Claude-native subagents and agent teams. Use subagents when workers only need to report back. Use native agent teams when workers need the shared task list or direct teammate messaging."
@@ -108,13 +106,13 @@ esac
 # Inject external directory access guidance for plan-mode agents
 case "${AGENT_TYPE}" in
 *explore* | *librarian* | *oracle*)
-	CONTEXT_PARTS+="$(_section_header 'External Access')"
+	CONTEXT_PARTS+="$(section_header 'External Access')"
 	CONTEXT_PARTS+="[EXTERNAL PATH ACCESS] The Read tool is scoped to the project root for subagents. For files outside the project root, use the file_read MCP tool (available via ToolSearch). It bypasses sandbox scoping and works in all contexts including plan mode. It returns a metadata footer with token estimate (~chars/4), total line count, and remaining lines. For large files, use offset/limit to read targeted chunks (e.g. file_read(path=..., offset=100, limit=50)). Fallback: Bash(cat /path/to/file) if MCP tools are unavailable."
 	;;
 *) ;;
 esac
 
-# --- Concurrency registration (atomic read-modify-write) ---
+# Concurrency registration: record this agent in active-agents.json under flock, then bridge spawn-ID to platform agent_id in subagents.json.
 ACTIVE_FILE="${STATE_DIR}/active-agents.json"
 CATALOG_FILE="${STATE_DIR}/agent-catalog.json"
 
@@ -130,7 +128,8 @@ fi
 # Register — flock-protected read-modify-write to prevent concurrent write loss
 STARTED_EPOCH=$(date +%s)
 (
-	flock -w 5 200 || { _log_hook_error "flock timeout on active-agents" "subagent-start.sh"; }
+	# 5s — flock wait; long enough for concurrent siblings, short enough to fail fast.
+	flock -w 5 200 || { log_hook_error "flock timeout on active-agents" "subagent-start.sh"; }
 	ACTIVE=$(cat "${ACTIVE_FILE}" 2>/dev/null || echo '[]')
 	TMP_ACTIVE=$(mktemp)
 	echo "${ACTIVE}" | jq --arg id "${AGENT_ID}" --arg agent "${AGENT_TYPE}" \
@@ -161,37 +160,34 @@ if [[ -f "${SUBAGENTS_FILE}" ]]; then
 	   ' "${SUBAGENTS_FILE}" >"${TMP_SUB}" && mv "${TMP_SUB}" "${SUBAGENTS_FILE}"
 fi
 
-# --- Catalog injection for orchestrators ---
 case "${AGENT_TYPE}" in
 *sisyphus*)
 	if [[ -f "${CATALOG_FILE}" ]]; then
 		DELEGATION_TABLE=$(jq -r '
 				sort_by(.cost_tier) |
 				.[] | "- \(.name) [\(.cost_tier)] — \(.when_to_use | if . == "" then "general" else (split(",")[0] | ltrimstr(" ")) end)"
-			' "${CATALOG_FILE}" 2>/dev/null || echo "")
+			' "${CATALOG_FILE}")
 		CATEGORIES_FILE="$(dirname "$0")/../servers/categories.json"
 		CATEGORY_TABLE=""
 		if [[ -f "${CATEGORIES_FILE}" ]]; then
 			CATEGORY_TABLE=$(jq -r '
 					.categories | to_entries[] |
 					"- \(.key): model=\(.value.model) — \(.value.description)"
-				' "${CATEGORIES_FILE}" 2>/dev/null || echo "")
+				' "${CATEGORIES_FILE}")
 		fi
 		if [[ -n "${DELEGATION_TABLE}" ]]; then
-			CONTEXT_PARTS+="$(_section_header 'Agent Catalog')"
+			CONTEXT_PARTS+="$(section_header 'Agent Catalog')"
 			CONTEXT_PARTS+="[DYNAMIC AGENT CATALOG] ${DELEGATION_TABLE}"
 			[[ -n "${CATEGORY_TABLE}" ]] && CONTEXT_PARTS+=$'\n'"[CATEGORIES] ${CATEGORY_TABLE} Use Agent(model=<category_model>) to route to the right model tier."
 		fi
 	else
-		CONTEXT_PARTS+="$(_section_header 'Agent Catalog')"$'\n'"[CATALOG STALE] No agent-catalog.json found. Call agents_list() to generate the catalog for routing hints."
+		CONTEXT_PARTS+="$(section_header 'Agent Catalog')"$'\n'"[CATALOG STALE] No agent-catalog.json found. Call agents_list() to generate the catalog for routing hints."
 	fi
 	;;
 *) ;;
 esac
 
-_HOOK_END=$(date +%s%N 2>/dev/null || date +%s)
-_HOOK_MS=$(((_HOOK_END - _HOOK_START) / 1000000))
-echo "{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"hook\":\"$(basename "$0")\",\"ms\":${_HOOK_MS}}" >>"${LOG_DIR}/hook-timing.jsonl" 2>/dev/null
+hook_timing_log "${_HOOK_START}"
 
 ESCAPED=$(printf '%s' "${CONTEXT_PARTS}" | jq -Rs .)
 printf '%s\n' "{\"hookSpecificOutput\": {\"hookEventName\": \"SubagentStart\", \"additionalContext\": ${ESCAPED}}}"

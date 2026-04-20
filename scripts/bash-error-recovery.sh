@@ -4,8 +4,7 @@
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
-INPUT="${HOOK_INPUT}"
-ERROR=$(echo "${INPUT}" | jq -r '.error // .tool_error // ""' 2>/dev/null)
+ERROR=$(jq -r '.error // .tool_error // ""' <<< "${HOOK_INPUT}")
 
 # Classify bash failure
 if echo "${ERROR}" | grep -qiE 'command not found|No such file or directory.*bin'; then

@@ -2,13 +2,12 @@
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
-INPUT="${HOOK_INPUT}"
 LOG_DIR="${HOOK_LOG_DIR}"
 
 LOG_FILE="${LOG_DIR}/instructions-loaded.jsonl"
 TIMESTAMP=$(date -Iseconds)
 
-ENTRY=$(printf '%s' "${INPUT}" | jq -c --arg ts "${TIMESTAMP}" '
+ENTRY=$(jq -c --arg ts "${TIMESTAMP}" '
 	{
 		hook_event_name: (.hook_event_name // "InstructionsLoaded"),
 		file_path: (.file_path // null),
@@ -21,7 +20,7 @@ ENTRY=$(printf '%s' "${INPUT}" | jq -c --arg ts "${TIMESTAMP}" '
 	+ (if .globs? != null then {globs: .globs} else {} end)
 	+ (if .trigger_file_path? != null then {trigger_file_path: .trigger_file_path} else {} end)
 	+ (if .parent_file_path? != null then {parent_file_path: .parent_file_path} else {} end)
-' 2>/dev/null)
+' <<< "${HOOK_INPUT}")
 
 if [[ -n "${ENTRY}" ]]; then
 	printf '%s\n' "${ENTRY}" >>"${LOG_FILE}"

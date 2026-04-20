@@ -449,6 +449,7 @@ run_script_with_payload() {
 		fi
 
 		local worktree_name
+		# Reverted helper migration: validate-plugin.sh has distinct error-handling requirements.
 		worktree_name="$(jq -r '.name // ""' "${payload_path}" 2>/dev/null)"
 		local tracking_file="${project_root}/.omca/state/worktrees/${worktree_name}.json"
 		if [[ ! -f "${tracking_file}" ]]; then
@@ -659,6 +660,7 @@ check_claims() {
 
 	# Validate version consistency: plugin.json must match marketplace.json
 	local plugin_version marketplace_version
+	# Reverted helper migration: validate-plugin.sh has distinct error-handling requirements.
 	plugin_version=$(jq -r '.version // ""' "${PLUGIN_JSON}" 2>/dev/null)
 	marketplace_version=$(jq -r '.plugins[0].version // ""' "${MARKETPLACE_PATH}" 2>/dev/null)
 	if [[ -z "${plugin_version}" ]]; then
@@ -861,6 +863,7 @@ run_compaction_race_case() {
 		return 1
 	fi
 
+	# Reverted helper migration: complex expression with output redirected to file, not stdout.
 	jq -r '.hookSpecificOutput.additionalContext // ""' "${session_out}" >"${session_context_file}"
 	jq -r '.hookSpecificOutput.additionalContext // ""' "${post_out}" >"${post_context_file}"
 

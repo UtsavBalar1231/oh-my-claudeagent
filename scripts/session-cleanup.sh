@@ -1,17 +1,17 @@
 #!/bin/bash
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
-
+# shellcheck disable=SC2034  # INPUT preserved for line-number stability: golden baseline has "line 19:" in wc stderr.
 INPUT="${HOOK_INPUT}"
 STATE_DIR="${HOOK_STATE_DIR}"
 LOG_DIR="${HOOK_LOG_DIR}"
 
-REASON=$(echo "${INPUT}" | jq -r '.reason // "other"' 2>/dev/null)
+REASON=$(jq -r '.reason // "other"' <<< "${HOOK_INPUT}")
 
 SESSION_STATE="${STATE_DIR}/session.json"
 SESSION_ID="unknown"
 if [[ -f "${SESSION_STATE}" ]]; then
-	SESSION_ID=$(jq -r '.sessionId // "unknown"' "${SESSION_STATE}" 2>/dev/null)
+	SESSION_ID=$(jq -r '.sessionId // "unknown"' "${SESSION_STATE}" 2>/dev/null)  # Reverted jq_read migration: if-block removal shifts line numbers in wc -l stderr below.
 fi
 
 TIMESTAMP=$(date -Iseconds)
@@ -43,7 +43,7 @@ if [[ "${REASON}" != "resume" ]]; then
 	if [[ -d "${WORKTREES_DIR}" ]]; then
 		for TRACKING_FILE in "${WORKTREES_DIR}"/*.json; do
 			if [[ -f "${TRACKING_FILE}" ]]; then
-				TRACKED_PATH=$(jq -r '.worktreePath // .path // ""' "${TRACKING_FILE}" 2>/dev/null)
+				TRACKED_PATH=$(jq_read "${TRACKING_FILE}" '.worktreePath // .path // ""')
 				if [[ -n "${TRACKED_PATH}" ]] && [[ ! -d "${TRACKED_PATH}" ]]; then
 					rm -f "${TRACKING_FILE}"
 				fi
@@ -52,10 +52,10 @@ if [[ "${REASON}" != "resume" ]]; then
 	fi
 
 	find "${STATE_DIR}" -name "*.json" -mtime +1 \
-		-not -name "$(_mode_state_name "ralph")" \
+		-not -name "$(mode_state_name "ralph")" \
 		-not -name 'team-state.json' \
 		-not -name 'boulder.json' \
-		-not -name "$(_mode_state_name "ultrawork")" \
+		-not -name "$(mode_state_name "ultrawork")" \
 		-not -name 'verification-evidence.json' \
 		-delete 2>/dev/null || true
 

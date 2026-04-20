@@ -19,7 +19,7 @@ trap 'rm -f "${CLAIM_FILE}"' EXIT
 # Security: validate size and content before injecting compaction context.
 # An attacker who can write to compaction-context.md could inject prompt content
 # into the next session. Truncate oversized files and strip obvious injection patterns.
-LINE_COUNT=$(wc -l < "${CLAIM_FILE}" 2>/dev/null || echo 0)
+LINE_COUNT=$(wc -l < "${CLAIM_FILE}")
 if [[ "${LINE_COUNT}" -gt 200 ]]; then
 	# Truncate to 200 lines with a visible warning so the model knows it was cut
 	TRUNCATED=$(head -n 200 "${CLAIM_FILE}")
@@ -28,18 +28,20 @@ fi
 
 # Strip lines that look like prompt injection attempts (same patterns as notepad sanitization).
 # Patterns: <system>, [SYSTEM], </instructions>, <|im_start|>system
-CLEANED=$(grep -viE '^\s*(<system>|\[system\]|</instructions>|<\|im_start\|>system|<\|im_end\|>|system prompt:|</system>)' "${CLAIM_FILE}" 2>/dev/null || true)
+CLEANED=$(grep -viE '^\s*(<system>|\[system\]|</instructions>|<\|im_start\|>system|<\|im_end\|>|system prompt:|</system>)' "${CLAIM_FILE}" 2>/dev/null)
 if [[ -z "${CLEANED}" ]]; then
 	CLEANED=$(cat "${CLAIM_FILE}" 2>/dev/null || true)
 fi
 
-CLEANED_LINES=$(echo "${CLEANED}" | wc -l 2>/dev/null || echo 0)
+CLEANED_LINES=$(echo "${CLEANED}" | wc -l)
 
 # Dynamic truncation: preserve complete sections up to 150 lines if structured,
 # otherwise keep first 100 lines. Append truncation marker when content is cut.
 if echo "${CLEANED}" | grep -q '^## ' 2>/dev/null; then
+	# 150 lines — structured limit (## sections present); headroom keeps sections intact.
 	LIMIT=150
 else
+	# 100 lines — unstructured limit; prose-only context needs less to orient the model.
 	LIMIT=100
 fi
 

@@ -2,14 +2,13 @@
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
-INPUT="${HOOK_INPUT}"
 
 emit_context() {
 	local message="$1"
 	jq -nc --arg msg "${message}" '{hookSpecificOutput: {hookEventName: "PreToolUse", additionalContext: $msg}}'
 }
 
-FILE_PATH=$(echo "${INPUT}" | jq -r '.tool_input.file_path // ""' 2>/dev/null)
+FILE_PATH=$(jq -r '.tool_input.file_path // ""' <<< "${HOOK_INPUT}")
 
 if [[ -z "${FILE_PATH}" ]]; then
 	exit 0

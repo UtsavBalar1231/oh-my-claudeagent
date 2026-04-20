@@ -2,7 +2,6 @@
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
-INPUT="${HOOK_INPUT}"
 PROJECT_ROOT="${HOOK_PROJECT_ROOT}"
 STATE_DIR="${HOOK_STATE_DIR}"
 LOG_DIR="${HOOK_LOG_DIR}"
@@ -19,16 +18,17 @@ fi
 
 SESSION_ID="${CLAUDE_SESSION_ID:-$(date +%s)-$$}"
 
-# Cross-session orphan-marker sweep (Task 2 of fix-orphan-pending-final-verify-marker plan).
-# Skips on compact per Task 0 finding — CLAUDE_SESSION_ID stability across compact is unverified,
-# so the sweep would risk wiping a legitimate in-progress marker. Mirrors the SOURCE guard at line 53.
-SWEEP_SOURCE=$(echo "${INPUT}" | jq -r '.source // "startup"' 2>/dev/null || echo "startup")
+# Cross-session orphan-marker sweep: remove a pending-final-verify.json from a prior session
+# so the Stop hook does not resolve against an unrelated plan's SHA. Skipped on compact —
+# CLAUDE_SESSION_ID stability across compact is unverified; wiping would risk a live marker.
+# Mirrors the SOURCE guard at line 53.
+SWEEP_SOURCE=$(jq -r '.source // "startup"' <<< "${HOOK_INPUT}")
 PENDING_MARKER="${STATE_DIR}/pending-final-verify.json"
 if [[ "${SWEEP_SOURCE}" != "compact" ]] && [[ -f "${PENDING_MARKER}" ]]; then
-	OLD_SID=$(jq -r '.session_id // ""' "${PENDING_MARKER}" 2>/dev/null || echo "")
+	OLD_SID=$(jq_read "${PENDING_MARKER}" '.session_id // ""')
 	if [[ -n "${OLD_SID}" && "${OLD_SID}" != "null" && "${OLD_SID}" != "${SESSION_ID}" ]]; then
 		rm -f "${PENDING_MARKER}"
-		_log_hook_error "cleared cross-session orphan marker (previous session_id=${OLD_SID})" "session-init.sh"
+		log_hook_error "cleared cross-session orphan marker (previous session_id=${OLD_SID})" "session-init.sh"
 	fi
 fi
 
@@ -63,7 +63,7 @@ mkdir -p "${STATE_DIR}/worktrees"
 # Check if CLAUDE.md has OMCA configuration (only on fresh startup, not compact)
 SETUP_NOTICE=""
 OMCA_CONFIGURED=0
-SOURCE=$(echo "${INPUT}" | jq -r '.source // "startup"' 2>/dev/null)
+SOURCE=$(jq -r '.source // "startup"' <<< "${HOOK_INPUT}")
 if [[ "${SOURCE}" != "compact" ]]; then
 	GLOBAL_CLAUDE_MD="${HOME}/.claude/CLAUDE.md"
 	PROJECT_CLAUDE_MD="${PROJECT_ROOT}/CLAUDE.md"
@@ -85,6 +85,8 @@ if [[ "${SOURCE}" != "compact" ]]; then
 
 	if [[ "${OMCA_CONFIGURED}" -eq 0 ]]; then
 		PLUGIN_ROOT_CHECK="$(cd "$(dirname "$0")/.." && pwd)"
+		# Reverted helper migration: plugin.json may not exist in all installations;
+		# the 2>/dev/null guard and inline pattern are required here.
 		VERSION=$(jq -r '.version // "unknown"' "${PLUGIN_ROOT_CHECK}/.claude-plugin/plugin.json" 2>/dev/null)
 		SETUP_NOTICE="\n[OMCA] Plugin not configured. Run /oh-my-claudeagent:omca-setup to set up orchestration (v${VERSION})."
 	fi

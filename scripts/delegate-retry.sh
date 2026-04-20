@@ -2,23 +2,22 @@
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
-INPUT="${HOOK_INPUT}"
 STATE_DIR="${HOOK_STATE_DIR}"
 
-ERROR_MSG=$(echo "${INPUT}" | jq -r '.error // .tool_result.error // .output // "Unknown error"' 2>/dev/null)
-SUBAGENT_TYPE=$(echo "${INPUT}" | jq -r '.tool_input.subagent_type // "unknown"' 2>/dev/null)
-TOOL_NAME=$(echo "${INPUT}" | jq -r '.tool_name // "Task"' 2>/dev/null)
+ERROR_MSG=$(jq -r '.error // .tool_result.error // .output // "Unknown error"' <<< "${HOOK_INPUT}")
+SUBAGENT_TYPE=$(jq -r '.tool_input.subagent_type // "unknown"' <<< "${HOOK_INPUT}")
+TOOL_NAME=$(jq -r '.tool_name // "Task"' <<< "${HOOK_INPUT}")
 
 # Detect subagent nesting depth violation (non-recoverable)
 # Error string observed in atlas transcript (agent-a6ece1cf5c29f1da5.jsonl)
 # grep -qi provides case-insensitive matching for resilience against format changes
 if echo "${ERROR_MSG}" | grep -qi "No such tool available: Agent"; then
 	MSG="[NESTING LIMIT] The Agent tool is unavailable — you are running as a subagent and cannot spawn further subagents. This is a Claude Code platform constraint. Implement the task directly using Read, Write, Edit, Bash, Grep, Glob. Do NOT retry Agent calls."
-	ESCAPED=$(echo "${MSG}" | jq -Rs .)
-	echo "{\"hookSpecificOutput\": {\"hookEventName\": \"PostToolUseFailure\", \"additionalContext\": ${ESCAPED}}}"
+	emit_context "PostToolUseFailure" "${MSG}"
 	exit 0
 fi
 
+# 200 bytes — ERROR_MSG cap; enough to identify error class without flooding context.
 ERROR_SUMMARY=$(echo "${ERROR_MSG}" | head -c 200)
 
 # Task 2.2 — Error classification
@@ -36,7 +35,7 @@ ERROR_COUNTS_FILE="${STATE_DIR}/error-counts.json"
 ERROR_KEY="${TOOL_NAME}:delegate_error"
 
 if [[ -f "${ERROR_COUNTS_FILE}" ]]; then
-	CURRENT_COUNT=$(jq -r --arg key "${ERROR_KEY}" '.[$key] // 0' "${ERROR_COUNTS_FILE}" 2>/dev/null || echo "0")
+	CURRENT_COUNT=$(jq -r --arg key "${ERROR_KEY}" '.[$key] // 0' "${ERROR_COUNTS_FILE}")
 else
 	CURRENT_COUNT=0
 fi
@@ -66,8 +65,7 @@ if echo "${ERROR_MSG}" | grep -qiE "${RETRYABLE_PATTERNS}"; then
 	# Task 2.3 — Structured output
 	MSG="[ERROR RECOVERY] Type: transient | Tool: ${TOOL_NAME} | Retry: ${NEW_COUNT}/3
 [RETRYABLE ERROR] The delegation failed due to a transient error (rate limit, capacity, timeout). Retry the same delegation — do not escalate to oracle for transient failures. ${TRANSIENT_NOTE}${CIRCUIT_BREAKER}"
-	ESCAPED=$(echo "${MSG}" | jq -Rs .)
-	echo "{\"hookSpecificOutput\": {\"hookEventName\": \"PostToolUseFailure\", \"additionalContext\": ${ESCAPED}}}"
+	emit_context "PostToolUseFailure" "${MSG}"
 	exit 0
 fi
 
@@ -75,6 +73,4 @@ fi
 # Task 2.4 — For deterministic/unknown: do NOT suppress reflection
 MSG="[ERROR RECOVERY] Type: ${ERROR_CLASS} | Tool: ${TOOL_NAME} | Retry: ${NEW_COUNT}/3
 [DELEGATE RETRY] Task delegation failed for agent '${SUBAGENT_TYPE}': ${ERROR_SUMMARY}. Consider: 1) Retry with more specific prompt, 2) Try a different agent tier, 3) Break task into smaller pieces.${CIRCUIT_BREAKER}"
-ESCAPED=$(echo "${MSG}" | jq -Rs .)
-
-echo "{\"hookSpecificOutput\": {\"hookEventName\": \"PostToolUseFailure\", \"additionalContext\": ${ESCAPED}}}"
+emit_context "PostToolUseFailure" "${MSG}"

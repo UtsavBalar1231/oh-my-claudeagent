@@ -2,9 +2,8 @@
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
-INPUT="${HOOK_INPUT}"
 
-COMMAND=$(echo "${INPUT}" | jq -r '.tool_input.command // ""' 2>/dev/null)
+COMMAND=$(jq -r '.tool_input.command // ""' <<< "${HOOK_INPUT}")
 
 if [[ -z "${COMMAND}" ]]; then
 	exit 0

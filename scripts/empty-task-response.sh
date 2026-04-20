@@ -2,15 +2,14 @@
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
-INPUT="${HOOK_INPUT}"
 
-RESPONSE=$(echo "${INPUT}" | jq -r '.tool_response // .tool_result // ""' 2>/dev/null)
+RESPONSE=$(jq -r '.tool_response // .tool_result // ""' <<< "${HOOK_INPUT}")
 
 RESPONSE_LENGTH=${#RESPONSE}
 
 # Check for empty/very short responses
 IS_POOR=false
-if [[ "${RESPONSE_LENGTH}" -lt 50 ]] || [[ -z "$(echo "${RESPONSE}" | tr -d '[:space:]' || true)" ]]; then
+if [[ "${RESPONSE_LENGTH}" -lt 50 ]] || [[ -z "$(echo "${RESPONSE}" | tr -d '[:space:]')" ]]; then
 	IS_POOR=true
 fi
 
@@ -24,8 +23,7 @@ fi
 
 if [[ "${IS_POOR}" == "true" ]]; then
 	MSG="[POOR AGENT OUTPUT] The agent returned empty, trivially short, or transitional text instead of a structured synthesis. The agent likely exhausted its turns on tool calls without producing a final summary. Consider: 1) Use SendMessage to resume the agent and ask it to synthesize its findings, 2) Retry with a more specific prompt that includes explicit output format requirements, 3) Check if the agent had the right tools for the task."
-	ESCAPED=$(echo "${MSG}" | jq -Rs .)
-	echo "{\"hookSpecificOutput\": {\"hookEventName\": \"PostToolUse\", \"additionalContext\": ${ESCAPED}}}"
+	emit_context "PostToolUse" "${MSG}"
 else
 	USAGE_FILE="${HOOK_STATE_DIR}/agent-usage.json"
 	if [[ -f "${USAGE_FILE}" ]]; then
@@ -34,7 +32,7 @@ else
 	fi
 
 	# Soft validation: check for required output sections by agent type (advisory only)
-	AGENT_TYPE=$(echo "${INPUT}" | jq -r '.agent_name // .subagent_type // ""' 2>/dev/null | sed 's/.*://')
+	AGENT_TYPE=$(jq -r '.agent_name // .subagent_type // ""' <<< "${HOOK_INPUT}" | sed 's/.*://')
 	MISSING_SECTIONS=""
 	case "${AGENT_TYPE}" in
 	executor)
@@ -76,8 +74,7 @@ else
 
 	if [[ -n "${MISSING_SECTIONS}" ]]; then
 		WARN="[ADVISORY] Agent '${AGENT_TYPE}' output is missing expected section headers:${MISSING_SECTIONS}. The required output format specifies these sections. Output may be incomplete or hard to parse downstream."
-		ESCAPED=$(echo "${WARN}" | jq -Rs .)
-		echo "{\"hookSpecificOutput\": {\"hookEventName\": \"PostToolUse\", \"additionalContext\": ${ESCAPED}}}"
+		emit_context "PostToolUse" "${WARN}"
 	else
 		exit 0
 	fi

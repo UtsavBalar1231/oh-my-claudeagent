@@ -2,16 +2,18 @@
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
-INPUT="${HOOK_INPUT}"
 STATE_DIR="${HOOK_STATE_DIR}"
 LOG_DIR="${HOOK_LOG_DIR}"
 
+# 2 — platform exit code blocking TaskCompleted; exit 0 allows, exit 2 blocks.
 BLOCK_EXIT_CODE=2
+# 300s (5m) — per-task evidence freshness; final-verification uses 3600s. UNDOCUMENTED.
 MAX_EVIDENCE_AGE_SECONDS=300
 
-TASK_DESCRIPTION=$(echo "${INPUT}" | jq -r '.task_description // .description // ""' 2>/dev/null || echo "")
-TEAMMATE_NAME=$(echo "${INPUT}" | jq -r '.teammate_name // ""' 2>/dev/null || echo "")
-TEAM_NAME=$(echo "${INPUT}" | jq -r '.team_name // ""' 2>/dev/null || echo "")
+# TASK_DESCRIPTION truncated to :0:100 at three log/error sites — keeps entries scannable.
+TASK_DESCRIPTION=$(jq -r '.task_description // .description // ""' <<< "${HOOK_INPUT}")
+TEAMMATE_NAME=$(jq -r '.teammate_name // ""' <<< "${HOOK_INPUT}")
+TEAM_NAME=$(jq -r '.team_name // ""' <<< "${HOOK_INPUT}")
 
 # Log agent identity for audit trail when present
 if [[ -n "${TEAMMATE_NAME}" ]] || [[ -n "${TEAM_NAME}" ]]; then
@@ -78,12 +80,12 @@ if [[ "${RECENT_EVIDENCE}" == "true" ]]; then
 	    )
 	  | all
 	' "${EVIDENCE_FILE}" >/dev/null 2>&1; then
-		_log_hook_error "invalid evidence schema for task: ${TASK_DESCRIPTION:0:100}" "task-completed-verify.sh"
+		log_hook_error "invalid evidence schema for task: ${TASK_DESCRIPTION:0:100}" "task-completed-verify.sh"
 		echo "Verification evidence has invalid schema. Use the evidence_log MCP tool (NOT manual file writes). Required: entries[] with type, command, exit_code, output_snippet, timestamp fields." >&2
 		exit "${BLOCK_EXIT_CODE}"
 	fi
 elif [[ "${NEEDS_EVIDENCE}" == "true" ]]; then
-	_log_hook_error "missing verification evidence for task: ${TASK_DESCRIPTION:0:100}" "task-completed-verify.sh"
+	log_hook_error "missing verification evidence for task: ${TASK_DESCRIPTION:0:100}" "task-completed-verify.sh"
 	if [[ "${RECENT_EDITS}" == "true" ]]; then
 		echo "Files were modified but no verification evidence was recorded. Use the evidence_log MCP tool after running build/test commands. Example: evidence_log(evidence_type=\"test\", command=\"just test\", exit_code=0, output_snippet=\"10 passed\")" >&2
 	else

@@ -2,10 +2,9 @@
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
-INPUT="${HOOK_INPUT}"
 
-TOOL_NAME=$(echo "${INPUT}" | jq -r '.tool_name // ""' 2>/dev/null)
-ERROR_MSG=$(echo "${INPUT}" | jq -r '.error // .tool_result.error // ""' 2>/dev/null)
+TOOL_NAME=$(jq -r '.tool_name // ""' <<< "${HOOK_INPUT}")
+ERROR_MSG=$(jq -r '.error // .tool_result.error // ""' <<< "${HOOK_INPUT}")
 
 case "${TOOL_NAME}" in
 Bash | Read | Grep | Glob | WebFetch | WebSearch)
@@ -27,16 +26,15 @@ elif echo "${ERROR_MSG}" | grep -qiE 'mcp.*error|tool.*unavailable|server.*not.*
 fi
 if [[ -n "${ADVICE:-}" ]]; then
 	MSG="[MCP ERROR RECOVERY] ${ADVICE}"
-	ESCAPED=$(echo "${MSG}" | jq -Rs .)
-	echo "{\"hookSpecificOutput\": {\"hookEventName\": \"PostToolUseFailure\", \"additionalContext\": ${ESCAPED}}}"
+	emit_context "PostToolUseFailure" "${MSG}"
 	exit 0
 fi
 
 if echo "${ERROR_MSG}" | grep -qiE '(invalid JSON|malformed JSON|parse error|SyntaxError|Unexpected token|JSON\.parse)'; then
+	# 200 bytes — ERROR_MSG cap; same as delegate-retry.sh; shows parse-error location.
 	ERROR_DETAIL=$(echo "${ERROR_MSG}" | head -c 200)
 	MSG="[JSON ERROR RECOVERY] JSON parse error detected in ${TOOL_NAME}. Common fixes: 1) Check for trailing commas in objects/arrays, 2) Ensure all strings are double-quoted, 3) Escape special characters in string values, 4) Verify brackets/braces are balanced. Error: ${ERROR_DETAIL}"
-	ESCAPED=$(echo "${MSG}" | jq -Rs .)
-	echo "{\"hookSpecificOutput\": {\"hookEventName\": \"PostToolUseFailure\", \"additionalContext\": ${ESCAPED}}}"
+	emit_context "PostToolUseFailure" "${MSG}"
 else
 	exit 0
 fi

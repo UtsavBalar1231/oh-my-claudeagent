@@ -2,13 +2,12 @@
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
-INPUT="${HOOK_INPUT}"
 STATE_DIR="${HOOK_STATE_DIR}"
 LOG_DIR="${HOOK_LOG_DIR}"
 
-FILE_PATH=$(echo "${INPUT}" | jq -r '.tool_input.file_path // "unknown"' 2>/dev/null)
-ERROR_MSG=$(echo "${INPUT}" | jq -r '.error // .tool_result.error // "Unknown error"' 2>/dev/null)
-TOOL_NAME=$(echo "${INPUT}" | jq -r '.tool_name // "Edit"' 2>/dev/null)
+FILE_PATH=$(jq -r '.tool_input.file_path // "unknown"' <<< "${HOOK_INPUT}")
+ERROR_MSG=$(jq -r '.error // .tool_result.error // "Unknown error"' <<< "${HOOK_INPUT}")
+TOOL_NAME=$(jq -r '.tool_name // "Edit"' <<< "${HOOK_INPUT}")
 
 TIMESTAMP=$(date -Iseconds)
 
@@ -32,7 +31,7 @@ ERROR_COUNTS_FILE="${STATE_DIR}/error-counts.json"
 ERROR_KEY="${TOOL_NAME}:edit_error"
 
 if [[ -f "${ERROR_COUNTS_FILE}" ]]; then
-	CURRENT_COUNT=$(jq -r --arg key "${ERROR_KEY}" '.[$key] // 0' "${ERROR_COUNTS_FILE}" 2>/dev/null || echo "0")
+	CURRENT_COUNT=$(jq -r --arg key "${ERROR_KEY}" '.[$key] // 0' "${ERROR_COUNTS_FILE}")
 else
 	CURRENT_COUNT=0
 fi
@@ -72,5 +71,4 @@ fi
 MSG="[ERROR RECOVERY] Type: ${ERROR_CLASS} | Tool: ${TOOL_NAME} | Retry: ${NEW_COUNT}/3
 ${RECOVERY_SUGGESTION}${CIRCUIT_BREAKER}"
 
-ESCAPED=$(echo "${MSG}" | jq -Rs .)
-echo "{\"hookSpecificOutput\": {\"hookEventName\": \"PostToolUseFailure\", \"additionalContext\": ${ESCAPED}}}"
+emit_context "PostToolUseFailure" "${MSG}"

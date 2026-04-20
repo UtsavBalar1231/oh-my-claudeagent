@@ -5,14 +5,14 @@ _HOOK_START=$(date +%s%N 2>/dev/null || date +%s)
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
-INPUT="${HOOK_INPUT}"
 STATE_DIR="${HOOK_STATE_DIR}"
 LOG_DIR="${HOOK_LOG_DIR}"
 
-SUBAGENT_TYPE=$(echo "${INPUT}" | jq -r '.tool_input.subagent_type // "unknown"' 2>/dev/null)
-SUBAGENT_PROMPT_FULL=$(echo "${INPUT}" | jq -r '.tool_input.prompt // ""' 2>/dev/null)
+SUBAGENT_TYPE=$(jq -r '.tool_input.subagent_type // "unknown"' <<< "${HOOK_INPUT}")
+SUBAGENT_PROMPT_FULL=$(jq -r '.tool_input.prompt // ""' <<< "${HOOK_INPUT}")
+# 200 chars — prompt preview cap for spawn-audit log; avoids storing full prompt bodies.
 SUBAGENT_PROMPT="${SUBAGENT_PROMPT_FULL:0:200}"
-SUBAGENT_MODEL=$(echo "${INPUT}" | jq -r '.tool_input.model // "default"' 2>/dev/null)
+SUBAGENT_MODEL=$(jq -r '.tool_input.model // "default"' <<< "${HOOK_INPUT}")
 
 TIMESTAMP=$(date -Iseconds)
 # Portable pseudo-unique ID (seconds + random noise — not true milliseconds)
@@ -40,11 +40,8 @@ AGENT_USAGE="${STATE_DIR}/agent-usage.json"
 	jq '.agentUsed = true' "${AGENT_USAGE}" >"${TMP2}" && mv "${TMP2}" "${AGENT_USAGE}"
 }
 
-SESSION_ID="unknown"
 SESSION_STATE="${STATE_DIR}/session.json"
-if [[ -f "${SESSION_STATE}" ]]; then
-	SESSION_ID=$(jq -r '.sessionId // "unknown"' "${SESSION_STATE}" 2>/dev/null)
-fi
+SESSION_ID=$(jq_read "${SESSION_STATE}" '.sessionId // "unknown"')
 
 LOG_FILE="${LOG_DIR}/subagents.jsonl"
 jq -nc --arg id "${SPAWN_ID}" --arg type "${SUBAGENT_TYPE}" --arg model "${SUBAGENT_MODEL}" --arg ts "${TIMESTAMP}" \
@@ -59,7 +56,7 @@ if [[ -f "${SESSION_STATE}" ]]; then
 		"${SESSION_STATE}" >"${TMP_FILE}" && mv "${TMP_FILE}" "${SESSION_STATE}"
 fi
 
-# --- Routing validation (advisory only) ---
+# Routing validation: advisory model/concurrency check against agent-catalog.json; never blocks spawn.
 ROUTING_CONTEXT=""
 
 # Read cached catalog (written by agents_list() MCP tool)
@@ -88,7 +85,7 @@ if [[ -f "${CATALOG_FILE}" ]] && [[ -f "${CATEGORIES_FILE}" ]]; then
 	if [[ -f "${ACTIVE_FILE}" ]]; then
 		CURRENT_MODEL="${SUBAGENT_MODEL}"
 		[[ "${CURRENT_MODEL}" == "default" ]] && CURRENT_MODEL="${EXPECTED_MODEL}"
-		MODEL_COUNT=$(jq --arg m "${CURRENT_MODEL}" '[.[] | select(.model == $m)] | length' "${ACTIVE_FILE}" 2>/dev/null || echo 0)
+		MODEL_COUNT=$(jq --arg m "${CURRENT_MODEL}" '[.[] | select(.model == $m)] | length' "${ACTIVE_FILE}")
 		MODEL_LIMIT=$(jq -r --arg m "${CURRENT_MODEL}" '.concurrency_limits[$m] // 999' "${CATEGORIES_FILE}" 2>/dev/null)
 		if [[ "${MODEL_COUNT}" -ge "${MODEL_LIMIT}" ]]; then
 			ROUTING_CONTEXT+=" [CONCURRENCY WARNING] ${MODEL_COUNT}/${MODEL_LIMIT} ${CURRENT_MODEL} agents active."
@@ -96,9 +93,7 @@ if [[ -f "${CATALOG_FILE}" ]] && [[ -f "${CATEGORIES_FILE}" ]]; then
 	fi
 fi
 
-_HOOK_END=$(date +%s%N 2>/dev/null || date +%s)
-_HOOK_MS=$(((_HOOK_END - _HOOK_START) / 1000000))
-echo "{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"hook\":\"$(basename "$0")\",\"ms\":${_HOOK_MS}}" >>"${LOG_DIR}/hook-timing.jsonl" 2>/dev/null
+hook_timing_log "${_HOOK_START}"
 
 SPAWN_MSG="Subagent ${SUBAGENT_TYPE} (${SPAWN_ID}) spawned with model ${SUBAGENT_MODEL}${ROUTING_CONTEXT}"
 jq -nc --arg msg "${SPAWN_MSG}" '{hookSpecificOutput: {hookEventName: "PreToolUse", additionalContext: $msg}}'

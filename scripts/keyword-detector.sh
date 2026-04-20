@@ -2,17 +2,16 @@
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
-INPUT="${HOOK_INPUT}"
 STATE_DIR="${HOOK_STATE_DIR}"
 
 # Skip keyword detection for subagent sessions
 # All hook payloads include agent_id when firing inside a subagent
-AGENT_ID=$(echo "${INPUT}" | jq -r '.agent_id // ""' 2>/dev/null)
+AGENT_ID=$(jq -r '.agent_id // ""' <<< "${HOOK_INPUT}")
 if [[ -n "${AGENT_ID}" ]]; then
 	exit 0  # Skip keyword detection for subagent sessions
 fi
 
-PROMPT=$(echo "${INPUT}" | jq -r '.prompt // empty' 2>/dev/null || echo "")
+PROMPT=$(jq -r '.prompt // ""' <<< "${HOOK_INPUT}")
 RALPH_STATE="${STATE_DIR}/ralph-state.json"
 ULTRAWORK_STATE="${STATE_DIR}/ultrawork-state.json"
 
@@ -104,15 +103,14 @@ if [[ ${#DETECTED_KEYWORDS[@]} -gt 0 ]]; then
 	STATE_FILE="${HOOK_STATE_DIR}/session.json"
 
 	if [[ -f "${STATE_FILE}" ]]; then
-		KEYWORDS_JSON=$(printf '%s\n' "${DETECTED_KEYWORDS[@]}" | jq -R . | jq -s . || true)
+		KEYWORDS_JSON=$(printf '%s\n' "${DETECTED_KEYWORDS[@]}" | jq -R . | jq -s .)
 		TMP_FILE=$(mktemp)
 		jq --argjson keywords "${KEYWORDS_JSON}" '.detectedKeywords = $keywords' "${STATE_FILE}" >"${TMP_FILE}" && mv "${TMP_FILE}" "${STATE_FILE}"
 	fi
 fi
 
 if [[ -n "${ADDITIONAL_CONTEXT}" ]]; then
-	ESCAPED_CONTEXT=$(echo "${ADDITIONAL_CONTEXT}" | jq -Rs .)
-	echo "{\"hookSpecificOutput\": {\"hookEventName\": \"UserPromptSubmit\", \"additionalContext\": ${ESCAPED_CONTEXT}}}"
+	emit_context "UserPromptSubmit" "${ADDITIONAL_CONTEXT}"
 else
 	exit 0
 fi

@@ -2,22 +2,21 @@
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
-INPUT="${HOOK_INPUT}"
 STATE_DIR="${HOOK_STATE_DIR}"
 LOG_DIR="${HOOK_LOG_DIR}"
 
 TIMESTAMP=$(date -Iseconds)
 
-ERROR_TYPE=$(echo "${INPUT}" | jq -r '.error // "unknown"' 2>/dev/null)
-ERROR_DETAILS=$(echo "${INPUT}" | jq -r '.error_details // ""' 2>/dev/null)
-LAST_MSG=$(echo "${INPUT}" | jq -r '.last_assistant_message // ""' 2>/dev/null)
+ERROR_TYPE=$(jq -r '.error // "unknown"' <<< "${HOOK_INPUT}")
+ERROR_DETAILS=$(jq -r '.error_details // ""' <<< "${HOOK_INPUT}")
+LAST_MSG=$(jq -r '.last_assistant_message // ""' <<< "${HOOK_INPUT}")
 
 # Detect active persistence modes
 RALPH_ACTIVE=false
 ULTRAWORK_ACTIVE=false
 
-_mode_is_active "ralph" "${STATE_DIR}" && RALPH_ACTIVE=true
-_mode_is_active "ultrawork" "${STATE_DIR}" && ULTRAWORK_ACTIVE=true
+mode_is_active "ralph" "${STATE_DIR}" && RALPH_ACTIVE=true
+mode_is_active "ultrawork" "${STATE_DIR}" && ULTRAWORK_ACTIVE=true
 
 # Build log entry
 if [[ "${RALPH_ACTIVE}" == "true" || "${ULTRAWORK_ACTIVE}" == "true" ]]; then

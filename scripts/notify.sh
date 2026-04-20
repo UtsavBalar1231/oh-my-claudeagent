@@ -2,11 +2,10 @@
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
-INPUT="${HOOK_INPUT}"
 LOG_DIR="${HOOK_LOG_DIR}"
 
-NOTIFICATION_TYPE=$(echo "${INPUT}" | jq -r '.type // "notification"' 2>/dev/null)
-MESSAGE=$(echo "${INPUT}" | jq -r '.message // "Claude Code needs attention"' 2>/dev/null)
+NOTIFICATION_TYPE=$(jq -r '.type // "notification"' <<< "${HOOK_INPUT}")
+MESSAGE=$(jq -r '.message // "Claude Code needs attention"' <<< "${HOOK_INPUT}")
 TITLE="oh-my-claudeagent"
 
 case "${NOTIFICATION_TYPE}" in

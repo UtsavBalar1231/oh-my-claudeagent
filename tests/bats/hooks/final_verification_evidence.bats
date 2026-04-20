@@ -308,7 +308,7 @@ EOF
 	_write_marker "${plan_file}" "${NOW}" "bats-test-session" "${plan_sha}"
 	# No F1-F4 evidence — would block if sidecar short-circuit did not fire
 
-	# Write sidecar with matching SHA at the path _compute_sidecar_path would resolve
+	# Write sidecar with matching SHA at the path compute_sidecar_path would resolve
 	local plan_basename
 	plan_basename=$(basename "${plan_file}" .md)
 	mkdir -p "${CLAUDE_PROJECT_ROOT}/.omca/notes"

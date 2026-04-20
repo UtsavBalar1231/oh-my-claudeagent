@@ -3,12 +3,11 @@
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
-INPUT="${HOOK_INPUT}"
 PROJECT_ROOT="${HOOK_PROJECT_ROOT}"
 STATE_DIR="${HOOK_STATE_DIR}"
 LOG_DIR="${HOOK_LOG_DIR}"
 
-HOOK_EVENT_NAME=$(echo "${INPUT}" | jq -r '.hook_event_name // ""' 2>/dev/null)
+HOOK_EVENT_NAME=$(jq -r '.hook_event_name // ""' <<< "${HOOK_INPUT}")
 TIMESTAMP=$(date -Iseconds)
 
 build_watch_paths_json() {
@@ -105,11 +104,11 @@ write_repo_state() {
 handle_task_created() {
 	local task_id task_subject task_description teammate_name team_name
 
-	task_id=$(echo "${INPUT}" | jq -r '.task_id // ""' 2>/dev/null)
-	task_subject=$(echo "${INPUT}" | jq -r '.task_subject // ""' 2>/dev/null)
-	task_description=$(echo "${INPUT}" | jq -r '.task_description // ""' 2>/dev/null)
-	teammate_name=$(echo "${INPUT}" | jq -r '.teammate_name // ""' 2>/dev/null)
-	team_name=$(echo "${INPUT}" | jq -r '.team_name // ""' 2>/dev/null)
+	task_id=$(jq -r '.task_id // ""' <<< "${HOOK_INPUT}")
+	task_subject=$(jq -r '.task_subject // ""' <<< "${HOOK_INPUT}")
+	task_description=$(jq -r '.task_description // ""' <<< "${HOOK_INPUT}")
+	teammate_name=$(jq -r '.teammate_name // ""' <<< "${HOOK_INPUT}")
+	team_name=$(jq -r '.team_name // ""' <<< "${HOOK_INPUT}")
 
 	jq -nc \
 		--arg task_id "${task_id}" \
@@ -137,22 +136,22 @@ handle_repo_refresh() {
 
 	case "${HOOK_EVENT_NAME}" in
 	CwdChanged)
-		old_cwd=$(echo "${INPUT}" | jq -r '.old_cwd // ""' 2>/dev/null)
-		active_cwd=$(echo "${INPUT}" | jq -r '.new_cwd // .cwd // ""' 2>/dev/null)
+		old_cwd=$(jq -r '.old_cwd // ""' <<< "${HOOK_INPUT}")
+		active_cwd=$(jq -r '.new_cwd // .cwd // ""' <<< "${HOOK_INPUT}")
 		changed_path=""
 		changed_event=""
 		;;
 	FileChanged)
-		active_cwd=$(echo "${INPUT}" | jq -r '.cwd // ""' 2>/dev/null)
+		active_cwd=$(jq -r '.cwd // ""' <<< "${HOOK_INPUT}")
 		old_cwd=""
-		changed_path=$(echo "${INPUT}" | jq -r '.file_path // ""' 2>/dev/null)
-		changed_event=$(echo "${INPUT}" | jq -r '.event // ""' 2>/dev/null)
+		changed_path=$(jq -r '.file_path // ""' <<< "${HOOK_INPUT}")
+		changed_event=$(jq -r '.event // ""' <<< "${HOOK_INPUT}")
 		if [[ -z "${active_cwd}" ]] && [[ -n "${changed_path}" ]]; then
 			active_cwd="$(dirname "${changed_path}")"
 		fi
 		;;
 	*)
-		_log_hook_error "Unsupported repo refresh event '${HOOK_EVENT_NAME}'" "lifecycle-state.sh"
+		log_hook_error "Unsupported repo refresh event '${HOOK_EVENT_NAME}'" "lifecycle-state.sh"
 		echo "Unsupported repo refresh event: ${HOOK_EVENT_NAME}" >&2
 		exit 1
 		;;
@@ -170,13 +169,13 @@ handle_repo_refresh() {
 handle_worktree_create() {
 	local name repo_root worktrees_root worktree_path tracking_file tmp_file
 
-	name=$(echo "${INPUT}" | jq -r '.name // ""' 2>/dev/null)
+	name=$(jq -r '.name // ""' <<< "${HOOK_INPUT}")
 	if [[ -z "${name}" ]]; then
 		echo "WorktreeCreate hook requires a non-empty name" >&2
 		exit 1
 	fi
 
-	repo_root=$(resolve_repo_root "$(echo "${INPUT}" | jq -r '.cwd // ""' 2>/dev/null)")
+	repo_root=$(resolve_repo_root "$(jq -r '.cwd // ""' <<< "${HOOK_INPUT}")")
 	worktrees_root="${repo_root}/.claude/worktrees"
 	worktree_path="${worktrees_root}/${name}"
 
@@ -218,7 +217,7 @@ handle_worktree_create() {
 handle_worktree_remove() {
 	local name tracking_file
 
-	name=$(echo "${INPUT}" | jq -r '.name // ""' 2>/dev/null)
+	name=$(jq -r '.name // ""' <<< "${HOOK_INPUT}")
 	if [[ -z "${name}" ]]; then
 		echo "WorktreeRemove hook requires a non-empty name" >&2
 		exit 1
@@ -249,7 +248,7 @@ WorktreeRemove)
 	handle_worktree_remove
 	;;
 *)
-	_log_hook_error "Unsupported lifecycle event '${HOOK_EVENT_NAME}'" "lifecycle-state.sh"
+	log_hook_error "Unsupported lifecycle event '${HOOK_EVENT_NAME}'" "lifecycle-state.sh"
 	echo "Unsupported lifecycle event: ${HOOK_EVENT_NAME}" >&2
 	exit 1
 	;;

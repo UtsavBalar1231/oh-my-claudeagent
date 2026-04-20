@@ -15,16 +15,16 @@ TMP_CONTEXT="${STATE_DIR}/compaction-context.tmp.$$"
 ## Active Mode
 TEMPLATE
 
-	if _mode_is_active "ralph" "${STATE_DIR}"; then
+	if mode_is_active "ralph" "${STATE_DIR}"; then
 		printf '%s\n' "Ralph mode is ACTIVE. The boulder never stops. Continue working on incomplete tasks."
 		BOULDER_FILE="${STATE_DIR}/boulder.json"
 		if [[ -f "${BOULDER_FILE}" ]]; then
 			printf '\n## Active Plan Reference\n'
-			jq -r '.active_plan // "No plan file"' "${BOULDER_FILE}" 2>/dev/null || true
+			jq_read "${BOULDER_FILE}" '.active_plan // "No plan file"'
 		fi
 	fi
 
-	if _mode_is_active "ultrawork" "${STATE_DIR}"; then
+	if mode_is_active "ultrawork" "${STATE_DIR}"; then
 		printf '%s\n' "Ultrawork mode is ACTIVE. Continue parallel work."
 	fi
 
@@ -56,7 +56,7 @@ TEMPLATE
 			for SECTION_FILE in "${PLAN_DIR}"*.md; do
 				[[ -f "${SECTION_FILE}" ]] || continue
 				SECTION_NAME=$(basename "${SECTION_FILE}" .md)
-				LINE_COUNT=$(wc -l <"${SECTION_FILE}" 2>/dev/null || echo 0)
+				LINE_COUNT=$(wc -l <"${SECTION_FILE}")
 				printf '- %s: %s lines\n' "${SECTION_NAME}" "${LINE_COUNT}"
 			done
 		done

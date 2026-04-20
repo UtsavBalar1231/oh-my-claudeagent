@@ -5,13 +5,14 @@
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
-INPUT="${HOOK_INPUT}"
 STATE_DIR="${HOOK_STATE_DIR}"
 
+# 3600s (1h) — F1-F4 freshness; sibling task-completed-verify uses 300s. UNDOCUMENTED.
 MAX_EVIDENCE_AGE_SECONDS=3600
+# 86400s (24h) — orphan-marker TTL. Belt-and-suspenders behind session-ID mismatch guard.
 MAX_MARKER_AGE_SECONDS=86400
 
-_noop_exit() {
+noop_exit() {
 	printf '{}\n'
 	exit 0
 }
@@ -19,13 +20,13 @@ _noop_exit() {
 # Kill switch for emergency rollback
 if [[ "${OMCA_HOOK_DISABLE_FINAL_VERIFY:-}" == "1" ]]; then
 	echo "[FINAL VERIFICATION] Kill switch active (OMCA_HOOK_DISABLE_FINAL_VERIFY=1) — skipping F1-F4 check." >&2
-	_noop_exit
+	noop_exit
 fi
 
 # Recursion guard
-STOP_HOOK_ACTIVE=$(echo "${INPUT}" | jq -r '.stop_hook_active // false' 2>/dev/null || echo "false")
+STOP_HOOK_ACTIVE=$(jq -r '.stop_hook_active // false' <<< "${HOOK_INPUT}")
 if [[ "${STOP_HOOK_ACTIVE}" == "true" ]]; then
-	_noop_exit
+	noop_exit
 fi
 
 # Background-subagent guard: skip F1-F4 enforcement while agents are still running
@@ -37,11 +38,11 @@ if [[ -f "${SUBAGENTS_FILE}" ]]; then
 		'[.active[]? | select(.status == "running") | select(
 			(.started_epoch // 0) > ($now - 900)
 		)] | length' \
-		"${SUBAGENTS_FILE}" 2>/dev/null || echo "0")
+		"${SUBAGENTS_FILE}")
 fi
 if [[ "${FV_ACTIVE_AGENTS}" -gt 0 ]]; then
-	_log_hook_error "final-verification deferred: ${FV_ACTIVE_AGENTS} background subagent(s) still running" "final-verification-evidence.sh"
-	_noop_exit
+	log_hook_error "final-verification deferred: ${FV_ACTIVE_AGENTS} background subagent(s) still running" "final-verification-evidence.sh"
+	noop_exit
 fi
 
 BOULDER_FILE="${STATE_DIR}/boulder.json"
@@ -49,44 +50,36 @@ MARKER_FILE="${STATE_DIR}/pending-final-verify.json"
 EVIDENCE_FILE="${STATE_DIR}/verification-evidence.json"
 
 # Determine whether enforcement applies via active boulder or persistent marker
-ACTIVE_PLAN=""
-if [[ -f "${BOULDER_FILE}" ]]; then
-	ACTIVE_PLAN=$(jq -r '.active_plan // ""' "${BOULDER_FILE}" 2>/dev/null || echo "")
-fi
+ACTIVE_PLAN=$(jq_read "${BOULDER_FILE}" '.active_plan // ""')
 
-MARKER_PLAN=""
-MARKER_AT=0
-if [[ -f "${MARKER_FILE}" ]]; then
-	MARKER_PLAN=$(jq -r '.plan_path // ""' "${MARKER_FILE}" 2>/dev/null || echo "")
-	MARKER_AT=$(jq -r '.marked_at // 0' "${MARKER_FILE}" 2>/dev/null || echo "0")
-fi
+MARKER_PLAN=$(jq_read "${MARKER_FILE}" '.plan_path // ""')
+MARKER_AT=$(jq_read "${MARKER_FILE}" '.marked_at // 0')
 
 # No active plan and no fresh marker — regular session, do not block
 if [[ -z "${ACTIVE_PLAN}" && -z "${MARKER_PLAN}" ]]; then
-	_noop_exit
+	noop_exit
 fi
 
-# Session-aware staleness short-circuits (Task 3 of fix-orphan-pending-final-verify-marker).
-# Runs after marker is read but before TTL / evidence check. Each short-circuit clears the
-# marker and noop_exits when the marker is provably stale by an independent signal.
+# Session-aware staleness short-circuits: runs before TTL/evidence check; each clears the
+# marker and noop_exits when an independent signal proves it stale.
 if [[ -n "${MARKER_PLAN}" ]]; then
 	# Short-circuit #1: session-ID mismatch.
-	CURRENT_SID=$(_resolve_session_id)
-	MARKER_SID=$(jq -r '.session_id // ""' "${MARKER_FILE}" 2>/dev/null || echo "")
+	CURRENT_SID=$(resolve_session_id)
+	MARKER_SID=$(jq_read "${MARKER_FILE}" '.session_id // ""')
 	if [[ -z "${CURRENT_SID}" ]]; then
-		_log_hook_error "session-ID unresolvable; skipping mismatch short-circuit" "final-verification-evidence.sh"
+		log_hook_error "session-ID unresolvable; skipping mismatch short-circuit" "final-verification-evidence.sh"
 	elif [[ -n "${MARKER_SID}" && "${MARKER_SID}" != "null" && "${MARKER_SID}" != "${CURRENT_SID}" ]]; then
 		rm -f "${MARKER_FILE}"
-		_noop_exit
+		noop_exit
 	fi
 
 	# Short-circuit #2: completion sidecar with matching SHA.
-	MARKER_SHA=$(jq -r '.plan_sha256 // ""' "${MARKER_FILE}" 2>/dev/null || echo "")
+	MARKER_SHA=$(jq_read "${MARKER_FILE}" '.plan_sha256 // ""')
 	if [[ -n "${MARKER_PLAN}" && -n "${MARKER_SHA}" ]]; then
-		SIDECAR_PATH=$(_compute_sidecar_path "${MARKER_PLAN}")
-		if _sidecar_sha_matches "${SIDECAR_PATH}" "${MARKER_SHA}"; then
+		SIDECAR_PATH=$(compute_sidecar_path "${MARKER_PLAN}")
+		if sidecar_sha_matches "${SIDECAR_PATH}" "${MARKER_SHA}"; then
 			rm -f "${MARKER_FILE}"
-			_noop_exit
+			noop_exit
 		fi
 	fi
 
@@ -96,7 +89,7 @@ if [[ -n "${MARKER_PLAN}" ]]; then
 		MARKER_DONE="${MARKER_DONE:-0}"
 		if [[ "${MARKER_DONE}" -eq 0 ]]; then
 			rm -f "${MARKER_FILE}"
-			_noop_exit
+			noop_exit
 		fi
 	fi
 fi
@@ -124,7 +117,7 @@ fi
 
 # If checkboxes are still pending, let ralph-persistence handle it
 if [[ "${INCOMPLETE}" -gt 0 ]]; then
-	_noop_exit
+	noop_exit
 fi
 
 # If no active boulder but marker is present — check marker freshness
@@ -133,14 +126,14 @@ if [[ -z "${ACTIVE_PLAN}" && -n "${MARKER_PLAN}" ]]; then
 	MARKER_AGE=$(( NOW - MARKER_AT ))
 	if [[ "${MARKER_AGE}" -gt "${MAX_MARKER_AGE_SECONDS}" ]]; then
 		# Stale marker — do not block
-		_noop_exit
+		noop_exit
 	fi
 	# Fresh marker without active plan → /stop-continuation bypass attempt; fall through to evidence check
 fi
 
 # Only enforce when plan is fully checked off OR marker is present (no active boulder path)
 if [[ "${INCOMPLETE}" -eq 0 && "${COMPLETE}" -eq 0 && -z "${MARKER_PLAN}" ]]; then
-	_noop_exit
+	noop_exit
 fi
 
 # Fail-closed on corrupt evidence file
@@ -154,7 +147,7 @@ fi
 NOW=$(date +%s)
 
 # Check for each F-type within the time window
-_has_ftype() {
+has_ftype() {
 	local ftype="$1"
 	if [[ ! -f "${EVIDENCE_FILE}" ]]; then
 		echo "false"
@@ -181,10 +174,10 @@ _has_ftype() {
 	echo "${found}"
 }
 
-F1=$(_has_ftype "final_verification_f1")
-F2=$(_has_ftype "final_verification_f2")
-F3=$(_has_ftype "final_verification_f3")
-F4=$(_has_ftype "final_verification_f4")
+F1=$(has_ftype "final_verification_f1")
+F2=$(has_ftype "final_verification_f2")
+F3=$(has_ftype "final_verification_f3")
+F4=$(has_ftype "final_verification_f4")
 
 MISSING=""
 [[ "${F1}" != "true" ]] && MISSING="${MISSING} final_verification_f1"
@@ -207,9 +200,9 @@ SHAS=$(jq -r --arg sha "${CURRENT_SHA}" '
 	| map(.output_snippet | capture("plan_sha256:(?<sha>[0-9a-f]+)").sha // "")
 	| unique
 	| @json
-' "${EVIDENCE_FILE}" 2>/dev/null || echo '[""]')
+' "${EVIDENCE_FILE}")
 
-SHA_COUNT=$(echo "${SHAS}" | jq 'length' 2>/dev/null || echo "0")
+SHA_COUNT=$(jq 'length' <<< "${SHAS}")
 SHA_COUNT="${SHA_COUNT:-0}"
 
 if [[ "${SHA_COUNT}" -gt 1 ]]; then
@@ -222,4 +215,4 @@ if [[ -f "${MARKER_FILE}" ]] && [[ -n "${CURRENT_SHA}" ]] && [[ "${SHA_COUNT}" -
 	rm -f "${MARKER_FILE}"
 fi
 
-_noop_exit
+noop_exit

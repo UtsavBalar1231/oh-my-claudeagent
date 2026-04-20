@@ -2,11 +2,10 @@
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
-INPUT="${HOOK_INPUT}"
 LOG_DIR="${HOOK_LOG_DIR}"
 
-SOURCE=$(echo "${INPUT}" | jq -r '.source // ""' 2>/dev/null)
-FILE_PATH=$(echo "${INPUT}" | jq -r '.file_path // ""' 2>/dev/null)
+SOURCE=$(jq -r '.source // ""' <<< "${HOOK_INPUT}")
+FILE_PATH=$(jq -r '.file_path // ""' <<< "${HOOK_INPUT}")
 
 TIMESTAMP=$(date -Iseconds)
 

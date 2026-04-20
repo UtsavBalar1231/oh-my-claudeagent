@@ -6,13 +6,13 @@
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
-INPUT="${HOOK_INPUT}"
 STATE_DIR="${HOOK_STATE_DIR}"
+# 2 — platform exit code blocking TeammateIdle; exit 0 allows idle, exit 2 keeps working.
 BLOCK_EXIT_CODE=2
 
 # 1. If ralph/ultrawork active → exit 2 (keep working, don't go idle)
 for MODE_NAME in ralph ultrawork; do
-	if _mode_is_active "${MODE_NAME}" "${STATE_DIR}"; then
+	if mode_is_active "${MODE_NAME}" "${STATE_DIR}"; then
 		echo "Persistence mode is active. Continue working." >&2
 		exit "${BLOCK_EXIT_CODE}"
 	fi
@@ -23,7 +23,7 @@ TIMEOUT_SECS="${OMCA_AGENT_TIMEOUT_SECS:-600}"
 SUBAGENTS_FILE="${STATE_DIR}/subagents.json"
 
 if [[ -f "${SUBAGENTS_FILE}" ]]; then
-	TEAMMATE_NAME=$(echo "${INPUT}" | jq -r '.teammate_name // .agent_name // ""' 2>/dev/null)
+	TEAMMATE_NAME=$(jq -r '.teammate_name // .agent_name // ""' <<< "${HOOK_INPUT}")
 	NOW=$(date +%s)
 
 	# Find the oldest active agent matching the teammate (or any active agent)
