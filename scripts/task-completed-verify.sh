@@ -15,14 +15,12 @@ TASK_DESCRIPTION=$(jq -r '.task_description // .description // ""' <<< "${HOOK_I
 TEAMMATE_NAME=$(jq -r '.teammate_name // ""' <<< "${HOOK_INPUT}")
 TEAM_NAME=$(jq -r '.team_name // ""' <<< "${HOOK_INPUT}")
 
-# Log agent identity for audit trail when present
 if [[ -n "${TEAMMATE_NAME}" ]] || [[ -n "${TEAM_NAME}" ]]; then
 	echo "{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"hook\":\"task-completed-verify.sh\",\"teammate_name\":\"${TEAMMATE_NAME}\",\"team_name\":\"${TEAM_NAME}\",\"task\":\"${TASK_DESCRIPTION:0:100}\"}" >>"${LOG_DIR}/task-verify-audit.jsonl" 2>/dev/null
 fi
 
 EVIDENCE_FILE="${STATE_DIR}/verification-evidence.json"
 
-# Determine if recent evidence exists (within MAX_EVIDENCE_AGE_SECONDS)
 RECENT_EVIDENCE=false
 EVIDENCE_AGE=0
 if [[ -f "${EVIDENCE_FILE}" ]]; then
@@ -43,7 +41,6 @@ if [[ -f "${EVIDENCE_FILE}" ]]; then
 	fi
 fi
 
-# Determine if recent edits exist (within MAX_EVIDENCE_AGE_SECONDS)
 RECENT_EDITS=false
 EDITS_LOG="${LOG_DIR}/edits.jsonl"
 if [[ -f "${EDITS_LOG}" ]]; then
@@ -58,7 +55,6 @@ if [[ -f "${EDITS_LOG}" ]]; then
 	fi
 fi
 
-# Only require evidence for tasks involving code/runtime changes
 NEEDS_EVIDENCE=false
 if [[ "${TASK_DESCRIPTION}" =~ (verify|test|build|typecheck|lint|validate|fix|implement|refactor|deploy) ]]; then
 	NEEDS_EVIDENCE=true

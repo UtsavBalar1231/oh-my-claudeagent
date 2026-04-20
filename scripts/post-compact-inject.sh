@@ -21,7 +21,6 @@ trap 'rm -f "${CLAIM_FILE}"' EXIT
 # into the next session. Truncate oversized files and strip obvious injection patterns.
 LINE_COUNT=$(wc -l < "${CLAIM_FILE}")
 if [[ "${LINE_COUNT}" -gt 200 ]]; then
-	# Truncate to 200 lines with a visible warning so the model knows it was cut
 	TRUNCATED=$(head -n 200 "${CLAIM_FILE}")
 	printf '%s\n[TRUNCATED: compaction context exceeded 200 lines and was cut]\n' "${TRUNCATED}" > "${CLAIM_FILE}"
 fi
@@ -58,7 +57,6 @@ if [[ -z "${CONTEXT}" ]]; then
 	exit 0
 fi
 
-# Fresh date after compaction (time may have passed)
 DATE_FRESH=$(LC_TIME=C date '+%A %B %d %Y %H' 2>/dev/null || echo "")
 if [[ -n "${DATE_FRESH}" ]]; then
 	read -r DOW MON DAY YEAR HOUR <<< "${DATE_FRESH}"

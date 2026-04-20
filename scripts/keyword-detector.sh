@@ -4,11 +4,10 @@ source "$(dirname "$0")/lib/common.sh"
 
 STATE_DIR="${HOOK_STATE_DIR}"
 
-# Skip keyword detection for subagent sessions
 # All hook payloads include agent_id when firing inside a subagent
 AGENT_ID=$(jq -r '.agent_id // ""' <<< "${HOOK_INPUT}")
 if [[ -n "${AGENT_ID}" ]]; then
-	exit 0  # Skip keyword detection for subagent sessions
+	exit 0
 fi
 
 PROMPT=$(jq -r '.prompt // ""' <<< "${HOOK_INPUT}")
@@ -80,9 +79,7 @@ HAS_ULTRAWORK=0
 [[ " ${DETECTED_KEYWORDS[*]} " =~ " ralph " ]] && HAS_RALPH=1
 [[ " ${DETECTED_KEYWORDS[*]} " =~ " ultrawork " ]] && HAS_ULTRAWORK=1
 
-# Create persistence state files for detected modes
 if [[ "${HAS_RALPH}" -eq 1 ]] && [[ ! " ${DETECTED_KEYWORDS[*]} " =~ " stop-continuation " ]]; then
-	# Ralph wins when both appear in the same prompt — clear any active ultrawork state
 	if [[ "${HAS_ULTRAWORK}" -eq 1 ]] && [[ -f "${ULTRAWORK_STATE}" ]]; then
 		rm -f "${ULTRAWORK_STATE}"
 	fi
@@ -91,7 +88,6 @@ if [[ "${HAS_RALPH}" -eq 1 ]] && [[ ! " ${DETECTED_KEYWORDS[*]} " =~ " stop-cont
 		"${NOW_ISO}" > "${RALPH_STATE}.tmp" && mv "${RALPH_STATE}.tmp" "${RALPH_STATE}"
 fi
 
-# Only activate ultrawork if ralph is not also requested in the same prompt
 if [[ "${HAS_ULTRAWORK}" -eq 1 ]] && [[ "${HAS_RALPH}" -eq 0 ]] \
 	&& [[ ! " ${DETECTED_KEYWORDS[*]} " =~ " stop-continuation " ]]; then
 	NOW_ISO=$(date -u +"%Y-%m-%dT%H:%M:%SZ")

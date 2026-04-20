@@ -11,12 +11,10 @@ TOOL_NAME=$(jq -r '.tool_name // "Edit"' <<< "${HOOK_INPUT}")
 
 TIMESTAMP=$(date -Iseconds)
 
-# Unified error log (errors.jsonl)
 LOG_FILE="${LOG_DIR}/errors.jsonl"
 jq -nc --arg file "${FILE_PATH}" --arg err "${ERROR_MSG}" --arg ts "${TIMESTAMP}" \
 	'{event: "edit_error", file: $file, error: $err, timestamp: $ts}' >>"${LOG_FILE}"
 
-# Task 2.2 — Error classification
 ERROR_TEXT="${ERROR_MSG}"
 if echo "${ERROR_TEXT}" | grep -qiE 'rate.limit|429|timeout|ECONNRESET|ETIMEDOUT'; then
 	ERROR_CLASS="transient"
@@ -26,7 +24,6 @@ else
 	ERROR_CLASS="unknown"
 fi
 
-# Task 2.1 — Retry count tracking
 ERROR_COUNTS_FILE="${STATE_DIR}/error-counts.json"
 ERROR_KEY="${TOOL_NAME}:edit_error"
 
@@ -46,7 +43,6 @@ else
 fi
 mv "${TMP_COUNTS}" "${ERROR_COUNTS_FILE}"
 
-# Task 2.3 — Recovery guidance based on error patterns
 RECOVERY_SUGGESTION=""
 
 if echo "${ERROR_MSG}" | grep -qi "not unique"; then
@@ -61,13 +57,11 @@ else
 	RECOVERY_SUGGESTION="Edit failed. Re-read the file to verify current contents match your old_string exactly, including whitespace and indentation."
 fi
 
-# Circuit-breaker at 3+ retries
 CIRCUIT_BREAKER=""
 if [[ "${NEW_COUNT}" -ge 3 ]]; then
 	CIRCUIT_BREAKER=" This error has occurred 3+ times. Stop retrying the same approach. Escalate to oracle for architectural guidance or try a fundamentally different approach."
 fi
 
-# Task 2.3 — Structured output format
 MSG="[ERROR RECOVERY] Type: ${ERROR_CLASS} | Tool: ${TOOL_NAME} | Retry: ${NEW_COUNT}/3
 ${RECOVERY_SUGGESTION}${CIRCUIT_BREAKER}"
 

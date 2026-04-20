@@ -5,7 +5,6 @@ source "$(dirname "$0")/lib/common.sh"
 STATE_DIR="${HOOK_STATE_DIR}"
 
 # Boulder fallback: block stop if a fresh work plan exists.
-# Emits Stop-hook allow decision and exits the script when a boulder is active.
 # NAMED WITH ACTION VERB: side-effect is intentional, see caller chains.
 allow_stop_via_boulder_fallback() {
 	local boulder_file="${STATE_DIR}/boulder.json"
@@ -37,7 +36,6 @@ if [[ "${STOP_HOOK_ACTIVE}" == "true" ]]; then
 	exit 0
 fi
 
-# Unified mode detection
 RALPH_STATE="${STATE_DIR}/ralph-state.json"
 ULTRAWORK_STATE="${STATE_DIR}/ultrawork-state.json"
 
@@ -99,7 +97,6 @@ if [[ "${RALPH_ACTIVE}" == "true" ]]; then
 		STAGNATION=0
 	fi
 
-	# Update state atomically
 	jq --arg hash "${TASK_HASH}" --argjson count "${STAGNATION}" \
 		'.last_task_hash = $hash | .stagnation_count = $count' \
 		"${RALPH_STATE}" > "${RALPH_STATE}.tmp" && \
@@ -107,16 +104,13 @@ if [[ "${RALPH_ACTIVE}" == "true" ]]; then
 
 	if [[ ${STAGNATION} -ge ${MAX_STAGNATION} ]]; then
 		log_hook_error "ralph stagnated (${STAGNATION}/${MAX_STAGNATION}) — allowing stop" "ralph-persistence.sh"
-		# No progress — try boulder fallback before allowing stop
 		allow_stop_via_boulder_fallback
-		# Allow stop — no progress after threshold attempts and no fresh boulder plan
 		exit 0
 	fi
 
 	# Plan-file-aware stagnation: supplement task-hash signal with plan checkbox state.
 	# REQUIRES RALPH_STATE to be set — see line 41 above.
 	# REQUIRES STAGNATION to be set — see line 92 above.
-	# Inlined from check_plan_file_progress (single callsite; scope-leak resolved by inlining).
 	_boulder_file_pfp="${STATE_DIR}/boulder.json"
 	if [[ -f "${_boulder_file_pfp}" ]]; then
 		_active_plan_pfp=$(jq_read "${_boulder_file_pfp}" '.active_plan // ""')
@@ -157,7 +151,6 @@ if [[ "${RALPH_ACTIVE}" == "true" ]]; then
 					_plan_stagnation_pfp=0
 				fi
 
-				# Update ralph-state.json with plan tracking fields atomically
 				jq --arg mtime "${_plan_mtime_pfp}" \
 					--argjson inc "${_incomplete_pfp}" \
 					--argjson com "${_complete_pfp}" \
@@ -168,7 +161,6 @@ if [[ "${RALPH_ACTIVE}" == "true" ]]; then
 
 				if [[ ${_plan_stagnation_pfp} -ge 3 ]]; then
 					log_hook_error "ralph plan stagnated (plan_stagnation_count=${_plan_stagnation_pfp}, incomplete=${_incomplete_pfp}) — allowing stop" "ralph-persistence.sh"
-					# Feed into existing stagnation-allows-stop path
 					allow_stop_via_boulder_fallback
 					exit 0
 				fi
@@ -177,7 +169,6 @@ if [[ "${RALPH_ACTIVE}" == "true" ]]; then
 	fi
 fi
 
-# Count incomplete tasks in ralph-state.json
 INCOMPLETE=0
 if [[ "${RALPH_ACTIVE}" == "true" ]]; then
 	INCOMPLETE=$(jq '[.tasks[]? | select(.status != "completed" and .status != "verified")] | length' "${RALPH_STATE}")
@@ -193,7 +184,6 @@ if [[ "${ULTRAWORK_ACTIVE}" == "true" ]]; then
 	SUBAGENTS_FILE="${STATE_DIR}/subagents.json"
 	UW_STAGNATION=$(jq_read "${ULTRAWORK_STATE}" '.stagnation_count // 0')
 
-	# Check if any agents are currently running
 	UW_NOW=$(date +%s)
 	UW_ACTIVE_AGENTS=0
 	if [[ -f "${SUBAGENTS_FILE}" ]]; then
@@ -204,35 +194,29 @@ if [[ "${ULTRAWORK_ACTIVE}" == "true" ]]; then
 			"${SUBAGENTS_FILE}")
 	fi
 
-	# Increment stagnation when no agents running; reset when agents are active
 	if [[ "${UW_ACTIVE_AGENTS}" -eq 0 ]]; then
 		UW_STAGNATION=$((UW_STAGNATION + 1))
 	else
 		UW_STAGNATION=0
 	fi
 
-	# Update ultrawork-state.json atomically
 	jq --argjson count "${UW_STAGNATION}" '.stagnation_count = $count' \
 		"${ULTRAWORK_STATE}" > "${ULTRAWORK_STATE}.tmp" && \
 		mv "${ULTRAWORK_STATE}.tmp" "${ULTRAWORK_STATE}"
 
 	if [[ ${UW_STAGNATION} -ge 5 ]]; then
-		# No agent activity — try boulder fallback before allowing stop
 		allow_stop_via_boulder_fallback
-		# No progress after threshold attempts and no fresh boulder plan — allow stop
 		exit 0
 	fi
 
-	# Agent-aware check: if agents are running, allow stop (Claude should wait for them)
 	if [[ "${UW_ACTIVE_AGENTS}" -gt 0 ]]; then
-		exit 0  # Allow stop — waiting for background agents to complete
+		exit 0
 	fi
 
 	echo '{"decision":"block","reason":"[ULTRAWORK PERSISTENCE] Ultrawork mode is active. Continue parallel execution of remaining tasks."}'
 	exit 0
 fi
 
-# No incomplete tasks and ultrawork not active — try boulder fallback
 allow_stop_via_boulder_fallback
 
 exit 0

@@ -6,7 +6,6 @@ source "$(dirname "$0")/lib/common.sh"
 
 ERROR=$(jq -r '.error // .tool_error // ""' <<< "${HOOK_INPUT}")
 
-# Classify bash failure
 if echo "${ERROR}" | grep -qiE 'command not found|No such file or directory.*bin'; then
 	ADVICE="Command not found. Check if the tool is installed and on PATH. Try: which <command>"
 elif echo "${ERROR}" | grep -qiE 'Permission denied|EACCES'; then
@@ -21,6 +20,5 @@ else
 	exit 0  # Unknown bash error — let catch-all handle
 fi
 
-# Output recovery guidance
 jq -n --arg advice "[BASH ERROR RECOVERY] ${ADVICE}" \
 	'{"hookSpecificOutput":{"hookEventName":"PostToolUseFailure","additionalContext":$advice}}'

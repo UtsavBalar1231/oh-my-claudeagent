@@ -10,7 +10,6 @@ STATE_DIR="${HOOK_STATE_DIR}"
 # 2 — platform exit code blocking TeammateIdle; exit 0 allows idle, exit 2 keeps working.
 BLOCK_EXIT_CODE=2
 
-# 1. If ralph/ultrawork active → exit 2 (keep working, don't go idle)
 for MODE_NAME in ralph ultrawork; do
 	if mode_is_active "${MODE_NAME}" "${STATE_DIR}"; then
 		echo "Persistence mode is active. Continue working." >&2
@@ -18,7 +17,6 @@ for MODE_NAME in ralph ultrawork; do
 	fi
 done
 
-# 2. Stall detection — terminate agents that exceed timeout
 TIMEOUT_SECS="${OMCA_AGENT_TIMEOUT_SECS:-600}"
 SUBAGENTS_FILE="${STATE_DIR}/subagents.json"
 
@@ -26,7 +24,6 @@ if [[ -f "${SUBAGENTS_FILE}" ]]; then
 	TEAMMATE_NAME=$(jq -r '.teammate_name // .agent_name // ""' <<< "${HOOK_INPUT}")
 	NOW=$(date +%s)
 
-	# Find the oldest active agent matching the teammate (or any active agent)
 	if [[ -n "${TEAMMATE_NAME}" ]]; then
 		STARTED_EPOCH=$(jq -r --arg name "${TEAMMATE_NAME}" \
 			'[.active[]? | select(.type == $name or .type == ("oh-my-claudeagent:" + $name))] | .[0] | .started_epoch // 0' \
@@ -49,5 +46,4 @@ if [[ -f "${SUBAGENTS_FILE}" ]]; then
 	fi
 fi
 
-# 3. No mode active, no stall → normal idle behavior
 exit 0

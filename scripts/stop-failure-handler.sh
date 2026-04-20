@@ -11,14 +11,12 @@ ERROR_TYPE=$(jq -r '.error // "unknown"' <<< "${HOOK_INPUT}")
 ERROR_DETAILS=$(jq -r '.error_details // ""' <<< "${HOOK_INPUT}")
 LAST_MSG=$(jq -r '.last_assistant_message // ""' <<< "${HOOK_INPUT}")
 
-# Detect active persistence modes
 RALPH_ACTIVE=false
 ULTRAWORK_ACTIVE=false
 
 mode_is_active "ralph" "${STATE_DIR}" && RALPH_ACTIVE=true
 mode_is_active "ultrawork" "${STATE_DIR}" && ULTRAWORK_ACTIVE=true
 
-# Build log entry
 if [[ "${RALPH_ACTIVE}" == "true" || "${ULTRAWORK_ACTIVE}" == "true" ]]; then
 	ACTIVE_MODE="ralph"
 	[[ "${ULTRAWORK_ACTIVE}" == "true" ]] && ACTIVE_MODE="ultrawork"

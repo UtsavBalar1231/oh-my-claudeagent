@@ -5,7 +5,6 @@ _HOOK_START=$(date +%s%N 2>/dev/null || date +%s)
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
-# Time awareness for subagents (lightweight — date only, no hour)
 DATE_CONTEXT=$(LC_TIME=C date '+%A %B %d %Y' 2>/dev/null || echo "")
 
 STATE_DIR="${HOOK_STATE_DIR}"
@@ -66,7 +65,6 @@ if [[ -f "${BOULDER_FILE}" ]]; then
 	fi
 fi
 
-# Inject evidence_log guidance for execution agents
 EXEC_GUIDANCE_HEADER_ADDED=0
 case "${AGENT_TYPE}" in
 *executor* | *hephaestus* | *sisyphus*)
@@ -79,7 +77,6 @@ case "${AGENT_TYPE}" in
 *) ;;
 esac
 
-# Inject anti-duplication rule for orchestrator agents
 case "${AGENT_TYPE}" in
 *sisyphus* | *metis* | *prometheus*)
 	if [[ "${EXEC_GUIDANCE_HEADER_ADDED}" -eq 0 ]]; then
@@ -103,7 +100,6 @@ case "${AGENT_TYPE}" in
 *) ;;
 esac
 
-# Inject external directory access guidance for plan-mode agents
 case "${AGENT_TYPE}" in
 *explore* | *librarian* | *oracle*)
 	CONTEXT_PARTS+="$(section_header 'External Access')"
@@ -112,7 +108,6 @@ case "${AGENT_TYPE}" in
 *) ;;
 esac
 
-# Concurrency registration: record this agent in active-agents.json under flock, then bridge spawn-ID to platform agent_id in subagents.json.
 ACTIVE_FILE="${STATE_DIR}/active-agents.json"
 CATALOG_FILE="${STATE_DIR}/agent-catalog.json"
 

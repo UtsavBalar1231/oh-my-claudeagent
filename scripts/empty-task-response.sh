@@ -7,13 +7,11 @@ RESPONSE=$(jq -r '.tool_response // .tool_result // ""' <<< "${HOOK_INPUT}")
 
 RESPONSE_LENGTH=${#RESPONSE}
 
-# Check for empty/very short responses
 IS_POOR=false
 if [[ "${RESPONSE_LENGTH}" -lt 50 ]] || [[ -z "$(echo "${RESPONSE}" | tr -d '[:space:]')" ]]; then
 	IS_POOR=true
 fi
 
-# Check for transitional patterns in short responses (< 200 chars)
 if [[ "${IS_POOR}" == "false" ]] && [[ "${RESPONSE_LENGTH}" -lt 200 ]]; then
 	LOWER_RESPONSE=$(echo "${RESPONSE}" | tr '[:upper:]' '[:lower:]')
 	if echo "${LOWER_RESPONSE}" | grep -qE '^(let me|now let me|i'\''ll |good\.|now i|ok,? let me|checking|looking at|reading |searching|next,? |i need to|i should|let'\''s |i want to|i'\''m going to|i will )'; then
@@ -31,7 +29,6 @@ else
 		jq '.agentUsed = true' "${USAGE_FILE}" >"${TMP}" && mv "${TMP}" "${USAGE_FILE}"
 	fi
 
-	# Soft validation: check for required output sections by agent type (advisory only)
 	AGENT_TYPE=$(jq -r '.agent_name // .subagent_type // ""' <<< "${HOOK_INPUT}" | sed 's/.*://')
 	MISSING_SECTIONS=""
 	case "${AGENT_TYPE}" in
@@ -68,7 +65,6 @@ else
 		done
 		;;
 	*)
-		# No required sections defined for this agent type
 		;;
 	esac
 

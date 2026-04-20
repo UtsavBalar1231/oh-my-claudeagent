@@ -28,7 +28,6 @@ TEMPLATE
 		printf '%s\n' "Ultrawork mode is ACTIVE. Continue parallel work."
 	fi
 
-	# Include subagent session data for RESUME, DON'T RESTART directive
 	SUBAGENT_LOG="${LOG_DIR}/subagents.jsonl"
 	ACTIVE_AGENTS=""
 	if [[ -f "${SUBAGENT_LOG}" ]]; then
@@ -46,7 +45,6 @@ TEMPLATE
 	printf '\n## Pending Tasks\n'
 	printf '%s\n' "Check boulder.json for active plan and remaining tasks."
 
-	# Notepad section summaries
 	NOTEPADS_DIR="${STATE_DIR}/notepads"
 	if [[ -d "${NOTEPADS_DIR}" ]]; then
 		printf '\n## Notepad Summaries\n'
@@ -62,7 +60,6 @@ TEMPLATE
 		done
 	fi
 
-	# Latest verification evidence
 	EVIDENCE_FILE="${STATE_DIR}/verification-evidence.json"
 	if [[ -f "${EVIDENCE_FILE}" ]]; then
 		printf '\n## Latest Verification Evidence\n'

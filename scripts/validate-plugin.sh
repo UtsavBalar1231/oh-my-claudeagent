@@ -636,10 +636,8 @@ check_claims() {
 		fail "mcp registry omca command should be 'uv'"
 	fi
 
-	# Validate config files
 	validate_json_file "${REPO_ROOT}/servers/categories.json" "categories config"
 
-	# Verify old server files were removed
 	if [[ ! -f "${REPO_ROOT}/servers/ast-grep-server.py" ]]; then
 		pass "ast-grep-server.py removed"
 	else
@@ -651,14 +649,12 @@ check_claims() {
 		fail "omca-state-server.py still exists (should have been removed)"
 	fi
 
-	# Verify agent-metadata.json was removed (OMCA-internal fields removed in v2.0.0)
 	if [[ ! -f "${REPO_ROOT}/servers/agent-metadata.json" ]]; then
 		pass "agent-metadata.json removed (OMCA-internal metadata fields deprecated)"
 	else
 		fail "agent-metadata.json still exists (should have been removed with costTier/category fields)"
 	fi
 
-	# Validate version consistency: plugin.json must match marketplace.json
 	local plugin_version marketplace_version
 	# Reverted helper migration: validate-plugin.sh has distinct error-handling requirements.
 	plugin_version=$(jq -r '.version // ""' "${PLUGIN_JSON}" 2>/dev/null)
@@ -969,7 +965,6 @@ check_hooks() {
 
 	run_registered_hooks "WorktreeCreate default" "WorktreeCreate" "" "${worktree_payload}" "${tmp_root}" "worktree-path"
 
-	# UserPromptSubmit: keyword-detector should produce JSON with additionalContext
 	local ralph_payload="${HOOK_FIXTURES_DIR}/userpromptsubmit-ralph.json"
 	local ultrawork_payload="${HOOK_FIXTURES_DIR}/userpromptsubmit-ultrawork.json"
 	local userpromptsubmit_commands
@@ -1028,21 +1023,18 @@ check_hooks() {
 	run_registered_hooks "Stop ultrawork active + no agents (block)" "Stop" "" "${stop_payload}" "${tmp_root}" "json-required"
 	rm -f "${ultrawork_wrapper_state}" "${tmp_root}/.omca/state/subagents.json"
 
-	# SubagentStart / SubagentStop
 	local subagentstart_payload="${HOOK_FIXTURES_DIR}/subagentstart-basic.json"
 	local subagentstopcomplete_payload="${HOOK_FIXTURES_DIR}/subagentstopcomplete-basic.json"
 
 	run_registered_hooks "SubagentStart basic" "SubagentStart" "" "${subagentstart_payload}" "${tmp_root}" "json-required"
 	run_registered_hooks "SubagentStop basic" "SubagentStop" "" "${subagentstopcomplete_payload}" "${tmp_root}" "json-optional"
 
-	# Verify active-agents.json was created by SubagentStart hook
 	if [[ -f "${tmp_root}/.omca/state/active-agents.json" ]]; then
 		pass "SubagentStart created active-agents.json"
 	else
 		fail "SubagentStart did not create active-agents.json"
 	fi
 
-	# StopFailure: handler logs to stop-failures.jsonl and exits 0 (no stdout)
 	local stopfailure_payload="${HOOK_FIXTURES_DIR}/stopfailure-ratelimit.json"
 	run_registered_hooks "StopFailure rate_limit" "StopFailure" "" "${stopfailure_payload}" "${tmp_root}" "empty"
 	if [[ -f "${tmp_root}/.omca/logs/stop-failures.jsonl" ]]; then

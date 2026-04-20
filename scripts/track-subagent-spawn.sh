@@ -33,7 +33,6 @@ jq --arg id "${SPAWN_ID}" \
 	'.active += [{"id": $id, "type": $type, "model": $model, "promptPreview": $prompt, "startedAt": $ts, "status": "running"}]' \
 	"${SUBAGENTS_FILE}" >"${TMP_FILE}" && mv "${TMP_FILE}" "${SUBAGENTS_FILE}"
 
-# Signal to agent-usage-reminder that delegation has occurred
 AGENT_USAGE="${STATE_DIR}/agent-usage.json"
 [[ -f "${AGENT_USAGE}" ]] && {
 	TMP2=$(mktemp)
@@ -56,18 +55,14 @@ if [[ -f "${SESSION_STATE}" ]]; then
 		"${SESSION_STATE}" >"${TMP_FILE}" && mv "${TMP_FILE}" "${SESSION_STATE}"
 fi
 
-# Routing validation: advisory model/concurrency check against agent-catalog.json; never blocks spawn.
 ROUTING_CONTEXT=""
 
-# Read cached catalog (written by agents_list() MCP tool)
 CATALOG_FILE="${STATE_DIR}/agent-catalog.json"
 CATEGORIES_FILE="$(dirname "$0")/../servers/categories.json"
 
 if [[ -f "${CATALOG_FILE}" ]] && [[ -f "${CATEGORIES_FILE}" ]]; then
-	# Extract agent name, normalize to lowercase
 	AGENT_NAME=$(echo "${SUBAGENT_TYPE##*:}" | tr '[:upper:]' '[:lower:]')
 
-	# Look up agent's preferred_category → expected model
 	PREFERRED_CAT=$(jq -r --arg name "${AGENT_NAME}" \
 		'.[] | select(.name == $name) | .preferred_category // "standard"' \
 		"${CATALOG_FILE}" 2>/dev/null)
@@ -75,12 +70,10 @@ if [[ -f "${CATALOG_FILE}" ]] && [[ -f "${CATEGORIES_FILE}" ]]; then
 		'.categories[$cat].model // "sonnet"' \
 		"${CATEGORIES_FILE}" 2>/dev/null)
 
-	# Warn on model mismatch (advisory only — NOT blocking)
 	if [[ "${SUBAGENT_MODEL}" != "default" ]] && [[ -n "${EXPECTED_MODEL}" ]] && [[ "${EXPECTED_MODEL}" != "${SUBAGENT_MODEL}" ]]; then
 		ROUTING_CONTEXT+=" [ROUTING WARNING] Agent ${AGENT_NAME} prefers category '${PREFERRED_CAT}' (model=${EXPECTED_MODEL}), but spawned with model=${SUBAGENT_MODEL}."
 	fi
 
-	# Check concurrency limits
 	ACTIVE_FILE="${STATE_DIR}/active-agents.json"
 	if [[ -f "${ACTIVE_FILE}" ]]; then
 		CURRENT_MODEL="${SUBAGENT_MODEL}"

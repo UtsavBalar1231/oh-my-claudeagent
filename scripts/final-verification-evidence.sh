@@ -49,13 +49,11 @@ BOULDER_FILE="${STATE_DIR}/boulder.json"
 MARKER_FILE="${STATE_DIR}/pending-final-verify.json"
 EVIDENCE_FILE="${STATE_DIR}/verification-evidence.json"
 
-# Determine whether enforcement applies via active boulder or persistent marker
 ACTIVE_PLAN=$(jq_read "${BOULDER_FILE}" '.active_plan // ""')
 
 MARKER_PLAN=$(jq_read "${MARKER_FILE}" '.plan_path // ""')
 MARKER_AT=$(jq_read "${MARKER_FILE}" '.marked_at // 0')
 
-# No active plan and no fresh marker — regular session, do not block
 if [[ -z "${ACTIVE_PLAN}" && -z "${MARKER_PLAN}" ]]; then
 	noop_exit
 fi
@@ -63,7 +61,7 @@ fi
 # Session-aware staleness short-circuits: runs before TTL/evidence check; each clears the
 # marker and noop_exits when an independent signal proves it stale.
 if [[ -n "${MARKER_PLAN}" ]]; then
-	# Short-circuit #1: session-ID mismatch.
+	# Session-ID mismatch short-circuit.
 	CURRENT_SID=$(resolve_session_id)
 	MARKER_SID=$(jq_read "${MARKER_FILE}" '.session_id // ""')
 	if [[ -z "${CURRENT_SID}" ]]; then
@@ -73,7 +71,7 @@ if [[ -n "${MARKER_PLAN}" ]]; then
 		noop_exit
 	fi
 
-	# Short-circuit #2: completion sidecar with matching SHA.
+	# Completion sidecar with matching SHA short-circuit.
 	MARKER_SHA=$(jq_read "${MARKER_FILE}" '.plan_sha256 // ""')
 	if [[ -n "${MARKER_PLAN}" && -n "${MARKER_SHA}" ]]; then
 		SIDECAR_PATH=$(compute_sidecar_path "${MARKER_PLAN}")
@@ -83,7 +81,7 @@ if [[ -n "${MARKER_PLAN}" ]]; then
 		fi
 	fi
 
-	# Short-circuit #3: marker's plan has zero [x] — never started, stale.
+	# Marker plan has zero [x] — never started, stale.
 	if [[ -n "${MARKER_PLAN}" && -f "${MARKER_PLAN}" ]]; then
 		MARKER_DONE=$(grep -cE '^- \[x\] ' "${MARKER_PLAN}" 2>/dev/null || true)
 		MARKER_DONE="${MARKER_DONE:-0}"
@@ -94,7 +92,6 @@ if [[ -n "${MARKER_PLAN}" ]]; then
 	fi
 fi
 
-# Resolve which plan path to inspect
 PLAN_PATH="${ACTIVE_PLAN}"
 if [[ -z "${PLAN_PATH}" ]]; then
 	PLAN_PATH="${MARKER_PLAN}"
@@ -105,7 +102,6 @@ if [[ -n "${PLAN_PATH}" ]] && [[ -f "${PLAN_PATH}" ]]; then
 	CURRENT_SHA=$(sha256sum "${PLAN_PATH}" 2>/dev/null | awk '{print $1}' || echo "")
 fi
 
-# Count checkboxes only when active plan exists and plan file is readable
 INCOMPLETE=0
 COMPLETE=0
 if [[ -n "${ACTIVE_PLAN}" && -f "${ACTIVE_PLAN}" ]]; then
@@ -115,12 +111,10 @@ if [[ -n "${ACTIVE_PLAN}" && -f "${ACTIVE_PLAN}" ]]; then
 	COMPLETE="${COMPLETE:-0}"
 fi
 
-# If checkboxes are still pending, let ralph-persistence handle it
 if [[ "${INCOMPLETE}" -gt 0 ]]; then
 	noop_exit
 fi
 
-# If no active boulder but marker is present — check marker freshness
 if [[ -z "${ACTIVE_PLAN}" && -n "${MARKER_PLAN}" ]]; then
 	NOW=$(date +%s)
 	MARKER_AGE=$(( NOW - MARKER_AT ))
@@ -131,7 +125,6 @@ if [[ -z "${ACTIVE_PLAN}" && -n "${MARKER_PLAN}" ]]; then
 	# Fresh marker without active plan → /stop-continuation bypass attempt; fall through to evidence check
 fi
 
-# Only enforce when plan is fully checked off OR marker is present (no active boulder path)
 if [[ "${INCOMPLETE}" -eq 0 && "${COMPLETE}" -eq 0 && -z "${MARKER_PLAN}" ]]; then
 	noop_exit
 fi
@@ -146,7 +139,6 @@ fi
 
 NOW=$(date +%s)
 
-# Check for each F-type within the time window
 has_ftype() {
 	local ftype="$1"
 	if [[ ! -f "${EVIDENCE_FILE}" ]]; then
@@ -186,7 +178,6 @@ MISSING=""
 [[ "${F4}" != "true" ]] && MISSING="${MISSING} final_verification_f4"
 
 if [[ -n "${MISSING}" ]]; then
-	# Trim leading space
 	MISSING="${MISSING# }"
 	echo "[FINAL VERIFICATION] Plan complete but F1-F4 evidence missing: ${MISSING}. Run the Final Verification Wave per agents/sisyphus.md or commands/start-work.md and call evidence_log(evidence_type=\"<type>\", command=\"oracle: APPROVE\", exit_code=0, output_snippet=\"plan_sha256:<sha> verdict:APPROVE\") for each." >&2
 	exit 2
@@ -210,7 +201,6 @@ if [[ "${SHA_COUNT}" -gt 1 ]]; then
 	exit 2
 fi
 
-# Auto-clear pending-final-verify marker on plan closure
 if [[ -f "${MARKER_FILE}" ]] && [[ -n "${CURRENT_SHA}" ]] && [[ "${SHA_COUNT}" -le 1 ]]; then
 	rm -f "${MARKER_FILE}"
 fi

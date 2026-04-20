@@ -36,7 +36,6 @@ SESSION_STATE="${STATE_DIR}/session.json"
 TMP_FILE=$(mktemp)
 TS=$(date -Iseconds)
 
-# Time awareness — prevents defaulting to stale training data
 DATE_CONTEXT=$(LC_TIME=C date '+%A %B %d %Y %H' 2>/dev/null || echo "")
 if [[ -n "${DATE_CONTEXT}" ]]; then
 	read -r DOW MON DAY YEAR HOUR <<< "${DATE_CONTEXT}"
@@ -60,19 +59,16 @@ echo '{}' >"${STATE_DIR}/injected-context-dirs.json"
 echo '{"agentUsed": false, "toolCallCount": 0}' >"${STATE_DIR}/agent-usage.json"
 mkdir -p "${STATE_DIR}/worktrees"
 
-# Check if CLAUDE.md has OMCA configuration (only on fresh startup, not compact)
 SETUP_NOTICE=""
 OMCA_CONFIGURED=0
 SOURCE=$(jq -r '.source // "startup"' <<< "${HOOK_INPUT}")
 if [[ "${SOURCE}" != "compact" ]]; then
 	GLOBAL_CLAUDE_MD="${HOME}/.claude/CLAUDE.md"
 	PROJECT_CLAUDE_MD="${PROJECT_ROOT}/CLAUDE.md"
-	# Check global ~/.claude/CLAUDE.md first (primary config location)
 	if [[ -f "${GLOBAL_CLAUDE_MD}" ]] && grep -q "omca-setup" "${GLOBAL_CLAUDE_MD}" 2>/dev/null; then
 		OMCA_CONFIGURED=1
 	fi
 
-	# Check project CLAUDE.md as secondary signal
 	if [[ "${OMCA_CONFIGURED}" -eq 0 ]] && [[ -f "${PROJECT_CLAUDE_MD}" ]] && grep -q "OMC:START\|omca-setup" "${PROJECT_CLAUDE_MD}" 2>/dev/null; then
 		OMCA_CONFIGURED=1
 	fi
@@ -96,7 +92,6 @@ PLUGIN_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PLUGIN_MD="${PLUGIN_ROOT}/templates/claudemd.md"
 
 if [[ "${OMCA_CONFIGURED}" -eq 1 ]]; then
-	# CLAUDE.md already has the behavioral spec — just emit session metadata
 	if [[ -n "${DATE_BLOCK}" ]]; then
 		SHORT_CONTEXT=$(printf '%s\nSession %s initialized.%b' "${DATE_BLOCK}" "${SESSION_ID}" "${SETUP_NOTICE}" | jq -Rs .)
 	else

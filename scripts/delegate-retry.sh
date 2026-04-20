@@ -8,9 +8,6 @@ ERROR_MSG=$(jq -r '.error // .tool_result.error // .output // "Unknown error"' <
 SUBAGENT_TYPE=$(jq -r '.tool_input.subagent_type // "unknown"' <<< "${HOOK_INPUT}")
 TOOL_NAME=$(jq -r '.tool_name // "Task"' <<< "${HOOK_INPUT}")
 
-# Detect subagent nesting depth violation (non-recoverable)
-# Error string observed in atlas transcript (agent-a6ece1cf5c29f1da5.jsonl)
-# grep -qi provides case-insensitive matching for resilience against format changes
 if echo "${ERROR_MSG}" | grep -qi "No such tool available: Agent"; then
 	MSG="[NESTING LIMIT] The Agent tool is unavailable — you are running as a subagent and cannot spawn further subagents. This is a Claude Code platform constraint. Implement the task directly using Read, Write, Edit, Bash, Grep, Glob. Do NOT retry Agent calls."
 	emit_context "PostToolUseFailure" "${MSG}"
@@ -20,7 +17,6 @@ fi
 # 200 bytes — ERROR_MSG cap; enough to identify error class without flooding context.
 ERROR_SUMMARY=$(echo "${ERROR_MSG}" | head -c 200)
 
-# Task 2.2 — Error classification
 ERROR_TEXT="${ERROR_MSG}"
 if echo "${ERROR_TEXT}" | grep -qiE 'rate.limit|429|timeout|ECONNRESET|ETIMEDOUT'; then
 	ERROR_CLASS="transient"
@@ -30,7 +26,6 @@ else
 	ERROR_CLASS="unknown"
 fi
 
-# Task 2.1 — Retry count tracking
 ERROR_COUNTS_FILE="${STATE_DIR}/error-counts.json"
 ERROR_KEY="${TOOL_NAME}:delegate_error"
 
@@ -50,27 +45,21 @@ else
 fi
 mv "${TMP_COUNTS}" "${ERROR_COUNTS_FILE}"
 
-# Check for retryable error patterns (keep original RETRYABLE_PATTERNS logic)
 RETRYABLE_PATTERNS="rate.limit|quota.exceeded|overloaded|too.many.requests|429|503|capacity|credit.balance|temporarily.unavailable|service.unavailable|timeout|ECONNRESET|ETIMEDOUT|rate_limit|resource_exhausted"
 
-# Circuit-breaker at 3+ retries
 CIRCUIT_BREAKER=""
 if [[ "${NEW_COUNT}" -ge 3 ]]; then
 	CIRCUIT_BREAKER=" This error has occurred 3+ times. Stop retrying the same approach. Escalate to oracle for architectural guidance or try a fundamentally different approach."
 fi
 
 if echo "${ERROR_MSG}" | grep -qiE "${RETRYABLE_PATTERNS}"; then
-	# Task 2.4 — Stagnation-aware reflection suppression for transient errors
 	TRANSIENT_NOTE="This is a tool/infrastructure failure, not a reasoning error. Do not self-reflect on your approach — the tool itself failed. Either retry after a moment or escalate."
-	# Task 2.3 — Structured output
 	MSG="[ERROR RECOVERY] Type: transient | Tool: ${TOOL_NAME} | Retry: ${NEW_COUNT}/3
 [RETRYABLE ERROR] The delegation failed due to a transient error (rate limit, capacity, timeout). Retry the same delegation — do not escalate to oracle for transient failures. ${TRANSIENT_NOTE}${CIRCUIT_BREAKER}"
 	emit_context "PostToolUseFailure" "${MSG}"
 	exit 0
 fi
 
-# Task 2.3 — Structured output for non-retryable delegate errors
-# Task 2.4 — For deterministic/unknown: do NOT suppress reflection
 MSG="[ERROR RECOVERY] Type: ${ERROR_CLASS} | Tool: ${TOOL_NAME} | Retry: ${NEW_COUNT}/3
 [DELEGATE RETRY] Task delegation failed for agent '${SUBAGENT_TYPE}': ${ERROR_SUMMARY}. Consider: 1) Retry with more specific prompt, 2) Try a different agent tier, 3) Break task into smaller pieces.${CIRCUIT_BREAKER}"
 emit_context "PostToolUseFailure" "${MSG}"

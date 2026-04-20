@@ -28,7 +28,6 @@ TMP=$(mktemp)
 jq '.toolCallCount += 1' "${USAGE_FILE}" >"${TMP}" && mv "${TMP}" "${USAGE_FILE}"
 COUNT=$(jq -r '.toolCallCount' "${USAGE_FILE}" 2>/dev/null)
 
-# Nudge every 3rd direct tool call
 if [[ $((COUNT % 3)) -eq 0 ]]; then
 	MSG="[DELEGATION REMINDER] You've made ${COUNT} direct search/fetch calls without delegating.
 Available agents: explore (codebase search), librarian (docs research), hephaestus (build fixes), momus (plan review), oracle (architecture advice).

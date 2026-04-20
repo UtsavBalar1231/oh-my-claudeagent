@@ -7,7 +7,6 @@ DEST_DIR=""
 DRY_RUN=""
 VERSION=""
 
-# parse args
 while [[ $# -gt 0 ]]; do
 	case "$1" in
 	--dry-run)
@@ -41,12 +40,10 @@ if [[ -z "${DEST_DIR}" ]]; then
 	exit 1
 fi
 
-# Determine version
 if [[ -z "${VERSION}" ]]; then
 	VERSION=$(jq -r '.version' "${PLUGIN_ROOT}/.claude-plugin/plugin.json" 2>/dev/null || echo "unknown")
 fi
 
-# Build rsync command
 RSYNC_ARGS=(-a --delete)
 [[ -n "${DRY_RUN}" ]] && RSYNC_ARGS+=(--dry-run --verbose)
 

@@ -13,7 +13,6 @@ LOG_DIR="${HOOK_LOG_DIR}"
 TRIGGER=$(jq -r '.trigger // "unknown"' <<< "${HOOK_INPUT}")
 COMPACT_SUMMARY=$(jq -r '.compact_summary // ""' <<< "${HOOK_INPUT}")
 
-# Log compaction event
 TS=$(date -Iseconds)
 [[ -n "${COMPACT_SUMMARY}" ]] && HAS_SUMMARY="true" || HAS_SUMMARY="false"
 jq -nc \
@@ -23,7 +22,6 @@ jq -nc \
 	'{event: "post_compact", timestamp: $ts, trigger: $trigger, hasSummary: $has_summary}' \
 	>>"${LOG_DIR}/sessions.jsonl"
 
-# Enrich compaction-context.md with compact_summary
 if [[ -n "${COMPACT_SUMMARY}" ]]; then
 	CONTEXT_FILE="${STATE_DIR}/compaction-context.md"
 	if [[ -f "${CONTEXT_FILE}" ]]; then

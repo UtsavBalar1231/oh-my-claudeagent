@@ -34,7 +34,7 @@ if [[ -f "${ACTIVE_FILE}" ]]; then
 	fi
 	# flock-protected write to prevent concurrent deregistration races
 	# 900s (15m) — active-agent TTL; safe upper bound for any legitimate subagent run.
-	CUTOFF=$(( CURRENT_EPOCH - 900 ))  # 15-min TTL
+	CUTOFF=$(( CURRENT_EPOCH - 900 ))
 	(
 		# 5s — flock wait; long enough for concurrent siblings, short enough to fail fast.
 		flock -w 5 200 || { log_hook_error "flock timeout on active-agents" "subagent-complete.sh"; }
@@ -52,7 +52,6 @@ jq -nc --arg agent_type "${RESOLVED_AGENT_TYPE}" --arg agent_id "${SUBAGENT_ID}"
 	'{agent_type: $agent_type, agent_id: $agent_id, duration_seconds: $duration, status: $status, timestamp: $ts}' \
 	>>"${METRICS_FILE}"
 
-# Routing and session-state audit: write structured events to routing-audit.jsonl, subagents.jsonl, and session.json.
 AUDIT_FILE="${LOG_DIR}/routing-audit.jsonl"
 # 200 bytes — routing-audit preview; smaller than 500-byte LAST_MSG cap for scannable log.
 LAST_MSG_PREVIEW=$(echo "${LAST_MSG}" | head -c 200)
@@ -65,7 +64,6 @@ LOG_FILE="${LOG_DIR}/subagents.jsonl"
 jq -nc --arg id "${SUBAGENT_ID}" --arg status "${EXIT_STATUS}" --arg ts "${TIMESTAMP}" \
 	'{event: "subagent_complete", id: $id, status: $status, timestamp: $ts}' >>"${LOG_FILE}"
 
-# Log subagent final message summary and transcript path for audit
 TRANSCRIPT=$(jq -r '.agent_transcript_path // ""' <<< "${HOOK_INPUT}")
 if [[ -n "${LAST_MSG}" ]]; then
 	jq -nc --arg id "${SUBAGENT_ID}" --arg msg "${LAST_MSG}" --arg transcript "${TRANSCRIPT}" --arg ts "${TIMESTAMP}" \

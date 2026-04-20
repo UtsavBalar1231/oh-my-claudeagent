@@ -14,7 +14,6 @@ Bash | Read | Grep | Glob | WebFetch | WebSearch)
 	;;
 esac
 
-# MCP tool failure patterns
 if echo "${ERROR_MSG}" | grep -qiE 'ast.grep.*not found|sg.*not found|No such file.*ast-grep'; then
 	ADVICE="ast-grep binary not found. Install via: cargo install ast-grep or brew install ast-grep."
 elif echo "${ERROR_MSG}" | grep -qiE 'timeout|timed out|deadline exceeded'; then
