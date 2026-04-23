@@ -5,6 +5,128 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-04-24
+
+v2.0.0 is the depth-0 orchestration cutover: `commands/` replaces orchestration skills, `executor` replaces `sisyphus-junior`, `atlas`/`socrates`/`triage` agents are removed, and the `omca-state` and `ast-grep` MCP servers are consolidated into a single `omca` server.
+
+### Breaking Changes
+
+- **`executor` replaces `sisyphus-junior`**: The focused-implementation agent has been renamed from `sisyphus-junior` to `executor` across all agent references, skills, and delegation tables. Update any custom configurations or saved prompts referencing `sisyphus-junior`. (`agents/executor.md`)
+- **MCP server consolidation**: The separate `omca-state` and `ast-grep` MCP servers have been merged into a single unified `omca` server. Tool names are preserved, but any direct server references in `.mcp.json` overrides need updating. (`servers/`)
+- **`boulder_read` / `boulder_clear` / `evidence_clear` removed**: Replaced by unified `mode_read` / `mode_clear` MCP tools. Agents and skills referencing the old tool names will receive unknown-tool errors. (`servers/omca-mcp.py`)
+- **`tools:` allowlist removed from all agents**: Replaced with `disallowedTools:` to unblock MCP tool inheritance. Any agents that relied on the strict `tools:` allowlist to restrict tool access must be updated. (`agents/*.md`)
+- **`atlas`, `socrates`, `triage` agents removed**: Responsibilities redistributed — `prometheus` absorbs Socratic Interview Mode; depth-0 orchestration moves to `commands/`; triage routing now handled by sisyphus delegation table. Update delegation references.
+- **`notepad` `questions` section removed**: MCP schema no longer accepts `questions` as a section name. Use `issues` or `decisions` instead.
+- **Release workflow changed**: `just release VERSION` now requires a CHANGELOG entry to exist before running (validates before bumping). Scripts that previously called release without a changelog entry will abort.
+
+### Added
+
+- **`commands/` directory with depth-0 orchestration entrypoints**: New `start-work`, `plan`, `ralph`, `ultrawork`, `ulw-loop` commands replace the corresponding skills for depth-0 orchestration. Slash commands now delegate per-task to `executor` in parallel. (`commands/`)
+- **`prometheus` Socratic Interview Mode**: Prometheus now absorbs the full Socratic Interview Mode, including a 6-item clearance checklist and exploration gate for fuzzy requests before planning. (`agents/prometheus.md`)
+- **`executor` agent** (renamed from `sisyphus-junior`): Cleaner identity, same role — focused implementation of known, scoped tasks. (`agents/executor.md`)
+- **`plan_sha256` field on `evidence_log`**: First-class field for plan-scoped evidence verification. F1-F4 hooks now scope evidence lookup to the current plan SHA, eliminating cross-plan false-positives. (`servers/omca-mcp.py`, `scripts/task-completed-verify.sh`)
+- **`file_read` MCP tool**: New tool in the omca MCP server for subagent path access outside the project root. Includes token estimation and `offset`/`limit` guidance for large-file pagination. (`servers/omca-mcp.py`)
+- **Statusline per-agent thematic glyphs**: Each agent now has a dedicated NerdFont v3-compatible glyph in the statusline daemon, with a stable ASCII fallback. Includes `agent_glyph` helper and per-agent parity tests. (`statusline/`)
+- **Statusline per-session socket + PID path naming**: Daemon socket and PID files now include the session ID, preventing cross-session collisions when multiple Claude Code sessions run concurrently. (`statusline/`)
+- **Statusline `types`, `config`, and `protocol` modules**: Typed dataclasses and configuration layer added to the statusline package; 117 pytest tests cover the new modules. (`statusline/`)
+- **`lifecycle-state.sh` for new hook events**: Handles `WorktreeCreate`, `WorktreeRemove`, `TaskCreated`, `CwdChanged`, `FileChanged` platform events. (`scripts/lifecycle-state.sh`, `hooks/hooks.json`)
+- **`subagent-complete.sh` background-agent pending context injection**: Injects pending-agent context into the host session when a background subagent completes, enabling the background-agent barrier to function correctly. (`scripts/subagent-complete.sh`)
+- **`if`-filtered `PermissionRequest` handlers for `rm`, `npm`, `jq`, `uv`**: Reduces permission-prompt noise for common read-only tool invocations without weakening the security guardrail. (`hooks/hooks.json`)
+- **`mode_read` / `mode_clear` unified MCP tools**: Replace three separate state-read tools with a single `mode` abstraction covering ralph, ultrawork, and other persistence modes. (`servers/omca-mcp.py`)
+- **BLOCKING QUESTIONS relay protocol**: Agents that cannot use `AskUserQuestion` (subagent context) now emit a structured `## BLOCKING QUESTIONS` block that sisyphus relays to the user. Documented in agent prompts and OMCA guide. (`agents/*.md`, `OMCA.md`)
+- **Final-verification-evidence Stop hook + F1-F4 convention**: `task-completed-verify.sh` enforces that F1-F4 tasks have matching `evidence_log` entries before allowing plan closure. (`scripts/task-completed-verify.sh`, `hooks/hooks.json`)
+- **Plan-checkbox-verify PreToolUse hook**: Prevents checkbox modifications that bypass the task-completed verification gate. (`hooks/hooks.json`)
+- **`validate-plugin.sh` migration markers and hygiene checks**: Script now checks for skill description length (≤250 chars), detects migration markers, and validates component hygiene. (`scripts/validate-plugin.sh`)
+- **`omca-setup` env var configuration**: Supports `OMCA_OPUS_MODEL` and agent-team environment variable configuration from the setup skill. (`skills/omca-setup/`)
+- **Agent concurrency tracking and routing validation**: Hooks track active subagent count and validate that delegation routing matches the agent catalog. (`scripts/track-subagent-spawn.sh`)
+- **`StopFailure` event handler**: Logs API errors to `.omca/logs/` when the session stops due to an API failure. (`scripts/`, `hooks/hooks.json`)
+- **`ExitPlanMode` PermissionRequest hook**: Fires when the plan-mode classifier requests `acceptEdits` transition; injects user-approval gate. (`hooks/hooks.json`)
+- **`PostToolUseFailure` handlers for Bash and Read**: Captures failure context for circuit-breaker tracking. (`hooks/hooks.json`)
+- **`<coding_discipline>` block in claudemd template**: Runtime guide now includes an explicit coding discipline section injected into every session. (`templates/claudemd.md`)
+- **Role-specific Memory Guidance sections in all agents**: Each agent with `memory: project` now declares role-specific save triggers and negative examples. (`agents/*.md`)
+- **`hook-scratch` dev wrapper**: Utility script for ad-hoc hook testing during development without registering the hook. (`scripts/`)
+- **Golden-output replay harness for shell hooks**: BATS test suite that captures and replays expected hook stdout/stderr, enabling regression detection across the full hook corpus. (`tests/bats/hooks/`)
+- **BATS + pytest behavioral testing infrastructure**: End-to-end test infrastructure with lifecycle fixtures, permission-filter tests, and MCP coverage. (`tests/`)
+- **Eval harness, regression fixtures**: Scaffolding for evaluating agent behavior against recorded fixture outputs. (`eval/`)
+- **`agent_id` bridging in subagent tracking**: Spawn-ID from the track hook is now mapped to the platform `agent_id` for accurate cross-hook agent identification. (`scripts/track-subagent-spawn.sh`)
+
+### Changed
+
+- **Depth-0 orchestration pattern**: `/start-work` now runs entirely at depth 0 (main sisyphus session), spawning `executor` per task in parallel. This replaces the previous pattern where atlas/start-work skills ran as subagents. Documented in `commands/start-work.md` and `templates/claudemd.md`.
+- **`prometheus` migrated to Claude-native planning surfaces**: Planning output now targets native plan mode rather than OMCA-specific plan files. Momus review and metis gap-analysis integrated into the pipeline. (`agents/prometheus.md`)
+- **`metis` output constrained to native planning flow**: Output is now structured for the Claude-native plan-approval gate rather than free-form analysis. (`agents/metis.md`)
+- **`momus` uses native surfaces for review state**: Review state tracked via native plan mode rather than notepad. (`agents/momus.md`)
+- **Statusline daemon exponential polling backoff**: Client polling now backs off exponentially on repeated no-change responses, reducing CPU overhead during idle sessions. (`statusline/`)
+- **Statusline OAuth API migrated to `rate_limits` payload**: Rate-limit data now sourced from the upstream `rate_limits` payload rather than the OAuth token endpoint, removing an auth dependency. (`statusline/`)
+- **`common.sh` POSIX sidecar helpers + comment tightening**: New sidecar-path, SHA-match, and idempotency helpers extracted into `common.sh`; comment noise reduced across the library. (`scripts/lib/common.sh`)
+- **Hook corpus clarity pass**: 34 shell hooks received a corpus-wide clarity pass — function naming conventions enforced (`check_*`/`validate_*` are side-effect-free; action functions use explicit verbs), magic-number derivation comments added, plan-reference comments removed. (`scripts/`)
+- **`hephaestus` and `metis` tool restrictions tightened**: Both agents now use `disallowedTools:` narrowed to their specific scope, reducing accidental broad-tool use. (`agents/hephaestus.md`, `agents/metis.md`)
+- **Agent metadata migrated from frontmatter to HTML comments**: Routing metadata (`<!-- omca: ... -->`) moved out of YAML frontmatter into HTML comments to avoid Claude Code frontmatter parsing conflicts. (`agents/*.md`)
+- **`scripts/lib/common.sh` shared boilerplate extraction**: Repeated jq-read, atomic-write, and mode-state idioms extracted into named helpers. All scripts now source `common.sh` and use `jq_read`, `log_hook_error`, `emit_context`, etc.
+- **`subagent-start.sh` restructured with agent-aware case statement**: Question-injection behavior is now per-agent rather than blanket, reducing noise for agents that handle their own output protocol. (`scripts/subagent-start.sh`)
+- **`session-cleanup.sh` and `teammate-idle-guard.sh` use mode helpers**: Scripts updated to use `mode_is_active` / `mode_state_name` helpers from `common.sh`. (`scripts/`)
+- **Skill bodies terse rewrite (21 skills)**: All skill bodies rewritten for conciseness — removed ceremony, redundant restatement, and thin-wrapper boilerplate. (`skills/*/SKILL.md`)
+- **Agent prompts terse rewrite (planning + execution agents)**: `sisyphus`, `prometheus`, `momus`, `atlas`, `metis`, `oracle`, `explore`, `librarian`, `executor` prompts stripped of filler, metaphor intros, and redundant principle restatements. (`agents/*.md`)
+- **`claudemd.md` template terse rewrite**: Token footprint reduced; `tool_routing` section converted to table format; file_reading guidance injected. (`templates/claudemd.md`)
+- **`write-guard.sh` evidence handling improved**: Now correctly distinguishes evidence writes (allowed via MCP tool) from direct file writes (blocked). (`scripts/write-guard.sh`)
+- **`task-completed-verify.sh` validation enhanced**: Stricter evidence freshness check; session-aware staleness short-circuits clear stale markers. (`scripts/task-completed-verify.sh`)
+- **`keyword-detector.sh` and templates routed to `commands/`**: Multi-word trigger phrases updated to avoid false positives; template lookup now resolves via `commands/` directory. (`scripts/keyword-detector.sh`)
+- **MCP `omca` server domain modules**: `omca-mcp.py` split into domain modules (agents, evidence, notepad, mode, file) for maintainability. (`servers/`)
+- **`plugin.json` / `marketplace.json` version consistency**: Manifest version fields now validated to be in sync during release. (`scripts/validate-plugin.sh`)
+- **`OMCA.md` and `README.md` updated for v2.0**: Agent catalog, workflow section, migration notes, and depth-0 orchestration pattern documented. Hardcoded component counts removed; counts are now runtime queries. (`OMCA.md`, `README.md`)
+- **`CONTRIBUTING.md` hook, agent, and skill guidelines updated**: Reflects new hook `if`-field rules, `disallowedTools:` convention, and `commands/` entrypoint pattern. (`CONTRIBUTING.md`)
+- **Agent AskUserQuestion soft caps removed**: Blanket turn-limit caps replaced with relay-protocol documentation; multi-call relay guidance added. (`agents/*.md`)
+- **`uv` MCP server migrated to `CLAUDE_PLUGIN_DATA`**: Virtual environment now lives in the plugin data directory, persisting across plugin updates. (`servers/`)
+- **`session-init.sh` conditional template injection**: Skips full `claudemd.md` template when `OMCA_CONFIGURED=1`, saving ~10K tokens per turn. (`scripts/session-init.sh`)
+- **Hook `PreToolUse`/`PostToolUse` matcher narrowed from `Task|Agent` to `Agent`**: Reduces unnecessary hook firing on Task tool events. (`hooks/hooks.json`)
+- **Effort frontmatter added to all agents and 14 skills**: `effort:` field added to agent and skill frontmatter for task-list cost estimation. (`agents/*.md`, `skills/*/SKILL.md`)
+- **`omca-setup` skill updated**: MCP permission namespace corrected; `--doctor` mode added for diagnosing configuration issues. (`skills/omca-setup/`)
+- **`maxTurns` removed from all 12 agent definitions**: Turn limits removed; agents rely on their own stop conditions and the verification protocol. (`agents/*.md`)
+
+### Security
+
+- **Permission filter hardened**: Compaction injection tightened; mode-conflict detection improved; `if`-field filtering added to reduce spawning overhead on tool events. (`scripts/permission-filter.sh`)
+
+### Fixed
+
+- **Cross-session orphan-marker false-positives in Stop hook**: The stop hook now scopes orphan-pending-final-verify marker detection to the current session, preventing stale markers from a previous session from blocking plan closure. (`scripts/stop-failure-handler.sh`)
+- **`boulder_progress` counts only numbered-task checkboxes**: Was previously counting all checkboxes (including sub-bullets), inflating progress numbers. (`servers/omca-mcp.py`)
+- **Auto-clear `pending-final-verify.json` on plan closure**: Plan closure now triggers automatic cleanup of the pending-verify marker, preventing stale state from blocking the next plan's verification. (`scripts/`, `hooks/hooks.json`)
+- **F1-F4 enforcement skipped while background subagents are active**: Final-verification check now detects active background agents and defers enforcement until they complete, preventing false-positive blocks during parallel execution. (`scripts/task-completed-verify.sh`)
+- **Plan file existence validation**: Hooks now validate that the referenced plan file exists before reading it, preventing a stale-reference cascade when a plan is deleted or renamed. (`scripts/`)
+- **`consolidate-memory` reads both user and project memory scopes**: Was only reading one scope, silently missing half of saved memories. (`skills/consolidate-memory/`)
+- **Statusline race-free daemon start + stale-PID stop safety**: Daemon startup now uses a lock file to prevent double-start; stale PID files are detected and cleaned up before attempting to stop. (`statusline/`)
+- **ExitPlanMode sequencing after momus review**: ExitPlanMode was being called before the user-approval gate in certain skill flows, bypassing the review step. (`skills/`, `agents/`)
+- **Background agent barrier extended to all background-agent launchers**: Was only applied in sisyphus; now enforced in atlas and all depth-0 orchestrators. (`agents/`, `skills/`)
+- **Agent hallucinations and guardrail gaps corrected**: oracle, hephaestus, explore, and librarian received factual corrections and restored missing guardrails. (`agents/*.md`)
+- **`health_check` crash on missing state files**: MCP health_check tool now handles missing `.omca/state/` files gracefully rather than raising. (`servers/omca-mcp.py`)
+- **Atomic writes and `Path` fallback in MCP server**: State file writes are now atomic (tmp → mv); `Path` objects used consistently to avoid OS-level type errors. (`servers/omca-mcp.py`)
+- **`permissionMode: plan` removed from `explore`, `librarian`, `oracle`**: Field is stripped by Claude Code for plugin agents; its presence caused silent misconfiguration. (`agents/*.md`)
+- **Stop hook output uses top-level `decision`/`reason` fields**: Was using nested fields that the platform did not read. (`scripts/stop-failure-handler.sh`)
+- **Deterministic state file creation and unified persistence blocking**: Ralph and ultrawork state files now created atomically; blocking logic unified to prevent race conditions during mode activation. (`scripts/`)
+- **Two-commit SHA stamp to fix marketplace updates**: Marketplace was not picking up version bumps; release now creates version-bump commit + separate SHA-stamp commit. (`justfile`)
+- **`read-error-recovery` advice updated for `file_read` MCP tool**: Skills and agents that referenced the old file-read error recovery pattern now reference the MCP tool. (`scripts/validate-plugin.sh`)
+- **`permissionMode` plan-mode handler made executable**: Script lacked execute permission. (`scripts/plan-mode-handler.sh`)
+- **Dead `.omca/project-memory.json` reference removed from `subagent-start`**: Reference pointed to a deleted file, causing a silent no-op in memory injection. (`scripts/subagent-start.sh`)
+- **`Agent(resume=)` replaced with `SendMessage` API**: `resume=` parameter was deprecated; updated to the current SDK pattern. (`skills/`)
+- **docs model reference updated**: opus model reference updated from 4 to 4-7; atlas removed from opus-tier list. (`skills/omca-setup/SKILL.md`)
+- **Plugin packaging excludes dev artifacts**: `validate-plugin.sh` and `marketplace.json` now exclude `.bats`, eval fixtures, and scratch files from the distributed plugin cache. (`scripts/validate-plugin.sh`)
+- **`multimodal-looker` uses `disallowedTools`**: Was using `tools:` strict allowlist which inadvertently blocked MCP tool inheritance. (`agents/multimodal-looker.md`)
+
+### Removed
+
+- **`atlas` agent**: Removed. Depth-0 orchestration entrypoints moved to `commands/`; sisyphus handles orchestration directly. (`agents/atlas.md` deleted)
+- **`socrates` agent**: Removed. Socratic Interview Mode absorbed into `prometheus`. (`agents/socrates.md` deleted)
+- **`triage` agent**: Removed. Request classification now handled by sisyphus delegation table. (`agents/triage.md` deleted)
+- **Skills migrated to `commands/`**: `start-work`, `atlas`, `ralph`, `ultrawork`, `ulw-loop` skills deleted; replaced by `commands/` entrypoints with the same trigger names. (`skills/` pruned)
+- **`questions` notepad section**: Removed from MCP schema; use `issues` or `decisions` for analogous content. (`servers/omca-mcp.py`)
+- **Separate `omca-state` and `ast-grep` MCP servers**: Merged into unified `omca` server. Launcher scripts and separate `pyproject.toml` entries removed. (`servers/`)
+- **`boulder_read`, `boulder_clear`, `evidence_clear` MCP tools**: Replaced by `mode_read` / `mode_clear`. (`servers/omca-mcp.py`)
+- **`cost:` frontmatter from all agent definitions**: Deprecated field removed from all agents. (`agents/*.md`)
+- **`maxTurns` from all agent definitions**: Removed; agents use their own stop conditions. (`agents/*.md`)
+- **Circuit breaker tracking hooks**: Removed after simplification pass — error recovery now uses structured logging rather than a circuit-breaker state machine. (`hooks/hooks.json`, `scripts/`)
+- **Hook internals leakage**: Removed debug output and internal state leakage from hook scripts that was appearing in session context. (`scripts/`)
+
 ## [1.5.2] - 2026-04-09
 
 ### Changed
