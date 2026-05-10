@@ -520,7 +520,10 @@ run_registered_hooks() {
 
 check_skill_description_lengths() {
 	local skill_file
-	local max_len=250
+	# 1536 — platform hard cap (v2.1.105). Descriptions exceeding this are truncated by Claude Code.
+	local hard_cap=1536
+	# 512 — internal soft cap. Descriptions beyond this may be truncated in older clients.
+	local soft_cap=512
 	local found_any=0
 
 	while IFS= read -r skill_file; do
@@ -578,10 +581,12 @@ check_skill_description_lengths() {
 		fi
 
 		local desc_len="${#desc}"
-		if [[ "${desc_len}" -gt "${max_len}" ]]; then
-			warn "skill description length: ${skill_name} description is ${desc_len} chars (limit ${max_len}) — Claude Code v2.1.84+ may truncate it"
+		if [[ "${desc_len}" -gt "${hard_cap}" ]]; then
+			fail "skill description length: ${skill_name} description is ${desc_len} chars (hard cap ${hard_cap}) — Claude Code will truncate it"
+		elif [[ "${desc_len}" -gt "${soft_cap}" ]]; then
+			warn "skill description length: ${skill_name} description is ${desc_len} chars (soft cap ${soft_cap}) — consider trimming for older clients"
 		else
-			pass "skill description length: ${skill_name} description is ${desc_len} chars (within ${max_len} limit)"
+			pass "skill description length: ${skill_name} description is ${desc_len} chars (within ${soft_cap} soft cap)"
 		fi
 	done < <(find "${REPO_ROOT}/skills" -name "SKILL.md" -print 2>/dev/null | sort)
 
