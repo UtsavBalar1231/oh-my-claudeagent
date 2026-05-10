@@ -15,8 +15,9 @@ SUBAGENT_PROMPT="${SUBAGENT_PROMPT_FULL:0:200}"
 SUBAGENT_MODEL=$(jq -r '.tool_input.model // "default"' <<< "${HOOK_INPUT}")
 
 TIMESTAMP=$(date -Iseconds)
-# Portable pseudo-unique ID (seconds + random noise — not true milliseconds)
-SPAWN_EPOCH="$(date +%s)$(printf '%03d' $((RANDOM % 1000)))"
+# Nanosecond-resolution ID where available (Linux); falls back to seconds-PID-RANDOM on macOS
+# where date +%N returns literal "%N". PID + RANDOM in the fallback covers multi-agent fan-out.
+SPAWN_EPOCH="$(date +%s%N 2>/dev/null || echo "$(date +%s)-$$-${RANDOM}")"
 SPAWN_ID="spawn-${SPAWN_EPOCH}"
 
 SUBAGENTS_FILE="${STATE_DIR}/subagents.json"

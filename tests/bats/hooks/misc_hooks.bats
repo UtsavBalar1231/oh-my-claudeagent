@@ -92,6 +92,30 @@ load '../test_helper'
 }
 
 # ---------------------------------------------------------------------------
+# e2. track-subagent-spawn: two rapid back-to-back calls produce distinct SPAWN_IDs
+# ---------------------------------------------------------------------------
+
+@test "track-subagent-spawn: back-to-back calls produce distinct SPAWN_IDs" {
+	local payload
+	payload='{"tool_name":"Task","tool_input":{"subagent_type":"oh-my-claudeagent:explore","prompt":"Find patterns","model":"sonnet"}}'
+
+	# First spawn
+	run_hook "track-subagent-spawn.sh" "$payload"
+	assert_success
+	local id1
+	id1=$(jq -r '.active[-1].id' "$CLAUDE_PROJECT_ROOT/.omca/state/subagents.json")
+
+	# Second spawn (immediate — tests nanosecond resolution or PID+RANDOM fallback)
+	run_hook "track-subagent-spawn.sh" "$payload"
+	assert_success
+	local id2
+	id2=$(jq -r '.active[-1].id' "$CLAUDE_PROJECT_ROOT/.omca/state/subagents.json")
+
+	# IDs must differ
+	[ "$id1" != "$id2" ]
+}
+
+# ---------------------------------------------------------------------------
 # f. subagent-complete: marks agent as completed in subagents.json
 # ---------------------------------------------------------------------------
 
