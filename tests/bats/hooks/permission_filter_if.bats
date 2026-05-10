@@ -32,7 +32,7 @@ load '../test_helper'
 	assert_output --partial '"deny"'
 }
 
-# ── npm: allowed ──────────────────────────────────────────────────────────────
+# ── npm: safe subcommands allowed; install/publish/exec fall through ──────────
 
 @test "if Bash(npm *): npm test is allowed" {
 	local fixture="$CLAUDE_PLUGIN_ROOT/tests/fixtures/hooks/permissionrequest-npm-test.json"
@@ -41,16 +41,64 @@ load '../test_helper'
 	assert_output --partial '"allow"'
 }
 
-@test "if Bash(npm *): npm install is allowed" {
-	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"npm install express"}}'
-	assert_success
-	assert_output --partial '"allow"'
-}
-
 @test "if Bash(npm *): npm run build is allowed" {
 	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"npm run build"}}'
 	assert_success
 	assert_output --partial '"allow"'
+}
+
+@test "if Bash(npm *): npm run test is allowed" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"npm run test"}}'
+	assert_success
+	assert_output --partial '"allow"'
+}
+
+@test "if Bash(npm *): npm ci is allowed" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"npm ci"}}'
+	assert_success
+	assert_output --partial '"allow"'
+}
+
+@test "if Bash(npm *): npm list is allowed" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"npm list"}}'
+	assert_success
+	assert_output --partial '"allow"'
+}
+
+@test "if Bash(npm *): npm view react is allowed" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"npm view react"}}'
+	assert_success
+	assert_output --partial '"allow"'
+}
+
+@test "if Bash(npm *): npm install <pkg> falls through (no decision)" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"npm install express"}}'
+	assert_success
+	assert_output ""
+}
+
+@test "if Bash(npm *): npm install (bare) falls through (no decision)" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"npm install"}}'
+	assert_success
+	assert_output ""
+}
+
+@test "if Bash(npm *): npm i falls through (no decision)" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"npm i lodash"}}'
+	assert_success
+	assert_output ""
+}
+
+@test "if Bash(npm *): npm publish falls through (no decision)" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"npm publish"}}'
+	assert_success
+	assert_output ""
+}
+
+@test "if Bash(npm *): npm exec falls through (no decision)" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"npm exec some-tool"}}'
+	assert_success
+	assert_output ""
 }
 
 # ── jq: allowed (with rawfile exception) ──────────────────────────────────────
@@ -145,21 +193,8 @@ load '../test_helper'
 	assert_output ""
 }
 
-# ── bun: allowed (trusted JS package manager) ─────────────────────────────────
-# The `if: "Bash(bun *)"` hook entry ensures bun commands reach this script.
-# Policy: auto-allow bun as a known-safe dev tool (same as npm).
-
-@test "if Bash(bun *): bun install is allowed" {
-	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"bun install"}}'
-	assert_success
-	assert_output --partial '"allow"'
-}
-
-@test "if Bash(bun *): bun install <package> is allowed" {
-	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"bun install some-package"}}'
-	assert_success
-	assert_output --partial '"allow"'
-}
+# ── bun: safe subcommands allowed; install <pkg> falls through ────────────────
+# Policy: auto-allow bun run/test; bun install <pkg> falls through to user.
 
 @test "if Bash(bun *): bun run build is allowed" {
 	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"bun run build"}}'
@@ -167,30 +202,90 @@ load '../test_helper'
 	assert_output --partial '"allow"'
 }
 
-# ── yarn: allowed (trusted JS package manager) ────────────────────────────────
+@test "if Bash(bun *): bun test is allowed" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"bun test"}}'
+	assert_success
+	assert_output --partial '"allow"'
+}
 
-@test "if Bash(yarn *): yarn install is allowed" {
+@test "if Bash(bun *): bun ci is allowed" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"bun ci"}}'
+	assert_success
+	assert_output --partial '"allow"'
+}
+
+@test "if Bash(bun *): bun install <package> falls through (no decision)" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"bun install some-package"}}'
+	assert_success
+	assert_output ""
+}
+
+@test "if Bash(bun *): bun install (bare) falls through (no decision)" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"bun install"}}'
+	assert_success
+	assert_output ""
+}
+
+# ── yarn: safe subcommands allowed; add <pkg> falls through ───────────────────
+
+@test "if Bash(yarn *): yarn run build is allowed" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"yarn run build"}}'
+	assert_success
+	assert_output --partial '"allow"'
+}
+
+@test "if Bash(yarn *): yarn test is allowed" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"yarn test"}}'
+	assert_success
+	assert_output --partial '"allow"'
+}
+
+@test "if Bash(yarn *): yarn ci is allowed" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"yarn ci"}}'
+	assert_success
+	assert_output --partial '"allow"'
+}
+
+@test "if Bash(yarn *): yarn install falls through (no decision)" {
 	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"yarn install"}}'
 	assert_success
-	assert_output --partial '"allow"'
+	assert_output ""
 }
 
-@test "if Bash(yarn *): yarn add <package> is allowed" {
+@test "if Bash(yarn *): yarn add <package> falls through (no decision)" {
 	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"yarn add lodash"}}'
 	assert_success
-	assert_output --partial '"allow"'
+	assert_output ""
 }
 
-# ── pnpm: allowed (trusted JS package manager) ────────────────────────────────
-
-@test "if Bash(pnpm *): pnpm install is allowed" {
-	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"pnpm install"}}'
-	assert_success
-	assert_output --partial '"allow"'
-}
+# ── pnpm: safe subcommands allowed; install falls through ────────────────────
 
 @test "if Bash(pnpm *): pnpm run test is allowed" {
 	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"pnpm run test"}}'
 	assert_success
 	assert_output --partial '"allow"'
+}
+
+@test "if Bash(pnpm *): pnpm test is allowed" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"pnpm test"}}'
+	assert_success
+	assert_output --partial '"allow"'
+}
+
+@test "if Bash(pnpm *): pnpm ci is allowed" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"pnpm ci"}}'
+	assert_success
+	assert_output --partial '"allow"'
+}
+
+@test "if Bash(pnpm *): pnpm install falls through (no decision)" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"pnpm install"}}'
+	assert_success
+	assert_output ""
+}
+
+@test "if Bash(pnpm *): pnpm add <package> falls through (no decision)" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"pnpm add express"}}'
+	assert_success
+	assert_output ""
 }

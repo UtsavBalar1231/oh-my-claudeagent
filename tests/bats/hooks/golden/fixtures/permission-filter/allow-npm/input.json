@@ -1,1 +1,1 @@
-{"hook_event_name":"PermissionRequest","tool_name":"Bash","tool_input":{"command":"npm install"},"session_id":"fixture-sid-001"}
+{"hook_event_name":"PermissionRequest","tool_name":"Bash","tool_input":{"command":"npm run build"},"session_id":"fixture-sid-001"}

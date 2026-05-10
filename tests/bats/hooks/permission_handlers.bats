@@ -3,10 +3,16 @@ load '../test_helper'
 
 # ── permission-filter.sh tests ────────────────────────────────────────────────
 
-@test "permission-filter: npm install is allowed" {
-	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"npm install express"}}'
+@test "permission-filter: npm run build is allowed" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"npm run build"}}'
 	assert_success
 	assert_output --partial '"allow"'
+}
+
+@test "permission-filter: npm install falls through (no auto-allow)" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"npm install express"}}'
+	assert_success
+	assert_output ""
 }
 
 @test "permission-filter: uv run is allowed" {

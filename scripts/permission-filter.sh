@@ -18,13 +18,27 @@ if [[ "${TRIMMED_CMD}" =~ ^(sudo[[:space:]]+)?rm[[:space:]]+-[a-zA-Z]*r[a-zA-Z]*
 	exit 0
 fi
 
-if [[ "${TRIMMED_CMD}" == npm\ * ]] ||
-	[[ "${TRIMMED_CMD}" == bun\ * ]] ||
-	[[ "${TRIMMED_CMD}" == yarn\ * ]] ||
-	[[ "${TRIMMED_CMD}" == pnpm\ * ]]; then
-	echo '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}'
-	exit 0
-fi
+# Auto-allow JS package manager safe subcommands (lockfile-only / read-only / run-only).
+# Blocked: install <pkg>, publish, exec, npx <pkg> — fall through to user decision.
+# Safe set: run *, test, ci, list, view (npm); run *, test (bun/yarn/pnpm).
+for _PM in npm bun yarn pnpm; do
+	if [[ "${TRIMMED_CMD}" == ${_PM}\ * ]]; then
+		_SUBCMD="${TRIMMED_CMD#${_PM} }"
+		if [[ "${_SUBCMD}" == run\ * ]] ||
+			[[ "${_SUBCMD}" == test ]] ||
+			[[ "${_SUBCMD}" == test\ * ]] ||
+			[[ "${_SUBCMD}" == ci ]] ||
+			[[ "${_SUBCMD}" == ci\ * ]] ||
+			[[ "${_SUBCMD}" == list ]] ||
+			[[ "${_SUBCMD}" == list\ * ]] ||
+			[[ "${_SUBCMD}" == view\ * ]]; then
+			echo '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}'
+			exit 0
+		fi
+		# install, publish, exec, npx, add, remove, etc. → fall through to user decision
+		exit 0
+	fi
+done
 
 # Auto-allow jq (used by hook scripts for JSON parsing).
 # Risk: jq --rawfile can read arbitrary files into variables. Deny that flag; allow the rest.
