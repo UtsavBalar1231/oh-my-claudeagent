@@ -4,7 +4,7 @@ source "$(dirname "$0")/lib/common.sh"
 
 
 TOOL_NAME=$(jq -r '.tool_name // ""' <<< "${HOOK_INPUT}")
-ERROR_MSG=$(jq -r '.error // .tool_result.error // ""' <<< "${HOOK_INPUT}")
+ERROR_MSG=$(jq -r '.error // ""' <<< "${HOOK_INPUT}")
 
 case "${TOOL_NAME}" in
 Bash | Read | Grep | Glob | WebFetch | WebSearch)

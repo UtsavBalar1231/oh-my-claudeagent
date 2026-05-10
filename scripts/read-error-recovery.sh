@@ -3,7 +3,7 @@
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
-ERROR=$(jq -r '.error // .tool_error // ""' <<< "${HOOK_INPUT}")
+ERROR=$(jq -r '.error // ""' <<< "${HOOK_INPUT}")
 
 if echo "${ERROR}" | grep -qiE 'no such file|not found|ENOENT'; then
 	ADVICE="File not found. Use Glob to search for similar filenames, or check if the path has changed."

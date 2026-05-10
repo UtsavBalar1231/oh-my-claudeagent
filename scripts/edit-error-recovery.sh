@@ -6,7 +6,7 @@ STATE_DIR="${HOOK_STATE_DIR}"
 LOG_DIR="${HOOK_LOG_DIR}"
 
 FILE_PATH=$(jq -r '.tool_input.file_path // "unknown"' <<< "${HOOK_INPUT}")
-ERROR_MSG=$(jq -r '.error // .tool_result.error // "Unknown error"' <<< "${HOOK_INPUT}")
+ERROR_MSG=$(jq -r '.error // "Unknown error"' <<< "${HOOK_INPUT}")
 TOOL_NAME=$(jq -r '.tool_name // "Edit"' <<< "${HOOK_INPUT}")
 
 TIMESTAMP=$(date -Iseconds)

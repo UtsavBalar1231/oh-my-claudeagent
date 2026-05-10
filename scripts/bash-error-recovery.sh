@@ -4,7 +4,7 @@
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
-ERROR=$(jq -r '.error // .tool_error // ""' <<< "${HOOK_INPUT}")
+ERROR=$(jq -r '.error // ""' <<< "${HOOK_INPUT}")
 
 if echo "${ERROR}" | grep -qiE 'command not found|No such file or directory.*bin'; then
 	ADVICE="Command not found. Check if the tool is installed and on PATH. Try: which <command>"
