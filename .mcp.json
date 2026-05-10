@@ -5,7 +5,8 @@
       "args": ["run", "--project", "${CLAUDE_PLUGIN_ROOT}/servers", "python", "${CLAUDE_PLUGIN_ROOT}/servers/omca-mcp.py"],
       "env": {
         "UV_PROJECT_ENVIRONMENT": "${CLAUDE_PLUGIN_DATA}/.venv"
-      }
+      },
+      "alwaysLoad": true
     },
     "grep": {
       "type": "http",
