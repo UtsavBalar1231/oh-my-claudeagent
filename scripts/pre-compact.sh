@@ -90,7 +90,7 @@ TEMPLATE
 	SUBAGENT_LOG="${LOG_DIR}/subagents.jsonl"
 	ACTIVE_AGENTS=""
 	if [[ -f "${SUBAGENT_LOG}" ]]; then
-		ACTIVE_AGENTS=$(tail -50 "${SUBAGENT_LOG}" | jq -s '[.[] | select(.event == "subagent_spawn")] | .[-10:] | .[] | "- Agent: \(.type // "unknown"), SpawnID: \(.id // "unknown"), Model: \(.model // "default")"' 2>/dev/null | tr -d '"')
+		ACTIVE_AGENTS=$(grep '"subagent_spawn"' "${SUBAGENT_LOG}" | tail -200 | jq -s '[.[] | select(.event == "subagent_spawn")] | .[-10:] | .[] | "- Agent: \(.type // "unknown"), SpawnID: \(.id // "unknown"), Model: \(.model // "default")"' 2>/dev/null | tr -d '"')
 	fi
 
 	printf '\n## Recently Spawned Agents\n'
@@ -121,7 +121,7 @@ TEMPLATE
 
 	if [[ -f "${EVIDENCE_FILE}" ]]; then
 		printf '\n## Latest Verification Evidence\n'
-		LATEST=$(jq -r '.entries | last | "type=\(.type) cmd=\(.command) exit=\(.exit_code) ts=\(.timestamp)"' "${EVIDENCE_FILE}" 2>/dev/null || echo "")
+		LATEST=$(jq -r '.entries | last | "type=\(.type) cmd=\(.command) exit=\(.exit_code) ts=\(.timestamp)"' "${EVIDENCE_FILE}")
 		if [[ -n "${LATEST}" ]]; then
 			printf '%s\n' "${LATEST}"
 		else
