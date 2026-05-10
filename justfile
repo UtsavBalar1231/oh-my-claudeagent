@@ -231,13 +231,11 @@ release version="":
 		.plugins[0].version = $v
 	' .claude-plugin/marketplace.json > /tmp/marketplace-tmp.json
 	mv /tmp/marketplace-tmp.json .claude-plugin/marketplace.json
-	# Sync version into servers/pyproject.toml and claudemd.md (portable sed)
+	# Sync version into servers/pyproject.toml (portable sed)
 	if sed --version >/dev/null 2>&1; then
 		sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" servers/pyproject.toml
-		sed -i "s/^version: .*/version: ${VERSION}/" templates/claudemd.md
 	else
 		sed -i '' "s/^version = \".*\"/version = \"${VERSION}\"/" servers/pyproject.toml
-		sed -i '' "s/^version: .*/version: ${VERSION}/" templates/claudemd.md
 	fi
 	echo "Synced version: $VERSION"
 	# Update lockfile after pyproject.toml version change
@@ -245,7 +243,7 @@ release version="":
 	echo "Updated uv.lock"
 	# Commit 1: version bump across all manifests
 	git add .claude-plugin/plugin.json .claude-plugin/marketplace.json \
-		servers/pyproject.toml templates/claudemd.md servers/uv.lock
+		servers/pyproject.toml servers/uv.lock
 	git commit -m "chore(release): bump version to ${VERSION}"
 	echo "Committed version bump"
 	# Commit 2: stamp the version-bump commit SHA into marketplace.json
