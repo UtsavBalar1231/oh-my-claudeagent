@@ -2,12 +2,6 @@
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
-
-emit_context() {
-	local message="$1"
-	jq -nc --arg msg "${message}" '{hookSpecificOutput: {hookEventName: "PreToolUse", additionalContext: $msg}}'
-}
-
 FILE_PATH=$(jq -r '.tool_input.file_path // ""' <<< "${HOOK_INPUT}")
 
 if [[ -z "${FILE_PATH}" ]]; then
@@ -16,16 +10,17 @@ fi
 
 case "${FILE_PATH}" in
 */verification-evidence.json)
-	MSG="[EVIDENCE GUARD] Do NOT manually write verification-evidence.json. Use the evidence_log MCP tool instead. Example: evidence_log(evidence_type=\"test\", command=\"just test\", exit_code=0, output_snippet=\"10 passed\")"
-	emit_context "${MSG}"
+	jq -nc \
+		--arg reason "Manual writes to verification-evidence.json are forbidden. Use the evidence_log MCP tool instead." \
+		'{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: $reason}}'
 	exit 0
 	;;
 *) ;;
 esac
 
 if [[ -f "${FILE_PATH}" ]]; then
-	MSG="[WRITE GUARD] File already exists: ${FILE_PATH}. Consider using Edit tool for modifications to preserve existing content."
-	emit_context "${MSG}"
+	MSG="Detected manual write to file that exists at path ${FILE_PATH}. Future modifications should use Edit to preserve history."
+	emit_context "PreToolUse" "${MSG}"
 else
 	exit 0
 fi

@@ -18,7 +18,7 @@ load '../test_helper'
 	assert_success
 	ctx=$(get_context)
 	assert [ -n "$ctx" ]
-	echo "$ctx" | grep -qi "WRITE GUARD"
+	echo "$ctx" | grep -qi "Detected manual write"
 }
 
 # ---------------------------------------------------------------------------
@@ -50,9 +50,10 @@ load '../test_helper'
 
 	run_hook "write-guard.sh" "$payload"
 	assert_success
-	ctx=$(get_context)
-	assert [ -n "$ctx" ]
-	echo "$ctx" | grep -qi "EVIDENCE"
+
+	local decision
+	decision=$(echo "$output" | jq -r '.hookSpecificOutput.permissionDecision // empty')
+	[ "$decision" = "deny" ]
 }
 
 # ---------------------------------------------------------------------------
