@@ -41,19 +41,6 @@ if [[ -f "${EVIDENCE_FILE}" ]]; then
 	fi
 fi
 
-RECENT_EDITS=false
-EDITS_LOG="${LOG_DIR}/edits.jsonl"
-if [[ -f "${EDITS_LOG}" ]]; then
-	if command -v stat &>/dev/null; then
-		EDITS_MTIME=$(stat -c %Y "${EDITS_LOG}" 2>/dev/null || stat -f %m "${EDITS_LOG}" 2>/dev/null || echo "")
-		if [[ "${EDITS_MTIME}" =~ ^[0-9]+$ ]]; then
-			EDITS_AGE=$(($(date +%s) - EDITS_MTIME))
-			if [[ "${EDITS_AGE}" -le "${MAX_EVIDENCE_AGE_SECONDS}" ]]; then
-				RECENT_EDITS=true
-			fi
-		fi
-	fi
-fi
 
 NEEDS_EVIDENCE=false
 if [[ "${TASK_DESCRIPTION}" =~ (^|[^[:alnum:]])(verify|test|build|typecheck|lint|validate|fix|implement|refactor|deploy)([^[:alnum:]]|$) ]]; then
@@ -82,11 +69,7 @@ if [[ "${RECENT_EVIDENCE}" == "true" ]]; then
 	fi
 elif [[ "${NEEDS_EVIDENCE}" == "true" ]]; then
 	log_hook_error "missing verification evidence for task: ${TASK_DESCRIPTION:0:100}" "task-completed-verify.sh"
-	if [[ "${RECENT_EDITS}" == "true" ]]; then
-		echo "Files were modified but no verification evidence was recorded. Use the evidence_log MCP tool after running build/test commands. Example: evidence_log(evidence_type=\"test\", command=\"just test\", exit_code=0, output_snippet=\"10 passed\")" >&2
-	else
-		echo "Task completion requires verification evidence, but no recent verification evidence was recorded. Use the evidence_log MCP tool after running the relevant build/test/lint command. Example: evidence_log(evidence_type=\"test\", command=\"just test\", exit_code=0, output_snippet=\"10 passed\")" >&2
-	fi
+	echo "Task completion requires verification evidence. Use the evidence_log MCP tool after running build/test commands. Example: evidence_log(evidence_type=\"test\", command=\"just test\", exit_code=0, output_snippet=\"10 passed\")" >&2
 	exit "${BLOCK_EXIT_CODE}"
 fi
 

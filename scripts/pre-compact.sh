@@ -90,6 +90,7 @@ TEMPLATE
 	SUBAGENT_LOG="${LOG_DIR}/subagents.jsonl"
 	ACTIVE_AGENTS=""
 	if [[ -f "${SUBAGENT_LOG}" ]]; then
+		# tr -d '"': jq @json wraps strings in quotes; strip them so context block renders as plaintext.
 		ACTIVE_AGENTS=$(grep '"subagent_spawn"' "${SUBAGENT_LOG}" | tail -200 | jq -s '[.[] | select(.event == "subagent_spawn")] | .[-10:] | .[] | "- Agent: \(.type // "unknown"), SpawnID: \(.id // "unknown"), Model: \(.model // "default")"' 2>/dev/null | tr -d '"')
 	fi
 

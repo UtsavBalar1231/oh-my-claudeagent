@@ -17,6 +17,7 @@ for MODE_NAME in ralph ultrawork; do
 	fi
 done
 
+# 600s (10m) — matches platform subagent stall timeout; override via OMCA_AGENT_TIMEOUT_SECS.
 TIMEOUT_SECS="${OMCA_AGENT_TIMEOUT_SECS:-600}"
 SUBAGENTS_FILE="${STATE_DIR}/subagents.json"
 

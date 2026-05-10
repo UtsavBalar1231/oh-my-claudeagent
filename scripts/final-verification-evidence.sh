@@ -100,9 +100,7 @@ if [[ -n "${MARKER_PLAN}" ]]; then
 
 	# Marker plan has zero [x] — never started, stale.
 	if [[ -n "${MARKER_PLAN}" && -f "${MARKER_PLAN}" ]]; then
-		MARKER_DONE=$(grep -cE '^- \[x\] ' "${MARKER_PLAN}" 2>/dev/null || true)
-		MARKER_DONE="${MARKER_DONE:-0}"
-		if [[ "${MARKER_DONE}" -eq 0 ]]; then
+		if ! grep -qE '^- \[x\] ' "${MARKER_PLAN}" 2>/dev/null; then
 			rm -f "${MARKER_FILE}"
 			noop_exit
 		fi
@@ -143,7 +141,7 @@ fi
 
 if [[ -z "${ACTIVE_PLAN}" && -n "${MARKER_PLAN}" ]]; then
 	NOW=$(date +%s)
-	MARKER_AGE=$(( NOW - MARKER_AT ))
+	MARKER_AGE=$(( NOW - ${MARKER_AT:-0} ))
 	if [[ "${MARKER_AGE}" -gt "${MAX_MARKER_AGE_SECONDS}" ]]; then
 		# Stale marker — do not block
 		noop_exit
