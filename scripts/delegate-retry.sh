@@ -39,11 +39,13 @@ NEW_COUNT=$((CURRENT_COUNT + 1))
 
 TMP_COUNTS=$(mktemp)
 if [[ -f "${ERROR_COUNTS_FILE}" ]]; then
-	jq --arg key "${ERROR_KEY}" --argjson count "${NEW_COUNT}" '.[$key] = $count' "${ERROR_COUNTS_FILE}" >"${TMP_COUNTS}" 2>/dev/null || echo "{\"${ERROR_KEY}\": ${NEW_COUNT}}" >"${TMP_COUNTS}"
+	if jq --arg key "${ERROR_KEY}" --argjson count "${NEW_COUNT}" '.[$key] = $count' "${ERROR_COUNTS_FILE}" >"${TMP_COUNTS}"; then
+		mv "${TMP_COUNTS}" "${ERROR_COUNTS_FILE}"
+	fi
 else
 	echo "{\"${ERROR_KEY}\": ${NEW_COUNT}}" >"${TMP_COUNTS}"
+	mv "${TMP_COUNTS}" "${ERROR_COUNTS_FILE}"
 fi
-mv "${TMP_COUNTS}" "${ERROR_COUNTS_FILE}"
 
 RETRYABLE_PATTERNS="rate.limit|quota.exceeded|overloaded|too.many.requests|429|503|capacity|credit.balance|temporarily.unavailable|service.unavailable|timeout|ECONNRESET|ETIMEDOUT|rate_limit|resource_exhausted"
 

@@ -25,6 +25,23 @@ load '../test_helper'
 	echo "$ctx" | grep -qi "unique"
 }
 
+@test "edit-error-recovery: corrupt error-counts.json is left unchanged on jq failure" {
+	local counts_file="$CLAUDE_PROJECT_ROOT/.omca/state/error-counts.json"
+	local corrupt_content='THIS IS NOT JSON {'
+	write_state "error-counts.json" "$corrupt_content"
+
+	local payload
+	payload='{"tool_name":"Edit","tool_input":{"file_path":"/tmp/foo.sh"},"error":"old_string not found in file"}'
+	run_hook "edit-error-recovery.sh" "$payload"
+	# Hook must not crash fatally — exit 0 is expected (graceful degradation)
+	assert_success
+
+	# File must not have been overwritten with a single-key object
+	local actual
+	actual=$(cat "$counts_file")
+	assert [ "$actual" = "$corrupt_content" ]
+}
+
 # ─── f. delegate-retry.sh ────────────────────────────────────────────────────
 
 @test "delegate-retry: unknown agent error produces oracle/escalation suggestion" {

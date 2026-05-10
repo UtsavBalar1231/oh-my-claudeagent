@@ -123,3 +123,21 @@ load '../test_helper'
 	# File should still not exist (session-init does not create it)
 	assert [ ! -f "$CLAUDE_PROJECT_ROOT/.omca/state/error-counts.json" ]
 }
+
+# Case 4: corrupt counts file → delegate-retry does NOT overwrite with single-key object
+@test "delegate-retry: corrupt error-counts.json is left unchanged on jq failure" {
+	local counts_file="$CLAUDE_PROJECT_ROOT/.omca/state/error-counts.json"
+	local corrupt_content='THIS IS NOT JSON {'
+	write_state "error-counts.json" "$corrupt_content"
+
+	local payload
+	payload='{"tool_name":"Agent","tool_input":{"subagent_type":"oh-my-claudeagent:executor"},"error":"Agent failed: some error"}'
+	run_hook "delegate-retry.sh" "$payload"
+	# Hook must not crash fatally — exit 0 is expected (graceful degradation)
+	assert_success
+
+	# File must not have been overwritten with a single-key object
+	local actual
+	actual=$(cat "$counts_file")
+	assert [ "$actual" = "$corrupt_content" ]
+}
