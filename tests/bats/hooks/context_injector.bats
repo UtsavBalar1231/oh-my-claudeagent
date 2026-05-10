@@ -114,7 +114,7 @@ _payload() {
 	[[ "$ctx" != *"Unique Agent Content"* ]]
 }
 
-@test "cache dedup: injected-context-dirs.json records the directory after first Read" {
+@test "cache dedup: injected-context-dirs.json records the mtime-keyed entry after first Read" {
 	mkdir -p "$CLAUDE_PROJECT_ROOT/subdir"
 	echo "# Cache test" > "$CLAUDE_PROJECT_ROOT/subdir/AGENTS.md"
 	touch "$CLAUDE_PROJECT_ROOT/subdir/file.txt"
@@ -124,9 +124,36 @@ _payload() {
 
 	local cache="$CLAUDE_PROJECT_ROOT/.omca/state/injected-context-dirs.json"
 	assert [ -f "$cache" ]
+	# Cache key is "${dir}|${mtime}" — verify at least one entry whose key starts with the dir
 	local recorded
-	recorded=$(jq -r --arg dir "$CLAUDE_PROJECT_ROOT/subdir" '.[$dir]' "$cache")
+	recorded=$(jq -r 'to_entries[] | select(.key | startswith("'"$CLAUDE_PROJECT_ROOT/subdir|"'")) | .value' "$cache")
 	assert [ "$recorded" = "true" ]
+}
+
+# ---------------------------------------------------------------------------
+# d2. mtime invalidation: editing AGENTS.md re-injects on next Read
+# ---------------------------------------------------------------------------
+
+@test "mtime invalidation: editing AGENTS.md causes re-injection on next Read" {
+	mkdir -p "$CLAUDE_PROJECT_ROOT/subdir"
+	echo "# Original content" > "$CLAUDE_PROJECT_ROOT/subdir/AGENTS.md"
+	touch "$CLAUDE_PROJECT_ROOT/subdir/file.txt"
+
+	# First call — injects original content
+	run_hook "context-injector.sh" "$(_payload Read "$CLAUDE_PROJECT_ROOT/subdir/file.txt")"
+	assert_success
+	ctx=$(get_context)
+	[[ "$ctx" == *"Original content"* ]]
+
+	# Modify AGENTS.md — advance mtime so the cache key changes
+	sleep 1
+	echo "# Updated content" > "$CLAUDE_PROJECT_ROOT/subdir/AGENTS.md"
+
+	# Second call — mtime changed, cache key is new → re-inject with updated content
+	run_hook "context-injector.sh" "$(_payload Read "$CLAUDE_PROJECT_ROOT/subdir/file.txt")"
+	assert_success
+	ctx=$(get_context)
+	[[ "$ctx" == *"Updated content"* ]]
 }
 
 # ---------------------------------------------------------------------------
