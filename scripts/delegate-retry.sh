@@ -6,7 +6,7 @@ STATE_DIR="${HOOK_STATE_DIR}"
 
 ERROR_MSG=$(jq -r '.error // .tool_result.error // .output // "Unknown error"' <<< "${HOOK_INPUT}")
 SUBAGENT_TYPE=$(jq -r '.tool_input.subagent_type // "unknown"' <<< "${HOOK_INPUT}")
-TOOL_NAME=$(jq -r '.tool_name // "Task"' <<< "${HOOK_INPUT}")
+TOOL_NAME=$(jq -r '.tool_name // "Agent"' <<< "${HOOK_INPUT}")
 
 if echo "${ERROR_MSG}" | grep -qi "No such tool available: Agent"; then
 	MSG="[NESTING LIMIT] The Agent tool is unavailable — you are running as a subagent and cannot spawn further subagents. This is a Claude Code platform constraint. Implement the task directly using Read, Write, Edit, Bash, Grep, Glob. Do NOT retry Agent calls."

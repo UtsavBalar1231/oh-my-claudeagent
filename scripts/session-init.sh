@@ -32,6 +32,19 @@ if [[ "${SWEEP_SOURCE}" != "compact" ]] && [[ -f "${PENDING_MARKER}" ]]; then
 	fi
 fi
 
+# One-time migration: merge legacy Task:delegate_error counter key → Agent:delegate_error.
+# Pre-v2.0 delegate-retry.sh used tool_name // "Task"; the canonical platform name is Agent.
+# Guard: only run if file exists AND contains the legacy key (idempotent on clean installs).
+COUNTS_FILE="${STATE_DIR}/error-counts.json"
+if [[ -f "${COUNTS_FILE}" ]] && jq -e 'has("Task:delegate_error")' "${COUNTS_FILE}" >/dev/null 2>&1; then
+	LEGACY_COUNT=$(jq -r '."Task:delegate_error" // 0' "${COUNTS_FILE}")
+	TMP_MIGRATION=$(mktemp)
+	jq --argjson legacy "${LEGACY_COUNT}" \
+		'del(."Task:delegate_error") | ."Agent:delegate_error" = ((."Agent:delegate_error" // 0) + $legacy)' \
+		"${COUNTS_FILE}" >"${TMP_MIGRATION}" && mv "${TMP_MIGRATION}" "${COUNTS_FILE}"
+	log_hook_error "migrated Task:delegate_error (${LEGACY_COUNT}) → Agent:delegate_error" "session-init.sh"
+fi
+
 SESSION_STATE="${STATE_DIR}/session.json"
 TMP_FILE=$(mktemp)
 TS=$(date -Iseconds)
