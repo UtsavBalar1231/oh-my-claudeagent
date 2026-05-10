@@ -22,7 +22,8 @@ case "${AGENT_TYPE}" in
 	CONTEXT_PARTS+="AskUserQuestion is not available here. When you need user input, emit a '## BLOCKING QUESTIONS' block at the end of your final response (Q1., Q2., lettered options A/B/C, Recommended: line) and return. The orchestrator will relay and resume you with the answers."
 	;;
 *)
-	CONTEXT_PARTS+="Make autonomous decisions. If unclear, choose the most reasonable option and proceed."
+	# Unlisted agents get no AskUserQuestion — safer than enabling it for unknown agent types.
+	CONTEXT_PARTS+="AskUserQuestion is not available here. Make autonomous decisions when possible; if you need user input, emit a '## BLOCKING QUESTIONS' block at the end of your final response (Q1., Q2., lettered options A/B/C, Recommended: line) and return. The orchestrator will relay."
 	;;
 esac
 
@@ -136,7 +137,7 @@ STARTED_EPOCH=$(date +%s)
 # Bridge spawn-ID to platform agent_id in subagents.json
 SUBAGENTS_FILE="${STATE_DIR}/subagents.json"
 if [[ -f "${SUBAGENTS_FILE}" ]]; then
-	AGENT_TYPE_SHORT="${AGENT_TYPE##*:}" # strip "oh-my-claudeagent:" prefix
+	AGENT_TYPE_SHORT="${AGENT_TYPE##*:}" # strip plugin namespace (everything up to and including the last ':')
 	TMP_SUB=$(mktemp)
 	jq --arg platform_id "${AGENT_ID}" \
 		--arg agent_type "${AGENT_TYPE_SHORT}" \

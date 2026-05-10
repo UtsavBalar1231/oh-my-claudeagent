@@ -8,7 +8,7 @@ STATE_DIR="${HOOK_STATE_DIR}"
 # each value is {"detected_at": <unix epoch>, "session_id": "<sid>"}.
 ACTIVE_MODES_FILE="${STATE_DIR}/active-modes.json"
 
-# All hook payloads include agent_id when firing inside a subagent
+# agent_id is only present in hook payloads fired inside a subagent call, not in top-level session hooks
 AGENT_ID=$(jq -r '.agent_id // ""' <<< "${HOOK_INPUT}")
 if [[ -n "${AGENT_ID}" ]]; then
 	exit 0

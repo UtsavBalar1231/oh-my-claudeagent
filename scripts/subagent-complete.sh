@@ -63,7 +63,7 @@ jq -nc --arg agent_type "${RESOLVED_AGENT_TYPE}" --arg agent_id "${SUBAGENT_ID}"
 
 AUDIT_FILE="${LOG_DIR}/routing-audit.jsonl"
 # 200 bytes — routing-audit preview; smaller than 500-byte LAST_MSG cap for scannable log.
-LAST_MSG_PREVIEW=$(echo "${LAST_MSG}" | head -c 200)
+LAST_MSG_PREVIEW=$(printf '%s' "${LAST_MSG}" | head -c 200)
 jq -nc --arg id "${SUBAGENT_ID}" --arg agent_type "$(jq -r '.agent_type // ""' <<< "${HOOK_INPUT}")" \
 	--arg msg "${LAST_MSG_PREVIEW}" --arg ts "${TIMESTAMP}" \
 	'{event: "agent_complete", id: $id, agent_type: $agent_type, message_preview: $msg, timestamp: $ts}' \

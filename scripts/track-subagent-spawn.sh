@@ -48,7 +48,6 @@ jq -nc --arg id "${SPAWN_ID}" --arg type "${SUBAGENT_TYPE}" --arg model "${SUBAG
 	--arg session_id "${SESSION_ID}" \
 	'{event: "subagent_spawn", id: $id, type: $type, model: $model, timestamp: $ts, spawned_at: $ts, parent_session_id: $session_id}' >>"${LOG_FILE}"
 
-SESSION_STATE="${STATE_DIR}/session.json"
 if [[ -f "${SESSION_STATE}" ]]; then
 	TMP_FILE=$(mktemp)
 	jq --arg id "${SPAWN_ID}" --arg type "${SUBAGENT_TYPE}" \
