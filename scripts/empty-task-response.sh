@@ -2,8 +2,16 @@
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
+_HOOK_START=$(date +%s%N)
 
-RESPONSE=$(jq -r '.tool_response // .tool_result // ""' <<< "${HOOK_INPUT}")
+# Agent tool returns tool_response as a structured object {result: "..."}; other
+# tools return a plain string. Extract the inner .result when present.
+_RAW_RESPONSE=$(jq -r '.tool_response // ""' <<< "${HOOK_INPUT}")
+if echo "${_RAW_RESPONSE}" | jq -e 'type == "object" and has("result")' >/dev/null 2>&1; then
+	RESPONSE=$(echo "${_RAW_RESPONSE}" | jq -r '.result // ""')
+else
+	RESPONSE="${_RAW_RESPONSE}"
+fi
 
 RESPONSE_LENGTH=${#RESPONSE}
 
@@ -29,7 +37,9 @@ else
 		jq '.agentUsed = true' "${USAGE_FILE}" >"${TMP}" && mv "${TMP}" "${USAGE_FILE}"
 	fi
 
-	AGENT_TYPE=$(jq -r '.agent_name // .subagent_type // ""' <<< "${HOOK_INPUT}" | sed 's/.*://')
+	# Canonical platform path: subagent_type is nested under tool_input (not top-level).
+	AGENT_TYPE_FULL=$(jq -r '.tool_input.subagent_type // ""' <<< "${HOOK_INPUT}")
+	AGENT_TYPE="${AGENT_TYPE_FULL##*:}"
 	MISSING_SECTIONS=""
 	case "${AGENT_TYPE}" in
 	executor)
@@ -72,6 +82,9 @@ else
 		WARN="[ADVISORY] Agent '${AGENT_TYPE}' output is missing expected section headers:${MISSING_SECTIONS}. The required output format specifies these sections. Output may be incomplete or hard to parse downstream."
 		emit_context "PostToolUse" "${WARN}"
 	else
+		hook_timing_log "${_HOOK_START}"
 		exit 0
 	fi
 fi
+
+hook_timing_log "${_HOOK_START}"
