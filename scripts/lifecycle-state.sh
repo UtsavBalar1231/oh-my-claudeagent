@@ -160,6 +160,9 @@ handle_repo_refresh() {
 	watch_paths_json=$(build_watch_paths_json "${repo_root}")
 	write_repo_state "${HOOK_EVENT_NAME}" "${repo_root}" "${active_cwd}" "${old_cwd}" "${changed_path}" "${changed_event}" "${watch_paths_json}"
 
+	# watchPaths is documented for both CwdChanged and FileChanged hooks (hooks.md §CwdChanged, §FileChanged).
+	# Returning it here dynamically updates the platform's file-watch list to key project config files.
+	# Decision: KEEP — field is live and tested against hooks.md. See .omca/notes/watchpaths-decision.md.
 	output_json=$(jq -nc --arg event_name "${HOOK_EVENT_NAME}" --argjson watch_paths "${watch_paths_json}" '{hookSpecificOutput: {hookEventName: $event_name, watchPaths: $watch_paths}}')
 	printf '%s\n' "${output_json}"
 	exit 0
