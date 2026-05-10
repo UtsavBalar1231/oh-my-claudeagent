@@ -26,11 +26,11 @@ if [[ -f "${SUBAGENTS_FILE}" ]]; then
 
 	if [[ -n "${TEAMMATE_NAME}" ]]; then
 		STARTED_EPOCH=$(jq -r --arg name "${TEAMMATE_NAME}" \
-			'[.active[]? | select(.type == $name or .type == ("oh-my-claudeagent:" + $name))] | .[0] | .started_epoch // 0' \
+			'[.active[]? | select(.type == $name or .type == ("oh-my-claudeagent:" + $name))] | max_by(.started_epoch) | .started_epoch // 0' \
 			"${SUBAGENTS_FILE}" 2>/dev/null)
 	else
 		STARTED_EPOCH=$(jq -r \
-			'[.active[]? | .started_epoch // 0] | .[0] // 0' \
+			'[.active[]?] | max_by(.started_epoch) | .started_epoch // 0' \
 			"${SUBAGENTS_FILE}" 2>/dev/null)
 	fi
 
