@@ -595,6 +595,37 @@ check_skill_description_lengths() {
 	fi
 }
 
+check_phantom_field_names() {
+	# Guard against re-introduction of phantom jq field names that caused real bugs:
+	# .tool_result.success (C-6 regression), .tool_error (never existed in hook payloads).
+	# Word-boundary anchors prevent false positives on legitimate substrings.
+	local patterns=(
+		'\.tool_error\b'
+		'\.tool_result\.error\b'
+		'\.tool_result\.success\b'
+	)
+	local pattern
+	local found=0
+
+	for pattern in "${patterns[@]}"; do
+		local matches
+		# Exclude this file itself — it contains the pattern strings as grep arguments/comments.
+		matches="$(grep -rn --include='*.sh' -E "${pattern}" "${REPO_ROOT}/scripts" \
+			--exclude="$(basename "$0")" 2>/dev/null || true)"
+		if [[ -n "${matches}" ]]; then
+			while IFS= read -r match_line; do
+				[[ -z "${match_line}" ]] && continue
+				fail "phantom field check: '${pattern}' found in ${match_line}"
+				found=1
+			done <<<"${matches}"
+		fi
+	done
+
+	if [[ "${found}" -eq 0 ]]; then
+		pass "phantom field check: no phantom jq field names (.tool_error, .tool_result.error, .tool_result.success) found in scripts/"
+	fi
+}
+
 check_claims() {
 	log "Running claims checks"
 
@@ -679,6 +710,7 @@ check_claims() {
 	check_agent_frontmatter_hygiene
 	check_skill_description_lengths
 	check_policy_posture_alignment
+	check_phantom_field_names
 }
 
 check_hook_fixtures_exist() {

@@ -20,6 +20,7 @@ trap 'rm -f "${CLAIM_FILE}"' EXIT
 # An attacker who can write to compaction-context.md could inject prompt content
 # into the next session. Truncate oversized files and strip obvious injection patterns.
 LINE_COUNT=$(wc -l < "${CLAIM_FILE}")
+# 200 lines — hard upper-bound before sanitization; limits injection scan surface on attacker-written files.
 if [[ "${LINE_COUNT}" -gt 200 ]]; then
 	TRUNCATED=$(head -n 200 "${CLAIM_FILE}")
 	printf '%s\n[TRUNCATED: compaction context exceeded 200 lines and was cut]\n' "${TRUNCATED}" > "${CLAIM_FILE}"
