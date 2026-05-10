@@ -8,7 +8,8 @@ ERROR_MSG=$(jq -r '.error // "Unknown error"' <<< "${HOOK_INPUT}")
 SUBAGENT_TYPE=$(jq -r '.tool_input.subagent_type // "unknown"' <<< "${HOOK_INPUT}")
 TOOL_NAME=$(jq -r '.tool_name // "Agent"' <<< "${HOOK_INPUT}")
 
-if echo "${ERROR_MSG}" | grep -qi "No such tool available: Agent"; then
+if echo "${ERROR_MSG}" | grep -qi "No such tool available: Agent" || \
+   echo "${ERROR_MSG}" | grep -qiE 'subagent.*nest|nest.*limit'; then
 	MSG="[NESTING LIMIT] The Agent tool is unavailable — you are running as a subagent and cannot spawn further subagents. This is a Claude Code platform constraint. Implement the task directly using Read, Write, Edit, Bash, Grep, Glob. Do NOT retry Agent calls."
 	emit_context "PostToolUseFailure" "${MSG}"
 	exit 0
@@ -49,6 +50,7 @@ fi
 
 RETRYABLE_PATTERNS="rate.limit|quota.exceeded|overloaded|too.many.requests|429|503|capacity|credit.balance|temporarily.unavailable|service.unavailable|timeout|ECONNRESET|ETIMEDOUT|rate_limit|resource_exhausted"
 
+# 3 — circuit-breaker threshold: two failures are retriable (transient/capacity); third signals a stuck delegation loop.
 CIRCUIT_BREAKER=""
 if [[ "${NEW_COUNT}" -ge 3 ]]; then
 	CIRCUIT_BREAKER=" This error has occurred 3+ times. Stop retrying the same approach. Escalate to oracle for architectural guidance or try a fundamentally different approach."

@@ -18,7 +18,7 @@ jq -nc --arg file "${FILE_PATH}" --arg err "${ERROR_MSG}" --arg ts "${TIMESTAMP}
 ERROR_TEXT="${ERROR_MSG}"
 if echo "${ERROR_TEXT}" | grep -qiE 'rate.limit|429|timeout|ECONNRESET|ETIMEDOUT'; then
 	ERROR_CLASS="transient"
-elif echo "${ERROR_TEXT}" | grep -qiE 'not.found|permission|EACCES|ENOENT|invalid.*schema'; then
+elif echo "${ERROR_TEXT}" | grep -qiE 'not[. ]found|permission|EACCES|ENOENT|invalid.*schema'; then
 	ERROR_CLASS="deterministic"
 else
 	ERROR_CLASS="unknown"
@@ -59,6 +59,7 @@ else
 	RECOVERY_SUGGESTION="Edit failed. Re-read the file to verify current contents match your old_string exactly, including whitespace and indentation."
 fi
 
+# 3 — circuit-breaker threshold: two failures are retriable (stale content, transient); third signals a stuck loop.
 CIRCUIT_BREAKER=""
 if [[ "${NEW_COUNT}" -ge 3 ]]; then
 	CIRCUIT_BREAKER=" This error has occurred 3+ times. Stop retrying the same approach. Escalate to oracle for architectural guidance or try a fundamentally different approach."

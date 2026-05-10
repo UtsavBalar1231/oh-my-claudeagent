@@ -1,6 +1,1 @@
-{
-  "hookSpecificOutput": {
-    "hookEventName": "PostToolUseFailure",
-    "additionalContext": "[READ ERROR RECOVERY] File not found. Use Glob to search for similar filenames, or check if the path has changed."
-  }
-}
+{"hookSpecificOutput": {"hookEventName": "PostToolUseFailure", "additionalContext": "[READ ERROR RECOVERY] File not found. Use Glob to search for similar filenames, or check if the path has changed.\n"}}

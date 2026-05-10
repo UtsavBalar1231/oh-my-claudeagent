@@ -15,5 +15,4 @@ else
 	exit 0
 fi
 
-jq -n --arg advice "[READ ERROR RECOVERY] ${ADVICE}" \
-	'{"hookSpecificOutput":{"hookEventName":"PostToolUseFailure","additionalContext":$advice}}'
+emit_context "PostToolUseFailure" "[READ ERROR RECOVERY] ${ADVICE}"
