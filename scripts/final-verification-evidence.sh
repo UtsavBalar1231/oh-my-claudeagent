@@ -89,6 +89,8 @@ if [[ -n "${MARKER_PLAN}" ]]; then
 						[[ "${_val}" == "${MARKER_SHA}" ]] && _SIDECAR_MATCHED=true
 						break
 						;;
+					*)
+						;;
 				esac
 			done < "${SIDECAR_PATH}"
 		fi

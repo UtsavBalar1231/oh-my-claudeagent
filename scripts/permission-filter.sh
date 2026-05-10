@@ -23,7 +23,7 @@ fi
 # Safe set: run *, test, ci, list, view (npm); run *, test (bun/yarn/pnpm).
 for _PM in npm bun yarn pnpm; do
 	if [[ "${TRIMMED_CMD}" == ${_PM}\ * ]]; then
-		_SUBCMD="${TRIMMED_CMD#${_PM} }"
+		_SUBCMD="${TRIMMED_CMD#"${_PM}" }"
 		if [[ "${_SUBCMD}" == run\ * ]] ||
 			[[ "${_SUBCMD}" == test ]] ||
 			[[ "${_SUBCMD}" == test\ * ]] ||
