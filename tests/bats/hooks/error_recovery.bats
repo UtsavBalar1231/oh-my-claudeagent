@@ -136,3 +136,21 @@ load '../test_helper'
 	assert_success
 	assert_output ""
 }
+
+@test "json-error-recovery: Edit tool with JSON in error exits 0 silently (no double-fire)" {
+	# edit-error-recovery.sh owns Edit failures; json-error-recovery must not also fire.
+	local payload
+	payload='{"tool_name":"Edit","tool_input":{"file_path":"/tmp/foo.sh"},"error":"invalid JSON: SyntaxError in old_string parameter"}'
+	run_hook "json-error-recovery.sh" "$payload"
+	assert_success
+	assert_output ""
+}
+
+@test "json-error-recovery: Agent tool with JSON in error exits 0 silently (no double-fire)" {
+	# delegate-retry.sh owns Agent failures; json-error-recovery must not also fire.
+	local payload
+	payload='{"tool_name":"Agent","tool_input":{"subagent_type":"oh-my-claudeagent:executor"},"error":"JSON parse error in agent response"}'
+	run_hook "json-error-recovery.sh" "$payload"
+	assert_success
+	assert_output ""
+}

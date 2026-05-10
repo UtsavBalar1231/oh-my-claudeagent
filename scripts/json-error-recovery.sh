@@ -6,8 +6,11 @@ source "$(dirname "$0")/lib/common.sh"
 TOOL_NAME=$(jq -r '.tool_name // ""' <<< "${HOOK_INPUT}")
 ERROR_MSG=$(jq -r '.error // ""' <<< "${HOOK_INPUT}")
 
+# Tools with dedicated per-tool PostToolUseFailure handlers — skip to prevent double-fire.
+# edit-error-recovery.sh handles Edit, read-error-recovery.sh handles Read,
+# bash-error-recovery.sh handles Bash, delegate-retry.sh handles Agent.
 case "${TOOL_NAME}" in
-Bash | Read | Grep | Glob | WebFetch | WebSearch)
+Edit | Read | Bash | Agent | Grep | Glob | WebFetch | WebSearch)
 	exit 0
 	;;
 *)
