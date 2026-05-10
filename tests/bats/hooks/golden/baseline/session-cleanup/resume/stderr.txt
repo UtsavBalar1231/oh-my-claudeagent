@@ -1,2 +1,2 @@
-/home/utsav/dev/softs/oh-my-claudeagent/scripts/session-cleanup.sh: line 19: <TMPFILE>/.omca/logs/hook-errors.jsonl: No such file or directory
-/home/utsav/dev/softs/oh-my-claudeagent/scripts/session-cleanup.sh: line 20: <TMPFILE>/.omca/logs/subagents.jsonl: No such file or directory
+/home/utsav/dev/softs/oh-my-claudeagent/scripts/session-cleanup.sh: line 17: <TMPFILE>/.omca/logs/hook-errors.jsonl: No such file or directory
+/home/utsav/dev/softs/oh-my-claudeagent/scripts/session-cleanup.sh: line 18: <TMPFILE>/.omca/logs/subagents.jsonl: No such file or directory

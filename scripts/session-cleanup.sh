@@ -1,8 +1,6 @@
 #!/bin/bash
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
-# shellcheck disable=SC2034  # INPUT preserved for line-number stability: golden baseline has "line 19:" in wc stderr.
-INPUT="${HOOK_INPUT}"
 STATE_DIR="${HOOK_STATE_DIR}"
 LOG_DIR="${HOOK_LOG_DIR}"
 
@@ -11,7 +9,7 @@ REASON=$(jq -r '.reason // "other"' <<< "${HOOK_INPUT}")
 SESSION_STATE="${STATE_DIR}/session.json"
 SESSION_ID="unknown"
 if [[ -f "${SESSION_STATE}" ]]; then
-	SESSION_ID=$(jq -r '.sessionId // "unknown"' "${SESSION_STATE}" 2>/dev/null)  # Reverted jq_read migration: if-block removal shifts line numbers in wc -l stderr below.
+	SESSION_ID=$(jq_read "${SESSION_STATE}" '.sessionId // "unknown"' "unknown")
 fi
 
 TIMESTAMP=$(date -Iseconds)
