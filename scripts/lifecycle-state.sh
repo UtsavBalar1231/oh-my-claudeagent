@@ -178,6 +178,14 @@ handle_worktree_create() {
 	fi
 
 	repo_root=$(resolve_repo_root "$(jq -r '.cwd // ""' <<< "${HOOK_INPUT}")")
+
+	# Guard: git worktree requires a git repository. Non-git directories are not
+	# supported — log and fail clearly rather than letting git produce a cryptic error.
+	if ! git -C "${repo_root}" rev-parse --show-toplevel >/dev/null 2>&1; then
+		echo "WorktreeCreate: not a git repository at ${repo_root}; worktree isolation requires git" >&2
+		exit 1
+	fi
+
 	worktrees_root="${repo_root}/.claude/worktrees"
 	worktree_path="${worktrees_root}/${name}"
 
