@@ -33,4 +33,7 @@ EDITS_FILE="${STATE_DIR}/recent-edits.json"
 		"${EDITS_FILE}" >"${TMP_FILE}" && mv "${TMP_FILE}" "${EDITS_FILE}"
 ) 200>"${EDITS_FILE}.lock"
 
+# Defensive empty JSON response for pre-v2.1.119 platforms where async hooks
+# emitting no stdout wrote empty transcript entries. Safe to emit on all versions.
+printf '{}\n'
 exit 0
