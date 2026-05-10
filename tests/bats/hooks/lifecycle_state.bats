@@ -91,6 +91,29 @@ load '../test_helper'
 # CwdChanged: updates repo-state.json
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Non-blockable events: unsupported events must exit 0, not 1
+# ---------------------------------------------------------------------------
+
+@test "lifecycle-state unknown outer event: exits 0 (non-blocking)" {
+	local payload
+	payload=$(jq -nc '{"hook_event_name":"UnknownEvent","session_id":"bats-test"}')
+
+	run_hook "lifecycle-state.sh" "$payload"
+	assert_success
+	[ "$status" -eq 0 ]
+}
+
+@test "lifecycle-state second unknown outer event: exits 0 (non-blocking)" {
+	# Second distinct unknown name — exercises the outer *) path independently.
+	local payload
+	payload=$(jq -nc '{"hook_event_name":"SessionStarted","session_id":"bats-test"}')
+
+	run_hook "lifecycle-state.sh" "$payload"
+	assert_success
+	[ "$status" -eq 0 ]
+}
+
 @test "lifecycle-state CwdChanged: writes repo-state.json" {
 	local payload
 	payload=$(jq -nc --arg cwd "$CLAUDE_PROJECT_ROOT" \

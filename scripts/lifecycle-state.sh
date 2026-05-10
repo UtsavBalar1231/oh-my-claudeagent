@@ -152,8 +152,7 @@ handle_repo_refresh() {
 		;;
 	*)
 		log_hook_error "Unsupported repo refresh event '${HOOK_EVENT_NAME}'" "lifecycle-state.sh"
-		echo "Unsupported repo refresh event: ${HOOK_EVENT_NAME}" >&2
-		exit 1
+		exit 0
 		;;
 	esac
 
@@ -252,7 +251,6 @@ WorktreeRemove)
 	;;
 *)
 	log_hook_error "Unsupported lifecycle event '${HOOK_EVENT_NAME}'" "lifecycle-state.sh"
-	echo "Unsupported lifecycle event: ${HOOK_EVENT_NAME}" >&2
-	exit 1
+	exit 0
 	;;
 esac
