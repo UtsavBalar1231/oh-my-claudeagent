@@ -126,6 +126,18 @@ TO CONTINUE IN A NEW SESSION:
 3. Add: "Continue from the handoff context above. [Your next task]"
 ```
 
+## Recommended user configuration
+
+Handoff is a user-driven workflow. To prevent Claude from self-invoking it mid-conversation, add to your `settings.json`:
+
+```json
+"skillOverrides": {
+  "oh-my-claudeagent:handoff": "user-invocable-only"
+}
+```
+
+See CLAUDE.md § "User-side settings recommendations" for details.
+
 ## Constraints
 
 - No programmatic session creation
