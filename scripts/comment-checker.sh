@@ -6,6 +6,9 @@ _HOOK_START=$(date +%s%N 2>/dev/null || date +%s)
 source "$(dirname "$0")/lib/common.sh"
 
 
+# Edit supplies .tool_input.new_string; Write supplies .tool_input.content.
+# If matcher widens to MultiEdit (.tool_input.edits[].new_string) or
+# NotebookEdit (.tool_input.new_source) this two-branch fallback breaks silently.
 CONTENT=$(jq -r '.tool_input.new_string // .tool_input.content // ""' <<< "${HOOK_INPUT}")
 
 if [[ -z "${CONTENT}" ]]; then

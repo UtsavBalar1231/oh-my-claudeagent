@@ -6,5 +6,9 @@ source "$(dirname "$0")/lib/common.sh"
 
 STATE_DIR="${HOOK_STATE_DIR}"
 TIMESTAMP=$(date +%s)
-echo "{\"pending\":true,\"timestamp\":${TIMESTAMP}}" > "${STATE_DIR}/pending-question.json"
+SESSION_ID=$(resolve_session_id)
+tmp=$(mktemp)
+jq -nc --arg ts "${TIMESTAMP}" --arg sid "${SESSION_ID}" \
+	'{"pending":true,"timestamp":($ts|tonumber),"session_id":$sid}' > "${tmp}"
+mv "${tmp}" "${STATE_DIR}/pending-question.json"
 exit 0
