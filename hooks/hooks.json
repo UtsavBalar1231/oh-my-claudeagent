@@ -102,6 +102,26 @@
 						"type": "command",
 						"if": "Bash(uv *)",
 						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh"
+					},
+					{
+						"type": "command",
+						"if": "Bash(sudo *)",
+						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh"
+					},
+					{
+						"type": "command",
+						"if": "Bash(bun *)",
+						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh"
+					},
+					{
+						"type": "command",
+						"if": "Bash(yarn *)",
+						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh"
+					},
+					{
+						"type": "command",
+						"if": "Bash(pnpm *)",
+						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh"
 					}
 				]
 			},

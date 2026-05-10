@@ -120,3 +120,77 @@ load '../test_helper'
 	assert_success
 	assert_output ""
 }
+
+# ── sudo: deny on rm -rf; fall-through otherwise ─────────────────────────────
+# The `if: "Bash(sudo *)"` hook entry ensures sudo commands reach this script.
+# sudo rm -rf is blocked by the rm-rf regex (line 16 of permission-filter.sh).
+# Other sudo commands produce no output (fall through to user decision).
+
+@test "if Bash(sudo *): sudo rm -rf / is denied" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"sudo rm -rf /"}}'
+	assert_success
+	assert_output --partial '"deny"'
+}
+
+@test "if Bash(sudo *): sudo rm -rf /var/cache is denied" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"sudo rm -rf /var/cache"}}'
+	assert_success
+	assert_output --partial '"deny"'
+}
+
+@test "if Bash(sudo *): sudo apt-get install produces no decision (falls through)" {
+	# sudo commands that are not rm -rf have no auto-allow; platform decides
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"sudo apt-get install build-essential"}}'
+	assert_success
+	assert_output ""
+}
+
+# ── bun: allowed (trusted JS package manager) ─────────────────────────────────
+# The `if: "Bash(bun *)"` hook entry ensures bun commands reach this script.
+# Policy: auto-allow bun as a known-safe dev tool (same as npm).
+
+@test "if Bash(bun *): bun install is allowed" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"bun install"}}'
+	assert_success
+	assert_output --partial '"allow"'
+}
+
+@test "if Bash(bun *): bun install <package> is allowed" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"bun install some-package"}}'
+	assert_success
+	assert_output --partial '"allow"'
+}
+
+@test "if Bash(bun *): bun run build is allowed" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"bun run build"}}'
+	assert_success
+	assert_output --partial '"allow"'
+}
+
+# ── yarn: allowed (trusted JS package manager) ────────────────────────────────
+
+@test "if Bash(yarn *): yarn install is allowed" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"yarn install"}}'
+	assert_success
+	assert_output --partial '"allow"'
+}
+
+@test "if Bash(yarn *): yarn add <package> is allowed" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"yarn add lodash"}}'
+	assert_success
+	assert_output --partial '"allow"'
+}
+
+# ── pnpm: allowed (trusted JS package manager) ────────────────────────────────
+
+@test "if Bash(pnpm *): pnpm install is allowed" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"pnpm install"}}'
+	assert_success
+	assert_output --partial '"allow"'
+}
+
+@test "if Bash(pnpm *): pnpm run test is allowed" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"pnpm run test"}}'
+	assert_success
+	assert_output --partial '"allow"'
+}
