@@ -31,6 +31,16 @@ if [[ "${REASON}" != "resume" ]]; then
 		"${STATE_DIR}/recent-edits.json"
 		"${STATE_DIR}/injected-context-dirs.json"
 		"${STATE_DIR}/agent-usage.json"
+		# Per-session delegate-error counters — reset by session-init.sh on next start.
+		"${STATE_DIR}/error-counts.json"
+		# Runtime agent-roster files — stale on exit regardless of content.
+		"${STATE_DIR}/active-agents.json"
+		"${STATE_DIR}/active-agents.lock"
+		# Pending-final-verify marker — session is ending so any in-flight verify
+		# obligation is either fulfilled or stale.  fresh markers from the same
+		# session are cleared here; the 24h TTL in final-verification-evidence.sh
+		# is belt-and-suspenders for markers that survive a crash.
+		"${STATE_DIR}/pending-final-verify.json"
 	)
 
 	for file in "${TEMP_FILES[@]}"; do
