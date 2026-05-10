@@ -7,7 +7,10 @@ LOG_DIR="${HOOK_LOG_DIR}"
 
 FILE_PATH=$(jq -r '.tool_input.file_path // .tool_input.path // "unknown"' <<< "${HOOK_INPUT}")
 TOOL_NAME=$(jq -r '.tool_name // "unknown"' <<< "${HOOK_INPUT}")
-TOOL_RESULT=$(jq -r '.tool_result.success // true' <<< "${HOOK_INPUT}")
+# Canonical PostToolUse field is `.tool_response` (not `.tool_result`).
+# `//` is falsy-sensitive (fires on `false` AND `null`), so a plain `// true` fallback
+# would silently convert `false` to `true`. Null-check form preserves real `false`.
+TOOL_RESULT=$(jq -r 'if .tool_response.success == null then true else .tool_response.success end' <<< "${HOOK_INPUT}")
 
 TIMESTAMP=$(date -Iseconds)
 
