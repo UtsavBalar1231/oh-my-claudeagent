@@ -113,12 +113,53 @@ load '../test_helper'
 # Cancel detection
 # ---------------------------------------------------------------------------
 
-@test "cancel: detects 'cancel ralph'" {
-	local payload='{"prompt":"cancel ralph"}'
+@test "cancel: detects 'cancel this task'" {
+	local payload='{"prompt":"cancel this task"}'
 	run_hook "keyword-detector.sh" "$payload"
 	assert_success
 	ctx=$(get_context)
 	assert echo "$ctx" | grep -q "CANCEL DETECTED"
+}
+
+@test "cancel: detects 'stop everything'" {
+	local payload='{"prompt":"stop everything"}'
+	run_hook "keyword-detector.sh" "$payload"
+	assert_success
+	ctx=$(get_context)
+	assert echo "$ctx" | grep -q "CANCEL DETECTED"
+}
+
+@test "cancel: detects 'abort this run'" {
+	local payload='{"prompt":"abort this run"}'
+	run_hook "keyword-detector.sh" "$payload"
+	assert_success
+	ctx=$(get_context)
+	assert echo "$ctx" | grep -q "CANCEL DETECTED"
+}
+
+@test "cancel: does NOT trigger on 'Cancel my plan'" {
+	local payload='{"prompt":"Cancel my plan"}'
+	run_hook "keyword-detector.sh" "$payload"
+	assert_success
+	ctx=$(get_context)
+	run bash -c "echo '$ctx' | grep -q 'CANCEL DETECTED'"
+	assert_failure
+}
+
+@test "cancel: does NOT trigger on 'stop the music'" {
+	local payload='{"prompt":"stop the music"}'
+	run_hook "keyword-detector.sh" "$payload"
+	assert_success
+	ctx=$(get_context)
+	run bash -c "echo '$ctx' | grep -q 'CANCEL DETECTED'"
+	assert_failure
+}
+
+@test "cancel: does NOT trigger on bare 'cancel'" {
+	local payload='{"prompt":"cancel"}'
+	run_hook "keyword-detector.sh" "$payload"
+	assert_success
+	assert_output ""
 }
 
 # ---------------------------------------------------------------------------

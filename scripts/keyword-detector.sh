@@ -83,7 +83,7 @@ if ! mode_already_announced "stop-continuation" \
 fi
 
 if ! mode_already_announced "cancel" \
-	&& { [[ "${PROMPT_LOWER}" =~ ^(stop|cancel|abort)$ ]] || [[ "${PROMPT_LOWER}" =~ (^stop[[:space:]]|[[:space:]]stop$|^cancel[[:space:]]|[[:space:]]cancel$|^abort[[:space:]]|[[:space:]]abort$) ]]; }; then
+	&& [[ "${PROMPT_LOWER}" =~ (cancel[[:space:]]+(this|task|run|operation|all)|stop[[:space:]]+(everything|now|all|task)|abort[[:space:]]+(this|task|run)) ]]; then
 	DETECTED_KEYWORDS+=("cancel")
 	ADDITIONAL_CONTEXT+="[CANCEL DETECTED] User wants to stop current operation. Invoke cancel skill."$'\n'
 fi
@@ -132,15 +132,15 @@ if [[ "${HAS_RALPH}" -eq 1 ]] && [[ ! " ${DETECTED_KEYWORDS[*]} " =~ " stop-cont
 		rm -f "${ULTRAWORK_STATE}"
 	fi
 	NOW_ISO=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-	printf '{"status":"active","activatedAt":"%s","tasks":[],"last_task_hash":"","stagnation_count":0}\n' \
-		"${NOW_ISO}" > "${RALPH_STATE}.tmp" && mv "${RALPH_STATE}.tmp" "${RALPH_STATE}"
+	RALPH_TMP=$(mktemp) && printf '{"status":"active","activatedAt":"%s","tasks":[],"last_task_hash":"","stagnation_count":0}\n' \
+		"${NOW_ISO}" > "${RALPH_TMP}" && mv "${RALPH_TMP}" "${RALPH_STATE}"
 fi
 
 if [[ "${HAS_ULTRAWORK}" -eq 1 ]] && [[ "${HAS_RALPH}" -eq 0 ]] \
 	&& [[ ! " ${DETECTED_KEYWORDS[*]} " =~ " stop-continuation " ]]; then
 	NOW_ISO=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-	printf '{"status":"active","activatedAt":"%s","stagnation_count":0}\n' \
-		"${NOW_ISO}" > "${ULTRAWORK_STATE}.tmp" && mv "${ULTRAWORK_STATE}.tmp" "${ULTRAWORK_STATE}"
+	UW_TMP=$(mktemp) && printf '{"status":"active","activatedAt":"%s","stagnation_count":0}\n' \
+		"${NOW_ISO}" > "${UW_TMP}" && mv "${UW_TMP}" "${ULTRAWORK_STATE}"
 fi
 
 if [[ ${#DETECTED_KEYWORDS[@]} -gt 0 ]]; then
