@@ -27,6 +27,14 @@ _write_boulder_for() {
 		"{\"active_plan\":\"${plan_path}\",\"status\":\"active\"}"
 }
 
+_write_marker_for() {
+	local plan_path="$1"
+	local now
+	now=$(date +%s)
+	write_state "pending-final-verify.json" \
+		"{\"plan_path\":\"${plan_path}\",\"plan_sha256\":\"\",\"marked_at\":${now},\"session_id\":\"bats-test-session\"}"
+}
+
 _compute_sha256() {
 	local plan_path="$1"
 	sha256sum "${plan_path}" | awk '{print $1}'
@@ -152,6 +160,7 @@ _write_legacy_snippet_ftypes() {
 	sha=$(_compute_sha256 "${plan_file}")
 
 	_write_boulder_for "${plan_file}"
+	_write_marker_for "${plan_file}"
 	_write_firstclass_no_f4 "${sha}"
 
 	run_hook "final-verification-evidence.sh" '{}'

@@ -92,6 +92,15 @@ if [[ -n "${MARKER_PLAN}" ]]; then
 	fi
 fi
 
+# Cross-session ACTIVE_PLAN-without-MARKER short-circuit:
+# active_plan from prior session is stale when no marker exists in this session.
+# INVARIANT: must run BEFORE PLAN_PATH derivation — once PLAN_PATH falls back to
+# MARKER_PLAN, the staleness signal is lost.
+if [[ -n "${ACTIVE_PLAN}" && -z "${MARKER_PLAN}" ]]; then
+	log_hook_error "cleared cross-session stale active_plan reference (no marker)" "final-verification-evidence.sh"
+	noop_exit
+fi
+
 PLAN_PATH="${ACTIVE_PLAN}"
 if [[ -z "${PLAN_PATH}" ]]; then
 	PLAN_PATH="${MARKER_PLAN}"
@@ -158,7 +167,6 @@ has_ftype() {
 				($sha == "")
 				or (.plan_sha256 == $sha)
 				or ((.output_snippet // "") | test("plan_sha256:" + $sha))
-				or (.plan_sha256 == null or .plan_sha256 == "")
 			)
 		))
 		| length > 0
@@ -183,12 +191,19 @@ if [[ -n "${MISSING}" ]]; then
 	exit 2
 fi
 
-# All 4 F-types present — validate legacy-unknown entries (no first-class plan_sha256 field) all share the same SHA
+# All 4 F-types present — validate all F1-F4 entries that belong to the current plan
+# share a single SHA. Extract SHA from first-class field AND snippet, then unique.
+# Entries from prior plans (different SHA) are ignored: they didn't satisfy has_ftype.
 SHAS=$(jq -r --arg sha "${CURRENT_SHA}" '
 	.entries // []
 	| map(select(.type | test("^final_verification_f[1-4]$")))
-	| map(select(.plan_sha256 == null or .plan_sha256 == ""))
-	| map(.output_snippet | capture("plan_sha256:(?<sha>[0-9a-f]+)").sha // "")
+	| map(
+		[(.plan_sha256 // empty)]
+		+ [(.output_snippet // "" | scan("plan_sha256:[a-f0-9]{64}") | sub("plan_sha256:"; ""))]
+		| unique
+		| .[]
+	)
+	| map(select(. == $sha or $sha == ""))
 	| unique
 	| @json
 ' "${EVIDENCE_FILE}")

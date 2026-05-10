@@ -55,23 +55,6 @@ _write_evidence_with_ftypes() {
 	write_state "verification-evidence.json" "{\"entries\":${entries}}"
 }
 
-# Write evidence with a specific SHA override for one entry (for SHA-mismatch test)
-_write_evidence_sha_mismatch() {
-	local ts
-	ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-	local entries
-	entries=$(jq -n \
-		--arg ts "${ts}" \
-		--arg sha "${PLAN_SHA}" \
-		'[
-			{"type":"final_verification_f1","command":"oracle: APPROVE","exit_code":0,"output_snippet":("plan_sha256:" + $sha + " verdict:APPROVE"),"timestamp":$ts},
-			{"type":"final_verification_f2","command":"oracle: APPROVE","exit_code":0,"output_snippet":("plan_sha256:" + $sha + " verdict:APPROVE"),"timestamp":$ts},
-			{"type":"final_verification_f3","command":"oracle: APPROVE","exit_code":0,"output_snippet":"plan_sha256:cafebabecafebabecafebabecafebabecafebabecafebabecafebabecafebabe verdict:APPROVE","timestamp":$ts},
-			{"type":"final_verification_f4","command":"oracle: APPROVE","exit_code":0,"output_snippet":("plan_sha256:" + $sha + " verdict:APPROVE"),"timestamp":$ts}
-		]')
-	write_state "verification-evidence.json" "{\"entries\":${entries}}"
-}
-
 # Write a pending-final-verify.json marker
 # Usage: _write_marker <plan_path> [marked_at] [session_id] [plan_sha256]
 _write_marker() {
@@ -132,6 +115,7 @@ _write_marker() {
 	local plan_file="${BATS_TEST_TMPDIR}/complete-plan.md"
 	_write_complete_plan "${plan_file}"
 	_write_boulder "${plan_file}"
+	_write_marker "${plan_file}"
 	_write_evidence_with_ftypes \
 		"final_verification_f1" \
 		"final_verification_f2" \
@@ -178,12 +162,26 @@ _write_marker() {
 @test "final-verification-evidence: SHA mismatch across F-type entries blocks Stop (exit 2)" {
 	local plan_file="${BATS_TEST_TMPDIR}/sha-mismatch-plan.md"
 	_write_complete_plan "${plan_file}"
+	local real_sha
+	real_sha=$(sha256sum "${plan_file}" | awk '{print $1}')
 	_write_boulder "${plan_file}"
-	_write_evidence_sha_mismatch
+	_write_marker "${plan_file}"
+
+	# F1/F2/F4 match real_sha; F3 uses a different SHA — cross-check must detect mismatch
+	local ts
+	ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+	local entries
+	entries=$(jq -n --arg ts "${ts}" --arg sha "${real_sha}" '[
+		{"type":"final_verification_f1","command":"oracle: APPROVE","exit_code":0,"output_snippet":("plan_sha256:" + $sha + " verdict:APPROVE"),"timestamp":$ts},
+		{"type":"final_verification_f2","command":"oracle: APPROVE","exit_code":0,"output_snippet":("plan_sha256:" + $sha + " verdict:APPROVE"),"timestamp":$ts},
+		{"type":"final_verification_f3","command":"oracle: APPROVE","exit_code":0,"output_snippet":"plan_sha256:cafebabecafebabecafebabecafebabecafebabecafebabecafebabecafebabe verdict:APPROVE","timestamp":$ts},
+		{"type":"final_verification_f4","command":"oracle: APPROVE","exit_code":0,"output_snippet":("plan_sha256:" + $sha + " verdict:APPROVE"),"timestamp":$ts}
+	]')
+	write_state "verification-evidence.json" "{\"entries\":${entries}}"
 
 	run_hook "final-verification-evidence.sh" '{}'
 	[ "$status" -eq 2 ]
-	echo "$output" | grep -qi "sha"
+	echo "$output" | grep -qi "final_verification_f3"
 }
 
 # ---------------------------------------------------------------------------

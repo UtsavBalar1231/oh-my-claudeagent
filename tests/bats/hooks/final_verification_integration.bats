@@ -50,6 +50,14 @@ _write_all_ftypes() {
 	write_state "verification-evidence.json" "{\"entries\":${entries}}"
 }
 
+_write_marker_for() {
+	local plan_path="$1"
+	local now
+	now=$(date +%s)
+	write_state "pending-final-verify.json" \
+		"{\"plan_path\":\"${plan_path}\",\"plan_sha256\":\"\",\"marked_at\":${now},\"session_id\":\"bats-test-session\"}"
+}
+
 _remove_ftype() {
 	local ftype="$1"
 	local evidence_file="${CLAUDE_PROJECT_ROOT}/.omca/state/verification-evidence.json"
@@ -88,6 +96,7 @@ _remove_ftype() {
 	sha=$(_compute_sha256 "${plan_file}")
 
 	_write_boulder_for "${plan_file}"
+	_write_marker_for "${plan_file}"
 	_write_all_ftypes "${sha}"
 	_remove_ftype "final_verification_f3"
 
