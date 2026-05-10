@@ -19,6 +19,10 @@ if [[ -n "${CLAUDE_PLUGIN_DATA:-}" ]]; then
 	fi
 fi
 
+# CLAUDE_SESSION_ID is reliable in v2.x. The fallback (epoch-PID) exists for
+# pre-v2.x clients where the var may be absent. Fallback IDs will NOT match
+# resolve_session_id's other lookup tiers, so cross-hook session correlation
+# degrades gracefully (orphan-sweep below will simply find no match).
 SESSION_ID="${CLAUDE_SESSION_ID:-$(date +%s)-$$}"
 
 # Cross-session orphan-marker sweep: remove a pending-final-verify.json from a prior session
