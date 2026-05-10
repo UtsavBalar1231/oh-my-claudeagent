@@ -62,10 +62,10 @@ if [[ "${REASON}" != "resume" ]]; then
 	fi
 
 	find "${STATE_DIR}" -name "*.json" -mtime +1 \
-		-not -name "$(mode_state_name "ralph")" \
+		-not -name "ralph${HOOK_MODE_STATE_SUFFIX}" \
 		-not -name 'team-state.json' \
 		-not -name 'boulder.json' \
-		-not -name "$(mode_state_name "ultrawork")" \
+		-not -name "ultrawork${HOOK_MODE_STATE_SUFFIX}" \
 		-not -name 'verification-evidence.json' \
 		-delete 2>/dev/null || true
 

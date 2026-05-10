@@ -74,8 +74,25 @@ if [[ -n "${MARKER_PLAN}" ]]; then
 	# Completion sidecar with matching SHA short-circuit.
 	MARKER_SHA=$(jq_read "${MARKER_FILE}" '.plan_sha256 // ""')
 	if [[ -n "${MARKER_PLAN}" && -n "${MARKER_SHA}" ]]; then
-		SIDECAR_PATH=$(compute_sidecar_path "${MARKER_PLAN}")
-		if sidecar_sha_matches "${SIDECAR_PATH}" "${MARKER_SHA}"; then
+		# Inline compute_sidecar_path: $CLAUDE_PROJECT_ROOT/.omca/notes/<plan-basename-.md>-completion.md
+		SIDECAR_PATH="${CLAUDE_PROJECT_ROOT:-$(pwd)}/.omca/notes/$(basename "${MARKER_PLAN}" .md)-completion.md"
+		# Inline sidecar_sha_matches: 0 when file exists and plan_sha256 line equals MARKER_SHA
+		_SIDECAR_MATCHED=false
+		if [[ -f "${SIDECAR_PATH}" ]]; then
+			while IFS= read -r _sidecar_line; do
+				case "${_sidecar_line}" in
+					plan_sha256:*)
+						_val="${_sidecar_line#plan_sha256:}"
+						_val="${_val# }"
+						_val="${_val#\"}"
+						_val="${_val%\"}"
+						[[ "${_val}" == "${MARKER_SHA}" ]] && _SIDECAR_MATCHED=true
+						break
+						;;
+				esac
+			done < "${SIDECAR_PATH}"
+		fi
+		if [[ "${_SIDECAR_MATCHED}" == true ]]; then
 			rm -f "${MARKER_FILE}"
 			noop_exit
 		fi

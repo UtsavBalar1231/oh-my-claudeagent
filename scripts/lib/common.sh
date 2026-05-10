@@ -22,24 +22,13 @@ section_header() {
 	printf '\n─── %s ─────────────────────────────────────\n' "${title}"
 }
 
-mode_state_name() {
-	local mode="$1"
-	printf '%s%s' "${mode}" "${HOOK_MODE_STATE_SUFFIX}"
-}
-
-mode_state_path() {
-	local mode="$1"
-	local state_dir="${2:-${HOOK_STATE_DIR}}"
-	printf '%s/%s' "${state_dir}" "$(mode_state_name "${mode}")"
-}
-
 mode_is_active() {
 	local mode="$1"
 	local state_dir="${2:-${HOOK_STATE_DIR}}"
 	local state_file
 	local status
 
-	state_file="$(mode_state_path "${mode}" "${state_dir}")"
+	state_file="${state_dir}/${mode}${HOOK_MODE_STATE_SUFFIX}"
 	if [[ ! -f "${state_file}" ]]; then
 		return 1
 	fi
@@ -47,40 +36,6 @@ mode_is_active() {
 	status=$(jq -r '.status // "inactive"' "${state_file}" 2>/dev/null || echo "")
 	[[ "${status}" == "active" ]]
 }
-
-# Compute the absolute path of the completion sidecar for a given plan file.
-# Usage: compute_sidecar_path <plan_path>
-# Prints: $CLAUDE_PROJECT_ROOT/.omca/notes/<plan-basename-without-.md>-completion.md
-compute_sidecar_path() (
-	plan_path="$1"
-	base=$(basename "$plan_path" .md)
-	root=${CLAUDE_PROJECT_ROOT:-$(pwd)}
-	printf '%s/.omca/notes/%s-completion.md' "$root" "$base"
-)
-
-# Check whether it is safe to overwrite an existing sidecar file.
-# Returns 0 (safe) when: no file, no plan_sha256 line, or SHA matches.
-# Returns 1 (refuse) when an existing SHA differs from current_sha.
-# Usage: check_sidecar_idempotency <sidecar_path> <current_sha>
-check_sidecar_idempotency() (
-	sidecar_path="$1"
-	current_sha="$2"
-	[ -f "$sidecar_path" ] || return 0
-	while IFS= read -r line; do
-		case "$line" in
-			plan_sha256:*)
-				val=${line#plan_sha256:}
-				val=${val# }
-				val=${val#\"}
-				val=${val%\"}
-				[ -z "$val" ] && return 0
-				[ "$val" = "$current_sha" ] && return 0
-				return 1
-				;;
-		esac
-	done < "$sidecar_path"
-	return 0
-)
 
 # Resolve session ID: tries CLAUDE_SESSION_ID env, HOOK_INPUT .session_id, session.json .sessionId.
 # Prints empty string (returns 0) when none found.
@@ -96,29 +51,6 @@ resolve_session_id() {
 	done
 	return 0
 }
-
-# Check whether a sidecar file exists and contains a matching plan_sha256.
-# Returns 0 (match) when file exists AND its plan_sha256 line equals expected.
-# Returns 1 (no match) when file absent, no plan_sha256 line, or SHA differs.
-# Usage: sidecar_sha_matches <sidecar_path> <expected_sha>
-sidecar_sha_matches() (
-	sidecar_path="$1"
-	expected_sha="$2"
-	[ -f "$sidecar_path" ] || return 1
-	while IFS= read -r line; do
-		case "$line" in
-			plan_sha256:*)
-				val=${line#plan_sha256:}
-				val=${val# }
-				val=${val#\"}
-				val=${val%\"}
-				[ "$val" = "$expected_sha" ] && return 0
-				return 1
-				;;
-		esac
-	done < "$sidecar_path"
-	return 1
-)
 
 # Read a JSON field with default. Returns default when file is absent or jq fails.
 # Usage: jq_read <file> <jq-expr-with-default>
