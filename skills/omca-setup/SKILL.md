@@ -108,11 +108,9 @@ Record each result (binary path + version or "not found") for the health report.
    - If found: remove everything from the old start marker line through the old end marker line (`<!-- OMCA:END -->` or `<\!-- OMCA:END -->`)
    - Log to user: "Migrated: removed old OMC block from other developer"
 
-4. **Own block check:**
+4. **Own block check (migration):**
    - Detect line matching `^--- omca-setup\s*$`
-   - If found: extract `version:` value from the metadata section (lines between `--- omca-setup` and next `---`)
-     - **Same version as plugin.json** → print "Already at version X.Y.Z — no changes needed." and jump directly to Phase 6 (health report only).
-     - **Different version** → remove the entire block from `^--- omca-setup\s*$` through `^--- /omca-setup ---\s*$` (inclusive)
+   - If found: remove the entire block from `^--- omca-setup\s*$` through `^--- /omca-setup ---\s*$` (inclusive) — this block was written by old injection-mode installs; the orchestration body is now delivered via `output-styles/omca-default.md`
    - If NOT found: no block to remove
 
 5. Everything remaining after removing detected blocks = **user content** (preserve exactly)
@@ -633,5 +631,4 @@ Print the Phase 6 health report format with all findings. Use "Doctor Report" he
 - NEVER claim marketplace installation or managed policy enforcement unless existing Claude Code settings prove it
 - Apply settings changes with explicit user confirmation via AskUserQuestion; print jq fallback on decline
 - Idempotent: running setup multiple times with the same version is a no-op
-- Template is read from disk, not generated — ensures deterministic output
 - Migration handles both `<!-- OMCA:START -->` and `<\!-- OMCA:START -->` (escaped and unescaped)
