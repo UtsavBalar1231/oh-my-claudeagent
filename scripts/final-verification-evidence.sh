@@ -170,7 +170,7 @@ has_ftype() {
 			)
 		))
 		| length > 0
-	' "${EVIDENCE_FILE}" 2>/dev/null || echo "false")
+	' "${EVIDENCE_FILE}")
 	echo "${found}"
 }
 

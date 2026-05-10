@@ -440,3 +440,23 @@ EOF
 	# Marker must still be present (not erroneously cleared)
 	[ -f "${CLAUDE_PROJECT_ROOT}/.omca/state/pending-final-verify.json" ]
 }
+
+# ---------------------------------------------------------------------------
+# (o) Corrupt evidence file → corruption guard fires (exit 2, explicit message)
+#     Verifies that has_ftype propagates jq parse errors to the corruption guard
+#     rather than silently returning "false".
+# ---------------------------------------------------------------------------
+
+@test "final-verification-evidence: corrupt evidence file triggers corruption guard (exit 2)" {
+	local plan_file="${BATS_TEST_TMPDIR}/corrupt-evidence-plan.md"
+	_write_complete_plan "${plan_file}"
+	_write_boulder "${plan_file}"
+	_write_marker "${plan_file}"
+
+	# Write a non-JSON (corrupt) evidence file — jq will fail to parse it
+	write_state "verification-evidence.json" "THIS IS NOT JSON {"
+
+	run_hook "final-verification-evidence.sh" '{}'
+	[ "$status" -eq 2 ]
+	echo "$output" | grep -qi "corrupt"
+}
