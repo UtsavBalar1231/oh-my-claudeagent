@@ -215,21 +215,24 @@ handle_worktree_create() {
 }
 
 handle_worktree_remove() {
-	local name tracking_file
+	local name tracking_file worktree_path
 
-	name=$(jq -r '.name // ""' <<< "${HOOK_INPUT}")
-	if [[ -z "${name}" ]]; then
-		echo "WorktreeRemove hook requires a non-empty name" >&2
+	# Platform sends `.worktree_path` (not `.name`) per hooks.md WorktreeRemove section.
+	# Derive name from basename for backward-compatible tracking-file rename pattern.
+	worktree_path=$(jq -r '.worktree_path // ""' <<< "${HOOK_INPUT}")
+	if [[ -z "${worktree_path}" ]]; then
+		echo "WorktreeRemove hook requires a non-empty worktree_path" >&2
 		exit 1
 	fi
+	name=$(basename "${worktree_path}")
 
 	tracking_file="${STATE_DIR}/worktrees/${name}.json"
 	if [[ -f "${tracking_file}" ]]; then
 		rm -f "${tracking_file}"
 	fi
 
-	jq -nc --arg name "${name}" --arg timestamp "${TIMESTAMP}" \
-		'{event: "worktree_remove", name: $name, timestamp: $timestamp}' >>"${LOG_DIR}/worktrees.jsonl"
+	jq -nc --arg name "${name}" --arg worktree_path "${worktree_path}" --arg timestamp "${TIMESTAMP}" \
+		'{event: "worktree_remove", name: $name, worktreePath: $worktree_path, timestamp: $timestamp}' >>"${LOG_DIR}/worktrees.jsonl"
 
 	exit 0
 }
