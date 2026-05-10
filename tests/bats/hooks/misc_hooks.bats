@@ -141,6 +141,56 @@ load '../test_helper'
 	[[ "$before" == "$after" ]]
 }
 
+@test "subagent-complete: status=empty when last_assistant_message is empty string" {
+	write_state "subagents.json" \
+		'{"active":[{"id":"agent-empty-1","type":"explore","model":"sonnet","status":"running"}],"completed":[]}'
+
+	local payload
+	payload='{"hook_event_name":"SubagentStop","agent_id":"agent-empty-1","agent_type":"explore","last_assistant_message":""}'
+
+	run_hook "subagent-complete.sh" "$payload"
+	assert_success
+
+	local subagents_file="$CLAUDE_PROJECT_ROOT/.omca/state/subagents.json"
+	local recorded_status
+	recorded_status=$(jq -r '.completed[-1].status' "$subagents_file")
+	[ "$recorded_status" = "empty" ]
+}
+
+@test "subagent-complete: status=stalled when last_assistant_message is 1-49 chars" {
+	write_state "subagents.json" \
+		'{"active":[{"id":"agent-stall-1","type":"explore","model":"sonnet","status":"running"}],"completed":[]}'
+
+	# 20-char message — clearly in the stalled range (1-49)
+	local payload
+	payload='{"hook_event_name":"SubagentStop","agent_id":"agent-stall-1","agent_type":"explore","last_assistant_message":"Short reply here."}'
+
+	run_hook "subagent-complete.sh" "$payload"
+	assert_success
+
+	local subagents_file="$CLAUDE_PROJECT_ROOT/.omca/state/subagents.json"
+	local recorded_status
+	recorded_status=$(jq -r '.completed[-1].status' "$subagents_file")
+	[ "$recorded_status" = "stalled" ]
+}
+
+@test "subagent-complete: status=completed when last_assistant_message is >=50 chars" {
+	write_state "subagents.json" \
+		'{"active":[{"id":"agent-done-1","type":"explore","model":"sonnet","status":"running"}],"completed":[]}'
+
+	# 60-char message — clearly in the completed range (≥50)
+	local payload
+	payload='{"hook_event_name":"SubagentStop","agent_id":"agent-done-1","agent_type":"explore","last_assistant_message":"This is a sufficiently long message that exceeds fifty characters easily."}'
+
+	run_hook "subagent-complete.sh" "$payload"
+	assert_success
+
+	local subagents_file="$CLAUDE_PROJECT_ROOT/.omca/state/subagents.json"
+	local recorded_status
+	recorded_status=$(jq -r '.completed[-1].status' "$subagents_file")
+	[ "$recorded_status" = "completed" ]
+}
+
 # ---------------------------------------------------------------------------
 # g. empty-task-response: warns on empty/very short agent output
 # ---------------------------------------------------------------------------

@@ -8,7 +8,16 @@ LOG_DIR="${HOOK_LOG_DIR}"
 SUBAGENT_ID=$(jq -r '.agent_id // ""' <<< "${HOOK_INPUT}")
 # 500 bytes — last_assistant_message cap; enough for routing-audit without bloating log.
 LAST_MSG=$(jq -r '.last_assistant_message // ""' <<< "${HOOK_INPUT}" | head -c 500)
-EXIT_STATUS="completed"  # SubagentStop only fires on completion; no exit_status field exists
+# Derive outcome from last_assistant_message length (no exit_status field on SubagentStop).
+# ≥50 chars → completed; 1-49 → stalled; 0 → empty.
+MSG_LEN=${#LAST_MSG}
+if [[ "${MSG_LEN}" -ge 50 ]]; then
+	EXIT_STATUS="completed"
+elif [[ "${MSG_LEN}" -ge 1 ]]; then
+	EXIT_STATUS="stalled"
+else
+	EXIT_STATUS="empty"
+fi
 
 TIMESTAMP=$(date -Iseconds)
 CURRENT_EPOCH=$(date +%s)
