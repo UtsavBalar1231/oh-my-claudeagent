@@ -82,7 +82,7 @@ new-agent name:
 	@echo "" >> agents/{{name}}.md
 	@echo "# {{name}}" >> agents/{{name}}.md
 	@echo "Created agents/{{name}}.md — update description, model, and disallowedTools"
-	@echo "Remember to update: servers/categories.json and the <agent_catalog> block in templates/claudemd.md"
+	@echo "Remember to update: servers/categories.json and the <agent_catalog> block in output-styles/omca-default.md"
 
 # Scaffold a new hook script
 [group('scaffold')]

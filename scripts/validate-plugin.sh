@@ -327,7 +327,7 @@ check_policy_phrase_in_file() {
 
 check_policy_posture_alignment() {
 	# Policy posture markers live in OMCA.md and the omca-setup skill.
-	# templates/claudemd.md is the session-injected runtime prompt — it
+	# output-styles/omca-default.md carries the orchestration body but
 	# intentionally omits managed-settings trivia, so it is NOT enforced here.
 	local policy_docs=(
 		"${OMCA_MD}"

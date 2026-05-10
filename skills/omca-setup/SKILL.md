@@ -74,28 +74,18 @@ Record each result (binary path + version or "not found") for the health report.
 
 ---
 
-### Phase 2: Read Template
+### Phase 2: Read Plugin Version
 
 1. Determine the plugin root. Navigate from this skill's location:
    - This SKILL.md is at `skills/omca-setup/SKILL.md`
    - Plugin root = two directories up from this file
    - Use `Bash: dirname` of the skill path or use `CLAUDE_PLUGIN_ROOT` env var
 
-2. Read the template file:
-   ```
-   Read("${PLUGIN_ROOT}/templates/claudemd.md")
-   ```
-
-3. Read the plugin version:
+2. Read the plugin version:
    ```
    Read("${PLUGIN_ROOT}/.claude-plugin/plugin.json")
    ```
    Extract the `version` field with jq.
-
-4. Update the template content in memory:
-   - Replace `version: 0.1.0` (or whatever is in the template) with `version: ${CURRENT_VERSION}` from plugin.json
-   - Add `installed: ${ISO_8601_TIMESTAMP}` line after the `author:` line in metadata
-   - Get the current timestamp: `Bash: date -u +%Y-%m-%dT%H:%M:%SZ`
 
 ---
 
@@ -140,14 +130,16 @@ Record each result (binary path + version or "not found") for the health report.
 
 ### Phase 4: Write CLAUDE.md
 
+The orchestration body is now delivered by `output-styles/omca-default.md` via the
+platform's output-style mechanism — it no longer needs to live in `~/.claude/CLAUDE.md`.
+
 Compose the final file:
-- **Template block** (from Phase 2, with updated version and installed timestamp)
-- **Blank line** (separator)
 - **User content** (from Phase 3, if any)
 
-If user content is empty (the entire old file was just a block), write only the template block.
+If user content is empty (the entire old file was just an omca-setup block now removed),
+write an empty file or skip the write entirely.
 
-Write the composed content to `~/.claude/CLAUDE.md`.
+If user content is non-empty, write it to `~/.claude/CLAUDE.md`.
 
 ---
 
