@@ -19,7 +19,12 @@ allow_stop_via_boulder_fallback() {
 			fi
 			if command -v stat &>/dev/null; then
 				local boulder_mtime boulder_age
-				boulder_mtime=$(stat -c %Y "${boulder_file}" 2>/dev/null || stat -f %m "${boulder_file}" 2>/dev/null || echo 0)
+				boulder_mtime=$(stat -c %Y "${boulder_file}" 2>/dev/null || stat -f %m "${boulder_file}" 2>/dev/null || echo "")
+				# Fail-closed: if stat returns empty, boulder mtime is unavailable — block stop conservatively.
+				if [[ -z "${boulder_mtime}" ]]; then
+					echo '{"decision":"block","reason":"[PERSISTENCE] Active work plan detected via boulder (stat unavailable — fail-closed). Continue working on tasks."}'
+					exit 0
+				fi
 				boulder_age=$(( $(date +%s) - boulder_mtime ))
 				if [[ ${boulder_age} -lt 900 ]]; then
 					echo '{"decision":"block","reason":"[PERSISTENCE] Active work plan detected via boulder. Continue working on tasks."}'
@@ -111,56 +116,56 @@ if [[ "${RALPH_ACTIVE}" == "true" ]]; then
 	# Plan-file-aware stagnation: supplement task-hash signal with plan checkbox state.
 	# REQUIRES RALPH_STATE to be set — see line 41 above.
 	# REQUIRES STAGNATION to be set — see line 92 above.
-	_boulder_file_pfp="${STATE_DIR}/boulder.json"
-	if [[ -f "${_boulder_file_pfp}" ]]; then
-		_active_plan_pfp=$(jq_read "${_boulder_file_pfp}" '.active_plan // ""')
-		if [[ -n "${_active_plan_pfp}" && "${_active_plan_pfp}" != "null" ]]; then
+	boulder_file_pfp="${STATE_DIR}/boulder.json"
+	if [[ -f "${boulder_file_pfp}" ]]; then
+		active_plan_pfp=$(jq_read "${boulder_file_pfp}" '.active_plan // ""')
+		if [[ -n "${active_plan_pfp}" && "${active_plan_pfp}" != "null" ]]; then
 			# Resolve plan path: support both absolute and relative (relative to project root)
-			_plan_file_pfp="${_active_plan_pfp}"
-			if [[ ! -f "${_plan_file_pfp}" ]]; then
+			plan_file_pfp="${active_plan_pfp}"
+			if [[ ! -f "${plan_file_pfp}" ]]; then
 				# Try relative to CLAUDE_PROJECT_ROOT if set
-				_project_root_pfp="${CLAUDE_PROJECT_ROOT:-}"
-				if [[ -n "${_project_root_pfp}" && -f "${_project_root_pfp}/${_active_plan_pfp}" ]]; then
-					_plan_file_pfp="${_project_root_pfp}/${_active_plan_pfp}"
+				project_root_pfp="${CLAUDE_PROJECT_ROOT:-}"
+				if [[ -n "${project_root_pfp}" && -f "${project_root_pfp}/${active_plan_pfp}" ]]; then
+					plan_file_pfp="${project_root_pfp}/${active_plan_pfp}"
 				else
-					log_hook_error "boulder active_plan references missing file: ${_active_plan_pfp} — allowing stop" "ralph-persistence.sh"
+					log_hook_error "boulder active_plan references missing file: ${active_plan_pfp} — allowing stop" "ralph-persistence.sh"
 					exit 0
 				fi
 			fi
 
 			# Read current plan file mtime (portable: GNU stat then BSD stat)
-			_plan_mtime_pfp=$(stat -c %Y "${_plan_file_pfp}" 2>/dev/null || stat -f %m "${_plan_file_pfp}" 2>/dev/null || echo "")
-			if [[ -n "${_plan_mtime_pfp}" ]]; then
+			plan_mtime_pfp=$(stat -c %Y "${plan_file_pfp}" 2>/dev/null || stat -f %m "${plan_file_pfp}" 2>/dev/null || echo "")
+			if [[ -n "${plan_mtime_pfp}" ]]; then
 				# Count incomplete and complete checkboxes
-				_incomplete_pfp=$(grep -c '^- \[ \] ' "${_plan_file_pfp}" 2>/dev/null || true)
-				_complete_pfp=$(grep -c '^- \[x\] ' "${_plan_file_pfp}" 2>/dev/null || true)
-				_incomplete_pfp="${_incomplete_pfp:-0}"
-				_complete_pfp="${_complete_pfp:-0}"
+				incomplete_pfp=$(grep -c '^- \[ \] ' "${plan_file_pfp}" 2>/dev/null || true)
+				complete_pfp=$(grep -c '^- \[x\] ' "${plan_file_pfp}" 2>/dev/null || true)
+				incomplete_pfp="${incomplete_pfp:-0}"
+				complete_pfp="${complete_pfp:-0}"
 
 				# Read previous values from ralph-state.json
-				_last_mtime_pfp=$(jq_read "${RALPH_STATE}" '.last_plan_mtime // ""')
-				_plan_stagnation_pfp=$(jq_read "${RALPH_STATE}" '.plan_stagnation_count // 0')
-				_last_mtime_pfp="${_last_mtime_pfp:-}"
-				_plan_stagnation_pfp="${_plan_stagnation_pfp:-0}"
+				last_mtime_pfp=$(jq_read "${RALPH_STATE}" '.last_plan_mtime // ""')
+				plan_stagnation_pfp=$(jq_read "${RALPH_STATE}" '.plan_stagnation_count // 0')
+				last_mtime_pfp="${last_mtime_pfp:-}"
+				plan_stagnation_pfp="${plan_stagnation_pfp:-0}"
 
 				# Detect plan-level stagnation: mtime unchanged AND incomplete count > 0 AND
 				# task-hash also unchanged (STAGNATION > 0 means hash matched at least once)
-				if [[ "${_incomplete_pfp}" -gt 0 && "${_plan_mtime_pfp}" == "${_last_mtime_pfp}" && "${STAGNATION}" -gt 0 ]]; then
-					_plan_stagnation_pfp=$((_plan_stagnation_pfp + 1))
+				if [[ "${incomplete_pfp}" -gt 0 && "${plan_mtime_pfp}" == "${last_mtime_pfp}" && "${STAGNATION}" -gt 0 ]]; then
+					plan_stagnation_pfp=$((plan_stagnation_pfp + 1))
 				else
-					_plan_stagnation_pfp=0
+					plan_stagnation_pfp=0
 				fi
 
-				jq --arg mtime "${_plan_mtime_pfp}" \
-					--argjson inc "${_incomplete_pfp}" \
-					--argjson com "${_complete_pfp}" \
-					--argjson psc "${_plan_stagnation_pfp}" \
+				jq --arg mtime "${plan_mtime_pfp}" \
+					--argjson inc "${incomplete_pfp}" \
+					--argjson com "${complete_pfp}" \
+					--argjson psc "${plan_stagnation_pfp}" \
 					'.last_plan_mtime = $mtime | .last_plan_incomplete = $inc | .last_plan_complete = $com | .plan_stagnation_count = $psc' \
 					"${RALPH_STATE}" > "${RALPH_STATE}.tmp" && \
 					mv "${RALPH_STATE}.tmp" "${RALPH_STATE}"
 
-				if [[ ${_plan_stagnation_pfp} -ge 3 ]]; then
-					log_hook_error "ralph plan stagnated (plan_stagnation_count=${_plan_stagnation_pfp}, incomplete=${_incomplete_pfp}) — allowing stop" "ralph-persistence.sh"
+				if [[ ${plan_stagnation_pfp} -ge 3 ]]; then
+					log_hook_error "ralph plan stagnated (plan_stagnation_count=${plan_stagnation_pfp}, incomplete=${incomplete_pfp}) — allowing stop" "ralph-persistence.sh"
 					allow_stop_via_boulder_fallback
 					exit 0
 				fi
