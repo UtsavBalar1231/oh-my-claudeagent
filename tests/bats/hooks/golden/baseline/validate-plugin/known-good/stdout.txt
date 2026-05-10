@@ -62,6 +62,7 @@
 [validate-plugin] PASS: policy posture: skills/omca-setup/SKILL.md includes managed settings boundary marker
 [validate-plugin] PASS: policy posture: skills/omca-setup/SKILL.md includes sandbox fail-closed marker
 [validate-plugin] PASS: policy posture: skills/omca-setup/SKILL.md includes non-bypassing permission filter guidance
+[validate-plugin] PASS: phantom field check: no phantom jq field names (.tool_error, .tool_result.error, .tool_result.success) found in scripts/
 [validate-plugin] Running hooks checks
 [validate-plugin] PASS: hooks contract: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/hooks/hooks.json)
 [validate-plugin] PASS: hook fixture pretooluse-task-agent.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/pretooluse-task-agent.json)
@@ -154,4 +155,4 @@
 [validate-plugin] PASS: mcp tools/list contains categories_list
 [validate-plugin] PASS: mcp tools/list contains concurrency_status
 [validate-plugin] PASS: mcp tools/list contains file_read
-[validate-plugin] Summary: 141 passed, 9 failed, 1 skipped, 0 warned
+[validate-plugin] Summary: 142 passed, 9 failed, 1 skipped, 0 warned

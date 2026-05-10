@@ -1,1 +1,2 @@
 Only in /state-after: recent-edits.json
+Only in /state-after: recent-edits.json.lock

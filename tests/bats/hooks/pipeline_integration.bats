@@ -244,9 +244,12 @@ setup() {
 	assert_output --partial "module-a"
 
 	# Cache file should now record dir A as injected
+	# Cache key is "${dir}|${mtime}" — compute mtime to build the lookup key.
 	assert [ -f "$cache_file" ]
-	local dir_a_cached
-	dir_a_cached=$(jq -r --arg d "$dir_a" '.[$d] // "false"' "$cache_file")
+	local dir_a_mtime dir_a_key dir_a_cached
+	dir_a_mtime=$(stat -c %Y "$dir_a/AGENTS.md" 2>/dev/null || stat -f %m "$dir_a/AGENTS.md" 2>/dev/null || echo "0")
+	dir_a_key="${dir_a}|${dir_a_mtime}"
+	dir_a_cached=$(jq -r --arg d "$dir_a_key" '.[$d] // "false"' "$cache_file")
 	assert [ "$dir_a_cached" = "true" ]
 
 	# Step 2: Read from dir A again — should NOT inject (already cached)
@@ -264,7 +267,9 @@ setup() {
 	assert_output --partial "module-b"
 
 	# Cache file should now record dir B as injected too
-	local dir_b_cached
-	dir_b_cached=$(jq -r --arg d "$dir_b" '.[$d] // "false"' "$cache_file")
+	local dir_b_mtime dir_b_key dir_b_cached
+	dir_b_mtime=$(stat -c %Y "$dir_b/AGENTS.md" 2>/dev/null || stat -f %m "$dir_b/AGENTS.md" 2>/dev/null || echo "0")
+	dir_b_key="${dir_b}|${dir_b_mtime}"
+	dir_b_cached=$(jq -r --arg d "$dir_b_key" '.[$d] // "false"' "$cache_file")
 	assert [ "$dir_b_cached" = "true" ]
 }
