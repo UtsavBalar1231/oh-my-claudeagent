@@ -200,3 +200,59 @@ load '../test_helper'
 	ctx=$(get_context)
 	assert echo "$ctx" | grep -q "RALPH MODE DETECTED"
 }
+
+# ---------------------------------------------------------------------------
+# Echo-suppression: active-modes.json guard (C-10)
+# ---------------------------------------------------------------------------
+
+@test "echo-suppression case 1: first-fire announces and writes active-modes.json" {
+	# No active-modes.json present — genuine first-fire
+	local payload='{"prompt":"ralph","session_id":"test-session-A"}'
+	run_hook "keyword-detector.sh" "$payload"
+	assert_success
+	ctx=$(get_context)
+	assert echo "$ctx" | grep -q "RALPH MODE DETECTED"
+	# Marker must be written
+	assert [ -f "$CLAUDE_PROJECT_ROOT/.omca/state/active-modes.json" ]
+	local stored_sid
+	stored_sid=$(jq -r '.ralph.session_id // ""' "$CLAUDE_PROJECT_ROOT/.omca/state/active-modes.json")
+	assert [ -n "$stored_sid" ]
+}
+
+@test "echo-suppression case 2: same-session re-fire does NOT re-announce" {
+	# Pre-populate active-modes.json with ralph from the current bats session
+	write_state "active-modes.json" \
+		"{\"ralph\":{\"detected_at\":1000000,\"session_id\":\"${CLAUDE_SESSION_ID}\"}}"
+	local payload='{"prompt":"ralph"}'
+	run_hook "keyword-detector.sh" "$payload"
+	assert_success
+	# No announcement should be emitted
+	assert_output ""
+}
+
+@test "echo-suppression case 3: cross-session reset re-announces on new session" {
+	# Pre-populate with a DIFFERENT session_id
+	write_state "active-modes.json" \
+		'{"ralph":{"detected_at":1000000,"session_id":"old-session-XYZ"}}'
+	# CLAUDE_SESSION_ID is set to "bats-test-session" by test_helper setup()
+	local payload='{"prompt":"ralph"}'
+	run_hook "keyword-detector.sh" "$payload"
+	assert_success
+	ctx=$(get_context)
+	assert echo "$ctx" | grep -q "RALPH MODE DETECTED"
+	# Marker must be updated with current session
+	local stored_sid
+	stored_sid=$(jq -r '.ralph.session_id // ""' "$CLAUDE_PROJECT_ROOT/.omca/state/active-modes.json")
+	assert [ "$stored_sid" = "$CLAUDE_SESSION_ID" ]
+}
+
+@test "echo-suppression case 4: ultrawork suppressed on same-session re-fire" {
+	# Pre-populate active-modes.json with ultrawork from the current bats session
+	write_state "active-modes.json" \
+		"{\"ultrawork\":{\"detected_at\":1000000,\"session_id\":\"${CLAUDE_SESSION_ID}\"}}"
+	local payload='{"prompt":"ultrawork please"}'
+	run_hook "keyword-detector.sh" "$payload"
+	assert_success
+	# No announcement should be emitted
+	assert_output ""
+}
