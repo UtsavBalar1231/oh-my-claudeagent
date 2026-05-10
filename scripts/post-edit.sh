@@ -19,13 +19,18 @@ jq -nc --arg tool "${TOOL_NAME}" --arg file "${FILE_PATH}" --argjson ok "${TOOL_
 	'{event: "file_edit", tool: $tool, file: $file, success: $ok, timestamp: $ts}' >>"${LOG_FILE}"
 
 EDITS_FILE="${STATE_DIR}/recent-edits.json"
-if [[ ! -f "${EDITS_FILE}" ]]; then
-	echo '{"files":{}}' >"${EDITS_FILE}"
-fi
 
-TMP_FILE=$(mktemp)
-jq --arg file "${FILE_PATH}" --arg ts "${TIMESTAMP}" \
-	'.files[$file] = $ts' \
-	"${EDITS_FILE}" >"${TMP_FILE}" && mv "${TMP_FILE}" "${EDITS_FILE}"
+# flock-protected read-modify-write to prevent concurrent Write races
+(
+	# 5s — flock wait; long enough for concurrent siblings, short enough to fail fast.
+	flock -w 5 200 || { log_hook_error "flock timeout on recent-edits" "post-edit.sh"; exit 0; }
+	if [[ ! -f "${EDITS_FILE}" ]]; then
+		echo '{"files":{}}' >"${EDITS_FILE}"
+	fi
+	TMP_FILE=$(mktemp)
+	jq --arg file "${FILE_PATH}" --arg ts "${TIMESTAMP}" \
+		'.files[$file] = $ts' \
+		"${EDITS_FILE}" >"${TMP_FILE}" && mv "${TMP_FILE}" "${EDITS_FILE}"
+) 200>"${EDITS_FILE}.lock"
 
 exit 0
