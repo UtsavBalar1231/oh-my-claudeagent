@@ -37,6 +37,9 @@ mode_is_active() {
 	[[ "${status}" == "active" ]]
 }
 
+# Session path layout: ~/.claude/projects/<encoded-cwd>/<session-id>.jsonl
+# <encoded-cwd>: working directory with every non-alphanumeric char → "-"
+# (e.g. /home/user/my-project → -home-user-my-project; platform-applied, OMCA reads only)
 # Resolve session ID: tries CLAUDE_SESSION_ID env, HOOK_INPUT .session_id, session.json .sessionId.
 # Prints empty string (returns 0) when none found.
 resolve_session_id() {

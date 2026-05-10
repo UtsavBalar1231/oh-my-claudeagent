@@ -28,6 +28,8 @@ class StatuslinePayload(TypedDict, total=False):
     total_input_tokens: int
     total_output_tokens: int
     total_api_duration_ms: int
+    effort: dict
+    thinking: dict
 
 
 class GitInfo(TypedDict, total=False):

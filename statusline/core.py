@@ -264,6 +264,19 @@ def _compose_line1(
     display_name = model.get("display_name", "Claude")
     parts.append(f"{CYAN}{glyphs['model']} {display_name}{RST}")
 
+    # Effort level — only render when non-normal to reduce noise
+    effort_level = (data.get("effort") or {}).get("level", "normal")
+    if effort_level and effort_level != "normal":
+        effort_glyph = "" if nerd else "E:"  # nf-fa-bolt
+        parts.append(f"{YELLOW}{effort_glyph} {effort_level}{RST}")
+        has_extra = True
+
+    # Thinking indicator — only render when enabled
+    if (data.get("thinking") or {}).get("enabled"):
+        thinking_glyph = "" if nerd else "[T]"  # nf-fa-lightbulb_o
+        parts.append(f"{CYAN}{thinking_glyph}{RST}")
+        has_extra = True
+
     # Session identifier (session_name or first 8 chars of session_id)
     session_name = data.get("session_name")
     session_id = data.get("session_id")

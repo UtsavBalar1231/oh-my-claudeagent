@@ -169,6 +169,10 @@ handle_repo_refresh() {
 }
 
 handle_worktree_create() {
+	# Registration rationale: this handler is NOT a no-op. It writes
+	# .omca/state/worktrees/{name}.json (the tracking file) and appends to
+	# worktrees.jsonl. handle_worktree_remove depends on the tracking file for
+	# cleanup — deregistering WorktreeCreate would silently break WorktreeRemove.
 	local name repo_root worktrees_root worktree_path tracking_file tmp_file
 
 	name=$(jq -r '.name // ""' <<< "${HOOK_INPUT}")
