@@ -1,1 +1,1 @@
-{"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": "[CURRENT DATE] Today is <HUMAN_DATE>. Current hour: <HOUR> (local).\nSession fixture-sid-001 initialized."}}
+{"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": "[CURRENT DATE] Today is <HUMAN_DATE>. Current hour: <HOUR> (local).\nSession fixture-sid-001 initialized. State directory: <TMPFILE>/.omca/state"}}

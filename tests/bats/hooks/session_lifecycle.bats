@@ -26,26 +26,30 @@ STOPFAILURE_PAYLOAD='{"session_id":"test-session","hook_event_name":"StopFailure
 	[[ "$context" == *"[CURRENT DATE]"* ]]
 }
 
-# ─── c. session-init skips full template when OMCA is configured ──────────────
+# ─── c. session-init output is bounded — no XML orchestration tags ───────────
 
-@test "session-init: skips full template when ~/.claude/CLAUDE.md has omca-setup" {
-	# Create a mock HOME with a CLAUDE.md containing the omca-setup marker
-	local mock_home="$BATS_TEST_TMPDIR/mock-home"
-	mkdir -p "$mock_home/.claude"
-	printf '%s\n' "--- omca-setup" "plugin: oh-my-claudeagent" "--- /omca-setup ---" \
-		> "$mock_home/.claude/CLAUDE.md"
-
-	HOME="$mock_home" run_hook "session-init.sh" "$STARTUP_PAYLOAD"
+@test "session-init: output contains no XML orchestration tags" {
+	run_hook "session-init.sh" "$STARTUP_PAYLOAD"
 	assert_success
 	local context
 	context=$(get_context)
-	# Configured path emits short context — the full behavioral template MUST NOT
-	# leak into the output. Key two canaries to orthogonal template signals so a
-	# future template rewrite cannot silently rot both at once.
+	# The hook emits only date + session-id + state-dir. Orchestration body lives
+	# in output-styles/omca-default.md — it must never bleed into hook output.
+	[[ "$context" != *"<operating_principles>"* ]]
 	[[ "$context" != *"<agent_catalog>"* ]]
-	[[ "$context" != *"Treat Claude Code as the platform owner"* ]]
-	# But it should still have the date and session info
+	[[ "$context" != *"<delegation>"* ]]
 	[[ "$context" == *"[CURRENT DATE]"* ]]
+}
+
+# ─── c2. orchestration body lives in output-styles/omca-default.md ───────────
+
+@test "output-styles/omca-default.md: contains operating-principles intro sentence" {
+	# Positive assertion: the orchestration body that was removed from session-init
+	# must be present in the output-styles file so the content is not lost.
+	local style_file
+	style_file="$(cd "$BATS_TEST_DIRNAME/../../.." && pwd)/output-styles/omca-default.md"
+	assert [ -f "$style_file" ]
+	grep -q "Treat Claude Code as the platform owner" "$style_file"
 }
 
 # ─── d. pre-compact saves compaction-context.md ───────────────────────────────
