@@ -70,11 +70,19 @@
 				]
 			},
 			{
-				"matcher": "Write",
+				"matcher": "Write|Edit",
 				"hooks": [
 					{
-						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/plan-checkbox-verify.sh"
+						"type": "mcp_tool",
+						"server": "omca",
+						"tool": "validate_plan_write",
+						"input": {
+							"tool_name": "${tool_name}",
+							"file_path": "${tool_input.file_path}",
+							"content": "${tool_input.content}",
+							"new_string": "${tool_input.new_string}",
+							"old_string": "${tool_input.old_string}"
+						}
 					}
 				]
 			}

@@ -1,5 +1,6 @@
 Only in /state-after: active-agents.json
 Only in /state-after: active-agents.lock
+Only in /state-after: active-modes.json
 Only in /state-after: ralph-state.json
 Only in /state-after: repo-state.json
 Only in /state-after: ultrawork-state.json

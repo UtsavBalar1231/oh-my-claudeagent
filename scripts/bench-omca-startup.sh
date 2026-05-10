@@ -24,7 +24,7 @@ run_timed() {
 	local rc=$?
 	end=$(date +%s%N)
 	# nanoseconds → seconds with 3 decimal places
-	elapsed=$(awk "BEGIN { printf \"%.3f\", ($end - $start) / 1000000000 }")
+	elapsed=$(awk "BEGIN { printf \"%.3f\", (${end} - ${start}) / 1000000000 }")
 	echo "${elapsed}"
 	return "${rc}"
 }

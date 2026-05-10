@@ -11,7 +11,15 @@ import sys
 
 from mcp.server.fastmcp import FastMCP
 
-from tools import ast as ast_tools, boulder, catalog, evidence, filesystem, notepad
+from tools import (
+    ast as ast_tools,
+    boulder,
+    catalog,
+    evidence,
+    filesystem,
+    notepad,
+    validate_plan_write,
+)
 
 mcp = FastMCP("omca")
 
@@ -21,6 +29,7 @@ evidence.register(mcp)
 filesystem.register(mcp)
 notepad.register(mcp)
 catalog.register(mcp)
+validate_plan_write.register(mcp)
 
 
 signal.signal(signal.SIGINT, signal.SIG_IGN)

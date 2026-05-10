@@ -40,20 +40,20 @@
 [validate-plugin] PASS: post-cutover hook lifecycle coverage includes WorktreeCreate
 [validate-plugin] PASS: agent frontmatter hygiene: no top-level tools allowlists detected
 [validate-plugin] PASS: agent frontmatter hygiene: no legacy permissionMode holdouts detected
-[validate-plugin] PASS: skill description length: cancel-ralph description is 39 chars (within 250 limit)
-[validate-plugin] PASS: skill description length: consolidate-memory description is 79 chars (within 250 limit)
-[validate-plugin] PASS: skill description length: dev-browser description is 183 chars (within 250 limit)
-[validate-plugin] PASS: skill description length: frontend-ui-ux description is 156 chars (within 250 limit)
-[validate-plugin] PASS: skill description length: git-master description is 202 chars (within 250 limit)
-[validate-plugin] PASS: skill description length: github-triage description is 226 chars (within 250 limit)
-[validate-plugin] PASS: skill description length: handoff description is 182 chars (within 250 limit)
-[validate-plugin] PASS: skill description length: hephaestus description is 85 chars (within 250 limit)
-[validate-plugin] PASS: skill description length: init-deep description is 79 chars (within 250 limit)
-[validate-plugin] PASS: skill description length: metis description is 109 chars (within 250 limit)
-[validate-plugin] PASS: skill description length: omca-setup description is 109 chars (within 250 limit)
-[validate-plugin] PASS: skill description length: playwright description is 192 chars (within 250 limit)
-[validate-plugin] PASS: skill description length: refactor description is 95 chars (within 250 limit)
-[validate-plugin] PASS: skill description length: stop-continuation description is 177 chars (within 250 limit)
+[validate-plugin] PASS: skill description length: cancel-ralph description is 39 chars (within 512 soft cap)
+[validate-plugin] PASS: skill description length: consolidate-memory description is 79 chars (within 512 soft cap)
+[validate-plugin] PASS: skill description length: dev-browser description is 183 chars (within 512 soft cap)
+[validate-plugin] PASS: skill description length: frontend-ui-ux description is 156 chars (within 512 soft cap)
+[validate-plugin] PASS: skill description length: git-master description is 202 chars (within 512 soft cap)
+[validate-plugin] PASS: skill description length: github-triage description is 226 chars (within 512 soft cap)
+[validate-plugin] PASS: skill description length: handoff description is 182 chars (within 512 soft cap)
+[validate-plugin] PASS: skill description length: hephaestus description is 85 chars (within 512 soft cap)
+[validate-plugin] PASS: skill description length: init-deep description is 79 chars (within 512 soft cap)
+[validate-plugin] PASS: skill description length: metis description is 109 chars (within 512 soft cap)
+[validate-plugin] PASS: skill description length: omca-setup description is 109 chars (within 512 soft cap)
+[validate-plugin] PASS: skill description length: playwright description is 192 chars (within 512 soft cap)
+[validate-plugin] PASS: skill description length: refactor description is 95 chars (within 512 soft cap)
+[validate-plugin] PASS: skill description length: stop-continuation description is 177 chars (within 512 soft cap)
 [validate-plugin] PASS: policy posture: OMCA.md includes auto mode marker
 [validate-plugin] PASS: policy posture: OMCA.md includes managed settings boundary marker
 [validate-plugin] PASS: policy posture: OMCA.md includes sandbox fail-closed marker
@@ -89,7 +89,10 @@
 [validate-plugin] PASS: hook fixture repo setup: initialized git repo at <TMPFILE>
 [validate-plugin] SKIP: PreToolUse Task|Agent: no matching hook command registered
 [validate-plugin] PASS: PreToolUse Write (write-guard.sh): script succeeded with valid JSON output
-[validate-plugin] PASS: PreToolUse Write (plan-checkbox-verify.sh): script succeeded with valid JSON output
+[validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): script succeeded with valid JSON output
+[validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): script succeeded with valid JSON output
+[validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): script succeeded with valid JSON output
+[validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): script succeeded with valid JSON output
 [validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): script succeeded with valid JSON output
 [validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): script succeeded with valid JSON output
 [validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): script succeeded with valid JSON output
@@ -151,4 +154,4 @@
 [validate-plugin] PASS: mcp tools/list contains categories_list
 [validate-plugin] PASS: mcp tools/list contains concurrency_status
 [validate-plugin] PASS: mcp tools/list contains file_read
-[validate-plugin] Summary: 138 passed, 9 failed, 1 skipped, 0 warned
+[validate-plugin] Summary: 141 passed, 9 failed, 1 skipped, 0 warned

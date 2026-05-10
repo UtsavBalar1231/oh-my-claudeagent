@@ -242,18 +242,6 @@ _run_fixture() {
 	_run_fixture "permission-filter" "allow-jq"
 }
 
-@test "golden: plan-checkbox-verify/non-plan-file" {
-	_run_fixture "plan-checkbox-verify" "non-plan-file"
-}
-
-@test "golden: plan-checkbox-verify/plan-with-checkboxes" {
-	_run_fixture "plan-checkbox-verify" "plan-with-checkboxes"
-}
-
-@test "golden: plan-checkbox-verify/plan-without-checkboxes" {
-	_run_fixture "plan-checkbox-verify" "plan-without-checkboxes"
-}
-
 @test "golden: plan-mode-handler/exit-plan-mode" {
 	_run_fixture "plan-mode-handler" "exit-plan-mode"
 }
