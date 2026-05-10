@@ -32,12 +32,12 @@ if [[ -f "${EVIDENCE_FILE}" ]]; then
 				RECENT_EVIDENCE=true
 			fi
 		else
-			# Cannot determine mtime — treat as fresh
-			RECENT_EVIDENCE=true
+			# Cannot determine mtime — fail closed; demand evidence
+			RECENT_EVIDENCE=false
 		fi
 	else
-		# No stat available — treat as fresh
-		RECENT_EVIDENCE=true
+		# No stat available — fail closed; demand evidence
+		RECENT_EVIDENCE=false
 	fi
 fi
 
@@ -56,7 +56,7 @@ if [[ -f "${EDITS_LOG}" ]]; then
 fi
 
 NEEDS_EVIDENCE=false
-if [[ "${TASK_DESCRIPTION}" =~ (verify|test|build|typecheck|lint|validate|fix|implement|refactor|deploy) ]]; then
+if [[ "${TASK_DESCRIPTION}" =~ (^|[^[:alnum:]])(verify|test|build|typecheck|lint|validate|fix|implement|refactor|deploy)([^[:alnum:]]|$) ]]; then
 	NEEDS_EVIDENCE=true
 fi
 
