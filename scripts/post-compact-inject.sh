@@ -27,10 +27,14 @@ fi
 
 # Strip lines that look like prompt injection attempts (same patterns as notepad sanitization).
 # Patterns: <system>, [SYSTEM], </instructions>, <|im_start|>system
-CLEANED=$(grep -viE '^\s*(<system>|\[system\]|</instructions>|<\|im_start\|>system|<\|im_end\|>|system prompt:|</system>)' "${CLAIM_FILE}" 2>/dev/null)
-if [[ -z "${CLEANED}" ]]; then
-	CLEANED=$(cat "${CLAIM_FILE}" 2>/dev/null || true)
+CLEANED=$(grep -viE '^\s*(<system>|\[system\]|</instructions>|<\|im_start\|>system|<\|im_end\|>|system prompt:|</system>)' "${CLAIM_FILE}")
+GREP_RC=$?
+if [[ "${GREP_RC}" -gt 1 ]]; then
+	# Real grep error (not "no match" or "all matched") — fail safe to empty.
+	CLEANED=""
 fi
+# GREP_RC == 1: all lines matched injection patterns — CLEANED is intentionally empty.
+# GREP_RC == 0: at least one non-matching line exists — CLEANED holds those lines.
 
 CLEANED_LINES=$(echo "${CLEANED}" | wc -l)
 
