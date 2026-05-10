@@ -82,13 +82,15 @@ if [[ "${SOURCE}" != "compact" ]]; then
 		OMCA_CONFIGURED=1
 	fi
 
-	if [[ "${OMCA_CONFIGURED}" -eq 0 ]] && [[ -f "${PROJECT_CLAUDE_MD}" ]] && grep -q "OMC:START\|omca-setup" "${PROJECT_CLAUDE_MD}" 2>/dev/null; then
+	# -E (ERE) required: \| is GNU grep BRE alternation; BSD grep treats it as literal |
+	if [[ "${OMCA_CONFIGURED}" -eq 0 ]] && [[ -f "${PROJECT_CLAUDE_MD}" ]] && grep -qE "OMC:START|omca-setup" "${PROJECT_CLAUDE_MD}" 2>/dev/null; then
 		OMCA_CONFIGURED=1
 	fi
 
 	# Check CLAUDE.local.md (v2.1.85+ personal project instructions, not checked into git)
 	PROJECT_CLAUDE_LOCAL_MD="${PROJECT_ROOT}/CLAUDE.local.md"
-	if [[ "${OMCA_CONFIGURED}" -eq 0 ]] && [[ -f "${PROJECT_CLAUDE_LOCAL_MD}" ]] && grep -q "OMC:START\|omca-setup" "${PROJECT_CLAUDE_LOCAL_MD}" 2>/dev/null; then
+	# -E (ERE) required: \| is GNU grep BRE alternation; BSD grep treats it as literal |
+	if [[ "${OMCA_CONFIGURED}" -eq 0 ]] && [[ -f "${PROJECT_CLAUDE_LOCAL_MD}" ]] && grep -qE "OMC:START|omca-setup" "${PROJECT_CLAUDE_LOCAL_MD}" 2>/dev/null; then
 		OMCA_CONFIGURED=1
 	fi
 
