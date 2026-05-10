@@ -37,7 +37,8 @@ fi
 # GREP_RC == 1: all lines matched injection patterns — CLEANED is intentionally empty.
 # GREP_RC == 0: at least one non-matching line exists — CLEANED holds those lines.
 
-CLEANED_LINES=$(echo "${CLEANED}" | wc -l)
+# printf '%s' avoids the echo-trailing-newline off-by-one (empty CLEANED → 0, not 1).
+CLEANED_LINES=$(printf '%s' "${CLEANED}" | wc -l)
 
 # Dynamic truncation: preserve complete sections up to 150 lines if structured,
 # otherwise keep first 100 lines. Append truncation marker when content is cut.
