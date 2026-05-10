@@ -31,6 +31,13 @@
       "type": "string",
       "description": "Preferred OMCA statusline mode: off, direct, or daemon (default: direct).",
       "sensitive": false
+    },
+    "disableForceOrchestrationStyle": {
+      "title": "Disable forced orchestration output style",
+      "type": "boolean",
+      "default": false,
+      "description": "When true, removes the force-for-plugin: true line from the installed output-styles/omca-default.md cache copy so your own outputStyle setting takes precedence instead of the plugin's orchestration style. The strip is applied at /oh-my-claudeagent:omca-setup time; you must re-run omca-setup after every plugin update (or /plugin marketplace update omca) because the cache copy may be overwritten and the strip will need re-application.",
+      "sensitive": false
     }
   }
 }

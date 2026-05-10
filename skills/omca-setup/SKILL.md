@@ -26,6 +26,7 @@ One-command setup: update orchestration block in `~/.claude/CLAUDE.md`, check de
 
 - `enableKeywordTriggers`: bool, default `false`
 - `statuslineMode`: `off|direct|daemon`, default `direct`
+- `disableForceOrchestrationStyle`: bool, default `false` — strips `force-for-plugin: true` from the installed style cache copy so your own `outputStyle` takes precedence; re-run setup after each plugin update
 
 **Sandbox**: For fail-closed environments, use `sandbox.failIfUnavailable: true` in managed settings. This skill reports sandbox posture but does not bypass host enforcement.
 
@@ -371,6 +372,85 @@ Configure the Claude Code statusline to use the oh-my-claudeagent statusline pac
       ```
 
    h. **Note**: If an old `~/.claude/statusline.py` wrapper script exists, it can be removed — it is superseded by this copy-based deployment.
+
+---
+
+### Phase 5.7: Force-Style Opt-Out
+
+Apply or skip the `disableForceOrchestrationStyle` opt-out based on the user's plugin config.
+
+1. Read the env var:
+   ```bash
+   OPT_OUT="${CLAUDE_PLUGIN_OPTION_DISABLEFORCEORCHESTRATIONSTYLE:-}"
+   ```
+
+2. Read the plugin version from `${PLUGIN_ROOT}/.claude-plugin/plugin.json`:
+   ```bash
+   PLUGIN_VERSION=$(jq -r '.version' "${PLUGIN_ROOT}/.claude-plugin/plugin.json")
+   ```
+
+3. Locate the installed cache copy of the style file:
+   ```bash
+   STYLE_FILE="${HOME}/.claude/plugins/cache/oh-my-claudeagent/${PLUGIN_VERSION}/output-styles/omca-default.md"
+   ```
+   If the file does not exist (development-mode install, or the cache path differs), skip this phase and note to user: "output-styles/omca-default.md not found in plugin cache — skipping force-style opt-out (development mode or non-standard install path)."
+
+4. Locate the sidecar state file:
+   ```bash
+   SIDECAR="${HOME}/.claude/plugins/cache/oh-my-claudeagent/.omca-force-strip-state.json"
+   ```
+
+5. **If `OPT_OUT` is `true` or `1`**:
+
+   a. Read the style file mtime:
+      ```bash
+      FILE_MTIME=$(python3 -c "import os; print(int(os.path.getmtime('${STYLE_FILE}')))")
+      ```
+
+   b. Read the sidecar (if it exists) to check whether the strip was already applied to the current file version:
+      ```bash
+      if [ -f "${SIDECAR}" ]; then
+        APPLIED_MTIME=$(jq -r '.applied_at_mtime // 0' "${SIDECAR}")
+        APPLIED_VER=$(jq -r '.version // ""' "${SIDECAR}")
+      else
+        APPLIED_MTIME=0
+        APPLIED_VER=""
+      fi
+      ```
+
+   c. **Already applied and file unchanged** — if `APPLIED_MTIME == FILE_MTIME` and `APPLIED_VER == PLUGIN_VERSION`, print "force-style strip already applied — no-op." and skip to step 6.
+
+   d. **Apply the strip** — remove the `force-for-plugin: true` line (portable Python one-liner avoids GNU/BSD sed differences):
+      ```bash
+      python3 -c "
+      import re, sys
+      path = sys.argv[1]
+      text = open(path).read()
+      stripped = re.sub(r'^force-for-plugin: true\n', '', text, flags=re.MULTILINE)
+      open(path, 'w').write(stripped)
+      " "${STYLE_FILE}"
+      ```
+      Idempotent: if the line is already absent, the substitution is a no-op.
+
+   e. **Update the sidecar** (atomic write):
+      ```bash
+      NEW_MTIME=$(python3 -c "import os; print(int(os.path.getmtime('${STYLE_FILE}')))")
+      python3 -c "
+      import json, sys
+      data = {'applied_at_mtime': int(sys.argv[1]), 'version': sys.argv[2]}
+      open(sys.argv[3], 'w').write(json.dumps(data) + '\n')
+      " "${NEW_MTIME}" "${PLUGIN_VERSION}" "${SIDECAR}"
+      ```
+
+   f. Report to user:
+      ```
+      force-for-plugin: true stripped from output-styles/omca-default.md (cache copy v${PLUGIN_VERSION}).
+      Your own outputStyle setting will take precedence.
+      Sidecar: ~/.claude/plugins/cache/oh-my-claudeagent/.omca-force-strip-state.json
+      Note: re-run /oh-my-claudeagent:omca-setup after each plugin update to re-apply the strip.
+      ```
+
+6. **If `OPT_OUT` is unset, `false`, or `0`**: skip silently — no changes to the style file.
 
 ---
 
