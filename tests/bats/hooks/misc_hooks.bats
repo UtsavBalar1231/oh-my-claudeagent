@@ -116,6 +116,31 @@ load '../test_helper'
 	[ "$completed_count" -ge 1 ]
 }
 
+@test "subagent-complete: flock timeout does NOT corrupt active-agents.json" {
+	# Seed active-agents.json with a known entry.
+	write_state "active-agents.json" \
+		'[{"id":"agent-test-abc","agent":"oh-my-claudeagent:explore","model":"sonnet","started":"2026-01-01T00:00:00+00:00","started_epoch":1735689600}]'
+	local before
+	before=$(read_state "active-agents.json")
+
+	# Stub flock to always fail (simulates lock-timeout).
+	local stub_dir="$BATS_TEST_TMPDIR/stubs"
+	mkdir -p "$stub_dir"
+	printf '#!/bin/bash\nexit 1\n' > "$stub_dir/flock"
+	chmod +x "$stub_dir/flock"
+
+	local payload
+	payload='{"hook_event_name":"SubagentStop","agent_id":"agent-test-abc","agent_type":"explore","last_assistant_message":"Done."}'
+
+	PATH="$stub_dir:$PATH" run_hook "subagent-complete.sh" "$payload"
+	assert_success
+
+	# Registry must be byte-for-byte identical — deregistration skipped on lock failure.
+	local after
+	after=$(read_state "active-agents.json")
+	[[ "$before" == "$after" ]]
+}
+
 # ---------------------------------------------------------------------------
 # g. empty-task-response: warns on empty/very short agent output
 # ---------------------------------------------------------------------------

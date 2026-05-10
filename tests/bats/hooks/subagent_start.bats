@@ -191,3 +191,27 @@ UNKNOWN_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_i
 	echo "$ctx" | grep -q "learnings, issues, decisions, problems"
 	! echo "$ctx" | grep -q "learnings, issues, decisions, problems, questions"
 }
+
+# ─── m. Flock-timeout safety ─────────────────────────────────────────────────
+
+@test "flock timeout: script exits 0 and does NOT corrupt active-agents.json" {
+	# Seed a known registry so we can verify it is unchanged after timeout.
+	write_state "active-agents.json" '[{"id":"existing-agent","agent":"oh-my-claudeagent:explore","model":"sonnet","started":"2026-01-01T00:00:00+00:00","started_epoch":1735689600}]'
+	local before
+	before=$(read_state "active-agents.json")
+
+	# Stub flock to always fail (simulates lock-timeout) by prepending a fake
+	# flock to PATH that exits 1 unconditionally.
+	local stub_dir="$BATS_TEST_TMPDIR/stubs"
+	mkdir -p "$stub_dir"
+	printf '#!/bin/bash\nexit 1\n' > "$stub_dir/flock"
+	chmod +x "$stub_dir/flock"
+
+	PATH="$stub_dir:$PATH" run_hook "subagent-start.sh" "$EXPLORE_PAYLOAD"
+	assert_success
+
+	# Registry must be byte-for-byte identical — no new entry appended.
+	local after
+	after=$(read_state "active-agents.json")
+	[[ "$before" == "$after" ]]
+}

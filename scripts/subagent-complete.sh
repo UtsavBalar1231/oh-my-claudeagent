@@ -37,7 +37,7 @@ if [[ -f "${ACTIVE_FILE}" ]]; then
 	CUTOFF=$(( CURRENT_EPOCH - 900 ))
 	(
 		# 5s — flock wait; long enough for concurrent siblings, short enough to fail fast.
-		flock -w 5 200 || { log_hook_error "flock timeout on active-agents" "subagent-complete.sh"; }
+		flock -w 5 200 || { log_hook_error "flock timeout on active-agents" "subagent-complete.sh"; exit 0; }
 		TMP_ACTIVE=$(mktemp)
 		jq --arg id "${SUBAGENT_ID}" --argjson cutoff "${CUTOFF}" \
 			'[.[] | select(.id != $id and .started_epoch > $cutoff)]' \

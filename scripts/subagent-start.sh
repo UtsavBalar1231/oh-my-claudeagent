@@ -124,7 +124,7 @@ fi
 STARTED_EPOCH=$(date +%s)
 (
 	# 5s — flock wait; long enough for concurrent siblings, short enough to fail fast.
-	flock -w 5 200 || { log_hook_error "flock timeout on active-agents" "subagent-start.sh"; }
+	flock -w 5 200 || { log_hook_error "flock timeout on active-agents" "subagent-start.sh"; exit 0; }
 	ACTIVE=$(cat "${ACTIVE_FILE}" 2>/dev/null || echo '[]')
 	TMP_ACTIVE=$(mktemp)
 	echo "${ACTIVE}" | jq --arg id "${AGENT_ID}" --arg agent "${AGENT_TYPE}" \
