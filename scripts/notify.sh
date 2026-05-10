@@ -4,18 +4,16 @@ source "$(dirname "$0")/lib/common.sh"
 
 LOG_DIR="${HOOK_LOG_DIR}"
 
-NOTIFICATION_TYPE=$(jq -r '.type // "notification"' <<< "${HOOK_INPUT}")
+NOTIFICATION_TYPE=$(jq -r '.notification_type // "notification"' <<< "${HOOK_INPUT}")
 MESSAGE=$(jq -r '.message // "Claude Code needs attention"' <<< "${HOOK_INPUT}")
 TITLE="oh-my-claudeagent"
 
 case "${NOTIFICATION_TYPE}" in
 idle_prompt)
 	TITLE="Claude Code - Waiting"
-	MESSAGE="Claude Code is waiting for your input"
 	;;
 permission_prompt)
 	TITLE="Claude Code - Permission Required"
-	MESSAGE="Claude Code needs permission to proceed"
 	;;
 *)
 	;;
