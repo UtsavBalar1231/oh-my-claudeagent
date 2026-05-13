@@ -88,6 +88,22 @@ Specialist agents, skills via slash commands or keyword triggers, bundled MCP se
 (omca: structural search + state, grep.app: public code search, context7: library docs),
 hooks for persistence, context injection, and auto-approval.
 
+### Heads-up — `worktree.baseRef` and unpushed commits
+
+OMCA's `explore` and `librarian` agents run with `isolation: worktree`, so each
+invocation spawns in a fresh git worktree. Since Claude Code v2.1.133, the default
+base ref for new worktrees is `origin/<default-branch>` (i.e. `"fresh"`) — **unpushed
+local commits are not visible to these subagents**.
+
+If you have WIP commits that haven't been pushed yet and you want subagents to see
+them, set this in your user `~/.claude/settings.json`:
+
+```json
+"worktree": { "baseRef": "head" }
+```
+
+Otherwise, push to your remote before delegating exploration of recently-changed code.
+
 ## Requirements
 
 - Claude Code CLI
