@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.1] - 2026-05-13
+
+### Documentation
+- Added three additional env vars to `OMCA.md`: `CLAUDE_CODE_FORK_SUBAGENT` (v2.1.119, forked subagents inherit full conversation context), `ENABLE_PROMPT_CACHING_1H` (v2.1.108, 1-hour cache TTL opt-in), `CLAUDE_CODE_FORCE_SYNC_OUTPUT` (v2.1.129, terminal sync override).
+- Added two managed-settings sandbox keys to the OMCA.md table: `sandbox.bwrapPath` and `sandbox.socatPath` (v2.1.133, Linux/WSL only).
+- Swept legacy "all 12 agents" references in prior CHANGELOG entries — OMCA ships 10 agents (see `agents/*.md`).
+
+### Fixed
+- Stale claim in the local contributor reference (`CLAUDE.md`, gitignored) that OMCA "does not register `PermissionDenied`" — v2.2.0 actually adopted that hook event. Local-only edit; does not ship via marketplace.
+
 ## [2.2.0] - 2026-05-13
 
 v2.2.0 ships platform-sync improvements: a `PermissionDenied` retry-coach hook, statusline token-count fixes aligned to the v2.1.132 schema, new agent `color:` and `background:` frontmatter across all 10 agents, two new `bin/` utilities (`omca-status`, `omca-doctor`), and documentation catch-up for new platform settings keys and env vars.
