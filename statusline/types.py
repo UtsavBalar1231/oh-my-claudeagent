@@ -25,9 +25,6 @@ class StatuslinePayload(TypedDict, total=False):
     session_id: str
     version: str
     transcript_path: str
-    total_input_tokens: int
-    total_output_tokens: int
-    total_api_duration_ms: int
     effort: dict
     thinking: dict
 

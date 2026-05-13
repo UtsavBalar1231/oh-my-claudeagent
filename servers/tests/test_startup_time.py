@@ -7,8 +7,10 @@ safety margin — well under the platform cap.
 Reference: foreground bench during v2.2.0 plan authoring measured
 p95=0.287s on this user's machine (uv 0.10.10, Python 3.14.5).
 """
+
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import statistics
@@ -54,29 +56,25 @@ def _one_run(plugin_root: Path) -> float | None:
     deadline = t0 + 15
     buf = b""
     while time.monotonic() < deadline:
-        chunk = proc.stdout.read1(65536) if hasattr(proc.stdout, "read1") else proc.stdout.read(65536)
+        chunk = (
+            proc.stdout.read1(65536)
+            if hasattr(proc.stdout, "read1")
+            else proc.stdout.read(65536)
+        )
         if not chunk:
             break
         buf += chunk
         if b'"id":2' in buf:
             elapsed = time.monotonic() - t0
-            try:
+            with contextlib.suppress(Exception):
                 proc.stdin.close()
-            except Exception:
-                pass
-            try:
+            with contextlib.suppress(Exception):
                 proc.terminate()
-            except Exception:
-                pass
             return elapsed
-    try:
+    with contextlib.suppress(Exception):
         proc.stdin.close()
-    except Exception:
-        pass
-    try:
+    with contextlib.suppress(Exception):
         proc.terminate()
-    except Exception:
-        pass
     return None
 
 
@@ -93,7 +91,11 @@ def test_omca_mcp_warm_startup_under_threshold() -> None:
         warm.append(t)
 
     warm_sorted = sorted(warm)
-    p95 = warm_sorted[int(len(warm_sorted) * 0.95)] if len(warm_sorted) > 1 else warm_sorted[0]
+    p95 = (
+        warm_sorted[int(len(warm_sorted) * 0.95)]
+        if len(warm_sorted) > 1
+        else warm_sorted[0]
+    )
     med = statistics.median(warm_sorted)
 
     summary = {

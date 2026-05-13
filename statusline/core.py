@@ -424,14 +424,14 @@ def _compose_line2(
         parts.append("/".join(line_parts))
 
     # Token count (total_input_tokens + total_output_tokens)
-    total_input = data.get("total_input_tokens")
-    total_output = data.get("total_output_tokens")
-    if total_input is not None or total_output is not None:
-        tok_sum = (total_input or 0) + (total_output or 0)
+    total_input = ctx_window.get("total_input_tokens")
+    total_output = ctx_window.get("total_output_tokens")
+    tok_sum = (total_input or 0) + (total_output or 0)
+    if tok_sum > 0:
         parts.append(f"{DIM}{_format_tokens(tok_sum)} tok{RST}")
 
     # API time
-    api_duration_ms = data.get("total_api_duration_ms")
+    api_duration_ms = cost_data.get("total_api_duration_ms")
     if api_duration_ms is not None:
         api_s = api_duration_ms // 1000
         parts.append(f"{DIM}api {api_s}s{RST}")
