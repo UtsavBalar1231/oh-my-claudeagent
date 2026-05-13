@@ -138,6 +138,33 @@ Hooks communicate via stdout JSON:
 {"hookSpecificOutput": {"hookEventName": "Stop", "decision": {"behavior": "block"}}}
 ```
 
+### bin/
+
+Added in v2.1.91 (changelog.md:895). Plugins can ship executable scripts or binaries under a `bin/` directory at the plugin root. Claude Code prepends that directory to the Bash tool's `PATH` for the duration of the session, so any executable placed there is available as a bare command without specifying a full path. Files must have the executable bit set (`chmod +x`) and a `#!/usr/bin/env bash` (or equivalent) shebang.
+
+OMCA ships:
+- `bin/omca-status` — print active boulder, evidence summary, F1-F4 status, and currently-running subagents
+- `bin/omca-doctor` — read-only health check (dependencies, settings, state directories, MCP server)
+
+Both scripts are invokable from any Bash tool call as bare commands: `omca-status` and `omca-doctor`. They read the project's `.omca/state/` and `~/.claude/settings.json` only, and never mutate state.
+
+### Monitors
+
+Added in v2.1.105 (changelog.md:640). Since v2.1.129 they must live under `"experimental": {}` in `plugin.json` or `claude plugin validate` will warn. Monitors are background processes defined in `monitors/monitors.json` that Claude Code starts automatically when the plugin is active. Each monitor entry specifies a `name`, a long-running `command` (e.g. `tail -F ./logs/error.log`), and an optional `description`; each stdout line is delivered to Claude as a notification during the session.
+
+OMCA does not currently adopt monitors — the hook-based context injection model covers all current context-delivery needs. The mechanism is documented here for future evaluation if real-time file-watch or external-event delivery is needed.
+
+```json
+// monitors/monitors.json (example — not currently used by OMCA)
+[
+  {
+    "name": "error-log",
+    "command": "tail -F ./logs/error.log",
+    "description": "Application error log"
+  }
+]
+```
+
 ---
 
 ## Getting Started
@@ -581,6 +608,29 @@ Copy agent files to `~/.claude/agents/` (user-scope agents retain it).
 
 ---
 
+## Environment Variables
+
+Key environment variables available to hooks, skills, and Bash tool commands.
+
+### `CLAUDE_CODE_SESSION_ID` (v2.1.132)
+
+The current session ID is injected into the Bash tool subprocess environment, matching the `session_id` value passed to hook scripts. Hook scripts already receive `CLAUDE_SESSION_ID` via the hook payload; this variable makes the same value available to any Bash command the model runs, useful for correlating log output or scoping per-session state without requiring a hook intermediary.
+
+### `CLAUDE_EFFORT` (v2.1.133)
+
+The active effort level (`low`, `medium`, `high`, `xhigh`, `max`) is injected into hook script environments and Bash tool subprocesses. Hook scripts can branch on effort to skip expensive operations when effort is `low`. Skills can reference `${CLAUDE_EFFORT}` in their content to communicate effort-aware instructions. Set the effort level via `/effort` or `--effort`.
+
+### `CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN` (v2.1.132)
+
+Set to `1` to opt out of the fullscreen alternate-screen renderer and keep the conversation in the terminal's native scrollback buffer. Useful for terminal multiplexers managing their own scrollback, or when capturing conversation output via pipe.
+
+```bash
+export CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1
+claude
+```
+
+---
+
 ## Managed Settings Boundary
 
 This plugin is not the policy authority. Managed settings own non-overridable org controls.
@@ -595,6 +645,7 @@ Important keys:
 | `allowManagedPermissionRulesOnly` | Allow only managed permission rules |
 | `allowManagedMcpServersOnly` | Allow only managed MCP servers |
 | `sandbox.failIfUnavailable` | Fail if sandbox cannot start (fail-closed posture) |
+| `parentSettingsBehavior` | (v2.1.133, managed settings only) Controls whether SDK/IDE parent-supplied managed settings apply when an admin-deployed managed tier is also present. `"first-wins"` (default): parent settings are dropped, admin tier wins. `"merge"`: parent settings apply under admin tier, filtered to tighten policy only. Has no effect when no admin tier is deployed. |
 
 Keep `teammateMode: "auto"` as the default collaboration baseline unless your org policy overrides it.
 
