@@ -106,6 +106,7 @@ Claude Code lifecycle events and provide:
 |-------|----------|
 | `SessionStart` | Lifecycle |
 | `UserPromptSubmit` | Lifecycle |
+| `UserPromptExpansion` | Lifecycle |
 | `SubagentStart` | Lifecycle |
 | `SubagentStop` | Lifecycle |
 | `PreToolUse` | Tool lifecycle |
@@ -531,6 +532,13 @@ the glob is Read, Written, or Edited, the rule content is injected as additional
 ---
 
 ## Keyword Activation
+
+Mode detection is dual-path:
+
+- **Free-text triggers** — `keyword-detector.sh` fires on `UserPromptSubmit`, pattern-matches the raw prompt text (e.g., "ralph don't stop"), and injects context.
+- **Slash-command triggers** — `slash-command-mode-detector.sh` fires on `UserPromptExpansion`, reads `command_name` directly (e.g., `oh-my-claudeagent:ralph`), and activates the corresponding mode without relying on the expanded body's wording. This is more reliable: mode activation works regardless of what the skill's SKILL.md body says.
+
+Both paths share the same `active-modes.json` schema and session-aware re-announce suppression (`mode_already_announced` / `mark_mode_announced` in `scripts/lib/common.sh`). If both fire for the same mode in the same session, the second invocation suppresses silently.
 
 The `keyword-detector.sh` hook fires on `UserPromptSubmit`, pattern-matches against
 known phrases, and injects context that triggers the corresponding skill.

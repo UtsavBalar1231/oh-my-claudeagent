@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] - 2026-05-13
+
+### Added
+- `UserPromptExpansion` hook adoption. Detects OMCA slash-command activation (e.g., `/oh-my-claudeagent:ralph`) directly via `command_name`, instead of text-matching the expanded prompt body. More reliable mode triggering.
+
+### Changed
+- Mode detection is now dual-path: free-text triggers (e.g., "ralph don't stop") still flow through `keyword-detector.sh` on `UserPromptSubmit`; slash-command triggers flow through the new `slash-command-mode-detector.sh` on `UserPromptExpansion`. Both share session-aware re-announce suppression via `mode_already_announced` / `mark_mode_announced` in `scripts/lib/common.sh`.
+
+### Deliberate non-adoptions
+- `plugin.json dependencies`: not applicable — OMCA's MCP server requirements (grep, context7) are HTTP servers, not plugins. The `dependencies` field accepts plugin-to-plugin references only. Documentation already lists the MCP requirements in `OMCA.md` and `omca-setup`.
+- `type: "prompt"` hook handlers: no compelling OMCA-specific use case. The v2.2.0 `PermissionDenied` retry coach already covers the main classification gap. Revisit when a future need surfaces.
+
 ## [2.2.1] - 2026-05-13
 
 ### Documentation
