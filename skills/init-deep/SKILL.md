@@ -1,6 +1,12 @@
 ---
 name: init-deep
-description: Generate hierarchical AGENTS.md files. Root + complexity-scored subdirectories.
+description: Generate hierarchical AGENTS.md files for a codebase (root + scored subdirectories).
+when_to_use: |
+  Use when:
+  - Starting work on a new or unfamiliar codebase
+  - AGENTS.md files are missing or stale
+  - User says "init deep", "generate AGENTS.md", or "document project structure"
+  - After a large refactor that changed directory layout
 user-invocable: true
 argument-hint: "[project path]"
 effort: medium

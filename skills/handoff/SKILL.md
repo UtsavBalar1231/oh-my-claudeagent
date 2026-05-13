@@ -1,6 +1,12 @@
 ---
 name: handoff
-description: Create a detailed context summary for continuing work in a new session. Use when context is getting long, session quality is degrading, or the context window is approaching capacity.
+description: Create a detailed context summary for seamless continuation in a new session.
+when_to_use: |
+  Use when:
+  - Context window is getting long or session quality is degrading
+  - Approaching context window capacity
+  - User says "handoff", "context is long", or "start fresh"
+  - Switching to a new Claude Code session mid-task
 user-invocable: true
 shell: bash
 argument-hint: optional notes about what to include

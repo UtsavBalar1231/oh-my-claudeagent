@@ -1,6 +1,12 @@
 ---
 name: omca-setup
-description: Configure ~/.claude/ for oh-my-claudeagent — injects orchestration block, checks deps, inspects setup state
+description: Configure ~/.claude/ for oh-my-claudeagent (deps check, block injection, settings, statusline).
+when_to_use: |
+  Use when:
+  - Installing or updating oh-my-claudeagent for the first time
+  - User says "setup omca", "configure omca", or "install oh-my-claudeagent"
+  - Diagnosing a broken or misconfigured plugin (--check, --doctor)
+  - Uninstalling the plugin (--uninstall)
 user-invocable: true
 shell: bash
 argument-hint: "[--uninstall | --check | --doctor]"

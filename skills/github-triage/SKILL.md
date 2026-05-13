@@ -1,6 +1,11 @@
 ---
 name: github-triage
-description: "Unified GitHub triage for issues AND PRs. 1 item = 1 background Agent (executor). Issues: answer questions from codebase, analyze bugs, assess features. PRs: review changes, assess merge safety. All parallel, all background."
+description: Parallel triage of open GitHub issues and PRs — one background executor per item, read-only.
+when_to_use: |
+  Use when:
+  - User wants to triage open GitHub issues or pull requests
+  - Batch analysis of bugs, feature requests, or PR merge safety is needed
+  - User says "triage issues", "review open PRs", or "what needs attention on GitHub"
 model: sonnet
 argument-hint: "[repo] [--issues-only | --prs-only]"
 effort: medium
