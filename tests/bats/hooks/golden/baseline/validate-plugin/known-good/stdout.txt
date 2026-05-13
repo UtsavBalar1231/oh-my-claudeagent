@@ -14,8 +14,8 @@
 [validate-plugin] PASS: ast-grep-server.py removed
 [validate-plugin] PASS: omca-state-server.py removed
 [validate-plugin] PASS: agent-metadata.json removed (OMCA-internal metadata fields deprecated)
-[validate-plugin] PASS: version consistency: plugin.json and marketplace.json both at 2.2.1
-[validate-plugin] PASS: migration marker: hard-cutover mode active at plugin=2.2.1, marketplace=2.2.1
+[validate-plugin] PASS: version consistency: plugin.json and marketplace.json both at 2.3.0
+[validate-plugin] PASS: migration marker: hard-cutover mode active at plugin=2.3.0, marketplace=2.3.0
 [validate-plugin] PASS: latest hook lifecycle coverage includes ConfigChange
 [validate-plugin] PASS: latest hook lifecycle coverage includes InstructionsLoaded
 [validate-plugin] PASS: latest hook lifecycle coverage includes Notification
