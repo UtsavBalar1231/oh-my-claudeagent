@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-05-13
+
+v2.1.0 ships three focused features that prevent the "stuck OMCA state" failure mode where `ralph` / `ultrawork` / `boulder` modes can remain active across sessions after a campaign completes, plus harden the MCP server's cold-start invariant.
+
+### Added
+
+- **Plan-completion auto-deactivation**: When `boulder_progress` reports `is_complete=true` AND the evidence log contains a matching F4 APPROVE entry for the active plan's SHA-256, the plugin now automatically clears `ralph`, `ultrawork`, `boulder`, and `final_verify` modes. Evidence is preserved (audit trail). Implementation extracts `_load_evidence()` and `_clear_mode_files()` helpers to `servers/tools/_common.py` so the MCP `evidence_read` tool wrapper and the new auto-deactivate path share the same loader, avoiding decorator side-effects and recursion. Fail-safe: `boulder_progress` never raises -- if `_load_evidence()` fails, the response carries `reason: "evidence_read_failed"`. F1/F2/F3 entries alone do NOT trigger auto-clear; only F4 APPROVE does. (`servers/tools/boulder.py`, `servers/tools/_common.py`, `servers/tools/evidence.py`)
+- **Stale `.in_use` PID marker garbage collection at session-init**: Claude Code's plugin runtime writes `${CLAUDE_PLUGIN_ROOT}/.in_use/<pid>` markers per active session and removes them on clean exit. On crash or kill, markers strand and the `.in_use/` directory accumulates dead-PID files over time. The new `scripts/gc-in-use-markers.sh` runs as the FIRST `SessionStart` hook (before `session-init.sh`), walks the marker directory, and removes files whose PID is no longer alive. Platform-branched liveness: Linux uses `/proc/<pid>`, macOS uses `kill -0`, Windows is deferred with a `TODO(windows-liveness)` marker. Always exits 0 so GC failure cannot block session-init. (`scripts/gc-in-use-markers.sh`, `hooks/hooks.json`)
+- **Startup-latency regression test for the MCP server**: New pytest test (`servers/tests/test_startup_latency.py`) times the gap between `omca-mcp.py` spawn and first `initialize` RPC reply, asserts <500ms on warm cache, skips gracefully on cold cache. Acts as a perpetual regression-guard against accidentally moving I/O-bound init (`ast_tools.discover_binary`, signal handlers, tool registration) after `mcp.run()` enters its RPC loop -- which would surface to users as transient "MCP server 'omca' not connected" PreToolUse hook errors at session start. (`servers/tests/test_startup_latency.py`)
+- **Server startup-ordering invariant documentation**: `docs/design/cold-start-ordering.md` documents the audit finding that all I/O-bound init currently runs synchronously BEFORE `mcp.run()` (the correct order), and codifies the invariant for future contributors. A one-line invariant comment in `omca-mcp.py` above the `__main__` guard points at the design doc. (`docs/design/cold-start-ordering.md`, `servers/omca-mcp.py`)
+- **Design notes for all three features**: `docs/design/cold-start-ordering.md`, `docs/design/stale-marker-gc.md`, `docs/design/auto-deactivate.md`. Each captures the audit / design rationale, acceptance criteria, and the closed decisions that future maintainers should not re-litigate.
+
+### Fixed
+
+- **Misleading `_SG_BIN` module comment**: The module-level `_SG_BIN` reference at `servers/tools/ast.py:131` previously claimed to be "set by `register()`" -- it is actually set by `set_sg_bin()` from the entry point after `discover_binary()` resolves a path. Comment now reflects reality. (`servers/tools/ast.py`)
+
+### Tooling
+
+- **`servers/omca-mcp.py` marked executable**: The file has a `#!/usr/bin/env python3` shebang but was tracked as non-executable in git, which the `check-shebang-scripts-are-executable` pre-commit hook now catches as Wave 2 changes touched the file. Aligned the file mode with its declared intent.
+
 ## [2.0.0] - 2026-04-24
 
 v2.0.0 is the depth-0 orchestration cutover: `commands/` replaces orchestration skills, `executor` replaces `sisyphus-junior`, `atlas`/`socrates`/`triage` agents are removed, and the `omca-state` and `ast-grep` MCP servers are consolidated into a single `omca` server.
