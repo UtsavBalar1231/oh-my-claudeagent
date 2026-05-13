@@ -151,6 +151,16 @@
 				]
 			}
 		],
+		"PermissionDenied": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/permission-denied-coach.sh"
+					}
+				]
+			}
+		],
 		"PostToolUse": [
 			{
 				"matcher": "AskUserQuestion",
