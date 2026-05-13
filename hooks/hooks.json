@@ -48,6 +48,16 @@
 				]
 			}
 		],
+		"UserPromptExpansion": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/slash-command-mode-detector.sh"
+					}
+				]
+			}
+		],
 		"SubagentStart": [
 			{
 				"hooks": [
