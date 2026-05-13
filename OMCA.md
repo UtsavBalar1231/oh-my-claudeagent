@@ -20,11 +20,13 @@ Delegate to specialists, verify with evidence, ship with confidence. Core loop: 
 
 ## Ownership Model
 
-**Claude-native**: plan mode, memory, hooks, plugin schema, permissions, sandboxing, subagents, teams.
+**Claude-native**: plan mode, memory, hooks, plugin schema, permissions, sandboxing, subagents, teams, `claude agents` agent view (Research Preview, v2.1.139+), `/goal` completion-condition loop (v2.1.139+).
 
 **OMCA**: agent prompts, orchestration policy, skill prompts, keyword activation, verification discipline, `omca` MCP server, session persistence (ralph, ultrawork), execution metadata in `.omca/state/` and `.omca/logs/`.
 
 Both `.omca/plans/` and native plan files valid. Prometheus generates to `.omca/plans/`; Claude-native plan mode works alongside.
+
+**`/goal` vs OMCA persistence loops**: `/goal` is a lighter-weight native completion-condition loop. OMCA's `ralph`, `ultrawork`, and `/oh-my-claudeagent:ulw-loop` carry the Final Verification Wave (F1-F4 evidence-discipline) that `/goal` does not. Use `/goal` for quick "keep working until X" tasks; use OMCA loops when work needs evidence-gated completion.
 
 **Channels**: Not used — OMCA focuses on in-session orchestration via hooks, subagents, skills.
 
