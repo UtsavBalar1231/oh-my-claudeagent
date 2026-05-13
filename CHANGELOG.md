@@ -5,6 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-05-13
+
+v2.2.0 ships platform-sync improvements: a `PermissionDenied` retry-coach hook, statusline token-count fixes aligned to the v2.1.132 schema, new agent `color:` and `background:` frontmatter across all 10 agents, two new `bin/` utilities (`omca-status`, `omca-doctor`), and documentation catch-up for new platform settings keys and env vars.
+
+### Added
+
+- **`PermissionDenied` retry-coach hook handler** — coaches the model after auto-mode-classifier denials with `{retry: true}` and an `additionalContext` hint for known-recoverable Bash patterns.
+- **`subagentStatusLine` plugin-level default** at `<plugin-root>/settings.json`, backed by `bin/omca-subagent-statusline`. Renders per-row token counts and task type in the subagent panel.
+- **`bin/omca-status`** — print active boulder, evidence summary, F1-F4 status, and currently-running subagents from any Bash tool call.
+- **`bin/omca-doctor`** — standalone read-only health check (dependencies, settings, state directories, CLAUDE.md migration state). Mirrors the `/oh-my-claudeagent:omca-setup --doctor` checks without invoking the slash command.
+- **`color:` and `background:` on agent frontmatter** across all 10 agents (`background: true` only on `explore` + `librarian`). Color table recorded in `.claude/rules/agent-conventions.md`.
+- **`when_to_use:` field** separated from `description:` on 5 user-facing skills (handoff, hephaestus, init-deep, omca-setup, github-triage).
+
+### Changed
+
+- **`explore` and `librarian` agents** now declare `background: true` in frontmatter (always run as background tasks). Callers no longer need to pass `run_in_background=true` explicitly for these two agents.
+
+### Fixed
+
+- **Statusline token-count display** reads from `context_window.total_input_tokens` and `context_window.total_output_tokens` per the v2.1.132 schema (was reading from top-level keys that the platform never emits, silently suppressing the token display on Line 2).
+- **`statusline/types.py`** no longer declares phantom top-level `total_input_tokens`, `total_output_tokens`, `total_api_duration_ms` fields. These now live under their correct nested objects.
+
+### Documentation
+
+- **Hook output cap** clarified at 50,000 characters (was 10,000 — the figure on `docs/hooks.md:641` is out of date; changelog is authoritative).
+- **New settings keys** documented in OMCA.md / CLAUDE.md: `parentSettingsBehavior`, `autoMode.hard_deny`, `autoMode.$defaults`, `worktree.symlinkDirectories`, `worktree.sparsePaths`, `sandbox.network.deniedDomains`, `statusLine.refreshInterval`.
+- **New env vars** documented in OMCA.md: `CLAUDE_CODE_SESSION_ID` (Bash subprocess), `CLAUDE_EFFORT`, `CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN`.
+- **Plugin `bin/` (v2.1.91) and `monitors/` (v2.1.105) features** documented in OMCA.md `## Core Concepts`. Monitors are documented but not adopted.
+- **`bin/` directory version pin** recorded in `.omca/notes/bin-directory-version-pin.md`.
+
+### Verified (no-op confirmations)
+
+- **H-4** `watchPaths` emission in `scripts/lifecycle-state.sh` is platform-consumed per `docs/hooks.md:1976` and `:2017`. Correctly wired on both CwdChanged and FileChanged events.
+- **H-15** `alwaysLoad: true` adoption backed by reproducible startup-time bench (`servers/tests/test_startup_time.py`): warm p95=0.287s, well under the 2.0s threshold and far under the platform's 5s startup cap.
+- **C-5** `scripts/agent-usage-reminder.sh` correctly unions `active-agents.json` and `subagents.json` to avoid race-window undercounts.
+- **H-21** bats stderr-assertion audit: all 14 patterns in `tests/bats/hooks/` survive v2.1.98's stderr-visibility change.
+
+### Deliberate non-adoptions
+
+- **`maxTurns:` agent frontmatter**: attempted during this release, reverted after user observed practical issues. Color and background fields ship. Revisit when the failure mode is better understood.
+- **`monitors/` plugin manifest**: documented in OMCA.md as a future-evaluation surface but explicitly NOT adopted in v2.2.0. Rationale: OMCA's current hook-based context injection covers every observed context-delivery need. Adopting would introduce a background-process surface that overlaps the hook taxonomy without a concrete demand signal.
+
 ## [2.1.0] - 2026-05-13
 
 v2.1.0 ships three focused features that prevent the "stuck OMCA state" failure mode where `ralph` / `ultrawork` / `boulder` modes can remain active across sessions after a campaign completes, plus harden the MCP server's cold-start invariant.
