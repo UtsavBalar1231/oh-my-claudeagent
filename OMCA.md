@@ -659,6 +659,23 @@ Force-enables synchronized output on terminals where auto-detection misses (nota
 
 ---
 
+## Observability and OTEL Attribution
+
+### Subagent attribution (v2.1.139+)
+
+Subagent API requests carry two request headers, and `claude_code.llm_request` OTEL spans carry the matching span attributes:
+
+| Surface | Field | Meaning |
+|---|---|---|
+| HTTP header | `x-claude-code-agent-id` | This subagent's agent ID |
+| HTTP header | `x-claude-code-parent-agent-id` | The spawning agent's ID (main session or the subagent's parent) |
+| OTEL span attribute | `agent_id` | Same as the `x-claude-code-agent-id` header |
+| OTEL span attribute | `parent_agent_id` | Same as the `x-claude-code-parent-agent-id` header |
+
+OMCA does not configure OTEL by default. With an OTEL collector wired up, subagent token usage and latency can be attributed to specific OMCA agents (sisyphus, prometheus, executor, oracle, explore, etc.) instead of one undifferentiated `claude_code.llm_request` stream.
+
+---
+
 ## Managed Settings Boundary
 
 This plugin is not the policy authority. Managed settings own non-overridable org controls.
