@@ -1,8 +1,10 @@
 """Boulder work plan tracking and mode management tools."""
 
+import hashlib
 import json
 import os
 import re
+import sys
 import time
 from typing import Literal
 
@@ -10,15 +12,65 @@ from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 
 from tools._common import (
+    _MODE_FILES,
     BOULDER_FILE,
     EVIDENCE_FILE,
-    PENDING_FINAL_VERIFY_FILE,
     RALPH_STATE_FILE,
     ULTRAWORK_STATE_FILE,
+    _clear_mode_files,
+    _load_evidence,
     _read_json,
     _state_dir,
     _write_json,
 )
+
+
+def _has_f4_approve(entries: list[dict], active_plan_sha: str) -> bool:
+    """Return True if any evidence entry is an F4 APPROVE for the given plan SHA."""
+    for entry in entries:
+        if entry.get("plan_sha256", "") != active_plan_sha:
+            continue
+        if not entry.get("type", "").startswith("final_verification_f4"):
+            continue
+        if entry.get("exit_code", -1) == 0:
+            return True
+        snippet = entry.get("output_snippet", "").upper()
+        if "APPROVE" in snippet or "APPROVED" in snippet:
+            return True
+    return False
+
+
+def _maybe_auto_deactivate(
+    state: str,
+    active_plan_sha256: str,
+    working_directory: str,
+) -> dict:
+    """
+    If F4 APPROVE evidence matches active plan, clear ralph/ultrawork/boulder/
+    final_verify and return {auto_deactivated: True, cleared: [...]}.
+    Never raises; always returns a dict safe to merge into boulder_progress result.
+    """
+    try:
+        entries = _load_evidence(state)
+    except Exception:
+        return {"auto_deactivated": False, "reason": "evidence_read_failed"}
+
+    if not _has_f4_approve(entries, active_plan_sha256):
+        return {"auto_deactivated": False, "reason": "no_matching_f4_approve"}
+
+    try:
+        cleared = _clear_mode_files(
+            state, ["ralph", "ultrawork", "boulder", "final_verify"]
+        )
+    except Exception:
+        return {"auto_deactivated": False, "reason": "internal_error"}
+
+    print(
+        "omca: plan complete + F4 APPROVE detected; auto-cleared "
+        "ralph/ultrawork/boulder/final_verify modes",
+        file=sys.stderr,
+    )
+    return {"auto_deactivated": True, "cleared": cleared}
 
 
 def register(mcp: FastMCP) -> None:
@@ -93,6 +145,8 @@ def register(mcp: FastMCP) -> None:
                 indent=2,
             )
 
+        active_plan_sha256 = hashlib.sha256(content.encode()).hexdigest()
+
         matches = re.findall(r"^- \[([ x])\] \d+\.", content, re.MULTILINE)
         total = len(matches)
         completed = sum(1 for m in matches if m == "x")
@@ -105,6 +159,13 @@ def register(mcp: FastMCP) -> None:
             "is_complete": remaining == 0 and total > 0,
             "plan_path": plan_path,
         }
+
+        if result["is_complete"]:
+            state = _state_dir(working_directory)
+            result.update(
+                _maybe_auto_deactivate(state, active_plan_sha256, working_directory)
+            )
+
         return json.dumps(result, indent=2)
 
     @mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
@@ -179,39 +240,28 @@ def register(mcp: FastMCP) -> None:
         """Clear active mode state files. Use when ending a work session, cancelling ralph/ultrawork persistence, or resetting plan state. 'all' clears ralph + ultrawork + boulder + final_verify but NOT evidence (evidence is permanent audit trail). Returns summary of cleared and skipped state files."""
         state = _state_dir(working_directory)
 
-        targets: list[tuple[str, str]] = []
-        if mode == "ralph":
-            targets = [("ralph", RALPH_STATE_FILE)]
-        elif mode == "ultrawork":
-            targets = [("ultrawork", ULTRAWORK_STATE_FILE)]
-        elif mode == "boulder":
-            targets = [("boulder", BOULDER_FILE)]
-        elif mode == "evidence":
-            targets = [("evidence", EVIDENCE_FILE)]
-        elif mode == "final_verify":
-            targets = [("final_verify", PENDING_FINAL_VERIFY_FILE)]
-        else:  # all
-            targets = [
-                ("ralph", RALPH_STATE_FILE),
-                ("ultrawork", ULTRAWORK_STATE_FILE),
-                ("boulder", BOULDER_FILE),
-                ("final_verify", PENDING_FINAL_VERIFY_FILE),
-            ]
+        if mode == "all":
+            mode_list = ["ralph", "ultrawork", "boulder", "final_verify"]
+        else:
+            mode_list = [mode]
 
-        cleared: list[str] = []
-        skipped: list[str] = []
+        # Collect which modes exist before clearing (for "was active/inactive" status)
+        active_status: dict[str, str] = {}
+        for label in mode_list:
+            filename = _MODE_FILES.get(label)
+            if filename:
+                data = _read_json(os.path.join(state, filename))
+                active_status[label] = "was active" if bool(data) else "was inactive"
 
-        for label, filename in targets:
-            path = os.path.join(state, filename)
-            try:
-                # Check if active before removing
-                data = _read_json(path)
-                was_active = bool(data)
-                os.remove(path)
-                status = "was active" if was_active else "was inactive"
-                cleared.append(f"{label} ({status})")
-            except FileNotFoundError:
-                skipped.append(f"{label} (not found)")
+        cleared_labels = _clear_mode_files(state, mode_list)
+        cleared_set = set(cleared_labels)
+
+        cleared: list[str] = [
+            f"{label} ({active_status.get(label, '')})" for label in cleared_labels
+        ]
+        skipped: list[str] = [
+            f"{label} (not found)" for label in mode_list if label not in cleared_set
+        ]
 
         parts: list[str] = []
         if cleared:

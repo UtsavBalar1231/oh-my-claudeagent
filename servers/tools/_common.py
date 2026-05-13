@@ -75,3 +75,38 @@ def _list_notepad_sections(directory: str) -> list[str]:
     """List notepad section names in a directory."""
     files = sorted(f for f in os.listdir(directory) if f.endswith(".md"))
     return [f.removesuffix(".md") for f in files]
+
+
+def _load_evidence(state_dir: str) -> list[dict]:
+    """Return evidence entries list; empty list on any failure."""
+    path = os.path.join(state_dir, EVIDENCE_FILE)
+    try:
+        data = _read_json(path)
+        return data.get("entries", [])
+    except Exception:
+        return []
+
+
+_MODE_FILES: dict[str, str] = {
+    "ralph": RALPH_STATE_FILE,
+    "ultrawork": ULTRAWORK_STATE_FILE,
+    "boulder": BOULDER_FILE,
+    "final_verify": PENDING_FINAL_VERIFY_FILE,
+    "evidence": EVIDENCE_FILE,
+}
+
+
+def _clear_mode_files(state: str, modes: list[str]) -> list[str]:
+    """Remove state files for the named modes; return list of actually-cleared mode names."""
+    cleared: list[str] = []
+    for label in modes:
+        filename = _MODE_FILES.get(label)
+        if not filename:
+            continue
+        path = os.path.join(state, filename)
+        try:
+            os.remove(path)
+            cleared.append(label)
+        except FileNotFoundError:
+            pass
+    return cleared
