@@ -631,6 +631,18 @@ export CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1
 claude
 ```
 
+### `CLAUDE_CODE_FORK_SUBAGENT` (v2.1.119)
+
+Set to `1` to enable forked subagents in non-interactive sessions. When forked, subagents inherit the FULL conversation context of the parent session instead of starting fresh. Useful for orchestration patterns where the subagent needs the orchestrator's accumulated context (e.g., a verifier reviewing the same payload the orchestrator just produced) without an explicit handoff prompt. Off by default on external builds; opt in per session.
+
+### `ENABLE_PROMPT_CACHING_1H` (v2.1.108)
+
+Set to `1` to opt API key, Bedrock, Vertex, and Foundry callers into the 1-hour prompt cache TTL (vs. the default 5-minute). Cuts cost on workflows with stable system prompts that get reused across many turns within an hour. OMCA orchestration falls into this pattern — the output-style body is identical for every session. Worth setting in user `~/.claude/settings.json` `env` block for cost-sensitive deployments.
+
+### `CLAUDE_CODE_FORCE_SYNC_OUTPUT` (v2.1.129)
+
+Force-enables synchronized output on terminals where auto-detection misses (notably Emacs `eat`). Reduces rendering glitches on rare terminal emulators. Set when you observe corrupted output or torn updates.
+
 ---
 
 ## Managed Settings Boundary
@@ -648,6 +660,8 @@ Important keys:
 | `allowManagedMcpServersOnly` | Allow only managed MCP servers |
 | `sandbox.failIfUnavailable` | Fail if sandbox cannot start (fail-closed posture) |
 | `parentSettingsBehavior` | (v2.1.133, managed settings only) Controls whether SDK/IDE parent-supplied managed settings apply when an admin-deployed managed tier is also present. `"first-wins"` (default): parent settings are dropped, admin tier wins. `"merge"`: parent settings apply under admin tier, filtered to tighten policy only. Has no effect when no admin tier is deployed. |
+| `sandbox.bwrapPath` | (v2.1.133, managed settings only, Linux/WSL) Absolute path to a custom `bubblewrap` binary used for sandboxed Bash execution. Override when the system `bwrap` is missing, too old, or replaced by a hardened build. |
+| `sandbox.socatPath` | (v2.1.133, managed settings only, Linux/WSL) Absolute path to a custom `socat` binary. Companion to `bwrapPath` — used by the sandbox's networking proxy. Override under the same conditions. |
 
 Keep `teammateMode: "auto"` as the default collaboration baseline unless your org policy overrides it.
 

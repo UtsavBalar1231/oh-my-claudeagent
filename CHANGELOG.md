@@ -143,7 +143,7 @@ v2.0.0 is the depth-0 orchestration cutover: `commands/` replaces orchestration 
 - **Hook `PreToolUse`/`PostToolUse` matcher narrowed from `Task|Agent` to `Agent`**: Reduces unnecessary hook firing on Task tool events. (`hooks/hooks.json`)
 - **Effort frontmatter added to all agents and 14 skills**: `effort:` field added to agent and skill frontmatter for task-list cost estimation. (`agents/*.md`, `skills/*/SKILL.md`)
 - **`omca-setup` skill updated**: MCP permission namespace corrected; `--doctor` mode added for diagnosing configuration issues. (`skills/omca-setup/`)
-- **`maxTurns` removed from all 12 agent definitions**: Turn limits removed; agents rely on their own stop conditions and the verification protocol. (`agents/*.md`)
+- **`maxTurns` removed from all 10 agent definitions**: Turn limits removed; agents rely on their own stop conditions and the verification protocol. (`agents/*.md`)
 
 ### Security
 
@@ -421,7 +421,7 @@ v2.0.0 is the depth-0 orchestration cutover: `commands/` replaces orchestration 
   Emits warning when ralph/ultrawork persistence mode was interrupted. StopFailure output
   and exit code are ignored by Claude Code — this is a permanent known limitation for
   persistence modes (users must manually resume after API errors)
-- **Effort frontmatter for agents**: all 12 agents gain `effort:` field — oracle=max,
+- **Effort frontmatter for agents**: all 10 agents gain `effort:` field — oracle=max,
   opus agents=high, sonnet agents=medium. Overrides session effort level per agent for
   cost/quality tuning
 - **Effort frontmatter for skills**: 14 of 20 skills gain `effort:` field — 9 high
@@ -549,7 +549,7 @@ v2.0.0 is the depth-0 orchestration cutover: `commands/` replaces orchestration 
 
 ### Changed
 
-- **Removed maxTurns from all 12 agents**: agents manage their own turn budget instead
+- **Removed maxTurns from all 10 agents**: agents manage their own turn budget instead
   of hard cutoffs; output mandate and failure conditions provide the safety net
 - **Improved empty-task-response detection**: threshold raised from 10 to 50 chars,
   added transitional pattern regex (detects "Let me...", "I'll...", etc. in short
