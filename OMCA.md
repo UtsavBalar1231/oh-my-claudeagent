@@ -195,6 +195,20 @@ After installing, run `/oh-my-claudeagent:omca-setup`. This checks dependencies 
 offers to apply permission rules, and prints a health report. Use `--check` for read-only
 health check, `--uninstall` to remove.
 
+### Plugin lifecycle commands
+
+| Command | Use case |
+|---|---|
+| `claude plugin install <name>` | Install a plugin from a known marketplace |
+| `claude plugin details <name>` | (v2.1.139+) Show a plugin's component inventory and projected per-session token cost — useful before installing or for diffing cost across versions |
+| `claude plugin list` | List installed plugins; surfaces folder-shadow warnings introduced in v2.1.140 |
+| `claude plugin tag <plugin> <tag>` | Tag an installed plugin version |
+| `claude plugin prune` | Remove unused cached plugin versions |
+| `claude project purge` | Remove cached plugin state for the current project |
+| `claude --prune` | Cascade prune: plugins + transitive dependencies |
+
+Run `claude plugin details oh-my-claudeagent` before a major release to capture the pre-bump token-cost projection; compare against the post-bump value to spot accidental cost regressions.
+
 ### Team Setup
 
 Add to `.claude/settings.json` for automatic team-wide installation:
