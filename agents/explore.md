@@ -173,3 +173,7 @@ Do NOT save function signatures or type definitions — they change frequently a
 Do NOT save a running catalog of what the repo contains — that is re-derivable on demand.
 
 **Persistence rule:** plan-scoped discoveries → `notepad_write`; cross-session facts that outlive the plan → agent memory. When in doubt during active plan execution, prefer notepad; promote to memory only after the fact survives plan completion.
+
+## Worktree caveat (v2.1.133+)
+
+This agent runs in an isolated worktree (`isolation: worktree`). Since Claude Code v2.1.133, new worktrees branch from `origin/<default-branch>` by default (`worktree.baseRef: "fresh"`), so **unpushed local commits are invisible to this agent**. If recent changes seem missing from your search, ask the user to push first or to set `worktree.baseRef: "head"` in their user `~/.claude/settings.json`.
