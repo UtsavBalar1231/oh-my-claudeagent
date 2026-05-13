@@ -41,6 +41,7 @@ def _graceful_exit(_signum, _frame):
 
 signal.signal(signal.SIGTERM, _graceful_exit)
 
+# I/O init (discover_binary) must stay before mcp.run(). See docs/design/cold-start-ordering.md.
 if __name__ == "__main__":
     sg_bin = ast_tools.discover_binary()
     ast_tools.set_sg_bin(sg_bin)

@@ -128,7 +128,7 @@ def discover_binary() -> str:
     sys.exit(1)
 
 
-# Module-level binary reference — set by register()
+# Module-level binary reference — set by set_sg_bin() in the entry point after discover_binary() resolves a path.
 _SG_BIN: str | None = None
 
 
