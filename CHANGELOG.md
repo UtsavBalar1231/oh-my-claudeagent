@@ -5,6 +5,56 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0] - 2026-05-13
+
+Tracks Claude Code v2.1.133–v2.1.140. The v2.1.132/v2.1.133/v2.1.136 surface was already
+covered by v2.2.0/v2.2.1/v2.3.0; v2.4.0 picks up the v2.1.139 + v2.1.140 deltas (hook
+`args:` exec form, `continueOnBlock`, `${CLAUDE_PROJECT_DIR}` in MCP stdio, subagent OTEL
+headers, case-insensitive `subagent_type`, plugin folder-shadow warnings) and adds a
+user-facing `worktree.baseRef "fresh"` data-loss warning to README + explore/librarian
+agents.
+
+### Added
+- `scripts/postedit-format-and-lint.sh` — extracted from the inline `bash -c` blob
+  previously embedded in `.claude/settings.json` PostToolUse Write|Edit. Now invoked via
+  `args:` exec form (v2.1.139+), so path placeholders pass through verbatim with no
+  shell quoting.
+
+### Changed
+- `.claude/settings.json` PostToolUse Write|Edit hook now uses `args:` exec form
+  (v2.1.139+).
+- `.claude-plugin/plugin.json` no longer declares `outputStyles: "./output-styles/"` —
+  the default folder is auto-discovered and the explicit declaration triggered a
+  v2.1.140 redundancy warning.
+- `explore` and `librarian` agent bodies warn that isolated worktrees branch from
+  `origin/<default-branch>` by default (v2.1.133), so unpushed local commits are
+  invisible to those subagents.
+- README.md surfaces the same `worktree.baseRef` heads-up to users.
+
+### Documentation
+- `OMCA.md`: added `${CLAUDE_PROJECT_DIR}` plugin/MCP-stdio env (v2.1.139), subagent
+  OTEL attribution headers `x-claude-code-agent-id` / `x-claude-code-parent-agent-id`
+  (v2.1.139), Plugin lifecycle commands table including `claude plugin details`
+  (v2.1.139), `claude agents` agent view + `/goal` non-adoption note (v2.1.139),
+  `ANTHROPIC_API_KEY` Remote-Control/notifications mutex (v2.1.139).
+- `.claude/rules/hook-scripts.md`: `args:` exec-form usage notes, `continueOnBlock`
+  PostToolUse option (PROVISIONAL — release-notes-only at plan-write time; re-verified
+  at execution).
+- `.claude/rules/agent-conventions.md`: case-insensitive `subagent_type` matching
+  (v2.1.140); canonical lowercase-kebab form reaffirmed for OMCA delegation; v140 color
+  palette re-verification comment (palette unchanged).
+
+### Deliberate non-adoptions
+- `/goal` command (v2.1.139): overlaps with OMCA `ralph` / `ultrawork` /
+  `/oh-my-claudeagent:ulw-loop`. OMCA loops carry F1-F4 evidence discipline that
+  `/goal` does not. Documented as a co-existing native primitive, not adopted.
+- `claude agents` agent view (v2.1.139): Research Preview only; documentation-only
+  mention in the ownership model.
+- `/scroll-speed` (v2.1.139): pure UX, no OMCA surface.
+- `claude --bg` (v2.1.140 fixes): background-session UX, not an agent/hook surface.
+- `type: "agent"` / `type: "http"` hook handlers: still experimental, consistent with
+  prior version exclusions.
+
 ## [2.3.0] - 2026-05-13
 
 ### Added
