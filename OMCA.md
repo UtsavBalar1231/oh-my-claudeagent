@@ -626,6 +626,12 @@ Key environment variables available to hooks, skills, and Bash tool commands.
 
 The current session ID is injected into the Bash tool subprocess environment, matching the `session_id` value passed to hook scripts. Hook scripts already receive `CLAUDE_SESSION_ID` via the hook payload; this variable makes the same value available to any Bash command the model runs, useful for correlating log output or scoping per-session state without requiring a hook intermediary.
 
+### `CLAUDE_PROJECT_DIR` (v2.1.139)
+
+Absolute path to the active project root. Hooks already received this value; v2.1.139 extends it to MCP stdio servers and to plugin command/`args:` strings, where `${CLAUDE_PROJECT_DIR}` is substituted at exec time. Use it for project-scoped paths in `.claude/settings.json` hook entries (the plugin's own hooks in `hooks/hooks.json` should keep using `${CLAUDE_PLUGIN_ROOT}`, which resolves to the installed plugin root and survives marketplace cache refreshes).
+
+The bundled `omca` MCP stdio server inherits this variable through its environment; it reads state from `${HOOK_PROJECT_ROOT}` (set in `scripts/lib/common.sh`) rather than `${CLAUDE_PROJECT_DIR}` to preserve user overrides of the state directory. Renaming the internal variable is a separate concern with backward-compatibility implications and is not in scope here.
+
 ### `CLAUDE_EFFORT` (v2.1.133)
 
 The active effort level (`low`, `medium`, `high`, `xhigh`, `max`) is injected into hook script environments and Bash tool subprocesses. Hook scripts can branch on effort to skip expensive operations when effort is `low`. Skills can reference `${CLAUDE_EFFORT}` in their content to communicate effort-aware instructions. Set the effort level via `/effort` or `--effort`.
