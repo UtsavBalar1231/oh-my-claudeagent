@@ -14,8 +14,8 @@
 [validate-plugin] PASS: ast-grep-server.py removed
 [validate-plugin] PASS: omca-state-server.py removed
 [validate-plugin] PASS: agent-metadata.json removed (OMCA-internal metadata fields deprecated)
-[validate-plugin] PASS: version consistency: plugin.json and marketplace.json both at 2.1.0
-[validate-plugin] PASS: migration marker: hard-cutover mode active at plugin=2.1.0, marketplace=2.1.0
+[validate-plugin] PASS: version consistency: plugin.json and marketplace.json both at 2.2.0
+[validate-plugin] PASS: migration marker: hard-cutover mode active at plugin=2.2.0, marketplace=2.2.0
 [validate-plugin] PASS: latest hook lifecycle coverage includes ConfigChange
 [validate-plugin] PASS: latest hook lifecycle coverage includes InstructionsLoaded
 [validate-plugin] PASS: latest hook lifecycle coverage includes Notification
@@ -45,12 +45,12 @@
 [validate-plugin] PASS: skill description length: dev-browser description is 183 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: frontend-ui-ux description is 156 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: git-master description is 202 chars (within 512 soft cap)
-[validate-plugin] PASS: skill description length: github-triage description is 226 chars (within 512 soft cap)
-[validate-plugin] PASS: skill description length: handoff description is 182 chars (within 512 soft cap)
-[validate-plugin] PASS: skill description length: hephaestus description is 85 chars (within 512 soft cap)
-[validate-plugin] PASS: skill description length: init-deep description is 79 chars (within 512 soft cap)
+[validate-plugin] PASS: skill description length: github-triage description is 94 chars (within 512 soft cap)
+[validate-plugin] PASS: skill description length: handoff description is 77 chars (within 512 soft cap)
+[validate-plugin] PASS: skill description length: hephaestus description is 78 chars (within 512 soft cap)
+[validate-plugin] PASS: skill description length: init-deep description is 84 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: metis description is 109 chars (within 512 soft cap)
-[validate-plugin] PASS: skill description length: omca-setup description is 109 chars (within 512 soft cap)
+[validate-plugin] PASS: skill description length: omca-setup description is 95 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: playwright description is 192 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: refactor description is 95 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: stop-continuation description is 177 chars (within 512 soft cap)
