@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "Multi-agent orchestration plugins for Claude Code",
-    "version": "2.2.0"
+    "version": "2.2.1"
   },
   "plugins": [
     {
@@ -17,7 +17,7 @@
         "sha": "97d85a4442e3b7fb8b99700e766c75fe8318068f"
       },
       "description": "Multi-agent orchestration for Claude Code. Specialist agents handle planning, execution, code review, debugging, and research with evidence-based verification.",
-      "version": "2.2.0",
+      "version": "2.2.1",
       "author": {
         "name": "UtsavBalar1231",
         "email": "utsavbalar1231@gmail.com"
