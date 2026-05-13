@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# omca-doctor — Read-only health check for OMCA setup.
+# Mirrors the --doctor mode of /oh-my-claudeagent:omca-setup but standalone.
+# Exit 0 if all PASS/WARN, exit 1 if any FAIL. Never mutates state.
+
+PASS=0; FAIL=0; WARN=0
+status() {
+    case "$1" in
+        PASS) PASS=$((PASS+1)) ;;
+        FAIL) FAIL=$((FAIL+1)) ;;
+        WARN) WARN=$((WARN+1)) ;;
+    esac
+    printf '  %-4s %s\n' "$1" "$2"
+}
+
+echo '=== Dependencies ==='
+for b in jq uv python3; do
+    if command -v "$b" >/dev/null 2>&1; then
+        status PASS "$b $("$b" --version 2>&1 | head -1 | awk '{print $NF}')"
+    else
+        status FAIL "$b not found"
+    fi
+done
+if command -v ast-grep >/dev/null 2>&1; then
+    status PASS "ast-grep $(ast-grep --version 2>&1 | head -1 | awk '{print $NF}')"
+elif command -v sg >/dev/null 2>&1; then
+    status PASS "sg (ast-grep) $(sg --version 2>&1 | head -1 | awk '{print $NF}')"
+else
+    status WARN "ast-grep not found (structural code search unavailable)"
+fi
+echo
+
+PROJECT_ROOT="${HOOK_PROJECT_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+echo '=== State directories ==='
+for d in .omca/state .omca/logs; do
+    if [ -d "$PROJECT_ROOT/$d" ]; then
+        status PASS "$d"
+    else
+        status WARN "$d (will be created on next session)"
+    fi
+done
+if grep -q '^\.omca/' "$PROJECT_ROOT/.gitignore" 2>/dev/null; then
+    status PASS ".gitignore has .omca/ entry"
+else
+    status WARN ".gitignore missing .omca/ entry"
+fi
+echo
+
+echo '=== User settings ==='
+S="${HOME}/.claude/settings.json"
+if [ -f "$S" ]; then
+    TM=$(jq -r '.teammateMode // "absent"' "$S")
+    [ "$TM" = "auto" ] && status PASS "teammateMode=auto" || status WARN "teammateMode=$TM"
+    TE=$(jq -r '.env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS // ""' "$S")
+    [ "$TE" = "1" ] && status PASS "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1" || status WARN "agent-teams env not set"
+    if jq -e '.enabledPlugins | with_entries(select(.key | startswith("oh-my-claudeagent")))' "$S" >/dev/null 2>&1; then
+        status PASS "plugin enabled in user settings"
+    else
+        status WARN "plugin not enabled in user settings"
+    fi
+else
+    status WARN "no ~/.claude/settings.json"
+fi
+echo
+
+echo '=== CLAUDE.md ==='
+if [ -f "${HOME}/.claude/CLAUDE.md" ]; then
+    if grep -q '^--- omca-setup' "${HOME}/.claude/CLAUDE.md"; then
+        status WARN "~/.claude/CLAUDE.md still has legacy injection block — re-run /oh-my-claudeagent:omca-setup"
+    else
+        status PASS "~/.claude/CLAUDE.md (no legacy block)"
+    fi
+else
+    status PASS "~/.claude/CLAUDE.md absent (post-migration target state)"
+fi
+echo
+
+echo "Summary: PASS=$PASS WARN=$WARN FAIL=$FAIL"
+[ "$FAIL" -gt 0 ] && exit 1 || exit 0
