@@ -673,6 +673,12 @@ Set to `1` to opt API key, Bedrock, Vertex, and Foundry callers into the 1-hour 
 
 Force-enables synchronized output on terminals where auto-detection misses (notably Emacs `eat`). Reduces rendering glitches on rare terminal emulators. Set when you observe corrupted output or torn updates.
 
+### `ANTHROPIC_API_KEY` / `apiKeyHelper` / `ANTHROPIC_AUTH_TOKEN` disable claude.ai features (v2.1.139)
+
+When any of these are set, Remote Control, `/schedule`, claude.ai MCP connectors, and notification preferences are disabled — even if a Claude.ai OAuth login is also present in the session. API-key auth and Claude.ai auth resolve to different account scopes; the platform consistently picks API-key auth when both are set, so claude.ai-scoped features become unreachable.
+
+OMCA's core workflows (ralph, ultrawork, start-work, F1-F4 verification) run in-process and do not depend on Remote Control or `/schedule`. Users who need claude.ai-only features must unset the API-key variable for that session.
+
 ---
 
 ## Observability and OTEL Attribution
