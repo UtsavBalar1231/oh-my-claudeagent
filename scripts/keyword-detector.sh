@@ -4,9 +4,7 @@ source "$(dirname "$0")/lib/common.sh"
 
 STATE_DIR="${HOOK_STATE_DIR}"
 
-# active-modes.json schema: top-level object keyed by mode name;
-# each value is {"detected_at": <unix epoch>, "session_id": "<sid>"}.
-ACTIVE_MODES_FILE="${STATE_DIR}/active-modes.json"
+# active-modes.json path — shared via common.sh (ACTIVE_MODES_FILE, mode_already_announced, mark_mode_announced)
 
 # agent_id is only present in hook payloads fired inside a subagent call, not in top-level session hooks
 AGENT_ID=$(jq -r '.agent_id // ""' <<< "${HOOK_INPUT}")
@@ -22,40 +20,9 @@ if [[ -z "${PROMPT}" ]]; then
 	exit 0
 fi
 
+# CURRENT_SESSION is referenced by mode_already_announced / mark_mode_announced in common.sh
+# shellcheck disable=SC2034
 CURRENT_SESSION=$(resolve_session_id)
-
-# Returns 0 if the mode is already active in this session (suppress re-announce).
-# Returns 1 if mode is absent, from a different session, or marker file is missing.
-mode_already_announced() {
-	local mode="$1"
-	local stored_sid
-	stored_sid=$(jq_read "${ACTIVE_MODES_FILE}" ".${mode}.session_id // \"\"")
-	[[ -n "${stored_sid}" && "${stored_sid}" == "${CURRENT_SESSION}" ]]
-}
-
-# Write or update a mode entry in active-modes.json. Log and continue on failure.
-mark_mode_announced() {
-	local mode="$1"
-	local now_epoch
-	now_epoch=$(date +%s)
-	# Initialize file as {} if missing
-	local base="{}"
-	if [[ -f "${ACTIVE_MODES_FILE}" ]]; then
-		base=$(cat "${ACTIVE_MODES_FILE}")
-	fi
-	local tmp
-	tmp=$(mktemp) || { log_hook_error "mktemp failed for active-modes.json" "$(basename "$0")"; return 0; }
-	if printf '%s\n' "${base}" | jq \
-		--arg mode "${mode}" \
-		--argjson epoch "${now_epoch}" \
-		--arg sid "${CURRENT_SESSION}" \
-		'.[$mode] = {"detected_at": $epoch, "session_id": $sid}' > "${tmp}" 2>/dev/null; then
-		mv "${tmp}" "${ACTIVE_MODES_FILE}" || log_hook_error "mv failed for active-modes.json" "$(basename "$0")"
-	else
-		rm -f "${tmp}"
-		log_hook_error "jq update failed for active-modes.json mode=${mode}" "$(basename "$0")"
-	fi
-}
 
 PROMPT_LOWER=$(echo "${PROMPT}" | tr '[:upper:]' '[:lower:]')
 

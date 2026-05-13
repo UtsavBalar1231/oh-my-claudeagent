@@ -88,3 +88,40 @@ hook_timing_log() {
 	echo "{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"hook\":\"$(basename "$0")\",\"ms\":${ms}}" \
 		>> "${HOOK_LOG_DIR}/hook-timing.jsonl" 2>/dev/null
 }
+
+# active-modes.json path (relative to HOOK_STATE_DIR, set in common.sh)
+ACTIVE_MODES_FILE="${HOOK_STATE_DIR}/active-modes.json"
+
+# Returns 0 if the mode is already active in this session (suppress re-announce).
+# Returns 1 if mode is absent, from a different session, or marker file is missing.
+# Requires CURRENT_SESSION to be set by the caller (via resolve_session_id).
+mode_already_announced() {
+	local mode="$1"
+	local stored_sid
+	stored_sid=$(jq_read "${ACTIVE_MODES_FILE}" ".${mode}.session_id // \"\"")
+	[[ -n "${stored_sid}" && "${stored_sid}" == "${CURRENT_SESSION}" ]]
+}
+
+# Write or update a mode entry in active-modes.json. Log and continue on failure.
+# Requires CURRENT_SESSION to be set by the caller (via resolve_session_id).
+mark_mode_announced() {
+	local mode="$1"
+	local now_epoch
+	now_epoch=$(date +%s)
+	local base="{}"
+	if [[ -f "${ACTIVE_MODES_FILE}" ]]; then
+		base=$(cat "${ACTIVE_MODES_FILE}")
+	fi
+	local tmp
+	tmp=$(mktemp) || { log_hook_error "mktemp failed for active-modes.json" "$(basename "$0")"; return 0; }
+	if printf '%s\n' "${base}" | jq \
+		--arg mode "${mode}" \
+		--argjson epoch "${now_epoch}" \
+		--arg sid "${CURRENT_SESSION}" \
+		'.[$mode] = {"detected_at": $epoch, "session_id": $sid}' > "${tmp}" 2>/dev/null; then
+		mv "${tmp}" "${ACTIVE_MODES_FILE}" || log_hook_error "mv failed for active-modes.json" "$(basename "$0")"
+	else
+		rm -f "${tmp}"
+		log_hook_error "jq update failed for active-modes.json mode=${mode}" "$(basename "$0")"
+	fi
+}
