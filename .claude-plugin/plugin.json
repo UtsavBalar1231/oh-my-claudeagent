@@ -18,7 +18,6 @@
     "delegation",
     "parallel-execution"
   ],
-  "outputStyles": "./output-styles/",
   "userConfig": {
     "enableKeywordTriggers": {
       "title": "Enable keyword triggers",
