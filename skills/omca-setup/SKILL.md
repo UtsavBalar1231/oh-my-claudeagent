@@ -450,6 +450,103 @@ Apply or skip the `disableForceOrchestrationStyle` opt-out based on the user's p
 
 ---
 
+### Phase 5.8: Detect outputStyle Degraded Mode
+
+OMCA's orchestration body lives in `output-styles/omca-default.md` with
+`force-for-plugin: true`, which per the platform spec
+(https://code.claude.com/docs/en/output-styles) "overrides the user's
+outputStyle setting." In practice this works for most setups, but two
+configurations can still leave OMCA running in degraded mode:
+
+- An explicit user-scope `outputStyle` pin in `~/.claude/settings.json` set to
+  something other than `"OMCA Default"`, where the user expects OMCA to win
+  but is observing a different active style (typically because another
+  enabled plugin also declares `force-for-plugin: true` and loads first;
+  plugin load order is opaque).
+- An explicit Project-scope or Local-scope `outputStyle` in
+  `.claude/settings.json` / `.claude/settings.local.json` — the spec text
+  says `force-for-plugin` overrides the user's setting, but does not cover
+  the higher-precedence scopes.
+
+This phase detects both conditions and offers a fix. It does NOT touch
+settings unless the user confirms.
+
+1. Read `~/.claude/settings.json` (treat as `{}` if absent).
+
+2. Extract `outputStyle`:
+   ```bash
+   PINNED=$(jq -r '.outputStyle // empty' ~/.claude/settings.json 2>/dev/null)
+   ```
+
+3. Scan all installed plugins for `force-for-plugin: true` output styles
+   that are NOT OMCA's own:
+   ```bash
+   COMPETITORS=$(grep -lrE '^force-for-plugin: true' ~/.claude/plugins/cache/ 2>/dev/null \
+     | grep -v "/oh-my-claudeagent/" \
+     | sort -u)
+   ```
+
+4. **Branch A — clean state** (`PINNED` empty AND no competitors):
+   Print `outputStyle: OMCA Default will load via force-for-plugin (no conflicts detected)` and skip.
+
+5. **Branch B — pin to OMCA Default already**: if `PINNED == "OMCA Default"`,
+   print `outputStyle already pinned to OMCA Default` and skip.
+
+6. **Branch C — non-OMCA pin set**: if `PINNED` is set and not
+   `"OMCA Default"`:
+
+   a. Report the conflict:
+      ```
+      outputStyle DEGRADED-MODE WARNING:
+        User settings pin outputStyle to "${PINNED}".
+        OMCA's force-for-plugin: true should override this per spec, but if
+        you are observing the pinned style winning in active sessions, the
+        likely cause is another plugin shipping the same flag and loading
+        first.
+      ```
+
+   b. List competitors if any:
+      ```
+      Other plugins declaring force-for-plugin: true:
+        <list>
+      Plugin load order is not user-configurable; the first one loaded wins.
+      ```
+
+   c. Ask the user via `AskUserQuestion`:
+      ```
+      Clear the outputStyle pin from ~/.claude/settings.json? OMCA's
+      force-for-plugin will then be the only signal selecting an output
+      style for new sessions. The active session's style is locked at
+      session-start and will not change until you restart Claude Code.
+      [Recommended: Yes when no other plugin is competing]
+      ```
+
+   d. On confirm: atomic delete via jq:
+      ```bash
+      jq 'del(.outputStyle)' ~/.claude/settings.json > /tmp/claude-settings-omca-clear-style.json \
+        && mv /tmp/claude-settings-omca-clear-style.json ~/.claude/settings.json
+      ```
+      Report: `Cleared outputStyle pin. Restart Claude Code to activate OMCA Default.`
+
+   e. On decline: print the fallback command so the user can run it later
+      and continue without modifying settings:
+      ```bash
+      jq 'del(.outputStyle)' ~/.claude/settings.json > /tmp/s.json && mv /tmp/s.json ~/.claude/settings.json
+      ```
+
+7. **Branch D — no pin but competitors present**: if `PINNED` is empty
+   AND competitors exist, print an informational note (no action):
+   ```
+   outputStyle: no user pin detected. Other plugins also declare
+   force-for-plugin: true:
+     <list>
+   If OMCA Default is not active in your sessions, plugin load order
+   may be selecting a competitor first. Disable the competing plugin
+   or re-enable OMCA after the competitor.
+   ```
+
+---
+
 ### Phase 6: Health Report
 
 Print a summary to the user:
