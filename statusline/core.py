@@ -107,6 +107,7 @@ def build_glyphs(nerd: bool) -> dict[str, str]:
             ],  # nf-fa-user (stable across Nerd Fonts v2 and v3)
             "worktree": "\ue728",  # nf-dev-git_merge
             "style": "\uf10c",  # nf-fa-circle_o
+            "warn": "\uf071",  # nf-fa-exclamation_triangle
             "five_hour": "\uf251",  # nf-fa-hourglass_half
             "weekly": "\uf073",  # nf-fa-calendar
         }
@@ -122,6 +123,7 @@ def build_glyphs(nerd: bool) -> dict[str, str]:
         "agent": "A:",
         "worktree": "W:",
         "style": "S:",
+        "warn": "!",
         "five_hour": "5h",
         "weekly": "7d",
     }
@@ -362,11 +364,17 @@ def _compose_line1(
                 wt_str += f" {DIM}<- {orig_branch}{RST}"
             parts.append(wt_str)
 
-    # Output style (only if not "default")
+    # Output style (only if not "default"). OMCA's force-for-plugin should make
+    # "OMCA Default" the active style whenever the plugin is enabled. Anything
+    # else means a user pin or competing plugin won — surface as DEGRADED so
+    # the operator notices the orchestration body isn't loaded.
     output_style = data.get("output_style", {}).get("name", "default")
     if output_style and output_style != "default":
         has_extra = True
-        parts.append(f"{DIM}{glyphs['style']} {output_style}{RST}")
+        if output_style == "OMCA Default":
+            parts.append(f"{DIM}{glyphs['style']} {output_style}{RST}")
+        else:
+            parts.append(f"{RED}{glyphs['warn']} DEGRADED: {output_style}{RST}")
 
     # Vim mode (end of line)
     if "vim" in data and data["vim"] is not None:
