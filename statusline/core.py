@@ -474,6 +474,24 @@ def _format_reset_time(resets_at: int | str | None) -> str:
         return ""
 
 
+def _compose_degraded_tip(data: StatuslinePayload, glyphs: dict[str, str]) -> str | None:
+    """Tip line shown only when the active output style is degraded.
+
+    Triggered when output_style.name is set, not 'default', and not 'OMCA Default'.
+    Tells the operator exactly which command will fix it and what won't fix it
+    (a live setting change doesn't apply until session restart).
+    """
+    name = data.get("output_style", {}).get("name", "default")
+    if not name or name in ("default", "OMCA Default"):
+        return None
+    arrow = "→" if glyphs.get("style") != "S:" else "->"
+    cmd = "/oh-my-claudeagent:omca-setup"
+    return (
+        f"{DIM}{arrow} run {RST}{YELLOW}{cmd}{RST}{DIM} to diagnose / clear pin "
+        f"{arrow} restart Claude Code to load OMCA Default{RST}"
+    )
+
+
 def _compose_line3(usage: dict, glyphs: dict[str, str]) -> str | None:
     """Compose the usage bars line (Line 3).
 
@@ -577,9 +595,13 @@ def render(data: StatuslinePayload, git_info: GitInfo) -> str:
 
     if use_two_lines:
         line3 = _compose_line3(usage, glyphs) if usage else None
+        tip = _compose_degraded_tip(data, glyphs)
+        lines = [line1, line2]
         if line3:
-            return f"{line1}\n{line2}\n{line3}"
-        return f"{line1}\n{line2}"
+            lines.append(line3)
+        if tip:
+            lines.append(tip)
+        return "\n".join(lines)
 
     # Single line: model + bar + cost + duration
     parts = []
