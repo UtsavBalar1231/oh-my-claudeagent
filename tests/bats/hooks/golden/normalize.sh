@@ -6,7 +6,19 @@
 
 # No set -euo pipefail — consistent with project hook-scripts.md convention.
 
+# Substitute the absolute repo path with <REPO_ROOT> so fixtures replay on any
+# host (CI runner, dev machine, contributor checkout). The harness exports
+# CLAUDE_PLUGIN_ROOT; fall back to git-rev-parse for direct manual use.
+REPO_ROOT="${CLAUDE_PLUGIN_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null)}"
+
+if [[ -n "${REPO_ROOT}" ]]; then
+	REPO_SUBST="s|${REPO_ROOT}|<REPO_ROOT>|g"
+else
+	REPO_SUBST=""
+fi
+
 sed -E \
+	${REPO_SUBST:+-e "${REPO_SUBST}"} \
 	-e 's/[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(Z|[-+][0-9]{2}:?[0-9]{2})?/<TS>/g' \
 	-e 's/[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]+ [-+][0-9]{4}/<TS>/g' \
 	-e 's/[A-Z][a-z]{2,8}, [A-Z][a-z]{2,8} [0-9]{1,2}, [0-9]{4}/<HUMAN_DATE>/g' \

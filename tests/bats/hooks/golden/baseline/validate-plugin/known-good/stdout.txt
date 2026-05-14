@@ -1,21 +1,21 @@
-[validate-plugin] Repository root: /home/utsav/dev/softs/oh-my-claudeagent
+[validate-plugin] Repository root: <REPO_ROOT>
 [validate-plugin] Requested checks: claims hooks mcp
 [validate-plugin] Running claims checks
-[validate-plugin] PASS: hooks contract: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/hooks/hooks.json)
-[validate-plugin] PASS: plugin manifest: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/.claude-plugin/plugin.json)
-[validate-plugin] PASS: marketplace manifest: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/.claude-plugin/marketplace.json)
-[validate-plugin] PASS: mcp registry: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/.mcp.json)
+[validate-plugin] PASS: hooks contract: valid JSON (<REPO_ROOT>/hooks/hooks.json)
+[validate-plugin] PASS: plugin manifest: valid JSON (<REPO_ROOT>/.claude-plugin/plugin.json)
+[validate-plugin] PASS: marketplace manifest: valid JSON (<REPO_ROOT>/.claude-plugin/marketplace.json)
+[validate-plugin] PASS: mcp registry: valid JSON (<REPO_ROOT>/.mcp.json)
 [validate-plugin] PASS: hooks registry has object root
 [validate-plugin] PASS: plugin manifest declares expected package name
 [validate-plugin] PASS: marketplace includes oh-my-claudeagent entry
 [validate-plugin] PASS: default marketplace source path is accepted by current contract
 [validate-plugin] PASS: mcp registry uses uv for omca server
-[validate-plugin] PASS: categories config: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/servers/categories.json)
+[validate-plugin] PASS: categories config: valid JSON (<REPO_ROOT>/servers/categories.json)
 [validate-plugin] PASS: ast-grep-server.py removed
 [validate-plugin] PASS: omca-state-server.py removed
 [validate-plugin] PASS: agent-metadata.json removed (OMCA-internal metadata fields deprecated)
-[validate-plugin] PASS: version consistency: plugin.json and marketplace.json both at 2.3.0
-[validate-plugin] PASS: migration marker: hard-cutover mode active at plugin=2.3.0, marketplace=2.3.0
+[validate-plugin] PASS: version consistency: plugin.json and marketplace.json both at 2.4.0
+[validate-plugin] PASS: migration marker: hard-cutover mode active at plugin=2.4.0, marketplace=2.4.0
 [validate-plugin] PASS: latest hook lifecycle coverage includes ConfigChange
 [validate-plugin] PASS: latest hook lifecycle coverage includes InstructionsLoaded
 [validate-plugin] PASS: latest hook lifecycle coverage includes Notification
@@ -64,29 +64,29 @@
 [validate-plugin] PASS: policy posture: skills/omca-setup/SKILL.md includes non-bypassing permission filter guidance
 [validate-plugin] PASS: phantom field check: no phantom jq field names (.tool_error, .tool_result.error, .tool_result.success) found in scripts/
 [validate-plugin] Running hooks checks
-[validate-plugin] PASS: hooks contract: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/hooks/hooks.json)
-[validate-plugin] PASS: hook fixture pretooluse-task-agent.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/pretooluse-task-agent.json)
-[validate-plugin] PASS: hook fixture pretooluse-write.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/pretooluse-write.json)
-[validate-plugin] PASS: hook fixture permissionrequest-bash.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/permissionrequest-bash.json)
-[validate-plugin] PASS: hook fixture permissionrequest-exitplanmode.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/permissionrequest-exitplanmode.json)
-[validate-plugin] PASS: hook fixture sessionstart-compact.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/sessionstart-compact.json)
-[validate-plugin] PASS: hook fixture instructionsloaded-basic.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/instructionsloaded-basic.json)
-[validate-plugin] PASS: hook fixture taskcreated-basic.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/taskcreated-basic.json)
-[validate-plugin] PASS: hook fixture taskcompleted-basic.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/taskcompleted-basic.json)
-[validate-plugin] PASS: hook fixture taskcompleted-with-evidence.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/taskcompleted-with-evidence.json)
-[validate-plugin] PASS: hook fixture taskcompleted-with-edits-no-evidence.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/taskcompleted-with-edits-no-evidence.json)
-[validate-plugin] PASS: hook fixture teammateidle-basic.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/teammateidle-basic.json)
-[validate-plugin] PASS: hook fixture cwdchanged-basic.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/cwdchanged-basic.json)
-[validate-plugin] PASS: hook fixture filechanged-basic.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/filechanged-basic.json)
-[validate-plugin] PASS: hook fixture worktreecreate-basic.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/worktreecreate-basic.json)
-[validate-plugin] PASS: hook fixture userpromptsubmit-ralph.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/userpromptsubmit-ralph.json)
-[validate-plugin] PASS: hook fixture userpromptsubmit-ultrawork.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/userpromptsubmit-ultrawork.json)
-[validate-plugin] PASS: hook fixture stop-basic.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/stop-basic.json)
-[validate-plugin] PASS: hook fixture subagentstart-basic.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/subagentstart-basic.json)
-[validate-plugin] PASS: hook fixture subagentstopcomplete-basic.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/subagentstopcomplete-basic.json)
-[validate-plugin] PASS: hook fixture stopfailure-ratelimit.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/stopfailure-ratelimit.json)
-[validate-plugin] PASS: hook fixture posttoolusefailure-bash.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/posttoolusefailure-bash.json)
-[validate-plugin] PASS: hook fixture posttoolusefailure-read.json: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/hooks/posttoolusefailure-read.json)
+[validate-plugin] PASS: hooks contract: valid JSON (<REPO_ROOT>/hooks/hooks.json)
+[validate-plugin] PASS: hook fixture pretooluse-task-agent.json: valid JSON (<REPO_ROOT>/tests/fixtures/hooks/pretooluse-task-agent.json)
+[validate-plugin] PASS: hook fixture pretooluse-write.json: valid JSON (<REPO_ROOT>/tests/fixtures/hooks/pretooluse-write.json)
+[validate-plugin] PASS: hook fixture permissionrequest-bash.json: valid JSON (<REPO_ROOT>/tests/fixtures/hooks/permissionrequest-bash.json)
+[validate-plugin] PASS: hook fixture permissionrequest-exitplanmode.json: valid JSON (<REPO_ROOT>/tests/fixtures/hooks/permissionrequest-exitplanmode.json)
+[validate-plugin] PASS: hook fixture sessionstart-compact.json: valid JSON (<REPO_ROOT>/tests/fixtures/hooks/sessionstart-compact.json)
+[validate-plugin] PASS: hook fixture instructionsloaded-basic.json: valid JSON (<REPO_ROOT>/tests/fixtures/hooks/instructionsloaded-basic.json)
+[validate-plugin] PASS: hook fixture taskcreated-basic.json: valid JSON (<REPO_ROOT>/tests/fixtures/hooks/taskcreated-basic.json)
+[validate-plugin] PASS: hook fixture taskcompleted-basic.json: valid JSON (<REPO_ROOT>/tests/fixtures/hooks/taskcompleted-basic.json)
+[validate-plugin] PASS: hook fixture taskcompleted-with-evidence.json: valid JSON (<REPO_ROOT>/tests/fixtures/hooks/taskcompleted-with-evidence.json)
+[validate-plugin] PASS: hook fixture taskcompleted-with-edits-no-evidence.json: valid JSON (<REPO_ROOT>/tests/fixtures/hooks/taskcompleted-with-edits-no-evidence.json)
+[validate-plugin] PASS: hook fixture teammateidle-basic.json: valid JSON (<REPO_ROOT>/tests/fixtures/hooks/teammateidle-basic.json)
+[validate-plugin] PASS: hook fixture cwdchanged-basic.json: valid JSON (<REPO_ROOT>/tests/fixtures/hooks/cwdchanged-basic.json)
+[validate-plugin] PASS: hook fixture filechanged-basic.json: valid JSON (<REPO_ROOT>/tests/fixtures/hooks/filechanged-basic.json)
+[validate-plugin] PASS: hook fixture worktreecreate-basic.json: valid JSON (<REPO_ROOT>/tests/fixtures/hooks/worktreecreate-basic.json)
+[validate-plugin] PASS: hook fixture userpromptsubmit-ralph.json: valid JSON (<REPO_ROOT>/tests/fixtures/hooks/userpromptsubmit-ralph.json)
+[validate-plugin] PASS: hook fixture userpromptsubmit-ultrawork.json: valid JSON (<REPO_ROOT>/tests/fixtures/hooks/userpromptsubmit-ultrawork.json)
+[validate-plugin] PASS: hook fixture stop-basic.json: valid JSON (<REPO_ROOT>/tests/fixtures/hooks/stop-basic.json)
+[validate-plugin] PASS: hook fixture subagentstart-basic.json: valid JSON (<REPO_ROOT>/tests/fixtures/hooks/subagentstart-basic.json)
+[validate-plugin] PASS: hook fixture subagentstopcomplete-basic.json: valid JSON (<REPO_ROOT>/tests/fixtures/hooks/subagentstopcomplete-basic.json)
+[validate-plugin] PASS: hook fixture stopfailure-ratelimit.json: valid JSON (<REPO_ROOT>/tests/fixtures/hooks/stopfailure-ratelimit.json)
+[validate-plugin] PASS: hook fixture posttoolusefailure-bash.json: valid JSON (<REPO_ROOT>/tests/fixtures/hooks/posttoolusefailure-bash.json)
+[validate-plugin] PASS: hook fixture posttoolusefailure-read.json: valid JSON (<REPO_ROOT>/tests/fixtures/hooks/posttoolusefailure-read.json)
 [validate-plugin] PASS: hook fixture repo setup: initialized git repo at <TMPFILE>
 [validate-plugin] SKIP: PreToolUse Task|Agent: no matching hook command registered
 [validate-plugin] PASS: PreToolUse Write (write-guard.sh): script succeeded with valid JSON output
@@ -128,11 +128,11 @@
 [validate-plugin] PASS: StopFailure rate_limit (stop-failure-handler.sh): script succeeded with empty stdout
 [validate-plugin] FAIL: StopFailure handler did not create stop-failures.jsonl
 [validate-plugin] Running mcp checks
-[validate-plugin] PASS: mcp registry: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/.mcp.json)
-[validate-plugin] PASS: mcp fixture initialize: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/mcp/initialize.json)
-[validate-plugin] PASS: mcp fixture initialized notification: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/mcp/initialized-notification.json)
-[validate-plugin] PASS: mcp fixture tools/list: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/mcp/tools-list.json)
-[validate-plugin] PASS: mcp fixture expected tools: valid JSON (/home/utsav/dev/softs/oh-my-claudeagent/tests/fixtures/mcp/expected-tools.json)
+[validate-plugin] PASS: mcp registry: valid JSON (<REPO_ROOT>/.mcp.json)
+[validate-plugin] PASS: mcp fixture initialize: valid JSON (<REPO_ROOT>/tests/fixtures/mcp/initialize.json)
+[validate-plugin] PASS: mcp fixture initialized notification: valid JSON (<REPO_ROOT>/tests/fixtures/mcp/initialized-notification.json)
+[validate-plugin] PASS: mcp fixture tools/list: valid JSON (<REPO_ROOT>/tests/fixtures/mcp/tools-list.json)
+[validate-plugin] PASS: mcp fixture expected tools: valid JSON (<REPO_ROOT>/tests/fixtures/mcp/expected-tools.json)
 [validate-plugin] PASS: mcp initialize response received
 [validate-plugin] PASS: mcp tools/list response received
 [validate-plugin] PASS: mcp tools/list contains ast_search

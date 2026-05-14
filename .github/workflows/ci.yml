@@ -78,6 +78,14 @@ jobs:
           persist-credentials: false
           submodules: true
 
+      - uses: astral-sh/setup-uv@v7
+
+      - name: Pre-warm omca MCP venv
+        run: uv sync --project servers
+
+      - name: Install ast-grep CLI
+        run: uv tool install ast-grep-cli
+
       - name: Run BATS behavioral tests
         run: tests/bats/bats-core/bin/bats tests/bats/hooks/
 

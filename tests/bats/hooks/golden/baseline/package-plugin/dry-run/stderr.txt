@@ -1,1 +1,1 @@
-Usage: /home/utsav/dev/softs/oh-my-claudeagent/scripts/package-plugin.sh <dest_dir> [--dry-run] [--version <N.N.N>]
+Usage: <REPO_ROOT>/scripts/package-plugin.sh <dest_dir> [--dry-run] [--version <N.N.N>]
