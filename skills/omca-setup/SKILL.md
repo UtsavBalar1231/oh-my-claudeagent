@@ -258,7 +258,8 @@ Configure the Claude Code statusline to use the oh-my-claudeagent statusline pac
 1. Read `~/.claude/settings.json` (if it exists; otherwise treat as `{}`).
 
 2. Check if `statusLine` is already configured:
-   - If `settings.statusLine` is present → print "statusLine already configured — skipping" and skip this phase.
+   - If `settings.statusLine` is present AND `settings.statusLine.hideVimModeIndicator == true` → print "statusLine already configured — skipping" and skip this phase.
+   - If `settings.statusLine` is present AND `hideVimModeIndicator` is missing or `false` → DO NOT skip; jump to step 6 (back-fill the indicator suppression).
 
 3. If not configured: use `AskUserQuestion` to ask:
    ```
@@ -323,15 +324,20 @@ Configure the Claude Code statusline to use the oh-my-claudeagent statusline pac
       - Daemon: `~/.claude/statusline/.venv/bin/cc-statusline`
       - Direct: `~/.claude/statusline/.venv/bin/cc-statusline-direct`
 
-      Use jq to merge atomically (read-merge-write):
+      Use jq to merge atomically (read-merge-write). Set `hideVimModeIndicator: true`
+      because the OMCA statusline already renders `vim.mode` on line 1 — without
+      this flag the platform draws a redundant `-- INSERT --` row beneath the
+      statusLine output (see `https://code.claude.com/docs/en/statusline` for the
+      `hideVimModeIndicator` field).
+
       ```bash
-      jq --arg cmd "<chosen-command>" '. + {"statusLine": {"type": "command", "command": $cmd, "padding": 1}}' \
+      jq --arg cmd "<chosen-command>" '. + {"statusLine": {"type": "command", "command": $cmd, "padding": 1, "hideVimModeIndicator": true}}' \
         ~/.claude/settings.json > /tmp/claude-settings-statusline.json \
         && mv /tmp/claude-settings-statusline.json ~/.claude/settings.json
       ```
       If `~/.claude/settings.json` does not exist, create it from `{}`:
       ```bash
-      echo '{}' | jq --arg cmd "<chosen-command>" '. + {"statusLine": {"type": "command", "command": $cmd, "padding": 1}}' \
+      echo '{}' | jq --arg cmd "<chosen-command>" '. + {"statusLine": {"type": "command", "command": $cmd, "padding": 1, "hideVimModeIndicator": true}}' \
         > ~/.claude/settings.json
       ```
 
@@ -368,6 +374,28 @@ Configure the Claude Code statusline to use the oh-my-claudeagent statusline pac
       ```
 
    h. **Note**: If an old `~/.claude/statusline.py` wrapper script exists, it can be removed — it is superseded by this copy-based deployment.
+
+6. **Back-fill `hideVimModeIndicator` on existing statusLine** (entered when step 2 detected `statusLine` present but the indicator-suppression field missing/false):
+
+   The OMCA statusline already renders `vim.mode` on line 1; without
+   `hideVimModeIndicator: true` the platform draws a redundant `-- INSERT --` row
+   beneath the user's statusLine output. Ask via `AskUserQuestion`:
+   ```
+   Your existing statusLine config does not set hideVimModeIndicator. OMCA renders
+   vim mode itself, so the platform's native '-- INSERT --' row is duplicate noise.
+   Add hideVimModeIndicator: true to suppress it? [Y/n]
+   ```
+
+   On confirm, atomic jq update:
+   ```bash
+   jq '.statusLine.hideVimModeIndicator = true' ~/.claude/settings.json \
+     > /tmp/claude-settings-vim-indicator.json \
+     && mv /tmp/claude-settings-vim-indicator.json ~/.claude/settings.json
+   ```
+
+   On decline: skip silently.
+
+7. **Known platform limitation — permission mode banner**: the `›› bypass permissions on (shift+tab to cycle)` indicator on the same native row has no documented opt-out as of Claude Code v2.1.141. Only the vim half is suppressible via `hideVimModeIndicator`. Document this in the report so users know the residual line is a platform feature, not an OMCA bug.
 
 ---
 

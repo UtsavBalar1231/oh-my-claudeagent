@@ -632,6 +632,23 @@ within the same turn to relay all of them.
 **permissionMode stripping:** Claude Code strips `permissionMode` from plugin agents.
 Copy agent files to `~/.claude/agents/` (user-scope agents retain it).
 
+**Native mode-indicator row duplicates OMCA's vim glyph:** the platform draws a
+`-- INSERT --` row beneath the user's `statusLine` output. The OMCA statusline
+already renders `vim.mode` on line 1, so the row is duplicate noise. Set
+`statusLine.hideVimModeIndicator: true` to suppress the platform row
+(documented in `https://code.claude.com/docs/en/statusline`); `omca-setup` Phase 5.6
+sets this automatically on first run and back-fills it on re-run for users with
+an existing `statusLine` config.
+
+**Permission-mode banner — no opt-out:** the `›› bypass permissions on (shift+tab
+to cycle)` indicator on the same native mode-indicator row has no documented
+suppression setting as of Claude Code v2.1.141. The platform renders it whenever
+the active permission mode is non-`default`. The only ways to hide it are: (a)
+switch the active permission mode back to `default` via `/permission-mode`, or
+(b) wait for Anthropic to add a `hidePermissionModeIndicator` companion to the
+documented `hideVimModeIndicator` field. File feedback citing the vim-indicator
+precedent if this matters to your workflow.
+
 ---
 
 ## Environment Variables
