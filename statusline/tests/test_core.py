@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import pathlib
 from datetime import UTC
 from unittest.mock import patch
@@ -26,6 +27,7 @@ from statusline.core import (
     _render_bar,
     _render_context_bar,
     _threshold_color,
+    _todo_counter,
     agent_glyph,
     build_glyphs,
     detect_nerd_font,
@@ -781,3 +783,241 @@ class TestAgentGlyph:
         stems = {p.stem for p in agents_dir.glob("*.md")}
         missing = stems - set(AGENT_GLYPHS_NERD)
         assert not missing, f"Agents missing from AGENT_GLYPHS_NERD: {missing}"
+
+
+# ---------------------------------------------------------------------------
+# _todo_counter
+# ---------------------------------------------------------------------------
+
+
+PLAN_CONTENT_MIXED = """\
+# My Plan
+
+- [ ] 1. First task
+- [ ] 2. Second task
+- [x] 3. Done task
+- [x] 4. Another done
+- [ ] 5. Fifth task
+- [ ] 6. Sixth task
+- [x] 7. Seventh done
+- [ ] 8. Eighth
+- [ ] 9. Ninth
+- [ ] 10. Tenth
+"""
+
+# Plan with numbered tasks 1-3, 3 done
+PLAN_CONTENT_3_OF_10 = """\
+# Plan
+
+- [x] 1. Done one
+- [x] 2. Done two
+- [x] 3. Done three
+- [ ] 4. Pending four
+- [ ] 5. Pending five
+- [ ] 6. Pending six
+- [ ] 7. Pending seven
+- [ ] 8. Pending eight
+- [ ] 9. Pending nine
+- [ ] 10. Pending ten
+"""
+
+# Plan with no numbered tasks — only unnumbered checkboxes
+PLAN_CONTENT_UNNUMBERED = """\
+# Plan
+
+- [ ] just a note
+- [x] another note
+- [ ] foo
+"""
+
+# Plan with numbered tasks but no completion
+PLAN_CONTENT_ALL_PENDING = """\
+- [ ] 1. First
+- [ ] 2. Second
+"""
+
+
+class TestTodoCounter:
+    def _glyphs_ascii(self) -> dict:
+        return build_glyphs(False)
+
+    def _glyphs_nerd(self) -> dict:
+        return build_glyphs(True)
+
+    def test_no_boulder_returns_empty(self, tmp_path: pathlib.Path) -> None:
+        """No boulder.json -> returns empty string."""
+        result = _todo_counter(str(tmp_path), self._glyphs_ascii(), False)
+        assert result == ""
+
+    def test_missing_plan_returns_empty(self, tmp_path: pathlib.Path) -> None:
+        """boulder.json points to non-existent plan -> returns empty string."""
+        state_dir = tmp_path / ".omca" / "state"
+        state_dir.mkdir(parents=True)
+        boulder = {"active_plan": str(tmp_path / "nonexistent.md")}
+        (state_dir / "boulder.json").write_text(json.dumps(boulder))
+        result = _todo_counter(str(tmp_path), self._glyphs_ascii(), False)
+        assert result == ""
+
+    def test_zero_numbered_tasks_returns_empty(self, tmp_path: pathlib.Path) -> None:
+        """Plan with only unnumbered checkboxes -> returns empty string."""
+        state_dir = tmp_path / ".omca" / "state"
+        state_dir.mkdir(parents=True)
+        plan_file = tmp_path / "plan.md"
+        plan_file.write_text(PLAN_CONTENT_UNNUMBERED)
+        boulder = {"active_plan": str(plan_file)}
+        (state_dir / "boulder.json").write_text(json.dumps(boulder))
+        result = _todo_counter(str(tmp_path), self._glyphs_ascii(), False)
+        assert result == ""
+
+    def test_ascii_3_done_10_total(self, tmp_path: pathlib.Path) -> None:
+        """ASCII mode: 3 done + 7 pending numbered -> T:3/10."""
+        state_dir = tmp_path / ".omca" / "state"
+        state_dir.mkdir(parents=True)
+        plan_file = tmp_path / "plan.md"
+        plan_file.write_text(PLAN_CONTENT_3_OF_10)
+        boulder = {"active_plan": str(plan_file)}
+        (state_dir / "boulder.json").write_text(json.dumps(boulder))
+        result = _todo_counter(str(tmp_path), self._glyphs_ascii(), False)
+        assert "T:3/10" in result
+
+    def test_nerd_font_uses_task_glyph(self, tmp_path: pathlib.Path) -> None:
+        """Nerd font mode: uses nf-fa-tasks glyph instead of T:."""
+        state_dir = tmp_path / ".omca" / "state"
+        state_dir.mkdir(parents=True)
+        plan_file = tmp_path / "plan.md"
+        plan_file.write_text(PLAN_CONTENT_3_OF_10)
+        boulder = {"active_plan": str(plan_file)}
+        (state_dir / "boulder.json").write_text(json.dumps(boulder))
+        result = _todo_counter(str(tmp_path), self._glyphs_nerd(), True)
+        # nf-fa-tasks glyph (U+F0AE) should be present
+        assert "" in result
+        assert "3/10" in result
+
+    def test_malformed_boulder_json_returns_empty(self, tmp_path: pathlib.Path) -> None:
+        """Malformed JSON in boulder.json -> silently returns empty string."""
+        state_dir = tmp_path / ".omca" / "state"
+        state_dir.mkdir(parents=True)
+        (state_dir / "boulder.json").write_text("{not valid json!!!")
+        result = _todo_counter(str(tmp_path), self._glyphs_ascii(), False)
+        assert result == ""
+
+    def test_boulder_null_active_plan_returns_empty(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """boulder.json with active_plan: null -> returns empty string."""
+        state_dir = tmp_path / ".omca" / "state"
+        state_dir.mkdir(parents=True)
+        boulder = {"active_plan": None}
+        (state_dir / "boulder.json").write_text(json.dumps(boulder))
+        result = _todo_counter(str(tmp_path), self._glyphs_ascii(), False)
+        assert result == ""
+
+    def test_all_pending_tasks(self, tmp_path: pathlib.Path) -> None:
+        """All numbered tasks pending: completed count is 0."""
+        state_dir = tmp_path / ".omca" / "state"
+        state_dir.mkdir(parents=True)
+        plan_file = tmp_path / "plan.md"
+        plan_file.write_text(PLAN_CONTENT_ALL_PENDING)
+        boulder = {"active_plan": str(plan_file)}
+        (state_dir / "boulder.json").write_text(json.dumps(boulder))
+        result = _todo_counter(str(tmp_path), self._glyphs_ascii(), False)
+        assert "T:0/2" in result
+
+    def test_empty_project_dir_returns_empty(self) -> None:
+        """Empty project_dir string -> returns empty string without crash."""
+        result = _todo_counter("", self._glyphs_ascii(), False)
+        assert result == ""
+
+
+# ---------------------------------------------------------------------------
+# _compose_line1 — TODO counter integration
+# ---------------------------------------------------------------------------
+
+
+class TestComposeLine1TodoCounter:
+    def _glyphs(self) -> dict:
+        return build_glyphs(False)
+
+    def test_todo_counter_appears_in_line1(
+        self, git_info_empty: dict, tmp_path: pathlib.Path
+    ) -> None:
+        """When boulder + plan exist with numbered tasks, T:<done>/<total> appears."""
+        state_dir = tmp_path / ".omca" / "state"
+        state_dir.mkdir(parents=True)
+        plan_file = tmp_path / "plan.md"
+        plan_file.write_text(PLAN_CONTENT_3_OF_10)
+        boulder = {"active_plan": str(plan_file)}
+        (state_dir / "boulder.json").write_text(json.dumps(boulder))
+
+        data = {
+            "model": {"display_name": "claude"},
+            "workspace": {"project_dir": str(tmp_path)},
+        }
+        line, has_extra = _compose_line1(
+            data, self._glyphs(), git_info_empty, nerd=False
+        )
+        assert "T:3/10" in line
+        assert has_extra is True
+
+    def test_no_boulder_no_todo_token(
+        self, git_info_empty: dict, tmp_path: pathlib.Path
+    ) -> None:
+        """No boulder.json -> no T: token in line."""
+        data = {
+            "model": {"display_name": "claude"},
+            "workspace": {"project_dir": str(tmp_path)},
+        }
+        line, _ = _compose_line1(data, self._glyphs(), git_info_empty, nerd=False)
+        assert "T:" not in line
+
+    def test_zero_numbered_tasks_no_todo_token(
+        self, git_info_empty: dict, tmp_path: pathlib.Path
+    ) -> None:
+        """Plan with only unnumbered tasks -> no T: token."""
+        state_dir = tmp_path / ".omca" / "state"
+        state_dir.mkdir(parents=True)
+        plan_file = tmp_path / "plan.md"
+        plan_file.write_text(PLAN_CONTENT_UNNUMBERED)
+        boulder = {"active_plan": str(plan_file)}
+        (state_dir / "boulder.json").write_text(json.dumps(boulder))
+
+        data = {
+            "model": {"display_name": "claude"},
+            "workspace": {"project_dir": str(tmp_path)},
+        }
+        line, _ = _compose_line1(data, self._glyphs(), git_info_empty, nerd=False)
+        assert "T:" not in line
+
+    def test_malformed_boulder_does_not_crash(
+        self, git_info_empty: dict, tmp_path: pathlib.Path
+    ) -> None:
+        """Malformed boulder.json must not cause _compose_line1 to raise."""
+        state_dir = tmp_path / ".omca" / "state"
+        state_dir.mkdir(parents=True)
+        (state_dir / "boulder.json").write_text("{bad json")
+
+        data = {
+            "model": {"display_name": "claude"},
+            "workspace": {"project_dir": str(tmp_path)},
+        }
+        # Must not raise; returns a valid string
+        line, _ = _compose_line1(data, self._glyphs(), git_info_empty, nerd=False)
+        assert isinstance(line, str)
+        assert "T:" not in line
+
+    def test_nonexistent_plan_path_no_crash(
+        self, git_info_empty: dict, tmp_path: pathlib.Path
+    ) -> None:
+        """Boulder pointing at a missing plan file -> no crash, no T: token."""
+        state_dir = tmp_path / ".omca" / "state"
+        state_dir.mkdir(parents=True)
+        boulder = {"active_plan": str(tmp_path / "does_not_exist.md")}
+        (state_dir / "boulder.json").write_text(json.dumps(boulder))
+
+        data = {
+            "model": {"display_name": "claude"},
+            "workspace": {"project_dir": str(tmp_path)},
+        }
+        line, _ = _compose_line1(data, self._glyphs(), git_info_empty, nerd=False)
+        assert isinstance(line, str)
+        assert "T:" not in line

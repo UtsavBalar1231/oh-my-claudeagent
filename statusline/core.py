@@ -6,8 +6,12 @@ scripts/statusline.py. The public entry point is render(data, git_info).
 
 from __future__ import annotations
 
+import json
+import logging
 import os
+import re
 from datetime import datetime, timezone
+from pathlib import Path
 
 from statusline.config import config
 from statusline.types import GitInfo, StatuslinePayload
@@ -17,6 +21,12 @@ from statusline.types import GitInfo, StatuslinePayload
 # ---------------------------------------------------------------------------
 
 FALLBACK = "[claude]"
+
+log = logging.getLogger(__name__)
+
+# Regex for numbered plan checkboxes — matches `- [ ] 1.` or `- [x] 12.` etc.
+# Must match the canonical pattern from boulder_progress MCP tool.
+_CHECKBOX_RE = re.compile(r"^- \[([ x])\] \d+\.", re.MULTILINE)
 
 # ANSI 16-color palette
 RST = "\033[0m"
@@ -110,6 +120,7 @@ def build_glyphs(nerd: bool) -> dict[str, str]:
             "warn": "\uf071",  # nf-fa-exclamation_triangle
             "five_hour": "\uf251",  # nf-fa-hourglass_half
             "weekly": "\uf073",  # nf-fa-calendar
+            "tasks": "\uf0ae",  # nf-fa-tasks
         }
     return {
         "branch": "*",
@@ -126,6 +137,7 @@ def build_glyphs(nerd: bool) -> dict[str, str]:
         "warn": "!",
         "five_hour": "5h",
         "weekly": "7d",
+        "tasks": "T:",
     }
 
 
@@ -247,6 +259,44 @@ def _format_tokens(n: int) -> str:
 
 
 # ---------------------------------------------------------------------------
+# TODO counter helper
+# ---------------------------------------------------------------------------
+
+
+def _todo_counter(project_dir: str, glyphs: dict[str, str], nerd: bool) -> str:
+    """Return a TODO counter token from the active plan, or empty string.
+
+    Reads boulder.json from <project_dir>/.omca/state/boulder.json, resolves
+    active_plan, counts numbered checkboxes, and returns a formatted token.
+    Returns "" (silently) when boulder is missing, plan is missing, total == 0,
+    or any error occurs.
+    """
+    try:
+        boulder_path = Path(project_dir) / ".omca" / "state" / "boulder.json"
+        if not boulder_path.exists():
+            return ""
+        raw = boulder_path.read_text(encoding="utf-8")
+        boulder = json.loads(raw)
+        active_plan = boulder.get("active_plan")
+        if not active_plan:
+            return ""
+        plan_path = Path(active_plan)
+        if not plan_path.exists():
+            return ""
+        content = plan_path.read_text(encoding="utf-8")
+        matches = _CHECKBOX_RE.findall(content)
+        total = len(matches)
+        if total == 0:
+            return ""
+        completed = sum(1 for m in matches if m == "x")
+        glyph = glyphs.get("tasks", "T:")
+        return f"{GREEN}{glyph}{completed}/{total}{RST}"
+    except Exception as exc:
+        log.debug("todo_counter: skipped due to error: %s", exc)
+        return ""
+
+
+# ---------------------------------------------------------------------------
 # Line composers
 # ---------------------------------------------------------------------------
 
@@ -278,6 +328,15 @@ def _compose_line1(
         thinking_glyph = "" if nerd else "[T]"  # nf-fa-lightbulb_o
         parts.append(f"{CYAN}{thinking_glyph}{RST}")
         has_extra = True
+
+    # TODO counter — show active plan progress when boulder.json is present
+    workspace = data.get("workspace", {})
+    project_dir = workspace.get("project_dir", data.get("cwd", ""))
+    if project_dir:
+        todo_token = _todo_counter(project_dir, glyphs, nerd)
+        if todo_token:
+            parts.append(todo_token)
+            has_extra = True
 
     # Session identifier (session_name or first 8 chars of session_id)
     session_name = data.get("session_name")
@@ -327,8 +386,6 @@ def _compose_line1(
             parts.append("  ".join(git_status_parts))
 
     # Directory name -- show project basename, and repo link if remote available
-    workspace = data.get("workspace", {})
-    project_dir = workspace.get("project_dir", data.get("cwd", ""))
     dir_name = os.path.basename(project_dir) if project_dir else ""
 
     if dir_name:
@@ -474,7 +531,9 @@ def _format_reset_time(resets_at: int | str | None) -> str:
         return ""
 
 
-def _compose_degraded_tip(data: StatuslinePayload, glyphs: dict[str, str]) -> str | None:
+def _compose_degraded_tip(
+    data: StatuslinePayload, glyphs: dict[str, str]
+) -> str | None:
     """Tip line shown only when the active output style is degraded.
 
     Triggered when output_style.name is set, not 'default', and not 'OMCA Default'.
