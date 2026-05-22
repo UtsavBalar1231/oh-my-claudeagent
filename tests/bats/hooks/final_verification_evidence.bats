@@ -460,3 +460,34 @@ EOF
 	[ "$status" -eq 2 ]
 	echo "$output" | grep -qi "corrupt"
 }
+
+# ---------------------------------------------------------------------------
+# (p) Cross-session active_plan-without-marker: event lands in hook-info.jsonl,
+#     NOT hook-errors.jsonl
+# ---------------------------------------------------------------------------
+
+@test "final-verification-evidence: cross-session active_plan clear logs to info channel not error channel" {
+	local plan_file="${BATS_TEST_TMPDIR}/cs-active-plan.md"
+	_write_complete_plan "${plan_file}"
+
+	# Boulder points to a plan from a prior session; no pending-final-verify marker
+	_write_boulder "${plan_file}"
+	# No _write_marker — ACTIVE_PLAN exists but MARKER_PLAN is absent
+
+	run_hook "final-verification-evidence.sh" '{}'
+	assert_success
+
+	local info_log="${CLAUDE_PROJECT_ROOT}/.omca/logs/hook-info.jsonl"
+	local err_log="${CLAUDE_PROJECT_ROOT}/.omca/logs/hook-errors.jsonl"
+
+	# info channel must contain the cross-session clear event
+	[ -f "${info_log}" ]
+	run jq -c 'select(.message == "cleared cross-session stale active_plan reference (no marker)")' "${info_log}"
+	[ -n "$output" ]
+
+	# error channel must NOT contain the cross-session clear event
+	if [ -f "${err_log}" ]; then
+		run jq -c 'select((.error // .message // "") | test("cleared cross-session"))' "${err_log}"
+		[ -z "$output" ]
+	fi
+}

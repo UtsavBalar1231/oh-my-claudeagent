@@ -121,7 +121,7 @@ fi
 # INVARIANT: must run BEFORE PLAN_PATH derivation — once PLAN_PATH falls back to
 # MARKER_PLAN, the staleness signal is lost.
 if [[ -n "${ACTIVE_PLAN}" && -z "${MARKER_PLAN}" ]]; then
-	log_hook_error "cleared cross-session stale active_plan reference (no marker)" "final-verification-evidence.sh"
+	log_hook_info "cleared cross-session stale active_plan reference (no marker)" "final-verification-evidence.sh"
 	noop_exit
 fi
 
