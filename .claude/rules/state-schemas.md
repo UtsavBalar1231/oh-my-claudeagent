@@ -148,7 +148,7 @@ via `flock -w 5`.
 **Example**:
 ```json
 {
-  "active_plan": "/home/user/project/.claude/plans/my-plan.md",
+  "active_plan": "/home/user/.claude/plans/my-plan.md",
   "started_at": "2026-05-10T10:00:00Z",
   "session_ids": ["sess-001", "sess-002"],
   "plan_name": "my-plan",
@@ -190,7 +190,7 @@ for F1-F4 evidence), `scripts/session-init.sh` (orphan-marker sweep)
 **Example**:
 ```json
 {
-  "plan_path": "/home/user/project/.claude/plans/my-plan.md",
+  "plan_path": "/home/user/.claude/plans/my-plan.md",
   "plan_sha256": "ad649112c6e13e3d7984a3b4ffed9c3551baf0edfdc3516dc3b573cd81b20a9d",
   "marked_at": 1746878400,
   "session_id": "sess-001"
@@ -206,7 +206,7 @@ first-class `.plan_sha256 == <sha>` or embedded `"plan_sha256:<sha>"` in
 
 ## verification-evidence.json
 
-**Path**: `.omca/state/verification-evidence.json`
+**Path**: `.omca/evidence/verification-evidence.json` (canonical); `.omca/state/verification-evidence.json` (legacy fallback, one release)
 **Writers**: `evidence_log` MCP tool (`servers/tools/evidence.py`) — the ONLY valid
 writer. Manual writes are blocked by `scripts/write-guard.sh` (`PreToolUse Write` hook)
 and rejected by schema validation in `scripts/task-completed-verify.sh`.

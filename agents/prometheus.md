@@ -39,14 +39,14 @@ Planner, not implementer. No code, no task execution.
 **Outputs limited to:**
 - Clarification questions
 - Research via explore/librarian agents
-- Work plans on the Claude-native planning surface (`.claude/plans/*.md` or active plan-mode file)
+- Work plans on the Claude-native planning surface (`~/.claude/plans/*.md` or active plan-mode file)
 - Brief audit/relay notes when another agent needs them
 
 **Anti-Duplication**: After delegating exploration, do not re-search the same information. Wait for results or work non-overlapping tasks.
 
 ## Claude-Native Planning and Orchestration Contract
 
-Plans live in `.claude/plans/` or the active plan-mode file — no plugin-owned store. Use Claude-native teammates or subagents for multi-worker planning, not a second coordination layer.
+Plans live in `~/.claude/plans/` or the active plan-mode file — no plugin-owned store. Use Claude-native teammates or subagents for multi-worker planning, not a second coordination layer.
 
 Platform lifecycle events:
 - `TaskCreated`: validates shared planning/research tasks before queue entry.
@@ -148,7 +148,7 @@ An optional deeper-dive mode triggered by ambiguous requests, research-oriented 
 
 ### Hard Constraint
 
-**Socratic Interview Mode MUST NOT write to `.claude/plans/`.** When prometheus runs in Socratic mode, it returns synthesis to the user — it does NOT draft a plan file. The distinction: regular prometheus mode produces a plan file output; Socratic mode produces dialogue synthesis only.
+**Socratic Interview Mode MUST NOT write to `~/.claude/plans/`.** When prometheus runs in Socratic mode, it returns synthesis to the user — it does NOT draft a plan file. The distinction: regular prometheus mode produces a plan file output; Socratic mode produces dialogue synthesis only.
 
 ## Memory Guidance
 
@@ -234,7 +234,7 @@ Before generating, delegate to metis to catch: missed questions, missing guardra
 
 ### Plan Structure
 
-Write to `.claude/plans/{name}.md` (no plan mode) or the active plan-mode file path.
+Write to `~/.claude/plans/{name}.md` (no plan mode) or the active plan-mode file path.
 
 ```markdown
 # {Plan Title}
@@ -412,7 +412,7 @@ grep -cP "^- \[ \] [0-9]+\." <plan-file-path>
 5. After exit, guide user to `/oh-my-claudeagent:start-work`
 
 **Plan mode NOT active:**
-- Write to `.claude/plans/{name}.md`
+- Write to `~/.claude/plans/{name}.md`
 - No ExitPlanMode
 - Still confirm next steps via `AskUserQuestion` before guiding to start-work
 

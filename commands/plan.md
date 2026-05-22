@@ -14,7 +14,7 @@ Follow `agents/prometheus.md` end-to-end:
 
 **Phase 1 — Interview**: Classify work intent (trivial/simple/complex/build/refactor/architecture/research). Apply Simple Request Detection. Run Exploration Gate — mandatory for Build from Scratch, Research, Architecture; scoped for Refactoring; skip for Trivial. Use `AskUserQuestion` for targeted interview questions; fall back to `## BLOCKING QUESTIONS` block if unavailable. Run Self-Clearance Check after every interview turn. All 10 items YES → auto-transition. Any NO → ask the specific unclear question.
 
-**Phase 2 — Plan Generation**: Consult metis before generating. Write plan to `.claude/plans/{name}.md` or active plan-mode file. Enforce task checkboxes (`- [ ] N.`). Run momus review loop (max 3 iterations) until OKAY.
+**Phase 2 — Plan Generation**: Consult metis before generating. Write plan to `~/.claude/plans/{name}.md` or active plan-mode file. Enforce task checkboxes (`- [ ] N.`). Run momus review loop (max 3 iterations) until OKAY.
 
 **Phase 3 — Handoff**: After momus OKAY, confirm next steps with user via `AskUserQuestion`. Guide to `/oh-my-claudeagent:start-work` for execution.
 
@@ -32,4 +32,4 @@ Delegate exploration to `explore` agents (parallel when topics are independent).
 
 ## Socratic Interview Mode
 
-If the request is underspecified or architectural in nature, enter Socratic Interview Mode (now part of prometheus — see `agents/prometheus.md` "Socratic Interview Mode" section) before entering Phase 1. Socratic mode surfaces hidden constraints and clarifies fuzzy problem statements via iterative dialogue. In Socratic mode, prometheus does NOT write to `.claude/plans/` — it returns synthesis only.
+If the request is underspecified or architectural in nature, enter Socratic Interview Mode (now part of prometheus — see `agents/prometheus.md` "Socratic Interview Mode" section) before entering Phase 1. Socratic mode surfaces hidden constraints and clarifies fuzzy problem statements via iterative dialogue. In Socratic mode, prometheus does NOT write to `~/.claude/plans/` — it returns synthesis only.
