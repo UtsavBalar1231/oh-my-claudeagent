@@ -42,7 +42,10 @@ class TestProtocol:
         payload = json.dumps(
             {
                 "model": {"display_name": "claude-3-5-sonnet"},
-                "context_window": {"context_window_size": 200000, "used_percentage": 10.0},
+                "context_window": {
+                    "context_window_size": 200000,
+                    "used_percentage": 10.0,
+                },
                 "cost": {},
                 "workspace": {},
             }
@@ -62,14 +65,14 @@ class TestProtocol:
         line = f"99\t{payload}\n"
         handler, output = _make_handler(line)
         handler.handle()
-        status, body = _decode_response(output)
+        status, _ = _decode_response(output)
         assert status == "ERR"
 
     def test_invalid_json_returns_err(self) -> None:
         line = f"{PROTOCOL_VERSION}\tnot-valid-json\n"
         handler, output = _make_handler(line)
         handler.handle()
-        status, body = _decode_response(output)
+        status, _ = _decode_response(output)
         assert status == "ERR"
 
     def test_empty_line_returns_nothing(self) -> None:
@@ -96,9 +99,52 @@ class TestProtocol:
             }
         )
         line = f"{PROTOCOL_VERSION}\t{payload}\n"
-        handler, output = _make_handler(line)
+        handler, _ = _make_handler(line)
 
         with patch("statusline.daemon.get_git_info", return_value={"is_git": "0"}):
             handler.handle()
 
         handler.server.reset_idle_timer.assert_called_once()
+
+
+class TestIdleTimerGuards:
+    """idle_timeout <= 0 must disable the shutdown timer entirely."""
+
+    def _make_daemon_stub(self, idle_timeout: int):
+        """Construct a StatuslineDaemon-like object without binding a socket."""
+        from statusline.daemon import StatuslineDaemon
+
+        d = StatuslineDaemon.__new__(StatuslineDaemon)
+        # Minimal fields reset_idle_timer touches
+        import threading
+
+        d._idle_timeout = idle_timeout
+        d._idle_timer = None
+        d._lock = threading.Lock()
+        return d
+
+    def test_zero_idle_timeout_does_not_arm_timer(self) -> None:
+        d = self._make_daemon_stub(0)
+        d.reset_idle_timer()
+        assert d._idle_timer is None
+
+    def test_negative_idle_timeout_does_not_arm_timer(self) -> None:
+        d = self._make_daemon_stub(-5)
+        d.reset_idle_timer()
+        assert d._idle_timer is None
+
+    def test_positive_idle_timeout_arms_timer(self) -> None:
+        d = self._make_daemon_stub(3600)
+        d.reset_idle_timer()
+        assert d._idle_timer is not None
+        d._idle_timer.cancel()  # don't leak threads
+
+    def test_reset_cancels_previous_timer(self) -> None:
+        d = self._make_daemon_stub(3600)
+        d.reset_idle_timer()
+        first = d._idle_timer
+        d.reset_idle_timer()
+        second = d._idle_timer
+        assert first is not second
+        assert second is not None
+        second.cancel()

@@ -101,11 +101,22 @@ class StatuslineDaemon(socketserver.ThreadingUnixStreamServer):
         self.reset_idle_timer()
 
     def reset_idle_timer(self) -> None:
-        """Reset the idle shutdown timer."""
+        """Reset the idle shutdown timer.
+
+        When ``idle_timeout <= 0``, the timer is disabled — daemon persists
+        until explicit stop or system reboot. Prevents the surprise where
+        CLAUDE_STATUSLINE_IDLE_TIMEOUT=0 would otherwise fire Timer(0.0,...)
+        immediately and kill the daemon on startup.
+        """
         with self._lock:
             if self._idle_timer is not None:
                 self._idle_timer.cancel()
-            self._idle_timer = threading.Timer(float(self._idle_timeout or 0), self._idle_shutdown)
+                self._idle_timer = None
+            if self._idle_timeout is None or self._idle_timeout <= 0:
+                return  # idle shutdown disabled
+            self._idle_timer = threading.Timer(
+                float(self._idle_timeout), self._idle_shutdown
+            )
             self._idle_timer.daemon = True
             self._idle_timer.start()
 
@@ -210,7 +221,9 @@ def _cmd_start(foreground: bool = False) -> None:
         ready, _, _ = select.select([read_fd], [], [], 2.0)
         if not ready:
             os.close(read_fd)
-            sys.stderr.write("cc-statusline-daemon: daemon failed to come up within 2s\n")
+            sys.stderr.write(
+                "cc-statusline-daemon: daemon failed to come up within 2s\n"
+            )
             sys.stderr.flush()
             # Try to kill the child if we can still find it
             with contextlib.suppress(OSError):

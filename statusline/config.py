@@ -7,6 +7,7 @@ and cached for the lifetime of the process.
 
 from __future__ import annotations
 
+import contextlib
 import os
 
 # ---------------------------------------------------------------------------
@@ -18,13 +19,13 @@ class Config:
     """Lazy-loaded configuration from environment variables."""
 
     __slots__ = (
-        "_idle_timeout",
+        "_bar_width",
         "_cache_ttl",
         "_git_timeout",
-        "_bar_width",
+        "_idle_timeout",
         "_ratelimit_bar_width",
-        "_threshold_warn",
         "_threshold_crit",
+        "_threshold_warn",
     )
 
     def __init__(self) -> None:
@@ -43,17 +44,19 @@ class Config:
         raw = os.environ.get(env_var)
         result = default
         if raw is not None:
-            try:
+            with contextlib.suppress(ValueError):
                 result = int(raw)
-            except ValueError:
-                pass
         object.__setattr__(self, attr, result)
         return result
 
     @property
     def idle_timeout(self) -> int:
-        """Idle shutdown timeout in seconds (CLAUDE_STATUSLINE_IDLE_TIMEOUT)."""
-        return self._get_int("_idle_timeout", "CLAUDE_STATUSLINE_IDLE_TIMEOUT", 1800)
+        """Idle shutdown timeout in seconds (CLAUDE_STATUSLINE_IDLE_TIMEOUT).
+
+        Default 86400 (24h). Set to 0 to disable idle shutdown entirely
+        (daemon persists until explicit stop or system reboot).
+        """
+        return self._get_int("_idle_timeout", "CLAUDE_STATUSLINE_IDLE_TIMEOUT", 86400)
 
     @property
     def cache_ttl(self) -> int:
