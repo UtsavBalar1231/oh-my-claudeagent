@@ -1,14 +1,12 @@
 """Verification evidence logging tools."""
 
 import json
-import os
 import time
 
 from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 
 from tools._common import (
-    _evidence_legacy_path,
     _evidence_new_path,
     _find_git_root,
     _load_evidence,
@@ -41,16 +39,9 @@ def register(mcp: FastMCP) -> None:
         ),
     ) -> str:
         """REQUIRED after every build/test/lint command -- task completion is blocked without this. Append a timestamped verification evidence entry. Use immediately after running any verification command (just test, just lint, just build, etc.). Set plan_sha256 on final_verification_f1..f4 entries to scope evidence to a specific plan run. Returns confirmation with total evidence entry count."""
-        state = _state_dir(working_directory)
         git_root = _find_git_root(working_directory)
         path = _evidence_new_path(git_root)
-        # Read via legacy fallback so existing entries from the old path are
-        # visible on first write to the new location.
-        legacy_path = _evidence_legacy_path(state)
-        if not os.path.exists(path) and os.path.exists(legacy_path):
-            data = _read_json(legacy_path)
-        else:
-            data = _read_json(path)
+        data = _read_json(path)
 
         if "entries" not in data:
             data["entries"] = []

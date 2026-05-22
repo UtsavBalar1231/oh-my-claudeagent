@@ -4,7 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 import tools.notepad as notepad_module
-from tools._common import NOTEPADS_DIR, VALID_SECTIONS
+from tools._common import VALID_SECTIONS
 
 
 def _get_tools(working_dir):
@@ -241,26 +241,8 @@ def test_notepad_compact_reduces_large_section(tools, tmp_git_root, working_dir)
     assert "Compacted" in text
 
 
-# --- legacy fallback ---
-
-
-def test_notepad_read_returns_legacy_content(tools, tmp_git_root, working_dir):
-    """notepad_read returns content from the legacy path when no new-path file exists."""
-    # Pre-seed a file at the legacy path (simulates an existing notepad before migration)
-    legacy_dir = tmp_git_root / ".omca" / "state" / NOTEPADS_DIR / "legacy-plan"
-    legacy_dir.mkdir(parents=True, exist_ok=True)
-    (legacy_dir / "learnings.md").write_text("## legacy entry\n\nLegacy content\n")
-
-    result = tools["notepad_read"](
-        plan_name="legacy-plan",
-        section="learnings",
-        working_directory=working_dir,
-    )
-    assert "Legacy content" in result
-
-
-def test_notepad_write_creates_new_path(tools, tmp_git_root, working_dir):
-    """notepad_write places the new entry at .omca/notepads/<plan>/<section>.md."""
+def test_notepad_write_creates_canonical_path(tools, tmp_git_root, working_dir):
+    """notepad_write places the new entry at .omca/notepads/<plan>/<section>.md (canonical path only)."""
     tools["notepad_write"](
         plan_name="new-path-plan",
         section="decisions",
@@ -272,26 +254,15 @@ def test_notepad_write_creates_new_path(tools, tmp_git_root, working_dir):
     assert "New path entry" in new_file.read_text()
 
 
-def test_notepad_read_prefers_new_path_over_legacy(tools, tmp_git_root, working_dir):
-    """notepad_read returns new-path content when both new and legacy files exist."""
-    # Pre-seed legacy
-    legacy_dir = tmp_git_root / ".omca" / "state" / NOTEPADS_DIR / "mixed-plan"
+def test_notepad_read_ignores_legacy_path(tools, tmp_git_root, working_dir):
+    """notepad_read returns not-found when only a legacy-path dir exists (legacy path no longer consulted)."""
+    legacy_dir = tmp_git_root / ".omca" / "state" / "notepads" / "legacy-plan"
     legacy_dir.mkdir(parents=True, exist_ok=True)
-    (legacy_dir / "issues.md").write_text("## old\n\nLegacy issues\n")
-
-    # Write via tool (lands at new path)
-    tools["notepad_write"](
-        plan_name="mixed-plan",
-        section="issues",
-        content="New issues entry",
-        working_directory=working_dir,
-    )
+    (legacy_dir / "learnings.md").write_text("## legacy entry\n\nLegacy content\n")
 
     result = tools["notepad_read"](
-        plan_name="mixed-plan",
-        section="issues",
+        plan_name="legacy-plan",
+        section="learnings",
         working_directory=working_dir,
     )
-    assert "New issues entry" in result
-    # Legacy content should NOT appear (new path wins)
-    assert "Legacy issues" not in result
+    assert "No notepad" in result

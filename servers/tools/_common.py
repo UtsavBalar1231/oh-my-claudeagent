@@ -15,7 +15,6 @@ EVIDENCE_FILE_NEW = "verification-evidence.json"
 RALPH_STATE_FILE = "ralph-state.json"
 ULTRAWORK_STATE_FILE = "ultrawork-state.json"
 PENDING_FINAL_VERIFY_FILE = "pending-final-verify.json"
-NOTEPADS_DIR = "notepads"
 NOTEPAD_DIR = ".omca/notepads"
 VALID_SECTIONS = ("learnings", "issues", "decisions", "problems")
 AGENT_CATALOG_FILE = "agent-catalog.json"
@@ -49,21 +48,6 @@ def _state_dir(working_directory: str) -> str:
     return os.path.join(root, OMCA_STATE_DIR)
 
 
-def _legacy_path_fallback(new_path: str, legacy_path: str) -> str:
-    """Return the preferred path for one-release transition reads.
-
-    Priority:
-    1. ``new_path`` if the file exists there — canonical location wins.
-    2. ``legacy_path`` if the file exists there — backwards-compat read.
-    3. ``new_path`` when neither exists — callers write to the new location.
-    """
-    if os.path.exists(new_path):
-        return new_path
-    if os.path.exists(legacy_path):
-        return legacy_path
-    return new_path
-
-
 def _read_json(path: str) -> dict:
     """Read a JSON file, returning empty dict if missing or invalid."""
     try:
@@ -81,11 +65,6 @@ def _write_json(path: str, data: dict | list) -> None:
         json.dump(data, f, indent=2)
         f.write("\n")
     os.replace(tmp, path)
-
-
-def _notepad_dir(state: str, plan_name: str) -> str:
-    """Return the legacy notepad directory for a plan (under .omca/state/notepads/)."""
-    return os.path.join(state, NOTEPADS_DIR, plan_name)
 
 
 def _notepad_new_dir(git_root: str, plan_name: str) -> str:
@@ -106,23 +85,15 @@ def _evidence_new_path(git_root: str) -> str:
     return os.path.join(git_root, EVIDENCE_DIR, EVIDENCE_FILE_NEW)
 
 
-def _evidence_legacy_path(state_dir: str) -> str:
-    """Return the legacy evidence file path under .omca/state/."""
-    return os.path.join(state_dir, EVIDENCE_FILE)
-
-
 def _load_evidence(state_dir: str) -> list[dict]:
     """Return evidence entries list; empty list on any failure.
 
-    Reads via legacy-path fallback: prefers new path (.omca/evidence/),
-    falls back to legacy (.omca/state/) if new path absent.
+    Reads only from the canonical path: .omca/evidence/verification-evidence.json.
     ``state_dir`` is expected to be ``<git_root>/.omca/state``.
     """
     # state_dir = <git_root>/.omca/state  →  git_root = two levels up
     git_root = os.path.dirname(os.path.dirname(state_dir))
-    new_path = _evidence_new_path(git_root)
-    legacy_path = _evidence_legacy_path(state_dir)
-    path = _legacy_path_fallback(new_path, legacy_path)
+    path = _evidence_new_path(git_root)
     try:
         data = _read_json(path)
         return data.get("entries", [])
@@ -144,22 +115,14 @@ def _clear_mode_files(state: str, modes: list[str]) -> list[str]:
     cleared: list[str] = []
     for label in modes:
         if label == "evidence":
-            # Evidence lives at the new path; try new then legacy for removal.
             # state = <git_root>/.omca/state  →  git_root = two levels up
             git_root = os.path.dirname(os.path.dirname(state))
-            paths_to_try = [
-                _evidence_new_path(git_root),
-                _evidence_legacy_path(state),
-            ]
-            removed = False
-            for path in paths_to_try:
-                try:
-                    os.remove(path)
-                    removed = True
-                except FileNotFoundError:
-                    pass
-            if removed:
+            path = _evidence_new_path(git_root)
+            try:
+                os.remove(path)
                 cleared.append(label)
+            except FileNotFoundError:
+                pass
             continue
         filename = _MODE_FILES.get(label)
         if not filename:

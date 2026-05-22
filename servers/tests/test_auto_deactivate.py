@@ -16,7 +16,8 @@ from mcp.server.fastmcp import FastMCP
 from tools import boulder as boulder_module
 from tools._common import (
     BOULDER_FILE,
-    EVIDENCE_FILE,
+    EVIDENCE_DIR,
+    EVIDENCE_FILE_NEW,
     PENDING_FINAL_VERIFY_FILE,
     RALPH_STATE_FILE,
     ULTRAWORK_STATE_FILE,
@@ -109,9 +110,10 @@ def test_auto_deactivate_f4_approve_matching_sha(
     """Plan complete + F4 APPROVE with matching SHA triggers auto-deactivation."""
     state_dir, _plan_file, sha = synthetic_state_dir
 
-    # Write evidence with a matching F4 APPROVE entry
+    # Write evidence with a matching F4 APPROVE entry to the canonical path
+    evidence_path = tmp_git_root / EVIDENCE_DIR / EVIDENCE_FILE_NEW
     _write_json(
-        str(state_dir / EVIDENCE_FILE),
+        str(evidence_path),
         {
             "entries": [
                 {
@@ -143,7 +145,7 @@ def test_auto_deactivate_f4_approve_matching_sha(
     assert not (state_dir / PENDING_FINAL_VERIFY_FILE).exists()
 
     # Evidence file MUST still exist (never auto-cleared)
-    assert (state_dir / EVIDENCE_FILE).exists()
+    assert evidence_path.exists()
 
 
 # ---------------------------------------------------------------------------
@@ -159,7 +161,7 @@ def test_auto_deactivate_f4_approve_wrong_sha(
 
     wrong_sha = "a" * 64  # 64-char hex, guaranteed different from real sha
     _write_json(
-        str(state_dir / EVIDENCE_FILE),
+        str(tmp_git_root / EVIDENCE_DIR / EVIDENCE_FILE_NEW),
         {
             "entries": [
                 {
@@ -199,10 +201,10 @@ def test_auto_deactivate_no_f4_only_earlier_waves(
     mcp_server, working_dir, tmp_git_root, synthetic_state_dir
 ):
     """Plan complete + only F1/F2/F3 APPROVE entries -> auto_deactivated=False."""
-    state_dir, _plan_file, sha = synthetic_state_dir
+    _state_dir, _plan_file, sha = synthetic_state_dir
 
     _write_json(
-        str(state_dir / EVIDENCE_FILE),
+        str(tmp_git_root / EVIDENCE_DIR / EVIDENCE_FILE_NEW),
         {
             "entries": [
                 {
