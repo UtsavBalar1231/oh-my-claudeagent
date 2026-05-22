@@ -206,7 +206,7 @@ first-class `.plan_sha256 == <sha>` or embedded `"plan_sha256:<sha>"` in
 
 ## verification-evidence.json
 
-**Path**: `.omca/evidence/verification-evidence.json` (canonical); `.omca/state/verification-evidence.json` (legacy fallback, one release)
+**Path**: `.omca/evidence/verification-evidence.json`
 **Writers**: `evidence_log` MCP tool (`servers/tools/evidence.py`) — the ONLY valid
 writer. Manual writes are blocked by `scripts/write-guard.sh` (`PreToolUse Write` hook)
 and rejected by schema validation in `scripts/task-completed-verify.sh`.
@@ -340,11 +340,7 @@ breaker at 3+ errors)
 1. Created on first error encounter; updated atomically per error event.
 2. Key format: `"<tool_name>:<error_kind>"` where `tool_name` comes from
    `.tool_name // "Agent"` (or `// "Edit"` etc.) in the hook payload.
-3. `session-init.sh` runs a one-time migration (commit 874738c): merges any legacy
-   `"Task:delegate_error"` key into `"Agent:delegate_error"` (pre-v2.0, `tool_name`
-   defaulted to `"Task"` instead of `"Agent"`). Guard: only fires if the file exists
-   AND contains `"Task:delegate_error"` — idempotent on clean installs.
-4. Values are cumulative integers — NOT reset each session.
+3. Values are cumulative integers — NOT reset each session.
 
 **Fields** (the schema is an open object; known keys are below):
 
