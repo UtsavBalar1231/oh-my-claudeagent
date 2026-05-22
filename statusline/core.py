@@ -271,6 +271,8 @@ def _todo_counter(project_dir: str, glyphs: dict[str, str], nerd: bool) -> str:
     Returns "" (silently) when boulder is missing, plan is missing, total == 0,
     or any error occurs.
     """
+    if not project_dir:
+        return ""
     try:
         boulder_path = Path(project_dir) / ".omca" / "state" / "boulder.json"
         if not boulder_path.exists():
