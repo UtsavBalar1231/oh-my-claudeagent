@@ -125,3 +125,22 @@ mark_mode_announced() {
 		log_hook_error "jq update failed for active-modes.json mode=${mode}" "$(basename "$0")"
 	fi
 }
+
+# Resolve the evidence file path: prefer .omca/evidence/ (new), fall back to
+# .omca/state/ (legacy). STATE_DIR is expected to be <root>/.omca/state.
+# Usage: EVIDENCE_FILE=$(resolve_evidence_file "${STATE_DIR}")
+resolve_evidence_file() {
+	local state_dir="$1"
+	local root
+	root="${state_dir%/state}"
+	local new_path="${root}/evidence/verification-evidence.json"
+	local legacy_path="${state_dir}/verification-evidence.json"
+	if [[ -f "${new_path}" ]]; then
+		printf '%s\n' "${new_path}"
+	elif [[ -f "${legacy_path}" ]]; then
+		printf '%s\n' "${legacy_path}"
+	else
+		# Neither exists — return new path (writers create here)
+		printf '%s\n' "${new_path}"
+	fi
+}

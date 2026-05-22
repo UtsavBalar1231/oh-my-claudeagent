@@ -19,7 +19,7 @@ if [[ -n "${TEAMMATE_NAME}" ]] || [[ -n "${TEAM_NAME}" ]]; then
 	echo "{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"hook\":\"task-completed-verify.sh\",\"teammate_name\":\"${TEAMMATE_NAME}\",\"team_name\":\"${TEAM_NAME}\",\"task\":\"${TASK_DESCRIPTION:0:100}\"}" >>"${LOG_DIR}/task-verify-audit.jsonl" 2>/dev/null
 fi
 
-EVIDENCE_FILE="${STATE_DIR}/verification-evidence.json"
+EVIDENCE_FILE=$(resolve_evidence_file "${STATE_DIR}")
 
 RECENT_EVIDENCE=false
 EVIDENCE_AGE=0

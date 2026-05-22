@@ -9,6 +9,8 @@ import subprocess
 OMCA_STATE_DIR = ".omca/state"
 BOULDER_FILE = "boulder.json"
 EVIDENCE_FILE = "verification-evidence.json"
+EVIDENCE_DIR = ".omca/evidence"
+EVIDENCE_FILE_NEW = "verification-evidence.json"
 RALPH_STATE_FILE = "ralph-state.json"
 ULTRAWORK_STATE_FILE = "ultrawork-state.json"
 PENDING_FINAL_VERIFY_FILE = "pending-final-verify.json"
@@ -92,9 +94,28 @@ def _list_notepad_sections(directory: str) -> list[str]:
     return [f.removesuffix(".md") for f in files]
 
 
+def _evidence_new_path(git_root: str) -> str:
+    """Return the canonical new evidence file path under .omca/evidence/."""
+    return os.path.join(git_root, EVIDENCE_DIR, EVIDENCE_FILE_NEW)
+
+
+def _evidence_legacy_path(state_dir: str) -> str:
+    """Return the legacy evidence file path under .omca/state/."""
+    return os.path.join(state_dir, EVIDENCE_FILE)
+
+
 def _load_evidence(state_dir: str) -> list[dict]:
-    """Return evidence entries list; empty list on any failure."""
-    path = os.path.join(state_dir, EVIDENCE_FILE)
+    """Return evidence entries list; empty list on any failure.
+
+    Reads via legacy-path fallback: prefers new path (.omca/evidence/),
+    falls back to legacy (.omca/state/) if new path absent.
+    ``state_dir`` is expected to be ``<git_root>/.omca/state``.
+    """
+    # state_dir = <git_root>/.omca/state  →  git_root = two levels up
+    git_root = os.path.dirname(os.path.dirname(state_dir))
+    new_path = _evidence_new_path(git_root)
+    legacy_path = _evidence_legacy_path(state_dir)
+    path = _legacy_path_fallback(new_path, legacy_path)
     try:
         data = _read_json(path)
         return data.get("entries", [])
@@ -115,6 +136,24 @@ def _clear_mode_files(state: str, modes: list[str]) -> list[str]:
     """Remove state files for the named modes; return list of actually-cleared mode names."""
     cleared: list[str] = []
     for label in modes:
+        if label == "evidence":
+            # Evidence lives at the new path; try new then legacy for removal.
+            # state = <git_root>/.omca/state  →  git_root = two levels up
+            git_root = os.path.dirname(os.path.dirname(state))
+            paths_to_try = [
+                _evidence_new_path(git_root),
+                _evidence_legacy_path(state),
+            ]
+            removed = False
+            for path in paths_to_try:
+                try:
+                    os.remove(path)
+                    removed = True
+                except FileNotFoundError:
+                    pass
+            if removed:
+                cleared.append(label)
+            continue
         filename = _MODE_FILES.get(label)
         if not filename:
             continue

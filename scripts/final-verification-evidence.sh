@@ -47,7 +47,7 @@ fi
 
 BOULDER_FILE="${STATE_DIR}/boulder.json"
 MARKER_FILE="${STATE_DIR}/pending-final-verify.json"
-EVIDENCE_FILE="${STATE_DIR}/verification-evidence.json"
+EVIDENCE_FILE=$(resolve_evidence_file "${STATE_DIR}")
 
 ACTIVE_PLAN=$(jq_read "${BOULDER_FILE}" '.active_plan // ""')
 

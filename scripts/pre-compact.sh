@@ -7,7 +7,7 @@ LOG_DIR="${HOOK_LOG_DIR}"
 
 BOULDER_FILE="${STATE_DIR}/boulder.json"
 MARKER_FILE="${STATE_DIR}/pending-final-verify.json"
-EVIDENCE_FILE="${STATE_DIR}/verification-evidence.json"
+EVIDENCE_FILE=$(resolve_evidence_file "${STATE_DIR}")
 
 # 3600s (1h) — F1-F4 freshness window. Matches final-verification-evidence.sh constant.
 PC_MAX_EVIDENCE_AGE_SECONDS=3600
