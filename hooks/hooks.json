@@ -70,6 +70,15 @@
 		],
 		"PreToolUse": [
 			{
+				"matcher": "Grep",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/executor-grep-deny.sh"
+					}
+				]
+			},
+			{
 				"matcher": "Agent",
 				"hooks": [
 					{
@@ -148,6 +157,26 @@
 						"type": "command",
 						"if": "Bash(pnpm *)",
 						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh"
+					},
+					{
+						"type": "command",
+						"if": "Bash(git *)",
+						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/git-destructive-deny.sh"
+					},
+					{
+						"type": "command",
+						"if": "Bash(sed *)",
+						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/sed-grep-deny.sh"
+					},
+					{
+						"type": "command",
+						"if": "Bash(grep *)",
+						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/sed-grep-deny.sh"
+					},
+					{
+						"type": "command",
+						"if": "Bash(grep *)",
+						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/executor-grep-deny.sh"
 					}
 				]
 			},

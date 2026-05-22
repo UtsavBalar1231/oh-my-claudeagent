@@ -98,6 +98,10 @@
 [validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): script succeeded with valid JSON output
 [validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): script succeeded with valid JSON output
 [validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): script succeeded with valid JSON output
+[validate-plugin] PASS: PermissionRequest Bash (git-destructive-deny.sh): script succeeded with valid JSON output
+[validate-plugin] PASS: PermissionRequest Bash (sed-grep-deny.sh): script succeeded with valid JSON output
+[validate-plugin] PASS: PermissionRequest Bash (sed-grep-deny.sh): script succeeded with valid JSON output
+[validate-plugin] PASS: PermissionRequest Bash (executor-grep-deny.sh): script succeeded with valid JSON output
 [validate-plugin] PASS: PermissionRequest ExitPlanMode (plan-mode-handler.sh): script succeeded with valid JSON output
 [validate-plugin] FAIL: SessionStart compact (post-compact-inject.sh): expected JSON output but received empty stdout
 [validate-plugin] PASS: TaskCreated default (lifecycle-state.sh): script succeeded with empty stdout
@@ -155,4 +159,4 @@
 [validate-plugin] PASS: mcp tools/list contains categories_list
 [validate-plugin] PASS: mcp tools/list contains concurrency_status
 [validate-plugin] PASS: mcp tools/list contains file_read
-[validate-plugin] Summary: 142 passed, 9 failed, 1 skipped, 0 warned
+[validate-plugin] Summary: 146 passed, 9 failed, 1 skipped, 0 warned
