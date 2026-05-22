@@ -219,11 +219,11 @@ _write_legacy_snippet_ftypes() {
 		--arg sha "${sha}" \
 		--arg old_sha "${old_sha}" \
 		'[
-			{"type":"final_verification_f1","command":"old run","exit_code":0,"output_snippet":("plan_sha256:" + $old_sha + " verdict:APPROVE"),"timestamp":$old_ts},
-			{"type":"final_verification_f1","command":"oracle: APPROVE","exit_code":0,"output_snippet":"verdict:APPROVE","timestamp":$new_ts,"plan_sha256":$sha},
-			{"type":"final_verification_f2","command":"oracle: APPROVE","exit_code":0,"output_snippet":"verdict:APPROVE","timestamp":$new_ts,"plan_sha256":$sha},
-			{"type":"final_verification_f3","command":"oracle: APPROVE","exit_code":0,"output_snippet":"verdict:APPROVE","timestamp":$new_ts,"plan_sha256":$sha},
-			{"type":"final_verification_f4","command":"oracle: APPROVE","exit_code":0,"output_snippet":"verdict:APPROVE","timestamp":$new_ts,"plan_sha256":$sha}
+			{"type":"final_verification_f1","command":"old run","exit_code":0,"output_snippet":("plan_sha256:" + $old_sha + " verdict:APPROVE"),"timestamp":$old_ts,"verified_by":"oracle"},
+			{"type":"final_verification_f1","command":"oracle: APPROVE","exit_code":0,"output_snippet":"verdict:APPROVE","timestamp":$new_ts,"plan_sha256":$sha,"verified_by":"oracle"},
+			{"type":"final_verification_f2","command":"oracle: APPROVE","exit_code":0,"output_snippet":"verdict:APPROVE","timestamp":$new_ts,"plan_sha256":$sha,"verified_by":"executor"},
+			{"type":"final_verification_f3","command":"oracle: APPROVE","exit_code":0,"output_snippet":"verdict:APPROVE","timestamp":$new_ts,"plan_sha256":$sha,"verified_by":"executor"},
+			{"type":"final_verification_f4","command":"oracle: APPROVE","exit_code":0,"output_snippet":"verdict:APPROVE","timestamp":$new_ts,"plan_sha256":$sha,"verified_by":"executor"}
 		]')
 	write_state "verification-evidence.json" "{\"entries\":${entries}}"
 

@@ -40,10 +40,10 @@ _write_all_ftypes_at_ts() {
 	local plan_sha="$2"
 	local entries
 	entries=$(jq -n --arg ts "${ts}" --arg sha "${plan_sha}" '[
-		{"type":"final_verification_f1","command":"oracle: APPROVE","exit_code":0,"output_snippet":("plan_sha256:" + $sha + " verdict:APPROVE"),"timestamp":$ts,"plan_sha256":$sha},
-		{"type":"final_verification_f2","command":"oracle: APPROVE","exit_code":0,"output_snippet":("plan_sha256:" + $sha + " verdict:APPROVE"),"timestamp":$ts,"plan_sha256":$sha},
-		{"type":"final_verification_f3","command":"oracle: APPROVE","exit_code":0,"output_snippet":("plan_sha256:" + $sha + " verdict:APPROVE"),"timestamp":$ts,"plan_sha256":$sha},
-		{"type":"final_verification_f4","command":"oracle: APPROVE","exit_code":0,"output_snippet":("plan_sha256:" + $sha + " verdict:APPROVE"),"timestamp":$ts,"plan_sha256":$sha}
+		{"type":"final_verification_f1","command":"oracle: APPROVE","exit_code":0,"output_snippet":("plan_sha256:" + $sha + " verdict:APPROVE"),"timestamp":$ts,"plan_sha256":$sha,"verified_by":"oracle"},
+		{"type":"final_verification_f2","command":"oracle: APPROVE","exit_code":0,"output_snippet":("plan_sha256:" + $sha + " verdict:APPROVE"),"timestamp":$ts,"plan_sha256":$sha,"verified_by":"executor"},
+		{"type":"final_verification_f3","command":"oracle: APPROVE","exit_code":0,"output_snippet":("plan_sha256:" + $sha + " verdict:APPROVE"),"timestamp":$ts,"plan_sha256":$sha,"verified_by":"executor"},
+		{"type":"final_verification_f4","command":"oracle: APPROVE","exit_code":0,"output_snippet":("plan_sha256:" + $sha + " verdict:APPROVE"),"timestamp":$ts,"plan_sha256":$sha,"verified_by":"executor"}
 	]')
 	write_state "verification-evidence.json" "{\"entries\":${entries}}"
 }

@@ -107,7 +107,8 @@ EOF
 				"command": "oracle: APPROVE",
 				"exit_code": 0,
 				"output_snippet": ("plan_sha256:" + $sha_c + " verdict:APPROVE"),
-				"timestamp": $ts
+				"timestamp": $ts,
+				"verified_by": "oracle"
 			},
 			{
 				"type": "final_verification_f2",
@@ -115,7 +116,8 @@ EOF
 				"exit_code": 0,
 				"plan_sha256": $sha_c,
 				"output_snippet": "verdict:APPROVE",
-				"timestamp": $ts
+				"timestamp": $ts,
+				"verified_by": "executor"
 			},
 			{
 				"type": "final_verification_f3",
@@ -123,7 +125,8 @@ EOF
 				"exit_code": 0,
 				"plan_sha256": $sha_c,
 				"output_snippet": "verdict:APPROVE",
-				"timestamp": $ts
+				"timestamp": $ts,
+				"verified_by": "executor"
 			},
 			{
 				"type": "final_verification_f4",
@@ -131,7 +134,8 @@ EOF
 				"exit_code": 0,
 				"plan_sha256": $sha_c,
 				"output_snippet": "verdict:APPROVE",
-				"timestamp": $ts
+				"timestamp": $ts,
+				"verified_by": "executor"
 			}
 		]')
 	write_state "verification-evidence.json" "{\"entries\":${entries}}"
