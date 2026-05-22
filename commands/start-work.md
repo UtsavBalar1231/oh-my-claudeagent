@@ -238,7 +238,11 @@ No evidence = not complete.
 
 ## FROZEN Plan Discipline
 
-After flipping the LAST `- [ ]` → `- [x]`, BEFORE running F1-F4:
+After flipping the LAST `- [ ]` → `- [x]`:
+
+**Phase 6 CI**: Run `just ci` (full pipeline) and log evidence via `evidence_log`.
+
+After the LAST `- [ ]` flip AND after Phase 6 CI evidence is logged, BEFORE running F1-F4:
 
 Write `STATE_DIR/pending-final-verify.json` (UNCONDITIONAL):
 
