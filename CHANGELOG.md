@@ -5,6 +5,105 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] - 2026-05-22
+
+Runtime-hardening release. 33-task plan `omca-runtime-hardening-and-cleanup`
+addressed every active TODO item plus mid-flight legacy-burden removal. F1-F4
+final-verification wave approved (oracle + executor). All behavioral fixes
+land as hooks / settings / deny rules — net per-turn context tokens decreased.
+
+### Added
+- `.omca/{evidence,notepads,drafts,rules}/` canonical layout mirroring the
+  reference structure at `pamir-app/.sisyphus/`. `boulder_write` dual-writes
+  the plan file to `~/.claude/plans/` (canonical) AND `.omca/plans/` (project
+  mirror) with SHA verification.
+- Three new PreToolUse / PermissionRequest deny hooks:
+  - `scripts/git-destructive-deny.sh` blocks `git reset --hard`, `git stash*`,
+    `git checkout --`, `git clean*`, `git restore*`. Opt-out via
+    `OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY=1` for the git-master skill.
+  - `scripts/sed-grep-deny.sh` blocks `sed -n` and `grep -n` (with clustered
+    flags like `-nA`, `-nB`); error message routes to Grep tool / `ast_search`.
+  - `scripts/executor-grep-deny.sh` denies Grep/grep against code-file
+    extensions when `subagent_type == executor` — forces ast adoption by
+    removing the alternative.
+- `scripts/sweep-stale-log-entries.sh` one-shot script to clean orphaned
+  empty-timestamp entries from `hook-errors.jsonl`.
+- `scripts/probe-userpromptsubmit-payload.sh` reusable probe for inspecting
+  `UserPromptSubmit` hook payload field availability.
+- `log_hook_info()` helper in `scripts/lib/common.sh` for info-level events
+  (mirror of `log_hook_error`, writes to `.omca/logs/hook-info.jsonl`).
+- `.omca/rules/orchestration-workflow.md` carries the prometheus → metis →
+  momus pipeline assertion. Surfaced on-demand by `context-injector.sh`, not
+  per-turn — zero context-token cost.
+- Statusline TODO counter on Line 1: when `boulder.json` points at an active
+  plan with `- [ ] N.` numbered checkboxes, renders `T: <done>/<total>` (or
+  nf-fa-tasks glyph in Nerd Font terminals).
+- Regression suites: `TestIdleTimerGuards` (statusline daemon),
+  `TestGlyphPaddingContract`, `TestComposeLine1` namespaced/bare OMCA Default,
+  `agent_cl4r1t4s_regressions.bats`.
+
+### Changed
+- `scripts/final-verification-evidence.sh` hardening:
+  - SHA-divergence check scoped to evidence entries with
+    `timestamp >= marker.marked_at` (was full-log scan, produced false
+    positives across plans).
+  - Evidence age window bound to marker lifetime with 7-day absolute ceiling
+    (was static 3600s wall-clock).
+  - `has_ftype` predicate requires `verified_by ∈ {oracle, executor}` AND
+    `exit_code == 0` on F1-F4 entries; rejection cause named in error message.
+  - "cleared cross-session stale active_plan" event relabeled from
+    `log_hook_error` to `log_hook_info` (was misclassified as error).
+- `commands/start-work.md`: FROZEN Plan Discipline marker write moved to
+  AFTER Phase 6 CI evidence is logged but BEFORE F1-F4 delegation. Captures
+  the truly-final plan SHA instead of pre-CI state.
+- `output-styles/omca-default.md` trimmed 185 → 59 lines. Removed
+  `<entrypoints>`, `<agent_catalog>`, `<workflow>`, `<parallel_execution>`,
+  `<verification>`, `<file_reading>` sections. Kept `<operating_principles>`,
+  `<coding_discipline>`, `<delegation>`, `<critical_rules>`.
+- `~/.claude/CLAUDE.md` orchestration body restored via omca-setup. Practical
+  operational guidance now lives there as a managed block between
+  `--- omca-setup` markers — survives output-style override.
+- Memory Guidance section removed from
+  `agents/{explore,librarian,momus,oracle,prometheus}.md` (audit: 5 agents
+  with ≥5 completed runs and 0 memory files after 33 days).
+- `agents/sisyphus.md` description shortened and persona-inflation line
+  deleted per CL4R1T4S "Role Grounding Without Persona Inflation" principle.
+- Statusline daemon defaults: `CLAUDE_STATUSLINE_IDLE_TIMEOUT` raised
+  1800s → 86400s (24h); `idle_timeout <= 0` correctly disables shutdown
+  (was a latent bug — `Timer(0.0, ...)` would have killed daemon at startup).
+- Statusline `OMCA Default` detector accepts both bare (`OMCA Default`) and
+  namespaced (`oh-my-claudeagent:OMCA Default`) forms. The strict bare-string
+  match falsely flagged healthy sessions as `DEGRADED`.
+- Statusline glyph-padding contract: every nerd-font (PUA) glyph is followed
+  by an unconditional space before its content. PUA codepoints render at
+  varying cell widths across terminals; the explicit space prevents content
+  from visually merging when the terminal renders the glyph narrow.
+
+### Removed
+- Legacy `_legacy_path_fallback` helper, `_evidence_legacy_path`, legacy
+  notepad fallback, legacy evidence-seed migration. Single canonical path
+  everywhere; no read-fallback to `.omca/state/*`.
+- Forbidding sentence "No `.omca/plans/`, `.omca/notes/`, or second planning
+  store." removed from `agents/metis.md`.
+- "legacy fallback" and "one-release fallback" prose swept from `CLAUDE.md`,
+  `agents/*.md`, `commands/*.md`, `output-styles/omca-default.md`,
+  `.claude/rules/state-schemas.md`.
+- Orphaned `.omca/state/verification-evidence.json.bak-before-prune` deleted;
+  545 evidence entries migrated from `.omca/state/` to `.omca/evidence/`.
+
+### Documentation
+- Plan + completion sidecar archived at
+  `~/.claude/plans/omca-runtime-hardening-and-cleanup.md` + mirror at
+  `.omca/plans/omca-runtime-hardening-and-cleanup.md`. Completion sidecar at
+  `.omca/notes/omca-runtime-hardening-and-cleanup-completion.md` records F1-F4
+  verdicts (all APPROVE) and SHA `2b5c168a...dab6d1ef`.
+
+### Deferred
+- TODO Item 2 (handoff suggestion at ≤10% context remaining) ships DEFERRED.
+  Claude Code v2.1.148 `UserPromptSubmit` hook payload has no context-remaining
+  field; re-probe in future Claude Code versions via
+  `scripts/probe-userpromptsubmit-payload.sh`.
+
 ## [2.4.0] - 2026-05-13
 
 Tracks Claude Code v2.1.133–v2.1.140. The v2.1.132/v2.1.133/v2.1.136 surface was already
