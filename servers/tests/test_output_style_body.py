@@ -36,22 +36,33 @@ def test_operating_principles_anchor():
 
 
 def test_xml_section_tags():
-    """All orchestration XML section tags must be present."""
+    """Surviving orchestration XML section tags must be present."""
     body = _body()
     tags = [
         "<operating_principles>",
-        "<delegation>",
-        "<entrypoints>",
-        "<agent_catalog>",
-        "<workflow>",
-        "<critical_rules>",
-        "<parallel_execution>",
-        "<verification>",
-        "<file_reading>",
         "<coding_discipline>",
+        "<delegation>",
+        "<critical_rules>",
     ]
     for tag in tags:
         assert tag in body, f"XML section tag absent: {tag}"
+
+
+def test_removed_xml_sections_absent():
+    """Tags removed in T21 trim must NOT be present (regression guard)."""
+    body = _body()
+    removed = [
+        "<entrypoints>",
+        "<agent_catalog>",
+        "<workflow>",
+        "<parallel_execution>",
+        "<verification>",
+        "<file_reading>",
+    ]
+    for tag in removed:
+        assert tag not in body, (
+            f"Removed XML section tag found (should be absent): {tag}"
+        )
 
 
 def test_background_agent_barrier_marker():
