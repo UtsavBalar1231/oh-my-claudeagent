@@ -184,3 +184,68 @@ _write_legacy_snippet_ftypes() {
 	run_hook "final-verification-evidence.sh" '{}'
 	assert_success
 }
+
+# ---------------------------------------------------------------------------
+# Test 5: Pre-marker entry with a distinct old SHA + marker + post-marker F1-F4
+#          → SHA-divergence check must NOT flag the old entry (exit 0).
+# ---------------------------------------------------------------------------
+
+@test "sha-scoping: pre-marker entry with different SHA is excluded from divergence check (exit 0)" {
+	local plan_file="${BATS_TEST_TMPDIR}/marker-scope-plan.md"
+	_write_complete_plan "${plan_file}"
+	local sha
+	sha=$(_compute_sha256 "${plan_file}")
+
+	_write_boulder_for "${plan_file}"
+
+	# Marker written NOW; pre-marker evidence will be timestamped one day earlier.
+	local now_epoch
+	now_epoch=$(date +%s)
+	local old_ts
+	old_ts=$(date -u -d "@$(( now_epoch - 86400 ))" +%Y-%m-%dT%H:%M:%SZ)
+	local new_ts
+	new_ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+	local old_sha="0000000000000000000000000000000000000000000000000000000000000001"
+
+	# Write marker with marked_at = now_epoch (after the old entry, before the new entries).
+	write_state "pending-final-verify.json" \
+		"{\"plan_path\":\"${plan_file}\",\"plan_sha256\":\"${sha}\",\"marked_at\":${now_epoch},\"session_id\":\"bats-test-session\"}"
+
+	# Evidence: one pre-marker entry with old_sha, then 4 post-marker F-type entries with current sha.
+	local entries
+	entries=$(jq -n \
+		--arg old_ts "${old_ts}" \
+		--arg new_ts "${new_ts}" \
+		--arg sha "${sha}" \
+		--arg old_sha "${old_sha}" \
+		'[
+			{"type":"final_verification_f1","command":"old run","exit_code":0,"output_snippet":("plan_sha256:" + $old_sha + " verdict:APPROVE"),"timestamp":$old_ts},
+			{"type":"final_verification_f1","command":"oracle: APPROVE","exit_code":0,"output_snippet":"verdict:APPROVE","timestamp":$new_ts,"plan_sha256":$sha},
+			{"type":"final_verification_f2","command":"oracle: APPROVE","exit_code":0,"output_snippet":"verdict:APPROVE","timestamp":$new_ts,"plan_sha256":$sha},
+			{"type":"final_verification_f3","command":"oracle: APPROVE","exit_code":0,"output_snippet":"verdict:APPROVE","timestamp":$new_ts,"plan_sha256":$sha},
+			{"type":"final_verification_f4","command":"oracle: APPROVE","exit_code":0,"output_snippet":"verdict:APPROVE","timestamp":$new_ts,"plan_sha256":$sha}
+		]')
+	write_state "verification-evidence.json" "{\"entries\":${entries}}"
+
+	run_hook "final-verification-evidence.sh" '{}'
+	assert_success
+}
+
+# ---------------------------------------------------------------------------
+# Test 6: Marker absent — full-log SHA scan (unchanged behavior).
+#          All F1-F4 entries share the current SHA → exit 0 regardless.
+# ---------------------------------------------------------------------------
+
+@test "sha-scoping: marker absent — full-log SHA scan still passes (exit 0)" {
+	local plan_file="${BATS_TEST_TMPDIR}/no-marker-plan.md"
+	_write_complete_plan "${plan_file}"
+	local sha
+	sha=$(_compute_sha256 "${plan_file}")
+
+	_write_boulder_for "${plan_file}"
+	# No marker written — MARKER_AT_ISO will be empty, full log is scanned.
+	_write_firstclass_ftypes "${sha}"
+
+	run_hook "final-verification-evidence.sh" '{}'
+	assert_success
+}

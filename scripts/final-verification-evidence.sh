@@ -53,6 +53,11 @@ ACTIVE_PLAN=$(jq_read "${BOULDER_FILE}" '.active_plan // ""')
 
 MARKER_PLAN=$(jq_read "${MARKER_FILE}" '.plan_path // ""')
 MARKER_AT=$(jq_read "${MARKER_FILE}" '.marked_at // 0')
+# Convert marker epoch to ISO for timestamp-scoped SHA-divergence check (empty string when marker absent).
+MARKER_AT_ISO=""
+if [[ -n "${MARKER_AT}" && "${MARKER_AT}" != "0" ]]; then
+	MARKER_AT_ISO=$(date -u -d "@${MARKER_AT}" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo "")
+fi
 
 if [[ -z "${ACTIVE_PLAN}" && -z "${MARKER_PLAN}" ]]; then
 	noop_exit
@@ -211,9 +216,15 @@ fi
 # All 4 F-types present — validate all F1-F4 entries that belong to the current plan
 # share a single SHA. Extract SHA from first-class field AND snippet, then unique.
 # Entries from prior plans (different SHA) are ignored: they didn't satisfy has_ftype.
-SHAS=$(jq -r --arg sha "${CURRENT_SHA}" '
+# When marker.marked_at is available, only consider entries timestamped >= marker_iso
+# to avoid false-positive SHA-divergence from evidence written for a previous plan run.
+SHAS=$(jq -r --arg sha "${CURRENT_SHA}" --arg marker_iso "${MARKER_AT_ISO}" '
 	.entries // []
 	| map(select(.type | test("^final_verification_f[1-4]$")))
+	| map(select(
+		($marker_iso == "")
+		or ((.timestamp // "") >= $marker_iso)
+	))
 	| map(
 		[(.plan_sha256 // empty)]
 		+ [(.output_snippet // "" | scan("plan_sha256:[a-f0-9]{64}") | sub("plan_sha256:"; ""))]
