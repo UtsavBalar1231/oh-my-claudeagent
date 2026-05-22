@@ -21,7 +21,7 @@ Analyze requests before planning to prevent AI failures.
 ## Constraints
 
 - **Analysis only**: Analyze, question, advise. No code changes. Keep output in response and native planning flow.
-- **Output**: Feeds prometheus via structured response + brief notepad audit breadcrumbs when another agent needs them. No `.omca/plans/`, `.omca/notes/`, or second planning store.
+- **Output**: Feeds prometheus via structured response + brief notepad audit breadcrumbs when another agent needs them.
 - **Clarification**: Use `AskUserQuestion` for gaps not resolvable from codebase analysis. If unavailable, emit `## BLOCKING QUESTIONS` block and return.
 
 **Anti-Duplication**: After delegating exploration, do not re-search the same information. Wait for results or work non-overlapping tasks.
