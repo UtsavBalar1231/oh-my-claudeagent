@@ -44,16 +44,15 @@ def state_dir(tmp_git_root):
 
 
 def test_notepad_write_creates_section_file(tools, tmp_git_root, working_dir):
-    """notepad_write creates a section file at notepads/{plan}/{section}.md"""
+    """notepad_write creates a section file at .omca/notepads/{plan}/{section}.md (new path)."""
     result = tools["notepad_write"](
         plan_name="my-plan",
         section="learnings",
         content="First learning",
         working_directory=working_dir,
     )
-    section_file = (
-        tmp_git_root / ".omca" / "state" / NOTEPADS_DIR / "my-plan" / "learnings.md"
-    )
+    # Writer uses new canonical path
+    section_file = tmp_git_root / ".omca" / "notepads" / "my-plan" / "learnings.md"
     assert section_file.exists()
     assert "First learning" in section_file.read_text()
     assert "my-plan/learnings.md" in result
@@ -73,9 +72,7 @@ def test_notepad_write_appends(tools, tmp_git_root, working_dir):
         content="Entry two",
         working_directory=working_dir,
     )
-    section_file = (
-        tmp_git_root / ".omca" / "state" / NOTEPADS_DIR / "append-plan" / "issues.md"
-    )
+    section_file = tmp_git_root / ".omca" / "notepads" / "append-plan" / "issues.md"
     text = section_file.read_text()
     assert "Entry one" in text
     assert "Entry two" in text
@@ -238,9 +235,63 @@ def test_notepad_compact_reduces_large_section(tools, tmp_git_root, working_dir)
         working_directory=working_dir,
     )
     assert "removed" in result or "Compacted" in result
-    # Verify file was actually compacted
-    section_file = (
-        tmp_git_root / ".omca" / "state" / NOTEPADS_DIR / "big-plan" / "learnings.md"
-    )
+    # Verify file was actually compacted — write uses new path, compact reads via fallback
+    section_file = tmp_git_root / ".omca" / "notepads" / "big-plan" / "learnings.md"
     text = section_file.read_text()
     assert "Compacted" in text
+
+
+# --- legacy fallback ---
+
+
+def test_notepad_read_returns_legacy_content(tools, tmp_git_root, working_dir):
+    """notepad_read returns content from the legacy path when no new-path file exists."""
+    # Pre-seed a file at the legacy path (simulates an existing notepad before migration)
+    legacy_dir = tmp_git_root / ".omca" / "state" / NOTEPADS_DIR / "legacy-plan"
+    legacy_dir.mkdir(parents=True, exist_ok=True)
+    (legacy_dir / "learnings.md").write_text("## legacy entry\n\nLegacy content\n")
+
+    result = tools["notepad_read"](
+        plan_name="legacy-plan",
+        section="learnings",
+        working_directory=working_dir,
+    )
+    assert "Legacy content" in result
+
+
+def test_notepad_write_creates_new_path(tools, tmp_git_root, working_dir):
+    """notepad_write places the new entry at .omca/notepads/<plan>/<section>.md."""
+    tools["notepad_write"](
+        plan_name="new-path-plan",
+        section="decisions",
+        content="New path entry",
+        working_directory=working_dir,
+    )
+    new_file = tmp_git_root / ".omca" / "notepads" / "new-path-plan" / "decisions.md"
+    assert new_file.exists()
+    assert "New path entry" in new_file.read_text()
+
+
+def test_notepad_read_prefers_new_path_over_legacy(tools, tmp_git_root, working_dir):
+    """notepad_read returns new-path content when both new and legacy files exist."""
+    # Pre-seed legacy
+    legacy_dir = tmp_git_root / ".omca" / "state" / NOTEPADS_DIR / "mixed-plan"
+    legacy_dir.mkdir(parents=True, exist_ok=True)
+    (legacy_dir / "issues.md").write_text("## old\n\nLegacy issues\n")
+
+    # Write via tool (lands at new path)
+    tools["notepad_write"](
+        plan_name="mixed-plan",
+        section="issues",
+        content="New issues entry",
+        working_directory=working_dir,
+    )
+
+    result = tools["notepad_read"](
+        plan_name="mixed-plan",
+        section="issues",
+        working_directory=working_dir,
+    )
+    assert "New issues entry" in result
+    # Legacy content should NOT appear (new path wins)
+    assert "Legacy issues" not in result

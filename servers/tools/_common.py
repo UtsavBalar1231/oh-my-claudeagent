@@ -3,6 +3,7 @@
 import json
 import os
 import subprocess
+from pathlib import Path
 
 # --- State Constants ---
 
@@ -15,6 +16,7 @@ RALPH_STATE_FILE = "ralph-state.json"
 ULTRAWORK_STATE_FILE = "ultrawork-state.json"
 PENDING_FINAL_VERIFY_FILE = "pending-final-verify.json"
 NOTEPADS_DIR = "notepads"
+NOTEPAD_DIR = ".omca/notepads"
 VALID_SECTIONS = ("learnings", "issues", "decisions", "problems")
 AGENT_CATALOG_FILE = "agent-catalog.json"
 
@@ -82,9 +84,14 @@ def _write_json(path: str, data: dict | list) -> None:
 
 
 def _notepad_dir(state: str, plan_name: str) -> str:
-    """Return the notepad directory for a plan, creating it if needed."""
-    d = os.path.join(state, NOTEPADS_DIR, plan_name)
-    os.makedirs(d, exist_ok=True)
+    """Return the legacy notepad directory for a plan (under .omca/state/notepads/)."""
+    return os.path.join(state, NOTEPADS_DIR, plan_name)
+
+
+def _notepad_new_dir(git_root: str, plan_name: str) -> str:
+    """Return the canonical notepad directory for a plan under .omca/notepads/, creating it if needed."""
+    d = os.path.join(git_root, NOTEPAD_DIR, plan_name)
+    Path(d).mkdir(parents=True, exist_ok=True)
     return d
 
 

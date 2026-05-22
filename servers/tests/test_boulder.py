@@ -1,9 +1,12 @@
 """Tests for boulder and mode MCP tools."""
 
 import asyncio
+import hashlib
 import json
 import os
 import sys
+from pathlib import Path
+from unittest import mock
 
 import pytest
 
@@ -434,3 +437,195 @@ def test_mode_clear_final_verify(mcp_server, working_dir, tmp_git_root):
     assert "final_verify" in result
     assert "Cleared" in result
     assert not marker_path.exists()
+
+
+# --- boulder_write mirror ---
+
+
+def test_boulder_write_mirrors_user_plan_to_project(
+    mcp_server, working_dir, tmp_git_root, tmp_path
+):
+    """Plan under ~/.claude/plans/ is mirrored to <project>/.omca/plans/."""
+    fake_home = tmp_path / "home"
+    user_plans = fake_home / ".claude" / "plans"
+    user_plans.mkdir(parents=True)
+    plan_file = user_plans / "foo.md"
+    plan_file.write_text("# Plan foo\n- [ ] 1. Task one\n")
+    src_sha = hashlib.sha256(plan_file.read_bytes()).hexdigest()
+
+    with mock.patch("tools.boulder.Path") as mock_path_cls:
+        # Patch Path.home() to return our fake home
+        real_path = Path
+
+        def path_side_effect(*args, **kwargs):
+            return real_path(*args, **kwargs)
+
+        mock_path_cls.side_effect = path_side_effect
+        mock_path_cls.home.return_value = fake_home
+
+        call_tool(
+            mcp_server,
+            "boulder_write",
+            {
+                "active_plan": str(plan_file),
+                "plan_name": "foo",
+                "session_id": "sess-001",
+                "working_directory": working_dir,
+            },
+        )
+
+    mirror = tmp_git_root / ".omca" / "plans" / "foo.md"
+    assert mirror.exists(), "mirror file should be created under .omca/plans/"
+    mirror_sha = hashlib.sha256(mirror.read_bytes()).hexdigest()
+    assert mirror_sha == src_sha, "mirror SHA must match source SHA"
+
+
+def test_boulder_write_mirrors_project_plan_to_user(
+    mcp_server, working_dir, tmp_git_root, tmp_path
+):
+    """Plan under .omca/plans/ is mirrored to ~/.claude/plans/."""
+    project_plans = tmp_git_root / ".omca" / "plans"
+    project_plans.mkdir(parents=True, exist_ok=True)
+    plan_file = project_plans / "bar.md"
+    plan_file.write_text("# Plan bar\n- [ ] 1. Task one\n")
+    src_sha = hashlib.sha256(plan_file.read_bytes()).hexdigest()
+
+    fake_home = tmp_path / "home"
+    user_plans = fake_home / ".claude" / "plans"
+
+    real_path = Path
+
+    def path_side_effect(*args, **kwargs):
+        return real_path(*args, **kwargs)
+
+    with mock.patch("tools.boulder.Path") as mock_path_cls:
+        mock_path_cls.side_effect = path_side_effect
+        mock_path_cls.home.return_value = fake_home
+
+        call_tool(
+            mcp_server,
+            "boulder_write",
+            {
+                "active_plan": str(plan_file),
+                "plan_name": "bar",
+                "session_id": "sess-001",
+                "working_directory": working_dir,
+            },
+        )
+
+    mirror = user_plans / "bar.md"
+    assert mirror.exists(), "mirror file should be created under ~/.claude/plans/"
+    mirror_sha = hashlib.sha256(mirror.read_bytes()).hexdigest()
+    assert mirror_sha == src_sha, "mirror SHA must match source SHA"
+
+
+def test_boulder_write_no_mirror_for_out_of_scheme_path(
+    mcp_server, working_dir, tmp_git_root, tmp_path
+):
+    """Plan at an arbitrary path outside known schemes produces no mirror and no warning."""
+    plan_file = tmp_path / "random" / "place.md"
+    plan_file.parent.mkdir(parents=True)
+    plan_file.write_text("# Random plan\n- [ ] 1. Task one\n")
+
+    import io
+
+    captured = io.StringIO()
+    with mock.patch("sys.stderr", captured):
+        call_tool(
+            mcp_server,
+            "boulder_write",
+            {
+                "active_plan": str(plan_file),
+                "plan_name": "random-plan",
+                "session_id": "sess-001",
+                "working_directory": working_dir,
+            },
+        )
+
+    # No mirror directories should be created
+    assert not (tmp_git_root / ".omca" / "plans").exists() or not any(
+        (tmp_git_root / ".omca" / "plans").iterdir()
+        if (tmp_git_root / ".omca" / "plans").exists()
+        else []
+    )
+    # No warning emitted for out-of-scheme paths
+    assert "WARN" not in captured.getvalue()
+
+
+def test_boulder_write_source_unreadable_returns_success_with_warning(
+    mcp_server, working_dir, tmp_git_root, tmp_path, capsys
+):
+    """If source plan is unreadable, boulder_write succeeds and emits a single stderr warning."""
+    fake_home = tmp_path / "home"
+    user_plans = fake_home / ".claude" / "plans"
+    user_plans.mkdir(parents=True)
+    # Use a path that doesn't exist so read fails
+    nonexistent_plan = user_plans / "ghost.md"
+
+    real_path = Path
+
+    def path_side_effect(*args, **kwargs):
+        return real_path(*args, **kwargs)
+
+    with mock.patch("tools.boulder.Path") as mock_path_cls:
+        mock_path_cls.side_effect = path_side_effect
+        mock_path_cls.home.return_value = fake_home
+
+        result = call_tool(
+            mcp_server,
+            "boulder_write",
+            {
+                "active_plan": str(nonexistent_plan),
+                "plan_name": "ghost",
+                "session_id": "sess-001",
+                "working_directory": working_dir,
+            },
+        )
+
+    # boulder_write must succeed (return a success message, not raise)
+    assert "ghost" in result
+    assert "sessions=1" in result
+    # Warning goes to stderr
+    captured = capsys.readouterr()
+    assert "WARN: boulder_write: could not read plan source for mirror" in captured.err
+
+
+def test_boulder_write_mirror_idempotent(
+    mcp_server, working_dir, tmp_git_root, tmp_path
+):
+    """Second boulder_write call with same plan content skips mirror I/O (idempotent)."""
+    fake_home = tmp_path / "home"
+    user_plans = fake_home / ".claude" / "plans"
+    user_plans.mkdir(parents=True)
+    plan_file = user_plans / "idem.md"
+    plan_file.write_text("# Idempotent plan\n- [ ] 1. Task\n")
+
+    real_path = Path
+
+    def path_side_effect(*args, **kwargs):
+        return real_path(*args, **kwargs)
+
+    def call():
+        with mock.patch("tools.boulder.Path") as mock_path_cls:
+            mock_path_cls.side_effect = path_side_effect
+            mock_path_cls.home.return_value = fake_home
+            call_tool(
+                mcp_server,
+                "boulder_write",
+                {
+                    "active_plan": str(plan_file),
+                    "plan_name": "idem",
+                    "session_id": "sess-001",
+                    "working_directory": working_dir,
+                },
+            )
+
+    call()
+    mirror = tmp_git_root / ".omca" / "plans" / "idem.md"
+    assert mirror.exists()
+    mtime_first = mirror.stat().st_mtime
+
+    call()
+    mtime_second = mirror.stat().st_mtime
+    # mtime should be unchanged — no write occurred
+    assert mtime_first == mtime_second

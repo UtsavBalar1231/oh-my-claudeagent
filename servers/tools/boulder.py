@@ -6,6 +6,7 @@ import os
 import re
 import sys
 import time
+from pathlib import Path
 from typing import Literal
 
 from mcp.server.fastmcp import FastMCP
@@ -73,6 +74,112 @@ def _maybe_auto_deactivate(
     return {"auto_deactivated": True, "cleared": cleared}
 
 
+def _sha256_file(path: Path) -> str:
+    """Return the hex SHA-256 digest of the file at path."""
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _mirror_plan(active_plan: str, working_directory: str) -> None:
+    """
+    Mirror active_plan between ~/.claude/plans/ and <project>/.omca/plans/.
+
+    Direction:
+    - canonical under ~/.claude/plans/  → mirror to <project>/.omca/plans/<basename>
+    - canonical under .omca/plans/      → mirror to ~/.claude/plans/<basename>
+    - any other path                    → skip silently (not an error)
+
+    Idempotent: skips I/O when the mirror already has the same SHA as the source.
+    Warn-and-proceed on read or write failures.
+    Raises RuntimeError on persistent SHA mismatch after writing.
+    """
+    user_plans = Path.home() / ".claude" / "plans"
+
+    # Resolve the source path to handle symlinks / relative segments
+    try:
+        src = Path(active_plan).resolve()
+    except Exception:
+        src = Path(active_plan)
+
+    # Determine state dir for project-local path
+    # Replicate _state_dir logic: resolve project root then strip state sub-path
+    from tools._common import (
+        _state_dir,
+    )  # local import to avoid circular at module level
+
+    state_dir = Path(_state_dir(working_directory))
+    # state_dir ends with .omca/state — parent parent is project root
+    project_root = state_dir.parent.parent
+    project_plans = project_root / ".omca" / "plans"
+
+    # Decide direction
+    try:
+        src.relative_to(user_plans)
+        mirror_dir = project_plans
+    except ValueError:
+        try:
+            src.relative_to(project_plans)
+            mirror_dir = user_plans
+        except ValueError:
+            # Out-of-scheme path — skip silently
+            return
+
+    # Read source bytes
+    try:
+        src_bytes = src.read_bytes()
+    except Exception as exc:
+        print(
+            f"WARN: boulder_write: could not read plan source for mirror: {exc}; continuing.",
+            file=sys.stderr,
+        )
+        return
+
+    src_sha = hashlib.sha256(src_bytes).hexdigest()
+    mirror_path = mirror_dir / src.name
+
+    # Idempotency check: skip if mirror already matches
+    if mirror_path.exists():
+        try:
+            if hashlib.sha256(mirror_path.read_bytes()).hexdigest() == src_sha:
+                return
+        except Exception:
+            pass  # If we can't read the mirror, attempt to overwrite it
+
+    # Write mirror
+    try:
+        mirror_dir.mkdir(parents=True, exist_ok=True)
+        tmp = mirror_dir / (src.name + ".tmp")
+        tmp.write_bytes(src_bytes)
+        tmp.replace(mirror_path)
+    except Exception as exc:
+        print(
+            f"WARN: boulder_write: mirror write failed: {exc}; continuing.",
+            file=sys.stderr,
+        )
+        return
+
+    # Verify SHA matches
+    try:
+        mirror_sha = hashlib.sha256(mirror_path.read_bytes()).hexdigest()
+    except Exception as exc:
+        raise RuntimeError(
+            f"boulder_write: SHA verification failed — could not read mirror: {exc}"
+        ) from exc
+
+    if mirror_sha != src_sha:
+        # Attempt one re-copy before raising
+        try:
+            mirror_path.write_bytes(src_bytes)
+            mirror_sha = hashlib.sha256(mirror_path.read_bytes()).hexdigest()
+        except Exception as exc:
+            raise RuntimeError(
+                f"boulder_write: SHA mismatch after re-copy attempt: {exc}"
+            ) from exc
+        if mirror_sha != src_sha:
+            raise RuntimeError(
+                f"boulder_write: SHA mismatch after mirror write: src={src_sha} mirror={mirror_sha}"
+            )
+
+
 def register(mcp: FastMCP) -> None:
     """Register all boulder and mode tools on the given FastMCP instance."""
 
@@ -111,6 +218,7 @@ def register(mcp: FastMCP) -> None:
             data["worktree_path"] = worktree_path
 
         _write_json(path, data)
+        _mirror_plan(active_plan, working_directory)
         return f"Boulder state written: plan={plan_name}, sessions={len(session_ids)}"
 
     @mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
