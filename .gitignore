@@ -12,6 +12,8 @@ servers/__pycache__/
 .omca/notes/
 .omca/plans/
 .omca/state/
+.omca/evidence/
+.omca/notepads/
 .omca/tmp/
 .omca/drafts/*
 !.omca/drafts/README.md
