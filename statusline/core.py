@@ -292,7 +292,10 @@ def _todo_counter(project_dir: str, glyphs: dict[str, str], nerd: bool) -> str:
             return ""
         completed = sum(1 for m in matches if m == "x")
         glyph = glyphs.get("tasks", "T:")
-        return f"{GREEN}{glyph}{completed}/{total}{RST}"
+        # Unconditional space after the glyph: PUA codepoints can render
+        # narrow or wide depending on terminal width handling; the gap keeps
+        # the count visually separated either way.
+        return f"{GREEN}{glyph} {completed}/{total}{RST}"
     except Exception as exc:
         log.debug("todo_counter: skipped due to error: %s", exc)
         return ""
@@ -578,14 +581,16 @@ def _compose_line3(usage: dict, glyphs: dict[str, str]) -> str | None:
 
     parts: list[str] = []
 
+    # Pattern note: each rate-limit glyph carries its own trailing space so the
+    # visual gap survives even when reset_time is missing (resets_str empty).
     if five_pct is not None:
         color = _threshold_color(five_pct)
         bar = _render_bar(five_pct, bar_width=10, color=color)
         pct_text = f"{color}{five_pct:.0f}%{RST}"
         glyph = glyphs["five_hour"]
         reset_time = _format_reset_time(usage.get("five_hour_resets_at"))
-        resets_str = f" (resets {reset_time})" if reset_time else ""
-        parts.append(f"{bar} {pct_text} {DIM}{glyph}{RST}{resets_str}")
+        resets_str = f"(resets {reset_time})" if reset_time else ""
+        parts.append(f"{bar} {pct_text} {DIM}{glyph} {RST}{resets_str}")
 
     if seven_pct is not None:
         color = _threshold_color(seven_pct)
@@ -593,8 +598,8 @@ def _compose_line3(usage: dict, glyphs: dict[str, str]) -> str | None:
         pct_text = f"{color}{seven_pct:.0f}%{RST}"
         glyph = glyphs["weekly"]
         reset_time = _format_reset_time(usage.get("seven_day_resets_at"))
-        resets_str = f" (resets {reset_time})" if reset_time else ""
-        parts.append(f"{bar} {pct_text} {DIM}{glyph}{RST}{resets_str}")
+        resets_str = f"(resets {reset_time})" if reset_time else ""
+        parts.append(f"{bar} {pct_text} {DIM}{glyph} {RST}{resets_str}")
 
     return SEP.join(parts)
 

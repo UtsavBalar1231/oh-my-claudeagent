@@ -575,6 +575,81 @@ class TestComposeLine3:
         assert "resets" in result
 
 
+class TestGlyphPaddingContract:
+    """Every nerd-font glyph that abuts content must carry a trailing space.
+
+    PUA codepoints render at varying cell widths across terminals/fonts;
+    the explicit space guarantees the content does not visually merge into
+    the glyph when the terminal renders it narrow.
+    """
+
+    def test_todo_counter_has_space_between_glyph_and_count(self) -> None:
+        import os
+        import tempfile
+
+        from statusline.core import _todo_counter
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Seed boulder.json + a plan with 3 numbered tasks (1 done)
+            os.makedirs(os.path.join(tmpdir, ".omca", "state"))
+            plan_path = os.path.join(tmpdir, "plan.md")
+            with open(plan_path, "w") as f:
+                f.write("- [x] 1. one\n- [ ] 2. two\n- [ ] 3. three\n")
+            with open(os.path.join(tmpdir, ".omca", "state", "boulder.json"), "w") as f:
+                f.write(f'{{"active_plan": "{plan_path}"}}')
+
+            glyphs = build_glyphs(False)  # ASCII -> "T:"
+            result = _todo_counter(tmpdir, glyphs, False)
+
+        # ASCII "T:" followed by space then count
+        assert "T: 1/3" in result, f"expected 'T: 1/3' substring, got {result!r}"
+
+    def test_rate_limit_glyph_padded_when_resets_string_empty(self) -> None:
+        import re
+
+        # five_hour: glyph followed by trailing space even with no reset time
+        usage = {
+            "five_hour_pct": 45.0,
+            "five_hour_resets_at": None,
+            "seven_day_pct": None,
+        }
+        glyphs = build_glyphs(False)  # ASCII -> "5h"
+        result = _compose_line3(usage, glyphs)
+        assert result is not None
+        visible = re.sub(r"\x1b\[[0-9;]*m", "", result)
+        # Glyph padded with space even when no reset time follows
+        assert "5h " in visible, f"expected '5h ' (glyph+space), got {visible!r}"
+
+    def test_rate_limit_glyph_separated_from_resets_string(self) -> None:
+        import re
+        from datetime import datetime
+
+        ts = int(datetime(2026, 4, 11, 17, 0, 0, tzinfo=UTC).timestamp())
+        now_dt = datetime(2026, 4, 11, 12, 0, 0, tzinfo=UTC)
+
+        usage = {
+            "seven_day_pct": 80.0,
+            "seven_day_resets_at": ts,
+            "five_hour_pct": None,
+        }
+        glyphs = build_glyphs(False)  # ASCII -> "7d"
+
+        with patch("statusline.core.datetime") as mock_dt:
+            local_result = datetime(2026, 4, 11, 17, 0, 0, tzinfo=UTC).astimezone()
+            mock_dt.fromtimestamp.return_value = local_result
+            mock_dt.fromisoformat.side_effect = datetime.fromisoformat
+            mock_dt.now.return_value = now_dt.astimezone()
+            result = _compose_line3(usage, glyphs)
+
+        assert result is not None
+        # Strip ANSI escapes to verify visible-text contract
+        visible = re.sub(r"\x1b\[[0-9;]*m", "", result)
+        assert "7d (resets" in visible, (
+            f"expected '7d (resets' in visible text, got {visible!r}"
+        )
+        assert "7d(resets" not in visible
+
+
 # ---------------------------------------------------------------------------
 # render (integration)
 # ---------------------------------------------------------------------------
@@ -903,7 +978,7 @@ class TestTodoCounter:
         assert result == ""
 
     def test_ascii_3_done_10_total(self, tmp_path: pathlib.Path) -> None:
-        """ASCII mode: 3 done + 7 pending numbered -> T:3/10."""
+        """ASCII mode: 3 done + 7 pending numbered -> T: 3/10."""
         state_dir = tmp_path / ".omca" / "state"
         state_dir.mkdir(parents=True)
         plan_file = tmp_path / "plan.md"
@@ -911,7 +986,7 @@ class TestTodoCounter:
         boulder = {"active_plan": str(plan_file)}
         (state_dir / "boulder.json").write_text(json.dumps(boulder))
         result = _todo_counter(str(tmp_path), self._glyphs_ascii(), False)
-        assert "T:3/10" in result
+        assert "T: 3/10" in result
 
     def test_nerd_font_uses_task_glyph(self, tmp_path: pathlib.Path) -> None:
         """Nerd font mode: uses nf-fa-tasks glyph instead of T:."""
@@ -954,7 +1029,7 @@ class TestTodoCounter:
         boulder = {"active_plan": str(plan_file)}
         (state_dir / "boulder.json").write_text(json.dumps(boulder))
         result = _todo_counter(str(tmp_path), self._glyphs_ascii(), False)
-        assert "T:0/2" in result
+        assert "T: 0/2" in result
 
     def test_empty_project_dir_returns_empty(self) -> None:
         """Empty project_dir string -> returns empty string without crash."""
@@ -989,7 +1064,7 @@ class TestComposeLine1TodoCounter:
         line, has_extra = _compose_line1(
             data, self._glyphs(), git_info_empty, nerd=False
         )
-        assert "T:3/10" in line
+        assert "T: 3/10" in line
         assert has_extra is True
 
     def test_no_boulder_no_todo_token(
