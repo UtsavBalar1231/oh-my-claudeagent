@@ -134,16 +134,39 @@ Record each result (binary path + version or "not found") for the health report.
 
 ### Phase 4: Write CLAUDE.md
 
-The orchestration body is now delivered by `output-styles/omca-default.md` via the
-platform's output-style mechanism — it no longer needs to live in `~/.claude/CLAUDE.md`.
+The lightweight output-style (`output-styles/omca-default.md`) carries principles +
+delegation only. Practical operational guidance (entrypoints, agent catalog, workflow,
+parallel-execution, verification, file-reading) lives in `~/.claude/CLAUDE.md` as a
+managed block so users benefit from it even when the output-style is overridden or
+`force-for-plugin` is stripped.
 
-Compose the final file:
-- **User content** (from Phase 3, if any)
+1. Read the orchestration block template at `${PLUGIN_ROOT}/skills/omca-setup/orchestration-block.md`.
 
-If user content is empty (the entire old file was just an omca-setup block now removed),
-write an empty file or skip the write entirely.
+2. Wrap the template body in marker lines so future runs can detect and replace it:
+   ```
+   --- omca-setup
 
-If user content is non-empty, write it to `~/.claude/CLAUDE.md`.
+   <template body verbatim>
+
+   --- /omca-setup ---
+   ```
+   The opening marker is `--- omca-setup` (no trailing slash). The closing marker is `--- /omca-setup ---`. These match the regex used in Phase 3 step 4 for idempotent re-injection.
+
+3. Compose the final file in this order:
+   - **User content** (from Phase 3, if any — preserved verbatim)
+   - **Blank line**
+   - **Wrapped orchestration block** (markers + template body)
+
+4. Write the composed content to `~/.claude/CLAUDE.md`.
+
+5. Idempotency: re-running setup detects the existing block via Phase 3 step 4 markers,
+   strips it, and re-injects the current template. User content stays unchanged.
+
+6. If the user wants to OPT OUT of the injection (lightweight output-style ONLY), they can:
+   - Run the skill once to install
+   - Manually delete the block between `--- omca-setup` and `--- /omca-setup ---`
+   - Subsequent setup runs will re-inject; permanent opt-out requires deleting plugin
+     or skipping setup re-runs after updates.
 
 ---
 
