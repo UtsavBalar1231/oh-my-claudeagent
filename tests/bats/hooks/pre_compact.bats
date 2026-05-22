@@ -41,7 +41,9 @@ _write_f_evidence() {
 				"plan_sha256": $sha
 			}]' <<< "${entries}")
 	done
-	write_state "verification-evidence.json" "{\"entries\":${entries}}"
+	mkdir -p "${CLAUDE_PROJECT_ROOT}/.omca/evidence"
+	printf '%s' "{\"entries\":${entries}}" \
+		> "${CLAUDE_PROJECT_ROOT}/.omca/evidence/verification-evidence.json"
 }
 
 # ─── Case (a): plan mid-flight + missing evidence → block ────────────────────

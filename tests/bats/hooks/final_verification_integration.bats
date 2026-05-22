@@ -47,7 +47,9 @@ _write_all_ftypes() {
 			{"type":"final_verification_f3","command":"oracle: APPROVE","exit_code":0,"output_snippet":("plan_sha256:" + $sha + " verdict:APPROVE"),"timestamp":$ts},
 			{"type":"final_verification_f4","command":"oracle: APPROVE","exit_code":0,"output_snippet":("plan_sha256:" + $sha + " verdict:APPROVE"),"timestamp":$ts}
 		]')
-	write_state "verification-evidence.json" "{\"entries\":${entries}}"
+	mkdir -p "${CLAUDE_PROJECT_ROOT}/.omca/evidence"
+	printf '%s' "{\"entries\":${entries}}" \
+		> "${CLAUDE_PROJECT_ROOT}/.omca/evidence/verification-evidence.json"
 }
 
 _write_marker_for() {
@@ -60,7 +62,7 @@ _write_marker_for() {
 
 _remove_ftype() {
 	local ftype="$1"
-	local evidence_file="${CLAUDE_PROJECT_ROOT}/.omca/state/verification-evidence.json"
+	local evidence_file="${CLAUDE_PROJECT_ROOT}/.omca/evidence/verification-evidence.json"
 	local tmp
 	tmp=$(mktemp)
 	jq --arg t "${ftype}" '.entries |= map(select(.type != $t))' \

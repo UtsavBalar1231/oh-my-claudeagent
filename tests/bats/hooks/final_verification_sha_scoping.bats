@@ -55,7 +55,9 @@ _write_firstclass_ftypes() {
 			{"type":"final_verification_f3","command":"oracle: APPROVE","exit_code":0,"output_snippet":"verdict:APPROVE","timestamp":$ts,"plan_sha256":$sha},
 			{"type":"final_verification_f4","command":"oracle: APPROVE","exit_code":0,"output_snippet":"verdict:APPROVE","timestamp":$ts,"plan_sha256":$sha}
 		]')
-	write_state "verification-evidence.json" "{\"entries\":${entries}}"
+	mkdir -p "${CLAUDE_PROJECT_ROOT}/.omca/evidence"
+	printf '%s' "{\"entries\":${entries}}" \
+		> "${CLAUDE_PROJECT_ROOT}/.omca/evidence/verification-evidence.json"
 }
 
 # Write evidence.json: 4 current F-steps with first-class field + 2 legacy entries with no first-class field.
@@ -77,7 +79,9 @@ _write_mixed_evidence() {
 			{"type":"final_verification_f1","command":"oracle: APPROVE","exit_code":0,"output_snippet":("plan_sha256:" + $other + " verdict:APPROVE"),"timestamp":$ts},
 			{"type":"final_verification_f2","command":"oracle: APPROVE","exit_code":0,"output_snippet":("plan_sha256:" + $other + " verdict:APPROVE"),"timestamp":$ts}
 		]')
-	write_state "verification-evidence.json" "{\"entries\":${entries}}"
+	mkdir -p "${CLAUDE_PROJECT_ROOT}/.omca/evidence"
+	printf '%s' "{\"entries\":${entries}}" \
+		> "${CLAUDE_PROJECT_ROOT}/.omca/evidence/verification-evidence.json"
 }
 
 # Write evidence.json with only F1-F3 using first-class field, no F4.
@@ -94,7 +98,9 @@ _write_firstclass_no_f4() {
 			{"type":"final_verification_f2","command":"oracle: APPROVE","exit_code":0,"output_snippet":"verdict:APPROVE","timestamp":$ts,"plan_sha256":$sha},
 			{"type":"final_verification_f3","command":"oracle: APPROVE","exit_code":0,"output_snippet":"verdict:APPROVE","timestamp":$ts,"plan_sha256":$sha}
 		]')
-	write_state "verification-evidence.json" "{\"entries\":${entries}}"
+	mkdir -p "${CLAUDE_PROJECT_ROOT}/.omca/evidence"
+	printf '%s' "{\"entries\":${entries}}" \
+		> "${CLAUDE_PROJECT_ROOT}/.omca/evidence/verification-evidence.json"
 }
 
 # Write evidence.json with 4 F-steps using legacy output_snippet embedding only (no first-class field).
@@ -112,7 +118,9 @@ _write_legacy_snippet_ftypes() {
 			{"type":"final_verification_f3","command":"oracle: APPROVE","exit_code":0,"output_snippet":("plan_sha256:" + $sha + " verdict:APPROVE"),"timestamp":$ts},
 			{"type":"final_verification_f4","command":"oracle: APPROVE","exit_code":0,"output_snippet":("plan_sha256:" + $sha + " verdict:APPROVE"),"timestamp":$ts}
 		]')
-	write_state "verification-evidence.json" "{\"entries\":${entries}}"
+	mkdir -p "${CLAUDE_PROJECT_ROOT}/.omca/evidence"
+	printf '%s' "{\"entries\":${entries}}" \
+		> "${CLAUDE_PROJECT_ROOT}/.omca/evidence/verification-evidence.json"
 }
 
 # ---------------------------------------------------------------------------
@@ -225,7 +233,9 @@ _write_legacy_snippet_ftypes() {
 			{"type":"final_verification_f3","command":"oracle: APPROVE","exit_code":0,"output_snippet":"verdict:APPROVE","timestamp":$new_ts,"plan_sha256":$sha,"verified_by":"executor"},
 			{"type":"final_verification_f4","command":"oracle: APPROVE","exit_code":0,"output_snippet":"verdict:APPROVE","timestamp":$new_ts,"plan_sha256":$sha,"verified_by":"executor"}
 		]')
-	write_state "verification-evidence.json" "{\"entries\":${entries}}"
+	mkdir -p "${CLAUDE_PROJECT_ROOT}/.omca/evidence"
+	printf '%s' "{\"entries\":${entries}}" \
+		> "${CLAUDE_PROJECT_ROOT}/.omca/evidence/verification-evidence.json"
 
 	run_hook "final-verification-evidence.sh" '{}'
 	assert_success

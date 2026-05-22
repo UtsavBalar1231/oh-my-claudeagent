@@ -110,7 +110,8 @@ run_cleanup() {
 
 @test "session-cleanup: preserves boulder.json and verification-evidence.json" {
 	write_state "boulder.json" '{"active_plan":"/tmp/my-plan.md"}'
-	write_state "verification-evidence.json" '{"entries":[]}'
+	mkdir -p "$CLAUDE_PROJECT_ROOT/.omca/evidence"
+	printf '%s' '{"entries":[]}' > "$CLAUDE_PROJECT_ROOT/.omca/evidence/verification-evidence.json"
 	write_state "ralph-state.json" '{"status":"active"}'
 	write_state "team-state.json" '{"teams":[]}'
 
@@ -118,7 +119,7 @@ run_cleanup() {
 	assert_success
 
 	assert [ -f "$CLAUDE_PROJECT_ROOT/.omca/state/boulder.json" ]
-	assert [ -f "$CLAUDE_PROJECT_ROOT/.omca/state/verification-evidence.json" ]
+	assert [ -f "$CLAUDE_PROJECT_ROOT/.omca/evidence/verification-evidence.json" ]
 	assert [ -f "$CLAUDE_PROJECT_ROOT/.omca/state/ralph-state.json" ]
 	assert [ -f "$CLAUDE_PROJECT_ROOT/.omca/state/team-state.json" ]
 }

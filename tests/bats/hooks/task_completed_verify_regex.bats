@@ -7,12 +7,13 @@ load '../test_helper'
 # partial-word matches like "verification", "implementation", "verifying" do
 # not trigger a false-positive evidence demand.
 
-# Helper: write a valid verification-evidence.json into the state dir
+# Helper: write a valid verification-evidence.json into the evidence dir
 _write_fresh_evidence() {
 	local ts
 	ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-	write_state "verification-evidence.json" \
-		"{\"entries\":[{\"type\":\"test\",\"command\":\"just test\",\"exit_code\":0,\"output_snippet\":\"10 passed\",\"timestamp\":\"${ts}\"}]}"
+	mkdir -p "$CLAUDE_PROJECT_ROOT/.omca/evidence"
+	printf '%s' "{\"entries\":[{\"type\":\"test\",\"command\":\"just test\",\"exit_code\":0,\"output_snippet\":\"10 passed\",\"timestamp\":\"${ts}\"}]}" \
+		> "$CLAUDE_PROJECT_ROOT/.omca/evidence/verification-evidence.json"
 }
 
 # ─── Negative fixtures — must NOT trigger evidence demand ────────────────────
@@ -77,11 +78,12 @@ _write_fresh_evidence() {
 	# here is that RECENT_EVIDENCE is set from the mtime, not defaulted to true.
 	# To exercise the fail-closed stat path we make the file unreadable so that
 	# stat -c and stat -f both fail → EVIDENCE_MTIME="" → not ^[0-9]+$.
-	write_state "verification-evidence.json" "not-json"
-	chmod 000 "$CLAUDE_PROJECT_ROOT/.omca/state/verification-evidence.json"
+	mkdir -p "$CLAUDE_PROJECT_ROOT/.omca/evidence"
+	printf '%s' "not-json" > "$CLAUDE_PROJECT_ROOT/.omca/evidence/verification-evidence.json"
+	chmod 000 "$CLAUDE_PROJECT_ROOT/.omca/evidence/verification-evidence.json"
 	run_hook "task-completed-verify.sh" '{"task_description":"fix the regression"}'
 	# Restore perms so teardown can clean up
-	chmod 644 "$CLAUDE_PROJECT_ROOT/.omca/state/verification-evidence.json" 2>/dev/null || true
+	chmod 644 "$CLAUDE_PROJECT_ROOT/.omca/evidence/verification-evidence.json" 2>/dev/null || true
 	[ "$status" -eq 2 ]
 }
 

@@ -76,7 +76,9 @@ _fentry() {
 		--argjson f3 "$(_fentry final_verification_f3 executor 0 "${sha}")" \
 		--argjson f4 "$(_fentry final_verification_f4 oracle 0 "${sha}")" \
 		'[$f1, $f2, $f3, $f4]')
-	write_state "verification-evidence.json" "{\"entries\":${entries}}"
+	mkdir -p "${CLAUDE_PROJECT_ROOT}/.omca/evidence"
+	printf '%s' "{\"entries\":${entries}}" \
+		> "${CLAUDE_PROJECT_ROOT}/.omca/evidence/verification-evidence.json"
 
 	run_hook "final-verification-evidence.sh" '{}'
 	[ "$status" -eq 2 ]
@@ -105,7 +107,9 @@ _fentry() {
 		--argjson f3 "$(_fentry final_verification_f3 executor 0 "${sha}")" \
 		--argjson f4 "$(_fentry final_verification_f4 oracle 0 "${sha}")" \
 		'[$f1, $f2, $f3, $f4]')
-	write_state "verification-evidence.json" "{\"entries\":${entries}}"
+	mkdir -p "${CLAUDE_PROJECT_ROOT}/.omca/evidence"
+	printf '%s' "{\"entries\":${entries}}" \
+		> "${CLAUDE_PROJECT_ROOT}/.omca/evidence/verification-evidence.json"
 
 	run_hook "final-verification-evidence.sh" '{}'
 	[ "$status" -eq 2 ]
@@ -132,7 +136,9 @@ _fentry() {
 		--argjson f3 "$(_fentry final_verification_f3 executor 0 "${sha}")" \
 		--argjson f4 "$(_fentry final_verification_f4 oracle 0 "${sha}")" \
 		'[$f1, $f2, $f3, $f4]')
-	write_state "verification-evidence.json" "{\"entries\":${entries}}"
+	mkdir -p "${CLAUDE_PROJECT_ROOT}/.omca/evidence"
+	printf '%s' "{\"entries\":${entries}}" \
+		> "${CLAUDE_PROJECT_ROOT}/.omca/evidence/verification-evidence.json"
 
 	run_hook "final-verification-evidence.sh" '{}'
 	assert_success

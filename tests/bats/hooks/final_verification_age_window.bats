@@ -45,7 +45,9 @@ _write_all_ftypes_at_ts() {
 		{"type":"final_verification_f3","command":"oracle: APPROVE","exit_code":0,"output_snippet":("plan_sha256:" + $sha + " verdict:APPROVE"),"timestamp":$ts,"plan_sha256":$sha,"verified_by":"executor"},
 		{"type":"final_verification_f4","command":"oracle: APPROVE","exit_code":0,"output_snippet":("plan_sha256:" + $sha + " verdict:APPROVE"),"timestamp":$ts,"plan_sha256":$sha,"verified_by":"executor"}
 	]')
-	write_state "verification-evidence.json" "{\"entries\":${entries}}"
+	mkdir -p "${CLAUDE_PROJECT_ROOT}/.omca/evidence"
+	printf '%s' "{\"entries\":${entries}}" \
+		> "${CLAUDE_PROJECT_ROOT}/.omca/evidence/verification-evidence.json"
 }
 
 # ---------------------------------------------------------------------------

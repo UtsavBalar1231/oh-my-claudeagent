@@ -6,6 +6,18 @@ load '../test_helper'
 PLAN_SHA="deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
 NOW=$(date +%s)
 
+# Write content to the canonical evidence file at .omca/evidence/verification-evidence.json
+write_evidence_file() {
+	local content="$1"
+	mkdir -p "${CLAUDE_PROJECT_ROOT}/.omca/evidence"
+	printf '%s' "${content}" > "${CLAUDE_PROJECT_ROOT}/.omca/evidence/verification-evidence.json"
+}
+
+# Read the canonical evidence file
+read_evidence_file() {
+	cat "${CLAUDE_PROJECT_ROOT}/.omca/evidence/verification-evidence.json"
+}
+
 # Write a synthetic boulder.json pointing to a plan file
 _write_boulder() {
 	local plan_path="$1"
@@ -52,7 +64,7 @@ _write_evidence_with_ftypes() {
 			--arg sha "${PLAN_SHA}" \
 			'. + [{"type":$t,"command":"oracle: APPROVE","exit_code":0,"output_snippet":("plan_sha256:" + $sha + " verdict:APPROVE"),"timestamp":$ts}]')
 	done
-	write_state "verification-evidence.json" "{\"entries\":${entries}}"
+	write_evidence_file "{\"entries\":${entries}}"
 }
 
 # Write a pending-final-verify.json marker
@@ -177,7 +189,7 @@ _write_marker() {
 		{"type":"final_verification_f3","command":"oracle: APPROVE","exit_code":0,"output_snippet":"plan_sha256:cafebabecafebabecafebabecafebabecafebabecafebabecafebabecafebabe verdict:APPROVE","timestamp":$ts},
 		{"type":"final_verification_f4","command":"oracle: APPROVE","exit_code":0,"output_snippet":("plan_sha256:" + $sha + " verdict:APPROVE"),"timestamp":$ts}
 	]')
-	write_state "verification-evidence.json" "{\"entries\":${entries}}"
+	write_evidence_file "{\"entries\":${entries}}"
 
 	run_hook "final-verification-evidence.sh" '{}'
 	[ "$status" -eq 2 ]
@@ -243,7 +255,7 @@ EOF
 			{"type":"final_verification_f3","command":"oracle: APPROVE","exit_code":0,"output_snippet":("plan_sha256:" + $sha + " verdict:APPROVE"),"timestamp":$ts},
 			{"type":"final_verification_f4","command":"oracle: APPROVE","exit_code":0,"output_snippet":("plan_sha256:" + $sha + " verdict:APPROVE"),"timestamp":$ts}
 		]')
-	write_state "verification-evidence.json" "{\"entries\":${entries}}"
+	write_evidence_file "{\"entries\":${entries}}"
 
 	# Write optional pending-final-verify marker (exercises Task 4c auto-clear path)
 	write_state "pending-final-verify.json" \
@@ -396,12 +408,12 @@ EOF
 			{"type":"final_verification_f3","command":"oracle: APPROVE","exit_code":0,"output_snippet":("plan_sha256:" + $sha + " verdict:APPROVE"),"timestamp":$ts},
 			{"type":"final_verification_f4","command":"oracle: APPROVE","exit_code":0,"output_snippet":("plan_sha256:" + $sha + " verdict:APPROVE"),"timestamp":$ts}
 		]')
-	write_state "verification-evidence.json" "{\"entries\":${entries}}"
+	write_evidence_file "{\"entries\":${entries}}"
 
 	# Snapshot boulder and evidence contents before hook run
 	local boulder_before evidence_before
 	boulder_before=$(read_state "boulder.json")
-	evidence_before=$(read_state "verification-evidence.json")
+	evidence_before=$(read_evidence_file)
 
 	export CLAUDE_SESSION_ID="current-session"
 	run_hook "final-verification-evidence.sh" '{}'
@@ -413,7 +425,7 @@ EOF
 
 	# boulder.json and verification-evidence.json must be unchanged
 	[ "$(read_state "boulder.json")" = "${boulder_before}" ]
-	[ "$(read_state "verification-evidence.json")" = "${evidence_before}" ]
+	[ "$(read_evidence_file)" = "${evidence_before}" ]
 }
 
 # ---------------------------------------------------------------------------
@@ -454,7 +466,7 @@ EOF
 	_write_marker "${plan_file}"
 
 	# Write a non-JSON (corrupt) evidence file — jq will fail to parse it
-	write_state "verification-evidence.json" "THIS IS NOT JSON {"
+	write_evidence_file "THIS IS NOT JSON {"
 
 	run_hook "final-verification-evidence.sh" '{}'
 	[ "$status" -eq 2 ]

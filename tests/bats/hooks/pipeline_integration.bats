@@ -73,7 +73,8 @@ setup() {
 	now=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 	# Write valid verification-evidence.json with proper schema
-	cat > "$CLAUDE_PROJECT_ROOT/.omca/state/verification-evidence.json" <<-EOF
+	mkdir -p "$CLAUDE_PROJECT_ROOT/.omca/evidence"
+	cat > "$CLAUDE_PROJECT_ROOT/.omca/evidence/verification-evidence.json" <<-EOF
 	{
 	  "entries": [
 	    {
@@ -97,7 +98,7 @@ setup() {
 
 @test "pipeline d: no evidence with recent edits blocks task-completed-verify" {
 	# Explicitly remove evidence from previous pipeline test (shared BATS_FILE_TMPDIR)
-	rm -f "$CLAUDE_PROJECT_ROOT/.omca/state/verification-evidence.json"
+	rm -f "$CLAUDE_PROJECT_ROOT/.omca/evidence/verification-evidence.json"
 
 	# Write a recent edits.jsonl so the hook knows files were modified
 	local now
