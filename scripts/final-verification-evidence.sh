@@ -7,7 +7,9 @@ source "$(dirname "$0")/lib/common.sh"
 
 STATE_DIR="${HOOK_STATE_DIR}"
 
-# 3600s (1h) — F1-F4 freshness; sibling task-completed-verify uses 300s. UNDOCUMENTED.
+# 604800s (7d) — absolute ceiling on marker-derived evidence age window.
+AGE_WINDOW_CEILING_SECONDS=604800
+# 3600s (1h) — fallback F1-F4 freshness when no marker is present; sibling task-completed-verify uses 300s. UNDOCUMENTED.
 MAX_EVIDENCE_AGE_SECONDS=3600
 # 86400s (24h) — orphan-marker TTL. Belt-and-suspenders behind session-ID mismatch guard.
 MAX_MARKER_AGE_SECONDS=86400
@@ -169,6 +171,16 @@ if [[ -f "${EVIDENCE_FILE}" ]]; then
 fi
 
 NOW=$(date +%s)
+
+# Derive evidence age window from marker lifetime; floor at 3600s, ceiling at 7d.
+if [[ "${MARKER_AT}" -gt 0 ]]; then
+	AGE_WINDOW=$(( NOW - MARKER_AT ))
+	if (( AGE_WINDOW < 3600 )); then AGE_WINDOW=3600; fi
+	if (( AGE_WINDOW > AGE_WINDOW_CEILING_SECONDS )); then AGE_WINDOW=${AGE_WINDOW_CEILING_SECONDS}; fi
+	MAX_EVIDENCE_AGE_SECONDS=${AGE_WINDOW}
+else
+	MAX_EVIDENCE_AGE_SECONDS=3600
+fi
 
 has_ftype() {
 	local ftype="$1"
