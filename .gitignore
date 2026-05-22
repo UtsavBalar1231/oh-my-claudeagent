@@ -9,7 +9,15 @@ servers/__pycache__/
 # oh-my-claudeagent runtime state
 # Historical dev artifacts — phased out post-v2.0
 .omc/
-.omca/
+.omca/logs/
+.omca/notes/
+.omca/plans/
+.omca/state/
+.omca/tmp/
+.omca/drafts/*
+!.omca/drafts/README.md
+.omca/rules/*
+!.omca/rules/README.md
 state/
 
 # Logs
