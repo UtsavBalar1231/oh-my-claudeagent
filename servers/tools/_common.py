@@ -45,6 +45,21 @@ def _state_dir(working_directory: str) -> str:
     return os.path.join(root, OMCA_STATE_DIR)
 
 
+def _legacy_path_fallback(new_path: str, legacy_path: str) -> str:
+    """Return the preferred path for one-release transition reads.
+
+    Priority:
+    1. ``new_path`` if the file exists there — canonical location wins.
+    2. ``legacy_path`` if the file exists there — backwards-compat read.
+    3. ``new_path`` when neither exists — callers write to the new location.
+    """
+    if os.path.exists(new_path):
+        return new_path
+    if os.path.exists(legacy_path):
+        return legacy_path
+    return new_path
+
+
 def _read_json(path: str) -> dict:
     """Read a JSON file, returning empty dict if missing or invalid."""
     try:
