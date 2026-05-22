@@ -17,6 +17,12 @@ log_hook_error() {
 	echo "{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"hook\":\"${hook_name}\",\"error\":\"${msg}\"}" >>"${HOOK_LOG_DIR}/hook-errors.jsonl" 2>/dev/null
 }
 
+log_hook_info() {
+	local msg="$1"
+	local hook_name="${2:-$(basename "$0")}"
+	echo "{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"level\":\"info\",\"hook\":\"${hook_name}\",\"message\":\"${msg}\"}" >>"${HOOK_LOG_DIR}/hook-info.jsonl" 2>/dev/null
+}
+
 section_header() {
 	local title="$1"
 	printf '\n─── %s ─────────────────────────────────────\n' "${title}"
