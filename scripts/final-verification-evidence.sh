@@ -202,10 +202,49 @@ has_ftype() {
 				or (.plan_sha256 == $sha)
 				or ((.output_snippet // "") | test("plan_sha256:" + $sha))
 			)
+			and ((.verified_by // "") | test("^(oracle|executor)$"))
+			and (.exit_code == 0)
 		))
 		| length > 0
 	' "${EVIDENCE_FILE}")
 	echo "${found}"
+}
+
+# Diagnose why a specific F-type entry failed validation — returns a human-readable cause.
+# Checks entries that match type + SHA but fail verified_by or exit_code constraints.
+_ftype_rejection_cause() {
+	local ftype="$1"
+	if [[ ! -f "${EVIDENCE_FILE}" ]]; then
+		echo ""
+		return
+	fi
+	jq -r --arg t "${ftype}" --argjson now "${NOW}" --argjson window "${MAX_EVIDENCE_AGE_SECONDS}" --arg sha "${CURRENT_SHA}" '
+		.entries // []
+		| map(select(
+			.type == $t
+			and (
+				(now - ((.timestamp // "1970-01-01T00:00:00Z") | strptime("%Y-%m-%dT%H:%M:%SZ") | mktime))
+				<= $window
+			)
+			and (
+				($sha == "")
+				or (.plan_sha256 == $sha)
+				or ((.output_snippet // "") | test("plan_sha256:" + $sha))
+			)
+		))
+		| if length == 0 then ""
+		  else
+		    map(
+		      if ((.verified_by // "") | test("^(oracle|executor)$") | not) then
+		        "entry rejected: verified_by must be '\''oracle'\'' or '\''executor'\'' (got '\''" + (.verified_by // "") + "'\'')"
+		      elif .exit_code != 0 then
+		        "entry rejected: exit_code != 0"
+		      else "" end
+		    )
+		    | map(select(. != ""))
+		    | first // ""
+		  end
+	' "${EVIDENCE_FILE}"
 }
 
 F1=$(has_ftype "final_verification_f1")
@@ -221,7 +260,28 @@ MISSING=""
 
 if [[ -n "${MISSING}" ]]; then
 	MISSING="${MISSING# }"
-	echo "[FINAL VERIFICATION] Plan complete but F1-F4 evidence missing: ${MISSING}. Run the Final Verification Wave per agents/sisyphus.md or commands/start-work.md and call evidence_log(evidence_type=\"<type>\", command=\"oracle: APPROVE\", exit_code=0, output_snippet=\"plan_sha256:<sha> verdict:APPROVE\") for each." >&2
+	# For each missing F-type, check whether a candidate entry exists but was rejected
+	# due to bad verified_by or non-zero exit_code, and surface the cause.
+	REJECTION_DETAIL=""
+	for _ftype in final_verification_f1 final_verification_f2 final_verification_f3 final_verification_f4; do
+		case "${_ftype}" in
+			final_verification_f1) [[ "${F1}" == "true" ]] && continue ;;
+			final_verification_f2) [[ "${F2}" == "true" ]] && continue ;;
+			final_verification_f3) [[ "${F3}" == "true" ]] && continue ;;
+			final_verification_f4) [[ "${F4}" == "true" ]] && continue ;;
+			*) continue ;;
+		esac
+		_cause=$(_ftype_rejection_cause "${_ftype}")
+		if [[ -n "${_cause}" ]]; then
+			REJECTION_DETAIL="${REJECTION_DETAIL} ${_ftype} ${_cause};"
+		fi
+	done
+	REJECTION_DETAIL="${REJECTION_DETAIL# }"
+	if [[ -n "${REJECTION_DETAIL}" ]]; then
+		echo "[FINAL VERIFICATION] Plan complete but F1-F4 evidence missing: ${MISSING}. Rejection detail: ${REJECTION_DETAIL}" >&2
+	else
+		echo "[FINAL VERIFICATION] Plan complete but F1-F4 evidence missing: ${MISSING}. Run the Final Verification Wave per agents/sisyphus.md or commands/start-work.md and call evidence_log(evidence_type=\"<type>\", command=\"oracle: APPROVE\", exit_code=0, output_snippet=\"plan_sha256:<sha> verdict:APPROVE\") for each." >&2
+	fi
 	exit 2
 fi
 
