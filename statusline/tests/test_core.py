@@ -415,6 +415,39 @@ class TestComposeLine1:
         line, _has_extra = _compose_line1(data, glyphs, git_info_empty)
         assert "default" not in line
 
+    def test_omca_default_bare_form_not_degraded(self, git_info_empty: dict) -> None:
+        data = {
+            "model": {"display_name": "claude"},
+            "output_style": {"name": "OMCA Default"},
+        }
+        glyphs = self._glyphs()
+        line, has_extra = _compose_line1(data, glyphs, git_info_empty)
+        assert "DEGRADED" not in line
+        assert "OMCA Default" in line
+        assert has_extra is True
+
+    def test_omca_default_namespaced_form_not_degraded(
+        self, git_info_empty: dict
+    ) -> None:
+        data = {
+            "model": {"display_name": "claude"},
+            "output_style": {"name": "oh-my-claudeagent:OMCA Default"},
+        }
+        glyphs = self._glyphs()
+        line, has_extra = _compose_line1(data, glyphs, git_info_empty)
+        assert "DEGRADED" not in line
+        assert "OMCA Default" in line
+        assert has_extra is True
+
+    def test_other_namespaced_style_is_degraded(self, git_info_empty: dict) -> None:
+        data = {
+            "model": {"display_name": "claude"},
+            "output_style": {"name": "some-plugin:Compact"},
+        }
+        glyphs = self._glyphs()
+        line, _has_extra = _compose_line1(data, glyphs, git_info_empty)
+        assert "DEGRADED" in line
+
 
 # ---------------------------------------------------------------------------
 # _compose_line2

@@ -298,6 +298,18 @@ def _todo_counter(project_dir: str, glyphs: dict[str, str], nerd: bool) -> str:
         return ""
 
 
+def _is_omca_default(name: str) -> bool:
+    """Return True when the output-style name resolves to OMCA Default.
+
+    Claude Code may report the active style as the bare display name
+    (``OMCA Default``) or namespaced (``oh-my-claudeagent:OMCA Default``)
+    depending on how it was selected. Accept either form.
+    """
+    if not name:
+        return False
+    return name.split(":", 1)[-1].strip() == "OMCA Default"
+
+
 # ---------------------------------------------------------------------------
 # Line composers
 # ---------------------------------------------------------------------------
@@ -423,15 +435,13 @@ def _compose_line1(
                 wt_str += f" {DIM}<- {orig_branch}{RST}"
             parts.append(wt_str)
 
-    # Output style (only if not "default"). OMCA's force-for-plugin should make
-    # "OMCA Default" the active style whenever the plugin is enabled. Anything
-    # else means a user pin or competing plugin won — surface as DEGRADED so
-    # the operator notices the orchestration body isn't loaded.
+    # Output style: anything other than default/OMCA Default = user pin or
+    # competing plugin won; surface DEGRADED so operator notices.
     output_style = data.get("output_style", {}).get("name", "default")
     if output_style and output_style != "default":
         has_extra = True
-        if output_style == "OMCA Default":
-            parts.append(f"{DIM}{glyphs['style']} {output_style}{RST}")
+        if _is_omca_default(output_style):
+            parts.append(f"{DIM}{glyphs['style']} OMCA Default{RST}")
         else:
             parts.append(f"{RED}{glyphs['warn']} DEGRADED: {output_style}{RST}")
 
@@ -538,12 +548,13 @@ def _compose_degraded_tip(
 ) -> str | None:
     """Tip line shown only when the active output style is degraded.
 
-    Triggered when output_style.name is set, not 'default', and not 'OMCA Default'.
-    Tells the operator exactly which command will fix it and what won't fix it
-    (a live setting change doesn't apply until session restart).
+    Triggered when output_style.name is set, not 'default', and not a form of
+    'OMCA Default' (bare or namespaced). Tells the operator exactly which command
+    will fix it and what won't fix it (a live setting change doesn't apply until
+    session restart).
     """
     name = data.get("output_style", {}).get("name", "default")
-    if not name or name in ("default", "OMCA Default"):
+    if not name or name == "default" or _is_omca_default(name):
         return None
     arrow = "→" if glyphs.get("style") != "S:" else "->"
     cmd = "/oh-my-claudeagent:omca-setup"
