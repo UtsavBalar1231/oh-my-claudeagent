@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.1] - 2026-05-24
+
+Fixes the `validate_plan_write` Write/Edit hook, which had been silently
+non-functional since the `mcp_tool` migration: a plugin-bundled `mcp_tool`
+hook must reference its server by the fully-qualified `plugin:<name>:<key>`
+name, not the bare `.mcp.json` key.
+
+### Fixed
+- `hooks/hooks.json`: the `Write|Edit` `mcp_tool` hook now targets
+  `plugin:oh-my-claudeagent:omca` instead of the bare `omca`. The bare key
+  never resolved at runtime — every Write/Edit emitted a non-blocking
+  `MCP server 'omca' not connected` warning and skipped plan-checkbox
+  validation entirely. Affected all users since the hook was introduced.
+
+### Changed
+- `tests/bats/hooks/plan_checkbox_verify.bats`: the server-name contract test
+  now asserts the fully-qualified name, so a regression to the bare key fails
+  CI instead of slipping through (the prior test encoded the broken value).
+
 ## [2.5.0] - 2026-05-22
 
 Runtime-hardening release. 33-task plan `omca-runtime-hardening-and-cleanup`

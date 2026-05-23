@@ -101,7 +101,7 @@
 				"hooks": [
 					{
 						"type": "mcp_tool",
-						"server": "omca",
+						"server": "plugin:oh-my-claudeagent:omca",
 						"tool": "validate_plan_write",
 						"input": {
 							"tool_name": "${tool_name}",

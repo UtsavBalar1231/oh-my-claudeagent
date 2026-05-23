@@ -25,15 +25,17 @@ load '../test_helper'
 	assert_success
 }
 
-# (c) mcp_tool entry targets the omca server
+# (c) mcp_tool entry must reference the server by its fully-qualified
+# "plugin:<name>:<key>" form. The bare ".mcp.json" key does NOT resolve at
+# runtime, silently skipping the hook with "MCP server 'omca' not connected".
 
-@test "plan-checkbox-verify: mcp_tool entry uses omca server" {
+@test "plan-checkbox-verify: mcp_tool entry uses fully-qualified omca server name" {
 	local hooks_json="${BATS_TEST_DIRNAME}/../../../hooks/hooks.json"
 	run jq -e '
 		.hooks.PreToolUse[]
 		| select(.hooks[].type == "mcp_tool")
 		| .hooks[]
-		| select(.tool == "validate_plan_write" and .server == "omca")
+		| select(.tool == "validate_plan_write" and .server == "plugin:oh-my-claudeagent:omca")
 	' "$hooks_json"
 	assert_success
 }
