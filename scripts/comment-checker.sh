@@ -5,11 +5,41 @@ _HOOK_START=$(date +%s%N 2>/dev/null || date +%s)
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
+json_content=$(jq -r '
+  def file_payloads:
+    [ .tool_response.files?, .tool_response.result.files?, .tool_response.metadata.files? ]
+    | map(select(type == "array")[]?)
+    | map(
+        select((.type? // "") != "delete")
+        | (.after? // .new? // .newString? // .new_string? // empty)
+        | select(type == "string")
+      )
+    | .[];
 
-# Edit supplies .tool_input.new_string; Write supplies .tool_input.content.
-# If matcher widens to MultiEdit (.tool_input.edits[].new_string) or
-# NotebookEdit (.tool_input.new_source) this two-branch fallback breaks silently.
-CONTENT=$(jq -r '.tool_input.new_string // .tool_input.content // ""' <<< "${HOOK_INPUT}")
+  (
+    .tool_input.content?,
+    .tool_input.new_string?,
+    (.tool_input.edits? | if type == "array" then .[] else empty end | (.new_string? // .newString? // empty)),
+    file_payloads
+  )
+  | select(type == "string")
+' <<< "${HOOK_INPUT}" 2>/dev/null || true)
+
+patch_content=$(jq -r '
+  (
+    .tool_input.patchText?,
+    .tool_input.input?,
+    .tool_input.patch?,
+    .tool_input.command?
+  )
+  | select(type == "string")
+' <<< "${HOOK_INPUT}" 2>/dev/null \
+  | awk '
+      /^\+\+\+/ { next }
+      /^\+/ { sub(/^\+/, ""); print }
+    ' || true)
+
+CONTENT=$(printf '%s\n%s' "${json_content}" "${patch_content}")
 
 if [[ -z "${CONTENT}" ]]; then
 	exit 0

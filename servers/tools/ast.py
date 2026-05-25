@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -90,6 +91,8 @@ LANG_EXTENSIONS = {
 
 TIMEOUT = 300
 MAX_RESULTS_DEFAULT = 500
+MAX_JSON_OUTPUT_BYTES = 1024 * 1024
+MAX_RESULT_CAP = 500
 
 
 def discover_binary() -> str:
@@ -148,6 +151,7 @@ def run_command(
     *,
     input_data: bytes | None = None,
     allow_exit_1: bool = False,
+    cwd: str | None = None,
 ) -> subprocess.CompletedProcess[bytes]:
     """Run a subprocess with timeout. Raises ToolError on failure."""
     if _SG_BIN is None:
@@ -158,6 +162,7 @@ def run_command(
             input=input_data,
             capture_output=True,
             timeout=TIMEOUT,
+            cwd=cwd,
         )
     except subprocess.TimeoutExpired:
         raise ToolError(f"Command timed out after {TIMEOUT}s") from None
@@ -174,6 +179,156 @@ def run_command(
             raise ToolError(f"ast-grep error (exit {result.returncode}): {stderr_text}")
 
     return result
+
+
+def resolve_workspace() -> str:
+    """Resolve the workspace root used to constrain path arguments."""
+    for env_name in ("CLAUDE_PROJECT_DIR", "CLAUDE_PROJECT_ROOT", "HOOK_PROJECT_ROOT"):
+        value = os.environ.get(env_name)
+        if value:
+            return os.path.realpath(value)
+    return os.path.realpath(os.getcwd())
+
+
+def normalize_workspace_paths(paths: list[str] | None) -> list[str]:
+    """Validate path arguments and normalize allowed paths to workspace-relative paths."""
+    workspace = resolve_workspace()
+    normalized: list[str] = []
+
+    for path in paths or ["."]:
+        if path == "":
+            raise ToolError("Path entries must not be empty")
+        if "\x00" in path:
+            raise ToolError("Path entries must not contain null bytes")
+        if path.startswith("-"):
+            raise ToolError("Path entries must not start with '-'")
+
+        absolute_path = path if os.path.isabs(path) else os.path.join(workspace, path)
+        absolute_path = os.path.abspath(absolute_path)
+        if os.path.commonpath([workspace, absolute_path]) != workspace:
+            raise ToolError(f"Path escapes workspace: {path}")
+
+        if os.path.exists(absolute_path):
+            real_path = os.path.realpath(absolute_path)
+            if os.path.commonpath([workspace, real_path]) != workspace:
+                raise ToolError(f"Path resolves outside workspace: {path}")
+
+        relative_path = os.path.relpath(absolute_path, workspace)
+        normalized.append("." if relative_path == "." else relative_path)
+
+    return normalized
+
+
+def clamp_max_results(max_results: int) -> int:
+    """Apply the hard result cap for AST output."""
+    return max(0, min(max_results, MAX_RESULT_CAP))
+
+
+def parse_compact_json_output(stdout: bytes) -> tuple[list[dict], bool]:
+    """Parse ast-grep compact JSON with output and result caps."""
+    if not stdout.strip():
+        return [], False
+
+    output_truncated = len(stdout) > MAX_JSON_OUTPUT_BYTES
+    raw = stdout[:MAX_JSON_OUTPUT_BYTES]
+    text = raw.decode("utf-8", errors="replace").strip()
+
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError as error:
+        if not output_truncated:
+            raise ToolError(
+                f"Failed to parse ast-grep JSON output: {error.msg}"
+            ) from None
+        parsed = parse_truncated_json_array(text)
+        if parsed is None:
+            raise ToolError(
+                "ast-grep JSON output exceeded 1 MiB and could not be parsed through a complete result"
+            ) from None
+
+    if not isinstance(parsed, list):
+        raise ToolError("Failed to parse ast-grep JSON output: expected a JSON array")
+
+    return parsed[:MAX_RESULT_CAP], output_truncated or len(parsed) > MAX_RESULT_CAP
+
+
+def parse_truncated_json_array(text: str) -> list[dict] | None:
+    """Recover complete leading objects from a truncated JSON array."""
+    decoder = json.JSONDecoder()
+    index = 0
+    length = len(text)
+    while index < length and text[index].isspace():
+        index += 1
+    if index >= length or text[index] != "[":
+        return None
+    index += 1
+    items: list[dict] = []
+
+    while len(items) < MAX_RESULT_CAP:
+        while index < length and text[index].isspace():
+            index += 1
+        if index < length and text[index] == ",":
+            index += 1
+            continue
+        if index < length and text[index] == "]":
+            return items
+        try:
+            item, next_index = decoder.raw_decode(text, index)
+        except json.JSONDecodeError:
+            break
+        if isinstance(item, dict):
+            items.append(item)
+        index = next_index
+
+    return items if items else None
+
+
+def no_match_message(pattern: str, lang: str, *, is_replace: bool = False) -> str:
+    """Return no-match text with common ast-grep pattern hints."""
+    base = "No matches found to replace" if is_replace else "No matches found"
+    stripped = pattern.strip()
+    hints: list[str] = []
+
+    if re.search(r"\\[wWdDsSbB]", stripped):
+        hints.append(
+            "Regex escapes like \\w, \\d, \\s, and \\b do not work in ast-grep patterns. Use $VAR for one AST node or switch to grep for text search."
+        )
+    if re.search(r"\[[A-Za-z0-9]-[A-Za-z0-9]\]", stripped):
+        hints.append(
+            "Character ranges like [a-z] are regex syntax, not AST syntax. Use $VAR for identifiers or switch to grep."
+        )
+    if "$" not in stripped and re.search(r"\.[*+]", stripped):
+        hints.append(
+            "Regex wildcards like .* and .+ do not work in ast-grep. Use $$$ for multiple AST nodes or switch to grep."
+        )
+    if re.fullmatch(r"[-\w.*]+\|[-\w.*|]+", stripped):
+        hints.append(
+            "Regex alternation with | does not work in ast-grep patterns. Run separate AST searches or switch to grep."
+        )
+
+    if (
+        lang == "python"
+        and stripped.startswith(("def ", "class ", "async def "))
+        and stripped.endswith(":")
+    ):
+        hints.append(f"Remove the trailing colon. Try `{stripped[:-1]}`.")
+    if (
+        lang in {"javascript", "typescript", "tsx"}
+        and "function" in pattern
+        and "{" not in pattern
+    ):
+        hints.append(
+            "JS/TS/TSX function patterns should be complete AST nodes, e.g. `function $NAME($$$ARGS) { $$$BODY }`."
+        )
+    if lang == "go" and pattern.lstrip().startswith("func") and "{" not in pattern:
+        hints.append(
+            "Go function patterns should include a body, e.g. `func $NAME($$$ARGS) { $$$BODY }`."
+        )
+    if lang == "rust" and pattern.lstrip().startswith("fn ") and "{" not in pattern:
+        hints.append(
+            "Rust function patterns should include a body, e.g. `fn $NAME($$$ARGS) { $$$BODY }`."
+        )
+    return base if not hints else base + "\n\nHints:\n- " + "\n- ".join(hints)
 
 
 def format_run_results(
@@ -298,25 +453,31 @@ def register(mcp: FastMCP) -> None:
         ),
     ) -> str:
         """Search code patterns across the filesystem using AST-aware structural matching. Use instead of grep when you need structural matches (function signatures, class shapes, import patterns) rather than text search. Supports 25 languages. Returns file:line:col with matched code snippets."""
+        safe_paths = normalize_workspace_paths(paths)
+        max_results = clamp_max_results(max_results)
         cmd = [_SG_BIN, "run", "-p", pattern, "--lang", lang, "--json=compact"]
         if context and context > 0:
             cmd.extend(["-C", str(context)])
         if globs:
             for g in globs:
                 cmd.extend(["--globs", g])
-        cmd.extend(paths if paths else ["."])
+        cmd.extend(["--", *safe_paths])
 
-        result = run_command(cmd, allow_exit_1=True)
-        stdout = result.stdout.decode("utf-8", errors="replace").strip()
-        if not stdout:
-            return "No matches found"
+        result = run_command(cmd, allow_exit_1=True, cwd=resolve_workspace())
+        if not result.stdout.strip():
+            return no_match_message(pattern, lang)
 
-        matches = json.loads(stdout)
+        matches, truncated = parse_compact_json_output(result.stdout)
+        if not matches:
+            return no_match_message(pattern, lang)
 
         if output_format == "json":
             return json.dumps(matches[:max_results], indent=2)
 
-        return format_run_results(matches, max_results)
+        output = format_run_results(matches, max_results)
+        if truncated and not output.startswith("[TRUNCATED]"):
+            output = "[TRUNCATED] Output exceeded AST MCP caps\n\n" + output
+        return output
 
     @mcp.tool(
         annotations={"destructiveHint": True},
@@ -336,7 +497,8 @@ def register(mcp: FastMCP) -> None:
         ),
     ) -> str:
         """Replace code patterns across the filesystem with AST-aware rewriting. Use for safe structural refactoring — renaming variables, updating function signatures, or migrating API calls. Always use dry_run=true first to preview changes. Returns list of replacements with file:line locations."""
-        cmd = [
+        safe_paths = normalize_workspace_paths(paths)
+        preview_cmd = [
             _SG_BIN,
             "run",
             "-p",
@@ -347,22 +509,55 @@ def register(mcp: FastMCP) -> None:
             lang,
             "--json=compact",
         ]
-        if not dry_run:
-            cmd.append("--update-all")
         if globs:
             for g in globs:
-                cmd.extend(["--globs", g])
-        cmd.extend(paths if paths else ["."])
+                preview_cmd.extend(["--globs", g])
+        preview_cmd.extend(["--", *safe_paths])
 
-        result = run_command(cmd, allow_exit_1=True)
-        stdout = result.stdout.decode("utf-8", errors="replace").strip()
-        if not stdout:
-            return "No matches found to replace"
+        workspace = resolve_workspace()
+        result = run_command(preview_cmd, allow_exit_1=True, cwd=workspace)
+        if not result.stdout.strip():
+            return no_match_message(pattern, lang, is_replace=True)
 
-        matches = json.loads(stdout)
-        return format_run_results(
-            matches, MAX_RESULTS_DEFAULT, is_replace=True, is_dry_run=dry_run
+        matches, truncated = parse_compact_json_output(result.stdout)
+        if not matches:
+            return no_match_message(pattern, lang, is_replace=True)
+
+        if dry_run:
+            output = format_run_results(
+                matches, MAX_RESULT_CAP, is_replace=True, is_dry_run=True
+            )
+            if truncated and not output.startswith("[TRUNCATED]"):
+                output = "[TRUNCATED] Output exceeded AST MCP caps\n\n" + output
+            return output
+
+        apply_cmd = [
+            _SG_BIN,
+            "run",
+            "-p",
+            pattern,
+            "-r",
+            rewrite,
+            "--lang",
+            lang,
+            "--update-all",
+        ]
+        if globs:
+            for g in globs:
+                apply_cmd.extend(["--globs", g])
+        apply_cmd.extend(["--", *safe_paths])
+
+        try:
+            run_command(apply_cmd, cwd=workspace)
+        except ToolError as error:
+            raise ToolError(f"Replace failed: {error}") from None
+
+        output = format_run_results(
+            matches, MAX_RESULT_CAP, is_replace=True, is_dry_run=False
         )
+        if truncated and not output.startswith("[TRUNCATED]"):
+            output = "[TRUNCATED] Output exceeded AST MCP caps\n\n" + output
+        return output
 
     @mcp.tool(
         annotations={"readOnlyHint": True, "idempotentHint": True},
@@ -392,22 +587,26 @@ def register(mcp: FastMCP) -> None:
         """Search code using a YAML rule with advanced combinators (kind, has, inside, follows, precedes, all, any, not). Use when ast_search patterns are insufficient — for context-sensitive matches like "function calls inside a class" or "imports followed by usage". Returns file:line:col with matched code and rule ID."""
         validate_yaml_rule(rule_yaml)
 
+        safe_paths = normalize_workspace_paths(paths)
+        max_results = clamp_max_results(max_results)
         cmd = [_SG_BIN, "scan", "--inline-rules", rule_yaml, "--json=compact"]
-        cmd.extend(paths if paths else ["."])
+        cmd.extend(["--", *safe_paths])
 
-        result = run_command(cmd)
-        stdout = result.stdout.decode("utf-8", errors="replace").strip()
-        if not stdout:
+        result = run_command(cmd, cwd=resolve_workspace())
+        if not result.stdout.strip():
             return "No matches found"
 
-        matches = json.loads(stdout)
+        matches, truncated = parse_compact_json_output(result.stdout)
         if not matches:
             return "No matches found"
 
         if output_format == "json":
             return json.dumps(matches[:max_results], indent=2)
 
-        return format_scan_results(matches, max_results)
+        output = format_scan_results(matches, max_results)
+        if truncated and not output.startswith("[TRUNCATED]"):
+            output = "[TRUNCATED] Output exceeded AST MCP caps\n\n" + output
+        return output
 
     @mcp.tool(
         annotations={"readOnlyHint": True, "idempotentHint": True},
@@ -469,19 +668,20 @@ def register(mcp: FastMCP) -> None:
         ]
 
         result = run_command(cmd, input_data=code.encode())
-        stdout = result.stdout.decode("utf-8", errors="replace").strip()
-
         no_match_msg = (
             "No matches found.\n\n"
             "Hint: If using relational rules (has, inside, follows, precedes), "
             "try adding `stopBy: end` to search the entire subtree."
         )
 
-        if not stdout:
+        if not result.stdout.strip():
             return no_match_msg
 
-        matches = json.loads(stdout)
+        matches, truncated = parse_compact_json_output(result.stdout)
         if not matches:
             return no_match_msg
 
-        return format_scan_results(matches, MAX_RESULTS_DEFAULT)
+        output = format_scan_results(matches, MAX_RESULT_CAP)
+        if truncated and not output.startswith("[TRUNCATED]"):
+            output = "[TRUNCATED] Output exceeded AST MCP caps\n\n" + output
+        return output

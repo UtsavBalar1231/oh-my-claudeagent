@@ -72,6 +72,42 @@ load '../test_helper'
 	echo "$ctx" | grep -qi "TODO"
 }
 
+@test "comment-checker: warns for MultiEdit new_string content" {
+	local dirty="function foo() {\n  // TODO: implement this\n  return null;\n}"
+	local clean="function bar() {\n  return 1;\n}"
+	local payload
+	payload=$(jq -nc --arg dirty "$dirty" --arg clean "$clean" '{"tool_name":"MultiEdit","tool_input":{"edits":[{"new_string":$clean},{"new_string":$dirty}]}}')
+
+	run_hook "comment-checker.sh" "$payload"
+	assert_success
+	ctx=$(get_context)
+	assert [ -n "$ctx" ]
+	echo "$ctx" | grep -qi "TODO"
+}
+
+@test "comment-checker: no warning for clean MultiEdit newString content" {
+	local first="function foo() {\n  return 1;\n}"
+	local second="function bar() {\n  return 2;\n}"
+	local payload
+	payload=$(jq -nc --arg first "$first" --arg second "$second" '{"tool_name":"MultiEdit","tool_input":{"edits":[{"newString":$first},{"newString":$second}]}}')
+
+	run_hook "comment-checker.sh" "$payload"
+	assert_success
+	assert_output ""
+}
+
+@test "comment-checker: warns for apply_patch added lines" {
+	local patch=$'*** Begin Patch\n*** Update File: example.py\n@@\n def foo():\n+    # AI-generated helper\n+    return 1\n-    return 0\n*** End Patch'
+	local payload
+	payload=$(jq -nc --arg patch "$patch" '{"tool_name":"apply_patch","tool_input":{"patchText":$patch}}')
+
+	run_hook "comment-checker.sh" "$payload"
+	assert_success
+	ctx=$(get_context)
+	assert [ -n "$ctx" ]
+	echo "$ctx" | grep -qi "AI attribution"
+}
+
 # ---------------------------------------------------------------------------
 # e. track-subagent-spawn: creates/updates subagents.json
 # ---------------------------------------------------------------------------
