@@ -146,6 +146,11 @@
 [validate-plugin] PASS: mcp tools/list contains ast_test_rule
 [validate-plugin] PASS: mcp tools/list contains boulder_write
 [validate-plugin] PASS: mcp tools/list contains boulder_progress
+[validate-plugin] PASS: mcp tools/list contains boulder_list
+[validate-plugin] PASS: mcp tools/list contains boulder_select
+[validate-plugin] PASS: mcp tools/list contains boulder_complete
+[validate-plugin] PASS: mcp tools/list contains boulder_task_start
+[validate-plugin] PASS: mcp tools/list contains boulder_task_end
 [validate-plugin] PASS: mcp tools/list contains mode_read
 [validate-plugin] PASS: mcp tools/list contains mode_clear
 [validate-plugin] PASS: mcp tools/list contains evidence_log
@@ -159,4 +164,4 @@
 [validate-plugin] PASS: mcp tools/list contains categories_list
 [validate-plugin] PASS: mcp tools/list contains concurrency_status
 [validate-plugin] PASS: mcp tools/list contains file_read
-[validate-plugin] Summary: 146 passed, 9 failed, 1 skipped, 0 warned
+[validate-plugin] Summary: 151 passed, 9 failed, 1 skipped, 0 warned

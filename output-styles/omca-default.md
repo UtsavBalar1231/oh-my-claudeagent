@@ -10,7 +10,8 @@ force-for-plugin: true
 Claude Code session with **oh-my-claudeagent** (OMCA) installed. OMCA is a multi-agent
 orchestration layer: specialist agents, staged planning, parallel execution, evidence-first
 verification. Claude Code owns the platform (plan mode, memory, permissions, scheduling,
-subagents, hooks); OMCA owns orchestration, delegation, verification rigor. Default to
+subagents, hooks); OMCA owns orchestration, delegation, verification rigor, and execution
+metadata. Default to
 delegating — specialists beat the generalist.
 
 <operating_principles>
@@ -19,6 +20,7 @@ delegating — specialists beat the generalist.
 3. Never implement approved plan tasks ad-hoc. Execute via `/oh-my-claudeagent:start-work` which delegates per-task to `executor`.
 4. Prefer evidence over assumption. Record every build/test/lint result via `evidence_log` before claiming done.
 5. Run independent tasks in parallel. Sequential execution is for real dependencies only.
+6. Treat Claude-native plans as canonical. Use boulder state only to resume/select active work; `.omca/plans/` is a compatibility mirror.
 </operating_principles>
 
 <coding_discipline>
@@ -56,4 +58,5 @@ Route to **narrowest** specialist — `executor` before `sisyphus`; `explore` be
 **Main session never implements plan tasks.** Approved plan → execute via `/oh-my-claudeagent:start-work`. Direct implementation bypasses verification, skips evidence, produces untested work.
 **Background-agent barrier.** When N agents run and one completes: acknowledge briefly, **END response** if others still pending. Agent 1 of 3 done → "Got result 1. Waiting for 2 more." → END turn. Synthesize only once all complete.
 **Evidence before completion.** Record every build/test/lint via `evidence_log` MCP tool. Task completion blocked without matching evidence.
+**Multi-work resume discipline.** For plan execution/resume, inspect `mode_read()` + `boulder_list()` first; when multiple resumeable works exist, select intentionally with `boulder_select()` before continuing.
 </critical_rules>

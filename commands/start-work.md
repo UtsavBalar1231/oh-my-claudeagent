@@ -44,20 +44,24 @@ stripped — delegated agents inherit parent session context.
 
 ### Finding the Active Plan
 
-1. `mode_read(mode="boulder")` — if `active_plan` points to a valid file with
-   unchecked boxes → resume that plan directly (skip steps 2-3).
+1. `mode_read()` plus `boulder_list()` — if `active_work` points to a valid file
+   with unchecked boxes → resume that work directly (skip steps 2-3). If there
+   are multiple resumeable works, prefer an explicit `[plan file]`/`work_id`;
+   otherwise present the resume options and ask the user to choose.
 
 2. No active boulder (or plan fully checked) → search both plan surfaces:
-   - `.omca/plans/*.md`
-   - `.claude/plans/*.md`
+   - `~/.claude/plans/*.md` (canonical native plans)
+   - `.omca/plans/*.md` (boulder compatibility mirror/resume surface)
 
 3. Merge results, deduplicate by absolute path, label each as `[active]`,
    `[omca]`, or `[native]`.
 
 ### Decision Logic
 
-- **Active boulder AND unchecked boxes** → append session, continue work.
-- **No active plan OR plan complete** → list available plans.
+- **Active boulder work AND unchecked boxes** → append session, continue work.
+- **Multiple resumeable boulder works** → list `boulder_list()` resume options;
+  select with `boulder_select(work_id="...")` before delegating.
+- **No active plan OR selected work complete** → list available plans.
   - Single plan found → auto-select.
   - Multiple plans → present list, ask user to choose.
 
@@ -89,7 +93,10 @@ boulder_write(
 ```
 
 `boulder_write` enforces deduplication and preserves `started_at`. Plan body
-stays at its authoritative location — boulder stores a pointer only.
+stays at its authoritative location — boulder stores a pointer only. Boulder
+state is schema v2 multi-work: the top-level fields mirror the selected active
+work, while `works` preserves other active/completed work sessions in the same
+repository.
 
 ### Output Formats
 
@@ -110,6 +117,7 @@ When resuming existing work:
 ```
 Resuming Work Session
 
+Work ID: {work_id}
 Active Plan: {plan-name}
 Progress: {completed}/{total} tasks
 Worktree: {worktree_path or "not set"}
@@ -131,7 +139,7 @@ Reading plan and beginning execution...
 
 ## Step 1: Register and Analyze
 
-1. `boulder_write(active_plan="<path>", plan_name="<name>", session_id="<current>")` — BEFORE delegating.
+1. `boulder_write(active_plan="<path>", plan_name="<name>", session_id="<current>")` — BEFORE delegating. Capture the returned `work_id` from state/progress and pass it to task tracking when available.
 2. Read FULL plan file.
 3. Parse `- [ ]` checkboxes.
 4. Build parallelization map: simultaneous tasks, dependencies, file conflicts.
@@ -551,6 +559,10 @@ whether to run metis re-analysis.
 ## MCP Tool Reference
 
 - **`boulder_write`**: Write/update execution metadata (active plan, session ID, worktree path)
+- **`boulder_list`**: List resumeable/completed works and progress summaries
+- **`boulder_select`**: Select one existing work before resuming/delegating
+- **`boulder_complete`**: Mark one work complete while preserving other works
+- **`boulder_task_start` / `boulder_task_end`**: Track per-task session/timing metadata
 - **`boulder_progress`**: Task completion counts
 - **`mode_read()`**: Active persistence modes
 - **`mode_clear()`**: Deactivate modes. `mode_clear(mode="ralph")` for selective

@@ -120,7 +120,8 @@ def test_auto_deactivate_f4_approve_matching_sha(
                     "type": "final_verification_f4",
                     "plan_sha256": sha,
                     "exit_code": 0,
-                    "output_snippet": "All checks passed",
+                    "verdict": "APPROVE",
+                    "output_snippet": "verdict:APPROVE — all checks passed",
                     "command": "final check",
                 }
             ]
@@ -244,6 +245,347 @@ def test_auto_deactivate_no_f4_only_earlier_waves(
     assert data["reason"] == "no_matching_f4_approve"
 
 
+def test_auto_deactivate_requires_explicit_f4_approve(
+    mcp_server, working_dir, tmp_git_root, synthetic_state_dir
+):
+    """Exit code 0 without an APPROVE verdict is not enough to auto-deactivate."""
+    state_dir, _plan_file, sha = synthetic_state_dir
+    evidence_path = tmp_git_root / EVIDENCE_DIR / EVIDENCE_FILE_NEW
+    _write_json(
+        str(evidence_path),
+        {
+            "entries": [
+                {
+                    "type": "final_verification_f4",
+                    "plan_sha256": sha,
+                    "exit_code": 0,
+                    "output_snippet": "REJECT — issue found",
+                    "command": "final check",
+                }
+            ]
+        },
+    )
+
+    result_str = call_tool(
+        mcp_server,
+        "boulder_progress",
+        {"working_directory": working_dir},
+    )
+    data = json.loads(result_str)
+
+    assert data["is_complete"] is True
+    assert data["auto_deactivated"] is False
+    assert data["reason"] == "no_matching_f4_approve"
+    assert (state_dir / BOULDER_FILE).exists()
+
+
+@pytest.mark.parametrize(
+    "entry_updates",
+    [
+        {"verdict": "DISAPPROVE", "output_snippet": "verdict:DISAPPROVE"},
+        {"output_snippet": "NOT APPROVED"},
+        {"exit_code": 1, "verdict": "APPROVE", "output_snippet": "verdict:APPROVE"},
+        {
+            "type": "final_verification_f4_retry",
+            "verdict": "APPROVE",
+            "output_snippet": "verdict:APPROVE",
+        },
+    ],
+)
+def test_auto_deactivate_rejects_non_strict_f4_approval(
+    mcp_server, working_dir, tmp_git_root, synthetic_state_dir, entry_updates
+):
+    """Only exact F4, exit 0, explicit APPROVE verdict can auto-deactivate."""
+    state_dir, _plan_file, sha = synthetic_state_dir
+    entry = {
+        "type": "final_verification_f4",
+        "plan_sha256": sha,
+        "exit_code": 0,
+        "output_snippet": "verdict:APPROVE",
+        "command": "final check",
+    }
+    entry.update(entry_updates)
+    _write_json(
+        str(tmp_git_root / EVIDENCE_DIR / EVIDENCE_FILE_NEW), {"entries": [entry]}
+    )
+
+    data = json.loads(
+        call_tool(mcp_server, "boulder_progress", {"working_directory": working_dir})
+    )
+
+    assert data["is_complete"] is True
+    assert data["auto_deactivated"] is False
+    assert data["reason"] == "no_matching_f4_approve"
+    assert (state_dir / BOULDER_FILE).exists()
+    assert (state_dir / RALPH_STATE_FILE).exists()
+    assert (state_dir / ULTRAWORK_STATE_FILE).exists()
+
+
+@pytest.mark.parametrize(
+    "entry_updates",
+    [
+        {"verdict": "APPROVE", "output_snippet": "final check passed"},
+        {"output_snippet": "all checks passed verdict:APPROVE"},
+    ],
+)
+def test_auto_deactivate_accepts_explicit_f4_approve_verdicts(
+    mcp_server, working_dir, tmp_git_root, synthetic_state_dir, entry_updates
+):
+    """Explicit verdict field or verdict:APPROVE snippet is accepted."""
+    state_dir, _plan_file, sha = synthetic_state_dir
+    entry = {
+        "type": "final_verification_f4",
+        "plan_sha256": sha,
+        "exit_code": 0,
+        "command": "final check",
+    }
+    entry.update(entry_updates)
+    _write_json(
+        str(tmp_git_root / EVIDENCE_DIR / EVIDENCE_FILE_NEW), {"entries": [entry]}
+    )
+
+    data = json.loads(
+        call_tool(mcp_server, "boulder_progress", {"working_directory": working_dir})
+    )
+
+    assert data["is_complete"] is True
+    assert data["auto_deactivated"] is True
+    assert not (state_dir / BOULDER_FILE).exists()
+
+
+def test_boulder_progress_explicit_plan_path_without_work_id_does_not_deactivate_active_work(
+    mcp_server, working_dir, tmp_git_root, tmp_path
+):
+    """A complete explicit plan_path must not auto-complete unrelated active work."""
+    state_dir = tmp_git_root / ".omca" / "state"
+    active_plan = tmp_path / "active.md"
+    active_plan.write_text(_make_plan_content(all_done=False))
+    complete_content = _make_plan_content(all_done=True)
+    complete_plan = tmp_path / "complete-explicit.md"
+    complete_plan.write_text(complete_content)
+
+    call_tool(
+        mcp_server,
+        "boulder_write",
+        {
+            "active_plan": str(active_plan),
+            "plan_name": "active-work",
+            "session_id": "sess-active",
+            "working_directory": working_dir,
+        },
+    )
+    active_id = json.loads((state_dir / BOULDER_FILE).read_text())["active_work_id"]
+    _write_json(str(state_dir / RALPH_STATE_FILE), {"task": "do work"})
+    _write_json(str(state_dir / ULTRAWORK_STATE_FILE), {"active": True})
+    _write_json(
+        str(tmp_git_root / EVIDENCE_DIR / EVIDENCE_FILE_NEW),
+        {
+            "entries": [
+                {
+                    "type": "final_verification_f4",
+                    "plan_sha256": _plan_sha(complete_content),
+                    "exit_code": 0,
+                    "verdict": "APPROVE",
+                    "output_snippet": "verdict:APPROVE",
+                    "command": "final check",
+                }
+            ]
+        },
+    )
+
+    data = json.loads(
+        call_tool(
+            mcp_server,
+            "boulder_progress",
+            {"plan_path": str(complete_plan), "working_directory": working_dir},
+        )
+    )
+
+    assert data["is_complete"] is True
+    assert data["auto_deactivated"] is False
+    assert data["reason"] == "explicit_plan_without_work_id"
+    retained = json.loads((state_dir / BOULDER_FILE).read_text())
+    assert retained["active_work_id"] == active_id
+    assert retained["works"][active_id]["status"] == "active"
+    assert (state_dir / RALPH_STATE_FILE).exists()
+    assert (state_dir / ULTRAWORK_STATE_FILE).exists()
+
+
+def test_explicit_plan_path_unknown_work_id_does_not_deactivate_single_active_work(
+    mcp_server, working_dir, tmp_git_root, tmp_path
+):
+    """Unknown explicit work_id must not fall back to the only active work."""
+    state_dir = tmp_git_root / ".omca" / "state"
+    active_plan = tmp_path / "active-incomplete.md"
+    active_plan.write_text(_make_plan_content(all_done=False))
+    complete_content = _make_plan_content(all_done=True)
+    complete_plan = tmp_path / "complete-unknown-work.md"
+    complete_plan.write_text(complete_content)
+
+    call_tool(
+        mcp_server,
+        "boulder_write",
+        {
+            "active_plan": str(active_plan),
+            "plan_name": "active-single",
+            "session_id": "sess-active",
+            "working_directory": working_dir,
+        },
+    )
+    active_id = json.loads((state_dir / BOULDER_FILE).read_text())["active_work_id"]
+    _write_json(str(state_dir / RALPH_STATE_FILE), {"task": "do work"})
+    _write_json(str(state_dir / ULTRAWORK_STATE_FILE), {"active": True})
+    _write_json(
+        str(tmp_git_root / EVIDENCE_DIR / EVIDENCE_FILE_NEW),
+        {
+            "entries": [
+                {
+                    "type": "final_verification_f4",
+                    "plan_sha256": _plan_sha(complete_content),
+                    "exit_code": 0,
+                    "verdict": "APPROVE",
+                    "command": "final check",
+                }
+            ]
+        },
+    )
+
+    data = json.loads(
+        call_tool(
+            mcp_server,
+            "boulder_progress",
+            {
+                "plan_path": str(complete_plan),
+                "work_id": "missing-work",
+                "working_directory": working_dir,
+            },
+        )
+    )
+
+    assert data["is_complete"] is True
+    assert data["auto_deactivated"] is False
+    assert data["reason"] == "work_not_found"
+    retained = json.loads((state_dir / BOULDER_FILE).read_text())
+    assert retained["active_work_id"] == active_id
+    assert retained["works"][active_id]["status"] == "active"
+    assert (state_dir / RALPH_STATE_FILE).exists()
+    assert (state_dir / ULTRAWORK_STATE_FILE).exists()
+
+
+def test_explicit_plan_path_mismatched_work_id_does_not_deactivate_work(
+    mcp_server, working_dir, tmp_git_root, tmp_path
+):
+    """Explicit plan_path must belong to the requested work_id before deactivation."""
+    state_dir = tmp_git_root / ".omca" / "state"
+    work_plan = tmp_path / "requested-work.md"
+    work_plan.write_text(_make_plan_content(all_done=False))
+    complete_content = _make_plan_content(all_done=True)
+    other_plan = tmp_path / "other-complete.md"
+    other_plan.write_text(complete_content)
+
+    call_tool(
+        mcp_server,
+        "boulder_write",
+        {
+            "active_plan": str(work_plan),
+            "plan_name": "requested-work",
+            "session_id": "sess-work",
+            "working_directory": working_dir,
+        },
+    )
+    work_id = json.loads((state_dir / BOULDER_FILE).read_text())["active_work_id"]
+    _write_json(str(state_dir / RALPH_STATE_FILE), {"task": "do work"})
+    _write_json(str(state_dir / ULTRAWORK_STATE_FILE), {"active": True})
+    _write_json(
+        str(tmp_git_root / EVIDENCE_DIR / EVIDENCE_FILE_NEW),
+        {
+            "entries": [
+                {
+                    "type": "final_verification_f4",
+                    "plan_sha256": _plan_sha(complete_content),
+                    "exit_code": 0,
+                    "verdict": "APPROVE",
+                    "command": "final check",
+                }
+            ]
+        },
+    )
+
+    data = json.loads(
+        call_tool(
+            mcp_server,
+            "boulder_progress",
+            {
+                "plan_path": str(other_plan),
+                "work_id": work_id,
+                "working_directory": working_dir,
+            },
+        )
+    )
+
+    assert data["is_complete"] is True
+    assert data["auto_deactivated"] is False
+    assert data["reason"] == "plan_path_work_mismatch"
+    retained = json.loads((state_dir / BOULDER_FILE).read_text())
+    assert retained["works"][work_id]["status"] == "active"
+    assert (state_dir / RALPH_STATE_FILE).exists()
+    assert (state_dir / ULTRAWORK_STATE_FILE).exists()
+
+
+def test_explicit_matching_plan_path_and_work_id_can_deactivate(
+    mcp_server, working_dir, tmp_git_root, tmp_path
+):
+    """Explicit plan_path + matching work_id is allowed to auto-deactivate."""
+    state_dir = tmp_git_root / ".omca" / "state"
+    complete_content = _make_plan_content(all_done=True)
+    complete_plan = tmp_path / "matching-complete.md"
+    complete_plan.write_text(complete_content)
+
+    call_tool(
+        mcp_server,
+        "boulder_write",
+        {
+            "active_plan": str(complete_plan),
+            "plan_name": "matching-work",
+            "session_id": "sess-work",
+            "working_directory": working_dir,
+        },
+    )
+    work_id = json.loads((state_dir / BOULDER_FILE).read_text())["active_work_id"]
+    _write_json(str(state_dir / RALPH_STATE_FILE), {"task": "do work"})
+    _write_json(str(state_dir / ULTRAWORK_STATE_FILE), {"active": True})
+    _write_json(
+        str(tmp_git_root / EVIDENCE_DIR / EVIDENCE_FILE_NEW),
+        {
+            "entries": [
+                {
+                    "type": "final_verification_f4",
+                    "plan_sha256": _plan_sha(complete_content),
+                    "exit_code": 0,
+                    "verdict": "APPROVE",
+                    "command": "final check",
+                }
+            ]
+        },
+    )
+
+    data = json.loads(
+        call_tool(
+            mcp_server,
+            "boulder_progress",
+            {
+                "plan_path": str(complete_plan),
+                "work_id": work_id,
+                "working_directory": working_dir,
+            },
+        )
+    )
+
+    assert data["auto_deactivated"] is True
+    assert data["completed_work_id"] == work_id
+    assert not (state_dir / BOULDER_FILE).exists()
+
+
 # ---------------------------------------------------------------------------
 # Test 4: plan incomplete -> _load_evidence is NOT called
 # ---------------------------------------------------------------------------
@@ -322,3 +664,147 @@ def test_auto_deactivate_fail_safe_on_evidence_read_error(
     assert (state_dir / RALPH_STATE_FILE).exists()
     assert (state_dir / ULTRAWORK_STATE_FILE).exists()
     assert (state_dir / BOULDER_FILE).exists()
+
+
+def test_auto_deactivate_completes_current_work_only_when_others_active(
+    mcp_server, working_dir, tmp_git_root, tmp_path
+):
+    """F4 approve completes only current work and retains boulder when another work is active."""
+    state_dir = tmp_git_root / ".omca" / "state"
+    done_content = _make_plan_content(all_done=True)
+    done_plan = tmp_path / "done.md"
+    done_plan.write_text(done_content)
+    other_plan = tmp_path / "other.md"
+    other_plan.write_text(_make_plan_content(all_done=False))
+    done_sha = _plan_sha(done_content)
+
+    call_tool(
+        mcp_server,
+        "boulder_write",
+        {
+            "active_plan": str(other_plan),
+            "plan_name": "other",
+            "session_id": "sess-other",
+            "working_directory": working_dir,
+        },
+    )
+    other_state = json.loads((state_dir / BOULDER_FILE).read_text())
+    other_id = other_state["active_work_id"]
+    call_tool(
+        mcp_server,
+        "boulder_write",
+        {
+            "active_plan": str(done_plan),
+            "plan_name": "done",
+            "session_id": "sess-done",
+            "working_directory": working_dir,
+        },
+    )
+    done_state = json.loads((state_dir / BOULDER_FILE).read_text())
+    done_id = done_state["active_work_id"]
+
+    _write_json(str(state_dir / RALPH_STATE_FILE), {"task": "do work"})
+    _write_json(str(state_dir / ULTRAWORK_STATE_FILE), {"active": True})
+    _write_json(
+        str(state_dir / PENDING_FINAL_VERIFY_FILE),
+        {"plan_sha256": done_sha, "plan_path": str(done_plan)},
+    )
+    evidence_path = tmp_git_root / EVIDENCE_DIR / EVIDENCE_FILE_NEW
+    _write_json(
+        str(evidence_path),
+        {
+            "entries": [
+                {
+                    "type": "final_verification_f4",
+                    "plan_sha256": done_sha,
+                    "exit_code": 0,
+                    "output_snippet": "verdict:APPROVE",
+                    "command": "final check",
+                }
+            ]
+        },
+    )
+
+    data = json.loads(
+        call_tool(mcp_server, "boulder_progress", {"working_directory": working_dir})
+    )
+    assert data["auto_deactivated"] is True
+    assert data["completed_work_id"] == done_id
+    assert data["boulder_retained"] is True
+    assert set(data["cleared"]) == {"ralph", "ultrawork", "final_verify"}
+    assert (state_dir / BOULDER_FILE).exists()
+
+    retained = json.loads((state_dir / BOULDER_FILE).read_text())
+    assert retained["works"][done_id]["status"] == "completed"
+    assert retained["active_work_id"] == other_id
+    assert retained["works"][other_id]["status"] == "active"
+    assert evidence_path.exists()
+
+
+def test_auto_deactivate_uses_selected_work_id_not_active_work(
+    mcp_server, working_dir, tmp_git_root, tmp_path
+):
+    """F4 auto-deactivate must complete the inspected work_id, not whatever is active."""
+    state_dir = tmp_git_root / ".omca" / "state"
+    done_content = _make_plan_content(all_done=True)
+    done_plan = tmp_path / "done-selected.md"
+    done_plan.write_text(done_content)
+    active_plan = tmp_path / "still-active.md"
+    active_plan.write_text(_make_plan_content(all_done=False))
+    done_sha = _plan_sha(done_content)
+
+    call_tool(
+        mcp_server,
+        "boulder_write",
+        {
+            "active_plan": str(done_plan),
+            "plan_name": "done-selected",
+            "session_id": "sess-done",
+            "working_directory": working_dir,
+        },
+    )
+    done_id = json.loads((state_dir / BOULDER_FILE).read_text())["active_work_id"]
+    call_tool(
+        mcp_server,
+        "boulder_write",
+        {
+            "active_plan": str(active_plan),
+            "plan_name": "still-active",
+            "session_id": "sess-active",
+            "working_directory": working_dir,
+        },
+    )
+    active_id = json.loads((state_dir / BOULDER_FILE).read_text())["active_work_id"]
+
+    _write_json(str(state_dir / RALPH_STATE_FILE), {"task": "do work"})
+    _write_json(str(state_dir / ULTRAWORK_STATE_FILE), {"active": True})
+    evidence_path = tmp_git_root / EVIDENCE_DIR / EVIDENCE_FILE_NEW
+    _write_json(
+        str(evidence_path),
+        {
+            "entries": [
+                {
+                    "type": "final_verification_f4",
+                    "plan_sha256": done_sha,
+                    "exit_code": 0,
+                    "output_snippet": "verdict:APPROVE",
+                    "command": "final check",
+                }
+            ]
+        },
+    )
+
+    data = json.loads(
+        call_tool(
+            mcp_server,
+            "boulder_progress",
+            {"work_id": done_id, "working_directory": working_dir},
+        )
+    )
+    assert data["auto_deactivated"] is True
+    assert data["completed_work_id"] == done_id
+
+    retained = json.loads((state_dir / BOULDER_FILE).read_text())
+    assert retained["active_work_id"] == active_id
+    assert retained["works"][done_id]["status"] == "completed"
+    assert retained["works"][active_id]["status"] == "active"

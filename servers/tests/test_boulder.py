@@ -590,6 +590,246 @@ def test_boulder_write_source_unreadable_returns_success_with_warning(
     assert "WARN: boulder_write: could not read plan source for mirror" in captured.err
 
 
+def test_boulder_write_normalizes_legacy_state(mcp_server, working_dir, tmp_git_root):
+    """Legacy top-level boulder state is normalized to schema v2 on write."""
+    state_dir = tmp_git_root / ".omca" / "state"
+    _write_json(
+        str(state_dir / BOULDER_FILE),
+        {
+            "active_plan": "/tmp/legacy-plan.md",
+            "plan_name": "legacy-plan",
+            "session_ids": ["sess-old"],
+            "agent": "sisyphus",
+            "started_at": "2026-05-13T00:00:00Z",
+        },
+    )
+
+    result = call_tool(
+        mcp_server,
+        "boulder_write",
+        {
+            "active_plan": "/tmp/legacy-plan.md",
+            "plan_name": "legacy-plan",
+            "session_id": "sess-new",
+            "working_directory": working_dir,
+        },
+    )
+    assert "sessions=2" in result
+
+    data = json.loads((state_dir / BOULDER_FILE).read_text())
+    assert data["schema_version"] == 2
+    assert data["active_work_id"] in data["works"]
+    work = data["works"][data["active_work_id"]]
+    assert work["started_at"] == "2026-05-13T00:00:00Z"
+    assert work["session_ids"] == ["sess-old", "sess-new"]
+    assert data["active_plan"] == work["active_plan"]
+
+
+def test_boulder_multi_work_list_select_complete(
+    mcp_server, working_dir, tmp_path, tmp_git_root
+):
+    """Multiple works can be listed, selected, and completed independently."""
+    plan_one = tmp_path / "one.md"
+    plan_two = tmp_path / "two.md"
+    plan_one.write_text("- [ ] 1. One\n")
+    plan_two.write_text("- [x] 1. Two\n")
+
+    call_tool(
+        mcp_server,
+        "boulder_write",
+        {
+            "active_plan": str(plan_one),
+            "plan_name": "one",
+            "session_id": "s1",
+            "working_directory": working_dir,
+        },
+    )
+    first_state = json.loads(
+        (tmp_git_root / ".omca" / "state" / BOULDER_FILE).read_text()
+    )
+    first_id = first_state["active_work_id"]
+    call_tool(
+        mcp_server,
+        "boulder_write",
+        {
+            "active_plan": str(plan_two),
+            "plan_name": "two",
+            "session_id": "s2",
+            "working_directory": working_dir,
+        },
+    )
+    second_state = json.loads(
+        (tmp_git_root / ".omca" / "state" / BOULDER_FILE).read_text()
+    )
+    second_id = second_state["active_work_id"]
+
+    listed = json.loads(
+        call_tool(mcp_server, "boulder_list", {"working_directory": working_dir})
+    )
+    assert listed["active_work_id"] == second_id
+    assert listed["counts"]["resumeable"] == 2
+    assert {item["work_id"] for item in listed["resume_options"]} == {
+        first_id,
+        second_id,
+    }
+
+    selected = json.loads(
+        call_tool(
+            mcp_server,
+            "boulder_select",
+            {"work_id": first_id, "working_directory": working_dir},
+        )
+    )
+    assert selected["active_work_id"] == first_id
+
+    completed = json.loads(
+        call_tool(mcp_server, "boulder_complete", {"working_directory": working_dir})
+    )
+    assert completed["completed_work_id"] == first_id
+    assert completed["active_work_id"] == second_id
+
+    listed_after = json.loads(
+        call_tool(mcp_server, "boulder_list", {"working_directory": working_dir})
+    )
+    assert listed_after["counts"]["completed"] == 1
+    assert {item["work_id"] for item in listed_after["resume_options"]} == {second_id}
+
+
+def test_boulder_task_timers_and_reserved_keys(
+    mcp_server, working_dir, tmp_path, tmp_git_root
+):
+    """Task start/end records elapsed timers and rejects reserved object keys."""
+    plan = tmp_path / "plan.md"
+    plan.write_text("- [ ] 1. Task\n")
+    call_tool(
+        mcp_server,
+        "boulder_write",
+        {
+            "active_plan": str(plan),
+            "plan_name": "tasks",
+            "session_id": "s1",
+            "working_directory": working_dir,
+        },
+    )
+
+    started = json.loads(
+        call_tool(
+            mcp_server,
+            "boulder_task_start",
+            {
+                "task_key": "task-1",
+                "task_label": "T1",
+                "task_title": "Do task",
+                "session_id": "s-task",
+                "agent": "executor",
+                "category": "build",
+                "working_directory": working_dir,
+            },
+        )
+    )
+    assert started["started"] is True
+    ended = json.loads(
+        call_tool(
+            mcp_server,
+            "boulder_task_end",
+            {"task_key": "task-1", "working_directory": working_dir},
+        )
+    )
+    assert ended["completed"] is True
+    assert ended["elapsed_ms"] >= 0
+
+    data = json.loads((tmp_git_root / ".omca" / "state" / BOULDER_FILE).read_text())
+    task = data["works"][data["active_work_id"]]["task_sessions"]["task-1"]
+    assert task["status"] == "completed"
+    assert task["started_at"]
+    rejected = json.loads(
+        call_tool(
+            mcp_server,
+            "boulder_task_start",
+            {
+                "task_key": "__proto__",
+                "task_label": "bad",
+                "task_title": "bad",
+                "session_id": "s-task",
+                "working_directory": working_dir,
+            },
+        )
+    )
+    assert rejected["error"] is True
+    assert "reserved" in rejected["message"]
+
+
+def test_boulder_progress_structured_sections_ignore_nested(
+    mcp_server, working_dir, tmp_path
+):
+    """Structured TODO/final-wave parsing counts only top-level task rows."""
+    plan = tmp_path / "structured.md"
+    plan.write_text(
+        "# Plan\n\n"
+        "## TODOs\n\n"
+        "- [x] 1. Done\n"
+        "  - [ ] nested unchecked\n"
+        "- [ ] 2. Pending\n\n"
+        "## Final Verification Wave\n\n"
+        "- [ ] F1. Review\n"
+        "  - [x] nested checked\n"
+        "- [x] F2. Validate\n\n"
+        "## Other\n"
+        "- [ ] 99. Not counted\n"
+    )
+    call_tool(
+        mcp_server,
+        "boulder_write",
+        {
+            "active_plan": str(plan),
+            "plan_name": "structured",
+            "session_id": "s1",
+            "working_directory": working_dir,
+        },
+    )
+
+    data = json.loads(
+        call_tool(mcp_server, "boulder_progress", {"working_directory": working_dir})
+    )
+    assert data["total"] == 4
+    assert data["completed"] == 2
+    assert data["remaining"] == 2
+    assert data["current_task"] == "2. Pending"
+
+
+def test_boulder_progress_prefers_worktree_plan_path(
+    mcp_server, working_dir, tmp_git_root, tmp_path
+):
+    """When active_plan is inside the repo, worktree_path resolves to the worktree copy."""
+    repo_plan_dir = tmp_git_root / "plans"
+    repo_plan_dir.mkdir()
+    repo_plan = repo_plan_dir / "plan.md"
+    repo_plan.write_text("- [ ] 1. Repo pending\n")
+    worktree = tmp_path / "worktree"
+    worktree_plan_dir = worktree / "plans"
+    worktree_plan_dir.mkdir(parents=True)
+    worktree_plan = worktree_plan_dir / "plan.md"
+    worktree_plan.write_text("- [x] 1. Worktree done\n")
+
+    call_tool(
+        mcp_server,
+        "boulder_write",
+        {
+            "active_plan": str(repo_plan),
+            "plan_name": "worktree-plan",
+            "session_id": "s1",
+            "worktree_path": str(worktree),
+            "working_directory": working_dir,
+        },
+    )
+
+    data = json.loads(
+        call_tool(mcp_server, "boulder_progress", {"working_directory": working_dir})
+    )
+    assert data["plan_path"] == str(worktree_plan)
+    assert data["is_complete"] is True
+
+
 def test_boulder_write_mirror_idempotent(
     mcp_server, working_dir, tmp_git_root, tmp_path
 ):

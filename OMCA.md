@@ -24,7 +24,7 @@ Delegate to specialists, verify with evidence, ship with confidence. Core loop: 
 
 **OMCA**: agent prompts, orchestration policy, skill prompts, keyword activation, verification discipline, `omca` MCP server, session persistence (ralph, ultrawork), execution metadata in `.omca/state/` and `.omca/logs/`.
 
-Both `.omca/plans/` and native plan files valid. Prometheus generates to `.omca/plans/`; Claude-native plan mode works alongside.
+Claude-native plans (`~/.claude/plans/` or the active plan-mode file) are canonical. `.omca/plans/` remains a supported compatibility mirror/resume surface maintained by boulder, not the primary authored plan surface.
 
 **`/goal` vs OMCA persistence loops**: `/goal` is a lighter-weight native completion-condition loop. OMCA's `ralph`, `ultrawork`, and `/oh-my-claudeagent:ulw-loop` carry the Final Verification Wave (F1-F4 evidence-discipline) that `/goal` does not. Use `/goal` for quick "keep working until X" tasks; use OMCA loops when work needs evidence-gated completion.
 
@@ -231,7 +231,7 @@ Add to `.claude/settings.json` for automatic team-wide installation:
 3. Try the planning pipeline: type "create plan for adding user authentication"
    — Prometheus opens an interview, gathers requirements, generates a work plan
 4. After plan review: run `/oh-my-claudeagent:start-work`
-   — Atlas picks up the plan and delegates tasks to executor in parallel
+   — Sisyphus picks up the plan and delegates tasks to executor in parallel
 5. For guaranteed completion: type "ralph don't stop"
    — Ralph mode activates; the session blocks on Stop until all tasks are verified
 6. For maximum speed: type "ultrawork"
@@ -263,12 +263,13 @@ Add to `.claude/settings.json` for automatic team-wide installation:
 **prometheus** — 9-item clearance checklist interview, consults metis, generates plan,
 submits to momus for review (up to 3 iterations). Optional Socratic Interview Mode for
 ambiguous or architectural requests: iterative dialogue, synthesis stop-criterion, does NOT
-write to `.claude/plans/` (research output only).
+write to `~/.claude/plans/` (research output only).
 
 **metis** — Classifies intent, explores codebase, identifies hidden requirements and scope
 risks. Invoked automatically by prometheus.
 
-**momus** — Evaluates plans against 5 criteria. Approval bias: 80% clear is good enough.
+**momus** — Evaluates plans against 5 criteria. Approval-biased for normal,
+reversible plans, strict for high-risk or irreversible work.
 
 **oracle** — Read-only. Dense output: bottom line in 2-3 sentences, action plan in 7
 steps max, effort estimates (Quick/Short/Medium/Large).
@@ -283,7 +284,8 @@ steps max, effort estimates (Quick/Short/Medium/Large).
 **explore** — Always run in background. Uses ast_search, Grep, Glob. Fire multiple in
 parallel for broad searches.
 
-**librarian** — Uses context7 for library docs, clones repos for source investigation.
+**librarian** — Uses context7 for library docs, and may create shallow read-only
+dependency clones under `/tmp/opencode` for source investigation.
 
 Socratic research interview is now part of `prometheus` (Socratic Interview Mode section).
 
@@ -467,8 +469,12 @@ Unified server for structural code search, plan tracking, verification, notepads
 
 | Tool | Purpose |
 |------|---------|
-| `boulder_write` | Register active plan |
-| `boulder_progress` | Check completed vs remaining tasks |
+| `boulder_write` | Register/select an active work plan in schema v2 multi-work state |
+| `boulder_progress` | Check completed vs remaining tasks for active or selected work |
+| `boulder_list` | List resumeable works, counts, and progress summaries |
+| `boulder_select` | Select one existing work as active |
+| `boulder_complete` | Mark one work completed while retaining other works |
+| `boulder_task_start` / `boulder_task_end` | Track per-task session and timing metadata |
 | `mode_read` | Read active modes (ralph, ultrawork, boulder, evidence) |
 | `mode_clear` | Deactivate modes (default: all) |
 
@@ -511,22 +517,23 @@ Prefer context7 over WebFetch for well-known libraries.
 
 All runtime state lives in `.omca/` (gitignored by default):
 
-- `state/boulder.json` — Active work plan (managed by omca MCP)
+- `state/boulder.json` — Schema v2 multi-work plan state (top-level fields mirror the selected active work; `works` preserves other active/completed work)
 - `state/verification-evidence.json` — Verification records
 - `state/ralph-state.json` — Ralph persistence state
 - `state/compaction-context.md` — Saved state for compaction survival
 - `state/notepads/{plan-name}/` — Per-plan notepad sections
-- `plans/{name}.md` — Prometheus-generated work plans
+- `plans/{name}.md` — Compatibility mirror/resume surface for native plans, maintained by boulder
 - `logs/` — Session, edit, and subagent audit logs
 - `rules/*.md` — Project rules (auto-injected on file match)
 
 ### Boulder Lifecycle
 
-1. Prometheus creates a plan at `.omca/plans/{name}.md`
-2. `boulder_write(active_plan, plan_name, session_id)` registers it
-3. `/start-work` reads boulder state and resumes from last incomplete task
-4. Atlas uses `mode_read` and `boulder_progress` to track execution
-5. `/stop-continuation` or `mode_clear` clears boulder state when done
+1. Prometheus creates a plan at `~/.claude/plans/{name}.md` or the active plan-mode file
+2. `boulder_write(active_plan, plan_name, session_id)` registers or selects a work, appends the session, and may mirror the plan under `.omca/plans/` for compatibility
+3. `/start-work` reads `boulder_list()`/`mode_read()` and resumes the selected work; multiple resumeable works are selectable via `boulder_select`
+4. Sisyphus/start-work uses `boulder_progress`, `boulder_task_start`, and `boulder_task_end` to track execution
+5. F4 approval marks the current work complete; boulder state is retained while other resumeable works remain
+6. `/stop-continuation` or `mode_clear` clears persistence state when explicitly requested
 
 ### Evidence Workflow
 

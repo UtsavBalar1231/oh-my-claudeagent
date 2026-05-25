@@ -16,7 +16,7 @@ argument-hint: optional notes about what to include
 
 ## Tool Restrictions
 
-Read-only. No Write/Edit/Agent. MCP tools: `mode_read`, `boulder_progress`, `notepad_read`, `notepad_list`.
+Read-only. No Write/Edit/Agent. MCP tools: `mode_read`, `boulder_list`, `notepad_read`, `notepad_list`.
 
 Self-contained handoff summary for seamless new-session continuation.
 
@@ -35,7 +35,7 @@ git branch --show-current
 git log --oneline -5
 ```
 
-Also: `TaskList()`, `mode_read(mode="boulder")`, `notepad_read` for active plan sections, `Glob(".claude/plans/*.md")`.
+Also: `TaskList()`, `mode_read()`, `boulder_list()`, `notepad_read` for active plan sections, `Glob("~/.claude/plans/*.md")`, and `.omca/plans/` only as a boulder compatibility mirror/resume surface.
 
 ## PHASE 2: EXTRACT
 
