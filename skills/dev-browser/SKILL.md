@@ -41,6 +41,8 @@ Add `--headless` flag if user requests it. **Wait for the `Ready` message before
 
 Connect to user's existing Chrome. Use when already logged in or user requests extension.
 
+If the companion extension is not already installed, ask the user to install it from the supported project release/source they trust. Do not invent download URLs or load arbitrary extensions.
+
 **Start relay:**
 
 ```bash
@@ -49,7 +51,7 @@ cd skills/dev-browser && npm i && npm run start-extension &
 
 ## Writing Scripts
 
-Run all from `skills/dev-browser/`. Execute inline via heredocs:
+Run all from `skills/dev-browser/`. Use inline heredocs for one-off scripts. For reusable or complex scripts, write them under `tmp/` only.
 
 ```bash
 cd skills/dev-browser && npx tsx <<'EOF'
@@ -148,6 +150,8 @@ Use `getAISnapshot()` to discover page elements. Returns YAML-formatted accessib
 ```
 
 **Interacting with refs:**
+
+Refs are tied to the current snapshot and may change after navigation, re-rendering, or dynamic updates. Take a fresh snapshot before selecting a ref if the page state changed. Prefer accessible roles/names from the snapshot over brittle CSS selectors when possible.
 
 ```typescript
 const snapshot = await client.getAISnapshot("hackernews");

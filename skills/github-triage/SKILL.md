@@ -15,9 +15,9 @@ effort: medium
 
 ## Tool Restrictions
 
-Read-only analysis. No Write/Edit. MCP tools: `notepad_write`, `evidence_log`, `ast_search`.
+Read-only GitHub and repository analysis. Do not modify repo files or GitHub state. Local report writes are allowed only under `/tmp/opencode/github-triage-{datetime}/`. MCP tools: `notepad_write`, `evidence_log`, `ast_search`.
 
-Fetch open issues/PRs, classify each, spawn 1 background executor per item. Each produces a report at `/tmp/{datetime}/`. Never take destructive action.
+Fetch open issue/PR metadata, classify each, spawn 1 background executor per item. Each subagent fetches full details for its item and writes a report under `/tmp/opencode/github-triage-{datetime}/`. Never take destructive action.
 
 ## Zero-Action Policy (NON-NEGOTIABLE)
 
@@ -30,19 +30,20 @@ Forbidden commands (automatic failure if used):
 - `gh issue edit` — NEVER
 - `gh pr edit` — NEVER
 - `gh pr review --approve` — NEVER
+- `gh api` with non-GET methods — NEVER (`POST`, `PUT`, `PATCH`, `DELETE` are forbidden)
 - Any `gh` command that writes, modifies, or deletes
 
 Allowed read-only commands:
 - `gh issue list`, `gh issue view`
 - `gh pr list`, `gh pr view`
-- `gh api repos/{REPO}/pulls/{number}/files`
+- `gh api --method GET repos/{REPO}/pulls/{number}/files`
 - `gh repo view`
 
 Violation = CRITICAL FAILURE. Report only; humans decide.
 
 ## Evidence Rule (MANDATORY)
 
-Every factual claim MUST cite a permalink with commit SHA or file path.
+Every factual claim MUST cite a GitHub permalink containing a commit SHA. Branch permalinks (`blob/main`, `blob/master`, branch names) are forbidden.
 
 Format:
 ```
@@ -50,7 +51,7 @@ CLAIM: "The handler for X is in Y"
 EVIDENCE: https://github.com/{REPO}/blob/{COMMIT_SHA}/path/to/file.py#L42
 ```
 
-No permalink = cannot make the claim. Write "UNVERIFIED" instead.
+No commit-SHA permalink = cannot make the claim. Write "UNVERIFIED" instead.
 
 Applies to: bug root cause (file + line), "feature exists" (cite where), "fix correct" (cite what), any code reference.
 
@@ -64,8 +65,8 @@ Applies to: bug root cause (file + line), "feature exists" (cite where), "fix co
 |------|-------|
 | Agent type for ALL items | `oh-my-claudeagent:executor` |
 | Execution mode | `run_in_background=true` |
-| Parallelism | ALL items launched simultaneously |
-| Result storage | Each subagent writes to `/tmp/{datetime}/{number}-{type}.md` |
+| Parallelism | Bounded batches, max 5 concurrent agents |
+| Result storage | `issue-{number}.md` or `pr-{number}.md` under `/tmp/opencode/github-triage-{datetime}/` |
 | Final collection | Orchestrator reads all reports and writes `SUMMARY.md` |
 
 ---
@@ -74,25 +75,25 @@ Applies to: bug root cause (file + line), "feature exists" (cite where), "fix co
 
 ```bash
 DATETIME=$(date +%Y%m%d-%H%M%S)
-OUTDIR="/tmp/github-triage-${DATETIME}"
+OUTDIR="/tmp/opencode/github-triage-${DATETIME}"
 mkdir -p "${OUTDIR}"
 echo "Reports will be written to: ${OUTDIR}"
 ```
 
 ---
 
-## PHASE 2: FETCH ALL OPEN ITEMS
+## PHASE 2: FETCH OPEN ITEM METADATA ONLY
 
 ```bash
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
 
-# Issues: all open
+# Issues: all open metadata only. Do not request body/comments here; control characters can break batching.
 gh issue list --repo $REPO --state open --limit 500 \
-  --json number,title,state,createdAt,updatedAt,labels,author,body,comments
+  --json number,title,state,createdAt,updatedAt,labels,author
 
-# PRs: all open
+# PRs: all open metadata only. Subagents fetch body/comments/reviews/files per item.
 gh pr list --repo $REPO --state open --limit 500 \
-  --json number,title,state,createdAt,updatedAt,labels,author,body,headRefName,baseRefName,isDraft,mergeable,reviewDecision,statusCheckRollup
+  --json number,title,state,createdAt,updatedAt,labels,author,headRefName,baseRefName,isDraft,mergeable,reviewDecision,statusCheckRollup
 ```
 
 If either returns exactly 500 results, paginate using `--search "created:<LAST_CREATED_AT"` until exhausted.
@@ -101,15 +102,15 @@ If either returns exactly 500 results, paginate using `--search "created:<LAST_C
 
 ## PHASE 3: CLASSIFY EACH ITEM
 
-For each item, determine its type based on title, labels, and body content:
+For each item, determine its type from metadata only: title, labels, author, and PR state fields. Do not fetch body/comments during classification.
 
 ### Issues
 
 | Type | Detection |
 |------|-----------|
-| `ISSUE_QUESTION` | Title contains `[Question]`, `[Discussion]`, `?`, or body asks "how to" / "why does" / "is it possible" |
-| `ISSUE_BUG` | Title contains `[Bug]`, `Bug:`, body describes unexpected behavior, error messages, stack traces |
-| `ISSUE_FEATURE` | Title contains `[Feature]`, `[RFE]`, `[Enhancement]`, `Feature Request`, `Proposal` |
+| `ISSUE_QUESTION` | Title contains `[Question]`, `[Discussion]`, or `?`, or labels indicate question/discussion |
+| `ISSUE_BUG` | Title contains `[Bug]`, `Bug:`, or labels indicate bug |
+| `ISSUE_FEATURE` | Title contains `[Feature]`, `[RFE]`, `[Enhancement]`, `Feature Request`, `Proposal`, or labels indicate enhancement |
 | `ISSUE_OTHER` | Anything else |
 
 ### PRs
@@ -146,22 +147,21 @@ Launch agents in batches of up to 5 concurrent. Wait for batch to complete befor
 ```
 You are analyzing GitHub issue #{number} for repository {REPO}.
 
-ZERO-ACTION POLICY: Do NOT run any mutation commands (no gh issue close, no gh issue comment, no gh pr merge). REPORT ONLY.
+ZERO-ACTION POLICY: Do NOT run any mutation commands (no gh issue close/edit/comment, no gh pr merge/edit/review, no gh api POST/PUT/PATCH/DELETE). REPORT ONLY.
 
 ITEM:
 - Issue #{number}: {title}
 - Author: {author}
-- Body: {body}
-- Comments: {comments_summary}
+- Initial data is metadata-only; fetch full issue details yourself with read-only `gh issue view {number} --repo {REPO} --json body,comments`.
 
 YOUR JOB:
-1. Read the issue. Understand what the user is asking.
+1. Fetch and read the issue body/comments. Understand what the user is asking.
 2. Search the codebase with Grep and Read to find the answer.
 3. Find specific file paths and code that address the question.
 
-EVIDENCE RULE: Every claim must cite a specific file path and line. If you cannot cite evidence, mark the claim UNVERIFIED.
+EVIDENCE RULE: Every factual code claim must cite a GitHub permalink with commit SHA. If you cannot cite evidence, mark the claim UNVERIFIED.
 
-Write your report to: {OUTDIR}/{number}-ISSUE_QUESTION.md
+Write your report to: {OUTDIR}/issue-{number}.md
 
 Report format:
 # Issue #{number}: {title}
@@ -173,7 +173,7 @@ Report format:
 
 ## Evidence
 [File paths and code references for each claim]
-EVIDENCE: <file_path>:<line_number> — [description]
+EVIDENCE: <commit-SHA GitHub permalink> — [description]
 
 ## Recommended Response
 [Draft response text for a maintainer to post — do NOT post it yourself]
@@ -189,22 +189,21 @@ EVIDENCE: <file_path>:<line_number> — [description]
 ```
 You are analyzing GitHub issue #{number} for repository {REPO}.
 
-ZERO-ACTION POLICY: Do NOT run any mutation commands (no gh issue close, no gh issue comment, no gh pr merge). REPORT ONLY.
+ZERO-ACTION POLICY: Do NOT run any mutation commands (no gh issue close/edit/comment, no gh pr merge/edit/review, no gh api POST/PUT/PATCH/DELETE). REPORT ONLY.
 
 ITEM:
 - Issue #{number}: {title}
 - Author: {author}
-- Body: {body}
-- Comments: {comments_summary}
+- Initial data is metadata-only; fetch full issue details yourself with read-only `gh issue view {number} --repo {REPO} --json body,comments`.
 
 YOUR JOB:
-1. Read the issue. Identify expected vs actual behavior and reproduction steps.
+1. Fetch and read the issue body/comments. Identify expected vs actual behavior and reproduction steps.
 2. Search the codebase for the relevant code path.
 3. Determine: confirmed bug, not a bug (behavior is correct), or unclear.
 
-EVIDENCE RULE: For CONFIRMED_BUG, you MUST cite exact file + line. No citation = UNVERIFIED. For NOT_A_BUG, you MUST cite the code that proves correct behavior.
+EVIDENCE RULE: For CONFIRMED_BUG, cite commit-SHA permalinks for exact code lines. No citation = UNVERIFIED. For NOT_A_BUG, cite commit-SHA permalinks proving correct behavior.
 
-Write your report to: {OUTDIR}/{number}-ISSUE_BUG.md
+Write your report to: {OUTDIR}/issue-{number}.md
 
 Report format:
 # Issue #{number}: {title}
@@ -212,10 +211,10 @@ Report format:
 **Verdict:** CONFIRMED_BUG | NOT_A_BUG | NEEDS_INVESTIGATION
 
 ## Root Cause (if CONFIRMED_BUG)
-EVIDENCE: <file_path>:<line_number> — [what goes wrong and why]
+EVIDENCE: <commit-SHA GitHub permalink> — [what goes wrong and why]
 
 ## Proof of Correct Behavior (if NOT_A_BUG)
-EVIDENCE: <file_path>:<line_number> — [code that shows intended behavior]
+EVIDENCE: <commit-SHA GitHub permalink> — [code that shows intended behavior]
 
 ## Fix Approach (if CONFIRMED_BUG)
 [Specific change needed — file, line, what to change]
@@ -234,22 +233,21 @@ EVIDENCE: <file_path>:<line_number> — [code that shows intended behavior]
 ```
 You are analyzing GitHub issue #{number} for repository {REPO}.
 
-ZERO-ACTION POLICY: Do NOT run any mutation commands. REPORT ONLY.
+ZERO-ACTION POLICY: Do NOT run any mutation commands, including gh api POST/PUT/PATCH/DELETE. REPORT ONLY.
 
 ITEM:
 - Issue #{number}: {title}
 - Author: {author}
-- Body: {body}
-- Comments: {comments_summary}
+- Initial data is metadata-only; fetch full issue details yourself with read-only `gh issue view {number} --repo {REPO} --json body,comments`.
 
 YOUR JOB:
-1. Read the feature request.
+1. Fetch and read the issue body/comments.
 2. Search the codebase to check if this feature already exists (partially or fully).
 3. Assess implementation feasibility.
 
-EVIDENCE RULE: If you claim the feature exists, cite the exact file and function.
+EVIDENCE RULE: If you claim the feature exists, cite commit-SHA permalinks for the exact file and function.
 
-Write your report to: {OUTDIR}/{number}-ISSUE_FEATURE.md
+Write your report to: {OUTDIR}/issue-{number}.md
 
 Report format:
 # Issue #{number}: {title}
@@ -257,7 +255,7 @@ Report format:
 **Already Exists:** YES_FULLY | YES_PARTIALLY | NO
 
 ## Existence Evidence (if exists)
-EVIDENCE: <file_path>:<line_number> — [how the feature is implemented]
+EVIDENCE: <commit-SHA GitHub permalink> — [how the feature is implemented]
 
 ## Feasibility
 [EASY | MODERATE | HARD | ARCHITECTURAL_CHANGE]
@@ -276,22 +274,21 @@ EVIDENCE: <file_path>:<line_number> — [how the feature is implemented]
 ```
 You are analyzing GitHub issue #{number} for repository {REPO}.
 
-ZERO-ACTION POLICY: Do NOT run any mutation commands. REPORT ONLY.
+ZERO-ACTION POLICY: Do NOT run any mutation commands, including gh api POST/PUT/PATCH/DELETE. REPORT ONLY.
 
 ITEM:
 - Issue #{number}: {title}
 - Author: {author}
-- Body: {body}
-- Comments: {comments_summary}
+- Initial data is metadata-only; fetch full issue details yourself with read-only `gh issue view {number} --repo {REPO} --json body,comments`.
 
 YOUR JOB:
-1. Read the issue. Understand what the reporter is describing.
+1. Fetch and read the issue body/comments. Understand what the reporter is describing.
 2. Search the codebase with Grep and Read to gather relevant context.
 3. Determine the best classification and whether it needs maintainer attention.
 
-EVIDENCE RULE: Every factual claim must cite a specific file path and line. If you cannot cite evidence, mark the claim UNVERIFIED.
+EVIDENCE RULE: Every factual code claim must cite a GitHub permalink with commit SHA. If you cannot cite evidence, mark the claim UNVERIFIED.
 
-Write your report to: {OUTDIR}/{number}-ISSUE_OTHER.md
+Write your report to: {OUTDIR}/issue-{number}.md
 
 Report format:
 # Issue #{number}: {title}
@@ -305,7 +302,7 @@ Report format:
 
 ## Evidence
 [File paths and code references for each claim]
-EVIDENCE: <file_path>:<line_number> — [description]
+EVIDENCE: <commit-SHA GitHub permalink> — [description]
 
 **Suggested Label:** [if any]
 **Action Required:** [what a maintainer should do]
@@ -318,7 +315,7 @@ EVIDENCE: <file_path>:<line_number> — [description]
 ```
 You are analyzing GitHub PR #{number} for repository {REPO}.
 
-ZERO-ACTION POLICY: Do NOT run any mutation commands (no gh pr merge, no gh pr close, no gh pr review --approve). REPORT ONLY. Read-only analysis via gh CLI and API only.
+ZERO-ACTION POLICY: Do NOT run any mutation commands (no gh pr merge/close/edit, no gh pr review --approve, no gh api POST/PUT/PATCH/DELETE). REPORT ONLY. Read-only analysis via gh CLI and GET API only.
 
 ITEM:
 - PR #{number}: {title}
@@ -330,8 +327,8 @@ ITEM:
 - CI Status: {statusCheckRollup_summary}
 
 YOUR JOB (READ-ONLY — no git checkout, no git fetch):
-1. Fetch PR details: gh pr view {number} --repo {REPO} --json files,reviews,comments,statusCheckRollup,reviewDecision
-2. Read changed files via: gh api repos/{REPO}/pulls/{number}/files
+1. Fetch PR details: gh pr view {number} --repo {REPO} --json body,files,reviews,comments,statusCheckRollup,reviewDecision
+2. Read changed files via: gh api --method GET repos/{REPO}/pulls/{number}/files
 3. Search codebase to understand what the PR is fixing.
 4. Assess merge safety against ALL six conditions.
 
@@ -343,9 +340,9 @@ MERGE CONDITIONS (report on each):
   e. Not a draft PR
   f. Mergeable state is clean (no conflicts)
 
-EVIDENCE RULE: For "fix is correct" assessment, cite the original bug code and the fix code with file paths.
+EVIDENCE RULE: For "fix is correct" assessment, cite original bug code and fix code with commit-SHA permalinks.
 
-Write your report to: {OUTDIR}/{number}-PR_BUGFIX.md
+Write your report to: {OUTDIR}/pr-{number}.md
 
 Report format:
 # PR #{number}: {title}
@@ -353,8 +350,8 @@ Report format:
 **Merge Safe:** YES (all 6 conditions met) | NO (list failing conditions)
 
 ## Fix Analysis
-EVIDENCE: Original bug at <file_path>:<line_number>
-EVIDENCE: Fix applied at <file_path>:<line_number> in PR diff
+EVIDENCE: Original bug at <commit-SHA GitHub permalink>
+EVIDENCE: Fix applied at <commit-SHA GitHub permalink> in PR diff
 
 ## Merge Condition Checklist
 - [ ] CI: PASS | FAIL | PENDING
@@ -378,7 +375,7 @@ EVIDENCE: Fix applied at <file_path>:<line_number> in PR diff
 ```
 You are analyzing GitHub PR #{number} for repository {REPO}.
 
-ZERO-ACTION POLICY: Do NOT run any mutation commands. READ-ONLY analysis only. No git checkout.
+ZERO-ACTION POLICY: Do NOT run any mutation commands, including gh api POST/PUT/PATCH/DELETE. READ-ONLY analysis only. No git checkout.
 
 ITEM:
 - PR #{number}: {title}
@@ -390,11 +387,11 @@ ITEM:
 - CI Status: {statusCheckRollup_summary}
 
 YOUR JOB:
-1. Fetch PR details: gh pr view {number} --repo {REPO} --json files,reviews,comments,statusCheckRollup
-2. Read changed files via: gh api repos/{REPO}/pulls/{number}/files
+1. Fetch PR details: gh pr view {number} --repo {REPO} --json body,files,reviews,comments,statusCheckRollup
+2. Read changed files via: gh api --method GET repos/{REPO}/pulls/{number}/files
 3. Assess the PR.
 
-Write your report to: {OUTDIR}/{number}-PR_OTHER.md
+Write your report to: {OUTDIR}/pr-{number}.md
 
 Report format:
 # PR #{number}: {title}
@@ -468,14 +465,14 @@ Tell the user the output directory path when complete.
 
 | Violation | Severity |
 |-----------|----------|
-| Running any gh mutation command (merge, close, edit) | CRITICAL |
+| Running any gh mutation command (merge, close, edit, comment, review, non-GET API) | CRITICAL |
 | Making claims without Evidence Rule citations | CRITICAL |
 | Batching multiple items into one Agent call | CRITICAL |
 | Using `run_in_background=false` | HIGH |
 | Spawning any agent type other than executor | HIGH |
 | Checking out PR branches via git | CRITICAL |
-| Not writing report to /tmp/{datetime}/ directory | HIGH |
-| Claiming feature exists without file:line citation | HIGH |
+| Not writing report to `/tmp/opencode/github-triage-{datetime}/` | HIGH |
+| Claiming feature exists without commit-SHA permalink citation | HIGH |
 
 ---
 
@@ -483,11 +480,11 @@ Tell the user the output directory path when complete.
 
 When invoked:
 
-1. Create output directory: `/tmp/github-triage-{datetime}/`
-2. Fetch all open issues + PRs via gh CLI (paginate if 500 reached)
+1. Create output directory: `/tmp/opencode/github-triage-{datetime}/`
+2. Fetch open issue + PR metadata via gh CLI (paginate if 500 reached; no body/comments initially)
 3. Classify each item (ISSUE_QUESTION, ISSUE_BUG, ISSUE_FEATURE, ISSUE_OTHER, PR_BUGFIX, PR_OTHER)
 4. For EACH item: `Agent(subagent_type="oh-my-claudeagent:executor", run_in_background=True, prompt=...)`
-5. Launch ALL agents in a single response — maximum parallelism
+5. Launch agents in bounded batches of up to 5 concurrent executors
 6. Collect reports from output directory once agents complete
 7. Write `{OUTDIR}/SUMMARY.md` with aggregated findings
 8. Report the output directory path to the user

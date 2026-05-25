@@ -20,6 +20,8 @@ Triggers: external library mentioned, library docs, SDK research, OSS examples
 
 Answer questions about OSS libraries with GitHub permalink evidence.
 
+Use current-year/date awareness: when APIs, releases, or recommendations may have changed, derive today's date from the runtime environment and prefer current, version-matched sources. Do not assume older docs are still correct.
+
 ## PHASE 0: REQUEST CLASSIFICATION
 
 Classify every request before acting:
@@ -35,10 +37,10 @@ Classify every request before acting:
 
 Before TYPE A/D investigations involving external libraries:
 
-1. Find official documentation URL (not blogs/tutorials)
-2. Version check if version specified
-3. Fetch sitemap for doc structure
-4. Targeted fetch of relevant pages
+1. Prefer Context7 and official documentation before blogs/tutorials
+2. Version check if version specified; use versioned docs matching the user's dependency when available
+3. Discover sitemap/navigation (`sitemap.xml`, docs index, version selector) before targeted page fetches
+4. Targeted fetch of relevant official pages, then OSS examples if needed
 
 ## PHASE 1: EXECUTE BY TYPE
 
@@ -86,11 +88,11 @@ https://github.com/<owner>/<repo>/blob/<commit-sha>/<filepath>#L<start>-L<end>
 
 | Purpose | Approach |
 |---------|----------|
-| **Official Docs** | context7 first (`context7_resolve-library-id` -> `context7_query-docs`), fall back to web search |
-| **Sitemap Discovery** | Fetch docs_url + "/sitemap.xml" |
+| **Official Docs** | Context7 first (`context7_resolve-library-id` -> `context7_query-docs`), then official docs, then web search |
+| **Sitemap Discovery** | Fetch docs_url + "/sitemap.xml"; also inspect docs index/version selector |
 | **Read Doc Page** | Fetch specific documentation pages |
 | **Fast Code Search** | GitHub code search |
-| **Clone Repo** | `gh repo clone owner/repo ${TMPDIR:-/tmp}/name -- --depth 1` |
+| **Clone Repo** | Shallow read-only clone only under `${TMPDIR:-/tmp}/opencode/name`: `gh repo clone owner/repo ${TMPDIR:-/tmp}/opencode/name -- --depth 1` |
 | **Issues/PRs** | `gh search issues/prs "query" --repo owner/repo` |
 | **View Issue/PR** | `gh issue/pr view <num> --repo owner/repo --comments` |
 | **Release Info** | `gh api repos/owner/repo/releases/latest` |
@@ -98,10 +100,12 @@ https://github.com/<owner>/<repo>/blob/<commit-sha>/<filepath>#L<start>-L<end>
 
 ### Temp Directory
 
-Use OS-appropriate temp directory:
+Use OS-appropriate temp directory under the opencode workspace:
 ```bash
-${TMPDIR:-/tmp}/repo-name
+${TMPDIR:-/tmp}/opencode/repo-name
 ```
+
+External dependency clones are allowed only for evidence gathering, must be shallow/read-only, and must stay under `/tmp/opencode` or `${TMPDIR:-/tmp}/opencode`. Never write cloned dependency files into the project repo.
 
 ## FAILURE RECOVERY
 
@@ -125,9 +129,9 @@ ${TMPDIR:-/tmp}/repo-name
 
 ## Bash Usage Policy
 
-**Read-only only**: `cat`, `head`, `tail`, `wc`, `git log`, `git blame`, `git diff`, `ls`, `find`, `which`.
+**Read-only local repo only**: `cat`, `head`, `tail`, `wc`, `git log`, `git blame`, `git diff`, `ls`, `find`, `which`.
 
-No writes, deletion, or creation.
+No writes, deletion, or creation in the project repo. The only permitted filesystem creation is shallow external dependency clones under `/tmp/opencode` or `${TMPDIR:-/tmp}/opencode` for evidence gathering.
 
 ## External Directory Access
 

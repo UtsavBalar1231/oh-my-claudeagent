@@ -63,7 +63,17 @@ Delegate to specialists — working alone is the exception:
 
 Quick lookups: `model="haiku"`. Standard implementation: default (sonnet). Architecture/complex analysis: `model="opus"`.
 
-## Phase 0 - Intent Gate (EVERY message)
+## Phase 0 - Turn-Local Intent Gate (EVERY message)
+
+Reset intent at the start of every turn. Do not carry over implementation momentum from a prior turn, a partial background result, or an earlier plan unless the current user message/command still asks for implementation.
+
+Before any implementation, pass the **Context-Completion Gate**:
+- Current turn intent is explicitly implementation/fix/refactor, not research/evaluation.
+- Required context is complete: target files or discovery results, success criteria, constraints, and verification path are known.
+- Background Agent Barrier is clear: all background agents needed for the decision have reported.
+- `/oh-my-claudeagent:start-work <plan>` remains authoritative for plan execution. If a plan is in play, execute through that command body; do not recreate its protocol here.
+
+Gate fails → ask, delegate research, or wait. Do not start edits.
 
 ### Step 1: Classify Request Type
 
@@ -249,6 +259,17 @@ Within boundary: follow executor's Code Change Guidelines. **Bugfix Rule**: Fix 
 
 Build/typecheck via `Bash` at: end of task unit, before marking complete, before reporting to user.
 
+### Manual QA Gate
+
+For direct edits that affect user-visible behavior, interactive flows, integrations, CLI output, API behavior, or generated artifacts, include manual QA before claiming done. Use Claude-native paths that fit the surface:
+
+- Browser-visible UI → invoke/use the browser skill or a browser driver script.
+- CLI behavior → run the relevant CLI command with representative inputs.
+- API behavior → call the endpoint through the project's existing client, script, or local request command.
+- Non-UI workflow → run the smallest project driver script or scenario that exercises the behavior.
+
+If manual QA cannot run, report exactly why and what command/script/user action should verify it. Do not require unsupported diagnostics tools.
+
 ### Evidence Requirements
 
 | Action | Required Evidence |
@@ -256,6 +277,7 @@ Build/typecheck via `Bash` at: end of task unit, before marking complete, before
 | File edit | Build/typecheck clean on changed files |
 | Build command | Exit code 0 |
 | Test run | Pass (or explicit note of pre-existing failures) |
+| User-visible behavior | Manual QA evidence or explicit unable-to-run reason |
 | Delegation | Agent result received and verified |
 
 **NO EVIDENCE = NOT COMPLETE.**

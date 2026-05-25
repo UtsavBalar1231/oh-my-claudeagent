@@ -37,18 +37,11 @@ Prevents editor hangs without user configuration.
 
 **CRITICAL**: Don't default to COMMIT mode. Parse the actual request.
 
-## CORE PRINCIPLE: MULTIPLE COMMITS BY DEFAULT
+## CORE PRINCIPLE: ATOMIC COMMITS BY DEFAULT
 
-**ONE COMMIT = FAILURE.** Default: CREATE MULTIPLE COMMITS. Single commit = bug in your logic.
+Each commit should represent one atomic concern: a change that can be reviewed, reverted, and explained independently. Prefer multiple commits when there are multiple concerns; a single commit is acceptable when all changed files are one inseparable concern.
 
-**HARD RULE:**
-```
-3+ files changed -> MUST be 2+ commits (NO EXCEPTIONS)
-5+ files changed -> MUST be 3+ commits (NO EXCEPTIONS)
-10+ files changed -> MUST be 5+ commits (NO EXCEPTIONS)
-```
-
-About to make 1 commit from multiple files → WRONG. STOP AND SPLIT.
+File count is a warning signal, not a formula. More files require stronger justification, but the split is determined by concerns and dependencies, not a fixed threshold.
 
 **SPLIT BY:**
 | Criterion | Action |
@@ -67,10 +60,11 @@ About to make 1 commit from multiple files → WRONG. STOP AND SPLIT.
 **MANDATORY SELF-CHECK before committing:**
 ```
 "I am making N commits from M files."
-IF N == 1 AND M > 2:
-  -> WRONG. Go back and split.
-  -> Write WHY each file must be together.
-  -> If you can't justify, SPLIT.
+For each commit:
+  -> What single concern does it represent?
+  -> Can it be reverted independently?
+  -> Are implementation and direct tests together?
+If any answer is unclear, split or explain why splitting would break the change.
 ```
 
 ## PHASE 0: Parallel Context Gathering (MANDATORY)
@@ -96,15 +90,15 @@ git log --oneline $(git merge-base HEAD main 2>/dev/null || git merge-base HEAD 
 
 ## PHASE 1: Style Detection (BLOCKING - MUST OUTPUT)
 
-### Language Detection
+### Language/Script Detection
 ```
-Count from git log -30:
-- Korean characters: N commits
-- English only: M commits
+Inspect git log -30 for the dominant human language/script and tone.
+Examples: English, Korean, Japanese, Chinese, mixed, emoji-heavy, terse keywords.
 
 DECISION:
-- If Korean >= 50% -> KOREAN
-- If English >= 50% -> ENGLISH
+- Use the majority language/script when clear.
+- If mixed or unclear, match the most recent relevant commit style.
+- Do not force a Korean/English binary.
 ```
 
 ### Commit Style Classification
@@ -120,7 +114,7 @@ DECISION:
 ```
 STYLE DETECTION RESULT
 ======================
-Language: [KOREAN | ENGLISH]
+Language/script: [detected language/script or MIXED]
 Style: [SEMANTIC | PLAIN | SHORT]
 
 Reference examples from repo:
@@ -139,20 +133,14 @@ BRANCH_STATE:
 REWRITE_SAFETY:
   - On main/master: NEVER rewrite
   - has_upstream=false: AGGRESSIVE_REWRITE allowed
-  - has_upstream=true, commits pushed: CAREFUL_REWRITE (warn on force push)
+  - has_upstream=true, commits pushed: CAREFUL_REWRITE (explicit permission required before rewrite; `--force-with-lease` only if pushing)
 ```
 
 ## PHASE 3: Atomic Unit Planning (BLOCKING)
 
-### Calculate Minimum Commit Count FIRST
-```
-FORMULA: min_commits = ceil(file_count / 3)
+### Identify Atomic Concerns FIRST
 
- 3 files -> min 1 commit
- 5 files -> min 2 commits
- 9 files -> min 3 commits
-15 files -> min 5 commits
-```
+Group files by independently reviewable concern. Use file count only to trigger scrutiny: if one planned commit touches many files, write a concrete justification for why those files must land together.
 
 ### Split by Directory/Module FIRST
 **RULE: Different directories = Different commits (almost always)**
@@ -173,9 +161,8 @@ Test patterns to match:
 COMMIT PLAN
 ===========
 Files changed: N
-Minimum commits required: ceil(N/3) = M
 Planned commits: K
-Status: K >= M (PASS) | K < M (FAIL - must split more)
+Status: ATOMIC (PASS) | NEEDS_SPLIT (explain concern overlap)
 
 COMMIT 1: [message in detected style]
   - path/to/file1.py
@@ -185,7 +172,7 @@ COMMIT 1: [message in detected style]
 
 ### MANDATORY JUSTIFICATION
 
-For each planned commit with 3+ files, write ONE sentence why they MUST be together.
+For each planned commit with multiple files, write ONE sentence naming the atomic concern.
 If you cannot write it, SPLIT.
 
 Valid: "implementation file + its direct test", "migration + model that would break without both"
@@ -240,22 +227,30 @@ git log --oneline $(git merge-base HEAD main 2>/dev/null || git merge-base HEAD 
 | Condition | Risk Level | Action |
 |-----------|------------|--------|
 | On main/master | CRITICAL | **ABORT** - never rebase main |
-| Dirty working directory | WARNING | Stash first |
-| Pushed commits exist | WARNING | Will require force-push; confirm |
+| Dirty working directory | WARNING | Stop and ask before stashing; never hide user changes silently |
+| Pushed commits exist | WARNING | Requires explicit permission before rewrite and `--force-with-lease` only |
 | All commits local | SAFE | Proceed freely |
 
 ## PHASE R2: Rebase Execution
+
+Rebases must be fully non-interactive. Use the mandatory environment prefix for every git command. Do not open editors. If conflicts occur, stop after reporting conflicted files and exact next commands; do not guess conflict resolutions unless the user explicitly requested conflict fixing.
 
 ```bash
 # Find merge-base
 MERGE_BASE=$(git merge-base HEAD main 2>/dev/null || git merge-base HEAD master)
 
 # For SQUASH (combine all into one):
-git reset --soft $MERGE_BASE
-git commit -m "Combined: <summarize all changes>"
+GIT_EDITOR=: EDITOR=: GIT_SEQUENCE_EDITOR=: GIT_PAGER=cat GIT_TERMINAL_PROMPT=0 git reset --soft $MERGE_BASE
+GIT_EDITOR=: EDITOR=: GIT_SEQUENCE_EDITOR=: GIT_PAGER=cat GIT_TERMINAL_PROMPT=0 git commit -m "Combined: <summarize all changes>"
 
-# For AUTOSQUASH:
-GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash $MERGE_BASE
+# For AUTOSQUASH (non-interactive editor disabled):
+GIT_EDITOR=: EDITOR=: GIT_SEQUENCE_EDITOR=: GIT_PAGER=cat GIT_TERMINAL_PROMPT=0 git rebase -i --autosquash $MERGE_BASE
+```
+
+After any successful rewrite of pushed history, push only when explicitly requested, and use:
+
+```bash
+GIT_EDITOR=: EDITOR=: GIT_SEQUENCE_EDITOR=: GIT_PAGER=cat GIT_TERMINAL_PROMPT=0 git push --force-with-lease
 ```
 
 # HISTORY SEARCH MODE (Phase H1-H3)
@@ -273,9 +268,9 @@ GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash $MERGE_BASE
 
 ## Anti-Patterns (AUTOMATIC FAILURE)
 
-1. **NEVER make one giant commit** - 3+ files MUST be 2+ commits
+1. **NEVER make one giant mixed-concern commit** - split by atomic concern
 2. **NEVER default to semantic commits** - detect from git log first
 3. **NEVER separate test from implementation** - same commit always
 4. **NEVER group by file type** - group by feature/module
 5. **NEVER rewrite pushed history** without explicit permission
-6. **NEVER use --force** - always use --force-with-lease
+6. **NEVER use --force** - use `--force-with-lease` only after explicit permission

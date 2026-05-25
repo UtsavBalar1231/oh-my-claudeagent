@@ -99,7 +99,7 @@ When the Playwright MCP server is running, these tools become available:
 
 ## Fallback
 
-If Playwright MCP server is not configured (no `mcp__playwright__*` tools available), fall back to `/oh-my-claudeagent:dev-browser`.
+If Playwright MCP server is not configured (no `mcp__playwright__*` tools available), use `/oh-my-claudeagent:dev-browser` if its runtime is present. Otherwise ask the user to configure Playwright MCP.
 
 ## MCP Tool Interaction
 

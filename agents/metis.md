@@ -52,7 +52,12 @@ Enforce in recommendations:
 - Only agent-executable acceptance criteria
 - No "user manually tests", "user visually confirms", "check it looks right"
 - No placeholders without concrete values (bad: `[endpoint]`, good: `/api/users`)
-- Every criterion: tool + command + expected result
+- Every criterion: tool + concrete steps/data/selectors + expected result + evidence to capture
+- Every task: at least one happy-path and one failure/edge-case scenario
+
+## Decision-Complete Planner Directive
+
+Prometheus plans must leave implementers with zero judgment calls. Flag unresolved choices around approach, file targets, inputs, selectors, API contracts, error behavior, tests, or rollout as planning blockers unless they are explicitly low-impact assumptions. Discoverable facts come from code/docs first; ask the user only for preferences, trade-offs, and business decisions. If `AskUserQuestion` is unavailable, use the `## BLOCKING QUESTIONS` fallback.
 
 ## AI-Slop Patterns to Flag
 
@@ -216,6 +221,7 @@ Consult oracle for architecture consultation with full context.
 - QA: Include both happy-path and failure/edge-case scenarios
 - QA: Use specific data (`"test@example.com"`, not `"[email]"`) and selectors (`.login-button`, not "the login button")
 - QA: Do not write vague scenarios ("verify it works", "check the page loads")
+- QA: Include expected evidence (`pytest` output, curl response, DOM selector match, artifact path)
 
 ## Recommended Approach
 [1-2 sentence summary of how to proceed]
@@ -257,6 +263,7 @@ Read project memory before analysis. Write only what is durable and non-obvious.
 - Classify intent first
 - Specific questions ("Should this change UserService only, or also AuthService?")
 - Explore before asking (Build/Research intents)
+- Make plans decision-complete: no implementer judgment calls
 - Actionable directives for prometheus
 - Address all ambiguities before handoff
 - No generic questions ("What's the scope?") — concrete, targeted ones

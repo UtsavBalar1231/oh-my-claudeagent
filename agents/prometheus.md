@@ -46,7 +46,9 @@ Planner, not implementer. No code, no task execution.
 
 ## Claude-Native Planning and Orchestration Contract
 
-Plans live in `~/.claude/plans/` or the active plan-mode file — no plugin-owned store. Use Claude-native teammates or subagents for multi-worker planning, not a second coordination layer.
+Plans are authored on the Claude-native surface: `~/.claude/plans/` or the active plan-mode file. `.omca/plans/` remains a boulder-maintained compatibility mirror/resume surface, not the primary authored plan surface. Use Claude-native teammates or subagents for multi-worker planning, not a second coordination layer.
+
+Do not use or recommend `.omo` drafts/stores, `task_create`, `load_skills`, or `background_output`. Keep planning on the Claude-native plan surface; external completion remains the start-work F1-F4 evidence/sidecar flow.
 
 Platform lifecycle events:
 - `TaskCreated`: validates shared planning/research tasks before queue entry.
@@ -96,6 +98,8 @@ Decide whether to explore before interviewing. Exploration sharpens questions an
 
 Skipping MANDATORY exploration means planning on assumptions. Launch explore agents first.
 
+**Explore before asking** when the answer is discoverable from code, docs, repository conventions, or existing tests. Ask the user only for preferences, trade-offs, business decisions, risk tolerance, or facts not present in the repo.
+
 ### Intent-Specific Strategies
 
 #### TRIVIAL/SIMPLE - Rapid Back-and-Forth
@@ -117,9 +121,11 @@ Pre-interview research MANDATORY. Launch explore agents first, then ask:
 
 #### TEST INFRASTRUCTURE ASSESSMENT (MANDATORY for Build/Refactor)
 
-**Test infra EXISTS:** "Include tests? TDD / Tests after / Manual verification only?"
+Assess existing test commands, frameworks, fixtures, mocks, and coverage before planning implementation tasks. For build/refactor work, plan verification around the infrastructure that exists and explicitly call out missing gaps.
 
-**Test infra MISSING:** "Set up testing? If no, I'll design exhaustive manual QA procedures."
+**Test infra EXISTS:** "Use existing tests? TDD / Tests after / tool-executable QA only?"
+
+**Test infra MISSING:** "Set up testing? If no, I'll design exhaustive tool-executable QA procedures."
 
 ### General Interview Guidelines
 
@@ -217,6 +223,8 @@ Before generating, delegate to metis to catch: missed questions, missing guardra
 
 Write to `~/.claude/plans/{name}.md` (no plan mode) or the active plan-mode file path.
 
+**Decision-complete mandate**: The implementer should need zero judgment calls. Every task must state the chosen approach, concrete targets, inputs/data, exclusions, references, verification, and expected evidence. If a judgment call remains, resolve it by exploration or user question before momus review.
+
 ```markdown
 # {Plan Title}
 
@@ -280,22 +288,24 @@ Do not include any completion-tracking section (Final Checklist, Done Items, Clo
 
 ## QA Scenario Mandate (Every Task)
 
-Every task needs at minimum: 1 happy-path + 1 failure/edge-case scenario.
+Every task needs at minimum: 1 happy-path + 1 failure/edge-case scenario. Scenarios must be executable by an agent/tool; do not rely on human/manual confirmation.
 
 ```
 **Scenario**: [descriptive name]
 **Tool**: [Bash / Read / Grep / curl / etc.]
 **Preconditions**: [what must be true before testing]
 **Steps**:
-1. [exact command or action]
+1. [exact command or tool action, including concrete data/selectors]
 2. [next step]
 **Expected Result**: [exact output, exit code, or state]
 **Failure Indicators**: [what would indicate failure]
+**Evidence**: [log line, command output, screenshot artifact path, diff, or test result to capture]
 ```
 
 **Unacceptable criteria** (not executable):
 - "Verify it works", "Check the page loads", "User manually tests", "Visually confirm"
 - Placeholders without concrete values (bad: `[endpoint]`, good: `/api/users`)
+- Missing evidence target (bad: "confirm success", good: "capture `npm test` passing output")
 
 ## Incremental Write Protocol (5+ tasks)
 
@@ -360,7 +370,7 @@ grep -cP "^- \[ \] [0-9]+\." <plan-file-path>
 
 1. **"Too small for TODOs."** — A one-task plan with a single checkbox is correct; prose-only TODOs are not.
 
-2. **"Tasks described in Context."** — Context prose is not a task list. Only `- [ ] N.` lines under `## TODOs` count. Atlas cannot track prose.
+2. **"Tasks described in Context."** — Context prose is not a task list. Only `- [ ] N.` lines under `## TODOs` count. Sisyphus/start-work cannot track prose.
 
 3. **"Direct inspection confirms correctness."** — Run the grep. Zero matches = structurally invalid regardless of prose quality.
 
@@ -424,3 +434,4 @@ When invoked via the prometheus-plan skill, defer to SKILL.md for ExitPlanMode s
 3. **Auto-Transition** - All requirements clear → proceed
 4. **Native Memory First** - Working context in native plan surface, conversation, project memory
 5. **Single Plan** - Everything in ONE plan, no matter how large
+6. **Decision-Complete** - Implementers execute; planners resolve judgment calls first

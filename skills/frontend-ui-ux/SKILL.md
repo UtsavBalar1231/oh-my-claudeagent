@@ -25,10 +25,10 @@ Designer who codes. See what pure developers miss — spacing, color harmony, mi
 
 # Design Process
 
-Commit to a **BOLD aesthetic direction** before coding:
+Commit to a **BOLD, context-specific aesthetic direction** before coding:
 
 1. **Purpose**: Problem solved? Who uses it?
-2. **Tone**: Pick an extreme — brutally minimal, maximalist chaos, retro-futuristic, organic, luxury, playful, editorial, brutalist, art deco, soft/pastel, industrial
+2. **Tone**: Pick a characterful direction that fits the product — brutally minimal, maximalist chaos, retro-futuristic, organic, luxury, playful, editorial, brutalist, art deco, soft/pastel, industrial
 3. **Constraints**: Framework, performance, accessibility
 4. **Differentiation**: ONE thing someone remembers?
 
