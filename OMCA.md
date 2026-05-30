@@ -257,7 +257,7 @@ Add to `.claude/settings.json` for automatic team-wide installation:
 |-------|-------|--------|--------|---------|
 | prometheus | opus | high | `/oh-my-claudeagent:plan` or "create plan" | Strategic planning with requirements interview + optional Socratic Interview Mode |
 | metis | opus | high | `/oh-my-claudeagent:metis` or "run metis" | Pre-planning gap analysis |
-| momus | opus | high | `Agent(subagent_type="oh-my-claudeagent:momus")` | Rigorous plan review — OKAY or REJECT |
+| momus | opus | high | `Skill(oh-my-claudeagent:momus)` (or `Agent(subagent_type="oh-my-claudeagent:momus")` from the main session) | Rigorous plan review — OKAY or REJECT |
 | oracle | opus | max | `Agent(subagent_type="oh-my-claudeagent:oracle")` | Architecture advisor, read-only |
 
 **prometheus** — 9-item clearance checklist interview, consults metis, generates plan,

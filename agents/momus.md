@@ -258,8 +258,14 @@ Return immediately. Orchestrator relays and resumes.
 
 ## Invocation
 
-Invoke with plan FILE PATH as prompt:
+**Preferred** — invoke the momus skill via the `Skill` tool with the plan FILE PATH. The Skill tool is available both in the main session and inside subagents:
+```
+Skill(skill="oh-my-claudeagent:momus", args="~/.claude/plans/my-plan.md")
+```
+
+**Main session only** — the `Agent` tool is unavailable to subagents, so a subagent (e.g. a spawned prometheus) MUST use the skill above:
 ```
 Agent(subagent_type="oh-my-claudeagent:momus", prompt="~/.claude/plans/my-plan.md")
 ```
+
 File path only — not inline plans, todo lists, or text summaries.

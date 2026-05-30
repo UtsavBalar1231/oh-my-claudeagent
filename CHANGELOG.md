@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.2] - 2026-05-30
+
+### Added
+
+- `skills/momus/SKILL.md` exposes the momus plan reviewer as a `context: fork`
+  skill, so it can be invoked through the Skill tool from subagents (the Agent
+  tool is unavailable below the main session). Prometheus runs its review loop
+  via the skill, and the `/oh-my-claudeagent:momus` slash command now resolves.
+
+### Changed
+
+- momus invocation routed through the Skill tool across `agents/prometheus.md`,
+  `agents/momus.md`, `commands/plan.md`, and `OMCA.md`; the Agent-tool path is
+  documented as main-session-only.
+
 ## [2.5.1] - 2026-05-24
 
 Fixes the `validate_plan_write` Write/Edit hook, which had been silently

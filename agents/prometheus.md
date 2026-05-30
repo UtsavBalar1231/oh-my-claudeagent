@@ -376,7 +376,7 @@ grep -cP "^- \[ \] [0-9]+\." <plan-file-path>
 
 ### Momus Review
 
-1. Submit plan to momus
+1. Invoke the **momus skill** via the `Skill` tool with the plan FILE PATH: `Skill(skill="oh-my-claudeagent:momus", args="~/.claude/plans/<name>.md")`. The Skill tool works whether prometheus runs in the main session or as a subagent. Do NOT use the `Agent` tool for momus — it is unavailable to subagents.
 2. REJECTED → address ALL issues, resubmit
 3. Loop until OKAY — max 3 iterations
 4. Still REJECTED after 3 → present plan + feedback to user, ask for direction
@@ -395,7 +395,7 @@ grep -cP "^- \[ \] [0-9]+\." <plan-file-path>
 **Plan mode active** (system context shows plan file at `~/.claude/plans/`):
 
 1. Write plan to native plan file path — that file is authoritative
-2. Submit to momus
+2. Invoke the **momus skill** via the `Skill` tool with the native plan FILE PATH. Do NOT use the `Agent` tool for momus — it is unavailable to subagents.
 3. After OKAY, ask user via `AskUserQuestion`: "Plan approved by momus. What would you like to do? (you can also type a custom response to modify the plan or stop here)":
    - **"Start implementation"** → `ExitPlanMode`, guide to `/oh-my-claudeagent:start-work`
    - **"Run metis review"** → invoke metis
