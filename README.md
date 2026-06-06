@@ -102,6 +102,10 @@ them, set this in your user `~/.claude/settings.json`:
 "worktree": { "baseRef": "head" }
 ```
 
+As of v2.1.154, `"head"` correctly resolves to the current worktree HEAD (the branch
+you have checked out), not the main checkout HEAD. Earlier versions had a bug where it
+resolved to the wrong HEAD in some setups.
+
 Otherwise, push to your remote before delegating exploration of recently-changed code.
 
 ## Requirements

@@ -25,6 +25,7 @@ One-command setup: update orchestration block in `~/.claude/CLAUDE.md`, check de
 - Install: `/plugin marketplace add UtsavBalar1231/oh-my-claudeagent` then `/plugin install oh-my-claudeagent@omca`
 - Update: `/plugin marketplace update omca` then `/plugin install oh-my-claudeagent@omca`
 - Apply in-session: `/reload-plugins`
+- Reload skills without restart (v2.1.152+): `/reload-skills` — picks up skill file edits (including orchestration-block.md changes written by omca-setup) in the active session without a full Claude Code restart
 
 **`--bare` caveat**: `claude --bare` skips plugin, hooks, skills, MCP, and CLAUDE.md auto-discovery. Run setup in normal (non-`--bare`) sessions.
 
@@ -418,7 +419,7 @@ Configure the Claude Code statusline to use the oh-my-claudeagent statusline pac
 
    On decline: skip silently.
 
-7. **Known platform limitation — permission mode banner**: the `›› bypass permissions on (shift+tab to cycle)` indicator on the same native row has no documented opt-out as of Claude Code v2.1.141. Only the vim half is suppressible via `hideVimModeIndicator`. Document this in the report so users know the residual line is a platform feature, not an OMCA bug.
+7. **Known platform limitation — permission mode banner**: the `›› bypass permissions on (shift+tab to cycle)` indicator on the same native row has no documented opt-out as of Claude Code v2.1.167. Only the vim half is suppressible via `hideVimModeIndicator`. Document this in the report so users know the residual line is a platform feature, not an OMCA bug.
 
 ---
 
@@ -756,6 +757,8 @@ echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | timeout 5 uv run --proje
 - PASS if response contains `"result"` with tool definitions
 - FAIL if timeout, error, or no response
 - Note: HTTP servers (grep.app, context7) are external — skip or ping-only
+
+**Pending approval (v2.1.154+)**: If tools from `.mcp.json` servers are unavailable despite a healthy binary, check whether Claude Code is showing a `⏸ Pending approval` indicator next to the `omca` server in the MCP panel. As of v2.1.154, unapproved `.mcp.json` servers no longer auto-connect — the user must explicitly approve them once. Use `/mcp` or the MCP settings UI to approve the `omca` server (and `grep`, `context7`) if they show as pending.
 
 ### Check 5: State Directory Health
 - `.omca/state/` exists — PASS/FAIL

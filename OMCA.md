@@ -66,6 +66,40 @@ including auto mode. `permissionMode` in agent frontmatter is stripped by Claude
 plugin agents. To retain `permissionMode`, copy agent files to `~/.claude/agents/`
 (user-scope agents retain it).
 
+**Plugin-agent frontmatter restrictions (v2.1.154+):** Claude Code silently ignores
+`hooks`, `mcpServers`, and `permissionMode` in agent frontmatter for plugin-shipped
+agents (i.e., agents in the plugin's `agents/` directory). No OMCA agent currently
+declares any of these fields. If you need an agent that uses custom hooks, extra MCP
+servers, or a specific permission mode, copy that agent file to `~/.claude/agents/`
+(user-scope) or `.claude/agents/` (project-scope) — agents at those paths are not
+plugin-managed and have no frontmatter restrictions.
+
+**Lean system prompt default (v2.1.154):**
+
+New subagents receive a shorter system prompt by default. Agents with detailed
+instructions in their frontmatter `description:` / body are unaffected. OMCA agent
+definitions are self-contained and already carry their full instruction sets.
+
+**`subagent_type` matching (v2.1.140):**
+
+`Agent(subagent_type=...)` matching is case- and separator-insensitive as of v2.1.140.
+`"oh-my-claudeagent:executor"`, `"oh-my-claudeagent:Executor"`, and
+`"oh-my-claudeagent_executor"` all resolve to the same agent. OMCA uses consistent
+lowercase colon-separated names throughout; this change is backward-compatible.
+
+**Inline agent `mcpServers` — strict-mcp policy (v2.1.153):**
+
+For inline agents that declare `mcpServers` in their frontmatter, Claude Code now
+enforces the session's strict-mcp policy (e.g., `allowManagedMcpServersOnly`). No OMCA
+agent declares `mcpServers` frontmatter (confirmed by grep); this change has no
+behavioral impact on OMCA.
+
+**Multiple `Agent(...)` types in `tools:` frontmatter (v2.1.147):**
+
+A platform bug was fixed in v2.1.147 where listing multiple agent types in a skill's
+`tools:` frontmatter would cause only the first to be recognized. OMCA skills that
+declare `tools: [Agent(...)]` are unaffected — no OMCA skill lists multiple Agent types.
+
 **Model resolution order:** `CLAUDE_CODE_SUBAGENT_MODEL` env > per-invocation model >
 agent frontmatter model > main session. Warning: setting `CLAUDE_CODE_SUBAGENT_MODEL`
 globally overrides all agent model tiers.
@@ -89,6 +123,40 @@ Two execution modes:
 Keywords are the natural interaction model. Type "create plan", "ralph don't stop", or
 "ultrawork" in any prompt and the corresponding skill activates automatically. Slash
 commands are also available for explicit invocation.
+
+**`disallowed-tools` frontmatter (v2.1.152):**
+
+SKILL.md files can declare a `disallowed-tools:` list in their frontmatter to prevent
+specific tools from being available when the skill runs. OMCA adopts this on two skills:
+
+| Skill | disallowed-tools | Reason |
+|-------|-----------------|--------|
+| `github-triage` | `[Write, Edit]` | Orchestrator skill is read-only; reports are written by spawned executor subagents |
+| `hephaestus` | `[Agent]` | Forked specialist must not delegate; fix loop is solo |
+
+For `context: fork` skills bound to a named agent via `agent:` frontmatter (e.g., metis,
+momus), skill-level `disallowed-tools` is redundant — the agent definition already
+enforces `disallowedTools` at the agent-config layer. The skill layer only matters for
+skills running in the main session without an `agent:` binding.
+
+**`\$` escape syntax (v2.1.163):**
+
+In SKILL.md bodies, `\$` is now a documented escape for a literal dollar sign (prevents
+variable interpolation by the platform). OMCA has zero literal dollar-digit sequences in
+command/skill bodies; no existing files need updating.
+
+**`/reload-skills` command (v2.1.152):**
+
+The platform adds a `/reload-skills` command that reloads skill definitions from disk
+without restarting the session. Useful after editing a SKILL.md mid-session. OMCA has no
+handler for this — it fires as a slash-command expansion, not a hook event.
+
+**Platform `workflow` keyword renamed `ultracode` (v2.1.157):**
+
+The platform's built-in dynamic-workflow keyword was renamed from `workflow` to
+`ultracode` in v2.1.157. This is unrelated to OMCA's own `ultrawork` keyword and the
+`/oh-my-claudeagent:ultrawork` skill. OMCA does not reference the platform keyword;
+no OMCA files are affected.
 
 ### Hooks
 
@@ -131,6 +199,81 @@ Claude Code lifecycle events and provide:
 | `WorktreeRemove` | Worktree |
 | `InstructionsLoaded` | Observability |
 
+**New platform events (v2.1.141–v2.1.167) — OMCA has no handlers for these:**
+
+| Event | Added | Notes |
+|-------|-------|-------|
+| `MessageDisplay` | v2.1.152 | Fires when a message is about to be displayed |
+| `PostToolBatch` | v2.1.152 | Fires after a batch of tool calls completes |
+| `Elicitation` | v2.1.152 | Fires when the model issues an elicitation request |
+| `ElicitationResult` | v2.1.152 | Fires with the elicitation response |
+| `Setup` | v2.1.152 | Plugin initialization event |
+
+These five are tracked in `validate-plugin.sh`'s `new_platform_events` array (introduced
+v2.1.141–v2.1.167 sync). The validator skips them when no handler is present and passes
+when one is present — no failures on absence.
+
+**Stop / SubagentStop — new input fields (v2.1.145):**
+
+The Stop and SubagentStop hook payloads now include two additional fields:
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `background_tasks` | array | Platform-managed background tasks running at Stop time |
+| `session_crons` | array | Scheduled cron jobs registered for the session |
+
+OMCA's ralph-persistence.sh does not consult these fields — the block/allow decision is
+based solely on ralph state and boulder progress. Background tasks are orthogonal to ralph
+blocking. (Verified by test: the v2.1.145 Stop payload change has zero
+behavioral impact on OMCA hooks.)
+
+**Stop / SubagentStop — `additionalContext` output (v2.1.163):**
+
+Hooks can now return `hookSpecificOutput.additionalContext` from Stop / SubagentStop.
+OMCA deliberately does not adopt this: co-existence with `decision:block` is not
+documented (schema inconclusive); exit-2 paths ignore all JSON output entirely, so any
+`additionalContext` set alongside a block decision would be silently dropped. OMCA's
+existing block shape `{"decision": {"behavior": "block"}, "reason": "..."}` is unchanged.
+(See "Deliberate non-adoptions" section below for the non-adoption log.)
+
+**SessionStart — new output fields (v2.1.152):**
+
+`SessionStart` hooks can return two new fields:
+
+| Field | Adopted by OMCA | Notes |
+|-------|----------------|-------|
+| `sessionTitle` | Yes — `session-init.sh` emits `"OMCA: <plan_name>"` when boulder is active | Sets the session title in the platform UI |
+| `reloadSkills` | No | Boolean; forces a skill reload on session start — no OMCA use case |
+
+**Stop hook block cap (v2.1.143):**
+
+The platform enforces a maximum of 8 consecutive Stop blocks per session. The cap is
+configurable via `CLAUDE_CODE_STOP_HOOK_BLOCK_CAP` (env var). OMCA's
+`ralph-persistence.sh` reads this env var (`STOP_BLOCK_CAP="${CLAUDE_CODE_STOP_HOOK_BLOCK_CAP:-8}"`)
+and emits a voluntary allow-stop (exit 0, no `decision:block`) at `cap-1` consecutive
+no-progress blocks, with reason `"Yielding to platform. To resume: invoke /oh-my-claudeagent:ralph again."`.
+Cap state is tracked in `.omca/state/ralph-cap-state.json`. (Adopted in the v2.1.141–v2.1.167 sync.)
+
+**Hooks run without terminal access (v2.1.141+):**
+
+Hook scripts no longer have access to `/dev/tty` or terminal control sequences.
+OMCA's `scripts/notify.sh` is unaffected — it uses only desktop notification APIs
+(`terminal-notifier`, `osascript`, `notify-send`, `zenity`, `powershell`) and stderr bell,
+with zero `/dev/tty` or `tput` calls.
+
+Hooks can now emit a `terminalSequence` output field to inject terminal escape sequences:
+```json
+{"hookSpecificOutput": {"hookEventName": "EVENT", "terminalSequence": "[2J"}}
+```
+OMCA does not use `terminalSequence` — existing desktop-notification paths remain unchanged.
+
+**`if:` condition matching semantics (v2.1.163):**
+
+The `if:` field on hook handlers updated its matching semantics in v2.1.163. OMCA's
+12 `if:` clauses are all command-name-only globs (e.g., `Bash(rm *)`, `Bash(npm *)`) and
+are unaffected — the update only changes behavior for patterns that use subshell or
+backtick constructs, which OMCA does not.
+
 Hook handlers support an `if` field using permission rule syntax (e.g., `Bash(git *)`)
 for argument-level filtering on tool events (`PreToolUse`, `PostToolUse`,
 `PostToolUseFailure`, `PermissionRequest`). Reduces process spawning overhead.
@@ -152,6 +295,46 @@ OMCA ships:
 Both scripts are invokable from any Bash tool call as bare commands: `omca-status` and `omca-doctor`. They read the project's `.omca/state/` and `~/.claude/settings.json` only, and never mutate state.
 
 Plugin-root `settings.json` ships a `subagentStatusLine` default backed by `bin/omca-subagent-statusline`. Users can override per-project by setting their own `subagentStatusLine` in `~/.claude/settings.json` or a project-level settings file. Omitting all overrides falls back to the platform's default `name · description · token count` row.
+
+**Statusline platform additions (v2.1.141–v2.1.167):**
+
+New fields added to the statusline input JSON payload, adopted in `statusline/core.py`:
+
+| Field | Version | Adopted | Notes |
+|-------|---------|---------|-------|
+| `workspace.repo.{host,owner,name}` | v2.1.145 | Yes | Repo identity segment; OSC 8 link to `https://{host}/{owner}/{name}` when all three present |
+| `pr.{number,url,review_state}` | v2.1.145 | Yes | PR number (#N) with optional OSC 8 link; review_state → glyph (approved=+/green, changes_requested=!/red, pending=?/yellow, draft=d/dim) |
+| `COLUMNS` / `LINES` env vars | v2.1.153 | Yes — `COLUMNS` fallback in `bin/omca-subagent-statusline` | Payload `columns` still wins; env vars complement when payload absent |
+| `context_window.remaining_percentage` | v2.1.153 | Yes — `_render_context_bar` uses it when `pct` arg is None | Falls back to `current_usage` calculation; explicit `pct` still wins |
+
+### plugin.json
+
+OMCA's `plugin.json` is the plugin manifest. Key fields and recent platform additions:
+
+**`displayName` (v2.1.143, ADOPTED):**
+
+A human-readable display name shown in the plugin marketplace and `/plugin list` output.
+OMCA sets `displayName` in `plugin.json`. Added during v2.1.141–v2.1.167 sync.
+
+**`defaultEnabled` (v2.1.154, NOT adopted):**
+
+Setting `"defaultEnabled": false` keeps a plugin installed but inactive until explicitly
+enabled. OMCA deliberately leaves this field absent (defaults to `true`) — OMCA is
+designed to be active immediately on install; an inactive-by-default state would break
+the first-session experience.
+
+**Root-level `SKILL.md` for single-skill plugins (v2.1.142):**
+
+Plugins that ship exactly one skill can place `SKILL.md` at the plugin root (instead of
+`skills/<name>/SKILL.md`). OMCA ships many skills and continues using the subdirectory
+layout; the root-level shorthand is not applicable.
+
+**Dependency enforcement on disable (v2.1.143):**
+
+When a plugin is disabled, Claude Code now checks whether other enabled plugins declare
+it as a dependency and blocks the disable if so. OMCA has no declared dependents in
+OMCA's known marketplace installations; this mechanism does not affect OMCA's install or
+disable behavior.
 
 ### Monitors
 
@@ -511,6 +694,29 @@ real-world usage examples, API patterns, and library implementations.
 Library documentation lookup. Two-step flow: resolve library ID first, then query docs.
 Prefer context7 over WebFetch for well-known libraries.
 
+### MCP platform additions (v2.1.141–v2.1.167)
+
+**stdio servers receive session env vars (v2.1.154, ADOPTED):**
+
+stdio MCP servers now receive `CLAUDE_CODE_SESSION_ID` and `CLAUDECODE=1` in their
+environment at launch. The `omca` server's `_resolve_session_id()` helper in
+`servers/tools/_common.py` uses `os.environ.get("CLAUDE_CODE_SESSION_ID", "")` as a
+fallback when no explicit `session_id` parameter is passed. Adopted in `boulder_write`
+and `boulder_task_start` (v2.1.141–v2.1.167 sync).
+
+**Per-server `timeout` < 1000 ms is now ignored (v2.1.162):**
+
+Previously, a per-server timeout below 1000 ms was floored to 1000 ms. As of v2.1.162
+it is silently ignored (no floor applied, no error). OMCA's `.mcp.json` has no `timeout`
+keys — this change has no behavioral impact.
+
+**Unapproved `.mcp.json` servers show "Pending approval" (v2.1.154):**
+
+Servers listed in `.mcp.json` but not yet approved by the user now display a
+"Pending approval" status indicator rather than silently failing. OMCA's three bundled
+servers (`omca`, `grep`, `context7`) are approved on first install; users seeing
+"Pending approval" should run `/oh-my-claudeagent:omca-setup --check` to diagnose.
+
 ---
 
 ## Runtime State
@@ -703,6 +909,54 @@ When any of these are set, Remote Control, `/schedule`, claude.ai MCP connectors
 
 OMCA's core workflows (ralph, ultrawork, start-work, F1-F4 verification) run in-process and do not depend on Remote Control or `/schedule`. Users who need claude.ai-only features must unset the API-key variable for that session.
 
+### `CLAUDE_CODE_ALWAYS_ENABLE_EFFORT` (v2.1.154)
+
+Set to `1` to enable the effort selector for all deployments, including those where it is
+disabled by default (API key builds, certain managed tiers). Useful for ensuring
+OMCA's effort-aware hook branching works when the platform would otherwise suppress the
+effort control.
+
+### `CLAUDE_CODE_ENABLE_AUTO_MODE` (v2.1.158)
+
+Enables auto permission mode for Bedrock, Vertex, and AWS Bedrock Foundry deployments,
+where it is off by default. Set to `1` to match the default-on behavior of claude.ai
+builds. Relevant for OMCA users running in managed cloud deployments who want auto-mode
+orchestration without the bypass-permissions confirmation flow.
+
+### `agent` setting — honored for dispatched sessions (v2.1.157)
+
+The `agent` key in `~/.claude/settings.json` (or project settings) is now honored for
+dispatched (non-interactive) Claude Code sessions. When set, the named agent identity is
+used for the dispatched session's system prompt. OMCA uses `templates/claudemd.md`
+injection for sisyphus identity in interactive sessions; dispatched-session orchestration
+is an advanced pattern not currently documented in OMCA's standard workflows.
+
+### `fallbackModel` (v2.1.166)
+
+Specifies a fallback model to use when the primary model is unavailable (e.g., capacity
+limits). Set in `~/.claude/settings.json`:
+
+```json
+{
+  "fallbackModel": "claude-sonnet-4-5"
+}
+```
+
+Not OMCA-specific; standard platform setting. Relevant for deployments where opus
+availability is not guaranteed.
+
+### `requiredMinimumVersion` / `requiredMaximumVersion` (v2.1.163)
+
+Managed keys that enforce a minimum or maximum Claude Code version for the deployment.
+These are org-policy keys — OMCA cannot set or override them. If your org enforces a
+minimum version, ensure it is ≥ v2.1.141 to get the full v2.1.141–v2.1.167 sync
+feature set.
+
+### `CLAUDE_CODE_OPUS_4_6_FAST_MODE_OVERRIDE` — removed (v2.1.160)
+
+This env var was deprecated in v2.1.154 and removed in v2.1.160. OMCA never referenced
+it; no action needed.
+
 ---
 
 ## Observability and OTEL Attribution
@@ -747,6 +1001,42 @@ known-safe package managers (npm, yarn, pnpm, bun), jq, and uv run/sync, and blo
 destructive patterns (rm -rf).
 
 `/oh-my-claudeagent:omca-setup` inspects and reports on these keys but cannot write them.
+
+---
+
+## Output Styles
+
+### `force-for-plugin` (re-verified 2026-06-06)
+
+`output-styles/omca-default.md` uses `force-for-plugin: true` in its frontmatter.
+This key is live and documented in the platform output-styles reference: it causes the
+plugin's output style to apply automatically whenever the plugin is enabled, without
+requiring the user to select it, and overrides the user's `outputStyle` setting. If
+multiple enabled plugins set `force-for-plugin: true`, the platform uses the first one
+loaded.
+
+**GFM task-list checkboxes (v2.1.149):**
+
+GitHub Flavored Markdown task-list checkboxes (`- [ ]` / `- [x]`) now render visually
+in model responses. OMCA plan files use checkbox syntax (`- [ ] N. Task`) and these now
+render in-session. No OMCA file changes required; this is a platform rendering improvement.
+
+---
+
+## Deliberate Non-Adoptions (v2.1.141–v2.1.167)
+
+Features introduced in this window that OMCA consciously declines to adopt:
+
+| Feature | Version | Reason |
+|---------|---------|--------|
+| `hookSpecificOutput.additionalContext` on Stop/SubagentStop | v2.1.163 | Co-existence with `decision:block` is undocumented (schema inconclusive); exit-2 path ignores all JSON — `additionalContext` would be silently dropped alongside a block decision |
+| `MessageDisplay`, `PostToolBatch`, `Elicitation`, `ElicitationResult`, `Setup` hook handlers | v2.1.152 | No OMCA use case; tracked in `new_platform_events` validator array (skip-on-absent semantics) |
+| `skills:` preload frontmatter | v2.1.150 | Adds context-window cost on every session; OMCA's lazy slash-command / keyword paths are sufficient |
+| `Agent(type=...)` spawn-allowlist in agent frontmatter | v2.1.148 | Sisyphus needs unrestricted spawn access to the full agent roster; an allowlist would require updating on every new specialist addition |
+| `defaultEnabled: false` in plugin.json | v2.1.154 | OMCA is designed to activate immediately on install; inactive-by-default would break first-session experience |
+| `reloadSkills` in SessionStart output | v2.1.152 | No OMCA use case identified |
+| `prompt`, `agent`, and `http` hook types | (standing) | Orthogonal to OMCA's bash-script hook model |
+| Monitors, Themes, Channels, LSP | (standing) | No current OMCA use case |
 
 ---
 
