@@ -142,6 +142,33 @@ def build_glyphs(nerd: bool) -> dict[str, str]:
 
 
 # ---------------------------------------------------------------------------
+# Terminal dimensions
+# ---------------------------------------------------------------------------
+
+
+def terminal_columns(payload_columns: int | None = None, default: int = 80) -> int:
+    """Return the terminal column count for display-width decisions.
+
+    Priority (highest to lowest):
+    1. ``payload_columns`` — the ``columns`` field from the statusline JSON payload
+       (most accurate, set by the platform from the actual PTY size).
+    2. ``COLUMNS`` env var — set by bash/zsh from the terminal's reported width.
+    3. ``default`` (80) — hard-coded fallback.
+
+    Note: LINES is not currently used by the statusline renderer but is documented
+    here for completeness in case future callers need it.
+    """
+    if payload_columns is not None and payload_columns > 0:
+        return payload_columns
+    env_cols = os.environ.get("COLUMNS")
+    if env_cols and env_cols.isdigit():
+        val = int(env_cols)
+        if val > 0:
+            return val
+    return default
+
+
+# ---------------------------------------------------------------------------
 # Context bar renderer
 # ---------------------------------------------------------------------------
 
@@ -178,6 +205,12 @@ def _render_context_bar(
     size_label = "1M" if ctx_size >= 1000000 else "200k"
 
     # Determine percentage
+    # Prefer pre-calculated remaining_percentage when present.
+    # remaining_percentage is 100 - used; convert to used for consistent display.
+    remaining_pct = ctx_window.get("remaining_percentage")
+    if remaining_pct is not None and pct is None:
+        pct = 100.0 - float(remaining_pct)
+
     effective_pct = pct
 
     if effective_pct is None:
@@ -232,6 +265,79 @@ def _remote_to_url(remote: str) -> str:
     if url.endswith(".git"):
         url = url[:-4]
     return url
+
+
+# ---------------------------------------------------------------------------
+# Repo / PR segment
+# ---------------------------------------------------------------------------
+
+# review_state glyph map (ASCII-safe fallback used for non-nerd terminals)
+_PR_STATE_GLYPH: dict[str, tuple[str, str]] = {
+    # (nerd_glyph, ascii_glyph): color applied separately
+    "approved": ("", "+"),   # nf-fa-check
+    "changes_requested": ("", "!"),  # nf-fa-times
+    "pending": ("", "?"),    # nf-fa-clock_o
+    "draft": ("", "d"),      # nf-fa-pencil
+}
+_PR_STATE_COLOR: dict[str, str] = {
+    "approved": GREEN,
+    "changes_requested": RED,
+    "pending": YELLOW,
+    "draft": DIM,
+}
+
+
+def _compose_repo_pr(data: StatuslinePayload, glyphs: dict[str, str], nerd: bool) -> str:
+    """Build the repo/PR segment from workspace.repo and pr fields.
+
+    Returns an empty string when the fields are absent so callers can skip
+    the segment cleanly without a condition on the output.
+
+    workspace.repo keys: host, owner, name
+    pr keys: number, url, review_state (review_state may be absent even when pr present)
+    review_state ∈ approved | pending | changes_requested | draft
+    """
+    workspace = data.get("workspace", {}) or {}
+    repo = workspace.get("repo", {}) or {}
+    repo_name = repo.get("name", "")
+    if not repo_name:
+        return ""
+
+    # Compose repo label: "owner/name" when owner present, else just "name"
+    owner = repo.get("owner", "")
+    repo_label = f"{owner}/{repo_name}" if owner else repo_name
+
+    # Optionally link to the repo host URL
+    host = repo.get("host", "")
+    if host and owner and repo_name:
+        repo_url = f"https://{host}/{owner}/{repo_name}"
+        repo_display = _osc8_link(repo_url, repo_label)
+    else:
+        repo_display = repo_label
+
+    segment = f"{DIM}{repo_display}{RST}"
+
+    # Attach PR info if present
+    pr = data.get("pr", {}) or {}
+    pr_number = pr.get("number")
+    if pr_number is not None:
+        pr_url = pr.get("url", "")
+        pr_num_str = f"#{pr_number}"
+        if pr_url:
+            pr_num_str = _osc8_link(pr_url, pr_num_str)
+
+        review_state = pr.get("review_state")
+        if review_state and review_state in _PR_STATE_COLOR:
+            color = _PR_STATE_COLOR[review_state]
+            glyph_pair = _PR_STATE_GLYPH.get(review_state, ("?", "?"))
+            glyph = glyph_pair[0] if nerd else glyph_pair[1]
+            state_str = f" {color}{glyph}{RST}"
+        else:
+            state_str = ""
+
+        segment = f"{segment} {CYAN}{pr_num_str}{RST}{state_str}"
+
+    return segment
 
 
 # ---------------------------------------------------------------------------
@@ -419,6 +525,12 @@ def _compose_line1(
         has_extra = True
         count = len(added_dirs)
         parts.append(f"{DIM}+{count} dir{'s' if count != 1 else ''}{RST}")
+
+    # Repo / PR segment
+    repo_pr = _compose_repo_pr(data, glyphs, nerd)
+    if repo_pr:
+        has_extra = True
+        parts.append(repo_pr)
 
     # Agent
     if "agent" in data and data["agent"] is not None:

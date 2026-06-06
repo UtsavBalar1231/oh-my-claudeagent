@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 
 # Python version guard — the int|None union syntax requires py310+; fail soft so a stale
@@ -23,7 +24,11 @@ def fmt_tokens(n: int | None) -> str:
 
 def main() -> int:
     data = json.load(sys.stdin)
-    cols = int(data.get("columns") or 80)
+    # Prefer the payload `columns` field; fall back to the COLUMNS env var,
+    # then hard-coded 80.
+    _env_cols = os.environ.get("COLUMNS")
+    _env_fallback = int(_env_cols) if _env_cols and _env_cols.isdigit() else 80
+    cols = int(data.get("columns") or _env_fallback)
     for task in data.get("tasks") or []:
         task_id = task.get("id")
         if not task_id:

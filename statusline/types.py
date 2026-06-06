@@ -19,6 +19,7 @@ class StatuslinePayload(TypedDict, total=False):
     agent: dict
     worktree: dict
     output_style: dict
+    pr: dict  # PR info: number, url, review_state
     exceeds_200k_tokens: bool
     cwd: str
     session_name: str
@@ -27,6 +28,7 @@ class StatuslinePayload(TypedDict, total=False):
     transcript_path: str
     effort: dict
     thinking: dict
+    columns: int  # Terminal column count from the platform
 
 
 class GitInfo(TypedDict, total=False):
