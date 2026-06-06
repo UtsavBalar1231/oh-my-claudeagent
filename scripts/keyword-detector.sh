@@ -20,6 +20,14 @@ if [[ -z "${PROMPT}" ]]; then
 	exit 0
 fi
 
+# Task-notification relays (background-agent results) arrive as user turns with no agent_id.
+# Skip detection when the tag appears in the first 500 chars (wrappers may precede it);
+# a real user prompt containing the literal tag is suppressed — acceptable, it's platform XML.
+PROMPT_HEAD="${PROMPT:0:500}"
+if [[ "${PROMPT_HEAD}" == *"<task-notification>"* ]]; then
+	exit 0
+fi
+
 # CURRENT_SESSION is referenced by mode_already_announced / mark_mode_announced in common.sh
 # shellcheck disable=SC2034
 CURRENT_SESSION=$(resolve_session_id)

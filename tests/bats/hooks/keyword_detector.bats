@@ -297,3 +297,34 @@ load '../test_helper'
 	# No announcement should be emitted
 	assert_output ""
 }
+
+# ---------------------------------------------------------------------------
+# Task-notification relay guard
+# ---------------------------------------------------------------------------
+
+@test "task-notification: prompt containing <task-notification> tag does NOT activate any mode" {
+	# Simulates the payload observed at 2026-06-06T07:48:36Z: a bg-agent inventory
+	# relayed as a type="user" turn whose content is a <task-notification> block.
+	# The block contains "ralph ultrawork handoff" — without the guard these keywords
+	# would have activated ralph mode and polluted active-modes.json.
+	local notif_prompt
+	notif_prompt='<task-notification><result>Agent completed: ralph ultrawork handoff plan hephaestus</result></task-notification>'
+	local payload
+	payload=$(jq -n --arg p "$notif_prompt" '{"prompt":$p}')
+	run_hook "keyword-detector.sh" "$payload"
+	assert_success
+	assert_output ""
+	assert [ ! -f "$CLAUDE_PROJECT_ROOT/.omca/state/ralph-state.json" ]
+	assert [ ! -f "$CLAUDE_PROJECT_ROOT/.omca/state/ultrawork-state.json" ]
+	assert [ ! -f "$CLAUDE_PROJECT_ROOT/.omca/state/active-modes.json" ]
+}
+
+@test "task-notification: genuine 'ralph don't stop' prompt still triggers ralph detection" {
+	# Regression guard: the task-notification guard must not suppress real user prompts.
+	local payload='{"prompt":"ralph don'\''t stop"}'
+	run_hook "keyword-detector.sh" "$payload"
+	assert_success
+	ctx=$(get_context)
+	assert echo "$ctx" | grep -q "RALPH MODE DETECTED"
+	assert [ -f "$CLAUDE_PROJECT_ROOT/.omca/state/ralph-state.json" ]
+}
