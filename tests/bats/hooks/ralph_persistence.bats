@@ -217,3 +217,102 @@ STOP_PAYLOAD='{"stop_reason":"end_turn","stop_hook_active":false}'
 	psc=$(read_state "ralph-state.json" | jq -r '.plan_stagnation_count // 0')
 	[[ "$psc" -eq 0 ]]
 }
+
+# ─── Stop-block cap: boulder fallback reaches cap-1 → yields with resume guidance ──
+
+@test "stop-block cap: boulder fallback cap guard — 3 consecutive blocks with cap=4 → 3rd call yields (allow) with resume guidance" {
+	# Uses a small cap (4) so cap-1=3 fires after 3 no-progress consecutive calls.
+	export CLAUDE_CODE_STOP_HOOK_BLOCK_CAP=4
+
+	# Ralph active with all tasks complete so boulder fallback path is reached
+	write_state "ralph-state.json" \
+		'{"status":"active","tasks":[{"id":"1","status":"completed"}],"last_task_hash":"","stagnation_count":0}'
+
+	# Create a plan file with incomplete tasks and static content (no progress)
+	local plan_dir="$BATS_TEST_TMPDIR/plans-cap"
+	mkdir -p "$plan_dir"
+	local plan_file="$plan_dir/cap-plan.md"
+	printf '# Plan\n- [ ] 1. Task A\n- [ ] 2. Task B\n' > "$plan_file"
+
+	local boulder_path="$CLAUDE_PROJECT_ROOT/.omca/state/boulder.json"
+	printf '%s' "{\"active_plan\":\"${plan_file}\",\"plan_name\":\"cap-plan\"}" > "$boulder_path"
+	# Boulder mtime is now → age 0 < 900 → fresh boulder path fires
+
+	# Call 1 and 2 should block (boulder_cnt 1, 2 — below cap-1=3)
+	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
+	assert_output --partial '"decision":"block"'
+
+	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
+	assert_output --partial '"decision":"block"'
+
+	# Call 3: boulder_cnt reaches 3 = cap-1 → should yield (allow stop, no decision:block)
+	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
+	assert_success
+	# Must NOT contain decision:block
+	refute_output --partial '"decision":"block"'
+	# Must contain resume guidance
+	assert_output --partial 'Yielding to platform'
+
+	unset CLAUDE_CODE_STOP_HOOK_BLOCK_CAP
+}
+
+# ─── Stop-block cap: progress delta resets counter ──────────────────────────
+
+@test "stop-block cap: boulder fallback cap guard — progress resets counter (cap-1 does NOT fire after progress)" {
+	export CLAUDE_CODE_STOP_HOOK_BLOCK_CAP=4
+
+	write_state "ralph-state.json" \
+		'{"status":"active","tasks":[{"id":"1","status":"completed"}],"last_task_hash":"","stagnation_count":0}'
+
+	local plan_dir="$BATS_TEST_TMPDIR/plans-reset"
+	mkdir -p "$plan_dir"
+	local plan_file="$plan_dir/reset-plan.md"
+	printf '# Plan\n- [ ] 1. Task A\n- [ ] 2. Task B\n' > "$plan_file"
+
+	local boulder_path="$CLAUDE_PROJECT_ROOT/.omca/state/boulder.json"
+	printf '%s' "{\"active_plan\":\"${plan_file}\",\"plan_name\":\"reset-plan\"}" > "$boulder_path"
+
+	# Call 1: establishes hash, counter=1 → block
+	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
+	assert_output --partial '"decision":"block"'
+
+	# Call 2: no change → counter=2 → block
+	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
+	assert_output --partial '"decision":"block"'
+
+	# Simulate progress: complete one task (changes plan content → hash changes)
+	printf '# Plan\n- [x] 1. Task A\n- [ ] 2. Task B\n' > "$plan_file"
+	touch "$boulder_path"  # Keep boulder fresh
+
+	# Call 3: progress detected → counter resets to 1 → normal block (NOT cap-yield)
+	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
+	assert_output --partial '"decision":"block"'
+	# Counter was reset, so a subsequent call (4th total) is also a normal block
+	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
+	assert_output --partial '"decision":"block"'
+
+	unset CLAUDE_CODE_STOP_HOOK_BLOCK_CAP
+}
+
+# ─── Stop payload background_tasks → normal behavior (no-op) ────────────────
+
+@test "stop payload: background_tasks does not affect ralph blocking decision" {
+	# Guard: ralph blocks are independent of background_tasks in payload.
+	# Script exits 0 (allows) at line ~61 when neither mode is active, so background_tasks
+	# alone cannot trigger a block. When ralph IS active, the decision is based on
+	# ralph state only — background_tasks in payload is orthogonal.
+	local BG_PAYLOAD='{"stop_reason":"end_turn","stop_hook_active":false,"background_tasks":[{"id":"bg-1","status":"running"}],"session_crons":[]}'
+
+	# Ralph active with pending tasks + background_tasks in payload → still blocks
+	write_state "ralph-state.json" \
+		'{"status":"active","tasks":[{"id":"1","status":"pending"}],"last_task_hash":"","stagnation_count":0}'
+	run_hook "ralph-persistence.sh" "$BG_PAYLOAD"
+	assert_success
+	assert_output --partial '"decision":"block"'
+
+	# No ralph/ultrawork active + background_tasks in payload → still allows (exits 0)
+	rm -f "$CLAUDE_PROJECT_ROOT/.omca/state/ralph-state.json"
+	run_hook "ralph-persistence.sh" "$BG_PAYLOAD"
+	assert_success
+	assert_output ""
+}

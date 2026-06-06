@@ -4,6 +4,29 @@ source "$(dirname "$0")/lib/common.sh"
 
 STATE_DIR="${HOOK_STATE_DIR}"
 
+# Platform cap on consecutive Stop-hook blocks.
+# At cap-1 consecutive blocks, yield gracefully with a resume instruction.
+STOP_BLOCK_CAP="${CLAUDE_CODE_STOP_HOOK_BLOCK_CAP:-8}"
+
+# Cap state file for counter-less block paths (boulder fallback + INCOMPLETE path).
+RALPH_CAP_STATE="${STATE_DIR}/ralph-cap-state.json"
+
+# Read or initialise cap state. Prints JSON object.
+_cap_state_read() {
+	if [[ -f "${RALPH_CAP_STATE}" ]]; then
+		jq -r '.' "${RALPH_CAP_STATE}" 2>/dev/null || echo '{}'
+	else
+		echo '{}'
+	fi
+}
+
+# Atomically write cap state JSON.
+_cap_state_write() {
+	local json="$1"
+	local tmp
+	tmp=$(mktemp) && printf '%s\n' "${json}" > "${tmp}" && mv "${tmp}" "${RALPH_CAP_STATE}"
+}
+
 # Boulder fallback: block stop if a fresh work plan exists.
 # NAMED WITH ACTION VERB: side-effect is intentional, see caller chains.
 allow_stop_via_boulder_fallback() {
@@ -22,11 +45,73 @@ allow_stop_via_boulder_fallback() {
 				boulder_mtime=$(stat -c %Y "${boulder_file}" 2>/dev/null || stat -f %m "${boulder_file}" 2>/dev/null || echo "")
 				# Fail-closed: if stat returns empty, boulder mtime is unavailable — block stop conservatively.
 				if [[ -z "${boulder_mtime}" ]]; then
+					# Stop-block cap guard (stat-unavailable path).
+					# Reset on progress (hash/complete change), yield at cap-1.
+					local cap_json boulder_cnt
+					cap_json=$(_cap_state_read)
+					boulder_cnt=$(printf '%s\n' "${cap_json}" | jq -r '.boulder_block_count // 0')
+					boulder_cnt=$((boulder_cnt + 1))
+					local cur_hash cur_complete last_hash last_complete
+					cur_complete=$(grep -c '^- \[x\] ' "${active_plan}" 2>/dev/null; true)
+					cur_complete="${cur_complete:-0}"
+					if command -v md5sum &>/dev/null; then
+						cur_hash=$(grep '^- \[.\] ' "${active_plan}" 2>/dev/null | md5sum | cut -d' ' -f1)
+					else
+						cur_hash=$(grep '^- \[.\] ' "${active_plan}" 2>/dev/null | md5 | cut -d' ' -f4)
+					fi
+					cur_hash="${cur_hash:-}"
+					last_hash=$(printf '%s\n' "${cap_json}" | jq -r '.boulder_last_plan_hash // ""')
+					last_complete=$(printf '%s\n' "${cap_json}" | jq -r '.boulder_last_complete // 0')
+					if [[ "${cur_hash}" != "${last_hash}" || "${cur_complete}" -gt "${last_complete}" ]]; then
+						boulder_cnt=1
+					fi
+					_cap_state_write "$(printf '%s\n' "${cap_json}" | jq \
+						--argjson cnt "${boulder_cnt}" \
+						--arg hash "${cur_hash}" \
+						--argjson com "${cur_complete}" \
+						'.boulder_block_count = $cnt | .boulder_last_plan_hash = $hash | .boulder_last_complete = $com')"
+					local cap_minus_one=$(( STOP_BLOCK_CAP - 1 ))
+					if [[ ${boulder_cnt} -ge ${cap_minus_one} ]]; then
+						log_hook_error "ralph cap guard yielding at boulder_block_count=${boulder_cnt} (cap=${STOP_BLOCK_CAP}, stat-unavailable path)" "ralph-persistence.sh"
+						echo '{"reason":"[RALPH PERSISTENCE] Stop-block cap limit approached (stat-unavailable path). Yielding to platform. To resume: restart your task or invoke /oh-my-claudeagent:ralph again."}'
+						exit 0
+					fi
 					echo '{"decision":"block","reason":"[PERSISTENCE] Active work plan detected via boulder (stat unavailable — fail-closed). Continue working on tasks."}'
 					exit 0
 				fi
 				boulder_age=$(( $(date +%s) - boulder_mtime ))
 				if [[ ${boulder_age} -lt 900 ]]; then
+					# Stop-block cap guard (fresh boulder path).
+					# Reset on progress (hash/complete change), yield at cap-1.
+					local cap_json boulder_cnt
+					cap_json=$(_cap_state_read)
+					boulder_cnt=$(printf '%s\n' "${cap_json}" | jq -r '.boulder_block_count // 0')
+					boulder_cnt=$((boulder_cnt + 1))
+					local cur_hash cur_complete last_hash last_complete
+					cur_complete=$(grep -c '^- \[x\] ' "${active_plan}" 2>/dev/null; true)
+					cur_complete="${cur_complete:-0}"
+					if command -v md5sum &>/dev/null; then
+						cur_hash=$(grep '^- \[.\] ' "${active_plan}" 2>/dev/null | md5sum | cut -d' ' -f1)
+					else
+						cur_hash=$(grep '^- \[.\] ' "${active_plan}" 2>/dev/null | md5 | cut -d' ' -f4)
+					fi
+					cur_hash="${cur_hash:-}"
+					last_hash=$(printf '%s\n' "${cap_json}" | jq -r '.boulder_last_plan_hash // ""')
+					last_complete=$(printf '%s\n' "${cap_json}" | jq -r '.boulder_last_complete // 0')
+					if [[ "${cur_hash}" != "${last_hash}" || "${cur_complete}" -gt "${last_complete}" ]]; then
+						boulder_cnt=1
+					fi
+					_cap_state_write "$(printf '%s\n' "${cap_json}" | jq \
+						--argjson cnt "${boulder_cnt}" \
+						--arg hash "${cur_hash}" \
+						--argjson com "${cur_complete}" \
+						'.boulder_block_count = $cnt | .boulder_last_plan_hash = $hash | .boulder_last_complete = $com')"
+					local cap_minus_one=$(( STOP_BLOCK_CAP - 1 ))
+					if [[ ${boulder_cnt} -ge ${cap_minus_one} ]]; then
+						log_hook_error "ralph cap guard yielding at boulder_block_count=${boulder_cnt} (cap=${STOP_BLOCK_CAP}, fresh boulder path)" "ralph-persistence.sh"
+						echo '{"reason":"[RALPH PERSISTENCE] Stop-block cap limit approached. Yielding to platform. To resume: restart your task or invoke /oh-my-claudeagent:ralph again."}'
+						exit 0
+					fi
 					echo '{"decision":"block","reason":"[PERSISTENCE] Active work plan detected via boulder. Continue working on tasks."}'
 					exit 0
 				fi
@@ -180,6 +265,25 @@ if [[ "${RALPH_ACTIVE}" == "true" ]]; then
 fi
 
 if [[ "${INCOMPLETE}" -gt 0 ]]; then
+	# Stop-block cap guard (INCOMPLETE path).
+	# Stagnation machinery won't fire when progress occurs but tasks remain; this counter
+	# prevents a platform hard-cut on long-running healthy plans.
+	CAP_JSON_INC=$(_cap_state_read)
+	INCOMPLETE_CNT=$(printf '%s\n' "${CAP_JSON_INC}" | jq -r '.incomplete_block_count // 0')
+	INCOMPLETE_CNT=$((INCOMPLETE_CNT + 1))
+	# Reset on genuine progress: mirror task-hash change signal (STAGNATION==0 means hash changed)
+	if [[ "${STAGNATION:-1}" -eq 0 ]]; then
+		INCOMPLETE_CNT=1
+	fi
+	_cap_state_write "$(printf '%s\n' "${CAP_JSON_INC}" | jq \
+		--argjson cnt "${INCOMPLETE_CNT}" \
+		'.incomplete_block_count = $cnt')"
+	CAP_MINUS_ONE_INC=$(( STOP_BLOCK_CAP - 1 ))
+	if [[ ${INCOMPLETE_CNT} -ge ${CAP_MINUS_ONE_INC} ]]; then
+		log_hook_error "ralph cap guard yielding at incomplete_block_count=${INCOMPLETE_CNT} (cap=${STOP_BLOCK_CAP}, INCOMPLETE path)" "ralph-persistence.sh"
+		echo '{"reason":"[RALPH PERSISTENCE] Stop-block cap limit approached with incomplete tasks. Yielding to platform. To resume: invoke /oh-my-claudeagent:ralph again."}'
+		exit 0
+	fi
 	echo '{"decision":"block","reason":"[RALPH PERSISTENCE] Ralph mode is active with incomplete tasks. Continue working until oracle verification passes."}'
 	exit 0
 fi
