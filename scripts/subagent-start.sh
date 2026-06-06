@@ -109,6 +109,13 @@ case "${AGENT_TYPE}" in
 *) ;;
 esac
 
+case "${AGENT_TYPE}" in
+*executor* | *explore* | *librarian* | *hephaestus* | *multimodal*)
+	CONTEXT_PARTS+=$'\n'"You are a worker subagent with zero dependencies on other agents. Orchestrator guidance about background-agent barriers, 'waiting for N more agents', or ending responses to wait does NOT apply to you. Always end your final message with your complete deliverable — never a wait/holding message."
+	;;
+*) ;;
+esac
+
 ACTIVE_FILE="${STATE_DIR}/active-agents.json"
 CATALOG_FILE="${STATE_DIR}/agent-catalog.json"
 

@@ -6,6 +6,11 @@ EXPLORE_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_i
 SISYPHUS_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id":"agent-abc123","agent_type":"oh-my-claudeagent:sisyphus"}'
 PROMETHEUS_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id":"agent-abc123","agent_type":"oh-my-claudeagent:prometheus"}'
 UNKNOWN_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id":"agent-abc123","agent_type":"custom-agent"}'
+EXECUTOR_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id":"agent-abc123","agent_type":"oh-my-claudeagent:executor"}'
+LIBRARIAN_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id":"agent-abc123","agent_type":"oh-my-claudeagent:librarian"}'
+HEPHAESTUS_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id":"agent-abc123","agent_type":"oh-my-claudeagent:hephaestus"}'
+MOMUS_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id":"agent-abc123","agent_type":"oh-my-claudeagent:momus"}'
+ORACLE_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id":"agent-abc123","agent_type":"oh-my-claudeagent:oracle"}'
 
 # ─── a. Agent Protocol injection ─────────────────────────────────────────────
 
@@ -190,6 +195,66 @@ UNKNOWN_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_i
 	# The sections list should mention the 4 retained sections but not "questions"
 	echo "$ctx" | grep -q "learnings, issues, decisions, problems"
 	! echo "$ctx" | grep -q "learnings, issues, decisions, problems, questions"
+}
+
+# ─── n. Worker counter-instruction — presence for worker roles ───────────────
+
+@test "counter-instruction: executor agent receives worker counter-instruction" {
+	run_hook "subagent-start.sh" "$EXECUTOR_PAYLOAD"
+	assert_success
+	local ctx
+	ctx=$(get_context)
+	echo "$ctx" | grep -q "worker subagent with zero dependencies"
+}
+
+@test "counter-instruction: explore agent receives worker counter-instruction" {
+	run_hook "subagent-start.sh" "$EXPLORE_PAYLOAD"
+	assert_success
+	local ctx
+	ctx=$(get_context)
+	echo "$ctx" | grep -q "worker subagent with zero dependencies"
+}
+
+@test "counter-instruction: librarian agent receives worker counter-instruction" {
+	run_hook "subagent-start.sh" "$LIBRARIAN_PAYLOAD"
+	assert_success
+	local ctx
+	ctx=$(get_context)
+	echo "$ctx" | grep -q "worker subagent with zero dependencies"
+}
+
+@test "counter-instruction: hephaestus agent receives worker counter-instruction" {
+	run_hook "subagent-start.sh" "$HEPHAESTUS_PAYLOAD"
+	assert_success
+	local ctx
+	ctx=$(get_context)
+	echo "$ctx" | grep -q "worker subagent with zero dependencies"
+}
+
+# ─── o. Worker counter-instruction — absence for non-worker roles ─────────────
+
+@test "counter-instruction: sisyphus agent does NOT receive worker counter-instruction" {
+	run_hook "subagent-start.sh" "$SISYPHUS_PAYLOAD"
+	assert_success
+	local ctx
+	ctx=$(get_context)
+	! echo "$ctx" | grep -q "worker subagent with zero dependencies"
+}
+
+@test "counter-instruction: momus agent does NOT receive worker counter-instruction" {
+	run_hook "subagent-start.sh" "$MOMUS_PAYLOAD"
+	assert_success
+	local ctx
+	ctx=$(get_context)
+	! echo "$ctx" | grep -q "worker subagent with zero dependencies"
+}
+
+@test "counter-instruction: oracle agent does NOT receive worker counter-instruction" {
+	run_hook "subagent-start.sh" "$ORACLE_PAYLOAD"
+	assert_success
+	local ctx
+	ctx=$(get_context)
+	! echo "$ctx" | grep -q "worker subagent with zero dependencies"
 }
 
 # ─── m. Flock-timeout safety ─────────────────────────────────────────────────

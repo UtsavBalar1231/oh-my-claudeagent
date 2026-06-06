@@ -48,6 +48,8 @@ User runs `/oh-my-claudeagent:start-work [plan path]`. Do not auto-start executi
 
 ## Parallel execution
 
+> **Main-session orchestrator (sisyphus) only.** If you are a subagent (executor, explore, librarian, oracle, hephaestus, or any other spawned agent), this section does NOT apply to you. Subagents must never wait for other agents — always complete your assigned work and end with your full deliverable.
+
 Multiple background agents when tasks are independent:
 
 1. Multiple `Agent` blocks with `run_in_background=true` in ONE message → parallel fan-out.
