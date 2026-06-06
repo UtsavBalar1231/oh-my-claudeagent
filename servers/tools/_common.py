@@ -24,6 +24,15 @@ class ToolError(Exception):
     pass
 
 
+def _resolve_session_id(session_id: str) -> str:
+    """Return session_id; explicit param wins, falls back to CLAUDE_CODE_SESSION_ID env var
+    injected into stdio MCP server processes. Returns empty string when neither provides a value.
+    """
+    if session_id:
+        return session_id
+    return os.environ.get("CLAUDE_CODE_SESSION_ID", "")
+
+
 def _find_git_root(working_directory: str) -> str:
     """Resolve the git worktree root from a working directory."""
     cwd = working_directory if working_directory else os.getcwd()

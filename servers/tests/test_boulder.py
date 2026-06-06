@@ -869,3 +869,192 @@ def test_boulder_write_mirror_idempotent(
     mtime_second = mirror.stat().st_mtime
     # mtime should be unchanged — no write occurred
     assert mtime_first == mtime_second
+
+
+# --- session_id env-default ---
+
+
+def test_boulder_write_session_id_from_env(mcp_server, working_dir, tmp_git_root):
+    """boulder_write uses CLAUDE_CODE_SESSION_ID env var when session_id param is empty."""
+    with mock.patch.dict(os.environ, {"CLAUDE_CODE_SESSION_ID": "env-sess-001"}):
+        result = call_tool(
+            mcp_server,
+            "boulder_write",
+            {
+                "active_plan": "/tmp/plan.md",
+                "plan_name": "env-plan",
+                "session_id": "",
+                "working_directory": working_dir,
+            },
+        )
+    assert "env-plan" in result
+    assert "sessions=1" in result
+
+    path = tmp_git_root / ".omca" / "state" / BOULDER_FILE
+    data = json.loads(path.read_text())
+    work = data["works"][data["active_work_id"]]
+    assert work["session_ids"] == ["env-sess-001"]
+
+
+def test_boulder_write_explicit_session_id_wins_over_env(
+    mcp_server, working_dir, tmp_git_root
+):
+    """boulder_write uses explicit session_id param over CLAUDE_CODE_SESSION_ID env var."""
+    with mock.patch.dict(
+        os.environ, {"CLAUDE_CODE_SESSION_ID": "env-sess-should-lose"}
+    ):
+        result = call_tool(
+            mcp_server,
+            "boulder_write",
+            {
+                "active_plan": "/tmp/plan.md",
+                "plan_name": "param-wins-plan",
+                "session_id": "explicit-sess-001",
+                "working_directory": working_dir,
+            },
+        )
+    assert "sessions=1" in result
+
+    path = tmp_git_root / ".omca" / "state" / BOULDER_FILE
+    data = json.loads(path.read_text())
+    work = data["works"][data["active_work_id"]]
+    assert work["session_ids"] == ["explicit-sess-001"]
+
+
+def test_boulder_write_neither_session_id_nor_env(
+    mcp_server, working_dir, tmp_git_root
+):
+    """boulder_write with empty session_id and no env var preserves empty behavior."""
+    env = {k: v for k, v in os.environ.items() if k != "CLAUDE_CODE_SESSION_ID"}
+    with mock.patch.dict(os.environ, env, clear=True):
+        result = call_tool(
+            mcp_server,
+            "boulder_write",
+            {
+                "active_plan": "/tmp/plan.md",
+                "plan_name": "no-session-plan",
+                "session_id": "",
+                "working_directory": working_dir,
+            },
+        )
+    assert "no-session-plan" in result
+
+    path = tmp_git_root / ".omca" / "state" / BOULDER_FILE
+    data = json.loads(path.read_text())
+    work = data["works"][data["active_work_id"]]
+    assert work["session_ids"] == []
+
+
+def test_boulder_task_start_session_id_from_env(
+    mcp_server, working_dir, tmp_path, tmp_git_root
+):
+    """boulder_task_start uses CLAUDE_CODE_SESSION_ID env var when session_id param is empty."""
+    plan = tmp_path / "plan.md"
+    plan.write_text("- [ ] 1. Task\n")
+    call_tool(
+        mcp_server,
+        "boulder_write",
+        {
+            "active_plan": str(plan),
+            "plan_name": "tasks-env",
+            "session_id": "s1",
+            "working_directory": working_dir,
+        },
+    )
+
+    with mock.patch.dict(os.environ, {"CLAUDE_CODE_SESSION_ID": "env-task-sess"}):
+        result = json.loads(
+            call_tool(
+                mcp_server,
+                "boulder_task_start",
+                {
+                    "task_key": "task-env",
+                    "task_label": "T-env",
+                    "task_title": "Env task",
+                    "session_id": "",
+                    "working_directory": working_dir,
+                },
+            )
+        )
+    assert result["started"] is True
+
+    data = json.loads((tmp_git_root / ".omca" / "state" / BOULDER_FILE).read_text())
+    task = data["works"][data["active_work_id"]]["task_sessions"]["task-env"]
+    assert task["session_id"] == "env-task-sess"
+
+
+def test_boulder_task_start_explicit_session_id_wins_over_env(
+    mcp_server, working_dir, tmp_path, tmp_git_root
+):
+    """boulder_task_start uses explicit session_id over CLAUDE_CODE_SESSION_ID env var."""
+    plan = tmp_path / "plan.md"
+    plan.write_text("- [ ] 1. Task\n")
+    call_tool(
+        mcp_server,
+        "boulder_write",
+        {
+            "active_plan": str(plan),
+            "plan_name": "tasks-param-wins",
+            "session_id": "s1",
+            "working_directory": working_dir,
+        },
+    )
+
+    with mock.patch.dict(os.environ, {"CLAUDE_CODE_SESSION_ID": "env-should-lose"}):
+        result = json.loads(
+            call_tool(
+                mcp_server,
+                "boulder_task_start",
+                {
+                    "task_key": "task-param",
+                    "task_label": "T-param",
+                    "task_title": "Param task",
+                    "session_id": "explicit-task-sess",
+                    "working_directory": working_dir,
+                },
+            )
+        )
+    assert result["started"] is True
+
+    data = json.loads((tmp_git_root / ".omca" / "state" / BOULDER_FILE).read_text())
+    task = data["works"][data["active_work_id"]]["task_sessions"]["task-param"]
+    assert task["session_id"] == "explicit-task-sess"
+
+
+def test_boulder_task_start_neither_session_id_nor_env(
+    mcp_server, working_dir, tmp_path, tmp_git_root
+):
+    """boulder_task_start with empty session_id and no env var records empty session_id."""
+    plan = tmp_path / "plan.md"
+    plan.write_text("- [ ] 1. Task\n")
+    call_tool(
+        mcp_server,
+        "boulder_write",
+        {
+            "active_plan": str(plan),
+            "plan_name": "tasks-no-sess",
+            "session_id": "s1",
+            "working_directory": working_dir,
+        },
+    )
+
+    env = {k: v for k, v in os.environ.items() if k != "CLAUDE_CODE_SESSION_ID"}
+    with mock.patch.dict(os.environ, env, clear=True):
+        result = json.loads(
+            call_tool(
+                mcp_server,
+                "boulder_task_start",
+                {
+                    "task_key": "task-no-sess",
+                    "task_label": "T-nosess",
+                    "task_title": "No sess task",
+                    "session_id": "",
+                    "working_directory": working_dir,
+                },
+            )
+        )
+    assert result["started"] is True
+
+    data = json.loads((tmp_git_root / ".omca" / "state" / BOULDER_FILE).read_text())
+    task = data["works"][data["active_work_id"]]["task_sessions"]["task-no-sess"]
+    assert task["session_id"] == ""

@@ -22,6 +22,7 @@ from tools._common import (
     _clear_mode_files,
     _load_evidence,
     _read_json,
+    _resolve_session_id,
     _state_dir,
     _write_json,
 )
@@ -584,6 +585,7 @@ def register(mcp: FastMCP) -> None:
         ),
     ) -> str:
         """Register an active work plan in boulder state. Use when starting plan execution to enable ralph persistence, progress tracking, and subagent context injection. Appends session_id to existing sessions so multi-session plans accumulate history. Returns confirmation with plan name and session count."""
+        session_id = _resolve_session_id(session_id)
         state = _state_dir(working_directory)
         existing = _read_boulder_state(state)
 
@@ -732,6 +734,7 @@ def register(mcp: FastMCP) -> None:
         ),
     ) -> str:
         """Upsert a running task session on a boulder work."""
+        session_id = _resolve_session_id(session_id)
         try:
             key = _safe_task_key(task_key)
         except ValueError as exc:
