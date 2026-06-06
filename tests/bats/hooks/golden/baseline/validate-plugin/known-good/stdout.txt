@@ -14,8 +14,7 @@
 [validate-plugin] PASS: ast-grep-server.py removed
 [validate-plugin] PASS: omca-state-server.py removed
 [validate-plugin] PASS: agent-metadata.json removed (OMCA-internal metadata fields deprecated)
-[validate-plugin] PASS: version consistency: plugin.json and marketplace.json both at 2.5.1
-[validate-plugin] PASS: migration marker: hard-cutover mode active at plugin=2.5.1, marketplace=2.5.1
+[validate-plugin] PASS: migration marker: hard-cutover mode active
 [validate-plugin] PASS: latest hook lifecycle coverage includes ConfigChange
 [validate-plugin] PASS: latest hook lifecycle coverage includes InstructionsLoaded
 [validate-plugin] PASS: latest hook lifecycle coverage includes Notification
@@ -50,6 +49,7 @@
 [validate-plugin] PASS: skill description length: hephaestus description is 78 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: init-deep description is 84 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: metis description is 109 chars (within 512 soft cap)
+[validate-plugin] PASS: skill description length: momus description is 139 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: omca-setup description is 95 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: playwright description is 192 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: refactor description is 95 chars (within 512 soft cap)

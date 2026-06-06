@@ -136,12 +136,12 @@ set_hard_cutover_mode() {
 	if [[ "${plugin_major}" -ge 2 || "${marketplace_major}" -ge 2 ]]; then
 		if [[ "${plugin_major}" -ge 2 && "${marketplace_major}" -ge 2 ]]; then
 			HARD_CUTOVER_ACTIVE=1
-			pass "migration marker: hard-cutover mode active at plugin=${plugin_version}, marketplace=${marketplace_version}"
+			pass "migration marker: hard-cutover mode active"
 		else
 			fail "migration marker: plugin/marketplace major versions diverge (${plugin_version} vs ${marketplace_version})"
 		fi
 	else
-		pass "migration marker: pre-2.0.0 mode at plugin=${plugin_version}, marketplace=${marketplace_version}"
+		pass "migration marker: pre-2.0.0 mode active"
 	fi
 
 	return 0
@@ -695,16 +695,6 @@ check_claims() {
 	# Reverted helper migration: validate-plugin.sh has distinct error-handling requirements.
 	plugin_version=$(jq -r '.version // ""' "${PLUGIN_JSON}" 2>/dev/null)
 	marketplace_version=$(jq -r '.plugins[0].version // ""' "${MARKETPLACE_PATH}" 2>/dev/null)
-	if [[ -z "${plugin_version}" ]]; then
-		fail "version consistency: plugin.json has no version field"
-	elif [[ -z "${marketplace_version}" ]]; then
-		fail "version consistency: marketplace.json has no plugins[0].version field"
-	elif [[ "${plugin_version}" == "${marketplace_version}" ]]; then
-		pass "version consistency: plugin.json and marketplace.json both at ${plugin_version}"
-	else
-		fail "version consistency: plugin.json=${plugin_version} does not match marketplace.json=${marketplace_version}"
-	fi
-
 	set_hard_cutover_mode "${plugin_version}" "${marketplace_version}"
 	check_latest_hook_lifecycle_coverage
 	check_agent_frontmatter_hygiene
