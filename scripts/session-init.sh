@@ -84,4 +84,20 @@ if [[ -n "${DATE_BLOCK}" ]]; then
 else
 	CONTEXT=$(printf 'Session %s initialized. State directory: %s' "${SESSION_ID}" "${STATE_DIR}" | jq -Rs .)
 fi
-echo "{\"hookSpecificOutput\": {\"hookEventName\": \"SessionStart\", \"additionalContext\": ${CONTEXT}}}"
+
+# Emit sessionTitle when boulder.json is present and has a plan_name.
+# Defensive: any read/parse error leaves SESSION_TITLE empty → key is omitted.
+BOULDER_FILE="${STATE_DIR}/boulder.json"
+SESSION_TITLE=""
+if [[ -f "${BOULDER_FILE}" ]]; then
+	SESSION_TITLE=$(jq -r '.plan_name // empty' "${BOULDER_FILE}" 2>/dev/null || true)
+fi
+
+if [[ -n "${SESSION_TITLE}" ]]; then
+	jq -n \
+		--argjson ctx "${CONTEXT}" \
+		--arg title "OMCA: ${SESSION_TITLE}" \
+		'{hookSpecificOutput: {hookEventName: "SessionStart", additionalContext: $ctx, sessionTitle: $title}}'
+else
+	echo "{\"hookSpecificOutput\": {\"hookEventName\": \"SessionStart\", \"additionalContext\": ${CONTEXT}}}"
+fi

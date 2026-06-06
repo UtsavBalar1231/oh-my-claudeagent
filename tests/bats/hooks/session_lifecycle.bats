@@ -52,6 +52,44 @@ STOPFAILURE_PAYLOAD='{"session_id":"test-session","hook_event_name":"StopFailure
 	grep -q "Treat Claude Code as the platform owner" "$style_file"
 }
 
+# ─── c3. session-init emits sessionTitle when boulder.json is active ──────────
+
+@test "session-init: output contains sessionTitle when boulder.json has plan_name" {
+	write_state "boulder.json" \
+		'{"active_plan":"/tmp/my-plan.md","plan_name":"my-awesome-plan","session_ids":["sess-001"],"agent":"sisyphus"}'
+
+	run_hook "session-init.sh" "$STARTUP_PAYLOAD"
+	assert_success
+
+	local title
+	title=$(echo "$output" | jq -r '.hookSpecificOutput.sessionTitle // empty')
+	assert [ "$title" = "OMCA: my-awesome-plan" ]
+}
+
+@test "session-init: sessionTitle key ABSENT when no boulder.json" {
+	# Ensure no boulder.json exists in state dir
+	rm -f "$CLAUDE_PROJECT_ROOT/.omca/state/boulder.json"
+
+	run_hook "session-init.sh" "$STARTUP_PAYLOAD"
+	assert_success
+
+	local has_title
+	has_title=$(echo "$output" | jq 'has("hookSpecificOutput") and (.hookSpecificOutput | has("sessionTitle"))')
+	assert [ "$has_title" = "false" ]
+}
+
+@test "session-init: existing additionalContext still present when boulder.json active" {
+	write_state "boulder.json" \
+		'{"active_plan":"/tmp/plan.md","plan_name":"test-plan","session_ids":["s1"],"agent":"sisyphus"}'
+
+	run_hook "session-init.sh" "$STARTUP_PAYLOAD"
+	assert_success
+
+	local context
+	context=$(get_context)
+	[[ "$context" == *"[CURRENT DATE]"* ]]
+}
+
 # ─── d. pre-compact saves compaction-context.md ───────────────────────────────
 
 @test "pre-compact: creates compaction-context.md with ralph state info" {
