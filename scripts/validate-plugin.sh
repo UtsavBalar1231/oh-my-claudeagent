@@ -174,6 +174,15 @@ check_latest_hook_lifecycle_coverage() {
 		"FileChanged"
 		"WorktreeCreate"
 	)
+	# New platform events not yet adopted by OMCA handlers.
+	# Tracked here for validator awareness; always skipped until handlers are registered.
+	local new_platform_events=(
+		"Elicitation"
+		"ElicitationResult"
+		"MessageDisplay"
+		"PostToolBatch"
+		"Setup"
+	)
 	local event_name
 
 	for event_name in "${latest_lifecycle_events[@]}"; do
@@ -191,6 +200,14 @@ check_latest_hook_lifecycle_coverage() {
 			fail "post-cutover hook lifecycle coverage missing ${event_name}"
 		else
 			skip "post-cutover hook lifecycle marker ${event_name} not required before 2.0.0"
+		fi
+	done
+
+	for event_name in "${new_platform_events[@]}"; do
+		if jq -e --arg event "${event_name}" '.hooks | has($event)' "${HOOKS_JSON}" >/dev/null 2>&1; then
+			pass "new platform event ${event_name} handler registered"
+		else
+			skip "new platform event ${event_name} not yet adopted by OMCA (v2.1.141-167)"
 		fi
 	done
 }
