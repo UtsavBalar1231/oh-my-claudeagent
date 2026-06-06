@@ -5,6 +5,106 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.0] - 2026-06-06
+
+Platform sync Claude Code v2.1.141→v2.1.167. Full-surface audit: 36 disposition rows across hooks,
+skills, agents, plugin.json, statusline, MCP, config, and output styles. Two dogfooding bugs fixed.
+See `REPORT-upgrades-2.1.167.md` for the complete audit record.
+
+### Added
+
+- **ralph Stop-block cap guard** (`scripts/ralph-persistence.sh`): new
+  `ralph-cap-state.json` state file tracks consecutive block counts on both the
+  ralph-active and boulder-fallback paths. At `CLAUDE_CODE_STOP_HOOK_BLOCK_CAP - 1`
+  (default 7) no-progress blocks, emits an allow-stop with a resume hint rather than
+  triggering a hard platform force-stop. Counters reset on genuine progress (task-hash
+  change or completed-count increase). (v2.1.143)
+- **`sessionTitle` output** (`scripts/session-init.sh`): when `boulder.json` contains a
+  `plan_name`, the SessionStart hook emits `sessionTitle: "OMCA: <plan_name>"` in the
+  existing `hookSpecificOutput` envelope, improving multi-session window/tab
+  discoverability. (v2.1.152)
+- **Statusline repo/PR segment** (`statusline/core.py`): new `_compose_repo_pr` helper
+  reads `workspace.repo.{host,owner,name}` and `pr.{number,url,review_state}` from the
+  statusline payload. Repo rendered as `owner/name` with OSC 8 hyperlink; PR number as
+  `#N` linked when `pr.url` present; `review_state` mapped to approved/changes-requested/
+  pending/draft glyphs. (v2.1.145)
+- **Statusline `COLUMNS` env fallback** (`statusline/core.py`,
+  `bin/omca-subagent-statusline`): new `terminal_columns()` helper resolves width from
+  payload `columns` → `COLUMNS` env → default 80, matching the platform env injection
+  added in v2.1.153.
+- **Statusline `remaining_percentage` pre-check** (`statusline/core.py`): when
+  `context_window.remaining_percentage` is present, `_render_context_bar` derives `pct`
+  from it rather than recomputing from used/total. Explicit caller-supplied `pct` still
+  wins. (v2.1.153)
+- **Skill `disallowed-tools` frontmatter** on two skills (v2.1.152):
+  - `skills/github-triage/SKILL.md`: `disallowed-tools: [Write, Edit]` enforces the
+    read-only-orchestrator contract.
+  - `skills/hephaestus/SKILL.md`: `disallowed-tools: [Agent]` enforces the
+    no-delegation rule in the fix-loop specialist.
+- **`displayName` in plugin.json**: `"Oh My ClaudeAgent"` added for the marketplace UI.
+  (v2.1.143)
+- **`CLAUDE_CODE_SESSION_ID` env default** (`servers/tools/_common.py`): new
+  `_resolve_session_id()` helper applies to `boulder_write` and `boulder_task_start`.
+  Explicit non-empty param wins; otherwise falls back to the env var injected by the
+  platform since v2.1.154. Callers that already pass a session_id are unaffected.
+- **New platform events in validator** (`scripts/validate-plugin.sh`): `new_platform_events`
+  third array added for the five new hook events introduced in v2.1.152+
+  (Elicitation, ElicitationResult, MessageDisplay, PostToolBatch, Setup). Entries in this
+  array receive skip semantics — absent from `hooks.json` is reported as skip, not fail.
+  Baseline preserved at 160 passed / 0 failed / 6 skipped.
+
+### Fixed
+
+- **Subagent wait-reflex / barrier-leak** (`scripts/subagent-start.sh`,
+  `skills/omca-setup/orchestration-block.md`): two-vector fix for worker subagents
+  faithfully echoing `## Parallel execution` barrier guidance as bare \"Waiting.\" finals
+  instead of their deliverables.
+  - Vector 1: new case arm in `subagent-start.sh` appends a counter-instruction to
+    context for `*executor*|*explore*|*librarian*|*hephaestus*|*multimodal*` agent types
+    (oracle/momus/sisyphus/prometheus/metis excluded — their wait/advisory behavior is
+    intentional).
+  - Vector 2: scoping callout added at `orchestration-block.md:52` directly below the
+    `## Parallel execution` heading, declaring the section main-session-sisyphus-only and
+    explicitly excluding all subagent identities.
+- **Keyword-detector task-notification false-activation** (`scripts/keyword-detector.sh`):
+  platform-relayed `<task-notification>` blocks reaching `UserPromptSubmit` as `.prompt`
+  could carry OMCA skill names (ralph, ultrawork, handoff) that triggered full mode
+  activation including ralph-state.json writes. New guard at lines 23-31 checks the first
+  500 chars of the prompt; exits 0 before keyword matching if `<task-notification>` tag is
+  detected.
+
+### Documentation
+
+- `docs/OMCA.md` +290 lines: 59 version annotations, 12 new subsections covering all
+  v2.1.141-v2.1.167 hook/skill/agent/plugin/statusline/MCP/env/output-style changes.
+  New \"Deliberate Non-Adoptions\" section (8-item table).
+- `README.md`: `worktree.baseRef "head"` resolution note for v2.1.154+.
+- `skills/omca-setup/SKILL.md`: `/reload-skills` command added to install/update flow
+  (v2.1.152); MCP pending-approval troubleshooting paragraph added to DOCTOR MODE Check 4
+  (v2.1.154); version pin updated v2.1.141 → v2.1.167.
+
+### Deliberate non-adoptions
+
+- **`hookSpecificOutput.additionalContext` on Stop/SubagentStop** (v2.1.163):
+  co-existence with `decision:block` is schema-inconclusive (not documented). Exit-2 path
+  used by `final-verification-evidence.sh` cannot carry `additionalContext` — platform
+  ignores JSON on exit 2. Both scripts keep their existing emission shapes.
+- **New hook event handlers** (Elicitation, ElicitationResult, MessageDisplay,
+  PostToolBatch, Setup — v2.1.152+): must-not-adopt. Validator-aware only (skip
+  semantics). See H6 in `REPORT-upgrades-2.1.167.md`.
+- **`skills:` preload on agents** (v2.1.154): increases per-turn context cost. OMCA
+  agents invoke skills via the Skill tool at the point of need.
+- **`Agent(type,...)` spawn-allowlist in `tools:`** (v2.1.147): main-thread sisyphus
+  requires full spawn capability.
+- **`defaultEnabled: false` in plugin.json** (v2.1.154): would break the install-and-use
+  workflow.
+- **`reloadSkills` SessionStart output** (v2.1.152): skills load correctly on session
+  start; no mid-session reload needed.
+- **`type: "prompt"` / `type: "agent"` / `type: "http"` hook handlers**: still
+  experimental; consistent with prior version exclusions (see v2.3.0, v2.4.0).
+- **`monitors/`, `themes/`, `channels/` plugin manifest fields; LSP features**: not
+  adopted. Rationale unchanged from prior versions.
+
 ## [2.5.2] - 2026-05-30
 
 ### Added
