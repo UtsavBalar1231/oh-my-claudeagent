@@ -9,6 +9,7 @@ when_to_use: |
 model: sonnet
 argument-hint: "[repo] [--issues-only | --prs-only]"
 effort: medium
+disallowed-tools: [Write, Edit]
 ---
 
 # GitHub Triage — Unified Issue & PR Processor

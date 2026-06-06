@@ -12,6 +12,7 @@ agent: oh-my-claudeagent:hephaestus
 user-invocable: true
 argument-hint: "[build command or error description]"
 effort: medium
+disallowed-tools: [Agent]
 ---
 
 Fix the following build issue: $ARGUMENTS
