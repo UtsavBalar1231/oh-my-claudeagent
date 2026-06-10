@@ -16,7 +16,7 @@ are noted where fields share identity semantics.
 **Writers**: `scripts/track-subagent-spawn.sh` (creates entry), `scripts/subagent-start.sh`
 (bridges spawn-ID to platform agent_id), `scripts/subagent-complete.sh` (moves entry to
 `completed`)
-**Readers**: `scripts/agent-usage-reminder.sh`, `scripts/subagent-complete.sh`
+**Readers**: `scripts/post-tool-batch.sh`, `scripts/subagent-complete.sh`
 (remaining-count check)
 **Lifecycle**:
 1. Initialized as `{"active":[],"completed":[]}` by `track-subagent-spawn.sh` if absent.
@@ -78,7 +78,7 @@ of running agents — they lag each other during the spawn race window.
 **Path**: `.omca/state/active-agents.json`
 **Writers**: `scripts/subagent-start.sh` (appends entry), `scripts/subagent-complete.sh`
 (removes entry via flock-protected write)
-**Readers**: `scripts/agent-usage-reminder.sh`, `scripts/track-subagent-spawn.sh`
+**Readers**: `scripts/post-tool-batch.sh`, `scripts/track-subagent-spawn.sh`
 (concurrency check), `scripts/subagent-complete.sh` (duration calculation)
 **Lifecycle**:
 1. `SubagentStart` fires `subagent-start.sh` — flock-protected append of new entry.
@@ -110,7 +110,7 @@ of running agents — they lag each other during the spawn race window.
 ```
 
 **Cross-references**: `[].id` matches `subagents.json active[].id`. The union of IDs from
-both files is the authoritative running-agent set — `agent-usage-reminder.sh` computes:
+both files is the authoritative running-agent set — `post-tool-batch.sh` computes:
 ```
 ([$aa[].id] + [$sa[].id]) | unique | length
 ```
@@ -370,24 +370,24 @@ Escalate to oracle."
 
 **Path**: `.omca/state/agent-usage.json`
 **Writers**: `scripts/session-init.sh` (initializes/resets), `scripts/track-subagent-spawn.sh`
-(sets `agentUsed = true`), `scripts/agent-usage-reminder.sh` (increments `toolCallCount`)
-**Readers**: `scripts/agent-usage-reminder.sh`
+(sets `agentUsed = true`), `scripts/post-tool-batch.sh` (increments `toolCallCount`)
+**Readers**: `scripts/post-tool-batch.sh`
 **Lifecycle**:
 1. Reset to `{"agentUsed": false, "toolCallCount": 0}` on every `SessionStart` by
    `session-init.sh`.
 2. `track-subagent-spawn.sh` sets `agentUsed = true` whenever an Agent tool call fires.
-3. `agent-usage-reminder.sh` increments `toolCallCount` on each direct tool call (when
-   no agents are active). Emits a delegation reminder every 3rd call if `agentUsed` is
-   still `false`.
-4. Once `agentUsed = true`, `agent-usage-reminder.sh` exits 0 immediately without
-   incrementing.
+3. `post-tool-batch.sh` increments `toolCallCount` once per qualifying batch (a batch
+   containing ≥1 Grep / Glob / WebFetch / WebSearch call, from a non-subagent session).
+   Emits a delegation reminder every 3rd increment if `agentUsed` is still `false`.
+4. Once `agentUsed = true`, `post-tool-batch.sh` exits the reminder path immediately
+   without incrementing.
 
 **Fields**:
 
 | Field | Type | Description |
 |---|---|---|
 | `agentUsed` | boolean | True once any Agent tool call has fired this session |
-| `toolCallCount` | integer | Number of direct (non-delegated) tool calls since session start |
+| `toolCallCount` | integer | Number of qualifying batches (containing ≥1 Grep/Glob/WebFetch/WebSearch call) counted since session start |
 
 **Example**:
 ```json

@@ -66,6 +66,15 @@ including auto mode. `permissionMode` in agent frontmatter is stripped by Claude
 plugin agents. To retain `permissionMode`, copy agent files to `~/.claude/agents/`
 (user-scope agents retain it).
 
+**`initialPrompt` in agent frontmatter (v2.1.141–v2.1.167, not adopted):**
+
+Agent files can declare an `initialPrompt:` field that fires an unconditional model turn
+at session start, before any user message. OMCA does not adopt this because
+`scripts/subagent-start.sh` already injects boulder plan context and mode banners as
+`additionalContext` on `SubagentStart` — the same information at zero model-turn cost.
+Adding an `initialPrompt` would consume a billable turn per subagent instantiation with
+no new information benefit.
+
 **Plugin-agent frontmatter restrictions (v2.1.154+):** Claude Code silently ignores
 `hooks`, `mcpServers`, and `permissionMode` in agent frontmatter for plugin-shipped
 agents (i.e., agents in the plugin's `agents/` directory). No OMCA agent currently
@@ -138,6 +147,34 @@ For `context: fork` skills bound to a named agent via `agent:` frontmatter (e.g.
 momus), skill-level `disallowed-tools` is redundant — the agent definition already
 enforces `disallowedTools` at the agent-config layer. The skill layer only matters for
 skills running in the main session without an `agent:` binding.
+
+**`arguments:` frontmatter (v2.1.141–v2.1.167, not adopted):**
+
+Skills can declare an `arguments:` block in their frontmatter to name positional parameters
+that the platform binds when the skill is invoked as a slash command with trailing text
+(e.g., `/oh-my-claudeagent:ralph fix the auth bug` → `$task="fix"`). OMCA does not adopt
+`arguments:` because shell-style positional binding truncates free-form input: only the
+first token is bound, making it unsuitable for narrative task descriptions. OMCA skill
+bodies receive the full user prompt via the platform's natural expansion path instead.
+
+**`hooks:` frontmatter (v2.1.141–v2.1.167, not adopted):**
+
+SKILL.md files can declare a `hooks:` block to register hook handlers that are active
+only while the skill is running. OMCA does not adopt this because OMCA's persistence
+loops (ralph, ultrawork) outlive the skill-active window — ralph's Stop-block behavior
+must persist across many turns after the skill completes, which skill-frontmatter hooks
+cannot support. Additionally, hooks declared in skill frontmatter are invisible to
+`scripts/validate-plugin.sh`, which validates hooks only from `hooks/hooks.json`. All
+OMCA hook registration stays in `hooks/hooks.json`.
+
+**`skillOverrides`, `skillListingBudgetFraction`, `maxSkillDescriptionChars` settings (v2.1.141–v2.1.167, not adopted):**
+
+These are user-preference settings in `settings.json`:
+- `skillOverrides` — per-skill invocation-mode overrides (e.g., `"user-invocable-only"`). Does **not** apply to plugin-shipped skills; only affects user-scope and project-scope skills.
+- `skillListingBudgetFraction` — fraction of context budget allocated to skill listing.
+- `maxSkillDescriptionChars` — cap on characters shown per skill description in listings.
+
+OMCA does not adopt any of them. The plugin controls its own skill descriptions and invocation contracts; user-side `skillOverrides` has no effect on plugin skills and cannot be used to restrict or redirect them.
 
 **`\$` escape syntax (v2.1.163):**
 
@@ -285,6 +322,22 @@ and emits a voluntary allow-stop (exit 0, no `decision:block`) at `cap-1` consec
 no-progress blocks, with reason `"Yielding to platform. To resume: invoke /oh-my-claudeagent:ralph again."`.
 Cap state is tracked in `.omca/state/ralph-cap-state.json`. (Adopted in the v2.1.141–v2.1.167 sync.)
 
+**`SessionStart` `watchPaths` output (v2.1.141–v2.1.167, not adopted):**
+
+`SessionStart` hooks can return a `watchPaths` array to register file-system paths for
+`FileChanged` event delivery. OMCA does not adopt this because the `FileChanged` handler
+(`scripts/cwdchanged.sh`, aliased) is side-effects-only — it logs the event and notifies;
+there is no runtime reader that would benefit from expanded watch coverage. Extending the
+watch set would generate noise without actionable signal.
+
+**`PostToolUse` `updatedToolOutput` field (v2.1.141–v2.1.167, not adopted):**
+
+`PostToolUse` hooks can return `updatedToolOutput` to rewrite the tool result visible to
+the model. OMCA deliberately does not adopt this. Rewriting tool output post-hoc is
+adversarial to evidence integrity — OMCA's verification model depends on the model seeing
+the literal command output, not a hook-filtered version. All context augmentation is done
+via `additionalContext`, which appends without overwriting.
+
 **Hooks run without terminal access (v2.1.141+):**
 
 Hook scripts no longer have access to `/dev/tty` or terminal control sequences.
@@ -326,6 +379,10 @@ OMCA ships:
 Both scripts are invokable from any Bash tool call as bare commands: `omca-status` and `omca-doctor`. They read the project's `.omca/state/` and `~/.claude/settings.json` only, and never mutate state.
 
 Plugin-root `settings.json` ships a `subagentStatusLine` default backed by `bin/omca-subagent-statusline`. Users can override per-project by setting their own `subagentStatusLine` in `~/.claude/settings.json` or a project-level settings file. Omitting all overrides falls back to the platform's default `name · description · token count` row.
+
+**`statusLine.refreshInterval` (v2.7.0, ADOPTED):**
+
+`omca-setup` Phase 5.6 sets `statusLine.refreshInterval: 5` (seconds) in `~/.claude/settings.json` alongside `hideVimModeIndicator`. This is the recommended value for OMCA: the statusline reads disk-cached git metadata (branch, PR state) that updates on roughly a 5 s cadence, so a matching refresh interval keeps the display current without polling faster than the cache. In background-agent idle scenarios — where the model is waiting on a subagent and no tool calls are firing — the platform only refreshes the statusline at this interval, so a value below 5 yields no additional freshness from the disk-cached sources. Doc-claim ceiling: the freshness improvement is specific to disk-sourced fields (`workspace.repo.*`, `pr.*`); fields sourced directly from the active tool call context update on each render regardless of this setting.
 
 **Statusline platform additions (v2.1.141–v2.1.167):**
 
@@ -735,6 +792,29 @@ environment at launch. The `omca` server's `_resolve_session_id()` helper in
 fallback when no explicit `session_id` parameter is passed. Adopted in `boulder_write`
 and `boulder_task_start` (v2.1.141–v2.1.167 sync).
 
+**`dependencies` in `plugin.json` (v2.1.141–v2.1.167, not adopted):**
+
+Plugins can declare a `dependencies` array in `plugin.json` to express inter-plugin
+dependencies. Declaring a dependency causes Claude Code to block disabling a dependency
+plugin while this plugin is active. OMCA has no runtime dependencies on other plugins
+and does not adopt this field. No OMCA consumers exist for this schema path.
+
+Note on marketplace tag convention: the platform marketplace uses `{plugin-name}--v{version}`
+(double-dash) tag format for versioned releases (e.g., `oh-my-claudeagent--v2.6.0`),
+while OMCA's own version tags follow `vX.Y.Z` (single prefix, no plugin-name prefix).
+The `claude plugin install oh-my-claudeagent@omca` install path resolves via the
+`omca` marketplace shortname, not a version tag, so the tag-format difference has no
+practical impact on installs or upgrades.
+
+**MCP `headersHelper` and WebSocket (`ws`) transport (v2.1.141–v2.1.167, not adopted):**
+
+Two MCP transport additions were introduced in this window:
+- `headersHelper` — a helper for injecting dynamic auth headers into HTTP-based MCP servers.
+- WebSocket (`ws`) transport — an alternative connection mode alongside stdio and SSE.
+
+OMCA's three bundled servers all use stdio transport (`type: "stdio"` in `.mcp.json`) and
+require no auth headers. Neither feature has any OMCA consumers; no adoption is needed.
+
 **Per-server `timeout` < 1000 ms is now ignored (v2.1.162):**
 
 Previously, a per-server timeout below 1000 ms was floored to 1000 ms. As of v2.1.162
@@ -882,7 +962,10 @@ already renders `vim.mode` on line 1, so the row is duplicate noise. Set
 `statusLine.hideVimModeIndicator: true` to suppress the platform row
 (documented in `https://code.claude.com/docs/en/statusline`); `omca-setup` Phase 5.6
 sets this automatically on first run and back-fills it on re-run for users with
-an existing `statusLine` config.
+an existing `statusLine` config. Phase 5.6 also sets `statusLine.refreshInterval: 5`
+alongside `hideVimModeIndicator` — see the `statusLine.refreshInterval` entry in the
+`bin/` section above for the cache-TTL rationale. (Earlier versions of this document
+did not mention `refreshInterval`; it was added in the 2026-06 feature sweep.)
 
 **Permission-mode banner — no opt-out:** the `›› bypass permissions on (shift+tab
 to cycle)` indicator on the same native mode-indicator row has no documented
@@ -1069,6 +1152,28 @@ Features introduced in this window that OMCA consciously declines to adopt:
 | `reloadSkills` in SessionStart output | v2.1.152 | No OMCA use case identified |
 | `prompt`, `agent`, and `http` hook types | (standing) | Orthogonal to OMCA's bash-script hook model |
 | Monitors, Themes, Channels, LSP | (standing) | No current OMCA use case |
+| `arguments:` in skill frontmatter | evaluated 2026-06 | Shell-style positional binding truncates free-form input — a slash command like `/ralph fix the auth bug` would bind only `$task="fix"`, discarding the rest. OMCA skills receive the full user prompt via natural expansion instead |
+| `hooks:` in skill frontmatter | evaluated 2026-06 | Persistence loops (ralph, ultrawork) outlive skill-active windows; skill-frontmatter hooks are not visible to `validate-plugin.sh`. All hook registration stays in `hooks/hooks.json` |
+| `skillOverrides` / `skillListingBudgetFraction` / `maxSkillDescriptionChars` settings | evaluated 2026-06 | User-preference settings only; `skillOverrides` does not apply to plugin-shipped skills. No plugin-side adoption possible or needed |
+| `initialPrompt` in agent frontmatter | evaluated 2026-06 | Fires an unconditional billable model turn per subagent; `subagent-start.sh` already injects boulder context as `additionalContext` at zero turn cost |
+| `SessionStart` `watchPaths` output | evaluated 2026-06 | `FileChanged` consumer is side-effects-only (log + notify); no runtime reader benefits from an expanded watch set |
+| `PostToolUse` `updatedToolOutput` | evaluated 2026-06 | Rewriting tool output post-hoc is adversarial to evidence integrity — OMCA's verification model requires the model to see literal command output |
+| `plugin.json` `dependencies` field | evaluated 2026-06 | OMCA has no runtime inter-plugin dependencies; field has no consumers in this plugin |
+| MCP `headersHelper` and WebSocket (`ws`) transport | evaluated 2026-06 | All OMCA MCP servers use stdio; no auth-header injection or WebSocket transport needed |
+
+**Platform-prohibited (skipped, not evaluated):**
+
+| Feature | Reason |
+|---------|--------|
+| `sessionTitle` output on `UserPromptSubmit` | Platform contract: `sessionTitle` is a `SessionStart`-only output field. Emitting it from `UserPromptSubmit` (or any other hook) is unsupported by spec; the platform ignores it outside startup/resume |
+
+**Adopted in 2026-06 sweep:**
+
+| Feature | Adopted in | Notes |
+|---------|-----------|-------|
+| `duration_ms` coaching in `bash-error-recovery.sh` | v2.7.0 | Added two branches: text-regex timeout detection (placed first in deterministic chain) and `duration_ms` ≥ 120 s fallback for slow-failure coaching (run_in_background / larger-timeout / narrower-scope). Payload probe confirmed `duration_ms` present in PostToolUseFailure Bash payloads |
+| `delegate-retry.sh` `duration_ms` branch | deferred | Agent-failure PostToolUseFailure payload structure not confirmed by probe contract — `duration_ms` coverage for Agent failures is pending a dedicated probe session |
+| `statusLine.refreshInterval: 5` | v2.7.0 | Applied via `omca-setup` Phase 5.6; both create and merge jq variants updated. Rationale: disk-sourced statusline reads git cache files that update on a ~5 s cadence; background-agent idle scenarios benefit from a matching refresh ceiling. Doc-claim ceiling: freshness improvement covers disk-sourced and idle-fan-out scenarios only |
 
 ---
 
