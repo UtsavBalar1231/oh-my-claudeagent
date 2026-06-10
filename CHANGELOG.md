@@ -5,6 +5,77 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.0] - 2026-06-10
+
+PostToolBatch adoption + deferred-fix sweep (Claude Code v2.1.170). Batch-level orchestration
+signals, golden-baseline portability, statusline/servers test repairs, stale-path fix, Pyright
+cleanup, and Bug A vector-2 live e2e closure. Model defaults updated for orchestrator-tier agents.
+See `REPORT-upgrades-2.1.167.md` for the complete audit record.
+
+### Added
+
+- **PostToolBatch handler v1** (`scripts/post-tool-batch.sh`): matcher-less registration
+  (the event supports no matchers). Non-blocking — both signals emit `additionalContext`
+  only. Payload schema empirically captured: `tool_calls[]` array with `tool_name`,
+  `tool_input`, `tool_use_id`, `tool_response` per entry (not in platform docs).
+  Two signals:
+  - **Same-file parallel-edit warning** (all sessions): ≥2 Write / Edit / NotebookEdit
+    entries targeting the same `file_path` in one batch → warning with the conflicting path.
+  - **Batch-consolidated delegation reminder** (main session only — skips subagent batches):
+    `toolCallCount` incremented once per batch containing ≥1 Grep / Glob / WebFetch /
+    WebSearch entry; existing reminder emitted at every 3rd increment when `agentUsed` is
+    `false`. Batches with no qualifying tools are skipped entirely.
+- **Golden TMPDIR-portable normalization** (`tests/bats/hooks/golden/normalize.sh`): both
+  tmpdir rule families generalized — `bats-run` rules and `mktemp` rule now anchor on a
+  leading `/` so `key=` prefixes are not swallowed. All 5 previously-failing env variants
+  now pass; checked-in baselines contain zero absolute paths.
+
+### Changed
+
+- **Delegation-reminder counting migrated per-call → per-batch**: `scripts/agent-usage-reminder.sh`
+  removed; the PostToolUse Grep|Glob|WebFetch|WebSearch registration removed from `hooks.json`.
+  `agent-usage.json` schema unchanged (`agentUsed` boolean + `toolCallCount` integer).
+  `agentUsed=true` suppression preserved.
+- **Default model for orchestrator-tier agents updated to `claude-fable-5[1m]`** (was
+  `claude-opus-4-5`): affects `agents/metis`, `agents/momus`, `agents/oracle`,
+  `agents/prometheus`, `agents/sisyphus`; `skills/frontend-ui-ux` category and
+  `servers/categories.json` `deep` tier; `servers/tools/catalog.py` model constant;
+  `skills/omca-setup/orchestration-block.md` agent-catalog table.
+
+### Fixed
+
+- **statusline `TestNewFieldsLine2` nested-schema repair** (`statusline/tests/test_core.py`):
+  three tests corrected to read from the nested locations `_compose_line2` actually uses —
+  token counts from `context_window.total_input_tokens` / `total_output_tokens` and API
+  duration from `cost.total_api_duration_ms`. Duplicate coverage removed with justification.
+- **servers startup-latency test de-hardcoded** (`servers/tests/test_startup_latency.py`):
+  hardcoded `~/.claude/plugins/cache/omca/oh-my-claudeagent/2.0.0` plugin root replaced
+  with a dynamic repo-relative path; machine-specific `/home/utsav` path eliminated.
+- **Stale evidence-path string** (`scripts/final-verification-evidence.sh` ~:315):
+  `.omca/state/evidence.jsonl` → `.omca/evidence/verification-evidence.json` in the
+  user-facing message.
+- **Pyright type noise in repo/PR segment tests** (`statusline/tests/test_repo_pr_segment.py`):
+  dict literals wrapped with `cast(StatuslinePayload, {...})` following the project test
+  convention; zero runtime behavior change; Pyright diagnostics for this file reduced to 0.
+
+### Verified
+
+- **Bug A vector-2 live e2e closed**: worker subagents now deliver inline final messages
+  rather than bare wait messages when the prompt contains relayed barrier-bait text. Tested
+  in a live session with the scoped barrier callout present in `~/.claude/CLAUDE.md`.
+  Deferred item in `REPORT-upgrades-2.1.167.md` marked CLOSED 2026-06-10.
+
+### Deliberate non-adoptions
+
+- **Remaining new hook event handlers** (MessageDisplay, Elicitation, ElicitationResult,
+  Setup — v2.1.152+): no OMCA use case. Tracked in `validate-plugin.sh`
+  `new_platform_events` array (skip semantics). See H6 in `REPORT-upgrades-2.1.167.md`.
+- **PostToolBatch blocking semantics (v2)**: `decision:block` in PostToolBatch responses
+  is not documented to co-exist with batch continuation and behavior is unvalidated in
+  production. Deferred to a future release.
+
+---
+
 ## [2.6.0] - 2026-06-06
 
 Platform sync Claude Code v2.1.141→v2.1.167. Full-surface audit: 36 disposition rows across hooks,
