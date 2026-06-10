@@ -1,0 +1,1 @@
+{"hook_event_name":"PostToolUseFailure","tool_name":"Bash","error":"some completely unknown error","duration_ms":300000,"session_id":"fixture-sid-001"}

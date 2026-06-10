@@ -106,6 +106,14 @@ _run_fixture() {
 	_run_fixture "bash-error-recovery" "test-failure"
 }
 
+@test "golden: bash-error-recovery/timeout-error" {
+	_run_fixture "bash-error-recovery" "timeout-error"
+}
+
+@test "golden: bash-error-recovery/slow-failure" {
+	_run_fixture "bash-error-recovery" "slow-failure"
+}
+
 @test "golden: comment-checker/ai-attribution" {
 	_run_fixture "comment-checker" "ai-attribution"
 }

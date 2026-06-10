@@ -94,6 +94,44 @@ load '../test_helper'
 	assert_output ""
 }
 
+@test "bash-error-recovery: timed out error text produces timeout coaching" {
+	local payload
+	payload='{"tool_name":"Bash","tool_input":{"command":"run-long.sh"},"error":"Command timed out after 60000ms","duration_ms":60000}'
+	run_hook "bash-error-recovery.sh" "$payload"
+	assert_success
+	local ctx
+	ctx=$(get_context)
+	[ -n "$ctx" ]
+	echo "$ctx" | grep -qi "timeout\|timed out\|run_in_background"
+}
+
+@test "bash-error-recovery: duration_ms>=120000 unclassified error produces slow-failure coaching" {
+	local payload
+	payload='{"tool_name":"Bash","tool_input":{"command":"some-script.sh"},"error":"some completely unknown error","duration_ms":300000}'
+	run_hook "bash-error-recovery.sh" "$payload"
+	assert_success
+	local ctx
+	ctx=$(get_context)
+	[ -n "$ctx" ]
+	echo "$ctx" | grep -qi "run_in_background\|2 minutes\|timeout"
+}
+
+@test "bash-error-recovery: duration_ms<120000 unclassified error still defers (no coaching)" {
+	local payload
+	payload='{"tool_name":"Bash","tool_input":{"command":"some-script.sh"},"error":"some completely unknown error","duration_ms":5000}'
+	run_hook "bash-error-recovery.sh" "$payload"
+	assert_success
+	assert_output ""
+}
+
+@test "bash-error-recovery: unclassified error without duration_ms still defers (byte-identical)" {
+	local payload
+	payload='{"tool_name":"Bash","tool_input":{"command":"some-script.sh"},"error":"some completely unknown error"}'
+	run_hook "bash-error-recovery.sh" "$payload"
+	assert_success
+	assert_output ""
+}
+
 # ─── h. read-error-recovery.sh ───────────────────────────────────────────────
 
 @test "read-error-recovery: file not found produces recovery advice" {

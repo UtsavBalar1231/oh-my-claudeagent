@@ -1,0 +1,1 @@
+{"hookSpecificOutput": {"hookEventName": "PostToolUseFailure", "additionalContext": "[BASH ERROR RECOVERY] Command ran for over 2 minutes before failing. Consider run_in_background=true, a larger timeout param, or narrowing scope (e.g. run a single test file).\n"}}
