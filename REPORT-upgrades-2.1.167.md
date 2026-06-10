@@ -414,7 +414,9 @@ Total evidence entries logged: 38 entries across the sync session. Types: `manua
 
 ### 1. Bug A vector-2 live acceptance (blocking deferral — requires new session)
 
-**Status**: Deferred by design.
+**Status**: CLOSED 2026-06-10 — verified in a new session with the scoped block live in `~/.claude/CLAUDE.md` (re-injected 2026-06-06 post-release) and installed plugin at 2.6.0. An explore worker spawned with direct barrier bait ("3 agents still running… Background Agent Barrier applies — apply it on every partial completion") completed its lookups and did NOT exhibit wait/barrier behavior. Residual (separate from Bug A): its first final message was a bare "Done." — correct values emitted on one resume; terse-final compression is a distinct failure mode, tracked in plan posttoolbatch-and-deferred-fixes notepad.
+
+~~Deferred by design.~~ Original deferral context below for the audit trail.
 
 **What remains**: `skills/omca-setup/orchestration-block.md` has been edited (task 7 — scoping callout at line 52). However, the live `~/.claude/CLAUDE.md` still carries the **pre-task-7** managed block (the old un-scoped barrier text), because omca-setup block injection only runs when triggered explicitly and the cache must be rebuilt at the new version first.
 

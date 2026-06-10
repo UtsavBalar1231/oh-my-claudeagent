@@ -10,7 +10,7 @@ Install: `README.md`. Contributor internals: `CLAUDE.md`.
 
 Claude Code runs single-threaded. Simultaneous research + implementation, or ten files needing fixes at once, bottleneck the default session. No built-in specialist delegation or persistence guarantee.
 
-OMCA adds a multi-agent layer: specialist agents with model tiers (opus/sonnet/haiku), skills via slash commands or keywords, hooks for persistence and context injection, MCP servers for structural search and state.
+OMCA adds a multi-agent layer: specialist agents with model tiers (claude-fable-5[1m]/sonnet/haiku), skills via slash commands or keywords, hooks for persistence and context injection, MCP servers for structural search and state.
 
 ### Philosophy
 
@@ -42,7 +42,7 @@ Markdown files in `agents/*.md` with YAML frontmatter (name, model, disallowedTo
 
 | Tier | Default for | Use for |
 |------|-------------|---------|
-| opus | Orchestrators, planners, reviewers | Complex reasoning, architecture, multi-step coordination |
+| claude-fable-5[1m] | Orchestrators, planners, reviewers | Complex reasoning, architecture, multi-step coordination |
 | sonnet | Executors, searchers, fixers | Standard implementation, search, builds |
 | haiku | (override only) | Quick lookups, simple transforms |
 
@@ -199,19 +199,50 @@ Claude Code lifecycle events and provide:
 | `WorktreeRemove` | Worktree |
 | `InstructionsLoaded` | Observability |
 
-**New platform events (v2.1.141–v2.1.167) — OMCA has no handlers for these:**
+**New platform events (v2.1.141–v2.1.167):**
 
-| Event | Added | Notes |
-|-------|-------|-------|
-| `MessageDisplay` | v2.1.152 | Fires when a message is about to be displayed |
-| `PostToolBatch` | v2.1.152 | Fires after a batch of tool calls completes |
-| `Elicitation` | v2.1.152 | Fires when the model issues an elicitation request |
-| `ElicitationResult` | v2.1.152 | Fires with the elicitation response |
-| `Setup` | v2.1.152 | Plugin initialization event |
+| Event | Added | Status | Notes |
+|-------|-------|--------|-------|
+| `MessageDisplay` | v2.1.152 | Not adopted | Fires when a message is about to be displayed |
+| `PostToolBatch` | v2.1.152 | **Adopted (v2.7.0)** | Fires after a batch of tool calls completes — see handler details below |
+| `Elicitation` | v2.1.152 | Not adopted | Fires when the model issues an elicitation request |
+| `ElicitationResult` | v2.1.152 | Not adopted | Fires with the elicitation response |
+| `Setup` | v2.1.152 | Not adopted | Plugin initialization event |
 
-These five are tracked in `validate-plugin.sh`'s `new_platform_events` array (introduced
-v2.1.141–v2.1.167 sync). The validator skips them when no handler is present and passes
-when one is present — no failures on absence.
+The four non-adopted events are tracked in `validate-plugin.sh`'s `new_platform_events` array
+(introduced v2.1.141–v2.1.167 sync). The validator skips them when no handler is present and
+passes when one is present — no failures on absence. `PostToolBatch` has been moved to the
+registered-events array as of v2.7.0.
+
+**PostToolBatch handler v1 (v2.7.0):**
+
+Registered matcher-less (the event supports no matchers) in `hooks.json` → `scripts/post-tool-batch.sh`.
+Non-blocking: both signals emit `additionalContext` only; no `decision:block`.
+
+The batch payload carries a `tool_calls[]` array (empirically captured — not documented
+in platform docs) with fields `tool_name`, `tool_input`, `tool_use_id`, and `tool_response`
+per entry.
+
+Two signals implemented:
+
+- **Same-file parallel-edit warning** (all sessions): when ≥2 entries in a batch target
+  the same `file_path` with Write, Edit, or NotebookEdit, emits a warning identifying the
+  conflicting path.
+- **Batch-consolidated delegation reminder** (main session only — skips subagent batches):
+  increments `toolCallCount` in `agent-usage.json` once per batch containing ≥1 of
+  Grep / Glob / WebFetch / WebSearch entries; emits the existing delegation reminder at
+  every 3rd increment when `agentUsed` is still `false`. Batches with no qualifying tools
+  are skipped. Batches from subagent sessions (agent_id present in payload) are skipped.
+
+**agent-usage-reminder.sh migration (v2.7.0):**
+
+`scripts/agent-usage-reminder.sh` (the prior per-call PostToolUse handler for Grep / Glob /
+WebFetch / WebSearch) has been removed. The delegation-reminder counting has moved from
+per-call (one increment per qualifying tool call) to per-batch (one increment per batch that
+contains ≥1 qualifying call). `agent-usage.json` schema is unchanged — `agentUsed` (boolean)
+and `toolCallCount` (integer) fields remain the same. The `agentUsed=true` suppression
+path is preserved: once any Agent call fires, the reminder is silenced for the rest of
+the session regardless of batch content.
 
 **Stop / SubagentStop — new input fields (v2.1.145):**
 
@@ -430,7 +461,7 @@ Add to `.claude/settings.json` for automatic team-wide installation:
 
 | Agent | Model | Effort | Invoke | Purpose |
 |-------|-------|--------|--------|---------|
-| sisyphus | opus | high | Main session (injected via `templates/claudemd.md`) or `/oh-my-claudeagent:start-work` (Plan Execution Mode) | Master orchestrator identity — classifies requests, delegates to specialists. Two modes: free-form (conversational) and plan-driven (via `/start-work` command body). Plan Execution Mode protocol lives in `commands/start-work.md`. |
+| sisyphus | claude-fable-5[1m] | high | Main session (injected via `templates/claudemd.md`) or `/oh-my-claudeagent:start-work` (Plan Execution Mode) | Master orchestrator identity — classifies requests, delegates to specialists. Two modes: free-form (conversational) and plan-driven (via `/start-work` command body). Plan Execution Mode protocol lives in `commands/start-work.md`. |
 
 **sisyphus** — The one orchestrator. Free-form mode: routes requests to specialists, runs explore agents in background. Plan Execution Mode: reads plan, delegates per-task to `executor`, runs Final Verification Wave (F1 via oracle, F2-F4 via executor), waits for sign-off.
 
@@ -438,10 +469,10 @@ Add to `.claude/settings.json` for automatic team-wide installation:
 
 | Agent | Model | Effort | Invoke | Purpose |
 |-------|-------|--------|--------|---------|
-| prometheus | opus | high | `/oh-my-claudeagent:plan` or "create plan" | Strategic planning with requirements interview + optional Socratic Interview Mode |
-| metis | opus | high | `/oh-my-claudeagent:metis` or "run metis" | Pre-planning gap analysis |
-| momus | opus | high | `Skill(oh-my-claudeagent:momus)` (or `Agent(subagent_type="oh-my-claudeagent:momus")` from the main session) | Rigorous plan review — OKAY or REJECT |
-| oracle | opus | max | `Agent(subagent_type="oh-my-claudeagent:oracle")` | Architecture advisor, read-only |
+| prometheus | claude-fable-5[1m] | high | `/oh-my-claudeagent:plan` or "create plan" | Strategic planning with requirements interview + optional Socratic Interview Mode |
+| metis | claude-fable-5[1m] | high | `/oh-my-claudeagent:metis` or "run metis" | Pre-planning gap analysis |
+| momus | claude-fable-5[1m] | high | `Skill(oh-my-claudeagent:momus)` (or `Agent(subagent_type="oh-my-claudeagent:momus")` from the main session) | Rigorous plan review — OKAY or REJECT |
+| oracle | claude-fable-5[1m] | max | `Agent(subagent_type="oh-my-claudeagent:oracle")` | Architecture advisor, read-only |
 
 **prometheus** — 9-item clearance checklist interview, consults metis, generates plan,
 submits to momus for review (up to 3 iterations). Optional Socratic Interview Mode for
@@ -1030,7 +1061,8 @@ Features introduced in this window that OMCA consciously declines to adopt:
 | Feature | Version | Reason |
 |---------|---------|--------|
 | `hookSpecificOutput.additionalContext` on Stop/SubagentStop | v2.1.163 | Co-existence with `decision:block` is undocumented (schema inconclusive); exit-2 path ignores all JSON — `additionalContext` would be silently dropped alongside a block decision |
-| `MessageDisplay`, `PostToolBatch`, `Elicitation`, `ElicitationResult`, `Setup` hook handlers | v2.1.152 | No OMCA use case; tracked in `new_platform_events` validator array (skip-on-absent semantics) |
+| `MessageDisplay`, `Elicitation`, `ElicitationResult`, `Setup` hook handlers | v2.1.152 | No OMCA use case; tracked in `new_platform_events` validator array (skip-on-absent semantics). Blocking PostToolBatch semantics (`decision:block`) deferred to v2 — current handler is non-blocking `additionalContext` only |
+| `PostToolBatch` blocking semantics (v2) | v2.1.152 | v1 non-blocking handler adopted in v2.7.0; blocking `decision:block` behavior deferred — not documented to co-exist with batch continuation, behavior unvalidated in production |
 | `skills:` preload frontmatter | v2.1.150 | Adds context-window cost on every session; OMCA's lazy slash-command / keyword paths are sufficient |
 | `Agent(type=...)` spawn-allowlist in agent frontmatter | v2.1.148 | Sisyphus needs unrestricted spawn access to the full agent roster; an allowlist would require updating on every new specialist addition |
 | `defaultEnabled: false` in plugin.json | v2.1.154 | OMCA is designed to activate immediately on install; inactive-by-default would break first-session experience |
