@@ -1,0 +1,1 @@
+{"hookSpecificOutput": {"hookEventName": "PostToolBatch", "additionalContext": "[CONCURRENT EDIT WARNING] Multiple write operations target the same file in this batch — last write wins and earlier changes may be lost:\n  /project/src/foo.ts\nSequence writes to the same file across separate turns.\n"}}

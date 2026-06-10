@@ -1,0 +1,1 @@
+{"hook_event_name":"PostToolBatch","session_id":"fixture-sid-001","tool_calls":[{"tool_name":"Grep","tool_input":{"pattern":"function","path":"/project/src"},"tool_use_id":"toolu_01ABC","tool_response":""}]}

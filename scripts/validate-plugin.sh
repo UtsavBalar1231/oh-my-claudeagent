@@ -207,7 +207,7 @@ check_latest_hook_lifecycle_coverage() {
 		if jq -e --arg event "${event_name}" '.hooks | has($event)' "${HOOKS_JSON}" >/dev/null 2>&1; then
 			pass "new platform event ${event_name} handler registered"
 		else
-			skip "new platform event ${event_name} not yet adopted by OMCA (v2.1.141-167)"
+			skip "new platform event ${event_name} not yet adopted by OMCA"
 		fi
 	done
 }

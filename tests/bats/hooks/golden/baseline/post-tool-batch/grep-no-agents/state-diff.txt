@@ -1,0 +1,10 @@
+diff -ru /state-before/agent-usage.json /state-after/agent-usage.json
+--- /state-before/agent-usage.json	<TS>
++++ /state-after/agent-usage.json	<TS>
+@@ -1 +1,4 @@
+-{"agentUsed": false, "toolCallCount": 2}
+\ No newline at end of file
++{
++  "agentUsed": false,
++  "toolCallCount": 3
++}

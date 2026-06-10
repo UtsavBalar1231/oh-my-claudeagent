@@ -1,0 +1,1 @@
+{"hook_event_name":"PostToolBatch","session_id":"fixture-sid-001","tool_calls":[{"tool_name":"Edit","tool_input":{"file_path":"/project/src/foo.ts","old_string":"a","new_string":"b"},"tool_use_id":"toolu_001","tool_response":""},{"tool_name":"Edit","tool_input":{"file_path":"/project/src/foo.ts","old_string":"c","new_string":"d"},"tool_use_id":"toolu_002","tool_response":""}]}

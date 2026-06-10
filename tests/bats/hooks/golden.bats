@@ -94,14 +94,6 @@ _run_fixture() {
 	diff "${baseline}/state-diff.txt" "${work_dir}/state-diff.norm"
 }
 
-@test "golden: agent-usage-reminder/grep-no-agents" {
-	_run_fixture "agent-usage-reminder" "grep-no-agents"
-}
-
-@test "golden: agent-usage-reminder/agents-already-used" {
-	_run_fixture "agent-usage-reminder" "agents-already-used"
-}
-
 @test "golden: bash-error-recovery/command-not-found" {
 	_run_fixture "bash-error-recovery" "command-not-found"
 }
@@ -268,6 +260,26 @@ _run_fixture() {
 
 @test "golden: post-edit/edit-event" {
 	_run_fixture "post-edit" "edit-event"
+}
+
+@test "golden: post-tool-batch/grep-no-agents" {
+	_run_fixture "post-tool-batch" "grep-no-agents"
+}
+
+@test "golden: post-tool-batch/agents-already-used" {
+	_run_fixture "post-tool-batch" "agents-already-used"
+}
+
+@test "golden: post-tool-batch/same-file-conflict" {
+	_run_fixture "post-tool-batch" "same-file-conflict"
+}
+
+@test "golden: post-tool-batch/disjoint-edits-silent" {
+	_run_fixture "post-tool-batch" "disjoint-edits-silent"
+}
+
+@test "golden: post-tool-batch/subagent-grep-no-count" {
+	_run_fixture "post-tool-batch" "subagent-grep-no-count"
 }
 
 @test "golden: pre-compact/happy-path" {

@@ -37,11 +37,11 @@
 [validate-plugin] PASS: post-cutover hook lifecycle coverage includes CwdChanged
 [validate-plugin] PASS: post-cutover hook lifecycle coverage includes FileChanged
 [validate-plugin] PASS: post-cutover hook lifecycle coverage includes WorktreeCreate
-[validate-plugin] SKIP: new platform event Elicitation not yet adopted by OMCA (v2.1.141-167)
-[validate-plugin] SKIP: new platform event ElicitationResult not yet adopted by OMCA (v2.1.141-167)
-[validate-plugin] SKIP: new platform event MessageDisplay not yet adopted by OMCA (v2.1.141-167)
-[validate-plugin] SKIP: new platform event PostToolBatch not yet adopted by OMCA (v2.1.141-167)
-[validate-plugin] SKIP: new platform event Setup not yet adopted by OMCA (v2.1.141-167)
+[validate-plugin] SKIP: new platform event Elicitation not yet adopted by OMCA
+[validate-plugin] SKIP: new platform event ElicitationResult not yet adopted by OMCA
+[validate-plugin] SKIP: new platform event MessageDisplay not yet adopted by OMCA
+[validate-plugin] PASS: new platform event PostToolBatch handler registered
+[validate-plugin] SKIP: new platform event Setup not yet adopted by OMCA
 [validate-plugin] PASS: agent frontmatter hygiene: no top-level tools allowlists detected
 [validate-plugin] PASS: agent frontmatter hygiene: no legacy permissionMode holdouts detected
 [validate-plugin] PASS: skill description length: cancel-ralph description is 39 chars (within 512 soft cap)
@@ -169,4 +169,4 @@
 [validate-plugin] PASS: mcp tools/list contains categories_list
 [validate-plugin] PASS: mcp tools/list contains concurrency_status
 [validate-plugin] PASS: mcp tools/list contains file_read
-[validate-plugin] Summary: 151 passed, 9 failed, 6 skipped, 0 warned
+[validate-plugin] Summary: 152 passed, 9 failed, 5 skipped, 0 warned

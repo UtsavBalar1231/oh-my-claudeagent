@@ -278,30 +278,30 @@ load '../test_helper'
 }
 
 # ---------------------------------------------------------------------------
-# h. agent-usage-reminder: nudges on 3rd tool call without delegation
+# h. post-tool-batch: delegation nudge counting moved to batch granularity
 # ---------------------------------------------------------------------------
 
-@test "agent-usage-reminder: emits delegation nudge on 3rd call without agent use" {
-	# Pre-set toolCallCount to 2 so next call hits count=3 (% 3 == 0)
+@test "post-tool-batch: emits delegation nudge on 3rd counted batch without agent use" {
+	# Pre-set toolCallCount to 2 so next counted batch hits count=3 (% 3 == 0)
 	write_state "agent-usage.json" '{"agentUsed":false,"toolCallCount":2}'
 
 	local payload
-	payload='{"tool_name":"Grep","tool_input":{"pattern":"foo"}}'
+	payload='{"hook_event_name":"PostToolBatch","tool_calls":[{"tool_name":"Grep","tool_input":{"pattern":"foo"},"tool_use_id":"toolu_x","tool_response":"ok"}]}'
 
-	run_hook "agent-usage-reminder.sh" "$payload"
+	run_hook "post-tool-batch.sh" "$payload"
 	assert_success
 	ctx=$(get_context)
 	assert [ -n "$ctx" ]
 	echo "$ctx" | grep -qi "DELEGATION REMINDER"
 }
 
-@test "agent-usage-reminder: no nudge when agentUsed is true" {
+@test "post-tool-batch: no nudge when agentUsed is true" {
 	write_state "agent-usage.json" '{"agentUsed":true,"toolCallCount":5}'
 
 	local payload
-	payload='{"tool_name":"Grep","tool_input":{"pattern":"foo"}}'
+	payload='{"hook_event_name":"PostToolBatch","tool_calls":[{"tool_name":"Grep","tool_input":{"pattern":"foo"},"tool_use_id":"toolu_x","tool_response":"ok"}]}'
 
-	run_hook "agent-usage-reminder.sh" "$payload"
+	run_hook "post-tool-batch.sh" "$payload"
 	assert_success
 	assert_output ""
 }

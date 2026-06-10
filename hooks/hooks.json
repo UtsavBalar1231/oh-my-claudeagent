@@ -239,15 +239,6 @@
 				]
 			},
 			{
-				"matcher": "Grep|Glob|WebFetch|WebSearch",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/agent-usage-reminder.sh"
-					}
-				]
-			},
-			{
 				"matcher": "Agent",
 				"hooks": [
 					{
@@ -462,6 +453,16 @@
 					{
 						"type": "command",
 						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/lifecycle-state.sh"
+					}
+				]
+			}
+		],
+		"PostToolBatch": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/post-tool-batch.sh"
 					}
 				]
 			}
