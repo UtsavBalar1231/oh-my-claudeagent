@@ -312,7 +312,7 @@ SHA_COUNT=$(jq 'length' <<< "${SHAS}")
 SHA_COUNT="${SHA_COUNT:-0}"
 
 if [[ "${SHA_COUNT}" -gt 1 ]]; then
-	echo "[FINAL VERIFICATION] Stale evidence from a prior plan detected. Current-plan SHA: ${CURRENT_SHA}. Use evidence_read to inspect or prune .omca/state/evidence.jsonl if confirmed stale." >&2
+	echo "[FINAL VERIFICATION] Stale evidence from a prior plan detected. Current-plan SHA: ${CURRENT_SHA}. Use evidence_read to inspect .omca/evidence/verification-evidence.json if confirmed stale." >&2
 	exit 2
 fi
 
