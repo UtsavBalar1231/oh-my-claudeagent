@@ -26,9 +26,9 @@ sed -E \
 	-e 's/Current hour: [0-9]+/Current hour: <HOUR>/g' \
 	-e 's/"ms":[0-9]+/"ms":<MS>/g' \
 	-e 's|\$[0-9]+|<PID>|g' \
-	-e 's|/tmp/tmp\.[A-Za-z0-9]{6,}|<TMPFILE>|g' \
-	-e 's|/tmp/bats-run-[A-Za-z0-9]+/test/[0-9]+/[A-Za-z0-9_-]+|<TMPFILE>|g' \
-	-e 's|/tmp/bats-[A-Za-z0-9._-]+|<TMPFILE>|g' \
+	-e 's|/[^"[:space:]]*/tmp\.[A-Za-z0-9]{6,}|<TMPFILE>|g' \
+	-e 's|/[^"[:space:]]*/bats-run-[A-Za-z0-9]+/test/[0-9]+/[A-Za-z0-9_-]+|<TMPFILE>|g' \
+	-e 's|/[^"[:space:]]*/bats-[A-Za-z0-9._-]+|<TMPFILE>|g' \
 	-e 's/(plan_sha256:[0-9a-f]{64})/\1/g' \
 	-e 's/[0-9a-f]{32,64}/<HASH>/g' \
 	-e 's/\b[0-9]{10,19}\b/<NUM>/g' \

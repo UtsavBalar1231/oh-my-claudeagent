@@ -31,6 +31,26 @@ rule for `/tmp/tmp.XXXXXX` did not cover the bats tmpdir pattern.
 's|/tmp/bats-[A-Za-z0-9._-]+|<TMPFILE>|g'
 ```
 
+### Round 3: TMPDIR outside /tmp leaks prefix into normalized output
+
+**Symptom**: Five variants failed (lifecycle-state/cwd-changed, session-cleanup/normal,
+session-cleanup/resume, session-init/startup, session-init/compact) on machines where
+`TMPDIR` is not under `/tmp` (e.g. `/home/utsav/.cache`). The bats tmpdir shape on such
+machines is `$TMPDIR/bats-run-XXXXX/test/N/<variant>/`. The prior rules anchored on the
+literal `/tmp/` prefix, so the `/bats-run-XXXXX/...` suffix was replaced with `<TMPFILE>`
+but the parent prefix (e.g. `/home/utsav/.cache`) remained, producing `/home/utsav/.cache<TMPFILE>`.
+
+**Fix**: Generalized all three tmpdir rules to match any absolute path prefix using
+`/[^"[:space:]]*/` in place of the literal `/tmp/`:
+```
+'s|/[^"[:space:]]*/tmp\.[A-Za-z0-9]{6,}|<TMPFILE>|g'
+'s|/[^"[:space:]]*/bats-run-[A-Za-z0-9]+/test/[0-9]+/[A-Za-z0-9_-]+|<TMPFILE>|g'
+'s|/[^"[:space:]]*/bats-[A-Za-z0-9._-]+|<TMPFILE>|g'
+```
+The leading `/` anchor prevents swallowing `key=`-style prefixes. Rule order is
+most-specific-first (bats-run full path before bats- short path). All 72 variants pass;
+no baselines were re-captured.
+
 ## Exclusions
 
 See `exclusions.txt`. No hooks excluded — all 35 scripts have working fixtures.
