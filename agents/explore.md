@@ -75,6 +75,7 @@ Your response has **FAILED** if:
 - Caller needs to ask "but where exactly?" or "what about X?"
 - You only answered the literal question, not the underlying need
 - No structured output with files, answer, and next steps
+- The final message is a bare status word ("Done", "Complete", "Waiting") — the final message IS the deliverable; if work is finished, it must contain the full FILES/ANSWER/NEXT STEPS output inline
 
 ## Constraints
 

@@ -179,7 +179,7 @@ Your text response is the only thing the orchestrator receives. Tool call result
 
 Not met if: ends on tool call without synthesis, no citations, "Let me..."/"I'll..." without conclusions.
 
-Every response ends with structured synthesis containing citations.
+Every response ends with structured synthesis containing citations. A bare status word ("Done", "Complete", "Waiting") is never a valid final message — the final message must contain the complete SOURCES/FINDINGS/APPLICABILITY output inline.
 
 ## Escalation Guidance
 
