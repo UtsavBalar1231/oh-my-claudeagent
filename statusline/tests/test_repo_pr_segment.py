@@ -8,6 +8,7 @@ remaining_pct    docs     — context_window.remaining_percentage preferred over
 from __future__ import annotations
 
 import re
+from typing import cast
 
 import pytest
 
@@ -24,6 +25,7 @@ from statusline.core import (
     terminal_columns,
     render,
 )
+from statusline.types import StatuslinePayload
 
 
 # ---------------------------------------------------------------------------
@@ -35,6 +37,11 @@ def _strip_ansi(s: str) -> str:
     s = re.sub(r"\x1b\[[0-9;]*m", "", s)
     s = re.sub(r"\x1b\]8;;[^\a]*\a[^\x1b]*\x1b\]8;;\a", lambda m: m.group(0).split("\a")[1], s)
     return s
+
+
+def _p(d: dict) -> StatuslinePayload:
+    """Cast a plain dict to StatuslinePayload for call-site type hygiene."""
+    return cast(StatuslinePayload, d)
 
 
 def _ascii_glyphs() -> dict:
@@ -103,7 +110,7 @@ class TestRemainingPercentage:
     ) -> None:
         """Integration: render() uses remaining_percentage when no used_percentage."""
         monkeypatch.setenv("CLAUDE_STATUSLINE_NERD_FONT", "0")
-        data = {
+        data: dict = {
             "model": {"display_name": "claude"},
             "context_window": {
                 "context_window_size": 200000,
@@ -111,7 +118,7 @@ class TestRemainingPercentage:
             },
             "cost": {},
         }
-        result = render(data, {"is_git": "0"})
+        result = render(_p(data), {"is_git": "0"})
         assert "25%" in result
 
 
@@ -124,103 +131,98 @@ class TestComposePrSegment:
     """Unit tests for the _compose_repo_pr helper (repo/PR segment, v2.1.145)."""
 
     def test_no_workspace_returns_empty(self) -> None:
-        assert _compose_repo_pr({}, _ascii_glyphs(), False) == ""
+        assert _compose_repo_pr(_p({}), _ascii_glyphs(), False) == ""
 
     def test_no_repo_in_workspace_returns_empty(self) -> None:
-        data: dict = {"workspace": {}}
-        assert _compose_repo_pr(data, _ascii_glyphs(), False) == ""
+        assert _compose_repo_pr(_p({"workspace": {}}), _ascii_glyphs(), False) == ""
 
     def test_empty_repo_name_returns_empty(self) -> None:
-        data: dict = {"workspace": {"repo": {"name": ""}}}
-        assert _compose_repo_pr(data, _ascii_glyphs(), False) == ""
+        assert _compose_repo_pr(_p({"workspace": {"repo": {"name": ""}}}), _ascii_glyphs(), False) == ""
 
     def test_repo_name_only(self) -> None:
-        data: dict = {"workspace": {"repo": {"name": "myrepo"}}}
-        result = _strip_ansi(_compose_repo_pr(data, _ascii_glyphs(), False))
+        result = _strip_ansi(_compose_repo_pr(_p({"workspace": {"repo": {"name": "myrepo"}}}), _ascii_glyphs(), False))
         assert "myrepo" in result
 
     def test_owner_and_name_combined(self) -> None:
-        data: dict = {
-            "workspace": {"repo": {"name": "myrepo", "owner": "myorg"}}
-        }
-        result = _strip_ansi(_compose_repo_pr(data, _ascii_glyphs(), False))
+        data = {"workspace": {"repo": {"name": "myrepo", "owner": "myorg"}}}
+        result = _strip_ansi(_compose_repo_pr(_p(data), _ascii_glyphs(), False))
         assert "myorg/myrepo" in result
 
     def test_pr_number_shown(self) -> None:
-        data: dict = {
+        data = {
             "workspace": {"repo": {"name": "myrepo", "owner": "myorg"}},
             "pr": {"number": 42},
         }
-        result = _strip_ansi(_compose_repo_pr(data, _ascii_glyphs(), False))
+        result = _strip_ansi(_compose_repo_pr(_p(data), _ascii_glyphs(), False))
         assert "#42" in result
 
     def test_pr_url_creates_osc8_link(self) -> None:
-        data: dict = {
+        data = {
             "workspace": {"repo": {"name": "myrepo", "owner": "myorg"}},
             "pr": {"number": 7, "url": "https://github.com/myorg/myrepo/pull/7"},
         }
-        result = _compose_repo_pr(data, _ascii_glyphs(), False)
+        result = _compose_repo_pr(_p(data), _ascii_glyphs(), False)
         # OSC 8 sequence for the PR URL
         assert "\033]8;;" in result
         assert "github.com/myorg/myrepo/pull/7" in result
 
     def test_pr_without_review_state(self) -> None:
         """PR present but review_state absent — must not crash; no state glyph."""
-        data: dict = {
+        data = {
             "workspace": {"repo": {"name": "myrepo"}},
             "pr": {"number": 1},
         }
-        result = _compose_repo_pr(data, _ascii_glyphs(), False)
+        result = _compose_repo_pr(_p(data), _ascii_glyphs(), False)
         assert result != ""
         # No state glyphs should appear in plain text
         plain = _strip_ansi(result)
         assert "#1" in plain
 
     def test_review_state_approved(self) -> None:
-        data: dict = {
+        data = {
             "workspace": {"repo": {"name": "myrepo"}},
             "pr": {"number": 5, "review_state": "approved"},
         }
-        result = _compose_repo_pr(data, _ascii_glyphs(), False)
+        result = _compose_repo_pr(_p(data), _ascii_glyphs(), False)
         assert "+" in result  # ASCII approved glyph
 
     def test_review_state_changes_requested(self) -> None:
-        data: dict = {
+        data = {
             "workspace": {"repo": {"name": "myrepo"}},
             "pr": {"number": 5, "review_state": "changes_requested"},
         }
-        result = _compose_repo_pr(data, _ascii_glyphs(), False)
+        result = _compose_repo_pr(_p(data), _ascii_glyphs(), False)
         # In ANSI output, "!" is the ASCII glyph for changes_requested
         # Check that the RED color is in the output
         assert RED in result
 
     def test_review_state_pending(self) -> None:
-        data: dict = {
+        data = {
             "workspace": {"repo": {"name": "myrepo"}},
             "pr": {"number": 5, "review_state": "pending"},
         }
-        result = _compose_repo_pr(data, _ascii_glyphs(), False)
+        result = _compose_repo_pr(_p(data), _ascii_glyphs(), False)
         assert YELLOW in result
 
     def test_review_state_draft(self) -> None:
-        data: dict = {
+        data = {
             "workspace": {"repo": {"name": "myrepo"}},
             "pr": {"number": 5, "review_state": "draft"},
         }
-        result = _compose_repo_pr(data, _ascii_glyphs(), False)
+        result = _compose_repo_pr(_p(data), _ascii_glyphs(), False)
         assert DIM in result
 
     def test_unknown_review_state_no_crash(self) -> None:
         """An unrecognized review_state must not crash the renderer."""
-        data: dict = {
+        data = {
             "workspace": {"repo": {"name": "myrepo"}},
             "pr": {"number": 5, "review_state": "unknown_future_state"},
         }
-        result = _compose_repo_pr(data, _ascii_glyphs(), False)
+        result = _compose_repo_pr(_p(data), _ascii_glyphs(), False)
         assert "#5" in _strip_ansi(result)
 
     def test_repo_with_host_creates_link(self) -> None:
-        data: dict = {
+        data = {
             "workspace": {
                 "repo": {
                     "host": "github.com",
@@ -229,16 +231,14 @@ class TestComposePrSegment:
                 }
             }
         }
-        result = _compose_repo_pr(data, _ascii_glyphs(), False)
+        result = _compose_repo_pr(_p(data), _ascii_glyphs(), False)
         # OSC 8 link to the repo
         assert "github.com/myorg/myrepo" in result
 
     def test_repo_without_host_no_link(self) -> None:
         """No host → no OSC 8 link, just plain text label."""
-        data: dict = {
-            "workspace": {"repo": {"owner": "myorg", "name": "myrepo"}}
-        }
-        result = _compose_repo_pr(data, _ascii_glyphs(), False)
+        data = {"workspace": {"repo": {"owner": "myorg", "name": "myrepo"}}}
+        result = _compose_repo_pr(_p(data), _ascii_glyphs(), False)
         # No OSC 8 sequences
         assert "\033]8;;" not in result
 
@@ -252,34 +252,34 @@ class TestComposeLine1RepoSegment:
     """Integration: _compose_line1 emits repo/PR segment when fields present."""
 
     def test_line1_shows_repo_when_present(self) -> None:
-        data: dict = {
+        data = {
             "model": {"display_name": "claude"},
             "workspace": {
                 "project_dir": "/home/user/myrepo",
                 "repo": {"owner": "myorg", "name": "myrepo"},
             },
         }
-        line, has_extra = _compose_line1(data, _ascii_glyphs(), {"is_git": "0"})
+        line, has_extra = _compose_line1(_p(data), _ascii_glyphs(), {"is_git": "0"})
         assert "myorg/myrepo" in _strip_ansi(line)
         assert has_extra is True
 
     def test_line1_no_segment_when_repo_absent(self) -> None:
         """No workspace.repo → no repo/PR segment, no crash."""
-        data: dict = {
+        data = {
             "model": {"display_name": "claude"},
             "workspace": {"project_dir": "/home/user/myrepo"},
         }
-        line, _ = _compose_line1(data, _ascii_glyphs(), {"is_git": "0"})
+        line, _ = _compose_line1(_p(data), _ascii_glyphs(), {"is_git": "0"})
         # No slash-separated owner/name
         assert "/" not in _strip_ansi(line).replace("claude", "")
 
     def test_line1_with_pr_number_and_review_state(self) -> None:
-        data: dict = {
+        data = {
             "model": {"display_name": "claude"},
             "workspace": {"repo": {"owner": "acme", "name": "api"}},
             "pr": {"number": 99, "review_state": "approved"},
         }
-        line, has_extra = _compose_line1(data, _ascii_glyphs(), {"is_git": "0"})
+        line, has_extra = _compose_line1(_p(data), _ascii_glyphs(), {"is_git": "0"})
         plain = _strip_ansi(line)
         assert "acme/api" in plain
         assert "#99" in plain
@@ -287,12 +287,12 @@ class TestComposeLine1RepoSegment:
 
     def test_line1_pr_without_review_state_no_crash(self) -> None:
         """pr without review_state must not crash _compose_line1."""
-        data: dict = {
+        data = {
             "model": {"display_name": "claude"},
             "workspace": {"repo": {"name": "api"}},
             "pr": {"number": 3},
         }
-        line, _ = _compose_line1(data, _ascii_glyphs(), {"is_git": "0"})
+        line, _ = _compose_line1(_p(data), _ascii_glyphs(), {"is_git": "0"})
         assert "#3" in _strip_ansi(line)
 
 

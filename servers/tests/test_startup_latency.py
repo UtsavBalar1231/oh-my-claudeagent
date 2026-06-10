@@ -2,7 +2,7 @@
 
 Methodology
 -----------
-1. Spawn ``omca-mcp.py`` as a subprocess using the installed plugin path and
+1. Spawn ``omca-mcp.py`` as a subprocess using the repo servers path and
    the ``UV_PROJECT_ENVIRONMENT`` venv (stdio transport -- FastMCP default).
 2. Record ``t0 = time.monotonic()`` immediately before ``Popen``.
 3. Write a minimal valid JSON-RPC ``initialize`` request to the process stdin.
@@ -52,13 +52,30 @@ from pathlib import Path
 import pytest
 
 # ---------------------------------------------------------------------------
-# Constants
+# Path resolution (no hardcoded machine paths or version numbers)
 # ---------------------------------------------------------------------------
 
-_PLUGIN_ROOT = Path("/home/utsav/.claude/plugins/cache/omca/oh-my-claudeagent/2.0.0")
-_PLUGIN_DATA = Path("/home/utsav/.claude/plugins/data/oh-my-claudeagent-omca")
-_SERVERS_DIR = _PLUGIN_ROOT / "servers"
+
+def _plugin_root() -> Path:
+    """Return the repo root: $CLAUDE_PLUGIN_ROOT env var or git rev-parse fallback."""
+    env = os.environ.get("CLAUDE_PLUGIN_ROOT")
+    if env:
+        return Path(env)
+    out = subprocess.check_output(["git", "rev-parse", "--show-toplevel"], text=True)
+    return Path(out.strip())
+
+
+def _plugin_data() -> Path:
+    """Return the plugin data dir: $CLAUDE_PLUGIN_DATA env var or default install path."""
+    env = os.environ.get("CLAUDE_PLUGIN_DATA")
+    if env:
+        return Path(env)
+    return Path.home() / ".claude" / "plugins" / "data" / "oh-my-claudeagent-omca"
+
+
+_SERVERS_DIR = _plugin_root() / "servers"
 _MCP_SCRIPT = _SERVERS_DIR / "omca-mcp.py"
+_PLUGIN_DATA = _plugin_data()
 
 # Latency threshold (seconds) -- 500 ms warm-cache ceiling.
 _THRESHOLD_S = 0.5

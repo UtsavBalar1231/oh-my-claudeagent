@@ -816,23 +816,17 @@ class TestNewFieldsLine2:
     def _glyphs(self) -> dict:
         return build_glyphs(False)
 
-    def test_token_count_shown(self) -> None:
-        data = {
-            "context_window": {"context_window_size": 200000, "used_percentage": 10.0},
-            "cost": {},
-            "total_input_tokens": 10000,
-            "total_output_tokens": 2000,
-        }
-        line = _compose_line2(data, self._glyphs())
-        # 10000 + 2000 = 12000 -> "12.0k tok"
-        assert "12.0k" in line
-        assert "tok" in line
+    # test_token_count_shown deleted: duplicate of test_token_display.test_token_display_reads_from_context_window
 
     def test_token_count_only_input(self) -> None:
+        # Unique: input-only path (no total_output_tokens in context_window)
         data = {
-            "context_window": {"context_window_size": 200000, "used_percentage": 10.0},
+            "context_window": {
+                "context_window_size": 200000,
+                "used_percentage": 10.0,
+                "total_input_tokens": 5000,
+            },
             "cost": {},
-            "total_input_tokens": 5000,
         }
         line = _compose_line2(data, self._glyphs())
         assert "5.0k" in line
@@ -846,10 +840,10 @@ class TestNewFieldsLine2:
         assert "tok" not in line
 
     def test_api_duration_shown(self) -> None:
+        # Unique: verifies specific seconds formatting (test_token_display only checks "api " presence)
         data = {
             "context_window": {"context_window_size": 200000, "used_percentage": 10.0},
-            "cost": {},
-            "total_api_duration_ms": 23456,
+            "cost": {"total_api_duration_ms": 23456},
         }
         line = _compose_line2(data, self._glyphs())
         assert "api 23s" in line
