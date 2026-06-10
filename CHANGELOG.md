@@ -5,6 +5,78 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.0] - 2026-06-10
+
+Bash failure coaching, statusline refresh cadence, and doc sweep (Claude Code v2.1.170+).
+Duration-aware timeout coaching in `bash-error-recovery.sh`, `refreshInterval: 5` applied
+via `omca-setup` Phase 5.6, dead advice removed from the handoff skill, stale state-schema
+references corrected, and `explore`/`librarian` output contract clarified.
+Evaluated-2026-06 non-adoptions documented in OMCA.md.
+
+### Added
+
+- **Duration-aware Bash failure coaching** (`scripts/bash-error-recovery.sh`): two new
+  branches added to the failure classification chain.
+  - **Timeout-text class**: regex `timed out|timeout|Command timed out` placed in the
+    deterministic chain before the duration probe; matches shell and tool-layer timeout
+    messages regardless of `duration_ms` value.
+  - **Slow-failure fallback** (≥ 120 s duration): fires strictly after all regex classes
+    are exhausted; requires `duration_ms` ≥ 120000 in the PostToolUseFailure Bash payload.
+    Coaches toward `run_in_background`, a larger `timeout` parameter, or narrowing scope.
+    `// empty`-guarded jq read; never overrides a deterministic class. Payload probe
+    confirmed `duration_ms` present in Bash PostToolUseFailure payloads.
+    `delegate-retry.sh` duration branch deferred — Agent-failure payload structure not yet
+    confirmed by probe contract.
+- **`statusLine.refreshInterval: 5` via `omca-setup` Phase 5.6**: three-way skip branch
+  in Phase 5 (a) both `hideVimModeIndicator` and `refreshInterval` present → skip,
+  (b) `refreshInterval` missing → apply Phase 6 back-fill, (c) `hideVimModeIndicator`
+  missing → apply Phase 6 back-fill. Consented back-fill jq path updated to set both
+  fields. Doctor Check 7 extended with a `refreshInterval` PASS/WARN line.
+  Rationale: disk-sourced statusline reads git cache files that update on a ~5 s cadence;
+  background-agent idle scenarios benefit from a matching refresh ceiling.
+
+### Fixed
+
+- **Dead `skillOverrides` advice in handoff skill** (`skills/handoff/SKILL.md`): the
+  embedded JSON block advising users to configure `skillOverrides` was inapplicable —
+  `skillOverrides` is a user-preference setting that does not apply to plugin-shipped
+  skills. Replaced with `/plugin disable` and `enabledPlugins` guidance preserving the
+  user-direction intent.
+- **Stale `agent-usage-reminder.sh` references in state-schemas.md**
+  (`.claude/rules/state-schemas.md`): all five references to the removed
+  `scripts/agent-usage-reminder.sh` replaced with `scripts/post-tool-batch.sh`; lifecycle
+  step 3 rewritten to reflect per-batch (≥1 qualifying tool call per batch) counting
+  semantics; `toolCallCount` field description updated accordingly.
+- **`explore`/`librarian` final-message contract** (`agents/explore.md`,
+  `agents/librarian.md`): bare status words (e.g. "Done", "Complete") as the entire final
+  message are invalid — the output contract requires a populated deliverable. Failure
+  Conditions bullet added to `explore`; Output Requirements final sentence added to
+  `librarian`.
+
+### Deliberate non-adoptions
+
+Evaluated 2026-06 — full rationale in OMCA.md "Deliberate Non-Adoptions" table:
+
+- **`arguments:` in skill frontmatter**: shell-style positional binding truncates
+  free-form input; OMCA skills receive the full user prompt via natural expansion.
+- **`hooks:` in skill frontmatter**: persistence loops outlive skill-active windows;
+  hook registration stays in `hooks/hooks.json`.
+- **`skillOverrides` / `skillListingBudgetFraction` / `maxSkillDescriptionChars`**:
+  user-preference settings only; `skillOverrides` does not apply to plugin-shipped skills.
+- **`initialPrompt` in agent frontmatter**: fires an unconditional billable model turn
+  per subagent; `subagent-start.sh` already injects boulder context as `additionalContext`
+  at zero turn cost.
+- **`SessionStart` `watchPaths` output**: `FileChanged` consumer is side-effects-only;
+  no runtime reader benefits from an expanded watch set.
+- **`PostToolUse` `updatedToolOutput`**: rewriting tool output post-hoc is adversarial
+  to evidence integrity — OMCA's verification model requires literal command output.
+- **`plugin.json` `dependencies` field**: OMCA has no runtime inter-plugin dependencies.
+- **MCP `headersHelper` and WebSocket (`ws`) transport**: all OMCA MCP servers use stdio.
+- **`sessionTitle` output on `UserPromptSubmit`**: platform-prohibited — `sessionTitle`
+  is a `SessionStart`-only output field; the platform ignores it outside startup/resume.
+
+---
+
 ## [2.7.0] - 2026-06-10
 
 PostToolBatch adoption + deferred-fix sweep (Claude Code v2.1.170). Batch-level orchestration
