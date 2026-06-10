@@ -134,15 +134,7 @@ TO CONTINUE IN A NEW SESSION:
 
 ## Recommended user configuration
 
-Handoff is a user-driven workflow. To prevent Claude from self-invoking it mid-conversation, add to your `settings.json`:
-
-```json
-"skillOverrides": {
-  "oh-my-claudeagent:handoff": "user-invocable-only"
-}
-```
-
-See CLAUDE.md § "User-side settings recommendations" for details.
+Handoff is a user-driven workflow. To prevent Claude from self-invoking it mid-conversation, disable the OMCA plugin temporarily via `/plugin disable oh-my-claudeagent` (re-enable with `/plugin enable oh-my-claudeagent`), or set `enabledPlugins` in your `settings.json` to exclude it for sessions where you do not want the handoff keyword trigger active.
 
 ## Constraints
 
