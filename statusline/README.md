@@ -92,6 +92,16 @@ uv sync
 To register the statusline with Claude Code, configure the `statusline` key in
 `~/.claude/settings.json` to call `cc-statusline` with stdin from the session JSON payload.
 
+**Recommended `refreshInterval`**: set `"refreshInterval": 5` in the `statusLine` object.
+This tells Claude Code to re-invoke the statusline command every 5 seconds, keeping
+disk-sourced state — git branch/status (cached to `/tmp/claude-statusline-git-*`) and boulder
+plan progress — visible while the main session sits idle between background-agent fan-outs.
+The value 5 aligns with the git cache TTL (also 5 s), so each refresh tick can surface a
+newly written git snapshot without triggering additional subprocess calls inside the renderer.
+Claims are limited to disk-sourced freshness: `refreshInterval` controls when the platform
+re-runs the statusline binary, not the cadence of individual field computations inside the
+renderer itself.
+
 ---
 
 ## CLI reference

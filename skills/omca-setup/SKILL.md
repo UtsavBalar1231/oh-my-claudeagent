@@ -281,9 +281,10 @@ Configure the Claude Code statusline to use the oh-my-claudeagent statusline pac
 
 1. Read `~/.claude/settings.json` (if it exists; otherwise treat as `{}`).
 
-2. Check if `statusLine` is already configured:
-   - If `settings.statusLine` is present AND `settings.statusLine.hideVimModeIndicator == true` → print "statusLine already configured — skipping" and skip this phase.
-   - If `settings.statusLine` is present AND `hideVimModeIndicator` is missing or `false` → DO NOT skip; jump to step 6 (back-fill the indicator suppression).
+2. Check if `statusLine` is already configured — three-way branch:
+   - **(a) Both fields present** — If `settings.statusLine` is present AND both `hideVimModeIndicator == true` AND `refreshInterval` is present → print "statusLine already configured — skipping" and skip this phase.
+   - **(b) `refreshInterval` missing** — If `settings.statusLine` is present AND `hideVimModeIndicator == true` but `refreshInterval` is absent → DO NOT skip; jump to step 6 to back-fill `refreshInterval`.
+   - **(c) `hideVimModeIndicator` missing or false** — If `settings.statusLine` is present but `hideVimModeIndicator` is missing or `false` → DO NOT skip; jump to step 6 to back-fill both fields. Existing installs without either field are not stranded — step 6 handles both.
 
 3. If not configured: use `AskUserQuestion` to ask:
    ```
@@ -352,16 +353,22 @@ Configure the Claude Code statusline to use the oh-my-claudeagent statusline pac
       because the OMCA statusline already renders `vim.mode` on line 1 — without
       this flag the platform draws a redundant `-- INSERT --` row beneath the
       statusLine output (see `https://code.claude.com/docs/en/statusline` for the
-      `hideVimModeIndicator` field).
+      `hideVimModeIndicator` field). Set `refreshInterval: 5` so the statusline
+      re-polls disk-sourced state (git metadata, boulder plan) on a 5-second cadence
+      — this keeps the display fresh while the main session sits idle during
+      background-agent fan-outs, where the coordinator is waiting rather than actively
+      generating. The value 5 matches the statusline's git cache TTL (5 s), so each
+      refresh tick can pick up a newly cached git snapshot without triggering redundant
+      subprocess calls.
 
       ```bash
-      jq --arg cmd "<chosen-command>" '. + {"statusLine": {"type": "command", "command": $cmd, "padding": 1, "hideVimModeIndicator": true}}' \
+      jq --arg cmd "<chosen-command>" '. + {"statusLine": {"type": "command", "command": $cmd, "padding": 1, "hideVimModeIndicator": true, "refreshInterval": 5}}' \
         ~/.claude/settings.json > /tmp/claude-settings-statusline.json \
         && mv /tmp/claude-settings-statusline.json ~/.claude/settings.json
       ```
       If `~/.claude/settings.json` does not exist, create it from `{}`:
       ```bash
-      echo '{}' | jq --arg cmd "<chosen-command>" '. + {"statusLine": {"type": "command", "command": $cmd, "padding": 1, "hideVimModeIndicator": true}}' \
+      echo '{}' | jq --arg cmd "<chosen-command>" '. + {"statusLine": {"type": "command", "command": $cmd, "padding": 1, "hideVimModeIndicator": true, "refreshInterval": 5}}' \
         > ~/.claude/settings.json
       ```
 
@@ -385,7 +392,7 @@ Configure the Claude Code statusline to use the oh-my-claudeagent statusline pac
         ~/.claude/statusline/pyproject.toml       — package manifest
         ~/.claude/statusline/statusline/          — package files (copied from plugin)
         ~/.claude/statusline/.venv/               — uv-managed venv with entry points
-        ~/.claude/settings.json                   — statusLine added (mode: daemon|direct)
+        ~/.claude/settings.json                   — statusLine added (mode: daemon|direct, refreshInterval: 5)
 
       For daemon mode: daemon started (auto-starts on first request if not running)
       Restart Claude Code to activate the statusline.
@@ -399,22 +406,34 @@ Configure the Claude Code statusline to use the oh-my-claudeagent statusline pac
 
    h. **Note**: If an old `~/.claude/statusline.py` wrapper script exists, it can be removed — it is superseded by this copy-based deployment.
 
-6. **Back-fill `hideVimModeIndicator` on existing statusLine** (entered when step 2 detected `statusLine` present but the indicator-suppression field missing/false):
+6. **Back-fill `hideVimModeIndicator` and `refreshInterval` on existing statusLine** (entered when step 2 detected `statusLine` present but one or both fields are missing):
+
+   Two fields may need back-filling independently. Ask for consent once, covering both:
 
    The OMCA statusline already renders `vim.mode` on line 1; without
    `hideVimModeIndicator: true` the platform draws a redundant `-- INSERT --` row
-   beneath the user's statusLine output. Ask via `AskUserQuestion`:
+   beneath the user's statusLine output. Additionally, `refreshInterval: 5` keeps
+   disk-sourced state (git metadata, boulder plan) fresh while the session sits idle
+   during background-agent fan-outs — without it the statusline only updates on active
+   keystrokes. Ask via `AskUserQuestion` (only when at least one field is absent):
    ```
-   Your existing statusLine config does not set hideVimModeIndicator. OMCA renders
-   vim mode itself, so the platform's native '-- INSERT --' row is duplicate noise.
-   Add hideVimModeIndicator: true to suppress it? [Y/n]
+   Your existing statusLine config is missing one or more OMCA-recommended fields.
+   Proposed additions:
+     hideVimModeIndicator: true  — suppresses redundant '-- INSERT --' row (OMCA renders vim mode itself)
+     refreshInterval: 5          — re-polls disk-sourced state every 5 s during idle background-agent runs
+
+   This changes your statusLine's execution cadence. Add the missing field(s)? [Y/n]
    ```
 
-   On confirm, atomic jq update:
+   On confirm, atomic jq update (idempotent — only adds each field when absent, so a
+   second run produces a byte-identical result):
    ```bash
-   jq '.statusLine.hideVimModeIndicator = true' ~/.claude/settings.json \
-     > /tmp/claude-settings-vim-indicator.json \
-     && mv /tmp/claude-settings-vim-indicator.json ~/.claude/settings.json
+   jq '
+     if .statusLine.hideVimModeIndicator == null then .statusLine.hideVimModeIndicator = true else . end |
+     if .statusLine.refreshInterval == null then .statusLine.refreshInterval = 5 else . end
+   ' ~/.claude/settings.json \
+     > /tmp/claude-settings-backfill.json \
+     && mv /tmp/claude-settings-backfill.json ~/.claude/settings.json
    ```
 
    On decline: skip silently.
@@ -775,9 +794,15 @@ echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | timeout 5 uv run --proje
 ### Check 7: Statusline Health
 - `~/.claude/statusline/.venv/bin/cc-statusline` exists — PASS/FAIL
 - `statusLine` configured in `~/.claude/settings.json` — PASS/WARN
+- `statusLine.refreshInterval` present in `~/.claude/settings.json` — PASS/WARN ("refreshInterval missing — statusline won't poll during idle background-agent runs; re-run omca-setup to back-fill")
 - If daemon mode: check if daemon is running (`cc-statusline-daemon status`) — PASS/WARN
 
-Print the Phase 6 health report format with all findings. Use "Doctor Report" header instead of "Health Check".
+Include all Check 7 findings (including the `refreshInterval` PASS/WARN line) in both the `--doctor` terminal output and the Phase 6 health report.
+
+Print the Phase 6 health report format with all findings. Use "Doctor Report" header instead of "Health Check". In the step-g user report (Phase 5.6 step g), add a line under the `~/.claude/settings.json` entry:
+```
+    ~/.claude/settings.json                   — statusLine added (mode: daemon|direct, refreshInterval: 5)
+```
 
 ---
 
