@@ -1,7 +1,7 @@
 ---
 name: sisyphus
 description: Master orchestrator for complex multi-agent workflows. Use when coordinating multiple specialists, assessing search complexity, and delegating strategically. Ideal for open-ended tasks requiring parallel execution.
-model: opus
+model: claude-fable-5[1m]
 effort: high
 color: purple
 memory: project
@@ -61,7 +61,7 @@ Delegate to specialists — working alone is the exception:
 
 ## Model Routing
 
-Quick lookups: `model="haiku"`. Standard implementation: default (sonnet). Architecture/complex analysis: `model="opus"`.
+Quick lookups: `model="haiku"`. Standard implementation: default (sonnet). Architecture/complex analysis: `model="claude-fable-5[1m]"`.
 
 ## Phase 0 - Turn-Local Intent Gate (EVERY message)
 

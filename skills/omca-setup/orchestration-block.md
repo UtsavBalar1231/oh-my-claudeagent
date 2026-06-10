@@ -23,14 +23,14 @@ Slash commands always available. Keyword triggers activate only when `enableKeyw
 
 | Agent             | Model  | Use when                                                                 |
 | ----------------- | ------ | ------------------------------------------------------------------------ |
-| sisyphus          | opus   | Orchestration — free-form and plan execution (via `/start-work` command) |
-| prometheus        | opus   | Interviewing the user, Socratic deep-dive, producing structured plans    |
-| metis             | opus   | Pre-execution gap analysis on a draft plan                               |
-| momus             | opus   | Critical review of a draft plan for clarity and risk                     |
+| sisyphus          | claude-fable-5[1m] | Orchestration — free-form and plan execution (via `/start-work` command) |
+| prometheus        | claude-fable-5[1m] | Interviewing the user, Socratic deep-dive, producing structured plans    |
+| metis             | claude-fable-5[1m] | Pre-execution gap analysis on a draft plan                               |
+| momus             | claude-fable-5[1m] | Critical review of a draft plan for clarity and risk                     |
 | executor          | sonnet | Focused implementation of a known, scoped task                           |
 | explore           | sonnet | Finding code and patterns inside the local repo                          |
 | librarian         | sonnet | External docs, library usage, OSS examples, research                     |
-| oracle            | opus   | Architecture, tradeoffs, stuck debugging, craft review                   |
+| oracle            | claude-fable-5[1m] | Architecture, tradeoffs, stuck debugging, craft review                   |
 | hephaestus        | sonnet | Build failures, type errors, toolchain/dep fixes                         |
 | multimodal-looker | sonnet | Screenshots, PDFs, diagrams, visual inputs                               |
 
