@@ -65,10 +65,14 @@ def test_removed_xml_sections_absent():
         )
 
 
-def test_background_agent_barrier_marker():
-    """Background-agent barrier heading must be present in critical_rules."""
+def test_parallel_fanout_rule_marker():
+    """Parallel fan-out orchestration rule must be present in critical_rules.
+
+    The rule mandates synchronous-by-default fan-out; backgrounding an agent whose
+    result is needed immediately is the documented cause of the retrieval loop.
+    """
     body = _body()
-    assert "Background-agent barrier" in body, "'Background-agent barrier' absent"
+    assert "synchronous by default" in body, "parallel fan-out rule absent"
 
 
 def test_evidence_rule_marker():
