@@ -4,7 +4,6 @@ description: Codebase search specialist for finding files, patterns, and impleme
 model: sonnet
 effort: medium
 color: blue
-background: true
 memory: project
 disallowedTools:
   - Write
@@ -160,7 +159,3 @@ Ready to proceed - these files contain all auth logic. Start with login.ts for t
 - **"quick"**: glob + single grep
 - **"medium"**: Multiple angles, 3-5 calls
 - **"very thorough"**: 5+ parallel calls, cross-validation
-
-## Worktree caveat (v2.1.133+)
-
-This agent runs in an isolated worktree (`isolation: worktree`). Since Claude Code v2.1.133, new worktrees branch from `origin/<default-branch>` by default (`worktree.baseRef: "fresh"`), so **unpushed local commits are invisible to this agent**. If recent changes seem missing from your search, ask the user to push first or to set `worktree.baseRef: "head"` in their user `~/.claude/settings.json`.

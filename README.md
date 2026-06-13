@@ -90,13 +90,15 @@ hooks for persistence, context injection, and auto-approval.
 
 ### Heads-up — `worktree.baseRef` and unpushed commits
 
-OMCA's `explore` and `librarian` agents run with `isolation: worktree`, so each
-invocation spawns in a fresh git worktree. Since Claude Code v2.1.133, the default
-base ref for new worktrees is `origin/<default-branch>` (i.e. `"fresh"`) — **unpushed
-local commits are not visible to these subagents**.
+When you run anything in an isolated git worktree — `/oh-my-claudeagent:start-work
+--worktree`, or any agent you've given `isolation: worktree` — each invocation spawns
+in a fresh worktree. Since Claude Code v2.1.133, the default base ref for new worktrees
+is `origin/<default-branch>` (i.e. `"fresh"`) — **unpushed local commits are not visible
+inside that worktree**. (OMCA's own `explore` and `librarian` agents run in your main
+checkout, not a worktree, so they always see uncommitted work.)
 
-If you have WIP commits that haven't been pushed yet and you want subagents to see
-them, set this in your user `~/.claude/settings.json`:
+If you have WIP commits that haven't been pushed yet and you want worktree-isolated work
+to see them, set this in your user `~/.claude/settings.json`:
 
 ```json
 "worktree": { "baseRef": "head" }

@@ -4,7 +4,6 @@ description: External documentation and open-source code researcher. Use when lo
 model: sonnet
 effort: medium
 color: orange
-background: true
 memory: project
 disallowedTools:
   - Write
@@ -189,7 +188,3 @@ Research-only — reads and reports, no code modifications.
 - Architecture concerns → recommend `oracle`
 - Local codebase question → recommend `explore`
 - Always conclude with clear handoff statement
-
-## Worktree caveat (v2.1.133+)
-
-This agent runs in an isolated worktree (`isolation: worktree`). Since Claude Code v2.1.133, new worktrees branch from `origin/<default-branch>` by default (`worktree.baseRef: "fresh"`), so **unpushed local commits are invisible to this agent**. When cross-referencing local code against external research, recent uncommitted/unpushed work may not be present; ask the user to push first or to set `worktree.baseRef: "head"` in their user `~/.claude/settings.json`.

@@ -172,15 +172,16 @@ Assess whether existing patterns are worth following.
 
 ### Parallel Execution (DEFAULT)
 
-Explore agents = Grep, not consultants. Always background, always parallel:
+Explore agents = Grep, not consultants. Fan out **synchronously in parallel**: multiple `Agent` calls in ONE message, NO `run_in_background`. They run concurrently, the turn blocks until all return, and each tool result IS that agent's full deliverable — collected directly, with no notification to parse.
 
 ```text
-// CORRECT: Always background, always parallel
-Agent(subagent_type="oh-my-claudeagent:explore", run_in_background=true, prompt="Find auth implementations...")
-Agent(subagent_type="oh-my-claudeagent:explore", run_in_background=true, prompt="Find error handling patterns...")
-Agent(subagent_type="oh-my-claudeagent:librarian", run_in_background=true, prompt="Find JWT best practices...")
-// Continue ONLY with non-overlapping work. If none exists, END YOUR RESPONSE.
+// CORRECT: parallel + synchronous — one message, multiple Agent calls, no background flag
+Agent(subagent_type="oh-my-claudeagent:explore", prompt="Find auth implementations...")
+Agent(subagent_type="oh-my-claudeagent:explore", prompt="Find error handling patterns...")
+Agent(subagent_type="oh-my-claudeagent:librarian", prompt="Find JWT best practices...")
 ```
+
+Do NOT set `run_in_background=true` for fan-out-then-synthesize. Backgrounding an agent whose result you immediately need is the cause of the "agent returned only a stub / re-querying" loop: a background completion `<task-notification>` is a **trigger + an output-file path, NOT the deliverable**. Reach for background ONLY when you have genuine non-overlapping work to do meanwhile (see Background Exception).
 
 ### Search Stop Conditions
 
@@ -188,34 +189,21 @@ STOP when: enough context, same info across sources, 2 iterations no new data, d
 
 **Do NOT over-explore.**
 
-### Background Result Collection
+### Result Collection
 
-1. Launch parallel agents → receive IDs
-2. Continue ONLY with non-overlapping work. All remaining depends on results → END RESPONSE
-3. Completion notification triggers next turn
-4. Results arrive IN task-notification text
-   - Do NOT read JSONL transcripts or `.omca/logs/` for results
-   - Do NOT poll filesystem state
-   - Exception: skills with explicit file-based output (e.g., github-triage)
-5. Cancel disposable agents when unneeded
+Synchronous fan-out (default): every Agent tool result returns inline when the batch completes. Read each deliverable straight from its tool result — no IDs to track, no notifications to await, no barrier.
 
-### Background Agent Barrier (MANDATORY)
+NEVER, for any agent:
+- Read the `.output` file or JSONL transcript to "get the result" — it is the full subagent conversation and will overflow your context.
+- Re-query a finished agent via `SendMessage` to fetch its "real output." If a synchronous agent returned a stub, that stub IS its final answer — relaunch a fresh agent with a sharper prompt instead of re-poking a dead one.
 
-When you launched N background agents and receive a completion notification:
+### Background Exception (rare)
 
-1. **COUNT**: task-notifications received vs agents launched
-2. **IF received < launched**:
-   - Acknowledge briefly (1-2 lines)
-   - "Waiting for N remaining agent(s)..."
-   - **END YOUR RESPONSE** — do NOT start work or analysis
-3. **IF received == launched**: all in — proceed
+Use `run_in_background=true` ONLY when you have real non-overlapping work to do while the agent runs, or for skills with explicit file-based output (e.g., github-triage). When you do:
 
-Claude Code delivers one notification per turn. Ending after partial results unblocks the queue.
-
-```
-Agent A completed → "Received A. Waiting for 1 more..." → END RESPONSE
-Agent B completed → "All reported. Proceeding..."
-```
+1. The deliverable arrives via the **Agent tool result** on completion — NOT in the `<task-notification>` text (trigger + output-file path only). Do not invent a "marker"; if the result is not yet in the tool result, the agent has not finished.
+2. Do NOT Read the `.output`/JSONL transcript (overflows context). Do NOT re-query via `SendMessage`.
+3. Barrier: while notifications are still pending and all remaining work depends on them, acknowledge briefly (1-2 lines), say how many remain, and **END YOUR RESPONSE**. Synthesize only once every background agent's tool result is in.
 
 ### Explore/Librarian Prompt Structure (MANDATORY)
 

@@ -217,17 +217,21 @@ Agent(subagent_type="oh-my-claudeagent:executor", prompt="Task 3...")
 Agent(subagent_type="oh-my-claudeagent:executor", prompt="Task 4...")
 ```
 
-### 2.2 Background Agent Barrier
+### 2.2 Result Collection
 
-When N background agents launched and first completes:
+Parallel groups run SYNCHRONOUSLY (multiple Agent calls in one message, NO
+`run_in_background`): every tool result returns inline when the batch completes —
+read each deliverable directly. Never Read a subagent's `.output`/JSONL transcript
+(overflows context), and never re-query a finished agent via `SendMessage` — a
+stub return IS the final answer; relaunch a fresh agent with a sharper prompt
+instead.
 
-1. COUNT task-notifications received vs agents launched.
-2. IF received < launched: acknowledge result briefly, say "Waiting for N more...", END response.
-3. IF received == launched: all results in — proceed.
-
-Claude Code delivers one notification per turn. Ending your response immediately
-unblocks queued notifications. Never act on partial results from parallel
-background agents.
+Background (`run_in_background=true`) is reserved for genuine meanwhile-work or
+file-based-output skills. Then the deliverable arrives via the Agent tool result
+on completion — NOT the `<task-notification>` text (a trigger + output-file path).
+While notifications are pending and all remaining work depends on them, acknowledge
+briefly, say how many remain, and END the response; synthesize once every tool
+result is in. Never act on partial results.
 
 ### 2.3 Verify After Every Delegation
 

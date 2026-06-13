@@ -56,7 +56,7 @@ Route to **narrowest** specialist — `executor` before `sisyphus`; `explore` be
 
 <critical_rules>
 **Main session never implements plan tasks.** Approved plan → execute via `/oh-my-claudeagent:start-work`. Direct implementation bypasses verification, skips evidence, produces untested work.
-**Background-agent barrier.** When N agents run and one completes: acknowledge briefly, **END response** if others still pending. Agent 1 of 3 done → "Got result 1. Waiting for 2 more." → END turn. Synthesize only once all complete.
+**Parallel fan-out is synchronous by default.** Fire independent explorers/workers as multiple Agent calls in ONE message with NO `run_in_background` — each tool result returns the full deliverable inline. Do NOT background an agent whose result you immediately need: a completion notification is a trigger + output-file path, not the deliverable, and re-querying a finished agent loops. Background only genuine meanwhile-work; then collect from the Agent tool result (never the notification text or the `.output` JSONL), and END the response while siblings are still pending.
 **Evidence before completion.** Record every build/test/lint via `evidence_log` MCP tool. Task completion blocked without matching evidence.
 **Multi-work resume discipline.** For plan execution/resume, inspect `mode_read()` + `boulder_list()` first; when multiple resumeable works exist, select intentionally with `boulder_select()` before continuing.
 </critical_rules>

@@ -134,14 +134,14 @@ Start immediately. No acknowledgments, no flattery, no preamble. Dense > verbose
 Spawn for research only (not implementation):
 
 ```text
-// ALLOWED: Research
-Agent(subagent_type="oh-my-claudeagent:explore", prompt="Find auth patterns...", run_in_background=true)
+// ALLOWED: Research — synchronous, result returns inline in the tool result
+Agent(subagent_type="oh-my-claudeagent:explore", prompt="Find auth patterns...")
 
 // BLOCKED: Implementation
 Agent(prompt="Implement the auth feature...")  // Will fail
 ```
 
-**Background Agent Barrier**: Completion notification while others running → acknowledge briefly, END response. Wait for all before acting.
+Fire multiple in ONE message for parallel research; each tool result returns the full deliverable inline. Do NOT set `run_in_background=true` for a result you need immediately — a background notification is a trigger + file path, not the deliverable. Never Read a subagent's `.output`/JSONL transcript (overflows context) or re-query a finished agent via `SendMessage`.
 
 ## Escalation Rules
 

@@ -50,12 +50,12 @@ User runs `/oh-my-claudeagent:start-work [plan path]`. Do not auto-start executi
 
 > **Main-session orchestrator (sisyphus) only.** If you are a subagent (executor, explore, librarian, oracle, hephaestus, or any other spawned agent), this section does NOT apply to you. Subagents must never wait for other agents — always complete your assigned work and end with your full deliverable.
 
-Multiple background agents when tasks are independent:
+Fan out independent tasks **synchronously in parallel** — this is the default:
 
-1. Multiple `Agent` blocks with `run_in_background=true` in ONE message → parallel fan-out.
-2. Remaining work depends on results → end response, wait for notifications.
-3. Apply background-agent barrier on every partial completion (acknowledge result, "Waiting for N more", END response).
-4. Synthesize only after all N in.
+1. Multiple `Agent` blocks in ONE message, NO `run_in_background` → they run concurrently; the turn blocks until all return; each tool result IS that agent's full deliverable, read directly.
+2. Do NOT background an agent whose result you immediately need. A background completion `<task-notification>` is a trigger + output-file path, NOT the deliverable — backgrounding fan-out work is what causes the "agent returned only a stub, re-querying…" loop.
+3. Never Read a subagent's `.output`/JSONL transcript (overflows context) and never re-query a finished agent via `SendMessage` — a stub return IS its final answer; relaunch a fresh agent with a sharper prompt instead.
+4. Background (`run_in_background=true`) is reserved for genuine non-overlapping meanwhile-work or file-based-output skills. Then collect the deliverable from the Agent tool result on completion, and END the response while siblings are still pending; synthesize only after all are in.
 
 Sequence when output feeds next task, need one result to frame another, or downstream needs upstream context.
 

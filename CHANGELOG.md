@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.2] - 2026-06-13
+
+Fixes the recurring background-subagent retrieval loop and removes incorrect
+worktree-isolation documentation.
+
+### Fixed
+
+- **Background subagent results no longer loop.** Orchestrator guidance treated a
+  background agent's completion `<task-notification>` as the deliverable, but it carries
+  only a trigger and an output-file path (the platform `TaskOutput` tool is deprecated).
+  The orchestrator would find no payload where it was told to look, confabulate a stub
+  reply (e.g. `Complete.`), and re-query the finished agent indefinitely. Parallel
+  fan-out is now **synchronous by default** — multiple `Agent` calls in one message with
+  no `run_in_background`, so each tool result carries the full deliverable inline.
+  `background: true` is removed from the `explore` and `librarian` agents, and the
+  corrected model is applied across `sisyphus`, `executor`, `start-work`, `ultrawork`,
+  the default output style, and the `omca-setup` orchestration block. Background mode is
+  retained as a documented exception for genuine non-overlapping work and file-based
+  output skills (e.g. `github-triage`).
+- **Removed false `isolation: worktree` claims.** No OMCA agent runs in a git worktree,
+  yet `explore`, `librarian`, and `README.md` stated the two read-only search agents do —
+  which, if true, would hide unpushed local commits from their searches. Docs now state
+  these agents run in the main checkout; the `worktree.baseRef` heads-up is rescoped to
+  actual worktree-isolated work (`/oh-my-claudeagent:start-work --worktree` or
+  user-added `isolation: worktree` agents).
+
 ## [2.8.1] - 2026-06-13
 
 Orchestrator-tier default model switched to Opus 4.8 (1M context).

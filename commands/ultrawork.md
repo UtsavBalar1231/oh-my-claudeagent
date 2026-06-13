@@ -175,11 +175,11 @@ Before claiming done:
 
 State managed by persistence layer. Don't clear manually — use `/oh-my-claudeagent:stop-continuation`. While active, Claude won't stop until all work verified.
 
-## When All Work Delegated
+## Collecting Parallel Results
 
-All work in background agents → END RESPONSE, wait for notifications. No log reading, transcript parsing, or state polling.
+Fire each batch as multiple `Agent` calls in ONE message with NO `run_in_background` — they run concurrently and every tool result returns inline when the batch completes. Read each deliverable directly; consolidate once the batch returns.
 
-**Background Agent Barrier**: Notification while others running → acknowledge briefly, END response. No consolidation until ALL reported.
+Never Read a subagent's `.output`/JSONL transcript (overflows context) and never re-query a finished agent via `SendMessage` — a stub return IS its final answer; relaunch a fresh agent with a sharper prompt. Reserve `run_in_background=true` for genuine non-overlapping meanwhile-work; then collect from the Agent tool result on completion (not the notification text), acknowledge briefly and END the response while siblings are pending, and consolidate only after ALL report.
 
 ## Anti-Patterns (NEVER)
 
