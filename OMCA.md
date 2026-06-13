@@ -10,7 +10,7 @@ Install: `README.md`. Contributor internals: `CLAUDE.md`.
 
 Claude Code runs single-threaded. Simultaneous research + implementation, or ten files needing fixes at once, bottleneck the default session. No built-in specialist delegation or persistence guarantee.
 
-OMCA adds a multi-agent layer: specialist agents with model tiers (claude-fable-5[1m]/sonnet/haiku), skills via slash commands or keywords, hooks for persistence and context injection, MCP servers for structural search and state.
+OMCA adds a multi-agent layer: specialist agents with model tiers (claude-opus-4-8[1m]/sonnet/haiku), skills via slash commands or keywords, hooks for persistence and context injection, MCP servers for structural search and state.
 
 ### Philosophy
 
@@ -42,7 +42,7 @@ Markdown files in `agents/*.md` with YAML frontmatter (name, model, disallowedTo
 
 | Tier | Default for | Use for |
 |------|-------------|---------|
-| claude-fable-5[1m] | Orchestrators, planners, reviewers | Complex reasoning, architecture, multi-step coordination |
+| claude-opus-4-8[1m] | Orchestrators, planners, reviewers | Complex reasoning, architecture, multi-step coordination |
 | sonnet | Executors, searchers, fixers | Standard implementation, search, builds |
 | haiku | (override only) | Quick lookups, simple transforms |
 
@@ -518,7 +518,7 @@ Add to `.claude/settings.json` for automatic team-wide installation:
 
 | Agent | Model | Effort | Invoke | Purpose |
 |-------|-------|--------|--------|---------|
-| sisyphus | claude-fable-5[1m] | high | Main session (injected via `templates/claudemd.md`) or `/oh-my-claudeagent:start-work` (Plan Execution Mode) | Master orchestrator identity — classifies requests, delegates to specialists. Two modes: free-form (conversational) and plan-driven (via `/start-work` command body). Plan Execution Mode protocol lives in `commands/start-work.md`. |
+| sisyphus | claude-opus-4-8[1m] | high | Main session (injected via `templates/claudemd.md`) or `/oh-my-claudeagent:start-work` (Plan Execution Mode) | Master orchestrator identity — classifies requests, delegates to specialists. Two modes: free-form (conversational) and plan-driven (via `/start-work` command body). Plan Execution Mode protocol lives in `commands/start-work.md`. |
 
 **sisyphus** — The one orchestrator. Free-form mode: routes requests to specialists, runs explore agents in background. Plan Execution Mode: reads plan, delegates per-task to `executor`, runs Final Verification Wave (F1 via oracle, F2-F4 via executor), waits for sign-off.
 
@@ -526,10 +526,10 @@ Add to `.claude/settings.json` for automatic team-wide installation:
 
 | Agent | Model | Effort | Invoke | Purpose |
 |-------|-------|--------|--------|---------|
-| prometheus | claude-fable-5[1m] | high | `/oh-my-claudeagent:plan` or "create plan" | Strategic planning with requirements interview + optional Socratic Interview Mode |
-| metis | claude-fable-5[1m] | high | `/oh-my-claudeagent:metis` or "run metis" | Pre-planning gap analysis |
-| momus | claude-fable-5[1m] | high | `Skill(oh-my-claudeagent:momus)` (or `Agent(subagent_type="oh-my-claudeagent:momus")` from the main session) | Rigorous plan review — OKAY or REJECT |
-| oracle | claude-fable-5[1m] | max | `Agent(subagent_type="oh-my-claudeagent:oracle")` | Architecture advisor, read-only |
+| prometheus | claude-opus-4-8[1m] | high | `/oh-my-claudeagent:plan` or "create plan" | Strategic planning with requirements interview + optional Socratic Interview Mode |
+| metis | claude-opus-4-8[1m] | high | `/oh-my-claudeagent:metis` or "run metis" | Pre-planning gap analysis |
+| momus | claude-opus-4-8[1m] | high | `Skill(oh-my-claudeagent:momus)` (or `Agent(subagent_type="oh-my-claudeagent:momus")` from the main session) | Rigorous plan review — OKAY or REJECT |
+| oracle | claude-opus-4-8[1m] | max | `Agent(subagent_type="oh-my-claudeagent:oracle")` | Architecture advisor, read-only |
 
 **prometheus** — 9-item clearance checklist interview, consults metis, generates plan,
 submits to momus for review (up to 3 iterations). Optional Socratic Interview Mode for

@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.1] - 2026-06-13
+
+Orchestrator-tier default model switched to Opus 4.8 (1M context).
+
+### Changed
+
+- **Orchestrator-tier default model updated to `claude-opus-4-8[1m]`** (was
+  `claude-fable-5[1m]`). Affects the `sisyphus`, `prometheus`, `metis`, `momus`, and
+  `oracle` agent definitions, the `frontend-ui-ux` skill, and the cost/concurrency tier
+  maps in `servers/categories.json` and `servers/tools/catalog.py`. The `omca-setup`
+  orchestration block and the `OMCA.md` agent catalog are updated to match. Sonnet- and
+  haiku-tier agents are unchanged.
+- **`scripts/package-plugin.sh`**: exclude `.claude/worktrees/` and `.in_use/` from
+  packaged plugin artifacts.
+
 ## [2.8.0] - 2026-06-10
 
 Bash failure coaching, statusline refresh cadence, and doc sweep (Claude Code v2.1.170+).
