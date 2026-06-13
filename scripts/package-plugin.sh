@@ -60,6 +60,8 @@ EXCLUDES=(
 	'CLAUDE.md'
 	'.sisyphus/'
 	'.claude/plans/'
+	'.claude/worktrees/'
+	'.in_use/'
 	'benchmarks/'
 	'tests/'
 	'*.pyc'
