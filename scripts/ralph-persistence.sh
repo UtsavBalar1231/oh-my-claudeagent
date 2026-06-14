@@ -27,6 +27,16 @@ _cap_state_write() {
 	tmp=$(mktemp) && printf '%s\n' "${json}" > "${tmp}" && mv "${tmp}" "${RALPH_CAP_STATE}"
 }
 
+# Set a mode's status to inactive so a stagnated or finished persistence mode disarms
+# itself instead of lingering active across sessions. A mode that never auto-deactivates
+# re-arms this Stop gate every turn — the root cause of month-old stuck ralph state.
+deactivate_mode() {
+	local state_file="$1"
+	[[ -f "${state_file}" ]] || return 0
+	local tmp
+	tmp=$(mktemp) && jq '.status = "inactive"' "${state_file}" > "${tmp}" && mv "${tmp}" "${state_file}"
+}
+
 # Boulder fallback: block stop if a fresh work plan exists.
 # NAMED WITH ACTION VERB: side-effect is intentional, see caller chains.
 allow_stop_via_boulder_fallback() {
@@ -193,7 +203,8 @@ if [[ "${RALPH_ACTIVE}" == "true" ]]; then
 		mv "${RALPH_STATE}.tmp" "${RALPH_STATE}"
 
 	if [[ ${STAGNATION} -ge ${MAX_STAGNATION} ]]; then
-		log_hook_error "ralph stagnated (${STAGNATION}/${MAX_STAGNATION}) — allowing stop" "ralph-persistence.sh"
+		log_hook_error "ralph stagnated (${STAGNATION}/${MAX_STAGNATION}) — allowing stop and deactivating ralph" "ralph-persistence.sh"
+		deactivate_mode "${RALPH_STATE}"
 		allow_stop_via_boulder_fallback
 		exit 0
 	fi
@@ -250,7 +261,8 @@ if [[ "${RALPH_ACTIVE}" == "true" ]]; then
 					mv "${RALPH_STATE}.tmp" "${RALPH_STATE}"
 
 				if [[ ${plan_stagnation_pfp} -ge 3 ]]; then
-					log_hook_error "ralph plan stagnated (plan_stagnation_count=${plan_stagnation_pfp}, incomplete=${incomplete_pfp}) — allowing stop" "ralph-persistence.sh"
+					log_hook_error "ralph plan stagnated (plan_stagnation_count=${plan_stagnation_pfp}, incomplete=${incomplete_pfp}) — allowing stop and deactivating ralph" "ralph-persistence.sh"
+					deactivate_mode "${RALPH_STATE}"
 					allow_stop_via_boulder_fallback
 					exit 0
 				fi
@@ -314,6 +326,7 @@ if [[ "${ULTRAWORK_ACTIVE}" == "true" ]]; then
 		mv "${ULTRAWORK_STATE}.tmp" "${ULTRAWORK_STATE}"
 
 	if [[ ${UW_STAGNATION} -ge 5 ]]; then
+		deactivate_mode "${ULTRAWORK_STATE}"
 		allow_stop_via_boulder_fallback
 		exit 0
 	fi
@@ -322,6 +335,21 @@ if [[ "${ULTRAWORK_ACTIVE}" == "true" ]]; then
 		exit 0
 	fi
 
+	# No live agents and ultrawork still active: bound this block with a MONOTONIC
+	# consecutive-block counter that resets ONLY when ultrawork yields — never on sibling
+	# presence — so an oscillating or stale agent count cannot loop it unboundedly. This
+	# is the one block path that previously had no STOP_BLOCK_CAP backstop at all.
+	UW_CAP_JSON=$(_cap_state_read)
+	UW_BLOCK_CNT=$(printf '%s\n' "${UW_CAP_JSON}" | jq -r '.ultrawork_block_count // 0')
+	UW_BLOCK_CNT=$((UW_BLOCK_CNT + 1))
+	if [[ ${UW_BLOCK_CNT} -ge $(( STOP_BLOCK_CAP - 1 )) ]]; then
+		log_hook_error "ultrawork cap yielding at ultrawork_block_count=${UW_BLOCK_CNT} (cap=${STOP_BLOCK_CAP}) — deactivating ultrawork" "ralph-persistence.sh"
+		_cap_state_write "$(printf '%s\n' "${UW_CAP_JSON}" | jq '.ultrawork_block_count = 0')"
+		deactivate_mode "${ULTRAWORK_STATE}"
+		echo '{"reason":"[ULTRAWORK PERSISTENCE] Consecutive Stop-block cap reached — yielding and deactivating ultrawork. To resume: invoke /oh-my-claudeagent:ultrawork again, or /oh-my-claudeagent:stop-continuation to clear persistence."}'
+		exit 0
+	fi
+	_cap_state_write "$(printf '%s\n' "${UW_CAP_JSON}" | jq --argjson c "${UW_BLOCK_CNT}" '.ultrawork_block_count = $c')"
 	echo '{"decision":"block","reason":"[ULTRAWORK PERSISTENCE] Ultrawork mode is active. Continue parallel execution of remaining tasks."}'
 	exit 0
 fi

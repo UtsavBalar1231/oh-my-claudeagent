@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.3] - 2026-06-14
+
+Eliminates the two inescapable orchestration loops — the orchestrator `Waiting.`
+loop and the finished-subagent `Done. Ending.` loop — by making the persistence
+control plane bounded and fail-open. Root cause and every fix were reproduced by
+running the actual hooks in isolated state.
+
+### Fixed
+
+- **Finished subagents no longer trapped in a `Done. Ending.` loop.** `oracle` and
+  `momus` were excluded from the worker anti-barrier exemption in
+  `subagent-start.sh`, so finished advisors inherited "Continue working in ralph
+  mode" with no off-ramp. The exemption is inverted: every agent EXCEPT the three
+  orchestrators (`sisyphus`/`prometheus`/`metis`) now receives it. Additionally,
+  `empty-task-response.sh` flagged a terse terminal acknowledgement (`Done.`) as
+  POOR output and told the orchestrator to **re-query the finished agent via
+  SendMessage** — an unbounded re-query cycle. Terminal acknowledgements are now
+  accepted as valid, and the nudge no longer suggests re-querying a terminal agent.
+- **Orchestrator no longer trapped in a `Waiting.` loop.** `subagent-complete.sh`
+  injected an age-blind `[BACKGROUND AGENTS PENDING] … END your response and wait`
+  barrier driven by `subagents.json`; a phantom entry (a subagent that died without a
+  `SubagentStop`) was immortal and emitted "wait" forever. The barrier injection is
+  removed, and `subagents.json` `.active` entries now self-expire at the same 900s
+  liveness cutoff already used by `active-agents.json`. Remaining barrier prose in
+  `agents/sisyphus.md`, `commands/ulw-loop.md`, and the `omca-setup` orchestration
+  block is replaced with a synchronous-default, single-wait, anti-loop rule.
+- **Persistence Stop gates are now bounded and fail-open.** `ralph-persistence.sh`:
+  the ultrawork no-agents block path (previously the only block path with **no**
+  `STOP_BLOCK_CAP` backstop) is now bounded by a monotonic counter and deactivates
+  ultrawork on yield; ralph self-deactivates when it stagnates instead of lingering
+  active across sessions (the cause of month-old stuck `ralph-state.json` with a
+  runaway `stagnation_count`). `final-verification-evidence.sh`: adds the
+  consecutive-block cap it previously lacked (an orphaned `pending-final-verify`
+  marker blocked Stop with `exit 2` forever) and the 24h orphan-marker TTL now fires
+  even when `boulder.json` still references an active plan.
+
 ## [2.8.2] - 2026-06-13
 
 Fixes the recurring background-subagent retrieval loop and removes incorrect

@@ -70,7 +70,7 @@ Reset intent at the start of every turn. Do not carry over implementation moment
 Before any implementation, pass the **Context-Completion Gate**:
 - Current turn intent is explicitly implementation/fix/refactor, not research/evaluation.
 - Required context is complete: target files or discovery results, success criteria, constraints, and verification path are known.
-- Background Agent Barrier is clear: all background agents needed for the decision have reported.
+- Required deliverables are present inline: synchronous fan-out returns each agent's result as its Agent tool result. If you backgrounded an agent, its result likewise arrives via the Agent tool result — never infer "done" from a notification or a running-count.
 - `/oh-my-claudeagent:start-work <plan>` remains authoritative for plan execution. If a plan is in play, execute through that command body; do not recreate its protocol here.
 
 Gate fails → ask, delegate research, or wait. Do not start edits.
@@ -203,7 +203,7 @@ Use `run_in_background=true` ONLY when you have real non-overlapping work to do 
 
 1. The deliverable arrives via the **Agent tool result** on completion — NOT in the `<task-notification>` text (trigger + output-file path only). Do not invent a "marker"; if the result is not yet in the tool result, the agent has not finished.
 2. Do NOT Read the `.output`/JSONL transcript (overflows context). Do NOT re-query via `SendMessage`.
-3. Barrier: while notifications are still pending and all remaining work depends on them, acknowledge briefly (1-2 lines), say how many remain, and **END YOUR RESPONSE**. Synthesize only once every background agent's tool result is in.
+3. Single-wait rule (anti-loop): end the response ONCE. On the next turn, synthesize from whatever Agent tool results are present. If a result is still absent, relaunch that agent synchronously or proceed without it — **never emit a bare wait/holding message on two consecutive turns for the same agents** (that is the "Waiting." loop).
 
 ### Explore/Librarian Prompt Structure (MANDATORY)
 

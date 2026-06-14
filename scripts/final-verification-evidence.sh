@@ -65,6 +65,19 @@ if [[ -z "${ACTIVE_PLAN}" && -z "${MARKER_PLAN}" ]]; then
 	noop_exit
 fi
 
+# Orphan-marker TTL — a marker older than MAX_MARKER_AGE_SECONDS is stale REGARDLESS of
+# whether boulder still references an active plan. Previously this only fired when
+# ACTIVE_PLAN was empty, so a same-session orphan marker could block Stop forever. Clear
+# it and allow stop (fail-open).
+if [[ -n "${MARKER_PLAN}" && -n "${MARKER_AT}" && "${MARKER_AT}" != "0" ]]; then
+	NOW_TTL=$(date +%s)
+	if [[ $(( NOW_TTL - MARKER_AT )) -gt "${MAX_MARKER_AGE_SECONDS}" ]]; then
+		log_hook_error "orphan final-verify marker older than ${MAX_MARKER_AGE_SECONDS}s — clearing and allowing stop" "final-verification-evidence.sh"
+		rm -f "${MARKER_FILE}"
+		noop_exit
+	fi
+fi
+
 # Session-aware staleness short-circuits: runs before TTL/evidence check; each clears the
 # marker and noop_exits when an independent signal proves it stale.
 if [[ -n "${MARKER_PLAN}" ]]; then
@@ -260,6 +273,23 @@ MISSING=""
 
 if [[ -n "${MISSING}" ]]; then
 	MISSING="${MISSING# }"
+	# Consecutive-block cap (mirrors ralph-persistence.sh, which this hook previously
+	# lacked). An unsatisfiable same-session orphan obligation must not block Stop
+	# unboundedly. Count consecutive blocks keyed by plan SHA (a SHA change resets); at
+	# cap, allow stop (fail-open) but RETAIN the marker so a later legitimate Stop nudges.
+	STOP_BLOCK_CAP="${CLAUDE_CODE_STOP_HOOK_BLOCK_CAP:-8}"
+	FV_CAP_STATE="${STATE_DIR}/final-verify-cap-state.json"
+	FV_PREV_SHA=$(jq_read "${FV_CAP_STATE}" '.plan_sha256 // ""')
+	FV_CNT=$(jq_read "${FV_CAP_STATE}" '.block_count // 0')
+	[[ "${FV_PREV_SHA}" != "${CURRENT_SHA}" ]] && FV_CNT=0
+	FV_CNT=$(( FV_CNT + 1 ))
+	_fv_tmp=$(mktemp) && jq -n --arg sha "${CURRENT_SHA}" --argjson c "${FV_CNT}" \
+		'{plan_sha256: $sha, block_count: $c}' > "${_fv_tmp}" && mv "${_fv_tmp}" "${FV_CAP_STATE}"
+	if [[ "${FV_CNT}" -ge "${STOP_BLOCK_CAP}" ]]; then
+		log_hook_error "final-verification yielding at block_count=${FV_CNT} (cap=${STOP_BLOCK_CAP}) — allowing stop, marker retained" "final-verification-evidence.sh"
+		echo "[FINAL VERIFICATION] F1-F4 evidence still missing after ${FV_CNT} Stop attempts — yielding to avoid an inescapable loop. To resolve: mode_clear(mode=\"final_verify\"), or set OMCA_HOOK_DISABLE_FINAL_VERIFY=1, or log evidence with plan_sha256:${CURRENT_SHA}. Marker retained for a later Stop." >&2
+		noop_exit
+	fi
 	# For each missing F-type, check whether a candidate entry exists but was rejected
 	# due to bad verified_by or non-zero exit_code, and surface the cause.
 	REJECTION_DETAIL=""
@@ -318,6 +348,8 @@ fi
 
 if [[ -f "${MARKER_FILE}" ]] && [[ -n "${CURRENT_SHA}" ]] && [[ "${SHA_COUNT}" -le 1 ]]; then
 	rm -f "${MARKER_FILE}"
+	# Evidence satisfied — reset the consecutive-block cap counter.
+	rm -f "${STATE_DIR}/final-verify-cap-state.json"
 fi
 
 noop_exit

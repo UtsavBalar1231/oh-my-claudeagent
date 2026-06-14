@@ -84,7 +84,7 @@ case "${AGENT_TYPE}" in
 		CONTEXT_PARTS+="$(section_header 'Execution Guidance')"
 		EXEC_GUIDANCE_HEADER_ADDED=1
 	fi
-	CONTEXT_PARTS+=$'\n'"[ANTI-DUPLICATION] Once you delegate exploration to explore/librarian agents, do not perform the same search yourself. Avoid after delegating: manually grep/searching for the same information; re-doing research agents are handling; 'just quickly checking' the same files. Continue only with non-overlapping work. When delegated results are needed but not ready: end your response and wait for the completion notification — do not re-search the same topics while waiting."
+	CONTEXT_PARTS+=$'\n'"[ANTI-DUPLICATION] Once you delegate exploration to explore/librarian agents, do not perform the same search yourself. Avoid after delegating: manually grep/searching for the same information; re-doing research agents are handling; 'just quickly checking' the same files. Continue only with non-overlapping work. A delegated result returns inline in the Agent tool result, not in any notification — do not poll, re-query, or emit a bare wait/holding message for it."
 	;;
 *) ;;
 esac
@@ -109,11 +109,16 @@ case "${AGENT_TYPE}" in
 *) ;;
 esac
 
+# Worker-exemption: every agent EXCEPT the orchestrators coordinates nothing and must
+# never wait. Whitelisting workers by name previously omitted oracle/momus, leaving
+# finished advisors with no off-ramp ("Done. Ending." loop). Invert: only the three
+# orchestrators are excluded; all other agent types (oracle, momus, executor, explore,
+# librarian, hephaestus, multimodal, and any future worker) get the exemption.
 case "${AGENT_TYPE}" in
-*executor* | *explore* | *librarian* | *hephaestus* | *multimodal*)
+*sisyphus* | *prometheus* | *metis*) ;;
+*)
 	CONTEXT_PARTS+=$'\n'"You are a worker subagent with zero dependencies on other agents. Orchestrator guidance about background-agent barriers, 'waiting for N more agents', or ending responses to wait does NOT apply to you. Always end your final message with your complete deliverable — never a wait/holding message."
 	;;
-*) ;;
 esac
 
 ACTIVE_FILE="${STATE_DIR}/active-agents.json"

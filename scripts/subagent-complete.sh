@@ -21,13 +21,19 @@ fi
 
 TIMESTAMP=$(date -Iseconds)
 CURRENT_EPOCH=$(date +%s)
+# 900s (15m) — subagent liveness TTL; the single authoritative "still running" rule,
+# applied identically here, in active-agents.json, and in every reader. An entry whose
+# started_epoch is older than this is a phantom (subagent died without a SubagentStop)
+# and must not count as running. Entries with no started_epoch yet (pre-SubagentStart
+# bridge, i.e. very recent spawn-* ids) are KEPT — never sweep an agent that just spawned.
+CUTOFF=$(( CURRENT_EPOCH - 900 ))
 
 SUBAGENTS_FILE="${STATE_DIR}/subagents.json"
 if [[ -f "${SUBAGENTS_FILE}" ]]; then
 	TMP_FILE=$(mktemp)
-	jq --arg ts "${TIMESTAMP}" --arg status "${EXIT_STATUS}" --arg id "${SUBAGENT_ID}" \
+	jq --arg ts "${TIMESTAMP}" --arg status "${EXIT_STATUS}" --arg id "${SUBAGENT_ID}" --argjson cutoff "${CUTOFF}" \
 		'.completed += [{"id": $id, "completedAt": $ts, "status": $status}] |
-		 .active = [.active[] | select(.id != $id)]' \
+		 .active = [.active[] | select(.id != $id and ((.started_epoch == null) or (.started_epoch > $cutoff)))]' \
 		"${SUBAGENTS_FILE}" >"${TMP_FILE}" && mv "${TMP_FILE}" "${SUBAGENTS_FILE}"
 fi
 
@@ -41,9 +47,8 @@ if [[ -f "${ACTIVE_FILE}" ]]; then
 	if [[ "${STARTED_EPOCH}" =~ ^[0-9]+$ ]] && [[ "${STARTED_EPOCH}" -gt 0 ]]; then
 		DURATION_SECONDS=$(( CURRENT_EPOCH - STARTED_EPOCH ))
 	fi
-	# flock-protected write to prevent concurrent deregistration races
-	# 900s (15m) — active-agent TTL; safe upper bound for any legitimate subagent run.
-	CUTOFF=$(( CURRENT_EPOCH - 900 ))
+	# flock-protected write to prevent concurrent deregistration races. CUTOFF (900s)
+	# is defined once above and shared with the subagents.json sweep — one liveness rule.
 	(
 		# 5s — flock wait; long enough for concurrent siblings, short enough to fail fast.
 		flock -w 5 200 || { log_hook_error "flock timeout on active-agents" "subagent-complete.sh"; exit 0; }
@@ -96,17 +101,7 @@ if [[ -f "${SESSION_STATE}" ]]; then
   ' "${SESSION_STATE}" >"${TMP_FILE}" && mv "${TMP_FILE}" "${SESSION_STATE}"
 fi
 
-# When other agents are still running, return additionalContext so the orchestrator
-# knows to wait instead of acting on partial results.
-REMAINING_ACTIVE=0
-if [[ -f "${SUBAGENTS_FILE}" ]]; then
-	REMAINING_ACTIVE=$(jq '[.active[]? | select(.status == "running")] | length' "${SUBAGENTS_FILE}")
-fi
-
-if [[ "${REMAINING_ACTIVE}" -gt 0 ]]; then
-	REMAINING_NAMES=$(jq -r '[.active[]? | select(.status == "running") | .type] | join(", ")' "${SUBAGENTS_FILE}")
-	jq -nc --arg ctx "[BACKGROUND AGENTS PENDING] ${REMAINING_ACTIVE} agent(s) still running: ${REMAINING_NAMES}. Do NOT proceed with implementation — END your response and wait for remaining agent notifications." \
-		'{hookSpecificOutput: {hookEventName: "SubagentStop", additionalContext: $ctx}}'
-fi
-
+# Deliberately emits NO "agents still running, wait" barrier: it was age-blind (a
+# phantom from a subagent that died without SubagentStop blocked forever) and the
+# orchestrator must rely on the native Agent tool result, not a shell running-count.
 exit 0

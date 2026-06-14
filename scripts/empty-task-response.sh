@@ -20,6 +20,16 @@ if [[ "${RESPONSE_LENGTH}" -lt 50 ]] || [[ -z "$(echo "${RESPONSE}" | tr -d '[:s
 	IS_POOR=true
 fi
 
+# A finished agent legitimately ends with a terse terminal acknowledgement. Treating
+# that as POOR and re-querying it is the "Done. Ending." re-query loop. A non-empty
+# response that reads as a deliberate completion is VALID, never poor.
+if [[ "${IS_POOR}" == "true" ]] && [[ -n "$(echo "${RESPONSE}" | tr -d '[:space:]')" ]]; then
+	LOWER_RESPONSE=$(echo "${RESPONSE}" | tr '[:upper:]' '[:lower:]')
+	if echo "${LOWER_RESPONSE}" | grep -qE '(done|ending|complete|completed|finished|no further|nothing (further|left|to do)|acknowledged|deliverable)'; then
+		IS_POOR=false
+	fi
+fi
+
 if [[ "${IS_POOR}" == "false" ]] && [[ "${RESPONSE_LENGTH}" -lt 200 ]]; then
 	LOWER_RESPONSE=$(echo "${RESPONSE}" | tr '[:upper:]' '[:lower:]')
 	if echo "${LOWER_RESPONSE}" | grep -qE '^(let me|now let me|i'\''ll |good\.|now i|ok,? let me|checking|looking at|reading |searching|next,? |i need to|i should|let'\''s |i want to|i'\''m going to|i will )'; then
@@ -28,7 +38,7 @@ if [[ "${IS_POOR}" == "false" ]] && [[ "${RESPONSE_LENGTH}" -lt 200 ]]; then
 fi
 
 if [[ "${IS_POOR}" == "true" ]]; then
-	MSG="[POOR AGENT OUTPUT] The agent returned empty, trivially short, or transitional text instead of a structured synthesis. The agent likely exhausted its turns on tool calls without producing a final summary. Consider: 1) Use SendMessage to resume the agent and ask it to synthesize its findings, 2) Retry with a more specific prompt that includes explicit output format requirements, 3) Check if the agent had the right tools for the task."
+	MSG="[POOR AGENT OUTPUT] The agent returned empty or trivially short text with no synthesis — it likely exhausted its turns on tool calls. Do NOT re-query the same agent (a finished agent is terminal; re-querying it loops). Relaunch a FRESH agent with a sharper prompt that states the required output format explicitly, or proceed with what you already have."
 	emit_context "PostToolUse" "${MSG}"
 else
 	USAGE_FILE="${HOOK_STATE_DIR}/agent-usage.json"

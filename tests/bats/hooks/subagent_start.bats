@@ -241,20 +241,23 @@ ORACLE_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id
 	! echo "$ctx" | grep -q "worker subagent with zero dependencies"
 }
 
-@test "counter-instruction: momus agent does NOT receive worker counter-instruction" {
+# momus and oracle are advisory WORKERS, not orchestrators — they coordinate no other
+# agents and must receive the exemption so a finished advisor is never told to wait
+# ("Done. Ending." loop). Only sisyphus/prometheus/metis (true orchestrators) are excluded.
+@test "counter-instruction: momus agent receives worker counter-instruction (advisors are workers)" {
 	run_hook "subagent-start.sh" "$MOMUS_PAYLOAD"
 	assert_success
 	local ctx
 	ctx=$(get_context)
-	! echo "$ctx" | grep -q "worker subagent with zero dependencies"
+	echo "$ctx" | grep -q "worker subagent with zero dependencies"
 }
 
-@test "counter-instruction: oracle agent does NOT receive worker counter-instruction" {
+@test "counter-instruction: oracle agent receives worker counter-instruction (advisors are workers)" {
 	run_hook "subagent-start.sh" "$ORACLE_PAYLOAD"
 	assert_success
 	local ctx
 	ctx=$(get_context)
-	! echo "$ctx" | grep -q "worker subagent with zero dependencies"
+	echo "$ctx" | grep -q "worker subagent with zero dependencies"
 }
 
 # ─── m. Flock-timeout safety ─────────────────────────────────────────────────

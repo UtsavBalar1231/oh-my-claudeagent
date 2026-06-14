@@ -55,7 +55,7 @@ Fan out independent tasks **synchronously in parallel** — this is the default:
 1. Multiple `Agent` blocks in ONE message, NO `run_in_background` → they run concurrently; the turn blocks until all return; each tool result IS that agent's full deliverable, read directly.
 2. Do NOT background an agent whose result you immediately need. A background completion `<task-notification>` is a trigger + output-file path, NOT the deliverable — backgrounding fan-out work is what causes the "agent returned only a stub, re-querying…" loop.
 3. Never Read a subagent's `.output`/JSONL transcript (overflows context) and never re-query a finished agent via `SendMessage` — a stub return IS its final answer; relaunch a fresh agent with a sharper prompt instead.
-4. Background (`run_in_background=true`) is reserved for genuine non-overlapping meanwhile-work or file-based-output skills. Then collect the deliverable from the Agent tool result on completion, and END the response while siblings are still pending; synthesize only after all are in.
+4. Background (`run_in_background=true`) is reserved for genuine non-overlapping meanwhile-work or file-based-output skills. Then collect the deliverable from the Agent tool result on completion — never from a notification or a running-count. End the response once if you must wait; never re-emit a bare wait/holding message on two consecutive turns for the same agents.
 
 Sequence when output feeds next task, need one result to frame another, or downstream needs upstream context.
 

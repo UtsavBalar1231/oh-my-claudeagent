@@ -34,4 +34,4 @@ Registers ralph (persistence) + ultrawork (parallelism). Session persists until 
 
 ## Delegation
 
-Delegate all implementation to `oh-my-claudeagent:executor`. Spawn agents in parallel batches per the ultrawork pattern (max 5 concurrent). Apply the Background Agent Barrier: on partial completion, acknowledge and END response; synthesize only after all agents report.
+Delegate all implementation to `oh-my-claudeagent:executor`. Spawn each batch as multiple `Agent` calls in ONE message with NO `run_in_background` (max 5 concurrent) — every tool result returns inline when the batch completes, so collect deliverables directly. No barrier, no waiting; reserve background only for genuine non-overlapping meanwhile-work.
