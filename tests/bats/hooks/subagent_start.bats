@@ -78,7 +78,7 @@ ORACLE_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id
 
 @test "ralph mode: active ralph-state.json causes mode mention in output" {
 	write_state "ralph-state.json" \
-		'{"status":"active","tasks":[],"last_task_hash":"","stagnation_count":0}'
+		'{"status":"active","tasks":[],"idle_count":0}'
 
 	run_hook "subagent-start.sh" "$EXPLORE_PAYLOAD"
 	assert_success

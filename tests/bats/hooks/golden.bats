@@ -310,8 +310,8 @@ _run_fixture() {
 	_run_fixture "ralph-persistence" "recursion-guard"
 }
 
-@test "golden: ralph-persistence/stagnated" {
-	_run_fixture "ralph-persistence" "stagnated"
+@test "golden: ralph-persistence/idle" {
+	_run_fixture "ralph-persistence" "idle"
 }
 
 @test "golden: read-error-recovery/file-not-found" {

@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.5] - 2026-06-14
+
+Removes the legacy stagnation/task-hash machinery from `ralph-persistence.sh` now that
+the monotonic block cap and plan-checkbox truth supersede it. Behaviour-preserving for
+real ralph/ultrawork persistence; no more heuristic proxies.
+
+### Changed
+
+- **`ralph-persistence.sh` rewritten around a single source of truth.** Removed the
+  task-hash md5 stagnation detector, the plan-mtime stagnation detector, and the three
+  reset-on-churn per-path counters (`boulder_block_count`, `incomplete_block_count`,
+  `ultrawork_block_count`). Replaced with **one monotonic `global_block_count`** that
+  resets only on a genuine allow-stop (never on intra-session churn) and **one
+  `idle_count`** that auto-deactivates a no-work mode. The authoritative "is the work
+  done" signal is now incomplete `.tasks[]` plus incomplete `- [ ]` plan checkboxes —
+  not file mtimes or task hashes. `keyword-detector.sh` writes the slimmed state schema
+  (`idle_count` instead of `last_task_hash`/`stagnation_count`).
+
 ## [2.8.4] - 2026-06-14
 
 Follow-ups to the v2.8.3 persistence-loop fix: a session-start zombie sweep and an

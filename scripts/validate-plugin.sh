@@ -1046,7 +1046,7 @@ check_hooks() {
 	local stop_payload="${HOOK_FIXTURES_DIR}/stop-basic.json"
 	run_registered_hooks "Stop default (no state)" "Stop" "" "${stop_payload}" "${tmp_root}" "json-optional"
 
-	printf '{"status":"active","activatedAt":"2026-03-22T12:00:00Z","tasks":[{"id":"t1","status":"in_progress"}],"last_task_hash":"","stagnation_count":0}\n' \
+	printf '{"status":"active","activatedAt":"2026-03-22T12:00:00Z","tasks":[{"id":"t1","status":"in_progress"}],"idle_count":0}\n' \
 		>"${ralph_wrapper_state}"
 	run_registered_hooks "Stop with ralph active" "Stop" "" "${stop_payload}" "${tmp_root}" "json-required"
 	rm -f "${ralph_wrapper_state}"

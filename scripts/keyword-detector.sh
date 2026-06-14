@@ -107,14 +107,14 @@ if [[ "${HAS_RALPH}" -eq 1 ]] && [[ ! " ${DETECTED_KEYWORDS[*]} " =~ " stop-cont
 		rm -f "${ULTRAWORK_STATE}"
 	fi
 	NOW_ISO=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-	RALPH_TMP=$(mktemp) && printf '{"status":"active","activatedAt":"%s","tasks":[],"last_task_hash":"","stagnation_count":0}\n' \
+	RALPH_TMP=$(mktemp) && printf '{"status":"active","activatedAt":"%s","tasks":[],"idle_count":0}\n' \
 		"${NOW_ISO}" > "${RALPH_TMP}" && mv "${RALPH_TMP}" "${RALPH_STATE}"
 fi
 
 if [[ "${HAS_ULTRAWORK}" -eq 1 ]] && [[ "${HAS_RALPH}" -eq 0 ]] \
 	&& [[ ! " ${DETECTED_KEYWORDS[*]} " =~ " stop-continuation " ]]; then
 	NOW_ISO=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-	UW_TMP=$(mktemp) && printf '{"status":"active","activatedAt":"%s","stagnation_count":0}\n' \
+	UW_TMP=$(mktemp) && printf '{"status":"active","activatedAt":"%s","idle_count":0}\n' \
 		"${NOW_ISO}" > "${UW_TMP}" && mv "${UW_TMP}" "${ULTRAWORK_STATE}"
 fi
 

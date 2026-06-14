@@ -181,7 +181,7 @@ setup() {
 @test "pipeline f: compaction survival — pre-compact writes context, post-compact-inject restores" {
 	# Write ralph-state.json (active)
 	write_state "ralph-state.json" \
-		'{"status":"active","tasks":[],"last_task_hash":"","stagnation_count":0}'
+		'{"status":"active","tasks":[],"idle_count":0}'
 
 	# Write boulder.json with active plan reference
 	write_state "boulder.json" \

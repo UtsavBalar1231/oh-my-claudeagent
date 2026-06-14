@@ -15,17 +15,17 @@ STOP_PAYLOAD='{"stop_reason":"end_turn","stop_hook_active":false}'
 
 @test "ralph active with pending tasks: blocks stop" {
 	write_state "ralph-state.json" \
-		'{"status":"active","tasks":[{"id":"1","status":"pending"}],"last_task_hash":"","stagnation_count":0}'
+		'{"status":"active","tasks":[{"id":"1","status":"pending"}],"idle_count":0}'
 	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
 	assert_success
 	assert_output --partial '"decision":"block"'
 }
 
-# ─── c. Ralph active + all tasks complete → allow stop ───────────────────────
+# ─── c. Ralph active + all tasks complete (no plan) → allow stop ─────────────
 
 @test "ralph active with all tasks completed: allows stop" {
 	write_state "ralph-state.json" \
-		'{"status":"active","tasks":[{"id":"1","status":"completed"},{"id":"2","status":"verified"}],"last_task_hash":"","stagnation_count":0}'
+		'{"status":"active","tasks":[{"id":"1","status":"completed"},{"id":"2","status":"verified"}],"idle_count":0}'
 	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
 	assert_success
 	assert_output ""
@@ -33,9 +33,8 @@ STOP_PAYLOAD='{"stop_reason":"end_turn","stop_hook_active":false}'
 
 # ─── d. Ultrawork active + no agents → block ─────────────────────────────────
 
-@test "ultrawork active with no running agents: blocks stop (stagnation < threshold)" {
-	write_state "ultrawork-state.json" \
-		'{"status":"active","stagnation_count":0}'
+@test "ultrawork active with no running agents: blocks stop" {
+	write_state "ultrawork-state.json" '{"status":"active","idle_count":0}'
 	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
 	assert_success
 	assert_output --partial '"decision":"block"'
@@ -44,11 +43,9 @@ STOP_PAYLOAD='{"stop_reason":"end_turn","stop_hook_active":false}'
 # ─── e. Ultrawork active + running agents (recent) → allow stop ──────────────
 
 @test "ultrawork active with recently-started agents: allows stop" {
-	write_state "ultrawork-state.json" \
-		'{"status":"active","stagnation_count":0}'
+	write_state "ultrawork-state.json" '{"status":"active","idle_count":0}'
 	local now
 	now=$(date +%s)
-	# Agent started 30 seconds ago — well within 900-second window
 	write_state "subagents.json" \
 		"{\"active\":[{\"id\":\"agent-1\",\"status\":\"running\",\"started_epoch\":$((now - 30))}]}"
 	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
@@ -56,68 +53,52 @@ STOP_PAYLOAD='{"stop_reason":"end_turn","stop_hook_active":false}'
 	assert_output ""
 }
 
-# ─── f. Boulder fallback — recent file (< 15 min) → block ────────────────────
+# ─── f. Ralph + incomplete plan checkbox → block (authoritative truth) ───────
 
-@test "boulder fallback with fresh file: blocks stop" {
-	# Boulder fallback only fires when ralph/ultrawork IS active but has no incomplete tasks.
-	# Script exits at line 52 if neither mode is active. So we need ralph active + all complete.
-	write_state "ralph-state.json" '{"status":"active","tasks":[{"id":"1","status":"completed"}],"last_task_hash":"","stagnation_count":0}'
-	# Create a real plan file so the file-existence check passes
-	local plan_dir="$BATS_TEST_TMPDIR/plans"
-	mkdir -p "$plan_dir"
-	local plan_file="$plan_dir/my-plan.md"
-	printf '# Plan\n- [ ] Task\n' > "$plan_file"
-	local boulder_path="$CLAUDE_PROJECT_ROOT/.omca/state/boulder.json"
-	printf '%s' "{\"active_plan\":\"${plan_file}\",\"plan_name\":\"my-plan\"}" > "$boulder_path"
-	# Boulder file is just created → mtime is now → age = 0 < 900
+@test "ralph active with incomplete plan checkbox: blocks stop" {
+	write_state "ralph-state.json" '{"status":"active","tasks":[],"idle_count":0}'
+	local plan_file="$CLAUDE_PROJECT_ROOT/plans/p.md"
+	mkdir -p "$CLAUDE_PROJECT_ROOT/plans"
+	printf '# Plan\n- [ ] 1. Task A\n' > "$plan_file"
+	write_state "boulder.json" "{\"active_plan\":\"${plan_file}\",\"plan_name\":\"p\"}"
 	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
 	assert_success
 	assert_output --partial '"decision":"block"'
 }
 
-# ─── g. Boulder fallback — stale file (> 15 min) → allow stop ────────────────
+# ─── g. Ralph + all plan checkboxes complete (no tasks) → allow stop ─────────
 
-@test "boulder fallback with stale file (>15 min): allows stop" {
-	# Need ralph active + all complete to reach boulder fallback (see test f)
-	write_state "ralph-state.json" '{"status":"active","tasks":[{"id":"1","status":"completed"}],"last_task_hash":"","stagnation_count":0}'
-	# Create a real plan file so the file-existence check passes
-	local plan_dir="$BATS_TEST_TMPDIR/plans"
-	mkdir -p "$plan_dir"
-	local plan_file="$plan_dir/my-plan.md"
-	printf '# Plan\n- [ ] Task\n' > "$plan_file"
-	local boulder_path="$CLAUDE_PROJECT_ROOT/.omca/state/boulder.json"
-	printf '%s' "{\"active_plan\":\"${plan_file}\",\"plan_name\":\"my-plan\"}" > "$boulder_path"
-	# Back-date mtime by 20 minutes (1200 seconds)
-	touch -d "20 minutes ago" "$boulder_path"
+@test "ralph active with all plan checkboxes complete: allows stop" {
+	write_state "ralph-state.json" '{"status":"active","tasks":[],"idle_count":0}'
+	local plan_file="$CLAUDE_PROJECT_ROOT/plans/done.md"
+	mkdir -p "$CLAUDE_PROJECT_ROOT/plans"
+	printf '# Plan\n- [x] 1. Done\n- [x] 2. Done\n' > "$plan_file"
+	write_state "boulder.json" "{\"active_plan\":\"${plan_file}\",\"plan_name\":\"done\"}"
 	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
 	assert_success
 	assert_output ""
 }
 
-# ─── h. Stagnation counter increments on repeated identical task state ────────
+# ─── h. Ralph + boulder points at a missing plan file → allow stop ──────────
 
-@test "stagnation counter increments when task state is unchanged across calls" {
+@test "ralph with boulder pointing to missing plan file: allows stop and deactivates" {
 	write_state "ralph-state.json" \
-		'{"status":"active","tasks":[{"id":"1","status":"pending"}],"last_task_hash":"","stagnation_count":1}'
-
-	# First call — task hash differs from "" → stagnation resets to 0 after first call,
-	# then on second call the hash is the same → stagnation becomes 1.
-	# We call once to establish the hash in the state file.
+		'{"status":"active","tasks":[{"id":"1","status":"pending"}],"idle_count":0}'
+	write_state "boulder.json" \
+		'{"active_plan":"/tmp/nonexistent-plan-12345.md","plan_name":"ghost-plan"}'
 	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
-
-	# Second call — hash should now match → stagnation_count should increment
-	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
-
-	local stagnation
-	stagnation=$(read_state "ralph-state.json" | jq -r '.stagnation_count')
-	[[ "$stagnation" -ge 1 ]]
+	assert_success
+	assert_output ""
+	local status
+	status=$(read_state "ralph-state.json" | jq -r '.status')
+	[[ "$status" == "inactive" ]]
 }
 
 # ─── i. Pending question → allow stop ────────────────────────────────────────
 
 @test "pending question within 300 seconds: allows stop" {
 	write_state "ralph-state.json" \
-		'{"status":"active","tasks":[{"id":"1","status":"pending"}],"last_task_hash":"","stagnation_count":0}'
+		'{"status":"active","tasks":[{"id":"1","status":"pending"}],"idle_count":0}'
 	local now
 	now=$(date +%s)
 	write_state "pending-question.json" "{\"timestamp\":$now}"
@@ -126,191 +107,105 @@ STOP_PAYLOAD='{"stop_reason":"end_turn","stop_hook_active":false}'
 	assert_output ""
 }
 
-# ─── j. Plan-file-aware stagnation: 3 unchanged invocations → escalates ──────
+# ─── j. Monotonic cap: cap-1 consecutive blocks → yield (allow) ──────────────
 
-@test "plan stagnation: mtime+hash unchanged across 3+ calls → plan_stagnation_count reaches 3" {
-	# Use no-tasks state so MAX_STAGNATION=5 (task-hash stagnation won't fire first)
-	write_state "ralph-state.json" \
-		'{"status":"active","tasks":[],"last_task_hash":"","stagnation_count":0,"plan_stagnation_count":0}'
-
-	# Create a plan file with incomplete checkboxes
-	local plan_file="$CLAUDE_PROJECT_ROOT/plans/test-plan.md"
-	mkdir -p "$CLAUDE_PROJECT_ROOT/plans"
-	printf '## TODOs\n- [ ] 1. First task\n- [ ] 2. Second task\n' > "$plan_file"
-
-	# Point boulder.json at the plan file (absolute path)
-	write_state "boulder.json" \
-		"{\"active_plan\":\"${plan_file}\",\"plan_name\":\"test-plan\"}"
-
-	# Call 1: establishes task hash and plan mtime; plan_stagnation stays 0
-	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
-
-	# Call 2: task hash matches → STAGNATION=1; plan mtime unchanged → plan_stagnation=1
-	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
-
-	# Call 3: STAGNATION=2; plan_stagnation=2
-	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
-
-	# Call 4: STAGNATION=3; plan_stagnation=3 → plan escalation fires (exits 0, allows stop)
-	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
-	assert_success
-
-	local psc
-	psc=$(read_state "ralph-state.json" | jq -r '.plan_stagnation_count')
-	[[ "$psc" -ge 3 ]]
-}
-
-# ─── k. Plan-file-aware stagnation: missing boulder → no-op ──────────────────
-
-@test "plan stagnation: no boulder.json → skips plan tracking silently" {
-	write_state "ralph-state.json" \
-		'{"status":"active","tasks":[{"id":"1","status":"pending"}],"last_task_hash":"","stagnation_count":0}'
-	# No boulder.json present — should behave exactly like baseline (blocks stop)
-	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
-	assert_success
-	assert_output --partial '"decision":"block"'
-}
-
-# ─── m. Missing plan file (plan progress path) → allow stop ─────────────────
-
-@test "ralph with boulder pointing to missing plan file: allows stop immediately (plan progress path)" {
-	write_state "ralph-state.json" \
-		'{"status":"active","tasks":[{"id":"1","status":"pending"}],"last_task_hash":"","stagnation_count":0}'
-	write_state "boulder.json" \
-		'{"active_plan":"/tmp/nonexistent-plan-12345.md","plan_name":"ghost-plan"}'
-	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
-	assert_success
-	assert_output ""
-}
-
-# ─── n. Missing plan file (boulder fallback path) → allow stop ──────────────
-
-@test "ralph with all tasks complete and boulder pointing to missing plan: allows stop (fallback path)" {
-	write_state "ralph-state.json" \
-		'{"status":"active","tasks":[{"id":"1","status":"completed"}],"last_task_hash":"","stagnation_count":0}'
-	write_state "boulder.json" \
-		'{"active_plan":"/tmp/nonexistent-plan-12345.md","plan_name":"ghost-plan"}'
-	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
-	assert_success
-	assert_output ""
-}
-
-# ─── l. Plan-file-aware stagnation: all checkboxes complete → no increment ───
-
-@test "plan stagnation: all checkboxes complete → plan_stagnation_count stays 0" {
-	write_state "ralph-state.json" \
-		'{"status":"active","tasks":[],"last_task_hash":"","stagnation_count":0,"plan_stagnation_count":0}'
-
-	local plan_file="$CLAUDE_PROJECT_ROOT/plans/complete-plan.md"
-	mkdir -p "$CLAUDE_PROJECT_ROOT/plans"
-	printf '## TODOs\n- [x] 1. Done task\n- [x] 2. Also done\n' > "$plan_file"
-
-	write_state "boulder.json" \
-		"{\"active_plan\":\"${plan_file}\",\"plan_name\":\"complete-plan\"}"
-
-	# Multiple calls — no incomplete checkboxes, so plan_stagnation must not increment
-	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
-	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
-	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
-
-	local psc
-	psc=$(read_state "ralph-state.json" | jq -r '.plan_stagnation_count // 0')
-	[[ "$psc" -eq 0 ]]
-}
-
-# ─── Stop-block cap: boulder fallback reaches cap-1 → yields with resume guidance ──
-
-@test "stop-block cap: boulder fallback cap guard — 3 consecutive blocks with cap=4 → 3rd call yields (allow) with resume guidance" {
-	# Uses a small cap (4) so cap-1=3 fires after 3 no-progress consecutive calls.
+@test "monotonic cap: cap=4 → blocks twice then yields on the 3rd consecutive block" {
 	export CLAUDE_CODE_STOP_HOOK_BLOCK_CAP=4
-
-	# Ralph active with all tasks complete so boulder fallback path is reached
-	write_state "ralph-state.json" \
-		'{"status":"active","tasks":[{"id":"1","status":"completed"}],"last_task_hash":"","stagnation_count":0}'
-
-	# Create a plan file with incomplete tasks and static content (no progress)
-	local plan_dir="$BATS_TEST_TMPDIR/plans-cap"
-	mkdir -p "$plan_dir"
-	local plan_file="$plan_dir/cap-plan.md"
-	printf '# Plan\n- [ ] 1. Task A\n- [ ] 2. Task B\n' > "$plan_file"
-
-	local boulder_path="$CLAUDE_PROJECT_ROOT/.omca/state/boulder.json"
-	printf '%s' "{\"active_plan\":\"${plan_file}\",\"plan_name\":\"cap-plan\"}" > "$boulder_path"
-	# Boulder mtime is now → age 0 < 900 → fresh boulder path fires
-
-	# Call 1 and 2 should block (boulder_cnt 1, 2 — below cap-1=3)
-	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
-	assert_output --partial '"decision":"block"'
+	write_state "ralph-state.json" '{"status":"active","tasks":[],"idle_count":0}'
+	local plan_file="$BATS_TEST_TMPDIR/cap.md"
+	printf '# Plan\n- [ ] 1. A\n- [ ] 2. B\n' > "$plan_file"
+	write_state "boulder.json" "{\"active_plan\":\"${plan_file}\",\"plan_name\":\"cap\"}"
 
 	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
 	assert_output --partial '"decision":"block"'
-
-	# Call 3: boulder_cnt reaches 3 = cap-1 → should yield (allow stop, no decision:block)
+	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
+	assert_output --partial '"decision":"block"'
 	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
 	assert_success
-	# Must NOT contain decision:block
 	refute_output --partial '"decision":"block"'
-	# Must contain resume guidance
-	assert_output --partial 'Yielding to platform'
+	assert_output --partial 'yielding to platform'
 
 	unset CLAUDE_CODE_STOP_HOOK_BLOCK_CAP
 }
 
-# ─── Stop-block cap: progress delta resets counter ──────────────────────────
+# ─── k. Monotonic cap: progress does NOT reset the counter (churn-proof) ─────
 
-@test "stop-block cap: boulder fallback cap guard — progress resets counter (cap-1 does NOT fire after progress)" {
+@test "monotonic cap: completing a checkbox does NOT reset the counter — still yields at cap-1" {
 	export CLAUDE_CODE_STOP_HOOK_BLOCK_CAP=4
+	write_state "ralph-state.json" '{"status":"active","tasks":[],"idle_count":0}'
+	local plan_file="$BATS_TEST_TMPDIR/churn.md"
+	printf '# Plan\n- [ ] 1. A\n- [ ] 2. B\n' > "$plan_file"
+	write_state "boulder.json" "{\"active_plan\":\"${plan_file}\",\"plan_name\":\"churn\"}"
 
-	write_state "ralph-state.json" \
-		'{"status":"active","tasks":[{"id":"1","status":"completed"}],"last_task_hash":"","stagnation_count":0}'
-
-	local plan_dir="$BATS_TEST_TMPDIR/plans-reset"
-	mkdir -p "$plan_dir"
-	local plan_file="$plan_dir/reset-plan.md"
-	printf '# Plan\n- [ ] 1. Task A\n- [ ] 2. Task B\n' > "$plan_file"
-
-	local boulder_path="$CLAUDE_PROJECT_ROOT/.omca/state/boulder.json"
-	printf '%s' "{\"active_plan\":\"${plan_file}\",\"plan_name\":\"reset-plan\"}" > "$boulder_path"
-
-	# Call 1: establishes hash, counter=1 → block
+	# Call 1: block (count 1)
 	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
 	assert_output --partial '"decision":"block"'
-
-	# Call 2: no change → counter=2 → block
+	# Simulate progress — complete one checkbox. The legacy code reset the counter here;
+	# the monotonic counter must NOT.
+	printf '# Plan\n- [x] 1. A\n- [ ] 2. B\n' > "$plan_file"
+	# Call 2: block (count 2)
 	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
 	assert_output --partial '"decision":"block"'
-
-	# Simulate progress: complete one task (changes plan content → hash changes)
-	printf '# Plan\n- [x] 1. Task A\n- [ ] 2. Task B\n' > "$plan_file"
-	touch "$boulder_path"  # Keep boulder fresh
-
-	# Call 3: progress detected → counter resets to 1 → normal block (NOT cap-yield)
+	# Call 3: count reaches cap-1=3 → yields despite the progress
 	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
-	assert_output --partial '"decision":"block"'
-	# Counter was reset, so a subsequent call (4th total) is also a normal block
-	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
-	assert_output --partial '"decision":"block"'
+	refute_output --partial '"decision":"block"'
+	assert_output --partial 'yielding to platform'
 
 	unset CLAUDE_CODE_STOP_HOOK_BLOCK_CAP
 }
 
-# ─── Stop payload background_tasks → normal behavior (no-op) ────────────────
+# ─── l. Idle deactivation: no-work ralph self-deactivates after IDLE_MAX ─────
+
+@test "idle deactivation: ralph active with no work for IDLE_MAX stops → deactivates" {
+	write_state "ralph-state.json" '{"status":"active","tasks":[],"idle_count":0}'
+	# No tasks, no plan → no work each turn. IDLE_MAX is 5.
+	for _ in 1 2 3 4 5; do
+		run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
+		assert_success
+		assert_output ""
+	done
+	local status
+	status=$(read_state "ralph-state.json" | jq -r '.status')
+	[[ "$status" == "inactive" ]]
+}
+
+# ─── m. Ultrawork bounded: no agents, cap consecutive blocks → yield+deactivate ─
+
+@test "ultrawork bounded: cap=4 no-agents blocks then yields and deactivates ultrawork" {
+	export CLAUDE_CODE_STOP_HOOK_BLOCK_CAP=4
+	write_state "ultrawork-state.json" '{"status":"active","idle_count":0}'
+	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
+	assert_output --partial '"decision":"block"'
+	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
+	assert_output --partial '"decision":"block"'
+	run_hook "ralph-persistence.sh" "$STOP_PAYLOAD"
+	refute_output --partial '"decision":"block"'
+	local status
+	status=$(read_state "ultrawork-state.json" | jq -r '.status')
+	[[ "$status" == "inactive" ]]
+	unset CLAUDE_CODE_STOP_HOOK_BLOCK_CAP
+}
+
+# ─── n. Recursion guard: stop_hook_active=true → allow stop ──────────────────
+
+@test "recursion guard: stop_hook_active true → allows stop even with incomplete work" {
+	write_state "ralph-state.json" \
+		'{"status":"active","tasks":[{"id":"1","status":"pending"}],"idle_count":0}'
+	run_hook "ralph-persistence.sh" '{"stop_reason":"end_turn","stop_hook_active":true}'
+	assert_success
+	assert_output ""
+}
+
+# ─── o. background_tasks in payload → orthogonal (still blocks) ──────────────
 
 @test "stop payload: background_tasks does not affect ralph blocking decision" {
-	# Guard: ralph blocks are independent of background_tasks in payload.
-	# Script exits 0 (allows) at line ~61 when neither mode is active, so background_tasks
-	# alone cannot trigger a block. When ralph IS active, the decision is based on
-	# ralph state only — background_tasks in payload is orthogonal.
 	local BG_PAYLOAD='{"stop_reason":"end_turn","stop_hook_active":false,"background_tasks":[{"id":"bg-1","status":"running"}],"session_crons":[]}'
-
-	# Ralph active with pending tasks + background_tasks in payload → still blocks
 	write_state "ralph-state.json" \
-		'{"status":"active","tasks":[{"id":"1","status":"pending"}],"last_task_hash":"","stagnation_count":0}'
+		'{"status":"active","tasks":[{"id":"1","status":"pending"}],"idle_count":0}'
 	run_hook "ralph-persistence.sh" "$BG_PAYLOAD"
 	assert_success
 	assert_output --partial '"decision":"block"'
 
-	# No ralph/ultrawork active + background_tasks in payload → still allows (exits 0)
 	rm -f "$CLAUDE_PROJECT_ROOT/.omca/state/ralph-state.json"
 	run_hook "ralph-persistence.sh" "$BG_PAYLOAD"
 	assert_success

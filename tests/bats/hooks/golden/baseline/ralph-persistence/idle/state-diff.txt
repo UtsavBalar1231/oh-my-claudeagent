@@ -2,9 +2,9 @@ diff -ru /state-before/ralph-state.json /state-after/ralph-state.json
 --- /state-before/ralph-state.json	<TS>
 +++ /state-after/ralph-state.json	<TS>
 @@ -1 +1,5 @@
--{"status":"active","tasks":[],"idle_count":0}
+-{"status":"active","tasks":[],"idle_count":3}
 +{
 +  "status": "active",
 +  "tasks": [],
-+  "idle_count": 1
++  "idle_count": 4
 +}
