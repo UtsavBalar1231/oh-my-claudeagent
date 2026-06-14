@@ -39,6 +39,34 @@ if [[ "${SWEEP_SOURCE}" != "compact" ]] && [[ -f "${PENDING_MARKER}" ]]; then
 	fi
 fi
 
+# Stale-subagent sweep: prune subagents.json .active and active-agents.json entries older
+# than the 900s liveness cutoff so a new session never inherits zombie "running" agents
+# (phantoms from a prior session that died without a SubagentStop). Same cutoff and
+# null-epoch-keep rule as subagent-complete.sh — one liveness rule across all readers.
+SWEEP_CUTOFF=$(( $(date +%s) - 900 ))
+SUBAGENTS_SWEEP="${STATE_DIR}/subagents.json"
+if [[ -f "${SUBAGENTS_SWEEP}" ]]; then
+	TMP_SW=$(mktemp)
+	if jq --argjson cutoff "${SWEEP_CUTOFF}" \
+		'.active = [(.active // [])[] | select((.started_epoch == null) or (.started_epoch > $cutoff))]' \
+		"${SUBAGENTS_SWEEP}" >"${TMP_SW}" 2>/dev/null; then
+		mv "${TMP_SW}" "${SUBAGENTS_SWEEP}"
+	else
+		rm -f "${TMP_SW}"
+	fi
+fi
+ACTIVE_AGENTS_SWEEP="${STATE_DIR}/active-agents.json"
+if [[ -f "${ACTIVE_AGENTS_SWEEP}" ]]; then
+	TMP_AA=$(mktemp)
+	if jq --argjson cutoff "${SWEEP_CUTOFF}" \
+		'[ (.[]?) | select((.started_epoch // 0) > $cutoff) ]' \
+		"${ACTIVE_AGENTS_SWEEP}" >"${TMP_AA}" 2>/dev/null; then
+		mv "${TMP_AA}" "${ACTIVE_AGENTS_SWEEP}"
+	else
+		rm -f "${TMP_AA}"
+	fi
+fi
+
 # One-time migration: merge legacy Task:delegate_error counter key → Agent:delegate_error.
 # Pre-v2.0 delegate-retry.sh used tool_name // "Task"; the canonical platform name is Agent.
 # Guard: only run if file exists AND contains the legacy key (idempotent on clean installs).

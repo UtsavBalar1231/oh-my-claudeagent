@@ -439,6 +439,34 @@ def test_mode_clear_final_verify(mcp_server, working_dir, tmp_git_root):
     assert not marker_path.exists()
 
 
+def test_mode_clear_agents_truncates_active_preserves_completed(
+    mcp_server, working_dir, tmp_git_root
+):
+    """mode_clear('agents') truncates subagents.json .active, preserves .completed, and
+    removes active-agents.json — the operator escape hatch for wedged phantom agents."""
+    state_dir = tmp_git_root / ".omca" / "state"
+    _write_json(
+        str(state_dir / "subagents.json"),
+        {
+            "active": [{"id": "phantom", "status": "running"}],
+            "completed": [{"id": "done"}],
+        },
+    )
+    _write_json(str(state_dir / "active-agents.json"), [{"id": "phantom"}])
+
+    result = call_tool(
+        mcp_server,
+        "mode_clear",
+        {"mode": "agents", "working_directory": working_dir},
+    )
+
+    assert "agents" in result
+    sub = json.loads((state_dir / "subagents.json").read_text())
+    assert sub["active"] == []
+    assert sub["completed"] == [{"id": "done"}]
+    assert not (state_dir / "active-agents.json").exists()
+
+
 # --- boulder_write mirror ---
 
 

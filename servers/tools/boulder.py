@@ -972,7 +972,13 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool(annotations={"destructiveHint": True})
     def mode_clear(
         mode: Literal[
-            "ralph", "ultrawork", "boulder", "evidence", "final_verify", "all"
+            "ralph",
+            "ultrawork",
+            "boulder",
+            "evidence",
+            "final_verify",
+            "agents",
+            "all",
         ] = Field(
             default="all",
             description=(
@@ -982,18 +988,20 @@ def register(mcp: FastMCP) -> None:
                 "'boulder' (boulder.json), "
                 "'evidence' (verification-evidence.json), "
                 "'final_verify' (pending-final-verify.json), "
-                "'all' (ralph + ultrawork + boulder + final_verify, NOT evidence)"
+                "'agents' (truncate subagents.json .active + remove active-agents.json — "
+                "operator escape hatch for wedged phantom agents), "
+                "'all' (ralph + ultrawork + boulder + final_verify + agents, NOT evidence)"
             ),
         ),
         working_directory: str = Field(
             default="", description="Project root (auto-detected from git)"
         ),
     ) -> str:
-        """Clear active mode state files. Use when ending a work session, cancelling ralph/ultrawork persistence, or resetting plan state. 'all' clears ralph + ultrawork + boulder + final_verify but NOT evidence (evidence is permanent audit trail). Returns summary of cleared and skipped state files."""
+        """Clear active mode state files. Use when ending a work session, cancelling ralph/ultrawork persistence, or resetting plan state. 'all' clears ralph + ultrawork + boulder + final_verify + agents but NOT evidence (evidence is permanent audit trail). 'agents' truncates the running-agent counting plane to recover from wedged phantom agents. Returns summary of cleared and skipped state files."""
         state = _state_dir(working_directory)
 
         if mode == "all":
-            mode_list = ["ralph", "ultrawork", "boulder", "final_verify"]
+            mode_list = ["ralph", "ultrawork", "boulder", "final_verify", "agents"]
         else:
             mode_list = [mode]
 
@@ -1009,7 +1017,8 @@ def register(mcp: FastMCP) -> None:
         cleared_set = set(cleared_labels)
 
         cleared: list[str] = [
-            f"{label} ({active_status.get(label, '')})" for label in cleared_labels
+            (f"{label} ({active_status[label]})" if label in active_status else label)
+            for label in cleared_labels
         ]
         skipped: list[str] = [
             f"{label} (not found)" for label in mode_list if label not in cleared_set

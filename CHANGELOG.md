@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.4] - 2026-06-14
+
+Follow-ups to the v2.8.3 persistence-loop fix: a session-start zombie sweep and an
+operator escape hatch for the agent-counting plane.
+
+### Added
+
+- **`mode_clear(mode="agents")`** truncates `subagents.json` `.active` (preserving the
+  `.completed` audit history) and removes `active-agents.json` — a sanctioned operator
+  escape hatch for recovering from wedged phantom agents. `mode_clear(mode="all")` now
+  includes it.
+
+### Fixed
+
+- **`session-init.sh` sweeps stale `.active` zombies on session start.** A new session
+  no longer inherits phantom "running" agents (entries older than the 900s liveness
+  cutoff) from a prior session that died without a `SubagentStop`. The sweep covers both
+  `subagents.json` `.active` and `active-agents.json`, using the same cutoff and
+  null-epoch-keep rule as `subagent-complete.sh`.
+
 ## [2.8.3] - 2026-06-14
 
 Eliminates the two inescapable orchestration loops — the orchestrator `Waiting.`

@@ -90,6 +90,22 @@ STOPFAILURE_PAYLOAD='{"session_id":"test-session","hook_event_name":"StopFailure
 	[[ "$context" == *"[CURRENT DATE]"* ]]
 }
 
+@test "session-init: sweeps stale subagents.json .active phantoms, keeps fresh ones" {
+	local now old fresh
+	now=$(date +%s)
+	old=$((now - 7200))
+	fresh=$((now - 60))
+	write_state "subagents.json" \
+		"{\"active\":[{\"id\":\"old\",\"type\":\"x\",\"status\":\"running\",\"started_epoch\":${old}},{\"id\":\"fresh\",\"type\":\"y\",\"status\":\"running\",\"started_epoch\":${fresh}}],\"completed\":[]}"
+
+	run_hook "session-init.sh" "$STARTUP_PAYLOAD"
+	assert_success
+
+	local ids
+	ids=$(jq -c '[.active[].id]' "$CLAUDE_PROJECT_ROOT/.omca/state/subagents.json")
+	[[ "$ids" == '["fresh"]' ]]
+}
+
 # ─── d. pre-compact saves compaction-context.md ───────────────────────────────
 
 @test "pre-compact: creates compaction-context.md with ralph state info" {
