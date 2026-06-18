@@ -6,6 +6,7 @@ verification evidence, subagent learning notepads, and filesystem access
 for sandbox-scoped subagents.
 """
 
+import os
 import signal
 import sys
 
@@ -35,11 +36,12 @@ validate_plan_write.register(mcp)
 signal.signal(signal.SIGINT, signal.SIG_IGN)
 
 
-def _graceful_exit(_signum, _frame):
-    sys.exit(0)
+def _terminate_immediately(_signum, _frame):
+    # Raising SystemExit from AnyIO's event loop can spin while cancelling stdio tasks.
+    os._exit(0)
 
 
-signal.signal(signal.SIGTERM, _graceful_exit)
+signal.signal(signal.SIGTERM, _terminate_immediately)
 
 # I/O init (discover_binary) must stay before mcp.run(). See docs/design/cold-start-ordering.md.
 if __name__ == "__main__":
