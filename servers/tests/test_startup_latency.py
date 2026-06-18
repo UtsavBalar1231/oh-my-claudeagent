@@ -211,6 +211,16 @@ def test_initialize_latency_warm_cache(server_proc):
     Skips when bytecode cache is cold (newest .pyc older than 60 s) to avoid
     a false pass on a machine that just checked out the repo.
     """
+    # CI runners have unpredictable subprocess startup behavior (varying uv
+    # cache state, ephemeral provisioning, scheduling noise) that defeats a
+    # wall-clock latency assertion — the project venv path adds uv-run overhead
+    # the installed-plugin warm path does not. The threshold guards local
+    # dev/production, not CI. Mirrors test_startup_time.py.
+    if os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS"):
+        pytest.skip(
+            "startup-latency bench is local-only; CI startup variance is too high"
+        )
+
     warm, warm_reason = _is_warm_cache()
     if not warm:
         pytest.skip(
