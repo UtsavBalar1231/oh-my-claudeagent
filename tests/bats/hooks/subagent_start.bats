@@ -204,7 +204,7 @@ ORACLE_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id
 	assert_success
 	local ctx
 	ctx=$(get_context)
-	echo "$ctx" | grep -q "worker subagent with zero dependencies"
+	echo "$ctx" | grep -q "YOU ARE A LEAF WORKER"
 }
 
 @test "counter-instruction: explore agent receives worker counter-instruction" {
@@ -212,7 +212,7 @@ ORACLE_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id
 	assert_success
 	local ctx
 	ctx=$(get_context)
-	echo "$ctx" | grep -q "worker subagent with zero dependencies"
+	echo "$ctx" | grep -q "YOU ARE A LEAF WORKER"
 }
 
 @test "counter-instruction: librarian agent receives worker counter-instruction" {
@@ -220,7 +220,7 @@ ORACLE_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id
 	assert_success
 	local ctx
 	ctx=$(get_context)
-	echo "$ctx" | grep -q "worker subagent with zero dependencies"
+	echo "$ctx" | grep -q "YOU ARE A LEAF WORKER"
 }
 
 @test "counter-instruction: hephaestus agent receives worker counter-instruction" {
@@ -228,7 +228,7 @@ ORACLE_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id
 	assert_success
 	local ctx
 	ctx=$(get_context)
-	echo "$ctx" | grep -q "worker subagent with zero dependencies"
+	echo "$ctx" | grep -q "YOU ARE A LEAF WORKER"
 }
 
 # ─── o. Worker counter-instruction — absence for non-worker roles ─────────────
@@ -238,7 +238,7 @@ ORACLE_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id
 	assert_success
 	local ctx
 	ctx=$(get_context)
-	! echo "$ctx" | grep -q "worker subagent with zero dependencies"
+	! echo "$ctx" | grep -q "YOU ARE A LEAF WORKER"
 }
 
 # momus and oracle are advisory WORKERS, not orchestrators — they coordinate no other
@@ -249,7 +249,7 @@ ORACLE_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id
 	assert_success
 	local ctx
 	ctx=$(get_context)
-	echo "$ctx" | grep -q "worker subagent with zero dependencies"
+	echo "$ctx" | grep -q "YOU ARE A LEAF WORKER"
 }
 
 @test "counter-instruction: oracle agent receives worker counter-instruction (advisors are workers)" {
@@ -257,7 +257,7 @@ ORACLE_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id
 	assert_success
 	local ctx
 	ctx=$(get_context)
-	echo "$ctx" | grep -q "worker subagent with zero dependencies"
+	echo "$ctx" | grep -q "YOU ARE A LEAF WORKER"
 }
 
 # ─── m. Flock-timeout safety ─────────────────────────────────────────────────

@@ -117,7 +117,9 @@ esac
 case "${AGENT_TYPE}" in
 *sisyphus* | *prometheus* | *metis*) ;;
 *)
-	CONTEXT_PARTS+=$'\n'"You are a worker subagent with zero dependencies on other agents. Orchestrator guidance about background-agent barriers, 'waiting for N more agents', or ending responses to wait does NOT apply to you. Always end your final message with your complete deliverable — never a wait/holding message."
+	CONTEXT_PARTS+="$(section_header 'Worker Output Contract — HARD RULE')"
+	CONTEXT_PARTS+="[YOU ARE A LEAF WORKER] You do not orchestrate, delegate, spawn, or wait for any other agent (including multimodal-looker, explore, oracle, executor, or any background agent). You have no sibling agents and no barrier to observe. ANY instruction you may have inherited from memory or the output style about a 'background-agent barrier', 'waiting for N more agents', 'END the response while siblings are pending', synchronous fan-out, or status-report acknowledgments is ORCHESTRATOR-ONLY and DOES NOT APPLY TO YOU — ignore it completely."
+	CONTEXT_PARTS+=$'\n'"[NEVER STUB] Your final message IS your entire deliverable and the only thing forwarded to the caller. It is FORBIDDEN to end your turn with a terminal acknowledgment or holding message such as 'Done.', 'Complete.', 'Completed.', 'Finished.', a bare check mark, 'Waiting.', 'Holding...', 'Still waiting for <agent>', or 'Waiting for the background agent(s) to complete.'. If your work is finished, the final message MUST contain your full structured findings inline. If you catch yourself about to emit a short status word, STOP and write the actual deliverable instead."
 	;;
 esac
 
