@@ -144,10 +144,24 @@ def _is_warm_cache() -> tuple[bool, str]:
     )
 
 
+def _spawn_env() -> dict:
+    """Build the spawn environment.
+
+    Only override ``UV_PROJECT_ENVIRONMENT`` to the plugin-data venv when that
+    venv actually exists (installed-plugin context). Otherwise leave it unset so
+    ``uv run`` uses the project's own venv (``servers/.venv``) — the one CI syncs
+    and dev machines build. Pointing at a nonexistent venv path makes ``uv`` try
+    to create/resolve it on the fly, so the server never replies in time.
+    """
+    env = dict(os.environ)
+    if _VENV_PYTHON.exists():
+        env["UV_PROJECT_ENVIRONMENT"] = str(_PLUGIN_DATA / ".venv")
+    return env
+
+
 def _spawn_server() -> subprocess.Popen:
     """Spawn omca-mcp.py via uv run with the plugin venv."""
-    env = dict(os.environ)
-    env["UV_PROJECT_ENVIRONMENT"] = str(_PLUGIN_DATA / ".venv")
+    env = _spawn_env()
     return subprocess.Popen(
         [
             "uv",
@@ -210,8 +224,7 @@ def test_initialize_latency_warm_cache(server_proc):
     # Re-spawn to get a clean t0 that includes process creation cost.
     _teardown(proc)
 
-    env = dict(os.environ)
-    env["UV_PROJECT_ENVIRONMENT"] = str(_PLUGIN_DATA / ".venv")
+    env = _spawn_env()
 
     t0 = time.monotonic()
     fresh = subprocess.Popen(

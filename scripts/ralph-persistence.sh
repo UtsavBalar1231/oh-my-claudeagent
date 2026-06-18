@@ -35,7 +35,8 @@ deactivate_mode() {
 # Reset the consecutive-block counter on any allow-stop exit. The cap counts only
 # CONSECUTIVE blocks — a single allow clears it. The block path sets BLOCKED=1 to opt out.
 BLOCKED=0
-# shellcheck disable=SC2329  # invoked indirectly via the EXIT trap below
+# SC2317 (older shellcheck flags trap-invoked function bodies as unreachable) + SC2329.
+# shellcheck disable=SC2317,SC2329  # invoked indirectly via the EXIT trap below
 reset_cap_on_allow() {
 	[[ "${BLOCKED}" -eq 0 ]] || return 0
 	[[ -f "${RALPH_CAP_STATE}" ]] || return 0

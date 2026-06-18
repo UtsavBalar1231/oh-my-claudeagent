@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.6] - 2026-06-18
+
+Reliability fixes for subagent output discipline and MCP shutdown, plus a green CI: the
+`Lint Shell` and `pytest MCP Tests` jobs were failing on every push due to environment
+divergence between local and CI runners.
+
+### Fixed
+
+- **Worker subagents must emit complete deliverables.** `subagent-start.sh` now injects a
+  hard "Worker Output Contract" for leaf agents: a worker never orchestrates, waits for, or
+  defers to sibling/background agents, and may never end its turn with a stub
+  acknowledgment ("Done.", "Waiting.", a bare check mark, etc.). The final message must
+  contain the full structured findings inline — it is the only thing forwarded to the
+  caller.
+- **MCP server exits immediately on `SIGTERM`.** The handler now calls `os._exit(0)`
+  instead of raising `SystemExit`, which could spin inside AnyIO's event loop while
+  cancelling stdio tasks and delay shutdown.
+- **CI `Lint Shell` job.** `reset_cap_on_allow` in `ralph-persistence.sh` is invoked
+  indirectly via an `EXIT` trap; the CI runner's shellcheck flags its body as unreachable
+  (SC2317). Added `SC2317` to the existing per-function disable directive (newer local
+  shellcheck does not emit it, which masked the failure).
+- **CI `pytest MCP Tests` job.** `test_startup_latency.py` forced
+  `UV_PROJECT_ENVIRONMENT` to the installed-plugin venv (`~/.claude/plugins/data/...`),
+  which is absent in CI — so `uv run` never reached a ready server and the initialize
+  request got no reply. The override now applies only when that venv actually exists;
+  otherwise the test uses the project's own (CI-synced) venv.
+
 ## [2.8.5] - 2026-06-14
 
 Removes the legacy stagnation/task-hash machinery from `ralph-persistence.sh` now that
