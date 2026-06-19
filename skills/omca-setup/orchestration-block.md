@@ -46,26 +46,11 @@ Pipeline: **prometheus → metis → momus → user approval → `/oh-my-claudea
 
 User runs `/oh-my-claudeagent:start-work [plan path]`. Do not auto-start execution.
 
-## Parallel execution
+## Parallel execution and verification
 
-**Leaf workers (any spawned subagent: executor, explore, librarian, oracle, hephaestus, multimodal-looker, momus, and any future worker): this entire section is orchestrator-only and does NOT apply to you.** You coordinate nothing, have no sibling agents, and have no barrier to observe. Complete your assigned task and end your turn with your full structured deliverable inline. Never a bare status word (`Done.`/`Waiting.`/`✓`), and never a "waiting for other agents" message.
+The full rules live in the OMCA output style's `<critical_rules>`, which is auto-applied every session, so they are not duplicated here. In brief: as the main-session orchestrator, fan out independent work as synchronous parallel `Agent` calls and read each result inline; record every build/test/lint via `evidence_log` before marking complete; escalate to `oracle` after 2+ failed fixes.
 
-When you ARE the main-session orchestrator, fan out independent tasks **synchronously in parallel**. This is the default:
-
-1. Multiple `Agent` blocks in ONE message, NO `run_in_background` → they run concurrently; the turn blocks until all return; each tool result IS that agent's full deliverable, read directly.
-2. Do NOT background an agent whose result you immediately need. A background completion `<task-notification>` is a trigger + output-file path, NOT the deliverable. Backgrounding fan-out work is what causes the "agent returned only a stub, re-querying…" loop.
-3. Never Read a subagent's `.output`/JSONL transcript (overflows context) and never re-query a finished agent via `SendMessage`. A stub return IS its final answer; relaunch a fresh agent with a sharper prompt instead.
-4. Background (`run_in_background=true`) is reserved for genuine non-overlapping meanwhile-work or file-based-output skills. Collect the deliverable from the Agent tool result on completion, never from a notification or a running-count. If you genuinely must pause for a backgrounded agent, do so at most once per agent and resume from its tool result next turn rather than re-posting a holding message.
-
-Sequence when output feeds next task, need one result to frame another, or downstream needs upstream context.
-
-## Verification
-
-Record every build/test/lint via `evidence_log` MCP tool before marking complete. The platform Stop hook enforces this; it is not a suggestion.
-
-Escalate to `oracle` after **2+ failed fixes**. Stop shotgun-debugging. Oracle steps back and finds root cause.
-
-Multi-system tradeoffs, unfamiliar patterns, multi-module decisions → get oracle read before committing. Early oracle is cheap; late oracle is not.
+If you are a spawned subagent (leaf worker), the parallel and barrier guidance does not apply to you. Complete your own task and end with your full deliverable inline, never a bare status word and never a "waiting for other agents" message.
 
 ## File reading outside project root
 
