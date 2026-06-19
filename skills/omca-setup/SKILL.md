@@ -12,20 +12,20 @@ shell: bash
 argument-hint: "[--uninstall | --check | --doctor]"
 ---
 
-# omca-setup — Plugin Configuration
+# omca-setup: Plugin Configuration
 
 One-command setup: update orchestration block in `~/.claude/CLAUDE.md`, check dependencies, inspect plugin state, print rollout guidance.
 
 **Out of scope**: marketplace install commands, auto-registering in `~/.claude/settings.json`, editing shared/managed settings, enforcing enterprise policy keys (`strictKnownMarketplaces`, `blockedMarketplaces`, `allowManagedHooksOnly`, `allowManagedPermissionRulesOnly`, `allowManagedMcpServersOnly`).
 
-**Policy baseline**: Claude Code native settings authoritative. `teammateMode: "auto"` is normal. Managed settings are non-overridable policy. `permission-filter.sh` is guardrail-only — does not auto-allow.
+**Policy baseline**: Claude Code native settings authoritative. `teammateMode: "auto"` is normal. Managed settings are non-overridable policy. `permission-filter.sh` is guardrail-only and does not auto-allow.
 
 **Install/update flow**:
 
 - Install: `/plugin marketplace add UtsavBalar1231/oh-my-claudeagent` then `/plugin install oh-my-claudeagent@omca`
 - Update: `/plugin marketplace update omca` then `/plugin install oh-my-claudeagent@omca`
 - Apply in-session: `/reload-plugins`
-- Reload skills without restart (v2.1.152+): `/reload-skills` — picks up skill file edits (including orchestration-block.md changes written by omca-setup) in the active session without a full Claude Code restart
+- Reload skills without restart (v2.1.152+): `/reload-skills` picks up skill file edits (including orchestration-block.md changes written by omca-setup) in the active session without a full Claude Code restart
 
 **`--bare` caveat**: `claude --bare` skips plugin, hooks, skills, MCP, and CLAUDE.md auto-discovery. Run setup in normal (non-`--bare`) sessions.
 
@@ -33,7 +33,7 @@ One-command setup: update orchestration block in `~/.claude/CLAUDE.md`, check de
 
 - `enableKeywordTriggers`: bool, default `false`
 - `statuslineMode`: `off|direct|daemon`, default `direct`
-- `disableForceOrchestrationStyle`: bool, default `false` — strips `force-for-plugin: true` from the installed style cache copy so your own `outputStyle` takes precedence; re-run setup after each plugin update
+- `disableForceOrchestrationStyle`: bool, default `false`. Strips `force-for-plugin: true` from the installed style cache copy so your own `outputStyle` takes precedence; re-run setup after each plugin update.
 
 **Sandbox**: For fail-closed environments, use `sandbox.failIfUnavailable: true` in managed settings. This skill reports sandbox posture but does not bypass host enforcement.
 
@@ -60,12 +60,12 @@ Run these checks in parallel:
 ```bash
 command -v jq && jq --version
 ```
-→ PASS/FAIL. If jq is missing, **STOP** — hooks will not work without it.
+→ PASS/FAIL. If jq is missing, **STOP**: hooks will not work without it.
 
 ```bash
 command -v uv && uv --version
 ```
-→ PASS/FAIL. If uv is missing, **STOP** — MCP servers will not start without it.
+→ PASS/FAIL. If uv is missing, **STOP**: MCP servers will not start without it.
 
 ```bash
 command -v python3 && python3 --version
@@ -75,7 +75,7 @@ command -v python3 && python3 --version
 ```bash
 if command -v ast-grep >/dev/null 2>&1; then ast-grep --version 2>&1 | head -1; else command -v sg >/dev/null 2>&1 && sg --version 2>&1 | head -1; fi
 ```
-→ PASS/WARN (optional — needed for structural code search MCP tools; accepts either `ast-grep` or `sg`)
+→ PASS/WARN (optional; needed for structural code search MCP tools; accepts either `ast-grep` or `sg`)
 
 Record each result (binary path + version or "not found") for the health report.
 
@@ -117,7 +117,7 @@ Record each result (binary path + version or "not found") for the health report.
 
 4. **Own block check (migration):**
    - Detect line matching `^--- omca-setup\s*$`
-   - If found: remove the entire block from `^--- omca-setup\s*$` through `^--- /omca-setup ---\s*$` (inclusive) — this block was written by old injection-mode installs; the orchestration body is now delivered via `output-styles/omca-default.md`
+   - If found: remove the entire block from `^--- omca-setup\s*$` through `^--- /omca-setup ---\s*$` (inclusive). This block was written by old injection-mode installs; the orchestration body is now delivered via `output-styles/omca-default.md`.
    - If NOT found: no block to remove
 
 5. Everything remaining after removing detected blocks = **user content** (preserve exactly)
@@ -154,7 +154,7 @@ managed block so users benefit from it even when the output-style is overridden 
    The opening marker is `--- omca-setup` (no trailing slash). The closing marker is `--- /omca-setup ---`. These match the regex used in Phase 3 step 4 for idempotent re-injection.
 
 3. Compose the final file in this order:
-   - **User content** (from Phase 3, if any — preserved verbatim)
+   - **User content** (from Phase 3, if any; preserved verbatim)
    - **Blank line**
    - **Wrapped orchestration block** (markers + template body)
 
@@ -215,7 +215,7 @@ managed block so users benefit from it even when the output-style is overridden 
    - `allowManagedMcpServersOnly` → allow only managed MCP server definitions
    - `sandbox.failIfUnavailable` → fail closed if the sandbox cannot be applied
 
-   These keys belong in managed settings when the organization needs non-overridable policy — this skill only points the user/admin at them. Marketplace-installed copies run from `~/.claude/plugins/cache/...`; the local `omca` MCP server bootstraps its ast-grep Python environment inside the active plugin root or cache copy, not in shared global state.
+   These keys belong in managed settings when the organization needs non-overridable policy. This skill only points the user/admin at them. Marketplace-installed copies run from `~/.claude/plugins/cache/...`; the local `omca` MCP server bootstraps its ast-grep Python environment inside the active plugin root or cache copy, not in shared global state.
 
 ---
 
@@ -235,10 +235,10 @@ Apply optional user-scope helper settings to `~/.claude/settings.json` with user
 4. Compute missing top-level: `teammateMode: "auto"`
 
 5. Compute missing env vars against the required set:
-   - `ANTHROPIC_DEFAULT_OPUS_MODEL`: `"claude-opus-4-7[1m]"` — routes opus-tier agents to extended-thinking model
-   - `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`: `"1"` — enables agent teams (required for `teammateMode: "auto"`)
+   - `ANTHROPIC_DEFAULT_OPUS_MODEL`: `"claude-opus-4-7[1m]"` (routes opus-tier agents to extended-thinking model)
+   - `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`: `"1"` (enables agent teams; required for `teammateMode: "auto"`)
 
-6. If all present: "Settings already configured" — skip
+6. If all present: "Settings already configured" -- skip
 
 7. If changes needed: show diff, use `AskUserQuestion` to confirm
 
@@ -265,12 +265,12 @@ Apply optional user-scope helper settings to `~/.claude/settings.json` with user
    ```
 
 10. Explain each setting:
-   - `teammateMode: "auto"` — enables agent teams with best available UI (tmux/iTerm2 split panes)
-   - `ANTHROPIC_DEFAULT_OPUS_MODEL` — routes opus-tier agents (oracle, prometheus, metis, momus, sisyphus) to `claude-opus-4-7[1m]` for extended thinking
-   - `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` — enables the experimental agent teams feature, required for `teammateMode: "auto"` to function
-    - `Write(.omca/**)` / `Edit(.omca/**)` / `Read(.omca/**)` — auto-allow plugin state file access
-    - `mcp__plugin_oh-my-claudeagent_omca__*` / `mcp__grep__*` / `mcp__context7__*` — auto-allow bundled MCP tool usage
-    - `Bash(jq *)` / `Bash(uv run *)` / `Bash(uv sync *)` — auto-allow common plugin utility commands (narrowed from `Bash(uv *)`)
+   - `teammateMode: "auto"`: enables agent teams with best available UI (tmux/iTerm2 split panes)
+   - `ANTHROPIC_DEFAULT_OPUS_MODEL`: routes opus-tier agents (oracle, prometheus, metis, momus, sisyphus) to `claude-opus-4-7[1m]` for extended thinking
+   - `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`: enables the experimental agent teams feature, required for `teammateMode: "auto"` to function
+    - `Write(.omca/**)` / `Edit(.omca/**)` / `Read(.omca/**)`: auto-allow plugin state file access
+    - `mcp__plugin_oh-my-claudeagent_omca__*` / `mcp__grep__*` / `mcp__context7__*`: auto-allow bundled MCP tool usage
+    - `Bash(jq *)` / `Bash(uv run *)` / `Bash(uv sync *)`: auto-allow common plugin utility commands (narrowed from `Bash(uv *)`)
     - These are optional local helper allowances; managed settings remain the policy authority.
 
 ---
@@ -281,10 +281,10 @@ Configure the Claude Code statusline to use the oh-my-claudeagent statusline pac
 
 1. Read `~/.claude/settings.json` (if it exists; otherwise treat as `{}`).
 
-2. Check if `statusLine` is already configured — three-way branch:
-   - **(a) Both fields present** — If `settings.statusLine` is present AND both `hideVimModeIndicator == true` AND `refreshInterval` is present → print "statusLine already configured — skipping" and skip this phase.
-   - **(b) `refreshInterval` missing** — If `settings.statusLine` is present AND `hideVimModeIndicator == true` but `refreshInterval` is absent → DO NOT skip; jump to step 6 to back-fill `refreshInterval`.
-   - **(c) `hideVimModeIndicator` missing or false** — If `settings.statusLine` is present but `hideVimModeIndicator` is missing or `false` → DO NOT skip; jump to step 6 to back-fill both fields. Existing installs without either field are not stranded — step 6 handles both.
+2. Check if `statusLine` is already configured. Three-way branch:
+   - **(a) Both fields present**: If `settings.statusLine` is present AND both `hideVimModeIndicator == true` AND `refreshInterval` is present → print "statusLine already configured; skipping" and skip this phase.
+   - **(b) `refreshInterval` missing**: If `settings.statusLine` is present AND `hideVimModeIndicator == true` but `refreshInterval` is absent → DO NOT skip; jump to step 6 to back-fill `refreshInterval`.
+   - **(c) `hideVimModeIndicator` missing or false**: If `settings.statusLine` is present but `hideVimModeIndicator` is missing or `false` → DO NOT skip; jump to step 6 to back-fill both fields. Existing installs without either field are not stranded; step 6 handles both.
 
 3. If not configured: use `AskUserQuestion` to ask:
    ```
@@ -350,12 +350,12 @@ Configure the Claude Code statusline to use the oh-my-claudeagent statusline pac
       - Direct: `~/.claude/statusline/.venv/bin/cc-statusline-direct`
 
       Use jq to merge atomically (read-merge-write). Set `hideVimModeIndicator: true`
-      because the OMCA statusline already renders `vim.mode` on line 1 — without
+      because the OMCA statusline already renders `vim.mode` on line 1. Without
       this flag the platform draws a redundant `-- INSERT --` row beneath the
       statusLine output (see `https://code.claude.com/docs/en/statusline` for the
       `hideVimModeIndicator` field). Set `refreshInterval: 5` so the statusline
-      re-polls disk-sourced state (git metadata, boulder plan) on a 5-second cadence
-      — this keeps the display fresh while the main session sits idle during
+      re-polls disk-sourced state (git metadata, boulder plan) on a 5-second cadence;
+      this keeps the display fresh while the main session sits idle during
       background-agent fan-outs, where the coordinator is waiting rather than actively
       generating. The value 5 matches the statusline's git cache TTL (5 s), so each
       refresh tick can pick up a newly cached git snapshot without triggering redundant
@@ -404,7 +404,7 @@ Configure the Claude Code statusline to use the oh-my-claudeagent statusline pac
       Or simply re-run /oh-my-claudeagent:omca-setup (it will skip already-configured phases).
       ```
 
-   h. **Note**: If an old `~/.claude/statusline.py` wrapper script exists, it can be removed — it is superseded by this copy-based deployment.
+   h. **Note**: If an old `~/.claude/statusline.py` wrapper script exists, it can be removed; it is superseded by this copy-based deployment.
 
 6. **Back-fill `hideVimModeIndicator` and `refreshInterval` on existing statusLine** (entered when step 2 detected `statusLine` present but one or both fields are missing):
 
@@ -414,7 +414,7 @@ Configure the Claude Code statusline to use the oh-my-claudeagent statusline pac
    `hideVimModeIndicator: true` the platform draws a redundant `-- INSERT --` row
    beneath the user's statusLine output. Additionally, `refreshInterval: 5` keeps
    disk-sourced state (git metadata, boulder plan) fresh while the session sits idle
-   during background-agent fan-outs — without it the statusline only updates on active
+   during background-agent fan-outs; without it the statusline only updates on active
    keystrokes. Ask via `AskUserQuestion` (only when at least one field is absent):
    ```
    Your existing statusLine config is missing one or more OMCA-recommended fields.
@@ -425,7 +425,7 @@ Configure the Claude Code statusline to use the oh-my-claudeagent statusline pac
    This changes your statusLine's execution cadence. Add the missing field(s)? [Y/n]
    ```
 
-   On confirm, atomic jq update (idempotent — only adds each field when absent, so a
+   On confirm, atomic jq update (idempotent: only adds each field when absent, so a
    second run produces a byte-identical result):
    ```bash
    jq '
@@ -438,7 +438,7 @@ Configure the Claude Code statusline to use the oh-my-claudeagent statusline pac
 
    On decline: skip silently.
 
-7. **Known platform limitation — permission mode banner**: the `›› bypass permissions on (shift+tab to cycle)` indicator on the same native row has no documented opt-out as of Claude Code v2.1.167. Only the vim half is suppressible via `hideVimModeIndicator`. Document this in the report so users know the residual line is a platform feature, not an OMCA bug.
+7. **Known platform limitation (permission mode banner)**: the `›› bypass permissions on (shift+tab to cycle)` indicator on the same native row has no documented opt-out as of Claude Code v2.1.167. Only the vim half is suppressible via `hideVimModeIndicator`. Document this in the report so users know the residual line is a platform feature, not an OMCA bug.
 
 ---
 
@@ -460,7 +460,7 @@ Apply or skip the `disableForceOrchestrationStyle` opt-out based on the user's p
    ```bash
    STYLE_FILE="${HOME}/.claude/plugins/cache/oh-my-claudeagent/${PLUGIN_VERSION}/output-styles/omca-default.md"
    ```
-   If the file does not exist (development-mode install, or the cache path differs), skip this phase and note to user: "output-styles/omca-default.md not found in plugin cache — skipping force-style opt-out (development mode or non-standard install path)."
+   If the file does not exist (development-mode install, or the cache path differs), skip this phase and note to user: "output-styles/omca-default.md not found in plugin cache; skipping force-style opt-out (development mode or non-standard install path)."
 
 4. Locate the sidecar state file:
    ```bash
@@ -485,9 +485,9 @@ Apply or skip the `disableForceOrchestrationStyle` opt-out based on the user's p
       fi
       ```
 
-   c. **Already applied and file unchanged** — if `APPLIED_MTIME == FILE_MTIME` and `APPLIED_VER == PLUGIN_VERSION`, print "force-style strip already applied — no-op." and skip to step 6.
+   c. **Already applied and file unchanged**: if `APPLIED_MTIME == FILE_MTIME` and `APPLIED_VER == PLUGIN_VERSION`, print "force-style strip already applied; no-op." and skip to step 6.
 
-   d. **Apply the strip** — remove the `force-for-plugin: true` line (portable Python one-liner avoids GNU/BSD sed differences):
+   d. **Apply the strip**: remove the `force-for-plugin: true` line (portable Python one-liner avoids GNU/BSD sed differences):
       ```bash
       python3 -c "
       import re, sys
@@ -517,7 +517,7 @@ Apply or skip the `disableForceOrchestrationStyle` opt-out based on the user's p
       Note: re-run /oh-my-claudeagent:omca-setup after each plugin update to re-apply the strip.
       ```
 
-6. **If `OPT_OUT` is unset, `false`, or `0`**: skip silently — no changes to the style file.
+6. **If `OPT_OUT` is unset, `false`, or `0`**: skip silently; no changes to the style file.
 
 ---
 
@@ -535,7 +535,7 @@ configurations can still leave OMCA running in degraded mode:
   enabled plugin also declares `force-for-plugin: true` and loads first;
   plugin load order is opaque).
 - An explicit Project-scope or Local-scope `outputStyle` in
-  `.claude/settings.json` / `.claude/settings.local.json` — the spec text
+  `.claude/settings.json` / `.claude/settings.local.json`. The spec text
   says `force-for-plugin` overrides the user's setting, but does not cover
   the higher-precedence scopes.
 
@@ -557,13 +557,13 @@ settings unless the user confirms.
      | sort -u)
    ```
 
-4. **Branch A — clean state** (`PINNED` empty AND no competitors):
+4. **Branch A: clean state** (`PINNED` empty AND no competitors):
    Print `outputStyle: OMCA Default will load via force-for-plugin (no conflicts detected)` and skip.
 
-5. **Branch B — pin to OMCA Default already**: if `PINNED == "OMCA Default"`,
+5. **Branch B: pin to OMCA Default already**: if `PINNED == "OMCA Default"`,
    print `outputStyle already pinned to OMCA Default` and skip.
 
-6. **Branch C — non-OMCA pin set**: if `PINNED` is set and not
+6. **Branch C: non-OMCA pin set**: if `PINNED` is set and not
    `"OMCA Default"`:
 
    a. Report the conflict:
@@ -605,7 +605,7 @@ settings unless the user confirms.
       jq 'del(.outputStyle)' ~/.claude/settings.json > /tmp/s.json && mv /tmp/s.json ~/.claude/settings.json
       ```
 
-7. **Branch D — no pin but competitors present**: if `PINNED` is empty
+7. **Branch D: no pin but competitors present**: if `PINNED` is empty
    AND competitors exist, print an informational note (no action):
    ```
    outputStyle: no user pin detected. Other plugins also declare
@@ -650,8 +650,8 @@ Restart Claude Code to activate changes.
 Fill in actual versions from Phase 1 results.
 
 State section:
-- `.omca/state/` and `.omca/logs/` directories (auto-created on session start) — report "Verified" if present, "Will be created on next session start" if not
-- `.omca/` in `.gitignore` — if not, add it:
+- `.omca/state/` and `.omca/logs/` directories (auto-created on session start): report "Verified" if present, "Will be created on next session start" if not.
+- `.omca/` in `.gitignore`: if not present, add it:
   ```bash
   echo '.omca/' >> .gitignore
   ```
@@ -725,14 +725,14 @@ Removed:
 
 ## CHECK MODE (`--check`)
 
-Non-destructive health check — no files are modified.
+Non-destructive health check. No files are modified.
 
-1. Run Phase 1 (Dependency Check) — report PASS/WARN/FAIL for each dep
+1. Run Phase 1 (Dependency Check). Report PASS/WARN/FAIL for each dep.
 
 2. Check `~/.claude/CLAUDE.md`:
    - Does own block exist? Report version if found
    - Does old format block exist? Report "migration needed"
-   - No block found? Report "not configured — run omca-setup"
+   - No block found? Report "not configured; run omca-setup"
 
 3. Check `~/.claude/settings.json`:
     - Is the plugin enabled in user settings? Report method (marketplace via enabledPlugins / dev mode via --plugin-dir / legacy plugins array / not registered)
@@ -743,30 +743,30 @@ Non-destructive health check — no files are modified.
    - Do state directories exist?
    - Is `.omca/` in `.gitignore`?
 
-5. Print the Phase 6 health report format with findings (but no "Setup Complete" header — use "Health Check" instead)
+5. Print the Phase 6 health report format with findings (but no "Setup Complete" header; use "Health Check" instead).
 
 ---
 
 ## DOCTOR MODE (`--doctor`)
 
-Extended diagnostic — superset of `--check` with deeper health verification. No files are modified.
+Extended diagnostic. Superset of `--check` with deeper health verification. No files are modified.
 
 ### Check 1: Dependencies
-Run Phase 1 (Dependency Check) — report PASS/WARN/FAIL for jq, uv, python3, ast-grep.
+Run Phase 1 (Dependency Check). Report PASS/WARN/FAIL for jq, uv, python3, ast-grep.
 
 ### Check 2: CLAUDE.md Block
 - Does own block exist in `~/.claude/CLAUDE.md`? Report version if found.
 - Does old format block exist? Report "migration needed".
-- No block? Report "not configured — run omca-setup".
+- No block? Report "not configured; run omca-setup".
 
 ### Check 3: Permission Namespace Audit
 Read `~/.claude/settings.json` and verify the required permission patterns are present:
-- `mcp__plugin_oh-my-claudeagent_omca__*` — PASS if present, FAIL if missing or has old bare `mcp__omca-state__*` or `mcp__ast-grep__*`
-- `mcp__grep__*` — PASS if present (HTTP server, bare name is correct)
-- `mcp__context7__*` — PASS if present (HTTP server, bare name is correct)
-- `Write(.omca/**)`, `Edit(.omca/**)`, `Read(.omca/**)` — PASS if all present
-- `Bash(jq *)`, `Bash(uv run *)`, `Bash(uv sync *)` — PASS if all present
-- Check for stale entries: `mcp__pgs__*`, `mcp__omca-state__*`, `mcp__ast-grep__*` — WARN if found ("stale permission — run omca-setup to update")
+- `mcp__plugin_oh-my-claudeagent_omca__*`: PASS if present, FAIL if missing or has old bare `mcp__omca-state__*` or `mcp__ast-grep__*`
+- `mcp__grep__*`: PASS if present (HTTP server, bare name is correct)
+- `mcp__context7__*`: PASS if present (HTTP server, bare name is correct)
+- `Write(.omca/**)`, `Edit(.omca/**)`, `Read(.omca/**)`: PASS if all present
+- `Bash(jq *)`, `Bash(uv run *)`, `Bash(uv sync *)`: PASS if all present
+- Check for stale entries: `mcp__pgs__*`, `mcp__omca-state__*`, `mcp__ast-grep__*`. WARN if found ("stale permission; run omca-setup to update")
 
 ### Check 4: MCP Server Health
 For each command-type MCP server, verify it can start and respond:
@@ -775,27 +775,27 @@ echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | timeout 5 uv run --proje
 ```
 - PASS if response contains `"result"` with tool definitions
 - FAIL if timeout, error, or no response
-- Note: HTTP servers (grep.app, context7) are external — skip or ping-only
+- Note: HTTP servers (grep.app, context7) are external. Skip or ping-only.
 
-**Pending approval (v2.1.154+)**: If tools from `.mcp.json` servers are unavailable despite a healthy binary, check whether Claude Code is showing a `⏸ Pending approval` indicator next to the `omca` server in the MCP panel. As of v2.1.154, unapproved `.mcp.json` servers no longer auto-connect — the user must explicitly approve them once. Use `/mcp` or the MCP settings UI to approve the `omca` server (and `grep`, `context7`) if they show as pending.
+**Pending approval (v2.1.154+)**: If tools from `.mcp.json` servers are unavailable despite a healthy binary, check whether Claude Code is showing a `⏸ Pending approval` indicator next to the `omca` server in the MCP panel. As of v2.1.154, unapproved `.mcp.json` servers no longer auto-connect; the user must explicitly approve them once. Use `/mcp` or the MCP settings UI to approve the `omca` server (and `grep`, `context7`) if they show as pending.
 
 ### Check 5: State Directory Health
-- `.omca/state/` exists — PASS/FAIL
-- `.omca/logs/` exists — PASS/FAIL
-- `.omca/` in `.gitignore` — PASS/FAIL
+- `.omca/state/` exists: PASS/FAIL
+- `.omca/logs/` exists: PASS/FAIL
+- `.omca/` in `.gitignore`: PASS/FAIL
 
 ### Check 6: Settings Validation
-- `teammateMode` is `"auto"` — PASS/WARN
-- `env.ANTHROPIC_DEFAULT_OPUS_MODEL` is `"claude-opus-4-7[1m]"` — PASS/WARN ("opus agents may use non-extended model")
-- `env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is `"1"` — PASS/WARN ("agent teams disabled — teammateMode won't function")
-- Plugin enabled in `enabledPlugins` — PASS/FAIL
-- Marketplace configured in `extraKnownMarketplaces` — PASS/FAIL
+- `teammateMode` is `"auto"`: PASS/WARN
+- `env.ANTHROPIC_DEFAULT_OPUS_MODEL` is `"claude-opus-4-7[1m]"`: PASS/WARN ("opus agents may use non-extended model")
+- `env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is `"1"`: PASS/WARN ("agent teams disabled; teammateMode won't function")
+- Plugin enabled in `enabledPlugins`: PASS/FAIL
+- Marketplace configured in `extraKnownMarketplaces`: PASS/FAIL
 
 ### Check 7: Statusline Health
-- `~/.claude/statusline/.venv/bin/cc-statusline` exists — PASS/FAIL
-- `statusLine` configured in `~/.claude/settings.json` — PASS/WARN
-- `statusLine.refreshInterval` present in `~/.claude/settings.json` — PASS/WARN ("refreshInterval missing — statusline won't poll during idle background-agent runs; re-run omca-setup to back-fill")
-- If daemon mode: check if daemon is running (`cc-statusline-daemon status`) — PASS/WARN
+- `~/.claude/statusline/.venv/bin/cc-statusline` exists: PASS/FAIL
+- `statusLine` configured in `~/.claude/settings.json`: PASS/WARN
+- `statusLine.refreshInterval` present in `~/.claude/settings.json`: PASS/WARN ("refreshInterval missing; statusline won't poll during idle background-agent runs; re-run omca-setup to back-fill")
+- If daemon mode: check if daemon is running (`cc-statusline-daemon status`): PASS/WARN
 
 Include all Check 7 findings (including the `refreshInterval` PASS/WARN line) in both the `--doctor` terminal output and the Phase 6 health report.
 

@@ -80,7 +80,7 @@ Assess complexity BEFORE deep consultation:
 | Complexity | Signals | Interview Approach |
 |------------|---------|-------------------|
 | **Trivial** | Single file, <10 lines change | Skip heavy interview. Quick confirm. |
-| **Simple** | 1-2 files, clear scope | Lightweight: targeted questions as needed — clearance checklist gates termination |
+| **Simple** | 1-2 files, clear scope | Lightweight: targeted questions as needed. Clearance checklist gates termination. |
 | **Complex** | 3+ files, architectural impact | Full consultation |
 
 ### Step 0.5: Exploration Gate
@@ -92,9 +92,9 @@ Decide whether to explore before interviewing. Exploration sharpens questions an
 | Build from Scratch | MANDATORY | Unknown patterns need discovery before plan design |
 | Research | MANDATORY | Path is unclear; investigation evidence shapes the plan |
 | Architecture | MANDATORY | Long-term impact requires evidence from codebase + docs |
-| Refactoring | SCOPED MANDATORY | Find usages + test coverage only — no wider exploration |
+| Refactoring | SCOPED MANDATORY | Find usages + test coverage only. No wider exploration. |
 | Mid-sized Task | RECOMMENDED | Check for existing patterns to avoid redundant abstractions |
-| Trivial/Simple | SKIP | Known location, direct action — exploration adds no value |
+| Trivial/Simple | SKIP | Known location, direct action. Exploration adds no value. |
 
 Skipping MANDATORY exploration means planning on assumptions. Launch explore agents first.
 
@@ -147,14 +147,14 @@ An optional deeper-dive mode triggered by ambiguous requests, research-oriented 
 ### Protocol
 
 1. **Investigate before asking**: Launch 2-3 parallel explore/librarian agents for initial context.
-2. **Iterative dialogue**: Per round — present findings, ask 1-3 focused follow-up questions via `AskUserQuestion` (if unavailable, emit `## BLOCKING QUESTIONS` block and return), launch targeted research based on answers, repeat.
-3. **Synthesis stop criterion**: Terminate questioning when synthesis is comprehensive — 2+ independent sources support each factual claim and confidence tags (HIGH/MEDIUM/LOW) are applied. Do NOT continue past this point.
+2. **Iterative dialogue**: Per round: present findings, ask 1-3 focused follow-up questions via `AskUserQuestion` (if unavailable, emit `## BLOCKING QUESTIONS` block and return), launch targeted research based on answers, repeat.
+3. **Synthesis stop criterion**: Terminate questioning when synthesis is comprehensive. That means 2+ independent sources support each factual claim and confidence tags (HIGH/MEDIUM/LOW) are applied. Do NOT continue past this point.
 4. **Documentation lookup**: Use context7 MCP tools as primary source for library docs (two-step: `resolve-library-id` → `query-docs`). Fall back to WebSearch only when context7 has no match.
 5. **Final synthesis**: Summary (2-3 sentences), Key Findings with evidence, Nuances (edge cases, trade-offs), Recommendations if applicable. Confirm: "Does this answer your question, or should I dig deeper?"
 
 ### Hard Constraint
 
-**Socratic Interview Mode MUST NOT write to `~/.claude/plans/`.** When prometheus runs in Socratic mode, it returns synthesis to the user — it does NOT draft a plan file. The distinction: regular prometheus mode produces a plan file output; Socratic mode produces dialogue synthesis only.
+**Socratic Interview Mode MUST NOT write to `~/.claude/plans/`.** When prometheus runs in Socratic mode, it returns synthesis to the user. It does NOT draft a plan file. Regular prometheus mode produces a plan file; Socratic mode produces dialogue synthesis only.
 
 ## Self-Clearance Check (After EVERY interview turn)
 
@@ -182,7 +182,7 @@ No passive endings. Every response ends with exactly ONE of:
 ### During Interview Mode
 - A specific question (via `AskUserQuestion` or text)
 - Planning-state update + next targeted question
-- "Waiting for [agent] results — will continue when they arrive"
+- "Waiting for [agent] results; will continue when they arrive"
 - "All requirements clear. Generating plan now."
 
 ### During Plan Generation
@@ -330,13 +330,13 @@ Large plans exceed output limits in one shot:
 | **MINOR** | FIX silently, note in summary |
 | **AMBIGUOUS** | See impact-tiered table below |
 
-**Ambiguous gap handling — tiered by impact:**
+**Ambiguous gap handling, tiered by impact:**
 
 | Impact Level | Examples | Action |
 |---|---|---|
 | Low-impact | Formatting style, log verbosity, naming conventions | Apply default silently, disclose in Assumptions section |
 | Medium-impact | Test framework choice, file structure, error response format | Apply default, flag as **ASSUMPTION** with review note in Assumptions section |
-| High-impact | Database engine, auth mechanism, API versioning strategy, data schema | **ASK before applying** — treat as Critical gap |
+| High-impact | Database engine, auth mechanism, API versioning strategy, data schema | **ASK before applying**: treat as Critical gap |
 
 High-impact defaults propagate through downstream agents (sisyphus, executor) without challenge. Make them explicit decisions, not silent choices.
 
@@ -366,26 +366,26 @@ grep -cP "^- \[ \] [0-9]+\." <plan-file-path>
 
 **Count zero → plan is NOT complete.** Add at least one `- [ ] 1.` task under `## TODOs` before momus review.
 
-**Anti-rationalization — none of these justify skipping checkboxes:**
+**Anti-rationalization: none of these justify skipping checkboxes:**
 
-1. **"Too small for TODOs."** — A one-task plan with a single checkbox is correct; prose-only TODOs are not.
+1. **"Too small for TODOs."** A one-task plan with a single checkbox is correct; prose-only TODOs are not.
 
-2. **"Tasks described in Context."** — Context prose is not a task list. Only `- [ ] N.` lines under `## TODOs` count. Sisyphus/start-work cannot track prose.
+2. **"Tasks described in Context."** Context prose is not a task list. Only `- [ ] N.` lines under `## TODOs` count. Sisyphus/start-work cannot track prose.
 
-3. **"Direct inspection confirms correctness."** — Run the grep. Zero matches = structurally invalid regardless of prose quality.
+3. **"Direct inspection confirms correctness."** Run the grep. Zero matches = structurally invalid regardless of prose quality.
 
 ### Momus Review
 
-1. Invoke the **momus skill** via the `Skill` tool with the plan FILE PATH: `Skill(skill="oh-my-claudeagent:momus", args="~/.claude/plans/<name>.md")`. The Skill tool works whether prometheus runs in the main session or as a subagent. Do NOT use the `Agent` tool for momus — it is unavailable to subagents.
+1. Invoke the **momus skill** via the `Skill` tool with the plan FILE PATH: `Skill(skill="oh-my-claudeagent:momus", args="~/.claude/plans/<name>.md")`. The Skill tool works whether prometheus runs in the main session or as a subagent. Do NOT use the `Agent` tool for momus; it is unavailable to subagents.
 2. REJECTED → address ALL issues, resubmit
-3. Loop until OKAY — max 3 iterations
+3. Loop until OKAY, max 3 iterations
 4. Still REJECTED after 3 → present plan + feedback to user, ask for direction
 
 ## PHASE 3: HANDOFF
 
 ### After Plan Completion
 
-1. No draft cleanup needed — Claude-native surfaces hold the context
+1. No draft cleanup needed. Claude-native surfaces hold the context.
 2. **User Confirmation Gate**: After momus approval, ask via `AskUserQuestion`: "Plan approved by momus. What would you like to do? (you can also type a custom response to modify the plan or stop here)":
    - **"Start implementation"** → ExitPlanMode (if active) then guide to `/oh-my-claudeagent:start-work`
    - **"Run metis review"** → invoke metis for gap analysis
@@ -394,8 +394,8 @@ grep -cP "^- \[ \] [0-9]+\." <plan-file-path>
 
 **Plan mode active** (system context shows plan file at `~/.claude/plans/`):
 
-1. Write plan to native plan file path — that file is authoritative
-2. Invoke the **momus skill** via the `Skill` tool with the native plan FILE PATH. Do NOT use the `Agent` tool for momus — it is unavailable to subagents.
+1. Write plan to native plan file path. That file is authoritative.
+2. Invoke the **momus skill** via the `Skill` tool with the native plan FILE PATH. Do NOT use the `Agent` tool for momus; it is unavailable to subagents.
 3. After OKAY, ask user via `AskUserQuestion`: "Plan approved by momus. What would you like to do? (you can also type a custom response to modify the plan or stop here)":
    - **"Start implementation"** → `ExitPlanMode`, guide to `/oh-my-claudeagent:start-work`
    - **"Run metis review"** → invoke metis
@@ -416,7 +416,7 @@ When invoked via the prometheus-plan skill, defer to SKILL.md for ExitPlanMode s
 - **`mode_read`**: Check if a previous plan is active before creating a new one
 - **`notepad_write`**: Audit breadcrumbs or question-relay fallback only
 
-**TaskCreate vs plan files**: `TaskCreate/TaskUpdate/TaskList` track your internal sub-tasks (e.g., "interview user", "research auth patterns"). Deliverable plans go to native plan file path — separate systems.
+**TaskCreate vs plan files**: `TaskCreate/TaskUpdate/TaskList` track your internal sub-tasks (e.g., "interview user", "research auth patterns"). Deliverable plans go to native plan file path. They are separate systems.
 
 ## BEHAVIORAL SUMMARY
 

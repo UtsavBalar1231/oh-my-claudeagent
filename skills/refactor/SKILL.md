@@ -97,7 +97,7 @@ Agent(
 )
 ```
 
-> **Nesting constraint**: Prometheus runs as a subagent (depth 1) and cannot delegate to metis or explore. Supply ALL necessary context in the prompt — include the full codemap, coverage data, and specific file paths so prometheus can plan without sub-research.
+> **Nesting constraint**: Prometheus runs as a subagent (depth 1) and cannot delegate to metis or explore. Supply ALL necessary context in the prompt: the full codemap, coverage data, and specific file paths so prometheus can plan without sub-research.
 
 ## PHASE 5: EXECUTE REFACTORING
 
@@ -113,7 +113,7 @@ Per step:
 
 ## PHASE 6: FINAL VERIFICATION
 
-Full test suite, type check, lint, build, final diagnostics. `evidence_log` after EACH — task completion blocked without fresh evidence.
+Full test suite, type check, lint, build, final diagnostics. Call `evidence_log` after EACH; task completion is blocked without fresh evidence.
 
 ## CRITICAL RULES
 

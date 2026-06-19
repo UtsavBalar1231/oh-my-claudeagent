@@ -18,7 +18,7 @@ argument-hint: optional notes about what to include
 
 Read-only. No Write/Edit/Agent. MCP tools: `mode_read`, `boulder_list`, `notepad_read`, `notepad_list`.
 
-Self-contained handoff summary for seamless new-session continuation.
+Self-contained handoff summary for new-session continuation.
 
 ## PHASE 0: VALIDATE
 
@@ -42,8 +42,8 @@ Also: `TaskList()`, `mode_read()`, `boulder_list()`, `notepad_read` for active p
 First person ("I did...", "I told you..."):
 - What was done, what remains
 - KEY FILES (max 10, workspace-relative)
-- USER REQUESTS verbatim — no paraphrasing
-- EXPLICIT CONSTRAINTS verbatim — no inventing
+- USER REQUESTS verbatim, no paraphrasing
+- EXPLICIT CONSTRAINTS verbatim, no inventing
 
 ## PHASE 3: FORMAT OUTPUT
 

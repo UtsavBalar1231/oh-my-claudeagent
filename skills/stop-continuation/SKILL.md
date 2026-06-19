@@ -11,9 +11,9 @@ Stops all continuation mechanisms for the current session.
 
 ## What This Stops
 
-1. **Ralph Loop** — Clears `.omca/state/ralph-state.json`
-2. **Boulder State** — Clears `.omca/state/boulder.json` (active work plan)
-3. **Ultrawork Mode** — Clears `.omca/state/ultrawork-state.json`
+1. **Ralph Loop**: clears `.omca/state/ralph-state.json`
+2. **Boulder State**: clears `.omca/state/boulder.json` (active work plan)
+3. **Ultrawork Mode**: clears `.omca/state/ultrawork-state.json`
 
 ## Process
 

@@ -21,4 +21,4 @@ Stop the active Ralph Loop.
 2. Clear via `mode_clear(mode="ralph")`
 3. Report result
 
-**Note**: Cancels ralph only. Full reset (ralph + ultrawork + boulder) → `/oh-my-claudeagent:stop-continuation`.
+Note: cancels ralph only. Full reset (ralph + ultrawork + boulder) → `/oh-my-claudeagent:stop-continuation`.

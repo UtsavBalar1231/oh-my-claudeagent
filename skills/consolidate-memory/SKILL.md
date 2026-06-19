@@ -9,7 +9,7 @@ Consolidate session knowledge into persistent memory.
 
 ## Steps
 
-1. `notepad_read(plan_name)` — all sections for active plan
+1. `notepad_read(plan_name)`: all sections for active plan
 2. Read agent memory files at both scopes if accessible:
    - user scope: `~/.claude/agent-memory/*/MEMORY.md`
    - project scope: `.claude/agent-memory/*/MEMORY.md` (platform writes project memories here — resolves from project root)

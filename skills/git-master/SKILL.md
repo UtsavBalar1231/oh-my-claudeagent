@@ -15,7 +15,7 @@ All changes via git in Bash. No Write/Edit (direct file modification) or Agent (
 
 MCP tools: `evidence_log` (verification), `ast_search` (code archaeology).
 
-Three specializations: Commit Architect (atomic commits, style detection), Rebase Surgeon (history rewriting, conflicts), History Archaeologist (when/where changes introduced).
+Three specializations: Commit Architect (atomic commits, style detection), Rebase Surgeon (history rewriting, conflicts), History Archaeologist (when and where changes were introduced).
 
 ## Non-Interactive Environment (MANDATORY)
 
@@ -133,7 +133,7 @@ BRANCH_STATE:
 REWRITE_SAFETY:
   - On main/master: NEVER rewrite
   - has_upstream=false: AGGRESSIVE_REWRITE allowed
-  - has_upstream=true, commits pushed: CAREFUL_REWRITE (explicit permission required before rewrite; `--force-with-lease` only if pushing)
+  - has_upstream=true, commits pushed: CAREFUL_REWRITE (explicit permission required before rewrite, `--force-with-lease` only if pushing)
 ```
 
 ## PHASE 3: Atomic Unit Planning (BLOCKING)
@@ -227,13 +227,13 @@ git log --oneline $(git merge-base HEAD main 2>/dev/null || git merge-base HEAD 
 | Condition | Risk Level | Action |
 |-----------|------------|--------|
 | On main/master | CRITICAL | **ABORT** - never rebase main |
-| Dirty working directory | WARNING | Stop and ask before stashing; never hide user changes silently |
-| Pushed commits exist | WARNING | Requires explicit permission before rewrite and `--force-with-lease` only |
+| Dirty working directory | WARNING | Stop and ask before stashing. Never hide user changes silently. |
+| Pushed commits exist | WARNING | Requires explicit permission before rewrite. `--force-with-lease` only. |
 | All commits local | SAFE | Proceed freely |
 
 ## PHASE R2: Rebase Execution
 
-Rebases must be fully non-interactive. Use the mandatory environment prefix for every git command. Do not open editors. If conflicts occur, stop after reporting conflicted files and exact next commands; do not guess conflict resolutions unless the user explicitly requested conflict fixing.
+Rebases must be fully non-interactive. Use the mandatory environment prefix for every git command. Do not open editors. If conflicts occur, stop after reporting the conflicted files and exact next commands. Do not guess conflict resolutions unless the user explicitly requested conflict fixing.
 
 ```bash
 # Find merge-base

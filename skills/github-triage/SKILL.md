@@ -25,13 +25,13 @@ Fetch open issue/PR metadata, classify each, spawn 1 background executor per ite
 **NEVER run any GitHub mutation command.** This skill is read-and-report ONLY.
 
 Forbidden commands (automatic failure if used):
-- `gh pr merge` — NEVER
-- `gh pr close` — NEVER
-- `gh issue close` — NEVER
-- `gh issue edit` — NEVER
-- `gh pr edit` — NEVER
-- `gh pr review --approve` — NEVER
-- `gh api` with non-GET methods — NEVER (`POST`, `PUT`, `PATCH`, `DELETE` are forbidden)
+- `gh pr merge`: NEVER
+- `gh pr close`: NEVER
+- `gh issue close`: NEVER
+- `gh issue edit`: NEVER
+- `gh pr edit`: NEVER
+- `gh pr review --approve`: NEVER
+- `gh api` with non-GET methods: NEVER (`POST`, `PUT`, `PATCH`, `DELETE` are forbidden)
 - Any `gh` command that writes, modifies, or deletes
 
 Allowed read-only commands:

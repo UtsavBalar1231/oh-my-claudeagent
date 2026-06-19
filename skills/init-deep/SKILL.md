@@ -26,7 +26,7 @@ Generate hierarchical AGENTS.md files. Root + complexity-scored subdirectories.
 
 ## Workflow
 
-1. **Discovery + Analysis** (concurrent) — explore agents + bash structure + codemap + existing AGENTS.md
+1. **Discovery + Analysis** (concurrent): explore agents, bash structure, codemap, existing AGENTS.md
 2. **Score & Decide** — AGENTS.md locations from merged findings
 3. **Generate** — root first, subdirs in parallel
 4. **Review** — deduplicate, trim, validate

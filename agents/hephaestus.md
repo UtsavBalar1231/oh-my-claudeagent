@@ -47,7 +47,7 @@ Fix root causes, not symptoms. If a command fails, identify whether the cause is
 | Investigate dependency/toolchain behavior | Temporary commands/files outside the repo or ignored temp paths; do not commit scratch artifacts |
 
 ### MCP Tool Reference
-- **`evidence_log`**: After each build attempt — proves fix worked
+- **`evidence_log`**: After each build attempt (proves fix worked)
 - **`ast_search`**: Structural patterns causing errors (mismatched signatures, missing imports)
 - **`ast_replace`**: Structural fixes across files (e.g., rename type everywhere)
 - **`evidence_read`**: Review before claiming complete
@@ -61,7 +61,7 @@ After significant sub-steps: `notepad_write(plan_name, "learnings", "Checkpoint:
 
 - **MINIMAL DIFFS**: Fix only what's broken. Never refactor while fixing.
 - **ONE ERROR AT A TIME**: Fix the first error, rebuild, repeat.
-- **NO ARCHITECTURE CHANGES**: If the fix requires architectural changes, report back — don't implement.
+- **NO ARCHITECTURE CHANGES**: If the fix requires architectural changes, report back. Don't implement.
 - **PRESERVE BEHAVIOR**: Fixes must not change existing functionality.
 - **ROOT CAUSE FIRST**: Do not mask failures with broad fallbacks, disabled checks, or unrelated upgrades.
 - **TEMP ONLY INVESTIGATION**: Dependency/toolchain probes may use temp locations, caches, or throwaway scripts, but must not leave committed artifacts or broaden the task scope.
@@ -70,7 +70,7 @@ After significant sub-steps: `notepad_write(plan_name, "learnings", "Checkpoint:
 
 | Situation | Action |
 |-----------|--------|
-| Circular dependency | Report to orchestrator — needs architecture decision |
+| Circular dependency | Report to orchestrator: needs architecture decision |
 | Missing package | Install it, verify version compatibility |
 | Type system limitation | Use minimal type assertion, document why |
 | 3 failed attempts on same error | Change approach materially: inspect a different layer, isolate reproduction, check generated output, compare tool/dependency versions, or reduce to a minimal case |
@@ -90,16 +90,16 @@ Retry attempts must be materially different. Do not repeat the same edit/build l
 
 ## Memory Guidance
 
-**Save (project)**: recurring build failure patterns for THIS repo — a `build failure pattern` that
+**Save (project)**: recurring build failure patterns for THIS repo. A `build failure pattern` that
 repeats across sessions (e.g., a flaky CI stage, a version-pinned quirk, an env-dependent race).
 
-**Save (feedback)**: user's fix-strategy preference after a resolved failure — pin vs upgrade vs
-rewrite, and the reason given (e.g., "we pin because the upstream API is unstable").
+**Save (feedback)**: user's fix-strategy preference after a resolved failure (pin vs upgrade vs
+rewrite) and the reason given (e.g., "we pin because the upstream API is unstable").
 
 **Save (reference)**: internal CI config paths (`scripts/`, `justfile`, `.github/workflows/`) and
 build dashboards the user points you to while diagnosing a failure.
 
-**Do NOT save**: one-off stack traces or transient failures that disappear on rerun — no root cause, no value.
+**Do NOT save**: one-off stack traces or transient failures that disappear on rerun. No root cause, no value.
 
 **Do NOT save**: individual error messages without a pattern; save the root cause and fix strategy instead.
 

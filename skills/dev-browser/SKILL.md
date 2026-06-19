@@ -22,7 +22,7 @@ Browser automation with persistent page state. Small, focused scripts per action
 
 ## Setup (MANDATORY)
 
-Browser server must be running. Two modes — ask user if unclear.
+Browser server must be running. Two modes: ask user if unclear.
 
 ### Standalone Mode (Default)
 
@@ -73,7 +73,7 @@ EOF
 1. **One thing per script** (navigate, click, fill, check)
 2. **Log state** at end for next steps
 3. **Descriptive page names** (`"checkout"`, not `"main"`)
-4. **Disconnect to exit** — pages persist
+4. **Disconnect to exit** (pages persist)
 5. **Plain JS in evaluate** — no TypeScript syntax
 
 ## No TypeScript in Browser Context

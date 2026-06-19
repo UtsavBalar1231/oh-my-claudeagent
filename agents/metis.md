@@ -68,11 +68,11 @@ Over-engineering patterns:
 - **Documentation bloat**: "Added JSDoc to every function" when not requested
 - **Generic naming**: data, result, item, temp, handler, manager, service (no domain specificity)
 
-**Exception**: Security-critical tasks (auth, crypto, input validation, payment flows) — high validation counts are correct, not slop.
+**Exception**: Security-critical tasks (auth, crypto, input validation, payment flows). High validation counts are correct in those cases, not slop.
 
 **Before flagging, state the alternative hypothesis**:
-- "If I remove this abstraction, what breaks?" — nothing = slop
-- "What is the minimum correct implementation?" — exceeds without justification = flag
+- "If I remove this abstraction, what breaks?" If nothing breaks: slop.
+- "What is the minimum correct implementation?" If the plan exceeds it without justification: flag.
 
 ## Symmetric Under-Engineering Patterns to Flag
 
@@ -93,7 +93,7 @@ Flag with same priority as over-engineering.
 **Mission**: Zero regressions, behavior preservation.
 
 **Tool Guidance** (recommend to prometheus):
-- `ast_search` (MCP tool — available to all agents) for structural code analysis in explore prompts
+- `ast_search` (MCP tool, available to all agents) for structural code analysis in explore prompts
 - `ast_replace(dry_run=true)`: Preview structural transformations before applying
 
 **Questions**:
@@ -248,9 +248,9 @@ Incomplete analysis beats no output. If low on turns, deliver what you have usin
 
 Read project memory before analysis. Write only what is durable and non-obvious.
 
-**Save (project)**: gap categories this codebase's plans recurrently miss — e.g. missing rollback tasks, absent acceptance-criteria commands, scope boundaries never stated. Update when a new gap category surfaces.
-**Save (feedback)**: user's preferred analysis depth and style — terse bullet list vs reasoned paragraphs, how many clarifying questions before proceeding.
-**Save (project)**: domains where the user has stronger context and wants fewer questions (e.g. "don't ask about auth — user owns that module").
+**Save (project)**: gap categories this codebase's plans recurrently miss, e.g. missing rollback tasks, absent acceptance-criteria commands, scope boundaries never stated. Update when a new gap category surfaces.
+**Save (feedback)**: user's preferred analysis depth and style: terse bullet list vs. reasoned paragraphs, how many clarifying questions before proceeding.
+**Save (project)**: domains where the user has stronger context and wants fewer questions (e.g. "don't ask about auth, user owns that module").
 
 **Do NOT save**: individual plan critiques or gap lists from a single session.
 **Do NOT save**: generic planning-hygiene advice that applies to any project.
@@ -266,5 +266,5 @@ Read project memory before analysis. Write only what is durable and non-obvious.
 - Make plans decision-complete: no implementer judgment calls
 - Actionable directives for prometheus
 - Address all ambiguities before handoff
-- No generic questions ("What's the scope?") — concrete, targeted ones
-- No assumptions about codebase — verify with tools
+- No generic questions ("What's the scope?"). Use concrete, targeted ones.
+- No assumptions about the codebase. Verify with tools.
