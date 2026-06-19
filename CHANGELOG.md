@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.0] - 2026-06-19
+
+Adopts a minimal-code philosophy across the orchestration harness, completes the
+root-cause fix for worker stub output, and de-slops the authored prose.
+
+### Added
+
+- **Minimal-code creed, embedded across the harness.** OMCA now biases every code-writing
+  path toward the minimum that works: a YAGNI decision ladder (does it need to exist?
+  stdlib? native platform feature? existing dependency? one line?) with a non-negotiable
+  safety floor where validation at trust boundaries, error and data-loss handling,
+  security, and anything the user asked for are never cut. The creed lives in the shared
+  output style, a per-spawn hook for the code-writers, and each pipeline agent in its own
+  role: prometheus plans the minimum, metis flags over-engineering, momus rejects
+  unrequested abstractions and scope creep, executor and hephaestus write the smallest
+  change, and oracle favors the simplest design that meets the requirement. Adapted from
+  ponytail (MIT).
+
+### Changed
+
+- **Humanized authored prose** across the agent and skill definitions: removed AI-writing
+  tells such as em dashes in prose, rule-of-three padding, promotional phrasing, and
+  mechanical boldface, while leaving frontmatter, headings, and code blocks untouched.
+- **Slimmer per-turn footprint.** The omca-setup CLAUDE.md block no longer duplicates the
+  parallel-execution and verification rules already carried by the output style; it points
+  to them instead, reclaiming that cost on every turn. Re-run omca-setup to pick up the
+  slimmer block.
+
+### Fixed
+
+- **Workers no longer emit barrier stubs instead of deliverables.** Orchestrator-only
+  barrier imperatives ("end response, wait", "Waiting for N more") were leaking into
+  worker-visible surfaces (the output style, the omca-setup block, and executor), so under
+  context pressure a worker could end its turn with a placeholder ("Done.", "Waiting.", a
+  bare check mark) instead of its findings. Those imperatives now live only where the
+  orchestrator sees them, every worker definition carries an explicit leaf-worker
+  contract, and a regression test guards the boundary.
+
 ## [2.8.6] - 2026-06-18
 
 Reliability fixes for subagent output discipline and MCP shutdown, plus a green CI: the
