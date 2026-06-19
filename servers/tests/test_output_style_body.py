@@ -1,13 +1,24 @@
-"""Assert orchestration content is present in the OMCA Default output-style body."""
+"""The OMCA Default output style is deliberately lean.
+
+It carries the minimal-code creed. The heavier orchestration, parallel-execution, and
+evidence framing was relocated to the omca-setup block and the specialist agents so it
+does not weigh on every turn. These tests assert the lean shape and that the relocated
+content was not lost.
+"""
 
 from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _OUTPUT_STYLE = _REPO_ROOT / "output-styles" / "omca-default.md"
+_ORCH_BLOCK = _REPO_ROOT / "skills" / "omca-setup" / "orchestration-block.md"
 
 
 def _body() -> str:
     return _OUTPUT_STYLE.read_text(encoding="utf-8")
+
+
+def _orch_block() -> str:
+    return _ORCH_BLOCK.read_text(encoding="utf-8")
 
 
 def test_file_exists():
@@ -27,58 +38,50 @@ def test_frontmatter_fields():
     )
 
 
-def test_operating_principles_anchor():
-    """Operating-principles intro sentence must be present."""
+def test_minimal_code_creed_present():
+    """The lean style's load-bearing content is the minimal-code creed."""
     body = _body()
-    assert "Treat Claude Code as the platform owner" in body, (
-        "operating-principles anchor sentence absent"
+    assert "Write the minimum that solves the problem" in body, (
+        "minimal-code creed absent from the output style"
     )
+    assert "<coding_discipline>" in body, "<coding_discipline> tag absent"
 
 
-def test_xml_section_tags():
-    """Surviving orchestration XML section tags must be present."""
-    body = _body()
-    tags = [
-        "<operating_principles>",
-        "<coding_discipline>",
-        "<delegation>",
-        "<critical_rules>",
-    ]
-    for tag in tags:
-        assert tag in body, f"XML section tag absent: {tag}"
+def test_heavy_framing_absent():
+    """The heavy always-on framing must not weigh on every turn via the output style.
 
-
-def test_removed_xml_sections_absent():
-    """Tags removed in T21 trim must NOT be present (regression guard)."""
+    Regression guard: it was relocated to the omca-setup block and the agents.
+    """
     body = _body()
     removed = [
+        "<operating_principles>",
+        "<delegation>",
+        "<critical_rules>",
         "<entrypoints>",
         "<agent_catalog>",
         "<workflow>",
         "<parallel_execution>",
         "<verification>",
         "<file_reading>",
+        "Treat Claude Code as the platform owner",
     ]
-    for tag in removed:
-        assert tag not in body, (
-            f"Removed XML section tag found (should be absent): {tag}"
+    for marker in removed:
+        assert marker not in body, (
+            f"heavy framing leaked back into the output style: {marker}"
         )
 
 
-def test_parallel_fanout_rule_marker():
-    """Parallel fan-out orchestration rule must be present in critical_rules.
-
-    The rule mandates synchronous-by-default fan-out; backgrounding an agent whose
-    result is needed immediately is the documented cause of the retrieval loop.
+def test_relocated_content_preserved_in_omca_setup_block():
+    """The orchestration and evidence guidance shed by the output style must still live
+    in the omca-setup block, so it is relocated rather than lost.
     """
-    body = _body()
-    assert "synchronous by default" in body, "parallel fan-out rule absent"
-
-
-def test_evidence_rule_marker():
-    """Evidence-before-completion rule must reference evidence_log."""
-    body = _body()
-    assert "evidence_log" in body, "'evidence_log' reference absent"
+    block = _orch_block()
+    assert "synchronous parallel" in block, (
+        "parallel fan-out guidance absent from the omca-setup block"
+    )
+    assert "evidence_log" in block, (
+        "evidence_log reference absent from the omca-setup block"
+    )
 
 
 def test_bats_canary_comments_absent():
