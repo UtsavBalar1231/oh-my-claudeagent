@@ -41,15 +41,16 @@ STOPFAILURE_PAYLOAD='{"session_id":"test-session","hook_event_name":"StopFailure
 	[[ "$context" == *"[CURRENT DATE]"* ]]
 }
 
-# ─── c2. orchestration body lives in output-styles/omca-default.md ───────────
+# ─── c2. output-styles/omca-default.md carries the minimal-code creed ─────────
 
-@test "output-styles/omca-default.md: contains operating-principles intro sentence" {
-	# Positive assertion: the orchestration body that was removed from session-init
-	# must be present in the output-styles file so the content is not lost.
+@test "output-styles/omca-default.md: carries the minimal-code coding discipline" {
+	# The always-on output style is deliberately lean: it carries the minimal-code
+	# creed, while orchestration routing/verification detail lives in the omca-setup
+	# block and the specialist agents (so it does not weigh on every turn).
 	local style_file
 	style_file="$(cd "$BATS_TEST_DIRNAME/../../.." && pwd)/output-styles/omca-default.md"
 	assert [ -f "$style_file" ]
-	grep -q "Treat Claude Code as the platform owner" "$style_file"
+	grep -q "Write the minimum that solves the problem" "$style_file"
 }
 
 # ─── c3. session-init emits sessionTitle when boulder.json is active ──────────

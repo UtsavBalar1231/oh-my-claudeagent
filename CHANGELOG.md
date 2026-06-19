@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.10.0] - 2026-06-19
+
+Makes OMCA's always-on footprint lean, after a benchmark showed its ambient context roughly
+doubled cost and code on coding tasks with no correctness gain.
+
+### Changed
+
+- **Lean default output style.** The force-for-plugin output style no longer carries the
+  operating principles, the full delegation table, or the plan-execution rules. All of that
+  is already present in the omca-setup block and the specialist agents, so it was duplicated
+  weight on every turn that primed the agent to over-produce. The style now carries only the
+  minimal-code creed. On the multi-file benchmark suite this cut OMCA-on cost about 27% and
+  time about 30% at equal correctness. Routing and verification behavior is unchanged. See
+  `benchmarks/results/2026-06-19-optimization.md`, which also identifies the advisory
+  PostToolUse hooks as the next and larger overhead lever.
+
 ## [2.9.0] - 2026-06-19
 
 Adopts a minimal-code philosophy across the orchestration harness, completes the
