@@ -74,6 +74,7 @@ case "${AGENT_TYPE}" in
 		EXEC_GUIDANCE_HEADER_ADDED=1
 	fi
 	CONTEXT_PARTS+=$'\n'"[VERIFICATION] After running build/test/lint commands, you MUST use the evidence_log MCP tool to record results. Do NOT manually write or cat to .omca/evidence/verification-evidence.json — the TaskCompleted hook validates schema and will reject manual writes. Example: evidence_log(evidence_type=\"test\", command=\"just test\", exit_code=0, output_snippet=\"10 passed\")"
+	CONTEXT_PARTS+=$'\n'"[MINIMAL CODE] Decision ladder before writing code, in order: (1) does it need to exist? YAGNI. (2) stdlib. (3) native platform feature. (4) already-installed dependency. (5) one line. (6) only then the minimum that works. Lazy NOT negligent: validating at trust boundaries, handling errors and data loss, security, accessibility, and anything the user explicitly asked for are non-negotiable. Non-trivial logic leaves ONE runnable check: the smallest assert/test, or an evidence_log entry where OMCA's flow already covers it. Boring over clever, fewest files."
 	;;
 *) ;;
 esac

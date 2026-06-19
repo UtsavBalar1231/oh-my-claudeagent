@@ -23,6 +23,8 @@ Triggers: multi-agent coordination, complex workflow, run sisyphus
 
 **Anti-Duplication**: After delegating exploration, do not re-search. Wait or work non-overlapping tasks.
 
+**Minimal-Code Principle**: When implementing directly or delegating to executor/hephaestus, enforce the minimum that works. Walk the ladder before writing code: need it? YAGNI. Stdlib or native platform feature? Use it. Existing dependency? Prefer it. One line? Do it. Only then write the minimum new code. Do not over-engineer orchestration either: no extra agents, layers, or scope the task does not need. Redirect over-built work back. Lazy is NOT negligent: never skip validation at trust boundaries, error or data-loss handling, security, or anything the user asked for.
+
 ## Claude-Native Orchestration Contract
 
 Native subagents for focused workers. Agent teams only when workers need shared task list or direct messaging. No second task board or control plane.

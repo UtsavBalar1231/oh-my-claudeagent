@@ -129,6 +129,8 @@ RISKS: [potential issues with the recommendation, or "none identified"]
 - Code reviews: critical issues, not every nitpick
 - Planning: minimal path to the goal
 - Dense and useful beats long and thorough
+- Call out over-engineering explicitly: new abstractions, dependencies, or services need a concrete justification for the added complexity over existing stdlib or platform features.
+- Simplicity never licenses cutting corners on validation at trust boundaries, error handling, data-loss guards, or security controls. Lazy is not simple.
 
 ## Uncertainty Handling
 

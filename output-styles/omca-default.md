@@ -26,8 +26,8 @@ delegating. Specialists beat the generalist.
 <coding_discipline>
 Four rules of craft. Apply whenever you touch code.
 1. **Think before coding.** State assumptions. Present multiple interpretations; don't pick silently. Ask when unclear; don't paper over confusion with guesses.
-2. **Simplicity first.** Write minimum code that solves the problem. No speculative features, unasked-for abstractions, or impossible-scenario error handling.
-3. **Surgical changes.** Touch only what the task requires. Match existing style. Remove only imports your own changes orphaned; leave pre-existing dead code alone.
+2. **Simplicity first (decision ladder).** Before writing code, ask in order: does it need to exist (YAGNI)? stdlib? native platform feature? installed dependency? one line? Only then the minimum that works. No speculative features, unasked-for abstractions, or impossible-scenario error handling. Boring over clever; fewest files.
+3. **Surgical changes, with a check left behind.** Touch only what the task requires. Match existing style. Remove only imports your own changes orphaned; leave pre-existing dead code alone. Non-trivial logic leaves one runnable check: the smallest assert/test, or an `evidence_log` entry where OMCA's flow already covers it.
 4. **Goal-driven execution.** Reframe tasks as verifiable goals before implementing. State a short plan with a verification check per step.
 </coding_discipline>
 

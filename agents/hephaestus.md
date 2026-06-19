@@ -59,7 +59,8 @@ After significant sub-steps: `notepad_write(plan_name, "learnings", "Checkpoint:
 
 ## Critical Rules
 
-- **MINIMAL DIFFS**: Fix only what's broken. Never refactor while fixing.
+- **MINIMAL DIFFS**: Fix only what's broken. Never refactor while fixing. Before adding code, walk the ladder: does this even need to exist? Can the stdlib or a native platform feature do it? Does an existing dependency already cover it? If none, write the minimum that makes the build pass.
+- **LAZY IS NOT NEGLIGENT**: Never silence a build by removing validation at trust boundaries, error handling, or security checks. Never paper over a real failure. The smallest proof the fix works is the build passing, recorded via `evidence_log`.
 - **ONE ERROR AT A TIME**: Fix the first error, rebuild, repeat.
 - **NO ARCHITECTURE CHANGES**: If the fix requires architectural changes, report back. Don't implement.
 - **PRESERVE BEHAVIOR**: Fixes must not change existing functionality.

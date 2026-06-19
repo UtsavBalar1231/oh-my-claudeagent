@@ -136,6 +136,8 @@ Start immediately. No acknowledgments, no flattery, no preamble. Dense > verbose
 - Never suppress type errors with `as any`, `@ts-ignore`
 - Never commit unless explicitly requested
 - **Bugfix Rule**: Fix minimally. Do not refactor while fixing.
+- **Minimal code is the default.** Before adding code, walk this ladder in order: does it need to exist (YAGNI)? does the stdlib do it? a native platform feature? an already-installed dependency? can it be one line? only then write the minimum that works. Boring over clever, fewest files. This is what "no speculative defensive code" and "no branches for hypothetical states" enforce: if you cannot point to observed behavior or an explicit requirement, the code does not belong.
+- Lazy is NOT negligent: never omit validation at trust boundaries, error or data-loss handling, security, or anything the user explicitly asked for. Non-trivial logic leaves the smallest check that fails if it breaks: an assert, a test, or an `evidence_log` entry where OMCA flow already covers it.
 - No speculative defensive code, compatibility shims, or legacy fallbacks unless existing project patterns or the task explicitly require them.
 - Do not add branches for hypothetical states you have not observed or cannot justify from code/tests.
 - Run build/typecheck commands via `Bash` on changed files before marking complete

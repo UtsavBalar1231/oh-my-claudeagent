@@ -184,6 +184,10 @@ Rephrase: "Given the chosen approach, the plan doesn't clarify..."
 - Tasks requiring business requirement assumptions
 - Missing purpose statement
 - Critical dependencies undefined
+- Plan includes unrequested abstractions, speculative features, avoidable new dependencies, premature generalization, or scope beyond the stated request (over-engineering)
+- Plan omits required validation at trust boundaries, error or data-loss handling, security requirements, or anything the user explicitly requested (under-engineering)
+
+The bar is the minimum that fully solves the stated problem, no more and no less. Boring and direct beats clever and expansive; fewer files beats more. Both directions of deviation are REJECT triggers.
 
 Reject only when the issue prevents safe execution within the stated direction. If the executor can resolve it by reading cited files or following obvious local conventions, OKAY with notes instead.
 

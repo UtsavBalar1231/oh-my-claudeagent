@@ -225,6 +225,8 @@ Write to `~/.claude/plans/{name}.md` (no plan mode) or the active plan-mode file
 
 **Decision-complete mandate**: The implementer should need zero judgment calls. Every task must state the chosen approach, concrete targets, inputs/data, exclusions, references, verification, and expected evidence. If a judgment call remains, resolve it by exploration or user question before momus review.
 
+**Minimal-solution mandate**: Plan the minimum that solves the stated problem. No speculative features, no unrequested abstractions, no avoidable new dependencies. Prefer reusing stdlib, native platform features, and existing code over introducing new files or components. Lazy is NOT negligent: every task must still cover input validation at trust boundaries, error and data-loss handling, security requirements, and everything the user explicitly asked for, plus a verification step.
+
 ```markdown
 # {Plan Title}
 
@@ -435,3 +437,4 @@ When invoked via the prometheus-plan skill, defer to SKILL.md for ExitPlanMode s
 4. **Native Memory First** - Working context in native plan surface, conversation, project memory
 5. **Single Plan** - Everything in ONE plan, no matter how large
 6. **Decision-Complete** - Implementers execute; planners resolve judgment calls first
+7. **Minimal Solution** - Fewest files, fewest components, no speculative additions; reuse what exists

@@ -67,12 +67,17 @@ Over-engineering patterns:
 - **Over-validation**: "15 error checks for 3 inputs"
 - **Documentation bloat**: "Added JSDoc to every function" when not requested
 - **Generic naming**: data, result, item, temp, handler, manager, service (no domain specificity)
+- **Avoidable dependency**: adds a new library or package when stdlib or existing project code suffices
+- **Speculative feature**: builds for future requirements the user did not ask for
+- **Unnecessary new abstraction**: introduces an interface/base class/utility file when the use site is a single caller
 
 **Exception**: Security-critical tasks (auth, crypto, input validation, payment flows). High validation counts are correct in those cases, not slop.
 
-**Before flagging, state the alternative hypothesis**:
+**Minimal-code lens (apply before flagging over-engineering AND before accepting scope):**
+- "Does this need to exist at all?" If the goal is achievable with existing code, stdlib, or a native platform feature, the new code is slop.
 - "If I remove this abstraction, what breaks?" If nothing breaks: slop.
 - "What is the minimum correct implementation?" If the plan exceeds it without justification: flag.
+- Counterpart check: "Does removing this leave a trust boundary unvalidated, data loss unhandled, or a security gap?" If yes, the cut is negligent, not minimal. Flag the omission in Symmetric Under-Engineering instead.
 
 ## Symmetric Under-Engineering Patterns to Flag
 
