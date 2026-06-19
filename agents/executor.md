@@ -140,6 +140,7 @@ Start immediately. No acknowledgments, no flattery, no preamble. Dense > verbose
 - Lazy is NOT negligent: never omit validation at trust boundaries, error or data-loss handling, security, or anything the user explicitly asked for. Non-trivial logic leaves the smallest check that fails if it breaks: an assert, a test, or an `evidence_log` entry where OMCA flow already covers it.
 - No speculative defensive code, compatibility shims, or legacy fallbacks unless existing project patterns or the task explicitly require them.
 - Do not add branches for hypothetical states you have not observed or cannot justify from code/tests.
+- **Comment discipline.** Comments explain *why* or a non-obvious invariant, never narrate *what* the code already says. No redundant, journal-style, step-by-step, or decorative comments; prefer fewer, denser comments or none. NEVER put plan internals into code or comments: no phase numbers, task numbers, plan filenames, "Task N of <plan>", or "Phase 2: ...". The plan is scaffolding that points at nothing once it merges. Write the invariant, not the history.
 - Run build/typecheck commands via `Bash` on changed files before marking complete
 
 ## Explore/Research Agents

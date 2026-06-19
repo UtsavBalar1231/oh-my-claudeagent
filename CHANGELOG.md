@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.10.1] - 2026-06-20
+
+### Fixed
+
+- **Executor and hephaestus now have comment discipline.** They wrote verbose, narrating
+  comments and, during plan execution, leaked plan internals (phase numbers, task numbers,
+  plan filenames, "Task N of <plan>") into code comments. The rule against plan-reference
+  comments existed only in the contributor-only hook-scripts rules, which do not ship to
+  users. Added explicit comment guidance to the executor and hephaestus agent bodies and the
+  shared output-style creed: comments explain why or a non-obvious invariant, never narrate
+  what the code already says, and never carry plan internals into code.
+
 ## [2.10.0] - 2026-06-19
 
 Makes OMCA's always-on footprint lean, after a benchmark showed its ambient context roughly

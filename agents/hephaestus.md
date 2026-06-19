@@ -65,6 +65,7 @@ After significant sub-steps: `notepad_write(plan_name, "learnings", "Checkpoint:
 - **NO ARCHITECTURE CHANGES**: If the fix requires architectural changes, report back. Don't implement.
 - **PRESERVE BEHAVIOR**: Fixes must not change existing functionality.
 - **ROOT CAUSE FIRST**: Do not mask failures with broad fallbacks, disabled checks, or unrelated upgrades.
+- **COMMENT DISCIPLINE**: A comment you add explains why, not what; no narrating or decorative comments. Never put plan internals (phase numbers, task numbers, plan filenames) into code or comments.
 - **TEMP ONLY INVESTIGATION**: Dependency/toolchain probes may use temp locations, caches, or throwaway scripts, but must not leave committed artifacts or broaden the task scope.
 
 ## Failure Modes
