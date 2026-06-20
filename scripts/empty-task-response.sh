@@ -41,12 +41,6 @@ if [[ "${IS_POOR}" == "true" ]]; then
 	MSG="[POOR AGENT OUTPUT] The agent returned empty or trivially short text with no synthesis — it likely exhausted its turns on tool calls. Do NOT re-query the same agent (a finished agent is terminal; re-querying it loops). Relaunch a FRESH agent with a sharper prompt that states the required output format explicitly, or proceed with what you already have."
 	emit_context "PostToolUse" "${MSG}"
 else
-	USAGE_FILE="${HOOK_STATE_DIR}/agent-usage.json"
-	if [[ -f "${USAGE_FILE}" ]]; then
-		TMP=$(mktemp)
-		jq '.agentUsed = true' "${USAGE_FILE}" >"${TMP}" && mv "${TMP}" "${USAGE_FILE}"
-	fi
-
 	# Canonical platform path: subagent_type is nested under tool_input (not top-level).
 	AGENT_TYPE_FULL=$(jq -r '.tool_input.subagent_type // ""' <<< "${HOOK_INPUT}")
 	AGENT_TYPE="${AGENT_TYPE_FULL##*:}"

@@ -9,8 +9,6 @@ DATE_CONTEXT=$(LC_TIME=C date '+%A %B %d %Y' 2>/dev/null || echo "")
 
 STATE_DIR="${HOOK_STATE_DIR}"
 
-AGENT_ID=$(jq -r '.agent_id // "unknown"' <<< "${HOOK_INPUT}")
-
 AGENT_TYPE=$(jq -r '.agent_type // "unknown"' <<< "${HOOK_INPUT}")
 
 CONTEXT_PARTS="$(section_header 'Agent Protocol')"
@@ -33,17 +31,6 @@ if [[ -n "${DATE_CONTEXT}" ]]; then
 fi
 
 CONTEXT_PARTS+=$'\n'"[OUTPUT MANDATE] Your text response is the ONLY output the orchestrator receives. Tool call results and intermediate reasoning are NOT forwarded. Structure your response according to your agent's defined output format. If running low on turns, stop tool calls and synthesize immediately."
-
-MODES_HEADER_ADDED=0
-for MODE_NAME in ralph ultrawork; do
-	if mode_is_active "${MODE_NAME}" "${STATE_DIR}"; then
-		if [[ "${MODES_HEADER_ADDED}" -eq 0 ]]; then
-			CONTEXT_PARTS+="$(section_header 'Active Modes')"
-			MODES_HEADER_ADDED=1
-		fi
-		CONTEXT_PARTS+=$'\n'"[${MODE_NAME^^} MODE ACTIVE] Continue working in ${MODE_NAME} mode."
-	fi
-done
 
 BOULDER_FILE="${STATE_DIR}/boulder.json"
 if [[ -f "${BOULDER_FILE}" ]]; then
@@ -124,52 +111,7 @@ case "${AGENT_TYPE}" in
 	;;
 esac
 
-ACTIVE_FILE="${STATE_DIR}/active-agents.json"
 CATALOG_FILE="${STATE_DIR}/agent-catalog.json"
-
-AGENT_MODEL="sonnet"
-if [[ -f "${CATALOG_FILE}" ]]; then
-	AGENT_NAME=$(echo "${AGENT_TYPE##*:}" | tr '[:upper:]' '[:lower:]')
-	CATALOG_MODEL=$(jq -r --arg name "${AGENT_NAME}" \
-		'.[] | select(.name == $name) | .default_model // "sonnet"' \
-		"${CATALOG_FILE}" 2>/dev/null)
-	[[ -n "${CATALOG_MODEL}" ]] && AGENT_MODEL="${CATALOG_MODEL}"
-fi
-
-# Register — flock-protected read-modify-write to prevent concurrent write loss
-STARTED_EPOCH=$(date +%s)
-(
-	# 5s — flock wait; long enough for concurrent siblings, short enough to fail fast.
-	flock -w 5 200 || { log_hook_error "flock timeout on active-agents" "subagent-start.sh"; exit 0; }
-	ACTIVE=$(cat "${ACTIVE_FILE}" 2>/dev/null || echo '[]')
-	TMP_ACTIVE=$(mktemp)
-	echo "${ACTIVE}" | jq --arg id "${AGENT_ID}" --arg agent "${AGENT_TYPE}" \
-		--arg model "${AGENT_MODEL}" --arg ts "$(date -Iseconds)" --argjson epoch "${STARTED_EPOCH}" \
-		'. += [{"id": $id, "agent": $agent, "model": $model, "started": $ts, "started_epoch": $epoch}]' \
-		>"${TMP_ACTIVE}" && mv "${TMP_ACTIVE}" "${ACTIVE_FILE}"
-) 200>"${STATE_DIR}/active-agents.lock"
-
-# Bridge spawn-ID to platform agent_id in subagents.json
-SUBAGENTS_FILE="${STATE_DIR}/subagents.json"
-if [[ -f "${SUBAGENTS_FILE}" ]]; then
-	AGENT_TYPE_SHORT="${AGENT_TYPE##*:}" # strip plugin namespace (everything up to and including the last ':')
-	TMP_SUB=$(mktemp)
-	jq --arg platform_id "${AGENT_ID}" \
-		--arg agent_type "${AGENT_TYPE_SHORT}" \
-		--argjson epoch "$(date +%s)" \
-		'
-	   # Find first .active[] entry with spawn-* ID matching this agent type
-	   (.active | to_entries | map(select(
-	       .value.id | startswith("spawn-")
-	   )) | map(select(
-	       .value.type == $agent_type or .value.type == ("oh-my-claudeagent:" + $agent_type)
-	   )) | .[0]) as $match |
-	   if $match != null then
-	       .active[$match.key].id = $platform_id |
-	       .active[$match.key].started_epoch = $epoch
-	   else . end
-	   ' "${SUBAGENTS_FILE}" >"${TMP_SUB}" && mv "${TMP_SUB}" "${SUBAGENTS_FILE}"
-fi
 
 case "${AGENT_TYPE}" in
 *sisyphus*)

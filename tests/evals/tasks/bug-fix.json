@@ -1,7 +1,7 @@
 {
   "name": "bug-fix",
-  "prompt": "The keyword-detector.sh script uses a pattern that would match 'ultrawork' anywhere in the prompt, including inside longer words. Add a word-boundary guard so 'ultrawork' only triggers when it appears as a standalone word or at a word boundary. Show the fix and verify it with a test.",
+  "prompt": "The keyword-detector.sh script uses a pattern that would match 'handoff' anywhere in the prompt, including inside longer words. Add a word-boundary guard so 'handoff' only triggers when it appears as a standalone word or at a word boundary. Show the fix and verify it with a test.",
   "expected_tools": ["Read", "Edit", "Bash"],
-  "success_criteria": "The fix uses proper word-boundary matching (e.g., `(^|[^a-zA-Z])ultrawork([^a-zA-Z]|$)` or `\\bultrawork\\b` via grep -P) to prevent false positives on substrings. A manual test shows 'ultrawork' triggers but 'myultrawork' does not. Existing validate-plugin tests still pass.",
+  "success_criteria": "The fix uses proper word-boundary matching (e.g., `(^|[^a-zA-Z])handoff([^a-zA-Z]|$)` or `\\bhandoff\\b` via grep -P) to prevent false positives on substrings. A manual test shows 'handoff' triggers but 'myhandoff' does not. Existing validate-plugin tests still pass.",
   "category": "bugfix"
 }

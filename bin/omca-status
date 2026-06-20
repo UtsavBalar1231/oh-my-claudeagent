@@ -37,32 +37,6 @@ else
 fi
 echo
 
-echo "=== Pending final-verify (F1-F4) ==="
-if [ -f "$STATE_DIR/pending-final-verify.json" ]; then
-    jq -r '
-      "  plan: \(.plan_path | split("/") | .[-1])",
-      "  plan_sha256: \(.plan_sha256[:16])…",
-      "  marked_at: \(.marked_at)",
-      "  session_id: \(.session_id // "unknown")"
-    ' "$STATE_DIR/pending-final-verify.json"
-else
-    echo "  (no pending wave)"
-fi
-echo
-
-echo "=== Subagents ==="
-if [ -f "$STATE_DIR/subagents.json" ]; then
-    jq -r '
-      "  active (in subagents.json): \(.active | length)",
-      "  completed this session: \(.completed | length)"
-    ' "$STATE_DIR/subagents.json"
-fi
-if [ -f "$STATE_DIR/active-agents.json" ]; then
-    AC=$(jq -r 'length' "$STATE_DIR/active-agents.json" 2>/dev/null || echo 0)
-    echo "  active (in active-agents.json): $AC"
-fi
-echo
-
 echo "=== Active modes ==="
 if [ -f "$STATE_DIR/active-modes.json" ]; then
     jq -r 'to_entries[] | "  \(.key): \(.value.detected_at // "?")"' "$STATE_DIR/active-modes.json"

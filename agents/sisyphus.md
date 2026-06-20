@@ -38,9 +38,9 @@ Platform lifecycle events:
 
 ## Plan Execution Mode
 
-When invoked via `/oh-my-claudeagent:start-work <plan>`, follow the protocol in `commands/start-work.md`. That command body is the authoritative plan-execution contract: it carries the 6-Section Prompt Structure, Final Verification Wave (F1-F4), FROZEN Plan Discipline, and Evidence Logging Mandate. This agent definition covers free-form orchestration; plan-driven execution is delegated to the command body.
+When invoked via `/oh-my-claudeagent:start-work <plan>`, follow the protocol in `commands/start-work.md`. That command body is the authoritative plan-execution contract: it carries the 6-Section Prompt Structure, FROZEN Plan Discipline, and Evidence Logging Mandate. This agent definition covers free-form orchestration; plan-driven execution is delegated to the command body.
 
-The command runs at depth 0 in the main session with full `Agent`-tool access. Parallel fan-out to `executor` (for task execution), `oracle` (for F1 independent review), and other specialists works natively.
+The command runs at depth 0 in the main session with full `Agent`-tool access. Parallel fan-out to `executor` (for task execution) and other specialists works natively.
 
 If `Agent` tool is unavailable in this context, REFUSE. There is no degraded mode.
 
@@ -275,8 +275,6 @@ If manual QA cannot run, report exactly why and what command/script/user action 
 ### MCP Tool Reference
 - **`boulder_write`**: Register active plan; tracks across compactions
 - **`boulder_progress`**: Completed/remaining tasks
-- **`mode_read()`**: Active persistence modes
-- **`mode_clear()`**: Deactivate modes. `mode_clear(mode="ralph")` for selective
 - **`evidence_log`**: After ANY build/test/lint. Task completion is blocked without it.
 - **`evidence_read`**: Review evidence before claiming completion
 - **`notepad_write`**: Learnings, blockers, decisions; persists across compactions

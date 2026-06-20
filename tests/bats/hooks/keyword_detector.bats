@@ -4,80 +4,6 @@
 load '../test_helper'
 
 # ---------------------------------------------------------------------------
-# Ralph detection
-# ---------------------------------------------------------------------------
-
-@test "ralph: detects 'ralph don't stop' and sets ralph-state.json" {
-	local payload='{"prompt":"ralph don'\''t stop"}'
-	run_hook "keyword-detector.sh" "$payload"
-	assert_success
-	ctx=$(get_context)
-	assert echo "$ctx" | grep -q "RALPH MODE DETECTED"
-	assert [ -f "$CLAUDE_PROJECT_ROOT/.omca/state/ralph-state.json" ]
-	local status
-	status=$(jq -r '.status' "$CLAUDE_PROJECT_ROOT/.omca/state/ralph-state.json")
-	assert [ "$status" = "active" ]
-}
-
-@test "ralph: state file has expected fields" {
-	local payload='{"prompt":"ralph"}'
-	run_hook "keyword-detector.sh" "$payload"
-	assert_success
-	assert [ -f "$CLAUDE_PROJECT_ROOT/.omca/state/ralph-state.json" ]
-	local tasks
-	tasks=$(jq -r '.tasks' "$CLAUDE_PROJECT_ROOT/.omca/state/ralph-state.json")
-	assert [ "$tasks" = "[]" ]
-}
-
-# ---------------------------------------------------------------------------
-# Ultrawork detection
-# ---------------------------------------------------------------------------
-
-@test "ultrawork: detects 'ulw' and creates ultrawork-state.json" {
-	local payload='{"prompt":"ulw run in parallel"}'
-	run_hook "keyword-detector.sh" "$payload"
-	assert_success
-	ctx=$(get_context)
-	assert echo "$ctx" | grep -q "ULTRAWORK MODE DETECTED"
-	assert [ -f "$CLAUDE_PROJECT_ROOT/.omca/state/ultrawork-state.json" ]
-	local status
-	status=$(jq -r '.status' "$CLAUDE_PROJECT_ROOT/.omca/state/ultrawork-state.json")
-	assert [ "$status" = "active" ]
-}
-
-@test "ultrawork: detects 'ultrawork' keyword" {
-	local payload='{"prompt":"ultrawork please"}'
-	run_hook "keyword-detector.sh" "$payload"
-	assert_success
-	ctx=$(get_context)
-	assert echo "$ctx" | grep -q "ULTRAWORK MODE DETECTED"
-}
-
-# ---------------------------------------------------------------------------
-# Mutual exclusion: ralph wins over ultrawork in same prompt
-# ---------------------------------------------------------------------------
-
-@test "mutual exclusion: ralph wins when both appear in same prompt" {
-	# Pre-create ultrawork-state.json
-	write_state "ultrawork-state.json" '{"status":"active"}'
-	local payload='{"prompt":"ralph ultrawork"}'
-	run_hook "keyword-detector.sh" "$payload"
-	assert_success
-	# ralph-state.json must exist
-	assert [ -f "$CLAUDE_PROJECT_ROOT/.omca/state/ralph-state.json" ]
-	# ultrawork-state.json must be deleted (ralph actively removes it)
-	assert [ ! -f "$CLAUDE_PROJECT_ROOT/.omca/state/ultrawork-state.json" ]
-}
-
-@test "mutual exclusion: only ralph context emitted when both detected" {
-	local payload='{"prompt":"ralph ultrawork"}'
-	run_hook "keyword-detector.sh" "$payload"
-	assert_success
-	ctx=$(get_context)
-	assert echo "$ctx" | grep -q "RALPH MODE DETECTED"
-}
-
-# ---------------------------------------------------------------------------
 # Handoff detection
 # ---------------------------------------------------------------------------
 
@@ -99,14 +25,6 @@ load '../test_helper'
 	assert_success
 	ctx=$(get_context)
 	assert echo "$ctx" | grep -q "STOP CONTINUATION DETECTED"
-}
-
-@test "stop-continuation: does not create ralph-state.json" {
-	local payload='{"prompt":"ralph stop continuation"}'
-	run_hook "keyword-detector.sh" "$payload"
-	assert_success
-	# ralph detection is suppressed by stop-continuation guard
-	assert [ ! -f "$CLAUDE_PROJECT_ROOT/.omca/state/ralph-state.json" ]
 }
 
 # ---------------------------------------------------------------------------
@@ -178,11 +96,10 @@ load '../test_helper'
 # ---------------------------------------------------------------------------
 
 @test "subagent skip: agent_id present causes exit 0 with no output" {
-	local payload='{"prompt":"ralph","agent_id":"sub-123"}'
+	local payload='{"prompt":"handoff please","agent_id":"sub-123"}'
 	run_hook "keyword-detector.sh" "$payload"
 	assert_success
 	assert_output ""
-	assert [ ! -f "$CLAUDE_PROJECT_ROOT/.omca/state/ralph-state.json" ]
 }
 
 # ---------------------------------------------------------------------------
@@ -197,49 +114,24 @@ load '../test_helper'
 }
 
 # ---------------------------------------------------------------------------
-# Case insensitivity
-# ---------------------------------------------------------------------------
-
-@test "case insensitive: RALPH DON'T STOP triggers ralph detection" {
-	local payload='{"prompt":"RALPH DON'\''T STOP"}'
-	run_hook "keyword-detector.sh" "$payload"
-	assert_success
-	ctx=$(get_context)
-	assert echo "$ctx" | grep -q "RALPH MODE DETECTED"
-	assert [ -f "$CLAUDE_PROJECT_ROOT/.omca/state/ralph-state.json" ]
-}
-
-# ---------------------------------------------------------------------------
 # Session.json update
 # ---------------------------------------------------------------------------
 
 @test "session.json: detectedKeywords updated when session.json exists" {
 	write_state "session.json" '{"sessionId":"test","detectedKeywords":[]}'
-	local payload='{"prompt":"ralph"}'
+	local payload='{"prompt":"handoff please"}'
 	run_hook "keyword-detector.sh" "$payload"
 	assert_success
 	local keywords
 	keywords=$(jq -r '.detectedKeywords[]' "$CLAUDE_PROJECT_ROOT/.omca/state/session.json")
-	assert echo "$keywords" | grep -q "ralph"
+	assert echo "$keywords" | grep -q "handoff"
 }
 
 @test "session.json: not created if it does not exist" {
-	local payload='{"prompt":"ralph"}'
+	local payload='{"prompt":"handoff please"}'
 	run_hook "keyword-detector.sh" "$payload"
 	assert_success
 	assert [ ! -f "$CLAUDE_PROJECT_ROOT/.omca/state/session.json" ]
-}
-
-# ---------------------------------------------------------------------------
-# Korean text
-# ---------------------------------------------------------------------------
-
-@test "korean: '멈추지 마' triggers ralph detection" {
-	local payload='{"prompt":"멈추지 마"}'
-	run_hook "keyword-detector.sh" "$payload"
-	assert_success
-	ctx=$(get_context)
-	assert echo "$ctx" | grep -q "RALPH MODE DETECTED"
 }
 
 # ---------------------------------------------------------------------------
@@ -248,23 +140,23 @@ load '../test_helper'
 
 @test "echo-suppression case 1: first-fire announces and writes active-modes.json" {
 	# No active-modes.json present — genuine first-fire
-	local payload='{"prompt":"ralph","session_id":"test-session-A"}'
+	local payload='{"prompt":"handoff please","session_id":"test-session-A"}'
 	run_hook "keyword-detector.sh" "$payload"
 	assert_success
 	ctx=$(get_context)
-	assert echo "$ctx" | grep -q "RALPH MODE DETECTED"
+	assert echo "$ctx" | grep -q "HANDOFF MODE DETECTED"
 	# Marker must be written
 	assert [ -f "$CLAUDE_PROJECT_ROOT/.omca/state/active-modes.json" ]
 	local stored_sid
-	stored_sid=$(jq -r '.ralph.session_id // ""' "$CLAUDE_PROJECT_ROOT/.omca/state/active-modes.json")
+	stored_sid=$(jq -r '.handoff.session_id // ""' "$CLAUDE_PROJECT_ROOT/.omca/state/active-modes.json")
 	assert [ -n "$stored_sid" ]
 }
 
 @test "echo-suppression case 2: same-session re-fire does NOT re-announce" {
-	# Pre-populate active-modes.json with ralph from the current bats session
+	# Pre-populate active-modes.json with handoff from the current bats session
 	write_state "active-modes.json" \
-		"{\"ralph\":{\"detected_at\":1000000,\"session_id\":\"${CLAUDE_SESSION_ID}\"}}"
-	local payload='{"prompt":"ralph"}'
+		"{\"handoff\":{\"detected_at\":1000000,\"session_id\":\"${CLAUDE_SESSION_ID}\"}}"
+	local payload='{"prompt":"handoff please"}'
 	run_hook "keyword-detector.sh" "$payload"
 	assert_success
 	# No announcement should be emitted
@@ -274,28 +166,17 @@ load '../test_helper'
 @test "echo-suppression case 3: cross-session reset re-announces on new session" {
 	# Pre-populate with a DIFFERENT session_id
 	write_state "active-modes.json" \
-		'{"ralph":{"detected_at":1000000,"session_id":"old-session-XYZ"}}'
+		'{"handoff":{"detected_at":1000000,"session_id":"old-session-XYZ"}}'
 	# CLAUDE_SESSION_ID is set to "bats-test-session" by test_helper setup()
-	local payload='{"prompt":"ralph"}'
+	local payload='{"prompt":"handoff please"}'
 	run_hook "keyword-detector.sh" "$payload"
 	assert_success
 	ctx=$(get_context)
-	assert echo "$ctx" | grep -q "RALPH MODE DETECTED"
+	assert echo "$ctx" | grep -q "HANDOFF MODE DETECTED"
 	# Marker must be updated with current session
 	local stored_sid
-	stored_sid=$(jq -r '.ralph.session_id // ""' "$CLAUDE_PROJECT_ROOT/.omca/state/active-modes.json")
+	stored_sid=$(jq -r '.handoff.session_id // ""' "$CLAUDE_PROJECT_ROOT/.omca/state/active-modes.json")
 	assert [ "$stored_sid" = "$CLAUDE_SESSION_ID" ]
-}
-
-@test "echo-suppression case 4: ultrawork suppressed on same-session re-fire" {
-	# Pre-populate active-modes.json with ultrawork from the current bats session
-	write_state "active-modes.json" \
-		"{\"ultrawork\":{\"detected_at\":1000000,\"session_id\":\"${CLAUDE_SESSION_ID}\"}}"
-	local payload='{"prompt":"ultrawork please"}'
-	run_hook "keyword-detector.sh" "$payload"
-	assert_success
-	# No announcement should be emitted
-	assert_output ""
 }
 
 # ---------------------------------------------------------------------------
@@ -303,28 +184,24 @@ load '../test_helper'
 # ---------------------------------------------------------------------------
 
 @test "task-notification: prompt containing <task-notification> tag does NOT activate any mode" {
-	# Simulates the payload observed at 2026-06-06T07:48:36Z: a bg-agent inventory
-	# relayed as a type="user" turn whose content is a <task-notification> block.
-	# The block contains "ralph ultrawork handoff" — without the guard these keywords
-	# would have activated ralph mode and polluted active-modes.json.
+	# Simulates a background-agent result relayed as a type="user" turn whose content
+	# is a <task-notification> block. Without the guard these keywords would have
+	# activated modes and polluted active-modes.json.
 	local notif_prompt
-	notif_prompt='<task-notification><result>Agent completed: ralph ultrawork handoff plan hephaestus</result></task-notification>'
+	notif_prompt='<task-notification><result>Agent completed: handoff plan hephaestus</result></task-notification>'
 	local payload
 	payload=$(jq -n --arg p "$notif_prompt" '{"prompt":$p}')
 	run_hook "keyword-detector.sh" "$payload"
 	assert_success
 	assert_output ""
-	assert [ ! -f "$CLAUDE_PROJECT_ROOT/.omca/state/ralph-state.json" ]
-	assert [ ! -f "$CLAUDE_PROJECT_ROOT/.omca/state/ultrawork-state.json" ]
 	assert [ ! -f "$CLAUDE_PROJECT_ROOT/.omca/state/active-modes.json" ]
 }
 
-@test "task-notification: genuine 'ralph don't stop' prompt still triggers ralph detection" {
+@test "task-notification: genuine 'handoff please' prompt still triggers handoff detection" {
 	# Regression guard: the task-notification guard must not suppress real user prompts.
-	local payload='{"prompt":"ralph don'\''t stop"}'
+	local payload='{"prompt":"handoff please"}'
 	run_hook "keyword-detector.sh" "$payload"
 	assert_success
 	ctx=$(get_context)
-	assert echo "$ctx" | grep -q "RALPH MODE DETECTED"
-	assert [ -f "$CLAUDE_PROJECT_ROOT/.omca/state/ralph-state.json" ]
+	assert echo "$ctx" | grep -q "HANDOFF MODE DETECTED"
 }

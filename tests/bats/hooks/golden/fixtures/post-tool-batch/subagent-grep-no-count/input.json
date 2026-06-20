@@ -1,1 +1,0 @@
-{"hook_event_name":"PostToolBatch","session_id":"fixture-sid-001","agent_id":"agent-exec-001","agent_type":"oh-my-claudeagent:executor","tool_calls":[{"tool_name":"Grep","tool_input":{"pattern":"fn","path":"/project"},"tool_use_id":"toolu_008","tool_response":""}]}

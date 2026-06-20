@@ -1,7 +1,6 @@
-"""Tests for catalog MCP tools (agents_list, categories_list, concurrency_status, health_check)."""
+"""Tests for catalog MCP tools (agents_list, categories_list, health_check)."""
 
 import json
-import time
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -85,36 +84,6 @@ def test_categories_list_has_expected_categories(tools, monkeypatch):
     data = json.loads(result)
     # categories.json should have at least one entry
     assert len(data) > 0
-
-
-# --- concurrency_status ---
-
-
-def test_concurrency_status_empty_state(tools, working_dir):
-    """concurrency_status returns valid structure when no active-agents.json exists."""
-    result = tools["concurrency_status"](working_directory=working_dir)
-    data = json.loads(result)
-    assert "active" in data
-    assert "counts" in data
-    assert "total" in data
-    assert data["total"] == 0
-    assert isinstance(data["active"], list)
-
-
-def test_concurrency_status_with_active_agents(tools, tmp_git_root, working_dir):
-    """concurrency_status counts agents from active-agents.json."""
-    active_file = tmp_git_root / ".omca" / "state" / "active-agents.json"
-    agents = [
-        {"name": "explore", "model": "haiku", "started_epoch": time.time()},
-        {"name": "oracle", "model": "opus", "started_epoch": time.time()},
-    ]
-    active_file.write_text(json.dumps(agents))
-
-    result = tools["concurrency_status"](working_directory=working_dir)
-    data = json.loads(result)
-    assert data["total"] == 2
-    assert "haiku" in data["counts"]
-    assert "opus" in data["counts"]
 
 
 # --- health_check ---

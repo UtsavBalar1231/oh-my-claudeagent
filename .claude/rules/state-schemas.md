@@ -10,129 +10,18 @@ are noted where fields share identity semantics.
 
 ---
 
-## subagents.json
-
-**Path**: `.omca/state/subagents.json`
-**Writers**: `scripts/track-subagent-spawn.sh` (creates entry), `scripts/subagent-start.sh`
-(bridges spawn-ID to platform agent_id), `scripts/subagent-complete.sh` (moves entry to
-`completed`)
-**Readers**: `scripts/post-tool-batch.sh`, `scripts/subagent-complete.sh`
-(remaining-count check)
-**Lifecycle**:
-1. Initialized as `{"active":[],"completed":[]}` by `track-subagent-spawn.sh` if absent.
-2. `PreToolUse Agent` fires `track-subagent-spawn.sh` — appends an entry to `.active[]`
-   with a synthetic `spawn-*` ID.
-3. `SubagentStart` fires `subagent-start.sh` — locates the matching `spawn-*` entry by
-   `type` and overwrites `.id` with the platform `agent_id` and stamps `started_epoch`.
-4. `SubagentStop` fires `subagent-complete.sh` — moves entry from `.active` to `.completed`.
-
-**Fields**:
-
-| Field | Type | Description |
-|---|---|---|
-| `active` | array | In-flight subagents |
-| `active[].id` | string | Platform `agent_id` (after SubagentStart bridge); `spawn-<epoch><rand>` before bridge |
-| `active[].type` | string | `tool_input.subagent_type` from hook payload (e.g. `oh-my-claudeagent:executor`) |
-| `active[].model` | string | `tool_input.model` or `"default"` |
-| `active[].promptPreview` | string | First 200 chars of `tool_input.prompt` |
-| `active[].startedAt` | string | ISO-8601 timestamp from `track-subagent-spawn.sh` |
-| `active[].status` | string | `"running"` (set on spawn; no update to active entries) |
-| `active[].started_epoch` | integer | Unix epoch, written by `subagent-start.sh` ID-bridge |
-| `completed` | array | Finished subagents |
-| `completed[].id` | string | Platform `agent_id` |
-| `completed[].completedAt` | string | ISO-8601 timestamp |
-| `completed[].status` | string | Always `"completed"` (SubagentStop has no exit_status field) |
-
-**Example**:
-```json
-{
-  "active": [
-    {
-      "id": "agent-abc123",
-      "type": "oh-my-claudeagent:executor",
-      "model": "sonnet",
-      "promptPreview": "Fix the auth bug in login.ts...",
-      "startedAt": "2026-05-10T12:00:00+00:00",
-      "status": "running",
-      "started_epoch": 1746878400
-    }
-  ],
-  "completed": [
-    {
-      "id": "agent-xyz789",
-      "completedAt": "2026-05-10T11:59:00+00:00",
-      "status": "completed"
-    }
-  ]
-}
-```
-
-**Cross-references**: `active[].id` is the same platform `agent_id` that appears in
-`active-agents.json[].id`. Both files must be consulted together to get a complete view
-of running agents — they lag each other during the spawn race window.
-
----
-
-## active-agents.json
-
-**Path**: `.omca/state/active-agents.json`
-**Writers**: `scripts/subagent-start.sh` (appends entry), `scripts/subagent-complete.sh`
-(removes entry via flock-protected write)
-**Readers**: `scripts/post-tool-batch.sh`, `scripts/track-subagent-spawn.sh`
-(concurrency check), `scripts/subagent-complete.sh` (duration calculation)
-**Lifecycle**:
-1. `SubagentStart` fires `subagent-start.sh` — flock-protected append of new entry.
-2. `SubagentStop` fires `subagent-complete.sh` — flock-protected removal of the matching
-   entry; entries older than 900s (15m TTL) are also swept.
-3. File is an array (no wrapper object). Absence treated as `[]` by readers.
-
-**Fields**:
-
-| Field | Type | Description |
-|---|---|---|
-| `[].id` | string | Platform `agent_id` from `SubagentStart` hook payload |
-| `[].agent` | string | `agent_type` from hook payload (e.g. `oh-my-claudeagent:executor`) |
-| `[].model` | string | Resolved model alias (`sonnet`, `opus`, etc.) |
-| `[].started` | string | ISO-8601 timestamp |
-| `[].started_epoch` | integer | Unix epoch; used by `subagent-complete.sh` for duration calculation |
-
-**Example**:
-```json
-[
-  {
-    "id": "agent-abc123",
-    "agent": "oh-my-claudeagent:executor",
-    "model": "sonnet",
-    "started": "2026-05-10T12:00:00+00:00",
-    "started_epoch": 1746878400
-  }
-]
-```
-
-**Cross-references**: `[].id` matches `subagents.json active[].id`. The union of IDs from
-both files is the authoritative running-agent set — `post-tool-batch.sh` computes:
-```
-([$aa[].id] + [$sa[].id]) | unique | length
-```
-where `$aa` = `active-agents.json` and `$sa` = `subagents.json .active`.
-
-**Concurrency lock**: writes to this file are guarded by `.omca/state/active-agents.lock`
-via `flock -w 5`.
-
----
-
 ## boulder.json
 
 **Path**: `.omca/state/boulder.json`
 **Writers**: `boulder_write` MCP tool (`servers/tools/boulder.py`)
-**Readers**: `scripts/subagent-start.sh` (plan context injection), `scripts/ralph-persistence.sh`,
-`scripts/final-verification-evidence.sh`, `mode_read` MCP tool
+**Readers**: `scripts/subagent-start.sh` (plan context injection),
+`scripts/final-verification-evidence.sh` (completeness check), `boulder_progress` MCP tool
 **Lifecycle**:
 1. Written by `/oh-my-claudeagent:start-work` via `boulder_write(active_plan, plan_name, session_id)`.
 2. On session resume, `boulder_write` is called again — `session_id` is appended to
    `session_ids[]` (no duplicates), `started_at` is preserved from the first write.
-3. Cleared by `mode_clear(mode="boulder"|"all")` — removes the file entirely.
-4. `mode_read()` adds a derived `plan_exists` boolean (not stored in the file).
+3. Removed when deleted manually or via direct file removal (no MCP clear tool remains).
+4. `boulder_progress` derives remaining/total task counts at read time from the plan file (not stored in the boulder file).
 
 **Fields**:
 
@@ -156,51 +45,8 @@ via `flock -w 5`.
 }
 ```
 
-**Note**: `mode_read()` synthesizes a `plan_exists` boolean at read time by checking
-`os.path.isfile(active_plan)`. This field is never written to disk.
-
----
-
-## pending-final-verify.json
-
-**Path**: `.omca/state/pending-final-verify.json`
-**Writers**: The `/oh-my-claudeagent:start-work` command body (LLM instruction in
-`commands/start-work.md` lines 243-256) — written by the orchestrating agent after
-flipping the last `- [ ]` checkbox
-**Readers**: `scripts/final-verification-evidence.sh` (validates cross-session, checks
-for F1-F4 evidence), `scripts/session-init.sh` (orphan-marker sweep)
-**Lifecycle**:
-1. Written UNCONDITIONALLY after the last plan checkbox is flipped, before running F1-F4.
-2. `session-init.sh` sweeps orphaned markers on session start: if `session_id` in the
-   file differs from `CLAUDE_SESSION_ID`, the file is deleted (cross-session orphan
-   guard). Skipped on compact-triggered reinit.
-3. `final-verification-evidence.sh` (Stop hook) uses this marker to determine if F1-F4
-   evidence is required. Cleared once all four F-type evidence entries for the recorded
-   `plan_sha256` are present, or manually via `mode_clear(mode="final_verify"|"all")`.
-
-**Fields**:
-
-| Field | Type | Description |
-|---|---|---|
-| `plan_path` | string | Absolute path to the plan file |
-| `plan_sha256` | string | SHA-256 hex digest of the plan file at freeze time (after last checkbox flip) |
-| `marked_at` | integer | Unix epoch timestamp when marker was written |
-| `session_id` | string | `CLAUDE_SESSION_ID` at write time; used for cross-session staleness detection |
-
-**Example**:
-```json
-{
-  "plan_path": "/home/user/.claude/plans/my-plan.md",
-  "plan_sha256": "ad649112c6e13e3d7984a3b4ffed9c3551baf0edfdc3516dc3b573cd81b20a9d",
-  "marked_at": 1746878400,
-  "session_id": "sess-001"
-}
-```
-
-**Cross-references**: `plan_sha256` must match the `plan_sha256` field on F1-F4 entries
-in `verification-evidence.json`. `final-verification-evidence.sh` requires either
-first-class `.plan_sha256 == <sha>` or embedded `"plan_sha256:<sha>"` in
-`.output_snippet` for each F1-F4 entry.
+**Note**: `boulder_progress` derives `plan_exists` at read time by checking whether
+`active_plan` points to an existing file. This boolean is never written to disk.
 
 ---
 
@@ -211,16 +57,15 @@ first-class `.plan_sha256 == <sha>` or embedded `"plan_sha256:<sha>"` in
 writer. Manual writes are blocked by `scripts/write-guard.sh` (`PreToolUse Write` hook)
 and rejected by schema validation in `scripts/task-completed-verify.sh`.
 **Readers**: `scripts/task-completed-verify.sh` (schema validation + freshness check),
-`scripts/final-verification-evidence.sh` (F1-F4 completeness check), `evidence_read`
-MCP tool
+`scripts/final-verification-evidence.sh` (final_verification completeness check),
+`evidence_read` MCP tool
 **Lifecycle**:
 1. Created (or appended to) by each `evidence_log(...)` call.
 2. Entries accumulate for the session; the file is NOT reset between tasks.
-3. `task-completed-verify.sh` checks mtime freshness (≤300s) and validates schema.
-4. `final-verification-evidence.sh` checks for all four F1-F4 entries scoped to
-   `plan_sha256` at session Stop.
-5. NOT cleared by `mode_clear(mode="all")` — evidence is a permanent audit trail.
-   Cleared only by `mode_clear(mode="evidence")`.
+3. `task-completed-verify.sh` checks mtime freshness (<=300s) and validates schema.
+4. `final-verification-evidence.sh` checks for a `final_verification` entry at session Stop
+   when boulder.json reports a completed plan.
+5. NOT cleared automatically — evidence is a permanent audit trail. Remove manually if needed.
 6. `output_snippet` is capped to 2000 characters by `evidence_log`.
 
 **Fields**:
@@ -234,7 +79,6 @@ MCP tool
 | `entries[].output_snippet` | string | Relevant output, capped at 2000 chars |
 | `entries[].timestamp` | string | ISO-8601 UTC timestamp |
 | `entries[].verified_by` | string | (optional) Agent or user who verified |
-| `entries[].plan_sha256` | string | (optional) SHA-256 of plan file; required on F1-F4 entries |
 
 **Type enum**:
 
@@ -244,10 +88,7 @@ MCP tool
 | `test` | Test suite run |
 | `lint` | Linter or static-analysis run |
 | `manual` | Manual verification step |
-| `final_verification_f1` | Plan compliance review (oracle APPROVE/REJECT) |
-| `final_verification_f2` | Code quality review |
-| `final_verification_f3` | Manual QA |
-| `final_verification_f4` | Scope fidelity check |
+| `final_verification` | End-of-plan completeness review |
 
 **Example**:
 ```json
@@ -262,21 +103,15 @@ MCP tool
       "verified_by": "executor"
     },
     {
-      "type": "final_verification_f1",
-      "command": "oracle: APPROVE",
+      "type": "final_verification",
+      "command": "final-verification-evidence.sh: plan complete + evidence present",
       "exit_code": 0,
-      "output_snippet": "plan_sha256:ad649112c6e13e3d7984a3b4ffed9c3551baf0edfdc3516dc3b573cd81b20a9d verdict:APPROVE",
-      "timestamp": "2026-05-10T12:10:00Z",
-      "plan_sha256": "ad649112c6e13e3d7984a3b4ffed9c3551baf0edfdc3516dc3b573cd81b20a9d"
+      "output_snippet": "verdict:APPROVE",
+      "timestamp": "2026-05-10T12:10:00Z"
     }
   ]
 }
 ```
-
-**Dual-shape convention for F1-F4**: `plan_sha256` must appear BOTH as a first-class
-field (`.plan_sha256`) AND embedded in `output_snippet` as `"plan_sha256:<hex>"`.
-`final-verification-evidence.sh` checks both shapes; the first-class field is preferred
-(structured access); the snippet embedding provides grep-ability.
 
 ---
 
@@ -291,8 +126,7 @@ field (`.plan_sha256`) AND embedded in `output_snippet` as `"plan_sha256:<hex>"`
    `detected_at` epoch and `session_id`.
 2. `mode_already_announced()` in `keyword-detector.sh` checks if `session_id` matches
    current session — if yes, suppresses re-announcement.
-3. File is NOT cleared automatically; cleared by `mode_clear(mode="all")` or manually.
-4. Introduced in Phase 1 (commit 23b3d90) to fix the keyword echo loop bug (C-10).
+3. File is NOT cleared automatically; remove manually to reset keyword re-announce suppression.
 
 **Top-level structure**: a plain object keyed by mode name. Each value is a mode-entry
 object.
@@ -305,26 +139,24 @@ object.
 | `<mode_name>.detected_at` | integer | Unix epoch when mode was first detected |
 | `<mode_name>.session_id` | string | `CLAUDE_SESSION_ID` at detection time |
 
-**Known mode keys**: `ralph`, `ultrawork`, `stop-continuation`, `cancel`, `handoff`,
-`omca-setup`, `metis`, `plan`, `hephaestus`.
+**Known mode keys**: `handoff`, `omca-setup`, `metis`, `plan`, `hephaestus`.
 
 **Example**:
 ```json
 {
-  "ralph": {
+  "handoff": {
     "detected_at": 1746878400,
     "session_id": "sess-001"
   },
-  "handoff": {
+  "hephaestus": {
     "detected_at": 1746878500,
     "session_id": "sess-001"
   }
 }
 ```
 
-**Note**: `subagent-start.sh` reads this file indirectly via `mode_is_active` from
-`common.sh`, which checks only `ralph` and `ultrawork` keys for mode-active banners in
-subagent context injection.
+**Note**: `keyword-detector.sh` reads this file to suppress re-announcement of modes
+already detected in the current session.
 
 ---
 
@@ -366,60 +198,12 @@ Escalate to oracle."
 
 ---
 
-## agent-usage.json
-
-**Path**: `.omca/state/agent-usage.json`
-**Writers**: `scripts/session-init.sh` (initializes/resets), `scripts/track-subagent-spawn.sh`
-(sets `agentUsed = true`), `scripts/post-tool-batch.sh` (increments `toolCallCount`)
-**Readers**: `scripts/post-tool-batch.sh`
-**Lifecycle**:
-1. Reset to `{"agentUsed": false, "toolCallCount": 0}` on every `SessionStart` by
-   `session-init.sh`.
-2. `track-subagent-spawn.sh` sets `agentUsed = true` whenever an Agent tool call fires.
-3. `post-tool-batch.sh` increments `toolCallCount` once per qualifying batch (a batch
-   containing ≥1 Grep / Glob / WebFetch / WebSearch call, from a non-subagent session).
-   Emits a delegation reminder every 3rd increment if `agentUsed` is still `false`.
-4. Once `agentUsed = true`, `post-tool-batch.sh` exits the reminder path immediately
-   without incrementing.
-
-**Fields**:
-
-| Field | Type | Description |
-|---|---|---|
-| `agentUsed` | boolean | True once any Agent tool call has fired this session |
-| `toolCallCount` | integer | Number of qualifying batches (containing ≥1 Grep/Glob/WebFetch/WebSearch call) counted since session start |
-
-**Example**:
-```json
-{
-  "agentUsed": false,
-  "toolCallCount": 6
-}
-```
-
----
-
 ## Cross-cutting invariants
 
-### Agent ID identity
-`subagents.json active[].id` and `active-agents.json [].id` refer to the same platform
-`agent_id` value. During the spawn race window (between `PreToolUse` and `SubagentStart`),
-`subagents.json` holds a synthetic `spawn-*` ID while `active-agents.json` does not yet
-have an entry. After the `SubagentStart` bridge in `subagent-start.sh`, both files
-converge on the platform ID. Always union both ID sets to get a complete running-agent
-count.
-
-### plan_sha256 linkage
-`pending-final-verify.json .plan_sha256` must match the `plan_sha256` on F1-F4 entries in
-`verification-evidence.json`. `final-verification-evidence.sh` accepts the SHA from either
-the first-class `.plan_sha256` field or the embedded `"plan_sha256:<hex>"` substring in
-`.output_snippet`. Callers should write both shapes (dual-shape convention).
-
 ### Session ID staleness
-`pending-final-verify.json` and `active-modes.json` both store `session_id` to enable
-cross-session staleness detection. `session-init.sh` sweeps `pending-final-verify.json`
-on startup; `keyword-detector.sh` uses `active-modes.json` session check to suppress
-re-announcements from the same session only.
+`active-modes.json` stores `session_id` to enable cross-session re-announce suppression.
+`keyword-detector.sh` checks `session_id` and suppresses a second announcement only if it
+matches the current session.
 
 ### Atomic writes
 All state files are written atomically: `tmp=$(mktemp) && jq ... > "$tmp" && mv "$tmp"

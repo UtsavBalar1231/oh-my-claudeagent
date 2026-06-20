@@ -1,6 +1,0 @@
-{
-  "session_id": "ses_fixture",
-  "cwd": "/tmp/project",
-  "hook_event_name": "WorktreeCreate",
-  "name": "fixture-worktree"
-}

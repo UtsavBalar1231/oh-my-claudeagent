@@ -1,1 +1,1 @@
-{"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": "[STOP CONTINUATION DETECTED] Halt all automated work — ralph and boulder state.\n\n"}}
+{"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": "[STOP CONTINUATION DETECTED] Halt all automated work and clear boulder state.\n\n"}}

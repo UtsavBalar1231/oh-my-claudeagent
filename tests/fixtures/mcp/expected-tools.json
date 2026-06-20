@@ -6,13 +6,6 @@
   "ast_test_rule",
   "boulder_write",
   "boulder_progress",
-  "boulder_list",
-  "boulder_select",
-  "boulder_complete",
-  "boulder_task_start",
-  "boulder_task_end",
-  "mode_read",
-  "mode_clear",
   "evidence_log",
   "evidence_read",
   "notepad_write",
@@ -22,6 +15,5 @@
   "agents_list",
   "health_check",
   "categories_list",
-  "concurrency_status",
   "file_read"
 ]

@@ -1,8 +1,7 @@
-"""Agent catalog, categories, and concurrency status tools."""
+"""Agent catalog and categories tools."""
 
 import json
 import os
-import time
 from pathlib import Path
 
 import yaml
@@ -81,44 +80,6 @@ def register(mcp: FastMCP) -> None:
             return json.dumps(data, indent=2)
         except json.JSONDecodeError:
             return json.dumps({"error": "categories.json is malformed"})
-
-    @mcp.tool()
-    def concurrency_status(
-        working_directory: str = Field(
-            default="", description="Project root (auto-detected from git)"
-        ),
-    ) -> str:
-        """Diagnostic tool for inspecting active agent state and tracking metrics. Prunes stale entries older than 15 minutes as a side effect. Returns JSON with active agent list, per-model counts, and total."""
-        state = _state_dir(working_directory)
-        active_path = os.path.join(state, "active-agents.json")
-
-        try:
-            with open(active_path) as f:
-                agents = json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
-            return json.dumps({"active": [], "counts": {}, "total": 0})
-
-        # Prune stale entries (>15 min)
-        cutoff = time.time() - 900
-        agents = [a for a in agents if a.get("started_epoch", 0) > cutoff]
-
-        # Write back pruned list
-        _write_json(active_path, agents)
-
-        # Count by model
-        counts: dict[str, int] = {}
-        for a in agents:
-            model = a.get("model", "unknown")
-            counts[model] = counts.get(model, 0) + 1
-
-        return json.dumps(
-            {
-                "active": agents,
-                "counts": counts,
-                "total": len(agents),
-            },
-            indent=2,
-        )
 
     @mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
     def health_check(

@@ -27,17 +27,6 @@
 				]
 			}
 		],
-		"InstructionsLoaded": [
-			{
-				"hooks": [
-					{
-						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/instructions-loaded-audit.sh",
-						"async": true
-					}
-				]
-			}
-		],
 		"UserPromptSubmit": [
 			{
 				"hooks": [
@@ -75,15 +64,6 @@
 					{
 						"type": "command",
 						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/executor-grep-deny.sh"
-					}
-				]
-			},
-			{
-				"matcher": "Agent",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/track-subagent-spawn.sh"
 					}
 				]
 			},
@@ -202,15 +182,6 @@
 		],
 		"PostToolUse": [
 			{
-				"matcher": "AskUserQuestion",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/track-question.sh"
-					}
-				]
-			},
-			{
 				"matcher": "Write|Edit",
 				"hooks": [
 					{
@@ -299,45 +270,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/ralph-persistence.sh"
-					}
-				]
-			},
-			{
-				"hooks": [
-					{
-						"type": "command",
 						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/final-verification-evidence.sh"
-					}
-				]
-			}
-		],
-		"StopFailure": [
-			{
-				"hooks": [
-					{
-						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/stop-failure-handler.sh"
-					}
-				]
-			}
-		],
-		"SubagentStop": [
-			{
-				"hooks": [
-					{
-						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/subagent-complete.sh"
-					}
-				]
-			}
-		],
-		"TaskCreated": [
-			{
-				"hooks": [
-					{
-						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/lifecycle-state.sh"
 					}
 				]
 			}
@@ -348,16 +281,6 @@
 					{
 						"type": "command",
 						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/pre-compact.sh"
-					}
-				]
-			}
-		],
-		"PostCompact": [
-			{
-				"hooks": [
-					{
-						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/post-compact-log.sh"
 					}
 				]
 			}
@@ -373,96 +296,12 @@
 				]
 			}
 		],
-		"Notification": [
-			{
-				"matcher": "idle_prompt|permission_prompt",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/notify.sh",
-						"async": true
-					}
-				]
-			}
-		],
 		"TaskCompleted": [
 			{
 				"hooks": [
 					{
 						"type": "command",
 						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/task-completed-verify.sh"
-					}
-				]
-			}
-		],
-		"TeammateIdle": [
-			{
-				"hooks": [
-					{
-						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/teammate-idle-guard.sh"
-					}
-				]
-			}
-		],
-		"ConfigChange": [
-			{
-				"hooks": [
-					{
-						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/config-change-audit.sh",
-						"async": true
-					}
-				]
-			}
-		],
-		"CwdChanged": [
-			{
-				"hooks": [
-					{
-						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/lifecycle-state.sh"
-					}
-				]
-			}
-		],
-		"FileChanged": [
-			{
-				"matcher": ".mcp.json|AGENTS.md|CLAUDE.md|hooks.json|plugin.json|settings.json|pyproject.toml|justfile",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/lifecycle-state.sh"
-					}
-				]
-			}
-		],
-		"WorktreeCreate": [
-			{
-				"hooks": [
-					{
-						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/lifecycle-state.sh"
-					}
-				]
-			}
-		],
-		"WorktreeRemove": [
-			{
-				"hooks": [
-					{
-						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/lifecycle-state.sh"
-					}
-				]
-			}
-		],
-		"PostToolBatch": [
-			{
-				"hooks": [
-					{
-						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/post-tool-batch.sh"
 					}
 				]
 			}

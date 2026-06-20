@@ -62,7 +62,7 @@ Exhaust provided context before reaching for tools. External lookups fill genuin
 | Structural code patterns | ast_search (MCP tool, available to all agents) |
 
 During active plan execution:
-- `mode_read` for plan context
+- `boulder_progress` for plan context
 - Recommend `evidence_log` in action plans for verification steps
 
 ## Bash Usage Policy

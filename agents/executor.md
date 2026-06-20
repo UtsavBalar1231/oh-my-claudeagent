@@ -105,8 +105,7 @@ If manual QA cannot run in the environment, say why and provide the exact scenar
 - **`ast_replace`**: Structural find-and-replace (`dry_run=true` to preview)
 - **`notepad_write`**: Discoveries or issues during implementation
 - **`evidence_read`**: Review evidence before claiming completion
-- **`mode_read()`**: Active persistence modes
-- **`mode_clear()`**: Deactivate modes. `mode_clear(mode="ralph")` for selective
+- **`boulder_progress`**: Check completed vs remaining tasks
 - Never `rm -f` on `.omca/state/`; use MCP tools
 
 ## Communication Style

@@ -74,28 +74,6 @@ ORACLE_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id
 	! echo "$ctx" | grep -q "READ-ONLY"
 }
 
-# ─── f. Ralph mode injection ─────────────────────────────────────────────────
-
-@test "ralph mode: active ralph-state.json causes mode mention in output" {
-	write_state "ralph-state.json" \
-		'{"status":"active","tasks":[],"idle_count":0}'
-
-	run_hook "subagent-start.sh" "$EXPLORE_PAYLOAD"
-	assert_success
-	local ctx
-	ctx=$(get_context)
-	# Should mention ralph mode
-	echo "$ctx" | grep -qi "ralph"
-}
-
-# ─── g. Active agents tracking ───────────────────────────────────────────────
-
-@test "active agents tracking: active-agents.json is created after SubagentStart" {
-	run_hook "subagent-start.sh" "$EXPLORE_PAYLOAD"
-	assert_success
-	[[ -f "$CLAUDE_PROJECT_ROOT/.omca/state/active-agents.json" ]]
-}
-
 # ─── h. Anti-duplication for orchestrator agents ─────────────────────────────
 
 @test "anti-duplication: sisyphus agent receives ANTI-DUPLICATION guidance" {
@@ -260,26 +238,3 @@ ORACLE_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id
 	echo "$ctx" | grep -q "YOU ARE A LEAF WORKER"
 }
 
-# ─── m. Flock-timeout safety ─────────────────────────────────────────────────
-
-@test "flock timeout: script exits 0 and does NOT corrupt active-agents.json" {
-	# Seed a known registry so we can verify it is unchanged after timeout.
-	write_state "active-agents.json" '[{"id":"existing-agent","agent":"oh-my-claudeagent:explore","model":"sonnet","started":"2026-01-01T00:00:00+00:00","started_epoch":1735689600}]'
-	local before
-	before=$(read_state "active-agents.json")
-
-	# Stub flock to always fail (simulates lock-timeout) by prepending a fake
-	# flock to PATH that exits 1 unconditionally.
-	local stub_dir="$BATS_TEST_TMPDIR/stubs"
-	mkdir -p "$stub_dir"
-	printf '#!/bin/bash\nexit 1\n' > "$stub_dir/flock"
-	chmod +x "$stub_dir/flock"
-
-	PATH="$stub_dir:$PATH" run_hook "subagent-start.sh" "$EXPLORE_PAYLOAD"
-	assert_success
-
-	# Registry must be byte-for-byte identical — no new entry appended.
-	local after
-	after=$(read_state "active-agents.json")
-	[[ "$before" == "$after" ]]
-}

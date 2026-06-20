@@ -5,9 +5,6 @@
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
-STATE_DIR="${HOOK_STATE_DIR}"
-SUBAGENTS_FILE="${STATE_DIR}/subagents.json"
-
 # CODE_EXT_REGEX — extensions for which grep on code is denied.
 # Non-code files (.txt .json .yaml .toml .log .lock etc.) pass through.
 CODE_EXT_REGEX='\.(py|ts|tsx|js|jsx|go|rs|java|kt|swift|c|cpp|h|hpp|md)$'
@@ -31,31 +28,13 @@ allow_pass() {
 }
 
 # ── Resolve subagent type ──────────────────────────────────────────────────────
-# 1. Try explicit subagent_type on the payload (present on some events).
-# 2. Fall back to agent_id lookup in subagents.json .active[].type.
-# If neither resolves to executor, allow.
+# Read subagent_type from the native hook payload.
+# If absent (main session call), allow unconditionally.
 AGENT_TYPE=$(jq -r '.subagent_type // ""' <<< "${HOOK_INPUT}")
 
 if [[ -z "${AGENT_TYPE}" || "${AGENT_TYPE}" == "null" ]]; then
-	AGENT_ID=$(jq -r '.agent_id // ""' <<< "${HOOK_INPUT}")
-	if [[ -z "${AGENT_ID}" || "${AGENT_ID}" == "null" ]]; then
-		# No agent context — main session tool call; allow.
-		allow_pass
-	fi
-
-	if [[ ! -f "${SUBAGENTS_FILE}" ]]; then
-		allow_pass
-	fi
-
-	# flock-protected read — avoids race with subagent-start.sh write.
-	# 5s — flock wait; long enough for concurrent siblings, short enough to fail fast.
-	# shellcheck disable=SC2016
-	AGENT_TYPE=$(
-		flock -w 5 "${STATE_DIR}/subagents.lock" \
-			jq -r --arg id "${AGENT_ID}" \
-				'.active[] | select(.id == $id) | .type // ""' \
-				"${SUBAGENTS_FILE}" 2>/dev/null || echo ""
-	)
+	# No subagent_type — main session tool call; allow.
+	allow_pass
 fi
 
 # Normalize: strip plugin namespace prefix if present.

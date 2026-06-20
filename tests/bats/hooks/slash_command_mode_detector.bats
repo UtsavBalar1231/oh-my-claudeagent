@@ -4,55 +4,6 @@
 load '../test_helper'
 
 # ---------------------------------------------------------------------------
-# ralph slash command
-# ---------------------------------------------------------------------------
-
-@test "ralph: /oh-my-claudeagent:ralph activates ralph mode and emits banner" {
-	local payload='{"command_name":"oh-my-claudeagent:ralph","command_args":[],"command_source":"plugin","expansion_type":"slash_command","prompt":""}'
-	run_hook "slash-command-mode-detector.sh" "$payload"
-	assert_success
-	ctx=$(get_context)
-	assert echo "$ctx" | grep -q "RALPH MODE ACTIVATED"
-	assert [ -f "$CLAUDE_PROJECT_ROOT/.omca/state/active-modes.json" ]
-	local stored_mode
-	stored_mode=$(jq -r '.ralph.session_id // ""' "$CLAUDE_PROJECT_ROOT/.omca/state/active-modes.json")
-	assert [ -n "$stored_mode" ]
-}
-
-# ---------------------------------------------------------------------------
-# ultrawork slash command
-# ---------------------------------------------------------------------------
-
-@test "ultrawork: /oh-my-claudeagent:ultrawork activates ultrawork mode and emits banner" {
-	local payload='{"command_name":"oh-my-claudeagent:ultrawork","command_args":[],"command_source":"plugin","expansion_type":"slash_command","prompt":""}'
-	run_hook "slash-command-mode-detector.sh" "$payload"
-	assert_success
-	ctx=$(get_context)
-	assert echo "$ctx" | grep -q "ULTRAWORK MODE ACTIVATED"
-	assert [ -f "$CLAUDE_PROJECT_ROOT/.omca/state/active-modes.json" ]
-	local stored_mode
-	stored_mode=$(jq -r '.ultrawork.session_id // ""' "$CLAUDE_PROJECT_ROOT/.omca/state/active-modes.json")
-	assert [ -n "$stored_mode" ]
-}
-
-# ---------------------------------------------------------------------------
-# ulw-loop alias
-# ---------------------------------------------------------------------------
-
-@test "ulw-loop: /oh-my-claudeagent:ulw-loop activates ultrawork mode (alias)" {
-	local payload='{"command_name":"oh-my-claudeagent:ulw-loop","command_args":[],"command_source":"plugin","expansion_type":"slash_command","prompt":""}'
-	run_hook "slash-command-mode-detector.sh" "$payload"
-	assert_success
-	ctx=$(get_context)
-	assert echo "$ctx" | grep -q "ULTRAWORK MODE ACTIVATED"
-	# Stored under the canonical 'ultrawork' key
-	assert [ -f "$CLAUDE_PROJECT_ROOT/.omca/state/active-modes.json" ]
-	local stored_mode
-	stored_mode=$(jq -r '.ultrawork.session_id // ""' "$CLAUDE_PROJECT_ROOT/.omca/state/active-modes.json")
-	assert [ -n "$stored_mode" ]
-}
-
-# ---------------------------------------------------------------------------
 # handoff slash command
 # ---------------------------------------------------------------------------
 
@@ -116,25 +67,25 @@ load '../test_helper'
 # Re-announce suppression (same session)
 # ---------------------------------------------------------------------------
 
-@test "echo-suppression: same-session re-fire does NOT re-announce ralph" {
+@test "echo-suppression: same-session re-fire does NOT re-announce handoff" {
 	write_state "active-modes.json" \
-		"{\"ralph\":{\"detected_at\":1000000,\"session_id\":\"${CLAUDE_SESSION_ID}\"}}"
-	local payload='{"command_name":"oh-my-claudeagent:ralph","command_args":[],"command_source":"plugin","expansion_type":"slash_command","prompt":""}'
+		"{\"handoff\":{\"detected_at\":1000000,\"session_id\":\"${CLAUDE_SESSION_ID}\"}}"
+	local payload='{"command_name":"oh-my-claudeagent:handoff","command_args":[],"command_source":"plugin","expansion_type":"slash_command","prompt":""}'
 	run_hook "slash-command-mode-detector.sh" "$payload"
 	assert_success
 	assert_output ""
 }
 
-@test "echo-suppression: cross-session re-announces ralph on new session" {
+@test "echo-suppression: cross-session re-announces handoff on new session" {
 	write_state "active-modes.json" \
-		'{"ralph":{"detected_at":1000000,"session_id":"old-session-XYZ"}}'
-	local payload='{"command_name":"oh-my-claudeagent:ralph","command_args":[],"command_source":"plugin","expansion_type":"slash_command","prompt":""}'
+		'{"handoff":{"detected_at":1000000,"session_id":"old-session-XYZ"}}'
+	local payload='{"command_name":"oh-my-claudeagent:handoff","command_args":[],"command_source":"plugin","expansion_type":"slash_command","prompt":""}'
 	run_hook "slash-command-mode-detector.sh" "$payload"
 	assert_success
 	ctx=$(get_context)
-	assert echo "$ctx" | grep -q "RALPH MODE ACTIVATED"
+	assert echo "$ctx" | grep -q "HANDOFF MODE ACTIVATED"
 	local stored_sid
-	stored_sid=$(jq -r '.ralph.session_id // ""' "$CLAUDE_PROJECT_ROOT/.omca/state/active-modes.json")
+	stored_sid=$(jq -r '.handoff.session_id // ""' "$CLAUDE_PROJECT_ROOT/.omca/state/active-modes.json")
 	assert [ "$stored_sid" = "$CLAUDE_SESSION_ID" ]
 }
 

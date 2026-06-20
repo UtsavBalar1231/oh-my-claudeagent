@@ -1,1 +1,0 @@
-WorktreeCreate hook requires a non-empty name

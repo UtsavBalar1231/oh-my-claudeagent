@@ -16,55 +16,6 @@ setup() {
 	export CLAUDE_SESSION_ID="bats-pipeline-session"
 }
 
-# ─── a. Keyword → Persistence pipeline ───────────────────────────────────────
-# keyword-detector.sh writes ralph-state.json → ralph-persistence.sh reads it
-
-@test "pipeline a: keyword-detector writes ralph-state, persistence reads and blocks" {
-	# Step 1: run keyword-detector with a ralph prompt — it should create ralph-state.json
-	run_hook "keyword-detector.sh" '{"prompt":"ralph"}'
-	assert_success
-
-	# Verify state handoff: ralph-state.json must now exist with status=active
-	assert [ -f "$CLAUDE_PROJECT_ROOT/.omca/state/ralph-state.json" ]
-	local status
-	status=$(jq -r '.status' "$CLAUDE_PROJECT_ROOT/.omca/state/ralph-state.json")
-	assert [ "$status" = "active" ]
-
-	# Step 2: add a pending task so persistence has something to block on
-	local ralph_state
-	ralph_state=$(cat "$CLAUDE_PROJECT_ROOT/.omca/state/ralph-state.json")
-	echo "$ralph_state" | jq '.tasks += [{"id":"t1","status":"pending"}]' \
-		> "$CLAUDE_PROJECT_ROOT/.omca/state/ralph-state.json"
-
-	# Step 3: run ralph-persistence — it reads ralph-state.json and should block
-	run_hook "ralph-persistence.sh" '{"stop_reason":"end_turn","stop_hook_active":false}'
-	assert_success
-	assert_output --partial '"decision":"block"'
-}
-
-# ─── b. Keyword → modify tasks → Persistence allows ─────────────────────────
-# Same pipeline but with all tasks completed → persistence should allow stop
-
-@test "pipeline b: keyword-detector writes ralph-state, all tasks complete, persistence allows" {
-	# Step 1: run keyword-detector to create ralph-state.json
-	run_hook "keyword-detector.sh" '{"prompt":"ralph don'"'"'t stop"}'
-	assert_success
-	assert [ -f "$CLAUDE_PROJECT_ROOT/.omca/state/ralph-state.json" ]
-
-	# Step 2: simulate all tasks completed (as an agent would update them)
-	local ralph_state
-	ralph_state=$(cat "$CLAUDE_PROJECT_ROOT/.omca/state/ralph-state.json")
-	echo "$ralph_state" \
-		| jq '.tasks = [{"id":"t1","status":"completed"},{"id":"t2","status":"verified"}]' \
-		> "$CLAUDE_PROJECT_ROOT/.omca/state/ralph-state.json"
-
-	# Step 3: run ralph-persistence — no incomplete tasks, should allow stop
-	run_hook "ralph-persistence.sh" '{"stop_reason":"end_turn","stop_hook_active":false}'
-	assert_success
-	# Allow = empty output (no block decision)
-	assert_output ""
-}
-
 # ─── c. Evidence → Task-Completion pipeline ──────────────────────────────────
 # Write valid verification-evidence.json → task-completed-verify reads and allows
 
@@ -112,77 +63,10 @@ setup() {
 	assert [ "$status" -eq 2 ]
 }
 
-# ─── e. Subagent tracking lifecycle ──────────────────────────────────────────
-# track-subagent-spawn → subagent-start → subagent-complete → check subagents.json
-
-@test "pipeline e: subagent tracking lifecycle across spawn, start, complete" {
-	local spawn_payload='{"tool_name":"Agent","tool_input":{"prompt":"test task","subagent_type":"oh-my-claudeagent:explore"}}'
-	local start_payload='{"agent_id":"test-agent-001","agent_type":"oh-my-claudeagent:explore"}'
-	local stop_payload='{"agent_id":"test-agent-001","agent_type":"oh-my-claudeagent:explore"}'
-
-	# Step 1: track-subagent-spawn writes a spawn-* entry to subagents.json
-	run_hook "track-subagent-spawn.sh" "$spawn_payload"
-	assert_success
-	assert [ -f "$CLAUDE_PROJECT_ROOT/.omca/state/subagents.json" ]
-
-	local active_count
-	active_count=$(jq '[.active[]] | length' "$CLAUDE_PROJECT_ROOT/.omca/state/subagents.json")
-	assert [ "$active_count" -ge 1 ]
-
-	# Verify it got a spawn-* prefixed id (not the final platform id yet)
-	local spawn_id
-	spawn_id=$(jq -r '.active[0].id' "$CLAUDE_PROJECT_ROOT/.omca/state/subagents.json")
-	# Should start with "spawn-"
-	[[ "$spawn_id" == spawn-* ]]
-
-	# Step 2: subagent-start bridges spawn-* → platform agent_id in subagents.json
-	# It also registers in active-agents.json
-	run_hook "subagent-start.sh" "$start_payload"
-	assert_success
-
-	# After subagent-start, active-agents.json should contain the platform agent id
-	assert [ -f "$CLAUDE_PROJECT_ROOT/.omca/state/active-agents.json" ]
-	local agent_in_active
-	agent_in_active=$(jq --arg id "test-agent-001" '[.[] | select(.id == $id)] | length' \
-		"$CLAUDE_PROJECT_ROOT/.omca/state/active-agents.json")
-	assert [ "$agent_in_active" -eq 1 ]
-
-	# The spawn-* entry in subagents.json should now have been bridged to platform id
-	local updated_id
-	updated_id=$(jq -r '.active[0].id' "$CLAUDE_PROJECT_ROOT/.omca/state/subagents.json")
-	assert [ "$updated_id" = "test-agent-001" ]
-
-	# Step 3: subagent-complete removes from active, adds to completed
-	run_hook "subagent-complete.sh" "$stop_payload"
-	assert_success
-
-	# active list should be empty for this agent
-	local remaining_active
-	remaining_active=$(jq --arg id "test-agent-001" '[.active[] | select(.id == $id)] | length' \
-		"$CLAUDE_PROJECT_ROOT/.omca/state/subagents.json")
-	assert [ "$remaining_active" -eq 0 ]
-
-	# completed list should have the agent
-	local completed_count
-	completed_count=$(jq --arg id "test-agent-001" '[.completed[] | select(.id == $id)] | length' \
-		"$CLAUDE_PROJECT_ROOT/.omca/state/subagents.json")
-	assert [ "$completed_count" -ge 1 ]
-
-	# active-agents.json should no longer contain the agent
-	local agent_still_active
-	agent_still_active=$(jq --arg id "test-agent-001" '[.[] | select(.id == $id)] | length' \
-		"$CLAUDE_PROJECT_ROOT/.omca/state/active-agents.json")
-	assert [ "$agent_still_active" -eq 0 ]
-}
-
-# ─── f. Full compaction survival pipeline ────────────────────────────────────
-# Write ralph + boulder state → pre-compact → verify compaction-context.md → post-compact-inject → verify output + cleanup
+# ─── f. Compaction context pipeline ──────────────────────────────────────────
+# pre-compact writes context, post-compact-inject restores
 
 @test "pipeline f: compaction survival — pre-compact writes context, post-compact-inject restores" {
-	# Write ralph-state.json (active)
-	write_state "ralph-state.json" \
-		'{"status":"active","tasks":[],"idle_count":0}'
-
 	# Write boulder.json with active plan reference
 	write_state "boulder.json" \
 		'{"active_plan":"/home/user/plans/my-plan.md","plan_name":"my-plan"}'
@@ -194,23 +78,12 @@ setup() {
 	local context_file="$CLAUDE_PROJECT_ROOT/.omca/state/compaction-context.md"
 	assert [ -f "$context_file" ]
 
-	# Compaction-context.md must contain ralph mode indicator
-	run grep -i "ralph" "$context_file"
-	assert_success
-
-	# Must also reference the active plan
-	run grep -i "my-plan" "$context_file"
-	assert_success
-
 	# Step 2: run post-compact-inject — reads compaction-context.md, emits additionalContext, deletes the file
 	run_hook "post-compact-inject.sh" '{"session_id":"bats-pipeline-session"}'
 	assert_success
 
 	# Output must contain the post-compaction restore marker
 	assert_output --partial "POST-COMPACTION CONTEXT RESTORE"
-
-	# The context must include ralph mode information (passed through from pre-compact)
-	assert_output --partial "Ralph"
 
 	# compaction-context.md must be deleted after injection (consumed)
 	assert [ ! -f "$context_file" ]

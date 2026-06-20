@@ -22,11 +22,11 @@ Delegate to specialists, verify with evidence, ship with confidence. Core loop: 
 
 **Claude-native**: plan mode, memory, hooks, plugin schema, permissions, sandboxing, subagents, teams, `claude agents` agent view (Research Preview, v2.1.139+), `/goal` completion-condition loop (v2.1.139+).
 
-**OMCA**: agent prompts, orchestration policy, skill prompts, keyword activation, verification discipline, `omca` MCP server, session persistence (ralph, ultrawork), execution metadata in `.omca/state/` and `.omca/logs/`.
+**OMCA**: agent prompts, orchestration policy, skill prompts, keyword activation, evidence discipline (one completeness check), `omca` MCP server (ast tools, boulder, evidence, notepad, file_read), stateless guardrail hooks, execution metadata in `.omca/state/` and `.omca/logs/`.
 
 Claude-native plans (`~/.claude/plans/` or the active plan-mode file) are canonical. `.omca/plans/` remains a supported compatibility mirror/resume surface maintained by boulder, not the primary authored plan surface.
 
-**`/goal` vs OMCA persistence loops**: `/goal` is a lighter-weight native completion-condition loop. OMCA's `ralph`, `ultrawork`, and `/oh-my-claudeagent:ulw-loop` carry the Final Verification Wave (F1-F4 evidence-discipline) that `/goal` does not. Use `/goal` for quick "keep working until X" tasks; use OMCA loops when work needs evidence-gated completion.
+**`/goal` vs `/oh-my-claudeagent:start-work`**: `/goal` is a native completion-condition loop. `/start-work` pairs with boulder state and evidence gating for plan-driven work. For timer-based re-runs, use native `/loop` — it is not a verified persistence loop, but it is the lightest way to keep running until you manually stop.
 
 **Channels**: Not used — OMCA focuses on in-session orchestration via hooks, subagents, skills.
 
@@ -129,9 +129,7 @@ Two execution modes:
 - **Direct skills** — the SKILL.md IS the agent prompt, runs in the current session
 - **`context: fork` skills** — forks into a fresh agent context with full tool access
 
-Keywords are the natural interaction model. Type "create plan", "ralph don't stop", or
-"ultrawork" in any prompt and the corresponding skill activates automatically. Slash
-commands are also available for explicit invocation.
+Keywords are the natural interaction model. Type "create plan" or "fix build" in any prompt and the corresponding skill activates automatically. Slash commands are also available for explicit invocation.
 
 **`disallowed-tools` frontmatter (v2.1.152):**
 
@@ -152,7 +150,7 @@ skills running in the main session without an `agent:` binding.
 
 Skills can declare an `arguments:` block in their frontmatter to name positional parameters
 that the platform binds when the skill is invoked as a slash command with trailing text
-(e.g., `/oh-my-claudeagent:ralph fix the auth bug` → `$task="fix"`). OMCA does not adopt
+(e.g., `/oh-my-claudeagent:plan fix the auth bug` → `$task="fix"`). OMCA does not adopt
 `arguments:` because shell-style positional binding truncates free-form input: only the
 first token is bound, making it unsuitable for narrative task descriptions. OMCA skill
 bodies receive the full user prompt via the platform's natural expansion path instead.
@@ -160,12 +158,9 @@ bodies receive the full user prompt via the platform's natural expansion path in
 **`hooks:` frontmatter (v2.1.141–v2.1.167, not adopted):**
 
 SKILL.md files can declare a `hooks:` block to register hook handlers that are active
-only while the skill is running. OMCA does not adopt this because OMCA's persistence
-loops (ralph, ultrawork) outlive the skill-active window — ralph's Stop-block behavior
-must persist across many turns after the skill completes, which skill-frontmatter hooks
-cannot support. Additionally, hooks declared in skill frontmatter are invisible to
-`scripts/validate-plugin.sh`, which validates hooks only from `hooks/hooks.json`. All
-OMCA hook registration stays in `hooks/hooks.json`.
+only while the skill is running. OMCA does not adopt this because hooks declared in
+skill frontmatter are invisible to `scripts/validate-plugin.sh`, which validates hooks
+only from `hooks/hooks.json`. All OMCA hook registration stays in `hooks/hooks.json`.
 
 **`skillOverrides`, `skillListingBudgetFraction`, `maxSkillDescriptionChars` settings (v2.1.141–v2.1.167, not adopted):**
 
@@ -191,8 +186,7 @@ handler for this — it fires as a slash-command expansion, not a hook event.
 **Platform `workflow` keyword renamed `ultracode` (v2.1.157):**
 
 The platform's built-in dynamic-workflow keyword was renamed from `workflow` to
-`ultracode` in v2.1.157. This is unrelated to OMCA's own `ultrawork` keyword and the
-`/oh-my-claudeagent:ultrawork` skill. OMCA does not reference the platform keyword;
+`ultracode` in v2.1.157. OMCA does not reference the platform keyword;
 no OMCA files are affected.
 
 ### Hooks
@@ -201,7 +195,6 @@ Hooks are bash scripts in `scripts/*.sh`, registered in `hooks/hooks.json`. They
 Claude Code lifecycle events and provide:
 
 - Context injection (AGENTS.md, rules, notepad directives)
-- Persistence blocking (ralph mode prevents Stop events)
 - Permission auto-approval for known-safe package managers (npm, yarn, pnpm, bun), jq, and uv run/sync. Blocks destructive patterns (rm -rf).
 - Error recovery suggestions (re-read after failed Edit, escalate after failed Agent)
 - Compaction survival (state saved pre-compact, re-injected post-compact)
@@ -290,18 +283,14 @@ The Stop and SubagentStop hook payloads now include two additional fields:
 | `background_tasks` | array | Platform-managed background tasks running at Stop time |
 | `session_crons` | array | Scheduled cron jobs registered for the session |
 
-OMCA's ralph-persistence.sh does not consult these fields — the block/allow decision is
-based solely on ralph state and boulder progress. Background tasks are orthogonal to ralph
-blocking. (Verified by test: the v2.1.145 Stop payload change has zero
-behavioral impact on OMCA hooks.)
+OMCA's Stop hook (`final-verification-evidence.sh`) does not consult these fields — it checks only boulder state and evidence. Background tasks are orthogonal to the completeness check. (Verified by test: the v2.1.145 Stop payload change has zero behavioral impact on OMCA hooks.)
 
 **Stop / SubagentStop — `additionalContext` output (v2.1.163):**
 
 Hooks can now return `hookSpecificOutput.additionalContext` from Stop / SubagentStop.
 OMCA deliberately does not adopt this: co-existence with `decision:block` is not
 documented (schema inconclusive); exit-2 paths ignore all JSON output entirely, so any
-`additionalContext` set alongside a block decision would be silently dropped. OMCA's
-existing block shape `{"decision": {"behavior": "block"}, "reason": "..."}` is unchanged.
+`additionalContext` alongside a block decision would be silently dropped.
 (See "Deliberate non-adoptions" section below for the non-adoption log.)
 
 **SessionStart — new output fields (v2.1.152):**
@@ -316,11 +305,10 @@ existing block shape `{"decision": {"behavior": "block"}, "reason": "..."}` is u
 **Stop hook block cap (v2.1.143):**
 
 The platform enforces a maximum of 8 consecutive Stop blocks per session. The cap is
-configurable via `CLAUDE_CODE_STOP_HOOK_BLOCK_CAP` (env var). OMCA's
-`ralph-persistence.sh` reads this env var (`STOP_BLOCK_CAP="${CLAUDE_CODE_STOP_HOOK_BLOCK_CAP:-8}"`)
-and emits a voluntary allow-stop (exit 0, no `decision:block`) at `cap-1` consecutive
-no-progress blocks, with reason `"Yielding to platform. To resume: invoke /oh-my-claudeagent:ralph again."`.
-Cap state is tracked in `.omca/state/ralph-cap-state.json`. (Adopted in the v2.1.141–v2.1.167 sync.)
+configurable via `CLAUDE_CODE_STOP_HOOK_BLOCK_CAP` (env var). OMCA's Stop hook
+(`final-verification-evidence.sh`) does not block the Stop event unless the plan
+is complete but evidence is missing — it never emits a persistence-style block.
+(Adopted in the v2.1.141–v2.1.167 sync.)
 
 **`SessionStart` `watchPaths` output (v2.1.141–v2.1.167, not adopted):**
 
@@ -373,7 +361,7 @@ Hooks communicate via stdout JSON:
 Added in v2.1.91 (changelog.md:895). Plugins can ship executable scripts or binaries under a `bin/` directory at the plugin root. Claude Code prepends that directory to the Bash tool's `PATH` for the duration of the session, so any executable placed there is available as a bare command without specifying a full path. Files must have the executable bit set (`chmod +x`) and a `#!/usr/bin/env bash` (or equivalent) shebang.
 
 OMCA ships:
-- `bin/omca-status` — print active boulder, evidence summary, F1-F4 status, and currently-running subagents
+- `bin/omca-status` — print active boulder, evidence summary, and plan completion status
 - `bin/omca-doctor` — read-only health check (dependencies, settings, state directories, MCP server)
 
 Both scripts are invokable from any Bash tool call as bare commands: `omca-status` and `omca-doctor`. They read the project's `.omca/state/` and `~/.claude/settings.json` only, and never mutate state.
@@ -503,11 +491,9 @@ Add to `.claude/settings.json` for automatic team-wide installation:
    — Prometheus opens an interview, gathers requirements, generates a work plan
 4. After plan review: run `/oh-my-claudeagent:start-work`
    — Sisyphus picks up the plan and delegates tasks to executor in parallel
-5. For guaranteed completion: type "ralph don't stop"
-   — Ralph mode activates; the session blocks on Stop until all tasks are verified
-6. For maximum speed: type "ultrawork"
-   — Ultrawork batches independent tasks across up to 5 concurrent agents
-7. When context is long: type "handoff"
+5. For timer-based re-runs: use `/loop 10m /oh-my-claudeagent:start-work`
+   — native `/loop` is a lightweight repeat, not a verified persistence loop
+6. When context is long: type "handoff"
    — A structured session summary is produced for pasting into a new session
 
 ---
@@ -520,7 +506,7 @@ Add to `.claude/settings.json` for automatic team-wide installation:
 |-------|-------|--------|--------|---------|
 | sisyphus | claude-opus-4-8[1m] | high | Main session (injected via `templates/claudemd.md`) or `/oh-my-claudeagent:start-work` (Plan Execution Mode) | Master orchestrator identity — classifies requests, delegates to specialists. Two modes: free-form (conversational) and plan-driven (via `/start-work` command body). Plan Execution Mode protocol lives in `commands/start-work.md`. |
 
-**sisyphus** — The one orchestrator. Free-form mode: routes requests to specialists, runs explore agents in background. Plan Execution Mode: reads plan, delegates per-task to `executor`, runs Final Verification Wave (F1 via oracle, F2-F4 via executor), waits for sign-off.
+**sisyphus** — The one orchestrator. Free-form mode: routes requests to specialists, runs explore agents in background. Plan Execution Mode: reads plan, delegates per-task to `executor`, logs evidence, runs a final completeness check at the end.
 
 ### Planning and Review
 
@@ -579,23 +565,6 @@ refactors while fixing. Stops and escalates after 5+ failed attempts.
 
 ## Skill Reference
 
-### Persistence
-
-| Skill | Slash command | Keywords |
-|-------|--------------|----------|
-| ralph | `/oh-my-claudeagent:ralph` | "ralph", "don't stop", "must complete", "until done", "keep going until", "finish this no matter" |
-| ultrawork | `/oh-my-claudeagent:ultrawork` | "ulw", "ultrawork" |
-| ulw-loop | `/oh-my-claudeagent:ulw-loop` | "ulw-loop", "ultrawork loop" |
-
-**ralph** — Persistence loop. Blocks the Stop event until all tasks are verified by oracle.
-State stored in `.omca/state/ralph-state.json`.
-
-**ultrawork** — Maximum parallel execution. Batches independent tasks across up to 5
-concurrent agents.
-
-**ulw-loop** — Combines ralph persistence with ultrawork parallelism AND oracle verification.
-Strictest completion guarantee.
-
 ### Planning Pipeline
 
 | Entrypoint | Surface | Invocation | Keywords |
@@ -619,7 +588,7 @@ The Plan Execution Mode protocol body lives in `commands/start-work.md`.
 
 **refactor** — Codebase-aware refactoring: parallel analysis via 5 explore agents, codemap
 and impact zone mapping, test coverage check, prometheus plan, step-by-step execution with
-ast-grep, final verification wave.
+ast-grep, evidence-gated completion.
 
 **git-master** — Atomic commits with style detection, rebase/squash, history search (blame,
 bisect, log -S).
@@ -636,8 +605,6 @@ bisect, log -S).
 | Skill | Slash command | Keywords |
 |-------|--------------|----------|
 | handoff | `/oh-my-claudeagent:handoff` | "handoff", "context is getting long", "start fresh session" |
-| cancel-ralph | `/oh-my-claudeagent:cancel-ralph` | (slash-command only) |
-| stop-continuation | `/oh-my-claudeagent:stop-continuation` | "stop continuation", "pause automation", "take manual control" |
 
 **handoff** — Gathers context from git, tasks, boulder state, and notepads, then produces
 a structured HANDOFF CONTEXT block for pasting into a new session.
@@ -673,36 +640,10 @@ agent per item in parallel. Zero-action policy: never merges, closes, or edits i
    -> Delegates each task to executor
    -> Verifies with build/typecheck/tests after each
    -> Marks checkboxes in plan file
-   -> Final Verification Wave (F1 oracle + F2-F4 executor)
+   -> Final completeness check via final-verification-evidence.sh
 
 4. Resume after interruption with /oh-my-claudeagent:start-work
    -> Boulder state resumes from last completed task
-```
-
-### Ralph Persistence
-
-Ralph mode prevents the session from ending until work is verified complete.
-
-```
-1. Type "ralph don't stop" or "ralph: [task description]"
-   -> ralph-persistence.sh (Stop hook) blocks Stop events
-   -> Session continues until oracle approves
-
-2. On error: creates fix task, continues (never stops on error)
-   On 3 consecutive failures: escalates to oracle
-   After all tasks: oracle verification required
-
-3. Cancel: type "cancel ralph"
-```
-
-### Ultrawork Parallel Execution
-
-```
-1. Type "ultrawork" or "ulw [task]"
-2. Tasks analyzed for parallelizability
-3. Independent tasks batched — up to 5 Agent() calls per batch
-4. Failures become fix tasks, execution continues
-5. Final verification with evidence_log
 ```
 
 ### Session Handoff
@@ -740,14 +681,8 @@ Unified server for structural code search, plan tracking, verification, notepads
 
 | Tool | Purpose |
 |------|---------|
-| `boulder_write` | Register/select an active work plan in schema v2 multi-work state |
-| `boulder_progress` | Check completed vs remaining tasks for active or selected work |
-| `boulder_list` | List resumeable works, counts, and progress summaries |
-| `boulder_select` | Select one existing work as active |
-| `boulder_complete` | Mark one work completed while retaining other works |
-| `boulder_task_start` / `boulder_task_end` | Track per-task session and timing metadata |
-| `mode_read` | Read active modes (ralph, ultrawork, boulder, evidence) |
-| `mode_clear` | Deactivate modes (default: all) |
+| `boulder_write` | Register an active work plan and accumulate session IDs across resumes |
+| `boulder_progress` | Check completed vs remaining tasks for the active plan |
 
 **Evidence tools** — Verification records:
 
@@ -790,7 +725,7 @@ stdio MCP servers now receive `CLAUDE_CODE_SESSION_ID` and `CLAUDECODE=1` in the
 environment at launch. The `omca` server's `_resolve_session_id()` helper in
 `servers/tools/_common.py` uses `os.environ.get("CLAUDE_CODE_SESSION_ID", "")` as a
 fallback when no explicit `session_id` parameter is passed. Adopted in `boulder_write`
-and `boulder_task_start` (v2.1.141–v2.1.167 sync).
+(v2.1.141–v2.1.167 sync).
 
 **`dependencies` in `plugin.json` (v2.1.141–v2.1.167, not adopted):**
 
@@ -834,9 +769,9 @@ servers (`omca`, `grep`, `context7`) are approved on first install; users seeing
 
 All runtime state lives in `.omca/` (gitignored by default):
 
-- `state/boulder.json` — Schema v2 multi-work plan state (top-level fields mirror the selected active work; `works` preserves other active/completed work)
-- `state/verification-evidence.json` — Verification records
-- `state/ralph-state.json` — Ralph persistence state
+- `state/boulder.json` — Active plan state: path, plan name, accumulated session IDs
+- `evidence/verification-evidence.json` — Verification records
+- `state/active-modes.json` — Keyword detection session tracking (re-announce suppression)
 - `state/compaction-context.md` — Saved state for compaction survival
 - `state/notepads/{plan-name}/` — Per-plan notepad sections
 - `plans/{name}.md` — Compatibility mirror/resume surface for native plans, maintained by boulder
@@ -846,11 +781,10 @@ All runtime state lives in `.omca/` (gitignored by default):
 ### Boulder Lifecycle
 
 1. Prometheus creates a plan at `~/.claude/plans/{name}.md` or the active plan-mode file
-2. `boulder_write(active_plan, plan_name, session_id)` registers or selects a work, appends the session, and may mirror the plan under `.omca/plans/` for compatibility
-3. `/start-work` reads `boulder_list()`/`mode_read()` and resumes the selected work; multiple resumeable works are selectable via `boulder_select`
-4. Sisyphus/start-work uses `boulder_progress`, `boulder_task_start`, and `boulder_task_end` to track execution
-5. F4 approval marks the current work complete; boulder state is retained while other resumeable works remain
-6. `/stop-continuation` or `mode_clear` clears persistence state when explicitly requested
+2. `boulder_write(active_plan, plan_name, session_id)` registers the plan and appends the session ID; `.omca/plans/` mirrors the plan for compatibility
+3. `/start-work` reads `boulder_progress()` to resume from the last completed task
+4. Sisyphus/start-work checks `boulder_progress` to track which tasks remain
+5. The final-verification-evidence.sh Stop hook confirms a `final_verification` evidence entry exists when boulder shows the plan complete
 
 ### Evidence Workflow
 
@@ -875,8 +809,8 @@ the glob is Read, Written, or Edited, the rule content is injected as additional
 
 Mode detection is dual-path:
 
-- **Free-text triggers** — `keyword-detector.sh` fires on `UserPromptSubmit`, pattern-matches the raw prompt text (e.g., "ralph don't stop"), and injects context.
-- **Slash-command triggers** — `slash-command-mode-detector.sh` fires on `UserPromptExpansion`, reads `command_name` directly (e.g., `oh-my-claudeagent:ralph`), and activates the corresponding mode without relying on the expanded body's wording. This is more reliable: mode activation works regardless of what the skill's SKILL.md body says.
+- **Free-text triggers** — `keyword-detector.sh` fires on `UserPromptSubmit`, pattern-matches the raw prompt text (e.g., "create plan", "fix build"), and injects context.
+- **Slash-command triggers** — `slash-command-mode-detector.sh` fires on `UserPromptExpansion`, reads `command_name` directly (e.g., `oh-my-claudeagent:hephaestus`), and activates the corresponding mode without relying on the expanded body's wording. This is more reliable: mode activation works regardless of what the skill's SKILL.md body says.
 
 Both paths share the same `active-modes.json` schema and session-aware re-announce suppression (`mode_already_announced` / `mark_mode_announced` in `scripts/lib/common.sh`). If both fire for the same mode in the same session, the second invocation suppresses silently.
 
@@ -889,10 +823,7 @@ Keywords are the natural interaction model — type natural phrases in any promp
 
 | Keyword / Phrase | Activates |
 |------------------|-----------|
-| `ralph`, `don't stop`, `must complete`, `until done`, `keep going until`, `finish this no matter` | ralph mode — persistence loop |
-| `ulw`, `ultrawork`, `run in parallel`, `simultaneously`, `as fast as possible` | ultrawork — parallel execution |
 | `handoff`, `context is getting long`, `start fresh session` | session handoff |
-| `stop continuation`, `pause automation`, `take manual control` | stop-continuation skill |
 | `run metis`, `metis analyze`, `pre-plan` | metis skill |
 | `run prometheus`, `create plan` | `/oh-my-claudeagent:plan` command (prometheus planning) |
 | `fix build`, `build broken` | hephaestus skill |
@@ -909,25 +840,19 @@ Type `@agent-oh-my-claudeagent:<name>` to guarantee delegation to a specific age
 
 ---
 
-## Session Persistence
-
-### Ralph Stop-Blocking
-
-`ralph-persistence.sh` runs on the Stop event. If ralph mode is active, it returns
-`{"decision": {"behavior": "block"}}` to prevent the session from ending. The session
-continues until oracle approves and ralph writes its completed state.
+## Session Continuity
 
 ### Compaction Survival
 
 When the context window fills, the plugin preserves state across compaction via a
 three-script pipeline: `pre-compact.sh` (PreCompact) saves state, `post-compact-log.sh`
 (PostCompact) logs it, and `post-compact-inject.sh` fires on `SessionStart` with reason
-`compact` — not on PostCompact. Ralph mode, active plans, and task state survive compaction.
+`compact` — not on PostCompact. Active plans and task state survive compaction.
 
 ### StopFailure Limitation
 
 `StopFailure` fires on API errors and is logging-only — hooks cannot block it. If an API
-error occurs during ralph, manually resume with `/oh-my-claudeagent:start-work`.
+error interrupts a plan run, manually resume with `/oh-my-claudeagent:start-work`.
 
 ---
 
@@ -937,12 +862,11 @@ error occurs during ralph, manually resume with `/oh-my-claudeagent:start-work`.
 `/oh-my-claudeagent:omca-setup --check`. Run `/reload-plugins` to restart MCP servers.
 
 **Subagent nesting depth:** `/oh-my-claudeagent:start-work` runs inline in the main
-session at depth 0 with full `Agent`-tool access. Parallel fan-out, specialist delegation,
-and independent F1-F4 review via `oracle` (F1) / `executor` (F2-F4) all work. The command
-body in `commands/start-work.md` is the authoritative Plan Execution Mode protocol. There
-is no degraded mode — orchestration only runs at depth 0 by design. The `atlas` agent was
-removed in v2.0; its plan-execution protocol migrated to the command body, its orchestrator
-role consolidated into `sisyphus` (the main-session identity).
+session at depth 0 with full `Agent`-tool access. Parallel fan-out and specialist delegation
+all work. The command body in `commands/start-work.md` is the authoritative Plan Execution
+Mode protocol. There is no degraded mode — orchestration only runs at depth 0 by design.
+The `atlas` agent was removed in v2.0; its plan-execution protocol migrated to the command
+body, its orchestrator role consolidated into `sisyphus` (the main-session identity).
 
 **Hook changes not taking effect:** Run `/reload-plugins`.
 
@@ -1021,7 +945,7 @@ Force-enables synchronized output on terminals where auto-detection misses (nota
 
 When any of these are set, Remote Control, `/schedule`, claude.ai MCP connectors, and notification preferences are disabled — even if a Claude.ai OAuth login is also present in the session. API-key auth and Claude.ai auth resolve to different account scopes; the platform consistently picks API-key auth when both are set, so claude.ai-scoped features become unreachable.
 
-OMCA's core workflows (ralph, ultrawork, start-work, F1-F4 verification) run in-process and do not depend on Remote Control or `/schedule`. Users who need claude.ai-only features must unset the API-key variable for that session.
+OMCA's core workflows (start-work, evidence gating, specialist delegation) run in-process and do not depend on Remote Control or `/schedule`. Users who need claude.ai-only features must unset the API-key variable for that session.
 
 ### `CLAUDE_CODE_ALWAYS_ENABLE_EFFORT` (v2.1.154)
 
@@ -1152,8 +1076,8 @@ Features introduced in this window that OMCA consciously declines to adopt:
 | `reloadSkills` in SessionStart output | v2.1.152 | No OMCA use case identified |
 | `prompt`, `agent`, and `http` hook types | (standing) | Orthogonal to OMCA's bash-script hook model |
 | Monitors, Themes, Channels, LSP | (standing) | No current OMCA use case |
-| `arguments:` in skill frontmatter | evaluated 2026-06 | Shell-style positional binding truncates free-form input — a slash command like `/ralph fix the auth bug` would bind only `$task="fix"`, discarding the rest. OMCA skills receive the full user prompt via natural expansion instead |
-| `hooks:` in skill frontmatter | evaluated 2026-06 | Persistence loops (ralph, ultrawork) outlive skill-active windows; skill-frontmatter hooks are not visible to `validate-plugin.sh`. All hook registration stays in `hooks/hooks.json` |
+| `arguments:` in skill frontmatter | evaluated 2026-06 | Shell-style positional binding truncates free-form input — a slash command like `/oh-my-claudeagent:plan fix the auth bug` would bind only `$task="fix"`, discarding the rest. OMCA skills receive the full user prompt via natural expansion instead |
+| `hooks:` in skill frontmatter | evaluated 2026-06 | Skill-frontmatter hooks are not visible to `validate-plugin.sh` (validates hooks only from `hooks/hooks.json`). All hook registration stays in `hooks/hooks.json` |
 | `skillOverrides` / `skillListingBudgetFraction` / `maxSkillDescriptionChars` settings | evaluated 2026-06 | User-preference settings only; `skillOverrides` does not apply to plugin-shipped skills. No plugin-side adoption possible or needed |
 | `initialPrompt` in agent frontmatter | evaluated 2026-06 | Fires an unconditional billable model turn per subagent; `subagent-start.sh` already injects boulder context as `additionalContext` at zero turn cost |
 | `SessionStart` `watchPaths` output | evaluated 2026-06 | `FileChanged` consumer is side-effects-only (log + notify); no runtime reader benefits from an expanded watch set |

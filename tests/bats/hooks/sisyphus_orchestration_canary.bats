@@ -17,17 +17,10 @@ load '../test_helper'
 	grep -qF "## 6-Section Prompt Structure" "${CLAUDE_PLUGIN_ROOT}/commands/start-work.md"
 }
 
-@test "sisyphus canary: commands/start-work.md carries Final Verification Wave section" {
-	grep -qF "## Final Verification Wave" "${CLAUDE_PLUGIN_ROOT}/commands/start-work.md"
+@test "sisyphus canary: commands/start-work.md carries Completeness Check section" {
+	grep -qF "## Completeness Check" "${CLAUDE_PLUGIN_ROOT}/commands/start-work.md"
 }
 
-@test "sisyphus canary: commands/start-work.md carries FROZEN Plan Discipline" {
-	grep -qF "## FROZEN Plan Discipline" "${CLAUDE_PLUGIN_ROOT}/commands/start-work.md"
-}
-
-@test "sisyphus canary: F1-F4 evidence_type strings preserved in commands/start-work.md" {
-	grep -qF "final_verification_f1" "${CLAUDE_PLUGIN_ROOT}/commands/start-work.md"
-	grep -qF "final_verification_f2" "${CLAUDE_PLUGIN_ROOT}/commands/start-work.md"
-	grep -qF "final_verification_f3" "${CLAUDE_PLUGIN_ROOT}/commands/start-work.md"
-	grep -qF "final_verification_f4" "${CLAUDE_PLUGIN_ROOT}/commands/start-work.md"
+@test "sisyphus canary: final_verification evidence type present in commands/start-work.md" {
+	grep -qF "final_verification" "${CLAUDE_PLUGIN_ROOT}/commands/start-work.md"
 }

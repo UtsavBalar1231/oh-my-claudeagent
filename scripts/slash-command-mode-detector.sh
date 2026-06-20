@@ -17,12 +17,9 @@ fi
 # all other oh-my-claudeagent:* commands exit 0 silently.
 MODE=""
 case "${COMMAND_NAME}" in
-	oh-my-claudeagent:ralph)           MODE="ralph" ;;
-	oh-my-claudeagent:ultrawork)       MODE="ultrawork" ;;
-	oh-my-claudeagent:ulw-loop)        MODE="ultrawork" ;;
-	oh-my-claudeagent:handoff)         MODE="handoff" ;;
+	oh-my-claudeagent:handoff)           MODE="handoff" ;;
 	oh-my-claudeagent:stop-continuation) MODE="stop-continuation" ;;
-	*)                                 exit 0 ;;
+	*)                                   exit 0 ;;
 esac
 
 # CURRENT_SESSION is referenced by mode_already_announced / mark_mode_announced in common.sh
@@ -39,10 +36,8 @@ mark_mode_announced "${MODE}"
 # Emit banner mapping mode to its activation message.
 BANNER=""
 case "${MODE}" in
-	ralph)             BANNER="[RALPH MODE ACTIVATED via slash command] Persistence mode — do not stop until verified complete." ;;
-	ultrawork)         BANNER="[ULTRAWORK MODE ACTIVATED via slash command] Maximum parallel execution." ;;
 	handoff)           BANNER="[HANDOFF MODE ACTIVATED via slash command] Create session handoff summary for new-session continuity." ;;
-	stop-continuation) BANNER="[STOP CONTINUATION ACTIVATED via slash command] Halt all automated work — ralph and boulder state." ;;
+	stop-continuation) BANNER="[STOP CONTINUATION ACTIVATED via slash command] Halt all automated work — boulder state." ;;
 	*)                 exit 0 ;;
 esac
 

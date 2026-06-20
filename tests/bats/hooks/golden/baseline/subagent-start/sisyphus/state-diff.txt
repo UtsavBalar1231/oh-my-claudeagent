@@ -1,2 +1,0 @@
-Only in /state-after: active-agents.json
-Only in /state-after: active-agents.lock

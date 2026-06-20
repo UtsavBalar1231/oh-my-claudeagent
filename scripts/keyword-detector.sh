@@ -2,8 +2,6 @@
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
-STATE_DIR="${HOOK_STATE_DIR}"
-
 # active-modes.json path — shared via common.sh (ACTIVE_MODES_FILE, mode_already_announced, mark_mode_announced)
 
 # agent_id is only present in hook payloads fired inside a subagent call, not in top-level session hooks
@@ -13,8 +11,6 @@ if [[ -n "${AGENT_ID}" ]]; then
 fi
 
 PROMPT=$(jq -r '.prompt // ""' <<< "${HOOK_INPUT}")
-RALPH_STATE="${STATE_DIR}/ralph-state.json"
-ULTRAWORK_STATE="${STATE_DIR}/ultrawork-state.json"
 
 if [[ -z "${PROMPT}" ]]; then
 	exit 0
@@ -37,24 +33,10 @@ PROMPT_LOWER=$(echo "${PROMPT}" | tr '[:upper:]' '[:lower:]')
 DETECTED_KEYWORDS=()
 ADDITIONAL_CONTEXT=""
 
-if ! mode_already_announced "ralph" \
-	&& { [[ "${PROMPT_LOWER}" =~ (ralph|don\'t[[:space:]]+stop|must[[:space:]]+complete|until[[:space:]]+done|keep[[:space:]]+going[[:space:]]+until|finish[[:space:]]+this[[:space:]]+no[[:space:]]+matter) ]] \
-		|| [[ "${PROMPT}" =~ (멈추지|止まるな|不要停) ]]; }; then
-	DETECTED_KEYWORDS+=("ralph")
-	ADDITIONAL_CONTEXT+="[RALPH MODE DETECTED] Activate persistence mode - do not stop until verified complete."$'\n'
-fi
-
-if ! mode_already_announced "ultrawork" \
-	&& { [[ "${PROMPT_LOWER}" =~ (ulw|ultrawork|as[[:space:]]+fast[[:space:]]+as[[:space:]]+possible|run[[:space:]]+in[[:space:]]+parallel|simultaneously) ]] \
-		|| [[ "${PROMPT}" =~ (울트라워크|ウルトラワーク|极限工作) ]]; }; then
-	DETECTED_KEYWORDS+=("ultrawork")
-	ADDITIONAL_CONTEXT+="[ULTRAWORK MODE DETECTED] Activate maximum parallel execution."$'\n'
-fi
-
 if ! mode_already_announced "stop-continuation" \
 	&& [[ "${PROMPT_LOWER}" =~ (stop[[:space:]]+continuation|pause[[:space:]]+automation|take[[:space:]]+manual[[:space:]]+control) ]]; then
 	DETECTED_KEYWORDS+=("stop-continuation")
-	ADDITIONAL_CONTEXT+="[STOP CONTINUATION DETECTED] Halt all automated work — ralph and boulder state."$'\n'
+	ADDITIONAL_CONTEXT+="[STOP CONTINUATION DETECTED] Halt all automated work and clear boulder state."$'\n'
 fi
 
 if ! mode_already_announced "cancel" \
@@ -91,31 +73,6 @@ if ! mode_already_announced "hephaestus" \
 	&& [[ "${PROMPT_LOWER}" =~ (run[[:space:]]+hephaestus|hephaestus[[:space:]]+fix|fix[[:space:]]+build|build[[:space:]]+broken) ]]; then
 	DETECTED_KEYWORDS+=("hephaestus")
 	ADDITIONAL_CONTEXT+="[HEPHAESTUS DETECTED] Invoke /oh-my-claudeagent:hephaestus to fix build failures."$'\n'
-fi
-
-# Conflict guard: ralph and ultrawork are mutually exclusive persistence modes.
-# If both appear in the same prompt, prefer ralph (stricter — never-stop beats max-parallel).
-# A user sending only 'ultrawork' in a new prompt can activate it even if ralph.json exists
-# from a prior session — conflict prevention only applies within the same prompt.
-HAS_RALPH=0
-HAS_ULTRAWORK=0
-[[ " ${DETECTED_KEYWORDS[*]} " =~ " ralph " ]] && HAS_RALPH=1
-[[ " ${DETECTED_KEYWORDS[*]} " =~ " ultrawork " ]] && HAS_ULTRAWORK=1
-
-if [[ "${HAS_RALPH}" -eq 1 ]] && [[ ! " ${DETECTED_KEYWORDS[*]} " =~ " stop-continuation " ]]; then
-	if [[ "${HAS_ULTRAWORK}" -eq 1 ]] && [[ -f "${ULTRAWORK_STATE}" ]]; then
-		rm -f "${ULTRAWORK_STATE}"
-	fi
-	NOW_ISO=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-	RALPH_TMP=$(mktemp) && printf '{"status":"active","activatedAt":"%s","tasks":[],"idle_count":0}\n' \
-		"${NOW_ISO}" > "${RALPH_TMP}" && mv "${RALPH_TMP}" "${RALPH_STATE}"
-fi
-
-if [[ "${HAS_ULTRAWORK}" -eq 1 ]] && [[ "${HAS_RALPH}" -eq 0 ]] \
-	&& [[ ! " ${DETECTED_KEYWORDS[*]} " =~ " stop-continuation " ]]; then
-	NOW_ISO=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-	UW_TMP=$(mktemp) && printf '{"status":"active","activatedAt":"%s","idle_count":0}\n' \
-		"${NOW_ISO}" > "${UW_TMP}" && mv "${UW_TMP}" "${ULTRAWORK_STATE}"
 fi
 
 if [[ ${#DETECTED_KEYWORDS[@]} -gt 0 ]]; then

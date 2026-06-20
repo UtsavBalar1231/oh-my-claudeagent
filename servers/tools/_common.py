@@ -12,11 +12,6 @@ BOULDER_FILE = "boulder.json"
 EVIDENCE_FILE = "verification-evidence.json"
 EVIDENCE_DIR = ".omca/evidence"
 EVIDENCE_FILE_NEW = "verification-evidence.json"
-RALPH_STATE_FILE = "ralph-state.json"
-ULTRAWORK_STATE_FILE = "ultrawork-state.json"
-PENDING_FINAL_VERIFY_FILE = "pending-final-verify.json"
-SUBAGENTS_FILE = "subagents.json"
-ACTIVE_AGENTS_FILE = "active-agents.json"
 NOTEPAD_DIR = ".omca/notepads"
 VALID_SECTIONS = ("learnings", "issues", "decisions", "problems")
 AGENT_CATALOG_FILE = "agent-catalog.json"
@@ -110,58 +105,3 @@ def _load_evidence(state_dir: str) -> list[dict]:
         return data.get("entries", [])
     except Exception:
         return []
-
-
-_MODE_FILES: dict[str, str] = {
-    "ralph": RALPH_STATE_FILE,
-    "ultrawork": ULTRAWORK_STATE_FILE,
-    "boulder": BOULDER_FILE,
-    "final_verify": PENDING_FINAL_VERIFY_FILE,
-    "evidence": EVIDENCE_FILE,
-}
-
-
-def _clear_mode_files(state: str, modes: list[str]) -> list[str]:
-    """Remove state files for the named modes; return list of actually-cleared mode names."""
-    cleared: list[str] = []
-    for label in modes:
-        if label == "agents":
-            # Operator escape hatch for wedged phantom agents: truncate the running-agent
-            # counting plane. Preserve subagents.json .completed (audit history); drop the
-            # .active list and remove active-agents.json (+ lock). Both recreate on demand.
-            changed = False
-            subagents_path = os.path.join(state, SUBAGENTS_FILE)
-            data = _read_json(subagents_path)
-            if data.get("active"):
-                data["active"] = []
-                _write_json(subagents_path, data)
-                changed = True
-            for fname in (ACTIVE_AGENTS_FILE, "active-agents.lock"):
-                try:
-                    os.remove(os.path.join(state, fname))
-                    changed = True
-                except FileNotFoundError:
-                    pass
-            if changed:
-                cleared.append(label)
-            continue
-        if label == "evidence":
-            # state = <git_root>/.omca/state  →  git_root = two levels up
-            git_root = os.path.dirname(os.path.dirname(state))
-            path = _evidence_new_path(git_root)
-            try:
-                os.remove(path)
-                cleared.append(label)
-            except FileNotFoundError:
-                pass
-            continue
-        filename = _MODE_FILES.get(label)
-        if not filename:
-            continue
-        path = os.path.join(state, filename)
-        try:
-            os.remove(path)
-            cleared.append(label)
-        except FileNotFoundError:
-            pass
-    return cleared

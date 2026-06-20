@@ -122,10 +122,6 @@ _run_fixture() {
 	_run_fixture "comment-checker" "clean-code"
 }
 
-@test "golden: config-change-audit/happy-path" {
-	_run_fixture "config-change-audit" "happy-path"
-}
-
 @test "golden: context-injector/read-no-agents" {
 	_run_fixture "context-injector" "read-no-agents"
 }
@@ -170,10 +166,6 @@ _run_fixture() {
 	_run_fixture "final-verification-evidence" "recursion-guard"
 }
 
-@test "golden: instructions-loaded-audit/happy-path" {
-	_run_fixture "instructions-loaded-audit" "happy-path"
-}
-
 @test "golden: json-error-recovery/ast-grep-not-found" {
 	_run_fixture "json-error-recovery" "ast-grep-not-found"
 }
@@ -186,44 +178,12 @@ _run_fixture() {
 	_run_fixture "keyword-detector" "no-keyword"
 }
 
-@test "golden: keyword-detector/ralph-keyword" {
-	_run_fixture "keyword-detector" "ralph-keyword"
-}
-
-@test "golden: keyword-detector/ultrawork-keyword" {
-	_run_fixture "keyword-detector" "ultrawork-keyword"
-}
-
 @test "golden: keyword-detector/stop-continuation" {
 	_run_fixture "keyword-detector" "stop-continuation"
 }
 
 @test "golden: keyword-detector/cancel" {
 	_run_fixture "keyword-detector" "cancel"
-}
-
-@test "golden: lifecycle-state/worktree-create" {
-	_run_fixture "lifecycle-state" "worktree-create"
-}
-
-@test "golden: lifecycle-state/worktree-remove" {
-	_run_fixture "lifecycle-state" "worktree-remove"
-}
-
-@test "golden: lifecycle-state/cwd-changed" {
-	_run_fixture "lifecycle-state" "cwd-changed"
-}
-
-@test "golden: lifecycle-state/task-created" {
-	_run_fixture "lifecycle-state" "task-created"
-}
-
-@test "golden: notify/idle-prompt" {
-	_run_fixture "notify" "idle-prompt"
-}
-
-@test "golden: notify/permission-prompt" {
-	_run_fixture "notify" "permission-prompt"
 }
 
 @test "golden: package-plugin/dry-run" {
@@ -254,14 +214,6 @@ _run_fixture() {
 	_run_fixture "post-compact-inject" "no-context-file"
 }
 
-@test "golden: post-compact-log/with-summary" {
-	_run_fixture "post-compact-log" "with-summary"
-}
-
-@test "golden: post-compact-log/no-summary" {
-	_run_fixture "post-compact-log" "no-summary"
-}
-
 @test "golden: post-edit/write-event" {
 	_run_fixture "post-edit" "write-event"
 }
@@ -270,48 +222,12 @@ _run_fixture() {
 	_run_fixture "post-edit" "edit-event"
 }
 
-@test "golden: post-tool-batch/grep-no-agents" {
-	_run_fixture "post-tool-batch" "grep-no-agents"
-}
-
-@test "golden: post-tool-batch/agents-already-used" {
-	_run_fixture "post-tool-batch" "agents-already-used"
-}
-
-@test "golden: post-tool-batch/same-file-conflict" {
-	_run_fixture "post-tool-batch" "same-file-conflict"
-}
-
-@test "golden: post-tool-batch/disjoint-edits-silent" {
-	_run_fixture "post-tool-batch" "disjoint-edits-silent"
-}
-
-@test "golden: post-tool-batch/subagent-grep-no-count" {
-	_run_fixture "post-tool-batch" "subagent-grep-no-count"
-}
-
 @test "golden: pre-compact/happy-path" {
 	_run_fixture "pre-compact" "happy-path"
 }
 
 @test "golden: pre-compact/ralph-active" {
 	_run_fixture "pre-compact" "ralph-active"
-}
-
-@test "golden: ralph-persistence/no-ralph" {
-	_run_fixture "ralph-persistence" "no-ralph"
-}
-
-@test "golden: ralph-persistence/ralph-active" {
-	_run_fixture "ralph-persistence" "ralph-active"
-}
-
-@test "golden: ralph-persistence/recursion-guard" {
-	_run_fixture "ralph-persistence" "recursion-guard"
-}
-
-@test "golden: ralph-persistence/idle" {
-	_run_fixture "ralph-persistence" "idle"
 }
 
 @test "golden: read-error-recovery/file-not-found" {
@@ -338,18 +254,6 @@ _run_fixture() {
 	_run_fixture "session-init" "compact"
 }
 
-@test "golden: stop-failure-handler/no-active-mode" {
-	_run_fixture "stop-failure-handler" "no-active-mode"
-}
-
-@test "golden: stop-failure-handler/ralph-active" {
-	_run_fixture "stop-failure-handler" "ralph-active"
-}
-
-@test "golden: subagent-complete/completed" {
-	_run_fixture "subagent-complete" "completed"
-}
-
 @test "golden: subagent-start/sisyphus" {
 	_run_fixture "subagent-start" "sisyphus"
 }
@@ -368,22 +272,6 @@ _run_fixture() {
 
 @test "golden: task-completed-verify/with-evidence" {
 	_run_fixture "task-completed-verify" "with-evidence"
-}
-
-@test "golden: teammate-idle-guard/no-active-mode" {
-	_run_fixture "teammate-idle-guard" "no-active-mode"
-}
-
-@test "golden: teammate-idle-guard/ralph-active" {
-	_run_fixture "teammate-idle-guard" "ralph-active"
-}
-
-@test "golden: track-question/happy-path" {
-	_run_fixture "track-question" "happy-path"
-}
-
-@test "golden: track-subagent-spawn/spawn-executor" {
-	_run_fixture "track-subagent-spawn" "spawn-executor"
 }
 
 @test "golden: validate-plugin/known-good" {

@@ -13,11 +13,8 @@ Slash commands always available. Keyword triggers activate only when `enableKeyw
 | Gap-analyze a draft plan | —                      | /oh-my-claudeagent:metis                 |
 | Review a draft plan      | —                      | /oh-my-claudeagent:momus                 |
 | Start execution          | —                      | /oh-my-claudeagent:start-work            |
-| Parallel work            | "ultrawork" / "ulw"    | /oh-my-claudeagent:ultrawork <task list> |
-| Must-finish persistence  | "ralph" / "don't stop" | /oh-my-claudeagent:ralph <task>          |
 | Fix broken build         | "fix build"            | /oh-my-claudeagent:hephaestus            |
 | Session handoff          | "handoff"              | /oh-my-claudeagent:handoff               |
-| Stop all continuation    | "stop continuation"    | /oh-my-claudeagent:stop-continuation     |
 
 ## Agent catalog
 
@@ -42,7 +39,7 @@ Pipeline: **prometheus → metis → momus → user approval → `/oh-my-claudea
 2. `metis` gap-analyzes the draft.
 3. `momus` reviews for clarity, verifiability, completeness.
 4. **User approves** (ExitPlanMode or confirmation).
-5. `/oh-my-claudeagent:start-work` executes the approved plan end-to-end at depth 0. The main session (sisyphus identity) spawns `executor` for each task (parallel where the plan declares `Parallel Execution: YES`), invokes `oracle` for F1 independent review, logs evidence per task with `plan_sha256`, and reports completion back to the user.
+5. `/oh-my-claudeagent:start-work` executes the approved plan end-to-end at depth 0. The main session (sisyphus identity) spawns `executor` for each task (parallel where the plan declares `Parallel Execution: YES`), logs evidence per task, and runs a final completeness check before reporting back to the user.
 
 User runs `/oh-my-claudeagent:start-work [plan path]`. Do not auto-start execution.
 

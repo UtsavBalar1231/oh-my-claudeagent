@@ -96,7 +96,7 @@ Hook scripts read and write state from `${CLAUDE_PROJECT_ROOT}/.omca/state/`. If
 `scripts/bin/run-hook-in-scratch.sh` creates a temporary project root, sets `CLAUDE_PROJECT_ROOT` to it, pipes your JSON payload to the named hook script, and cleans up afterward:
 
 ```bash
-echo '{"prompt":"ultrawork this"}' | scripts/bin/run-hook-in-scratch.sh keyword-detector.sh
+echo '{"prompt":"handoff please"}' | scripts/bin/run-hook-in-scratch.sh keyword-detector.sh
 ```
 
 Pass any hook script name (relative to `scripts/`) as the first argument. The wrapper accepts JSON on stdin and forwards all arguments after the script name to the hook.

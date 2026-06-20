@@ -3,7 +3,6 @@ load '../test_helper'
 
 STARTUP_PAYLOAD='{"hook_event_name":"SessionStart","source":"startup"}'
 COMPACT_PAYLOAD='{"hook_event_name":"SessionStart","source":"compact"}'
-STOPFAILURE_PAYLOAD='{"session_id":"test-session","hook_event_name":"StopFailure","error":"rate_limit","error_details":"429 Too Many Requests","last_assistant_message":"API Error: Rate limit reached"}'
 
 # ─── a. session-init creates session.json ────────────────────────────────────
 
@@ -91,27 +90,9 @@ STOPFAILURE_PAYLOAD='{"session_id":"test-session","hook_event_name":"StopFailure
 	[[ "$context" == *"[CURRENT DATE]"* ]]
 }
 
-@test "session-init: sweeps stale subagents.json .active phantoms, keeps fresh ones" {
-	local now old fresh
-	now=$(date +%s)
-	old=$((now - 7200))
-	fresh=$((now - 60))
-	write_state "subagents.json" \
-		"{\"active\":[{\"id\":\"old\",\"type\":\"x\",\"status\":\"running\",\"started_epoch\":${old}},{\"id\":\"fresh\",\"type\":\"y\",\"status\":\"running\",\"started_epoch\":${fresh}}],\"completed\":[]}"
-
-	run_hook "session-init.sh" "$STARTUP_PAYLOAD"
-	assert_success
-
-	local ids
-	ids=$(jq -c '[.active[].id]' "$CLAUDE_PROJECT_ROOT/.omca/state/subagents.json")
-	[[ "$ids" == '["fresh"]' ]]
-}
-
 # ─── d. pre-compact saves compaction-context.md ───────────────────────────────
 
-@test "pre-compact: creates compaction-context.md with ralph state info" {
-	write_state "ralph-state.json" \
-		'{"status":"active","tasks":[{"id":"1","status":"pending"}]}'
+@test "pre-compact: creates compaction-context.md with pending tasks block" {
 	write_state "boulder.json" \
 		'{"active_plan":"/tmp/my-plan.md","plan_name":"my-plan"}'
 
@@ -122,21 +103,21 @@ STOPFAILURE_PAYLOAD='{"session_id":"test-session","hook_event_name":"StopFailure
 	assert [ -f "$CLAUDE_PROJECT_ROOT/.omca/state/compaction-context.md" ]
 	local ctx
 	ctx=$(cat "$CLAUDE_PROJECT_ROOT/.omca/state/compaction-context.md")
-	[[ "$ctx" == *"Ralph mode is ACTIVE"* ]]
+	[[ "$ctx" == *"Pending Tasks"* ]]
 }
 
 # ─── e. post-compact-inject restores saved context ────────────────────────────
 
 @test "post-compact-inject: output contains saved compaction-context.md content" {
 	write_state "compaction-context.md" \
-		"$(printf '## Active Mode\nRalph mode is ACTIVE. The boulder never stops.\n## Pending Tasks\nTask alpha is pending.')"
+		"$(printf '## Active Plan\nPlan my-plan is active. The boulder never stops.\n## Pending Tasks\nTask alpha is pending.')"
 
 	run_hook "post-compact-inject.sh" "$COMPACT_PAYLOAD"
 	assert_success
 	local context
 	context=$(get_context)
 	[[ "$context" == *"[POST-COMPACTION CONTEXT RESTORE]"* ]]
-	[[ "$context" == *"Ralph mode is ACTIVE"* ]]
+	[[ "$context" == *"Plan my-plan is active"* ]]
 }
 
 # ─── f. post-compact-inject deletes compaction-context.md after injection ─────
@@ -159,20 +140,3 @@ STOPFAILURE_PAYLOAD='{"session_id":"test-session","hook_event_name":"StopFailure
 	assert_output ""
 }
 
-# ─── h. stop-failure-handler logs to stop-failures.jsonl ─────────────────────
-
-@test "stop-failure-handler: logs event to stop-failures.jsonl" {
-	run_hook "stop-failure-handler.sh" "$STOPFAILURE_PAYLOAD"
-	assert_success
-
-	local log_file="$CLAUDE_PROJECT_ROOT/.omca/logs/stop-failures.jsonl"
-	assert [ -f "$log_file" ]
-
-	local event
-	event=$(tail -1 "$log_file" | jq -r '.event')
-	assert [ "$event" = "stop_failure" ]
-
-	local error
-	error=$(tail -1 "$log_file" | jq -r '.error')
-	assert [ "$error" = "rate_limit" ]
-}

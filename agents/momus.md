@@ -126,7 +126,7 @@ Plan provides:
 
 ## Plan Context Awareness
 
-- `mode_read` to check if reviewing active plan vs draft
+- `boulder_progress` to check if reviewing an active plan vs a draft
 - `notepad_write(plan_name, "issues", "...")` for critical findings
 
 ## Review Process

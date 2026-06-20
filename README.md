@@ -78,9 +78,8 @@ Use `--dry-run` first to preview the file list. The script excludes dev artifact
 Run `/oh-my-claudeagent:omca-setup` to configure and verify dependencies. Then:
 
 - "create plan for [your task]" — planning pipeline
-- "ralph don't stop" — persistence mode (works until done)
-- "ultrawork" — parallel agents (up to 5)
 - `/oh-my-claudeagent:start-work` — execute a ready plan
+- `/loop 10m /oh-my-claudeagent:start-work` — re-run on a timer via native `/loop` (lightweight, not a verified persistence loop)
 
 ## What You Get
 

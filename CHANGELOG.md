@@ -5,6 +5,57 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.10.2] - 2026-06-20
+
+Shrinks OMCA to a native-leaning core. Measurement across easy tasks, hard trap tasks, and real
+SWE-bench-Verified bugs found that the orchestration control plane added cost, not correctness:
+modern Claude already plans, explores, runs tests, and iterates on its own, so a
+plan/delegate/verify layer duplicated the model's native agency. This release removes that layer
+and keeps only what the model does not supply for free.
+
+This release removes user-facing features (ralph, ultrawork, several MCP tools). Existing users
+should re-run `/oh-my-claudeagent:omca-setup` to refresh the instruction block in their CLAUDE.md.
+
+### Removed
+
+- **ralph and ultrawork modes.** The Stop-blocking persistence loop and the parallel-execution
+  mode are gone, along with their commands (`ralph`, `ultrawork`, `ulw-loop`), the
+  `cancel-ralph` and `stop-continuation` skills, and their state files. The closest native
+  replacement for "don't stop" is `/loop`, which re-runs a prompt on a timer. It is not a
+  drop-in: `/loop` has no verified-completion guarantee and no oracle gate. Parallel work is now
+  the model's native parallel agent fan-out.
+- **The four-wave final-verification ceremony (F1-F4).** Replaced by a single completeness
+  check (see Changed). The `pending-final-verify` marker, the completion sidecar, and the
+  per-attempt cap-state file are gone.
+- **Subagent-tracking state.** `subagents.json`, `active-agents.json`, `agent-usage.json`, the
+  spawn/complete/batch hooks, and the `concurrency_status` MCP tool are removed. Native subagent
+  lifecycle covers what they tracked.
+- **MCP tools** `boulder_list`, `boulder_select`, `boulder_complete`, `boulder_task_start`,
+  `boulder_task_end`, `mode_read`, `mode_clear`, and `concurrency_status`.
+- **Observability-only hooks.** The instructions-loaded, config-change, post-compact-log,
+  lifecycle-state, notify, and stop-failure log hooks are removed (they emitted no decisions).
+
+### Changed
+
+- **boulder is flat.** `servers/tools/boulder.py` went from a multi-work schema to a flat
+  single-active-plan tracker exposing only `boulder_write` and `boulder_progress`. The
+  statusline TODO counter is unaffected (the `active_plan` key and checkbox format are
+  preserved).
+- **One blocking completeness check.** The Stop hook now blocks only when the active plan is
+  fully checked and no `final_verification` evidence entry exists, with
+  `OMCA_HOOK_DISABLE_FINAL_VERIFY` as the sole escape. Evidence presence is the gate, so a
+  single logged verdict opens it permanently. There is no marker, no SHA scoping, and no cap
+  file, and it cannot wedge.
+
+### Migration
+
+- Re-run `/oh-my-claudeagent:omca-setup`.
+- Replace `ralph`/`ultrawork` usage with native `/loop` (timer re-run) and native parallel agent
+  fan-out, accepting the weaker persistence guarantee.
+- If you spawn a background agent while a plan is complete, the completeness check is now
+  demanded immediately on the foreground Stop rather than deferred until the background agent
+  finishes.
+
 ## [2.10.1] - 2026-06-20
 
 ### Fixed
@@ -19,7 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.10.0] - 2026-06-19
 
-Makes OMCA's always-on footprint lean, after a benchmark showed its ambient context roughly
+Makes OMCA's always-on footprint lean, after measurement showed its ambient context roughly
 doubled cost and code on coding tasks with no correctness gain.
 
 ### Changed
@@ -28,10 +79,8 @@ doubled cost and code on coding tasks with no correctness gain.
   operating principles, the full delegation table, or the plan-execution rules. All of that
   is already present in the omca-setup block and the specialist agents, so it was duplicated
   weight on every turn that primed the agent to over-produce. The style now carries only the
-  minimal-code creed. On the multi-file benchmark suite this cut OMCA-on cost about 27% and
-  time about 30% at equal correctness. Routing and verification behavior is unchanged. See
-  `benchmarks/results/2026-06-19-optimization.md`, which also identifies the advisory
-  PostToolUse hooks as the next and larger overhead lever.
+  minimal-code creed. Measurement showed this cut OMCA-on cost about 27% and time about 30% at
+  equal correctness. Routing and verification behavior is unchanged.
 
 ## [2.9.0] - 2026-06-19
 

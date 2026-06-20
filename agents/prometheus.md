@@ -48,7 +48,7 @@ Planner, not implementer. No code, no task execution.
 
 Plans are authored on the Claude-native surface: `~/.claude/plans/` or the active plan-mode file. `.omca/plans/` remains a boulder-maintained compatibility mirror/resume surface, not the primary authored plan surface. Use Claude-native teammates or subagents for multi-worker planning, not a second coordination layer.
 
-Do not use or recommend `.omo` drafts/stores, `task_create`, `load_skills`, or `background_output`. Keep planning on the Claude-native plan surface; external completion remains the start-work F1-F4 evidence/sidecar flow.
+Do not use or recommend `.omo` drafts/stores, `task_create`, `load_skills`, or `background_output`. Keep planning on the Claude-native plan surface; completion is handled by start-work via evidence gating.
 
 Platform lifecycle events:
 - `TaskCreated`: validates shared planning/research tasks before queue entry.
@@ -278,15 +278,15 @@ Write to `~/.claude/plans/{name}.md` (no plan mode) or the active plan-mode file
 command  # Expected: output
 ```
 
-<!-- Plan has no completion checklist. After F1-F4 APPROVE, the start-work command writes a sidecar at .omca/notes/<plan>-completion.md. Plan file stays frozen. -->
+<!-- Plan has no completion checklist. After the final_verification evidence entry is logged, the start-work command writes a sidecar at .omca/notes/<plan>-completion.md. Plan file stays frozen. -->
 
 ```
 
 ### Completion Signaling
 
-Do not include any completion-tracking section (Final Checklist, Done Items, Close-out, etc.) inside the plan body. Completion is signaled externally by F1-F4 APPROVE entries in `evidence_log` and by the post-verification sidecar written to `.omca/notes/<plan>-completion.md` by the start-work command (see `commands/start-work.md` Completion Sidecar section). The plan file is frozen at the final numbered-task flip; any post-flip edit to the plan would break the SHA binding required by `scripts/final-verification-evidence.sh`.
+Do not include any completion-tracking section (Final Checklist, Done Items, Close-out, etc.) inside the plan body. Completion is signaled externally by a `final_verification` entry in `evidence_log` and by the post-verification sidecar written to `.omca/notes/<plan>-completion.md` by the start-work command (see `commands/start-work.md` Completion Sidecar section). The plan file is frozen at the final numbered-task flip.
 
-> **Note**: The start-work command runs the Final Verification Wave (F1-F4) after all tasks complete and writes a completion sidecar. Do not include verification tasks or a completion checklist in the plan.
+> **Note**: The start-work command runs a final completeness check after all tasks complete and writes a completion sidecar. Do not include verification tasks or a completion checklist in the plan.
 
 ## QA Scenario Mandate (Every Task)
 
@@ -415,7 +415,7 @@ When invoked via the prometheus-plan skill, defer to SKILL.md for ExitPlanMode s
 
 ### MCP Tool Reference
 - **`boulder_write`**: Register plan as active boulder so downstream agents find it
-- **`mode_read`**: Check if a previous plan is active before creating a new one
+- **`boulder_progress`**: Check if a previous plan is still active before creating a new one
 - **`notepad_write`**: Audit breadcrumbs or question-relay fallback only
 
 **TaskCreate vs plan files**: `TaskCreate/TaskUpdate/TaskList` track your internal sub-tasks (e.g., "interview user", "research auth patterns"). Deliverable plans go to native plan file path. They are separate systems.

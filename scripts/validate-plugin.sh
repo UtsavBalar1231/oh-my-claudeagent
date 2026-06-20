@@ -59,7 +59,7 @@ Usage: bash scripts/validate-plugin.sh [options]
 
 Options:
   --check <claims|hooks|mcp>   Run a specific check (repeatable)
-  --case <name>                Named hook scenario (supports: compaction-race, worktree-output-missing)
+  --case <name>                Named hook scenario (supports: compaction-race)
   --marketplace <path>         Override marketplace JSON path
   --help                       Show this help text
 
@@ -149,11 +149,8 @@ set_hard_cutover_mode() {
 
 check_latest_hook_lifecycle_coverage() {
 	local latest_lifecycle_events=(
-		"ConfigChange"
-		"InstructionsLoaded"
-		"Notification"
+		"PermissionDenied"
 		"PermissionRequest"
-		"PostCompact"
 		"PostToolUse"
 		"PostToolUseFailure"
 		"PreCompact"
@@ -161,19 +158,12 @@ check_latest_hook_lifecycle_coverage() {
 		"SessionEnd"
 		"SessionStart"
 		"Stop"
-		"StopFailure"
 		"SubagentStart"
-		"SubagentStop"
 		"TaskCompleted"
-		"TeammateIdle"
+		"UserPromptExpansion"
 		"UserPromptSubmit"
 	)
-	local post_cutover_events=(
-		"TaskCreated"
-		"CwdChanged"
-		"FileChanged"
-		"WorktreeCreate"
-	)
+	local post_cutover_events=()
 	# New platform events not yet adopted by OMCA handlers.
 	# Tracked here for validator awareness; always skipped until handlers are registered.
 	local new_platform_events=(
@@ -727,21 +717,11 @@ check_hook_fixtures_exist() {
 		"permissionrequest-bash.json"
 		"permissionrequest-exitplanmode.json"
 		"sessionstart-compact.json"
-		"instructionsloaded-basic.json"
-		"taskcreated-basic.json"
 		"taskcompleted-basic.json"
 		"taskcompleted-with-evidence.json"
 		"taskcompleted-with-edits-no-evidence.json"
-		"teammateidle-basic.json"
-		"cwdchanged-basic.json"
-		"filechanged-basic.json"
-		"worktreecreate-basic.json"
-		"userpromptsubmit-ralph.json"
-		"userpromptsubmit-ultrawork.json"
 		"stop-basic.json"
 		"subagentstart-basic.json"
-		"subagentstopcomplete-basic.json"
-		"stopfailure-ratelimit.json"
 		"posttoolusefailure-bash.json"
 		"posttoolusefailure-read.json"
 	)
@@ -789,53 +769,7 @@ prepare_hook_fixture_repo() {
 	return 0
 }
 
-check_repo_state_file() {
-	local state_file="$1"
-	local repo_root="$2"
-	local event_name="$3"
-	local changed_path="${4:-}"
 
-	if [[ ! -f "${state_file}" ]]; then
-		fail "repo-state check: missing ${state_file} after ${event_name}"
-		return 1
-	fi
-
-	if jq -e \
-		--arg root "${repo_root}" \
-		--arg event_name "${event_name}" \
-		--arg changed_path "${changed_path}" '
-			.repoRoot == $root
-			and .lastEvent == $event_name
-			and .watchPaths == [
-				$root + "/.claude/settings.json",
-				$root + "/.mcp.json",
-				$root + "/AGENTS.md",
-				$root + "/CLAUDE.md",
-				$root + "/hooks/hooks.json",
-				$root + "/.claude-plugin/plugin.json",
-				$root + "/settings.json"
-			]
-			and (if $changed_path == "" then (.changedFile | not) else .changedFile.path == $changed_path end)
-		' "${state_file}" >/dev/null 2>&1; then
-		pass "repo-state check: ${event_name} stored expected repo root and watchPaths"
-	else
-		fail "repo-state check: ${event_name} state missing expected watchPaths or metadata"
-	fi
-}
-
-run_worktree_output_missing_case() {
-	local payload_path="$1"
-	local project_root="$2"
-	local fake_script
-
-	fake_script="$(mktemp)"
-	printf '#!/bin/bash\nexit 0\n' >"${fake_script}"
-	chmod +x "${fake_script}"
-
-	run_script_with_payload "WorktreeCreate missing output case" "${fake_script}" "${payload_path}" "${project_root}" "worktree-path"
-
-	rm -f "${fake_script}"
-}
 
 run_compaction_race_case() {
 	local payload_path="$1"
@@ -961,22 +895,11 @@ check_hooks() {
 	local permission_payload="${HOOK_FIXTURES_DIR}/permissionrequest-bash.json"
 	local exitplanmode_payload="${HOOK_FIXTURES_DIR}/permissionrequest-exitplanmode.json"
 	local session_compact_payload="${HOOK_FIXTURES_DIR}/sessionstart-compact.json"
-	local instructions_payload="${HOOK_FIXTURES_DIR}/instructionsloaded-basic.json"
-	local taskcreated_payload="${tmp_root}/taskcreated-basic.runtime.json"
 	local task_payload="${HOOK_FIXTURES_DIR}/taskcompleted-basic.json"
-	local teammate_payload="${HOOK_FIXTURES_DIR}/teammateidle-basic.json"
-	local cwdchanged_payload="${tmp_root}/cwdchanged-basic.runtime.json"
-	local filechanged_payload="${tmp_root}/filechanged-basic.runtime.json"
-	local worktree_payload="${tmp_root}/worktreecreate-basic.runtime.json"
-	local filechanged_matcher='.mcp.json|AGENTS.md|CLAUDE.md|hooks.json|plugin.json|settings.json|pyproject.toml|justfile'
 
 	local existing_file="${tmp_root}/existing.txt"
 	touch "${existing_file}"
 	jq --arg file "${existing_file}" '.tool_input.file_path = $file' "${HOOK_FIXTURES_DIR}/pretooluse-write.json" >"${pretool_write_payload}"
-	jq --arg cwd "${tmp_root}" '.cwd = $cwd' "${HOOK_FIXTURES_DIR}/taskcreated-basic.json" >"${taskcreated_payload}"
-	jq --arg cwd "${tmp_root}/hooks" --arg old_cwd "${tmp_root}" --arg new_cwd "${tmp_root}/hooks" '.cwd = $cwd | .old_cwd = $old_cwd | .new_cwd = $new_cwd' "${HOOK_FIXTURES_DIR}/cwdchanged-basic.json" >"${cwdchanged_payload}"
-	jq --arg cwd "${tmp_root}" --arg file_path "${tmp_root}/.claude/settings.json" '.cwd = $cwd | .file_path = $file_path' "${HOOK_FIXTURES_DIR}/filechanged-basic.json" >"${filechanged_payload}"
-	jq --arg cwd "${tmp_root}" '.cwd = $cwd' "${HOOK_FIXTURES_DIR}/worktreecreate-basic.json" >"${worktree_payload}"
 
 	run_registered_hooks "PreToolUse Task|Agent" "PreToolUse" "Task|Agent" "${pretool_task_payload}" "${tmp_root}" "json-required"
 	run_registered_hooks "PreToolUse Write" "PreToolUse" "Write" "${pretool_write_payload}" "${tmp_root}" "json-required"
@@ -986,121 +909,21 @@ check_hooks() {
 	printf 'compact fixture context' >"${tmp_root}/.omca/state/compaction-context.md"
 	run_registered_hooks "SessionStart compact" "SessionStart" "compact" "${session_compact_payload}" "${tmp_root}" "json-required"
 
-	run_registered_hooks "TaskCreated default" "TaskCreated" "" "${taskcreated_payload}" "${tmp_root}" "empty"
-	if [[ -f "${tmp_root}/.omca/logs/tasks.jsonl" ]]; then
-		if jq -e '.event == "task_created"' "${tmp_root}/.omca/logs/tasks.jsonl" >/dev/null 2>&1; then
-			pass "TaskCreated hook logged task_created event to tasks.jsonl"
-		else
-			fail "TaskCreated hook created tasks.jsonl but missing task_created event"
-		fi
-	else
-		fail "TaskCreated hook did not create tasks.jsonl"
-	fi
-
 	run_registered_hooks "TaskCompleted default" "TaskCompleted" "" "${task_payload}" "${tmp_root}" "empty"
-	run_registered_hooks "TeammateIdle default" "TeammateIdle" "" "${teammate_payload}" "${tmp_root}" "empty"
 
-	run_registered_hooks "InstructionsLoaded default" "InstructionsLoaded" "" "${instructions_payload}" "${tmp_root}" "json-optional"
-	run_registered_hooks "CwdChanged default" "CwdChanged" "" "${cwdchanged_payload}" "${tmp_root}" "json-required"
-	check_repo_state_file "${tmp_root}/.omca/state/repo-state.json" "${tmp_root}" "CwdChanged"
-
-	run_registered_hooks "FileChanged watchPaths" "FileChanged" "${filechanged_matcher}" "${filechanged_payload}" "${tmp_root}" "json-required"
-	check_repo_state_file "${tmp_root}/.omca/state/repo-state.json" "${tmp_root}" "FileChanged" "${tmp_root}/.claude/settings.json"
-
-	run_registered_hooks "WorktreeCreate default" "WorktreeCreate" "" "${worktree_payload}" "${tmp_root}" "worktree-path"
-
-	local ralph_payload="${HOOK_FIXTURES_DIR}/userpromptsubmit-ralph.json"
-	local ultrawork_payload="${HOOK_FIXTURES_DIR}/userpromptsubmit-ultrawork.json"
-	local userpromptsubmit_commands
-	local state_suffix="-state.json"
-	local ralph_wrapper_state="${tmp_root}/.omca/state/ralph${state_suffix}"
-	local ultrawork_wrapper_state="${tmp_root}/.omca/state/ultrawork${state_suffix}"
-	userpromptsubmit_commands="$(resolve_hook_commands "UserPromptSubmit" "")"
-	if [[ -n "${userpromptsubmit_commands}" ]]; then
-		run_registered_hooks "UserPromptSubmit ralph" "UserPromptSubmit" "" "${ralph_payload}" "${tmp_root}" "json-required"
-		if [[ -f "${ralph_wrapper_state}" ]]; then
-			if jq -e '.status == "active"' "${ralph_wrapper_state}" >/dev/null 2>&1; then
-				pass "keyword-detector creates Ralph wrapper state with active status"
-			else
-				fail "keyword-detector created Ralph wrapper state but status is not active"
-			fi
-		else
-			fail "keyword-detector should create Ralph wrapper state on ralph keyword"
-		fi
-
-		run_registered_hooks "UserPromptSubmit ultrawork" "UserPromptSubmit" "" "${ultrawork_payload}" "${tmp_root}" "json-required"
-		if [[ -f "${ultrawork_wrapper_state}" ]]; then
-			if jq -e '.status == "active"' "${ultrawork_wrapper_state}" >/dev/null 2>&1; then
-				pass "keyword-detector creates ultrawork wrapper state with active status"
-			else
-				fail "keyword-detector created ultrawork wrapper state but status is not active"
-			fi
-		else
-			fail "keyword-detector should create ultrawork wrapper state on ultrawork keyword"
-		fi
-	else
-		skip "UserPromptSubmit keyword-detector validations: no matching hook command registered"
-	fi
-
-	rm -f "${ralph_wrapper_state}" "${ultrawork_wrapper_state}"
 	local stop_payload="${HOOK_FIXTURES_DIR}/stop-basic.json"
 	run_registered_hooks "Stop default (no state)" "Stop" "" "${stop_payload}" "${tmp_root}" "json-optional"
 
-	printf '{"status":"active","activatedAt":"2026-03-22T12:00:00Z","tasks":[{"id":"t1","status":"in_progress"}],"idle_count":0}\n' \
-		>"${ralph_wrapper_state}"
-	run_registered_hooks "Stop with ralph active" "Stop" "" "${stop_payload}" "${tmp_root}" "json-required"
-	rm -f "${ralph_wrapper_state}"
-
-	local uw_epoch
-	uw_epoch=$(date +%s)
-	printf '{"status":"active","activatedAt":"2026-03-22T12:00:00Z","wrapper":"stop-hook","mode":"ultrawork"}\n' \
-		>"${ultrawork_wrapper_state}"
-	printf '{"active":[{"id":"test-agent-1","type":"explore","status":"running","startedAt":"2026-03-22T12:00:00Z","started_epoch":%s}],"completed":[]}\n' \
-		"${uw_epoch}" >"${tmp_root}/.omca/state/subagents.json"
-	run_registered_hooks "Stop ultrawork active + running agents (allow)" "Stop" "" "${stop_payload}" "${tmp_root}" "json-optional"
-	rm -f "${ultrawork_wrapper_state}" "${tmp_root}/.omca/state/subagents.json"
-
-	printf '{"status":"active","activatedAt":"2026-03-22T12:00:00Z","wrapper":"stop-hook","mode":"ultrawork"}\n' \
-		>"${ultrawork_wrapper_state}"
-	printf '{"active":[],"completed":[]}\n' \
-		>"${tmp_root}/.omca/state/subagents.json"
-	run_registered_hooks "Stop ultrawork active + no agents (block)" "Stop" "" "${stop_payload}" "${tmp_root}" "json-required"
-	rm -f "${ultrawork_wrapper_state}" "${tmp_root}/.omca/state/subagents.json"
-
 	local subagentstart_payload="${HOOK_FIXTURES_DIR}/subagentstart-basic.json"
-	local subagentstopcomplete_payload="${HOOK_FIXTURES_DIR}/subagentstopcomplete-basic.json"
-
 	run_registered_hooks "SubagentStart basic" "SubagentStart" "" "${subagentstart_payload}" "${tmp_root}" "json-required"
-	run_registered_hooks "SubagentStop basic" "SubagentStop" "" "${subagentstopcomplete_payload}" "${tmp_root}" "json-optional"
-
-	if [[ -f "${tmp_root}/.omca/state/active-agents.json" ]]; then
-		pass "SubagentStart created active-agents.json"
-	else
-		fail "SubagentStart did not create active-agents.json"
-	fi
-
-	local stopfailure_payload="${HOOK_FIXTURES_DIR}/stopfailure-ratelimit.json"
-	run_registered_hooks "StopFailure rate_limit" "StopFailure" "" "${stopfailure_payload}" "${tmp_root}" "empty"
-	if [[ -f "${tmp_root}/.omca/logs/stop-failures.jsonl" ]]; then
-		if jq -e '.event == "stop_failure"' "${tmp_root}/.omca/logs/stop-failures.jsonl" >/dev/null 2>&1; then
-			pass "StopFailure handler logged stop_failure event to stop-failures.jsonl"
-		else
-			fail "StopFailure handler created stop-failures.jsonl but missing stop_failure event"
-		fi
-	else
-		fail "StopFailure handler did not create stop-failures.jsonl"
-	fi
 
 	if [[ -n "${HOOK_CASE}" ]]; then
 		case "${HOOK_CASE}" in
 		compaction-race)
 			run_compaction_race_case "${session_compact_payload}" "${tmp_root}"
 			;;
-		worktree-output-missing)
-			run_worktree_output_missing_case "${worktree_payload}" "${tmp_root}"
-			;;
 		*)
-			fail "Unsupported hook case '${HOOK_CASE}'. Supported: compaction-race, worktree-output-missing"
+			fail "Unsupported hook case '${HOOK_CASE}'. Supported: compaction-race"
 			;;
 		esac
 	fi

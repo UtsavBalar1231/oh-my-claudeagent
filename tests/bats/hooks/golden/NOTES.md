@@ -4,13 +4,13 @@
 
 ### Round 1: diff-header file timestamps
 
-**Symptom**: `state-diff.txt` for `ralph-persistence/ralph-active` and `ralph-persistence/stagnated`
-diffed between first and second capture. The raw state-diff contains `diff -ru` output which
-includes file modification timestamps in the header lines:
+**Symptom**: `state-diff.txt` for hooks that modify state files diffed between first and
+second capture. The raw state-diff contains `diff -ru` output which includes file
+modification timestamps in the header lines:
 
 ```
---- /state-before/ralph-state.json	2026-04-20 14:27:33.528845827 +0530
-+++ /state-after/ralph-state.json	2026-04-20 14:27:33.541977413 +0530
+--- /state-before/boulder.json	2026-04-20 14:27:33.528845827 +0530
++++ /state-after/boulder.json	2026-04-20 14:27:33.541977413 +0530
 ```
 
 **Fix**: Added normalization rule to `normalize.sh`:

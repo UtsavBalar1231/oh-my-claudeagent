@@ -22,7 +22,7 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool()
     def evidence_log(
         evidence_type: str = Field(
-            description="Evidence type: build, test, lint, manual, or final_verification_f1..f4 (final verification wave: F1 plan compliance, F2 code quality, F3 manual QA, F4 scope fidelity). Called after verification commands."
+            description="Evidence type: build, test, lint, manual, or final_verification (end-of-plan completeness verdict; one logged entry opens the gate permanently). Called after verification commands."
         ),
         command: str = Field(description="Command that was executed"),
         exit_code: int = Field(description="Exit code of the command"),
@@ -35,10 +35,10 @@ def register(mcp: FastMCP) -> None:
         ),
         plan_sha256: str = Field(
             default="",
-            description="SHA-256 of the active plan file; attach on F1-F4 entries to scope verification evidence to the current plan run. Leave empty for build/test/lint/manual entries.",
+            description="SHA-256 of the active plan file; attach on final_verification entries to scope evidence to a specific plan run. Leave empty for build/test/lint/manual entries.",
         ),
     ) -> str:
-        """REQUIRED after every build/test/lint command -- task completion is blocked without this. Append a timestamped verification evidence entry. Use immediately after running any verification command (just test, just lint, just build, etc.). Set plan_sha256 on final_verification_f1..f4 entries to scope evidence to a specific plan run. Returns confirmation with total evidence entry count."""
+        """REQUIRED after every build/test/lint command -- task completion is blocked without this. Append a timestamped verification evidence entry. Use immediately after running any verification command (just test, just lint, just build, etc.). Set plan_sha256 on final_verification entries to scope evidence to a specific plan run. Returns confirmation with total evidence entry count."""
         git_root = _find_git_root(working_directory)
         path = _evidence_new_path(git_root)
         data = _read_json(path)

@@ -158,7 +158,7 @@ Returns line-numbered content with token/line counts. Large files → `offset`/`
 
 ## Plan Context Awareness
 
-- `mode_read` for active plan
+- `boulder_progress` to check active plan context
 - Record significant findings via `notepad_write(plan_name, "learnings", content)`: doc links, surprising behaviors, applicable patterns
 - Only findings that change approach; skip routine results.
 

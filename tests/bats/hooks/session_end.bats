@@ -34,48 +34,31 @@ run_cleanup() {
 # ─── b. temp files deleted on normal stop ────────────────────────────────────
 
 @test "session-cleanup: removes ephemeral state files on stop" {
-	for f in session.json subagents.json recent-edits.json \
-		injected-context-dirs.json agent-usage.json \
-		error-counts.json active-agents.json active-agents.lock; do
+	for f in session.json recent-edits.json \
+		injected-context-dirs.json error-counts.json; do
 		write_state "$f" '{"stale":true}'
 	done
 
 	run_cleanup "$END_PAYLOAD"
 	assert_success
 
-	for f in session.json subagents.json recent-edits.json \
-		injected-context-dirs.json agent-usage.json \
-		error-counts.json active-agents.json active-agents.lock; do
+	for f in session.json recent-edits.json \
+		injected-context-dirs.json error-counts.json; do
 		assert [ ! -f "$CLAUDE_PROJECT_ROOT/.omca/state/$f" ]
 	done
 }
 
-# ─── c. pending-final-verify cleared on stop ─────────────────────────────────
-
-@test "session-cleanup: removes pending-final-verify.json on stop" {
-	write_state "pending-final-verify.json" \
-		'{"plan_path":"/tmp/test-plan.md","marked_at":9999999999,"session_id":"test-sid"}'
-
-	run_cleanup "$END_PAYLOAD"
-	assert_success
-
-	assert [ ! -f "$CLAUDE_PROJECT_ROOT/.omca/state/pending-final-verify.json" ]
-}
-
-# ─── d. resume skips temp-file cleanup ───────────────────────────────────────
+# ─── c. resume skips temp-file cleanup ───────────────────────────────────────
 
 @test "session-cleanup: preserves ephemeral files on resume" {
 	write_state "session.json" '{"sessionId":"alive-sid"}'
 	write_state "recent-edits.json" '{"files":["a.sh"]}'
-	write_state "pending-final-verify.json" \
-		'{"plan_path":"/tmp/plan.md","marked_at":9999999999}'
 
 	run_cleanup "$RESUME_PAYLOAD"
 	assert_success
 
 	assert [ -f "$CLAUDE_PROJECT_ROOT/.omca/state/session.json" ]
 	assert [ -f "$CLAUDE_PROJECT_ROOT/.omca/state/recent-edits.json" ]
-	assert [ -f "$CLAUDE_PROJECT_ROOT/.omca/state/pending-final-verify.json" ]
 }
 
 # ─── e. orphan worktree tracking files removed ───────────────────────────────
@@ -112,7 +95,6 @@ run_cleanup() {
 	write_state "boulder.json" '{"active_plan":"/tmp/my-plan.md"}'
 	mkdir -p "$CLAUDE_PROJECT_ROOT/.omca/evidence"
 	printf '%s' '{"entries":[]}' > "$CLAUDE_PROJECT_ROOT/.omca/evidence/verification-evidence.json"
-	write_state "ralph-state.json" '{"status":"active"}'
 	write_state "team-state.json" '{"teams":[]}'
 
 	run_cleanup "$END_PAYLOAD"
@@ -120,7 +102,6 @@ run_cleanup() {
 
 	assert [ -f "$CLAUDE_PROJECT_ROOT/.omca/state/boulder.json" ]
 	assert [ -f "$CLAUDE_PROJECT_ROOT/.omca/evidence/verification-evidence.json" ]
-	assert [ -f "$CLAUDE_PROJECT_ROOT/.omca/state/ralph-state.json" ]
 	assert [ -f "$CLAUDE_PROJECT_ROOT/.omca/state/team-state.json" ]
 }
 
