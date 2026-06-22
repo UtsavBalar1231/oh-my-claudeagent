@@ -141,6 +141,131 @@ def test_ast_search_no_match_hints_regex_patterns(tools, mocker):
     assert "alternation" in result
 
 
+def test_ast_search_no_match_hints_c_bare_call(tools, mocker):
+    """ast_search warns that bare C call patterns parse as macro_type_specifier."""
+    mock_proc = _make_process(stdout=b"")
+    mocker.patch("subprocess.run", return_value=mock_proc)
+
+    result = tools["ast_search"](
+        pattern="lapis_record_set_outcome($$$)",
+        lang="c",
+        paths=["."],
+        globs=None,
+        context=None,
+        max_results=500,
+        output_format="text",
+    )
+    assert "No matches found" in result
+    assert "Hints" in result
+    assert "call_expression" in result
+
+
+def test_ast_search_surfaces_error_node_warning(tools, mocker):
+    """A swallowed ast-grep 'ERROR node' warning is surfaced on zero-match."""
+    stderr = (
+        b"Warning: Pattern contains an ERROR node and may cause unexpected results.\n"
+        b"Help: ast-grep parsed the pattern but it matched nothing in this run.\n"
+        b"See also: https://ast-grep.github.io/playground.html\n"
+    )
+    mock_proc = _make_process(returncode=0, stdout=b"", stderr=stderr)
+    mocker.patch("subprocess.run", return_value=mock_proc)
+
+    result = tools["ast_search"](
+        pattern="target($$$)",
+        lang="solidity",
+        paths=["."],
+        globs=None,
+        context=None,
+        max_results=500,
+        output_format="text",
+    )
+    assert "No matches found" in result
+    assert "ERROR node" in result
+    assert "kind:" in result
+    assert "See also" not in result  # Help/URL noise stripped
+
+
+def test_ast_search_extension_mismatch_hint(tools, mocker, tmp_path):
+    """An explicit file whose extension cannot match the requested lang is flagged."""
+    f = tmp_path / "x.c"
+    f.write_text("int main(){ return 0; }\n")
+    mocker.patch("tools.ast.resolve_workspace", return_value=str(tmp_path))
+    mock_proc = _make_process(returncode=1, stdout=b"", stderr=b"")
+    mocker.patch("subprocess.run", return_value=mock_proc)
+
+    result = tools["ast_search"](
+        pattern="return $X",
+        lang="cpp",
+        paths=["x.c"],
+        globs=None,
+        context=None,
+        max_results=500,
+        output_format="text",
+    )
+    assert "No matches found" in result
+    assert "extension" in result
+    assert "lang='cpp'" in result
+
+
+def test_ast_search_hard_parse_error_raises(tools, mocker):
+    """A hard parse error (exit 8) raises ToolError, never a silent zero."""
+    stderr = b"Error: Cannot parse query as a valid pattern.\nHelp: fix the pattern.\n"
+    mock_proc = _make_process(returncode=8, stdout=b"", stderr=stderr)
+    mocker.patch("subprocess.run", return_value=mock_proc)
+
+    with pytest.raises(ToolError, match="ast-grep error"):
+        tools["ast_search"](
+            pattern="greet() { $$$ }",
+            lang="bash",
+            paths=["."],
+            globs=None,
+            context=None,
+            max_results=500,
+            output_format="text",
+        )
+
+
+def test_ast_search_wellformed_zero_stays_clean(tools, mocker):
+    """A well-formed, genuinely-absent pattern stays a plain 'No matches found'."""
+    mock_proc = _make_process(returncode=1, stdout=b"", stderr=b"")
+    mocker.patch("subprocess.run", return_value=mock_proc)
+
+    result = tools["ast_search"](
+        pattern="missing($$$)",
+        lang="python",
+        paths=["."],
+        globs=None,
+        context=None,
+        max_results=500,
+        output_format="text",
+    )
+    assert result == "No matches found"
+
+
+def test_pattern_warning_strips_noise():
+    """pattern_warning returns only the Warning line, dropping Help/See-also."""
+    stderr = (
+        b"Warning: Pattern contains an ERROR node and may cause unexpected results.\n"
+        b"Help: x\nSee also: https://example\n"
+    )
+    out = ast_module.pattern_warning(stderr)
+    assert (
+        out
+        == "Warning: Pattern contains an ERROR node and may cause unexpected results."
+    )
+    assert ast_module.pattern_warning(b"") is None
+    assert ast_module.pattern_warning(b"ERROR: file: No such file\n") is None
+
+
+def test_extension_mismatch_skips_directories(tmp_path, mocker):
+    """extension_mismatch returns None when a path is a directory or matches the lang."""
+    mocker.patch("tools.ast.resolve_workspace", return_value=str(tmp_path))
+    (tmp_path / "x.c").write_text("int x;\n")
+    assert ast_module.extension_mismatch(["."], "cpp") is None  # directory
+    assert ast_module.extension_mismatch(["x.c"], "c") is None  # extension matches lang
+    assert ast_module.extension_mismatch(["x.c"], "cpp") is not None  # genuine mismatch
+
+
 def test_ast_search_rejects_unsafe_paths(tools):
     """ast_search validates path args before invoking ast-grep."""
     with pytest.raises(ToolError, match="empty"):
@@ -378,6 +503,32 @@ def test_ast_replace_apply_uses_two_pass_commands(tools, mocker):
     assert "--json=compact" not in apply_cmd
     assert "--update-all" in apply_cmd
     assert apply_cmd[-2:] == ["--", "."]
+
+
+def test_ast_replace_apply_refused_when_truncated(tools, mocker):
+    """Apply is refused (no second subprocess) when matches exceed the preview cap."""
+    matches = [
+        {
+            "file": f"f{i}.py",
+            "lines": "old_func(x)",
+            "range": {"start": {"line": 0, "column": 0}},
+        }
+        for i in range(ast_module.MAX_RESULT_CAP + 1)
+    ]
+    preview_proc = _make_process(stdout=json.dumps(matches).encode())
+    run_mock = mocker.patch("subprocess.run", return_value=preview_proc)
+
+    with pytest.raises(ToolError, match="Refusing to apply"):
+        tools["ast_replace"](
+            pattern="old_func($X)",
+            rewrite="new_func($X)",
+            lang="python",
+            paths=["."],
+            globs=None,
+            dry_run=False,
+        )
+    # Only the preview ran; --update-all was never spawned.
+    assert run_mock.call_count == 1
 
 
 def test_ast_replace_apply_failure_reports_replace_failed(tools, mocker):

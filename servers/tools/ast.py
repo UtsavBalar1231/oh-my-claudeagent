@@ -306,6 +306,15 @@ def no_match_message(pattern: str, lang: str, *, is_replace: bool = False) -> st
             "Regex alternation with | does not work in ast-grep patterns. Run separate AST searches or switch to grep."
         )
 
+    if lang == "c" and re.fullmatch(r"[A-Za-z_]\w*\s*\(.*\)", stripped):
+        hints.append(
+            "In C a bare call pattern like `name($$$)` parses as a type/macro "
+            "(macro_type_specifier), not a function call, so it never matches real call "
+            "sites and silently returns nothing. Use ast_find_rule with `kind: "
+            "call_expression` (match the name via `has: {field: function, regex: '^name$'}`), "
+            "or a pattern object giving expression context: `context: 'int v = name($$$);'` "
+            "with `selector: call_expression`."
+        )
     if (
         lang == "python"
         and stripped.startswith(("def ", "class ", "async def "))
@@ -329,6 +338,88 @@ def no_match_message(pattern: str, lang: str, *, is_replace: bool = False) -> st
             "Rust function patterns should include a body, e.g. `fn $NAME($$$ARGS) { $$$BODY }`."
         )
     return base if not hints else base + "\n\nHints:\n- " + "\n- ".join(hints)
+
+
+def pattern_warning(stderr: bytes) -> str | None:
+    """Return ast-grep's ERROR-node parse warning line, if present.
+
+    `ast-grep run` emits `Warning: Pattern contains an ERROR node ...` to stderr while
+    still exiting 0/1, so the wrapper's no-match path would otherwise discard it. We
+    surface only the single `Warning:` line and drop the Help/See-also/URL noise.
+    """
+    if not stderr:
+        return None
+    for line in stderr.decode("utf-8", errors="replace").splitlines():
+        line = line.strip()
+        if line.startswith("Warning:") and "ERROR node" in line:
+            return line
+    return None
+
+
+def extension_mismatch(safe_paths: list[str], lang: str) -> str | None:
+    """Warn when explicit file paths cannot match `lang` by extension.
+
+    ast-grep filters files by the requested language's extension set even with an
+    explicit `--lang`, so e.g. `lang="cpp"` against a `.c` file scans nothing and
+    returns a silent zero. Only fires when every path is an existing file whose
+    extension is outside the lang's set; returns None when any path is a directory
+    (contents unknown) or no path is an existing file.
+    """
+    lang_exts = {ext for ext, mapped in LANG_EXTENSIONS.items() if mapped == lang}
+    if not lang_exts:
+        return None
+
+    workspace = resolve_workspace()
+    file_paths: list[str] = []
+    for path in safe_paths:
+        absolute = path if os.path.isabs(path) else os.path.join(workspace, path)
+        if os.path.isdir(absolute):
+            return None
+        if os.path.isfile(absolute):
+            file_paths.append(absolute)
+
+    if not file_paths:
+        return None
+    if all(os.path.splitext(p)[1] not in lang_exts for p in file_paths):
+        return (
+            f"None of the given file path(s) have an extension mapped to lang='{lang}'. "
+            "ast-grep filters files by language extension, so it likely scanned nothing. "
+            "Check that lang matches the files' type."
+        )
+    return None
+
+
+def zero_match_message(
+    pattern: str,
+    lang: str,
+    *,
+    stderr: bytes = b"",
+    safe_paths: list[str] | None = None,
+    is_replace: bool = False,
+) -> str:
+    """Assemble the no-match message, adding only zero-false-positive diagnostics.
+
+    A genuine, well-formed zero returns the plain `no_match_message` unchanged. Extra
+    notes are appended only when ast-grep itself flagged an ERROR-node pattern or when
+    explicit file paths cannot match the requested language by extension.
+    """
+    message = no_match_message(pattern, lang, is_replace=is_replace)
+    extras: list[str] = []
+
+    warning = pattern_warning(stderr)
+    if warning:
+        extras.append(
+            f"{warning} Replace literal sub-parts with metavariables ($VAR / $$$), "
+            "or use ast_find_rule with an explicit `kind:`."
+        )
+
+    mismatch = extension_mismatch(safe_paths or [], lang)
+    if mismatch:
+        extras.append(mismatch)
+
+    if extras:
+        return message + "\n\n" + "\n".join(extras)
+    return message
 
 
 def format_run_results(
@@ -465,11 +556,15 @@ def register(mcp: FastMCP) -> None:
 
         result = run_command(cmd, allow_exit_1=True, cwd=resolve_workspace())
         if not result.stdout.strip():
-            return no_match_message(pattern, lang)
+            return zero_match_message(
+                pattern, lang, stderr=result.stderr, safe_paths=safe_paths
+            )
 
         matches, truncated = parse_compact_json_output(result.stdout)
         if not matches:
-            return no_match_message(pattern, lang)
+            return zero_match_message(
+                pattern, lang, stderr=result.stderr, safe_paths=safe_paths
+            )
 
         if output_format == "json":
             return json.dumps(matches[:max_results], indent=2)
@@ -496,7 +591,7 @@ def register(mcp: FastMCP) -> None:
             default=True, description="Preview changes without applying (default: true)"
         ),
     ) -> str:
-        """Replace code patterns across the filesystem with AST-aware rewriting. Use for safe structural refactoring — renaming variables, updating function signatures, or migrating API calls. Always use dry_run=true first to preview changes. Returns list of replacements with file:line locations."""
+        """Replace code patterns across the filesystem with AST-aware rewriting. Use for safe structural refactoring — renaming variables, updating function signatures, or migrating API calls. Always use dry_run=true first to preview changes. Returns list of replacements with file:line locations. Apply is refused when matches exceed the preview cap; narrow the scope so the full change set previews first."""
         safe_paths = normalize_workspace_paths(paths)
         preview_cmd = [
             _SG_BIN,
@@ -517,11 +612,23 @@ def register(mcp: FastMCP) -> None:
         workspace = resolve_workspace()
         result = run_command(preview_cmd, allow_exit_1=True, cwd=workspace)
         if not result.stdout.strip():
-            return no_match_message(pattern, lang, is_replace=True)
+            return zero_match_message(
+                pattern,
+                lang,
+                stderr=result.stderr,
+                safe_paths=safe_paths,
+                is_replace=True,
+            )
 
         matches, truncated = parse_compact_json_output(result.stdout)
         if not matches:
-            return no_match_message(pattern, lang, is_replace=True)
+            return zero_match_message(
+                pattern,
+                lang,
+                stderr=result.stderr,
+                safe_paths=safe_paths,
+                is_replace=True,
+            )
 
         if dry_run:
             output = format_run_results(
@@ -530,6 +637,17 @@ def register(mcp: FastMCP) -> None:
             if truncated and not output.startswith("[TRUNCATED]"):
                 output = "[TRUNCATED] Output exceeded AST MCP caps\n\n" + output
             return output
+
+        # --update-all rewrites every match on disk, but the preview is capped at
+        # MAX_RESULT_CAP. Refuse to apply a truncated change set so we never edit
+        # files the dry run could not show.
+        if truncated:
+            raise ToolError(
+                f"Refusing to apply: matches exceed the {MAX_RESULT_CAP}-result preview "
+                "cap, so --update-all would rewrite files the dry run did not show. Narrow "
+                "the scope with paths/globs or a more specific pattern until the full change "
+                "set previews, then re-run with dry_run=false."
+            )
 
         apply_cmd = [
             _SG_BIN,
