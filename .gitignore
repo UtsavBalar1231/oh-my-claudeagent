@@ -4,22 +4,10 @@ __pycache__/
 servers/__pycache__/
 .ruff_cache/
 .mypy_cache/
-# uv.lock is tracked for deterministic installs
 
 # oh-my-claudeagent runtime state
 .omc/
-.omca/logs/
-.omca/notes/
-.omca/plans/
-.omca/state/
-.omca/evidence/
-.omca/notepads/
-.omca/tmp/
-.omca/drafts/*
-!.omca/drafts/README.md
-.omca/rules/*
-!.omca/rules/README.md
-!.omca/rules/orchestration-workflow.md
+.omca/
 state/
 servers/.omca
 
@@ -49,7 +37,6 @@ CLAUDE.md
 .claude/
 
 # Docs
-UPGRADE.md
 docs/adr
 docs/audit
 docs/research
