@@ -54,9 +54,12 @@ COMPACT_PAYLOAD='{"hook_event_name":"SessionStart","source":"compact"}'
 
 # ─── c3. session-init emits sessionTitle when boulder.json is active ──────────
 
-@test "session-init: output contains sessionTitle when boulder.json has plan_name" {
+@test "session-init: output contains sessionTitle when boulder.json names an existing plan" {
+	local plan_file="$CLAUDE_PROJECT_ROOT/.omca/state/active-plan.md"
+	mkdir -p "$(dirname "$plan_file")"
+	printf '# plan\n' > "$plan_file"
 	write_state "boulder.json" \
-		'{"active_plan":"/tmp/my-plan.md","plan_name":"my-awesome-plan","session_ids":["sess-001"],"agent":"sisyphus"}'
+		"{\"active_plan\":\"$plan_file\",\"plan_name\":\"my-awesome-plan\",\"session_ids\":[\"sess-001\"],\"agent\":\"sisyphus\"}"
 
 	run_hook "session-init.sh" "$STARTUP_PAYLOAD"
 	assert_success
@@ -64,6 +67,18 @@ COMPACT_PAYLOAD='{"hook_event_name":"SessionStart","source":"compact"}'
 	local title
 	title=$(echo "$output" | jq -r '.hookSpecificOutput.sessionTitle // empty')
 	assert [ "$title" = "OMCA: my-awesome-plan" ]
+}
+
+@test "session-init: sessionTitle ABSENT when active_plan points at a missing file (stale boulder)" {
+	write_state "boulder.json" \
+		'{"active_plan":"/tmp/does-not-exist-omca-plan.md","plan_name":"ghost-plan","session_ids":["sess-001"],"agent":"sisyphus"}'
+
+	run_hook "session-init.sh" "$STARTUP_PAYLOAD"
+	assert_success
+
+	local title
+	title=$(echo "$output" | jq -r '.hookSpecificOutput.sessionTitle // empty')
+	assert [ "$title" = "" ]
 }
 
 @test "session-init: sessionTitle key ABSENT when no boulder.json" {
@@ -139,4 +154,3 @@ COMPACT_PAYLOAD='{"hook_event_name":"SessionStart","source":"compact"}'
 	assert_success
 	assert_output ""
 }
-

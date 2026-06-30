@@ -9,7 +9,7 @@
 			"description": "Normal implementation work"
 		},
 		"deep": {
-			"model": "claude-opus-4-8[1m]",
+			"model": "claude-opus-4-8",
 			"description": "Complex analysis, architecture decisions"
 		},
 		"readonly": {
@@ -18,7 +18,6 @@
 		}
 	},
 	"concurrency_limits": {
-		"claude-opus-4-8[1m]": 3,
 		"opus": 3,
 		"sonnet": 5,
 		"haiku": 10

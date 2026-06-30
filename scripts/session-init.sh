@@ -70,12 +70,16 @@ else
 	CONTEXT=$(printf 'Session %s initialized. State directory: %s' "${SESSION_ID}" "${STATE_DIR}" | jq -Rs .)
 fi
 
-# Emit sessionTitle when boulder.json is present and has a plan_name.
-# Defensive: any read/parse error leaves SESSION_TITLE empty → key is omitted.
+# Emit sessionTitle only when boulder.json names a plan AND that plan file still exists.
+# Defensive: any read/parse error, or a stale active_plan pointing at a deleted file,
+# leaves SESSION_TITLE empty → key is omitted.
 BOULDER_FILE="${STATE_DIR}/boulder.json"
 SESSION_TITLE=""
 if [[ -f "${BOULDER_FILE}" ]]; then
-	SESSION_TITLE=$(jq -r '.plan_name // empty' "${BOULDER_FILE}" 2>/dev/null || true)
+	ACTIVE_PLAN=$(jq -r '.active_plan // empty' "${BOULDER_FILE}" 2>/dev/null || true)
+	if [[ -n "${ACTIVE_PLAN}" && -f "${ACTIVE_PLAN}" ]]; then
+		SESSION_TITLE=$(jq -r '.plan_name // empty' "${BOULDER_FILE}" 2>/dev/null || true)
+	fi
 fi
 
 if [[ -n "${SESSION_TITLE}" ]]; then

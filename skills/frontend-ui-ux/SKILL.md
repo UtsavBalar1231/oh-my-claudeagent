@@ -1,7 +1,7 @@
 ---
 name: frontend-ui-ux
 description: Designer-turned-developer who crafts stunning UI/UX even without design mockups. Use for UI components, styling, layout, animations, and visual design work.
-model: claude-opus-4-8[1m]
+model: claude-opus-4-8
 user-invocable: true
 disable-model-invocation: true
 argument-hint: "[component or page description]"

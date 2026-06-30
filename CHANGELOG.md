@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.11.0] - 2026-07-01
+
+Syncs OMCA with Claude Code v2.1.197 and moves the agent roster to the current Claude model
+generation. Routing stays conservative: orchestrators and advisors remain on Opus, workers stay on
+the `sonnet` alias (which resolves to Sonnet 5 on the Anthropic API as of v2.1.197), and `explore`
+moves to Haiku for cheap broad search.
+
+### Changed
+
+- **Model generation refresh.** Agents now target `claude-opus-4-8` and the current Sonnet
+  generation through the `sonnet` alias. The `[1m]` context suffix is removed throughout because
+  the platform strips it automatically as of Claude Code v2.1.173. The `explore` agent now runs on
+  `haiku`.
+- **Per-agent effort tuning.** Each agent declares an explicit reasoning effort: high for
+  orchestrators and advisors, medium for workers, low for `explore`, and xhigh for
+  `multimodal-looker`.
+
+### Added
+
+- **Session title from the active plan.** When a plan is active, the session title reflects its
+  name. A boulder pointer at a deleted plan file leaves the title unset.
+
+### Fixed
+
+- **Outdated model pin in setup.** The setup skill wrote an older Opus model into user settings. It
+  now writes the current model.
+- **Documentation drift.** Corrected a stale adoption claim for a batch-tool hook that was removed
+  in the minimize refactor, and removed unregistered team lifecycle events from the hook table.
+
+### Docs
+
+- Extended the platform adoption ledger through Claude Code v2.1.197, including model-alias
+  resolution caveats for non-Anthropic providers and recommendations for the new user-scope
+  settings.
+
 ## [2.10.2] - 2026-06-20
 
 Shrinks OMCA to a native-leaning core. Measurement across easy tasks, hard trap tasks, and real

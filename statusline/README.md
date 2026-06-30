@@ -13,7 +13,7 @@ and optional Nerd Font glyphs.
 In a git project with an active session, the output is up to three lines:
 
 ```
-  claude-sonnet-4-5 · * main ~2 +1 · > my-project
+  claude-sonnet-5 · * main ~2 +1 · > my-project
 ▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 34%  200k · $0.12 · ~ 1m 42s · +87/-23
 ▰▰▰▱▱▱▱▱▱▱ 28%  (5h resets 4pm) · ▰▰▱▱▱▱▱▱▱▱ 18%  (7d resets thu 9am)
 ```
@@ -256,7 +256,7 @@ The package has zero runtime dependencies (Python stdlib only, requires Python 3
 Run the renderer directly against a JSON payload:
 
 ```bash
-echo '{"model": {"display_name": "claude-sonnet-4-5"}, "context_window": {"used_percentage": 42}}' \
+echo '{"model": {"display_name": "claude-sonnet-5"}, "context_window": {"used_percentage": 42}}' \
   | python3 -m statusline.direct
 ```
 
@@ -267,14 +267,14 @@ Test the daemon manually:
 cc-statusline-daemon --foreground
 
 # In another terminal, send a request
-printf '1\t{"model": {"display_name": "claude-sonnet-4-5"}, "context_window": {}}\n' \
+printf '1\t{"model": {"display_name": "claude-sonnet-5"}, "context_window": {}}\n' \
   | nc -U /tmp/cc-statusline-$(id -u).sock   # macOS
 # Linux uses abstract socket -- use Python:
 python3 -c "
 import socket, sys
 s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 s.connect('\x00cc-statusline-$(id -u)')
-s.sendall(b'1\t{\"model\":{\"display_name\":\"claude-sonnet-4-5\"},\"context_window\":{}}\n')
+s.sendall(b'1\t{\"model\":{\"display_name\":\"claude-sonnet-5\"},\"context_window\":{}}\n')
 print(s.recv(4096).decode())
 s.close()
 "

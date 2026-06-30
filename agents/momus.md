@@ -1,7 +1,7 @@
 ---
 name: momus
 description: Rigorous work plan reviewer that catches gaps, ambiguities, and missing context. Use after creating a work plan to validate clarity, verifiability, and completeness before execution. Ruthlessly critical to prevent implementation failures.
-model: claude-opus-4-8[1m]
+model: claude-opus-4-8
 effort: high
 color: red
 disallowedTools:

@@ -10,7 +10,7 @@ Install: `README.md`. Contributor internals: `CLAUDE.md`.
 
 Claude Code runs single-threaded. Simultaneous research + implementation, or ten files needing fixes at once, bottleneck the default session. No built-in specialist delegation or persistence guarantee.
 
-OMCA adds a multi-agent layer: specialist agents with model tiers (claude-opus-4-8[1m]/sonnet/haiku), skills via slash commands or keywords, hooks for persistence and context injection, MCP servers for structural search and state.
+OMCA adds a multi-agent layer: specialist agents with model tiers (claude-opus-4-8/sonnet/haiku), skills via slash commands or keywords, hooks for persistence and context injection, MCP servers for structural search and state.
 
 ### Philosophy
 
@@ -42,7 +42,7 @@ Markdown files in `agents/*.md` with YAML frontmatter (name, model, disallowedTo
 
 | Tier | Default for | Use for |
 |------|-------------|---------|
-| claude-opus-4-8[1m] | Orchestrators, planners, reviewers | Complex reasoning, architecture, multi-step coordination |
+| claude-opus-4-8 | Orchestrators, planners, reviewers | Complex reasoning, architecture, multi-step coordination |
 | sonnet | Executors, searchers, fixers | Standard implementation, search, builds |
 | haiku | (override only) | Quick lookups, simple transforms |
 
@@ -215,9 +215,7 @@ Claude Code lifecycle events and provide:
 | `PostToolUseFailure` | Tool lifecycle |
 | `Stop` | Lifecycle |
 | `StopFailure` | Lifecycle |
-| `TaskCreated` | Task lifecycle |
 | `TaskCompleted` | Task lifecycle |
-| `TeammateIdle` | Collaboration |
 | `PreCompact` | Memory |
 | `PostCompact` | Memory |
 | `SessionEnd` | Lifecycle |
@@ -229,50 +227,30 @@ Claude Code lifecycle events and provide:
 | `WorktreeRemove` | Worktree |
 | `InstructionsLoaded` | Observability |
 
+`TaskCreated` and `TeammateIdle` are platform task-collaboration lifecycle events OMCA
+does not currently hook — `scripts/teammate-idle-guard.sh` no longer exists, and no
+script registers `TaskCreated`. Only `TaskCompleted` is registered among the three
+(`task-completed-verify.sh`, the evidence-gating handler).
+
 **New platform events (v2.1.141–v2.1.167):**
 
 | Event | Added | Status | Notes |
 |-------|-------|--------|-------|
 | `MessageDisplay` | v2.1.152 | Not adopted | Fires when a message is about to be displayed |
-| `PostToolBatch` | v2.1.152 | **Adopted (v2.7.0)** | Fires after a batch of tool calls completes — see handler details below |
+| `PostToolBatch` | v2.1.152 | Not adopted (removed) | Still a valid platform event in v2.1.197; OMCA's handler was removed in the v2.10 minimize-to-core refactor — see footnote below |
 | `Elicitation` | v2.1.152 | Not adopted | Fires when the model issues an elicitation request |
 | `ElicitationResult` | v2.1.152 | Not adopted | Fires with the elicitation response |
 | `Setup` | v2.1.152 | Not adopted | Plugin initialization event |
 
-The four non-adopted events are tracked in `validate-plugin.sh`'s `new_platform_events` array
+The non-adopted events are tracked in `validate-plugin.sh`'s `new_platform_events` array
 (introduced v2.1.141–v2.1.167 sync). The validator skips them when no handler is present and
-passes when one is present — no failures on absence. `PostToolBatch` has been moved to the
-registered-events array as of v2.7.0.
+passes when one is present — no failures on absence.
 
-**PostToolBatch handler v1 (v2.7.0):**
-
-Registered matcher-less (the event supports no matchers) in `hooks.json` → `scripts/post-tool-batch.sh`.
-Non-blocking: both signals emit `additionalContext` only; no `decision:block`.
-
-The batch payload carries a `tool_calls[]` array (empirically captured — not documented
-in platform docs) with fields `tool_name`, `tool_input`, `tool_use_id`, and `tool_response`
-per entry.
-
-Two signals implemented:
-
-- **Same-file parallel-edit warning** (all sessions): when ≥2 entries in a batch target
-  the same `file_path` with Write, Edit, or NotebookEdit, emits a warning identifying the
-  conflicting path.
-- **Batch-consolidated delegation reminder** (main session only — skips subagent batches):
-  increments `toolCallCount` in `agent-usage.json` once per batch containing ≥1 of
-  Grep / Glob / WebFetch / WebSearch entries; emits the existing delegation reminder at
-  every 3rd increment when `agentUsed` is still `false`. Batches with no qualifying tools
-  are skipped. Batches from subagent sessions (agent_id present in payload) are skipped.
-
-**agent-usage-reminder.sh migration (v2.7.0):**
-
-`scripts/agent-usage-reminder.sh` (the prior per-call PostToolUse handler for Grep / Glob /
-WebFetch / WebSearch) has been removed. The delegation-reminder counting has moved from
-per-call (one increment per qualifying tool call) to per-batch (one increment per batch that
-contains ≥1 qualifying call). `agent-usage.json` schema is unchanged — `agentUsed` (boolean)
-and `toolCallCount` (integer) fields remain the same. The `agentUsed=true` suppression
-path is preserved: once any Agent call fires, the reminder is silenced for the rest of
-the session regardless of batch content.
+**PostToolBatch history:** implemented in v2.7.0 as `scripts/post-tool-batch.sh`
+(same-file parallel-edit warnings, batch-consolidated delegation reminder, and the
+`agent-usage-reminder.sh` per-call-to-per-batch migration); removed in the v2.10
+minimize-to-core refactor along with `agent-usage-reminder.sh` — neither script exists
+in the current tree.
 
 **Stop / SubagentStop — new input fields (v2.1.145):**
 
@@ -504,7 +482,7 @@ Add to `.claude/settings.json` for automatic team-wide installation:
 
 | Agent | Model | Effort | Invoke | Purpose |
 |-------|-------|--------|--------|---------|
-| sisyphus | claude-opus-4-8[1m] | high | Main session (injected via `templates/claudemd.md`) or `/oh-my-claudeagent:start-work` (Plan Execution Mode) | Master orchestrator identity — classifies requests, delegates to specialists. Two modes: free-form (conversational) and plan-driven (via `/start-work` command body). Plan Execution Mode protocol lives in `commands/start-work.md`. |
+| sisyphus | claude-opus-4-8 | high | Main session (injected via `templates/claudemd.md`) or `/oh-my-claudeagent:start-work` (Plan Execution Mode) | Master orchestrator identity — classifies requests, delegates to specialists. Two modes: free-form (conversational) and plan-driven (via `/start-work` command body). Plan Execution Mode protocol lives in `commands/start-work.md`. |
 
 **sisyphus** — The one orchestrator. Free-form mode: routes requests to specialists, runs explore agents in background. Plan Execution Mode: reads plan, delegates per-task to `executor`, logs evidence, runs a final completeness check at the end.
 
@@ -512,10 +490,10 @@ Add to `.claude/settings.json` for automatic team-wide installation:
 
 | Agent | Model | Effort | Invoke | Purpose |
 |-------|-------|--------|--------|---------|
-| prometheus | claude-opus-4-8[1m] | high | `/oh-my-claudeagent:plan` or "create plan" | Strategic planning with requirements interview + optional Socratic Interview Mode |
-| metis | claude-opus-4-8[1m] | high | `/oh-my-claudeagent:metis` or "run metis" | Pre-planning gap analysis |
-| momus | claude-opus-4-8[1m] | high | `Skill(oh-my-claudeagent:momus)` (or `Agent(subagent_type="oh-my-claudeagent:momus")` from the main session) | Rigorous plan review — OKAY or REJECT |
-| oracle | claude-opus-4-8[1m] | max | `Agent(subagent_type="oh-my-claudeagent:oracle")` | Architecture advisor, read-only |
+| prometheus | claude-opus-4-8 | high | `/oh-my-claudeagent:plan` or "create plan" | Strategic planning with requirements interview + optional Socratic Interview Mode |
+| metis | claude-opus-4-8 | high | `/oh-my-claudeagent:metis` or "run metis" | Pre-planning gap analysis |
+| momus | claude-opus-4-8 | high | `Skill(oh-my-claudeagent:momus)` (or `Agent(subagent_type="oh-my-claudeagent:momus")` from the main session) | Rigorous plan review — OKAY or REJECT |
+| oracle | claude-opus-4-8 | max | `Agent(subagent_type="oh-my-claudeagent:oracle")` | Architecture advisor, read-only |
 
 **prometheus** — 9-item clearance checklist interview, consults metis, generates plan,
 submits to momus for review (up to 3 iterations). Optional Socratic Interview Mode for
@@ -976,9 +954,11 @@ limits). Set in `~/.claude/settings.json`:
 
 ```json
 {
-  "fallbackModel": "claude-sonnet-4-5"
+  "fallbackModel": ["claude-sonnet-5", "claude-haiku-4-5"]
 }
 ```
+
+`fallbackModel` accepts up to 3 models (v2.1.166), tried in order until one is reachable.
 
 Not OMCA-specific; standard platform setting. Relevant for deployments where opus
 availability is not guaranteed.
@@ -1098,6 +1078,52 @@ Features introduced in this window that OMCA consciously declines to adopt:
 | `duration_ms` coaching in `bash-error-recovery.sh` | v2.7.0 | Added two branches: text-regex timeout detection (placed first in deterministic chain) and `duration_ms` ≥ 120 s fallback for slow-failure coaching (run_in_background / larger-timeout / narrower-scope). Payload probe confirmed `duration_ms` present in PostToolUseFailure Bash payloads |
 | `delegate-retry.sh` `duration_ms` branch | deferred | Agent-failure PostToolUseFailure payload structure not confirmed by probe contract — `duration_ms` coverage for Agent failures is pending a dedicated probe session |
 | `statusLine.refreshInterval: 5` | v2.7.0 | Applied via `omca-setup` Phase 5.6; both create and merge jq variants updated. Rationale: disk-sourced statusline reads git cache files that update on a ~5 s cadence; background-agent idle scenarios benefit from a matching refresh ceiling. Doc-claim ceiling: freshness improvement covers disk-sourced and idle-fan-out scenarios only |
+
+**Adopted this sync (v2.1.168–v2.1.197):**
+
+| Feature | Notes |
+|---------|-------|
+| `[1m]` auto-strip alignment | v2.1.173 dropped the `[1m]` context-window suffix from model identifiers platform-side; OMCA's agent docs and tables now use bare `claude-opus-4-8` throughout |
+| Per-agent `effort:` tuning | Agent Reference table effort levels (high/max) reviewed and kept; no regressions found against v2.1.197 effort semantics |
+| `sessionTitle` from boulder.json | Already adopted (v2.1.152, `session-init.sh`); re-verified against v2.1.197 and now guarded against an absent boulder file |
+| Model generation move | Agent docs reference the current generation: sonnet-5, opus-4-8, haiku-4-5 |
+
+**Provider-alias caveat:** the `sonnet` alias resolves to claude-sonnet-5 on the Anthropic
+API (confirmed v2.1.197+). Bedrock resolves `sonnet` to Sonnet 4.5; AWS Platform resolves
+it to 4.6. OMCA's worker agents keep the bare `sonnet` alias in `model:` frontmatter
+(portable across providers); users running non-Anthropic providers who need a specific
+generation should pin an explicit model ID in their own settings rather than relying on
+the alias.
+
+**Nesting invariant (v2.1.172):** the platform raised the max agent spawn depth to 5.
+OMCA's own spawn graph stays at depth 2 — only `sisyphus`, `executor`, and `prometheus`
+spawn further subagents; every other agent declares `disallowedTools: Agent`. No change
+needed; documented here so the depth-5 platform cap isn't mistaken for an OMCA target.
+
+**Deliberate non-adoptions (v2.1.168–v2.1.197):**
+
+| Feature | Version | Reason |
+|---------|---------|--------|
+| `type: agent` / `type: prompt` semantic evidence verifier on `TaskCompleted` | v2.1.197 spec | NO-GO. Evaluated in `.omca/notes/spike-semantic-verification-hooks.md`. Docs mark `type: agent` experimental/may-change; would roughly double LLM call volume on the task-completion path versus the existing zero-cost bash+jq gate (`task-completed-verify.sh`); targets a hypothetical mismatch failure mode with no observed incident history, while the existing deterministic hard gates (schema + freshness checks) already cover the failure modes actually seen in production. Re-evaluate only if `type: agent` graduates out of experimental and a real semantic-mismatch incident is observed |
+| `worktree.bgIsolation` | v2.1.143 | Claude-native owns worktree isolation policy; OMCA documents the `worktree.baseRef` hazard (see CLAUDE.md) but does not set this key — no OMCA workflow depends on background-isolation defaults differing from the platform default |
+| `sandbox.credentials` | v2.1.187 | Managed-settings-adjacent credential-scoping key; outside OMCA's ownership boundary (sandboxing is Claude-native's domain per the Ownership Model above) |
+| `autoMode.classifyAllShell` | v2.1.193 | Would route every Bash call through the auto-mode classifier, not just unmatched ones; OMCA's `permission-filter.sh` already fast-paths known-safe tooling deterministically — classifying all shell calls would add latency without changing OMCA's allow/deny outcomes |
+| `enforceAvailableModels` | v2.1.175 | Ordering hazard: this setting hard-fails on any stale model reference. Safe to enable only after all stale model IDs are purged from a deployment's settings and agent frontmatter (this sync's `[1m]` strip and model-generation update is exactly that purge). OMCA documents the setting but does not enable it by default — enabling is a user decision once their own config is clean |
+| `fallbackModel[]` | v2.1.166 | Documented above under Environment Variables; not auto-set by OMCA because the right fallback chain depends on the user's model availability and provider, which OMCA cannot infer |
+| `disableBundledSkills` | v2.1.169 | User-preference key for suppressing platform-bundled skills; orthogonal to OMCA's own skill set, no plugin-side action needed |
+| `autoMode` destructive-git default-block | v2.1.183 | Overlaps OMCA's own `scripts/git-master`-adjacent destructive-git denial in `permission-filter.sh` (`sudo rm -rf` guardrail). Complementary, not adopted as a replacement — OMCA's hook runs regardless of `autoMode` state |
+| `Agent(type)` deny enforcement | v2.1.186 | No OMCA agent declares a `type` field; nothing to enforce against yet |
+| Nested `.claude/` closest-wins precedence | v2.1.178 | Affects multi-root or nested-project layouts; OMCA's state lives under a single `.omca/` root per `CLAUDE_PROJECT_DIR` and does not nest |
+| Background-subagent permission-prompt | v2.1.186 | Background `Agent` calls now surface permission prompts the same as foreground; this is platform UX, not a setting OMCA wires |
+| Scheduled/webhook trigger reclassification | v2.1.183 | Claude-native owns `/schedule` triggers (see Ownership Model); OMCA's evidence/boulder state does not interact with trigger firing |
+
+**Cost-governance recommendation (v2.1.178):** the `Tool(param:value)` permission syntax
+(e.g. `Agent(model:opus)`) restricts a tool call's parameters at the permission-rule level.
+Users running cost-sensitive deployments can add an allow/deny rule scoped to
+`Agent(model:opus)` in their own `settings.json` to cap which subagents may spawn at the
+opus tier, independent of what model each OMCA agent's frontmatter requests. This is a
+user-side recommendation — OMCA's shipped `settings.json` does not set it, since the
+right cap depends on the deployment's budget, not on OMCA's orchestration logic.
 
 ---
 

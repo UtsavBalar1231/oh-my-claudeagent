@@ -20,14 +20,14 @@ Slash commands always available. Keyword triggers activate only when `enableKeyw
 
 | Agent             | Model  | Use when                                                                 |
 | ----------------- | ------ | ------------------------------------------------------------------------ |
-| sisyphus          | claude-opus-4-8[1m] | Orchestration: free-form and plan execution (via `/start-work` command) |
-| prometheus        | claude-opus-4-8[1m] | Interviewing the user, Socratic deep-dive, producing structured plans    |
-| metis             | claude-opus-4-8[1m] | Pre-execution gap analysis on a draft plan                               |
-| momus             | claude-opus-4-8[1m] | Critical review of a draft plan for clarity and risk                     |
+| sisyphus          | claude-opus-4-8 | Orchestration: free-form and plan execution (via `/start-work` command) |
+| prometheus        | claude-opus-4-8 | Interviewing the user, Socratic deep-dive, producing structured plans    |
+| metis             | claude-opus-4-8 | Pre-execution gap analysis on a draft plan                               |
+| momus             | claude-opus-4-8 | Critical review of a draft plan for clarity and risk                     |
 | executor          | sonnet | Focused implementation of a known, scoped task                           |
 | explore           | sonnet | Finding code and patterns inside the local repo                          |
 | librarian         | sonnet | External docs, library usage, OSS examples, research                     |
-| oracle            | claude-opus-4-8[1m] | Architecture, tradeoffs, stuck debugging, craft review                   |
+| oracle            | claude-opus-4-8 | Architecture, tradeoffs, stuck debugging, craft review                   |
 | hephaestus        | sonnet | Build failures, type errors, toolchain/dep fixes                         |
 | multimodal-looker | sonnet | Screenshots, PDFs, diagrams, visual inputs                               |
 
