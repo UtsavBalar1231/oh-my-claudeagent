@@ -17,9 +17,8 @@ fi
 # all other oh-my-claudeagent:* commands exit 0 silently.
 MODE=""
 case "${COMMAND_NAME}" in
-	oh-my-claudeagent:handoff)           MODE="handoff" ;;
-	oh-my-claudeagent:stop-continuation) MODE="stop-continuation" ;;
-	*)                                   exit 0 ;;
+	oh-my-claudeagent:handoff) MODE="handoff" ;;
+	*)                         exit 0 ;;
 esac
 
 # CURRENT_SESSION is referenced by mode_already_announced / mark_mode_announced in common.sh
@@ -36,9 +35,8 @@ mark_mode_announced "${MODE}"
 # Emit banner mapping mode to its activation message.
 BANNER=""
 case "${MODE}" in
-	handoff)           BANNER="[HANDOFF MODE ACTIVATED via slash command] Create session handoff summary for new-session continuity." ;;
-	stop-continuation) BANNER="[STOP CONTINUATION ACTIVATED via slash command] Halt all automated work — boulder state." ;;
-	*)                 exit 0 ;;
+	handoff) BANNER="[HANDOFF MODE ACTIVATED via slash command] Create session handoff summary for new-session continuity." ;;
+	*)       exit 0 ;;
 esac
 
 emit_context "UserPromptExpansion" "${BANNER}"

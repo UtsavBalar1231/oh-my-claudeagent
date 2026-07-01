@@ -50,12 +50,12 @@ Plans are authored on the Claude-native surface: `~/.claude/plans/` or the activ
 
 Do not use or recommend `.omo` drafts/stores, `task_create`, `load_skills`, or `background_output`. Keep planning on the Claude-native plan surface; completion is handled by start-work via evidence gating.
 
-Platform lifecycle events:
+Agent-teams platform lifecycle events (only when running with experimental agent teams):
 - `TaskCreated`: validates shared planning/research tasks before queue entry.
 - `TaskCompleted`: blocks task close until findings are in the native plan, review loop, or final response.
 - `TeammateIdle`: signals when a teammate needs work, direction, or clean shutdown.
 
-Use these instead of planner-side status files.
+Only `TaskCompleted` carries an OMCA hook; the others are unhooked platform signals. Use them instead of planner-side status files.
 
 ## PHASE 1: INTERVIEW MODE (DEFAULT)
 

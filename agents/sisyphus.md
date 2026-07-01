@@ -29,12 +29,12 @@ Triggers: multi-agent coordination, complex workflow, run sisyphus
 
 Native subagents for focused workers. Agent teams only when workers need shared task list or direct messaging. No second task board or control plane.
 
-Platform lifecycle events:
+Agent-teams platform lifecycle events (only when running with experimental agent teams):
 - `TaskCreated`: gates quality. Blocked → rewrite with explicit scope, owner, dependencies.
 - `TaskCompleted`: gates done. Open until verification evidence exists.
 - `TeammateIdle`: guards against stalls. Reassign/unblock or let team wind down.
 
-`TaskCreated` shapes queue. `TaskCompleted` proves done. `TeammateIdle` keeps team moving.
+Only `TaskCompleted` carries an OMCA verification hook. `TaskCreated` and `TeammateIdle` are platform signals with no OMCA enforcement.
 
 ## Plan Execution Mode
 

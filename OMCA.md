@@ -236,7 +236,7 @@ script registers `TaskCreated`. Only `TaskCompleted` is registered among the thr
 
 | Event | Added | Status | Notes |
 |-------|-------|--------|-------|
-| `MessageDisplay` | v2.1.152 | Not adopted | Fires when a message is about to be displayed |
+| `MessageDisplay` | v2.1.152 | Not adopted | Display-only terminal overlay; `displayContent` never reaches the transcript or context. Re-confirmed not-adopted 2026-07-01: screen/transcript divergence conflicts with evidence-first design, and every candidate use serves better via durable `additionalContext`/evidence |
 | `PostToolBatch` | v2.1.152 | Not adopted (removed) | Still a valid platform event in v2.1.197; OMCA's handler was removed in the v2.10 minimize-to-core refactor — see footnote below |
 | `Elicitation` | v2.1.152 | Not adopted | Fires when the model issues an elicitation request |
 | `ElicitationResult` | v2.1.152 | Not adopted | Fires with the elicitation response |

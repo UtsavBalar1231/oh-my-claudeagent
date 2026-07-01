@@ -33,18 +33,6 @@ PROMPT_LOWER=$(echo "${PROMPT}" | tr '[:upper:]' '[:lower:]')
 DETECTED_KEYWORDS=()
 ADDITIONAL_CONTEXT=""
 
-if ! mode_already_announced "stop-continuation" \
-	&& [[ "${PROMPT_LOWER}" =~ (stop[[:space:]]+continuation|pause[[:space:]]+automation|take[[:space:]]+manual[[:space:]]+control) ]]; then
-	DETECTED_KEYWORDS+=("stop-continuation")
-	ADDITIONAL_CONTEXT+="[STOP CONTINUATION DETECTED] Halt all automated work and clear boulder state."$'\n'
-fi
-
-if ! mode_already_announced "cancel" \
-	&& [[ "${PROMPT_LOWER}" =~ (cancel[[:space:]]+(this|task|run|operation|all)|stop[[:space:]]+(everything|now|all|task)|abort[[:space:]]+(this|task|run)) ]]; then
-	DETECTED_KEYWORDS+=("cancel")
-	ADDITIONAL_CONTEXT+="[CANCEL DETECTED] User wants to stop current operation. Invoke cancel skill."$'\n'
-fi
-
 if ! mode_already_announced "handoff" \
 	&& [[ "${PROMPT_LOWER}" =~ (handoff|context[[:space:]]+is[[:space:]]+getting[[:space:]]+long|start[[:space:]]+fresh[[:space:]]+session) ]]; then
 	DETECTED_KEYWORDS+=("handoff")

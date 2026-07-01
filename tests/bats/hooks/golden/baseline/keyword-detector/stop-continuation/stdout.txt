@@ -1,1 +1,0 @@
-{"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": "[STOP CONTINUATION DETECTED] Halt all automated work and clear boulder state.\n\n"}}

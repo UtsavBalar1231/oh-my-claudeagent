@@ -178,14 +178,6 @@ _run_fixture() {
 	_run_fixture "keyword-detector" "no-keyword"
 }
 
-@test "golden: keyword-detector/stop-continuation" {
-	_run_fixture "keyword-detector" "stop-continuation"
-}
-
-@test "golden: keyword-detector/cancel" {
-	_run_fixture "keyword-detector" "cancel"
-}
-
 @test "golden: package-plugin/dry-run" {
 	_run_fixture "package-plugin" "dry-run"
 }

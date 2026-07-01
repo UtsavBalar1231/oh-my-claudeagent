@@ -19,21 +19,6 @@ load '../test_helper'
 }
 
 # ---------------------------------------------------------------------------
-# stop-continuation slash command
-# ---------------------------------------------------------------------------
-
-@test "stop-continuation: /oh-my-claudeagent:stop-continuation activates mode and emits banner" {
-	local payload='{"command_name":"oh-my-claudeagent:stop-continuation","command_args":[],"command_source":"plugin","expansion_type":"slash_command","prompt":""}'
-	run_hook "slash-command-mode-detector.sh" "$payload"
-	assert_success
-	ctx=$(get_context)
-	assert echo "$ctx" | grep -q "STOP CONTINUATION ACTIVATED"
-	local stored_mode
-	stored_mode=$(jq -r '."stop-continuation".session_id // ""' "$CLAUDE_PROJECT_ROOT/.omca/state/active-modes.json")
-	assert [ -n "$stored_mode" ]
-}
-
-# ---------------------------------------------------------------------------
 # Non-OMCA slash command — no activation
 # ---------------------------------------------------------------------------
 
