@@ -316,20 +316,29 @@ Configure the Claude Code statusline to use the oh-my-claudeagent statusline pac
       ```
       ~/.claude/statusline/
         pyproject.toml              ← copied from <plugin-root>/statusline/pyproject.toml
-        statusline/                 ← copied from <plugin-root>/statusline/*.py
-          __init__.py
-          core.py
-          git.py
-          daemon.py
-          client.py
-          direct.py
+        statusline/                 ← all *.py copied from <plugin-root>/statusline/
+        servers/                    ← sibling dependency; NOT a package (no __init__.py)
+          tools/
+            __init__.py             ← copied from <plugin-root>/servers/tools/
+            _boulder_core.py        ← copied from <plugin-root>/servers/tools/
       ```
+
+      The `servers/tools/` sibling is load-bearing: `statusline/core.py` imports
+      `tools._boulder_core` (the boulder-registry resolver) by adding the sibling
+      `servers/` directory to `sys.path` at import time (`__file__/../../servers`).
+      Without it, `cc-statusline` silently falls back to the `[claude]` stub and
+      `cc-statusline-subagent` crashes with `ModuleNotFoundError: No module named
+      'tools'`. `_boulder_core.py` has zero third-party imports and is the only
+      `tools.*` reference in the statusline package, so those two files are the
+      complete closure.
 
       Commands (replace `<plugin-root>` with the path from step a):
       ```bash
-      mkdir -p ~/.claude/statusline/statusline
+      mkdir -p ~/.claude/statusline/statusline ~/.claude/statusline/servers/tools
       cp <plugin-root>/statusline/pyproject.toml ~/.claude/statusline/pyproject.toml
       cp <plugin-root>/statusline/*.py ~/.claude/statusline/statusline/
+      cp <plugin-root>/servers/tools/__init__.py <plugin-root>/servers/tools/_boulder_core.py \
+        ~/.claude/statusline/servers/tools/
       ```
 
    c. **Run `uv sync`** to create the venv and install entry points:
@@ -399,6 +408,7 @@ Configure the Claude Code statusline to use the oh-my-claudeagent statusline pac
       Statusline configured:
         ~/.claude/statusline/pyproject.toml       — package manifest
         ~/.claude/statusline/statusline/          — package files (copied from plugin)
+        ~/.claude/statusline/servers/tools/       — boulder-resolver sibling (core.py dependency)
         ~/.claude/statusline/.venv/               — uv-managed venv with entry points
         ~/.claude/settings.json                   — statusLine added (mode: daemon|direct, refreshInterval: 5)
         ~/.claude/settings.json                   — subagentStatusLine added (cc-statusline-subagent, direct mode)
@@ -409,6 +419,8 @@ Configure the Claude Code statusline to use the oh-my-claudeagent statusline pac
       Note: After plugin updates, re-copy the files and re-run uv sync to pick up changes:
         cp <plugin-root>/statusline/pyproject.toml ~/.claude/statusline/pyproject.toml
         cp <plugin-root>/statusline/*.py ~/.claude/statusline/statusline/
+        cp <plugin-root>/servers/tools/__init__.py <plugin-root>/servers/tools/_boulder_core.py \
+          ~/.claude/statusline/servers/tools/
         uv sync --project ~/.claude/statusline
       Or simply re-run /oh-my-claudeagent:omca-setup (it will skip already-configured phases).
       ```
@@ -802,6 +814,15 @@ echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | timeout 5 uv run --proje
 
 ### Check 7: Statusline Health
 - `~/.claude/statusline/.venv/bin/cc-statusline` exists: PASS/FAIL
+- `~/.claude/statusline/servers/tools/_boulder_core.py` exists: PASS/FAIL ("core.py sibling dependency missing; statusline falls back to the `[claude]` stub and subagent statusline crashes — re-run omca-setup to redeploy")
+- Render smoke test — pipe a minimal payload through the entry point and confirm the output is not the `[claude]` fallback stub:
+  ```bash
+  echo '{"model":{"display_name":"X"},"workspace":{"current_dir":"'"$HOME"'"}}' \
+    | ~/.claude/statusline/.venv/bin/cc-statusline 2>/dev/null | grep -q '\[claude\]' \
+    && echo "WARN: statusline renders fallback stub — sibling deps likely missing" \
+    || echo "PASS: statusline renders"
+  ```
+  PASS/WARN. A `[claude]` result means the package or its `servers/tools` sibling is broken; re-run omca-setup.
 - `statusLine` configured in `~/.claude/settings.json`: PASS/WARN
 - `statusLine.refreshInterval` present in `~/.claude/settings.json`: PASS/WARN ("refreshInterval missing; statusline won't poll during idle background-agent runs; re-run omca-setup to back-fill")
 - If daemon mode: check if daemon is running (`cc-statusline-daemon status`): PASS/WARN
