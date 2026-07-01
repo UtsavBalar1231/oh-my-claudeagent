@@ -98,6 +98,10 @@ repeats across sessions (e.g., a flaky CI stage, a version-pinned quirk, an env-
 **Save (feedback)**: user's fix-strategy preference after a resolved failure (pin vs upgrade vs
 rewrite) and the reason given (e.g., "we pin because the upstream API is unstable").
 
+**Save (feedback)**: a standing directive the user states mid-fix that should outlive this session
+(e.g., "never auto-upgrade major versions", "always pin after a CVE fix"). Save it so it persists
+past compaction rather than only holding for the current build.
+
 **Save (reference)**: internal CI config paths (`scripts/`, `justfile`, `.github/workflows/`) and
 build dashboards the user points you to while diagnosing a failure.
 

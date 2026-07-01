@@ -6,10 +6,12 @@
 
 load '../test_helper'
 
-# Write a synthetic boulder.json pointing to a plan file
+# Write a synthetic boulder.json pointing to a plan file. Old flat schema with a
+# plan_name so the resolver shim's in-memory migration + single-plan fallback
+# binds this session to it (test_helper's CLAUDE_SESSION_ID has no explicit binding).
 _write_boulder() {
 	local plan_path="$1"
-	write_state "boulder.json" "{\"active_plan\":\"${plan_path}\"}"
+	write_state "boulder.json" "{\"active_plan\":\"${plan_path}\",\"plan_name\":\"test-plan\"}"
 }
 
 # Write a plan file with all checkboxes complete
@@ -39,7 +41,8 @@ _write_incomplete_plan() {
 EOF
 }
 
-# Write a verification-evidence.json with a final_verification entry
+# Write a verification-evidence.json with a final_verification entry (legacy —
+# no plan_sha256 field).
 _write_final_verification_evidence() {
 	local exit_code="${1:-0}"
 	local ts
@@ -49,6 +52,24 @@ _write_final_verification_evidence() {
 		--arg ts "${ts}" \
 		--argjson ec "${exit_code}" \
 		'{"type":"final_verification","command":"executor: COMPLETE","exit_code":$ec,"output_snippet":"COMPLETE","timestamp":$ts}')
+	mkdir -p "${CLAUDE_PROJECT_ROOT}/.omca/evidence"
+	printf '%s' "{\"entries\":[${entry}]}" \
+		> "${CLAUDE_PROJECT_ROOT}/.omca/evidence/verification-evidence.json"
+}
+
+# Write a verification-evidence.json with a final_verification entry scoped to
+# a specific plan_sha256 (Task 5 evidence scoping).
+_write_final_verification_evidence_scoped() {
+	local plan_sha256="$1"
+	local exit_code="${2:-0}"
+	local ts
+	ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+	local entry
+	entry=$(jq -n \
+		--arg ts "${ts}" \
+		--argjson ec "${exit_code}" \
+		--arg sha "${plan_sha256}" \
+		'{"type":"final_verification","command":"executor: COMPLETE","exit_code":$ec,"output_snippet":"COMPLETE","timestamp":$ts,"plan_sha256":$sha}')
 	mkdir -p "${CLAUDE_PROJECT_ROOT}/.omca/evidence"
 	printf '%s' "{\"entries\":[${entry}]}" \
 		> "${CLAUDE_PROJECT_ROOT}/.omca/evidence/verification-evidence.json"
@@ -215,4 +236,62 @@ EOF
 
 	run_hook "final-verification-evidence.sh" '{}'
 	[ "$status" -eq 2 ]
+}
+
+# ---------------------------------------------------------------------------
+# (l) plan_sha256 scoping: matching entry opens the gate
+# ---------------------------------------------------------------------------
+
+@test "final-verification-evidence: matching plan_sha256 entry allows Stop (exit 0)" {
+	local plan_file="${BATS_TEST_TMPDIR}/complete-plan.md"
+	_write_complete_plan "${plan_file}"
+	_write_boulder "${plan_file}"
+	local sha
+	sha=$(sha256sum "${plan_file}" | awk '{print $1}')
+	_write_final_verification_evidence_scoped "${sha}" 0
+
+	run_hook "final-verification-evidence.sh" '{}'
+	assert_success
+}
+
+# ---------------------------------------------------------------------------
+# (m) plan_sha256 scoping: non-matching entry does not open the gate
+# ---------------------------------------------------------------------------
+
+@test "final-verification-evidence: mismatched plan_sha256 entry blocks Stop (exit 2)" {
+	local plan_file="${BATS_TEST_TMPDIR}/complete-plan.md"
+	_write_complete_plan "${plan_file}"
+	_write_boulder "${plan_file}"
+	_write_final_verification_evidence_scoped "0000000000000000000000000000000000000000000000000000000000000000" 0
+
+	run_hook "final-verification-evidence.sh" '{}'
+	[ "$status" -eq 2 ]
+}
+
+# ---------------------------------------------------------------------------
+# (n) unbound session (no boulder.json at all — empty shim result) allows Stop
+# ---------------------------------------------------------------------------
+
+@test "final-verification-evidence: unbound session (empty shim result) allows Stop (exit 0)" {
+	# No boulder.json written at all — the shim resolves to {} for this session.
+	run_hook "final-verification-evidence.sh" '{}'
+	assert_success
+}
+
+# ---------------------------------------------------------------------------
+# (o) stdin read timeout — warn, allow Stop rather than trap the session
+# ---------------------------------------------------------------------------
+
+@test "final-verification-evidence: stdin timeout warns and allows Stop (exit 0)" {
+	local plan_file="${BATS_TEST_TMPDIR}/complete-plan.md"
+	_write_complete_plan "${plan_file}"
+	_write_boulder "${plan_file}"
+	# No evidence — would normally block, but an unreadable stdin signal must
+	# not trap the session on a check that cannot be evaluated.
+
+	run env HOOK_INPUT="" HOOK_INPUT_TIMED_OUT=1 \
+		CLAUDE_PROJECT_ROOT="${CLAUDE_PROJECT_ROOT}" CLAUDE_PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT}" CLAUDE_SESSION_ID="${CLAUDE_SESSION_ID}" \
+		bash "${CLAUDE_PLUGIN_ROOT}/scripts/final-verification-evidence.sh"
+	assert_success
+	assert_output --partial "stdin read timed out"
 }

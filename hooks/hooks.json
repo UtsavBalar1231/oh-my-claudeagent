@@ -273,6 +273,14 @@
 						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/final-verification-evidence.sh"
 					}
 				]
+			},
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/drift-guard.sh"
+					}
+				]
 			}
 		],
 		"PreCompact": [

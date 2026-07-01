@@ -111,6 +111,7 @@ renderer itself.
 | `cc-statusline` | `statusline.client:main` | Main renderer — reads JSON from stdin, returns rendered output |
 | `cc-statusline-daemon` | `statusline.daemon:main` | Daemon lifecycle management |
 | `cc-statusline-direct` | `statusline.direct:main` | Inline renderer — reads JSON from stdin, no daemon interaction |
+| `cc-statusline-subagent` | `statusline.subagent:main` | Per-subagent tasks-panel renderer — see below |
 
 ### cc-statusline-daemon subcommands
 
@@ -120,6 +121,42 @@ cc-statusline-daemon --foreground  Run in foreground (for debugging)
 cc-statusline-daemon stop          Send SIGTERM to the running daemon
 cc-statusline-daemon status        Print "running" or "stopped"
 ```
+
+---
+
+## Per-subagent status line (`subagentStatusLine`)
+
+The platform's `subagentStatusLine` hook (v2.1.197+) is a separate mechanism from
+`statusLine`: it renders one row per active subagent in the tasks panel, rather than
+one line for the main session. Wire it in `~/.claude/settings.json`:
+
+```json
+"subagentStatusLine": {
+  "type": "command",
+  "command": "~/.claude/statusline/.venv/bin/cc-statusline-subagent"
+}
+```
+
+**Input** (stdin): one JSON object with a `tasks` array (each task carries `id`, `name`,
+`type`, `status`, `description`, `label`, `startTime`, `tokenCount`, `tokenSamples`, `cwd`)
+and a `columns` field.
+
+**Output** (stdout): one JSON line per task to override its row —
+`{"id": "<task id>", "content": "<row body>"}`.
+
+Each row shows the agent name (namespace prefix stripped, themed glyph reused from
+`agent_glyph`), its real model, status, and token count. The model is looked up from
+`.omca/state/subagent-models.json` (written by the SubagentStart hook, not this module):
+join on `task.id` → map key first, falling back to a `task.name`/`task.type` →
+`agent_type` match for state entries keyed differently than expected. Rows for tasks with
+no map entry render without a model rather than erroring — this renderer is PURE-READ
+against that file and must never break the tasks panel.
+
+**Main-line enrichment**: `statusLine` line 1 also shows a live count (`N agents`) of
+entries in `.omca/state/subagent-models.json` when subagents are active. The main
+session's own payload carries no `tasks` field, so the count comes from the same state
+file rather than from the statusline JSON payload. This is separate from the per-agent
+row rendering above — the orchestrator's own model slot on line 1 is unaffected.
 
 ---
 
@@ -244,6 +281,7 @@ are converted to HTTPS for the OSC 8 hyperlink in Line 1.
 | `statusline.client` | `main()` | CLI entry for `cc-statusline`; handles mode dispatch, daemon auto-start, direct fallback |
 | `statusline.daemon` | `main()`, `StatuslineDaemon`, `StatuslineHandler` | Unix socket server; CLI for `cc-statusline-daemon` |
 | `statusline.direct` | `main()` | CLI entry for `cc-statusline-direct`; inline render, no daemon |
+| `statusline.subagent` | `main()` | CLI entry for `cc-statusline-subagent`; per-subagent tasks-panel rows |
 | `statusline.git` | `get_git_info(project_dir)` | Git metadata with 5s disk cache |
 | `statusline.__init__` | `__version__` | Package version (`1.0.0`) |
 

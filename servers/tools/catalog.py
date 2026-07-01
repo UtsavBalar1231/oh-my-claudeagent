@@ -8,6 +8,7 @@ import yaml
 from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 
+from tools import _boulder_core
 from tools._common import AGENT_CATALOG_FILE, _state_dir, _write_json
 from tools.ast import discover_binary, get_sg_bin
 
@@ -106,7 +107,20 @@ def register(mcp: FastMCP) -> None:
         else:
             results.append(f"state_dir: MISSING ({state})")
         # Check key state files
-        for name in ["session.json", "boulder.json", "verification-evidence.json"]:
+        for name in ["session.json", "verification-evidence.json"]:
             path = state_path / name
             results.append(f"  {name}: {'exists' if path.exists() else 'absent'}")
+        boulder_path = state_path / "boulder.json"
+        if boulder_path.exists():
+            try:
+                plan_count = len(
+                    _boulder_core.normalize(json.loads(boulder_path.read_text()))[
+                        "plans"
+                    ]
+                )
+            except (json.JSONDecodeError, OSError):
+                plan_count = 0
+            results.append(f"  boulder.json: {plan_count} plan(s)")
+        else:
+            results.append("  boulder.json: absent")
         return "\n".join(results)

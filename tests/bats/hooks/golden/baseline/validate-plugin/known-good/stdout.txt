@@ -90,6 +90,7 @@
 [validate-plugin] FAIL: SessionStart compact (post-compact-inject.sh): expected JSON output but received empty stdout
 [validate-plugin] PASS: TaskCompleted default (task-completed-verify.sh): script succeeded with empty stdout
 [validate-plugin] PASS: Stop default (no state) (final-verification-evidence.sh): script succeeded
+[validate-plugin] PASS: Stop default (no state) (drift-guard.sh): script succeeded
 [validate-plugin] PASS: SubagentStart basic (subagent-start.sh): script succeeded with valid JSON output
 [validate-plugin] Running mcp checks
 [validate-plugin] PASS: mcp registry: valid JSON (<REPO_ROOT>/.mcp.json)
@@ -116,4 +117,4 @@
 [validate-plugin] PASS: mcp tools/list contains health_check
 [validate-plugin] PASS: mcp tools/list contains categories_list
 [validate-plugin] PASS: mcp tools/list contains file_read
-[validate-plugin] Summary: 106 passed, 1 failed, 6 skipped, 0 warned
+[validate-plugin] Summary: 107 passed, 1 failed, 6 skipped, 0 warned

@@ -1,15 +1,26 @@
 #!/bin/bash
-# final-verification-evidence.sh — blocks Stop when a completed plan lacks a final_verification evidence entry.
-# A single logged entry of type "final_verification" (exit_code=0) opens the gate permanently (idempotency anchor).
+# final-verification-evidence.sh — blocks Stop when THIS SESSION's bound plan is
+# complete but lacks a matching final_verification evidence entry (exit_code=0,
+# plan_sha256 matches the bound plan's current bytes, or a legacy entry with no
+# plan_sha256 field — backward-compat with evidence logged before scoping existed).
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
 STATE_DIR="${HOOK_STATE_DIR}"
+PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(dirname "$0")/..}"
 
 noop_exit() {
 	printf '{}\n'
 	exit 0
 }
+
+# stdin read timed out: HOOK_INPUT is empty/unreliable, so stop_hook_active and
+# plan-completeness signals below cannot be trusted. Warn and allow the Stop —
+# trapping the session on an unreadable signal is worse than an unenforced gate.
+if [[ "${HOOK_INPUT_TIMED_OUT:-0}" -eq 1 ]]; then
+	echo "[FINAL VERIFICATION] stdin read timed out — cannot evaluate plan completeness this Stop. Allowing." >&2
+	noop_exit
+fi
 
 # Kill switch for emergency rollback
 if [[ "${OMCA_HOOK_DISABLE_FINAL_VERIFY:-}" == "1" ]]; then
@@ -23,12 +34,16 @@ if [[ "${STOP_HOOK_ACTIVE}" == "true" ]]; then
 	noop_exit
 fi
 
-BOULDER_FILE="${STATE_DIR}/boulder.json"
 EVIDENCE_FILE=$(resolve_evidence_file "${STATE_DIR}")
 
-ACTIVE_PLAN=$(jq_read "${BOULDER_FILE}" '.active_plan // ""')
+# Resolve via the shared shim (never hand-parse boulder.json): binding -> sole
+# plan -> most-recent started_at, `{}` when the registry is empty or this
+# session was never bound to anything — an unbound session must never be
+# blocked on a plan it has no relationship to.
+BOULDER_RESOLVED=$(python3 "${PLUGIN_ROOT}/servers/tools/boulder_resolve.py" "$(resolve_session_id)" "${HOOK_PROJECT_ROOT}" 2>/dev/null)
+ACTIVE_PLAN=$(jq -r '.active_plan // ""' <<< "${BOULDER_RESOLVED:-{\}}" 2>/dev/null)
 
-# No active plan on record — nothing to enforce
+# No bound plan on record — nothing to enforce
 if [[ -z "${ACTIVE_PLAN}" || ! -f "${ACTIVE_PLAN}" ]]; then
 	noop_exit
 fi
@@ -55,12 +70,20 @@ if [[ -f "${EVIDENCE_FILE}" ]]; then
 	fi
 fi
 
-# Check for a final_verification evidence entry (any exit_code=0 entry opens the gate permanently)
+PLAN_SHA256=$(sha256sum "${ACTIVE_PLAN}" | awk '{print $1}')
+
+# Check for a final_verification entry that opens the gate: exit_code=0, and
+# either scoped to this exact plan (plan_sha256 matches) or a pre-scoping
+# legacy entry (no plan_sha256 field at all).
 HAS_VERDICT=false
 if [[ -f "${EVIDENCE_FILE}" ]]; then
-	HAS_VERDICT=$(jq -r '
+	HAS_VERDICT=$(jq -r --arg sha "${PLAN_SHA256}" '
 		.entries // []
-		| map(select(.type == "final_verification" and .exit_code == 0))
+		| map(select(
+			.type == "final_verification"
+			and .exit_code == 0
+			and ((.plan_sha256 // "") == "" or .plan_sha256 == $sha)
+		))
 		| length > 0
 	' "${EVIDENCE_FILE}")
 fi
@@ -69,6 +92,6 @@ if [[ "${HAS_VERDICT}" == "true" ]]; then
 	noop_exit
 fi
 
-# Plan complete, no final_verification evidence — block Stop
-echo "[FINAL VERIFICATION] Plan fully checked but no final_verification evidence found. Call evidence_log(evidence_type=\"final_verification\", command=\"<your verdict>\", exit_code=0, output_snippet=\"...\") to open the gate. Set OMCA_HOOK_DISABLE_FINAL_VERIFY=1 to bypass." >&2
+# Plan complete, no matching final_verification evidence — block Stop
+echo "[FINAL VERIFICATION] Plan '${ACTIVE_PLAN}' fully checked but no matching final_verification evidence found. Call evidence_log(evidence_type=\"final_verification\", command=\"<your verdict>\", exit_code=0, output_snippet=\"...\", plan_sha256=\"${PLAN_SHA256}\") to open the gate. Set OMCA_HOOK_DISABLE_FINAL_VERIFY=1 to bypass." >&2
 exit 2

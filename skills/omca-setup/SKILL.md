@@ -372,6 +372,14 @@ Configure the Claude Code statusline to use the oh-my-claudeagent statusline pac
         > ~/.claude/settings.json
       ```
 
+   e2. **Also configure `subagentStatusLine`** (separate platform hook, v2.1.197+) so each spawned subagent's row in the tasks panel shows its real name, model, status, and token count. Unlike `statusLine`, this has no daemon variant — it always points at the direct-mode entry point. Skip if `settings.subagentStatusLine` is already present:
+
+      ```bash
+      jq 'if .subagentStatusLine then . else . + {"subagentStatusLine": {"type": "command", "command": "~/.claude/statusline/.venv/bin/cc-statusline-subagent"}} end' \
+        ~/.claude/settings.json > /tmp/claude-settings-statusline.json \
+        && mv /tmp/claude-settings-statusline.json ~/.claude/settings.json
+      ```
+
    f. **For daemon mode only**: start the daemon, then verify it came up:
       ```bash
       ~/.claude/statusline/.venv/bin/cc-statusline-daemon start
@@ -393,6 +401,7 @@ Configure the Claude Code statusline to use the oh-my-claudeagent statusline pac
         ~/.claude/statusline/statusline/          — package files (copied from plugin)
         ~/.claude/statusline/.venv/               — uv-managed venv with entry points
         ~/.claude/settings.json                   — statusLine added (mode: daemon|direct, refreshInterval: 5)
+        ~/.claude/settings.json                   — subagentStatusLine added (cc-statusline-subagent, direct mode)
 
       For daemon mode: daemon started (auto-starts on first request if not running)
       Restart Claude Code to activate the statusline.

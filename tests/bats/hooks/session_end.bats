@@ -112,3 +112,55 @@ run_cleanup() {
 	run_cleanup "$END_PAYLOAD"
 	assert_success
 }
+
+# ─── i. authoritative binding GC ─────────────────────────────────────────────
+
+@test "session-cleanup: prunes the ending session's boulder.json binding" {
+	write_state "session.json" '{"sessionId":"sess-ending"}'
+	write_state "boulder.json" '{
+		"plans": {"my-plan": {"active_plan": "/tmp/plan.md", "session_ids": ["sess-ending"], "agent": "sisyphus"}},
+		"bindings": {"sess-ending": {"plan_name": "my-plan", "bound_at": "2026-01-01T00:00:00Z"}}
+	}'
+
+	run_cleanup "$END_PAYLOAD"
+	assert_success
+
+	local boulder_file="$CLAUDE_PROJECT_ROOT/.omca/state/boulder.json"
+	assert [ -f "$boulder_file" ]
+	run jq -e '.bindings | has("sess-ending")' "$boulder_file"
+	assert_failure
+	run jq -e '.plans["my-plan"]' "$boulder_file"
+	assert_success
+}
+
+@test "session-cleanup: leaves concurrent sessions' bindings intact" {
+	write_state "session.json" '{"sessionId":"sess-ending"}'
+	write_state "boulder.json" '{
+		"plans": {"my-plan": {"active_plan": "/tmp/plan.md", "session_ids": ["sess-ending", "sess-other"], "agent": "sisyphus"}},
+		"bindings": {
+			"sess-ending": {"plan_name": "my-plan", "bound_at": "2026-01-01T00:00:00Z"},
+			"sess-other": {"plan_name": "my-plan", "bound_at": "2026-01-01T00:00:00Z"}
+		}
+	}'
+
+	run_cleanup "$END_PAYLOAD"
+	assert_success
+
+	local boulder_file="$CLAUDE_PROJECT_ROOT/.omca/state/boulder.json"
+	run jq -e '.bindings | has("sess-other")' "$boulder_file"
+	assert_success
+}
+
+@test "session-cleanup: no-ops the binding prune when session id is unknown" {
+	write_state "boulder.json" '{
+		"plans": {"my-plan": {"active_plan": "/tmp/plan.md", "session_ids": ["sess-x"], "agent": "sisyphus"}},
+		"bindings": {"sess-x": {"plan_name": "my-plan", "bound_at": "2026-01-01T00:00:00Z"}}
+	}'
+
+	run_cleanup "$END_PAYLOAD"
+	assert_success
+
+	local boulder_file="$CLAUDE_PROJECT_ROOT/.omca/state/boulder.json"
+	run jq -e '.bindings | has("sess-x")' "$boulder_file"
+	assert_success
+}

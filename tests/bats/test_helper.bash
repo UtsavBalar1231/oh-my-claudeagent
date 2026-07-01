@@ -14,6 +14,10 @@ setup() {
 	mkdir -p "$CLAUDE_PROJECT_ROOT/.omca/state"
 	mkdir -p "$CLAUDE_PROJECT_ROOT/.omca/logs"
 	mkdir -p "$CLAUDE_PROJECT_ROOT/.omca/rules"
+	# Real repos always have a .git at their root — context-injector.sh's worktree-safe
+	# PROJECT_ROOT derivation walks up looking for one. Without this, the walk would
+	# escape the isolated fixture and hit whatever .git happens to sit above $TMPDIR.
+	mkdir -p "$CLAUDE_PROJECT_ROOT/.git"
 
 	# Plugin root = repo root = two levels up from tests/bats/
 	export CLAUDE_PLUGIN_ROOT="$(cd "$_TEST_HELPER_DIR/../.." && pwd)"

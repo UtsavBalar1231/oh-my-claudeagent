@@ -1,3 +1,4 @@
 Only in /state-after: injected-context-dirs.json
 Only in /state-after: session.json
+Only in /state-after: subagent-models.json
 Only in /state-after: worktrees

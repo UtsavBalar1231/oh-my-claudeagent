@@ -10,11 +10,20 @@ import json
 import logging
 import os
 import re
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 from statusline.config import config
 from statusline.types import GitInfo, StatuslinePayload
+
+# statusline and servers are sibling packages in the same plugin checkout;
+# reuse the boulder-registry resolver ladder instead of a third copy of it.
+_SERVERS_DIR = str(Path(__file__).resolve().parent.parent / "servers")
+if _SERVERS_DIR not in sys.path:
+    sys.path.insert(0, _SERVERS_DIR)
+
+from tools._boulder_core import resolve_bound_plan  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -274,10 +283,10 @@ def _remote_to_url(remote: str) -> str:
 # review_state glyph map (ASCII-safe fallback used for non-nerd terminals)
 _PR_STATE_GLYPH: dict[str, tuple[str, str]] = {
     # (nerd_glyph, ascii_glyph): color applied separately
-    "approved": ("", "+"),   # nf-fa-check
+    "approved": ("", "+"),  # nf-fa-check
     "changes_requested": ("", "!"),  # nf-fa-times
-    "pending": ("", "?"),    # nf-fa-clock_o
-    "draft": ("", "d"),      # nf-fa-pencil
+    "pending": ("", "?"),  # nf-fa-clock_o
+    "draft": ("", "d"),  # nf-fa-pencil
 }
 _PR_STATE_COLOR: dict[str, str] = {
     "approved": GREEN,
@@ -287,7 +296,9 @@ _PR_STATE_COLOR: dict[str, str] = {
 }
 
 
-def _compose_repo_pr(data: StatuslinePayload, glyphs: dict[str, str], nerd: bool) -> str:
+def _compose_repo_pr(
+    data: StatuslinePayload, glyphs: dict[str, str], nerd: bool
+) -> str:
     """Build the repo/PR segment from workspace.repo and pr fields.
 
     Returns an empty string when the fields are absent so callers can skip
@@ -369,13 +380,18 @@ def _format_tokens(n: int) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _todo_counter(project_dir: str, glyphs: dict[str, str], nerd: bool) -> str:
-    """Return a TODO counter token from the active plan, or empty string.
+def _todo_counter(
+    project_dir: str, glyphs: dict[str, str], nerd: bool, session_id: str = ""
+) -> str:
+    """Return a TODO counter token from the bound active plan, or empty string.
 
-    Reads boulder.json from <project_dir>/.omca/state/boulder.json, resolves
-    active_plan, counts numbered checkboxes, and returns a formatted token.
-    Returns "" (silently) when boulder is missing, plan is missing, total == 0,
-    or any error occurs.
+    Reads boulder.json from <project_dir>/.omca/state/boulder.json and resolves
+    the plan bound to `session_id` via the shared registry ladder (explicit
+    binding -> sole plan -> most-recently-started plan), tolerating both the
+    old flat schema and the new {plans, bindings} registry schema. Counts
+    numbered checkboxes in the resolved plan and returns a formatted token.
+    Returns "" (silently) when boulder is missing, no plan resolves, total == 0,
+    or any error occurs. PURE-READ — never writes boulder.json.
     """
     if not project_dir:
         return ""
@@ -385,7 +401,7 @@ def _todo_counter(project_dir: str, glyphs: dict[str, str], nerd: bool) -> str:
             return ""
         raw = boulder_path.read_text(encoding="utf-8")
         boulder = json.loads(raw)
-        active_plan = boulder.get("active_plan")
+        active_plan = resolve_bound_plan(boulder, session_id).get("active_plan")
         if not active_plan:
             return ""
         plan_path = Path(active_plan)
@@ -405,6 +421,26 @@ def _todo_counter(project_dir: str, glyphs: dict[str, str], nerd: bool) -> str:
     except Exception as exc:
         log.debug("todo_counter: skipped due to error: %s", exc)
         return ""
+
+
+def _active_agent_count(project_dir: str) -> int:
+    """Count live subagents from `.omca/state/subagent-models.json`.
+
+    PURE-READ, soft-fails to 0 on any error (absent file, malformed JSON,
+    non-dict payload) -- the main statusline payload carries no `tasks`
+    field, so this state file is the only signal available for a count.
+    """
+    if not project_dir:
+        return 0
+    try:
+        path = Path(project_dir) / ".omca" / "state" / "subagent-models.json"
+        if not path.exists():
+            return 0
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return len(data) if isinstance(data, dict) else 0
+    except Exception as exc:
+        log.debug("active_agent_count: skipped due to error: %s", exc)
+        return 0
 
 
 def _is_omca_default(name: str) -> bool:
@@ -456,10 +492,18 @@ def _compose_line1(
     workspace = data.get("workspace", {})
     project_dir = workspace.get("project_dir", data.get("cwd", ""))
     if project_dir:
-        todo_token = _todo_counter(project_dir, glyphs, nerd)
+        todo_token = _todo_counter(
+            project_dir, glyphs, nerd, str(data.get("session_id") or "")
+        )
         if todo_token:
             parts.append(todo_token)
             has_extra = True
+
+        agent_count = _active_agent_count(project_dir)
+        if agent_count > 0:
+            has_extra = True
+            noun = "agent" if agent_count == 1 else "agents"
+            parts.append(f"{MAGENTA}{glyphs['agent']} {agent_count} {noun}{RST}")
 
     # Session identifier (session_name or first 8 chars of session_id)
     session_name = data.get("session_name")

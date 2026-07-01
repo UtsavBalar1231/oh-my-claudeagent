@@ -86,3 +86,39 @@ run_post_compact() {
 	context=$(get_context)
 	[ -z "$context" ]
 }
+
+# ---------------------------------------------------------------------------
+# d. Round-trip: real task/decision content survives sanitization + caps, and
+#    a second SessionStart(compact) firing in the same compaction does not
+#    re-inject (the file is claimed via mv on first read).
+# ---------------------------------------------------------------------------
+
+@test "post-compact-inject: real task/decision content round-trips once, not twice" {
+	run_post_compact \
+		"# Post-Compaction Context" \
+		"" \
+		"## Remaining tasks" \
+		"- [ ] 1. Task number 1 description" \
+		"- [ ] 2. Task number 2 description" \
+		"…5 more (see boulder.json / notepad)" \
+		"" \
+		"## Decisions" \
+		"## 2026-01-05T00:00:00Z" \
+		"" \
+		"Decision number 5 content here." \
+		"…2 more (see boulder.json / notepad)"
+
+	assert_success
+	local context
+	context=$(get_context)
+	[[ "$context" == *"Task number 1 description"* ]]
+	[[ "$context" == *"Decision number 5 content here."* ]]
+	[[ "$context" == *"…5 more"* ]]
+
+	# Second firing in the same compaction: context file already claimed/removed.
+	run_hook "post-compact-inject.sh" "{}"
+	assert_success
+	local second_context
+	second_context=$(get_context)
+	[ -z "$second_context" ]
+}

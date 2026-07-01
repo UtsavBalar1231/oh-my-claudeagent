@@ -5,6 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.12.0] - 2026-07-01
+
+Adopts a set of improvements adapted from oh-my-claudecode, plus a per-subagent model indicator in
+the statusline. The headline change is a session-bound plan registry so concurrent sessions on
+different plans no longer overwrite each other.
+
+### Added
+
+- **Multi-session, multi-plan boulder (session-bound registry).** `boulder.json` now holds a
+  registry of plans plus per-session bindings, resolved through a single pure-read resolver and a
+  bash-callable shim. Concurrent sessions each track their own plan instead of clobbering one
+  shared slot. Writes are serialized with a file lock, and each session's binding is pruned when it
+  ends. Old flat state is migrated lazily on the next write.
+- **drift-guard Stop hook.** Blocks a stop when the assistant claims completion while the git diff
+  or untracked files still contain stub markers (`.only`, `TODO: implement`, unimplemented
+  `throw`). Complements the evidence gate: one proves tests were shown, the other proves stubs were
+  not left behind. Fail-open on any git error; disable with `OMCA_HOOK_DISABLE_DRIFT_GUARD`.
+- **Per-subagent model in the statusline.** When a subagent spawns, its configured model is
+  captured to disk and shown in the agent panel (`executor · Sonnet`, `oracle · Opus 4.8`). The
+  main line gains an active-agent count. The main line's own model stays the orchestrator's, which
+  is a platform limit.
+- **Compaction now preserves real content.** The pre/post-compact round-trip inlines the active
+  plan's remaining tasks and recent decisions instead of a pointer.
+
+### Changed
+
+- **context-injector hardening.** Rule injections are de-duplicated per session (content-hash plus
+  realpath), and the project root is derived worktree-safely from the accessed file so worktree
+  files no longer pull in parent-repo rules.
+- **stdin-read timeout.** The shared hook reader now times out instead of hanging forever if the
+  parent never closes stdin; blocking hooks warn or fail closed rather than silently pass on a
+  timeout.
+- **Standing user directives** are recorded in Claude-native project memory (guidance only, no new
+  store), so they persist and survive compaction natively.
+
+### Upgrade note
+
+`boulder.json` migrates from the old flat schema on the next write. Finish in-flight sessions
+around the upgrade: a session still running the previous version writes the old schema and can
+overwrite a registry written by a concurrently-updated session.
+
 ## [2.11.0] - 2026-07-01
 
 Syncs OMCA with Claude Code v2.1.197 and moves the agent roster to the current Claude model

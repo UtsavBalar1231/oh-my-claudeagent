@@ -57,3 +57,15 @@ _write_fresh_evidence() {
 	run_hook "task-completed-verify.sh" "$TASK_VERIFY"
 	[ "$status" -eq 2 ]
 }
+
+# ─── f. stdin read timeout — fail closed, warn (never silently allow) ────────
+
+@test "stdin timeout: exits 2 (block) and warns, never silently allows" {
+	# Timeout means task_description/teammate_name parse as empty, which would
+	# otherwise silently skip the evidence requirement — must fail closed instead.
+	run env HOOK_INPUT="" HOOK_INPUT_TIMED_OUT=1 \
+		CLAUDE_PROJECT_ROOT="${CLAUDE_PROJECT_ROOT}" CLAUDE_PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT}" CLAUDE_SESSION_ID="${CLAUDE_SESSION_ID}" \
+		bash "${CLAUDE_PLUGIN_ROOT}/scripts/task-completed-verify.sh"
+	[ "$status" -eq 2 ]
+	assert_output --partial "stdin read timed out"
+}

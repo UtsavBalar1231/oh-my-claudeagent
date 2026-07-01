@@ -261,3 +261,117 @@ _payload() {
 	rule_body=$(echo "$ctx" | grep -o 'x\+')
 	assert [ "${#rule_body}" -le 1000 ]
 }
+
+# ---------------------------------------------------------------------------
+# k. Rule dedup: content-hash + realpath keyed, per session
+# ---------------------------------------------------------------------------
+
+@test "rule dedup: second Read of the same file does NOT re-inject an already-injected rule" {
+	printf '# pattern: *.py\nDedup rule content.' \
+		> "$CLAUDE_PROJECT_ROOT/.omca/rules/dedup.md"
+	touch "$CLAUDE_PROJECT_ROOT/main.py"
+
+	run_hook "context-injector.sh" "$(_payload Read "$CLAUDE_PROJECT_ROOT/main.py")"
+	assert_success
+	ctx=$(get_context)
+	[[ "$ctx" == *"Dedup rule content"* ]]
+
+	run_hook "context-injector.sh" "$(_payload Read "$CLAUDE_PROJECT_ROOT/main.py")"
+	assert_success
+	ctx=$(get_context)
+	[[ "$ctx" != *"Dedup rule content"* ]]
+}
+
+@test "rule dedup: a rule matching a different file on second call still injects (not globally suppressed)" {
+	printf '# pattern: *.py\nShared rule content.' \
+		> "$CLAUDE_PROJECT_ROOT/.omca/rules/shared.md"
+	touch "$CLAUDE_PROJECT_ROOT/first.py"
+	touch "$CLAUDE_PROJECT_ROOT/second.py"
+
+	run_hook "context-injector.sh" "$(_payload Read "$CLAUDE_PROJECT_ROOT/first.py")"
+	assert_success
+	ctx=$(get_context)
+	[[ "$ctx" == *"Shared rule content"* ]]
+
+	# Same rule file/content, different accessed file — still deduped (key is rule-identity,
+	# not accessed-file identity), matching the "per rule per session" contract.
+	run_hook "context-injector.sh" "$(_payload Read "$CLAUDE_PROJECT_ROOT/second.py")"
+	assert_success
+	ctx=$(get_context)
+	[[ "$ctx" != *"Shared rule content"* ]]
+}
+
+@test "rule dedup: symlinked rule file resolves to same realpath and is not double-injected" {
+	printf '# pattern: *.py\nSymlink rule content.' \
+		> "$CLAUDE_PROJECT_ROOT/.omca/rules/real-rule.md"
+	ln -s "$CLAUDE_PROJECT_ROOT/.omca/rules/real-rule.md" "$CLAUDE_PROJECT_ROOT/.omca/rules/alias-rule.md"
+	touch "$CLAUDE_PROJECT_ROOT/main.py"
+
+	# First call: glob picks up both real-rule.md and alias-rule.md (symlink), same realpath+hash
+	# → injected once, not twice.
+	run_hook "context-injector.sh" "$(_payload Read "$CLAUDE_PROJECT_ROOT/main.py")"
+	assert_success
+	ctx=$(get_context)
+	local occurrences
+	occurrences=$(echo "$ctx" | grep -o "Symlink rule content" | wc -l)
+	assert [ "$occurrences" -eq 1 ]
+}
+
+@test "rule dedup: cache records a rule: prefixed key in injected-context-dirs.json" {
+	printf '# pattern: *.py\nCache key rule content.' \
+		> "$CLAUDE_PROJECT_ROOT/.omca/rules/cachekey.md"
+	touch "$CLAUDE_PROJECT_ROOT/main.py"
+
+	run_hook "context-injector.sh" "$(_payload Read "$CLAUDE_PROJECT_ROOT/main.py")"
+	assert_success
+
+	local cache="$CLAUDE_PROJECT_ROOT/.omca/state/injected-context-dirs.json"
+	assert [ -f "$cache" ]
+	local recorded
+	recorded=$(jq -r 'to_entries[] | select(.key | startswith("rule:")) | .value' "$cache")
+	assert [ "$recorded" = "true" ]
+}
+
+# ---------------------------------------------------------------------------
+# l. Worktree-safe PROJECT_ROOT derivation
+# ---------------------------------------------------------------------------
+
+@test "worktree root: AGENTS.md walk terminates at the linked worktree's .git file, not the parent dir" {
+	# Simulate a linked worktree: .git is a FILE (gitdir pointer), not a directory.
+	local worktree_dir="$BATS_TEST_TMPDIR/worktree"
+	mkdir -p "$worktree_dir/subdir"
+	echo "gitdir: /some/main/repo/.git/worktrees/wt" > "$worktree_dir/.git"
+	echo "# Worktree Agents" > "$worktree_dir/AGENTS.md"
+
+	# A parent-level AGENTS.md that must NOT be walked into once the worktree boundary is hit.
+	echo "# Parent Secret Agents" > "$BATS_TEST_TMPDIR/AGENTS.md"
+
+	touch "$worktree_dir/subdir/file.txt"
+
+	run_hook "context-injector.sh" "$(_payload Read "$worktree_dir/subdir/file.txt")"
+	assert_success
+	ctx=$(get_context)
+	[[ "$ctx" == *"Worktree Agents"* ]]
+	[[ "$ctx" != *"Parent Secret Agents"* ]]
+}
+
+@test "worktree root: .omca/rules scan uses the worktree root, not CLAUDE_PROJECT_ROOT" {
+	local worktree_dir="$BATS_TEST_TMPDIR/worktree2"
+	mkdir -p "$worktree_dir/.omca/rules"
+	echo "gitdir: /some/main/repo/.git/worktrees/wt2" > "$worktree_dir/.git"
+	printf '# pattern: *.py\nWorktree-local rule content.' \
+		> "$worktree_dir/.omca/rules/local.md"
+
+	# A same-pattern rule under the (unrelated) CLAUDE_PROJECT_ROOT must NOT fire, proving the
+	# rules scan followed the worktree root rather than falling back to CLAUDE_PROJECT_ROOT.
+	printf '# pattern: *.py\nMain repo rule content.' \
+		> "$CLAUDE_PROJECT_ROOT/.omca/rules/main.md"
+
+	touch "$worktree_dir/main.py"
+
+	run_hook "context-injector.sh" "$(_payload Read "$worktree_dir/main.py")"
+	assert_success
+	ctx=$(get_context)
+	[[ "$ctx" == *"Worktree-local rule content"* ]]
+	[[ "$ctx" != *"Main repo rule content"* ]]
+}

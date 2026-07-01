@@ -5,7 +5,6 @@ _HOOK_START=$(date +%s%N 2>/dev/null || date +%s)
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
-PROJECT_ROOT="${HOOK_PROJECT_ROOT}"
 STATE_DIR="${HOOK_STATE_DIR}"
 
 read -r FILE_PATH TOOL_NAME < <(jq -r '[.tool_input.file_path // "", .tool_name // ""] | @tsv' <<< "${HOOK_INPUT}")
@@ -15,6 +14,21 @@ IS_READ_EVENT=false
 if [[ -z "${FILE_PATH}" ]] || [[ ! -f "${FILE_PATH}" ]]; then
 	exit 0
 fi
+
+# Worktree-safe root: walk up from the accessed file testing -e (not -d) ".git",
+# since a linked worktree's ".git" is a file (gitdir pointer), not a directory.
+# Caps at "/"; falls back to HOOK_PROJECT_ROOT when no repo boundary is found, so a
+# worktree file's AGENTS.md walk and .omca/rules scan never cross into the parent repo.
+PROJECT_ROOT=""
+WALK_DIR=$(dirname "${FILE_PATH}")
+while [[ "${WALK_DIR}" != "/" ]]; do
+	if [[ -e "${WALK_DIR}/.git" ]]; then
+		PROJECT_ROOT="${WALK_DIR}"
+		break
+	fi
+	WALK_DIR=$(dirname "${WALK_DIR}")
+done
+[[ -z "${PROJECT_ROOT}" ]] && PROJECT_ROOT="${HOOK_PROJECT_ROOT}"
 
 CACHE_FILE="${STATE_DIR}/injected-context-dirs.json"
 if [[ ! -f "${CACHE_FILE}" ]]; then
@@ -79,7 +93,22 @@ if [[ -d "${RULES_DIR}" ]]; then
 					RULE_TAIL=$(tail -n +2 "${RULE_FILE}")
 					# 1000 chars — rule body cap; smaller than 2000-byte doc cap (rules are denser).
 					RULE_CONTENT="${RULE_TAIL:0:1000}"
-					CONTEXT_PARTS+="[Rule: ${PATTERN}]: ${RULE_CONTENT}"$'\n'
+
+					# Dedup key: realpath (survives symlink aliasing) + content-hash of the
+					# injected body (survives edits — a changed rule re-injects). Namespaced
+					# with "rule:" to avoid colliding with the AGENTS.md/README "dir|mtime" keys
+					# sharing this same cache file.
+					RULE_REALPATH=$(realpath "${RULE_FILE}" 2>/dev/null || printf '%s' "${RULE_FILE}")
+					RULE_HASH=$(printf '%s' "${RULE_CONTENT}" | sha256sum | cut -d' ' -f1)
+					RULE_CACHE_KEY="rule:${RULE_REALPATH}:${RULE_HASH}"
+
+					RULE_ALREADY_INJECTED=$(jq -r --arg key "${RULE_CACHE_KEY}" '.[$key] // "false"' "${CACHE_FILE}" 2>/dev/null)
+					if [[ "${RULE_ALREADY_INJECTED}" == "false" ]]; then
+						CONTEXT_PARTS+="[Rule: ${PATTERN}]: ${RULE_CONTENT}"$'\n'
+
+						RULE_TMP=$(mktemp)
+						jq --arg key "${RULE_CACHE_KEY}" '.[$key] = "true"' "${CACHE_FILE}" >"${RULE_TMP}" && mv "${RULE_TMP}" "${CACHE_FILE}"
+					fi
 				fi
 			fi
 		fi

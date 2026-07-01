@@ -52,14 +52,15 @@ COMPACT_PAYLOAD='{"hook_event_name":"SessionStart","source":"compact"}'
 	grep -q "Write the minimum that solves the problem" "$style_file"
 }
 
-# ─── c3. session-init emits sessionTitle when boulder.json is active ──────────
+# ─── c3. session-init emits sessionTitle via the boulder_resolve.py shim ──────
+# CLAUDE_SESSION_ID is fixed to "bats-test-session" by test_helper.bash setup.
 
-@test "session-init: output contains sessionTitle when boulder.json names an existing plan" {
+@test "session-init: output contains sessionTitle when this session is bound to a plan" {
 	local plan_file="$CLAUDE_PROJECT_ROOT/.omca/state/active-plan.md"
 	mkdir -p "$(dirname "$plan_file")"
 	printf '# plan\n' > "$plan_file"
 	write_state "boulder.json" \
-		"{\"active_plan\":\"$plan_file\",\"plan_name\":\"my-awesome-plan\",\"session_ids\":[\"sess-001\"],\"agent\":\"sisyphus\"}"
+		"{\"plans\":{\"my-awesome-plan\":{\"active_plan\":\"$plan_file\",\"started_at\":\"2026-01-01T00:00:00Z\",\"session_ids\":[\"bats-test-session\"],\"agent\":\"sisyphus\"}},\"bindings\":{\"bats-test-session\":{\"plan_name\":\"my-awesome-plan\"}}}"
 
 	run_hook "session-init.sh" "$STARTUP_PAYLOAD"
 	assert_success
@@ -69,9 +70,9 @@ COMPACT_PAYLOAD='{"hook_event_name":"SessionStart","source":"compact"}'
 	assert [ "$title" = "OMCA: my-awesome-plan" ]
 }
 
-@test "session-init: sessionTitle ABSENT when active_plan points at a missing file (stale boulder)" {
+@test "session-init: sessionTitle ABSENT when the bound plan's active_plan file is missing (stale)" {
 	write_state "boulder.json" \
-		'{"active_plan":"/tmp/does-not-exist-omca-plan.md","plan_name":"ghost-plan","session_ids":["sess-001"],"agent":"sisyphus"}'
+		'{"plans":{"ghost-plan":{"active_plan":"/tmp/does-not-exist-omca-plan.md","started_at":"2026-01-01T00:00:00Z","session_ids":["bats-test-session"],"agent":"sisyphus"}},"bindings":{"bats-test-session":{"plan_name":"ghost-plan"}}}'
 
 	run_hook "session-init.sh" "$STARTUP_PAYLOAD"
 	assert_success
@@ -81,8 +82,8 @@ COMPACT_PAYLOAD='{"hook_event_name":"SessionStart","source":"compact"}'
 	assert [ "$title" = "" ]
 }
 
-@test "session-init: sessionTitle key ABSENT when no boulder.json" {
-	# Ensure no boulder.json exists in state dir
+@test "session-init: sessionTitle key ABSENT when no boulder.json (unbound shim)" {
+	# Ensure no boulder.json exists in state dir — shim resolves to {} for this session
 	rm -f "$CLAUDE_PROJECT_ROOT/.omca/state/boulder.json"
 
 	run_hook "session-init.sh" "$STARTUP_PAYLOAD"
@@ -93,9 +94,12 @@ COMPACT_PAYLOAD='{"hook_event_name":"SessionStart","source":"compact"}'
 	assert [ "$has_title" = "false" ]
 }
 
-@test "session-init: existing additionalContext still present when boulder.json active" {
+@test "session-init: existing additionalContext still present when this session is bound to a plan" {
+	local plan_file="$CLAUDE_PROJECT_ROOT/.omca/state/active-plan-2.md"
+	mkdir -p "$(dirname "$plan_file")"
+	printf '# plan\n' > "$plan_file"
 	write_state "boulder.json" \
-		'{"active_plan":"/tmp/plan.md","plan_name":"test-plan","session_ids":["s1"],"agent":"sisyphus"}'
+		"{\"plans\":{\"test-plan\":{\"active_plan\":\"$plan_file\",\"started_at\":\"2026-01-01T00:00:00Z\",\"session_ids\":[\"bats-test-session\"],\"agent\":\"sisyphus\"}},\"bindings\":{\"bats-test-session\":{\"plan_name\":\"test-plan\"}}}"
 
 	run_hook "session-init.sh" "$STARTUP_PAYLOAD"
 	assert_success
@@ -105,9 +109,24 @@ COMPACT_PAYLOAD='{"hook_event_name":"SessionStart","source":"compact"}'
 	[[ "$context" == *"[CURRENT DATE]"* ]]
 }
 
+# ─── c4. session-init resets subagent-models.json ─────────────────────────────
+
+@test "session-init: resets subagent-models.json to {}" {
+	write_state "subagent-models.json" '{"agent-stale":{"agent_type":"oh-my-claudeagent:executor","model":"Sonnet"}}'
+
+	run_hook "session-init.sh" "$STARTUP_PAYLOAD"
+	assert_success
+
+	local content
+	content=$(read_state "subagent-models.json")
+	assert [ "$content" = "{}" ]
+}
+
 # ─── d. pre-compact saves compaction-context.md ───────────────────────────────
 
 @test "pre-compact: creates compaction-context.md with pending tasks block" {
+	# Old flat schema, no plan bound to this session — shim resolution falls
+	# back to pointer text (the flat schema predates bindings).
 	write_state "boulder.json" \
 		'{"active_plan":"/tmp/my-plan.md","plan_name":"my-plan"}'
 
@@ -118,7 +137,7 @@ COMPACT_PAYLOAD='{"hook_event_name":"SessionStart","source":"compact"}'
 	assert [ -f "$CLAUDE_PROJECT_ROOT/.omca/state/compaction-context.md" ]
 	local ctx
 	ctx=$(cat "$CLAUDE_PROJECT_ROOT/.omca/state/compaction-context.md")
-	[[ "$ctx" == *"Pending Tasks"* ]]
+	[[ "$ctx" == *"Remaining tasks"* ]]
 }
 
 # ─── e. post-compact-inject restores saved context ────────────────────────────

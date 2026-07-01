@@ -356,6 +356,8 @@ Save memories that would change behavior in a future session. Three types matter
 
 **Reference**: when the user cites an external system (Linear board, Slack channel, Grafana dashboard) to steer routing or triage decisions. Record the pointer and its purpose.
 
+**Standing directives**: when the user states a rule meant to outlive this turn ("always run tests before claiming done", "never touch auth/* this session"), save it as feedback so it persists past compaction and auto-loads next session, not just as an in-turn instruction.
+
 Do NOT save per-task implementation details. Those are executor territory, not orchestration memory.
 Do NOT save templated status boilerplate or commit message summaries. Those are in git history.
 

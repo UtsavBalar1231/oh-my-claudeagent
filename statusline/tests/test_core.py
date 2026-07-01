@@ -17,6 +17,7 @@ from statusline.core import (
     RED,
     RST,
     YELLOW,
+    _active_agent_count,
     _compose_line1,
     _compose_line2,
     _compose_line3,
@@ -596,7 +597,7 @@ class TestGlyphPaddingContract:
             with open(plan_path, "w") as f:
                 f.write("- [x] 1. one\n- [ ] 2. two\n- [ ] 3. three\n")
             with open(os.path.join(tmpdir, ".omca", "state", "boulder.json"), "w") as f:
-                f.write(f'{{"active_plan": "{plan_path}"}}')
+                f.write(f'{{"active_plan": "{plan_path}", "plan_name": "test-plan"}}')
 
             glyphs = build_glyphs(False)  # ASCII -> "T:"
             result = _todo_counter(tmpdir, glyphs, False)
@@ -977,7 +978,7 @@ class TestTodoCounter:
         state_dir.mkdir(parents=True)
         plan_file = tmp_path / "plan.md"
         plan_file.write_text(PLAN_CONTENT_3_OF_10)
-        boulder = {"active_plan": str(plan_file)}
+        boulder = {"active_plan": str(plan_file), "plan_name": "test-plan"}
         (state_dir / "boulder.json").write_text(json.dumps(boulder))
         result = _todo_counter(str(tmp_path), self._glyphs_ascii(), False)
         assert "T: 3/10" in result
@@ -988,7 +989,7 @@ class TestTodoCounter:
         state_dir.mkdir(parents=True)
         plan_file = tmp_path / "plan.md"
         plan_file.write_text(PLAN_CONTENT_3_OF_10)
-        boulder = {"active_plan": str(plan_file)}
+        boulder = {"active_plan": str(plan_file), "plan_name": "test-plan"}
         (state_dir / "boulder.json").write_text(json.dumps(boulder))
         result = _todo_counter(str(tmp_path), self._glyphs_nerd(), True)
         # nf-fa-tasks glyph (U+F0AE) should be present
@@ -1020,7 +1021,7 @@ class TestTodoCounter:
         state_dir.mkdir(parents=True)
         plan_file = tmp_path / "plan.md"
         plan_file.write_text(PLAN_CONTENT_ALL_PENDING)
-        boulder = {"active_plan": str(plan_file)}
+        boulder = {"active_plan": str(plan_file), "plan_name": "test-plan"}
         (state_dir / "boulder.json").write_text(json.dumps(boulder))
         result = _todo_counter(str(tmp_path), self._glyphs_ascii(), False)
         assert "T: 0/2" in result
@@ -1048,7 +1049,7 @@ class TestComposeLine1TodoCounter:
         state_dir.mkdir(parents=True)
         plan_file = tmp_path / "plan.md"
         plan_file.write_text(PLAN_CONTENT_3_OF_10)
-        boulder = {"active_plan": str(plan_file)}
+        boulder = {"active_plan": str(plan_file), "plan_name": "test-plan"}
         (state_dir / "boulder.json").write_text(json.dumps(boulder))
 
         data = {
@@ -1123,3 +1124,203 @@ class TestComposeLine1TodoCounter:
         line, _ = _compose_line1(data, self._glyphs(), git_info_empty, nerd=False)
         assert isinstance(line, str)
         assert "T:" not in line
+
+
+# ---------------------------------------------------------------------------
+# _todo_counter — bound-plan registry resolution (shared corpus)
+# ---------------------------------------------------------------------------
+
+FIXTURES_DIR = (
+    pathlib.Path(__file__).parent.parent.parent
+    / "tests"
+    / "fixtures"
+    / "boulder-schemas"
+)
+
+
+class TestTodoCounterRegistryResolution:
+    """PURE-READ resolution via _boulder_core.resolve_bound_plan.
+
+    Reuses the shared boulder-schemas corpus (also consumed by the MCP
+    server's own resolver tests) to prove statusline resolves identically,
+    without ever writing boulder.json.
+    """
+
+    def _glyphs(self) -> dict:
+        return build_glyphs(False)
+
+    def test_old_flat_schema_resolves_active_plan(
+        self,
+        tmp_path: pathlib.Path,
+    ) -> None:
+        """Old flat schema (from the shared corpus) still resolves via migration."""
+        state_dir = tmp_path / ".omca" / "state"
+        state_dir.mkdir(parents=True)
+        plan_file = tmp_path / "plan.md"
+        plan_file.write_text(PLAN_CONTENT_3_OF_10)
+
+        boulder = json.loads((FIXTURES_DIR / "old-flat.json").read_text())
+        boulder["active_plan"] = str(plan_file)
+        (state_dir / "boulder.json").write_text(json.dumps(boulder))
+
+        result = _todo_counter(str(tmp_path), self._glyphs(), False)
+        assert "T: 3/10" in result
+
+    def test_new_schema_binding_hit_resolves_bound_plan(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """New registry schema: an explicit binding resolves that exact plan."""
+        state_dir = tmp_path / ".omca" / "state"
+        state_dir.mkdir(parents=True)
+        plan_a = tmp_path / "plan-a.md"
+        plan_a.write_text(PLAN_CONTENT_ALL_PENDING)
+        plan_b = tmp_path / "plan-b.md"
+        plan_b.write_text(PLAN_CONTENT_3_OF_10)
+
+        boulder = json.loads((FIXTURES_DIR / "two-plan.json").read_text())
+        boulder["plans"]["plan-a"]["active_plan"] = str(plan_a)
+        boulder["plans"]["plan-b"]["active_plan"] = str(plan_b)
+        boulder["bindings"]["sess-bound"] = {
+            "plan_name": "plan-b",
+            "bound_at": "2026-03-01T00:00:00Z",
+        }
+        (state_dir / "boulder.json").write_text(json.dumps(boulder))
+
+        result = _todo_counter(
+            str(tmp_path), self._glyphs(), False, session_id="sess-bound"
+        )
+        assert "T: 3/10" in result
+
+    def test_binding_miss_with_no_plans_returns_empty(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """Binding present but points at a plan name absent from the registry."""
+        state_dir = tmp_path / ".omca" / "state"
+        state_dir.mkdir(parents=True)
+        boulder = {
+            "plans": {},
+            "bindings": {"sess-orphan": {"plan_name": "ghost-plan"}},
+        }
+        (state_dir / "boulder.json").write_text(json.dumps(boulder))
+
+        result = _todo_counter(
+            str(tmp_path), self._glyphs(), False, session_id="sess-orphan"
+        )
+        assert result == ""
+
+    def test_corrupt_json_from_shared_corpus_returns_empty(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """Corrupt boulder.json (shared corpus fixture) never crashes."""
+        state_dir = tmp_path / ".omca" / "state"
+        state_dir.mkdir(parents=True)
+        corrupt = (FIXTURES_DIR / "corrupt.json").read_text()
+        (state_dir / "boulder.json").write_text(corrupt)
+
+        result = _todo_counter(str(tmp_path), self._glyphs(), False, session_id="sess")
+        assert result == ""
+
+    def test_half_written_json_from_shared_corpus_returns_empty(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """Truncated/half-written boulder.json never crashes."""
+        state_dir = tmp_path / ".omca" / "state"
+        state_dir.mkdir(parents=True)
+        half_written = (FIXTURES_DIR / "half-written.json").read_text()
+        (state_dir / "boulder.json").write_text(half_written)
+
+        result = _todo_counter(str(tmp_path), self._glyphs(), False, session_id="sess")
+        assert result == ""
+
+    def test_two_plan_file_falls_back_to_most_recent_without_binding(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """No session binding -> resolves the plan with the latest started_at."""
+        state_dir = tmp_path / ".omca" / "state"
+        state_dir.mkdir(parents=True)
+        plan_a = tmp_path / "plan-a.md"
+        plan_a.write_text(PLAN_CONTENT_ALL_PENDING)
+        plan_b = tmp_path / "plan-b.md"
+        plan_b.write_text(PLAN_CONTENT_3_OF_10)
+
+        boulder = json.loads((FIXTURES_DIR / "two-plan.json").read_text())
+        boulder["plans"]["plan-a"]["active_plan"] = str(plan_a)
+        boulder["plans"]["plan-b"]["active_plan"] = str(plan_b)
+        (state_dir / "boulder.json").write_text(json.dumps(boulder))
+
+        # two-plan.json fixture: plan-b has the later started_at.
+        result = _todo_counter(str(tmp_path), self._glyphs(), False)
+        assert "T: 3/10" in result
+
+
+# ---------------------------------------------------------------------------
+# _active_agent_count
+# ---------------------------------------------------------------------------
+
+
+class TestActiveAgentCount:
+    def test_no_state_file_returns_zero(self, tmp_path: pathlib.Path) -> None:
+        assert _active_agent_count(str(tmp_path)) == 0
+
+    def test_counts_entries(self, tmp_path: pathlib.Path) -> None:
+        state_dir = tmp_path / ".omca" / "state"
+        state_dir.mkdir(parents=True)
+        models = {
+            "agent-1": {"agent_type": "executor", "model": "Sonnet 5"},
+            "agent-2": {"agent_type": "oracle", "model": "Opus 4.8"},
+        }
+        (state_dir / "subagent-models.json").write_text(json.dumps(models))
+        assert _active_agent_count(str(tmp_path)) == 2
+
+    def test_malformed_json_returns_zero(self, tmp_path: pathlib.Path) -> None:
+        state_dir = tmp_path / ".omca" / "state"
+        state_dir.mkdir(parents=True)
+        (state_dir / "subagent-models.json").write_text("{not valid json!!!")
+        assert _active_agent_count(str(tmp_path)) == 0
+
+    def test_non_dict_json_returns_zero(self, tmp_path: pathlib.Path) -> None:
+        state_dir = tmp_path / ".omca" / "state"
+        state_dir.mkdir(parents=True)
+        (state_dir / "subagent-models.json").write_text("[1, 2, 3]")
+        assert _active_agent_count(str(tmp_path)) == 0
+
+    def test_empty_project_dir_returns_zero(self) -> None:
+        assert _active_agent_count("") == 0
+
+
+# ---------------------------------------------------------------------------
+# _compose_line1 — active agent count integration
+# ---------------------------------------------------------------------------
+
+
+class TestComposeLine1ActiveAgentCount:
+    def _glyphs(self) -> dict:
+        return build_glyphs(False)
+
+    def test_agent_count_appears_in_line1(
+        self, git_info_empty: dict, tmp_path: pathlib.Path
+    ) -> None:
+        state_dir = tmp_path / ".omca" / "state"
+        state_dir.mkdir(parents=True)
+        models = {"agent-1": {"agent_type": "executor", "model": "Sonnet 5"}}
+        (state_dir / "subagent-models.json").write_text(json.dumps(models))
+
+        data = {
+            "model": {"display_name": "claude"},
+            "workspace": {"project_dir": str(tmp_path)},
+        }
+        line, has_extra = _compose_line1(
+            data, self._glyphs(), git_info_empty, nerd=False
+        )
+        assert "1 agent" in line
+        assert has_extra is True
+
+    def test_no_state_file_no_agent_count(
+        self, git_info_empty: dict, tmp_path: pathlib.Path
+    ) -> None:
+        data = {
+            "model": {"display_name": "claude"},
+            "workspace": {"project_dir": str(tmp_path)},
+        }
+        line, _ = _compose_line1(data, self._glyphs(), git_info_empty, nerd=False)
+        assert "A: " not in line

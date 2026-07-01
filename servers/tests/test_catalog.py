@@ -99,3 +99,41 @@ def test_health_check_reports_ast_grep_status(tools, working_dir):
     """health_check reports ast-grep binary status (OK or NOT FOUND)."""
     result = tools["health_check"](working_directory=working_dir)
     assert "ast-grep:" in result
+
+
+def test_health_check_reports_boulder_absent(tools, working_dir):
+    """health_check reports boulder.json as absent when no state file exists."""
+    result = tools["health_check"](working_directory=working_dir)
+    assert "boulder.json: absent" in result
+
+
+def test_health_check_reports_plan_count_flat_schema(tools, working_dir, tmp_git_root):
+    """health_check reports 1 plan for the old flat single-plan schema."""
+    state_dir = tmp_git_root / ".omca" / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    (state_dir / "boulder.json").write_text(
+        json.dumps({"active_plan": "/tmp/plan.md", "plan_name": "my-plan"})
+    )
+    result = tools["health_check"](working_directory=working_dir)
+    assert "boulder.json: 1 plan(s)" in result
+
+
+def test_health_check_reports_plan_count_registry_schema(
+    tools, working_dir, tmp_git_root
+):
+    """health_check reports N plans for the registry schema with N entries."""
+    state_dir = tmp_git_root / ".omca" / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    (state_dir / "boulder.json").write_text(
+        json.dumps(
+            {
+                "plans": {
+                    "plan-a": {"active_plan": "/tmp/a.md"},
+                    "plan-b": {"active_plan": "/tmp/b.md"},
+                },
+                "bindings": {},
+            }
+        )
+    )
+    result = tools["health_check"](working_directory=working_dir)
+    assert "boulder.json: 2 plan(s)" in result

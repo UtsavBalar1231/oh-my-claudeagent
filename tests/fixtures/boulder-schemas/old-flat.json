@@ -1,0 +1,8 @@
+{
+  "active_plan": "/home/user/.claude/plans/legacy-plan.md",
+  "plan_name": "legacy-plan",
+  "started_at": "2026-01-01T00:00:00Z",
+  "session_ids": ["sess-legacy-1", "sess-legacy-2"],
+  "agent": "sisyphus",
+  "worktree_path": ""
+}

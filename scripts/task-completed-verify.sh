@@ -7,6 +7,15 @@ LOG_DIR="${HOOK_LOG_DIR}"
 
 # 2 — platform exit code blocking TaskCompleted; exit 0 allows, exit 2 blocks.
 BLOCK_EXIT_CODE=2
+
+# stdin read timed out: HOOK_INPUT is empty, so TASK_DESCRIPTION/TEAMMATE_NAME below
+# would parse as empty and silently skip the evidence requirement. Fail closed instead —
+# an unreadable signal must not be indistinguishable from "no evidence needed".
+if [[ "${HOOK_INPUT_TIMED_OUT:-0}" -eq 1 ]]; then
+	log_hook_error "stdin read timed out — failing closed" "task-completed-verify.sh"
+	echo "[TASK COMPLETED VERIFY] stdin read timed out — cannot confirm this task needs no evidence. Blocking; use evidence_log if verification was performed." >&2
+	exit "${BLOCK_EXIT_CODE}"
+fi
 # 300s (5m) — per-task evidence freshness; final-verification uses 3600s. UNDOCUMENTED.
 MAX_EVIDENCE_AGE_SECONDS=300
 

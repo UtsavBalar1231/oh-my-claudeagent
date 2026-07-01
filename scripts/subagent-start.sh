@@ -8,8 +8,46 @@ source "$(dirname "$0")/lib/common.sh"
 DATE_CONTEXT=$(LC_TIME=C date '+%A %B %d %Y' 2>/dev/null || echo "")
 
 STATE_DIR="${HOOK_STATE_DIR}"
+PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(dirname "$0")/..}"
 
 AGENT_TYPE=$(jq -r '.agent_type // "unknown"' <<< "${HOOK_INPUT}")
+AGENT_ID=$(jq -r '.agent_id // ""' <<< "${HOOK_INPUT}")
+
+# Capture the spawning agent's configured model so the statusline can show each
+# subagent's real model. Resolves only OMCA agents (agent_type prefixed
+# "oh-my-claudeagent:"); other agent_types (explore's Claude-native cousins,
+# general-purpose, etc.) store an empty model — the renderer shows none.
+if [[ -n "${AGENT_ID}" ]]; then
+	AGENT_SHORT_NAME="${AGENT_TYPE#oh-my-claudeagent:}"
+	AGENT_FRONTMATTER_FILE="${PLUGIN_ROOT}/agents/${AGENT_SHORT_NAME}.md"
+	RAW_MODEL=""
+	if [[ -f "${AGENT_FRONTMATTER_FILE}" ]]; then
+		RAW_MODEL=$(awk '/^---$/{n++; next} n==1 && /^model:/{print $2; exit}' "${AGENT_FRONTMATTER_FILE}")
+	fi
+	case "${RAW_MODEL}" in
+	claude-opus-4-8) DISPLAY_MODEL="Opus 4.8" ;;
+	sonnet) DISPLAY_MODEL="Sonnet" ;;
+	haiku) DISPLAY_MODEL="Haiku" ;;
+	claude-sonnet-5) DISPLAY_MODEL="Sonnet 5" ;;
+	"") DISPLAY_MODEL="" ;;
+	*) DISPLAY_MODEL="${RAW_MODEL}" ;;
+	esac
+
+	MODELS_FILE="${STATE_DIR}/subagent-models.json"
+	MODELS_BASE="{}"
+	[[ -f "${MODELS_FILE}" ]] && MODELS_BASE=$(cat "${MODELS_FILE}")
+	MODELS_TMP=$(mktemp) || log_hook_error "mktemp failed for subagent-models.json" "subagent-start.sh"
+	if [[ -n "${MODELS_TMP}" ]] && printf '%s\n' "${MODELS_BASE}" | jq \
+		--arg id "${AGENT_ID}" \
+		--arg type "${AGENT_TYPE}" \
+		--arg model "${DISPLAY_MODEL}" \
+		'.[$id] = {"agent_type": $type, "model": $model}' > "${MODELS_TMP}" 2>/dev/null; then
+		mv "${MODELS_TMP}" "${MODELS_FILE}" || log_hook_error "mv failed for subagent-models.json" "subagent-start.sh"
+	else
+		rm -f "${MODELS_TMP}"
+		log_hook_error "jq update failed for subagent-models.json agent_id=${AGENT_ID}" "subagent-start.sh"
+	fi
+fi
 
 CONTEXT_PARTS="$(section_header 'Agent Protocol')"
 case "${AGENT_TYPE}" in
@@ -32,25 +70,28 @@ fi
 
 CONTEXT_PARTS+=$'\n'"[OUTPUT MANDATE] Your text response is the ONLY output the orchestrator receives. Tool call results and intermediate reasoning are NOT forwarded. Structure your response according to your agent's defined output format. If running low on turns, stop tool calls and synthesize immediately."
 
-BOULDER_FILE="${STATE_DIR}/boulder.json"
-if [[ -f "${BOULDER_FILE}" ]]; then
-	PLAN_FILE=$(jq_read "${BOULDER_FILE}" '.active_plan // ""')
-	PLAN_NAME=$(jq_read "${BOULDER_FILE}" '.plan_name // ""')
-	# Validate plan file exists — platform may have deleted it
-	if [[ -n "${PLAN_FILE}" && ! -f "${PLAN_FILE}" ]]; then
-		log_hook_error "boulder active_plan references missing file: ${PLAN_FILE} — skipping plan injection" "subagent-start.sh"
-		PLAN_FILE=""
-	fi
-	if [[ -n "${PLAN_FILE}" || -n "${PLAN_NAME}" ]]; then
-		CONTEXT_PARTS+="$(section_header 'Plan Context')"
-	fi
-	if [[ -n "${PLAN_FILE}" ]]; then
-		CONTEXT_PARTS+=$'\n'"[ACTIVE PLAN] Refer to: ${PLAN_FILE}"
-		CONTEXT_PARTS+=$'\n'"CRITICAL: The plan file at ${PLAN_FILE} is READ-ONLY. NEVER modify the plan file directly. Use notepad_write to record issues or decisions instead."
-	fi
-	if [[ -n "${PLAN_NAME}" ]]; then
-		CONTEXT_PARTS+=$'\n'"[NOTEPAD AVAILABLE] Plan: ${PLAN_NAME}. Use notepad_write('${PLAN_NAME}', section, content) to record discoveries. Sections: learnings, issues, decisions, problems. Always APPEND — never overwrite."
-	fi
+# Resolve via the shared shim (never hand-parse boulder.json): binding -> sole
+# plan -> most-recent started_at, `{}` only when the registry is truly empty.
+# A subagent's session_id rarely matches the main session's binding key
+# (subagents get their own agent_id) — the fallback tiers serve them instead;
+# bindings mainly disambiguate concurrent MAIN sessions.
+BOULDER_RESOLVED=$(python3 "${PLUGIN_ROOT}/servers/tools/boulder_resolve.py" "$(resolve_session_id)" "${HOOK_PROJECT_ROOT}" 2>/dev/null)
+PLAN_FILE=$(jq -r '.active_plan // ""' <<< "${BOULDER_RESOLVED:-{\}}" 2>/dev/null)
+PLAN_NAME=$(jq -r '.plan_name // ""' <<< "${BOULDER_RESOLVED:-{\}}" 2>/dev/null)
+# Validate plan file exists — platform may have deleted it
+if [[ -n "${PLAN_FILE}" && ! -f "${PLAN_FILE}" ]]; then
+	log_hook_error "boulder active_plan references missing file: ${PLAN_FILE} — skipping plan injection" "subagent-start.sh"
+	PLAN_FILE=""
+fi
+if [[ -n "${PLAN_FILE}" || -n "${PLAN_NAME}" ]]; then
+	CONTEXT_PARTS+="$(section_header 'Plan Context')"
+fi
+if [[ -n "${PLAN_FILE}" ]]; then
+	CONTEXT_PARTS+=$'\n'"[ACTIVE PLAN] Refer to: ${PLAN_FILE}"
+	CONTEXT_PARTS+=$'\n'"CRITICAL: The plan file at ${PLAN_FILE} is READ-ONLY. NEVER modify the plan file directly. Use notepad_write to record issues or decisions instead."
+fi
+if [[ -n "${PLAN_NAME}" ]]; then
+	CONTEXT_PARTS+=$'\n'"[NOTEPAD AVAILABLE] Plan: ${PLAN_NAME}. Use notepad_write('${PLAN_NAME}', section, content) to record discoveries. Sections: learnings, issues, decisions, problems. Always APPEND — never overwrite."
 fi
 
 EXEC_GUIDANCE_HEADER_ADDED=0
@@ -61,6 +102,7 @@ case "${AGENT_TYPE}" in
 		EXEC_GUIDANCE_HEADER_ADDED=1
 	fi
 	CONTEXT_PARTS+=$'\n'"[VERIFICATION] After running build/test/lint commands, you MUST use the evidence_log MCP tool to record results. Do NOT manually write or cat to .omca/evidence/verification-evidence.json — the TaskCompleted hook validates schema and will reject manual writes. Example: evidence_log(evidence_type=\"test\", command=\"just test\", exit_code=0, output_snippet=\"10 passed\")"
+	CONTEXT_PARTS+=$'\n'"[PLAN SHA] When logging a final_verification entry, compute sha256 of the active plan file and pass it as evidence_log(..., plan_sha256=<sha256>) so the Stop gate scopes evidence to this plan run."
 	CONTEXT_PARTS+=$'\n'"[MINIMAL CODE] Decision ladder before writing code, in order: (1) does it need to exist? YAGNI. (2) stdlib. (3) native platform feature. (4) already-installed dependency. (5) one line. (6) only then the minimum that works. Lazy NOT negligent: validating at trust boundaries, handling errors and data loss, security, accessibility, and anything the user explicitly asked for are non-negotiable. Non-trivial logic leaves ONE runnable check: the smallest assert/test, or an evidence_log entry where OMCA's flow already covers it. Boring over clever, fewest files."
 	;;
 *) ;;

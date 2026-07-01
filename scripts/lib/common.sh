@@ -1,8 +1,16 @@
 #!/usr/bin/env bash
 if [[ -z "${HOOK_INPUT+x}" ]]; then
-	HOOK_INPUT=$(cat)
+	# 5s — generous margin over platform stdin write latency; long enough that no
+	# observed hook payload has ever needed more, short enough to bound a stuck Stop.
+	HOOK_INPUT=$(timeout 5 cat)
+	if [[ $? -eq 124 ]]; then
+		HOOK_INPUT=""
+		HOOK_INPUT_TIMED_OUT=1
+	else
+		HOOK_INPUT_TIMED_OUT=0
+	fi
 fi
-export HOOK_INPUT
+export HOOK_INPUT HOOK_INPUT_TIMED_OUT
 
 HOOK_PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$(pwd)}"
 HOOK_STATE_DIR="${HOOK_STATE_DIR:-${HOOK_PROJECT_ROOT}/.omca/state}"

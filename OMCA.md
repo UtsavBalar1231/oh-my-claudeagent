@@ -747,10 +747,12 @@ servers (`omca`, `grep`, `context7`) are approved on first install; users seeing
 
 All runtime state lives in `.omca/` (gitignored by default):
 
-- `state/boulder.json` — Active plan state: path, plan name, accumulated session IDs
+- `state/boulder.json` — Session-bound plan registry: one entry per plan under `plans[plan_name]`, one binding per session under `bindings[session_id]`
 - `evidence/verification-evidence.json` — Verification records
 - `state/active-modes.json` — Keyword detection session tracking (re-announce suppression)
 - `state/compaction-context.md` — Saved state for compaction survival
+- `state/injected-context-dirs.json` — Per-session dedup keys for AGENTS.md/README.md and `.omca/rules/*.md` context injection, reset every `SessionStart`
+- `state/subagent-models.json` — Live subagent id → resolved model name, for the statusline renderer
 - `state/notepads/{plan-name}/` — Per-plan notepad sections
 - `plans/{name}.md` — Compatibility mirror/resume surface for native plans, maintained by boulder
 - `logs/` — Session, edit, and subagent audit logs
@@ -758,11 +760,17 @@ All runtime state lives in `.omca/` (gitignored by default):
 
 ### Boulder Lifecycle
 
+`boulder.json` is a session-bound plan **registry**, not a single-plan pointer: multiple
+plans can be tracked concurrently under `plans[plan_name]`, and each session binds to
+exactly one of them via `bindings[session_id]`. See `.claude/rules/state-schemas.md` for
+the full schema and the `resolve_bound_plan` ladder.
+
 1. Prometheus creates a plan at `~/.claude/plans/{name}.md` or the active plan-mode file
-2. `boulder_write(active_plan, plan_name, session_id)` registers the plan and appends the session ID; `.omca/plans/` mirrors the plan for compatibility
-3. `/start-work` reads `boulder_progress()` to resume from the last completed task
+2. `boulder_write(active_plan, plan_name, session_id)` upserts `plans[plan_name]` (preserving `started_at`, appending `session_id` to `session_ids`) and binds this session to it; `.omca/plans/` mirrors the plan for compatibility
+3. `/start-work` reads `boulder_progress()` (resolves the calling session's bound plan when no explicit `plan_path`/`plan_name` is given) to resume from the last completed task
 4. Sisyphus/start-work checks `boulder_progress` to track which tasks remain
-5. The final-verification-evidence.sh Stop hook confirms a `final_verification` evidence entry exists when boulder shows the plan complete
+5. The final-verification-evidence.sh Stop hook resolves this session's bound plan and confirms a matching `final_verification` evidence entry exists when that plan's checkboxes show it complete
+6. `SessionEnd` (`session-cleanup.sh`) removes only the ending session's binding; a plan itself is never deleted while incomplete or still bound by another session. A 7-day age backstop in `boulder_write`'s `_gc_prune()` also prunes stale bindings and unbound, checkbox-complete plans, for sessions that never hit a clean `SessionEnd`
 
 ### Evidence Workflow
 
@@ -1038,6 +1046,56 @@ loaded.
 GitHub Flavored Markdown task-list checkboxes (`- [ ]` / `- [x]`) now render visually
 in model responses. OMCA plan files use checkbox syntax (`- [ ] N. Task`) and these now
 render in-session. No OMCA file changes required; this is a platform rendering improvement.
+
+---
+
+## OMC (oh-my-claudecode) Adoptions
+
+A sibling project, oh-my-claudecode (OMC), independently solved several problems OMCA
+also has. This sync ported five of its ideas, adapted to OMCA's bash+Python idiom rather
+than copied verbatim.
+
+**Adopted:**
+
+| Feature | Notes |
+|---------|-------|
+| Session-bound plan registry | `boulder.json` moved from a single `active_plan` pointer to `{plans: {<plan_name>: {...}}, bindings: {<session_id>: {plan_name, bound_at}}}`. Fixes the clobber where two concurrent sessions working different plans overwrote each other's state. `resolve_bound_plan()` (`servers/tools/_boulder_core.py`) is the one pure-read resolution ladder every consumer calls, via direct import in Python or the `boulder_resolve.py` shim from bash. See `.claude/rules/state-schemas.md` for the full schema |
+| drift-guard hard-block Stop hook | New `scripts/drift-guard.sh`: when the last assistant turn reads as a completion claim ("done", "fixed", "implemented", etc., unless negated) but the diff still contains a stub marker (`.only`, `TODO: implement`, an unimplemented-error throw), the Stop is blocked with the offending `file:line`. Self-clearing — fixing the stub removes the marker, so there is no separate loop-guard state file. Kill-switch: `OMCA_HOOK_DISABLE_DRIFT_GUARD` |
+| context-injector hardening | `scripts/context-injector.sh` now dedups injections by content-hash+realpath (reusing `injected-context-dirs.json`, which `session-init.sh` already resets every `SessionStart`) instead of re-injecting on every matching file access. The project-root walk for both the `.omca/rules` scan and the AGENTS.md/README terminator now resolves worktree-safely (a linked worktree's `.git` is a file, not a directory, so the walk tests `-e` not `-d`), so a worktree session no longer walks up into the parent repo |
+| stdin-read timeout | `scripts/lib/common.sh`'s shared `HOOK_INPUT=$(cat)` read now wraps in `timeout 5 cat`, discarding on exit 124 rather than hanging indefinitely if stdin is never closed. Blocking hooks (`final-verification-evidence.sh`, `drift-guard.sh`, `task-completed-verify.sh`) treat an empty-from-timeout read as fail-closed-or-warn, not a silent pass |
+| Compaction content round-trip | `pre-compact.sh` now inlines the session's next 10 unchecked plan tasks and the 5 most recent notepad decisions (tasks first, so they survive `post-compact-inject.sh`'s downstream line cap), instead of leaving compaction to rely on whatever the model happened to keep in its own summary |
+| Per-subagent statusline model | `subagent-start.sh` now records each live subagent's resolved display model (e.g. `Sonnet`, `Opus 4.8`) in `subagent-models.json`; the statusline renders it per running task instead of showing only the parent session's model |
+
+**Reframed, not ported as-is:**
+
+- **Directives via Claude-native memory, not a new store.** OMC persists standing user
+  directives ("always run tests before claiming done") in its own dedicated store. OMCA
+  already has a durable, cross-session store for exactly this: Claude-native project
+  memory. Rather than build a second directives mechanism, the relevant agents'
+  `## Memory Guidance` sections and `output-styles/omca-default.md` now name standing
+  directives as an explicit `feedback`-type memory save trigger. No new file, no new
+  re-injection path.
+- **Context-injector hardening stopped at hardening.** OMC's version also adds
+  multi-source injection (pulling context from more than `.omca/rules/*.md` and
+  AGENTS.md/README). OMCA only adopted the dedup and worktree-root fixes; multi-source
+  injection was not a problem OMCA had, so it was left out rather than adding unused
+  surface area.
+
+**Task 0 runtime findings** (probed before building on top of them; full detail in
+`.omca/notes/probe-runtime-semantics.md`):
+
+- The `Stop` hook payload carries `transcript_path`, not an inline `messages` array, so
+  drift-guard tails the transcript JSONL and reads the last `assistant`-type record's
+  `message.content`, rather than reading a message list directly off the payload.
+- When multiple `Stop` hooks are registered, the platform dispatches all of them in
+  parallel — one hook's exit code can never short-circuit a sibling's execution, and any
+  single hook exiting 2 blocks the stop regardless of what the others return. drift-guard
+  was built to be correct standing alone, with no assumption about ordering relative to
+  `final-verification-evidence.sh`.
+- `CLAUDE_CODE_SESSION_ID` is the confirmed binding key for anything running as an MCP
+  tool or agent process (live-observed in-session); bash hook scripts keep the existing
+  three-tier fallback (`CLAUDE_SESSION_ID` env, then the hook payload's `session_id`,
+  then `session.json`) since the hook-side env var was not independently confirmed.
 
 ---
 

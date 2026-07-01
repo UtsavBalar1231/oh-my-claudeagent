@@ -42,22 +42,41 @@ stripped — delegated agents inherit parent session context.
 
 ### Finding the Active Plan
 
-1. Check `boulder_progress()` — if `active_plan` points to a valid file with
-   unchecked boxes, resume that work directly (skip steps 2-3).
+`boulder.json` is a registry: several plans can be tracked concurrently
+(`plans[plan_name]`), and each session is bound to at most one of them
+(`bindings[session_id]`). Plan selection in this step is what creates or updates that
+binding.
 
-2. No active boulder (or plan fully checked) → search plan surfaces:
-   - `~/.claude/plans/*.md` (canonical native plans)
-   - `.omca/plans/*.md` (compatibility surface)
+1. Check `boulder_progress()` — it resolves this session's bound plan from the
+   registry (explicit binding → sole registered plan → most-recently-started plan).
+   If it resolves to a valid file with unchecked boxes, resume that work directly
+   (skip steps 2-3).
 
-3. Merge results, deduplicate by absolute path, label each as `[active]` or
-   `[available]`.
+2. No bound plan resolves (or the bound plan is fully checked) → build the selection
+   list from two sources:
+   - The registry's OTHER concurrently-active plans (`plans[plan_name]` entries not
+     bound to this session), each labeled `[active]` — these are plans other sessions
+     are mid-execution on. **Exclude any plan whose checkboxes are all checked** —
+     completion is derived from the plan file's `- [x]` boxes, not a stored flag, so
+     a fully-checked plan never appears in the selection list even if its registry
+     entry hasn't been garbage-collected yet.
+   - Plan files not yet in the registry, found by searching:
+     - `~/.claude/plans/*.md` (canonical native plans)
+     - `.omca/plans/*.md` (compatibility surface)
+     labeled `[available]`.
+
+3. Merge results, deduplicate by absolute path.
 
 ### Decision Logic
 
-- **Active boulder AND unchecked boxes** → append session, continue work.
-- **No active plan OR plan complete** → list available plans.
+- **This session already resolves to a bound plan with unchecked boxes** → append
+  session (re-run `boulder_write`, which is idempotent), continue work.
+- **No bound plan, or the bound plan is complete** → list available plans (per above,
+  completed plans excluded).
   - Single plan found → auto-select.
-  - Multiple plans → present list, ask user to choose.
+  - Multiple plans → present list, ask user to choose. Selecting a plan calls
+    `boulder_write`, which both upserts `plans[plan_name]` and sets
+    `bindings[session_id]` to that plan — this is what "binds" the session.
 
 ### Argument Handling
 
@@ -70,7 +89,10 @@ If `--worktree <path>` is provided:
 3. Invalid → show setup: `git worktree add <path> <branch>`.
 
 Without `--worktree`:
-1. Boulder has `worktree_path` (resume case) → use it.
+1. The resolved plan's registry entry (`plans[plan_name].worktree_path`) is set
+   (resume case) → use it. `worktree_path` is per-plan, not global — a session
+   resuming a different plan than its own last one gets that plan's worktree, not
+   whatever it used previously.
 2. Otherwise → show setup prompt, store via `boulder_write`.
 
 ### Boulder Write (BEFORE Delegating)
@@ -253,14 +275,23 @@ Output: COMPLETE or INCOMPLETE with specifics.]"
 )
 ```
 
-After the review, log the verdict:
+Before logging the verdict, compute the plan file's own hash so the Stop gate can
+scope the evidence to this exact plan run rather than any `final_verification` entry
+that happens to be lying around:
+
+```bash
+sha256sum "<absolute path to plan file>"
+```
+
+Pass the resulting hash as `plan_sha256` on the `final_verification` call:
 
 ```
 evidence_log(
   evidence_type="final_verification",
   command="executor: COMPLETE",
   exit_code=0,
-  output_snippet="COMPLETE — all requirements met"
+  output_snippet="COMPLETE — all requirements met",
+  plan_sha256="<sha256sum output>"
 )
 ```
 
@@ -290,14 +321,16 @@ evidence_log(
 )
 ```
 
-Completeness-check evidence call:
+Completeness-check evidence call (`plan_sha256` scopes the verdict to this plan's
+current bytes — see Completeness Check above):
 
 ```
 evidence_log(
   evidence_type="final_verification",
   command="executor: COMPLETE",
   exit_code=0,
-  output_snippet="COMPLETE — all N requirements met, no constraints violated"
+  output_snippet="COMPLETE — all N requirements met, no constraints violated",
+  plan_sha256="<sha256sum of the plan file>"
 )
 ```
 
