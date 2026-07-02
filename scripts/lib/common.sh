@@ -17,6 +17,9 @@ HOOK_STATE_DIR="${HOOK_STATE_DIR:-${HOOK_PROJECT_ROOT}/.omca/state}"
 HOOK_LOG_DIR="${HOOK_LOG_DIR:-${HOOK_PROJECT_ROOT}/.omca/logs}"
 HOOK_MODE_STATE_SUFFIX="-state.json"
 
+# 300s (5min): a clean window this long resets an error-counter key; prevents permanently tripped breakers.
+ERROR_COUNT_DECAY_SECONDS=300
+
 mkdir -p "${HOOK_STATE_DIR}" "${HOOK_LOG_DIR}" 2>/dev/null
 
 log_hook_error() {
@@ -29,6 +32,54 @@ log_hook_info() {
 	local msg="$1"
 	local hook_name="${2:-$(basename "$0")}"
 	echo "{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"level\":\"info\",\"hook\":\"${hook_name}\",\"message\":\"${msg}\"}" >>"${HOOK_LOG_DIR}/hook-info.jsonl" 2>/dev/null
+}
+
+# Bump the error counter for <key> in error-counts.json: increments count,
+# stamps last_failure_at, and prepends a truncated error summary to
+# last_errors (newest first, capped at 3). Resets count + last_errors when
+# the prior last_failure_at predates ERROR_COUNT_DECAY_SECONDS. Legacy bare-
+# int values are read as {count: N, no timestamp/errors} and upgraded to the
+# object shape on write. On any read/write failure the file is left
+# untouched (atomic mktemp+mv) and "1" is printed as a safe fallback count.
+# Usage: NEW_COUNT=$(error_count_bump <key> <error-summary>)
+error_count_bump() {
+	local key="$1"
+	local error_summary="$2"
+	local file="${HOOK_STATE_DIR}/error-counts.json"
+	local now
+	now=$(date +%s)
+	error_summary=$(printf '%s' "${error_summary}" | tr '\n' ' ' | cut -c1-160)
+
+	local base="{}"
+	[[ -f "${file}" ]] && base=$(cat "${file}")
+
+	local tmp
+	tmp=$(mktemp) || { log_hook_error "mktemp failed for error-counts.json" "$(basename "$0")"; echo 1; return 0; }
+
+	if printf '%s\n' "${base}" | jq \
+		--arg key "${key}" --arg err "${error_summary}" \
+		--argjson now "${now}" --argjson decay "${ERROR_COUNT_DECAY_SECONDS}" '
+		def entry_of($k):
+			(.[$k] // 0) as $v |
+			if ($v | type) == "number" then {count: $v, last_failure_at: null, last_errors: []}
+			else $v end;
+		(entry_of($key)) as $e |
+		(if ($e.last_failure_at != null) and (($now - $e.last_failure_at) > $decay)
+			then {count: 0, last_errors: []}
+			else {count: $e.count, last_errors: $e.last_errors} end) as $carried |
+		.[$key] = {
+			count: ($carried.count + 1),
+			last_failure_at: $now,
+			last_errors: ([$err] + $carried.last_errors)[0:3]
+		}
+	' >"${tmp}" 2>/dev/null; then
+		mv "${tmp}" "${file}" || log_hook_error "mv failed for error-counts.json key=${key}" "$(basename "$0")"
+		jq -r --arg key "${key}" '.[$key].count' "${file}" 2>/dev/null || echo 1
+	else
+		rm -f "${tmp}"
+		log_hook_error "jq update failed for error-counts.json key=${key}" "$(basename "$0")"
+		echo 1
+	fi
 }
 
 section_header() {
@@ -148,4 +199,45 @@ resolve_evidence_file() {
 	local root
 	root="${state_dir%/state}"
 	printf '%s\n' "${root}/evidence/verification-evidence.json"
+}
+
+# Parse plan-file checkboxes with the same semantics as the Python CHECKBOX_RE
+# (servers/tools/_boulder_core.py: `^- \[([ x])\] \d+\.`, case-insensitive on x)
+# so bash callers and boulder_progress/statusline agree on the same counts.
+# Emits four space-separated integers: unchecked checked total raw_unchecked.
+#   unchecked      — numbered `- [ ] N.` lines
+#   checked        — numbered `- [x] N.` / `- [X] N.` lines
+#   total          — unchecked + checked
+#   raw_unchecked  — any `- [ ] ` line regardless of numbering; raw_unchecked >
+#                    unchecked means malformed/unnumbered boxes are present
+# Usage: read -r unchecked checked total raw_unchecked < <(count_plan_checkboxes "$plan_file")
+count_plan_checkboxes() {
+	local plan_file="$1"
+	local unchecked checked raw_unchecked
+
+	if [[ ! -f "${plan_file}" ]]; then
+		printf '0 0 0 0\n'
+		return 0
+	fi
+
+	unchecked=$(grep -cE '^- \[ \] [0-9]+\.' "${plan_file}" || true)
+	checked=$(grep -cE '^- \[[xX]\] [0-9]+\.' "${plan_file}" || true)
+	raw_unchecked=$(grep -cE '^- \[ \] ' "${plan_file}" || true)
+
+	printf '%d %d %d %d\n' "${unchecked}" "${checked}" "$((unchecked + checked))" "${raw_unchecked}"
+}
+
+# Checks OMCA_DISABLED_HOOKS — a comma- and/or whitespace-separated list of
+# hook basenames without the .sh suffix — for <name>. Returns 0 (disabled) on
+# a match, 1 when unset/empty/no match. Unified kill switch for OMCA hooks.
+# Usage: hook_is_disabled "final-verification-evidence" && exit 0
+hook_is_disabled() {
+	local name="$1"
+	local list="${OMCA_DISABLED_HOOKS:-}"
+	[[ -z "${list}" ]] && return 1
+	local entry
+	for entry in ${list//,/ }; do
+		[[ "${entry}" == "${name}" ]] && return 0
+	done
+	return 1
 }

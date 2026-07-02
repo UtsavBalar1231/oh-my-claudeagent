@@ -14,6 +14,12 @@ noop_exit() {
 	exit 0
 }
 
+# Unified kill switch (also honors the legacy OMCA_HOOK_DISABLE_FINAL_VERIFY below)
+if hook_is_disabled "final-verification-evidence"; then
+	echo "[FINAL VERIFICATION] Disabled via OMCA_DISABLED_HOOKS — skipping check." >&2
+	noop_exit
+fi
+
 # stdin read timed out: HOOK_INPUT is empty/unreliable, so stop_hook_active and
 # plan-completeness signals below cannot be trusted. Warn and allow the Stop —
 # trapping the session on an unreadable signal is worse than an unenforced gate.
@@ -48,16 +54,15 @@ if [[ -z "${ACTIVE_PLAN}" || ! -f "${ACTIVE_PLAN}" ]]; then
 	noop_exit
 fi
 
-# Count remaining unchecked boxes; if any remain the plan is not done — allow stop
-INCOMPLETE=$(grep -cE '^- \[ \] ' "${ACTIVE_PLAN}" 2>/dev/null || true)
-INCOMPLETE="${INCOMPLETE:-0}"
+# Count remaining unchecked boxes via the shared helper (agrees with boulder_progress
+# and statusline, which both count only numbered `- [ ] N.` boxes); if any remain
+# the plan is not done — allow stop
+read -r INCOMPLETE COMPLETE _TOTAL _RAW_UNCHECKED < <(count_plan_checkboxes "${ACTIVE_PLAN}")
 if [[ "${INCOMPLETE}" -gt 0 ]]; then
 	noop_exit
 fi
 
 # Plan is fully checked. If no checkboxes at all (empty/non-task plan), allow stop
-COMPLETE=$(grep -cE '^- \[x\] ' "${ACTIVE_PLAN}" 2>/dev/null || true)
-COMPLETE="${COMPLETE:-0}"
 if [[ "${INCOMPLETE}" -eq 0 && "${COMPLETE}" -eq 0 ]]; then
 	noop_exit
 fi

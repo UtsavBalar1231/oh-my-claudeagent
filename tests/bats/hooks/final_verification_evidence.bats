@@ -295,3 +295,64 @@ EOF
 	assert_success
 	assert_output --partial "stdin read timed out"
 }
+
+# ---------------------------------------------------------------------------
+# (p) Malformed/unnumbered unchecked box does not count toward completion —
+# counting now goes through count_plan_checkboxes, agreeing with boulder_progress
+# ---------------------------------------------------------------------------
+
+@test "final-verification-evidence: numbered-complete plan with a malformed unnumbered box still allows Stop (exit 0)" {
+	local plan_file="${BATS_TEST_TMPDIR}/malformed-plan.md"
+	cat > "${plan_file}" <<'EOF'
+# My Plan
+
+- [x] 1. First task
+- [x] 2. Second task
+- [ ] Task 3: malformed, no number-dot
+EOF
+	_write_boulder "${plan_file}"
+	_write_final_verification_evidence 0
+
+	run_hook "final-verification-evidence.sh" '{}'
+	assert_success
+}
+
+# ---------------------------------------------------------------------------
+# (q) OMCA_DISABLED_HOOKS kill switch
+# ---------------------------------------------------------------------------
+
+@test "final-verification-evidence: OMCA_DISABLED_HOOKS listing this hook bypasses the gate (exit 0)" {
+	local plan_file="${BATS_TEST_TMPDIR}/complete-plan.md"
+	_write_complete_plan "${plan_file}"
+	_write_boulder "${plan_file}"
+	# No evidence — would block, but the kill switch fires first.
+
+	export OMCA_DISABLED_HOOKS="final-verification-evidence"
+	run_hook "final-verification-evidence.sh" '{}'
+	assert_success
+	unset OMCA_DISABLED_HOOKS
+}
+
+@test "final-verification-evidence: OMCA_DISABLED_HOOKS listing a different hook does not bypass the gate (exit 2)" {
+	local plan_file="${BATS_TEST_TMPDIR}/complete-plan.md"
+	_write_complete_plan "${plan_file}"
+	_write_boulder "${plan_file}"
+	# No evidence — the gate should still block.
+
+	export OMCA_DISABLED_HOOKS="other-hook"
+	run_hook "final-verification-evidence.sh" '{}'
+	[ "$status" -eq 2 ]
+	unset OMCA_DISABLED_HOOKS
+}
+
+@test "final-verification-evidence: legacy OMCA_HOOK_DISABLE_FINAL_VERIFY=1 still disables alongside OMCA_DISABLED_HOOKS" {
+	local plan_file="${BATS_TEST_TMPDIR}/complete-plan.md"
+	_write_complete_plan "${plan_file}"
+	_write_boulder "${plan_file}"
+	# No evidence — would block, but the legacy kill switch fires first.
+
+	export OMCA_HOOK_DISABLE_FINAL_VERIFY=1
+	run_hook "final-verification-evidence.sh" '{}'
+	assert_success
+	unset OMCA_HOOK_DISABLE_FINAL_VERIFY
+}

@@ -305,38 +305,66 @@ already detected in the current session.
 ## error-counts.json
 
 **Path**: `.omca/state/error-counts.json`
-**Writers**: `scripts/delegate-retry.sh` (`PostToolUseFailure Agent` hook),
-`scripts/edit-error-recovery.sh` (`PostToolUseFailure Edit` hook), other
-`*-error-recovery.sh` scripts for their respective tools
-**Readers**: `scripts/delegate-retry.sh`, `scripts/edit-error-recovery.sh` (circuit
-breaker at 3+ errors)
+**Writers**: all five `*-error-recovery.sh` / `delegate-retry.sh` scripts, via
+the shared `error_count_bump(key, error_summary)` helper in `scripts/lib/common.sh`
+(`PostToolUseFailure` hooks for Agent, Edit, Bash, Read, and the catch-all JSON
+error path). Each script bumps the counter only on branches that actually emit
+PostToolUseFailure advice, not on silent/deferred exit-0 branches.
+**Readers**: the same five scripts (circuit breaker at 3+ errors); `scripts/session-init.sh`
+(one-time legacy-key migration on session start)
 **Lifecycle**:
-1. Created on first error encounter; updated atomically per error event.
+1. Created on first error encounter; updated atomically per error event
+   (mktemp+mv) via `error_count_bump`.
 2. Key format: `"<tool_name>:<error_kind>"` where `tool_name` comes from
    `.tool_name // "Agent"` (or `// "Edit"` etc.) in the hook payload.
-3. Values are cumulative integers — NOT reset each session.
+3. Values are NOT reset each session, except for a decay window: a key's
+   `count`/`last_errors` reset to empty when the prior `last_failure_at` is
+   older than `ERROR_COUNT_DECAY_SECONDS` (300s / 5min, `common.sh`) — a clean
+   window this long means the failure streak is over, not permanently tripped.
+4. `session-init.sh` runs a one-time, shape-agnostic migration of the legacy
+   `Task:delegate_error` key into `Agent:delegate_error` on every session start
+   (idempotent — only fires when the legacy key is present).
 
 **Fields** (the schema is an open object; known keys are below):
 
 | Key | Type | Description |
 |---|---|---|
-| `"Agent:delegate_error"` | integer | Delegation failures via the Agent tool |
-| `"Edit:edit_error"` | integer | Edit tool failures |
-| `"Bash:bash_error"` | integer | Bash tool failures (from `bash-error-recovery.sh`) |
-| `"Read:read_error"` | integer | Read tool failures (from `read-error-recovery.sh`) |
-| `"<tool>:<kind>"` | integer | General pattern; any tool name and error kind |
+| `"Agent:delegate_error"` | int or object | Delegation failures via the Agent tool |
+| `"Edit:edit_error"` | int or object | Edit tool failures |
+| `"Bash:bash_error"` | int or object | Bash tool failures (from `bash-error-recovery.sh`) |
+| `"Read:read_error"` | int or object | Read tool failures (from `read-error-recovery.sh`) |
+| `"<tool>:json_error"` | int or object | JSON/tool-output parse failures (from `json-error-recovery.sh`) |
+| `"<tool>:<kind>"` | int or object | General pattern; any tool name and error kind |
+
+Each value is EITHER a bare integer (legacy shape, pre-`error_count_bump`) OR
+an object `{count, last_failure_at, last_errors}`:
+
+| Object field | Type | Description |
+|---|---|---|
+| `count` | integer | Cumulative failures since the last decay reset |
+| `last_failure_at` | integer (epoch seconds) | Timestamp of the most recent bump |
+| `last_errors` | array of string | Most recent error summaries, newest first, capped at 3, each truncated to 160 chars with newlines stripped |
+
+`error_count_bump` upgrades a bare-int legacy value to the object shape
+in-memory on read (`{count: N, last_failure_at: null, last_errors: []}`); it is
+never persisted back to disk in the bare-int shape once bumped.
 
 **Example**:
 ```json
 {
-  "Agent:delegate_error": 2,
+  "Agent:delegate_error": {
+    "count": 2,
+    "last_failure_at": 1746878400,
+    "last_errors": ["MCP server 'plugin:...' not connected", "timeout after 30s"]
+  },
   "Edit:edit_error": 1
 }
 ```
 
-**Circuit breaker**: once any key reaches ≥ 3, the corresponding recovery script
-appends a hard-stop instruction to the context: "Stop retrying the same approach.
-Escalate to oracle."
+**Circuit breaker**: once any key's count reaches ≥ 3, the corresponding
+recovery script appends a hard-stop instruction plus an "Attempts: 1) <err> 2)
+<err> 3) <err>" timeline (built from `last_errors // [] | reverse`, oldest
+first) to the context: "Stop retrying the same approach. Escalate to oracle."
 
 ---
 
@@ -385,6 +413,130 @@ file, so `model` is stored as `""` and the renderer shows no model.
     "agent_type": "oh-my-claudeagent:sisyphus",
     "model": "Opus 4.8"
   }
+}
+```
+
+---
+
+## plan-continuation.json
+
+**Path**: `.omca/state/plan-continuation.json`
+**Writers**: `scripts/plan-continuation-guard.sh` (`Stop` hook)
+**Readers**: `scripts/plan-continuation-guard.sh` (own counters, read back on
+the next Stop event)
+**Lifecycle**:
+1. Read (via `jq_read`, which returns the field's `//` default on a missing
+   file) at the start of every Stop event once the guard's earlier rails (kill
+   switch, no bound plan, no unchecked boxes, user-pause, compaction, stale
+   binding, assistant-question) have all passed.
+2. Written only when the guard is about to block (`exit 2`) or about to
+   persist a stagnation escape — never on a rail that exits before the
+   counter section.
+3. Reset (deleted) by `scripts/session-init.sh` on every `SessionStart` —
+   counters are session-scoped; a new session gets a clean cooldown/hard-cap
+   state regardless of the prior session's history.
+
+**Fields**:
+
+| Field | Type | Description |
+|---|---|---|
+| `consecutive_blocks` | integer | Consecutive Stop events this guard has blocked without an intervening clean window |
+| `last_block_at` | integer (epoch seconds) | Timestamp of the most recent block, used for both the exponential cooldown and the hard-cap clean-window reset |
+| `last_unchecked_count` | integer | The plan's unchecked-checkbox count as of the last block, compared against the current count to detect stagnation |
+| `same_count_run` | integer | Consecutive blocks where `last_unchecked_count` did not change — a run length, not a boolean, so the guard can tell "matched once" from "matched `STAGNATION_STREAK` times in a row" |
+| `stagnated` | boolean | Once `true`, the guard exits open (no more blocks) for the rest of the session — set when `same_count_run` reaches `STAGNATION_STREAK` (3) |
+
+**Example**:
+```json
+{
+  "consecutive_blocks": 2,
+  "last_block_at": 1746878400,
+  "last_unchecked_count": 4,
+  "same_count_run": 1,
+  "stagnated": false
+}
+```
+
+**Backoff mechanics**: cooldown is `BASE_COOLDOWN_SECONDS * 2^consecutive_blocks`
+(5s, 10s, 20s, 40s, 80s); once `consecutive_blocks` reaches `HARD_CAP_BLOCKS` (5)
+the guard stops blocking entirely until `CLEAN_WINDOW_SECONDS` (300s) pass
+since `last_block_at`, at which point `consecutive_blocks` resets to 0.
+
+---
+
+## tool-loop-window.json
+
+**Path**: `.omca/state/tool-loop-window.json`
+**Writers**: `scripts/tool-loop-detector.sh` (`PostToolUse Bash|Edit|Read|Grep|Glob` hook)
+**Readers**: `scripts/tool-loop-detector.sh` (own signature/count, read back on
+the next matching tool call)
+**Lifecycle**:
+1. Written on every matching `PostToolUse` call — this is a sliding one-slot
+   window, not a session-wide log, so it is overwritten (not appended) each call.
+2. Not explicitly reset by `scripts/session-init.sh`; deleted at `SessionStart`
+   alongside the other two new state files for consistency (a stale signature
+   from a prior session would otherwise let a false "3rd repeat" fire on the
+   first call of a new session).
+
+**Fields**:
+
+| Field | Type | Description |
+|---|---|---|
+| `signature` | string | First 16 hex chars of `sha256(canonicalized {tool_name, tool_input})` — `jq -cS` sorts object keys so key-order differences never desync the signature |
+| `count` | integer | Consecutive calls sharing this exact signature; resets to 1 on any signature change |
+
+**Example**:
+```json
+{
+  "signature": "a1b2c3d4e5f6a7b8",
+  "count": 2
+}
+```
+
+**Fire condition**: when `count` reaches `LOOP_FIRE_COUNT` (3), the hook emits
+a `PostToolUse` `additionalContext` nudge exactly once for that streak (not on
+every call after the 3rd) — the counter keeps incrementing past 3 but the
+emit is gated on `count == 3` specifically.
+
+---
+
+## delegation-counter.json
+
+**Path**: `.omca/state/delegation-counter.json`
+**Writers**: `scripts/delegation-reminder.sh` (`PostToolUse Edit|Write|Bash` and
+`PostToolUse Agent` hooks — both matchers point at the same script; behavior
+branches on `.tool_name`)
+**Readers**: `scripts/delegation-reminder.sh` (own counters, read back on the
+next direct work-tool call)
+**Lifecycle**:
+1. Only evaluated for main-session calls — the script exits 0 immediately when
+   `.subagent_type` is present in the payload (a subagent's own tool calls
+   never count toward or reset this counter).
+2. Incremented on each direct `Edit`/`Write`/`Bash` call while `silenced` is
+   `false`; reset to `{direct_calls: 0, silenced: true}` whenever an `Agent`
+   call is observed (a delegation happened) — this also permanently silences
+   the reminder for the rest of the session, matching the header comment's
+   "fires at most once per session, not per batch" contract.
+3. Once `direct_calls` reaches 3 with no intervening delegation, the script
+   fires the one-shot reminder and sets `silenced: true`.
+4. `silenced: true` is terminal for the session: no `Agent` call or further
+   direct call ever flips it back to `false`. The next flip only happens via
+   the `SessionStart` reset below.
+5. Reset (deleted) by `scripts/session-init.sh` on every `SessionStart` —
+   the nudge is session-scoped, not a persistent judgment across sessions.
+
+**Fields**:
+
+| Field | Type | Description |
+|---|---|---|
+| `direct_calls` | integer | Consecutive direct work-tool calls (Edit/Write/Bash) since session start, while `silenced` is `false` |
+| `silenced` | boolean | `true` once the one-shot reminder fires OR any `Agent` call is observed — terminal for the rest of the session (see lifecycle) |
+
+**Example**:
+```json
+{
+  "direct_calls": 3,
+  "silenced": true
 }
 ```
 
