@@ -16,6 +16,7 @@ from statusline.git import (
     _write_cache,
     resolve_git_dir,
 )
+from statusline.types import GitInfo
 
 # ---------------------------------------------------------------------------
 # _parse_porcelain_v2
@@ -73,7 +74,9 @@ class TestParsePorcelainV2:
         assert untracked == 1
 
     def test_unmerged_entry(self) -> None:
-        output = "# branch.head main\nu UU N... 100644 100644 100644 100644 a b c file.txt\n"
+        output = (
+            "# branch.head main\nu UU N... 100644 100644 100644 100644 a b c file.txt\n"
+        )
         _, _staged, modified, _untracked = _parse_porcelain_v2(output)
         assert modified == 1
 
@@ -186,7 +189,7 @@ class TestGetGitInfoStaleCacheFallback:
         project_dir = str(tmp_path)
 
         # Pre-populate a stale cache entry
-        stale_data = {
+        stale_data: GitInfo = {
             "is_git": "1",
             "git_dir": "/stale/path/.git",
             "branch": "stale-branch",
@@ -212,8 +215,8 @@ class TestGetGitInfoStaleCacheFallback:
         result = _get_git_info(project_dir)
 
         # Should get stale branch back, not {"is_git": "0"}
-        assert result["branch"] == "stale-branch"
-        assert result["is_git"] == "1"
+        assert result.get("branch") == "stale-branch"
+        assert result.get("is_git") == "1"
 
     def test_returns_is_git_zero_when_no_cache_and_fetch_fails(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -234,7 +237,7 @@ class TestGetGitInfoStaleCacheFallback:
     ) -> None:
         """When cache is within TTL, fetch is not called."""
         project_dir = str(tmp_path)
-        fresh_data = {
+        fresh_data: GitInfo = {
             "is_git": "1",
             "branch": "cached-branch",
             "staged": "0",
@@ -256,5 +259,5 @@ class TestGetGitInfoStaleCacheFallback:
         monkeypatch.setattr("statusline.git._fetch_git_info", spy_fetch)
 
         result = _get_git_info(project_dir)
-        assert result["branch"] == "cached-branch"
+        assert result.get("branch") == "cached-branch"
         assert not fetch_called, "fetch should not be called when cache is fresh"

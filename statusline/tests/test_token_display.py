@@ -1,8 +1,9 @@
 """Regression test: token-count + api-duration reads use nested paths per v2.1.132 schema."""
+
 from __future__ import annotations
 
 from statusline.core import _compose_line2
-
+from statusline.types import StatuslinePayload
 
 # Minimal glyph set used by the function; values are display-only so any
 # placeholder strings work for the assertion checks.
@@ -14,7 +15,7 @@ GLYPHS = {
 }
 
 
-def _payload_with_context_window() -> dict:
+def _payload_with_context_window() -> StatuslinePayload:
     return {
         "model": {"display_name": "Opus", "id": "claude-opus-4-7"},
         "session_id": "test-session",
@@ -53,7 +54,7 @@ def test_api_duration_reads_from_cost() -> None:
 
 
 def test_token_segment_absent_when_context_window_missing() -> None:
-    payload = {
+    payload: StatuslinePayload = {
         "model": {"display_name": "Opus", "id": "claude-opus-4-7"},
         "session_id": "test-session",
         "cost": {"total_cost_usd": 0.0, "total_duration_ms": 0},
@@ -61,7 +62,9 @@ def test_token_segment_absent_when_context_window_missing() -> None:
     line = _compose_line2(payload, GLYPHS)
     # No context_window means no token segment; `cost.total_cost_usd: 0.0`
     # produces the "$0.00" segment but ` tok` should not appear.
-    assert " tok" not in line, f"Line 2 unexpectedly rendered tok with no context_window: {line!r}"
+    assert " tok" not in line, (
+        f"Line 2 unexpectedly rendered tok with no context_window: {line!r}"
+    )
 
 
 def test_token_segment_absent_when_zero_tokens() -> None:
@@ -71,7 +74,7 @@ def test_token_segment_absent_when_zero_tokens() -> None:
     the first API response. Rendering "0 tok" in that state is noise; the
     v2.2.0 fix tightens the render condition to require a positive sum.
     """
-    payload = {
+    payload: StatuslinePayload = {
         "model": {"display_name": "Opus", "id": "claude-opus-4-7"},
         "session_id": "test-session",
         "context_window": {

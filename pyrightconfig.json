@@ -1,0 +1,15 @@
+{
+  "include": ["statusline", "servers"],
+  "exclude": [
+    "**/.venv",
+    "**/__pycache__",
+    "**/node_modules",
+    ".claude/worktrees"
+  ],
+  "pythonVersion": "3.13",
+  "executionEnvironments": [
+    { "root": "statusline", "extraPaths": [".", "servers"] },
+    { "root": "servers", "extraPaths": ["."] }
+  ],
+  "typeCheckingMode": "basic"
+}

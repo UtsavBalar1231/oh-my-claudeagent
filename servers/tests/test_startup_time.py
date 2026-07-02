@@ -57,13 +57,16 @@ def _one_run(
         stderr=subprocess.DEVNULL,
     )
     assert proc.stdin is not None
+    assert proc.stdout is not None
     proc.stdin.write(HANDSHAKE_BYTES)
     proc.stdin.flush()
     deadline = t0 + deadline_seconds
     buf = b""
     while time.monotonic() < deadline:
         chunk = (
-            proc.stdout.read1(65536)
+            # hasattr guards this at runtime for non-buffered stdout; pyright
+            # can't narrow across the hasattr check statically.
+            proc.stdout.read1(65536)  # pyright: ignore[reportAttributeAccessIssue]
             if hasattr(proc.stdout, "read1")
             else proc.stdout.read(65536)
         )

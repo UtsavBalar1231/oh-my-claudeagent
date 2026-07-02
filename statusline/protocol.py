@@ -1,5 +1,4 @@
-"""Shared protocol constants and path helpers for the statusline daemon/client.
-"""
+"""Shared protocol constants and path helpers for the statusline daemon/client."""
 
 from __future__ import annotations
 

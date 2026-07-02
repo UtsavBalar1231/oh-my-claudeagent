@@ -34,6 +34,7 @@ from statusline.core import (
     detect_nerd_font,
     render,
 )
+from statusline.types import GitInfo, StatuslinePayload
 
 # ---------------------------------------------------------------------------
 # detect_nerd_font
@@ -288,7 +289,7 @@ class TestExtractRateLimits:
         assert _extract_rate_limits({"rate_limits": {}}) is None
 
     def test_both_windows(self) -> None:
-        data = {
+        data: StatuslinePayload = {
             "rate_limits": {
                 "five_hour": {"used_percentage": 45.0, "resets_at": 1000},
                 "seven_day": {"used_percentage": 80.0, "resets_at": 2000},
@@ -302,7 +303,7 @@ class TestExtractRateLimits:
         assert result["seven_day_resets_at"] == 2000
 
     def test_one_window_missing(self) -> None:
-        data = {
+        data: StatuslinePayload = {
             "rate_limits": {
                 "five_hour": {"used_percentage": 45.0, "resets_at": 1000},
             }
@@ -313,7 +314,7 @@ class TestExtractRateLimits:
         assert result["seven_day_pct"] is None
 
     def test_all_values_none_returns_none(self) -> None:
-        data = {
+        data: StatuslinePayload = {
             "rate_limits": {
                 "five_hour": {},
                 "seven_day": {},
@@ -332,15 +333,15 @@ class TestComposeLine1:
     def _glyphs(self) -> dict:
         return build_glyphs(False)  # ASCII for easier string checks
 
-    def test_minimal_payload(self, git_info_empty: dict) -> None:
-        data = {"model": {"display_name": "claude-3-5-sonnet"}}
+    def test_minimal_payload(self, git_info_empty: GitInfo) -> None:
+        data: StatuslinePayload = {"model": {"display_name": "claude-3-5-sonnet"}}
         glyphs = self._glyphs()
         line, has_extra = _compose_line1(data, glyphs, git_info_empty)
         assert "claude-3-5-sonnet" in line
         assert has_extra is False
 
-    def test_with_git_branch(self, git_info_active: dict) -> None:
-        data = {
+    def test_with_git_branch(self, git_info_active: GitInfo) -> None:
+        data: StatuslinePayload = {
             "model": {"display_name": "claude-opus"},
             "workspace": {"project_dir": "/home/user/myrepo"},
         }
@@ -349,8 +350,8 @@ class TestComposeLine1:
         assert "main" in line
         assert has_extra is True
 
-    def test_with_agent(self, git_info_empty: dict) -> None:
-        data = {
+    def test_with_agent(self, git_info_empty: GitInfo) -> None:
+        data: StatuslinePayload = {
             "model": {"display_name": "claude-opus"},
             "agent": {"name": "my-agent"},
         }
@@ -359,8 +360,8 @@ class TestComposeLine1:
         assert "my-agent" in line
         assert has_extra is True
 
-    def test_with_worktree(self, git_info_empty: dict) -> None:
-        data = {
+    def test_with_worktree(self, git_info_empty: GitInfo) -> None:
+        data: StatuslinePayload = {
             "model": {"display_name": "claude-opus"},
             "worktree": {
                 "name": "feature-branch",
@@ -374,8 +375,8 @@ class TestComposeLine1:
         assert "main" in line
         assert has_extra is True
 
-    def test_with_vim_mode(self, git_info_empty: dict) -> None:
-        data = {
+    def test_with_vim_mode(self, git_info_empty: GitInfo) -> None:
+        data: StatuslinePayload = {
             "model": {"display_name": "claude-opus"},
             "vim": {"mode": "normal"},
         }
@@ -385,8 +386,8 @@ class TestComposeLine1:
         assert "n" in line
         assert has_extra is True
 
-    def test_git_status_counts_shown(self, git_info_active: dict) -> None:
-        data = {
+    def test_git_status_counts_shown(self, git_info_active: GitInfo) -> None:
+        data: StatuslinePayload = {
             "model": {"display_name": "claude"},
             "workspace": {"project_dir": "/home/user/myrepo"},
         }
@@ -397,8 +398,8 @@ class TestComposeLine1:
         assert "+2" in line
         assert "?1" in line
 
-    def test_non_default_output_style(self, git_info_empty: dict) -> None:
-        data = {
+    def test_non_default_output_style(self, git_info_empty: GitInfo) -> None:
+        data: StatuslinePayload = {
             "model": {"display_name": "claude"},
             "output_style": {"name": "compact"},
         }
@@ -407,8 +408,8 @@ class TestComposeLine1:
         assert "compact" in line
         assert has_extra is True
 
-    def test_default_output_style_not_shown(self, git_info_empty: dict) -> None:
-        data = {
+    def test_default_output_style_not_shown(self, git_info_empty: GitInfo) -> None:
+        data: StatuslinePayload = {
             "model": {"display_name": "claude"},
             "output_style": {"name": "default"},
         }
@@ -416,8 +417,8 @@ class TestComposeLine1:
         line, _has_extra = _compose_line1(data, glyphs, git_info_empty)
         assert "default" not in line
 
-    def test_omca_default_bare_form_not_degraded(self, git_info_empty: dict) -> None:
-        data = {
+    def test_omca_default_bare_form_not_degraded(self, git_info_empty: GitInfo) -> None:
+        data: StatuslinePayload = {
             "model": {"display_name": "claude"},
             "output_style": {"name": "OMCA Default"},
         }
@@ -428,9 +429,9 @@ class TestComposeLine1:
         assert has_extra is True
 
     def test_omca_default_namespaced_form_not_degraded(
-        self, git_info_empty: dict
+        self, git_info_empty: GitInfo
     ) -> None:
-        data = {
+        data: StatuslinePayload = {
             "model": {"display_name": "claude"},
             "output_style": {"name": "oh-my-claudeagent:OMCA Default"},
         }
@@ -440,8 +441,8 @@ class TestComposeLine1:
         assert "OMCA Default" in line
         assert has_extra is True
 
-    def test_other_namespaced_style_is_degraded(self, git_info_empty: dict) -> None:
-        data = {
+    def test_other_namespaced_style_is_degraded(self, git_info_empty: GitInfo) -> None:
+        data: StatuslinePayload = {
             "model": {"display_name": "claude"},
             "output_style": {"name": "some-plugin:Compact"},
         }
@@ -460,7 +461,7 @@ class TestComposeLine2:
         return build_glyphs(False)
 
     def test_with_cost(self) -> None:
-        data = {
+        data: StatuslinePayload = {
             "context_window": {"context_window_size": 200000, "used_percentage": 10.0},
             "cost": {"total_cost_usd": 1.23},
         }
@@ -469,7 +470,7 @@ class TestComposeLine2:
         assert "1.23" in line
 
     def test_without_cost_shows_zero(self) -> None:
-        data = {
+        data: StatuslinePayload = {
             "context_window": {"context_window_size": 200000, "used_percentage": 10.0},
             "cost": {},
         }
@@ -478,7 +479,7 @@ class TestComposeLine2:
         assert "0.00" in line
 
     def test_duration_shown(self) -> None:
-        data = {
+        data: StatuslinePayload = {
             "context_window": {"context_window_size": 200000, "used_percentage": 10.0},
             "cost": {"total_duration_ms": 90000},
         }
@@ -487,7 +488,7 @@ class TestComposeLine2:
         assert "1m 30s" in line
 
     def test_lines_added_and_removed(self) -> None:
-        data = {
+        data: StatuslinePayload = {
             "context_window": {"context_window_size": 200000, "used_percentage": 10.0},
             "cost": {"total_lines_added": 42, "total_lines_removed": 17},
         }
@@ -497,7 +498,7 @@ class TestComposeLine2:
         assert "17" in line
 
     def test_zero_lines_not_shown(self) -> None:
-        data = {
+        data: StatuslinePayload = {
             "context_window": {"context_window_size": 200000, "used_percentage": 10.0},
             "cost": {"total_lines_added": 0, "total_lines_removed": 0},
         }
@@ -663,10 +664,10 @@ class TestGlyphPaddingContract:
 
 class TestRender:
     def test_single_line_mode(
-        self, monkeypatch: pytest.MonkeyPatch, minimal_payload: dict
+        self, monkeypatch: pytest.MonkeyPatch, minimal_payload: StatuslinePayload
     ) -> None:
         monkeypatch.setenv("CLAUDE_STATUSLINE_NERD_FONT", "0")
-        git_info = {"is_git": "0"}
+        git_info: GitInfo = {"is_git": "0"}
         result = render(minimal_payload, git_info)
         # No git, no agent, no worktree, no vim -> single line
         assert "\n" not in result
@@ -675,8 +676,8 @@ class TestRender:
     def test_two_line_mode_with_git(
         self,
         monkeypatch: pytest.MonkeyPatch,
-        minimal_payload: dict,
-        git_info_active: dict,
+        minimal_payload: StatuslinePayload,
+        git_info_active: GitInfo,
     ) -> None:
         monkeypatch.setenv("CLAUDE_STATUSLINE_NERD_FONT", "0")
         minimal_payload["workspace"] = {"project_dir": "/home/user/myrepo"}
@@ -687,8 +688,8 @@ class TestRender:
     def test_three_line_mode_with_rate_limits(
         self,
         monkeypatch: pytest.MonkeyPatch,
-        full_payload: dict,
-        git_info_active: dict,
+        full_payload: StatuslinePayload,
+        git_info_active: GitInfo,
     ) -> None:
         monkeypatch.setenv("CLAUDE_STATUSLINE_NERD_FONT", "0")
         result = render(full_payload, git_info_active)
@@ -696,29 +697,29 @@ class TestRender:
         assert len(lines) == 3
 
     def test_nerd_font_uses_glyphs(
-        self, monkeypatch: pytest.MonkeyPatch, minimal_payload: dict
+        self, monkeypatch: pytest.MonkeyPatch, minimal_payload: StatuslinePayload
     ) -> None:
         monkeypatch.setenv("CLAUDE_STATUSLINE_NERD_FONT", "1")
-        git_info = {"is_git": "0"}
+        git_info: GitInfo = {"is_git": "0"}
         result = render(minimal_payload, git_info)
         # Nerd font rocket glyph u+f135
         assert "\uf135" in result
 
     def test_ascii_mode_no_nerd_glyphs(
-        self, monkeypatch: pytest.MonkeyPatch, minimal_payload: dict
+        self, monkeypatch: pytest.MonkeyPatch, minimal_payload: StatuslinePayload
     ) -> None:
         monkeypatch.setenv("CLAUDE_STATUSLINE_NERD_FONT", "0")
-        git_info = {"is_git": "0"}
+        git_info: GitInfo = {"is_git": "0"}
         result = render(minimal_payload, git_info)
         # No nerd font rocket glyph
         assert "\uf135" not in result
 
     def test_two_line_with_agent(
-        self, monkeypatch: pytest.MonkeyPatch, minimal_payload: dict
+        self, monkeypatch: pytest.MonkeyPatch, minimal_payload: StatuslinePayload
     ) -> None:
         monkeypatch.setenv("CLAUDE_STATUSLINE_NERD_FONT", "0")
         minimal_payload["agent"] = {"name": "my-agent"}
-        git_info = {"is_git": "0"}
+        git_info: GitInfo = {"is_git": "0"}
         result = render(minimal_payload, git_info)
         lines = result.split("\n")
         assert len(lines) == 2
@@ -727,8 +728,8 @@ class TestRender:
     def test_fallback_no_model(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """render still runs with empty model; won't crash."""
         monkeypatch.setenv("CLAUDE_STATUSLINE_NERD_FONT", "0")
-        data = {"model": {}, "context_window": {}, "cost": {}}
-        git_info = {"is_git": "0"}
+        data: StatuslinePayload = {"model": {}, "context_window": {}, "cost": {}}
+        git_info: GitInfo = {"is_git": "0"}
         # Should not raise
         result = render(data, git_info)
         assert isinstance(result, str)
@@ -763,16 +764,16 @@ class TestNewFieldsLine1:
     def _glyphs(self) -> dict:
         return build_glyphs(False)
 
-    def test_session_name_shown(self, git_info_empty: dict) -> None:
-        data = {
+    def test_session_name_shown(self, git_info_empty: GitInfo) -> None:
+        data: StatuslinePayload = {
             "model": {"display_name": "claude"},
             "session_name": "my-session",
         }
         line, _ = _compose_line1(data, self._glyphs(), git_info_empty)
         assert "my-session" in line
 
-    def test_session_id_truncated(self, git_info_empty: dict) -> None:
-        data = {
+    def test_session_id_truncated(self, git_info_empty: GitInfo) -> None:
+        data: StatuslinePayload = {
             "model": {"display_name": "claude"},
             "session_id": "abcdef1234567890",
         }
@@ -782,9 +783,9 @@ class TestNewFieldsLine1:
         assert "abcdef1234567890" not in line
 
     def test_session_name_takes_precedence_over_session_id(
-        self, git_info_empty: dict
+        self, git_info_empty: GitInfo
     ) -> None:
-        data = {
+        data: StatuslinePayload = {
             "model": {"display_name": "claude"},
             "session_name": "named",
             "session_id": "fallback-id",
@@ -793,21 +794,21 @@ class TestNewFieldsLine1:
         assert "named" in line
         assert "fallback" not in line
 
-    def test_version_shown(self, git_info_empty: dict) -> None:
-        data = {
+    def test_version_shown(self, git_info_empty: GitInfo) -> None:
+        data: StatuslinePayload = {
             "model": {"display_name": "claude"},
             "version": "2.1.94",
         }
         line, _ = _compose_line1(data, self._glyphs(), git_info_empty)
         assert "v2.1.94" in line
 
-    def test_no_session_no_version_no_crash(self, git_info_empty: dict) -> None:
-        data = {"model": {"display_name": "claude"}}
+    def test_no_session_no_version_no_crash(self, git_info_empty: GitInfo) -> None:
+        data: StatuslinePayload = {"model": {"display_name": "claude"}}
         line, _ = _compose_line1(data, self._glyphs(), git_info_empty)
         assert "claude" in line
 
-    def test_transcript_path_creates_osc8_link(self, git_info_empty: dict) -> None:
-        data = {
+    def test_transcript_path_creates_osc8_link(self, git_info_empty: GitInfo) -> None:
+        data: StatuslinePayload = {
             "model": {"display_name": "claude"},
             "session_name": "my-sess",
             "transcript_path": "/tmp/session.jsonl",
@@ -826,7 +827,7 @@ class TestNewFieldsLine2:
 
     def test_token_count_only_input(self) -> None:
         # Unique: input-only path (no total_output_tokens in context_window)
-        data = {
+        data: StatuslinePayload = {
             "context_window": {
                 "context_window_size": 200000,
                 "used_percentage": 10.0,
@@ -838,7 +839,7 @@ class TestNewFieldsLine2:
         assert "5.0k" in line
 
     def test_token_count_absent_when_not_in_payload(self) -> None:
-        data = {
+        data: StatuslinePayload = {
             "context_window": {"context_window_size": 200000, "used_percentage": 10.0},
             "cost": {},
         }
@@ -847,7 +848,7 @@ class TestNewFieldsLine2:
 
     def test_api_duration_shown(self) -> None:
         # Unique: verifies specific seconds formatting (test_token_display only checks "api " presence)
-        data = {
+        data: StatuslinePayload = {
             "context_window": {"context_window_size": 200000, "used_percentage": 10.0},
             "cost": {"total_api_duration_ms": 23456},
         }
@@ -855,7 +856,7 @@ class TestNewFieldsLine2:
         assert "api 23s" in line
 
     def test_api_duration_absent_when_not_in_payload(self) -> None:
-        data = {
+        data: StatuslinePayload = {
             "context_window": {"context_window_size": 200000, "used_percentage": 10.0},
             "cost": {},
         }
@@ -1137,7 +1138,7 @@ class TestComposeLine1TodoCounter:
         return build_glyphs(False)
 
     def test_todo_counter_appears_in_line1(
-        self, git_info_empty: dict, tmp_path: pathlib.Path
+        self, git_info_empty: GitInfo, tmp_path: pathlib.Path
     ) -> None:
         """When boulder + plan exist with numbered tasks, T:<done>/<total> appears."""
         state_dir = tmp_path / ".omca" / "state"
@@ -1147,7 +1148,7 @@ class TestComposeLine1TodoCounter:
         boulder = _bound_boulder(plan_file)
         (state_dir / "boulder.json").write_text(json.dumps(boulder))
 
-        data = {
+        data: StatuslinePayload = {
             "model": {"display_name": "claude"},
             "workspace": {"project_dir": str(tmp_path)},
             "session_id": TEST_SESSION,
@@ -1159,10 +1160,10 @@ class TestComposeLine1TodoCounter:
         assert has_extra is True
 
     def test_no_boulder_no_todo_token(
-        self, git_info_empty: dict, tmp_path: pathlib.Path
+        self, git_info_empty: GitInfo, tmp_path: pathlib.Path
     ) -> None:
         """No boulder.json -> no T: token in line."""
-        data = {
+        data: StatuslinePayload = {
             "model": {"display_name": "claude"},
             "workspace": {"project_dir": str(tmp_path)},
         }
@@ -1170,7 +1171,7 @@ class TestComposeLine1TodoCounter:
         assert "T:" not in line
 
     def test_zero_numbered_tasks_no_todo_token(
-        self, git_info_empty: dict, tmp_path: pathlib.Path
+        self, git_info_empty: GitInfo, tmp_path: pathlib.Path
     ) -> None:
         """Plan with only unnumbered tasks -> no T: token."""
         state_dir = tmp_path / ".omca" / "state"
@@ -1180,7 +1181,7 @@ class TestComposeLine1TodoCounter:
         boulder = _bound_boulder(plan_file)
         (state_dir / "boulder.json").write_text(json.dumps(boulder))
 
-        data = {
+        data: StatuslinePayload = {
             "model": {"display_name": "claude"},
             "workspace": {"project_dir": str(tmp_path)},
             "session_id": TEST_SESSION,
@@ -1189,14 +1190,14 @@ class TestComposeLine1TodoCounter:
         assert "T:" not in line
 
     def test_malformed_boulder_does_not_crash(
-        self, git_info_empty: dict, tmp_path: pathlib.Path
+        self, git_info_empty: GitInfo, tmp_path: pathlib.Path
     ) -> None:
         """Malformed boulder.json must not cause _compose_line1 to raise."""
         state_dir = tmp_path / ".omca" / "state"
         state_dir.mkdir(parents=True)
         (state_dir / "boulder.json").write_text("{bad json")
 
-        data = {
+        data: StatuslinePayload = {
             "model": {"display_name": "claude"},
             "workspace": {"project_dir": str(tmp_path)},
         }
@@ -1206,7 +1207,7 @@ class TestComposeLine1TodoCounter:
         assert "T:" not in line
 
     def test_nonexistent_plan_path_no_crash(
-        self, git_info_empty: dict, tmp_path: pathlib.Path
+        self, git_info_empty: GitInfo, tmp_path: pathlib.Path
     ) -> None:
         """Boulder pointing at a missing plan file -> no crash, no T: token."""
         state_dir = tmp_path / ".omca" / "state"
@@ -1214,7 +1215,7 @@ class TestComposeLine1TodoCounter:
         boulder = {"active_plan": str(tmp_path / "does_not_exist.md")}
         (state_dir / "boulder.json").write_text(json.dumps(boulder))
 
-        data = {
+        data: StatuslinePayload = {
             "model": {"display_name": "claude"},
             "workspace": {"project_dir": str(tmp_path)},
         }
@@ -1400,14 +1401,14 @@ class TestComposeLine1ActiveAgentCount:
         return build_glyphs(False)
 
     def test_agent_count_appears_in_line1(
-        self, git_info_empty: dict, tmp_path: pathlib.Path
+        self, git_info_empty: GitInfo, tmp_path: pathlib.Path
     ) -> None:
         state_dir = tmp_path / ".omca" / "state"
         state_dir.mkdir(parents=True)
         models = {"agent-1": {"agent_type": "executor", "model": "Sonnet 5"}}
         (state_dir / "subagent-models.json").write_text(json.dumps(models))
 
-        data = {
+        data: StatuslinePayload = {
             "model": {"display_name": "claude"},
             "workspace": {"project_dir": str(tmp_path)},
         }
@@ -1418,9 +1419,9 @@ class TestComposeLine1ActiveAgentCount:
         assert has_extra is True
 
     def test_no_state_file_no_agent_count(
-        self, git_info_empty: dict, tmp_path: pathlib.Path
+        self, git_info_empty: GitInfo, tmp_path: pathlib.Path
     ) -> None:
-        data = {
+        data: StatuslinePayload = {
             "model": {"display_name": "claude"},
             "workspace": {"project_dir": str(tmp_path)},
         }

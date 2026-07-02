@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import io
 import json
+from typing import cast
 from unittest.mock import MagicMock, patch
 
 from statusline.daemon import PROTOCOL_VERSION, StatuslineHandler
@@ -100,11 +101,12 @@ class TestProtocol:
         )
         line = f"{PROTOCOL_VERSION}\t{payload}\n"
         handler, _ = _make_handler(line)
+        server_mock = cast(MagicMock, handler.server)
 
         with patch("statusline.daemon.get_git_info", return_value={"is_git": "0"}):
             handler.handle()
 
-        handler.server.reset_idle_timer.assert_called_once()
+        server_mock.reset_idle_timer.assert_called_once()
 
 
 class TestIdleTimerGuards:

@@ -14,9 +14,10 @@
 #
 # | leaf recipe | ci.yml pattern                                                    | why it differs from the recipe body |
 # |-------------|--------------------------------------------------------------------|--------------------------------------|
-# | fmt-check   | ruff format --check servers/                                        | CI installs ruff globally (`uv tool install ruff`), not via `uv run --project servers` |
-# | lint-shell  | shellcheck scripts/*.sh                                             | identical invocation |
+# | fmt-check   | ruff format --check servers/                                        | CI installs ruff globally (`uv tool install ruff`), not via `uv run --project servers`; statusline/ coverage runs alongside but isn't separately pinned here |
+# | lint-shell  | shellcheck scripts/*.sh scripts/qa/*.sh scripts/qa/lib/*.sh         | identical invocation; scripts/*.sh is non-recursive by design, so scripts/qa/ (qa harness, packaging-excluded) is listed explicitly |
 # | lint-python | ruff check servers/                                                 | same normalization as fmt-check |
+# | typecheck   | uv run --project servers pyright                                    | identical invocation; pyrightconfig.json covers servers/ + statusline/ in one run |
 # | test        | bash scripts/validate-plugin.sh --check claims --check hooks       | identical invocation |
 # | test-bats   | tests/bats/bats-core/bin/bats tests/bats/hooks/ tests/bats/unit/    | identical invocation; must cover BOTH suite dirs |
 # | test-pytest | uv run --project servers pytest servers/tests/                     | identical invocation modulo trailing -v/--tb flags |
@@ -75,8 +76,9 @@ _resolve_leaf_steps() {
 _step_pattern() {
 	case "$1" in
 		fmt-check) echo "ruff format --check servers/" ;;
-		lint-shell) echo "shellcheck scripts/*.sh" ;;
+		lint-shell) echo "shellcheck scripts/*.sh scripts/qa/*.sh scripts/qa/lib/*.sh" ;;
 		lint-python) echo "ruff check servers/" ;;
+		typecheck) echo "uv run --project servers pyright" ;;
 		test) echo "bash scripts/validate-plugin.sh --check claims --check hooks" ;;
 		test-bats) echo "tests/bats/bats-core/bin/bats tests/bats/hooks/ tests/bats/unit/" ;;
 		test-pytest) echo "uv run --project servers pytest servers/tests/" ;;
@@ -88,7 +90,7 @@ _step_pattern() {
 @test "just ci recipe chain resolves to the expected leaf steps" {
 	local steps
 	steps=$(_resolve_leaf_steps ci "$CLAUDE_PLUGIN_ROOT/justfile" | sort -u | tr '\n' ' ')
-	[ "$steps" = "fmt-check lint-python lint-shell test test-bats test-mcp test-pytest " ]
+	[ "$steps" = "fmt-check lint-python lint-shell test test-bats test-mcp test-pytest typecheck " ]
 }
 
 @test "every just ci leaf step has a pinned ci.yml coverage pattern" {

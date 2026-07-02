@@ -12,8 +12,10 @@ import os
 import subprocess
 import tempfile
 import time
+from typing import cast
 
 from statusline.config import config
+from statusline.types import GitInfo
 
 # Remote URL is re-fetched only when this sub-TTL (seconds) has elapsed.
 _REMOTE_TTL = 60
@@ -119,7 +121,7 @@ def _parse_porcelain_v2(output: str) -> tuple[str | None, int, int, int]:
     return branch_header, staged, modified, untracked
 
 
-def _fetch_git_info(project_dir: str, cached: dict[str, str] | None = None) -> dict[str, str]:
+def _fetch_git_info(project_dir: str, cached: GitInfo | None = None) -> GitInfo:
     """Fetch fresh git info using optimized approach.
 
     Uses direct .git/HEAD read for branch + single porcelain v2 status command,
@@ -204,19 +206,19 @@ def _fetch_git_info(project_dir: str, cached: dict[str, str] | None = None) -> d
     }
 
 
-def _read_cache(cache_path: str) -> dict[str, str] | None:
+def _read_cache(cache_path: str) -> GitInfo | None:
     """Read the cache file. Returns None on any error."""
     try:
         with open(cache_path) as f:
             data = json.load(f)
         if isinstance(data, dict):
-            return data  # type: ignore[return-value]
+            return cast(GitInfo, data)
     except (OSError, json.JSONDecodeError, ValueError):
         pass
     return None
 
 
-def _write_cache(cache_path: str, info: dict[str, str]) -> None:
+def _write_cache(cache_path: str, info: GitInfo) -> None:
     """Atomically write info dict to cache_path."""
     try:
         cache_dir = os.path.dirname(cache_path)
@@ -228,7 +230,7 @@ def _write_cache(cache_path: str, info: dict[str, str]) -> None:
         pass
 
 
-def _get_git_info(project_dir: str) -> dict[str, str]:
+def _get_git_info(project_dir: str) -> GitInfo:
     """Get git info, using cache when fresh.
 
     Fallback chain:
@@ -270,7 +272,7 @@ def _get_git_info(project_dir: str) -> dict[str, str]:
 # ---------------------------------------------------------------------------
 
 
-def get_git_info(project_dir: str) -> dict[str, str]:
+def get_git_info(project_dir: str) -> GitInfo:
     """Get git info for a project directory, with caching.
 
     Public wrapper for the internal _get_git_info function.

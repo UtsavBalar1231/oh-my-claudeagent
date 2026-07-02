@@ -10,6 +10,7 @@ from typing import Literal, get_args
 
 import yaml
 from mcp.server.fastmcp import FastMCP
+from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from tools._common import ToolError
@@ -520,7 +521,7 @@ def register(mcp: FastMCP) -> None:
     """Register all AST tools on the given FastMCP instance."""
 
     @mcp.tool(
-        annotations={"readOnlyHint": True, "idempotentHint": True},
+        annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True),
     )
     def ast_search(
         pattern: str = Field(
@@ -575,7 +576,7 @@ def register(mcp: FastMCP) -> None:
         return output
 
     @mcp.tool(
-        annotations={"destructiveHint": True},
+        annotations=ToolAnnotations(destructiveHint=True),
     )
     def ast_replace(
         pattern: str = Field(description="AST pattern to match"),
@@ -678,7 +679,7 @@ def register(mcp: FastMCP) -> None:
         return output
 
     @mcp.tool(
-        annotations={"readOnlyHint": True, "idempotentHint": True},
+        annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True),
     )
     def ast_find_rule(
         rule_yaml: str = Field(
@@ -727,7 +728,7 @@ def register(mcp: FastMCP) -> None:
         return output
 
     @mcp.tool(
-        annotations={"readOnlyHint": True, "idempotentHint": True},
+        annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True),
     )
     def ast_dump_tree(
         code: str = Field(description="Code snippet to visualize"),
@@ -759,7 +760,7 @@ def register(mcp: FastMCP) -> None:
         return tree_output
 
     @mcp.tool(
-        annotations={"readOnlyHint": True, "idempotentHint": True},
+        annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True),
     )
     def ast_test_rule(
         code: str = Field(description="Code snippet to test against"),

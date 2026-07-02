@@ -16,22 +16,28 @@ lint: lint-shell lint-python
 lint-shell:
 	shellcheck scripts/*.sh
 
-# Lint Python with ruff
+# Lint Python with ruff. servers/ and statusline/ carry separate ruff configs
+# (py310 vs py312 target-version) since statusline's stdlib usage (e.g. datetime.UTC)
+# needs py312; each gets its own `uv run --project` invocation rather than one
+# config silently overriding the other.
 [group('lint')]
 lint-python:
 	uv run --project servers ruff check servers/
+	uv run --project statusline ruff check statusline/
 
 # ── Format ────────────────────────────────────────────────────────
 
-# Format Python with ruff
+# Format Python with ruff. Two invocations for the same reason as lint-python.
 [group('format')]
 fmt:
 	uv run --project servers ruff format servers/
+	uv run --project statusline ruff format statusline/
 
 # Check Python formatting without changes
 [group('format')]
 fmt-check:
 	uv run --project servers ruff format --check servers/
+	uv run --project statusline ruff format --check statusline/
 
 # ── Test ──────────────────────────────────────────────────────────
 
@@ -64,6 +70,16 @@ test-pytest:
 [group('test')]
 test-bats:
 	tests/bats/bats-core/bin/bats tests/bats/hooks/ tests/bats/unit/
+
+# ── Typecheck ────────────────────────────────────────────────────
+
+# Type-check servers/ and statusline/ with pyright (pinned as a servers/ dev
+# dependency; the root pyrightconfig.json covers both dirs via executionEnvironments,
+# so one invocation is enough). Note: the pyright PyPI wrapper downloads/runs a Node
+# runtime on first execution -- CI installs Node via actions/setup-node for this reason.
+[group('test')]
+typecheck:
+	uv run --project servers pyright
 
 # ── Scaffold ──────────────────────────────────────────────────────
 
@@ -195,9 +211,9 @@ test-all: test test-bats test-pytest test-mcp
 
 # ── CI ────────────────────────────────────────────────────────────
 
-# Run full CI pipeline (format check + lint + test + mcp)
+# Run full CI pipeline (format check + lint + typecheck + test + mcp)
 [group('ci')]
-ci: fmt-check lint test test-bats test-pytest test-mcp
+ci: fmt-check lint typecheck test test-bats test-pytest test-mcp
 
 # ── Release ──────────────────────────────────────────────────────
 

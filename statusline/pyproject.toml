@@ -6,7 +6,7 @@ requires-python = ">=3.10"
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0"]
+dev = ["pytest>=8.0", "ruff"]
 
 [project.scripts]
 cc-statusline = "statusline.client:main"

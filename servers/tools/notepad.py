@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Literal
 
 from mcp.server.fastmcp import FastMCP
+from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from tools._common import (
@@ -53,7 +54,7 @@ def register(mcp: FastMCP) -> None:
 
         return result_msg
 
-    @mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
+    @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True))
     def notepad_read(
         plan_name: str = Field(description="Plan name"),
         section: Literal["learnings", "issues", "decisions", "problems"] | None = Field(
@@ -86,7 +87,7 @@ def register(mcp: FastMCP) -> None:
 
         return "\n---\n\n".join(output)
 
-    @mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
+    @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True))
     def notepad_list(
         plan_name: str = Field(
             default="", description="Plan name (lists all plans if empty)"

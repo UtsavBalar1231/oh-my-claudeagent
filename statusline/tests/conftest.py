@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import pytest
 
+from statusline.types import GitInfo, StatuslinePayload
+
 
 @pytest.fixture()
-def minimal_payload() -> dict:
+def minimal_payload() -> StatuslinePayload:
     """Minimal valid payload with only required model field."""
     return {
         "model": {"display_name": "claude-3-5-sonnet"},
@@ -16,7 +18,7 @@ def minimal_payload() -> dict:
 
 
 @pytest.fixture()
-def full_payload() -> dict:
+def full_payload() -> StatuslinePayload:
     """Full payload with all optional fields populated."""
     return {
         "model": {"display_name": "claude-opus-4-5"},
@@ -49,7 +51,7 @@ def full_payload() -> dict:
 
 
 @pytest.fixture()
-def git_info_active() -> dict:
+def git_info_active() -> GitInfo:
     """Git info for an active repo with changes."""
     return {
         "is_git": "1",
@@ -63,7 +65,7 @@ def git_info_active() -> dict:
 
 
 @pytest.fixture()
-def git_info_empty() -> dict:
+def git_info_empty() -> GitInfo:
     """Git info indicating not a git repo."""
     return {"is_git": "0"}
 

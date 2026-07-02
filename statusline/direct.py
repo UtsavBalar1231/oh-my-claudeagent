@@ -11,12 +11,13 @@ import sys
 
 from statusline.core import FALLBACK, render
 from statusline.git import get_git_info
+from statusline.types import GitInfo, StatuslinePayload
 
 
 def main() -> None:
     try:
         try:
-            data = json.load(sys.stdin)
+            data: StatuslinePayload = json.load(sys.stdin)
         except (json.JSONDecodeError, ValueError):
             print(FALLBACK)
             return
@@ -27,7 +28,7 @@ def main() -> None:
 
         workspace = data.get("workspace", {})
         project_dir = workspace.get("project_dir", data.get("cwd", ""))
-        git_info = get_git_info(project_dir) if project_dir else {}
+        git_info: GitInfo = get_git_info(project_dir) if project_dir else {}
 
         output = render(data, git_info)
         print(output)

@@ -18,7 +18,10 @@ from tools._common import EVIDENCE_DIR, EVIDENCE_FILE_NEW
 def call_tool(server: FastMCP, name: str, args: dict) -> str:
     """Call an MCP tool synchronously and return the text result."""
     result = asyncio.run(server.call_tool(name, args))
-    return result[1]["result"]
+    # mcp.call_tool()'s public stub is typed Sequence[ContentBlock] | dict[str, Any],
+    # but it actually returns a (content, structured_result) tuple at runtime
+    # (verified against the installed mcp package); stub/runtime mismatch, not our bug.
+    return result[1]["result"]  # pyright: ignore[reportArgumentType, reportIndexIssue]
 
 
 @pytest.fixture

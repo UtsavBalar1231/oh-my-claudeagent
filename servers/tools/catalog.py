@@ -6,6 +6,7 @@ from pathlib import Path
 
 import yaml
 from mcp.server.fastmcp import FastMCP
+from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from tools import _boulder_core
@@ -65,7 +66,7 @@ def register(mcp: FastMCP) -> None:
         _write_json(cache_path, catalog)
         return json.dumps(catalog, indent=2)
 
-    @mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
+    @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True))
     def categories_list(
         working_directory: str = Field(
             default="",
@@ -86,7 +87,7 @@ def register(mcp: FastMCP) -> None:
         except json.JSONDecodeError:
             return json.dumps({"error": "categories.json is malformed"})
 
-    @mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
+    @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True))
     def health_check(
         working_directory: str = Field(
             default="", description="Project root (auto-detected from git)"

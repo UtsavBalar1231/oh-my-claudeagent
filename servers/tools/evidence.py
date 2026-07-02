@@ -4,6 +4,7 @@ import json
 import time
 
 from mcp.server.fastmcp import FastMCP
+from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from tools._common import (
@@ -62,7 +63,7 @@ def register(mcp: FastMCP) -> None:
         _write_json(path, data)
         return f"Evidence recorded: {evidence_type} (exit {exit_code}), {len(data['entries'])} total entries"
 
-    @mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
+    @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True))
     def evidence_read(
         working_directory: str = Field(
             default="", description="Project root (auto-detected from git)"

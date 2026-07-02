@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
+from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from tools import _boulder_core
@@ -238,7 +239,7 @@ def register(mcp: FastMCP) -> None:
             active_plan, plan_name, session_id, agent, worktree_path, working_directory
         )
 
-    @mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
+    @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True))
     def boulder_progress(
         plan_path: str = Field(
             default="",

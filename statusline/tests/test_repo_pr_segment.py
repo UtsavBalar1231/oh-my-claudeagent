@@ -14,28 +14,28 @@ import pytest
 
 from statusline.core import (
     DIM,
-    GREEN,
     RED,
     YELLOW,
-    RST,
     _compose_line1,
     _compose_repo_pr,
     _render_context_bar,
     build_glyphs,
-    terminal_columns,
     render,
+    terminal_columns,
 )
 from statusline.types import StatuslinePayload
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _strip_ansi(s: str) -> str:
     """Remove ANSI escape sequences and OSC sequences from a string."""
     s = re.sub(r"\x1b\[[0-9;]*m", "", s)
-    s = re.sub(r"\x1b\]8;;[^\a]*\a[^\x1b]*\x1b\]8;;\a", lambda m: m.group(0).split("\a")[1], s)
+    s = re.sub(
+        r"\x1b\]8;;[^\a]*\a[^\x1b]*\x1b\]8;;\a", lambda m: m.group(0).split("\a")[1], s
+    )
     return s
 
 
@@ -93,7 +93,9 @@ class TestRemainingPercentage:
         bar = _render_context_bar(None, ctx, False, bar_width=10)
         assert "50%" in bar
 
-    def test_remaining_percentage_absent_and_no_current_usage_shows_waiting(self) -> None:
+    def test_remaining_percentage_absent_and_no_current_usage_shows_waiting(
+        self,
+    ) -> None:
         """No remaining_percentage, no current_usage → waiting placeholder."""
         ctx = {"context_window_size": 200000}
         bar = _render_context_bar(None, ctx, False, bar_width=10)
@@ -137,10 +139,19 @@ class TestComposePrSegment:
         assert _compose_repo_pr(_p({"workspace": {}}), _ascii_glyphs(), False) == ""
 
     def test_empty_repo_name_returns_empty(self) -> None:
-        assert _compose_repo_pr(_p({"workspace": {"repo": {"name": ""}}}), _ascii_glyphs(), False) == ""
+        assert (
+            _compose_repo_pr(
+                _p({"workspace": {"repo": {"name": ""}}}), _ascii_glyphs(), False
+            )
+            == ""
+        )
 
     def test_repo_name_only(self) -> None:
-        result = _strip_ansi(_compose_repo_pr(_p({"workspace": {"repo": {"name": "myrepo"}}}), _ascii_glyphs(), False))
+        result = _strip_ansi(
+            _compose_repo_pr(
+                _p({"workspace": {"repo": {"name": "myrepo"}}}), _ascii_glyphs(), False
+            )
+        )
         assert "myrepo" in result
 
     def test_owner_and_name_combined(self) -> None:
@@ -347,7 +358,9 @@ class TestTerminalColumns:
 class TestBinSubagentStatuslineColumns:
     """Verify bin/omca-subagent-statusline COLUMNS fallback behavior (v2.1.153)."""
 
-    def test_columns_from_payload(self, tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_columns_from_payload(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """payload.columns takes precedence over COLUMNS env."""
         import json
         import subprocess
@@ -359,7 +372,9 @@ class TestBinSubagentStatuslineColumns:
             "tasks": [{"id": "t1", "name": "a" * 50}],
         }
         bin_path = str(
-            __import__("pathlib").Path(__file__).parent.parent.parent / "bin" / "omca-subagent-statusline"
+            __import__("pathlib").Path(__file__).parent.parent.parent
+            / "bin"
+            / "omca-subagent-statusline"
         )
         result = subprocess.run(
             [sys.executable, bin_path],
@@ -384,7 +399,9 @@ class TestBinSubagentStatuslineColumns:
         long_name = "x" * 60
         payload = {"tasks": [{"id": "t1", "name": long_name}]}
         bin_path = str(
-            __import__("pathlib").Path(__file__).parent.parent.parent / "bin" / "omca-subagent-statusline"
+            __import__("pathlib").Path(__file__).parent.parent.parent
+            / "bin"
+            / "omca-subagent-statusline"
         )
         result = subprocess.run(
             [sys.executable, bin_path],

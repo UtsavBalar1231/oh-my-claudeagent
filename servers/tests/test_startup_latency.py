@@ -252,6 +252,8 @@ def test_initialize_latency_warm_cache(server_proc):
         env=env,
     )
     try:
+        assert fresh.stdin is not None
+        assert fresh.stdout is not None
         fresh.stdin.write(_INIT_MSG.encode())
         fresh.stdin.flush()
         reply_line = fresh.stdout.readline()

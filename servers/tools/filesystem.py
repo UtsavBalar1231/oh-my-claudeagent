@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Annotated
 
 from mcp.server.fastmcp import FastMCP
+from mcp.types import ToolAnnotations
 from pydantic import Field
 
 # --- Constants ---
@@ -118,7 +119,7 @@ def _audit(path: str, allowed: bool) -> None:
 def register(mcp: FastMCP) -> None:
     """Register filesystem read tools. TODO: Remove when Claude Code #29610 is fixed."""
 
-    @mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
+    @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True))
     def file_read(
         path: Annotated[str, Field(description="Absolute path to the file to read")],
         offset: Annotated[

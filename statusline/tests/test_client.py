@@ -9,7 +9,6 @@ import pytest
 
 from statusline.client import PROTOCOL_VERSION, _render_direct, _try_daemon
 
-
 # ---------------------------------------------------------------------------
 # _try_daemon
 # ---------------------------------------------------------------------------
@@ -19,9 +18,7 @@ class TestTryDaemon:
     def test_returns_output_on_ok_response(self) -> None:
         # Simulate daemon returning a valid OK response
         response_body = "line1\nline2"
-        raw_response = (
-            f"{PROTOCOL_VERSION}\tOK\n{response_body}\n".encode("utf-8")
-        )
+        raw_response = f"{PROTOCOL_VERSION}\tOK\n{response_body}\n".encode()
 
         mock_sock = MagicMock()
         mock_sock.recv.side_effect = [raw_response, b""]
@@ -88,7 +85,10 @@ class TestRenderDirect:
             {
                 "model": {"display_name": "claude-opus"},
                 "workspace": {"project_dir": "/home/user/repo"},
-                "context_window": {"context_window_size": 200000, "used_percentage": 5.0},
+                "context_window": {
+                    "context_window_size": 200000,
+                    "used_percentage": 5.0,
+                },
                 "cost": {},
             }
         )

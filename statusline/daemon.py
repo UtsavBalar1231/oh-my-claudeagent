@@ -31,6 +31,7 @@ from statusline.config import config
 from statusline.core import FALLBACK, render
 from statusline.git import get_git_info
 from statusline.protocol import PROTOCOL_VERSION, _pid_path, _socket_path
+from statusline.types import GitInfo, StatuslinePayload
 
 # ---------------------------------------------------------------------------
 # Request handler
@@ -58,14 +59,14 @@ class StatuslineHandler(socketserver.StreamRequestHandler):
             return
 
         try:
-            data = json.loads(payload)
+            data: StatuslinePayload = json.loads(payload)
             if not isinstance(data, dict) or not data.get("model"):
                 self.wfile.write(f"{PROTOCOL_VERSION}\tOK\n{FALLBACK}\n".encode())
                 return
 
             workspace = data.get("workspace", {})
             project_dir = workspace.get("project_dir", data.get("cwd", ""))
-            git_info = get_git_info(project_dir) if project_dir else {}
+            git_info: GitInfo = get_git_info(project_dir) if project_dir else {}
             output = render(data, git_info)
             self.wfile.write(f"{PROTOCOL_VERSION}\tOK\n{output}\n".encode())
         except Exception:
