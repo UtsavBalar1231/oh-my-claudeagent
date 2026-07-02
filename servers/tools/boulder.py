@@ -211,6 +211,7 @@ def _do_boulder_progress(
             "remaining": remaining,
             "is_complete": total > 0 and completed == total,
             "plan_path": plan_path,
+            "next_task_label": _boulder_core.next_task_label(content),
         },
         indent=2,
     )
@@ -255,5 +256,5 @@ def register(mcp: FastMCP) -> None:
             default="", description="Project root (auto-detected from git)"
         ),
     ) -> str:
-        """Parse plan file checkboxes and return task progress summary. Use to check remaining work before claiming completion or to report plan status. Resolves the plan from the registry (by plan_name, or by this session's binding) when plan_path is omitted. Returns JSON with total, completed, remaining, is_complete, and plan_path fields."""
+        """Parse plan file checkboxes and return task progress summary. Use to check remaining work before claiming completion or to report plan status. Resolves the plan from the registry (by plan_name, or by this session's binding) when plan_path is omitted. Returns JSON with total, completed, remaining, is_complete, plan_path, and next_task_label (text of the first unchecked task, truncated to 80 chars, or null when none remain) fields."""
         return _do_boulder_progress(plan_path, plan_name, session_id, working_directory)

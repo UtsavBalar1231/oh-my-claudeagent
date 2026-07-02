@@ -196,6 +196,10 @@ def register(mcp: FastMCP) -> None:
         if used_enc != encoding:
             footer_parts.append(f"encoding fallback: {used_enc}")
         if limit > 0 and offset + limit < total:
-            footer_parts.append(f"{total - offset - limit} more lines available")
+            next_offset = offset + limit
+            footer_parts.append(
+                f"{total - next_offset} more lines available "
+                f"(use offset={next_offset} to continue)"
+            )
 
         return result + f"\n\n({', '.join(footer_parts)})"

@@ -713,3 +713,93 @@ def test_boulder_progress_no_active_plan_returns_message(mcp_server, working_dir
         {"working_directory": working_dir},
     )
     assert "No active plan" in result
+
+
+# --- boulder_progress: next_task_label ---
+
+
+def test_boulder_progress_next_task_label_mixed(mcp_server, working_dir, tmp_path):
+    """next_task_label returns the first unchecked task's text, ignoring checked ones."""
+    plan_file = tmp_path / "plan.md"
+    plan_file.write_text(
+        "- [x] 1. Task one done\n- [ ] 2. Task two pending\n- [ ] 3. Task three pending\n"
+    )
+
+    call_tool(
+        mcp_server,
+        "boulder_write",
+        {
+            "active_plan": str(plan_file),
+            "plan_name": "label-plan",
+            "session_id": "sess-001",
+            "working_directory": working_dir,
+        },
+    )
+
+    result = call_tool(
+        mcp_server,
+        "boulder_progress",
+        {"session_id": "sess-001", "working_directory": working_dir},
+    )
+    data = json.loads(result)
+    assert data["next_task_label"] == "Task two pending"
+
+
+def test_boulder_progress_next_task_label_empty_plan(mcp_server, working_dir, tmp_path):
+    """next_task_label is None when the plan has no numbered checkboxes."""
+    plan_file = tmp_path / "plan.md"
+    plan_file.write_text("# Empty plan\n\nNo tasks here.\n")
+
+    result = call_tool(
+        mcp_server,
+        "boulder_progress",
+        {"plan_path": str(plan_file), "working_directory": working_dir},
+    )
+    data = json.loads(result)
+    assert data["next_task_label"] is None
+
+
+def test_boulder_progress_next_task_label_all_complete(
+    mcp_server, working_dir, tmp_path
+):
+    """next_task_label is None when every numbered checkbox is checked."""
+    plan_file = tmp_path / "plan.md"
+    plan_file.write_text("- [x] 1. Done\n- [x] 2. Also done\n")
+
+    result = call_tool(
+        mcp_server,
+        "boulder_progress",
+        {"plan_path": str(plan_file), "working_directory": working_dir},
+    )
+    data = json.loads(result)
+    assert data["next_task_label"] is None
+
+
+def test_boulder_progress_next_task_label_truncated(mcp_server, working_dir, tmp_path):
+    """next_task_label truncates labels longer than 80 chars with an ellipsis."""
+    long_label = "x" * 120
+    plan_file = tmp_path / "plan.md"
+    plan_file.write_text(f"- [ ] 1. {long_label}\n")
+
+    result = call_tool(
+        mcp_server,
+        "boulder_progress",
+        {"plan_path": str(plan_file), "working_directory": working_dir},
+    )
+    data = json.loads(result)
+    assert len(data["next_task_label"]) == 80
+    assert data["next_task_label"].endswith("…")
+
+
+def test_next_task_label_pure_function_mixed():
+    """_boulder_core.next_task_label is a pure function over plan content."""
+    content = "- [x] 1. Done\n- [ ] 2. Pending task\n"
+    assert _boulder_core.next_task_label(content) == "Pending task"
+
+
+def test_next_task_label_pure_function_no_checkboxes():
+    assert _boulder_core.next_task_label("# Plan\n\nNo tasks.\n") is None
+
+
+def test_next_task_label_pure_function_all_checked():
+    assert _boulder_core.next_task_label("- [x] 1. Done\n- [x] 2. Done too\n") is None

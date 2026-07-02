@@ -23,7 +23,7 @@ _SERVERS_DIR = str(Path(__file__).resolve().parent.parent / "servers")
 if _SERVERS_DIR not in sys.path:
     sys.path.insert(0, _SERVERS_DIR)
 
-from tools._boulder_core import normalize  # noqa: E402
+from tools._boulder_core import next_task_label, normalize  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -428,7 +428,12 @@ def _todo_counter(
         # Unconditional space after the glyph: PUA codepoints can render
         # narrow or wide depending on terminal width handling; the gap keeps
         # the count visually separated either way.
-        return f"{GREEN}{glyph} {completed}/{total}{RST}"
+        token = f"{GREEN}{glyph} {completed}/{total}{RST}"
+        label = next_task_label(content)
+        if label:
+            arrow = "→" if nerd else "->"
+            token += f" {DIM}{arrow} {label}{RST}"
+        return token
     except Exception as exc:
         log.debug("todo_counter: skipped due to error: %s", exc)
         return ""

@@ -13,6 +13,29 @@ from pathlib import Path
 # Single source of truth shared by boulder.py, boulder_gc.py, and statusline.
 CHECKBOX_RE = re.compile(r"^- \[([ x])\] \d+\.", re.MULTILINE)
 
+# Same checkbox anchor as CHECKBOX_RE, extended with a trailing capture group
+# for the task label text — used only by next_task_label() below.
+_CHECKBOX_LABEL_RE = re.compile(r"^- \[([ x])\] \d+\.\s*(.*)$", re.MULTILINE)
+
+# 80 chars — keeps next_task_label a short resume hint, not a full restatement
+# of the task (plan tasks routinely run to multiple sentences).
+MAX_LABEL_LEN = 80
+
+
+def next_task_label(content: str) -> str | None:
+    """Return the text of the first unchecked numbered task, truncated for display.
+
+    Uses the same checkbox anchor as CHECKBOX_RE. Returns None when the plan
+    has no numbered checkboxes or every numbered checkbox is checked.
+    """
+    for state, label in _CHECKBOX_LABEL_RE.findall(content):
+        if state.lower() != "x":
+            label = label.strip()
+            if len(label) > MAX_LABEL_LEN:
+                label = label[: MAX_LABEL_LEN - 1].rstrip() + "…"
+            return label
+    return None
+
 
 def plan_is_complete(active_plan: str) -> bool:
     """Derive completion from plan-file checkboxes — no stored completed_at.

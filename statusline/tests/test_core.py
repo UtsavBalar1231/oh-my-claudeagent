@@ -1016,6 +1016,19 @@ class TestTodoCounter:
         )
         assert "T: 3/10" in result
 
+    def test_ascii_appends_next_task_label(self, tmp_path: pathlib.Path) -> None:
+        """ASCII mode: counter token is followed by an ASCII arrow + next unchecked label."""
+        state_dir = tmp_path / ".omca" / "state"
+        state_dir.mkdir(parents=True)
+        plan_file = tmp_path / "plan.md"
+        plan_file.write_text("- [x] 1. Done\n- [ ] 2. Wire up the widget\n")
+        boulder = _bound_boulder(plan_file)
+        (state_dir / "boulder.json").write_text(json.dumps(boulder))
+        result = _todo_counter(
+            str(tmp_path), self._glyphs_ascii(), False, session_id=TEST_SESSION
+        )
+        assert "-> Wire up the widget" in result
+
     def test_nerd_font_uses_task_glyph(self, tmp_path: pathlib.Path) -> None:
         """Nerd font mode: uses nf-fa-tasks glyph instead of T:."""
         state_dir = tmp_path / ".omca" / "state"

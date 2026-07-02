@@ -262,6 +262,44 @@ _payload() {
 	assert [ "${#rule_body}" -le 1000 ]
 }
 
+@test "rule truncation: truncated rule body carries a note naming the full file path" {
+	local long_content
+	long_content=$(python3 -c "print('x' * 1200, end='')")
+	local rule_file="$CLAUDE_PROJECT_ROOT/.omca/rules/long-rule.md"
+	printf '# pattern: *.py\n%s' "$long_content" > "$rule_file"
+	touch "$CLAUDE_PROJECT_ROOT/main.py"
+
+	run_hook "context-injector.sh" "$(_payload Read "$CLAUDE_PROJECT_ROOT/main.py")"
+	assert_success
+	ctx=$(get_context)
+	assert echo "$ctx" | grep -q "truncated"
+	assert echo "$ctx" | grep -qF "$rule_file"
+}
+
+@test "rule non-truncation: short rule body carries no truncation note" {
+	printf '# pattern: *.py\nShort rule body.' \
+		> "$CLAUDE_PROJECT_ROOT/.omca/rules/short-rule.md"
+	touch "$CLAUDE_PROJECT_ROOT/main.py"
+
+	run_hook "context-injector.sh" "$(_payload Read "$CLAUDE_PROJECT_ROOT/main.py")"
+	assert_success
+	ctx=$(get_context)
+	[[ "$ctx" != *"truncated"* ]]
+}
+
+@test "AGENTS.md truncation: long AGENTS.md carries a note naming the full file path" {
+	mkdir -p "$CLAUDE_PROJECT_ROOT/subdir"
+	local agents_file="$CLAUDE_PROJECT_ROOT/subdir/AGENTS.md"
+	python3 -c "print('x' * 2500, end='')" > "$agents_file"
+	touch "$CLAUDE_PROJECT_ROOT/subdir/file.txt"
+
+	run_hook "context-injector.sh" "$(_payload Read "$CLAUDE_PROJECT_ROOT/subdir/file.txt")"
+	assert_success
+	ctx=$(get_context)
+	assert echo "$ctx" | grep -q "truncated"
+	assert echo "$ctx" | grep -qF "$agents_file"
+}
+
 # ---------------------------------------------------------------------------
 # k. Rule dedup: content-hash + realpath keyed, per session
 # ---------------------------------------------------------------------------

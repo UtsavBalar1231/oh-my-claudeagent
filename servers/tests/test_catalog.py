@@ -86,6 +86,26 @@ def test_categories_list_has_expected_categories(tools, monkeypatch):
     assert len(data) > 0
 
 
+def test_categories_list_has_no_concurrency_limits(tools, monkeypatch):
+    """concurrency_limits is dead config with no consumer; must not reappear."""
+    monkeypatch.setenv("CLAUDE_PLUGIN_ROOT", str(REPO_ROOT))
+    result = tools["categories_list"](working_directory="")
+    data = json.loads(result)
+    assert "concurrency_limits" not in data
+
+
+def test_categories_list_models_are_agent_tool_aliases(tools, monkeypatch):
+    """Category model values must be Agent-tool aliases, not full model IDs."""
+    monkeypatch.setenv("CLAUDE_PLUGIN_ROOT", str(REPO_ROOT))
+    result = tools["categories_list"](working_directory="")
+    data = json.loads(result)
+    valid_aliases = {"sonnet", "opus", "haiku", "fable"}
+    for name, entry in data["categories"].items():
+        assert entry["model"] in valid_aliases, (
+            f"category '{name}' has non-alias model '{entry['model']}'"
+        )
+
+
 # --- health_check ---
 
 
