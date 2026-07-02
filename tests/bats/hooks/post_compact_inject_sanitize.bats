@@ -122,3 +122,32 @@ run_post_compact() {
 	second_context=$(get_context)
 	[ -z "$second_context" ]
 }
+
+# ---------------------------------------------------------------------------
+# e. Compaction stamp — feeds plan-continuation-guard.sh rail 6. Must be
+#    written unconditionally, even when there is no context file to restore,
+#    since this script only runs on the "compact" SessionStart matcher (a
+#    compaction always just happened whenever it's invoked).
+# ---------------------------------------------------------------------------
+
+@test "post-compact-inject: stamps last-compaction-at even with no context file" {
+	run_hook "post-compact-inject.sh" "{}"
+	assert_success
+
+	local stamp_file="$CLAUDE_PROJECT_ROOT/.omca/state/last-compaction-at"
+	[ -f "$stamp_file" ]
+	local stamp
+	stamp=$(cat "$stamp_file")
+	[[ "$stamp" =~ ^[0-9]+$ ]]
+}
+
+@test "post-compact-inject: stamps last-compaction-at when a context file is restored" {
+	run_post_compact "some restored context"
+	assert_success
+
+	local stamp_file="$CLAUDE_PROJECT_ROOT/.omca/state/last-compaction-at"
+	[ -f "$stamp_file" ]
+	local stamp
+	stamp=$(cat "$stamp_file")
+	[[ "$stamp" =~ ^[0-9]+$ ]]
+}
