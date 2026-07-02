@@ -391,9 +391,15 @@ run_script_with_payload() {
 	local stdout_file="${run_dir}/stdout.txt"
 	local stderr_file="${run_dir}/stderr.txt"
 
+	# Pin state/log dirs to project_root explicitly: when validate-plugin.sh itself
+	# runs under a caller that has HOOK_STATE_DIR/HOOK_LOG_DIR exported (e.g. the golden
+	# harness's env -i isolation), those values would otherwise leak into this child hook
+	# and point it away from the fixture state seeded under project_root.
 	CLAUDE_PROJECT_ROOT="${project_root}" \
 		CLAUDE_PLUGIN_ROOT="${REPO_ROOT}" \
 		CLAUDE_SESSION_ID="validate-plugin-session" \
+		HOOK_STATE_DIR="${project_root}/.omca/state" \
+		HOOK_LOG_DIR="${project_root}/.omca/logs" \
 		bash "${script_path}" <"${payload_path}" >"${stdout_file}" 2>"${stderr_file}"
 	local exit_code=$?
 

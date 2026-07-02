@@ -1,2 +1,0 @@
-Only in /state-after: last-compaction-at
-Only in /state-after: subagent-models.json
