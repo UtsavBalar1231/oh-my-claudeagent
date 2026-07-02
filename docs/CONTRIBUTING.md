@@ -60,7 +60,7 @@ Key rules:
 2. Follow existing frontmatter format (`name`, `description`, `argument-hint` if applicable)
 3. If the skill should be keyword-activated, add a detection pattern to `scripts/keyword-detector.sh`
 4. Skills with `context: fork` run at depth 0 — use for orchestrators that need the `Agent` tool
-5. **Skill descriptions must be ≤250 characters** (Claude Code truncates at this limit). Move longer trigger phrases or usage notes into the SKILL.md body.
+5. **Skill descriptions have a 512-character soft cap and a 1,536-character hard cap** (the platform truncates at the hard cap; older clients may truncate at the soft cap). Run `validate-plugin.sh` before committing; it warns at 512 and fails at 1,536. Move longer trigger phrases or usage notes into the SKILL.md body.
 6. **Do not leak hook internals.** Skills describe WHAT users do; hooks automate HOW. Unless the skill's primary purpose IS hook configuration or diagnosis, skills must NOT mention: raw `.omca/state/*.json` file paths (use the `boulder_write`, `boulder_progress` MCP tools from the omca server instead), hook script names (`task-completed-verify.sh`, etc.), hook event names (`PreToolUse`, `Stop`, etc.), or hook env vars (`HOOK_INPUT`, `HOOK_STATE_DIR`). Recognized exceptions: `omca-setup` (installs hooks), `stop-continuation` (clears hook-managed state). Rationale: exposing file paths forces users to understand internal layouts they can't control and forces every future hook refactor to update skill prose.
 
 ## Testing

@@ -36,6 +36,7 @@
 [validate-plugin] PASS: agent frontmatter hygiene: no top-level tools allowlists detected
 [validate-plugin] PASS: agent frontmatter hygiene: no legacy permissionMode holdouts detected
 [validate-plugin] PASS: skill description length: consolidate-memory description is 79 chars (within 512 soft cap)
+[validate-plugin] PASS: skill description length: debugging description is 504 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: dev-browser description is 183 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: frontend-ui-ux description is 156 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: git-master description is 202 chars (within 512 soft cap)
@@ -48,6 +49,7 @@
 [validate-plugin] PASS: skill description length: omca-setup description is 95 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: playwright description is 192 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: refactor description is 95 chars (within 512 soft cap)
+[validate-plugin] PASS: skill description length: remove-ai-slops description is 469 chars (within 512 soft cap)
 [validate-plugin] PASS: policy posture: OMCA.md includes auto mode marker
 [validate-plugin] PASS: policy posture: OMCA.md includes managed settings boundary marker
 [validate-plugin] PASS: policy posture: OMCA.md includes sandbox fail-closed marker
@@ -60,6 +62,13 @@
 [validate-plugin] Running claudemd template packaging checks
 [validate-plugin] PASS: claudemd template packaging: templates/claudemd.md (referenced by SKILL.md) exists
 [validate-plugin] PASS: claudemd template packaging: package-plugin.sh ships templates/claudemd.md
+[validate-plugin] Running skill references existence checks
+[validate-plugin] PASS: skill references: debugging SKILL.md reference references/diagnostics.md exists
+[validate-plugin] PASS: skill references: debugging SKILL.md reference references/methodology.md exists
+[validate-plugin] PASS: skill references: debugging references/diagnostics.md is reachable from SKILL.md
+[validate-plugin] PASS: skill references: debugging references/methodology.md is reachable from SKILL.md
+[validate-plugin] PASS: skill references: remove-ai-slops SKILL.md reference references/categories.md exists
+[validate-plugin] PASS: skill references: remove-ai-slops references/categories.md is reachable from SKILL.md
 [validate-plugin] Running depersonalization checks
 [validate-plugin] PASS: depersonalization: no home-path, credential, or bearer-token literals found in tracked shipped files
 [validate-plugin] Running docs accuracy checks
@@ -142,7 +151,7 @@
 [validate-plugin] PASS: PermissionRequest Bash (sed-grep-deny.sh): script succeeded with valid JSON output
 [validate-plugin] PASS: PermissionRequest Bash (executor-grep-deny.sh): script succeeded with valid JSON output
 [validate-plugin] PASS: PermissionRequest ExitPlanMode (plan-mode-handler.sh): script succeeded with valid JSON output
-[validate-plugin] FAIL: SessionStart compact (post-compact-inject.sh): expected JSON output but received empty stdout
+[validate-plugin] PASS: SessionStart compact (post-compact-inject.sh): script succeeded with valid JSON output
 [validate-plugin] PASS: TaskCompleted default (task-completed-verify.sh): script succeeded with empty stdout
 [validate-plugin] PASS: Stop default (no state) (plan-continuation-guard.sh): script succeeded
 [validate-plugin] PASS: Stop default (no state) (final-verification-evidence.sh): script succeeded
@@ -173,4 +182,5 @@
 [validate-plugin] PASS: mcp tools/list contains health_check
 [validate-plugin] PASS: mcp tools/list contains categories_list
 [validate-plugin] PASS: mcp tools/list contains file_read
-[validate-plugin] Summary: 159 passed, 1 failed, 6 skipped, 0 warned
+[validate-plugin] PASS: mcp tools/list contains session_search
+[validate-plugin] Summary: 169 passed, 0 failed, 6 skipped, 0 warned

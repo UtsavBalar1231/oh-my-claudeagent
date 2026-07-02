@@ -926,8 +926,50 @@ check_claims() {
 	check_policy_posture_alignment
 	check_phantom_field_names
 	check_claudemd_template_packaging
+	check_skill_references_exist
 	check_depersonalization
 	check_docs_accuracy
+}
+
+check_skill_references_exist() {
+	log "Running skill references existence checks"
+
+	local skill_md skill_dir skill_name refs_dir found_any=0
+	while IFS= read -r skill_md; do
+		[[ -z "${skill_md}" ]] && continue
+		skill_dir="$(dirname "${skill_md}")"
+		skill_name="$(basename "${skill_dir}")"
+		refs_dir="${skill_dir}/references"
+		[[ -d "${refs_dir}" ]] || continue
+		found_any=1
+
+		# Every references/*.md path mentioned in SKILL.md must exist on disk.
+		local ref_mention
+		while IFS= read -r ref_mention; do
+			[[ -z "${ref_mention}" ]] && continue
+			if [[ -f "${skill_dir}/${ref_mention}" ]]; then
+				pass "skill references: ${skill_name} SKILL.md reference ${ref_mention} exists"
+			else
+				fail "skill references: ${skill_name} SKILL.md references ${ref_mention} but it is missing"
+			fi
+		done < <(grep -oE 'references/[A-Za-z0-9_./-]+\.md' "${skill_md}" | sort -u)
+
+		# Every file under references/ must be mentioned in SKILL.md (no orphans).
+		local ref_file ref_rel
+		while IFS= read -r ref_file; do
+			[[ -z "${ref_file}" ]] && continue
+			ref_rel="${ref_file#"${skill_dir}"/}"
+			if grep -qF "${ref_rel}" "${skill_md}"; then
+				pass "skill references: ${skill_name} ${ref_rel} is reachable from SKILL.md"
+			else
+				fail "skill references: ${skill_name} ${ref_rel} is orphaned (not referenced from SKILL.md)"
+			fi
+		done < <(find "${refs_dir}" -type f -name "*.md" | sort)
+	done < <(find "${REPO_ROOT}/skills" -name "SKILL.md" -print 2>/dev/null | sort)
+
+	if [[ "${found_any}" -eq 0 ]]; then
+		skip "skill references: no skills with a references/ directory found"
+	fi
 }
 
 check_claudemd_template_packaging() {
