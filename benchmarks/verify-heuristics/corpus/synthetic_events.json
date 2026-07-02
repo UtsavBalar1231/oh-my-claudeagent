@@ -1,0 +1,57 @@
+[
+  {
+    "description": "add a helper function",
+    "subagent_type": "executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": true,
+    "note": "No verification keyword, no evidence at all. Both CURRENT and the no-new-state alternative should pass this."
+  },
+  {
+    "description": "verify the login flow works",
+    "subagent_type": "executor",
+    "needs_evidence_keyword": true,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-incomplete",
+    "synthetic": true,
+    "note": "Verification keyword present, no evidence logged at all. Both candidates should block; a null control would pass it, which is the point of the null baseline."
+  },
+  {
+    "description": "test the checkout flow",
+    "subagent_type": "executor",
+    "needs_evidence_keyword": true,
+    "seconds_since_evidence": 301,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-incomplete",
+    "synthetic": true,
+    "note": "Boundary case: evidence exists but 1 second past the 300s window. CURRENT blocks (301 > 300)."
+  },
+  {
+    "description": "test the checkout flow",
+    "subagent_type": "executor",
+    "needs_evidence_keyword": true,
+    "seconds_since_evidence": 299,
+    "recent_evidence": true,
+    "evidence_command_overlap": false,
+    "label": "true-incomplete",
+    "synthetic": true,
+    "note": "Evidence exists 299s ago (inside the window) but its command text has zero token overlap with the task description -- it verified something unrelated. CURRENT passes it (false-pass risk); the no-new-state alternative blocks it because command/description tokens don't overlap. This is the fixture designed to separate the two candidates."
+  },
+  {
+    "description": "implement the retry-limit config option",
+    "subagent_type": "executor",
+    "needs_evidence_keyword": true,
+    "seconds_since_evidence": 12,
+    "recent_evidence": true,
+    "evidence_command_overlap": true,
+    "label": "true-complete",
+    "synthetic": true,
+    "note": "Evidence exists 12s ago and its command text overlaps with the task description (e.g. 'just test retry-limit'). Both CURRENT and the alternative should pass this -- the agreement case."
+  }
+]

@@ -9,6 +9,7 @@ servers/__pycache__/
 .omc/
 .omca/*
 !/.omca/rules/
+!/.omca/notes/
 state/
 servers/.omca
 
@@ -32,7 +33,6 @@ tmp/
 TODO.md
 
 # AI context files
-AGENTS.md
 CLAUDE.md
 .sisyphus/
 .claude/

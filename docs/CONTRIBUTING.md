@@ -10,6 +10,8 @@
 
 Run `just setup` to install dev dependencies (ruff, pre-commit) and git hooks.
 
+Structural changes to a directory (new file, moved entry point, changed layout) update that directory's `AGENTS.md` in the same change.
+
 ## Adding a Hook
 
 Two steps are required — skipping either step produces dead code ([ADR-009](adr/README.md#adr-009)):

@@ -1,0 +1,1152 @@
+[
+  {
+    "description": "Compare agent definitions",
+    "subagent_type": "general-purpose",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-incomplete",
+    "synthetic": false
+  },
+  {
+    "description": "Compare skills catalogs",
+    "subagent_type": "general-purpose",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-incomplete",
+    "synthetic": false
+  },
+  {
+    "description": "Compare hook systems",
+    "subagent_type": "general-purpose",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Deep dive MCP/tooling layer",
+    "subagent_type": "general-purpose",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "ambiguous",
+    "synthetic": false
+  },
+  {
+    "description": "Deep dive state/execution model",
+    "subagent_type": "general-purpose",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-incomplete",
+    "synthetic": false
+  },
+  {
+    "description": "Line-level shared-agent prompt diffs",
+    "subagent_type": "general-purpose",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Orchestration runtime semantics",
+    "subagent_type": "general-purpose",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Config, docs, QA, release engineering",
+    "subagent_type": "general-purpose",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-incomplete",
+    "synthetic": false
+  },
+  {
+    "description": "Research output styles landscape",
+    "subagent_type": "oh-my-claudeagent:librarian",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "ambiguous",
+    "synthetic": false
+  },
+  {
+    "description": "Oracle review of adoption plan",
+    "subagent_type": "oh-my-claudeagent:oracle",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-incomplete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 1: checkbox+kill-switch helpers",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 2: plan-format drift warning hook",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "ambiguous",
+    "synthetic": false
+  },
+  {
+    "description": "Task 3: verify mcp_tool hook fires",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": true,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-incomplete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 4: restore templates/claudemd.md",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 5: output style redesign",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Phase 1 gate: fix fallout, run just ci",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": true,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 6: CI/release drift fixes",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-incomplete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 8: categories.json repair",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 9: depersonalization + docs-accuracy gates",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "ambiguous",
+    "synthetic": false
+  },
+  {
+    "description": "Task 7: workflow-contract bats test",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": true,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-incomplete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 10: sisyphus.md upgrades",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 185.677,
+    "recent_evidence": true,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 11: executor.md upgrades",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 140.404,
+    "recent_evidence": true,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 12: prometheus + plan command upgrades",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 362.616,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 13: momus + metis upgrades",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 183.823,
+    "recent_evidence": true,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 14: oracle/librarian/looker upgrades",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 162.64,
+    "recent_evidence": true,
+    "evidence_command_overlap": false,
+    "label": "true-incomplete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 15: start-work execution-loop upgrades",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 227.889,
+    "recent_evidence": true,
+    "evidence_command_overlap": false,
+    "label": "ambiguous",
+    "synthetic": false
+  },
+  {
+    "description": "Task 16: git-master + frontend skill cherry-picks",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 194.438,
+    "recent_evidence": true,
+    "evidence_command_overlap": false,
+    "label": "true-incomplete",
+    "synthetic": false
+  },
+  {
+    "description": "Register cleanup: em-dashes in Phase 3 diff",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 850.533,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-incomplete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 17: write-guard notepad deny",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 125.936,
+    "recent_evidence": true,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 18: comment-checker upgrade",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 478.325,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 20: plan-continuation guard script",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 563.452,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 21: tool-loop detector script",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 296.329,
+    "recent_evidence": true,
+    "evidence_command_overlap": false,
+    "label": "ambiguous",
+    "synthetic": false
+  },
+  {
+    "description": "Task 22: delegation-counter reminder script",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 310.345,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-incomplete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 19: retry-history + decay",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 1337.698,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 23: serial Phase-4 integration",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 2458.498,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 24: boulder next_task_label + MCP bits",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 2969.576,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Phase 4 gate: live-session hook probe + full ci",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 3463.106,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-incomplete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 25: configuration reference + presets",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 3695.975,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 26: known-issues verify + README IA",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": true,
+    "seconds_since_evidence": 3724.042,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-incomplete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 27: CONTRIBUTING checklist + test-discipline rule",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": true,
+    "seconds_since_evidence": 3656.751,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 28: final sweep + dispositions",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 431.845,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 29: commits, CHANGELOG, release 2.13.0",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 1430.984,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-incomplete",
+    "synthetic": false
+  },
+  {
+    "description": "Completeness review of the executed plan",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 1798.188,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-incomplete",
+    "synthetic": false
+  },
+  {
+    "description": "Fix dash-gate gap, re-cut release",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": true,
+    "seconds_since_evidence": 2578.58,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Re-run completeness review",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 2750.171,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Oracle review of v2.14 plan",
+    "subagent_type": "oh-my-claudeagent:oracle",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 5385.438,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 1: mock-model spike",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 6476.271,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "ambiguous",
+    "synthetic": false
+  },
+  {
+    "description": "Task 2: statusline debt + gates",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 7734.696,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 3: golden root cause + recapture",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 6939.68,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 4: delegation-reminder live probe",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 6900.916,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 5: claude-code-qa harness",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 1391.151,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 6: mock-model server",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 2099.227,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Phase 2 boundary: fix qa cleanup leak",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": true,
+    "seconds_since_evidence": 2341.401,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 7: remove-ai-slops skill",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 378.772,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 8: debugging skill",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 319.71,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 9: transcript-search tool, gated",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 445.248,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 10: minimized AGENTS.md maps",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 320.147,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 11: telemetry gate analysis",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 184.333,
+    "recent_evidence": true,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Platform effort mechanics",
+    "subagent_type": "claude-code-guide",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Research CC release notes",
+    "subagent_type": "oh-my-claudeagent:librarian",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "ambiguous",
+    "synthetic": false
+  },
+  {
+    "description": "Research claude-sonnet-5 model",
+    "subagent_type": "oh-my-claudeagent:librarian",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "ambiguous",
+    "synthetic": false
+  },
+  {
+    "description": "Cross-check CC new features",
+    "subagent_type": "claude-code-guide",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Baseline OMCA model+feature refs",
+    "subagent_type": "oh-my-claudeagent:explore",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-incomplete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 1 alias resolution gate",
+    "subagent_type": "oh-my-claudeagent:librarian",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 2 triage stale 4-7 sites",
+    "subagent_type": "oh-my-claudeagent:explore",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-incomplete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 4a [1m] blast-radius grep",
+    "subagent_type": "oh-my-claudeagent:explore",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 3 fix stale 4-7 refs",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": true,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "ambiguous",
+    "synthetic": false
+  },
+  {
+    "description": "Task 4 migrate agent models+effort",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 5 reconcile categories.json",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 8 exhaustive changelog scan",
+    "subagent_type": "oh-my-claudeagent:librarian",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 9 find TeamCreate refs",
+    "subagent_type": "oh-my-claudeagent:explore",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 10 hook matcher audit",
+    "subagent_type": "oh-my-claudeagent:explore",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 11 PostToolBatch archaeology",
+    "subagent_type": "oh-my-claudeagent:explore",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 12 code-review collision",
+    "subagent_type": "oh-my-claudeagent:explore",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-incomplete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 13 secondary breaking changes",
+    "subagent_type": "oh-my-claudeagent:explore",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 6+7 non-OMCA doc edits",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 201.431,
+    "recent_evidence": true,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 17 advisory additionalContext",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 254.765,
+    "recent_evidence": true,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 18a sessionTitle hook",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 273.99,
+    "recent_evidence": true,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 16 semantic-verify spike",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": true,
+    "seconds_since_evidence": 314.928,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-incomplete",
+    "synthetic": false
+  },
+  {
+    "description": "Wave 4 OMCA.md doc lane",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 212.758,
+    "recent_evidence": true,
+    "evidence_command_overlap": true,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Completeness review",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 178.956,
+    "recent_evidence": true,
+    "evidence_command_overlap": false,
+    "label": "true-incomplete",
+    "synthetic": false
+  },
+  {
+    "description": "Remove dead stop-continuation/cancel handlers",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 39558.617,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "ambiguous",
+    "synthetic": false
+  },
+  {
+    "description": "Research MessageDisplay hook adoption",
+    "subagent_type": "oh-my-claudeagent:librarian",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 39511.521,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "ambiguous",
+    "synthetic": false
+  },
+  {
+    "description": "Investigate OMC orchestration",
+    "subagent_type": "general-purpose",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 533.0,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Investigate OMC modes/persistence",
+    "subagent_type": "general-purpose",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 647.852,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Investigate OMC verification/guardrails",
+    "subagent_type": "general-purpose",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 677.254,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "ambiguous",
+    "synthetic": false
+  },
+  {
+    "description": "Investigate OMC memory/knowledge/skills",
+    "subagent_type": "general-purpose",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 663.817,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Investigate OMC infra/ergonomics",
+    "subagent_type": "general-purpose",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 659.132,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Map boulder plan-execution state",
+    "subagent_type": "oh-my-claudeagent:explore",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 1013.027,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "ambiguous",
+    "synthetic": false
+  },
+  {
+    "description": "Map compaction + injection + Stop hooks",
+    "subagent_type": "oh-my-claudeagent:explore",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 1028.351,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "ambiguous",
+    "synthetic": false
+  },
+  {
+    "description": "Map hook stdin/common.sh/git plumbing",
+    "subagent_type": "oh-my-claudeagent:explore",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 1061.268,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-incomplete",
+    "synthetic": false
+  },
+  {
+    "description": "Confirm Stop-hook payload schema",
+    "subagent_type": "oh-my-claudeagent:librarian",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 1406.4,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Oracle: verify plan vs code",
+    "subagent_type": "oh-my-claudeagent:oracle",
+    "needs_evidence_keyword": true,
+    "seconds_since_evidence": 2855.459,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 0 runtime probes",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 4196.713,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 19 context-injector harden",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 4332.5,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Tasks 1+2 boulder registry core",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 471.505,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "ambiguous",
+    "synthetic": false
+  },
+  {
+    "description": "Task 3 statusline resolver",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 368.095,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "ambiguous",
+    "synthetic": false
+  },
+  {
+    "description": "Task 4 subagent-start resolver",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 360.595,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "ambiguous",
+    "synthetic": false
+  },
+  {
+    "description": "Task 5 final-verification resolver",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 472.483,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 6 session-init resolver",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 316.182,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 8 GC + catalog",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 379.143,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Tasks 7+9 boulder docs",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 351.842,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Research statusline subagent model",
+    "subagent_type": "oh-my-claudeagent:librarian",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 108.492,
+    "recent_evidence": true,
+    "evidence_command_overlap": false,
+    "label": "ambiguous",
+    "synthetic": false
+  },
+  {
+    "description": "Subagent model capture hook",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 839.499,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "subagentStatusLine renderer + main enrich",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 948.301,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Tasks 10+11 stdin-timeout",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 819.277,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Tasks 12-15 drift-guard hook",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 673.589,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Tasks 16+17 compaction round-trip",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 480.391,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 18 directive guidance",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 130.877,
+    "recent_evidence": true,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Task 20 OMCA.md ledger + doc sweep",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 239.175,
+    "recent_evidence": true,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Completeness review",
+    "subagent_type": "oh-my-claudeagent:executor",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": 281.785,
+    "recent_evidence": true,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Research Claude Code changes",
+    "subagent_type": "claude-code-guide",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Research claude-sonnet-5 model",
+    "subagent_type": "oh-my-claudeagent:librarian",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Research ultrathink ultrawork ultracode",
+    "subagent_type": "oh-my-claudeagent:librarian",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  },
+  {
+    "description": "Inventory OMCA current state",
+    "subagent_type": "oh-my-claudeagent:explore",
+    "needs_evidence_keyword": false,
+    "seconds_since_evidence": null,
+    "recent_evidence": false,
+    "evidence_command_overlap": false,
+    "label": "true-complete",
+    "synthetic": false
+  }
+]
