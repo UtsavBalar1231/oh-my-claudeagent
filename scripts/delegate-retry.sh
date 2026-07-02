@@ -29,31 +29,17 @@ fi
 
 ERROR_COUNTS_FILE="${STATE_DIR}/error-counts.json"
 ERROR_KEY="${TOOL_NAME}:delegate_error"
-
-if [[ -f "${ERROR_COUNTS_FILE}" ]]; then
-	CURRENT_COUNT=$(jq -r --arg key "${ERROR_KEY}" '.[$key] // 0' "${ERROR_COUNTS_FILE}")
-else
-	CURRENT_COUNT=0
-fi
-
-NEW_COUNT=$((CURRENT_COUNT + 1))
-
-TMP_COUNTS=$(mktemp)
-if [[ -f "${ERROR_COUNTS_FILE}" ]]; then
-	if jq --arg key "${ERROR_KEY}" --argjson count "${NEW_COUNT}" '.[$key] = $count' "${ERROR_COUNTS_FILE}" >"${TMP_COUNTS}"; then
-		mv "${TMP_COUNTS}" "${ERROR_COUNTS_FILE}"
-	fi
-else
-	echo "{\"${ERROR_KEY}\": ${NEW_COUNT}}" >"${TMP_COUNTS}"
-	mv "${TMP_COUNTS}" "${ERROR_COUNTS_FILE}"
-fi
+NEW_COUNT=$(error_count_bump "${ERROR_KEY}" "${ERROR_MSG}")
 
 RETRYABLE_PATTERNS="rate.limit|quota.exceeded|overloaded|too.many.requests|429|503|capacity|credit.balance|temporarily.unavailable|service.unavailable|timeout|ECONNRESET|ETIMEDOUT|rate_limit|resource_exhausted"
 
 # 3 — circuit-breaker threshold: two failures are retriable (transient/capacity); third signals a stuck delegation loop.
 CIRCUIT_BREAKER=""
 if [[ "${NEW_COUNT}" -ge 3 ]]; then
-	CIRCUIT_BREAKER=" This error has occurred 3+ times. Stop retrying the same approach. Escalate to oracle for architectural guidance or try a fundamentally different approach."
+	TIMELINE=$(jq -r --arg key "${ERROR_KEY}" \
+		'(.[$key].last_errors // []) | reverse | to_entries | map("\(.key + 1)) \(.value)") | join(" ")' \
+		"${ERROR_COUNTS_FILE}" 2>/dev/null)
+	CIRCUIT_BREAKER=" This error has occurred 3+ times. Attempts: ${TIMELINE}. Stop retrying the same approach. Escalate to oracle for architectural guidance or try a fundamentally different approach."
 fi
 
 if echo "${ERROR_MSG}" | grep -qiE "${RETRYABLE_PATTERNS}"; then

@@ -6,6 +6,20 @@ STATE_DIR="${HOOK_STATE_DIR}"
 CONTEXT_FILE="${STATE_DIR}/compaction-context.md"
 CLAIM_FILE="${STATE_DIR}/compaction-context.restore.$$"
 
+# Stamp compaction time unconditionally (this script only runs on the
+# "compact" SessionStart matcher, so a compaction always just happened here)
+# so plan-continuation-guard.sh's rail 6 can give the session a moment to
+# resettle before nudging it to keep working. Fail-open: a stamp failure never
+# blocks context restoration below.
+COMPACTION_STAMP_TMP=$(mktemp -p "${STATE_DIR}" 2>/dev/null)
+if [[ -n "${COMPACTION_STAMP_TMP}" ]]; then
+	if date +%s >"${COMPACTION_STAMP_TMP}" 2>/dev/null; then
+		mv "${COMPACTION_STAMP_TMP}" "${STATE_DIR}/last-compaction-at"
+	else
+		rm -f "${COMPACTION_STAMP_TMP}"
+	fi
+fi
+
 if [[ ! -f "${CONTEXT_FILE}" ]]; then
 	exit 0
 fi

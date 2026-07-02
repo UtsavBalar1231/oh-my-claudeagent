@@ -27,14 +27,33 @@ SESSION_ID="${CLAUDE_SESSION_ID:-$(date +%s)-$$}"
 
 # One-time migration: merge legacy Task:delegate_error counter key → Agent:delegate_error.
 # Pre-v2.0 delegate-retry.sh used tool_name // "Task"; the canonical platform name is Agent.
-# Guard: only run if file exists AND contains the legacy key (idempotent on clean installs).
+# Shape-agnostic: entries are now EITHER a bare int (legacy) OR an object
+# {count, last_failure_at, last_errors} (error_count_bump helper, common.sh) — a
+# naive "+ N" merge breaks on the object shape, so counts/errors/timestamps are
+# merged per-field regardless of which side is which shape.
 COUNTS_FILE="${STATE_DIR}/error-counts.json"
 if [[ -f "${COUNTS_FILE}" ]] && jq -e 'has("Task:delegate_error")' "${COUNTS_FILE}" >/dev/null 2>&1; then
-	LEGACY_COUNT=$(jq -r '."Task:delegate_error" // 0' "${COUNTS_FILE}")
+	LEGACY_COUNT=$(jq -r '."Task:delegate_error" | if type == "object" then (.count // 0) else (. // 0) end' "${COUNTS_FILE}")
 	TMP_MIGRATION=$(mktemp)
-	jq --argjson legacy "${LEGACY_COUNT}" \
-		'del(."Task:delegate_error") | ."Agent:delegate_error" = ((."Agent:delegate_error" // 0) + $legacy)' \
-		"${COUNTS_FILE}" >"${TMP_MIGRATION}" && mv "${TMP_MIGRATION}" "${COUNTS_FILE}"
+	jq --argjson legacy "${LEGACY_COUNT}" '
+		def as_count: if type == "object" then (.count // 0) else (. // 0) end;
+		def as_errors: if type == "object" then (.last_errors // []) else [] end;
+		def as_failure_at: if type == "object" then (.last_failure_at // null) else null end;
+		(."Task:delegate_error") as $legacy_entry
+		| (."Agent:delegate_error" // 0) as $target
+		| del(."Task:delegate_error")
+		| ."Agent:delegate_error" = (
+			if ($target | type) == "object" or ($legacy_entry | type) == "object" then
+				{
+					count: (($target | as_count) + ($legacy_entry | as_count)),
+					last_failure_at: (($target | as_failure_at) // ($legacy_entry | as_failure_at)),
+					last_errors: (($target | as_errors) + ($legacy_entry | as_errors) | .[0:3])
+				}
+			else
+				($target | as_count) + ($legacy_entry | as_count)
+			end
+		)
+	' "${COUNTS_FILE}" >"${TMP_MIGRATION}" && mv "${TMP_MIGRATION}" "${COUNTS_FILE}"
 	log_hook_error "migrated Task:delegate_error (${LEGACY_COUNT}) → Agent:delegate_error" "session-init.sh"
 fi
 
@@ -63,6 +82,7 @@ jq -nc --arg sid "${SESSION_ID}" --arg ts "${TS}" --arg cwd "${PROJECT_ROOT}" \
 
 echo '{}' >"${STATE_DIR}/injected-context-dirs.json"
 echo '{}' >"${STATE_DIR}/subagent-models.json"
+rm -f "${STATE_DIR}/plan-continuation.json" "${STATE_DIR}/tool-loop-window.json" "${STATE_DIR}/delegation-counter.json"
 mkdir -p "${STATE_DIR}/worktrees"
 
 if [[ -n "${DATE_BLOCK}" ]]; then

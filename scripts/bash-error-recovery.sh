@@ -7,6 +7,9 @@ source "$(dirname "$0")/lib/common.sh"
 
 ERROR=$(jq -r '.error // ""' <<< "${HOOK_INPUT}")
 DURATION_MS=$(jq -r '.duration_ms // empty' <<< "${HOOK_INPUT}" 2>/dev/null)
+TOOL_NAME=$(jq -r '.tool_name // "Bash"' <<< "${HOOK_INPUT}")
+ERROR_COUNTS_FILE="${HOOK_STATE_DIR}/error-counts.json"
+ERROR_KEY="${TOOL_NAME}:bash_error"
 
 if echo "${ERROR}" | grep -qiE 'command not found|No such file or directory.*bin'; then
 	ADVICE="Command not found. Check if the tool is installed and on PATH. Try: which <command>"
@@ -29,4 +32,15 @@ else
 	fi
 fi
 
-emit_context "PostToolUseFailure" "[BASH ERROR RECOVERY] ${ADVICE}"
+NEW_COUNT=$(error_count_bump "${ERROR_KEY}" "${ERROR}")
+
+# 3 — circuit-breaker threshold: two failures are retriable (flaky/transient); third signals a stuck loop.
+CIRCUIT_BREAKER=""
+if [[ "${NEW_COUNT}" -ge 3 ]]; then
+	TIMELINE=$(jq -r --arg key "${ERROR_KEY}" \
+		'(.[$key].last_errors // []) | reverse | to_entries | map("\(.key + 1)) \(.value)") | join(" ")' \
+		"${ERROR_COUNTS_FILE}" 2>/dev/null)
+	CIRCUIT_BREAKER=" This error has occurred 3+ times. Attempts: ${TIMELINE}. Stop retrying the same approach. Escalate to oracle for architectural guidance or try a fundamentally different approach."
+fi
+
+emit_context "PostToolUseFailure" "[BASH ERROR RECOVERY] ${ADVICE}${CIRCUIT_BREAKER}"

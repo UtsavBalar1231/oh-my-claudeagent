@@ -14,7 +14,7 @@ load '../test_helper'
 	assert [ -f "$counts_file" ]
 
 	local count
-	count=$(jq -r '."Agent:delegate_error" // 0' "$counts_file")
+	count=$(jq -r '."Agent:delegate_error".count // 0' "$counts_file")
 	assert [ "$count" -eq 1 ]
 }
 
@@ -30,7 +30,7 @@ load '../test_helper'
 
 	local counts_file="$CLAUDE_PROJECT_ROOT/.omca/state/error-counts.json"
 	local count
-	count=$(jq -r '."Agent:delegate_error" // 0' "$counts_file")
+	count=$(jq -r '."Agent:delegate_error".count // 0' "$counts_file")
 	assert [ "$count" -eq 2 ]
 }
 
@@ -140,4 +140,94 @@ load '../test_helper'
 	local actual
 	actual=$(cat "$counts_file")
 	assert [ "$actual" = "$corrupt_content" ]
+}
+
+# ─── error_count_bump: decay, legacy upgrade, timeline, cap ───────────────────
+
+# Case 5: a last_failure_at older than the decay window resets count to 1 on next bump
+@test "delegate-retry: stale last_failure_at (6min old) decays count back to 1" {
+	local counts_file="$CLAUDE_PROJECT_ROOT/.omca/state/error-counts.json"
+	local payload
+	payload='{"tool_name":"Agent","tool_input":{"subagent_type":"oh-my-claudeagent:executor"},"error":"Agent failed: attempt"}'
+
+	run_hook "delegate-retry.sh" "$payload"
+	assert_success
+	run_hook "delegate-retry.sh" "$payload"
+	assert_success
+
+	local count
+	count=$(jq -r '."Agent:delegate_error".count' "$counts_file")
+	assert [ "$count" -eq 2 ]
+
+	# 360s (6min) — older than ERROR_COUNT_DECAY_SECONDS (300s), forces a clean-window reset.
+	local stale_ts=$(( $(date +%s) - 360 ))
+	jq --argjson ts "$stale_ts" '."Agent:delegate_error".last_failure_at = $ts' "$counts_file" > "$counts_file.tmp"
+	mv "$counts_file.tmp" "$counts_file"
+
+	run_hook "delegate-retry.sh" "$payload"
+	assert_success
+
+	count=$(jq -r '."Agent:delegate_error".count' "$counts_file")
+	assert [ "$count" -eq 1 ]
+}
+
+# Case 6: legacy bare-int state is read without error and upgraded to object shape on write
+@test "delegate-retry: legacy bare-int error-counts.json is read cleanly and upgraded" {
+	local counts_file="$CLAUDE_PROJECT_ROOT/.omca/state/error-counts.json"
+	write_state "error-counts.json" '{"Agent:delegate_error": 2}'
+
+	local payload
+	payload='{"tool_name":"Agent","tool_input":{"subagent_type":"oh-my-claudeagent:executor"},"error":"Agent failed: legacy"}'
+	run_hook "delegate-retry.sh" "$payload"
+	assert_success
+
+	local count
+	count=$(jq -r '."Agent:delegate_error".count' "$counts_file")
+	assert [ "$count" -eq 3 ]
+
+	local kind
+	kind=$(jq -r '."Agent:delegate_error" | type' "$counts_file")
+	assert [ "$kind" = "object" ]
+}
+
+# Case 7: breaker message at 3rd failure carries a compact attempt timeline
+@test "delegate-retry: circuit-breaker message at 3rd failure contains attempt timeline" {
+	local payload_a payload_b payload_c
+	payload_a='{"tool_name":"Agent","tool_input":{"subagent_type":"oh-my-claudeagent:executor"},"error":"Agent failed: first issue"}'
+	payload_b='{"tool_name":"Agent","tool_input":{"subagent_type":"oh-my-claudeagent:executor"},"error":"Agent failed: second issue"}'
+	payload_c='{"tool_name":"Agent","tool_input":{"subagent_type":"oh-my-claudeagent:executor"},"error":"Agent failed: third issue"}'
+
+	run_hook "delegate-retry.sh" "$payload_a"
+	assert_success
+	run_hook "delegate-retry.sh" "$payload_b"
+	assert_success
+	run_hook "delegate-retry.sh" "$payload_c"
+	assert_success
+
+	local ctx
+	ctx=$(get_context)
+	echo "$ctx" | grep -qi "Attempts:"
+	echo "$ctx" | grep -qi "first issue"
+	echo "$ctx" | grep -qi "second issue"
+	echo "$ctx" | grep -qi "third issue"
+}
+
+# Case 8: last_errors is capped at 3 entries even after a 4th failure
+@test "delegate-retry: last_errors array is capped at 3 entries" {
+	local counts_file="$CLAUDE_PROJECT_ROOT/.omca/state/error-counts.json"
+	local i payload
+	for i in 1 2 3 4; do
+		payload="{\"tool_name\":\"Agent\",\"tool_input\":{\"subagent_type\":\"oh-my-claudeagent:executor\"},\"error\":\"Agent failed: issue ${i}\"}"
+		run_hook "delegate-retry.sh" "$payload"
+		assert_success
+	done
+
+	local len
+	len=$(jq -r '."Agent:delegate_error".last_errors | length' "$counts_file")
+	assert [ "$len" -eq 3 ]
+
+	# Newest-first: the most recent failure (issue 4) must be at index 0, oldest capped entry dropped.
+	local newest
+	newest=$(jq -r '."Agent:delegate_error".last_errors[0]' "$counts_file")
+	echo "$newest" | grep -qi "issue 4"
 }
