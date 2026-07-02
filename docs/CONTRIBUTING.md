@@ -78,6 +78,19 @@ Add fixture payloads to `tests/fixtures/hooks/` for new hook scripts. The claims
 validates counts declared in CLAUDE.md against on-disk reality — update counts when adding
 agents or skills.
 
+## Post-fix Verification for Race and Timing Bugs
+
+Hook race and timing fixes are easy to claim fixed without ever re-triggering the
+original failure. Follow this checklist:
+
+1. When filing the bug, capture a reproducer (exact command sequence, timing, or fixture)
+   that reliably triggers the race — not just a description of the symptom.
+2. Before closing the fix, re-run that exact reproducer against the fix commit.
+3. Record the verdict in the commit message or changelog entry: reproducer ran and no
+   longer fails, or reproducer still flakes under N runs.
+4. If the reproducer cannot be re-obtained (e.g. it depended on since-changed CI timing),
+   say so honestly — record the fix as "fix unverified end-to-end" rather than "fixed".
+
 ## Plugin Configuration
 
 **Custom paths replace defaults**: `commands`, `agents`, `skills`, and `outputStyles` fields in `plugin.json` replace the platform's default directories — they are not additive. To keep the default directory alongside a custom one, include the default path explicitly in the array.

@@ -1,6 +1,6 @@
 # Orchestration Workflow
 
-> Surfaced on-demand by `scripts/context-injector.sh` when path-matched events fire — NOT injected per-turn.
+> Reference material, not auto-injected. `scripts/context-injector.sh` only injects rule files that start with a `# pattern: <glob>` line (see `.omca/rules/test-discipline.md` for an example); this file has no such line, so read it directly when needed.
 
 ## Pipeline
 

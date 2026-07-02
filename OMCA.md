@@ -4,6 +4,17 @@ Plugin for Claude Code adding multi-agent orchestration: specialist agents, slas
 
 Install: `README.md`. Contributor internals: `CLAUDE.md`.
 
+## Where To Look
+
+| You want to... | Go to |
+|---|---|
+| Know what this is, new to the project | `README.md` |
+| Install the plugin | `README.md` install section |
+| Configure a setting, env var, or hook toggle | `docs/reference/configuration.md` |
+| Something is broken or behaving unexpectedly | `docs/reference/known-issues.md` |
+| Contribute code, add a hook or agent | `docs/CONTRIBUTING.md` |
+| Understand agents, skills, MCP tools, runtime state | this file, sections below |
+
 ---
 
 ## What Is This
@@ -292,10 +303,11 @@ is complete but evidence is missing — it never emits a persistence-style block
 **`SessionStart` `watchPaths` output (v2.1.141–v2.1.167, not adopted):**
 
 `SessionStart` hooks can return a `watchPaths` array to register file-system paths for
-`FileChanged` event delivery. OMCA does not adopt this because the `FileChanged` handler
-(`scripts/cwdchanged.sh`, aliased) is side-effects-only — it logs the event and notifies;
-there is no runtime reader that would benefit from expanded watch coverage. Extending the
-watch set would generate noise without actionable signal.
+`FileChanged` event delivery. OMCA does not adopt this — there is no `FileChanged`
+handler in the current tree (the prior side-effects-only handler was removed in the
+v2.10 minimize-to-core refactor along with `CwdChanged`/`FileChanged` registration), and
+no runtime reader that would benefit from expanded watch coverage. Extending the watch
+set would generate noise without actionable signal.
 
 **`PostToolUse` `updatedToolOutput` field (v2.1.141–v2.1.167, not adopted):**
 
@@ -307,10 +319,11 @@ via `additionalContext`, which appends without overwriting.
 
 **Hooks run without terminal access (v2.1.141+):**
 
-Hook scripts no longer have access to `/dev/tty` or terminal control sequences.
-OMCA's `scripts/notify.sh` is unaffected — it uses only desktop notification APIs
-(`terminal-notifier`, `osascript`, `notify-send`, `zenity`, `powershell`) and stderr bell,
-with zero `/dev/tty` or `tput` calls.
+Hook scripts no longer have access to `/dev/tty` or terminal control sequences. OMCA
+has no desktop-notification handler in the current tree (the prior `notify.sh` script,
+which used only `terminal-notifier`, `osascript`, `notify-send`, `zenity`, `powershell`,
+and stderr bell, was removed in the v2.10 minimize-to-core refactor) — this platform
+change has no OMCA impact.
 
 Hooks can now emit a `terminalSequence` output field to inject terminal escape sequences:
 ```json

@@ -89,25 +89,9 @@ hooks for persistence, context injection, and auto-approval.
 
 ### Heads-up — `worktree.baseRef` and unpushed commits
 
-When you run anything in an isolated git worktree — `/oh-my-claudeagent:start-work
---worktree`, or any agent you've given `isolation: worktree` — each invocation spawns
-in a fresh worktree. Since Claude Code v2.1.133, the default base ref for new worktrees
-is `origin/<default-branch>` (i.e. `"fresh"`) — **unpushed local commits are not visible
-inside that worktree**. (OMCA's own `explore` and `librarian` agents run in your main
-checkout, not a worktree, so they always see uncommitted work.)
-
-If you have WIP commits that haven't been pushed yet and you want worktree-isolated work
-to see them, set this in your user `~/.claude/settings.json`:
-
-```json
-"worktree": { "baseRef": "head" }
-```
-
-As of v2.1.154, `"head"` correctly resolves to the current worktree HEAD (the branch
-you have checked out), not the main checkout HEAD. Earlier versions had a bug where it
-resolved to the wrong HEAD in some setups.
-
-Otherwise, push to your remote before delegating exploration of recently-changed code.
+Worktree-isolated agents can silently miss your unpushed local commits. See
+[Known Issues](docs/reference/known-issues.md#worktreebaseref-hides-unpushed-commits-by-default)
+for the trap and the one-setting workaround.
 
 ## Requirements
 
@@ -117,10 +101,24 @@ Otherwise, push to your remote before delegating exploration of recently-changed
 - `python3` 3.10+
 - `ast-grep` CLI (`ast-grep` or `sg`)
 
+### For LLM agents
+
+If you're an agent installing this plugin on someone's behalf, paste this after
+install:
+
+```
+Run /oh-my-claudeagent:omca-setup, then verify: (1) it reports dependencies OK
+(jq, uv, python3, ast-grep all found), (2) it confirms ~/.claude/settings.json
+was updated with the orchestration block, (3) it prints a final summary with no
+FAIL lines. If any check fails, run it again with --doctor and report the output.
+```
+
 ## Documentation
 
 - `OMCA.md` — Complete guide: agents, skills, workflows, MCP tools, runtime state, troubleshooting
 - `CLAUDE.md` — Contributor internals: hook map, cross-file patterns, adding components
+- [`docs/reference/known-issues.md`](docs/reference/known-issues.md) — live limitations and workarounds
+- [`docs/reference/configuration.md`](docs/reference/configuration.md) — every user-facing setting, env var, and settings.json block
 
 ## Acknowledgments
 
