@@ -5,6 +5,137 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.13.0] - 2026-07-02
+
+Adds a set of Stop-time and PostToolUse hooks aimed at keeping sessions on task
+(a plan-continuation guard, a tool-loop detector, and a delegation reminder), plus
+static type checking, a local maintainer QA harness with a mock inference backend,
+a transcript-search MCP tool, decaying error counters with retry history, and a
+round of research-informed upgrades to the agent prompts, output style, and docs.
+
+### Added
+
+- **Plan-continuation guard.** A new Stop hook nudges the session to keep working when
+  its bound plan still has unchecked tasks, instead of letting a session end mid-plan.
+  Nine safety rails (recursion guard, kill switch, missing/unbound plan, no unchecked
+  boxes, user-pause phrase detection, post-compaction grace window, stale-binding
+  escape, trailing-question detection, and an exponential-cooldown counter with a hard
+  cap and stagnation escape) keep it from becoming a nag.
+- **Tool-loop detector.** Flags three consecutive identical tool calls (same tool and
+  arguments) as a loop signal and suggests changing approach instead of repeating it.
+- **Delegation reminder.** A one-shot, per-session nudge toward specialist agents after
+  three direct work-tool calls with no delegation in between.
+- **Unified `OMCA_DISABLED_HOOKS` kill switch.** A single comma/whitespace-separated
+  env var now disables any OMCA hook by basename, replacing the ad hoc per-hook
+  env vars that preceded it.
+- **Decaying error counters with retry history.** Error counts for the five
+  PostToolUseFailure recovery hooks (bash, edit, read, json, delegate-retry) now reset
+  after a clean window instead of growing forever, and circuit-breaker messages include
+  a numbered timeline of recent errors instead of just a repeat count.
+- **`boulder_progress` next-task label.** Plan progress now includes the text of the
+  first unchecked task (truncated for display), and the statusline's plan/TODO segment
+  shows it as a resume hint.
+- **Restored `templates/claudemd.md`** as the orchestration-block template (agent
+  catalog, workflow pipeline, cross-cutting policy), plus a redesigned default output
+  style organized around explicit Principles, What-not-to-do, Communication, and
+  Coding-discipline sections.
+- **Agent prompt upgrades.** sisyphus gains counter-defaults (literal-following,
+  over-exploration, over-asking, capability under-reach), a team-eligibility table, and
+  a thinking-calibration note; executor gains a verification termination rule and
+  manual-QA teardown tracking; prometheus, start-work, and the specialist agents share
+  an ambiguity-resolution ladder (patterns -> tests -> docs -> reasonable inference ->
+  ask, as a last resort).
+- **New validate-plugin gates**: claudemd template packaging, depersonalization (no
+  home paths, credentials, or bearer tokens in shipped files), docs-accuracy (README/
+  OMCA.md path references resolve to real files), and MCP tool/hook name cross-checks.
+- **Upgraded comment-checker** with slop-pattern detection for comments that restate
+  what the code already says, a whole-file opt-out marker, and a kill-switch check.
+- **New docs**: `docs/reference/configuration.md`, `docs/reference/known-issues.md`,
+  and two worked settings.json profiles (`docs/examples/low-friction.md`,
+  `docs/examples/strict.md`).
+- **Typecheck gate.** `just typecheck` runs pyright over `servers/` and
+  `statusline/` (a shared root `pyrightconfig.json`), wired into `just ci` and a
+  new CI job; ruff lint/format now also cover `statusline/`, which previously
+  shipped with no static coverage at all.
+- **Local `claude-code-qa` harness** (`scripts/qa/`, `just qa`): packaged-plugin
+  install verification, live hook probes, a statusline probe, and a session
+  smoke test. The smoke test runs against a local mock Anthropic Messages
+  endpoint by default instead of staying skip-by-default; a machine-local spike
+  confirmed that `ANTHROPIC_BASE_URL`, scoped to the `claude` subprocess, redirects
+  credentialed inference traffic to a local listener without a routing or auth
+  failure, so the mock can shape a valid response and the smoke test runs
+  deterministically with no real API spend.
+- **`session_search` MCP tool.** Read-only, role-structured search over local
+  session transcripts, scoped to the resolved project's own transcript
+  directory. A bare `rg` search over transcript JSONL returns raw lines that can
+  run into the tens of KB with no role attribution; this tool parses the
+  block-typed message structure and caps output to bounded, de-noised excerpts.
+- **Two new skills**: `remove-ai-slops` (categorized detection and rewriting of
+  AI-tell prose patterns) and `debugging` (a diagnostics-first methodology for
+  isolating root causes before attempting a fix), plus a validate-plugin check
+  that every skill's `references/*.md` links are bidirectionally consistent
+  (no missing targets, no orphaned files).
+- **Directory-level `AGENTS.md` maps** for the root and six top-level
+  directories (`hooks/`, `scripts/`, `servers/`, `skills/`, `statusline/`,
+  `tests/`), with a CONTRIBUTING.md note that structural changes update the
+  relevant map in the same change.
+
+### Changed
+
+- **CI now runs the full local test suite before a release can happen.** The bats job
+  covers `tests/bats/unit/` alongside `tests/bats/hooks/`, a new MCP-validation job
+  starts the real server and checks its tool list, and the release workflow's
+  pre-tag gate widened from claims-only to claims-and-hooks validation.
+- **CI workflow hardening.** Third-party actions are pinned to a commit SHA, the
+  release workflow's `contents: write` permission is scoped to the job that needs it
+  instead of the whole workflow, tag-triggered dependency-setup steps disable default
+  caching, checkouts that don't push set `persist-credentials: false`, and release
+  creation now runs `gh release create` directly instead of a third-party action.
+- **Notepad files are now append-only at the Write-tool level**: `write-guard.sh`
+  denies direct `Write` calls under `.omca/notepads/`, steering toward the
+  `notepad_write` MCP tool so history is never silently overwritten.
+- **`categories.json` model values switched to short aliases** (`sonnet`/`opus`/
+  `fable`) matching agent frontmatter conventions, and the unused
+  `concurrency_limits` block was dropped.
+- **`.omca/notes/` is no longer gitignored**, so decision records can ship in
+  the repository instead of staying local-only.
+
+### Fixed
+
+- **Legacy error-counter migration** now merges the bare-int and object counter shapes
+  correctly instead of breaking when either side had already been upgraded by the new
+  decaying-counter format.
+- **`.omca/` runtime state no longer prevents shipping rule files.** The gitignore
+  narrowed from a blanket `.omca/` to `.omca/*` with an explicit `!/.omca/rules/`
+  carve-out, and a consuming project's own `.omca/.gitignore` is now written
+  automatically (without overwriting a customized one) the first time its state
+  directory is created.
+- **Truncated file reads and injected context now say where to find the rest**:
+  `file_read` and `context-injector.sh`'s AGENTS.md/README.md/rule injections append a
+  note naming the full path (and, for `file_read`, the offset to resume from) instead
+  of silently cutting off.
+- **Golden validate-plugin fixture was masking a real hook failure.** The
+  harness's isolated-environment state-dir variables were leaking into the
+  child hook under test instead of being pinned to the fixture's own project
+  root, so `post-compact-inject.sh` silently produced no output during the
+  golden run. Both are now pinned explicitly.
+- **Statusline subagent panel showed the platform's generic label instead of the real
+  agent name, and the todo counter could drop out of sync with the active session.**
+  Session-id resolution is now aligned between `session-init.sh` and the statusline
+  reader, subagent names resolve by id instead of trusting the generic label, and the
+  display ladder gained a fallback so a still-resolvable agent never silently drops
+  out of the panel. An opt-in env var can dump the raw statusline payload for
+  debugging without touching normal runtime behavior.
+
+### Notes
+
+Two audits closed without new code: a boulder-telemetry review found every
+candidate field already derivable from state the plan/session registry already
+stores (see `.omca/notes/boulder-telemetry-verdict.md`), and an A/B benchmark
+of task-completion verification candidates against the current heuristic
+concluded keep-current; no candidate cleared its pre-registered improvement
+bar (see `benchmarks/verify-heuristics/RESULTS.md`).
+
 ## [2.12.1] - 2026-07-02
 
 Statusline accuracy release: the active-agent count and the plan/TODO segment now reflect what is
