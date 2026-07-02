@@ -64,6 +64,7 @@ EXCLUDES=(
 	'.in_use/'
 	'benchmarks/'
 	'tests/'
+	'scripts/qa/'
 	'*.pyc'
 	'__pycache__/'
 	'node_modules/'

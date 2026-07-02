@@ -11,10 +11,12 @@ default:
 [group('lint')]
 lint: lint-shell lint-python
 
-# Lint shell scripts with shellcheck
+# Lint shell scripts with shellcheck. scripts/*.sh is non-recursive by design, so
+# scripts/qa/ (the qa harness, packaging-excluded) is listed explicitly rather than
+# widening the glob to every subdirectory.
 [group('lint')]
 lint-shell:
-	shellcheck scripts/*.sh
+	shellcheck scripts/*.sh scripts/qa/*.sh scripts/qa/lib/*.sh
 
 # Lint Python with ruff. servers/ and statusline/ carry separate ruff configs
 # (py310 vs py312 target-version) since statusline's stdlib usage (e.g. datetime.UTC)
@@ -70,6 +72,17 @@ test-pytest:
 [group('test')]
 test-bats:
 	tests/bats/bats-core/bin/bats tests/bats/hooks/ tests/bats/unit/
+
+# Run the claude-code-qa harness: packaged-plugin install/hook/statusline probes plus
+# a skip-by-default session smoke test. Maintainer pre-release step, NOT part of CI --
+# it launches real `claude` sessions against a scratch project under the real HOME
+# (see scripts/qa/lib/qa-common.sh for the isolation model), so it stays local/manual.
+[group('test')]
+qa:
+	bash scripts/qa/install-verify.sh
+	bash scripts/qa/hook-live-probe.sh
+	bash scripts/qa/statusline-probe.sh
+	bash scripts/qa/session-smoke.sh
 
 # ── Typecheck ────────────────────────────────────────────────────
 
