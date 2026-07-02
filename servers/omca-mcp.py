@@ -19,6 +19,7 @@ from tools import (
     evidence,
     filesystem,
     notepad,
+    sessions,
     validate_plan_write,
 )
 
@@ -30,6 +31,7 @@ evidence.register(mcp)
 filesystem.register(mcp)
 notepad.register(mcp)
 catalog.register(mcp)
+sessions.register(mcp)
 validate_plan_write.register(mcp)
 
 
