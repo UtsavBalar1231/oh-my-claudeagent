@@ -60,13 +60,21 @@ while true; do
 			# and exits before the line that would exceed 2000 bytes, so we never cut mid-codepoint
 			# the way head -c 2000 could on multi-byte sequences.
 			AGENTS_CONTENT=$(awk 'BEGIN{n=0}{n+=length($0)+1; if(n>2000)exit; print}' "${CURRENT_DIR}/AGENTS.md")
-			CONTEXT_PARTS+="[AGENTS.md from ${CURRENT_DIR}]: ${AGENTS_CONTENT}"$'\n'
+			CONTEXT_PARTS+="[AGENTS.md from ${CURRENT_DIR}]: ${AGENTS_CONTENT}"
+			if [[ "$(wc -c <"${CURRENT_DIR}/AGENTS.md")" -gt 2000 ]]; then
+				CONTEXT_PARTS+=" (truncated — read full file at ${CURRENT_DIR}/AGENTS.md)"
+			fi
+			CONTEXT_PARTS+=$'\n'
 		fi
 
 		if [[ -f "${CURRENT_DIR}/README.md" ]]; then
 			# 2000 bytes, line-respecting — same awk idiom as AGENTS.md above.
 			README_CONTENT=$(awk 'BEGIN{n=0}{n+=length($0)+1; if(n>2000)exit; print}' "${CURRENT_DIR}/README.md")
-			CONTEXT_PARTS+="[README.md from ${CURRENT_DIR}]: ${README_CONTENT}"$'\n'
+			CONTEXT_PARTS+="[README.md from ${CURRENT_DIR}]: ${README_CONTENT}"
+			if [[ "$(wc -c <"${CURRENT_DIR}/README.md")" -gt 2000 ]]; then
+				CONTEXT_PARTS+=" (truncated — read full file at ${CURRENT_DIR}/README.md)"
+			fi
+			CONTEXT_PARTS+=$'\n'
 		fi
 
 		TMP=$(mktemp)
@@ -104,7 +112,11 @@ if [[ -d "${RULES_DIR}" ]]; then
 
 					RULE_ALREADY_INJECTED=$(jq -r --arg key "${RULE_CACHE_KEY}" '.[$key] // "false"' "${CACHE_FILE}" 2>/dev/null)
 					if [[ "${RULE_ALREADY_INJECTED}" == "false" ]]; then
-						CONTEXT_PARTS+="[Rule: ${PATTERN}]: ${RULE_CONTENT}"$'\n'
+						CONTEXT_PARTS+="[Rule: ${PATTERN}]: ${RULE_CONTENT}"
+						if [[ "${#RULE_TAIL}" -gt 1000 ]]; then
+							CONTEXT_PARTS+=" (truncated — read full rule at ${RULE_FILE})"
+						fi
+						CONTEXT_PARTS+=$'\n'
 
 						RULE_TMP=$(mktemp)
 						jq --arg key "${RULE_CACHE_KEY}" '.[$key] = "true"' "${CACHE_FILE}" >"${RULE_TMP}" && mv "${RULE_TMP}" "${CACHE_FILE}"
