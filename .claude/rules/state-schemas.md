@@ -325,14 +325,18 @@ Escalate to oracle."
 ## subagent-models.json
 
 **Path**: `.omca/state/subagent-models.json`
-**Writers**: `scripts/subagent-start.sh` (`SubagentStart` hook)
-**Readers**: statusline renderer (shows each live subagent's real model)
+**Writers**: `scripts/subagent-start.sh` (`SubagentStart` hook),
+`scripts/subagent-stop.sh` (`SubagentStop` hook)
+**Readers**: statusline renderer (per-subagent model names, and
+`_active_agent_count()` renders `N agents` on Line 1 from `len()` of this file)
 **Lifecycle**:
 1. Upserted on every `SubagentStart` event that carries a non-empty `agent_id`.
-2. Reset to `{}` by `scripts/session-init.sh` on `SessionStart` (session-scoped,
-   mirrors the `injected-context-dirs.json` reset).
-3. No `SubagentStop` cleanup — the renderer only shows live tasks, so stale
-   entries left after a subagent finishes are simply never displayed.
+2. The entry is deleted on that agent's `SubagentStop` — required because the
+   main statusline counts entries as "active agents"; without the delete the
+   count is "agents ever spawned this session", not "running now".
+3. Reset to `{}` by `scripts/session-init.sh` on `SessionStart` (session-scoped,
+   mirrors the `injected-context-dirs.json` reset) — the backstop for entries a
+   crashed subagent leaves behind.
 
 **Top-level structure**: a plain object keyed by `agent_id` (unique per spawned
 subagent instance).

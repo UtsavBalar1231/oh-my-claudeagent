@@ -57,6 +57,17 @@
 				]
 			}
 		],
+		"SubagentStop": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/subagent-stop.sh",
+						"timeout": 5000
+					}
+				]
+			}
+		],
 		"PreToolUse": [
 			{
 				"matcher": "Grep",
