@@ -237,6 +237,33 @@
 						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/empty-task-response.sh"
 					}
 				]
+			},
+			{
+				"matcher": "Bash|Edit|Read|Grep|Glob",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/tool-loop-detector.sh"
+					}
+				]
+			},
+			{
+				"matcher": "Edit|Write|Bash",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/delegation-reminder.sh"
+					}
+				]
+			},
+			{
+				"matcher": "Agent",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/delegation-reminder.sh"
+					}
+				]
 			}
 		],
 		"PostToolUseFailure": [
