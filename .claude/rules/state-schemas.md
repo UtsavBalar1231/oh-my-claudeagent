@@ -149,13 +149,28 @@ Writes use `tempfile.mkstemp(dir=state_dir, ...)` + `os.replace()` — never a f
 temp path, so two writers can never collide on the same temp file even inside the
 same lock window.
 
-**Session ID note**: `_resolve_session_id` (Python/MCP side, `servers/tools/_common.py`)
-reads the `CLAUDE_CODE_SESSION_ID` env var — this is the authoritative key used for
-every `bindings{}` key written by `boulder_write`. The bash-side `resolve_session_id`
-(`scripts/lib/common.sh`) checks a differently-named env var (`CLAUDE_SESSION_ID`) first
-and falls back to the hook payload's `.session_id` / `session.json`'s `.sessionId` —
-in practice these resolve to the same underlying platform session identifier, but the
-env var name itself is not shared between the bash and Python layers.
+**Session ID note**: the platform session UUID (the transcript filename, e.g.
+`a457c5cc-5014-...`) is the canonical id — it is what every session-id-keyed
+lookup must agree on, including `bindings{}` keys written by `boulder_write`.
+
+`_resolve_session_id` (Python/MCP side, `servers/tools/_common.py`) reads the
+`CLAUDE_CODE_SESSION_ID` env var, confirmed live-present in MCP/agent shell env
+and equal to the platform UUID. The bash-side `resolve_session_id`
+(`scripts/lib/common.sh`) checks a differently-named env var (`CLAUDE_SESSION_ID`)
+first — confirmed ABSENT from hook shell env in practice — then falls back to the
+hook payload's `.session_id` (present and equal to the platform UUID on every
+`SessionStart` call), then `session.json`'s `.sessionId`. Because tier 1 is dead
+in practice, the bash resolver effectively always lands on tier 2, which does
+carry the platform UUID.
+
+`scripts/session-init.sh` used to hand-roll its own id lookup
+(`${CLAUDE_SESSION_ID:-$(date +%s)-$$}`), skipping the payload's `.session_id`
+entirely and writing an epoch-PID id into `session.json` and the SessionStart
+banner. That epoch-PID id never matched `boulder_write`'s platform-UUID
+bindings key, so anything resolving a session's bound plan from a banner-derived
+id (e.g. the statusline `T:` counter) silently found nothing. Fixed by having
+`session-init.sh` call the shared `resolve_session_id()` helper instead, so it
+lands on the same platform UUID as every other reader.
 
 ---
 

@@ -10,9 +10,11 @@ import pytest
 
 from statusline.core import build_glyphs
 from statusline.subagent import (
+    _dump_payload,
     _load_models,
     _render_row,
     _resolve_model,
+    _resolve_name,
     _visible_truncate,
     main,
 )
@@ -65,6 +67,75 @@ class TestResolveModel:
         assert _resolve_model({"id": "a", "name": "executor"}, {}) == ""
 
 
+class TestResolveName:
+    def test_state_entry_wins_over_generic_payload_name(self) -> None:
+        models = {
+            "agent-1": {"agent_type": "oh-my-claudeagent:librarian", "model": "Sonnet"}
+        }
+        task = {"id": "agent-1", "name": "local_agent"}
+        assert _resolve_name(task, models) == "librarian"
+
+    def test_meaningful_payload_name_wins_when_no_state_entry(self) -> None:
+        task = {"id": "unmapped", "name": "oh-my-claudeagent:oracle"}
+        assert _resolve_name(task, {}) == "oracle"
+
+    def test_generic_name_no_state_entry_keeps_generic(self) -> None:
+        task = {"id": "unmapped", "name": "local_agent"}
+        assert _resolve_name(task, {}) == "local_agent"
+
+    def test_other_plugin_namespace_stripped(self) -> None:
+        models = {"agent-1": {"agent_type": "some-plugin:reviewer", "model": ""}}
+        task = {"id": "agent-1", "name": "local_agent"}
+        assert _resolve_name(task, models) == "reviewer"
+
+    def test_empty_state_agent_type_falls_back_to_payload(self) -> None:
+        models = {"agent-1": {"agent_type": "", "model": "Sonnet"}}
+        task = {"id": "agent-1", "name": "oh-my-claudeagent:hephaestus"}
+        assert _resolve_name(task, models) == "hephaestus"
+
+
+class TestDumpPayload:
+    def test_no_env_var_is_noop(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("OMCA_SUBAGENT_STATUSLINE_DUMP", raising=False)
+        _dump_payload('{"tasks": []}')  # must not raise
+
+    def test_writes_jsonl_line(
+        self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        dump_path = tmp_path / "dump.jsonl"
+        monkeypatch.setenv("OMCA_SUBAGENT_STATUSLINE_DUMP", str(dump_path))
+        _dump_payload('{"tasks": []}')
+        _dump_payload('{"tasks": [1]}')
+        lines = dump_path.read_text(encoding="utf-8").splitlines()
+        assert lines == ['{"tasks": []}', '{"tasks": [1]}']
+
+    def test_unwritable_path_no_crash(
+        self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Directory as target path -> open() raises OSError; must be swallowed.
+        monkeypatch.setenv("OMCA_SUBAGENT_STATUSLINE_DUMP", str(tmp_path))
+        _dump_payload('{"tasks": []}')  # must not raise
+
+    def test_main_dumps_payload_and_renders_normally(
+        self,
+        tmp_path: pathlib.Path,
+        capsys: pytest.CaptureFixture,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        dump_path = tmp_path / "dump.jsonl"
+        monkeypatch.setenv("OMCA_SUBAGENT_STATUSLINE_DUMP", str(dump_path))
+        payload = {
+            "tasks": [
+                {"id": "a", "name": "oh-my-claudeagent:hephaestus", "status": "running"}
+            ]
+        }
+        monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(payload)))
+        main()
+        out = capsys.readouterr().out.strip().splitlines()
+        assert len(out) == 1
+        assert dump_path.read_text(encoding="utf-8").strip() == json.dumps(payload)
+
+
 class TestVisibleTruncate:
     def test_zero_width_returns_empty(self) -> None:
         assert _visible_truncate("hello", 0) == ""
@@ -113,6 +184,18 @@ class TestRenderRow:
         task = {"id": "a", "name": "oh-my-claudeagent:hephaestus", "status": "running"}
         row = _render_row(task, {}, self._glyphs(), False, 80)
         assert "oh-my-claudeagent:" not in row
+
+    def test_generic_platform_name_replaced_by_state_agent_type(self) -> None:
+        # Regression: the platform's task name/type is often the generic
+        # "local_agent" placeholder even though the real agent is known via
+        # the SubagentStart state cache.
+        task = {"id": "a58e436", "name": "local_agent", "status": "running"}
+        models = {
+            "a58e436": {"agent_type": "oh-my-claudeagent:librarian", "model": "Sonnet"}
+        }
+        row = _render_row(task, models, self._glyphs(), False, 80)
+        assert "librarian" in row
+        assert "local_agent" not in row
 
 
 class TestMainStdinContract:

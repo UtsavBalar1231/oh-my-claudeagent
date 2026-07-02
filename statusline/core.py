@@ -23,7 +23,7 @@ _SERVERS_DIR = str(Path(__file__).resolve().parent.parent / "servers")
 if _SERVERS_DIR not in sys.path:
     sys.path.insert(0, _SERVERS_DIR)
 
-from tools._boulder_core import next_task_label, normalize  # noqa: E402
+from tools._boulder_core import next_task_label, resolve_bound_plan  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -383,34 +383,30 @@ def _format_tokens(n: int) -> str:
 def _todo_counter(
     project_dir: str, glyphs: dict[str, str], nerd: bool, session_id: str = ""
 ) -> str:
-    """Return a TODO counter token for THIS session's bound plan, or "".
+    """Return a TODO counter token for the resolved active plan, or "".
 
-    Display is deliberately stricter than the resolver ladder hooks use: the
-    token renders only when `session_id` holds an explicit binding in the
-    registry, and the bound plan still has open tasks. The sole-plan and
-    most-recent fallbacks exist for resume plumbing, not display — without
-    this gate a fresh session doing unrelated work inherits whatever stale
-    plan is left in boulder.json. A checkbox-complete plan is hidden too:
-    finished work is not an active TODO. Returns "" when boulder is missing,
-    the session is unbound (the old flat schema has no bindings, so it never
-    displays), the plan file is gone, total == 0, all tasks are done, or any
-    error occurs. PURE-READ — never writes boulder.json.
+    Resolves via the shared registry ladder (`_boulder_core.resolve_bound_plan`):
+    an explicit binding for `session_id` wins first; when nothing binds (empty
+    `session_id`, or a `session_id` absent from `bindings`) this falls back to
+    the sole registered plan, then the most-recently-started one. The exact
+    fallback ladder hooks already use. Binding keys and the platform session id
+    are not guaranteed to come from the same id generation (see the session-id
+    note in .claude/rules/state-schemas.md) — degrading to the most plausible
+    plan beats hiding the counter outright whenever that mismatch occurs. A
+    checkbox-complete plan is still hidden: finished work is not an active
+    TODO. Returns "" when boulder is missing, no plan resolves at all, the
+    plan file is gone, total == 0, every task is checked, or any error
+    occurs. PURE-READ — never writes boulder.json.
     """
-    if not project_dir or not session_id:
+    if not project_dir:
         return ""
     try:
         boulder_path = Path(project_dir) / ".omca" / "state" / "boulder.json"
         if not boulder_path.exists():
             return ""
         raw = boulder_path.read_text(encoding="utf-8")
-        registry = normalize(json.loads(raw))
-        binding = registry["bindings"].get(session_id)
-        if not isinstance(binding, dict):
-            return ""
-        plan_entry = registry["plans"].get(binding.get("plan_name", ""))
-        if not isinstance(plan_entry, dict):
-            return ""
-        active_plan = plan_entry.get("active_plan")
+        boulder = json.loads(raw)
+        active_plan = resolve_bound_plan(boulder, session_id).get("active_plan")
         if not active_plan:
             return ""
         plan_path = Path(active_plan)

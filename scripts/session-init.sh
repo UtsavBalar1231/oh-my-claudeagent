@@ -19,11 +19,14 @@ if [[ -n "${CLAUDE_PLUGIN_DATA:-}" ]]; then
 	fi
 fi
 
-# CLAUDE_SESSION_ID is reliable in v2.x. The fallback (epoch-PID) exists for
-# pre-v2.x clients where the var may be absent. Fallback IDs will NOT match
-# resolve_session_id's other lookup tiers, so cross-hook session correlation
-# degrades gracefully.
-SESSION_ID="${CLAUDE_SESSION_ID:-$(date +%s)-$$}"
+# resolve_session_id() ranks CLAUDE_SESSION_ID, then the SessionStart
+# payload's own .session_id (the platform UUID, same as the transcript
+# filename), then a stale session.json -- prefer it over CLAUDE_SESSION_ID
+# alone, which is frequently unset. Epoch-PID fallback only fires when the
+# payload truly lacks a session_id (pre-v2.x clients); such an id won't
+# match other session-id-keyed state (e.g. boulder.json bindings).
+SESSION_ID="$(resolve_session_id)"
+SESSION_ID="${SESSION_ID:-$(date +%s)-$$}"
 
 # One-time migration: merge legacy Task:delegate_error counter key → Agent:delegate_error.
 # Pre-v2.0 delegate-retry.sh used tool_name // "Task"; the canonical platform name is Agent.
@@ -104,7 +107,7 @@ python3 "${PLUGIN_ROOT_RESOLVE}/servers/tools/boulder_gc.py" "${HOOK_PROJECT_ROO
 # that plan's active_plan file still exists. Defensive: any resolve error, an
 # unbound session, or a stale active_plan pointing at a deleted file, leaves
 # SESSION_TITLE empty → key is omitted.
-BOUND_PLAN=$(python3 "${PLUGIN_ROOT_RESOLVE}/servers/tools/boulder_resolve.py" "$(resolve_session_id)" "${HOOK_PROJECT_ROOT}" 2>/dev/null || echo '{}')
+BOUND_PLAN=$(python3 "${PLUGIN_ROOT_RESOLVE}/servers/tools/boulder_resolve.py" "${SESSION_ID}" "${HOOK_PROJECT_ROOT}" 2>/dev/null || echo '{}')
 SESSION_TITLE=""
 ACTIVE_PLAN=$(jq -r '.active_plan // empty' <<< "${BOUND_PLAN}" 2>/dev/null || true)
 if [[ -n "${ACTIVE_PLAN}" && -f "${ACTIVE_PLAN}" ]]; then

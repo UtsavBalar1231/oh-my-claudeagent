@@ -1097,9 +1097,13 @@ class TestTodoCounter:
         )
         assert result == ""
 
-    def test_unbound_session_hidden(self, tmp_path: pathlib.Path) -> None:
-        """A session with no binding sees no plan: the sole-plan fallback is
-        resolver plumbing for hooks, not statusline display."""
+    def test_unbound_session_falls_back_to_sole_plan(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """A session with no matching binding still sees the sole registered
+        plan: bindings keys and the payload session id can come from different
+        id generations (epoch-pid vs platform UUID), so display degrades to
+        the most plausible plan instead of vanishing."""
         state_dir = tmp_path / ".omca" / "state"
         state_dir.mkdir(parents=True)
         plan_file = tmp_path / "plan.md"
@@ -1109,10 +1113,13 @@ class TestTodoCounter:
         result = _todo_counter(
             str(tmp_path), self._glyphs_ascii(), False, session_id="sess-new"
         )
-        assert result == ""
+        assert "T: 3/10" in result
 
-    def test_empty_session_id_hidden(self, tmp_path: pathlib.Path) -> None:
-        """No session_id -> no binding lookup possible -> hidden."""
+    def test_empty_session_id_falls_back_to_sole_plan(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """No session_id -> no binding lookup possible -> falls back to the
+        sole registered plan rather than hiding."""
         state_dir = tmp_path / ".omca" / "state"
         state_dir.mkdir(parents=True)
         plan_file = tmp_path / "plan.md"
@@ -1120,7 +1127,7 @@ class TestTodoCounter:
         boulder = _bound_boulder(plan_file)
         (state_dir / "boulder.json").write_text(json.dumps(boulder))
         result = _todo_counter(str(tmp_path), self._glyphs_ascii(), False)
-        assert result == ""
+        assert "T: 3/10" in result
 
     def test_empty_project_dir_returns_empty(self) -> None:
         """Empty project_dir string -> returns empty string without crash."""
@@ -1247,12 +1254,13 @@ class TestTodoCounterRegistryResolution:
     def _glyphs(self) -> dict:
         return build_glyphs(False)
 
-    def test_old_flat_schema_hidden_without_binding(
+    def test_old_flat_schema_falls_back_to_migrated_sole_plan(
         self,
         tmp_path: pathlib.Path,
     ) -> None:
-        """Old flat schema has no bindings, so it never displays: stale
-        pre-migration plans must not leak into fresh sessions."""
+        """Old flat schema has no bindings, but migrates to a single-plan
+        registry: the sole-plan fallback still resolves it for an unbound
+        session rather than hiding it."""
         state_dir = tmp_path / ".omca" / "state"
         state_dir.mkdir(parents=True)
         plan_file = tmp_path / "plan.md"
@@ -1265,7 +1273,7 @@ class TestTodoCounterRegistryResolution:
         result = _todo_counter(
             str(tmp_path), self._glyphs(), False, session_id="sess-flat"
         )
-        assert result == ""
+        assert "T: 3/10" in result
 
     def test_new_schema_binding_hit_resolves_bound_plan(
         self, tmp_path: pathlib.Path
@@ -1291,6 +1299,19 @@ class TestTodoCounterRegistryResolution:
             str(tmp_path), self._glyphs(), False, session_id="sess-bound"
         )
         assert "T: 3/10" in result
+
+    def test_zero_plans_returns_empty(self, tmp_path: pathlib.Path) -> None:
+        """Empty registry (no plans at all) -> the ladder has nothing to
+        fall back to, so the counter stays hidden."""
+        state_dir = tmp_path / ".omca" / "state"
+        state_dir.mkdir(parents=True)
+        boulder = {"plans": {}, "bindings": {}}
+        (state_dir / "boulder.json").write_text(json.dumps(boulder))
+
+        result = _todo_counter(
+            str(tmp_path), self._glyphs(), False, session_id="sess-empty"
+        )
+        assert result == ""
 
     def test_binding_miss_with_no_plans_returns_empty(
         self, tmp_path: pathlib.Path
@@ -1333,9 +1354,11 @@ class TestTodoCounterRegistryResolution:
         result = _todo_counter(str(tmp_path), self._glyphs(), False, session_id="sess")
         assert result == ""
 
-    def test_two_plan_file_hidden_without_binding(self, tmp_path: pathlib.Path) -> None:
-        """No session binding -> nothing displays. The most-recent fallback
-        is for hook-side resume plumbing, never for the statusline."""
+    def test_two_plan_no_binding_falls_back_to_most_recent(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """No session binding, multiple plans registered -> falls back to
+        the most-recently-started plan rather than hiding."""
         state_dir = tmp_path / ".omca" / "state"
         state_dir.mkdir(parents=True)
         plan_a = tmp_path / "plan-a.md"
@@ -1348,12 +1371,11 @@ class TestTodoCounterRegistryResolution:
         boulder["plans"]["plan-b"]["active_plan"] = str(plan_b)
         (state_dir / "boulder.json").write_text(json.dumps(boulder))
 
-        # two-plan.json fixture: plan-b has the later started_at, but an
-        # unbound session must not inherit it.
+        # two-plan.json fixture: plan-b has the later started_at.
         result = _todo_counter(
             str(tmp_path), self._glyphs(), False, session_id="sess-unbound"
         )
-        assert result == ""
+        assert "T: 3/10" in result
 
 
 # ---------------------------------------------------------------------------

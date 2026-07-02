@@ -9,6 +9,11 @@ Model lookup is PURE-READ against ``.omca/state/subagent-models.json``
 (written by the SubagentStart hook, not owned by this module) and must
 never crash the renderer -- an absent or malformed file just means rows
 render without a model.
+
+The documented payload (checked 2026-07-02) has no focused/selected field --
+the platform renders the selection caret and owns Up/Down cycling itself.
+Our job is one correct content line per task id; that per-id accuracy is
+what makes cycling through tasks visibly meaningful.
 """
 
 from __future__ import annotations
@@ -46,6 +51,11 @@ _STATUS_COLOR = {
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
+# Observed-but-undocumented platform placeholder labels for a task's
+# name/type when it hasn't (or can't) resolve a real agent name. Treated as
+# "no name" so the state-file lookup gets a chance to supply the real one.
+_GENERIC_NAMES = frozenset({"local_agent", "agent", "task"})
+
 
 def _load_models(cwd: str) -> dict:
     """Read the subagent-model map for a task's project dir.
@@ -82,6 +92,50 @@ def _resolve_model(task: dict, models: dict) -> str:
     return entry.get("model", "") or ""
 
 
+def _strip_namespace(name: str) -> str:
+    """Reduce a `<plugin>:<agent>` label to its last segment."""
+    return name.rsplit(":", 1)[-1]
+
+
+def _resolve_name(task: dict, models: dict) -> str:
+    """Resolve a task's display name: state-file agent_type, then payload, then generic.
+
+    The platform's own task name/type is sometimes a generic placeholder
+    (see `_GENERIC_NAMES`) rather than the real agent. The SubagentStart
+    hook records the real `agent_type` per task id in `subagent-models.json`,
+    so prefer that when present; fall back to the payload label when it's
+    meaningful; otherwise keep the generic label rather than inventing one.
+    """
+    entry = models.get(task.get("id", ""))
+    if isinstance(entry, dict):
+        agent_type = entry.get("agent_type", "") or ""
+        if agent_type:
+            return _strip_namespace(agent_type)
+
+    payload_name = task.get("name") or task.get("type") or "agent"
+    stripped = _strip_namespace(payload_name)
+    if stripped in _GENERIC_NAMES:
+        return payload_name
+    return stripped
+
+
+def _dump_payload(raw: str) -> None:
+    """Append the raw stdin payload to the opt-in dump file, if configured.
+
+    Exists to capture real payload shapes for platform-behavior questions
+    (e.g. selection state) that the documented schema does not answer.
+    Fail-open: any error writing the dump must never affect rendering.
+    """
+    dump_path = os.environ.get("OMCA_SUBAGENT_STATUSLINE_DUMP")
+    if not dump_path:
+        return
+    try:
+        with open(dump_path, "a", encoding="utf-8") as f:
+            f.write(raw.rstrip("\n") + "\n")
+    except OSError:
+        pass
+
+
 def _visible_truncate(s: str, width: int) -> str:
     """Truncate to `width` visible columns, passing ANSI codes through untouched."""
     if width <= 0:
@@ -107,9 +161,7 @@ def _visible_truncate(s: str, width: int) -> str:
 def _render_row(
     task: dict, models: dict, glyphs: dict, nerd: bool, columns: int
 ) -> str:
-    name = (task.get("name") or task.get("type") or "agent").removeprefix(
-        "oh-my-claudeagent:"
-    )
+    name = _resolve_name(task, models)
     glyph = agent_glyph(name, nerd)
     parts = [f"{WHITE}{glyph} {name}{RST}"]
 
@@ -131,8 +183,10 @@ def _render_row(
 
 def main() -> None:
     try:
+        raw = sys.stdin.read()
+        _dump_payload(raw)
         try:
-            data = json.load(sys.stdin)
+            data = json.loads(raw)
         except (json.JSONDecodeError, ValueError):
             return
 

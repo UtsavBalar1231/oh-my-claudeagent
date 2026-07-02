@@ -108,6 +108,11 @@ boulder_write(
 )
 ```
 
+`<current session id>` is the platform session UUID (the `Session <id> initialized`
+value from the SessionStart context, same as the transcript filename) — not a
+locally-generated banner id. Passing the wrong id here is what desyncs the
+statusline TODO counter and every other session-id-keyed lookup against it.
+
 `boulder_write` enforces deduplication and preserves `started_at`. Plan body
 stays at its authoritative location — boulder stores a pointer only.
 

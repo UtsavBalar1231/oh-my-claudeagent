@@ -15,6 +15,32 @@ COMPACT_PAYLOAD='{"hook_event_name":"SessionStart","source":"compact"}'
 	assert [ -n "$session_id" ]
 }
 
+@test "session-init: sessionId prefers the SessionStart payload's platform session_id over a generated banner id when CLAUDE_SESSION_ID is unset" {
+	unset CLAUDE_SESSION_ID
+	local payload='{"hook_event_name":"SessionStart","source":"startup","session_id":"a457c5cc-5014-425c-944d-e4ddf901b5aa"}'
+
+	run_hook "session-init.sh" "$payload"
+	assert_success
+
+	local session_id
+	session_id=$(cat "$CLAUDE_PROJECT_ROOT/.omca/state/session.json" | jq -r '.sessionId')
+	assert [ "$session_id" = "a457c5cc-5014-425c-944d-e4ddf901b5aa" ]
+}
+
+@test "session-init: sessionId falls back to a generated id when neither CLAUDE_SESSION_ID nor payload session_id are present" {
+	unset CLAUDE_SESSION_ID
+
+	run_hook "session-init.sh" "$STARTUP_PAYLOAD"
+	assert_success
+
+	local session_id
+	session_id=$(cat "$CLAUDE_PROJECT_ROOT/.omca/state/session.json" | jq -r '.sessionId')
+	# Fallback shape is "<epoch>-<pid>" — just prove it's non-empty and not the
+	# payload's (absent) session_id.
+	assert [ -n "$session_id" ]
+	[[ "$session_id" =~ ^[0-9]+-[0-9]+$ ]]
+}
+
 # ─── b. session-init injects current date ─────────────────────────────────────
 
 @test "session-init: output contains [CURRENT DATE] block" {
