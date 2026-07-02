@@ -1,20 +1,20 @@
 # Transcript-search tool verdict
 
-Task 9 of `omca-deferred-hardening-v2-14`. Gate: build only if a named
-consumer needs something `rg` over the raw transcript files cannot already
-give it, honestly stated deltas or none.
+Decision record: whether OMCA ships a transcript-search MCP tool. Gate:
+build only if a named consumer needs something `rg` over the raw transcript
+files cannot already give it, honestly stated deltas or none. Decided
+2026-07-02.
 
 ## Named consumers
 
-1. Task 12's corpus extraction (verify-heuristics A/B benchmark). Sequenced
-   after this task in the same plan (`omca-deferred-hardening-v2-14.md` line
-   117: "Task 9's tool, if built, is available to task 12 (sequenced); if
-   task 9 no-goes, task 12 uses direct JSONL extraction per its protocol.").
-   A real consumer, contingent on this gate.
+1. The verify-heuristics A/B benchmark's corpus extraction. If this tool is
+   built, the benchmark can use it; if this tool is a no-go, the benchmark
+   falls back to direct JSONL extraction per its own protocol. A real
+   consumer, contingent on this gate.
 2. Handoff/recap enrichment. An agent mid-session answering "what did we
    decide about X last session" needs role-scoped, bounded results it can
    read without blowing its own context window. `skills/handoff` today has
-   no transcript-search step at all — this is a plausible future consumer,
+   no transcript-search step at all: this is a plausible future consumer,
    not a currently-wired one, but the need (bounded, role-filtered search
    over past turns) is real and unmet by any existing tool.
 
@@ -38,13 +38,13 @@ was verified against a real directory on this machine: the git root
 `/home/utsav/dev/softs/oh-my-claudeagent` slugs to
 `-home-utsav-dev-softs-oh-my-claudeagent`, and that literal directory
 exists under `~/.claude/projects/` with real `*.jsonl` transcripts inside
-it. `rg` needs zero help finding that directory manually — a human or a
+it. `rg` needs zero help finding that directory manually; a human or a
 raw `rg --glob '*.jsonl' -i query ~/.claude/projects/<slug>/` invocation
 could do the same walk. Slug resolution alone would not justify a new tool.
 
 ### Real delta 1: role/turn-structured extraction
 
-Transcript JSONL lines are not text logs — they are full Claude Code
+Transcript JSONL lines are not text logs: they are full Claude Code
 session-event records. A single turn line routinely runs into the tens of
 KB (thinking blocks carry base64-ish signatures, tool_use blocks carry full
 JSON inputs, tool_result blocks carry entire file contents or command
@@ -53,7 +53,7 @@ output). Confirmed by reading a live transcript at
 `message.content` is either a plain string (simple turns) or a list of
 typed blocks (`text`, `thinking`, `tool_use`, `tool_result`), and the role
 that actually matters to a search ("did the assistant say X", "did a tool
-report Y") is not the same as the top-level `type` field alone — a
+report Y") is not the same as the top-level `type` field alone; a
 `tool_result` block lives inside a `user`-typed event but semantically
 answers to "tool", not "user". A plain `rg` match returns the raw JSON line
 verbatim: a caller gets a wall of escaped JSON with the match buried inside
@@ -72,7 +72,7 @@ caps each excerpt to roughly 200 characters around the hit and caps total
 matches to `limit` (default 10, hard max 50), with a truncation notice when
 more matches exist than are returned. `rg` has no equivalent of "give me
 ±100 chars around each hit, and only from the human-relevant text, not the
-signature blob" — `rg -A/-B` operates on line boundaries, and each
+signature blob": `rg -A/-B` operates on line boundaries, and each
 transcript line already is one match.
 
 ## Verdict: GO

@@ -1,9 +1,9 @@
 # Boulder telemetry verdict
 
-Task 11 of `omca-deferred-hardening-v2-14`. Gate: a candidate telemetry field
-qualifies only if some real consumer would act on data that cannot already be
-derived from an existing source. The existing sources, confirmed by reading
-the live code, are:
+Decision record: whether boulder.json needs a new telemetry field. Gate: a
+candidate telemetry field qualifies only if some real consumer would act on
+data that cannot already be derived from an existing source. Decided
+2026-07-02. The existing sources, confirmed by reading the live code, are:
 
 - Plan checkboxes in the plan file itself: completion and the next unchecked
   task. `plan_is_complete()` and `next_task_label()` in

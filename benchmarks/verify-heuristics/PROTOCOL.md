@@ -55,7 +55,7 @@ written by a background subagent mid-flight is invisible to this
 reconstruction. This under-counts RECENT_EVIDENCE=true relative to the real
 hook in exactly the cases where a subagent verified its own work. That
 biases the reconstructed CURRENT candidate toward more false-blocks than the
-live hook actually produces — noted, not corrected, because correcting it
+live hook actually produces: noted, not corrected, because correcting it
 would require re-deriving subagent-internal state this corpus does not
 contain.
 
@@ -88,8 +88,8 @@ rework-signal token (`fix`, `wrong`, `bug`, `gap`, `missed`, `incomplete`,
 earlier event **true-incomplete**. If no later call shares any significant
 word with D, label it **true-complete**. If a later call shares words with D
 but carries no rework-signal token, the event is **ambiguous** and is
-EXCLUDED from both metrics, not guessed either way — the plan's explicit
-requirement. A task can be genuinely reopened for reasons unrelated to the
+EXCLUDED from both metrics, not guessed either way, per this protocol's
+explicit requirement. A task can be genuinely reopened for reasons unrelated to the
 original task's quality (dependency shifted, scope grew, an adjacent bug was
 found by accident); this proxy has no way to distinguish "reopened because
 the first pass was wrong" from "reopened because the world moved," which is
@@ -103,7 +103,7 @@ labeled.
   contain a rework-signal token about something else entirely. Rare given
   the word-overlap gate, not zero.
 - False true-complete (a task that was actually broken looks complete):
-  rework happened in a way this proxy cannot see — a later human-only
+  rework happened in a way this proxy cannot see, such as a later human-only
   conversation turn with no matching `Agent` call, a fix folded into an
   unrelated task's scope, or rework in a session outside this project's
   five transcript files entirely (e.g., a fix applied from a different
@@ -117,8 +117,8 @@ Real corpus: all `Agent` tool_use/tool_result pairs across the five
 transcript files (`corpus/real_events.json`, extracted by
 `extract_corpus.py`). As of this experiment's run, that is on the order of
 110+ events before exclusion. Only `description`, `subagent_type`, relative
-timestamps, keyword/overlap booleans, and the derived label are stored —
-never raw prompt or result text — per the redaction requirement below.
+timestamps, keyword/overlap booleans, and the derived label are stored;
+never raw prompt or result text, per the redaction requirement below.
 
 Five synthetic fixtures (`corpus/synthetic_events.json`, hand-authored,
 explicitly `"synthetic": true`) cover edge cases the real corpus may not
@@ -130,7 +130,7 @@ alternative.
 **Redaction.** Corpus fixtures store only: file id (not the raw session
 UUID path), a redacted sequence index, `description` (already a short
 factual title supplied by the orchestrator, e.g. "Compare agent
-definitions" — not sensitive), `subagent_type`, seconds-since-previous-
+definitions", not sensitive), `subagent_type`, seconds-since-previous-
 evidence-call, keyword-match booleans, word-overlap-with-later-call
 booleans, rework-signal-token booleans, and the derived label. No prompt
 text, no tool_result text, no file paths beyond what's already in
@@ -144,7 +144,7 @@ text, no tool_result text, no file paths beyond what's already in
   (true-incomplete events total).
 
 **Pre-registered caveat, fixed now:** if the true-incomplete count (after
-exclusions) is below **5**, the false-pass metric is not computed at all —
+exclusions) is below **5**, the false-pass metric is not computed at all;
 the experiment reports false-block only. A false-block-only result is
 one-sided evidence: it can support keeping the current heuristic or
 tightening it further, but it CANNOT justify loosening the gate, because
@@ -153,14 +153,14 @@ have enough true-incomplete events to show that trade actually held.
 
 ## Candidates
 
-1. **CURRENT** — `scripts/task-completed-verify.sh` as it stands: keyword
+1. **CURRENT**: `scripts/task-completed-verify.sh` as it stands: keyword
    regex over `task_description`, OR-gated with evidence-file mtime <= 300s
    (reconstructed per "Evidence-recency reconstruction" above).
-2. **NO-NEW-STATE alternative** — same keyword regex, but additionally
+2. **NO-NEW-STATE alternative**: same keyword regex, but additionally
    requires at least one significant word shared between the task
    description and the nearest preceding evidence call's `command` field
    (no new state: uses only fields the evidence schema already has today).
-3. **SESSION-SCOPED alternative — documented only, not implemented.**
+3. **SESSION-SCOPED alternative: documented only, not implemented.**
    Matching evidence to the exact task by session id would need: a new
    `session_id` field on every `evidence_log` entry (`evidence.py` +
    `.claude/rules/state-schemas.md`'s evidence schema, both currently
@@ -170,7 +170,7 @@ have enough true-incomplete events to show that trade actually held.
    This experiment does not implement or measure it; it is named here so
    Stage 3 can point at the cost if a future review asks "why not just do
    the precise thing."
-4. **NULL CONTROL** — no gate; every event passes. Included for
+4. **NULL CONTROL**: no gate; every event passes. Included for
    calibration: it shows the ceiling false-pass rate (100% of
    true-incomplete events "pass" because nothing is checked) and the floor
    false-block rate (0%), so the other candidates' numbers have a frame of
@@ -182,7 +182,7 @@ A candidate other than CURRENT is adopted only if **all** of the following
 hold on this corpus:
 1. True-incomplete count (after exclusion) is >= 5, so the false-pass
    metric is actually computed. Below 5: automatic KEEP CURRENT, regardless
-   of any false-block number — one-sided evidence cannot justify loosening.
+   of any false-block number: one-sided evidence cannot justify loosening.
 2. The candidate's false-pass rate is <= CURRENT's false-pass rate (never
    regress on catching true-incomplete events).
 3. The candidate's false-block rate is at least 5 percentage points lower

@@ -5,8 +5,8 @@
 A headless `claude -p` turn on this machine, running under OAuth subscription auth, can be
 pointed at a local mock endpoint. The inference request itself (a POST to `/v1/messages`
 carrying a `messages` array) arrived at a local listener when `ANTHROPIC_BASE_URL` was set
-on the `claude` subprocess. This is not a routing failure and not an auth failure. Task 6
-(mock-model server) should proceed.
+on the `claude` subprocess. This is not a routing failure and not an auth failure. The
+mock-model server work is unblocked and should proceed.
 
 ## Env contract
 
@@ -90,9 +90,9 @@ probe run), matching the isolation model's statement that new files under
   run; nothing under the dev checkout or a real project was touched.
 - No files in this repository were modified except this verdict note.
 
-## Implication for the qa harness (task 5 / task 6)
+## Implication for the qa harness
 
-SUPPORTED means task 6's mock-model server is worth building: `session-smoke.sh` can run
+SUPPORTED means the mock-model server is worth building: `session-smoke.sh` can run
 a mock-backed smoke test by default (deterministic, no real API spend, no dependency on
 subscription auth being healthy in CI-like contexts) instead of staying skip-by-default.
 The env contract to reuse is exactly what this spike proved: set `ANTHROPIC_BASE_URL`
