@@ -25,7 +25,7 @@ One-command setup: update orchestration block in `~/.claude/CLAUDE.md`, check de
 - Install: `/plugin marketplace add UtsavBalar1231/oh-my-claudeagent` then `/plugin install oh-my-claudeagent@omca`
 - Update: `/plugin marketplace update omca` then `/plugin install oh-my-claudeagent@omca`
 - Apply in-session: `/reload-plugins`
-- Reload skills without restart (v2.1.152+): `/reload-skills` picks up skill file edits (including orchestration-block.md changes written by omca-setup) in the active session without a full Claude Code restart
+- Reload skills without restart (v2.1.152+): `/reload-skills` picks up skill file edits (including templates/claudemd.md changes written by omca-setup) in the active session without a full Claude Code restart
 
 **`--bare` caveat**: `claude --bare` skips plugin, hooks, skills, MCP, and CLAUDE.md auto-discovery. Run setup in normal (non-`--bare`) sessions.
 
@@ -141,7 +141,7 @@ parallel-execution, verification, file-reading) lives in `~/.claude/CLAUDE.md` a
 managed block so users benefit from it even when the output-style is overridden or
 `force-for-plugin` is stripped.
 
-1. Read the orchestration block template at `${PLUGIN_ROOT}/skills/omca-setup/orchestration-block.md`.
+1. Read the orchestration block template at `${PLUGIN_ROOT}/templates/claudemd.md`.
 
 2. Wrap the template body in marker lines so future runs can detect and replace it:
    ```

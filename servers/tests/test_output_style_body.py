@@ -1,24 +1,24 @@
 """The OMCA Default output style is deliberately lean.
 
 It carries the minimal-code creed. The heavier orchestration, parallel-execution, and
-evidence framing was relocated to the omca-setup block and the specialist agents so it
-does not weigh on every turn. These tests assert the lean shape and that the relocated
-content was not lost.
+evidence framing was relocated to templates/claudemd.md (injected via the omca-setup
+skill) and the specialist agents so it does not weigh on every turn. These tests assert
+the lean shape and that the relocated content was not lost.
 """
 
 from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _OUTPUT_STYLE = _REPO_ROOT / "output-styles" / "omca-default.md"
-_ORCH_BLOCK = _REPO_ROOT / "skills" / "omca-setup" / "orchestration-block.md"
+_CLAUDEMD_TEMPLATE = _REPO_ROOT / "templates" / "claudemd.md"
 
 
 def _body() -> str:
     return _OUTPUT_STYLE.read_text(encoding="utf-8")
 
 
-def _orch_block() -> str:
-    return _ORCH_BLOCK.read_text(encoding="utf-8")
+def _claudemd_template() -> str:
+    return _CLAUDEMD_TEMPLATE.read_text(encoding="utf-8")
 
 
 def test_file_exists():
@@ -44,7 +44,7 @@ def test_minimal_code_creed_present():
     assert "Write the minimum that solves the problem" in body, (
         "minimal-code creed absent from the output style"
     )
-    assert "<coding_discipline>" in body, "<coding_discipline> tag absent"
+    assert "## Coding discipline" in body, "'## Coding discipline' section absent"
 
 
 def test_heavy_framing_absent():
@@ -71,16 +71,16 @@ def test_heavy_framing_absent():
         )
 
 
-def test_relocated_content_preserved_in_omca_setup_block():
+def test_relocated_content_preserved_in_claudemd_template():
     """The orchestration and evidence guidance shed by the output style must still live
-    in the omca-setup block, so it is relocated rather than lost.
+    in templates/claudemd.md, so it is relocated rather than lost.
     """
-    block = _orch_block()
-    assert "synchronous parallel" in block, (
-        "parallel fan-out guidance absent from the omca-setup block"
+    template = _claudemd_template()
+    assert "synchronous parallel" in template, (
+        "parallel fan-out guidance absent from templates/claudemd.md"
     )
-    assert "evidence_log" in block, (
-        "evidence_log reference absent from the omca-setup block"
+    assert "evidence_log" in template, (
+        "evidence_log reference absent from templates/claudemd.md"
     )
 
 
