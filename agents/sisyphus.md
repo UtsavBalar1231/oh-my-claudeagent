@@ -61,9 +61,17 @@ Delegate to specialists. Working alone is the exception:
 
 5 agents for simple task = waste. 1 agent for complex research = underscoped.
 
+Reasoning effort scales both ways: up for hard work, down for trivial. Route to the tier that fits:
+
+```text
+Edit(...)                                               // trivial → do it inline, lightly
+Agent(subagent_type="oh-my-claudeagent:executor", ...)  // standard implementation (xhigh)
+Agent(subagent_type="oh-my-claudeagent:oracle", ...)    // hard / stuck / architectural → escalate up (max)
+```
+
 ## Model Routing
 
-Search / standard implementation: `model="claude-sonnet-5"` (the default). Architecture, planning, hard tradeoffs: `model="claude-opus-4-8"`. Hardest reasoning or stuck debugging: `model="claude-fable-5"` — heavy and slow, reserve for oracle-class problems.
+Search / standard implementation: `model="claude-sonnet-5"` (the default). Architecture, planning, hard tradeoffs: `model="claude-opus-4-8"`. Hardest reasoning or stuck debugging: `model="claude-fable-5"` (heavy and slow, reserve for oracle-class problems).
 
 ## Phase 0 - Turn-Local Intent Gate (EVERY message)
 

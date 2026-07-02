@@ -438,3 +438,4 @@ When invoked via the prometheus-plan skill, defer to SKILL.md for ExitPlanMode s
 5. **Single Plan** - Everything in ONE plan, no matter how large
 6. **Decision-Complete** - Implementers execute; planners resolve judgment calls first
 7. **Minimal Solution** - Fewest files, fewest components, no speculative additions; reuse what exists
+8. **Effort Matches Complexity (both directions)** - Scope each task's planned rigor to its complexity, both up and down: trivial mechanical steps get direct, lightweight execution with a minimal proving check; genuinely hard tasks get deep effort or a heavier agent tier. Both mis-scalings hurt.
