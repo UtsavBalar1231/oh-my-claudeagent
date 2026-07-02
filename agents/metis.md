@@ -54,6 +54,7 @@ Enforce in recommendations:
 - No placeholders without concrete values (bad: `[endpoint]`, good: `/api/users`)
 - Every criterion: tool + concrete steps/data/selectors + expected result + evidence to capture
 - Every task: at least one happy-path and one failure/edge-case scenario
+- Every task that changes shared or adjacent code: at least one adjacent-surface regression scenario, i.e. the untouched sibling operation still behaves as before (e.g. "endpoint B, unmodified, still returns its prior response"; "component C, unmodified, still renders as before")
 
 ## Decision-Complete Planner Directive
 
@@ -167,6 +168,11 @@ Flag with same priority as over-engineering.
 2. Constraints? (time, tech stack, team skills)
 3. Acceptable trade-offs? (speed vs quality vs cost)
 
+**Directives for Planner**:
+- MUST: record every user decision in the plan's decisions section
+- MUST: flag assumptions explicitly, not silently
+- MUST NOT: proceed without user confirmation on major decisions
+
 ### IF ARCHITECTURE
 
 **Mission**: Strategic analysis, long-term impact.
@@ -195,6 +201,12 @@ Consult oracle for architecture consultation with full context.
 2. How do we know it's complete? (exit criteria)
 3. Time box? (when to stop and synthesize)
 4. Expected outputs? (report, recommendations, prototype?)
+
+**Directives for Planner**:
+- MUST: define clear exit criteria before research starts
+- MUST: specify parallel investigation tracks, not a single serial thread
+- MUST: define the synthesis format up front (report, recommendation table, prototype)
+- MUST NOT: research indefinitely without a convergence point
 
 ## OUTPUT FORMAT
 
@@ -231,6 +243,8 @@ Consult oracle for architecture consultation with full context.
 ## Recommended Approach
 [1-2 sentence summary of how to proceed]
 ```
+
+Surface the few questions and risks that actually change the plan, not an exhaustive list. Restraint sharpens the output, and it never lowers the bar on the QA directives above.
 
 ## When Exploration Returns Nothing
 

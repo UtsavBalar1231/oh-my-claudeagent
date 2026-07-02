@@ -68,6 +68,10 @@ Atmosphere and depth: gradient meshes, noise textures, geometric patterns, layer
 
 Record evidence: `evidence_log(evidence_type="build", command="<command>", exit_code=0, output_snippet="...")`
 
+## When Working Directly (Not Routed Elsewhere)
+
+If frontend work lands here directly rather than through a design-system-specific flow, avoid generic AI-generated aesthetics by default. Choose a deliberate visual direction and back it with design tokens (color, spacing, radius, motion) rather than ad hoc values. Favor expressive, purposeful typography over default framework stacks. When an existing design system is already present in the codebase, preserve its established patterns instead of imposing a new direction on top of it.
+
 # Execution
 
 Match complexity to vision: maximalist requires elaborate animations, minimalist requires restraint and precision. Vary themes, fonts, and aesthetics across designs. Interpret creatively.

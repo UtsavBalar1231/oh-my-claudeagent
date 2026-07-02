@@ -253,8 +253,30 @@ result is in. Never act on partial results.
 [ ] No regressions
 ```
 
-Mark completion immediately: edit plan file `- [ ]` → `- [x]`, then read to
-confirm. Do NOT proceed until confirmed.
+Mechanical checks are not review. Subagents self-report, and self-reports are not
+evidence. After the mechanical checks pass, read every file the delegated agent
+created or modified, then cross-reference what it claimed against what the code
+actually does:
+
+```
+[ ] Does it work as expected, not just "should work"?
+[ ] Does it follow the existing codebase pattern (naming, error handling, layer boundaries)?
+[ ] Did the expected result actually come out (not a plausible-sounding substitute)?
+[ ] Were the MUST DO and MUST NOT DO requirements from the delegation prompt honored?
+```
+
+If you cannot explain what the changed code does, you have not reviewed it:
+go back and read it. Never trust a subagent's self-report as a substitute for
+reading the diff yourself.
+
+If any QA scenario spawned a resource (process, port, container, temp dir,
+browser session), confirm its teardown receipt before treating the task as
+verified: a leftover process or bound port is not complete.
+
+Only once the review above passes: edit plan file `- [ ]` → `- [x]`, then read
+back the file to confirm the edit landed. Both the flip and the read-back
+confirmation must complete before the next delegation: dispatching the next
+`Agent` call before that is the forbidden act, not merely premature.
 
 No evidence = not complete.
 
@@ -295,8 +317,14 @@ evidence_log(
 )
 ```
 
+A verdict of "COMPLETE, but..." or "looks good aside from..." counts as
+INCOMPLETE: a qualified approval is a rejection. Fix the qualified issue and
+re-verify; there is no partial-credit verdict.
+
 On INCOMPLETE: fix the specific gap, re-run the completeness review, log a fresh
-`final_verification` entry. Repeat until COMPLETE.
+`final_verification` entry. Repeat until COMPLETE. This loop is bounded by the
+fix-and-rerun cycle itself: it terminates when the gap is actually closed, not
+by a retry counter.
 
 The Stop hook enforces this gate: it blocks session end when the plan is fully
 checked but no `final_verification` evidence entry (exit_code=0) exists. A logged
@@ -354,6 +382,13 @@ immediately delegate next task.
 **Pause only when**: plan needs clarification, blocked by external dependency,
 critical failure.
 
+At each phase boundary (or, in unphased plans, roughly every few completed
+tasks), review the plan's notepad `issues` section via `notepad_read` and
+disposition every open entry: schedule it as a task, defer it with a stated
+reason, or reject it with a stated reason. Entries left silently unaddressed
+accumulate into gaps the completeness check will not catch, since it reviews
+the plan's checkboxes, not the notepad.
+
 ### Stop Conditions
 
 | Condition    | Signal                                                | Action                                             |
@@ -368,6 +403,17 @@ critical failure.
 Max 3 retries per task. Blocked after 3 → `notepad_write(plan_name, "issues", ...)`,
 continue to independent tasks. After 2+ tasks in same area fail → ask user
 whether to run metis re-analysis.
+
+When relaunching a task after a failed executor attempt, the fresh delegation
+prompt must carry forward what was already tried and why it failed: the exact
+commands/edits attempted and the observed error, not just "try again." A new
+agent repeating the same failed approach because it never saw the failure is a
+wasted retry, not a fresh angle.
+
+A task never moves past unverified into "done." A verification failure is never
+dismissed as a false positive without evidence proving the failure itself was
+spurious (e.g. a flaky-test rerun that then passes, logged). "That's probably
+just flaky" is not evidence.
 
 ## MCP Tool Reference
 

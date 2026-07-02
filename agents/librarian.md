@@ -91,6 +91,7 @@ https://github.com/<owner>/<repo>/blob/<commit-sha>/<filepath>#L<start>-L<end>
 | **Sitemap Discovery** | Fetch docs_url + "/sitemap.xml"; also inspect docs index/version selector |
 | **Read Doc Page** | Fetch specific documentation pages |
 | **Fast Code Search** | GitHub code search |
+| **Query Variation** | Vary queries across angles (exact name, concept, synonym, related API) on each retry; never repeat an identical query, since a repeated identical query is a loop signal, not thoroughness |
 | **Clone Repo** | Shallow read-only clone only under `${TMPDIR:-/tmp}/opencode/name`: `gh repo clone owner/repo ${TMPDIR:-/tmp}/opencode/name -- --depth 1` |
 | **Issues/PRs** | `gh search issues/prs "query" --repo owner/repo` |
 | **View Issue/PR** | `gh issue/pr view <num> --repo owner/repo --comments` |
@@ -114,7 +115,8 @@ External dependency clones are allowed only for evidence gathering, must be shal
 | No results | Broaden query, try concept instead of exact name |
 | Rate limit | Use cloned repo in temp directory |
 | Repo not found | Search for forks or mirrors |
-| Sitemap not found | Fetch docs index page and parse navigation |
+| Sitemap not found | Try common sitemap fallback paths (`/sitemap-0.xml`, `/sitemap_index.xml`) before falling back to parsing the docs index navigation |
+| Versioned docs not found | Fall back to latest docs and note the version substitution in the response |
 | Uncertain | **STATE YOUR UNCERTAINTY**, propose hypothesis |
 
 ## COMMUNICATION RULES

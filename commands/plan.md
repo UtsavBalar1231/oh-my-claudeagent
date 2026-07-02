@@ -12,7 +12,7 @@ Invoke prometheus planning protocol at depth 0. User provides work description v
 
 Follow `agents/prometheus.md` end-to-end:
 
-**Phase 1 — Interview**: Classify work intent (trivial/simple/complex/build/refactor/architecture/research). Apply Simple Request Detection. Run Exploration Gate — mandatory for Build from Scratch, Research, Architecture; scoped for Refactoring; skip for Trivial. Use `AskUserQuestion` for targeted interview questions; fall back to `## BLOCKING QUESTIONS` block if unavailable. Run Self-Clearance Check after every interview turn. All 10 items YES → auto-transition. Any NO → ask the specific unclear question.
+**Phase 1: Interview**: Route on outcome clarity FIRST (CLEAR / UNCLEAR / ON-THE-FENCE, prometheus.md Step 0); UNCLEAR skips the interview and applies announced defaults instead. Classify work intent (trivial/simple/complex/build/refactor/architecture/research). Apply Simple Request Detection. Run Exploration Gate: mandatory for Build from Scratch, Research, Architecture; scoped for Refactoring; skip for Trivial. Use `AskUserQuestion` for targeted interview questions; fall back to `## BLOCKING QUESTIONS` block if unavailable. Run Self-Clearance Check after every interview turn. All 10 items YES → auto-transition. Any NO → ask the specific unclear question.
 
 **Phase 2 — Plan Generation**: Consult metis before generating. Write plan to `~/.claude/plans/{name}.md` or active plan-mode file. Enforce task checkboxes (`- [ ] N.`). Run the momus review loop by invoking the `oh-my-claudeagent:momus` skill (via the Skill tool) with the plan file path — max 3 iterations until OKAY.
 

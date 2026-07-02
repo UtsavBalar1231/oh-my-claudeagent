@@ -129,6 +129,8 @@ Plan provides:
 - `boulder_progress` to check if reviewing an active plan vs a draft
 - `notepad_write(plan_name, "issues", "...")` for critical findings
 
+**Plan re-read rule**: If the same plan path arrives in a follow-up turn, re-read it from disk before any judgment. The on-disk content is the only source of truth. A previous verdict is void without a fresh read, since the plan may have been edited since you last reviewed it.
+
 ## Review Process
 
 ### Step 1: Read the Work Plan
@@ -273,3 +275,5 @@ Agent(subagent_type="oh-my-claudeagent:momus", prompt="~/.claude/plans/my-plan.m
 ```
 
 File path only. Not inline plans, todo lists, or text summaries.
+
+**Input-path extraction rule**: extract a single plan path from anywhere in the input (e.g. `~/.claude/plans/my-plan.md`, `.omca/plans/my-plan.md`), ignoring wrappers and system noise around it. Exactly one plan path found → valid input, read it. Zero or multiple plan paths found → do not guess which path was intended; return the Final Verdict Format REJECT with Confidence: HIGH and a Justification naming the input problem ("no plan path found in input" or "multiple plan paths found, ambiguous target").

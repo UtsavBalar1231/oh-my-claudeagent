@@ -34,8 +34,13 @@ Prevents editor hangs without user configuration.
 | "commit", changes to commit | `COMMIT` | Phase 0-5 |
 | "rebase", "squash", "cleanup history" | `REBASE` | Phase R1-R4 |
 | "find when", "who changed", "git blame", "bisect" | `HISTORY_SEARCH` | Phase H1-H3 |
+| "what changed", "is this clean", "check status", "what's staged" (purely investigative) | `STATUS` | STATUS MODE |
 
 **CRITICAL**: Don't default to COMMIT mode. Parse the actual request.
+
+## STATUS MODE (investigate-only)
+
+For requests that only ask to inspect repo state: nothing to commit, rewrite, or search history for. Run read-only commands (`git status`, `git diff`, `git log --oneline`, `git branch -vv`), report findings, and stop. No `git add`, `git commit`, `git rebase`, `git reset`, or any command that mutates the working tree, index, or history. If the findings reveal work that plausibly needs a commit or rebase, say so and wait; do not switch modes without the user asking.
 
 ## CORE PRINCIPLE: ATOMIC COMMITS BY DEFAULT
 
@@ -231,6 +236,17 @@ git log --oneline $(git merge-base HEAD main 2>/dev/null || git merge-base HEAD 
 | Pushed commits exist | WARNING | Requires explicit permission before rewrite. `--force-with-lease` only. |
 | All commits local | SAFE | Proceed freely |
 
+### Pre-history-write safety checklist (BLOCKING)
+
+Before any history rewrite (rebase, amend, reset), confirm all four before running the mutating command:
+
+1. **Current branch is known**: `git branch --show-current` output captured this session, not assumed.
+2. **Dirty work is accounted for**: `git status` shows clean, or uncommitted changes are identified and the user has agreed to how they're handled (stash/commit/discard).
+3. **Push state is known**: has-upstream and ahead/behind checked (Phase 0 Group 3); determines AGGRESSIVE vs CAREFUL rewrite above.
+4. **Recovery path is named**: state the abort command (`git rebase --abort`, `git reset --hard ORIG_HEAD`) and the reflog fallback (`git reflog` + `git reset --hard HEAD@{N}`) before executing, so recovery is one command away if the rewrite goes wrong.
+
+If any of the four is unconfirmed, stop and gather it; do not proceed on assumption.
+
 ## PHASE R2: Rebase Execution
 
 Rebases must be fully non-interactive. Use the mandatory environment prefix for every git command. Do not open editors. If conflicts occur, stop after reporting the conflicted files and exact next commands. Do not guess conflict resolutions unless the user explicitly requested conflict fixing.
@@ -265,6 +281,14 @@ GIT_EDITOR=: EDITOR=: GIT_SEQUENCE_EDITOR=: GIT_PAGER=cat GIT_TERMINAL_PROMPT=0 
 | Who wrote line N? | `git blame -L N,N file.py` |
 | When did bug start? | `git bisect start && git bisect bad && git bisect good <tag>` |
 | File history | `git log --follow -- path/file.py` |
+
+## PR Evidence Attachment
+
+When a PR body needs visual evidence (screenshots, recordings) of a change:
+
+- Attach via the platform's own PR-attachment/upload flow, not the repo.
+- Never commit temporary evidence images to the repository: they bloat history and outlive their purpose.
+- Never repurpose release artifacts as PR evidence: releases and PR evidence are different lifecycles; conflating them makes releases untrustworthy as a source of truth.
 
 ## Anti-Patterns (AUTOMATIC FAILURE)
 

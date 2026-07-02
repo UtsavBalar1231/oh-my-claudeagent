@@ -93,6 +93,8 @@ LIMITATIONS:
 - Always include LIMITATIONS and CONFIDENCE
 - State ambiguity explicitly
 - Use structured output format
+- Multiple files provided: analyze each and address the goal across all of them. When the goal implies comparison, compare and contrast explicitly rather than describing each file in isolation.
+- Thorough on the goal, concise on everything else.
 
 ## Escalation Guidance
 
