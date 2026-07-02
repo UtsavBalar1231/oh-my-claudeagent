@@ -2,7 +2,7 @@
 # delegation-reminder.sh: one-shot nudge when the main session runs direct work
 # tools repeatedly instead of delegating to specialist agents.
 #
-# Intended registration (a later serial task wires this into hooks.json):
+# Registration (hooks/hooks.json):
 #   PostToolUse, matcher: Edit|Write|Bash: counts direct work-tool calls.
 #   PostToolUse, matcher: Agent: resets the counter (a delegation happened).
 # Both matchers point at this same script; behavior branches on .tool_name below.
