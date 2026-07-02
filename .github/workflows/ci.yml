@@ -33,6 +33,17 @@ jobs:
       - name: Run validation suites
         run: bash scripts/validate-plugin.sh --check claims --check hooks
 
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo "### What this job checks"
+            echo "Plugin claims (manifest/schema) and hook registration, via \`just test\`."
+            echo ""
+            echo "### If this fails"
+            echo "The plugin manifest or a hook definition is malformed or out of sync. Run \`bash scripts/validate-plugin.sh --check claims --check hooks\` locally to see the exact failure."
+          } >> "$GITHUB_STEP_SUMMARY"
+
   lint-python:
     name: Lint Python
     runs-on: ubuntu-latest
@@ -54,6 +65,17 @@ jobs:
       - name: Lint
         run: ruff check servers/
 
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo "### What this job checks"
+            echo "Python formatting and lint rules for the MCP servers, via ruff (mirrors \`just fmt-check lint-python\`)."
+            echo ""
+            echo "### If this fails"
+            echo "A file under servers/ is unformatted or violates a ruff rule. Run \`uv run --project servers ruff format servers/\` and \`uv run --project servers ruff check servers/\` locally to fix."
+          } >> "$GITHUB_STEP_SUMMARY"
+
   lint-shell:
     name: Lint Shell
     runs-on: ubuntu-latest
@@ -66,6 +88,17 @@ jobs:
 
       - name: ShellCheck
         run: shellcheck scripts/*.sh
+
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo "### What this job checks"
+            echo "Shell script quality across scripts/*.sh, via shellcheck (mirrors \`just lint-shell\`)."
+            echo ""
+            echo "### If this fails"
+            echo "A hook script has a shellcheck violation. Run \`shellcheck scripts/*.sh\` locally to see the exact warning and file/line."
+          } >> "$GITHUB_STEP_SUMMARY"
 
   test-bats:
     name: BATS Hook Tests
@@ -87,7 +120,18 @@ jobs:
         run: uv tool install ast-grep-cli
 
       - name: Run BATS behavioral tests
-        run: tests/bats/bats-core/bin/bats tests/bats/hooks/
+        run: tests/bats/bats-core/bin/bats tests/bats/hooks/ tests/bats/unit/
+
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo "### What this job checks"
+            echo "Hook script and shared-library behavior under tests/bats/hooks/ and tests/bats/unit/, via bats-core (mirrors \`just test-bats\`)."
+            echo ""
+            echo "### If this fails"
+            echo "A hook script or a common.sh helper regressed. Run \`tests/bats/bats-core/bin/bats tests/bats/hooks/ tests/bats/unit/\` locally (after \`git submodule update --init\`) to see the failing test."
+          } >> "$GITHUB_STEP_SUMMARY"
 
   test-pytest:
     name: pytest MCP Tests
@@ -116,3 +160,45 @@ jobs:
 
       - name: Run pytest
         run: uv run --project servers pytest servers/tests/ -v --tb=short
+
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo "### What this job checks"
+            echo "MCP tool unit tests under servers/tests/, via pytest (mirrors \`just test-pytest\`)."
+            echo ""
+            echo "### If this fails"
+            echo "An MCP tool's behavior regressed. Run \`uv run --project servers pytest servers/tests/ -v --tb=short\` locally to see the failing test and traceback."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  test-mcp:
+    name: MCP Validation
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+
+      # validate-plugin.sh --check mcp starts the real omca MCP server, whose
+      # entry point calls discover_binary() and exits 1 if ast-grep is absent.
+      - name: Install ast-grep CLI
+        run: uv tool install ast-grep-cli
+
+      - name: Run MCP validation
+        run: bash scripts/validate-plugin.sh --check mcp
+
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo "### What this job checks"
+            echo "The omca MCP server starts and responds to initialize/list-tools, via \`just test-mcp\`."
+            echo ""
+            echo "### If this fails"
+            echo "The MCP server failed to start or misreports its tool list, often due to a missing ast-grep binary or a broken tool registration. Run \`bash scripts/validate-plugin.sh --check mcp\` locally to see the exact failure."
+          } >> "$GITHUB_STEP_SUMMARY"

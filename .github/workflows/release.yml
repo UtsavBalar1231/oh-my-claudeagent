@@ -5,8 +5,7 @@ on:
     tags:
       - "v*.*.*"
 
-permissions:
-  contents: write
+permissions: {}
 
 defaults:
   run:
@@ -19,23 +18,114 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           persist-credentials: false
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
           python-version: "3.12"
 
       - name: Run validation
-        run: bash scripts/validate-plugin.sh --check claims
+        run: bash scripts/validate-plugin.sh --check claims --check hooks
+
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo "### What this job checks"
+            echo "Plugin claims (manifest/schema) and hook registration, via \`just test\`."
+            echo ""
+            echo "### If this fails"
+            echo "The plugin manifest or a hook definition is malformed or out of sync. This gate must pass before a release is created."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  test-bats:
+    name: BATS Hook Tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+          submodules: true
+
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          enable-cache: false
+
+      - name: Pre-warm omca MCP venv
+        run: uv sync --project servers
+
+      - name: Install ast-grep CLI
+        run: uv tool install ast-grep-cli
+
+      - name: Run BATS behavioral tests
+        run: tests/bats/bats-core/bin/bats tests/bats/hooks/ tests/bats/unit/
+
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo "### What this job checks"
+            echo "Hook script and shared-library behavior under tests/bats/hooks/ and tests/bats/unit/, via bats-core (mirrors \`just test-bats\`)."
+            echo ""
+            echo "### If this fails"
+            echo "A hook script or a common.sh helper regressed. This gate must pass before a release is created."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  test-pytest:
+    name: pytest MCP Tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+        with:
+          python-version: "3.12"
+
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          enable-cache: false
+
+      - name: Install test dependencies
+        run: uv sync --project servers --group dev
+
+      # The startup-latency and signal-shutdown tests spawn the real omca MCP
+      # server, whose entry point calls discover_binary() and exits 1 if ast-grep
+      # is absent — so the server must have ast-grep on PATH to reply to initialize.
+      - name: Install ast-grep CLI
+        run: uv tool install ast-grep-cli
+
+      - name: Run pytest
+        run: uv run --project servers pytest servers/tests/ -v --tb=short
+
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo "### What this job checks"
+            echo "MCP tool unit tests under servers/tests/, via pytest (mirrors \`just test-pytest\`)."
+            echo ""
+            echo "### If this fails"
+            echo "An MCP tool's behavior regressed. This gate must pass before a release is created."
+          } >> "$GITHUB_STEP_SUMMARY"
 
   release:
     name: Create Release
-    needs: validate
+    needs: [validate, test-bats, test-pytest]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
 
       - name: Validate version matches tag
         run: |
@@ -47,7 +137,17 @@ jobs:
           fi
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v3
-        with:
-          generate_release_notes: true
-          make_latest: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${GITHUB_REF_NAME}" --generate-notes --latest
+
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo "### What this job checks"
+            echo "Tag version matches plugin.json, then creates the GitHub release (runs only after validate, test-bats, and test-pytest all pass)."
+            echo ""
+            echo "### If this fails"
+            echo "Either the tag/version mismatch check failed, or the release creation step failed. Check the step logs above for which one."
+          } >> "$GITHUB_STEP_SUMMARY"
