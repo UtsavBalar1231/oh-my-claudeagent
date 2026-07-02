@@ -164,6 +164,9 @@ case "${AGENT_TYPE}" in
 				sort_by(.cost_tier) |
 				.[] | "- \(.name) [\(.cost_tier)] — \(.when_to_use | if . == "" then "general" else (split(",")[0] | ltrimstr(" ")) end)"
 			' "${CATALOG_FILE}")
+		# categories.json "model" values are Agent-tool aliases (sonnet|opus|haiku|fable),
+		# verified against the live Agent tool's model parameter enum. Forwarded as-is
+		# below so Agent(model=...) always receives a valid alias, never a full model ID.
 		CATEGORIES_FILE="$(dirname "$0")/../servers/categories.json"
 		CATEGORY_TABLE=""
 		if [[ -f "${CATEGORIES_FILE}" ]]; then
