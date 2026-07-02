@@ -5,6 +5,49 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.12.1] - 2026-07-02
+
+Statusline accuracy release: the active-agent count and the plan/TODO segment now reflect what is
+actually running in the current session, and stale boulder state heals itself at session start.
+Also moves the agent roster to the current model generation, with Claude Fable 5 for the oracle.
+
+### Changed
+
+- **Model roster refresh.** oracle moves to `claude-fable-5` at `max` effort for the hardest
+  reasoning and stuck debugging. Orchestrators, planners, and reviewers stay on `claude-opus-4-8`,
+  now at `xhigh` effort. Workers pin `claude-sonnet-5` explicitly (executor and hephaestus at
+  `xhigh`, librarian and multimodal-looker at `high`, explore at `medium`) so the statusline shows
+  the real generation. Haiku leaves the default roster but stays supported as an override model
+  (statusline display, cost tiers, and concurrency caps all keep it).
+- **Effort guidance for the planner and orchestrator.** prometheus and sisyphus now scope rigor to
+  task complexity in both directions: trivial mechanical edits run inline and lightly, hard or
+  stuck problems escalate to a heavier agent tier. Worker effort is fixed per agent, so tier
+  routing is the orchestrator's throttle.
+
+### Fixed
+
+- **Statusline deploy was missing the boulder-resolver sibling.** `statusline/core.py` imports
+  `tools._boulder_core` from a sibling `servers/` directory that omca-setup never copied, so the
+  main statusline silently fell back to the `[claude]` stub and `cc-statusline-subagent` crashed on
+  import. The setup skill now deploys `servers/tools/` alongside the package, and its doctor check
+  gains a render smoke test that catches the stub.
+- **Active-agent count showed every agent ever spawned.** Nothing removed entries from
+  `subagent-models.json` when a subagent finished, so the Line 1 count only ever grew. A new
+  `SubagentStop` hook deletes the finished agent's entry; the SessionStart reset remains as the
+  backstop for crashed subagents.
+- **Plan/TODO segment leaked stale plans into unrelated sessions.** Display used the resolver's
+  fallback ladder, so a fresh session inherited whatever plan was left in `boulder.json`, including
+  plans whose tasks were all complete. The segment now renders only when the current session holds
+  an explicit binding and the bound plan still has open tasks. A stdlib `boulder_gc.py` shim runs
+  at SessionStart under the registry lock and prunes plans that are unbound and finished, missing
+  their file, or pathless, plus orphan bindings, so a completed-but-never-cleared plan cannot
+  resurface in session titles or resolvers.
+
+### Upgrade note
+
+Re-run `/oh-my-claudeagent:omca-setup` after updating so the deployed statusline package picks up
+the new renderer and the `servers/tools/` sibling.
+
 ## [2.12.0] - 2026-07-01
 
 Adopts a set of improvements adapted from oh-my-claudecode, plus a per-subagent model indicator in
