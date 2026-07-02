@@ -10,6 +10,8 @@ servers/__pycache__/
 .omca/*
 !/.omca/rules/
 !/.omca/notes/
+/.omca/notes/*
+!/.omca/notes/*-verdict.md
 state/
 servers/.omca
 
