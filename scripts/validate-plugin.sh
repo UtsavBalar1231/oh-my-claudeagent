@@ -13,6 +13,10 @@ MCP_FIXTURES_DIR="${REPO_ROOT}/tests/fixtures/mcp"
 MCP_SERVER_PROJECT="${REPO_ROOT}/servers"
 OMCA_MD="${REPO_ROOT}/OMCA.md"
 OMCA_SETUP_SKILL_MD="${REPO_ROOT}/skills/omca-setup/SKILL.md"
+README_MD="${REPO_ROOT}/README.md"
+CONTRIBUTING_MD="${REPO_ROOT}/docs/CONTRIBUTING.md"
+JUSTFILE="${REPO_ROOT}/justfile"
+DEPERSONALIZATION_ALLOWLIST="${REPO_ROOT}/scripts/depersonalization-allowlist.txt"
 
 AGENTS_DIR="${VALIDATE_PLUGIN_AGENTS_DIR:-${REPO_ROOT}/agents}"
 FORCE_HARD_CUTOVER="${VALIDATE_PLUGIN_FORCE_HARD_CUTOVER:-0}"
@@ -633,6 +637,213 @@ check_phantom_field_names() {
 	fi
 }
 
+depersonalization_is_allowlisted() {
+	local rel_path="$1"
+	local matched="$2"
+	local allowlist_file="$3"
+	local entry entry_path entry_pattern
+
+	[[ -f "${allowlist_file}" ]] || return 1
+
+	while IFS= read -r entry; do
+		[[ -z "${entry}" || "${entry}" == \#* ]] && continue
+		entry_path="${entry%%:*}"
+		entry_pattern="${entry#*:}"
+		if [[ "${entry_path}" == "${rel_path}" && "${entry_pattern}" == "${matched}" ]]; then
+			return 0
+		fi
+	done <"${allowlist_file}"
+
+	return 1
+}
+
+check_depersonalization_pattern() {
+	local label="$1"
+	local pattern="$2"
+	local allowlist_file="$3"
+	shift 3
+	local files=("$@")
+	local hit_found=0
+	local hit abs_path rest lineno matched rel_path
+
+	while IFS= read -r hit; do
+		[[ -z "${hit}" ]] && continue
+		abs_path="${hit%%:*}"
+		rest="${hit#*:}"
+		lineno="${rest%%:*}"
+		matched="${rest#*:}"
+		rel_path="$(relative_path "${abs_path}")"
+
+		# Documentation placeholders — never real leaks.
+		if [[ "${matched}" == "/home/user/" || "${matched}" == "/Users/user/" ]]; then
+			continue
+		fi
+
+		if depersonalization_is_allowlisted "${rel_path}" "${matched}" "${allowlist_file}"; then
+			continue
+		fi
+
+		fail "depersonalization: ${rel_path}:${lineno}: ${label} '${matched}'"
+		hit_found=1
+	done < <(grep -nEo "${pattern}" "${files[@]}" 2>/dev/null)
+
+	[[ "${hit_found}" -eq 0 ]]
+}
+
+check_depersonalization() {
+	log "Running depersonalization checks"
+
+	# Roots are the exhaustive list of shipped-content directories/files from the task.
+	# .omca/, .claude/, tests/, and CHANGELOG.md are deliberately excluded — the first
+	# two are local dev state, tests/ carries fixture data, and CHANGELOG.md is history.
+	local scan_roots=(agents skills scripts servers commands templates output-styles docs)
+	local scan_root_files=(README.md OMCA.md)
+
+	local abs_files=()
+	local rel_file root
+	for root in "${scan_roots[@]}"; do
+		while IFS= read -r rel_file; do
+			[[ -z "${rel_file}" ]] && continue
+			# The allowlist itself documents matched literals for reference — exclude it
+			# from scanning, or every allowlisted entry would trip its own listing.
+			[[ "${rel_file}" == "scripts/depersonalization-allowlist.txt" ]] && continue
+			abs_files+=("${REPO_ROOT}/${rel_file}")
+		done < <(git -C "${REPO_ROOT}" ls-files -- "${root}" 2>/dev/null)
+	done
+	for rel_file in "${scan_root_files[@]}"; do
+		if git -C "${REPO_ROOT}" ls-files --error-unmatch "${rel_file}" >/dev/null 2>&1; then
+			abs_files+=("${REPO_ROOT}/${rel_file}")
+		fi
+	done
+
+	if [[ "${#abs_files[@]}" -eq 0 ]]; then
+		fail "depersonalization: no tracked files found under scan roots"
+		return 1
+	fi
+
+	# Home-path literals. /home/user/ and /Users/user/ are filtered out post-match
+	# (below) as documentation placeholders rather than excluded from the regex, so a
+	# real username that happens to be "user" is still structurally detectable.
+	local home_path_regex='(/home/|/Users/)[A-Za-z0-9_.-]+/'
+	local win_path_regex='C:\\Users\\[A-Za-z0-9_.-]+'
+	# Matches a *_TOKEN / *_API_KEY / *_SECRET assignment followed by a value that
+	# isn't an obvious placeholder (a variable reference, a token in angle brackets,
+	# a quote, or whitespace/end of line).
+	local cred_regex='[A-Z0-9_]*(TOKEN|API_KEY|SECRET)=[^$<"[:space:]][^"[:space:]]*'
+	local bearer_regex='Bearer [A-Za-z0-9_-]{20,}'
+
+	local clean=1
+	check_depersonalization_pattern "home-path literal" "${home_path_regex}" "${DEPERSONALIZATION_ALLOWLIST}" "${abs_files[@]}" || clean=0
+	check_depersonalization_pattern "windows home-path literal" "${win_path_regex}" "${DEPERSONALIZATION_ALLOWLIST}" "${abs_files[@]}" || clean=0
+	check_depersonalization_pattern "credential-looking literal" "${cred_regex}" "${DEPERSONALIZATION_ALLOWLIST}" "${abs_files[@]}" || clean=0
+	check_depersonalization_pattern "bearer-token-looking literal" "${bearer_regex}" "${DEPERSONALIZATION_ALLOWLIST}" "${abs_files[@]}" || clean=0
+
+	if [[ "${clean}" -eq 1 ]]; then
+		pass "depersonalization: no home-path, credential, or bearer-token literals found in tracked shipped files"
+	fi
+}
+
+docs_accuracy_extract_just_recipes() {
+	local doc_path="$1"
+	[[ -f "${doc_path}" ]] || return 0
+	grep -oE '`just [a-zA-Z0-9_-]+' "${doc_path}" | sed -E 's/^`just //'
+}
+
+docs_accuracy_extract_paths() {
+	local doc_path="$1"
+	[[ -f "${doc_path}" ]] || return 0
+	# Heuristic (kept intentionally conservative — see CLAUDE.md "conservative to avoid
+	# false positives"): a backtick-quoted token counts as a repo-relative path only if
+	# (a) it contains a `/` and ends in a file extension, AND (b) its first path segment
+	# is a real top-level repo entry. This excludes bare filenames (e.g. `plugin.json`,
+	# which is ambiguous without a directory) and shorthand notation used in prose
+	# (e.g. `state/boulder.json`, short for `.omca/state/boulder.json`).
+	# Output is "lineno:path" so callers can inspect surrounding prose context.
+	# shellcheck disable=SC2016 # backtick is a literal markdown delimiter, not command substitution
+	grep -noE '`[A-Za-z0-9_./-]+\.[A-Za-z0-9]+`' "${doc_path}" | tr -d '`'
+}
+
+docs_accuracy_documents_removal() {
+	local doc_path="$1"
+	local lineno="$2"
+	local window_start=$((lineno - 3))
+	[[ "${window_start}" -lt 1 ]] && window_start=1
+	local window_end=$((lineno + 3))
+
+	sed -n "${window_start},${window_end}p" "${doc_path}" |
+		grep -qEi 'no longer exist|does not exist|removed in|neither script exists|not currently used'
+}
+
+check_docs_accuracy() {
+	log "Running docs accuracy checks"
+
+	if [[ ! -f "${JUSTFILE}" ]]; then
+		fail "docs accuracy: justfile missing at ${JUSTFILE}"
+		return 1
+	fi
+
+	local recipes
+	recipes="$(grep -oE '^[a-zA-Z][a-zA-Z0-9_-]*' "${JUSTFILE}" | sort -u)"
+
+	local known_top_level=(
+		agents bin commands docs hooks output-styles scripts servers
+		skills statusline templates tests
+		.claude .claude-plugin .github .omca
+	)
+
+	local docs=("${README_MD}" "${OMCA_MD}" "${CONTRIBUTING_MD}")
+	local doc_path doc_rel recipe found_recipe=1
+
+	for doc_path in "${docs[@]}"; do
+		[[ -f "${doc_path}" ]] || continue
+		doc_rel="$(relative_path "${doc_path}")"
+
+		while IFS= read -r recipe; do
+			[[ -z "${recipe}" ]] && continue
+			if grep -qxF "${recipe}" <<<"${recipes}"; then
+				pass "docs accuracy: ${doc_rel} cites existing recipe 'just ${recipe}'"
+			else
+				fail "docs accuracy: ${doc_rel} cites 'just ${recipe}' which does not exist in ${JUSTFILE}"
+				found_recipe=0
+			fi
+		done < <(docs_accuracy_extract_just_recipes "${doc_path}")
+
+		local entry lineno candidate segment first_segment known=0
+		while IFS= read -r entry; do
+			[[ -z "${entry}" ]] && continue
+			lineno="${entry%%:*}"
+			candidate="${entry#*:}"
+
+			# Placeholder guard: scaffold examples like `agents/name.md` are documented
+			# templates, not real files — the literal segment "name" marks them.
+			if [[ "${candidate}" == *"/name."* || "${candidate}" == *"/name/"* ]]; then
+				continue
+			fi
+
+			first_segment="${candidate%%/*}"
+			known=0
+			for segment in "${known_top_level[@]}"; do
+				if [[ "${segment}" == "${first_segment}" ]]; then
+					known=1
+					break
+				fi
+			done
+			[[ "${known}" -eq 1 ]] || continue
+
+			if [[ -e "${REPO_ROOT}/${candidate}" ]]; then
+				pass "docs accuracy: ${doc_rel} references existing path '${candidate}'"
+			elif docs_accuracy_documents_removal "${doc_path}" "${lineno}"; then
+				pass "docs accuracy: ${doc_rel}:${lineno} documents removal of '${candidate}' (not a stale reference)"
+			else
+				fail "docs accuracy: ${doc_rel}:${lineno} references '${candidate}' which does not exist in the repo"
+				found_recipe=0
+			fi
+		done < <(docs_accuracy_extract_paths "${doc_path}")
+	done
+
+	[[ "${found_recipe}" -eq 1 ]]
+}
+
 check_claims() {
 	log "Running claims checks"
 
@@ -708,6 +919,45 @@ check_claims() {
 	check_skill_description_lengths
 	check_policy_posture_alignment
 	check_phantom_field_names
+	check_claudemd_template_packaging
+	check_depersonalization
+	check_docs_accuracy
+}
+
+check_claudemd_template_packaging() {
+	log "Running claudemd template packaging checks"
+
+	local template_ref
+	template_ref="$(grep -oE '\$\{PLUGIN_ROOT\}/templates/[A-Za-z0-9_.-]+\.md' "${OMCA_SETUP_SKILL_MD}" | head -1)"
+	if [[ -z "${template_ref}" ]]; then
+		fail "claudemd template packaging: no \${PLUGIN_ROOT}/templates/*.md reference found in ${OMCA_SETUP_SKILL_MD}"
+		return 1
+	fi
+
+	local template_rel_path="${template_ref#\$\{PLUGIN_ROOT\}/}"
+	local template_abs_path="${REPO_ROOT}/${template_rel_path}"
+	if [[ -f "${template_abs_path}" ]]; then
+		pass "claudemd template packaging: ${template_rel_path} (referenced by SKILL.md) exists"
+	else
+		fail "claudemd template packaging: ${template_rel_path} referenced by SKILL.md but missing at ${template_abs_path}"
+		return 1
+	fi
+
+	local package_tmp
+	package_tmp="$(mktemp -d)"
+	if ! bash "${REPO_ROOT}/scripts/package-plugin.sh" "${package_tmp}" >/dev/null 2>&1; then
+		fail "claudemd template packaging: package-plugin.sh failed against ${package_tmp}"
+		rm -rf "${package_tmp}"
+		return 1
+	fi
+
+	if [[ -f "${package_tmp}/${template_rel_path}" ]]; then
+		pass "claudemd template packaging: package-plugin.sh ships ${template_rel_path}"
+	else
+		fail "claudemd template packaging: package-plugin.sh does not ship ${template_rel_path} (check EXCLUDES in package-plugin.sh)"
+	fi
+
+	rm -rf "${package_tmp}"
 }
 
 check_hook_fixtures_exist() {
@@ -879,10 +1129,48 @@ run_compaction_race_case() {
 	return 0
 }
 
+check_mcp_tool_hook_server_names() {
+	log "Running mcp_tool hook server-name checks"
+
+	local plugin_name
+	plugin_name="$(jq -r '.name' "${PLUGIN_JSON}")"
+	if [[ -z "${plugin_name}" || "${plugin_name}" == "null" ]]; then
+		fail "mcp_tool hook check: unable to read plugin name from ${PLUGIN_JSON}"
+		return 1
+	fi
+
+	# Regression guard: a bare server name (e.g. "omca" instead of
+	# "plugin:oh-my-claudeagent:omca") silently disables mcp_tool hook resolution —
+	# confirmed by reproduction, not just spec.
+	local prefix="plugin:${plugin_name}:"
+	local found=0
+	local entry tool server key
+	while IFS= read -r entry; do
+		found=1
+		tool="$(jq -r '.tool' <<<"${entry}")"
+		server="$(jq -r '.server' <<<"${entry}")"
+		if [[ "${server}" != "${prefix}"* ]]; then
+			fail "mcp_tool hook '${tool}': server '${server}' is not plugin-namespaced (expected prefix '${prefix}')"
+			continue
+		fi
+		key="${server#"${prefix}"}"
+		if ! jq -e --arg k "${key}" '.mcpServers | has($k)' "${MCP_JSON}" >/dev/null 2>&1; then
+			fail "mcp_tool hook '${tool}': server key '${key}' not registered in ${MCP_JSON}"
+			continue
+		fi
+		pass "mcp_tool hook '${tool}' server FQN '${server}' matches plugin name + registered MCP server '${key}'"
+	done < <(jq -c '[.. | objects | select(.type? == "mcp_tool")][]' "${HOOKS_JSON}")
+
+	if [[ "${found}" -eq 0 ]]; then
+		skip "no mcp_tool hooks found in ${HOOKS_JSON}"
+	fi
+}
+
 check_hooks() {
 	log "Running hooks checks"
 
 	validate_json_file "${HOOKS_JSON}" "hooks contract"
+	check_mcp_tool_hook_server_names
 	check_hook_fixtures_exist
 
 	local tmp_root

@@ -2,6 +2,8 @@
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
+hook_is_disabled "write-guard" && exit 0
+
 FILE_PATH=$(jq -r '.tool_input.file_path // ""' <<< "${HOOK_INPUT}")
 
 if [[ -z "${FILE_PATH}" ]]; then
@@ -12,6 +14,12 @@ case "${FILE_PATH}" in
 */verification-evidence.json)
 	jq -nc \
 		--arg reason "Manual writes to verification-evidence.json are forbidden. Use the evidence_log MCP tool instead." \
+		'{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: $reason}}'
+	exit 0
+	;;
+*/.omca/notepads/*)
+	jq -nc \
+		--arg reason "notepad files are append-only; Write would destroy history. Use the notepad_write MCP tool." \
 		'{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: $reason}}'
 	exit 0
 	;;

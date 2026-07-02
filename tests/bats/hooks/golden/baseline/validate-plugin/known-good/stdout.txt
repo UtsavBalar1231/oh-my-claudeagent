@@ -57,8 +57,63 @@
 [validate-plugin] PASS: policy posture: skills/omca-setup/SKILL.md includes sandbox fail-closed marker
 [validate-plugin] PASS: policy posture: skills/omca-setup/SKILL.md includes non-bypassing permission filter guidance
 [validate-plugin] PASS: phantom field check: no phantom jq field names (.tool_error, .tool_result.error, .tool_result.success) found in scripts/
+[validate-plugin] Running claudemd template packaging checks
+[validate-plugin] PASS: claudemd template packaging: templates/claudemd.md (referenced by SKILL.md) exists
+[validate-plugin] PASS: claudemd template packaging: package-plugin.sh ships templates/claudemd.md
+[validate-plugin] Running depersonalization checks
+[validate-plugin] PASS: depersonalization: no home-path, credential, or bearer-token literals found in tracked shipped files
+[validate-plugin] Running docs accuracy checks
+[validate-plugin] PASS: docs accuracy: README.md references existing path '.claude/settings.json'
+[validate-plugin] PASS: docs accuracy: README.md references existing path 'docs/reference/known-issues.md'
+[validate-plugin] PASS: docs accuracy: README.md references existing path 'docs/reference/configuration.md'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'docs/reference/configuration.md'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'docs/reference/known-issues.md'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'docs/CONTRIBUTING.md'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'templates/claudemd.md'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/subagent-start.sh'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/validate-plugin.sh'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
+[validate-plugin] PASS: docs accuracy: OMCA.md:243 documents removal of 'scripts/teammate-idle-guard.sh' (not a stale reference)
+[validate-plugin] PASS: docs accuracy: OMCA.md:261 documents removal of 'scripts/post-tool-batch.sh' (not a stale reference)
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'statusline/core.py'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path '.claude/settings.json'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'templates/claudemd.md'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'commands/start-work.md'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'commands/start-work.md'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'servers/tools/_common.py'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path '.claude/rules/state-schemas.md'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/lib/common.sh'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'commands/start-work.md'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path '.claude/settings.json'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/lib/common.sh'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'templates/claudemd.md'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/permission-filter.sh'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'output-styles/omca-default.md'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'servers/tools/_boulder_core.py'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path '.claude/rules/state-schemas.md'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/drift-guard.sh'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/context-injector.sh'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/lib/common.sh'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'output-styles/omca-default.md'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path '.omca/notes/probe-runtime-semantics.md'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path '.omca/notes/spike-semantic-verification-hooks.md'
+[validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md cites existing recipe 'just setup'
+[validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md cites existing recipe 'just release'
+[validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md cites existing recipe 'just release'
+[validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md references existing path 'hooks/hooks.json'
+[validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md references existing path 'templates/claudemd.md'
+[validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md references existing path 'scripts/keyword-detector.sh'
+[validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md references existing path '.claude-plugin/plugin.json'
+[validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md references existing path '.claude-plugin/marketplace.json'
 [validate-plugin] Running hooks checks
 [validate-plugin] PASS: hooks contract: valid JSON (<REPO_ROOT>/hooks/hooks.json)
+[validate-plugin] Running mcp_tool hook server-name checks
+[validate-plugin] PASS: mcp_tool hook 'validate_plan_write' server FQN 'plugin:oh-my-claudeagent:omca' matches plugin name + registered MCP server 'omca'
 [validate-plugin] PASS: hook fixture pretooluse-task-agent.json: valid JSON (<REPO_ROOT>/tests/fixtures/hooks/pretooluse-task-agent.json)
 [validate-plugin] PASS: hook fixture pretooluse-write.json: valid JSON (<REPO_ROOT>/tests/fixtures/hooks/pretooluse-write.json)
 [validate-plugin] PASS: hook fixture permissionrequest-bash.json: valid JSON (<REPO_ROOT>/tests/fixtures/hooks/permissionrequest-bash.json)
@@ -89,6 +144,7 @@
 [validate-plugin] PASS: PermissionRequest ExitPlanMode (plan-mode-handler.sh): script succeeded with valid JSON output
 [validate-plugin] FAIL: SessionStart compact (post-compact-inject.sh): expected JSON output but received empty stdout
 [validate-plugin] PASS: TaskCompleted default (task-completed-verify.sh): script succeeded with empty stdout
+[validate-plugin] PASS: Stop default (no state) (plan-continuation-guard.sh): script succeeded
 [validate-plugin] PASS: Stop default (no state) (final-verification-evidence.sh): script succeeded
 [validate-plugin] PASS: Stop default (no state) (drift-guard.sh): script succeeded
 [validate-plugin] PASS: SubagentStart basic (subagent-start.sh): script succeeded with valid JSON output
@@ -117,4 +173,4 @@
 [validate-plugin] PASS: mcp tools/list contains health_check
 [validate-plugin] PASS: mcp tools/list contains categories_list
 [validate-plugin] PASS: mcp tools/list contains file_read
-[validate-plugin] Summary: 107 passed, 1 failed, 6 skipped, 0 warned
+[validate-plugin] Summary: 159 passed, 1 failed, 6 skipped, 0 warned

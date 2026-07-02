@@ -129,3 +129,59 @@ load '../test_helper'
 	decision=$(echo "$output" | jq -r '.hookSpecificOutput.permissionDecision // empty')
 	[ -z "$decision" ]
 }
+
+# ---------------------------------------------------------------------------
+# Case 4: write to a notepad file → deny JSON, exit 0
+# ---------------------------------------------------------------------------
+
+@test "write-guard: emits permissionDecision deny for notepad path" {
+	local target="$CLAUDE_PROJECT_ROOT/.omca/notepads/my-plan/learnings.md"
+
+	local payload
+	payload=$(printf '{"tool_name":"Write","tool_input":{"file_path":"%s"}}' "$target")
+
+	run_hook "write-guard.sh" "$payload"
+	assert_success
+
+	local decision
+	decision=$(echo "$output" | jq -r '.hookSpecificOutput.permissionDecision // empty')
+	[ "$decision" = "deny" ]
+}
+
+@test "write-guard: deny output contains notepad_write reason for notepad path" {
+	local target="$CLAUDE_PROJECT_ROOT/.omca/notepads/my-plan/learnings.md"
+
+	local payload
+	payload=$(printf '{"tool_name":"Write","tool_input":{"file_path":"%s"}}' "$target")
+
+	run_hook "write-guard.sh" "$payload"
+	assert_success
+
+	local reason
+	reason=$(echo "$output" | jq -r '.hookSpecificOutput.permissionDecisionReason // empty')
+	assert [ -n "$reason" ]
+	echo "$reason" | grep -qi "notepad_write"
+}
+
+@test "write-guard: non-notepad write unaffected by notepad deny case" {
+	local target="$CLAUDE_PROJECT_ROOT/brand-new-file.txt"
+	rm -f "$target"
+
+	local payload
+	payload=$(printf '{"tool_name":"Write","tool_input":{"file_path":"%s"}}' "$target")
+
+	run_hook "write-guard.sh" "$payload"
+	assert_success
+	assert_output ""
+}
+
+@test "write-guard: OMCA_DISABLED_HOOKS=write-guard bypasses notepad deny" {
+	local target="$CLAUDE_PROJECT_ROOT/.omca/notepads/my-plan/learnings.md"
+
+	local payload
+	payload=$(printf '{"tool_name":"Write","tool_input":{"file_path":"%s"}}' "$target")
+
+	OMCA_DISABLED_HOOKS="write-guard" run_hook "write-guard.sh" "$payload"
+	assert_success
+	assert_output ""
+}

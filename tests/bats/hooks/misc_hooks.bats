@@ -109,6 +109,151 @@ load '../test_helper'
 }
 
 # ---------------------------------------------------------------------------
+# f2. comment-checker: slop-pattern categories (code-restating, filler words,
+# decorative separators, trivial doc comments, context-free TODO/FIXME)
+# ---------------------------------------------------------------------------
+
+@test "comment-checker: warns on code-restating comment" {
+	local content=$'# set user name to input value\nuser_name = input_value'
+	local payload
+	payload=$(jq -nc --arg c "$content" '{"tool_name":"Write","tool_input":{"content":$c}}')
+
+	run_hook "comment-checker.sh" "$payload"
+	assert_success
+	ctx=$(get_context)
+	assert [ -n "$ctx" ]
+	echo "$ctx" | grep -qi "restates the following code line"
+}
+
+@test "comment-checker: no warning when comment adds information code doesn't restate" {
+	local content=$'# cache the previous input value for diffing on next call\nuser_name = input_value'
+	local payload
+	payload=$(jq -nc --arg c "$content" '{"tool_name":"Write","tool_input":{"content":$c}}')
+
+	run_hook "comment-checker.sh" "$payload"
+	assert_success
+	assert_output ""
+}
+
+@test "comment-checker: warns on filler-word qualifier comment" {
+	local content=$'# obviously this handles the edge case\nfoo()'
+	local payload
+	payload=$(jq -nc --arg c "$content" '{"tool_name":"Write","tool_input":{"content":$c}}')
+
+	run_hook "comment-checker.sh" "$payload"
+	assert_success
+	ctx=$(get_context)
+	assert [ -n "$ctx" ]
+	echo "$ctx" | grep -qi "Filler-word comment"
+}
+
+@test "comment-checker: no warning for comment without filler qualifiers" {
+	local content=$'# handles the edge case for empty input\nfoo()'
+	local payload
+	payload=$(jq -nc --arg c "$content" '{"tool_name":"Write","tool_input":{"content":$c}}')
+
+	run_hook "comment-checker.sh" "$payload"
+	assert_success
+	assert_output ""
+}
+
+@test "comment-checker: warns on decorative separator comment" {
+	local content=$'# ====================\nfoo()'
+	local payload
+	payload=$(jq -nc --arg c "$content" '{"tool_name":"Write","tool_input":{"content":$c}}')
+
+	run_hook "comment-checker.sh" "$payload"
+	assert_success
+	ctx=$(get_context)
+	assert [ -n "$ctx" ]
+	echo "$ctx" | grep -qi "Decorative separator comment"
+}
+
+@test "comment-checker: no warning for a labeled section-banner comment" {
+	local content=$'# === Section: Setup ===\nfoo()'
+	local payload
+	payload=$(jq -nc --arg c "$content" '{"tool_name":"Write","tool_input":{"content":$c}}')
+
+	run_hook "comment-checker.sh" "$payload"
+	assert_success
+	assert_output ""
+}
+
+@test "comment-checker: warns on trivial doc comment above a one-line function" {
+	local content=$'# returns the user id\ndef get_user_id():\n    return self.id\n'
+	local payload
+	payload=$(jq -nc --arg c "$content" '{"tool_name":"Write","tool_input":{"content":$c}}')
+
+	run_hook "comment-checker.sh" "$payload"
+	assert_success
+	ctx=$(get_context)
+	assert [ -n "$ctx" ]
+	echo "$ctx" | grep -qi "Doc comment adds nothing beyond the function name"
+}
+
+@test "comment-checker: no warning for a doc comment that adds real information" {
+	local content=$'# validates against the external billing service and retries on timeout\ndef get_user_id():\n    return self.id\n'
+	local payload
+	payload=$(jq -nc --arg c "$content" '{"tool_name":"Write","tool_input":{"content":$c}}')
+
+	run_hook "comment-checker.sh" "$payload"
+	assert_success
+	assert_output ""
+}
+
+@test "comment-checker: warns on context-free TODO with no ref/owner/explanation" {
+	local content=$'# TODO fix this\nfoo()'
+	local payload
+	payload=$(jq -nc --arg c "$content" '{"tool_name":"Write","tool_input":{"content":$c}}')
+
+	run_hook "comment-checker.sh" "$payload"
+	assert_success
+	ctx=$(get_context)
+	assert [ -n "$ctx" ]
+	echo "$ctx" | grep -qi "Context-free TODO/FIXME"
+}
+
+@test "comment-checker: no warning for TODO carrying an issue reference" {
+	local content=$'# TODO(#123): fix this after upstream releases a patch\nfoo()'
+	local payload
+	payload=$(jq -nc --arg c "$content" '{"tool_name":"Write","tool_input":{"content":$c}}')
+
+	run_hook "comment-checker.sh" "$payload"
+	assert_success
+	assert_output ""
+}
+
+@test "comment-checker: @allow bypasses slop-pattern checks on that line" {
+	local content=$'# obviously simple @allow\nfoo()'
+	local payload
+	payload=$(jq -nc --arg c "$content" '{"tool_name":"Write","tool_input":{"content":$c}}')
+
+	run_hook "comment-checker.sh" "$payload"
+	assert_success
+	assert_output ""
+}
+
+@test "comment-checker: comment-checker-disable-file marker exempts the whole payload" {
+	local content=$'# comment-checker-disable-file\n# obviously this is bad\nfoo()'
+	local payload
+	payload=$(jq -nc --arg c "$content" '{"tool_name":"Write","tool_input":{"content":$c}}')
+
+	run_hook "comment-checker.sh" "$payload"
+	assert_success
+	assert_output ""
+}
+
+@test "comment-checker: OMCA_DISABLED_HOOKS bypasses detection entirely" {
+	local content="# AI-generated code\ndef foo():\n    pass"
+	local payload
+	payload=$(jq -nc --arg c "$content" '{"tool_name":"Write","tool_input":{"content":$c}}')
+
+	OMCA_DISABLED_HOOKS="comment-checker" run_hook "comment-checker.sh" "$payload"
+	assert_success
+	assert_output ""
+}
+
+# ---------------------------------------------------------------------------
 # g. empty-task-response: warns on empty/very short agent output
 # ---------------------------------------------------------------------------
 
