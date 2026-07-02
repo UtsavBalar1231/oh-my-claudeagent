@@ -237,7 +237,7 @@ if [[ -n "${SLOP_FINDINGS}" ]]; then
 		case "${category}" in
 			separator) WARNINGS+="Decorative separator comment detected (\"${detail}\"). " ;;
 			filler) WARNINGS+="Filler-word comment detected (\"${detail}\"). " ;;
-			bare-todo) WARNINGS+="Context-free TODO/FIXME detected (\"${detail}\") — add an issue ref, owner, or explanation. " ;;
+			bare-todo) WARNINGS+="Context-free TODO/FIXME detected (\"${detail}\"): add an issue ref, owner, or explanation. " ;;
 			restates) WARNINGS+="Comment restates the following code line (\"${detail}\"). " ;;
 			trivial-doc) WARNINGS+="Doc comment adds nothing beyond the function name (\"${detail}\"). " ;;
 			*) ;;

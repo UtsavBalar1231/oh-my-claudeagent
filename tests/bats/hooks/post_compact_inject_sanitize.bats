@@ -124,7 +124,7 @@ run_post_compact() {
 }
 
 # ---------------------------------------------------------------------------
-# e. Compaction stamp — feeds plan-continuation-guard.sh rail 6. Must be
+# e. Compaction stamp: feeds plan-continuation-guard.sh rail 6. Must be
 #    written unconditionally, even when there is no context file to restore,
 #    since this script only runs on the "compact" SessionStart matcher (a
 #    compaction always just happened whenever it's invoked).

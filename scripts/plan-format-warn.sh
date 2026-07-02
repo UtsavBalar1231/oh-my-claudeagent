@@ -1,5 +1,5 @@
 #!/bin/bash
-# plan-format-warn.sh — PostToolUse (Write|Edit) advisory hook.
+# plan-format-warn.sh: PostToolUse (Write|Edit) advisory hook.
 # Raw `- [ ]` checkboxes that don't match the numbered `- [ ] N.` form are
 # invisible to boulder_progress/statusline counting; this names the offending
 # lines at write time. Advisory only: never denies, always exits 0.
@@ -26,12 +26,12 @@ if [[ "${RAW_UNCHECKED}" -le "${UNCHECKED}" ]]; then
 	exit 0
 fi
 
-# 5 — cap on named malformed lines; keeps additionalContext short for plans
+# 5: cap on named malformed lines; keeps additionalContext short for plans
 # with many malformed boxes while still surfacing the common single-typo case.
 MAX_NAMED_LINES=5
 
 # Same raw-unchecked pattern as count_plan_checkboxes, minus lines that also
-# satisfy the numbered pattern — i.e. exactly the malformed set.
+# satisfy the numbered pattern, i.e. exactly the malformed set.
 MALFORMED_LINES=$(grep -nE '^- \[ \] ' "${FILE_PATH}" | grep -vE '^[0-9]+:- \[ \] [0-9]+\.')
 TOTAL_MALFORMED=$((RAW_UNCHECKED - UNCHECKED))
 NAMED=$(printf '%s\n' "${MALFORMED_LINES}" | head -n "${MAX_NAMED_LINES}")

@@ -20,7 +20,7 @@ fi
 
 NEW_COUNT=$(error_count_bump "${ERROR_KEY}" "${ERROR}")
 
-# 3 — circuit-breaker threshold: two failures are retriable (stale path, transient); third signals a stuck loop.
+# 3: circuit-breaker threshold: two failures are retriable (stale path, transient); third signals a stuck loop.
 CIRCUIT_BREAKER=""
 if [[ "${NEW_COUNT}" -ge 3 ]]; then
 	TIMELINE=$(jq -r --arg key "${ERROR_KEY}" \

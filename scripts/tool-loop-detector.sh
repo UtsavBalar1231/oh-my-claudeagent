@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # PostToolUse hook. Intended matcher (wired by the registration task that adds
-# this to hooks/hooks.json): Bash|Edit|Read|Grep|Glob — the tools most prone to
+# this to hooks/hooks.json): Bash|Edit|Read|Grep|Glob, the tools most prone to
 # blind repeat-and-hope retries. Detects 3 consecutive identical invocations
 # (same tool name + same tool_input) and nudges toward changing approach.
 # shellcheck source=lib/common.sh
@@ -44,7 +44,7 @@ else
 	log_hook_error "jq write failed for tool-loop-window.json" "$(basename "$0")"
 fi
 
-# 3 — fires once per streak at the exact repeat count that signals a loop, not on
+# 3: fires once per streak at the exact repeat count that signals a loop, not on
 # every call after (avoids re-nagging on the 4th, 5th, ... identical call).
 LOOP_FIRE_COUNT=3
 if [[ "${NEW_COUNT}" -eq "${LOOP_FIRE_COUNT}" ]]; then

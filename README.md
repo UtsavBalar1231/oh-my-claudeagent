@@ -117,8 +117,8 @@ FAIL lines. If any check fails, run it again with --doctor and report the output
 
 - `OMCA.md` — Complete guide: agents, skills, workflows, MCP tools, runtime state, troubleshooting
 - `CLAUDE.md` — Contributor internals: hook map, cross-file patterns, adding components
-- [`docs/reference/known-issues.md`](docs/reference/known-issues.md) — live limitations and workarounds
-- [`docs/reference/configuration.md`](docs/reference/configuration.md) — every user-facing setting, env var, and settings.json block
+- [`docs/reference/known-issues.md`](docs/reference/known-issues.md): live limitations and workarounds
+- [`docs/reference/configuration.md`](docs/reference/configuration.md): every user-facing setting, env var, and settings.json block
 
 ## Acknowledgments
 

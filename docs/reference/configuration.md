@@ -88,15 +88,15 @@ basename is present in `OMCA_DISABLED_HOOKS`.
 
 | Variable | Value | Disables |
 |---|---|---|
-| `OMCA_HOOK_DISABLE_FINAL_VERIFY` | `1` | `final-verification-evidence` — same effect as adding `final-verification-evidence` to `OMCA_DISABLED_HOOKS`. |
-| `OMCA_HOOK_DISABLE_DRIFT_GUARD` | `1` | `drift-guard` — the check that blocks a completion claim while stub markers remain on newly added lines. |
-| `OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY` | `1` | `git-destructive-deny` — the guard that blocks `git reset --hard`, `git stash`, `git checkout --`, `git clean`, and `git restore` from being run through the agent. |
+| `OMCA_HOOK_DISABLE_FINAL_VERIFY` | `1` | `final-verification-evidence`: same effect as adding `final-verification-evidence` to `OMCA_DISABLED_HOOKS`. |
+| `OMCA_HOOK_DISABLE_DRIFT_GUARD` | `1` | `drift-guard`: the check that blocks a completion claim while stub markers remain on newly added lines. |
+| `OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY` | `1` | `git-destructive-deny`: the guard that blocks `git reset --hard`, `git stash`, `git checkout --`, `git clean`, and `git restore` from being run through the agent. |
 
 ### Other environment variables
 
 | Variable | Purpose |
 |---|---|
-| `OMCA_PROBE_OUTPUT` | Output file path for the one-shot `UserPromptSubmit` payload capture script used during hook development. Not part of normal operation, and not registered as a permanent hook — only relevant if you are debugging the hook payload shape yourself. |
+| `OMCA_PROBE_OUTPUT` | Output file path for the one-shot `UserPromptSubmit` payload capture script used during hook development. Not part of normal operation, and not registered as a permanent hook; only relevant if you are debugging the hook payload shape yourself. |
 
 ## Recommended settings.json blocks
 

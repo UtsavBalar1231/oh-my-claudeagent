@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# hooks/hooks.json — structural coverage for the Phase-4 wiring: asserts the
+# hooks/hooks.json: structural coverage for the Phase-4 wiring: asserts the
 # three new scripts (plan-continuation-guard.sh, tool-loop-detector.sh,
 # delegation-reminder.sh) are registered under the exact event/matcher shapes
 # their own headers declare, rather than trusting validate-plugin.sh's

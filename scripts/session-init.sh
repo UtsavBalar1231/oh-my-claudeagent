@@ -28,7 +28,7 @@ SESSION_ID="${CLAUDE_SESSION_ID:-$(date +%s)-$$}"
 # One-time migration: merge legacy Task:delegate_error counter key → Agent:delegate_error.
 # Pre-v2.0 delegate-retry.sh used tool_name // "Task"; the canonical platform name is Agent.
 # Shape-agnostic: entries are now EITHER a bare int (legacy) OR an object
-# {count, last_failure_at, last_errors} (error_count_bump helper, common.sh) — a
+# {count, last_failure_at, last_errors} (error_count_bump helper, common.sh); a
 # naive "+ N" merge breaks on the object shape, so counts/errors/timestamps are
 # merged per-field regardless of which side is which shape.
 COUNTS_FILE="${STATE_DIR}/error-counts.json"

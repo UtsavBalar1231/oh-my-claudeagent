@@ -205,10 +205,10 @@ resolve_evidence_file() {
 # (servers/tools/_boulder_core.py: `^- \[([ x])\] \d+\.`, case-insensitive on x)
 # so bash callers and boulder_progress/statusline agree on the same counts.
 # Emits four space-separated integers: unchecked checked total raw_unchecked.
-#   unchecked      — numbered `- [ ] N.` lines
-#   checked        — numbered `- [x] N.` / `- [X] N.` lines
-#   total          — unchecked + checked
-#   raw_unchecked  — any `- [ ] ` line regardless of numbering; raw_unchecked >
+#   unchecked:     numbered `- [ ] N.` lines
+#   checked:       numbered `- [x] N.` / `- [X] N.` lines
+#   total:         unchecked + checked
+#   raw_unchecked: any `- [ ] ` line regardless of numbering; raw_unchecked >
 #                    unchecked means malformed/unnumbered boxes are present
 # Usage: read -r unchecked checked total raw_unchecked < <(count_plan_checkboxes "$plan_file")
 count_plan_checkboxes() {
@@ -227,8 +227,8 @@ count_plan_checkboxes() {
 	printf '%d %d %d %d\n' "${unchecked}" "${checked}" "$((unchecked + checked))" "${raw_unchecked}"
 }
 
-# Checks OMCA_DISABLED_HOOKS — a comma- and/or whitespace-separated list of
-# hook basenames without the .sh suffix — for <name>. Returns 0 (disabled) on
+# Checks OMCA_DISABLED_HOOKS, a comma- and/or whitespace-separated list of
+# hook basenames without the .sh suffix, for <name>. Returns 0 (disabled) on
 # a match, 1 when unset/empty/no match. Unified kill switch for OMCA hooks.
 # Usage: hook_is_disabled "final-verification-evidence" && exit 0
 hook_is_disabled() {

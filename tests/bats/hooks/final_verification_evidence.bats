@@ -297,7 +297,7 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
-# (p) Malformed/unnumbered unchecked box does not count toward completion —
+# (p) Malformed/unnumbered unchecked box does not count toward completion:
 # counting now goes through count_plan_checkboxes, agreeing with boulder_progress
 # ---------------------------------------------------------------------------
 
@@ -325,7 +325,7 @@ EOF
 	local plan_file="${BATS_TEST_TMPDIR}/complete-plan.md"
 	_write_complete_plan "${plan_file}"
 	_write_boulder "${plan_file}"
-	# No evidence — would block, but the kill switch fires first.
+	# No evidence: would block, but the kill switch fires first.
 
 	export OMCA_DISABLED_HOOKS="final-verification-evidence"
 	run_hook "final-verification-evidence.sh" '{}'
@@ -337,7 +337,7 @@ EOF
 	local plan_file="${BATS_TEST_TMPDIR}/complete-plan.md"
 	_write_complete_plan "${plan_file}"
 	_write_boulder "${plan_file}"
-	# No evidence — the gate should still block.
+	# No evidence: the gate should still block.
 
 	export OMCA_DISABLED_HOOKS="other-hook"
 	run_hook "final-verification-evidence.sh" '{}'
@@ -349,7 +349,7 @@ EOF
 	local plan_file="${BATS_TEST_TMPDIR}/complete-plan.md"
 	_write_complete_plan "${plan_file}"
 	_write_boulder "${plan_file}"
-	# No evidence — would block, but the legacy kill switch fires first.
+	# No evidence: would block, but the legacy kill switch fires first.
 
 	export OMCA_HOOK_DISABLE_FINAL_VERIFY=1
 	run_hook "final-verification-evidence.sh" '{}'

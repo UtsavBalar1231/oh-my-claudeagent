@@ -4,13 +4,13 @@
 #
 # The `just ci` chain is DERIVED from the justfile at test runtime (see _resolve_leaf_steps
 # below), so adding a new step to the `ci:` recipe without a matching entry in _step_pattern
-# fails the "every leaf step has a pinned pattern" test below — that is the whole point.
+# fails the "every leaf step has a pinned pattern" test below: that is the whole point.
 #
 # Pinned pairing table (leaf recipe -> substring expected in ci.yml). A pin is needed wherever
 # ci.yml invokes the same underlying command differently than the justfile recipe body does (for
 # example, a globally installed tool instead of `uv run --project servers`). Each pin is also
 # asserted to be an actual substring of the recipe's own body, so a pin cannot silently drift
-# from the real command — only from CI's coverage of it.
+# from the real command, only from CI's coverage of it.
 #
 # | leaf recipe | ci.yml pattern                                                    | why it differs from the recipe body |
 # |-------------|--------------------------------------------------------------------|--------------------------------------|
@@ -122,7 +122,7 @@ _step_pattern() {
 @test "negative sanity: removing the test-mcp job from a ci.yml copy makes coverage fail" {
 	local fixture="$BATS_TEST_TMPDIR/ci-missing-mcp.yml"
 	# Drop the entire test-mcp job block (its header through the line before the next
-	# top-level job) from an IN-MEMORY copy — the real ci.yml is never touched.
+	# top-level job) from an IN-MEMORY copy: the real ci.yml is never touched.
 	awk '
 		/^  test-mcp:/ { skip = 1; next }
 		skip && /^  [a-zA-Z_-]+:/ { skip = 0 }

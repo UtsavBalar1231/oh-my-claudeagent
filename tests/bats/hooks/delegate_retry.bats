@@ -159,7 +159,7 @@ load '../test_helper'
 	count=$(jq -r '."Agent:delegate_error".count' "$counts_file")
 	assert [ "$count" -eq 2 ]
 
-	# 360s (6min) — older than ERROR_COUNT_DECAY_SECONDS (300s), forces a clean-window reset.
+	# 360s (6min): older than ERROR_COUNT_DECAY_SECONDS (300s), forces a clean-window reset.
 	local stale_ts=$(( $(date +%s) - 360 ))
 	jq --argjson ts "$stale_ts" '."Agent:delegate_error".last_failure_at = $ts' "$counts_file" > "$counts_file.tmp"
 	mv "$counts_file.tmp" "$counts_file"

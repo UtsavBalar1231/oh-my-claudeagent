@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Behavioral tests for delegation-reminder.sh — one-shot nudge when the main
+# Behavioral tests for delegation-reminder.sh: one-shot nudge when the main
 # session runs direct work tools repeatedly without delegating.
 
 load '../test_helper'

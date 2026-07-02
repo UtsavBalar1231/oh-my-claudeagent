@@ -40,7 +40,7 @@ fi
 
 NEW_COUNT=$(error_count_bump "${ERROR_KEY}" "${ERROR_MSG}")
 
-# 3 — circuit-breaker threshold: two failures are retriable (transient MCP hiccups); third signals a stuck loop.
+# 3: circuit-breaker threshold: two failures are retriable (transient MCP hiccups); third signals a stuck loop.
 CIRCUIT_BREAKER=""
 if [[ "${NEW_COUNT}" -ge 3 ]]; then
 	TIMELINE=$(jq -r --arg key "${ERROR_KEY}" \

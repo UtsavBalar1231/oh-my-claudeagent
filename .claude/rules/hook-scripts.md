@@ -43,7 +43,7 @@ The first two share the same `count_plan_checkboxes` helper (`scripts/lib/common
 to derive checked/unchecked counts, so they can never disagree about which
 state a plan is in. `hooks/hooks.json` lists `plan-continuation-guard.sh`
 before `final-verification-evidence.sh`: since the two are disjoint by
-construction, array order has no functional effect on which one blocks — the
+construction, array order has no functional effect on which one blocks; the
 ordering is a documentation choice, not a priority mechanism.
 
 ### Legacy kill-switch back-compat
@@ -54,7 +54,7 @@ kill-switch mechanism going forward. Three hooks predate it and still honor
 their own single-purpose legacy flag as well: `OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY`
 (`git-destructive-deny.sh`), `OMCA_HOOK_DISABLE_FINAL_VERIFY`
 (`final-verification-evidence.sh`), and `OMCA_HOOK_DISABLE_DRIFT_GUARD`
-(`drift-guard.sh`). Either mechanism disables the hook — OR semantics, not a
+(`drift-guard.sh`). Either mechanism disables the hook: OR semantics, not a
 replacement. New hooks should use `hook_is_disabled()` only.
 
 ### Platform hook reference (v2.1.94)

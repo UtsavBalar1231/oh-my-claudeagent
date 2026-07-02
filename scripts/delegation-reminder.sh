@@ -1,16 +1,16 @@
 #!/bin/bash
-# delegation-reminder.sh — one-shot nudge when the main session runs direct work
+# delegation-reminder.sh: one-shot nudge when the main session runs direct work
 # tools repeatedly instead of delegating to specialist agents.
 #
 # Intended registration (a later serial task wires this into hooks.json):
-#   PostToolUse, matcher: Edit|Write|Bash — counts direct work-tool calls.
-#   PostToolUse, matcher: Agent — resets the counter (a delegation happened).
+#   PostToolUse, matcher: Edit|Write|Bash: counts direct work-tool calls.
+#   PostToolUse, matcher: Agent: resets the counter (a delegation happened).
 # Both matchers point at this same script; behavior branches on .tool_name below.
 #
 # Rationale: a batch-level delegation reminder was removed in the native-leaning
 # minimize refactor. This differs: it is per-call, fires at most once per session
 # (not per batch), and is kill-switchable. Fresh audit evidence showed the
-# main-session-does-leaf-work failure mode persists — static prompt pressure in
+# main-session-does-leaf-work failure mode persists: static prompt pressure in
 # CLAUDE.md/output-styles alone has not closed it, so this fires at the
 # behavioral moment instead.
 # shellcheck source=lib/common.sh
@@ -46,7 +46,7 @@ TOOL_NAME=$(jq -r '.tool_name // ""' <<< "${HOOK_INPUT}")
 
 # An Agent call is a delegation: reset the counter and silence future reminders
 # this session. Only reachable if this script is ALSO registered on
-# PostToolUse Agent — the Edit|Write|Bash matcher never sees tool_name=="Agent".
+# PostToolUse Agent: the Edit|Write|Bash matcher never sees tool_name=="Agent".
 if [[ "${TOOL_NAME}" == "Agent" ]]; then
 	write_counter 0 true
 	exit 0
@@ -62,7 +62,7 @@ fi
 
 DIRECT_CALLS=$((DIRECT_CALLS + 1))
 
-# 3 — three direct work-tool calls with zero delegation in between is the
+# 3: three direct work-tool calls with zero delegation in between is the
 # threshold observed in audit evidence where main-session leaf work recurs.
 if [[ "${DIRECT_CALLS}" -ge 3 ]]; then
 	write_counter "${DIRECT_CALLS}" true

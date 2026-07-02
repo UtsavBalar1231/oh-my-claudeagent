@@ -51,7 +51,7 @@ def _find_git_root(working_directory: str) -> str:
 def _ensure_omca_gitignore(git_root: str) -> None:
     """Drop `.omca/.gitignore` if absent so the whole tree stays untracked except rules/.
 
-    Never overwrites an existing file — a project may have intentionally
+    Never overwrites an existing file: a project may have intentionally
     customized it (e.g. to also track a different subdirectory).
     """
     gitignore_path = os.path.join(git_root, ".omca", ".gitignore")

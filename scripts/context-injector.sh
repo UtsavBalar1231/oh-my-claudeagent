@@ -62,7 +62,7 @@ while true; do
 			AGENTS_CONTENT=$(awk 'BEGIN{n=0}{n+=length($0)+1; if(n>2000)exit; print}' "${CURRENT_DIR}/AGENTS.md")
 			CONTEXT_PARTS+="[AGENTS.md from ${CURRENT_DIR}]: ${AGENTS_CONTENT}"
 			if [[ "$(wc -c <"${CURRENT_DIR}/AGENTS.md")" -gt 2000 ]]; then
-				CONTEXT_PARTS+=" (truncated — read full file at ${CURRENT_DIR}/AGENTS.md)"
+				CONTEXT_PARTS+=" (truncated, read full file at ${CURRENT_DIR}/AGENTS.md)"
 			fi
 			CONTEXT_PARTS+=$'\n'
 		fi
@@ -72,7 +72,7 @@ while true; do
 			README_CONTENT=$(awk 'BEGIN{n=0}{n+=length($0)+1; if(n>2000)exit; print}' "${CURRENT_DIR}/README.md")
 			CONTEXT_PARTS+="[README.md from ${CURRENT_DIR}]: ${README_CONTENT}"
 			if [[ "$(wc -c <"${CURRENT_DIR}/README.md")" -gt 2000 ]]; then
-				CONTEXT_PARTS+=" (truncated — read full file at ${CURRENT_DIR}/README.md)"
+				CONTEXT_PARTS+=" (truncated, read full file at ${CURRENT_DIR}/README.md)"
 			fi
 			CONTEXT_PARTS+=$'\n'
 		fi
@@ -114,7 +114,7 @@ if [[ -d "${RULES_DIR}" ]]; then
 					if [[ "${RULE_ALREADY_INJECTED}" == "false" ]]; then
 						CONTEXT_PARTS+="[Rule: ${PATTERN}]: ${RULE_CONTENT}"
 						if [[ "${#RULE_TAIL}" -gt 1000 ]]; then
-							CONTEXT_PARTS+=" (truncated — read full rule at ${RULE_FILE})"
+							CONTEXT_PARTS+=" (truncated, read full rule at ${RULE_FILE})"
 						fi
 						CONTEXT_PARTS+=$'\n'
 

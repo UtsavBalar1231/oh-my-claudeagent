@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Behavioral tests for plan-continuation-guard.sh — Stop hook that nudges the
+# Behavioral tests for plan-continuation-guard.sh: Stop hook that nudges the
 # agent to keep working when the bound plan still has unchecked numbered
 # tasks. Disjoint by construction with final-verification-evidence.sh (that
 # gate only fires when the plan is fully checked); both read counts from the

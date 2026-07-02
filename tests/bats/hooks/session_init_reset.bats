@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# session-init.sh — new-state-file session reset + shape-agnostic error-counts
+# session-init.sh: new-state-file session reset + shape-agnostic error-counts
 # migration. Behavioral coverage for the Phase-4 wiring: plan-continuation.json,
 # tool-loop-window.json, delegation-counter.json must not survive a SessionStart,
 # and the legacy Task:delegate_error migration must merge correctly regardless

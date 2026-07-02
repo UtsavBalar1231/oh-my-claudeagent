@@ -674,7 +674,7 @@ check_depersonalization_pattern() {
 		matched="${rest#*:}"
 		rel_path="$(relative_path "${abs_path}")"
 
-		# Documentation placeholders — never real leaks.
+		# Documentation placeholders, never real leaks.
 		if [[ "${matched}" == "/home/user/" || "${matched}" == "/Users/user/" ]]; then
 			continue
 		fi
@@ -694,7 +694,7 @@ check_depersonalization() {
 	log "Running depersonalization checks"
 
 	# Roots are the exhaustive list of shipped-content directories/files from the task.
-	# .omca/, .claude/, tests/, and CHANGELOG.md are deliberately excluded — the first
+	# .omca/, .claude/, tests/, and CHANGELOG.md are deliberately excluded: the first
 	# two are local dev state, tests/ carries fixture data, and CHANGELOG.md is history.
 	local scan_roots=(agents skills scripts servers commands templates output-styles docs)
 	local scan_root_files=(README.md OMCA.md)
@@ -704,7 +704,7 @@ check_depersonalization() {
 	for root in "${scan_roots[@]}"; do
 		while IFS= read -r rel_file; do
 			[[ -z "${rel_file}" ]] && continue
-			# The allowlist itself documents matched literals for reference — exclude it
+			# The allowlist itself documents matched literals for reference, exclude it
 			# from scanning, or every allowlisted entry would trip its own listing.
 			[[ "${rel_file}" == "scripts/depersonalization-allowlist.txt" ]] && continue
 			abs_files+=("${REPO_ROOT}/${rel_file}")
@@ -752,7 +752,7 @@ docs_accuracy_extract_just_recipes() {
 docs_accuracy_extract_paths() {
 	local doc_path="$1"
 	[[ -f "${doc_path}" ]] || return 0
-	# Heuristic (kept intentionally conservative — see CLAUDE.md "conservative to avoid
+	# Heuristic (kept intentionally conservative; see CLAUDE.md "conservative to avoid
 	# false positives"): a backtick-quoted token counts as a repo-relative path only if
 	# (a) it contains a `/` and ends in a file extension, AND (b) its first path segment
 	# is a real top-level repo entry. This excludes bare filenames (e.g. `plugin.json`,
@@ -815,7 +815,7 @@ check_docs_accuracy() {
 			candidate="${entry#*:}"
 
 			# Placeholder guard: scaffold examples like `agents/name.md` are documented
-			# templates, not real files — the literal segment "name" marks them.
+			# templates, not real files: the literal segment "name" marks them.
 			if [[ "${candidate}" == *"/name."* || "${candidate}" == *"/name/"* ]]; then
 				continue
 			fi
@@ -1140,7 +1140,7 @@ check_mcp_tool_hook_server_names() {
 	fi
 
 	# Regression guard: a bare server name (e.g. "omca" instead of
-	# "plugin:oh-my-claudeagent:omca") silently disables mcp_tool hook resolution —
+	# "plugin:oh-my-claudeagent:omca") silently disables mcp_tool hook resolution,
 	# confirmed by reproduction, not just spec.
 	local prefix="plugin:${plugin_name}:"
 	local found=0

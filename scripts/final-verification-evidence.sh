@@ -16,7 +16,7 @@ noop_exit() {
 
 # Unified kill switch (also honors the legacy OMCA_HOOK_DISABLE_FINAL_VERIFY below)
 if hook_is_disabled "final-verification-evidence"; then
-	echo "[FINAL VERIFICATION] Disabled via OMCA_DISABLED_HOOKS — skipping check." >&2
+	echo "[FINAL VERIFICATION] Disabled via OMCA_DISABLED_HOOKS, skipping check." >&2
 	noop_exit
 fi
 
@@ -56,7 +56,7 @@ fi
 
 # Count remaining unchecked boxes via the shared helper (agrees with boulder_progress
 # and statusline, which both count only numbered `- [ ] N.` boxes); if any remain
-# the plan is not done — allow stop
+# the plan is not done: allow stop
 read -r INCOMPLETE COMPLETE _TOTAL _RAW_UNCHECKED < <(count_plan_checkboxes "${ACTIVE_PLAN}")
 if [[ "${INCOMPLETE}" -gt 0 ]]; then
 	noop_exit

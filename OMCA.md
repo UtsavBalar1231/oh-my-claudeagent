@@ -303,7 +303,7 @@ is complete but evidence is missing — it never emits a persistence-style block
 **`SessionStart` `watchPaths` output (v2.1.141–v2.1.167, not adopted):**
 
 `SessionStart` hooks can return a `watchPaths` array to register file-system paths for
-`FileChanged` event delivery. OMCA does not adopt this — there is no `FileChanged`
+`FileChanged` event delivery. OMCA does not adopt this: there is no `FileChanged`
 handler in the current tree (the prior side-effects-only handler was removed in the
 v2.10 minimize-to-core refactor along with `CwdChanged`/`FileChanged` registration), and
 no runtime reader that would benefit from expanded watch coverage. Extending the watch
@@ -322,7 +322,7 @@ via `additionalContext`, which appends without overwriting.
 Hook scripts no longer have access to `/dev/tty` or terminal control sequences. OMCA
 has no desktop-notification handler in the current tree (the prior `notify.sh` script,
 which used only `terminal-notifier`, `osascript`, `notify-send`, `zenity`, `powershell`,
-and stderr bell, was removed in the v2.10 minimize-to-core refactor) — this platform
+and stderr bell, was removed in the v2.10 minimize-to-core refactor); this platform
 change has no OMCA impact.
 
 Hooks can now emit a `terminalSequence` output field to inject terminal escape sequences:

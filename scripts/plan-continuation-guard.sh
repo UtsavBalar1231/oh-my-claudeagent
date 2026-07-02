@@ -1,5 +1,5 @@
 #!/bin/bash
-# plan-continuation-guard.sh — blocks Stop when THIS SESSION's bound plan still
+# plan-continuation-guard.sh: blocks Stop when THIS SESSION's bound plan still
 # has unchecked numbered tasks, nudging the agent to keep working instead of
 # stopping mid-plan. Disjoint by construction with final-verification-evidence.sh:
 # that gate fires only when the plan is fully checked, this one only when it
@@ -8,7 +8,7 @@
 # Rails, in order (each exits 0 before any counter mutation): (1) recursion
 # guard, (2) kill switch, (3) no bound/missing plan, (4) no unchecked boxes,
 # (5) user-pause intent, (6) recent compaction stamp, (7) stale binding with no
-# fresh evidence, (8) assistant's last message is a question, (9) counters —
+# fresh evidence, (8) assistant's last message is a question, (9) counters:
 # exponential cooldown, hard cap, stagnation escape.
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
@@ -17,22 +17,22 @@ STATE_DIR="${HOOK_STATE_DIR}"
 PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(dirname "$0")/..}"
 STATE_FILE="${STATE_DIR}/plan-continuation.json"
 
-# 60s — rail 6 compaction-recency window: a compaction just happened, give the
+# 60s: rail 6 compaction-recency window: a compaction just happened, give the
 # session a moment to resettle before nudging it to keep going.
 COMPACTION_FRESH_SECONDS=60
-# 86400s (24h) — rail 7 binding staleness threshold: a binding this old with no
+# 86400s (24h): rail 7 binding staleness threshold: a binding this old with no
 # fresh evidence looks abandoned rather than actively worked.
 STALE_BINDING_SECONDS=86400
-# 300s (5m) — rail 9 clean window: this long since the last block resets the
+# 300s (5m): rail 9 clean window: this long since the last block resets the
 # hard-cap counter, so a session that resumes cleanly isn't punished forever.
 CLEAN_WINDOW_SECONDS=300
-# 5 — rail 9 hard cap: this many consecutive blocks without a clean window and
+# 5: rail 9 hard cap: this many consecutive blocks without a clean window and
 # the guard backs off for good (until the clean window resets it).
 HARD_CAP_BLOCKS=5
-# 3 — rail 9 stagnation streak: this many consecutive blocks with an unchanged
+# 3: rail 9 stagnation streak: this many consecutive blocks with an unchanged
 # unchecked-count means the agent isn't making progress; stop nagging.
 STAGNATION_STREAK=3
-# 5s — rail 9 cooldown base: doubled per consecutive block (5, 10, 20, 40, 80s).
+# 5s: rail 9 cooldown base: doubled per consecutive block (5, 10, 20, 40, 80s).
 BASE_COOLDOWN_SECONDS=5
 
 noop_exit() {
@@ -44,7 +44,7 @@ noop_exit() {
 # the plan/user-message signals below cannot be trusted. Mirrors the fail-open
 # convention in final-verification-evidence.sh and drift-guard.sh.
 if [[ "${HOOK_INPUT_TIMED_OUT:-0}" -eq 1 ]]; then
-	echo "[PLAN CONTINUATION] stdin read timed out — cannot evaluate plan state this Stop. Allowing." >&2
+	echo "[PLAN CONTINUATION] stdin read timed out, cannot evaluate plan state this Stop. Allowing." >&2
 	noop_exit
 fi
 
@@ -56,12 +56,12 @@ fi
 
 # Rail 2: kill switch
 if hook_is_disabled "plan-continuation-guard"; then
-	echo "[PLAN CONTINUATION] Disabled via OMCA_DISABLED_HOOKS — skipping check." >&2
+	echo "[PLAN CONTINUATION] Disabled via OMCA_DISABLED_HOOKS, skipping check." >&2
 	noop_exit
 fi
 
 # Rail 3: resolve the session's bound plan via the shared shim (never
-# hand-parse boulder.json) — mirrors final-verification-evidence.sh exactly so
+# hand-parse boulder.json), mirrors final-verification-evidence.sh exactly so
 # both hooks agree on which plan, if any, this session is bound to.
 BOULDER_RESOLVED=$(python3 "${PLUGIN_ROOT}/servers/tools/boulder_resolve.py" "$(resolve_session_id)" "${HOOK_PROJECT_ROOT}" 2>/dev/null)
 ACTIVE_PLAN=$(jq -r '.active_plan // ""' <<< "${BOULDER_RESOLVED:-{\}}" 2>/dev/null)
@@ -71,7 +71,7 @@ if [[ -z "${ACTIVE_PLAN}" || ! -f "${ACTIVE_PLAN}" ]]; then
 	noop_exit
 fi
 
-# Rail 4: no unchecked boxes — nothing to nudge. Disjoint with
+# Rail 4: no unchecked boxes, nothing to nudge. Disjoint with
 # final-verification-evidence.sh by construction: that gate only fires when
 # INCOMPLETE == 0.
 read -r INCOMPLETE _COMPLETE _TOTAL _RAW_UNCHECKED < <(count_plan_checkboxes "${ACTIVE_PLAN}")
@@ -85,7 +85,7 @@ fi
 # inline `.messages` array is read defensively first (unconfirmed but cheap to
 # probe) before falling back to tailing the transcript file, matching the
 # pattern drift-guard.sh already uses for assistant text. Transcript lines are
-# JSONL with `.type` and `.message.role` both set to the speaker's role — this
+# JSONL with `.type` and `.message.role` both set to the speaker's role; this
 # mirrors drift-guard.sh's assistant extraction, generalized to a $role param;
 # unconfirmed for the "user" role specifically since no prior hook reads it,
 # so this rail is best-effort and fails toward skipping (exit 0) on any
@@ -164,7 +164,7 @@ fi
 
 # Rail 7: stale-binding escape. `boulder_resolve.py` doesn't expose `bound_at`
 # (it only returns the plan_name/active_plan/worktree_path triple), so this
-# reads bindings[session_id].bound_at directly from boulder.json — a single
+# reads bindings[session_id].bound_at directly from boulder.json, a single
 # extra field read, not a re-implementation of the resolution ladder itself.
 # Best-effort proxy for "evidence logged this session": the evidence file's
 # mtime relative to bound_at (per-session evidence timestamps aren't cheaply
@@ -237,9 +237,9 @@ SAME_COUNT_RUN=$(jq_read "${STATE_FILE}" '.same_count_run // 0')
 STAGNATED=$(jq_read "${STATE_FILE}" '.stagnated // false')
 
 # Any state field that failed to parse to the expected type is a corrupt/edge
-# state file — fail open rather than risk arithmetic on garbage.
+# state file, fail open rather than risk arithmetic on garbage.
 if ! [[ "${CONSECUTIVE_BLOCKS}" =~ ^[0-9]+$ && "${LAST_BLOCK_AT}" =~ ^[0-9]+$ && "${LAST_UNCHECKED_COUNT}" =~ ^-?[0-9]+$ && "${SAME_COUNT_RUN}" =~ ^[0-9]+$ ]]; then
-	log_hook_error "plan-continuation.json has malformed counters — failing open" "$(basename "$0")"
+	log_hook_error "plan-continuation.json has malformed counters, failing open" "$(basename "$0")"
 	noop_exit
 fi
 
@@ -266,7 +266,7 @@ fi
 
 # Stagnation: if the last STAGNATION_STREAK consecutive blocks already shared
 # this same unchecked count, this call would be the (STAGNATION_STREAK+1)th in
-# a row with no progress — stop nagging and persist the escape for the rest of
+# a row with no progress: stop nagging and persist the escape for the rest of
 # the session instead of blocking again.
 if [[ "${INCOMPLETE}" -eq "${LAST_UNCHECKED_COUNT}" && "${SAME_COUNT_RUN}" -ge "${STAGNATION_STREAK}" ]]; then
 	write_continuation_state "${CONSECUTIVE_BLOCKS}" "${LAST_BLOCK_AT}" "${INCOMPLETE}" "${SAME_COUNT_RUN}" "true" || true

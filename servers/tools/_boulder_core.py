@@ -14,10 +14,10 @@ from pathlib import Path
 CHECKBOX_RE = re.compile(r"^- \[([ x])\] \d+\.", re.MULTILINE)
 
 # Same checkbox anchor as CHECKBOX_RE, extended with a trailing capture group
-# for the task label text — used only by next_task_label() below.
+# for the task label text, used only by next_task_label() below.
 _CHECKBOX_LABEL_RE = re.compile(r"^- \[([ x])\] \d+\.\s*(.*)$", re.MULTILINE)
 
-# 80 chars — keeps next_task_label a short resume hint, not a full restatement
+# 80 chars: keeps next_task_label a short resume hint, not a full restatement
 # of the task (plan tasks routinely run to multiple sentences).
 MAX_LABEL_LEN = 80
 
