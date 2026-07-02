@@ -591,16 +591,21 @@ class TestGlyphPaddingContract:
         from statusline.core import _todo_counter
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            # Seed boulder.json + a plan with 3 numbered tasks (1 done)
+            # Seed a session-bound registry boulder.json + a plan with 3
+            # numbered tasks (1 done) — display requires an explicit binding.
             os.makedirs(os.path.join(tmpdir, ".omca", "state"))
             plan_path = os.path.join(tmpdir, "plan.md")
             with open(plan_path, "w") as f:
                 f.write("- [x] 1. one\n- [ ] 2. two\n- [ ] 3. three\n")
+            boulder = {
+                "plans": {"test-plan": {"active_plan": plan_path}},
+                "bindings": {"sess-glyph": {"plan_name": "test-plan"}},
+            }
             with open(os.path.join(tmpdir, ".omca", "state", "boulder.json"), "w") as f:
-                f.write(f'{{"active_plan": "{plan_path}", "plan_name": "test-plan"}}')
+                json.dump(boulder, f)
 
             glyphs = build_glyphs(False)  # ASCII -> "T:"
-            result = _todo_counter(tmpdir, glyphs, False)
+            result = _todo_counter(tmpdir, glyphs, False, session_id="sess-glyph")
 
         # ASCII "T:" followed by space then count
         assert "T: 1/3" in result, f"expected 'T: 1/3' substring, got {result!r}"
@@ -939,6 +944,28 @@ PLAN_CONTENT_ALL_PENDING = """\
 - [ ] 2. Second
 """
 
+# Plan with every numbered task complete -- must never display
+PLAN_CONTENT_ALL_DONE = """\
+- [x] 1. First
+- [x] 2. Second
+"""
+
+# Session id used by the bound-registry helper below
+TEST_SESSION = "sess-test"
+
+
+def _bound_boulder(plan_file: pathlib.Path, session_id: str = TEST_SESSION) -> dict:
+    """Registry-schema boulder.json with `session_id` bound to the plan."""
+    return {
+        "plans": {
+            "test-plan": {
+                "active_plan": str(plan_file),
+                "started_at": "2026-01-01T00:00:00Z",
+            }
+        },
+        "bindings": {session_id: {"plan_name": "test-plan", "bound_at": 1}},
+    }
+
 
 class TestTodoCounter:
     def _glyphs_ascii(self) -> dict:
@@ -949,14 +976,16 @@ class TestTodoCounter:
 
     def test_no_boulder_returns_empty(self, tmp_path: pathlib.Path) -> None:
         """No boulder.json -> returns empty string."""
-        result = _todo_counter(str(tmp_path), self._glyphs_ascii(), False)
+        result = _todo_counter(
+            str(tmp_path), self._glyphs_ascii(), False, session_id=TEST_SESSION
+        )
         assert result == ""
 
     def test_missing_plan_returns_empty(self, tmp_path: pathlib.Path) -> None:
         """boulder.json points to non-existent plan -> returns empty string."""
         state_dir = tmp_path / ".omca" / "state"
         state_dir.mkdir(parents=True)
-        boulder = {"active_plan": str(tmp_path / "nonexistent.md")}
+        boulder = _bound_boulder(tmp_path / "nonexistent.md")
         (state_dir / "boulder.json").write_text(json.dumps(boulder))
         result = _todo_counter(str(tmp_path), self._glyphs_ascii(), False)
         assert result == ""
@@ -967,9 +996,11 @@ class TestTodoCounter:
         state_dir.mkdir(parents=True)
         plan_file = tmp_path / "plan.md"
         plan_file.write_text(PLAN_CONTENT_UNNUMBERED)
-        boulder = {"active_plan": str(plan_file)}
+        boulder = _bound_boulder(plan_file)
         (state_dir / "boulder.json").write_text(json.dumps(boulder))
-        result = _todo_counter(str(tmp_path), self._glyphs_ascii(), False)
+        result = _todo_counter(
+            str(tmp_path), self._glyphs_ascii(), False, session_id=TEST_SESSION
+        )
         assert result == ""
 
     def test_ascii_3_done_10_total(self, tmp_path: pathlib.Path) -> None:
@@ -978,9 +1009,11 @@ class TestTodoCounter:
         state_dir.mkdir(parents=True)
         plan_file = tmp_path / "plan.md"
         plan_file.write_text(PLAN_CONTENT_3_OF_10)
-        boulder = {"active_plan": str(plan_file), "plan_name": "test-plan"}
+        boulder = _bound_boulder(plan_file)
         (state_dir / "boulder.json").write_text(json.dumps(boulder))
-        result = _todo_counter(str(tmp_path), self._glyphs_ascii(), False)
+        result = _todo_counter(
+            str(tmp_path), self._glyphs_ascii(), False, session_id=TEST_SESSION
+        )
         assert "T: 3/10" in result
 
     def test_nerd_font_uses_task_glyph(self, tmp_path: pathlib.Path) -> None:
@@ -989,9 +1022,11 @@ class TestTodoCounter:
         state_dir.mkdir(parents=True)
         plan_file = tmp_path / "plan.md"
         plan_file.write_text(PLAN_CONTENT_3_OF_10)
-        boulder = {"active_plan": str(plan_file), "plan_name": "test-plan"}
+        boulder = _bound_boulder(plan_file)
         (state_dir / "boulder.json").write_text(json.dumps(boulder))
-        result = _todo_counter(str(tmp_path), self._glyphs_nerd(), True)
+        result = _todo_counter(
+            str(tmp_path), self._glyphs_nerd(), True, session_id=TEST_SESSION
+        )
         # nf-fa-tasks glyph (U+F0AE) should be present
         assert "" in result
         assert "3/10" in result
@@ -1001,18 +1036,25 @@ class TestTodoCounter:
         state_dir = tmp_path / ".omca" / "state"
         state_dir.mkdir(parents=True)
         (state_dir / "boulder.json").write_text("{not valid json!!!")
-        result = _todo_counter(str(tmp_path), self._glyphs_ascii(), False)
+        result = _todo_counter(
+            str(tmp_path), self._glyphs_ascii(), False, session_id=TEST_SESSION
+        )
         assert result == ""
 
     def test_boulder_null_active_plan_returns_empty(
         self, tmp_path: pathlib.Path
     ) -> None:
-        """boulder.json with active_plan: null -> returns empty string."""
+        """Bound plan entry with active_plan: null -> returns empty string."""
         state_dir = tmp_path / ".omca" / "state"
         state_dir.mkdir(parents=True)
-        boulder = {"active_plan": None}
+        boulder = {
+            "plans": {"test-plan": {"active_plan": None}},
+            "bindings": {TEST_SESSION: {"plan_name": "test-plan"}},
+        }
         (state_dir / "boulder.json").write_text(json.dumps(boulder))
-        result = _todo_counter(str(tmp_path), self._glyphs_ascii(), False)
+        result = _todo_counter(
+            str(tmp_path), self._glyphs_ascii(), False, session_id=TEST_SESSION
+        )
         assert result == ""
 
     def test_all_pending_tasks(self, tmp_path: pathlib.Path) -> None:
@@ -1021,10 +1063,50 @@ class TestTodoCounter:
         state_dir.mkdir(parents=True)
         plan_file = tmp_path / "plan.md"
         plan_file.write_text(PLAN_CONTENT_ALL_PENDING)
-        boulder = {"active_plan": str(plan_file), "plan_name": "test-plan"}
+        boulder = _bound_boulder(plan_file)
+        (state_dir / "boulder.json").write_text(json.dumps(boulder))
+        result = _todo_counter(
+            str(tmp_path), self._glyphs_ascii(), False, session_id=TEST_SESSION
+        )
+        assert "T: 0/2" in result
+
+    def test_completed_plan_hidden(self, tmp_path: pathlib.Path) -> None:
+        """A checkbox-complete plan never displays, even when bound."""
+        state_dir = tmp_path / ".omca" / "state"
+        state_dir.mkdir(parents=True)
+        plan_file = tmp_path / "plan.md"
+        plan_file.write_text(PLAN_CONTENT_ALL_DONE)
+        boulder = _bound_boulder(plan_file)
+        (state_dir / "boulder.json").write_text(json.dumps(boulder))
+        result = _todo_counter(
+            str(tmp_path), self._glyphs_ascii(), False, session_id=TEST_SESSION
+        )
+        assert result == ""
+
+    def test_unbound_session_hidden(self, tmp_path: pathlib.Path) -> None:
+        """A session with no binding sees no plan: the sole-plan fallback is
+        resolver plumbing for hooks, not statusline display."""
+        state_dir = tmp_path / ".omca" / "state"
+        state_dir.mkdir(parents=True)
+        plan_file = tmp_path / "plan.md"
+        plan_file.write_text(PLAN_CONTENT_3_OF_10)
+        boulder = _bound_boulder(plan_file, session_id="some-other-session")
+        (state_dir / "boulder.json").write_text(json.dumps(boulder))
+        result = _todo_counter(
+            str(tmp_path), self._glyphs_ascii(), False, session_id="sess-new"
+        )
+        assert result == ""
+
+    def test_empty_session_id_hidden(self, tmp_path: pathlib.Path) -> None:
+        """No session_id -> no binding lookup possible -> hidden."""
+        state_dir = tmp_path / ".omca" / "state"
+        state_dir.mkdir(parents=True)
+        plan_file = tmp_path / "plan.md"
+        plan_file.write_text(PLAN_CONTENT_3_OF_10)
+        boulder = _bound_boulder(plan_file)
         (state_dir / "boulder.json").write_text(json.dumps(boulder))
         result = _todo_counter(str(tmp_path), self._glyphs_ascii(), False)
-        assert "T: 0/2" in result
+        assert result == ""
 
     def test_empty_project_dir_returns_empty(self) -> None:
         """Empty project_dir string -> returns empty string without crash."""
@@ -1049,12 +1131,13 @@ class TestComposeLine1TodoCounter:
         state_dir.mkdir(parents=True)
         plan_file = tmp_path / "plan.md"
         plan_file.write_text(PLAN_CONTENT_3_OF_10)
-        boulder = {"active_plan": str(plan_file), "plan_name": "test-plan"}
+        boulder = _bound_boulder(plan_file)
         (state_dir / "boulder.json").write_text(json.dumps(boulder))
 
         data = {
             "model": {"display_name": "claude"},
             "workspace": {"project_dir": str(tmp_path)},
+            "session_id": TEST_SESSION,
         }
         line, has_extra = _compose_line1(
             data, self._glyphs(), git_info_empty, nerd=False
@@ -1081,12 +1164,13 @@ class TestComposeLine1TodoCounter:
         state_dir.mkdir(parents=True)
         plan_file = tmp_path / "plan.md"
         plan_file.write_text(PLAN_CONTENT_UNNUMBERED)
-        boulder = {"active_plan": str(plan_file)}
+        boulder = _bound_boulder(plan_file)
         (state_dir / "boulder.json").write_text(json.dumps(boulder))
 
         data = {
             "model": {"display_name": "claude"},
             "workspace": {"project_dir": str(tmp_path)},
+            "session_id": TEST_SESSION,
         }
         line, _ = _compose_line1(data, self._glyphs(), git_info_empty, nerd=False)
         assert "T:" not in line
@@ -1149,11 +1233,12 @@ class TestTodoCounterRegistryResolution:
     def _glyphs(self) -> dict:
         return build_glyphs(False)
 
-    def test_old_flat_schema_resolves_active_plan(
+    def test_old_flat_schema_hidden_without_binding(
         self,
         tmp_path: pathlib.Path,
     ) -> None:
-        """Old flat schema (from the shared corpus) still resolves via migration."""
+        """Old flat schema has no bindings, so it never displays: stale
+        pre-migration plans must not leak into fresh sessions."""
         state_dir = tmp_path / ".omca" / "state"
         state_dir.mkdir(parents=True)
         plan_file = tmp_path / "plan.md"
@@ -1163,8 +1248,10 @@ class TestTodoCounterRegistryResolution:
         boulder["active_plan"] = str(plan_file)
         (state_dir / "boulder.json").write_text(json.dumps(boulder))
 
-        result = _todo_counter(str(tmp_path), self._glyphs(), False)
-        assert "T: 3/10" in result
+        result = _todo_counter(
+            str(tmp_path), self._glyphs(), False, session_id="sess-flat"
+        )
+        assert result == ""
 
     def test_new_schema_binding_hit_resolves_bound_plan(
         self, tmp_path: pathlib.Path
@@ -1232,10 +1319,9 @@ class TestTodoCounterRegistryResolution:
         result = _todo_counter(str(tmp_path), self._glyphs(), False, session_id="sess")
         assert result == ""
 
-    def test_two_plan_file_falls_back_to_most_recent_without_binding(
-        self, tmp_path: pathlib.Path
-    ) -> None:
-        """No session binding -> resolves the plan with the latest started_at."""
+    def test_two_plan_file_hidden_without_binding(self, tmp_path: pathlib.Path) -> None:
+        """No session binding -> nothing displays. The most-recent fallback
+        is for hook-side resume plumbing, never for the statusline."""
         state_dir = tmp_path / ".omca" / "state"
         state_dir.mkdir(parents=True)
         plan_a = tmp_path / "plan-a.md"
@@ -1248,9 +1334,12 @@ class TestTodoCounterRegistryResolution:
         boulder["plans"]["plan-b"]["active_plan"] = str(plan_b)
         (state_dir / "boulder.json").write_text(json.dumps(boulder))
 
-        # two-plan.json fixture: plan-b has the later started_at.
-        result = _todo_counter(str(tmp_path), self._glyphs(), False)
-        assert "T: 3/10" in result
+        # two-plan.json fixture: plan-b has the later started_at, but an
+        # unbound session must not inherit it.
+        result = _todo_counter(
+            str(tmp_path), self._glyphs(), False, session_id="sess-unbound"
+        )
+        assert result == ""
 
 
 # ---------------------------------------------------------------------------

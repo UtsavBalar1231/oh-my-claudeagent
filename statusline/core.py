@@ -18,12 +18,12 @@ from statusline.config import config
 from statusline.types import GitInfo, StatuslinePayload
 
 # statusline and servers are sibling packages in the same plugin checkout;
-# reuse the boulder-registry resolver ladder instead of a third copy of it.
+# reuse the boulder-registry schema handling instead of a third copy of it.
 _SERVERS_DIR = str(Path(__file__).resolve().parent.parent / "servers")
 if _SERVERS_DIR not in sys.path:
     sys.path.insert(0, _SERVERS_DIR)
 
-from tools._boulder_core import resolve_bound_plan  # noqa: E402
+from tools._boulder_core import normalize  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -383,25 +383,34 @@ def _format_tokens(n: int) -> str:
 def _todo_counter(
     project_dir: str, glyphs: dict[str, str], nerd: bool, session_id: str = ""
 ) -> str:
-    """Return a TODO counter token from the bound active plan, or empty string.
+    """Return a TODO counter token for THIS session's bound plan, or "".
 
-    Reads boulder.json from <project_dir>/.omca/state/boulder.json and resolves
-    the plan bound to `session_id` via the shared registry ladder (explicit
-    binding -> sole plan -> most-recently-started plan), tolerating both the
-    old flat schema and the new {plans, bindings} registry schema. Counts
-    numbered checkboxes in the resolved plan and returns a formatted token.
-    Returns "" (silently) when boulder is missing, no plan resolves, total == 0,
-    or any error occurs. PURE-READ — never writes boulder.json.
+    Display is deliberately stricter than the resolver ladder hooks use: the
+    token renders only when `session_id` holds an explicit binding in the
+    registry, and the bound plan still has open tasks. The sole-plan and
+    most-recent fallbacks exist for resume plumbing, not display — without
+    this gate a fresh session doing unrelated work inherits whatever stale
+    plan is left in boulder.json. A checkbox-complete plan is hidden too:
+    finished work is not an active TODO. Returns "" when boulder is missing,
+    the session is unbound (the old flat schema has no bindings, so it never
+    displays), the plan file is gone, total == 0, all tasks are done, or any
+    error occurs. PURE-READ — never writes boulder.json.
     """
-    if not project_dir:
+    if not project_dir or not session_id:
         return ""
     try:
         boulder_path = Path(project_dir) / ".omca" / "state" / "boulder.json"
         if not boulder_path.exists():
             return ""
         raw = boulder_path.read_text(encoding="utf-8")
-        boulder = json.loads(raw)
-        active_plan = resolve_bound_plan(boulder, session_id).get("active_plan")
+        registry = normalize(json.loads(raw))
+        binding = registry["bindings"].get(session_id)
+        if not isinstance(binding, dict):
+            return ""
+        plan_entry = registry["plans"].get(binding.get("plan_name", ""))
+        if not isinstance(plan_entry, dict):
+            return ""
+        active_plan = plan_entry.get("active_plan")
         if not active_plan:
             return ""
         plan_path = Path(active_plan)
@@ -413,6 +422,8 @@ def _todo_counter(
         if total == 0:
             return ""
         completed = sum(1 for m in matches if m == "x")
+        if completed == total:
+            return ""
         glyph = glyphs.get("tasks", "T:")
         # Unconditional space after the glyph: PUA codepoints can render
         # narrow or wide depending on terminal width handling; the gap keeps

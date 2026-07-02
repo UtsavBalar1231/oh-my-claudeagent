@@ -29,8 +29,15 @@ to exactly one of them via `bindings[session_id]`.
   the plan's live `sha256sum` against logged `final_verification` evidence.
 - `scripts/session-init.sh` — resolves via the same shim to set `sessionTitle` from the
   bound plan's name (read-only, no write-back).
-- `statusline/core.py` — reads `boulder.json` directly and calls `resolve_bound_plan()`
-  from `_boulder_core` in-process (Python, so no shim needed) to show plan progress.
+- `statusline/core.py` — reads `boulder.json` directly and normalizes it via
+  `_boulder_core.normalize()` in-process (Python, so no shim needed). Display is
+  deliberately STRICTER than the resolver ladder: the TODO token renders only when
+  the payload's `session_id` has an explicit `bindings[]` entry and the bound plan
+  still has open tasks. Sole-plan / most-recent fallbacks and flat-schema files
+  never display — those fallbacks are resume plumbing for hooks, and honoring them
+  in the statusline made fresh sessions inherit stale plans.
+- `scripts/session-init.sh` — also invokes the `boulder_gc.py` shim (write path,
+  under lock) before resolving; see GC policy layer 2 below.
 - `boulder_progress` MCP tool — resolves by `plan_name`, by session binding, or takes an
   explicit `plan_path`, then derives task counts from the plan file's checkboxes.
 
@@ -101,16 +108,27 @@ exact same resolution ladder as the Python writer.
 
 **Completion is derived, not stored**. There is no `completed_at` field — a plan's
 completion is computed on demand from its own `- [ ] N.` / `- [x] N.` checkboxes
-(`_plan_is_complete` in `boulder.py`, sharing the `_CHECKBOX_RE` pattern with
-`statusline/core.py`). A plan with no checkboxes at all is never considered complete.
+(`plan_is_complete` + `CHECKBOX_RE` in `_boulder_core.py`, the single source shared
+by `boulder.py`, `boulder_gc.py`, and `statusline/core.py`). A plan with no
+checkboxes at all is never considered complete.
 
-**GC policy** — two layers:
+**GC policy** — three layers:
 1. **Primary, at `SessionEnd`**: `scripts/session-cleanup.sh` deletes this session's
    `bindings[session_id]` entry under an exclusive `flock` on a *separate* lock file,
    `.omca/state/boulder.json.lock` — the same lock file `boulder.py` uses for its
    read-modify-write, so the two writers never race. Runs only when the end reason is
    not `"resume"`. Never deletes `plans` entries.
-2. **Backstop, on every `boulder_write`**: `_gc_prune()` in `boulder.py` prunes (a) any
+2. **Self-heal, at `SessionStart`**: `scripts/session-init.sh` runs the stdlib-only
+   `boulder_gc.py` shim (`gc_prune_unbound()` in `_boulder_core.py`) under the same
+   lock. It drops bindings that reference nonexistent plans, then prunes any plan
+   that is simultaneously unbound AND (checkbox-complete, missing its plan file, or
+   lacking an `active_plan` path) — no age threshold. This is what clears a
+   finished-but-never-cleared plan before it can leak into session titles or
+   resolver fallbacks. Incomplete plans with a live file are always kept (resumable
+   work). A flat-schema file is only rewritten (in registry shape) when the GC
+   actually pruned something; untouched flat files stay as-is for `boulder_write`'s
+   lazy migration.
+3. **Backstop, on every `boulder_write`**: `_gc_prune()` in `boulder.py` prunes (a) any
    binding whose `bound_at` is older than `GC_MAX_AGE_SECONDS` (7 days, i.e.
    `7 * 24 * 3600`) — covers sessions that never hit a clean `SessionEnd` — and (b) any
    plan that is simultaneously unbound (no binding references it), older than the same

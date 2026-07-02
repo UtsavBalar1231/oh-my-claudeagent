@@ -5,7 +5,6 @@ import contextlib
 import fcntl
 import json
 import os
-import re
 import tempfile
 import time
 from pathlib import Path
@@ -21,9 +20,9 @@ from tools._common import (
     _state_dir,
 )
 
-# Checkbox format: ^- \[([ x])\] \d+\.  (MULTILINE)
-# Must match statusline/core.py _CHECKBOX_RE exactly.
-_CHECKBOX_RE = re.compile(r"^- \[([ x])\] \d+\.", re.MULTILINE)
+# Canonical pattern lives in _boulder_core (shared with the SessionStart GC
+# shim and the statusline renderer); alias locally to keep call sites stable.
+_CHECKBOX_RE = _boulder_core.CHECKBOX_RE
 
 # 7d (604800s) — GC backstop for unbound plans/stale bindings. Primary GC for
 # bindings is SessionEnd (session-cleanup.sh, a later track); this is a
@@ -91,16 +90,8 @@ def _write_boulder_atomic(state_dir: str, data: dict) -> None:
         raise
 
 
-def _plan_is_complete(active_plan: str) -> bool:
-    """Derive completion from plan-file checkboxes — no separate `completed_at` field."""
-    if not active_plan:
-        return False
-    try:
-        content = Path(active_plan).read_text()
-    except OSError:
-        return False
-    matches = _CHECKBOX_RE.findall(content)
-    return bool(matches) and all(m.lower() == "x" for m in matches)
+# Single completion oracle, shared with the GC shim and statusline gating.
+_plan_is_complete = _boulder_core.plan_is_complete
 
 
 def _gc_prune(plans: dict, bindings: dict) -> None:

@@ -1,9 +1,64 @@
 """Stdlib-only boulder registry core: schema migration + pure-read resolution.
 
 No fastmcp/pydantic imports here — this module is shared by the MCP server
-(``boulder.py``) AND the bash-callable resolver shim (``boulder_resolve.py``),
-which must stay dependency-light enough to run as a bare ``python3`` script.
+(``boulder.py``), the bash-callable resolver shim (``boulder_resolve.py``),
+the SessionStart GC shim (``boulder_gc.py``), and the statusline renderer,
+which must all stay dependency-light enough to run as bare ``python3``.
 """
+
+import re
+from pathlib import Path
+
+# Canonical numbered-checkbox pattern — matches `- [ ] 1.` / `- [x] 12.`.
+# Single source of truth shared by boulder.py, boulder_gc.py, and statusline.
+CHECKBOX_RE = re.compile(r"^- \[([ x])\] \d+\.", re.MULTILINE)
+
+
+def plan_is_complete(active_plan: str) -> bool:
+    """Derive completion from plan-file checkboxes — no stored completed_at.
+
+    A plan with no numbered checkboxes is never complete. Unreadable or
+    missing files return False (missing-file pruning is a separate, explicit
+    decision in gc_prune_unbound — not conflated with completion).
+    """
+    if not active_plan:
+        return False
+    try:
+        content = Path(active_plan).read_text()
+    except OSError:
+        return False
+    matches = CHECKBOX_RE.findall(content)
+    return bool(matches) and all(m.lower() == "x" for m in matches)
+
+
+def gc_prune_unbound(registry: dict) -> dict:
+    """Prune finished or orphaned plans no session is bound to. Mutates in place.
+
+    Removes, in order: bindings whose plan_name no longer exists in `plans`;
+    then any plan that is simultaneously unbound AND (checkbox-complete, OR
+    missing its plan file, OR lacking an active_plan path). Incomplete plans
+    with a live file are always kept, bound or not — they are resumable work.
+    Returns {"pruned_plans": [...], "pruned_bindings": [...]}.
+    """
+    plans = registry["plans"]
+    bindings = registry["bindings"]
+
+    orphan_bindings = [
+        sid for sid, b in bindings.items() if b.get("plan_name") not in plans
+    ]
+    for sid in orphan_bindings:
+        del bindings[sid]
+
+    bound_names = {b.get("plan_name") for b in bindings.values()}
+    pruned_plans = []
+    for name in list(plans):
+        if name in bound_names:
+            continue
+        path = plans[name].get("active_plan", "")
+        if not path or not Path(path).exists() or plan_is_complete(path):
+            del plans[name]
+            pruned_plans.append(name)
+    return {"pruned_plans": pruned_plans, "pruned_bindings": orphan_bindings}
 
 
 def is_flat_schema(data: dict) -> bool:

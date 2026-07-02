@@ -71,11 +71,19 @@ else
 	CONTEXT=$(printf 'Session %s initialized. State directory: %s' "${SESSION_ID}" "${STATE_DIR}" | jq -Rs .)
 fi
 
+PLUGIN_ROOT_RESOLVE="${CLAUDE_PLUGIN_ROOT:-$(dirname "$0")/..}"
+
+# Self-heal the plan registry before anything resolves against it: prune plans
+# that are checkbox-complete or whose file is gone AND that no session is bound
+# to. Without this a finished-but-never-cleared plan lingers in boulder.json
+# forever (the write-path GC only runs on boulder_write) and leaks into session
+# titles and downstream resolvers. Fail-soft: GC errors never block the hook.
+python3 "${PLUGIN_ROOT_RESOLVE}/servers/tools/boulder_gc.py" "${HOOK_PROJECT_ROOT}" >/dev/null 2>&1 || true
+
 # Emit sessionTitle only when the resolver shim binds this session to a plan AND
 # that plan's active_plan file still exists. Defensive: any resolve error, an
 # unbound session, or a stale active_plan pointing at a deleted file, leaves
 # SESSION_TITLE empty → key is omitted.
-PLUGIN_ROOT_RESOLVE="${CLAUDE_PLUGIN_ROOT:-$(dirname "$0")/..}"
 BOUND_PLAN=$(python3 "${PLUGIN_ROOT_RESOLVE}/servers/tools/boulder_resolve.py" "$(resolve_session_id)" "${HOOK_PROJECT_ROOT}" 2>/dev/null || echo '{}')
 SESSION_TITLE=""
 ACTIVE_PLAN=$(jq -r '.active_plan // empty' <<< "${BOUND_PLAN}" 2>/dev/null || true)
