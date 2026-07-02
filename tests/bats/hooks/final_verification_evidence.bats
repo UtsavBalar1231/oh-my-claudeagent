@@ -58,7 +58,7 @@ _write_final_verification_evidence() {
 }
 
 # Write a verification-evidence.json with a final_verification entry scoped to
-# a specific plan_sha256 (Task 5 evidence scoping).
+# a specific plan_sha256.
 _write_final_verification_evidence_scoped() {
 	local plan_sha256="$1"
 	local exit_code="${2:-0}"
