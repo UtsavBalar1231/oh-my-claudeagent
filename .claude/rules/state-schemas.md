@@ -346,8 +346,9 @@ subagent instance).
 
 **Model resolution**: strip the `oh-my-claudeagent:` prefix from `agent_type`,
 read `${CLAUDE_PLUGIN_ROOT}/agents/<name>.md` frontmatter `model:`, map via a
-small case statement (`claude-opus-4-8`→`Opus 4.8`, `sonnet`→`Sonnet`,
-`haiku`→`Haiku`, `claude-sonnet-5`→`Sonnet 5`, else the raw value). Non-OMCA
+small case statement (`claude-fable-5`→`Fable 5`, `claude-opus-4-8`→`Opus 4.8`,
+`claude-sonnet-5`→`Sonnet 5`, `sonnet`→`Sonnet`, `haiku`→`Haiku`, else the raw
+value). Non-OMCA
 agent types (e.g. `explore`, `general-purpose`) have no matching frontmatter
 file, so `model` is stored as `""` and the renderer shows no model.
 

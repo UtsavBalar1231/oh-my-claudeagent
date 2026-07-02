@@ -25,10 +25,12 @@ if [[ -n "${AGENT_ID}" ]]; then
 		RAW_MODEL=$(awk '/^---$/{n++; next} n==1 && /^model:/{print $2; exit}' "${AGENT_FRONTMATTER_FILE}")
 	fi
 	case "${RAW_MODEL}" in
+	claude-fable-5) DISPLAY_MODEL="Fable 5" ;;
 	claude-opus-4-8) DISPLAY_MODEL="Opus 4.8" ;;
-	sonnet) DISPLAY_MODEL="Sonnet" ;;
-	haiku) DISPLAY_MODEL="Haiku" ;;
 	claude-sonnet-5) DISPLAY_MODEL="Sonnet 5" ;;
+	sonnet) DISPLAY_MODEL="Sonnet" ;;
+	claude-haiku-4-5) DISPLAY_MODEL="Haiku 4.5" ;;
+	haiku) DISPLAY_MODEL="Haiku" ;;
 	"") DISPLAY_MODEL="" ;;
 	*) DISPLAY_MODEL="${RAW_MODEL}" ;;
 	esac

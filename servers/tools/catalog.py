@@ -17,10 +17,14 @@ def register(mcp: FastMCP) -> None:
     """Register all catalog and concurrency tools on the given FastMCP instance."""
 
     _MODEL_COST_TIER = {
+        "claude-fable-5": "premium",
+        "fable": "premium",
         "claude-opus-4-8": "expensive",
         "opus": "expensive",
-        "haiku": "free",
+        "claude-sonnet-5": "cheap",
         "sonnet": "cheap",
+        "claude-haiku-4-5": "free",
+        "haiku": "free",
     }
 
     @mcp.tool()

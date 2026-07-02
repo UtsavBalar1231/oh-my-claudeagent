@@ -1,8 +1,8 @@
 ---
 name: explore
 description: Codebase search specialist for finding files, patterns, and implementations. Use when asking "Where is X?", "Which file has Y?", or "Find the code that does Z". Fire multiple in parallel for broad searches.
-model: haiku
-effort: low
+model: claude-sonnet-5
+effort: medium
 color: blue
 memory: project
 disallowedTools:
@@ -11,7 +11,7 @@ disallowedTools:
   - Agent
 ---
 <!-- OMCA Metadata
-Cost: free | Category: standard | Escalation: sisyphus, oracle
+Cost: cheap | Category: standard | Escalation: sisyphus, oracle
 Triggers: 2+ modules involved, find X, where is X, which file has
 -->
 

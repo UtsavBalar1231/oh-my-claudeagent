@@ -98,7 +98,7 @@ ORACLE_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id
 @test "agent catalog: sisyphus agent with catalog.json gets dynamic delegation table" {
 	# Write a minimal agent-catalog.json
 	write_state "agent-catalog.json" \
-		'[{"name":"explore","cost_tier":"haiku","when_to_use":"codebase search and discovery","default_model":"haiku"}]'
+		'[{"name":"explore","cost_tier":"cheap","when_to_use":"codebase search and discovery","default_model":"claude-sonnet-5"}]'
 
 	run_hook "subagent-start.sh" "$SISYPHUS_PAYLOAD"
 	assert_success
@@ -316,12 +316,12 @@ ORACLE_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id
 
 # ─── q. Model capture into subagent-models.json ──────────────────────────────
 
-@test "model capture: executor agent_type resolves to Sonnet" {
+@test "model capture: executor agent_type resolves to Sonnet 5" {
 	run_hook "subagent-start.sh" "$EXECUTOR_PAYLOAD"
 	assert_success
 	local model
 	model=$(read_state "subagent-models.json" | jq -r '."agent-abc123".model')
-	assert [ "$model" = "Sonnet" ]
+	assert [ "$model" = "Sonnet 5" ]
 	local type
 	type=$(read_state "subagent-models.json" | jq -r '."agent-abc123".agent_type')
 	assert [ "$type" = "oh-my-claudeagent:executor" ]

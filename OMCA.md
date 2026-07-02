@@ -10,7 +10,7 @@ Install: `README.md`. Contributor internals: `CLAUDE.md`.
 
 Claude Code runs single-threaded. Simultaneous research + implementation, or ten files needing fixes at once, bottleneck the default session. No built-in specialist delegation or persistence guarantee.
 
-OMCA adds a multi-agent layer: specialist agents with model tiers (claude-opus-4-8/sonnet/haiku), skills via slash commands or keywords, hooks for persistence and context injection, MCP servers for structural search and state.
+OMCA adds a multi-agent layer: specialist agents with model tiers (claude-fable-5/claude-opus-4-8/claude-sonnet-5), skills via slash commands or keywords, hooks for persistence and context injection, MCP servers for structural search and state.
 
 ### Philosophy
 
@@ -42,9 +42,10 @@ Markdown files in `agents/*.md` with YAML frontmatter (name, model, disallowedTo
 
 | Tier | Default for | Use for |
 |------|-------------|---------|
+| claude-fable-5 | oracle | Hardest reasoning, stuck debugging, long-horizon work — heavy and slow; read-only advisor only |
 | claude-opus-4-8 | Orchestrators, planners, reviewers | Complex reasoning, architecture, multi-step coordination |
-| sonnet | Executors, searchers, fixers | Standard implementation, search, builds |
-| haiku | (override only) | Quick lookups, simple transforms |
+| claude-sonnet-5 | Executors, searchers, fixers, visual analysis | Standard implementation, search, builds, multimodal |
+| haiku / claude-haiku-4-5 | (override only — outdated) | Quick lookups, simple transforms; still supported, just off the default roster |
 
 Override any agent's model: `Agent(subagent_type="oh-my-claudeagent:explore", model="haiku")`
 
@@ -1142,9 +1143,9 @@ Features introduced in this window that OMCA consciously declines to adopt:
 | Feature | Notes |
 |---------|-------|
 | `[1m]` auto-strip alignment | v2.1.173 dropped the `[1m]` context-window suffix from model identifiers platform-side; OMCA's agent docs and tables now use bare `claude-opus-4-8` throughout |
-| Per-agent `effort:` tuning | Agent Reference table effort levels (high/max) reviewed and kept; no regressions found against v2.1.197 effort semantics |
+| Per-agent `effort:` tuning | Effort raised to xhigh for sonnet/opus workers and planners, max for oracle (fable-5); explore stays low, librarian medium |
 | `sessionTitle` from boulder.json | Already adopted (v2.1.152, `session-init.sh`); re-verified against v2.1.197 and now guarded against an absent boulder file |
-| Model generation move | Agent docs reference the current generation: sonnet-5, opus-4-8, haiku-4-5 |
+| Model generation move | Agent roster: oracle on fable-5, orchestrators/planners on opus-4-8, workers on sonnet-5; haiku retired |
 
 **Provider-alias caveat:** the `sonnet` alias resolves to claude-sonnet-5 on the Anthropic
 API (confirmed v2.1.197+). Bedrock resolves `sonnet` to Sonnet 4.5; AWS Platform resolves

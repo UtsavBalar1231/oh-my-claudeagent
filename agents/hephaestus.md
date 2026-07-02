@@ -1,8 +1,8 @@
 ---
 name: hephaestus
 description: Build-fixer agent that resolves build failures, type errors, toolchain issues, and dependency problems. Named after the divine blacksmith. Use when builds fail, types don't check, or dependencies break.
-model: sonnet
-effort: medium
+model: claude-sonnet-5
+effort: xhigh
 color: yellow
 disallowedTools:
   - Agent

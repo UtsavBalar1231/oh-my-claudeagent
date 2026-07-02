@@ -40,8 +40,8 @@ Create `agents/name.md` with YAML frontmatter:
 ---
 name: agent-name
 description: One-line role description
-model: opus|sonnet|haiku
-effort: max|high|medium|low
+model: claude-fable-5|claude-opus-4-8|claude-sonnet-5
+effort: max|xhigh|high|medium|low
 disallowedTools: Write, Edit  # use disallowedTools, NOT tools:
 memory: project                   # optional; enables persistent project memory
 ---

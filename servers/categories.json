@@ -1,23 +1,28 @@
 {
 	"categories": {
 		"quick": {
-			"model": "haiku",
+			"model": "claude-sonnet-5",
 			"description": "Fast lookups, simple searches"
 		},
 		"standard": {
-			"model": "sonnet",
+			"model": "claude-sonnet-5",
 			"description": "Normal implementation work"
 		},
 		"deep": {
 			"model": "claude-opus-4-8",
 			"description": "Complex analysis, architecture decisions"
 		},
+		"hardest": {
+			"model": "claude-fable-5",
+			"description": "Most demanding reasoning, stuck debugging, long-horizon work"
+		},
 		"readonly": {
-			"model": "sonnet",
+			"model": "claude-sonnet-5",
 			"description": "Read-only exploration and research"
 		}
 	},
 	"concurrency_limits": {
+		"fable": 2,
 		"opus": 3,
 		"sonnet": 5,
 		"haiku": 10

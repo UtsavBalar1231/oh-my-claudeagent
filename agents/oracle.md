@@ -1,8 +1,8 @@
 ---
 name: oracle
 description: Read-only strategic advisor for architecture decisions, debugging hard problems, and code reviews. Use after 2+ failed fix attempts, for multi-system tradeoffs, unfamiliar patterns, or when completing significant work that needs verification.
-model: claude-opus-4-8
-effort: high
+model: claude-fable-5
+effort: max
 color: purple
 disallowedTools:
   - Write
@@ -11,7 +11,7 @@ disallowedTools:
 memory: project
 ---
 <!-- OMCA Metadata
-Cost: expensive | Category: deep | Escalation: (terminal: no further escalation target)
+Cost: premium | Category: hardest | Escalation: (terminal: no further escalation target)
 Triggers: 2+ failed fix attempts, architecture decision, code review
 -->
 
