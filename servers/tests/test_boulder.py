@@ -322,10 +322,40 @@ def test_resolver_old_flat_schema_binding_via_single_plan():
     assert result["active_plan"] == data["active_plan"]
 
 
+# --- resolver ladder: strict mode (explicit-binding-only) ---
+
+
+def test_resolver_strict_binding_hit():
+    data = load_fixture("two-plan")
+    data["bindings"]["sess-x"] = {"plan_name": "plan-a", "bound_at": 1}
+    result = _boulder_core.resolve_bound_plan(data, "sess-x", strict=True)
+    assert result["plan_name"] == "plan-a"
+
+
+def test_resolver_strict_no_binding_single_plan_returns_empty():
+    data = load_fixture("single-plan")
+    result = _boulder_core.resolve_bound_plan(data, "unknown-session", strict=True)
+    assert result == {}
+
+
+def test_resolver_strict_no_binding_multi_plan_returns_empty():
+    data = load_fixture("two-plan")
+    result = _boulder_core.resolve_bound_plan(data, "unknown-session", strict=True)
+    assert result == {}
+
+
+def test_resolver_strict_old_flat_schema_returns_empty():
+    """Flat-schema migration always produces empty bindings, so strict mode
+    can never resolve a plan from it: only the lenient single-plan fallback can."""
+    data = load_fixture("old-flat")
+    result = _boulder_core.resolve_bound_plan(data, "unbound-session", strict=True)
+    assert result == {}
+
+
 # --- pure-read proof ---
 
 
-def test_resolver_never_writes_old_flat_fixture(tmp_path):
+def test_resolver_never_writes_old_flat_fixture():
     """resolve_bound_plan on an old-flat fixture leaves the file byte-identical."""
     src = os.path.join(FIXTURES_DIR, "old-flat.json")
     with open(src) as f:
@@ -477,6 +507,52 @@ def test_boulder_resolve_cli_matches_python_resolver(
         check=True,
     )
     assert json.loads(result.stdout) == expected
+
+
+@pytest.mark.parametrize(
+    "fixture_name,session_id",
+    [
+        ("single-plan", "no-such-session"),
+        ("two-plan", "no-such-session"),
+        ("old-flat", "sess-legacy-1"),
+    ],
+)
+def test_boulder_resolve_cli_strict_no_binding_prints_empty_object(
+    tmp_git_root, fixture_name, session_id
+):
+    """--strict skips the sole-plan/most-recent/flat-schema fallbacks entirely."""
+    data = load_fixture(fixture_name)
+    boulder_path = tmp_git_root / ".omca" / "state" / BOULDER_FILE
+    boulder_path.write_text(json.dumps(data))
+
+    script = os.path.join(
+        os.path.dirname(__file__), "..", "tools", "boulder_resolve.py"
+    )
+    result = subprocess.run(
+        [sys.executable, script, session_id, str(tmp_git_root), "--strict"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert json.loads(result.stdout) == {}
+
+
+def test_boulder_resolve_cli_strict_with_explicit_binding_resolves(tmp_git_root):
+    data = load_fixture("two-plan")
+    data["bindings"]["sess-x"] = {"plan_name": "plan-a", "bound_at": 1}
+    boulder_path = tmp_git_root / ".omca" / "state" / BOULDER_FILE
+    boulder_path.write_text(json.dumps(data))
+
+    script = os.path.join(
+        os.path.dirname(__file__), "..", "tools", "boulder_resolve.py"
+    )
+    result = subprocess.run(
+        [sys.executable, script, "sess-x", str(tmp_git_root), "--strict"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert json.loads(result.stdout)["plan_name"] == "plan-a"
 
 
 def test_boulder_resolve_cli_corrupt_file_prints_empty_object(tmp_git_root):

@@ -1,8 +1,11 @@
 #!/bin/bash
-# final-verification-evidence.sh — blocks Stop when THIS SESSION's bound plan is
-# complete but lacks a matching final_verification evidence entry (exit_code=0,
-# plan_sha256 matches the bound plan's current bytes, or a legacy entry with no
-# plan_sha256 field — backward-compat with evidence logged before scoping existed).
+# final-verification-evidence.sh — blocks Stop when THIS SESSION's bound plan
+# (resolved strictly: an explicit boulder.json binding only, never a sole-plan
+# or most-recent fallback) is complete but lacks a matching final_verification
+# evidence entry (exit_code=0, plan_sha256 matches the bound plan's current
+# bytes, or a legacy entry with no plan_sha256 field — backward-compat with
+# evidence logged before scoping existed). An unbound session is never
+# blocked on a plan it has no relationship to.
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
@@ -42,11 +45,11 @@ fi
 
 EVIDENCE_FILE=$(resolve_evidence_file "${STATE_DIR}")
 
-# Resolve via the shared shim (never hand-parse boulder.json): binding -> sole
-# plan -> most-recent started_at, `{}` when the registry is empty or this
+# Resolve via the shared shim (never hand-parse boulder.json), --strict: only
+# an explicit binding resolves, `{}` when the registry is empty or this
 # session was never bound to anything — an unbound session must never be
 # blocked on a plan it has no relationship to.
-BOULDER_RESOLVED=$(python3 "${PLUGIN_ROOT}/servers/tools/boulder_resolve.py" "$(resolve_session_id)" "${HOOK_PROJECT_ROOT}" 2>/dev/null)
+BOULDER_RESOLVED=$(python3 "${PLUGIN_ROOT}/servers/tools/boulder_resolve.py" "$(resolve_session_id)" "${HOOK_PROJECT_ROOT}" --strict 2>/dev/null)
 ACTIVE_PLAN=$(jq -r '.active_plan // ""' <<< "${BOULDER_RESOLVED:-{\}}" 2>/dev/null)
 
 # No bound plan on record — nothing to enforce

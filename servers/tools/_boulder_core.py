@@ -140,12 +140,24 @@ def _plan_triple(plan_name: str, plan_entry: dict) -> dict:
     }
 
 
-def resolve_bound_plan(data: dict, session_id: str) -> dict:
+def resolve_bound_plan(data: dict, session_id: str, strict: bool = False) -> dict:
     """Resolve which plan `session_id` is bound to. PURE-READ — never writes.
 
-    Ladder: explicit binding -> the sole registered plan -> the plan with the
-    most recent `started_at` -> empty dict. Tolerates both the old flat schema
-    and the new registry schema without persisting a migration.
+    Lenient ladder (`strict=False`, the default): explicit binding -> the sole
+    registered plan -> the plan with the most recent `started_at` -> empty
+    dict. Tolerates both the old flat schema and the new registry schema
+    without persisting a migration. The two fallback rungs are resume
+    plumbing for readers that tolerate ambiguity (`boulder_progress`, an
+    explicit `plan_name` lookup): they let a session with no recorded
+    binding still recover a plan when there is a reasonable single guess.
+
+    Strict mode (`strict=True`): only an explicit `bindings[session_id]` entry
+    resolves a plan; both fallback rungs are skipped and a session with no
+    binding gets `{}`. Any enforcement or context-injection consumer (a Stop
+    hook that blocks the session, a title or plan-context injector) must pass
+    `strict=True`, otherwise an unbound session silently inherits whatever
+    plan another session happens to be working on, which is exactly the
+    failure the statusline's own strict, in-process resolution already avoids.
     """
     registry = normalize(data)
     plans = registry["plans"]
@@ -156,6 +168,9 @@ def resolve_bound_plan(data: dict, session_id: str) -> dict:
         if binding and binding.get("plan_name") in plans:
             plan_name = binding["plan_name"]
             return _plan_triple(plan_name, plans[plan_name])
+
+    if strict:
+        return {}
 
     if not plans:
         return {}

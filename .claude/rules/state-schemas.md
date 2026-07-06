@@ -88,10 +88,13 @@ to exactly one of them via `bindings[session_id]`.
 }
 ```
 
-**Resolution — `resolve_bound_plan` (in `servers/tools/_boulder_core.py`)**:
+**Resolution — `resolve_bound_plan(data, session_id, strict=False)` (in
+`servers/tools/_boulder_core.py`)**:
 
 Pure-read function, called by every reader above (directly in Python, or via the
-`boulder_resolve.py` shim from bash). It never writes. Ladder, in order:
+`boulder_resolve.py` shim from bash). It never writes.
+
+Lenient ladder (`strict=False`, the default), in order:
 1. This session has an explicit `bindings[session_id]` whose `plan_name` still exists
    in `plans` → return that plan.
 2. Exactly one plan is registered → return it (single-plan case needs no binding).
@@ -99,12 +102,24 @@ Pure-read function, called by every reader above (directly in Python, or via the
    `started_at`.
 4. No plans registered → `{}`.
 
+Strict mode (`strict=True`) stops after step 1: only an explicit binding resolves a
+plan; steps 2-3 are skipped and an unbound session gets `{}`. Fallback steps 2-3 are
+resume plumbing for readers that tolerate ambiguity: the only lenient consumer is the
+`boulder_progress` MCP tool (direct `plan_name` lookups still bypass the resolver
+ladder entirely). Every hook-script consumer that enforces or injects on the session's
+behalf passes `strict=True` so an unbound session can never inherit another session's
+plan: `plan-continuation-guard.sh`, `final-verification-evidence.sh`,
+`subagent-start.sh`, `session-init.sh`, and `pre-compact.sh`. `statusline/core.py`
+predates the `strict` parameter and implements the equivalent explicit-binding-only
+check directly in-process (see the Readers note above) rather than calling through it.
+
 **`boulder_resolve.py`** (`servers/tools/boulder_resolve.py`) is a stdlib-only,
 bash-callable wrapper around `resolve_bound_plan`: `python3 boulder_resolve.py
-[session_id] [working_directory]`, prints the resolved `{plan_name, active_plan,
-worktree_path}` triple as JSON (or `{}`) and always exits 0 — bash readers should shell
-out to this shim rather than hand-parsing `boulder.json`, so every reader stays on the
-exact same resolution ladder as the Python writer.
+[session_id] [working_directory] [--strict]`, prints the resolved `{plan_name,
+active_plan, worktree_path}` triple as JSON (or `{}`) and always exits 0 — bash readers
+should shell out to this shim rather than hand-parsing `boulder.json`, so every reader
+stays on the exact same resolution ladder as the Python writer. `--strict` (any
+position in argv) forwards `strict=True`.
 
 **Completion is derived, not stored**. There is no `completed_at` field — a plan's
 completion is computed on demand from its own `- [ ] N.` / `- [x] N.` checkboxes

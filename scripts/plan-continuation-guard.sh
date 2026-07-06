@@ -1,7 +1,10 @@
 #!/bin/bash
-# plan-continuation-guard.sh: blocks Stop when THIS SESSION's bound plan still
-# has unchecked numbered tasks, nudging the agent to keep working instead of
-# stopping mid-plan. Disjoint by construction with final-verification-evidence.sh:
+# plan-continuation-guard.sh: blocks Stop when THIS SESSION's bound plan
+# (resolved strictly: an explicit boulder.json binding only, never a
+# sole-plan or most-recent fallback) still has unchecked numbered tasks,
+# nudging the agent to keep working instead of stopping mid-plan. An unbound
+# session is never blocked on a plan it has no relationship to. Disjoint by
+# construction with final-verification-evidence.sh:
 # that gate fires only when the plan is fully checked, this one only when it
 # has unchecked boxes remaining, both read counts from the same
 # count_plan_checkboxes helper, so they can never both fire for the same state.
@@ -62,8 +65,10 @@ fi
 
 # Rail 3: resolve the session's bound plan via the shared shim (never
 # hand-parse boulder.json), mirrors final-verification-evidence.sh exactly so
-# both hooks agree on which plan, if any, this session is bound to.
-BOULDER_RESOLVED=$(python3 "${PLUGIN_ROOT}/servers/tools/boulder_resolve.py" "$(resolve_session_id)" "${HOOK_PROJECT_ROOT}" 2>/dev/null)
+# both hooks agree on which plan, if any, this session is bound to. --strict:
+# an explicit binding only, never the sole-plan/most-recent fallback. An
+# unbound session must never be blocked on a plan it has no relationship to.
+BOULDER_RESOLVED=$(python3 "${PLUGIN_ROOT}/servers/tools/boulder_resolve.py" "$(resolve_session_id)" "${HOOK_PROJECT_ROOT}" --strict 2>/dev/null)
 ACTIVE_PLAN=$(jq -r '.active_plan // ""' <<< "${BOULDER_RESOLVED:-{\}}" 2>/dev/null)
 PLAN_NAME=$(jq -r '.plan_name // ""' <<< "${BOULDER_RESOLVED:-{\}}" 2>/dev/null)
 

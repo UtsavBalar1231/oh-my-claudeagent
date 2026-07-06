@@ -6,12 +6,15 @@
 
 load '../test_helper'
 
-# Write a synthetic boulder.json pointing to a plan file. Old flat schema with a
-# plan_name so the resolver shim's in-memory migration + single-plan fallback
-# binds this session to it (test_helper's CLAUDE_SESSION_ID has no explicit binding).
+# Write a boulder.json registry with an explicit binding for this test's
+# session: strict resolution requires one; it no longer falls back to
+# flat-schema migration or sole-plan guessing.
 _write_boulder() {
 	local plan_path="$1"
-	write_state "boulder.json" "{\"active_plan\":\"${plan_path}\",\"plan_name\":\"test-plan\"}"
+	local session="${2:-${CLAUDE_SESSION_ID}}"
+	jq -n --arg plan "${plan_path}" --arg name "test-plan" --arg sid "${session}" \
+		'{"plans":{($name):{"active_plan":$plan,"started_at":"2026-01-01T00:00:00Z","session_ids":[$sid],"agent":"sisyphus"}},"bindings":{($sid):{"plan_name":$name,"bound_at":1}}}' \
+		> "${CLAUDE_PROJECT_ROOT}/.omca/state/boulder.json"
 }
 
 # Write a plan file with all checkboxes complete
@@ -111,6 +114,18 @@ _write_final_verification_evidence_scoped() {
 	run_hook "final-verification-evidence.sh" '{}'
 	[ "$status" -eq 2 ]
 	echo "$output" | grep -qi "final_verification"
+}
+
+@test "final-verification-evidence: registered complete plan bound to another session allows Stop (exit 0)" {
+	local plan_file="${BATS_TEST_TMPDIR}/complete-plan.md"
+	_write_complete_plan "${plan_file}"
+	# Complete plan is registered and bound, but only to a different session.
+	# Strict resolution must not fall back to it for this test's session, even
+	# though no evidence exists (which would otherwise block).
+	_write_boulder "${plan_file}" "other-session"
+
+	run_hook "final-verification-evidence.sh" '{}'
+	assert_success
 }
 
 # ---------------------------------------------------------------------------

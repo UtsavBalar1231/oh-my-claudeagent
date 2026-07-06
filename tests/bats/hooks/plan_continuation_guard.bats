@@ -86,6 +86,19 @@ _continuation_state() {
 	assert_success
 }
 
+@test "plan-continuation-guard: registered incomplete plan with no binding for this session allows Stop (exit 0)" {
+	local plan_file="${BATS_TEST_TMPDIR}/unchecked-plan.md"
+	_write_unchecked_plan "${plan_file}"
+	# Registry has a plan and an unrelated session's binding, but none for
+	# this test's CLAUDE_SESSION_ID. Strict resolution must not fall back.
+	jq -n --arg plan "${plan_file}" \
+		'{"plans":{"other-plan":{"active_plan":$plan,"started_at":"2026-01-01T00:00:00Z","session_ids":["other-session"],"agent":"sisyphus"}},"bindings":{"other-session":{"plan_name":"other-plan","bound_at":1}}}' \
+		> "${CLAUDE_PROJECT_ROOT}/.omca/state/boulder.json"
+
+	run_hook "plan-continuation-guard.sh" '{}'
+	assert_success
+}
+
 @test "plan-continuation-guard: stop_hook_active exits 0 and leaves counters file untouched" {
 	local plan_file="${BATS_TEST_TMPDIR}/unchecked-plan.md"
 	_write_unchecked_plan "${plan_file}"

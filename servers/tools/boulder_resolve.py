@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 """Bash-callable resolver shim: prints the bound-plan triple for a session id.
 
-Usage: python3 boulder_resolve.py [session_id] [working_directory]
+Usage: python3 boulder_resolve.py [session_id] [working_directory] [--strict]
 
 Shares the resolver ladder and session-id resolution with `boulder.py` (via
 `_boulder_core` / `_common`) so bash consumers bind on the exact same plan the
 Python writer would. Stdlib-only — no fastmcp/pydantic. Fail-soft: prints `{}`
 and exits 0 on any error.
+
+`--strict` (any position) resolves only via an explicit binding, skipping the
+sole-plan/most-recent fallbacks (see `resolve_bound_plan`'s docstring). Every
+hook script that enforces or injects on the session's behalf passes it.
 """
 
 import json
@@ -27,19 +31,19 @@ from tools._common import (
 def main() -> None:
     result: dict = {}
     try:
-        session_id = sys.argv[1] if len(sys.argv) > 1 else ""
+        strict = "--strict" in sys.argv[1:]
+        args = [a for a in sys.argv[1:] if a != "--strict"]
+        session_id = args[0] if len(args) > 0 else ""
         session_id = _resolve_session_id(session_id)
         # Fall back to CLAUDE_PROJECT_ROOT (platform-set, mirrors common.sh
         # HOOK_PROJECT_ROOT) so a hook that omits the arg still finds the
         # project's boulder.json instead of resolving against an unrelated cwd.
         working_directory = (
-            sys.argv[2]
-            if len(sys.argv) > 2
-            else os.environ.get("CLAUDE_PROJECT_ROOT", "")
+            args[1] if len(args) > 1 else os.environ.get("CLAUDE_PROJECT_ROOT", "")
         )
         state = _state_dir(working_directory)
         data = _read_json(os.path.join(state, BOULDER_FILE))
-        result = resolve_bound_plan(data, session_id)
+        result = resolve_bound_plan(data, session_id, strict=strict)
     except Exception:
         result = {}
     print(json.dumps(result))

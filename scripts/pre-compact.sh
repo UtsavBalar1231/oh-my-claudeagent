@@ -7,8 +7,11 @@ PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(dirname "$0")/..}"
 
 EVIDENCE_FILE=$(resolve_evidence_file "${STATE_DIR}")
 
-# Resolve THIS session's bound plan via the shared shim — never hand-parse boulder.json.
-BOULDER_RESOLVED=$(python3 "${PLUGIN_ROOT}/servers/tools/boulder_resolve.py" "$(resolve_session_id)" "${HOOK_PROJECT_ROOT}" 2>/dev/null)
+# Resolve THIS session's bound plan via the shared shim — never hand-parse
+# boulder.json. --strict: an explicit binding only, never the sole-plan or
+# most-recent fallback. An unbound session must never be injected with a
+# plan it has no relationship to.
+BOULDER_RESOLVED=$(python3 "${PLUGIN_ROOT}/servers/tools/boulder_resolve.py" "$(resolve_session_id)" "${HOOK_PROJECT_ROOT}" --strict 2>/dev/null)
 PLAN_FILE=$(jq -r '.active_plan // ""' <<< "${BOULDER_RESOLVED:-{}}" 2>/dev/null)
 PLAN_NAME=$(jq -r '.plan_name // ""' <<< "${BOULDER_RESOLVED:-{}}" 2>/dev/null)
 

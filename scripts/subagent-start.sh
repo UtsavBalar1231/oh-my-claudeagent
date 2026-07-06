@@ -72,12 +72,13 @@ fi
 
 CONTEXT_PARTS+=$'\n'"[OUTPUT MANDATE] Your text response is the ONLY output the orchestrator receives. Tool call results and intermediate reasoning are NOT forwarded. Structure your response according to your agent's defined output format. If running low on turns, stop tool calls and synthesize immediately."
 
-# Resolve via the shared shim (never hand-parse boulder.json): binding -> sole
-# plan -> most-recent started_at, `{}` only when the registry is truly empty.
-# A subagent's session_id rarely matches the main session's binding key
-# (subagents get their own agent_id) — the fallback tiers serve them instead;
-# bindings mainly disambiguate concurrent MAIN sessions.
-BOULDER_RESOLVED=$(python3 "${PLUGIN_ROOT}/servers/tools/boulder_resolve.py" "$(resolve_session_id)" "${HOOK_PROJECT_ROOT}" 2>/dev/null)
+# Resolve via the shared shim (never hand-parse boulder.json), --strict: only
+# an explicit binding resolves, never the sole-plan/most-recent fallback. A
+# subagent shares its parent session's platform id (SubagentStart carries the
+# same session_id boulder_write bound), so this still resolves the plan the
+# parent is working; a session with no relationship to any plan must never be
+# injected with one.
+BOULDER_RESOLVED=$(python3 "${PLUGIN_ROOT}/servers/tools/boulder_resolve.py" "$(resolve_session_id)" "${HOOK_PROJECT_ROOT}" --strict 2>/dev/null)
 PLAN_FILE=$(jq -r '.active_plan // ""' <<< "${BOULDER_RESOLVED:-{\}}" 2>/dev/null)
 PLAN_NAME=$(jq -r '.plan_name // ""' <<< "${BOULDER_RESOLVED:-{\}}" 2>/dev/null)
 # Validate plan file exists — platform may have deleted it

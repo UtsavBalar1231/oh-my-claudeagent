@@ -51,8 +51,11 @@ ORACLE_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id
 	local plan_file="$plan_dir/my-plan.md"
 	printf '# My Plan\n- task 1\n' > "$plan_file"
 
+	# Registry shape with an explicit binding for this session: strict
+	# resolution requires one; it no longer falls back to flat-schema
+	# migration.
 	write_state "boulder.json" \
-		"{\"active_plan\":\"${plan_file}\",\"plan_name\":\"my-plan\"}"
+		"{\"plans\":{\"my-plan\":{\"active_plan\":\"${plan_file}\",\"started_at\":\"2026-01-01T00:00:00Z\",\"session_ids\":[\"${CLAUDE_SESSION_ID}\"],\"agent\":\"sisyphus\"}},\"bindings\":{\"${CLAUDE_SESSION_ID}\":{\"plan_name\":\"my-plan\",\"bound_at\":1}}}"
 
 	run_hook "subagent-start.sh" "$EXPLORE_PAYLOAD"
 	assert_success
@@ -145,7 +148,7 @@ ORACLE_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id
 
 @test "subagent-start skips plan injection when plan file missing" {
 	write_state "boulder.json" \
-		'{"active_plan":"/tmp/nonexistent-plan-12345.md","plan_name":"ghost-plan"}'
+		"{\"plans\":{\"ghost-plan\":{\"active_plan\":\"/tmp/nonexistent-plan-12345.md\",\"started_at\":\"2026-01-01T00:00:00Z\",\"session_ids\":[\"${CLAUDE_SESSION_ID}\"],\"agent\":\"sisyphus\"}},\"bindings\":{\"${CLAUDE_SESSION_ID}\":{\"plan_name\":\"ghost-plan\",\"bound_at\":1}}}"
 	run_hook "subagent-start.sh" "$EXPLORE_PAYLOAD"
 	assert_success
 	local ctx
@@ -164,7 +167,7 @@ ORACLE_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id
 	printf '# My Plan\n- task 1\n' >"$plan_file"
 
 	write_state "boulder.json" \
-		"{\"active_plan\":\"${plan_file}\",\"plan_name\":\"my-plan\"}"
+		"{\"plans\":{\"my-plan\":{\"active_plan\":\"${plan_file}\",\"started_at\":\"2026-01-01T00:00:00Z\",\"session_ids\":[\"${CLAUDE_SESSION_ID}\"],\"agent\":\"sisyphus\"}},\"bindings\":{\"${CLAUDE_SESSION_ID}\":{\"plan_name\":\"my-plan\",\"bound_at\":1}}}"
 
 	run_hook "subagent-start.sh" "$EXPLORE_PAYLOAD"
 	assert_success
@@ -243,7 +246,8 @@ ORACLE_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id
 # The corpus fixtures reference plan paths under /home/user/.claude/plans,
 # which don't exist on the test box — subagent-start.sh's missing-file guard
 # would drop them, so each case rewrites active_plan to a real tmp file while
-# keeping the fixture's plans/bindings registry shape.
+# keeping the fixture's plans/bindings registry shape. Resolution is strict:
+# only an explicit bindings[session_id] entry ever resolves a plan.
 
 @test "shim resolution: explicit binding for this session wins over other plans" {
 	local plan_a="$BATS_TEST_TMPDIR/plan-a.md"
@@ -266,7 +270,7 @@ ORACLE_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id
 	! echo "$ctx" | grep -q "${plan_b}"
 }
 
-@test "shim resolution: no binding + single registered plan falls back to that plan" {
+@test "shim resolution: no binding + single registered plan injects no plan context" {
 	local plan_a="$BATS_TEST_TMPDIR/plan-a.md"
 	printf '# Plan A\n' > "$plan_a"
 
@@ -279,10 +283,11 @@ ORACLE_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id
 	assert_success
 	local ctx
 	ctx=$(get_context)
-	echo "$ctx" | grep -q "\[ACTIVE PLAN\] Refer to: ${plan_a}"
+	! echo "$ctx" | grep -q "\[ACTIVE PLAN\]"
+	! echo "$ctx" | grep -q "\[NOTEPAD AVAILABLE\]"
 }
 
-@test "shim resolution: no binding + multiple plans falls back to most-recent started_at" {
+@test "shim resolution: no binding + multiple plans injects no plan context" {
 	local plan_a="$BATS_TEST_TMPDIR/plan-a.md"
 	local plan_b="$BATS_TEST_TMPDIR/plan-b.md"
 	printf '# Plan A\n' > "$plan_a"
@@ -298,9 +303,9 @@ ORACLE_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id
 	assert_success
 	local ctx
 	ctx=$(get_context)
-	# plan-b has the later started_at (2026-03-01 vs 2026-02-01)
-	echo "$ctx" | grep -q "\[ACTIVE PLAN\] Refer to: ${plan_b}"
+	! echo "$ctx" | grep -q "\[ACTIVE PLAN\]"
 	! echo "$ctx" | grep -q "${plan_a}"
+	! echo "$ctx" | grep -q "${plan_b}"
 }
 
 @test "shim resolution: empty registry injects no plan context" {

@@ -104,10 +104,12 @@ PLUGIN_ROOT_RESOLVE="${CLAUDE_PLUGIN_ROOT:-$(dirname "$0")/..}"
 python3 "${PLUGIN_ROOT_RESOLVE}/servers/tools/boulder_gc.py" "${HOOK_PROJECT_ROOT}" >/dev/null 2>&1 || true
 
 # Emit sessionTitle only when the resolver shim binds this session to a plan AND
-# that plan's active_plan file still exists. Defensive: any resolve error, an
-# unbound session, or a stale active_plan pointing at a deleted file, leaves
-# SESSION_TITLE empty → key is omitted.
-BOUND_PLAN=$(python3 "${PLUGIN_ROOT_RESOLVE}/servers/tools/boulder_resolve.py" "${SESSION_ID}" "${HOOK_PROJECT_ROOT}" 2>/dev/null || echo '{}')
+# that plan's active_plan file still exists. --strict: only an explicit binding
+# resolves, never the sole-plan/most-recent fallback. An unbound session must
+# never be titled with a plan it has no relationship to. Defensive: any resolve
+# error, an unbound session, or a stale active_plan pointing at a deleted file,
+# leaves SESSION_TITLE empty → key is omitted.
+BOUND_PLAN=$(python3 "${PLUGIN_ROOT_RESOLVE}/servers/tools/boulder_resolve.py" "${SESSION_ID}" "${HOOK_PROJECT_ROOT}" --strict 2>/dev/null || echo '{}')
 SESSION_TITLE=""
 ACTIVE_PLAN=$(jq -r '.active_plan // empty' <<< "${BOUND_PLAN}" 2>/dev/null || true)
 if [[ -n "${ACTIVE_PLAN}" && -f "${ACTIVE_PLAN}" ]]; then
