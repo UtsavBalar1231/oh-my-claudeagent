@@ -1097,13 +1097,13 @@ class TestTodoCounter:
         )
         assert result == ""
 
-    def test_unbound_session_falls_back_to_sole_plan(
+    def test_unbound_session_with_sole_plan_returns_empty(
         self, tmp_path: pathlib.Path
     ) -> None:
-        """A session with no matching binding still sees the sole registered
-        plan: bindings keys and the payload session id can come from different
-        id generations (epoch-pid vs platform UUID), so display degrades to
-        the most plausible plan instead of vanishing."""
+        """A session with no matching binding sees no plan, even when exactly
+        one plan is registered: bindings keys and the payload session id can
+        come from different id generations (epoch-pid vs platform UUID), and
+        showing another session's plan is worse than showing none."""
         state_dir = tmp_path / ".omca" / "state"
         state_dir.mkdir(parents=True)
         plan_file = tmp_path / "plan.md"
@@ -1113,13 +1113,11 @@ class TestTodoCounter:
         result = _todo_counter(
             str(tmp_path), self._glyphs_ascii(), False, session_id="sess-new"
         )
-        assert "T: 3/10" in result
+        assert result == ""
 
-    def test_empty_session_id_falls_back_to_sole_plan(
-        self, tmp_path: pathlib.Path
-    ) -> None:
-        """No session_id -> no binding lookup possible -> falls back to the
-        sole registered plan rather than hiding."""
+    def test_empty_session_id_returns_empty(self, tmp_path: pathlib.Path) -> None:
+        """No session_id -> no binding lookup possible -> renders no token,
+        even when a plan is registered."""
         state_dir = tmp_path / ".omca" / "state"
         state_dir.mkdir(parents=True)
         plan_file = tmp_path / "plan.md"
@@ -1127,7 +1125,7 @@ class TestTodoCounter:
         boulder = _bound_boulder(plan_file)
         (state_dir / "boulder.json").write_text(json.dumps(boulder))
         result = _todo_counter(str(tmp_path), self._glyphs_ascii(), False)
-        assert "T: 3/10" in result
+        assert result == ""
 
     def test_empty_project_dir_returns_empty(self) -> None:
         """Empty project_dir string -> returns empty string without crash."""
@@ -1254,13 +1252,13 @@ class TestTodoCounterRegistryResolution:
     def _glyphs(self) -> dict:
         return build_glyphs(False)
 
-    def test_old_flat_schema_falls_back_to_migrated_sole_plan(
+    def test_old_flat_schema_with_no_binding_returns_empty(
         self,
         tmp_path: pathlib.Path,
     ) -> None:
-        """Old flat schema has no bindings, but migrates to a single-plan
-        registry: the sole-plan fallback still resolves it for an unbound
-        session rather than hiding it."""
+        """Old flat schema migrates to a registry with empty bindings: an
+        unbound session resolves to no plan under strict resolution, even
+        though exactly one plan exists after migration."""
         state_dir = tmp_path / ".omca" / "state"
         state_dir.mkdir(parents=True)
         plan_file = tmp_path / "plan.md"
@@ -1273,7 +1271,7 @@ class TestTodoCounterRegistryResolution:
         result = _todo_counter(
             str(tmp_path), self._glyphs(), False, session_id="sess-flat"
         )
-        assert "T: 3/10" in result
+        assert result == ""
 
     def test_new_schema_binding_hit_resolves_bound_plan(
         self, tmp_path: pathlib.Path
@@ -1354,11 +1352,13 @@ class TestTodoCounterRegistryResolution:
         result = _todo_counter(str(tmp_path), self._glyphs(), False, session_id="sess")
         assert result == ""
 
-    def test_two_plan_no_binding_falls_back_to_most_recent(
-        self, tmp_path: pathlib.Path
-    ) -> None:
-        """No session binding, multiple plans registered -> falls back to
-        the most-recently-started plan rather than hiding."""
+    def test_two_plan_no_binding_returns_empty(self, tmp_path: pathlib.Path) -> None:
+        """No session binding, multiple plans registered -> renders no
+        token rather than another session's most-recently-started plan.
+        This is the multi-session case: without strict resolution, every
+        unbound session in a project with several registered plans would
+        display whichever plan happens to have started most recently,
+        regardless of which session (if any) actually owns it."""
         state_dir = tmp_path / ".omca" / "state"
         state_dir.mkdir(parents=True)
         plan_a = tmp_path / "plan-a.md"
@@ -1371,11 +1371,10 @@ class TestTodoCounterRegistryResolution:
         boulder["plans"]["plan-b"]["active_plan"] = str(plan_b)
         (state_dir / "boulder.json").write_text(json.dumps(boulder))
 
-        # two-plan.json fixture: plan-b has the later started_at.
         result = _todo_counter(
             str(tmp_path), self._glyphs(), False, session_id="sess-unbound"
         )
-        assert "T: 3/10" in result
+        assert result == ""
 
 
 # ---------------------------------------------------------------------------

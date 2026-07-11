@@ -385,14 +385,14 @@ def _todo_counter(
 ) -> str:
     """Return a TODO counter token for the resolved active plan, or "".
 
-    Resolves via the shared registry ladder (`_boulder_core.resolve_bound_plan`):
-    an explicit binding for `session_id` wins first; when nothing binds (empty
-    `session_id`, or a `session_id` absent from `bindings`) this falls back to
-    the sole registered plan, then the most-recently-started one. The exact
-    fallback ladder hooks already use. Binding keys and the platform session id
-    are not guaranteed to come from the same id generation (see the session-id
-    note in .claude/rules/state-schemas.md) — degrading to the most plausible
-    plan beats hiding the counter outright whenever that mismatch occurs. A
+    Resolves via the shared registry resolver (`_boulder_core.resolve_bound_plan`)
+    in strict mode: the token renders only when `session_id` has an explicit
+    `bindings[session_id]` entry whose plan still has open tasks. A session
+    with no binding — empty `session_id`, a `session_id` absent from
+    `bindings`, or a binding key generated under a different scheme than the
+    platform session id (see the session-id note in
+    .claude/rules/state-schemas.md) — resolves to no plan and renders "".
+    Showing another session's plan is worse than showing none. A
     checkbox-complete plan is still hidden: finished work is not an active
     TODO. Returns "" when boulder is missing, no plan resolves at all, the
     plan file is gone, total == 0, every task is checked, or any error
@@ -406,7 +406,9 @@ def _todo_counter(
             return ""
         raw = boulder_path.read_text(encoding="utf-8")
         boulder = json.loads(raw)
-        active_plan = resolve_bound_plan(boulder, session_id).get("active_plan")
+        active_plan = resolve_bound_plan(boulder, session_id, strict=True).get(
+            "active_plan"
+        )
         if not active_plan:
             return ""
         plan_path = Path(active_plan)

@@ -29,9 +29,9 @@ to exactly one of them via `bindings[session_id]`.
   the plan's live `sha256sum` against logged `final_verification` evidence.
 - `scripts/session-init.sh` — resolves via the same shim to set `sessionTitle` from the
   bound plan's name (read-only, no write-back).
-- `statusline/core.py` — reads `boulder.json` directly and normalizes it via
-  `_boulder_core.normalize()` in-process (Python, so no shim needed). Display is
-  deliberately STRICTER than the resolver ladder: the TODO token renders only when
+- `statusline/core.py` — reads `boulder.json` directly (Python, so no shim needed)
+  and resolves it via `_boulder_core.resolve_bound_plan(..., strict=True)`, the same
+  strict call every hook-script consumer makes. The TODO token renders only when
   the payload's `session_id` has an explicit `bindings[]` entry and the bound plan
   still has open tasks. Sole-plan / most-recent fallbacks and flat-schema files
   never display — those fallbacks are resume plumbing for hooks, and honoring them
@@ -109,9 +109,9 @@ resume plumbing for readers that tolerate ambiguity: the only lenient consumer i
 ladder entirely). Every hook-script consumer that enforces or injects on the session's
 behalf passes `strict=True` so an unbound session can never inherit another session's
 plan: `plan-continuation-guard.sh`, `final-verification-evidence.sh`,
-`subagent-start.sh`, `session-init.sh`, and `pre-compact.sh`. `statusline/core.py`
-predates the `strict` parameter and implements the equivalent explicit-binding-only
-check directly in-process (see the Readers note above) rather than calling through it.
+`subagent-start.sh`, `session-init.sh`, `pre-compact.sh`, and `statusline/core.py`
+(see the Readers note above) — the statusline's TODO counter calls through the
+same strict resolver rather than a separate in-process check.
 
 **`boulder_resolve.py`** (`servers/tools/boulder_resolve.py`) is a stdlib-only,
 bash-callable wrapper around `resolve_bound_plan`: `python3 boulder_resolve.py
