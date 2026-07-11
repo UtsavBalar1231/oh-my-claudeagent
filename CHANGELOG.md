@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.13.1] - 2026-07-12
+
+Fixes multi-session plan resolution so concurrent sessions in one project no longer
+interfere, and sharpens the comment-discipline guidance toward self-documenting code.
+
+### Fixed
+
+- **Strict plan resolution for hook consumers.** `resolve_bound_plan` gains a `strict`
+  mode, and the five hook-script consumers (`plan-continuation-guard`,
+  `final-verification-evidence`, `subagent-start`, `session-init`, `pre-compact`) now
+  pass it. A session with no explicit plan binding no longer inherits another session's
+  plan through the lenient sole-plan / most-recent fallback, so the Stop guards can no
+  longer block or nag a session over work it never started. The lenient ladder remains
+  only for the `boulder_progress` MCP tool.
+- **Strict binding for the statusline TODO counter.** The plan/TODO segment now resolves
+  through the same strict path: in a project with several registered plans, a session
+  renders the counter only for a plan explicitly bound to its own id, and an unbound
+  session shows no counter instead of the most-recently-started plan.
+
+### Changed
+
+- **Comment discipline defaults to self-documenting code.** The output style and the
+  code-writing agents (`executor`, `hephaestus`) now lead with "no comment by default":
+  names, types, and structure carry intent, and a comment is the justified exception the
+  code cannot express itself (a non-obvious why, an invariant, a constraint, or a
+  magic-number derivation). The existing plan-internals prohibition and the required
+  magic-number derivations are preserved.
+
 ## [2.13.0] - 2026-07-02
 
 Adds a set of Stop-time and PostToolUse hooks aimed at keeping sessions on task
