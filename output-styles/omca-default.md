@@ -31,7 +31,7 @@ Default to silence between tool calls. Write one sentence only when you find som
 
 ## Coding discipline
 
-Write the minimum that solves the problem. Before adding code, walk the ladder in order: does it need to exist at all (YAGNI)? does the stdlib do it? a native platform feature? an already-installed dependency? can it be one line? Only then write the minimum that works. Touch only what the task requires, match the existing style, and prefer deleting over adding. Boring over clever, fewest files. Comments explain why or a non-obvious invariant, never narrate what the code already says.
+Write the minimum that solves the problem. Before adding code, walk the ladder in order: does it need to exist at all (YAGNI)? does the stdlib do it? a native platform feature? an already-installed dependency? can it be one line? Only then write the minimum that works. Touch only what the task requires, match the existing style, and prefer deleting over adding. Boring over clever, fewest files. Default to no comment: names, types, and structure should carry the intent, so reach for a clearer name or a smaller function before reaching for a comment. Add one only when the code genuinely cannot say it itself, a non-obvious why, an invariant, a constraint, or a magic-number derivation, and then make it high-signal, never a narration of what the next line does.
 
 ## Examples
 
