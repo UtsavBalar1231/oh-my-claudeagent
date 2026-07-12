@@ -5,10 +5,13 @@ one JSON object from stdin with a ``tasks`` array, emits one JSON line per
 task to override that task's row in the tasks panel. Runnable directly via
 ``python3 -m statusline.subagent``, mirroring ``statusline.direct``.
 
-Model lookup is PURE-READ against ``.omca/state/subagent-models.json``
-(written by the SubagentStart hook, not owned by this module) and must
-never crash the renderer -- an absent or malformed file just means rows
-render without a model.
+Model resolution prefers the task payload's own ``model`` field (platform
+v2.1.205+, reflecting the actual resolved model including per-call
+``Agent(model=...)`` overrides the state file can't see) and falls back to
+a PURE-READ lookup against ``.omca/state/subagent-models.json`` (written by
+the SubagentStart hook, not owned by this module) for older platforms.
+Must never crash the renderer -- an absent or malformed file just means
+rows render without a model.
 
 The documented payload (checked 2026-07-02) has no focused/selected field --
 the platform renders the selection caret and owns Up/Down cycling itself.
@@ -50,6 +53,7 @@ _STATUS_COLOR = {
 }
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+_MODEL_ID_RE = re.compile(r"^claude-([a-z]+)-(\d+)(?:-(\d+))?$")
 
 # Observed-but-undocumented platform placeholder labels for a task's
 # name/type when it hasn't (or can't) resolve a real agent name. Treated as
@@ -73,13 +77,38 @@ def _load_models(cwd: str) -> dict:
     return data if isinstance(data, dict) else {}
 
 
-def _resolve_model(task: dict, models: dict) -> str:
-    """Resolve a task's real model: id-join primary, name/type fallback.
+def _friendly_model(model_id: str) -> str:
+    """Map a raw model id to its friendly display name.
 
-    ``task.id`` is unique per spawn so it's the primary join key; the
-    fallback matches ``task.name``/``task.type`` against the stored
-    ``agent_type`` for state files keyed differently than expected.
+    ``claude-<name>-<major>[-<minor>]`` becomes ``<Name> <major>[.<minor>]``
+    (e.g. ``claude-sonnet-5`` -> ``Sonnet 5``, ``claude-opus-4-8`` ->
+    ``Opus 4.8``) -- this must match the format the SubagentStart hook
+    stores in ``subagent-models.json`` so rows never flicker between
+    formats depending on which source resolved them. Ids that don't match
+    the pattern (bare names, empty string, unrecognized future formats)
+    pass through unchanged.
     """
+    match = _MODEL_ID_RE.match(model_id)
+    if not match:
+        return model_id
+    name, major, minor = match.groups()
+    version = f"{major}.{minor}" if minor else major
+    return f"{name.capitalize()} {version}"
+
+
+def _resolve_model(task: dict, models: dict) -> str:
+    """Resolve a task's real model: payload field primary, state-file fallback.
+
+    ``task["model"]`` (platform v2.1.205+) reflects the actual resolved
+    model, including per-call ``Agent(model=...)`` overrides the state file
+    can't see, so it wins whenever present. Older platforms omit the field,
+    so fall back to the state-file lookup: ``task.id`` join primary, then
+    matching ``task.name``/``task.type`` against the stored ``agent_type``.
+    """
+    raw_model = task.get("model") or ""
+    if raw_model:
+        return _friendly_model(raw_model)
+
     entry = models.get(task.get("id", ""))
     if entry is None:
         agent_type = task.get("name") or task.get("type") or ""

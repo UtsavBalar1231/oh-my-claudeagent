@@ -11,6 +11,7 @@ import pytest
 from statusline.core import build_glyphs
 from statusline.subagent import (
     _dump_payload,
+    _friendly_model,
     _load_models,
     _render_row,
     _resolve_model,
@@ -65,6 +66,62 @@ class TestResolveModel:
 
     def test_empty_models_returns_empty(self) -> None:
         assert _resolve_model({"id": "a", "name": "executor"}, {}) == ""
+
+    def test_payload_model_wins_over_state_file(self) -> None:
+        # Platform payload field (v2.1.205+) reflects the actual resolved
+        # model -- including per-call Agent(model=...) overrides the state
+        # file can't see -- so it takes priority even when the state file
+        # disagrees.
+        models = {"agent-1": {"agent_type": "executor", "model": "Sonnet 5"}}
+        task = {
+            "id": "agent-1",
+            "name": "oh-my-claudeagent:executor",
+            "model": "claude-opus-4-8",
+        }
+        assert _resolve_model(task, models) == "Opus 4.8"
+
+    def test_payload_model_used_with_no_state_entry(self) -> None:
+        task = {
+            "id": "unmapped",
+            "name": "oh-my-claudeagent:oracle",
+            "model": "claude-fable-5",
+        }
+        assert _resolve_model(task, {}) == "Fable 5"
+
+    def test_payload_model_absent_falls_back_to_state_file(self) -> None:
+        # Older platforms (pre-v2.1.205) omit task["model"] entirely; the
+        # state-file lookup must behave exactly as before.
+        models = {"agent-1": {"agent_type": "executor", "model": "Sonnet 5"}}
+        task = {"id": "agent-1", "name": "oh-my-claudeagent:executor"}
+        assert _resolve_model(task, models) == "Sonnet 5"
+
+    def test_payload_model_empty_string_falls_back_to_state_file(self) -> None:
+        models = {"agent-1": {"agent_type": "executor", "model": "Sonnet 5"}}
+        task = {"id": "agent-1", "name": "oh-my-claudeagent:executor", "model": ""}
+        assert _resolve_model(task, models) == "Sonnet 5"
+
+
+class TestFriendlyModel:
+    def test_sonnet_5(self) -> None:
+        assert _friendly_model("claude-sonnet-5") == "Sonnet 5"
+
+    def test_opus_4_8(self) -> None:
+        assert _friendly_model("claude-opus-4-8") == "Opus 4.8"
+
+    def test_fable_5(self) -> None:
+        assert _friendly_model("claude-fable-5") == "Fable 5"
+
+    def test_haiku_4_5(self) -> None:
+        assert _friendly_model("claude-haiku-4-5") == "Haiku 4.5"
+
+    def test_non_matching_id_passes_through(self) -> None:
+        assert _friendly_model("sonnet") == "sonnet"
+
+    def test_empty_string_stays_empty(self) -> None:
+        assert _friendly_model("") == ""
+
+    def test_unrecognized_future_id_passes_through(self) -> None:
+        assert _friendly_model("claude-nova-9-1-2") == "claude-nova-9-1-2"
 
 
 class TestResolveName:
