@@ -125,6 +125,121 @@ load '../test_helper'
 	echo "$ctx" | grep -qi "restates the following code line"
 }
 
+# The restates check previously required the comment to contribute zero words
+# of its own, so it only ever matched hand-built cases like the test above.
+# Real narration carries a word the code line lacks; these lock that in.
+@test "comment-checker: warns on narrating comment that adds one word" {
+	local content=$'# Set the path attribute\nself.path = path'
+	local payload
+	payload=$(jq -nc --arg c "$content" '{"tool_name":"Write","tool_input":{"content":$c}}')
+
+	run_hook "comment-checker.sh" "$payload"
+	assert_success
+	ctx=$(get_context)
+	assert [ -n "$ctx" ]
+	echo "$ctx" | grep -qi "restates the following code line"
+}
+
+@test "comment-checker: warns on line-by-line narration via density" {
+	local content=$'# Define the configuration class\nclass Config:\n    # Initialize the configuration\n    def __init__(self, path):\n        # Store the path\n        self.path = path\n        # Create an empty dict\n        self.values = {}\n    # Load the config file\n    def load(self):\n        # Open and parse it\n        return json.load(open(self.path))'
+	local payload
+	payload=$(jq -nc --arg c "$content" '{"tool_name":"Write","tool_input":{"content":$c}}')
+
+	run_hook "comment-checker.sh" "$payload"
+	assert_success
+	ctx=$(get_context)
+	assert [ -n "$ctx" ]
+	echo "$ctx" | grep -qi "comment density"
+}
+
+# Load-bearing comments the rules file mandates. A tightening pass that
+# silences these has overshot, so failures here are the intended alarm.
+@test "comment-checker: no warning for magic-number derivation comment" {
+	local content=$'# 3600s (1h) - F1-F4 evidence freshness window. Sibling uses 300s; UNDOCUMENTED divergence.\nMAX_EVIDENCE_AGE_SECONDS=3600'
+	local payload
+	payload=$(jq -nc --arg c "$content" '{"tool_name":"Write","tool_input":{"content":$c}}')
+
+	run_hook "comment-checker.sh" "$payload"
+	assert_success
+	assert_output ""
+}
+
+# The terse mandated form restates its constant by construction, so it is
+# exempted by shape. Without that carve-out the gate blocks a comment the
+# rules file REQUIRES on every numeric constant.
+@test "comment-checker: no warning for terse magic-number comment" {
+	local content=$'# 300s evidence age\nMAX_EVIDENCE_AGE_SECONDS=300'
+	local payload
+	payload=$(jq -nc --arg c "$content" '{"tool_name":"Write","tool_input":{"file_path":"/tmp/x.sh","content":$c}}')
+
+	run_hook "comment-checker.sh" "$payload"
+	assert_success
+	assert_output ""
+}
+
+@test "comment-checker: skips non-source files so Markdown headings are not comments" {
+	local content=$'# Install dependencies\njust install\n\n# Run the tests\njust test\n\n# Build the plugin\njust build\n\n# Release a version\njust release\n\n# Clean the cache\njust clean\n\n# Lint the shell\njust lint'
+	local payload
+	payload=$(jq -nc --arg c "$content" '{"tool_name":"Write","tool_input":{"file_path":"/tmp/README.md","content":$c}}')
+
+	run_hook "comment-checker.sh" "$payload"
+	assert_success
+	assert_output ""
+}
+
+@test "comment-checker: skips its own source so the gate cannot self-trip" {
+	local content=$'# AI-generated helper\nfoo() { :; }'
+	local payload
+	payload=$(jq -nc --arg c "$content" '{"tool_name":"Write","tool_input":{"file_path":"/repo/scripts/comment-checker.sh","content":$c}}')
+
+	run_hook "comment-checker.sh" "$payload"
+	assert_success
+	assert_output ""
+}
+
+@test "comment-checker: advise mode emits context and never denies" {
+	local content=$'# AI-generated helper\nfoo() { :; }'
+	local payload
+	payload=$(jq -nc --arg c "$content" '{"tool_name":"Write","tool_input":{"file_path":"/tmp/x.sh","content":$c}}')
+
+	OMCA_COMMENT_GATE=advise run_hook "comment-checker.sh" "$payload"
+	assert_success
+	refute_output --partial "permissionDecision"
+	ctx=$(get_context)
+	assert [ -n "$ctx" ]
+}
+
+@test "comment-checker: deny mode blocks tier-1 literal patterns" {
+	local content=$'# AI-generated helper\nfoo() { :; }'
+	local payload
+	payload=$(jq -nc --arg c "$content" '{"tool_name":"Write","tool_input":{"file_path":"/tmp/x.sh","content":$c}}')
+
+	OMCA_COMMENT_GATE=deny run_hook "comment-checker.sh" "$payload"
+	assert_success
+	assert_output --partial '"permissionDecision":"deny"'
+	assert_output --partial "REQUIRED by .claude/rules/hook-scripts.md"
+}
+
+@test "comment-checker: gate off exits silently" {
+	local content=$'# AI-generated helper\nfoo() { :; }'
+	local payload
+	payload=$(jq -nc --arg c "$content" '{"tool_name":"Write","tool_input":{"file_path":"/tmp/x.sh","content":$c}}')
+
+	OMCA_COMMENT_GATE=off run_hook "comment-checker.sh" "$payload"
+	assert_success
+	assert_output ""
+}
+
+@test "comment-checker: no warning for invariant comment" {
+	local content=$'# REQUIRES RALPH_STATE to be set upstream - see resolve_session_id above.\nif [[ -z "$RALPH_STATE" ]]; then\n  return 1\nfi'
+	local payload
+	payload=$(jq -nc --arg c "$content" '{"tool_name":"Write","tool_input":{"content":$c}}')
+
+	run_hook "comment-checker.sh" "$payload"
+	assert_success
+	assert_output ""
+}
+
 @test "comment-checker: no warning when comment adds information code doesn't restate" {
 	local content=$'# cache the previous input value for diffing on next call\nuser_name = input_value'
 	local payload

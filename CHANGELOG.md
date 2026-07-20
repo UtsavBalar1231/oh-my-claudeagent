@@ -5,6 +5,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.13.2] - 2026-07-20
+
+Repairs the comment checker, whose slop-detection rules could not fire on realistic
+input, and promotes it from an advisory notice into a tiered gate that can block a
+write before it lands.
+
+### Fixed
+
+- **Comment slop detection could not fire on real narration.** The code-restating
+  rule required a comment to share two or more tokens with the next code line *and*
+  contribute no word of its own — a combination real narrating comments never satisfy,
+  since they almost always add a word. `# Set the path attribute` above
+  `self.path = path` scored one shared token and one extra, failing both halves. The
+  same `extra == 0` condition made the trivial-doc rule equally brittle. Both now
+  allow one novel token. Separately, `return`, `value`, and `values` were stopwords,
+  so a body like `# Return the values` tokenized to nothing and could never match.
+- **Non-source files were scanned as code.** The checker never read `file_path`, and
+  its comment matcher treats a leading `#` as a comment, so Markdown headings were
+  parsed as code comments — a README write reported five restating comments and a
+  density warning. Detection is now limited to source extensions.
+- **Interleaved narration went unreported.** One comment per code line never reaches
+  the consecutive-run threshold, so a fully narrated function produced no finding at
+  all. A comment-density check now covers that shape.
+
+### Added
+
+- **Tiered comment gate on `PreToolUse`.** `OMCA_COMMENT_GATE=off|advise|deny` selects
+  enforcement. Literal AI-attribution and placeholder comments hard-deny; per-line
+  heuristics deny once per content signature and then fail open, so a lexical false
+  positive costs one retry rather than trapping the edit; whole-hunk aggregates stay
+  advisory. The default `advise` records what a live gate would have blocked without
+  blocking, so sensitivity can be reviewed before enabling it.
+- **CI-pinned carve-outs for mandated comments.** The magic-number derivation comment
+  required above every numeric constant is exempt by shape, and fixtures covering both
+  its terse and verbose forms now fail the suite if a future tightening silences them.
+  Every deny message names the comment categories that must survive the fix, so a block
+  cannot be resolved by stripping required comments.
+
+### Changed
+
+- **`comment-checker.sh` moved from `PostToolUse` to `PreToolUse`.** It previously ran
+  after the edit was already on disk and could only emit advisory text. Its advisory
+  wording is now imperative rather than a passive suggestion to review.
+
 ## [2.13.1] - 2026-07-12
 
 Fixes multi-session plan resolution so concurrent sessions in one project no longer

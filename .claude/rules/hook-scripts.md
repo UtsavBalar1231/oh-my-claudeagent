@@ -18,6 +18,36 @@ When editing or creating hook scripts:
 - **Async hooks**: use `"async": true` only for observability (logging), not for context injection.
 - **`if` field**: use for argument-level filtering on tool events (`PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `PermissionRequest`). Syntax: `"if": "Bash(git *)"` — shell-glob matching against tool arguments. Reduces process spawning overhead. Do NOT use on dual-purpose hooks, dynamic-logic hooks, or security-critical hooks where a too-narrow filter could silently disable protection.
 
+### Comment gate (`comment-checker.sh`)
+
+Runs on `PreToolUse Write|Edit|MultiEdit` and denies via
+`permissionDecision: "deny"` + exit 0 — it does NOT use exit 2, so the exit-2
+whitelist above is unchanged. `OMCA_COMMENT_GATE=off|advise|deny` selects the
+enforcement level; the default `advise` computes deny decisions and records
+them to `hook-info.jsonl` without blocking, so sensitivity can be reviewed
+before the gate goes live.
+
+Three tiers, by false-positive risk:
+
+| Tier | Findings | Enforcement |
+|---|---|---|
+| 1 | literal AI attribution/authorship, ref-less `TODO: implement` | hard deny |
+| 2 | restates, trivial-doc, filler, bare-todo, separator | deny once per content signature, then fail open |
+| 3 | comment density, consecutive-run | advisory only, never denies |
+
+Tier 2 fails open on a repeat because the checks are lexical token-overlap and
+cannot always separate slop from a genuine non-obvious comment; the signature
+state lives in `.omca/state/comment-gate-window.json`. Tier 3 stays advisory
+because a whole-hunk ratio has no line to quote and mandated Google-style
+headers can legitimately reach it.
+
+Two carve-outs are load-bearing and CI-pinned in `misc_hooks.bats`: the
+magic-number derivation shape required above every numeric constant is exempt
+from the restates check, and non-source extensions exit before any check (the
+`#` matcher would otherwise read Markdown headings as comments). Every deny
+message names the comment categories that must survive the fix, so the model
+cannot resolve a block by stripping required comments.
+
 ### Intentionally unfiltered hooks
 
 Two hooks deliberately omit the `if` field:

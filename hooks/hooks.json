@@ -88,6 +88,15 @@
 				]
 			},
 			{
+				"matcher": "Write|Edit|MultiEdit",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/comment-checker.sh"
+					}
+				]
+			},
+			{
 				"matcher": "Write|Edit",
 				"hooks": [
 					{
@@ -199,15 +208,6 @@
 						"type": "command",
 						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/post-edit.sh",
 						"async": true
-					}
-				]
-			},
-			{
-				"matcher": "Write|Edit|MultiEdit",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/comment-checker.sh"
 					}
 				]
 			},
