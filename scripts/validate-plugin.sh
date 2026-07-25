@@ -171,6 +171,7 @@ check_latest_hook_lifecycle_coverage() {
 	# New platform events not yet adopted by OMCA handlers.
 	# Tracked here for validator awareness; always skipped until handlers are registered.
 	local new_platform_events=(
+		"DirectoryAdded"
 		"Elicitation"
 		"ElicitationResult"
 		"MessageDisplay"
@@ -258,24 +259,27 @@ check_agent_frontmatter_hygiene() {
 	mapfile -t tools_matches < <(collect_frontmatter_key_matches "tools")
 	if [[ "${#tools_matches[@]}" -eq 0 ]]; then
 		pass "agent frontmatter hygiene: no top-level tools allowlists detected"
+	elif [[ "${HARD_CUTOVER_ACTIVE}" -eq 1 ]]; then
+		# No carve-out: a tools allowlist that omits a needed tool launches the agent with none.
+		fail "agent frontmatter hygiene: top-level tools allowlists are forbidden, use disallowedTools (${tools_matches[*]})"
 	else
-		local allowed_tools_exception="${REPO_ROOT}/agents/multimodal-looker.md"
-		local unexpected_tools=()
-		local tools_file
-		for tools_file in "${tools_matches[@]}"; do
-			if [[ "${tools_file}" != "${allowed_tools_exception}" ]]; then
-				unexpected_tools+=("${tools_file}")
-			fi
-		done
+		skip "agent frontmatter hygiene: top-level tools allowlists still present pre-2.0.0 (${tools_matches[*]})"
+	fi
 
-		if [[ "${#unexpected_tools[@]}" -eq 0 ]] && [[ "${#tools_matches[@]}" -eq 1 ]] &&
-			grep -Fq "repository's only top-level" "${allowed_tools_exception}"; then
-			pass "agent frontmatter hygiene: only documented multimodal-looker tools allowlist remains"
-		elif [[ "${HARD_CUTOVER_ACTIVE}" -eq 1 ]]; then
-			fail "agent frontmatter hygiene: top-level tools allowlists are forbidden after 2.0.0 marker (${unexpected_tools[*]:-${tools_matches[*]}})"
-		else
-			skip "agent frontmatter hygiene: top-level tools allowlists still present pre-2.0.0 (${unexpected_tools[*]:-${tools_matches[*]}})"
+	local name_matches=()
+	mapfile -t name_matches < <(collect_frontmatter_key_matches "name")
+	local colon_names=()
+	local name_file name_value
+	for name_file in "${name_matches[@]}"; do
+		name_value="$(awk '/^name:/ { sub(/^name:[[:space:]]*/, ""); print; exit }' "${name_file}")"
+		if [[ "${name_value}" == *:* ]]; then
+			colon_names+=("$(relative_path "${name_file}")")
 		fi
+	done
+	if [[ "${#colon_names[@]}" -eq 0 ]]; then
+		pass "agent frontmatter hygiene: no agent name contains a colon"
+	else
+		fail "agent frontmatter hygiene: agent name values must not contain ':', the platform rejects the agent at load time (${colon_names[*]})"
 	fi
 
 	local permission_matches=()
@@ -287,6 +291,70 @@ check_agent_frontmatter_hygiene() {
 	else
 		skip "agent frontmatter hygiene: legacy permissionMode holdouts still present pre-2.0.0 (${permission_matches[*]})"
 	fi
+}
+
+documented_hook_events() {
+	# Pulls the backticked first column out of the "Hook events OMCA handles" table.
+	awk '
+		/^\*\*Hook events OMCA handles:\*\*/ { in_table = 1; next }
+		in_table && /^\| `/ {
+			row = $0
+			sub(/^\| `/, "", row)
+			sub(/`.*$/, "", row)
+			print row
+			seen_row = 1
+			next
+		}
+		in_table && seen_row && $0 !~ /^\|/ { exit }
+	' "$1"
+}
+
+check_hook_event_table_matches_registry() {
+	if [[ ! -f "${OMCA_MD}" ]]; then
+		fail "hook event table: OMCA.md missing at ${OMCA_MD}"
+		return 1
+	fi
+
+	local documented=()
+	mapfile -t documented < <(documented_hook_events "${OMCA_MD}")
+	if [[ "${#documented[@]}" -eq 0 ]]; then
+		fail "hook event table: no 'Hook events OMCA handles' table found in $(relative_path "${OMCA_MD}")"
+		return 1
+	fi
+
+	local registered=()
+	mapfile -t registered < <(jq -r '.hooks | keys[]' "${HOOKS_JSON}")
+
+	local undocumented=() unregistered=() event other found
+	for event in "${registered[@]}"; do
+		found=0
+		for other in "${documented[@]}"; do
+			[[ "${event}" == "${other}" ]] && found=1 && break
+		done
+		[[ "${found}" -eq 0 ]] && undocumented+=("${event}")
+	done
+	for event in "${documented[@]}"; do
+		found=0
+		for other in "${registered[@]}"; do
+			[[ "${event}" == "${other}" ]] && found=1 && break
+		done
+		[[ "${found}" -eq 0 ]] && unregistered+=("${event}")
+	done
+
+	local clean=1
+	if [[ "${#undocumented[@]}" -gt 0 ]]; then
+		fail "hook event table: registered in hooks.json but absent from the OMCA.md table (${undocumented[*]})"
+		clean=0
+	fi
+	if [[ "${#unregistered[@]}" -gt 0 ]]; then
+		fail "hook event table: listed in the OMCA.md table but no handler registered in hooks.json (${unregistered[*]})"
+		clean=0
+	fi
+	if [[ "${clean}" -eq 1 ]]; then
+		pass "hook event table: OMCA.md matches the hooks.json event set"
+	fi
+
+	[[ "${clean}" -eq 1 ]]
 }
 
 relative_path() {
@@ -376,6 +444,12 @@ resolve_hook_commands() {
 
 resolve_hook_path() {
 	local raw_command="$1"
+	# Handlers use shell form with the placeholder quoted ("${CLAUDE_PLUGIN_ROOT}/scripts/x.sh")
+	# so a space in the install path survives word splitting. The shell strips those quotes
+	# before exec; this resolver must do the same or every path resolves to a nonexistent file.
+	if [[ "${raw_command}" == '"'*'"' ]]; then
+		raw_command="${raw_command:1:${#raw_command}-2}"
+	fi
 	printf '%s' "${raw_command//\$\{CLAUDE_PLUGIN_ROOT\}/${REPO_ROOT}}"
 }
 
@@ -921,6 +995,7 @@ check_claims() {
 	marketplace_version=$(jq -r '.plugins[0].version // ""' "${MARKETPLACE_PATH}" 2>/dev/null)
 	set_hard_cutover_mode "${plugin_version}" "${marketplace_version}"
 	check_latest_hook_lifecycle_coverage
+	check_hook_event_table_matches_registry
 	check_agent_frontmatter_hygiene
 	check_skill_description_lengths
 	check_policy_posture_alignment

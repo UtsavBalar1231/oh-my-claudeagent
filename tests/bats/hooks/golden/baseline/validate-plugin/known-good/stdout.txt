@@ -28,12 +28,15 @@
 [validate-plugin] PASS: latest hook lifecycle coverage includes TaskCompleted
 [validate-plugin] PASS: latest hook lifecycle coverage includes UserPromptExpansion
 [validate-plugin] PASS: latest hook lifecycle coverage includes UserPromptSubmit
+[validate-plugin] SKIP: new platform event DirectoryAdded not yet adopted by OMCA
 [validate-plugin] SKIP: new platform event Elicitation not yet adopted by OMCA
 [validate-plugin] SKIP: new platform event ElicitationResult not yet adopted by OMCA
 [validate-plugin] SKIP: new platform event MessageDisplay not yet adopted by OMCA
 [validate-plugin] SKIP: new platform event PostToolBatch not yet adopted by OMCA
 [validate-plugin] SKIP: new platform event Setup not yet adopted by OMCA
+[validate-plugin] PASS: hook event table: OMCA.md matches the hooks.json event set
 [validate-plugin] PASS: agent frontmatter hygiene: no top-level tools allowlists detected
+[validate-plugin] PASS: agent frontmatter hygiene: no agent name contains a colon
 [validate-plugin] PASS: agent frontmatter hygiene: no legacy permissionMode holdouts detected
 [validate-plugin] PASS: skill description length: consolidate-memory description is 79 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: debugging description is 504 chars (within 512 soft cap)
@@ -75,6 +78,9 @@
 [validate-plugin] PASS: docs accuracy: README.md references existing path '.claude/settings.json'
 [validate-plugin] PASS: docs accuracy: README.md references existing path 'docs/reference/known-issues.md'
 [validate-plugin] PASS: docs accuracy: README.md references existing path 'docs/reference/configuration.md'
+[validate-plugin] PASS: docs accuracy: OMCA.md cites existing recipe 'just doctor'
+[validate-plugin] PASS: docs accuracy: OMCA.md cites existing recipe 'just new-agent'
+[validate-plugin] PASS: docs accuracy: OMCA.md cites existing recipe 'just ci'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'docs/reference/configuration.md'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'docs/reference/known-issues.md'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'docs/CONTRIBUTING.md'
@@ -84,9 +90,12 @@
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
-[validate-plugin] PASS: docs accuracy: OMCA.md:243 documents removal of 'scripts/teammate-idle-guard.sh' (not a stale reference)
-[validate-plugin] PASS: docs accuracy: OMCA.md:261 documents removal of 'scripts/post-tool-batch.sh' (not a stale reference)
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/validate-plugin.sh'
+[validate-plugin] PASS: docs accuracy: OMCA.md:286 documents removal of 'scripts/post-tool-batch.sh' (not a stale reference)
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/lib/common.sh'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'statusline/core.py'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'statusline/subagent.py'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'statusline/README.md'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path '.claude/settings.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'templates/claudemd.md'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'commands/start-work.md'
@@ -98,6 +107,10 @@
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path '.claude/settings.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/lib/common.sh'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/delegate-retry.sh'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'servers/tools/ast.py'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path '.claude/rules/state-schemas.md'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/tool-loop-detector.sh'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'templates/claudemd.md'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/permission-filter.sh'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'output-styles/omca-default.md'
@@ -110,7 +123,25 @@
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path '.omca/notes/probe-runtime-semantics.md'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path '.claude/rules/agent-conventions.md'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'statusline/subagent.py'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path '.omca/notes/spike-semantic-verification-hooks.md'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'agents/sisyphus.md'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path '.claude/settings.json'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path '.claude/settings.local.json'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'statusline/core.py'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'docs/reference/known-issues.md'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path '.claude/rules/hook-scripts.md'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'commands/start-work.md'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'agents/sisyphus.md'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'agents/executor.md'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/validate-plugin.sh'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'commands/start-work.md'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'agents/multimodal-looker.md'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path '.claude/settings.json'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'servers/tools/ast.py'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/validate-plugin.sh'
 [validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md cites existing recipe 'just setup'
 [validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md cites existing recipe 'just release'
 [validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md cites existing recipe 'just release'
@@ -183,4 +214,4 @@
 [validate-plugin] PASS: mcp tools/list contains categories_list
 [validate-plugin] PASS: mcp tools/list contains file_read
 [validate-plugin] PASS: mcp tools/list contains session_search
-[validate-plugin] Summary: 169 passed, 0 failed, 6 skipped, 0 warned
+[validate-plugin] Summary: 199 passed, 0 failed, 7 skipped, 0 warned
