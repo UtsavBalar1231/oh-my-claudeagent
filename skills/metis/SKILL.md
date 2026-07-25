@@ -2,6 +2,7 @@
 name: metis
 description: Pre-planning analysis via the Metis consultant. Catches gaps, identifies risks, surfaces hidden requirements.
 context: fork
+background: false
 agent: oh-my-claudeagent:metis
 user-invocable: true
 argument-hint: "[request to analyze]"

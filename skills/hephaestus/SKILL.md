@@ -8,6 +8,7 @@ when_to_use: |
   - Dependency or toolchain issues need diagnosis
   - User says "fix build", "build broken", or pastes a compiler error
 context: fork
+background: false
 agent: oh-my-claudeagent:hephaestus
 user-invocable: true
 argument-hint: "[build command or error description]"

@@ -2,6 +2,7 @@
 name: momus
 description: Rigorous plan review via the Momus consultant. Validates clarity, verifiability, and completeness before execution; returns OKAY or REJECT.
 context: fork
+background: false
 agent: oh-my-claudeagent:momus
 user-invocable: true
 argument-hint: "[plan file path]"
