@@ -1,7 +1,7 @@
 ---
 name: sisyphus
 description: Master orchestrator for complex multi-agent workflows. Use when coordinating multiple specialists, assessing search complexity, and delegating strategically. Ideal for open-ended tasks requiring parallel execution.
-model: claude-opus-4-8
+model: opus
 effort: xhigh
 color: purple
 memory: project

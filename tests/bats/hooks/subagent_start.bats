@@ -101,7 +101,7 @@ ORACLE_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id
 @test "agent catalog: sisyphus agent with catalog.json gets dynamic delegation table" {
 	# Write a minimal agent-catalog.json
 	write_state "agent-catalog.json" \
-		'[{"name":"explore","cost_tier":"cheap","when_to_use":"codebase search and discovery","default_model":"claude-sonnet-5"}]'
+		'[{"name":"explore","cost_tier":"cheap","when_to_use":"codebase search and discovery","default_model":"sonnet"}]'
 
 	run_hook "subagent-start.sh" "$SISYPHUS_PAYLOAD"
 	assert_success
@@ -321,23 +321,23 @@ ORACLE_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id
 
 # ─── q. Model capture into subagent-models.json ──────────────────────────────
 
-@test "model capture: executor agent_type resolves to Sonnet 5" {
+@test "model capture: executor agent_type resolves to Sonnet" {
 	run_hook "subagent-start.sh" "$EXECUTOR_PAYLOAD"
 	assert_success
 	local model
 	model=$(read_state "subagent-models.json" | jq -r '."agent-abc123".model')
-	assert [ "$model" = "Sonnet 5" ]
+	assert [ "$model" = "Sonnet" ]
 	local type
 	type=$(read_state "subagent-models.json" | jq -r '."agent-abc123".agent_type')
 	assert [ "$type" = "oh-my-claudeagent:executor" ]
 }
 
-@test "model capture: sisyphus agent_type resolves to Opus 4.8" {
+@test "model capture: sisyphus agent_type resolves to Opus" {
 	run_hook "subagent-start.sh" "$SISYPHUS_PAYLOAD"
 	assert_success
 	local model
 	model=$(read_state "subagent-models.json" | jq -r '."agent-abc123".model')
-	assert [ "$model" = "Opus 4.8" ]
+	assert [ "$model" = "Opus" ]
 }
 
 @test "model capture: non-OMCA agent_type stores empty model" {

@@ -1,7 +1,7 @@
 ---
 name: multimodal-looker
 description: Multimodal analyst for images, PDFs, and diagrams. Use when you need interpreted/extracted data from visual content rather than raw file contents. Analyzes screenshots, UI mockups, architecture diagrams, and document pages.
-model: claude-sonnet-5
+model: sonnet
 effort: high
 color: pink
 disallowedTools:
@@ -38,7 +38,7 @@ Examine media files, extract requested information. Nothing beyond what was aske
 3. Return structured, actionable information
 4. Main agent skips raw file → saves context tokens
 
-Intentional `tools: Read` allowlist: pure media interpretation. Broader access adds risk without value.
+The `disallowedTools` list is deliberately wide: this agent does pure media interpretation, and broader access adds risk without value.
 
 ## Structured Output Format
 

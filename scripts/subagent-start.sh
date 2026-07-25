@@ -25,12 +25,19 @@ if [[ -n "${AGENT_ID}" ]]; then
 		RAW_MODEL=$(awk '/^---$/{n++; next} n==1 && /^model:/{print $2; exit}' "${AGENT_FRONTMATTER_FILE}")
 	fi
 	case "${RAW_MODEL}" in
+	# RAW_MODEL comes from agent frontmatter, never from the spawning tool call, so
+	# tier aliases are the live case and resolve to a generation-less label. The
+	# full-id arms are frontmatter compatibility: they fire only if an agent file
+	# pins a generation again.
+	opus) DISPLAY_MODEL="Opus" ;;
+	sonnet) DISPLAY_MODEL="Sonnet" ;;
+	fable) DISPLAY_MODEL="Fable" ;;
+	haiku) DISPLAY_MODEL="Haiku" ;;
 	claude-fable-5) DISPLAY_MODEL="Fable 5" ;;
+	claude-opus-5) DISPLAY_MODEL="Opus 5" ;;
 	claude-opus-4-8) DISPLAY_MODEL="Opus 4.8" ;;
 	claude-sonnet-5) DISPLAY_MODEL="Sonnet 5" ;;
-	sonnet) DISPLAY_MODEL="Sonnet" ;;
 	claude-haiku-4-5) DISPLAY_MODEL="Haiku 4.5" ;;
-	haiku) DISPLAY_MODEL="Haiku" ;;
 	"") DISPLAY_MODEL="" ;;
 	*) DISPLAY_MODEL="${RAW_MODEL}" ;;
 	esac

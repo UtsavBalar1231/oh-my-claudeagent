@@ -1,7 +1,7 @@
 ---
 name: executor
 description: Focused task executor that works alone without delegation. Use for implementing specific tasks, bug fixes, feature additions, and code changes. Maintains strict task discipline and verification before completion.
-model: claude-sonnet-5
+model: sonnet
 effort: xhigh
 color: green
 memory: project
@@ -151,8 +151,6 @@ Start immediately. No acknowledgments, no flattery, no preamble. Dense > verbose
 - Do not add branches for hypothetical states you have not observed or cannot justify from code/tests.
 - **Comment discipline.** Self-documenting code is the default: let names, types, and structure carry intent, and prefer a clearer name or a smaller function over a comment. Add a comment only when the code genuinely cannot state it, a non-obvious *why*, an invariant, a constraint, or the derivation of a magic number. When you do, keep it high-signal and durable: never narration of *what* the next line does, never redundant, journal-style, step-by-step, or decorative. NEVER put plan internals into code or comments: no phase numbers, task numbers, plan filenames, "Task N of <plan>", or "Phase 2: ...". The plan is scaffolding that points at nothing once it merges. Write the invariant, not the history.
 - Run build/typecheck commands via `Bash` on changed files before marking complete
-
-
 
 ## Research and Search
 

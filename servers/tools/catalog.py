@@ -20,6 +20,7 @@ def register(mcp: FastMCP) -> None:
     _MODEL_COST_TIER = {
         "claude-fable-5": "premium",
         "fable": "premium",
+        "claude-opus-5": "expensive",
         "claude-opus-4-8": "expensive",
         "opus": "expensive",
         "claude-sonnet-5": "cheap",

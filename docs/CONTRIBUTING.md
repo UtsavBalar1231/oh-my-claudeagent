@@ -42,7 +42,7 @@ Create `agents/name.md` with YAML frontmatter:
 ---
 name: agent-name
 description: One-line role description
-model: claude-fable-5|claude-opus-4-8|claude-sonnet-5
+model: fable|opus|sonnet
 effort: max|xhigh|high|medium|low
 disallowedTools: Write, Edit  # use disallowedTools, NOT tools:
 memory: project                   # optional; enables persistent project memory
@@ -50,6 +50,7 @@ memory: project                   # optional; enables persistent project memory
 ```
 
 Key rules:
+- Declare the tier alias (`fable`, `opus`, `sonnet`) in `model:`, not a full generation ID. The alias tracks the platform's current model for that tier, so the frontmatter never goes stale.
 - Use `disallowedTools:` to restrict capabilities — never `tools:` (blocks MCP inheritance, [Known Limitations](../CLAUDE.md#agent-tools-allowlist-blocks-mcp-tool-inheritance))
 - Do not declare `permissionMode:` — it is stripped from plugin agents by Claude Code for security
 - Add the agent to the `<agent_catalog>` block in `templates/claudemd.md`
