@@ -61,9 +61,14 @@ binding.
      a fully-checked plan never appears in the selection list even if its registry
      entry hasn't been garbage-collected yet.
    - Plan files not yet in the registry, found by searching:
-     - `~/.claude/plans/*.md` (canonical native plans)
+     - `<plans-dir>/*.md` (canonical native plans)
      - `.omca/plans/*.md` (compatibility surface)
      labeled `[available]`.
+
+   `<plans-dir>` is the platform's plans directory: the `plansDirectory` setting when
+   it is set (a path relative to the project root), otherwise `~/.claude/plans`. Read
+   it from settings before globbing; with `plansDirectory` configured, the default
+   path holds nothing and a `~/.claude/plans` glob finds no platform-created plan.
 
 3. Merge results, deduplicate by absolute path.
 
@@ -202,6 +207,7 @@ Example delegation:
 ```text
 Agent(
   subagent_type="oh-my-claudeagent:executor",
+  run_in_background=false,
   prompt=`[FULL 6-SECTION PROMPT]`
 )
 ```
@@ -213,37 +219,56 @@ Agent(
 Parallel tasks: prepare ALL prompts, invoke in ONE message, wait, verify all.
 Sequential tasks: one at a time — real dependency, not comfort.
 
-For exploration agents (always background):
+**The platform runs subagents in the background unless you say otherwise.** A
+backgrounded agent gets a narrower built-in tool set and its result reaches you a
+turn later, so anything you need in this turn must carry `run_in_background=false`
+explicitly. Pass the flag at every call site rather than relying on a default.
+
+For exploration and research (result needed to plan the next step):
 ```text
-Agent(subagent_type="oh-my-claudeagent:explore", run_in_background=true, ...)
-Agent(subagent_type="oh-my-claudeagent:librarian", run_in_background=true, ...)
+Agent(subagent_type="oh-my-claudeagent:explore", run_in_background=false, ...)
+Agent(subagent_type="oh-my-claudeagent:librarian", run_in_background=false, ...)
 ```
 
-For task execution (never background):
+For task execution (result needed before the task can be marked complete):
 ```text
-Agent(subagent_type="oh-my-claudeagent:executor", prompt="...", ...)
+Agent(subagent_type="oh-my-claudeagent:executor", run_in_background=false, prompt="...", ...)
 ```
 
 Parallel task group (invoke in ONE message):
 ```text
 // Tasks 2, 3, 4 are independent — invoke together
-Agent(subagent_type="oh-my-claudeagent:executor", prompt="Task 2...")
-Agent(subagent_type="oh-my-claudeagent:executor", prompt="Task 3...")
-Agent(subagent_type="oh-my-claudeagent:executor", prompt="Task 4...")
+Agent(subagent_type="oh-my-claudeagent:executor", run_in_background=false, prompt="Task 2...")
+Agent(subagent_type="oh-my-claudeagent:executor", run_in_background=false, prompt="Task 3...")
+Agent(subagent_type="oh-my-claudeagent:executor", run_in_background=false, prompt="Task 4...")
 ```
+
+#### Parallel group width
+
+The platform refuses a spawn once 20 subagents are running concurrently
+(`CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS`), failing with `Concurrent subagent limit
+reached` and telling you not to retry. A plan's declared parallel group must stay
+under that ceiling: if a group lists more tasks than the ceiling allows, split it
+into sub-batches and run them back to back. Count agents already running from an
+earlier batch, since they still hold their slots.
+
+A session can spawn 200 subagents total (`CLAUDE_CODE_MAX_SUBAGENTS_PER_SESSION`),
+and a finished agent still counts. On a plan large enough to approach that, prefer
+one agent per task over one agent per file.
 
 ### 2.2 Result Collection
 
-Parallel groups run SYNCHRONOUSLY (multiple Agent calls in one message, NO
-`run_in_background`): every tool result returns inline when the batch completes —
-read each deliverable directly. Never Read a subagent's `.output`/JSONL transcript
-(overflows context), and never re-query a finished agent via `SendMessage` — a
-stub return IS the final answer; relaunch a fresh agent with a sharper prompt
-instead.
+Parallel groups run SYNCHRONOUSLY (multiple Agent calls in one message, each with
+`run_in_background=false`): every tool result returns inline when the batch
+completes — read each deliverable directly. Never Read a subagent's `.output`/JSONL
+transcript (overflows context), and never re-query a finished agent via
+`SendMessage` — a stub return IS the final answer; relaunch a fresh agent with a
+sharper prompt instead.
 
-Background (`run_in_background=true`) is reserved for genuine meanwhile-work or
-file-based-output skills. Then the deliverable arrives via the Agent tool result
-on completion — NOT the `<task-notification>` text (a trigger + output-file path).
+Background (`run_in_background=true`, the platform default) is reserved for genuine
+meanwhile-work or file-based-output skills. Then the deliverable arrives via the
+Agent tool result on completion — NOT the `<task-notification>` text (a trigger +
+output-file path).
 While notifications are pending and all remaining work depends on them, acknowledge
 briefly, say how many remain, and END the response; synthesize once every tool
 result is in. Never act on partial results.
@@ -296,6 +321,7 @@ Then run a single completeness review. Delegate to `executor`:
 ```text
 Agent(
   subagent_type="oh-my-claudeagent:executor",
+  run_in_background=false,
   prompt="[6-section completeness review prompt — read plan end-to-end, read diffs,
 check each requirement was implemented, check each constraint was honored.
 Output: COMPLETE or INCOMPLETE with specifics.]"

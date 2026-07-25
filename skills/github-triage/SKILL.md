@@ -67,6 +67,7 @@ Applies to: bug root cause (file + line), "feature exists" (cite where), "fix co
 | Agent type for ALL items | `oh-my-claudeagent:executor` |
 | Execution mode | `run_in_background=true` |
 | Parallelism | Bounded batches, max 5 concurrent agents |
+| Total items per run | 180 (session spawn budget is 200 and finished agents still count) |
 | Result storage | `issue-{number}.md` or `pr-{number}.md` under `/tmp/opencode/github-triage-{datetime}/` |
 | Final collection | Orchestrator reads all reports and writes `SUMMARY.md` |
 
@@ -125,7 +126,27 @@ For each item, determine its type from metadata only: title, labels, author, and
 
 ## PHASE 4: SPAWN 1 BACKGROUND AGENT PER ITEM
 
-For EVERY classified item, spawn one executor agent:
+### Total-item cap (apply BEFORE spawning anything)
+
+The batch-of-5 rule bounds concurrency only. A session can spawn 200 subagents total
+(`CLAUDE_CODE_MAX_SUBAGENTS_PER_SESSION`), and a finished agent keeps counting, so a
+repo with hundreds of open items will hit the ceiling mid-run and the remaining
+spawns fail with `Subagent spawn limit reached`.
+
+Cap this run at **180 items** (200 minus headroom for the orchestrator's own
+delegations). If the classified list is longer:
+
+1. Sort by `updatedAt` descending and take the first 180. Recently-touched items are
+   the ones a triage pass is for.
+2. Write the dropped items to `{OUTDIR}/SKIPPED.md`, one line per item: number,
+   type, title, `updatedAt`. Never truncate silently.
+3. State the count in `SUMMARY.md` and in your final message: how many items were
+   triaged, how many were skipped, and that `SKIPPED.md` lists them.
+
+A run that reports 180 of 340 items with the skipped list on disk is correct. A run
+that reports 180 items as if that were all of them is a wrong answer.
+
+For EVERY item that survives the cap, spawn one executor agent:
 
 ```python
 Agent(
@@ -420,10 +441,11 @@ Report format:
 
 ## PHASE 5: COLLECT RESULTS AND WRITE SUMMARY
 
-After all background agents complete, read every report file from `{OUTDIR}/`:
+After all background agents complete, read every per-item report from `{OUTDIR}/`
+(`SKIPPED.md` is not a report; carry its count into the summary instead):
 
 ```bash
-ls {OUTDIR}/*.md
+ls {OUTDIR}/issue-*.md {OUTDIR}/pr-*.md
 ```
 
 Produce a final summary at `{OUTDIR}/SUMMARY.md`:
@@ -484,8 +506,9 @@ When invoked:
 1. Create output directory: `/tmp/opencode/github-triage-{datetime}/`
 2. Fetch open issue + PR metadata via gh CLI (paginate if 500 reached; no body/comments initially)
 3. Classify each item (ISSUE_QUESTION, ISSUE_BUG, ISSUE_FEATURE, ISSUE_OTHER, PR_BUGFIX, PR_OTHER)
-4. For EACH item: `Agent(subagent_type="oh-my-claudeagent:executor", run_in_background=True, prompt=...)`
-5. Launch agents in bounded batches of up to 5 concurrent executors
-6. Collect reports from output directory once agents complete
-7. Write `{OUTDIR}/SUMMARY.md` with aggregated findings
-8. Report the output directory path to the user
+4. Apply the 180-item cap; log any overflow to `{OUTDIR}/SKIPPED.md`
+5. For EACH surviving item: `Agent(subagent_type="oh-my-claudeagent:executor", run_in_background=True, prompt=...)`
+6. Launch agents in bounded batches of up to 5 concurrent executors
+7. Collect reports from output directory once agents complete
+8. Write `{OUTDIR}/SUMMARY.md` with aggregated findings
+9. Report the output directory path to the user

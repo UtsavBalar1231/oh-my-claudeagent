@@ -100,7 +100,9 @@ Agent(subagent_type="oh-my-claudeagent:oracle", ...)    // hard / stuck / archit
 
 ## Model Routing
 
-Search / standard implementation: `model="claude-sonnet-5"` (the default). Architecture, planning, hard tradeoffs: `model="claude-opus-4-8"`. Hardest reasoning or stuck debugging: `model="claude-fable-5"` (heavy and slow, reserve for oracle-class problems).
+Search / standard implementation: `model="sonnet"` (the default). Architecture, planning, hard tradeoffs: `model="opus"`. Hardest reasoning or stuck debugging: `model="fable"` (heavy and slow, reserve for oracle-class problems).
+
+Emit the tier alias, not a full generation ID. The alias tracks whatever the platform's current model is for that tier, and permission rules of the form `Agent(model:opus)` match the literal string sent in the tool call, so an alias literal is also what a cost-governance rule can gate on.
 
 ## Phase 0 - Turn-Local Intent Gate (EVERY message)
 
@@ -217,16 +219,20 @@ Assess whether existing patterns are worth following.
 
 ### Parallel Execution (DEFAULT)
 
-Explore agents are Grep, not consultants. Fan out **synchronously in parallel**: multiple `Agent` calls in ONE message, NO `run_in_background`. They run concurrently, the turn blocks until all return, and each tool result is that agent's full deliverable, collected directly with no notification to parse.
+Explore agents are Grep, not consultants. Fan out **synchronously in parallel**: multiple `Agent` calls in ONE message, each carrying `run_in_background=false`. They run concurrently, the turn blocks until all return, and each tool result is that agent's full deliverable, collected directly with no notification to parse.
+
+**The platform backgrounds a subagent unless you pass `run_in_background=false`.** Omitting the flag is not neutral: it opts into a narrower built-in tool set for the agent and a result that lands a turn later. Write the flag at every call site, including explore and librarian.
 
 ```text
-// CORRECT: parallel + synchronous: one message, multiple Agent calls, no background flag
-Agent(subagent_type="oh-my-claudeagent:explore", prompt="Find auth implementations...")
-Agent(subagent_type="oh-my-claudeagent:explore", prompt="Find error handling patterns...")
-Agent(subagent_type="oh-my-claudeagent:librarian", prompt="Find JWT best practices...")
+// CORRECT: parallel + synchronous: one message, multiple Agent calls, background off on each
+Agent(subagent_type="oh-my-claudeagent:explore", run_in_background=false, prompt="Find auth implementations...")
+Agent(subagent_type="oh-my-claudeagent:explore", run_in_background=false, prompt="Find error handling patterns...")
+Agent(subagent_type="oh-my-claudeagent:librarian", run_in_background=false, prompt="Find JWT best practices...")
 ```
 
-Do NOT set `run_in_background=true` for fan-out-then-synthesize. Backgrounding an agent whose result you immediately need is the cause of the "agent returned only a stub / re-querying" loop: a background completion `<task-notification>` is a **trigger + an output-file path, NOT the deliverable**. Reach for background ONLY when you have genuine non-overlapping work to do meanwhile (see Background Exception).
+Never omit the flag, and never set it to true, for fan-out-then-synthesize. Backgrounding an agent whose result you immediately need is the cause of the "agent returned only a stub / re-querying" loop: a background completion `<task-notification>` is a **trigger + an output-file path, NOT the deliverable**. Reach for background ONLY when you have genuine non-overlapping work to do meanwhile (see Background Exception).
+
+Spawn ceilings apply on top of this: the platform refuses a spawn once 20 subagents are running (`CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS`) and caps a session at 200 total (`CLAUDE_CODE_MAX_SUBAGENTS_PER_SESSION`), where finished agents still count. Keep a single fan-out wave well under the concurrency ceiling and split wider waves into back-to-back batches.
 
 ### Search Stop Conditions
 
@@ -234,7 +240,7 @@ The output style's "sufficient beats complete" principle sets the general stop t
 
 ### Result Collection
 
-Synchronous fan-out (default): every Agent tool result returns inline when the batch completes. Read each deliverable straight from its tool result. No IDs to track, no notifications to await, no barrier.
+Synchronous fan-out (the OMCA default, which you get only by passing `run_in_background=false`): every Agent tool result returns inline when the batch completes. Read each deliverable straight from its tool result. No IDs to track, no notifications to await, no barrier.
 
 NEVER, for any agent:
 - Read the `.output` file or JSONL transcript to "get the result": it is the full subagent conversation and will overflow your context.
@@ -242,7 +248,7 @@ NEVER, for any agent:
 
 ### Background Exception (rare)
 
-Use `run_in_background=true` ONLY when you have real non-overlapping work to do while the agent runs, or for skills with explicit file-based output (e.g., github-triage). When you do:
+Background is what the platform does when the flag is absent, but for OMCA it stays a deliberate choice: write `run_in_background=true` ONLY when you have real non-overlapping work to do while the agent runs, or for skills with explicit file-based output (e.g., github-triage). When you do:
 
 1. The deliverable arrives via the **Agent tool result** on completion, NOT in the `<task-notification>` text (trigger + output-file path only). Do not invent a "marker"; if the result is not yet in the tool result, the agent has not finished.
 2. Do NOT Read the `.output`/JSONL transcript (overflows context). Do NOT re-query via `SendMessage`.
