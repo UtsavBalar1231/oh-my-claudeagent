@@ -5,6 +5,151 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Platform sync against Claude Code v2.1.199 through v2.1.220.
+
+### Fixed
+
+- **The Bash deny guards never ran when a command was auto-allowed.** This is a
+  pre-existing hole, not something the platform sync introduced.
+  `scripts/permission-filter.sh` and `scripts/git-destructive-deny.sh` were registered on
+  `PermissionRequest` only. That event fires when a permission dialog is about to be shown,
+  while `PreToolUse` fires before tool execution regardless of permission status, so under
+  `permissions.defaultMode: "auto"` a command the classifier allowed outright reached
+  neither guard. A headless `claude -p` turn ran `rm -rf` on a canary directory with no
+  denial and deleted it; the same command fed to the packaged script on stdin returned a
+  well-formed deny. The logic was correct and the wiring was absent, which is also why five
+  rounds of stdin-driven review passed it. Both denies are now also registered on
+  `PreToolUse` with matcher `Bash` and no `if` filter. The trusted-tooling auto-allow and
+  `git-destructive-deny.sh`'s trailing git allow stay on `PermissionRequest` alone, because
+  a `PreToolUse` allow skips the permission prompt and would bypass auto mode and the user's
+  own `ask` rules for those commands. Both scripts hold that line with an early `exit 0` on
+  `hook_event_name == PreToolUse`, placed after the deny and before the first allow.
+  Documented in `.claude/rules/hook-scripts.md` alongside the testing-methodology lesson,
+  that stdin proves a hook's logic and only a live session proves its registration.
+  Residual scope, indirect invocations such as `/bin/rm`, `command rm`, `env rm`, and an
+  `xargs` pipeline, is recorded in `docs/reference/known-issues.md`.
+- **Hook `timeout` was being read as milliseconds.** The field is seconds. The two
+  `"timeout": 5000` values in `hooks/hooks.json` were 83-minute caps, the opposite of the
+  intended five-second tightening, and are now `5`. The per-event default table is
+  documented alongside the note that a plugin-provided `timeout` can never raise the
+  `SessionEnd` budget, so raising that number does not fix the session-binding leak a
+  budget kill causes.
+- **A compound command could ride the trusted-tooling fast path.** Hook `if:` matching is
+  per-subcommand, so `jq . a.json & rm -rf ~/x` matched `Bash(jq *)` and reached the jq
+  auto-allow branch. The filter had no operator check at all, so every compound shape rode
+  the fast path. A command whose trimmed text contains `|`, `;`, `&`, `<`, `>`, a backtick,
+  `$(`, a literal newline, or a carriage return now falls through to the platform decision.
+  The bare `&` covers `&&` and `&>`; the newline covers multi-line commands; the carriage
+  return is hardening for shells that terminate a statement on a bare CR, which bash does
+  not. Globs, tilde, and `$VAR` expansion still take the fast path, since none of them can
+  introduce a second command. The `rm -rf` deny branch still runs first.
+- **The PermissionDenied retry signal sat in the wrong place.** `permission-denied-coach.sh`
+  returned `retry: true` at the top level of its JSON. The platform reads it only inside
+  `hookSpecificOutput`, so the flag was ignored and the model got the bare rejection with no
+  retry signal. Exit code and stderr are ignored on that event, which makes the JSON body the
+  hook's only channel.
+- **Both Stop hooks read the final assistant turn through a mechanism the docs warn
+  against.** They now read `last_assistant_message` from the payload first and keep the
+  transcript tail as a fallback, because the transcript is not guaranteed to hold the final
+  message at Stop time. drift-guard exists to catch a completion claim in that message, so
+  a miss there was a silent guard failure. The undocumented `.messages` probe is gone.
+- **`file_read` materialized whole files on bounded reads.** The reader called
+  `read_text().splitlines()` unconditionally and the size guard applied only to unbounded
+  reads, so a bounded read of a large file loaded all of it and could emit one unbounded
+  line into the caller's context. It now streams the requested window, still counts total
+  lines for the footer, and cuts any single line past 2000 characters with a truncation
+  marker.
+- **`session_search` missed spilled tool results.** Large tool outputs are spilled to
+  per-session sidecar files with only a preview left inline, so a flat transcript glob
+  under-reported on exactly the queries the tool exists for. Sidecars are now searched under
+  role `tool`, ordered by file mtime since they carry no timestamp. Subagent transcripts stay
+  out of scope, since a subagent's turns surface as its parent's tool result.
+- **MCP "not connected" errors produced no advice.** The `omca` server is plugin-provided, so
+  evidence and boulder calls fail during any reconnect window, and neither the bare nor the
+  wrapped form of that error matched a branch. The new branch points at connection status and
+  states that the evidence call must be retried rather than skipped.
+- **Platform spawn ceilings escalated to oracle.** The concurrency and session-cap errors hit
+  no branch and landed on retry advice that is unachievable for an infrastructure limit, with
+  the third occurrence tripping the three-strike breaker. Both now return before the counter.
+- **Every "no `run_in_background`" instruction described the opposite of what happens.**
+  Subagents background by default as of v2.1.198, with a narrower built-in tool set and the
+  result arriving a turn later. `run_in_background=false` is now explicit at every fan-out
+  call site; background stays deliberate where a skill writes files instead of returning a
+  deliverable.
+- **`~/.claude/plans` was hardcoded as both the authoring and the discovery surface.** With
+  `plansDirectory` set, plans were written where plan discovery no longer looked. Both sides
+  resolve the setting now.
+- **The hook event tables advertised events with no handler.** Nine events were listed as
+  handled, `PermissionDenied` was omitted despite being registered, and two references
+  pointed at scripts deleted in the v2.10 refactor. The table is regenerated from the
+  registry and a validator check diffs the two in both directions.
+- **`Write(.omca/**)` in the recommended allowlist now triggers a startup warning.** Path
+  rules for `Write`, `NotebookEdit`, and `Glob` are accepted but never match. `Edit` already
+  covers every file-editing tool, so the rule is dropped and the doctor flags it for
+  already-configured users.
+- **The documented `tools: Read` carve-out named an exception no shipped agent uses.** Since
+  `tools:` is a strict allowlist whose mis-listing launches an agent with zero tools, the
+  carve-out invited a contributor to restore it. Any `tools:` key now fails CI.
+- **The loop detector's window could carry a streak across a user turn.** It resets on either
+  a signature or a `prompt_id` change now. An absent field compares equal, so older clients
+  behave as before.
+
+### Added
+
+- **Tier aliases in agent frontmatter.** Every agent now declares `opus`, `sonnet`, or `fable`
+  instead of a pinned generation id, so a provider resolves each tier to the newest generation
+  its allowlist permits and nothing goes stale on the next model release. The subagent-start
+  display map gained alias arms while keeping its full-id arms as frontmatter compatibility,
+  and `omca-setup` no longer writes `ANTHROPIC_DEFAULT_OPUS_MODEL`, since a default-model pin
+  overrides the alias.
+- **Quoted paths on every command hook handler.** Each handler invokes a path under the
+  marketplace cache in the user's home directory, where a space anywhere in the path splits an
+  unquoted shell-form invocation, so every `command` value now quotes the placeholder. The
+  handlers stay in shell form: exec form spawns `command` as a real executable with no shell,
+  and a `.sh` file is not executable on native Windows, so every hook would fail to spawn there
+  with no error signal.
+- **Spinner labels on the handlers whose latency is felt.** Session init, context injection,
+  the comment gate, and the error-recovery family. Deliberately not blanket-applied.
+- **`background: false` on the forked skills.** Forked skills background by default from
+  v2.1.218, and a backgrounded fork gets the narrower background-subagent tool set. Pinning
+  `false` keeps the plan-review verdict inline and keeps build-fix edits inside checkpoint
+  coverage.
+- **`disable-model-invocation: true` on handoff.** Replaces a workaround that told users to
+  disable the whole plugin, and retires a settings recommendation that never applied to
+  plugin skills. The `handoff` keyword is now described as an advisory nudge everywhere.
+- **Per-task effort and context-window rendering in the subagent statusline.** The per-task
+  `effort` value is a bare string or int, not the main line's dict. A percentage-of-window row
+  replaces the raw token count when the platform supplies the window size.
+- **MCP connect diagnostics in the doctor.** The health check probed only the stdio server and
+  punted on the two HTTP ones, which is where connection status and error text actually
+  surface. Hidden whitespace in a configured URL is named as a cause of a URL that looks
+  correct but never connects.
+- **A total-item cap on batch triage.** The item ceiling is enforced before any spawn, with
+  overflow written to an explicit skipped list rather than silently truncated.
+- **Agent `name:` values containing a colon fail CI.** The platform hard-rejects such an agent
+  at load time; the scaffold now refuses to create one.
+
+### Changed
+
+- **Stop hooks block via decision control instead of exit 2.** The plan-continuation guard,
+  the final-verification gate, and the completion-stub guard write Stop decision JSON
+  (`decision` plus `reason`) and exit 0 instead of writing to stderr and exiting 2. The
+  task-completion gate is the only turn-gate or task-gate hook left that blocks via exit 2.
+  The PreToolUse and PermissionRequest deny hooks still block by exiting 2, which is one of the
+  two shapes those events accept: both also accept a JSON deny decision, PreToolUse through
+  `hookSpecificOutput.permissionDecision` and PermissionRequest through
+  `hookSpecificOutput.decision.behavior`. Exit 2 is the shape those three hooks keep.
+- **`--doctor` is namespaced and scoped.** The platform's `/doctor` (alias `/checkup`) is now
+  fix-capable, so OMCA's own read-only report is written as
+  `/oh-my-claudeagent:omca-setup --doctor` and "fix my setup" routes to the built-in.
+- **`DirectoryAdded` is tracked, not adopted.** The event exists as a changelog line with no
+  matcher table or input schema, so a handler would be built on a guessed payload.
+- **The nesting-depth prose no longer names a number.** The platform default moved twice in
+  this window, and the docs page still describes the older behavior, so agent prose is written
+  to be correct under either value and the research spawn is explicitly optional.
+
 ## [2.13.2] - 2026-07-20
 
 Repairs the comment checker, whose slop-detection rules could not fire on realistic
