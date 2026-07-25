@@ -5,7 +5,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/gc-in-use-markers.sh"
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/gc-in-use-markers.sh\""
 					}
 				]
 			},
@@ -13,7 +13,9 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/session-init.sh"
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/session-init.sh\"",
+						"timeout": 5,
+						"statusMessage": "Loading OMCA session context"
 					}
 				]
 			},
@@ -22,7 +24,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/post-compact-inject.sh"
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/post-compact-inject.sh\""
 					}
 				]
 			}
@@ -32,7 +34,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/keyword-detector.sh"
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/keyword-detector.sh\""
 					}
 				]
 			}
@@ -42,7 +44,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/slash-command-mode-detector.sh"
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/slash-command-mode-detector.sh\""
 					}
 				]
 			}
@@ -52,7 +54,8 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/subagent-start.sh"
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/subagent-start.sh\"",
+						"timeout": 5
 					}
 				]
 			}
@@ -96,7 +99,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/write-guard.sh"
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/write-guard.sh\""
 					}
 				]
 			},
@@ -105,7 +108,9 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/comment-checker.sh"
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/comment-checker.sh\"",
+						"timeout": 5,
+						"statusMessage": "Checking comments"
 					}
 				]
 			},
@@ -133,63 +138,63 @@
 				"hooks": [
 					{
 						"type": "command",
-						"if": "Bash(rm *)",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh"
+						"if": "Bash(*rm *)",
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh\""
 					},
 					{
 						"type": "command",
 						"if": "Bash(npm *)",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh"
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh\""
 					},
 					{
 						"type": "command",
 						"if": "Bash(jq *)",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh"
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh\""
 					},
 					{
 						"type": "command",
 						"if": "Bash(uv *)",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh"
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh\""
 					},
 					{
 						"type": "command",
-						"if": "Bash(sudo *)",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh"
+						"if": "Bash(*sudo *)",
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh\""
 					},
 					{
 						"type": "command",
 						"if": "Bash(bun *)",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh"
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh\""
 					},
 					{
 						"type": "command",
 						"if": "Bash(yarn *)",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh"
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh\""
 					},
 					{
 						"type": "command",
 						"if": "Bash(pnpm *)",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh"
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh\""
 					},
 					{
 						"type": "command",
 						"if": "Bash(git *)",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/git-destructive-deny.sh"
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/git-destructive-deny.sh\""
 					},
 					{
 						"type": "command",
 						"if": "Bash(sed *)",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/sed-grep-deny.sh"
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/sed-grep-deny.sh\""
 					},
 					{
 						"type": "command",
 						"if": "Bash(grep *)",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/sed-grep-deny.sh"
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/sed-grep-deny.sh\""
 					},
 					{
 						"type": "command",
 						"if": "Bash(grep *)",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/executor-grep-deny.sh"
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/executor-grep-deny.sh\""
 					}
 				]
 			},
@@ -198,7 +203,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/plan-mode-handler.sh"
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/plan-mode-handler.sh\""
 					}
 				]
 			}
@@ -208,7 +213,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/permission-denied-coach.sh"
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/permission-denied-coach.sh\""
 					}
 				]
 			}
@@ -219,7 +224,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/post-edit.sh",
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/post-edit.sh\"",
 						"async": true
 					}
 				]
@@ -229,7 +234,9 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/context-injector.sh"
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/context-injector.sh\"",
+						"timeout": 5,
+						"statusMessage": "Injecting project context"
 					}
 				]
 			},
@@ -238,7 +245,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/plan-format-warn.sh"
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/plan-format-warn.sh\""
 					}
 				]
 			},
@@ -247,7 +254,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/empty-task-response.sh"
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/empty-task-response.sh\""
 					}
 				]
 			},
@@ -256,7 +263,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/tool-loop-detector.sh"
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/tool-loop-detector.sh\""
 					}
 				]
 			},
@@ -265,7 +272,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/delegation-reminder.sh"
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/delegation-reminder.sh\""
 					}
 				]
 			},
@@ -274,7 +281,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/delegation-reminder.sh"
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/delegation-reminder.sh\""
 					}
 				]
 			}
@@ -285,7 +292,8 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/edit-error-recovery.sh"
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/edit-error-recovery.sh\"",
+						"statusMessage": "Analyzing Edit failure"
 					}
 				]
 			},
@@ -294,7 +302,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/delegate-retry.sh"
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/delegate-retry.sh\""
 					}
 				]
 			},
@@ -303,7 +311,8 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/bash-error-recovery.sh"
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/bash-error-recovery.sh\"",
+						"statusMessage": "Analyzing Bash failure"
 					}
 				]
 			},
@@ -312,7 +321,8 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/read-error-recovery.sh"
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/read-error-recovery.sh\"",
+						"statusMessage": "Analyzing Read failure"
 					}
 				]
 			},
@@ -320,7 +330,8 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/json-error-recovery.sh"
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/json-error-recovery.sh\"",
+						"statusMessage": "Analyzing tool-output failure"
 					}
 				]
 			}
@@ -330,7 +341,8 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/plan-continuation-guard.sh"
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/plan-continuation-guard.sh\"",
+						"timeout": 5
 					}
 				]
 			},
@@ -338,7 +350,8 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/final-verification-evidence.sh"
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/final-verification-evidence.sh\"",
+						"timeout": 5
 					}
 				]
 			},
@@ -346,7 +359,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/drift-guard.sh"
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/drift-guard.sh\""
 					}
 				]
 			}
@@ -356,7 +369,8 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/pre-compact.sh"
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/pre-compact.sh\"",
+						"timeout": 5
 					}
 				]
 			}
@@ -366,8 +380,8 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/session-cleanup.sh",
-						"timeout": 5000
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/session-cleanup.sh\"",
+						"timeout": 5
 					}
 				]
 			}
@@ -377,7 +391,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/task-completed-verify.sh"
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/task-completed-verify.sh\""
 					}
 				]
 			}
