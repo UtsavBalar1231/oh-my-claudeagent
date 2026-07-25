@@ -241,3 +241,22 @@ hook_is_disabled() {
 	done
 	return 1
 }
+
+# Block a Stop with <reason> and exit 0. `decision`+`reason` is the pair that
+# prevents the stop; hookSpecificOutput.additionalContext is the platform's
+# non-blocking alternative for the event, not a modifier, so emitting both
+# would deliver the same text twice. A block is signalled by stdout alone, so
+# the static fallback keeps a jq failure from turning a block into an allow.
+# Usage: block_exit "<reason text>"
+block_exit() {
+	local reason="$1"
+	local payload
+	if payload=$(jq -n --arg reason "${reason}" '{"decision":"block","reason":$reason}' 2>/dev/null) \
+		&& [[ -n "${payload}" ]]; then
+		printf '%s\n' "${payload}"
+	else
+		log_hook_error "jq failed to encode Stop block reason, emitting static block payload" "$(basename "$0")"
+		printf '%s\n' '{"decision":"block","reason":"An OMCA Stop gate blocked this stop but its reason text could not be encoded. See .omca/logs/hook-errors.jsonl."}'
+	fi
+	exit 0
+}

@@ -45,6 +45,15 @@ fi
 
 EVIDENCE_FILE=$(resolve_evidence_file "${STATE_DIR}")
 
+# A registry that exists but does not parse resolves to `{}`, the same result
+# as no registry at all, which would read as "no bound plan" and disable this
+# gate invisibly. Say so on stderr; plan-continuation-guard.sh is the gate that
+# refuses the stop on this condition, so this one does not block too.
+if [[ -f "${STATE_DIR}/boulder.json" ]] && ! jq -e . "${STATE_DIR}/boulder.json" >/dev/null 2>&1; then
+	log_hook_error "boulder.json is not valid JSON, plan state unresolvable" "$(basename "$0")"
+	echo "[FINAL VERIFICATION] ${STATE_DIR}/boulder.json is not valid JSON, so no plan resolves and this gate is not enforcing. Repair or delete the file." >&2
+fi
+
 # Resolve via the shared shim (never hand-parse boulder.json), --strict: only
 # an explicit binding resolves, `{}` when the registry is empty or this
 # session was never bound to anything — an unbound session must never be
@@ -73,8 +82,7 @@ fi
 # Fail-closed on corrupt evidence file
 if [[ -f "${EVIDENCE_FILE}" ]]; then
 	if ! jq -e '.entries | arrays' "${EVIDENCE_FILE}" >/dev/null 2>&1; then
-		echo "[FINAL VERIFICATION] Evidence file corrupt — refusing to allow Stop until manually repaired." >&2
-		exit 2
+		block_exit "[FINAL VERIFICATION] Evidence file corrupt. Repair ${EVIDENCE_FILE} before stopping."
 	fi
 fi
 
@@ -101,5 +109,4 @@ if [[ "${HAS_VERDICT}" == "true" ]]; then
 fi
 
 # Plan complete, no matching final_verification evidence — block Stop
-echo "[FINAL VERIFICATION] Plan '${ACTIVE_PLAN}' fully checked but no matching final_verification evidence found. Call evidence_log(evidence_type=\"final_verification\", command=\"<your verdict>\", exit_code=0, output_snippet=\"...\", plan_sha256=\"${PLAN_SHA256}\") to open the gate. Set OMCA_HOOK_DISABLE_FINAL_VERIFY=1 to bypass." >&2
-exit 2
+block_exit "[FINAL VERIFICATION] Plan '${ACTIVE_PLAN}' fully checked but no matching final_verification evidence found. Call evidence_log(evidence_type=\"final_verification\", command=\"<your verdict>\", exit_code=0, output_snippet=\"...\", plan_sha256=\"${PLAN_SHA256}\") to open the gate. Set OMCA_HOOK_DISABLE_FINAL_VERIFY=1 to bypass."

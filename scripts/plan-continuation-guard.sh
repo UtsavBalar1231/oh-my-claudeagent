@@ -11,7 +11,7 @@
 # Rails, in order (each exits 0 before any counter mutation): (1) recursion
 # guard, (2) kill switch, (3) no bound/missing plan, (4) no unchecked boxes,
 # (5) user-pause intent, (6) recent compaction stamp, (7) stale binding with no
-# fresh evidence, (8) assistant's last message is a question, (9) counters:
+# fresh evidence, (8) assistant needs user input, (9) counters:
 # exponential cooldown, hard cap, stagnation escape.
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
@@ -19,6 +19,7 @@ source "$(dirname "$0")/lib/common.sh"
 STATE_DIR="${HOOK_STATE_DIR}"
 PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(dirname "$0")/..}"
 STATE_FILE="${STATE_DIR}/plan-continuation.json"
+BOULDER_FILE="${STATE_DIR}/boulder.json"
 
 # 60s: rail 6 compaction-recency window: a compaction just happened, give the
 # session a moment to resettle before nudging it to keep going.
@@ -63,6 +64,16 @@ if hook_is_disabled "plan-continuation-guard"; then
 	noop_exit
 fi
 
+# A registry that exists but does not parse is not the same state as no
+# registry: boulder_resolve.py prints `{}` for both, so a parse failure would
+# read as "this session has no plan" and silently disable plan-scoped
+# enforcement. Refuse the stop until it is repaired; the sibling gate stays
+# quiet on this condition so one cause never fires two gates.
+if [[ -f "${BOULDER_FILE}" ]] && ! jq -e . "${BOULDER_FILE}" >/dev/null 2>&1; then
+	log_hook_error "boulder.json is not valid JSON, plan state unresolvable" "$(basename "$0")"
+	block_exit "[PLAN CONTINUATION] ${BOULDER_FILE} is not valid JSON, so this session's plan state cannot be resolved and plan-scoped enforcement is off. Repair or delete the file (boulder_write rewrites it), then stop again. Set OMCA_DISABLED_HOOKS=plan-continuation-guard to bypass."
+fi
+
 # Rail 3: resolve the session's bound plan via the shared shim (never
 # hand-parse boulder.json), mirrors final-verification-evidence.sh exactly so
 # both hooks agree on which plan, if any, this session is bound to. --strict:
@@ -84,36 +95,17 @@ if [[ "${INCOMPLETE}" -eq 0 ]]; then
 	noop_exit
 fi
 
-# --- Shared transcript/message text extraction -----------------------------
-# The Stop payload is confirmed (via final-verification-evidence.sh and
-# drift-guard.sh) to carry `.stop_hook_active` and `.transcript_path`. An
-# inline `.messages` array is read defensively first (unconfirmed but cheap to
-# probe) before falling back to tailing the transcript file, matching the
-# pattern drift-guard.sh already uses for assistant text. Transcript lines are
-# JSONL with `.type` and `.message.role` both set to the speaker's role; this
-# mirrors drift-guard.sh's assistant extraction, generalized to a $role param;
-# unconfirmed for the "user" role specifically since no prior hook reads it,
-# so this rail is best-effort and fails toward skipping (exit 0) on any
-# extraction failure, per the pause rail's own uncertainty-favors-pause intent.
-extract_from_messages() {
+# --- Transcript text extraction --------------------------------------------
+# Transcript lines are JSONL with `.type` and `.message.role` both set to the
+# speaker's role. The payload carries no user-side message field, so the user
+# rail below has to read the transcript; that makes it best-effort and it fails
+# toward skipping (exit 0) on any extraction failure, per the pause rail's own
+# uncertainty-favors-pause intent.
+extract_last_transcript_text() {
 	local role="$1"
-	jq -r --arg role "${role}" '
-		(.messages // empty) as $msgs
-		| ($msgs | map(select(.role == $role)) | last) as $last
-		| if $last == null then empty
-		  else
-		    ($last.content) as $c
-		    | if ($c | type) == "string" then $c
-		      else ($c // [] | map(select(.type == "text") | .text) | join("\n"))
-		      end
-		  end
-	' <<< "${HOOK_INPUT}" 2>/dev/null
-}
-
-extract_from_transcript() {
-	local transcript="$1"
-	local role="$2"
-	local line text
+	local transcript line text
+	transcript=$(jq -r '.transcript_path // ""' <<< "${HOOK_INPUT}" 2>/dev/null)
+	[[ -n "${transcript}" && -f "${transcript}" ]] || return 1
 	while IFS= read -r line; do
 		text=$(jq -r --arg role "${role}" '
 			select(.type == $role and (.message.role == $role))
@@ -130,24 +122,10 @@ extract_from_transcript() {
 	return 1
 }
 
-extract_last_text() {
-	local role="$1"
-	local text
-	text=$(extract_from_messages "${role}")
-	if [[ -z "${text}" || "${text}" == "null" ]]; then
-		local transcript_path
-		transcript_path=$(jq -r '.transcript_path // ""' <<< "${HOOK_INPUT}" 2>/dev/null)
-		if [[ -n "${transcript_path}" && -f "${transcript_path}" ]]; then
-			text=$(extract_from_transcript "${transcript_path}" "${role}")
-		fi
-	fi
-	printf '%s' "${text}"
-}
-
 # Rail 5: user-pause intent. Conservative, word-boundary, case-insensitive
 # phrase list. Apostrophes are stripped from both text and pattern so
 # "that's enough" matches without fighting bash quoting.
-USER_TEXT=$(extract_last_text "user")
+USER_TEXT=$(extract_last_transcript_text "user")
 if [[ -n "${USER_TEXT}" && "${USER_TEXT}" != "null" ]]; then
 	LOWER_USER_TEXT=$(tr '[:upper:]' '[:lower:]' <<< "${USER_TEXT}" | tr -d "'")
 	PAUSE_RE='\b(pause|stop here|thats enough|later|hold off|take a break)\b'
@@ -174,7 +152,6 @@ fi
 # Best-effort proxy for "evidence logged this session": the evidence file's
 # mtime relative to bound_at (per-session evidence timestamps aren't cheaply
 # separable from other sessions' entries in this file).
-BOULDER_FILE="${STATE_DIR}/boulder.json"
 if [[ -f "${BOULDER_FILE}" ]]; then
 	SESSION_ID_FOR_BINDING=$(resolve_session_id)
 	BOUND_AT=$(jq -r --arg sid "${SESSION_ID_FOR_BINDING}" '.bindings[$sid].bound_at // empty' "${BOULDER_FILE}" 2>/dev/null)
@@ -193,16 +170,47 @@ if [[ -f "${BOULDER_FILE}" ]]; then
 	fi
 fi
 
-# Rail 8: assistant's last message ends in a question. Heuristic: trailing
-# whitespace trimmed, text ends in "?". "Directed at the user" isn't reliably
-# separable from rhetorical/code-quoted question marks with the fields
-# available, so this stays intentionally simple and conservative.
-ASSISTANT_TEXT=$(extract_last_text "assistant")
+# Rail 8: the assistant needs user input before it can continue. Two signals are
+# accepted, either alone: the '## BLOCKING QUESTIONS' heading a subagent must
+# emit because AskUserQuestion is unavailable to it, or a main-session turn that
+# actually called AskUserQuestion. A trailing "?" is deliberately not a signal:
+# the model authors punctuation freely, so it would let any turn end mid-plan.
+BLOCKING_QUESTIONS_RE='^[[:space:]]*#{1,6}[[:space:]]*BLOCKING QUESTIONS'
+
+# The payload's `.last_assistant_message` is authoritative; the transcript file
+# may not hold the turn's final message yet, so it is only a fallback.
+ASSISTANT_TEXT=$(jq -r '.last_assistant_message // ""' <<< "${HOOK_INPUT}" 2>/dev/null)
+if [[ -z "${ASSISTANT_TEXT}" || "${ASSISTANT_TEXT}" == "null" ]]; then
+	ASSISTANT_TEXT=$(extract_last_transcript_text "assistant")
+fi
 if [[ -n "${ASSISTANT_TEXT}" && "${ASSISTANT_TEXT}" != "null" ]]; then
-	TRIMMED_ASSISTANT_TEXT="${ASSISTANT_TEXT%"${ASSISTANT_TEXT##*[![:space:]]}"}"
-	if [[ -n "${TRIMMED_ASSISTANT_TEXT}" && "${TRIMMED_ASSISTANT_TEXT}" == *\? ]]; then
+	if grep -qiE "${BLOCKING_QUESTIONS_RE}" <<< "${ASSISTANT_TEXT}"; then
 		noop_exit
 	fi
+fi
+
+# A tool call carries no payload field at Stop, so the transcript is the only
+# place the call is observable: an assistant record whose content array holds a
+# `tool_use` named AskUserQuestion. Scanning backwards stops at the first real
+# human prompt (a user record with no tool_result in its content), which bounds
+# the scan to the current turn so a question answered several turns ago cannot
+# keep granting the escape. Any extraction failure yields no signal, and no
+# signal means the guard falls through and blocks.
+turn_invoked_ask_user_question() {
+	local transcript signal
+	transcript=$(jq -r '.transcript_path // ""' <<< "${HOOK_INPUT}" 2>/dev/null)
+	[[ -n "${transcript}" && -f "${transcript}" ]] || return 1
+	signal=$(tac "${transcript}" 2>/dev/null | jq -r -n 'first(
+		inputs
+		| if (.type == "assistant" and (any(.message.content[]?; .type == "tool_use" and .name == "AskUserQuestion"))) then "ask"
+		  elif (.type == "user" and .message.role == "user" and (([.message.content[]? | .type] | index("tool_result")) == null)) then "boundary"
+		  else empty end
+	) // "none"' 2>/dev/null)
+	[[ "${signal}" == "ask" ]]
+}
+
+if turn_invoked_ask_user_question; then
+	noop_exit
 fi
 
 # --- Rail 9: counters, cooldown, hard cap, stagnation -----------------------
@@ -241,11 +249,17 @@ LAST_UNCHECKED_COUNT=$(jq_read "${STATE_FILE}" '.last_unchecked_count // -1')
 SAME_COUNT_RUN=$(jq_read "${STATE_FILE}" '.same_count_run // 0')
 STAGNATED=$(jq_read "${STATE_FILE}" '.stagnated // false')
 
-# Any state field that failed to parse to the expected type is a corrupt/edge
-# state file, fail open rather than risk arithmetic on garbage.
+# A field that did not parse to the expected type means the counters are
+# unusable, not that the plan is finished: restart the window instead of
+# allowing the stop, so writing garbage here cannot switch the gate off. The
+# next block rewrites the file with well-typed values.
 if ! [[ "${CONSECUTIVE_BLOCKS}" =~ ^[0-9]+$ && "${LAST_BLOCK_AT}" =~ ^[0-9]+$ && "${LAST_UNCHECKED_COUNT}" =~ ^-?[0-9]+$ && "${SAME_COUNT_RUN}" =~ ^[0-9]+$ ]]; then
-	log_hook_error "plan-continuation.json has malformed counters, failing open" "$(basename "$0")"
-	noop_exit
+	log_hook_error "plan-continuation.json has malformed counters, restarting the window" "$(basename "$0")"
+	CONSECUTIVE_BLOCKS=0
+	LAST_BLOCK_AT=0
+	LAST_UNCHECKED_COUNT=-1
+	SAME_COUNT_RUN=0
+	STAGNATED=false
 fi
 
 if [[ "${STAGNATED}" == "true" ]]; then
@@ -285,10 +299,10 @@ else
 fi
 NEW_CONSECUTIVE_BLOCKS=$(( CONSECUTIVE_BLOCKS + 1 ))
 
-if ! write_continuation_state "${NEW_CONSECUTIVE_BLOCKS}" "${NOW}" "${INCOMPLETE}" "${NEW_SAME_COUNT_RUN}" "false"; then
-	noop_exit
-fi
+# The counters only tune backoff and the hard cap; the block decision above
+# does not read them, so a failed persist must not become an allow. The failure
+# is already logged inside write_continuation_state.
+write_continuation_state "${NEW_CONSECUTIVE_BLOCKS}" "${NOW}" "${INCOMPLETE}" "${NEW_SAME_COUNT_RUN}" "false" || true
 
 NEXT_TASK=$(grep -m1 -E '^- \[ \] [0-9]+\.' "${ACTIVE_PLAN}" | sed -E 's/^- \[ \] [0-9]+\.[[:space:]]*//')
-echo "[PLAN CONTINUATION] The bound plan '${PLAN_NAME}' still has ${INCOMPLETE} unchecked tasks (next: ${NEXT_TASK}). If you believe the work is complete, re-examine each unchecked item skeptically; finish it or record in the plan notepad why it cannot proceed." >&2
-exit 2
+block_exit "[PLAN CONTINUATION] The bound plan '${PLAN_NAME}' still has ${INCOMPLETE} unchecked tasks (next: ${NEXT_TASK}). If you believe the work is complete, re-examine each unchecked item skeptically; finish it or record in the plan notepad why it cannot proceed."

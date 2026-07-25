@@ -33,23 +33,11 @@ if [[ "${STOP_HOOK_ACTIVE}" == "true" ]]; then
 	noop_exit
 fi
 
-# --- Extract the last assistant text: inline `.messages` array, or fall back
-# to tailing `.transcript_path` (Task 0 probe: Stop payload confirmed to carry
-# transcript_path; `.messages` is not confirmed but read defensively first).
-extract_from_messages() {
-	jq -r '
-		(.messages // empty) as $msgs
-		| ($msgs | map(select(.role == "assistant")) | last) as $last
-		| if $last == null then empty
-		  else
-		    ($last.content) as $c
-		    | if ($c | type) == "string" then $c
-		      else ($c // [] | map(select(.type == "text") | .text) | join("\n"))
-		      end
-		  end
-	' <<< "${HOOK_INPUT}" 2>/dev/null
-}
-
+# --- Extract the last assistant text. The Stop payload's
+# `.last_assistant_message` is the authoritative source: the transcript file is
+# written asynchronously and is not guaranteed to hold the final message of the
+# turn yet. Tailing the transcript stays as a fallback for older clients that
+# don't send the field.
 extract_from_transcript() {
 	local transcript="$1"
 	local line text
@@ -69,7 +57,7 @@ extract_from_transcript() {
 	return 1
 }
 
-ASSISTANT_TEXT=$(extract_from_messages)
+ASSISTANT_TEXT=$(jq -r '.last_assistant_message // ""' <<< "${HOOK_INPUT}" 2>/dev/null)
 if [[ -z "${ASSISTANT_TEXT}" || "${ASSISTANT_TEXT}" == "null" ]]; then
 	TRANSCRIPT_PATH=$(jq -r '.transcript_path // ""' <<< "${HOOK_INPUT}" 2>/dev/null)
 	if [[ -n "${TRANSCRIPT_PATH}" && -f "${TRANSCRIPT_PATH}" ]]; then
@@ -124,6 +112,12 @@ MARKER_TODO='TODO: implement'                                       # explicit u
 MARKER_NOT_IMPL='throw new [A-Za-z]*Error\(["'"'"'].*not implemented' # stub throw for an unimplemented code path
 MARKER_PATTERN="${MARKER_ONLY}|${MARKER_TODO}|${MARKER_NOT_IMPL}"
 
+# A bats `@test "..."` line is a test name, not code: a suite that documents
+# markers (this guard's own suite included) otherwise matches its description of
+# what it looks for. Only the declaration line is exempt, so a real stub inside
+# a test body still gets caught.
+BATS_TEST_DECL='^[[:space:]]*@test[[:space:]]'
+
 # New-file-relative added line numbers for a tracked file's unstaged+staged
 # diff against HEAD. Only `+` lines advance the new-line counter; hunk headers
 # (@@ -a,b +c,d @@) reset it to c per hunk.
@@ -160,6 +154,7 @@ scan_file() {
 	local lineno rest
 	while IFS=: read -r lineno rest; do
 		[[ -z "${lineno}" ]] && continue
+		[[ "${rest}" =~ ${BATS_TEST_DECL} ]] && continue
 		if [[ "${untracked}" == "true" ]] || grep -qxF "${lineno}" <<< "${added_lines}"; then
 			FINDINGS+="${file}:${lineno}  ${rest}"$'\n'
 		fi
@@ -180,7 +175,6 @@ if [[ -z "${FINDINGS}" ]]; then
 	noop_exit
 fi
 
-echo "[DRIFT GUARD] Completion claimed but stub markers remain on added/untracked lines:" >&2
-echo "${FINDINGS}" >&2
-echo "[DRIFT GUARD] Resolve the stubs before claiming done, or stop claiming completion. Set OMCA_HOOK_DISABLE_DRIFT_GUARD=1 to bypass." >&2
-exit 2
+block_exit "[DRIFT GUARD] Completion claimed but stub markers remain on added/untracked lines:
+${FINDINGS}
+Resolve the stubs before claiming done, or stop claiming completion. Set OMCA_HOOK_DISABLE_DRIFT_GUARD=1 to bypass."

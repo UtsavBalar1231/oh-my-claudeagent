@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 # Behavioral tests for final-verification-evidence.sh — single-check completeness gate.
-# The hook blocks Stop (exit 2) iff the active plan is fully checked AND no
+# The hook blocks Stop (decision: block) iff the active plan is fully checked AND no
 # final_verification evidence entry (exit_code=0) exists AND stop_hook_active is false.
 # A single logged entry of type "final_verification" opens the gate permanently.
 
@@ -78,6 +78,13 @@ _write_final_verification_evidence_scoped() {
 		> "${CLAUDE_PROJECT_ROOT}/.omca/evidence/verification-evidence.json"
 }
 
+# A Stop block is exit 0 with the decision on stdout.
+_assert_blocked() {
+	assert_success
+	[ "$(jq -r '.decision' <<< "$output")" = "block" ]
+	[ -n "$(jq -r '.reason // ""' <<< "$output")" ]
+}
+
 # ---------------------------------------------------------------------------
 # (a) No active boulder — nothing to enforce (exit 0)
 # ---------------------------------------------------------------------------
@@ -105,14 +112,14 @@ _write_final_verification_evidence_scoped() {
 # (c) All checkboxes done, no final_verification evidence — block Stop
 # ---------------------------------------------------------------------------
 
-@test "final-verification-evidence: complete plan with no evidence blocks Stop (exit 2)" {
+@test "final-verification-evidence: complete plan with no evidence blocks Stop" {
 	local plan_file="${BATS_TEST_TMPDIR}/complete-plan.md"
 	_write_complete_plan "${plan_file}"
 	_write_boulder "${plan_file}"
 	# No evidence written
 
 	run_hook "final-verification-evidence.sh" '{}'
-	[ "$status" -eq 2 ]
+	_assert_blocked
 	echo "$output" | grep -qi "final_verification"
 }
 
@@ -193,14 +200,14 @@ EOF
 # (h) final_verification evidence with exit_code=1 (INCOMPLETE) does not open gate
 # ---------------------------------------------------------------------------
 
-@test "final-verification-evidence: final_verification with exit_code=1 does not open gate (exit 2)" {
+@test "final-verification-evidence: final_verification with exit_code=1 does not open gate" {
 	local plan_file="${BATS_TEST_TMPDIR}/complete-plan.md"
 	_write_complete_plan "${plan_file}"
 	_write_boulder "${plan_file}"
 	_write_final_verification_evidence 1
 
 	run_hook "final-verification-evidence.sh" '{}'
-	[ "$status" -eq 2 ]
+	_assert_blocked
 }
 
 # ---------------------------------------------------------------------------
@@ -218,7 +225,7 @@ EOF
 # (j) Corrupt evidence file — corruption guard fires (exit 2, explicit message)
 # ---------------------------------------------------------------------------
 
-@test "final-verification-evidence: corrupt evidence file triggers corruption guard (exit 2)" {
+@test "final-verification-evidence: corrupt evidence file triggers corruption guard" {
 	local plan_file="${BATS_TEST_TMPDIR}/corrupt-evidence-plan.md"
 	_write_complete_plan "${plan_file}"
 	_write_boulder "${plan_file}"
@@ -228,7 +235,7 @@ EOF
 		> "${CLAUDE_PROJECT_ROOT}/.omca/evidence/verification-evidence.json"
 
 	run_hook "final-verification-evidence.sh" '{}'
-	[ "$status" -eq 2 ]
+	_assert_blocked
 	echo "$output" | grep -qi "corrupt"
 }
 
@@ -236,7 +243,7 @@ EOF
 # (k) Other evidence types present but no final_verification — gate still blocks
 # ---------------------------------------------------------------------------
 
-@test "final-verification-evidence: non-final evidence types do not open gate (exit 2)" {
+@test "final-verification-evidence: non-final evidence types do not open gate" {
 	local plan_file="${BATS_TEST_TMPDIR}/complete-plan.md"
 	_write_complete_plan "${plan_file}"
 	_write_boulder "${plan_file}"
@@ -250,7 +257,7 @@ EOF
 	]}" > "${CLAUDE_PROJECT_ROOT}/.omca/evidence/verification-evidence.json"
 
 	run_hook "final-verification-evidence.sh" '{}'
-	[ "$status" -eq 2 ]
+	_assert_blocked
 }
 
 # ---------------------------------------------------------------------------
@@ -273,14 +280,14 @@ EOF
 # (m) plan_sha256 scoping: non-matching entry does not open the gate
 # ---------------------------------------------------------------------------
 
-@test "final-verification-evidence: mismatched plan_sha256 entry blocks Stop (exit 2)" {
+@test "final-verification-evidence: mismatched plan_sha256 entry blocks Stop" {
 	local plan_file="${BATS_TEST_TMPDIR}/complete-plan.md"
 	_write_complete_plan "${plan_file}"
 	_write_boulder "${plan_file}"
 	_write_final_verification_evidence_scoped "0000000000000000000000000000000000000000000000000000000000000000" 0
 
 	run_hook "final-verification-evidence.sh" '{}'
-	[ "$status" -eq 2 ]
+	_assert_blocked
 }
 
 # ---------------------------------------------------------------------------
@@ -291,6 +298,14 @@ EOF
 	# No boulder.json written at all — the shim resolves to {} for this session.
 	run_hook "final-verification-evidence.sh" '{}'
 	assert_success
+}
+
+@test "final-verification-evidence: unparseable boulder.json says the gate is off instead of going quiet" {
+	printf 'NOT JSON {' > "${CLAUDE_PROJECT_ROOT}/.omca/state/boulder.json"
+
+	run_hook "final-verification-evidence.sh" '{}'
+	assert_success
+	assert_output --partial "not valid JSON"
 }
 
 # ---------------------------------------------------------------------------
@@ -348,7 +363,7 @@ EOF
 	unset OMCA_DISABLED_HOOKS
 }
 
-@test "final-verification-evidence: OMCA_DISABLED_HOOKS listing a different hook does not bypass the gate (exit 2)" {
+@test "final-verification-evidence: OMCA_DISABLED_HOOKS listing a different hook does not bypass the gate" {
 	local plan_file="${BATS_TEST_TMPDIR}/complete-plan.md"
 	_write_complete_plan "${plan_file}"
 	_write_boulder "${plan_file}"
@@ -356,7 +371,7 @@ EOF
 
 	export OMCA_DISABLED_HOOKS="other-hook"
 	run_hook "final-verification-evidence.sh" '{}'
-	[ "$status" -eq 2 ]
+	_assert_blocked
 	unset OMCA_DISABLED_HOOKS
 }
 
@@ -370,4 +385,30 @@ EOF
 	run_hook "final-verification-evidence.sh" '{}'
 	assert_success
 	unset OMCA_HOOK_DISABLE_FINAL_VERIFY
+}
+
+# ---------------------------------------------------------------------------
+# Shared block_exit helper: stdout is the only block signal, so a jq failure
+# must not degrade a block into an allow.
+# ---------------------------------------------------------------------------
+
+@test "block_exit: falls back to a static block payload when jq cannot encode the reason" {
+	run env HOOK_INPUT='{}' bash -c '
+		source "'"${CLAUDE_PLUGIN_ROOT}"'/scripts/lib/common.sh"
+		jq() { return 1; }
+		block_exit "reason that cannot be encoded"
+	'
+	assert_success
+	[ "$(jq -r '.decision' <<< "$output")" = "block" ]
+	[ -n "$(jq -r '.reason // ""' <<< "$output")" ]
+}
+
+@test "block_exit: emits only the blocking pair, no additionalContext duplicate" {
+	run env HOOK_INPUT='{}' bash -c '
+		source "'"${CLAUDE_PLUGIN_ROOT}"'/scripts/lib/common.sh"
+		block_exit "plain reason"
+	'
+	assert_success
+	[ "$(jq -r '.reason' <<< "$output")" = "plain reason" ]
+	[ "$(jq -r 'has("hookSpecificOutput")' <<< "$output")" = "false" ]
 }

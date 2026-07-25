@@ -26,7 +26,14 @@ _commit_all() {
 
 _claim_payload() {
 	local text="$1"
-	jq -n --arg t "$text" '{"hook_event_name":"Stop","stop_hook_active":false,"messages":[{"role":"assistant","content":$t}]}'
+	jq -n --arg t "$text" '{"hook_event_name":"Stop","stop_hook_active":false,"last_assistant_message":$t}'
+}
+
+# A Stop block is exit 0 with the decision on stdout.
+_assert_blocked() {
+	assert_success
+	[ "$(jq -r '.decision' <<< "$output")" = "block" ]
+	[ -n "$(jq -r '.reason // ""' <<< "$output")" ]
 }
 
 @test "drift-guard: clean repo with completion claim allows Stop" {
@@ -38,13 +45,13 @@ _claim_payload() {
 	assert_output '{}'
 }
 
-@test "drift-guard: .only marker on an added line blocks with exit 2" {
+@test "drift-guard: .only marker on an added line blocks Stop" {
 	echo "hello" > a.txt
 	_commit_all
 	echo "it.only('t', () => {})" >> a.txt
 
 	run_hook "drift-guard.sh" "$(_claim_payload 'Done, all tests pass.')"
-	assert_failure 2
+	_assert_blocked
 	assert_output --partial "a.txt"
 	assert_output --partial "only"
 }
@@ -59,13 +66,13 @@ _claim_payload() {
 	assert_output '{}'
 }
 
-@test "drift-guard: untracked new stub file blocks with exit 2" {
+@test "drift-guard: untracked new stub file blocks Stop" {
 	echo "hello" > a.txt
 	_commit_all
 	echo "TODO: implement" > new.txt
 
 	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
-	assert_failure 2
+	_assert_blocked
 	assert_output --partial "new.txt"
 }
 
@@ -107,7 +114,7 @@ _claim_payload() {
 	assert_output --partial "Kill switch"
 }
 
-@test "drift-guard: assistant text extracted from transcript_path when messages is absent" {
+@test "drift-guard: assistant text extracted from transcript_path when last_assistant_message is absent" {
 	echo "hello" > a.txt
 	_commit_all
 	echo "TODO: implement" > new.txt
@@ -122,7 +129,7 @@ EOF
 	payload=$(jq -n --arg tp "$transcript" '{"hook_event_name":"Stop","stop_hook_active":false,"transcript_path":$tp}')
 
 	run_hook "drift-guard.sh" "$payload"
-	assert_failure 2
+	_assert_blocked
 	assert_output --partial "new.txt"
 }
 
@@ -134,6 +141,30 @@ EOF
 	run_hook "drift-guard.sh" "$(_claim_payload 'This is not done yet.')"
 	assert_success
 	assert_output '{}'
+}
+
+# Both fixtures assemble the marker from split literals so that this suite is
+# not itself a finding: the guard scans the file it writes, not the line here.
+@test "drift-guard: a marker inside a bats test name is not a finding" {
+	echo "hello" > a.txt
+	_commit_all
+	local marker=".on""ly"
+	printf '@test "guard: %s marker on an added line blocks Stop" {\n\ttrue\n}\n' "$marker" > suite.bats
+
+	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
+	assert_success
+	assert_output '{}'
+}
+
+@test "drift-guard: a marker in a bats test body is still a finding" {
+	echo "hello" > a.txt
+	_commit_all
+	local body="it.on""ly(\"x\")"
+	printf '@test "guard: something" {\n\t%s\n}\n' "$body" > suite.bats
+
+	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
+	_assert_blocked
+	assert_output --partial "suite.bats"
 }
 
 @test "drift-guard: HOOK_INPUT_TIMED_OUT=1 warns and allows Stop" {
