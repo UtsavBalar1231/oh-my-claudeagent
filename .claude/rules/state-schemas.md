@@ -133,6 +133,32 @@ checkboxes at all is never considered complete.
    `.omca/state/boulder.json.lock` — the same lock file `boulder.py` uses for its
    read-modify-write, so the two writers never race. Runs only when the end reason is
    not `"resume"`. Never deletes `plans` entries.
+
+   **This layer is not guaranteed to run to completion.** The platform's `SessionEnd` budget
+   is 1.5 seconds, and it is raised only by a per-hook `timeout` found in a *settings file*;
+   a `timeout` declared in a plugin-provided `hooks.json` never raises it. So
+   `session-cleanup.sh` can be killed mid-write, leaving this session's binding in place, and
+   recovery falls to layer 2 on the next `SessionStart`. The handler's `"timeout": 5` is a
+   five-second *cap*, not a budget raise: raising that number does not extend the budget and
+   does not fix the leak. The only lever is the user-side
+   `CLAUDE_CODE_SESSIONEND_HOOKS_TIMEOUT_MS` env var (milliseconds). A related hazard from the
+   same window applied to `SessionStart`, not `SessionEnd`: hook events did not stream during
+   `SessionStart` hooks in headless sessions, so a remote worker could be idle-reaped mid-hook
+   and leave `session-init.sh`'s state resets half applied. Fixed in v2.1.204.
+
+   A second correctness trap on this layer: a forked session's `SessionStart` used to wipe the
+   live parent's per-subagent model map, dedup map, and counters, and overwrite the shared
+   session file so the parent's `SessionEnd` deleted the wrong binding. `session-init.sh` now
+   branches on the payload's `source`. Per the docs' `SessionStart` matcher table, `"fork"`
+   covers `--fork-session` with `--resume` or `--continue`, the `/fork` background copy, and
+   `/branch`; a plain background dispatch is not automatically `"startup"`, and before
+   v2.1.214 forks reported `"resume"`. Only `"fork"` skips the shared-state resets and the
+   `session.json` write; `startup`, `resume`, `clear`, and `compact` still own the full reset,
+   because each is either the same session continuing or a new session with no concurrent
+   peer. `session-cleanup.sh` prefers the payload's own `session_id` when pruning a binding,
+   with the session-file fallback retained for payloads that carry no id, and it skips the
+   shared-file deletions and directory sweeps entirely when `session.json` records a different
+   session id, so an ending fork cannot strip a live parent's state.
 2. **Self-heal, at `SessionStart`**: `scripts/session-init.sh` runs the stdlib-only
    `boulder_gc.py` shim (`gc_prune_unbound()` in `_boulder_core.py`) under the same
    lock. It drops bindings that reference nonexistent plans, then prunes any plan
@@ -426,11 +452,21 @@ subagent instance).
 
 **Model resolution**: strip the `oh-my-claudeagent:` prefix from `agent_type`,
 read `${CLAUDE_PLUGIN_ROOT}/agents/<name>.md` frontmatter `model:`, map via a
-small case statement (`claude-fable-5`→`Fable 5`, `claude-opus-4-8`→`Opus 4.8`,
-`claude-sonnet-5`→`Sonnet 5`, `sonnet`→`Sonnet`, `haiku`→`Haiku`, else the raw
-value). Non-OMCA
+small case statement. Tier aliases are what agent frontmatter declares, so those are the
+live arms: `opus`→`Opus`, `sonnet`→`Sonnet`, `fable`→`Fable`,
+`haiku`→`Haiku`. Full ids stay as arms only for frontmatter compatibility, in case an agent
+file pins a generation again; the hook never reads the spawning call:
+`claude-fable-5`→`Fable 5`, `claude-opus-5`→`Opus 5`,
+`claude-opus-4-8`→`Opus 4.8`, `claude-sonnet-5`→`Sonnet 5`,
+`claude-haiku-4-5`→`Haiku 4.5`. An empty `model:` maps to `""`; anything else falls
+through to the raw value. Non-OMCA
 agent types (e.g. `explore`, `general-purpose`) have no matching frontmatter
 file, so `model` is stored as `""` and the renderer shows no model.
+
+This field records the *frontmatter* model, not the effective one. Before v2.1.211 a
+subagent model override was reverted on resume, so the two could diverge; that divergence is
+exactly why `statusline/subagent.py` prefers the payload's own model field over this file
+when both are present.
 
 **Example**:
 ```json
@@ -513,13 +549,15 @@ the next matching tool call)
 | Field | Type | Description |
 |---|---|---|
 | `signature` | string | First 16 hex chars of `sha256(canonicalized {tool_name, tool_input})` — `jq -cS` sorts object keys so key-order differences never desync the signature |
-| `count` | integer | Consecutive calls sharing this exact signature; resets to 1 on any signature change |
+| `count` | integer | Consecutive calls sharing this exact signature and `prompt_id`; resets to 1 when either changes |
+| `prompt_id` | string | UUID of the user prompt in flight when the slot was written. Empty string when the client predates v2.1.196 or no user input has happened yet |
 
 **Example**:
 ```json
 {
   "signature": "a1b2c3d4e5f6a7b8",
-  "count": 2
+  "count": 2,
+  "prompt_id": "550e8400-e29b-41d4-a716-446655440000"
 }
 ```
 
@@ -527,6 +565,19 @@ the next matching tool call)
 a `PostToolUse` `additionalContext` nudge exactly once for that streak (not on
 every call after the 3rd) — the counter keeps incrementing past 3 but the
 emit is gated on `count == 3` specifically.
+
+The count resets to 1 when EITHER `signature` OR `prompt_id` changes, so a repeat carried
+across a user turn boundary no longer reads as the 3rd call of a streak. State files written
+by older versions carry no `prompt_id` and compare equal to an absent field, so there is
+nothing to migrate.
+
+**Known scoping gap**: this is a single global slot shared by the main session and every
+concurrent subagent. Interleaved subagent calls can shred a real streak (false negative),
+and less often three unrelated agents issuing the same call can trip the nudge (false
+positive). The correct scoping key is `agent_id`, not `prompt_id`; `prompt_id` only fixes
+the turn-boundary case. Fixing it properly means either keying the state file per
+`agent_id` or moving to a small keyed map with GC on `SubagentStop`, which is a decision,
+not a patch. Tracked in `docs/reference/known-issues.md`.
 
 ---
 
@@ -584,3 +635,17 @@ All state files are written atomically: `tmp=$(mktemp) && jq ... > "$tmp" && mv 
 target.json`. Never write to state files directly; use the designated MCP tools or hook
 scripts. `verification-evidence.json` additionally rejects direct writes via the
 `write-guard.sh` PreToolUse hook.
+
+### Platform transcript layout (read-only, not OMCA state)
+
+`session_search` reads the platform's own transcript tree under
+`~/.claude/projects/<slug>/`, which is not an OMCA-owned schema and must never be written
+to. Two layout facts the tool depends on:
+
+- A large tool result is spilled to `<slug>/<session>/tool-results/*.txt` and only a
+  preview stays inline in the `.jsonl`, so a flat `*.jsonl` glob under-reports. The sidecar
+  is searched under role `tool`, with its timestamp synthesized from file mtime since the
+  file carries none.
+- `<slug>/<session>/subagents/` holds subagent turns and is deliberately out of scope: a
+  subagent's own turns surface as its parent's tool result, so including them would
+  double-count the same text.
