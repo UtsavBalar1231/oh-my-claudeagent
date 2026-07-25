@@ -151,6 +151,39 @@ run_cleanup() {
 	assert_success
 }
 
+@test "session-cleanup: prunes the binding named by the payload, not the one in session.json" {
+	write_state "session.json" '{"sessionId":"sess-parent"}'
+	write_state "boulder.json" '{
+		"plans": {"my-plan": {"active_plan": "/tmp/plan.md", "session_ids": ["sess-parent", "sess-fork"], "agent": "sisyphus"}},
+		"bindings": {
+			"sess-parent": {"plan_name": "my-plan", "bound_at": "2026-01-01T00:00:00Z"},
+			"sess-fork": {"plan_name": "my-plan", "bound_at": "2026-01-01T00:00:00Z"}
+		}
+	}'
+
+	run_cleanup '{"hook_event_name":"SessionEnd","reason":"stop","session_id":"sess-fork"}'
+	assert_success
+
+	local boulder_file="$CLAUDE_PROJECT_ROOT/.omca/state/boulder.json"
+	run jq -e '.bindings | has("sess-fork")' "$boulder_file"
+	assert_failure
+	run jq -e '.bindings | has("sess-parent")' "$boulder_file"
+	assert_success
+}
+
+@test "session-cleanup: leaves shared state alone when another session owns session.json" {
+	write_state "session.json" '{"sessionId":"sess-parent"}'
+	write_state "recent-edits.json" '{"files":["a.sh"]}'
+	write_state "injected-context-dirs.json" '{"/parent/dir|100":"true"}'
+
+	run_cleanup '{"hook_event_name":"SessionEnd","reason":"stop","session_id":"sess-fork"}'
+	assert_success
+
+	assert [ -f "$CLAUDE_PROJECT_ROOT/.omca/state/session.json" ]
+	assert [ -f "$CLAUDE_PROJECT_ROOT/.omca/state/recent-edits.json" ]
+	assert [ -f "$CLAUDE_PROJECT_ROOT/.omca/state/injected-context-dirs.json" ]
+}
+
 @test "session-cleanup: no-ops the binding prune when session id is unknown" {
 	write_state "boulder.json" '{
 		"plans": {"my-plan": {"active_plan": "/tmp/plan.md", "session_ids": ["sess-x"], "agent": "sisyphus"}},

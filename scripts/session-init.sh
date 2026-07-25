@@ -61,8 +61,19 @@ if [[ -f "${COUNTS_FILE}" ]] && jq -e 'has("Task:delegate_error")' "${COUNTS_FIL
 fi
 
 SESSION_STATE="${STATE_DIR}/session.json"
-TMP_FILE=$(mktemp)
 TS=$(date -Iseconds)
+
+# .omca/state/ is per-project and shared by every session in the project. Source
+# "fork" (--fork-session with --resume or --continue, the /fork background copy,
+# or /branch) means a second session is running alongside a live parent, so it
+# must not reset shared files or stamp its own id into session.json. startup,
+# resume, clear and compact are the same session continuing or a new session with
+# no concurrent peer, so they own the reset.
+SESSION_SOURCE=$(jq -r '.source // ""' <<< "${HOOK_INPUT}")
+OWNS_SHARED_STATE=1
+if [[ "${SESSION_SOURCE}" == "fork" ]]; then
+	OWNS_SHARED_STATE=0
+fi
 
 DATE_CONTEXT=$(LC_TIME=C date '+%A %B %d %Y %H' 2>/dev/null || echo "")
 if [[ -n "${DATE_CONTEXT}" ]]; then
@@ -72,20 +83,25 @@ else
 	DATE_BLOCK=""
 fi
 
-jq -n \
-	--arg sid "${SESSION_ID}" \
-	--arg ts "${TS}" \
-	--arg root "${PROJECT_ROOT}" \
-	'{sessionId: $sid, startedAt: $ts, projectRoot: $root, subagents: [], edits: [], activeMode: null}' \
-	>"${TMP_FILE}" && mv "${TMP_FILE}" "${SESSION_STATE}"
+if (( OWNS_SHARED_STATE )); then
+	TMP_FILE=$(mktemp)
+	jq -n \
+		--arg sid "${SESSION_ID}" \
+		--arg ts "${TS}" \
+		--arg root "${PROJECT_ROOT}" \
+		'{sessionId: $sid, startedAt: $ts, projectRoot: $root, subagents: [], edits: [], activeMode: null}' \
+		>"${TMP_FILE}" && mv "${TMP_FILE}" "${SESSION_STATE}"
+fi
 
 LOG_FILE="${LOG_DIR}/sessions.jsonl"
 jq -nc --arg sid "${SESSION_ID}" --arg ts "${TS}" --arg cwd "${PROJECT_ROOT}" \
 	'{event: "session_start", sessionId: $sid, timestamp: $ts, cwd: $cwd}' >>"${LOG_FILE}"
 
-echo '{}' >"${STATE_DIR}/injected-context-dirs.json"
-echo '{}' >"${STATE_DIR}/subagent-models.json"
-rm -f "${STATE_DIR}/plan-continuation.json" "${STATE_DIR}/tool-loop-window.json" "${STATE_DIR}/delegation-counter.json"
+if (( OWNS_SHARED_STATE )); then
+	echo '{}' >"${STATE_DIR}/injected-context-dirs.json"
+	echo '{}' >"${STATE_DIR}/subagent-models.json"
+	rm -f "${STATE_DIR}/plan-continuation.json" "${STATE_DIR}/tool-loop-window.json" "${STATE_DIR}/delegation-counter.json"
+fi
 mkdir -p "${STATE_DIR}/worktrees"
 
 if [[ -n "${DATE_BLOCK}" ]]; then

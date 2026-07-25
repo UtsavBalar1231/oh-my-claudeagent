@@ -7,21 +7,37 @@ LOG_DIR="${HOOK_LOG_DIR}"
 REASON=$(jq -r '.reason // "other"' <<< "${HOOK_INPUT}")
 
 SESSION_STATE="${STATE_DIR}/session.json"
-SESSION_ID="unknown"
+RECORDED_SESSION_ID=""
 if [[ -f "${SESSION_STATE}" ]]; then
-	SESSION_ID=$(jq_read "${SESSION_STATE}" '.sessionId // "unknown"' "unknown")
+	RECORDED_SESSION_ID=$(jq_read "${SESSION_STATE}" '.sessionId // ""' "")
 fi
 
 TIMESTAMP=$(date -Iseconds)
 
 ERROR_COUNT=$(wc -l <"${LOG_DIR}/hook-errors.jsonl" 2>/dev/null || echo 0)
 
+# The payload's own id names the session that is actually ending. session.json
+# holds whichever session last claimed the shared state, which is a different
+# session for a fork, so trusting it would prune the wrong boulder binding.
+# Fall back to the recorded id for payloads that carry no session_id.
+SESSION_ID=$(jq -r '.session_id // ""' <<< "${HOOK_INPUT}")
+SESSION_ID="${SESSION_ID:-${RECORDED_SESSION_ID}}"
+SESSION_ID="${SESSION_ID:-unknown}"
+
+# Shared per-project state belongs to the session recorded in session.json. When
+# the ending session is a different one, deleting those files would strip a live
+# session's context. Its own boulder binding is still pruned below.
+OWNS_SHARED_STATE=1
+if [[ -n "${RECORDED_SESSION_ID}" ]] && [[ "${SESSION_ID}" != "${RECORDED_SESSION_ID}" ]]; then
+	OWNS_SHARED_STATE=0
+fi
+
 LOG_FILE="${LOG_DIR}/sessions.jsonl"
 jq -nc --arg sid "${SESSION_ID}" --arg ts "${TIMESTAMP}" \
 	--argjson err "${ERROR_COUNT}" \
 	'{event: "session_end", sessionId: $sid, timestamp: $ts, hook_errors: $err}' >>"${LOG_FILE}"
 
-if [[ "${REASON}" != "resume" ]]; then
+if [[ "${REASON}" != "resume" ]] && (( OWNS_SHARED_STATE )); then
 	TEMP_FILES=(
 		"${STATE_DIR}/session.json"
 		"${STATE_DIR}/recent-edits.json"
@@ -55,10 +71,13 @@ if [[ "${REASON}" != "resume" ]]; then
 		-delete 2>/dev/null || true
 
 	find "${LOG_DIR}" -name "*.jsonl" -mtime +7 -delete 2>/dev/null || true
+fi
 
+if [[ "${REASON}" != "resume" ]]; then
 	# Authoritative binding GC: drop this session's boulder.json binding under the
 	# same flock the MCP writer (boulder.py) uses. boulder_write's age-prune is
-	# only a backstop for sessions that never hit SessionEnd cleanly.
+	# only a backstop for sessions that never hit SessionEnd cleanly. Runs even
+	# when another session owns the shared state: a binding is per session id.
 	BOULDER_FILE_PATH="${STATE_DIR}/boulder.json"
 	BOULDER_LOCK_PATH="${STATE_DIR}/boulder.json.lock"
 	if [[ -n "${SESSION_ID}" ]] && [[ "${SESSION_ID}" != "unknown" ]] \
