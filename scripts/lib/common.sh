@@ -22,16 +22,21 @@ ERROR_COUNT_DECAY_SECONDS=300
 
 mkdir -p "${HOOK_STATE_DIR}" "${HOOK_LOG_DIR}" 2>/dev/null
 
+# Messages carry caller-supplied text: file paths, quoted findings, error
+# output. jq builds the record so a quote or backslash in that text cannot
+# break the line, which shell interpolation could not guarantee.
 log_hook_error() {
 	local msg="$1"
 	local hook_name="${2:-$(basename "$0")}"
-	echo "{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"hook\":\"${hook_name}\",\"error\":\"${msg}\"}" >>"${HOOK_LOG_DIR}/hook-errors.jsonl" 2>/dev/null
+	jq -cn --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg hook "${hook_name}" --arg msg "${msg}" \
+		'{timestamp: $ts, hook: $hook, error: $msg}' >>"${HOOK_LOG_DIR}/hook-errors.jsonl" 2>/dev/null
 }
 
 log_hook_info() {
 	local msg="$1"
 	local hook_name="${2:-$(basename "$0")}"
-	echo "{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"level\":\"info\",\"hook\":\"${hook_name}\",\"message\":\"${msg}\"}" >>"${HOOK_LOG_DIR}/hook-info.jsonl" 2>/dev/null
+	jq -cn --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg hook "${hook_name}" --arg msg "${msg}" \
+		'{timestamp: $ts, level: "info", hook: $hook, message: $msg}' >>"${HOOK_LOG_DIR}/hook-info.jsonl" 2>/dev/null
 }
 
 # Bump the error counter for <key> in error-counts.json: increments count,

@@ -324,7 +324,13 @@ fi
 # strip-everything overcorrection the project's comment policy forbids.
 PROTECTED="Do NOT remove other comments while fixing this: file headers, non-obvious function contracts, invariant notes, and magic-number derivation comments are REQUIRED by .claude/rules/hook-scripts.md. Resubmit the same code change with only the quoted comments fixed. Genuine exceptions: put comment-checker-disable-file in the first 5 lines of the hunk."
 
+# Usage: deny <reason text> <tier label>
 deny() {
+	# Log before emitting: without this the audit trail holds shadow-mode
+	# would-denies and nothing at all once the gate is enforcing. The tier label
+	# rather than the reason keeps the entry short enough to scan; the quoted
+	# finding text lives in the deny message the model receives.
+	log_hook_info "denied ($2) ${FILE_PATH}" "$(basename "$0")"
 	jq -nc --arg reason "$1" \
 		'{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: $reason}}'
 	exit 0
@@ -348,7 +354,7 @@ if [[ "${GATE_MODE}" != "deny" ]]; then
 fi
 
 if [[ -n "${TIER1}" ]]; then
-	deny "Blocked: AI-attribution or placeholder comment. ${TIER1}${PROTECTED}"
+	deny "Blocked: AI-attribution or placeholder comment. ${TIER1}${PROTECTED}" "tier1"
 fi
 
 if [[ -z "${TIER2}" ]]; then
@@ -374,4 +380,4 @@ tmp=$(mktemp) \
 	&& jq -nc --arg sig "${SIG}" --arg f "${FILE_PATH}" '{signature: $sig, file_path: $f}' > "${tmp}" \
 	&& mv "${tmp}" "${GATE_STATE}"
 
-deny "Blocked: comment slop. ${TIER2}${PROTECTED}"
+deny "Blocked: comment slop. ${TIER2}${PROTECTED}" "tier2"
