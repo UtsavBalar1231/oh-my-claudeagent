@@ -55,6 +55,12 @@ _STATUS_COLOR = {
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 _MODEL_ID_RE = re.compile(r"^claude-([a-z]+)-(\d+)(?:-(\d+))?$")
 
+# Mirrors the alias arms in scripts/subagent-start.sh: both resolve the same
+# alias (payload field here, state file there) and a row must not change case
+# depending on which answered. `best`/`opusplan` name no generation, so they
+# are deliberately absent and pass through unchanged.
+_MODEL_ALIASES = frozenset({"opus", "sonnet", "fable", "haiku"})
+
 # Observed-but-undocumented platform placeholder labels for a task's
 # name/type when it hasn't (or can't) resolve a real agent name. Treated as
 # "no name" so the state-file lookup gets a chance to supply the real one.
@@ -84,10 +90,13 @@ def _friendly_model(model_id: str) -> str:
     (e.g. ``claude-sonnet-5`` -> ``Sonnet 5``, ``claude-opus-4-8`` ->
     ``Opus 4.8``) -- this must match the format the SubagentStart hook
     stores in ``subagent-models.json`` so rows never flicker between
-    formats depending on which source resolved them. Ids that don't match
-    the pattern (bare names, empty string, unrecognized future formats)
-    pass through unchanged.
+    formats depending on which source resolved them. A bare tier alias in
+    ``_MODEL_ALIASES`` becomes its capitalized, generation-less label for the
+    same reason. Anything else (empty string, unrecognized future formats)
+    passes through unchanged.
     """
+    if model_id in _MODEL_ALIASES:
+        return model_id.capitalize()
     match = _MODEL_ID_RE.match(model_id)
     if not match:
         return model_id
@@ -165,6 +174,25 @@ def _dump_payload(raw: str) -> None:
         pass
 
 
+def _effort_label(task: dict) -> str:
+    """Render a task's ``effort`` value, or "" when the field is absent.
+
+    The per-task field is a bare value, not the main status line's
+    ``{"level": ...}`` dict: either one of the level strings (low, medium,
+    high, xhigh, max) or a numeric token budget, which renders compact.
+    Absence means the subagent inherits the session level, and the session
+    level already shows on the main line, so nothing is rendered for it.
+    """
+    effort = task.get("effort")
+    if isinstance(effort, bool) or effort is None:
+        return ""
+    if isinstance(effort, int):
+        return _format_tokens(effort)
+    if isinstance(effort, str):
+        return effort.strip()
+    return ""
+
+
 def _visible_truncate(s: str, width: int) -> str:
     """Truncate to `width` visible columns, passing ANSI codes through untouched."""
     if width <= 0:
@@ -203,9 +231,21 @@ def _render_row(
         color = _STATUS_COLOR.get(status, DIM)
         parts.append(f"{color}{status}{RST}")
 
+    effort = _effort_label(task)
+    if effort:
+        effort_glyph = "" if nerd else "E:"  # nf-fa-bolt
+        parts.append(f"{YELLOW}{effort_glyph} {effort}{RST}")
+
     token_count = task.get("tokenCount")
     if isinstance(token_count, int) and token_count > 0:
-        parts.append(f"{DIM}{_format_tokens(token_count)} tok{RST}")
+        window = task.get("contextWindowSize")
+        # A percentage is comparable across rows running on different windows;
+        # the raw count is all that can be shown when the window is unknown.
+        if isinstance(window, int) and window > 0:
+            pct = min(100.0, token_count / window * 100.0)
+            parts.append(f"{DIM}{pct:.0f}% ctx{RST}")
+        else:
+            parts.append(f"{DIM}{_format_tokens(token_count)} tok{RST}")
 
     return _visible_truncate(SEP.join(parts), columns)
 

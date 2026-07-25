@@ -386,6 +386,26 @@ class TestComposeLine1:
         assert "n" in line
         assert has_extra is True
 
+    @pytest.mark.parametrize("level", ["low", "medium", "high", "xhigh", "max"])
+    def test_documented_effort_levels_render(
+        self, level: str, git_info_empty: GitInfo
+    ) -> None:
+        data: StatuslinePayload = {
+            "model": {"display_name": "claude"},
+            "effort": {"level": level},
+        }
+        glyphs = self._glyphs()
+        line, has_extra = _compose_line1(data, glyphs, git_info_empty, nerd=False)
+        assert f"E: {level}" in line
+        assert has_extra is True
+
+    def test_absent_effort_renders_no_token(self, git_info_empty: GitInfo) -> None:
+        data: StatuslinePayload = {"model": {"display_name": "claude"}}
+        glyphs = self._glyphs()
+        line, has_extra = _compose_line1(data, glyphs, git_info_empty, nerd=False)
+        assert "E:" not in line
+        assert has_extra is False
+
     def test_git_status_counts_shown(self, git_info_active: GitInfo) -> None:
         data: StatuslinePayload = {
             "model": {"display_name": "claude"},

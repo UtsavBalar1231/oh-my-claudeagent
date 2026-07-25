@@ -489,9 +489,11 @@ def _compose_line1(
     display_name = model.get("display_name", "Claude")
     parts.append(f"{CYAN}{glyphs['model']} {display_name}{RST}")
 
-    # Effort level — only render when non-normal to reduce noise
-    effort_level = (data.get("effort") or {}).get("level", "normal")
-    if effort_level and effort_level != "normal":
+    # Effort level. The platform enum is low|medium|high|xhigh|max and the
+    # default varies by model, so no single value is safe to suppress. An
+    # absent field already means the model has no effort selector.
+    effort_level = str((data.get("effort") or {}).get("level") or "").strip()
+    if effort_level:
         effort_glyph = "" if nerd else "E:"  # nf-fa-bolt
         parts.append(f"{YELLOW}{effort_glyph} {effort_level}{RST}")
         has_extra = True

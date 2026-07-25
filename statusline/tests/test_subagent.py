@@ -114,8 +114,18 @@ class TestFriendlyModel:
     def test_haiku_4_5(self) -> None:
         assert _friendly_model("claude-haiku-4-5") == "Haiku 4.5"
 
-    def test_non_matching_id_passes_through(self) -> None:
-        assert _friendly_model("sonnet") == "sonnet"
+    def test_tier_aliases_match_the_hook_labels(self) -> None:
+        # scripts/subagent-start.sh maps these same four aliases to these same
+        # labels; a mismatch makes a row change case depending on whether the
+        # payload field or the state file resolved it.
+        assert _friendly_model("opus") == "Opus"
+        assert _friendly_model("sonnet") == "Sonnet"
+        assert _friendly_model("fable") == "Fable"
+        assert _friendly_model("haiku") == "Haiku"
+
+    def test_tier_only_alias_passes_through(self) -> None:
+        assert _friendly_model("best") == "best"
+        assert _friendly_model("opusplan") == "opusplan"
 
     def test_empty_string_stays_empty(self) -> None:
         assert _friendly_model("") == ""
@@ -253,6 +263,44 @@ class TestRenderRow:
         row = _render_row(task, models, self._glyphs(), False, 80)
         assert "librarian" in row
         assert "local_agent" not in row
+
+    def test_effort_string_rendered(self) -> None:
+        task = {"id": "a", "name": "executor", "status": "running", "effort": "xhigh"}
+        row = _render_row(task, {}, self._glyphs(), False, 80)
+        assert "E: xhigh" in row
+
+    def test_effort_int_rendered_as_token_budget(self) -> None:
+        task = {"id": "a", "name": "executor", "status": "running", "effort": 32000}
+        row = _render_row(task, {}, self._glyphs(), False, 80)
+        assert "E: 32.0k" in row
+
+    def test_effort_absent_renders_no_token(self) -> None:
+        task = {"id": "a", "name": "executor", "status": "running"}
+        row = _render_row(task, {}, self._glyphs(), False, 80)
+        assert "E:" not in row
+
+    def test_context_window_size_renders_percentage(self) -> None:
+        task = {
+            "id": "a",
+            "name": "executor",
+            "status": "running",
+            "tokenCount": 50000,
+            "contextWindowSize": 200000,
+        }
+        row = _render_row(task, {}, self._glyphs(), False, 80)
+        assert "25% ctx" in row
+        assert "tok" not in row
+
+    def test_context_window_size_absent_falls_back_to_tokens(self) -> None:
+        task = {
+            "id": "a",
+            "name": "executor",
+            "status": "running",
+            "tokenCount": 50000,
+        }
+        row = _render_row(task, {}, self._glyphs(), False, 80)
+        assert "50.0k tok" in row
+        assert "ctx" not in row
 
 
 class TestMainStdinContract:

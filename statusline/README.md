@@ -138,14 +138,27 @@ one line for the main session. Wire it in `~/.claude/settings.json`:
 ```
 
 **Input** (stdin): one JSON object with a `tasks` array (each task carries `id`, `name`,
-`type`, `status`, `description`, `label`, `startTime`, `tokenCount`, `tokenSamples`, `cwd`)
-and a `columns` field.
+`type`, `status`, `description`, `label`, `startTime`, `model`, `effort`,
+`contextWindowSize`, `tokenCount`, `tokenSamples`, `cwd`) and a `columns` field.
+
+`effort` (platform v2.1.214+) is the reasoning effort configured for that subagent, in
+its frontmatter or on the invocation. Its shape differs from the main status line's
+`effort`, which is a `{"level": "high"}` dict: the per-task field is a bare value, either
+one of `low`/`medium`/`high`/`xhigh`/`max` or a numeric token budget. It is absent when
+the subagent inherits the session level, and the row renders no effort token in that case
+since the main line already shows the session value.
+
+`contextWindowSize` (platform v2.1.205+) is the resolved model's context window in
+tokens, omitted while the task's model is unresolved. When present, the row shows
+`tokenCount` as a percentage of it, which is comparable across rows running on different
+windows; when absent, the row falls back to the raw compact token count.
 
 **Output** (stdout): one JSON line per task to override its row —
 `{"id": "<task id>", "content": "<row body>"}`.
 
 Each row shows the agent name (namespace prefix stripped, themed glyph reused from
-`agent_glyph`), its real model, status, and token count. The model is looked up from
+`agent_glyph`), its real model, status, configured effort, and context usage. The model
+is looked up from
 `.omca/state/subagent-models.json` (written by the SubagentStart hook, not this module):
 join on `task.id` → map key first, falling back to a `task.name`/`task.type` →
 `agent_type` match for state entries keyed differently than expected. Rows for tasks with
@@ -169,6 +182,7 @@ All configuration is via environment variables. No config files.
 | `CLAUDE_STATUSLINE_MODE` | `daemon`, `direct` | `daemon` | `daemon`: try daemon, auto-start, fall back to direct. `direct`: always render inline, never contact daemon. |
 | `CLAUDE_STATUSLINE_NERD_FONT` | `1`, `0` | `1` | Override Nerd Font glyph usage. Takes precedence over `NERD_FONT`. |
 | `NERD_FONT` | `1`, `0` | `1` | Fallback Nerd Font preference when `CLAUDE_STATUSLINE_NERD_FONT` is not set. |
+| `OMCA_SUBAGENT_STATUSLINE_DUMP` | path | unset | Append each raw `subagentStatusLine` stdin payload to this file as JSONL. Opt-in capture for answering platform-payload questions; fail-open, no rotation. To identify an undocumented field, diff the payload key sets (`jq -r 'paths(scalars) \| join(".")' <file> \| sort -u`) between a capture taken with the feature off and one taken with it on, rather than guessing a name. |
 
 When neither `CLAUDE_STATUSLINE_NERD_FONT` nor `NERD_FONT` is set, Nerd Font glyphs are
 enabled by default. Set either variable to `0` to use ASCII fallbacks (`*` for branch,
