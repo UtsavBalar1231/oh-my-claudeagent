@@ -63,10 +63,13 @@ test-hooks:
 test-mcp:
 	bash scripts/validate-plugin.sh --check mcp
 
-# Run pytest MCP tool tests
+# Run pytest suites for both Python projects. Split invocations for the same reason as
+# lint-python: servers/ and statusline/ are separate uv projects with their own configs
+# and their own dev dependencies, so one pytest run cannot cover both.
 [group('test')]
 test-pytest:
 	uv run --project servers pytest servers/tests/ -v
+	uv run --project statusline --extra dev pytest statusline/tests/ -v
 
 # Run BATS behavioral tests for hook scripts
 [group('test')]
@@ -99,6 +102,7 @@ typecheck:
 # Scaffold a new agent
 [group('scaffold')]
 new-agent name:
+	@case '{{ name }}' in *:*) echo "agent name must not contain ':', the platform rejects such an agent at load time" >&2; exit 1 ;; esac
 	@echo "---" > agents/{{name}}.md
 	@echo "name: {{name}}" >> agents/{{name}}.md
 	@echo "description: TODO" >> agents/{{name}}.md

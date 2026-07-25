@@ -94,7 +94,9 @@ jobs:
           enable-cache: false
 
       - name: Install test dependencies
-        run: uv sync --project servers --group dev
+        run: |
+          uv sync --project servers --group dev
+          uv sync --project statusline --extra dev
 
       # The startup-latency and signal-shutdown tests spawn the real omca MCP
       # server, whose entry point calls discover_binary() and exits 1 if ast-grep
@@ -102,15 +104,21 @@ jobs:
       - name: Install ast-grep CLI
         run: uv tool install ast-grep-cli
 
-      - name: Run pytest
+      # Both projects, matching `just test-pytest`. statusline/ keeps its own
+      # project and target-version, so it needs a second invocation rather than
+      # a wider path argument.
+      - name: Run pytest (servers)
         run: uv run --project servers pytest servers/tests/ -v --tb=short
+
+      - name: Run pytest (statusline)
+        run: uv run --project statusline --extra dev pytest statusline/tests/ -v --tb=short
 
       - name: Job summary
         if: always()
         run: |
           {
             echo "### What this job checks"
-            echo "MCP tool unit tests under servers/tests/, via pytest (mirrors \`just test-pytest\`)."
+            echo "Unit tests under servers/tests/ and statusline/tests/, via pytest (mirrors \`just test-pytest\`)."
             echo ""
             echo "### If this fails"
             echo "An MCP tool's behavior regressed. This gate must pass before a release is created."
