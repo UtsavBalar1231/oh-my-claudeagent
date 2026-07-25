@@ -46,7 +46,7 @@ One-command setup: update orchestration block in `~/.claude/CLAUDE.md`, check de
 Parse `$ARGUMENTS` for flags:
 - `--uninstall` → jump to UNINSTALL MODE
 - `--check` → jump to CHECK MODE
-- `--doctor` → jump to DOCTOR MODE
+- `--doctor` → jump to DOCTOR MODE (this skill's own OMCA-scoped read-only report, not the built-in `/doctor`)
 - No flag → SETUP MODE (default)
 
 ---
@@ -228,15 +228,16 @@ Apply optional user-scope helper settings to `~/.claude/settings.json` with user
 2. Detect managed-policy lock keys in current scope (`allowManagedHooksOnly`, `allowManagedPermissionRulesOnly`, `allowManagedMcpServersOnly`). If present and true, do not propose local permission-rule writes; report that managed policy owns permission enforcement.
 
 3. Compute missing optional helper permissions against the recommended set:
-   - `Write(.omca/**)`, `Edit(.omca/**)`, `Read(.omca/**)`
+   - `Edit(.omca/**)`, `Read(.omca/**)`
    - `mcp__plugin_oh-my-claudeagent_omca__*`, `mcp__grep__*`, `mcp__context7__*`
    - `Bash(jq *)`, `Bash(uv run *)`, `Bash(uv sync *)`
 
 4. Compute missing top-level: `teammateMode: "auto"`
 
 5. Compute missing env vars against the required set:
-   - `ANTHROPIC_DEFAULT_OPUS_MODEL`: `"claude-opus-4-8"` (routes opus-tier agents to extended-thinking model)
    - `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`: `"1"` (enables agent teams; required for `teammateMode: "auto"`)
+
+   Do not write `ANTHROPIC_DEFAULT_OPUS_MODEL` or its `SONNET`/`FABLE` siblings. Each of those keys takes a full model name, never an alias, so setting one pins a generation that goes stale. OMCA agents declare the tier alias in their own frontmatter and let the platform resolve it, which is what these keys would otherwise override.
 
 6. If all present: "Settings already configured" -- skip
 
@@ -249,10 +250,8 @@ Apply optional user-scope helper settings to `~/.claude/settings.json` with user
    jq '. + {
      "teammateMode": "auto"
    } | .env += {
-     "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4-8",
      "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
    } | .permissions.allow += [
-     "Write(.omca/**)",
      "Edit(.omca/**)",
      "Read(.omca/**)",
      "mcp__plugin_oh-my-claudeagent_omca__*",
@@ -266,9 +265,8 @@ Apply optional user-scope helper settings to `~/.claude/settings.json` with user
 
 10. Explain each setting:
    - `teammateMode: "auto"`: enables agent teams with best available UI (tmux/iTerm2 split panes)
-   - `ANTHROPIC_DEFAULT_OPUS_MODEL`: routes opus-tier agents (oracle, prometheus, metis, momus, sisyphus) to `claude-opus-4-8` for extended thinking
    - `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`: enables the experimental agent teams feature, required for `teammateMode: "auto"` to function
-    - `Write(.omca/**)` / `Edit(.omca/**)` / `Read(.omca/**)`: auto-allow plugin state file access
+    - `Edit(.omca/**)` / `Read(.omca/**)`: auto-allow plugin state file access. `Edit` covers every file-editing tool including `Write`; a `Write(path)` rule is accepted but never matched by the file permission checks and makes Claude Code print a startup warning, so do not add one.
     - `mcp__plugin_oh-my-claudeagent_omca__*` / `mcp__grep__*` / `mcp__context7__*`: auto-allow bundled MCP tool usage
     - `Bash(jq *)` / `Bash(uv run *)` / `Bash(uv sync *)`: auto-allow common plugin utility commands (narrowed from `Bash(uv *)`)
     - These are optional local helper allowances; managed settings remain the policy authority.
@@ -757,7 +755,7 @@ Non-destructive health check. No files are modified.
 
 3. Check `~/.claude/settings.json`:
     - Is the plugin enabled in user settings? Report method (marketplace via enabledPlugins / dev mode via --plugin-dir / legacy plugins array / not registered)
-    - Are required env vars configured (`ANTHROPIC_DEFAULT_OPUS_MODEL`, `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`)? Report each as PASS/WARN
+    - Is `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` configured? Report PASS/WARN. Also report a WARN for any `ANTHROPIC_DEFAULT_*_MODEL` key, which pins a generation over the tier alias OMCA agents declare
     - Remind the user that managed policy keys such as `strictKnownMarketplaces`, `blockedMarketplaces`, `allowManagedHooksOnly`, `allowManagedPermissionRulesOnly`, `allowManagedMcpServersOnly`, and `sandbox.failIfUnavailable` are outside this skill's enforcement scope
 
 4. Check `.omca/` state:
@@ -768,9 +766,11 @@ Non-destructive health check. No files are modified.
 
 ---
 
-## DOCTOR MODE (`--doctor`)
+## DOCTOR MODE (`/oh-my-claudeagent:omca-setup --doctor`)
 
-Extended diagnostic. Superset of `--check` with deeper health verification. No files are modified.
+Extended diagnostic for the OMCA plugin's own configuration. Superset of `--check` with deeper health verification. Read-only: no files are modified, findings are reported for the user to act on.
+
+This is a different tool from the built-in `/doctor` (alias `/checkup`), which checks Claude Code installation health, settings validity, unused extensions, and `CLAUDE.md` size, and can apply fixes after confirming. When the user asks to *fix* their setup, run the built-in `/doctor`. Run this mode only for an OMCA-scoped read-only report, and always name it with its full namespaced invocation so the two are not confused.
 
 ### Check 1: Dependencies
 Run Phase 1 (Dependency Check). Report PASS/WARN/FAIL for jq, uv, python3, ast-grep.
@@ -785,9 +785,12 @@ Read `~/.claude/settings.json` and verify the required permission patterns are p
 - `mcp__plugin_oh-my-claudeagent_omca__*`: PASS if present, FAIL if missing or has old bare `mcp__omca-state__*` or `mcp__ast-grep__*`
 - `mcp__grep__*`: PASS if present (HTTP server, bare name is correct)
 - `mcp__context7__*`: PASS if present (HTTP server, bare name is correct)
-- `Write(.omca/**)`, `Edit(.omca/**)`, `Read(.omca/**)`: PASS if all present
+- `Edit(.omca/**)`, `Read(.omca/**)`: PASS if both present
 - `Bash(jq *)`, `Bash(uv run *)`, `Bash(uv sync *)`: PASS if all present
-- Check for stale entries: `mcp__pgs__*`, `mcp__omca-state__*`, `mcp__ast-grep__*`. WARN if found ("stale permission; run omca-setup to update")
+- Check for stale entries. WARN if found ("stale permission; run omca-setup to update"):
+  - `mcp__pgs__*`, `mcp__omca-state__*`, `mcp__ast-grep__*`
+  - `Write(.omca/**)`: never matched by the file permission checks and makes Claude Code warn at startup. Tell the user to delete it; `Edit(.omca/**)` already covers writing.
+  - `env.ANTHROPIC_DEFAULT_OPUS_MODEL`, `env.ANTHROPIC_DEFAULT_SONNET_MODEL`, or `env.ANTHROPIC_DEFAULT_FABLE_MODEL` set to any value: OMCA agents now declare tier aliases (`opus`, `sonnet`, `fable`) and let the platform resolve them. A pin here overrides that resolution for every agent on the tier, so a value naming an older generation (for example `"claude-opus-4-8"`) or carrying a `[1m]` suffix silently holds those agents back. Tell the user to delete the key unless they deliberately want a fixed generation, in which case they own keeping it current.
 
 ### Check 4: MCP Server Health
 For each command-type MCP server, verify it can start and respond:
@@ -796,7 +799,19 @@ echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | timeout 5 uv run --proje
 ```
 - PASS if response contains `"result"` with tool definitions
 - FAIL if timeout, error, or no response
-- Note: HTTP servers (grep.app, context7) are external. Skip or ping-only.
+
+For the two HTTP servers (`grep`, `context7`), the client already carries the diagnostic. Run:
+```bash
+claude mcp list
+```
+`claude mcp list` and `/mcp` report the HTTP status code and the server's error text when a connection fails, so read the reported status rather than guessing:
+- Connected: PASS
+- `⏸ Pending approval`: WARN, see the approval note below
+- `not configured`: the entry has an empty `url`. WARN and point the user at the entry to fill in.
+- An HTTP status and error text: FAIL, and report both verbatim. Common causes are an expired or missing auth token (401/403), a wrong URL path (404), and a proxy or network policy blocking the host.
+- A missing-variable warning: an `${VAR}` reference in the server config has no value and no `:-default` fallback, so the literal `${VAR}` text was used as the URL.
+
+If a URL looks correct but still fails to connect, check for whitespace: Claude Code warns about MCP config values with hidden leading or trailing whitespace. A trailing space or newline inside the quoted `url` string in `.mcp.json` or `settings.json` makes the value a different host than it reads as.
 
 **Pending approval (v2.1.154+)**: If tools from `.mcp.json` servers are unavailable despite a healthy binary, check whether Claude Code is showing a `⏸ Pending approval` indicator next to the `omca` server in the MCP panel. As of v2.1.154, unapproved `.mcp.json` servers no longer auto-connect; the user must explicitly approve them once. Use `/mcp` or the MCP settings UI to approve the `omca` server (and `grep`, `context7`) if they show as pending.
 
@@ -807,7 +822,7 @@ echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | timeout 5 uv run --proje
 
 ### Check 6: Settings Validation
 - `teammateMode` is `"auto"`: PASS/WARN
-- `env.ANTHROPIC_DEFAULT_OPUS_MODEL` is `"claude-opus-4-8"`: PASS/WARN ("opus agents may use non-extended model")
+- `env.ANTHROPIC_DEFAULT_OPUS_MODEL` absent: PASS. Present: WARN ("tier pin overrides the `opus` alias for every opus agent; delete it unless you want a fixed generation")
 - `env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is `"1"`: PASS/WARN ("agent teams disabled; teammateMode won't function")
 - Plugin enabled in `enabledPlugins`: PASS/FAIL
 - Marketplace configured in `extraKnownMarketplaces`: PASS/FAIL
