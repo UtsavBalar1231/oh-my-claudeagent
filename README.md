@@ -110,7 +110,10 @@ install:
 Run /oh-my-claudeagent:omca-setup, then verify: (1) it reports dependencies OK
 (jq, uv, python3, ast-grep all found), (2) it confirms ~/.claude/settings.json
 was updated with the orchestration block, (3) it prints a final summary with no
-FAIL lines. If any check fails, run it again with --doctor and report the output.
+FAIL lines. If any check fails, run /oh-my-claudeagent:omca-setup --doctor and
+report the output. That flag is this skill's own read-only report, scoped to OMCA
+configuration; it changes nothing. The platform's separate built-in /doctor
+(alias /checkup) is the fix-capable one.
 ```
 
 ## Documentation

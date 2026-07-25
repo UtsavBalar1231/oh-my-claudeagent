@@ -11,7 +11,7 @@ injection mechanism.
 | Toggle keyword triggers, statusline mode, or the forced output style | [Plugin settings](#plugin-settings) |
 | Disable a specific hook, or all hooks at once | [`OMCA_DISABLED_HOOKS`](#omca_disabled_hooks-the-unified-kill-switch) |
 | Disable one of the older per-hook flags | [Legacy per-hook flags](#legacy-per-hook-flags-deprecated) |
-| Reduce permission prompts or restrict `/handoff` | [Recommended settings.json blocks](#recommended-settingsjson-blocks) |
+| Reduce permission prompts, cap model tiers, or scope auto mode | [Recommended settings.json blocks](#recommended-settingsjson-blocks) |
 | Configure git worktree isolation for spawned agents | [Worktree settings](#worktree-settings) |
 | Pick between daemon and direct statusline rendering | [Statusline modes](#statusline-modes) |
 | Write a project rule that auto-injects when a file is touched | [Project rules (`.omca/rules/`)](#project-rules-omcarules) |
@@ -21,6 +21,10 @@ injection mechanism.
 
 Set under `pluginConfigs["oh-my-claudeagent@omca"].options` in `settings.json`, or via the
 plugin's own installer prompts during `/oh-my-claudeagent:omca-setup`.
+
+**Scope**: as of v2.1.207 `pluginConfigs` is **not** read from a project's shared
+`.claude/settings.json`. Put the block in your user `~/.claude/settings.json` (or pass it via
+`--settings`). A `pluginConfigs` block committed to a repo is a silent no-op.
 
 | Key | Type | Default | What it does |
 |---|---|---|---|
@@ -103,19 +107,88 @@ basename is present in `OMCA_DISABLED_HOOKS`.
 These are opt-in blocks you add to your own `settings.json` (user or project scope, as
 noted). None of them are applied automatically by the plugin.
 
-### Restrict `/handoff` to manual invocation
+### `/handoff` needs no settings block
 
-Handoff is meant to be a deliberate user action, not something the model triggers on its
-own mid-conversation (for example, when it judges that context has gotten long). Add this
-to prevent self-invocation:
+Handoff ships with `disable-model-invocation: true`, so it only runs when you type
+`/oh-my-claudeagent:handoff`. The `skillOverrides` block that used to be recommended here
+did nothing: `skillOverrides` does not apply to plugin-shipped skills. The `handoff` keyword
+still produces an advisory nudge toward the slash command; it does not start the workflow.
+
+### Model and effort settings
+
+| Setting | Suggested value | Why |
+|---|---|---|
+| `teammateDefaultModel` | `null` | Teammates then inherit the lead session's `/model`. Any other value depends on your model availability, provider, and budget, which is why `omca-setup` does not merge this key |
+| `modelOverrides` | unset unless needed | The named escape hatch for provider portability. It maps individual Anthropic model ids to provider-specific ids. OMCA agents declare tier aliases (`opus`, `sonnet`, `fable`), so map the versions those aliases resolve to on your provider rather than editing agent frontmatter |
+| `availableModels` | unset unless your org requires it | This key alone constrains which models subagents and skills may select, independent of `enforceAvailableModels`. Filtering matches an alias, a version prefix, or a full provider-form id, so an allowlist of `[sonnet, haiku]` still shuts out the `opus` and `fable` agents |
+| `askUserQuestionTimeout` | leave at the default `never` | A timed-out question dialog is a silent auto-answer. `prometheus` treats a skipped interview question as resolving to that question's default, and `omca-setup` asks for confirmation before writing to `~/.claude/settings.json` |
+| `workflowSizeGuideline` | unset | It bounds native dynamic workflows only and does not constrain direct `Agent` fan-out, so it cannot cap an OMCA parallel group. Setting it also hides the matching `/config` row |
+| `emojiCompletionEnabled` | your preference | Cosmetic input-editor setting for `:shortcode:` completion. Not part of what `omca-setup` applies |
+
+Effort precedence, highest priority last: the `effortLevel` setting, then the session's
+`--effort` flag or environment, then an agent's frontmatter `effort:`, then a per-invocation
+override. OMCA depends on frontmatter winning over the settings default, so do not read
+`effortLevel` as a hard ceiling. `fastMode` and `fastModePerSessionOptIn` sit alongside it and
+have no OMCA consumer.
+
+### Auto mode settings
+
+`autoMode` and its sub-keys are read from **user settings, `--settings`, or managed settings
+only**. They are not read from project `.claude/settings.json`, and as of v2.1.207 not from
+`.claude/settings.local.json` either, so an `autoMode` block committed to a repo is a silent
+no-op.
+
+- `autoMode.environment` is free-text prose describing the machine the classifier is judging.
+  Nobody but you can write it.
+- Omitting the literal `"$defaults"` from an `autoMode` array replaces the built-in ruleset
+  entirely, including the rule against transcript tampering.
+- `disableAutoMode: "disable"` makes `permission-denied-coach.sh` unreachable, since the
+  classifier never runs.
+- `useAutoModeDuringPlan` (default `true`) governs whether the planning agents' shell calls
+  prompt one by one. It is not read from shared project settings.
+- Inspect the effective ruleset with `claude auto-mode defaults`, `claude auto-mode config`,
+  `claude auto-mode critique`, and `claude auto-mode reset`.
+
+Auto mode is on by default on Bedrock, Vertex, and Foundry as of v2.1.207;
+`CLAUDE_CODE_ENABLE_AUTO_MODE` is now only a way to force it on where a deployment turned it
+off.
+
+### Parameter-scoped permission rules
+
+The `Tool(param:value)` permission syntax matches a tool call's own input, which makes three
+forms useful for cost and blast-radius governance. None is set by the plugin.
 
 ```json
 {
-  "skillOverrides": {
-    "oh-my-claudeagent:handoff": "user-invocable-only"
+  "permissions": {
+    "deny": [
+      "Agent(model:opus)",
+      "Agent(isolation:worktree)",
+      "Bash(run_in_background:true)"
+    ]
   }
 }
 ```
+
+Use the alias form (`opus`) rather than a pinned id. The rule is matched against the literal
+input Claude sends, before any normalization, and OMCA's delegation examples pass
+`model="opus"`, `model="sonnet"`, or `model="fable"`, so the alias form fires on those calls
+and a pinned id does not.
+
+`Agent(model:...)` gates explicit per-call overrides only. An agent that takes its tier from
+its own frontmatter is spawned with no `model` parameter at all, and an omitted parameter is
+never matched, so no rule of this shape can cap the roster agents' declared tier. Use
+`availableModels` for that.
+
+Do not add `Write(<path>)`, `NotebookEdit(<path>)`, or `Glob(<path>)` rules. They are accepted
+but never match, and the platform now prints a startup warning for each one. `Edit(<path>)`
+covers every file-editing tool, including `Write`.
+
+### Screen reader and accessibility
+
+Set `CLAUDE_STATUSLINE_NERD_FONT=0` for plain-text statusline glyphs. The statusline still
+emits ANSI color escapes unconditionally; see
+[`docs/reference/known-issues.md`](known-issues.md).
 
 ### Worktree settings
 
@@ -124,8 +197,8 @@ isolated git worktrees.
 
 | Setting | Purpose |
 |---|---|
-| `worktree.symlinkDirectories` | Array of directory names (relative to the repo root) to symlink into each new worktree instead of copying them. Use this for `node_modules` or a large build cache that would otherwise be duplicated per worktree. |
-| `worktree.sparsePaths` | Array of paths to check out via git sparse-checkout (cone mode) in each worktree. Only listed paths are written to disk, which speeds up worktree creation in large monorepos. Omit to check out the full tree. |
+| `worktree.symlinkDirectories` | Array of directory names (relative to the repo root) to symlink into each new worktree instead of copying them. Use this for `node_modules` or a large build cache that would otherwise be duplicated per worktree. **Windows floor v2.1.205**: below that version, following this recommendation on a Windows client could delete files outside the worktree on removal. |
+| `worktree.sparsePaths` | Array of paths to check out via git sparse-checkout (cone mode) in each worktree. Only listed paths are written to disk, which speeds up worktree creation in large monorepos. Omit to check out the full tree. Below v2.1.207, removing such a worktree left `extensions.worktreeConfig` behind in the repo config, which breaks go-git-based tooling. |
 | `worktree.baseRef` | Controls which ref a new worktree branches from: `"fresh"` (default) branches from `origin/<default-branch>`; `"head"` branches from local `HEAD`. See [`docs/reference/known-issues.md`](known-issues.md) for the unpushed-commits trap this setting controls. |
 
 ```json
@@ -160,6 +233,11 @@ skips the daemon and renders inline.
 re-run it if those fields are ever missing.
 
 ## Project rules (`.omca/rules/`)
+
+Two rule directories exist and they load by different mechanisms. `.claude/rules/*.md` is
+platform-loaded and gated on project settings being an included settings source for the
+session, so it can be silently absent. `.omca/rules/*.md` is injected by
+`context-injector.sh` on file access and always fires.
 
 Drop a Markdown file into `.omca/rules/` in your project to have its contents
 automatically surfaced whenever you read, write, or edit a matching file.
