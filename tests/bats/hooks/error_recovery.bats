@@ -192,3 +192,27 @@ load '../test_helper'
 	assert_success
 	assert_output ""
 }
+
+@test "json-error-recovery: plugin MCP server not connected produces reconnect guidance" {
+	local payload
+	payload='{"tool_name":"mcp__plugin_oh-my-claudeagent_omca__evidence_log","error":"MCP server '"'"'plugin:oh-my-claudeagent:omca'"'"' not connected"}'
+	run_hook "json-error-recovery.sh" "$payload"
+	assert_success
+	local ctx
+	ctx=$(get_context)
+	echo "$ctx" | grep -qi "not connected"
+	echo "$ctx" | grep -qi "claude mcp list"
+	echo "$ctx" | grep -qi "retried"
+}
+
+@test "json-error-recovery: wrapped not-connected error is caught before the mcp-error branch" {
+	local payload
+	payload='{"tool_name":"mcp__plugin_oh-my-claudeagent_omca__boulder_write","error":"Error: MCP server '"'"'plugin:oh-my-claudeagent:omca'"'"' not connected"}'
+	run_hook "json-error-recovery.sh" "$payload"
+	assert_success
+	local ctx
+	ctx=$(get_context)
+	echo "$ctx" | grep -qi "claude mcp list"
+	# The generic restart advice must not win the branch race for this shape.
+	! echo "$ctx" | grep -qi "/reload-plugins"
+}

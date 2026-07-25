@@ -15,6 +15,20 @@ if echo "${ERROR_MSG}" | grep -qi "No such tool available: Agent" || \
 	exit 0
 fi
 
+# Spawn-budget ceilings are platform limits, not delegation mistakes: return before
+# the error counter so a ceiling never counts toward the 3-strike oracle escalation.
+if echo "${ERROR_MSG}" | grep -qiE 'concurrent subagent limit'; then
+	MSG="[CONCURRENCY CEILING] Too many subagents are running at once (platform cap, default 20, raised via CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS). Nothing about the prompt or the agent tier is wrong. Wait for in-flight agents to finish and read their results, then retry this spawn, or narrow the fan-out so fewer agents run at the same time. Do NOT retry immediately and do NOT escalate to oracle."
+	emit_context "PostToolUseFailure" "${MSG}"
+	exit 0
+fi
+
+if echo "${ERROR_MSG}" | grep -qiE 'subagent spawn limit|subagents per session'; then
+	MSG="[SESSION SPAWN CEILING] This session has spawned its maximum number of subagents (platform cap, default 200, raised via CLAUDE_CODE_MAX_SUBAGENTS_PER_SESSION). Retrying the spawn cannot succeed. Complete the remaining work directly with Read, Write, Edit, Bash, Grep, Glob, or re-scope what is left and continue it in a fresh session. Do NOT escalate to oracle: this is an infrastructure ceiling, not an architectural problem."
+	emit_context "PostToolUseFailure" "${MSG}"
+	exit 0
+fi
+
 # 200 bytes — ERROR_MSG cap; enough to identify error class without flooding context.
 ERROR_SUMMARY=$(echo "${ERROR_MSG}" | head -c 200)
 
@@ -43,9 +57,9 @@ if [[ "${NEW_COUNT}" -ge 3 ]]; then
 fi
 
 if echo "${ERROR_MSG}" | grep -qiE "${RETRYABLE_PATTERNS}"; then
-	TRANSIENT_NOTE="This is a tool/infrastructure failure, not a reasoning error. Do not self-reflect on your approach — the tool itself failed. Either retry after a moment or escalate."
+	TRANSIENT_NOTE="This is a tool/infrastructure failure, not a reasoning error. Do not self-reflect on your approach: the tool itself failed. Either resume after a moment or escalate."
 	MSG="[ERROR RECOVERY] Type: transient | Tool: ${TOOL_NAME} | Retry: ${NEW_COUNT}/3
-[RETRYABLE ERROR] The delegation failed due to a transient error (rate limit, capacity, timeout). Retry the same delegation — do not escalate to oracle for transient failures. ${TRANSIENT_NOTE}${CIRCUIT_BREAKER}"
+[RETRYABLE ERROR] The delegation failed due to a transient error (rate limit, capacity, timeout). The failure carries whatever the agent produced before it was cut off: read that partial work, then delegate only the remainder instead of re-sending the original prompt. Do not escalate to oracle for transient failures. ${TRANSIENT_NOTE}${CIRCUIT_BREAKER}"
 	emit_context "PostToolUseFailure" "${MSG}"
 	exit 0
 fi

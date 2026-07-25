@@ -134,3 +134,20 @@ NOTES: no blockers"
 	assert [ -n "$ctx" ]
 	echo "$ctx" | grep -qi "POOR AGENT OUTPUT"
 }
+
+# ---------------------------------------------------------------------------
+# Case 7: the empty-result advisory does not blame an infrastructure cutoff
+# ---------------------------------------------------------------------------
+
+@test "empty-task-response: empty-result advice attributes the empty turn to the agent" {
+	local payload
+	payload='{"tool_name":"Task","tool_input":{"subagent_type":"oh-my-claudeagent:executor"},"tool_response":{"result":""}}'
+
+	run_hook "empty-task-response.sh" "$payload"
+	assert_success
+	ctx=$(get_context)
+	echo "$ctx" | grep -qi "POOR AGENT OUTPUT"
+	echo "$ctx" | grep -qi "delegation error carrying the agent's partial work"
+	# A cutoff arrives on the failure path, so this advice must not read as a certainty.
+	! echo "$ctx" | grep -qi "likely exhausted its turns"
+}

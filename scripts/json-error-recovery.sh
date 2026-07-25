@@ -23,6 +23,8 @@ if echo "${ERROR_MSG}" | grep -qiE 'ast.grep.*not found|sg.*not found|No such fi
 	ADVICE="ast-grep binary not found. Install via: cargo install ast-grep or brew install ast-grep."
 elif echo "${ERROR_MSG}" | grep -qiE 'timeout|timed out|deadline exceeded'; then
 	ADVICE="MCP tool timed out. The codebase may be too large for this operation. Try narrowing the search scope."
+elif echo "${ERROR_MSG}" | grep -qiE 'not.*connected'; then
+	ADVICE="MCP server not connected. The omca server is plugin-provided, so it is unavailable during a reconnect window or after a plugin reload. Check server health with 'claude mcp list' or /mcp, which report connection status and the server's own error text. Then retry the call: evidence logging via evidence_log must be retried, never skipped, or the completion claim has no evidence behind it."
 elif echo "${ERROR_MSG}" | grep -qiE 'invalid.*yaml|yaml.*parse|YAML.*error'; then
 	ADVICE="Invalid YAML in ast-grep rule. Check rule syntax — use ast_test_rule to validate before ast_find_rule."
 elif echo "${ERROR_MSG}" | grep -qiE 'mcp.*error|tool.*unavailable|server.*not.*running'; then

@@ -38,7 +38,7 @@ if [[ "${IS_POOR}" == "false" ]] && [[ "${RESPONSE_LENGTH}" -lt 200 ]]; then
 fi
 
 if [[ "${IS_POOR}" == "true" ]]; then
-	MSG="[POOR AGENT OUTPUT] The agent returned empty or trivially short text with no synthesis — it likely exhausted its turns on tool calls. Do NOT re-query the same agent (a finished agent is terminal; re-querying it loops). Relaunch a FRESH agent with a sharper prompt that states the required output format explicitly, or proceed with what you already have."
+	MSG="[POOR AGENT OUTPUT] The agent returned empty or trivially short text with no synthesis. A rate limit, server error, or kill would have arrived as a delegation error carrying the agent's partial work, so an empty result here means the agent ended its own turn without a deliverable, typically after spending its turns on tool calls. Do NOT re-query the same agent (a finished agent is terminal; re-querying it loops). Relaunch a FRESH agent with a sharper prompt that states the required output format explicitly, or proceed with what you already have."
 	emit_context "PostToolUse" "${MSG}"
 else
 	# Canonical platform path: subagent_type is nested under tool_input (not top-level).

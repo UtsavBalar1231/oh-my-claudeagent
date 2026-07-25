@@ -231,3 +231,66 @@ load '../test_helper'
 	newest=$(jq -r '."Agent:delegate_error".last_errors[0]' "$counts_file")
 	echo "$newest" | grep -qi "issue 4"
 }
+
+# ─── spawn-budget ceilings: advice fits a hard limit, counter is not bumped ────
+
+# Case 9: concurrency ceiling gets wait/narrow-fan-out advice and no counter bump
+@test "delegate-retry: concurrent subagent limit yields ceiling advice, no counter bump" {
+	local payload
+	payload='{"tool_name":"Agent","tool_input":{"subagent_type":"oh-my-claudeagent:executor"},"error":"Concurrent subagent limit reached"}'
+	run_hook "delegate-retry.sh" "$payload"
+	assert_success
+
+	local ctx
+	ctx=$(get_context)
+	echo "$ctx" | grep -q "CONCURRENCY CEILING"
+	echo "$ctx" | grep -qi "wait for in-flight agents"
+	# The generic delegation advice must not appear: a ceiling is not fixed by re-prompting.
+	! echo "$ctx" | grep -qi "different agent tier"
+
+	assert [ ! -f "$CLAUDE_PROJECT_ROOT/.omca/state/error-counts.json" ]
+}
+
+# Case 10: session ceiling says finish directly or re-scope, and never bumps the counter
+@test "delegate-retry: subagent spawn limit yields session-ceiling advice, no counter bump" {
+	local payload
+	payload='{"tool_name":"Agent","tool_input":{"subagent_type":"oh-my-claudeagent:executor"},"error":"Subagent spawn limit reached"}'
+	run_hook "delegate-retry.sh" "$payload"
+	assert_success
+
+	local ctx
+	ctx=$(get_context)
+	echo "$ctx" | grep -q "SESSION SPAWN CEILING"
+	echo "$ctx" | grep -qi "fresh session"
+
+	assert [ ! -f "$CLAUDE_PROJECT_ROOT/.omca/state/error-counts.json" ]
+}
+
+# Case 11: three consecutive ceilings never reach the oracle-escalation breaker
+@test "delegate-retry: repeated spawn-limit failures never escalate to oracle" {
+	local payload i
+	payload='{"tool_name":"Agent","tool_input":{"subagent_type":"oh-my-claudeagent:executor"},"error":"Subagent spawn limit reached"}'
+	for i in 1 2 3; do
+		run_hook "delegate-retry.sh" "$payload"
+		assert_success
+		local ctx
+		ctx=$(get_context)
+		! echo "$ctx" | grep -qi "occurred 3+ times"
+		! echo "$ctx" | grep -qi "Escalate to oracle for architectural guidance"
+	done
+}
+
+@test "delegate-retry: transient branch tells the caller to resume from partial work" {
+	local payload
+	payload='{"tool_name":"Agent","tool_input":{"subagent_type":"oh-my-claudeagent:executor"},"error":"rate_limit: 429 Too Many Requests"}'
+	run_hook "delegate-retry.sh" "$payload"
+	assert_success
+
+	local ctx
+	ctx=$(get_context)
+	echo "$ctx" | grep -q "RETRYABLE ERROR"
+	echo "$ctx" | grep -qi "read that partial work"
+	echo "$ctx" | grep -qi "delegate only the remainder"
+	# Re-sending the original prompt throws away the partial work the failure carries.
+	! echo "$ctx" | grep -qi "retry the same delegation"
+}
