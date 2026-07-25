@@ -1,6 +1,7 @@
 """Tests for the session_search MCP tool."""
 
 import json
+import os
 
 import pytest
 
@@ -231,6 +232,188 @@ def test_malformed_lines_skipped_silently(tools, transcripts_root):
         tools["session_search"](query="needle", project_path="/home/user/proj")
     )
     assert len(result["matches"]) == 1
+
+
+# --- Spilled tool results ---
+
+
+def _write_sidecar(project_dir, session, name, text):
+    d = project_dir / session / "tool-results"
+    d.mkdir(parents=True, exist_ok=True)
+    f = d / name
+    f.write_text(text, encoding="utf-8")
+    return f
+
+
+def test_spilled_tool_result_is_searched(tools, transcripts_root):
+    project_dir = _make_project(str(transcripts_root), "/home/user/proj")
+    _write_sidecar(
+        project_dir,
+        "sess-a",
+        "spill1.txt",
+        "x" * 500 + "needle in the spill" + "y" * 500,
+    )
+    result = json.loads(
+        tools["session_search"](
+            query="needle in the spill", project_path="/home/user/proj"
+        )
+    )
+    assert len(result["matches"]) == 1
+    m = result["matches"][0]
+    assert m["role"] == "tool"
+    assert "needle in the spill" in m["excerpt"]
+    # Excerpt stays inside the ~200 char budget around the hit
+    assert len(m["excerpt"]) <= len("needle in the spill") + 2 * 100
+    # No timestamp in the file, so mtime stands in for one
+    assert m["timestamp"]
+    assert m["file"] == "sess-a/tool-results/spill1.txt"
+
+
+def test_sidecar_skipped_for_non_tool_role_filter(tools, transcripts_root):
+    project_dir = _make_project(str(transcripts_root), "/home/user/proj")
+    _write_sidecar(project_dir, "sess-a", "spill1.txt", "needle in the spill")
+    result = json.loads(
+        tools["session_search"](
+            query="needle", project_path="/home/user/proj", role="user"
+        )
+    )
+    assert result["matches"] == []
+
+
+def test_subagent_transcripts_are_out_of_scope(tools, transcripts_root):
+    project_dir = _make_project(str(transcripts_root), "/home/user/proj")
+    sub = project_dir / "sess-a" / "subagents" / "workflows" / "wf_1"
+    sub.mkdir(parents=True)
+    _write_line(
+        sub / "agent-1.jsonl",
+        {
+            "type": "assistant",
+            "timestamp": "2026-01-01T00:00:00Z",
+            "message": {
+                "role": "assistant",
+                "content": [{"type": "text", "text": "needle from a subagent"}],
+            },
+        },
+    )
+    result = json.loads(
+        tools["session_search"](query="needle", project_path="/home/user/proj")
+    )
+    assert result["matches"] == []
+
+
+def test_sidecar_and_jsonl_ordered_newest_first(tools, transcripts_root):
+    project_dir = _make_project(str(transcripts_root), "/home/user/proj")
+    f = project_dir / "session1.jsonl"
+    _write_line(
+        f,
+        {
+            "type": "user",
+            "timestamp": "2026-01-01T00:00:00Z",
+            "message": {"role": "user", "content": "needle in the jsonl"},
+        },
+    )
+    sidecar = _write_sidecar(project_dir, "sess-a", "spill1.txt", "needle in the spill")
+    os.utime(f, (1_700_000_000, 1_700_000_000))
+    os.utime(sidecar, (1_800_000_000, 1_800_000_000))
+
+    result = json.loads(
+        tools["session_search"](query="needle", project_path="/home/user/proj")
+    )
+    roles = [m["role"] for m in result["matches"]]
+    assert roles == ["tool", "user"]
+
+
+def _spill_pointer(sidecar, preview):
+    """Mirror the inline text the platform leaves in place of a spilled result."""
+    return (
+        "<persisted-output>\n"
+        f"Output too large (47.5KB). Full output saved to: {sidecar}\n\n"
+        f"Preview (first 2KB):\n{preview}\n...\n</persisted-output>"
+    )
+
+
+def test_inline_spill_preview_not_counted_twice(tools, transcripts_root):
+    project_dir = _make_project(str(transcripts_root), "/home/user/proj")
+    body = "needle in the spill" + "y" * 500
+    sidecar = _write_sidecar(project_dir, "sess-a", "spill1.txt", body)
+    _write_line(
+        project_dir / "sess-a.jsonl",
+        {
+            "type": "user",
+            "timestamp": "2026-01-01T00:00:00Z",
+            "message": {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "tool_result",
+                        "content": _spill_pointer(sidecar, body[:200]),
+                    }
+                ],
+            },
+        },
+    )
+    result = json.loads(
+        tools["session_search"](
+            query="needle in the spill", project_path="/home/user/proj"
+        )
+    )
+    assert len(result["matches"]) == 1, result
+    assert result["matches"][0]["file"] == "sess-a/tool-results/spill1.txt"
+
+
+def test_inline_spill_preview_kept_when_sidecar_is_gone(tools, transcripts_root):
+    project_dir = _make_project(str(transcripts_root), "/home/user/proj")
+    sidecar = project_dir / "sess-a" / "tool-results" / "swept.txt"
+    _write_line(
+        project_dir / "sess-a.jsonl",
+        {
+            "type": "user",
+            "timestamp": "2026-01-01T00:00:00Z",
+            "message": {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "tool_result",
+                        "content": _spill_pointer(sidecar, "needle in the spill"),
+                    }
+                ],
+            },
+        },
+    )
+    result = json.loads(
+        tools["session_search"](
+            query="needle in the spill", project_path="/home/user/proj"
+        )
+    )
+    assert len(result["matches"]) == 1, result
+    assert result["matches"][0]["role"] == "tool"
+    assert result["matches"][0]["file"] == "sess-a.jsonl"
+
+
+def test_inline_tool_result_without_spill_pointer_still_matches(
+    tools, transcripts_root
+):
+    """A plain tool result must not be suppressed just because sidecars exist."""
+    project_dir = _make_project(str(transcripts_root), "/home/user/proj")
+    _write_sidecar(project_dir, "sess-a", "spill1.txt", "unrelated spill body")
+    _write_line(
+        project_dir / "sess-a.jsonl",
+        {
+            "type": "user",
+            "timestamp": "2026-01-01T00:00:00Z",
+            "message": {
+                "role": "user",
+                "content": [{"type": "tool_result", "content": "needle stayed inline"}],
+            },
+        },
+    )
+    result = json.loads(
+        tools["session_search"](
+            query="needle stayed inline", project_path="/home/user/proj"
+        )
+    )
+    assert len(result["matches"]) == 1, result
+    assert result["matches"][0]["file"] == "sess-a.jsonl"
 
 
 # --- Missing slug dir ---

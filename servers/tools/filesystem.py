@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import time
 from fnmatch import fnmatch
+from itertools import islice
 from pathlib import Path
 from typing import Annotated
 
@@ -21,6 +22,9 @@ from pydantic import Field
 # --- Constants ---
 _MAX_FILE_SIZE = 3 * 1024 * 1024  # 3MB (only enforced when limit=0)
 _BINARY_CHECK_SIZE = 8192  # 8KB
+# 2000 chars — a minified bundle is one line; without a cap a single line
+# can outweigh the whole read in the caller's context.
+_MAX_LINE_CHARS = 2000
 _AUDIT_LOG = ".omca/logs/file-access.jsonl"
 
 _DENY_PATTERNS = [
@@ -67,14 +71,36 @@ def _is_binary(path: Path) -> bool:
     return b"\x00" in chunk
 
 
-def _read_lines(path: Path, encoding: str) -> tuple[list[str], str]:
-    """Read file lines with encoding fallback. Returns (lines, used_encoding)."""
+def _cap_line(line: str) -> str:
+    """Strip the line terminator and cap length, marking any truncation."""
+    line = line.rstrip("\r\n")
+    if len(line) <= _MAX_LINE_CHARS:
+        return line
+    dropped = len(line) - _MAX_LINE_CHARS
+    return f"{line[:_MAX_LINE_CHARS]}... [line truncated, {dropped} more chars]"
+
+
+def _read_window(
+    path: Path, encoding: str, offset: int, limit: int
+) -> tuple[list[str], int, str]:
+    """Stream the requested line window with encoding fallback.
+
+    Only the window is held in memory; the lines before and after it are
+    counted and discarded so the footer's total stays exact without
+    materializing the file. Returns (window, total_lines, used_encoding).
+    """
+    span = None if limit <= 0 else limit
+    offset = max(0, offset)
     for enc in [encoding, "latin-1"]:
         try:
-            return path.read_text(encoding=enc).splitlines(), enc
+            with open(path, encoding=enc) as f:
+                skipped = sum(1 for _ in islice(f, offset))
+                window = [_cap_line(line) for line in islice(f, span)]
+                trailing = sum(1 for _ in f)
+            return window, skipped + len(window) + trailing, enc
         except (UnicodeDecodeError, LookupError):
             continue
-    return [], encoding  # unreachable — latin-1 never fails
+    return [], 0, encoding  # unreachable — latin-1 never fails
 
 
 def _format_numbered(lines: list[str], offset: int) -> str:
@@ -144,8 +170,13 @@ def register(mcp: FastMCP) -> None:
         Bypasses the built-in Read tool's project-root scoping for subagents.
         The footer shows estimated token count and file size. For large files,
         use offset and limit to read targeted sections instead of the whole file.
-        Default limit is 5000 lines.
+        Default limit is 5000 lines. Lines longer than 2000 characters are cut
+        off with a truncation marker.
         """
+        # A negative offset reads from the start rather than erroring, so the
+        # audit entry and the line numbering both stay on the normal path.
+        offset = max(0, offset)
+
         # 1. Resolve and validate path (rejects devices, FIFOs, sockets)
         resolved, err = _safe_resolve(path)
         if err:
@@ -172,21 +203,16 @@ def register(mcp: FastMCP) -> None:
             _audit(path, allowed=False)
             return f"Binary file detected: {path} ({_human_size(size)})"
 
-        # 5. Read with encoding fallback
-        lines, used_enc = _read_lines(resolved, encoding)
+        # 5. Stream the requested window with encoding fallback
+        window, total, used_enc = _read_window(resolved, encoding, offset, limit)
         _audit(path, allowed=True)
 
-        if not lines:
+        if total == 0:
             return "(empty file)"
-
-        total = len(lines)
-
-        # 6. Apply offset/limit
         if offset >= total:
             return f"(offset {offset} exceeds file length of {total} lines)"
 
-        sliced = lines[offset : offset + limit if limit > 0 else total]
-        result = _format_numbered(sliced, offset)
+        result = _format_numbered(window, offset)
 
         # 7. Add metadata footer
         est_tokens = _estimate_tokens(size)

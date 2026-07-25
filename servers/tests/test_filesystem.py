@@ -88,6 +88,33 @@ def test_large_file_chunked_read_allowed(tools, tmp_path):
     assert "     1\t" in result
 
 
+def test_bounded_read_does_not_materialize_whole_file(tools, tmp_path, monkeypatch):
+    """A bounded read streams the window instead of loading the file at once."""
+    big_file = tmp_path / "streamed.txt"
+    chunk = ("z" * 99 + "\n") * 1000  # ~100KB per block
+    big_file.write_text(chunk * 31)  # ~3.1MB
+
+    def refuse_read_text(self, *args, **kwargs):
+        raise AssertionError("bounded read must not load the whole file")
+
+    monkeypatch.setattr(fs_module.Path, "read_text", refuse_read_text)
+
+    result = tools["file_read"](path=str(big_file), offset=0, limit=10)
+    assert "     1\t" in result
+    assert "    10\t" in result
+    assert "    11\t" not in result
+    assert "31000 lines total" in result
+
+
+def test_very_long_line_is_capped_with_marker(tools, tmp_path):
+    """A single line past the per-line cap is cut off and marked."""
+    f = tmp_path / "minified.js"
+    f.write_text("q" * 5000 + "\n")
+    result = tools["file_read"](path=str(f))
+    assert "line truncated, 3000 more chars" in result
+    assert "q" * 2001 not in result
+
+
 # --- Edge cases ---
 
 
@@ -215,3 +242,29 @@ def test_audit_log_entry_written(tools, tmp_path, monkeypatch):
     content = log_path.read_text()
     assert str(f) in content
     assert '"allowed": true' in content
+
+
+def test_negative_offset_reads_from_start_and_audits(tools, tmp_path, monkeypatch):
+    """A negative offset clamps to 0 instead of raising, and still audits."""
+    monkeypatch.chdir(tmp_path)
+    f = tmp_path / "neg.txt"
+    f.write_text("".join(f"line{i}\n" for i in range(6)))
+
+    result = tools["file_read"](path=str(f), offset=-2, limit=3)
+
+    assert "line0" in result
+    assert "line3" not in result
+    assert "     1\tline0" in result
+    log_path = tmp_path / ".omca" / "logs" / "file-access.jsonl"
+    assert '"allowed": true' in log_path.read_text()
+
+
+def test_read_window_tolerates_negative_offset(tmp_path):
+    """_read_window clamps a negative offset rather than raising ValueError."""
+    f = tmp_path / "neg.txt"
+    f.write_text("".join(f"line{i}\n" for i in range(6)))
+
+    window, total, _enc = fs_module._read_window(f, "utf-8", -2, 5)
+
+    assert total == 6
+    assert window[0].strip() == "line0"
