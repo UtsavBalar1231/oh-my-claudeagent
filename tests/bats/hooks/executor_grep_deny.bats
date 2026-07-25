@@ -109,3 +109,38 @@ load '../test_helper'
 		'{"tool_name":"Read","subagent_type":"oh-my-claudeagent:executor","tool_input":{"file_path":"src/main.py"}}'
 	assert_success
 }
+
+# ── compound commands: no blanket allow ───────────────────────────────────────
+# The Bash allow outranks the platform prompt, so a compound command must fall
+# through rather than be auto-allowed by this hook.
+
+@test "Bash grep with && second command emits no allow (main session)" {
+	run_hook "executor-grep-deny.sh" \
+		'{"tool_name":"Bash","tool_input":{"command":"grep foo data.json && ls /tmp"}}'
+	assert_success
+	assert_output ''
+}
+
+@test "Bash grep with pipe emits no allow (executor)" {
+	run_hook "executor-grep-deny.sh" \
+		'{"tool_name":"Bash","subagent_type":"oh-my-claudeagent:executor","tool_input":{"command":"grep foo data.json | sort"}}'
+	assert_success
+	assert_output ''
+}
+
+# CODE_EXT_REGEX is anchored at end-of-string, so a code file that is not the last
+# token never reaches deny_grep. Pins the fall-through: the ast_search rule is
+# unenforced for this shape, but the command is no longer auto-allowed either.
+@test "Bash grep on a non-final code file falls through, not allowed" {
+	run_hook "executor-grep-deny.sh" \
+		'{"tool_name":"Bash","subagent_type":"oh-my-claudeagent:executor","tool_input":{"command":"grep foo main.py && ls /tmp"}}'
+	assert_success
+	assert_output ''
+}
+
+@test "Bash simple grep still emits allow (operator scan does not over-match)" {
+	run_hook "executor-grep-deny.sh" \
+		'{"tool_name":"Bash","tool_input":{"command":"grep foo data.json"}}'
+	assert_success
+	assert_output '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}'
+}

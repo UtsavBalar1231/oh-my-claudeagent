@@ -62,19 +62,32 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/subagent-stop.sh",
-						"timeout": 5000
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/subagent-stop.sh\"",
+						"timeout": 5
 					}
 				]
 			}
 		],
 		"PreToolUse": [
 			{
+				"matcher": "Bash",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh\""
+					},
+					{
+						"type": "command",
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/git-destructive-deny.sh\""
+					}
+				]
+			},
+			{
 				"matcher": "Grep",
 				"hooks": [
 					{
 						"type": "command",
-						"command": "${CLAUDE_PLUGIN_ROOT}/scripts/executor-grep-deny.sh"
+						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/executor-grep-deny.sh\""
 					}
 				]
 			},

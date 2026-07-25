@@ -118,6 +118,81 @@ run_hook_merged() {
 	assert_success
 }
 
+# ─── Subcommand terminated by a separator rather than whitespace ───────────────
+# The deny now runs on PreToolUse for every Bash call, so a subcommand that ends on
+# a separator has to deny too. It previously did not: the trailing match required
+# whitespace or end of string, so `git stash;` and `echo $(git stash)` walked past.
+
+@test "git-destructive-deny: git stash followed by a semicolon is blocked" {
+	run_hook_merged "git-destructive-deny.sh" "$(bash_payload 'git stash; echo ok')"
+	assert_failure 2
+	assert_output --partial "Destructive git"
+}
+
+@test "git-destructive-deny: git stash backgrounded is blocked" {
+	run_hook_merged "git-destructive-deny.sh" "$(bash_payload 'git stash&')"
+	assert_failure 2
+}
+
+@test "git-destructive-deny: git stash piped is blocked" {
+	run_hook_merged "git-destructive-deny.sh" "$(bash_payload 'git stash|cat')"
+	assert_failure 2
+}
+
+@test "git-destructive-deny: git stash inside a substitution is blocked" {
+	run_hook_merged "git-destructive-deny.sh" "$(bash_payload 'echo $(git stash)')"
+	assert_failure 2
+}
+
+@test "git-destructive-deny: git clean redirected is blocked" {
+	run_hook_merged "git-destructive-deny.sh" "$(bash_payload 'git clean >/tmp/out')"
+	assert_failure 2
+}
+
+# ─── sudo prefix ───────────────────────────────────────────────────────────────
+# Without the optional sudo the command carried no operator, so it reached the
+# trailing allow and was auto-approved rather than merely falling through.
+
+@test "git-destructive-deny: sudo git clean -fdx is blocked" {
+	run_hook_merged "git-destructive-deny.sh" "$(bash_payload 'sudo git clean -fdx')"
+	assert_failure 2
+	assert_output --partial "Destructive git"
+}
+
+@test "git-destructive-deny: sudo git reset --hard is blocked" {
+	run_hook_merged "git-destructive-deny.sh" "$(bash_payload 'sudo git reset --hard')"
+	assert_failure 2
+}
+
+# ─── Subcommand prefixes and non-path checkout flags stay out of scope ─────────
+# `git checkout --` discards working tree changes; `git checkout --detach` does not,
+# and denying it was over-matching that the separator requirement removed.
+
+@test "git-destructive-deny: git cleanup is allowed" {
+	run_hook "git-destructive-deny.sh" "$(bash_payload 'git cleanup')"
+	assert_success
+}
+
+@test "git-destructive-deny: git stashy is allowed" {
+	run_hook "git-destructive-deny.sh" "$(bash_payload 'git stashy')"
+	assert_success
+}
+
+@test "git-destructive-deny: git checkout --detach is allowed" {
+	run_hook "git-destructive-deny.sh" "$(bash_payload 'git checkout --detach')"
+	assert_success
+}
+
+@test "git-destructive-deny: git checkout --track origin/x is allowed" {
+	run_hook "git-destructive-deny.sh" "$(bash_payload 'git checkout --track origin/x')"
+	assert_success
+}
+
+@test "git-destructive-deny: git checkout -- . is still blocked" {
+	run_hook_merged "git-destructive-deny.sh" "$(bash_payload 'git checkout -- .')"
+	assert_failure 2
+}
+
 # ─── Opt-out via env var ────────────────────────────────────────────────────────
 
 @test "git-destructive-deny: opt-out via OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY=1 allows reset --hard" {

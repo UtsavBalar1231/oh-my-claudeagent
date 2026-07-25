@@ -99,3 +99,42 @@ load '../test_helper'
 	assert_success
 	assert_output ""
 }
+
+# ── compound commands: no blanket allow ───────────────────────────────────────
+# An allow outranks the platform prompt, so a command whose head is sed/grep but
+# which carries a second command must fall through, not be auto-allowed.
+
+@test "grep head with && second command falls through (no allow)" {
+	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"grep foo file.txt && ls /tmp"}}'
+	assert_success
+	assert_output ''
+}
+
+@test "grep head with ; second command falls through (no allow)" {
+	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"grep -c foo file.txt; ls /tmp"}}'
+	assert_success
+	assert_output ''
+}
+
+@test "sed head with && second command falls through (no allow)" {
+	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"sed -i '\''s/x/y/'\'' file.txt && ls /tmp"}}'
+	assert_success
+	assert_output ''
+}
+
+@test "grep head with pipe falls through (no allow)" {
+	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"grep foo file.txt | sort"}}'
+	assert_success
+	assert_output ''
+}
+
+@test "grep head with command substitution falls through (no allow)" {
+	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"grep foo $(ls)"}}'
+	assert_success
+	assert_output ''
+}
+
+@test "grep -n still denies even inside a compound command" {
+	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"grep -n foo file.txt && ls /tmp"}}'
+	assert_failure 2
+}

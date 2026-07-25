@@ -19,5 +19,16 @@ if [[ "${CMD}" =~ (^|[[:space:]])sed[[:space:]]+-[[:alnum:]]*n[[:alnum:]]*([[:sp
 	exit 2
 fi
 
+# The allow below covers every command this hook did not deny, so it must not
+# speak for a command that carries a second one: the `Bash(sed *)`/`Bash(grep *)`
+# if-filters glob-match the whole argument string, so `grep x f && curl ... | sh`
+# reaches here, and an allow outranks the platform prompt it would otherwise get.
+# Any operator leaves the decision to the platform. Mirrors the operator scan in
+# permission-filter.sh and git-destructive-deny.sh, same quote-blindness.
+OPERATOR_RE=$'[|;<>`&\n\r]|[$]\\('
+if [[ "${CMD}" =~ ${OPERATOR_RE} ]]; then
+	exit 0
+fi
+
 echo '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}'
 exit 0

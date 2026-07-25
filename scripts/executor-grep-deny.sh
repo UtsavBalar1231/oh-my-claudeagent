@@ -20,8 +20,14 @@ Grep | Bash) ;;
 esac
 
 # allow_pass — emit PermissionRequest allow JSON for Bash events; silent exit for Grep (PreToolUse).
+# The Bash allow covers every command this hook did not deny, so it must not speak
+# for a command that carries a second one: the `Bash(grep *)` if-filter glob-matches
+# the whole argument string, so `grep x f && curl ... | sh` reaches here, and an allow
+# outranks the platform prompt it would otherwise get. Any operator falls through to
+# the platform. Mirrors permission-filter.sh, same quote-blindness.
+OPERATOR_RE=$'[|;<>`&\n\r]|[$]\\('
 allow_pass() {
-	if [[ "${TOOL_NAME}" == "Bash" ]]; then
+	if [[ "${TOOL_NAME}" == "Bash" ]] && [[ ! "$(jq -r '.tool_input.command // ""' <<< "${HOOK_INPUT}")" =~ ${OPERATOR_RE} ]]; then
 		echo '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}'
 	fi
 	exit 0
