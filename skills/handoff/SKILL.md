@@ -8,6 +8,7 @@ when_to_use: |
   - User says "handoff", "context is long", or "start fresh"
   - Switching to a new Claude Code session mid-task
 user-invocable: true
+disable-model-invocation: true
 shell: bash
 argument-hint: optional notes about what to include
 ---
@@ -132,9 +133,12 @@ TO CONTINUE IN A NEW SESSION:
 3. Add: "Continue from the handoff context above. [Your next task]"
 ```
 
-## Recommended user configuration
+## Invocation
 
-Handoff is a user-driven workflow. To prevent Claude from self-invoking it mid-conversation, disable the OMCA plugin temporarily via `/plugin disable oh-my-claudeagent` (re-enable with `/plugin enable oh-my-claudeagent`), or set `enabledPlugins` in your `settings.json` to exclude it for sessions where you do not want the handoff keyword trigger active.
+Handoff is a user-driven workflow, so this skill sets `disable-model-invocation: true`: it
+runs only when you type `/oh-my-claudeagent:handoff`. Claude cannot load it on its own, and
+it is not preloaded into subagents. The "handoff" keyword the OMCA keyword detector watches
+for is an advisory nudge that suggests running the command; it does not start the workflow.
 
 ## Constraints
 

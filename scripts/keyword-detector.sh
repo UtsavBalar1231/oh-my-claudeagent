@@ -36,7 +36,7 @@ ADDITIONAL_CONTEXT=""
 if ! mode_already_announced "handoff" \
 	&& [[ "${PROMPT_LOWER}" =~ (handoff|context[[:space:]]+is[[:space:]]+getting[[:space:]]+long|start[[:space:]]+fresh[[:space:]]+session) ]]; then
 	DETECTED_KEYWORDS+=("handoff")
-	ADDITIONAL_CONTEXT+="[HANDOFF MODE DETECTED] Create session handoff summary for new-session continuity."$'\n'
+	ADDITIONAL_CONTEXT+="[HANDOFF MODE DETECTED] Handoff is user-driven and its skill cannot be model-invoked: suggest running /oh-my-claudeagent:handoff instead of improvising a summary."$'\n'
 fi
 
 if ! mode_already_announced "omca-setup" \
