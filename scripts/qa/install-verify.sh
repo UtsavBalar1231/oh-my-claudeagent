@@ -40,16 +40,27 @@ check_hook_script_paths() {
 	while IFS= read -r cmd; do
 		[[ -z "${cmd}" ]] && continue
 		checked=$((checked + 1))
+		# Handlers quote the placeholder so a space in the install path survives
+		# word splitting. The shell strips those quotes before exec; this check
+		# must do the same or every path resolves to a nonexistent file.
+		if [[ "${cmd}" == '"'*'"' ]]; then
+			cmd="${cmd:1:${#cmd}-2}"
+		fi
 		rel_path="${cmd#\$\{CLAUDE_PLUGIN_ROOT\}/}"
 		if [[ ! -f "${package_dir}/${rel_path}" ]]; then
 			qa_fail "hook command does not resolve in package: ${cmd}"
+			missing=$((missing + 1))
+		elif [[ ! -x "${package_dir}/${rel_path}" ]]; then
+			# Shell form honors the shebang, so a lost executable bit surfaces
+			# only once the platform tries to spawn the handler.
+			qa_fail "hook script is not executable in package: ${cmd}"
 			missing=$((missing + 1))
 		fi
 	done < <(jq -r '[.. | objects | select(.type? == "command") | .command] | .[]' "${hooks_json}")
 	if [[ "${checked}" -eq 0 ]]; then
 		qa_fail "no command hooks found to check in ${hooks_json}"
 	elif [[ "${missing}" -eq 0 ]]; then
-		qa_pass "all ${checked} hook command paths resolve inside the packaged tree"
+		qa_pass "all ${checked} hook command paths resolve and are executable inside the packaged tree"
 	fi
 }
 

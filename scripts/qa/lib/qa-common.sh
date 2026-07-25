@@ -67,6 +67,24 @@ qa_new_scratch_project() {
 	printf '%s\n' "${dir}"
 }
 
+# ---- canary factory ----
+
+# qa_new_canary_dir <parent_dir> — throwaway directory holding one file, for probes
+# asserting a destructive command was actually blocked. Registered for teardown here,
+# so it is removed and receipted whether the probe passed, failed, or aborted.
+#
+# The parent is the caller's scratch project, not $TMPDIR: under permission mode auto
+# the classifier judges an out-of-project path more harshly, and a probe refused for
+# being out-of-project never reaches the guard. The mundane name is the same
+# concern — a path named "canary" reads as a tripwire and gets refused on sight.
+qa_new_canary_dir() {
+	local parent="$1" dir
+	dir="$(mktemp -d "${parent}/stale-build-cache-XXXXXX")"
+	printf 'stale artifact\n' >"${dir}/stale.o"
+	QA_CLEANUP_DIRS+=("${dir}")
+	printf '%s\n' "${dir}"
+}
+
 # ---- packaged-plugin build ----
 
 # Build the packaged plugin tree once and cache it in QA_PACKAGE_DIR for the lifetime
