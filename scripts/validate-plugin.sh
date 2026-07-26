@@ -871,6 +871,17 @@ check_docs_accuracy() {
 		.claude .claude-plugin .github .omca
 	)
 
+	# Resolve path claims against git metadata, not the working tree. A developer's
+	# checkout carries untracked files a fresh clone does not, so a presence test
+	# passes locally and fails in CI on the same commit. Tracked-ness is identical
+	# in both, which also keeps this check's output stable enough to record as a
+	# golden baseline.
+	local -A tracked_paths=()
+	local tracked_entry
+	while IFS= read -r tracked_entry; do
+		[[ -n "${tracked_entry}" ]] && tracked_paths["${tracked_entry}"]=1
+	done < <(git -C "${REPO_ROOT}" ls-files 2>/dev/null)
+
 	local docs=("${README_MD}" "${OMCA_MD}" "${CONTRIBUTING_MD}")
 	local doc_path doc_rel recipe found_recipe=1
 
@@ -910,8 +921,12 @@ check_docs_accuracy() {
 			done
 			[[ "${known}" -eq 1 ]] || continue
 
-			if [[ -e "${REPO_ROOT}/${candidate}" ]]; then
+			if [[ -n "${tracked_paths[${candidate}]:-}" ]]; then
 				pass "docs accuracy: ${doc_rel} references existing path '${candidate}'"
+			elif git -C "${REPO_ROOT}" check-ignore -q "${candidate}" 2>/dev/null; then
+				# User-scope or runtime state a reader creates for themselves, so
+				# the reference is about their machine rather than this tree.
+				skip "docs accuracy: ${doc_rel}:${lineno} references untracked, gitignored path '${candidate}'"
 			elif docs_accuracy_documents_removal "${doc_path}" "${lineno}"; then
 				pass "docs accuracy: ${doc_rel}:${lineno} documents removal of '${candidate}' (not a stale reference)"
 			else

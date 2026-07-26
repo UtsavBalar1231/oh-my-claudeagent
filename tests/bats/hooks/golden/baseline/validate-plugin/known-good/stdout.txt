@@ -75,7 +75,7 @@
 [validate-plugin] Running depersonalization checks
 [validate-plugin] PASS: depersonalization: no home-path, credential, or bearer-token literals found in tracked shipped files
 [validate-plugin] Running docs accuracy checks
-[validate-plugin] PASS: docs accuracy: README.md references existing path '.claude/settings.json'
+[validate-plugin] SKIP: docs accuracy: README.md:21 references untracked, gitignored path '.claude/settings.json'
 [validate-plugin] PASS: docs accuracy: README.md references existing path 'docs/reference/known-issues.md'
 [validate-plugin] PASS: docs accuracy: README.md references existing path 'docs/reference/configuration.md'
 [validate-plugin] PASS: docs accuracy: OMCA.md cites existing recipe 'just doctor'
@@ -84,6 +84,8 @@
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'docs/reference/configuration.md'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'docs/reference/known-issues.md'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'docs/CONTRIBUTING.md'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'agents/sisyphus.md'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'servers/categories.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'templates/claudemd.md'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/subagent-start.sh'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/validate-plugin.sh'
@@ -91,12 +93,12 @@
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/validate-plugin.sh'
-[validate-plugin] PASS: docs accuracy: OMCA.md:286 documents removal of 'scripts/post-tool-batch.sh' (not a stale reference)
+[validate-plugin] PASS: docs accuracy: OMCA.md:307 documents removal of 'scripts/post-tool-batch.sh' (not a stale reference)
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/lib/common.sh'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'statusline/core.py'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'statusline/subagent.py'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'statusline/README.md'
-[validate-plugin] PASS: docs accuracy: OMCA.md references existing path '.claude/settings.json'
+[validate-plugin] SKIP: docs accuracy: OMCA.md:546 references untracked, gitignored path '.claude/settings.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'templates/claudemd.md'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'commands/start-work.md'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'commands/start-work.md'
@@ -104,7 +106,7 @@
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path '.claude/rules/state-schemas.md'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/lib/common.sh'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'commands/start-work.md'
-[validate-plugin] PASS: docs accuracy: OMCA.md references existing path '.claude/settings.json'
+[validate-plugin] SKIP: docs accuracy: OMCA.md:1023 references untracked, gitignored path '.claude/settings.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/lib/common.sh'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/delegate-retry.sh'
@@ -120,15 +122,13 @@
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/context-injector.sh'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/lib/common.sh'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'output-styles/omca-default.md'
-[validate-plugin] PASS: docs accuracy: OMCA.md references existing path '.omca/notes/probe-runtime-semantics.md'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path '.claude/rules/agent-conventions.md'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'statusline/subagent.py'
-[validate-plugin] PASS: docs accuracy: OMCA.md references existing path '.omca/notes/spike-semantic-verification-hooks.md'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'agents/sisyphus.md'
-[validate-plugin] PASS: docs accuracy: OMCA.md references existing path '.claude/settings.json'
-[validate-plugin] PASS: docs accuracy: OMCA.md references existing path '.claude/settings.local.json'
+[validate-plugin] SKIP: docs accuracy: OMCA.md:1440 references untracked, gitignored path '.claude/settings.json'
+[validate-plugin] SKIP: docs accuracy: OMCA.md:1440 references untracked, gitignored path '.claude/settings.local.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'statusline/core.py'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'docs/reference/known-issues.md'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
@@ -139,7 +139,9 @@
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/validate-plugin.sh'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'commands/start-work.md'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'agents/multimodal-looker.md'
-[validate-plugin] PASS: docs accuracy: OMCA.md references existing path '.claude/settings.json'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'agents/sisyphus.md'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'servers/categories.json'
+[validate-plugin] SKIP: docs accuracy: OMCA.md:1529 references untracked, gitignored path '.claude/settings.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'servers/tools/ast.py'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/validate-plugin.sh'
 [validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md cites existing recipe 'just setup'
@@ -214,4 +216,4 @@
 [validate-plugin] PASS: mcp tools/list contains categories_list
 [validate-plugin] PASS: mcp tools/list contains file_read
 [validate-plugin] PASS: mcp tools/list contains session_search
-[validate-plugin] Summary: 199 passed, 0 failed, 7 skipped, 0 warned
+[validate-plugin] Summary: 195 passed, 0 failed, 13 skipped, 0 warned
