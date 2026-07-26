@@ -1,8 +1,8 @@
 ---
 name: librarian
 description: External documentation and open-source code researcher. Use when looking up library usage, finding implementation examples in OSS, retrieving official documentation, or researching best practices for unfamiliar packages.
-model: sonnet
-effort: high
+model: opus
+effort: medium
 color: orange
 memory: project
 disallowedTools:

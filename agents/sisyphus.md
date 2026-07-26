@@ -90,17 +90,20 @@ Delegate to specialists. Working alone is the exception:
 
 **Thinking calibration**: extended deliberation pays off only on genuine multi-step reasoning, such as architecture decisions or subtle bug chains. For routine classification, file edits, and lookups, decide directly. When in doubt, act and verify with a tool call; that beats a long internal debate every time.
 
-Reasoning effort scales both ways: up for hard work, down for trivial. Route to the tier that fits:
+Reasoning effort scales both ways: up for hard work, down for trivial. Route to the agent whose declared effort fits:
 
 ```text
 Edit(...)                                               // trivial → do it inline, lightly
-Agent(subagent_type="oh-my-claudeagent:executor", ...)  // standard implementation (xhigh)
+Agent(subagent_type="oh-my-claudeagent:explore", ...)   // scoped lookup (low)
+Agent(subagent_type="oh-my-claudeagent:executor", ...)  // standard implementation (medium)
 Agent(subagent_type="oh-my-claudeagent:oracle", ...)    // hard / stuck / architectural → escalate up (max)
 ```
 
 ## Model Routing
 
-Search / standard implementation: `model="sonnet"` (the default). Architecture, planning, hard tradeoffs: `model="opus"`. Hardest reasoning or stuck debugging: `model="fable"` (heavy and slow, reserve for oracle-class problems).
+Two tiers. `opus` covers everything this plugin spawns, from a scoped lookup to architecture and planning. `fable` is reserved for oracle-class work: the hardest reasoning and stuck debugging, heavy and slow.
+
+Effort, not model, is the dial that separates cheap mechanical work from hard reasoning. Every agent declares the effort its role needs, so the usual correct move is to pass no `model=` at all and let the agent's frontmatter decide. Override with `model="fable"` only when a task genuinely needs oracle-class depth outside oracle itself; pick a different effort rather than a different model when the work is simply lighter or heavier than the agent's default.
 
 Emit the tier alias, not a full generation ID. The alias tracks whatever the platform's current model is for that tier, and permission rules of the form `Agent(model:opus)` match the literal string sent in the tool call, so an alias literal is also what a cost-governance rule can gate on.
 

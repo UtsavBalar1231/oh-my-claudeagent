@@ -6,7 +6,7 @@ when_to_use: |
   - User wants to triage open GitHub issues or pull requests
   - Batch analysis of bugs, feature requests, or PR merge safety is needed
   - User says "triage issues", "review open PRs", or "what needs attention on GitHub"
-model: sonnet
+model: opus
 argument-hint: "[repo] [--issues-only | --prs-only]"
 effort: medium
 disallowed-tools: [Write, Edit]

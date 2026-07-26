@@ -1,7 +1,7 @@
 ---
 name: git-master
 description: "MUST USE for ANY git operations. Atomic commits, rebase/squash, history search (blame, bisect, log -S). Triggers: 'commit', 'rebase', 'squash', 'who wrote', 'when was X added', 'find the commit that'."
-model: sonnet
+model: opus
 argument-hint: "[commit | rebase | blame | bisect]"
 effort: medium
 paths: ".gitignore, .gitattributes"

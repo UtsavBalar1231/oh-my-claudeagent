@@ -321,12 +321,12 @@ ORACLE_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id
 
 # ─── q. Model capture into subagent-models.json ──────────────────────────────
 
-@test "model capture: executor agent_type resolves to Sonnet" {
+@test "model capture: executor agent_type resolves to Opus" {
 	run_hook "subagent-start.sh" "$EXECUTOR_PAYLOAD"
 	assert_success
 	local model
 	model=$(read_state "subagent-models.json" | jq -r '."agent-abc123".model')
-	assert [ "$model" = "Sonnet" ]
+	assert [ "$model" = "Opus" ]
 	local type
 	type=$(read_state "subagent-models.json" | jq -r '."agent-abc123".agent_type')
 	assert [ "$type" = "oh-my-claudeagent:executor" ]
@@ -338,6 +338,18 @@ ORACLE_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id
 	local model
 	model=$(read_state "subagent-models.json" | jq -r '."agent-abc123".model')
 	assert [ "$model" = "Opus" ]
+}
+
+# Every agent but oracle declares the same tier, so an executor-vs-sisyphus pair
+# no longer proves the lookup reads frontmatter: a resolver hardcoded to "Opus"
+# would satisfy both. oracle is the only agent on a different tier and is what
+# keeps this suite able to tell a real lookup from a constant.
+@test "model capture: oracle agent_type resolves to Fable" {
+	run_hook "subagent-start.sh" "$ORACLE_PAYLOAD"
+	assert_success
+	local model
+	model=$(read_state "subagent-models.json" | jq -r '."agent-abc123".model')
+	assert [ "$model" = "Fable" ]
 }
 
 @test "model capture: non-OMCA agent_type stores empty model" {

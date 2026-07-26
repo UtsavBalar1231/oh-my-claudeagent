@@ -1,11 +1,11 @@
 {
 	"categories": {
 		"quick": {
-			"model": "sonnet",
-			"description": "Fast lookups, simple searches"
+			"model": "opus",
+			"description": "Short scoped lookups and simple searches"
 		},
 		"standard": {
-			"model": "sonnet",
+			"model": "opus",
 			"description": "Normal implementation work"
 		},
 		"deep": {
@@ -17,7 +17,7 @@
 			"description": "Most demanding reasoning, stuck debugging, long-horizon work"
 		},
 		"readonly": {
-			"model": "sonnet",
+			"model": "opus",
 			"description": "Read-only exploration and research"
 		}
 	}
