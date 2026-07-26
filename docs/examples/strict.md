@@ -70,13 +70,15 @@ legacy `OMCA_HOOK_DISABLE_*` flags. The evidence gates (`final-verification-evid
 
 Two adjacent choices a strict setup should make deliberately:
 
-- Add `Agent(model:opus)`, `Agent(isolation:worktree)`, and `Bash(run_in_background:true)` to
+- Add `Agent(model:fable)`, `Agent(isolation:worktree)`, and `Bash(run_in_background:true)` to
   `permissions.deny` or `permissions.ask` if you want delegation tier, worktree isolation, and
   backgrounded shell commands gated per call. Use the alias form for the model: the rule matches
-  the literal input Claude sends, and OMCA's delegation examples pass `model="opus"`,
-  `model="sonnet"`, or `model="fable"`, so a pinned id will not match. Note the limit of the
-  syntax: an agent whose tier comes from its own frontmatter sends no `model` parameter, and an
-  omitted parameter is never matched, so this rule gates explicit per-call overrides only.
+  the literal input Claude sends, and OMCA's delegation guidance passes an alias rather than a
+  pinned id, so a pinned id will not match. `fable` is the tier worth gating, since the roster
+  declares `opus` in frontmatter and reaches `fable` only through an explicit override. Note the
+  limit of the syntax: an agent whose tier comes from its own frontmatter sends no `model`
+  parameter, and an omitted parameter is never matched, so this rule gates explicit per-call
+  overrides only.
 - Do not add `Write(<path>)`, `NotebookEdit(<path>)`, or `Glob(<path>)` rules. They are
   accepted but never match, and the platform prints a startup warning for each. `Edit(<path>)`
   already covers every file-editing tool including `Write`.

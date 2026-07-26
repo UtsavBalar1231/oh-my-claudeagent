@@ -119,8 +119,8 @@ still produces an advisory nudge toward the slash command; it does not start the
 | Setting | Suggested value | Why |
 |---|---|---|
 | `teammateDefaultModel` | `null` | Teammates then inherit the lead session's `/model`. Any other value depends on your model availability, provider, and budget, which is why `omca-setup` does not merge this key |
-| `modelOverrides` | unset unless needed | The named escape hatch for provider portability. It maps individual Anthropic model ids to provider-specific ids. OMCA agents declare tier aliases (`opus`, `sonnet`, `fable`), so map the versions those aliases resolve to on your provider rather than editing agent frontmatter |
-| `availableModels` | unset unless your org requires it | This key alone constrains which models subagents and skills may select, independent of `enforceAvailableModels`. Filtering matches an alias, a version prefix, or a full provider-form id, so an allowlist of `[sonnet, haiku]` still shuts out the `opus` and `fable` agents |
+| `modelOverrides` | unset unless needed | The named escape hatch for provider portability. It maps individual Anthropic model ids to provider-specific ids. OMCA agents declare tier aliases (`opus`, `fable`), so map the versions those aliases resolve to on your provider rather than editing agent frontmatter |
+| `availableModels` | unset unless your org requires it | This key alone constrains which models subagents and skills may select, independent of `enforceAvailableModels`. Filtering matches an alias, a version prefix, or a full provider-form id. The roster declares only `opus` and `fable`, so an allowlist omitting `opus` shuts out every agent but oracle, and one omitting `fable` shuts out oracle. An allowlist of `[sonnet, haiku]` now leaves nothing on the roster spawnable |
 | `askUserQuestionTimeout` | leave at the default `never` | A timed-out question dialog is a silent auto-answer. `prometheus` treats a skipped interview question as resolving to that question's default, and `omca-setup` asks for confirmation before writing to `~/.claude/settings.json` |
 | `workflowSizeGuideline` | unset | It bounds native dynamic workflows only and does not constrain direct `Agent` fan-out, so it cannot cap an OMCA parallel group. Setting it also hides the matching `/config` row |
 | `emojiCompletionEnabled` | your preference | Cosmetic input-editor setting for `:shortcode:` completion. Not part of what `omca-setup` applies |
@@ -162,7 +162,7 @@ forms useful for cost and blast-radius governance. None is set by the plugin.
 {
   "permissions": {
     "deny": [
-      "Agent(model:opus)",
+      "Agent(model:fable)",
       "Agent(isolation:worktree)",
       "Bash(run_in_background:true)"
     ]
@@ -170,10 +170,11 @@ forms useful for cost and blast-radius governance. None is set by the plugin.
 }
 ```
 
-Use the alias form (`opus`) rather than a pinned id. The rule is matched against the literal
-input Claude sends, before any normalization, and OMCA's delegation examples pass
-`model="opus"`, `model="sonnet"`, or `model="fable"`, so the alias form fires on those calls
-and a pinned id does not.
+Use the alias form (`opus`, `fable`) rather than a pinned id. The rule is matched against the
+literal input Claude sends, before any normalization, and OMCA's delegation guidance passes the
+alias when it passes a model at all, so the alias form fires on those calls and a pinned id does
+not. `Agent(model:fable)` is the rule that bites hardest in practice, because a per-call `fable`
+override is the one delegation that reaches beyond the roster's declared tier.
 
 `Agent(model:...)` gates explicit per-call overrides only. An agent that takes its tier from
 its own frontmatter is spawned with no `model` parameter at all, and an omitted parameter is

@@ -21,7 +21,7 @@ Install: `README.md`. Contributor internals: `CLAUDE.md`.
 
 Claude Code runs single-threaded. Simultaneous research + implementation, or ten files needing fixes at once, bottleneck the default session. No built-in specialist delegation or persistence guarantee.
 
-OMCA adds a multi-agent layer: specialist agents with model tiers (fable/opus/sonnet), skills via slash commands or keywords, hooks for persistence and context injection, MCP servers for structural search and state.
+OMCA adds a multi-agent layer: specialist agents on two model tiers (opus for the roster, fable for oracle) tuned by per-agent effort, skills via slash commands or keywords, hooks for persistence and context injection, MCP servers for structural search and state.
 
 ### Philosophy
 
@@ -55,10 +55,31 @@ Markdown files in `agents/*.md` with YAML frontmatter (name, model, disallowedTo
 
 | Tier | Default for | Use for |
 |------|-------------|---------|
-| fable | oracle | Hardest reasoning, stuck debugging, long-horizon work — heavy and slow; read-only advisor only |
-| opus | Orchestrators, planners, reviewers | Complex reasoning, architecture, multi-step coordination |
-| sonnet | Executors, searchers, fixers, visual analysis | Standard implementation, search, builds, multimodal |
-| haiku | (override only — outdated) | Quick lookups, simple transforms; still supported, just off the default roster |
+| fable | oracle | Hardest reasoning, stuck debugging, long-horizon work; heavy and slow, read-only advisor only |
+| opus | Every other agent: orchestrator, planners, reviewers, executor, searchers, fixer, visual analysis | Everything else the plugin spawns, from a scoped lookup to architecture |
+| sonnet | (override only) | Still a valid `Agent(..., model="sonnet")` override; no agent declares it |
+| haiku | (override only, outdated) | Quick lookups, simple transforms; still supported, just off the default roster |
+
+**The model column no longer tells the agents apart.** With one tier covering everything but
+oracle, `model:` cannot distinguish a searcher from a planner. `effort:` is what does, and every
+agent declares it in frontmatter:
+
+| Effort | Agents | Why that level |
+|--------|--------|----------------|
+| low | explore | Short, scoped work that is not intelligence-sensitive, which is what the docs reserve `low` for (`claude-code-docs/docs/model-config.md`, "Choose an effort level") |
+| medium | executor, hephaestus, librarian, multimodal-looker | Same source: `medium` reduces token usage for cost-sensitive work that can trade off some intelligence. These four run most often, so per-call spend matters more here than reasoning depth |
+| xhigh | sisyphus, prometheus, metis, momus | Deeper reasoning at higher token spend, for orchestration, interviewing, gap analysis, and plan review |
+| max | oracle | Deepest reasoning, for the one role that is only asked when something is already stuck |
+
+So scaling a delegation up or down means picking the agent whose declared effort fits, or
+overriding effort, not picking a different model. `agents/sisyphus.md`'s Model Routing section
+carries the same rule for call sites: pass no `model=` at all in the usual case.
+
+The same collapse reaches `servers/categories.json`. Four of its five categories (`quick`,
+`standard`, `deep`, `readonly`) now name `opus` and only `hardest` names `fable`, so a consumer
+reading `.value.model` sees two distinct outcomes across five categories. What actually separates
+those categories is effort, and the category schema has no field for it, so the file's
+distinctions are narrower than its category names suggest.
 
 Override any agent's model: `Agent(subagent_type="oh-my-claudeagent:explore", model="haiku")`
 
@@ -585,8 +606,8 @@ steps max, effort estimates (Quick/Short/Medium/Large).
 
 | Agent | Model | Effort | Invoke | Purpose |
 |-------|-------|--------|--------|---------|
-| explore | sonnet | medium | `Agent(..., run_in_background=false)` | Codebase search — files, patterns, implementations |
-| librarian | sonnet | high | `Agent(..., run_in_background=false)` | External docs, OSS examples, library research |
+| explore | opus | low | `Agent(..., run_in_background=false)` | Codebase search — files, patterns, implementations |
+| librarian | opus | medium | `Agent(..., run_in_background=false)` | External docs, OSS examples, library research |
 
 **explore** uses ast_search, Grep, Glob. Fire multiple in parallel for broad searches.
 
@@ -611,9 +632,9 @@ Socratic research interview is now part of `prometheus` (Socratic Interview Mode
 
 | Agent | Model | Effort | Invoke | Purpose |
 |-------|-------|--------|--------|---------|
-| executor | sonnet | xhigh | `Agent(subagent_type="oh-my-claudeagent:executor")` | Focused task executor — implements directly, never delegates implementation |
-| hephaestus | sonnet | xhigh | `/oh-my-claudeagent:hephaestus` or "fix build" | Build and toolchain fixer — minimal-diff policy |
-| multimodal-looker | sonnet | high | `Agent(subagent_type="oh-my-claudeagent:multimodal-looker")` | Image, PDF, diagram analysis (read-only) |
+| executor | opus | medium | `Agent(subagent_type="oh-my-claudeagent:executor")` | Focused task executor — implements directly, never delegates implementation |
+| hephaestus | opus | medium | `/oh-my-claudeagent:hephaestus` or "fix build" | Build and toolchain fixer — minimal-diff policy |
+| multimodal-looker | opus | medium | `Agent(subagent_type="oh-my-claudeagent:multimodal-looker")` | Image, PDF, diagram analysis (read-only) |
 
 **executor** implements one atomic task per delegation. It may spawn a read-only research
 agent when the platform's spawn-depth ceiling allows it, and otherwise searches with
@@ -1259,8 +1280,8 @@ than copied verbatim.
   injection was not a problem OMCA had, so it was left out rather than adding unused
   surface area.
 
-**Probed runtime findings** (verified before building on top of them; full detail in
-`.omca/notes/probe-runtime-semantics.md`):
+**Probed runtime findings** (each verified against a live payload before anything was
+built on top of it, rather than inferred from the docs):
 
 - The `Stop` payload carries `last_assistant_message` and `transcript_path`; there is no
   inline `messages` array, and the undocumented probe for one was removed. Both Stop hooks
@@ -1330,13 +1351,15 @@ Features introduced in this window that OMCA consciously declines to adopt:
 | Model generation move | Agent roster: oracle on `fable`, orchestrators/planners on `opus`, workers on `sonnet`; haiku retired |
 
 **Provider-alias caveat:** every OMCA agent declares a tier alias in `model:` frontmatter
-(`opus`, `sonnet`, `fable`), which is what `.claude/rules/agent-conventions.md` mandates. The
+(`opus` or `fable`), which is what `.claude/rules/agent-conventions.md` mandates. The
 generation an alias resolves to depends on the provider (`claude-code-docs/docs/model-config.md`
 provider table): `opus` is Opus 5 on the Anthropic API, Claude Platform on AWS, Amazon Bedrock,
-and Google Cloud's Agent Platform, and Opus 4.6 on Microsoft Foundry; `sonnet` is Sonnet 5 on
-the Anthropic API, Sonnet 4.6 on Claude Platform on AWS, and Sonnet 4.5 on Bedrock, Agent
-Platform, and Foundry. That spread is the accepted cost of not having a pinned id go stale on
-the next release. The statusline still shows the true generation per subagent row, because
+and Google Cloud's Agent Platform, and Opus 4.6 on Microsoft Foundry. That spread reaches the
+whole roster now that `opus` is the only tier any agent declares, and it is the accepted cost of
+not having a pinned id go stale on the next release. Note that Opus 4.6 supports `low`,
+`medium`, `high`, and `max` but not `xhigh`, so on Foundry the four `xhigh` agents run at `high`,
+which is the platform's documented fallback to the highest supported level at or below the one
+set. The statusline still shows the true generation per subagent row, because
 `statusline/subagent.py` prefers the payload's resolved `model` field and only falls back to
 the frontmatter-derived label when the payload omits it.
 
@@ -1345,7 +1368,7 @@ that needs a specific generation. `availableModels` is the other side of that: i
 constrains which models subagents and skills may select, independent of
 `enforceAvailableModels`, and on the Anthropic API and Claude Platform on AWS a family alias
 resolves to the newest version of its family the allowlist permits, so an allowlist that
-includes `opus`, `sonnet`, and `fable` covers the whole roster.
+includes `opus` and `fable` covers the whole roster.
 
 **Nesting invariant:** the platform's nested-spawn depth default has moved more than once.
 v2.1.217 set it to 1, and v2.1.219 raised it to 3 (`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`).
@@ -1361,7 +1384,7 @@ blocked on it.
 
 | Feature | Version | Reason |
 |---------|---------|--------|
-| `type: agent` / `type: prompt` semantic evidence verifier on `TaskCompleted` | v2.1.197 spec | NO-GO. Evaluated in `.omca/notes/spike-semantic-verification-hooks.md`. Docs mark `type: agent` experimental/may-change; would roughly double LLM call volume on the task-completion path versus the existing zero-cost bash+jq gate (`task-completed-verify.sh`); targets a hypothetical mismatch failure mode with no observed incident history, while the existing deterministic hard gates (schema + freshness checks) already cover the failure modes actually seen in production. Re-evaluate only if `type: agent` graduates out of experimental and a real semantic-mismatch incident is observed |
+| `type: agent` / `type: prompt` semantic evidence verifier on `TaskCompleted` | v2.1.197 spec | NO-GO. Docs mark `type: agent` experimental/may-change; would roughly double LLM call volume on the task-completion path versus the existing zero-cost bash+jq gate (`task-completed-verify.sh`); targets a hypothetical mismatch failure mode with no observed incident history, while the existing deterministic hard gates (schema + freshness checks) already cover the failure modes actually seen in production. Re-evaluate only if `type: agent` graduates out of experimental and a real semantic-mismatch incident is observed |
 | `worktree.bgIsolation` | v2.1.143 | Claude-native owns worktree isolation policy; OMCA documents the `worktree.baseRef` hazard (see CLAUDE.md) but does not set this key — no OMCA workflow depends on background-isolation defaults differing from the platform default |
 | `sandbox.credentials` | v2.1.187 | Managed-settings-adjacent credential-scoping key; outside OMCA's ownership boundary (sandboxing is Claude-native's domain per the Ownership Model above) |
 | `autoMode.classifyAllShell` | v2.1.193 | Would route every Bash call through the auto-mode classifier, not just unmatched ones; OMCA's `permission-filter.sh` already fast-paths known-safe tooling deterministically — classifying all shell calls would add latency without changing OMCA's allow/deny outcomes |
@@ -1375,16 +1398,19 @@ blocked on it.
 | Scheduled/webhook trigger reclassification | v2.1.183 | Claude-native owns `/schedule` triggers (see Ownership Model); OMCA's evidence/boulder state does not interact with trigger firing |
 
 **Cost-governance recommendation (v2.1.178):** the `Tool(param:value)` permission syntax
-(e.g. `Agent(model:opus)`) restricts a tool call's parameters at the permission-rule level.
-Users running cost-sensitive deployments can add an allow/deny rule scoped to
-`Agent(model:opus)` in their own `settings.json`. This is a user-side recommendation: OMCA's
+(e.g. `Agent(model:fable)`) restricts a tool call's parameters at the permission-rule level.
+Users running cost-sensitive deployments can add an allow/deny rule scoped to a model alias in
+their own `settings.json`. This is a user-side recommendation: OMCA's
 shipped `settings.json` does not set it, since the right cap depends on the deployment's
 budget, not on OMCA's orchestration logic.
 
 Write the rule in the alias form. The rule is compared against the literal input Claude sends,
 before any normalization (`claude-code-docs/docs/permissions.md`), and `agents/sisyphus.md`'s
-delegation examples pass `model="sonnet"`, `model="opus"`, and `model="fable"`, so an
-`Agent(model:opus)` rule fires on those calls and a pinned id in the rule would not.
+Model Routing section passes an alias when it passes a model at all, so an alias-form rule fires
+on those calls and a pinned id in the rule would not. The rule worth writing is
+`Agent(model:fable)`: sisyphus now instructs the orchestrator to pass no `model=` in the usual
+case and to reach for `model="fable"` only when a task needs oracle-class depth, so `fable` is
+the only alias a delegation still sends explicitly.
 
 **The coverage is partial, by construction.** An agent that takes its tier from frontmatter is
 spawned with no `model` parameter in the tool call at all, and an omitted parameter is never
@@ -1463,6 +1489,25 @@ section and in `CLAUDE.md`; neither is set by OMCA.
 | Agent `name:` values containing `:` fail CI | The platform hard-rejects such an agent at load time. No shipped file violates it, but the scaffold could produce one, so the validator and `just new-agent` both refuse it now |
 | `DirectoryAdded` tracked, not adopted | Tracking half only: the event exists as a changelog line with no section, matcher table, or input schema, so a handler would be built on a guessed payload |
 | The `tools: Read` carve-out removed | The rules file, the validator, and `agents/multimodal-looker.md` all described an exception no shipped agent uses. Since `tools:` is a strict allowlist whose mis-listing launches an agent with zero tools, the carve-out invited a contributor to restore it. Any `tools:` key is now a validator failure |
+
+**Roster change this sync (maintainer decision, not a platform feature):**
+
+The `sonnet` tier is retired from the roster. `executor`, `explore`, `hephaestus`, `librarian`,
+and `multimodal-looker` declare `model: opus`, and each drops an effort level so the tier move
+does not also raise reasoning depth: `executor`, `hephaestus`, `librarian`, and
+`multimodal-looker` at `medium`, `explore` at `low`. `oracle` is unchanged at `fable` and `max`;
+`sisyphus`, `prometheus`, `metis`, and `momus` are unchanged at `opus` and `xhigh`.
+
+Three consequences worth stating plainly. The model column stopped discriminating, so
+`agents/sisyphus.md`'s Model Routing section now presents two tiers and names effort as the
+dial, with the usual correct call passing no `model=` at all. `servers/categories.json` inherited
+the same collapse: four of its five categories name `opus` and only `hardest` names `fable`, so a
+consumer reading `.value.model` sees two outcomes across five category names, and the schema has
+no effort field to carry what actually separates them. And per-token cost rises for every
+delegation that used to run on Sonnet, with the lower effort levels as the offset.
+
+Earlier sync tables in this document record the roster as it stood at the time of that sync. The
+tables under Core Concepts and Agent Reference are the live state.
 
 **Document-only this sync (facts and hazards with no code change):**
 

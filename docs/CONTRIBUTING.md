@@ -42,7 +42,7 @@ Create `agents/name.md` with YAML frontmatter:
 ---
 name: agent-name
 description: One-line role description
-model: fable|opus|sonnet
+model: opus|fable
 effort: max|xhigh|high|medium|low
 disallowedTools: Write, Edit  # use disallowedTools, NOT tools:
 memory: project                   # optional; enables persistent project memory
@@ -50,7 +50,8 @@ memory: project                   # optional; enables persistent project memory
 ```
 
 Key rules:
-- Declare the tier alias (`fable`, `opus`, `sonnet`) in `model:`, not a full generation ID. The alias tracks the platform's current model for that tier, so the frontmatter never goes stale.
+- Declare the tier alias in `model:`, not a full generation ID. The alias tracks the platform's current model for that tier, so the frontmatter never goes stale. The roster uses two tiers: `opus` for every agent the plugin spawns, `fable` for oracle-class reasoning. Other aliases such as `sonnet` and `haiku` remain valid per-call overrides but are not what a new agent declares.
+- Pick `effort:` deliberately, because it is what separates one agent from another now that the model column does not. `low` suits short scoped work that is not intelligence-sensitive, `medium` trades some intelligence for lower token spend, `xhigh` buys deeper reasoning for orchestration and planning, `max` is for the advisor role.
 - Use `disallowedTools:` to restrict capabilities — never `tools:` (blocks MCP inheritance, [Known Limitations](../CLAUDE.md#agent-tools-allowlist-blocks-mcp-tool-inheritance))
 - Do not declare `permissionMode:` — it is stripped from plugin agents by Claude Code for security
 - Add the agent to the `<agent_catalog>` block in `templates/claudemd.md`

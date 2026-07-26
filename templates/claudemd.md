@@ -18,18 +18,22 @@ Slash commands always available. Keyword triggers activate only when `enableKeyw
 
 ## Agent catalog
 
-| Agent             | Model            | Use when                                                                 |
-| ----------------- | ---------------- | ------------------------------------------------------------------------ |
-| sisyphus          | opus             | Orchestration: free-form and plan execution (via `/start-work` command) |
-| prometheus        | opus             | Interviewing the user, Socratic deep-dive, producing structured plans    |
-| metis             | opus             | Pre-execution gap analysis on a draft plan                               |
-| momus             | opus             | Critical review of a draft plan for clarity and risk                     |
-| executor          | sonnet           | Focused implementation of a known, scoped task                           |
-| explore           | sonnet           | Finding code and patterns inside the local repo                          |
-| librarian         | sonnet           | External docs, library usage, OSS examples, research                     |
-| oracle            | fable            | Architecture, tradeoffs, stuck debugging, craft review                   |
-| hephaestus        | sonnet           | Build failures, type errors, toolchain/dep fixes                         |
-| multimodal-looker | sonnet           | Screenshots, PDFs, diagrams, visual inputs                               |
+Every agent but `oracle` runs on `opus`, so the model column does not separate them. `effort:` does, and each agent declares the level its role needs.
+
+| Agent             | Model            | Effort  | Use when                                                                 |
+| ----------------- | ---------------- | ------- | ------------------------------------------------------------------------ |
+| sisyphus          | opus             | xhigh   | Orchestration: free-form and plan execution (via `/start-work` command) |
+| prometheus        | opus             | xhigh   | Interviewing the user, Socratic deep-dive, producing structured plans    |
+| metis             | opus             | xhigh   | Pre-execution gap analysis on a draft plan                               |
+| momus             | opus             | xhigh   | Critical review of a draft plan for clarity and risk                     |
+| executor          | opus             | medium  | Focused implementation of a known, scoped task                           |
+| explore           | opus             | low     | Finding code and patterns inside the local repo                          |
+| librarian         | opus             | medium  | External docs, library usage, OSS examples, research                     |
+| oracle            | fable            | max     | Architecture, tradeoffs, stuck debugging, craft review                   |
+| hephaestus        | opus             | medium  | Build failures, type errors, toolchain/dep fixes                         |
+| multimodal-looker | opus             | medium  | Screenshots, PDFs, diagrams, visual inputs                               |
+
+Scale a delegation by picking the agent whose declared effort fits the work, not by passing a different model.
 
 ## Workflow
 
