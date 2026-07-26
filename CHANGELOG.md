@@ -5,6 +5,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.14.1] - 2026-07-26
+
+### Changed
+
+- **The `sonnet` tier is retired from the agent roster.** `executor`, `explore`,
+  `hephaestus`, `librarian`, and `multimodal-looker` now declare `model: opus`. Each drops an
+  effort level so the tier move does not raise reasoning depth at the same time: `executor`,
+  `hephaestus`, `librarian`, and `multimodal-looker` run at `medium`, `explore` at `low`.
+  `oracle` is unchanged at `fable` and `max`; `sisyphus`, `prometheus`, `metis`, and `momus`
+  are unchanged at `opus` and `xhigh`. Per-token cost rises for every delegation that
+  previously ran on Sonnet, with the lower effort levels as the offset.
+
+  To keep the previous behavior, set `CLAUDE_CODE_SUBAGENT_MODEL=sonnet` in your own
+  environment or settings rather than editing the plugin's agent files, which a plugin update
+  overwrites. That variable sits above frontmatter in the platform's model resolution order,
+  so it applies to every spawned agent including `oracle` and cannot be scoped to part of the
+  roster.
+- **`model:` no longer separates one agent from another; `effort:` does.** With one tier
+  covering everything but `oracle`, `agents/sisyphus.md`'s Model Routing section presents two
+  tiers and names effort as the dial, and the usual correct delegation now passes no `model=`
+  at all. `servers/categories.json` inherits the same collapse: four of its five categories
+  name `opus` and only `hardest` names `fable`, so a consumer reading `.value.model` sees two
+  outcomes across five category names. The roster tables in `OMCA.md`,
+  `templates/claudemd.md`, and the contributor docs carry effort alongside model.
+
+### Fixed
+
+- **CI had been failing on `main` since early July, and it silently stopped publishing
+  releases.** `scripts/validate-plugin.sh` checked whether a path cited in the docs existed
+  on disk. A maintainer's checkout carries untracked files a fresh clone does not, so prose
+  naming a user's own `.claude/settings.json` passed locally and failed on every runner for
+  the same commit. That failed the validate job, and the golden test replays its output so
+  the BATS job failed with it. Because the release job is gated on both, it was skipped
+  rather than failed on every tag: `v2.13.0`, `v2.13.1`, `v2.13.2`, and `v2.14.0` were all
+  pushed with no GitHub release created for any of them. Path claims now resolve against
+  tracked files, which are identical in a checkout and a clone. An untracked but gitignored
+  citation is reported as skipped because it names user-scope state rather than repository
+  content; an untracked citation that is not ignored still fails, because that is a real
+  dead pointer. Two such pointers into untracked notes were removed from `OMCA.md`.
+- **A truncation test failed on some CI runs and passed on others.** It collected every run
+  of the filler character in the injected context, and the truncation note names the rule's
+  full path, so a temp directory whose random suffix contained that character added a second
+  match and overstated the body. It now measures the longest run.
+
 ## [2.14.0] - 2026-07-26
 
 Platform sync against Claude Code v2.1.199 through v2.1.220.
