@@ -256,9 +256,13 @@ _payload() {
 	run_hook "context-injector.sh" "$(_payload Read "$CLAUDE_PROJECT_ROOT/main.py")"
 	assert_success
 	ctx=$(get_context)
-	# The injected rule body must not exceed 1000 chars (extract just the x-sequence)
+	# Measure the longest run of x rather than every run. The truncation note names
+	# the rule's full path, and a temp directory whose random suffix contains an x
+	# adds a second match, so concatenating them overstates the body by a couple of
+	# characters and fails only on the runs where the suffix happens to contain one.
 	local rule_body
-	rule_body=$(echo "$ctx" | grep -o 'x\+')
+	rule_body=$(echo "$ctx" | grep -o 'x\+' |
+		awk '{ if (length($0) > n) { n = length($0); s = $0 } } END { print s }')
 	assert [ "${#rule_body}" -le 1000 ]
 }
 
