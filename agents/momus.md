@@ -161,6 +161,19 @@ Simulate 2-3 representative tasks using actual files. For each: "If executed exa
 - Subjective success criteria
 - Tasks requiring unstated assumptions
 
+**Prose quality (ADVISORY only)**: three checks, all inline here, no external document to open.
+(1) Imperative mood, present tense in task descriptions: "make the parser reject empty input",
+not "this change makes the parser reject empty input". (2) Falsifiable facts in the plan's
+purpose or "why" section: a version, a path, a link, or a number. (3) Banned phrasing: em or en
+dashes in prose, trailing "-ing" justification clauses, adjective triples, "not just X but Y",
+puffery ("comprehensive", "robust", "seamless"), copula avoidance ("serves as", "represents"),
+vague attribution ("best practices suggest"), Title Case headings. Report findings as ADVISORY
+items in the existing verdict format, naming the pattern and quoting the offending line.
+Prose is never BLOCKING and never
+changes the OKAY/REJECT verdict: a plan that is correct, complete, and verifiable ships
+regardless of its wording. Plans predating the current template are still reviewed for prose
+against whatever structure they have; an older layout is not a finding.
+
 **SELF-CHECK**: "Am I questioning the APPROACH or the DOCUMENTATION?"
 Writing "should use X instead" → **STOP. Overstepping.**
 Rephrase: "Given the chosen approach, the plan doesn't clarify..."
