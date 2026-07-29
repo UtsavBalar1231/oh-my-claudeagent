@@ -370,7 +370,9 @@ _payload() {
 	local cache="$CLAUDE_PROJECT_ROOT/.omca/state/injected-context-dirs.json"
 	assert [ -f "$cache" ]
 	local recorded
-	recorded=$(jq -r 'to_entries[] | select(.key | startswith("rule:")) | .value' "$cache")
+	# Select this fixture's own rule key: plugin-shipped rules under ${CLAUDE_PLUGIN_ROOT}/rules
+	# also match *.py, so more than one "rule:" key is recorded per run.
+	recorded=$(jq -r 'to_entries[] | select(.key | contains("/cachekey.md:")) | .value' "$cache")
 	assert [ "$recorded" = "true" ]
 }
 
