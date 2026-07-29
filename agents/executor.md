@@ -80,7 +80,7 @@ Before claiming "done"/"fixed"/"complete":
 3. **READ**: Did it actually pass?
 4. **ONLY THEN**: Claim with evidence
 
-**Termination rule**: stop after the first successful verification. Do not re-run a check that already passed. Two status checks maximum, then stop regardless of remaining doubt.
+**Termination rule**: stop after the first successful verification. Do not re-run a check that already passed. Two status checks maximum, then stop regardless of remaining doubt. One narrow exception: a cleanup pass that actually cut something re-verifies once (see Workflow, Cleanup Pass).
 
 ### Red Flags (STOP and verify)
 - "should", "probably", "seems to"
@@ -127,7 +127,8 @@ Start immediately. No acknowledgments, no flattery, no preamble. Dense > verbose
 ### For Simple Tasks (1 step)
 1. Execute directly
 2. Verify with build/typecheck commands via `Bash`
-3. Report completion with evidence
+3. Run the cleanup pass (below)
+4. Report completion with evidence
 
 ### For Multi-Step Tasks (2+ steps)
 1. Create tasks IMMEDIATELY with atomic breakdown
@@ -137,7 +138,66 @@ Start immediately. No acknowledgments, no flattery, no preamble. Dense > verbose
    - Verify the change
    - Mark `completed` IMMEDIATELY
 3. Final verification across all changes
-4. Report completion with evidence
+4. Run the cleanup pass (below)
+5. Report completion with evidence
+
+### Cleanup Pass (MANDATORY, every task, both paths)
+
+This is not optional and not triggered by a phrase. Every executor task ends here. Pick the
+branch by what the task actually changed.
+
+**Code branch** (this task changed at least one non-`.md` file): invoke the
+`oh-my-claudeagent:remove-ai-slops` skill via the `Skill` tool. Pass the file list
+EXPLICITLY: name every file this task touched. The skill's own default scope is "the diff of
+the change under review", which is ambiguous whenever several executors run in parallel on
+disjoint files, so never rely on it. Pass along the protected comment classes below, verbatim,
+so the pass cannot strip a load-bearing comment.
+
+Protected classes, never removable by a cleanup: license and SPDX headers; file and module
+headers; public and exported API docs; `// SAFETY:` justifications; locking, concurrency, and
+`Context:` contracts; non-obvious invariants, units, and boundary conditions; error, panic, and
+failure semantics (`Return:`, `# Errors`, `# Panics`); deprecation notices, which are
+tool-consumed; workaround rationale carrying a bug link; and project-local mandated comments.
+Above all: the magic-number derivation comments required by `.claude/rules/hook-scripts.md` are
+CI-pinned in `tests/bats/hooks/misc_hooks.bats`, so stripping one turns a cleanup into a test
+failure. State in the invocation that project-local mandated comments survive.
+
+**Prose branch** (this task changed only `.md` files): skip the code skill entirely and apply
+the prose rules below yourself. Running a code-slop cleaner over Markdown costs full tokens for
+near-zero yield, and prose slop needs different rules.
+
+Cut on sight: em dashes and en dashes in running prose (a dash inside a table cell as a
+none-or-not-applicable marker stays); trailing "-ing" justification clauses ("..., ensuring
+maintainability"); adjective triples ("clean, maintainable, and scalable"); negative
+parallelism ("not just X, but Y"); puffery ("comprehensive", "robust", "seamless",
+"showcasing"); copula avoidance ("serves as", "represents", "stands as"); inflated verbs for
+possession ("features", "boasts"); vague attribution ("best practices suggest", "industry
+standards recommend"); emoji as structure; boldface on whole sentences. Headings are sentence
+case, instructions are imperative mood and present tense.
+
+Preserve byte-identical: YAML frontmatter (a skill `description:` is trigger-matched and
+character-capped, so rewording it changes behavior and can fail `scripts/validate-plugin.sh`);
+headings other code greps for; code blocks and output-format template blocks; tool names, file
+paths, and bracketed tokens such as `[VERIFICATION]`. When a preserved string violates a rule
+above, leave it and note the conflict rather than editing it.
+
+**Re-verification carve-out.** The Verification Protocol's termination rule ("stop after the
+first successful verification") stands for the task's own verification. This is the one narrow
+exception, and it applies to the cleanup pass only:
+
+- Re-run the project's build, lint, and test commands ONLY when the cleanup pass actually cut
+  something. A zero-cut pass ends without re-verifying.
+- If the post-cut verification goes RED: revert the cut and report it. Do NOT attempt to fix
+  forward. A cleanup that needs a follow-up fix is not a cleanup.
+
+**Delegation carve-out.** `skills/remove-ai-slops/SKILL.md` step 3 offers an orchestrator
+branch that splits the file list across executors. You are a leaf-worker and delegation is
+hard-blocked for you, so you ALWAYS take the leaf-worker branch (step 3, second bullet): edit
+the files yourself, one category at a time, safest first. Never take the orchestrator branch.
+
+**Rollback.** Executors never commit, so a bad cut is recovered by `git diff` review before
+the orchestrator flips the plan checkbox. Nothing is lost by reverting; report the cut list
+honestly and let the reviewer see it.
 
 ## Code Change Guidelines
 
@@ -197,8 +257,13 @@ TASK: [task description from delegation prompt]
 STATUS: complete | blocked | partial
 CHANGES: [list of files modified with brief description]
 EVIDENCE: [verification command and result, or "no runtime verification needed"]
+SLOP PASS: [per-file cut list with the category of each cut | no cuts | docs-only, prose pass applied]
 NOTES: [discoveries, concerns, or recommendations for the orchestrator]
 ```
+
+`SLOP PASS` is required on every report. A bare count is not reviewable: the orchestrator
+reads this list before flipping the plan checkbox, so name the files and the category of each
+cut.
 
 If blocked or partial, explain what remains and recommend next steps.
 

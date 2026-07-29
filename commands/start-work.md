@@ -364,7 +364,26 @@ actually does:
 [ ] Does it follow the existing codebase pattern (naming, error handling, layer boundaries)?
 [ ] Did the expected result actually come out (not a plausible-sounding substitute)?
 [ ] Were the MUST DO and MUST NOT DO requirements from the delegation prompt honored?
+[ ] Read the executor's `SLOP PASS:` cut list and confirm nothing load-bearing was cut.
 ```
+
+The executor's report ends with a `SLOP PASS:` line carrying a per-file cut list with
+the category of each cut, or `no cuts`, or `docs-only, prose pass applied`. That line is
+a self-report, and this section already said self-reports are not evidence, so confirming
+the line is present proves nothing. Open each file it names and look at what left.
+
+The dangerous cuts are exactly the ones the build and the test suite cannot catch,
+because nothing exercises them:
+
+- a validation removed from a path no test covers, including anything at a trust boundary
+- a `// SAFETY:` or invariant justification removed as "obvious"
+- an error branch, a cleanup path, or a data-loss guard removed as "defensive"
+- a magic-number derivation comment removed as "restates the code"
+
+A green build after those cuts means the suite never reached them, not that they were
+slop. If the cut list names one and you cannot point at the test that would fail without
+it, treat the cut as a regression and require it back before flipping the checkbox.
+`no cuts` still gets a diff read: an absent cut list is not an absent change.
 
 If you cannot explain what the changed code does, you have not reviewed it:
 go back and read it. Never trust a subagent's self-report as a substitute for
