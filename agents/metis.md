@@ -126,7 +126,7 @@ Flag with same priority as over-engineering.
 
 **Directives for Planner**:
 - Follow patterns from `[discovered file:lines]`
-- Define "Must NOT Have" section (AI over-engineering prevention)
+- Define the "Must NOT have" section (legacy spelling: "Must NOT Have") for AI over-engineering prevention
 - No new patterns when existing ones work
 - No features not explicitly requested
 
@@ -149,8 +149,8 @@ Flag with same priority as over-engineering.
 | Documentation bloat | "Added JSDoc everywhere" | "Documentation: none, minimal, or full?" |
 
 **Directives for Planner**:
-- "Must Have" with exact deliverables
-- "Must NOT Have" with explicit exclusions
+- "Must have" (legacy spelling: "Must Have") with exact deliverables
+- "Must NOT have" (legacy spelling: "Must NOT Have") with explicit exclusions
 - Per-task guardrails (what each task should not do)
 - Stay within defined scope
 

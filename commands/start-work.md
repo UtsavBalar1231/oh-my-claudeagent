@@ -178,12 +178,13 @@ typically too thin — include full context.
 
 ```markdown
 ## 1. TASK
-[Quote EXACT checkbox item. Be obsessively specific.]
+[Quote the task's checkbox line AND every sub-bullet beneath it, VERBATIM.
+The checkbox line alone is a title, not a task.]
 
 ## 2. EXPECTED OUTCOME
-- [ ] Files created/modified: [exact paths]
+- [ ] Files created/modified: [exact paths, from the task's `File:` sub-bullet]
 - [ ] Functionality: [exact behavior]
-- [ ] Verification: `[command]` passes
+- [ ] Verification: `[command]` passes, taken from the task's `Done when:` sub-bullet
 
 ## 3. REQUIRED TOOLS
 - [tool]: [what to search/check]
@@ -193,14 +194,57 @@ typically too thin — include full context.
 - Write tests for [specific cases]
 
 ## 5. MUST NOT DO
+- [Every `Must NOT:` sub-bullet on the task, restated verbatim]
 - Do NOT modify files outside [scope]
 - Do NOT add dependencies
 - Do NOT skip verification
 
 ## 6. CONTEXT
 ### Dependencies
-[What previous tasks built]
+[What previous tasks built, resolved from the task's `Depends:` sub-bullet]
+### Files in play
+[The task's `File:` paths, plus what already exists at each]
 ```
+
+### §1: quote the whole task block, not just the checkbox line
+
+Plan task labels are capped at roughly 80 characters because the statusline truncates
+there. All the substance lives in the sub-bullets directly beneath the checkbox line,
+contiguous with it and with no blank line between them:
+
+```
+- [ ] 7. Imperative task title
+  - File: `exact/path.ts`
+  - Done when: runnable command or observable state
+  - Depends: 2, 3
+  - Must NOT: exclusion
+```
+
+Quoting the checkbox line alone yields a bare title with no paths, no acceptance
+criterion and no exclusions, which is strictly less than the executor needs. Quote the
+checkbox line plus every sub-bullet under it, verbatim, and stop at the first line that
+is not part of that block (a blank line, or the next `- [ ]` line).
+
+Each sub-bullet then feeds a specific section, and the mapping is not a judgment call:
+
+| Sub-bullet    | Feeds                                                            |
+|---------------|------------------------------------------------------------------|
+| `Done when:`  | §2 EXPECTED OUTCOME, as the verification line                     |
+| `Must NOT:`   | §5 MUST NOT DO, restated verbatim                                 |
+| `File:`       | §2's "Files created/modified" and §6 CONTEXT                      |
+| `Depends:`    | §6 CONTEXT, under Dependencies                                    |
+
+A sub-bullet the plan omits is simply absent; do not invent one. Copying it into its
+target section does NOT replace quoting it in §1: §1 carries the task as written, the
+other sections carry it as instructions.
+
+**Older plans use a different shape.** Plans written before the sub-bullet template
+carry bolded fields instead: `**What to do**`, `**Acceptance Criteria**`,
+`**Must NOT do**`. Quote whichever shape the task actually uses rather than assuming
+the sub-bullet form, and map the bolded fields the same way: `**Acceptance Criteria**`
+to §2, `**Must NOT do**` to §5. A plan is one shape or the other, never both. If a task
+has neither shape, the checkbox line is all there is, and §1 says so explicitly so the
+executor knows the thinness is the plan's, not a truncation.
 
 Example delegation:
 

@@ -166,7 +166,7 @@ Assess existing test commands, frameworks, fixtures, mocks, and coverage before 
 
 #### TDD Exemption Whitelist
 
-When the Verification Strategy's Test Decision is TDD, these categories are exempt from write-test-first (tests-after or tool-executable QA only, justified per task): pure formatting changes, comment-only edits, dependency version bumps with no behavior delta, rename-only moves. Each exemption states which category applies in the task itself (e.g. "exempt: formatting-only"); it does not silently drop the test step.
+When the test decision recorded in `## Verification` is TDD, these categories are exempt from write-test-first (tests-after or tool-executable QA only, justified per task): pure formatting changes, comment-only edits, dependency version bumps with no behavior delta, rename-only moves. Each exemption states which category applies in the task itself (e.g. "exempt: formatting-only"); it does not silently drop the test step.
 
 ### General Interview Guidelines
 
@@ -272,66 +272,68 @@ Include a contrarian self-grill in the metis brief: challenge the single highest
 
 Write to `<plans-dir>/{name}.md` (no plan mode) or the active plan-mode file path.
 
+Where a DRAFT was written in Step 1.6, this phase does not create a second file. It rewrites that same path in place with a single full-file `Write` whose metadata line reads `**Status**: FINAL`, never an Edit of the Status line alone. `boulder_write` runs only after that write lands.
+
 **Decision-complete mandate**: The implementer should need zero judgment calls. Every task must state the chosen approach, concrete targets, inputs/data, exclusions, references, verification, and expected evidence. If a judgment call remains, resolve it by exploration or user question before momus review.
 
 **Minimal-solution mandate**: Plan the minimum that solves the stated problem. No speculative features, no unrequested abstractions, no avoidable new dependencies. Prefer reusing stdlib, native platform features, and existing code over introducing new files or components. Lazy is NOT negligent: every task must still cover input validation at trust boundaries, error and data-loss handling, security requirements, and everything the user explicitly asked for, plus a verification step.
 
-**TL;DR-last rule**: Draft every section below EXCEPT `## TL;DR` first (Context, Work Objectives, TODOs, Assumptions), then fill `## TL;DR` LAST, so it summarizes the plan you actually wrote, not the intention you started with. For 5+ task plans this dovetails with the Incremental Write Protocol below: skeleton first, TL;DR filled in the final edit pass.
+**Prose style mandate**: these five rules govern every plan you write. They are complete as stated; there is no style document to open mid-plan. Do not restate them inside the plan itself.
+
+- Task descriptions in imperative mood, present tense: "make the parser reject empty input", not "this change makes the parser reject empty input".
+- Sentence case for headings.
+- Every `## Why` bullet carries something falsifiable: a version, a path, a link, or a number.
+- Split any task description longer than two lines. If it does not fit in two lines, it is two tasks or it is padded.
+- No em dashes or en dashes in prose. Use a period, comma, colon, or parentheses.
+
+For a wording call the five rules do not cover, delete the phrase or replace it with a fact. The recurring offenders are trailing "-ing" justification clauses, adjective triples, "not just X but Y", puffery ("comprehensive", "robust", "seamless"), copula avoidance ("serves as", "represents"), and vague attribution ("best practices suggest").
+
+**Metadata-last rule**: Draft `## Why`, `## Work Objectives`, `## TODOs`, and `## Verification` first, then fill the `**Scope**` metadata line LAST, so its file count and parallel-wave count describe the plan you actually wrote rather than the one you set out to write. For 5+ task plans this dovetails with the Incremental Write Protocol below: skeleton first, metadata line filled in the final edit pass.
 
 ```markdown
-# {Plan Title}
+# {Imperative plan title}
 
-## TL;DR
-> **Quick Summary**: [1-2 sentences]
-> **Deliverables**: [Bullet list]
-> **Estimated Effort**: [Quick | Short | Medium | Large]
-> **Parallel Execution**: [YES - N waves | NO - sequential]
+**Scope**: {N} files | **Parallel Execution**: {YES - N waves | NO} | **Status**: {DRAFT | FINAL}
 
-## Context
-### Original Request
-[User's initial description]
+## Why
+- {Factual bullet. Must contain something falsifiable: a version, a path, a link, or a number.}
 
-### Interview Summary
-**Key Discussions**: [decisions made]
-**Research Findings**: [discoveries]
 
 ## Work Objectives
-### Core Objective
-[What we're achieving]
-
-### Must Have
-- [Non-negotiable requirement]
-
-### Must NOT Have (Guardrails)
-- [Explicit exclusion]
-
-## Verification Strategy
-- **Test Decision**: [TDD / Tests-after / Manual-only]
-- **Framework**: [if applicable]
+### Must have
+- {requirement}
+### Must NOT have
+- {explicit exclusion}
 
 ## TODOs
-- [ ] 1. [Task Title]
-  **What to do**: [Clear steps]
-  **Must NOT do**: [Exclusions]
-  **References**: [file:lines]
-  **Acceptance Criteria**: [Verifiable conditions]
-  **Commit**: YES | NO
+- [ ] 1. {Imperative task title, meaningful within its first 80 characters}
+  - File: `{exact path}`
+  - Done when: {runnable command or observable state}
+  - Depends: {task numbers, or omit}
+  - Must NOT: {exclusion, or omit}
+- [ ] 2. [P] {a task safe to run in parallel carries the [P] marker}
+  - File: `{exact path}`
+  - Done when: {...}
 
-## Assumptions
+## Verification
+- `{command}`: {expected result}
 
-| Decision | Default Applied | Impact Level | Alternative Not Chosen | Review Note |
-|----------|----------------|-------------|----------------------|-------------|
-| [decision] | [what was chosen] | [Low/Medium/High] | [what else was possible] | [why this default; flag HIGH for executor review] |
-
-## Success Criteria
-### Verification Commands
-```bash
-command  # Expected: output
+## Open questions
+- Q1. {question} **Default if unanswered**: {the assumption that will be taken}
 ```
+
+**Template constraints (machine-parsed by downstream consumers, never violate):**
+- Task lines are `- [ ] N. <label>` at column 0, one space inside the brackets, label on the SAME line.
+- Each label stands alone within its first 80 characters, since the statusline truncates there.
+- The headings `## TODOs` and `## Work Objectives` keep those exact names.
+- Sub-bullets are plain `- File:` / `- Done when:` and never `- [ ]`. Any non-numbered `- [ ] ` line anywhere in the plan trips the format warning.
+- `## Verification` uses plain bullets, not checkboxes, so its entries are never mistaken for tasks.
+- Sub-bullets sit immediately beneath their own checkbox line, contiguous, with no blank line between them, so the orchestrator can quote a task whole.
+
+Omit an optional line rather than emitting it empty: a task with no dependencies has no `Depends:` line at all. Sections beyond the template are allowed only when the work genuinely needs them.
 
 <!-- Plan has no completion checklist. After the final_verification evidence entry is logged, the start-work command writes a sidecar at .omca/notes/<plan>-completion.md. Plan file stays frozen. -->
 
-```
 
 ### Completion Signaling
 
@@ -340,6 +342,8 @@ Do not include any completion-tracking section (Final Checklist, Done Items, Clo
 > **Note**: The start-work command runs a final completeness check after all tasks complete and writes a completion sidecar. Do not include verification tasks or a completion checklist in the plan.
 
 ## QA Scenario Mandate (Every Task)
+
+**Where the scenario lives**: when a single runnable command proves the task, collapse the whole scenario into that task's `Done when:` line and write no scenario block (e.g. `Done when: \`just test-bats\` exits 0`). Emit the full block below only for a task whose proof has no runnable check, such as a UI flow or a multi-step state inspection. The block then sits under the task's sub-bullets, still contiguous with the checkbox line.
 
 Every task needs at minimum: 1 happy-path + 1 failure/edge-case scenario. A task that touches a shared entry point (API route, CLI subcommand, shared module) also needs 1 adjacent-surface regression scenario, i.e. the untouched sibling operation still returns its previous result (e.g., "the `/orders` endpoint response is unchanged after modifying `/login`"; "the `list` subcommand output is unchanged after modifying `add`"). Scenarios must be executable by an agent/tool; do not rely on human/manual confirmation.
 
@@ -390,8 +394,8 @@ Large plans exceed output limits in one shot:
 
 | Impact Level | Examples | Action |
 |---|---|---|
-| Low-impact | Formatting style, log verbosity, naming conventions | Apply default silently, disclose in Assumptions section |
-| Medium-impact | Test framework choice, file structure, error response format | Apply default, flag as **ASSUMPTION** with review note in Assumptions section |
+| Low-impact | Formatting style, log verbosity, naming conventions | Apply default silently, disclose as a `Default if unanswered` under `## Open questions` |
+| Medium-impact | Test framework choice, file structure, error response format | Apply default, record it under `## Open questions` with the alternative that was not chosen |
 | High-impact | Database engine, auth mechanism, API versioning strategy, data schema | **ASK before applying**: treat as Critical gap |
 
 High-impact defaults propagate through downstream agents (sisyphus, executor) without challenge. Make them explicit decisions, not silent choices.
@@ -400,14 +404,14 @@ High-impact defaults propagate through downstream agents (sisyphus, executor) wi
 
 1. Broaden query and retry once (wider terms, different scope)
 2. Still empty → do NOT block plan generation
-   - State gap in plan's Interview Summary
+   - State the gap as a `## Why` bullet naming what could not be established
    - Document what was attempted
    - Flag as assumption for implementer
 
 ### When User Answers Don't Resolve Gaps
 
 1. Mark gap as `**UNRESOLVED:**` in the plan
-2. Proceed with explicit assumption documented in Context section
+2. Proceed with the explicit assumption recorded under `## Open questions`
 3. Flag for revisiting during implementation
 
 ### Plan Structure Self-Check (defense-in-depth)
@@ -443,7 +447,7 @@ grep -cP "^- \[ \] [0-9]+\." <plan-file-path>
 
 When presenting the plan summary to the user at handoff, LEAD with the routing call itself: "I treated this as open-ended and chose defaults; if you had a specific outcome in mind, say so and I will switch to asking" (adapt wording for CLEAR requests with defaulted internals: "I treated the following as reversible internals and applied defaults; flag any you want to change."). This turns a wrong routing read into a one-line correction at the gate rather than a silently-spent adversarial loop.
 
-Follow with the list of defaults applied (mirror the plan's Assumptions section: Low/Medium-impact rows; High-impact items were already asked, not defaulted, per the Owner-Decision Filter).
+Follow with the list of defaults applied (mirror the plan's `## Open questions` section: the Low/Medium-impact `Default if unanswered` entries; High-impact items were already asked, not defaulted, per the Owner-Decision Filter).
 
 ### Approval-Gate State & Loop Guard
 
