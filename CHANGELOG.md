@@ -5,6 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Comment and prose conventions now ship with the plugin.** A `rules/` directory at the
+  plugin root carries per-language comment conventions for Bash, Python, kernel C and
+  headers, Rust, and Go, plus a prose convention for Markdown. Each is injected as context
+  when you touch a file of that language, so the conventions apply without any per-project
+  setup. Your own `.omca/rules/` still wins on a filename collision: create
+  `.omca/rules/comments-python.md` to replace the shipped Python rule, or create it empty
+  to switch that rule off. `OMCA_DISABLED_HOOKS=context-injector` disables rule injection
+  entirely.
+- **Every task now ends with a cleanup pass.** Code changes get the `remove-ai-slops`
+  sweep; a task that touched only Markdown gets a prose pass instead. The pass runs on
+  every executor spawn, and what it cut is reviewed before the task is marked done, so
+  generated clutter does not accumulate across a plan.
+
+### Changed
+
+- **Plans are leaner and tasks-first.** A plan opens with a single metadata line carrying
+  Scope, Parallel Execution, and Status, then `## Why`, `## Work Objectives`, `## TODOs`,
+  `## Verification`, and `## Open questions`. Each task carries its own `- File:`,
+  `- Done when:`, `- Depends:`, and `- Must NOT:` sub-bullets, and execution hands the
+  whole task block to the agent doing the work rather than the checkbox line alone. Less
+  prose to read, and the constraints travel with the task instead of sitting in a preamble.
+- **Planning drafts in place.** The plan file is written as `Status: DRAFT` before the
+  interview starts and rewritten to `Status: FINAL` when it is ready, so an interrupted
+  planning session leaves a real file behind instead of nothing. `/start-work` refuses to
+  execute a plan whose Status is explicitly something other than FINAL. A plan with no
+  Status field at all still executes, so existing plans are unaffected.
+
+### Fixed
+
+- **No marketplace install had ever received a rule file.** `scripts/context-injector.sh`
+  scanned only the project's own `.omca/rules`, so any rule shipped inside the plugin was
+  unreachable. It now scans the plugin root as well, with the project directory taking
+  precedence.
+- **Documented paths under `rules/` were skipped rather than checked.**
+  `scripts/validate-plugin.sh` validated doc path references only for a known set of
+  top-level directories, and `rules` was not in it.
+
 ## [2.14.1] - 2026-07-26
 
 ### Changed
