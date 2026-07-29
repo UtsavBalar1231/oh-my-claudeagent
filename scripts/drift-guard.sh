@@ -118,6 +118,46 @@ MARKER_PATTERN="${MARKER_ONLY}|${MARKER_TODO}|${MARKER_NOT_IMPL}"
 # a test body still gets caught.
 BATS_TEST_DECL='^[[:space:]]*@test[[:space:]]'
 
+# In Markdown, a backtick-quoted occurrence and a fenced code block are the two
+# forms that mean "I am naming this pattern", not "I left this stub": a
+# comment-convention document cannot ban a marker without writing it down. Only
+# those two forms are exempt, so a bare marker in Markdown prose stays a
+# finding: genuine unfinished work does sometimes get recorded in a doc.
+md_fenced_lines() {
+	local line fence=0 n=0
+	while IFS= read -r line || [[ -n "${line}" ]]; do
+		n=$((n + 1))
+		if [[ "${line}" =~ ^[[:space:]]*\`\`\` ]]; then
+			fence=$((1 - fence))
+			printf '%s\n' "${n}"
+		elif [[ "${fence}" -eq 1 ]]; then
+			printf '%s\n' "${n}"
+		fi
+	done < "$1"
+}
+
+# Remove every backtick-delimited span, shortest-match first, so a marker that
+# survives was never quoted.
+md_strip_inline_code() {
+	local text="$1" head tail
+	while [[ "${text}" == *\`*\`* ]]; do
+		head="${text%%\`*}"
+		tail="${text#*\`}"
+		tail="${tail#*\`}"
+		text="${head}${tail}"
+	done
+	printf '%s' "${text}"
+}
+
+md_line_is_documenting() {
+	local lineno="$1" text="$2" fenced="$3"
+	grep -qxF "${lineno}" <<< "${fenced}" && return 0
+	local stripped
+	stripped=$(md_strip_inline_code "${text}")
+	grep -qE "${MARKER_PATTERN}" <<< "${stripped}" && return 1
+	return 0
+}
+
 # New-file-relative added line numbers for a tracked file's unstaged+staged
 # diff against HEAD. Only `+` lines advance the new-line counter; hunk headers
 # (@@ -a,b +c,d @@) reset it to c per hunk.
@@ -151,14 +191,26 @@ scan_file() {
 		[[ -z "${added_lines}" ]] && return 0
 	fi
 
+	local matches
+	matches=$(grep -InE "${MARKER_PATTERN}" "${abs_path}" 2>/dev/null)
+	[[ -z "${matches}" ]] && return 0
+
+	local md_fenced=""
+	if [[ "${file}" == *.md ]]; then
+		md_fenced=$(md_fenced_lines "${abs_path}")
+	fi
+
 	local lineno rest
 	while IFS=: read -r lineno rest; do
 		[[ -z "${lineno}" ]] && continue
 		[[ "${rest}" =~ ${BATS_TEST_DECL} ]] && continue
+		if [[ "${file}" == *.md ]] && md_line_is_documenting "${lineno}" "${rest}" "${md_fenced}"; then
+			continue
+		fi
 		if [[ "${untracked}" == "true" ]] || grep -qxF "${lineno}" <<< "${added_lines}"; then
 			FINDINGS+="${file}:${lineno}  ${rest}"$'\n'
 		fi
-	done < <(grep -InE "${MARKER_PATTERN}" "${abs_path}" 2>/dev/null)
+	done <<< "${matches}"
 }
 
 while IFS= read -r file; do

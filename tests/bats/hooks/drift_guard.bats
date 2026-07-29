@@ -167,6 +167,52 @@ EOF
 	assert_output --partial "suite.bats"
 }
 
+# The Markdown fixtures below also assemble the marker from split literals, for
+# the same reason: this suite must not become its own finding.
+@test "drift-guard: a backticked marker in Markdown is not a finding" {
+	echo "hello" > a.txt
+	_commit_all
+	local marker="TODO: imple""ment"
+	printf 'Bare `%s` is not a comment.\n' "$marker" > doc.md
+
+	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
+	assert_success
+	assert_output '{}'
+}
+
+@test "drift-guard: a marker inside a fenced code block in Markdown is not a finding" {
+	echo "hello" > a.txt
+	_commit_all
+	local marker="TODO: imple""ment"
+	printf 'Bad example:\n\n```go\n// %s pagination\n```\n' "$marker" > doc.md
+
+	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
+	assert_success
+	assert_output '{}'
+}
+
+@test "drift-guard: a bare marker in Markdown prose is still a finding" {
+	echo "hello" > a.txt
+	_commit_all
+	local marker="TODO: imple""ment"
+	printf 'Still to do: %s the pagination path.\n' "$marker" > doc.md
+
+	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
+	_assert_blocked
+	assert_output --partial "doc.md"
+}
+
+@test "drift-guard: the Markdown carve-out does not leak to non-Markdown files" {
+	echo "hello" > a.txt
+	_commit_all
+	local marker="TODO: imple""ment"
+	printf '# Bare `%s` is not a comment.\n' "$marker" > script.sh
+
+	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
+	_assert_blocked
+	assert_output --partial "script.sh"
+}
+
 @test "drift-guard: HOOK_INPUT_TIMED_OUT=1 warns and allows Stop" {
 	HOOK_INPUT="" HOOK_INPUT_TIMED_OUT=1 run bash "$CLAUDE_PLUGIN_ROOT/scripts/drift-guard.sh" < /dev/null
 	assert_success
