@@ -79,6 +79,7 @@ Hooks that currently honor `OMCA_DISABLED_HOOKS`:
 | `plan-format-warn` | Warns when a plan file's checkboxes don't follow the numbered `- [ ] N.` form that progress tracking depends on. |
 | `delegation-reminder` | One-time nudge to delegate to a specialist agent instead of doing repeated direct work in the main session. |
 | `comment-checker` | Flags narrating, step-by-step, or plan-internal comments in code you write or edit. |
+| `context-injector` | Injects nearby `AGENTS.md`/`README.md` excerpts and matching rule bodies (both plugin-shipped `rules/` and project `.omca/rules/`) when you read or edit a file. |
 
 Set the variable in your shell profile, in a wrapper script, or per-invocation, depending
 on whether the override should be permanent or one-off.

@@ -5,7 +5,10 @@ _HOOK_START=$(date +%s%N 2>/dev/null || date +%s)
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
+hook_is_disabled "context-injector" && exit 0
+
 STATE_DIR="${HOOK_STATE_DIR}"
+PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(dirname "$0")/..}"
 
 read -r FILE_PATH TOOL_NAME < <(jq -r '[.tool_input.file_path // "", .tool_name // ""] | @tsv' <<< "${HOOK_INPUT}")
 IS_READ_EVENT=false
@@ -88,44 +91,59 @@ while true; do
 done
 fi
 
-RULES_DIR="${PROJECT_ROOT}/.omca/rules"
-if [[ -d "${RULES_DIR}" ]]; then
+# Project rules are collected first, so a same-named plugin-shipped rule is shadowed and
+# a user can override any shipped rule by creating a file of the same basename. The dedup
+# key below is realpath-based and never collapses two paths, so filename precedence is the
+# only thing preventing a shipped rule and its override from both injecting.
+RULE_FILES=()
+SEEN_RULE_NAMES=""
+for RULES_DIR in "${PROJECT_ROOT}/.omca/rules" "${PLUGIN_ROOT}/rules"; do
+	[[ -d "${RULES_DIR}" ]] || continue
 	for RULE_FILE in "${RULES_DIR}"/*.md; do
-		if [[ -f "${RULE_FILE}" ]]; then
-			RULE_FIRST_LINE=$(head -1 "${RULE_FILE}")
-			PATTERN=$(printf '%s' "${RULE_FIRST_LINE}" | sed -n 's/^# pattern: //p')
-			if [[ -n "${PATTERN}" ]]; then
-				BASENAME=$(basename "${FILE_PATH}")
-				# shellcheck disable=SC2053
-				if [[ "${BASENAME}" == ${PATTERN} ]]; then
-					RULE_TAIL=$(tail -n +2 "${RULE_FILE}")
-					# 1000 chars — rule body cap; smaller than 2000-byte doc cap (rules are denser).
-					RULE_CONTENT="${RULE_TAIL:0:1000}"
+		[[ -f "${RULE_FILE}" ]] || continue
+		RULE_NAME=$(basename "${RULE_FILE}")
+		case " ${SEEN_RULE_NAMES} " in
+			*" ${RULE_NAME} "*) continue ;;
+			*) ;;
+		esac
+		SEEN_RULE_NAMES+=" ${RULE_NAME}"
+		RULE_FILES+=("${RULE_FILE}")
+	done
+done
 
-					# Dedup key: realpath (survives symlink aliasing) + content-hash of the
-					# injected body (survives edits — a changed rule re-injects). Namespaced
-					# with "rule:" to avoid colliding with the AGENTS.md/README "dir|mtime" keys
-					# sharing this same cache file.
-					RULE_REALPATH=$(realpath "${RULE_FILE}" 2>/dev/null || printf '%s' "${RULE_FILE}")
-					RULE_HASH=$(printf '%s' "${RULE_CONTENT}" | sha256sum | cut -d' ' -f1)
-					RULE_CACHE_KEY="rule:${RULE_REALPATH}:${RULE_HASH}"
+for RULE_FILE in "${RULE_FILES[@]}"; do
+	RULE_FIRST_LINE=$(head -1 "${RULE_FILE}")
+	PATTERN=$(printf '%s' "${RULE_FIRST_LINE}" | sed -n 's/^# pattern: //p')
+	if [[ -n "${PATTERN}" ]]; then
+		BASENAME=$(basename "${FILE_PATH}")
+		# shellcheck disable=SC2053
+		if [[ "${BASENAME}" == ${PATTERN} ]]; then
+			RULE_TAIL=$(tail -n +2 "${RULE_FILE}")
+			# 1000 chars — rule body cap; smaller than 2000-byte doc cap (rules are denser).
+			RULE_CONTENT="${RULE_TAIL:0:1000}"
 
-					RULE_ALREADY_INJECTED=$(jq -r --arg key "${RULE_CACHE_KEY}" '.[$key] // "false"' "${CACHE_FILE}" 2>/dev/null)
-					if [[ "${RULE_ALREADY_INJECTED}" == "false" ]]; then
-						CONTEXT_PARTS+="[Rule: ${PATTERN}]: ${RULE_CONTENT}"
-						if [[ "${#RULE_TAIL}" -gt 1000 ]]; then
-							CONTEXT_PARTS+=" (truncated, read full rule at ${RULE_FILE})"
-						fi
-						CONTEXT_PARTS+=$'\n'
+			# Dedup key: realpath (survives symlink aliasing) + content-hash of the
+			# injected body (survives edits — a changed rule re-injects). Namespaced
+			# with "rule:" to avoid colliding with the AGENTS.md/README "dir|mtime" keys
+			# sharing this same cache file.
+			RULE_REALPATH=$(realpath "${RULE_FILE}" 2>/dev/null || printf '%s' "${RULE_FILE}")
+			RULE_HASH=$(printf '%s' "${RULE_CONTENT}" | sha256sum | cut -d' ' -f1)
+			RULE_CACHE_KEY="rule:${RULE_REALPATH}:${RULE_HASH}"
 
-						RULE_TMP=$(mktemp)
-						jq --arg key "${RULE_CACHE_KEY}" '.[$key] = "true"' "${CACHE_FILE}" >"${RULE_TMP}" && mv "${RULE_TMP}" "${CACHE_FILE}"
-					fi
+			RULE_ALREADY_INJECTED=$(jq -r --arg key "${RULE_CACHE_KEY}" '.[$key] // "false"' "${CACHE_FILE}" 2>/dev/null)
+			if [[ "${RULE_ALREADY_INJECTED}" == "false" ]]; then
+				CONTEXT_PARTS+="[Rule: ${PATTERN}]: ${RULE_CONTENT}"
+				if [[ "${#RULE_TAIL}" -gt 1000 ]]; then
+					CONTEXT_PARTS+=" (truncated, read full rule at ${RULE_FILE})"
 				fi
+				CONTEXT_PARTS+=$'\n'
+
+				RULE_TMP=$(mktemp)
+				jq --arg key "${RULE_CACHE_KEY}" '.[$key] = "true"' "${CACHE_FILE}" >"${RULE_TMP}" && mv "${RULE_TMP}" "${CACHE_FILE}"
 			fi
 		fi
-	done
-fi
+	fi
+done
 
 if [[ -n "${CONTEXT_PARTS}" ]]; then
 	ESCAPED=$(echo "${CONTEXT_PARTS}" | jq -Rs .)
