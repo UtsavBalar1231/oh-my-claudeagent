@@ -11,6 +11,7 @@ injection mechanism.
 | Toggle keyword triggers, statusline mode, or the forced output style | [Plugin settings](#plugin-settings) |
 | Disable a specific hook, or all hooks at once | [`OMCA_DISABLED_HOOKS`](#omca_disabled_hooks-the-unified-kill-switch) |
 | Disable one of the older per-hook flags | [Legacy per-hook flags](#legacy-per-hook-flags-deprecated) |
+| Change how strictly comments in your code are policed | [`OMCA_COMMENT_GATE`](#omca_comment_gate-the-comment-gates-enforcement-level) |
 | Reduce permission prompts, cap model tiers, or scope auto mode | [Recommended settings.json blocks](#recommended-settingsjson-blocks) |
 | Configure git worktree isolation for spawned agents | [Worktree settings](#worktree-settings) |
 | Pick between daemon and direct statusline rendering | [Statusline modes](#statusline-modes) |
@@ -78,7 +79,7 @@ Hooks that currently honor `OMCA_DISABLED_HOOKS`:
 | `write-guard` | Warns before a `Write` call overwrites an existing file, and intercepts direct writes to evidence state. |
 | `plan-format-warn` | Warns when a plan file's checkboxes don't follow the numbered `- [ ] N.` form that progress tracking depends on. |
 | `delegation-reminder` | One-time nudge to delegate to a specialist agent instead of doing repeated direct work in the main session. |
-| `comment-checker` | Flags narrating, step-by-step, or plan-internal comments in code you write or edit. |
+| `comment-checker` | Pre-write gate over comments in source files: flags AI attribution, narration that restates the next line, decorative separators, filler qualifiers, and context-free TODOs. Whether a finding blocks the write is set by [`OMCA_COMMENT_GATE`](#omca_comment_gate-the-comment-gates-enforcement-level). |
 | `context-injector` | Injects nearby `AGENTS.md`/`README.md` excerpts and matching rule bodies (both plugin-shipped `rules/` and project `.omca/rules/`) when you read or edit a file. |
 
 Set the variable in your shell profile, in a wrapper script, or per-invocation, depending
@@ -96,6 +97,26 @@ basename is present in `OMCA_DISABLED_HOOKS`.
 | `OMCA_HOOK_DISABLE_FINAL_VERIFY` | `1` | `final-verification-evidence`: same effect as adding `final-verification-evidence` to `OMCA_DISABLED_HOOKS`. |
 | `OMCA_HOOK_DISABLE_DRIFT_GUARD` | `1` | `drift-guard`: the check that blocks a completion claim while stub markers remain on newly added lines. |
 | `OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY` | `1` | `git-destructive-deny`: the guard that blocks `git reset --hard`, `git stash`, `git checkout --`, `git clean`, and `git restore` from being run through the agent. |
+
+### `OMCA_COMMENT_GATE`: the comment gate's enforcement level
+
+Selects how far `comment-checker` goes when it finds a slop comment in a source file you
+are writing or editing. It is a separate axis from `OMCA_DISABLED_HOOKS`, which turns the
+hook off entirely.
+
+| Value | Behavior |
+|---|---|
+| `off` | The hook exits immediately. No findings, no advice, nothing recorded. |
+| `advise` | **Default.** Shadow mode: the gate computes the same deny decision it would make under `deny`, records it, and then lets the write through with an advisory note instead of blocking. |
+| `deny` | Blocks the write. AI-attribution and placeholder findings always block; heuristic findings block once per file-and-findings signature and then fail open, so a genuine non-obvious comment cannot trap an edit in a retry loop. |
+
+Shadow-mode decisions are recorded to `.omca/logs/hook-info.jsonl` as `would-deny` entries
+naming the tier and the file. Read those first to judge how the heuristics behave on your
+own code, then switch to `deny` once the rate looks right:
+
+```bash
+OMCA_COMMENT_GATE=deny
+```
 
 ### Other environment variables
 
