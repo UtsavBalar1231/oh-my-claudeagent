@@ -137,12 +137,46 @@ from the restates check, and non-source extensions exit before any check (the
 message names the comment categories that must survive the fix, so the model
 cannot resolve a block by stripping required comments.
 
+### Rule injection (`context-injector.sh`)
+
+`context-injector.sh` scans two rule directories per Read/Write/Edit event, in this order:
+`${PROJECT_ROOT}/.omca/rules` first, then `${CLAUDE_PLUGIN_ROOT}/rules`. The plugin-root
+directory is what ships with a marketplace install: it holds the per-language comment
+conventions (Bash, Python, kernel C and headers, Rust, Go) and the Markdown prose
+convention. Before it existed the hook read the project directory alone, so a shipped rule
+could not reach any install; keep that in mind before narrowing either scan.
+
+The file contract:
+
+- Line 1 is `# pattern: <glob>` and nothing else. A file whose first line does not parse
+  contributes no rule, silently.
+- The glob is matched against the edited file's **basename**, not its path, using bash's
+  own `==` glob comparison.
+- One pattern per file. There is no multi-pattern form; ship a second file instead.
+- The body is everything from line 2 on, capped at 1000 characters. Overflow is dropped and
+  replaced by a truncation marker naming the rule's path, so the reader can open the file
+  for the rest. The cap counts the body only, so line 1 never eats into it.
+
+Precedence and dedup are two separate mechanisms and it matters that they are:
+
+- **Precedence is by basename.** The project directory is walked first and a basename
+  already seen is skipped, so `.omca/rules/comments-python.md` shadows the shipped file of
+  that name entirely. A user disables a single shipped rule, rather than replacing it, with
+  a same-named file whose body is empty.
+- **Dedup is by realpath plus body hash**, keyed `rule:<realpath>:<sha256>` in
+  `injected-context-dirs.json`. It never collapses two distinct paths, so two rules with
+  different filenames and identical bodies both inject. Basename precedence is the only
+  thing standing between a shipped rule and its override both firing.
+
+The hook honors `hook_is_disabled`, so `OMCA_DISABLED_HOOKS=context-injector` turns off
+rule injection and the AGENTS.md/README walk together. There is no per-directory switch.
+
 ### Intentionally unfiltered hooks
 
 These hooks deliberately omit the `if` field:
 
 - **`write-guard.sh`** (PreToolUse / Write): dual-purpose — intercepts evidence writes AND warns on file overwrites. Filtering by evidence path would silently disable the overwrite warning.
-- **`context-injector.sh`** (PostToolUse / Read|Write|Edit): walks directory trees at runtime to pattern-match `.omca/rules/*.md`. The matching logic is dynamic and cannot be reduced to a static `if` glob.
+- **`context-injector.sh`** (PostToolUse / Read|Write|Edit): walks directory trees at runtime to pattern-match rule files. The matching logic is dynamic and cannot be reduced to a static `if` glob. See "Rule injection" above.
 - **`permission-filter.sh` and `git-destructive-deny.sh` on PreToolUse / Bash**: these registrations exist only to make the deny fire on a command no dialog would have been shown for, so an `if` glob narrow enough to skip a spawn is also narrow enough to skip the command that needed denying. Their `PermissionRequest` registrations keep their `if` filters, because that half is the allow half and a missed spawn there costs a prompt, not a guardrail. See "Bash guardrail wiring" above.
 
 ### Stop-hook disjointness

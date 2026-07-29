@@ -896,10 +896,28 @@ The `task-completed-verify` hook blocks task completion (exit 2) if evidence is 
 keyword-aware — tasks without verification keywords (test, build, lint, verify) skip
 strict evidence requirements.
 
-### Project Rules
+### Rules
 
-Create `.omca/rules/name.md` with a `# pattern: <glob>` header. When any file matching
-the glob is Read, Written, or Edited, the rule content is injected as additional context.
+A rule file starts with a `# pattern: <glob>` first line and carries its guidance in the
+body below. When a file whose **basename** matches that glob is Read, Written, or Edited,
+`scripts/context-injector.sh` injects the body as additional context. One pattern per
+file; the body is capped at 1000 characters, with anything past the cap replaced by a
+truncation marker naming the rule's path so the full text stays one Read away.
+
+Rules come from two directories:
+
+- `rules/*.md` at the plugin root ships with the plugin, so every install gets it. The
+  shipped set covers per-language comment conventions (Bash, Python, kernel C and headers,
+  Rust, Go) and a prose convention for Markdown.
+- `.omca/rules/*.md` in your project holds your own rules.
+
+The project directory is scanned first and wins on a filename collision, so creating
+`.omca/rules/comments-python.md` replaces the shipped Python rule outright. To switch a
+shipped rule off rather than replace it, create a same-named file whose body is empty.
+Two rules with *different* filenames both inject even when their bodies are identical,
+because the injector's dedup key is the rule's resolved path.
+
+`OMCA_DISABLED_HOOKS=context-injector` turns the whole mechanism off for a session.
 
 ---
 

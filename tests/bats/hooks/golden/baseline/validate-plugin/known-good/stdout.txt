@@ -104,9 +104,11 @@
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'commands/start-work.md'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'servers/tools/_common.py'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path '.claude/rules/state-schemas.md'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/context-injector.sh'
+[validate-plugin] SKIP: docs accuracy: OMCA.md:915 references untracked, gitignored path '.omca/rules/comments-python.md'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/lib/common.sh'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'commands/start-work.md'
-[validate-plugin] SKIP: docs accuracy: OMCA.md:1023 references untracked, gitignored path '.claude/settings.json'
+[validate-plugin] SKIP: docs accuracy: OMCA.md:1041 references untracked, gitignored path '.claude/settings.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/lib/common.sh'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/delegate-retry.sh'
@@ -127,8 +129,8 @@
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path '.claude/rules/agent-conventions.md'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'statusline/subagent.py'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'agents/sisyphus.md'
-[validate-plugin] SKIP: docs accuracy: OMCA.md:1440 references untracked, gitignored path '.claude/settings.json'
-[validate-plugin] SKIP: docs accuracy: OMCA.md:1440 references untracked, gitignored path '.claude/settings.local.json'
+[validate-plugin] SKIP: docs accuracy: OMCA.md:1458 references untracked, gitignored path '.claude/settings.json'
+[validate-plugin] SKIP: docs accuracy: OMCA.md:1458 references untracked, gitignored path '.claude/settings.local.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'statusline/core.py'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'docs/reference/known-issues.md'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
@@ -141,15 +143,17 @@
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'agents/multimodal-looker.md'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'agents/sisyphus.md'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'servers/categories.json'
-[validate-plugin] SKIP: docs accuracy: OMCA.md:1529 references untracked, gitignored path '.claude/settings.json'
+[validate-plugin] SKIP: docs accuracy: OMCA.md:1547 references untracked, gitignored path '.claude/settings.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'servers/tools/ast.py'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/validate-plugin.sh'
 [validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md cites existing recipe 'just setup'
-[validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md cites existing recipe 'just release'
+[validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md cites existing recipe 'just ci'
+[validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md cites existing recipe 'just test'
 [validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md cites existing recipe 'just release'
 [validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md references existing path 'hooks/hooks.json'
 [validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md references existing path 'templates/claudemd.md'
 [validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md references existing path 'scripts/keyword-detector.sh'
+[validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md references existing path 'servers/pyproject.toml'
 [validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md references existing path '.claude-plugin/plugin.json'
 [validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md references existing path '.claude-plugin/marketplace.json'
 [validate-plugin] Running hooks checks
@@ -216,4 +220,4 @@
 [validate-plugin] PASS: mcp tools/list contains categories_list
 [validate-plugin] PASS: mcp tools/list contains file_read
 [validate-plugin] PASS: mcp tools/list contains session_search
-[validate-plugin] Summary: 195 passed, 0 failed, 13 skipped, 0 warned
+[validate-plugin] Summary: 198 passed, 0 failed, 14 skipped, 0 warned

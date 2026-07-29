@@ -85,7 +85,10 @@ Run `/oh-my-claudeagent:omca-setup` to configure and verify dependencies. Then:
 
 Specialist agents, skills via slash commands or keyword triggers, bundled MCP servers
 (omca: structural search + state, grep.app: public code search, context7: library docs),
-hooks for persistence, context injection, and auto-approval.
+hooks for persistence, context injection, and auto-approval. Comment conventions for
+Bash, Python, kernel C and headers, Rust, and Go plus a Markdown prose convention ship in
+`rules/` and are injected when you edit a matching file; override or disable any of them
+from your project's `.omca/rules/`.
 
 ### Heads-up — `worktree.baseRef` and unpushed commits
 
