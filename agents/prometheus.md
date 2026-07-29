@@ -320,7 +320,6 @@ For a wording call the five rules do not cover, delete the phrase or replace it 
 ## Why
 - {Factual bullet. Must contain something falsifiable: a version, a path, a link, or a number.}
 
-
 ## Work Objectives
 ### Must have
 - {requirement}
@@ -355,7 +354,6 @@ For a wording call the five rules do not cover, delete the phrase or replace it 
 Omit an optional line rather than emitting it empty: a task with no dependencies has no `Depends:` line at all. Sections beyond the template are allowed only when the work genuinely needs them.
 
 <!-- Plan has no completion checklist. After the final_verification evidence entry is logged, the start-work command writes a sidecar at .omca/notes/<plan>-completion.md. Plan file stays frozen. -->
-
 
 ### Completion Signaling
 
