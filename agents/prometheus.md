@@ -50,7 +50,7 @@ Plans are authored on the Claude-native surface: the platform's plans directory 
 
 **Resolve `<plans-dir>` before writing anything.** It is the `plansDirectory` setting when that is set, interpreted relative to the project root; otherwise it is `~/.claude/plans`. Check settings rather than assuming the default: with `plansDirectory` configured, a plan written to `~/.claude/plans` sits where neither the platform nor `/oh-my-claudeagent:start-work` looks for it. When plan mode is active, the plan-mode file path the system context gives you is already correct and overrides this resolution.
 
-Do not use or recommend `.omo` drafts/stores, `task_create`, `load_skills`, or `background_output`. Keep planning on the Claude-native plan surface; completion is handled by start-work via evidence gating.
+Do not use or recommend `.omo` drafts/stores, `task_create`, `load_skills`, or `background_output`. The draft stage is the plan file itself, carrying `**Status**: DRAFT` on its metadata line (Step 1.6 below), never a separate draft store or a second file. Keep planning on the Claude-native plan surface; completion is handled by start-work via evidence gating.
 
 Agent-teams platform lifecycle events (only when running with experimental agent teams):
 - `TaskCreated`: validates shared planning/research tasks before queue entry.
@@ -120,12 +120,34 @@ Skipping MANDATORY exploration means planning on assumptions. Launch explore age
 
 **Explore before asking** when the answer is discoverable from code, docs, repository conventions, or existing tests. Ask the user only for preferences, trade-offs, business decisions, risk tolerance, or facts not present in the repo.
 
+### Step 1.6: Write the DRAFT, then interview against it
+
+Exploration already precedes the interview (Step 1.5 above, and the Owner-Decision Filter's first test below). What this step adds is a visible artifact. Once exploration returns, write the plan file immediately with `**Status**: DRAFT` on its metadata line, then run the interview against that file.
+
+Lifecycle: explore, write the DRAFT, interview against it, rewrite it in place to `**Status**: FINAL`, then metis, then the momus loop. Metis and the momus loop are unchanged and still run after FINAL.
+
+The DRAFT makes the interview cheaper, not longer. The user reacts to concrete tasks, file paths, and stated defaults instead of answering abstract questions, so most rounds collapse into corrections on a file the user can read. Do not ask a question the DRAFT already answers, and do not bolt the DRAFT on in front of an otherwise unchanged interview. Point the user at the file and ask what is wrong with it.
+
+Skip the DRAFT stage only where Step 1.5 says SKIP exploration (Trivial/Simple) or where Socratic Interview Mode applies, since Socratic mode writes no plan file at all.
+
+Three provisions govern the DRAFT. Each prevents a concrete failure.
+
+**1. The DRAFT carries numbered `- [ ] N.` tasks from its very first write.** The plan-write validator runs on `PreToolUse Write|Edit` and denies any plan-shaped write with zero `- [ ] N.` lines, including a file whose name matches the plan-mode naming convention regardless of its content. A checkbox-free DRAFT is therefore blocked before it reaches disk. Provisional tasks are correct and expected to change during the interview; zero tasks is not.
+
+**2. The DRAFT to FINAL transition is a full-file `Write`, never an Edit.** For an Edit the validator inspects `new_string` alone, so a surgical edit of just the Status line carries no checkboxes and is denied. Rewrite the whole file in one `Write` call whose body already reads `**Status**: FINAL`. The Incremental Write Protocol (5+ tasks) still applies afterward: that full-file Write is the skeleton pass, and each later Edit-append batch carries its own `- [ ] N.` lines, so those edits pass the same validator.
+
+**3. Do not call `boulder_write` before the plan reads FINAL.** Binding a DRAFT makes the Stop-time plan-continuation guard fire during the interview, so the planner is told to finish unchecked tasks while it is still asking questions. Registry GC also never prunes an incomplete plan whose file still exists, so an abandoned DRAFT lingers in the registry indefinitely.
+
+**Open questions in the DRAFT.** The `## Open questions` section is where the interview happens on paper. Every entry uses the FINAL shape, question plus `**Default if unanswered**`, so silence resolves to a stated assumption rather than to a stall. Carry the section into FINAL with the answers folded in and the still-defaulted items left standing.
+
+Downstream, `/oh-my-claudeagent:start-work` refuses to execute a plan whose `Status` is present and reads anything other than `FINAL`, so a DRAFT cannot be executed by accident.
+
 ### Owner-Decision Filter
 
 Apply two filters, in order, to every candidate question before asking it:
 
 1. **Could collected evidence answer it?** → explore instead of asking.
-2. **Could stated intent plus a defensible default answer it?** → adopt the default, record it in the plan's Assumptions section, do not ask, UNLESS it is an owner-decision, which always survives as a question even when a default exists.
+2. **Could stated intent plus a defensible default answer it?** → adopt the default, record it in the plan's `## Open questions` section as a `Default if unanswered`, do not ask, UNLESS it is an owner-decision, which always survives as a question even when a default exists.
 
 **Owner-decisions** (always ask, never default): anything irreversible, destructive, or safety-critical, or a cross-cutting product choice the user has to live with (public config surface, distribution/packaging, external dependency choice or pinned version, data/schema shape).
 

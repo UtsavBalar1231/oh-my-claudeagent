@@ -74,6 +74,33 @@ binding.
 
 ### Decision Logic
 
+#### Draft gate (checked before anything is executed)
+
+A plan may carry a `**Status**:` field on its metadata line. Read it before executing,
+resuming, or auto-selecting a plan:
+
+- `Status` says `FINAL` → executable.
+- No `Status` field anywhere in the plan → executable. Plans written before this field
+  existed carry no status line, and a missing field must never block execution.
+- `Status` is present but says anything other than `FINAL` (`DRAFT` being the common
+  case) → REFUSE to execute it. A draft is a plan the user is still being interviewed
+  about, and executing one runs work nobody agreed to.
+
+On a refusal, emit this and return without delegating anything:
+
+```
+This plan is still a draft (Status: {value}), so start-work will not execute it.
+
+Finish the plan first:
+  /oh-my-claudeagent:plan
+
+Once the plan's Status line reads FINAL, re-run:
+  /oh-my-claudeagent:start-work {plan path}
+```
+
+A refused plan is also excluded from the selection list, so a single draft never
+auto-selects. If every candidate is a draft, say so rather than picking one.
+
 - **This session already resolves to a bound plan with unchecked boxes** → append
   session (re-run `boulder_write`, which is idempotent), continue work.
 - **No bound plan, or the bound plan is complete** → list available plans (per above,

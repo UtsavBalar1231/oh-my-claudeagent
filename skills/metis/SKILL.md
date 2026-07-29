@@ -5,13 +5,18 @@ context: fork
 background: false
 agent: oh-my-claudeagent:metis
 user-invocable: true
-argument-hint: "[request to analyze]"
+argument-hint: "[plan file path or request to analyze]"
 effort: high
 ---
 
-Analyze the following request: $ARGUMENTS
+Analyze: $ARGUMENTS
 
-No request specified → ask the user what to analyze.
+$ARGUMENTS accepts either form:
+
+- A **plan file path** (for example a `Status: DRAFT` plan from prometheus) → read that file and gap-analyze its contents.
+- Anything else → treat it as an inline request and gap-analyze the request text itself.
+
+Decide by trying to read it as a path: if `$ARGUMENTS` resolves to a readable file, use the file; otherwise use the text. Nothing specified → ask the user what to analyze.
 
 Follow metis workflow: classify intent, explore codebase for patterns, identify risks and gaps, provide directives for planner.
 
