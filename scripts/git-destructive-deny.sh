@@ -5,6 +5,11 @@
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
+if hook_is_disabled "git-destructive-deny"; then
+	log_hook_info "Disabled via OMCA_DISABLED_HOOKS — skipping destructive-git check." "$(basename "$0")"
+	exit 0
+fi
+
 if [[ "${OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY:-}" == "1" ]]; then
 	log_hook_info "Opt-out active (OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY=1) — skipping destructive-git check." "$(basename "$0")"
 	exit 0

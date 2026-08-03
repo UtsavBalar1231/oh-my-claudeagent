@@ -8,6 +8,17 @@ _TEST_HELPER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 load "$_TEST_HELPER_DIR/bats-support/load"
 load "$_TEST_HELPER_DIR/bats-assert/load"
 
+unset OMCA_COMMENT_GATE \
+	OMCA_DISABLED_HOOKS \
+	OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY \
+	OMCA_HOOK_DISABLE_FINAL_VERIFY \
+	OMCA_HOOK_DISABLE_DRIFT_GUARD \
+	HOOK_STATE_DIR \
+	HOOK_LOG_DIR \
+	HOOK_INPUT \
+	HOOK_INPUT_TIMED_OUT \
+	CLAUDE_PLUGIN_DATA
+
 setup() {
 	# Create isolated project root for this test
 	export CLAUDE_PROJECT_ROOT="$BATS_TEST_TMPDIR/project"

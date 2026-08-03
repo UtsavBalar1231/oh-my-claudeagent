@@ -85,6 +85,11 @@ _assert_blocked() {
 	[ -n "$(jq -r '.reason // ""' <<< "$output")" ]
 }
 
+_assert_allowed() {
+	assert_success
+	refute_output --partial '"decision"'
+}
+
 # ---------------------------------------------------------------------------
 # (a) No active boulder — nothing to enforce (exit 0)
 # ---------------------------------------------------------------------------
@@ -92,7 +97,7 @@ _assert_blocked() {
 @test "final-verification-evidence: no active plan allows Stop (exit 0)" {
 	# State dir empty — no boulder.json, no evidence
 	run_hook "final-verification-evidence.sh" '{}'
-	assert_success
+	_assert_allowed
 }
 
 # ---------------------------------------------------------------------------
@@ -105,7 +110,7 @@ _assert_blocked() {
 	_write_boulder "${plan_file}"
 
 	run_hook "final-verification-evidence.sh" '{}'
-	assert_success
+	_assert_allowed
 }
 
 # ---------------------------------------------------------------------------
@@ -132,7 +137,7 @@ _assert_blocked() {
 	_write_boulder "${plan_file}" "other-session"
 
 	run_hook "final-verification-evidence.sh" '{}'
-	assert_success
+	_assert_allowed
 }
 
 # ---------------------------------------------------------------------------
@@ -146,7 +151,7 @@ _assert_blocked() {
 	_write_final_verification_evidence 0
 
 	run_hook "final-verification-evidence.sh" '{}'
-	assert_success
+	_assert_allowed
 }
 
 # ---------------------------------------------------------------------------
@@ -160,7 +165,7 @@ _assert_blocked() {
 	# No evidence — would block, but guard fires first
 
 	run_hook "final-verification-evidence.sh" '{"stop_hook_active":true}'
-	assert_success
+	_assert_allowed
 }
 
 # ---------------------------------------------------------------------------
@@ -175,7 +180,7 @@ _assert_blocked() {
 
 	export OMCA_HOOK_DISABLE_FINAL_VERIFY=1
 	run_hook "final-verification-evidence.sh" '{}'
-	assert_success
+	_assert_allowed
 	unset OMCA_HOOK_DISABLE_FINAL_VERIFY
 }
 
@@ -193,7 +198,7 @@ EOF
 	_write_boulder "${plan_file}"
 
 	run_hook "final-verification-evidence.sh" '{}'
-	assert_success
+	_assert_allowed
 }
 
 # ---------------------------------------------------------------------------
@@ -218,7 +223,7 @@ EOF
 	write_state "boulder.json" '{"active_plan":"/nonexistent/plan.md"}'
 
 	run_hook "final-verification-evidence.sh" '{}'
-	assert_success
+	_assert_allowed
 }
 
 # ---------------------------------------------------------------------------
@@ -273,7 +278,7 @@ EOF
 	_write_final_verification_evidence_scoped "${sha}" 0
 
 	run_hook "final-verification-evidence.sh" '{}'
-	assert_success
+	_assert_allowed
 }
 
 # ---------------------------------------------------------------------------
@@ -297,14 +302,14 @@ EOF
 @test "final-verification-evidence: unbound session (empty shim result) allows Stop (exit 0)" {
 	# No boulder.json written at all — the shim resolves to {} for this session.
 	run_hook "final-verification-evidence.sh" '{}'
-	assert_success
+	_assert_allowed
 }
 
 @test "final-verification-evidence: unparseable boulder.json says the gate is off instead of going quiet" {
 	printf 'NOT JSON {' > "${CLAUDE_PROJECT_ROOT}/.omca/state/boulder.json"
 
 	run_hook "final-verification-evidence.sh" '{}'
-	assert_success
+	_assert_allowed
 	assert_output --partial "not valid JSON"
 }
 
@@ -322,7 +327,7 @@ EOF
 	run env HOOK_INPUT="" HOOK_INPUT_TIMED_OUT=1 \
 		CLAUDE_PROJECT_ROOT="${CLAUDE_PROJECT_ROOT}" CLAUDE_PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT}" CLAUDE_SESSION_ID="${CLAUDE_SESSION_ID}" \
 		bash "${CLAUDE_PLUGIN_ROOT}/scripts/final-verification-evidence.sh"
-	assert_success
+	_assert_allowed
 	assert_output --partial "stdin read timed out"
 }
 
@@ -344,7 +349,7 @@ EOF
 	_write_final_verification_evidence 0
 
 	run_hook "final-verification-evidence.sh" '{}'
-	assert_success
+	_assert_allowed
 }
 
 # ---------------------------------------------------------------------------
@@ -359,7 +364,7 @@ EOF
 
 	export OMCA_DISABLED_HOOKS="final-verification-evidence"
 	run_hook "final-verification-evidence.sh" '{}'
-	assert_success
+	_assert_allowed
 	unset OMCA_DISABLED_HOOKS
 }
 
@@ -383,7 +388,7 @@ EOF
 
 	export OMCA_HOOK_DISABLE_FINAL_VERIFY=1
 	run_hook "final-verification-evidence.sh" '{}'
-	assert_success
+	_assert_allowed
 	unset OMCA_HOOK_DISABLE_FINAL_VERIFY
 }
 

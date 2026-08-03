@@ -12,6 +12,11 @@ noop_exit() {
 	exit 0
 }
 
+if hook_is_disabled "drift-guard"; then
+	echo "[DRIFT GUARD] Disabled via OMCA_DISABLED_HOOKS — skipping check." >&2
+	noop_exit
+fi
+
 # Kill switch for emergency rollback
 if [[ "${OMCA_HOOK_DISABLE_DRIFT_GUARD:-}" == "1" ]]; then
 	echo "[DRIFT GUARD] Kill switch active (OMCA_HOOK_DISABLE_DRIFT_GUARD=1) — skipping check." >&2

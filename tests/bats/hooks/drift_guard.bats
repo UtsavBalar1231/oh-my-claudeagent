@@ -114,6 +114,25 @@ _assert_blocked() {
 	assert_output --partial "Kill switch"
 }
 
+@test "drift-guard: OMCA_DISABLED_HOOKS listing this hook allows Stop" {
+	echo "hello" > a.txt
+	_commit_all
+	echo "TODO: implement" > new.txt
+
+	OMCA_DISABLED_HOOKS="drift-guard" run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
+	assert_success
+	refute_output --partial '"decision"'
+}
+
+@test "drift-guard: OMCA_DISABLED_HOOKS listing a different hook still blocks" {
+	echo "hello" > a.txt
+	_commit_all
+	echo "TODO: implement" > new.txt
+
+	OMCA_DISABLED_HOOKS="other-hook" run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
+	_assert_blocked
+}
+
 @test "drift-guard: assistant text extracted from transcript_path when last_assistant_message is absent" {
 	echo "hello" > a.txt
 	_commit_all

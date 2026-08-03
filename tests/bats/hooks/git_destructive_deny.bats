@@ -201,3 +201,17 @@ run_hook_merged() {
 		<<< "$(bash_payload 'git reset --hard')"
 	assert_success
 }
+
+@test "git-destructive-deny: OMCA_DISABLED_HOOKS listing this hook allows reset --hard" {
+	OMCA_DISABLED_HOOKS="git-destructive-deny" \
+		run bash -c "bash ${CLAUDE_PLUGIN_ROOT}/scripts/git-destructive-deny.sh 2>&1" \
+		<<< "$(bash_payload 'git reset --hard')"
+	assert_success
+}
+
+@test "git-destructive-deny: OMCA_DISABLED_HOOKS listing a different hook still denies reset --hard" {
+	OMCA_DISABLED_HOOKS="other-hook" \
+		run bash -c "bash ${CLAUDE_PLUGIN_ROOT}/scripts/git-destructive-deny.sh 2>&1" \
+		<<< "$(bash_payload 'git reset --hard')"
+	assert_failure 2
+}

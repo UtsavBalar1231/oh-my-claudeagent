@@ -61,6 +61,11 @@ _assert_blocked() {
 	[ -n "$(jq -r '.reason // ""' <<< "$output")" ]
 }
 
+_assert_allowed() {
+	assert_success
+	refute_output --partial '"decision"'
+}
+
 _continuation_state() {
 	cat "${CLAUDE_PROJECT_ROOT}/.omca/state/plan-continuation.json" 2>/dev/null
 }
@@ -85,12 +90,12 @@ _continuation_state() {
 	_write_boulder "${plan_file}"
 
 	run_hook "plan-continuation-guard.sh" '{}'
-	assert_success
+	_assert_allowed
 }
 
 @test "plan-continuation-guard: no bound plan allows Stop (exit 0)" {
 	run_hook "plan-continuation-guard.sh" '{}'
-	assert_success
+	_assert_allowed
 }
 
 @test "plan-continuation-guard: registered incomplete plan with no binding for this session allows Stop (exit 0)" {
@@ -103,7 +108,7 @@ _continuation_state() {
 		> "${CLAUDE_PROJECT_ROOT}/.omca/state/boulder.json"
 
 	run_hook "plan-continuation-guard.sh" '{}'
-	assert_success
+	_assert_allowed
 }
 
 @test "plan-continuation-guard: stop_hook_active exits 0 and leaves counters file untouched" {
@@ -112,7 +117,7 @@ _continuation_state() {
 	_write_boulder "${plan_file}"
 
 	run_hook "plan-continuation-guard.sh" '{"stop_hook_active":true}'
-	assert_success
+	_assert_allowed
 	[ ! -f "${CLAUDE_PROJECT_ROOT}/.omca/state/plan-continuation.json" ]
 }
 
@@ -123,7 +128,7 @@ _continuation_state() {
 
 	export OMCA_DISABLED_HOOKS="plan-continuation-guard"
 	run_hook "plan-continuation-guard.sh" '{}'
-	assert_success
+	_assert_allowed
 	unset OMCA_DISABLED_HOOKS
 }
 
@@ -140,7 +145,7 @@ _continuation_state() {
 	_assert_blocked
 
 	run_hook "plan-continuation-guard.sh" '{}'
-	assert_success
+	_assert_allowed
 }
 
 @test "plan-continuation-guard: stagnation escape frees the 4th identical-count invocation" {
@@ -162,7 +167,7 @@ _continuation_state() {
 	jq '.last_block_at = 0' "${CLAUDE_PROJECT_ROOT}/.omca/state/plan-continuation.json" \
 		> "${BATS_TEST_TMPDIR}/pc.json" && mv "${BATS_TEST_TMPDIR}/pc.json" "${CLAUDE_PROJECT_ROOT}/.omca/state/plan-continuation.json"
 	run_hook "plan-continuation-guard.sh" '{}'
-	assert_success
+	_assert_allowed
 	[ "$(jq -r '.stagnated' "${CLAUDE_PROJECT_ROOT}/.omca/state/plan-continuation.json")" = "true" ]
 }
 
@@ -187,7 +192,7 @@ EOF
 	payload=$(jq -n --arg tp "${transcript}" '{"hook_event_name":"Stop","stop_hook_active":false,"transcript_path":$tp}')
 
 	run_hook "plan-continuation-guard.sh" "${payload}"
-	assert_success
+	_assert_allowed
 }
 
 @test "plan-continuation-guard: same transcript without a pause phrase still blocks" {
@@ -235,7 +240,7 @@ EOF
 
 	run_hook "plan-continuation-guard.sh" \
 		"$(jq -n --arg tp "${transcript}" '{"transcript_path":$tp,"last_assistant_message":"Task 2 forks two ways."}')"
-	assert_success
+	_assert_allowed
 	assert_output '{}'
 }
 
@@ -299,7 +304,7 @@ EOF
 	local msg
 	msg=$'Task 2 needs a decision.\n\n## BLOCKING QUESTIONS\n\nQ1. Which parser?\nA) recursive descent\nB) generated\nRecommended: A'
 	run_hook "plan-continuation-guard.sh" "$(jq -n --arg m "${msg}" '{"last_assistant_message":$m}')"
-	assert_success
+	_assert_allowed
 	assert_output '{}'
 }
 
