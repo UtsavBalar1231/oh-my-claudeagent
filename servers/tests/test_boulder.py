@@ -1,6 +1,5 @@
 """Tests for the session-bound boulder plan registry (boulder_write/boulder_progress)."""
 
-import asyncio
 import json
 import os
 import subprocess
@@ -11,8 +10,9 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
+from tests._mcp_helpers import call_tool
 from tools import _boulder_core, boulder as boulder_module
 from tools._common import BOULDER_FILE
 
@@ -31,20 +31,10 @@ def load_fixture_raw(name: str) -> str:
         return f.read()
 
 
-def call_tool(server: FastMCP, name: str, args: dict) -> str:
-    """Call an MCP tool synchronously and return the text result."""
-    result = asyncio.run(server.call_tool(name, args))
-    # result is (list[ContentBlock], {'result': str})
-    # mcp.call_tool()'s public stub is typed Sequence[ContentBlock] | dict[str, Any],
-    # but it actually returns a (content, structured_result) tuple at runtime
-    # (verified against the installed mcp package); stub/runtime mismatch, not our bug.
-    return result[1]["result"]  # pyright: ignore[reportArgumentType, reportIndexIssue]
-
-
 @pytest.fixture
 def mcp_server():
-    """Create a FastMCP server with boulder tools registered."""
-    server = FastMCP("test-boulder")
+    """Create an MCPServer with boulder tools registered."""
+    server = MCPServer("test-boulder")
     boulder_module.register(server)
     return server
 

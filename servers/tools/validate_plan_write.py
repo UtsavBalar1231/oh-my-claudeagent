@@ -3,7 +3,8 @@
 import json
 import re
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
+from mcp.types import ToolAnnotations
 from pydantic import Field
 
 # ---------------------------------------------------------------------------
@@ -60,10 +61,18 @@ def _allow() -> str:
 # ---------------------------------------------------------------------------
 
 
-def register(mcp: FastMCP) -> None:
-    """Register the validate_plan_write tool on the given FastMCP instance."""
+def register(mcp: MCPServer) -> None:
+    """Register the validate_plan_write tool on the given MCPServer instance."""
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            read_only_hint=True, idempotent_hint=True, open_world_hint=False
+        ),
+        meta={
+            "anthropic/searchHint": "internal hook validator for plan-file checkbox structure"
+        },
+        structured_output=False,
+    )
     def validate_plan_write(
         tool_name: str = Field(
             description="The triggering tool name: 'Write' or 'Edit'."

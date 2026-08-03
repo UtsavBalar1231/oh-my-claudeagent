@@ -1,7 +1,11 @@
 # Servers
 
-The `omca` MCP server: a FastMCP Python app exposing OMCA's tools (boulder plan
+The `omca` MCP server: an `MCPServer` Python app exposing OMCA's tools (boulder plan
 registry, evidence log, notepads, ast-grep search, filesystem helpers).
+
+It is built on the official `mcp` Python SDK 2.x, which implements MCP spec revision
+2026-07-28 and serves both that revision and every 2025-era client from the same stdio
+server.
 
 ## Layout
 

@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 from typing import Literal
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
@@ -19,10 +19,21 @@ from tools._common import (
 )
 
 
-def register(mcp: FastMCP) -> None:
-    """Register all notepad tools on the given FastMCP instance."""
+def register(mcp: MCPServer) -> None:
+    """Register all notepad tools on the given MCPServer instance."""
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            read_only_hint=False,
+            destructive_hint=False,
+            idempotent_hint=False,
+            open_world_hint=False,
+        ),
+        meta={
+            "anthropic/searchHint": "persist a learning, issue, decision, or problem so it survives compaction"
+        },
+        structured_output=False,
+    )
     def notepad_write(
         plan_name: str = Field(description="Plan name (matches boulder plan_name)"),
         section: Literal["learnings", "issues", "decisions", "problems"] = Field(
@@ -54,7 +65,17 @@ def register(mcp: FastMCP) -> None:
 
         return result_msg
 
-    @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True))
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            read_only_hint=True,
+            idempotent_hint=True,
+            open_world_hint=False,
+        ),
+        meta={
+            "anthropic/searchHint": "recall learnings, issues, decisions, and problems recorded for a plan"
+        },
+        structured_output=False,
+    )
     def notepad_read(
         plan_name: str = Field(description="Plan name"),
         section: Literal["learnings", "issues", "decisions", "problems"] | None = Field(
@@ -87,7 +108,17 @@ def register(mcp: FastMCP) -> None:
 
         return "\n---\n\n".join(output)
 
-    @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True))
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            read_only_hint=True,
+            idempotent_hint=True,
+            open_world_hint=False,
+        ),
+        meta={
+            "anthropic/searchHint": "discover which plans have notepads and which sections exist"
+        },
+        structured_output=False,
+    )
     def notepad_list(
         plan_name: str = Field(
             default="", description="Plan name (lists all plans if empty)"
@@ -126,7 +157,18 @@ def register(mcp: FastMCP) -> None:
 
         return "\n".join(lines)
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            read_only_hint=False,
+            destructive_hint=True,
+            idempotent_hint=False,
+            open_world_hint=False,
+        ),
+        meta={
+            "anthropic/searchHint": "truncate older entries in a large notepad section between plan phases"
+        },
+        structured_output=False,
+    )
     def notepad_compact(
         plan_name: str = Field(description="Plan name (matches boulder plan_name)"),
         section: Literal["learnings", "issues", "decisions", "problems"] = Field(

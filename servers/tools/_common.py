@@ -1,8 +1,11 @@
 """Shared state helpers for omca MCP tools."""
 
+import contextlib
+import fcntl
 import json
 import os
 import subprocess
+import tempfile
 from pathlib import Path
 
 # --- State Constants ---
@@ -79,13 +82,34 @@ def _read_json(path: str) -> dict:
 
 
 def _write_json(path: str, data: dict | list) -> None:
-    """Atomically write JSON to a file."""
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    tmp = path + ".tmp"
-    with open(tmp, "w") as f:
-        json.dump(data, f, indent=2)
-        f.write("\n")
-    os.replace(tmp, path)
+    """Atomically write JSON via mkstemp+os.replace."""
+    directory = os.path.dirname(path)
+    os.makedirs(directory, exist_ok=True)
+    fd, tmp_path = tempfile.mkstemp(
+        dir=directory, prefix="." + os.path.basename(path) + "-", suffix=".tmp"
+    )
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(data, f, indent=2)
+            f.write("\n")
+        os.replace(tmp_path, path)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.remove(tmp_path)
+        raise
+
+
+@contextlib.contextmanager
+def _file_lock(lock_path: str):
+    """Hold an exclusive flock on a separate lock file for a read-modify-write."""
+    os.makedirs(os.path.dirname(lock_path), exist_ok=True)
+    fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o644)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        yield
+    finally:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
 
 
 def _notepad_new_dir(git_root: str, plan_name: str) -> str:

@@ -3,7 +3,7 @@
 Methodology
 -----------
 1. Spawn ``omca-mcp.py`` as a subprocess using the repo servers path and
-   the ``UV_PROJECT_ENVIRONMENT`` venv (stdio transport -- FastMCP default).
+   the ``UV_PROJECT_ENVIRONMENT`` venv (stdio transport -- MCPServer default).
 2. Record ``t0 = time.monotonic()`` immediately before ``Popen``.
 3. Write a minimal valid JSON-RPC ``initialize`` request to the process stdin.
 4. Record ``t1 = time.monotonic()`` after reading the first reply line on
@@ -38,7 +38,7 @@ cache itself (that would hide real cold-start regressions).
 
 Transport
 ---------
-``mcp.run()`` in omca-mcp.py is called with no arguments, so FastMCP uses its
+``mcp.run()`` in omca-mcp.py is called with no arguments, so MCPServer uses its
 default stdio transport (confirmed by reading the source: see
 ``servers/omca-mcp.py`` line with ``mcp.run()``).
 """

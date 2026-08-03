@@ -9,7 +9,7 @@ import sys
 from typing import Literal, get_args
 
 import yaml
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
@@ -517,11 +517,17 @@ def validate_yaml_rule(yaml_str: str) -> dict:
     return parsed
 
 
-def register(mcp: FastMCP) -> None:
-    """Register all AST tools on the given FastMCP instance."""
+def register(mcp: MCPServer) -> None:
+    """Register all AST tools on the given MCPServer instance."""
 
     @mcp.tool(
-        annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True),
+        annotations=ToolAnnotations(
+            read_only_hint=True, idempotent_hint=True, open_world_hint=False
+        ),
+        meta={
+            "anthropic/searchHint": "structural code search by syntax pattern across 25 languages; use instead of grep when the pattern is syntactic"
+        },
+        structured_output=False,
     )
     def ast_search(
         pattern: str = Field(
@@ -576,7 +582,16 @@ def register(mcp: FastMCP) -> None:
         return output
 
     @mcp.tool(
-        annotations=ToolAnnotations(destructiveHint=True),
+        annotations=ToolAnnotations(
+            read_only_hint=False,
+            destructive_hint=True,
+            idempotent_hint=False,
+            open_world_hint=False,
+        ),
+        meta={
+            "anthropic/searchHint": "AST-aware structural find-and-replace refactor across files"
+        },
+        structured_output=False,
     )
     def ast_replace(
         pattern: str = Field(description="AST pattern to match"),
@@ -679,7 +694,13 @@ def register(mcp: FastMCP) -> None:
         return output
 
     @mcp.tool(
-        annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True),
+        annotations=ToolAnnotations(
+            read_only_hint=True, idempotent_hint=True, open_world_hint=False
+        ),
+        meta={
+            "anthropic/searchHint": "YAML rule search with kind/has/inside/follows/precedes combinators for context-sensitive matches"
+        },
+        structured_output=False,
     )
     def ast_find_rule(
         rule_yaml: str = Field(
@@ -728,7 +749,13 @@ def register(mcp: FastMCP) -> None:
         return output
 
     @mcp.tool(
-        annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True),
+        annotations=ToolAnnotations(
+            read_only_hint=True, idempotent_hint=True, open_world_hint=False
+        ),
+        meta={
+            "anthropic/searchHint": "dump the AST/CST of a snippet to build or debug an ast-grep pattern"
+        },
+        structured_output=False,
     )
     def ast_dump_tree(
         code: str = Field(description="Code snippet to visualize"),
@@ -760,7 +787,13 @@ def register(mcp: FastMCP) -> None:
         return tree_output
 
     @mcp.tool(
-        annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True),
+        annotations=ToolAnnotations(
+            read_only_hint=True, idempotent_hint=True, open_world_hint=False
+        ),
+        meta={
+            "anthropic/searchHint": "validate an ast-grep YAML rule against a snippet before running it repo-wide"
+        },
+        structured_output=False,
     )
     def ast_test_rule(
         code: str = Field(description="Code snippet to test against"),

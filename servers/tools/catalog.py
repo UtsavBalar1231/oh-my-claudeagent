@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 
 import yaml
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
@@ -14,8 +14,8 @@ from tools._common import AGENT_CATALOG_FILE, _state_dir, _write_json
 from tools.ast import discover_binary, get_sg_bin
 
 
-def register(mcp: FastMCP) -> None:
-    """Register all catalog and concurrency tools on the given FastMCP instance."""
+def register(mcp: MCPServer) -> None:
+    """Register all catalog and concurrency tools on the given MCPServer instance."""
 
     _MODEL_COST_TIER = {
         "claude-fable-5": "premium",
@@ -29,7 +29,18 @@ def register(mcp: FastMCP) -> None:
         "haiku": "free",
     }
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            read_only_hint=False,
+            destructive_hint=False,
+            idempotent_hint=True,
+            open_world_hint=False,
+        ),
+        meta={
+            "anthropic/searchHint": "agent roster with when_to_use, cost tier, and model, for delegation routing"
+        },
+        structured_output=False,
+    )
     def agents_list(
         working_directory: str = Field(
             default="", description="Project root (auto-detected from git)"
@@ -67,7 +78,13 @@ def register(mcp: FastMCP) -> None:
         _write_json(cache_path, catalog)
         return json.dumps(catalog, indent=2)
 
-    @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True))
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            read_only_hint=True, idempotent_hint=True, open_world_hint=False
+        ),
+        meta={"anthropic/searchHint": "agent category to model tier mapping"},
+        structured_output=False,
+    )
     def categories_list(
         working_directory: str = Field(
             default="",
@@ -88,7 +105,15 @@ def register(mcp: FastMCP) -> None:
         except json.JSONDecodeError:
             return json.dumps({"error": "categories.json is malformed"})
 
-    @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True))
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            read_only_hint=True, idempotent_hint=True, open_world_hint=False
+        ),
+        meta={
+            "anthropic/searchHint": "diagnose omca plugin state: ast-grep binary, state directory, key state files"
+        },
+        structured_output=False,
+    )
     def health_check(
         working_directory: str = Field(
             default="", description="Project root (auto-detected from git)"

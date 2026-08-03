@@ -5,7 +5,7 @@ Usage: python3 boulder_resolve.py [session_id] [working_directory] [--strict]
 
 Shares the resolver ladder and session-id resolution with `boulder.py` (via
 `_boulder_core` / `_common`) so bash consumers bind on the exact same plan the
-Python writer would. Stdlib-only — no fastmcp/pydantic. Fail-soft: prints `{}`
+Python writer would. Stdlib-only — no mcp/pydantic. Fail-soft: prints `{}`
 and exits 0 on any error.
 
 `--strict` (any position) resolves only via an explicit binding, skipping the

@@ -1,6 +1,5 @@
 """Tests for validate_plan_write MCP tool."""
 
-import asyncio
 import json
 import os
 import sys
@@ -9,24 +8,16 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
+from tests._mcp_helpers import call_tool
 from tools import validate_plan_write as vpw_module
-
-
-def call_tool(server: FastMCP, name: str, args: dict) -> str:
-    """Call an MCP tool synchronously and return the text result."""
-    result = asyncio.run(server.call_tool(name, args))
-    # mcp.call_tool()'s public stub is typed Sequence[ContentBlock] | dict[str, Any],
-    # but it actually returns a (content, structured_result) tuple at runtime
-    # (verified against the installed mcp package); stub/runtime mismatch, not our bug.
-    return result[1]["result"]  # pyright: ignore[reportArgumentType, reportIndexIssue]
 
 
 @pytest.fixture
 def mcp_server():
-    """Create a FastMCP server with validate_plan_write registered."""
-    server = FastMCP("test-validate-plan-write")
+    """Create an MCPServer with validate_plan_write registered."""
+    server = MCPServer("test-validate-plan-write")
     vpw_module.register(server)
     return server
 

@@ -1,24 +1,23 @@
 """Boulder plan tracking tools — session-bound plan registry."""
 
 import calendar
-import contextlib
-import fcntl
 import json
 import os
-import tempfile
 import time
 from pathlib import Path
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from tools import _boulder_core
 from tools._common import (
     BOULDER_FILE,
+    _file_lock,
     _read_json,
     _resolve_session_id,
     _state_dir,
+    _write_json,
 )
 
 # Canonical pattern lives in _boulder_core (shared with the SessionStart GC
@@ -55,40 +54,14 @@ def _lock_path(state_dir: str) -> str:
     return os.path.join(state_dir, BOULDER_FILE + ".lock")
 
 
-@contextlib.contextmanager
 def _boulder_lock(state_dir: str):
-    """Hold an exclusive flock on a SEPARATE lock file for the read-modify-write.
-
-    Locking a separate file (not boulder.json itself) avoids the inode footgun
-    where `os.replace` swaps the data file out from under a lock held on it.
-    """
-    os.makedirs(state_dir, exist_ok=True)
-    fd = os.open(_lock_path(state_dir), os.O_CREAT | os.O_RDWR, 0o644)
-    try:
-        fcntl.flock(fd, fcntl.LOCK_EX)
-        yield
-    finally:
-        fcntl.flock(fd, fcntl.LOCK_UN)
-        os.close(fd)
+    """Hold an exclusive flock on `boulder.json.lock` for the read-modify-write."""
+    return _file_lock(_lock_path(state_dir))
 
 
 def _write_boulder_atomic(state_dir: str, data: dict) -> None:
-    """Atomically replace boulder.json via mkstemp+os.replace (not a fixed .tmp path).
-
-    A fixed `.tmp` name is a concurrency footgun: two writers racing would
-    collide on the same temp path even under the lock's protection window.
-    """
-    os.makedirs(state_dir, exist_ok=True)
-    fd, tmp_path = tempfile.mkstemp(dir=state_dir, prefix=".boulder-", suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w") as f:
-            json.dump(data, f, indent=2)
-            f.write("\n")
-        os.replace(tmp_path, _boulder_path(state_dir))
-    except BaseException:
-        with contextlib.suppress(OSError):
-            os.remove(tmp_path)
-        raise
+    """Atomically replace boulder.json; `_write_json` owns the mkstemp+os.replace."""
+    _write_json(_boulder_path(state_dir), data)
 
 
 # Single completion oracle, shared with the GC shim and statusline gating.
@@ -218,10 +191,21 @@ def _do_boulder_progress(
     )
 
 
-def register(mcp: FastMCP) -> None:
-    """Register boulder tools on the given FastMCP instance."""
+def register(mcp: MCPServer) -> None:
+    """Register boulder tools on the given MCPServer instance."""
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            read_only_hint=False,
+            destructive_hint=False,
+            idempotent_hint=True,
+            open_world_hint=False,
+        ),
+        meta={
+            "anthropic/searchHint": "register the active work plan and bind this session to it"
+        },
+        structured_output=False,
+    )
     def boulder_write(
         active_plan: str = Field(description="Absolute path to the plan file"),
         plan_name: str = Field(description="Short name for the plan"),
@@ -239,7 +223,17 @@ def register(mcp: FastMCP) -> None:
             active_plan, plan_name, session_id, agent, worktree_path, working_directory
         )
 
-    @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True))
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            read_only_hint=True,
+            idempotent_hint=True,
+            open_world_hint=False,
+        ),
+        meta={
+            "anthropic/searchHint": "plan task progress: completed and remaining checkboxes, plus the next task label"
+        },
+        structured_output=False,
+    )
     def boulder_progress(
         plan_path: str = Field(
             default="",

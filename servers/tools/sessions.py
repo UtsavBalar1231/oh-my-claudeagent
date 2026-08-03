@@ -23,7 +23,7 @@ import time
 from pathlib import Path
 from typing import Annotated
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
@@ -182,10 +182,18 @@ def _search_sidecar(path: Path, query_lower: str) -> list[dict[str, str]]:
     ]
 
 
-def register(mcp: FastMCP) -> None:
-    """Register the session_search tool on the given FastMCP instance."""
+def register(mcp: MCPServer) -> None:
+    """Register the session_search tool on the given MCPServer instance."""
 
-    @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            read_only_hint=True, idempotent_hint=True, open_world_hint=False
+        ),
+        meta={
+            "anthropic/searchHint": "search this project's past Claude Code session transcripts"
+        },
+        structured_output=False,
+    )
     def session_search(
         query: Annotated[
             str,

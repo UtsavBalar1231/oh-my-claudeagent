@@ -1,10 +1,26 @@
 """Tests for notepad MCP tools."""
 
+import os
+import sys
+
 import pytest
-from pydantic import ValidationError
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 
 import tools.notepad as notepad_module
+from tests._mcp_helpers import call_tool
 from tools._common import VALID_SECTIONS
+
+
+@pytest.fixture
+def mcp_server():
+    """Create an MCPServer with notepad tools registered."""
+    server = MCPServer("test-notepad")
+    notepad_module.register(server)
+    return server
 
 
 def _get_tools(working_dir):
@@ -78,41 +94,42 @@ def test_notepad_write_appends(tools, tmp_git_root, working_dir):
     assert "Entry two" in text
 
 
-def test_notepad_write_rejects_invalid_section(tools, working_dir):
-    """notepad_write rejects invalid section names via Literal type enforcement."""
-    # The function uses Literal typing — calling with an invalid value still succeeds
-    # at the Python level (no runtime enforcement from Literal alone), but the MCP
-    # schema validation happens before this function is called in production.
-    # We test that the valid sections are the expected ones instead.
-    assert set(VALID_SECTIONS) == {
-        "learnings",
-        "issues",
-        "decisions",
-        "problems",
-    }
+@pytest.mark.parametrize("bad_section", ["questions", "notes"])
+def test_notepad_write_rejects_unknown_section(
+    mcp_server, working_dir, tmp_git_root, bad_section
+):
+    """An unlisted section is rejected by the server's own argument validation."""
+    with pytest.raises(ToolError, match=bad_section):
+        call_tool(
+            mcp_server,
+            "notepad_write",
+            {
+                "plan_name": "reject-plan",
+                "section": bad_section,
+                "content": "should not land",
+                "working_directory": working_dir,
+            },
+        )
+    assert not (tmp_git_root / ".omca" / "notepads" / "reject-plan").exists()
 
 
-def test_notepad_write_rejects_questions_section(tools, working_dir):
-    """The deprecated 'questions' section must be rejected by Literal validation.
-
-    Blocking clarification questions must now be emitted in the subagent's
-    final text response as a '## BLOCKING QUESTIONS' block — writing to a
-    notepad 'questions' section is a footgun and has been removed.
-    """
-    # VALID_SECTIONS no longer lists "questions"
-    assert "questions" not in VALID_SECTIONS
-
-    # The Literal[...] annotation on notepad_write should reject "questions"
-    # when the tool is invoked through the MCP schema layer. At the raw
-    # function level Python doesn't enforce Literal, so we assert via a
-    # pydantic TypeAdapter over the same Literal as the source of truth.
-    from typing import Literal
-
-    from pydantic import TypeAdapter
-
-    adapter = TypeAdapter(Literal["learnings", "issues", "decisions", "problems"])
-    with pytest.raises(ValidationError):
-        adapter.validate_python("questions")
+def test_notepad_write_accepts_every_declared_section(
+    mcp_server, working_dir, tmp_git_root
+):
+    """The mirror of the rejection test: VALID_SECTIONS is exactly what the server takes."""
+    for section in VALID_SECTIONS:
+        call_tool(
+            mcp_server,
+            "notepad_write",
+            {
+                "plan_name": "accept-plan",
+                "section": section,
+                "content": f"entry for {section}",
+                "working_directory": working_dir,
+            },
+        )
+        path = tmp_git_root / ".omca" / "notepads" / "accept-plan" / f"{section}.md"
+        assert path.exists(), f"{section} is in VALID_SECTIONS but the tool rejected it"
 
 
 # --- notepad_read ---

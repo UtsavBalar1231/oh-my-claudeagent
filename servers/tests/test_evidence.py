@@ -1,33 +1,25 @@
 """Tests for evidence MCP tools."""
 
-import asyncio
 import json
 import os
 import sys
+import threading
 
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
+from tests._mcp_helpers import call_tool
 from tools import evidence as evidence_module
 from tools._common import EVIDENCE_DIR, EVIDENCE_FILE_NEW
 
 
-def call_tool(server: FastMCP, name: str, args: dict) -> str:
-    """Call an MCP tool synchronously and return the text result."""
-    result = asyncio.run(server.call_tool(name, args))
-    # mcp.call_tool()'s public stub is typed Sequence[ContentBlock] | dict[str, Any],
-    # but it actually returns a (content, structured_result) tuple at runtime
-    # (verified against the installed mcp package); stub/runtime mismatch, not our bug.
-    return result[1]["result"]  # pyright: ignore[reportArgumentType, reportIndexIssue]
-
-
 @pytest.fixture
 def mcp_server():
-    """Create a FastMCP server with evidence tools registered."""
-    server = FastMCP("test-evidence")
+    """Create an MCPServer with evidence tools registered."""
+    server = MCPServer("test-evidence")
     evidence_module.register(server)
     return server
 
@@ -113,6 +105,48 @@ def test_evidence_log_truncates_snippet(mcp_server, working_dir, tmp_git_root):
     path = tmp_git_root / EVIDENCE_DIR / EVIDENCE_FILE_NEW
     data = json.loads(path.read_text())
     assert len(data["entries"][0]["output_snippet"]) == 2000
+
+
+# --- true parallel writers ---
+
+
+def test_evidence_log_parallel_writers_no_lost_entries(
+    mcp_server, working_dir, tmp_git_root
+):
+    """N=30 barrier-synchronized writers all survive: no lost appends, no errors."""
+    n = 30
+    barrier = threading.Barrier(n)
+    errors = []
+
+    def worker(i: int) -> None:
+        try:
+            barrier.wait(timeout=10)
+            call_tool(
+                mcp_server,
+                "evidence_log",
+                {
+                    "evidence_type": "test",
+                    "command": f"cmd-{i}",
+                    "exit_code": 0,
+                    "output_snippet": "ok",
+                    "working_directory": working_dir,
+                },
+            )
+        except Exception as exc:  # pragma: no cover - surfaced via errors list
+            errors.append(exc)
+
+    threads = [threading.Thread(target=worker, args=(i,)) for i in range(n)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert not errors, f"worker errors: {errors}"
+
+    path = tmp_git_root / EVIDENCE_DIR / EVIDENCE_FILE_NEW
+    data = json.loads(path.read_text())
+    assert len(data["entries"]) == n
+    assert {e["command"] for e in data["entries"]} == {f"cmd-{i}" for i in range(n)}
 
 
 # --- evidence_read ---

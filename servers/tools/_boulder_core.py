@@ -1,6 +1,6 @@
 """Stdlib-only boulder registry core: schema migration + pure-read resolution.
 
-No fastmcp/pydantic imports here — this module is shared by the MCP server
+No mcp/pydantic imports here — this module is shared by the MCP server
 (``boulder.py``), the bash-callable resolver shim (``boulder_resolve.py``),
 the SessionStart GC shim (``boulder_gc.py``), and the statusline renderer,
 which must all stay dependency-light enough to run as bare ``python3``.

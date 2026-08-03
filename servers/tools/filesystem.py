@@ -15,7 +15,7 @@ from itertools import islice
 from pathlib import Path
 from typing import Annotated
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
@@ -142,10 +142,18 @@ def _audit(path: str, allowed: bool) -> None:
         pass  # Audit is best-effort — never block the tool
 
 
-def register(mcp: FastMCP) -> None:
+def register(mcp: MCPServer) -> None:
     """Register filesystem read tools. TODO: Remove when Claude Code #29610 is fixed."""
 
-    @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True))
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            read_only_hint=True, idempotent_hint=True, open_world_hint=False
+        ),
+        meta={
+            "anthropic/searchHint": "read a file outside the project root, with line numbers and a token estimate"
+        },
+        structured_output=False,
+    )
     def file_read(
         path: Annotated[str, Field(description="Absolute path to the file to read")],
         offset: Annotated[

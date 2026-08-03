@@ -3,12 +3,13 @@
 import json
 import time
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from tools._common import (
     _evidence_new_path,
+    _file_lock,
     _find_git_root,
     _load_evidence,
     _read_json,
@@ -16,11 +17,61 @@ from tools._common import (
     _write_json,
 )
 
+SNIPPET_MAX_CHARS = 2000
 
-def register(mcp: FastMCP) -> None:
-    """Register all evidence tools on the given FastMCP instance."""
 
-    @mcp.tool()
+def _do_evidence_log(
+    evidence_type: str,
+    command: str,
+    exit_code: int,
+    output_snippet: str,
+    verified_by: str,
+    working_directory: str,
+    plan_sha256: str,
+) -> str:
+    """Append one evidence entry under an exclusive lock."""
+    git_root = _find_git_root(working_directory)
+    path = _evidence_new_path(git_root)
+
+    entry = {
+        "type": evidence_type,
+        "command": command,
+        "exit_code": exit_code,
+        "output_snippet": output_snippet[:SNIPPET_MAX_CHARS],
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
+    if verified_by:
+        entry["verified_by"] = verified_by
+    if plan_sha256:
+        entry["plan_sha256"] = plan_sha256
+
+    with _file_lock(path + ".lock"):
+        data = _read_json(path)
+        entries = data.setdefault("entries", [])
+        entries.append(entry)
+        _write_json(path, data)
+        total = len(entries)
+
+    return (
+        f"Evidence recorded: {evidence_type} (exit {exit_code}), {total} total entries"
+    )
+
+
+def register(mcp: MCPServer) -> None:
+    """Register all evidence tools on the given MCPServer instance."""
+
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            read_only_hint=False,
+            destructive_hint=False,
+            idempotent_hint=False,
+            open_world_hint=False,
+        ),
+        meta={
+            "anthropic/searchHint": "record a build, test, or lint verification result; required before any completion claim"
+        },
+        structured_output=False,
+    )
     def evidence_log(
         evidence_type: str = Field(
             description="Evidence type: build, test, lint, manual, or final_verification (end-of-plan completeness verdict; one logged entry opens the gate permanently). Called after verification commands."
@@ -40,30 +91,27 @@ def register(mcp: FastMCP) -> None:
         ),
     ) -> str:
         """REQUIRED after every build/test/lint command -- task completion is blocked without this. Append a timestamped verification evidence entry. Use immediately after running any verification command (just test, just lint, just build, etc.). Set plan_sha256 on final_verification entries to scope evidence to a specific plan run. Returns confirmation with total evidence entry count."""
-        git_root = _find_git_root(working_directory)
-        path = _evidence_new_path(git_root)
-        data = _read_json(path)
+        return _do_evidence_log(
+            evidence_type,
+            command,
+            exit_code,
+            output_snippet,
+            verified_by,
+            working_directory,
+            plan_sha256,
+        )
 
-        if "entries" not in data:
-            data["entries"] = []
-
-        entry = {
-            "type": evidence_type,
-            "command": command,
-            "exit_code": exit_code,
-            "output_snippet": output_snippet[:2000],
-            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        }
-        if verified_by:
-            entry["verified_by"] = verified_by
-        if plan_sha256:
-            entry["plan_sha256"] = plan_sha256
-
-        data["entries"].append(entry)
-        _write_json(path, data)
-        return f"Evidence recorded: {evidence_type} (exit {exit_code}), {len(data['entries'])} total entries"
-
-    @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True))
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            read_only_hint=True,
+            idempotent_hint=True,
+            open_world_hint=False,
+        ),
+        meta={
+            "anthropic/searchHint": "review all logged verification evidence before claiming a task complete"
+        },
+        structured_output=False,
+    )
     def evidence_read(
         working_directory: str = Field(
             default="", description="Project root (auto-detected from git)"
