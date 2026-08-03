@@ -390,8 +390,7 @@ def _todo_counter(
     `bindings[session_id]` entry whose plan still has open tasks. A session
     with no binding — empty `session_id`, a `session_id` absent from
     `bindings`, or a binding key generated under a different scheme than the
-    platform session id (see the session-id note in
-    .claude/rules/state-schemas.md) — resolves to no plan and renders "".
+    platform session id — resolves to no plan and renders "".
     Showing another session's plan is worse than showing none. A
     checkbox-complete plan is still hidden: finished work is not an active
     TODO. Returns "" when boulder is missing, no plan resolves at all, the

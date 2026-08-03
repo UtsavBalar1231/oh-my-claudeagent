@@ -18,6 +18,20 @@ a manual QA harness.
 
 ## Conventions
 
-Hook-authoring conventions (stdin/jq parsing, atomic writes, exit codes, logging
-channels, magic-number comments) live in `.claude/rules/hook-scripts.md`. Read that
-before adding or editing a script here, not this file.
+Hook-authoring conventions for a script here:
+
+- Never `set -euo pipefail`. A hook degrades gracefully when state files are missing.
+- Read the payload from stdin (`INPUT=$(cat)`) and parse fields with `jq`.
+- Write state atomically: `tmp=$(mktemp) && ... && mv "$tmp" target.json`.
+- Default to `exit 0`. Succeed silently when the script's condition does not apply.
+- Block from a `PreToolUse` or `PermissionRequest` hook with a stderr message and
+  `exit 2`; the platform ignores stdout JSON on a non-zero exit. Block from a `Stop`
+  hook with `{"decision": "block", "reason": "..."}` on stdout and `exit 0`.
+- Keep state under `.omca/state/` relative to `CLAUDE_PROJECT_ROOT`, never `~/.claude/`.
+- Reference the plugin root as `$(dirname "$0")/..`.
+- Source `lib/common.sh` and use its helpers rather than reimplementing an idiom.
+- Give every numeric constant a single-line derivation comment within two lines above it.
+  Write `UNDOCUMENTED` when the rationale is not discoverable rather than guessing.
+- Do not cite plan task numbers or plan filenames in a comment. Write the invariant.
+- Register the script in `hooks/hooks.json`. An unregistered script is dead code.
+- Tabs for indentation, per `.editorconfig`. shellcheck runs with `enable=all`.

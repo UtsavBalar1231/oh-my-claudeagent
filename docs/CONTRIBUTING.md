@@ -52,7 +52,8 @@ memory: project                   # optional; enables persistent project memory
 Key rules:
 - Declare the tier alias in `model:`, not a full generation ID. The alias tracks the platform's current model for that tier, so the frontmatter never goes stale. The roster uses two tiers: `opus` for every agent the plugin spawns, `fable` for oracle-class reasoning. Other aliases such as `sonnet` and `haiku` remain valid per-call overrides but are not what a new agent declares.
 - Pick `effort:` deliberately, because it is what separates one agent from another now that the model column does not. `low` suits short scoped work that is not intelligence-sensitive, `medium` trades some intelligence for lower token spend, `xhigh` buys deeper reasoning for orchestration and planning, `max` is for the advisor role.
-- Use `disallowedTools:` to restrict capabilities, never `tools:`, which blocks MCP inheritance ([agent conventions](../.claude/rules/agent-conventions.md))
+- Use `disallowedTools:` to restrict capabilities, never `tools:`. `tools:` is a strict allowlist that blocks MCP tool inheritance, and an incomplete list launches the agent with no usable tools. `scripts/validate-plugin.sh` fails on a `tools:` key in agent frontmatter.
+- Keep `name:` free of `:`. The platform rejects an agent whose frontmatter name holds a colon, so the agent never loads. The `oh-my-claudeagent:` prefix used at call sites is added by the platform.
 - Do not declare `permissionMode:`. Claude Code strips it from plugin agents for security.
 - Add the agent to the agent catalog table in `templates/claudemd.md`
 - **`CLAUDE_CODE_SUBAGENT_MODEL` overrides ALL agent model declarations.** Warn users who set it: it affects every spawned agent regardless of frontmatter.

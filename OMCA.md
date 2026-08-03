@@ -748,7 +748,7 @@ When context is long and quality is degrading:
 
 Three MCP servers are bundled via `.mcp.json` and launched by Claude Code.
 
-### omca (local Python FastMCP server)
+### omca (local Python MCPServer server)
 
 Unified server for structural code search, plan tracking, verification, notepads, and filesystem access.
 
@@ -874,8 +874,8 @@ All runtime state lives in `.omca/` (gitignored by default):
 
 `boulder.json` is a session-bound plan **registry**, not a single-plan pointer: multiple
 plans can be tracked concurrently under `plans[plan_name]`, and each session binds to
-exactly one of them via `bindings[session_id]`. See `.claude/rules/state-schemas.md` for
-the full schema and the `resolve_bound_plan` ladder.
+exactly one of them via `bindings[session_id]`. `servers/tools/_boulder_core.py` holds the
+schema and the `resolve_bound_plan` ladder every reader calls.
 
 1. Prometheus creates a plan at `<plans-dir>/{name}.md` or the active plan-mode file
 2. `boulder_write(active_plan, plan_name, session_id)` upserts `plans[plan_name]` (preserving `started_at`, appending `session_id` to `session_ids`) and binds this session to it; `.omca/plans/` mirrors the plan for compatibility
@@ -1078,7 +1078,8 @@ nor hinders the three-strike counter.
 
 `CLAUDE_CODE_SESSIONEND_HOOKS_TIMEOUT_MS` is the only lever that can raise the SessionEnd
 budget, and it is user-side: a `timeout` declared in a plugin-provided `hooks.json` never
-raises it. See `.claude/rules/state-schemas.md` for what a 1.5-second kill costs.
+raises it. A kill at 1.5 seconds leaves this session's `bindings[session_id]` entry in
+`boulder.json` behind, and recovery falls to the `SessionStart` GC in `session-init.sh`.
 
 ### `prompt_id` (hook input field, v2.1.196)
 
@@ -1276,7 +1277,7 @@ than copied verbatim.
 
 | Feature | Notes |
 |---------|-------|
-| Session-bound plan registry | `boulder.json` moved from a single `active_plan` pointer to `{plans: {<plan_name>: {...}}, bindings: {<session_id>: {plan_name, bound_at}}}`. Fixes the clobber where two concurrent sessions working different plans overwrote each other's state. `resolve_bound_plan()` (`servers/tools/_boulder_core.py`) is the one pure-read resolution ladder every consumer calls, via direct import in Python or the `boulder_resolve.py` shim from bash. See `.claude/rules/state-schemas.md` for the full schema |
+| Session-bound plan registry | `boulder.json` moved from a single `active_plan` pointer to `{plans: {<plan_name>: {...}}, bindings: {<session_id>: {plan_name, bound_at}}}`. Fixes the clobber where two concurrent sessions working different plans overwrote each other's state. `resolve_bound_plan()` (`servers/tools/_boulder_core.py`) is the one pure-read resolution ladder every consumer calls, via direct import in Python or the `boulder_resolve.py` shim from bash |
 | drift-guard hard-block Stop hook | New `scripts/drift-guard.sh`: when the last assistant turn reads as a completion claim ("done", "fixed", "implemented", etc., unless negated) but the diff still contains a stub marker (`.only`, `TODO: implement`, an unimplemented-error throw), the Stop is blocked with the offending `file:line`. Self-clearing — fixing the stub removes the marker, so there is no separate loop-guard state file. Kill-switch: `OMCA_HOOK_DISABLE_DRIFT_GUARD` |
 | context-injector hardening | `scripts/context-injector.sh` now dedups injections by content-hash+realpath (reusing `injected-context-dirs.json`, which `session-init.sh` already resets every `SessionStart`) instead of re-injecting on every matching file access. The project-root walk for both the `.omca/rules` scan and the AGENTS.md/README terminator now resolves worktree-safely (a linked worktree's `.git` is a file, not a directory, so the walk tests `-e` not `-d`), so a worktree session no longer walks up into the parent repo |
 | stdin-read timeout | `scripts/lib/common.sh`'s shared `HOOK_INPUT=$(cat)` read now wraps in `timeout 5 cat`, discarding on exit 124 rather than hanging indefinitely if stdin is never closed. Blocking hooks (`final-verification-evidence.sh`, `drift-guard.sh`, `task-completed-verify.sh`) treat an empty-from-timeout read as fail-closed-or-warn, not a silent pass |
@@ -1369,7 +1370,7 @@ Features introduced in this window that OMCA consciously declines to adopt:
 | Model generation move | Agent roster: oracle on `fable`, orchestrators/planners on `opus`, workers on `sonnet`; haiku retired |
 
 **Provider-alias caveat:** every OMCA agent declares a tier alias in `model:` frontmatter
-(`opus` or `fable`), which is what `.claude/rules/agent-conventions.md` mandates. The
+(`opus` or `fable`) rather than a pinned generation ID, so the frontmatter never goes stale. The
 generation an alias resolves to depends on the provider (`claude-code-docs/docs/model-config.md`
 provider table): `opus` is Opus 5 on the Anthropic API, Claude Platform on AWS, Amazon Bedrock,
 and Google Cloud's Agent Platform, and Opus 4.6 on Microsoft Foundry. That spread reaches the
@@ -1483,7 +1484,7 @@ section and in `CLAUDE.md`; neither is set by OMCA.
 
 | Feature | Notes |
 |---------|-------|
-| Hook `timeout` is seconds, not milliseconds | The two `"timeout": 5000` values in `hooks/hooks.json` were 83-minute caps, the opposite of the intended 5-second tightening, and are now `5`. Per-event defaults are tabulated in `.claude/rules/hook-scripts.md` |
+| Hook `timeout` is seconds, not milliseconds | The two `"timeout": 5000` values in `hooks/hooks.json` were 83-minute caps, the opposite of the intended 5-second tightening, and are now `5`. The per-event defaults range from 1.5 seconds for `SessionEnd` up to 600 for a `command` handler |
 | Quoted shell form on every command handler | Each handler invokes `${CLAUDE_PLUGIN_ROOT}/scripts/...`, which resolves into the marketplace cache under the user's home; in shell form a space anywhere in that path splits the command, so every `command` value now quotes the placeholder. Exec form (`args` present) was tried and rejected: it spawns `command` as a real executable with no shell, and a `.sh` file is not executable on native Windows, so every handler would fail to spawn there with no error signal, and setting `args` also makes the platform ignore the `shell` field. Exec form stays available for handlers whose `command` is a genuine cross-platform binary |
 | `statusMessage` on user-perceived slow handlers | Spinner labels on `session-init.sh`, `context-injector.sh`, `comment-checker.sh`, and the `*-error-recovery.sh` family. Not blanket-applied: most handlers finish in milliseconds and a label for them reads as noise |
 | Compound-command fall-through in the trusted-tooling fast path | Hook `if:` matching is per-subcommand, so `jq . a.json && rm -rf ~/x` reached the jq auto-allow branch. A command whose trimmed text contains a command separator, a redirect, or a command substitution now falls through to the platform decision: `\|`, `;`, `&`, `<`, `>`, a backtick, `$(`, a literal newline, or a carriage return. The bare `&` covers `&&` and `&>`, the newline covers multi-line commands, and the carriage return is hardening for shells that terminate a statement on a bare CR, which bash does not. Globs, tilde, and `$VAR` expansion still take the fast path, since none of them can introduce a second command. The `rm -rf` deny branch still runs first, so the deny path is unchanged |
@@ -1584,7 +1585,7 @@ tables under Core Concepts and Agent Reference are the live state.
 | `sandbox.network.strictAllowlist` (PROVISIONAL) | Changelog-only, absent from the sandboxing and settings pages. Real symptom: librarian drives `gh api` through sandboxed Bash, so an allowlist without `api.github.com` reads as a broken agent. The stdio MCP server is unaffected |
 | Reserved MCP server names (`Claude Browser`, `Claude Preview`) | Forward-looking; it matters only if a browser-adjacent OMCA server is ever added. Not worth a validator check |
 | `/clear` resets the cost counter | The statusline renders the reported total verbatim and asserts nothing about its lifecycle |
-| REVIEW.md | A Claude-native review-service surface, not a plugin one: `code-review.md` documents it under the managed Code Review product and states that local `/code-review` does not read it. This repository now carries a short `REVIEW.md` digest at its root so managed reviews of OMCA itself inherit the `.claude/rules/` policy. The service reads the reviewed repository's own root, so the copy that travels inside an installed plugin cache is inert for the user's project |
+| REVIEW.md | A Claude-native review-service surface, not a plugin one: `code-review.md` documents it under the managed Code Review product and states that local `/code-review` does not read it. The service reads the reviewed repository's own root, so a copy travelling inside an installed plugin cache would be inert for the user's project, and OMCA ships none |
 | `showClearContextOnPlanAccept` | `plan-mode-handler.sh` auto-allows ExitPlanMode, so the accept screen is normally suppressed in OMCA sessions. Verify against a live plan accept before stating that as fact |
 | `disableWorkflows` and `workflowKeywordTriggerEnabled` | The kill switches beside the `ultracode` rename. No live collision: the keyword detector's patterns are disjoint from `ultracode` and off by default |
 | `ultracode` keyword fired on non-human input | Design-parity lesson. `keyword-detector.sh` has provenance rails for agent id and task notifications but no webhook or relayed-comment check, and no payload field for one has been probed. Do not guess a field name |

@@ -24,8 +24,8 @@ that no loop happened.
 **Tracking**: the `prompt_id` stamp added to the window fixes only the user-turn-boundary
 case, not this one. The correct scoping key is `agent_id`, which means either one state file
 per agent or a keyed map with garbage collection on `SubagentStop`. That is a design decision
-rather than a patch, so it is deliberately open. Schema detail in
-`.claude/rules/state-schemas.md`.
+rather than a patch, so it is deliberately open. The window itself is a single global slot,
+`.omca/state/tool-loop-window.json`, holding one `signature`/`count`/`prompt_id` triple.
 
 ## The statusline emits ANSI color escapes unconditionally
 

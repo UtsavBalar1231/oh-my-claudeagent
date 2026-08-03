@@ -158,8 +158,8 @@ headers; public and exported API docs; `// SAFETY:` justifications; locking, con
 `Context:` contracts; non-obvious invariants, units, and boundary conditions; error, panic, and
 failure semantics (`Return:`, `# Errors`, `# Panics`); deprecation notices, which are
 tool-consumed; workaround rationale carrying a bug link; and project-local mandated comments.
-Above all: the magic-number derivation comments required by `.claude/rules/hook-scripts.md` are
-CI-pinned in `tests/bats/hooks/misc_hooks.bats`, so stripping one turns a cleanup into a test
+Above all: in this repo every numeric constant in a shell script carries a single-line comment
+deriving its value, and that rule is pinned by CI, so stripping one turns a cleanup into a test
 failure. State in the invocation that project-local mandated comments survive.
 
 **Prose branch** (this task changed only `.md` files): skip the code skill entirely and apply

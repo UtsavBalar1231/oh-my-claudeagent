@@ -20,6 +20,18 @@ registry, evidence log, notepads, ast-grep search, filesystem helpers).
 
 ## Conventions
 
-Python style, ruff config, and FastMCP/`Field()` patterns live in
-`.claude/rules/python.md`. State file schemas these tools read and write live in
-`.claude/rules/state-schemas.md`.
+- ruff targets py310 at line-length 88, rule set `E, F, B, C4, SIM, I, UP, PIE, PGH, RUF`.
+  E501 is ignored because the formatter owns line length. B008 is ignored globally because
+  `MCPServer` needs `Field()` in parameter defaults to carry tool descriptions.
+- Format with `uv run --project servers ruff format servers/`, lint with
+  `uv run --project servers ruff check servers/`. Four-space indent, LF endings.
+- Define tools with `MCPServer` decorators (`@mcp.tool()`) and describe each parameter with
+  `Field()`. Keep a tool docstring under 2KB; Claude Code truncates past that.
+- There is no root `pyproject.toml`. Python tooling stays inside `servers/`.
+
+The state files these tools read and write are `boulder.json` (a session-bound plan
+registry keyed `plans[plan_name]` and `bindings[session_id]`),
+`verification-evidence.json` (the append-only evidence log, `output_snippet` capped at
+2000 characters), and the notepad tree under `.omca/state/notepads/`. Read
+`servers/tools/_boulder_core.py` for the resolution ladder rather than hand-parsing
+`boulder.json` anywhere else.

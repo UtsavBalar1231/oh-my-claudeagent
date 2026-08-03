@@ -211,7 +211,7 @@ SLOP_FINDINGS=$(printf '%s\n' "${CONTENT}" | awk '
         j = i + 1
         while (j <= n && lines[j] ~ /^[[:space:]]*$/) j++
         if (j <= n && !is_comment(lines[j])) {
-          # Magic-number derivation carve-out: .claude/rules/hook-scripts.md
+          # Magic-number derivation carve-out: the shell-script policy here
           # REQUIRES a comment above every numeric constant, and the terse
           # mandated form ("# 300s evidence age" over "MAX_AGE=300") restates
           # by construction. Exempt the shape rather than block the rule.
@@ -322,7 +322,7 @@ fi
 # Every deny names the categories that must survive the fix. Without it the
 # model "resolves" a deny by stripping required comments, which is the
 # strip-everything overcorrection the project's comment policy forbids.
-PROTECTED="The convention: names, types, and structure carry the what, so a comment earns its place only by carrying something the code cannot state, the non-obvious why, an invariant, a constraint, or the derivation of a magic number. A correct fix deletes the quoted comment, or rewrites it as the reason the code is the way it is. A clearer name beats a comment that restates the line below it. Do NOT remove other comments while fixing this: file headers, non-obvious function contracts, invariant notes, and magic-number derivation comments are REQUIRED by .claude/rules/hook-scripts.md. Resubmit the same code change with only the quoted comments fixed. Genuine exceptions: put comment-checker-disable-file in the first 5 lines of the hunk."
+PROTECTED="The convention: names, types, and structure carry the what, so a comment earns its place only by carrying something the code cannot state, the non-obvious why, an invariant, a constraint, or the derivation of a magic number. A correct fix deletes the quoted comment, or rewrites it as the reason the code is the way it is. A clearer name beats a comment that restates the line below it. Do NOT remove other comments while fixing this: file headers, non-obvious function contracts, invariant notes, and magic-number derivation comments are REQUIRED and must survive. Resubmit the same code change with only the quoted comments fixed. Genuine exceptions: put comment-checker-disable-file in the first 5 lines of the hunk."
 
 # Usage: deny <reason text> <tier label>
 deny() {

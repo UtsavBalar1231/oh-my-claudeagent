@@ -27,7 +27,7 @@ per-language source is indexed in the Sources table at the end.
 | 10 | Comments are not a changelog. Git owns the history. | all | project-local, see category 10 in `skills/remove-ai-slops/references/categories.md` |
 | 11 | Delete commented-out code rather than shipping it. | all | project-local policy, NOT ecosystem consensus. See "Sourcing corrections" below. |
 | 12 | Line comments are the norm; avoid block comments. | Rust, Go | RFC 505, Effective Go |
-| 13 | Numeric constants in this repo's shell scripts carry a derivation comment. | this repo's `scripts/*.sh` | `.claude/rules/hook-scripts.md` |
+| 13 | Numeric constants in this repo's shell scripts carry a derivation comment. | this repo's `scripts/*.sh` | project-local policy, see "Bash" below |
 
 ## Bash
 
@@ -68,11 +68,12 @@ for f in "$@"; do
 
 Two comments, zero information. Both restate their line. Compare rule 2.
 
-`.claude/rules/hook-scripts.md` governs `scripts/*.sh` in this checkout and is stricter than the
-Google guide. Read it rather than a restatement. Two intersections matter for cleanup work: it
-**mandates** a derivation comment above every numeric constant (protected class 12 below), and
-it **forbids** plan-reference comments, meaning plan task numbers, plan basenames, and "Task N
-of X". Write the invariant, not the history.
+This repo's own policy for `scripts/*.sh` is stricter than the Google guide, and two of its
+rules matter for cleanup work. It **mandates** a single-line derivation comment within two
+lines above every numeric constant (protected class 12 below), capped at about 90 characters,
+with `UNDOCUMENTED` written out when the rationale is not discoverable rather than guessed. It
+**forbids** plan-reference comments, meaning plan task numbers, plan basenames, and "Task N of
+X". Write the invariant, not the history.
 
 ## Python
 
@@ -383,9 +384,9 @@ This list is the input contract for the cleanup skill.
 11. **Algorithm complexity notes.** Reasoned from principle, not sourced: no first-party guide
     in these five ecosystems names complexity annotations. Kept because a stated bound
     (`O(n log n)`) is a contract a caller depends on and cannot cheaply rederive.
-12. **Project-local mandated comments.** The magic-number derivation comments required by
-    `.claude/rules/hook-scripts.md` for every numeric constant in this repo's shell scripts are
-    CI-pinned in `tests/bats/hooks/misc_hooks.bats`, so stripping them as "narrating comments"
+12. **Project-local mandated comments.** The magic-number derivation comments this repo
+    requires for every numeric constant in its shell scripts are CI-pinned in
+    `tests/bats/hooks/misc_hooks.bats`, so stripping them as "narrating comments"
     turns a cleanup into a test failure. Any repo with its own mandated-comment rule gets the
     same protection; check for one before running a cleanup pass.
 
@@ -418,5 +419,5 @@ This list is the input contract for the cleanup skill.
 Books, no URL: John Ousterhout, *A Philosophy of Software Design*, chapters 12 and 13. Robert C.
 Martin, *Clean Code*, chapter 4 (attribution is secondary, unverified against a physical copy).
 
-Repo-local policy, not a URL: `.claude/rules/hook-scripts.md`,
+Repo-local policy, not a URL: the shell-script comment rules restated under "Bash" above, and
 `skills/remove-ai-slops/references/categories.md` (categories 4 and 10).

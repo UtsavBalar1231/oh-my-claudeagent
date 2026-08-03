@@ -19,5 +19,7 @@ rather than here.
 
 ## Conventions
 
-State-file schemas exercised by these tests live in `.claude/rules/state-schemas.md`.
-Hook-authoring conventions live in `.claude/rules/hook-scripts.md`.
+The state files these tests exercise are written under `.omca/state/` (and
+`.omca/evidence/` for the evidence log). `fixtures/boulder-schemas/` holds the
+`boulder.json` shapes, and `servers/tools/_boulder_core.py` is the authority on that
+schema. Hook-authoring conventions are listed in `scripts/AGENTS.md`.

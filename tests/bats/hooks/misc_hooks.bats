@@ -217,7 +217,7 @@ load '../test_helper'
 	OMCA_COMMENT_GATE=deny run_hook "comment-checker.sh" "$payload"
 	assert_success
 	assert_output --partial '"permissionDecision":"deny"'
-	assert_output --partial "REQUIRED by .claude/rules/hook-scripts.md"
+	assert_output --partial "REQUIRED and must survive"
 }
 
 @test "comment-checker: gate off exits silently" {

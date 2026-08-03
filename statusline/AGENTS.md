@@ -20,5 +20,7 @@ Python project (`pyproject.toml`/`uv.lock`), separate from `servers/`.
 
 ## Conventions
 
-Statusline reads `boulder.json` directly (see `.claude/rules/state-schemas.md`) rather
-than going through the MCP tool, since it must render outside a tool-call context.
+Statusline reads `.omca/state/boulder.json` directly rather than going through the MCP
+tool, since it must render outside a tool-call context. `servers/tools/_boulder_core.py`
+is the authority on that file's schema and on `resolve_bound_plan`, which this code calls
+with `strict=True`.
