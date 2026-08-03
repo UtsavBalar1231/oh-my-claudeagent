@@ -5,6 +5,59 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **OMCA tool results reach the model as text again, not escaped JSON.** Every tool returns
+  a string, which made the SDK synthesize an output schema of `{"result": string}` and send
+  its result as structured content. Claude Code drops the text block whenever structured
+  content is present and shows the JSON instead, so every result the model read was a
+  single escaped line: `\n` in place of line breaks, `\"` in place of quotes, about 5% more
+  tokens, and two failure modes where a schema mismatch turned into a hard tool error. Tools
+  now opt out of structured output, and a test fails the build if one opts back in.
+- **Tools that only read are now marked as such.** Six tools shipped with no annotations at
+  all, which the client reads as "destructive" and "reaches the open internet". Every tool
+  now declares its own posture, and the read-only ones can run in parallel instead of one at
+  a time.
+- **The evidence log no longer drops concurrent writes.** Thirty simultaneous writers left
+  eight entries behind. Appending was an unlocked read-modify-write and the shared atomic
+  write staged through one fixed temporary name, so parallel writers collided and the loser
+  failed outright. Because task completion gates on that log, the losses were silent and
+  could take the final verification entry with them.
+- **`OMCA_DISABLED_HOOKS` now works for the drift guard and the destructive-git deny.** Both
+  ignored it, so following the documentation to switch off a stuck gate left the gate running.
+- **A shipped agent and a user-visible gate message no longer cite files you do not have.**
+  Both pointed at repository paths that were never part of an install.
+
+### Added
+
+- **The server now tells Claude when to reach for it.** With tool search on, which is the
+  default, a server's instructions and its bare tool names are all that load at the start of
+  a session. OMCA shipped without instructions, so its tools were effectively invisible until
+  something happened to name one. The server now describes what each tool family is for, and
+  every tool carries a one-line hint that shows up in tool-search results.
+
+### Changed
+
+- **The MCP server speaks the 2026-07-28 protocol revision.** It moves to the 2.x line of the
+  official Python SDK, which serves the new revision and every 2025-era client from the same
+  process, so it works with the Claude Code you have today and the one that adopts the new
+  revision later. Startup cost about 0.1s more, landing near 0.34s against a 5s budget.
+- **The repository stops publishing maintainer-local material.** Internal spike verdicts, one
+  checkout's own rule overrides, review-only instructions, a research corpus, and a design
+  note are no longer tracked. The rule overrides mattered most: the rule injector reads them
+  at runtime, so every contributor had been inheriting one maintainer's orchestration
+  preferences as project policy. Documentation that pointed at those files now carries the
+  rule itself.
+- **Test suites no longer depend on the shell that runs them.** The hook suite cleared none of
+  the environment variables its subjects read, so an exported kill switch could quietly turn
+  real assertions into no-ops; a developer with one set saw ten failures that had nothing to
+  do with their change. Nineteen tests asserting a Stop hook allowed the stop could not fail
+  at all, because a Stop hook blocks with exit zero too. The statusline daemon now gets tested
+  against a real socket rather than a self-contradictory mock, and its cache files stay inside
+  each test's own directory instead of accumulating in the shared temporary one.
+
 ## [2.15.0] - 2026-07-30
 
 ### Added
