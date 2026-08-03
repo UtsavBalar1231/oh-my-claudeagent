@@ -7,11 +7,7 @@ servers/__pycache__/
 
 # oh-my-claudeagent runtime state
 .omc/
-.omca/*
-!/.omca/rules/
-!/.omca/notes/
-/.omca/notes/*
-!/.omca/notes/*-verdict.md
+.omca/
 state/
 servers/.omca
 
@@ -39,7 +35,10 @@ CLAUDE.md
 .sisyphus/
 .claude/
 
-# Docs
+# Maintainer-local docs and research artifacts
 docs/adr
 docs/audit
 docs/research
+docs/design/
+REVIEW.md
+benchmarks/
