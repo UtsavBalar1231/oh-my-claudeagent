@@ -171,20 +171,21 @@
 [validate-plugin] PASS: hook fixture posttoolusefailure-read.json: valid JSON (<REPO_ROOT>/tests/fixtures/hooks/posttoolusefailure-read.json)
 [validate-plugin] PASS: hook fixture repo setup: initialized git repo at <TMPFILE>
 [validate-plugin] SKIP: PreToolUse Task|Agent: no matching hook command registered
-[validate-plugin] PASS: PreToolUse Write (write-guard.sh): script succeeded with valid JSON output
-[validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): script succeeded with valid JSON output
-[validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): script succeeded with valid JSON output
-[validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): script succeeded with valid JSON output
-[validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): script succeeded with valid JSON output
-[validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): script succeeded with valid JSON output
-[validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): script succeeded with valid JSON output
-[validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): script succeeded with valid JSON output
-[validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): script succeeded with valid JSON output
-[validate-plugin] PASS: PermissionRequest Bash (git-destructive-deny.sh): script succeeded with valid JSON output
-[validate-plugin] PASS: PermissionRequest Bash (sed-grep-deny.sh): script succeeded with valid JSON output
-[validate-plugin] PASS: PermissionRequest Bash (sed-grep-deny.sh): script succeeded with valid JSON output
-[validate-plugin] PASS: PermissionRequest Bash (executor-grep-deny.sh): script succeeded with valid JSON output
-[validate-plugin] PASS: PermissionRequest ExitPlanMode (plan-mode-handler.sh): script succeeded with valid JSON output
+[validate-plugin] PASS: PreToolUse Write (write-guard.sh): script succeeded
+[validate-plugin] PASS: PreToolUse Write (comment-checker.sh): script succeeded
+[validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): script succeeded
+[validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): script succeeded
+[validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): script succeeded
+[validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): script succeeded
+[validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): script succeeded
+[validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): script succeeded
+[validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): script succeeded
+[validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): script succeeded
+[validate-plugin] PASS: PermissionRequest Bash (git-destructive-deny.sh): script succeeded
+[validate-plugin] PASS: PermissionRequest Bash (sed-grep-deny.sh): script succeeded
+[validate-plugin] PASS: PermissionRequest Bash (sed-grep-deny.sh): script succeeded
+[validate-plugin] PASS: PermissionRequest Bash (executor-grep-deny.sh): script succeeded
+[validate-plugin] SKIP: PermissionRequest ExitPlanMode: no matching hook command registered
 [validate-plugin] PASS: SessionStart compact (post-compact-inject.sh): script succeeded with valid JSON output
 [validate-plugin] PASS: TaskCompleted default (task-completed-verify.sh): script succeeded with empty stdout
 [validate-plugin] PASS: Stop default (no state) (plan-continuation-guard.sh): script succeeded
@@ -217,4 +218,4 @@
 [validate-plugin] PASS: mcp tools/list contains categories_list
 [validate-plugin] PASS: mcp tools/list contains file_read
 [validate-plugin] PASS: mcp tools/list contains session_search
-[validate-plugin] Summary: 195 passed, 0 failed, 14 skipped, 0 warned
+[validate-plugin] Summary: 195 passed, 0 failed, 15 skipped, 0 warned

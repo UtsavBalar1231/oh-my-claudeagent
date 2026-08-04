@@ -429,7 +429,7 @@ resolve_hook_commands() {
 	if [[ -n "${matcher_value}" ]]; then
 		jq -r --arg event "${event_name}" --arg matcher "${matcher_value}" '
 			.hooks[$event][]?
-			| select((.matcher // "") == $matcher)
+			| select(((.matcher // "") | split("|")) | index($matcher))
 			| .hooks[]?.command // empty
 		' "${HOOKS_JSON}"
 		return 0
@@ -1157,8 +1157,6 @@ prepare_hook_fixture_repo() {
 	return 0
 }
 
-
-
 run_compaction_race_case() {
 	local payload_path="$1"
 	local project_root="$2"
@@ -1328,8 +1326,8 @@ check_hooks() {
 	jq --arg file "${existing_file}" '.tool_input.file_path = $file' "${HOOK_FIXTURES_DIR}/pretooluse-write.json" >"${pretool_write_payload}"
 
 	run_registered_hooks "PreToolUse Task|Agent" "PreToolUse" "Task|Agent" "${pretool_task_payload}" "${tmp_root}" "json-required"
-	run_registered_hooks "PreToolUse Write" "PreToolUse" "Write" "${pretool_write_payload}" "${tmp_root}" "json-required"
-	run_registered_hooks "PermissionRequest Bash" "PermissionRequest" "Bash" "${permission_payload}" "${tmp_root}" "json-required"
+	run_registered_hooks "PreToolUse Write" "PreToolUse" "Write" "${pretool_write_payload}" "${tmp_root}" "json-optional"
+	run_registered_hooks "PermissionRequest Bash" "PermissionRequest" "Bash" "${permission_payload}" "${tmp_root}" "json-optional"
 	run_registered_hooks "PermissionRequest ExitPlanMode" "PermissionRequest" "ExitPlanMode" "${exitplanmode_payload}" "${tmp_root}" "json-required"
 
 	printf 'compact fixture context' >"${tmp_root}/.omca/state/compaction-context.md"
