@@ -484,16 +484,3 @@ permissionrequest_payload() {
 		"$CLAUDE_PLUGIN_ROOT/hooks/hooks.json"
 	assert_success
 }
-
-# ── plan-mode-handler.sh tests ────────────────────────────────────────────────
-
-# The hook is a no-op: an `allow` without `updatedInput` is discarded for a tool
-# with requiresUserInteraction(), which ExitPlanMode has. Pin that it emits no
-# decision and no stderr, so nothing claims an approval that never lands.
-@test "plan-mode-handler: ExitPlanMode gets no decision and no false audit line" {
-	local fixture="$CLAUDE_PLUGIN_ROOT/tests/fixtures/hooks/permissionrequest-exitplanmode.json"
-	run_hook_file "plan-mode-handler.sh" "$fixture"
-	assert_success
-	assert_output '{}'
-	refute_output --partial 'Auto-approved'
-}

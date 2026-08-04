@@ -194,14 +194,6 @@ _run_fixture() {
 	_run_fixture "permission-filter" "allow-jq"
 }
 
-@test "golden: plan-mode-handler/exit-plan-mode" {
-	_run_fixture "plan-mode-handler" "exit-plan-mode"
-}
-
-@test "golden: plan-mode-handler/other-tool" {
-	_run_fixture "plan-mode-handler" "other-tool"
-}
-
 @test "golden: post-compact-inject/no-context-file" {
 	_run_fixture "post-compact-inject" "no-context-file"
 }

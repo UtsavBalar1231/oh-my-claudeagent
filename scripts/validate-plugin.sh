@@ -1314,10 +1314,8 @@ check_hooks() {
 	mkdir -p "${tmp_root}/.omca/state" "${tmp_root}/.omca/logs"
 	prepare_hook_fixture_repo "${tmp_root}"
 
-	local pretool_task_payload="${HOOK_FIXTURES_DIR}/pretooluse-task-agent.json"
 	local pretool_write_payload="${tmp_root}/pretooluse-write.runtime.json"
 	local permission_payload="${HOOK_FIXTURES_DIR}/permissionrequest-bash.json"
-	local exitplanmode_payload="${HOOK_FIXTURES_DIR}/permissionrequest-exitplanmode.json"
 	local session_compact_payload="${HOOK_FIXTURES_DIR}/sessionstart-compact.json"
 	local task_payload="${HOOK_FIXTURES_DIR}/taskcompleted-basic.json"
 
@@ -1325,10 +1323,8 @@ check_hooks() {
 	touch "${existing_file}"
 	jq --arg file "${existing_file}" '.tool_input.file_path = $file' "${HOOK_FIXTURES_DIR}/pretooluse-write.json" >"${pretool_write_payload}"
 
-	run_registered_hooks "PreToolUse Task|Agent" "PreToolUse" "Task|Agent" "${pretool_task_payload}" "${tmp_root}" "json-required"
 	run_registered_hooks "PreToolUse Write" "PreToolUse" "Write" "${pretool_write_payload}" "${tmp_root}" "json-optional"
 	run_registered_hooks "PermissionRequest Bash" "PermissionRequest" "Bash" "${permission_payload}" "${tmp_root}" "json-optional"
-	run_registered_hooks "PermissionRequest ExitPlanMode" "PermissionRequest" "ExitPlanMode" "${exitplanmode_payload}" "${tmp_root}" "json-required"
 
 	printf 'compact fixture context' >"${tmp_root}/.omca/state/compaction-context.md"
 	run_registered_hooks "SessionStart compact" "SessionStart" "compact" "${session_compact_payload}" "${tmp_root}" "json-required"
