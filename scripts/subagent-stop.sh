@@ -4,10 +4,10 @@
 # ever spawned this session. Counterpart to subagent-start.sh's upsert;
 # SessionStart's reset remains the backstop for entries a crash leaves behind.
 
-_HOOK_START=$(date +%s%N 2>/dev/null || date +%s)
-
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
+
+_HOOK_START=$(epoch_ns)
 
 AGENT_ID=$(jq -r '.agent_id // ""' <<< "${HOOK_INPUT}")
 MODELS_FILE="${HOOK_STATE_DIR}/subagent-models.json"

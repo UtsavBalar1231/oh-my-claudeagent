@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 # Unit tests for the portability and state-safety hardening in scripts/lib/common.sh:
 # the timeout/gtimeout/cat probe, the fail-open signal on an unparseable payload,
-# _sha256 fallback, the BSD-safe _epoch_ns value probe, concurrency-safe and
+# sha256_of_stdin fallback, the BSD-safe epoch_ns value probe, concurrency-safe and
 # self-healing JSON read-modify-write, and the Stop-event block ledger.
 
 load '../test_helper'
@@ -30,7 +30,8 @@ _path_without() {
 	mkdir -p "$dir"
 	local c p
 	for c in bash jq cat date grep sed cut tr basename dirname mktemp mv rm mkdir \
-		flock printf sha256sum shasum tail head sort wc awk timeout gtimeout sleep chmod; do
+		flock printf sha256sum shasum tail head sort wc awk timeout gtimeout sleep chmod \
+		rmdir stat touch find; do
 		[[ "${excluded}" == *" ${c} "* ]] && continue
 		p=$(command -v "$c" 2>/dev/null) && ln -sf "$p" "$dir/$c"
 	done
@@ -119,42 +120,42 @@ _path_without() {
 	assert_output '0'
 }
 
-# ─── d. _sha256 ──────────────────────────────────────────────────────────────
+# ─── d. sha256_of_stdin ──────────────────────────────────────────────────────────────
 
-@test "_sha256: matches sha256sum for a known input" {
-	_lib 'printf "abc" | _sha256'
+@test "sha256_of_stdin: matches sha256sum for a known input" {
+	_lib 'printf "abc" | sha256_of_stdin'
 	assert_success
 	assert_output 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'
 }
 
-@test "_sha256: falls back to shasum when sha256sum is absent" {
+@test "sha256_of_stdin: falls back to shasum when sha256sum is absent" {
 	local bin
 	bin=$(_path_without sha256sum)
 	run env -i PATH="$bin" HOME="$HOME" CLAUDE_PROJECT_ROOT="$BATS_TEST_TMPDIR/p" HOOK_INPUT='{}' \
-		"$bin/bash" -c "cd '$CLAUDE_PLUGIN_ROOT'; source '$COMMON'; printf 'abc' | _sha256"
+		"$bin/bash" -c "cd '$CLAUDE_PLUGIN_ROOT'; source '$COMMON'; printf 'abc' | sha256_of_stdin"
 	assert_success
 	assert_output 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'
 }
 
-@test "_sha256: with no digest tool prints the sentinel, never an empty string" {
+@test "sha256_of_stdin: with no digest tool prints the sentinel, never an empty string" {
 	local bin
 	bin=$(_path_without sha256sum shasum)
 	run env -i PATH="$bin" HOME="$HOME" CLAUDE_PROJECT_ROOT="$BATS_TEST_TMPDIR/p" HOOK_INPUT='{}' \
-		"$bin/bash" -c "cd '$CLAUDE_PLUGIN_ROOT'; source '$COMMON'; printf 'abc' | _sha256"
+		"$bin/bash" -c "cd '$CLAUDE_PLUGIN_ROOT'; source '$COMMON'; printf 'abc' | sha256_of_stdin"
 	assert_success
 	assert_output 'no-digest'
 	refute_output ''
 }
 
-# ─── e. _epoch_ns BSD probe ──────────────────────────────────────────────────
+# ─── e. epoch_ns BSD probe ──────────────────────────────────────────────────
 
-@test "_epoch_ns: returns all-digit nanoseconds on GNU date" {
-	_lib '_epoch_ns'
+@test "epoch_ns: returns all-digit nanoseconds on GNU date" {
+	_lib 'epoch_ns'
 	assert_success
 	[[ "$output" =~ ^[0-9]{19}$ ]]
 }
 
-@test "_epoch_ns: BSD date printing a literal N falls back to scaled seconds" {
+@test "epoch_ns: BSD date printing a literal N falls back to scaled seconds" {
 	local bin
 	bin=$(_path_without date)
 	# BSD/macOS `date` accepts +%s%N, exits 0, and echoes the N verbatim. An
@@ -168,7 +169,7 @@ EOF
 	chmod +x "$bin/date"
 
 	run env -i PATH="$bin" HOME="$HOME" CLAUDE_PROJECT_ROOT="$BATS_TEST_TMPDIR/p" HOOK_INPUT='{}' \
-		"$bin/bash" -c "cd '$CLAUDE_PLUGIN_ROOT'; source '$COMMON'; _epoch_ns"
+		"$bin/bash" -c "cd '$CLAUDE_PLUGIN_ROOT'; source '$COMMON'; epoch_ns"
 	assert_success
 	assert_output '1785843035000000000'
 }
@@ -179,6 +180,47 @@ EOF
 	_lib 'hook_timing_log "1785843035N"; echo "rc=$?"'
 	assert_success
 	assert_output 'rc=0'
+}
+
+_bsd_date_path() {
+	local bin
+	bin=$(_path_without date)
+	cat > "$bin/date" <<'EOF'
+#!/usr/bin/env bash
+if [[ "$1" == "+%s%N" ]]; then printf '1785843035N\n'; exit 0; fi
+exec /bin/date "$@"
+EOF
+	chmod +x "$bin/date"
+	printf '%s\n' "$bin"
+}
+
+@test "timing capture: no hook captures a start stamp via the exit-status-only date probe" {
+	run grep -rn 'date +%s%N' "$CLAUDE_PLUGIN_ROOT/scripts"
+	assert_output --partial 'lib/common.sh'
+	refute_output --partial 'scripts/comment-checker.sh'
+	refute_output --partial 'scripts/plan-format-warn.sh'
+	refute_output --partial 'scripts/context-injector.sh'
+	refute_output --partial 'scripts/subagent-stop.sh'
+	refute_output --partial 'scripts/subagent-start.sh'
+	refute_output --partial 'scripts/tool-loop-detector.sh'
+	refute_output --partial 'scripts/empty-task-response.sh'
+}
+
+@test "timing capture: a hook records a timing row on a BSD-shaped date" {
+	local bin payload
+	bin=$(_bsd_date_path)
+	mkdir -p "$BATS_TEST_TMPDIR/p"
+	payload=$(jq -nc --arg f "$BATS_TEST_TMPDIR/p/sample.py" \
+		'{"tool_name":"Write","tool_input":{"file_path":$f,"content":"x = 1\n"},"agent_id":"a1","agent_type":"oh-my-claudeagent:executor","tool_response":"ok"}')
+
+	run env -i PATH="$bin" HOME="$HOME" CLAUDE_PROJECT_ROOT="$BATS_TEST_TMPDIR/p" \
+		CLAUDE_PLUGIN_ROOT="$CLAUDE_PLUGIN_ROOT" \
+		HOOK_STATE_DIR="$BATS_TEST_TMPDIR/state" HOOK_LOG_DIR="$BATS_TEST_TMPDIR/logs" \
+		"$bin/bash" "$CLAUDE_PLUGIN_ROOT/scripts/comment-checker.sh" <<< "$payload"
+
+	run jq -r '.ms' "$BATS_TEST_TMPDIR/logs/hook-timing.jsonl"
+	assert_success
+	[[ "$output" =~ ^[0-9]+$ ]]
 }
 
 # ─── f. concurrency-safe, self-healing RMW ───────────────────────────────────
@@ -242,6 +284,56 @@ EOF
 	assert_output '1'
 }
 
+@test "error_count_bump: an unwritable state dir still echoes a usable count" {
+	mkdir -p "$BATS_TEST_TMPDIR/state"
+	chmod a-w "$BATS_TEST_TMPDIR/state"
+	_lib 'error_count_bump lockfail "boom"'
+	chmod u+w "$BATS_TEST_TMPDIR/state"
+	assert_success
+	assert_output '1'
+}
+
+@test "error_count_bump: a single bump is correct without flock" {
+	local bin
+	bin=$(_path_without flock)
+	run env -i PATH="$bin" HOME="$HOME" HOOK_STATE_DIR="$BATS_TEST_TMPDIR/state" \
+		HOOK_LOG_DIR="$BATS_TEST_TMPDIR/logs" HOOK_INPUT='{}' \
+		"$bin/bash" -c "cd '$CLAUDE_PLUGIN_ROOT'; source '$COMMON'; error_count_bump noflock 'boom'"
+	assert_success
+	assert_output '1'
+}
+
+@test "error_count_bump: concurrent bumps do not lose updates without flock" {
+	local bin
+	bin=$(_path_without flock)
+	run env -i PATH="$bin" HOME="$HOME" "$bin/bash" -c "
+		cd '$CLAUDE_PLUGIN_ROOT'
+		for i in 1 2 3 4 5 6 7 8 9 10; do
+			(
+				export HOOK_STATE_DIR='$BATS_TEST_TMPDIR/state' HOOK_LOG_DIR='$BATS_TEST_TMPDIR/logs' HOOK_INPUT='{}'
+				source '$COMMON'
+				error_count_bump raced \"err\$i\" > /dev/null
+			) &
+		done
+		wait
+		jq -r '.raced.count' '$BATS_TEST_TMPDIR/state/error-counts.json'
+	"
+	assert_success
+	assert_output '10'
+}
+
+@test "error_count_bump: a stale lock directory does not wedge the next bump" {
+	local bin
+	bin=$(_path_without flock)
+	mkdir -p "$BATS_TEST_TMPDIR/state/error-counts.json.lockdir"
+	touch -d '1 hour ago' "$BATS_TEST_TMPDIR/state/error-counts.json.lockdir"
+	run env -i PATH="$bin" HOME="$HOME" HOOK_STATE_DIR="$BATS_TEST_TMPDIR/state" \
+		HOOK_LOG_DIR="$BATS_TEST_TMPDIR/logs" HOOK_INPUT='{}' \
+		"$bin/bash" -c "cd '$CLAUDE_PLUGIN_ROOT'; source '$COMMON'; error_count_bump stale 'boom'"
+	assert_success
+	assert_output '1'
+}
+
 @test "mark_mode_announced: a corrupt active-modes.json self-heals" {
 	mkdir -p "$BATS_TEST_TMPDIR/state"
 	printf '{{{ broken' > "$BATS_TEST_TMPDIR/state/active-modes.json"
@@ -280,6 +372,35 @@ EOF
 	      stop_block_allowed g && echo allow || echo cap'
 	assert_success
 	assert_output 'allow'
+}
+
+@test "stop_blocks_reset: a gate argument clears only that gate's key" {
+	_lib 'for i in 1 2 3 4 5; do stop_block_allowed gate-a >/dev/null; done
+	      for i in 1 2 3 4 5; do stop_block_allowed gate-b >/dev/null; done
+	      stop_blocks_reset gate-a
+	      stop_block_allowed gate-a && echo a-allow || echo a-cap
+	      stop_block_allowed gate-b && echo b-allow || echo b-cap'
+	assert_success
+	assert_line --index 0 'a-allow'
+	assert_line --index 1 'b-cap'
+}
+
+@test "stop_blocks_reset: a gate argument leaves the ledger file valid JSON" {
+	_lib 'stop_block_allowed gate-a >/dev/null
+	      stop_blocks_reset gate-a'
+	assert_success
+	run jq -r 'has("gate-a")' "$BATS_TEST_TMPDIR/state/stop-blocks.json"
+	assert_success
+	assert_output 'false'
+}
+
+@test "stop_blocks_reset: a gate reset on an unwritable state dir still returns 0" {
+	mkdir -p "$BATS_TEST_TMPDIR/state"
+	chmod a-w "$BATS_TEST_TMPDIR/state"
+	_lib 'stop_blocks_reset gate-a; echo "rc=$?"'
+	chmod u+w "$BATS_TEST_TMPDIR/state"
+	assert_success
+	assert_output 'rc=0'
 }
 
 @test "stop_block_allowed: an unwritable state dir fails open (refuses to block)" {

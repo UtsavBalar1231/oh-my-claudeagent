@@ -2,7 +2,7 @@
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
-_HOOK_START=$(date +%s%N)
+_HOOK_START=$(epoch_ns)
 
 # Agent tool returns tool_response as a structured object {result: "..."}; other
 # tools return a plain string. Extract the inner .result when present.

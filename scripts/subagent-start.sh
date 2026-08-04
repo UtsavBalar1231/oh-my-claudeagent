@@ -1,9 +1,9 @@
 #!/bin/bash
 
-_HOOK_START=$(date +%s%N 2>/dev/null || date +%s)
-
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
+
+_HOOK_START=$(epoch_ns)
 
 DATE_CONTEXT=$(LC_TIME=C date '+%A %B %d %Y' 2>/dev/null || echo "")
 

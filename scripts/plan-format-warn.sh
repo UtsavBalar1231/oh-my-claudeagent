@@ -3,10 +3,10 @@
 # Raw `- [ ]` checkboxes that don't match the numbered `- [ ] N.` form are
 # invisible to boulder_progress/statusline counting; this names the offending
 # lines at write time. Advisory only: never denies, always exits 0.
-_HOOK_START=$(date +%s%N 2>/dev/null || date +%s)
-
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
+
+_HOOK_START=$(epoch_ns)
 
 hook_is_disabled "plan-format-warn" && exit 0
 

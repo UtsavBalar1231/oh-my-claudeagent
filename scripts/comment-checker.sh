@@ -5,10 +5,10 @@
 # OMCA_COMMENT_GATE=off|advise|deny controls enforcement; default "advise"
 # computes deny decisions and logs them without blocking (shadow mode).
 
-_HOOK_START=$(date +%s%N 2>/dev/null || date +%s)
-
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
+
+_HOOK_START=$(epoch_ns)
 
 hook_is_disabled "comment-checker" && exit 0
 
@@ -366,7 +366,7 @@ fi
 # from a genuine non-obvious comment, so a repeat attempt on the same file and
 # findings fails open rather than trapping the edit in a retry loop.
 GATE_STATE="${HOOK_STATE_DIR}/comment-gate-window.json"
-SIG=$(printf '%s\n%s' "${FILE_PATH}" "${QUOTED}" | _sha256)
+SIG=$(printf '%s\n%s' "${FILE_PATH}" "${QUOTED}" | sha256_of_stdin)
 PREV_SIG=$(jq_read "${GATE_STATE}" '.signature' "")
 
 if [[ "${SIG}" == "${SHA256_UNAVAILABLE}" ]]; then

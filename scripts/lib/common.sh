@@ -52,7 +52,7 @@ log_hook_info() {
 
 SHA256_UNAVAILABLE="no-digest"
 
-_sha256() {
+sha256_of_stdin() {
 	if command -v sha256sum >/dev/null 2>&1; then
 		sha256sum | cut -d' ' -f1
 	elif command -v shasum >/dev/null 2>&1; then
@@ -63,7 +63,7 @@ _sha256() {
 	fi
 }
 
-_epoch_ns() {
+epoch_ns() {
 	local ns
 	ns=$(date +%s%N 2>/dev/null)
 	if [[ "${ns}" =~ ^[0-9]+$ ]]; then
@@ -73,27 +73,76 @@ _epoch_ns() {
 	fi
 }
 
-_with_state_lock() {
+STATE_LOCK_SPIN_ATTEMPTS=50
+STATE_LOCK_SPIN_SLEEP_SECONDS=0.1
+STATE_LOCK_ABANDONED_AFTER_SECONDS=60
+
+reclaim_state_lockdir_if_abandoned() {
+	local lockdir="$1"
+	local now mtime
+	now=$(date +%s)
+	mtime=$(stat -c %Y "${lockdir}" 2>/dev/null || stat -f %m "${lockdir}" 2>/dev/null)
+	[[ "${mtime}" =~ ^[0-9]+$ ]] || return 1
+	(( now - mtime > STATE_LOCK_ABANDONED_AFTER_SECONDS )) || return 1
+	rmdir "${lockdir}" 2>/dev/null
+}
+
+acquire_state_lockdir_or_give_up() {
+	local lockdir="$1"
+	local attempt
+	for (( attempt = 0; attempt < STATE_LOCK_SPIN_ATTEMPTS; attempt++ )); do
+		mkdir "${lockdir}" 2>/dev/null && return 0
+		reclaim_state_lockdir_if_abandoned "${lockdir}" && continue
+		sleep "${STATE_LOCK_SPIN_SLEEP_SECONDS}"
+	done
+	return 1
+}
+
+run_body_holding_state_lockdir() {
+	local lockdir="$1"
+	shift
+	(
+		STATE_LOCKDIR="${lockdir}"
+		trap 'rmdir "${STATE_LOCKDIR}" 2>/dev/null' EXIT INT TERM HUP
+		"$@"
+	)
+}
+
+with_state_lock() {
 	local file="$1"
 	shift
-	if ! command -v flock >/dev/null 2>&1; then
+	local dir
+	dir=$(dirname "${file}")
+
+	if [[ ! -d "${dir}" || ! -w "${dir}" ]]; then
 		"$@"
 		return $?
 	fi
-	(
-		flock -w 5 200 || log_hook_error "flock wait timed out on $(basename "${file}"), proceeding unlocked" "$(basename "$0")"
+
+	if command -v flock >/dev/null 2>&1; then
+		(
+			flock -w 5 200 || log_hook_error "flock wait timed out on $(basename "${file}"), proceeding unlocked" "$(basename "$0")"
+			"$@"
+		) 200>"${file}.lock"
+		return $?
+	fi
+
+	if ! acquire_state_lockdir_or_give_up "${file}.lockdir"; then
+		log_hook_error "lock spin exhausted on $(basename "${file}"), proceeding unlocked" "$(basename "$0")"
 		"$@"
-	) 200>"${file}.lock"
+		return $?
+	fi
+	run_body_holding_state_lockdir "${file}.lockdir" "$@"
 }
 
-_json_base() {
+json_base() {
 	local base
 	base=$(jq -c . "$1" 2>/dev/null) || base='{}'
 	[[ -z "${base}" || "${base}" == "null" ]] && base='{}'
 	printf '%s\n' "${base}"
 }
 
-_json_rmw() {
+json_rmw() {
 	local file="$1"
 	local filter="$2"
 	shift 2
@@ -101,34 +150,29 @@ _json_rmw() {
 	dir=$(dirname "${file}")
 	mkdir -p "${dir}" 2>/dev/null
 	tmp=$(mktemp -p "${dir}" 2>/dev/null || mktemp "${dir}/.omca-rmw.XXXXXX" 2>/dev/null) || return 1
-	if _json_base "${file}" | jq "$@" "${filter}" >"${tmp}" 2>/dev/null && [[ -s "${tmp}" ]]; then
+	if json_base "${file}" | jq "$@" "${filter}" >"${tmp}" 2>/dev/null && [[ -s "${tmp}" ]]; then
 		mv "${tmp}" "${file}" 2>/dev/null && return 0
 	fi
 	rm -f "${tmp}"
 	return 1
 }
 
-# Bump the error counter for <key> in error-counts.json: increments count,
-# stamps last_failure_at, and prepends a truncated error summary to
-# last_errors (newest first, capped at 3). Resets count + last_errors when
-# the prior last_failure_at predates ERROR_COUNT_DECAY_SECONDS. Legacy bare-
-# int values are read as {count: N, no timestamp/errors} and upgraded to the
 # Usage: NEW_COUNT=$(error_count_bump <key> <error-summary>)
 error_count_bump() {
 	local key="$1"
 	local error_summary="$2"
 	local file="${HOOK_STATE_DIR}/error-counts.json"
 	error_summary=$(printf '%s' "${error_summary}" | tr '\n' ' ' | cut -c1-160)
-	_with_state_lock "${file}" _error_count_bump_body "${file}" "${key}" "${error_summary}"
+	with_state_lock "${file}" error_count_bump_body "${file}" "${key}" "${error_summary}"
 }
 
-_error_count_bump_body() {
+error_count_bump_body() {
 	local file="$1" key="$2" error_summary="$3"
 	local now
 	now=$(date +%s)
 
 	# shellcheck disable=SC2016 # jq filter: $vars are jq bindings passed via --arg, not shell
-	if _json_rmw "${file}" '
+	if json_rmw "${file}" '
 		def entry_of($k):
 			(.[$k] // 0) as $v |
 			if ($v | type) == "number" then {count: $v, last_failure_at: null, last_errors: []}
@@ -217,7 +261,7 @@ emit_context() {
 hook_timing_log() {
 	local start_ns="$1"
 	local end_ns ms
-	end_ns=$(_epoch_ns)
+	end_ns=$(epoch_ns)
 	[[ "${start_ns}" =~ ^[0-9]+$ ]] || return 0
 	ms=$(( (end_ns - start_ns) / 1000000 ))
 	echo "{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"hook\":\"$(basename "$0")\",\"ms\":${ms}}" \
@@ -242,8 +286,8 @@ mode_already_announced() {
 mark_mode_announced() {
 	local mode="$1"
 	# shellcheck disable=SC2016 # jq filter: $vars are jq bindings passed via --arg, not shell
-	_with_state_lock "${ACTIVE_MODES_FILE}" \
-		_json_rmw "${ACTIVE_MODES_FILE}" '.[$mode] = {"detected_at": $epoch, "session_id": $sid}' \
+	with_state_lock "${ACTIVE_MODES_FILE}" \
+		json_rmw "${ACTIVE_MODES_FILE}" '.[$mode] = {"detected_at": $epoch, "session_id": $sid}' \
 		--arg mode "${mode}" \
 		--argjson epoch "$(date +%s)" \
 		--arg sid "${CURRENT_SESSION}" \
@@ -251,7 +295,6 @@ mark_mode_announced() {
 	return 0
 }
 
-# 5 blocks — same cap as plan-continuation-guard.sh rail 9.
 HARD_CAP_BLOCKS=5
 STOP_BLOCKS_FILE="${HOOK_STATE_DIR}/stop-blocks.json"
 
@@ -272,14 +315,23 @@ stop_block_allowed() {
 	((count < HARD_CAP_BLOCKS)) || return 1
 
 	# shellcheck disable=SC2016 # jq filter: $vars are jq bindings passed via --arg, not shell
-	_with_state_lock "${STOP_BLOCKS_FILE}" \
-		_json_rmw "${STOP_BLOCKS_FILE}" '.[$g] = ((.[$g] // 0 | numbers // 0) + 1)' --arg g "${gate}" \
+	with_state_lock "${STOP_BLOCKS_FILE}" \
+		json_rmw "${STOP_BLOCKS_FILE}" '.[$g] = ((.[$g] // 0 | numbers // 0) + 1)' --arg g "${gate}" \
 		|| return 1
 	return 0
 }
 
 stop_blocks_reset() {
-	rm -f "${STOP_BLOCKS_FILE}" 2>/dev/null
+	local gate="$1"
+	if [[ -z "${gate}" ]]; then
+		rm -f "${STOP_BLOCKS_FILE}" 2>/dev/null
+		return 0
+	fi
+	[[ -f "${STOP_BLOCKS_FILE}" ]] || return 0
+	# shellcheck disable=SC2016 # jq filter: $vars are jq bindings passed via --arg, not shell
+	with_state_lock "${STOP_BLOCKS_FILE}" \
+		json_rmw "${STOP_BLOCKS_FILE}" 'del(.[$g])' --arg g "${gate}" \
+		|| log_hook_error "stop-blocks reset failed for gate=${gate}" "$(basename "$0")"
 	return 0
 }
 

@@ -1,9 +1,9 @@
 #!/bin/bash
 
-_HOOK_START=$(date +%s%N 2>/dev/null || date +%s)
-
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
+
+_HOOK_START=$(epoch_ns)
 
 hook_is_disabled "context-injector" && exit 0
 
@@ -127,7 +127,7 @@ for RULE_FILE in "${RULE_FILES[@]}"; do
 			# with "rule:" to avoid colliding with the AGENTS.md/README "dir|mtime" keys
 			# sharing this same cache file.
 			RULE_REALPATH=$(realpath "${RULE_FILE}" 2>/dev/null || printf '%s' "${RULE_FILE}")
-			RULE_HASH=$(printf '%s' "${RULE_CONTENT}" | _sha256)
+			RULE_HASH=$(printf '%s' "${RULE_CONTENT}" | sha256_of_stdin)
 
 			if [[ "${RULE_HASH}" == "${SHA256_UNAVAILABLE}" ]]; then
 				CONTEXT_PARTS+="[Rule: ${PATTERN}]: ${RULE_CONTENT}"

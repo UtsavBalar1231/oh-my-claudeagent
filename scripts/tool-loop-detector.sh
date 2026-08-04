@@ -6,7 +6,7 @@
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
-START_NS=$(date +%s%N 2>/dev/null || date +%s)
+START_NS=$(epoch_ns)
 
 hook_is_disabled "tool-loop-detector" && { hook_timing_log "${START_NS}"; exit 0; }
 
@@ -20,7 +20,7 @@ if [[ -z "${SIG_INPUT}" ]]; then
 	exit 0
 fi
 
-SIG=$(printf '%s' "${SIG_INPUT}" | _sha256)
+SIG=$(printf '%s' "${SIG_INPUT}" | sha256_of_stdin)
 if [[ "${SIG}" == "${SHA256_UNAVAILABLE}" ]]; then
 	hook_timing_log "${START_NS}"
 	exit 0
