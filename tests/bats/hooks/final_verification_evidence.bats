@@ -417,3 +417,80 @@ EOF
 	[ "$(jq -r '.reason' <<< "$output")" = "plain reason" ]
 	[ "$(jq -r 'has("hookSpecificOutput")' <<< "$output")" = "false" ]
 }
+
+# ---------------------------------------------------------------------------
+# Loop bounding: no test in this suite drove the gate past HARD_CAP_BLOCKS
+# before, so a cap of 5 was never exercised and an unresolved state blocked
+# every Stop for the rest of the session.
+# ---------------------------------------------------------------------------
+
+@test "final-verification-evidence: a missing verdict stops blocking once the Stop-block cap is hit" {
+	local plan_file="${BATS_TEST_TMPDIR}/complete-plan.md"
+	_write_complete_plan "${plan_file}"
+	_write_boulder "${plan_file}"
+
+	local decisions="" i
+	# 7 > HARD_CAP_BLOCKS (5).
+	for i in 1 2 3 4 5 6 7; do
+		run_hook "final-verification-evidence.sh" '{}'
+		decisions+="$(jq -r '.decision // "allow"' <<< "$output") "
+	done
+
+	assert_equal "$decisions" "block block block block block allow allow "
+}
+
+@test "final-verification-evidence: a corrupt evidence file stops blocking once the cap is hit" {
+	local plan_file="${BATS_TEST_TMPDIR}/complete-plan.md"
+	_write_complete_plan "${plan_file}"
+	_write_boulder "${plan_file}"
+	mkdir -p "${CLAUDE_PROJECT_ROOT}/.omca/evidence"
+	printf '%s' "THIS IS NOT JSON {" \
+		> "${CLAUDE_PROJECT_ROOT}/.omca/evidence/verification-evidence.json"
+
+	local decisions="" i
+	for i in 1 2 3 4 5 6 7; do
+		run_hook "final-verification-evidence.sh" '{}'
+		decisions+="$(jq -r '.decision // "allow"' <<< "$output") "
+	done
+
+	assert_equal "$decisions" "block block block block block allow allow "
+}
+
+@test "final-verification-evidence: logging the verdict restores the Stop-block budget" {
+	local plan_file="${BATS_TEST_TMPDIR}/complete-plan.md"
+	_write_complete_plan "${plan_file}"
+	_write_boulder "${plan_file}"
+
+	local i
+	for i in 1 2 3; do
+		run_hook "final-verification-evidence.sh" '{}'
+		_assert_blocked
+	done
+
+	_write_final_verification_evidence 0
+	run_hook "final-verification-evidence.sh" '{}'
+	assert_success
+	assert_output '{}'
+	[ ! -f "${CLAUDE_PROJECT_ROOT}/.omca/state/stop-blocks.json" ]
+}
+
+@test "final-verification-evidence: jq unavailable allows Stop" {
+	local plan_file="${BATS_TEST_TMPDIR}/complete-plan.md"
+	_write_complete_plan "${plan_file}"
+	_write_boulder "${plan_file}"
+
+	local dir="${BATS_TEST_TMPDIR}/nojq-bin"
+	mkdir -p "${dir}"
+	local c p
+	for c in bash cat date grep sed cut tr basename dirname mktemp mv rm mkdir \
+		flock printf sha256sum tail head sort wc awk tac stat chmod python3; do
+		p=$(command -v "$c" 2>/dev/null) && ln -sf "$p" "${dir}/$c"
+	done
+
+	run env -i PATH="${dir}" HOME="${HOME}" CLAUDE_PROJECT_ROOT="${CLAUDE_PROJECT_ROOT}" \
+		CLAUDE_PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT}" CLAUDE_SESSION_ID="${CLAUDE_SESSION_ID}" \
+		HOOK_INPUT='{"stop_hook_active":false}' HOOK_INPUT_TIMED_OUT=0 \
+		"${dir}/bash" "${CLAUDE_PLUGIN_ROOT}/scripts/final-verification-evidence.sh" < /dev/null
+	assert_success
+	refute_output --partial '"decision"'
+}

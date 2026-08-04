@@ -30,9 +30,6 @@ STALE_BINDING_SECONDS=86400
 # 300s (5m): rail 9 clean window: this long since the last block resets the
 # hard-cap counter, so a session that resumes cleanly isn't punished forever.
 CLEAN_WINDOW_SECONDS=300
-# 5: rail 9 hard cap: this many consecutive blocks without a clean window and
-# the guard backs off for good (until the clean window resets it).
-HARD_CAP_BLOCKS=5
 # 3: rail 9 stagnation streak: this many consecutive blocks with an unchanged
 # unchecked-count means the agent isn't making progress; stop nagging.
 STAGNATION_STREAK=3
@@ -49,6 +46,11 @@ noop_exit() {
 # convention in final-verification-evidence.sh and drift-guard.sh.
 if [[ "${HOOK_INPUT_TIMED_OUT:-0}" -eq 1 ]]; then
 	echo "[PLAN CONTINUATION] stdin read timed out, cannot evaluate plan state this Stop. Allowing." >&2
+	noop_exit
+fi
+
+if ! command -v jq >/dev/null 2>&1; then
+	echo "[PLAN CONTINUATION] jq is unavailable, cannot evaluate plan state this Stop. Allowing." >&2
 	noop_exit
 fi
 
@@ -71,6 +73,7 @@ fi
 # quiet on this condition so one cause never fires two gates.
 if [[ -f "${BOULDER_FILE}" ]] && ! jq -e . "${BOULDER_FILE}" >/dev/null 2>&1; then
 	log_hook_error "boulder.json is not valid JSON, plan state unresolvable" "$(basename "$0")"
+	stop_block_allowed "plan-continuation-guard" || noop_exit
 	block_exit "[PLAN CONTINUATION] ${BOULDER_FILE} is not valid JSON, so this session's plan state cannot be resolved and plan-scoped enforcement is off. Repair or delete the file (boulder_write rewrites it), then stop again. Set OMCA_DISABLED_HOOKS=plan-continuation-guard to bypass."
 fi
 
@@ -272,6 +275,7 @@ NOW=$(date +%s)
 if [[ "${CONSECUTIVE_BLOCKS}" -ge "${HARD_CAP_BLOCKS}" ]]; then
 	if (( NOW - LAST_BLOCK_AT >= CLEAN_WINDOW_SECONDS )); then
 		CONSECUTIVE_BLOCKS=0
+		stop_blocks_reset
 	else
 		noop_exit
 	fi
@@ -299,10 +303,10 @@ else
 fi
 NEW_CONSECUTIVE_BLOCKS=$(( CONSECUTIVE_BLOCKS + 1 ))
 
-# The counters only tune backoff and the hard cap; the block decision above
-# does not read them, so a failed persist must not become an allow. The failure
 # is already logged inside write_continuation_state.
-write_continuation_state "${NEW_CONSECUTIVE_BLOCKS}" "${NOW}" "${INCOMPLETE}" "${NEW_SAME_COUNT_RUN}" "false" || true
+write_continuation_state "${NEW_CONSECUTIVE_BLOCKS}" "${NOW}" "${INCOMPLETE}" "${NEW_SAME_COUNT_RUN}" "false" || noop_exit
+
+stop_block_allowed "plan-continuation-guard" || noop_exit
 
 NEXT_TASK=$(grep -m1 -E '^- \[ \] [0-9]+\.' "${ACTIVE_PLAN}" | sed -E 's/^- \[ \] [0-9]+\.[[:space:]]*//')
 block_exit "[PLAN CONTINUATION] The bound plan '${PLAN_NAME}' still has ${INCOMPLETE} unchecked tasks (next: ${NEXT_TASK}). If you believe the work is complete, re-examine each unchecked item skeptically; finish it or record in the plan notepad why it cannot proceed."

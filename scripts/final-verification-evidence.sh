@@ -31,6 +31,11 @@ if [[ "${HOOK_INPUT_TIMED_OUT:-0}" -eq 1 ]]; then
 	noop_exit
 fi
 
+if ! command -v jq >/dev/null 2>&1; then
+	echo "[FINAL VERIFICATION] jq is unavailable, cannot evaluate plan completeness this Stop. Allowing." >&2
+	noop_exit
+fi
+
 # Kill switch for emergency rollback
 if [[ "${OMCA_HOOK_DISABLE_FINAL_VERIFY:-}" == "1" ]]; then
 	echo "[FINAL VERIFICATION] Kill switch active (OMCA_HOOK_DISABLE_FINAL_VERIFY=1) — skipping check." >&2
@@ -82,6 +87,7 @@ fi
 # Fail-closed on corrupt evidence file
 if [[ -f "${EVIDENCE_FILE}" ]]; then
 	if ! jq -e '.entries | arrays' "${EVIDENCE_FILE}" >/dev/null 2>&1; then
+		stop_block_allowed "final-verification-evidence" || noop_exit
 		block_exit "[FINAL VERIFICATION] Evidence file corrupt. Repair ${EVIDENCE_FILE} before stopping."
 	fi
 fi
@@ -105,8 +111,11 @@ if [[ -f "${EVIDENCE_FILE}" ]]; then
 fi
 
 if [[ "${HAS_VERDICT}" == "true" ]]; then
+	stop_blocks_reset
 	noop_exit
 fi
+
+stop_block_allowed "final-verification-evidence" || noop_exit
 
 # Plan complete, no matching final_verification evidence — block Stop
 block_exit "[FINAL VERIFICATION] Plan '${ACTIVE_PLAN}' fully checked but no matching final_verification evidence found. Call evidence_log(evidence_type=\"final_verification\", command=\"<your verdict>\", exit_code=0, output_snippet=\"...\", plan_sha256=\"${PLAN_SHA256}\") to open the gate. Set OMCA_HOOK_DISABLE_FINAL_VERIFY=1 to bypass."

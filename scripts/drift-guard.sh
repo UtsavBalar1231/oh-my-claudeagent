@@ -31,6 +31,11 @@ if [[ "${HOOK_INPUT_TIMED_OUT:-0}" -eq 1 ]]; then
 	noop_exit
 fi
 
+if ! command -v jq >/dev/null 2>&1; then
+	echo "[DRIFT GUARD] jq is unavailable — cannot evaluate stub drift this Stop. Allowing." >&2
+	noop_exit
+fi
+
 # Re-entry backstop: if a prior Stop hook already forced a continuation this
 # turn, don't re-run the (relatively expensive) git/text scan again.
 STOP_HOOK_ACTIVE=$(jq -r '.stop_hook_active // false' <<< "${HOOK_INPUT}")
@@ -112,7 +117,7 @@ fi
 
 # Stub marker set — each with a derivation comment. Deliberately excludes
 # `.skip` and "placeholder returns" (too broad / too many false positives).
-MARKER_ONLY='\.only\b'                                              # focused test left in (it.only(, describe.only()
+MARKER_ONLY='\b(describe|context|it|test|bench|suite)\.only\b'
 MARKER_TODO='TODO: implement'                                       # explicit unfinished-implementation marker
 MARKER_NOT_IMPL='throw new [A-Za-z]*Error\(["'"'"'].*not implemented' # stub throw for an unimplemented code path
 MARKER_PATTERN="${MARKER_ONLY}|${MARKER_TODO}|${MARKER_NOT_IMPL}"
@@ -163,12 +168,33 @@ md_line_is_documenting() {
 	return 0
 }
 
-# New-file-relative added line numbers for a tracked file's unstaged+staged
-# diff against HEAD. Only `+` lines advance the new-line counter; hunk headers
-# (@@ -a,b +c,d @@) reset it to c per hunk.
-get_added_lines() {
-	local file="$1"
-	git -C "${HOOK_PROJECT_ROOT}" diff HEAD --unified=0 -- "${file}" 2>/dev/null | awk '
+# 500 changed files — ~1ms scan each; above this the tree is machine-generated.
+MAX_CHANGED_FILES=500
+
+CHANGED_FILES=$(git -C "${HOOK_PROJECT_ROOT}" diff HEAD --name-only 2>/dev/null)
+UNTRACKED_FILES=$(git -C "${HOOK_PROJECT_ROOT}" ls-files --others --exclude-standard 2>/dev/null)
+
+FILE_COUNT=$(grep -c . <<< "${CHANGED_FILES}${UNTRACKED_FILES:+$'\n'}${UNTRACKED_FILES}")
+if (( FILE_COUNT > MAX_CHANGED_FILES )); then
+	echo "[DRIFT GUARD] ${FILE_COUNT} changed files exceeds the ${MAX_CHANGED_FILES}-file scan ceiling — skipping stub scan this Stop." >&2
+	log_hook_info "changed-file count ${FILE_COUNT} exceeds ${MAX_CHANGED_FILES}, stub scan skipped" "$(basename "$0")"
+	noop_exit
+fi
+
+FINDINGS=""
+
+added_lines_stream() {
+	git -C "${HOOK_PROJECT_ROOT}" diff HEAD --unified=0 2>/dev/null | awk '
+		/^--- / { expect_header = 1; next }
+		expect_header {
+			expect_header = 0
+			if ($0 ~ /^\+\+\+ /) {
+				path = substr($0, 5)
+				sub(/^b\//, "", path)
+				if (path == "/dev/null") path = ""
+				next
+			}
+		}
 		/^@@/ {
 			split($0, parts, " ")
 			plus = parts[3]
@@ -177,60 +203,53 @@ get_added_lines() {
 			line = nums[1]
 			next
 		}
-		/^\+\+\+/ { next }
-		/^\+/ { print line; line++; next }
+		/^\+/ {
+			if (path != "") print path "\t" line "\t" substr($0, 2)
+			line++
+			next
+		}
 	'
 }
 
-FINDINGS=""
-
-scan_file() {
-	local file="$1"
-	local untracked="$2"
-	local abs_path="${HOOK_PROJECT_ROOT}/${file}"
-	[[ -f "${abs_path}" ]] || return 0
-
-	local added_lines=""
-	if [[ "${untracked}" != "true" ]]; then
-		added_lines=$(get_added_lines "${file}")
-		[[ -z "${added_lines}" ]] && return 0
-	fi
-
-	local matches
-	matches=$(grep -InE "${MARKER_PATTERN}" "${abs_path}" 2>/dev/null)
-	[[ -z "${matches}" ]] && return 0
-
-	local md_fenced=""
-	if [[ "${file}" == *.md ]]; then
-		md_fenced=$(md_fenced_lines "${abs_path}")
-	fi
-
-	local lineno rest
-	while IFS=: read -r lineno rest; do
-		[[ -z "${lineno}" ]] && continue
-		[[ "${rest}" =~ ${BATS_TEST_DECL} ]] && continue
-		if [[ "${file}" == *.md ]] && md_line_is_documenting "${lineno}" "${rest}" "${md_fenced}"; then
-			continue
-		fi
-		if [[ "${untracked}" == "true" ]] || grep -qxF "${lineno}" <<< "${added_lines}"; then
-			FINDINGS+="${file}:${lineno}  ${rest}"$'\n'
-		fi
-	done <<< "${matches}"
+untracked_lines_stream() {
+	local file
+	while IFS= read -r file; do
+		[[ -z "${file}" ]] && continue
+		[[ -f "${HOOK_PROJECT_ROOT}/${file}" ]] || continue
+		grep -nE "${MARKER_PATTERN}" "${HOOK_PROJECT_ROOT}/${file}" 2>/dev/null \
+			| awk -v f="${file}" '{ i = index($0, ":"); print f "\t" substr($0, 1, i - 1) "\t" substr($0, i + 1) }'
+	done <<< "${UNTRACKED_FILES}"
 }
 
-while IFS= read -r file; do
-	[[ -z "${file}" ]] && continue
-	scan_file "${file}" "false"
-done < <(git -C "${HOOK_PROJECT_ROOT}" diff HEAD --name-only 2>/dev/null)
+MD_CACHE_FILE=""
+MD_CACHE_LINES=""
 
-while IFS= read -r file; do
-	[[ -z "${file}" ]] && continue
-	scan_file "${file}" "true"
-done < <(git -C "${HOOK_PROJECT_ROOT}" ls-files --others --exclude-standard 2>/dev/null)
+record_candidate() {
+	local file="$1" lineno="$2" text="$3"
+	[[ -n "${file}" && -n "${lineno}" ]] || return 0
+	grep -qE "${MARKER_PATTERN}" <<< "${text}" || return 0
+	[[ "${text}" =~ ${BATS_TEST_DECL} ]] && return 0
+	if [[ "${file}" == *.md ]]; then
+		if [[ "${MD_CACHE_FILE}" != "${file}" ]]; then
+			MD_CACHE_FILE="${file}"
+			MD_CACHE_LINES=$(md_fenced_lines "${HOOK_PROJECT_ROOT}/${file}" 2>/dev/null)
+		fi
+		md_line_is_documenting "${lineno}" "${text}" "${MD_CACHE_LINES}" && return 0
+	fi
+	FINDINGS+="${file}:${lineno}  ${text}"$'\n'
+	return 0
+}
+
+while IFS=$'\t' read -r file lineno text; do
+	record_candidate "${file}" "${lineno}" "${text}"
+done < <({ added_lines_stream; untracked_lines_stream; } | grep -E "${MARKER_PATTERN}")
 
 if [[ -z "${FINDINGS}" ]]; then
+	stop_blocks_reset
 	noop_exit
 fi
+
+stop_block_allowed "drift-guard" || noop_exit
 
 block_exit "[DRIFT GUARD] Completion claimed but stub markers remain on added/untracked lines:
 ${FINDINGS}

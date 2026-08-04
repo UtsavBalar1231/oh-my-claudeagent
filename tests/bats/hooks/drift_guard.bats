@@ -167,7 +167,7 @@ EOF
 @test "drift-guard: a marker inside a bats test name is not a finding" {
 	echo "hello" > a.txt
 	_commit_all
-	local marker=".on""ly"
+	local marker="it.on""ly"
 	printf '@test "guard: %s marker on an added line blocks Stop" {\n\ttrue\n}\n' "$marker" > suite.bats
 
 	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
@@ -236,4 +236,124 @@ EOF
 	HOOK_INPUT="" HOOK_INPUT_TIMED_OUT=1 run bash "$CLAUDE_PLUGIN_ROOT/scripts/drift-guard.sh" < /dev/null
 	assert_success
 	assert_output --partial "stdin read timed out"
+}
+
+# ---------------------------------------------------------------------------
+# Marker precision
+# ---------------------------------------------------------------------------
+
+# `.only` is a projection call in several ORMs (Django, Peewee). A bare
+# `\.only\b` flagged it, and there is no way for the author to resolve the
+# finding short of disabling the gate.
+@test "drift-guard: an ORM .only() projection is not a finding" {
+	echo "hello" > a.txt
+	_commit_all
+	printf 'qs = Model.objects.only("id")\nrow = User.select().only(User.id)\n' > orm.py
+
+	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
+	assert_success
+	assert_output '{}'
+}
+
+@test "drift-guard: a focused test .only is still a finding" {
+	echo "hello" > a.txt
+	_commit_all
+	local marker="describe.on""ly"
+	printf '%s("suite", () => {})\n' "$marker" > spec.js
+
+	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
+	_assert_blocked
+	assert_output --partial "spec.js"
+}
+
+# ---------------------------------------------------------------------------
+# Loop bounding and cost ceiling
+# ---------------------------------------------------------------------------
+
+# drift-guard had no counter of any kind: an unresolved stub plus a completion
+# claim blocked every Stop for the rest of the session, and the only recovery
+# was killing the client.
+@test "drift-guard: an unresolved stub stops blocking once the Stop-block cap is hit" {
+	echo "hello" > a.txt
+	_commit_all
+	echo "TODO: implement" > new.txt
+
+	local decisions="" i
+	# 7 > HARD_CAP_BLOCKS (5).
+	for i in 1 2 3 4 5 6 7; do
+		run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
+		decisions+="$(jq -r '.decision // "allow"' <<< "$output") "
+	done
+
+	assert_equal "$decisions" "block block block block block allow allow "
+}
+
+@test "drift-guard: resolving the stub restores the Stop-block budget" {
+	echo "hello" > a.txt
+	_commit_all
+	echo "TODO: implement" > new.txt
+
+	local i
+	for i in 1 2 3 4 5 6; do
+		run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
+	done
+	assert_output '{}'
+
+	echo "resolved" > new.txt
+	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
+	assert_output '{}'
+
+	echo "TODO: implement" > another.txt
+	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
+	_assert_blocked
+}
+
+@test "drift-guard: jq unavailable allows Stop" {
+	echo "hello" > a.txt
+	_commit_all
+	echo "TODO: implement" > new.txt
+
+	local dir="$BATS_TEST_TMPDIR/nojq-bin"
+	mkdir -p "$dir"
+	local c p
+	for c in bash cat date grep sed cut tr basename dirname mktemp mv rm mkdir \
+		flock printf sha256sum tail head sort wc awk tac stat chmod git; do
+		p=$(command -v "$c" 2>/dev/null) && ln -sf "$p" "$dir/$c"
+	done
+
+	run env -i PATH="$dir" HOME="$HOME" CLAUDE_PROJECT_ROOT="$CLAUDE_PROJECT_ROOT" \
+		CLAUDE_PLUGIN_ROOT="$CLAUDE_PLUGIN_ROOT" \
+		HOOK_INPUT='{"stop_hook_active":false,"last_assistant_message":"Done."}' \
+		HOOK_INPUT_TIMED_OUT=0 \
+		"$dir/bash" "$CLAUDE_PLUGIN_ROOT/scripts/drift-guard.sh" < /dev/null
+	assert_success
+	refute_output --partial '"decision"'
+}
+
+# The scan costs about 1ms per changed file with no ceiling, so a codegen run or
+# a vendored-tree import froze turn-end for tens of seconds. Above the ceiling
+# the guard skips instead of stalling.
+@test "drift-guard: a tree above the changed-file ceiling skips the scan" {
+	local i
+	mkdir -p src
+	for i in $(seq 1 520); do echo "line" > "src/f$i.txt"; done
+	_commit_all
+	for i in $(seq 1 520); do echo "TODO: implement" >> "src/f$i.txt"; done
+
+	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
+	assert_success
+	assert_output --partial "exceeds the 500-file scan ceiling"
+	refute_output --partial '"decision"'
+}
+
+@test "drift-guard: a tree just under the ceiling still scans and blocks" {
+	local i
+	mkdir -p src
+	for i in $(seq 1 40); do echo "line" > "src/f$i.txt"; done
+	_commit_all
+	echo "TODO: implement" >> src/f7.txt
+
+	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
+	_assert_blocked
+	assert_output --partial "src/f7.txt"
 }
