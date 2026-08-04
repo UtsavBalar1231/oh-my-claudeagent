@@ -24,8 +24,14 @@ Hook-authoring conventions for a script here:
 - Read the payload from stdin (`INPUT=$(cat)`) and parse fields with `jq`.
 - Write state atomically: `tmp=$(mktemp) && ... && mv "$tmp" target.json`.
 - Default to `exit 0`. Succeed silently when the script's condition does not apply.
-- Block from a `PreToolUse` or `PermissionRequest` hook with a stderr message and
-  `exit 2`; the platform ignores stdout JSON on a non-zero exit. Block from a `Stop`
+- Block from a `PreToolUse` hook with a stderr message and `exit 2`; the platform ignores
+  stdout JSON on a non-zero exit and sends the stderr text to the model. `exit 2` does
+  **not** block a `PermissionRequest` hook — that event reads its answer only from
+  `hookSpecificOutput.decision.behavior` on stdout with `exit 0`, and ignores the exit
+  status entirely. A script registered on both events must emit both shapes:
+  `hookSpecificOutput.permissionDecision` for `PreToolUse`,
+  `hookSpecificOutput.decision.behavior` for `PermissionRequest`. See the two-shape
+  branch in `permission-filter.sh` for the reference implementation. Block from a `Stop`
   hook with `{"decision": "block", "reason": "..."}` on stdout and `exit 0`.
 - Keep state under `.omca/state/` relative to `CLAUDE_PROJECT_ROOT`, never `~/.claude/`.
 - Reference the plugin root as `$(dirname "$0")/..`.

@@ -82,8 +82,13 @@ of these fall through to the platform decision rather than denying:
 - a variable assignment prefix, `FOO=1 rm -rf DIR`
 - an argument-fed pipeline, `find DIR -print0 | xargs -0 rm -rf`
 - a nested shell, `bash -c 'rm -rf DIR'`
-- long-form flags, `rm --recursive --force DIR`
 - another tool doing the deletion: `find DIR -delete`, or a one-line Python `rmtree`
+
+Flag order, flag case and the long form are no longer part of that list: `rm -Rf DIR`,
+`rm -f -r DIR` and `rm --recursive DIR` deny like `rm -rf DIR`. On the git side, a leading
+global option no longer hides the subcommand, so `git -C DIR reset --hard`,
+`git --git-dir=DIR/.git reset --hard` and `git -c k=v reset --hard` deny, as do
+`git checkout REV -- PATH` and `git rm`.
 
 Widening the pattern to cover these means either a real shell tokenizer inside a bash hook
 or a prefix list that a caller can always step outside of. Neither turns the guard into

@@ -63,6 +63,9 @@ OMCA_DISABLED_HOOKS=plan-continuation-guard
 
 # Turn off more than one hook
 OMCA_DISABLED_HOOKS="plan-continuation-guard,drift-guard"
+
+# Turn off every OMCA hook at once (`*` is equivalent)
+OMCA_DISABLED_HOOKS=all
 ```
 
 This is the recommended way to silence the plan-continuation guard if it is nudging you
