@@ -37,6 +37,30 @@ jq -nc --arg sid "${SESSION_ID}" --arg ts "${TIMESTAMP}" \
 	--argjson err "${ERROR_COUNT}" \
 	'{event: "session_end", sessionId: $sid, timestamp: $ts, hook_errors: $err}' >>"${LOG_FILE}"
 
+if [[ "${REASON}" != "resume" ]]; then
+	# Authoritative binding GC: drop this session's boulder.json binding under the
+	# same flock the MCP writer (boulder.py) uses. boulder_write's age-prune is
+	# only a backstop for sessions that never hit SessionEnd cleanly. Runs even
+	# when another session owns the shared state: a binding is per session id.
+	BOULDER_FILE_PATH="${STATE_DIR}/boulder.json"
+	BOULDER_LOCK_PATH="${STATE_DIR}/boulder.json.lock"
+	if [[ -n "${SESSION_ID}" ]] && [[ "${SESSION_ID}" != "unknown" ]] \
+		&& [[ -f "${BOULDER_FILE_PATH}" ]] \
+		&& command -v flock >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+		(
+			flock -x 200
+			BOULDER_TMP=$(mktemp -p "${STATE_DIR}" 2>/dev/null || mktemp "${STATE_DIR}/.omca-boulder.XXXXXX" 2>/dev/null)
+			if [[ -n "${BOULDER_TMP}" ]] && jq --arg sid "${SESSION_ID}" \
+				'if has("bindings") then .bindings |= del(.[$sid]) else . end' \
+				"${BOULDER_FILE_PATH}" >"${BOULDER_TMP}" 2>/dev/null; then
+				mv "${BOULDER_TMP}" "${BOULDER_FILE_PATH}"
+			else
+				rm -f "${BOULDER_TMP}"
+			fi
+		) 200>"${BOULDER_LOCK_PATH}"
+	fi
+fi
+
 if [[ "${REASON}" != "resume" ]] && (( OWNS_SHARED_STATE )); then
 	TEMP_FILES=(
 		"${STATE_DIR}/session.json"
@@ -74,43 +98,23 @@ if [[ "${REASON}" != "resume" ]] && (( OWNS_SHARED_STATE )); then
 	LOG_MAX_BYTES=1048576
 	# 1000 lines — roughly a week of one project's hook traffic.
 	LOG_KEEP_LINES=1000
+	HOOK_ERRORS_READER_CURSOR="${STATE_DIR}/hook-errors-cursor"
 	for LOG in "${LOG_DIR}"/*.jsonl "${LOG_DIR}"/*.log; do
 		[[ -f "${LOG}" ]] || continue
 		LOG_BYTES=$(wc -c <"${LOG}" 2>/dev/null | tr -d ' ')
 		[[ "${LOG_BYTES}" =~ ^[0-9]+$ ]] || continue
 		if (( LOG_BYTES > LOG_MAX_BYTES )); then
-			LOG_TMP=$(mktemp) || continue
+			LOG_TMP=$(mktemp -p "${LOG_DIR}" 2>/dev/null || mktemp "${LOG_DIR}/.omca-log.XXXXXX" 2>/dev/null) || continue
 			if tail -n "${LOG_KEEP_LINES}" "${LOG}" >"${LOG_TMP}" 2>/dev/null; then
 				mv "${LOG_TMP}" "${LOG}"
+				if [[ "$(basename "${LOG}")" == "hook-errors.jsonl" ]]; then
+					rm -f "${HOOK_ERRORS_READER_CURSOR}"
+				fi
 			else
 				rm -f "${LOG_TMP}"
 			fi
 		fi
 	done
-fi
-
-if [[ "${REASON}" != "resume" ]]; then
-	# Authoritative binding GC: drop this session's boulder.json binding under the
-	# same flock the MCP writer (boulder.py) uses. boulder_write's age-prune is
-	# only a backstop for sessions that never hit SessionEnd cleanly. Runs even
-	# when another session owns the shared state: a binding is per session id.
-	BOULDER_FILE_PATH="${STATE_DIR}/boulder.json"
-	BOULDER_LOCK_PATH="${STATE_DIR}/boulder.json.lock"
-	if [[ -n "${SESSION_ID}" ]] && [[ "${SESSION_ID}" != "unknown" ]] \
-		&& [[ -f "${BOULDER_FILE_PATH}" ]] \
-		&& command -v flock >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
-		(
-			flock -x 200
-			BOULDER_TMP=$(mktemp)
-			if jq --arg sid "${SESSION_ID}" \
-				'if has("bindings") then .bindings |= del(.[$sid]) else . end' \
-				"${BOULDER_FILE_PATH}" >"${BOULDER_TMP}" 2>/dev/null; then
-				mv "${BOULDER_TMP}" "${BOULDER_FILE_PATH}"
-			else
-				rm -f "${BOULDER_TMP}"
-			fi
-		) 200>"${BOULDER_LOCK_PATH}"
-	fi
 fi
 
 exit 0

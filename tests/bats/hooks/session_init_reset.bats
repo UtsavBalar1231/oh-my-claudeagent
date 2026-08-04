@@ -118,18 +118,18 @@ load '../test_helper'
 	local fake="$BATS_TEST_TMPDIR/fakeplugin"
 	mkdir -p "$fake/servers"
 	printf '[project]\nname = "x"\n' > "$fake/servers/pyproject.toml"
-	printf '#!/bin/sh\nsleep 30\n' > "$fake/uv"
+	printf '#!/bin/sh\nsleep 5\n' > "$fake/uv"
 	chmod +x "$fake/uv"
 
 	local started ended
 	started=$(date +%s)
 	CLAUDE_PLUGIN_DATA="$BATS_TEST_TMPDIR/plugindata" \
 		PATH="$fake:$PATH" \
-		run timeout 5 bash "$CLAUDE_PLUGIN_ROOT/scripts/session-init.sh" <<< '{"session_id":"sess-slow","source":"startup"}'
+		run timeout 3 bash "$CLAUDE_PLUGIN_ROOT/scripts/session-init.sh" <<< '{"session_id":"sess-slow","source":"startup"}'
 	ended=$(date +%s)
 
 	assert_success
-	[ "$(( ended - started ))" -lt 5 ]
+	[ "$(( ended - started ))" -lt 3 ]
 	echo "$output" | jq -e '.hookSpecificOutput.hookEventName == "SessionStart"' >/dev/null
 	echo "$output" | jq -e '.hookSpecificOutput.additionalContext | test("CURRENT DATE")' >/dev/null
 	assert [ -f "$CLAUDE_PROJECT_ROOT/.omca/state/session.json" ]
@@ -172,6 +172,54 @@ _log_hook_error() {
 	run_hook "session-init.sh" '{"session_id":"sess-a","source":"startup"}'
 	assert_success
 	[[ "$(get_context)" != *"HOOK ERRORS"* ]]
+}
+
+_fake_uv_plugin_data() {
+	local fake="$1" data="$2"
+	mkdir -p "$fake" "$data"
+	printf '#!/bin/sh\ntouch "%s/ran"\n' "$data" > "$fake/uv"
+	chmod +x "$fake/uv"
+}
+
+@test "session-init: no second uv sync spawns while another session holds the venv sync lock" {
+	local fake="$BATS_TEST_TMPDIR/fakebin" data="$BATS_TEST_TMPDIR/plugindata"
+	_fake_uv_plugin_data "$fake" "$data"
+
+	flock -x "$data/.venv-sync.lock" sleep 3 &
+	local holder=$!
+	sleep 1
+
+	CLAUDE_PLUGIN_DATA="$data" PATH="$fake:$PATH" \
+		run bash "$CLAUDE_PLUGIN_ROOT/scripts/session-init.sh" <<< '{"session_id":"sess-lock","source":"startup"}'
+	assert_success
+	sleep 1
+
+	assert [ ! -f "$data/ran" ]
+	kill "$holder" 2>/dev/null || true
+}
+
+@test "session-init: a fork spawns no uv sync of its own, leaving the venv to the parent" {
+	local fake="$BATS_TEST_TMPDIR/fakebin" data="$BATS_TEST_TMPDIR/plugindata"
+	_fake_uv_plugin_data "$fake" "$data"
+
+	CLAUDE_PLUGIN_DATA="$data" PATH="$fake:$PATH" \
+		run bash "$CLAUDE_PLUGIN_ROOT/scripts/session-init.sh" <<< '{"session_id":"sess-fork","source":"fork"}'
+	assert_success
+	sleep 1
+
+	assert [ ! -f "$data/ran" ]
+}
+
+@test "session-init: an uncontended startup still spawns the venv sync" {
+	local fake="$BATS_TEST_TMPDIR/fakebin" data="$BATS_TEST_TMPDIR/plugindata"
+	_fake_uv_plugin_data "$fake" "$data"
+
+	CLAUDE_PLUGIN_DATA="$data" PATH="$fake:$PATH" \
+		run bash "$CLAUDE_PLUGIN_ROOT/scripts/session-init.sh" <<< '{"session_id":"sess-solo","source":"startup"}'
+	assert_success
+	sleep 1
+
+	assert [ -f "$data/ran" ]
 }
 
 @test "session-init: a rotated error log is re-read from the top, not skipped" {

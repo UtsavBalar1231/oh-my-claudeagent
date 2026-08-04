@@ -30,12 +30,14 @@ update_recent_edits() {
 		"${EDITS_FILE}" >"${TMP_FILE}" && mv "${TMP_FILE}" "${EDITS_FILE}"
 }
 
+RECENT_EDITS_LOCK_WAIT_SECONDS=5
+
 if command -v flock >/dev/null 2>&1; then
 	(
-		flock -w 5 200
+		flock -w "${RECENT_EDITS_LOCK_WAIT_SECONDS}" 200
 		FLOCK_RC=$?
 		if (( FLOCK_RC == 1 )); then
-			log_hook_error "flock timed out after 5s on recent-edits" "post-edit.sh"
+			log_hook_error "flock timed out after ${RECENT_EDITS_LOCK_WAIT_SECONDS}s on recent-edits" "post-edit.sh"
 			exit 0
 		elif (( FLOCK_RC != 0 )); then
 			log_hook_error "flock failed (rc=${FLOCK_RC}) on recent-edits; skipping update" "post-edit.sh"

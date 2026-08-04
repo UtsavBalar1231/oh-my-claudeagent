@@ -240,3 +240,66 @@ PY
 	assert_success
 	[ "$(wc -l < "$CLAUDE_PROJECT_ROOT/.omca/logs/config-changes.log")" -eq 10 ]
 }
+
+@test "session-cleanup: rotates an oversized log from a same-directory temp, not \$TMPDIR" {
+	_fill_log "hook-timing.jsonl" 20000
+	TMPDIR="$BATS_TEST_TMPDIR/absent" HOOK_INPUT="$END_PAYLOAD" \
+		run bash "$CLAUDE_PLUGIN_ROOT/scripts/session-cleanup.sh" <<< "$END_PAYLOAD"
+	assert_success
+	[ "$(wc -l < "$CLAUDE_PROJECT_ROOT/.omca/logs/hook-timing.jsonl")" -eq 1000 ]
+}
+
+@test "session-cleanup: replaces boulder.json from a same-directory temp, not \$TMPDIR" {
+	write_state "session.json" '{"sessionId":"sess-ending"}'
+	write_state "boulder.json" '{
+		"plans": {"my-plan": {"active_plan": "/tmp/plan.md", "session_ids": ["sess-ending"], "agent": "sisyphus"}},
+		"bindings": {"sess-ending": {"plan_name": "my-plan", "bound_at": "2026-01-01T00:00:00Z"}}
+	}'
+
+	TMPDIR="$BATS_TEST_TMPDIR/absent" HOOK_INPUT="$END_PAYLOAD" \
+		run bash "$CLAUDE_PLUGIN_ROOT/scripts/session-cleanup.sh" <<< "$END_PAYLOAD"
+	assert_success
+
+	run jq -e '.bindings | has("sess-ending")' "$CLAUDE_PROJECT_ROOT/.omca/state/boulder.json"
+	assert_failure
+}
+
+@test "session-cleanup: runs the binding GC before log rotation, so a kill drops only the log trim" {
+	local shim="$BATS_TEST_TMPDIR/shim"
+	mkdir -p "$shim"
+	printf '#!/bin/sh\nsleep 10\n' > "$shim/tail"
+	chmod +x "$shim/tail"
+
+	write_state "session.json" '{"sessionId":"sess-ending"}'
+	write_state "boulder.json" '{
+		"plans": {"my-plan": {"active_plan": "/tmp/plan.md", "session_ids": ["sess-ending"], "agent": "sisyphus"}},
+		"bindings": {"sess-ending": {"plan_name": "my-plan", "bound_at": "2026-01-01T00:00:00Z"}}
+	}'
+	_fill_log "hook-timing.jsonl" 20000
+
+	PATH="$shim:$PATH" HOOK_INPUT="$END_PAYLOAD" \
+		run timeout 2 bash "$CLAUDE_PLUGIN_ROOT/scripts/session-cleanup.sh" <<< "$END_PAYLOAD"
+
+	run jq -e '.bindings | has("sess-ending")' "$CLAUDE_PROJECT_ROOT/.omca/state/boulder.json"
+	assert_failure
+}
+
+@test "session-cleanup: invalidates session-init's hook-errors cursor when it rotates that log" {
+	write_state "hook-errors-cursor" "5 245"
+	_fill_log "hook-errors.jsonl" 20000
+
+	run_cleanup "$END_PAYLOAD"
+	assert_success
+
+	assert [ ! -f "$CLAUDE_PROJECT_ROOT/.omca/state/hook-errors-cursor" ]
+}
+
+@test "session-cleanup: keeps session-init's hook-errors cursor when that log is not rotated" {
+	write_state "hook-errors-cursor" "5 245"
+	_fill_log "hook-errors.jsonl" 10
+
+	run_cleanup "$END_PAYLOAD"
+	assert_success
+
+	assert [ -f "$CLAUDE_PROJECT_ROOT/.omca/state/hook-errors-cursor" ]
+}

@@ -15,8 +15,18 @@ start_venv_sync() {
 	command -v setsid >/dev/null 2>&1 && runner="setsid"
 	# shellcheck disable=SC2016
 	${runner} bash -c '
-		if UV_PROJECT_ENVIRONMENT="$2/.venv" uv sync --project "$1/servers" --quiet 2>/dev/null; then
-			cp "$1/servers/pyproject.toml" "$2/pyproject.toml" 2>/dev/null
+		sync_venv_then_refresh_pyproject_cache() {
+			if UV_PROJECT_ENVIRONMENT="$2/.venv" uv sync --project "$1/servers" --quiet 2>/dev/null; then
+				cp "$1/servers/pyproject.toml" "$2/pyproject.toml" 2>/dev/null
+			fi
+		}
+		if command -v flock >/dev/null 2>&1; then
+			(
+				flock -n 9 || exit 0
+				sync_venv_then_refresh_pyproject_cache "$@"
+			) 9>"$2/.venv-sync.lock"
+		else
+			sync_venv_then_refresh_pyproject_cache "$@"
 		fi
 	' _ "${plugin_root}" "${CLAUDE_PLUGIN_DATA}" </dev/null >/dev/null 2>&1 &
 	disown 2>/dev/null
@@ -174,4 +184,6 @@ else
 	echo "{\"hookSpecificOutput\": {\"hookEventName\": \"SessionStart\", \"additionalContext\": ${CONTEXT}}}"
 fi
 
-start_venv_sync
+if (( OWNS_SHARED_STATE )); then
+	start_venv_sync
+fi
