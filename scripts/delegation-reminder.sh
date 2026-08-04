@@ -18,11 +18,8 @@ source "$(dirname "$0")/lib/common.sh"
 
 hook_is_disabled "delegation-reminder" && exit 0
 
-# Main-session detection mirrors executor-grep-deny.sh EXACTLY: .subagent_type
-# is the native payload field for "this call happened inside a subagent".
-# agent_id is a SubagentStart-only field and must NOT be used here.
-SUBAGENT_TYPE=$(jq -r '.subagent_type // ""' <<< "${HOOK_INPUT}")
-if [[ -n "${SUBAGENT_TYPE}" && "${SUBAGENT_TYPE}" != "null" ]]; then
+AGENT_ID=$(jq -r '.agent_id // ""' <<< "${HOOK_INPUT}")
+if [[ -n "${AGENT_ID}" && "${AGENT_ID}" != "null" ]]; then
 	exit 0
 fi
 

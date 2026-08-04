@@ -19,35 +19,23 @@ Grep | Bash) ;;
 	;;
 esac
 
-# allow_pass — emit PermissionRequest allow JSON for Bash events; silent exit for Grep (PreToolUse).
-# The Bash allow covers every command this hook did not deny, so it must not speak
-# for a command that carries a second one: the `Bash(grep *)` if-filter glob-matches
-# the whole argument string, so `grep x f && curl ... | sh` reaches here, and an allow
-# outranks the platform prompt it would otherwise get. Any operator falls through to
-# the platform. Mirrors permission-filter.sh, same quote-blindness.
-OPERATOR_RE=$'[|;<>`&\n\r]|[$]\\('
-allow_pass() {
-	if [[ "${TOOL_NAME}" == "Bash" ]] && [[ ! "$(jq -r '.tool_input.command // ""' <<< "${HOOK_INPUT}")" =~ ${OPERATOR_RE} ]]; then
-		echo '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}'
-	fi
+pass() {
 	exit 0
 }
 
-# ── Resolve subagent type ──────────────────────────────────────────────────────
-# Read subagent_type from the native hook payload.
-# If absent (main session call), allow unconditionally.
-AGENT_TYPE=$(jq -r '.subagent_type // ""' <<< "${HOOK_INPUT}")
+AGENT_ID=$(jq -r '.agent_id // ""' <<< "${HOOK_INPUT}")
 
-if [[ -z "${AGENT_TYPE}" || "${AGENT_TYPE}" == "null" ]]; then
-	# No subagent_type — main session tool call; allow.
-	allow_pass
+if [[ -z "${AGENT_ID}" || "${AGENT_ID}" == "null" ]]; then
+	pass
 fi
+
+AGENT_TYPE=$(jq -r '.agent_type // ""' <<< "${HOOK_INPUT}")
 
 # Normalize: strip plugin namespace prefix if present.
 AGENT_TYPE_NORM="${AGENT_TYPE##*:}"
 
 if [[ "${AGENT_TYPE_NORM}" != "executor" ]]; then
-	allow_pass
+	pass
 fi
 
 # ── Executor path: check tool ──────────────────────────────────────────────────
@@ -69,7 +57,7 @@ Bash)
 	CMD=$(jq -r '.tool_input.command // ""' <<< "${HOOK_INPUT}")
 	# Bail if no grep word boundary present.
 	if [[ ! "${CMD}" =~ (^|[^a-zA-Z_])grep([^a-zA-Z_]|$) ]]; then
-		allow_pass
+		pass
 	fi
 	# Check if any token in the command is a filename ending in a code extension.
 	if [[ "${CMD}" =~ ${CODE_EXT_REGEX} ]]; then
@@ -80,4 +68,4 @@ Bash)
 	;;
 esac
 
-allow_pass
+pass

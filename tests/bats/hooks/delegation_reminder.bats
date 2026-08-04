@@ -42,12 +42,25 @@ load '../test_helper'
 	assert_output ""
 }
 
-# ── Main-session detection via .subagent_type ─────────────────────────────────
+# ── Main-session detection via .agent_id ──────────────────────────────────────
 
-@test "payload with subagent_type set never increments or triggers" {
-	run_hook "delegation-reminder.sh" '{"tool_name":"Write","subagent_type":"oh-my-claudeagent:executor"}'
-	run_hook "delegation-reminder.sh" '{"tool_name":"Edit","subagent_type":"oh-my-claudeagent:executor"}'
-	run_hook "delegation-reminder.sh" '{"tool_name":"Bash","subagent_type":"oh-my-claudeagent:executor"}'
+@test "payload with agent_id set (inside a subagent) never increments or triggers" {
+	run_hook "delegation-reminder.sh" '{"tool_name":"Write","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor"}'
+	run_hook "delegation-reminder.sh" '{"tool_name":"Edit","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor"}'
+	run_hook "delegation-reminder.sh" '{"tool_name":"Bash","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor"}'
+	assert_success
+	assert_output ""
+	[ ! -f "$CLAUDE_PROJECT_ROOT/.omca/state/delegation-counter.json" ]
+}
+
+# Regression pin: the base hook payload has no top-level subagent_type, so a
+# fixture built around that field would let this nudge fire inside a leaf worker
+# and tell an executor to delegate — which executors are forbidden to do.
+@test "REAL subagent payload never nudges a leaf worker to delegate" {
+	local p='{"session_id":"11111111-2222-3333-4444-555555555555","transcript_path":"/tmp/t.jsonl","cwd":"/tmp","prompt_id":"p1","permission_mode":"default","agent_id":"agt_abc123","agent_type":"oh-my-claudeagent:executor","effort":"medium","tool_name":"Write"}'
+	run_hook "delegation-reminder.sh" "$p"
+	run_hook "delegation-reminder.sh" "$p"
+	run_hook "delegation-reminder.sh" "$p"
 	assert_success
 	assert_output ""
 	[ ! -f "$CLAUDE_PROJECT_ROOT/.omca/state/delegation-counter.json" ]
