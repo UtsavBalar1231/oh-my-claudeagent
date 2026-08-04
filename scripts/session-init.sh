@@ -6,18 +6,21 @@ PROJECT_ROOT="${HOOK_PROJECT_ROOT}"
 STATE_DIR="${HOOK_STATE_DIR}"
 LOG_DIR="${HOOK_LOG_DIR}"
 
-# PLUGIN_DATA venv sync (v2.1.78+) — ensure MCP server dependencies persist across updates
-if [[ -n "${CLAUDE_PLUGIN_DATA:-}" ]]; then
-	PLUGIN_ROOT_SYNC="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
-	if ! diff -q "${PLUGIN_ROOT_SYNC}/servers/pyproject.toml" "${CLAUDE_PLUGIN_DATA}/pyproject.toml" >/dev/null 2>&1; then
-		mkdir -p "${CLAUDE_PLUGIN_DATA}"
-		# Run uv sync BEFORE updating cached pyproject. Reverse order silently masks failures:
-		# cached pyproject updated → next session sees diff-clean → skips sync → venv stays broken.
-		if UV_PROJECT_ENVIRONMENT="${CLAUDE_PLUGIN_DATA}/.venv" uv sync --project "${PLUGIN_ROOT_SYNC}/servers" --quiet 2>/dev/null; then
-			cp "${PLUGIN_ROOT_SYNC}/servers/pyproject.toml" "${CLAUDE_PLUGIN_DATA}/pyproject.toml" 2>/dev/null
+start_venv_sync() {
+	[[ -n "${CLAUDE_PLUGIN_DATA:-}" ]] || return 0
+	local plugin_root="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
+	diff -q "${plugin_root}/servers/pyproject.toml" "${CLAUDE_PLUGIN_DATA}/pyproject.toml" >/dev/null 2>&1 && return 0
+	mkdir -p "${CLAUDE_PLUGIN_DATA}"
+	local runner=""
+	command -v setsid >/dev/null 2>&1 && runner="setsid"
+	# shellcheck disable=SC2016
+	${runner} bash -c '
+		if UV_PROJECT_ENVIRONMENT="$2/.venv" uv sync --project "$1/servers" --quiet 2>/dev/null; then
+			cp "$1/servers/pyproject.toml" "$2/pyproject.toml" 2>/dev/null
 		fi
-	fi
-fi
+	' _ "${plugin_root}" "${CLAUDE_PLUGIN_DATA}" </dev/null >/dev/null 2>&1 &
+	disown 2>/dev/null
+}
 
 # resolve_session_id() ranks CLAUDE_SESSION_ID, then the SessionStart
 # payload's own .session_id (the platform UUID, same as the transcript
@@ -101,13 +104,43 @@ if (( OWNS_SHARED_STATE )); then
 	echo '{}' >"${STATE_DIR}/injected-context-dirs.json"
 	echo '{}' >"${STATE_DIR}/subagent-models.json"
 	rm -f "${STATE_DIR}/plan-continuation.json" "${STATE_DIR}/tool-loop-window.json" "${STATE_DIR}/delegation-counter.json"
+	stop_blocks_reset
 fi
 mkdir -p "${STATE_DIR}/worktrees"
 
+ERROR_LOG="${LOG_DIR}/hook-errors.jsonl"
+ERROR_CURSOR="${STATE_DIR}/hook-errors-cursor"
+ERROR_BLOCK=""
+if [[ -f "${ERROR_LOG}" ]]; then
+	read -r CURSOR CURSOR_BYTES < <(cat "${ERROR_CURSOR}" 2>/dev/null)
+	[[ "${CURSOR}" =~ ^[0-9]+$ ]] || CURSOR=0
+	[[ "${CURSOR_BYTES}" =~ ^[0-9]+$ ]] || CURSOR_BYTES=0
+	TOTAL_LINES=$(wc -l <"${ERROR_LOG}" 2>/dev/null | tr -d ' ')
+	TOTAL_BYTES=$(wc -c <"${ERROR_LOG}" 2>/dev/null | tr -d ' ')
+	[[ "${TOTAL_LINES}" =~ ^[0-9]+$ ]] || TOTAL_LINES=0
+	[[ "${TOTAL_BYTES}" =~ ^[0-9]+$ ]] || TOTAL_BYTES=0
+	if (( CURSOR > TOTAL_LINES || TOTAL_BYTES < CURSOR_BYTES )); then
+		CURSOR=0
+	fi
+	if (( TOTAL_LINES > CURSOR )); then
+		FAILING_HOOKS=$(tail -n "$(( TOTAL_LINES - CURSOR ))" "${ERROR_LOG}" 2>/dev/null \
+			| jq -r 'select(type == "object") | .hook // empty' 2>/dev/null | sort -u | tr '\n' ' ')
+		FAILING_HOOKS="${FAILING_HOOKS% }"
+		if [[ -n "${FAILING_HOOKS}" ]]; then
+			HOOK_COUNT=$(wc -w <<< "${FAILING_HOOKS}" | tr -d ' ')
+			ERROR_BLOCK=$(printf '\n[HOOK ERRORS] %s hook(s) logged errors since the last session start: %s. See %s.' \
+				"${HOOK_COUNT}" "${FAILING_HOOKS}" "${ERROR_LOG}")
+		fi
+	fi
+	if (( OWNS_SHARED_STATE )); then
+		printf '%s %s\n' "${TOTAL_LINES}" "${TOTAL_BYTES}" >"${ERROR_CURSOR}" 2>/dev/null
+	fi
+fi
+
 if [[ -n "${DATE_BLOCK}" ]]; then
-	CONTEXT=$(printf '%s\nSession %s initialized. State directory: %s' "${DATE_BLOCK}" "${SESSION_ID}" "${STATE_DIR}" | jq -Rs .)
+	CONTEXT=$(printf '%s\nSession %s initialized. State directory: %s%s' "${DATE_BLOCK}" "${SESSION_ID}" "${STATE_DIR}" "${ERROR_BLOCK}" | jq -Rs .)
 else
-	CONTEXT=$(printf 'Session %s initialized. State directory: %s' "${SESSION_ID}" "${STATE_DIR}" | jq -Rs .)
+	CONTEXT=$(printf 'Session %s initialized. State directory: %s%s' "${SESSION_ID}" "${STATE_DIR}" "${ERROR_BLOCK}" | jq -Rs .)
 fi
 
 PLUGIN_ROOT_RESOLVE="${CLAUDE_PLUGIN_ROOT:-$(dirname "$0")/..}"
@@ -140,3 +173,5 @@ if [[ -n "${SESSION_TITLE}" ]]; then
 else
 	echo "{\"hookSpecificOutput\": {\"hookEventName\": \"SessionStart\", \"additionalContext\": ${CONTEXT}}}"
 fi
+
+start_venv_sync

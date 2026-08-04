@@ -197,3 +197,46 @@ run_cleanup() {
 	run jq -e '.bindings | has("sess-x")' "$boulder_file"
 	assert_success
 }
+
+# ── log prune ────────────────────────────────────────────────────────────────
+# Regression: `-mtime +7` can never match a log that every session appends to,
+# so the hot JSONL logs grew without bound, and the `*.jsonl` glob missed the
+# `.log` files entirely. The prune is by size now, keeping the recent tail.
+
+_fill_log() {
+	local name="$1" lines="$2"
+	python3 - "$CLAUDE_PROJECT_ROOT/.omca/logs/$name" "$lines" <<'PY'
+import sys
+path, lines = sys.argv[1], int(sys.argv[2])
+with open(path, "w") as fh:
+    for i in range(lines):
+        fh.write("entry %d %s\n" % (i, "x" * 100))
+PY
+}
+
+@test "session-cleanup: prunes an oversized jsonl log an mtime rule could never reach" {
+	_fill_log "hook-timing.jsonl" 20000
+	run_cleanup "$END_PAYLOAD"
+	assert_success
+
+	local kept
+	kept=$(wc -l < "$CLAUDE_PROJECT_ROOT/.omca/logs/hook-timing.jsonl")
+	[ "$kept" -eq 1000 ]
+	# The newest entries are the ones worth keeping.
+	run tail -n 1 "$CLAUDE_PROJECT_ROOT/.omca/logs/hook-timing.jsonl"
+	assert_output --partial 'entry 19999'
+}
+
+@test "session-cleanup: prunes an oversized .log file, which the old glob missed" {
+	_fill_log "agent-spawns.log" 20000
+	run_cleanup "$END_PAYLOAD"
+	assert_success
+	[ "$(wc -l < "$CLAUDE_PROJECT_ROOT/.omca/logs/agent-spawns.log")" -eq 1000 ]
+}
+
+@test "session-cleanup: leaves a small log untouched" {
+	_fill_log "config-changes.log" 10
+	run_cleanup "$END_PAYLOAD"
+	assert_success
+	[ "$(wc -l < "$CLAUDE_PROJECT_ROOT/.omca/logs/config-changes.log")" -eq 10 ]
+}

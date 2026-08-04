@@ -70,7 +70,23 @@ if [[ "${REASON}" != "resume" ]] && (( OWNS_SHARED_STATE )); then
 		-not -name 'verification-evidence.json' \
 		-delete 2>/dev/null || true
 
-	find "${LOG_DIR}" -name "*.jsonl" -mtime +7 -delete 2>/dev/null || true
+	# 1048576 bytes (1 MiB) — past this a log stops being hand-scannable.
+	LOG_MAX_BYTES=1048576
+	# 1000 lines — roughly a week of one project's hook traffic.
+	LOG_KEEP_LINES=1000
+	for LOG in "${LOG_DIR}"/*.jsonl "${LOG_DIR}"/*.log; do
+		[[ -f "${LOG}" ]] || continue
+		LOG_BYTES=$(wc -c <"${LOG}" 2>/dev/null | tr -d ' ')
+		[[ "${LOG_BYTES}" =~ ^[0-9]+$ ]] || continue
+		if (( LOG_BYTES > LOG_MAX_BYTES )); then
+			LOG_TMP=$(mktemp) || continue
+			if tail -n "${LOG_KEEP_LINES}" "${LOG}" >"${LOG_TMP}" 2>/dev/null; then
+				mv "${LOG_TMP}" "${LOG}"
+			else
+				rm -f "${LOG_TMP}"
+			fi
+		fi
+	done
 fi
 
 if [[ "${REASON}" != "resume" ]]; then
