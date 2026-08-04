@@ -337,9 +337,17 @@ unverified. Emitting both would also deliver the same text twice, so the blockin
 is what `block_exit()` in `scripts/lib/common.sh` writes.
 
 Among the turn-gate and task-gate hooks, `task-completed-verify.sh` is now the only one that
-blocks via exit 2. Exit 2 remains the correct block shape for the PreToolUse and
-PermissionRequest deny hooks, and `git-destructive-deny.sh`, `sed-grep-deny.sh`, and
-`executor-grep-deny.sh` still use it, writing to stderr only.
+blocks via exit 2.
+
+The deny hooks are a separate family with their own shapes. `PreToolUse` accepts either
+stderr text plus exit 2 or a `hookSpecificOutput.permissionDecision: "deny"` payload with
+exit 0; `PermissionRequest` reads `hookSpecificOutput.decision.behavior`. Every guard
+registered on both events branches on `hook_event_name` and writes the shape that event
+reads: `permission-filter.sh`, `git-destructive-deny.sh`, `sed-grep-deny.sh`, and
+`executor-grep-deny.sh`. Whether exit 2 also denies on `PermissionRequest` is disputed —
+the vendored exit-code table says it does, live probing of the shipped client found it
+discarded — and the branch is correct under either reading, which is why it stands rather
+than being collapsed.
 
 **SessionStart — new output fields (v2.1.152):**
 
@@ -997,9 +1005,11 @@ questions; when a subagent raises more, the orchestrator makes multiple sequenti
 within the same turn to relay all of them.
 
 `AskUserQuestion` no longer auto-continues when nobody answers. In `-p` or background runs
-that means prometheus's interview and `plan-mode-handler.sh`'s auto-approve assumption both
-stall indefinitely rather than resolving to a default. Do not build an unattended workflow
-that depends on a question answering itself.
+that means prometheus's interview stalls indefinitely rather than resolving to a default.
+Do not build an unattended workflow that depends on a question answering itself. The plan
+accept screen is in the same class and always was: OMCA once shipped a hook that tried to
+auto-approve it, and the platform discards a hook decision for a tool that requires user
+interaction, so that approval never applied. The hook has since been deleted.
 
 **permissionMode stripping:** Claude Code strips `permissionMode` from plugin agents.
 Copy agent files to `~/.claude/agents/` (user-scope agents retain it).
@@ -1278,7 +1288,7 @@ than copied verbatim.
 | Feature | Notes |
 |---------|-------|
 | Session-bound plan registry | `boulder.json` moved from a single `active_plan` pointer to `{plans: {<plan_name>: {...}}, bindings: {<session_id>: {plan_name, bound_at}}}`. Fixes the clobber where two concurrent sessions working different plans overwrote each other's state. `resolve_bound_plan()` (`servers/tools/_boulder_core.py`) is the one pure-read resolution ladder every consumer calls, via direct import in Python or the `boulder_resolve.py` shim from bash |
-| drift-guard hard-block Stop hook | New `scripts/drift-guard.sh`: when the last assistant turn reads as a completion claim ("done", "fixed", "implemented", etc., unless negated) but the diff still contains a stub marker (`.only`, `TODO: implement`, an unimplemented-error throw), the Stop is blocked with the offending `file:line`. Self-clearing — fixing the stub removes the marker, so there is no separate loop-guard state file. Kill-switch: `OMCA_HOOK_DISABLE_DRIFT_GUARD` |
+| drift-guard hard-block Stop hook | New `scripts/drift-guard.sh`: when the last assistant turn reads as a completion claim ("done", "fixed", "implemented", etc., unless negated) but the diff still contains a stub marker, the Stop is blocked with the offending `file:line`. A focused-test marker is only looked for in JavaScript and TypeScript sources, where such a test can actually run; an unfinished-implementation marker and an unimplemented-error throw are looked for in any language. Self-clearing — fixing the stub removes the marker. A repeated block is bounded separately by the shared per-gate Stop-block ledger at `.omca/state/stop-blocks.json`, capped at 5 blocks per gate and reset on the gate's clean path. Kill-switch: `OMCA_HOOK_DISABLE_DRIFT_GUARD` |
 | context-injector hardening | `scripts/context-injector.sh` now dedups injections by content-hash+realpath (reusing `injected-context-dirs.json`, which `session-init.sh` already resets every `SessionStart`) instead of re-injecting on every matching file access. The project-root walk for both the `.omca/rules` scan and the AGENTS.md/README terminator now resolves worktree-safely (a linked worktree's `.git` is a file, not a directory, so the walk tests `-e` not `-d`), so a worktree session no longer walks up into the parent repo |
 | stdin-read timeout | `scripts/lib/common.sh`'s shared `HOOK_INPUT=$(cat)` read now wraps in `timeout 5 cat`, discarding on exit 124 rather than hanging indefinitely if stdin is never closed. Blocking hooks (`final-verification-evidence.sh`, `drift-guard.sh`, `task-completed-verify.sh`) treat an empty-from-timeout read as fail-closed-or-warn, not a silent pass |
 | Compaction content round-trip | `pre-compact.sh` now inlines the session's next 10 unchecked plan tasks and the 5 most recent notepad decisions (tasks first, so they survive `post-compact-inject.sh`'s downstream line cap), instead of leaving compaction to rely on whatever the model happened to keep in its own summary |
@@ -1494,7 +1504,7 @@ section and in `CLAUDE.md`; neither is set by OMCA.
 | `plansDirectory` resolution | `~/.claude/plans` was hardcoded as both the authoring and the discovery surface, so with the setting on, prometheus wrote where `/start-work` no longer looked. Both now resolve the directory: the setting when present (relative to the project root), else `~/.claude/plans`, with an active plan-mode path overriding |
 | Hook event tables regenerated from the registry | The table advertised nine events with no handler, omitted `PermissionDenied`, and pointed at two scripts deleted in the v2.10 refactor. `scripts/validate-plugin.sh` now diffs the table against `jq -r '.hooks \| keys[]'` in both directions, so it cannot re-drift silently |
 | `last_assistant_message` on Stop/SubagentStop | Both Stop hooks read the final assistant turn from the payload field first, with the transcript tail kept as fallback because the transcript is not guaranteed to hold the final message at Stop time. The undocumented `.messages` probe is gone. drift-guard's whole purpose is catching a completion claim in that message, so a miss there was a silent guard failure |
-| Stop hooks block via `decision: block` | `plan-continuation-guard.sh`, `final-verification-evidence.sh`, and `drift-guard.sh` now write Stop decision-control JSON (`decision` plus `reason`, nothing else) and exit 0 instead of writing to stderr and exiting 2. `task-completed-verify.sh` is the only turn-gate or task-gate hook left that blocks via exit 2; the PreToolUse and PermissionRequest deny hooks (`git-destructive-deny.sh`, `sed-grep-deny.sh`, `executor-grep-deny.sh`) keep exit 2, which is the only block shape those events have |
+| Stop hooks block via `decision: block` | `plan-continuation-guard.sh`, `final-verification-evidence.sh`, and `drift-guard.sh` now write Stop decision-control JSON (`decision` plus `reason`, nothing else) and exit 0 instead of writing to stderr and exiting 2. `task-completed-verify.sh` is the only turn-gate or task-gate hook left that blocks via exit 2. The deny hooks are unaffected: each writes the shape its event reads, branching on `hook_event_name` (see the Stop / SubagentStop section above) |
 | Tier aliases in agent frontmatter | Every agent declares a tier alias (`opus`, `sonnet`, `fable`) instead of a pinned generation id, so a provider resolves it to the newest generation its allowlist permits and nothing goes stale on the next model release. The subagent-start display map gained alias arms above its full-id arms, which remain only as frontmatter compatibility for an agent file that pins a generation again; the hook reads frontmatter, not the spawning call. And `omca-setup` no longer writes `ANTHROPIC_DEFAULT_OPUS_MODEL`: a default-model pin overrides the alias and reintroduces exactly the staleness the alias removes |
 | `Write(.omca/**)` dropped from the recommended allowlist | `Write`/`NotebookEdit`/`Glob` path rules are accepted but never match, and now emit a startup warning. `Edit(.omca/**)` plus `Read(.omca/**)` covers the intent, since `Edit` governs every file-editing tool including `Write`. The doctor's stale-entry warnings flag the removed rule for already-configured users |
 | Spawn budgets: session cap, concurrency cap, depth default | `delegate-retry.sh` gained early-return branches for the concurrency and session ceilings, returning before the error counter so an infrastructure limit can never advance the three-strike breaker toward oracle. `commands/start-work.md` gained a parallel-group width note, and `github-triage` gained a total-item cap with an explicit skipped-item list instead of silent truncation |
@@ -1533,7 +1543,7 @@ tables under Core Concepts and Agent Reference are the live state.
 | Fact | Consequence for OMCA |
 |------|----------------------|
 | Subagent rate-limit and API errors reported to the parent | Partial output returns as a success, so `delegate-retry.sh` never sees it. The real residual is that `RETRYABLE_PATTERNS` has no `usage.limit` or "terminated early" pattern, so the documented payload falls to the generic branch |
-| `AskUserQuestion` no longer auto-continues | prometheus's interview and `plan-mode-handler.sh`'s auto-approve assumption both stall indefinitely in `-p` and background runs. Unattended runs must not depend on a question resolving itself |
+| `AskUserQuestion` no longer auto-continues | prometheus's interview stalls indefinitely in `-p` and background runs. Unattended runs must not depend on a question resolving itself |
 | Stacked slash-skill invocations | `/metis /momus` is now typable. The answer stays `/oh-my-claudeagent:plan`, which already sequences them |
 | `CLAUDE_CODE_RETRY_WATCHDOG` | An API-retry knob, not a delegation one: it retries `429`/`529` capacity errors indefinitely and, as of v2.1.199, raises the transient-error retry default to 300 and lifts the cap on an explicit `CLAUDE_CODE_MAX_RETRIES`. Documented as the recommendation for unattended and CI runs. It does not touch `delegate-retry.sh`'s counter either way, so the choice is the operator's |
 | Project-scoped plugins load from worktrees (v2.1.200) | Below that version, a `--plugin-dir` install meant worktree-isolated runs executed with no OMCA hooks and no MCP server. This checkout is project-scoped |
@@ -1586,7 +1596,7 @@ tables under Core Concepts and Agent Reference are the live state.
 | Reserved MCP server names (`Claude Browser`, `Claude Preview`) | Forward-looking; it matters only if a browser-adjacent OMCA server is ever added. Not worth a validator check |
 | `/clear` resets the cost counter | The statusline renders the reported total verbatim and asserts nothing about its lifecycle |
 | REVIEW.md | A Claude-native review-service surface, not a plugin one: `code-review.md` documents it under the managed Code Review product and states that local `/code-review` does not read it. The service reads the reviewed repository's own root, so a copy travelling inside an installed plugin cache would be inert for the user's project, and OMCA ships none |
-| `showClearContextOnPlanAccept` | `plan-mode-handler.sh` auto-allows ExitPlanMode, so the accept screen is normally suppressed in OMCA sessions. Verify against a live plan accept before stating that as fact |
+| `showClearContextOnPlanAccept` | Nothing in OMCA suppresses the accept screen. The hook that once tried to auto-allow it has been deleted: the platform discards a hook decision for a tool that requires user interaction, so the approval never took effect |
 | `disableWorkflows` and `workflowKeywordTriggerEnabled` | The kill switches beside the `ultracode` rename. No live collision: the keyword detector's patterns are disjoint from `ultracode` and off by default |
 | `ultracode` keyword fired on non-human input | Design-parity lesson. `keyword-detector.sh` has provenance rails for agent id and task notifications but no webhook or relayed-comment check, and no payload field for one has been probed. Do not guess a field name |
 | `Agent` tool hardened against indirect prompt injection | Both content-returning agents already carry the rail |

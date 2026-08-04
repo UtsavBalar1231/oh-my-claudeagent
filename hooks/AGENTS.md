@@ -39,12 +39,21 @@ event is unregistered on purpose; `OMCA.md` carries the per-event reason.
   `ask` rules from settings still apply. Consolidating the two events into one handler
   for tidiness would convert a six-tool convenience into a silent standing bypass of the
   user's permission posture, which is a worse hole than the inert deny it would be
-  cleaning up after. Both scripts encode this as an early `exit 0` on `hook_event_name
-  == PreToolUse`, sitting after the deny and before the first allow.
+  cleaning up after. `permission-filter.sh` encodes this as an early `exit 0` on
+  `hook_event_name == PreToolUse`, sitting after the deny and before the first allow. It is
+  the only script that needs the guard, because it is the only one with an allow to guard.
 
-  `git-destructive-deny.sh` follows the same split. Its block is an `exit 2`, which both
-  events honor, so it needs no per-event output branch; its trailing allow for every git
-  command it did not deny stays on `PermissionRequest`.
+  `git-destructive-deny.sh`, `sed-grep-deny.sh`, and `executor-grep-deny.sh` are registered
+  on both events too, but they are deny-only: none of them emits an allow on any path. Each
+  branches its output on `hook_event_name`, because the two events read a decision from
+  different places — `PreToolUse` from stderr plus `exit 2` or from
+  `hookSpecificOutput.permissionDecision`, `PermissionRequest` from
+  `hookSpecificOutput.decision.behavior` with `exit 0`. Whether `exit 2` also denies on
+  `PermissionRequest` is disputed: the vendored exit-code table says it does, live probing
+  of the shipped client found it discarded. The branch is correct either way, which is why
+  it exists; do not collapse it. `git-destructive-deny.sh`'s former trailing allow for every
+  git command it did not deny was deleted — it auto-approved everything the pattern failed
+  to recognise, and a deny gate's answer to an unrecognised command is silence.
 
   The deny matches a recursive removal at any command position:
   string start, after a separator, or inside a subshell or command substitution. Anchoring

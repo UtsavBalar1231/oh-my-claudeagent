@@ -72,14 +72,21 @@ This is the recommended way to silence the plan-continuation guard if it is nudg
 to keep working on a plan you have intentionally paused, or to mute any other hook that
 is getting in the way during a specific session.
 
-Hooks that currently honor `OMCA_DISABLED_HOOKS`:
+Two reserved tokens, `all` and `*`, match every hook regardless of the rest of the list, so
+`OMCA_DISABLED_HOOKS=all` disables the whole set in one step.
+
+Hooks that honor `OMCA_DISABLED_HOOKS` (grep `hook_is_disabled` in `scripts/` for the live
+list; a hook not on it ignores the variable entirely):
 
 | Hook basename | What it normally does |
 |---|---|
 | `final-verification-evidence` | Blocks session Stop when the bound plan is fully checked off but no `final_verification` evidence entry has been logged for it. |
 | `plan-continuation-guard` | Blocks session Stop when the bound plan still has unchecked numbered tasks, nudging the agent to keep going instead of stopping mid-plan. |
 | `tool-loop-detector` | Warns when the same tool call repeats several times in a row, a common sign of a blind retry loop. |
-| `write-guard` | Warns before a `Write` call overwrites an existing file, and intercepts direct writes to evidence state. |
+| `write-guard` | Denies writes to protected paths — `verification-evidence.json` and anything under `.omca/notepads/` — on `Write`, `Edit`, and `MultiEdit` alike, and additionally warns before a `Write` call overwrites an existing file. |
+| `git-destructive-deny` | Denies git subcommands that discard working-tree state: `reset --hard`, `stash`, `clean`, `restore`, `rm -r` (any clustered flag containing `r` or `R`), and a `checkout` whose arguments include a `--` pathspec separator. Matches at any command position and through an optional `sudo` prefix and leading git global options (`-C`, `-c`, `--git-dir`, `--work-tree`, `--no-pager`, and siblings). |
+| `sed-grep-deny` | Denies `sed -n` and `grep -n` in Bash, including clustered short flags such as `-ne` or `-rn`, steering the agent to the Grep tool, `Read` with offset/limit, or `ast_search`. |
+| `drift-guard` | Blocks session Stop when the last assistant turn reads as a completion claim but the working tree still contains stub markers on changed lines. |
 | `plan-format-warn` | Warns when a plan file's checkboxes don't follow the numbered `- [ ] N.` form that progress tracking depends on. |
 | `delegation-reminder` | One-time nudge to delegate to a specialist agent instead of doing repeated direct work in the main session. |
 | `comment-checker` | Pre-write gate over comments in source files: flags AI attribution, narration that restates the next line, decorative separators, filler qualifiers, and context-free TODOs. Whether a finding blocks the write is set by [`OMCA_COMMENT_GATE`](#omca_comment_gate-the-comment-gates-enforcement-level). |
