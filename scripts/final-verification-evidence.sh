@@ -92,30 +92,39 @@ if [[ -f "${EVIDENCE_FILE}" ]]; then
 	fi
 fi
 
-PLAN_SHA256=$(sha256sum "${ACTIVE_PLAN}" | awk '{print $1}')
+PLAN_SHA256=$(sha256_of_stdin < "${ACTIVE_PLAN}")
+DIGEST_SCOPING_AVAILABLE=true
+if [[ -z "${PLAN_SHA256}" || "${PLAN_SHA256}" == "${SHA256_UNAVAILABLE}" ]]; then
+	DIGEST_SCOPING_AVAILABLE=false
+fi
 
 # Check for a final_verification entry that opens the gate: exit_code=0, and
 # either scoped to this exact plan (plan_sha256 matches) or a pre-scoping
 # legacy entry (no plan_sha256 field at all).
 HAS_VERDICT=false
 if [[ -f "${EVIDENCE_FILE}" ]]; then
-	HAS_VERDICT=$(jq -r --arg sha "${PLAN_SHA256}" '
+	HAS_VERDICT=$(jq -r --arg sha "${PLAN_SHA256}" --argjson scoped "${DIGEST_SCOPING_AVAILABLE}" '
 		.entries // []
 		| map(select(
 			.type == "final_verification"
 			and .exit_code == 0
-			and ((.plan_sha256 // "") == "" or .plan_sha256 == $sha)
+			and (($scoped | not) or (.plan_sha256 // "") == "" or .plan_sha256 == $sha)
 		))
 		| length > 0
 	' "${EVIDENCE_FILE}")
 fi
 
 if [[ "${HAS_VERDICT}" == "true" ]]; then
-	stop_blocks_reset
+	stop_blocks_reset "final-verification-evidence"
 	noop_exit
 fi
 
 stop_block_allowed "final-verification-evidence" || noop_exit
 
+PLAN_SHA256_ARGUMENT=", plan_sha256=\"${PLAN_SHA256}\""
+if [[ "${DIGEST_SCOPING_AVAILABLE}" == "false" ]]; then
+	PLAN_SHA256_ARGUMENT=""
+fi
+
 # Plan complete, no matching final_verification evidence — block Stop
-block_exit "[FINAL VERIFICATION] Plan '${ACTIVE_PLAN}' fully checked but no matching final_verification evidence found. Call evidence_log(evidence_type=\"final_verification\", command=\"<your verdict>\", exit_code=0, output_snippet=\"...\", plan_sha256=\"${PLAN_SHA256}\") to open the gate. Set OMCA_HOOK_DISABLE_FINAL_VERIFY=1 to bypass."
+block_exit "[FINAL VERIFICATION] Plan '${ACTIVE_PLAN}' fully checked but no matching final_verification evidence found. Call evidence_log(evidence_type=\"final_verification\", command=\"<your verdict>\", exit_code=0, output_snippet=\"...\"${PLAN_SHA256_ARGUMENT}) to open the gate. Set OMCA_HOOK_DISABLE_FINAL_VERIFY=1 to bypass."

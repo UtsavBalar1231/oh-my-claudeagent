@@ -117,10 +117,21 @@ fi
 
 # Stub marker set — each with a derivation comment. Deliberately excludes
 # `.skip` and "placeholder returns" (too broad / too many false positives).
-MARKER_ONLY='\b(describe|context|it|test|bench|suite)\.only\b'
+MARKER_FOCUSED_TEST='\b(describe|context|it|test|bench|suite|specify|concurrent|serial|sequential)\.only\b'
 MARKER_TODO='TODO: implement'                                       # explicit unfinished-implementation marker
 MARKER_NOT_IMPL='throw new [A-Za-z]*Error\(["'"'"'].*not implemented' # stub throw for an unimplemented code path
-MARKER_PATTERN="${MARKER_ONLY}|${MARKER_TODO}|${MARKER_NOT_IMPL}"
+MARKER_ANY_LANGUAGE="${MARKER_TODO}|${MARKER_NOT_IMPL}"
+MARKER_PATTERN="${MARKER_FOCUSED_TEST}|${MARKER_ANY_LANGUAGE}"
+
+FILE_WHERE_A_FOCUSED_TEST_CAN_RUN='\.(js|jsx|ts|tsx|mjs|cjs)$'
+
+markers_applicable_to() {
+	if [[ "$1" =~ ${FILE_WHERE_A_FOCUSED_TEST_CAN_RUN} ]]; then
+		printf '%s' "${MARKER_PATTERN}"
+	else
+		printf '%s' "${MARKER_ANY_LANGUAGE}"
+	fi
+}
 
 # A bats `@test "..."` line is a test name, not code: a suite that documents
 # markers (this guard's own suite included) otherwise matches its description of
@@ -160,19 +171,21 @@ md_strip_inline_code() {
 }
 
 md_line_is_documenting() {
-	local lineno="$1" text="$2" fenced="$3"
+	local lineno="$1" text="$2" fenced="$3" applicable="$4"
 	grep -qxF "${lineno}" <<< "${fenced}" && return 0
 	local stripped
 	stripped=$(md_strip_inline_code "${text}")
-	grep -qE "${MARKER_PATTERN}" <<< "${stripped}" && return 1
+	grep -qE "${applicable}" <<< "${stripped}" && return 1
 	return 0
 }
 
 # 500 changed files — ~1ms scan each; above this the tree is machine-generated.
 MAX_CHANGED_FILES=500
 
-CHANGED_FILES=$(git -C "${HOOK_PROJECT_ROOT}" diff HEAD --name-only 2>/dev/null)
-UNTRACKED_FILES=$(git -C "${HOOK_PROJECT_ROOT}" ls-files --others --exclude-standard 2>/dev/null)
+GIT_DIFF_CONFIG=(-c diff.mnemonicPrefix=false -c diff.noprefix=false -c core.quotePath=false)
+
+CHANGED_FILES=$(git -C "${HOOK_PROJECT_ROOT}" "${GIT_DIFF_CONFIG[@]}" diff --no-ext-diff HEAD --name-only 2>/dev/null)
+UNTRACKED_FILES=$(git -C "${HOOK_PROJECT_ROOT}" -c core.quotePath=false ls-files --others --exclude-standard 2>/dev/null)
 
 FILE_COUNT=$(grep -c . <<< "${CHANGED_FILES}${UNTRACKED_FILES:+$'\n'}${UNTRACKED_FILES}")
 if (( FILE_COUNT > MAX_CHANGED_FILES )); then
@@ -184,12 +197,13 @@ fi
 FINDINGS=""
 
 added_lines_stream() {
-	git -C "${HOOK_PROJECT_ROOT}" diff HEAD --unified=0 2>/dev/null | awk '
+	git -C "${HOOK_PROJECT_ROOT}" "${GIT_DIFF_CONFIG[@]}" diff --no-ext-diff HEAD --unified=0 2>/dev/null | awk '
 		/^--- / { expect_header = 1; next }
 		expect_header {
 			expect_header = 0
 			if ($0 ~ /^\+\+\+ /) {
 				path = substr($0, 5)
+				sub(/\t$/, "", path)
 				sub(/^b\//, "", path)
 				if (path == "/dev/null") path = ""
 				next
@@ -227,14 +241,16 @@ MD_CACHE_LINES=""
 record_candidate() {
 	local file="$1" lineno="$2" text="$3"
 	[[ -n "${file}" && -n "${lineno}" ]] || return 0
-	grep -qE "${MARKER_PATTERN}" <<< "${text}" || return 0
+	local applicable
+	applicable=$(markers_applicable_to "${file}")
+	grep -qE "${applicable}" <<< "${text}" || return 0
 	[[ "${text}" =~ ${BATS_TEST_DECL} ]] && return 0
 	if [[ "${file}" == *.md ]]; then
 		if [[ "${MD_CACHE_FILE}" != "${file}" ]]; then
 			MD_CACHE_FILE="${file}"
 			MD_CACHE_LINES=$(md_fenced_lines "${HOOK_PROJECT_ROOT}/${file}" 2>/dev/null)
 		fi
-		md_line_is_documenting "${lineno}" "${text}" "${MD_CACHE_LINES}" && return 0
+		md_line_is_documenting "${lineno}" "${text}" "${MD_CACHE_LINES}" "${applicable}" && return 0
 	fi
 	FINDINGS+="${file}:${lineno}  ${text}"$'\n'
 	return 0
@@ -245,7 +261,7 @@ while IFS=$'\t' read -r file lineno text; do
 done < <({ added_lines_stream; untracked_lines_stream; } | grep -E "${MARKER_PATTERN}")
 
 if [[ -z "${FINDINGS}" ]]; then
-	stop_blocks_reset
+	stop_blocks_reset "drift-guard"
 	noop_exit
 fi
 

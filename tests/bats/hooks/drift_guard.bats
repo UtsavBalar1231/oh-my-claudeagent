@@ -46,20 +46,20 @@ _assert_blocked() {
 }
 
 @test "drift-guard: .only marker on an added line blocks Stop" {
-	echo "hello" > a.txt
+	echo "hello" > a.js
 	_commit_all
-	echo "it.only('t', () => {})" >> a.txt
+	echo "it.only('t', () => {})" >> a.js
 
 	run_hook "drift-guard.sh" "$(_claim_payload 'Done, all tests pass.')"
 	_assert_blocked
-	assert_output --partial "a.txt"
+	assert_output --partial "a.js"
 	assert_output --partial "only"
 }
 
 @test "drift-guard: marker on a pre-existing unchanged line allows Stop" {
-	printf 'line1\nit.only("x")\nline3\n' > preexist.txt
+	printf 'line1\nit.only("x")\nline3\n' > preexist.js
 	_commit_all
-	echo "unrelated new line" >> preexist.txt
+	echo "unrelated new line" >> preexist.js
 
 	run_hook "drift-guard.sh" "$(_claim_payload 'Implemented and fixed.')"
 	assert_success
@@ -167,8 +167,8 @@ EOF
 @test "drift-guard: a marker inside a bats test name is not a finding" {
 	echo "hello" > a.txt
 	_commit_all
-	local marker="it.on""ly"
-	printf '@test "guard: %s marker on an added line blocks Stop" {\n\ttrue\n}\n' "$marker" > suite.bats
+	local marker="TODO: imple""ment"
+	printf '@test "guard: %s is reported" {\n\ttrue\n}\n' "$marker" > suite.bats
 
 	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
 	assert_success
@@ -178,7 +178,7 @@ EOF
 @test "drift-guard: a marker in a bats test body is still a finding" {
 	echo "hello" > a.txt
 	_commit_all
-	local body="it.on""ly(\"x\")"
+	local body="# TODO: imple""ment"
 	printf '@test "guard: something" {\n\t%s\n}\n' "$body" > suite.bats
 
 	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
@@ -356,4 +356,131 @@ EOF
 	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
 	_assert_blocked
 	assert_output --partial "src/f7.txt"
+}
+
+@test "drift-guard: a marker in a file whose name contains a space is reported" {
+	echo "hello" > a.txt
+	_commit_all
+	echo "it.only('t', () => {})" > "my file.js"
+	git add -A
+
+	run_hook "drift-guard.sh" "$(_claim_payload 'Done, all tests pass.')"
+	_assert_blocked
+	assert_output --partial "my file.js"
+}
+
+@test "drift-guard: diff.mnemonicPrefix does not defeat the Markdown fence exemption" {
+	echo "hello" > a.txt
+	_commit_all
+	git config diff.mnemonicPrefix true
+	local marker="TODO: imple""ment"
+	printf '# Doc\n\n```go\n// %s pagination\n```\n' "$marker" > doc.md
+	git add -A
+
+	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
+	assert_success
+	assert_output '{}'
+}
+
+@test "drift-guard: core.quotePath does not mangle a non-ASCII path" {
+	echo "hello" > a.txt
+	_commit_all
+	git config core.quotePath true
+	echo "it.only('t', () => {})" > "café.js"
+	git add -A
+
+	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
+	_assert_blocked
+	assert_output --partial "café.js"
+}
+
+@test "drift-guard: an external diff driver cannot replace the parse input" {
+	echo "hello" > a.js
+	_commit_all
+	git config diff.external /bin/true
+	echo "it.only('t', () => {})" >> a.js
+
+	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
+	_assert_blocked
+	assert_output --partial "a.js"
+}
+
+@test "drift-guard: specify.only, it.concurrent.only and serial.only are markers" {
+	echo "hello" > a.js
+	_commit_all
+	printf 'specify.only("a")\nit.concurrent.only("b")\ntest.describe.serial.only("c")\n' >> a.js
+
+	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
+	_assert_blocked
+	assert_output --partial "specify.only"
+	assert_output --partial "it.concurrent.only"
+	assert_output --partial "serial.only"
+}
+
+@test "drift-guard: Model.objects.only stays excluded" {
+	echo "hello" > a.js
+	_commit_all
+	echo 'qs = Model.objects.only("id")' >> a.js
+
+	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
+	assert_success
+	assert_output '{}'
+}
+
+@test "drift-guard: a focused-test spelling in a non-JS file is prose, not a runnable focused test" {
+	echo "hello" > a.txt
+	_commit_all
+	echo 'echo "it.only(1)"' > helper.sh
+	echo 'note = "it.only(2)"' > mod.py
+	echo 'it.only("x")' > notes.txt
+	printf '@test "it.only in a name" {\n\techo "it.only(3)"\n}\n' > suite.bats
+
+	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
+	assert_success
+	assert_output '{}'
+}
+
+@test "drift-guard: a focused test in a .ts file is still a finding" {
+	echo "hello" > a.txt
+	_commit_all
+	echo 'it.only("x", () => {})' > spec.ts
+
+	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
+	_assert_blocked
+	assert_output --partial "spec.ts"
+}
+
+@test "drift-guard: an unfinished-implementation marker stays language-independent" {
+	echo "hello" > a.txt
+	_commit_all
+	local marker="TODO: imple""ment"
+	printf 'run() { : ; } # %s\n' "$marker" > helper.sh
+	printf 'def run(): pass  # %s\n' "$marker" > mod.py
+	printf '# Notes\n\n%s the parser\n' "$marker" > notes.md
+
+	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
+	_assert_blocked
+	assert_output --partial "helper.sh"
+	assert_output --partial "mod.py"
+	assert_output --partial "notes.md"
+}
+
+@test "drift-guard: a single-line hunk reports the file's own line number" {
+	printf 'a\nb\nc\nd\ne\n' > spec.js
+	_commit_all
+	printf 'a\nb\nc\nit.only("x")\ne\n' > spec.js
+
+	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
+	_assert_blocked
+	assert_output --partial "spec.js:4"
+}
+
+@test "drift-guard: removed lines before an addition do not shift the reported line" {
+	printf 'a\nb\nc\nd\ne\nf\n' > spec.js
+	_commit_all
+	printf 'a\nb\nit.only("x")\nf\n' > spec.js
+
+	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
+	_assert_blocked
+	assert_output --partial "spec.js:3"
 }

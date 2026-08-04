@@ -275,7 +275,7 @@ NOW=$(date +%s)
 if [[ "${CONSECUTIVE_BLOCKS}" -ge "${HARD_CAP_BLOCKS}" ]]; then
 	if (( NOW - LAST_BLOCK_AT >= CLEAN_WINDOW_SECONDS )); then
 		CONSECUTIVE_BLOCKS=0
-		stop_blocks_reset
+		stop_blocks_reset "plan-continuation-guard"
 	else
 		noop_exit
 	fi
@@ -303,7 +303,6 @@ else
 fi
 NEW_CONSECUTIVE_BLOCKS=$(( CONSECUTIVE_BLOCKS + 1 ))
 
-# is already logged inside write_continuation_state.
 write_continuation_state "${NEW_CONSECUTIVE_BLOCKS}" "${NOW}" "${INCOMPLETE}" "${NEW_SAME_COUNT_RUN}" "false" || noop_exit
 
 stop_block_allowed "plan-continuation-guard" || noop_exit

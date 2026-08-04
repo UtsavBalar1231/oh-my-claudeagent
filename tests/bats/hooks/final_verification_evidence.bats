@@ -471,7 +471,9 @@ EOF
 	run_hook "final-verification-evidence.sh" '{}'
 	assert_success
 	assert_output '{}'
-	[ ! -f "${CLAUDE_PROJECT_ROOT}/.omca/state/stop-blocks.json" ]
+	run jq -r 'has("final-verification-evidence")' "${CLAUDE_PROJECT_ROOT}/.omca/state/stop-blocks.json"
+	assert_success
+	assert_output 'false'
 }
 
 @test "final-verification-evidence: jq unavailable allows Stop" {
@@ -493,4 +495,45 @@ EOF
 		"${dir}/bash" "${CLAUDE_PLUGIN_ROOT}/scripts/final-verification-evidence.sh" < /dev/null
 	assert_success
 	refute_output --partial '"decision"'
+}
+
+_no_digest_path() {
+	local dir="${BATS_TEST_TMPDIR}/nodigest-bin"
+	mkdir -p "${dir}"
+	local c p
+	for c in bash jq cat date grep sed cut tr basename dirname mktemp mv rm mkdir rmdir \
+		flock printf tail head sort wc awk tac stat chmod python3 timeout touch find; do
+		p=$(command -v "$c" 2>/dev/null) && ln -sf "$p" "${dir}/$c"
+	done
+	printf '%s\n' "${dir}"
+}
+
+_run_hook_without_digest() {
+	local dir
+	dir=$(_no_digest_path)
+	run env -i PATH="${dir}" HOME="${HOME}" CLAUDE_PROJECT_ROOT="${CLAUDE_PROJECT_ROOT}" \
+		CLAUDE_PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT}" CLAUDE_SESSION_ID="${CLAUDE_SESSION_ID}" \
+		"${dir}/bash" "${CLAUDE_PLUGIN_ROOT}/scripts/final-verification-evidence.sh" <<< '{"stop_hook_active":false}'
+}
+
+@test "final-verification-evidence: no digest tool still honors scoped evidence" {
+	local plan_file="${BATS_TEST_TMPDIR}/complete-plan.md"
+	_write_complete_plan "${plan_file}"
+	_write_boulder "${plan_file}"
+	_write_final_verification_evidence_scoped "$(sha256sum "${plan_file}" | awk '{print $1}')"
+
+	_run_hook_without_digest
+	assert_success
+	assert_output '{}'
+}
+
+@test "final-verification-evidence: no digest tool never instructs an empty plan_sha256" {
+	local plan_file="${BATS_TEST_TMPDIR}/complete-plan.md"
+	_write_complete_plan "${plan_file}"
+	_write_boulder "${plan_file}"
+
+	_run_hook_without_digest
+	assert_success
+	assert_equal "$(jq -r '.decision' <<< "$output")" "block"
+	refute_output --partial 'plan_sha256=\"\"'
 }
