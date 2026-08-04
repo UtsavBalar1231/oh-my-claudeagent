@@ -175,6 +175,83 @@ load '../test_helper'
 	assert_output ""
 }
 
+# ---------------------------------------------------------------------------
+# Case 5: unnormalised spellings of a protected path
+# The guard matches path text, so `//`, `/./` and `/../` name the same notepad file
+# without matching the pattern until the path is normalised.
+# ---------------------------------------------------------------------------
+
+@test "write-guard: denies a notepad path spelled with a doubled slash" {
+	local target="$CLAUDE_PROJECT_ROOT/.omca//notepads/my-plan/learnings.md"
+
+	local payload
+	payload=$(printf '{"tool_name":"Write","tool_input":{"file_path":"%s"}}' "$target")
+
+	run_hook "write-guard.sh" "$payload"
+	assert_success
+	[ "$(echo "$output" | jq -r '.hookSpecificOutput.permissionDecision // empty')" = "deny" ]
+}
+
+@test "write-guard: denies a notepad path spelled with a dot segment" {
+	local target="$CLAUDE_PROJECT_ROOT/.omca/./notepads/my-plan/learnings.md"
+
+	local payload
+	payload=$(printf '{"tool_name":"Write","tool_input":{"file_path":"%s"}}' "$target")
+
+	run_hook "write-guard.sh" "$payload"
+	assert_success
+	[ "$(echo "$output" | jq -r '.hookSpecificOutput.permissionDecision // empty')" = "deny" ]
+}
+
+@test "write-guard: denies a notepad path spelled with a parent segment" {
+	local target="$CLAUDE_PROJECT_ROOT/.omca/state/../notepads/my-plan/learnings.md"
+
+	local payload
+	payload=$(printf '{"tool_name":"Write","tool_input":{"file_path":"%s"}}' "$target")
+
+	run_hook "write-guard.sh" "$payload"
+	assert_success
+	[ "$(echo "$output" | jq -r '.hookSpecificOutput.permissionDecision // empty')" = "deny" ]
+}
+
+@test "write-guard: a parent segment leading out of the notepad dir is not denied" {
+	local target="$CLAUDE_PROJECT_ROOT/.omca/notepads/../scratch.md"
+	rm -f "$target"
+
+	local payload
+	payload=$(printf '{"tool_name":"Write","tool_input":{"file_path":"%s"}}' "$target")
+
+	run_hook "write-guard.sh" "$payload"
+	assert_success
+	assert_output ""
+}
+
+# ---------------------------------------------------------------------------
+# Case 6: Edit and MultiEdit carry the same file_path field as Write
+# ---------------------------------------------------------------------------
+
+@test "write-guard: denies a notepad Edit payload" {
+	local target="$CLAUDE_PROJECT_ROOT/.omca//notepads/my-plan/learnings.md"
+
+	local payload
+	payload=$(printf '{"tool_name":"Edit","tool_input":{"file_path":"%s","old_string":"a","new_string":"b"}}' "$target")
+
+	run_hook "write-guard.sh" "$payload"
+	assert_success
+	[ "$(echo "$output" | jq -r '.hookSpecificOutput.permissionDecision // empty')" = "deny" ]
+}
+
+@test "write-guard: denies a MultiEdit payload targeting the evidence file" {
+	local target="$CLAUDE_PROJECT_ROOT/.omca/state/./verification-evidence.json"
+
+	local payload
+	payload=$(printf '{"tool_name":"MultiEdit","tool_input":{"file_path":"%s","edits":[]}}' "$target")
+
+	run_hook "write-guard.sh" "$payload"
+	assert_success
+	[ "$(echo "$output" | jq -r '.hookSpecificOutput.permissionDecision // empty')" = "deny" ]
+}
+
 @test "write-guard: OMCA_DISABLED_HOOKS=write-guard bypasses notepad deny" {
 	local target="$CLAUDE_PROJECT_ROOT/.omca/notepads/my-plan/learnings.md"
 

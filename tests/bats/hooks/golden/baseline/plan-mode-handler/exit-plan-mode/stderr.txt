@@ -1,1 +1,0 @@
-[plan-mode-handler] Auto-approved ExitPlanMode — upstream AskUserQuestion gate assumed

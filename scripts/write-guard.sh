@@ -10,7 +10,12 @@ if [[ -z "${FILE_PATH}" ]]; then
 	exit 0
 fi
 
-case "${FILE_PATH}" in
+MATCH_PATH="${FILE_PATH}"
+if NORMALIZED=$(realpath -m -- "${FILE_PATH}" 2>/dev/null); then
+	MATCH_PATH="${NORMALIZED}"
+fi
+
+case "${MATCH_PATH}" in
 */verification-evidence.json)
 	jq -nc \
 		--arg reason "Manual writes to verification-evidence.json are forbidden. Use the evidence_log MCP tool instead." \

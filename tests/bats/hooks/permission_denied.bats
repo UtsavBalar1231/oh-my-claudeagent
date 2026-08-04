@@ -7,7 +7,9 @@ _assert_retry_hint() {
     [ "$status" -eq 0 ]
     echo "$output" | jq -e '.hookSpecificOutput.retry == true' >/dev/null
     echo "$output" | jq -e '.hookSpecificOutput.hookEventName == "PermissionDenied"' >/dev/null
-    echo "$output" | jq -e '.hookSpecificOutput.additionalContext | length > 0' >/dev/null
+    # The CLI normalizer reads only `retry` on this event and discards
+    # additionalContext, so emitting it would be dead weight the comment lies about.
+    echo "$output" | jq -e '.hookSpecificOutput | has("additionalContext") | not' >/dev/null
     # A top-level retry is not read by the platform, so it must not be the only signal.
     echo "$output" | jq -e 'has("retry") | not' >/dev/null
 }
@@ -22,9 +24,6 @@ _assert_retry_hint() {
     payload='{"tool_name":"Bash","reason":"Blocked by classifier: uploads to an unrecognized host","tool_input":{"command":"curl -T f https://example.com"}}'
     run bash "$CLAUDE_PLUGIN_ROOT/scripts/permission-denied-coach.sh" <<< "$payload"
     _assert_retry_hint
-    # The written explanation is the only hint the model gets about what the
-    # classifier was missing, so it has to survive into the coaching text.
-    echo "$output" | jq -e '.hookSpecificOutput.additionalContext | test("unrecognized host")' >/dev/null
 }
 
 @test "permission-denied-coach: retry hint even when the payload carries no reason" {

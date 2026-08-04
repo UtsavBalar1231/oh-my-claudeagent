@@ -27,6 +27,57 @@ load '../test_helper'
 	assert_output --partial '"deny"'
 }
 
+# The recursive flag was only recognised inside the first option cluster and only in
+# lowercase, so every spelling below reached the platform undenied.
+
+@test "permission-filter: rm -Rf is denied (uppercase flag)" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"rm -Rf /tmp/x"}}'
+	assert_success
+	assert_output --partial '"deny"'
+}
+
+@test "permission-filter: rm -R is denied (uppercase, no force)" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"rm -R /tmp/x"}}'
+	assert_success
+	assert_output --partial '"deny"'
+}
+
+@test "permission-filter: rm -f -r is denied (split flags)" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"rm -f -r /tmp/x"}}'
+	assert_success
+	assert_output --partial '"deny"'
+}
+
+@test "permission-filter: rm -v -rf is denied (recursive flag not first)" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"rm -v -rf /tmp/x"}}'
+	assert_success
+	assert_output --partial '"deny"'
+}
+
+@test "permission-filter: sudo rm -f -r / is denied" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"sudo rm -f -r /"}}'
+	assert_success
+	assert_output --partial '"deny"'
+}
+
+@test "permission-filter: rm --recursive is denied (long form)" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"rm --recursive /tmp/x"}}'
+	assert_success
+	assert_output --partial '"deny"'
+}
+
+@test "permission-filter: rm -f of a single file is not denied" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"rm -f /tmp/one.txt"}}'
+	assert_success
+	assert_output ""
+}
+
+@test "permission-filter: rm --force of a single file is not denied" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"rm --force /tmp/one.txt"}}'
+	assert_success
+	assert_output ""
+}
+
 @test "permission-filter: unknown command produces no output (no opinion)" {
 	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"python3 script.py"}}'
 	assert_success
@@ -208,9 +259,9 @@ load '../test_helper'
 
 # ── git-destructive-deny.sh: compound commands ────────────────────────────────
 # `if: "Bash(git *)"` dispatches on the head of the command only, so a compound
-# reaches this hook with a second command the deny never inspected. The blanket
-# allow at the end must not speak for those: an allow outranks the platform
-# prompt they would otherwise get.
+# reaches this hook with a second command the deny never inspected. No path may
+# answer those with an allow: an allow outranks the platform prompt they would
+# otherwise get.
 
 @test "git-destructive-deny: a compound ending in reset --hard is blocked" {
 	run_hook "git-destructive-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"git status && git reset --hard"}}'
@@ -235,18 +286,17 @@ load '../test_helper'
 	assert_output ""
 }
 
-@test "git-destructive-deny: a plain read-only git command is still allowed" {
+@test "git-destructive-deny: a plain read-only git command is silent, not allowed" {
 	run_hook "git-destructive-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"git status"}}'
 	assert_success
-	assert_output --partial '"allow"'
+	assert_output ""
 }
 
 # ── event branching: PreToolUse vs PermissionRequest ─────────────────────────
 # PermissionRequest fires only when a permission dialog is about to be shown, so
 # under auto mode a command the classifier allows outright never reaches it and
-# both guards used to sit idle. The deny therefore also runs on PreToolUse, and the
-# allow branches must not: a PreToolUse allow skips the platform's own permission
-# evaluation for the command it names.
+# both guards used to sit idle. The deny therefore also runs on PreToolUse, where an
+# allow would skip the platform's own permission evaluation for the command it names.
 
 pretooluse_payload() {
 	printf '{"tool_name":"Bash","hook_event_name":"PreToolUse","tool_input":{"command":"%s"}}' "$1"
@@ -366,10 +416,10 @@ permissionrequest_payload() {
 	assert_output ""
 }
 
-@test "git-destructive-deny: git status still auto-allows on PermissionRequest" {
+@test "git-destructive-deny: git status gets no allow on PermissionRequest either" {
 	run_hook "git-destructive-deny.sh" "$(permissionrequest_payload 'git status')"
 	assert_success
-	assert_output --partial '"behavior":"allow"'
+	assert_output ""
 }
 
 @test "git-destructive-deny: a commit message naming reset --hard is silent on PreToolUse" {
@@ -423,10 +473,13 @@ permissionrequest_payload() {
 
 # ── plan-mode-handler.sh tests ────────────────────────────────────────────────
 
-@test "plan-mode-handler: ExitPlanMode is approved with acceptEdits mode" {
+# The hook is a no-op: an `allow` without `updatedInput` is discarded for a tool
+# with requiresUserInteraction(), which ExitPlanMode has. Pin that it emits no
+# decision and no stderr, so nothing claims an approval that never lands.
+@test "plan-mode-handler: ExitPlanMode gets no decision and no false audit line" {
 	local fixture="$CLAUDE_PLUGIN_ROOT/tests/fixtures/hooks/permissionrequest-exitplanmode.json"
 	run_hook_file "plan-mode-handler.sh" "$fixture"
 	assert_success
-	assert_output --partial '"allow"'
-	assert_output --partial 'acceptEdits'
+	assert_output '{}'
+	refute_output --partial 'Auto-approved'
 }

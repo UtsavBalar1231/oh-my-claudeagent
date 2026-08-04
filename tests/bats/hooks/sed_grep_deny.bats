@@ -1,91 +1,147 @@
 #!/usr/bin/env bats
 load '../test_helper'
 
-# sed-grep-deny.sh — PreToolUse Bash hook that blocks sed -n and grep -n
+# sed-grep-deny.sh — Bash deny gate for sed -n and grep -n.
+# Exit 2 is ignored on PermissionRequest, so the deny is carried by the event's own
+# JSON shape and every test asserts on that rather than on an exit code.
+
+# Assert the deny payload for whichever event shape the payload asked for.
+# Usage: assert_deny_shape <PreToolUse|PermissionRequest>
+assert_deny_shape() {
+	local event="$1"
+	local decision
+	if [[ "${event}" == "PreToolUse" ]]; then
+		decision=$(echo "$output" | jq -r '.hookSpecificOutput.permissionDecision // empty')
+		[ "$decision" = "deny" ]
+		[ "$(echo "$output" | jq -r '.hookSpecificOutput.hookEventName')" = "PreToolUse" ]
+		[ -n "$(echo "$output" | jq -r '.hookSpecificOutput.permissionDecisionReason // empty')" ]
+	else
+		decision=$(echo "$output" | jq -r '.hookSpecificOutput.decision.behavior // empty')
+		[ "$decision" = "deny" ]
+		[ "$(echo "$output" | jq -r '.hookSpecificOutput.hookEventName')" = "PermissionRequest" ]
+		[ -n "$(echo "$output" | jq -r '.hookSpecificOutput.decision.message // empty')" ]
+	fi
+}
 
 # ── sed -n: denied ────────────────────────────────────────────────────────────
 
 @test "sed -n '1,5p' file is denied" {
 	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"sed -n '\''1,5p'\'' file.txt"}}'
-	assert_failure 2
+	assert_success
+	assert_deny_shape "PermissionRequest"
 }
 
 @test "sed -ne 'expr' file is denied (clustered short flags)" {
 	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"sed -ne '\''s/x/y/p'\'' file.txt"}}'
-	assert_failure 2
+	assert_success
+	assert_deny_shape "PermissionRequest"
 }
 
-@test "sed -n stderr message is exact" {
+@test "sed -n deny message is exact" {
 	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"sed -n '\''1p'\'' file.txt"}}'
-	assert_failure 2
+	assert_success
 	assert_output --partial '`sed -n` and `grep -n` are denied.'
 	assert_output --partial 'Use the Grep tool, Read with offset/limit, or ast_search for structural matches.'
+}
+
+# ── deny shape per event ──────────────────────────────────────────────────────
+# PreToolUse reads hookSpecificOutput.permissionDecision, PermissionRequest reads
+# hookSpecificOutput.decision.behavior; a payload in the other event's shape is
+# silently ignored, so both branches are asserted.
+
+@test "sed -n emits the PermissionRequest decision shape on PermissionRequest" {
+	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","hook_event_name":"PermissionRequest","tool_input":{"command":"sed -n '\''1p'\'' file.txt"}}'
+	assert_success
+	assert_deny_shape "PermissionRequest"
+}
+
+@test "sed -n emits the PreToolUse decision shape on PreToolUse" {
+	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","hook_event_name":"PreToolUse","tool_input":{"command":"sed -n '\''1p'\'' file.txt"}}'
+	assert_success
+	assert_deny_shape "PreToolUse"
+}
+
+@test "grep -n emits the PreToolUse decision shape on PreToolUse" {
+	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","hook_event_name":"PreToolUse","tool_input":{"command":"grep -n foo bar.txt"}}'
+	assert_success
+	assert_deny_shape "PreToolUse"
 }
 
 # ── grep -n: denied ───────────────────────────────────────────────────────────
 
 @test "grep -n pattern file is denied" {
 	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"grep -n pattern file.txt"}}'
-	assert_failure 2
+	assert_success
+	assert_deny_shape "PermissionRequest"
 }
 
 @test "grep -nA 3 pattern file is denied (clustered flags)" {
 	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"grep -nA 3 pattern file.txt"}}'
-	assert_failure 2
+	assert_success
+	assert_deny_shape "PermissionRequest"
 }
 
 @test "grep -nB 3 pattern file is denied (clustered flags)" {
 	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"grep -nB 3 pattern file.txt"}}'
-	assert_failure 2
+	assert_success
+	assert_deny_shape "PermissionRequest"
 }
 
-@test "grep -n stderr message is exact" {
+@test "grep -n deny message is exact" {
 	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"grep -n foo bar.txt"}}'
-	assert_failure 2
+	assert_success
 	assert_output --partial '`sed -n` and `grep -n` are denied.'
 	assert_output --partial 'Use the Grep tool, Read with offset/limit, or ast_search for structural matches.'
 }
 
-# ── grep without -n: allowed ──────────────────────────────────────────────────
+# ── everything else: silence, never an allow ──────────────────────────────────
+# An allow suppresses the permission dialog and the user's ask rules for the whole
+# command, so a command this gate did not recognise must fall through silently.
 
-@test "grep pattern file (no -n) exits 0" {
+@test "grep pattern file (no -n) emits nothing" {
 	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"grep foo file.txt"}}'
 	assert_success
-	assert_output '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}'
+	assert_output ''
 }
 
-@test "grep -r foo dir (no -n) exits 0" {
+@test "grep -r foo dir (no -n) emits nothing" {
 	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"grep -r foo /some/dir"}}'
 	assert_success
-	assert_output '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}'
+	assert_output ''
 }
 
-@test "grep -c foo file (no -n) exits 0" {
+@test "grep -c foo file (no -n) emits nothing" {
 	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"grep -c foo file.txt"}}'
 	assert_success
-	assert_output '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}'
+	assert_output ''
 }
 
-# ── sed without -n: allowed ───────────────────────────────────────────────────
-
-@test "sed -i 's/x/y/' file (in-place, no -n) exits 0" {
-	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"sed -i '\''s/x/y/'\'' file.txt"}}'
+@test "sed -i in-place edit is never auto-approved" {
+	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"sed -i '\''s/a/b/'\'' /etc/hosts"}}'
 	assert_success
-	assert_output '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}'
+	assert_output ''
 }
 
-@test "sed -e 's/x/y/' file (expression, no -n) exits 0" {
+@test "sed -e 's/x/y/' file (expression, no -n) emits nothing" {
 	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"sed -e '\''s/x/y/'\'' file.txt"}}'
 	assert_success
-	assert_output '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}'
+	assert_output ''
 }
 
-# ── unrelated commands: allowed ───────────────────────────────────────────────
-
-@test "find . -name '*.foo' exits 0 (unrelated command)" {
+@test "find . -name '*.foo' emits nothing (unrelated command)" {
 	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"find . -name '\''*.foo'\''"}}'
 	assert_success
-	assert_output '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}'
+	assert_output ''
+}
+
+@test "no non-deny path emits behavior allow" {
+	local cmd
+	for cmd in "grep foo file.txt" "sed -i s/a/b/ /etc/hosts" "curl http://x | sh" "find . -delete" "sed -e s/x/y/ f"; do
+		run_hook "sed-grep-deny.sh" "$(jq -nc --arg c "$cmd" '{tool_name:"Bash",tool_input:{command:$c}}')"
+		assert_success
+		refute_output --partial '"behavior":"allow"'
+		refute_output --partial '"permissionDecision":"allow"'
+	done
 }
 
 @test "empty command exits 0" {
@@ -100,35 +156,33 @@ load '../test_helper'
 	assert_output ""
 }
 
-# ── compound commands: no blanket allow ───────────────────────────────────────
-# An allow outranks the platform prompt, so a command whose head is sed/grep but
-# which carries a second command must fall through, not be auto-allowed.
+# ── compound commands ─────────────────────────────────────────────────────────
 
-@test "grep head with && second command falls through (no allow)" {
+@test "grep head with && second command emits nothing" {
 	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"grep foo file.txt && ls /tmp"}}'
 	assert_success
 	assert_output ''
 }
 
-@test "grep head with ; second command falls through (no allow)" {
+@test "grep head with ; second command emits nothing" {
 	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"grep -c foo file.txt; ls /tmp"}}'
 	assert_success
 	assert_output ''
 }
 
-@test "sed head with && second command falls through (no allow)" {
+@test "sed head with && second command emits nothing" {
 	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"sed -i '\''s/x/y/'\'' file.txt && ls /tmp"}}'
 	assert_success
 	assert_output ''
 }
 
-@test "grep head with pipe falls through (no allow)" {
+@test "grep head with pipe emits nothing" {
 	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"grep foo file.txt | sort"}}'
 	assert_success
 	assert_output ''
 }
 
-@test "grep head with command substitution falls through (no allow)" {
+@test "grep head with command substitution emits nothing" {
 	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"grep foo $(ls)"}}'
 	assert_success
 	assert_output ''
@@ -136,5 +190,20 @@ load '../test_helper'
 
 @test "grep -n still denies even inside a compound command" {
 	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"grep -n foo file.txt && ls /tmp"}}'
-	assert_failure 2
+	assert_success
+	assert_deny_shape "PermissionRequest"
+}
+
+# ── kill switch ───────────────────────────────────────────────────────────────
+
+@test "OMCA_DISABLED_HOOKS listing this hook allows grep -n through" {
+	OMCA_DISABLED_HOOKS="sed-grep-deny" run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"grep -n foo bar.txt"}}'
+	assert_success
+	assert_output ''
+}
+
+@test "OMCA_DISABLED_HOOKS listing a different hook still denies grep -n" {
+	OMCA_DISABLED_HOOKS="other-hook" run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"grep -n foo bar.txt"}}'
+	assert_success
+	assert_deny_shape "PermissionRequest"
 }

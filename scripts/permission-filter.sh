@@ -2,7 +2,6 @@
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
-
 COMMAND=$(jq -r '.tool_input.command // ""' <<< "${HOOK_INPUT}")
 
 # PermissionRequest fires only when a permission dialog is about to be shown, so a
@@ -25,7 +24,7 @@ TRIMMED_CMD=$(echo "${COMMAND}" | sed 's/^[[:space:]]*//')
 # a literal mention out of scope: in `grep -rn "rm -rf" scripts/` the `rm` follows
 # a quote. Quote state is untracked here as it is in the operator scan below, so a
 # removal quoted after a separator denies too; accepted in place of a tokenizer.
-DESTRUCTIVE_RM_RE=$'(^|[;&|()`\n\r])[[:space:]]*(sudo[[:space:]]+)?rm[[:space:]]+-[a-zA-Z]*r[a-zA-Z]*([[:space:]]|$)'
+DESTRUCTIVE_RM_RE=$'(^|[;&|()`\n\r])[[:space:]]*(sudo[[:space:]]+)?rm[[:space:]]+((-[a-zA-Z]+|--[a-zA-Z-]+)[[:space:]]+)*(-[a-zA-Z]*[rR][a-zA-Z]*|--recursive)([[:space:]]|$)'
 if [[ "${TRIMMED_CMD}" =~ ${DESTRUCTIVE_RM_RE} ]]; then
 	# Each event reads its decision from a different place: PreToolUse from
 	# hookSpecificOutput.permissionDecision, PermissionRequest from

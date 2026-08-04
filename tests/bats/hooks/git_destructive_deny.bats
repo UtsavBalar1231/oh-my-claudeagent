@@ -209,6 +209,85 @@ run_hook_merged() {
 	assert_success
 }
 
+# ─── Spellings that reach the same working-tree loss ───────────────────────────
+# The subcommand match previously required `git <subcommand>` at the head, so a
+# leading global option or a revision before `--` walked past it.
+
+@test "git-destructive-deny: checkout of a revision followed by -- is blocked" {
+	run_hook_merged "git-destructive-deny.sh" "$(bash_payload 'git checkout HEAD -- .')"
+	assert_failure 2
+	assert_output --partial "Destructive git"
+}
+
+@test "git-destructive-deny: a -C redirected reset --hard is blocked" {
+	run_hook_merged "git-destructive-deny.sh" "$(bash_payload 'git -C /repo reset --hard')"
+	assert_failure 2
+}
+
+@test "git-destructive-deny: a --git-dir redirected reset --hard is blocked" {
+	run_hook_merged "git-destructive-deny.sh" "$(bash_payload 'git --git-dir=/repo/.git reset --hard')"
+	assert_failure 2
+}
+
+@test "git-destructive-deny: a -c config-override reset --hard is blocked" {
+	run_hook_merged "git-destructive-deny.sh" "$(bash_payload 'git -c user.name=x reset --hard')"
+	assert_failure 2
+}
+
+@test "git-destructive-deny: git rm of a tree is blocked" {
+	run_hook_merged "git-destructive-deny.sh" "$(bash_payload 'git rm -rf .')"
+	assert_failure 2
+}
+
+@test "git-destructive-deny: a quoted subcommand is blocked" {
+	run_hook_merged "git-destructive-deny.sh" "$(bash_payload 'git \"reset\" --hard')"
+	assert_failure 2
+}
+
+# ─── Destructive text inside a quoted argument is not a command ────────────────
+# `(` and `)` were separators in the leading class with no quote tracking, so the
+# words below denied from inside a message or a search pattern. A single false
+# positive on a read-only command teaches the user to disable the guard for good.
+
+@test "git-destructive-deny: a commit message naming the subcommand in parens is not blocked" {
+	run_hook_merged "git-destructive-deny.sh" "$(bash_payload 'git commit -m \"restore state (git stash used)\"')"
+	assert_success
+	assert_output ""
+}
+
+@test "git-destructive-deny: a read-only log pickaxe search in parens is not blocked" {
+	run_hook_merged "git-destructive-deny.sh" "$(bash_payload 'git log --oneline -S \"(git restore)\"')"
+	assert_success
+	assert_output ""
+}
+
+@test "git-destructive-deny: a chained checkout with a later -- token is not blocked" {
+	run_hook_merged "git-destructive-deny.sh" "$(bash_payload 'git checkout main && echo -- x')"
+	assert_success
+	assert_output ""
+}
+
+# ─── No path emits an allow ────────────────────────────────────────────────────
+# An allow suppresses the permission dialog and the user's ask rules, so a command
+# this gate did not classify as destructive falls through silently. The old trailing
+# allow auto-approved a hooksPath rewrite, which is code execution on the next commit.
+
+@test "git-destructive-deny: a core.hooksPath rewrite is never auto-approved" {
+	run_hook "git-destructive-deny.sh" "$(bash_payload 'git config --local core.hooksPath /tmp/evil')"
+	assert_success
+	assert_output ""
+}
+
+@test "git-destructive-deny: no non-deny path emits behavior allow" {
+	local cmd
+	for cmd in "git status" "git log" "git config --local core.hooksPath /tmp/evil" "git push --force" "git fetch"; do
+		run_hook "git-destructive-deny.sh" "$(jq -nc --arg c "$cmd" '{tool_name:"Bash",tool_input:{command:$c}}')"
+		assert_success
+		refute_output --partial '"behavior":"allow"'
+		refute_output --partial '"permissionDecision":"allow"'
+	done
+}
+
 @test "git-destructive-deny: OMCA_DISABLED_HOOKS listing a different hook still denies reset --hard" {
 	OMCA_DISABLED_HOOKS="other-hook" \
 		run bash -c "bash ${CLAUDE_PLUGIN_ROOT}/scripts/git-destructive-deny.sh 2>&1" \
