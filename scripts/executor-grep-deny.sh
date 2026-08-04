@@ -38,10 +38,19 @@ if [[ "${AGENT_TYPE_NORM}" != "executor" ]]; then
 	pass
 fi
 
+HOOK_EVENT=$(jq -r '.hook_event_name // "PermissionRequest"' <<< "${HOOK_INPUT}")
+
+DENY_REASON="Executor must use ast_search for structural queries against code files. Plain text-grep on code is denied."
+
 # ── Executor path: check tool ──────────────────────────────────────────────────
 deny_grep() {
-	echo "Executor must use ast_search for structural queries against code files. Plain text-grep on code is denied." >&2
-	exit 2
+	if [[ "${HOOK_EVENT}" == "PreToolUse" ]]; then
+		echo "${DENY_REASON}" >&2
+		exit 2
+	fi
+	jq -nc --arg reason "${DENY_REASON}" \
+		'{hookSpecificOutput: {hookEventName: "PermissionRequest", decision: {behavior: "deny", message: $reason}}}'
+	exit 0
 }
 
 case "${TOOL_NAME}" in
@@ -55,8 +64,8 @@ Grep)
 	;;
 Bash)
 	CMD=$(jq -r '.tool_input.command // ""' <<< "${HOOK_INPUT}")
-	# Bail if no grep word boundary present.
-	if [[ ! "${CMD}" =~ (^|[^a-zA-Z_])grep([^a-zA-Z_]|$) ]]; then
+	GREP_AT_COMMAND_POSITION_RE=$'(^|[;&|(`\n\r]|[$]\\()[[:space:]]*(sudo[[:space:]]+)?grep([^a-zA-Z_]|$)'
+	if [[ ! "${CMD}" =~ ${GREP_AT_COMMAND_POSITION_RE} ]]; then
 		pass
 	fi
 	# Check if any token in the command is a filename ending in a code extension.

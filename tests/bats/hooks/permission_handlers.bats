@@ -263,15 +263,29 @@ load '../test_helper'
 # answer those with an allow: an allow outranks the platform prompt they would
 # otherwise get.
 
-@test "git-destructive-deny: a compound ending in reset --hard is blocked" {
-	run_hook "git-destructive-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"git status && git reset --hard"}}'
+@test "git-destructive-deny: a compound ending in reset --hard is blocked on PreToolUse" {
+	run_hook "git-destructive-deny.sh" '{"tool_name":"Bash","hook_event_name":"PreToolUse","tool_input":{"command":"git status && git reset --hard"}}'
 	[ "$status" -eq 2 ]
 	assert_output --partial 'Destructive git command blocked'
 }
 
-@test "git-destructive-deny: a compound ending in clean -fd is blocked" {
-	run_hook "git-destructive-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"cd /x; git clean -fd"}}'
+@test "git-destructive-deny: a compound ending in clean -fd is blocked on PreToolUse" {
+	run_hook "git-destructive-deny.sh" '{"tool_name":"Bash","hook_event_name":"PreToolUse","tool_input":{"command":"cd /x; git clean -fd"}}'
 	[ "$status" -eq 2 ]
+}
+
+@test "git-destructive-deny: an event-less compound ending in reset --hard denies in the default PermissionRequest shape" {
+	run_hook "git-destructive-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"git status && git reset --hard"}}'
+	assert_success
+	assert_output --partial '"hookEventName":"PermissionRequest"'
+	assert_output --partial '"behavior":"deny"'
+	assert_output --partial 'Destructive git command blocked'
+}
+
+@test "git-destructive-deny: an event-less compound ending in clean -fd denies in the default PermissionRequest shape" {
+	run_hook "git-destructive-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"cd /x; git clean -fd"}}'
+	assert_success
+	assert_output --partial '"behavior":"deny"'
 }
 
 @test "git-destructive-deny: a compound with a non-git second command is not allowed" {

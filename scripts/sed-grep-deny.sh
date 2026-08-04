@@ -22,8 +22,9 @@ DENY_REASON="\`sed -n\` and \`grep -n\` are denied. Use the Grep tool, Read with
 # Pattern: command word followed by one or more flag clusters that include `n`.
 # [[:alnum:]]* before/after `n` allows clusters like -ne, -nA, -rn, -nB3 are
 # caught because the flag group contains n.
-if [[ "${CMD}" =~ (^|[[:space:]])sed[[:space:]]+-[[:alnum:]]*n[[:alnum:]]*([[:space:]]|$) ]] \
-	|| [[ "${CMD}" =~ (^|[[:space:]])grep[[:space:]]+-[[:alnum:]]*n[[:alnum:]]*([[:space:]]|$) ]]; then
+CMD_POSITION_RE=$'(^|[;&|`\n\r]|[$]\\()[[:space:]]*'
+if [[ "${CMD}" =~ ${CMD_POSITION_RE}sed[[:space:]]+-[[:alnum:]]*n[[:alnum:]]*([[:space:]]|$) ]] \
+	|| [[ "${CMD}" =~ ${CMD_POSITION_RE}grep[[:space:]]+-[[:alnum:]]*n[[:alnum:]]*([[:space:]]|$) ]]; then
 	if [[ "${HOOK_EVENT}" == "PreToolUse" ]]; then
 		jq -nc --arg reason "${DENY_REASON}" \
 			'{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: $reason}}'

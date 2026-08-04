@@ -194,6 +194,36 @@ assert_deny_shape() {
 	assert_deny_shape "PermissionRequest"
 }
 
+@test "a commit message naming the flag is not denied (command position, not whitespace)" {
+	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","hook_event_name":"PreToolUse","tool_input":{"command":"git commit -m \"refactor: drop grep -n calls from hooks\""}}'
+	assert_success
+	assert_output ''
+}
+
+@test "a sed -n mention inside a quoted argument is not denied" {
+	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","hook_event_name":"PreToolUse","tool_input":{"command":"echo \"we used sed -n here once\""}}'
+	assert_success
+	assert_output ''
+}
+
+@test "grep -n at the head of the command still denies" {
+	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","hook_event_name":"PreToolUse","tool_input":{"command":"grep -n foo src/"}}'
+	assert_success
+	assert_deny_shape "PreToolUse"
+}
+
+@test "grep -n after a pipe still denies" {
+	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","hook_event_name":"PreToolUse","tool_input":{"command":"cat f | grep -n foo"}}'
+	assert_success
+	assert_deny_shape "PreToolUse"
+}
+
+@test "sed -n after a semicolon still denies" {
+	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","hook_event_name":"PreToolUse","tool_input":{"command":"cd /x; sed -n 1p f.txt"}}'
+	assert_success
+	assert_deny_shape "PreToolUse"
+}
+
 # ── kill switch ───────────────────────────────────────────────────────────────
 
 @test "OMCA_DISABLED_HOOKS listing this hook allows grep -n through" {

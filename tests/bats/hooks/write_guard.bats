@@ -252,6 +252,37 @@ load '../test_helper'
 	[ "$(echo "$output" | jq -r '.hookSpecificOutput.permissionDecision // empty')" = "deny" ]
 }
 
+# ---------------------------------------------------------------------------
+# Case 7: the existing-file nudge is Write-only
+# The matcher covers Write|Edit|MultiEdit for the protected-path denies above, but
+# the nudge advises using Edit, so firing it on an Edit both contradicts itself and
+# injects a path into context on every single Edit.
+# ---------------------------------------------------------------------------
+
+@test "write-guard: Edit of an existing file emits nothing" {
+	local target="$CLAUDE_PROJECT_ROOT/existing-file.txt"
+	printf 'some content' > "$target"
+
+	local payload
+	payload=$(printf '{"tool_name":"Edit","tool_input":{"file_path":"%s","old_string":"a","new_string":"b"}}' "$target")
+
+	run_hook "write-guard.sh" "$payload"
+	assert_success
+	assert_output ""
+}
+
+@test "write-guard: MultiEdit of an existing file emits nothing" {
+	local target="$CLAUDE_PROJECT_ROOT/existing-file.txt"
+	printf 'some content' > "$target"
+
+	local payload
+	payload=$(printf '{"tool_name":"MultiEdit","tool_input":{"file_path":"%s","edits":[]}}' "$target")
+
+	run_hook "write-guard.sh" "$payload"
+	assert_success
+	assert_output ""
+}
+
 @test "write-guard: OMCA_DISABLED_HOOKS=write-guard bypasses notepad deny" {
 	local target="$CLAUDE_PROJECT_ROOT/.omca/notepads/my-plan/learnings.md"
 

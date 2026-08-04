@@ -31,7 +31,9 @@ case "${MATCH_PATH}" in
 *) ;;
 esac
 
-if [[ -f "${FILE_PATH}" ]]; then
+TOOL_NAME=$(jq -r '.tool_name // ""' <<< "${HOOK_INPUT}")
+
+if [[ "${TOOL_NAME}" == "Write" && -f "${FILE_PATH}" ]]; then
 	MSG="Detected manual write to file that exists at path ${FILE_PATH}. Future modifications should use Edit to preserve history."
 	emit_context "PreToolUse" "${MSG}"
 else

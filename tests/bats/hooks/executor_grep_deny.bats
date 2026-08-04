@@ -9,26 +9,26 @@ load '../test_helper'
 
 @test "Grep *.py with agent_type=executor is denied (exit 2)" {
 	run_hook "executor-grep-deny.sh" \
-		'{"tool_name":"Grep","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor","tool_input":{"pattern":"foo","glob":"*.py"}}'
+		'{"hook_event_name":"PreToolUse","tool_name":"Grep","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor","tool_input":{"pattern":"foo","glob":"*.py"}}'
 	assert_failure 2
 }
 
 @test "Grep denial stderr message references ast_search" {
 	run_hook "executor-grep-deny.sh" \
-		'{"tool_name":"Grep","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor","tool_input":{"pattern":"foo","glob":"*.py"}}'
+		'{"hook_event_name":"PreToolUse","tool_name":"Grep","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor","tool_input":{"pattern":"foo","glob":"*.py"}}'
 	assert_failure 2
 	assert_output --partial 'ast_search'
 }
 
 @test "Grep *.ts with agent_type=executor is denied" {
 	run_hook "executor-grep-deny.sh" \
-		'{"tool_name":"Grep","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor","tool_input":{"pattern":"foo","glob":"*.ts"}}'
+		'{"hook_event_name":"PreToolUse","tool_name":"Grep","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor","tool_input":{"pattern":"foo","glob":"*.ts"}}'
 	assert_failure 2
 }
 
 @test "Grep *.md with agent_type=executor is denied" {
 	run_hook "executor-grep-deny.sh" \
-		'{"tool_name":"Grep","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor","tool_input":{"pattern":"foo","glob":"*.md"}}'
+		'{"hook_event_name":"PreToolUse","tool_name":"Grep","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor","tool_input":{"pattern":"foo","glob":"*.md"}}'
 	assert_failure 2
 }
 
@@ -36,19 +36,19 @@ load '../test_helper'
 
 @test "Grep *.json with agent_type=executor is allowed (exit 0)" {
 	run_hook "executor-grep-deny.sh" \
-		'{"tool_name":"Grep","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor","tool_input":{"pattern":"foo","glob":"*.json"}}'
+		'{"hook_event_name":"PreToolUse","tool_name":"Grep","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor","tool_input":{"pattern":"foo","glob":"*.json"}}'
 	assert_success
 }
 
 @test "Grep *.yaml with agent_type=executor is allowed" {
 	run_hook "executor-grep-deny.sh" \
-		'{"tool_name":"Grep","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor","tool_input":{"pattern":"foo","glob":"*.yaml"}}'
+		'{"hook_event_name":"PreToolUse","tool_name":"Grep","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor","tool_input":{"pattern":"foo","glob":"*.yaml"}}'
 	assert_success
 }
 
 @test "Grep *.toml with agent_type=executor is allowed" {
 	run_hook "executor-grep-deny.sh" \
-		'{"tool_name":"Grep","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor","tool_input":{"pattern":"foo","glob":"*.toml"}}'
+		'{"hook_event_name":"PreToolUse","tool_name":"Grep","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor","tool_input":{"pattern":"foo","glob":"*.toml"}}'
 	assert_success
 }
 
@@ -56,13 +56,13 @@ load '../test_helper'
 
 @test "Grep *.py with explicit agent_type=oh-my-claudeagent:explore is allowed" {
 	run_hook "executor-grep-deny.sh" \
-		'{"tool_name":"Grep","agent_id":"agt_expl01","agent_type":"oh-my-claudeagent:explore","tool_input":{"pattern":"foo","glob":"*.py"}}'
+		'{"hook_event_name":"PreToolUse","tool_name":"Grep","agent_id":"agt_expl01","agent_type":"oh-my-claudeagent:explore","tool_input":{"pattern":"foo","glob":"*.py"}}'
 	assert_success
 }
 
 @test "Grep *.py with no agent_id (main session) is allowed" {
 	run_hook "executor-grep-deny.sh" \
-		'{"tool_name":"Grep","tool_input":{"pattern":"foo","glob":"*.py"}}'
+		'{"hook_event_name":"PreToolUse","tool_name":"Grep","tool_input":{"pattern":"foo","glob":"*.py"}}'
 	assert_success
 }
 
@@ -70,13 +70,13 @@ load '../test_helper'
 
 @test "Bash grep on .py file with agent_type=executor is denied (exit 2)" {
 	run_hook "executor-grep-deny.sh" \
-		'{"tool_name":"Bash","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor","tool_input":{"command":"grep foo src/main.py"}}'
+		'{"hook_event_name":"PreToolUse","tool_name":"Bash","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor","tool_input":{"command":"grep foo src/main.py"}}'
 	assert_failure 2
 }
 
 @test "Bash grep on .ts file with agent_type=executor is denied" {
 	run_hook "executor-grep-deny.sh" \
-		'{"tool_name":"Bash","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor","tool_input":{"command":"grep -r pattern src/index.ts"}}'
+		'{"hook_event_name":"PreToolUse","tool_name":"Bash","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor","tool_input":{"command":"grep -r pattern src/index.ts"}}'
 	assert_failure 2
 }
 
@@ -84,13 +84,13 @@ load '../test_helper'
 
 @test "Bash grep on .json file with agent_type=executor is allowed" {
 	run_hook "executor-grep-deny.sh" \
-		'{"tool_name":"Bash","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor","tool_input":{"command":"grep foo data.json"}}'
+		'{"hook_event_name":"PreToolUse","tool_name":"Bash","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor","tool_input":{"command":"grep foo data.json"}}'
 	assert_success
 }
 
 @test "Bash grep on .log file with agent_type=executor is allowed" {
 	run_hook "executor-grep-deny.sh" \
-		'{"tool_name":"Bash","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor","tool_input":{"command":"grep ERROR app.log"}}'
+		'{"hook_event_name":"PreToolUse","tool_name":"Bash","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor","tool_input":{"command":"grep ERROR app.log"}}'
 	assert_success
 }
 
@@ -98,7 +98,7 @@ load '../test_helper'
 
 @test "Bash non-grep command with agent_type=executor is allowed" {
 	run_hook "executor-grep-deny.sh" \
-		'{"tool_name":"Bash","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor","tool_input":{"command":"ls src/"}}'
+		'{"hook_event_name":"PreToolUse","tool_name":"Bash","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor","tool_input":{"command":"ls src/"}}'
 	assert_success
 }
 
@@ -106,7 +106,7 @@ load '../test_helper'
 
 @test "Read tool event is always allowed (not Grep or Bash)" {
 	run_hook "executor-grep-deny.sh" \
-		'{"tool_name":"Read","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor","tool_input":{"file_path":"src/main.py"}}'
+		'{"hook_event_name":"PreToolUse","tool_name":"Read","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor","tool_input":{"file_path":"src/main.py"}}'
 	assert_success
 }
 
@@ -114,14 +114,14 @@ load '../test_helper'
 
 @test "Bash grep with && second command emits no allow (main session)" {
 	run_hook "executor-grep-deny.sh" \
-		'{"tool_name":"Bash","tool_input":{"command":"grep foo data.json && ls /tmp"}}'
+		'{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"grep foo data.json && ls /tmp"}}'
 	assert_success
 	assert_output ''
 }
 
 @test "Bash grep with pipe emits no allow (executor)" {
 	run_hook "executor-grep-deny.sh" \
-		'{"tool_name":"Bash","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor","tool_input":{"command":"grep foo data.json | sort"}}'
+		'{"hook_event_name":"PreToolUse","tool_name":"Bash","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor","tool_input":{"command":"grep foo data.json | sort"}}'
 	assert_success
 	assert_output ''
 }
@@ -131,14 +131,14 @@ load '../test_helper'
 # unenforced for this shape, and the command is not auto-allowed either.
 @test "Bash grep on a non-final code file falls through, not allowed" {
 	run_hook "executor-grep-deny.sh" \
-		'{"tool_name":"Bash","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor","tool_input":{"command":"grep foo main.py && ls /tmp"}}'
+		'{"hook_event_name":"PreToolUse","tool_name":"Bash","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor","tool_input":{"command":"grep foo main.py && ls /tmp"}}'
 	assert_success
 	assert_output ''
 }
 
 @test "Bash simple grep in main session emits nothing, not an allow" {
 	run_hook "executor-grep-deny.sh" \
-		'{"tool_name":"Bash","tool_input":{"command":"grep foo data.json"}}'
+		'{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"grep foo data.json"}}'
 	assert_success
 	assert_output ''
 }
@@ -151,21 +151,78 @@ load '../test_helper'
 
 @test "REAL subagent payload: Grep *.rs inside executor is denied (exit 2)" {
 	run_hook "executor-grep-deny.sh" \
-		'{"session_id":"11111111-2222-3333-4444-555555555555","transcript_path":"/tmp/t.jsonl","cwd":"/tmp","prompt_id":"p1","permission_mode":"default","agent_id":"agt_abc123","agent_type":"oh-my-claudeagent:executor","effort":"medium","tool_name":"Grep","tool_input":{"pattern":"foo","glob":"*.rs"}}'
+		'{"hook_event_name":"PreToolUse","session_id":"11111111-2222-3333-4444-555555555555","transcript_path":"/tmp/t.jsonl","cwd":"/tmp","prompt_id":"p1","permission_mode":"default","agent_id":"agt_abc123","agent_type":"oh-my-claudeagent:executor","effort":"medium","tool_name":"Grep","tool_input":{"pattern":"foo","glob":"*.rs"}}'
 	assert_failure 2
 	assert_output --partial 'ast_search'
 }
 
 @test "REAL subagent payload: Bash grep on a .rs file inside executor is denied (exit 2)" {
 	run_hook "executor-grep-deny.sh" \
-		'{"session_id":"11111111-2222-3333-4444-555555555555","cwd":"/tmp","prompt_id":"p1","permission_mode":"default","agent_id":"agt_abc123","agent_type":"oh-my-claudeagent:executor","effort":"medium","tool_name":"Bash","tool_input":{"command":"grep foo src/main.rs"}}'
+		'{"hook_event_name":"PreToolUse","session_id":"11111111-2222-3333-4444-555555555555","cwd":"/tmp","prompt_id":"p1","permission_mode":"default","agent_id":"agt_abc123","agent_type":"oh-my-claudeagent:executor","effort":"medium","tool_name":"Bash","tool_input":{"command":"grep foo src/main.rs"}}'
 	assert_failure 2
 	assert_output --partial 'ast_search'
 }
 
 @test "REAL main-thread payload: agent_type present without agent_id is allowed" {
 	run_hook "executor-grep-deny.sh" \
-		'{"session_id":"11111111-2222-3333-4444-555555555555","cwd":"/tmp","permission_mode":"default","agent_type":"oh-my-claudeagent:executor","tool_name":"Grep","tool_input":{"pattern":"foo","glob":"*.rs"}}'
+		'{"hook_event_name":"PreToolUse","session_id":"11111111-2222-3333-4444-555555555555","cwd":"/tmp","permission_mode":"default","agent_type":"oh-my-claudeagent:executor","tool_name":"Grep","tool_input":{"pattern":"foo","glob":"*.rs"}}'
 	assert_success
 	assert_output ''
+}
+
+@test "a grep mentioned inside an argument is not denied" {
+	run_hook "executor-grep-deny.sh" \
+		'{"hook_event_name":"PreToolUse","tool_name":"Bash","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor","tool_input":{"command":"echo replacing grep with ast_search in src/main.py"}}'
+	assert_success
+	assert_output ''
+}
+
+@test "a commit message naming grep and a code file is not denied" {
+	run_hook "executor-grep-deny.sh" \
+		'{"hook_event_name":"PreToolUse","tool_name":"Bash","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor","tool_input":{"command":"git commit -m fix-grep-in-main.py"}}'
+	assert_success
+	assert_output ''
+}
+
+@test "grep at the head of the command is still denied" {
+	run_hook "executor-grep-deny.sh" \
+		'{"hook_event_name":"PreToolUse","tool_name":"Bash","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor","tool_input":{"command":"grep foo src/main.py"}}'
+	assert_failure 2
+}
+
+@test "grep after a pipe is still denied" {
+	run_hook "executor-grep-deny.sh" \
+		'{"hook_event_name":"PreToolUse","tool_name":"Bash","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor","tool_input":{"command":"cat list | grep foo src/main.py"}}'
+	assert_failure 2
+}
+
+@test "Bash grep on a code file emits the PermissionRequest deny shape" {
+	run_hook "executor-grep-deny.sh" \
+		'{"hook_event_name":"PermissionRequest","tool_name":"Bash","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor","tool_input":{"command":"grep foo src/main.py"}}'
+	assert_success
+	[ "$(echo "$output" | jq -r '.hookSpecificOutput.hookEventName')" = "PermissionRequest" ]
+	[ "$(echo "$output" | jq -r '.hookSpecificOutput.decision.behavior')" = "deny" ]
+	[ -n "$(echo "$output" | jq -r '.hookSpecificOutput.decision.message // empty')" ]
+}
+
+@test "an absent hook_event_name reads as PermissionRequest" {
+	run_hook "executor-grep-deny.sh" \
+		'{"tool_name":"Bash","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor","tool_input":{"command":"grep foo src/main.py"}}'
+	assert_success
+	[ "$(echo "$output" | jq -r '.hookSpecificOutput.decision.behavior')" = "deny" ]
+}
+
+@test "hooks.json: executor-grep-deny.sh is registered on PreToolUse Bash" {
+	run jq -e '[.hooks.PreToolUse[] | select(.matcher == "Bash") | .hooks[]
+		| select(.command | test("executor-grep-deny\\.sh"))] | length == 1' \
+		"$CLAUDE_PLUGIN_ROOT/hooks/hooks.json"
+	assert_success
+}
+
+@test "hooks.json: the PreToolUse Bash executor-grep-deny handler carries no if filter" {
+	run jq -e '[.hooks.PreToolUse[] | select(.matcher == "Bash") | .hooks[]
+		| select(.command | test("executor-grep-deny\\.sh")) | select(has("if"))]
+		| length == 0' \
+		"$CLAUDE_PLUGIN_ROOT/hooks/hooks.json"
+	assert_success
 }

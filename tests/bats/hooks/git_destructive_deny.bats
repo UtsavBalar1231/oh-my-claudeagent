@@ -3,9 +3,12 @@ load '../test_helper'
 
 # ─── git-destructive-deny.sh tests ────────────────────────────────────────────
 
-# Helper: build a Bash tool hook payload with the given command string
 bash_payload() {
-	printf '{"tool_name":"Bash","tool_input":{"command":"%s"}}' "$1"
+	printf '{"tool_name":"Bash","hook_event_name":"PreToolUse","tool_input":{"command":"%s"}}' "$1"
+}
+
+permreq_payload() {
+	printf '{"tool_name":"Bash","hook_event_name":"PermissionRequest","tool_input":{"command":"%s"}}' "$1"
 }
 
 # Run a hook and merge stderr into stdout so assert_output can inspect denial messages.
@@ -286,6 +289,102 @@ run_hook_merged() {
 		refute_output --partial '"behavior":"allow"'
 		refute_output --partial '"permissionDecision":"allow"'
 	done
+}
+
+@test "git-destructive-deny: git rm --cached is not blocked" {
+	run_hook_merged "git-destructive-deny.sh" "$(bash_payload 'git rm --cached secrets.env')"
+	assert_success
+	assert_output ""
+}
+
+@test "git-destructive-deny: git rm of a single file is not blocked" {
+	run_hook_merged "git-destructive-deny.sh" "$(bash_payload 'git rm stale.txt')"
+	assert_success
+	assert_output ""
+}
+
+@test "git-destructive-deny: git rm -r of a directory is blocked" {
+	run_hook_merged "git-destructive-deny.sh" "$(bash_payload 'git rm -r vendor/')"
+	assert_failure 2
+	assert_output --partial "Destructive git"
+}
+
+@test "git-destructive-deny: a space-separated --git-dir reset --hard is blocked" {
+	run_hook_merged "git-destructive-deny.sh" "$(bash_payload 'git --git-dir /r/.git reset --hard')"
+	assert_failure 2
+}
+
+@test "git-destructive-deny: a space-separated --work-tree reset --hard is blocked" {
+	run_hook_merged "git-destructive-deny.sh" "$(bash_payload 'git --work-tree /w reset --hard')"
+	assert_failure 2
+}
+
+@test "git-destructive-deny: a --no-pager reset --hard is blocked" {
+	run_hook_merged "git-destructive-deny.sh" "$(bash_payload 'git --no-pager reset --hard')"
+	assert_failure 2
+}
+
+@test "git-destructive-deny: an attached -c config override reset --hard is blocked" {
+	run_hook_merged "git-destructive-deny.sh" "$(bash_payload 'git -cuser.name=x reset --hard')"
+	assert_failure 2
+}
+
+@test "git-destructive-deny: a --bare clean -fdx is blocked" {
+	run_hook_merged "git-destructive-deny.sh" "$(bash_payload 'git --bare clean -fdx')"
+	assert_failure 2
+}
+
+@test "git-destructive-deny: git --no-pager log is allowed" {
+	run_hook_merged "git-destructive-deny.sh" "$(bash_payload 'git --no-pager log')"
+	assert_success
+	assert_output ""
+}
+
+@test "git-destructive-deny: a subshell clean -fdx is blocked" {
+	run_hook_merged "git-destructive-deny.sh" "$(bash_payload '(git clean -fdx)')"
+	assert_failure 2
+}
+
+@test "git-destructive-deny: a subshell stash is blocked" {
+	run_hook_merged "git-destructive-deny.sh" "$(bash_payload '(git stash)')"
+	assert_failure 2
+}
+
+@test "git-destructive-deny: a subshell reset --hard is blocked" {
+	run_hook_merged "git-destructive-deny.sh" "$(bash_payload '(git reset --hard)')"
+	assert_failure 2
+}
+
+@test "git-destructive-deny: a commit message naming the subcommand after a semicolon is not blocked" {
+	run_hook_merged "git-destructive-deny.sh" "$(bash_payload 'git commit -m \"cleanup; git stash was used\"')"
+	assert_success
+	assert_output ""
+}
+
+@test "git-destructive-deny: a single-quoted message naming the subcommand in backticks is not blocked" {
+	run_hook_merged "git-destructive-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"git commit -m '"'"'drop the `git stash` step'"'"'"}}'
+	assert_success
+	assert_output ""
+}
+
+@test "git-destructive-deny: reset --hard emits the PermissionRequest deny shape" {
+	run_hook "git-destructive-deny.sh" "$(permreq_payload 'git reset --hard')"
+	assert_success
+	[ "$(echo "$output" | jq -r '.hookSpecificOutput.hookEventName')" = "PermissionRequest" ]
+	[ "$(echo "$output" | jq -r '.hookSpecificOutput.decision.behavior')" = "deny" ]
+	[ -n "$(echo "$output" | jq -r '.hookSpecificOutput.decision.message // empty')" ]
+}
+
+@test "git-destructive-deny: an absent hook_event_name reads as PermissionRequest" {
+	run_hook "git-destructive-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"git reset --hard"}}'
+	assert_success
+	[ "$(echo "$output" | jq -r '.hookSpecificOutput.decision.behavior')" = "deny" ]
+}
+
+@test "git-destructive-deny: git status emits no allow on PermissionRequest" {
+	run_hook "git-destructive-deny.sh" "$(permreq_payload 'git status')"
+	assert_success
+	assert_output ""
 }
 
 @test "git-destructive-deny: OMCA_DISABLED_HOOKS listing a different hook still denies reset --hard" {
