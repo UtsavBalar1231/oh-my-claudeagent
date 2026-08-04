@@ -5,6 +5,96 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.17.0] - 2026-08-05
+
+### Fixed
+
+- **The Bash guardrails now fire on commands nobody is asked about.** They were registered
+  only on the event that runs when a permission dialog is about to be shown. Under auto
+  mode the classifier resolves most shell commands without any dialog, so for those the
+  guards never ran at all. A headless turn ran `rm -rf` against a canary directory with
+  both guards installed, produced no denial, and deleted it. The patterns had been right
+  the whole time; the wiring was missing. The deny half of each guard now also runs before
+  tool execution, regardless of permission status.
+- **A guard no longer approves what it fails to recognise.** Two of them ended in an
+  unconditional allow, which suppresses the permission dialog — so anything the patterns
+  missed was actively auto-approved rather than merely un-blocked. That covered in-place
+  `sed` against any file, a local `core.hooksPath` write (arbitrary code execution on the
+  next commit), and the `-C` form of a hard reset. A deny gate's answer to a command it
+  does not recognise is now silence, which leaves the decision to the platform.
+- **Each guard now speaks the deny shape its event actually reads.** One guard denied by
+  exit code on an event whose answer is read only from its output, so its deny was
+  discarded while its non-deny path approved. Whether that event honours an exit code is
+  disputed between the platform's own documentation and what live probing shows, so every
+  guard registered on both events now emits the shape each event documents — correct
+  either way, and no longer dependent on an unresolved question.
+- **The executor's Grep restriction was inert in production.** It decided whether it was
+  running inside a subagent by reading a field that is not part of the hook payload. Given
+  a real payload it allowed the Grep it exists to deny; given the invented shape its tests
+  used, it denied correctly. That is why every one of its tests passed while the rule
+  enforced nothing.
+- **The guards stopped blocking ordinary work.** A commit whose message merely mentioned a
+  denied flag or a destructive subcommand was blocked, because quoted text was scanned as
+  if it were code. `git rm --cached`, the standard way to un-commit a file, was blocked by
+  a pattern meant for recursive removal. Every `Edit` of an existing file emitted advice
+  telling you to use Edit. Each of these teaches you to switch the guard off permanently,
+  which costs far more than the case it caught.
+- **More destructive spellings are covered**: the uppercase, separated and long-form
+  recursive `rm` flags; `git checkout HEAD -- <path>`; the `-C`, `-c`, `--git-dir` and
+  `--work-tree` global forms in both spellings; recursive `git rm`; and a destructive
+  command at the head of a subshell.
+- **A Stop gate can no longer wedge the end of your turn.** A gate that blocks tells the
+  model to keep working, so one that blocks unconditionally leaves you unable to finish and
+  forced to kill the client. Missing `jq` made one gate block every single time, with the
+  platform's own recursion flag explicitly set. Two more paths bypassed the backoff
+  counters entirely, so the cap they were supposed to respect never engaged. The shared
+  budget was also reset wholesale by any gate's clean path, meaning one gate refunded
+  another's spent budget and the cap never bound. Every blocking path is now counted, and
+  every failure resolves toward letting you stop.
+- **Turn-end got fast and honest.** The drift check forked git once per changed file with
+  no ceiling — about 35 seconds of frozen turn-end on a large generated tree. It is now a
+  single pass with a file ceiling, roughly two orders of magnitude cheaper. It also
+  silently dropped files whose names contain a space, mis-read every path when a common
+  git config option was set, and matched `.only` in ordinary database code — an
+  unresolvable block on a project that never had a focused test. Focused-test markers are
+  now looked for only in JavaScript and TypeScript sources, where such a test can run.
+- **Starting a session no longer waits on the network.** Session setup ran a dependency
+  sync inside a five-second budget; on overrun the hook produced nothing at all — no date
+  context, no session title, no plan-registry repair, no per-session state reset. It failed
+  persistently rather than occasionally, because the cache it checks is refreshed only when
+  a sync succeeds, so one slow link broke every subsequent session identically. Setup now
+  finishes first and the sync runs detached, under a lock so parallel sessions cannot
+  corrupt the environment between them.
+- **Logs stop growing without bound.** Pruning tested for files untouched for a week, which
+  can never match a log still being written to, and its pattern missed one of the two log
+  types outright. Pruning is now by size and keeps the newest entries. Hook errors were
+  also being recorded to a file nothing ever read, so a permanently broken hook stayed
+  invisible; the count is now reported once per session.
+- **OMCA works on a machine without GNU tools.** The shared library every hook depends on
+  assumed four binaries that stock macOS does not ship. The worst was `timeout`: without
+  it, every hook read empty input and exited successfully, so the entire hook layer went
+  silently inert and every deny gate failed open. Digest, lock and timestamp handling had
+  the same shape — BSD `date` was the subtlest, since it succeeds while printing something
+  unusable, so the intended fallback never triggered. Concurrent state updates were also
+  losing writes, and a corrupt or empty counter file could pin the retry budget forever.
+- **The plugin validator stopped reporting checks it was not running.** It matched hook
+  registrations by exact string, so widening any registration to cover several tools made
+  the lookup silently stop finding it — reporting a skip while exercising nothing.
+
+### Added
+
+- **The evidence file and the append-only notepads are guarded against `Edit`, not just
+  `Write`.** Editing was the more natural way to forge a record in a JSON file, and nothing
+  else covered it.
+- **`OMCA_DISABLED_HOOKS` accepts `all` (or `*`)** to switch off every hook at once, which
+  the configuration documentation already promised.
+
+### Removed
+
+- **The plan-mode handler.** Its decision was discarded by the platform for any tool that
+  requires user interaction, so it never had an effect — while logging that it had
+  approved something, which made the audit trail worse than useless.
+
 ## [2.16.0] - 2026-08-04
 
 ### Fixed
