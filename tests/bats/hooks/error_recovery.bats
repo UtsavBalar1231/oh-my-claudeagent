@@ -25,7 +25,7 @@ load '../test_helper'
 	echo "$ctx" | grep -qi "unique"
 }
 
-@test "edit-error-recovery: corrupt error-counts.json is left unchanged on jq failure" {
+@test "edit-error-recovery: corrupt error-counts.json self-heals instead of pinning the counter" {
 	local counts_file="$CLAUDE_PROJECT_ROOT/.omca/state/error-counts.json"
 	local corrupt_content='THIS IS NOT JSON {'
 	write_state "error-counts.json" "$corrupt_content"
@@ -36,10 +36,11 @@ load '../test_helper'
 	# Hook must not crash fatally — exit 0 is expected (graceful degradation)
 	assert_success
 
-	# File must not have been overwritten with a single-key object
-	local actual
-	actual=$(cat "$counts_file")
-	assert [ "$actual" = "$corrupt_content" ]
+	# A corrupt file used to be left in place, which pinned the retry counter at
+	# 1/3 forever. error_count_bump now rebases on `{}` and writes a valid file.
+	run jq -e . "$counts_file"
+	assert_success
+	refute_output --partial "$corrupt_content"
 }
 
 # ─── f. delegate-retry.sh ────────────────────────────────────────────────────

@@ -127,7 +127,17 @@ for RULE_FILE in "${RULE_FILES[@]}"; do
 			# with "rule:" to avoid colliding with the AGENTS.md/README "dir|mtime" keys
 			# sharing this same cache file.
 			RULE_REALPATH=$(realpath "${RULE_FILE}" 2>/dev/null || printf '%s' "${RULE_FILE}")
-			RULE_HASH=$(printf '%s' "${RULE_CONTENT}" | sha256sum | cut -d' ' -f1)
+			RULE_HASH=$(printf '%s' "${RULE_CONTENT}" | _sha256)
+
+			if [[ "${RULE_HASH}" == "${SHA256_UNAVAILABLE}" ]]; then
+				CONTEXT_PARTS+="[Rule: ${PATTERN}]: ${RULE_CONTENT}"
+				if [[ "${#RULE_TAIL}" -gt 1000 ]]; then
+					CONTEXT_PARTS+=" (truncated, read full rule at ${RULE_FILE})"
+				fi
+				CONTEXT_PARTS+=$'\n'
+				continue
+			fi
+
 			RULE_CACHE_KEY="rule:${RULE_REALPATH}:${RULE_HASH}"
 
 			RULE_ALREADY_INJECTED=$(jq -r --arg key "${RULE_CACHE_KEY}" '.[$key] // "false"' "${CACHE_FILE}" 2>/dev/null)

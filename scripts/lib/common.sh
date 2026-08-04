@@ -2,13 +2,24 @@
 if [[ -z "${HOOK_INPUT+x}" ]]; then
 	# 5s — generous margin over platform stdin write latency; long enough that no
 	# observed hook payload has ever needed more, short enough to bound a stuck Stop.
-	HOOK_INPUT=$(timeout 5 cat)
-	if [[ $? -eq 124 ]]; then
+	HOOK_INPUT_TIMED_OUT=0
+	_hook_read_rc=0
+	if command -v timeout >/dev/null 2>&1; then
+		HOOK_INPUT=$(timeout 5 cat)
+		_hook_read_rc=$?
+	elif command -v gtimeout >/dev/null 2>&1; then
+		HOOK_INPUT=$(gtimeout 5 cat)
+		_hook_read_rc=$?
+	else
+		HOOK_INPUT=$(cat)
+	fi
+	if [[ ${_hook_read_rc} -eq 124 ]]; then
 		HOOK_INPUT=""
 		HOOK_INPUT_TIMED_OUT=1
-	else
-		HOOK_INPUT_TIMED_OUT=0
+	elif [[ -z "${HOOK_INPUT//[[:space:]]/}" ]] || ! jq -e . >/dev/null 2>&1 <<<"${HOOK_INPUT}"; then
+		HOOK_INPUT_TIMED_OUT=1
 	fi
+	unset _hook_read_rc
 fi
 export HOOK_INPUT HOOK_INPUT_TIMED_OUT
 
@@ -39,31 +50,85 @@ log_hook_info() {
 		'{timestamp: $ts, level: "info", hook: $hook, message: $msg}' >>"${HOOK_LOG_DIR}/hook-info.jsonl" 2>/dev/null
 }
 
+SHA256_UNAVAILABLE="no-digest"
+
+_sha256() {
+	if command -v sha256sum >/dev/null 2>&1; then
+		sha256sum | cut -d' ' -f1
+	elif command -v shasum >/dev/null 2>&1; then
+		shasum -a 256 | cut -d' ' -f1
+	else
+		cat >/dev/null
+		printf '%s\n' "${SHA256_UNAVAILABLE}"
+	fi
+}
+
+_epoch_ns() {
+	local ns
+	ns=$(date +%s%N 2>/dev/null)
+	if [[ "${ns}" =~ ^[0-9]+$ ]]; then
+		printf '%s\n' "${ns}"
+	else
+		printf '%s000000000\n' "$(date +%s)"
+	fi
+}
+
+_with_state_lock() {
+	local file="$1"
+	shift
+	if ! command -v flock >/dev/null 2>&1; then
+		"$@"
+		return $?
+	fi
+	(
+		flock -w 5 200 || log_hook_error "flock wait timed out on $(basename "${file}"), proceeding unlocked" "$(basename "$0")"
+		"$@"
+	) 200>"${file}.lock"
+}
+
+_json_base() {
+	local base
+	base=$(jq -c . "$1" 2>/dev/null) || base='{}'
+	[[ -z "${base}" || "${base}" == "null" ]] && base='{}'
+	printf '%s\n' "${base}"
+}
+
+_json_rmw() {
+	local file="$1"
+	local filter="$2"
+	shift 2
+	local dir tmp
+	dir=$(dirname "${file}")
+	mkdir -p "${dir}" 2>/dev/null
+	tmp=$(mktemp -p "${dir}" 2>/dev/null || mktemp "${dir}/.omca-rmw.XXXXXX" 2>/dev/null) || return 1
+	if _json_base "${file}" | jq "$@" "${filter}" >"${tmp}" 2>/dev/null && [[ -s "${tmp}" ]]; then
+		mv "${tmp}" "${file}" 2>/dev/null && return 0
+	fi
+	rm -f "${tmp}"
+	return 1
+}
+
 # Bump the error counter for <key> in error-counts.json: increments count,
 # stamps last_failure_at, and prepends a truncated error summary to
 # last_errors (newest first, capped at 3). Resets count + last_errors when
 # the prior last_failure_at predates ERROR_COUNT_DECAY_SECONDS. Legacy bare-
 # int values are read as {count: N, no timestamp/errors} and upgraded to the
-# object shape on write. On any read/write failure the file is left
-# untouched (atomic mktemp+mv) and "1" is printed as a safe fallback count.
 # Usage: NEW_COUNT=$(error_count_bump <key> <error-summary>)
 error_count_bump() {
 	local key="$1"
 	local error_summary="$2"
 	local file="${HOOK_STATE_DIR}/error-counts.json"
+	error_summary=$(printf '%s' "${error_summary}" | tr '\n' ' ' | cut -c1-160)
+	_with_state_lock "${file}" _error_count_bump_body "${file}" "${key}" "${error_summary}"
+}
+
+_error_count_bump_body() {
+	local file="$1" key="$2" error_summary="$3"
 	local now
 	now=$(date +%s)
-	error_summary=$(printf '%s' "${error_summary}" | tr '\n' ' ' | cut -c1-160)
 
-	local base="{}"
-	[[ -f "${file}" ]] && base=$(cat "${file}")
-
-	local tmp
-	tmp=$(mktemp) || { log_hook_error "mktemp failed for error-counts.json" "$(basename "$0")"; echo 1; return 0; }
-
-	if printf '%s\n' "${base}" | jq \
-		--arg key "${key}" --arg err "${error_summary}" \
-		--argjson now "${now}" --argjson decay "${ERROR_COUNT_DECAY_SECONDS}" '
+	# shellcheck disable=SC2016 # jq filter: $vars are jq bindings passed via --arg, not shell
+	if _json_rmw "${file}" '
 		def entry_of($k):
 			(.[$k] // 0) as $v |
 			if ($v | type) == "number" then {count: $v, last_failure_at: null, last_errors: []}
@@ -77,12 +142,11 @@ error_count_bump() {
 			last_failure_at: $now,
 			last_errors: ([$err] + $carried.last_errors)[0:3]
 		}
-	' >"${tmp}" 2>/dev/null; then
-		mv "${tmp}" "${file}" || log_hook_error "mv failed for error-counts.json key=${key}" "$(basename "$0")"
+	' --arg key "${key}" --arg err "${error_summary}" \
+		--argjson now "${now}" --argjson decay "${ERROR_COUNT_DECAY_SECONDS}"; then
 		jq -r --arg key "${key}" '.[$key].count' "${file}" 2>/dev/null || echo 1
 	else
-		rm -f "${tmp}"
-		log_hook_error "jq update failed for error-counts.json key=${key}" "$(basename "$0")"
+		log_hook_error "update failed for error-counts.json key=${key}" "$(basename "$0")"
 		echo 1
 	fi
 }
@@ -153,7 +217,8 @@ emit_context() {
 hook_timing_log() {
 	local start_ns="$1"
 	local end_ns ms
-	end_ns=$(date +%s%N 2>/dev/null || date +%s)
+	end_ns=$(_epoch_ns)
+	[[ "${start_ns}" =~ ^[0-9]+$ ]] || return 0
 	ms=$(( (end_ns - start_ns) / 1000000 ))
 	echo "{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"hook\":\"$(basename "$0")\",\"ms\":${ms}}" \
 		>> "${HOOK_LOG_DIR}/hook-timing.jsonl" 2>/dev/null
@@ -176,24 +241,46 @@ mode_already_announced() {
 # Requires CURRENT_SESSION to be set by the caller (via resolve_session_id).
 mark_mode_announced() {
 	local mode="$1"
-	local now_epoch
-	now_epoch=$(date +%s)
-	local base="{}"
-	if [[ -f "${ACTIVE_MODES_FILE}" ]]; then
-		base=$(cat "${ACTIVE_MODES_FILE}")
-	fi
-	local tmp
-	tmp=$(mktemp) || { log_hook_error "mktemp failed for active-modes.json" "$(basename "$0")"; return 0; }
-	if printf '%s\n' "${base}" | jq \
+	# shellcheck disable=SC2016 # jq filter: $vars are jq bindings passed via --arg, not shell
+	_with_state_lock "${ACTIVE_MODES_FILE}" \
+		_json_rmw "${ACTIVE_MODES_FILE}" '.[$mode] = {"detected_at": $epoch, "session_id": $sid}' \
 		--arg mode "${mode}" \
-		--argjson epoch "${now_epoch}" \
+		--argjson epoch "$(date +%s)" \
 		--arg sid "${CURRENT_SESSION}" \
-		'.[$mode] = {"detected_at": $epoch, "session_id": $sid}' > "${tmp}" 2>/dev/null; then
-		mv "${tmp}" "${ACTIVE_MODES_FILE}" || log_hook_error "mv failed for active-modes.json" "$(basename "$0")"
-	else
-		rm -f "${tmp}"
-		log_hook_error "jq update failed for active-modes.json mode=${mode}" "$(basename "$0")"
+		|| log_hook_error "update failed for active-modes.json mode=${mode}" "$(basename "$0")"
+	return 0
+}
+
+# 5 blocks — same cap as plan-continuation-guard.sh rail 9.
+HARD_CAP_BLOCKS=5
+STOP_BLOCKS_FILE="${HOOK_STATE_DIR}/stop-blocks.json"
+
+stop_block_allowed() {
+	local gate="$1"
+	[[ -n "${gate}" ]] || return 1
+	command -v jq >/dev/null 2>&1 || return 1
+	[[ -d "${HOOK_STATE_DIR}" && -w "${HOOK_STATE_DIR}" ]] || return 1
+
+	local count=0
+	if [[ -f "${STOP_BLOCKS_FILE}" ]]; then
+		if ! count=$(jq -er --arg g "${gate}" '(.[$g] // 0) | numbers // 0' "${STOP_BLOCKS_FILE}" 2>/dev/null); then
+			printf '{}\n' >"${STOP_BLOCKS_FILE}" 2>/dev/null
+			return 1
+		fi
+		[[ "${count}" =~ ^[0-9]+$ ]] || count=0
 	fi
+	((count < HARD_CAP_BLOCKS)) || return 1
+
+	# shellcheck disable=SC2016 # jq filter: $vars are jq bindings passed via --arg, not shell
+	_with_state_lock "${STOP_BLOCKS_FILE}" \
+		_json_rmw "${STOP_BLOCKS_FILE}" '.[$g] = ((.[$g] // 0 | numbers // 0) + 1)' --arg g "${gate}" \
+		|| return 1
+	return 0
+}
+
+stop_blocks_reset() {
+	rm -f "${STOP_BLOCKS_FILE}" 2>/dev/null
+	return 0
 }
 
 # Resolve the canonical evidence file path: <root>/.omca/evidence/verification-evidence.json.
@@ -233,13 +320,13 @@ count_plan_checkboxes() {
 }
 
 # Checks OMCA_DISABLED_HOOKS, a comma- and/or whitespace-separated list of
-# hook basenames without the .sh suffix, for <name>. Returns 0 (disabled) on
-# a match, 1 when unset/empty/no match. Unified kill switch for OMCA hooks.
 # Usage: hook_is_disabled "final-verification-evidence" && exit 0
 hook_is_disabled() {
 	local name="$1"
 	local list="${OMCA_DISABLED_HOOKS:-}"
 	[[ -z "${list}" ]] && return 1
+	local padded=" ${list//,/ } "
+	[[ "${padded}" == *" all "* || "${padded}" == *" * "* ]] && return 0
 	local entry
 	for entry in ${list//,/ }; do
 		[[ "${entry}" == "${name}" ]] && return 0
@@ -261,7 +348,10 @@ block_exit() {
 		printf '%s\n' "${payload}"
 	else
 		log_hook_error "jq failed to encode Stop block reason, emitting static block payload" "$(basename "$0")"
-		printf '%s\n' '{"decision":"block","reason":"An OMCA Stop gate blocked this stop but its reason text could not be encoded. See .omca/logs/hook-errors.jsonl."}'
+		local gate
+		gate=$(basename "$0" .sh | tr -cd '[:alnum:]._-')
+		printf '{"decision":"block","reason":"The OMCA Stop gate %s blocked this stop but its reason text could not be encoded. See .omca/logs/hook-errors.jsonl. To bypass, set OMCA_DISABLED_HOOKS=%s (or OMCA_DISABLED_HOOKS=all) and stop again."}\n' \
+			"${gate}" "${gate}"
 	fi
 	exit 0
 }

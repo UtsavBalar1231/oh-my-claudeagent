@@ -20,10 +20,7 @@ jq -nc --arg tool "${TOOL_NAME}" --arg file "${FILE_PATH}" --argjson ok "${TOOL_
 
 EDITS_FILE="${STATE_DIR}/recent-edits.json"
 
-# flock-protected read-modify-write to prevent concurrent Write races
-(
-	# 5s — flock wait; long enough for concurrent siblings, short enough to fail fast.
-	flock -w 5 200 || { log_hook_error "flock timeout on recent-edits" "post-edit.sh"; exit 0; }
+update_recent_edits() {
 	if [[ ! -f "${EDITS_FILE}" ]]; then
 		echo '{"files":{}}' >"${EDITS_FILE}"
 	fi
@@ -31,7 +28,24 @@ EDITS_FILE="${STATE_DIR}/recent-edits.json"
 	jq --arg file "${FILE_PATH}" --arg ts "${TIMESTAMP}" \
 		'.files[$file] = $ts' \
 		"${EDITS_FILE}" >"${TMP_FILE}" && mv "${TMP_FILE}" "${EDITS_FILE}"
-) 200>"${EDITS_FILE}.lock"
+}
+
+if command -v flock >/dev/null 2>&1; then
+	(
+		flock -w 5 200
+		FLOCK_RC=$?
+		if (( FLOCK_RC == 1 )); then
+			log_hook_error "flock timed out after 5s on recent-edits" "post-edit.sh"
+			exit 0
+		elif (( FLOCK_RC != 0 )); then
+			log_hook_error "flock failed (rc=${FLOCK_RC}) on recent-edits; skipping update" "post-edit.sh"
+			exit 0
+		fi
+		update_recent_edits
+	) 200>"${EDITS_FILE}.lock"
+else
+	update_recent_edits
+fi
 
 # Defensive empty JSON response for pre-v2.1.119 platforms where async hooks
 # emitting no stdout wrote empty transcript entries. Safe to emit on all versions.

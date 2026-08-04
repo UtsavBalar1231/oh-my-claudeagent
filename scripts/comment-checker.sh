@@ -366,8 +366,15 @@ fi
 # from a genuine non-obvious comment, so a repeat attempt on the same file and
 # findings fails open rather than trapping the edit in a retry loop.
 GATE_STATE="${HOOK_STATE_DIR}/comment-gate-window.json"
-SIG=$(printf '%s\n%s' "${FILE_PATH}" "${QUOTED}" | sha256sum | cut -c1-16)
+SIG=$(printf '%s\n%s' "${FILE_PATH}" "${QUOTED}" | _sha256)
 PREV_SIG=$(jq_read "${GATE_STATE}" '.signature' "")
+
+if [[ "${SIG}" == "${SHA256_UNAVAILABLE}" ]]; then
+	log_hook_info "no digest tool; tier2 gate advises instead of denying: ${FILE_PATH}" "$(basename "$0")"
+	advise "${ADVISORY}"
+	exit 0
+fi
+SIG="${SIG:0:16}"
 
 if [[ "${SIG}" == "${PREV_SIG}" ]]; then
 	log_hook_info "gate failed open after repeat deny: ${FILE_PATH}" "$(basename "$0")"

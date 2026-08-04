@@ -20,7 +20,12 @@ if [[ -z "${SIG_INPUT}" ]]; then
 	exit 0
 fi
 
-SIG=$(printf '%s' "${SIG_INPUT}" | sha256sum | cut -c1-16)
+SIG=$(printf '%s' "${SIG_INPUT}" | _sha256)
+if [[ "${SIG}" == "${SHA256_UNAVAILABLE}" ]]; then
+	hook_timing_log "${START_NS}"
+	exit 0
+fi
+SIG="${SIG:0:16}"
 
 STATE_FILE="${HOOK_STATE_DIR}/tool-loop-window.json"
 # A repeat only counts as a loop within one user turn: prompt_id changing means the
