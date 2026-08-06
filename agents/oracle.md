@@ -71,17 +71,6 @@ During active plan execution:
 
 No writes (`>`, `>>`, `tee`), deletion (`rm`), or creation (`touch`, `mkdir`).
 
-## External Directory Access
-
-For files outside project root, use `file_read` MCP tool:
-
-```
-file_read(path="/external/path/file.py")
-file_read(path="/external/path/file.py", offset=100, limit=50)
-```
-
-Returns line-numbered content with token count, line count, remaining lines. For large files, use `offset`/`limit` to conserve context. Bypasses sandbox scoping. Fallback: `Bash(cat /path)` when not in plan mode.
-
 ## Output Verbosity (STRICT)
 
 A good consultation reads like a two-minute answer from a trusted colleague, not a long report from someone proving they did the reading.

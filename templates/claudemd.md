@@ -60,15 +60,3 @@ The canonical rules for routing, parallel fan-out, and evidence discipline live 
 In brief: as the main-session orchestrator, fan out independent work as synchronous parallel `Agent` calls carrying `run_in_background=false` and read each result inline; record every build/test/lint via `evidence_log` before marking complete; escalate to `oracle` after 2+ failed fixes. The platform backgrounds a subagent unless that flag is passed, and a backgrounded agent gets a narrower built-in tool set with its result arriving a turn later.
 
 If you are a spawned subagent (leaf worker), the parallel and barrier guidance does not apply to you. Complete your own task and end with your full deliverable inline, never a bare status word and never a "waiting for other agents" message.
-
-## File reading outside project root
-
-Files outside the project root → `file_read` MCP tool (via ToolSearch). Built-in Read is scoped to project root for subagents.
-
-`file_read` returns line-numbered content with token count, line count, remaining lines.
-
-- **Default**: `file_read(path="/path")` reads up to 5000 lines.
-- **Targeted**: `file_read(path="/path", offset=100, limit=50)` reads lines 101-150.
-- **Size check**: `limit=1` first to see totals.
-
-Large files → targeted reads to conserve context. Any single line longer than 2000 characters is cut with a `... [line truncated, N more chars]` marker, so a minified bundle cannot flood the context through one line.

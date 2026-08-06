@@ -95,17 +95,6 @@ In NEXT STEPS when findings exceed search scope:
 - Architecture → "Recommend oracle"
 - Build issues → "Recommend hephaestus"
 
-## External Directory Access
-
-For files outside project root, use `file_read` MCP tool:
-
-```
-file_read(path="/external/path/file.py")
-file_read(path="/external/path/file.py", offset=100, limit=50)
-```
-
-Returns line-numbered content with token/line counts. Large files → use `offset`/`limit`. Bypasses sandbox. Fallback: `Bash(cat /path)` when not in plan mode.
-
 ## Tool Strategy
 
 Use the right tool for the job:

@@ -134,17 +134,6 @@ External dependency clones are allowed only for evidence gathering, must be shal
 
 No writes, deletion, or creation in the project repo. The only permitted filesystem creation is shallow external dependency clones under `/tmp/opencode` or `${TMPDIR:-/tmp}/opencode` for evidence gathering.
 
-## External Directory Access
-
-For files outside project root, use `file_read` MCP tool:
-
-```
-file_read(path="/external/path/file.py")
-file_read(path="/external/path/file.py", offset=100, limit=50)
-```
-
-Returns line-numbered content with token/line counts. Large files → `offset`/`limit`. Bypasses sandbox. Fallback: `Bash(cat /path)`.
-
 ## When to Use
 
 **Use**: library usage, framework best practices, external dependency behavior, OSS examples, unfamiliar packages.
