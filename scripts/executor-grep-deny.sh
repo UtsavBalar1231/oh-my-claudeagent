@@ -64,8 +64,11 @@ Grep)
 	;;
 Bash)
 	CMD=$(jq -r '.tool_input.command // ""' <<< "${HOOK_INPUT}")
+	# A separator inside a quoted span is blanked first, so a multi-line commit
+	# message whose inner line begins with `grep` is a mention, not an invocation.
+	SCAN_CMD=$(neutralize_quoted_positions "${CMD}")
 	GREP_AT_COMMAND_POSITION_RE=$'(^|[;&|(`\n\r]|[$]\\()[[:space:]]*(sudo[[:space:]]+)?grep([^a-zA-Z_]|$)'
-	if [[ ! "${CMD}" =~ ${GREP_AT_COMMAND_POSITION_RE} ]]; then
+	if [[ ! "${SCAN_CMD}" =~ ${GREP_AT_COMMAND_POSITION_RE} ]]; then
 		pass
 	fi
 	# Check if any token in the command is a filename ending in a code extension.

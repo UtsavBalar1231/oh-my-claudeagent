@@ -386,6 +386,71 @@ hook_is_disabled() {
 	return 1
 }
 
+# Blank out the characters that open a command position when they occur inside a
+# quoted span, so a Bash guard scanning for a command-position pattern cannot read
+# a literal mention as a real invocation. `; & | ( )` plus newline and CR become
+# `_`; inside a single-quoted span `$` and backtick lose their meaning too, so they
+# are blanked as well.
+# This is a substitute for a tokenizer, not one: an unbalanced quote makes the rest
+# of the string read as quoted, which under-denies rather than over-denies.
+# Arguments:
+#   $1 - the raw command string
+# Outputs:
+#   The neutralized string on STDOUT, no trailing newline.
+neutralize_quoted_positions() {
+	local s="$1" out="" quote="" ch i
+	for ((i = 0; i < ${#s}; i++)); do
+		ch="${s:i:1}"
+		if [[ -n "${quote}" ]]; then
+			if [[ "${ch}" == "${quote}" ]]; then
+				quote=""
+			elif [[ "${ch}" == [\;\&\|\(\)] || "${ch}" == $'\n' || "${ch}" == $'\r' ]]; then
+				ch="_"
+			elif [[ "${quote}" == "'" && ("${ch}" == '$' || "${ch}" == '`') ]]; then
+				ch="_"
+			fi
+		elif [[ "${ch}" == "'" || "${ch}" == '"' ]]; then
+			quote="${ch}"
+		fi
+		out+="${ch}"
+	done
+	printf '%s' "${out}"
+}
+
+# Blank the contents of every <delim>-delimited span whose closing delimiter falls on
+# the SAME line, leaving the delimiters themselves in place, so a scanner reading the
+# result sees a mention as an empty span rather than as text it can match. This is the
+# opposite transform from neutralize_quoted_positions, which preserves quoted text and
+# only defuses the metacharacters inside it.
+# A delimiter with no partner before the next newline is literal (`don't`): it is
+# emitted unchanged, so an apostrophe can never swallow the rest of its line.
+# Arguments:
+#   $1 - the raw text
+#   $2 - a single-character delimiter
+# Outputs:
+#   The stripped text on STDOUT, no trailing newline.
+strip_paired_spans() {
+	local s="$1" delim="$2" out="" i ch rest line_rest before_close
+	local n=${#s}
+	for ((i = 0; i < n; i++)); do
+		ch="${s:i:1}"
+		if [[ "${ch}" != "${delim}" ]]; then
+			out+="${ch}"
+			continue
+		fi
+		rest="${s:i+1}"
+		line_rest="${rest%%$'\n'*}"
+		before_close="${line_rest%%"${delim}"*}"
+		if [[ "${before_close}" == "${line_rest}" ]]; then
+			out+="${ch}"
+			continue
+		fi
+		out+="${delim}${delim}"
+		i=$((i + ${#before_close} + 1))
+	done
+	printf '%s' "${out}"
+}
+
 # Block a Stop with <reason> and exit 0. `decision`+`reason` is the pair that
 # prevents the stop; hookSpecificOutput.additionalContext is the platform's
 # non-blocking alternative for the event, not a modifier, so emitting both

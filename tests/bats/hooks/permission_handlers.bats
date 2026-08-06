@@ -484,3 +484,49 @@ permissionrequest_payload() {
 		"$CLAUDE_PLUGIN_ROOT/hooks/hooks.json"
 	assert_success
 }
+
+# ── A quoted mention whose inner line starts with the token ───────────────────
+# The command-position class contains a raw newline, so before quoted spans were
+# neutralized a multi-line commit message opened a fake command position at every
+# inner line start. A multi-paragraph message describing a shell cleanup denied,
+# and the workaround was `git commit -F file`.
+
+@test "permission-filter: a multi-line message with a recursive removal at an inner line start is not denied" {
+	local cmd
+	cmd=$(printf 'git commit -m "refactor hooks\n\nrm -rf calls were replaced by explicit deletes"')
+	run_hook "permission-filter.sh" "$(jq -nc --arg c "$cmd" '{tool_name:"Bash",hook_event_name:"PreToolUse",tool_input:{command:$c}}')"
+	assert_success
+	assert_output ""
+}
+
+@test "permission-filter: a multi-line message with a recursive removal mid-line is not denied" {
+	local cmd
+	cmd=$(printf 'git commit -m "refactor hooks\n\nwe dropped the rm -rf call here"')
+	run_hook "permission-filter.sh" "$(jq -nc --arg c "$cmd" '{tool_name:"Bash",hook_event_name:"PreToolUse",tool_input:{command:$c}}')"
+	assert_success
+	assert_output ""
+}
+
+@test "permission-filter: a real recursive removal on an unquoted second line still denies" {
+	local cmd
+	cmd=$(printf 'cd /tmp\nrm -rf build')
+	run_hook "permission-filter.sh" "$(jq -nc --arg c "$cmd" '{tool_name:"Bash",hook_event_name:"PreToolUse",tool_input:{command:$c}}')"
+	assert_success
+	assert_output --partial '"deny"'
+}
+
+@test "permission-filter: a real recursive removal after && still denies" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","hook_event_name":"PreToolUse","tool_input":{"command":"git status && rm -rf x"}}'
+	assert_success
+	assert_output --partial '"deny"'
+}
+
+# Neutralization is scoped to the deny scan: the operator check that disqualifies the
+# trusted-tooling fast path still sees a quoted separator, so a quoted operator cannot
+# buy an auto-allow it would not otherwise get.
+
+@test "permission-filter: jq with a quoted separator is not auto-allowed" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","hook_event_name":"PermissionRequest","tool_input":{"command":"jq -r \".a | .b\" f.json"}}'
+	assert_success
+	refute_output --partial '"allow"'
+}

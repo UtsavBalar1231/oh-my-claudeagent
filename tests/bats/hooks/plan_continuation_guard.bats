@@ -442,7 +442,7 @@ _init_repo() {
 # Assembled from split literals so this suite is not itself a drift finding.
 _add_untracked_stub() {
 	local marker="TODO: imple""ment"
-	printf '%s pagination\n' "${marker}" > "${CLAUDE_PROJECT_ROOT}/stub.txt"
+	printf '# %s pagination\n' "${marker}" > "${CLAUDE_PROJECT_ROOT}/stub.sh"
 }
 
 # Every gate short-circuits without an assistant message, so the matrix payload

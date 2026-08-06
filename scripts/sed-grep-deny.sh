@@ -22,9 +22,12 @@ DENY_REASON="\`sed -n\` and \`grep -n\` are denied. Use the Grep tool, Read with
 # Pattern: command word followed by one or more flag clusters that include `n`.
 # [[:alnum:]]* before/after `n` allows clusters like -ne, -nA, -rn, -nB3 are
 # caught because the flag group contains n.
+# A separator inside a quoted span is blanked first, so a multi-line commit
+# message whose inner line begins with `sed -n` is a mention, not an invocation.
+SCAN_CMD=$(neutralize_quoted_positions "${CMD}")
 CMD_POSITION_RE=$'(^|[;&|`\n\r]|[$]\\()[[:space:]]*'
-if [[ "${CMD}" =~ ${CMD_POSITION_RE}sed[[:space:]]+-[[:alnum:]]*n[[:alnum:]]*([[:space:]]|$) ]] \
-	|| [[ "${CMD}" =~ ${CMD_POSITION_RE}grep[[:space:]]+-[[:alnum:]]*n[[:alnum:]]*([[:space:]]|$) ]]; then
+if [[ "${SCAN_CMD}" =~ ${CMD_POSITION_RE}sed[[:space:]]+-[[:alnum:]]*n[[:alnum:]]*([[:space:]]|$) ]] \
+	|| [[ "${SCAN_CMD}" =~ ${CMD_POSITION_RE}grep[[:space:]]+-[[:alnum:]]*n[[:alnum:]]*([[:space:]]|$) ]]; then
 	if [[ "${HOOK_EVENT}" == "PreToolUse" ]]; then
 		jq -nc --arg reason "${DENY_REASON}" \
 			'{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: $reason}}'

@@ -44,23 +44,21 @@ setup() {
 	assert_success
 }
 
-# ─── d. No Evidence + recent edits → Task-Completion blocked ────────────────
-# No evidence file + recent edits.jsonl → task-completed-verify blocks with exit 2
+# ─── d. Recorder → Task-Completion pipeline ─────────────────────────────────
+# verification-command-recorder writes the slot → task-completed-verify reads it and
+# blocks, because no evidence postdates the verification it recorded.
 
-@test "pipeline d: no evidence with recent edits blocks task-completed-verify" {
+@test "pipeline d: a recorded verification with no evidence after it blocks task-completed-verify" {
 	# Explicitly remove evidence from previous pipeline test (shared BATS_FILE_TMPDIR)
 	rm -f "$CLAUDE_PROJECT_ROOT/.omca/evidence/verification-evidence.json"
 
-	# Write a recent edits.jsonl so the hook knows files were modified
-	local now
-	now=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-	printf '{"event":"edit","file":"src/foo.ts","timestamp":"%s"}\n' "$now" \
-		> "$CLAUDE_PROJECT_ROOT/.omca/logs/edits.jsonl"
+	run_hook "verification-command-recorder.sh" '{"tool_input":{"command":"just test"}}'
+	assert_success
+	[ -f "$CLAUDE_PROJECT_ROOT/.omca/state/last-verification-command.json" ]
 
-	# task description matches verification keywords
 	run_hook "task-completed-verify.sh" '{"task_description":"all tests pass after fix"}'
-	# Should be blocked (exit 2)
 	assert [ "$status" -eq 2 ]
+	assert_output --partial "just test"
 }
 
 # ─── f. Compaction context pipeline ──────────────────────────────────────────

@@ -226,3 +226,31 @@ load '../test_helper'
 		"$CLAUDE_PLUGIN_ROOT/hooks/hooks.json"
 	assert_success
 }
+
+# ── A quoted mention whose inner line starts with the command word ────────────
+# The command-position class contains a raw newline, so an inner line of a quoted
+# multi-line message read as a command position. A trailing pathspec supplies the
+# code extension the deny also requires, which is the shape that actually fired.
+
+@test "Bash: a multi-line commit message with the command word at an inner line start is not denied" {
+	local cmd
+	cmd=$(printf 'git commit -m "search cleanup\n\ngrep was replaced by ast_search" -- src/main.py')
+	run_hook "executor-grep-deny.sh" \
+		"$(jq -nc --arg c "$cmd" '{hook_event_name:"PreToolUse",tool_name:"Bash",agent_id:"agt_exec01",agent_type:"oh-my-claudeagent:executor",tool_input:{command:$c}}')"
+	assert_success
+	assert_output ''
+}
+
+@test "Bash: a real grep on an unquoted second line still denies" {
+	local cmd
+	cmd=$(printf 'cd /src\ngrep foo main.py')
+	run_hook "executor-grep-deny.sh" \
+		"$(jq -nc --arg c "$cmd" '{hook_event_name:"PreToolUse",tool_name:"Bash",agent_id:"agt_exec01",agent_type:"oh-my-claudeagent:executor",tool_input:{command:$c}}')"
+	assert_failure 2
+}
+
+@test "Bash: a real grep after && still denies" {
+	run_hook "executor-grep-deny.sh" \
+		'{"hook_event_name":"PreToolUse","tool_name":"Bash","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor","tool_input":{"command":"cd /src && grep foo main.py"}}'
+	assert_failure 2
+}

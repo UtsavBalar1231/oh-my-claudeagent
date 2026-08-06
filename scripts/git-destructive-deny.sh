@@ -26,26 +26,6 @@ fi
 # shellcheck disable=SC2001
 CMD=$(echo "${CMD}" | sed 's/^[[:space:]]*//')
 
-neutralize_quoted_positions() {
-	local s="$1" out="" quote="" ch i
-	for ((i = 0; i < ${#s}; i++)); do
-		ch="${s:i:1}"
-		if [[ -n "${quote}" ]]; then
-			if [[ "${ch}" == "${quote}" ]]; then
-				quote=""
-			elif [[ "${ch}" == [\;\&\|\(\)] || "${ch}" == $'\n' || "${ch}" == $'\r' ]]; then
-				ch="_"
-			elif [[ "${quote}" == "'" && ("${ch}" == '$' || "${ch}" == '`') ]]; then
-				ch="_"
-			fi
-		elif [[ "${ch}" == "'" || "${ch}" == '"' ]]; then
-			quote="${ch}"
-		fi
-		out+="${ch}"
-	done
-	printf '%s' "${out}"
-}
-
 SCAN_CMD=$(neutralize_quoted_positions "${CMD}")
 
 # The destructive subcommand denies at any command position, not only the head of

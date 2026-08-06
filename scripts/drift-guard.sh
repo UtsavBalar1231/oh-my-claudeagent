@@ -81,20 +81,31 @@ fi
 
 # --- Completion-claim check: case-insensitive, excluding negated matches
 # ("not done", "haven't finished", ...). ERE lookbehind isn't portable across
-# grep implementations, so negation is checked manually against the text
-# immediately preceding each match offset.
+# grep implementations, so negation is checked manually, below.
 CLAIM_RE='\b(done|complete|completed|finished|implemented|fixed|resolved|ready (to|for) (merge|review))\b'
-NEG_RE="(not |haven'?t |isn'?t |doesn'?t |won'?t )\$"
+
+# Scoped to the sentence the match sits in, not to the word immediately before it:
+# "the tests are not passing, so nothing is fixed" negates across several words. The
+# scope ends at the previous sentence boundary so an earlier sentence's negator cannot
+# cancel a later genuine claim.
+NEG_RE="(\b(not|no|nothing|none|never|un[a-z]+ished|incomplete|yet to|remains)\b|n'?t\b)"
 
 LOWER_TEXT=$(tr '[:upper:]' '[:lower:]' <<< "${ASSISTANT_TEXT}")
 
+# Backtick and double-quote spans quote someone else's words or name a literal, so a
+# claim inside one is not this turn's claim. Single quotes are NOT stripped from prose:
+# "haven't ... it's" would pair two apostrophes and blank the negators between them.
+CLAIM_TEXT=$(strip_paired_spans "${LOWER_TEXT}" '`')
+CLAIM_TEXT=$(strip_paired_spans "${CLAIM_TEXT}" '"')
+
 has_completion_claim() {
-	local offsets off _match prefix
-	offsets=$(grep -aboE "${CLAIM_RE}" <<< "${LOWER_TEXT}")
+	local offsets off _match prefix sentence
+	offsets=$(grep -aboE "${CLAIM_RE}" <<< "${CLAIM_TEXT}")
 	[[ -z "${offsets}" ]] && return 1
 	while IFS=: read -r off _match; do
-		prefix="${LOWER_TEXT:0:off}"
-		if [[ "${prefix}" =~ ${NEG_RE} ]]; then
+		prefix="${CLAIM_TEXT:0:off}"
+		sentence="${prefix##*[.!?;:$'\n']}"
+		if [[ "${sentence}" =~ ${NEG_RE} ]]; then
 			continue
 		fi
 		return 0
@@ -125,11 +136,17 @@ MARKER_PATTERN="${MARKER_FOCUSED_TEST}|${MARKER_ANY_LANGUAGE}"
 
 FILE_WHERE_A_FOCUSED_TEST_CAN_RUN='\.(js|jsx|ts|tsx|mjs|cjs)$'
 
-markers_applicable_to() {
+# A document cannot hold an executable stub, so a marker in one is always a mention.
+FILE_THAT_IS_PROSE='\.(md|markdown|rst|txt|adoc)$'
+
+# The markers safe to match against quote-stripped text. MARKER_NOT_IMPL is absent by
+# construction: its pattern spans an opening quote, so stripping quoted spans would
+# make it unmatchable forever. It is matched against the raw line instead.
+quote_safe_markers_for() {
 	if [[ "$1" =~ ${FILE_WHERE_A_FOCUSED_TEST_CAN_RUN} ]]; then
-		printf '%s' "${MARKER_PATTERN}"
+		printf '%s' "${MARKER_FOCUSED_TEST}|${MARKER_TODO}"
 	else
-		printf '%s' "${MARKER_ANY_LANGUAGE}"
+		printf '%s' "${MARKER_TODO}"
 	fi
 }
 
@@ -138,46 +155,6 @@ markers_applicable_to() {
 # what it looks for. Only the declaration line is exempt, so a real stub inside
 # a test body still gets caught.
 BATS_TEST_DECL='^[[:space:]]*@test[[:space:]]'
-
-# In Markdown, a backtick-quoted occurrence and a fenced code block are the two
-# forms that mean "I am naming this pattern", not "I left this stub": a
-# comment-convention document cannot ban a marker without writing it down. Only
-# those two forms are exempt, so a bare marker in Markdown prose stays a
-# finding: genuine unfinished work does sometimes get recorded in a doc.
-md_fenced_lines() {
-	local line fence=0 n=0
-	while IFS= read -r line || [[ -n "${line}" ]]; do
-		n=$((n + 1))
-		if [[ "${line}" =~ ^[[:space:]]*\`\`\` ]]; then
-			fence=$((1 - fence))
-			printf '%s\n' "${n}"
-		elif [[ "${fence}" -eq 1 ]]; then
-			printf '%s\n' "${n}"
-		fi
-	done < "$1"
-}
-
-# Remove every backtick-delimited span, shortest-match first, so a marker that
-# survives was never quoted.
-md_strip_inline_code() {
-	local text="$1" head tail
-	while [[ "${text}" == *\`*\`* ]]; do
-		head="${text%%\`*}"
-		tail="${text#*\`}"
-		tail="${tail#*\`}"
-		text="${head}${tail}"
-	done
-	printf '%s' "${text}"
-}
-
-md_line_is_documenting() {
-	local lineno="$1" text="$2" fenced="$3" applicable="$4"
-	grep -qxF "${lineno}" <<< "${fenced}" && return 0
-	local stripped
-	stripped=$(md_strip_inline_code "${text}")
-	grep -qE "${applicable}" <<< "${stripped}" && return 1
-	return 0
-}
 
 # 500 changed files — ~1ms scan each; above this the tree is machine-generated.
 MAX_CHANGED_FILES=500
@@ -235,23 +212,19 @@ untracked_lines_stream() {
 	done <<< "${UNTRACKED_FILES}"
 }
 
-MD_CACHE_FILE=""
-MD_CACHE_LINES=""
-
 record_candidate() {
 	local file="$1" lineno="$2" text="$3"
 	[[ -n "${file}" && -n "${lineno}" ]] || return 0
-	local applicable
-	applicable=$(markers_applicable_to "${file}")
-	grep -qE "${applicable}" <<< "${text}" || return 0
+	[[ "${file}" =~ ${FILE_THAT_IS_PROSE} ]] && return 0
 	[[ "${text}" =~ ${BATS_TEST_DECL} ]] && return 0
-	if [[ "${file}" == *.md ]]; then
-		if [[ "${MD_CACHE_FILE}" != "${file}" ]]; then
-			MD_CACHE_FILE="${file}"
-			MD_CACHE_LINES=$(md_fenced_lines "${HOOK_PROJECT_ROOT}/${file}" 2>/dev/null)
-		fi
-		md_line_is_documenting "${lineno}" "${text}" "${MD_CACHE_LINES}" "${applicable}" && return 0
+
+	if ! grep -qE "${MARKER_NOT_IMPL}" <<< "${text}"; then
+		local stripped
+		stripped=$(strip_paired_spans "${text}" "'")
+		stripped=$(strip_paired_spans "${stripped}" '"')
+		grep -qE "$(quote_safe_markers_for "${file}")" <<< "${stripped}" || return 0
 	fi
+
 	FINDINGS+="${file}:${lineno}  ${text}"$'\n'
 	return 0
 }

@@ -393,3 +393,23 @@ run_hook_merged() {
 		<<< "$(bash_payload 'git reset --hard')"
 	assert_failure 2
 }
+
+# ── A quoted mention whose inner line starts with the subcommand ──────────────
+# The neutralization this depends on lives in lib/common.sh and is shared with the
+# other Bash guards, so this locks the behavior against a regression there.
+
+@test "git-destructive-deny: a multi-line message with the subcommand at an inner line start is not blocked" {
+	local cmd
+	cmd=$(printf 'git commit -m "workflow cleanup\n\ngit reset --hard is no longer part of the flow"')
+	run_hook_merged "git-destructive-deny.sh" "$(jq -nc --arg c "$cmd" '{tool_name:"Bash",hook_event_name:"PreToolUse",tool_input:{command:$c}}')"
+	assert_success
+	assert_output ""
+}
+
+@test "git-destructive-deny: a real reset on an unquoted second line is blocked" {
+	local cmd
+	cmd=$(printf 'cd /repo\ngit reset --hard')
+	run_hook_merged "git-destructive-deny.sh" "$(jq -nc --arg c "$cmd" '{tool_name:"Bash",hook_event_name:"PreToolUse",tool_input:{command:$c}}')"
+	assert_failure 2
+	assert_output --partial "Destructive git"
+}

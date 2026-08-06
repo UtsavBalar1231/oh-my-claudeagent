@@ -4,7 +4,13 @@ load '../test_helper'
 TASK_BASIC='{"task_description":"status report only"}'
 TASK_VERIFY='{"task_description":"all tests pass — implement and verify the build"}'
 
-# Helper: write a valid verification-evidence.json into the evidence dir
+_write_slot() {
+	local at="${1:-$(date +%s)}"
+	jq -n --argjson at "$at" --arg s "$CLAUDE_SESSION_ID" \
+		'{command: "just test", at: $at, session_id: $s, exit_code: null}' \
+		> "$CLAUDE_PROJECT_ROOT/.omca/state/last-verification-command.json"
+}
+
 _write_fresh_evidence() {
 	local ts
 	ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -13,59 +19,63 @@ _write_fresh_evidence() {
 		> "$CLAUDE_PROJECT_ROOT/.omca/evidence/verification-evidence.json"
 }
 
-# ─── a. No evidence, no edits → allow ────────────────────────────────────────
+# ─── a. Nothing recorded → allow, whatever the task is named ─────────────────
 
-@test "no evidence file, no edits log, informational task: exits 0 (allow)" {
+@test "no slot, informational task: exits 0 (allow)" {
 	run_hook "task-completed-verify.sh" "$TASK_BASIC"
 	assert_success
 }
 
-# ─── b. Evidence exists and is fresh → allow ─────────────────────────────────
+@test "no slot, verification-sounding task: exits 0 (allow)" {
+	run_hook "task-completed-verify.sh" "$TASK_VERIFY"
+	assert_success
+}
 
-@test "valid fresh evidence, verification task: exits 0 (allow)" {
+# ─── b. Slot satisfied by later evidence → allow ─────────────────────────────
+
+@test "slot with evidence logged after it: exits 0 (allow)" {
+	_write_slot "$(($(date +%s) - 60))"
 	_write_fresh_evidence
 	run_hook "task-completed-verify.sh" "$TASK_VERIFY"
 	assert_success
 }
 
-# ─── c. Evidence missing, task claims verification → block ────────────────────
+# ─── c. Verification ran, evidence never followed → block ────────────────────
 
-@test "no evidence, no edits log, verification task: exits 2 (block)" {
-	run_hook "task-completed-verify.sh" "$TASK_VERIFY"
+@test "slot with no evidence at all: exits 2 (block) and names the command" {
+	_write_slot
+	run_hook "task-completed-verify.sh" "$TASK_BASIC"
 	[ "$status" -eq 2 ]
-	assert_output --partial "requires verification evidence"
+	assert_output --partial "logged no evidence after it"
+	assert_output --partial "just test"
 }
 
-# ─── d. Recent edits + no evidence + verification task → block ────────────────
+# ─── d. Evidence predating the verification does not satisfy it ──────────────
 
-@test "recent edits log, no evidence, verification task: exits 2 (block)" {
-	# Create a fresh edits.jsonl so RECENT_EDITS=true
-	printf '{"event":"edit","file":"foo.sh"}\n' > "$CLAUDE_PROJECT_ROOT/.omca/logs/edits.jsonl"
-	run_hook "task-completed-verify.sh" "$TASK_VERIFY"
-	# exit 2 means blocked — bats 'run' captures exit code in $status
-	[ "$status" -eq 2 ]
-}
-
-# ─── e. Evidence stale (>5 min) + recent edits → block ───────────────────────
-
-@test "stale evidence (>5 min) with recent edits: exits 2 (block)" {
+@test "evidence older than the slot: exits 2 (block)" {
 	_write_fresh_evidence
-	# Back-date evidence by 10 minutes so RECENT_EVIDENCE becomes false
 	touch -d "10 minutes ago" "$CLAUDE_PROJECT_ROOT/.omca/evidence/verification-evidence.json"
-	# Fresh edits log so RECENT_EDITS=true
-	printf '{"event":"edit","file":"bar.sh"}\n' > "$CLAUDE_PROJECT_ROOT/.omca/logs/edits.jsonl"
+	_write_slot
 	run_hook "task-completed-verify.sh" "$TASK_VERIFY"
 	[ "$status" -eq 2 ]
 }
 
-# ─── f. stdin read timeout — fail closed, warn (never silently allow) ────────
+# ─── e. stdin read timeout — warn and allow ──────────────────────────────────
 
-@test "stdin timeout: exits 2 (block) and warns, never silently allows" {
-	# Timeout means task_description/teammate_name parse as empty, which would
-	# otherwise silently skip the evidence requirement — must fail closed instead.
+@test "stdin timeout: warns but the state-derived verdict still stands" {
+	# The verdict comes from the slot, not the payload, so an unreadable payload
+	# costs only the audit line. Allowing here matches drift-guard's posture.
+	run env HOOK_INPUT="" HOOK_INPUT_TIMED_OUT=1 \
+		CLAUDE_PROJECT_ROOT="${CLAUDE_PROJECT_ROOT}" CLAUDE_PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT}" CLAUDE_SESSION_ID="${CLAUDE_SESSION_ID}" \
+		bash "${CLAUDE_PLUGIN_ROOT}/scripts/task-completed-verify.sh"
+	assert_success
+	assert_output --partial "stdin read timed out"
+}
+
+@test "stdin timeout with an unsatisfied slot: still blocks" {
+	_write_slot
 	run env HOOK_INPUT="" HOOK_INPUT_TIMED_OUT=1 \
 		CLAUDE_PROJECT_ROOT="${CLAUDE_PROJECT_ROOT}" CLAUDE_PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT}" CLAUDE_SESSION_ID="${CLAUDE_SESSION_ID}" \
 		bash "${CLAUDE_PLUGIN_ROOT}/scripts/task-completed-verify.sh"
 	[ "$status" -eq 2 ]
-	assert_output --partial "stdin read timed out"
 }

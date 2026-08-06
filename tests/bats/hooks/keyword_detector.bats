@@ -132,6 +132,61 @@ load '../test_helper'
 	assert [ ! -f "$CLAUDE_PROJECT_ROOT/.omca/state/active-modes.json" ]
 }
 
+# ---------------------------------------------------------------------------
+# Mention vs. instance: a prompt that talks ABOUT a trigger phrase
+# ---------------------------------------------------------------------------
+
+@test "mention: meta-cue 'the phrase' suppresses hephaestus detection" {
+	local p='Does the phrase fix build in a user prompt trigger hephaestus? I do not want you to fix anything.'
+	local payload
+	payload=$(jq -n --arg p "$p" '{"prompt":$p}')
+	run_hook "keyword-detector.sh" "$payload"
+	assert_success
+	assert_output ""
+}
+
+@test "mention: quoted trigger phrases suppress omca-setup and prometheus detection" {
+	local p='Document that "setup omca" and "create plan" are the trigger phrases; do not run them.'
+	local payload
+	payload=$(jq -n --arg p "$p" '{"prompt":$p}')
+	run_hook "keyword-detector.sh" "$payload"
+	assert_success
+	assert_output ""
+}
+
+@test "mention: quoting alone suppresses detection without a meta-cue" {
+	local p='I pasted "setup omca" into the doc yesterday.'
+	local payload
+	payload=$(jq -n --arg p "$p" '{"prompt":$p}')
+	run_hook "keyword-detector.sh" "$payload"
+	assert_success
+	assert_output ""
+}
+
+@test "mention control: unquoted 'fix build' still triggers hephaestus" {
+	local payload='{"prompt":"the build is failing, fix build please"}'
+	run_hook "keyword-detector.sh" "$payload"
+	assert_success
+	ctx=$(get_context)
+	assert echo "$ctx" | grep -q "HEPHAESTUS DETECTED"
+}
+
+@test "mention control: unquoted 'setup omca' still triggers omca-setup" {
+	local payload='{"prompt":"setup omca on this machine"}'
+	run_hook "keyword-detector.sh" "$payload"
+	assert_success
+	ctx=$(get_context)
+	assert echo "$ctx" | grep -q "OMCA-SETUP DETECTED"
+}
+
+@test "mention control: unquoted 'create plan' still triggers prometheus" {
+	local payload='{"prompt":"create plan for the auth rewrite"}'
+	run_hook "keyword-detector.sh" "$payload"
+	assert_success
+	ctx=$(get_context)
+	assert echo "$ctx" | grep -q "PROMETHEUS DETECTED"
+}
+
 @test "task-notification: genuine 'handoff please' prompt still triggers handoff detection" {
 	# Regression guard: the task-notification guard must not suppress real user prompts.
 	local payload='{"prompt":"handoff please"}'

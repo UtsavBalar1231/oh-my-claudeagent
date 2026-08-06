@@ -158,6 +158,8 @@
 [validate-plugin] PASS: hooks contract: valid JSON (<REPO_ROOT>/hooks/hooks.json)
 [validate-plugin] Running mcp_tool hook server-name checks
 [validate-plugin] PASS: mcp_tool hook 'validate_plan_write' server FQN 'plugin:oh-my-claudeagent:omca' matches plugin name + registered MCP server 'omca'
+[validate-plugin] Running hook script executability checks
+[validate-plugin] PASS: hook executability: every registered command handler script is executable
 [validate-plugin] PASS: hook fixture pretooluse-task-agent.json: valid JSON (<REPO_ROOT>/tests/fixtures/hooks/pretooluse-task-agent.json)
 [validate-plugin] PASS: hook fixture pretooluse-write.json: valid JSON (<REPO_ROOT>/tests/fixtures/hooks/pretooluse-write.json)
 [validate-plugin] PASS: hook fixture permissionrequest-bash.json: valid JSON (<REPO_ROOT>/tests/fixtures/hooks/permissionrequest-bash.json)
@@ -217,4 +219,4 @@
 [validate-plugin] PASS: mcp tools/list contains categories_list
 [validate-plugin] PASS: mcp tools/list contains file_read
 [validate-plugin] PASS: mcp tools/list contains session_search
-[validate-plugin] Summary: 195 passed, 0 failed, 14 skipped, 0 warned
+[validate-plugin] Summary: 196 passed, 0 failed, 14 skipped, 0 warned

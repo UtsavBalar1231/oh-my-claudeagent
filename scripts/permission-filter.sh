@@ -21,11 +21,15 @@ TRIMMED_CMD=$(echo "${COMMAND}" | sed 's/^[[:space:]]*//')
 # A recursive removal denies wherever it sits: `cd /x && rm -rf ~` is the same
 # operation as `rm -rf ~`. The leading alternation requires a command position
 # (string start, separator, subshell or substitution opener), which is what keeps
-# a literal mention out of scope: in `grep -rn "rm -rf" scripts/` the `rm` follows
-# a quote. Quote state is untracked here as it is in the operator scan below, so a
-# removal quoted after a separator denies too; accepted in place of a tokenizer.
+# a literal mention out of scope. Characters that would open a command position
+# inside a quoted span are blanked first, so a multi-line commit message whose
+# inner line begins with the token does not read as a real invocation.
+# Only this deny scans the neutralized string: the operator check below gates the
+# trusted-tooling auto-allow, and blinding it to a quoted separator would widen
+# that fast path instead of narrowing a deny.
+DESTRUCTIVE_RM_SCAN_CMD=$(neutralize_quoted_positions "${TRIMMED_CMD}")
 DESTRUCTIVE_RM_RE=$'(^|[;&|()`\n\r])[[:space:]]*(sudo[[:space:]]+)?rm[[:space:]]+((-[a-zA-Z]+|--[a-zA-Z-]+)[[:space:]]+)*(-[a-zA-Z]*[rR][a-zA-Z]*|--recursive)([[:space:]]|$)'
-if [[ "${TRIMMED_CMD}" =~ ${DESTRUCTIVE_RM_RE} ]]; then
+if [[ "${DESTRUCTIVE_RM_SCAN_CMD}" =~ ${DESTRUCTIVE_RM_RE} ]]; then
 	# Each event reads its decision from a different place: PreToolUse from
 	# hookSpecificOutput.permissionDecision, PermissionRequest from
 	# hookSpecificOutput.decision.behavior. A payload in the other event's shape is

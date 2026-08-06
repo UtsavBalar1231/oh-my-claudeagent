@@ -250,6 +250,14 @@ _run_fixture() {
 	_run_fixture "subagent-start" "explore"
 }
 
+@test "golden: verification-command-recorder/records-slot" {
+	_run_fixture "verification-command-recorder" "records-slot"
+}
+
+@test "golden: verification-command-recorder/quoted-mention" {
+	_run_fixture "verification-command-recorder" "quoted-mention"
+}
+
 @test "golden: task-completed-verify/no-evidence" {
 	_run_fixture "task-completed-verify" "no-evidence"
 }

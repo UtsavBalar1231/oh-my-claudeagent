@@ -75,29 +75,40 @@ if printf '%s\n' "${CONTENT}" | head -n 5 | grep -q "comment-checker-disable-fil
 	exit 0
 fi
 
-# Tier 1 — literal attribution/placeholder strings. Near-zero false positive,
-# so these are the only findings safe to hard-deny unconditionally.
+# A banned string reached through a string literal or a grep pattern is code
+# that MENTIONS the pattern, not an instance of it. Tier 1 and Tier 2 share this
+# one definition so that distinction has only one place to rot.
+COMMENT_LINE_RE='^[[:space:]]*(#|//)'
+
+# Tier 1 — literal attribution/placeholder strings on a comment line. Near-zero
+# false positive, so these are the only findings safe to hard-deny.
 TIER1=""
 
-if echo "${CONTENT}" | grep -qi "# AI-generated"; then
-	TIER1+="AI attribution comment detected. "
-fi
-
-if echo "${CONTENT}" | grep -qi "# This code was written by"; then
-	TIER1+="AI authorship comment detected. "
-fi
-
-# "TODO: implement" carrying an owner or issue ref is a tracked task, not a
-# placeholder, so it is exempt here exactly as it is in the bare-todo check.
-if echo "${CONTENT}" | awk '
-  BEGIN { hit = 0 }
-  tolower($0) ~ /todo:[[:space:]]*implement/ {
-    if ($0 !~ /#[0-9]+/ && $0 !~ /[A-Z]+-[0-9]+/ && $0 !~ /@[A-Za-z]/) hit = 1
+TIER1_HITS=$(printf '%s\n' "${CONTENT}" | awk -v comment_re="${COMMENT_LINE_RE}" '
+  $0 !~ comment_re { next }
+  { lc = tolower($0) }
+  lc ~ /# ai-generated/ { attribution = 1 }
+  lc ~ /# this code was written by/ { authorship = 1 }
+  # "TODO: implement" carrying an owner or issue ref is a tracked task, not a
+  # placeholder, so it is exempt here exactly as it is in the bare-todo check.
+  lc ~ /todo:[[:space:]]*implement/ {
+    if ($0 !~ /#[0-9]+/ && $0 !~ /[A-Z]+-[0-9]+/ && $0 !~ /@[A-Za-z]/) placeholder = 1
   }
-  END { exit (hit ? 0 : 1) }
-'; then
-	TIER1+="Unimplemented TODO placeholder detected. "
-fi
+  END {
+    if (attribution) print "ai-attribution"
+    if (authorship) print "ai-authorship"
+    if (placeholder) print "todo-placeholder"
+  }
+')
+
+while IFS= read -r hit; do
+	case "${hit}" in
+	ai-attribution) TIER1+="AI attribution comment detected. " ;;
+	ai-authorship) TIER1+="AI authorship comment detected. " ;;
+	todo-placeholder) TIER1+="Unimplemented TODO placeholder detected. " ;;
+	*) ;;
+	esac
+done <<< "${TIER1_HITS}"
 
 # Tier 3 — whole-hunk aggregates. No per-line finding to quote and mandated
 # Google-style headers can legitimately reach these ratios, so these stay
@@ -131,9 +142,9 @@ fi
 # Tier 2 — per-line heuristic findings (categories 1-5). Emitted as
 # "category|detail" lines by a single awk pass so every check shares one line
 # array and one @allow bypass check.
-SLOP_FINDINGS=$(printf '%s\n' "${CONTENT}" | awk '
+SLOP_FINDINGS=$(printf '%s\n' "${CONTENT}" | awk -v comment_re="${COMMENT_LINE_RE}" '
   function is_comment(l) {
-    return (l ~ /^[[:space:]]*#/ || l ~ /^[[:space:]]*\/\//)
+    return (l ~ comment_re)
   }
   function strip_marker(l,    s) {
     s = l

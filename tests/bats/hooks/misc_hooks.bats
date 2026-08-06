@@ -61,7 +61,7 @@ load '../test_helper'
 # ---------------------------------------------------------------------------
 
 @test "comment-checker: warns when content contains 'TODO: implement'" {
-	local content="function foo() {\n  // TODO: implement this\n  return null;\n}"
+	local content=$'function foo() {\n  // TODO: implement this\n  return null;\n}'
 	local payload
 	payload=$(jq -nc --arg c "$content" '{"tool_name":"Write","tool_input":{"content":$c}}')
 
@@ -73,8 +73,8 @@ load '../test_helper'
 }
 
 @test "comment-checker: warns for MultiEdit new_string content" {
-	local dirty="function foo() {\n  // TODO: implement this\n  return null;\n}"
-	local clean="function bar() {\n  return 1;\n}"
+	local dirty=$'function foo() {\n  // TODO: implement this\n  return null;\n}'
+	local clean=$'function bar() {\n  return 1;\n}'
 	local payload
 	payload=$(jq -nc --arg dirty "$dirty" --arg clean "$clean" '{"tool_name":"MultiEdit","tool_input":{"edits":[{"new_string":$clean},{"new_string":$dirty}]}}')
 
@@ -183,6 +183,73 @@ load '../test_helper'
 	payload=$(jq -nc --arg c "$content" '{"tool_name":"Write","tool_input":{"file_path":"/tmp/README.md","content":$c}}')
 
 	run_hook "comment-checker.sh" "$payload"
+	assert_success
+	assert_output ""
+}
+
+# Tier 1 scans comment lines only. A gate that fires on a banned string reached
+# through a string literal or a grep pattern cannot tell code that DOES a thing
+# from code that talks ABOUT it, and this repo writes guards about its guards.
+@test "comment-checker: tier-1 ignores a banned string inside a grep pattern" {
+	local content=$'if grep -qi "# AI-generated" "$f"; then deny; fi'
+	local payload
+	payload=$(jq -nc --arg c "$content" '{"tool_name":"Write","tool_input":{"file_path":"/repo/scripts/new-gate.sh","content":$c}}')
+
+	OMCA_COMMENT_GATE=deny run_hook "comment-checker.sh" "$payload"
+	assert_success
+	refute_output --partial "permissionDecision"
+}
+
+@test "comment-checker: tier-1 ignores banned strings inside a list literal" {
+	local content=$'BANNED = ["TODO: implement", "# AI-generated"]'
+	local payload
+	payload=$(jq -nc --arg c "$content" '{"tool_name":"Write","tool_input":{"file_path":"/repo/servers/fixtures.py","content":$c}}')
+
+	OMCA_COMMENT_GATE=deny run_hook "comment-checker.sh" "$payload"
+	assert_success
+	refute_output --partial "permissionDecision"
+}
+
+@test "comment-checker: tier-1 still denies an attribution comment in the same file shape" {
+	local content=$'# AI-generated helper\nif grep -qi "x" "$f"; then deny; fi'
+	local payload
+	payload=$(jq -nc --arg c "$content" '{"tool_name":"Write","tool_input":{"file_path":"/repo/scripts/new-gate.sh","content":$c}}')
+
+	OMCA_COMMENT_GATE=deny run_hook "comment-checker.sh" "$payload"
+	assert_success
+	assert_output --partial '"permissionDecision":"deny"'
+	assert_output --partial "AI attribution comment detected"
+}
+
+@test "comment-checker: tier-1 still denies a TODO placeholder comment" {
+	local content=$'# TODO: implement\ndef f():\n    pass'
+	local payload
+	payload=$(jq -nc --arg c "$content" '{"tool_name":"Write","tool_input":{"file_path":"/repo/servers/fixtures.py","content":$c}}')
+
+	OMCA_COMMENT_GATE=deny run_hook "comment-checker.sh" "$payload"
+	assert_success
+	assert_output --partial '"permissionDecision":"deny"'
+	assert_output --partial "Unimplemented TODO placeholder detected"
+}
+
+@test "comment-checker: advise mode reports a tier-1 comment but never denies" {
+	local content=$'# This code was written by an assistant\nfoo() { :; }'
+	local payload
+	payload=$(jq -nc --arg c "$content" '{"tool_name":"Write","tool_input":{"file_path":"/tmp/x.sh","content":$c}}')
+
+	OMCA_COMMENT_GATE=advise run_hook "comment-checker.sh" "$payload"
+	assert_success
+	refute_output --partial "permissionDecision"
+	ctx=$(get_context)
+	assert echo "$ctx" | grep -qi "AI authorship comment detected"
+}
+
+@test "comment-checker: advise mode stays silent on a banned string in a literal" {
+	local content=$'BANNED = ["# This code was written by"]'
+	local payload
+	payload=$(jq -nc --arg c "$content" '{"tool_name":"Write","tool_input":{"file_path":"/repo/servers/fixtures.py","content":$c}}')
+
+	OMCA_COMMENT_GATE=advise run_hook "comment-checker.sh" "$payload"
 	assert_success
 	assert_output ""
 }

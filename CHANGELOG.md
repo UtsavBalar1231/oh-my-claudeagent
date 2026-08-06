@@ -5,6 +5,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.17.2] - 2026-08-06
+
+### Fixed
+
+- **A commit message can mention a destructive command again.** The Bash guards anchor
+  their patterns to a command position, and a newline inside a quoted string opened one.
+  So a multi-paragraph commit message describing a shell cleanup was denied whenever the
+  token it discussed happened to start a line. Mid-line mentions always passed, which made
+  it look intermittent. One guard was given a quoted-span neutralizer in 2.17.0 and its
+  three siblings were not; the helper now lives in the shared library and all four use it.
+  Real commands still deny, including at any position in a chain.
+- **Task completion no longer blocks on what a task is called.** The gate word-matched the
+  task description for verbs like build, test and fix, then demanded verification evidence.
+  A task named "Write documentation explaining how to fix build errors" could not be
+  completed without logging evidence for a command nobody ran, which is pressure toward
+  fabricating exactly the record the gate exists to protect. The platform's task payload
+  carries nothing about what a task did, so the trigger is now a recorded fact instead of a
+  guess: a new recorder notes when a verification command actually runs, and the gate fires
+  only when evidence does not follow one. The block message names the command. The gate
+  also gained the kill-switch it was the only one lacking.
+- **The drift guard stopped blocking on files that describe it.** Its stub scan read a
+  marker inside a string literal as a marker, so editing the guard itself, or a test
+  fixture, or a changelog entry about it, refused the end of your turn. Markers in quoted
+  spans are now ignored, prose files are skipped outright, and the completion-claim check
+  reads negation across the whole sentence, so "I have not finished, nothing is complete
+  yet" is no longer a claim of completion.
+- **The comment gate stopped reading string literals as comments.** Its hard-deny tier
+  scanned whole file contents, so a script containing a grep pattern for a banned comment,
+  or a fixture listing one, was denied. It now looks only at comment lines.
+- **Talking about a keyword no longer triggers it.** Asking whether a phrase activates a
+  mode activated that mode, quotes and an explicit "do not run" included.
+
+### Added
+
+- **Verification-command recorder.** A `PostToolUse` handler that records the last
+  verification command actually run, in `.omca/state/last-verification-command.json`. It is
+  the signal the task-completion gate now reads. It never blocks anything on its own, and a
+  runner it fails to recognise means silence rather than a false denial.
+- **The validator now checks that registered hook scripts are executable.** A shell-form
+  handler without the executable bit fails at dispatch, so its guard silently never runs,
+  and nothing in the pre-flight command could see it. Found the honest way: a new hook in
+  this very release shipped without the bit and passed a clean validation run.
+
+### Changed
+
+- A task that should have run verification but ran nothing now completes without objection.
+  The old gate caught that case only when the task's title happened to contain a verb, and
+  its remedy was a log entry for nothing. Plan-level coverage is unchanged.
+
 ## [2.17.1] - 2026-08-06
 
 ### Fixed

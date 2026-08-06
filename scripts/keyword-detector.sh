@@ -30,6 +30,20 @@ CURRENT_SESSION=$(resolve_session_id)
 
 PROMPT_LOWER=$(echo "${PROMPT}" | tr '[:upper:]' '[:lower:]')
 
+# A prompt that TALKS ABOUT a trigger phrase must not fire the mode. This hook
+# is advisory, so both filters below bias toward under-firing: a missed banner
+# costs a slash command the user can still type, a false one derails the turn.
+#
+# Meta-cue: the prompt is discussing the phrase rather than asking for it.
+if [[ "${PROMPT_LOWER}" =~ (the[[:space:]]+(phrase|keyword|trigger|literal)|trigger[[:space:]]+phrase|document[[:space:]]+that|do[[:space:]]+not[[:space:]]+run|don.t[[:space:]]+run) ]]; then
+	exit 0
+fi
+
+# Quoting: a keyword inside double quotes or backticks is being cited, not
+# invoked. Single quotes are deliberately left alone — apostrophes make a
+# single-quoted span unparseable in English prose.
+PROMPT_LOWER=$(printf '%s\n' "${PROMPT_LOWER}" | awk '{ gsub(/"[^"]*"/, " "); gsub(/`[^`]*`/, " "); print }')
+
 DETECTED_KEYWORDS=()
 ADDITIONAL_CONTEXT=""
 

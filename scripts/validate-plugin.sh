@@ -1302,11 +1302,41 @@ check_mcp_tool_hook_server_names() {
 	fi
 }
 
+check_hook_scripts_executable() {
+	log "Running hook script executability checks"
+
+	# A shell-form handler without the executable bit fails at dispatch, so the guard it
+	# implements silently never runs. Missing-file resolution is already covered by
+	# run_registered_hooks, so only paths that exist are judged here.
+	local raw_command script_path rel_path
+	local found=0
+	local clean=1
+
+	while IFS= read -r raw_command; do
+		[[ -z "${raw_command}" ]] && continue
+		script_path="$(resolve_hook_path "${raw_command}")"
+		[[ -f "${script_path}" ]] || continue
+		found=1
+		if [[ ! -x "${script_path}" ]]; then
+			rel_path="$(relative_path "${script_path}")"
+			fail "hook executability: ${rel_path} is registered in hooks.json but is not executable (fix: chmod +x ${rel_path})"
+			clean=0
+		fi
+	done < <(jq -r '.hooks[]?[]?.hooks[]? | select(.type == "command") | .command // empty' "${HOOKS_JSON}" | sort -u)
+
+	if [[ "${found}" -eq 0 ]]; then
+		skip "hook executability: no resolvable command handler scripts registered in ${HOOKS_JSON}"
+	elif [[ "${clean}" -eq 1 ]]; then
+		pass "hook executability: every registered command handler script is executable"
+	fi
+}
+
 check_hooks() {
 	log "Running hooks checks"
 
 	validate_json_file "${HOOKS_JSON}" "hooks contract"
 	check_mcp_tool_hook_server_names
+	check_hook_scripts_executable
 	check_hook_fixtures_exist
 
 	local tmp_root

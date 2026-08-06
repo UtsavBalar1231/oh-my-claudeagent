@@ -69,11 +69,11 @@ _assert_blocked() {
 @test "drift-guard: untracked new stub file blocks Stop" {
 	echo "hello" > a.txt
 	_commit_all
-	echo "TODO: implement" > new.txt
+	echo "TODO: implement" > new.sh
 
 	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
 	_assert_blocked
-	assert_output --partial "new.txt"
+	assert_output --partial "new.sh"
 }
 
 @test "drift-guard: untracked binary file does not crash and is not a false block" {
@@ -97,7 +97,7 @@ _assert_blocked() {
 }
 
 @test "drift-guard: repo with no commits (no HEAD) fails open (allows Stop)" {
-	echo "TODO: implement" > new.txt
+	echo "TODO: implement" > new.sh
 
 	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
 	assert_success
@@ -107,7 +107,7 @@ _assert_blocked() {
 @test "drift-guard: kill switch (OMCA_HOOK_DISABLE_DRIFT_GUARD=1) allows Stop" {
 	echo "hello" > a.txt
 	_commit_all
-	echo "TODO: implement" > new.txt
+	echo "TODO: implement" > new.sh
 
 	OMCA_HOOK_DISABLE_DRIFT_GUARD=1 run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
 	assert_success
@@ -117,7 +117,7 @@ _assert_blocked() {
 @test "drift-guard: OMCA_DISABLED_HOOKS listing this hook allows Stop" {
 	echo "hello" > a.txt
 	_commit_all
-	echo "TODO: implement" > new.txt
+	echo "TODO: implement" > new.sh
 
 	OMCA_DISABLED_HOOKS="drift-guard" run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
 	assert_success
@@ -127,7 +127,7 @@ _assert_blocked() {
 @test "drift-guard: OMCA_DISABLED_HOOKS listing a different hook still blocks" {
 	echo "hello" > a.txt
 	_commit_all
-	echo "TODO: implement" > new.txt
+	echo "TODO: implement" > new.sh
 
 	OMCA_DISABLED_HOOKS="other-hook" run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
 	_assert_blocked
@@ -136,7 +136,7 @@ _assert_blocked() {
 @test "drift-guard: assistant text extracted from transcript_path when last_assistant_message is absent" {
 	echo "hello" > a.txt
 	_commit_all
-	echo "TODO: implement" > new.txt
+	echo "TODO: implement" > new.sh
 
 	local transcript="$BATS_TEST_TMPDIR/transcript.jsonl"
 	cat > "$transcript" <<EOF
@@ -149,13 +149,59 @@ EOF
 
 	run_hook "drift-guard.sh" "$payload"
 	_assert_blocked
-	assert_output --partial "new.txt"
+	assert_output --partial "new.sh"
+}
+
+# ---------------------------------------------------------------------------
+# Completion-claim precision
+# ---------------------------------------------------------------------------
+
+# A claim word inside a backtick or double-quote span is quoted material, not this
+# turn's claim: asking about the word "done" is not asserting it.
+@test "drift-guard: a quoted 'done' is not a completion claim" {
+	echo "hello" > a.txt
+	_commit_all
+	echo "TODO: implement" > new.sh
+
+	run_hook "drift-guard.sh" "$(_claim_payload 'You asked whether the parser is "done" — the answer is no.')"
+	assert_success
+	assert_output '{}'
+}
+
+@test "drift-guard: an unquoted claim in the same shape still blocks" {
+	echo "hello" > a.txt
+	_commit_all
+	echo "TODO: implement" > new.sh
+
+	run_hook "drift-guard.sh" "$(_claim_payload 'The parser is done and the answer is yes.')"
+	_assert_blocked
+}
+
+# Negation scopes to the sentence, not to the word immediately preceding the claim:
+# "the suite is not green, so nothing is fixed" was blocked by the adjacent-prefix rule.
+@test "drift-guard: a negator earlier in the same sentence suppresses the claim" {
+	echo "hello" > a.txt
+	_commit_all
+	echo "TODO: implement" > new.sh
+
+	run_hook "drift-guard.sh" "$(_claim_payload 'The suite is not green, so the parser path is fixed nowhere yet.')"
+	assert_success
+	assert_output '{}'
+}
+
+@test "drift-guard: a negator in a previous sentence does not suppress a later claim" {
+	echo "hello" > a.txt
+	_commit_all
+	echo "TODO: implement" > new.sh
+
+	run_hook "drift-guard.sh" "$(_claim_payload 'Earlier the suite was not green. The parser is fixed now.')"
+	_assert_blocked
 }
 
 @test "drift-guard: negated completion claim (not done) allows Stop despite a stub" {
 	echo "hello" > a.txt
 	_commit_all
-	echo "TODO: implement" > new.txt
+	echo "TODO: implement" > new.sh
 
 	run_hook "drift-guard.sh" "$(_claim_payload 'This is not done yet.')"
 	assert_success
@@ -186,50 +232,97 @@ EOF
 	assert_output --partial "suite.bats"
 }
 
-# The Markdown fixtures below also assemble the marker from split literals, for
-# the same reason: this suite must not become its own finding.
-@test "drift-guard: a backticked marker in Markdown is not a finding" {
-	echo "hello" > a.txt
-	_commit_all
-	local marker="TODO: imple""ment"
-	printf 'Bare `%s` is not a comment.\n' "$marker" > doc.md
-
-	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
-	assert_success
-	assert_output '{}'
-}
-
-@test "drift-guard: a marker inside a fenced code block in Markdown is not a finding" {
-	echo "hello" > a.txt
-	_commit_all
-	local marker="TODO: imple""ment"
-	printf 'Bad example:\n\n```go\n// %s pagination\n```\n' "$marker" > doc.md
-
-	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
-	assert_success
-	assert_output '{}'
-}
-
-@test "drift-guard: a bare marker in Markdown prose is still a finding" {
+# The prose fixtures below also assemble the marker from split literals, for the
+# same reason: this suite must not become its own finding.
+#
+# A document cannot hold an executable stub, so prose extensions are skipped
+# outright. That replaces the old fence/backtick analysis, which could not tell a
+# convention doc naming a marker from a genuine note, and blocked on both.
+@test "drift-guard: a marker in unfenced Markdown prose is not a finding" {
 	echo "hello" > a.txt
 	_commit_all
 	local marker="TODO: imple""ment"
 	printf 'Still to do: %s the pagination path.\n' "$marker" > doc.md
 
 	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
-	_assert_blocked
-	assert_output --partial "doc.md"
+	assert_success
+	assert_output '{}'
 }
 
-@test "drift-guard: the Markdown carve-out does not leak to non-Markdown files" {
+@test "drift-guard: every prose extension is skipped" {
+	echo "hello" > a.txt
+	_commit_all
+	local marker="TODO: imple""ment" ext
+	for ext in md markdown rst txt adoc; do
+		printf '%s the parser\n' "$marker" > "notes.${ext}"
+	done
+
+	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
+	assert_success
+	assert_output '{}'
+}
+
+@test "drift-guard: the prose carve-out does not leak to code files" {
 	echo "hello" > a.txt
 	_commit_all
 	local marker="TODO: imple""ment"
-	printf '# Bare `%s` is not a comment.\n' "$marker" > script.sh
+	printf '# %s the pagination path\n' "$marker" > script.sh
 
 	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
 	_assert_blocked
 	assert_output --partial "script.sh"
+}
+
+# ---------------------------------------------------------------------------
+# Quoted mentions in code
+# ---------------------------------------------------------------------------
+
+# A marker inside a quoted string is a value, not a stub: the shell constant below
+# and the Python list after it both blocked, and neither had a resolution short of
+# disabling the gate.
+@test "drift-guard: a marker as a shell string constant is not a finding" {
+	echo "hello" > a.txt
+	_commit_all
+	local marker="TODO: imple""ment"
+	printf "MARKER_TODO='%s'\n" "$marker" > guard.sh
+
+	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
+	assert_success
+	assert_output '{}'
+}
+
+@test "drift-guard: a marker in a Python list literal outside tests/ is not a finding" {
+	echo "hello" > a.txt
+	_commit_all
+	local marker="TODO: imple""ment"
+	printf 'BANNED = ["%s"]\n' "$marker" > lint_rules.py
+
+	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
+	assert_success
+	assert_output '{}'
+}
+
+@test "drift-guard: an unquoted marker comment in the same file is still a finding" {
+	echo "hello" > a.txt
+	_commit_all
+	local marker="TODO: imple""ment"
+	printf "MARKER_TODO='%s'\n# %s the parser\n" "$marker" "$marker" > guard.sh
+
+	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
+	_assert_blocked
+	assert_output --partial "guard.sh"
+}
+
+# The not-implemented throw spans an opening quote by construction, so stripping
+# quoted spans globally would make it unmatchable forever. It matches the raw line.
+@test "drift-guard: a not-implemented throw is still a finding despite its quotes" {
+	echo "hello" > a.txt
+	_commit_all
+	printf 'function f() { throw new Error("not implemented yet"); }\n' > impl.js
+
+	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
+	_assert_blocked
+	assert_output --partial "impl.js"
 }
 
 @test "drift-guard: HOOK_INPUT_TIMED_OUT=1 warns and allows Stop" {
@@ -276,7 +369,7 @@ EOF
 @test "drift-guard: an unresolved stub stops blocking once the Stop-block cap is hit" {
 	echo "hello" > a.txt
 	_commit_all
-	echo "TODO: implement" > new.txt
+	echo "TODO: implement" > new.sh
 
 	local decisions="" i
 	# 7 > HARD_CAP_BLOCKS (5).
@@ -291,7 +384,7 @@ EOF
 @test "drift-guard: resolving the stub restores the Stop-block budget" {
 	echo "hello" > a.txt
 	_commit_all
-	echo "TODO: implement" > new.txt
+	echo "TODO: implement" > new.sh
 
 	local i
 	for i in 1 2 3 4 5 6; do
@@ -299,11 +392,11 @@ EOF
 	done
 	assert_output '{}'
 
-	echo "resolved" > new.txt
+	echo "resolved" > new.sh
 	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
 	assert_output '{}'
 
-	echo "TODO: implement" > another.txt
+	echo "TODO: implement" > another.sh
 	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
 	_assert_blocked
 }
@@ -311,7 +404,7 @@ EOF
 @test "drift-guard: jq unavailable allows Stop" {
 	echo "hello" > a.txt
 	_commit_all
-	echo "TODO: implement" > new.txt
+	echo "TODO: implement" > new.sh
 
 	local dir="$BATS_TEST_TMPDIR/nojq-bin"
 	mkdir -p "$dir"
@@ -336,9 +429,9 @@ EOF
 @test "drift-guard: a tree above the changed-file ceiling skips the scan" {
 	local i
 	mkdir -p src
-	for i in $(seq 1 520); do echo "line" > "src/f$i.txt"; done
+	for i in $(seq 1 520); do echo "line" > "src/f$i.sh"; done
 	_commit_all
-	for i in $(seq 1 520); do echo "TODO: implement" >> "src/f$i.txt"; done
+	for i in $(seq 1 520); do echo "TODO: implement" >> "src/f$i.sh"; done
 
 	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
 	assert_success
@@ -349,13 +442,13 @@ EOF
 @test "drift-guard: a tree just under the ceiling still scans and blocks" {
 	local i
 	mkdir -p src
-	for i in $(seq 1 40); do echo "line" > "src/f$i.txt"; done
+	for i in $(seq 1 40); do echo "line" > "src/f$i.sh"; done
 	_commit_all
-	echo "TODO: implement" >> src/f7.txt
+	echo "TODO: implement" >> src/f7.sh
 
 	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
 	_assert_blocked
-	assert_output --partial "src/f7.txt"
+	assert_output --partial "src/f7.sh"
 }
 
 @test "drift-guard: a marker in a file whose name contains a space is reported" {
@@ -369,17 +462,17 @@ EOF
 	assert_output --partial "my file.js"
 }
 
-@test "drift-guard: diff.mnemonicPrefix does not defeat the Markdown fence exemption" {
+@test "drift-guard: diff.mnemonicPrefix does not mangle the reported path" {
 	echo "hello" > a.txt
 	_commit_all
 	git config diff.mnemonicPrefix true
 	local marker="TODO: imple""ment"
-	printf '# Doc\n\n```go\n// %s pagination\n```\n' "$marker" > doc.md
+	printf '# %s pagination\n' "$marker" > pager.sh
 	git add -A
 
 	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
-	assert_success
-	assert_output '{}'
+	_assert_blocked
+	assert_output --partial "pager.sh"
 }
 
 @test "drift-guard: core.quotePath does not mangle a non-ASCII path" {
@@ -456,13 +549,13 @@ EOF
 	local marker="TODO: imple""ment"
 	printf 'run() { : ; } # %s\n' "$marker" > helper.sh
 	printf 'def run(): pass  # %s\n' "$marker" > mod.py
-	printf '# Notes\n\n%s the parser\n' "$marker" > notes.md
+	printf 'fn run() {} // %s\n' "$marker" > mod.rs
 
 	run_hook "drift-guard.sh" "$(_claim_payload 'Done.')"
 	_assert_blocked
 	assert_output --partial "helper.sh"
 	assert_output --partial "mod.py"
-	assert_output --partial "notes.md"
+	assert_output --partial "mod.rs"
 }
 
 @test "drift-guard: a single-line hunk reports the file's own line number" {

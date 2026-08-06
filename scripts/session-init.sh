@@ -113,7 +113,7 @@ jq -nc --arg sid "${SESSION_ID}" --arg ts "${TS}" --arg cwd "${PROJECT_ROOT}" \
 if (( OWNS_SHARED_STATE )); then
 	echo '{}' >"${STATE_DIR}/injected-context-dirs.json"
 	echo '{}' >"${STATE_DIR}/subagent-models.json"
-	rm -f "${STATE_DIR}/plan-continuation.json" "${STATE_DIR}/tool-loop-window.json" "${STATE_DIR}/delegation-counter.json"
+	rm -f "${STATE_DIR}/plan-continuation.json" "${STATE_DIR}/tool-loop-window.json" "${STATE_DIR}/delegation-counter.json" "${STATE_DIR}/last-verification-command.json"
 	stop_blocks_reset
 fi
 mkdir -p "${STATE_DIR}/worktrees"

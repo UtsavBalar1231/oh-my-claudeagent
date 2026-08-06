@@ -1,14 +1,18 @@
 #!/usr/bin/env bats
 load '../test_helper'
 
-# ─── Regex boundary tests (H-7 part 1) ──────────────────────────────────────
-#
-# The NEEDS_EVIDENCE regex requires word boundaries (^|[^[:alnum:]]) so that
-# partial-word matches like "verification", "implementation", "verifying" do
-# not trigger a false-positive evidence demand.
+# The gate no longer guesses from the task's name. Its verdict comes from the slot
+# verification-command-recorder.sh writes, so these cases pin slot ordering, session
+# scoping, staleness, and the two task names the old verb regex blocked outright.
 
-# Helper: write a valid verification-evidence.json into the evidence dir
-_write_fresh_evidence() {
+_write_slot() {
+	local command="${1:-just test}" at="${2:-$(date +%s)}" sid="${3:-$CLAUDE_SESSION_ID}"
+	jq -n --arg c "$command" --argjson at "$at" --arg s "$sid" \
+		'{command: $c, at: $at, session_id: $s, exit_code: null}' \
+		> "$CLAUDE_PROJECT_ROOT/.omca/state/last-verification-command.json"
+}
+
+_write_evidence() {
 	local ts
 	ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 	mkdir -p "$CLAUDE_PROJECT_ROOT/.omca/evidence"
@@ -16,80 +20,98 @@ _write_fresh_evidence() {
 		> "$CLAUDE_PROJECT_ROOT/.omca/evidence/verification-evidence.json"
 }
 
-# ─── Negative fixtures — must NOT trigger evidence demand ────────────────────
+# ─── Reproduced false positives — these task names must complete ─────────────
 
-@test "regex negative: 'documenting verification' exits 0 (no demand)" {
-	run_hook "task-completed-verify.sh" '{"task_description":"documenting verification steps"}'
+@test "false positive: 'Write documentation explaining how to fix build errors' completes" {
+	run_hook "task-completed-verify.sh" '{"task_description":"Write documentation explaining how to fix build errors"}'
 	assert_success
 }
 
-@test "regex negative: 'implementation plan' exits 0 (no demand)" {
-	run_hook "task-completed-verify.sh" '{"task_description":"write the implementation plan"}'
+@test "false positive: 'Summarize the test strategy discussion' completes" {
+	run_hook "task-completed-verify.sh" '{"task_description":"Summarize the test strategy discussion"}'
 	assert_success
 }
 
-@test "regex negative: 'verifying that' exits 0 (no demand)" {
-	run_hook "task-completed-verify.sh" '{"task_description":"verifying that the docs are current"}'
-	assert_success
+# ─── True-positive control — the case the gate exists for ────────────────────
+
+@test "true positive: a recorded verification with no evidence after it blocks" {
+	_write_slot "just test"
+	run_hook "task-completed-verify.sh" '{"task_description":"anything at all"}'
+	[ "$status" -eq 2 ]
+	assert_output --partial 'just test'
+	assert_output --partial "logged no evidence after it"
 }
 
-@test "regex negative: 'built the feature' exits 0 (no demand)" {
-	run_hook "task-completed-verify.sh" '{"task_description":"built the feature description"}'
-	assert_success
-}
-
-# ─── Positive fixtures — must trigger evidence demand when evidence missing ──
-
-@test "regex positive: 'fix the bug' with no evidence exits 2 (demand)" {
-	run_hook "task-completed-verify.sh" '{"task_description":"fix the bug in parser"}'
+@test "true positive: a failing verification with stale evidence still blocks" {
+	_write_evidence
+	touch -d "2 minutes ago" "$CLAUDE_PROJECT_ROOT/.omca/evidence/verification-evidence.json"
+	_write_slot "just test" "$(date +%s)"
+	run_hook "task-completed-verify.sh" '{"task_description":"anything"}'
 	[ "$status" -eq 2 ]
 }
 
-@test "regex positive: 'verify the build' with no evidence exits 2 (demand)" {
-	run_hook "task-completed-verify.sh" '{"task_description":"verify the build passes"}'
-	[ "$status" -eq 2 ]
-}
+# ─── Slot ordering ───────────────────────────────────────────────────────────
 
-@test "regex positive: 'deploy to staging' with no evidence exits 2 (demand)" {
-	run_hook "task-completed-verify.sh" '{"task_description":"deploy to staging environment"}'
-	[ "$status" -eq 2 ]
-}
-
-@test "regex positive: 'run test' with no evidence exits 2 (demand)" {
-	run_hook "task-completed-verify.sh" '{"task_description":"run test for the new module"}'
-	[ "$status" -eq 2 ]
-}
-
-@test "regex positive: 'fix the bug' with fresh evidence exits 0 (allow)" {
-	_write_fresh_evidence
-	run_hook "task-completed-verify.sh" '{"task_description":"fix the bug in parser"}'
+@test "slot ordering: evidence logged after the verification allows" {
+	_write_slot "just test" "$(($(date +%s) - 60))"
+	_write_evidence
+	run_hook "task-completed-verify.sh" '{"task_description":"anything"}'
 	assert_success
 }
 
-# ─── Stat fail-closed tests (H-7 part 2) ─────────────────────────────────────
-#
-# When stat cannot determine mtime (unreadable file, unknown format), the hook
-# must fail closed — RECENT_EVIDENCE stays false — so evidence is demanded for
-# verification tasks rather than silently passing.
-
-@test "stat fail-closed: corrupt evidence file + verification task exits 2 (demand)" {
-	# Write a corrupt (non-JSON, stat-readable) evidence file; mtime parsing
-	# succeeds but the content will fail schema validation — the important path
-	# here is that RECENT_EVIDENCE is set from the mtime, not defaulted to true.
-	# To exercise the fail-closed stat path we make the file unreadable so that
-	# stat -c and stat -f both fail → EVIDENCE_MTIME="" → not ^[0-9]+$.
+@test "slot ordering: evidence postdating the slot but schema-invalid blocks" {
+	_write_slot "just test" "$(($(date +%s) - 60))"
 	mkdir -p "$CLAUDE_PROJECT_ROOT/.omca/evidence"
-	printf '%s' "not-json" > "$CLAUDE_PROJECT_ROOT/.omca/evidence/verification-evidence.json"
-	chmod 000 "$CLAUDE_PROJECT_ROOT/.omca/evidence/verification-evidence.json"
-	run_hook "task-completed-verify.sh" '{"task_description":"fix the regression"}'
-	# Restore perms so teardown can clean up
-	chmod 644 "$CLAUDE_PROJECT_ROOT/.omca/evidence/verification-evidence.json" 2>/dev/null || true
+	printf '%s' '{"entries":[{"type":"test"}]}' \
+		> "$CLAUDE_PROJECT_ROOT/.omca/evidence/verification-evidence.json"
+	run_hook "task-completed-verify.sh" '{"task_description":"anything"}'
+	[ "$status" -eq 2 ]
+	assert_output --partial "invalid schema"
+}
+
+@test "slot ordering: no slot at all allows regardless of evidence" {
+	run_hook "task-completed-verify.sh" '{"task_description":"fix the build and verify the tests"}'
+	assert_success
+}
+
+# ─── Session scoping and staleness ───────────────────────────────────────────
+
+@test "session mismatch: a slot from another session allows" {
+	_write_slot "just test" "$(date +%s)" "some-other-session"
+	run_hook "task-completed-verify.sh" '{"task_description":"anything"}'
+	assert_success
+}
+
+@test "staleness: a slot older than 3600s allows" {
+	_write_slot "just test" "$(($(date +%s) - 4000))"
+	run_hook "task-completed-verify.sh" '{"task_description":"anything"}'
+	assert_success
+}
+
+@test "staleness: a slot just under 3600s still blocks" {
+	_write_slot "just test" "$(($(date +%s) - 3500))"
+	run_hook "task-completed-verify.sh" '{"task_description":"anything"}'
 	[ "$status" -eq 2 ]
 }
 
-@test "stat fail-closed: no evidence file + informational task exits 0 (allow)" {
-	# Informational task never sets NEEDS_EVIDENCE — even with fail-closed stat
-	# (no evidence file present), exit 0 because demand is never triggered.
-	run_hook "task-completed-verify.sh" '{"task_description":"update the documentation"}'
+# ─── Kill switch ─────────────────────────────────────────────────────────────
+
+@test "kill switch: OMCA_DISABLED_HOOKS listing this gate allows" {
+	_write_slot "just test"
+	OMCA_DISABLED_HOOKS="task-completed-verify" run_hook "task-completed-verify.sh" '{"task_description":"anything"}'
+	assert_success
+}
+
+@test "kill switch: OMCA_DISABLED_HOOKS listing a different hook still blocks" {
+	_write_slot "just test"
+	OMCA_DISABLED_HOOKS="other-hook" run_hook "task-completed-verify.sh" '{"task_description":"anything"}'
+	[ "$status" -eq 2 ]
+}
+
+# ─── Malformed slot ──────────────────────────────────────────────────────────
+
+@test "malformed slot: unparseable file allows" {
+	printf '%s' 'not-json' > "$CLAUDE_PROJECT_ROOT/.omca/state/last-verification-command.json"
+	run_hook "task-completed-verify.sh" '{"task_description":"anything"}'
 	assert_success
 }

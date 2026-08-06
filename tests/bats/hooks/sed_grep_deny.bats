@@ -237,3 +237,39 @@ assert_deny_shape() {
 	assert_success
 	assert_deny_shape "PermissionRequest"
 }
+
+# ── A quoted mention whose inner line starts with the token ───────────────────
+# The command-position class contains a raw newline, so an inner line of a quoted
+# multi-line message read as a command position until quoted spans were neutralized.
+
+@test "a multi-line message with the sed flag at an inner line start is not denied" {
+	local cmd
+	cmd=$(printf 'git commit -m "hook cleanup\n\nsed -n was replaced by the Read tool"')
+	run_hook "sed-grep-deny.sh" "$(jq -nc --arg c "$cmd" '{tool_name:"Bash",hook_event_name:"PreToolUse",tool_input:{command:$c}}')"
+	assert_success
+	assert_output ''
+}
+
+@test "a multi-line message with the grep flag at an inner line start is not denied" {
+	local cmd
+	cmd=$(printf 'git commit -m "hook cleanup\n\ngrep -n was replaced by the Grep tool"')
+	run_hook "sed-grep-deny.sh" "$(jq -nc --arg c "$cmd" '{tool_name:"Bash",hook_event_name:"PreToolUse",tool_input:{command:$c}}')"
+	assert_success
+	assert_output ''
+}
+
+@test "a real grep flag on an unquoted second line still denies" {
+	local cmd
+	cmd=$(printf 'cd /src\ngrep -n foo bar.txt')
+	run_hook "sed-grep-deny.sh" "$(jq -nc --arg c "$cmd" '{tool_name:"Bash",hook_event_name:"PreToolUse",tool_input:{command:$c}}')"
+	assert_success
+	assert_deny_shape "PreToolUse"
+}
+
+@test "a real sed flag on an unquoted second line still denies" {
+	local cmd
+	cmd=$(printf 'cd /src\nsed -n 1p f.txt')
+	run_hook "sed-grep-deny.sh" "$(jq -nc --arg c "$cmd" '{tool_name:"Bash",hook_event_name:"PreToolUse",tool_input:{command:$c}}')"
+	assert_success
+	assert_deny_shape "PreToolUse"
+}
