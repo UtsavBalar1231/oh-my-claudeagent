@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.17.1] - 2026-08-06
+
+### Fixed
+
+- **Agents are no longer told that a loaded tool is hidden behind tool search.** The
+  bundled MCP server is marked to always load, so its tools reach every context, main
+  session and subagent alike, with their full schemas and their real callable names
+  already in the tool list. The context injected into explore, librarian and oracle
+  claimed the opposite: that the tool was named `file_read` and had to be hydrated
+  through `ToolSearch` before it could be called. Three agent bodies and the user-scope
+  template repeated the same claim. A model holding the schema and that instruction at
+  the same time resolved the contradiction by inventing a shorter name that does not
+  exist, and the call failed with `No such tool available`. The guidance was causing the
+  failure it looked like it was preventing. Everything else those blocks carried is
+  already in the tool description the platform loads for itself: the project-root
+  scoping note, offset and limit, the metadata footer, large-file handling. So they are
+  deleted rather than corrected. One pointer survives, on the path that runs when a read
+  actually fails, and it names the tool correctly.
+
 ## [2.17.0] - 2026-08-05
 
 ### Fixed
