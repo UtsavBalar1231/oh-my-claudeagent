@@ -23,11 +23,42 @@ FILE_PATH=$(jq -r '.tool_input.file_path // ""' <<< "${HOOK_INPUT}" 2>/dev/null)
 # also match Markdown headings and are meaningless in prose. Restricting to
 # source extensions is what keeps this repo's Markdown-first content out of
 # scope. A payload with no file_path stays in scope: real Write/Edit calls
-# always carry one, so absence means a synthetic or test payload.
+# always carry one, so absence means a synthetic or test payload — and with no
+# extension to key on, both common markers stay live for it.
+#
+# The extension is also what picks the marker set, in this one case statement so
+# the admitted list and the marker map cannot drift apart. Applying a marker the
+# language does not have is not a harmless widening: `#` opens a preprocessor
+# directive in C, so every `#include` read as a comment restating the line under
+# it, and Lua has neither `#` nor `//`.
+#
+# A language whose only comment form is a block delimiter (CSS, OCaml, HTML) is
+# left out rather than approximated, and so is one whose line marker is genuinely
+# ambiguous across dialects: `.s` is `#` under GAS and `;` under NASM, and `#`
+# there is a cpp directive again, which is the trap this map exists to avoid.
+# A dialect pair that disagrees but cannot collide is unioned instead — `.m` is
+# Objective-C `//` or MATLAB `%`, and neither marker can open a line in the other
+# language.
+COMMENT_MARKERS='#|//'
 if [[ -n "${FILE_PATH}" ]]; then
 	case "${FILE_PATH}" in
-	*.sh | *.bash | *.zsh | *.py | *.js | *.jsx | *.ts | *.tsx | *.go | *.rs) ;;
-	*.c | *.h | *.cpp | *.hpp | *.java | *.rb | *.php | *.lua | *.swift | *.kt) ;;
+	*.sh | *.bash | *.zsh | *.fish | *.ps1 | *.psm1) COMMENT_MARKERS='#' ;;
+	*.py | *.pyi | *.rb | *.pl | *.pm | *.r | *.R | *.jl) COMMENT_MARKERS='#' ;;
+	*.ex | *.exs | *.cr | *.nim | *.tcl | *.mk) COMMENT_MARKERS='#' ;;
+	Makefile | Dockerfile | justfile | Justfile) COMMENT_MARKERS='#' ;;
+	*/Makefile | */Dockerfile | */justfile | */Justfile) COMMENT_MARKERS='#' ;;
+	*.c | *.h | *.cpp | *.cc | *.cxx | *.hpp | *.hh | *.hxx | *.mm) COMMENT_MARKERS='//' ;;
+	*.java | *.cs | *.swift | *.kt | *.kts | *.scala | *.dart) COMMENT_MARKERS='//' ;;
+	*.js | *.jsx | *.mjs | *.cjs | *.ts | *.tsx | *.mts | *.cts) COMMENT_MARKERS='//' ;;
+	*.go | *.rs | *.zig | *.d | *.groovy | *.gradle) COMMENT_MARKERS='//' ;;
+	*.fs | *.fsx | *.sol | *.proto | *.scss | *.less) COMMENT_MARKERS='//' ;;
+	*.lua | *.sql | *.hs | *.elm | *.adb | *.ads | *.vhd | *.vhdl) COMMENT_MARKERS='--' ;;
+	*.erl | *.hrl | *.tex) COMMENT_MARKERS='%' ;;
+	*.clj | *.cljs | *.cljc | *.lisp | *.el | *.scm | *.rkt) COMMENT_MARKERS=';' ;;
+	*.f90 | *.f95 | *.f03 | *.f08) COMMENT_MARKERS='!' ;;
+	*.vb) COMMENT_MARKERS="'" ;;
+	*.m) COMMENT_MARKERS='//|%' ;;
+	*.php | *.tf | *.tfvars) COMMENT_MARKERS='#|//' ;;
 	*) exit 0 ;;
 	esac
 fi
@@ -78,17 +109,22 @@ fi
 # A banned string reached through a string literal or a grep pattern is code
 # that MENTIONS the pattern, not an instance of it. Tier 1 and Tier 2 share this
 # one definition so that distinction has only one place to rot.
-COMMENT_LINE_RE='^[[:space:]]*(#|//)'
+COMMENT_LINE_RE="^[[:space:]]*(${COMMENT_MARKERS})"
+COMMENT_STRIP_RE="^[[:space:]]*(${COMMENT_MARKERS})[[:space:]]*"
 
 # Tier 1 — literal attribution/placeholder strings on a comment line. Near-zero
 # false positive, so these are the only findings safe to hard-deny.
 TIER1=""
 
-TIER1_HITS=$(printf '%s\n' "${CONTENT}" | awk -v comment_re="${COMMENT_LINE_RE}" '
+TIER1_HITS=$(printf '%s\n' "${CONTENT}" | awk -v comment_re="${COMMENT_LINE_RE}" -v strip_re="${COMMENT_STRIP_RE}" '
   $0 !~ comment_re { next }
-  { lc = tolower($0) }
-  lc ~ /# ai-generated/ { attribution = 1 }
-  lc ~ /# this code was written by/ { authorship = 1 }
+  # Anchor the attribution phrases at the start of the comment body rather than
+  # against a literal "# " prefix: the prefix form was blind to every marker but
+  # `#`, and an unanchored match would fire on a comment that merely names the
+  # phrase.
+  { lc = tolower($0); body = lc; sub(strip_re, "", body) }
+  body ~ /^ai-generated/ { attribution = 1 }
+  body ~ /^this code was written by/ { authorship = 1 }
   # "TODO: implement" carrying an owner or issue ref is a tracked task, not a
   # placeholder, so it is exempt here exactly as it is in the bare-todo check.
   lc ~ /todo:[[:space:]]*implement/ {
@@ -115,8 +151,8 @@ done <<< "${TIER1_HITS}"
 # advisory permanently and never contribute to a deny.
 TIER3=""
 
-CONSECUTIVE=$(echo "${CONTENT}" | awk '
-  /^[[:space:]]*#/ || /^[[:space:]]*\/\// { count++; if (count > max) max = count; next }
+CONSECUTIVE=$(echo "${CONTENT}" | awk -v comment_re="${COMMENT_LINE_RE}" '
+  $0 ~ comment_re { count++; if (count > max) max = count; next }
   { count = 0 }
   END { print max+0 }
 ')
@@ -124,9 +160,9 @@ if [[ "${CONSECUTIVE}" -gt 5 ]]; then
 	TIER3+="Excessive consecutive comment lines (${CONSECUTIVE} in a row) detected. "
 fi
 
-read -r COMMENT_LINES CODE_LINES <<< "$(printf '%s\n' "${CONTENT}" | awk '
+read -r COMMENT_LINES CODE_LINES <<< "$(printf '%s\n' "${CONTENT}" | awk -v comment_re="${COMMENT_LINE_RE}" '
   /^[[:space:]]*$/ { next }
-  /^[[:space:]]*#/ || /^[[:space:]]*\/\// { c++; next }
+  $0 ~ comment_re { c++; next }
   { k++ }
   END { print c+0, k+0 }
 ')"
@@ -142,13 +178,13 @@ fi
 # Tier 2 — per-line heuristic findings (categories 1-5). Emitted as
 # "category|detail" lines by a single awk pass so every check shares one line
 # array and one @allow bypass check.
-SLOP_FINDINGS=$(printf '%s\n' "${CONTENT}" | awk -v comment_re="${COMMENT_LINE_RE}" '
+SLOP_FINDINGS=$(printf '%s\n' "${CONTENT}" | awk -v comment_re="${COMMENT_LINE_RE}" -v strip_re="${COMMENT_STRIP_RE}" '
   function is_comment(l) {
     return (l ~ comment_re)
   }
   function strip_marker(l,    s) {
     s = l
-    sub(/^[[:space:]]*(#|\/\/)[[:space:]]*/, "", s)
+    sub(strip_re, "", s)
     return s
   }
   # Split text on non-alphanumeric boundaries into a lowercase token set,

@@ -177,6 +177,63 @@ load '../test_helper'
 	assert_output ""
 }
 
+# `#` opens a preprocessor directive in C, not a comment. While the marker set
+# was language-blind, every `#include` was read as a comment restating the line
+# under it, and a header-only edit could not be written at all.
+@test "comment-checker: C preprocessor directives are not comments" {
+	local content=$'#include "pamir_ks_ta.h"\nstatic const char pamir_id[] = "x";'
+	local payload
+	payload=$(jq -nc --arg c "$content" '{"tool_name":"Write","tool_input":{"file_path":"/repo/ta/pamir_ks_ta.c","content":$c}}')
+
+	OMCA_COMMENT_GATE=deny run_hook "comment-checker.sh" "$payload"
+	assert_success
+	assert_output ""
+}
+
+@test "comment-checker: still catches a restating // comment in C" {
+	local content=$'// set the user name\nuser_name = input_value;'
+	local payload
+	payload=$(jq -nc --arg c "$content" '{"tool_name":"Write","tool_input":{"file_path":"/repo/ta/x.c","content":$c}}')
+
+	OMCA_COMMENT_GATE=deny run_hook "comment-checker.sh" "$payload"
+	assert_success
+	assert_output --partial "restates the following code line"
+}
+
+# Tier 1 matched a literal "# " prefix, so an attribution comment was invisible
+# in every language whose marker is not `#`.
+@test "comment-checker: tier-1 denies an attribution comment behind a // marker" {
+	local content=$'// AI-generated helper\nint f(void) { return 1; }'
+	local payload
+	payload=$(jq -nc --arg c "$content" '{"tool_name":"Write","tool_input":{"file_path":"/repo/ta/x.c","content":$c}}')
+
+	OMCA_COMMENT_GATE=deny run_hook "comment-checker.sh" "$payload"
+	assert_success
+	assert_output --partial "AI attribution comment detected"
+}
+
+@test "comment-checker: reads -- as the comment marker in Lua" {
+	local content=$'-- set the user name\nuser_name = input_value'
+	local payload
+	payload=$(jq -nc --arg c "$content" '{"tool_name":"Write","tool_input":{"file_path":"/repo/x.lua","content":$c}}')
+
+	OMCA_COMMENT_GATE=deny run_hook "comment-checker.sh" "$payload"
+	assert_success
+	assert_output --partial "restates the following code line"
+}
+
+# A comment that names an attribution phrase mid-sentence is a mention, not an
+# instance: only the phrase at the start of the comment body is the thing itself.
+@test "comment-checker: tier-1 ignores an attribution phrase mid-comment" {
+	local content=$'// the gate below denies an ai-generated banner\nint f(void) { return 1; }'
+	local payload
+	payload=$(jq -nc --arg c "$content" '{"tool_name":"Write","tool_input":{"file_path":"/repo/ta/x.c","content":$c}}')
+
+	OMCA_COMMENT_GATE=deny run_hook "comment-checker.sh" "$payload"
+	assert_success
+	refute_output --partial "AI attribution comment detected"
+}
+
 @test "comment-checker: skips non-source files so Markdown headings are not comments" {
 	local content=$'# Install dependencies\njust install\n\n# Run the tests\njust test\n\n# Build the plugin\njust build\n\n# Release a version\njust release\n\n# Clean the cache\njust clean\n\n# Lint the shell\njust lint'
 	local payload
