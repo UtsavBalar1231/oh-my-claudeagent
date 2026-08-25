@@ -28,6 +28,24 @@ SCAN_CMD=$(neutralize_quoted_positions "${CMD}")
 CMD_POSITION_RE=$'(^|[;&|`\n\r]|[$]\\()[[:space:]]*'
 if [[ "${SCAN_CMD}" =~ ${CMD_POSITION_RE}sed[[:space:]]+-[[:alnum:]]*n[[:alnum:]]*([[:space:]]|$) ]] \
 	|| [[ "${SCAN_CMD}" =~ ${CMD_POSITION_RE}grep[[:space:]]+-[[:alnum:]]*n[[:alnum:]]*([[:space:]]|$) ]]; then
+	# A grep the translator vouches for is rewritten rather than refused: its intent is
+	# unambiguous, so a deny would only buy a round trip. `updatedInput` replaces the
+	# whole input object, so the original tool_input is carried forward with `command`
+	# swapped; enumerating the Bash fields here would drop any the caller sent that
+	# this script does not know about.
+	if REWRITTEN=$(grep_to_rg "${CMD}"); then
+		ALLOW_REASON="Rewrote the denied grep to: ${REWRITTEN}"
+		if [[ "${HOOK_EVENT}" == "PreToolUse" ]]; then
+			jq -c --arg reason "${ALLOW_REASON}" --arg cmd "${REWRITTEN}" \
+				'{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "allow", permissionDecisionReason: $reason, updatedInput: (.tool_input | .command = $cmd)}}' \
+				<<< "${HOOK_INPUT}"
+		else
+			jq -c --arg cmd "${REWRITTEN}" \
+				'{hookSpecificOutput: {hookEventName: "PermissionRequest", decision: {behavior: "allow", updatedInput: (.tool_input | .command = $cmd)}}}' \
+				<<< "${HOOK_INPUT}"
+		fi
+		exit 0
+	fi
 	if [[ "${HOOK_EVENT}" == "PreToolUse" ]]; then
 		jq -nc --arg reason "${DENY_REASON}" \
 			'{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: $reason}}'

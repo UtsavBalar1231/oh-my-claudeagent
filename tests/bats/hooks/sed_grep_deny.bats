@@ -61,16 +61,16 @@ assert_deny_shape() {
 	assert_deny_shape "PreToolUse"
 }
 
-@test "grep -n emits the PreToolUse decision shape on PreToolUse" {
-	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","hook_event_name":"PreToolUse","tool_input":{"command":"grep -n foo bar.txt"}}'
+@test "a non-translatable grep -n emits the PreToolUse decision shape on PreToolUse" {
+	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","hook_event_name":"PreToolUse","tool_input":{"command":"grep -nA 3 foo bar.txt"}}'
 	assert_success
 	assert_deny_shape "PreToolUse"
 }
 
 # ── grep -n: denied ───────────────────────────────────────────────────────────
 
-@test "grep -n pattern file is denied" {
-	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"grep -n pattern file.txt"}}'
+@test "grep -n with a long flag is denied" {
+	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"grep -n --include=*.py pattern src/"}}'
 	assert_success
 	assert_deny_shape "PermissionRequest"
 }
@@ -88,7 +88,7 @@ assert_deny_shape() {
 }
 
 @test "grep -n deny message is exact" {
-	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"grep -n foo bar.txt"}}'
+	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"grep -nA 3 foo bar.txt"}}'
 	assert_success
 	assert_output --partial '`sed -n` and `grep -n` are denied.'
 	assert_output --partial 'Use the Grep tool, Read with offset/limit, or ast_search for structural matches.'
@@ -207,7 +207,7 @@ assert_deny_shape() {
 }
 
 @test "grep -n at the head of the command still denies" {
-	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","hook_event_name":"PreToolUse","tool_input":{"command":"grep -n foo src/"}}'
+	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","hook_event_name":"PreToolUse","tool_input":{"command":"grep -nA 3 foo src/"}}'
 	assert_success
 	assert_deny_shape "PreToolUse"
 }
@@ -233,7 +233,7 @@ assert_deny_shape() {
 }
 
 @test "OMCA_DISABLED_HOOKS listing a different hook still denies grep -n" {
-	OMCA_DISABLED_HOOKS="other-hook" run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"grep -n foo bar.txt"}}'
+	OMCA_DISABLED_HOOKS="other-hook" run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"grep -nA 3 foo bar.txt"}}'
 	assert_success
 	assert_deny_shape "PermissionRequest"
 }

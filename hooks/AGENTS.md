@@ -1,6 +1,6 @@
 # Hook Inventory
 
-`hooks/hooks.json` is the canonical hook registry — query it directly for counts.
+`hooks/hooks.json` is the canonical hook registry. Query it directly for counts.
 
 ## Hook events
 
@@ -41,19 +41,28 @@ event is unregistered on purpose; `OMCA.md` carries the per-event reason.
   user's permission posture, which is a worse hole than the inert deny it would be
   cleaning up after. `permission-filter.sh` encodes this as an early `exit 0` on
   `hook_event_name == PreToolUse`, sitting after the deny and before the first allow. It is
-  the only script that needs the guard, because it is the only one with an allow to guard.
+  the only script that needs the guard, because it is the only one whose allow is a blanket
+  fast path keyed on a tool name rather than on a command the script parsed in full.
 
   `git-destructive-deny.sh`, `sed-grep-deny.sh`, and `executor-grep-deny.sh` are registered
-  on both events too, but they are deny-only: none of them emits an allow on any path. Each
-  branches its output on `hook_event_name`, because the two events read a decision from
-  different places — `PreToolUse` from stderr plus `exit 2` or from
+  on both events too. `git-destructive-deny.sh` and `executor-grep-deny.sh` are deny-only:
+  neither emits an allow on any path. `sed-grep-deny.sh` is the one exception, and a narrow
+  one. When it recognises a plain `grep` invocation it can translate, it allows the call
+  with an `updatedInput` rewrite to `rg` instead of denying and costing a round trip. The
+  property that matters is unchanged: a command it does not recognise still gets silence,
+  never an allow. `executor-grep-deny.sh` deliberately has no such rewrite, because the
+  policy it carries is that the executor queries code through `ast_search`; `rg` is still
+  text grep, so rewriting there would reverse the policy rather than restate the command.
+
+  Each of the three branches its output on `hook_event_name`, because the two events read a
+  decision from different places: `PreToolUse` from stderr plus `exit 2` or from
   `hookSpecificOutput.permissionDecision`, `PermissionRequest` from
-  `hookSpecificOutput.decision.behavior` with `exit 0`. Whether `exit 2` also denies on
-  `PermissionRequest` is disputed: the vendored exit-code table says it does, live probing
-  of the shipped client found it discarded. The branch is correct either way, which is why
-  it exists; do not collapse it. `git-destructive-deny.sh`'s former trailing allow for every
-  git command it did not deny was deleted — it auto-approved everything the pattern failed
-  to recognise, and a deny gate's answer to an unrecognised command is silence.
+  `hookSpecificOutput.decision.behavior` with `exit 0`. The branch is required, not a hedge.
+  Exit code 2 is not honored on `PermissionRequest`: the permission flow proceeds unchanged
+  and the stderr is discarded, so only the `decision` object can deny there. Do not collapse
+  the branch. `git-destructive-deny.sh`'s former trailing allow for every git command it did
+  not deny was deleted, because it auto-approved everything the pattern failed to recognise,
+  and a deny gate's answer to an unrecognised command is silence.
 
   The deny matches a recursive removal at any command position:
   string start, after a separator, or inside a subshell or command substitution. Anchoring
@@ -78,4 +87,7 @@ event is unregistered on purpose; `OMCA.md` carries the per-event reason.
   regions is how a guardrail becomes a hole, because a genuinely compound command could then
   hide its separator inside quotes. `tests/bats/hooks/permission_handlers.bats` pins the
   behavior so it cannot be "fixed" by accident.
-- Hook lifecycle ownership stays Claude-native. OMCA only supplies command handlers.
+- Hook lifecycle ownership stays Claude-native. OMCA supplies the handlers: `type: command`
+  for every shell handler, plus one `type: mcp_tool` handler whose `tool` is
+  `validate_plan_write`. Query `hooks/hooks.json` for the current handler types rather than
+  assuming a single kind.
