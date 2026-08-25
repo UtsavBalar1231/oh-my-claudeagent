@@ -21,7 +21,9 @@ SCANNABLE=$(strip_paired_spans "${SCANNABLE}" "'")
 # produce a false block. The list therefore stays tight, growing only when a real
 # runner is observed going unrecorded. Anchoring on start-of-string or a shell
 # separator keeps a mid-command flag value from reading as an invocation.
-VERIFICATION_RUNNER_RE='(^|[;&|(])[[:space:]]*(just[[:space:]]+(test|ci|lint|fmt-check|build)|(npm|pnpm|yarn|bun)[[:space:]]+(test|run[[:space:]]+(test|lint|build))|pytest|cargo[[:space:]]+(test|build|check|clippy)|go[[:space:]]+(test|build|vet)|make[[:space:]]+(test|check|lint)|bats|tsc|ruff[[:space:]]+check|shellcheck|uv[[:space:]]+run[[:space:]][^;&|]*pytest)([^-[:alnum:]_]|$)'
+# `test` and `lint` take a suffix because the prefix already names the check and the
+# suffix narrows it. `build` and `fmt` cannot: build-and-deploy ships, fmt rewrites.
+VERIFICATION_RUNNER_RE='(^|[;&|(])[[:space:]]*(just[[:space:]]+((test|lint)(-[[:alnum:]_]+)*|ci|fmt-check|typecheck|build)|(npm|pnpm|yarn|bun)[[:space:]]+(test|run[[:space:]]+(test|lint|build))|pytest|cargo[[:space:]]+(test|build|check|clippy)|go[[:space:]]+(test|build|vet)|make[[:space:]]+(test|check|lint)|bats|tsc|ruff[[:space:]]+check|shellcheck|uv[[:space:]]+run[[:space:]][^;&|]*pytest)([^-[:alnum:]_]|$)'
 
 [[ "${SCANNABLE}" =~ ${VERIFICATION_RUNNER_RE} ]] || exit 0
 

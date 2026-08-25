@@ -44,6 +44,27 @@ _slot_exists() {
 	done
 }
 
+@test "recorder: a hyphenated test or lint recipe records" {
+	local c
+	for c in "just test-hooks" "just test-bats" "just test-pytest" "just test-mcp" \
+		"just test-all" "just lint-shell" "just lint-python" "just typecheck"; do
+		rm -f "$CLAUDE_PROJECT_ROOT/$SLOT_REL"
+		_record "$c"
+		_slot_exists || fail "no slot recorded for: $c"
+	done
+}
+
+# A suffix narrows a check for test and lint, but changes the verb for the others:
+# build-and-deploy ships and fmt rewrites, so neither is a verification.
+@test "recorder: a suffix on a non-check recipe records nothing" {
+	local c
+	for c in "just fmt" "just build-and-deploy" "just release 2.19.0" "just install-hooks"; do
+		rm -f "$CLAUDE_PROJECT_ROOT/$SLOT_REL"
+		_record "$c"
+		! _slot_exists || fail "slot wrongly recorded for: $c"
+	done
+}
+
 # ─── Mentions are not invocations ────────────────────────────────────────────
 
 @test "recorder: a runner inside a double-quoted span records nothing" {
