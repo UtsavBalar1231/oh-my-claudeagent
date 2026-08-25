@@ -36,11 +36,13 @@ from statusline.core import (
     WHITE,
     YELLOW,
     _format_tokens,
+    _visible_truncate,
     agent_glyph,
     build_glyphs,
     detect_nerd_font,
     terminal_columns,
 )
+from statusline.types import SubagentStatuslinePayload
 
 _STATUS_COLOR = {
     "in_progress": YELLOW,
@@ -52,7 +54,6 @@ _STATUS_COLOR = {
     "error": RED,
 }
 
-_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 _MODEL_ID_RE = re.compile(r"^claude-([a-z]+)-(\d+)(?:-(\d+))?$")
 
 # Mirrors the alias arms in scripts/subagent-start.sh: both resolve the same
@@ -193,28 +194,6 @@ def _effort_label(task: dict) -> str:
     return ""
 
 
-def _visible_truncate(s: str, width: int) -> str:
-    """Truncate to `width` visible columns, passing ANSI codes through untouched."""
-    if width <= 0:
-        return ""
-    out: list[str] = []
-    visible = 0
-    i = 0
-    n = len(s)
-    while i < n:
-        m = _ANSI_RE.match(s, i)
-        if m:
-            out.append(m.group())
-            i = m.end()
-            continue
-        if visible >= width:
-            break
-        out.append(s[i])
-        visible += 1
-        i += 1
-    return "".join(out) + RST
-
-
 def _render_row(
     task: dict, models: dict, glyphs: dict, nerd: bool, columns: int
 ) -> str:
@@ -255,7 +234,7 @@ def main() -> None:
         raw = sys.stdin.read()
         _dump_payload(raw)
         try:
-            data = json.loads(raw)
+            data: SubagentStatuslinePayload = json.loads(raw)
         except (json.JSONDecodeError, ValueError):
             return
 

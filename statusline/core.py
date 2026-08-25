@@ -177,6 +177,42 @@ def terminal_columns(payload_columns: int | None = None, default: int = 80) -> i
     return default
 
 
+# SGR colors and OSC 8 hyperlink delimiters occupy no terminal columns, so the
+# truncator must step over them whole: slicing one in half emits the remainder
+# as literal text and leaves the terminal in the escape's state.
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m|\x1b\]8;;[^\x07\x1b]*(?:\x07|\x1b\\)")
+_OSC8_CLOSERS = ("\x1b]8;;\x07", "\x1b]8;;\x1b\\")
+
+
+def _visible_truncate(s: str, width: int) -> str:
+    """Truncate to `width` visible columns, passing ANSI codes through untouched."""
+    if width <= 0:
+        return ""
+    out: list[str] = []
+    visible = 0
+    i = 0
+    n = len(s)
+    link_open = False
+    while i < n:
+        m = _ANSI_RE.match(s, i)
+        if m:
+            token = m.group()
+            if token.startswith("\x1b]8;;"):
+                link_open = token not in _OSC8_CLOSERS
+            out.append(token)
+            i = m.end()
+            continue
+        if visible >= width:
+            break
+        out.append(s[i])
+        visible += 1
+        i += 1
+    # Cutting inside a hyperlink would leave every later line linked to its URL.
+    if link_open:
+        out.append(_OSC8_CLOSERS[0])
+    return "".join(out) + RST
+
+
 # ---------------------------------------------------------------------------
 # Context bar renderer
 # ---------------------------------------------------------------------------
@@ -305,8 +341,11 @@ def _compose_repo_pr(
     the segment cleanly without a condition on the output.
 
     workspace.repo keys: host, owner, name
-    pr keys: number, url, review_state (review_state may be absent even when pr present)
+    pr keys: number, url, review_state, kind (all but number may be absent)
     review_state ∈ approved | pending | changes_requested | draft
+    kind == "mr" marks a GitLab merge request, which the client's own footer
+    badge renders as ``MR !N``; anything else (including absence) is a GitHub
+    pull request and keeps the ``#N`` form.
     """
     workspace = data.get("workspace", {}) or {}
     repo = workspace.get("repo", {}) or {}
@@ -333,7 +372,8 @@ def _compose_repo_pr(
     pr_number = pr.get("number")
     if pr_number is not None:
         pr_url = pr.get("url", "")
-        pr_num_str = f"#{pr_number}"
+        sigil = "!" if pr.get("kind") == "mr" else "#"
+        pr_num_str = f"{sigil}{pr_number}"
         if pr_url:
             pr_num_str = _osc8_link(pr_url, pr_num_str)
 
@@ -820,9 +860,11 @@ def render(data: StatuslinePayload, git_info: GitInfo) -> str:
               directly from ``data["rate_limits"]`` when present (v2.1.80+).
         git_info: Git metadata dict from get_git_info().
 
-    Returns a string of 1, 2, or 3 lines joined by newline.
+    Returns a string of 1, 2, or 3 lines joined by newline, each clamped to the
+    terminal width so a long line cannot wrap into a second row.
     The caller decides whether to print or send over socket.
     """
+    columns = terminal_columns()
     nerd = detect_nerd_font()
     glyphs = build_glyphs(nerd)
 
@@ -849,7 +891,7 @@ def render(data: StatuslinePayload, git_info: GitInfo) -> str:
             lines.append(line3)
         if tip:
             lines.append(tip)
-        return "\n".join(lines)
+        return "\n".join(_visible_truncate(line, columns) for line in lines)
 
     # Single line: model + bar + cost + duration
     parts = []
@@ -874,4 +916,4 @@ def render(data: StatuslinePayload, git_info: GitInfo) -> str:
     dur_str = _format_duration(duration_ms)
     parts.append(f"{BLUE}{glyphs['clock']} {dur_str}{RST}")
 
-    return SEP.join(parts)
+    return _visible_truncate(SEP.join(parts), columns)
