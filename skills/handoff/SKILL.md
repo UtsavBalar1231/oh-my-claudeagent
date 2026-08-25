@@ -46,7 +46,7 @@ git branch --show-current
 git log --oneline -5
 ```
 
-Also: `TaskList()`, `boulder_progress()`, `notepad_read` for active plan sections, `Glob("~/.claude/plans/*.md")`, and `.omca/plans/` only as a boulder compatibility mirror/resume surface.
+Also: `boulder_progress()`, `notepad_read` for active plan sections, `Glob("~/.claude/plans/*.md")`, and `.omca/plans/` only as a boulder compatibility mirror/resume surface. `TaskList()` too where it exists, but it is withheld on Opus 5 and Fable 5 era models unless `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` is set, so treat the plan file's numbered checkboxes and `boulder_progress()` as the primary source and `TaskList()` as a supplement.
 
 ## PHASE 2: EXTRACT
 
@@ -75,7 +75,7 @@ PROGRESS
 Tasks completed: X / Y total
 - [x] [Completed task name]
 - [ ] [Pending task name]
-(Use TaskList() counts and checkboxes — do not invent)
+(Use the plan file's checkboxes and `boulder_progress()`, plus `TaskList()` counts where that tool exists. Never invent a count: if no source is available, write "unknown".)
 
 NOTEPAD SUMMARY
 ---------------
@@ -101,7 +101,7 @@ REMAINING WORK
 --------------
 - [ ] [Unchecked plan task — copy exact task text]
 - [ ] [Next logical step if not in plan]
-(Pull from plan file checkboxes and TaskList() state)
+(Pull from plan file checkboxes, and from `TaskList()` state where that tool exists)
 
 KEY FILES
 ---------
@@ -129,7 +129,7 @@ Rules:
 - No bold/italic/code fences in content fields
 - Only what matters for continuation
 - USER REQUESTS and CONSTRAINTS: verbatim only
-- PROGRESS: actual TaskList() counts
+- PROGRESS: actual counts from the plan file and `boulder_progress()`, supplemented by `TaskList()` where available. Write "unknown" rather than a guess
 - NOTEPAD SUMMARY: omit if no active plan/notepad data
 - REMAINING WORK: verbatim from plan file
 

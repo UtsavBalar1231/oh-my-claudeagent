@@ -203,6 +203,8 @@ Invalid: "all related to feature X", "they were changed together"
 ### Register Task Items
 Use TaskCreate to register each commit as a trackable item. Mark each in_progress before executing, completed after.
 
+Precondition: `TodoWrite` and `TaskCreate`/`TaskGet`/`TaskUpdate`/`TaskList` are withheld on Opus 5 and Fable 5 era models unless `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` is set. When they are absent the mandate still stands, carried in your own response text instead of a task list.
+
 ### Execute Commits
 For each new commit group, in dependency order:
 

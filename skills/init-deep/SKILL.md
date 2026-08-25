@@ -33,6 +33,8 @@ Generate hierarchical AGENTS.md files. Root + complexity-scored subdirectories.
 
 Use TaskCreate for ALL phases. Mark in_progress → completed in real-time.
 
+Precondition: `TodoWrite` and `TaskCreate`/`TaskGet`/`TaskUpdate`/`TaskList` are withheld on Opus 5 and Fable 5 era models unless `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` is set. When they are absent the mandate still stands, carried in your own response text instead of a task list.
+
 ## Phase 1: Discovery + Analysis (Concurrent)
 
 ### Background Explore Agents (launch immediately)
