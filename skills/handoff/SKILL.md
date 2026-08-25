@@ -11,6 +11,16 @@ user-invocable: true
 disable-model-invocation: true
 shell: bash
 argument-hint: optional notes about what to include
+allowed-tools:
+  - Read
+  - Glob
+  - Bash(git status *)
+  - Bash(git diff *)
+  - Bash(git log *)
+  - Bash(git branch --show-current)
+  - mcp__plugin_oh-my-claudeagent_omca__boulder_progress
+  - mcp__plugin_oh-my-claudeagent_omca__notepad_read
+  - mcp__plugin_oh-my-claudeagent_omca__notepad_list
 ---
 
 # Handoff - Session Context Summarization

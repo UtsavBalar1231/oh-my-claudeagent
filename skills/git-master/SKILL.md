@@ -5,6 +5,21 @@ model: opus
 argument-hint: "[commit | rebase | blame | bisect]"
 effort: medium
 paths: ".gitignore, .gitattributes"
+allowed-tools:
+  - Read
+  - Grep
+  - Glob
+  - Bash(git status *)
+  - Bash(git diff *)
+  - Bash(git log *)
+  - Bash(git blame *)
+  - Bash(git show *)
+  - Bash(git branch --show-current)
+  - Bash(git branch -vv)
+  - Bash(git merge-base *)
+  - Bash(git rev-parse *)
+  - mcp__plugin_oh-my-claudeagent_omca__ast_search
+  - mcp__plugin_oh-my-claudeagent_omca__evidence_log
 ---
 
 # Git Master Agent
