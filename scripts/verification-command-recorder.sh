@@ -25,6 +25,14 @@ VERIFICATION_RUNNER_RE='(^|[;&|(])[[:space:]]*(just[[:space:]]+(test|ci|lint|fmt
 
 [[ "${SCANNABLE}" =~ ${VERIFICATION_RUNNER_RE} ]] || exit 0
 
+# The auto-mode classifier never sees tool results, so it cannot tell a verification run
+# from any other shell call when it reviews the next one. This note is the supported
+# channel for that one fact. It stays a static assertion about this call's origin: the
+# field is model-facing input to a permission decision, so anything persuasive or
+# instructional here would be a prompt-injection surface aimed at our own permissions.
+printf '{"hookSpecificOutput":{"hookEventName":"PostToolUse","classifierContext":"%s"}}\n' \
+	"This Bash call ran one of this repository's own verification runners (test, lint, build, or typecheck)."
+
 SLOT_FILE="${HOOK_STATE_DIR}/last-verification-command.json"
 EVIDENCE_FILE=$(resolve_evidence_file "${HOOK_STATE_DIR}")
 
