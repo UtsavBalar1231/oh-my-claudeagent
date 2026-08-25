@@ -233,7 +233,7 @@ load '../test_helper'
 	echo "$newest" | grep -qi "issue 4"
 }
 
-# ─── spawn-budget ceilings: advice fits a hard limit, counter is not bumped ────
+# ─── platform ceilings: advice fits a hard limit, counter is not bumped ───────
 
 # Case 9: concurrency ceiling gets wait/narrow-fan-out advice and no counter bump
 @test "delegate-retry: concurrent subagent limit yields ceiling advice, no counter bump" {
@@ -252,25 +252,27 @@ load '../test_helper'
 	assert [ ! -f "$CLAUDE_PROJECT_ROOT/.omca/state/error-counts.json" ]
 }
 
-# Case 10: session ceiling says finish directly or re-scope, and never bumps the counter
-@test "delegate-retry: subagent spawn limit yields session-ceiling advice, no counter bump" {
+# Case 10: a nesting-depth failure gets its own advice and never bumps the counter
+@test "delegate-retry: nesting depth violation yields nesting advice, no counter bump" {
 	local payload
-	payload='{"tool_name":"Agent","tool_input":{"subagent_type":"oh-my-claudeagent:executor"},"error":"Subagent spawn limit reached"}'
+	payload='{"tool_name":"Agent","tool_input":{"subagent_type":"oh-my-claudeagent:executor"},"error":"No such tool available: Agent"}'
 	run_hook "delegate-retry.sh" "$payload"
 	assert_success
 
 	local ctx
 	ctx=$(get_context)
-	echo "$ctx" | grep -q "SESSION SPAWN CEILING"
-	echo "$ctx" | grep -qi "fresh session"
+	echo "$ctx" | grep -q "NESTING LIMIT"
+	echo "$ctx" | grep -qi "cannot spawn further subagents"
+	# A depth constraint is not fixed by re-prompting, so the generic advice must not appear.
+	! echo "$ctx" | grep -qi "different agent tier"
 
 	assert [ ! -f "$CLAUDE_PROJECT_ROOT/.omca/state/error-counts.json" ]
 }
 
 # Case 11: three consecutive ceilings never reach the oracle-escalation breaker
-@test "delegate-retry: repeated spawn-limit failures never escalate to oracle" {
+@test "delegate-retry: repeated concurrency-ceiling failures never escalate to oracle" {
 	local payload i
-	payload='{"tool_name":"Agent","tool_input":{"subagent_type":"oh-my-claudeagent:executor"},"error":"Subagent spawn limit reached"}'
+	payload='{"tool_name":"Agent","tool_input":{"subagent_type":"oh-my-claudeagent:executor"},"error":"Concurrent subagent limit reached"}'
 	for i in 1 2 3; do
 		run_hook "delegate-retry.sh" "$payload"
 		assert_success
@@ -279,6 +281,8 @@ load '../test_helper'
 		! echo "$ctx" | grep -qi "occurred 3+ times"
 		! echo "$ctx" | grep -qi "Escalate to oracle for architectural guidance"
 	done
+
+	assert [ ! -f "$CLAUDE_PROJECT_ROOT/.omca/state/error-counts.json" ]
 }
 
 @test "delegate-retry: transient branch tells the caller to resume from partial work" {

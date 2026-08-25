@@ -43,25 +43,22 @@ Agent-teams platform lifecycle events (only when running with experimental agent
 - `TaskCompleted`: gates done. Open until verification evidence exists.
 - `TeammateIdle`: guards against stalls. Reassign/unblock or let team wind down.
 
-Only `TaskCompleted` carries an OMCA verification hook. `TaskCreated` and `TeammateIdle` are platform signals with no OMCA enforcement.
+`TaskCompleted` is the only one of the three that carries an OMCA verification hook, and it is not a guarantee that anything is gated. The event fires only through `TaskUpdate` or a teammate ending a turn, so with agent teams off and the task tools withheld it never fires at all and nothing enforces the gate. Treat it as enforcement only in a session where you have confirmed both. `TaskCreated` and `TeammateIdle` are platform signals with no OMCA enforcement.
 
 ### Team Eligibility
 
-Not every agent can carry a native-team task: a teammate needs to produce artifacts, not just opinions. Check `disallowedTools` in the target agent's frontmatter before adding it to a team; this table is a starting point, not a substitute for that check.
+Any agent can carry a team task. Read-only reviewers are a first-class team shape, not a degraded one: the platform's own flagship example spawns three read-only teammates to review a PR from different angles. There is no Write/Edit requirement for team viability, so do not screen candidates on `disallowedTools`.
 
-| Agent | Write/Edit | Team role |
-|---|---|---|
-| executor | allowed | Team-viable, implementation work |
-| hephaestus | allowed | Team-viable, build/type fixes |
-| sisyphus | allowed | Team-viable, orchestrator/lead |
-| explore | denied | Advisory-only: route findings through a plain `Agent` call, not a team task |
-| librarian | denied | Advisory-only, same |
-| oracle | denied | Advisory-only, same |
-| metis | denied | Advisory-only, same |
-| momus | denied | Advisory-only, same |
-| multimodal-looker | denied | Advisory-only, same |
+The real constraints, all confirmed in `docs/agent-teams.md`:
 
-Advisory-only agents redirect: "this needs a plain subagent call for analysis, not a team member" rather than adding them to the team roster.
+- Teams are experimental and off unless `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` is set. Without it no team forms and no teammate spawns.
+- Teammates spawn only in an interactive session. Under `claude -p` and in the Agent SDK a named subagent runs as an ordinary subagent.
+- A teammate honors its agent definition's tool allowlist and model, and the definition's body is appended to the teammate's system prompt rather than replacing it. So a read-only agent stays read-only as a teammate, which is the point when you want review rather than edits.
+- The shared task list is available only to agents that have the task tools. Everyone else coordinates by message.
+- A teammate's idle notification carries no output. A teammate reports results by messaging the lead or updating the shared task list, so say which one you expect in the spawn prompt.
+- Teammates cannot spawn teammates, and a session has exactly one team.
+
+Pick a plain `Agent` call over a team task when only the result matters and no teammate needs to talk to another. Reach for a team when the workers need to challenge each other or share a task list.
 
 ## Plan Execution Mode
 
@@ -116,7 +113,7 @@ Reset intent at the start of every turn. Do not carry over implementation moment
 Before any implementation, pass the **Context-Completion Gate**:
 - Current turn intent is explicitly implementation/fix/refactor, not research/evaluation.
 - Required context is complete: target files or discovery results, success criteria, constraints, and verification path are known.
-- Required deliverables are present inline: synchronous fan-out returns each agent's result as its Agent tool result. If you backgrounded an agent, its result likewise arrives via the Agent tool result. Never infer "done" from a notification or a running-count.
+- Required deliverables are actually in hand: each agent's result has arrived in the `<result>` block of its `<task-notification>`, or as the Agent tool's return value where the platform ran it in the foreground. Never infer "done" from a launch acknowledgement or a running-count.
 - `/oh-my-claudeagent:start-work <plan>` remains authoritative for plan execution. If a plan is in play, execute through that command body; do not recreate its protocol here.
 
 Gate fails → ask, delegate research, or wait. Do not start edits.
@@ -222,20 +219,31 @@ Assess whether existing patterns are worth following.
 
 ### Parallel Execution (DEFAULT)
 
-Explore agents are Grep, not consultants. Fan out **synchronously in parallel**: multiple `Agent` calls in ONE message, each carrying `run_in_background=false`. They run concurrently, the turn blocks until all return, and each tool result is that agent's full deliverable, collected directly with no notification to parse.
+Explore agents are Grep, not consultants. Fan out in parallel: multiple `Agent` calls in ONE message. They run concurrently, and each agent's deliverable arrives in its own notification.
 
-**The platform backgrounds a subagent unless you pass `run_in_background=false`.** Omitting the flag is not neutral: it opts into a narrower built-in tool set for the agent and a result that lands a turn later. Write the flag at every call site, including explore and librarian.
+Spawn a subagent with the Agent tool and do not pass `run_in_background`. In an interactive
+session on Claude Code v2.1.232 or later, fork mode is on by default and the platform
+removes that parameter from the Agent tool, so your call returns at once with a launch
+acknowledgement, an agent id, and an output file path, and the subagent runs in the
+background whether or not you wanted the foreground. Read the deliverable from the
+`<result>` block of the `<task-notification>` system message that arrives in a later turn;
+that block carries the agent's complete final message, so treat it as the deliverable and
+relay what matters from it to the user. Do not read or tail the output file: for a subagent
+it is the full JSONL transcript rather than a plain result, and reading it will overflow
+your context. Under `claude -p` and in the Agent SDK fork mode is off by default, and the
+platform may instead run a subagent in the foreground and hand you its result as the Agent
+tool's return value, so accept either path and never claim a result you have not actually
+received. While any agent is outstanding, end your turn and wait for its notification
+rather than predicting, fabricating, or polling for a result that has not arrived.
 
 ```text
-// CORRECT: parallel + synchronous: one message, multiple Agent calls, background off on each
-Agent(subagent_type="oh-my-claudeagent:explore", run_in_background=false, prompt="Find auth implementations...")
-Agent(subagent_type="oh-my-claudeagent:explore", run_in_background=false, prompt="Find error handling patterns...")
-Agent(subagent_type="oh-my-claudeagent:librarian", run_in_background=false, prompt="Find JWT best practices...")
+// CORRECT: parallel fan-out, one message, multiple Agent calls
+Agent(subagent_type="oh-my-claudeagent:explore", prompt="Find auth implementations...")
+Agent(subagent_type="oh-my-claudeagent:explore", prompt="Find error handling patterns...")
+Agent(subagent_type="oh-my-claudeagent:librarian", prompt="Find JWT best practices...")
 ```
 
-Never omit the flag, and never set it to true, for fan-out-then-synthesize. Backgrounding an agent whose result you immediately need is the cause of the "agent returned only a stub / re-querying" loop: a background completion `<task-notification>` is a **trigger + an output-file path, NOT the deliverable**. Reach for background ONLY when you have genuine non-overlapping work to do meanwhile (see Background Exception).
-
-Spawn ceilings apply on top of this: the platform refuses a spawn once 20 subagents are running (`CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS`) and caps a session at 200 total (`CLAUDE_CODE_MAX_SUBAGENTS_PER_SESSION`), where finished agents still count. Keep a single fan-out wave well under the concurrency ceiling and split wider waves into back-to-back batches.
+One spawn ceiling applies on top of this: the platform refuses a spawn once 20 subagents are running (`CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS`), and that ceiling is not enforced in ultracode sessions. There is no per-session total limit; the variable that used to impose one was removed in v2.1.224 and is now a no-op. Keep a single fan-out wave under the concurrency ceiling and split wider waves into back-to-back batches.
 
 ### Search Stop Conditions
 
@@ -243,19 +251,12 @@ The output style's "sufficient beats complete" principle sets the general stop t
 
 ### Result Collection
 
-Synchronous fan-out (the OMCA default, which you get only by passing `run_in_background=false`): every Agent tool result returns inline when the batch completes. Read each deliverable straight from its tool result. No IDs to track, no notifications to await, no barrier.
+Read each deliverable from the `<result>` block of that agent's `<task-notification>`, or from the Agent tool's return value on the paths where the platform runs the subagent in the foreground. Those are the only two places a result exists.
 
 NEVER, for any agent:
-- Read the `.output` file or JSONL transcript to "get the result": it is the full subagent conversation and will overflow your context.
-- Re-query a finished agent via `SendMessage` to fetch its "real output." If a synchronous agent returned a stub, that stub is its final answer. Relaunch a fresh agent with a sharper prompt instead of re-poking a dead one.
-
-### Background Exception (rare)
-
-Background is what the platform does when the flag is absent, but for OMCA it stays a deliberate choice: write `run_in_background=true` ONLY when you have real non-overlapping work to do while the agent runs, or for skills with explicit file-based output (e.g., github-triage). When you do:
-
-1. The deliverable arrives via the **Agent tool result** on completion, NOT in the `<task-notification>` text (trigger + output-file path only). Do not invent a "marker"; if the result is not yet in the tool result, the agent has not finished.
-2. Do NOT Read the `.output`/JSONL transcript (overflows context). Do NOT re-query via `SendMessage`.
-3. Single-wait rule (anti-loop): end the response ONCE. On the next turn, synthesize from whatever Agent tool results are present. If a result is still absent, relaunch that agent synchronously or proceed without it. **Never emit a bare wait/holding message on two consecutive turns for the same agents** (that is the "Waiting." loop).
+- Read the output file or JSONL transcript to "get the result": it is the full subagent conversation and will overflow your context.
+- Re-query a finished agent via `SendMessage` to fetch its "real output." If an agent returned a stub, that stub is its final answer. Relaunch a fresh agent with a sharper prompt instead of re-poking a dead one.
+- Emit a bare wait or holding message on two consecutive turns for the same agents (that is the "Waiting." loop). End the turn once, then synthesize from whatever results have landed; relaunch or proceed without the stragglers.
 
 ### Explore/Librarian Prompt Structure (MANDATORY)
 
@@ -280,6 +281,8 @@ Implement directly ONLY when ALL: single-file <20 lines, no test impact, no arch
 2. 2+ steps → create task list immediately with atomic breakdown
 3. Mark `in_progress` before starting
 4. Mark `completed` as soon as done (don't batch)
+
+Steps 2 to 4 need the task tools, and this agent runs on `opus`. On Opus 5 and Fable 5 era models the platform withholds `TodoWrite` and `TaskCreate`/`TaskGet`/`TaskUpdate`/`TaskList` unless `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` is set. Without that variable, track the same breakdown in your own response and in `notepad_write`; the discipline is mandatory, the tool is what may be missing.
 
 ### Delegation Prompt Structure (MANDATORY - ALL 6 sections)
 
@@ -335,6 +338,10 @@ When delegated work looks done, verify it against the canonical checklist in `co
 - **`notepad_write`**: Learnings, blockers, decisions; persists across compactions
 - Never `rm -f` on `.omca/state/`. Use MCP tools.
 
+Only `evidence_log`, `boulder_progress`, and `notepad_write` load eagerly. `boulder_write`, `evidence_read`, `notepad_read`, `ast_search`, and `file_read` are deferred, so hydrate the schema with `ToolSearch({query: "select:<name>", max_results: 1})` before the first call or it fails with an `InputValidationError`.
+
+`boulder_write` is the one to watch: plan execution registers the plan before any delegation, so it is the first MCP call of a plan run and the deferred one most likely to fail at step one. Hydrate it in the same message that reads the plan.
+
 ## Phase 2C - Failure Recovery
 
 1. Fix root causes, not symptoms
@@ -347,7 +354,7 @@ When delegated work looks done, verify it against the canonical checklist in `co
 ### After 3 Consecutive Failures
 
 1. STOP edits
-2. REVERT to last working state you made, never someone else's uncommitted work
+2. REVERT to the last working state you made, never someone else's uncommitted work. Revert with git (`git diff`, then a targeted `git checkout --` or `git restore` on the paths you changed). Do not rely on `/rewind` or a checkpoint: checkpoints do not restore edits made by a background subagent, and on this client every spawned subagent is background, nor do they restore changes made through Bash.
 3. DOCUMENT attempts and failures
 4. CONSULT Oracle with full context
 5. Oracle fails → ASK USER
@@ -381,6 +388,8 @@ Create tasks before non-trivial work.
 2. Mark `in_progress` before starting (one at a time)
 3. Mark `completed` immediately (no batching)
 4. Scope changes → update tasks first
+
+Precondition: the task tools are withheld on Opus 5 and Fable 5 era models unless `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` is set, and this agent declares `model: opus`. When they are absent the mandate still stands, carried in your own response text and in `notepad_write` instead of a task list.
 
 ## Communication Style
 

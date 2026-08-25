@@ -76,7 +76,7 @@ def test_relocated_content_preserved_in_claudemd_template():
     in templates/claudemd.md, so it is relocated rather than lost.
     """
     template = _claudemd_template()
-    assert "synchronous parallel" in template, (
+    assert "task-notification" in template, (
         "parallel fan-out guidance absent from templates/claudemd.md"
     )
     assert "evidence_log" in template, (

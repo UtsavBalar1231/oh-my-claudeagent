@@ -59,15 +59,15 @@ Applies to: bug root cause (file + line), "feature exists" (cite where), "fix co
 ## ARCHITECTURE
 
 ```
-1 issue or PR  =  1 Agent(subagent_type="oh-my-claudeagent:executor", run_in_background=true)
+1 issue or PR  =  1 Agent(subagent_type="oh-my-claudeagent:executor")
 ```
 
 | Rule | Value |
 |------|-------|
 | Agent type for ALL items | `oh-my-claudeagent:executor` |
-| Execution mode | `run_in_background=true` |
+| Execution mode | Background, by platform default. There is no parameter to set |
 | Parallelism | Bounded batches, max 5 concurrent agents |
-| Total items per run | 180 (session spawn budget is 200 and finished agents still count) |
+| Total items per run | No platform cap. Bound the run yourself and record the overflow (see below) |
 | Result storage | `issue-{number}.md` or `pr-{number}.md` under `/tmp/opencode/github-triage-{datetime}/` |
 | Final collection | Orchestrator reads all reports and writes `SUMMARY.md` |
 
@@ -126,32 +126,38 @@ For each item, determine its type from metadata only: title, labels, author, and
 
 ## PHASE 4: SPAWN 1 BACKGROUND AGENT PER ITEM
 
-### Total-item cap (apply BEFORE spawning anything)
+### Run-size bound (decide BEFORE spawning anything)
 
-The batch-of-5 rule bounds concurrency only. A session can spawn 200 subagents total
-(`CLAUDE_CODE_MAX_SUBAGENTS_PER_SESSION`), and a finished agent keeps counting, so a
-repo with hundreds of open items will hit the ceiling mid-run and the remaining
-spawns fail with `Subagent spawn limit reached`.
+No platform ceiling limits how many subagents a session spawns in total. The only
+spawn limit that applies here is the concurrent one: the Agent tool refuses a spawn
+with `Concurrent subagent limit reached` once the session's running count reaches
+`CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` (default 20), and it starts succeeding again
+as soon as running agents finish. Batches of 5 stay under that and under the
+tool-call concurrency default of 10, so a batched run never trips it. A session
+running with ultracode effort is exempt from the concurrent limit entirely.
 
-Cap this run at **180 items** (200 minus headroom for the orchestrator's own
-delegations). If the classified list is longer:
+What actually bounds a run is wall-clock time and the orchestrator's own context:
+every finished agent's result lands inline in this conversation. So the total is a
+judgment call, not a constant. Pick a bound for the run, from the user's stated scope
+if they gave one, otherwise from how large the classified list is against how much
+room is left in the conversation. Then, if the classified list is longer than the
+bound:
 
-1. Sort by `updatedAt` descending and take the first 180. Recently-touched items are
+1. Sort by `updatedAt` descending and take the first N. Recently-touched items are
    the ones a triage pass is for.
 2. Write the dropped items to `{OUTDIR}/SKIPPED.md`, one line per item: number,
    type, title, `updatedAt`. Never truncate silently.
 3. State the count in `SUMMARY.md` and in your final message: how many items were
    triaged, how many were skipped, and that `SKIPPED.md` lists them.
 
-A run that reports 180 of 340 items with the skipped list on disk is correct. A run
-that reports 180 items as if that were all of them is a wrong answer.
+A run that reports 120 of 340 items with the skipped list on disk is correct. A run
+that reports those 120 as if they were all of them is a wrong answer.
 
-For EVERY item that survives the cap, spawn one executor agent:
+For EVERY item that survives the bound, spawn one executor agent:
 
 ```python
 Agent(
     subagent_type="oh-my-claudeagent:executor",
-    run_in_background=True,
     prompt=SUBAGENT_PROMPT_FOR_TYPE
 )
 ```
@@ -491,7 +497,7 @@ Tell the user the output directory path when complete.
 | Running any gh mutation command (merge, close, edit, comment, review, non-GET API) | CRITICAL |
 | Making claims without Evidence Rule citations | CRITICAL |
 | Batching multiple items into one Agent call | CRITICAL |
-| Using `run_in_background=false` | HIGH |
+| Re-spawning an item because its result did not arrive in the turn that spawned it | HIGH |
 | Spawning any agent type other than executor | HIGH |
 | Checking out PR branches via git | CRITICAL |
 | Not writing report to `/tmp/opencode/github-triage-{datetime}/` | HIGH |
@@ -506,8 +512,8 @@ When invoked:
 1. Create output directory: `/tmp/opencode/github-triage-{datetime}/`
 2. Fetch open issue + PR metadata via gh CLI (paginate if 500 reached; no body/comments initially)
 3. Classify each item (ISSUE_QUESTION, ISSUE_BUG, ISSUE_FEATURE, ISSUE_OTHER, PR_BUGFIX, PR_OTHER)
-4. Apply the 180-item cap; log any overflow to `{OUTDIR}/SKIPPED.md`
-5. For EACH surviving item: `Agent(subagent_type="oh-my-claudeagent:executor", run_in_background=True, prompt=...)`
+4. Decide the run-size bound; log any overflow to `{OUTDIR}/SKIPPED.md`
+5. For EACH surviving item: `Agent(subagent_type="oh-my-claudeagent:executor", prompt=...)`
 6. Launch agents in bounded batches of up to 5 concurrent executors
 7. Collect reports from output directory once agents complete
 8. Write `{OUTDIR}/SUMMARY.md` with aggregated findings

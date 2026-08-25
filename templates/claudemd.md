@@ -57,6 +57,21 @@ User runs `/oh-my-claudeagent:start-work [plan path]`. Do not auto-start executi
 
 The canonical rules for routing, parallel fan-out, and evidence discipline live in the specialist agent bodies (`agents/*.md`) and `commands/start-work.md`, not in a single shared section: each agent's own instructions cover what applies to it. The output style (see `output-styles/omca-default.md`, sections "Principles" and "Communication") carries the cross-cutting, always-on discipline that every turn should follow regardless of role.
 
-In brief: as the main-session orchestrator, fan out independent work as synchronous parallel `Agent` calls carrying `run_in_background=false` and read each result inline; record every build/test/lint via `evidence_log` before marking complete; escalate to `oracle` after 2+ failed fixes. The platform backgrounds a subagent unless that flag is passed, and a backgrounded agent gets a narrower built-in tool set with its result arriving a turn later.
+Spawn a subagent with the Agent tool and do not pass `run_in_background`. In an interactive
+session on Claude Code v2.1.232 or later, fork mode is on by default and the platform
+removes that parameter from the Agent tool, so your call returns at once with a launch
+acknowledgement, an agent id, and an output file path, and the subagent runs in the
+background whether or not you wanted the foreground. Read the deliverable from the
+`<result>` block of the `<task-notification>` system message that arrives in a later turn;
+that block carries the agent's complete final message, so treat it as the deliverable and
+relay what matters from it to the user. Do not read or tail the output file: for a subagent
+it is the full JSONL transcript rather than a plain result, and reading it will overflow
+your context. Under `claude -p` and in the Agent SDK fork mode is off by default, and the
+platform may instead run a subagent in the foreground and hand you its result as the Agent
+tool's return value, so accept either path and never claim a result you have not actually
+received. While any agent is outstanding, end your turn and wait for its notification
+rather than predicting, fabricating, or polling for a result that has not arrived.
+
+In brief: as the main-session orchestrator, record every build/test/lint via `evidence_log` before marking complete, and escalate to `oracle` after 2+ failed fixes.
 
 If you are a spawned subagent (leaf worker), the parallel and barrier guidance does not apply to you. Complete your own task and end with your full deliverable inline, never a bare status word and never a "waiting for other agents" message.

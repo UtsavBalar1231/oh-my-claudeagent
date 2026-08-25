@@ -1,6 +1,7 @@
 ---
 name: plan
 description: Create a strategic work plan via Prometheus-style interview and structured plan drafting.
+disable-model-invocation: true
 argument-hint: "[work description]"
 ---
 

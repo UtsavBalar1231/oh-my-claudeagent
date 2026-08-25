@@ -1,6 +1,7 @@
 ---
 name: start-work
 description: Start a work session from a Prometheus-generated plan.
+disable-model-invocation: true
 argument-hint: "[plan file] [--worktree <path>]"
 ---
 
@@ -129,7 +130,8 @@ Without `--worktree`:
 
 ### Boulder Write (BEFORE Delegating)
 
-After plan is selected, BEFORE any delegation:
+After plan is selected, BEFORE any delegation. `boulder_write` is a deferred tool, so
+hydrate it with `ToolSearch({query: "select:boulder_write", max_results: 1})` first:
 
 ```
 boulder_write(
@@ -278,7 +280,6 @@ Example delegation:
 ```text
 Agent(
   subagent_type="oh-my-claudeagent:executor",
-  run_in_background=false,
   prompt=`[FULL 6-SECTION PROMPT]`
 )
 ```
@@ -290,28 +291,38 @@ Agent(
 Parallel tasks: prepare ALL prompts, invoke in ONE message, wait, verify all.
 Sequential tasks: one at a time — real dependency, not comfort.
 
-**The platform runs subagents in the background unless you say otherwise.** A
-backgrounded agent gets a narrower built-in tool set and its result reaches you a
-turn later, so anything you need in this turn must carry `run_in_background=false`
-explicitly. Pass the flag at every call site rather than relying on a default.
+Spawn a subagent with the Agent tool and do not pass `run_in_background`. In an interactive
+session on Claude Code v2.1.232 or later, fork mode is on by default and the platform
+removes that parameter from the Agent tool, so your call returns at once with a launch
+acknowledgement, an agent id, and an output file path, and the subagent runs in the
+background whether or not you wanted the foreground. Read the deliverable from the
+`<result>` block of the `<task-notification>` system message that arrives in a later turn;
+that block carries the agent's complete final message, so treat it as the deliverable and
+relay what matters from it to the user. Do not read or tail the output file: for a subagent
+it is the full JSONL transcript rather than a plain result, and reading it will overflow
+your context. Under `claude -p` and in the Agent SDK fork mode is off by default, and the
+platform may instead run a subagent in the foreground and hand you its result as the Agent
+tool's return value, so accept either path and never claim a result you have not actually
+received. While any agent is outstanding, end your turn and wait for its notification
+rather than predicting, fabricating, or polling for a result that has not arrived.
 
 For exploration and research (result needed to plan the next step):
 ```text
-Agent(subagent_type="oh-my-claudeagent:explore", run_in_background=false, ...)
-Agent(subagent_type="oh-my-claudeagent:librarian", run_in_background=false, ...)
+Agent(subagent_type="oh-my-claudeagent:explore", ...)
+Agent(subagent_type="oh-my-claudeagent:librarian", ...)
 ```
 
 For task execution (result needed before the task can be marked complete):
 ```text
-Agent(subagent_type="oh-my-claudeagent:executor", run_in_background=false, prompt="...", ...)
+Agent(subagent_type="oh-my-claudeagent:executor", prompt="...", ...)
 ```
 
 Parallel task group (invoke in ONE message):
 ```text
 // Tasks 2, 3, 4 are independent — invoke together
-Agent(subagent_type="oh-my-claudeagent:executor", run_in_background=false, prompt="Task 2...")
-Agent(subagent_type="oh-my-claudeagent:executor", run_in_background=false, prompt="Task 3...")
-Agent(subagent_type="oh-my-claudeagent:executor", run_in_background=false, prompt="Task 4...")
+Agent(subagent_type="oh-my-claudeagent:executor", prompt="Task 2...")
+Agent(subagent_type="oh-my-claudeagent:executor", prompt="Task 3...")
+Agent(subagent_type="oh-my-claudeagent:executor", prompt="Task 4...")
 ```
 
 #### Parallel group width
@@ -321,28 +332,24 @@ The platform refuses a spawn once 20 subagents are running concurrently
 reached` and telling you not to retry. A plan's declared parallel group must stay
 under that ceiling: if a group lists more tasks than the ceiling allows, split it
 into sub-batches and run them back to back. Count agents already running from an
-earlier batch, since they still hold their slots.
+earlier batch, since they still hold their slots. That ceiling is not enforced in
+ultracode sessions.
 
-A session can spawn 200 subagents total (`CLAUDE_CODE_MAX_SUBAGENTS_PER_SESSION`),
-and a finished agent still counts. On a plan large enough to approach that, prefer
-one agent per task over one agent per file.
+There is no per-session total limit on how many subagents a session may spawn, so a
+finished agent costs nothing. Concurrency is the only budget to plan against.
 
 ### 2.2 Result Collection
 
-Parallel groups run SYNCHRONOUSLY (multiple Agent calls in one message, each with
-`run_in_background=false`): every tool result returns inline when the batch
-completes — read each deliverable directly. Never Read a subagent's `.output`/JSONL
-transcript (overflows context), and never re-query a finished agent via
-`SendMessage` — a stub return IS the final answer; relaunch a fresh agent with a
-sharper prompt instead.
+A parallel group is several Agent calls in ONE message. Each returns a launch
+acknowledgement immediately, and each deliverable arrives later in the `<result>` block
+of its own `<task-notification>`. Read the deliverable from there. Never Read a
+subagent's `.output`/JSONL transcript (overflows context), and never re-query a finished
+agent via `SendMessage` — a stub return IS the final answer; relaunch a fresh agent with
+a sharper prompt instead.
 
-Background (`run_in_background=true`, the platform default) is reserved for genuine
-meanwhile-work or file-based-output skills. Then the deliverable arrives via the
-Agent tool result on completion — NOT the `<task-notification>` text (a trigger +
-output-file path).
 While notifications are pending and all remaining work depends on them, acknowledge
-briefly, say how many remain, and END the response; synthesize once every tool
-result is in. Never act on partial results.
+briefly, say how many remain, and END the response; synthesize once every result is in.
+Never act on partial results.
 
 ### 2.3 Verify After Every Delegation
 
@@ -411,7 +418,6 @@ Then run a single completeness review. Delegate to `executor`:
 ```text
 Agent(
   subagent_type="oh-my-claudeagent:executor",
-  run_in_background=false,
   prompt="[6-section completeness review prompt — read plan end-to-end, read diffs,
 check each requirement was implemented, check each constraint was honored.
 Output: COMPLETE or INCOMPLETE with specifics.]"
@@ -456,8 +462,17 @@ in emergencies.
 
 ## Evidence Logging Mandate
 
-Use `evidence_log` after EVERY verification command. The task-completion hook
-enforces this — no evidence, no done.
+Use `evidence_log` after EVERY verification command. No evidence, no done.
+
+The `TaskCompleted` hook backs this up, but it does not gate every path to completion:
+it fires only when a task is closed through `TaskUpdate` or when a teammate ends its
+turn, so a run that never touches the task list is never gated by it. Treat the mandate
+as yours to honor rather than as something the hook will catch for you.
+
+Task-list tools are a precondition, not a given. `TaskCreate`/`TaskUpdate` are withheld
+on Opus 5 and Fable 5 era models unless `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` is set in the
+environment, and every OMCA agent declares one of those tiers. Without that variable the
+task list is unavailable and the `TaskCompleted` hook has nothing to fire on.
 
 Standard pattern:
 ```
@@ -540,18 +555,22 @@ just flaky" is not evidence.
 
 - **`boulder_write`**: Write/update execution metadata (active plan, session ID, worktree path)
 - **`boulder_progress`**: Task completion counts and active plan info
-- **`evidence_log`**: After EVERY verification command — enforced by task-completion hook
+- **`evidence_log`**: After EVERY verification command — no evidence, no done
 - **`evidence_read`**: Before final report to summarize all results
 - **`notepad_write`**: Blockers/audit breadcrumbs (learnings, issues, decisions, problems)
 - **`notepad_read`**: Fallback audit notes when relevant to a pending task
 - Never `rm -f` on `.omca/state/` — use MCP tools
+
+Only `evidence_log`, `boulder_progress`, and `notepad_write` load eagerly. `boulder_write`, `evidence_read`, `notepad_read`, `ast_search`, and `file_read` are deferred, so hydrate the schema with `ToolSearch({query: "select:<name>", max_results: 1})` before the first call or it fails with an `InputValidationError`.
+
+`boulder_write` is the one to watch: this command requires it BEFORE any delegation, so it is the first MCP call of every plan run and a missing-tool error there stops the run at step one. Hydrate it in the same message that reads the plan.
 
 ## Critical Rules
 
 - `boulder_write` BEFORE delegating — tracks execution metadata
 - Read FULL plan before delegating
 - All 6 sections in every delegation prompt
-- `evidence_log` after EVERY verification command — task-completion hook enforces this
+- `evidence_log` after EVERY verification command — no evidence, no done
 - `evidence_read` before final report to summarize all results
 - Mark plan checkboxes immediately after verification — do NOT batch
 - Never trust subagent claims without independent verification

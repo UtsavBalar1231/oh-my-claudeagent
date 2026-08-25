@@ -266,23 +266,42 @@ row only when a handler is actually registered for it.
 | `PermissionDenied` | Tool lifecycle |
 | `PostToolUse` | Tool lifecycle |
 | `PostToolUseFailure` | Tool lifecycle |
+| `PostToolBatch` | Tool lifecycle |
 | `Stop` | Lifecycle |
+| `StopFailure` | Lifecycle |
 | `TaskCompleted` | Task lifecycle |
 | `PreCompact` | Memory |
 | `SessionEnd` | Lifecycle |
+| `Setup` | Provisioning |
+| `FileChanged` | Filesystem |
 
 `PermissionDenied` routes to `permission-denied-coach.sh`, which turns an auto-mode
 classifier denial into retry guidance. `UserPromptExpansion` routes to
 `slash-command-mode-detector.sh`.
+
+`PostToolBatch` carries the loop detector, which fires once per resolved batch and reads
+the `tool_calls` array, so a signature can no longer be shredded by interleaved subagent
+calls the way a per-call `PostToolUse` slot was. `StopFailure` fires instead of `Stop` when
+a turn ends in an API error, which is the case the plan gates never see; its handler
+appends the `error` class and `error_details` to `.omca/logs/` so an interrupted plan run
+leaves a record. `Setup` fires only under `claude --init-only`, `claude -p --init`, and
+`claude -p --maintenance`, so the dependency check runs on the `init` matcher and the
+stale-marker and log sweeps run on `maintenance`, off the per-session startup path.
+`FileChanged` watches the evidence ledger and the boulder registry: it is driven by a
+filesystem watcher rather than by tool names, so it sees a mutation that no `Write`-scoped
+guard can. It has no decision control, so it detects and logs and never blocks.
+
+A `FileChanged` matcher is two things at once, a watch list and a filter, and the watch
+list takes literal filenames rather than globs or regexes. The registered matcher is
+therefore the two bare basenames, joined by the only separator that event accepts.
 
 **Registered platform events OMCA does not handle:**
 
 | Event | Why no handler |
 |-------|----------------|
 | `PostCompact` | Compaction re-injection runs on `SessionStart` with reason `compact` instead, which is where the restored context can still reach the model. `compact_summary` is genuinely uncaptured but has no consumer |
-| `StopFailure` | Fires on API errors and cannot block. Its `error` class is uncaptured; recovery is a manual `/oh-my-claudeagent:start-work` re-run, which needs no hook |
 | `Notification` | Desktop notification delivery was removed in the v2.10 minimize-to-core refactor; hooks also no longer have terminal access |
-| `ConfigChange`, `CwdChanged`, `FileChanged` | Observability-only in OMCA's prior handlers, removed in the same refactor. Re-evaluating `FileChanged` also reopens `SessionStart` `watchPaths` |
+| `ConfigChange`, `CwdChanged` | Observability-only in OMCA's prior handlers, removed in the same refactor. Neither reports a state change any OMCA runtime reader consumes |
 | `WorktreeCreate`, `WorktreeRemove` | Worktree isolation policy is Claude-native's. `--worktree` delegation is prompt-injected paths plus boulder bookkeeping, so there is nothing for a worktree hook to add |
 | `InstructionsLoaded` | Async and observability-only: no injection capability, and it reports `CLAUDE.md` / `.claude/rules` loads rather than `.omca/rules`, so it cannot replace `context-injector.sh`'s content-hash ledger |
 | `TaskCreated`, `TeammateIdle` | Task-collaboration lifecycle owned by the native shared task list. Only `TaskCompleted` is registered among the three, as the evidence gate |
@@ -292,10 +311,10 @@ classifier denial into retry guidance. `UserPromptExpansion` routes to
 | Event | Added | Status | Notes |
 |-------|-------|--------|-------|
 | `MessageDisplay` | v2.1.152 | Not adopted | Display-only terminal overlay; `displayContent` never reaches the transcript or context. Re-confirmed not-adopted 2026-07-01: screen/transcript divergence conflicts with evidence-first design, and every candidate use serves better via durable `additionalContext`/evidence |
-| `PostToolBatch` | v2.1.152 | Not adopted (removed) | Still a valid platform event in v2.1.197; OMCA's handler was removed in the v2.10 minimize-to-core refactor — see footnote below |
+| `PostToolBatch` | v2.1.152 | Adopted | Carries the loop detector. The handler reads the `tool_calls` array, and each entry's `tool_response` is the serialized string the model sees, not `PostToolUse`'s structured output object |
 | `Elicitation` | v2.1.152 | Not adopted | Fires when the model issues an elicitation request |
 | `ElicitationResult` | v2.1.152 | Not adopted | Fires with the elicitation response |
-| `Setup` | v2.1.152 | Not adopted | Plugin initialization event |
+| `Setup` | v2.1.152 | Adopted | Explicit provisioning event. Registered on both matchers: `init` runs the dependency check, `maintenance` runs the stale-marker and log sweeps |
 | `DirectoryAdded` | v2.1.219 | Not adopted (PROVISIONAL) | Tracked only. The event exists as a changelog line with no section, no matcher table, and no input schema in the hooks reference, so a handler would be built on a guessed payload |
 
 The table heading's version range covers the first five rows; `DirectoryAdded` postdates it
@@ -304,11 +323,12 @@ and is dated in its own row.
 The non-adopted events are tracked in `validate-plugin.sh`'s `new_platform_events` array. The validator skips them when no handler is present and
 passes when one is present — no failures on absence.
 
-**PostToolBatch history:** implemented in v2.7.0 as `scripts/post-tool-batch.sh`
-(same-file parallel-edit warnings, batch-consolidated delegation reminder, and the
-`agent-usage-reminder.sh` per-call-to-per-batch migration); removed in the v2.10
-minimize-to-core refactor along with `agent-usage-reminder.sh` — neither script exists
-in the current tree.
+**PostToolBatch history:** an earlier handler named post-tool-batch.sh carried same-file
+parallel-edit warnings and a batch-consolidated delegation reminder, and was dropped in the
+v2.10 minimize-to-core refactor alongside agent-usage-reminder.sh. Neither script is in the
+current tree, and the event's re-adoption does not restore them. What rides the event now is
+the loop detector, which needs the batch shape for correctness rather than for consolidation:
+a per-call slot cannot tell one agent repeating itself from three agents interleaving.
 
 **Stop / SubagentStop — new input fields (v2.1.145):**
 
@@ -366,14 +386,14 @@ configurable via `CLAUDE_CODE_STOP_HOOK_BLOCK_CAP` (env var). OMCA's Stop hook
 is complete but evidence is missing — it never emits a persistence-style block.
 (Adopted in the v2.1.141–v2.1.167 sync.)
 
-**`SessionStart` `watchPaths` output (v2.1.141–v2.1.167, not adopted):**
+**`SessionStart` `watchPaths` output (v2.1.141–v2.1.167):**
 
 `SessionStart` hooks can return a `watchPaths` array to register file-system paths for
-`FileChanged` event delivery. OMCA does not adopt this: there is no `FileChanged`
-handler in the current tree (the prior side-effects-only handler was removed in the
-v2.10 minimize-to-core refactor along with `CwdChanged`/`FileChanged` registration), and
-no runtime reader that would benefit from expanded watch coverage. Extending the watch
-set would generate noise without actionable signal.
+`FileChanged` event delivery. OMCA's watch list is instead seeded by the `FileChanged`
+matcher itself, which names the two state files the handler cares about. The dynamic form
+buys nothing here because those two paths are known at registration time; a session that
+needed to watch a path discovered at runtime is the case `watchPaths` exists for, and OMCA
+has none.
 
 **`PostToolUse` `updatedToolOutput` field (v2.1.141–v2.1.167, not adopted):**
 
@@ -614,25 +634,31 @@ steps max, effort estimates (Quick/Short/Medium/Large).
 
 | Agent | Model | Effort | Invoke | Purpose |
 |-------|-------|--------|--------|---------|
-| explore | opus | low | `Agent(..., run_in_background=false)` | Codebase search — files, patterns, implementations |
-| librarian | opus | medium | `Agent(..., run_in_background=false)` | External docs, OSS examples, library research |
+| explore | opus | low | `Agent(subagent_type="oh-my-claudeagent:explore")` | Codebase search — files, patterns, implementations |
+| librarian | opus | medium | `Agent(subagent_type="oh-my-claudeagent:librarian")` | External docs, OSS examples, library research |
 
 **explore** uses ast_search, Grep, Glob. Fire multiple in parallel for broad searches.
 
 **librarian** — Uses context7 for library docs, and may create shallow read-only
 dependency clones under `/tmp/opencode` for source investigation.
 
-**Fan-out flag, not a per-agent policy.** As of v2.1.198 the platform backgrounds every
-subagent unless the call passes `run_in_background=false`, so backgrounding is the default
-rather than something OMCA chooses for explore and librarian. OMCA's policy is the
-inverse: pass `run_in_background=false` on every fan-out call site, explore and librarian
-and executor alike, because the deliverable is needed in the same turn, and a
-backgrounded agent gets a narrower built-in tool set with its result arriving a turn
-later. Background stays reserved for genuine meanwhile-work and for file-based-output
-skills such as `github-triage`, which pins `run_in_background=true` deliberately. The
-invariant that made this policy: a background completion notification is a trigger plus an
-output-file path, never the deliverable; the deliverable arrives as the `Agent` tool
-result.
+**Backgrounding is the platform's default, not a per-agent policy.** It is not something
+OMCA chooses for explore and librarian, and there is no longer a flag to opt out of it.
+
+Spawn a subagent with the Agent tool and do not pass `run_in_background`. In an interactive
+session on Claude Code v2.1.232 or later, fork mode is on by default and the platform
+removes that parameter from the Agent tool, so your call returns at once with a launch
+acknowledgement, an agent id, and an output file path, and the subagent runs in the
+background whether or not you wanted the foreground. Read the deliverable from the
+`<result>` block of the `<task-notification>` system message that arrives in a later turn;
+that block carries the agent's complete final message, so treat it as the deliverable and
+relay what matters from it to the user. Do not read or tail the output file: for a subagent
+it is the full JSONL transcript rather than a plain result, and reading it will overflow
+your context. Under `claude -p` and in the Agent SDK fork mode is off by default, and the
+platform may instead run a subagent in the foreground and hand you its result as the Agent
+tool's return value, so accept either path and never claim a result you have not actually
+received. While any agent is outstanding, end your turn and wait for its notification
+rather than predicting, fabricating, or polling for a result that has not arrived.
 
 Socratic research interview is now part of `prometheus` (Socratic Interview Mode section).
 
@@ -975,10 +1001,16 @@ survive compaction. There is no `PostCompact` handler: by the time that event fi
 restored context is already assembled, so the injection has to ride the following
 `SessionStart` to reach the model at all.
 
-### StopFailure Limitation
+### StopFailure limitation
 
-`StopFailure` fires on API errors and cannot be blocked by a hook, and OMCA registers no
-handler for it. If an API error interrupts a plan run, resume manually with
+`StopFailure` fires when a turn ends in an API error, and it fires instead of `Stop`, not
+alongside it. The plan gates therefore never see such a turn: a plan run interrupted by a
+rate limit or a server error ends with every checkbox where it was and no gate output.
+
+A hook cannot change that. The platform discards a `StopFailure` handler's stdout and exit
+code, so the event supports no decision control at all. What OMCA's handler does is record
+it: the `error` class and `error_details` are appended to `.omca/logs/`, which turns a
+silent death into a diagnosable one. Resuming is still manual, with
 `/oh-my-claudeagent:start-work`.
 
 ---
@@ -1058,16 +1090,22 @@ The active effort level (`low`, `medium`, `high`, `xhigh`, `max`) is injected in
 
 ### Spawn budgets
 
-Three ceilings bound how wide and how deep a fan-out can go. None is set by OMCA.
+Two ceilings bound how wide and how deep a fan-out can go. Neither is set by OMCA.
 
 | Variable | Default | Notes |
 |---|---|---|
-| `CLAUDE_CODE_MAX_SUBAGENTS_PER_SESSION` | 200 (v2.1.212) | Session-wide total. Finished agents still count. `/clear` resets it. The error tells the model to finish the remaining work directly, so it is not retryable |
 | `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` | 20 (v2.1.217) | In-flight ceiling. `Concurrent subagent limit reached` explicitly says not to retry: wait for in-flight agents and read their results. ultracode sessions are exempt |
 | `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` | moved (v2.1.217 set 1, v2.1.219 raised it to 3) | The docs page still describes the pre-v2.1.219 behavior, so cite the changelog. Do not write prose that depends on the number |
 
-`scripts/delegate-retry.sh` returns early on both limit strings, before the error counter, so
-a platform ceiling can never advance the three-strike breaker toward an oracle escalation.
+`scripts/delegate-retry.sh` returns early on the concurrency limit string, before the error
+counter, so a platform ceiling can never advance the three-strike breaker toward an oracle
+escalation.
+
+A third ceiling used to sit above these two: a session-wide total-subagent cap, default 200,
+counting finished agents and reset by `/clear`. Its environment variable was removed in
+v2.1.224 and is now a no-op, so a value still set in a user's own config does nothing and
+nothing needs to be raised to widen a long session. The variable name is deliberately not
+written here, so a search of this document cannot resurface it as live configuration.
 
 `CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY` (default 10) is the tighter of the two parallelism
 ceilings next to the 20-concurrent-subagent cap. Exceeding it serializes silently, so a
@@ -1338,20 +1376,20 @@ Features introduced in this window that OMCA consciously declines to adopt:
 
 | Feature | Version | Reason |
 |---------|---------|--------|
-| `hookSpecificOutput.additionalContext` on Stop/SubagentStop | v2.1.163 | Co-existence with `decision:block` is undocumented (schema inconclusive); exit-2 path ignores all JSON — `additionalContext` would be silently dropped alongside a block decision |
-| `MessageDisplay`, `Elicitation`, `ElicitationResult`, `Setup` hook handlers | v2.1.152 | No OMCA use case; tracked in `new_platform_events` validator array (skip-on-absent semantics). Blocking PostToolBatch semantics (`decision:block`) deferred to v2 — current handler is non-blocking `additionalContext` only |
-| `PostToolBatch` blocking semantics (v2) | v2.1.152 | v1 non-blocking handler adopted in v2.7.0; blocking `decision:block` behavior deferred — not documented to co-exist with batch continuation, behavior unvalidated in production |
+| `hookSpecificOutput.additionalContext` on Stop/SubagentStop | v2.1.163 | Co-existence with `decision:block` is undocumented (schema inconclusive); the platform reads a hook's stdout JSON on every exit code, and exit 2 is the one outcome that JSON cannot override, so an `additionalContext` emitted beside a block cannot soften the block and its delivery alongside one is unspecified |
+| `MessageDisplay`, `Elicitation`, `ElicitationResult` hook handlers | v2.1.152 | No OMCA use case; tracked in `new_platform_events` validator array (skip-on-absent semantics) |
+| `PostToolBatch` blocking semantics | v2.1.152 | The event is registered, but its handler only injects `additionalContext`. A `decision: block` there stops the agentic loop before the next model call, which is a heavier response than a loop nudge warrants |
 | `skills:` preload frontmatter | v2.1.150 | Adds context-window cost on every session; OMCA's lazy slash-command / keyword paths are sufficient |
 | `Agent(type=...)` spawn-allowlist in agent frontmatter | v2.1.148 | Sisyphus needs unrestricted spawn access to the full agent roster; an allowlist would require updating on every new specialist addition |
 | `defaultEnabled: false` in plugin.json | v2.1.154 | OMCA is designed to activate immediately on install; inactive-by-default would break first-session experience |
 | `reloadSkills` in SessionStart output | v2.1.152 | No OMCA use case identified |
-| `prompt`, `agent`, and `http` hook types | (standing) | Orthogonal to OMCA's bash-script hook model |
+| `prompt`, `agent`, and `http` hook types | (standing) | Declined on cost and determinism, not on handler-type purity: `hooks/hooks.json` already registers an `mcp_tool` handler (`validate_plan_write`) alongside its `command` handlers, so "OMCA is `type: command` only" is not the reason and must not be cited as one. A `prompt` or `agent` handler puts a model call in the path of every matching tool event, which a plan-write validator resolves deterministically for free, and `http` adds a network dependency to a gate that must work offline |
 | Monitors, Themes, Channels, LSP | (standing) | No current OMCA use case |
 | `arguments:` in skill frontmatter | evaluated 2026-06 | Shell-style positional binding truncates free-form input — a slash command like `/oh-my-claudeagent:plan fix the auth bug` would bind only `$task="fix"`, discarding the rest. OMCA skills receive the full user prompt via natural expansion instead |
 | `hooks:` in skill frontmatter | evaluated 2026-06 | Skill-frontmatter hooks are not visible to `validate-plugin.sh` (validates hooks only from `hooks/hooks.json`). All hook registration stays in `hooks/hooks.json` |
 | `skillOverrides` / `skillListingBudgetFraction` / `maxSkillDescriptionChars` settings | evaluated 2026-06 | User-preference settings only; `skillOverrides` does not apply to plugin-shipped skills. No plugin-side adoption possible or needed |
 | `initialPrompt` in agent frontmatter | evaluated 2026-06 | Fires an unconditional billable model turn per subagent; `subagent-start.sh` already injects boulder context as `additionalContext` at zero turn cost |
-| `SessionStart` `watchPaths` output | evaluated 2026-06 | `FileChanged` consumer is side-effects-only (log + notify); no runtime reader benefits from an expanded watch set |
+| `SessionStart` `watchPaths` output | evaluated 2026-06 | The `FileChanged` watch list is seeded by that event's own matcher, and both watched paths are known at registration time, so nothing is left for the dynamic form to add |
 | `PostToolUse` `updatedToolOutput` | evaluated 2026-06 | Rewriting tool output post-hoc is adversarial to evidence integrity — OMCA's verification model requires the model to see literal command output |
 | `plugin.json` `dependencies` field | evaluated 2026-06 | OMCA has no runtime inter-plugin dependencies; field has no consumers in this plugin |
 | MCP `headersHelper` and WebSocket (`ws`) transport | evaluated 2026-06 | All OMCA MCP servers use stdio; no auth-header injection or WebSocket transport needed |
@@ -1472,9 +1510,10 @@ project `.claude/settings.json` and never `.claude/settings.local.json`, so no f
 effective ruleset with `claude auto-mode defaults`, `claude auto-mode config`, `claude
 auto-mode critique`, and `claude auto-mode reset`.
 
-`teammateDefaultModel` is best left `null` so teammates inherit the lead session's
-`/model`. It is deliberately not part of `omca-setup`'s auto-merged settings set, because
-the right value depends on model availability, provider, and budget.
+The settings key that used to pin a default model for teammates was removed in v2.1.234.
+Teammates now take the lead session's `/model` with no key to set, which is what the old
+recommendation asked for anyway, so a leftover entry in a user's own settings is inert
+rather than harmful. It was never part of `omca-setup`'s auto-merged settings set.
 
 Screen-reader users should set `CLAUDE_STATUSLINE_NERD_FONT=0`, which yields plain-text
 glyphs today. OMCA does not document a `CLAUDE_AX_SCREEN_READER` branch as working, because
@@ -1496,11 +1535,12 @@ section and in `CLAUDE.md`; neither is set by OMCA.
 |---------|-------|
 | Hook `timeout` is seconds, not milliseconds | The two `"timeout": 5000` values in `hooks/hooks.json` were 83-minute caps, the opposite of the intended 5-second tightening, and are now `5`. The per-event defaults range from 1.5 seconds for `SessionEnd` up to 600 for a `command` handler |
 | Quoted shell form on every command handler | Each handler invokes `${CLAUDE_PLUGIN_ROOT}/scripts/...`, which resolves into the marketplace cache under the user's home; in shell form a space anywhere in that path splits the command, so every `command` value now quotes the placeholder. Exec form (`args` present) was tried and rejected: it spawns `command` as a real executable with no shell, and a `.sh` file is not executable on native Windows, so every handler would fail to spawn there with no error signal, and setting `args` also makes the platform ignore the `shell` field. Exec form stays available for handlers whose `command` is a genuine cross-platform binary |
+| `shell: "bash"` pinned on every `type: command` handler | Not a Windows-only field, which is how this ledger used to dismiss it. Shell form runs the command under `sh -c` on Unix and falls back to PowerShell on Windows when Git Bash is absent, and neither is a shell a `.sh` handler written against bash can be fed to safely. Pinning `bash` names the interpreter on both platforms instead of inheriting whichever one the host resolves to. Every `command` handler in `hooks/hooks.json` now carries it |
 | `statusMessage` on user-perceived slow handlers | Spinner labels on `session-init.sh`, `context-injector.sh`, `comment-checker.sh`, and the `*-error-recovery.sh` family. Not blanket-applied: most handlers finish in milliseconds and a label for them reads as noise |
 | Compound-command fall-through in the trusted-tooling fast path | Hook `if:` matching is per-subcommand, so `jq . a.json && rm -rf ~/x` reached the jq auto-allow branch. A command whose trimmed text contains a command separator, a redirect, or a command substitution now falls through to the platform decision: `\|`, `;`, `&`, `<`, `>`, a backtick, `$(`, a literal newline, or a carriage return. The bare `&` covers `&&` and `&>`, the newline covers multi-line commands, and the carriage return is hardening for shells that terminate a statement on a bare CR, which bash does not. Globs, tilde, and `$VAR` expansion still take the fast path, since none of them can introduce a second command. The `rm -rf` deny branch still runs first, so the deny path is unchanged |
 | `context: fork` skills pin `background: false` | Forked skills background by default from v2.1.218, and a backgrounded fork gets the narrower background-subagent tool set with its result a turn later. metis, momus, and hephaestus pin `false` so momus's OKAY/REJECT verdict stays inline for the bounded review loop and hephaestus's edits stay inside `/rewind` checkpoint coverage |
 | `disable-model-invocation: true` on handoff | Replaces a workaround that told users to disable the whole plugin, and retires a `skillOverrides` recommendation this ledger already called inert for plugin skills. The `handoff` keyword now degrades to an advisory nudge toward the slash command and is described that way everywhere |
-| Subagents background by default (v2.1.198) | Every "no `run_in_background`" instruction described the opposite of what happens. `run_in_background=false` is now explicit at every fan-out call site in `commands/start-work.md`, `agents/sisyphus.md`, and `agents/executor.md`. The lever stays at the call site because `github-triage` wants background deliberately |
+| Subagents background by default (v2.1.198) | Every "no `run_in_background`" instruction described the opposite of what happens. The fix at the time was to pass the flag as `false` at every fan-out call site. That fix was superseded from v2.1.232, which removes the parameter from the Agent tool in an interactive session: there is no flag to pass and no foreground path to ask for. The call sites now carry the fan-out paragraph under Agent Reference instead |
 | `plansDirectory` resolution | `~/.claude/plans` was hardcoded as both the authoring and the discovery surface, so with the setting on, prometheus wrote where `/start-work` no longer looked. Both now resolve the directory: the setting when present (relative to the project root), else `~/.claude/plans`, with an active plan-mode path overriding |
 | Hook event tables regenerated from the registry | The table advertised nine events with no handler, omitted `PermissionDenied`, and pointed at two scripts deleted in the v2.10 refactor. `scripts/validate-plugin.sh` now diffs the table against `jq -r '.hooks \| keys[]'` in both directions, so it cannot re-drift silently |
 | `last_assistant_message` on Stop/SubagentStop | Both Stop hooks read the final assistant turn from the payload field first, with the transcript tail kept as fallback because the transcript is not guaranteed to hold the final message at Stop time. The undocumented `.messages` probe is gone. drift-guard's whole purpose is catching a completion claim in that message, so a miss there was a silent guard failure |
@@ -1582,9 +1622,9 @@ tables under Core Concepts and Agent Reference are the live state.
 | `Elicitation`'s requester is an MCP server, not the model | Correcting the event description above |
 | Exit-2 blocks land even when stdout JSON fails schema validation (v2.1.214) | Audit came back clean: every OMCA blocking path writes to stderr only. The stderr-only convention is load-bearing, not stylistic |
 | Hook infrastructure errors are not user rejections (v2.1.212) | OMCA emits `continue: false` nowhere, so only this half applies, and it holds reliably from v2.1.212 |
-| `continueOnBlock` is a `type: prompt` / `type: agent` field | Not a PostToolUse field. OMCA is `type: command` only, so the standing "future hooks declare `continueOnBlock: true`" advice was never actionable |
-| `PostToolBatch` blocking semantics are now documented | The documentation blocker is resolved; the non-adoption stands on minimize-to-core grounds. Caveat for anyone porting a handler: `tool_calls[].tool_response` is the serialized string, not PostToolUse's structured output |
-| `once`, `shell`, and the http/prompt/agent handler types | `once` is structurally inert given that skill-frontmatter hooks are a standing non-adoption, `shell` is Windows-only, and `allowedEnvVars` is moot with no http handlers |
+| `continueOnBlock` is a `type: prompt` / `type: agent` field | Not a PostToolUse field. OMCA registers no handler of either type (its non-`command` handler is the `mcp_tool` plan-write validator, which the field does not cover), so the standing "future hooks declare `continueOnBlock: true`" advice was never actionable |
+| `PostToolBatch` blocking semantics are now documented | The documented shape is what made the event usable: the loop detector now rides it. Caveat for anyone porting a handler: `tool_calls[].tool_response` is the serialized string, not PostToolUse's structured output |
+| `once` and the http/prompt/agent handler types | `once` is structurally inert given that skill-frontmatter hooks are a standing non-adoption, and `allowedEnvVars` is moot with no http handlers |
 | `maxTurns` in agent frontmatter | Shipped in v2.2.0 and reverted after user-observed truncation. Recording it here so its absence is distinguishable from ignorance, which is how it got re-added last time |
 | Multi-second slowdown with many deny/ask rules, fixed v2.1.208 | The version floor to cite when recommending `/fewer-permission-prompts`. OMCA's own allow set is nowhere near pathological |
 | Managed settings consented from a non-interactive run, fixed v2.1.207 | A managed policy consented during a `-p` or SDK run could change deny rules underneath OMCA's hooks. Hooks evaluate first, so only `allowManagedHooksOnly` can disable them |
@@ -1608,6 +1648,7 @@ tables under Core Concepts and Agent Reference are the live state.
 | `mcp_server_errors` | A headless stream-json field available only with `--mcp-config`. It is a headless-only diagnostic, separate from the interactive `claude mcp list` and `/mcp` path, and does not belong in the doctor's checks |
 | `SessionStart` hook streaming and idle reaping (v2.1.204) | A mid-hook reap leaves `session-init.sh`'s state resets half applied. Measured runtime is well under the budget, so no `timeout` is warranted for that reason |
 | `SessionStart` source `"fork"` | A fork's SessionStart wipes the live parent's per-subagent model map, dedup map, and counters, and overwrites the shared session file so the parent's SessionEnd deletes the wrong boulder binding. But `"fork"` is the wrong gate to fix it on: background sessions report `"startup"` while `/branch` and `--fork-session --resume` report `"fork"` and want the reset. The safe half is preferring the payload's own `session_id` in `session-cleanup.sh` |
+| `SessionEnd` reason `bypass_permissions_disabled` removed in v2.1.234 | Docs completeness only. `session-cleanup.sh` branches on the reason string, but the only value it tests for is `resume`, so it never saw this one and needs no change. Recorded so its absence from the reason set reads as removal rather than an omission |
 
 **Deliberate non-adoptions this sync:**
 
@@ -1638,7 +1679,11 @@ tables under Core Concepts and Agent Reference are the live state.
 | `background: true` on explore and librarian | Adopted in v2.2.0 and removed in v2.8.2 because a background task notification carries only a trigger and an output path, which produced confabulated stub replies and indefinite re-querying of finished agents. Re-adding recreates that loop |
 | `maxTurns` | Shipped and reverted in v2.2.0 after user-observed truncation. Runaway control lives at the hook layer instead: the error-count breaker and the tool-loop detector both fire at three |
 | Plugin `workflows` manifest field | The delivery mechanism for a dynamic-workflow rewrite that is itself declined. Adopting the field with no script ships an empty component path |
-| Dynamic workflows as a replacement for `/start-work` | The blocker is hook coupling: a workflow runtime driving agents in code produces no Stop events for `plan-continuation-guard.sh` and `final-verification-evidence.sh` to gate on. Resumability and out-of-context intermediate results are the capabilities OMCA genuinely lacks here |
+| Dynamic workflows as a replacement for `/start-work` | Two blockers. Hook coupling: a workflow runtime driving agents in code produces no Stop events for `plan-continuation-guard.sh` and `final-verification-evidence.sh` to gate on. And representation: a workflow holds its plan in a script, while OMCA's plan is a markdown file whose checkboxes are the progress record and whose sha256 scopes the evidence log. A script-held plan has no checkbox to flip and no file to hash, so every gate downstream of the plan file loses its input. Resumability and out-of-context intermediate results are the capabilities OMCA genuinely lacks here. For the narrower case a workflow is usually reached for, many independent units of the same shape, `/batch` is the escape hatch: it fans out without asking OMCA to give up the plan file |
+| `/loop` as OMCA's persistence mechanism | It is a timer that re-issues a prompt, with no completion condition and no verification, so a looped `/start-work` re-runs whether or not the previous pass advanced anything. OMCA's persistence is the plan file's checkboxes plus the evidence gates, which is a different guarantee. `/loop` stays documented as the lightest way to keep a session re-running until the user stops it, and it is not wired into any OMCA command |
+| `/schedule` with routines | Claude-native owns trigger firing, and a routine that carries the work would run it outside the session that holds the boulder binding, so a scheduled `/start-work` would either bind a fresh plan registry entry per firing or find none at all. Neither is a progress record. Nothing in OMCA reads or writes a routine, so the ownership line stays where the Ownership Model puts it |
+| Channels for agent-to-agent coordination | OMCA's fan-out is a tree, not a mesh: a spawned agent is a leaf by contract, with no siblings to address and its deliverable returning in its own task notification. Channels solve peer coordination between long-lived teammates, which is the native teams surface, and adopting them would mean giving leaf workers a second communication path that no OMCA gate observes |
+| Shrinking `subagent-models.json` to drop resolved entries | The file looks like a per-spawn cache with a redundant delete on `SubagentStop`, but the delete is what makes it a live set: `statusline/core.py` renders the active-agent count from the number of entries, so an entry left behind turns "running now" into "spawned this session". Removing the file or the delete breaks the count in opposite directions |
 | The advisor tool as an oracle replacement | Three blockers: Anthropic-API only while OMCA supports Bedrock and Vertex, a Fable-class main model would need a Fable-class advisor and none is offered, and it is experimental. Its full-transcript-context advantage is real, as a user-side complement |
 | Nested subagent stream-json forwarding at depth 2 and beyond | No stream-json consumer. Revisit only if the nesting policy changes |
 | `asyncRewake` | The proposed fit misreads `post-edit.sh`, which only logs and always exits 0. The format-and-lint hook is synchronous and project-local, so adopting this would need carve-outs in two load-bearing rules for no gain |
