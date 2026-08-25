@@ -10,6 +10,18 @@ when_to_use: |
 user-invocable: true
 shell: bash
 argument-hint: "[--uninstall | --check | --doctor]"
+allowed-tools:
+  - Read
+  - Glob
+  - Grep
+  - Bash(command -v *)
+  - Bash(jq *)
+  - Bash(uv --version)
+  - Bash(python3 --version)
+  - Bash(ast-grep --version)
+  - Bash(sg --version)
+  - Bash(git rev-parse *)
+  - Bash(claude mcp list)
 ---
 
 # omca-setup: Plugin Configuration
@@ -208,7 +220,7 @@ managed block so users benefit from it even when the output-style is overridden 
    Ownership boundary: this skill inspects `~/.claude/settings.json` and prints install snippets, but does not register the plugin automatically.
 
 4. Print enterprise rollout guidance (inspection only; do not write or enforce):
-   - `strictKnownMarketplaces` → allow only admin-approved marketplaces
+   - `strictKnownMarketplaces`, accepted alias `allowedMarketplaces` → allow only admin-approved marketplaces
    - `blockedMarketplaces` → explicitly deny marketplaces that should never resolve
    - `allowManagedHooksOnly` → allow only hooks defined in managed settings
    - `allowManagedPermissionRulesOnly` → allow only managed permission rules
@@ -232,26 +244,20 @@ Apply optional user-scope helper settings to `~/.claude/settings.json` with user
    - `mcp__plugin_oh-my-claudeagent_omca__*`, `mcp__grep__*`, `mcp__context7__*`
    - `Bash(jq *)`, `Bash(uv run *)`, `Bash(uv sync *)`
 
-4. Compute missing top-level: `teammateMode: "auto"`
+4. This skill writes no top-level keys and no `env` entries. Two in particular are left to the user:
 
-5. Compute missing env vars against the required set:
-   - `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`: `"1"` (enables agent teams; required for `teammateMode: "auto"`)
+   - `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`, and with it `teammateMode: "auto"`, which is inert unless that variable is set. With agent teams enabled, any subagent Claude names launches as a teammate instead, and a teammate reports only an idle notification, never its output, so an orchestration flow that waits on subagent results can stall. OMCA's model is fan-out-and-read-results, so setup neither sets the variable nor warns when it is absent. Users who want teams set it themselves.
+   - `ANTHROPIC_DEFAULT_OPUS_MODEL` and its `SONNET`/`FABLE` siblings. Each takes a full model name, never an alias, so setting one pins a generation that goes stale. OMCA agents declare the tier alias in their own frontmatter and let the platform resolve it, which is what these keys would otherwise override.
 
-   Do not write `ANTHROPIC_DEFAULT_OPUS_MODEL` or its `SONNET`/`FABLE` siblings. Each of those keys takes a full model name, never an alias, so setting one pins a generation that goes stale. OMCA agents declare the tier alias in their own frontmatter and let the platform resolve it, which is what these keys would otherwise override.
+5. If all present: "Settings already configured" -- skip
 
-6. If all present: "Settings already configured" -- skip
+6. If changes needed: show diff, use `AskUserQuestion` to confirm
 
-7. If changes needed: show diff, use `AskUserQuestion` to confirm
+7. On confirm: read-merge-write with `jq` (handle nonexistent file)
 
-8. On confirm: read-merge-write with `jq` (handle nonexistent file)
-
-9. On decline: print raw jq command as fallback:
+8. On decline: print raw jq command as fallback:
    ```
-   jq '. + {
-     "teammateMode": "auto"
-   } | .env += {
-     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
-   } | .permissions.allow += [
+   jq '.permissions.allow += [
      "Edit(.omca/**)",
      "Read(.omca/**)",
      "mcp__plugin_oh-my-claudeagent_omca__*",
@@ -263,9 +269,7 @@ Apply optional user-scope helper settings to `~/.claude/settings.json` with user
    ]' ~/.claude/settings.json > /tmp/claude-settings-tmp.json && mv /tmp/claude-settings-tmp.json ~/.claude/settings.json
    ```
 
-10. Explain each setting:
-   - `teammateMode: "auto"`: enables agent teams with best available UI (tmux/iTerm2 split panes)
-   - `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`: enables the experimental agent teams feature, required for `teammateMode: "auto"` to function
+9. Explain each setting:
     - `Edit(.omca/**)` / `Read(.omca/**)`: auto-allow plugin state file access. `Edit` covers every file-editing tool including `Write`; a `Write(path)` rule is accepted but never matched by the file permission checks and makes Claude Code print a startup warning, so do not add one.
     - `mcp__plugin_oh-my-claudeagent_omca__*` / `mcp__grep__*` / `mcp__context7__*`: auto-allow bundled MCP tool usage
     - `Bash(jq *)` / `Bash(uv run *)` / `Bash(uv sync *)`: auto-allow common plugin utility commands (narrowed from `Bash(uv *)`)
@@ -703,7 +707,7 @@ State section:
 
 2. Report any user-scope references to `oh-my-claudeagent` in:
    - `enabledPlugins`
-   - `extraKnownMarketplaces`
+   - `extraKnownMarketplaces`, or its accepted alias `additionalMarketplaces`
    - legacy `plugins` array entries
 
 3. Print supported cleanup commands instead of editing shared settings automatically:
@@ -755,8 +759,9 @@ Non-destructive health check. No files are modified.
 
 3. Check `~/.claude/settings.json`:
     - Is the plugin enabled in user settings? Report method (marketplace via enabledPlugins / dev mode via --plugin-dir / legacy plugins array / not registered)
-    - Is `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` configured? Report PASS/WARN. Also report a WARN for any `ANTHROPIC_DEFAULT_*_MODEL` key, which pins a generation over the tier alias OMCA agents declare
-    - Remind the user that managed policy keys such as `strictKnownMarketplaces`, `blockedMarketplaces`, `allowManagedHooksOnly`, `allowManagedPermissionRulesOnly`, `allowManagedMcpServersOnly`, and `sandbox.failIfUnavailable` are outside this skill's enforcement scope
+    - Is `CLAUDE_CODE_ENABLE_TODO_TOOLS` set? Report PASS/WARN, and never write it. On Opus 5 and Fable 5 era models the platform withholds `TodoWrite` and the `TaskCreate`/`TaskGet`/`TaskUpdate`/`TaskList` tools unless this variable is set, and every OMCA agent declares one of those tiers. Without it the task-list mandates in the agent prompts and the `TaskCompleted` gate are both inert
+    - Report a WARN for any `ANTHROPIC_DEFAULT_*_MODEL` key, which pins a generation over the tier alias OMCA agents declare
+    - Remind the user that managed policy keys such as `strictKnownMarketplaces` (alias `allowedMarketplaces`), `blockedMarketplaces`, `allowManagedHooksOnly`, `allowManagedPermissionRulesOnly`, `allowManagedMcpServersOnly`, and `sandbox.failIfUnavailable` are outside this skill's enforcement scope
 
 4. Check `.omca/` state:
    - Do state directories exist?
@@ -821,11 +826,10 @@ If a URL looks correct but still fails to connect, check for whitespace: Claude 
 - `.omca/` in `.gitignore`: PASS/FAIL
 
 ### Check 6: Settings Validation
-- `teammateMode` is `"auto"`: PASS/WARN
 - `env.ANTHROPIC_DEFAULT_OPUS_MODEL` absent: PASS. Present: WARN ("tier pin overrides the `opus` alias for every opus agent; delete it unless you want a fixed generation")
-- `env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is `"1"`: PASS/WARN ("agent teams disabled; teammateMode won't function")
+- `env.CLAUDE_CODE_ENABLE_TODO_TOOLS` set: PASS. Absent: WARN ("Opus 5 and Fable 5 era models withhold `TodoWrite` and the `TaskCreate`/`TaskGet`/`TaskUpdate`/`TaskList` tools unless this is set, and every OMCA agent declares one of those tiers, so the task-list mandates in the agent prompts and the `TaskCompleted` gate are both inert"). Report only; this skill never writes the variable
 - Plugin enabled in `enabledPlugins`: PASS/FAIL
-- Marketplace configured in `extraKnownMarketplaces`: PASS/FAIL
+- Marketplace configured in `extraKnownMarketplaces` or its accepted alias `additionalMarketplaces`: PASS/FAIL. Either spelling counts as configured
 
 ### Check 7: Statusline Health
 - `~/.claude/statusline/.venv/bin/cc-statusline` exists: PASS/FAIL
@@ -857,5 +861,6 @@ Print the Phase 6 health report format with all findings. Use "Doctor Report" he
 - NEVER modify files outside `~/.claude/` and `.omca/` (plus `.gitignore`)
 - NEVER claim marketplace installation or managed policy enforcement unless existing Claude Code settings prove it
 - Apply settings changes with explicit user confirmation via AskUserQuestion; print jq fallback on decline
+- The `allowed-tools` grant covers inspection only: version probes, `jq` reads, `git rev-parse`, `claude mcp list`. It names no `mv`, `cp`, `mkdir`, `rm`, or `uv sync`, so every settings write and every filesystem mutation still goes through the normal permission flow
 - Idempotent: running setup multiple times with the same version is a no-op
 - Migration handles both `<!-- OMCA:START -->` and `<\!-- OMCA:START -->` (escaped and unescaped)

@@ -13,6 +13,7 @@ injection mechanism.
 | Disable one of the older per-hook flags | [Legacy per-hook flags](#legacy-per-hook-flags-deprecated) |
 | Change how strictly comments in your code are policed | [`OMCA_COMMENT_GATE`](#omca_comment_gate-the-comment-gates-enforcement-level) |
 | Reduce permission prompts, cap model tiers, or scope auto mode | [Recommended settings.json blocks](#recommended-settingsjson-blocks) |
+| Make the sandbox network allowlist fail closed | [Sandbox network settings](#sandbox-network-settings) |
 | Configure git worktree isolation for spawned agents | [Worktree settings](#worktree-settings) |
 | Pick between daemon and direct statusline rendering | [Statusline modes](#statusline-modes) |
 | Write a project rule that auto-injects when a file is touched | [Project rules (`.omca/rules/`)](#project-rules-omcarules) |
@@ -134,6 +135,16 @@ OMCA_COMMENT_GATE=deny
 |---|---|
 | `OMCA_PROBE_OUTPUT` | Output file path for the one-shot `UserPromptSubmit` payload capture script used during hook development. Not part of normal operation, and not registered as a permanent hook; only relevant if you are debugging the hook payload shape yourself. |
 
+### Platform environment variables OMCA depends on
+
+These are read by the client, not by OMCA. Scope for both is the session environment, or an
+`env` block in a settings file; neither has a `/config` row.
+
+| Variable | Purpose |
+|---|---|
+| `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` | How many subagent layers may exist below the main conversation. At the limit the client withholds the `Agent` tool from the subagent entirely, so a planned delegation cannot happen at all: the agent does the work itself and returns one summary. A fork at the limit keeps the tool listed but it returns an error instead of spawning. Accepts a positive whole number in plain digits; anything else is ignored, so the limit can be adjusted but never removed. This is why OMCA's leaf agents are told to search inline rather than delegate. Requires client v2.1.217 |
+| `CLAUDE_AFK_TIMEOUT_MS` | Idle milliseconds before an unanswered `AskUserQuestion` dialog auto-continues without you. Auto-continue is off by default and opts in through `askUserQuestionTimeout`, but this variable takes precedence and turns it on even when that setting is unset or `never`. That reintroduces exactly the hazard the `askUserQuestionTimeout` row above warns about: `prometheus` treats a skipped interview question as resolving to its default, so an auto-continued dialog silently shapes the plan. `0` does not disable the timeout, it closes the dialog immediately. `CLAUDE_AFK_COUNTDOWN_MS` sets when the on-screen countdown appears. Requires client v2.1.198 |
+
 ## Recommended settings.json blocks
 
 These are opt-in blocks you add to your own `settings.json` (user or project scope, as
@@ -150,12 +161,16 @@ still produces an advisory nudge toward the slash command; it does not start the
 
 | Setting | Suggested value | Why |
 |---|---|---|
-| `teammateDefaultModel` | `null` | Teammates then inherit the lead session's `/model`. Any other value depends on your model availability, provider, and budget, which is why `omca-setup` does not merge this key |
+| `subagentPromptCacheTtl` | unset, or `"1h"` for long fan-outs | Scope: any settings file. Picks the prompt cache lifetime for every request outside the main conversation, which is exactly OMCA's traffic: subagents, workflows, compaction, and session titles. Values are `"5m"` and `"1h"`; unset leaves each request on its own default. `"1h"` keeps a parallel group's cache warm across a long task, and the API bills a one-hour cache write at a higher rate. Precedence, highest first: `FORCE_PROMPT_CACHING_5M`, `CLAUDE_CODE_SUBAGENT_PROMPT_CACHE_TTL`, this key, `ENABLE_PROMPT_CACHING_1H`. Requires client v2.1.242 |
 | `modelOverrides` | unset unless needed | The named escape hatch for provider portability. It maps individual Anthropic model ids to provider-specific ids. OMCA agents declare tier aliases (`opus`, `fable`), so map the versions those aliases resolve to on your provider rather than editing agent frontmatter |
 | `availableModels` | unset unless your org requires it | This key alone constrains which models subagents and skills may select, independent of `enforceAvailableModels`. Filtering matches an alias, a version prefix, or a full provider-form id. The roster declares only `opus` and `fable`, so an allowlist omitting `opus` shuts out every agent but oracle, and one omitting `fable` shuts out oracle. An allowlist of `[sonnet, haiku]` now leaves nothing on the roster spawnable |
 | `askUserQuestionTimeout` | leave at the default `never` | A timed-out question dialog is a silent auto-answer. `prometheus` treats a skipped interview question as resolving to that question's default, and `omca-setup` asks for confirmation before writing to `~/.claude/settings.json` |
 | `workflowSizeGuideline` | unset | It bounds native dynamic workflows only and does not constrain direct `Agent` fan-out, so it cannot cap an OMCA parallel group. Setting it also hides the matching `/config` row |
 | `emojiCompletionEnabled` | your preference | Cosmetic input-editor setting for `:shortcode:` completion. Not part of what `omca-setup` applies |
+
+There is no longer a setting for a default teammate model. The key that did this was removed
+in v2.1.234 along with its `/config` row, and a leftover value has no effect. Teammates now
+follow the lead session's model unless the spawn names one.
 
 Effort precedence, highest priority last: the `effortLevel` setting, then the session's
 `--effort` flag or environment, then an agent's frontmatter `effort:`, then a per-invocation
@@ -176,8 +191,18 @@ no-op.
   entirely, including the rule against transcript tampering.
 - `disableAutoMode: "disable"` makes `permission-denied-coach.sh` unreachable, since the
   classifier never runs.
-- `useAutoModeDuringPlan` (default `true`) governs whether the planning agents' shell calls
-  prompt one by one. It is not read from shared project settings.
+- `autoMode.classifyAllShell` (Boolean, default `false`, read from user or managed settings,
+  the same sources as `autoMode` itself) sends every Bash and PowerShell command through the
+  classifier while auto mode is active. Left off, auto mode suspends only the allow rules that
+  could run arbitrary code, such as `Bash(*)` and `Bash(python *)`; a command matched by any
+  narrower allow rule skips the classifier entirely. `/fewer-permission-prompts` and
+  `omca-setup` both write rules of that narrower shape, so turning this on is what keeps those
+  rules from becoming an unreviewed path. Requires client v2.1.193.
+- `useAutoModeDuringPlan` (Boolean, default `true`) governs whether the planning agents' shell
+  calls prompt one by one. Its scope is user, local, or managed settings, which is wider than
+  `autoMode`'s own: a `.claude/settings.local.json` may set it even though the same file is
+  never a source for `autoMode`. Shared project settings still cannot. Set `false` to get a
+  prompt for every command outside the built-in read-only set.
 - Inspect the effective ruleset with `claude auto-mode defaults`, `claude auto-mode config`,
   `claude auto-mode critique`, and `claude auto-mode reset`.
 
@@ -217,6 +242,15 @@ Do not add `Write(<path>)`, `NotebookEdit(<path>)`, or `Glob(<path>)` rules. The
 but never match, and the platform now prints a startup warning for each one. `Edit(<path>)`
 covers every file-editing tool, including `Write`.
 
+### Sandbox network settings
+
+| Setting | Scope | What it does |
+|---|---|---|
+| `sandbox.network.strictAllowlist` | User or managed settings. A repository cannot turn it on or off | Boolean, default `false`. The fail-closed switch for the network allowlist: `true` denies a sandboxed command any host outside `sandbox.network.allowedDomains` plus the `WebFetch(domain:...)` allow rules, instead of falling back to the permission mode. Left at `false`, a host outside the allowlist is resolved by mode: the classifier judges it in auto mode, `dontAsk` denies, `bypassPermissions` allows, and anything else prompts. Enforced for sandboxed commands only; in-process tools such as `WebFetch` still follow their permission rules. Any honored source setting `true` keeps it on. Requires client v2.1.219 |
+
+`sandbox.network.deniedDomains` is the blocklist half and takes precedence where both match.
+This key is the one that makes the allowlist authoritative rather than advisory.
+
 ### Screen reader and accessibility
 
 Set `CLAUDE_STATUSLINE_NERD_FONT=0` for plain-text statusline glyphs. The statusline still
@@ -233,6 +267,7 @@ isolated git worktrees.
 | `worktree.symlinkDirectories` | Array of directory names (relative to the repo root) to symlink into each new worktree instead of copying them. Use this for `node_modules` or a large build cache that would otherwise be duplicated per worktree. **Windows floor v2.1.205**: below that version, following this recommendation on a Windows client could delete files outside the worktree on removal. |
 | `worktree.sparsePaths` | Array of paths to check out via git sparse-checkout (cone mode) in each worktree. Only listed paths are written to disk, which speeds up worktree creation in large monorepos. Omit to check out the full tree. Below v2.1.207, removing such a worktree left `extensions.worktreeConfig` behind in the repo config, which breaks go-git-based tooling. |
 | `worktree.baseRef` | Controls which ref a new worktree branches from: `"fresh"` (default) branches from `origin/<default-branch>`; `"head"` branches from local `HEAD`. See [`docs/reference/known-issues.md`](known-issues.md) for the unpushed-commits trap this setting controls. |
+| `worktree.bgIsolation` | Scope: any settings file. How a background session isolates its file edits. `"worktree"` (default) blocks `Edit` and `Write` in the main checkout until the session calls `EnterWorktree`; `"none"` lets background jobs edit the working copy directly. This governs every spawned subagent, since a subagent runs in the background unless spawned with `run_in_background=false`, so at the default a delegated executor cannot write in the main checkout at all. Set `"none"` in a repository where git worktrees are impractical. |
 
 ```json
 {

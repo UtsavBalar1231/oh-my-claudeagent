@@ -4,28 +4,22 @@ Live limitations and traps you can hit in normal use, one entry per issue. Resol
 issues are removed from this page rather than kept as history. Check `CHANGELOG.md`
 if you want the fix record.
 
-## The repeated-tool-call nudge shares one slot across concurrent agents
+## The repeated-tool-call nudge still keeps one window for the whole session
 
-**Symptom**: you fan out several subagents, one of them genuinely loops on the same Grep
-three times, and no nudge appears. Or the opposite: three unrelated agents happen to issue
-the same call and one of them is told it is looping when it is not.
+**Symptom**: during a wide fan-out, an agent that genuinely repeats the same work three times
+gets no nudge.
 
-**Why**: `tool-loop-detector.sh` keeps a single global window at
-`.omca/state/tool-loop-window.json` holding one signature and one count. The main session and
-every concurrent subagent write to that same slot, so interleaved calls from different agents
-overwrite each other's signature and reset a real streak (the common case, a false negative),
-and coincidentally identical calls from different agents accumulate into one count (the rarer
-false positive).
+**Why**: `tool-loop-detector.sh` runs on `PostToolBatch`, which fires once per resolved batch
+and carries the whole `tool_calls` array. That fixed the original problem, where parallel
+calls from different agents interleaved into one another's signature at the individual-call
+level. What remains is smaller: the window is still a single file,
+`.omca/state/tool-loop-window.json`, holding one `signature`/`count`/`prompt_id` triple, so
+batches from agents running at the same time can still overwrite each other's signature and
+reset a streak.
 
-**Workaround**: none needed for correctness, since the nudge is advisory and the detector
-never blocks. Treat its absence during parallel fan-out as expected rather than as evidence
+**Workaround**: none needed for correctness. The nudge is advisory and the detector never
+blocks, so treat its absence during parallel fan-out as uninformative rather than as evidence
 that no loop happened.
-
-**Tracking**: the `prompt_id` stamp added to the window fixes only the user-turn-boundary
-case, not this one. The correct scoping key is `agent_id`, which means either one state file
-per agent or a keyed map with garbage collection on `SubagentStop`. That is a design decision
-rather than a patch, so it is deliberately open. The window itself is a single global slot,
-`.omca/state/tool-loop-window.json`, holding one `signature`/`count`/`prompt_id` triple.
 
 ## The statusline emits ANSI color escapes unconditionally
 
@@ -37,9 +31,13 @@ There is no setting that turns them off.
 
 **Workaround**: set `CLAUDE_STATUSLINE_NERD_FONT=0`. That replaces every glyph with a
 plain-text equivalent, which removes the font dependency and makes the line readable, but it
-does not strip the color escapes. A `CLAUDE_AX_SCREEN_READER` branch is deliberately not
-documented as working here: neither its settings nor its flag form is confirmed to reach the
-statusline environment, so recommending it would be a guess.
+does not strip the color escapes.
+
+**Detection**: `CLAUDE_AX_SCREEN_READER` is an environment variable, so the statusline runs as
+a subprocess that inherits it and can read it directly. The other two spellings of the same
+preference cannot be seen from here: the `--ax-screen-reader` flag and the `axScreenReader`
+setting both live inside the client and are never handed to the statusline command. So a
+future branch on the env var is workable; a branch on the flag or the setting is not.
 
 **Tracking**: the glyph half is solved; making the escapes conditional is open.
 
@@ -117,6 +115,17 @@ expect the behavior described.
 | v2.1.211 | A hook returning `ask` could be overridden by the auto-mode classifier's allow under unsandboxed Bash. A subagent model override was also reverted on resume |
 | v2.1.212 | A committed `.claude/worktrees` symlink was an escape path, and plan-mode Bash could mutate files unprompted |
 | v2.1.216 | `git -C`, `--git-dir`, and `GIT_DIR`/`GIT_WORK_TREE` could redirect a worktree-isolated subagent's git into the shared checkout, and read-only commands on Windows could reach network paths with no permission prompt |
+| v2.1.217 | Background session isolation did not canonicalize a symlinked working directory, so a session could escape its workspace folder. Concurrent subagents were also uncapped, so a single message could fan out unbounded background agents (the cap arrived here, default 20) |
+| v2.1.218 | Hooks declared in agent frontmatter ran from folders that had never accepted workspace trust |
+| v2.1.221 | A Bash permission check could be bypassed by hiding commands inside a zsh `[[ ]]` regex conditional, and PowerShell permission checks mishandled paths containing quote characters on Windows |
+| v2.1.222 | Worktree isolation still did not cover Bash and file edits in every session type, so an isolated session or its subagents could run destructive git commands against the main checkout. A `PreToolUse` auto-allow hook could also bypass tool restrictions inside background agent tasks, which is the event OMCA's trusted-tooling fast path deliberately stays off |
+| v2.1.223 | A crafted Bash command could hide part of itself from the permission check, and tabs or invisible Unicode could hide part of a command from the approval dialog that was about to grant it |
+| v2.1.224 | Sandbox filesystem deny entries written with a trailing slash (`denyRead: "~/.aws/"`) were silently bypassable, and a project path over 200 characters resolved into another project's session directory, which is the tree `session_search` reads |
+| v2.1.228 | Session cleanup deleted contents inside a project's memory folder |
+| v2.1.232 | A nested git repository inherited trust from its parent directory instead of requiring its own confirmation |
+| v2.1.234 | A session-scoped permission answer, including a deny, was dropped when it was given in response to a background subagent's prompt. Since v2.1.232 every non-teammate subagent spawn runs in the background, so this covers the normal delegation path |
+| v2.1.239 | Hooks failed with `posix_spawn ENOENT` once the session's working directory had been deleted, and the Linux sandbox made a nonexistent `.git/config.worktree` unreadable, which broke every sandboxed git command in a repo carrying `extensions.worktreeConfig` |
+| v2.1.245 | A hook `if` condition such as `Bash(cat *)` fired on unrelated Bash commands whenever the command contained `$()` or backtick substitution followed by more arguments. Startup also crashed outright on Linux distributions shipping glibc 2.44 (Arch, CachyOS, Fedora Rawhide) |
 
 ## The `omca` MCP server can vanish mid-plan
 
