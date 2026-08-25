@@ -32,10 +32,17 @@ HOOKS_JSON="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)/hooks/hooks.json"
 	assert_output "true"
 }
 
-@test "hooks.json: tool-loop-detector.sh is registered under PostToolUse with matcher Bash|Edit|Read|Grep|Glob" {
+@test "hooks.json: tool-loop-detector.sh is registered under PostToolBatch with no matcher" {
 	run jq -e '
-		.hooks.PostToolUse
-		| any(.matcher == "Bash|Edit|Read|Grep|Glob" and (.hooks[]?.command | test("tool-loop-detector\\.sh\"?$")))
+		.hooks.PostToolBatch
+		| any((has("matcher") | not) and (.hooks[]?.command | test("tool-loop-detector\\.sh\"?$")))
+	' "$HOOKS_JSON"
+	assert_success
+}
+
+@test "hooks.json: tool-loop-detector.sh is no longer registered under PostToolUse" {
+	run jq -e '
+		[.hooks.PostToolUse[]?.hooks[]?.command | select(test("tool-loop-detector\\.sh\"?$"))] | length == 0
 	' "$HOOKS_JSON"
 	assert_success
 }

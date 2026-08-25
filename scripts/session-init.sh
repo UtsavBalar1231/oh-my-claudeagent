@@ -175,14 +175,25 @@ if [[ -n "${ACTIVE_PLAN}" && -f "${ACTIVE_PLAN}" ]]; then
 	SESSION_TITLE=$(jq -r '.plan_name // empty' <<< "${BOUND_PLAN}" 2>/dev/null || true)
 fi
 
-if [[ -n "${SESSION_TITLE}" ]]; then
-	jq -n \
-		--argjson ctx "${CONTEXT}" \
-		--arg title "OMCA: ${SESSION_TITLE}" \
-		'{hookSpecificOutput: {hookEventName: "SessionStart", additionalContext: $ctx, sessionTitle: $title}}'
-else
-	echo "{\"hookSpecificOutput\": {\"hookEventName\": \"SessionStart\", \"additionalContext\": ${CONTEXT}}}"
+# A title the user set explicitly (--name, /rename) arrives back as the payload's
+# session_title. It outranks the plan name: retitling would silently discard the
+# name they chose, and the plan is already named in additionalContext.
+if [[ -n "$(jq -r '.session_title // ""' <<< "${HOOK_INPUT}")" ]]; then
+	SESSION_TITLE=""
 fi
+
+# Seed the FileChanged watch list with the two files whose integrity nothing else
+# observes: write-guard.sh protects the evidence ledger by tool name, so a Bash
+# redirect or a script that rewrites either file is invisible to it.
+jq -n \
+	--argjson ctx "${CONTEXT}" \
+	--arg title "${SESSION_TITLE:+OMCA: ${SESSION_TITLE}}" \
+	--arg evidence "$(resolve_evidence_file "${STATE_DIR}")" \
+	--arg boulder "${STATE_DIR}/boulder.json" \
+	'{hookSpecificOutput: (
+		{hookEventName: "SessionStart", additionalContext: $ctx, watchPaths: [$evidence, $boulder]}
+		+ (if $title == "" then {} else {sessionTitle: $title} end)
+	)}'
 
 if (( OWNS_SHARED_STATE )); then
 	start_venv_sync

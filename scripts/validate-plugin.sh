@@ -168,15 +168,17 @@ check_latest_hook_lifecycle_coverage() {
 		"UserPromptSubmit"
 	)
 	local post_cutover_events=()
-	# New platform events not yet adopted by OMCA handlers.
-	# Tracked here for validator awareness; always skipped until handlers are registered.
+	# Platform events tracked for validator awareness. An entry passes once a handler is
+	# registered for it and skips while it is unadopted, so the list covers both states.
 	local new_platform_events=(
 		"DirectoryAdded"
 		"Elicitation"
 		"ElicitationResult"
+		"FileChanged"
 		"MessageDisplay"
 		"PostToolBatch"
 		"Setup"
+		"StopFailure"
 	)
 	local event_name
 
@@ -1331,12 +1333,40 @@ check_hook_scripts_executable() {
 	fi
 }
 
+check_hook_handler_shell_field() {
+	log "Running hook handler shell-field checks"
+
+	# Shell form routes a .sh handler through Git Bash on Windows and honors the shebang;
+	# an omitted `shell` leaves that selection to the platform default. Only `type: command`
+	# handlers take the field — `mcp_tool` handlers have no shell at all, so they are exempt.
+	local missing
+	missing="$(jq -r '
+		[.hooks[]?[]?.hooks[]?
+		 | select(.type == "command")
+		 | select(has("shell") | not)
+		 | .command] | .[]
+	' "${HOOKS_JSON}")"
+
+	if [[ -z "${missing}" ]]; then
+		pass "hook handler shell field: every type:command handler declares shell"
+		return 0
+	fi
+
+	local entry
+	while IFS= read -r entry; do
+		fail "hook handler shell field: command handler omits shell (${entry})"
+	done <<<"${missing}"
+
+	return 1
+}
+
 check_hooks() {
 	log "Running hooks checks"
 
 	validate_json_file "${HOOKS_JSON}" "hooks contract"
 	check_mcp_tool_hook_server_names
 	check_hook_scripts_executable
+	check_hook_handler_shell_field
 	check_hook_fixtures_exist
 
 	local tmp_root

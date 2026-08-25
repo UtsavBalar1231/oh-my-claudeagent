@@ -227,7 +227,7 @@ load '../test_helper'
 }
 
 # ---------------------------------------------------------------------------
-# Case 6: Edit and MultiEdit carry the same file_path field as Write
+# Case 6: Edit carries the same file_path field as Write
 # ---------------------------------------------------------------------------
 
 @test "write-guard: denies a notepad Edit payload" {
@@ -241,22 +241,25 @@ load '../test_helper'
 	[ "$(echo "$output" | jq -r '.hookSpecificOutput.permissionDecision // empty')" = "deny" ]
 }
 
-@test "write-guard: denies a MultiEdit payload targeting the evidence file" {
+@test "write-guard: denies an evidence-file write for every tool the matcher covers (MultiEdit removed: not a real tool)" {
 	local target="$CLAUDE_PROJECT_ROOT/.omca/state/./verification-evidence.json"
 
-	local payload
-	payload=$(printf '{"tool_name":"MultiEdit","tool_input":{"file_path":"%s","edits":[]}}' "$target")
+	local tool payload
+	for tool in Write Edit; do
+		payload=$(printf '{"tool_name":"%s","tool_input":{"file_path":"%s"}}' "$tool" "$target")
 
-	run_hook "write-guard.sh" "$payload"
-	assert_success
-	[ "$(echo "$output" | jq -r '.hookSpecificOutput.permissionDecision // empty')" = "deny" ]
+		run_hook "write-guard.sh" "$payload"
+		assert_success
+		[ "$(echo "$output" | jq -r '.hookSpecificOutput.permissionDecision // empty')" = "deny" ]
+	done
 }
 
 # ---------------------------------------------------------------------------
 # Case 7: the existing-file nudge is Write-only
-# The matcher covers Write|Edit|MultiEdit for the protected-path denies above, but
-# the nudge advises using Edit, so firing it on an Edit both contradicts itself and
-# injects a path into context on every single Edit.
+# The matcher covers Write|Edit for the protected-path denies above, but the nudge
+# advises using Edit, so firing it on an Edit both contradicts itself and injects a
+# path into context on every single Edit. The Edit case below is the whole non-Write
+# half of the matcher; a MultiEdit twin was removed because the tool does not exist.
 # ---------------------------------------------------------------------------
 
 @test "write-guard: Edit of an existing file emits nothing" {
@@ -265,18 +268,6 @@ load '../test_helper'
 
 	local payload
 	payload=$(printf '{"tool_name":"Edit","tool_input":{"file_path":"%s","old_string":"a","new_string":"b"}}' "$target")
-
-	run_hook "write-guard.sh" "$payload"
-	assert_success
-	assert_output ""
-}
-
-@test "write-guard: MultiEdit of an existing file emits nothing" {
-	local target="$CLAUDE_PROJECT_ROOT/existing-file.txt"
-	printf 'some content' > "$target"
-
-	local payload
-	payload=$(printf '{"tool_name":"MultiEdit","tool_input":{"file_path":"%s","edits":[]}}' "$target")
 
 	run_hook "write-guard.sh" "$payload"
 	assert_success

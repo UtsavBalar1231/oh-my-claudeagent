@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# PostToolUse hook. Intended matcher (wired by the registration task that adds
-# this to hooks/hooks.json): Bash|Edit|Read|Grep|Glob, the tools most prone to
-# blind repeat-and-hope retries. Detects 3 consecutive identical invocations
-# (same tool name + same tool_input) and nudges toward changing approach.
+# PostToolBatch hook (the event has no matcher support). Fires once per resolved
+# batch carrying the whole tool_calls array, so the streak is per batch rather
+# than per call: concurrent subagents can no longer interleave into one another's
+# signature. Detects 3 consecutive identical batches and nudges toward changing
+# approach.
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
@@ -10,12 +11,20 @@ START_NS=$(epoch_ns)
 
 hook_is_disabled "tool-loop-detector" && { hook_timing_log "${START_NS}"; exit 0; }
 
-# Single jq pass: parse payload + canonicalize {tool_name, tool_input} together
-# with sorted keys (-S) so key-order differences in tool_input never desync the
-# signature. Empty output means the payload was not valid JSON.
-SIG_INPUT=$(jq -cS '{tool_name: (.tool_name // ""), tool_input: (.tool_input // {})}' <<< "${HOOK_INPUT}" 2>/dev/null)
+# Sorted keys (-S) so key-order differences never desync the signature.
+# tool_response is deliberately excluded: it is the serialized result the model saw,
+# which can differ between two attempts of the identical batch. Empty output means
+# the payload was not valid JSON.
+SIG_INPUT=$(jq -cS '[.tool_calls[]? | {tool_name: (.tool_name // ""), tool_input: (.tool_input // {})}]' <<< "${HOOK_INPUT}" 2>/dev/null)
 if [[ -z "${SIG_INPUT}" ]]; then
-	log_hook_error "malformed payload, unable to parse tool_name/tool_input" "$(basename "$0")"
+	log_hook_error "malformed payload, unable to parse tool_calls" "$(basename "$0")"
+	hook_timing_log "${START_NS}"
+	exit 0
+fi
+
+# No calls to repeat: without this, repeated call-less payloads would share one
+# signature and nudge about a loop that never happened.
+if [[ "${SIG_INPUT}" == "[]" ]]; then
 	hook_timing_log "${START_NS}"
 	exit 0
 fi
@@ -56,10 +65,10 @@ else
 fi
 
 # 3: fires once per streak at the exact repeat count that signals a loop, not on
-# every call after (avoids re-nagging on the 4th, 5th, ... identical call).
+# every batch after (avoids re-nagging on the 4th, 5th, ... identical batch).
 LOOP_FIRE_COUNT=3
 if [[ "${NEW_COUNT}" -eq "${LOOP_FIRE_COUNT}" ]]; then
-	emit_context "PostToolUse" "This exact call has now run 3 times in a row with identical arguments. Repetition is a loop signal, not persistence: change the approach, vary the input, or escalate."
+	emit_context "PostToolBatch" "This exact set of tool calls has now run 3 times in a row with identical arguments. Repetition is a loop signal, not persistence: change the approach, vary the input, or escalate."
 fi
 
 hook_timing_log "${START_NS}"

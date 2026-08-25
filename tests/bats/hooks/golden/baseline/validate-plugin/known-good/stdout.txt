@@ -31,9 +31,11 @@
 [validate-plugin] SKIP: new platform event DirectoryAdded not yet adopted by OMCA
 [validate-plugin] SKIP: new platform event Elicitation not yet adopted by OMCA
 [validate-plugin] SKIP: new platform event ElicitationResult not yet adopted by OMCA
+[validate-plugin] PASS: new platform event FileChanged handler registered
 [validate-plugin] SKIP: new platform event MessageDisplay not yet adopted by OMCA
-[validate-plugin] SKIP: new platform event PostToolBatch not yet adopted by OMCA
-[validate-plugin] SKIP: new platform event Setup not yet adopted by OMCA
+[validate-plugin] PASS: new platform event PostToolBatch handler registered
+[validate-plugin] PASS: new platform event Setup handler registered
+[validate-plugin] PASS: new platform event StopFailure handler registered
 [validate-plugin] PASS: hook event table: OMCA.md matches the hooks.json event set
 [validate-plugin] PASS: agent frontmatter hygiene: no top-level tools allowlists detected
 [validate-plugin] PASS: agent frontmatter hygiene: no agent name contains a colon
@@ -93,7 +95,6 @@
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/validate-plugin.sh'
-[validate-plugin] PASS: docs accuracy: OMCA.md:<LINE> documents removal of 'scripts/post-tool-batch.sh' (not a stale reference)
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/lib/common.sh'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'statusline/core.py'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'statusline/subagent.py'
@@ -125,6 +126,7 @@
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'output-styles/omca-default.md'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'statusline/subagent.py'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'agents/sisyphus.md'
 [validate-plugin] SKIP: docs accuracy: OMCA.md:<LINE> references untracked, gitignored path '.claude/settings.json'
@@ -132,9 +134,7 @@
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'statusline/core.py'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'docs/reference/known-issues.md'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
-[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'commands/start-work.md'
-[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'agents/sisyphus.md'
-[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'agents/executor.md'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/validate-plugin.sh'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'commands/start-work.md'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'agents/multimodal-looker.md'
@@ -143,6 +143,7 @@
 [validate-plugin] SKIP: docs accuracy: OMCA.md:<LINE> references untracked, gitignored path '.claude/settings.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'servers/tools/ast.py'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/validate-plugin.sh'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'statusline/core.py'
 [validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md cites existing recipe 'just setup'
 [validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md cites existing recipe 'just ci'
 [validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md cites existing recipe 'just test'
@@ -160,6 +161,8 @@
 [validate-plugin] PASS: mcp_tool hook 'validate_plan_write' server FQN 'plugin:oh-my-claudeagent:omca' matches plugin name + registered MCP server 'omca'
 [validate-plugin] Running hook script executability checks
 [validate-plugin] PASS: hook executability: every registered command handler script is executable
+[validate-plugin] Running hook handler shell-field checks
+[validate-plugin] PASS: hook handler shell field: every type:command handler declares shell
 [validate-plugin] PASS: hook fixture pretooluse-task-agent.json: valid JSON (<REPO_ROOT>/tests/fixtures/hooks/pretooluse-task-agent.json)
 [validate-plugin] PASS: hook fixture pretooluse-write.json: valid JSON (<REPO_ROOT>/tests/fixtures/hooks/pretooluse-write.json)
 [validate-plugin] PASS: hook fixture permissionrequest-bash.json: valid JSON (<REPO_ROOT>/tests/fixtures/hooks/permissionrequest-bash.json)
@@ -219,4 +222,4 @@
 [validate-plugin] PASS: mcp tools/list contains categories_list
 [validate-plugin] PASS: mcp tools/list contains file_read
 [validate-plugin] PASS: mcp tools/list contains session_search
-[validate-plugin] Summary: 196 passed, 0 failed, 14 skipped, 0 warned
+[validate-plugin] Summary: 200 passed, 0 failed, 12 skipped, 0 warned

@@ -40,11 +40,14 @@ _run_without_digest() {
 # the `@tsv` state read (default IFS eats the leading empty field) and pinned the
 # streak at 1, so the detector could never reach its fire count.
 
+# The detector reads a PostToolBatch tool_calls array; a non-empty batch is what
+# carries the payload past the early exit into the digest path under test.
+_loop_batch_payload='{"hook_event_name":"PostToolBatch","prompt_id":"p1","tool_calls":[{"tool_name":"Bash","tool_input":{"command":"ls -la"}}]}'
+
 @test "tool-loop-detector: without a digest tool it writes no state and never fires" {
-	local payload='{"tool_name":"Bash","tool_input":{"command":"ls -la"},"prompt_id":"p1"}'
 	local i
 	for i in 1 2 3 4; do
-		_run_without_digest "tool-loop-detector.sh" "$payload"
+		_run_without_digest "tool-loop-detector.sh" "$_loop_batch_payload"
 		assert_success
 		assert_output ''
 	done
@@ -52,10 +55,9 @@ _run_without_digest() {
 }
 
 @test "tool-loop-detector: with a digest tool the streak still fires on the third call" {
-	local payload='{"tool_name":"Bash","tool_input":{"command":"ls -la"},"prompt_id":"p1"}'
-	run_hook "tool-loop-detector.sh" "$payload"
-	run_hook "tool-loop-detector.sh" "$payload"
-	run_hook "tool-loop-detector.sh" "$payload"
+	run_hook "tool-loop-detector.sh" "$_loop_batch_payload"
+	run_hook "tool-loop-detector.sh" "$_loop_batch_payload"
+	run_hook "tool-loop-detector.sh" "$_loop_batch_payload"
 	assert_success
 	[[ "$(get_context)" == *"3 times in a row"* ]]
 	[ "$(jq -r '.count' "$CLAUDE_PROJECT_ROOT/.omca/state/tool-loop-window.json")" = "3" ]
