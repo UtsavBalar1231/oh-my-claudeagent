@@ -28,7 +28,7 @@ READ_AB='[{"tool_name":"Read","tool_input":{"file_path":"/a"}},{"tool_name":"Rea
 	local ctx
 	ctx=$(get_context)
 	[ -n "$ctx" ]
-	echo "$ctx" | rg -qi "loop signal"
+	echo "$ctx" | grep -qi "loop signal"
 	echo "$output" | jq -e '.hookSpecificOutput.hookEventName == "PostToolBatch"'
 
 	# The 4th identical batch must stay silent — one nudge per streak.
@@ -56,7 +56,7 @@ READ_AB='[{"tool_name":"Read","tool_input":{"file_path":"/a"}},{"tool_name":"Rea
 	local ctx
 	ctx=$(get_context)
 	[ -n "$ctx" ]
-	echo "$ctx" | rg -qi "loop signal"
+	echo "$ctx" | grep -qi "loop signal"
 }
 
 @test "tool-loop-batch: a batch differing only in membership is a different signature" {
@@ -101,7 +101,7 @@ READ_AB='[{"tool_name":"Read","tool_input":{"file_path":"/a"}},{"tool_name":"Rea
 	run_hook "tool-loop-detector.sh" "$first"
 	local ctx
 	ctx=$(get_context)
-	echo "$ctx" | rg -qi "loop signal"
+	echo "$ctx" | grep -qi "loop signal"
 }
 
 @test "tool-loop-batch: a new prompt_id resets the streak" {
