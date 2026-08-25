@@ -72,11 +72,14 @@ load '../test_helper'
 	echo "$ctx" | grep -qi "TODO"
 }
 
-@test "comment-checker: warns for MultiEdit new_string content" {
+# The two cases below replace MultiEdit twins, removed because the tool does not
+# exist. Edit is the non-Write half of the Write|Edit matcher, and it carries
+# new_string as a scalar rather than an edits[] array.
+
+@test "comment-checker: warns for Edit new_string content" {
 	local dirty=$'function foo() {\n  // TODO: implement this\n  return null;\n}'
-	local clean=$'function bar() {\n  return 1;\n}'
 	local payload
-	payload=$(jq -nc --arg dirty "$dirty" --arg clean "$clean" '{"tool_name":"MultiEdit","tool_input":{"edits":[{"new_string":$clean},{"new_string":$dirty}]}}')
+	payload=$(jq -nc --arg dirty "$dirty" '{"tool_name":"Edit","tool_input":{"old_string":"","new_string":$dirty}}')
 
 	run_hook "comment-checker.sh" "$payload"
 	assert_success
@@ -85,11 +88,10 @@ load '../test_helper'
 	echo "$ctx" | grep -qi "TODO"
 }
 
-@test "comment-checker: no warning for clean MultiEdit newString content" {
-	local first="function foo() {\n  return 1;\n}"
-	local second="function bar() {\n  return 2;\n}"
+@test "comment-checker: no warning for clean Edit new_string content" {
+	local clean=$'function foo() {\n  return 1;\n}'
 	local payload
-	payload=$(jq -nc --arg first "$first" --arg second "$second" '{"tool_name":"MultiEdit","tool_input":{"edits":[{"newString":$first},{"newString":$second}]}}')
+	payload=$(jq -nc --arg clean "$clean" '{"tool_name":"Edit","tool_input":{"old_string":"","new_string":$clean}}')
 
 	run_hook "comment-checker.sh" "$payload"
 	assert_success
@@ -175,6 +177,41 @@ load '../test_helper'
 	run_hook "comment-checker.sh" "$payload"
 	assert_success
 	assert_output ""
+}
+
+# A machine-readable pragma is addressed to a linter, not to a reader, so its
+# token overlap with the line below is the directive naming its own target.
+# This is the convention comment-checker.sh's own source follows.
+@test "comment-checker: shellcheck source directive is not a restatement" {
+	local content=$'# shellcheck source=lib/common.sh\nsource "$(dirname "$0")/lib/common.sh"'
+	local payload
+	payload=$(jq -nc --arg c "$content" '{"tool_name":"Write","tool_input":{"file_path":"/repo/scripts/foo.sh","content":$c}}')
+
+	OMCA_COMMENT_GATE=deny run_hook "comment-checker.sh" "$payload"
+	assert_success
+	assert_output ""
+}
+
+@test "comment-checker: still denies a genuine restatement in a shell script" {
+	local content=$'# set the user name\nuser_name="$input_value"'
+	local payload
+	payload=$(jq -nc --arg c "$content" '{"tool_name":"Write","tool_input":{"file_path":"/repo/scripts/foo.sh","content":$c}}')
+
+	OMCA_COMMENT_GATE=deny run_hook "comment-checker.sh" "$payload"
+	assert_success
+	assert_output --partial "restates the following code line"
+}
+
+# The exemption matches the directive form at the start of the comment body. A
+# comment that merely names a linter mid-sentence is prose and stays in scope.
+@test "comment-checker: pragma keyword mid-comment is not exempt" {
+	local content=$'# the path for noqa\nself.path = path'
+	local payload
+	payload=$(jq -nc --arg c "$content" '{"tool_name":"Write","tool_input":{"file_path":"/repo/x.py","content":$c}}')
+
+	OMCA_COMMENT_GATE=deny run_hook "comment-checker.sh" "$payload"
+	assert_success
+	assert_output --partial "restates the following code line"
 }
 
 # `#` opens a preprocessor directive in C, not a comment. While the marker set

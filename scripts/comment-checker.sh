@@ -1,6 +1,6 @@
 #!/bin/bash
 # Flags AI-slop comment patterns in written content, and (when gating is on)
-# denies the write before it lands. Fires on PreToolUse Write|Edit|MultiEdit.
+# denies the write before it lands. Fires on PreToolUse Write|Edit.
 #
 # OMCA_COMMENT_GATE=off|advise|deny controls enforcement; default "advise"
 # computes deny decisions and logs them without blocking (shadow mode).
@@ -75,7 +75,7 @@ json_content=$(jq -r '
   (
     .tool_input.content?,
     .tool_input.new_string?,
-    (.tool_input.edits? | if type == "array" then .[] else empty end | (.new_string? // .newString? // empty))
+    (.tool_input.edits? | if type == "array" then .[] else empty end | .new_string?)
   )
   | select(type == "string")
 ' <<< "${HOOK_INPUT}" 2>/dev/null || true)
@@ -170,7 +170,10 @@ read -r COMMENT_LINES CODE_LINES <<< "$(printf '%s\n' "${CONTENT}" | awk -v comm
 # trips the consecutive-run check above; density is what catches it. 40% of
 # non-blank lines, floor of 6, keeps file headers and magic-number
 # derivations in a normal hunk well clear.
-if [[ "${COMMENT_LINES}" -ge 6 ]] \
+# A hunk with no code lines at all is a header or a comment-block edit, where
+# the ratio is unbounded by construction and says nothing about narration.
+if [[ "${CODE_LINES}" -gt 0 ]] \
+	&& [[ "${COMMENT_LINES}" -ge 6 ]] \
 	&& [[ $((COMMENT_LINES * 10)) -ge $(((COMMENT_LINES + CODE_LINES) * 4)) ]]; then
 	TIER3+="High comment density (${COMMENT_LINES} comment lines to ${CODE_LINES} code lines): likely line-by-line narration rather than documentation. "
 fi
@@ -263,7 +266,15 @@ SLOP_FINDINGS=$(printf '%s\n' "${CONTENT}" | awk -v comment_re="${COMMENT_LINE_R
           # mandated form ("# 300s evidence age" over "MAX_AGE=300") restates
           # by construction. Exempt the shape rather than block the rule.
           is_magic_number = (text ~ /[0-9]/ && lines[j] ~ /^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*[[:space:]]*=[[:space:]]*-?[0-9]/)
-          if (!is_magic_number) {
+          # Machine-readable pragma carve-out: a tool directive is addressed to
+          # shellcheck/flake8/mypy and not to a reader, so its overlap with the
+          # line below is the directive naming its own target rather than
+          # narration — `# shellcheck source=lib/common.sh` above a `source`
+          # line, the shape the header of this very script uses. Anchored at the
+          # start of the comment body so a comment merely mentioning a linter is
+          # still judged as prose.
+          is_pragma = (text ~ /^(shellcheck[[:space:]]|noqa([[:space:]:]|$)|type:|pylint:|ruff:|mypy:)/)
+          if (!is_magic_number && !is_pragma) {
             delete ctoks; delete codetoks
             tokenize(lc, ctoks)
             tokenize(tolower(lines[j]), codetoks)
