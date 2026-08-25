@@ -2,6 +2,61 @@
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
+# Translate a denied `grep` invocation into the equivalent `rg` one, so a gate can
+# rewrite the call instead of spending a deny-and-retry round trip on it.
+# The translated set is deliberately tiny: a deny costs one retry, a wrong rewrite
+# silently runs a different command than the caller asked for. Refused shapes are
+# anything but a single simple command (the operand tail is copied through byte for
+# byte, so a separator, redirect, substitution, or expansion could move meaning
+# outside it), a command word other than exactly `grep`, and any flag that is not a
+# clustered short flag spelled identically by rg. `r`/`R` are dropped since rg
+# recurses by default.
+# Recursive rg skips gitignored, hidden, and binary files where recursive grep does
+# not; that divergence is accepted because rg is already the search posture this
+# plugin tells callers to use. An explicitly named file is searched by rg regardless
+# of ignore rules, so the single-file form is exact.
+# Arguments:
+#   $1 - the raw command string
+# Outputs:
+#   The rewritten `rg ...` command on STDOUT, no trailing newline.
+# Returns:
+#   0 when translated, 1 when the caller must keep denying.
+grep_to_rg() {
+	local cmd="$1" rest tok cluster keep flags="" i ch
+	local -a tail_tokens
+	local UNSAFE_SHELL_CHARS=$'[;&|<>`()$\n\r]'
+	[[ "${cmd}" =~ ${UNSAFE_SHELL_CHARS} ]] && return 1
+	rest="${cmd#"${cmd%%[![:space:]]*}"}"
+	[[ "${rest}" == grep[[:space:]]* ]] || return 1
+	rest="${rest#grep}"
+	while true; do
+		rest="${rest#"${rest%%[![:space:]]*}"}"
+		[[ -n "${rest}" ]] || return 1
+		tok="${rest%%[[:space:]]*}"
+		[[ "${tok}" == -* ]] || break
+		[[ "${tok}" =~ ^-[a-zA-Z]+$ ]] || return 1
+		cluster="${tok#-}"
+		keep=""
+		for ((i = 0; i < ${#cluster}; i++)); do
+			ch="${cluster:i:1}"
+			case "${ch}" in
+			r | R) ;;
+			n | i | w | v | c | l | F | H | h) keep+="${ch}" ;;
+			*) return 1 ;;
+			esac
+		done
+		[[ -n "${keep}" ]] && flags+=" -${keep}"
+		rest="${rest#"${tok}"}"
+	done
+	# `read -ra` splits without globbing, so a `*.py` operand is not expanded here.
+	read -ra tail_tokens <<< "${rest}"
+	for tok in "${tail_tokens[@]}"; do
+		tok="${tok#[\'\"]}"
+		[[ "${tok}" == -* ]] && return 1
+	done
+	printf 'rg%s %s' "${flags}" "${rest}"
+}
+
 if hook_is_disabled "sed-grep-deny"; then
 	log_hook_info "Disabled via OMCA_DISABLED_HOOKS — skipping sed/grep check." "$(basename "$0")"
 	exit 0

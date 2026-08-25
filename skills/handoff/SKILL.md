@@ -27,7 +27,7 @@ allowed-tools:
 
 ## Tool Restrictions
 
-Read-only. No Write/Edit/Agent. MCP tools: `boulder_write`, `boulder_progress`, `notepad_read`, `notepad_list`.
+Read-only. No Write/Edit/Agent. MCP tools: `boulder_progress`, `notepad_read`, `notepad_list`. `boulder_write` is deliberately absent: it is the only writer of the plan registry, and a summarizer has nothing to register.
 
 Self-contained handoff summary for new-session continuation.
 
