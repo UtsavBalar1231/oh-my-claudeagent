@@ -1,4 +1,5 @@
 {
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "oh-my-claudeagent",
   "displayName": "Oh My ClaudeAgent",
   "version": "2.17.2",
@@ -23,13 +24,15 @@
     "enableKeywordTriggers": {
       "title": "Enable keyword triggers",
       "type": "boolean",
-      "description": "Optional compatibility setting for legacy keyword-trigger workflows (default: false).",
+      "default": false,
+      "description": "Optional compatibility setting for legacy keyword-trigger workflows.",
       "sensitive": false
     },
     "statuslineMode": {
       "title": "Statusline mode",
       "type": "string",
-      "description": "Preferred OMCA statusline mode: off, direct, or daemon (default: direct).",
+      "default": "direct",
+      "description": "Preferred OMCA statusline mode: off, direct, or daemon.",
       "sensitive": false
     },
     "disableForceOrchestrationStyle": {

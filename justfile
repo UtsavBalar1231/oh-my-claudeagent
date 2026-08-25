@@ -106,7 +106,7 @@ new-agent name:
 	@echo "---" > agents/{{name}}.md
 	@echo "name: {{name}}" >> agents/{{name}}.md
 	@echo "description: TODO" >> agents/{{name}}.md
-	@echo "model: sonnet" >> agents/{{name}}.md
+	@echo "model: opus" >> agents/{{name}}.md
 	@echo "disallowedTools: Write, Edit" >> agents/{{name}}.md
 	@echo "effort: medium" >> agents/{{name}}.md
 	@echo "memory: project" >> agents/{{name}}.md
@@ -189,6 +189,14 @@ validate-plugin:
 	command -v claude >/dev/null 2>&1 || { echo "claude CLI not found, skipping"; exit 0; }
 	claude plugin validate .
 
+# Validate the manifests with warnings promoted to errors. Catches a misspelled or
+# leftover field that would load at runtime but should not be published. Skips silently
+# where the claude CLI is absent so CI runners without it do not fail on this step.
+[group('validate')]
+validate-manifest:
+	command -v claude >/dev/null 2>&1 || { echo "claude CLI not found, skipping"; exit 0; }
+	claude plugin validate . --strict
+
 # Smoke test — verify plugin loads correctly (requires claude CLI)
 [group('validate')]
 smoke-test:
@@ -228,9 +236,9 @@ test-all: test test-bats test-pytest test-mcp
 
 # ── CI ────────────────────────────────────────────────────────────
 
-# Run full CI pipeline (format check + lint + typecheck + test + mcp)
+# Run full CI pipeline (format check + lint + typecheck + test + mcp + manifest)
 [group('ci')]
-ci: fmt-check lint typecheck test test-bats test-pytest test-mcp
+ci: fmt-check lint typecheck test test-bats test-pytest test-mcp validate-manifest
 
 # ── Release ──────────────────────────────────────────────────────
 

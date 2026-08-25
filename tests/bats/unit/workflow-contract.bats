@@ -22,6 +22,7 @@
 # | test-bats   | tests/bats/bats-core/bin/bats tests/bats/hooks/ tests/bats/unit/    | identical invocation; must cover BOTH suite dirs |
 # | test-pytest | uv run --project servers pytest servers/tests/                     | identical invocation modulo trailing -v/--tb flags |
 # | test-mcp    | bash scripts/validate-plugin.sh --check mcp                        | identical invocation |
+# | validate-manifest | claude plugin validate . --strict                             | identical invocation; the recipe's `command -v claude` guard makes it skip locally, so CI installs the CLI to keep the step enforcing |
 
 load '../test_helper'
 
@@ -83,6 +84,7 @@ _step_pattern() {
 		test-bats) echo "tests/bats/bats-core/bin/bats tests/bats/hooks/ tests/bats/unit/" ;;
 		test-pytest) echo "uv run --project servers pytest servers/tests/" ;;
 		test-mcp) echo "bash scripts/validate-plugin.sh --check mcp" ;;
+		validate-manifest) echo "claude plugin validate . --strict" ;;
 		*) echo "" ;;
 	esac
 }
@@ -90,7 +92,7 @@ _step_pattern() {
 @test "just ci recipe chain resolves to the expected leaf steps" {
 	local steps
 	steps=$(_resolve_leaf_steps ci "$CLAUDE_PLUGIN_ROOT/justfile" | sort -u | tr '\n' ' ')
-	[ "$steps" = "fmt-check lint-python lint-shell test test-bats test-mcp test-pytest typecheck " ]
+	[ "$steps" = "fmt-check lint-python lint-shell test test-bats test-mcp test-pytest typecheck validate-manifest " ]
 }
 
 @test "every just ci leaf step has a pinned ci.yml coverage pattern" {

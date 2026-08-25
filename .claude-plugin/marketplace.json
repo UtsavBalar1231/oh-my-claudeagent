@@ -2,7 +2,8 @@
   "name": "omca",
   "owner": {
     "name": "UtsavBalar1231",
-    "email": "utsavbalar1231@gmail.com"
+    "email": "utsavbalar1231@gmail.com",
+    "url": "https://github.com/UtsavBalar1231"
   },
   "metadata": {
     "description": "Multi-agent orchestration plugins for Claude Code",
@@ -11,6 +12,7 @@
   "plugins": [
     {
       "name": "oh-my-claudeagent",
+      "displayName": "Oh My ClaudeAgent",
       "source": {
         "source": "github",
         "repo": "UtsavBalar1231/oh-my-claudeagent",
@@ -42,5 +44,6 @@
         "workflow"
       ]
     }
-  ]
+  ],
+  "renames": {}
 }
