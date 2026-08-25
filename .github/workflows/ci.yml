@@ -276,7 +276,7 @@ jobs:
         run: |
           {
             echo "### What this job checks"
-            echo "The plugin manifest against the platform's own schema, via \`just validate-manifest\`."
+            echo "The plugin manifest against the platform's own schema, by running \`claude plugin validate . --strict\` directly. The \`just validate-manifest\` recipe skips itself when the CLI is absent, so this job installs the CLI and calls the validator rather than the recipe."
             echo ""
             echo "### If this fails"
             echo "A field in \`.claude-plugin/plugin.json\` or \`.claude-plugin/marketplace.json\` is malformed or unknown to the installed CLI. Run \`claude plugin validate . --strict\` locally to see the exact failure."
