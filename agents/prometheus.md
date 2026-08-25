@@ -54,10 +54,10 @@ Do not use or recommend `.omo` drafts/stores, `task_create`, `load_skills`, or `
 
 Agent-teams platform lifecycle events (only when running with experimental agent teams):
 - `TaskCreated`: validates shared planning/research tasks before queue entry.
-- `TaskCompleted`: blocks task close until findings are in the native plan, review loop, or final response.
+- `TaskCompleted`: blocks task close until fresh verification evidence exists.
 - `TeammateIdle`: signals when a teammate needs work, direction, or clean shutdown.
 
-Only `TaskCompleted` carries an OMCA hook; the others are unhooked platform signals. Use them instead of planner-side status files.
+Only `TaskCompleted` carries an OMCA hook; the others are unhooked platform signals. Use them instead of planner-side status files. `TaskCompleted` fires only through `TaskUpdate` or a teammate ending a turn with tasks open, and client v2.1.233 withholds the task tools on Opus 5 and Fable 5 era models unless `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` is set, so on a default roster the gate never runs and the Stop gates are what enforce.
 
 ## PHASE 1: INTERVIEW MODE (DEFAULT)
 

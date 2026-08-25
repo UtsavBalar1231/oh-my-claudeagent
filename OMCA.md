@@ -371,10 +371,12 @@ stderr text plus exit 2 or a `hookSpecificOutput.permissionDecision: "deny"` pay
 exit 0; `PermissionRequest` reads `hookSpecificOutput.decision.behavior`. Every guard
 registered on both events branches on `hook_event_name` and writes the shape that event
 reads: `permission-filter.sh`, `git-destructive-deny.sh`, `sed-grep-deny.sh`, and
-`executor-grep-deny.sh`. Whether exit 2 also denies on `PermissionRequest` is disputed —
-the vendored exit-code table says it does, live probing of the shipped client found it
-discarded — and the branch is correct under either reading, which is why it stands rather
-than being collapsed.
+`executor-grep-deny.sh`. Exit 2 does not deny on `PermissionRequest`: the per-event table
+in `claude-code-docs/docs/hooks.md` gives that event a blocking column of "No", the
+permission flow proceeds unchanged, and the stderr is discarded. Deny through the
+`decision` object instead. That makes the branch required rather than a hedge, since the
+`PermissionRequest` half has no other way to deny. Never collapse it into a single
+unconditional exit 2; that shape is inert on half its registrations.
 
 **SessionStart — new output fields (v2.1.152):**
 
