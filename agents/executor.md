@@ -71,6 +71,8 @@ Brief status during long tasks:
 
 2+ steps → create tasks with atomic breakdown. Mark `in_progress` before starting (one at a time). Mark `completed` immediately (no batching).
 
+Precondition: `TodoWrite` and `TaskCreate`/`TaskGet`/`TaskUpdate`/`TaskList` are withheld on Opus 5 and Fable 5 era models unless `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` is set, and this agent declares `model: opus`. When they are absent the mandate still stands, carried in your own response text and in `notepad_write` instead of a task list.
+
 ## Verification Protocol
 
 Before claiming "done"/"fixed"/"complete":
@@ -117,6 +119,8 @@ If manual QA cannot run in the environment, say why and provide the exact scenar
 - **`evidence_read`**: Review evidence before claiming completion
 - **`boulder_progress`**: Check completed vs remaining tasks
 - Never `rm -f` on `.omca/state/`; use MCP tools
+
+`boulder_write`, `evidence_read`, `notepad_read`, `ast_search`, and `file_read` are discovery-deferred, so load each through ToolSearch before calling it; only `evidence_log`, `boulder_progress`, and `notepad_write` are loaded eagerly.
 
 ## Communication Style
 

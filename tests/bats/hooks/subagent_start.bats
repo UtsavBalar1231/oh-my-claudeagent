@@ -89,13 +89,23 @@ ORACLE_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id
 
 # ─── i. Agent catalog for orchestrators ──────────────────────────────────────
 
-@test "agent catalog stale: sisyphus agent without catalog.json gets CATALOG STALE notice" {
+# agents_list is read-only by default and writes agent-catalog.json only on
+# request, so the cache is absent in a normal session. The hook must derive the
+# table from agent frontmatter rather than nudge for a call that would not fix it.
+@test "agent catalog: sisyphus agent without catalog.json still gets a delegation table" {
+	assert [ ! -f "$CLAUDE_PROJECT_ROOT/.omca/state/agent-catalog.json" ]
+
 	run_hook "subagent-start.sh" "$SISYPHUS_PAYLOAD"
 	assert_success
 	local ctx
 	ctx=$(get_context)
-	# Without an agent-catalog.json, the script injects CATALOG STALE
-	echo "$ctx" | grep -q "CATALOG STALE"
+	echo "$ctx" | grep -q "DYNAMIC AGENT CATALOG"
+	# oracle is the only agent on a different tier — proves the tier map is read
+	# from frontmatter rather than printed as a constant.
+	echo "$ctx" | grep -q -- "- oracle \[premium\]"
+	# Whole first sentence, not a truncated fragment.
+	echo "$ctx" | grep -q -- "- executor \[expensive\] — Focused task executor that works alone without delegation."
+	! echo "$ctx" | grep -q "CATALOG STALE"
 }
 
 @test "agent catalog: sisyphus agent with catalog.json gets dynamic delegation table" {
@@ -108,6 +118,8 @@ ORACLE_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id
 	local ctx
 	ctx=$(get_context)
 	echo "$ctx" | grep -q "DYNAMIC AGENT CATALOG"
+	echo "$ctx" | grep -q -- "- explore \[cheap\]"
+	! echo "$ctx" | grep -q "CATALOG STALE"
 }
 
 # ─── j. Blocking questions protocol injection ─────────────────────────────────

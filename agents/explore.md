@@ -5,6 +5,7 @@ model: opus
 effort: low
 color: blue
 memory: project
+maxTurns: 30
 disallowedTools:
   - Write
   - Edit
@@ -108,6 +109,8 @@ Use the right tool for the job:
 | History/evolution (when added, who changed) | Bash with git commands |
 
 Flood with parallel calls. Cross-validate findings across multiple tools.
+
+`boulder_write`, `evidence_read`, `notepad_read`, `ast_search`, and `file_read` are discovery-deferred, so load each through ToolSearch before calling it; only `evidence_log`, `boulder_progress`, and `notepad_write` are loaded eagerly.
 
 ## Example Query Handling
 

@@ -18,6 +18,10 @@ from tools._common import (
 )
 
 SNIPPET_MAX_CHARS = 2000
+# Raises the client's persist-to-disk threshold for this tool's text result.
+# A full evidence log is many 2000-char snippets; 100000 holds ~50 of them,
+# well under the client's 500000 ceiling.
+EVIDENCE_MAX_RESULT_CHARS = 100_000
 
 
 def _do_evidence_log(
@@ -62,13 +66,15 @@ def register(mcp: MCPServer) -> None:
 
     @mcp.tool(
         annotations=ToolAnnotations(
+            title="Log verification evidence",
             read_only_hint=False,
             destructive_hint=False,
             idempotent_hint=False,
             open_world_hint=False,
         ),
         meta={
-            "anthropic/searchHint": "record a build, test, or lint verification result; required before any completion claim"
+            "anthropic/searchHint": "record a build, test, or lint verification result; required before any completion claim",
+            "anthropic/alwaysLoad": True,
         },
         structured_output=False,
     )
@@ -108,7 +114,8 @@ def register(mcp: MCPServer) -> None:
             open_world_hint=False,
         ),
         meta={
-            "anthropic/searchHint": "review all logged verification evidence before claiming a task complete"
+            "anthropic/searchHint": "review all logged verification evidence before claiming a task complete",
+            "anthropic/maxResultSizeChars": EVIDENCE_MAX_RESULT_CHARS,
         },
         structured_output=False,
     )

@@ -26,6 +26,11 @@ _BINARY_CHECK_SIZE = 8192  # 8KB
 # can outweigh the whole read in the caller's context.
 _MAX_LINE_CHARS = 2000
 _AUDIT_LOG = ".omca/logs/file-access.jsonl"
+# Raises the client's persist-to-disk threshold for this tool's text result.
+# The default 5000-line window at the 2000-char line cap can reach 10M chars in
+# theory; 200000 covers a normal source file whole while staying under the
+# client's 500000 ceiling, so ordinary reads stop being spilled to disk.
+_MAX_RESULT_CHARS = 200_000
 
 _DENY_PATTERNS = [
     "**/.ssh/*",
@@ -150,7 +155,8 @@ def register(mcp: MCPServer) -> None:
             read_only_hint=True, idempotent_hint=True, open_world_hint=False
         ),
         meta={
-            "anthropic/searchHint": "read a file outside the project root, with line numbers and a token estimate"
+            "anthropic/searchHint": "read a file outside the project root, with line numbers and a token estimate",
+            "anthropic/maxResultSizeChars": _MAX_RESULT_CHARS,
         },
         structured_output=False,
     )

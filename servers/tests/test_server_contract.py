@@ -18,7 +18,6 @@ CLIENT_TEXT_CAP_CHARS = 2048
 
 WRITE_TOOLS = frozenset(
     {
-        "agents_list",
         "ast_replace",
         "boulder_write",
         "evidence_log",
@@ -26,6 +25,19 @@ WRITE_TOOLS = frozenset(
         "notepad_write",
     }
 )
+
+# Kept deliberately small. Each entry stays in every session's cached prefix and
+# invalidates that cache on any tool change, so the set covers only the tools an
+# agent must reach without a tool-search step.
+ALWAYS_LOAD_TOOLS = frozenset({"boulder_progress", "evidence_log", "notepad_write"})
+
+# Raises the client's persist-to-disk threshold for a tool's text result.
+MAX_RESULT_SIZE_CHARS = {
+    "ast_search": 200_000,
+    "evidence_read": 100_000,
+    "file_read": 200_000,
+    "session_search": 100_000,
+}
 
 EXPECTED_TOOLS = frozenset(
     {
@@ -124,6 +136,37 @@ def test_destructive_hint_only_on_write_tools(tools):
             )
 
 
+def test_always_load_is_exactly_the_declared_set(tools):
+    """Server-wide alwaysLoad is gone; only these tools opt in per-tool."""
+    actual = {t.name for t in tools if (t.meta or {}).get("anthropic/alwaysLoad")}
+    assert actual == ALWAYS_LOAD_TOOLS, (
+        f"unexpectedly eager: {sorted(actual - ALWAYS_LOAD_TOOLS)}; "
+        f"expected but deferred: {sorted(ALWAYS_LOAD_TOOLS - actual)}"
+    )
+
+
+def test_max_result_size_chars_matches_the_declared_values(tools):
+    actual = {
+        t.name: (t.meta or {}).get("anthropic/maxResultSizeChars")
+        for t in tools
+        if (t.meta or {}).get("anthropic/maxResultSizeChars") is not None
+    }
+    assert actual == MAX_RESULT_SIZE_CHARS
+
+
+def test_write_tools_declare_a_human_readable_title(tools):
+    """The client shows a write tool's title in /mcp and in the permission dialog,
+    where it would otherwise print the raw namespaced tool name."""
+    for tool in tools:
+        title = tool.annotations.title
+        if tool.name in WRITE_TOOLS:
+            assert title, (
+                f"{tool.name} writes and needs a title for the permission dialog"
+            )
+        else:
+            assert title is None, f"{tool.name} declares a title it does not need"
+
+
 def test_every_tool_declares_a_search_hint(tools):
     """Every tool declares _meta["anthropic/searchHint"]."""
     for tool in tools:
@@ -165,6 +208,7 @@ def smoke_args(tool_name: str, root) -> dict:
     sample.write_text("def f():\n    print(1)\n")
     rule = "id: smoke\nlanguage: python\nrule:\n  pattern: print($A)\n"
     return {
+        "agents_list": {"working_directory": str(root)},
         "ast_dump_tree": {"code": "print($A)", "language": "python"},
         "ast_find_rule": {"rule_yaml": rule},
         "ast_search": {"pattern": "print($A)", "lang": "python"},

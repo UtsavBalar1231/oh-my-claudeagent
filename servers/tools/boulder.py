@@ -196,6 +196,7 @@ def register(mcp: MCPServer) -> None:
 
     @mcp.tool(
         annotations=ToolAnnotations(
+            title="Register work plan",
             read_only_hint=False,
             destructive_hint=False,
             idempotent_hint=True,
@@ -230,7 +231,8 @@ def register(mcp: MCPServer) -> None:
             open_world_hint=False,
         ),
         meta={
-            "anthropic/searchHint": "plan task progress: completed and remaining checkboxes, plus the next task label"
+            "anthropic/searchHint": "plan task progress: completed and remaining checkboxes, plus the next task label",
+            "anthropic/alwaysLoad": True,
         },
         structured_output=False,
     )

@@ -24,13 +24,15 @@ def register(mcp: MCPServer) -> None:
 
     @mcp.tool(
         annotations=ToolAnnotations(
+            title="Append to notepad",
             read_only_hint=False,
             destructive_hint=False,
             idempotent_hint=False,
             open_world_hint=False,
         ),
         meta={
-            "anthropic/searchHint": "persist a learning, issue, decision, or problem so it survives compaction"
+            "anthropic/searchHint": "persist a learning, issue, decision, or problem so it survives compaction",
+            "anthropic/alwaysLoad": True,
         },
         structured_output=False,
     )
@@ -159,6 +161,7 @@ def register(mcp: MCPServer) -> None:
 
     @mcp.tool(
         annotations=ToolAnnotations(
+            title="Compact notepad section",
             read_only_hint=False,
             destructive_hint=True,
             idempotent_hint=False,

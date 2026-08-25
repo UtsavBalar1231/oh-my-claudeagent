@@ -3,6 +3,7 @@
 import json
 import os
 from pathlib import Path
+from typing import Annotated
 
 import yaml
 from mcp.server.mcpserver import MCPServer
@@ -31,8 +32,7 @@ def register(mcp: MCPServer) -> None:
 
     @mcp.tool(
         annotations=ToolAnnotations(
-            read_only_hint=False,
-            destructive_hint=False,
+            read_only_hint=True,
             idempotent_hint=True,
             open_world_hint=False,
         ),
@@ -45,8 +45,14 @@ def register(mcp: MCPServer) -> None:
         working_directory: str = Field(
             default="", description="Project root (auto-detected from git)"
         ),
+        write_cache: Annotated[
+            bool,
+            Field(
+                description="Also write the catalog to .omca/state/agent-catalog.json, which the SubagentStart hook reads for its delegation table. Pass true when the hook reports the catalog is missing."
+            ),
+        ] = False,
     ) -> str:
-        """Return structured catalog of all agents with orchestration metadata. Use at session start for routing decisions — provides when_to_use, cost_tier, and model for each agent. Writes agent-catalog.json cache for hooks. Returns JSON array of agent entries."""
+        """Return structured catalog of all agents with orchestration metadata. Use at session start for routing decisions — provides when_to_use, cost_tier, and model for each agent. Reads only, unless write_cache=True refreshes the agent-catalog.json cache the SubagentStart hook reads. Returns JSON array of agent entries."""
         _env_val = os.environ.get("CLAUDE_PLUGIN_ROOT")
         plugin_root = (
             Path(_env_val) if _env_val else Path(__file__).parent.parent.parent
@@ -73,9 +79,9 @@ def register(mcp: MCPServer) -> None:
                             }
                         )
 
-        state = _state_dir(working_directory)
-        cache_path = os.path.join(state, AGENT_CATALOG_FILE)
-        _write_json(cache_path, catalog)
+        if write_cache:
+            state = _state_dir(working_directory)
+            _write_json(os.path.join(state, AGENT_CATALOG_FILE), catalog)
         return json.dumps(catalog, indent=2)
 
     @mcp.tool(

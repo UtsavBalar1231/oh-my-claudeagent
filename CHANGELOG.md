@@ -1506,7 +1506,7 @@ v2.2.0 ships platform-sync improvements: a `PermissionDenied` retry-coach hook, 
 ### Verified (no-op confirmations)
 
 - **H-4** `watchPaths` emission in `scripts/lifecycle-state.sh` is platform-consumed per `docs/hooks.md:1976` and `:2017`. Correctly wired on both CwdChanged and FileChanged events.
-- **H-15** `alwaysLoad: true` adoption backed by reproducible startup-time bench (`servers/tests/test_startup_time.py`): warm p95=0.287s, well under the 2.0s threshold and far under the platform's 5s startup cap.
+- **H-15** `alwaysLoad: true` adoption backed by reproducible startup-time bench (`servers/tests/test_startup_time.py`): warm p95=0.287s, well under the 2.0s threshold and far under the platform's 5s startup cap. **Corrected in retrospect (kept for the record, not the conclusion):** those numbers are accurate and they establish only that the server starts fast. They were never evidence for loading its tools eagerly. The cost of `alwaysLoad` is context tokens, not milliseconds: every eagerly loaded tool's schema sits in each session's cached prefix, and editing any of them invalidates that prefix. Measured later, the full roster serializes to about 23,300 characters, roughly 5,800 tokens paid per session. A reproducible benchmark cited as proof a decision was sound had measured the wrong axis. The server-wide flag is gone; per-tool `anthropic/alwaysLoad` on a small eager set replaced it, and the bench now reports payload size next to latency so the two are not confused again.
 - **C-5** `scripts/agent-usage-reminder.sh` correctly unions `active-agents.json` and `subagents.json` to avoid race-window undercounts.
 - **H-21** bats stderr-assertion audit: all 14 patterns in `tests/bats/hooks/` survive v2.1.98's stderr-visibility change.
 

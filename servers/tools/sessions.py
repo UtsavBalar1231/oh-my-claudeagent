@@ -36,6 +36,10 @@ MAX_LIMIT = 50
 # 100 — chars of context on each side of a hit; ~200 char excerpts total.
 EXCERPT_RADIUS = 100
 _VALID_ROLES = ("user", "assistant", "tool")
+# Raises the client's persist-to-disk threshold for this tool's text result.
+# Bounded by MAX_LIMIT excerpts of ~200 chars plus JSON overhead, so 100000 is
+# far above any real result and well under the client's 500000 ceiling.
+TRANSCRIPT_MAX_RESULT_CHARS = 100_000
 # The platform replaces a spilled tool result inline with a pointer to the
 # sidecar plus a prefix of its body, so the same text lives in two places.
 _SPILL_PATH_RE = re.compile(r"(/\S+/tool-results/[^\s/]+\.txt)")
@@ -190,7 +194,8 @@ def register(mcp: MCPServer) -> None:
             read_only_hint=True, idempotent_hint=True, open_world_hint=False
         ),
         meta={
-            "anthropic/searchHint": "search this project's past Claude Code session transcripts"
+            "anthropic/searchHint": "search this project's past Claude Code session transcripts",
+            "anthropic/maxResultSizeChars": TRANSCRIPT_MAX_RESULT_CHARS,
         },
         structured_output=False,
     )

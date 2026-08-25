@@ -53,6 +53,8 @@ Fix root causes, not symptoms. If a command fails, identify whether the cause is
 - **`evidence_read`**: Review before claiming complete
 - **`notepad_write`**: Diagnosis findings or workarounds
 
+`boulder_write`, `evidence_read`, `notepad_read`, `ast_search`, and `file_read` are discovery-deferred, so load each through ToolSearch before calling it; only `evidence_log`, `boulder_progress`, and `notepad_write` are loaded eagerly.
+
 ## Progress Checkpointing
 
 After significant sub-steps: `notepad_write(plan_name, "learnings", "Checkpoint: [step], modified [files]")`. Survives crashes and compactions.

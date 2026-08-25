@@ -94,6 +94,10 @@ TIMEOUT = 300
 MAX_RESULTS_DEFAULT = 500
 MAX_JSON_OUTPUT_BYTES = 1024 * 1024
 MAX_RESULT_CAP = 500
+# Raises the client's persist-to-disk threshold for ast_search's text result.
+# MAX_RESULT_CAP matches with code snippets can exceed the default threshold on
+# a wide pattern; 200000 keeps those inline, under the client's 500000 ceiling.
+SEARCH_MAX_RESULT_CHARS = 200_000
 
 
 def discover_binary() -> str:
@@ -525,7 +529,8 @@ def register(mcp: MCPServer) -> None:
             read_only_hint=True, idempotent_hint=True, open_world_hint=False
         ),
         meta={
-            "anthropic/searchHint": "structural code search by syntax pattern across 25 languages; use instead of grep when the pattern is syntactic"
+            "anthropic/searchHint": "structural code search by syntax pattern across 25 languages; use instead of grep when the pattern is syntactic",
+            "anthropic/maxResultSizeChars": SEARCH_MAX_RESULT_CHARS,
         },
         structured_output=False,
     )
@@ -583,6 +588,7 @@ def register(mcp: MCPServer) -> None:
 
     @mcp.tool(
         annotations=ToolAnnotations(
+            title="Rewrite code by AST pattern",
             read_only_hint=False,
             destructive_hint=True,
             idempotent_hint=False,

@@ -65,6 +65,20 @@ def test_agents_list_returns_required_fields(tools, monkeypatch, working_dir):
             assert field in entry, f"Agent entry missing field '{field}': {entry}"
 
 
+def test_agents_list_cache_write_is_opt_in(
+    tools, monkeypatch, working_dir, tmp_git_root
+):
+    """The default call is read-only; write_cache=True refreshes the hook's cache."""
+    monkeypatch.setenv("CLAUDE_PLUGIN_ROOT", str(REPO_ROOT))
+    cache = tmp_git_root / ".omca" / "state" / "agent-catalog.json"
+
+    tools["agents_list"](working_directory=working_dir)
+    assert not cache.exists()
+
+    tools["agents_list"](working_directory=working_dir, write_cache=True)
+    assert json.loads(cache.read_text())
+
+
 # --- categories_list ---
 
 

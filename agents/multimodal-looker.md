@@ -4,6 +4,7 @@ description: Multimodal analyst for images, PDFs, and diagrams. Use when you nee
 model: opus
 effort: medium
 color: pink
+maxTurns: 15
 disallowedTools:
   - Agent
   - Bash
@@ -39,6 +40,8 @@ Examine media files, extract requested information. Nothing beyond what was aske
 4. Main agent skips raw file → saves context tokens
 
 The `disallowedTools` list is deliberately wide: this agent does pure media interpretation, and broader access adds risk without value.
+
+`boulder_write`, `evidence_read`, `notepad_read`, `ast_search`, and `file_read` are discovery-deferred, so load each through ToolSearch before calling it; only `evidence_log`, `boulder_progress`, and `notepad_write` are loaded eagerly. ToolSearch is on this agent's `disallowedTools` list, so those five are out of reach here: report what you need instead of trying to call them.
 
 ## Structured Output Format
 

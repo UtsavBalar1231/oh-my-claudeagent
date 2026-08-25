@@ -26,6 +26,8 @@ Analyze requests before planning to prevent AI failures.
 
 **Anti-Duplication**: After delegating exploration, do not re-search the same information. Wait for results or work non-overlapping tasks.
 
+`boulder_write`, `evidence_read`, `notepad_read`, `ast_search`, and `file_read` are discovery-deferred, so load each through ToolSearch before calling it; only `evidence_log`, `boulder_progress`, and `notepad_write` are loaded eagerly.
+
 ## PHASE 0: INTENT CLASSIFICATION (First Step)
 
 Classify work intent before any analysis. This determines your entire strategy.

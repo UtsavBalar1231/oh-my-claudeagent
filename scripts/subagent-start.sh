@@ -158,31 +158,59 @@ esac
 
 CATALOG_FILE="${STATE_DIR}/agent-catalog.json"
 
+# Derive the delegation table from agent frontmatter, the same source agents_list
+# reads. The MCP tool is read-only by default and only refreshes the cache file on
+# request, so the cache is absent in a normal session; deriving here means the
+# table is always available and never stale.
+agent_table_from_frontmatter() {
+	awk '
+		function value(line) { sub(/^[A-Za-z_]+:[[:space:]]*/, "", line); return line }
+		function flush() {
+			if (name == "") return
+			tier = "cheap"
+			if (model == "fable") tier = "premium"
+			else if (model == "opus") tier = "expensive"
+			else if (model == "haiku") tier = "free"
+			# index() rather than split(): awk reads a split separator as a regex,
+			# where ". " matches any character followed by a space.
+			stop = index(desc, ". ")
+			summary = (stop > 0 ? substr(desc, 1, stop) : desc)
+			printf "- %s [%s] — %s\n", name, tier, (summary == "" ? "general" : summary)
+		}
+		FNR == 1 { flush(); fm = 0; name = ""; model = ""; desc = "" }
+		/^---[[:space:]]*$/ { fm++; next }
+		fm == 1 && /^name:/ { name = value($0) }
+		fm == 1 && /^model:/ { model = value($0) }
+		fm == 1 && /^description:/ { desc = value($0) }
+		END { flush() }
+	' "${PLUGIN_ROOT}"/agents/*.md
+}
+
 case "${AGENT_TYPE}" in
 *sisyphus*)
+	DELEGATION_TABLE=""
 	if [[ -f "${CATALOG_FILE}" ]]; then
 		DELEGATION_TABLE=$(jq -r '
 				sort_by(.cost_tier) |
-				.[] | "- \(.name) [\(.cost_tier)] — \(.when_to_use | if . == "" then "general" else (split(",")[0] | ltrimstr(" ")) end)"
+				.[] | "- \(.name) [\(.cost_tier)] — \((.when_to_use // .description // "") | if . == "" then "general" else (split(",")[0] | ltrimstr(" ")) end)"
 			' "${CATALOG_FILE}")
-		# categories.json "model" values are Agent-tool aliases (sonnet|opus|haiku|fable),
-		# verified against the live Agent tool's model parameter enum. Forwarded as-is
-		# below so Agent(model=...) always receives a valid alias, never a full model ID.
-		CATEGORIES_FILE="$(dirname "$0")/../servers/categories.json"
-		CATEGORY_TABLE=""
-		if [[ -f "${CATEGORIES_FILE}" ]]; then
-			CATEGORY_TABLE=$(jq -r '
-					.categories | to_entries[] |
-					"- \(.key): model=\(.value.model) — \(.value.description)"
-				' "${CATEGORIES_FILE}")
-		fi
-		if [[ -n "${DELEGATION_TABLE}" ]]; then
-			CONTEXT_PARTS+="$(section_header 'Agent Catalog')"
-			CONTEXT_PARTS+="[DYNAMIC AGENT CATALOG] ${DELEGATION_TABLE}"
-			[[ -n "${CATEGORY_TABLE}" ]] && CONTEXT_PARTS+=$'\n'"[CATEGORIES] ${CATEGORY_TABLE} Use Agent(model=<category_model>) to route to the right model tier."
-		fi
-	else
-		CONTEXT_PARTS+="$(section_header 'Agent Catalog')"$'\n'"[CATALOG STALE] No agent-catalog.json found. Call agents_list() to generate the catalog for routing hints."
+	fi
+	[[ -z "${DELEGATION_TABLE}" ]] && DELEGATION_TABLE=$(agent_table_from_frontmatter)
+	# categories.json "model" values are Agent-tool aliases (sonnet|opus|haiku|fable),
+	# verified against the live Agent tool's model parameter enum. Forwarded as-is
+	# below so Agent(model=...) always receives a valid alias, never a full model ID.
+	CATEGORIES_FILE="${PLUGIN_ROOT}/servers/categories.json"
+	CATEGORY_TABLE=""
+	if [[ -f "${CATEGORIES_FILE}" ]]; then
+		CATEGORY_TABLE=$(jq -r '
+				.categories | to_entries[] |
+				"- \(.key): model=\(.value.model) — \(.value.description)"
+			' "${CATEGORIES_FILE}")
+	fi
+	if [[ -n "${DELEGATION_TABLE}" ]]; then
+		CONTEXT_PARTS+="$(section_header 'Agent Catalog')"
+		CONTEXT_PARTS+="[DYNAMIC AGENT CATALOG] ${DELEGATION_TABLE}"
+		[[ -n "${CATEGORY_TABLE}" ]] && CONTEXT_PARTS+=$'\n'"[CATEGORIES] ${CATEGORY_TABLE} Use Agent(model=<category_model>) to route to the right model tier."
 	fi
 	;;
 *) ;;

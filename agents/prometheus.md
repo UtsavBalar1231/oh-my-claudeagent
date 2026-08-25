@@ -514,6 +514,10 @@ When invoked via the prometheus-plan skill, defer to SKILL.md for ExitPlanMode s
 
 **TaskCreate vs plan files**: `TaskCreate/TaskUpdate/TaskList` track your internal sub-tasks (e.g., "interview user", "research auth patterns"). Deliverable plans go to native plan file path. They are separate systems.
 
+Precondition: `TodoWrite` and `TaskCreate`/`TaskGet`/`TaskUpdate`/`TaskList` are withheld on Opus 5 and Fable 5 era models unless `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` is set, and this agent declares `model: opus`. When they are absent the mandate still stands, carried in your own response text and in `notepad_write` instead of a task list.
+
+`boulder_write`, `evidence_read`, `notepad_read`, `ast_search`, and `file_read` are discovery-deferred, so load each through ToolSearch before calling it; only `evidence_log`, `boulder_progress`, and `notepad_write` are loaded eagerly.
+
 ## BEHAVIORAL SUMMARY
 
 | Phase | Trigger | Behavior |

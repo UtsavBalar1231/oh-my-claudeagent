@@ -129,9 +129,13 @@ Plan provides:
 - `boulder_progress` to check if reviewing an active plan vs a draft
 - `notepad_write(plan_name, "issues", "...")` for critical findings
 
+`boulder_write`, `evidence_read`, `notepad_read`, `ast_search`, and `file_read` are discovery-deferred, so load each through ToolSearch before calling it; only `evidence_log`, `boulder_progress`, and `notepad_write` are loaded eagerly.
+
 **Plan re-read rule**: If the same plan path arrives in a follow-up turn, re-read it from disk before any judgment. The on-disk content is the only source of truth. A previous verdict is void without a fresh read, since the plan may have been edited since you last reviewed it.
 
 ## Review Process
+
+Work these steps in order, and track them as a task list when the tools are there. Precondition: `TodoWrite` and `TaskCreate`/`TaskGet`/`TaskUpdate`/`TaskList` are withheld on Opus 5 and Fable 5 era models unless `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` is set, and this agent declares `model: opus`. When they are absent the sequence still stands, carried in your own response text and in `notepad_write` instead of a task list.
 
 ### Step 1: Read the Work Plan
 - Load file, parse tasks, extract ALL file references
