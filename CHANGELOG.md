@@ -5,6 +5,111 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.18.0] - 2026-08-26
+
+The plugin's picture of the platform was pinned at client 2.1.220 while the installed
+client was 2.1.245. This release reconciles the gap: it corrects what the docs asserted
+about subagents, adopts the hook events that appeared in between, drops the settings keys
+that were removed, and stops recommending a mode that breaks OMCA's own result collection.
+
+### Fixed
+
+- **The subagent fan-out contract was factually wrong in five shipped files.** Every
+  orchestration surface made `run_in_background=false` the load-bearing instruction: pass
+  it, read the deliverable inline, treat a task notification as a trigger carrying an
+  output-file path. None of that holds. In an interactive session on v2.1.232 or later,
+  fork mode is on by default and the platform removes the parameter from the Agent tool
+  outright, so the call returns a launch acknowledgement and the subagent runs in the
+  background regardless. The deliverable arrives in the `<result>` block of the
+  notification, which carries the agent's complete final message. Under `claude -p` and the
+  Agent SDK, fork mode is off and the result may come back as the Agent tool's return
+  value instead, so both paths are now accepted. One paragraph states this and is repeated
+  byte for byte across the five surfaces, so they cannot drift apart again. Verified
+  against a live probe rather than against the docs.
+- **The plan gate stopped blocking a turn that is waiting on agents.** A turn ending with
+  background work in flight is paused to be woken, not stalled mid-plan, and every parallel
+  fan-out wave ends that way. The guard now exits open when the payload reports a
+  non-terminal background task, and resets its block ledger on the way out: at five blocks
+  per session, spending them on fan-out waves would have silenced the gate before it ever
+  met a real stall. The drift guard deliberately keeps blocking here, because a completion
+  claim made while executors are still writing files is exactly what it exists to catch.
+- **The comment gate reads the file's own language.** It matched a fixed `#` and `//`
+  marker set everywhere, so C's `#include` and `#define` scored as comments restating the
+  line below them and a preprocessor-only edit could not be written at all, while Lua, SQL,
+  Erlang, Clojure and Fortran were scanned for markers none of them use. The extension case
+  statement now picks the marker set alongside admitting the file. Two false positives went
+  with it: a machine-readable pragma is addressed to a linter rather than to a reader, and
+  the density check divided by a code-line count that is zero for a file-header edit.
+- **The statusline agrees with the client's own badge and stays on one line.** A GitLab
+  merge request renders as `!N` instead of `#N`, and the main line is clamped to the
+  terminal width, so a long line no longer wraps and pushes the prompt off-screen. The
+  truncator steps over OSC 8 hyperlink delimiters whole and emits the closer on a cut
+  inside a link, which otherwise leaked the link into every later line in the terminal.
+
+### Added
+
+- **Four platform hook events now carry a handler.** `Setup` branches on its trigger to run
+  the dependency check or the stale-marker and log sweeps off the per-session startup path.
+  `StopFailure` fires instead of `Stop` when a turn ends in an API error, the case the plan
+  gates never see, and records the error class so an interrupted run leaves a trace.
+  `FileChanged` watches the evidence ledger and the plan registry, the two state files the
+  write guard cannot protect against a shell redirect. `PostToolBatch` takes over the loop
+  detector, where one batch is one signature, so concurrent calls can no longer interleave
+  into one another's streak.
+- **The permission classifier is told when a Bash call was a verification runner.** It never
+  sees tool results, so it could not know the previous command was this repo's own test or
+  lint runner. `classifierContext` carries that one fact, as a static assertion about the
+  call's origin: the field is model-facing input to a permission decision, so anything
+  persuasive there would be a prompt-injection surface aimed at our own permissions.
+- **A translatable `grep` is rewritten to `rg` instead of denied.** The deny gate spent a
+  full deny-and-retry round trip on an invocation whose intent was unambiguous. The
+  translated set is deliberately tiny, because the failure modes are not symmetric: a deny
+  costs one retry, a wrong rewrite silently runs a different command than the caller asked
+  for. Anything but a single simple command with identically spelled short flags is refused,
+  and an unrecognised command still gets silence.
+- **CI validates the plugin manifests with warnings promoted to errors.** `just ci` never
+  checked them against the platform's own schema, so a misspelled or leftover field loaded
+  at runtime and surfaced only on publish. The manifests then fix what the validator
+  flagged, including two option defaults that lived in prose instead of the `default` field
+  the client reads.
+- **`git-master` and `handoff` declare `allowed-tools`.** Both read state and report;
+  neither needs to write. Without a grant they inherited the session's full tool set, so
+  the narrow thing they do was bounded only by the prompt.
+
+### Changed
+
+- **The MCP server's `alwaysLoad` flag is gone, replaced by a three-tool eager set.** Set
+  server-wide, it loaded every tool's schema into every session's cached prefix: about
+  23,300 characters, roughly 5,800 tokens per session, with any one schema edit
+  invalidating the whole prefix. `evidence_log`, `boulder_progress` and `notepad_write` opt
+  back in per tool, because an agent must reach those without a tool-search step; the rest
+  arrive through ToolSearch, and the agent prompts name the deferred ones so a first call
+  cannot fail on a missing schema. The startup bench now reports serialized tools/list size
+  next to latency, so the two axes cannot be confused again.
+- **`omca-setup` no longer steers users into agent teams.** With teams enabled a subagent
+  launches as a teammate, and a teammate reports an idle notification rather than its
+  output, which stalls the fan-out-and-read-results flow every OMCA workflow is built on.
+  Users who want teams enable them themselves. The doctor gained a report on
+  `CLAUDE_CODE_ENABLE_TODO_TOOLS`, never written: without it the task tools are withheld on
+  the model tiers every OMCA agent declares, which leaves the task-list mandates and the
+  completion gate inert.
+- **Removed platform keys swept from the reference pages.** `teammateDefaultModel` went
+  away in v2.1.234 along with its `/config` row, and the per-session subagent cap
+  `CLAUDE_CODE_MAX_SUBAGENTS_PER_SESSION` in v2.1.224; a leftover value for either is
+  inert, so the retry coach drops the branch that coached on a limit that can no longer be
+  hit. The settings that now matter to how OMCA runs are documented in their place,
+  including `subagentPromptCacheTtl`, `autoMode.classifyAllShell`,
+  `sandbox.network.strictAllowlist`, `worktree.bgIsolation`, and the spawn-depth variable
+  that explains why leaf agents search inline: at the limit the Agent tool is withheld
+  outright and the delegation silently never happens.
+- Every `type: command` hook handler declares `shell: bash`, which is what routes a `.sh`
+  handler through Git Bash on Windows, and the validator fails any handler omitting it.
+  `MultiEdit` is not a real tool, so it leaves the write-guard and comment-checker matchers
+  along with the test cases that fabricated its payloads.
+- `agents_list` is read-only by default. It was annotated as a writer only because it wrote
+  its cache file on every call; that write is now opt-in, and the delegation table is
+  derived from agent frontmatter directly rather than from a cache nobody writes.
+
 ## [2.17.2] - 2026-08-06
 
 ### Fixed
