@@ -246,7 +246,7 @@ Claude Code lifecycle events and provide:
 - Permission auto-approval for known-safe package managers (npm, yarn, pnpm, bun), jq, and uv run/sync. Blocks destructive patterns (rm -rf).
 - Error recovery suggestions (re-read after failed Edit, escalate after failed Agent)
 - Compaction survival (state saved pre-compact, re-injected post-compact)
-- Verification gating (TaskCompleted blocked without fresh evidence)
+- Verification gating (TaskCompleted blocked without fresh evidence, on the sessions where that event can fire; see below)
 
 **Hook events OMCA handles:**
 
@@ -305,6 +305,13 @@ therefore the two bare basenames, joined by the only separator that event accept
 | `WorktreeCreate`, `WorktreeRemove` | Worktree isolation policy is Claude-native's. `--worktree` delegation is prompt-injected paths plus boulder bookkeeping, so there is nothing for a worktree hook to add |
 | `InstructionsLoaded` | Async and observability-only: no injection capability, and it reports `CLAUDE.md` / `.claude/rules` loads rather than `.omca/rules`, so it cannot replace `context-injector.sh`'s content-hash ledger |
 | `TaskCreated`, `TeammateIdle` | Task-collaboration lifecycle owned by the native shared task list. Only `TaskCompleted` is registered among the three, as the evidence gate |
+
+`TaskCompleted` fires only through `TaskUpdate` or a teammate ending a turn with tasks still open.
+Client v2.1.233 withholds `TodoWrite` and the `TaskCreate`/`TaskGet`/`TaskUpdate`/`TaskList` tools
+on Opus 5 and Fable 5 era models unless `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` is set, and every OMCA
+agent declares one of those tiers. With the task tools withheld and agent teams off, neither
+trigger occurs, so `task-completed-verify.sh` never runs. Treat it as an opt-in gate rather than a
+guarantee: the three Stop gates are what enforce evidence discipline by default.
 
 **New platform events (v2.1.141–v2.1.167):**
 

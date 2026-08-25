@@ -49,10 +49,15 @@ echo
 echo '=== User settings ==='
 S="${HOME}/.claude/settings.json"
 if [ -f "$S" ]; then
-    TM=$(jq -r '.teammateMode // "absent"' "$S")
-    [ "$TM" = "auto" ] && status PASS "teammateMode=auto" || status WARN "teammateMode=$TM"
+    # Agent teams are reported, never recommended. With them on, any subagent Claude
+    # names launches as a teammate, and a teammate returns an idle notification rather
+    # than its output, which stalls a flow that waits on subagent results.
     TE=$(jq -r '.env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS // ""' "$S")
-    [ "$TE" = "1" ] && status PASS "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1" || status WARN "agent-teams env not set"
+    [ "$TE" = "1" ] && status WARN "agent teams enabled; fan-out cannot collect results" \
+        || status PASS "agent teams off"
+    TT=$(jq -r '.env.CLAUDE_CODE_ENABLE_TODO_TOOLS // ""' "$S")
+    [ "$TT" = "1" ] && status PASS "CLAUDE_CODE_ENABLE_TODO_TOOLS=1" \
+        || status WARN "task tools withheld on this model tier; TaskCompleted gate is inert"
     if jq -e '.enabledPlugins | with_entries(select(.key | startswith("oh-my-claudeagent")))' "$S" >/dev/null 2>&1; then
         status PASS "plugin enabled in user settings"
     else
