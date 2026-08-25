@@ -34,7 +34,7 @@
 [validate-plugin] PASS: new platform event FileChanged handler registered
 [validate-plugin] SKIP: new platform event MessageDisplay not yet adopted by OMCA
 [validate-plugin] PASS: new platform event PostToolBatch handler registered
-[validate-plugin] PASS: new platform event Setup handler registered
+[validate-plugin] SKIP: new platform event Setup not yet adopted by OMCA
 [validate-plugin] PASS: new platform event StopFailure handler registered
 [validate-plugin] PASS: hook event table: OMCA.md matches the hooks.json event set
 [validate-plugin] PASS: agent frontmatter hygiene: no top-level tools allowlists detected
@@ -222,4 +222,4 @@
 [validate-plugin] PASS: mcp tools/list contains categories_list
 [validate-plugin] PASS: mcp tools/list contains file_read
 [validate-plugin] PASS: mcp tools/list contains session_search
-[validate-plugin] Summary: 200 passed, 0 failed, 12 skipped, 0 warned
+[validate-plugin] Summary: 199 passed, 0 failed, 13 skipped, 0 warned

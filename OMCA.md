@@ -272,7 +272,6 @@ row only when a handler is actually registered for it.
 | `TaskCompleted` | Task lifecycle |
 | `PreCompact` | Memory |
 | `SessionEnd` | Lifecycle |
-| `Setup` | Provisioning |
 | `FileChanged` | Filesystem |
 
 `PermissionDenied` routes to `permission-denied-coach.sh`, which turns an auto-mode
@@ -326,7 +325,7 @@ guarantee: the three Stop gates are what enforce evidence discipline by default.
 | `PostToolBatch` | v2.1.152 | Adopted | Carries the loop detector. The handler reads the `tool_calls` array, and each entry's `tool_response` is the serialized string the model sees, not `PostToolUse`'s structured output object |
 | `Elicitation` | v2.1.152 | Not adopted | Fires when the model issues an elicitation request |
 | `ElicitationResult` | v2.1.152 | Not adopted | Fires with the elicitation response |
-| `Setup` | v2.1.152 | Adopted | Explicit provisioning event. Registered on both matchers: `init` runs the dependency check, `maintenance` runs the stale-marker and log sweeps |
+| `Setup` | v2.1.152 | Not adopted | Non-interactive provisioning event. The dependency report it would carry is already available without a session through `bin/omca-doctor`, and the housekeeping sweeps already run on `SessionStart`, where they are needed. A handler here would be a third entry point to work that has two |
 | `DirectoryAdded` | v2.1.219 | Not adopted (PROVISIONAL) | Tracked only. The event exists as a changelog line with no section, no matcher table, and no input schema in the hooks reference, so a handler would be built on a guessed payload |
 
 The table heading's version range covers the first five rows; `DirectoryAdded` postdates it

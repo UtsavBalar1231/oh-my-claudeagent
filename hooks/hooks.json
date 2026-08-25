@@ -1,501 +1,479 @@
 {
-	"hooks": {
-		"Setup": [
-			{
-				"matcher": "init",
-				"hooks": [
-					{
-						"type": "command",
-						"shell": "bash",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/setup-maintenance.sh\""
-					}
-				]
-			},
-			{
-				"matcher": "maintenance",
-				"hooks": [
-					{
-						"type": "command",
-						"shell": "bash",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/setup-maintenance.sh\""
-					}
-				]
-			}
-		],
-		"SessionStart": [
-			{
-				"hooks": [
-					{
-						"type": "command",
-						"shell": "bash",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/gc-in-use-markers.sh\""
-					}
-				]
-			},
-			{
-				"hooks": [
-					{
-						"type": "command",
-						"shell": "bash",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/session-init.sh\"",
-						"timeout": 5,
-						"statusMessage": "Loading OMCA session context"
-					}
-				]
-			},
-			{
-				"matcher": "compact",
-				"hooks": [
-					{
-						"type": "command",
-						"shell": "bash",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/post-compact-inject.sh\""
-					}
-				]
-			}
-		],
-		"UserPromptSubmit": [
-			{
-				"hooks": [
-					{
-						"type": "command",
-						"shell": "bash",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/keyword-detector.sh\""
-					}
-				]
-			}
-		],
-		"UserPromptExpansion": [
-			{
-				"hooks": [
-					{
-						"type": "command",
-						"shell": "bash",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/slash-command-mode-detector.sh\""
-					}
-				]
-			}
-		],
-		"SubagentStart": [
-			{
-				"hooks": [
-					{
-						"type": "command",
-						"shell": "bash",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/subagent-start.sh\"",
-						"timeout": 5
-					}
-				]
-			}
-		],
-		"SubagentStop": [
-			{
-				"hooks": [
-					{
-						"type": "command",
-						"shell": "bash",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/subagent-stop.sh\"",
-						"timeout": 5
-					}
-				]
-			}
-		],
-		"PreToolUse": [
-			{
-				"matcher": "Bash",
-				"hooks": [
-					{
-						"type": "command",
-						"shell": "bash",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh\""
-					},
-					{
-						"type": "command",
-						"shell": "bash",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/git-destructive-deny.sh\""
-					},
-					{
-						"type": "command",
-						"shell": "bash",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/sed-grep-deny.sh\""
-					},
-					{
-						"type": "command",
-						"shell": "bash",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/executor-grep-deny.sh\""
-					}
-				]
-			},
-			{
-				"matcher": "Grep",
-				"hooks": [
-					{
-						"type": "command",
-						"shell": "bash",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/executor-grep-deny.sh\""
-					}
-				]
-			},
-			{
-				"matcher": "Write|Edit",
-				"hooks": [
-					{
-						"type": "command",
-						"shell": "bash",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/write-guard.sh\""
-					}
-				]
-			},
-			{
-				"matcher": "Write|Edit",
-				"hooks": [
-					{
-						"type": "command",
-						"shell": "bash",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/comment-checker.sh\"",
-						"timeout": 5,
-						"statusMessage": "Checking comments"
-					}
-				]
-			},
-			{
-				"matcher": "Write|Edit",
-				"hooks": [
-					{
-						"type": "mcp_tool",
-						"server": "plugin:oh-my-claudeagent:omca",
-						"tool": "validate_plan_write",
-						"input": {
-							"tool_name": "${tool_name}",
-							"file_path": "${tool_input.file_path}",
-							"content": "${tool_input.content}",
-							"new_string": "${tool_input.new_string}",
-							"old_string": "${tool_input.old_string}"
-						}
-					}
-				]
-			}
-		],
-		"PermissionRequest": [
-			{
-				"matcher": "Bash",
-				"hooks": [
-					{
-						"type": "command",
-						"shell": "bash",
-						"if": "Bash(*rm *)",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh\""
-					},
-					{
-						"type": "command",
-						"shell": "bash",
-						"if": "Bash(npm *)",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh\""
-					},
-					{
-						"type": "command",
-						"shell": "bash",
-						"if": "Bash(jq *)",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh\""
-					},
-					{
-						"type": "command",
-						"shell": "bash",
-						"if": "Bash(uv *)",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh\""
-					},
-					{
-						"type": "command",
-						"shell": "bash",
-						"if": "Bash(*sudo *)",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh\""
-					},
-					{
-						"type": "command",
-						"shell": "bash",
-						"if": "Bash(bun *)",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh\""
-					},
-					{
-						"type": "command",
-						"shell": "bash",
-						"if": "Bash(yarn *)",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh\""
-					},
-					{
-						"type": "command",
-						"shell": "bash",
-						"if": "Bash(pnpm *)",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh\""
-					},
-					{
-						"type": "command",
-						"shell": "bash",
-						"if": "Bash(git *)",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/git-destructive-deny.sh\""
-					},
-					{
-						"type": "command",
-						"shell": "bash",
-						"if": "Bash(sed *)",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/sed-grep-deny.sh\""
-					},
-					{
-						"type": "command",
-						"shell": "bash",
-						"if": "Bash(grep *)",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/sed-grep-deny.sh\""
-					},
-					{
-						"type": "command",
-						"shell": "bash",
-						"if": "Bash(grep *)",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/executor-grep-deny.sh\""
-					}
-				]
-			}
-		],
-		"PermissionDenied": [
-			{
-				"hooks": [
-					{
-						"type": "command",
-						"shell": "bash",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/permission-denied-coach.sh\""
-					}
-				]
-			}
-		],
-		"PostToolUse": [
-			{
-				"matcher": "Write|Edit",
-				"hooks": [
-					{
-						"type": "command",
-						"shell": "bash",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/post-edit.sh\"",
-						"async": true
-					}
-				]
-			},
-			{
-				"matcher": "Read|Write|Edit",
-				"hooks": [
-					{
-						"type": "command",
-						"shell": "bash",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/context-injector.sh\"",
-						"timeout": 5,
-						"statusMessage": "Injecting project context"
-					}
-				]
-			},
-			{
-				"matcher": "Write|Edit",
-				"hooks": [
-					{
-						"type": "command",
-						"shell": "bash",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/plan-format-warn.sh\""
-					}
-				]
-			},
-			{
-				"matcher": "Agent",
-				"hooks": [
-					{
-						"type": "command",
-						"shell": "bash",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/empty-task-response.sh\""
-					}
-				]
-			},
-			{
-				"matcher": "Edit|Write|Bash",
-				"hooks": [
-					{
-						"type": "command",
-						"shell": "bash",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/delegation-reminder.sh\""
-					}
-				]
-			},
-			{
-				"matcher": "Bash",
-				"hooks": [
-					{
-						"type": "command",
-						"shell": "bash",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/verification-command-recorder.sh\""
-					}
-				]
-			},
-			{
-				"matcher": "Agent",
-				"hooks": [
-					{
-						"type": "command",
-						"shell": "bash",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/delegation-reminder.sh\""
-					}
-				]
-			}
-		],
-		"PostToolBatch": [
-			{
-				"hooks": [
-					{
-						"type": "command",
-						"shell": "bash",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/tool-loop-detector.sh\""
-					}
-				]
-			}
-		],
-		"PostToolUseFailure": [
-			{
-				"matcher": "Edit",
-				"hooks": [
-					{
-						"type": "command",
-						"shell": "bash",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/edit-error-recovery.sh\"",
-						"statusMessage": "Analyzing Edit failure"
-					}
-				]
-			},
-			{
-				"matcher": "Agent",
-				"hooks": [
-					{
-						"type": "command",
-						"shell": "bash",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/delegate-retry.sh\""
-					}
-				]
-			},
-			{
-				"matcher": "Bash",
-				"hooks": [
-					{
-						"type": "command",
-						"shell": "bash",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/bash-error-recovery.sh\"",
-						"statusMessage": "Analyzing Bash failure"
-					}
-				]
-			},
-			{
-				"matcher": "Read",
-				"hooks": [
-					{
-						"type": "command",
-						"shell": "bash",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/read-error-recovery.sh\"",
-						"statusMessage": "Analyzing Read failure"
-					}
-				]
-			},
-			{
-				"hooks": [
-					{
-						"type": "command",
-						"shell": "bash",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/json-error-recovery.sh\"",
-						"statusMessage": "Analyzing tool-output failure"
-					}
-				]
-			}
-		],
-		"Stop": [
-			{
-				"hooks": [
-					{
-						"type": "command",
-						"shell": "bash",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/plan-continuation-guard.sh\"",
-						"timeout": 5
-					}
-				]
-			},
-			{
-				"hooks": [
-					{
-						"type": "command",
-						"shell": "bash",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/final-verification-evidence.sh\"",
-						"timeout": 5
-					}
-				]
-			},
-			{
-				"hooks": [
-					{
-						"type": "command",
-						"shell": "bash",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/drift-guard.sh\"",
-						"timeout": 10
-					}
-				]
-			}
-		],
-		"StopFailure": [
-			{
-				"hooks": [
-					{
-						"type": "command",
-						"shell": "bash",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/stop-failure-log.sh\""
-					}
-				]
-			}
-		],
-		"PreCompact": [
-			{
-				"hooks": [
-					{
-						"type": "command",
-						"shell": "bash",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/pre-compact.sh\"",
-						"timeout": 5
-					}
-				]
-			}
-		],
-		"SessionEnd": [
-			{
-				"hooks": [
-					{
-						"type": "command",
-						"shell": "bash",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/session-cleanup.sh\"",
-						"timeout": 5
-					}
-				]
-			}
-		],
-		"TaskCompleted": [
-			{
-				"hooks": [
-					{
-						"type": "command",
-						"shell": "bash",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/task-completed-verify.sh\""
-					}
-				]
-			}
-		],
-		"FileChanged": [
-			{
-				"matcher": "verification-evidence.json|boulder.json",
-				"hooks": [
-					{
-						"type": "command",
-						"shell": "bash",
-						"command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/file-changed-log.sh\""
-					}
-				]
-			}
-		]
-	}
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/gc-in-use-markers.sh\""
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/session-init.sh\"",
+            "timeout": 5,
+            "statusMessage": "Loading OMCA session context"
+          }
+        ]
+      },
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/post-compact-inject.sh\""
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/keyword-detector.sh\""
+          }
+        ]
+      }
+    ],
+    "UserPromptExpansion": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/slash-command-mode-detector.sh\""
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/subagent-start.sh\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/subagent-stop.sh\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh\""
+          },
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/git-destructive-deny.sh\""
+          },
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/sed-grep-deny.sh\""
+          },
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/executor-grep-deny.sh\""
+          }
+        ]
+      },
+      {
+        "matcher": "Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/executor-grep-deny.sh\""
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/write-guard.sh\""
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/comment-checker.sh\"",
+            "timeout": 5,
+            "statusMessage": "Checking comments"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "mcp_tool",
+            "server": "plugin:oh-my-claudeagent:omca",
+            "tool": "validate_plan_write",
+            "input": {
+              "tool_name": "${tool_name}",
+              "file_path": "${tool_input.file_path}",
+              "content": "${tool_input.content}",
+              "new_string": "${tool_input.new_string}",
+              "old_string": "${tool_input.old_string}"
+            }
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "if": "Bash(*rm *)",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh\""
+          },
+          {
+            "type": "command",
+            "shell": "bash",
+            "if": "Bash(npm *)",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh\""
+          },
+          {
+            "type": "command",
+            "shell": "bash",
+            "if": "Bash(jq *)",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh\""
+          },
+          {
+            "type": "command",
+            "shell": "bash",
+            "if": "Bash(uv *)",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh\""
+          },
+          {
+            "type": "command",
+            "shell": "bash",
+            "if": "Bash(*sudo *)",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh\""
+          },
+          {
+            "type": "command",
+            "shell": "bash",
+            "if": "Bash(bun *)",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh\""
+          },
+          {
+            "type": "command",
+            "shell": "bash",
+            "if": "Bash(yarn *)",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh\""
+          },
+          {
+            "type": "command",
+            "shell": "bash",
+            "if": "Bash(pnpm *)",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh\""
+          },
+          {
+            "type": "command",
+            "shell": "bash",
+            "if": "Bash(git *)",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/git-destructive-deny.sh\""
+          },
+          {
+            "type": "command",
+            "shell": "bash",
+            "if": "Bash(sed *)",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/sed-grep-deny.sh\""
+          },
+          {
+            "type": "command",
+            "shell": "bash",
+            "if": "Bash(grep *)",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/sed-grep-deny.sh\""
+          },
+          {
+            "type": "command",
+            "shell": "bash",
+            "if": "Bash(grep *)",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/executor-grep-deny.sh\""
+          }
+        ]
+      }
+    ],
+    "PermissionDenied": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/permission-denied-coach.sh\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/post-edit.sh\"",
+            "async": true
+          }
+        ]
+      },
+      {
+        "matcher": "Read|Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/context-injector.sh\"",
+            "timeout": 5,
+            "statusMessage": "Injecting project context"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/plan-format-warn.sh\""
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/empty-task-response.sh\""
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/delegation-reminder.sh\""
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/verification-command-recorder.sh\""
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/delegation-reminder.sh\""
+          }
+        ]
+      }
+    ],
+    "PostToolBatch": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/tool-loop-detector.sh\""
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/edit-error-recovery.sh\"",
+            "statusMessage": "Analyzing Edit failure"
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/delegate-retry.sh\""
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/bash-error-recovery.sh\"",
+            "statusMessage": "Analyzing Bash failure"
+          }
+        ]
+      },
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/read-error-recovery.sh\"",
+            "statusMessage": "Analyzing Read failure"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/json-error-recovery.sh\"",
+            "statusMessage": "Analyzing tool-output failure"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/plan-continuation-guard.sh\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/final-verification-evidence.sh\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/drift-guard.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "StopFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/stop-failure-log.sh\""
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/pre-compact.sh\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/session-cleanup.sh\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "TaskCompleted": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/task-completed-verify.sh\""
+          }
+        ]
+      }
+    ],
+    "FileChanged": [
+      {
+        "matcher": "verification-evidence.json|boulder.json",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/file-changed-log.sh\""
+          }
+        ]
+      }
+    ]
+  }
 }
