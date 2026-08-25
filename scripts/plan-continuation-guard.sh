@@ -10,9 +10,9 @@
 # count_plan_checkboxes helper, so they can never both fire for the same state.
 # Rails, in order (each exits 0 before any counter mutation): (1) recursion
 # guard, (2) kill switch, (3) no bound/missing plan, (4) no unchecked boxes,
-# (5) user-pause intent, (6) recent compaction stamp, (7) stale binding with no
-# fresh evidence, (8) assistant needs user input, (9) counters:
-# exponential cooldown, hard cap, stagnation escape.
+# (5) live background work, (6) user-pause intent, (7) recent compaction stamp,
+# (8) stale binding with no fresh evidence, (9) assistant needs user input,
+# (10) counters: exponential cooldown, hard cap, stagnation escape.
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
@@ -21,19 +21,19 @@ PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(dirname "$0")/..}"
 STATE_FILE="${STATE_DIR}/plan-continuation.json"
 BOULDER_FILE="${STATE_DIR}/boulder.json"
 
-# 60s: rail 6 compaction-recency window: a compaction just happened, give the
+# 60s: rail 7 compaction-recency window: a compaction just happened, give the
 # session a moment to resettle before nudging it to keep going.
 COMPACTION_FRESH_SECONDS=60
-# 86400s (24h): rail 7 binding staleness threshold: a binding this old with no
+# 86400s (24h): rail 8 binding staleness threshold: a binding this old with no
 # fresh evidence looks abandoned rather than actively worked.
 STALE_BINDING_SECONDS=86400
-# 300s (5m): rail 9 clean window: this long since the last block resets the
+# 300s (5m): rail 10 clean window: this long since the last block resets the
 # hard-cap counter, so a session that resumes cleanly isn't punished forever.
 CLEAN_WINDOW_SECONDS=300
-# 3: rail 9 stagnation streak: this many consecutive blocks with an unchanged
+# 3: rail 10 stagnation streak: this many consecutive blocks with an unchanged
 # unchecked-count means the agent isn't making progress; stop nagging.
 STAGNATION_STREAK=3
-# 5s: rail 9 cooldown base: doubled per consecutive block (5, 10, 20, 40, 80s).
+# 5s: rail 10 cooldown base: doubled per consecutive block (5, 10, 20, 40, 80s).
 BASE_COOLDOWN_SECONDS=5
 
 noop_exit() {
@@ -98,6 +98,23 @@ if [[ "${INCOMPLETE}" -eq 0 ]]; then
 	noop_exit
 fi
 
+# Rail 5: live background work means the turn is paused waiting to be woken back
+# up, not stalled mid-plan — a spawned subagent is a background task, so every
+# parallel wave ends this way. `background_tasks` is documented as the in-flight
+# list, so an entry counts as live unless its status reached a terminal value,
+# and a missing status reads as live too. The ledger reset is as load-bearing as
+# the open: at HARD_CAP_BLOCKS blocks per session, spending them on fan-out waves
+# would silence the gate before it ever met a real stall.
+TERMINAL_TASK_STATUS='^(completed?|failed|error|killed|cancell?ed|timed?_?out|done)$'
+# shellcheck disable=SC2016 # jq filter: $terminal is a jq binding passed via --arg
+LIVE_BACKGROUND_TASKS=$(jq -r --arg terminal "${TERMINAL_TASK_STATUS}" '
+	[(.background_tasks // [])[] | select(((.status // "running") | ascii_downcase | test($terminal)) | not)] | length
+' <<< "${HOOK_INPUT}" 2>/dev/null)
+if [[ "${LIVE_BACKGROUND_TASKS}" =~ ^[0-9]+$ ]] && (( LIVE_BACKGROUND_TASKS > 0 )); then
+	stop_blocks_reset "plan-continuation-guard"
+	noop_exit
+fi
+
 # --- Transcript text extraction --------------------------------------------
 # Transcript lines are JSONL with `.type` and `.message.role` both set to the
 # speaker's role. The payload carries no user-side message field, so the user
@@ -125,7 +142,7 @@ extract_last_transcript_text() {
 	return 1
 }
 
-# Rail 5: user-pause intent. Conservative, word-boundary, case-insensitive
+# Rail 6: user-pause intent. Conservative, word-boundary, case-insensitive
 # phrase list. Apostrophes are stripped from both text and pattern so
 # "that's enough" matches without fighting bash quoting.
 USER_TEXT=$(extract_last_transcript_text "user")
@@ -137,7 +154,7 @@ if [[ -n "${USER_TEXT}" && "${USER_TEXT}" != "null" ]]; then
 	fi
 fi
 
-# Rail 6: compaction rail. A later task wires the stamping; absent file simply
+# Rail 7: compaction rail. A later task wires the stamping; absent file simply
 # means this rail never fires.
 COMPACTION_STAMP="${STATE_DIR}/last-compaction-at"
 if [[ -f "${COMPACTION_STAMP}" ]]; then
@@ -148,7 +165,7 @@ if [[ -f "${COMPACTION_STAMP}" ]]; then
 	fi
 fi
 
-# Rail 7: stale-binding escape. `boulder_resolve.py` doesn't expose `bound_at`
+# Rail 8: stale-binding escape. `boulder_resolve.py` doesn't expose `bound_at`
 # (it only returns the plan_name/active_plan/worktree_path triple), so this
 # reads bindings[session_id].bound_at directly from boulder.json, a single
 # extra field read, not a re-implementation of the resolution ladder itself.
@@ -173,7 +190,7 @@ if [[ -f "${BOULDER_FILE}" ]]; then
 	fi
 fi
 
-# Rail 8: the assistant needs user input before it can continue. Two signals are
+# Rail 9: the assistant needs user input before it can continue. Two signals are
 # accepted, either alone: the '## BLOCKING QUESTIONS' heading a subagent must
 # emit because AskUserQuestion is unavailable to it, or a main-session turn that
 # actually called AskUserQuestion. A trailing "?" is deliberately not a signal:
@@ -216,7 +233,7 @@ if turn_invoked_ask_user_question; then
 	noop_exit
 fi
 
-# --- Rail 9: counters, cooldown, hard cap, stagnation -----------------------
+# --- Rail 10: counters, cooldown, hard cap, stagnation ----------------------
 write_continuation_state() {
 	local consecutive="$1" last_block_at="$2" last_unchecked="$3" same_count_run="$4" stagnated="$5"
 	local tmp
