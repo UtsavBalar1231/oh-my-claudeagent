@@ -291,9 +291,14 @@ stale-marker and log sweeps run on `maintenance`, off the per-session startup pa
 filesystem watcher rather than by tool names, so it sees a mutation that no `Write`-scoped
 guard can. It has no decision control, so it detects and logs and never blocks.
 
-A `FileChanged` matcher is two things at once, a watch list and a filter, and the watch
-list takes literal filenames rather than globs or regexes. The registered matcher is
-therefore the two bare basenames, joined by the only separator that event accepts.
+A `FileChanged` matcher is two things at once. As a watch list it takes literal filenames
+resolved against the working directory; as a filter it is matched against the changed
+file's basename to pick which hook groups run. OMCA's two targets live in subdirectories,
+so only the basename register can select them, which is why the registered matcher is the
+two bare basenames. The watch half comes from `session-init.sh`, which returns both
+absolute paths in `SessionStart` `watchPaths`. Dropping that emission silently disables
+the handler, because the matcher alone watches cwd-relative names that do not exist.
+Measured on client 2.1.245.
 
 **Registered platform events OMCA does not handle:**
 
@@ -395,14 +400,14 @@ configurable via `CLAUDE_CODE_STOP_HOOK_BLOCK_CAP` (env var). OMCA's Stop hook
 is complete but evidence is missing — it never emits a persistence-style block.
 (Adopted in the v2.1.141–v2.1.167 sync.)
 
-**`SessionStart` `watchPaths` output (v2.1.141–v2.1.167):**
+**`SessionStart` `watchPaths` output (v2.1.141–v2.1.167, adopted):**
 
-`SessionStart` hooks can return a `watchPaths` array to register file-system paths for
-`FileChanged` event delivery. OMCA's watch list is instead seeded by the `FileChanged`
-matcher itself, which names the two state files the handler cares about. The dynamic form
-buys nothing here because those two paths are known at registration time; a session that
-needed to watch a path discovered at runtime is the case `watchPaths` exists for, and OMCA
-has none.
+`SessionStart` hooks return a `watchPaths` array to register file-system paths for
+`FileChanged` event delivery. `session-init.sh` returns the absolute paths of the evidence
+ledger and the plan registry, and that emission is what arms the watcher. The matcher
+cannot do it alone: its segments resolve against the working directory, so the two bare
+basenames name files that do not exist at the repo root. Removing the `watchPaths`
+emission disables `file-changed-log.sh` silently, with nothing reporting the gap.
 
 **`PostToolUse` `updatedToolOutput` field (v2.1.141–v2.1.167, not adopted):**
 
@@ -1398,7 +1403,7 @@ Features introduced in this window that OMCA consciously declines to adopt:
 | `hooks:` in skill frontmatter | evaluated 2026-06 | Skill-frontmatter hooks are not visible to `validate-plugin.sh` (validates hooks only from `hooks/hooks.json`). All hook registration stays in `hooks/hooks.json` |
 | `skillOverrides` / `skillListingBudgetFraction` / `maxSkillDescriptionChars` settings | evaluated 2026-06 | User-preference settings only; `skillOverrides` does not apply to plugin-shipped skills. No plugin-side adoption possible or needed |
 | `initialPrompt` in agent frontmatter | evaluated 2026-06 | Fires an unconditional billable model turn per subagent; `subagent-start.sh` already injects boulder context as `additionalContext` at zero turn cost |
-| `SessionStart` `watchPaths` output | evaluated 2026-06 | The `FileChanged` watch list is seeded by that event's own matcher, and both watched paths are known at registration time, so nothing is left for the dynamic form to add |
+| `SessionStart` `watchPaths` output | ADOPTED 2026-08 | Live probing showed the matcher's watch half registers cwd-relative names that do not exist, so `FileChanged` never fired. `session-init.sh` now returns both absolute paths and the handler dispatches. See the `FileChanged` section above |
 | `PostToolUse` `updatedToolOutput` | evaluated 2026-06 | Rewriting tool output post-hoc is adversarial to evidence integrity — OMCA's verification model requires the model to see literal command output |
 | `plugin.json` `dependencies` field | evaluated 2026-06 | OMCA has no runtime inter-plugin dependencies; field has no consumers in this plugin |
 | MCP `headersHelper` and WebSocket (`ws`) transport | evaluated 2026-06 | All OMCA MCP servers use stdio; no auth-header injection or WebSocket transport needed |

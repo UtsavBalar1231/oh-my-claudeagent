@@ -197,8 +197,9 @@ that were removed, and stops recommending a mode that breaks OMCA's own result c
   does not recognise is now silence, which leaves the decision to the platform.
 - **Each guard now speaks the deny shape its event actually reads.** One guard denied by
   exit code on an event whose answer is read only from its output, so its deny was
-  discarded while its non-deny path approved. Whether that event honours an exit code is
-  disputed between the platform's own documentation and what live probing shows, so every
+  discarded while its non-deny path approved. Whether that event honours an exit code was
+  an open question at the time, between the platform's own documentation and what live
+  probing showed (settled in 2.18.0: it does not honour one), so every
   guard registered on both events now emits the shape each event documents — correct
   either way, and no longer dependent on an unresolved question.
 - **The executor's Grep restriction was inert in production.** It decided whether it was
