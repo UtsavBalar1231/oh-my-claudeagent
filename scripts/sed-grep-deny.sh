@@ -70,7 +70,7 @@ if [[ -z "${CMD}" ]]; then
 	exit 0
 fi
 
-DENY_REASON="\`sed -n\` and \`grep -n\` are denied. Use the Grep tool, Read with offset/limit, or ast_search for structural matches."
+DENY_REASON="\`sed -n\` and \`grep -n\` are denied. Use rg, the Grep tool, Read with offset/limit, or ast_search for structural matches."
 
 # Deny `sed -n` (with optional clustered short flags like -ne, -nqp) OR
 # `grep -n` (with optional clustered short flags like -nA, -nB, -nC).

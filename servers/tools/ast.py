@@ -195,10 +195,66 @@ def resolve_workspace() -> str:
     return os.path.realpath(os.getcwd())
 
 
+def path_within(root: str, candidate: str) -> bool:
+    """Return True when candidate is root itself or nested under it.
+
+    A candidate on a different Windows drive is outside every root, so the
+    ValueError commonpath raises there is answered False rather than propagated.
+    """
+    try:
+        return os.path.commonpath([root, candidate]) == root
+    except ValueError:
+        return False
+
+
+def git_worktree_roots(workspace: str) -> list[str]:
+    """Return the realpath of every git worktree linked to the workspace's repository.
+
+    Empty when the workspace is not a git checkout, or git is unavailable.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "worktree", "list", "--porcelain"],
+            capture_output=True,
+            text=True,
+            cwd=workspace,
+            timeout=5,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return []
+    if result.returncode != 0:
+        return []
+    prefix = "worktree "
+    return [
+        os.path.realpath(line[len(prefix) :])
+        for line in result.stdout.splitlines()
+        if line.startswith(prefix)
+    ]
+
+
 def normalize_workspace_paths(paths: list[str] | None) -> list[str]:
-    """Validate path arguments and normalize allowed paths to workspace-relative paths."""
+    """Validate path arguments and normalize them against the in-scope roots.
+
+    A path inside the workspace is returned workspace-relative, matching the cwd
+    every ast-grep invocation runs under. A path inside a sibling git worktree of
+    the same repository is in scope too (the same repository checked out twice is
+    not "outside the workspace") and is returned absolute, since it has no useful
+    relative spelling from the workspace. Anything else raises.
+
+    The worktree list costs a git call, so it is resolved only once a path has
+    already failed the workspace check.
+    """
     workspace = resolve_workspace()
     normalized: list[str] = []
+    extra_roots: list[str] | None = None
+
+    def containing_root(candidate: str) -> str | None:
+        nonlocal extra_roots
+        if path_within(workspace, candidate):
+            return workspace
+        if extra_roots is None:
+            extra_roots = git_worktree_roots(workspace)
+        return next((r for r in extra_roots if path_within(r, candidate)), None)
 
     for path in paths or ["."]:
         if path == "":
@@ -210,13 +266,18 @@ def normalize_workspace_paths(paths: list[str] | None) -> list[str]:
 
         absolute_path = path if os.path.isabs(path) else os.path.join(workspace, path)
         absolute_path = os.path.abspath(absolute_path)
-        if os.path.commonpath([workspace, absolute_path]) != workspace:
+        root = containing_root(absolute_path)
+        if root is None:
             raise ToolError(f"Path escapes workspace: {path}")
 
         if os.path.exists(absolute_path):
             real_path = os.path.realpath(absolute_path)
-            if os.path.commonpath([workspace, real_path]) != workspace:
+            if containing_root(real_path) is None:
                 raise ToolError(f"Path resolves outside workspace: {path}")
+
+        if root != workspace:
+            normalized.append(absolute_path)
+            continue
 
         relative_path = os.path.relpath(absolute_path, workspace)
         normalized.append("." if relative_path == "." else relative_path)

@@ -53,6 +53,15 @@ def _make_process(returncode=0, stdout=b"", stderr=b""):
     return proc
 
 
+def _make_text_process(returncode=0, stdout="", stderr=""):
+    """Build a fake CompletedProcess for a `text=True` subprocess call."""
+    proc = MagicMock()
+    proc.returncode = returncode
+    proc.stdout = stdout
+    proc.stderr = stderr
+    return proc
+
+
 # --- ast_search ---
 
 
@@ -333,6 +342,73 @@ def test_ast_search_normalizes_absolute_workspace_paths(tools, mocker, tmp_path)
     )
 
     assert run_mock.call_args.args[0][-2:] == ["--", "src"]
+
+
+def test_ast_search_accepts_sibling_git_worktree(tools, mocker, tmp_path):
+    """A worktree of the same repository is in scope and is passed absolute."""
+    workspace = tmp_path / "workspace"
+    worktree = tmp_path / "wt" / "feature"
+    (worktree / "src").mkdir(parents=True)
+    workspace.mkdir()
+    mocker.patch("os.getcwd", return_value=str(workspace))
+    mocker.patch("tools.ast.git_worktree_roots", return_value=[str(worktree)])
+    mock_proc = _make_process(stdout=b"[]")
+    run_mock = mocker.patch("subprocess.run", return_value=mock_proc)
+
+    target = str(worktree / "src")
+    tools["ast_search"](
+        pattern="$X",
+        lang="python",
+        paths=[target],
+        globs=None,
+        context=None,
+        max_results=500,
+        output_format="text",
+    )
+
+    assert run_mock.call_args.args[0][-2:] == ["--", target]
+
+
+def test_ast_search_rejects_path_outside_every_worktree(tools, mocker, tmp_path):
+    """A path in no registered worktree still escapes, worktree support notwithstanding."""
+    workspace = tmp_path / "workspace"
+    outside = tmp_path / "elsewhere"
+    workspace.mkdir()
+    outside.mkdir()
+    mocker.patch("os.getcwd", return_value=str(workspace))
+    mocker.patch("tools.ast.git_worktree_roots", return_value=[])
+
+    with pytest.raises(ToolError, match="escapes workspace"):
+        tools["ast_search"](
+            pattern="$X",
+            lang="python",
+            paths=[str(outside)],
+            globs=None,
+            context=None,
+            max_results=500,
+            output_format="text",
+        )
+
+
+def test_git_worktree_roots_parses_porcelain_output(mocker, tmp_path):
+    """Only `worktree` lines contribute roots; other porcelain fields are ignored."""
+    main = tmp_path / "repo"
+    linked = tmp_path / "wt" / "feature"
+    porcelain = (
+        f"worktree {main}\nHEAD abc123\nbranch refs/heads/main\n\n"
+        f"worktree {linked}\nHEAD def456\nbranch refs/heads/feature\n\n"
+    )
+    # git runs with text=True here, so this mock carries str stdout, not bytes.
+    mocker.patch("subprocess.run", return_value=_make_text_process(stdout=porcelain))
+
+    assert ast_module.git_worktree_roots(str(tmp_path)) == [str(main), str(linked)]
+
+
+def test_git_worktree_roots_empty_outside_a_repository(mocker, tmp_path):
+    """A non-zero git exit yields no roots, leaving the workspace the only scope."""
+    mocker.patch("subprocess.run", return_value=_make_text_process(returncode=128))
+
+    assert ast_module.git_worktree_roots(str(tmp_path)) == []
 
 
 def test_ast_search_rejects_symlink_escape(tools, mocker, tmp_path):

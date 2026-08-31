@@ -20,6 +20,15 @@ load '../test_helper'
 	assert_output --partial 'ast_search'
 }
 
+# ast_search is scoped to the repository and its worktrees, so a deny that names it
+# alone leaves a caller working outside those with no sanctioned search tool.
+@test "Grep denial stderr message offers rg as the out-of-scope fallback" {
+	run_hook "executor-grep-deny.sh" \
+		'{"hook_event_name":"PreToolUse","tool_name":"Grep","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor","tool_input":{"pattern":"foo","glob":"*.py"}}'
+	assert_failure 2
+	assert_output --partial 'rg'
+}
+
 @test "Grep *.ts with agent_type=executor is denied" {
 	run_hook "executor-grep-deny.sh" \
 		'{"hook_event_name":"PreToolUse","tool_name":"Grep","agent_id":"agt_exec01","agent_type":"oh-my-claudeagent:executor","tool_input":{"pattern":"foo","glob":"*.ts"}}'

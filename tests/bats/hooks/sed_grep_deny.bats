@@ -41,7 +41,7 @@ assert_deny_shape() {
 	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"sed -n '\''1p'\'' file.txt"}}'
 	assert_success
 	assert_output --partial '`sed -n` and `grep -n` are denied.'
-	assert_output --partial 'Use the Grep tool, Read with offset/limit, or ast_search for structural matches.'
+	assert_output --partial 'Use rg, the Grep tool, Read with offset/limit, or ast_search for structural matches.'
 }
 
 # ── deny shape per event ──────────────────────────────────────────────────────
@@ -91,7 +91,7 @@ assert_deny_shape() {
 	run_hook "sed-grep-deny.sh" '{"tool_name":"Bash","tool_input":{"command":"grep -nA 3 foo bar.txt"}}'
 	assert_success
 	assert_output --partial '`sed -n` and `grep -n` are denied.'
-	assert_output --partial 'Use the Grep tool, Read with offset/limit, or ast_search for structural matches.'
+	assert_output --partial 'Use rg, the Grep tool, Read with offset/limit, or ast_search for structural matches.'
 }
 
 # ── everything else: silence, never an allow ──────────────────────────────────

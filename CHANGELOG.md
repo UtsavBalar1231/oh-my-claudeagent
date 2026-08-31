@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **An executor working in a git worktree had no sanctioned search tool.** Three surfaces
+  combined into a dead end. `executor-grep-deny.sh` denies the `Grep` tool and Bash `grep`
+  on code files for executor subagents and named `ast_search` as the only alternative;
+  `sed-grep-deny.sh` denies `grep -n` and `sed -n` for everyone; and `ast_search` clamped
+  every path argument to `CLAUDE_PROJECT_DIR`, so a worktree checked out anywhere else was
+  refused as escaping the workspace. An executor that hit all three fell back to `awk` and
+  `Read`, because nothing told it that `rg` was never denied in the first place.
+
+  `normalize_workspace_paths` now treats a git worktree of the same repository as in scope.
+  The same repository checked out twice is not outside the workspace, and the clamp was
+  over-broad exactly there. A path inside the workspace is still returned relative to it; a
+  path inside a linked worktree is returned absolute, since it has no useful relative
+  spelling from the workspace cwd every ast-grep invocation runs under. Anything in neither
+  still raises. The worktree list costs one `git worktree list --porcelain` call, resolved
+  lazily so a path that passes the workspace check spends nothing, and an empty list outside
+  a repository leaves the old behavior intact.
+
+  Both deny messages now name `rg` alongside `ast_search`, and `agents/executor.md` states
+  the search posture directly: `ast_search` when the target is syntactic, `rg` when it is
+  literal text, `Read` once the file is known, and `rg` plus `file_read` for a path outside
+  the repository and its worktrees. The gate offering only a tool that cannot reach the path
+  was the half of the bug that no scoping change would have fixed.
+
 ## [2.18.0] - 2026-08-26
 
 The plugin's picture of the platform was pinned at client 2.1.220 while the installed

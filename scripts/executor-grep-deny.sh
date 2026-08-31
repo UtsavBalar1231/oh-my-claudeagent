@@ -40,7 +40,7 @@ fi
 
 HOOK_EVENT=$(jq -r '.hook_event_name // "PermissionRequest"' <<< "${HOOK_INPUT}")
 
-DENY_REASON="Executor must use ast_search for structural queries against code files. Plain text-grep on code is denied."
+DENY_REASON="Plain text-grep on code is denied for the executor. Structural query: ast_search. Literal text: rg. ast_search reaches this repository and its git worktrees only; for a path outside those, use rg."
 
 # ── Executor path: check tool ──────────────────────────────────────────────────
 deny_grep() {

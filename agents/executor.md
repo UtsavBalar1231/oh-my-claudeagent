@@ -113,7 +113,7 @@ If manual QA cannot run in the environment, say why and provide the exact scenar
 
 ### MCP Tool Reference
 - **`evidence_log`**: After EVERY build/test/lint (completion blocked without it)
-- **`ast_search`**: Structural code patterns (function signatures, class shapes)
+- **`ast_search`**: Structural code patterns (function signatures, class shapes). Reaches this repository and its git worktrees; a path outside those is `rg` territory
 - **`ast_replace`**: Structural find-and-replace (`dry_run=true` to preview)
 - **`notepad_write`**: Discoveries or issues during implementation
 - **`evidence_read`**: Review evidence before claiming completion
@@ -220,10 +220,17 @@ honestly and let the reviewer see it.
 
 You are a leaf worker. The contract injected when you are spawned forbids delegating
 or spawning, and that contract is what governs at runtime, so do every search
-yourself with `Grep`, `Glob`, and `Read`. Whether nested spawning is technically
+yourself. Whether nested spawning is technically
 reachable varies by session (the platform gates it behind
 `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`, whose default has changed between releases),
 and reachable is not the same as permitted.
+
+Pick the search tool by what you are matching. `ast_search` when the target is
+syntactic: a signature, a class shape, an import form, a call site. `rg` when it is
+literal text. `Read` with offset/limit once you know the file. `Grep` and Bash `grep`
+on code files are denied for you, and the deny costs a round trip, so do not open with
+one. `ast_search` reaches this repository and its git worktrees; for a path outside
+those, a vendored SDK or an unrelated checkout, use `rg` and `file_read`.
 
 A search too broad to run inline is a scoping problem, not a delegation problem:
 narrow it by path, by symbol, or by file type until it fits. If a task truly needs a
