@@ -5,7 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.18.1] - 2026-08-31
+
+A search gate pointed executors at the one tool that could not reach the files they were
+working on. This release widens `ast_search` to the repository's git worktrees and makes
+every deny message name a tool that reaches the path the caller asked about.
 
 ### Fixed
 
