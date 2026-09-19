@@ -690,12 +690,14 @@ check_skill_description_lengths() {
 
 check_phantom_field_names() {
 	# Guard against re-introduction of phantom jq field names that caused real bugs:
-	# .tool_result.success (C-6 regression), .tool_error (never existed in hook payloads).
+	# .tool_result.success (C-6 regression), .tool_error (never existed in hook payloads),
+	# .tool_response.success (absent from Write and Edit payloads, so it read as a constant).
 	# Word-boundary anchors prevent false positives on legitimate substrings.
 	local patterns=(
 		'\.tool_error\b'
 		'\.tool_result\.error\b'
 		'\.tool_result\.success\b'
+		'\.tool_response\.success\b'
 	)
 	local pattern
 	local found=0
@@ -715,7 +717,7 @@ check_phantom_field_names() {
 	done
 
 	if [[ "${found}" -eq 0 ]]; then
-		pass "phantom field check: no phantom jq field names (.tool_error, .tool_result.error, .tool_result.success) found in scripts/"
+		pass "phantom field check: no phantom jq field names (.tool_error, .tool_result.error, .tool_result.success, .tool_response.success) found in scripts/"
 	fi
 }
 
