@@ -40,6 +40,56 @@ _payload() {
 	assert echo "$ctx" | grep -q "AGENTS.md from"
 }
 
+@test "OMCA_NATIVE_AGENTS_MD=1: AGENTS.md excerpt skipped when no project CLAUDE.md exists" {
+	mkdir -p "$CLAUDE_PROJECT_ROOT/subdir"
+	echo "# Natively Loaded Agents" > "$CLAUDE_PROJECT_ROOT/subdir/AGENTS.md"
+	touch "$CLAUDE_PROJECT_ROOT/subdir/file.txt"
+
+	export OMCA_NATIVE_AGENTS_MD=1
+	run_hook "context-injector.sh" "$(_payload Read "$CLAUDE_PROJECT_ROOT/subdir/file.txt")"
+	assert_success
+	ctx=$(get_context)
+	[[ "$ctx" != *"Natively Loaded Agents"* ]]
+}
+
+@test "OMCA_NATIVE_AGENTS_MD=1: AGENTS.md excerpt still injected when a project CLAUDE.md exists" {
+	mkdir -p "$CLAUDE_PROJECT_ROOT/subdir"
+	echo "# Project memory" > "$CLAUDE_PROJECT_ROOT/CLAUDE.md"
+	echo "# Gated Agents Guide" > "$CLAUDE_PROJECT_ROOT/subdir/AGENTS.md"
+	touch "$CLAUDE_PROJECT_ROOT/subdir/file.txt"
+
+	export OMCA_NATIVE_AGENTS_MD=1
+	run_hook "context-injector.sh" "$(_payload Read "$CLAUDE_PROJECT_ROOT/subdir/file.txt")"
+	assert_success
+	ctx=$(get_context)
+	[[ "$ctx" == *"Gated Agents Guide"* ]]
+}
+
+@test "native-loading skip is off by default: AGENTS.md excerpt injected with the gate unset" {
+	mkdir -p "$CLAUDE_PROJECT_ROOT/subdir"
+	echo "# Default Path Agents" > "$CLAUDE_PROJECT_ROOT/subdir/AGENTS.md"
+	touch "$CLAUDE_PROJECT_ROOT/subdir/file.txt"
+
+	run_hook "context-injector.sh" "$(_payload Read "$CLAUDE_PROJECT_ROOT/subdir/file.txt")"
+	assert_success
+	ctx=$(get_context)
+	[[ "$ctx" == *"Default Path Agents"* ]]
+}
+
+@test "OMCA_NATIVE_AGENTS_MD=1: README.md excerpt is unaffected by the AGENTS.md skip" {
+	mkdir -p "$CLAUDE_PROJECT_ROOT/subdir"
+	echo "# Skipped Agents" > "$CLAUDE_PROJECT_ROOT/subdir/AGENTS.md"
+	echo "# Kept README" > "$CLAUDE_PROJECT_ROOT/subdir/README.md"
+	touch "$CLAUDE_PROJECT_ROOT/subdir/file.txt"
+
+	export OMCA_NATIVE_AGENTS_MD=1
+	run_hook "context-injector.sh" "$(_payload Read "$CLAUDE_PROJECT_ROOT/subdir/file.txt")"
+	assert_success
+	ctx=$(get_context)
+	[[ "$ctx" != *"Skipped Agents"* ]]
+	[[ "$ctx" == *"Kept README"* ]]
+}
+
 # ---------------------------------------------------------------------------
 # b. README.md injection on Read
 # ---------------------------------------------------------------------------
@@ -374,6 +424,51 @@ _payload() {
 	# also match *.py, so more than one "rule:" key is recorded per run.
 	recorded=$(jq -r 'to_entries[] | select(.key | contains("/cachekey.md:")) | .value' "$cache")
 	assert [ "$recorded" = "true" ]
+}
+
+# ---------------------------------------------------------------------------
+# k2. Aggregate injected-context budget
+# ---------------------------------------------------------------------------
+
+# Write N project rules matching *.py, each with a ~1000-char body, named so the glob
+# walks them in order: a-01.md .. a-NN.md, then zz-last.md carrying a unique marker.
+_write_budget_rules() {
+	local count="$1"
+	local body
+	body=$(python3 -c "print('y' * 1000, end='')")
+	for i in $(seq -w 1 "$count"); do
+		printf '# pattern: *.py\n%s' "$body" \
+			> "$CLAUDE_PROJECT_ROOT/.omca/rules/a-$i.md"
+	done
+	printf '# pattern: *.py\nLAST_RULE_SENTINEL %s' "$body" \
+		> "$CLAUDE_PROJECT_ROOT/.omca/rules/zz-last.md"
+	touch "$CLAUDE_PROJECT_ROOT/main.py"
+}
+
+@test "context budget: total injected context stays within 8000 chars and names dropped paths" {
+	_write_budget_rules 12
+
+	run_hook "context-injector.sh" "$(_payload Read "$CLAUDE_PROJECT_ROOT/main.py")"
+	assert_success
+	ctx=$(get_context)
+	assert [ "${#ctx}" -le 8000 ]
+	assert echo "$ctx" | grep -q "context budget reached"
+	assert echo "$ctx" | grep -qF "$CLAUDE_PROJECT_ROOT/.omca/rules/"
+}
+
+@test "context budget: a rule dropped for budget is not cached and injects on the next event" {
+	_write_budget_rules 12
+
+	run_hook "context-injector.sh" "$(_payload Read "$CLAUDE_PROJECT_ROOT/main.py")"
+	assert_success
+	ctx=$(get_context)
+	[[ "$ctx" != *"LAST_RULE_SENTINEL"* ]]
+
+	# Rules that fit the first event are now cached, freeing the budget for the dropped one.
+	run_hook "context-injector.sh" "$(_payload Read "$CLAUDE_PROJECT_ROOT/main.py")"
+	assert_success
+	ctx=$(get_context)
+	[[ "$ctx" == *"LAST_RULE_SENTINEL"* ]]
 }
 
 # ---------------------------------------------------------------------------
