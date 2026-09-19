@@ -32,6 +32,7 @@
       "title": "Statusline mode",
       "type": "string",
       "default": "direct",
+      "options": ["off", "direct", "daemon"],
       "description": "Preferred OMCA statusline mode: off, direct, or daemon.",
       "sensitive": false
     },
