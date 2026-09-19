@@ -3,6 +3,7 @@ name: explore
 description: Codebase search specialist for finding files, patterns, and implementations. Use when asking "Where is X?", "Which file has Y?", or "Find the code that does Z". Fire multiple in parallel for broad searches.
 model: opus
 effort: low
+omitClaudeMd: true
 color: blue
 memory: project
 maxTurns: 30
@@ -109,6 +110,8 @@ Use the right tool for the job:
 | History/evolution (when added, who changed) | Bash with git commands |
 
 Flood with parallel calls. Cross-validate findings across multiple tools.
+
+For a path outside the project root, read it with the omca `file_read` MCP tool: the built-in Read is scoped to the project root for subagents.
 
 `boulder_write`, `evidence_read`, `notepad_read`, `ast_search`, and `file_read` are discovery-deferred, so load each through ToolSearch before calling it; only `evidence_log`, `boulder_progress`, and `notepad_write` are loaded eagerly.
 

@@ -3,6 +3,7 @@ name: librarian
 description: External documentation and open-source code researcher. Use when looking up library usage, finding implementation examples in OSS, retrieving official documentation, or researching best practices for unfamiliar packages.
 model: opus
 effort: medium
+omitClaudeMd: true
 color: orange
 memory: project
 disallowedTools:
@@ -99,6 +100,8 @@ https://github.com/<owner>/<repo>/blob/<commit-sha>/<filepath>#L<start>-L<end>
 | **Git History** | `git log`, `git blame`, `git show` |
 
 `boulder_write`, `evidence_read`, `notepad_read`, `ast_search`, and `file_read` are discovery-deferred, so load each through ToolSearch before calling it; only `evidence_log`, `boulder_progress`, and `notepad_write` are loaded eagerly.
+
+A cloned repo sits outside the project root, so read its files with the omca `file_read` MCP tool: the built-in Read is scoped to the project root for subagents.
 
 ### Temp Directory
 

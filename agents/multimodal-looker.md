@@ -3,6 +3,7 @@ name: multimodal-looker
 description: Multimodal analyst for images, PDFs, and diagrams. Use when you need interpreted/extracted data from visual content rather than raw file contents. Analyzes screenshots, UI mockups, architecture diagrams, and document pages.
 model: opus
 effort: medium
+omitClaudeMd: true
 color: pink
 maxTurns: 15
 disallowedTools:
@@ -14,8 +15,6 @@ disallowedTools:
   - Grep
   - NotebookEdit
   - Skill
-  - ToolSearch
-  - TodoWrite
 ---
 <!-- OMCA Metadata
 Cost: cheap | Category: readonly | Escalation: oracle, executor
@@ -41,7 +40,7 @@ Examine media files, extract requested information. Nothing beyond what was aske
 
 The `disallowedTools` list is deliberately wide: this agent does pure media interpretation, and broader access adds risk without value.
 
-`boulder_write`, `evidence_read`, `notepad_read`, `ast_search`, and `file_read` are discovery-deferred, so load each through ToolSearch before calling it; only `evidence_log`, `boulder_progress`, and `notepad_write` are loaded eagerly. ToolSearch is on this agent's `disallowedTools` list, so those five are out of reach here: report what you need instead of trying to call them.
+Most omca tools are discovery-deferred. Load one through ToolSearch when the analysis genuinely needs it, for example the omca `file_read` tool for an image or PDF outside the project root, since built-in Read is scoped to the project root for subagents. Otherwise work from Read alone.
 
 ## Structured Output Format
 
