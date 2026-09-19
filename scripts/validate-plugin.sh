@@ -455,6 +455,32 @@ resolve_hook_path() {
 	printf '%s' "${raw_command//\$\{CLAUDE_PLUGIN_ROOT\}/${REPO_ROOT}}"
 }
 
+# The platform parses hook stdout as JSON only when it is a single object; two or more
+# lines that each parse as JSON are read as plain text, and a failed parse is reported as
+# a hook error. Prints the offending shape and returns 1 when stdout cannot be read
+# unambiguously as either plain text or one JSON object.
+hook_stdout_shape_violation() {
+	local stdout_file="$1"
+
+	local first_char
+	first_char="$(tr -d '[:space:]' <"${stdout_file}" | cut -c1)"
+	if [[ "${first_char}" != "{" ]]; then
+		return 0
+	fi
+
+	if [[ "$(wc -l <"${stdout_file}")" -gt 1 ]]; then
+		printf 'stdout starting with { spans multiple lines (JSON must be one line)'
+		return 1
+	fi
+
+	if ! jq -e 'type == "object"' "${stdout_file}" >/dev/null 2>&1; then
+		printf 'stdout mixes a JSON object with bare text'
+		return 1
+	fi
+
+	return 0
+}
+
 run_script_with_payload() {
 	local label="$1"
 	local script_path="$2"
@@ -486,6 +512,14 @@ run_script_with_payload() {
 		rm -rf "${run_dir}"
 		return 1
 	fi
+
+	local shape_violation
+	if ! shape_violation="$(hook_stdout_shape_violation "${stdout_file}")"; then
+		fail "${label}: ${shape_violation}"
+		rm -rf "${run_dir}"
+		return 1
+	fi
+	pass "${label}: stdout shape is plain text or one single-line JSON object"
 
 	case "${output_expectation}" in
 	json-required)
@@ -1486,6 +1520,11 @@ check_mcp() {
 
 	rm -rf "${mcp_tmp}"
 }
+
+# Sourcing seam for unit tests that call a single helper without running any check.
+if [[ -n "${VALIDATE_PLUGIN_SOURCE_ONLY:-}" ]]; then
+	return 0
+fi
 
 while [[ $# -gt 0 ]]; do
 	case "$1" in

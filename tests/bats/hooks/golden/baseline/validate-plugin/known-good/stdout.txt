@@ -41,20 +41,22 @@
 [validate-plugin] PASS: agent frontmatter hygiene: no agent name contains a colon
 [validate-plugin] PASS: agent frontmatter hygiene: no legacy permissionMode holdouts detected
 [validate-plugin] PASS: skill description length: consolidate-memory description is 79 chars (within 512 soft cap)
-[validate-plugin] PASS: skill description length: debugging description is 504 chars (within 512 soft cap)
+[validate-plugin] PASS: skill description length: debugging description is 299 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: dev-browser description is 183 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: frontend-ui-ux description is 156 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: git-master description is 202 chars (within 512 soft cap)
-[validate-plugin] PASS: skill description length: github-triage description is 94 chars (within 512 soft cap)
+[validate-plugin] PASS: skill description length: github-triage description is 93 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: handoff description is 77 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: hephaestus description is 78 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: init-deep description is 84 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: metis description is 109 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: momus description is 139 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: omca-setup description is 95 chars (within 512 soft cap)
+[validate-plugin] PASS: skill description length: plan description is 89 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: playwright description is 192 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: refactor description is 95 chars (within 512 soft cap)
-[validate-plugin] PASS: skill description length: remove-ai-slops description is 469 chars (within 512 soft cap)
+[validate-plugin] PASS: skill description length: remove-ai-slops description is 297 chars (within 512 soft cap)
+[validate-plugin] PASS: skill description length: start-work description is 54 chars (within 512 soft cap)
 [validate-plugin] PASS: policy posture: OMCA.md includes auto mode marker
 [validate-plugin] PASS: policy posture: OMCA.md includes managed settings boundary marker
 [validate-plugin] PASS: policy posture: OMCA.md includes sandbox fail-closed marker
@@ -63,7 +65,7 @@
 [validate-plugin] PASS: policy posture: skills/omca-setup/SKILL.md includes managed settings boundary marker
 [validate-plugin] PASS: policy posture: skills/omca-setup/SKILL.md includes sandbox fail-closed marker
 [validate-plugin] PASS: policy posture: skills/omca-setup/SKILL.md includes non-bypassing permission filter guidance
-[validate-plugin] PASS: phantom field check: no phantom jq field names (.tool_error, .tool_result.error, .tool_result.success) found in scripts/
+[validate-plugin] PASS: phantom field check: no phantom jq field names (.tool_error, .tool_result.error, .tool_result.success, .tool_response.success) found in scripts/
 [validate-plugin] Running claudemd template packaging checks
 [validate-plugin] PASS: claudemd template packaging: templates/claudemd.md (referenced by SKILL.md) exists
 [validate-plugin] PASS: claudemd template packaging: package-plugin.sh ships templates/claudemd.md
@@ -101,14 +103,14 @@
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'statusline/README.md'
 [validate-plugin] SKIP: docs accuracy: OMCA.md:<LINE> references untracked, gitignored path '.claude/settings.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'templates/claudemd.md'
-[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'commands/start-work.md'
-[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'commands/start-work.md'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'skills/start-work/SKILL.md'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'skills/start-work/SKILL.md'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'servers/tools/_common.py'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'servers/tools/_boulder_core.py'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/context-injector.sh'
 [validate-plugin] SKIP: docs accuracy: OMCA.md:<LINE> references untracked, gitignored path '.omca/rules/comments-python.md'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/lib/common.sh'
-[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'commands/start-work.md'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'skills/start-work/SKILL.md'
 [validate-plugin] SKIP: docs accuracy: OMCA.md:<LINE> references untracked, gitignored path '.claude/settings.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/lib/common.sh'
@@ -136,7 +138,7 @@
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/validate-plugin.sh'
-[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'commands/start-work.md'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'skills/start-work/SKILL.md'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'agents/multimodal-looker.md'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'agents/sisyphus.md'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'servers/categories.json'
@@ -176,25 +178,45 @@
 [validate-plugin] PASS: hook fixture posttoolusefailure-bash.json: valid JSON (<REPO_ROOT>/tests/fixtures/hooks/posttoolusefailure-bash.json)
 [validate-plugin] PASS: hook fixture posttoolusefailure-read.json: valid JSON (<REPO_ROOT>/tests/fixtures/hooks/posttoolusefailure-read.json)
 [validate-plugin] PASS: hook fixture repo setup: initialized git repo at <TMPFILE>
+[validate-plugin] PASS: PreToolUse Write (write-guard.sh): stdout shape is plain text or one single-line JSON object
 [validate-plugin] PASS: PreToolUse Write (write-guard.sh): script succeeded
+[validate-plugin] PASS: PreToolUse Write (comment-checker.sh): stdout shape is plain text or one single-line JSON object
 [validate-plugin] PASS: PreToolUse Write (comment-checker.sh): script succeeded
+[validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): stdout shape is plain text or one single-line JSON object
 [validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): script succeeded
+[validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): stdout shape is plain text or one single-line JSON object
 [validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): script succeeded
+[validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): stdout shape is plain text or one single-line JSON object
 [validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): script succeeded
+[validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): stdout shape is plain text or one single-line JSON object
 [validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): script succeeded
+[validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): stdout shape is plain text or one single-line JSON object
 [validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): script succeeded
+[validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): stdout shape is plain text or one single-line JSON object
 [validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): script succeeded
+[validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): stdout shape is plain text or one single-line JSON object
 [validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): script succeeded
+[validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): stdout shape is plain text or one single-line JSON object
 [validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): script succeeded
+[validate-plugin] PASS: PermissionRequest Bash (git-destructive-deny.sh): stdout shape is plain text or one single-line JSON object
 [validate-plugin] PASS: PermissionRequest Bash (git-destructive-deny.sh): script succeeded
+[validate-plugin] PASS: PermissionRequest Bash (sed-grep-deny.sh): stdout shape is plain text or one single-line JSON object
 [validate-plugin] PASS: PermissionRequest Bash (sed-grep-deny.sh): script succeeded
+[validate-plugin] PASS: PermissionRequest Bash (sed-grep-deny.sh): stdout shape is plain text or one single-line JSON object
 [validate-plugin] PASS: PermissionRequest Bash (sed-grep-deny.sh): script succeeded
+[validate-plugin] PASS: PermissionRequest Bash (executor-grep-deny.sh): stdout shape is plain text or one single-line JSON object
 [validate-plugin] PASS: PermissionRequest Bash (executor-grep-deny.sh): script succeeded
+[validate-plugin] PASS: SessionStart compact (post-compact-inject.sh): stdout shape is plain text or one single-line JSON object
 [validate-plugin] PASS: SessionStart compact (post-compact-inject.sh): script succeeded with valid JSON output
+[validate-plugin] PASS: TaskCompleted default (task-completed-verify.sh): stdout shape is plain text or one single-line JSON object
 [validate-plugin] PASS: TaskCompleted default (task-completed-verify.sh): script succeeded with empty stdout
+[validate-plugin] PASS: Stop default (no state) (plan-continuation-guard.sh): stdout shape is plain text or one single-line JSON object
 [validate-plugin] PASS: Stop default (no state) (plan-continuation-guard.sh): script succeeded
+[validate-plugin] PASS: Stop default (no state) (final-verification-evidence.sh): stdout shape is plain text or one single-line JSON object
 [validate-plugin] PASS: Stop default (no state) (final-verification-evidence.sh): script succeeded
+[validate-plugin] PASS: Stop default (no state) (drift-guard.sh): stdout shape is plain text or one single-line JSON object
 [validate-plugin] PASS: Stop default (no state) (drift-guard.sh): script succeeded
+[validate-plugin] PASS: SubagentStart basic (subagent-start.sh): stdout shape is plain text or one single-line JSON object
 [validate-plugin] PASS: SubagentStart basic (subagent-start.sh): script succeeded with valid JSON output
 [validate-plugin] Running mcp checks
 [validate-plugin] PASS: mcp registry: valid JSON (<REPO_ROOT>/.mcp.json)
@@ -222,4 +244,4 @@
 [validate-plugin] PASS: mcp tools/list contains categories_list
 [validate-plugin] PASS: mcp tools/list contains file_read
 [validate-plugin] PASS: mcp tools/list contains session_search
-[validate-plugin] Summary: 199 passed, 0 failed, 13 skipped, 0 warned
+[validate-plugin] Summary: 221 passed, 0 failed, 13 skipped, 0 warned

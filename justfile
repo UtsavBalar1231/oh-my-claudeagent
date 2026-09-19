@@ -183,11 +183,17 @@ analyze-session:
 
 # ── Validate ─────────────────────────────────────────────────────
 
-# Validate plugin structure with claude CLI (requires claude in PATH)
+# Validate plugin structure with claude CLI (requires claude in PATH).
+# Both positionals are needed: the repo root resolves only marketplace.json (whose plugin entry
+# is a remote github source, so the local plugin.json is never opened), the manifest path walks
+# plugin.json plus every skill and agent. The manifest run is non-strict because a CLAUDE.md at
+# the plugin root draws a warning --strict promotes to an error; non-strict still exits 1 on a
+# real frontmatter parse failure.
 [group('validate')]
 validate-plugin:
 	command -v claude >/dev/null 2>&1 || { echo "claude CLI not found, skipping"; exit 0; }
 	claude plugin validate .
+	claude plugin validate .claude-plugin/plugin.json
 
 # Validate the manifests with warnings promoted to errors. Catches a misspelled or
 # leftover field that would load at runtime but should not be published. Skips silently
@@ -196,6 +202,7 @@ validate-plugin:
 validate-manifest:
 	command -v claude >/dev/null 2>&1 || { echo "claude CLI not found, skipping"; exit 0; }
 	claude plugin validate . --strict
+	claude plugin validate .claude-plugin/plugin.json
 
 # Smoke test — verify plugin loads correctly (requires claude CLI)
 [group('validate')]

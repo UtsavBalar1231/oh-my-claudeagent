@@ -271,6 +271,9 @@ jobs:
       - name: Validate plugin manifest
         run: claude plugin validate . --strict
 
+      - name: Validate plugin manifest, skills, and agents
+        run: claude plugin validate .claude-plugin/plugin.json
+
       - name: Job summary
         if: always()
         run: |
