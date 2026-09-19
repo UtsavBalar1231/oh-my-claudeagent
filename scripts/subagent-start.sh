@@ -34,6 +34,7 @@ if [[ -n "${AGENT_ID}" ]]; then
 	fable) DISPLAY_MODEL="Fable" ;;
 	haiku) DISPLAY_MODEL="Haiku" ;;
 	claude-fable-5) DISPLAY_MODEL="Fable 5" ;;
+	claude-fable-5-1) DISPLAY_MODEL="Fable 5.1" ;;
 	claude-opus-5) DISPLAY_MODEL="Opus 5" ;;
 	claude-opus-4-8) DISPLAY_MODEL="Opus 4.8" ;;
 	claude-sonnet-5) DISPLAY_MODEL="Sonnet 5" ;;

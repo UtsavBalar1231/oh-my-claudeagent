@@ -364,6 +364,27 @@ ORACLE_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id
 	assert [ "$model" = "Fable" ]
 }
 
+# The full-id arms of the model map fire only when an agent file pins a
+# generation, which no shipped agent does — so this points the hook at a
+# throwaway plugin root holding one pinned agent file.
+@test "model capture: pinned claude-fable-5-1 resolves to Fable 5.1" {
+	local fake_root="$BATS_TEST_TMPDIR/fake-plugin"
+	mkdir -p "$fake_root/agents"
+	cat > "$fake_root/agents/pinned.md" <<-'EOF'
+		---
+		name: pinned
+		description: pinned-generation fixture
+		model: claude-fable-5-1
+		---
+	EOF
+	local payload='{"session_id":"test","hook_event_name":"SubagentStart","agent_id":"agent-pin","agent_type":"oh-my-claudeagent:pinned"}'
+	run env CLAUDE_PLUGIN_ROOT="$fake_root" bash "$CLAUDE_PLUGIN_ROOT/scripts/subagent-start.sh" <<< "$payload"
+	assert_success
+	local model
+	model=$(read_state "subagent-models.json" | jq -r '."agent-pin".model')
+	assert [ "$model" = "Fable 5.1" ]
+}
+
 @test "model capture: non-OMCA agent_type stores empty model" {
 	local payload='{"session_id":"test","hook_event_name":"SubagentStart","agent_id":"agent-xyz","agent_type":"general-purpose"}'
 	run_hook "subagent-start.sh" "$payload"
