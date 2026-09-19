@@ -778,7 +778,7 @@ check_depersonalization() {
 	# Roots are the exhaustive list of shipped-content directories/files from the task.
 	# .omca/, .claude/, tests/, and CHANGELOG.md are deliberately excluded: the first
 	# two are local dev state, tests/ carries fixture data, and CHANGELOG.md is history.
-	local scan_roots=(agents skills scripts servers commands templates output-styles docs)
+	local scan_roots=(agents skills scripts servers templates output-styles docs)
 	local scan_root_files=(README.md OMCA.md)
 
 	local abs_files=()
@@ -868,7 +868,7 @@ check_docs_accuracy() {
 	recipes="$(grep -oE '^[a-zA-Z][a-zA-Z0-9_-]*' "${JUSTFILE}" | sort -u)"
 
 	local known_top_level=(
-		agents bin commands docs hooks output-styles rules scripts servers
+		agents bin docs hooks output-styles rules scripts servers
 		skills statusline templates tests
 		.claude .claude-plugin .github .omca
 	)

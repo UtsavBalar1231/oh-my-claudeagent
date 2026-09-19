@@ -1,6 +1,7 @@
 ---
 name: start-work
 description: Start a work session from a Prometheus-generated plan.
+user-invocable: true
 disable-model-invocation: true
 argument-hint: "[plan file] [--worktree <path>]"
 ---

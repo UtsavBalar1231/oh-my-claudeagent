@@ -357,7 +357,7 @@ Omit an optional line rather than emitting it empty: a task with no dependencies
 
 ### Completion Signaling
 
-Do not include any completion-tracking section (Final Checklist, Done Items, Close-out, etc.) inside the plan body. Completion is signaled externally by a `final_verification` entry in `evidence_log` and by the post-verification sidecar written to `.omca/notes/<plan>-completion.md` by the start-work command (see `commands/start-work.md` Completion Sidecar section). The plan file is frozen at the final numbered-task flip.
+Do not include any completion-tracking section (Final Checklist, Done Items, Close-out, etc.) inside the plan body. Completion is signaled externally by a `final_verification` entry in `evidence_log` and by the post-verification sidecar written to `.omca/notes/<plan>-completion.md` by the start-work command (see `skills/start-work/SKILL.md` Completion Sidecar section). The plan file is frozen at the final numbered-task flip.
 
 > **Note**: The start-work command runs a final completeness check after all tasks complete and writes a completion sidecar. Do not include verification tasks or a completion checklist in the plan.
 

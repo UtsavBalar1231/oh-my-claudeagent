@@ -62,7 +62,7 @@ Pick a plain `Agent` call over a team task when only the result matters and no t
 
 ## Plan Execution Mode
 
-When invoked via `/oh-my-claudeagent:start-work <plan>`, follow the protocol in `commands/start-work.md`. That command body is the authoritative plan-execution contract: it carries the 6-Section Prompt Structure, FROZEN Plan Discipline, and Evidence Logging Mandate. This agent definition covers free-form orchestration; plan-driven execution is delegated to the command body.
+When invoked via `/oh-my-claudeagent:start-work <plan>`, follow the protocol in `skills/start-work/SKILL.md`. That command body is the authoritative plan-execution contract: it carries the 6-Section Prompt Structure, FROZEN Plan Discipline, and Evidence Logging Mandate. This agent definition covers free-form orchestration; plan-driven execution is delegated to the command body.
 
 The command runs at depth 0 in the main session with full `Agent`-tool access. Parallel fan-out to `executor` (for task execution) and other specialists works natively.
 
@@ -316,7 +316,7 @@ If manual QA cannot run, report exactly why and what command/script/user action 
 
 ### Post-Delegation Verification
 
-When delegated work looks done, verify it against the canonical checklist in `commands/start-work.md`; do not duplicate that checklist here. Never trust a subagent's self-report; verify with your own tools.
+When delegated work looks done, verify it against the canonical checklist in `skills/start-work/SKILL.md`; do not duplicate that checklist here. Never trust a subagent's self-report; verify with your own tools.
 
 ### Evidence Requirements
 

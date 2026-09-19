@@ -55,7 +55,7 @@ User runs `/oh-my-claudeagent:start-work [plan path]`. Do not auto-start executi
 
 ## Parallel execution and verification
 
-The canonical rules for routing, parallel fan-out, and evidence discipline live in the specialist agent bodies (`agents/*.md`) and `commands/start-work.md`, not in a single shared section: each agent's own instructions cover what applies to it. The output style (see `output-styles/omca-default.md`, sections "Principles" and "Communication") carries the cross-cutting, always-on discipline that every turn should follow regardless of role.
+The canonical rules for routing, parallel fan-out, and evidence discipline live in the specialist agent bodies (`agents/*.md`) and `skills/start-work/SKILL.md`, not in a single shared section: each agent's own instructions cover what applies to it. The output style (see `output-styles/omca-default.md`, sections "Principles" and "Communication") carries the cross-cutting, always-on discipline that every turn should follow regardless of role.
 
 Spawn a subagent with the Agent tool and do not pass `run_in_background`. In an interactive
 session on Claude Code v2.1.232 or later, fork mode is on by default and the platform

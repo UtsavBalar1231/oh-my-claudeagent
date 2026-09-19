@@ -616,7 +616,7 @@ Add to `.claude/settings.json` for automatic team-wide installation:
 
 | Agent | Model | Effort | Invoke | Purpose |
 |-------|-------|--------|--------|---------|
-| sisyphus | opus | xhigh | Main session (injected via `templates/claudemd.md`) or `/oh-my-claudeagent:start-work` (Plan Execution Mode) | Master orchestrator identity — classifies requests, delegates to specialists. Two modes: free-form (conversational) and plan-driven (via `/start-work` command body). Plan Execution Mode protocol lives in `commands/start-work.md`. |
+| sisyphus | opus | xhigh | Main session (injected via `templates/claudemd.md`) or `/oh-my-claudeagent:start-work` (Plan Execution Mode) | Master orchestrator identity — classifies requests, delegates to specialists. Two modes: free-form (conversational) and plan-driven (via `/start-work` command body). Plan Execution Mode protocol lives in `skills/start-work/SKILL.md`. |
 
 **sisyphus** — The one orchestrator. Free-form mode: routes requests to specialists, runs explore agents in background. Plan Execution Mode: reads plan, delegates per-task to `executor`, logs evidence, runs a final completeness check at the end.
 
@@ -706,7 +706,7 @@ refactors while fixing. Stops and escalates after 5+ failed attempts.
 **start-work** — Finds the active plan (via boulder state, `.omca/plans/`, or
 the resolved plans directory), sets up boulder state, optionally configures a git worktree,
 then enters Plan Execution Mode in the main session (sisyphus identity) at depth 0.
-The Plan Execution Mode protocol body lives in `commands/start-work.md`.
+The Plan Execution Mode protocol body lives in `skills/start-work/SKILL.md`.
 
 ### Fixing and Development
 
@@ -1035,7 +1035,7 @@ silent death into a diagnosable one. Resuming is still manual, with
 
 **Subagent nesting depth:** `/oh-my-claudeagent:start-work` runs inline in the main
 session at depth 0 with full `Agent`-tool access. Parallel fan-out and specialist delegation
-all work. The command body in `commands/start-work.md` is the authoritative Plan Execution
+all work. The command body in `skills/start-work/SKILL.md` is the authoritative Plan Execution
 Mode protocol. There is no degraded mode — orchestration only runs at depth 0 by design.
 The `atlas` agent was removed in v2.0; its plan-execution protocol migrated to the command
 body, its orchestrator role consolidated into `sisyphus` (the main-session identity).
@@ -1560,7 +1560,7 @@ section and in `CLAUDE.md`; neither is set by OMCA.
 | Stop hooks block via `decision: block` | `plan-continuation-guard.sh`, `final-verification-evidence.sh`, and `drift-guard.sh` now write Stop decision-control JSON (`decision` plus `reason`, nothing else) and exit 0 instead of writing to stderr and exiting 2. `task-completed-verify.sh` is the only turn-gate or task-gate hook left that blocks via exit 2. The deny hooks are unaffected: each writes the shape its event reads, branching on `hook_event_name` (see the Stop / SubagentStop section above) |
 | Tier aliases in agent frontmatter | Every agent declares a tier alias (`opus`, `sonnet`, `fable`) instead of a pinned generation id, so a provider resolves it to the newest generation its allowlist permits and nothing goes stale on the next model release. The subagent-start display map gained alias arms above its full-id arms, which remain only as frontmatter compatibility for an agent file that pins a generation again; the hook reads frontmatter, not the spawning call. And `omca-setup` no longer writes `ANTHROPIC_DEFAULT_OPUS_MODEL`: a default-model pin overrides the alias and reintroduces exactly the staleness the alias removes |
 | `Write(.omca/**)` dropped from the recommended allowlist | `Write`/`NotebookEdit`/`Glob` path rules are accepted but never match, and now emit a startup warning. `Edit(.omca/**)` plus `Read(.omca/**)` covers the intent, since `Edit` governs every file-editing tool including `Write`. The doctor's stale-entry warnings flag the removed rule for already-configured users |
-| Spawn budgets: session cap, concurrency cap, depth default | `delegate-retry.sh` gained early-return branches for the concurrency and session ceilings, returning before the error counter so an infrastructure limit can never advance the three-strike breaker toward oracle. `commands/start-work.md` gained a parallel-group width note, and `github-triage` gained a total-item cap with an explicit skipped-item list instead of silent truncation |
+| Spawn budgets: session cap, concurrency cap, depth default | `delegate-retry.sh` gained early-return branches for the concurrency and session ceilings, returning before the error counter so an infrastructure limit can never advance the three-strike breaker toward oracle. `skills/start-work/SKILL.md` gained a parallel-group width note, and `github-triage` gained a total-item cap with an explicit skipped-item list instead of silent truncation |
 | `file_read` no longer materializes whole files | The reader called `read_text().splitlines()` unconditionally and the size guard applied only to unbounded reads, so a bounded read of a huge file loaded all of it and could emit one unbounded line. It now streams the window with `islice` while still counting total lines for the footer, and caps any single line at 2000 characters with a truncation marker. The size ceiling was deliberately not extended to bounded reads: offset/limit is the documented escape hatch for large files |
 | `session_search` scans spilled tool results | Large tool outputs now spill to `<slug>/<session>/tool-results/*.txt` with only a preview inlined, so a flat `*.jsonl` glob under-reported on exactly the queries the tool exists for. Sidecar hits are searched with the same excerpt budget under role `tool`, ordered by file mtime since sidecars carry no timestamp. `<session>/subagents/` is deliberately out of scope |
 | MCP "not connected" is classified | The `omca` server is plugin-provided, so `evidence_log` and `boulder_write` fail during any reconnect window. `json-error-recovery.sh` matched neither the bare nor the wrapped form of that error and exited silently. The new branch points at `claude mcp list` / `/mcp` and states that the evidence call must be retried, not skipped |
