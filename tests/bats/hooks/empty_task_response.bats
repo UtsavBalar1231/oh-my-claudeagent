@@ -1,147 +1,66 @@
 #!/usr/bin/env bats
 # Behavioral tests for empty-task-response.sh
-# Covers structured tool_response (Agent tool format), transitional-only text, and empty output.
+# The report reaches the hook on the SubagentHandback payload under auto mode, and on a
+# completed non-handback Agent result otherwise. Launch acks and hand-back pointers are silent.
 
 load '../test_helper'
 
-# ---------------------------------------------------------------------------
-# Case 1: structured object response with RECOMMENDATION — advisory must NOT fire
-# ---------------------------------------------------------------------------
-
-@test "empty-task-response: no advisory when oracle returns structured result with RECOMMENDATION" {
-	local payload
-	payload=$(jq -nc '{
-		tool_name: "Task",
-		tool_input: {subagent_type: "oh-my-claudeagent:oracle"},
-		tool_response: {result: "RECOMMENDATION: use strategy A\nALTERNATIVES: strategy B, C\nRISKS: low overhead"}
-	}')
-
-	run_hook "empty-task-response.sh" "$payload"
-	assert_success
-	ctx=$(get_context)
-	# No advisory context should be emitted
-	if [[ -n "$ctx" ]]; then
-		echo "$ctx" | grep -qiv "POOR AGENT OUTPUT" || true
-		echo "$ctx" | grep -qiv "ADVISORY" || true
-		# Fail explicitly if advisory fired
-		echo "Unexpected advisory context: $ctx" >&2
-		false
-	fi
-}
-
-# ---------------------------------------------------------------------------
-# Case 2: structured object response with transitional-only text — advisory FIRES
-# ---------------------------------------------------------------------------
-
-@test "empty-task-response: advisory fires when executor returns transitional-only structured result" {
-	local payload
-	payload=$(jq -nc '{
-		tool_name: "Task",
-		tool_input: {subagent_type: "oh-my-claudeagent:executor"},
-		tool_response: {result: "Now let me start working on this task for you."}
-	}')
-
-	run_hook "empty-task-response.sh" "$payload"
-	assert_success
-	ctx=$(get_context)
-	assert [ -n "$ctx" ]
-	echo "$ctx" | grep -qi "POOR AGENT OUTPUT"
-}
-
-# ---------------------------------------------------------------------------
-# Case 3: structured object response with empty result — advisory FIRES
-# ---------------------------------------------------------------------------
-
-@test "empty-task-response: advisory fires when tool_response has empty result field" {
-	local payload
-	payload=$(jq -nc '{
-		tool_name: "Task",
-		tool_input: {subagent_type: "oh-my-claudeagent:executor"},
-		tool_response: {result: ""}
-	}')
-
-	run_hook "empty-task-response.sh" "$payload"
-	assert_success
-	ctx=$(get_context)
-	assert [ -n "$ctx" ]
-	echo "$ctx" | grep -qi "POOR AGENT OUTPUT"
-}
-
-# ---------------------------------------------------------------------------
-# Case 4: missing sections advisory fires for executor with good-length but incomplete output
-# ---------------------------------------------------------------------------
-
-@test "empty-task-response: advisory fires for executor missing required sections" {
-	local response
-	response="I completed the task and made the changes. The implementation is done and working correctly as expected."
-
-	local payload
-	payload=$(jq -nc --arg r "$response" '{
-		tool_name: "Task",
-		tool_input: {subagent_type: "oh-my-claudeagent:executor"},
-		tool_response: {result: $r}
-	}')
-
-	run_hook "empty-task-response.sh" "$payload"
-	assert_success
-	ctx=$(get_context)
-	assert [ -n "$ctx" ]
-	echo "$ctx" | grep -qi "ADVISORY"
-}
-
-# ---------------------------------------------------------------------------
-# Case 5: executor with all required sections — no advisory
-# ---------------------------------------------------------------------------
-
-@test "empty-task-response: no advisory when executor returns all required sections" {
-	local response
-	response="TASK: fix the bug
+FULL_EXECUTOR_REPORT="TASK: fix the bug
 STATUS: complete
 CHANGES: scripts/foo.sh — fixed field read
 EVIDENCE: just test-hooks passed, 21 tests
 NOTES: no blockers"
 
+# ---------------------------------------------------------------------------
+# Payloads that carry no report at all
+# ---------------------------------------------------------------------------
+
+@test "empty-task-response: async launch acknowledgement is silent" {
 	local payload
-	payload=$(jq -nc --arg r "$response" '{
-		tool_name: "Task",
-		tool_input: {subagent_type: "oh-my-claudeagent:executor"},
-		tool_response: {result: $r}
+	payload=$(jq -nc '{
+		hook_event_name: "PostToolUse",
+		tool_name: "Agent",
+		tool_input: {subagent_type: "oh-my-claudeagent:executor", prompt: "do the thing"},
+		tool_response: {isAsync: true, status: "async_launched", agentId: "a1", outputFile: "/tmp/a1.txt"}
 	}')
 
 	run_hook "empty-task-response.sh" "$payload"
 	assert_success
-	ctx=$(get_context)
-	if [[ -n "$ctx" ]]; then
-		# Should not contain POOR AGENT OUTPUT or ADVISORY
-		if echo "$ctx" | grep -qi "POOR AGENT OUTPUT\|ADVISORY"; then
-			echo "Unexpected advisory: $ctx" >&2
-			false
-		fi
-	fi
+	assert_output ""
 }
 
-# ---------------------------------------------------------------------------
-# Case 6: plain string tool_response (backward compat) — empty string fires advisory
-# ---------------------------------------------------------------------------
-
-@test "empty-task-response: advisory fires for plain empty string tool_response" {
+@test "empty-task-response: completed Agent result pointing at a hand-back is silent" {
 	local payload
-	payload='{"tool_name":"Task","tool_input":{"subagent_type":"oh-my-claudeagent:explore"},"tool_response":""}'
+	payload=$(jq -nc '{
+		hook_event_name: "PostToolUse",
+		tool_name: "Agent",
+		tool_input: {subagent_type: "oh-my-claudeagent:executor"},
+		tool_response: {
+			status: "completed",
+			handback: "send",
+			content: [{type: "text", text: "This agent'"'"'s report was delivered to you as a message from \"a1\" (its SubagentHandback call). Read it there; it is not repeated here."}]
+		}
+	}')
 
 	run_hook "empty-task-response.sh" "$payload"
 	assert_success
-	ctx=$(get_context)
-	assert [ -n "$ctx" ]
-	echo "$ctx" | grep -qi "POOR AGENT OUTPUT"
+	assert_output ""
 }
 
 # ---------------------------------------------------------------------------
-# Case 7: the empty-result advisory does not blame an infrastructure cutoff
+# SubagentHandback — the payload that carries the report
 # ---------------------------------------------------------------------------
 
-@test "empty-task-response: empty-result advice attributes the empty turn to the agent" {
+@test "empty-task-response: short hand-back message fires the poor-output advice" {
 	local payload
-	payload='{"tool_name":"Task","tool_input":{"subagent_type":"oh-my-claudeagent:executor"},"tool_response":{"result":""}}'
+	payload=$(jq -nc '{
+		hook_event_name: "PostToolUse",
+		tool_name: "SubagentHandback",
+		agent_id: "a1",
+		agent_type: "oh-my-claudeagent:executor",
+		tool_input: {message: "4"},
+		tool_response: {success: true, message: "Report delivered to your caller."}
+	}')
 
 	run_hook "empty-task-response.sh" "$payload"
 	assert_success
@@ -150,4 +69,149 @@ NOTES: no blockers"
 	echo "$ctx" | grep -qi "delegation error carrying the agent's partial work"
 	# A cutoff arrives on the failure path, so this advice must not read as a certainty.
 	! echo "$ctx" | grep -qi "likely exhausted its turns"
+}
+
+@test "empty-task-response: transitional-only hand-back message fires the poor-output advice" {
+	local payload
+	payload=$(jq -nc '{
+		hook_event_name: "PostToolUse",
+		tool_name: "SubagentHandback",
+		agent_id: "a1",
+		agent_type: "oh-my-claudeagent:executor",
+		tool_input: {message: "Now let me start working on this task for you."}
+	}')
+
+	run_hook "empty-task-response.sh" "$payload"
+	assert_success
+	get_context | grep -qi "POOR AGENT OUTPUT"
+}
+
+@test "empty-task-response: full hand-back report is silent" {
+	local payload
+	payload=$(jq -nc --arg r "$FULL_EXECUTOR_REPORT" '{
+		hook_event_name: "PostToolUse",
+		tool_name: "SubagentHandback",
+		agent_id: "a1",
+		agent_type: "oh-my-claudeagent:executor",
+		tool_input: {message: $r}
+	}')
+
+	run_hook "empty-task-response.sh" "$payload"
+	assert_success
+	assert_output ""
+}
+
+@test "empty-task-response: hand-back report missing sections gets the section advisory" {
+	local payload
+	payload=$(jq -nc '{
+		hook_event_name: "PostToolUse",
+		tool_name: "SubagentHandback",
+		agent_id: "a1",
+		agent_type: "oh-my-claudeagent:executor",
+		tool_input: {message: "I completed the task and made the changes. The implementation is done and working correctly as expected."}
+	}')
+
+	run_hook "empty-task-response.sh" "$payload"
+	assert_success
+	ctx=$(get_context)
+	echo "$ctx" | grep -qi "ADVISORY"
+	echo "$ctx" | grep -q "executor"
+}
+
+@test "empty-task-response: oracle hand-back with its own sections is silent" {
+	local payload
+	payload=$(jq -nc '{
+		hook_event_name: "PostToolUse",
+		tool_name: "SubagentHandback",
+		agent_id: "a1",
+		agent_type: "oh-my-claudeagent:oracle",
+		tool_input: {message: "RECOMMENDATION: use strategy A\nALTERNATIVES: strategy B, C\nRISKS: low overhead"}
+	}')
+
+	run_hook "empty-task-response.sh" "$payload"
+	assert_success
+	assert_output ""
+}
+
+# ---------------------------------------------------------------------------
+# Prepended harness note
+# ---------------------------------------------------------------------------
+
+@test "empty-task-response: a bracketed harness note is not measured as the report" {
+	local payload
+	payload=$(jq -nc --arg r "$FULL_EXECUTOR_REPORT" '{
+		hook_event_name: "PostToolUse",
+		tool_name: "SubagentHandback",
+		agent_id: "a1",
+		agent_type: "oh-my-claudeagent:executor",
+		tool_input: {message: ("[harness: subagent output matched instruction-shaped pattern(s): foo]\n" + $r)}
+	}')
+
+	run_hook "empty-task-response.sh" "$payload"
+	assert_success
+	assert_output ""
+}
+
+@test "empty-task-response: a bracketed harness note alone counts as no report" {
+	local payload
+	payload=$(jq -nc '{
+		hook_event_name: "PostToolUse",
+		tool_name: "SubagentHandback",
+		agent_id: "a1",
+		agent_type: "oh-my-claudeagent:executor",
+		tool_input: {message: "[harness: subagent output matched instruction-shaped pattern(s): foo]"}
+	}')
+
+	run_hook "empty-task-response.sh" "$payload"
+	assert_success
+	get_context | grep -qi "POOR AGENT OUTPUT"
+}
+
+# ---------------------------------------------------------------------------
+# Non-auto mode: a completed Agent result carries the report in content[].text
+# ---------------------------------------------------------------------------
+
+@test "empty-task-response: completed Agent result without hand-back is still checked" {
+	local payload
+	payload=$(jq -nc '{
+		hook_event_name: "PostToolUse",
+		tool_name: "Agent",
+		tool_input: {subagent_type: "oh-my-claudeagent:executor"},
+		tool_response: {
+			status: "completed",
+			content: [{type: "text", text: "I completed the task and made the changes. The implementation is done and working correctly as expected."}]
+		}
+	}')
+
+	run_hook "empty-task-response.sh" "$payload"
+	assert_success
+	get_context | grep -qi "ADVISORY"
+}
+
+@test "empty-task-response: completed Agent result with a full report is silent" {
+	local payload
+	payload=$(jq -nc --arg r "$FULL_EXECUTOR_REPORT" '{
+		hook_event_name: "PostToolUse",
+		tool_name: "Agent",
+		tool_input: {subagent_type: "oh-my-claudeagent:executor"},
+		tool_response: {status: "completed", content: [{type: "text", text: $r}]}
+	}')
+
+	run_hook "empty-task-response.sh" "$payload"
+	assert_success
+	assert_output ""
+}
+
+@test "empty-task-response: completed Agent result with empty content fires the poor-output advice" {
+	local payload
+	payload=$(jq -nc '{
+		hook_event_name: "PostToolUse",
+		tool_name: "Agent",
+		tool_input: {subagent_type: "oh-my-claudeagent:executor"},
+		tool_response: {status: "completed", content: []}
+	}')
+
+	run_hook "empty-task-response.sh" "$payload"
+	assert_success
+	get_context | grep -qi "POOR AGENT OUTPUT"
 }

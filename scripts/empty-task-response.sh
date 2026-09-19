@@ -4,13 +4,37 @@ source "$(dirname "$0")/lib/common.sh"
 
 _HOOK_START=$(epoch_ns)
 
-# Agent tool returns tool_response as a structured object {result: "..."}; other
-# tools return a plain string. Extract the inner .result when present.
-_RAW_RESPONSE=$(jq -r '.tool_response // ""' <<< "${HOOK_INPUT}")
-if echo "${_RAW_RESPONSE}" | jq -e 'type == "object" and has("result")' >/dev/null 2>&1; then
-	RESPONSE=$(echo "${_RAW_RESPONSE}" | jq -r '.result // ""')
+noop_exit() {
+	hook_timing_log "${_HOOK_START}"
+	exit 0
+}
+
+TOOL_NAME=$(jq -r '.tool_name // ""' <<< "${HOOK_INPUT}")
+
+if [[ "${TOOL_NAME}" == "SubagentHandback" ]]; then
+	# Under auto mode the report travels only here, verbatim in tool_input.message;
+	# agent_type on this payload is the handing-back subagent's own type.
+	RESPONSE=$(jq -r '.tool_input.message // ""' <<< "${HOOK_INPUT}")
+	AGENT_TYPE_FULL=$(jq -r '.agent_type // ""' <<< "${HOOK_INPUT}")
 else
-	RESPONSE="${_RAW_RESPONSE}"
+	# An async launch acknowledgement carries no report at all, and a completed
+	# result with handback "send" carries only a pointer at the hand-back payload.
+	STATUS=$(jq -r '.tool_response.status // ""' <<< "${HOOK_INPUT}")
+	HANDBACK=$(jq -r '.tool_response.handback // ""' <<< "${HOOK_INPUT}")
+	if [[ "${STATUS}" != "completed" ]] || [[ "${HANDBACK}" == "send" ]]; then
+		noop_exit
+	fi
+	RESPONSE=$(jq -r '[.tool_response.content[]? | .text? // empty] | join("\n")' <<< "${HOOK_INPUT}")
+	AGENT_TYPE_FULL=$(jq -r '.tool_input.subagent_type // ""' <<< "${HOOK_INPUT}")
+fi
+
+# A harness note can be prepended as one bracketed line; the report is what follows it.
+if [[ "${RESPONSE}" == \[*\]* ]]; then
+	if [[ "${RESPONSE}" == *$'\n'* ]]; then
+		RESPONSE=${RESPONSE#*$'\n'}
+	else
+		RESPONSE=""
+	fi
 fi
 
 RESPONSE_LENGTH=${#RESPONSE}
@@ -41,53 +65,37 @@ if [[ "${IS_POOR}" == "true" ]]; then
 	MSG="[POOR AGENT OUTPUT] The agent returned empty or trivially short text with no synthesis. A rate limit, server error, or kill would have arrived as a delegation error carrying the agent's partial work, so an empty result here means the agent ended its own turn without a deliverable, typically after spending its turns on tool calls. Do NOT re-query the same agent (a finished agent is terminal; re-querying it loops). Relaunch a FRESH agent with a sharper prompt that states the required output format explicitly, or proceed with what you already have."
 	emit_context "PostToolUse" "${MSG}"
 else
-	# Canonical platform path: subagent_type is nested under tool_input (not top-level).
-	AGENT_TYPE_FULL=$(jq -r '.tool_input.subagent_type // ""' <<< "${HOOK_INPUT}")
 	AGENT_TYPE="${AGENT_TYPE_FULL##*:}"
 	MISSING_SECTIONS=""
 	case "${AGENT_TYPE}" in
 	executor)
 		REQUIRED="STATUS: CHANGES: EVIDENCE:"
-		for section in ${REQUIRED}; do
-			if ! echo "${RESPONSE}" | grep -qiE "${section}"; then
-				MISSING_SECTIONS="${MISSING_SECTIONS} ${section}"
-			fi
-		done
 		;;
 	explore)
 		REQUIRED="FILES: ANSWER: NEXT STEPS:"
-		for section in ${REQUIRED}; do
-			if ! echo "${RESPONSE}" | grep -qiE "${section}"; then
-				MISSING_SECTIONS="${MISSING_SECTIONS} ${section}"
-			fi
-		done
 		;;
 	oracle)
 		REQUIRED="RECOMMENDATION: ALTERNATIVES: RISKS:"
-		for section in ${REQUIRED}; do
-			if ! echo "${RESPONSE}" | grep -qiE "${section}"; then
-				MISSING_SECTIONS="${MISSING_SECTIONS} ${section}"
-			fi
-		done
 		;;
 	librarian)
 		REQUIRED="SOURCES: FINDINGS: APPLICABILITY:"
-		for section in ${REQUIRED}; do
-			if ! echo "${RESPONSE}" | grep -qiE "${section}"; then
-				MISSING_SECTIONS="${MISSING_SECTIONS} ${section}"
-			fi
-		done
 		;;
 	*)
+		REQUIRED=""
 		;;
 	esac
+
+	for section in ${REQUIRED}; do
+		if ! echo "${RESPONSE}" | grep -qiE "${section}"; then
+			MISSING_SECTIONS="${MISSING_SECTIONS} ${section}"
+		fi
+	done
 
 	if [[ -n "${MISSING_SECTIONS}" ]]; then
 		WARN="[ADVISORY] Agent '${AGENT_TYPE}' output is missing expected section headers:${MISSING_SECTIONS}. The required output format specifies these sections. Output may be incomplete or hard to parse downstream."
 		emit_context "PostToolUse" "${WARN}"
 	else
-		hook_timing_log "${_HOOK_START}"
-		exit 0
+		noop_exit
 	fi
 fi
 

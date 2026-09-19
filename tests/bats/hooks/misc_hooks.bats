@@ -535,7 +535,7 @@ load '../test_helper'
 
 @test "empty-task-response: warns when agent output is empty" {
 	local payload
-	payload='{"tool_name":"Task","tool_input":{"subagent_type":"explore"},"tool_response":""}'
+	payload='{"tool_name":"SubagentHandback","agent_type":"explore","tool_input":{"message":""}}'
 
 	run_hook "empty-task-response.sh" "$payload"
 	assert_success
@@ -546,7 +546,7 @@ load '../test_helper'
 
 @test "empty-task-response: warns when agent output is very short" {
 	local payload
-	payload='{"tool_name":"Task","tool_input":{"subagent_type":"explore"},"tool_response":"ok"}'
+	payload='{"tool_name":"SubagentHandback","agent_type":"explore","tool_input":{"message":"ok"}}'
 
 	run_hook "empty-task-response.sh" "$payload"
 	assert_success

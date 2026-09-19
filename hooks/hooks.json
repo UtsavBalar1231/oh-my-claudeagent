@@ -279,7 +279,7 @@
         ]
       },
       {
-        "matcher": "Agent",
+        "matcher": "Agent|SubagentHandback",
         "hooks": [
           {
             "type": "command",
