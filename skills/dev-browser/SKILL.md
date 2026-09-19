@@ -33,7 +33,7 @@ ${CLAUDE_PLUGIN_ROOT}/skills/dev-browser/server.sh &
 ```
 
 > **Note (Windows):** These instructions apply to the scripting layer only.
-> The plugin's hook infrastructure requires bash — use WSL or Git Bash on Windows.
+> The plugin's hook infrastructure requires bash, so use WSL or Git Bash on Windows.
 
 Add `--headless` flag if user requests it. **Wait for the `Ready` message before running scripts.**
 
@@ -74,17 +74,17 @@ EOF
 2. **Log state** at end for next steps
 3. **Descriptive page names** (`"checkout"`, not `"main"`)
 4. **Disconnect to exit** (pages persist)
-5. **Plain JS in evaluate** — no TypeScript syntax
+5. **Plain JS in evaluate**: no TypeScript syntax
 
 ## No TypeScript in Browser Context
 
-`page.evaluate()` runs in browser — TS annotations fail at runtime:
+`page.evaluate()` runs in the browser, so TS annotations fail at runtime:
 
 ```typescript
 // Correct
 const text = await page.evaluate(() => document.body.innerText);
 
-// Wrong — TypeScript syntax breaks inside evaluate()
+// Wrong: TypeScript syntax breaks inside evaluate()
 const text = await page.evaluate(() => {
   const el: HTMLElement = document.body; // FAILS
   return el.innerText;

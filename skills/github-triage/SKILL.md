@@ -1,6 +1,6 @@
 ---
 name: github-triage
-description: Parallel triage of open GitHub issues and PRs — one background executor per item, read-only.
+description: "Parallel triage of open GitHub issues and PRs: one background executor per item, read-only."
 when_to_use: |
   Use when:
   - User wants to triage open GitHub issues or pull requests
@@ -12,7 +12,7 @@ effort: medium
 disallowed-tools: [Write, Edit]
 ---
 
-# GitHub Triage — Unified Issue & PR Processor
+# GitHub Triage: Unified Issue & PR Processor
 
 ## Tool Restrictions
 
@@ -201,10 +201,10 @@ Report format:
 
 ## Evidence
 [File paths and code references for each claim]
-EVIDENCE: <commit-SHA GitHub permalink> — [description]
+EVIDENCE: <commit-SHA GitHub permalink> - [description]
 
 ## Recommended Response
-[Draft response text for a maintainer to post — do NOT post it yourself]
+[Draft response text for a maintainer to post - do NOT post it yourself]
 
 ## Action Required
 [What a human maintainer should do]
@@ -239,16 +239,16 @@ Report format:
 **Verdict:** CONFIRMED_BUG | NOT_A_BUG | NEEDS_INVESTIGATION
 
 ## Root Cause (if CONFIRMED_BUG)
-EVIDENCE: <commit-SHA GitHub permalink> — [what goes wrong and why]
+EVIDENCE: <commit-SHA GitHub permalink> - [what goes wrong and why]
 
 ## Proof of Correct Behavior (if NOT_A_BUG)
-EVIDENCE: <commit-SHA GitHub permalink> — [code that shows intended behavior]
+EVIDENCE: <commit-SHA GitHub permalink> - [code that shows intended behavior]
 
 ## Fix Approach (if CONFIRMED_BUG)
-[Specific change needed — file, line, what to change]
+[Specific change needed - file, line, what to change]
 
 ## Severity
-[LOW | MEDIUM | HIGH | CRITICAL] — [justification]
+[LOW | MEDIUM | HIGH | CRITICAL] - [justification]
 
 ## Action Required
 [What a human maintainer should do next]
@@ -283,7 +283,7 @@ Report format:
 **Already Exists:** YES_FULLY | YES_PARTIALLY | NO
 
 ## Existence Evidence (if exists)
-EVIDENCE: <commit-SHA GitHub permalink> — [how the feature is implemented]
+EVIDENCE: <commit-SHA GitHub permalink> - [how the feature is implemented]
 
 ## Feasibility
 [EASY | MODERATE | HARD | ARCHITECTURAL_CHANGE]
@@ -330,7 +330,7 @@ Report format:
 
 ## Evidence
 [File paths and code references for each claim]
-EVIDENCE: <commit-SHA GitHub permalink> — [description]
+EVIDENCE: <commit-SHA GitHub permalink> - [description]
 
 **Suggested Label:** [if any]
 **Action Required:** [what a maintainer should do]
@@ -354,7 +354,7 @@ ITEM:
 - Review Decision: {reviewDecision}
 - CI Status: {statusCheckRollup_summary}
 
-YOUR JOB (READ-ONLY — no git checkout, no git fetch):
+YOUR JOB (READ-ONLY: no git checkout, no git fetch):
 1. Fetch PR details: gh pr view {number} --repo {REPO} --json body,files,reviews,comments,statusCheckRollup,reviewDecision
 2. Read changed files via: gh api --method GET repos/{REPO}/pulls/{number}/files
 3. Search codebase to understand what the PR is fixing.
@@ -363,7 +363,7 @@ YOUR JOB (READ-ONLY — no git checkout, no git fetch):
 MERGE CONDITIONS (report on each):
   a. CI status: ALL passing
   b. Review decision: APPROVED
-  c. Fix is clearly correct — addresses an obvious, unambiguous bug
+  c. Fix is clearly correct, addressing an obvious, unambiguous bug
   d. No risky side effects (no architectural changes, no breaking changes)
   e. Not a draft PR
   f. Mergeable state is clean (no conflicts)
@@ -393,7 +393,7 @@ EVIDENCE: Fix applied at <commit-SHA GitHub permalink> in PR diff
 [What could go wrong if merged]
 
 ## Action Required
-[What a human maintainer should do — be specific]
+[What a human maintainer should do - be specific]
 ```
 
 ---
@@ -434,13 +434,13 @@ Report format:
 - Draft: YES | NO
 
 ## Risk Level
-[LOW | MEDIUM | HIGH] — [justification]
+[LOW | MEDIUM | HIGH] - [justification]
 
 ## Alignment
-[Does this fit the project direction? YES | NO | UNCLEAR — cite evidence]
+[Does this fit the project direction? YES | NO | UNCLEAR - cite evidence]
 
 ## Action Required
-[NEEDS_REVIEW | REQUEST_CHANGES | WAIT_FOR_CI | CLOSE | other — with reason]
+[NEEDS_REVIEW | REQUEST_CHANGES | WAIT_FOR_CI | CLOSE | other - with reason]
 ```
 
 ---
@@ -457,7 +457,7 @@ ls {OUTDIR}/issue-*.md {OUTDIR}/pr-*.md
 Produce a final summary at `{OUTDIR}/SUMMARY.md`:
 
 ```markdown
-# GitHub Triage Report — {REPO}
+# GitHub Triage Report: {REPO}
 
 **Date:** {datetime}
 **Output directory:** {OUTDIR}

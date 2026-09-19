@@ -18,13 +18,13 @@ Skills describe WHAT users do. Hooks are internal infrastructure that automates 
 
 **Forbidden in skills** (unless listed as an exception below):
 
-- Raw file paths like `.omca/state/*.json` — use `boulder_write`, `boulder_progress` MCP tools from the omca server instead
+- Raw file paths like `.omca/state/*.json`: use `boulder_write`, `boulder_progress` MCP tools from the omca server instead
 - Hook script names (`task-completed-verify.sh`, etc.)
-- Hook event names used only in `hooks/hooks.json` (`PreToolUse`, `PostToolUse`, `Stop`, etc.) — these are platform contracts, not user-facing concepts
+- Hook event names used only in `hooks/hooks.json` (`PreToolUse`, `PostToolUse`, `Stop`, etc.): these are platform contracts, not user-facing concepts
 - Hook-specific environment variables (`HOOK_INPUT`, `HOOK_STATE_DIR`)
 
 **Exceptions (legitimate hook knowledge)**:
 
-- `omca-setup` — installs and configures hooks
+- `omca-setup`: installs and configures hooks
 
 **Rationale**: Most skills already follow this rule with zero hook references (refactor, github-triage, hephaestus, metis, consolidate-memory, dev-browser, frontend-ui-ux, git-master, init-deep, playwright). Skills that leak file paths force users to understand internal layouts they can't control, and force future hook refactors to update skill prose.

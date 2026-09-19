@@ -1,6 +1,6 @@
 ---
 name: debugging
-description: Runtime debugging loop, reproduce, form ranked hypotheses, instrument, fix, verify. Use for crashes, wrong output, intermittent failures, race conditions, or anything that works locally but not in prod. Triggers: "debug this", "why is this failing at runtime", "intermittent failure", "race condition", "works locally but not in prod", "flaky test", "silent failure". NOT for build failures, type errors, or toolchain issues; those belong to the hephaestus flow. This skill owns runtime misbehavior only.
+description: "Runtime debugging loop: reproduce, rank hypotheses, instrument, fix, verify. Use for crashes, wrong output, intermittent or silent failures, race conditions, flaky tests, and code that works locally but not in prod. Not for build failures, type errors, or toolchain issues; those go to hephaestus."
 ---
 
 # Debugging

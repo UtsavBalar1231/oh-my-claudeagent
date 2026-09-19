@@ -81,11 +81,11 @@ NOTEPAD SUMMARY
 ---------------
 [Only include if an active plan with notepad data exists]
 Plan: [plan-name]
-- learnings: N entries — [one-line summary of key insight]
-- issues: N entries — [one-line summary of open issue if any]
-- decisions: N entries — [list verbatim from notepad decisions section, one per line]
-- problems: N entries — [summary if non-zero]
-- questions: N entries — [list open questions if non-zero]
+- learnings: N entries - [one-line summary of key insight]
+- issues: N entries - [one-line summary of open issue if any]
+- decisions: N entries - [list verbatim from notepad decisions section, one per line]
+- problems: N entries - [summary if non-zero]
+- questions: N entries - [list open questions if non-zero]
 
 WORK COMPLETED
 --------------
@@ -99,7 +99,7 @@ CURRENT STATE
 
 REMAINING WORK
 --------------
-- [ ] [Unchecked plan task — copy exact task text]
+- [ ] [Unchecked plan task - copy exact task text]
 - [ ] [Next logical step if not in plan]
 (Pull from plan file checkboxes, and from `TaskList()` state where that tool exists)
 
@@ -110,12 +110,12 @@ KEY FILES
 
 IMPORTANT DECISIONS
 -------------------
-- [Technical decisions and why — pull from notepad decisions section if available]
+- [Technical decisions and why - pull from notepad decisions section if available]
 - [Trade-offs considered]
 
 EXPLICIT CONSTRAINTS
 --------------------
-- [Verbatim constraints only — from user or existing AGENTS.md]
+- [Verbatim constraints only - from user or existing AGENTS.md]
 - If none: None
 
 CONTEXT FOR CONTINUATION
