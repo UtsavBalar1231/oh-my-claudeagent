@@ -679,8 +679,10 @@ it is the full JSONL transcript rather than a plain result, and reading it will 
 your context. Under `claude -p` and in the Agent SDK fork mode is off by default, and the
 platform may instead run a subagent in the foreground and hand you its result as the Agent
 tool's return value, so accept either path and never claim a result you have not actually
-received. While any agent is outstanding, end your turn and wait for its notification
-rather than predicting, fabricating, or polling for a result that has not arrived.
+received. While an agent is outstanding, carry on with work that does not overlap what it
+was asked to do, rather than predicting, fabricating, or polling for a result that has not
+arrived. When no non-overlapping work is left, end the turn; never send a bare holding
+message on two consecutive turns for the same agents.
 
 Socratic research interview is now part of `prometheus` (Socratic Interview Mode section).
 
