@@ -32,7 +32,7 @@ Two steps are required. Skipping either produces dead code ([ADR-009](adr/README
 
 Use the `if` field for argument-level filtering on tool events (`PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `PermissionRequest`): `"if": "Bash(git *)"`, permission rule syntax, reduces process spawning. Do not use on security-critical or dual-purpose hooks where a narrow filter would silently disable coverage.
 
-Plugin hook changes require `/reload-plugins` to take effect (not auto-reloaded).
+Each hook runs as a fresh process, so an edit to the body of `scripts/name.sh` applies on the next invocation. A change to `hooks/hooks.json` is registration, not script content, and applies only once the plugin is loaded again: closing the `/plugin` menu reloads it for you, and so does starting a new session.
 
 ## Adding an agent
 
@@ -56,7 +56,7 @@ Key rules:
 - Keep `name:` free of `:`. The platform rejects an agent whose frontmatter name holds a colon, so the agent never loads. The `oh-my-claudeagent:` prefix used at call sites is added by the platform.
 - Do not declare `permissionMode:`. Claude Code strips it from plugin agents for security.
 - Add the agent to the agent catalog table in `templates/claudemd.md`
-- **`CLAUDE_CODE_SUBAGENT_MODEL` overrides ALL agent model declarations.** Warn users who set it: it affects every spawned agent regardless of frontmatter.
+- **`CLAUDE_CODE_SUBAGENT_MODEL` no longer outranks frontmatter.** Since v2.1.251 the order is a per-invocation model first, then the agent definition's `model:` field (`inherit` included), then the environment variable. Every agent on this roster declares `model:`, so the variable is a default that never applies here. The variable that does override a definition is `CLAUDE_CODE_SUBAGENT_MODEL_FORCE` (v2.1.257 or later): with it set, the declared tier is ignored for every agent, oracle's `fable` included.
 - **Do not leak hook internals into agent prompts.** State the behavioral rule, not the enforcement mechanism. Agent prompts must NOT mention: hook script names (`final-verification-evidence.sh`, `task-completed-verify.sh`, etc.), "X hook" as a noun (`SubagentStart hook`, `Stop hook`, `the final-verification hook`), raw `.omca/state/*.json` file paths, or cross-references to specific plan names/task numbers for enforcement rationale. Describe the behavior instead: *"session termination is blocked until final-verification evidence is present"* not *"the `final-verification-evidence.sh` hook blocks Stop"*. Exception: platform event names like `TaskCreated`, `TaskCompleted`, `TeammateIdle` may appear as API contract references, but do not frame them as "lifecycle hooks"; use "lifecycle events" or "platform lifecycle gates". Naming internal scripts in agent prose creates stale prompts whenever hooks are renamed, refactored, or replaced with MCP tools.
 
 ## Adding a skill

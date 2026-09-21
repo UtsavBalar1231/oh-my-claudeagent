@@ -75,3 +75,7 @@ rather than predicting, fabricating, or polling for a result that has not arrive
 In brief: as the main-session orchestrator, record every build/test/lint via `evidence_log` before marking complete, and escalate to `oracle` after 2+ failed fixes.
 
 If you are a spawned subagent (leaf worker), the parallel and barrier guidance does not apply to you. Complete your own task and end with your full deliverable inline, never a bare status word and never a "waiting for other agents" message.
+
+## Reading outside the project root
+
+Reach for the omca `file_read` MCP tool. `permissions.blockReadsOutsideWorkingDirectories` fences the built-in filesystem surfaces, Read, Grep, Glob and LSP, to the working directories; it does not fence MCP tools, so `file_read` still returns the file when that setting is on.

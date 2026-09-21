@@ -43,6 +43,15 @@ Claude-native plans are canonical. The plans directory is the `plansDirectory` s
 
 **Channels**: Not used — OMCA focuses on in-session orchestration via hooks, subagents, skills.
 
+**Restricted mode voids every guarantee below.** A session started with `--restricted`, or
+with `CLAUDE_CODE_RESTRICTED=1` in the launch environment, loads only managed settings and an
+explicit `--settings` file; it ignores user, project, and local settings entirely. OMCA's
+hooks and its `omca` MCP server are both absent in such a session, so none of the guardrails,
+evidence gating, or state tracking this guide describes is in effect. Restricted mode also
+removes the built-in tools that run commands or code, which takes the Bash tool the
+verification workflow depends on. Treat a restricted session as plain Claude Code. The flag
+requires client v2.1.248 or later.
+
 ---
 
 ## Core Concepts
@@ -92,7 +101,7 @@ main session (sisyphus identity, depth 0, full Agent tool)
 
 The orchestrator (`sisyphus`) is the main-session identity injected via
 `templates/claudemd.md`. Plan-driven execution is triggered via
-`/oh-my-claudeagent:start-work` — a slash command that runs inline in the main session
+`/oh-my-claudeagent:start-work`, a user-invoked skill that runs inline in the main session
 at depth 0 with full Agent-tool access (its body carries the Plan Execution Mode
 protocol). No `context: fork` skill intermediates between user and orchestrator.
 
@@ -616,7 +625,7 @@ Add to `.claude/settings.json` for automatic team-wide installation:
 
 | Agent | Model | Effort | Invoke | Purpose |
 |-------|-------|--------|--------|---------|
-| sisyphus | opus | xhigh | Main session (injected via `templates/claudemd.md`) or `/oh-my-claudeagent:start-work` (Plan Execution Mode) | Master orchestrator identity — classifies requests, delegates to specialists. Two modes: free-form (conversational) and plan-driven (via `/start-work` command body). Plan Execution Mode protocol lives in `skills/start-work/SKILL.md`. |
+| sisyphus | opus | xhigh | Main session (injected via `templates/claudemd.md`) or `/oh-my-claudeagent:start-work` (Plan Execution Mode) | Master orchestrator identity that classifies requests, delegates to specialists. Two modes: free-form (conversational) and plan-driven (via the `start-work` skill body). Plan Execution Mode protocol lives in `skills/start-work/SKILL.md`. |
 
 **sisyphus** — The one orchestrator. Free-form mode: routes requests to specialists, runs explore agents in background. Plan Execution Mode: reads plan, delegates per-task to `executor`, logs evidence, runs a final completeness check at the end.
 
@@ -699,9 +708,13 @@ refactors while fixing. Stops and escalates after 5+ failed attempts.
 
 | Entrypoint | Surface | Invocation | Keywords |
 |------------|---------|------------|----------|
-| plan | command | `/oh-my-claudeagent:plan` | "create plan" |
+| plan | skill | `/oh-my-claudeagent:plan` | "create plan" |
 | metis | skill | `/oh-my-claudeagent:metis` | "run metis" |
-| start-work | command | `/oh-my-claudeagent:start-work` | (none) |
+| start-work | skill | `/oh-my-claudeagent:start-work` | (none) |
+
+`plan` and `start-work` both live under `skills/` and both carry
+`disable-model-invocation: true`, so the model never auto-fires them. Typing the slash
+command is the only way either one starts.
 
 **start-work** — Finds the active plan (via boulder state, `.omca/plans/`, or
 the resolved plans directory), sets up boulder state, optionally configures a git worktree,
@@ -988,7 +1001,7 @@ Keywords are the natural interaction model — type natural phrases in any promp
 |------------------|-----------|
 | `handoff`, `context is getting long`, `start fresh session` | an advisory nudge toward `/oh-my-claudeagent:handoff`; it does not start the workflow |
 | `run metis`, `metis analyze`, `pre-plan` | metis skill |
-| `run prometheus`, `create plan` | `/oh-my-claudeagent:plan` command (prometheus planning) |
+| `run prometheus`, `create plan` | `plan` skill, via `/oh-my-claudeagent:plan` (prometheus planning) |
 | `fix build`, `build broken` | hephaestus skill |
 | `setup omca` | omca-setup skill |
 
@@ -1035,9 +1048,9 @@ silent death into a diagnosable one. Resuming is still manual, with
 
 **Subagent nesting depth:** `/oh-my-claudeagent:start-work` runs inline in the main
 session at depth 0 with full `Agent`-tool access. Parallel fan-out and specialist delegation
-all work. The command body in `skills/start-work/SKILL.md` is the authoritative Plan Execution
+all work. The skill body in `skills/start-work/SKILL.md` is the authoritative Plan Execution
 Mode protocol. There is no degraded mode — orchestration only runs at depth 0 by design.
-The `atlas` agent was removed in v2.0; its plan-execution protocol migrated to the command
+The `atlas` agent was removed in v2.0; its plan-execution protocol migrated to that skill
 body, its orchestrator role consolidated into `sisyphus` (the main-session identity).
 
 **Hook changes not taking effect:** Run `/reload-plugins`.
@@ -1138,9 +1151,13 @@ counts subagent-level failures, which are a different plane, so this variable ne
 nor hinders the three-strike counter.
 
 `CLAUDE_CODE_SESSIONEND_HOOKS_TIMEOUT_MS` is the only lever that can raise the SessionEnd
-budget, and it is user-side: a `timeout` declared in a plugin-provided `hooks.json` never
-raises it. A kill at 1.5 seconds leaves this session's `bindings[session_id]` entry in
-`boulder.json` behind, and recovery falls to the `SessionStart` GC in `session-init.sh`.
+budget for OMCA, and it is user-side: a `timeout` declared in a plugin-provided `hooks.json`
+never raises it, and only a per-hook `timeout` in a settings file does, up to a 60 second
+ceiling. Since v2.1.268 the variable also becomes the timeout for each `SessionEnd` hook that
+declares none of its own, so setting it is what gives `session-cleanup.sh` more than the
+1.5 second default. Leave it unset and a kill at 1.5 seconds leaves this session's
+`bindings[session_id]` entry in `boulder.json` behind, with recovery falling to the
+`SessionStart` GC in `session-init.sh`.
 
 ### `prompt_id` (hook input field, v2.1.196)
 
@@ -1426,7 +1443,7 @@ Features introduced in this window that OMCA consciously declines to adopt:
 | Feature | Notes |
 |---------|-------|
 | `[1m]` auto-strip alignment | v2.1.173 dropped the `[1m]` context-window suffix from model identifiers platform-side; OMCA's agent docs and tables use bare model identifiers throughout |
-| Per-agent `effort:` tuning | Effort raised to xhigh for sonnet/opus workers and planners, max for oracle; explore sits at medium, librarian and multimodal-looker at high |
+| Per-agent `effort:` tuning | Orchestrator and planners at xhigh, oracle at max; executor, hephaestus, librarian, and multimodal-looker at medium, explore at low |
 | `sessionTitle` from boulder.json | Already adopted (v2.1.152, `session-init.sh`); re-verified against v2.1.197 and now guarded against an absent boulder file |
 | Model generation move | Agent roster: oracle on `fable`, orchestrators/planners on `opus`, workers on `sonnet`; haiku retired |
 

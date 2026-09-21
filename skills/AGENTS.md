@@ -4,9 +4,16 @@ Installed skills live in `skills/*/SKILL.md`.
 
 ## Skill list
 
+Every skill except the orchestration entrypoints named below:
+
 `consolidate-memory`, `debugging`, `dev-browser`, `frontend-ui-ux`, `git-master`, `github-triage`, `handoff`, `hephaestus`, `init-deep`, `metis`, `momus`, `omca-setup`, `playwright`, `refactor`, `remove-ai-slops`
 
-Orchestration entrypoints moved to `commands/*.md`: `plan`, `start-work`. Skills removed in v2.10: `cancel-ralph`, `stop-continuation`, `ralph`, `ultrawork`, `ulw-loop`. Also deleted: `sisyphus-orchestrate`, `atlas`, `prometheus-plan`.
+The orchestration entrypoints are skills here too: `plan` (`skills/plan/SKILL.md`) and
+`start-work` (`skills/start-work/SKILL.md`). Both set `disable-model-invocation: true` so only
+a user can invoke them, and both omit `context: fork` so the body runs inline in the invoking
+session, where the `Agent` tool is available and orchestration happens at depth 0.
+
+Skills removed in v2.10: `cancel-ralph`, `stop-continuation`, `ralph`, `ultrawork`, `ulw-loop`. Also deleted: `sisyphus-orchestrate`, `atlas`, `prometheus-plan`.
 
 ## Public surface note
 

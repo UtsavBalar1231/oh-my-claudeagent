@@ -151,6 +151,7 @@
 [validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md cites existing recipe 'just test'
 [validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md cites existing recipe 'just release'
 [validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md references existing path 'hooks/hooks.json'
+[validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md references existing path 'hooks/hooks.json'
 [validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md references existing path 'scripts/validate-plugin.sh'
 [validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md references existing path 'templates/claudemd.md'
 [validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md references existing path 'scripts/keyword-detector.sh'
@@ -244,4 +245,4 @@
 [validate-plugin] PASS: mcp tools/list contains categories_list
 [validate-plugin] PASS: mcp tools/list contains file_read
 [validate-plugin] PASS: mcp tools/list contains session_search
-[validate-plugin] Summary: 221 passed, 0 failed, 13 skipped, 0 warned
+[validate-plugin] Summary: 222 passed, 0 failed, 13 skipped, 0 warned
