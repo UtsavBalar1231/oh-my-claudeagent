@@ -1,0 +1,24 @@
+{
+  "label": "minimal-code-composite",
+  "commit": "6172992",
+  "arms": {
+    "A": "committed prompt files, no candidate copied in",
+    "B": "candidate: hoisted and compressed minimal-code rule in agents/executor.md, compressed Minimal-Code Principle plus deleted Code Changes restatement in agents/sisyphus.md, rewritten Coding discipline in output-styles/omca-default.md, smallest-diff line in the SCOPE section and smallest-diff clause in the post-delegation diff review in skills/start-work/SKILL.md"
+  },
+  "permission_mode": "bypassPermissions",
+  "both_arms_same_commit": true,
+  "candidate_files_excluded_from_diff_figures": true,
+  "fixtures": {
+    "diff-latitude": {
+      "A": { "lines_added": [28, 3, 24], "mean_lines_added": 18.33, "passes": 3, "trials": 3 },
+      "B": { "lines_added": [28, 30, 18], "mean_lines_added": 25.33, "passes": 3, "trials": 3 }
+    },
+    "bug-fix": {
+      "B": { "passes": 3, "trials": 3, "lines_added": [20, 18, 18] }
+    }
+  },
+  "decision": "revert",
+  "decision_reason": "No correctness regression on either fixture, but mean lines_added on diff-latitude rose from 18.33 in arm A to 25.33 in arm B. The criterion required a lower mean on the candidate arm, so the composite reverts.",
+  "harness_note": "plugin_root was recorded empty for every trial: the skillsPath grep in the runner did not match this client's debug-log format, and the worktrees were removed before the gap was noticed. Every trial used --plugin-dir pointed at its own worktree, so the arm assignment is unaffected, but the field could not be filled in after the fact.",
+  "variance_note": "Arm A spread was 3 to 28 added lines across three trials, wider than the 39 to 58 spread recorded in the baseline batch at an earlier commit. Three trials per arm cannot separate a small real effect from that spread; the verdict here is that the candidate did not shrink diffs, not that it made them larger."
+}

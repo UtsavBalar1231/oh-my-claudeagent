@@ -227,6 +227,8 @@ The checkbox line alone is a title, not a task.]
 - [Every requirement the task states: the pattern to follow at reference file:lines,
   the cases to test]
 - [Every `Must NOT:` sub-bullet on the task, restated verbatim]
+- Write the smallest diff that satisfies the task. Validation at trust boundaries, error
+  and data-loss handling, security, and anything the task asks for are never what gets cut.
 
 ## 5. CONTEXT
 ### Dependencies
@@ -360,6 +362,7 @@ actually does:
 [ ] Did the expected result actually come out (not a plausible-sounding substitute)?
 [ ] Were the SCOPE requirements and exclusions from the delegation prompt honored?
 [ ] Read the executor's `SLOP PASS:` cut list and confirm nothing load-bearing was cut.
+[ ] Is this the smallest diff that satisfies the task? If not, send it back with what to drop.
 ```
 
 The executor's report ends with a `SLOP PASS:` line carrying a per-file cut list with

@@ -1,0 +1,15 @@
+{
+  "fixture": "bug-fix",
+  "arm": "B",
+  "commit": "6172992d9bbb0c6a09591b6ff20458c511524f19",
+  "candidate_file": "agents/executor.md,agents/sisyphus.md,output-styles/omca-default.md,skills/start-work/SKILL.md",
+  "trial_index": 1,
+  "exit_code": 0,
+  "lines_added": 20,
+  "lines_deleted": 1,
+  "files_touched": 2,
+  "verdict": "pass",
+  "verdict_reason": "standalone handoff announces, substring does not, validate-plugin.sh exit 0",
+  "plugin_root": "",
+  "duration_seconds": 37
+}

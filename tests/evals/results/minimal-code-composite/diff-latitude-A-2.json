@@ -1,0 +1,15 @@
+{
+  "fixture": "diff-latitude",
+  "arm": "A",
+  "commit": "6172992d9bbb0c6a09591b6ff20458c511524f19",
+  "candidate_file": null,
+  "trial_index": 2,
+  "exit_code": 0,
+  "lines_added": 3,
+  "lines_deleted": 0,
+  "files_touched": 1,
+  "verdict": "pass",
+  "verdict_reason": "filtered run names planning only, bare run names every task, both exit 0",
+  "plugin_root": "",
+  "duration_seconds": 22
+}
