@@ -1,0 +1,33 @@
+{
+  "label": "sisyphus-routing-collapse",
+  "commit": "e37787a",
+  "arm": "B",
+  "permission_mode": "bypassPermissions",
+  "candidate_file": "agents/sisyphus.md",
+  "comparator": "recorded baseline arm A at commit e0f46f7. The baseline arm was already three of three on both fixtures, so only the candidate arm was run live.",
+  "harness_note": "The candidate prompt file is copied into each worktree before the turn, so it appears in every git diff. Every lines_added, lines_deleted and files_touched figure recorded here excludes agents/sisyphus.md, since that row is harness setup rather than work the turn did. Neither fixture carries a diff-size target, so no line count is a decision criterion.",
+  "turns": 7,
+  "fixtures": {
+    "multi-file-search": {
+      "passes": 3,
+      "trials": 3,
+      "baseline_passes": 3,
+      "mean_lines_added": 0.0,
+      "mean_files_touched": 0.0,
+      "mean_duration_seconds": 27.3,
+      "status": "no regression",
+      "reason": "Three of three. Each trial named at least three scripts that write under .omca/logs/ with a log target the checkout confirms, and no trial paired a script with a log file it does not write."
+    },
+    "planning": {
+      "passes": 0,
+      "trials": 3,
+      "baseline_passes": 3,
+      "mean_duration_seconds": 620.7,
+      "status": "uninformative, pre-existing failure at HEAD",
+      "reason": "Zero of three: every trial delegated the plan to a prometheus subagent, ended the turn waiting for it, and left no plan file in the worktree or in ~/.claude/plans. A control trial run at the same commit with the committed agents/sisyphus.md, no candidate copied in, failed the same way with the same shape and duration, so the failure is not attributable to the candidate. This fixture measures nothing about this edit at this commit and the regression belongs to a change that landed between e0f46f7 and e37787a."
+    }
+  },
+  "scorer_validation": "The multi-file-search scorer derives its truth table from the checkout rather than a hand-list, and was exercised on synthetic text before the batch at no live-turn cost: a correct three-pair listing passes, a listing that pairs post-edit.sh with sessions.jsonl fails on the contradiction, and a listing naming no script fails on the count.",
+  "verdict": "kept",
+  "verdict_reason": "The one fixture that still discriminates at this commit shows no regression against the baseline pass rate, and the planning failure reproduces without the candidate."
+}

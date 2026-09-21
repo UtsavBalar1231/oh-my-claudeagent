@@ -118,25 +118,20 @@ Before any implementation, pass the **Context-Completion Gate**:
 
 Gate fails → ask, delegate research, or wait. Do not start edits.
 
-### Step 1: Classify Request Type
+### Request Routing
 
-| Type | Signal | Action |
-|------|--------|--------|
-| **Trivial** | Single file, known location, direct answer | Direct tools only |
-| **Explicit** | Specific file/line, clear command | Execute directly |
-| **Exploratory** | "How does X work?", "Find Y" | Fire explore agents in parallel |
-| **Open-ended** | "Improve", "Refactor", "Add feature" | Assess codebase first |
-| **Ambiguous** | Unclear scope, multiple interpretations | Ask ONE clarifying question |
+Every request poses one question: how much machinery does it deserve. The matrix answers it, and where two readings of the request would need very different amounts of machinery, ask before choosing.
 
-### Step 2: Check for Ambiguity
+| Task Profile | Action |
+|---|---|
+| Single file, <10 lines, no ambiguity, no verification needed | Execute directly |
+| "How does X work?", "Find Y", or any scoped lookup | Fire explore agents in parallel |
+| Multi-file, or research needed to identify the change | Delegate to specialist |
+| Open-ended ("Improve", "Refactor", "Add feature") | Assess the codebase first, then delegate |
+| Architectural, cross-cutting, or touches multiple modules | Always delegate |
+| Novel or ambiguous scope | Ask first, then decide |
 
-| Situation | Action |
-|-----------|--------|
-| Single valid interpretation | Proceed |
-| Multiple interpretations, similar effort | Proceed with reasonable default, note assumption |
-| Multiple interpretations, 2x+ effort difference | Ask |
-| Missing critical info (file, error, context) | Ask |
-| User's design seems flawed or suboptimal | Raise the concern before implementing |
+**Delegation depth**: Simple 1 hop, complex 2, architectural 3+ when justified.
 
 Use `AskUserQuestion` when ambiguity requires user input. If unavailable (subagent context), emit a `## BLOCKING QUESTIONS` block at the end of your final response and return. The orchestrator will relay.
 
@@ -161,25 +156,6 @@ Scan subagent response for `## BLOCKING QUESTIONS`. When present:
 3. Call `AskUserQuestion` with up to 4 questions. If more remain, make additional `AskUserQuestion` calls in the same turn (e.g., Q1-Q4 in call 1, Q5-Q8 in call 2). No per-turn or per-session cap; relay every question the subagent raised.
 4. Collect all answers, then resume: `SendMessage({to: "<agent_id>", prompt: "User answered:\n- Q1: <a1>\n- Q2: <a2>\n\nContinue."})`
 5. Never present questions as text. Hydration fails → "I cannot reach AskUserQuestion in this session"
-
-### Step 3: Delegation Check (run this before acting)
-
-1. Specialized agent matches this request?
-2. Can delegate with specific context for best results?
-3. Can do it myself, for sure?
-
-**Trivially simple** = all of: single file, <10 lines, zero ambiguity, no verification beyond quick read. All met → execute directly. Otherwise delegate.
-
-**Decision matrix**:
-
-| Task Profile | Action |
-|---|---|
-| Single file, <10 lines, no ambiguity, no verification needed | Execute directly |
-| Multi-file, or research needed to identify the change | Delegate to specialist |
-| Architectural, cross-cutting, or touches multiple modules | Always delegate |
-| Novel or ambiguous scope | Ask first, then decide |
-
-**Delegation depth**: Simple 1 hop, complex 2, architectural 3+ when justified.
 
 ## Phase 1 - Codebase Assessment (Open-ended tasks)
 

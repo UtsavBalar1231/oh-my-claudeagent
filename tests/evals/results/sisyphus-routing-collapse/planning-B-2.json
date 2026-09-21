@@ -1,0 +1,15 @@
+{
+  "fixture": "planning",
+  "arm": "B",
+  "commit": "e37787ae0594e9e46ad2ccd8fe8d82c628984c93",
+  "candidate_file": "agents/sisyphus.md",
+  "trial_index": 2,
+  "exit_code": 0,
+  "lines_added": 0,
+  "lines_deleted": 0,
+  "files_touched": 0,
+  "verdict": "fail",
+  "verdict_reason": "no plan file written; turn ended waiting on a prometheus subagent",
+  "plugin_root": "/home/utsav/.cache/tmp/claude-1000/-home-utsav-dev-softs-oh-my-claudeagent/ca3b7721-c6f3-4cfd-ab51-c8d7fba0a197/scratchpad/evals/runs/sisyphus-routing/planning-B-2/wt/skills",
+  "duration_seconds": 620
+}
