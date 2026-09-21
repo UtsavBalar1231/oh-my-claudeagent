@@ -12,6 +12,11 @@ This command runs in the main session at depth 0. The `Agent` tool is available,
 so orchestration is real: parallel fan-out to `executor`, specialist escalation
 via `hephaestus`/`explore`/`librarian` as needed. No depth-1 degradation.
 
+The platform's native Workflow tool is not a substitute for this command. A workflow run
+is driven by the platform's own runtime, so its agents never call `evidence_log`, never
+bind a plan through boulder, and are never seen by the TaskCompleted gate or the Stop
+gates. That makes it a separate lane, not a replacement for plan execution here.
+
 ## Refusal Clause
 
 This command body runs in the main session at depth 0. If this command somehow
