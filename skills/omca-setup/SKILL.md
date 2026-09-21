@@ -246,7 +246,7 @@ Apply optional user-scope helper settings to `~/.claude/settings.json` with user
 
 4. This skill writes no top-level keys and no `env` entries. Two in particular are left to the user:
 
-   - `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`, and with it `teammateMode: "auto"`, which is inert unless that variable is set. With agent teams enabled, any subagent Claude names launches as a teammate instead, and a teammate reports only an idle notification, never its output, so an orchestration flow that waits on subagent results can stall. OMCA's model is fan-out-and-read-results, so setup neither sets the variable nor warns when it is absent. Users who want teams set it themselves.
+   - `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`, and with it `teammateMode: "auto"`, which is inert unless that variable is set. With agent teams enabled, any subagent Claude names silently launches as a teammate instead, so `subagent_type` routing and OMCA's SubagentStart and SubagentStop accounting stop describing what actually ran. OMCA's model is fan-out-and-read-results against that accounting, so setup neither sets the variable nor warns when it is absent. Users who want teams set it themselves.
    - `ANTHROPIC_DEFAULT_OPUS_MODEL` and its `SONNET`/`FABLE` siblings. Each takes a full model name, never an alias, so setting one pins a generation that goes stale. OMCA agents declare the tier alias in their own frontmatter and let the platform resolve it, which is what these keys would otherwise override.
 
 5. If all present: "Settings already configured" -- skip
@@ -383,7 +383,7 @@ Configure the Claude Code statusline to use the oh-my-claudeagent statusline pac
         > ~/.claude/settings.json
       ```
 
-   e2. **Also configure `subagentStatusLine`** (separate platform hook, v2.1.197+) so each spawned subagent's row in the tasks panel shows its real name, model, status, and token count. Unlike `statusLine`, this has no daemon variant — it always points at the direct-mode entry point. Skip if `settings.subagentStatusLine` is already present:
+   e2. **Also configure `subagentStatusLine`** (separate platform hook, v2.1.197+) so each spawned subagent's row in the tasks panel shows its real name, model, status, and token count. Unlike `statusLine`, this has no daemon variant: it always points at the direct-mode entry point. Skip if `settings.subagentStatusLine` is already present:
 
       ```bash
       jq 'if .subagentStatusLine then . else . + {"subagentStatusLine": {"type": "command", "command": "~/.claude/statusline/.venv/bin/cc-statusline-subagent"}} end' \
@@ -408,12 +408,12 @@ Configure the Claude Code statusline to use the oh-my-claudeagent statusline pac
    g. Report to user:
       ```
       Statusline configured:
-        ~/.claude/statusline/pyproject.toml       — package manifest
-        ~/.claude/statusline/statusline/          — package files (copied from plugin)
-        ~/.claude/statusline/servers/tools/       — boulder-resolver sibling (core.py dependency)
-        ~/.claude/statusline/.venv/               — uv-managed venv with entry points
-        ~/.claude/settings.json                   — statusLine added (mode: daemon|direct, refreshInterval: 5)
-        ~/.claude/settings.json                   — subagentStatusLine added (cc-statusline-subagent, direct mode)
+        ~/.claude/statusline/pyproject.toml       - package manifest
+        ~/.claude/statusline/statusline/          - package files (copied from plugin)
+        ~/.claude/statusline/servers/tools/       - boulder-resolver sibling (core.py dependency)
+        ~/.claude/statusline/.venv/               - uv-managed venv with entry points
+        ~/.claude/settings.json                   - statusLine added (mode: daemon|direct, refreshInterval: 5)
+        ~/.claude/settings.json                   - subagentStatusLine added (cc-statusline-subagent, direct mode)
 
       For daemon mode: daemon started (auto-starts on first request if not running)
       Restart Claude Code to activate the statusline.
@@ -442,8 +442,8 @@ Configure the Claude Code statusline to use the oh-my-claudeagent statusline pac
    ```
    Your existing statusLine config is missing one or more OMCA-recommended fields.
    Proposed additions:
-     hideVimModeIndicator: true  — suppresses redundant '-- INSERT --' row (OMCA renders vim mode itself)
-     refreshInterval: 5          — re-polls disk-sourced state every 5 s during idle background-agent runs
+     hideVimModeIndicator: true  - suppresses redundant '-- INSERT --' row (OMCA renders vim mode itself)
+     refreshInterval: 5          - re-polls disk-sourced state every 5 s during idle background-agent runs
 
    This changes your statusLine's execution cadence. Add the missing field(s)? [Y/n]
    ```
@@ -562,6 +562,11 @@ configurations can still leave OMCA running in degraded mode:
   says `force-for-plugin` overrides the user's setting, but does not cover
   the higher-precedence scopes.
 
+A probe on 2.1.278 found that a user-scope pin naming a built-in style did
+not suppress OMCA's own `force-for-plugin` style, not even on the first turn
+of a fresh session. Report a pin as a suspected cause only. Clearing it is a
+diagnostic step whose effect on the active style is unconfirmed.
+
 This phase detects both conditions and offers a fix. It does NOT touch
 settings unless the user confirms.
 
@@ -610,8 +615,10 @@ settings unless the user confirms.
       ```
       Clear the outputStyle pin from ~/.claude/settings.json? OMCA's
       force-for-plugin will then be the only signal selecting an output
-      style for new sessions. The active session's style is locked at
-      session-start and will not change until you restart Claude Code.
+      style. Since 2.1.251 a style selected mid-session applies from the
+      next message, so no restart is needed to switch. Only creating or
+      editing a style file needs one, because Claude Code reads style
+      files at startup.
       [Recommended: Yes when no other plugin is competing]
       ```
 
@@ -620,13 +627,16 @@ settings unless the user confirms.
       jq 'del(.outputStyle)' ~/.claude/settings.json > /tmp/claude-settings-omca-clear-style.json \
         && mv /tmp/claude-settings-omca-clear-style.json ~/.claude/settings.json
       ```
-      Report: `Cleared outputStyle pin. Restart Claude Code to activate OMCA Default.`
+      Report: `Cleared outputStyle pin. OMCA Default applies from the next message.`
 
    e. On decline: print the fallback command so the user can run it later
       and continue without modifying settings:
       ```bash
       jq 'del(.outputStyle)' ~/.claude/settings.json > /tmp/s.json && mv /tmp/s.json ~/.claude/settings.json
       ```
+      `/output-style` returned in 2.1.269 and is the direct route: run it
+      to list the installed styles, or `/output-style [name]` to switch to
+      one. It works in headless sessions too.
 
 7. **Branch D: no pin but competitors present**: if `PINNED` is empty
    AND competitors exist, print an informational note (no action):
@@ -653,19 +663,23 @@ Get the current plugin git commit SHA: `cd "${PLUGIN_ROOT}" && git rev-parse --s
 Dependencies:
   jq:      PASS (v1.7.1)
   python3: PASS (v3.12.0)
-  ast-grep: WARN (not found — structural code search unavailable)
+  ast-grep: WARN (not found - structural code search unavailable)
 
 Files:
-  ~/.claude/CLAUDE.md      — Block injected v0.1.0 (backup: CLAUDE.md.bak)
-  ~/.claude/settings.json  — Inspected only: enabled | local checkout / dev mode | legacy config detected | not configured in user scope
-  Plugin root              — ~/.claude/plugins/cache/... | local checkout path
-  Git commit            — [short SHA from plugin root]
+  ~/.claude/CLAUDE.md      - Block injected v0.1.0 (backup: CLAUDE.md.bak)
+  ~/.claude/settings.json  - Inspected only: enabled | local checkout / dev mode | legacy config detected | not configured in user scope
+  Plugin root              - ~/.claude/plugins/cache/... | local checkout path
+  Git commit            - [short SHA from plugin root]
+
+Platform:
+  CLAUDE.md block   - [Matches templates/claudemd.md | Differs from the shipped template; re-run omca-setup]
+  Restricted session - [Not detected | CLAUDE_CODE_RESTRICTED=1; user, project and local settings ignored, so OMCA hooks and the MCP server are absent]
 
 State:
-  .omca/state/  — Verified
-  .omca/logs/   — Verified
-  Plugin-local .venv    — [Present | Auto-created on first ast-grep MCP server start in the active plugin root]
-  .gitignore   — .omca/ entry present
+  .omca/state/  - Verified
+  .omca/logs/   - Verified
+  Plugin-local .venv    - [Present | Auto-created on first ast-grep MCP server start in the active plugin root]
+  .gitignore   - .omca/ entry present
 
 Restart Claude Code to activate changes.
 ```
@@ -737,9 +751,9 @@ State section:
    === oh-my-claudeagent Uninstalled ===
 
 Removed:
-  ~/.claude/CLAUDE.md      — Block removed (or file deleted)
-  ~/.claude/settings.json  — Cleanup guidance printed; manual scope-specific removal may still be needed
-  .omca/                    — [Removed | Kept]
+  ~/.claude/CLAUDE.md      - Block removed (or file deleted)
+  ~/.claude/settings.json  - Cleanup guidance printed; manual scope-specific removal may still be needed
+  .omca/                    - [Removed | Kept]
 
    The plugin files remain at their install location or cache copy until Claude Code uninstall/remove commands run.
    ```
@@ -784,6 +798,7 @@ Run Phase 1 (Dependency Check). Report PASS/WARN/FAIL for jq, uv, python3, ast-g
 - Does own block exist in `~/.claude/CLAUDE.md`? Report version if found.
 - Does old format block exist? Report "migration needed".
 - No block? Report "not configured; run omca-setup".
+- Installed block matches the shipped template: PASS. Differs: WARN ("the block between the `--- omca-setup` markers in `~/.claude/CLAUDE.md` no longer matches `${PLUGIN_ROOT}/templates/claudemd.md`, so the agent catalog and delegation guidance loaded every turn are stale; re-run `/oh-my-claudeagent:omca-setup` to refresh the block"). Compare the two bodies; report the result and stop, this mode never rewrites the block. Include this finding in the Phase 6 report.
 
 ### Check 3: Permission Namespace Audit
 Read `~/.claude/settings.json` and verify the required permission patterns are present:
@@ -833,12 +848,12 @@ If a URL looks correct but still fails to connect, check for whitespace: Claude 
 
 ### Check 7: Statusline Health
 - `~/.claude/statusline/.venv/bin/cc-statusline` exists: PASS/FAIL
-- `~/.claude/statusline/servers/tools/_boulder_core.py` exists: PASS/FAIL ("core.py sibling dependency missing; statusline falls back to the `[claude]` stub and subagent statusline crashes — re-run omca-setup to redeploy")
-- Render smoke test — pipe a minimal payload through the entry point and confirm the output is not the `[claude]` fallback stub:
+- `~/.claude/statusline/servers/tools/_boulder_core.py` exists: PASS/FAIL ("core.py sibling dependency missing; statusline falls back to the `[claude]` stub and subagent statusline crashes; re-run omca-setup to redeploy")
+- Render smoke test: pipe a minimal payload through the entry point and confirm the output is not the `[claude]` fallback stub:
   ```bash
   echo '{"model":{"display_name":"X"},"workspace":{"current_dir":"'"$HOME"'"}}' \
     | ~/.claude/statusline/.venv/bin/cc-statusline 2>/dev/null | grep -q '\[claude\]' \
-    && echo "WARN: statusline renders fallback stub — sibling deps likely missing" \
+    && echo "WARN: statusline renders fallback stub; sibling deps likely missing" \
     || echo "PASS: statusline renders"
   ```
   PASS/WARN. A `[claude]` result means the package or its `servers/tools` sibling is broken; re-run omca-setup.
@@ -846,11 +861,20 @@ If a URL looks correct but still fails to connect, check for whitespace: Claude 
 - `statusLine.refreshInterval` present in `~/.claude/settings.json`: PASS/WARN ("refreshInterval missing; statusline won't poll during idle background-agent runs; re-run omca-setup to back-fill")
 - If daemon mode: check if daemon is running (`cc-statusline-daemon status`): PASS/WARN
 
-Include all Check 7 findings (including the `refreshInterval` PASS/WARN line) in both the `--doctor` terminal output and the Phase 6 health report.
+### Check 8: Platform Overrides
+
+Platform settings and environment variables that change how OMCA behaves without touching anything OMCA owns. Every bullet here is report-only: name the condition, name what the user would do, and write nothing.
+
+- `permissions.blockReadsOutsideWorkingDirectories` absent or false: PASS. True: WARN ("the built-in Read, Grep, Glob and LSP tools are fenced to the working directories in every permission mode. Measured on 2.1.278, the omca `file_read` MCP tool is not fenced, so OMCA still reaches outside the project root. Auto mode offers a one-time `Block from now on` choice that writes this key into user settings from a single keystroke, so confirm you meant to set it; widen with `/add-dir` or delete the key if not")
+- `maxEffortLevel` absent: PASS. Present: WARN ("a cap below an agent's declared `effort:` wins over frontmatter, measured on 2.1.278, so a cap under `xhigh` lowers the planning agents and any cap can lower oracle. Delete the key or raise it to the highest level the roster declares"). Check the top level and any `modelSettings` entry. Do not warn on `effortLevel`, which was measured not to override frontmatter and leaves the roster alone
+- `env.CLAUDE_CODE_SUBAGENT_MODEL_FORCE` unset: PASS. Set: WARN ("while this is set the platform ignores every agent definition's `model` field, so the whole roster collapses onto one model and oracle loses its fable tier. Unset it unless you deliberately want one model everywhere"). Plain `CLAUDE_CODE_SUBAGENT_MODEL` needs no warning, since agent frontmatter outranks it
+- `env.CLAUDE_CODE_RESTRICTED` unset: PASS. Set to `1`: WARN ("a restricted session ignores user, project, and local settings, so OMCA's hooks and MCP server are absent entirely and every evidence gate, state file, and statusline reading in this report is inert. Start the session without `--restricted` to get the plugin back"). This check reads the environment variable only: a session started with the `--restricted` flag leaves no setting to inspect, so when the variable is absent say that the flag itself is undetectable from inside the session and point at Check 4, where a healthy binary whose tools are still unavailable is the indirect signal
+
+Include all Check 7 findings (including the `refreshInterval` PASS/WARN line) in both the `--doctor` terminal output and the Phase 6 health report. Include the Check 8 `CLAUDE_CODE_RESTRICTED` finding and the Check 2 block-drift finding in both places as well: those two decide whether the rest of the report describes a live plugin at all.
 
 Print the Phase 6 health report format with all findings. Use "Doctor Report" header instead of "Health Check". In the step-g user report (Phase 5.6 step g), add a line under the `~/.claude/settings.json` entry:
 ```
-    ~/.claude/settings.json                   — statusLine added (mode: daemon|direct, refreshInterval: 5)
+    ~/.claude/settings.json                   - statusLine added (mode: daemon|direct, refreshInterval: 5)
 ```
 
 ---
