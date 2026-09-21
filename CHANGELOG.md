@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.19.1] - 2026-09-21
+
+### Fixed
+
+- The instruction block that setup writes into `~/.claude/CLAUDE.md` still told the
+  orchestrator to end its turn whenever an agent was outstanding. That sentence was
+  corrected everywhere else in 2.19.0, but this copy ships into a user's own settings and
+  so applied to every session regardless. A lead that ends its turn holding a delegation
+  never receives the result, which in a headless run means the work is simply lost.
+  Re-run `/oh-my-claudeagent:omca-setup` to refresh the block.
+
 ## [2.19.0] - 2026-09-21
 
 The plugin's picture of the platform was pinned at client 2.1.245 while the installed
