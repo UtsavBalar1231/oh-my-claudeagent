@@ -6,7 +6,7 @@ disable-model-invocation: true
 argument-hint: "[plan file] [--worktree <path>]"
 ---
 
-# Plan Execution Mode — start-work
+# Plan Execution Mode: start-work
 
 This command runs in the main session at depth 0. The `Agent` tool is available,
 so orchestration is real: parallel fan-out to `executor`, specialist escalation
@@ -29,12 +29,12 @@ Do not attempt a partial execution. Emit the refusal message below and return:
 ```
 ERROR: start-work requires full `Agent`-tool access and was invoked in a context
 where the tool is stripped (subagent depth >= 1). There is no degraded-mode
-fallback — orchestration and delegation require `Agent`.
+fallback, orchestration and delegation require `Agent`.
 
 Invoke plan execution from the main session via:
   /oh-my-claudeagent:start-work <plan>
 
-Do not call Agent(subagent_type="oh-my-claudeagent:start-work") — that spawns
+Do not call Agent(subagent_type="oh-my-claudeagent:start-work"), that spawns
 this command at depth 1 where this error fires.
 ```
 
@@ -45,7 +45,7 @@ Return immediately after emitting this. No further execution.
 ### Plan Mode Handling
 
 Plan mode active → call `ExitPlanMode` first. Plugin agents have `permissionMode`
-stripped — delegated agents inherit parent session context.
+stripped, delegated agents inherit parent session context.
 
 ### Finding the Active Plan
 
@@ -54,7 +54,7 @@ stripped — delegated agents inherit parent session context.
 (`bindings[session_id]`). Plan selection in this step is what creates or updates that
 binding.
 
-1. Check `boulder_progress()` — it resolves this session's bound plan from the
+1. Check `boulder_progress()`, it resolves this session's bound plan from the
    registry (explicit binding → sole registered plan → most-recently-started plan).
    If it resolves to a valid file with unchecked boxes, resume that work directly
    (skip steps 2-3).
@@ -62,8 +62,8 @@ binding.
 2. No bound plan resolves (or the bound plan is fully checked) → build the selection
    list from two sources:
    - The registry's OTHER concurrently-active plans (`plans[plan_name]` entries not
-     bound to this session), each labeled `[active]` — these are plans other sessions
-     are mid-execution on. **Exclude any plan whose checkboxes are all checked** —
+     bound to this session), each labeled `[active]`, these are plans other sessions
+     are mid-execution on. **Exclude any plan whose checkboxes are all checked**,
      completion is derived from the plan file's `- [x]` boxes, not a stored flag, so
      a fully-checked plan never appears in the selection list even if its registry
      entry hasn't been garbage-collected yet.
@@ -115,11 +115,11 @@ auto-selects. If every candidate is a draft, say so rather than picking one.
   - Single plan found → auto-select.
   - Multiple plans → present list, ask user to choose. Selecting a plan calls
     `boulder_write`, which both upserts `plans[plan_name]` and sets
-    `bindings[session_id]` to that plan — this is what "binds" the session.
+    `bindings[session_id]` to that plan, this is what "binds" the session.
 
 ### Argument Handling
 
-If `[plan file]` argument is provided, use that path directly — skip search.
+If `[plan file]` argument is provided, use that path directly, skip search.
 
 If `--worktree <path>` is provided:
 1. Validate: `git rev-parse --show-toplevel` inside path.
@@ -129,7 +129,7 @@ If `--worktree <path>` is provided:
 
 Without `--worktree`:
 1. The resolved plan's registry entry (`plans[plan_name].worktree_path`) is set
-   (resume case) → use it. `worktree_path` is per-plan, not global — a session
+   (resume case) → use it. `worktree_path` is per-plan, not global, a session
    resuming a different plan than its own last one gets that plan's worktree, not
    whatever it used previously.
 2. Otherwise → show setup prompt, store via `boulder_write`.
@@ -149,12 +149,12 @@ boulder_write(
 ```
 
 `<current session id>` is the platform session UUID (the `Session <id> initialized`
-value from the SessionStart context, same as the transcript filename) — not a
+value from the SessionStart context, same as the transcript filename), not a
 locally-generated banner id. Passing the wrong id here is what desyncs the
 statusline TODO counter and every other session-id-keyed lookup against it.
 
 `boulder_write` enforces deduplication and preserves `started_at`. Plan body
-stays at its authoritative location — boulder stores a pointer only.
+stays at its authoritative location, boulder stores a pointer only.
 
 ### Output Formats
 
@@ -291,7 +291,7 @@ Agent(
 ### 2.1 Parallelization
 
 Parallel tasks: prepare all prompts, invoke in one message, verify all once their results land.
-Sequential tasks: one at a time — real dependency, not comfort.
+Sequential tasks: one at a time, when the dependency is real rather than for comfort.
 
 A subagent's deliverable arrives in the `<result>` block of its `<task-notification>`, or as the Agent tool's return value where the platform ran it in the foreground; those are the only two places a result exists, so never claim a result you have not received in one of them. While an agent is outstanding, carry on with work that does not overlap what it was asked to do.
 Do not read or tail the agent's output file: for a subagent it is the full JSONL transcript rather than a plain result, and reading it will overflow your context. The OMCA Default output style carries the full statement of this, under "Fan-out".
@@ -309,7 +309,7 @@ Agent(subagent_type="oh-my-claudeagent:executor", prompt="...", ...)
 
 Parallel task group (invoke in one message):
 ```text
-// Tasks 2, 3, 4 are independent — invoke together
+// Tasks 2, 3, 4 are independent, invoke together
 Agent(subagent_type="oh-my-claudeagent:executor", prompt="Task 2...")
 Agent(subagent_type="oh-my-claudeagent:executor", prompt="Task 3...")
 Agent(subagent_type="oh-my-claudeagent:executor", prompt="Task 4...")
@@ -334,7 +334,7 @@ A parallel group is several Agent calls in one message. Each returns a launch
 acknowledgement immediately, and each deliverable arrives later in the `<result>` block
 of its own `<task-notification>`. Read the deliverable from there. Never Read a
 subagent's `.output`/JSONL transcript (overflows context), and never re-query a finished
-agent via `SendMessage` — a stub return IS the final answer; relaunch a fresh agent with
+agent via `SendMessage`, a stub return IS the final answer; relaunch a fresh agent with
 a sharper prompt instead.
 
 While notifications are pending and all remaining work depends on them, acknowledge
@@ -344,9 +344,9 @@ Never act on partial results.
 ### 2.3 Verify After Every Delegation
 
 ```
-[ ] Build/typecheck at project level — zero errors
-[ ] Build command — exit 0
-[ ] Test suite — all pass
+[ ] Build/typecheck at project level: zero errors
+[ ] Build command: exit 0
+[ ] Test suite: all pass
 [ ] Files exist and match requirements
 [ ] No regressions
 ```
@@ -407,7 +407,7 @@ Then run a single completeness review. Delegate to `executor`:
 ```text
 Agent(
   subagent_type="oh-my-claudeagent:executor",
-  prompt="[five-section completeness review prompt — read plan end-to-end, read diffs,
+  prompt="[five-section completeness review prompt: read plan end-to-end, read diffs,
 check each requirement was implemented, check each constraint was honored.
 Output: COMPLETE or INCOMPLETE with specifics.]"
 )
@@ -428,7 +428,7 @@ evidence_log(
   evidence_type="final_verification",
   command="executor: COMPLETE",
   exit_code=0,
-  output_snippet="COMPLETE — all requirements met",
+  output_snippet="COMPLETE, all requirements met",
   plan_sha256="<sha256sum output>"
 )
 ```
@@ -475,14 +475,14 @@ evidence_log(
 ```
 
 Completeness-check evidence call (`plan_sha256` scopes the verdict to this plan's
-current bytes — see Completeness Check above):
+current bytes, see Completeness Check above):
 
 ```
 evidence_log(
   evidence_type="final_verification",
   command="executor: COMPLETE",
   exit_code=0,
-  output_snippet="COMPLETE — all N requirements met, no constraints violated",
+  output_snippet="COMPLETE, all N requirements met, no constraints violated",
   plan_sha256="<sha256sum of the plan file>"
 )
 ```
@@ -548,7 +548,7 @@ just flaky" is not evidence.
 - **`evidence_read`**: Before final report to summarize all results
 - **`notepad_write`**: Blockers/audit breadcrumbs (learnings, issues, decisions, problems)
 - **`notepad_read`**: Fallback audit notes when relevant to a pending task
-- Never `rm -f` on `.omca/state/` — use MCP tools
+- Never `rm -f` on `.omca/state/`: use MCP tools
 
 Only `evidence_log`, `boulder_progress`, and `notepad_write` load eagerly. `boulder_write`, `evidence_read`, `notepad_read`, `ast_search`, and `file_read` are deferred, so hydrate the schema with `ToolSearch({query: "select:<name>", max_results: 1})` before the first call or it fails with an `InputValidationError`.
 
@@ -564,4 +564,4 @@ Only `evidence_log`, `boulder_progress`, and `notepad_write` load eagerly. `boul
 - Mark plan checkboxes immediately after verification; do not batch
 - Never trust subagent claims without independent verification
 - Never batch multiple plan tasks in one delegation
-- Never use `Bash(claude ...)` — use native `Agent(subagent_type=...)`
+- Never use `Bash(claude ...)`: use native `Agent(subagent_type=...)`

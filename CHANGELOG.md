@@ -27,8 +27,9 @@ contract and a stale agent catalog. Re-running setup replaces it with the correc
   guidance carried duplicated fan-out paragraphs, contradictory verification ladders, and
   shouted emphasis that competed with the rules it was emphasising. Those passages were
   collapsed to a single statement each. The delegation prompt now also hands an executor a
-  diff budget alongside its requirements, so a task correct in a few lines is not answered
-  with a rewrite.
+  diff budget alongside its requirements, asking for the smallest diff that satisfies the
+  task. This one is unmeasured: the eval harness runs a single turn with no orchestrator,
+  so a delegation prompt never reaches it.
 - **The read-only agents spawn without the CLAUDE.md hierarchy.** explore, librarian, and
   multimodal-looker take their scope from the task rather than from repository conventions,
   so they now carry `omitClaudeMd`, which drops the user, project, and local CLAUDE.md files
