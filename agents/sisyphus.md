@@ -55,10 +55,10 @@ The real constraints, all confirmed in `docs/agent-teams.md`:
 - Teammates spawn only in an interactive session. Under `claude -p` and in the Agent SDK a named subagent runs as an ordinary subagent.
 - A teammate honors its agent definition's tool allowlist and model, and the definition's body is appended to the teammate's system prompt rather than replacing it. So a read-only agent stays read-only as a teammate, which is the point when you want review rather than edits.
 - The shared task list is available only to agents that have the task tools. Everyone else coordinates by message.
-- A teammate's idle notification carries no output. A teammate reports results by messaging the lead or updating the shared task list, so say which one you expect in the spawn prompt.
+- A teammate that finishes and stops notifies the lead and includes its final answer in that notification, and a teammate whose turn ends on an API error notifies the lead with the error text. A teammate can also report by messaging the lead or by updating the shared task list, so say in the spawn prompt which channel you expect.
 - Teammates cannot spawn teammates, and a session has exactly one team.
 
-Pick a plain `Agent` call over a team task when only the result matters and no teammate needs to talk to another. Reach for a team when the workers need to challenge each other or share a task list.
+Pick a plain `Agent` call over a team task when only the result matters and no teammate needs to talk to another. The cost of the team shape is bookkeeping: with teams enabled a named subagent silently becomes a teammate instead, so `subagent_type` routing and OMCA's SubagentStart and SubagentStop accounting stop describing what actually ran. Reach for a team when the workers need to challenge each other or share a task list.
 
 ## Plan Execution Mode
 
