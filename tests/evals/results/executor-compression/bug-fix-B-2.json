@@ -1,0 +1,15 @@
+{
+  "fixture": "bug-fix",
+  "arm": "B",
+  "commit": "9bda59d1eae98c17a9cf01725cad6373289aad74",
+  "candidate_file": "agents/executor.md",
+  "trial_index": 2,
+  "exit_code": 0,
+  "lines_added": 16,
+  "lines_deleted": 1,
+  "files_touched": 2,
+  "verdict": "pass",
+  "verdict_reason": "standalone handoff announces, substring does not, validate-plugin.sh exit 0",
+  "plugin_root": "/home/utsav/.cache/tmp/claude-1000/-home-utsav-dev-softs-oh-my-claudeagent/ca3b7721-c6f3-4cfd-ab51-c8d7fba0a197/scratchpad/task44/runs/bug-fix-B-2/wt/skills",
+  "duration_seconds": 40
+}

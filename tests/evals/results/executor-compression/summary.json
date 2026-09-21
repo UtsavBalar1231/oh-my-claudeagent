@@ -1,0 +1,37 @@
+{
+  "label": "executor-compression",
+  "commit": "9bda59d",
+  "arm": "B",
+  "permission_mode": "bypassPermissions",
+  "candidate_file": "agents/executor.md",
+  "comparator": "baseline arm A at commit e0f46f7, using the behavioral record set for bug-fix",
+  "harness_note": "The candidate prompt file is copied into each worktree before the turn, so it appears in every git diff. Every lines_added, lines_deleted and files_touched figure recorded here excludes agents/executor.md, since that row is harness setup rather than work the turn did. lines_added is not a decision criterion for either fixture: neither dictates a diff-size target.",
+  "turns": 6,
+  "fixtures": {
+    "single-file-edit": {
+      "passes": 3,
+      "trials": 3,
+      "baseline_passes": 3,
+      "mean_lines_added": 1.0,
+      "mean_lines_deleted": 0.0,
+      "mean_files_touched": 1.0,
+      "mean_duration_seconds": 11.7,
+      "status": "no regression",
+      "reason": "Three of three. Line 2 of scripts/session-init.sh carries the required comment in every trial, scripts/session-init.sh is the only file the turn changed, and validate-plugin.sh exits 0."
+    },
+    "bug-fix": {
+      "passes": 3,
+      "trials": 3,
+      "baseline_passes": 3,
+      "mean_lines_added": 18.7,
+      "mean_lines_deleted": 1.0,
+      "mean_files_touched": 2.0,
+      "mean_duration_seconds": 40.0,
+      "status": "no regression",
+      "reason": "Three of three under the behavioral scorer. keyword-detector.sh announces handoff mode on a standalone mention and stays silent on a substring mention in every trial, and validate-plugin.sh exits 0. Each trial also added bats coverage to tests/bats/hooks/keyword_detector.bats."
+    }
+  },
+  "scorer_validation": "The behavioral scorer was exercised against a synthetic worktree before the batch, at no live-turn cost: unfixed code answers standalone 1 / substring 1 and fails, a guarded copy answers standalone 1 / substring 0 and passes.",
+  "verdict": "kept",
+  "verdict_reason": "No trial regressed on correctness against the baseline pass rate for either fixture, so the compressed executor body is applied."
+}
