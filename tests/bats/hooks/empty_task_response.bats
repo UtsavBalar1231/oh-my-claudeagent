@@ -7,7 +7,7 @@ load '../test_helper'
 
 FULL_EXECUTOR_REPORT="TASK: fix the bug
 STATUS: complete
-CHANGES: scripts/foo.sh — fixed field read
+CHANGES: scripts/foo.sh, fixed field read
 EVIDENCE: just test-hooks passed, 21 tests
 NOTES: no blockers"
 
@@ -48,7 +48,7 @@ NOTES: no blockers"
 }
 
 # ---------------------------------------------------------------------------
-# SubagentHandback — the payload that carries the report
+# SubagentHandback: the payload that carries the report
 # ---------------------------------------------------------------------------
 
 @test "empty-task-response: short hand-back message fires the poor-output advice" {

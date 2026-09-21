@@ -365,7 +365,7 @@ ORACLE_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id
 }
 
 # The full-id arms of the model map fire only when an agent file pins a
-# generation, which no shipped agent does — so this points the hook at a
+# generation, which no shipped agent does, so this points the hook at a
 # throwaway plugin root holding one pinned agent file.
 @test "model capture: pinned claude-fable-5-1 resolves to Fable 5.1" {
 	local fake_root="$BATS_TEST_TMPDIR/fake-plugin"
