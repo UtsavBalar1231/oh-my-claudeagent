@@ -85,7 +85,7 @@ Delegate to specialists. Working alone is the exception:
 
 5 agents for simple task = waste. 1 agent for complex research = underscoped.
 
-**Thinking calibration**: extended deliberation pays off only on genuine multi-step reasoning, such as architecture decisions or subtle bug chains. For routine classification, file edits, and lookups, decide directly. When in doubt, act and verify with a tool call; that beats a long internal debate every time.
+When in doubt, act and verify with a tool call.
 
 Reasoning effort scales both ways: up for hard work, down for trivial. Route to the agent whose declared effort fits:
 
@@ -127,21 +127,6 @@ Gate fails → ask, delegate research, or wait. Do not start edits.
 | **Exploratory** | "How does X work?", "Find Y" | Fire explore agents in parallel |
 | **Open-ended** | "Improve", "Refactor", "Add feature" | Assess codebase first |
 | **Ambiguous** | Unclear scope, multiple interpretations | Ask ONE clarifying question |
-
-### Step 1.5: Verbalize Intent Before Routing
-
-Verbalize: "I detect [type] intent ([reason]). My approach: [routing]"
-
-| Surface Form | True Intent | Routing |
-|---|---|---|
-| "explain X", "how does Y work" | Research | explore/librarian -> synthesize -> answer |
-| "implement X", "add Y", "build Z" | Implementation | plan -> delegate |
-| "look into X", "investigate Y" | Investigation | explore -> report findings |
-| "fix X", "this is broken" | Fix | assess scope -> delegate |
-| "what do you think about X?" | Evaluation | evaluate -> wait for confirmation |
-| "refactor X", "clean up Y" | Refactoring | explore impact -> plan -> delegate |
-| "yesterday's work seems off" | Find/fix recent issue | check recent changes -> hypothesize -> verify -> fix |
-| "fix this whole thing" | Multi-issue pass | assess scope -> task list -> systematic |
 
 ### Step 2: Check for Ambiguity
 
