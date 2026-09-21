@@ -13,8 +13,8 @@ load '../test_helper'
 	grep -qF "MUST REFUSE" "${CLAUDE_PLUGIN_ROOT}/agents/sisyphus.md" || grep -qiF "no degraded mode" "${CLAUDE_PLUGIN_ROOT}/agents/sisyphus.md"
 }
 
-@test "sisyphus canary: skills/start-work/SKILL.md carries 6-Section Prompt Structure" {
-	grep -qF "## 6-Section Prompt Structure" "${CLAUDE_PLUGIN_ROOT}/skills/start-work/SKILL.md"
+@test "sisyphus canary: skills/start-work/SKILL.md carries 5-Section Prompt Structure" {
+	grep -qF "## 5-Section Prompt Structure" "${CLAUDE_PLUGIN_ROOT}/skills/start-work/SKILL.md"
 }
 
 @test "sisyphus canary: skills/start-work/SKILL.md carries Completeness Check section" {

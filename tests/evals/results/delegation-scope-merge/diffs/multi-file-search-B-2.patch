@@ -1,0 +1,129 @@
+diff --git a/agents/sisyphus.md b/agents/sisyphus.md
+index 4f16ea1..55e18dd 100644
+--- a/agents/sisyphus.md
++++ b/agents/sisyphus.md
+@@ -62,7 +62,7 @@ Pick a plain `Agent` call over a team task when only the result matters and no t
+ 
+ ## Plan Execution Mode
+ 
+-When invoked via `/oh-my-claudeagent:start-work <plan>`, follow the protocol in `skills/start-work/SKILL.md`. That command body is the authoritative plan-execution contract: it carries the 6-Section Prompt Structure, FROZEN Plan Discipline, and Evidence Logging Mandate. This agent definition covers free-form orchestration; plan-driven execution is delegated to the command body.
++When invoked via `/oh-my-claudeagent:start-work <plan>`, follow the protocol in `skills/start-work/SKILL.md`. That command body is the authoritative plan-execution contract: it carries the 5-Section Prompt Structure, FROZEN Plan Discipline, and Evidence Logging Mandate. This agent definition covers free-form orchestration; plan-driven execution is delegated to the command body.
+ 
+ The command runs at depth 0 in the main session with full `Agent`-tool access. Parallel fan-out to `executor` (for task execution) and other specialists works natively.
+ 
+@@ -233,15 +233,14 @@ Implement directly only when all of these hold: single-file <20 lines, no test i
+ 
+ Steps 2 to 4 need the task tools, and this agent runs on `opus`. On Opus 5 and Fable 5 era models the platform withholds `TodoWrite` and `TaskCreate`/`TaskGet`/`TaskUpdate`/`TaskList` unless `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` is set. Without that variable, track the same breakdown in your own response and in `notepad_write`; the discipline is mandatory, the tool is what may be missing.
+ 
+-### Delegation Prompt Structure (all six sections, every time)
++### Delegation Prompt Structure (all five sections, every time)
+ 
+ ```
+ 1. TASK: Atomic, specific goal (one action per delegation)
+ 2. EXPECTED OUTCOME: Concrete deliverables with success criteria
+ 3. REQUIRED TOOLS: Explicit tool whitelist
+-4. MUST DO: Exhaustive requirements - leave NOTHING implicit
+-5. MUST NOT DO: Forbidden actions - anticipate and block rogue behavior
+-6. CONTEXT: File paths, existing patterns, constraints
++4. SCOPE: The requirements and the exclusions this plan states, with the reason for each
++5. CONTEXT: File paths, existing patterns, constraints
+ ```
+ 
+ ### Code Changes
+diff --git a/skills/start-work/SKILL.md b/skills/start-work/SKILL.md
+index aec59e8..b48f1bd 100644
+--- a/skills/start-work/SKILL.md
++++ b/skills/start-work/SKILL.md
+@@ -201,10 +201,9 @@ TASK ANALYSIS:
+ - Sequential Dependencies: [list]
+ ```
+ 
+-## 6-Section Prompt Structure
++## 5-Section Prompt Structure
+ 
+-Every delegation prompt includes all 6 sections. Prompts under 30 lines are
+-typically too thin — include full context.
++Every delegation prompt includes all five sections.
+ 
+ ```markdown
+ ## 1. TASK
+@@ -219,17 +218,12 @@ The checkbox line alone is a title, not a task.]
+ ## 3. REQUIRED TOOLS
+ - [tool]: [what to search/check]
+ 
+-## 4. MUST DO
+-- Follow pattern in [reference file:lines]
+-- Write tests for [specific cases]
+-
+-## 5. MUST NOT DO
++## 4. SCOPE
++- [Every requirement the task states: the pattern to follow at reference file:lines,
++  the cases to test]
+ - [Every `Must NOT:` sub-bullet on the task, restated verbatim]
+-- Do NOT modify files outside [scope]
+-- Do NOT add dependencies
+-- Do NOT skip verification
+ 
+-## 6. CONTEXT
++## 5. CONTEXT
+ ### Dependencies
+ [What previous tasks built, resolved from the task's `Depends:` sub-bullet]
+ ### Files in play
+@@ -260,9 +254,9 @@ Each sub-bullet then feeds a specific section, and the mapping is not a judgment
+ | Sub-bullet    | Feeds                                                            |
+ |---------------|------------------------------------------------------------------|
+ | `Done when:`  | §2 EXPECTED OUTCOME, as the verification line                     |
+-| `Must NOT:`   | §5 MUST NOT DO, restated verbatim                                 |
+-| `File:`       | §2's "Files created/modified" and §6 CONTEXT                      |
+-| `Depends:`    | §6 CONTEXT, under Dependencies                                    |
++| `Must NOT:`   | §4 SCOPE, restated verbatim                                       |
++| `File:`       | §2's "Files created/modified" and §5 CONTEXT                      |
++| `Depends:`    | §5 CONTEXT, under Dependencies                                    |
+ 
+ A sub-bullet the plan omits is simply absent; do not invent one. Copying it into its
+ target section does not replace quoting it in §1: §1 carries the task as written, the
+@@ -272,7 +266,7 @@ other sections carry it as instructions.
+ carry bolded fields instead: `**What to do**`, `**Acceptance Criteria**`,
+ `**Must NOT do**`. Quote whichever shape the task actually uses rather than assuming
+ the sub-bullet form, and map the bolded fields the same way: `**Acceptance Criteria**`
+-to §2, `**Must NOT do**` to §5. A plan is one shape or the other, never both. If a task
++to §2, `**Must NOT do**` to §4. A plan is one shape or the other, never both. If a task
+ has neither shape, the checkbox line is all there is, and §1 says so explicitly so the
+ executor knows the thinness is the plan's, not a truncation.
+ 
+@@ -281,7 +275,7 @@ Example delegation:
+ ```text
+ Agent(
+   subagent_type="oh-my-claudeagent:executor",
+-  prompt=`[FULL 6-SECTION PROMPT]`
++  prompt=`[FULL 5-SECTION PROMPT]`
+ )
+ ```
+ 
+@@ -359,7 +353,7 @@ actually does:
+ [ ] Does it work as expected, not just "should work"?
+ [ ] Does it follow the existing codebase pattern (naming, error handling, layer boundaries)?
+ [ ] Did the expected result actually come out (not a plausible-sounding substitute)?
+-[ ] Were the MUST DO and MUST NOT DO requirements from the delegation prompt honored?
++[ ] Were the SCOPE requirements and exclusions from the delegation prompt honored?
+ [ ] Read the executor's `SLOP PASS:` cut list and confirm nothing load-bearing was cut.
+ ```
+ 
+@@ -405,7 +399,7 @@ Then run a single completeness review. Delegate to `executor`:
+ ```text
+ Agent(
+   subagent_type="oh-my-claudeagent:executor",
+-  prompt="[6-section completeness review prompt — read plan end-to-end, read diffs,
++  prompt="[five-section completeness review prompt — read plan end-to-end, read diffs,
+ check each requirement was implemented, check each constraint was honored.
+ Output: COMPLETE or INCOMPLETE with specifics.]"
+ )
+@@ -556,7 +550,7 @@ Only `evidence_log`, `boulder_progress`, and `notepad_write` load eagerly. `boul
+ 
+ - `boulder_write` before delegating; tracks execution metadata
+ - Read the full plan before delegating
+-- All 6 sections in every delegation prompt
++- All five sections in every delegation prompt
+ - `evidence_log` after every verification command
+ - `evidence_read` before final report to summarize all results
+ - Mark plan checkboxes immediately after verification; do not batch

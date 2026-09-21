@@ -1,0 +1,15 @@
+{
+  "fixture": "multi-file-search",
+  "arm": "B",
+  "commit": "31f4a484a8f647313597b1bcdffeeba9ea2bba7e",
+  "candidate_file": "skills/start-work/SKILL.md + agents/sisyphus.md",
+  "trial_index": 2,
+  "exit_code": 0,
+  "lines_added": 0,
+  "lines_deleted": 0,
+  "files_touched": 0,
+  "verdict": "pass",
+  "verdict_reason": "named five scripts with their own log file, every pair confirmed by the checkout; no contradicted log target",
+  "plugin_root": null,
+  "duration_seconds": 25
+}

@@ -1,0 +1,26 @@
+{
+  "label": "delegation-scope-merge",
+  "commit": "31f4a48",
+  "arm": "B",
+  "permission_mode": "bypassPermissions",
+  "candidate_file": "skills/start-work/SKILL.md + agents/sisyphus.md",
+  "comparator": "recorded baseline arm at commit e0f46f7. The baseline arm was already three of three on this fixture and the criterion here is correctness rather than diff size, so only the candidate arm was run live.",
+  "harness_note": "Both candidate prompt files are copied into each worktree before the turn, so both appear in every git diff. Every lines_added, lines_deleted and files_touched figure recorded here excludes agents/sisyphus.md and skills/start-work/SKILL.md, since those rows are harness setup rather than work the turn did. Each trial ran in its own fresh worktree, so each had its own .omca state directory. The fixture carries no diff-size target, so no line count is a decision criterion.",
+  "turns": 3,
+  "fixtures": {
+    "multi-file-search": {
+      "passes": 3,
+      "trials": 3,
+      "baseline_passes": 3,
+      "mean_lines_added": 0.0,
+      "mean_files_touched": 0.0,
+      "mean_duration_seconds": 28.0,
+      "status": "no regression",
+      "reason": "Three of three. Each trial named at least three scripts that write their own file under .omca/logs/ with a target the checkout confirms, and no trial paired a script with a log file it does not write."
+    }
+  },
+  "scorer_validation": "The truth table was derived from the checkout by matching log filenames across scripts/ and scripts/lib/, not from a hand-list. Direct writers: post-edit.sh to edits.jsonl, edit-error-recovery.sh to errors.jsonl, session-init.sh and session-cleanup.sh to sessions.jsonl, task-completed-verify.sh to task-verify-audit.jsonl. Helper writers in common.sh: hook-errors.jsonl, hook-info.jsonl, hook-timing.jsonl. A listing pairing a script with a file absent from that table fails on contradiction; a listing naming fewer than three pairs fails on count.",
+  "known_gap": "plugin_root is null on all three trials. The skillsPath capture regex did not match this client's debug log format and the debug log lived inside the worktree, which was removed after the turn. Re-capturing would cost three live turns and changes no verdict, so it was not rerun.",
+  "verdict": "kept",
+  "verdict_reason": "Three of three against a baseline that was also three of three, so the merged SCOPE section shows no regression on the fixture that discriminates at this commit."
+}

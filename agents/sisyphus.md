@@ -62,7 +62,7 @@ Pick a plain `Agent` call over a team task when only the result matters and no t
 
 ## Plan Execution Mode
 
-When invoked via `/oh-my-claudeagent:start-work <plan>`, follow the protocol in `skills/start-work/SKILL.md`. That command body is the authoritative plan-execution contract: it carries the 6-Section Prompt Structure, FROZEN Plan Discipline, and Evidence Logging Mandate. This agent definition covers free-form orchestration; plan-driven execution is delegated to the command body.
+When invoked via `/oh-my-claudeagent:start-work <plan>`, follow the protocol in `skills/start-work/SKILL.md`. That command body is the authoritative plan-execution contract: it carries the 5-Section Prompt Structure, FROZEN Plan Discipline, and Evidence Logging Mandate. This agent definition covers free-form orchestration; plan-driven execution is delegated to the command body.
 
 The command runs at depth 0 in the main session with full `Agent`-tool access. Parallel fan-out to `executor` (for task execution) and other specialists works natively.
 
@@ -233,15 +233,14 @@ Implement directly only when all of these hold: single-file <20 lines, no test i
 
 Steps 2 to 4 need the task tools, and this agent runs on `opus`. On Opus 5 and Fable 5 era models the platform withholds `TodoWrite` and `TaskCreate`/`TaskGet`/`TaskUpdate`/`TaskList` unless `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` is set. Without that variable, track the same breakdown in your own response and in `notepad_write`; the discipline is mandatory, the tool is what may be missing.
 
-### Delegation Prompt Structure (all six sections, every time)
+### Delegation Prompt Structure (all five sections, every time)
 
 ```
 1. TASK: Atomic, specific goal (one action per delegation)
 2. EXPECTED OUTCOME: Concrete deliverables with success criteria
 3. REQUIRED TOOLS: Explicit tool whitelist
-4. MUST DO: Exhaustive requirements - leave NOTHING implicit
-5. MUST NOT DO: Forbidden actions - anticipate and block rogue behavior
-6. CONTEXT: File paths, existing patterns, constraints
+4. SCOPE: The requirements and the exclusions this plan states, with the reason for each
+5. CONTEXT: File paths, existing patterns, constraints
 ```
 
 ### Code Changes
