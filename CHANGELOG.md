@@ -5,6 +5,73 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+The plugin's picture of the platform was pinned at client 2.1.245 while the installed
+client was 2.1.278. This release reconciles the gap across the shipped docs, the hooks, the
+agent prompts, and the setup skill.
+
+**After upgrading, re-run `/oh-my-claudeagent:omca-setup`.** The OMCA block this plugin
+installs into your own `~/.claude/CLAUDE.md` is written once at setup time and is not
+rewritten by a plugin update, so an existing block still teaches the pre-2.1.278 fan-out
+contract and a stale agent catalog. Re-running setup replaces it with the corrected block.
+
+### Changed
+
+- **The plan and start-work entrypoints are skills.** `plan` and `start-work` moved out of
+  `commands/` and into `skills/`, which is the surface the platform keeps developing and the
+  one the rest of the plugin already used. The invocations are unchanged:
+  `/oh-my-claudeagent:plan` and `/oh-my-claudeagent:start-work` still work exactly as before,
+  with the same arguments. Nothing in a user's settings or workflow needs editing.
+- **Agent prompts read as one instruction set rather than several.** The orchestration
+  guidance carried duplicated fan-out paragraphs, contradictory verification ladders, and
+  shouted emphasis that competed with the rules it was emphasising. Those passages were
+  collapsed to a single statement each. The delegation prompt now also hands an executor a
+  diff budget alongside its requirements, so a task correct in a few lines is not answered
+  with a rewrite.
+- **The read-only agents spawn without the CLAUDE.md hierarchy.** explore, librarian, and
+  multimodal-looker take their scope from the task rather than from repository conventions,
+  so they now carry `omitClaudeMd`, which drops the user, project, and local CLAUDE.md files
+  and the project rule files from each spawn. Agents that act on or judge against repository
+  conventions are unaffected.
+- **Skill descriptions were shortened.** Several sat near the point where a reduced-context
+  window truncates them, which is silent when it happens.
+
+### Added
+
+- **Setup reports the platform settings that silently change how the plugin behaves.** The
+  doctor pass now warns when a setting caps agent effort below what the roster declares,
+  when a forced subagent model would flatten oracle off its tier, when a session is running
+  restricted so the plugin's hooks and MCP server are absent, and when reads outside the
+  working directory are blocked. Each of these changes plugin behavior without producing an
+  error, so the check exists to make the cause visible.
+- **The statusline mode is a picker.** Setup offers the available modes rather than asking
+  for a value to type.
+- **The plugin validator checks hook stdout shape and the plugin manifest.** A handler that
+  prints multi-line JSON, or JSON followed by bare text, is a parse failure at runtime; the
+  validator now catches both before release. `just validate-manifest` also validates the
+  manifest path directly, which reaches every skill and agent frontmatter.
+
+### Fixed
+
+- **Hooks read a subagent's report from the wrong place under fork and auto mode.** Under
+  fork mode the `PostToolUse Agent` payload is a launch acknowledgement rather than a
+  result, and in auto mode a subagent reports through `SubagentHandback`. The output-quality
+  check was inspecting the acknowledgement and firing its advisory on every launch. It now
+  reads the handback payload, and keeps the Agent branch for the modes where the result does
+  arrive there.
+- **The post-edit hook read a success field the Write and Edit payloads never carry.**
+- **Injected context had no budget.** The rule and AGENTS.md injection could emit well past
+  the platform's per-string cap, at which point the overflow is written to a file and
+  silently dropped from the injection. The walk is now budgeted, and the AGENTS.md excerpt
+  can be skipped where the platform loads AGENTS.md itself.
+- **A retry advisory fired for a retry the platform already performs.**
+- **A pinned `claude-fable-5-1` now displays as Fable 5.1** in the per-subagent model
+  readout, instead of falling through as a raw model id.
+- **The shipped docs asserted platform facts that no longer hold.** The subagent, hook,
+  settings, and permission surfaces were re-derived against client 2.1.278 and corrected
+  where they had gone stale.
+
 ## [2.18.1] - 2026-08-31
 
 A search gate pointed executors at the one tool that could not reach the files they were
