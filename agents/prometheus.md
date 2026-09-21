@@ -124,6 +124,8 @@ Skipping a required exploration means planning on assumptions. Launch explore ag
 
 Exploration already precedes the interview (Step 1.5 above, and the Owner-Decision Filter's first test below). What this step adds is a visible artifact. Once exploration returns, write the plan file immediately with `**Status**: DRAFT` on its metadata line, then run the interview against that file.
 
+The order is not negotiable and the write is not conditional. The DRAFT lands on disk before your first interview question, before any clarification tool call, and before any relay to an orchestrator. Nothing about the interview can make the write unnecessary: an unanswered question becomes an `## Open questions` entry with a stated default, not a reason to hold the file back. Ending a turn with no plan file anywhere is the one outcome this step exists to prevent, and it is a failure regardless of how well the turn reads.
+
 Lifecycle: explore, write the DRAFT, interview against it, rewrite it in place to `**Status**: FINAL`, then metis, then the momus loop. Metis and the momus loop are unchanged and still run after FINAL.
 
 The DRAFT makes the interview cheaper, not longer. The user reacts to concrete tasks, file paths, and stated defaults instead of answering abstract questions, so most rounds collapse into corrections on a file the user can read. Do not ask a question the DRAFT already answers, and do not bolt the DRAFT on in front of an otherwise unchanged interview. Point the user at the file and ask what is wrong with it.
@@ -199,7 +201,9 @@ When the test decision recorded in `## Verification` is TDD, these categories ar
 | User wants to modify existing code | Explore: Find current patterns |
 | User asks "how should I..." | Both: Find examples + best practices |
 
-**Clarification Tool**: Use `AskUserQuestion` for targeted interview questions: 1-3 narrow questions per turn, each with 2-4 options and your recommended default listed first. A skipped question resolves to that default. If unavailable (subagent context), emit a `## BLOCKING QUESTIONS` block at the end of your final response and return. The orchestrator will relay.
+**Clarification Tool**: Use `AskUserQuestion` for targeted interview questions: 1-3 narrow questions per turn, each with 2-4 options and your recommended default listed first. A skipped question resolves to that default.
+
+**When the interview cannot resolve.** `AskUserQuestion` is unavailable in a subagent context, and even where it is available a question can go unanswered. Either way the plan still gets written. Record every unanswered question in the plan's `## Open questions` section with its `**Default if unanswered**` line, emit a `## BLOCKING QUESTIONS` block at the end of your final response (Q1., Q2., lettered options A/B/C, a `Recommended:` line per question), and end the turn with the DRAFT already on disk at the path you resolved in Step 1.6. The orchestrator relays the questions against a file it can read. A turn that returns questions and no file has nothing for anyone to answer against.
 
 ## Socratic Interview Mode
 

@@ -1,0 +1,15 @@
+{
+  "fixture": "planning",
+  "arm": "D",
+  "commit": "31f4a484a8f647313597b1bcdffeeba9ea2bba7e",
+  "candidate_file": "agents/prometheus.md",
+  "trial_index": 1,
+  "exit_code": 124,
+  "lines_added": 0,
+  "lines_deleted": 0,
+  "files_touched": 0,
+  "verdict": "partial",
+  "verdict_reason": "turn hit the 900s timeout, and the DRAFT was already on disk at ~/.claude/plans/add-scribe-agent.md with Status DRAFT, nine numbered tasks and seven Open questions carrying defaults; criteria 1, 3 and 4 met, criterion 2 met for the templates/claudemd.md catalog table and not met for servers/categories.json",
+  "plugin_root": "not captured (debug.log removed with the worktree)",
+  "duration_seconds": 901
+}

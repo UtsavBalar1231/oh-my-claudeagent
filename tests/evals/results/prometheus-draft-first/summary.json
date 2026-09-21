@@ -1,0 +1,18 @@
+{
+  "label": "prometheus-draft-first",
+  "fixture": "planning",
+  "arm": "D",
+  "commit": "31f4a484a8f647313597b1bcdffeeba9ea2bba7e",
+  "candidate_file": "agents/prometheus.md",
+  "candidate_change": "draft write made unconditional and ordered before any interview attempt; blocking-questions fallback moved onto the main interview path",
+  "decision_criterion": "how many trials leave a plan file on disk",
+  "plan_file_written": "2 of 3",
+  "comparison": "the HEAD control in results/lead-nonblocking wrote no plan file in 1 of 1; prior arm B wrote 2 of 3, both times by the lead planning directly rather than by prometheus",
+  "notes": [
+    "Trials 1 and 2 both hit the 900s harness timeout with the plan already on disk, which is the effect the change is for: a turn that runs out of time now leaves a readable DRAFT instead of nothing.",
+    "Trial 1 wrote to ~/.claude/plans; trial 2 wrote to the worktree's .omca/plans, which is the compatibility mirror rather than the resolved plans directory.",
+    "Trial 3 failed before prometheus was spawned: the lead declined to plan and pointed the user at the slash command. Nothing in this candidate governs that path.",
+    "Trial 2's plan body was lost when the worktree was removed, so its success criteria are unscored. Copy plan files out of the worktree before removal in future batches.",
+    "Criterion 2 names servers/categories.json and the templates/claudemd.md catalog table. Trial 1 named the catalog table and not categories.json."
+  ]
+}
