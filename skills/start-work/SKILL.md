@@ -12,11 +12,11 @@ This command runs in the main session at depth 0. The `Agent` tool is available,
 so orchestration is real: parallel fan-out to `executor`, specialist escalation
 via `hephaestus`/`explore`/`librarian` as needed. No depth-1 degradation.
 
-## Mandatory MUST REFUSE Clause
+## Refusal Clause
 
 This command body runs in the main session at depth 0. If this command somehow
 executes in a context where the `Agent` tool is unavailable (subagent depth >= 1,
-or stripped by platform), REFUSE and exit immediately.
+or stripped by platform), refuse and exit immediately.
 
 There is no degraded mode. Do not implement tasks directly. Do not self-review.
 Do not attempt a partial execution. Emit the refusal message below and return:
@@ -131,7 +131,7 @@ Without `--worktree`:
 
 ### Boulder Write (BEFORE Delegating)
 
-After plan is selected, BEFORE any delegation. `boulder_write` is a deferred tool, so
+After plan is selected, before any delegation. `boulder_write` is a deferred tool, so
 hydrate it with `ToolSearch({query: "select:boulder_write", max_results: 1})` first:
 
 ```
@@ -189,8 +189,8 @@ Reading plan and beginning execution...
 
 ## Step 1: Register and Analyze
 
-1. `boulder_write(active_plan="<path>", plan_name="<name>", session_id="<current>")` — BEFORE delegating.
-2. Read FULL plan file.
+1. `boulder_write(active_plan="<path>", plan_name="<name>", session_id="<current>")`, before delegating.
+2. Read the full plan file.
 3. Parse `- [ ]` checkboxes.
 4. Build parallelization map: simultaneous tasks, dependencies, file conflicts.
 
@@ -203,7 +203,7 @@ TASK ANALYSIS:
 
 ## 6-Section Prompt Structure
 
-Every delegation prompt MUST include ALL 6 sections. Prompts under 30 lines are
+Every delegation prompt includes all 6 sections. Prompts under 30 lines are
 typically too thin — include full context.
 
 ```markdown
@@ -265,7 +265,7 @@ Each sub-bullet then feeds a specific section, and the mapping is not a judgment
 | `Depends:`    | §6 CONTEXT, under Dependencies                                    |
 
 A sub-bullet the plan omits is simply absent; do not invent one. Copying it into its
-target section does NOT replace quoting it in §1: §1 carries the task as written, the
+target section does not replace quoting it in §1: §1 carries the task as written, the
 other sections carry it as instructions.
 
 **Older plans use a different shape.** Plans written before the sub-bullet template
@@ -289,7 +289,7 @@ Agent(
 
 ### 2.1 Parallelization
 
-Parallel tasks: prepare ALL prompts, invoke in ONE message, wait, verify all.
+Parallel tasks: prepare all prompts, invoke in one message, wait, verify all.
 Sequential tasks: one at a time — real dependency, not comfort.
 
 Spawn a subagent with the Agent tool and do not pass `run_in_background`. In an interactive
@@ -318,7 +318,7 @@ For task execution (result needed before the task can be marked complete):
 Agent(subagent_type="oh-my-claudeagent:executor", prompt="...", ...)
 ```
 
-Parallel task group (invoke in ONE message):
+Parallel task group (invoke in one message):
 ```text
 // Tasks 2, 3, 4 are independent — invoke together
 Agent(subagent_type="oh-my-claudeagent:executor", prompt="Task 2...")
@@ -341,7 +341,7 @@ finished agent costs nothing. Concurrency is the only budget to plan against.
 
 ### 2.2 Result Collection
 
-A parallel group is several Agent calls in ONE message. Each returns a launch
+A parallel group is several Agent calls in one message. Each returns a launch
 acknowledgement immediately, and each deliverable arrives later in the `<result>` block
 of its own `<task-notification>`. Read the deliverable from there. Never Read a
 subagent's `.output`/JSONL transcript (overflows context), and never re-query a finished
@@ -349,7 +349,7 @@ agent via `SendMessage` — a stub return IS the final answer; relaunch a fresh 
 a sharper prompt instead.
 
 While notifications are pending and all remaining work depends on them, acknowledge
-briefly, say how many remain, and END the response; synthesize once every result is in.
+briefly, say how many remain, and end the response; synthesize once every result is in.
 Never act on partial results.
 
 ### 2.3 Verify After Every Delegation
@@ -406,8 +406,6 @@ back the file to confirm the edit landed. Both the flip and the read-back
 confirmation must complete before the next delegation: dispatching the next
 `Agent` call before that is the forbidden act, not merely premature.
 
-No evidence = not complete.
-
 ## Completeness Check
 
 After flipping the LAST `- [ ]` → `- [x]`:
@@ -459,11 +457,11 @@ checked but no `final_verification` evidence entry (exit_code=0) exists. A logge
 verdict opens the gate permanently. Set `OMCA_HOOK_DISABLE_FINAL_VERIFY=1` only
 in emergencies.
 
-**Do NOT report completion until `final_verification` evidence is logged.**
+Do not report completion until `final_verification` evidence is logged.
 
 ## Evidence Logging Mandate
 
-Use `evidence_log` after EVERY verification command. No evidence, no done.
+Use `evidence_log` after every verification command. No evidence, no done.
 
 The `TaskCompleted` hook backs this up, but it does not gate every path to completion:
 it fires only when a task is closed through `TaskUpdate` or when a teammate ends its
@@ -513,7 +511,7 @@ Session end is blocked until a `final_verification` entry with `exit_code=0` exi
 
 ## Auto-Continue Policy
 
-NEVER ask "should I continue" between plan steps. After verification passes →
+Do not ask "should I continue" between plan steps. After verification passes →
 immediately delegate next task.
 
 **Pause only when**: plan needs clarification, blocked by external dependency,
@@ -556,7 +554,7 @@ just flaky" is not evidence.
 
 - **`boulder_write`**: Write/update execution metadata (active plan, session ID, worktree path)
 - **`boulder_progress`**: Task completion counts and active plan info
-- **`evidence_log`**: After EVERY verification command — no evidence, no done
+- **`evidence_log`**: after every verification command; no evidence, no done
 - **`evidence_read`**: Before final report to summarize all results
 - **`notepad_write`**: Blockers/audit breadcrumbs (learnings, issues, decisions, problems)
 - **`notepad_read`**: Fallback audit notes when relevant to a pending task
@@ -564,16 +562,16 @@ just flaky" is not evidence.
 
 Only `evidence_log`, `boulder_progress`, and `notepad_write` load eagerly. `boulder_write`, `evidence_read`, `notepad_read`, `ast_search`, and `file_read` are deferred, so hydrate the schema with `ToolSearch({query: "select:<name>", max_results: 1})` before the first call or it fails with an `InputValidationError`.
 
-`boulder_write` is the one to watch: this command requires it BEFORE any delegation, so it is the first MCP call of every plan run and a missing-tool error there stops the run at step one. Hydrate it in the same message that reads the plan.
+`boulder_write` is the one to watch: this command requires it before any delegation, so it is the first MCP call of every plan run and a missing-tool error there stops the run at step one. Hydrate it in the same message that reads the plan.
 
 ## Critical Rules
 
-- `boulder_write` BEFORE delegating — tracks execution metadata
-- Read FULL plan before delegating
+- `boulder_write` before delegating; tracks execution metadata
+- Read the full plan before delegating
 - All 6 sections in every delegation prompt
-- `evidence_log` after EVERY verification command — no evidence, no done
+- `evidence_log` after every verification command
 - `evidence_read` before final report to summarize all results
-- Mark plan checkboxes immediately after verification — do NOT batch
+- Mark plan checkboxes immediately after verification; do not batch
 - Never trust subagent claims without independent verification
 - Never batch multiple plan tasks in one delegation
 - Never use `Bash(claude ...)` — use native `Agent(subagent_type=...)`

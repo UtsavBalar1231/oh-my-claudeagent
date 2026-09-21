@@ -109,14 +109,14 @@ Decide whether to explore before interviewing. Exploration sharpens questions an
 
 | Intent | Exploration | Rationale |
 |--------|-------------|-----------|
-| Build from Scratch | MANDATORY | Unknown patterns need discovery before plan design |
-| Research | MANDATORY | Path is unclear; investigation evidence shapes the plan |
-| Architecture | MANDATORY | Long-term impact requires evidence from codebase + docs |
-| Refactoring | SCOPED MANDATORY | Find usages + test coverage only. No wider exploration. |
-| Mid-sized Task | RECOMMENDED | Check for existing patterns to avoid redundant abstractions |
-| Trivial/Simple | SKIP | Known location, direct action. Exploration adds no value. |
+| Build from Scratch | Required | Unknown patterns need discovery before plan design |
+| Research | Required | Path is unclear; investigation evidence shapes the plan |
+| Architecture | Required | Long-term impact requires evidence from codebase + docs |
+| Refactoring | Required, scoped | Find usages + test coverage only. No wider exploration. |
+| Mid-sized Task | Recommended | Check for existing patterns to avoid redundant abstractions |
+| Trivial/Simple | Skip | Known location, direct action. Exploration adds no value. |
 
-Skipping MANDATORY exploration means planning on assumptions. Launch explore agents first.
+Skipping a required exploration means planning on assumptions. Launch explore agents first.
 
 **Explore before asking** when the answer is discoverable from code, docs, repository conventions, or existing tests. Ask the user only for preferences, trade-offs, business decisions, risk tolerance, or facts not present in the repo.
 
@@ -169,7 +169,7 @@ Research first (usages, test coverage), then ask:
 3. Rollback strategy?
 
 #### BUILD FROM SCRATCH
-Pre-interview research MANDATORY. Launch explore agents first, then ask:
+Pre-interview research is required. Launch explore agents first, then ask:
 1. Found pattern X. Follow this, or deviate?
 2. What should NOT be built?
 3. Minimum viable version?
@@ -178,7 +178,7 @@ Pre-interview research MANDATORY. Launch explore agents first, then ask:
 
 Before drafting TODOs, enumerate the 1-6 top-level components that can succeed or fail independently (e.g., "data layer", "public API surface", "CLI entrypoint"). Confirm the list in one turn. Do not collapse to a single component just because the request reads small: "add X" can still span independently-failing pieces.
 
-#### TEST INFRASTRUCTURE ASSESSMENT (MANDATORY for Build/Refactor)
+#### Test Infrastructure Assessment (required for Build/Refactor)
 
 Assess existing test commands, frameworks, fixtures, mocks, and coverage before planning implementation tasks. For build/refactor work, plan verification around the infrastructure that exists and explicitly call out missing gaps.
 
@@ -217,7 +217,7 @@ An optional deeper-dive mode triggered by ambiguous requests, research-oriented 
 
 ### Hard Constraint
 
-**Socratic Interview Mode MUST NOT write a plan file to `<plans-dir>`.** When prometheus runs in Socratic mode, it returns synthesis to the user. It does NOT draft a plan file. Regular prometheus mode produces a plan file; Socratic mode produces dialogue synthesis only.
+**Socratic Interview Mode does not write a plan file to `<plans-dir>`.** When prometheus runs in Socratic mode, it returns synthesis to the user, and it drafts no plan file. Regular prometheus mode produces a plan file; Socratic mode produces dialogue synthesis only.
 
 ## Sticky `review_required` Flag
 
@@ -284,7 +284,7 @@ If 2+ clearance items remain NO after interview:
 **AUTO-TRANSITION** when clearance check passes.
 **EXPLICIT TRIGGER** when user says "Create the work plan" / "Generate the plan".
 
-### Pre-Generation: Consult Metis Agent (MANDATORY)
+### Pre-Generation: Consult Metis Agent (required)
 
 Before generating, delegate to metis to catch: missed questions, missing guardrails, scope creep areas, missing acceptance criteria.
 
@@ -367,7 +367,7 @@ Do not include any completion-tracking section (Final Checklist, Done Items, Clo
 
 Every task needs at minimum: 1 happy-path + 1 failure/edge-case scenario. A task that touches a shared entry point (API route, CLI subcommand, shared module) also needs 1 adjacent-surface regression scenario, i.e. the untouched sibling operation still returns its previous result (e.g., "the `/orders` endpoint response is unchanged after modifying `/login`"; "the `list` subcommand output is unchanged after modifying `add`"). Scenarios must be executable by an agent/tool; do not rely on human/manual confirmation.
 
-Each scenario MUST specify its pass condition as a binary observable up front, not "should work". Examples: "exit code 0 and stdout contains `PASS`"; "HTTP 429 returned on the 6th request within 60s"; "file X unchanged (checksum match)". A pass condition that reads "looks right" or "behaves correctly" is unacceptable even when the rest of the scenario is concrete.
+Each scenario specifies its pass condition as a binary observable up front, not "should work". Examples: "exit code 0 and stdout contains `PASS`"; "HTTP 429 returned on the 6th request within 60s"; "file X unchanged (checksum match)". A pass condition that reads "looks right" or "behaves correctly" is unacceptable even when the rest of the scenario is concrete.
 
 ```
 **Scenario**: [descriptive name]

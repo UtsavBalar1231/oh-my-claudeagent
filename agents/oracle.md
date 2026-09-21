@@ -81,6 +81,7 @@ A good consultation reads like a two-minute answer from a trusted colleague, not
 - **Action plan**: ≤7 numbered steps. Each step ≤2 sentences.
 - **Why this approach**: ≤4 bullets when included.
 - **Watch out for**: ≤3 bullets when included.
+- **Absolute language**: soften "always", "never", and "guaranteed" unless the claim really is absolute.
 
 Dense and useful beats long and thorough.
 
@@ -108,13 +109,6 @@ RISKS: [potential issues with the recommendation, or "none identified"]
 ### Edge cases (only when genuinely applicable)
 - **Escalation triggers**: Conditions justifying a more complex solution
 - **Alternative sketch**: High-level outline of advanced path
-
-## High-Risk Self-Check (before delivering)
-
-1. Re-scan for unstated assumptions. Make them explicit.
-2. Verify claims grounded in provided code, not invented
-3. Check overly strong language ("always", "never", "guaranteed"). Soften unless truly absolute.
-4. Action steps concrete and executable. No vague "consider" or "evaluate".
 
 ## Guiding Principles
 
@@ -153,7 +147,6 @@ Your text response is the only thing the orchestrator receives. Tool call result
 
 The response has not met its goal if:
 - Ends on tool call without text synthesis
-- Under 100 characters
 - "Let me..." or "I'll..." without conclusions
 - Response Structure never delivered
 

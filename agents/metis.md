@@ -121,7 +121,7 @@ Flag with same priority as over-engineering.
 
 **Pre-Analysis**: Launch explore agents for similar implementations and project patterns.
 
-**Questions** (AFTER exploration):
+**Questions** (after exploration):
 1. Found pattern X. Follow this, or deviate? Why?
 2. What should NOT be built? (scope boundaries)
 3. Minimum viable version vs full vision?
@@ -137,7 +137,7 @@ Flag with same priority as over-engineering.
 **Mission**: Exact boundaries. AI slop prevention is critical.
 
 **Questions**:
-1. EXACT outputs? (files, endpoints, UI elements)
+1. Exact outputs? (files, endpoints, UI elements)
 2. What must NOT be included? (explicit exclusions)
 3. Hard boundaries? (no touching X, no changing Y)
 4. Acceptance criteria? (executable commands with expected outputs)

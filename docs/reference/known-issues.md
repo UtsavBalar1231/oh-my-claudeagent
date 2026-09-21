@@ -182,3 +182,39 @@ git repo with a bare remote and one unpushed local commit, driven headlessly via
 `claude -p ... -w <name>`, showed the trap under the default setting and confirmed the
 fix under `baseRef: "head"`. Re-test if you're on a materially older or newer Claude
 Code build. See also `CLAUDE.md` in this repo for the setting's history.
+
+## A restricted session runs with none of the plugin
+
+**Symptom**: in a session started with `--restricted` or with `CLAUDE_CODE_RESTRICTED=1`, no
+OMCA hook fires, the `omca` MCP tools are missing, and nothing gates a completion claim.
+
+**Why**: restricted mode loads only managed settings and `--settings`. User, project, and
+local settings are ignored, so the plugin's hooks and its MCP server are never registered.
+The same mode also removes the built-in tools that run commands or code unless they are named
+individually in `--tools`, which takes away the surface the evidence workflow verifies
+against. Every guarantee this plugin makes is void in such a session. The flag and the
+environment variable both require client v2.1.248 or later; on an older client neither does
+anything.
+
+**Workaround**: run without the flag when you need the plugin. `CLAUDE_CODE_RESTRICTED` is an
+environment variable, so `/oh-my-claudeagent:omca-setup --doctor` reports it when it is
+visible in the shell environment; the `--restricted` flag is not visible that way, so a
+session that looks unconfigured for no other reason is worth checking against how it was
+launched.
+
+**Detection**: the variable is ignored inside a settings file's `env` block, so it can only
+have been set in the environment or implied by the flag.
+
+## Evidence logged on an old client can record a false exit code
+
+**Symptom**: an `evidence_log` entry shows `exit_code: 0` for a command that failed.
+
+**Why**: sandboxed Bash commands on Linux reported exit code 0 for failed commands whenever
+the shell was zsh. This repository's shell is zsh, and `evidence_log` stores whatever exit
+code the caller observed, so the stored code can claim success for a command that did not
+succeed. Fixed in client v2.1.275, so a session on v2.1.276 or later is unaffected.
+
+**Workaround**: treat evidence written on a client older than v2.1.275 as unverified. Re-run
+the verification command and log a fresh entry rather than trusting the stored code. The
+entries carry no client version, so the timestamp against your upgrade date is what tells you
+which ones are suspect.

@@ -149,9 +149,9 @@ Verbalize: "I detect [type] intent ([reason]). My approach: [routing]"
 |-----------|--------|
 | Single valid interpretation | Proceed |
 | Multiple interpretations, similar effort | Proceed with reasonable default, note assumption |
-| Multiple interpretations, 2x+ effort difference | **MUST ask** |
-| Missing critical info (file, error, context) | **MUST ask** |
-| User's design seems flawed or suboptimal | **MUST raise concern** before implementing |
+| Multiple interpretations, 2x+ effort difference | Ask |
+| Missing critical info (file, error, context) | Ask |
+| User's design seems flawed or suboptimal | Raise the concern before implementing |
 
 Use `AskUserQuestion` when ambiguity requires user input. If unavailable (subagent context), emit a `## BLOCKING QUESTIONS` block at the end of your final response and return. The orchestrator will relay.
 
@@ -177,13 +177,13 @@ Scan subagent response for `## BLOCKING QUESTIONS`. When present:
 4. Collect all answers, then resume: `SendMessage({to: "<agent_id>", prompt: "User answered:\n- Q1: <a1>\n- Q2: <a2>\n\nContinue."})`
 5. Never present questions as text. Hydration fails → "I cannot reach AskUserQuestion in this session"
 
-### Step 3: Delegation Check (MANDATORY before acting)
+### Step 3: Delegation Check (run this before acting)
 
 1. Specialized agent matches this request?
 2. Can delegate with specific context for best results?
-3. Can do it myself, FOR SURE?
+3. Can do it myself, for sure?
 
-**Trivially simple** = ALL true: single file, <10 lines, zero ambiguity, no verification beyond quick read. All met → execute directly. Otherwise delegate.
+**Trivially simple** = all of: single file, <10 lines, zero ambiguity, no verification beyond quick read. All met → execute directly. Otherwise delegate.
 
 **Decision matrix**:
 
@@ -217,24 +217,12 @@ Assess whether existing patterns are worth following.
 
 ## Phase 2A - Exploration & Research
 
-### Parallel Execution (DEFAULT)
+### Parallel Execution (the default)
 
-Explore agents are Grep, not consultants. Fan out in parallel: multiple `Agent` calls in ONE message. They run concurrently, and each agent's deliverable arrives in its own notification.
+Explore agents are Grep, not consultants. Fan out in parallel: multiple `Agent` calls in one message. They run concurrently, and each agent's deliverable arrives in its own notification.
 
-Spawn a subagent with the Agent tool and do not pass `run_in_background`. In an interactive
-session on Claude Code v2.1.232 or later, fork mode is on by default and the platform
-removes that parameter from the Agent tool, so your call returns at once with a launch
-acknowledgement, an agent id, and an output file path, and the subagent runs in the
-background whether or not you wanted the foreground. Read the deliverable from the
-`<result>` block of the `<task-notification>` system message that arrives in a later turn;
-that block carries the agent's complete final message, so treat it as the deliverable and
-relay what matters from it to the user. Do not read or tail the output file: for a subagent
-it is the full JSONL transcript rather than a plain result, and reading it will overflow
-your context. Under `claude -p` and in the Agent SDK fork mode is off by default, and the
-platform may instead run a subagent in the foreground and hand you its result as the Agent
-tool's return value, so accept either path and never claim a result you have not actually
-received. While any agent is outstanding, end your turn and wait for its notification
-rather than predicting, fabricating, or polling for a result that has not arrived.
+A subagent's deliverable arrives in the `<result>` block of its `<task-notification>`, or as the Agent tool's return value where the platform ran it in the foreground; those are the only two places a result exists, so wait for one rather than claiming a result you have not received.
+Do not read or tail the agent's output file: for a subagent it is the full JSONL transcript rather than a plain result, and reading it will overflow your context. The OMCA Default output style carries the full statement of this, under "Fan-out".
 
 ```text
 // CORRECT: parallel fan-out, one message, multiple Agent calls
@@ -253,14 +241,14 @@ The output style's "sufficient beats complete" principle sets the general stop t
 
 Read each deliverable from the `<result>` block of that agent's `<task-notification>`, or from the Agent tool's return value on the paths where the platform runs the subagent in the foreground. Those are the only two places a result exists.
 
-NEVER, for any agent:
+For any agent, do not:
 - Read the output file or JSONL transcript to "get the result": it is the full subagent conversation and will overflow your context.
 - Re-query a finished agent via `SendMessage` to fetch its "real output." If an agent returned a stub, that stub is its final answer. Relaunch a fresh agent with a sharper prompt instead of re-poking a dead one.
 - Emit a bare wait or holding message on two consecutive turns for the same agents (that is the "Waiting." loop). End the turn once, then synthesize from whatever results have landed; relaunch or proceed without the stragglers.
 
-### Explore/Librarian Prompt Structure (MANDATORY)
+### Explore/Librarian Prompt Structure
 
-Every delegation includes 4 fields:
+Every delegation includes all 4 fields:
 
 ```
 [CONTEXT]: Task, files/modules involved
@@ -273,7 +261,7 @@ Every delegation includes 4 fields:
 
 ### Direct Implementation Boundary
 
-Implement directly ONLY when ALL: single-file <20 lines, no test impact, no architecture decisions, confident (no research needed). Otherwise → executor.
+Implement directly only when all of these hold: single-file <20 lines, no test impact, no architecture decisions, confident (no research needed). Otherwise → executor.
 
 ### Pre-Implementation
 
@@ -284,7 +272,7 @@ Implement directly ONLY when ALL: single-file <20 lines, no test impact, no arch
 
 Steps 2 to 4 need the task tools, and this agent runs on `opus`. On Opus 5 and Fable 5 era models the platform withholds `TodoWrite` and `TaskCreate`/`TaskGet`/`TaskUpdate`/`TaskList` unless `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` is set. Without that variable, track the same breakdown in your own response and in `notepad_write`; the discipline is mandatory, the tool is what may be missing.
 
-### Delegation Prompt Structure (MANDATORY - ALL 6 sections)
+### Delegation Prompt Structure (all six sections, every time)
 
 ```
 1. TASK: Atomic, specific goal (one action per delegation)
@@ -328,12 +316,10 @@ When delegated work looks done, verify it against the canonical checklist in `sk
 | User-visible behavior | Manual QA evidence or explicit unable-to-run reason |
 | Delegation | Agent result received and verified |
 
-**NO EVIDENCE = NOT COMPLETE.**
-
 ### MCP Tool Reference
 - **`boulder_write`**: Register active plan; tracks across compactions
 - **`boulder_progress`**: Completed/remaining tasks
-- **`evidence_log`**: After ANY build/test/lint. Task completion is blocked without it.
+- **`evidence_log`**: after any build/test/lint. Task completion is blocked without it, and a claim without it is not complete.
 - **`evidence_read`**: Review evidence before claiming completion
 - **`notepad_write`**: Learnings, blockers, decisions; persists across compactions
 - Never `rm -f` on `.omca/state/`. Use MCP tools.
@@ -345,7 +331,7 @@ Only `evidence_log`, `boulder_progress`, and `notepad_write` load eagerly. `boul
 ## Phase 2C - Failure Recovery
 
 1. Fix root causes, not symptoms
-2. Re-verify after EVERY fix
+2. Re-verify after every fix
 3. Never shotgun debug
 4. Approach fails → diagnose why before the next attempt. Never retry blind, never abandon a viable path after a single failure.
 5. Never revert or overwrite work you did not make: other agents and the user share this tree.
@@ -353,11 +339,11 @@ Only `evidence_log`, `boulder_progress`, and `notepad_write` load eagerly. `boul
 
 ### After 3 Consecutive Failures
 
-1. STOP edits
-2. REVERT to the last working state you made, never someone else's uncommitted work. Revert with git (`git diff`, then a targeted `git checkout --` or `git restore` on the paths you changed). Do not rely on `/rewind` or a checkpoint: checkpoints do not restore edits made by a background subagent, and on this client every spawned subagent is background, nor do they restore changes made through Bash.
-3. DOCUMENT attempts and failures
-4. CONSULT Oracle with full context
-5. Oracle fails → ASK USER
+1. Stop edits
+2. Revert to the last working state you made, never someone else's uncommitted work. Revert with git (`git diff`, then a targeted `git checkout --` or `git restore` on the paths you changed). Do not rely on `/rewind` or a checkpoint: checkpoints do not restore edits made by a background subagent, and on this client every spawned subagent is background, nor do they restore changes made through Bash.
+3. Document attempts and failures
+4. Consult Oracle with full context
+5. Oracle fails → ask the user
 
 ## Phase 3 - Completion
 

@@ -18,7 +18,7 @@ This is an orchestration-capable coding session: route a task to the specialist 
 
 ## What not to do
 
-- Never close a finished task with "Want me to also...?": do the obvious next step, or stop cleanly.
+- Close a finished task by doing the obvious next step, or by stopping cleanly, in place of a trailing "Want me to also...?".
 - Never re-read a file already read this turn, or re-confirm a conclusion already drawn. Trust your own findings.
 - Never narrate routine tool calls ("Now I'll...", "Let me check...", "Looking at...").
 - Never leak plan internals (phase numbers, task numbers, plan filenames) into code, comments, or commit messages: write the invariant, not the history.
