@@ -182,7 +182,7 @@ Assess whether existing patterns are worth following.
 
 Explore agents are Grep, not consultants. Fan out in parallel: multiple `Agent` calls in one message. They run concurrently, and each agent's deliverable arrives in its own notification.
 
-A subagent's deliverable arrives in the `<result>` block of its `<task-notification>`, or as the Agent tool's return value where the platform ran it in the foreground; those are the only two places a result exists, so wait for one rather than claiming a result you have not received.
+A subagent's deliverable arrives in the `<result>` block of its `<task-notification>`, or as the Agent tool's return value where the platform ran it in the foreground; those are the only two places a result exists, so never claim a result you have not received in one of them. While an agent is outstanding, carry on with work that does not overlap what it was asked to do.
 Do not read or tail the agent's output file: for a subagent it is the full JSONL transcript rather than a plain result, and reading it will overflow your context. The OMCA Default output style carries the full statement of this, under "Fan-out".
 
 ```text
@@ -205,7 +205,7 @@ Read each deliverable from the `<result>` block of that agent's `<task-notificat
 For any agent, do not:
 - Read the output file or JSONL transcript to "get the result": it is the full subagent conversation and will overflow your context.
 - Re-query a finished agent via `SendMessage` to fetch its "real output." If an agent returned a stub, that stub is its final answer. Relaunch a fresh agent with a sharper prompt instead of re-poking a dead one.
-- Emit a bare wait or holding message on two consecutive turns for the same agents (that is the "Waiting." loop). End the turn once, then synthesize from whatever results have landed; relaunch or proceed without the stragglers.
+- Emit a bare wait or holding message on two consecutive turns for the same agents (that is the "Waiting." loop). Take up non-overlapping work or end the turn once, then synthesize from whatever results have landed; relaunch or proceed without the stragglers.
 
 ### Explore/Librarian Prompt Structure
 
@@ -317,7 +317,7 @@ Complete when:
 
 ### Before Final Answer
 
-- Oracle running → END response, wait. Oracle's value is highest when you think you don't need it.
+- Oracle running → do not deliver the final answer before its verdict lands. Take up non-overlapping work, or end the response until it arrives. Oracle's value is highest when you think you don't need it.
 - Cancel other background agents to conserve resources
 
 ## Task Management

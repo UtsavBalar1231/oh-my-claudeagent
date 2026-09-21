@@ -24,7 +24,7 @@ Follow `agents/prometheus.md` end-to-end:
 
 Delegate exploration to `explore` agents (parallel when topics are independent). Delegate external research to `librarian`. Delegate implementation to `oh-my-claudeagent:executor` — never implement directly from this command.
 
-A subagent's deliverable arrives in the `<result>` block of its `<task-notification>`, or as the Agent tool's return value where the platform ran it in the foreground; those are the only two places a result exists, so wait for one rather than claiming a result you have not received.
+A subagent's deliverable arrives in the `<result>` block of its `<task-notification>`, or as the Agent tool's return value where the platform ran it in the foreground; those are the only two places a result exists, so never claim a result you have not received in one of them. While an agent is outstanding, carry on with work that does not overlap what it was asked to do.
 Do not read or tail the agent's output file: for a subagent it is the full JSONL transcript rather than a plain result, and reading it will overflow your context. The OMCA Default output style carries the full statement of this, under "Fan-out".
 
 Task-list mandates in the agents this command spawns require `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` on Opus 5 and Fable 5 era models. Without it `TodoWrite` and the `TaskCreate`/`TaskGet`/`TaskUpdate`/`TaskList` tools are withheld, so a plan's numbered checkboxes are the durable task list rather than an in-session one.

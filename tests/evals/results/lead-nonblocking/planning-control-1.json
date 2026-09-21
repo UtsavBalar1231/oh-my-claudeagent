@@ -1,0 +1,15 @@
+{
+  "fixture": "planning",
+  "arm": "control",
+  "commit": "f02fff778d37cf8077b7f918b2960aaa44456015",
+  "candidate_file": null,
+  "trial_index": 1,
+  "exit_code": 0,
+  "lines_added": 0,
+  "lines_deleted": 0,
+  "files_touched": 0,
+  "verdict": "fail",
+  "verdict_reason": "control at HEAD with the committed prompts: delegated the whole plan to prometheus, ended the turn holding, no Write dispatched in the session and no plan file in the worktree or ~/.claude/plans",
+  "plugin_root": "/home/utsav/.cache/tmp/eval-UR3SA5/wt/skills",
+  "duration_seconds": 620
+}

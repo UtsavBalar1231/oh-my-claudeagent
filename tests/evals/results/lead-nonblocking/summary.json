@@ -1,0 +1,24 @@
+{
+  "label": "lead-nonblocking",
+  "commit": "f02fff7",
+  "arm": "B",
+  "permission_mode": "bypassPermissions",
+  "candidate_file": "agents/sisyphus.md, output-styles/omca-default.md, skills/plan/SKILL.md, skills/start-work/SKILL.md",
+  "comparator": "one live control at the same commit with the committed prompt files, no candidate copied in, recorded here as planning-control-1.",
+  "harness_note": "The candidate prompt files are copied into each worktree before the turn, so they appear in every git diff. The planning fixture writes its deliverable to ~/.claude/plans rather than into the worktree, so no line count here is a decision criterion. The debug log on client 2.1.278 prints skillsPath=exists rather than a resolved path, so plugin_root records the --plugin-dir worktree instead. The candidate arm behaved differently from the control on files that exist only in the worktree copy, which is what confirms the worktree served the run.",
+  "turns": 4,
+  "fixtures": {
+    "planning": {
+      "plan_file_written": 2,
+      "trials": 3,
+      "control_plan_file_written": 0,
+      "baseline_passes": 3,
+      "mean_duration_seconds": 640.7,
+      "status": "failure mode reduced, criterion 2 still unmet",
+      "reason": "The regression's shape is the lead handing the whole deliverable to a prometheus subagent and ending the turn holding. Under claude -p the depth-0 Agent call is backgrounded and returns in milliseconds, and the run has no later turn in which the task-notification can arrive, so the deliverable never lands. Two of three candidate trials had the lead plan directly and write the plan file; the third reproduced the control's delegate-and-hold shape. No trial names servers/categories.json, which criterion 2 requires verbatim, so no trial scores a clean pass against the criteria as written."
+    }
+  },
+  "scorer_note": "servers/categories.json maps a category name to a model tier and holds no per-agent entry, so adding an agent in an existing category requires no edit to it. Criterion 2 asks for an integration step that a correct plan should not contain. The criteria were left unchanged here; whether to repair that clause is a separate decision.",
+  "verdict": "kept",
+  "verdict_reason": "The candidate removes the barrier imperative that makes a headless delegate-and-hold terminal, and the delegate-and-hold shape drops from every control trial to one of three candidate trials."
+}
