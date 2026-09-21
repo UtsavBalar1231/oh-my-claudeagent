@@ -1,0 +1,80 @@
+{
+  "label": "baseline",
+  "commit": "e0f46f737f5a023ca16a7b8a9c73c9cc6ec4aec8",
+  "arm": "A",
+  "permission_mode": "bypassPermissions",
+  "harness_note": "acceptEdits was tried first and is unusable: the client refuses an Edit to a loaded plugin's hook script, so single-file-edit and bug-fix cannot pass under it in headless mode. bypassPermissions is applied uniformly to every fixture and every arm, so it does not favour one arm over another.",
+  "turns_not_counted": "Four harness-validation turns were spent before the batch and their records were discarded. Two re-scoring turns on planning trial 3 are counted in turn-count.txt.",
+  "fixtures": {
+    "single-file-edit": {
+      "passes": 3,
+      "trials": 3,
+      "mean_lines_added": 1.0,
+      "mean_lines_deleted": 0.0,
+      "mean_files_touched": 1.0,
+      "mean_duration_seconds": 11.3,
+      "status": "qualified",
+      "reason": "Three of three. The fixture dictates its own edit exactly, so its line count measures nothing and no diff-size target applies to it."
+    },
+    "diff-latitude": {
+      "passes": 3,
+      "trials": 3,
+      "mean_lines_added": 47.3,
+      "mean_lines_deleted": 3.0,
+      "mean_files_touched": 1.7,
+      "mean_duration_seconds": 78.3,
+      "status": "qualified",
+      "reason": "Three of three, with lines_added of 58, 45 and 39 against a target of about five. This is the only fixture any lines_added figure is asserted against, and the spread above target is the signal later measurements move."
+    },
+    "multi-file-search": {
+      "passes": 3,
+      "trials": 3,
+      "mean_lines_added": 0.0,
+      "mean_lines_deleted": 0.0,
+      "mean_files_touched": 0.0,
+      "mean_duration_seconds": 42.0,
+      "status": "qualified",
+      "reason": "Three of three. Read-only fixture, so every line count is zero by construction."
+    },
+    "planning": {
+      "passes": 3,
+      "trials": 3,
+      "mean_lines_added": 0.0,
+      "mean_lines_deleted": 0.0,
+      "mean_files_touched": 0.0,
+      "mean_duration_seconds": 94.7,
+      "status": "qualified",
+      "reason": "Three of three. Trial 3 was scored twice: the first scorer looked only at git status and at ~/.claude/plans, and that run wrote its plan to .omca/plans/ inside the worktree, which is gitignored. The scorer now searches the worktree filesystem against a marker file written after checkout. Trials 1 and 2 wrote to ~/.claude/plans and were unaffected."
+    },
+    "bug-fix": {
+      "passes": 3,
+      "trials": 3,
+      "mean_lines_added": 18.3,
+      "mean_lines_deleted": 1.0,
+      "mean_files_touched": 2.0,
+      "mean_duration_seconds": 48.7,
+      "status": "qualified",
+      "authoritative_records": "bug-fix-behavioral-A-1.json, bug-fix-behavioral-A-2.json, bug-fix-behavioral-A-3.json",
+      "reason": "Three of three under the behavioral scorer. Every figure in this entry is computed from the behavioral set, and a task measuring against this fixture uses that set. The three bug-fix-A-N.json records from the construct-matching scorer are kept for provenance and are not authoritative: their means are distorted by a run that was scored wrong, so mixing the two sets would compare different scorers rather than different prompts.",
+      "superseded_records": {
+        "files": "bug-fix-A-1.json, bug-fix-A-2.json, bug-fix-A-3.json",
+        "passes": 2,
+        "trials": 3,
+        "mean_lines_added": 30.3,
+        "scorer": "construct-matching, replaced"
+      },
+      "trial_1_failure_detail": "Trial 1 of the superseded set failed the scorer, not the task. The scorer matched a fixed list of boundary constructs and the run used (^|[^a-z0-9_])handoff([^a-z0-9_]|$), which is a correct guard the list did not contain. The run also added two BATS regression tests and reported the suite green. The scorer was replaced with a behavioral check that runs keyword-detector.sh on a standalone mention and on a substring mention and compares the announcements, which is construct-agnostic. That check was validated against a synthetic worktree before the re-run: unchecked out code answers (standalone 1, substring 1) and fails, a correctly guarded copy answers (standalone 1, substring 0) and passes. This is the record of why the re-run happened.",
+      "rerun_note": "Three live turns, same commit, same isolation, sequential. diff.patch is stored under diffs/ for each, so a future re-score of these trials costs no live turn."
+    },
+    "research": {
+      "passes": 0,
+      "trials": 3,
+      "mean_lines_added": 0.0,
+      "mean_lines_deleted": 0.0,
+      "mean_files_touched": 0.0,
+      "mean_duration_seconds": 469.0,
+      "status": "disqualified",
+      "reason": "Zero of three. All three runs produced substantive research and named public repositories, but none put a URL in its final message, and the criterion asks for cited sources that are real rather than hallucinated. Confirming a citation is real needs a network fetch per source, so this criterion cannot be scored mechanically the way the other five can. The fixture is also the most expensive in the set at about 469 seconds per trial. Leave it out of later measurements until it has a criterion that can be checked without judgment."
+    }
+  }
+}

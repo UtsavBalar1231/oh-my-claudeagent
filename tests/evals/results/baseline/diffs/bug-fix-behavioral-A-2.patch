@@ -1,0 +1,44 @@
+diff --git a/scripts/keyword-detector.sh b/scripts/keyword-detector.sh
+index 4c1ab59..ea2d243 100755
+--- a/scripts/keyword-detector.sh
++++ b/scripts/keyword-detector.sh
+@@ -47,8 +47,10 @@ PROMPT_LOWER=$(printf '%s\n' "${PROMPT_LOWER}" | awk '{ gsub(/"[^"]*"/, " "); gs
+ DETECTED_KEYWORDS=()
+ ADDITIONAL_CONTEXT=""
+
++# Explicit boundary classes instead of \b: bash =~ uses the platform regex
++# library, and BSD/macOS ERE has no \b.
+ if ! mode_already_announced "handoff" \
+-	&& [[ "${PROMPT_LOWER}" =~ (handoff|context[[:space:]]+is[[:space:]]+getting[[:space:]]+long|start[[:space:]]+fresh[[:space:]]+session) ]]; then
++	&& [[ "${PROMPT_LOWER}" =~ ((^|[^[:alnum:]_])handoff([^[:alnum:]_]|$)|context[[:space:]]+is[[:space:]]+getting[[:space:]]+long|start[[:space:]]+fresh[[:space:]]+session) ]]; then
+ 	DETECTED_KEYWORDS+=("handoff")
+ 	ADDITIONAL_CONTEXT+="[HANDOFF MODE DETECTED] Handoff is user-driven and its skill cannot be model-invoked: suggest running /oh-my-claudeagent:handoff instead of improvising a summary."$'\n'
+ fi
+diff --git a/tests/bats/hooks/keyword_detector.bats b/tests/bats/hooks/keyword_detector.bats
+index ad29d8d..1e097c3 100644
+--- a/tests/bats/hooks/keyword_detector.bats
++++ b/tests/bats/hooks/keyword_detector.bats
+@@ -15,6 +15,23 @@ load '../test_helper'
+ 	assert echo "$ctx" | grep -q "HANDOFF MODE DETECTED"
+ }
+
++@test "handoff: detects standalone word next to punctuation" {
++	local payload='{"prompt":"time for a handoff."}'
++	run_hook "keyword-detector.sh" "$payload"
++	assert_success
++	ctx=$(get_context)
++	assert echo "$ctx" | grep -q "HANDOFF MODE DETECTED"
++}
++
++@test "handoff: does NOT trigger when embedded in a longer word" {
++	local prompts=("the prehandoff hook is flaky" "check handoffs.log" "handoff_state is stale" "xhandoffx")
++	for p in "${prompts[@]}"; do
++		run_hook "keyword-detector.sh" "{\"prompt\":\"${p}\"}"
++		assert_success
++		assert_output ""
++	done
++}
++
+ # ---------------------------------------------------------------------------
+ # Negative: no keyword
+ # ---------------------------------------------------------------------------

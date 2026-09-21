@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Basic eval harness — reads task definitions, reports expected format
+# Lists the task definitions under tasks/. Trials are run by hand, see README.md.
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TASKS_DIR="${SCRIPT_DIR}/tasks"
 
@@ -11,5 +11,5 @@ for task in "${TASKS_DIR}"/*.json; do
     echo "  [$category] $name"
 done
 echo ""
-echo "To run: claude -p 'task prompt here' --plugin-dir . | tee output.log"
-echo "Manual verification required — automated execution is future work"
+echo "To run a trial, follow the isolation procedure in tests/evals/README.md."
+echo "Never run a fixture with this checkout as the working directory."
