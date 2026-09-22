@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 # hooks/hooks.json: structural coverage for the Phase-4 wiring: asserts the
-# three new scripts (plan-continuation-guard.sh, tool-loop-detector.sh,
-# delegation-reminder.sh) are registered under the exact event/matcher shapes
+# scripts plan-continuation-guard.sh and tool-loop-detector.sh are registered
+# under the exact event/matcher shapes
 # their own headers declare, rather than trusting validate-plugin.sh's
 # fixture-replay checks alone to catch a missing or mis-matchered entry.
 
@@ -47,28 +47,11 @@ HOOKS_JSON="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)/hooks/hooks.json"
 	assert_success
 }
 
-@test "hooks.json: delegation-reminder.sh is registered under PostToolUse with matcher Edit|Write|Bash" {
+@test "hooks.json: delegation-reminder.sh is not registered" {
 	run jq -e '
-		.hooks.PostToolUse
-		| any(.matcher == "Edit|Write|Bash" and (.hooks[]?.command | test("delegation-reminder\\.sh\"?$")))
+		[.hooks[][]?.hooks[]? | (.command // "") | select(test("delegation-reminder\\.sh\"?$"))] | length == 0
 	' "$HOOKS_JSON"
 	assert_success
-}
-
-@test "hooks.json: delegation-reminder.sh is registered a second time under PostToolUse with matcher Agent" {
-	run jq -e '
-		.hooks.PostToolUse
-		| any(.matcher == "Agent" and (.hooks[]?.command | test("delegation-reminder\\.sh\"?$")))
-	' "$HOOKS_JSON"
-	assert_success
-}
-
-@test "hooks.json: delegation-reminder.sh appears exactly twice total across all PostToolUse entries" {
-	run jq -r '
-		[.hooks.PostToolUse[] | .hooks[]? | select(.command | test("delegation-reminder\\.sh\"?$"))]
-		| length
-	' "$HOOKS_JSON"
-	assert_output "2"
 }
 
 # validate-plugin.sh --check hooks asserts the stdout shape of every hook script it

@@ -90,8 +90,8 @@ check_stop_negative() {
 	fi
 }
 
-# check_posttooluse_injection — three direct Write calls in one turn, no Agent
-# delegation, must trip delegation-reminder.sh's PostToolUse injection.
+# check_posttooluse_injection: one Write of a Markdown file must trip
+# context-injector.sh's PostToolUse injection of the shipped prose rule.
 check_posttooluse_injection() {
 	local project package log
 	project="$(qa_new_scratch_project)"
@@ -99,16 +99,16 @@ check_posttooluse_injection() {
 	# See check_pretooluse_deny: the helpers' own append happens inside a $() subshell
 	# and is lost when it exits.
 	QA_CLEANUP_DIRS+=("${project}" "${package}")
-	log="$(mktemp "${TMPDIR:-/tmp}/qa-hook-probe-reminder-XXXXXX.log")"
+	log="$(mktemp "${TMPDIR:-/tmp}/qa-hook-probe-injection-XXXXXX.log")"
 	QA_CLEANUP_DIRS+=("${log}")
 
 	qa_claude_probe "${project}" "${package}" "${log}" \
-		'Use the Write tool three separate times, once each, to create: a.txt containing "a", then b.txt containing "b", then c.txt containing "c". Do not use any other tool.'
+		'Use the Write tool once to create notes.md containing "hello". Do not use any other tool.'
 
-	if grep -q 'DELEGATION REMINDER' "${log}" 2>/dev/null; then
-		qa_pass "PostToolUse injection: delegation-reminder fired after 3 direct Write calls"
+	if grep -q 'Prose rules' "${log}" 2>/dev/null; then
+		qa_pass "PostToolUse injection: context-injector injected the Markdown prose rule after a Write"
 	else
-		qa_fail "PostToolUse injection: no DELEGATION REMINDER text found in debug log ${log}"
+		qa_fail "PostToolUse injection: no injected prose rule text found in debug log ${log}"
 	fi
 }
 
