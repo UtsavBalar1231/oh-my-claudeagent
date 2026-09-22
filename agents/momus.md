@@ -2,7 +2,7 @@
 name: momus
 description: Rigorous work plan reviewer that catches gaps, ambiguities, and missing context. Use after creating a work plan to validate clarity, verifiability, and completeness before execution. Ruthlessly critical to prevent implementation failures.
 model: opus
-effort: xhigh
+effort: high
 color: red
 disallowedTools:
   - Bash

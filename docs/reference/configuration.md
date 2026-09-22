@@ -170,11 +170,14 @@ There is no longer a setting for a default teammate model. The key that did this
 in v2.1.234 along with its `/config` row, and a leftover value has no effect. Teammates now
 follow the lead session's model unless the spawn names one.
 
-Effort precedence, highest priority last: the `effortLevel` setting, then the session's
-`--effort` flag or environment, then an agent's frontmatter `effort:`, then a per-invocation
-override. OMCA depends on frontmatter winning over the settings default, so do not read
-`effortLevel` as a hard ceiling. `fastMode` and `fastModePerSessionOptIn` sit alongside it and
-have no OMCA consumer.
+Effort for an OMCA subagent: its frontmatter `effort:` overrides the session's level, whether
+that came from `/effort`, `--effort`, a `modelSettings` entry, `effortLevel`, or the model
+default. Two things still win over frontmatter: the `CLAUDE_CODE_EFFORT_LEVEL` environment
+variable, and a `maxEffortLevel` or organization cap, which clamps every level, frontmatter
+included. The main-thread agent runs at the session's level. A top-level `effortLevel` in user
+settings does not apply to Opus 5.5 or newer models, which start at their own default
+(`medium` on Opus 5.5); in project, local, managed, or `--settings` files it applies to every
+model. `fastMode` and `fastModePerSessionOptIn` sit alongside it and have no OMCA consumer.
 
 ### Auto mode settings
 

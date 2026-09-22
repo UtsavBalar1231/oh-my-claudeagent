@@ -77,8 +77,8 @@ agent declares it in frontmatter:
 |--------|--------|----------------|
 | low | explore | Short, scoped work that is not intelligence-sensitive, which is what the docs reserve `low` for (`claude-code-docs/docs/model-config.md`, "Choose an effort level") |
 | medium | executor, hephaestus, librarian, multimodal-looker | Same source: `medium` reduces token usage for cost-sensitive work that can trade off some intelligence. These four run most often, so per-call spend matters more here than reasoning depth |
-| xhigh | sisyphus, prometheus, metis, momus | Deeper reasoning at higher token spend, for orchestration, interviewing, gap analysis, and plan review |
-| max | oracle | Deepest reasoning, for the one role that is only asked when something is already stuck |
+| high | sisyphus, prometheus, metis, momus | The intelligence-sensitive default, for orchestration, interviewing, gap analysis, and plan review. Opus 5.5 at a given level thinks more per turn than Opus 5 did, and Anthropic's guidance reserves `xhigh` for measured gains. As the main-thread agent, sisyphus runs at the session's effort instead |
+| xhigh | oracle | Deeper reasoning, for the one role that is only asked when something is already stuck. Fable 5.1 guidance calls `max` prone to overthinking and starts at `high` |
 
 So scaling a delegation up or down means picking the agent whose declared effort fits, or
 overriding effort, not picking a different model. `agents/sisyphus.md`'s Model Routing section
@@ -632,10 +632,10 @@ Add to `.claude/settings.json` for automatic team-wide installation:
 
 | Agent | Model | Effort | Invoke | Purpose |
 |-------|-------|--------|--------|---------|
-| prometheus | opus | xhigh | `/oh-my-claudeagent:plan` or "create plan" | Strategic planning with requirements interview + optional Socratic Interview Mode |
-| metis | opus | xhigh | `/oh-my-claudeagent:metis` or "run metis" | Pre-planning gap analysis |
-| momus | opus | xhigh | `Skill(oh-my-claudeagent:momus)` (or `Agent(subagent_type="oh-my-claudeagent:momus")` from the main session) | Rigorous plan review — OKAY or REJECT |
-| oracle | fable | max | `Agent(subagent_type="oh-my-claudeagent:oracle")` | Architecture advisor, read-only |
+| prometheus | opus | high | `/oh-my-claudeagent:plan` or "create plan" | Strategic planning with requirements interview + optional Socratic Interview Mode |
+| metis | opus | high | `/oh-my-claudeagent:metis` or "run metis" | Pre-planning gap analysis |
+| momus | opus | high | `Skill(oh-my-claudeagent:momus)` (or `Agent(subagent_type="oh-my-claudeagent:momus")`) | Rigorous plan review — OKAY or REJECT |
+| oracle | fable | xhigh | `Agent(subagent_type="oh-my-claudeagent:oracle")` | Architecture advisor, read-only |
 
 **prometheus** — 9-item clearance checklist interview, consults metis, generates plan,
 submits to momus for review (up to 3 iterations). Optional Socratic Interview Mode for
@@ -1436,7 +1436,7 @@ Features introduced in this window that OMCA consciously declines to adopt:
 | Feature | Notes |
 |---------|-------|
 | `[1m]` auto-strip alignment | v2.1.173 dropped the `[1m]` context-window suffix from model identifiers platform-side; OMCA's agent docs and tables use bare model identifiers throughout |
-| Per-agent `effort:` tuning | Orchestrator and planners at xhigh, oracle at max; executor, hephaestus, librarian, and multimodal-looker at medium, explore at low |
+| Per-agent `effort:` tuning | Orchestrator and planners at xhigh, oracle at max; executor, hephaestus, librarian, and multimodal-looker at medium, explore at low. Retuned for Opus 5.5 and Fable 5.1: planners at high, oracle at xhigh |
 | `sessionTitle` from boulder.json | Already adopted (v2.1.152, `session-init.sh`); re-verified against v2.1.197 and now guarded against an absent boulder file |
 | Model generation move | Agent roster: oracle on `fable`, orchestrators/planners on `opus`, workers on `sonnet`; haiku retired |
 

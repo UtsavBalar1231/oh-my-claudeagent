@@ -22,14 +22,14 @@ Every agent but `oracle` runs on `opus`, so the model column does not separate t
 
 | Agent             | Model            | Effort  | Use when                                                                 |
 | ----------------- | ---------------- | ------- | ------------------------------------------------------------------------ |
-| sisyphus          | opus             | xhigh   | Orchestration: free-form and plan execution (via `/start-work` command) |
-| prometheus        | opus             | xhigh   | Interviewing the user, Socratic deep-dive, producing structured plans    |
-| metis             | opus             | xhigh   | Pre-execution gap analysis on a draft plan                               |
-| momus             | opus             | xhigh   | Critical review of a draft plan for clarity and risk                     |
+| sisyphus          | opus             | high    | Orchestration: free-form and plan execution (via `/start-work` command) |
+| prometheus        | opus             | high    | Interviewing the user, Socratic deep-dive, producing structured plans    |
+| metis             | opus             | high    | Pre-execution gap analysis on a draft plan                               |
+| momus             | opus             | high    | Critical review of a draft plan for clarity and risk                     |
 | executor          | opus             | medium  | Focused implementation of a known, scoped task                           |
 | explore           | opus             | low     | Finding code and patterns inside the local repo                          |
 | librarian         | opus             | medium  | External docs, library usage, OSS examples, research                     |
-| oracle            | fable            | max     | Architecture, tradeoffs, stuck debugging, craft review                   |
+| oracle            | fable            | xhigh   | Architecture, tradeoffs, stuck debugging, craft review                   |
 | hephaestus        | opus             | medium  | Build failures, type errors, toolchain/dep fixes                         |
 | multimodal-looker | opus             | medium  | Screenshots, PDFs, diagrams, visual inputs                               |
 
