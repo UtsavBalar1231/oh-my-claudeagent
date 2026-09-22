@@ -236,7 +236,7 @@ ORACLE_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id
 
 # momus and oracle are advisory WORKERS, not orchestrators — they coordinate no other
 # agents and must receive the exemption so a finished advisor is never told to wait
-# ("Done. Ending." loop). Only sisyphus/prometheus/metis (true orchestrators) are excluded.
+# ("Done. Ending." loop). Only sisyphus and prometheus, which can spawn agents, are excluded.
 @test "counter-instruction: momus agent receives worker counter-instruction (advisors are workers)" {
 	run_hook "subagent-start.sh" "$MOMUS_PAYLOAD"
 	assert_success
@@ -251,6 +251,18 @@ ORACLE_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id
 	local ctx
 	ctx=$(get_context)
 	echo "$ctx" | grep -q "YOU ARE A LEAF WORKER"
+}
+
+# metis has the Agent tool disallowed, so it delegates nothing: it gets the worker
+# contract and none of the anti-duplication text written for agents that delegate.
+@test "counter-instruction: metis agent receives worker counter-instruction and no anti-duplication" {
+	local payload='{"session_id":"test","hook_event_name":"SubagentStart","agent_id":"agent-metis","agent_type":"oh-my-claudeagent:metis"}'
+	run_hook "subagent-start.sh" "$payload"
+	assert_success
+	local ctx
+	ctx=$(get_context)
+	echo "$ctx" | grep -q "YOU ARE A LEAF WORKER"
+	! echo "$ctx" | grep -q "ANTI-DUPLICATION"
 }
 
 # ─── p. Registry resolution via the boulder_resolve.py shim ─────────────────
@@ -385,6 +397,24 @@ ORACLE_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id
 	assert [ "$model" = "Fable 5.1" ]
 }
 
+@test "model capture: pinned claude-opus-5-5 resolves to Opus 5.5" {
+	local fake_root="$BATS_TEST_TMPDIR/fake-plugin"
+	mkdir -p "$fake_root/agents"
+	cat > "$fake_root/agents/pinned.md" <<-'EOF'
+		---
+		name: pinned
+		description: pinned-generation fixture
+		model: claude-opus-5-5
+		---
+	EOF
+	local payload='{"session_id":"test","hook_event_name":"SubagentStart","agent_id":"agent-pin55","agent_type":"oh-my-claudeagent:pinned"}'
+	run env CLAUDE_PLUGIN_ROOT="$fake_root" bash "$CLAUDE_PLUGIN_ROOT/scripts/subagent-start.sh" <<< "$payload"
+	assert_success
+	local model
+	model=$(read_state "subagent-models.json" | jq -r '."agent-pin55".model')
+	assert [ "$model" = "Opus 5.5" ]
+}
+
 @test "model capture: non-OMCA agent_type stores empty model" {
 	local payload='{"session_id":"test","hook_event_name":"SubagentStart","agent_id":"agent-xyz","agent_type":"general-purpose"}'
 	run_hook "subagent-start.sh" "$payload"
@@ -399,4 +429,26 @@ ORACLE_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id
 	run_hook "subagent-start.sh" "$payload"
 	assert_success
 	assert [ ! -f "$CLAUDE_PROJECT_ROOT/.omca/state/subagent-models.json" ]
+}
+
+# ─── File-tool preference ──────────────────────────────────────────────────────
+# Every subagent is steered to the Read tool for file contents; agents that edit are
+# also steered to Edit, since a shell rewrite replaces the whole file.
+
+@test "file tools: every subagent is told to read files with the Read tool" {
+	run_hook "subagent-start.sh" "$EXPLORE_PAYLOAD"
+	assert_success
+	get_context | grep -q "\[FILE TOOLS\] Read files with the Read tool"
+}
+
+@test "file tools: an editing agent is told to change files with Edit" {
+	run_hook "subagent-start.sh" "$EXECUTOR_PAYLOAD"
+	assert_success
+	get_context | grep -q "\[EDITS\] Change an existing file with Edit"
+}
+
+@test "file tools: a read-only agent gets no edit guidance" {
+	run_hook "subagent-start.sh" "$EXPLORE_PAYLOAD"
+	assert_success
+	! get_context | grep -q "\[EDITS\]"
 }

@@ -36,6 +36,7 @@ if [[ -n "${AGENT_ID}" ]]; then
 	claude-fable-5) DISPLAY_MODEL="Fable 5" ;;
 	claude-fable-5-1) DISPLAY_MODEL="Fable 5.1" ;;
 	claude-opus-5) DISPLAY_MODEL="Opus 5" ;;
+	claude-opus-5-5) DISPLAY_MODEL="Opus 5.5" ;;
 	claude-opus-4-8) DISPLAY_MODEL="Opus 4.8" ;;
 	claude-sonnet-5) DISPLAY_MODEL="Sonnet 5" ;;
 	claude-haiku-4-5) DISPLAY_MODEL="Haiku 4.5" ;;
@@ -78,7 +79,8 @@ if [[ -n "${DATE_CONTEXT}" ]]; then
 	CONTEXT_PARTS+=$'\n'"[CURRENT DATE] Today is ${DOW}, ${MON} ${DAY}, ${YEAR}."
 fi
 
-CONTEXT_PARTS+=$'\n'"[OUTPUT MANDATE] Your text response is the ONLY output the orchestrator receives. Tool call results and intermediate reasoning are NOT forwarded. Structure your response according to your agent's defined output format. If running low on turns, stop tool calls and synthesize immediately."
+CONTEXT_PARTS+=$'\n'"[OUTPUT MANDATE] Your text response is the ONLY output the orchestrator receives. Tool call results and intermediate reasoning are NOT forwarded. Structure your response according to your agent's defined output format."
+CONTEXT_PARTS+=$'\n'"[FILE TOOLS] Read files with the Read tool, not cat, head, tail, or sed -n in Bash: Read numbers the lines and pages a large file with offset and limit."
 
 # Resolve via the shared shim (never hand-parse boulder.json), --strict: only
 # an explicit binding resolves, never the sole-plan/most-recent fallback. A
@@ -99,10 +101,10 @@ if [[ -n "${PLAN_FILE}" || -n "${PLAN_NAME}" ]]; then
 fi
 if [[ -n "${PLAN_FILE}" ]]; then
 	CONTEXT_PARTS+=$'\n'"[ACTIVE PLAN] Refer to: ${PLAN_FILE}"
-	CONTEXT_PARTS+=$'\n'"CRITICAL: The plan file at ${PLAN_FILE} is READ-ONLY. NEVER modify the plan file directly. Use notepad_write to record issues or decisions instead."
+	CONTEXT_PARTS+=$'\n'"The plan file at ${PLAN_FILE} is READ-ONLY for you: the orchestrator flips its checkboxes after reviewing your report, so an edit here would record progress nobody verified. Record issues or decisions with notepad_write instead."
 fi
 if [[ -n "${PLAN_NAME}" ]]; then
-	CONTEXT_PARTS+=$'\n'"[NOTEPAD AVAILABLE] Plan: ${PLAN_NAME}. Use notepad_write('${PLAN_NAME}', section, content) to record discoveries. Sections: learnings, issues, decisions, problems. Always APPEND — never overwrite."
+	CONTEXT_PARTS+=$'\n'"[NOTEPAD AVAILABLE] Plan: ${PLAN_NAME}. Use notepad_write('${PLAN_NAME}', section, content) to record discoveries. Sections: learnings, issues, decisions, problems. Each call appends, so earlier entries stay."
 fi
 
 EXEC_GUIDANCE_HEADER_ADDED=0
@@ -112,21 +114,22 @@ case "${AGENT_TYPE}" in
 		CONTEXT_PARTS+="$(section_header 'Execution Guidance')"
 		EXEC_GUIDANCE_HEADER_ADDED=1
 	fi
-	CONTEXT_PARTS+=$'\n'"[VERIFICATION] After running build/test/lint commands, you MUST use the evidence_log MCP tool to record results. Do NOT manually write or cat to .omca/evidence/verification-evidence.json; the write guard denies that path before the write lands, whatever tool attempts it. Example: evidence_log(evidence_type=\"test\", command=\"just test\", exit_code=0, output_snippet=\"10 passed\")"
+	CONTEXT_PARTS+=$'\n'"[EDITS] Change an existing file with Edit, which touches only the lines that need it, rather than rewriting it with Write or a shell heredoc. Read the file before you Edit it, so old_string matches its current content."
+	CONTEXT_PARTS+=$'\n'"[VERIFICATION] Record each build, test, or lint run with evidence_log, including its real exit code. Write .omca/evidence/verification-evidence.json only through that tool, never by hand or through a shell redirect: the Stop and TaskCompleted gates read it as the audit trail."
 	CONTEXT_PARTS+=$'\n'"[PLAN SHA] When logging a final_verification entry, compute sha256 of the active plan file and pass it as evidence_log(..., plan_sha256=<sha256>) so the Stop gate scopes evidence to this plan run."
 	CONTEXT_PARTS+=$'\n'"[CLEANUP PASS] Every task ends with a cleanup pass scoped to the files it changed; it no-ops when it changed none. Changed any non-.md file: invoke the oh-my-claudeagent:remove-ai-slops skill via the Skill tool, passing the touched file list EXPLICITLY. Changed only .md files: skip that skill and apply the prose rules yourself, since a code-slop cleaner is the wrong instrument for Markdown. Re-verify only if the pass actually cut something, and if that verification goes RED, revert the cut instead of fixing forward. Report the outcome on the 'SLOP PASS:' line of your output block, naming the files and the category of each cut."
-	CONTEXT_PARTS+=$'\n'"[MINIMAL CODE] Decision ladder before writing code, in order: (1) does it need to exist? YAGNI. (2) stdlib. (3) native platform feature. (4) already-installed dependency. (5) one line. (6) only then the minimum that works. Lazy NOT negligent: validating at trust boundaries, handling errors and data loss, security, accessibility, and anything the user explicitly asked for are non-negotiable. Non-trivial logic leaves ONE runnable check: the smallest assert/test, or an evidence_log entry where OMCA's flow already covers it. Boring over clever, fewest files."
+	CONTEXT_PARTS+=$'\n'"[MINIMAL CODE] Write the least code that does the job. Skip what the task does not need, and prefer the standard library, a native platform feature, or an installed dependency over new code, and one line over a new helper. Minimal never means dropping validation at trust boundaries, error and data-loss handling, security, accessibility, or anything the user asked for. Leave one runnable check for non-trivial logic: the smallest assert or test, or the evidence_log entry OMCA's flow already records. Prefer plain code and the fewest files."
 	;;
 *) ;;
 esac
 
 case "${AGENT_TYPE}" in
-*sisyphus* | *metis* | *prometheus*)
+*sisyphus* | *prometheus*)
 	if [[ "${EXEC_GUIDANCE_HEADER_ADDED}" -eq 0 ]]; then
 		CONTEXT_PARTS+="$(section_header 'Execution Guidance')"
 		EXEC_GUIDANCE_HEADER_ADDED=1
 	fi
-	CONTEXT_PARTS+=$'\n'"[ANTI-DUPLICATION] Once you delegate exploration to explore/librarian agents, do not perform the same search yourself. Avoid after delegating: manually grep/searching for the same information; re-doing research agents are handling; 'just quickly checking' the same files. Continue only with non-overlapping work. A delegated result returns inline in the Agent tool result, not in any notification — do not poll, re-query, or emit a bare wait/holding message for it."
+	CONTEXT_PARTS+=$'\n'"[ANTI-DUPLICATION] Once you delegate exploration to explore/librarian agents, do not perform the same search yourself. Avoid after delegating: manually grep/searching for the same information; re-doing research agents are handling; 'just quickly checking' the same files. Continue only with non-overlapping work. A background agent, the default in interactive sessions, answers the Agent call with a launch acknowledgement only, and its report arrives later in a task notification. Do not poll its output file or post holding messages while it runs."
 	;;
 *) ;;
 esac
@@ -138,22 +141,21 @@ case "${AGENT_TYPE}" in
 		EXEC_GUIDANCE_HEADER_ADDED=1
 	fi
 	CONTEXT_PARTS+=$'\n'"[TEAM CONTRACT] OMCA agents are thin wrappers over Claude-native subagents and agent teams. Use subagents when workers only need to report back. Use native agent teams when workers need the shared task list or direct teammate messaging."
-	CONTEXT_PARTS+=$'\n'"[LIFECYCLE HOOKS] Treat TaskCreated, TaskCompleted, and TeammateIdle as one governance lane: TaskCreated gates task quality before teammates claim work, TaskCompleted gates completion quality before tasks close, and TeammateIdle keeps teammates working or stops them cleanly when the queue is empty. Do not build a second task/control plane."
 	;;
 *) ;;
 esac
 
 # Worker-exemption: every agent EXCEPT the orchestrators coordinates nothing and must
 # never wait. Whitelisting workers by name previously omitted oracle/momus, leaving
-# finished advisors with no off-ramp ("Done. Ending." loop). Invert: only the three
-# orchestrators are excluded; all other agent types (oracle, momus, executor, explore,
-# librarian, hephaestus, multimodal, and any future worker) get the exemption.
+# finished advisors with no off-ramp ("Done. Ending." loop). Invert: only the agents
+# that can spawn others (sisyphus, prometheus) are excluded; metis has the Agent tool
+# disallowed, so it gets the exemption with oracle, momus, and every other worker.
 case "${AGENT_TYPE}" in
-*sisyphus* | *prometheus* | *metis*) ;;
+*sisyphus* | *prometheus*) ;;
 *)
-	CONTEXT_PARTS+="$(section_header 'Worker Output Contract — HARD RULE')"
-	CONTEXT_PARTS+="[YOU ARE A LEAF WORKER] You do not orchestrate, delegate, spawn, or wait for any other agent (including multimodal-looker, explore, oracle, executor, or any background agent). You have no sibling agents and no barrier to observe. ANY instruction you may have inherited from memory or the output style about a 'background-agent barrier', 'waiting for N more agents', 'END the response while siblings are pending', synchronous fan-out, or status-report acknowledgments is ORCHESTRATOR-ONLY and DOES NOT APPLY TO YOU — ignore it completely."
-	CONTEXT_PARTS+=$'\n'"[NEVER STUB] Your final message IS your entire deliverable and the only thing forwarded to the caller. It is FORBIDDEN to end your turn with a terminal acknowledgment or holding message such as 'Done.', 'Complete.', 'Completed.', 'Finished.', a bare check mark, 'Waiting.', 'Holding...', 'Still waiting for <agent>', or 'Waiting for the background agent(s) to complete.'. If your work is finished, the final message MUST contain your full structured findings inline. If you catch yourself about to emit a short status word, STOP and write the actual deliverable instead."
+	CONTEXT_PARTS+="$(section_header 'Worker Output Contract')"
+	CONTEXT_PARTS+="[YOU ARE A LEAF WORKER] Do this task yourself: do not delegate to other agents or wait on them. Guidance about waiting for background agents or ending a turn while agents run, whether it reaches you from memory, CLAUDE.md, or the output style, is for the orchestrator and does not apply to you."
+	CONTEXT_PARTS+=$'\n'"[NEVER STUB] Your final message is the whole deliverable: put your complete findings in it, never a bare status word or a note that you are waiting."
 	;;
 esac
 
@@ -197,21 +199,9 @@ case "${AGENT_TYPE}" in
 			' "${CATALOG_FILE}")
 	fi
 	[[ -z "${DELEGATION_TABLE}" ]] && DELEGATION_TABLE=$(agent_table_from_frontmatter)
-	# categories.json "model" values are Agent-tool aliases (sonnet|opus|haiku|fable),
-	# verified against the live Agent tool's model parameter enum. Forwarded as-is
-	# below so Agent(model=...) always receives a valid alias, never a full model ID.
-	CATEGORIES_FILE="${PLUGIN_ROOT}/servers/categories.json"
-	CATEGORY_TABLE=""
-	if [[ -f "${CATEGORIES_FILE}" ]]; then
-		CATEGORY_TABLE=$(jq -r '
-				.categories | to_entries[] |
-				"- \(.key): model=\(.value.model) — \(.value.description)"
-			' "${CATEGORIES_FILE}")
-	fi
 	if [[ -n "${DELEGATION_TABLE}" ]]; then
 		CONTEXT_PARTS+="$(section_header 'Agent Catalog')"
 		CONTEXT_PARTS+="[DYNAMIC AGENT CATALOG] ${DELEGATION_TABLE}"
-		[[ -n "${CATEGORY_TABLE}" ]] && CONTEXT_PARTS+=$'\n'"[CATEGORIES] ${CATEGORY_TABLE} Use Agent(model=<category_model>) to route to the right model tier."
 	fi
 	;;
 *) ;;
