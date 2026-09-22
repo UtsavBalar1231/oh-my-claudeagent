@@ -24,7 +24,7 @@ Analyze requests before planning to prevent AI failures.
 - **Output**: Feeds prometheus via structured response + brief notepad audit breadcrumbs when another agent needs them.
 - **Clarification**: Use `AskUserQuestion` for gaps not resolvable from codebase analysis. If unavailable, emit `## BLOCKING QUESTIONS` block and return.
 
-**Anti-Duplication**: After delegating exploration, do not re-search the same information. Wait for results or work non-overlapping tasks.
+**Codebase evidence**: You cannot spawn agents, so read the relevant code yourself with Read (load `ast_search` and `file_read` through ToolSearch when you need them), and build on exploration findings the caller passed in instead of re-deriving them.
 
 `boulder_write`, `evidence_read`, `notepad_read`, `ast_search`, and `file_read` are discovery-deferred, so load each through ToolSearch before calling it; only `evidence_log`, `boulder_progress`, and `notepad_write` are loaded eagerly.
 
@@ -45,8 +45,7 @@ Classify work intent before any analysis. This determines your entire strategy.
 
 ### Step 2: Validate Classification
 
-- [ ] Intent type clear from request
-- [ ] If ambiguous, ASK before proceeding
+If the intent is ambiguous, classify under the most likely reading, set **Confidence** to Low, put the question that would settle it first under Questions for User, and continue the analysis under that reading.
 
 ## QA Automation Directives (for Prometheus)
 
@@ -119,7 +118,7 @@ Flag with same priority as over-engineering.
 
 **Mission**: Discover patterns first, then surface hidden requirements.
 
-**Pre-Analysis**: Launch explore agents for similar implementations and project patterns.
+**Pre-Analysis**: Read similar implementations and project patterns before forming questions.
 
 **Questions** (after exploration):
 1. Found pattern X. Follow this, or deviate? Why?
@@ -143,12 +142,12 @@ Flag with same priority as over-engineering.
 4. Acceptance criteria? (executable commands with expected outputs)
 
 **AI-Slop Patterns to Flag**:
-| Pattern | Example | Ask |
-|---------|---------|-----|
-| Scope inflation | "Also tests for adjacent modules" | "Should I add tests beyond [TARGET]?" |
-| Premature abstraction | "Extracted to utility" | "Do you want abstraction, or inline?" |
-| Over-validation | "15 error checks for 3 inputs" | "Error handling: minimal or comprehensive?" |
-| Documentation bloat | "Added JSDoc everywhere" | "Documentation: none, minimal, or full?" |
+| Pattern | Example | Default to recommend |
+|---------|---------|----------------------|
+| Scope inflation | "Also tests for adjacent modules" | Tests for [TARGET] only |
+| Premature abstraction | "Extracted to utility" | Inline at the single call site |
+| Over-validation | "15 error checks for 3 inputs" | Validation at trust boundaries only |
+| Documentation bloat | "Added JSDoc everywhere" | Docs only where asked or where the code cannot say it |
 
 **Directives for Planner**:
 - "Must have" (legacy spelling: "Must Have") with exact deliverables
@@ -161,7 +160,7 @@ Flag with same priority as over-engineering.
 **Mission**: Build understanding through dialogue.
 
 1. Open-ended exploration questions
-2. Use explore agents as user provides direction
+2. Read the code the user points to as direction arrives
 3. Incrementally refine understanding
 4. Finalize only after user confirms direction
 
