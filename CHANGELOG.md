@@ -5,6 +5,78 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Reconciles the plugin with client 2.1.280 and re-baselines its prompts for Opus 5.5, which
+the `opus` alias now resolves to, and Fable 5.1. The prompts were written for models that
+needed emphasis and scaffolding to comply; Opus 5.5 follows a plain instruction literally, so
+the main change is saying less and giving the reason.
+
+**This release needs Claude Code v2.1.271 or later.** `plugin.json` declares `options` on a
+`userConfig` field, which older clients cannot load.
+
+**After upgrading, re-run `/oh-my-claudeagent:omca-setup`.** The block setup installs into
+`~/.claude/CLAUDE.md` changed, and setup's MCP allow rules were wrong before this release, so
+calls to the bundled grep and context7 tools kept prompting until setup rewrites them.
+
+### Changed
+
+- **The main session does direct work by default.** It handles known changes, quick
+  lookups, and single fixes itself and delegates sizeable, self-contained work, because each
+  subagent re-establishes context before its report has to be read back. The plugin makes
+  sisyphus the session agent, which replaces Claude Code's own system prompt and its advice
+  on when a subagent is worth spawning, so the old "delegation first" wording was the only
+  delegation guidance the main session saw. This change is unmeasured: no eval fixture runs
+  a real delegation yet.
+- **File reads are steered to the Read tool instead of being denied.** The hook that denied
+  `sed -n` and `grep -n` in Bash is gone. The output style and the context injected into
+  subagents ask for Read to read a file and Edit to change one; on the rebaseline eval, a
+  turn that read through Bash usually rewrote the whole file where Read then Edit made a
+  small change.
+- **Effort is one step lower.** The orchestrator and planners run at `high` and oracle at
+  `xhigh`, following the Opus 5.5 and Fable 5.1 guidance to reserve the top levels for a
+  measured gain.
+- **Keyword triggers are off unless you turn them on.** The `enableKeywordTriggers` option
+  always defaulted to off, but the hook never read it, so trigger phrases fired for everyone.
+  Enable the option in the plugin's settings to keep them. Text the client marks as pasted
+  no longer fires a trigger.
+- **Plan execution checks the plan, not this repository.** `/oh-my-claudeagent:start-work`
+  told the lead to run `just ci`, a recipe from this repository's own justfile, as the final
+  check in every project. It now runs the plan's own `## Verification` commands. It runs the
+  project suite once per parallel group rather than after each task, re-opens a task whose
+  change that group run rejects, and does the completeness review itself, handing it to an
+  executor only when the full diff no longer fits in context.
+- **`evidence_log` accepts five evidence types.** `build`, `test`, `lint`, `manual`, and
+  `final_verification` are now a schema enum, so any other value fails with a validation
+  error instead of being stored. The refactor skill used to log `typecheck`; it now picks
+  `build`, `test`, or `lint` to match the command.
+- **Agent, skill, hook, and MCP tool text was rewritten** to state what to do and why, without
+  capitals, forbidden-word lists, or steps that assumed task tools Opus 5.5 lacks. A finished
+  agent that returns a stub is now resumed once with SendMessage rather than replaced.
+- **The executor cannot spawn agents.** It was already told never to delegate; the Agent
+  tool is now disallowed in its definition.
+
+### Fixed
+
+- The Bash guards missed a destructive command behind a variable assignment, such as
+  `FOO=1 rm -rf ~` or `GIT_EDITOR=: git stash`.
+- `health_check` looked for the evidence ledger in the wrong directory and always reported
+  it absent.
+- The doctor warned that setup's own CLAUDE.md block was a legacy leftover.
+- Setup picked the plugin root by sorting cached versions as strings, which ranks 2.9 above
+  2.19.
+
+### Added
+
+- `ast_replace` dry runs show the rewritten text for each match.
+- The validator rejects agent and skill frontmatter keys the platform ignores, and effort
+  values outside the platform's five levels.
+
+### Removed
+
+- The delegation reminder hook, which nudged the main session to delegate after three direct
+  tool calls and so argued against the new default.
+
 ## [2.19.1] - 2026-09-21
 
 ### Fixed
