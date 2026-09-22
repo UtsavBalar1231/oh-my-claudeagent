@@ -12,7 +12,7 @@ Agent definitions live in `agents/*.md`:
 
 Skills live in `skills/*/SKILL.md`. Every skill except the orchestration entrypoints below:
 
-`consolidate-memory`, `debugging`, `dev-browser`, `frontend-ui-ux`, `git-master`, `github-triage`, `handoff`, `hephaestus`, `init-deep`, `metis`, `momus`, `omca-setup`, `playwright`, `refactor`, `remove-ai-slops`
+`consolidate-memory`, `debugging`, `git-master`, `github-triage`, `handoff`, `hephaestus`, `init-deep`, `metis`, `momus`, `omca-setup`, `refactor`, `remove-ai-slops`
 
 ## Orchestration entrypoints
 

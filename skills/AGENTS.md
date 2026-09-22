@@ -6,7 +6,7 @@ Installed skills live in `skills/*/SKILL.md`.
 
 Every skill except the orchestration entrypoints named below:
 
-`consolidate-memory`, `debugging`, `dev-browser`, `frontend-ui-ux`, `git-master`, `github-triage`, `handoff`, `hephaestus`, `init-deep`, `metis`, `momus`, `omca-setup`, `playwright`, `refactor`, `remove-ai-slops`
+`consolidate-memory`, `debugging`, `git-master`, `github-triage`, `handoff`, `hephaestus`, `init-deep`, `metis`, `momus`, `omca-setup`, `refactor`, `remove-ai-slops`
 
 The orchestration entrypoints are skills here too: `plan` (`skills/plan/SKILL.md`) and
 `start-work` (`skills/start-work/SKILL.md`). Both set `disable-model-invocation: true` so only
@@ -34,4 +34,4 @@ Skills describe WHAT users do. Hooks are internal infrastructure that automates 
 
 - `omca-setup`: installs and configures hooks
 
-**Rationale**: Most skills already follow this rule with zero hook references (refactor, github-triage, hephaestus, metis, consolidate-memory, dev-browser, frontend-ui-ux, git-master, init-deep, playwright). Skills that leak file paths force users to understand internal layouts they can't control, and force future hook refactors to update skill prose.
+**Rationale**: Most skills already follow this rule with zero hook references (refactor, github-triage, hephaestus, metis, consolidate-memory, git-master, init-deep). Skills that leak file paths force users to understand internal layouts they can't control, and force future hook refactors to update skill prose.

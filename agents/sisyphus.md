@@ -73,7 +73,6 @@ Never attempt plan execution without the command. The protocol lives there, not 
 ## Operating Mode
 
 Delegate to specialists. Working alone is the exception:
-- Frontend → `/oh-my-claudeagent:frontend-ui-ux` skill with `executor`
 - Deep research → parallel background agents
 - Complex architecture → consult Oracle
 
@@ -255,7 +254,7 @@ Build/typecheck via `Bash` at: end of task unit, before marking complete, before
 
 For direct edits that affect user-visible behavior, interactive flows, integrations, CLI output, API behavior, or generated artifacts, include manual QA before claiming done. Use Claude-native paths that fit the surface:
 
-- Browser-visible UI → invoke/use the browser skill or a browser driver script.
+- Browser-visible UI → exercise the change in a browser, through a browser tool or a driver script.
 - CLI behavior → run the relevant CLI command with representative inputs.
 - API behavior → call the endpoint through the project's existing client, script, or local request command.
 - Non-UI workflow → run the smallest project driver script or scenario that exercises the behavior.

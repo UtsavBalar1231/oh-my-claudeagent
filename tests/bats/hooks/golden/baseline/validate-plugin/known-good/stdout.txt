@@ -42,8 +42,6 @@
 [validate-plugin] PASS: agent frontmatter hygiene: no legacy permissionMode holdouts detected
 [validate-plugin] PASS: skill description length: consolidate-memory description is 79 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: debugging description is 299 chars (within 512 soft cap)
-[validate-plugin] PASS: skill description length: dev-browser description is 183 chars (within 512 soft cap)
-[validate-plugin] PASS: skill description length: frontend-ui-ux description is 156 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: git-master description is 202 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: github-triage description is 93 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: handoff description is 77 chars (within 512 soft cap)
@@ -53,7 +51,6 @@
 [validate-plugin] PASS: skill description length: momus description is 139 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: omca-setup description is 95 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: plan description is 89 chars (within 512 soft cap)
-[validate-plugin] PASS: skill description length: playwright description is 192 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: refactor description is 95 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: remove-ai-slops description is 297 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: start-work description is 54 chars (within 512 soft cap)
@@ -245,4 +242,4 @@
 [validate-plugin] PASS: mcp tools/list contains categories_list
 [validate-plugin] PASS: mcp tools/list contains file_read
 [validate-plugin] PASS: mcp tools/list contains session_search
-[validate-plugin] Summary: 222 passed, 0 failed, 13 skipped, 0 warned
+[validate-plugin] Summary: 219 passed, 0 failed, 13 skipped, 0 warned

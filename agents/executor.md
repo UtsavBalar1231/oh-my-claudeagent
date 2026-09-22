@@ -75,7 +75,7 @@ Claim "done", "fixed", or "complete" only after a command you ran and read prove
 For changes to user-visible behavior, interactive flows, CLI output, APIs, integrations, generated artifacts, or bug fixes with observable behavior: a clean build or a passing test suite is a formal check, not a functional one. Run the actual scenario.
 
 1. Identify the smallest manual scenario that exercises the change.
-2. Run it using the project's native surface: browser skill/browser driver, CLI command, API request/client, or driver script.
+2. Run it using the project's native surface: browser driver, CLI command, API request/client, or driver script.
 3. The moment the scenario spawns a resource (process, port, temp dir, browser session, container), add a teardown todo for it.
 4. Execute every teardown todo and capture the receipt before declaring done. A leftover process, bound port, or temp dir means the task is not done.
 5. Capture evidence in the final `EVIDENCE` field.

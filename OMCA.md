@@ -738,13 +738,6 @@ ast-grep, evidence-gated completion.
 **git-master** — Atomic commits with style detection, rebase/squash, history search (blame,
 bisect, log -S).
 
-### Browser
-
-| Skill | Slash command | Keywords |
-|-------|--------------|----------|
-| playwright | `/oh-my-claudeagent:playwright` | (none) |
-| dev-browser | `/oh-my-claudeagent:dev-browser` | "go to [url]", "take a screenshot" |
-
 ### Session Management
 
 | Skill | Slash command | Keywords |
@@ -762,7 +755,6 @@ subagents. The keyword produces a nudge suggesting the slash command, nothing mo
 |-------|--------------|----------|
 | omca-setup | `/oh-my-claudeagent:omca-setup` | "setup omca" |
 | init-deep | `/oh-my-claudeagent:init-deep` | (none) |
-| frontend-ui-ux | `/oh-my-claudeagent:frontend-ui-ux` | (none) |
 | github-triage | `/oh-my-claudeagent:github-triage` | (slash-command only) |
 | consolidate-memory | `/oh-my-claudeagent:consolidate-memory` | (none) |
 
