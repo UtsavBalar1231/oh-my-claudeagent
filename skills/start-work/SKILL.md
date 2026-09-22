@@ -19,26 +19,20 @@ gates. That makes it a separate lane, not a replacement for plan execution here.
 
 ## Refusal Clause
 
-This command body runs in the main session at depth 0. If this command somehow
-executes in a context where the `Agent` tool is unavailable (subagent depth >= 1,
-or stripped by platform), refuse and exit immediately.
+This command body runs in the main session at depth 0. If the `Agent` tool is not in
+your tool list (a `--tools`, `--disallowedTools`, or deny-rule restriction removed it),
+refuse and return.
 
-There is no degraded mode. Do not implement tasks directly. Do not self-review.
+There is no degraded mode. Do not implement tasks directly.
 Do not attempt a partial execution. Emit the refusal message below and return:
 
 ```
-ERROR: start-work requires full `Agent`-tool access and was invoked in a context
-where the tool is stripped (subagent depth >= 1). There is no degraded-mode
-fallback, orchestration and delegation require `Agent`.
+ERROR: start-work needs the `Agent` tool to delegate plan tasks, and this session
+does not have it. There is no degraded-mode fallback.
 
-Invoke plan execution from the main session via:
+Run plan execution from a session where the Agent tool is available:
   /oh-my-claudeagent:start-work <plan>
-
-Do not call Agent(subagent_type="oh-my-claudeagent:start-work"), that spawns
-this command at depth 1 where this error fires.
 ```
-
-Return immediately after emitting this. No further execution.
 
 ## Plan Discovery Logic (Step 0)
 
@@ -162,9 +156,6 @@ When listing plans for selection:
 ```
 Available Work Plans
 
-Current Time: {ISO timestamp}
-Session ID: {current session id}
-
 1. [plan-name-1.md] - Modified: {date} - Progress: 3/10 tasks
 2. [plan-name-2.md] - Modified: {date} - Progress: 0/5 tasks
 
@@ -187,7 +178,6 @@ When auto-selecting single plan:
 Starting Work Session
 
 Plan: {plan-name}
-Session: {timestamp} (started)
 
 Reading plan and beginning execution...
 ```
@@ -197,14 +187,10 @@ Reading plan and beginning execution...
 1. `boulder_write(active_plan="<path>", plan_name="<name>", session_id="<current>")`, before delegating.
 2. Read the full plan file.
 3. Parse `- [ ]` checkboxes.
-4. Build parallelization map: simultaneous tasks, dependencies, file conflicts.
-
-```
-TASK ANALYSIS:
-- Total: [N], Remaining: [M]
-- Parallelizable Groups: [list]
-- Sequential Dependencies: [list]
-```
+4. Take the parallel groups from the plan: its `**Parallel Execution**` metadata and the
+   `[P]` marker on parallel-safe tasks. Run two tasks together only when their `File:`
+   paths do not overlap and every task in their `Depends:` is checked; in a plan without
+   `[P]` markers, apply the same two tests to decide.
 
 ## 5-Section Prompt Structure
 
@@ -325,34 +311,38 @@ into sub-batches and run them back to back. Count agents already running from an
 earlier batch, since they still hold their slots. That ceiling is not enforced in
 ultracode sessions.
 
-There is no per-session total limit on how many subagents a session may spawn, so a
-finished agent costs nothing. Concurrency is the only budget to plan against.
+There is no per-session total limit on how many subagents a session may spawn, so
+concurrency is the only platform ceiling. It is not the cost ceiling: each spawn
+re-establishes context and each report costs a read. Spawn executors for plan tasks, and
+reach for `explore` or `librarian` only when a delegation needs a fact that a few reads
+of your own cannot supply.
 
 ### 2.2 Result Collection
 
 A parallel group is several Agent calls in one message. Each returns a launch
 acknowledgement immediately, and each deliverable arrives later in the `<result>` block
 of its own `<task-notification>`. Read the deliverable from there. Never Read a
-subagent's `.output`/JSONL transcript (overflows context), and never re-query a finished
-agent via `SendMessage`, a stub return IS the final answer; relaunch a fresh agent with
-a sharper prompt instead.
+subagent's `.output`/JSONL transcript (overflows context). When a deliverable comes back
+partial or as a bare stub, continue that agent once with `SendMessage` and ask for what
+is missing; it resumes with its own context instead of re-exploring.
 
-While notifications are pending and all remaining work depends on them, acknowledge
-briefly, say how many remain, and end the response; synthesize once every result is in.
-Never act on partial results.
+Review each deliverable as it lands: reading one executor's diff does not overlap the
+tasks still running. Hold group-wide steps (the project-level build and test run, the
+next dependent wave) until every result in the group is in. When waiting is all that is
+left, say how many results remain and end the response.
 
 ### 2.3 Verify After Every Delegation
 
-```
-[ ] Build/typecheck at project level: zero errors
-[ ] Build command: exit 0
-[ ] Test suite: all pass
-[ ] Files exist and match requirements
-[ ] No regressions
-```
+Re-run the task's `Done when:` command (its `**Acceptance Criteria**` check in an older
+plan) yourself and confirm it passes; that is the per-task mechanical check. Run the
+project-level build and test suite once the whole parallel group has landed, not after
+each task: sibling executors edit the same working tree, so a mid-group run reports
+their unfinished edits as this task's failure. If the group suite fails, re-open
+(`- [x]` to `- [ ]`) every task in the group whose diff the failure touches before you
+delegate anything else, so the plan never records a task as done that the suite rejects.
 
 Mechanical checks are not review. Subagents self-report, and self-reports are not
-evidence. After the mechanical checks pass, read every file the delegated agent
+evidence. After the mechanical check passes, read every file the delegated agent
 created or modified, then cross-reference what it claimed against what the code
 actually does:
 
@@ -391,18 +381,24 @@ If any QA scenario spawned a resource (process, port, container, temp dir,
 browser session), confirm its teardown receipt before treating the task as
 verified: a leftover process or bound port is not complete.
 
-Only once the review above passes: edit plan file `- [ ]` → `- [x]`, then read
-back the file to confirm the edit landed. Both the flip and the read-back
-confirmation must complete before the next delegation: dispatching the next
-`Agent` call before that is the forbidden act, not merely premature.
+Only once the review above passes: edit plan file `- [ ]` → `- [x]`. The successful
+Edit is the confirmation, since an Edit whose text does not match fails instead of
+landing. Flip the box before the next delegation: `boulder_progress`, the Stop gate, and
+a resumed session all read progress from these boxes.
 
 ## Completeness Check
 
 After flipping the LAST `- [ ]` → `- [x]`:
 
-**Run `just ci`** (full pipeline) and log evidence via `evidence_log`.
+**Run the plan's `## Verification` commands**, the project's own full check, and log
+each result via `evidence_log`. When the plan lists none, run the project's own build,
+lint, and test commands.
 
-Then run a single completeness review. Delegate to `executor`:
+Then run a single completeness review yourself: read the plan end to end, read the
+plan's full diff, and check that each requirement was implemented and each `Must NOT`
+was honored. The verdict is COMPLETE or INCOMPLETE with specifics. You reviewed every
+task's diff in 2.3, so a fresh reviewer mostly re-derives your findings; hand the review
+to `executor` only when the full diff no longer fits in your remaining context:
 
 ```text
 Agent(
@@ -426,7 +422,7 @@ Pass the resulting hash as `plan_sha256` on the `final_verification` call:
 ```
 evidence_log(
   evidence_type="final_verification",
-  command="executor: COMPLETE",
+  command="completeness review: COMPLETE",
   exit_code=0,
   output_snippet="COMPLETE, all requirements met",
   plan_sha256="<sha256sum output>"
@@ -458,9 +454,11 @@ it fires only when a task is closed through `TaskUpdate` or when a teammate ends
 turn, so a run that never touches the task list is never gated by it. Treat the mandate
 as yours to honor rather than as something the hook will catch for you.
 
-Task-list tools are a precondition, not a given. `TaskCreate`/`TaskUpdate` are withheld
-on Opus 5 and Fable 5 era models unless `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` is set in the
-environment, and every OMCA agent declares one of those tiers. Without that variable the
+Task-list tools are a precondition, not a given. Claude Code provides
+`TaskCreate`/`TaskUpdate` by default only on Claude 3.x, Opus 4 through 4.7, Sonnet 4
+through 4.6, and Haiku 4.5. Every other model, including the ones the `opus` and `fable`
+aliases resolve to on the Anthropic API, goes without them unless
+`CLAUDE_CODE_ENABLE_TODO_TOOLS=1` is set in the environment. Without that variable the
 task list is unavailable and the `TaskCompleted` hook has nothing to fire on.
 
 Standard pattern:
@@ -480,7 +478,7 @@ current bytes, see Completeness Check above):
 ```
 evidence_log(
   evidence_type="final_verification",
-  command="executor: COMPLETE",
+  command="completeness review: COMPLETE",
   exit_code=0,
   output_snippet="COMPLETE, all N requirements met, no constraints violated",
   plan_sha256="<sha256sum of the plan file>"
@@ -503,6 +501,11 @@ Session end is blocked until a `final_verification` entry with `exit_code=0` exi
 
 Do not ask "should I continue" between plan steps. After verification passes →
 immediately delegate next task.
+
+After each checkbox flip, write the user a short note: which task finished, what
+verified it, and what runs next. Claude Code collapses thinking by default, so
+between-tool notes the model writes as thinking stay hidden, and this note is the only
+progress a user sees during a long run.
 
 **Pause only when**: plan needs clarification, blocked by external dependency,
 critical failure.

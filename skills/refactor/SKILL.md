@@ -11,7 +11,7 @@ effort: high
 ## Usage
 
 ```
-/refactor <refactoring-target> [--scope=<file|module|project>] [--strategy=<safe|aggressive>]
+/oh-my-claudeagent:refactor <refactoring-target> [--scope=<file|module|project>] [--strategy=<safe|aggressive>]
 
 Arguments:
   refactoring-target: What to refactor. Can be:
@@ -31,7 +31,7 @@ Options:
     - aggressive: Allow broader changes with adequate coverage
 ```
 
-Deterministic refactoring with codebase awareness: understand intent, map codebase, assess risk, plan via prometheus, execute with ast-grep MCP tools, verify after each change.
+Deterministic refactoring with codebase awareness: understand intent, map codebase, assess risk, plan the steps, execute with ast-grep MCP tools, verify after each change.
 
 ## PHASE 0: INTENT GATE
 
@@ -41,29 +41,17 @@ Classify and validate before acting.
 |--------|----------------|--------|
 | Specific file/symbol | Explicit | Proceed to codebase analysis |
 | "Refactor X to Y" | Clear transformation | Proceed to codebase analysis |
-| "Improve", "Clean up" | Open-ended | **MUST ask**: "What specific improvement?" |
-| Ambiguous scope | Uncertain | **MUST ask**: "Which modules/files?" |
+| "Improve", "Clean up" | Open-ended | Ask "What specific improvement?" when readings would change which code moves; otherwise state your reading and proceed |
+| Ambiguous scope | Uncertain | Ask "Which modules/files?" |
 
 ## PHASE 1: CODEBASE ANALYSIS
 
-### Parallel Explore Agents
-
-```
-// Agent 1: Find the refactoring target
-Agent(subagent_type="oh-my-claudeagent:explore", prompt="Find all occurrences and definitions of [TARGET]")
-
-// Agent 2: Find related code
-Agent(subagent_type="oh-my-claudeagent:explore", prompt="Find all code that imports, uses, or depends on [TARGET]")
-
-// Agent 3: Find similar patterns
-Agent(subagent_type="oh-my-claudeagent:explore", prompt="Find similar code patterns to [TARGET] in the codebase")
-
-// Agent 4: Find tests
-Agent(subagent_type="oh-my-claudeagent:explore", prompt="Find all test files related to [TARGET]")
-
-// Agent 5: Architecture context
-Agent(subagent_type="oh-my-claudeagent:explore", prompt="Find architectural patterns and module organization around [TARGET]")
-```
+Map the target before changing it: its definitions, every caller and importer, the
+tests that exercise it, and sibling code that follows the same pattern. Search directly
+with `ast_search` and Bash; a file- or module-scope refactor needs a handful of
+searches, not subagents. Fan out to `explore` only for a `--scope=project` change whose
+search areas are independent, one agent per area, each briefed completely in its first
+prompt.
 
 ## PHASE 2: BUILD CODEMAP
 
@@ -79,55 +67,40 @@ Dependency graph and impact zones from Phase 1:
 
 ## PHASE 3: TEST ASSESSMENT
 
-| Coverage Level | Strategy |
-|----------------|----------|
-| HIGH (>80%) | Run existing tests after each step |
-| MEDIUM (50-80%) | Run tests + add safety assertions |
-| LOW (<50%) | **PAUSE**: Propose adding tests first |
-| NONE | **BLOCK**: Refuse aggressive refactoring |
+Find the tests that exercise the code you are about to change and run them once for a
+green baseline. If no test would fail on a behavior change in that code, pause and
+propose characterization tests first, and refuse `--strategy=aggressive` until they
+exist.
 
 ## PHASE 4: PLAN GENERATION
 
-Delegate to prometheus:
-
-```
-Agent(
-  subagent_type="oh-my-claudeagent:prometheus",
-  prompt="Create a detailed refactoring plan for: [GOAL]. Codemap: [CODEMAP]. Coverage: [VERIFICATION_PLAN]. Requirements: atomic steps, each independently verifiable, ordered by dependency, with exact file paths and rollback strategy."
-)
-```
-
-> **Nesting constraint**: Prometheus runs as a subagent (depth 1) and cannot delegate to metis or explore. Supply ALL necessary context in the prompt: the full codemap, coverage data, and specific file paths so prometheus can plan without sub-research.
+Write the step list yourself from the codemap: atomic steps, each independently
+verifiable, ordered by dependency, with exact file paths and how to roll each one back.
+A refactor that needs an interview or owner decisions stops here: ask the user to run
+`/oh-my-claudeagent:plan`, since a `prometheus` subagent runs without `AskUserQuestion`.
 
 ## PHASE 5: EXECUTE REFACTORING
 
 Per step:
 
-1. **Pre-Step**: Mark task in_progress, verify baseline
-2. **Execute**: Use ast-grep MCP tools for structural replacement, or Edit for targeted changes. For symbol renaming, use `lsp_rename` only if the current Claude environment exposes it.
+1. **Pre-Step**: Confirm the baseline is green before touching the step's files
+2. **Execute**: Use ast-grep MCP tools for structural replacement, or Edit for targeted changes. For a symbol rename, find every reference first (`ast_search`, or the `LSP` tool's find-references where a language server is installed), then edit each site.
 3. **Post-Step Verification**: Run typecheck + run tests
-4. **Record Evidence**: After each verification, call `evidence_log(evidence_type="typecheck", command="<cmd>", exit_code=<code>, output_snippet="<output>")`
-5. **Complete**: Mark task completed if verification passes
+4. **Record Evidence**: After each verification, call `evidence_log(evidence_type="<build|test|lint>", command="<cmd>", exit_code=<code>, output_snippet="<output>")`, choosing the type that matches the command
+5. **Complete**: Move to the next step only when verification passes
 
-**If ANY verification fails**: STOP, REVERT, DIAGNOSE.
+If a verification fails, revert that step to get back to green, then diagnose from the recorded failure output before retrying it.
 
 ## PHASE 6: FINAL VERIFICATION
 
-Full test suite, type check, lint, build, final diagnostics. Call `evidence_log` after EACH; task completion is blocked without fresh evidence.
+Full test suite, type check, lint, build, final diagnostics. Record each with `evidence_log`, including its real exit code.
 
 ## CRITICAL RULES
 
-**NEVER:**
-- Skip typecheck/build verification after changes
-- Proceed with failing tests
-- Use `as any`, `@ts-ignore`, `@ts-expect-error`
-- Delete tests to make them pass
-
-**ALWAYS:**
-- Understand before changing
-- Preview before applying (use ast-grep MCP tools with dry_run where supported)
-- Verify after every change
-- Follow existing codebase patterns
+A refactor preserves behavior, so never hide a behavior change to get green: no type
+suppression (`as any`, `@ts-ignore`, `@ts-expect-error`), and no deleting or weakening a
+test to make it pass. Preview structural rewrites with the ast-grep MCP tools' dry_run
+where supported, and move to the next step only when the current one verifies.
 
 ## Deprecated Code & Library Migration
 

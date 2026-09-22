@@ -46,7 +46,7 @@ git branch --show-current
 git log --oneline -5
 ```
 
-Also: `boulder_progress()`, `notepad_read` for active plan sections, `Glob("~/.claude/plans/*.md")`, and `.omca/plans/` only as a boulder compatibility mirror/resume surface. `TaskList()` too where it exists, but it is withheld on Opus 5 and Fable 5 era models unless `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` is set, so treat the plan file's numbered checkboxes and `boulder_progress()` as the primary source and `TaskList()` as a supplement.
+Also: `boulder_progress()`, `notepad_read` for active plan sections, the plan files in `<plans-dir>` (the `plansDirectory` setting when set, relative to the project root, otherwise `~/.claude/plans`), and `.omca/plans/` only as a boulder compatibility mirror/resume surface. `TaskList()` too where it exists, but Claude Code provides it by default only on Claude 3.x, Opus 4 through 4.7, Sonnet 4 through 4.6, and Haiku 4.5 unless `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` is set, so treat the plan file's numbered checkboxes and `boulder_progress()` as the primary source and `TaskList()` as a supplement.
 
 ## PHASE 2: EXTRACT
 

@@ -14,8 +14,8 @@ Ten categories live in `references/categories.md`: what each looks like, the KEE
 1. **Scope.** Default to the diff of the change under review, or an explicit file list if the caller hands you one. Do not wander into files outside that scope, even when you spot slop in passing. Note it and move on.
 2. **Categorize.** Read every file in scope against the ten categories in `references/categories.md`. Build a per-file list of candidate cuts, each tagged with its category and a one-line reason.
 3. **Batch and apply.**
-   - If you are orchestrating (this skill was invoked from a session that can delegate), split the file list into small batches and hand each batch to an executor with the category list and KEEP rules attached, so each executor evaluates independently rather than inheriting your first pass's blind spots.
-   - If you are a leaf worker (no delegation available), edit the files directly, one category at a time, safest first: comments, then dead code, then defensive clutter, then everything else.
+   - Edit the files directly, one category at a time, safest first: comments, then dead code, then defensive clutter, then everything else.
+   - Split the list across executors only when it is large enough that independent batches finish sooner than one pass, and attach the category list and KEEP rules to each batch.
    - For any cut inside `references/categories.md`'s trust-boundary set, apply the proof requirement before removing anything. No adversarial case, no deletion.
 4. **Verify.** Run the project's own build, lint, and test commands on the touched files. A cleanup that breaks the build is not a cleanup. If the project's build/test story is unclear, ask rather than guess.
 5. **Record.** Log each verification with `evidence_log`. If you're mid-plan and find a category boundary you had to call by judgment (kept something that looked like slop, or cut something that looked defensible), write it to the plan's notepad so the decision survives past this turn.
