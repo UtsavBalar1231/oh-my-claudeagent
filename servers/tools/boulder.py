@@ -210,7 +210,9 @@ def register(mcp: MCPServer) -> None:
     def boulder_write(
         active_plan: str = Field(description="Absolute path to the plan file"),
         plan_name: str = Field(description="Short name for the plan"),
-        session_id: str = Field(description="Current session ID"),
+        session_id: str = Field(
+            description="This session's platform UUID, as shown in the SessionStart context ('Session <id> initialized'). An empty string uses the server's CLAUDE_CODE_SESSION_ID. Any other value binds a session that does not exist, and the Stop hooks will not see the plan."
+        ),
         agent: str = Field(default="sisyphus", description="Agent managing this plan"),
         worktree_path: str = Field(
             default="", description="Git worktree path if using worktrees"
@@ -219,7 +221,7 @@ def register(mcp: MCPServer) -> None:
             default="", description="Project root (auto-detected from git)"
         ),
     ) -> str:
-        """Register an active work plan in the session-bound plan registry. Upserts plans[plan_name] (preserving started_at, appending session_id to its session_ids, no dup) and binds this session to it. Returns confirmation with plan name and session count."""
+        """Register a work plan in the project's plan registry (.omca/state/boulder.json) and bind this session to it. Upserts plans[plan_name], keeping its started_at and adding session_id to its session_ids, then prunes bindings older than 7 days and unbound, finished plans of that age. Binding turns on plan enforcement for this session: while numbered tasks (`- [ ] N.`) remain unchecked, the Stop hook blocks the stop with a nudge to continue, and once all are checked it blocks until a final_verification evidence entry matches the plan. Call it once before executing a plan; calling it again is safe. Returns a confirmation with the plan name and session count."""
         return _do_boulder_write(
             active_plan, plan_name, session_id, agent, worktree_path, working_directory
         )
@@ -253,5 +255,5 @@ def register(mcp: MCPServer) -> None:
             default="", description="Project root (auto-detected from git)"
         ),
     ) -> str:
-        """Parse plan file checkboxes and return task progress summary. Use to check remaining work before claiming completion or to report plan status. Resolves the plan from the registry (by plan_name, or by this session's binding) when plan_path is omitted. Returns JSON with total, completed, remaining, is_complete, plan_path, and next_task_label (text of the first unchecked task, truncated to 80 chars, or null when none remain) fields."""
+        """Count a plan file's numbered checkboxes (`- [ ] N.` and `- [x] N.`; unnumbered boxes are ignored) and return progress. Use to report plan status or to find the next task. With plan_path, reads that file. Otherwise it looks up plan_name in the registry, or else this session's binding; a session with no binding falls back to the only registered plan, or to the most recently started one, which may belong to another session, so pass plan_name or plan_path when several plans exist. Returns JSON with total, completed, remaining, is_complete, plan_path, and next_task_label (the first unchecked task, truncated to 80 chars, or null when none remain); a JSON error object with plan_missing when the plan file is gone; or a plain message when no plan resolves."""
         return _do_boulder_progress(plan_path, plan_name, session_id, working_directory)

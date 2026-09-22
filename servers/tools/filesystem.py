@@ -179,13 +179,19 @@ def register(mcp: MCPServer) -> None:
             Field(description="File encoding (default utf-8, falls back to latin-1)"),
         ] = "utf-8",
     ) -> str:
-        """Read a file with line numbers, token estimate footer, and offset/limit chunking.
+        """Read a text file with line numbers, a size footer, and offset/limit paging.
 
-        Bypasses the built-in Read tool's project-root scoping for subagents.
-        The footer shows estimated token count and file size. For large files,
-        use offset and limit to read targeted sections instead of the whole file.
-        Default limit is 5000 lines. Lines longer than 2000 characters are cut
-        off with a truncation marker.
+        Use it for a path the built-in Read tool cannot reach, typically one outside
+        the working directories while permissions.blockReadsOutsideWorkingDirectories
+        is on; that setting fences Read, Grep, Glob, and LSP but not MCP tools.
+        Default limit is 5000 lines; lines over 2000 characters are cut with a
+        truncation marker. The footer's token figure estimates the whole file
+        (bytes / 4), not the returned window, and names the next offset when lines
+        remain. Refuses with a plain-text message, not an error: directories,
+        devices, binary files (a null byte in the first 8 KB), unlimited reads
+        (limit=0) of files over 3 MB, and paths matching a sensitive-file denylist
+        (.ssh, .gnupg, .aws, .env files, credentials*, *secret*, SSH private keys,
+        /etc/shadow). Each call is logged to .omca/logs/file-access.jsonl.
         """
         # A negative offset reads from the start rather than erroring, so the
         # audit entry and the line numbering both stay on the normal path.

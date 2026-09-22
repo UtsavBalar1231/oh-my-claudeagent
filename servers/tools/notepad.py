@@ -181,7 +181,7 @@ def register(mcp: MCPServer) -> None:
             default="", description="Project root (auto-detected from git)"
         ),
     ) -> str:
-        """Compact a notepad section by truncating older entries, keeping the most recent lines. Use between plan phases when notepad sections grow large. Keeps the last 20 lines and prepends a count of removed entries. Returns compacted content summary."""
+        """Permanently delete all but the last 20 lines of one notepad section. The cut is by line, not by entry, so an entry that straddles it loses its first lines and its timestamp header, and removed text is not archived anywhere. The section then starts with a marker giving the number of removed lines. Use it only when a section is too large to read usefully and its older entries no longer matter; read them with notepad_read first if they might. Returns a one-line summary, or a no-op message when the section has 20 lines or fewer."""
         state = _state_dir(working_directory)
         git_root = os.path.dirname(os.path.dirname(state))
         path = Path(git_root) / NOTEPAD_DIR / plan_name / f"{section}.md"
@@ -193,7 +193,7 @@ def register(mcp: MCPServer) -> None:
         kept = lines[-20:]  # Keep last 20
         removed = len(lines) - 20
         compacted = (
-            "\n".join([f"[Compacted: {removed} earlier entries removed]", *kept]) + "\n"
+            "\n".join([f"[Compacted: {removed} earlier lines removed]", *kept]) + "\n"
         )
         fd, tmp = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
         try:
@@ -204,4 +204,4 @@ def register(mcp: MCPServer) -> None:
             os.close(fd)
             os.unlink(tmp)
             raise
-        return f"Compacted '{section}': removed {removed} old entries, kept last 20"
+        return f"Compacted '{section}': removed {removed} old lines, kept last 20"

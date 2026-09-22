@@ -123,9 +123,9 @@ def register(mcp: MCPServer) -> None:
         # Does it have the required numbered checkboxes?
         if not _has_checkboxes(body):
             reason = (
-                f"[PLAN-CHECKBOX-VERIFY] Plan file {file_path} has no - [ ] N. "
-                "checkboxes. Prometheus must emit at least one numbered task. "
-                "This is the load-bearing enforcement of orchestration discipline."
+                f"[PLAN-CHECKBOX-VERIFY] Plan file {file_path} has no numbered task "
+                "checkbox. Write each task as `- [ ] 1. <task>`; plan progress and the "
+                "Stop hooks count only numbered checkboxes."
             )
             return _deny(reason)
 

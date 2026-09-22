@@ -31,8 +31,10 @@ those files.
 
 Reach for a tool when:
 
-- You just ran a build, test, or lint command. Record it with `evidence_log` — OMCA hooks \
-block task completion until evidence exists. `evidence_read` reviews what is already logged.
+- You just ran a build, test, or lint command. Record it with `evidence_log`, real exit code \
+included. A plan-bound session cannot stop until a `final_verification` entry exists; when \
+task tools are enabled, a TaskCompleted hook also checks for evidence. `evidence_read` \
+returns everything logged so far.
 - You are executing a multi-step plan. `boulder_write` registers it and binds this session; \
 `boulder_progress` reports completed and remaining checkboxes plus the next task.
 - You learned something that must outlive a compaction: a discovery, blocker, decision, or \
@@ -46,8 +48,8 @@ when a pattern will not match, and `ast_replace` rewrites AST-safely (preview wi
 - You need a file outside the project root, where the built-in Read tool is scoped out. \
 `file_read` returns line-numbered content with a token estimate and offset/limit paging.
 - You need something from an earlier session here. `session_search` scans local transcripts.
-- You are choosing a delegation target. `agents_list` gives when_to_use, cost tier, and model \
-per agent; `categories_list` maps categories to model tiers.
+- You are choosing a delegation target. `agents_list` gives each agent's description, cost \
+tier, and default model; `categories_list` maps categories to model tiers.
 - The plugin itself looks broken. `health_check` reports on the ast-grep binary and state files.
 """
 

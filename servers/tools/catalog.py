@@ -19,8 +19,10 @@ def register(mcp: MCPServer) -> None:
     """Register all catalog and concurrency tools on the given MCPServer instance."""
 
     _MODEL_COST_TIER = {
+        "claude-fable-5-1": "premium",
         "claude-fable-5": "premium",
         "fable": "premium",
+        "claude-opus-5-5": "expensive",
         "claude-opus-5": "expensive",
         "claude-opus-4-8": "expensive",
         "opus": "expensive",
@@ -52,7 +54,7 @@ def register(mcp: MCPServer) -> None:
             ),
         ] = False,
     ) -> str:
-        """Return structured catalog of all agents with orchestration metadata. Use at session start for routing decisions — provides when_to_use, cost_tier, and model for each agent. Reads only, unless write_cache=True refreshes the agent-catalog.json cache the SubagentStart hook reads. Returns JSON array of agent entries."""
+        """Return a JSON array with one entry per agent file in the plugin's agents/ directory: name, description (the frontmatter description), default_model (the frontmatter model alias, "sonnet" when absent), and cost_tier (premium for fable, expensive for opus, cheap for sonnet and unknown values, free for haiku). The Agent tool's own agent list already carries names and descriptions; use this when the model or cost tier matters. Read-only unless write_cache=true, which also writes .omca/state/agent-catalog.json for the SubagentStart hook."""
         _env_val = os.environ.get("CLAUDE_PLUGIN_ROOT")
         plugin_root = (
             Path(_env_val) if _env_val else Path(__file__).parent.parent.parent

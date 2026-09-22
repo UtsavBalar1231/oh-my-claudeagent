@@ -619,7 +619,7 @@ def register(mcp: MCPServer) -> None:
             default="text", description="Output format: text (compact) or json (full)"
         ),
     ) -> str:
-        """Search code patterns across the filesystem using AST-aware structural matching. Use instead of grep when you need structural matches (function signatures, class shapes, import patterns) rather than text search. Supports 25 languages. Returns file:line:col with matched code snippets."""
+        """Search code by syntax pattern with ast-grep. Use it instead of text search when the target is structural (function signatures, class shapes, import forms, call patterns); use rg for plain text, comments, or string contents. Paths must lie inside the project root or one of its git worktrees; any other path is rejected with an error, so search outside the repository with rg. Only files whose extension maps to lang are scanned (lang='cpp' skips .c files). Returns file:line:col and the matched line for each hit, at most 500 hits (max_results can lower that), with a [TRUNCATED] marker when more exist; a zero-match result carries hints when the pattern uses regex syntax that ast-grep does not support."""
         safe_paths = normalize_workspace_paths(paths)
         max_results = clamp_max_results(max_results)
         cmd = [_SG_BIN, "run", "-p", pattern, "--lang", lang, "--json=compact"]
@@ -677,7 +677,7 @@ def register(mcp: MCPServer) -> None:
             default=True, description="Preview changes without applying (default: true)"
         ),
     ) -> str:
-        """Replace code patterns across the filesystem with AST-aware rewriting. Use for safe structural refactoring — renaming variables, updating function signatures, or migrating API calls. Always use dry_run=true first to preview changes. Returns list of replacements with file:line locations. Apply is refused when matches exceed the preview cap; narrow the scope so the full change set previews first."""
+        """Rewrite code by syntax pattern with ast-grep, for structural refactors such as renaming a call, reordering arguments, or migrating an API. Paths must lie inside the project root or one of its git worktrees; any other path is rejected. Preview first: dry_run defaults to true and writes nothing; pass dry_run=false only once the preview shows the intended change set. The write goes to disk through ast-grep rather than the Edit tool, so Edit hooks and read-before-edit checks do not run. Returns list of replacements with file:line locations. Apply is refused when matches exceed the 500-match preview cap; narrow paths, globs, or the pattern until the full change set previews."""
         safe_paths = normalize_workspace_paths(paths)
         preview_cmd = [
             _SG_BIN,

@@ -2,6 +2,7 @@
 
 import json
 import time
+from typing import Literal
 
 from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
@@ -79,11 +80,15 @@ def register(mcp: MCPServer) -> None:
         structured_output=False,
     )
     def evidence_log(
-        evidence_type: str = Field(
-            description="Evidence type: build, test, lint, manual, or final_verification (end-of-plan completeness verdict; one logged entry opens the gate permanently). Called after verification commands."
+        evidence_type: Literal[
+            "build", "test", "lint", "manual", "final_verification"
+        ] = Field(
+            description="Kind of evidence. final_verification is the end-of-plan completeness verdict. The plan Stop gate accepts only a final_verification entry with exit_code 0 whose plan_sha256 matches the plan file's current SHA-256; an entry without plan_sha256 matches any plan, and editing the plan after logging makes a scoped entry stop matching."
         ),
         command: str = Field(description="Command that was executed"),
-        exit_code: int = Field(description="Exit code of the command"),
+        exit_code: int = Field(
+            description="Exit code of the command. For final_verification, 0 records COMPLETE and any other value INCOMPLETE."
+        ),
         output_snippet: str = Field(
             description="Relevant output snippet (truncated if needed)"
         ),
@@ -93,10 +98,10 @@ def register(mcp: MCPServer) -> None:
         ),
         plan_sha256: str = Field(
             default="",
-            description="SHA-256 of the active plan file; attach on final_verification entries to scope evidence to a specific plan run. Leave empty for build/test/lint/manual entries.",
+            description="Hex SHA-256 of the plan file's current bytes, the first field of `sha256sum <plan file>`. Set it on final_verification entries so the verdict applies only to this version of the plan; leave empty for other types.",
         ),
     ) -> str:
-        """REQUIRED after every build/test/lint command -- task completion is blocked without this. Append a timestamped verification evidence entry. Use immediately after running any verification command (just test, just lint, just build, etc.). Set plan_sha256 on final_verification entries to scope evidence to a specific plan run. Returns confirmation with total evidence entry count."""
+        """Append a timestamped entry to the project's verification evidence log (.omca/evidence/verification-evidence.json), the audit trail OMCA's gates read. Use it after each build, test, or lint run, with the run's real exit code (a failing run is still evidence), and once at the end of a plan for the final_verification verdict. Two gates read the log: a plan-bound session cannot stop until a final_verification entry matches the plan (see evidence_type), and when task tools are enabled a TaskCompleted hook refuses to close a task if a verification run finished after the log was last written. Entries are never removed and are shared by every session in the project. Returns a confirmation with the total entry count."""
         return _do_evidence_log(
             evidence_type,
             command,
@@ -124,7 +129,7 @@ def register(mcp: MCPServer) -> None:
             default="", description="Project root (auto-detected from git)"
         ),
     ) -> str:
-        """Read all accumulated verification evidence records. Use before claiming task completion to review what has been verified, or when an orchestrator needs to confirm subagent work. Returns full JSON evidence log or a no-evidence message."""
+        """Return every entry in the project's verification evidence log as JSON, oldest first, or a no-evidence message. The log is never cleared and is shared by all sessions in the project, so it holds entries from earlier sessions and other plans; there is no filter or paging, and each output_snippet is capped at 2,000 characters. Use it to confirm what was logged, for example evidence a subagent reports."""
         state = _state_dir(working_directory)
         entries = _load_evidence(state)
         if not entries:
