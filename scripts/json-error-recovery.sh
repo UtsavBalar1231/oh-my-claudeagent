@@ -35,7 +35,7 @@ if [[ -n "${ADVICE:-}" ]]; then
 elif echo "${ERROR_MSG}" | grep -qiE '(invalid JSON|malformed JSON|parse error|SyntaxError|Unexpected token|JSON\.parse)'; then
 	# 200 bytes — ERROR_MSG cap; same as delegate-retry.sh; shows parse-error location.
 	ERROR_DETAIL=$(echo "${ERROR_MSG}" | head -c 200)
-	MSG="[JSON ERROR RECOVERY] JSON parse error detected in ${TOOL_NAME}. Common fixes: 1) Check for trailing commas in objects/arrays, 2) Ensure all strings are double-quoted, 3) Escape special characters in string values, 4) Verify brackets/braces are balanced. Error: ${ERROR_DETAIL}"
+	MSG="[JSON ERROR RECOVERY] ${TOOL_NAME} failed on malformed JSON: ${ERROR_DETAIL}"
 else
 	exit 0
 fi
@@ -48,7 +48,7 @@ if [[ "${NEW_COUNT}" -ge 3 ]]; then
 	TIMELINE=$(jq -r --arg key "${ERROR_KEY}" \
 		'(.[$key].last_errors // []) | reverse | to_entries | map("\(.key + 1)) \(.value)") | join(" ")' \
 		"${ERROR_COUNTS_FILE}" 2>/dev/null)
-	CIRCUIT_BREAKER=" This error has occurred 3+ times. Attempts: ${TIMELINE}. Stop retrying the same approach. Escalate to oracle for architectural guidance or try a fundamentally different approach."
+	CIRCUIT_BREAKER=" This tool has failed 3+ times, each failure within five minutes of the last. Attempts: ${TIMELINE}. The count covers every failure of the tool, related or not. If these are repeated attempts at one fix, stop repeating it: change the approach, or ask oracle for a diagnosis."
 fi
 
 emit_context "PostToolUseFailure" "${MSG}${CIRCUIT_BREAKER}"

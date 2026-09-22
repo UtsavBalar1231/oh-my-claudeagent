@@ -15,12 +15,9 @@ if echo "${ERROR}" | grep -qiE 'command not found|No such file or directory.*bin
 	ADVICE="Command not found. Check if the tool is installed and on PATH. Try: which <command>"
 elif echo "${ERROR}" | grep -qiE 'Permission denied|EACCES'; then
 	ADVICE="Permission denied. Check file permissions or try with appropriate access."
-elif echo "${ERROR}" | grep -qiE 'compil.*error|compilation|error TS|SyntaxError|ParseError'; then
-	ADVICE="Compilation/syntax error. Read the error output carefully — fix the specific file and line mentioned."
-elif echo "${ERROR}" | grep -qiE 'FAIL|AssertionError|test.*fail|expect.*received'; then
-	ADVICE="Test failure. Read the failing test assertion. Check what the test expects vs what the code produces."
-elif echo "${ERROR}" | grep -qiE 'exit code [1-9]|exited with'; then
-	ADVICE="Non-zero exit code. Read the full output above for the specific error."
+elif echo "${ERROR}" | grep -qiE 'compil.*error|compilation|error TS|SyntaxError|ParseError|FAIL|AssertionError|test.*fail|expect.*received|exit code [1-9]|exited with'; then
+	# The failure output already reaches the model; these classes only feed the counter.
+	ADVICE=""
 elif echo "${ERROR}" | grep -qiE 'timed out|timeout|Command timed out'; then
 	ADVICE="Command timed out. Consider: run_in_background=true for long operations, a larger timeout param, or narrow the scope (e.g. target a single test file)."
 else
@@ -40,7 +37,8 @@ if [[ "${NEW_COUNT}" -ge 3 ]]; then
 	TIMELINE=$(jq -r --arg key "${ERROR_KEY}" \
 		'(.[$key].last_errors // []) | reverse | to_entries | map("\(.key + 1)) \(.value)") | join(" ")' \
 		"${ERROR_COUNTS_FILE}" 2>/dev/null)
-	CIRCUIT_BREAKER=" This error has occurred 3+ times. Attempts: ${TIMELINE}. Stop retrying the same approach. Escalate to oracle for architectural guidance or try a fundamentally different approach."
+	CIRCUIT_BREAKER=" This tool has failed 3+ times, each failure within five minutes of the last. Attempts: ${TIMELINE}. The count covers every failure of the tool, related or not. If these are repeated attempts at one fix, stop repeating it: change the approach, or ask oracle for a diagnosis."
 fi
 
+[[ -n "${ADVICE}${CIRCUIT_BREAKER}" ]] || exit 0
 emit_context "PostToolUseFailure" "[BASH ERROR RECOVERY] ${ADVICE}${CIRCUIT_BREAKER}"

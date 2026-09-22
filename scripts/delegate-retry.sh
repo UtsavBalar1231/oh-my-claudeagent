@@ -10,7 +10,7 @@ TOOL_NAME=$(jq -r '.tool_name // "Agent"' <<< "${HOOK_INPUT}")
 
 if echo "${ERROR_MSG}" | grep -qi "No such tool available: Agent" || \
    echo "${ERROR_MSG}" | grep -qiE 'subagent.*nest|nest.*limit'; then
-	MSG="[NESTING LIMIT] The Agent tool is unavailable — you are running as a subagent and cannot spawn further subagents. This is a Claude Code platform constraint. Implement the task directly using Read, Write, Edit, Bash, Grep, Glob. Do NOT retry Agent calls."
+	MSG="[NESTING LIMIT] The Agent tool is not in this agent's tool list: its definition disallows it, a session restriction removed it, or it is at the subagent depth limit (CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH, three layers below the main conversation by default). Every Agent call fails the same way, so do the work directly with the tools you have."
 	emit_context "PostToolUseFailure" "${MSG}"
 	exit 0
 fi
@@ -47,11 +47,11 @@ if [[ "${NEW_COUNT}" -ge 3 ]]; then
 	TIMELINE=$(jq -r --arg key "${ERROR_KEY}" \
 		'(.[$key].last_errors // []) | reverse | to_entries | map("\(.key + 1)) \(.value)") | join(" ")' \
 		"${ERROR_COUNTS_FILE}" 2>/dev/null)
-	CIRCUIT_BREAKER=" This error has occurred 3+ times. Attempts: ${TIMELINE}. Stop retrying the same approach. Escalate to oracle for architectural guidance or try a fundamentally different approach."
+	CIRCUIT_BREAKER=" This tool has failed 3+ times, each failure within five minutes of the last. Attempts: ${TIMELINE}. The count covers every failure of the tool, related or not. If these are repeated attempts at one fix, stop repeating it: change the approach, or ask oracle for a diagnosis."
 fi
 
 if echo "${ERROR_MSG}" | grep -qiE "${RETRYABLE_PATTERNS}"; then
-	TRANSIENT_NOTE="This is a tool/infrastructure failure, not a reasoning error. Do not self-reflect on your approach: the tool itself failed. Either resume after a moment or escalate."
+	TRANSIENT_NOTE="The failure is in the service, not in your prompt or approach. Once it clears, resume the same agent with SendMessage so it keeps its history, or delegate only the remainder."
 	MSG="[ERROR RECOVERY] Type: transient | Tool: ${TOOL_NAME} | Retry: ${NEW_COUNT}/3
 [RETRYABLE ERROR] The delegation failed due to a transient error (rate limit, capacity, timeout). Claude Code already exhausted its own recovery before this surfaced: a response cut off mid-stream is continued automatically, and a model-level failure is routed through the fallback model chain when one is configured. The failure carries whatever the agent produced before it was cut off: read that partial work, then delegate only the remainder instead of re-sending the original prompt. Do not escalate to oracle for transient failures. ${TRANSIENT_NOTE}${CIRCUIT_BREAKER}"
 	emit_context "PostToolUseFailure" "${MSG}"

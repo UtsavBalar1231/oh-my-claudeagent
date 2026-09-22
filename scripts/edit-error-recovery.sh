@@ -48,7 +48,7 @@ if [[ "${NEW_COUNT}" -ge 3 ]]; then
 	TIMELINE=$(jq -r --arg key "${ERROR_KEY}" \
 		'(.[$key].last_errors // []) | reverse | to_entries | map("\(.key + 1)) \(.value)") | join(" ")' \
 		"${ERROR_COUNTS_FILE}" 2>/dev/null)
-	CIRCUIT_BREAKER=" This error has occurred 3+ times. Attempts: ${TIMELINE}. Stop retrying the same approach. Escalate to oracle for architectural guidance or try a fundamentally different approach."
+	CIRCUIT_BREAKER=" This tool has failed 3+ times, each failure within five minutes of the last. Attempts: ${TIMELINE}. The count covers every failure of the tool, related or not. If these are repeated attempts at one fix, stop repeating it: change the approach, or ask oracle for a diagnosis."
 fi
 
 MSG="[ERROR RECOVERY] Type: ${ERROR_CLASS} | Tool: ${TOOL_NAME} | Retry: ${NEW_COUNT}/3

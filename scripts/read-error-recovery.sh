@@ -9,11 +9,11 @@ ERROR_COUNTS_FILE="${HOOK_STATE_DIR}/error-counts.json"
 ERROR_KEY="${TOOL_NAME}:read_error"
 
 if echo "${ERROR}" | grep -qiE 'no such file|not found|ENOENT'; then
-	ADVICE="File not found. Use Glob to search for similar filenames, or check if the path has changed."
+	ADVICE="File not found. Search for the name with find or rg --files, or check whether the path changed."
 elif echo "${ERROR}" | grep -qiE 'permission|EACCES'; then
-	ADVICE="Permission denied. The file exists but cannot be read. Use mcp__plugin_oh-my-claudeagent_omca__file_read for files outside the project root. Fallback: Bash(cat /path) if MCP tools are unavailable."
+	ADVICE="Permission denied. For a path outside the working directories, read it with mcp__plugin_oh-my-claudeagent_omca__file_read, or ask the user to add its directory with /add-dir. If the file's own permissions forbid reading (EACCES), no tool will read it: report that instead of retrying."
 elif echo "${ERROR}" | grep -qiE 'directory|is a directory'; then
-	ADVICE="Path is a directory, not a file. Use Bash(ls ...) to list contents, or Glob to find files within."
+	ADVICE="Path is a directory, not a file. List it with ls, or search inside it with find or rg --files."
 else
 	exit 0
 fi
@@ -26,7 +26,7 @@ if [[ "${NEW_COUNT}" -ge 3 ]]; then
 	TIMELINE=$(jq -r --arg key "${ERROR_KEY}" \
 		'(.[$key].last_errors // []) | reverse | to_entries | map("\(.key + 1)) \(.value)") | join(" ")' \
 		"${ERROR_COUNTS_FILE}" 2>/dev/null)
-	CIRCUIT_BREAKER=" This error has occurred 3+ times. Attempts: ${TIMELINE}. Stop retrying the same approach. Escalate to oracle for architectural guidance or try a fundamentally different approach."
+	CIRCUIT_BREAKER=" This tool has failed 3+ times, each failure within five minutes of the last. Attempts: ${TIMELINE}. The count covers every failure of the tool, related or not. If these are repeated attempts at one fix, stop repeating it: change the approach, or ask oracle for a diagnosis."
 fi
 
 emit_context "PostToolUseFailure" "[READ ERROR RECOVERY] ${ADVICE}${CIRCUIT_BREAKER}"

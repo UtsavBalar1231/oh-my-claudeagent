@@ -77,14 +77,13 @@ load '../test_helper'
 	[ -n "$ctx" ]
 }
 
-@test "bash-error-recovery: test failure error produces recovery advice" {
+@test "bash-error-recovery: test failure adds no advice but still counts toward the breaker" {
 	local payload
 	payload='{"tool_name":"Bash","tool_input":{"command":"just test"},"error":"FAIL: 3 tests failed. AssertionError: expected true"}'
 	run_hook "bash-error-recovery.sh" "$payload"
 	assert_success
-	local ctx
-	ctx=$(get_context)
-	[ -n "$ctx" ]
+	assert_output ""
+	assert [ -f "$CLAUDE_PROJECT_ROOT/.omca/state/error-counts.json" ]
 }
 
 @test "bash-error-recovery: unknown bash error exits 0 with no output (catch-all defers)" {
@@ -153,6 +152,19 @@ load '../test_helper'
 	local ctx
 	ctx=$(get_context)
 	[ -n "$ctx" ]
+}
+
+# A fenced path is reachable through file_read or /add-dir; a shell cat is not the fallback.
+@test "read-error-recovery: permission error points at file_read, not a shell read" {
+	local payload
+	payload='{"tool_name":"Read","tool_input":{"file_path":"/etc/shadow"},"error":"EACCES: permission denied, open /etc/shadow"}'
+	run_hook "read-error-recovery.sh" "$payload"
+	assert_success
+	local ctx
+	ctx=$(get_context)
+	echo "$ctx" | grep -q "file_read"
+	echo "$ctx" | grep -q "/add-dir"
+	! echo "$ctx" | grep -qi "cat /"
 }
 
 # ─── i. json-error-recovery.sh (catch-all) ───────────────────────────────────

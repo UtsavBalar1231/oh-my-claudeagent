@@ -262,8 +262,9 @@ load '../test_helper'
 	local ctx
 	ctx=$(get_context)
 	echo "$ctx" | grep -q "NESTING LIMIT"
-	echo "$ctx" | grep -qi "cannot spawn further subagents"
-	# A depth constraint is not fixed by re-prompting, so the generic advice must not appear.
+	echo "$ctx" | grep -qi "not in this agent's tool list"
+	echo "$ctx" | grep -qi "definition disallows it"
+	# A missing Agent tool is not fixed by re-prompting, so the generic advice must not appear.
 	! echo "$ctx" | grep -qi "different agent tier"
 
 	assert [ ! -f "$CLAUDE_PROJECT_ROOT/.omca/state/error-counts.json" ]
