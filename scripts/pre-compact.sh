@@ -41,7 +41,7 @@ TEMPLATE
 			printf '%s\n' "No remaining unchecked tasks found in plan."
 		fi
 	else
-		printf '%s\n' "Check boulder.json for active plan and remaining tasks."
+		printf '%s\n' "No plan is bound to this session."
 	fi
 
 	printf '\n## Decisions\n'

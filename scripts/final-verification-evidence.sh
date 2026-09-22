@@ -127,4 +127,4 @@ if [[ "${DIGEST_SCOPING_AVAILABLE}" == "false" ]]; then
 fi
 
 # Plan complete, no matching final_verification evidence — block Stop
-block_exit "[FINAL VERIFICATION] Plan '${ACTIVE_PLAN}' fully checked but no matching final_verification evidence found. Call evidence_log(evidence_type=\"final_verification\", command=\"<your verdict>\", exit_code=0, output_snippet=\"...\"${PLAN_SHA256_ARGUMENT}) to open the gate. Set OMCA_HOOK_DISABLE_FINAL_VERIFY=1 to bypass."
+block_exit "[FINAL VERIFICATION] Every task in plan '${ACTIVE_PLAN}' is checked, but no final_verification evidence matches its current contents. Record the verdict of the plan's completeness review, running the review first if it has not run: evidence_log(evidence_type=\"final_verification\", command=\"<what the review covered>\", exit_code=<0 for COMPLETE, 1 for INCOMPLETE>, output_snippet=\"<verdict>\"${PLAN_SHA256_ARGUMENT}). An INCOMPLETE verdict means fixing the gap and reviewing again. Set OMCA_HOOK_DISABLE_FINAL_VERIFY=1 to bypass."

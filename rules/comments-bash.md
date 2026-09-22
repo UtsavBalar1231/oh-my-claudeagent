@@ -15,9 +15,9 @@ everything, and never restate the line below the comment.
 `TODO` carries an owner or a bug reference: `# TODO(owner): short description`. Bare
 `TODO: implement` is not a comment.
 
-Every numeric constant assignment carries a single-line derivation comment within two
-lines above it. When the rationale is unrecoverable, write `UNDOCUMENTED` rather than
-guessing.
+Name a numeric constant so the name explains the number. When the name cannot carry the
+rationale (a measured threshold, a value that differs from a sibling), put a one-line
+derivation comment above it, and write `UNDOCUMENTED` when the rationale is unrecoverable.
 
 Comments are not a changelog, and never cite plan task numbers or plan filenames. Write
 the invariant, not the history.

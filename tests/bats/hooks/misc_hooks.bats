@@ -167,8 +167,8 @@ load '../test_helper'
 }
 
 # The terse mandated form restates its constant by construction, so it is
-# exempted by shape. Without that carve-out the gate blocks a comment the
-# rules file REQUIRES on every numeric constant.
+# exempted by shape. Without that carve-out the gate blocks the derivation
+# comment the rules file asks for when a constant's name cannot carry it.
 @test "comment-checker: no warning for terse magic-number comment" {
 	local content=$'# 300s evidence age\nMAX_EVIDENCE_AGE_SECONDS=300'
 	local payload

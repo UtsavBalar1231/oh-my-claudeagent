@@ -325,4 +325,4 @@ write_continuation_state "${NEW_CONSECUTIVE_BLOCKS}" "${NOW}" "${INCOMPLETE}" "$
 stop_block_allowed "plan-continuation-guard" || noop_exit
 
 NEXT_TASK=$(grep -m1 -E '^- \[ \] [0-9]+\.' "${ACTIVE_PLAN}" | sed -E 's/^- \[ \] [0-9]+\.[[:space:]]*//')
-block_exit "[PLAN CONTINUATION] The bound plan '${PLAN_NAME}' still has ${INCOMPLETE} unchecked tasks (next: ${NEXT_TASK}). If you believe the work is complete, re-examine each unchecked item skeptically; finish it or record in the plan notepad why it cannot proceed."
+block_exit "[PLAN CONTINUATION] The bound plan '${PLAN_NAME}' still has ${INCOMPLETE} unchecked tasks (next: ${NEXT_TASK}). Continue with the next task. If its work is already done and reviewed, flip its checkbox. If it cannot proceed without the user, record why with notepad_write and ask the user; a turn that asks the user is not blocked."

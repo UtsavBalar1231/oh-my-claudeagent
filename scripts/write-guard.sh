@@ -34,7 +34,7 @@ esac
 TOOL_NAME=$(jq -r '.tool_name // ""' <<< "${HOOK_INPUT}")
 
 if [[ "${TOOL_NAME}" == "Write" && -f "${FILE_PATH}" ]]; then
-	MSG="Detected manual write to file that exists at path ${FILE_PATH}. Future modifications should use Edit to preserve history."
+	MSG="Detected manual write: Write replaces all of ${FILE_PATH}. When only part of a file changes, Edit touches just that span and cannot drop unrelated lines."
 	emit_context "PreToolUse" "${MSG}"
 else
 	exit 0

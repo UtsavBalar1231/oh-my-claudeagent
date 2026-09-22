@@ -103,6 +103,6 @@ EOF
 
 	local ctx="${CLAUDE_PROJECT_ROOT}/.omca/state/compaction-context.md"
 	assert [ -f "${ctx}" ]
-	grep -q "Check boulder.json for active plan and remaining tasks." "${ctx}"
+	grep -q "No plan is bound to this session." "${ctx}"
 	grep -q "No decisions recorded yet." "${ctx}"
 }
