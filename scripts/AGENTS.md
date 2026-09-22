@@ -43,9 +43,8 @@ Hook-authoring conventions for a script here:
 - A deny gate never allows a command it failed to recognise. Silence, `exit 0` with no
   stdout, is the answer to a command the pattern does not match; a trailing allow
   auto-approves everything the gate missed. A command the gate positively recognised and
-  translated may be allowed through an `updatedInput` rewrite instead, as `sed-grep-deny.sh`
-  does when it rewrites `grep` to `rg`. That is a restatement of a matched command, not a
-  fallback for an unmatched one.
+  translated may be allowed through an `updatedInput` rewrite instead. That is a
+  restatement of a matched command, not a fallback for an unmatched one.
 - Keep state under `.omca/state/` relative to `CLAUDE_PROJECT_ROOT`, never `~/.claude/`.
 - Reference the plugin root as `$(dirname "$0")/..`.
 - Source `lib/common.sh` and use its helpers rather than reimplementing an idiom.

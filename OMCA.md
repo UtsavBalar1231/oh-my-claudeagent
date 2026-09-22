@@ -383,8 +383,7 @@ The deny hooks are a separate family with their own shapes. `PreToolUse` accepts
 stderr text plus exit 2 or a `hookSpecificOutput.permissionDecision: "deny"` payload with
 exit 0; `PermissionRequest` reads `hookSpecificOutput.decision.behavior`. Every guard
 registered on both events branches on `hook_event_name` and writes the shape that event
-reads: `permission-filter.sh`, `git-destructive-deny.sh`, `sed-grep-deny.sh`, and
-`executor-grep-deny.sh`. Exit 2 does not deny on `PermissionRequest`: the per-event table
+reads: `permission-filter.sh`, `git-destructive-deny.sh`, and `executor-grep-deny.sh`. Exit 2 does not deny on `PermissionRequest`: the per-event table
 in `claude-code-docs/docs/hooks.md` gives that event a blocking column of "No", the
 permission flow proceeds unchanged, and the stderr is discarded. Deny through the
 `decision` object instead. That makes the branch required rather than a hedge, since the

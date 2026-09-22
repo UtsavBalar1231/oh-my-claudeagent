@@ -58,10 +58,10 @@ _path_without() {
 @test "common.sh reader: no timeout on PATH keeps a deny gate denying" {
 	local bin
 	bin=$(_path_without timeout gtimeout)
-	local payload='{"tool_name":"Bash","tool_input":{"command":"sed -n 1,5p foo.txt"}}'
+	local payload='{"tool_name":"Bash","tool_input":{"command":"git stash"}}'
 
 	run env -i PATH="$bin" HOME="$HOME" CLAUDE_PROJECT_ROOT="$BATS_TEST_TMPDIR/p" \
-		"$bin/bash" "$CLAUDE_PLUGIN_ROOT/scripts/sed-grep-deny.sh" <<< "$payload"
+		"$bin/bash" "$CLAUDE_PLUGIN_ROOT/scripts/git-destructive-deny.sh" <<< "$payload"
 
 	# Before the probe existed, `timeout` resolved to nothing, HOOK_INPUT stayed
 	# empty and the hook produced no decision — every deny gate silently inert.
@@ -69,7 +69,7 @@ _path_without() {
 	# ignored on PermissionRequest.
 	assert_success
 	assert_output --partial '"behavior":"deny"'
-	assert_output --partial 'denied'
+	assert_output --partial 'Destructive git command blocked'
 }
 
 @test "common.sh reader: gtimeout is used when timeout is absent" {

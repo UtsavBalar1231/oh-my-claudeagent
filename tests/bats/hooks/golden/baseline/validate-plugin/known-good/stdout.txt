@@ -198,10 +198,6 @@
 [validate-plugin] PASS: PermissionRequest Bash (permission-filter.sh): script succeeded
 [validate-plugin] PASS: PermissionRequest Bash (git-destructive-deny.sh): stdout shape is plain text or one single-line JSON object
 [validate-plugin] PASS: PermissionRequest Bash (git-destructive-deny.sh): script succeeded
-[validate-plugin] PASS: PermissionRequest Bash (sed-grep-deny.sh): stdout shape is plain text or one single-line JSON object
-[validate-plugin] PASS: PermissionRequest Bash (sed-grep-deny.sh): script succeeded
-[validate-plugin] PASS: PermissionRequest Bash (sed-grep-deny.sh): stdout shape is plain text or one single-line JSON object
-[validate-plugin] PASS: PermissionRequest Bash (sed-grep-deny.sh): script succeeded
 [validate-plugin] PASS: PermissionRequest Bash (executor-grep-deny.sh): stdout shape is plain text or one single-line JSON object
 [validate-plugin] PASS: PermissionRequest Bash (executor-grep-deny.sh): script succeeded
 [validate-plugin] PASS: SessionStart compact (post-compact-inject.sh): stdout shape is plain text or one single-line JSON object
@@ -242,4 +238,4 @@
 [validate-plugin] PASS: mcp tools/list contains categories_list
 [validate-plugin] PASS: mcp tools/list contains file_read
 [validate-plugin] PASS: mcp tools/list contains session_search
-[validate-plugin] Summary: 219 passed, 0 failed, 13 skipped, 0 warned
+[validate-plugin] Summary: 215 passed, 0 failed, 13 skipped, 0 warned

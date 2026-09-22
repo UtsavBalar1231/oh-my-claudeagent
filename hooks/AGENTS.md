@@ -44,17 +44,14 @@ event is unregistered on purpose; `OMCA.md` carries the per-event reason.
   the only script that needs the guard, because it is the only one whose allow is a blanket
   fast path keyed on a tool name rather than on a command the script parsed in full.
 
-  `git-destructive-deny.sh`, `sed-grep-deny.sh`, and `executor-grep-deny.sh` are registered
-  on both events too. `git-destructive-deny.sh` and `executor-grep-deny.sh` are deny-only:
-  neither emits an allow on any path. `sed-grep-deny.sh` is the one exception, and a narrow
-  one. When it recognises a plain `grep` invocation it can translate, it allows the call
-  with an `updatedInput` rewrite to `rg` instead of denying and costing a round trip. The
-  property that matters is unchanged: a command it does not recognise still gets silence,
-  never an allow. `executor-grep-deny.sh` deliberately has no such rewrite, because the
-  policy it carries is that the executor queries code through `ast_search`; `rg` is still
-  text grep, so rewriting there would reverse the policy rather than restate the command.
+  `git-destructive-deny.sh` and `executor-grep-deny.sh` are registered on both events too.
+  Both are deny-only: neither emits an allow on any path, so a command they do not
+  recognise gets silence, never an allow. `executor-grep-deny.sh` has no rewrite to `rg`,
+  because the policy it carries is that the executor queries code through `ast_search`;
+  `rg` is still text grep, so rewriting there would reverse the policy rather than restate
+  the command.
 
-  Each of the three branches its output on `hook_event_name`, because the two events read a
+  Each of the two branches its output on `hook_event_name`, because the two events read a
   decision from different places: `PreToolUse` from stderr plus `exit 2` or from
   `hookSpecificOutput.permissionDecision`, `PermissionRequest` from
   `hookSpecificOutput.decision.behavior` with `exit 0`. The branch is required, not a hedge.
