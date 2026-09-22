@@ -6,8 +6,8 @@
 
 load '../test_helper'
 
-# Surfaces a spawned worker subagent can see: its own definition, the globally-applied
-# output style (force-for-plugin: true), and the CLAUDE.md block injected by omca-setup.
+# Surfaces a worker can see: its own definition, the CLAUDE.md block omca-setup installs
+# (loaded by every agent without omitClaudeMd), and the output style, which reaches forks.
 # All leaf-worker definitions — the negative (no-barrier-imperative) check covers every one.
 WORKER_AGENT_DEFS=(
 	"agents/executor.md"
@@ -30,7 +30,7 @@ WORKER_DEFS_NEED_CONTRACT=(
 
 GLOBAL_WORKER_VISIBLE=(
 	"output-styles/omca-default.md"
-	"skills/omca-setup/orchestration-block.md"
+	"templates/claudemd.md"
 )
 
 @test "worker isolation: no bare barrier imperative in worker-visible surfaces" {
