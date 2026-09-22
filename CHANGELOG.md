@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.20.0] - 2026-09-23
 
 Reconciles the plugin with client 2.1.280 and re-baselines its prompts for Opus 5.5, which
 the `opus` alias now resolves to, and Fable 5.1. The prompts were written for models that
@@ -76,6 +76,9 @@ calls to the bundled grep and context7 tools kept prompting until setup rewrites
 
 - The delegation reminder hook, which nudged the main session to delegate after three direct
   tool calls and so argued against the new default.
+- The `frontend-ui-ux`, `playwright`, and `dev-browser` skills. They served web UI work
+  outside this plugin's scope, and `playwright` depended on a Playwright MCP server the
+  plugin never shipped.
 
 ## [2.19.1] - 2026-09-21
 
