@@ -523,6 +523,9 @@ def format_run_results(
         text = m.get("lines", m.get("text", "")).strip()
         if text:
             lines.append(f"  {text}")
+        replacement = m.get("replacement")
+        if is_replace and isinstance(replacement, str):
+            lines.append(f"  -> {replacement.strip()}")
         lines.append("")
 
     if is_replace and is_dry_run:

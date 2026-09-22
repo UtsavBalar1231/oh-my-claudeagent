@@ -532,6 +532,32 @@ def test_ast_replace_dry_run(tools, mocker):
     assert "replacement" in result
 
 
+def test_ast_replace_dry_run_shows_the_rewritten_text(tools, mocker):
+    """A dry-run preview shows what each match becomes, not only where it is."""
+    matches = [
+        {
+            "file": "app.py",
+            "lines": "old_func(x)",
+            "replacement": "new_func(x)",
+            "range": {"start": {"line": 5, "column": 0}},
+        }
+    ]
+    mocker.patch(
+        "subprocess.run",
+        return_value=_make_process(stdout=json.dumps(matches).encode()),
+    )
+
+    result = tools["ast_replace"](
+        pattern="old_func($X)",
+        rewrite="new_func($X)",
+        lang="python",
+        paths=["."],
+        globs=None,
+        dry_run=True,
+    )
+    assert "-> new_func(x)" in result
+
+
 def test_ast_replace_no_matches(tools, mocker):
     """ast_replace returns no-match message when stdout is empty."""
     mock_proc = _make_process(stdout=b"")
