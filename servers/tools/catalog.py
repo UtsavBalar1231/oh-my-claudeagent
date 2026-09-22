@@ -144,8 +144,14 @@ def register(mcp: MCPServer) -> None:
         else:
             results.append(f"state_dir: MISSING ({state})")
         # Check key state files
-        for name in ["session.json", "verification-evidence.json"]:
-            path = state_path / name
+        # The evidence ledger lives in .omca/evidence/, beside state/, not inside it.
+        for name, path in [
+            ("session.json", state_path / "session.json"),
+            (
+                "verification-evidence.json",
+                state_path.parent / "evidence" / "verification-evidence.json",
+            ),
+        ]:
             results.append(f"  {name}: {'exists' if path.exists() else 'absent'}")
         boulder_path = state_path / "boulder.json"
         if boulder_path.exists():

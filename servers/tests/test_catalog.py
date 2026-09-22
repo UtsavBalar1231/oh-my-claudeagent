@@ -141,6 +141,15 @@ def test_health_check_reports_boulder_absent(tools, working_dir):
     assert "boulder.json: absent" in result
 
 
+def test_health_check_finds_the_evidence_ledger(tools, working_dir, tmp_git_root):
+    """The ledger lives in .omca/evidence/, beside state/, not inside state/."""
+    evidence_dir = tmp_git_root / ".omca" / "evidence"
+    evidence_dir.mkdir(parents=True, exist_ok=True)
+    (evidence_dir / "verification-evidence.json").write_text('{"entries": []}')
+    result = tools["health_check"](working_directory=working_dir)
+    assert "verification-evidence.json: exists" in result
+
+
 def test_health_check_reports_plan_count_flat_schema(tools, working_dir, tmp_git_root):
     """health_check reports 1 plan for the old flat single-plan schema."""
     state_dir = tmp_git_root / ".omca" / "state"
