@@ -1,0 +1,44 @@
+diff --git a/tests/evals/run-eval.sh b/tests/evals/run-eval.sh
+index 14c737a..8b913db 100755
+--- a/tests/evals/run-eval.sh
++++ b/tests/evals/run-eval.sh
+@@ -1,14 +1,36 @@
+ #!/usr/bin/env bash
+ # Lists the task definitions under tasks/. Trials are run by hand, see README.md.
++# Usage: run-eval.sh [--category <name>]
+ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ TASKS_DIR="${SCRIPT_DIR}/tasks"
+ 
+-echo "=== oh-my-claudeagent Eval Harness ==="
+-echo "Tasks found: $(ls "${TASKS_DIR}"/*.json 2>/dev/null | wc -l)"
++usage() {
++    echo "Usage: $0 [--category <name>]" >&2
++    exit 2
++}
++
++filter=""
++case "$1" in
++    "") ;;
++    --category)
++        [[ -n "$2" ]] || usage
++        filter="$2"
++        ;;
++    *) usage ;;
++esac
++
++lines=()
+ for task in "${TASKS_DIR}"/*.json; do
+     name=$(jq -r '.name' "${task}")
+     category=$(jq -r '.category' "${task}")
+-    echo "  [$category] $name"
++    [[ -n "${filter}" && "${category}" != "${filter}" ]] && continue
++    lines+=("  [${category}] ${name}")
++done
++
++echo "=== oh-my-claudeagent Eval Harness ==="
++echo "Tasks found: ${#lines[@]}"
++for line in "${lines[@]}"; do
++    echo "${line}"
+ done
+ echo ""
+ echo "To run a trial, follow the isolation procedure in tests/evals/README.md."

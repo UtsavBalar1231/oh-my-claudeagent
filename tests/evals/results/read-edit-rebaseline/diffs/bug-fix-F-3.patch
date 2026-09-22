@@ -1,0 +1,39 @@
+diff --git a/scripts/keyword-detector.sh b/scripts/keyword-detector.sh
+index 4c1ab59..51108b3 100755
+--- a/scripts/keyword-detector.sh
++++ b/scripts/keyword-detector.sh
+@@ -48,7 +48,7 @@ DETECTED_KEYWORDS=()
+ ADDITIONAL_CONTEXT=""
+ 
+ if ! mode_already_announced "handoff" \
+-	&& [[ "${PROMPT_LOWER}" =~ (handoff|context[[:space:]]+is[[:space:]]+getting[[:space:]]+long|start[[:space:]]+fresh[[:space:]]+session) ]]; then
++	&& [[ "${PROMPT_LOWER}" =~ ((^|[^[:alnum:]_])handoff($|[^[:alnum:]_])|context[[:space:]]+is[[:space:]]+getting[[:space:]]+long|start[[:space:]]+fresh[[:space:]]+session) ]]; then
+ 	DETECTED_KEYWORDS+=("handoff")
+ 	ADDITIONAL_CONTEXT+="[HANDOFF MODE DETECTED] Handoff is user-driven and its skill cannot be model-invoked: suggest running /oh-my-claudeagent:handoff instead of improvising a summary."$'\n'
+ fi
+diff --git a/tests/bats/hooks/keyword_detector.bats b/tests/bats/hooks/keyword_detector.bats
+index ad29d8d..4373548 100644
+--- a/tests/bats/hooks/keyword_detector.bats
++++ b/tests/bats/hooks/keyword_detector.bats
+@@ -15,6 +15,21 @@ load '../test_helper'
+ 	assert echo "$ctx" | grep -q "HANDOFF MODE DETECTED"
+ }
+ 
++@test "handoff: detects standalone word with punctuation ('ready for handoff.')" {
++	run_hook "keyword-detector.sh" '{"prompt":"ready for handoff."}'
++	assert_success
++	[[ "$(get_context)" == *"HANDOFF MODE DETECTED"* ]]
++}
++
++@test "handoff: ignores 'handoff' inside longer words" {
++	local prompt
++	for prompt in "review the handoffs list" "call prehandoff first" "rename handoff_state" "use handoffmanager"; do
++		run_hook "keyword-detector.sh" "{\"prompt\":\"$prompt\"}"
++		assert_success
++		[[ "$(get_context)" != *"HANDOFF MODE DETECTED"* ]] || fail "matched: $prompt"
++	done
++}
++
+ # ---------------------------------------------------------------------------
+ # Negative: no keyword
+ # ---------------------------------------------------------------------------

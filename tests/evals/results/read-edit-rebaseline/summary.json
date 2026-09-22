@@ -1,0 +1,236 @@
+{
+  "label": "read-edit-rebaseline",
+  "commit": "9ccf8b22021f8a0dccada92fd77892cef5862b10",
+  "client": "2.1.280",
+  "model": "claude-opus-5-5[1m] (the opus alias), default effort medium: a top-level user effortLevel does not apply to Opus 5.5",
+  "permission_mode": "bypassPermissions",
+  "harness_note": "Procedure from tests/evals/README.md, with --output-format stream-json --verbose added so tool and text blocks can be counted; every arm ran the same command. Candidate files are copied into each worktree, so lines_added and files_touched exclude them. multi-file-search was scored by reading each final answer.",
+  "arms": {
+    "A": "committed prompts at the commit above",
+    "B": "agents/sisyphus.md and output-styles/omca-default.md rebalanced for Opus 5.5 (size-based delegation, a when-to-speak communication rule), plus hooks.json without the delegation-reminder registrations",
+    "C": "B with the committed output style (sisyphus and hooks.json only)",
+    "D": "B with the committed agents/sisyphus.md (output style and hooks.json only)",
+    "F": "B plus a File tools rule in the output style (read with Read, change with Edit, rather than cat/head/tail/sed -n or a shell heredoc) and hooks.json without the sed-grep-deny registrations"
+  },
+  "stats": [
+    {
+      "fixture": "bug-fix",
+      "arm": "A",
+      "trials": 3,
+      "passes": 3,
+      "lines_added": [
+        16,
+        16,
+        16
+      ],
+      "median_lines_added": 16,
+      "minimal_le5": 0,
+      "trials_using_read": 1,
+      "mean_text_blocks": 2.7,
+      "mean_cost_usd": 0.482,
+      "mean_duration_seconds": 41.7
+    },
+    {
+      "fixture": "bug-fix",
+      "arm": "B",
+      "trials": 3,
+      "passes": 3,
+      "lines_added": [
+        16,
+        19,
+        17
+      ],
+      "median_lines_added": 17,
+      "minimal_le5": 0,
+      "trials_using_read": 1,
+      "mean_text_blocks": 7,
+      "mean_cost_usd": 0.547,
+      "mean_duration_seconds": 79.7
+    },
+    {
+      "fixture": "bug-fix",
+      "arm": "F",
+      "trials": 3,
+      "passes": 3,
+      "lines_added": [
+        19,
+        17,
+        16
+      ],
+      "median_lines_added": 17,
+      "minimal_le5": 0,
+      "trials_using_read": 1,
+      "mean_text_blocks": 5.3,
+      "mean_cost_usd": 0.538,
+      "mean_duration_seconds": 58
+    },
+    {
+      "fixture": "diff-latitude",
+      "arm": "A",
+      "trials": 8,
+      "passes": 8,
+      "lines_added": [
+        19,
+        3,
+        3,
+        3,
+        24,
+        26,
+        19,
+        31
+      ],
+      "median_lines_added": 19,
+      "minimal_le5": 3,
+      "trials_using_read": 3,
+      "mean_text_blocks": 1.9,
+      "mean_cost_usd": 0.421,
+      "mean_duration_seconds": 33.3
+    },
+    {
+      "fixture": "diff-latitude",
+      "arm": "B",
+      "trials": 8,
+      "passes": 8,
+      "lines_added": [
+        16,
+        20,
+        32,
+        25,
+        29,
+        27,
+        25,
+        17
+      ],
+      "median_lines_added": 25,
+      "minimal_le5": 0,
+      "trials_using_read": 0,
+      "mean_text_blocks": 4,
+      "mean_cost_usd": 0.422,
+      "mean_duration_seconds": 35.8
+    },
+    {
+      "fixture": "diff-latitude",
+      "arm": "C",
+      "trials": 8,
+      "passes": 8,
+      "lines_added": [
+        22,
+        18,
+        18,
+        26,
+        25,
+        28,
+        18,
+        21
+      ],
+      "median_lines_added": 22,
+      "minimal_le5": 0,
+      "trials_using_read": 0,
+      "mean_text_blocks": 2,
+      "mean_cost_usd": 0.39,
+      "mean_duration_seconds": 30.1
+    },
+    {
+      "fixture": "diff-latitude",
+      "arm": "D",
+      "trials": 8,
+      "passes": 8,
+      "lines_added": [
+        21,
+        27,
+        25,
+        29,
+        27,
+        4,
+        25,
+        26
+      ],
+      "median_lines_added": 26,
+      "minimal_le5": 1,
+      "trials_using_read": 1,
+      "mean_text_blocks": 4.6,
+      "mean_cost_usd": 0.428,
+      "mean_duration_seconds": 37.8
+    },
+    {
+      "fixture": "diff-latitude",
+      "arm": "F",
+      "trials": 8,
+      "passes": 8,
+      "lines_added": [
+        3,
+        3,
+        18,
+        7,
+        19,
+        3,
+        3,
+        2
+      ],
+      "median_lines_added": 3,
+      "minimal_le5": 5,
+      "trials_using_read": 5,
+      "mean_text_blocks": 3.9,
+      "mean_cost_usd": 0.412,
+      "mean_duration_seconds": 32.3
+    },
+    {
+      "fixture": "multi-file-search",
+      "arm": "A",
+      "trials": 3,
+      "passes": 3,
+      "lines_added": [
+        0,
+        0,
+        0
+      ],
+      "median_lines_added": 0,
+      "minimal_le5": 3,
+      "trials_using_read": 0,
+      "mean_text_blocks": 1.7,
+      "mean_cost_usd": 0.381,
+      "mean_duration_seconds": 25.7
+    },
+    {
+      "fixture": "multi-file-search",
+      "arm": "B",
+      "trials": 3,
+      "passes": 3,
+      "lines_added": [
+        0,
+        0,
+        0
+      ],
+      "median_lines_added": 0,
+      "minimal_le5": 3,
+      "trials_using_read": 0,
+      "mean_text_blocks": 3.3,
+      "mean_cost_usd": 0.388,
+      "mean_duration_seconds": 28.3
+    },
+    {
+      "fixture": "multi-file-search",
+      "arm": "F",
+      "trials": 3,
+      "passes": 3,
+      "lines_added": [
+        0,
+        0,
+        0
+      ],
+      "median_lines_added": 0,
+      "minimal_le5": 3,
+      "trials_using_read": 0,
+      "mean_text_blocks": 4,
+      "mean_cost_usd": 0.378,
+      "mean_duration_seconds": 24.7
+    }
+  ],
+  "findings": [
+    "On diff-latitude the minimal solution tracks the Read tool: every trial in every arm that read the file with Read produced a small Edit or Write of 7 lines or fewer. Of the trials that read it through Bash, all but one rewrote the file at 16 to 32 lines; the exception (F-8) made a 2-line in-place shell edit.",
+    "B, C, and D reached the minimal solution less often than A (0, 0, and 1 of 8 against 3 of 8). At n=8 this is directional: Fisher's exact p is about 0.2 for B against A, and about 0.04 for the three arms pooled, which is a post-hoc pooling. The one change the three share is the delegation-reminder removal. In the arm A transcripts (observed there, not recorded in these files), the reminder fired after three direct Bash calls and interrupted a Bash rewrite; in three of the four trials where it fired, the model then switched to Read and Edit, which suggests its restraint effect was accidental.",
+    "F, which states the Read and Edit preference directly, did better than A on this fixture: median 3 lines against 19, minimal in 5 of 8 against 3 of 8, 8 of 8 passing, at the same cost. The evidence is directional (Fisher's exact p about 0.6 on the minimal count, exact Mann-Whitney p about 0.1 on lines added), and F differs from B by two changes, the File tools rule and the sed-grep-deny removal, so the gain cannot be credited to the rule alone.",
+    "The communication rule roughly doubles user-visible text blocks (1.9 to 3.9 on diff-latitude, 2.7 to 5.3 on bug-fix) with no correctness change; bug-fix runs longer (41.7s to 58s) while writing those updates.",
+    "No arm delegated on these fixtures, so the delegation rebalance itself is not measured here; it is orchestration-only in this harness."
+  ]
+}

@@ -1,0 +1,32 @@
+diff --git a/tests/evals/run-eval.sh b/tests/evals/run-eval.sh
+index 14c737a..79e1d00 100755
+--- a/tests/evals/run-eval.sh
++++ b/tests/evals/run-eval.sh
+@@ -3,11 +3,27 @@
+ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ TASKS_DIR="${SCRIPT_DIR}/tasks"
+ 
++filter=""
++while [[ $# -gt 0 ]]; do
++    case "$1" in
++        --category)
++            [[ -n "${2:-}" ]] || { echo "Usage: $0 [--category <name>]" >&2; exit 2; }
++            filter="$2"
++            shift 2
++            ;;
++        *)
++            echo "Usage: $0 [--category <name>]" >&2
++            exit 2
++            ;;
++    esac
++done
++
+ echo "=== oh-my-claudeagent Eval Harness ==="
+ echo "Tasks found: $(ls "${TASKS_DIR}"/*.json 2>/dev/null | wc -l)"
+ for task in "${TASKS_DIR}"/*.json; do
+     name=$(jq -r '.name' "${task}")
+     category=$(jq -r '.category' "${task}")
++    [[ -n "${filter}" && "${category}" != "${filter}" ]] && continue
+     echo "  [$category] $name"
+ done
+ echo ""

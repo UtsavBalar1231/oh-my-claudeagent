@@ -1,0 +1,22 @@
+diff --git a/tests/evals/run-eval.sh b/tests/evals/run-eval.sh
+index 14c737a..7774b37 100755
+--- a/tests/evals/run-eval.sh
++++ b/tests/evals/run-eval.sh
+@@ -1,13 +1,17 @@
+ #!/usr/bin/env bash
+ # Lists the task definitions under tasks/. Trials are run by hand, see README.md.
++# Usage: run-eval.sh [--category <name>]
+ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ TASKS_DIR="${SCRIPT_DIR}/tasks"
++filter=""
++[ "$1" = "--category" ] && filter="$2"
+ 
+ echo "=== oh-my-claudeagent Eval Harness ==="
+ echo "Tasks found: $(ls "${TASKS_DIR}"/*.json 2>/dev/null | wc -l)"
+ for task in "${TASKS_DIR}"/*.json; do
+     name=$(jq -r '.name' "${task}")
+     category=$(jq -r '.category' "${task}")
++    [ -n "$filter" ] && [ "$category" != "$filter" ] && continue
+     echo "  [$category] $name"
+ done
+ echo ""
