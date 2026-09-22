@@ -3,6 +3,15 @@
 
 load '../test_helper'
 
+# These tests exercise the opt-in path; the option defaults to off.
+export CLAUDE_PLUGIN_OPTION_ENABLEKEYWORDTRIGGERS=true
+
+@test "option unset: a trigger phrase injects nothing" {
+	CLAUDE_PLUGIN_OPTION_ENABLEKEYWORDTRIGGERS= run_hook "keyword-detector.sh" '{"prompt":"handoff please"}'
+	assert_success
+	assert_output ""
+}
+
 # ---------------------------------------------------------------------------
 # Handoff detection
 # ---------------------------------------------------------------------------
@@ -194,4 +203,22 @@ load '../test_helper'
 	assert_success
 	ctx=$(get_context)
 	assert echo "$ctx" | grep -q "HANDOFF MODE DETECTED"
+}
+
+# A paste the client marked with <pasted_content id> lines is not the user asking for a
+# mode, so a pasted build log containing a trigger phrase stays silent.
+@test "pasted content: a trigger phrase inside marked pasted text does not fire" {
+	local payload
+	payload=$(jq -nc --arg p $'look at this log\n<pasted_content id="a1b2">\nerror: build broken at step 3\n</pasted_content id="a1b2">\nwhat failed?' '{prompt: $p}')
+	run_hook "keyword-detector.sh" "$payload"
+	assert_success
+	refute_output --partial "HEPHAESTUS"
+}
+
+@test "pasted content: the same phrase typed outside the paste still fires" {
+	local payload
+	payload=$(jq -nc --arg p $'<pasted_content id="a1b2">\nsome log line\n</pasted_content id="a1b2">\nfix build please' '{prompt: $p}')
+	run_hook "keyword-detector.sh" "$payload"
+	assert_success
+	assert_output --partial "HEPHAESTUS"
 }

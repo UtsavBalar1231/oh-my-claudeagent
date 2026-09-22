@@ -4,6 +4,9 @@ source "$(dirname "$0")/lib/common.sh"
 
 # active-modes.json path — shared via common.sh (ACTIVE_MODES_FILE, mode_already_announced, mark_mode_announced)
 
+# Keyword triggers are opt-in through the enableKeywordTriggers plugin option (default false).
+[[ "${CLAUDE_PLUGIN_OPTION_ENABLEKEYWORDTRIGGERS:-false}" == "true" ]] || exit 0
+
 # agent_id is only present in hook payloads fired inside a subagent call, not in top-level session hooks
 AGENT_ID=$(jq -r '.agent_id // ""' <<< "${HOOK_INPUT}")
 if [[ -n "${AGENT_ID}" ]]; then
@@ -11,6 +14,11 @@ if [[ -n "${AGENT_ID}" ]]; then
 fi
 
 PROMPT=$(jq -r '.prompt // ""' <<< "${HOOK_INPUT}")
+
+# Pasted text is not the user asking for a mode: a pasted build log that says "build
+# broken" must not fire. The client wraps each paste in <pasted_content id="..."> lines
+# when it marks pastes, and sends them unmarked otherwise.
+PROMPT=$(awk '/^<pasted_content id="[^"]*">$/ { skip = 1; next } /^<\/pasted_content id="[^"]*">$/ { skip = 0; next } !skip' <<< "${PROMPT}")
 
 if [[ -z "${PROMPT}" ]]; then
 	exit 0
