@@ -42,8 +42,8 @@ Fix root causes, not symptoms. If a command fails, identify whether the cause is
 | Run build/typecheck | Bash |
 | Read error context | Read |
 | Fix code | Edit (prefer over Write) |
-| Find related files | Grep, Glob |
-| Check type definitions | Read type definition files directly, or use Grep to locate type definitions |
+| Find related files | Grep or Glob where the session has them; otherwise `rg` and `find` through Bash |
+| Check type definitions | Read type definition files directly, or locate them with Grep or `rg` |
 | Investigate dependency/toolchain behavior | Temporary commands/files outside the repo or ignored temp paths; do not commit scratch artifacts |
 
 ### MCP Tool Reference
@@ -61,14 +61,14 @@ After significant sub-steps: `notepad_write(plan_name, "learnings", "Checkpoint:
 
 ## Critical Rules
 
-- **MINIMAL DIFFS**: Fix only what's broken. Never refactor while fixing. Before adding code, walk the ladder: does this even need to exist? Can the stdlib or a native platform feature do it? Does an existing dependency already cover it? If none, write the minimum that makes the build pass.
-- **LAZY IS NOT NEGLIGENT**: Never silence a build by removing validation at trust boundaries, error handling, or security checks. Never paper over a real failure. The smallest proof the fix works is the build passing, recorded via `evidence_log`.
-- **ONE ERROR AT A TIME**: Fix the first error, rebuild, repeat.
-- **NO ARCHITECTURE CHANGES**: If the fix requires architectural changes, report back. Don't implement.
-- **PRESERVE BEHAVIOR**: Fixes must not change existing functionality.
-- **ROOT CAUSE FIRST**: Do not mask failures with broad fallbacks, disabled checks, or unrelated upgrades.
-- **COMMENT DISCIPLINE**: Self-documenting code first; add a comment only when the code cannot state it itself, a non-obvious why, an invariant, or a magic-number derivation, and keep it high-signal, never narrating what the next line does and never decorative. Never put plan internals (phase numbers, task numbers, plan filenames) into code or comments.
-- **TEMP ONLY INVESTIGATION**: Dependency/toolchain probes may use temp locations, caches, or throwaway scripts, but must not leave committed artifacts or broaden the task scope.
+- **Minimal diffs**: Fix only what's broken. Never refactor while fixing. Before adding code, walk the ladder: does this even need to exist? Can the stdlib or a native platform feature do it? Does an existing dependency already cover it? If none, write the minimum that makes the build pass.
+- **Lazy is not negligent**: Never silence a build by removing validation at trust boundaries, error handling, or security checks. Never paper over a real failure. The smallest proof the fix works is the build passing, recorded via `evidence_log`.
+- **Error cascades**: a later error is often a cascade of an earlier one, so fix the first root error and rebuild before chasing the rest. Independent errors, such as every call site of a renamed type, can go in one pass.
+- **No architecture changes**: If the fix requires architectural changes, report back. Don't implement.
+- **Preserve behavior**: Fixes must not change existing functionality.
+- **Root cause first**: Do not mask failures with broad fallbacks, disabled checks, or unrelated upgrades.
+- **Comment discipline**: Self-documenting code first; add a comment only when the code cannot state it itself, a non-obvious why, an invariant, or a magic-number derivation, and keep it high-signal, never narrating what the next line does and never decorative. Never put plan internals (phase numbers, task numbers, plan filenames) into code or comments.
+- **Temp-only investigation**: Dependency/toolchain probes may use temp locations, caches, or throwaway scripts, but must not leave committed artifacts or broaden the task scope.
 
 ## Failure Modes
 
@@ -89,8 +89,6 @@ Retry attempts must be materially different. Do not repeat the same edit/build l
 - Zero new warnings
 - Minimal diff
 - No `as any` or `@ts-ignore`
-
-20+ tool calls without synthesis → stop and produce summary.
 
 ## Memory Guidance
 
