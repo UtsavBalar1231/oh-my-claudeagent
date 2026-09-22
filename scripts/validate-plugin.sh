@@ -19,6 +19,15 @@ JUSTFILE="${REPO_ROOT}/justfile"
 DEPERSONALIZATION_ALLOWLIST="${REPO_ROOT}/scripts/depersonalization-allowlist.txt"
 
 AGENTS_DIR="${VALIDATE_PLUGIN_AGENTS_DIR:-${REPO_ROOT}/agents}"
+SKILLS_DIR="${VALIDATE_PLUGIN_SKILLS_DIR:-${REPO_ROOT}/skills}"
+
+# Frontmatter keys the platform reads: plugins-reference.md "Plugin agent frontmatter" and the
+# skills.md frontmatter reference. Claude Code ignores an unknown key without an error and
+# `claude plugin validate` does not flag one, so a misspelled `disallowedTools` would silently
+# drop an agent's tool restrictions.
+PLUGIN_AGENT_KEYS=" name description model effort maxTurns tools disallowedTools skills memory background omitClaudeMd isolation color experimental "
+SKILL_KEYS=" name description when_to_use argument-hint arguments disable-model-invocation user-invocable allowed-tools disallowed-tools model effort context agent background hooks paths shell metadata license compatibility "
+EFFORT_LEVELS=" low medium high xhigh max "
 FORCE_HARD_CUTOVER="${VALIDATE_PLUGIN_FORCE_HARD_CUTOVER:-0}"
 
 PASS_COUNT=0
@@ -292,6 +301,41 @@ check_agent_frontmatter_hygiene() {
 		fail "agent frontmatter hygiene: legacy permissionMode holdouts are forbidden after 2.0.0 marker (${permission_matches[*]})"
 	else
 		skip "agent frontmatter hygiene: legacy permissionMode holdouts still present pre-2.0.0 (${permission_matches[*]})"
+	fi
+}
+
+frontmatter_top_level_keys() {
+	awk 'NR == 1 && $0 != "---" { exit } NR > 1 && $0 == "---" { exit } NR > 1 && /^[A-Za-z_-]+:/ { sub(/:.*/, ""); print }' "$1"
+}
+
+check_frontmatter_keys() {
+	local file key allowed effort
+	local unknown=() bad_effort=()
+	while IFS= read -r file; do
+		[[ -z "${file}" ]] && continue
+		allowed="${SKILL_KEYS}"
+		[[ "${file}" == "${AGENTS_DIR}"/* ]] && allowed="${PLUGIN_AGENT_KEYS}"
+		while IFS= read -r key; do
+			[[ "${allowed}" == *" ${key} "* ]] || unknown+=("$(relative_path "${file}"):${key}")
+		done < <(frontmatter_top_level_keys "${file}")
+		effort="$(awk 'NR > 1 && $0 == "---" { exit } /^effort:/ { sub(/^effort:[[:space:]]*/, ""); print; exit }' "${file}")"
+		if [[ -n "${effort}" && "${EFFORT_LEVELS}" != *" ${effort} "* ]]; then
+			bad_effort+=("$(relative_path "${file}"):${effort}")
+		fi
+	done < <(
+		find "${AGENTS_DIR}" -maxdepth 1 -name "*.md" -print 2>/dev/null
+		find "${SKILLS_DIR}" -mindepth 2 -maxdepth 2 -name SKILL.md -print 2>/dev/null
+	)
+
+	if [[ "${#unknown[@]}" -eq 0 ]]; then
+		pass "frontmatter keys: every agent and skill key is one the platform reads"
+	else
+		fail "frontmatter keys: the platform ignores these keys without an error (${unknown[*]})"
+	fi
+	if [[ "${#bad_effort[@]}" -eq 0 ]]; then
+		pass "frontmatter keys: every effort value is low, medium, high, xhigh, or max"
+	else
+		fail "frontmatter keys: effort values outside the platform enum (${bad_effort[*]})"
 	fi
 }
 
@@ -1050,6 +1094,7 @@ check_claims() {
 	check_latest_hook_lifecycle_coverage
 	check_hook_event_table_matches_registry
 	check_agent_frontmatter_hygiene
+	check_frontmatter_keys
 	check_skill_description_lengths
 	check_policy_posture_alignment
 	check_phantom_field_names
