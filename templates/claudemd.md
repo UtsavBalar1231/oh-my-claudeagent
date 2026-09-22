@@ -18,7 +18,7 @@ Slash commands always available. Keyword triggers activate only when `enableKeyw
 
 ## Agent catalog
 
-Every agent but `oracle` runs on `opus`, so the model column does not separate them. `effort:` does, and each agent declares the level its role needs.
+Every agent but `oracle` runs on `opus`, so the model column does not separate them. The alias follows the main conversation's Opus when the session runs one, and otherwise resolves to the current Opus. `effort:` separates the agents, and each declares the level its role needs; as the main-thread agent, sisyphus runs at the session's effort instead.
 
 | Agent             | Model            | Effort  | Use when                                                                 |
 | ----------------- | ---------------- | ------- | ------------------------------------------------------------------------ |
@@ -49,13 +49,13 @@ User runs `/oh-my-claudeagent:start-work [plan path]`. Do not auto-start executi
 
 ## Cross-cutting policy
 
-- **Delegation-first**: the main session orchestrates; specialist work goes to the agents above. Direct edits are reserved for trivially small, already-known changes.
+- **Delegate by size**: the main session does known changes, quick lookups, and single fixes itself, and routes sizeable, self-contained work to the specialist in the catalog above that is built for it. Each subagent re-establishes context and the main session then re-reads its report, so delegate when the payoff clearly exceeds that overhead.
 - **Evidence-first**: every build, test, or lint verification is logged via `evidence_log` before a completion claim is made.
 - **Plan pipeline**: `/oh-my-claudeagent:plan` drafts a plan through the prometheus/metis/momus pipeline; `/oh-my-claudeagent:start-work` executes an approved plan end to end.
 
 ## Parallel execution and verification
 
-The canonical rules for routing, parallel fan-out, and evidence discipline live in the specialist agent bodies (`agents/*.md`) and `skills/start-work/SKILL.md`, not in a single shared section: each agent's own instructions cover what applies to it. The output style (see `output-styles/omca-default.md`, sections "Principles" and "Communication") carries the cross-cutting, always-on discipline that every turn should follow regardless of role.
+The canonical rules for routing, parallel fan-out, and evidence discipline live in the specialist agent bodies (`agents/*.md`) and `skills/start-work/SKILL.md`, not in a single shared section: each agent's own instructions cover what applies to it. The output style (see `output-styles/omca-default.md`, sections "Principles" and "Communication") carries the always-on discipline for the main conversation and its forks; other subagents never receive it, so a rule a subagent needs belongs in that subagent's own definition.
 
 Spawn a subagent with the Agent tool and do not pass `run_in_background`. In an interactive
 session on Claude Code v2.1.232 or later, fork mode is on by default and the platform
