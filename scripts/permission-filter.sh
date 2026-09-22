@@ -28,7 +28,10 @@ TRIMMED_CMD=$(echo "${COMMAND}" | sed 's/^[[:space:]]*//')
 # trusted-tooling auto-allow, and blinding it to a quoted separator would widen
 # that fast path instead of narrowing a deny.
 DESTRUCTIVE_RM_SCAN_CMD=$(neutralize_quoted_positions "${TRIMMED_CMD}")
-DESTRUCTIVE_RM_RE=$'(^|[;&|()`\n\r])[[:space:]]*(sudo[[:space:]]+)?rm[[:space:]]+((-[a-zA-Z]+|--[a-zA-Z-]+)[[:space:]]+)*(-[a-zA-Z]*[rR][a-zA-Z]*|--recursive)([[:space:]]|$)'
+# Leading `VAR=value` assignments and an `env` wrapper run the same removal, so the
+# command position admits them; without this `FOO=1 rm -rf ~` read as a non-rm command.
+ENV_ASSIGN_RE=$'([A-Za-z_][A-Za-z0-9_]*=("[^"]*"|\'[^\']*\'|[^[:space:];&|`"\']*)[[:space:]]+)*'
+DESTRUCTIVE_RM_RE=$'(^|[;&|()`\n\r])[[:space:]]*'"${ENV_ASSIGN_RE}"$'(sudo[[:space:]]+)?(env[[:space:]]+)?'"${ENV_ASSIGN_RE}"$'rm[[:space:]]+((-[a-zA-Z]+|--[a-zA-Z-]+)[[:space:]]+)*(-[a-zA-Z]*[rR][a-zA-Z]*|--recursive)([[:space:]]|$)'
 if [[ "${DESTRUCTIVE_RM_SCAN_CMD}" =~ ${DESTRUCTIVE_RM_RE} ]]; then
 	# Each event reads its decision from a different place: PreToolUse from
 	# hookSpecificOutput.permissionDecision, PermissionRequest from

@@ -41,7 +41,10 @@ SCAN_CMD=$(neutralize_quoted_positions "${CMD}")
 # `git cleanup` and `git checkout --detach` stay out of scope.
 DESTRUCTIVE_GIT_GLOBALS='((-C[[:space:]]+[^[:space:]]+|-c[[:space:]]+[^[:space:]]+|-c[^[:space:]]+|--git-dir[=[:space:]][^[:space:]]+|--work-tree[=[:space:]][^[:space:]]+|--no-pager|--paginate|-p|--bare|--literal-pathspecs|--no-replace-objects)[[:space:]]+)*'
 DESTRUCTIVE_GIT_SUBCMD=$'(reset["\']?[[:space:]]+--hard|stash|clean|restore|rm[[:space:]]+-[a-zA-Z]*[rR][a-zA-Z]*|checkout([[:space:]]+[^[:space:];&|`\n\r]+)*[[:space:]]+--)'
-DESTRUCTIVE_GIT_RE=$'(^|[;&|(`\n\r]|[$]\\()[[:space:]]*(sudo[[:space:]]+)?git[[:space:]]+'
+# Leading `VAR=value` assignments (`GIT_EDITOR=: git stash`) and an `env` wrapper run the
+# same git command, so the command position admits them.
+ENV_ASSIGN_RE=$'([A-Za-z_][A-Za-z0-9_]*=("[^"]*"|\'[^\']*\'|[^[:space:];&|`"\']*)[[:space:]]+)*'
+DESTRUCTIVE_GIT_RE=$'(^|[;&|(`\n\r]|[$]\\()[[:space:]]*'"${ENV_ASSIGN_RE}"$'(sudo[[:space:]]+)?(env[[:space:]]+)?'"${ENV_ASSIGN_RE}"$'git[[:space:]]+'
 DESTRUCTIVE_GIT_RE+="${DESTRUCTIVE_GIT_GLOBALS}"$'["\']?'"${DESTRUCTIVE_GIT_SUBCMD}"$'["\']?([[:space:]);&|<>`\n\r]|$)'
 DENY_REASON="Destructive git command blocked. If working tree is dirty, REPORT and STOP — never modify history. Set OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY=1 to override for testing."
 if [[ "${SCAN_CMD}" =~ ${DESTRUCTIVE_GIT_RE} ]]; then

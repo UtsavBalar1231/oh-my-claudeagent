@@ -413,3 +413,28 @@ run_hook_merged() {
 	assert_failure 2
 	assert_output --partial "Destructive git"
 }
+
+# ─── Leading assignments and env wrappers run the same command ────────────────
+
+@test "git-destructive-deny: reset --hard behind an editor assignment is blocked" {
+	run_hook_merged "git-destructive-deny.sh" "$(bash_payload 'GIT_EDITOR=: git reset --hard ORIG_HEAD')"
+	assert_failure 2
+	assert_output --partial "Destructive git"
+}
+
+@test "git-destructive-deny: stash behind several assignments is blocked" {
+	run_hook_merged "git-destructive-deny.sh" "$(bash_payload 'GIT_EDITOR=: GIT_PAGER=cat git stash')"
+	assert_failure 2
+	assert_output --partial "Destructive git"
+}
+
+@test "git-destructive-deny: clean behind env is blocked" {
+	run_hook_merged "git-destructive-deny.sh" "$(bash_payload 'env GIT_X=1 git clean -fdx')"
+	assert_failure 2
+	assert_output --partial "Destructive git"
+}
+
+@test "git-destructive-deny: a safe command behind an assignment passes" {
+	run_hook_merged "git-destructive-deny.sh" "$(bash_payload 'GIT_EDITOR=: git commit -m x')"
+	assert_success
+}

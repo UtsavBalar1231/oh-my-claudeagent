@@ -530,3 +530,31 @@ permissionrequest_payload() {
 	assert_success
 	refute_output --partial '"allow"'
 }
+
+# ── leading assignments and env wrappers ─────────────────────────────────────
+# `VAR=value cmd` and `env VAR=value cmd` run cmd itself, so a removal behind them
+# is the same operation and must deny the same way.
+
+@test "permission-filter: rm -rf behind a variable assignment is denied" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"FOO=1 rm -rf /tmp/x"}}'
+	assert_success
+	assert_output --partial '"deny"'
+}
+
+@test "permission-filter: rm -rf behind a quoted assignment is denied" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"X=\"a b\" rm -rf y"}}'
+	assert_success
+	assert_output --partial '"deny"'
+}
+
+@test "permission-filter: rm -rf behind env is denied" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"env FOO=1 rm -rf z"}}'
+	assert_success
+	assert_output --partial '"deny"'
+}
+
+@test "permission-filter: an rm mention after a non-assignment word is not a removal" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"echo FOO=1 rm -rf x"}}'
+	assert_success
+	refute_output --partial '"deny"'
+}
