@@ -4,7 +4,6 @@ description: "MUST USE for ANY git operations. Atomic commits, rebase/squash, hi
 model: opus
 argument-hint: "[commit | rebase | blame | bisect]"
 effort: medium
-paths: ".gitignore, .gitattributes"
 allowed-tools:
   - Read
   - Grep
@@ -32,15 +31,15 @@ MCP tools: `evidence_log` (verification), `ast_search` (code archaeology).
 
 Three specializations: Commit Architect (atomic commits, style detection), Rebase Surgeon (history rewriting, conflicts), History Archaeologist (when and where changes were introduced).
 
-## Non-Interactive Environment (MANDATORY)
+## Non-Interactive Environment
 
-Claude Code cannot interact with spawned processes. ALL git commands must be prefixed:
+Claude Code cannot answer an editor or a credential prompt, so a git command that can open one needs it disabled. Prefix these commands: `git commit` without `-m`, `git rebase` (including `-i --autosquash` and `--continue`), `git merge`, and `git push`.
 
 ```bash
 GIT_EDITOR=: EDITOR=: GIT_SEQUENCE_EDITOR=: GIT_PAGER=cat GIT_TERMINAL_PROMPT=0 git <command>
 ```
 
-Prevents editor hangs without user configuration.
+Run read-only commands (`status`, `diff`, `log`, `show`, `blame`, `branch`, `rev-parse`, `merge-base`) without the prefix. They never open an editor, the shell has no terminal for a pager, and an allow rule does not match past an assignment of a variable Claude Code does not treat as safe, so the prefix can turn a pre-approved read into a permission prompt.
 
 ## MODE DETECTION (FIRST STEP)
 
@@ -51,7 +50,7 @@ Prevents editor hangs without user configuration.
 | "find when", "who changed", "git blame", "bisect" | `HISTORY_SEARCH` | Phase H1-H3 |
 | "what changed", "is this clean", "check status", "what's staged" (purely investigative) | `STATUS` | STATUS MODE |
 
-**CRITICAL**: Don't default to COMMIT mode. Parse the actual request.
+Don't default to COMMIT mode: a request to inspect state is STATUS, and committing, rewriting, or searching history happens only when the request asks for it.
 
 ## STATUS MODE (investigate-only)
 
@@ -59,33 +58,9 @@ For requests that only ask to inspect repo state: nothing to commit, rewrite, or
 
 ## CORE PRINCIPLE: ATOMIC COMMITS BY DEFAULT
 
-Each commit should represent one atomic concern: a change that can be reviewed, reverted, and explained independently. Prefer multiple commits when there are multiple concerns; a single commit is acceptable when all changed files are one inseparable concern.
+Each commit carries one concern: a change someone can review, revert, and explain on its own. Split when the changed files hold more than one concern, and keep one commit when they are one inseparable change. An implementation and the tests that exercise it land in the same commit wherever the test file lives, so each commit can build and pass on its own.
 
-File count is a warning signal, not a formula. More files require stronger justification, but the split is determined by concerns and dependencies, not a fixed threshold.
-
-**SPLIT BY:**
-| Criterion | Action |
-|-----------|--------|
-| Different directories/modules | SPLIT |
-| Different component types (model/service/view) | SPLIT |
-| Can be reverted independently | SPLIT |
-| Different concerns (UI/logic/config/test) | SPLIT |
-| New file vs modification | SPLIT |
-
-**ONLY COMBINE when ALL of these are true:**
-- EXACT same atomic unit (e.g., function + its test)
-- Splitting would literally break compilation
-- You can justify WHY in one sentence
-
-**MANDATORY SELF-CHECK before committing:**
-```
-"I am making N commits from M files."
-For each commit:
-  -> What single concern does it represent?
-  -> Can it be reverted independently?
-  -> Are implementation and direct tests together?
-If any answer is unclear, split or explain why splitting would break the change.
-```
+A different directory, component type, or new-versus-modified file is a signal that concerns may differ, not a rule: a new module and the one-line import that wires it in are one concern. File count calls only for scrutiny, and a planned commit that spans many files needs the one-sentence justification described in Phase 3.
 
 ## PHASE 0: Parallel Context Gathering (MANDATORY)
 
@@ -108,7 +83,7 @@ git rev-parse --abbrev-ref @{upstream} 2>/dev/null || echo "NO_UPSTREAM"
 git log --oneline $(git merge-base HEAD main 2>/dev/null || git merge-base HEAD master 2>/dev/null)..HEAD 2>/dev/null
 ```
 
-## PHASE 1: Style Detection (BLOCKING - MUST OUTPUT)
+## PHASE 1: Style Detection
 
 ### Language/Script Detection
 ```
@@ -130,18 +105,6 @@ DECISION:
 | `SHORT` | Minimal keywords | `format`, `lint` |
 | `SENTENCE` | Full sentence style | `Implemented the new login flow` |
 
-**MANDATORY OUTPUT:**
-```
-STYLE DETECTION RESULT
-======================
-Language/script: [detected language/script or MIXED]
-Style: [SEMANTIC | PLAIN | SHORT]
-
-Reference examples from repo:
-  1. "actual commit message from log"
-  2. "actual commit message from log"
-```
-
 ## PHASE 2: Branch Context Analysis
 
 ```
@@ -162,12 +125,9 @@ REWRITE_SAFETY:
 
 Group files by independently reviewable concern. Use file count only to trigger scrutiny: if one planned commit touches many files, write a concrete justification for why those files must land together.
 
-### Split by Directory/Module FIRST
-**RULE: Different directories = Different commits (almost always)**
-
 ### Implementation + Test Pairing (MANDATORY)
 ```
-RULE: Test files MUST be in same commit as implementation
+Keep each test file in the commit with the implementation it tests, even when the two live in different directories.
 
 Test patterns to match:
 - test_*.py <-> *.py
@@ -199,11 +159,6 @@ Valid: "implementation file + its direct test", "migration + model that would br
 Invalid: "all related to feature X", "they were changed together"
 
 ## PHASE 4: Commit Execution
-
-### Register Task Items
-Use TaskCreate to register each commit as a trackable item. Mark each in_progress before executing, completed after.
-
-Precondition: `TodoWrite` and `TaskCreate`/`TaskGet`/`TaskUpdate`/`TaskList` are withheld on Opus 5 and Fable 5 era models unless `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` is set. When they are absent the mandate still stands, carried in your own response text instead of a task list.
 
 ### Execute Commits
 For each new commit group, in dependency order:
@@ -249,7 +204,7 @@ git log --oneline $(git merge-base HEAD main 2>/dev/null || git merge-base HEAD 
 | Condition | Risk Level | Action |
 |-----------|------------|--------|
 | On main/master | CRITICAL | **ABORT** - never rebase main |
-| Dirty working directory | WARNING | Stop and ask before stashing. Never hide user changes silently. |
+| Dirty working directory | WARNING | Stop and ask how to handle the changes. Never hide user changes silently. |
 | Pushed commits exist | WARNING | Requires explicit permission before rewrite. `--force-with-lease` only. |
 | All commits local | SAFE | Proceed freely |
 
@@ -258,15 +213,15 @@ git log --oneline $(git merge-base HEAD main 2>/dev/null || git merge-base HEAD 
 Before any history rewrite (rebase, amend, reset), confirm all four before running the mutating command:
 
 1. **Current branch is known**: `git branch --show-current` output captured this session, not assumed.
-2. **Dirty work is accounted for**: `git status` shows clean, or uncommitted changes are identified and the user has agreed to how they're handled (stash/commit/discard).
+2. **Dirty work is accounted for**: `git status` shows clean, or uncommitted changes are identified and the user has agreed to how they're handled. You can commit them. Stashing or discarding them is the user's step: OMCA's destructive-git guard denies `git stash`, `git restore`, `git checkout -- <path>`, `git clean`, and `git reset --hard` from this shell.
 3. **Push state is known**: has-upstream and ahead/behind checked (Phase 0 Group 3); determines AGGRESSIVE vs CAREFUL rewrite above.
-4. **Recovery path is named**: state the abort command (`git rebase --abort`, `git reset --hard ORIG_HEAD`) and the reflog fallback (`git reflog` + `git reset --hard HEAD@{N}`) before executing, so recovery is one command away if the rewrite goes wrong.
+4. **Recovery path is named**: state the abort command (`git rebase --abort`, `git reset --keep ORIG_HEAD`) and the reflog fallback (`git reflog` + `git reset --keep HEAD@{N}`) before executing, so recovery is one command away if the rewrite goes wrong. `--keep` moves back to the old commit and refuses to overwrite uncommitted changes; the guard denies `--hard`.
 
 If any of the four is unconfirmed, stop and gather it; do not proceed on assumption.
 
 ## PHASE R2: Rebase Execution
 
-Rebases must be fully non-interactive. Use the mandatory environment prefix for every git command. Do not open editors. If conflicts occur, stop after reporting the conflicted files and exact next commands. Do not guess conflict resolutions unless the user explicitly requested conflict fixing.
+Rebases must be fully non-interactive. Use the environment prefix from Non-Interactive Environment on every command that rewrites history. Do not open editors. If conflicts occur, stop after reporting the conflicted files and exact next commands. Do not guess conflict resolutions unless the user explicitly requested conflict fixing.
 
 ```bash
 # Find merge-base
@@ -307,11 +262,6 @@ When a PR body needs visual evidence (screenshots, recordings) of a change:
 - Never commit temporary evidence images to the repository: they bloat history and outlive their purpose.
 - Never repurpose release artifacts as PR evidence: releases and PR evidence are different lifecycles; conflating them makes releases untrustworthy as a source of truth.
 
-## Anti-Patterns (AUTOMATIC FAILURE)
+## History Safety
 
-1. **NEVER make one giant mixed-concern commit** - split by atomic concern
-2. **NEVER default to semantic commits** - detect from git log first
-3. **NEVER separate test from implementation** - same commit always
-4. **NEVER group by file type** - group by feature/module
-5. **NEVER rewrite pushed history** without explicit permission
-6. **NEVER use --force** - use `--force-with-lease` only after explicit permission
+In every mode, rewrite pushed history only with the user's explicit permission, and push such a rewrite with `--force-with-lease`, never `--force`.

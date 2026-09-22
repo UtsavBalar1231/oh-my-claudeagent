@@ -30,14 +30,14 @@ One-command setup: update orchestration block in `~/.claude/CLAUDE.md`, check de
 
 **Out of scope**: marketplace install commands, auto-registering in `~/.claude/settings.json`, editing shared/managed settings, enforcing enterprise policy keys (`strictKnownMarketplaces`, `blockedMarketplaces`, `allowManagedHooksOnly`, `allowManagedPermissionRulesOnly`, `allowManagedMcpServersOnly`).
 
-**Policy baseline**: Claude Code native settings authoritative. `teammateMode: "auto"` is normal. Managed settings are non-overridable policy. `permission-filter.sh` is guardrail-only and does not auto-allow.
+**Policy baseline**: Claude Code native settings are authoritative. `teammateMode: "auto"` is normal. Managed settings are non-overridable policy. `permission-filter.sh` does not auto-allow arbitrary commands: it denies recursive `rm` on every Bash call, and when a permission prompt is about to appear it auto-approves only a short trusted-tooling list (`npm`, `bun`, `yarn`, and `pnpm` with `run`, `test`, `ci`, `list`, or `view`; `jq` without `--rawfile`; `uv run`; `uv sync`) and never a compound command.
 
 **Install/update flow**:
 
 - Install: `/plugin marketplace add UtsavBalar1231/oh-my-claudeagent` then `/plugin install oh-my-claudeagent@omca`
 - Update: `/plugin marketplace update omca` then `/plugin install oh-my-claudeagent@omca`
-- Apply in-session: `/reload-plugins`
-- Reload skills without restart (v2.1.152+): `/reload-skills` picks up skill file edits (including templates/claudemd.md changes written by omca-setup) in the active session without a full Claude Code restart
+- Apply in-session: Claude Code reloads plugins itself after a `/plugin` install or update. Run `/reload-plugins` (with `--force` if it warns about the prompt cache) only when the install summary says a change is still pending, or after a `claude plugin` command run in another terminal.
+- `/reload-skills` re-scans skill directories only. It does not reload `~/.claude/CLAUDE.md`, so the block setup writes there takes effect in the next session.
 
 **`--bare` caveat**: `claude --bare` skips plugin, hooks, skills, MCP, and CLAUDE.md auto-discovery. Run setup in normal (non-`--bare`) sessions.
 
@@ -95,10 +95,10 @@ Record each result (binary path + version or "not found") for the health report.
 
 ### Phase 2: Read Plugin Version
 
-1. Determine the plugin root. Navigate from this skill's location:
-   - This SKILL.md is at `skills/omca-setup/SKILL.md`
-   - Plugin root = two directories up from this file
-   - Use `Bash: dirname` of the skill path or use `CLAUDE_PLUGIN_ROOT` env var
+1. Determine the plugin root. Claude Code substitutes the loaded plugin's path into this file, so the value is `${CLAUDE_PLUGIN_ROOT}`. The Bash tool has no `CLAUDE_PLUGIN_ROOT` variable and keeps no shell state between calls, so start every command that uses `PLUGIN_ROOT` with:
+   ```bash
+   PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT}"
+   ```
 
 2. Read the plugin version:
    ```
@@ -127,9 +127,9 @@ Record each result (binary path + version or "not found") for the health report.
    - If found: remove everything from the old start marker line through the old end marker line (`<!-- OMCA:END -->` or `<\!-- OMCA:END -->`)
    - Log to user: "Migrated: removed old OMC block from other developer"
 
-4. **Own block check (migration):**
+4. **Own block check:**
    - Detect line matching `^--- omca-setup\s*$`
-   - If found: remove the entire block from `^--- omca-setup\s*$` through `^--- /omca-setup ---\s*$` (inclusive). This block was written by old injection-mode installs; the orchestration body is now delivered via `output-styles/omca-default.md`.
+   - If found: remove the entire block from `^--- omca-setup\s*$` through `^--- /omca-setup ---\s*$` (inclusive). This is the block Phase 4 writes; removing it here lets Phase 4 write the current template in its place.
    - If NOT found: no block to remove
 
 5. Everything remaining after removing detected blocks = **user content** (preserve exactly)
@@ -241,7 +241,7 @@ Apply optional user-scope helper settings to `~/.claude/settings.json` with user
 
 3. Compute missing optional helper permissions against the recommended set:
    - `Edit(.omca/**)`, `Read(.omca/**)`
-   - `mcp__plugin_oh-my-claudeagent_omca__*`, `mcp__grep__*`, `mcp__context7__*`
+   - `mcp__plugin_oh-my-claudeagent_omca__*`, `mcp__plugin_oh-my-claudeagent_grep__*`, `mcp__plugin_oh-my-claudeagent_context7__*`
    - `Bash(jq *)`, `Bash(uv run *)`, `Bash(uv sync *)`
 
 4. This skill writes no top-level keys and no `env` entries. Two in particular are left to the user:
@@ -257,21 +257,21 @@ Apply optional user-scope helper settings to `~/.claude/settings.json` with user
 
 8. On decline: print raw jq command as fallback:
    ```
-   jq '.permissions.allow += [
+   tmp=$(mktemp ~/.claude/settings.json.XXXXXX) && jq '.permissions.allow += [
      "Edit(.omca/**)",
      "Read(.omca/**)",
      "mcp__plugin_oh-my-claudeagent_omca__*",
-     "mcp__grep__*",
-     "mcp__context7__*",
+     "mcp__plugin_oh-my-claudeagent_grep__*",
+     "mcp__plugin_oh-my-claudeagent_context7__*",
      "Bash(jq *)",
      "Bash(uv run *)",
      "Bash(uv sync *)"
-   ]' ~/.claude/settings.json > /tmp/claude-settings-tmp.json && mv /tmp/claude-settings-tmp.json ~/.claude/settings.json
+   ]' ~/.claude/settings.json > "$tmp" && mv "$tmp" ~/.claude/settings.json
    ```
 
 9. Explain each setting:
     - `Edit(.omca/**)` / `Read(.omca/**)`: auto-allow plugin state file access. `Edit` covers every file-editing tool including `Write`; a `Write(path)` rule is accepted but never matched by the file permission checks and makes Claude Code print a startup warning, so do not add one.
-    - `mcp__plugin_oh-my-claudeagent_omca__*` / `mcp__grep__*` / `mcp__context7__*`: auto-allow bundled MCP tool usage
+    - `mcp__plugin_oh-my-claudeagent_omca__*` / `mcp__plugin_oh-my-claudeagent_grep__*` / `mcp__plugin_oh-my-claudeagent_context7__*`: auto-allow bundled MCP tool usage. A plugin-bundled server's tools carry the plugin name in their prefix, HTTP servers included, so the bare `mcp__grep__*` and `mcp__context7__*` forms never match them.
     - `Bash(jq *)` / `Bash(uv run *)` / `Bash(uv sync *)`: auto-allow common plugin utility commands (narrowed from `Bash(uv *)`)
     - These are optional local helper allowances; managed settings remain the policy authority.
 
@@ -288,7 +288,7 @@ Configure the Claude Code statusline to use the oh-my-claudeagent statusline pac
    - **(b) `refreshInterval` missing**: If `settings.statusLine` is present AND `hideVimModeIndicator == true` but `refreshInterval` is absent → DO NOT skip; jump to step 6 to back-fill `refreshInterval`.
    - **(c) `hideVimModeIndicator` missing or false**: If `settings.statusLine` is present but `hideVimModeIndicator` is missing or `false` → DO NOT skip; jump to step 6 to back-fill both fields. Existing installs without either field are not stranded; step 6 handles both.
 
-3. If not configured: use `AskUserQuestion` to ask:
+3. If not configured, first resolve the `statuslineMode` plugin option in prose, not in the shell. Claude Code substitutes a plugin option into this file only when the user has set it, so the value is: `${user_config.statuslineMode}`. If that still shows the placeholder text instead of `off`, `direct`, or `daemon`, the option is unset and its plugin.json default, `direct`, applies. Never copy the placeholder into a bash command: unsubstituted, it is a "bad substitution" error. When the resolved mode is `off`, skip this phase. Otherwise use `AskUserQuestion` to ask:
    ```
    Enable the oh-my-claudeagent statusline? It shows model, context bar, cost, duration, git status, and more in your terminal.
    [y/N]
@@ -298,19 +298,7 @@ Configure the Claude Code statusline to use the oh-my-claudeagent statusline pac
 
 5. On confirm:
 
-   a. **Resolve the plugin root** (Python):
-      ```python
-      import glob, os
-      candidates = glob.glob(os.path.expanduser("~/.claude/plugins/cache/omca/oh-my-claudeagent/*/"))
-      plugin_root = sorted(candidates)[-1] if candidates else None
-      ```
-      If no candidates found (development mode), fall back to the git root:
-      ```python
-      import subprocess
-      result = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True)
-      plugin_root = result.stdout.strip() if result.returncode == 0 else None
-      ```
-      If `plugin_root` is still `None`, report an error and skip the phase.
+   a. **Resolve the plugin root**: use `PLUGIN_ROOT` from Phase 2, the root this session loaded. Do not glob the cache for the newest version directory: a string sort ranks `2.9.0` above `2.19.1`, and a `--plugin-dir` checkout is not in the cache at all.
 
    b. **Create the deployment structure** at `~/.claude/statusline/`:
 
@@ -348,7 +336,7 @@ Configure the Claude Code statusline to use the oh-my-claudeagent statusline pac
       uv sync --project ~/.claude/statusline
       ```
 
-   d. **Ask user for mode selection** using `AskUserQuestion`:
+   d. **Choose the mode.** Use the mode resolved in step 3 when it is `direct` or `daemon`, without asking: that is the mode the user configured, or the plugin default. Only when it resolved to something else, ask using `AskUserQuestion`:
       ```
       Statusline mode?
         1. Daemon (fastest, <1ms warm response) [recommended]
@@ -373,9 +361,10 @@ Configure the Claude Code statusline to use the oh-my-claudeagent statusline pac
       subprocess calls.
 
       ```bash
-      jq --arg cmd "<chosen-command>" '. + {"statusLine": {"type": "command", "command": $cmd, "padding": 1, "hideVimModeIndicator": true, "refreshInterval": 5}}' \
-        ~/.claude/settings.json > /tmp/claude-settings-statusline.json \
-        && mv /tmp/claude-settings-statusline.json ~/.claude/settings.json
+      tmp=$(mktemp ~/.claude/settings.json.XXXXXX) \
+        && jq --arg cmd "<chosen-command>" '. + {"statusLine": {"type": "command", "command": $cmd, "padding": 1, "hideVimModeIndicator": true, "refreshInterval": 5}}' \
+        ~/.claude/settings.json > "$tmp" \
+        && mv "$tmp" ~/.claude/settings.json
       ```
       If `~/.claude/settings.json` does not exist, create it from `{}`:
       ```bash
@@ -386,9 +375,10 @@ Configure the Claude Code statusline to use the oh-my-claudeagent statusline pac
    e2. **Also configure `subagentStatusLine`** (separate platform hook, v2.1.197+) so each spawned subagent's row in the tasks panel shows its real name, model, status, and token count. Unlike `statusLine`, this has no daemon variant: it always points at the direct-mode entry point. Skip if `settings.subagentStatusLine` is already present:
 
       ```bash
-      jq 'if .subagentStatusLine then . else . + {"subagentStatusLine": {"type": "command", "command": "~/.claude/statusline/.venv/bin/cc-statusline-subagent"}} end' \
-        ~/.claude/settings.json > /tmp/claude-settings-statusline.json \
-        && mv /tmp/claude-settings-statusline.json ~/.claude/settings.json
+      tmp=$(mktemp ~/.claude/settings.json.XXXXXX) \
+        && jq 'if .subagentStatusLine then . else . + {"subagentStatusLine": {"type": "command", "command": "~/.claude/statusline/.venv/bin/cc-statusline-subagent"}} end' \
+        ~/.claude/settings.json > "$tmp" \
+        && mv "$tmp" ~/.claude/settings.json
       ```
 
    f. **For daemon mode only**: start the daemon, then verify it came up:
@@ -451,12 +441,12 @@ Configure the Claude Code statusline to use the oh-my-claudeagent statusline pac
    On confirm, atomic jq update (idempotent: only adds each field when absent, so a
    second run produces a byte-identical result):
    ```bash
-   jq '
+   tmp=$(mktemp ~/.claude/settings.json.XXXXXX) && jq '
      if .statusLine.hideVimModeIndicator == null then .statusLine.hideVimModeIndicator = true else . end |
      if .statusLine.refreshInterval == null then .statusLine.refreshInterval = 5 else . end
    ' ~/.claude/settings.json \
-     > /tmp/claude-settings-backfill.json \
-     && mv /tmp/claude-settings-backfill.json ~/.claude/settings.json
+     > "$tmp" \
+     && mv "$tmp" ~/.claude/settings.json
    ```
 
    On decline: skip silently.
@@ -469,25 +459,25 @@ Configure the Claude Code statusline to use the oh-my-claudeagent statusline pac
 
 Apply or skip the `disableForceOrchestrationStyle` opt-out based on the user's plugin config.
 
-1. Read the env var:
-   ```bash
-   OPT_OUT="${CLAUDE_PLUGIN_OPTION_DISABLEFORCEORCHESTRATIONSTYLE:-}"
-   ```
+1. Resolve the option in prose, not in the shell. Claude Code substitutes a plugin option into this file only when the user has set it, so the value is: `${user_config.disableForceOrchestrationStyle}`. If that still shows the placeholder text instead of `true` or `false`, the option is unset and its plugin.json default, `false`, applies. Never copy the placeholder into a bash command: unsubstituted, it is a "bad substitution" error. The `CLAUDE_PLUGIN_OPTION_*` variables reach hook processes only, never this shell. Call the resolved value `OPT_OUT` below.
 
 2. Read the plugin version from `${PLUGIN_ROOT}/.claude-plugin/plugin.json`:
    ```bash
    PLUGIN_VERSION=$(jq -r '.version' "${PLUGIN_ROOT}/.claude-plugin/plugin.json")
    ```
 
-3. Locate the installed cache copy of the style file:
+3. Locate the installed cache copy of the style file. On a marketplace install `PLUGIN_ROOT` is that copy, `~/.claude/plugins/cache/<marketplace>/oh-my-claudeagent/<version>/`:
    ```bash
-   STYLE_FILE="${HOME}/.claude/plugins/cache/oh-my-claudeagent/${PLUGIN_VERSION}/output-styles/omca-default.md"
+   case "${PLUGIN_ROOT}" in
+     "${HOME}"/.claude/plugins/cache/*) STYLE_FILE="${PLUGIN_ROOT}/output-styles/omca-default.md" ;;
+     *) STYLE_FILE="" ;;
+   esac
    ```
-   If the file does not exist (development-mode install, or the cache path differs), skip this phase and note to user: "output-styles/omca-default.md not found in plugin cache; skipping force-style opt-out (development mode or non-standard install path)."
+   If `STYLE_FILE` is empty or the file does not exist, skip this phase and note to user: "output-styles/omca-default.md not found in plugin cache; skipping force-style opt-out (development mode or non-standard install path)." A `--plugin-dir` checkout is skipped on purpose, because stripping there would edit tracked source.
 
-4. Locate the sidecar state file:
+4. Locate the sidecar state file in the plugin's persistent data directory, which survives plugin updates:
    ```bash
-   SIDECAR="${HOME}/.claude/plugins/cache/oh-my-claudeagent/.omca-force-strip-state.json"
+   SIDECAR="${CLAUDE_PLUGIN_DATA}/force-strip-state.json"
    ```
 
 5. **If `OPT_OUT` is `true` or `1`**:
@@ -536,7 +526,7 @@ Apply or skip the `disableForceOrchestrationStyle` opt-out based on the user's p
       ```
       force-for-plugin: true stripped from output-styles/omca-default.md (cache copy v${PLUGIN_VERSION}).
       Your own outputStyle setting will take precedence.
-      Sidecar: ~/.claude/plugins/cache/oh-my-claudeagent/.omca-force-strip-state.json
+      Sidecar: ${CLAUDE_PLUGIN_DATA}/force-strip-state.json
       Note: re-run /oh-my-claudeagent:omca-setup after each plugin update to re-apply the strip.
       ```
 
@@ -576,6 +566,13 @@ settings unless the user confirms.
    ```bash
    PINNED=$(jq -r '.outputStyle // empty' ~/.claude/settings.json 2>/dev/null)
    ```
+
+   Also read the two higher-precedence scopes in the current project, which the user-scope read cannot see:
+   ```bash
+   LOCAL_PIN=$(jq -r '.outputStyle // empty' .claude/settings.local.json 2>/dev/null)
+   PROJECT_PIN=$(jq -r '.outputStyle // empty' .claude/settings.json 2>/dev/null)
+   ```
+   If either is set, report it with its file name as a degraded-mode cause alongside whichever branch below applies. This skill does not edit project settings, so point the user at the file.
 
 3. Scan all installed plugins for `force-for-plugin: true` output styles
    that are NOT OMCA's own:
@@ -624,19 +621,21 @@ settings unless the user confirms.
 
    d. On confirm: atomic delete via jq:
       ```bash
-      jq 'del(.outputStyle)' ~/.claude/settings.json > /tmp/claude-settings-omca-clear-style.json \
-        && mv /tmp/claude-settings-omca-clear-style.json ~/.claude/settings.json
+      tmp=$(mktemp ~/.claude/settings.json.XXXXXX) \
+        && jq 'del(.outputStyle)' ~/.claude/settings.json > "$tmp" \
+        && mv "$tmp" ~/.claude/settings.json
       ```
       Report: `Cleared outputStyle pin. OMCA Default applies from the next message.`
 
    e. On decline: print the fallback command so the user can run it later
       and continue without modifying settings:
       ```bash
-      jq 'del(.outputStyle)' ~/.claude/settings.json > /tmp/s.json && mv /tmp/s.json ~/.claude/settings.json
+      tmp=$(mktemp ~/.claude/settings.json.XXXXXX) && jq 'del(.outputStyle)' ~/.claude/settings.json > "$tmp" && mv "$tmp" ~/.claude/settings.json
       ```
-      `/output-style` returned in 2.1.269 and is the direct route: run it
-      to list the installed styles, or `/output-style [name]` to switch to
-      one. It works in headless sessions too.
+      `/output-style` with no argument lists the installed styles and marks
+      the active one. Switching with `/output-style <name>` saves the choice
+      to `.claude/settings.local.json`, a Local-scope pin of the kind this
+      phase warns about, so use the command to inspect, not to fix.
 
 7. **Branch D: no pin but competitors present**: if `PINNED` is empty
    AND competitors exist, print an informational note (no action):
@@ -666,7 +665,7 @@ Dependencies:
   ast-grep: WARN (not found - structural code search unavailable)
 
 Files:
-  ~/.claude/CLAUDE.md      - Block injected v0.1.0 (backup: CLAUDE.md.bak)
+  ~/.claude/CLAUDE.md      - Block injected (backup: CLAUDE.md.bak)
   ~/.claude/settings.json  - Inspected only: enabled | local checkout / dev mode | legacy config detected | not configured in user scope
   Plugin root              - ~/.claude/plugins/cache/... | local checkout path
   Git commit            - [short SHA from plugin root]
@@ -741,7 +740,7 @@ State section:
     Remove .omca/ state directory? This deletes logs, plans, and any optional local context files stored there. [y/N]
    ```
 
-2. If user confirms:
+2. If user confirms, print this command for the user to run in their own shell. Uninstall runs while the plugin is still enabled, and OMCA's guard denies a recursive `rm` from Claude's shell:
    ```bash
    rm -rf .omca/
    ```
@@ -753,7 +752,7 @@ State section:
 Removed:
   ~/.claude/CLAUDE.md      - Block removed (or file deleted)
   ~/.claude/settings.json  - Cleanup guidance printed; manual scope-specific removal may still be needed
-  .omca/                    - [Removed | Kept]
+  .omca/                    - [Removal command printed | Kept]
 
    The plugin files remain at their install location or cache copy until Claude Code uninstall/remove commands run.
    ```
@@ -767,13 +766,13 @@ Non-destructive health check. No files are modified.
 1. Run Phase 1 (Dependency Check). Report PASS/WARN/FAIL for each dep.
 
 2. Check `~/.claude/CLAUDE.md`:
-   - Does own block exist? Report version if found
+   - Does own block exist? Report whether it matches `${PLUGIN_ROOT}/templates/claudemd.md`; the block carries no version string
    - Does old format block exist? Report "migration needed"
    - No block found? Report "not configured; run omca-setup"
 
 3. Check `~/.claude/settings.json`:
     - Is the plugin enabled in user settings? Report method (marketplace via enabledPlugins / dev mode via --plugin-dir / legacy plugins array / not registered)
-    - Is `CLAUDE_CODE_ENABLE_TODO_TOOLS` set? Report PASS/WARN, and never write it. On Opus 5 and Fable 5 era models the platform withholds `TodoWrite` and the `TaskCreate`/`TaskGet`/`TaskUpdate`/`TaskList` tools unless this variable is set, and every OMCA agent declares one of those tiers. Without it the task-list mandates in the agent prompts and the `TaskCompleted` gate are both inert
+    - Is `CLAUDE_CODE_ENABLE_TODO_TOOLS` set? Report PASS/WARN, and never write it. Claude Code provides `TodoWrite` and the `TaskCreate`/`TaskGet`/`TaskUpdate`/`TaskList` tools by default only on Claude 3.x, Opus 4 through 4.7, Sonnet 4 through 4.6, and Haiku 4.5, and the models the OMCA roster's `opus` and `fable` aliases resolve to are outside that list. Without the variable the task-list mandates in the agent prompts and the `TaskCompleted` gate are both inert
     - Report a WARN for any `ANTHROPIC_DEFAULT_*_MODEL` key, which pins a generation over the tier alias OMCA agents declare
     - Remind the user that managed policy keys such as `strictKnownMarketplaces` (alias `allowedMarketplaces`), `blockedMarketplaces`, `allowManagedHooksOnly`, `allowManagedPermissionRulesOnly`, `allowManagedMcpServersOnly`, and `sandbox.failIfUnavailable` are outside this skill's enforcement scope
 
@@ -795,7 +794,7 @@ This is a different tool from the built-in `/doctor` (alias `/checkup`), which c
 Run Phase 1 (Dependency Check). Report PASS/WARN/FAIL for jq, uv, python3, ast-grep.
 
 ### Check 2: CLAUDE.md Block
-- Does own block exist in `~/.claude/CLAUDE.md`? Report version if found.
+- Does own block exist in `~/.claude/CLAUDE.md`? Report present or absent. The block carries no version string; the drift check below compares its content.
 - Does old format block exist? Report "migration needed".
 - No block? Report "not configured; run omca-setup".
 - Installed block matches the shipped template: PASS. Differs: WARN ("the block between the `--- omca-setup` markers in `~/.claude/CLAUDE.md` no longer matches `${PLUGIN_ROOT}/templates/claudemd.md`, so the agent catalog and delegation guidance loaded every turn are stale; re-run `/oh-my-claudeagent:omca-setup` to refresh the block"). Compare the two bodies; report the result and stop, this mode never rewrites the block. Include this finding in the Phase 6 report.
@@ -803,20 +802,21 @@ Run Phase 1 (Dependency Check). Report PASS/WARN/FAIL for jq, uv, python3, ast-g
 ### Check 3: Permission Namespace Audit
 Read `~/.claude/settings.json` and verify the required permission patterns are present:
 - `mcp__plugin_oh-my-claudeagent_omca__*`: PASS if present, FAIL if missing or has old bare `mcp__omca-state__*` or `mcp__ast-grep__*`
-- `mcp__grep__*`: PASS if present (HTTP server, bare name is correct)
-- `mcp__context7__*`: PASS if present (HTTP server, bare name is correct)
+- `mcp__plugin_oh-my-claudeagent_grep__*`: PASS if present
+- `mcp__plugin_oh-my-claudeagent_context7__*`: PASS if present
 - `Edit(.omca/**)`, `Read(.omca/**)`: PASS if both present
 - `Bash(jq *)`, `Bash(uv run *)`, `Bash(uv sync *)`: PASS if all present
 - Check for stale entries. WARN if found ("stale permission; run omca-setup to update"):
-  - `mcp__pgs__*`, `mcp__omca-state__*`, `mcp__ast-grep__*`
+  - `mcp__pgs__*`, `mcp__omca-state__*`, `mcp__ast-grep__*`, and bare `mcp__grep__*` or `mcp__context7__*`, which match only a server the user configured under that name, never the plugin's own
   - `Write(.omca/**)`: never matched by the file permission checks and makes Claude Code warn at startup. Tell the user to delete it; `Edit(.omca/**)` already covers writing.
   - `env.ANTHROPIC_DEFAULT_OPUS_MODEL`, `env.ANTHROPIC_DEFAULT_SONNET_MODEL`, or `env.ANTHROPIC_DEFAULT_FABLE_MODEL` set to any value: OMCA agents now declare tier aliases (`opus`, `sonnet`, `fable`) and let the platform resolve them. A pin here overrides that resolution for every agent on the tier, so a value naming an older generation (for example `"claude-opus-4-8"`) or carrying a `[1m]` suffix silently holds those agents back. Tell the user to delete the key unless they deliberately want a fixed generation, in which case they own keeping it current.
 
 ### Check 4: MCP Server Health
 For each command-type MCP server, verify it can start and respond:
 ```bash
-echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | timeout 5 uv run --project ${PLUGIN_ROOT}/servers omca-mcp.py 2>/dev/null
+echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | UV_PROJECT_ENVIRONMENT="${CLAUDE_PLUGIN_DATA}/.venv" timeout 5 uv run --project "${CLAUDE_PLUGIN_ROOT}/servers" python "${CLAUDE_PLUGIN_ROOT}/servers/omca-mcp.py" 2>/dev/null
 ```
+This mirrors the launch line in the plugin's `.mcp.json`. The script path is absolute because `uv run` resolves relative paths against the current directory, and `UV_PROJECT_ENVIRONMENT` reuses the environment the live server runs in instead of creating `servers/.venv` inside the plugin root, which this read-only mode must not do.
 - PASS if response contains `"result"` with tool definitions
 - FAIL if timeout, error, or no response
 
@@ -833,7 +833,7 @@ claude mcp list
 
 If a URL looks correct but still fails to connect, check for whitespace: Claude Code warns about MCP config values with hidden leading or trailing whitespace. A trailing space or newline inside the quoted `url` string in `.mcp.json` or `settings.json` makes the value a different host than it reads as.
 
-**Pending approval (v2.1.154+)**: If tools from `.mcp.json` servers are unavailable despite a healthy binary, check whether Claude Code is showing a `⏸ Pending approval` indicator next to the `omca` server in the MCP panel. As of v2.1.154, unapproved `.mcp.json` servers no longer auto-connect; the user must explicitly approve them once. Use `/mcp` or the MCP settings UI to approve the `omca` server (and `grep`, `context7`) if they show as pending.
+**Pending approval**: `⏸ Pending approval` applies to project-scoped servers read from a repository's `.mcp.json`. Plugin servers start automatically when the plugin is enabled, so in a marketplace install a healthy binary with missing tools points elsewhere: the plugin is disabled, the session is restricted (Check 8), or the server failed at startup. The state reaches the `omca`, `grep`, and `context7` entries only in a session opened inside an OMCA checkout, whose `.mcp.json` then reads as project configuration; approve them once through `/mcp` there.
 
 ### Check 5: State Directory Health
 - `.omca/state/` exists: PASS/FAIL
@@ -842,7 +842,7 @@ If a URL looks correct but still fails to connect, check for whitespace: Claude 
 
 ### Check 6: Settings Validation
 - `env.ANTHROPIC_DEFAULT_OPUS_MODEL` absent: PASS. Present: WARN ("tier pin overrides the `opus` alias for every opus agent; delete it unless you want a fixed generation")
-- `env.CLAUDE_CODE_ENABLE_TODO_TOOLS` set: PASS. Absent: WARN ("Opus 5 and Fable 5 era models withhold `TodoWrite` and the `TaskCreate`/`TaskGet`/`TaskUpdate`/`TaskList` tools unless this is set, and every OMCA agent declares one of those tiers, so the task-list mandates in the agent prompts and the `TaskCompleted` gate are both inert"). Report only; this skill never writes the variable
+- `env.CLAUDE_CODE_ENABLE_TODO_TOOLS` set: PASS. Absent: WARN ("Claude Code provides `TodoWrite` and the `TaskCreate`/`TaskGet`/`TaskUpdate`/`TaskList` tools by default only on Claude 3.x, Opus 4 through 4.7, Sonnet 4 through 4.6, and Haiku 4.5, and the models the OMCA roster's `opus` and `fable` aliases resolve to are outside that list, so the task-list mandates in the agent prompts and the `TaskCompleted` gate are both inert"). Report only; this skill never writes the variable
 - Plugin enabled in `enabledPlugins`: PASS/FAIL
 - Marketplace configured in `extraKnownMarketplaces` or its accepted alias `additionalMarketplaces`: PASS/FAIL. Either spelling counts as configured
 
@@ -866,7 +866,9 @@ If a URL looks correct but still fails to connect, check for whitespace: Claude 
 Platform settings and environment variables that change how OMCA behaves without touching anything OMCA owns. Every bullet here is report-only: name the condition, name what the user would do, and write nothing.
 
 - `permissions.blockReadsOutsideWorkingDirectories` absent or false: PASS. True: WARN ("the built-in Read, Grep, Glob and LSP tools are fenced to the working directories in every permission mode. Measured on 2.1.278, the omca `file_read` MCP tool is not fenced, so OMCA still reaches outside the project root. Auto mode offers a one-time `Block from now on` choice that writes this key into user settings from a single keystroke, so confirm you meant to set it; widen with `/add-dir` or delete the key if not")
-- `maxEffortLevel` absent: PASS. Present: WARN ("a cap below an agent's declared `effort:` wins over frontmatter, measured on 2.1.278, so a cap under `xhigh` lowers the planning agents and any cap can lower oracle. Delete the key or raise it to the highest level the roster declares"). Check the top level and any `modelSettings` entry. Do not warn on `effortLevel`, which was measured not to override frontmatter and leaves the roster alone
+- `maxEffortLevel` absent or `"max"`: PASS. A `"max"` value sets no cap, at the top level or in a `modelSettings` entry, where it exempts that model from the same file's cap. Any other value: WARN ("a cap below an agent's declared `effort:` wins over frontmatter, measured on 2.1.278, so a cap under `high` lowers the planning agents and a cap under `xhigh` lowers oracle. Delete the key or raise it to the highest level the roster declares"). Check the top level and any `modelSettings` entry. Do not warn on `effortLevel`, which was measured not to override frontmatter and leaves the roster alone
+- `env.CLAUDE_CODE_EFFORT_LEVEL` absent from `~/.claude/settings.json` and from the project's `.claude/settings.json` and `.claude/settings.local.json`: PASS. Set in any of them: WARN ("this variable outranks every agent's `effort:` frontmatter, so each agent runs at this level instead of the one it declares, still subject to any `maxEffortLevel` cap. Remove it from the settings `env` block unless you want one level everywhere")
+- Top-level `effortLevel` in `~/.claude/settings.json`: INFO when present, never WARN ("a top-level `effortLevel` in user settings does not apply to Opus 5.5 or newer models, so a main session on Opus 5.5 starts at that model's default, `medium`, unless you pick a level with `/effort` or the `/model` picker. It still applies on Opus 5, Fable 5.1, and earlier models, and agent `effort:` frontmatter overrides it either way"). A top-level `effortLevel` in project, local, or managed settings applies to every model and needs no note
 - `env.CLAUDE_CODE_SUBAGENT_MODEL_FORCE` unset: PASS. Set: WARN ("while this is set the platform ignores every agent definition's `model` field, so the whole roster collapses onto one model and oracle loses its fable tier. Unset it unless you deliberately want one model everywhere"). Plain `CLAUDE_CODE_SUBAGENT_MODEL` needs no warning, since agent frontmatter outranks it
 - `env.CLAUDE_CODE_RESTRICTED` unset: PASS. Set to `1`: WARN ("a restricted session ignores user, project, and local settings, so OMCA's hooks and MCP server are absent entirely and every evidence gate, state file, and statusline reading in this report is inert. Start the session without `--restricted` to get the plugin back"). This check reads the environment variable only: a session started with the `--restricted` flag leaves no setting to inspect, so when the variable is absent say that the flag itself is undetectable from inside the session and point at Check 4, where a healthy binary whose tools are still unavailable is the indirect signal
 
@@ -886,5 +888,5 @@ Print the Phase 6 health report format with all findings. Use "Doctor Report" he
 - NEVER claim marketplace installation or managed policy enforcement unless existing Claude Code settings prove it
 - Apply settings changes with explicit user confirmation via AskUserQuestion; print jq fallback on decline
 - The `allowed-tools` grant covers inspection only: version probes, `jq` reads, `git rev-parse`, `claude mcp list`. It names no `mv`, `cp`, `mkdir`, `rm`, or `uv sync`, so every settings write and every filesystem mutation still goes through the normal permission flow
-- Idempotent: running setup multiple times with the same version is a no-op
+- Idempotent: each run strips the block and writes the current template, and user content stays unchanged
 - Migration handles both `<!-- OMCA:START -->` and `<\!-- OMCA:START -->` (escaped and unescaped)

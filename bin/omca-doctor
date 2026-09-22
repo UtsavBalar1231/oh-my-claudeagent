@@ -69,14 +69,14 @@ fi
 echo
 
 echo '=== CLAUDE.md ==='
-if [ -f "${HOME}/.claude/CLAUDE.md" ]; then
-    if grep -q '^--- omca-setup' "${HOME}/.claude/CLAUDE.md"; then
-        status WARN "~/.claude/CLAUDE.md still has legacy injection block — re-run /oh-my-claudeagent:omca-setup"
-    else
-        status PASS "~/.claude/CLAUDE.md (no legacy block)"
-    fi
+# The omca-setup block is the installed state: setup writes it on every run.
+C="${HOME}/.claude/CLAUDE.md"
+if grep -qE '<\\?!-- OMCA:START -->' "$C" 2>/dev/null; then
+    status WARN "~/.claude/CLAUDE.md has an old OMCA:START block; run /oh-my-claudeagent:omca-setup to migrate it"
+elif grep -qE '^--- omca-setup[[:space:]]*$' "$C" 2>/dev/null; then
+    status PASS "~/.claude/CLAUDE.md has the omca-setup block"
 else
-    status PASS "~/.claude/CLAUDE.md absent (post-migration target state)"
+    status WARN "~/.claude/CLAUDE.md has no omca-setup block; run /oh-my-claudeagent:omca-setup to install it"
 fi
 echo
 

@@ -31,26 +31,21 @@ Generate hierarchical AGENTS.md files. Root + complexity-scored subdirectories.
 3. **Generate**: root first, subdirs in parallel
 4. **Review**: deduplicate, trim, validate
 
-Use TaskCreate for ALL phases. Mark in_progress → completed in real-time.
-
-Precondition: `TodoWrite` and `TaskCreate`/`TaskGet`/`TaskUpdate`/`TaskList` are withheld on Opus 5 and Fable 5 era models unless `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` is set. When they are absent the mandate still stands, carried in your own response text instead of a task list.
-
 ## Phase 1: Discovery + Analysis (Concurrent)
 
-### Background Explore Agents (launch immediately)
+### Background Explore Agents
 
-```
-Agent(subagent_type="oh-my-claudeagent:explore", prompt="Project structure: PREDICT standard patterns for detected language → REPORT deviations only")
-Agent(subagent_type="oh-my-claudeagent:explore", prompt="Entry points: FIND main files → REPORT non-standard organization")
-Agent(subagent_type="oh-my-claudeagent:explore", prompt="Conventions: FIND config files (.eslintrc, pyproject.toml, .editorconfig) → REPORT project-specific rules")
-Agent(subagent_type="oh-my-claudeagent:explore", prompt="Anti-patterns: FIND 'DO NOT', 'NEVER', 'ALWAYS', 'DEPRECATED' comments → LIST forbidden patterns")
-Agent(subagent_type="oh-my-claudeagent:explore", prompt="Build/CI: FIND .github/workflows, Makefile → REPORT non-standard patterns")
-Agent(subagent_type="oh-my-claudeagent:explore", prompt="Test patterns: FIND test configs, test structure → REPORT unique conventions")
-```
+Each explore agent re-reads the repository from scratch and hands back a report you then read, so delegate only the tracks the Bash pass below cannot answer in a few reads: none for a small repository, and at most five in total for a large one. Launch the ones you choose in a single message so they run concurrently, and brief each with its directory scope and what to report. Candidate tracks:
+
+- Entry points and non-standard organization
+- Config files (.eslintrc, pyproject.toml, .editorconfig) and the project-specific rules they encode
+- Comments that mark forbidden or deprecated patterns (`DO NOT`, `NEVER`, `DEPRECATED`), with the reason each gives
+- Build and CI (.github/workflows, Makefile) where it departs from the defaults
+- Test configuration and layout
 
 ### Background Agent Barrier
 
-Agent completes but others running → acknowledge briefly, END response. Do NOT merge or proceed until ALL reported.
+Merge the explore findings only after every agent has reported. Until then, carry on with the main-session analysis below, which does not overlap theirs; when it is done and agents are still running, end the turn once instead of answering each notification with a holding message.
 
 ### Main Session (concurrent with agents)
 
@@ -68,46 +63,19 @@ Extract key insights, conventions, anti-patterns. `--create-new`: read first (pr
 
 #### 3. LSP Codemap (if available)
 
-Optional Claude-native/plugin LSP tools for entry points: `lsp_servers()`, `lsp_document_symbols()`, `lsp_workspace_symbols()`. If unavailable, rely on explore agents and bash only.
-
-#### 4. Dynamic Agent Spawning
-
-Additional explore agents based on project scale (max 5 total):
-
-| Factor | Threshold | Additional Agents |
-|--------|-----------|-------------------|
-| Total files | >100 | +1 per 100 files |
-| Total lines | >10k | +1 per 10k lines |
-| Directory depth | ≥4 | +2 for deep exploration |
-| Large files (>500 lines) | >10 files | +1 for complexity hotspots |
-| Multiple languages | >1 | +1 per language |
-
-```bash
-total_files=$(find . -type f -not -path '*/node_modules/*' -not -path '*/.git/*' | wc -l)
-```
+If the `LSP` tool is active (it needs a code-intelligence plugin for the language), use it to list the symbols in entry-point files, search symbols across the workspace, and find references into heavily used modules. Otherwise rely on the explore agents and the Bash pass.
 
 ## Phase 2: Scoring & Location Decision
 
-### Scoring Matrix
+The root always gets an AGENTS.md. A subdirectory gets one when an agent working inside it would need knowledge that neither the root file nor the code in front of it supplies. Signals, strongest first:
 
-| Factor | Weight | High Threshold | Source |
-|--------|--------|----------------|--------|
-| File count | 3x | >20 | bash |
-| Subdir count | 2x | >5 | bash |
-| Code ratio | 2x | >70% | bash |
-| Unique patterns | 1x | Has own config | explore |
-| Module boundary | 2x | Has index.ts/__init__.py | bash |
-| Symbol density | 2x | >30 symbols | lsp_workspace_symbols count |
-| Reference centrality | 3x | >20 refs | lsp_find_references count |
+- Its own config, build, or test commands
+- A module boundary that other code imports through (`index.ts`, `__init__.py`, a public API)
+- Conventions or constraints that differ from its parent
+- Code much of the repository depends on (many incoming references, when the `LSP` tool is active)
+- Size: many files or subdirectories make the other signals likelier without being one
 
-### Decision Rules
-
-| Score | Action |
-|-------|--------|
-| **Root (.)** | ALWAYS create |
-| **>15** | Create AGENTS.md |
-| **8-15** | Create if distinct domain |
-| **<8** | Skip (parent covers) |
+Leave a directory to its parent file when the parent already covers it. Every extra file costs context in each session that loads it.
 
 ## Phase 3: Generate AGENTS.md
 
@@ -138,21 +106,19 @@ total_files=$(find . -type f -not -path '*/node_modules/*' -not -path '*/.git/*'
 {dev/test/build}
 ```
 
-Quality gates: 50-150 lines, no generic advice, no obvious info.
+Quality bar: every line tells an agent something it could not infer from the code or from general knowledge of the stack. Later sessions load these files as instructions, so write each convention or constraint as a plain sentence that carries its reason, and match the length to what the directory needs, with no filler sections.
 
 ### Subdirectory AGENTS.md (Parallel)
 
-30-80 lines max per location.
+Same bar, scoped to the directory: what differs from the parent, and why.
 
 ## Phase 4: Review & Deduplicate
 
-Remove: generic advice, parent duplicates. Trim to limits. Verify telegraphic style.
+Remove generic advice and anything a parent file already says. Keep the reason attached to each rule that survives.
 
 ## Anti-Patterns
 
-- Sequential execution → MUST parallel
 - Ignoring existing → ALWAYS read first, even with --create-new
 - Over-documenting → not every dir needs AGENTS.md
 - Redundancy → child never repeats parent
 - Generic content → remove anything applying to ALL projects
-- Static agent count → vary by project size/depth

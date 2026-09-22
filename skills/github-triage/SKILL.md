@@ -20,27 +20,16 @@ Read-only GitHub and repository analysis. Do not modify repo files or GitHub sta
 
 Fetch open issue/PR metadata, classify each, spawn 1 background executor per item. Each subagent fetches full details for its item and writes a report under `/tmp/opencode/github-triage-{datetime}/`. Never take destructive action.
 
-## Zero-Action Policy (NON-NEGOTIABLE)
+## Zero-Action Policy
 
-**NEVER run any GitHub mutation command.** This skill is read-and-report ONLY.
+This skill reads and reports; a human maintainer decides what happens to every item, and a mutation made during triage takes that decision away. Run only these read-only commands:
 
-Forbidden commands (automatic failure if used):
-- `gh pr merge`: NEVER
-- `gh pr close`: NEVER
-- `gh issue close`: NEVER
-- `gh issue edit`: NEVER
-- `gh pr edit`: NEVER
-- `gh pr review --approve`: NEVER
-- `gh api` with non-GET methods: NEVER (`POST`, `PUT`, `PATCH`, `DELETE` are forbidden)
-- Any `gh` command that writes, modifies, or deletes
-
-Allowed read-only commands:
 - `gh issue list`, `gh issue view`
 - `gh pr list`, `gh pr view`
 - `gh api --method GET repos/{REPO}/pulls/{number}/files`
 - `gh repo view`
 
-Violation = CRITICAL FAILURE. Report only; humans decide.
+Never run a `gh` command that merges, closes, edits, comments on, labels, or reviews an item (`gh pr merge`, `gh pr close`, `gh issue close`, `gh issue edit`, `gh pr edit`, `gh pr review`), and never call `gh api` with `POST`, `PUT`, `PATCH`, or `DELETE`.
 
 ## Evidence Rule (MANDATORY)
 
@@ -108,11 +97,13 @@ For each item, determine its type from metadata only: title, labels, author, and
 
 ### Issues
 
-| Type | Detection |
+Title prefixes and labels are strong signals. A `?` in a title is weak, because bug reports are often phrased as questions: an item that reports broken or unexpected behavior is `ISSUE_BUG` however it is phrased.
+
+| Type | Signals |
 |------|-----------|
-| `ISSUE_QUESTION` | Title contains `[Question]`, `[Discussion]`, or `?`, or labels indicate question/discussion |
-| `ISSUE_BUG` | Title contains `[Bug]`, `Bug:`, or labels indicate bug |
+| `ISSUE_BUG` | Title contains `[Bug]` or `Bug:`, labels indicate bug, or the title describes broken or unexpected behavior |
 | `ISSUE_FEATURE` | Title contains `[Feature]`, `[RFE]`, `[Enhancement]`, `Feature Request`, `Proposal`, or labels indicate enhancement |
+| `ISSUE_QUESTION` | Title contains `[Question]` or `[Discussion]`, or labels indicate question/discussion, and no defect is reported |
 | `ISSUE_OTHER` | Anything else |
 
 ### PRs
@@ -164,7 +155,7 @@ Agent(
 
 Launch agents in batches of up to 5 concurrent. Wait for batch to complete before launching next batch.
 
-**Background Agent Barrier**: When a background agent completes but others in the batch are still running, acknowledge its result briefly (1-2 lines) and END your response immediately. Do NOT start collecting reports or writing the summary until ALL agents in the batch have completed. This prevents queued notifications from getting stuck.
+**Background Agent Barrier**: Each result arrives as a task notification, often in a later turn than the spawn. Launch the next batch, read reports, or write the summary only after every agent in the current batch has reported. While a batch runs, do work that does not overlap it, such as preparing the next batch's prompts; when none is left, end the turn once. Do not send a holding message on consecutive turns for the same batch, and do not re-spawn an item because its result has not arrived yet.
 
 ---
 
@@ -184,7 +175,7 @@ ITEM:
 
 YOUR JOB:
 1. Fetch and read the issue body/comments. Understand what the user is asking.
-2. Search the codebase with Grep and Read to find the answer.
+2. Search the codebase to find the answer: `ast_search` for a syntactic target (a signature, a call site, an import), `rg` for literal text, then Read what you find.
 3. Find specific file paths and code that address the question.
 
 EVIDENCE RULE: Every factual code claim must cite a GitHub permalink with commit SHA. If you cannot cite evidence, mark the claim UNVERIFIED.
@@ -311,7 +302,7 @@ ITEM:
 
 YOUR JOB:
 1. Fetch and read the issue body/comments. Understand what the reporter is describing.
-2. Search the codebase with Grep and Read to gather relevant context.
+2. Search the codebase with `ast_search` or `rg`, then Read, to gather relevant context.
 3. Determine the best classification and whether it needs maintainer attention.
 
 EVIDENCE RULE: Every factual code claim must cite a GitHub permalink with commit SHA. If you cannot cite evidence, mark the claim UNVERIFIED.
@@ -487,21 +478,6 @@ All individual reports in: {OUTDIR}/
 ```
 
 Tell the user the output directory path when complete.
-
----
-
-## ANTI-PATTERNS (AUTOMATIC FAILURE)
-
-| Violation | Severity |
-|-----------|----------|
-| Running any gh mutation command (merge, close, edit, comment, review, non-GET API) | CRITICAL |
-| Making claims without Evidence Rule citations | CRITICAL |
-| Batching multiple items into one Agent call | CRITICAL |
-| Re-spawning an item because its result did not arrive in the turn that spawned it | HIGH |
-| Spawning any agent type other than executor | HIGH |
-| Checking out PR branches via git | CRITICAL |
-| Not writing report to `/tmp/opencode/github-triage-{datetime}/` | HIGH |
-| Claiming feature exists without commit-SHA permalink citation | HIGH |
 
 ---
 
