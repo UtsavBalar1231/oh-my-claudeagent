@@ -18,7 +18,7 @@ Or from inside a Claude Code session:
 
 ### Team Setup
 
-Add to your project's `.claude/settings.json` so team members get the plugin automatically:
+Add to your project's `.claude/settings.json` so team members get the plugin automatically in local sessions (cloud sessions load only plugins synced from claude.ai):
 
 ```json
 {
@@ -98,7 +98,7 @@ for the trap and the one-setting workaround.
 
 ## Requirements
 
-- Claude Code CLI
+- Claude Code CLI v2.1.271 or later (older clients cannot load a plugin whose `userConfig` declares `options`)
 - `jq`
 - `uv`
 - `python3` 3.10+

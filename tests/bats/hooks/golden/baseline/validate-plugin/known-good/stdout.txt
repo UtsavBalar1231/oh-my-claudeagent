@@ -101,7 +101,6 @@
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'statusline/subagent.py'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'statusline/README.md'
 [validate-plugin] SKIP: docs accuracy: OMCA.md:<LINE> references untracked, gitignored path '.claude/settings.json'
-[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'templates/claudemd.md'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'skills/start-work/SKILL.md'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'skills/start-work/SKILL.md'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'servers/tools/_common.py'
@@ -240,4 +239,4 @@
 [validate-plugin] PASS: mcp tools/list contains categories_list
 [validate-plugin] PASS: mcp tools/list contains file_read
 [validate-plugin] PASS: mcp tools/list contains session_search
-[validate-plugin] Summary: 217 passed, 0 failed, 13 skipped, 0 warned
+[validate-plugin] Summary: 216 passed, 0 failed, 13 skipped, 0 warned

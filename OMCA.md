@@ -320,9 +320,11 @@ Measured on client 2.1.245.
 | `TaskCreated`, `TeammateIdle` | Task-collaboration lifecycle owned by the native shared task list. Only `TaskCompleted` is registered among the three, as the evidence gate |
 
 `TaskCompleted` fires only through `TaskUpdate` or a teammate ending a turn with tasks still open.
-Client v2.1.233 withholds `TodoWrite` and the `TaskCreate`/`TaskGet`/`TaskUpdate`/`TaskList` tools
-on Opus 5 and Fable 5 era models unless `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` is set, and every OMCA
-agent declares one of those tiers. With the task tools withheld and agent teams off, neither
+Claude Code provides `TodoWrite` and the `TaskCreate`/`TaskGet`/`TaskUpdate`/`TaskList` tools by
+default only on Claude 3.x, Opus 4 through 4.7, Sonnet 4 through 4.6, and Haiku 4.5; every other
+model, including what the roster's `opus` and `fable` aliases resolve to on the Anthropic API, goes
+without them unless `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` is set. A subagent gets them only when the
+session has them. With the task tools withheld and agent teams off, neither
 trigger occurs, so `task-completed-verify.sh` never runs. Treat it as an opt-in gate rather than a
 guarantee: the three Stop gates are what enforce evidence discipline by default.
 
@@ -592,7 +594,9 @@ Run `claude plugin details oh-my-claudeagent` before a major release to capture 
 
 ### Team Setup
 
-Add to `.claude/settings.json` for automatic team-wide installation:
+Add to `.claude/settings.json` to install the plugin for everyone who opens the repository in a
+local session. Cloud sessions do not load plugins from repository settings; they get only plugins
+synced from claude.ai.
 
 ```json
 {
@@ -624,9 +628,9 @@ Add to `.claude/settings.json` for automatic team-wide installation:
 
 | Agent | Model | Effort | Invoke | Purpose |
 |-------|-------|--------|--------|---------|
-| sisyphus | opus | xhigh | Main session (injected via `templates/claudemd.md`) or `/oh-my-claudeagent:start-work` (Plan Execution Mode) | Master orchestrator identity that classifies requests, delegates to specialists. Two modes: free-form (conversational) and plan-driven (via the `start-work` skill body). Plan Execution Mode protocol lives in `skills/start-work/SKILL.md`. |
+| sisyphus | opus | high | Main session (the plugin's `settings.json` sets it as the session `agent`) or `/oh-my-claudeagent:start-work` (Plan Execution Mode) | Master orchestrator identity that classifies requests, does direct work itself, and delegates sizeable, self-contained work to specialists. Two modes: free-form (conversational) and plan-driven (via the `start-work` skill body). Plan Execution Mode protocol lives in `skills/start-work/SKILL.md`. |
 
-**sisyphus** — The one orchestrator. Free-form mode: routes requests to specialists, runs explore agents in background. Plan Execution Mode: reads plan, delegates per-task to `executor`, logs evidence, runs a final completeness check at the end.
+**sisyphus**: the one orchestrator. Free-form mode: does known changes and quick lookups itself, and routes wide investigations, research, and independent implementation parts to specialists. Plan Execution Mode: reads plan, delegates per-task to `executor`, logs evidence, runs a final completeness check at the end.
 
 ### Planning and Review
 
@@ -658,7 +662,7 @@ steps max, effort estimates (Quick/Short/Medium/Large).
 | explore | opus | low | `Agent(subagent_type="oh-my-claudeagent:explore")` | Codebase search — files, patterns, implementations |
 | librarian | opus | medium | `Agent(subagent_type="oh-my-claudeagent:librarian")` | External docs, OSS examples, library research |
 
-**explore** uses ast_search, Grep, Glob. Fire multiple in parallel for broad searches.
+**explore** searches with ast_search and rg (Grep and Glob where the session has them). Spawn one per independent area of a wide investigation.
 
 **librarian** — Uses context7 for library docs, and may create shallow read-only
 dependency clones under `/tmp/opencode` for source investigation.
@@ -1230,8 +1234,8 @@ availability is not guaranteed.
 
 Managed keys that enforce a minimum or maximum Claude Code version for the deployment.
 These are org-policy keys — OMCA cannot set or override them. If your org enforces a
-minimum version, ensure it is ≥ v2.1.141 to get the full v2.1.141–v2.1.167 sync
-feature set.
+minimum version, it must be at least v2.1.271: `plugin.json` declares `options` on a
+`userConfig` field, and clients before v2.1.271 cannot load such a plugin.
 
 ### `CLAUDE_CODE_OPUS_4_6_FAST_MODE_OVERRIDE` — removed (v2.1.160)
 
@@ -1443,13 +1447,14 @@ Features introduced in this window that OMCA consciously declines to adopt:
 **Provider-alias caveat:** every OMCA agent declares a tier alias in `model:` frontmatter
 (`opus` or `fable`) rather than a pinned generation ID, so the frontmatter never goes stale. The
 generation an alias resolves to depends on the provider (`claude-code-docs/docs/model-config.md`
-provider table): `opus` is Opus 5 on the Anthropic API, Claude Platform on AWS, Amazon Bedrock,
-and Google Cloud's Agent Platform, and Opus 4.6 on Microsoft Foundry. That spread reaches the
-whole roster now that `opus` is the only tier any agent declares, and it is the accepted cost of
-not having a pinned id go stale on the next release. Note that Opus 4.6 supports `low`,
-`medium`, `high`, and `max` but not `xhigh`, so on Foundry the four `xhigh` agents run at `high`,
-which is the platform's documented fallback to the highest supported level at or below the one
-set. The statusline still shows the true generation per subagent row, because
+provider table): `opus` is Opus 5.5 on the Anthropic API, Claude Platform on AWS, Amazon
+Bedrock, and Google Cloud's Agent Platform, and Opus 4.6 on Microsoft Foundry. A family alias
+also follows the main conversation's exact model, `[1m]` suffix included, when the main
+conversation runs in that family (`claude-code-docs/docs/sub-agents.md`, "Choose a model"), so a
+user who picks an older Opus runs the whole roster on it. That spread reaches the whole roster
+now that `opus` is the only tier any agent declares, and it is the accepted cost of not having a
+pinned id go stale on the next release. No `opus` agent declares `xhigh` any more, so the
+Foundry fallback from `xhigh` to `high` on Opus 4.6 no longer lowers any of them. The statusline still shows the true generation per subagent row, because
 `statusline/subagent.py` prefers the payload's resolved `model` field and only falls back to
 the frontmatter-derived label when the payload omits it.
 
@@ -1665,8 +1670,8 @@ tables under Core Concepts and Agent Reference are the live state.
 | `Agent` tool hardened against indirect prompt injection | Both content-returning agents already carry the rail |
 | `mode` param deprecated; subagents inherit the parent permission mode | Corroborates the CI-enforced rule that plugin agents declare no `permissionMode` |
 | `skillListingMaxDescChars` | The 1,536 figure is now a settable default rather than a fixed platform limit. OMCA's thresholds need no change, since the 512 soft cap keeps every description far below either number |
-| `effortLevel`, `fastMode`, `fastModePerSessionOptIn` | The precedence chain runs settings `effortLevel`, then session `--effort` or env, then agent frontmatter, then per-invocation. OMCA depends on frontmatter winning over the settings default, so the chain is worth having written down |
-| `alwaysThinkingEnabled` and `MAX_THINKING_TOKENS` | `thinking.enabled` is a documented statusline payload field (`statusline.md`: whether extended thinking is enabled for the session), so the render has a real input source and needs no OMCA change. The half that matters is Fable 5: `MAX_THINKING_TOKENS=0` disables thinking on the Anthropic API except on Fable 5, which cannot have thinking turned off, so oracle rows keep the thinking marker even at `0` |
+| `effortLevel`, `fastMode`, `fastModePerSessionOptIn` | Agent frontmatter `effort:` overrides the session level from `/effort`, `--effort`, `modelSettings`, or `effortLevel`; the `CLAUDE_CODE_EFFORT_LEVEL` variable and a `maxEffortLevel` cap still win over frontmatter. A top-level user `effortLevel` does not apply to Opus 5.5 or newer models. OMCA depends on frontmatter winning over the settings default, so the chain is worth having written down |
+| `alwaysThinkingEnabled` and `MAX_THINKING_TOKENS` | `thinking.enabled` is a documented statusline payload field (`statusline.md`: whether extended thinking is enabled for the session), so the render has a real input source and needs no OMCA change. The half that matters is the models that cannot turn thinking off: `MAX_THINKING_TOKENS=0` disables thinking on the Anthropic API except on Opus 5.5 and the Fable models, so every roster row keeps the thinking marker even at `0` |
 | Subagent model override reverted on resume before v2.1.211 | `subagent-models.json` records the frontmatter model, not the effective one. That divergence is exactly why the subagent statusline prefers the payload field |
 | `mcp_server_errors` | A headless stream-json field available only with `--mcp-config`. It is a headless-only diagnostic, separate from the interactive `claude mcp list` and `/mcp` path, and does not belong in the doctor's checks |
 | `SessionStart` hook streaming and idle reaping (v2.1.204) | A mid-hook reap leaves `session-init.sh`'s state resets half applied. Measured runtime is well under the budget, so no `timeout` is warranted for that reason |
