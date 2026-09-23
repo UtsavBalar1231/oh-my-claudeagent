@@ -31,25 +31,25 @@ load '../test_helper'
 # lowercase, so every spelling below reached the platform undenied.
 
 @test "permission-filter: rm -Rf is denied (uppercase flag)" {
-	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"rm -Rf /tmp/x"}}'
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"rm -Rf ~"}}'
 	assert_success
 	assert_output --partial '"deny"'
 }
 
 @test "permission-filter: rm -R is denied (uppercase, no force)" {
-	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"rm -R /tmp/x"}}'
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"rm -R ~"}}'
 	assert_success
 	assert_output --partial '"deny"'
 }
 
 @test "permission-filter: rm -f -r is denied (split flags)" {
-	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"rm -f -r /tmp/x"}}'
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"rm -f -r ~"}}'
 	assert_success
 	assert_output --partial '"deny"'
 }
 
 @test "permission-filter: rm -v -rf is denied (recursive flag not first)" {
-	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"rm -v -rf /tmp/x"}}'
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"rm -v -rf ~"}}'
 	assert_success
 	assert_output --partial '"deny"'
 }
@@ -61,7 +61,7 @@ load '../test_helper'
 }
 
 @test "permission-filter: rm --recursive is denied (long form)" {
-	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"rm --recursive /tmp/x"}}'
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"rm --recursive ~"}}'
 	assert_success
 	assert_output --partial '"deny"'
 }
@@ -179,9 +179,8 @@ load '../test_helper'
 }
 
 # ── destructive removal at a non-leading command position ────────────────────
-# The deny is not anchored at the start of the command: a recursive removal is
-# the same operation wherever it sits, and the platform prompt it would
-# otherwise fall through to is a weaker line than an outright deny.
+# The deny is not anchored at the start of the command: a recursive removal of a
+# catastrophic target is the same operation wherever it sits.
 
 @test "permission-filter: && compound ending in rm -rf of a home path is denied" {
 	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"cd /x && rm -rf ~/y"}}'
@@ -196,7 +195,7 @@ load '../test_helper'
 }
 
 @test "permission-filter: semicolon compound ending in rm -rf is denied" {
-	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"cd /x; rm -rf /tmp/y"}}'
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"cd /x; rm -rf /usr"}}'
 	assert_success
 	assert_output --partial '"deny"'
 }
@@ -226,7 +225,7 @@ load '../test_helper'
 }
 
 @test "permission-filter: leading-whitespace rm -rf is denied" {
-	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"   rm -rf /tmp/x"}}'
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"   rm -rf /"}}'
 	assert_success
 	assert_output --partial '"deny"'
 }
@@ -321,33 +320,33 @@ permissionrequest_payload() {
 }
 
 @test "permission-filter: rm -rf denies on PreToolUse in the PreToolUse decision shape" {
-	run_hook "permission-filter.sh" "$(pretooluse_payload 'rm -rf /home/u/work')"
+	run_hook "permission-filter.sh" "$(pretooluse_payload 'rm -rf /home')"
 	assert_success
 	assert_output --partial '"hookEventName":"PreToolUse"'
 	assert_output --partial '"permissionDecision":"deny"'
 }
 
 @test "permission-filter: rm -rf denies on PermissionRequest in the PermissionRequest shape" {
-	run_hook "permission-filter.sh" "$(permissionrequest_payload 'rm -rf /home/u/work')"
+	run_hook "permission-filter.sh" "$(permissionrequest_payload 'rm -rf /home')"
 	assert_success
 	assert_output --partial '"hookEventName":"PermissionRequest"'
 	assert_output --partial '"behavior":"deny"'
 }
 
 @test "permission-filter: sudo rm -rf denies on PreToolUse" {
-	run_hook "permission-filter.sh" "$(pretooluse_payload 'sudo rm -rf /var/lib/thing')"
+	run_hook "permission-filter.sh" "$(pretooluse_payload 'sudo rm -rf /var')"
 	assert_success
 	assert_output --partial '"permissionDecision":"deny"'
 }
 
 @test "permission-filter: && compound carrying rm -rf denies on PreToolUse" {
-	run_hook "permission-filter.sh" "$(pretooluse_payload 'cd /x && rm -rf /home/u/y')"
+	run_hook "permission-filter.sh" "$(pretooluse_payload 'cd /x && rm -rf ~/y')"
 	assert_success
 	assert_output --partial '"permissionDecision":"deny"'
 }
 
 @test "permission-filter: rm -rf inside a substitution denies on PreToolUse" {
-	run_hook "permission-filter.sh" "$(pretooluse_payload 'echo $(rm -rf /home/u/y)')"
+	run_hook "permission-filter.sh" "$(pretooluse_payload 'echo $(rm -rf ~/y)')"
 	assert_success
 	assert_output --partial '"permissionDecision":"deny"'
 }
@@ -409,12 +408,74 @@ permissionrequest_payload() {
 	assert_output ""
 }
 
-# A temp-directory target is not carved out: `rm -rf /tmp/x` is the canary shape
-# that ran unblocked under auto mode, and a path-shaped exemption is a hole once a
-# symlink or a `$TMPDIR` the caller controls points outside the temp tree.
-@test "permission-filter: rm -rf of a temp path denies on PreToolUse" {
+# ── target scope ─────────────────────────────────────────────────────────────
+# The deny is scoped by target depth, not by a directory allowlist: a scratch or
+# build tree is routine cleanup, so only a target whose loss is machine-wide denies.
+# Everything else is left to the platform's own permission evaluation.
+
+@test "permission-filter: rm -rf of a nested temp path is silent on PreToolUse" {
 	run_hook "permission-filter.sh" "$(pretooluse_payload 'rm -rf /tmp/omca-canary')"
 	assert_success
+	assert_output ""
+}
+
+@test "permission-filter: a loop cleaning a pid-suffixed scratch dir is silent" {
+	local cmd='for d in a b; do mkdir -p /tmp/x$$; dpkg-deb -x $d/p.deb /tmp/x$$; md5sum $(find /tmp/x$$ -name "*.so"); rm -rf /tmp/x$$; done'
+	run_hook "permission-filter.sh" "$(jq -nc --arg c "$cmd" '{tool_name:"Bash",hook_event_name:"PreToolUse",tool_input:{command:$c}}')"
+	assert_success
+	assert_output ""
+}
+
+@test "permission-filter: rm -rf of a relative build dir is silent" {
+	run_hook "permission-filter.sh" "$(pretooluse_payload 'cd /x && rm -rf build dist/out')"
+	assert_success
+	assert_output ""
+}
+
+@test "permission-filter: rm -rf two levels under home is silent" {
+	run_hook "permission-filter.sh" "$(pretooluse_payload 'rm -rf ~/.cache/foo')"
+	assert_success
+	assert_output ""
+}
+
+@test "permission-filter: a directory directly under root denies" {
+	run_hook "permission-filter.sh" "$(pretooluse_payload 'rm -rf /usr/*')"
+	assert_output --partial '"permissionDecision":"deny"'
+}
+
+@test "permission-filter: a directory directly under home denies" {
+	run_hook "permission-filter.sh" "$(pretooluse_payload 'rm -rf $HOME/dev')"
+	assert_output --partial '"permissionDecision":"deny"'
+}
+
+@test "permission-filter: a glob of the working directory denies" {
+	run_hook "permission-filter.sh" "$(pretooluse_payload 'rm -rf ./*')"
+	assert_output --partial '"permissionDecision":"deny"'
+}
+
+@test "permission-filter: a parent-directory target denies" {
+	run_hook "permission-filter.sh" "$(pretooluse_payload 'rm -rf a/../..')"
+	assert_output --partial '"permissionDecision":"deny"'
+}
+
+@test "permission-filter: a variable-led path that is root-level when empty denies" {
+	run_hook "permission-filter.sh" "$(pretooluse_payload 'rm -rf $DIR/*')"
+	assert_output --partial '"permissionDecision":"deny"'
+}
+
+@test "permission-filter: a deeper variable-led path is silent" {
+	run_hook "permission-filter.sh" "$(pretooluse_payload 'rm -rf $DIR/build/out')"
+	assert_success
+	assert_output ""
+}
+
+@test "permission-filter: --no-preserve-root denies whatever the target" {
+	run_hook "permission-filter.sh" "$(pretooluse_payload 'rm -rf --no-preserve-root /tmp/a/b')"
+	assert_output --partial '"permissionDecision":"deny"'
+}
+
+@test "permission-filter: a safe removal does not mask a later catastrophic one" {
+	run_hook "permission-filter.sh" "$(pretooluse_payload 'rm -rf /tmp/a/b; rm -rf ~')"
 	assert_output --partial '"permissionDecision":"deny"'
 }
 
@@ -509,14 +570,14 @@ permissionrequest_payload() {
 
 @test "permission-filter: a real recursive removal on an unquoted second line still denies" {
 	local cmd
-	cmd=$(printf 'cd /tmp\nrm -rf build')
+	cmd=$(printf 'cd /tmp\nrm -rf *')
 	run_hook "permission-filter.sh" "$(jq -nc --arg c "$cmd" '{tool_name:"Bash",hook_event_name:"PreToolUse",tool_input:{command:$c}}')"
 	assert_success
 	assert_output --partial '"deny"'
 }
 
 @test "permission-filter: a real recursive removal after && still denies" {
-	run_hook "permission-filter.sh" '{"tool_name":"Bash","hook_event_name":"PreToolUse","tool_input":{"command":"git status && rm -rf x"}}'
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","hook_event_name":"PreToolUse","tool_input":{"command":"git status && rm -rf .."}}'
 	assert_success
 	assert_output --partial '"deny"'
 }
@@ -536,19 +597,19 @@ permissionrequest_payload() {
 # is the same operation and must deny the same way.
 
 @test "permission-filter: rm -rf behind a variable assignment is denied" {
-	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"FOO=1 rm -rf /tmp/x"}}'
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"FOO=1 rm -rf /"}}'
 	assert_success
 	assert_output --partial '"deny"'
 }
 
 @test "permission-filter: rm -rf behind a quoted assignment is denied" {
-	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"X=\"a b\" rm -rf y"}}'
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"X=\"a b\" rm -rf ~"}}'
 	assert_success
 	assert_output --partial '"deny"'
 }
 
 @test "permission-filter: rm -rf behind env is denied" {
-	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"env FOO=1 rm -rf z"}}'
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"env FOO=1 rm -rf ."}}'
 	assert_success
 	assert_output --partial '"deny"'
 }

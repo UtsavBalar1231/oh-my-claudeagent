@@ -6,7 +6,7 @@ load '../test_helper'
 
 # ── rm -rf: denied ────────────────────────────────────────────────────────────
 
-@test "if Bash(rm *): rm -rf /tmp/build is denied" {
+@test "if Bash(rm *): rm -rf ~ is denied" {
 	local fixture="$CLAUDE_PLUGIN_ROOT/tests/fixtures/hooks/permissionrequest-rm-rf.json"
 	run_hook_file "permission-filter.sh" "$fixture"
 	assert_success
@@ -21,13 +21,13 @@ load '../test_helper'
 }
 
 @test "if Bash(rm *): rm -r variant is also denied" {
-	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"rm -r /tmp/old"}}'
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"rm -r /opt"}}'
 	assert_success
 	assert_output --partial '"deny"'
 }
 
 @test "if Bash(rm *): sudo rm -rf is denied" {
-	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"sudo rm -rf /var/cache"}}'
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"sudo rm -rf /var"}}'
 	assert_success
 	assert_output --partial '"deny"'
 }
@@ -180,8 +180,8 @@ load '../test_helper'
 	assert_output --partial '"deny"'
 }
 
-@test "if Bash(sudo *): sudo rm -rf /var/cache is denied" {
-	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"sudo rm -rf /var/cache"}}'
+@test "if Bash(sudo *): sudo rm -rf /var is denied" {
+	run_hook "permission-filter.sh" '{"tool_name":"Bash","tool_input":{"command":"sudo rm -rf /var"}}'
 	assert_success
 	assert_output --partial '"deny"'
 }

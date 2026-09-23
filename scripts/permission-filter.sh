@@ -18,8 +18,8 @@ fi
 # shellcheck disable=SC2001
 TRIMMED_CMD=$(echo "${COMMAND}" | sed 's/^[[:space:]]*//')
 
-# A recursive removal denies wherever it sits: `cd /x && rm -rf ~` is the same
-# operation as `rm -rf ~`. The leading alternation requires a command position
+# A recursive removal of a catastrophic target denies wherever it sits:
+# `cd /x && rm -rf ~` is the same operation as `rm -rf ~`. The leading alternation requires a command position
 # (string start, separator, subshell or substitution opener), which is what keeps
 # a literal mention out of scope. Characters that would open a command position
 # inside a quoted span are blanked first, so a multi-line commit message whose
@@ -32,15 +32,92 @@ DESTRUCTIVE_RM_SCAN_CMD=$(neutralize_quoted_positions "${TRIMMED_CMD}")
 # command position admits them; without this `FOO=1 rm -rf ~` read as a non-rm command.
 ENV_ASSIGN_RE=$'([A-Za-z_][A-Za-z0-9_]*=("[^"]*"|\'[^\']*\'|[^[:space:];&|`"\']*)[[:space:]]+)*'
 DESTRUCTIVE_RM_RE=$'(^|[;&|()`\n\r])[[:space:]]*'"${ENV_ASSIGN_RE}"$'(sudo[[:space:]]+)?(env[[:space:]]+)?'"${ENV_ASSIGN_RE}"$'rm[[:space:]]+((-[a-zA-Z]+|--[a-zA-Z-]+)[[:space:]]+)*(-[a-zA-Z]*[rR][a-zA-Z]*|--recursive)([[:space:]]|$)'
-if [[ "${DESTRUCTIVE_RM_SCAN_CMD}" =~ ${DESTRUCTIVE_RM_RE} ]]; then
+# The argument list of one invocation runs to the next separator. A `)` ends it too,
+# so a removal inside `$(...)` does not swallow the rest of the outer command.
+RM_ARGS_RE=$'^([^;&|)`\n\r]*)(.?)'
+
+# Only targets whose loss is machine-wide deny: the root, home, the working directory
+# or a parent of it, and anything directly under the root or home (`/usr`, `~/dev`).
+# A leading `$VAR` is read as empty, since `rm -rf "$DIR/"*` with DIR unset is the
+# classic way to reach `/`. Deeper paths (`/tmp/x$$`, `build`, `~/.cache/foo`) fall
+# through to the platform's own evaluation, which refuses critical paths itself.
+rm_target_is_catastrophic() {
+	local t="${1//[\"\']/}" rest limit p
+	local -a parts=() kept=()
+	if [[ "${t}" =~ ^(~[^/]*|\$HOME|\$\{HOME\})(/.*)?$ ]]; then
+		rest="${BASH_REMATCH[2]}" limit=1
+	elif [[ "${t}" =~ ^\$(\{[A-Za-z_][A-Za-z0-9_]*\}|[A-Za-z_][A-Za-z0-9_]*)(.*)$ ]]; then
+		rest="${BASH_REMATCH[2]}" limit=1
+		[[ "${rest}" == /* ]] || return 1
+	elif [[ "${t}" == /* ]]; then
+		rest="${t}" limit=1
+	else
+		rest="${t}" limit=0
+	fi
+	IFS=/ read -ra parts <<< "${rest}"
+	for p in "${parts[@]}"; do
+		case "${p}" in
+		'' | .) ;;
+		..)
+			if ((${#kept[@]})) && [[ "${kept[-1]}" != .. ]]; then
+				unset 'kept[-1]'
+			elif ((limit == 0)); then
+				kept+=(..)
+			fi
+			;;
+		*) kept+=("${p}") ;;
+		esac
+	done
+	# A trailing glob removes the contents of its parent, which is the parent's loss.
+	while ((${#kept[@]})) && [[ "${kept[-1]}" == '*' || "${kept[-1]}" == '.*' ]]; do
+		unset 'kept[-1]'
+	done
+	if ((limit == 0)); then
+		for p in "${kept[@]}"; do
+			[[ "${p}" == .. ]] || return 1
+		done
+		return 0
+	fi
+	((${#kept[@]} <= limit))
+}
+
+destructive_rm_present() {
+	local scan="$1" args w end_opts
+	local -a words
+	while [[ "${scan}" =~ ${DESTRUCTIVE_RM_RE} ]]; do
+		scan="${scan#*"${BASH_REMATCH[0]}"}"
+		[[ "${scan}" =~ ${RM_ARGS_RE} ]]
+		args="${BASH_REMATCH[1]}"
+		# A substituted target is unknowable until it runs.
+		if [[ "${args}" == *"\$("* || "${BASH_REMATCH[2]}" == '`' ]]; then
+			return 0
+		fi
+		read -ra words <<< "${args}"
+		end_opts=false
+		for w in "${words[@]}"; do
+			if ! ${end_opts}; then
+				case "${w}" in
+				--) end_opts=true && continue ;;
+				--no-preserve-root) return 0 ;;
+				-*) continue ;;
+				*) ;;
+				esac
+			fi
+			rm_target_is_catastrophic "${w}" && return 0
+		done
+	done
+	return 1
+}
+
+if destructive_rm_present "${DESTRUCTIVE_RM_SCAN_CMD}"; then
 	# Each event reads its decision from a different place: PreToolUse from
 	# hookSpecificOutput.permissionDecision, PermissionRequest from
 	# hookSpecificOutput.decision.behavior. A payload in the other event's shape is
 	# ignored, so the deny has to be written twice rather than shared.
 	if [[ "${HOOK_EVENT}" == "PreToolUse" ]]; then
-		echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Destructive rm -rf operation blocked. Use explicit file deletion instead."}}'
+		echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Destructive rm -rf blocked: the target is the filesystem root, home, the working directory, or a directory directly under root or home. Name a deeper path explicitly."}}'
 	else
-		echo '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"deny","message":"Destructive rm -rf operation blocked. Use explicit file deletion instead."}}}'
+		echo '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"deny","message":"Destructive rm -rf blocked: the target is the filesystem root, home, the working directory, or a directory directly under root or home. Name a deeper path explicitly."}}}'
 	fi
 	exit 0
 fi

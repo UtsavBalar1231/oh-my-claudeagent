@@ -252,7 +252,7 @@ Hooks are bash scripts in `scripts/*.sh`, registered in `hooks/hooks.json`. They
 Claude Code lifecycle events and provide:
 
 - Context injection (AGENTS.md, rules, notepad directives)
-- Permission auto-approval for known-safe package managers (npm, yarn, pnpm, bun), jq, and uv run/sync. Blocks destructive patterns (rm -rf).
+- Permission auto-approval for known-safe package managers (npm, yarn, pnpm, bun), jq, and uv run/sync. Blocks a recursive removal whose target is the root, home, the working directory, or a directory directly under root or home.
 - Error recovery suggestions (re-read after failed Edit, escalate after failed Agent)
 - Compaction survival (state saved pre-compact, re-injected post-compact)
 - Verification gating (TaskCompleted blocked without fresh evidence, on the sessions where that event can fire; see below)
@@ -1284,8 +1284,9 @@ Important keys:
 Keep `teammateMode: "auto"` as the default collaboration baseline unless your org policy overrides it.
 
 `scripts/permission-filter.sh` does not auto-allow arbitrary commands — it only auto-approves
-known-safe package managers (npm, yarn, pnpm, bun), jq, and uv run/sync, and blocks
-destructive patterns (rm -rf). A command containing a command separator, a redirect, or a
+known-safe package managers (npm, yarn, pnpm, bun), jq, and uv run/sync, and blocks a
+recursive removal whose target is the root, home, the working directory, or a directory
+directly under root or home. A command containing a command separator, a redirect, or a
 command substitution takes neither branch: it falls through to the platform decision, because
 hook `if:` matching is per-subcommand and the filter only ever saw the first one. A carriage
 return is matched alongside those, as hardening for shells that terminate a statement on a

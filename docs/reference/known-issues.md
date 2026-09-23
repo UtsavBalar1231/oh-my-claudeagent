@@ -92,6 +92,13 @@ Widening the pattern to cover these means either a real shell tokenizer inside a
 or a prefix list that a caller can always step outside of. Neither turns the guard into
 something it is not.
 
+The removal guard is also scoped by target. It denies only a target whose loss is
+machine-wide: the filesystem root, home, the working directory or a parent of it, a
+directory directly under root or home, a `$VAR/` path that lands there when the variable is
+empty, a substituted target, or `--no-preserve-root`. A deeper path such as
+`rm -rf /tmp/build` or `rm -rf ~/.cache/foo` is left to the platform. It reads the literal
+text, so a symlink at a deep path that points somewhere shallow is not seen.
+
 **Workaround**: treat these hooks as a guardrail against a model reaching for the obvious
 destructive spelling, not as a security boundary. Anything adversarial, and anything where
 the cost of a wrong deletion is real, needs the platform's own layers: `permissions.deny`
