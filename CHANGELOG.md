@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.20.1] - 2026-09-23
+
+### Fixed
+
+- `permission-filter.sh` no longer denies every recursive `rm`. Routine cleanup such as
+  `rm -rf /tmp/x$$` inside a loop, or `rm -rf build`, was refused outright. The deny now
+  inspects each invocation's targets and fires only when a target is the filesystem root,
+  home, the working directory or a parent of it, or a directory directly under root or home
+  (`/usr`, `~/dev`, `/usr/*`, `./*`). A leading `$VAR` is read as empty, so `rm -rf $DIR/*`
+  still denies. `--no-preserve-root` and a substituted target (`$(...)`, backticks) also
+  still deny. Every other recursive removal falls through to the platform's own permission
+  evaluation, which refuses critical paths on its own.
+
 ## [2.20.0] - 2026-09-23
 
 Reconciles the plugin with client 2.1.280 and re-baselines its prompts for Opus 5.5, which
