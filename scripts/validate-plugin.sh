@@ -948,7 +948,7 @@ check_docs_accuracy() {
 	recipes="$(grep -oE '^[a-zA-Z][a-zA-Z0-9_-]*' "${JUSTFILE}" | sort -u)"
 
 	local known_top_level=(
-		agents bin docs hooks output-styles rules scripts servers
+		agents bin docs hooks opencode output-styles rules scripts servers
 		skills statusline templates tests
 		.claude .claude-plugin .github .omca
 	)

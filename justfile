@@ -63,6 +63,21 @@ test-hooks:
 test-mcp:
 	bash scripts/validate-plugin.sh --check mcp
 
+# Run the OpenCode adapter suite (typecheck, unit tests, smoke, model path); skips without bun or opencode
+[group('test')]
+test-opencode:
+	#!/usr/bin/env bash
+	set -euo pipefail
+	if ! command -v bun >/dev/null 2>&1 || ! command -v opencode >/dev/null 2>&1; then
+		echo "SKIP test-opencode: bun or opencode not on PATH"
+		exit 0
+	fi
+	bun install --frozen-lockfile
+	bun run typecheck
+	bun test opencode/
+	bash opencode/test/smoke.sh
+	bash opencode/test/model-path.sh
+
 # Run pytest suites for both Python projects. Split invocations for the same reason as
 # lint-python: servers/ and statusline/ are separate uv projects with their own configs
 # and their own dev dependencies, so one pytest run cannot cover both.
@@ -243,9 +258,9 @@ test-all: test test-bats test-pytest test-mcp
 
 # ── CI ────────────────────────────────────────────────────────────
 
-# Run full CI pipeline (format check + lint + typecheck + test + mcp + manifest)
+# Run full CI pipeline (format check + lint + typecheck + test + mcp + manifest + opencode)
 [group('ci')]
-ci: fmt-check lint typecheck test test-bats test-pytest test-mcp validate-manifest
+ci: fmt-check lint typecheck test test-bats test-pytest test-mcp validate-manifest test-opencode
 
 # ── Release ──────────────────────────────────────────────────────
 
@@ -272,6 +287,9 @@ release version="":
 		jq --arg v "${VERSION}" '.version = $v' .claude-plugin/plugin.json > /tmp/plugin-tmp.json
 		mv /tmp/plugin-tmp.json .claude-plugin/plugin.json
 		echo "Updated plugin.json: $VERSION"
+		jq --arg v "${VERSION}" '.version = $v' package.json > /tmp/package-tmp.json
+		mv /tmp/package-tmp.json package.json
+		echo "Updated package.json: $VERSION"
 	fi
 	# Sync version into marketplace.json (SHA stamped in a separate commit below)
 	jq --arg v "${VERSION}" '
@@ -291,7 +309,7 @@ release version="":
 	echo "Updated uv.lock"
 	# Commit 1: version bump across all manifests
 	git add .claude-plugin/plugin.json .claude-plugin/marketplace.json \
-		servers/pyproject.toml servers/uv.lock
+		servers/pyproject.toml servers/uv.lock package.json
 	git commit -m "chore(release): bump version to ${VERSION}"
 	echo "Committed version bump"
 	# Commit 2: stamp the version-bump commit SHA into marketplace.json

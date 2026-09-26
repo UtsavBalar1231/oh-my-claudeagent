@@ -250,6 +250,58 @@ jobs:
             echo "The MCP server failed to start or misreports its tool list, often due to a missing ast-grep binary or a broken tool registration. Run \`bash scripts/validate-plugin.sh --check mcp\` locally to see the exact failure."
           } >> "$GITHUB_STEP_SUMMARY"
 
+  test-opencode:
+    name: OpenCode Adapter
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+
+      # The smoke test loads the plugin in OpenCode, which starts the omca MCP
+      # server, and that server exits 1 if ast-grep is absent.
+      - name: Install ast-grep CLI
+        run: uv tool install ast-grep-cli
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+
+      - name: Install OpenCode CLI
+        run: npm i -g @opencode/cli@2.0.18
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Unit tests
+        run: bun test opencode/
+
+      - name: Smoke test
+        run: bash opencode/test/smoke.sh
+
+      - name: Model path test
+        run: bash opencode/test/model-path.sh
+
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo "### What this job checks"
+            echo "The OpenCode adapter typechecks, passes its unit tests, and loads in a real OpenCode 2.0.18 install, via the commands in \`just test-opencode\`."
+            echo ""
+            echo "### If this fails"
+            echo "The adapter build, its generated config, or its runtime wiring drifted from what OpenCode expects. Run \`just test-opencode\` locally with bun and opencode on PATH to see the exact failure."
+          } >> "$GITHUB_STEP_SUMMARY"
+
   validate-manifest:
     name: Manifest Validation
     runs-on: ubuntu-latest
