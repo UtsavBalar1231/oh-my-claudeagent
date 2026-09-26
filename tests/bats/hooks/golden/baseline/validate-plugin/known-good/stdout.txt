@@ -79,6 +79,9 @@
 [validate-plugin] PASS: depersonalization: no home-path, credential, or bearer-token literals found in tracked shipped files
 [validate-plugin] Running docs accuracy checks
 [validate-plugin] SKIP: docs accuracy: README.md:<LINE> references untracked, gitignored path '.claude/settings.json'
+[validate-plugin] PASS: docs accuracy: README.md references existing path 'opencode/index.ts'
+[validate-plugin] SKIP: docs accuracy: README.md:<LINE> references untracked, gitignored path 'servers/.venv'
+[validate-plugin] PASS: docs accuracy: README.md references existing path 'opencode/generated/omca.json'
 [validate-plugin] PASS: docs accuracy: README.md references existing path 'docs/reference/known-issues.md'
 [validate-plugin] PASS: docs accuracy: README.md references existing path 'docs/reference/configuration.md'
 [validate-plugin] PASS: docs accuracy: OMCA.md cites existing recipe 'just doctor'
@@ -239,4 +242,4 @@
 [validate-plugin] PASS: mcp tools/list contains categories_list
 [validate-plugin] PASS: mcp tools/list contains file_read
 [validate-plugin] PASS: mcp tools/list contains session_search
-[validate-plugin] Summary: 216 passed, 0 failed, 13 skipped, 0 warned
+[validate-plugin] Summary: 218 passed, 0 failed, 14 skipped, 0 warned

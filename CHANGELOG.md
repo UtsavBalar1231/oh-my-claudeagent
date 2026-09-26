@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- OpenCode V2 adapter in `opencode/`. It registers the `omca-` specialist subagents,
+  skills, commands, the `omca` MCP server and the shell and edit guardrails in OpenCode
+  2.0.18 or later. Install it as a git spec,
+  `oh-my-claudeagent@git+https://github.com/UtsavBalar1231/oh-my-claudeagent.git`, or from
+  a local `opencode/` directory.
+- The adapter's `models` option maps the `opus` and `fable` tiers to OpenCode model ids.
+  Without it, every `omca-*` subagent inherits the parent session's model.
+
 ## [2.20.1] - 2026-09-23
 
 ### Fixed

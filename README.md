@@ -119,6 +119,79 @@ configuration; it changes nothing. The platform's separate built-in /doctor
 (alias /checkup) is the fix-capable one.
 ```
 
+## OpenCode V2
+
+The `opencode/` directory is an adapter that loads OMCA's specialists, skills, MCP server
+and guardrails into OpenCode 2.0.18 or later. The entry point is `opencode/index.ts`,
+exported from `package.json`.
+
+### Install
+
+Add the plugin to your OpenCode config, installed from git:
+
+```jsonc
+{
+  "plugins": [
+    {
+      "package": "oh-my-claudeagent@git+https://github.com/UtsavBalar1231/oh-my-claudeagent.git",
+      "options": { "models": { "opus": "anthropic/claude-opus-5-5", "fable": "anthropic/claude-fable-5-1" } }
+    }
+  ]
+}
+```
+
+To load a local checkout instead, point at its `opencode/` directory:
+
+```jsonc
+{
+  "plugins": ["/path/to/oh-my-claudeagent/opencode"]
+}
+```
+
+`options.models` maps OMCA's `opus` and `fable` tiers to OpenCode model ids, in
+`provider/model` form with an optional `#variant`. Without it, every `omca-*` subagent inherits the parent session's
+model. To override one agent, set `agents.omca-<name>.model` in your own config, which
+merges over the plugin's agent.
+
+Prerequisites: `uv`, ast-grep (`ast-grep` or `sg`), `bash` 4.3+ and `jq`.
+
+### What ships
+
+- Subagents: `omca-explore`, `omca-oracle`, `omca-librarian`, `omca-multimodal-looker`,
+  `omca-metis`, `omca-momus`, `omca-hephaestus`, `omca-executor`.
+- Skills: `omca-debugging`, `omca-remove-ai-slops`, `omca-refactor`, `omca-git-master`,
+  `omca-handoff`. All are slash-invocable. `/omca-handoff` is user-only and is never
+  advertised to the model.
+- Commands: `/omca-metis`, `/omca-momus`, `/omca-hephaestus`. Each asks the primary agent
+  to launch that subagent.
+- MCP: the `omca` server with the evidence, notepad, AST and `file_read` tools, exposed as
+  `omca_<tool>` (for example `omca_evidence_log`). It is registered only when `uv` and
+  ast-grep are on PATH, and its first launch runs `uv sync`.
+- Guardrails: `permission-filter.sh`, `git-destructive-deny.sh`, `write-guard.sh` and
+  `comment-checker.sh` run on model and user shell commands and on file edits, and block
+  the call on deny. Comment enforcement blocks only with `OMCA_COMMENT_GATE=deny` set.
+- Output style: OMCA's working discipline is injected into primary agents only (for
+  example `build` and `plan`).
+
+Every id carries the `omca-` prefix, so OpenCode's built-ins (`build`, `plan`, `general`,
+`explore`) are untouched.
+
+Not included: the sisyphus orchestrator, the prometheus planner, `plan` and `start-work`
+with boulder plan tracking, the Stop gates (plan continuation, final verification, drift
+guard), and the statusline.
+
+### Files it creates
+
+- `.omca/` at the workspace root, for evidence, notepads and other MCP state.
+- `servers/.venv` inside the installed package, created by the first `uv sync`.
+
+### Maintainer note
+
+OpenCode prompts are generated into the committed `opencode/generated/omca.json`. After
+editing `agents/`, `skills/` or `output-styles/`, run `bun run generate`, or CI's freshness
+test fails. The script is not named `build` because npm runs a `build` script as a
+preparation step when a git dependency is installed, which fails under OpenCode.
+
 ## Documentation
 
 - `OMCA.md` — Complete guide: agents, skills, workflows, MCP tools, runtime state, troubleshooting
