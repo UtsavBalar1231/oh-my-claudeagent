@@ -5,6 +5,9 @@ servers/__pycache__/
 .ruff_cache/
 .mypy_cache/
 
+# JavaScript
+node_modules/
+
 # oh-my-claudeagent runtime state
 .omc/
 .omca/
