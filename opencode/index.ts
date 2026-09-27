@@ -12,6 +12,8 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)))
 const TIERS = ["opus", "fable"]
 const HIDDEN_TOOLS = ["omca_session_search", "omca_agents_list", "omca_categories_list", "omca_validate_plan_write", "omca_boulder_write"]
 const EDIT_TOOLS = ["write", "edit", "patch"]
+const GUARDS_INACTIVE =
+  "OMCA guardrails are inactive on this host (the guard scripts could not run). Ask the user for explicit confirmation before any destructive git or rm command."
 
 let prompts: Prompts | undefined
 
@@ -39,8 +41,7 @@ function enforce(result: GuardResult) {
 function validModels(raw: unknown): Record<string, ModelRef> {
   const out: Record<string, ModelRef> = {}
   if (raw === undefined) return out
-  const proto = raw && typeof raw === "object" ? Object.getPrototypeOf(raw) : undefined
-  if (proto !== Object.prototype && proto !== null) {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
     console.error(`omca: ignoring models. Expected an object with opus and/or fable keys, got ${JSON.stringify(raw)}`)
     return out
   }
@@ -83,12 +84,18 @@ async function setup(ctx: Context) {
   const projectRoot = ctx.location.directory
   const data = loadPrompts()
 
-  guardSelfTest(root).then(
+  const guardsInactive = guardSelfTest(root).then(
     (failed) => {
       if (failed.length) console.error(`omca: guard self-test failed for ${failed.join(", ")}; the guards need bash 4.3+ and jq`)
+      return failed.length > 0
     },
-    (err) => console.error(`omca: guard self-test failed; the guards need bash 4.3+ and jq: ${err}`),
+    (err) => {
+      console.error(`omca: guard self-test failed; the guards need bash 4.3+ and jq: ${err}`)
+      return true
+    },
   )
+  const omcaAgents = new Set(data.agents.map((a) => a.id))
+  const getsOutputStyle = new Map<string, boolean>()
 
   // Transform callbacks only assign precomputed values: one throwing transform disables the whole plugin.
   await register("agents", async () => {
@@ -129,7 +136,7 @@ async function setup(ctx: Context) {
       name,
       description,
       execute: async ({ sessionID, prompt, delivery }: CommandInvocation) => {
-        await ctx.session.prompt({ ...prompt, sessionID, delivery, text: template.replaceAll("$ARGUMENTS", prompt.text) })
+        await ctx.session.prompt({ ...prompt, sessionID, delivery, text: template.replaceAll("$ARGUMENTS", () => prompt.text) })
       },
     }))
     await ctx.command.transform((editor) => {
@@ -157,9 +164,16 @@ async function setup(ctx: Context) {
       "context",
       guarded("context", async (event) => {
         for (const tool of HIDDEN_TOOLS) delete event.tools[tool]
-        if (!event.agent) return
-        const agent: Awaited<ReturnType<Context["agent"]["get"]>> = await ctx.agent.get({ agentID: event.agent })
-        if (agent.data.mode === "primary" || agent.data.mode === "all") event.system.push({ type: "text", text: data.outputStyle })
+        if (!event.agent || omcaAgents.has(event.agent)) return
+        let primary = getsOutputStyle.get(event.agent)
+        if (primary === undefined) {
+          const agent: Awaited<ReturnType<Context["agent"]["get"]>> = await ctx.agent.get({ agentID: event.agent })
+          primary = agent.data.mode === "primary" || agent.data.mode === "all"
+          getsOutputStyle.set(event.agent, primary)
+        }
+        if (!primary) return
+        if (data.outputStyle) event.system.push({ type: "text", text: data.outputStyle })
+        if (await guardsInactive) event.system.push({ type: "text", text: GUARDS_INACTIVE })
       }),
     ),
   )

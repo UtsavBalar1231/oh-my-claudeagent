@@ -1,6 +1,6 @@
 import type { Plugin } from "@opencode/plugin"
 import { afterEach, beforeEach, expect, spyOn, test } from "bun:test"
-import { mkdtempSync, rmSync } from "node:fs"
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { isAbsolute, join } from "node:path"
 import plugin from "./index.ts"
@@ -32,6 +32,7 @@ function fakeContext(options: Rec = {}, agentThrows = false) {
   const mcp = new Map<string, unknown>()
   const hooks: Record<string, Hook> = {}
   const prompts: Rec[] = []
+  const gets: string[] = []
   const hookOn = (domain: string) => async (name: string, callback: Hook) => {
     hooks[`${domain}.${name}`] = callback
     return registration
@@ -58,7 +59,10 @@ function fakeContext(options: Rec = {}, agentThrows = false) {
         })
         return registration
       },
-      get: async ({ agentID }: { agentID: string }) => ({ location: { directory }, data: agents.get(agentID) ?? newAgent(agentID) }),
+      get: async ({ agentID }: { agentID: string }) => {
+        gets.push(agentID)
+        return { location: { directory }, data: agents.get(agentID) ?? newAgent(agentID) }
+      },
     },
     skill: {
       transform: async (callback: (editor: { add(skill: Rec): void }) => void) => {
@@ -87,8 +91,16 @@ function fakeContext(options: Rec = {}, agentThrows = false) {
     shell: { hook: hookOn("shell") },
     tool: { hook: hookOn("tool") },
   }
-  return { ctx: ctx as unknown as Plugin.Context, agents, skills, commands, mcp, hooks, prompts }
+  return { ctx: ctx as unknown as Plugin.Context, agents, skills, commands, mcp, hooks, prompts, gets }
 }
+
+async function fireContext(fake: ReturnType<typeof fakeContext>, agent: string) {
+  const event = { agent, tools: { omca_session_search: {}, omca_evidence_log: {} }, system: [] as Rec[] }
+  await fake.hooks["session.context"]!(event)
+  return event
+}
+
+const inactiveLine = (system: Rec[]) => system.some((s) => String(s.text).startsWith("OMCA guardrails are inactive on this host"))
 
 const modelErrors = () =>
   errorSpy.mock.calls.filter((args: unknown[]) => String(args[0]).startsWith("omca: ignoring models."))
@@ -135,11 +147,7 @@ test("a command prompts the session with its template and arguments", async () =
 test("the context hook pushes the output style only for a primary agent and hides tools for all", async () => {
   const fake = fakeContext()
   await plugin.setup(fake.ctx)
-  const fire = async (agent: string) => {
-    const event = { agent, tools: { omca_session_search: {}, omca_evidence_log: {} }, system: [] as Rec[] }
-    await fake.hooks["session.context"]!(event)
-    return event
-  }
+  const fire = (agent: string) => fireContext(fake, agent)
   const primary = await fire("build")
   expect(primary.system).toHaveLength(1)
   expect(primary.system[0]).toMatchObject({ type: "text" })
@@ -148,6 +156,42 @@ test("the context hook pushes the output style only for a primary agent and hide
   const sub = await fire("omca-explore")
   expect(sub.system).toHaveLength(0)
   expect(sub.tools).not.toHaveProperty("omca_session_search")
+})
+
+test("the context hook looks up an agent's mode once and never for omca subagents", async () => {
+  const fake = fakeContext()
+  await plugin.setup(fake.ctx)
+  await fireContext(fake, "build")
+  await fireContext(fake, "build")
+  await fireContext(fake, "omca-explore")
+  expect(fake.gets).toEqual(["build"])
+})
+
+test("a primary agent is told when the guard self-test fails", async () => {
+  const shim = mkdtempSync(join(tmpdir(), "omca-shim-"))
+  dirs.push(shim)
+  writeFileSync(join(shim, "jq"), "#!/bin/sh\nexit 127\n")
+  chmodSync(join(shim, "jq"), 0o755)
+  const savedPath = process.env.PATH
+  process.env.PATH = `${shim}:${savedPath}`
+  try {
+    const fake = fakeContext()
+    await plugin.setup(fake.ctx)
+    expect(inactiveLine((await fireContext(fake, "build")).system)).toBe(true)
+  } finally {
+    process.env.PATH = savedPath
+  }
+  const fake = fakeContext()
+  await plugin.setup(fake.ctx)
+  expect(inactiveLine((await fireContext(fake, "build")).system)).toBe(false)
+})
+
+test("command arguments are substituted literally", async () => {
+  const fake = fakeContext()
+  await plugin.setup(fake.ctx)
+  const momus = fake.commands.find((c) => c.name === "omca-momus")!
+  await momus.execute({ sessionID: "ses_1", prompt: { text: "p.md $& $$" }, delivery: "queue" })
+  expect(String(fake.prompts[0]!.text)).toContain("p.md $& $$")
 })
 
 test("the tool hook denies a destructive git command and allows git status", async () => {
