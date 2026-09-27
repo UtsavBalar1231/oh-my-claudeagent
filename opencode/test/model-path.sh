@@ -26,7 +26,8 @@ fail() {
 
 free_port() { python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])'; }
 
-export XDG_CONFIG_HOME="${tmp}/config" XDG_DATA_HOME="${tmp}/data" OPENCODE_DB=":memory:"
+UV_CACHE_DIR=${UV_CACHE_DIR:-$(uv cache dir)}
+export UV_CACHE_DIR XDG_CONFIG_HOME="${tmp}/config" XDG_DATA_HOME="${tmp}/data" XDG_CACHE_HOME="${tmp}/cache" OPENCODE_DB=":memory:"
 OPENCODE_PASSWORD=$(python3 -c 'import secrets; print(secrets.token_hex(16))')
 export OPENCODE_PASSWORD
 export STUB_LOG="${tmp}/requests.jsonl"
@@ -120,11 +121,16 @@ result=$(tool_results_since "${start}")
 [[ "${result}" == *"omca guard:"* ]] || fail write-evidence "no omca guard denial reached the model"
 pass write-evidence
 
+start=$(wc -l <"${STUB_LOG}")
 run subagent
 sessions=$(api session)
 jq -e '.data[]? | select(.parentID != null)' <<<"${sessions}" >/dev/null || fail subagent "no child session: ${sessions}"
 jq -e --arg h "${explorer}" "select((${systems}) | contains(\$h))" "${STUB_LOG}" >/dev/null ||
   fail subagent "no request carried the omca-explore system"
+[[ "$("${git_c[@]}" rev-parse HEAD)" == "${head_before}" ]] || fail subagent "HEAD moved"
+child_result=$(tail -n +"$((start + 1))" "${STUB_LOG}" |
+  jq -r --arg h "${explorer}" "select(.messages[-1].role == \"tool\" and ((${systems}) | contains(\$h))) | .messages[-1].content | if type == \"string\" then . else ([.[]?.text] | join(\"\n\")) end")
+[[ "${child_result}" == *"omca guard:"* ]] || fail subagent "no omca guard denial reached the omca-explore child"
 pass subagent
 
 jq -e --arg h "${explorer}" --arg e "${evidence}" "select(.tools and ((${systems}) | contains(\$h) | not) and ((${systems}) | contains(\$e)))" \

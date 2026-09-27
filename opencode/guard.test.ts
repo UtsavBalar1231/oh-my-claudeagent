@@ -86,6 +86,25 @@ describe("decisions", () => {
     expect(errorSpy).toHaveBeenCalledTimes(0)
   })
 
+  test("comment-checker denies a restating comment in a source-file patch", async () => {
+    process.env.OMCA_COMMENT_GATE = "deny"
+    const patchText =
+      '*** Begin Patch\n*** Add File: scripts/foo.sh\n+# set the user name\n+user_name="$input_value"\n*** End Patch'
+    const result = await checkEdit(root, "patch", { patchText }, tmp)
+    expect(result.deny).toBe(true)
+    if (result.deny) expect(result.reason).toContain("restates the following code line")
+    expect(errorSpy).toHaveBeenCalledTimes(0)
+  })
+
+  test("write-guard denies a patch that moves a file onto the evidence ledger", async () => {
+    const patchText =
+      "*** Begin Patch\n*** Update File: notes.txt\n*** Move to: .omca/evidence/verification-evidence.json\n@@\n-a\n+b\n*** End Patch"
+    const result = await checkEdit(root, "patch", { patchText }, tmp)
+    expect(result.deny).toBe(true)
+    if (result.deny) expect(result.reason).toContain("evidence_log")
+    expect(errorSpy).toHaveBeenCalledTimes(0)
+  })
+
   test("write-guard denies a patch that adds the evidence ledger", async () => {
     const patchText = "*** Begin Patch\n*** Add File: .omca/evidence/verification-evidence.json\n+{}\n*** End Patch"
     const result = await checkEdit(root, "patch", { patchText }, tmp)
