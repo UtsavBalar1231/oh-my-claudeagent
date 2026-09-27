@@ -6,7 +6,6 @@
     ".": "./opencode/index.ts"
   },
   "scripts": {
-    "generate": "bun opencode/build.ts",
     "typecheck": "tsc --noEmit -p opencode",
     "test": "bun test opencode/"
   },

@@ -19,12 +19,7 @@ function hits(text: string, pattern: string | RegExp): string[] {
   return text.split("\n").filter((line) => (typeof pattern === "string" ? line.includes(pattern) : pattern.test(line)));
 }
 
-describe("generated omca.json", () => {
-  test("is fresh", () => {
-    const committed = JSON.parse(readFileSync(join(import.meta.dir, "generated/omca.json"), "utf8"));
-    expect(data, "generated/omca.json is stale: run bun run generate").toEqual(committed);
-  });
-
+describe("generated prompts", () => {
   test("has no forbidden tokens", () => {
     const found = texts.flatMap(([where, text]) => FORBIDDEN.flatMap((p) => hits(text, p).map((line) => `${where} [${p}]: ${line}`)));
     expect(found).toEqual([]);

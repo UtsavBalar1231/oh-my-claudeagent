@@ -2,9 +2,8 @@ import type { Agent, Mcp, Plugin, Skill } from "@opencode/plugin"
 import type { CommandInvocation } from "@opencode/plugin/promise/command"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
-import data from "./generated/omca.json" with { type: "json" }
 import { checkEdit, checkShell, guardSelfTest, type GuardResult } from "./guard.ts"
-import { parseModelRef } from "./lib.ts"
+import { generate, parseModelRef, type Prompts } from "./lib.ts"
 
 type Context = Plugin.Context
 type ModelRef = NonNullable<Agent.Info["model"]>
@@ -13,6 +12,19 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)))
 const TIERS = ["opus", "fable"]
 const HIDDEN_TOOLS = ["omca_session_search", "omca_agents_list", "omca_categories_list", "omca_validate_plan_write", "omca_boulder_write"]
 const EDIT_TOOLS = ["write", "edit", "patch"]
+
+let prompts: Prompts | undefined
+
+function loadPrompts(): Prompts {
+  if (prompts) return prompts
+  try {
+    prompts = generate(root)
+  } catch (err) {
+    console.error(`omca: prompt translation failed: ${err}`)
+    prompts = { agents: [], skills: [], commands: [], outputStyle: "" }
+  }
+  return prompts
+}
 
 class GuardDeny extends Error {
   constructor(reason: string) {
@@ -69,6 +81,7 @@ function guarded<T>(name: string, fn: (event: T) => Promise<void>) {
 
 async function setup(ctx: Context) {
   const projectRoot = ctx.location.directory
+  const data = loadPrompts()
 
   guardSelfTest(root).then(
     (failed) => {

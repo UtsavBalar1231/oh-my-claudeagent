@@ -200,18 +200,15 @@ function str(data: Frontmatter, key: string, file: string): string {
   return value;
 }
 
-function sortKeys(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(sortKeys);
-  if (value && typeof value === "object") {
-    return Object.fromEntries(Object.keys(value).sort().map((k) => [k, sortKeys((value as Record<string, unknown>)[k])]));
-  }
-  return value;
-}
+export type PromptAgent = { id: string; tier: string; description: string; system: string; steps?: number; color?: string; deny: string[] };
+export type PromptSkill = { id: string; name: string; description: string; relPath: string; content: string; autoinvoke?: boolean };
+export type PromptCommand = { name: string; description: string; template: string };
+export type Prompts = { agents: PromptAgent[]; skills: PromptSkill[]; commands: PromptCommand[]; outputStyle: string };
 
-export function generate(root: string) {
-  const agents: object[] = [];
-  const skills: object[] = [];
-  const commands: object[] = [];
+export function generate(root: string): Prompts {
+  const agents: PromptAgent[] = [];
+  const skills: PromptSkill[] = [];
+  const commands: PromptCommand[] = [];
   let outputStyle = "";
   for (const src of listSources()) {
     const { data, text } = prepare(root, src);
@@ -248,12 +245,7 @@ export function generate(root: string) {
       outputStyle = body(text);
     }
   }
-  return sortKeys({ agents, skills, commands, outputStyle }) as {
-    agents: Record<string, unknown>[];
-    skills: Record<string, unknown>[];
-    commands: Record<string, unknown>[];
-    outputStyle: string;
-  };
+  return { agents, skills, commands, outputStyle };
 }
 
 export function parseModelRef(ref: unknown): { providerID: string; id: string; variant?: string } | undefined {
