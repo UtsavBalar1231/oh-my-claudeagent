@@ -188,7 +188,8 @@ guard), and the statusline.
 
 - `.omca/` at the workspace root: guard state and logs from the first guarded command, and
   evidence and notepads from the MCP tools.
-- `servers/.venv` inside the installed package, created by the first `uv sync`.
+- A Python virtual environment (`.venv`) in the installed package's `servers` directory,
+  created by the first `uv sync`.
 
 ### Maintainer note
 
