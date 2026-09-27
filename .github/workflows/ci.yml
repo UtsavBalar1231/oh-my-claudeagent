@@ -299,7 +299,7 @@ jobs:
             echo "The OpenCode adapter typechecks, passes its unit tests, and loads in a real OpenCode 2.0.18 install, via the commands in \`just test-opencode\`."
             echo ""
             echo "### If this fails"
-            echo "The adapter build, its generated config, or its runtime wiring drifted from what OpenCode expects. Run \`just test-opencode\` locally with bun and opencode on PATH to see the exact failure."
+            echo "The adapter's prompt translation or its runtime wiring drifted from what OpenCode expects. Run \`just test-opencode\` locally with bun and opencode on PATH to see the exact failure."
           } >> "$GITHUB_STEP_SUMMARY"
 
   validate-manifest:

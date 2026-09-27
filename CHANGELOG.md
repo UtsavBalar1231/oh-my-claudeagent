@@ -10,8 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - OpenCode V2 adapter in `opencode/`. It registers the `omca-` specialist subagents,
-  skills, commands, the `omca` MCP server and the shell and edit guardrails in OpenCode
-  2.0.18 or later. Install it as a git spec,
+  skills, commands, the `omca` MCP server and the shell and edit guardrails in OpenCode,
+  tested against 2.0.18. Install it as a git spec,
   `oh-my-claudeagent@git+https://github.com/UtsavBalar1231/oh-my-claudeagent.git`, or from
   a local `opencode/` directory.
 - The adapter's `models` option maps the `opus` and `fable` tiers to OpenCode model ids.
