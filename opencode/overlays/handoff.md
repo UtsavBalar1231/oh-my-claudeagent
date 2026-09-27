@@ -23,6 +23,5 @@ TO CONTINUE IN A NEW SESSION:
 
 ## Invocation
 
-Handoff is a user-driven workflow, so this skill is never advertised to the model: it runs
-only when you type `/omca-handoff`. The model cannot load it on its own, and it is not
-preloaded into subagents.
+Handoff is a user-driven workflow, so this skill is not advertised to the model: it runs
+when you type `/omca-handoff`, and it is not preloaded into subagents.

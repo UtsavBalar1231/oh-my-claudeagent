@@ -13,7 +13,7 @@
 | **Release Info** | `gh api repos/owner/repo/releases/latest` |
 | **Git History** | `git log`, `git blame`, `git show` |
 
-A cloned repo sits outside the project root, so read its files with the omca `file_read` MCP tool: the built-in Read is scoped to the project root for subagents.
+A cloned repo sits outside the project root, so read its files with the omca `file_read` MCP tool: the built-in `read` tool prompts for external-directory approval on a path outside the workspace, and `file_read` avoids that.
 
 ### Temp Directory
 

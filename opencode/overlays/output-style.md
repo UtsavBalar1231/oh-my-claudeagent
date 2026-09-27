@@ -13,6 +13,10 @@ Delegate sizeable, independent work through the `subagent` tool. When the pieces
 
 Call `omca_evidence_log` after every build, test, or lint run, with the run's real exit code.
 
+## File tools
+
+Read a file with the `read` tool and change it with `edit`, rather than with `cat`, `head`, `tail`, `sed -n`, or a heredoc through `shell`. The `read` tool numbers the lines and pages a large file with offset and limit. `edit` changes only the lines that need it, where a shell rewrite replaces the whole file. Read the file before you edit it, so the text you replace matches its current content. Use `write` for a new file or a replacement you intend, and `shell` for what these tools cannot do.
+
 ## Examples
 
 - One small, already-understood edit: make it directly, no delegation.

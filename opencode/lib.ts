@@ -40,6 +40,13 @@ export const PHRASES: [string, string][] = [
   ["in explore prompts", "in omca-explore prompts"],
   ["`${CLAUDE_PLUGIN_ROOT}/agents/momus.md`", "the omca-momus agent instructions"],
   [" and the omca-setup guidance", ""],
+  ["## Bash Usage Policy", "## Shell Usage Policy"],
+  [": Read numbers the lines", ": the read tool numbers the lines"],
+  ["the omca `file_read` MCP tool", "`file_read`"],
+  ["those go to hephaestus", "those go to omca-hephaestus"],
+  ["## Boundary with hephaestus", "## Boundary with omca-hephaestus"],
+  ["feature implementation (executor), architecture (oracle), refactoring (executor)", "feature implementation (omca-executor), architecture (omca-oracle), refactoring (omca-executor)"],
+  ["running metis re-analysis", "running omca-metis re-analysis"],
 ];
 
 const DELEGATES = ["explore", "oracle", "librarian", "executor", "hephaestus", "metis", "momus", "multimodal-looker"];
@@ -51,7 +58,6 @@ export const TOKENS: [string, string][] = [
   ["`Agent`", "`subagent`"],
   ["`Bash`", "`shell`"],
   ...["Read", "Edit", "Write", "Grep", "Glob", "WebFetch", "WebSearch"].map((t): [string, string] => [`\`${t}\``, `\`${t.toLowerCase()}\``]),
-  ["CLAUDE.md", "AGENTS.md"],
   ["mcp__plugin_oh-my-claudeagent_omca__", "omca_"],
   ...DELEGATES.map((n): [string, string] => [`\`${n}\``, `\`omca-${n}\``]),
 ];
@@ -62,9 +68,15 @@ export const FORBIDDEN: (string | RegExp)[] = [
   "ToolSearch", "AskUserQuestion", "SendMessage", "subagent_type", "oh-my-claudeagent:", "CLAUDE_PLUGIN_ROOT",
   "TaskCreate", "TaskList", "TodoWrite", "ExitPlanMode", "task-notification", "Agent(", "mcp__plugin_",
   "run_in_background", "CLAUDE.md", "~/.claude", "omca-plan", "omca-start-work", "<!--", /sisyphus/i, /prometheus/i,
+  /\bBash\b/, /\b(Read|Edit|Write|Grep|Glob|WebFetch|WebSearch) tool\b/,
 ];
 
-export const BARE_TARGET = /(\b(spawn(ing)?|consult(ing)?|launch|recommend)\s+(the\s+)?|→\s*|\[\s*)`?(explore|oracle|librarian|executor|hephaestus|metis|momus)\b(?!-)/i;
+const TARGETS = "(explore|oracle|librarian|executor|hephaestus|metis|momus)";
+export const BARE_TARGET = new RegExp(
+  `(\\b(spawn(ing)?|consult(ing)?|launch|recommend)\\s+(the\\s+)?|→\\s*|\\[\\s*)\`?${TARGETS}\\b(?!-)` +
+    `|\\bgo to\\s+${TARGETS}\\b(?!-)|\\bwith\\s+${TARGETS}\\b(?![-\\w]|\\s+[a-z])|\\(${TARGETS}\\)|(?<!-)\\b${TARGETS} re-analysis`,
+  "i",
+);
 
 const COLORS: Record<string, string> = {
   red: "#ef4444", blue: "#3b82f6", green: "#22c55e", yellow: "#eab308",
@@ -97,7 +109,7 @@ function headings(lines: string[]): Heading[] {
   const out: Heading[] = [];
   let fenced = false;
   lines.forEach((line, i) => {
-    if (line.startsWith("```")) fenced = !fenced;
+    if (line.startsWith("```") || line.startsWith("~~~")) fenced = !fenced;
     const m = fenced ? null : /^(#{1,6})\s+(.*?)\s*$/.exec(line);
     if (m) out.push({ line: i, level: m[1]!.length, text: m[2]! });
   });
@@ -173,7 +185,9 @@ export function translate(text: string): string {
   return text
     .replace(/\b(the\s+)?sisyphus\b/gi, (m, _the, at: number, s: string) => `${article(m, at, s)} primary agent`)
     .replace(/\b(the\s+)?prometheus\b/gi, (m, _the, at: number, s: string) => `${article(m, at, s)} planner`)
-    .replace(OMCA_TOOLS, "omca_$1");
+    .replace(OMCA_TOOLS, "omca_$1")
+    .replace(/\b(Read|Edit|Write|Grep|Glob|WebFetch|WebSearch) tool\b/g, (_m, t: string) => `${t.toLowerCase()} tool`)
+    .replace(/\bBash\b/g, "shell");
 }
 
 function body(text: string): string {

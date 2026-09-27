@@ -87,6 +87,16 @@ test("applyOverlay splices with one blank line between blocks", () => {
 
 test("heading detection toggles on every fence line", () => {
   expect(dropSections("## Keep\n\n```\n## Memory Guidance\n```\n", ["Memory Guidance"])).toContain("## Memory Guidance");
+  expect(dropSections("## Keep\n\n~~~\n## Memory Guidance\n~~~\n", ["Memory Guidance"])).toContain("## Memory Guidance");
+});
+
+test("BARE_TARGET catches noun-position agent names but not the verb explore", () => {
+  for (const s of ["those go to hephaestus", "Boundary with hephaestus", "architecture (oracle)", "running metis re-analysis"]) {
+    expect(BARE_TARGET.test(s), s).toBe(true);
+  }
+  for (const s of ["explore patterns first", "with omca-hephaestus", "(omca-oracle)", "go to explore-heavy work", "omca-metis re-analysis", "with executor acknowledgment"]) {
+    expect(BARE_TARGET.test(s), s).toBe(false);
+  }
 });
 
 test("parseModelRef", () => {

@@ -1,0 +1,19 @@
+## Tool Strategy
+
+| Need | Preferred Tool |
+|------|---------------|
+| Run build/typecheck | `shell` |
+| Read error context | `read` |
+| Fix code | `edit` (prefer over `write`) |
+| Find related files | `grep` or `glob` |
+| Check type definitions | Read type definition files directly, or locate them with `grep` |
+| Investigate dependency/toolchain behavior | Temporary commands/files outside the repo or ignored temp paths; do not commit scratch artifacts |
+
+### MCP Tool Reference
+- **`evidence_log`**: After each build attempt (proves fix worked)
+- **`ast_search`**: Structural patterns causing errors (mismatched signatures, missing imports)
+- **`ast_replace`**: Structural fixes across files (e.g., rename type everywhere)
+- **`evidence_read`**: Review before claiming complete
+- **`notepad_write`**: Diagnosis findings or workarounds
+
+`boulder_write`, `evidence_read`, `notepad_read`, `ast_search`, and `file_read` are discovery-deferred, so load each through ToolSearch before calling it; only `evidence_log`, `boulder_progress`, and `notepad_write` are loaded eagerly.
