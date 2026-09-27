@@ -1,3 +1,6 @@
+<!-- Overlay for agents/executor.md. Each section below replaces the section with the same heading in that file;
+     every section not listed here is taken from the source unchanged. -->
+
 ### Cleanup Pass (every task, both paths)
 
 This is not optional and not triggered by a phrase. Every executor task ends here. Pick the

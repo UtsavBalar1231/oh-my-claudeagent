@@ -1,3 +1,6 @@
+<!-- Overlay for output-styles/omca-default.md. Each section below replaces the section with the same heading in that file;
+     every section not listed here is taken from the source unchanged. -->
+
 ## Fan-out
 
 Delegate sizeable, independent work through the `subagent` tool. When the pieces are independent, send the `subagent` calls in one turn rather than one per turn.

@@ -1,3 +1,6 @@
+<!-- Overlay for skills/refactor/SKILL.md. Each section below replaces the section with the same heading in that file;
+     every section not listed here is taken from the source unchanged. -->
+
 ## PHASE 4: PLAN GENERATION
 
 Write the step list yourself from the codemap, as a plan file of numbered `- [ ] N.` tasks:

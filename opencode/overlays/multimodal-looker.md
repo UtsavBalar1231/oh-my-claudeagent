@@ -1,3 +1,6 @@
+<!-- Overlay for agents/multimodal-looker.md. Each section below replaces the section with the same heading in that file;
+     every section not listed here is taken from the source unchanged. -->
+
 ## How It Works
 
 1. Receive file path + extraction goal

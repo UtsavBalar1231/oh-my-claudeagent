@@ -1,3 +1,6 @@
+<!-- Overlay for agents/momus.md. Each section below replaces the section with the same heading in that file;
+     every section not listed here is taken from the source unchanged. -->
+
 ## Invocation
 
 **Preferred**: run the `/omca-momus` command with the plan FILE PATH:

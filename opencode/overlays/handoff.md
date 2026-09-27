@@ -1,3 +1,6 @@
+<!-- Overlay for skills/handoff/SKILL.md. Each section below replaces the section with the same heading in that file;
+     every section not listed here is taken from the source unchanged. -->
+
 ## PHASE 1: GATHER CONTEXT
 
 Run in parallel:

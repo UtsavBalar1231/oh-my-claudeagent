@@ -1,3 +1,6 @@
+<!-- Overlay for skills/git-master/SKILL.md. Each section below replaces the section with the same heading in that file;
+     every section not listed here is taken from the source unchanged. -->
+
 ## Tool Restrictions
 
 All changes via git in `shell`. No `edit`/`write` (direct file modification) or `subagent` (delegation).
