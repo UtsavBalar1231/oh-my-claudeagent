@@ -72,14 +72,15 @@ Markdown files in `agents/*.md` with YAML frontmatter (name, model, disallowedTo
 **The sonnet tier is back for the routine workers.** It was retired in v2.14.1, when the Sonnet
 on offer was Sonnet 5. Sonnet 5.5 (client v2.1.284 or later) changed that trade: the three
 workers that run most often, and whose scope the orchestrator's prompt fixes, run on it at
-`medium`, and every agent whose output turns on judgment stays on `opus`. On an older client the
+`high`, one step above its `medium` default, and every agent whose output turns on judgment stays on `opus`. On an older client the
 `sonnet` alias resolves to Sonnet 5.
 
 Every agent declares its effort in frontmatter:
 
 | Effort | Agents | Why that level |
 |--------|--------|----------------|
-| medium | explore, executor, librarian, hephaestus, multimodal-looker | `medium` is the default on Sonnet 5.5 and Opus 5.5, and the docs describe it as fitting day-to-day engineering work with a clear scope (`claude-code-docs/docs/model-config.md`, "Choose an effort level"). These five run most often, so per-call spend matters more here than reasoning depth |
+| medium | hephaestus, multimodal-looker | `medium` is the default on Opus 5.5, and the docs describe it as fitting day-to-day engineering work with a clear scope (`claude-code-docs/docs/model-config.md`, "Choose an effort level"). Opus at its default already carries the judgment these roles need |
+| high | explore, executor, librarian | On Sonnet 5.5, one step above its `medium` default: the docs reserve `high` for work where verification matters or edge cases are likely, such as fixing a bug in an existing codebase (same section). The cheaper tier buys the deeper level, so these workers verify more before they report |
 | high | sisyphus, prometheus, metis, momus | The intelligence-sensitive default, for orchestration, interviewing, gap analysis, and plan review. Opus 5.5 at a given level thinks more per turn than Opus 5 did, and Anthropic's guidance reserves `xhigh` for measured gains. As the main-thread agent, sisyphus runs at the session's effort instead |
 | xhigh | oracle | Deeper reasoning, for the one role that is only asked when something is already stuck. Fable 5.1 guidance calls `max` prone to overthinking and starts at `high` |
 
@@ -670,8 +671,8 @@ steps max, effort estimates (Quick/Short/Medium/Large).
 
 | Agent | Model | Effort | Invoke | Purpose |
 |-------|-------|--------|--------|---------|
-| explore | sonnet | medium | `Agent(subagent_type="oh-my-claudeagent:explore")` | Codebase search — files, patterns, implementations |
-| librarian | sonnet | medium | `Agent(subagent_type="oh-my-claudeagent:librarian")` | External docs, OSS examples, library research |
+| explore | sonnet | high | `Agent(subagent_type="oh-my-claudeagent:explore")` | Codebase search — files, patterns, implementations |
+| librarian | sonnet | high | `Agent(subagent_type="oh-my-claudeagent:librarian")` | External docs, OSS examples, library research |
 
 **explore** searches with ast_search and rg (Grep and Glob where the session has them). Spawn one per independent area of a wide investigation.
 
@@ -704,7 +705,7 @@ Socratic research interview is now part of `prometheus` (Socratic Interview Mode
 
 | Agent | Model | Effort | Invoke | Purpose |
 |-------|-------|--------|--------|---------|
-| executor | sonnet | medium | `Agent(subagent_type="oh-my-claudeagent:executor")` | Focused task executor — implements directly, never delegates implementation |
+| executor | sonnet | high | `Agent(subagent_type="oh-my-claudeagent:executor")` | Focused task executor — implements directly, never delegates implementation |
 | hephaestus | opus | medium | `/oh-my-claudeagent:hephaestus` or "fix build" | Build and toolchain fixer — minimal-diff policy |
 | multimodal-looker | opus | medium | `Agent(subagent_type="oh-my-claudeagent:multimodal-looker")` | Image, PDF, diagram analysis (read-only) |
 
@@ -1452,7 +1453,7 @@ Features introduced in this window that OMCA consciously declines to adopt:
 | Feature | Notes |
 |---------|-------|
 | `[1m]` auto-strip alignment | v2.1.173 dropped the `[1m]` context-window suffix from model identifiers platform-side; OMCA's agent docs and tables use bare model identifiers throughout |
-| Per-agent `effort:` tuning | Orchestrator and planners at xhigh, oracle at max; executor, hephaestus, librarian, and multimodal-looker at medium, explore at low. Retuned for Opus 5.5 and Fable 5.1: planners at high, oracle at xhigh. Sonnet 5.5 later put explore, executor, and librarian on `sonnet` at medium |
+| Per-agent `effort:` tuning | Orchestrator and planners at xhigh, oracle at max; executor, hephaestus, librarian, and multimodal-looker at medium, explore at low. Retuned for Opus 5.5 and Fable 5.1: planners at high, oracle at xhigh. Sonnet 5.5 later put explore, executor, and librarian on `sonnet` at high |
 | `sessionTitle` from boulder.json | Already adopted (v2.1.152, `session-init.sh`); re-verified against v2.1.197 and now guarded against an absent boulder file |
 | Model generation move | Agent roster: oracle on `fable`, orchestrators/planners on `opus`, workers on `sonnet`; haiku retired |
 

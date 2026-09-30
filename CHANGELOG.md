@@ -32,10 +32,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **`explore`, `executor` and `librarian` run on `sonnet` at `medium`.** The Sonnet tier
+- **`explore`, `executor` and `librarian` run on `sonnet` at `high`.** The Sonnet tier
   retired in 2.14.1 returns for the three routine workers now that `sonnet` resolves to
-  Sonnet 5.5 (client 2.1.284 or later), whose default `medium` the docs describe as fitting
-  day-to-day engineering work with a clear scope. `explore` moves up from `low`. Every agent
+  Sonnet 5.5 (client 2.1.284 or later). They run one step above its `medium` default, the
+  level the docs reserve for work where verification matters or edge cases are likely, so
+  the cheaper tier buys deeper checking. `explore` moves up from `low`, `executor` and
+  `librarian` from `medium`. Every agent
   whose output turns on judgment stays on `opus`: sisyphus, the planners, hephaestus and
   multimodal-looker. Sisyphus can still pass `model="opus"` for one delegated task that needs
   more judgment than its agent's tier. `servers/categories.json` routes `quick`, `standard`

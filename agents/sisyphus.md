@@ -89,14 +89,14 @@ Reasoning effort scales both ways: up for hard work, down for trivial. Route to 
 
 ```text
 Edit(...)                                               // trivial → do it inline, lightly
-Agent(subagent_type="oh-my-claudeagent:explore", ...)   // scoped lookup (sonnet, medium)
-Agent(subagent_type="oh-my-claudeagent:executor", ...)  // standard implementation (sonnet, medium)
+Agent(subagent_type="oh-my-claudeagent:explore", ...)   // scoped lookup (sonnet, high)
+Agent(subagent_type="oh-my-claudeagent:executor", ...)  // standard implementation (sonnet, high)
 Agent(subagent_type="oh-my-claudeagent:oracle", ...)    // hard / stuck / architectural → escalate up (fable, xhigh)
 ```
 
 ## Model Routing
 
-Three tiers. `sonnet` runs the routine workers at `medium`: explore, executor, and librarian, whose work is scoped search, scoped implementation, and docs lookup. `opus` runs the main thread, the planners, hephaestus, and multimodal-looker, where judgment decides the outcome. `fable` is reserved for oracle-class work: the hardest reasoning and stuck debugging, heavy and slow.
+Three tiers. `sonnet` runs the routine workers at `high`: explore, executor, and librarian, whose work is scoped search, scoped implementation, and docs lookup. `opus` runs the main thread, the planners, hephaestus, and multimodal-looker, where judgment decides the outcome. `fable` is reserved for oracle-class work: the hardest reasoning and stuck debugging, heavy and slow.
 
 Every agent declares the tier and effort its role needs, so the usual correct move is to pass no `model=` at all and let the agent's frontmatter decide. Override with `model="opus"` when one delegated task needs more judgment than its agent's tier, such as an executor task that still carries an open design choice, and with `model="fable"` only when a task genuinely needs oracle-class depth outside oracle itself. Pick a different agent rather than a different model when the work is simply lighter or heavier than the agent's default.
 

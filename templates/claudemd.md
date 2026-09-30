@@ -18,7 +18,7 @@ Slash commands always available. Keyword triggers activate only when `enableKeyw
 
 ## Agent catalog
 
-Three tiers. `sonnet` runs the routine workers (explore, executor, librarian) at `medium`, `opus` runs the planners and the agents whose work turns on judgment, and `fable` runs oracle. An alias follows the main conversation's model when the session runs one from the same family, and otherwise resolves to that family's current model. Each agent declares the tier and effort its role needs; as the main-thread agent, sisyphus runs at the session's effort instead.
+Three tiers. `sonnet` runs the routine workers (explore, executor, librarian) at `high`, `opus` runs the planners and the agents whose work turns on judgment, and `fable` runs oracle. An alias follows the main conversation's model when the session runs one from the same family, and otherwise resolves to that family's current model. Each agent declares the tier and effort its role needs; as the main-thread agent, sisyphus runs at the session's effort instead.
 
 | Agent             | Model            | Effort  | Use when                                                                 |
 | ----------------- | ---------------- | ------- | ------------------------------------------------------------------------ |
@@ -26,9 +26,9 @@ Three tiers. `sonnet` runs the routine workers (explore, executor, librarian) at
 | prometheus        | opus             | high    | Interviewing the user, Socratic deep-dive, producing structured plans    |
 | metis             | opus             | high    | Pre-execution gap analysis on a draft plan                               |
 | momus             | opus             | high    | Critical review of a draft plan for clarity and risk                     |
-| executor          | sonnet           | medium  | Focused implementation of a known, scoped task                           |
-| explore           | sonnet           | medium  | Finding code and patterns inside the local repo                          |
-| librarian         | sonnet           | medium  | External docs, library usage, OSS examples, research                     |
+| executor          | sonnet           | high    | Focused implementation of a known, scoped task                           |
+| explore           | sonnet           | high    | Finding code and patterns inside the local repo                          |
+| librarian         | sonnet           | high    | External docs, library usage, OSS examples, research                     |
 | oracle            | fable            | xhigh   | Architecture, tradeoffs, stuck debugging, craft review                   |
 | hephaestus        | opus             | medium  | Build failures, type errors, toolchain/dep fixes                         |
 | multimodal-looker | opus             | medium  | Screenshots, PDFs, diagrams, visual inputs                               |
