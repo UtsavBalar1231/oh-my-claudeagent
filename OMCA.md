@@ -64,9 +64,9 @@ Markdown files in `agents/*.md` with YAML frontmatter (name, model, disallowedTo
 
 | Tier | Default for | Use for |
 |------|-------------|---------|
-| fable | oracle | Hardest reasoning, stuck debugging, long-horizon work; heavy and slow, read-only advisor only |
-| opus | Every other agent: orchestrator, planners, reviewers, executor, searchers, fixer, visual analysis | Everything else the plugin spawns, from a scoped lookup to architecture |
-| sonnet | (override only) | Still a valid `Agent(..., model="sonnet")` override; no agent declares it |
+| fable | oracle, and the advisor when the user runs `/advisor fable` | Hardest reasoning, stuck debugging, long-horizon work; heavy and slow, read-only counsel only |
+| opus | Orchestrator, planners, reviewers, hephaestus, multimodal-looker | Work where judgment decides the outcome: planning, plan review, diagnosing a broken build, reading visual input |
+| sonnet | explore, executor, librarian | Routine scoped work: codebase search, scoped implementation, docs lookup |
 | haiku | (override only, outdated) | Quick lookups, simple transforms; still supported, just off the default roster |
 
 **The sonnet tier is back for the routine workers.** It was retired in v2.14.1, when the Sonnet
@@ -93,11 +93,13 @@ its agent's tier.
 agents, so hephaestus and multimodal-looker, filed under `standard` and `readonly`, still declare
 `opus` in their own frontmatter, which is what the platform reads.
 
-The same collapse reaches `servers/categories.json`. Four of its five categories (`quick`,
-`standard`, `deep`, `readonly`) now name `opus` and only `hardest` names `fable`, so a consumer
-reading `.value.model` sees two distinct outcomes across five categories. What actually separates
-those categories is effort, and the category schema has no field for it, so the file's
-distinctions are narrower than its category names suggest.
+**Advisor.** The platform's advisor tool (`/advisor`, the `advisorModel` setting) is the
+on-call reviewer. OMCA's prompts consult it before a large plan, when an error repeats, and
+before calling a long task done; oracle stays the escalation for a question that needs its own
+investigation. It is off until the user turns it on, and each call re-reads the whole transcript
+uncached. Subagents inherit it subject to the pairing check: an Opus 5.5 caller accepts only a
+Fable or Opus 5+ advisor, and a Sonnet 5.5 caller accepts Fable, Opus 4.7 or later, or
+Sonnet 5 or later (`claude-code-docs/docs/advisor.md`, "Choose an advisor model").
 
 Override any agent's model: `Agent(subagent_type="oh-my-claudeagent:explore", model="haiku")`
 
@@ -1616,11 +1618,11 @@ consumer reading `.value.model` sees two outcomes across five category names, an
 no effort field to carry what actually separates them. And per-token cost rises for every
 delegation that used to run on Sonnet, with the lower effort levels as the offset.
 
-Earlier sync tables in this document record the roster as it stood at the time of that sync. The
-tables under Core Concepts and Agent Reference are the live state.
 Reversed for explore, executor, and librarian once Sonnet 5.5 shipped; the live roster is under
 Core Concepts, "Model tiers".
 
+Earlier sync tables in this document record the roster as it stood at the time of that sync. The
+tables under Core Concepts and Agent Reference are the live state.
 
 **Document-only this sync (facts and hazards with no code change):**
 

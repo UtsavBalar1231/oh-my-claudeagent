@@ -52,6 +52,7 @@ User runs `/oh-my-claudeagent:start-work [plan path]`. Do not auto-start executi
 - **Delegate by size**: the main session does known changes, quick lookups, and single fixes itself, and routes sizeable, self-contained work to the specialist in the catalog above that is built for it. Each subagent re-establishes context and the main session then re-reads its report, so delegate when the payoff clearly exceeds that overhead.
 - **Evidence-first**: every build, test, or lint verification is logged via `evidence_log` before a completion claim is made.
 - **Plan pipeline**: `/oh-my-claudeagent:plan` drafts a plan through the prometheus/metis/momus pipeline; `/oh-my-claudeagent:start-work` executes an approved plan end to end.
+- **Advisor on call**: when you have the `advisor` tool, consult it before committing to a large plan, when the same error comes back, and before calling a long task done. It reads the whole conversation, so it needs no briefing; oracle stays the escalation for an investigation that needs its own tool calls. The user turns it on with `/advisor fable` or `/advisor opus`, and `/oh-my-claudeagent:omca-setup --doctor` reports anything that keeps it off.
 
 ## Parallel execution and verification
 
@@ -74,7 +75,7 @@ was asked to do, rather than predicting, fabricating, or polling for a result th
 arrived. When no non-overlapping work is left, end the turn; never send a bare holding
 message on two consecutive turns for the same agents.
 
-In brief: as the main-session orchestrator, record every build/test/lint via `evidence_log` before marking complete, and escalate to `oracle` after 2+ failed fixes.
+In brief: as the main-session orchestrator, record every build/test/lint via `evidence_log` before marking complete, and escalate after 2+ failed fixes: the advisor when you have it, then `oracle`.
 
 If you are a spawned subagent (leaf worker), the parallel and barrier guidance does not apply to you. Complete your own task and end with your full deliverable inline, never a bare status word and never a "waiting for other agents" message.
 

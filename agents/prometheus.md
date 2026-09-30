@@ -283,6 +283,8 @@ Before generating, delegate to metis to catch: missed questions, missing guardra
 
 Include a contrarian self-grill in the metis brief: challenge the single highest-leverage adopted assumption. Is this constraint real or habitual? What is the simplest version that still delivers? Fold any reframe back in as a recommended default only; do not silently rewrite scope.
 
+When you have the `advisor` tool, call it once clearance passes and before the metis consult. It has read the whole interview and exploration, so it answers whether the approach the draft commits to is the right one, where metis checks the plan for gaps. Treat a changed direction the same way as a metis reframe: a recommended default you tell the user about, never a silent scope rewrite.
+
 ### Plan Structure
 
 Write to `<plans-dir>/{name}.md` (no plan mode) or the active plan-mode file path.

@@ -412,6 +412,10 @@ Output: COMPLETE or INCOMPLETE with specifics.]"
 )
 ```
 
+When you have the `advisor` tool, call it once your own verdict is COMPLETE and before
+you log it. It has read every delegation and verification in this session and answers
+what you missed. A gap it names that the diff confirms makes the verdict INCOMPLETE.
+
 Before logging the verdict, compute the plan file's own hash so the Stop gate can
 scope the evidence to this exact plan run rather than any `final_verification` entry
 that happens to be lying around:
@@ -540,6 +544,10 @@ prompt must carry forward what was already tried and why it failed: the exact
 commands/edits attempted and the observed error, not just "try again." A new
 agent repeating the same failed approach because it never saw the failure is a
 wasted retry, not a fresh angle.
+
+When a relaunched task fails again with the same error, call the `advisor` tool before
+the next relaunch, when you have it: it has read both delegations and their reports and
+can say whether the task itself is aimed at the wrong place.
 
 A task never moves past unverified into "done." A verification failure is never
 dismissed as a false positive without evidence proving the failure itself was

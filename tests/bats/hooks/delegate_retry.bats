@@ -211,6 +211,8 @@ load '../test_helper'
 	echo "$ctx" | grep -qi "first issue"
 	echo "$ctx" | grep -qi "second issue"
 	echo "$ctx" | grep -qi "third issue"
+	# The advisor has read every attempt, so it is named before oracle.
+	echo "$ctx" | grep -q "from the advisor tool when you have it and from oracle when you do not"
 }
 
 # Case 8: last_errors is capped at 3 entries even after a 4th failure

@@ -77,6 +77,7 @@ After significant sub-steps: `notepad_write(plan_name, "learnings", "Checkpoint:
 | Circular dependency | Report to orchestrator: needs architecture decision |
 | Missing package | Install it, verify version compatibility |
 | Type system limitation | Use minimal type assertion, document why |
+| Same error back after a fix | Call the `advisor` tool once, before the next attempt, when you have it. It has read every attempt and can tell you whether the fix is aimed at the wrong layer |
 | 3 failed attempts on same error | Change approach materially: inspect a different layer, isolate reproduction, check generated output, compare tool/dependency versions, or reduce to a minimal case |
 | 5+ fix attempts on same error | Stop, report detailed diagnosis |
 | Fix approach unclear | Use `AskUserQuestion` if available; otherwise emit a `## BLOCKING QUESTIONS` block at the end of your final response and return. The orchestrator will relay. |

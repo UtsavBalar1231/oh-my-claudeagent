@@ -14,8 +14,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tested against 2.0.18. Install it as a git spec,
   `oh-my-claudeagent@git+https://github.com/UtsavBalar1231/oh-my-claudeagent.git`, or from
   a local `opencode/` directory.
-- The adapter's `models` option maps the `opus` and `fable` tiers to OpenCode model ids.
-  Without it, every `omca-*` subagent inherits the parent session's model.
+- The adapter's `models` option maps the `opus`, `sonnet` and `fable` tiers to OpenCode
+  model ids. Without it, every `omca-*` subagent inherits the parent session's model.
+- The advisor tool is part of the orchestration policy. When a user turns it on with
+  `/advisor fable` (or `/advisor opus`), sisyphus, the prometheus protocol, start-work,
+  executor, hephaestus and the CLAUDE.md block consult it at three points: before committing
+  to a plan, when the same error comes back, and before calling a long task done. Oracle stays
+  the escalation for a question that needs its own investigation, and the fallback when the
+  advisor is off. The tool-failure circuit breaker names the advisor before oracle.
+- `/oh-my-claudeagent:omca-setup --doctor` reports whether the advisor is on and what keeps it
+  off: `CLAUDE_CODE_DISABLE_ADVISOR_TOOL`, any variable that stops feature-flag fetching
+  (`DISABLE_TELEMETRY`, `DO_NOT_TRACK`, `DISABLE_GROWTHBOOK`,
+  `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`), or a third-party provider. It reads the live
+  environment as well as settings files. Setup still writes no `advisorModel`: a Fable advisor
+  bills to usage credits on some plans, behind a consent only `/model fable` records.
+- `claude-sonnet-5-5` joins the full-id model labels and the catalog's cost tiers.
+
+### Changed
+
+- **`explore`, `executor` and `librarian` run on `sonnet` at `medium`.** The Sonnet tier
+  retired in 2.14.1 returns for the three routine workers now that `sonnet` resolves to
+  Sonnet 5.5 (client 2.1.284 or later), whose default `medium` the docs describe as fitting
+  day-to-day engineering work with a clear scope. `explore` moves up from `low`. Every agent
+  whose output turns on judgment stays on `opus`: sisyphus, the planners, hephaestus and
+  multimodal-looker. Sisyphus can still pass `model="opus"` for one delegated task that needs
+  more judgment than its agent's tier. `servers/categories.json` routes `quick`, `standard`
+  and `readonly` to `sonnet`.
+
+  On a third-party provider this is a downgrade: `sonnet` resolves to Sonnet 4.6 on Claude
+  Platform on AWS and Sonnet 4.5 on Bedrock, Google Cloud and Foundry, where these three
+  agents previously ran the provider's `opus`, and the advisor is unavailable there. Pin
+  `ANTHROPIC_DEFAULT_SONNET_MODEL` to the provider's newest Sonnet id; `--doctor` names the
+  provider when it sees one.
 
 ## [2.20.1] - 2026-09-23
 

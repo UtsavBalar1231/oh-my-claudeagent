@@ -199,6 +199,8 @@ No architectural changes or cross-cutting refactors.
 
 Before escalating for a failure, make three materially different attempts when safe and in scope. Examples: reproduce with a narrower command, inspect the owning code path, add/adjust the minimal test or fixture, fix configuration vs code, or validate dependency/tool versions. Do not repeat the same failing edit with minor variations.
 
+When you have the `advisor` tool, call it when the same error comes back, before the next attempt: it has read every attempt so far and can tell you whether you are digging in the wrong place. Call it once more before you report complete on a task that needed more than one fix attempt. Test its guidance against the code; if a suggested step fails, say so in your report.
+
 Report back with:
 ```
 ESCALATION
