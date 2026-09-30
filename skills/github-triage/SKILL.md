@@ -125,7 +125,7 @@ with `Concurrent subagent limit reached` once the session's running count reache
 `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` (default 20), and it starts succeeding again
 as soon as running agents finish. Batches of 5 stay under that and under the
 tool-call concurrency default of 10, so a batched run never trips it. A session
-running with ultracode effort is exempt from the concurrent limit entirely.
+running with ultracode on is exempt from the concurrent limit entirely.
 
 What actually bounds a run is wall-clock time and the orchestrator's own context:
 every finished agent's result lands inline in this conversation. So the total is a
