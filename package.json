@@ -1,6 +1,6 @@
 {
   "name": "oh-my-claudeagent",
-  "version": "2.20.1",
+  "version": "2.21.0",
   "type": "module",
   "exports": {
     ".": "./opencode/index.ts"
