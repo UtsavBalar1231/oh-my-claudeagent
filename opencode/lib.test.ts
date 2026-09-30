@@ -60,7 +60,8 @@ describe("generated prompts", () => {
     expect(explore.steps).toBe(30);
     expect(explore.deny).toEqual(["edit", "subagent"]);
     expect(explore.color).toBe("#3b82f6");
-    expect(explore.tier).toBe("opus");
+    expect(explore.tier).toBe("sonnet");
+    expect(agent("omca-multimodal-looker").tier).toBe("opus");
     expect(agent("omca-oracle").tier).toBe("fable");
   });
 

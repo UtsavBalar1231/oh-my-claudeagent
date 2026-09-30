@@ -26,6 +26,7 @@ def register(mcp: MCPServer) -> None:
         "claude-opus-5": "expensive",
         "claude-opus-4-8": "expensive",
         "opus": "expensive",
+        "claude-sonnet-5-5": "cheap",
         "claude-sonnet-5": "cheap",
         "sonnet": "cheap",
         "claude-haiku-4-5": "free",

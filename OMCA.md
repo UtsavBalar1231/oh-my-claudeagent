@@ -69,20 +69,29 @@ Markdown files in `agents/*.md` with YAML frontmatter (name, model, disallowedTo
 | sonnet | (override only) | Still a valid `Agent(..., model="sonnet")` override; no agent declares it |
 | haiku | (override only, outdated) | Quick lookups, simple transforms; still supported, just off the default roster |
 
-**The model column no longer tells the agents apart.** With one tier covering everything but
-oracle, `model:` cannot distinguish a searcher from a planner. `effort:` is what does, and every
-agent declares it in frontmatter:
+**The sonnet tier is back for the routine workers.** It was retired in v2.14.1, when the Sonnet
+on offer was Sonnet 5. Sonnet 5.5 (client v2.1.284 or later) changed that trade: the three
+workers that run most often, and whose scope the orchestrator's prompt fixes, run on it at
+`medium`, and every agent whose output turns on judgment stays on `opus`. On an older client the
+`sonnet` alias resolves to Sonnet 5.
+
+Every agent declares its effort in frontmatter:
 
 | Effort | Agents | Why that level |
 |--------|--------|----------------|
-| low | explore | Short, scoped work that is not intelligence-sensitive, which is what the docs reserve `low` for (`claude-code-docs/docs/model-config.md`, "Choose an effort level") |
-| medium | executor, hephaestus, librarian, multimodal-looker | Same source: `medium` reduces token usage for cost-sensitive work that can trade off some intelligence. These four run most often, so per-call spend matters more here than reasoning depth |
+| medium | explore, executor, librarian, hephaestus, multimodal-looker | `medium` is the default on Sonnet 5.5 and Opus 5.5, and the docs describe it as fitting day-to-day engineering work with a clear scope (`claude-code-docs/docs/model-config.md`, "Choose an effort level"). These five run most often, so per-call spend matters more here than reasoning depth |
 | high | sisyphus, prometheus, metis, momus | The intelligence-sensitive default, for orchestration, interviewing, gap analysis, and plan review. Opus 5.5 at a given level thinks more per turn than Opus 5 did, and Anthropic's guidance reserves `xhigh` for measured gains. As the main-thread agent, sisyphus runs at the session's effort instead |
 | xhigh | oracle | Deeper reasoning, for the one role that is only asked when something is already stuck. Fable 5.1 guidance calls `max` prone to overthinking and starts at `high` |
 
-So scaling a delegation up or down means picking the agent whose declared effort fits, or
-overriding effort, not picking a different model. `agents/sisyphus.md`'s Model Routing section
-carries the same rule for call sites: pass no `model=` at all in the usual case.
+So scaling a delegation up or down means picking the agent whose declared tier and effort fit.
+`agents/sisyphus.md`'s Model Routing section carries the same rule for call sites: pass no
+`model=` in the usual case, and `model="opus"` when one delegated task needs more judgment than
+its agent's tier.
+
+`servers/categories.json` follows the same split: `quick`, `standard`, and `readonly` name
+`sonnet`, `deep` names `opus`, and `hardest` names `fable`. The file maps kinds of work, not
+agents, so hephaestus and multimodal-looker, filed under `standard` and `readonly`, still declare
+`opus` in their own frontmatter, which is what the platform reads.
 
 The same collapse reaches `servers/categories.json`. Four of its five categories (`quick`,
 `standard`, `deep`, `readonly`) now name `opus` and only `hardest` names `fable`, so a consumer
@@ -659,8 +668,8 @@ steps max, effort estimates (Quick/Short/Medium/Large).
 
 | Agent | Model | Effort | Invoke | Purpose |
 |-------|-------|--------|--------|---------|
-| explore | opus | low | `Agent(subagent_type="oh-my-claudeagent:explore")` | Codebase search — files, patterns, implementations |
-| librarian | opus | medium | `Agent(subagent_type="oh-my-claudeagent:librarian")` | External docs, OSS examples, library research |
+| explore | sonnet | medium | `Agent(subagent_type="oh-my-claudeagent:explore")` | Codebase search — files, patterns, implementations |
+| librarian | sonnet | medium | `Agent(subagent_type="oh-my-claudeagent:librarian")` | External docs, OSS examples, library research |
 
 **explore** searches with ast_search and rg (Grep and Glob where the session has them). Spawn one per independent area of a wide investigation.
 
@@ -693,7 +702,7 @@ Socratic research interview is now part of `prometheus` (Socratic Interview Mode
 
 | Agent | Model | Effort | Invoke | Purpose |
 |-------|-------|--------|--------|---------|
-| executor | opus | medium | `Agent(subagent_type="oh-my-claudeagent:executor")` | Focused task executor — implements directly, never delegates implementation |
+| executor | sonnet | medium | `Agent(subagent_type="oh-my-claudeagent:executor")` | Focused task executor — implements directly, never delegates implementation |
 | hephaestus | opus | medium | `/oh-my-claudeagent:hephaestus` or "fix build" | Build and toolchain fixer — minimal-diff policy |
 | multimodal-looker | opus | medium | `Agent(subagent_type="oh-my-claudeagent:multimodal-looker")` | Image, PDF, diagram analysis (read-only) |
 
@@ -1441,19 +1450,22 @@ Features introduced in this window that OMCA consciously declines to adopt:
 | Feature | Notes |
 |---------|-------|
 | `[1m]` auto-strip alignment | v2.1.173 dropped the `[1m]` context-window suffix from model identifiers platform-side; OMCA's agent docs and tables use bare model identifiers throughout |
-| Per-agent `effort:` tuning | Orchestrator and planners at xhigh, oracle at max; executor, hephaestus, librarian, and multimodal-looker at medium, explore at low. Retuned for Opus 5.5 and Fable 5.1: planners at high, oracle at xhigh |
+| Per-agent `effort:` tuning | Orchestrator and planners at xhigh, oracle at max; executor, hephaestus, librarian, and multimodal-looker at medium, explore at low. Retuned for Opus 5.5 and Fable 5.1: planners at high, oracle at xhigh. Sonnet 5.5 later put explore, executor, and librarian on `sonnet` at medium |
 | `sessionTitle` from boulder.json | Already adopted (v2.1.152, `session-init.sh`); re-verified against v2.1.197 and now guarded against an absent boulder file |
 | Model generation move | Agent roster: oracle on `fable`, orchestrators/planners on `opus`, workers on `sonnet`; haiku retired |
 
 **Provider-alias caveat:** every OMCA agent declares a tier alias in `model:` frontmatter
-(`opus` or `fable`) rather than a pinned generation ID, so the frontmatter never goes stale. The
+(`sonnet`, `opus`, or `fable`) rather than a pinned generation ID, so the frontmatter never goes stale. The
 generation an alias resolves to depends on the provider (`claude-code-docs/docs/model-config.md`
 provider table): `opus` is Opus 5.5 on the Anthropic API, Claude Platform on AWS, Amazon
-Bedrock, and Google Cloud's Agent Platform, and Opus 4.6 on Microsoft Foundry. A family alias
+Bedrock, and Google Cloud's Agent Platform, and Opus 4.6 on Microsoft Foundry. `sonnet` spreads
+further: Sonnet 5.5 on the Anthropic API, Sonnet 4.6 on Claude Platform on AWS, and Sonnet 4.5
+on Bedrock, Google Cloud, and Foundry, so on a third-party provider the three routine workers run
+generations behind the Anthropic API, where they previously ran the provider's `opus`. Such a user pins
+`ANTHROPIC_DEFAULT_SONNET_MODEL` to the provider's newest Sonnet id. A family alias
 also follows the main conversation's exact model, `[1m]` suffix included, when the main
 conversation runs in that family (`claude-code-docs/docs/sub-agents.md`, "Choose a model"), so a
-user who picks an older Opus runs the whole roster on it. That spread reaches the whole roster
-now that `opus` is the only tier any agent declares, and it is the accepted cost of not having a
+user who picks an older Opus runs every `opus` agent on it. That spread is the accepted cost of not having a
 pinned id go stale on the next release. No `opus` agent declares `xhigh` any more, so the
 Foundry fallback from `xhigh` to `high` on Opus 4.6 no longer lowers any of them. The statusline still shows the true generation per subagent row, because
 `statusline/subagent.py` prefers the payload's resolved `model` field and only falls back to
@@ -1606,6 +1618,9 @@ delegation that used to run on Sonnet, with the lower effort levels as the offse
 
 Earlier sync tables in this document record the roster as it stood at the time of that sync. The
 tables under Core Concepts and Agent Reference are the live state.
+Reversed for explore, executor, and librarian once Sonnet 5.5 shipped; the live roster is under
+Core Concepts, "Model tiers".
+
 
 **Document-only this sync (facts and hazards with no code change):**
 

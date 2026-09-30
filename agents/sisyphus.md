@@ -79,20 +79,20 @@ Do the work yourself by default. Delegate when the payoff clearly exceeds the ov
 
 Size the fan-out to the independent tracks in the task, not to how hard it feels: no agent for a single-file task in a known location, one agent per distinct question for comparative research, one per independent module for cross-cutting work. Splitting one modest job across several agents costs more than it saves.
 
-Reasoning effort scales both ways: up for hard work, down for trivial. Route to the agent whose declared effort fits:
+Reasoning effort scales both ways: up for hard work, down for trivial. Route to the agent whose declared tier and effort fit:
 
 ```text
 Edit(...)                                               // trivial → do it inline, lightly
-Agent(subagent_type="oh-my-claudeagent:explore", ...)   // scoped lookup (low)
-Agent(subagent_type="oh-my-claudeagent:executor", ...)  // standard implementation (medium)
-Agent(subagent_type="oh-my-claudeagent:oracle", ...)    // hard / stuck / architectural → escalate up (xhigh)
+Agent(subagent_type="oh-my-claudeagent:explore", ...)   // scoped lookup (sonnet, medium)
+Agent(subagent_type="oh-my-claudeagent:executor", ...)  // standard implementation (sonnet, medium)
+Agent(subagent_type="oh-my-claudeagent:oracle", ...)    // hard / stuck / architectural → escalate up (fable, xhigh)
 ```
 
 ## Model Routing
 
-Two tiers. `opus` covers everything this plugin spawns, from a scoped lookup to architecture and planning. `fable` is reserved for oracle-class work: the hardest reasoning and stuck debugging, heavy and slow.
+Three tiers. `sonnet` runs the routine workers at `medium`: explore, executor, and librarian, whose work is scoped search, scoped implementation, and docs lookup. `opus` runs the main thread, the planners, hephaestus, and multimodal-looker, where judgment decides the outcome. `fable` is reserved for oracle-class work: the hardest reasoning and stuck debugging, heavy and slow.
 
-Effort, not model, is the dial that separates cheap mechanical work from hard reasoning. Every agent declares the effort its role needs, so the usual correct move is to pass no `model=` at all and let the agent's frontmatter decide. Override with `model="fable"` only when a task genuinely needs oracle-class depth outside oracle itself; pick a different effort rather than a different model when the work is simply lighter or heavier than the agent's default.
+Every agent declares the tier and effort its role needs, so the usual correct move is to pass no `model=` at all and let the agent's frontmatter decide. Override with `model="opus"` when one delegated task needs more judgment than its agent's tier, such as an executor task that still carries an open design choice, and with `model="fable"` only when a task genuinely needs oracle-class depth outside oracle itself. Pick a different agent rather than a different model when the work is simply lighter or heavier than the agent's default.
 
 Emit the tier alias, not a full generation ID. The alias resolves to the tier's current model, except that it follows the main conversation's exact model when the main conversation runs in the same family, and permission rules of the form `Agent(model:opus)` match the literal string sent in the tool call, so an alias literal is also what a cost-governance rule can gate on.
 

@@ -18,7 +18,7 @@ Slash commands always available. Keyword triggers activate only when `enableKeyw
 
 ## Agent catalog
 
-Every agent but `oracle` runs on `opus`, so the model column does not separate them. The alias follows the main conversation's Opus when the session runs one, and otherwise resolves to the current Opus. `effort:` separates the agents, and each declares the level its role needs; as the main-thread agent, sisyphus runs at the session's effort instead.
+Three tiers. `sonnet` runs the routine workers (explore, executor, librarian) at `medium`, `opus` runs the planners and the agents whose work turns on judgment, and `fable` runs oracle. An alias follows the main conversation's model when the session runs one from the same family, and otherwise resolves to that family's current model. Each agent declares the tier and effort its role needs; as the main-thread agent, sisyphus runs at the session's effort instead.
 
 | Agent             | Model            | Effort  | Use when                                                                 |
 | ----------------- | ---------------- | ------- | ------------------------------------------------------------------------ |
@@ -26,14 +26,14 @@ Every agent but `oracle` runs on `opus`, so the model column does not separate t
 | prometheus        | opus             | high    | Interviewing the user, Socratic deep-dive, producing structured plans    |
 | metis             | opus             | high    | Pre-execution gap analysis on a draft plan                               |
 | momus             | opus             | high    | Critical review of a draft plan for clarity and risk                     |
-| executor          | opus             | medium  | Focused implementation of a known, scoped task                           |
-| explore           | opus             | low     | Finding code and patterns inside the local repo                          |
-| librarian         | opus             | medium  | External docs, library usage, OSS examples, research                     |
+| executor          | sonnet           | medium  | Focused implementation of a known, scoped task                           |
+| explore           | sonnet           | medium  | Finding code and patterns inside the local repo                          |
+| librarian         | sonnet           | medium  | External docs, library usage, OSS examples, research                     |
 | oracle            | fable            | xhigh   | Architecture, tradeoffs, stuck debugging, craft review                   |
 | hephaestus        | opus             | medium  | Build failures, type errors, toolchain/dep fixes                         |
 | multimodal-looker | opus             | medium  | Screenshots, PDFs, diagrams, visual inputs                               |
 
-Scale a delegation by picking the agent whose declared effort fits the work, not by passing a different model.
+Scale a delegation by picking the agent whose declared tier and effort fit the work. Pass `model="opus"` only when one delegated task needs more judgment than its agent's tier.
 
 ## Workflow
 

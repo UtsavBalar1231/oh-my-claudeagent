@@ -272,6 +272,9 @@ Agent(
 )
 ```
 
+Executor runs on `sonnet`. A task whose plan text leaves a design choice open goes out
+with `model="opus"` on that one call; a task the plan fully specifies needs no override.
+
 ## Parallel Execution Semantics
 
 ### 2.1 Parallelization

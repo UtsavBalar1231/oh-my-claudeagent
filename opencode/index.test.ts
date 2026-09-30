@@ -105,17 +105,17 @@ const inactiveLine = (system: Rec[]) => system.some((s) => String(s.text).starts
 const modelErrors = () =>
   errorSpy.mock.calls.filter((args: unknown[]) => String(args[0]).startsWith("omca: ignoring models."))
 
-test("a valid opus model ref sets the agent model", async () => {
-  const fake = fakeContext({ models: { opus: "anthropic/claude-opus-5-5" } })
+test("a valid sonnet model ref sets the agent model", async () => {
+  const fake = fakeContext({ models: { sonnet: "anthropic/claude-sonnet-5-5" } })
   await plugin.setup(fake.ctx)
-  expect(fake.agents.get("omca-explore")?.model).toEqual({ providerID: "anthropic", id: "claude-opus-5-5" })
+  expect(fake.agents.get("omca-explore")?.model).toEqual({ providerID: "anthropic", id: "claude-sonnet-5-5" })
   expect(fake.agents.get("omca-explore")?.mode).toBe("subagent")
   expect(fake.agents.get("omca-explore")?.permissions).toContainEqual({ action: "edit", resource: "*", effect: "deny" })
   expect(modelErrors()).toHaveLength(0)
 })
 
 test("an invalid model ref is ignored with exactly one error line", async () => {
-  const fake = fakeContext({ models: { opus: "bad" } })
+  const fake = fakeContext({ models: { sonnet: "bad" } })
   await plugin.setup(fake.ctx)
   expect(fake.agents.get("omca-explore")).toBeDefined()
   expect(fake.agents.get("omca-explore")?.model).toBeUndefined()

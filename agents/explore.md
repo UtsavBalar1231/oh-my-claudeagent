@@ -1,8 +1,8 @@
 ---
 name: explore
 description: Codebase search specialist for finding files, patterns, and implementations. Use when asking "Where is X?", "Which file has Y?", or "Find the code that does Z". Fire multiple in parallel for broad searches.
-model: opus
-effort: low
+model: sonnet
+effort: medium
 omitClaudeMd: true
 color: blue
 memory: project

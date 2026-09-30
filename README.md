@@ -148,7 +148,7 @@ To load a local checkout instead, point at its `opencode/` directory:
 }
 ```
 
-`options.models` maps OMCA's `opus` and `fable` tiers to OpenCode model ids, in
+`options.models` maps OMCA's `opus`, `sonnet` and `fable` tiers to OpenCode model ids, in
 `provider/model` form with an optional `#variant`. Without it, every `omca-*` subagent
 inherits the parent session's model. To override one agent, set `agents.omca-<name>.model`
 in your own config, which merges over the plugin's agent.

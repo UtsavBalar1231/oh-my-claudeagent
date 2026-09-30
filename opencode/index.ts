@@ -9,7 +9,7 @@ type Context = Plugin.Context
 type ModelRef = NonNullable<Agent.Info["model"]>
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)))
-const TIERS = ["opus", "fable"]
+const TIERS = ["opus", "sonnet", "fable"]
 const HIDDEN_TOOLS = ["omca_session_search", "omca_agents_list", "omca_categories_list", "omca_validate_plan_write", "omca_boulder_write"]
 const EDIT_TOOLS = ["write", "edit", "patch"]
 const GUARDS_INACTIVE =
@@ -42,12 +42,12 @@ function validModels(raw: unknown): Record<string, ModelRef> {
   const out: Record<string, ModelRef> = {}
   if (raw === undefined) return out
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
-    console.error(`omca: ignoring models. Expected an object with opus and/or fable keys, got ${JSON.stringify(raw)}`)
+    console.error(`omca: ignoring models. Expected an object with opus, sonnet and/or fable keys, got ${JSON.stringify(raw)}`)
     return out
   }
   for (const [tier, ref] of Object.entries(raw as Record<string, unknown>)) {
     const parsed = parseModelRef(ref)
-    if (!TIERS.includes(tier)) console.error(`omca: ignoring models.${tier}: unknown tier, expected opus or fable`)
+    if (!TIERS.includes(tier)) console.error(`omca: ignoring models.${tier}: unknown tier, expected opus, sonnet or fable`)
     else if (!parsed) console.error(`omca: ignoring models.${tier}: ${JSON.stringify(ref)} is not provider/model[#variant]`)
     else out[tier] = parsed as ModelRef
   }

@@ -100,11 +100,12 @@ ORACLE_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id
 	local ctx
 	ctx=$(get_context)
 	echo "$ctx" | grep -q "DYNAMIC AGENT CATALOG"
-	# oracle is the only agent on a different tier — proves the tier map is read
-	# from frontmatter rather than printed as a constant.
+	# Three agents on three tiers prove the tier map is read from frontmatter
+	# rather than printed as a constant.
 	echo "$ctx" | grep -q -- "- oracle \[premium\]"
+	echo "$ctx" | grep -q -- "- sisyphus \[expensive\]"
 	# Whole first sentence, not a truncated fragment.
-	echo "$ctx" | grep -q -- "- executor \[expensive\] — Focused task executor that works alone without delegation."
+	echo "$ctx" | grep -q -- "- executor \[cheap\] — Focused task executor that works alone without delegation."
 	! echo "$ctx" | grep -q "CATALOG STALE"
 }
 
@@ -345,12 +346,12 @@ ORACLE_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id
 
 # ─── q. Model capture into subagent-models.json ──────────────────────────────
 
-@test "model capture: executor agent_type resolves to Opus" {
+@test "model capture: executor agent_type resolves to Sonnet" {
 	run_hook "subagent-start.sh" "$EXECUTOR_PAYLOAD"
 	assert_success
 	local model
 	model=$(read_state "subagent-models.json" | jq -r '."agent-abc123".model')
-	assert [ "$model" = "Opus" ]
+	assert [ "$model" = "Sonnet" ]
 	local type
 	type=$(read_state "subagent-models.json" | jq -r '."agent-abc123".agent_type')
 	assert [ "$type" = "oh-my-claudeagent:executor" ]
@@ -364,10 +365,6 @@ ORACLE_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id
 	assert [ "$model" = "Opus" ]
 }
 
-# Every agent but oracle declares the same tier, so an executor-vs-sisyphus pair
-# no longer proves the lookup reads frontmatter: a resolver hardcoded to "Opus"
-# would satisfy both. oracle is the only agent on a different tier and is what
-# keeps this suite able to tell a real lookup from a constant.
 @test "model capture: oracle agent_type resolves to Fable" {
 	run_hook "subagent-start.sh" "$ORACLE_PAYLOAD"
 	assert_success
@@ -413,6 +410,24 @@ ORACLE_PAYLOAD='{"session_id":"test","hook_event_name":"SubagentStart","agent_id
 	local model
 	model=$(read_state "subagent-models.json" | jq -r '."agent-pin55".model')
 	assert [ "$model" = "Opus 5.5" ]
+}
+
+@test "model capture: pinned claude-sonnet-5-5 resolves to Sonnet 5.5" {
+	local fake_root="$BATS_TEST_TMPDIR/fake-plugin"
+	mkdir -p "$fake_root/agents"
+	cat > "$fake_root/agents/pinned.md" <<-'EOF'
+		---
+		name: pinned
+		description: pinned-generation fixture
+		model: claude-sonnet-5-5
+		---
+	EOF
+	local payload='{"session_id":"test","hook_event_name":"SubagentStart","agent_id":"agent-pins55","agent_type":"oh-my-claudeagent:pinned"}'
+	run env CLAUDE_PLUGIN_ROOT="$fake_root" bash "$CLAUDE_PLUGIN_ROOT/scripts/subagent-start.sh" <<< "$payload"
+	assert_success
+	local model
+	model=$(read_state "subagent-models.json" | jq -r '."agent-pins55".model')
+	assert [ "$model" = "Sonnet 5.5" ]
 }
 
 @test "model capture: non-OMCA agent_type stores empty model" {

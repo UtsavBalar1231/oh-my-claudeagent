@@ -55,11 +55,11 @@ workspace() {
 }
 
 local_plugin() {
-  jq -cn --arg pkg "${repo}/opencode" --arg opus "$1" '{plugins: [{package: $pkg, options: {models: {opus: $opus}}}]}'
+  jq -cn --arg pkg "${repo}/opencode" --arg sonnet "$1" '{plugins: [{package: $pkg, options: {models: {sonnet: $sonnet}}}]}'
 }
 
 A=${tmp}/a B=${tmp}/b C=${tmp}/c clone=${tmp}/clone log=${tmp}/server.log
-workspace "${A}" "$(local_plugin anthropic/claude-opus-5-5)"
+workspace "${A}" "$(local_plugin anthropic/claude-sonnet-5-5)"
 workspace "${B}" "$(local_plugin bad)"
 mkdir -p "${clone}"
 git -C "${repo}" ls-files -co --exclude-standard -z |
@@ -94,10 +94,10 @@ check "omca-explore fields" \
   "${agents_a}" "${explore} | {mode, steps, permissions}"
 pass "omca-explore is a subagent with steps 30 and edit/subagent denied"
 
-check "model in A" "${explore} | .model.providerID == \"anthropic\" and .model.id == \"claude-opus-5-5\"" "${agents_a}" "${explore} | .model"
+check "model in A" "${explore} | .model.providerID == \"anthropic\" and .model.id == \"claude-sonnet-5-5\"" "${agents_a}" "${explore} | .model"
 poll "agents registered in B" 15 "${eight}" /api/agent "${B}"
 check "no model in B" "${explore} | .model == null" "${out}" "${explore} | .model"
-pass "omca-explore model is anthropic/claude-opus-5-5 in A and unset in B"
+pass "omca-explore model is anthropic/claude-sonnet-5-5 in A and unset in B"
 
 skills=$(api GET /api/skill "${A}")
 check "skills" '[.data[].id | select(startswith("omca-"))] | length == 5' "${skills}" '[.data[].id | select(startswith("omca-"))]'

@@ -38,6 +38,7 @@ if [[ -n "${AGENT_ID}" ]]; then
 	claude-opus-5) DISPLAY_MODEL="Opus 5" ;;
 	claude-opus-5-5) DISPLAY_MODEL="Opus 5.5" ;;
 	claude-opus-4-8) DISPLAY_MODEL="Opus 4.8" ;;
+	claude-sonnet-5-5) DISPLAY_MODEL="Sonnet 5.5" ;;
 	claude-sonnet-5) DISPLAY_MODEL="Sonnet 5" ;;
 	claude-haiku-4-5) DISPLAY_MODEL="Haiku 4.5" ;;
 	"") DISPLAY_MODEL="" ;;
