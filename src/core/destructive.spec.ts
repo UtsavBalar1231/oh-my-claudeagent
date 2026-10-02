@@ -516,3 +516,196 @@ describe("heredoc bodies", () => {
     catastrophic("echo \"<<'EOF'\"\nrm -rf /");
   });
 });
+
+describe("a substitution inside double quotes", () => {
+  test.each([
+    'echo "$(rm -rf ~)"',
+    '"$(rm -rf ~)"',
+    'echo "before $(rm -rf /) after"',
+    'echo "`rm -rf ~`"',
+    'echo "$(echo "$(rm -rf ~)")"',
+    'echo "$(echo ok; rm -rf ~)"',
+    'A="$(rm -rf ~)" true',
+    'echo "$((1 + 2))" && rm -rf ~',
+    'rm -rf "$(echo ~)"',
+    'rm -rf "$(pwd)/$(date)"',
+    'rm -rf "$(dirname "$PWD")"',
+    'rm -rf "`echo ~`"',
+  ])("%s is catastrophic", (command) => catastrophic(command));
+
+  test.each([
+    ['echo "$(git stash)"', "stash"],
+    ['echo "`git reset --hard`"', "reset --hard"],
+    ['git commit -m "$(git clean -fd)"', "clean"],
+  ] as const)("%s is blocking", (command, operation) => git(command, operation));
+
+  test("a removal that is only a mention beside a substitution is not a match", () => {
+    none("echo '$(rm -rf ~)'");
+    none("echo '`rm -rf ~`'");
+    none('echo "\\$(rm -rf ~)"');
+    none('echo "\\`rm -rf ~\\`"');
+    none('echo "\\\\\\$(rm -rf ~)"');
+    none('echo "$(date)" "; rm -rf ~"');
+    none('echo "$(date)" "rm -rf ~"');
+    none('echo "$((1 + 2))" "(rm -rf ~)"');
+    none('echo "$(echo "x")" "; git stash"');
+    none('git commit -m "fix $(date): stop calling rm -rf ~"');
+    none('echo "$(echo "a; rm -rf ~")"');
+  });
+
+  test("a substitution that runs something harmless is not a match", () => {
+    none('echo "$(date)"');
+    none('echo "`date`"');
+    none('git commit -m "release $(git describe --tags)"');
+  });
+
+  test("an escaped backslash does not escape the substitution after it", () => {
+    catastrophic('echo "\\\\$(rm -rf ~)"');
+  });
+
+  test("the neutralized text leaves a substitution as a command and keeps the length", () => {
+    const command = `echo "$(a; b) (c) \`d; e\`" '$(f)'`;
+    expect(neutralizeQuotedPositions(command)).toBe(`echo "$(a; b) _c_ \`d; e\`" '__f_'`);
+    expect(neutralizeQuotedPositions(command)).toHaveLength(command.length);
+    expect(neutralizeQuotedPositions('"\\$(x)"')).toBe('"\\__x_"');
+  });
+});
+
+describe("a relative target", () => {
+  test.each([
+    ["rm -rf ..", "catastrophic"],
+    ["rm -rf ../sub", "catastrophic"],
+    ["rm -rf ../sub/", "catastrophic"],
+    ["rm -rf ../../proj", "catastrophic"],
+    ["rm -rf ../../proj/*", "catastrophic"],
+    ["rm -rf ../../proj/sub/..", "catastrophic"],
+    ["rm -rf ./*", "catastrophic"],
+    ["rm -rf ./build", "advisory"],
+    ["rm -rf build/out", "advisory"],
+    ["rm -rf ./sub", "advisory"],
+    ["rm -rf build/*", "advisory"],
+    ["rm -rf ../other", "advisory"],
+  ])("from the project's subdirectory, %s is %s", (command, expected) =>
+    expect(classOf(command, POSIX_SESSION)).toBe(expected));
+
+  test("a relative path below the working directory is never catastrophic, however shallow the directory", () => {
+    expect(classOf("rm -rf build", bashIn({ home: "/home/bob", cwd: "/home/bob" }))).toBe("advisory");
+    expect(classOf("rm -rf lib", bashIn({ home: "/home/bob", cwd: "/usr" }))).toBe("advisory");
+    expect(classOf("rm -rf ../lib", bashIn({ home: "/home/bob", cwd: "/usr/bin" }))).toBe("advisory");
+  });
+
+  test("with no working directory known, a relative path keeps the reading it had", () => {
+    expect(classOf("rm -rf ../sub")).toBe("advisory");
+    expect(classOf("rm -rf ../sub", bashIn({ home: "/home/bob" }))).toBe("advisory");
+    expect(classOf("rm -rf ../sub", bashIn({ cwd: "proj/sub" }))).toBe("advisory");
+    expect(classOf("rm -rf ..")).toBe("catastrophic");
+  });
+
+  test("on Windows a relative path is resolved against the working directory too", () => {
+    const session = bashIn({ home: "C:\\Users\\x", cwd: "C:\\Users\\x\\proj\\sub", root: "C:\\Users\\x\\proj" });
+    expect(classOf("rm -rf ..\\sub", session)).toBe("catastrophic");
+    expect(classOf("rm -rf ..\\..", session)).toBe("catastrophic");
+    expect(classOf("rm -rf ..\\build", session)).toBe("advisory");
+    expect(classOf("rm -rf .\\build", session)).toBe("advisory");
+  });
+});
+
+describe("the working directory named as a variable or a substitution", () => {
+  const SESSION = bashIn({ home: "/home/bob", cwd: "/home/bob/proj/sub", root: "/home/bob/proj" });
+  const NO_CWD = bashIn({ home: "/home/bob" });
+
+  test.each([
+    'rm -rf "$(pwd)/build"',
+    "rm -rf $(pwd)/build",
+    'rm -rf "`pwd`/build"',
+    "rm -rf `pwd`/build/out",
+    'rm -rf "$PWD/build"',
+    "rm -rf $PWD/build",
+    "rm -rf ${PWD}/build",
+    'rm -rf "${PWD}/build"',
+    "rm -rf $PWD/build/*",
+    "rm -rf $(pwd)/build $PWD/dist",
+    'echo "$(rm -rf "$PWD/build")"',
+    "echo $(rm -rf $(pwd)/build) done",
+    "cd x && rm -rf $PWD/build; echo ok",
+  ])("%s is held for review whether or not the working directory is known", (command) => {
+    expect(classOf(command, SESSION)).toBe("advisory");
+    expect(classOf(command, NO_CWD)).toBe("advisory");
+    expect(classOf(command)).toBe("advisory");
+  });
+
+  test.each([
+    'rm -rf "$PWD"',
+    "rm -rf $PWD",
+    "rm -rf ${PWD}",
+    "rm -rf $(pwd)",
+    'rm -rf "$(pwd)"',
+    "rm -rf `pwd`",
+    "rm -rf $(pwd)/..",
+    'rm -rf "$PWD/.."',
+    "rm -rf $PWD/*",
+    "rm -rf $(pwd)/*",
+    "rm -rf ${PWD}/../..",
+    "rm -rf $PWD/.",
+  ])("%s is the working directory or a parent, so it is catastrophic", (command) => {
+    expect(classOf(command, SESSION)).toBe("catastrophic");
+    expect(classOf(command, NO_CWD)).toBe("catastrophic");
+    expect(classOf(command)).toBe("catastrophic");
+  });
+
+  test("a sibling of the working directory is judged as the path it names when the directory is known", () => {
+    expect(classOf("rm -rf $PWD/../other", SESSION)).toBe("advisory");
+    expect(classOf("rm -rf $PWD/../../x", SESSION)).toBe("catastrophic");
+    expect(classOf("rm -rf $PWD/../other", NO_CWD)).toBe("advisory");
+  });
+
+  test("a variable that only starts with PWD, or another substitution in the target, is still unknown", () => {
+    expect(classOf("rm -rf $PWDX/build", SESSION)).toBe("catastrophic");
+    expect(classOf("rm -rf $pwd/build", SESSION)).toBe("catastrophic");
+    expect(classOf('rm -rf "$(pwd)$(echo /x)"', SESSION)).toBe("catastrophic");
+    expect(classOf("rm -rf $(echo $PWD)/build", SESSION)).toBe("catastrophic");
+    expect(classOf("rm -rf `echo ~`/build", SESSION)).toBe("catastrophic");
+  });
+
+  test("a single-quoted mention of the working directory in a command is not a removal", () => {
+    none("echo 'rm -rf $PWD'");
+    none('echo "rm -rf $PWD"');
+    none("echo \"$(pwd)\" 'rm -rf $(pwd)'");
+  });
+});
+
+describe("the command prefix scan stays linear", () => {
+  const fastest = (command: string, ctx?: Context): number => {
+    const times = [0, 1, 2].map(() => {
+      const start = performance.now();
+      classify(command, ctx);
+      return performance.now() - start;
+    });
+    return Math.min(...times);
+  };
+
+  test.each([
+    ["spaces", "A=b ".repeat(500) + "rm -rf build"],
+    ["tabs", "A=b\t".repeat(500) + "rm -rf build"],
+    ["newlines", "A=b\n".repeat(500) + "rm -rf build"],
+    ["quoted values", 'A="b c" '.repeat(500) + "rm -rf build"],
+    ["substitutions", "A=$(x) ".repeat(500) + "rm -rf build"],
+    ["parentheses", "A=(b=c ".repeat(500) + "rm -rf build"],
+    ["before git", "A=b ".repeat(500) + "git status"],
+    ["a run of white space", `;${" ".repeat(4000)}git status`],
+  ])("a command behind 500 assignments (%s) classifies in under 50 ms", (_, command) => {
+    expect(fastest(command)).toBeLessThan(50);
+  });
+
+  test("the assignments are still skipped, on one line or on several", () => {
+    removal(`${"A=b ".repeat(500)}rm -rf build`, "build");
+    removal(`${"A=b\n".repeat(500)}rm -rf build`, "build");
+    git(`${"A=b ".repeat(500)}git reset --hard`, "reset --hard");
+    catastrophic(`${"A=b ".repeat(500)}sudo rm -rf ~`);
+    catastrophic("FOO=1\nrm -rf /");
+    catastrophic("sudo A=b rm -rf /");
+    catastrophic("A=$(rm -rf ~) true");
+    catastrophic('A="$(echo hi)" rm -rf ~');
+    none(`${"A=b ".repeat(500)}echo rm -rf build`);
+  });
+});

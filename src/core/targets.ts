@@ -1,4 +1,4 @@
-import { inferPlatform, isAbsolutePath, isInside, normalizePath, type Platform } from "./path.ts";
+import { inferPlatform, isAbsolutePath, isInside, joinPath, normalizePath, type Platform, samePath } from "./path.ts";
 import type { Context } from "./shell.ts";
 
 const NAME = "[A-Za-z_][A-Za-z0-9_]*";
@@ -20,6 +20,18 @@ const MOUNTS: Readonly<Record<Platform, RegExp>> = {
   win32: /^\/(?:(?:cygdrive|mnt)\/)?[A-Za-z](?=\/|$)/,
   linux: /^\/mnt\/[A-Za-z](?=\/|$)/,
   darwin: /^\/Volumes\/[^/]+(?=\/|$)/,
+};
+
+// The working directory is never empty in a running shell, so a path under one of these is the
+// project's own and the reference alone is the directory itself.
+const CWD_REFERENCE: Readonly<Record<Context["shell"], RegExp>> = {
+  bash: /^(?:\$PWD|\$\{PWD\}|\$\(\s*pwd\s*\)|`\s*pwd\s*`)((?:[\\/].*)?)$/s,
+  powershell: /^(?:\$pwd|\$\{pwd\}|\$?\(\s*(?:get-location|pwd)\s*\))((?:[\\/].*)?)$/is,
+};
+/** The substitutions that read as the working directory; any other `$(...)` in a target is unknown. */
+export const CWD_SUBSTITUTION: Readonly<Record<Context["shell"], RegExp>> = {
+  bash: /\$\(\s*pwd\s*\)|`\s*pwd\s*`/g,
+  powershell: /\$\(\s*(?:get-location|pwd)\s*\)/gi,
 };
 
 type Reference = { name: string; rest: string };
@@ -82,6 +94,21 @@ function isCatastrophicPath(text: string, ctx: Context): boolean {
 }
 
 /**
+ * A relative target resolved against the working directory. Strictly below it, the target is the
+ * project's own to remove whatever the depth of the directory it sits in; anywhere else it is
+ * judged as the absolute path it names.
+ */
+function isCatastrophicRelative(text: string, ctx: Context): boolean {
+  const { cwd } = ctx;
+  const platform = platformOf(ctx);
+  if (cwd === undefined || !isAbsolutePath(platform, cwd)) return false;
+  const path = joinPath(platform, cwd, text);
+  const bare = path.replace(TRAILING_GLOBS, "");
+  if (isInside(platform, cwd, bare) && !samePath(platform, cwd, bare)) return false;
+  return isCatastrophicPath(path, ctx);
+}
+
+/**
  * Only a target whose loss is machine-wide is catastrophic: a filesystem or drive root, a share
  * root, a mount and the folders directly under it, home, the working directory or a parent of
  * either, and anything directly under the root or home. A leading variable reads as empty,
@@ -92,6 +119,11 @@ export function isCatastrophicTarget(word: string, ctx: Context): boolean {
   const target = word.replace(/["']/g, "");
   const home = homeRest(target, true);
   if (home !== undefined) return partsBelow(home, true).length <= 1;
+  const here = CWD_REFERENCE[ctx.shell].exec(target)?.[1];
+  if (here !== undefined) {
+    const relative = ctx.shell === "powershell" ? here.replaceAll("\\", "/") : here;
+    return partsBelow(relative, false).every((part) => part === "..") || isCatastrophicRelative(relative, ctx);
+  }
   const variable = variableAt(target);
   if (variable !== undefined) {
     const { name, rest } = variable;
@@ -103,5 +135,5 @@ export function isCatastrophicTarget(word: string, ctx: Context): boolean {
   const slashed = ctx.shell === "powershell" || inferPlatform(target) === "win32" ? target.replaceAll("\\", "/") : target;
   const text = /^[A-Za-z]:$/.test(slashed) ? `${slashed}/` : slashed;
   if (text.startsWith("/") || /^[A-Za-z]:\//.test(text)) return isCatastrophicPath(text, ctx);
-  return partsBelow(text, false).every((part) => part === "..");
+  return partsBelow(text, false).every((part) => part === "..") || isCatastrophicRelative(text, ctx);
 }

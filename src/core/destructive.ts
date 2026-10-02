@@ -5,27 +5,33 @@ import {
   powershellRemovals,
 } from "./powershell.ts";
 import { anyCase, ARGUMENT, type Context, commandWord, NS, type Removal, S } from "./shell.ts";
-import { isCatastrophicTarget } from "./targets.ts";
+import { CWD_SUBSTITUTION, isCatastrophicTarget } from "./targets.ts";
 
 export type { Context, Removal } from "./shell.ts";
 
-// Leading `VAR=value` assignments and an `env` wrapper run the same command, so the command
-// position admits them.
-const ENV_ASSIGN = `([A-Za-z_][A-Za-z0-9_]*=("[^"]*"|'[^']*'|[^ \\t\\n\\v\\f\\r;&|\`"']*)${S}+)*`;
-const PREFIX = `${S}*${ENV_ASSIGN}(sudo${S}+)?(env${S}+)?(command${S}+(-p${S}+)?)?${ENV_ASSIGN}`;
+// Leading `VAR=value` assignments and `sudo`, `env` and `command` wrappers run the same command, so
+// the command position admits them. A chain stops at a separator, and the wrappers have no empty
+// branch, so each chain splits one way and no two command positions scan the same token.
+const H = "[ \\t\\v\\f]";
+const ENV_ASSIGN = `(?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|[^ \\t\\n\\v\\f\\r;&|()\`"']*)${H}+)*`;
+const COMMAND_WRAPPER = `command${S}+(?:-p${S}+)?`;
+const WRAPPERS = `(?:sudo${S}+(?:env${S}+)?(?:${COMMAND_WRAPPER})?|env${S}+(?:${COMMAND_WRAPPER})?|${COMMAND_WRAPPER})`;
+const PREFIX = `${ENV_ASSIGN}(?:${WRAPPERS}${ENV_ASSIGN})?`;
 
 const RM = new RegExp(
-  `(^|[;&|()\`\\n\\r])${PREFIX}${commandWord("rm")}${S}+((-[a-zA-Z]+|--[a-zA-Z-]+)${S}+)*(-[a-zA-Z]*[rR][a-zA-Z]*|--recursive)(${S}|$)`,
+  `(^|[;&|()\`\\n\\r])${S}*${PREFIX}${commandWord("rm")}${S}+((-[a-zA-Z]+|--[a-zA-Z-]+)${S}+)*(-[a-zA-Z]*[rR][a-zA-Z]*|--recursive)(${S}|$)`,
 );
 // One invocation's arguments run to the next separator; a `)` ends them too, so a removal
-// inside `$(...)` does not swallow the rest of the outer command.
-const RM_ARGS = /^([^;&|)`\n\r]*)([^]?)/;
+// inside `$(...)` does not swallow the rest of the outer command. A substitution that reads as
+// the working directory is part of its argument.
+const RM_ARGS = new RegExp(`^((?:${CWD_SUBSTITUTION.bash.source}|[^;&|)\`\\n\\r])*)([^]?)`);
 
 const GIT_GLOBALS = `((-C${S}+${ARGUMENT}|-c${S}+${ARGUMENT}|-c${NS}+|--git-dir[= \\t\\n\\v\\f\\r]${ARGUMENT}|--work-tree[= \\t\\n\\v\\f\\r]${ARGUMENT}|--no-pager|--paginate|-p|--bare|--literal-pathspecs|--no-replace-objects)${S}+)*`;
 const GIT_SUBCOMMAND = `(?<subcommand>reset["']?${S}+--hard|stash|clean|restore|rm${S}+-[a-zA-Z]*[rR][a-zA-Z]*|checkout(${S}+[^ \\t\\n\\v\\f\\r;&|\`]+)*${S}+--)`;
 
 function gitPatterns(commandPosition: string, wrapper: string, git: string) {
-  const at = `(?<=^|${commandPosition}|[$]\\()${S}*${wrapper}${PREFIX}${commandWord(git)}${S}+${GIT_GLOBALS}`;
+  const wrapped = wrapper === "" ? "" : `(?:${S}*${wrapper})?`;
+  const at = `(?<=^|${commandPosition}|[$]\\()${wrapped}${S}*${PREFIX}${commandWord(git)}${S}+${GIT_GLOBALS}`;
   return {
     git: new RegExp(`${at}["']?${GIT_SUBCOMMAND}["']?(?=[ \\t\\n\\v\\f\\r);&|<>\`]|$)`, "g"),
     push: new RegExp(`${at}push(?=${S}|$)(?<args>[^;&|)\`\\n\\r]*)`, "g"),
@@ -73,33 +79,57 @@ function blankBodies(command: string, from: number, pending: readonly Heredoc[])
   return out;
 }
 
+type Frame = { kind: "'" | '"' | "$(" | "`"; depth: number };
+
 /**
  * Blanks the characters that open a command position inside a quoted span, so a mention is
  * never read as an invocation: `; & | ( )`, newline and CR become `_`, and inside single quotes
- * `$` and backtick too. The body of a heredoc with a quoted delimiter becomes `_` whole. Length
- * is preserved. An unbalanced quote reads the rest as quoted, which under-matches rather than
- * over-matches.
+ * `$` and backtick too. A `$(...)` or backtick substitution inside double quotes runs, so its
+ * text is left as the command it is, unless a backslash escapes the opener. The body of a heredoc
+ * with a quoted delimiter becomes `_` whole. Length is preserved. An unbalanced quote reads the
+ * rest as quoted, which under-matches rather than over-matches.
  */
 export function neutralizeQuotedPositions(command: string): string {
-  let quote = "";
+  const frames: Frame[] = [];
   let out = "";
   const pending: Heredoc[] = [];
   for (let i = 0; i < command.length; i++) {
     const ch = command.charAt(i);
     const next = command.charAt(i + 1);
-    if (quote !== "") {
-      const isBlanked = ";&|()\n\r".includes(ch) || (quote === "'" && (ch === "$" || ch === "`"));
-      out += isBlanked ? "_" : ch;
-      if (ch === quote) quote = "";
-    } else if (ch === "'" || ch === '"') {
-      quote = ch;
+    const top = frames.at(-1);
+    if (top?.kind === "'") {
+      out += ";&|()\n\r$`".includes(ch) ? "_" : ch;
+      if (ch === "'") frames.pop();
+    } else if (top?.kind === '"') {
+      if (ch === "\\" && (next === "$" || next === "`" || next === "\\")) {
+        out += ch + (next === "\\" ? next : "_");
+        i++;
+      } else if (ch === "$" && next === "(") {
+        frames.push({ kind: "$(", depth: 0 });
+        out += ch + next;
+        i++;
+      } else if (ch === "`") {
+        frames.push({ kind: "`", depth: 0 });
+        out += ch;
+      } else {
+        if (ch === '"') frames.pop();
+        out += ch !== '"' && ";&|()\n\r".includes(ch) ? "_" : ch;
+      }
+    } else if (ch === "`" && top?.kind === "`") {
+      frames.pop();
       out += ch;
-    } else if (ch === "\n" && pending.length > 0) {
+    } else if (ch === ")" && top?.kind === "$(" && top.depth === 0) {
+      frames.pop();
+      out += ch;
+    } else if (ch === "'" || ch === '"') {
+      frames.push({ kind: ch, depth: 0 });
+      out += ch;
+    } else if (ch === "\n" && frames.length === 0 && pending.length > 0) {
       const bodies = blankBodies(command, i + 1, pending);
       pending.length = 0;
       out += ch + bodies;
       i += bodies.length;
-    } else if (ch === "<" && next === "<" && command.charAt(i - 1) !== "<") {
+    } else if (ch === "<" && next === "<" && command.charAt(i - 1) !== "<" && frames.length === 0) {
       const heredoc = QUOTED_HEREDOC.exec(command.slice(i));
       if (heredoc === null) {
         out += ch;
@@ -109,6 +139,7 @@ export function neutralizeQuotedPositions(command: string): string {
         i += heredoc[0].length - 1;
       }
     } else {
+      if (top?.kind === "$(") top.depth += ch === "(" ? 1 : ch === ")" ? -1 : 0;
       out += ch;
     }
   }
@@ -167,7 +198,9 @@ function removals(command: string, scan: string, ctx: Context): { isCatastrophic
     offset += match.index + match[0].length;
     const args = RM_ARGS.exec(scan.slice(offset));
     const scanned = args?.[1] ?? "";
-    if (scanned.includes("$(") || args?.[2] === "`") return { isCatastrophic: true, removals: [] };
+    if (scanned.replace(CWD_SUBSTITUTION.bash, "").includes("$(") || args?.[2] === "`") {
+      return { isCatastrophic: true, removals: [] };
+    }
     const words = shellWords(command.slice(offset, offset + scanned.length));
     let isEndOfOptions = false;
     for (const word of words) {

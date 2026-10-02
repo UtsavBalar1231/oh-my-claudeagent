@@ -557,6 +557,53 @@ test("a quoted heredoc body is not a command, and a command after it still is", 
   expect(checked).toHaveLength(1);
 });
 
+test("a substitution inside double quotes is a command and a single-quoted one is a mention", async ($, on) => {
+  const { asked, checked } = world(on);
+  const denied = { decision: "deny", reason: RM_CATASTROPHIC };
+
+  expect(await check($, 'echo "$(rm -rf ~)"')).toEqual(denied);
+  expect(await check($, 'echo "`rm -rf ~`"')).toEqual(denied);
+  expect(await powershell($, 'Write-Host "$(Remove-Item -Recurse $HOME)"')).toEqual(denied);
+  expect(await check($, "echo '$(rm -rf ~)'")).toEqual(ENGINE);
+  expect(await check($, 'echo "$(date)" "; rm -rf ~"')).toEqual(ENGINE);
+  expect(await powershell($, "Write-Host '$(Remove-Item -Recurse $HOME)'")).toEqual(ENGINE);
+  expect(await powershell($, 'Write-Host "`$(Remove-Item -Recurse $HOME)"')).toEqual(ENGINE);
+  expect(asked).toEqual([]);
+  expect(checked).toHaveLength(4);
+});
+
+test("a relative target is resolved against the session's folder before it is judged", async ($, on) => {
+  const { asked, checked } = world(on, { cwd: "/work/sub", surfaces: [] });
+  const denied = { decision: "deny", reason: RM_CATASTROPHIC };
+
+  expect(await check($, "rm -rf ..")).toEqual(denied);
+  expect(await check($, "rm -rf ../sub")).toEqual(denied);
+  expect(await check($, "rm -rf ../../work/sub/")).toEqual(denied);
+  expect(await powershell($, "Remove-Item -Recurse ..\\sub")).toEqual(denied);
+  expect(await check($, "rm -rf ./build")).toEqual(ENGINE);
+  expect(await check($, "rm -rf build/out")).toEqual(ENGINE);
+  expect(await check($, "rm -rf ../other")).toEqual(ENGINE);
+  expect(await powershell($, "Remove-Item -Recurse .\\build")).toEqual(ENGINE);
+  expect(asked).toEqual([]);
+  expect(checked).toHaveLength(4);
+});
+
+test("the working directory named by variable or substitution: below it is held for review, it and its parents are denied", async ($, on) => {
+  const { asked, checked } = world(on, { cwd: "/work/sub", surfaces: [] });
+  const denied = { decision: "deny", reason: RM_CATASTROPHIC };
+
+  expect(await check($, 'rm -rf "$(pwd)/build"')).toEqual(ENGINE);
+  expect(await check($, 'rm -rf "$PWD/build"')).toEqual(ENGINE);
+  expect(await powershell($, "Remove-Item -Recurse $PWD\\build")).toEqual(ENGINE);
+  expect(await powershell($, "Remove-Item -Recurse (Get-Location)\\build")).toEqual(ENGINE);
+  expect(await check($, 'rm -rf "$PWD"')).toEqual(denied);
+  expect(await check($, "rm -rf $(pwd)/..")).toEqual(denied);
+  expect(await powershell($, "Remove-Item -Recurse $PWD")).toEqual(denied);
+  expect(await check($, 'rm -rf "$(echo ~)/build"')).toEqual(denied);
+  expect(asked).toEqual([]);
+  expect(checked).toHaveLength(4);
+});
+
 test("git behind a path or an .exe suffix is guarded", async ($, on) => {
   world(on, { surfaces: [] });
 

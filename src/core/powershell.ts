@@ -1,13 +1,13 @@
 import { baseName } from "./path.ts";
 import { anyCase, type Context, commandWord, type Removal, S } from "./shell.ts";
-import { isCatastrophicTarget } from "./targets.ts";
+import { CWD_SUBSTITUTION, isCatastrophicTarget } from "./targets.ts";
 
 export const POWERSHELL_COMMAND_POSITION = "[;&|(){}\\n\\r]";
 // `cmd /c` runs the next word as a command, quoted or not, but only where `cmd` itself is one.
-export const POWERSHELL_CMD_WRAPPER = `(?:${anyCase("cmd")}(?:\\.${anyCase("exe")})?${S}+/[cCkK]${S}+"?)?`;
+export const POWERSHELL_CMD_WRAPPER = `${anyCase("cmd")}(?:\\.${anyCase("exe")})?${S}+/[cCkK]${S}+"?`;
 
 const REMOVAL = new RegExp(
-  `(^|${POWERSHELL_COMMAND_POSITION})${S}*(?:&${S}+)?${POWERSHELL_CMD_WRAPPER}(?<word>${commandWord(anyCase("Remove-Item|ri|rm|del|erase|rd|rmdir"))})(?=${S}|$)`,
+  `(^|${POWERSHELL_COMMAND_POSITION})${S}*(?:&${S}+)?(?:${POWERSHELL_CMD_WRAPPER})?(?<word>${commandWord(anyCase("Remove-Item|ri|rm|del|erase|rd|rmdir"))})(?=${S}|$)`,
   "g",
 );
 const CMD_NAMES = new Set(["del", "erase", "rd", "rmdir"]);
@@ -45,61 +45,83 @@ const PARAMETERS = new Map(
   }),
 );
 
+type Frame = { kind: "'" | '"' | "'@" | '"@' | "#" | "<#" | "$("; depth: number };
+
 /**
  * Blanks what is not a command in PowerShell the way `neutralizeQuotedPositions` does for sh:
  * inside a quoted span or here-string the characters that open a command position become `_`,
- * and a comment is blanked whole. Length is preserved.
+ * and a comment is blanked whole. A `$(...)` inside a double-quoted string or here-string runs,
+ * so its text is left as the command it is, unless a backtick escapes the `$`. Length is
+ * preserved.
  */
 export function neutralizePowershell(command: string): string {
-  let quote = "";
+  const frames: Frame[] = [];
   let out = "";
+  const open = (kind: Frame["kind"]) => frames.push({ kind, depth: 0 });
   for (let i = 0; i < command.length; i++) {
     const ch = command.charAt(i);
     const next = command.charAt(i + 1);
-    if (quote === "") {
+    const top = frames.at(-1);
+    const kind = top?.kind;
+    if (kind === undefined || kind === "$(") {
       const isHereString = (next === "'" || next === '"') && ch === "@" && /^[ \t]*\r?(\n|$)/.test(command.slice(i + 2));
       if (isHereString) {
-        quote = `${next}@`;
+        open(next === "'" ? "'@" : '"@');
         out += ch + next;
         i++;
       } else if (ch === "'" || ch === '"') {
-        quote = ch;
+        open(ch);
         out += ch;
       } else if (ch === "<" && next === "#") {
-        quote = "<#";
+        open("<#");
         out += "__";
         i++;
       } else if (ch === "#" && COMMENT_START.test(command.charAt(i - 1))) {
-        quote = "#";
+        open("#");
         out += "_";
-      } else out += ch;
-    } else if (quote === "'") {
-      if (ch === "'") quote = "";
+      } else if (ch === ")" && top?.kind === "$(" && top.depth === 0) {
+        frames.pop();
+        out += ch;
+      } else {
+        if (top?.kind === "$(") top.depth += ch === "(" ? 1 : ch === ")" ? -1 : 0;
+        out += ch;
+      }
+    } else if (kind === "'") {
+      if (ch === "'") frames.pop();
       out += ch !== "'" && (BLANKED.includes(ch) || ch === "$") ? "_" : ch;
-    } else if (quote === '"') {
+    } else if (kind === '"') {
       if (ch === "`") {
         out += ch + next;
         i++;
+      } else if (ch === "$" && next === "(") {
+        open("$(");
+        out += ch + next;
+        i++;
       } else {
-        if (ch === '"') quote = "";
+        if (ch === '"') frames.pop();
         out += ch !== '"' && BLANKED.includes(ch) ? "_" : ch;
       }
-    } else if (quote === "'@" || quote === '"@') {
-      if (ch === "\n" && command.startsWith(quote, i + 1)) {
-        out += `_${quote}`;
-        i += quote.length;
-        quote = "";
-      } else out += quote === "'@" || BLANKED.includes(ch) ? "_" : ch;
-    } else if (quote === "#") {
-      if (ch === "\n") quote = "";
-      out += ch === "\n" ? ch : "_";
-    } else {
-      if (ch === "#" && next === ">") {
-        quote = "";
-        out += "__";
+    } else if (kind === "'@" || kind === '"@') {
+      if (ch === "\n" && command.startsWith(kind, i + 1)) {
+        out += `_${kind}`;
+        i += kind.length;
+        frames.pop();
+      } else if (kind === '"@' && ch === "`" && next === "$") {
+        out += ch + next;
         i++;
-      } else out += "_";
-    }
+      } else if (kind === '"@' && ch === "$" && next === "(") {
+        open("$(");
+        out += ch + next;
+        i++;
+      } else out += kind === "'@" || BLANKED.includes(ch) ? "_" : ch;
+    } else if (kind === "#") {
+      if (ch === "\n") frames.pop();
+      out += ch === "\n" ? ch : "_";
+    } else if (ch === "#" && next === ">") {
+      frames.pop();
+      out += "__";
+      i++;
+    } else out += "_";
   }
   return out;
 }
@@ -167,9 +189,16 @@ function argumentsEnd(command: string, scan: string, from: number): number {
   return scan.length;
 }
 
-function parse(command: string, words: readonly string[]): { isRecursive: boolean; targets: string[] } {
+const isWhatIf = (name: string): boolean =>
+  [...PARAMETERS.keys()].filter((full) => full.startsWith(name.toLowerCase())).join() === "whatif";
+
+function parse(
+  command: string,
+  words: readonly string[],
+): { isRecursive: boolean; isDryRun: boolean; targets: string[] } {
   const isCmd = CMD_NAMES.has(command);
   let isRecursive = false;
+  let isDryRun = false;
   const targets: string[] = [];
   for (let i = 0; i < words.length; i++) {
     const word = words[i] ?? "";
@@ -177,6 +206,7 @@ function parse(command: string, words: readonly string[]): { isRecursive: boolea
     if (parameter !== null) {
       const kind = parameterKind(parameter[1] ?? "");
       const attached = parameter[2];
+      if (isWhatIf(parameter[1] ?? "")) isDryRun ||= !/^\$?false$/i.test(attached ?? "");
       if (kind === "recurse") isRecursive ||= !/^\$?false$/i.test(attached ?? "");
       else if (kind === "path") {
         const value = attached ?? words[i + 1];
@@ -188,7 +218,7 @@ function parse(command: string, words: readonly string[]): { isRecursive: boolea
     else if (isCmd && /^\/s$/i.test(word)) isRecursive = true;
     else if (!isCmd || !/^\/[qfpa?](?::.*)?$/i.test(word)) targets.push(word);
   }
-  return { isRecursive, targets };
+  return { isRecursive, isDryRun, targets };
 }
 
 /**
@@ -207,9 +237,10 @@ export function powershellRemovals(
     const end = argumentsEnd(command, scan, start);
     const word = (match.groups?.["word"] ?? "").replace(/^["']|["']$/g, "");
     const name = baseName("win32", word).toLowerCase().replace(/\.exe$/, "");
-    const { isRecursive, targets } = parse(name, powershellWords(command.slice(start, end)));
-    if (!isRecursive) continue;
-    if (scan.slice(start, end).includes("$(") || targets.some((target) => isCatastrophicTarget(target, ctx))) {
+    const { isRecursive, isDryRun, targets } = parse(name, powershellWords(command.slice(start, end)));
+    if (!isRecursive || isDryRun) continue;
+    const isSubstituted = scan.slice(start, end).replace(CWD_SUBSTITUTION.powershell, "").includes("$(");
+    if (isSubstituted || targets.some((target) => isCatastrophicTarget(target, ctx))) {
       return { isCatastrophic: true, removals: [] };
     }
     found.push({ targets });

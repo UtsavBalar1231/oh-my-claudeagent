@@ -298,6 +298,176 @@ describe("a mention is not the command running", () => {
   });
 });
 
+describe("a subexpression inside double quotes", () => {
+  test.each([
+    'Write-Host "$(Remove-Item -Recurse C:\\)"',
+    'Write-Host "$(Remove-Item -Recurse ~)"',
+    '"$(Remove-Item -Recurse ~)"',
+    'Write-Host "before $(rm -r C:\\) after"',
+    'Write-Host "$(Get-Date; Remove-Item -Recurse C:\\)"',
+    'Write-Host "$(Get-Date -Format "$(Remove-Item -Recurse C:\\)")"',
+    '$x = "$(Remove-Item -Recurse $HOME)"',
+    '@"\n$(Remove-Item -Recurse C:\\)\n"@ | Set-Content x.ps1',
+    '@"\nbody $(rm -r ~) body\n"@',
+    'Remove-Item -Recurse "$(Get-Location)"',
+    'Write-Host "$((1 + 2))"; Remove-Item -Recurse C:\\',
+  ])("%s is catastrophic", (command) => expect(classOf(command)).toBe("catastrophic"));
+
+  test.each([
+    ['Write-Host "$(git stash)"', "stash"],
+    ['git commit -m "$(git clean -fd)"', "clean"],
+    ['@"\n$(git reset --hard)\n"@', "reset --hard"],
+  ] as const)("%s is blocking", (command, operation) =>
+    expect(classify(command, PS)).toEqual({ kind: "blocking", removals: [], git: [{ operation }] }),
+  );
+
+  test("a mention beside a subexpression, or in a single-quoted string, is not a match", () => {
+    expect(classOf("Write-Host '$(Remove-Item -Recurse C:\\)'")).toBe("none");
+    expect(classOf("Write-Host 'a $(rm -r ~) b'")).toBe("none");
+    expect(classOf("@'\n$(Remove-Item -Recurse C:\\)\n'@")).toBe("none");
+    expect(classOf('Write-Host "`$(Remove-Item -Recurse C:\\)"')).toBe("none");
+    expect(classOf('@"\n`$(Remove-Item -Recurse C:\\)\n"@')).toBe("none");
+    expect(classOf('Write-Host "$(Get-Date)" "; Remove-Item -Recurse C:\\"')).toBe("none");
+    expect(classOf('Write-Host "$(Get-Date)" "Remove-Item -Recurse C:\\"')).toBe("none");
+    expect(classOf('Write-Host "$((1 + 2))" "(rm -r ~)"')).toBe("none");
+    expect(classOf('git commit -m "fix $(Get-Date): never Remove-Item -Recurse C:\\"')).toBe("none");
+    expect(classOf('Write-Host "$(Write-Host "a; Remove-Item -Recurse C:\\")"')).toBe("none");
+  });
+
+  test("a subexpression that runs something harmless is not a match", () => {
+    expect(classOf('Write-Host "$(Get-Date)"')).toBe("none");
+    expect(classOf('Write-Host "$(Get-ChildItem C:\\ -Recurse)"')).toBe("none");
+    expect(classOf('git commit -m "release $(git describe --tags)"')).toBe("none");
+  });
+
+  test("the neutralized text leaves a subexpression as a command and keeps the length", () => {
+    const command = `Write-Host "a; $(b; c) (d)" 'e $(f)' "\`$(g)"`;
+    const out = neutralizePowershell(command);
+    expect(out).toBe(`Write-Host "a_ $(b; c) _d_" 'e __f_' "\`$_g_"`);
+    expect(out).toHaveLength(command.length);
+  });
+});
+
+describe("-WhatIf", () => {
+  test.each([
+    "Remove-Item -Recurse -Force C:\\ -WhatIf",
+    "Remove-Item -WhatIf -Recurse C:\\",
+    "Remove-Item -Recurse C:\\ -whatif",
+    "Remove-Item -Recurse C:\\ -wh",
+    "Remove-Item -Recurse C:\\ -wha",
+    "Remove-Item -Recurse C:\\ -WhatIf:$true",
+    "Remove-Item -Recurse -Path C:\\ -WhatIf",
+    "Remove-Item -Recurse $HOME -WhatIf",
+    "rm -r -WhatIf C:\\",
+    "ri -Recurse -wh ~",
+    "del -Recurse -WhatIf C:\\",
+    "Remove-Item -Recurse build -WhatIf",
+    'Write-Host "$(Remove-Item -Recurse C:\\ -WhatIf)"',
+  ])("%s is a dry run, not a removal", (command) => expect(classOf(command)).toBe("none"));
+
+  test.each([
+    ["Remove-Item -Recurse C:\\", "catastrophic"],
+    ["Remove-Item -Recurse C:\\ -WhatIf:$false", "catastrophic"],
+    ["Remove-Item -Recurse C:\\ -WhatIf:$False", "catastrophic"],
+    ["Remove-Item -Recurse -WhatIf:$false C:\\", "catastrophic"],
+    ["Remove-Item -Recurse C:\\ -w", "catastrophic"],
+    ["Remove-Item -Recurse C:\\ -Wi", "catastrophic"],
+    ["Remove-Item -Recurse C:\\ -Confirm", "catastrophic"],
+    ["Remove-Item -Recurse -Path C:\\ -Include -WhatIf", "catastrophic"],
+    ["Remove-Item -Recurse a -WhatIf; Remove-Item -Recurse C:\\", "catastrophic"],
+    ["Remove-Item -Recurse C:\\ -WhatIf; Remove-Item -Recurse C:\\", "catastrophic"],
+    ["Remove-Item -Recurse build -WhatIf:$false", "advisory"],
+    ["Remove-Item -Recurse build", "advisory"],
+  ])("%s is %s", (command, expected) => expect(classOf(command)).toBe(expected));
+
+  test("a dry run beside a real removal reports only the real one", () => {
+    expect(classify("Remove-Item -Recurse a -WhatIf; Remove-Item -Recurse b", PS)).toEqual({
+      kind: "advisory",
+      removals: [{ targets: ["b"] }],
+      git: [],
+    });
+  });
+
+  test("a mention of -WhatIf in another command does not excuse the removal", () => {
+    expect(classOf("Write-Host -WhatIf; Remove-Item -Recurse C:\\")).toBe("catastrophic");
+    expect(classOf("Remove-Item -Recurse C:\\ # -WhatIf")).toBe("catastrophic");
+  });
+});
+
+describe("a relative target", () => {
+  test.each([
+    ["Remove-Item -Recurse ..\\proj", "catastrophic"],
+    ["Remove-Item -Recurse ..\\proj\\", "catastrophic"],
+    ["Remove-Item -Recurse -Path .\\..\\proj", "catastrophic"],
+    ["Remove-Item -Recurse ../proj", "catastrophic"],
+    ["Remove-Item -Recurse ..", "catastrophic"],
+    ["Remove-Item -Recurse .\\build", "advisory"],
+    ["Remove-Item -Recurse build\\out", "advisory"],
+    ["Remove-Item -Recurse -Force .\\proj", "advisory"],
+    ["Remove-Item -Recurse ..\\proj\\build", "advisory"],
+  ])("from the project root, %s is %s", (command, expected) => expect(classOf(command, SESSION)).toBe(expected));
+
+  test("without a working directory a relative path stays held for review", () => {
+    expect(classOf("Remove-Item -Recurse ..\\proj")).toBe("advisory");
+  });
+});
+
+describe("the working directory named as a variable or a subexpression", () => {
+  const NO_CWD: Context = { shell: "powershell", home: "C:\\Users\\x" };
+
+  test.each([
+    "Remove-Item -Recurse $PWD\\build",
+    "Remove-Item -Recurse $pwd\\build",
+    "Remove-Item -Recurse $PWD/build",
+    "Remove-Item -Recurse ${PWD}\\build",
+    'Remove-Item -Recurse "$PWD\\build"',
+    "Remove-Item -Recurse (Get-Location)\\build",
+    "Remove-Item -Recurse (get-location)\\build",
+    "Remove-Item -Recurse $(Get-Location)\\build",
+    'Remove-Item -Recurse "$(Get-Location)\\build"',
+    "Remove-Item -Recurse (pwd)\\build",
+    "Remove-Item -Recurse $(pwd)\\build\\out",
+    "Remove-Item -Recurse -Path $PWD\\build -Force",
+    "Remove-Item -Recurse $PWD\\build\\*",
+    "rm -r $PWD\\build",
+    "rd /s /q $PWD\\build",
+  ])("%s is held for review whether or not the working directory is known", (command) => {
+    expect(classOf(command, SESSION)).toBe("advisory");
+    expect(classOf(command, NO_CWD)).toBe("advisory");
+    expect(classOf(command)).toBe("advisory");
+  });
+
+  test.each([
+    "Remove-Item -Recurse $PWD",
+    "Remove-Item -Recurse $pwd",
+    "Remove-Item -Recurse ${PWD}",
+    'Remove-Item -Recurse "$PWD"',
+    "Remove-Item -Recurse (Get-Location)",
+    "Remove-Item -Recurse $(Get-Location)",
+    "Remove-Item -Recurse (pwd)",
+    "Remove-Item -Recurse $PWD\\..",
+    "Remove-Item -Recurse (Get-Location)\\..\\..",
+    "Remove-Item -Recurse $PWD\\*",
+    "Remove-Item -Recurse -Force $(Get-Location)\\*",
+    "ri -r $PWD",
+  ])("%s is the working directory or a parent, so it is catastrophic", (command) => {
+    expect(classOf(command, SESSION)).toBe("catastrophic");
+    expect(classOf(command, NO_CWD)).toBe("catastrophic");
+    expect(classOf(command)).toBe("catastrophic");
+  });
+
+  test("another subexpression in the target is still unknown, and a variable that only starts with PWD is not it", () => {
+    expect(classOf('Remove-Item -Recurse "$(Get-Location)$(Get-Date)"', SESSION)).toBe("catastrophic");
+    expect(classOf("Remove-Item -Recurse $(Split-Path $PWD)\\build", SESSION)).toBe("catastrophic");
+    expect(classOf("Remove-Item -Recurse $PWDX\\build", SESSION)).toBe("catastrophic");
+  });
+
+  test("a mention of the working directory in a quoted string is not a removal", () => {
+    expect(classOf("Write-Host 'Remove-Item -Recurse $PWD'", SESSION)).toBe("none");
+    expect(classOf('Write-Host "Remove-Item -Recurse $PWD"', SESSION)).toBe("none");
+  });
+});
+
 describe("neutralizePowershell", () => {
   test("blanks command positions inside quotes and whole comments, keeping the length", () => {
     const command = `Write-Host "a; b | (c) {d}" 'e $(f) g;h' # i; j\nk <# l ; m #> n`;
