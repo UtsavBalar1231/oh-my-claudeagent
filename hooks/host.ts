@@ -10,6 +10,7 @@ export type AtomHost<K extends keyof State> = {
 export type Options = {
   showBand: boolean;
   guardMode: "dialog" | "deny";
+  enableKeywordTriggers: boolean;
 };
 
 type Env = () => Promise<string | undefined>;

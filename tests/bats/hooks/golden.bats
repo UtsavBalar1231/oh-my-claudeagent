@@ -122,18 +122,6 @@ _run_fixture() {
 	_run_fixture "comment-checker" "clean-code"
 }
 
-@test "golden: context-injector/read-no-agents" {
-	_run_fixture "context-injector" "read-no-agents"
-}
-
-@test "golden: context-injector/write-no-agents" {
-	_run_fixture "context-injector" "write-no-agents"
-}
-
-@test "golden: context-injector/edit-no-agents" {
-	_run_fixture "context-injector" "edit-no-agents"
-}
-
 @test "golden: delegate-retry/nesting-limit" {
 	_run_fixture "delegate-retry" "nesting-limit"
 }
@@ -148,14 +136,6 @@ _run_fixture() {
 
 @test "golden: edit-error-recovery/transient" {
 	_run_fixture "edit-error-recovery" "transient"
-}
-
-@test "golden: empty-task-response/poor-response" {
-	_run_fixture "empty-task-response" "poor-response"
-}
-
-@test "golden: empty-task-response/good-response" {
-	_run_fixture "empty-task-response" "good-response"
 }
 
 @test "golden: final-verification-evidence/no-active-plan" {
@@ -174,24 +154,12 @@ _run_fixture() {
 	_run_fixture "json-error-recovery" "mcp-timeout"
 }
 
-@test "golden: keyword-detector/no-keyword" {
-	_run_fixture "keyword-detector" "no-keyword"
-}
-
 @test "golden: package-plugin/dry-run" {
 	_run_fixture "package-plugin" "dry-run"
 }
 
 @test "golden: post-compact-inject/no-context-file" {
 	_run_fixture "post-compact-inject" "no-context-file"
-}
-
-@test "golden: post-edit/write-event" {
-	_run_fixture "post-edit" "write-event"
-}
-
-@test "golden: post-edit/edit-event" {
-	_run_fixture "post-edit" "edit-event"
 }
 
 @test "golden: pre-compact/happy-path" {

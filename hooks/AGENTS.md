@@ -13,8 +13,8 @@ event is unregistered on purpose; `OMCA.md` carries the per-event reason.
 
 ## Current runtime contract
 
-- `UserPromptSubmit` routes to `keyword-detector.sh` for activation keywords.
-- `UserPromptExpansion` routes to `slash-command-mode-detector.sh`.
+- `UserPromptSubmit` and `UserPromptExpansion` route to the server's `keyword-detector` and
+  `slash-mode-detector` handlers.
 - `PermissionDenied` routes to `permission-denied-coach.sh`, which turns an auto-mode
   classifier denial into retry guidance.
 - `permission-filter.sh` has two roles, and they are registered on different events.

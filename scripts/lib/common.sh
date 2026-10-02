@@ -268,33 +268,6 @@ hook_timing_log() {
 		>> "${HOOK_LOG_DIR}/hook-timing.jsonl" 2>/dev/null
 }
 
-# active-modes.json path (relative to HOOK_STATE_DIR, set in common.sh)
-ACTIVE_MODES_FILE="${HOOK_STATE_DIR}/active-modes.json"
-
-# Returns 0 if the mode is already active in this session (suppress re-announce).
-# Returns 1 if mode is absent, from a different session, or marker file is missing.
-# Requires CURRENT_SESSION to be set by the caller (via resolve_session_id).
-mode_already_announced() {
-	local mode="$1"
-	local stored_sid
-	stored_sid=$(jq_read "${ACTIVE_MODES_FILE}" ".${mode}.session_id // \"\"")
-	[[ -n "${stored_sid}" && "${stored_sid}" == "${CURRENT_SESSION}" ]]
-}
-
-# Write or update a mode entry in active-modes.json. Log and continue on failure.
-# Requires CURRENT_SESSION to be set by the caller (via resolve_session_id).
-mark_mode_announced() {
-	local mode="$1"
-	# shellcheck disable=SC2016 # jq filter: $vars are jq bindings passed via --arg, not shell
-	with_state_lock "${ACTIVE_MODES_FILE}" \
-		json_rmw "${ACTIVE_MODES_FILE}" '.[$mode] = {"detected_at": $epoch, "session_id": $sid}' \
-		--arg mode "${mode}" \
-		--argjson epoch "$(date +%s)" \
-		--arg sid "${CURRENT_SESSION}" \
-		|| log_hook_error "update failed for active-modes.json mode=${mode}" "$(basename "$0")"
-	return 0
-}
-
 HARD_CAP_BLOCKS=5
 STOP_BLOCKS_FILE="${HOOK_STATE_DIR}/stop-blocks.json"
 

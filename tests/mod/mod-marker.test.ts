@@ -22,7 +22,7 @@ test("session start writes the marker with its time, the plugin version and the 
   const w = engine(on);
   await start($);
   const manifest = w.reads.find((path) => path.endsWith("/.claude-plugin/plugin.json")) ?? "";
-  expect(marker(w)).toEqual({ written_at: STARTED_MS, version: null, options: { showBand: true, guardMode: "dialog" } });
+  expect(marker(w)).toEqual({ written_at: STARTED_MS, version: null, options: { showBand: true, guardMode: "dialog", enableKeywordTriggers: false } });
   expect(w.logs.some((line) => line.startsWith("mod-marker: cannot read the plugin version"))).toBe(true);
 
   write(w, manifest, '{ "name": "oh-my-claudeagent", "version": "3.0.0" }');
@@ -31,7 +31,7 @@ test("session start writes the marker with its time, the plugin version and the 
   expect(marker(w)).toEqual({
     written_at: STARTED_MS + 60_000,
     version: "3.0.0",
-    options: { showBand: true, guardMode: "dialog" },
+    options: { showBand: true, guardMode: "dialog", enableKeywordTriggers: false },
   });
 });
 
@@ -43,4 +43,10 @@ test("each main-loop turn start rewrites the marker with the turn's time", async
     await $.turn.start({ text: "go", turnId });
   }
   expect(marker(w)).toMatchObject({ written_at: STARTED_MS + 2_000 });
+});
+
+test("the marker carries the plugin option that turns keyword triggers on", { options: { enableKeywordTriggers: true } }, async ($, on) => {
+  const w = engine(on);
+  await start($);
+  expect(marker(w)).toMatchObject({ options: { enableKeywordTriggers: true } });
 });

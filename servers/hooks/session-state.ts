@@ -7,6 +7,8 @@ export type Session = {
   isGuided?: boolean;
   isTitleChecked?: boolean;
   promptAt?: number;
+  injectedContext?: Set<string>;
+  announcedModes?: Set<string>;
 };
 
 export const MAX_SESSIONS = 32;
@@ -33,4 +35,13 @@ export function touchSession(id: string): Session {
     sessions.delete(oldest);
   }
   return session;
+}
+
+/** True the first time `mode` is announced in the session; a call without a session cannot remember. */
+export function announceOnce(session: Session | undefined, mode: string): boolean {
+  if (session === undefined) return true;
+  const modes = (session.announcedModes ??= new Set());
+  if (modes.has(mode)) return false;
+  modes.add(mode);
+  return true;
 }

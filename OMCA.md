@@ -296,8 +296,8 @@ row only when a handler is actually registered for it.
 | `FileChanged` | Filesystem |
 
 `PermissionDenied` routes to `permission-denied-coach.sh`, which turns an auto-mode
-classifier denial into retry guidance. `UserPromptExpansion` routes to
-`slash-command-mode-detector.sh`.
+classifier denial into retry guidance. `UserPromptSubmit` and
+`UserPromptExpansion` carry the server's keyword and slash-mode detectors.
 
 `PostToolBatch` carries the loop detector, which fires once per resolved batch and reads
 the `tool_calls` array, so a signature can no longer be shredded by interleaved subagent
@@ -328,7 +328,7 @@ Measured on client 2.1.245.
 | `Notification` | Desktop notification delivery was removed in the v2.10 minimize-to-core refactor; hooks also no longer have terminal access |
 | `ConfigChange`, `CwdChanged` | Observability-only in OMCA's prior handlers, removed in the same refactor. Neither reports a state change any OMCA runtime reader consumes |
 | `WorktreeCreate`, `WorktreeRemove` | Worktree isolation policy is Claude-native's. `--worktree` delegation is prompt-injected paths plus boulder bookkeeping, so there is nothing for a worktree hook to add |
-| `InstructionsLoaded` | Async and observability-only: no injection capability, and it reports `CLAUDE.md` / `.claude/rules` loads rather than `.omca/rules`, so it cannot replace `context-injector.sh`'s content-hash ledger |
+| `InstructionsLoaded` | Async and observability-only: no injection capability, and it reports `CLAUDE.md` / `.claude/rules` loads rather than `.omca/rules`, so it cannot replace the context injector's per-session dedup |
 | `TaskCreated`, `TeammateIdle` | Task-collaboration lifecycle owned by the native shared task list. Only `TaskCompleted` is registered among the three, as the evidence gate |
 
 `TaskCompleted` fires only through `TaskUpdate` or a teammate ending a turn with tasks still open.
@@ -933,13 +933,11 @@ All runtime state lives in `.omca/` (gitignored by default):
 
 - `state/boulder.json` — Session-bound plan registry: one entry per plan under `plans[plan_name]`, one binding per session under `bindings[session_id]`
 - `evidence/verification-evidence.json` — Verification records
-- `state/active-modes.json` — Keyword detection session tracking (re-announce suppression)
 - `state/compaction-context.md` — Saved state for compaction survival
-- `state/injected-context-dirs.json` — Per-session dedup keys for AGENTS.md/README.md and `.omca/rules/*.md` context injection, reset every `SessionStart`
 - `state/subagent-models.json` — Live subagent id → resolved model name, for the statusline renderer
 - `state/notepads/{plan-name}/` — Per-plan notepad sections
 - `plans/{name}.md` — Compatibility mirror/resume surface for native plans, maintained by boulder
-- `logs/` — Session, edit, and subagent audit logs
+- `logs/` — Session and subagent audit logs
 - `rules/*.md` — Project rules (auto-injected on file match)
 
 ### Boulder Lifecycle
@@ -972,7 +970,8 @@ written since it ran. The task's name plays no part in the verdict.
 
 A rule file starts with a `# pattern: <glob>` first line and carries its guidance in the
 body below. When a file whose **basename** matches that glob is Read, Written, or Edited,
-`scripts/context-injector.sh` injects the body as additional context. One pattern per
+the omca server's context injector injects the body as additional context, once per
+session until the body changes. One pattern per
 file; the body is capped at 1000 characters, with anything past the cap replaced by a
 truncation marker naming the rule's path so the full text stays one Read away.
 
@@ -987,7 +986,7 @@ The project directory is scanned first and wins on a filename collision, so crea
 `.omca/rules/comments-python.md` replaces the shipped Python rule outright. To switch a
 shipped rule off rather than replace it, create a same-named file whose body is empty.
 Two rules with *different* filenames both inject even when their bodies are identical,
-because the injector's dedup key is the rule's resolved path.
+because the injector's dedup key is the rule's path.
 
 `OMCA_DISABLED_HOOKS=context-injector` turns the whole mechanism off for a session.
 
@@ -997,13 +996,10 @@ because the injector's dedup key is the rule's resolved path.
 
 Mode detection is dual-path:
 
-- **Free-text triggers** — `keyword-detector.sh` fires on `UserPromptSubmit`, pattern-matches the raw prompt text (e.g., "create plan", "fix build"), and injects context.
-- **Slash-command triggers** — `slash-command-mode-detector.sh` fires on `UserPromptExpansion`, reads `command_name` directly (e.g., `oh-my-claudeagent:hephaestus`), and activates the corresponding mode without relying on the expanded body's wording. This is more reliable: mode activation works regardless of what the skill's SKILL.md body says.
+- **Free-text triggers** — the `keyword-detector` handler runs on `UserPromptSubmit`, pattern-matches the prompt text (e.g., "create plan", "fix build"), and injects a nudge toward the matching skill. It runs only when the `enableKeywordTriggers` option is on: the mod copies its options into the session marker, and the handler reads the option from that marker, so a session without a marker has triggers off. It skips subagent prompts, background-agent relays, pasted text, double-quoted or backticked spans, and prompts that discuss their own trigger phrases.
+- **Slash-command triggers** — the `slash-mode-detector` handler runs on `UserPromptExpansion`, reads `command_name` directly (e.g., `oh-my-claudeagent:handoff`), and activates the corresponding mode without relying on the expanded body's wording. This is more reliable: mode activation works regardless of what the skill's SKILL.md body says, and it needs no option.
 
-Both paths share the same `active-modes.json` schema and session-aware re-announce suppression (`mode_already_announced` / `mark_mode_announced` in `scripts/lib/common.sh`). If both fire for the same mode in the same session, the second invocation suppresses silently.
-
-The `keyword-detector.sh` hook fires on `UserPromptSubmit`, pattern-matches against
-known phrases, and injects context that triggers the corresponding skill.
+Both handlers record the modes they announce in the server's session state, so a mode is announced once per session. If both fire for the same mode in the same session, the second stays silent.
 
 Keywords are the natural interaction model — type natural phrases in any prompt.
 
@@ -1368,7 +1364,7 @@ than copied verbatim.
 |---------|-------|
 | Session-bound plan registry | `boulder.json` moved from a single `active_plan` pointer to `{plans: {<plan_name>: {...}}, bindings: {<session_id>: {plan_name, bound_at}}}`. Fixes the clobber where two concurrent sessions working different plans overwrote each other's state. `resolve_bound_plan()` (`servers/tools/_boulder_core.py`) is the one pure-read resolution ladder every consumer calls, via direct import in Python or the `boulder_resolve.py` shim from bash |
 | drift-guard hard-block Stop hook | New `scripts/drift-guard.sh`: when the last assistant turn reads as a completion claim ("done", "fixed", "implemented", etc., unless negated) but the diff still contains a stub marker, the Stop is blocked with the offending `file:line`. A focused-test marker is only looked for in JavaScript and TypeScript sources, where such a test can actually run; an unfinished-implementation marker and an unimplemented-error throw are looked for in any language. Self-clearing — fixing the stub removes the marker. A repeated block is bounded separately by the shared per-gate Stop-block ledger at `.omca/state/stop-blocks.json`, capped at 5 blocks per gate and reset on the gate's clean path. Kill-switch: `OMCA_HOOK_DISABLE_DRIFT_GUARD` |
-| context-injector hardening | `scripts/context-injector.sh` now dedups injections by content-hash+realpath (reusing `injected-context-dirs.json`, which `session-init.sh` already resets every `SessionStart`) instead of re-injecting on every matching file access. The project-root walk for both the `.omca/rules` scan and the AGENTS.md/README terminator now resolves worktree-safely (a linked worktree's `.git` is a file, not a directory, so the walk tests `-e` not `-d`), so a worktree session no longer walks up into the parent repo |
+| context-injector hardening | The context injector now dedups injections by content-hash+realpath (reusing `injected-context-dirs.json`, which `session-init.sh` already resets every `SessionStart`) instead of re-injecting on every matching file access. The project-root walk for both the `.omca/rules` scan and the AGENTS.md/README terminator now resolves worktree-safely (a linked worktree's `.git` is a file, not a directory, so the walk tests `-e` not `-d`), so a worktree session no longer walks up into the parent repo |
 | stdin-read timeout | `scripts/lib/common.sh`'s shared `HOOK_INPUT=$(cat)` read now wraps in `timeout 5 cat`, discarding on exit 124 rather than hanging indefinitely if stdin is never closed. Blocking hooks (`final-verification-evidence.sh`, `drift-guard.sh`, `task-completed-verify.sh`) treat an empty-from-timeout read as fail-closed-or-warn, not a silent pass |
 | Compaction content round-trip | `pre-compact.sh` now inlines the session's next 10 unchecked plan tasks and the 5 most recent notepad decisions (tasks first, so they survive `post-compact-inject.sh`'s downstream line cap), instead of leaving compaction to rely on whatever the model happened to keep in its own summary |
 | Per-subagent statusline model | `subagent-start.sh` now records each live subagent's resolved display model (e.g. `Sonnet`, `Opus 4.8`) in `subagent-models.json`; the statusline renders it per running task instead of showing only the parent session's model |
@@ -1686,7 +1682,7 @@ tables under Core Concepts and Agent Reference are the live state.
 | REVIEW.md | A Claude-native review-service surface, not a plugin one: `code-review.md` documents it under the managed Code Review product and states that local `/code-review` does not read it. The service reads the reviewed repository's own root, so a copy travelling inside an installed plugin cache would be inert for the user's project, and OMCA ships none |
 | `showClearContextOnPlanAccept` | Nothing in OMCA suppresses the accept screen. The hook that once tried to auto-allow it has been deleted: the platform discards a hook decision for a tool that requires user interaction, so the approval never took effect |
 | `disableWorkflows` and `workflowKeywordTriggerEnabled` | The kill switches beside the `ultracode` rename. No live collision: the keyword detector's patterns are disjoint from `ultracode` and off by default |
-| `ultracode` keyword fired on non-human input | Design-parity lesson. `keyword-detector.sh` has provenance rails for agent id and task notifications but no webhook or relayed-comment check, and no payload field for one has been probed. Do not guess a field name |
+| `ultracode` keyword fired on non-human input | Design-parity lesson. The keyword detector has provenance rails for agent id and task notifications but no webhook or relayed-comment check, and no payload field for one has been probed. Do not guess a field name |
 | `Agent` tool hardened against indirect prompt injection | Both content-returning agents already carry the rail |
 | `mode` param deprecated; subagents inherit the parent permission mode | Corroborates the CI-enforced rule that plugin agents declare no `permissionMode` |
 | `skillListingMaxDescChars` | The 1,536 figure is now a settable default rather than a fixed platform limit. OMCA's thresholds need no change, since the 512 soft cap keeps every description far below either number |

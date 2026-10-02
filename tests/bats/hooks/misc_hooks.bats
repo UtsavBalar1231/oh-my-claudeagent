@@ -528,29 +528,3 @@ load '../test_helper'
 	assert_success
 	assert_output ""
 }
-
-# ---------------------------------------------------------------------------
-# g. empty-task-response: warns on empty/very short agent output
-# ---------------------------------------------------------------------------
-
-@test "empty-task-response: warns when agent output is empty" {
-	local payload
-	payload='{"tool_name":"SubagentHandback","agent_type":"explore","tool_input":{"message":""}}'
-
-	run_hook "empty-task-response.sh" "$payload"
-	assert_success
-	ctx=$(get_context)
-	assert [ -n "$ctx" ]
-	echo "$ctx" | grep -qi "POOR AGENT OUTPUT"
-}
-
-@test "empty-task-response: warns when agent output is very short" {
-	local payload
-	payload='{"tool_name":"SubagentHandback","agent_type":"explore","tool_input":{"message":"ok"}}'
-
-	run_hook "empty-task-response.sh" "$payload"
-	assert_success
-	ctx=$(get_context)
-	assert [ -n "$ctx" ]
-	echo "$ctx" | grep -qi "POOR AGENT OUTPUT"
-}

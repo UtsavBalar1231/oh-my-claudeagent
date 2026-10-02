@@ -1,0 +1,184 @@
+import { afterEach, describe, expect, test } from "bun:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { POOR_OUTPUT } from "./empty-task-response.ts";
+import { dispatch, type Payload } from "./registry.ts";
+
+const NOW = 1_786_000_000_000;
+const FULL_EXECUTOR_REPORT =
+  "TASK: fix the bug\nSTATUS: complete\nCHANGES: scripts/foo.sh, fixed field read\nEVIDENCE: just test-hooks passed, 21 tests\nNOTES: no blockers";
+const UNSTRUCTURED = "I completed the task and made the changes. The implementation is done and working correctly as expected.";
+const POOR = { hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: POOR_OUTPUT } };
+const advisory = (agent: string, missing: string) => ({
+  hookSpecificOutput: {
+    hookEventName: "PostToolUse",
+    additionalContext: `[ADVISORY] Agent '${agent}' output is missing expected section headers: ${missing}. The required output format specifies these sections. Output may be incomplete or hard to parse downstream.`,
+  },
+});
+
+const roots: string[] = [];
+
+afterEach(() => {
+  delete process.env.OMCA_DISABLED_HOOKS;
+  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+});
+
+function check(fields: Record<string, unknown>) {
+  const root = mkdtempSync(join(tmpdir(), "omca-task-response-"));
+  roots.push(root);
+  return dispatch({ event: "PostToolUse", session_id: crypto.randomUUID(), ...fields }, root, NOW);
+}
+
+const handback = (message: string, agentType = "oh-my-claudeagent:executor") =>
+  check({ tool_name: "SubagentHandback", agent_id: "a1", agent_type: agentType, tool_input: { message } });
+
+const agentResult = (toolResponse: unknown, subagentType = "oh-my-claudeagent:executor") =>
+  check({ tool_name: "Agent", tool_input: { subagent_type: subagentType }, tool_response: toolResponse });
+
+describe("payloads that carry no report", () => {
+  test("empty-task-response: async launch acknowledgement is silent", async () => {
+    expect(await agentResult({ isAsync: true, status: "async_launched", agentId: "a1", outputFile: "/tmp/a1.txt" })).toEqual({});
+  });
+
+  test("empty-task-response: completed Agent result pointing at a hand-back is silent", async () => {
+    const pointer = `This agent's report was delivered to you as a message from "a1" (its SubagentHandback call). Read it there; it is not repeated here.`;
+    expect(await agentResult({ status: "completed", handback: "send", content: [{ type: "text", text: pointer }] })).toEqual({});
+  });
+
+  test("empty-task-response: a tool other than Agent or SubagentHandback is never checked", async () => {
+    expect(await check({ tool_name: "Read", tool_input: { message: "4" }, tool_response: { status: "completed", content: [] } })).toEqual({});
+  });
+});
+
+describe("SubagentHandback carries the report", () => {
+  test("empty-task-response: short hand-back message fires the poor-output advice", async () => {
+    const output = await handback("4");
+    expect(output).toEqual(POOR);
+    expect(POOR_OUTPUT).toContain("delegation error carrying the agent's partial work");
+    expect(POOR_OUTPUT).not.toContain("likely exhausted its turns");
+  });
+
+  test("empty-task-response: transitional-only hand-back message fires the poor-output advice", async () => {
+    expect(await handback("Now let me start working on this task for you.")).toEqual(POOR);
+  });
+
+  test("empty-task-response: a short report whose later line starts like a transition is not poor", async () => {
+    const report = "FILES: a.ts\nANSWER: the guard lives in a.ts\nNEXT STEPS: read b.ts";
+    expect(await handback(report, "oh-my-claudeagent:explore")).toEqual({});
+    expect(await handback(`Next, ${report}`, "oh-my-claudeagent:explore")).toEqual(POOR);
+  });
+
+  test("empty-task-response: a transitional phrase inside a long report is not poor", async () => {
+    const report = `${FULL_EXECUTOR_REPORT}\nLet me know if the field name should change. ${"Detail. ".repeat(20)}`;
+    expect(await handback(report)).toEqual({});
+  });
+
+  test("empty-task-response: a terse completion acknowledgement is not treated as poor", async () => {
+    expect(await handback("Done. Ending.", "oh-my-claudeagent:custom")).toEqual({});
+    expect(await handback("Nothing further to report.", "oh-my-claudeagent:custom")).toEqual({});
+  });
+
+  test("empty-task-response: a terse completion still gets the section advisory for a structured agent", async () => {
+    expect(await handback("Done. Ending.")).toEqual(advisory("executor", "STATUS: CHANGES: EVIDENCE:"));
+  });
+
+  test("empty-task-response: full hand-back report is silent", async () => {
+    expect(await handback(FULL_EXECUTOR_REPORT)).toEqual({});
+  });
+
+  test("empty-task-response: hand-back report missing sections gets the section advisory", async () => {
+    expect(await handback(UNSTRUCTURED)).toEqual(advisory("executor", "STATUS: CHANGES: EVIDENCE:"));
+  });
+
+  test("empty-task-response: section headers match case-insensitively and only the missing ones are named", async () => {
+    expect(await handback(`status: done\nChanges: none\n${"Detail. ".repeat(8)}`)).toEqual(advisory("executor", "EVIDENCE:"));
+  });
+
+  test("empty-task-response: oracle hand-back with its own sections is silent", async () => {
+    expect(await handback("RECOMMENDATION: use strategy A\nALTERNATIVES: strategy B, C\nRISKS: low overhead", "oh-my-claudeagent:oracle")).toEqual({});
+  });
+
+  test("empty-task-response: explore needs NEXT STEPS: as one header, not NEXT and STEPS: apart", async () => {
+    const report = `FILES: a.ts\nANSWER: the guard lives in a.ts\nSTEPS: none, NEXT: read b.ts ${"Detail. ".repeat(20)}`;
+    expect(await handback(report, "oh-my-claudeagent:explore")).toEqual(advisory("explore", "NEXT STEPS:"));
+  });
+
+  test("empty-task-response: librarian sections are checked and an unknown agent type has none", async () => {
+    expect(await handback(UNSTRUCTURED, "oh-my-claudeagent:librarian")).toEqual(advisory("librarian", "SOURCES: FINDINGS: APPLICABILITY:"));
+    expect(await handback(UNSTRUCTURED, "general-purpose")).toEqual({});
+  });
+});
+
+describe("prepended harness note", () => {
+  test("empty-task-response: a bracketed harness note is not measured as the report", async () => {
+    expect(await handback(`[harness: subagent output matched instruction-shaped pattern(s): foo]\n${FULL_EXECUTOR_REPORT}`)).toEqual({});
+  });
+
+  test("empty-task-response: a bracketed harness note alone counts as no report", async () => {
+    expect(await handback("[harness: subagent output matched instruction-shaped pattern(s): foo]")).toEqual(POOR);
+  });
+});
+
+describe("a completed Agent result carries the report in content[].text", () => {
+  test("empty-task-response: completed Agent result without hand-back is still checked", async () => {
+    expect(await agentResult({ status: "completed", content: [{ type: "text", text: UNSTRUCTURED }] })).toEqual(advisory("executor", "STATUS: CHANGES: EVIDENCE:"));
+  });
+
+  test("empty-task-response: completed Agent result with a full report is silent", async () => {
+    expect(await agentResult({ status: "completed", content: [{ type: "text", text: FULL_EXECUTOR_REPORT }] })).toEqual({});
+  });
+
+  test("empty-task-response: completed Agent result with empty content fires the poor-output advice", async () => {
+    expect(await agentResult({ status: "completed", content: [] })).toEqual(POOR);
+  });
+
+  test("empty-task-response: text blocks are joined and blocks without text are skipped", async () => {
+    const [head = "", tail = ""] = FULL_EXECUTOR_REPORT.split("\nEVIDENCE:");
+    const content = [{ type: "text", text: head }, { type: "image" }, { type: "text", text: `EVIDENCE:${tail}` }];
+    expect(await agentResult({ status: "completed", content })).toEqual({});
+  });
+});
+
+describe("empty or very short output", () => {
+  test("empty-task-response: warns when agent output is empty", async () => {
+    expect(await check({ tool_name: "SubagentHandback", agent_type: "explore", tool_input: { message: "" } })).toEqual(POOR);
+  });
+
+  test("empty-task-response: warns when agent output is very short", async () => {
+    expect(await check({ tool_name: "SubagentHandback", agent_type: "explore", tool_input: { message: "ok" } })).toEqual(POOR);
+  });
+});
+
+describe("kill switch and golden fixtures", () => {
+  test("empty-task-response: OMCA_DISABLED_HOOKS=empty-task-response silences both warnings", async () => {
+    process.env.OMCA_DISABLED_HOOKS = "empty-task-response";
+    expect([await handback("4"), await handback(UNSTRUCTURED)]).toEqual([{}, {}]);
+    process.env.OMCA_DISABLED_HOOKS = "context-injector";
+    expect(await handback("4")).toEqual(POOR);
+  });
+
+  const fixture = (message: string): Payload => ({
+    event: "PostToolUse",
+    hook_event_name: "PostToolUse",
+    tool_name: "SubagentHandback",
+    agent_id: "fixture-agent-001",
+    agent_type: "oh-my-claudeagent:executor",
+    tool_input: { message },
+    tool_response: { success: true, message: "Report delivered to your caller." },
+    session_id: "fixture-sid-001",
+  });
+
+  test("poor-response replays to the poor-output advice", async () => {
+    const root = mkdtempSync(join(tmpdir(), "omca-task-response-"));
+    roots.push(root);
+    expect(await dispatch(fixture("Let me check that."), root, NOW)).toEqual(POOR);
+  });
+
+  test("good-response replays to an empty answer", async () => {
+    const root = mkdtempSync(join(tmpdir(), "omca-task-response-"));
+    roots.push(root);
+    const report = "TASK: Implement feature X\nSTATUS: complete\nCHANGES: Modified src/main.py to add feature\nEVIDENCE: just test passed with 15 tests\nNOTES: None";
+    expect(await dispatch(fixture(report), root, NOW)).toEqual({});
+  });
+});

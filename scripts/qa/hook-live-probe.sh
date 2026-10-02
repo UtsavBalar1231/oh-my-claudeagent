@@ -92,7 +92,7 @@ check_stop_negative() {
 }
 
 # check_posttooluse_injection: one Write of a Markdown file must trip
-# context-injector.sh's PostToolUse injection of the shipped prose rule.
+# the context injector's PostToolUse injection of the shipped prose rule.
 check_posttooluse_injection() {
 	local project package log
 	project="$(qa_new_scratch_project)"

@@ -181,12 +181,9 @@ EOF
 	run grep -rn 'date +%s%N' "$CLAUDE_PLUGIN_ROOT/scripts"
 	assert_output --partial 'lib/common.sh'
 	refute_output --partial 'scripts/comment-checker.sh'
-	refute_output --partial 'scripts/plan-format-warn.sh'
-	refute_output --partial 'scripts/context-injector.sh'
 	refute_output --partial 'scripts/subagent-stop.sh'
 	refute_output --partial 'scripts/subagent-start.sh'
 	refute_output --partial 'scripts/tool-loop-detector.sh'
-	refute_output --partial 'scripts/empty-task-response.sh'
 }
 
 @test "timing capture: a hook records a timing row on a BSD-shaped date" {
@@ -315,18 +312,6 @@ EOF
 		"$bin/bash" -c "cd '$CLAUDE_PLUGIN_ROOT'; source '$COMMON'; error_count_bump stale 'boom'"
 	assert_success
 	assert_output '1'
-}
-
-@test "mark_mode_announced: a corrupt active-modes.json self-heals" {
-	mkdir -p "$BATS_TEST_TMPDIR/state"
-	printf '{{{ broken' > "$BATS_TEST_TMPDIR/state/active-modes.json"
-
-	_lib 'CURRENT_SESSION=sid-1 mark_mode_announced plan'
-	assert_success
-
-	run jq -r '.plan.session_id' "$BATS_TEST_TMPDIR/state/active-modes.json"
-	assert_success
-	assert_output 'sid-1'
 }
 
 # ─── g. Stop-event block ledger ──────────────────────────────────────────────

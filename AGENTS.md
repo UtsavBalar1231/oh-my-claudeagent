@@ -30,5 +30,5 @@ depth 0.
 ## Runtime notes
 
 - Hook events live in `hooks/hooks.json`; top-level shell scripts in `scripts/*.sh`; MCP entries in `.mcp.json`.
-- `UserPromptSubmit` routes to `keyword-detector.sh` for handoff, stop-continuation, and other activation keywords.
+- `UserPromptSubmit` routes to the server's `keyword-detector` handler for activation keywords.
 - The docs follow the hard cutover model: slash-first workflows, native plan and memory ownership, managed settings as the policy boundary.

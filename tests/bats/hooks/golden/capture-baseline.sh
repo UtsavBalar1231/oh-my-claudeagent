@@ -52,7 +52,7 @@ fixture_sid() {
 }
 
 # Run one hook variant.
-# $1 = hook script basename (e.g. keyword-detector.sh)
+# $1 = hook script basename (e.g. session-init.sh)
 # $2 = fixture directory (absolute path)
 # $3 = work tmpdir for this invocation
 # Outputs: stdout_file, stderr_file, exit_code_file, state_diff_file under $3/out/

@@ -35,13 +35,5 @@ if [ -f "$STATE_DIR/verification-evidence.json" ]; then
 else
     echo "  (none)"
 fi
-echo
-
-echo "=== Active modes ==="
-if [ -f "$STATE_DIR/active-modes.json" ]; then
-    jq -r 'to_entries[] | "  \(.key): \(.value.detected_at // "?")"' "$STATE_DIR/active-modes.json"
-else
-    echo "  (none)"
-fi
 
 exit 0

@@ -122,6 +122,7 @@ export function readOptions(options: PluginOptions): Options {
   return {
     showBand: options["showBand"] !== false,
     guardMode: options["guardMode"] === "deny" ? "deny" : "dialog",
+    enableKeywordTriggers: options["enableKeywordTriggers"] === true,
   };
 }
 

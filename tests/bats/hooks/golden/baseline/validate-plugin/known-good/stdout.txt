@@ -85,9 +85,7 @@
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'skills/start-work/SKILL.md'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'servers/tools/_common.py'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'servers/tools/_boulder_core.py'
-[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/context-injector.sh'
 [validate-plugin] SKIP: docs accuracy: OMCA.md:<LINE> references untracked, gitignored path '.omca/rules/comments-python.md'
-[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/lib/common.sh'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'skills/start-work/SKILL.md'
 [validate-plugin] SKIP: docs accuracy: OMCA.md:<LINE> references untracked, gitignored path '.claude/settings.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
@@ -102,7 +100,6 @@
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'servers/tools/_boulder_core.py'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/drift-guard.sh'
 [validate-plugin] SKIP: docs accuracy: OMCA.md:<LINE> references untracked, gitignored path '.omca/state/stop-blocks.json'
-[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/context-injector.sh'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/lib/common.sh'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'output-styles/omca-default.md'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
@@ -133,7 +130,6 @@
 [validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md references existing path 'hooks/hooks.json'
 [validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md references existing path 'scripts/validate-plugin.sh'
 [validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md references existing path 'templates/claudemd.md'
-[validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md references existing path 'scripts/keyword-detector.sh'
 [validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md references existing path 'servers/pyproject.toml'
 [validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md references existing path '.claude-plugin/plugin.json'
 [validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md references existing path '.claude-plugin/marketplace.json'
@@ -144,6 +140,7 @@
 [validate-plugin] PASS: mcp_tool hook 'omca_hook' server FQN 'plugin:oh-my-claudeagent:omca-hooks' matches plugin name + registered MCP server 'omca-hooks'
 [validate-plugin] PASS: mcp_tool hook 'omca_hook' server FQN 'plugin:oh-my-claudeagent:omca-hooks' matches plugin name + registered MCP server 'omca-hooks'
 [validate-plugin] PASS: mcp_tool hook 'validate_plan_write' server FQN 'plugin:oh-my-claudeagent:omca' matches plugin name + registered MCP server 'omca'
+[validate-plugin] PASS: mcp_tool hook 'omca_hook' server FQN 'plugin:oh-my-claudeagent:omca-hooks' matches plugin name + registered MCP server 'omca-hooks'
 [validate-plugin] PASS: mcp_tool hook 'omca_hook' server FQN 'plugin:oh-my-claudeagent:omca-hooks' matches plugin name + registered MCP server 'omca-hooks'
 [validate-plugin] PASS: mcp_tool hook 'omca_hook' server FQN 'plugin:oh-my-claudeagent:omca-hooks' matches plugin name + registered MCP server 'omca-hooks'
 [validate-plugin] PASS: mcp_tool hook 'omca_hook' server FQN 'plugin:oh-my-claudeagent:omca-hooks' matches plugin name + registered MCP server 'omca-hooks'
@@ -205,4 +202,4 @@
 [validate-plugin] PASS: mcp tools/list contains categories_list
 [validate-plugin] PASS: mcp tools/list contains file_read
 [validate-plugin] PASS: mcp tools/list contains session_search
-[validate-plugin] Summary: 187 passed, 0 failed, 8 skipped, 0 warned
+[validate-plugin] Summary: 184 passed, 0 failed, 8 skipped, 0 warned

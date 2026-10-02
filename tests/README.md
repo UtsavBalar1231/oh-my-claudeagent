@@ -89,14 +89,14 @@ Note: the `validate` job's MCP check (`--check mcp`) is excluded from CI because
 
 ## Running Hooks Ad-hoc
 
-Hook scripts read and write state from `${CLAUDE_PROJECT_ROOT}/.omca/state/`. If `CLAUDE_PROJECT_ROOT` is unset it defaults to `$(pwd)`, so running a hook script directly (e.g. `bash scripts/keyword-detector.sh`) **without setting the variable first will mutate your real `.omca/state/` files** in the current working directory.
+Hook scripts read and write state from `${CLAUDE_PROJECT_ROOT}/.omca/state/`. If `CLAUDE_PROJECT_ROOT` is unset it defaults to `$(pwd)`, so running a hook script directly (e.g. `bash scripts/<hook>.sh`) **without setting the variable first will mutate your real `.omca/state/` files** in the current working directory.
 
 ### Preferred: use the scratch wrapper
 
 `scripts/bin/run-hook-in-scratch.sh` creates a temporary project root, sets `CLAUDE_PROJECT_ROOT` to it, pipes your JSON payload to the named hook script, and cleans up afterward:
 
 ```bash
-echo '{"prompt":"handoff please"}' | scripts/bin/run-hook-in-scratch.sh keyword-detector.sh
+echo '{"session_id":"s1"}' | scripts/bin/run-hook-in-scratch.sh <hook>.sh
 ```
 
 Pass any hook script name (relative to `scripts/`) as the first argument. The wrapper accepts JSON on stdin and forwards all arguments after the script name to the hook.

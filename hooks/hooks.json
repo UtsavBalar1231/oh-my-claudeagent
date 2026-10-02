@@ -54,11 +54,6 @@
       {
         "hooks": [
           {
-            "type": "command",
-            "shell": "bash",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/keyword-detector.sh\""
-          },
-          {
             "type": "mcp_tool",
             "server": "plugin:oh-my-claudeagent:omca-hooks",
             "tool": "omca_hook",
@@ -67,6 +62,7 @@
               "event": "UserPromptSubmit",
               "session_id": "${session_id}",
               "cwd": "${cwd}",
+              "agent_id": "${agent_id}",
               "prompt": "${prompt}",
               "session_title": "${session_title}"
             }
@@ -78,11 +74,6 @@
       {
         "hooks": [
           {
-            "type": "command",
-            "shell": "bash",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/slash-command-mode-detector.sh\""
-          },
-          {
             "type": "mcp_tool",
             "server": "plugin:oh-my-claudeagent:omca-hooks",
             "tool": "omca_hook",
@@ -91,6 +82,7 @@
               "event": "UserPromptExpansion",
               "session_id": "${session_id}",
               "cwd": "${cwd}",
+              "command_name": "${command_name}",
               "prompt": "${prompt}"
             }
           }
@@ -220,45 +212,23 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "Write|Edit",
+        "matcher": "Read|Write|Edit|Agent|SubagentHandback",
         "hooks": [
           {
-            "type": "command",
-            "shell": "bash",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/post-edit.sh\"",
-            "async": true
-          }
-        ]
-      },
-      {
-        "matcher": "Read|Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "shell": "bash",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/context-injector.sh\"",
-            "timeout": 5,
-            "statusMessage": "Injecting project context"
-          }
-        ]
-      },
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "shell": "bash",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/plan-format-warn.sh\""
-          }
-        ]
-      },
-      {
-        "matcher": "Agent|SubagentHandback",
-        "hooks": [
-          {
-            "type": "command",
-            "shell": "bash",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/empty-task-response.sh\""
+            "type": "mcp_tool",
+            "server": "plugin:oh-my-claudeagent:omca-hooks",
+            "tool": "omca_hook",
+            "timeout": 10,
+            "input": {
+              "event": "PostToolUse",
+              "session_id": "${session_id}",
+              "cwd": "${cwd}",
+              "agent_id": "${agent_id}",
+              "agent_type": "${agent_type}",
+              "tool_name": "${tool_name}",
+              "tool_input": "${tool_input}",
+              "tool_response": "${tool_response}"
+            }
           }
         ]
       },

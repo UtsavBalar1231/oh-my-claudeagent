@@ -90,6 +90,7 @@ list; a hook not on it ignores the variable entirely):
 | `plan-format-warn` | Warns when a plan file's checkboxes don't follow the numbered `- [ ] N.` form that progress tracking depends on. |
 | `comment-checker` | Pre-write gate over comments in source files: flags AI attribution, narration that restates the next line, decorative separators, filler qualifiers, and context-free TODOs. Whether a finding blocks the write is set by [`OMCA_COMMENT_GATE`](#omca_comment_gate-the-comment-gates-enforcement-level). |
 | `context-injector` | Injects nearby `AGENTS.md`/`README.md` excerpts and matching rule bodies (both plugin-shipped `rules/` and project `.omca/rules/`) when you read or edit a file. |
+| `empty-task-response` | Advises when a delegated agent's report is empty or trivially short, or lacks the section headers its agent's output format requires. |
 
 Set the variable in your shell profile, in a wrapper script, or per-invocation, depending
 on whether the override should be permanent or one-off.
@@ -306,8 +307,8 @@ re-run it if those fields are ever missing.
 
 Two rule directories exist and they load by different mechanisms. `.claude/rules/*.md` is
 platform-loaded and gated on project settings being an included settings source for the
-session, so it can be silently absent. `.omca/rules/*.md` is injected by
-`context-injector.sh` on file access and always fires.
+session, so it can be silently absent. `.omca/rules/*.md` is injected by the omca
+server's context injector on file access and always fires.
 
 Drop a Markdown file into `.omca/rules/` in your project to have its contents
 automatically surfaced whenever you read, write, or edit a matching file.

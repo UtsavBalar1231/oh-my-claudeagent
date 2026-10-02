@@ -1,9 +1,8 @@
 #!/usr/bin/env bats
 # Portability coverage for hooks that reach for tools stock macOS does not ship:
-# sha256sum (tool-loop-detector, comment-checker, context-injector) and flock
-# (post-edit). Each case runs the hook under a PATH that contains the coreutils
-# it needs and neither digest tool nor flock, which is what a mac without
-# coreutils looks like from inside a hook.
+# sha256sum (tool-loop-detector, comment-checker). Each case runs the hook under
+# a PATH that contains the coreutils it needs and neither digest tool nor flock,
+# which is what a mac without coreutils looks like from inside a hook.
 
 load '../test_helper'
 
@@ -91,73 +90,4 @@ _loop_batch_payload='{"hook_event_name":"PostToolBatch","prompt_id":"p1","tool_c
 	local sig
 	sig=$(jq -r '.signature' "$CLAUDE_PROJECT_ROOT/.omca/state/comment-gate-window.json")
 	[[ "$sig" =~ ^[0-9a-f]{16}$ ]]
-}
-
-# ── context-injector: no digest tool ──────────────────────────────────────────
-# Regression: an empty rule hash froze the cache key, so an edited rule kept
-# matching its old key and never re-injected.
-
-_seed_rule() {
-	printf '# pattern: *.py\n%s\n' "$1" > "$CLAUDE_PROJECT_ROOT/.omca/rules/r.md"
-	printf 'x=1\n' > "$CLAUDE_PROJECT_ROOT/f.py"
-}
-
-_inject_payload() {
-	jq -nc --arg p "$CLAUDE_PROJECT_ROOT/f.py" '{tool_name:"Read",tool_input:{file_path:$p}}'
-}
-
-@test "context-injector: without a digest tool an edited rule still re-injects" {
-	_seed_rule "RULE BODY v1"
-	_run_without_digest "context-injector.sh" "$(_inject_payload)"
-	assert_success
-	[[ "$(get_context)" == *"RULE BODY v1"* ]]
-
-	_seed_rule "RULE BODY v2"
-	_run_without_digest "context-injector.sh" "$(_inject_payload)"
-	assert_success
-	[[ "$(get_context)" == *"RULE BODY v2"* ]]
-
-	# No sentinel may be written as if it were a digest.
-	run jq -e '[keys[] | select(startswith("rule:"))] | length == 0' \
-		"$CLAUDE_PROJECT_ROOT/.omca/state/injected-context-dirs.json"
-	assert_success
-}
-
-@test "context-injector: with a digest tool an unchanged rule injects once, an edited one re-injects" {
-	_seed_rule "RULE BODY v1"
-	run_hook "context-injector.sh" "$(_inject_payload)"
-	[[ "$(get_context)" == *"RULE BODY v1"* ]]
-
-	run_hook "context-injector.sh" "$(_inject_payload)"
-	[[ "$(get_context)" != *"RULE BODY v1"* ]]
-
-	_seed_rule "RULE BODY v2"
-	run_hook "context-injector.sh" "$(_inject_payload)"
-	[[ "$(get_context)" == *"RULE BODY v2"* ]]
-}
-
-# ── post-edit: no flock ───────────────────────────────────────────────────────
-# Regression: an unguarded `flock` exited 127 inside the subshell, the update was
-# skipped entirely, and rc=127 was logged as "flock timeout" — an error line for
-# a lock that was never contended.
-
-@test "post-edit: without flock the recent-edits update still happens" {
-	local payload
-	payload=$(jq -nc '{tool_name:"Write",tool_input:{file_path:"/proj/x.rs"},tool_response:{success:true}}')
-	_run_without_digest "post-edit.sh" "$payload"
-	assert_success
-	run jq -r '.files["/proj/x.rs"]' "$CLAUDE_PROJECT_ROOT/.omca/state/recent-edits.json"
-	assert_success
-	refute_output 'null'
-}
-
-@test "post-edit: without flock nothing is logged as a flock timeout" {
-	local payload
-	payload=$(jq -nc '{tool_name:"Write",tool_input:{file_path:"/proj/x.rs"},tool_response:{success:true}}')
-	_run_without_digest "post-edit.sh" "$payload"
-	assert_success
-	if [[ -f "$CLAUDE_PROJECT_ROOT/.omca/logs/hook-errors.jsonl" ]]; then
-		run grep -c 'flock' "$CLAUDE_PROJECT_ROOT/.omca/logs/hook-errors.jsonl"
-		assert_output '0'
-	fi
 }
