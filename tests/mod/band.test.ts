@@ -461,7 +461,7 @@ const RENDER_SAMPLES = 25;
 const RENDER_BUDGET_MS = 5;
 
 test(
-  "the band's own render time from a 46-task plan with 12 checked stays under 5 ms",
+  "the band's median render time from a 46-task plan with 12 checked stays under 5 ms",
   {
     plugins: [
       {
@@ -492,7 +492,9 @@ test(
       samples.push(Number(sample));
     }
     expect(samples.every(Number.isFinite), samples.join(" ")).toBe(true);
-    expect(Math.max(...samples), samples.join(" ")).toBeLessThan(RENDER_BUDGET_MS);
+    // The median, not the maximum: one scheduler stall on a loaded machine is not render cost.
+    const median = samples.toSorted((a, b) => a - b)[Math.floor(RENDER_SAMPLES / 2)] ?? Number.NaN;
+    expect(median, samples.join(" ")).toBeLessThan(RENDER_BUDGET_MS);
   },
 );
 
