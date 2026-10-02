@@ -8,8 +8,13 @@ const SERVER = join(import.meta.dir, "omca.ts");
 const CLIENT_TEXT_CAP_CHARS = 2048;
 const MAX_RESULT_SIZE_CEILING = 500_000;
 const MAX_RESULT_SIZE_TOOLS = ["evidence_read", "file_read", "ast_search", "session_search"];
-const WRITE_TOOLS = ["boulder_write", "evidence_log", "omca_hook", "notepad_write", "notepad_compact"];
+const WRITE_TOOLS = ["ast_replace", "boulder_write", "evidence_log", "omca_hook", "notepad_write", "notepad_compact"];
 const ALL_TOOLS = [
+  "ast_search",
+  "ast_replace",
+  "ast_find_rule",
+  "ast_dump_tree",
+  "ast_test_rule",
   "boulder_write",
   "boulder_progress",
   "evidence_log",

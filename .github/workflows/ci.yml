@@ -11,6 +11,12 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# The linux x64 archive of one ast-grep release; the digest is that archive's SHA-256, so a
+# version bump changes both.
+env:
+  AST_GREP_VERSION: 0.45.3
+  AST_GREP_SHA256: f8ac830881339d1edee6b2652f54798c0f4da5a827f2db38a08ee31117783ce8
+
 defaults:
   run:
     shell: bash
@@ -156,7 +162,11 @@ jobs:
         run: uv sync --project servers
 
       - name: Install ast-grep CLI
-        run: uv tool install ast-grep-cli
+        run: |
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/ast-grep.zip" "https://github.com/ast-grep/ast-grep/releases/download/$AST_GREP_VERSION/app-x86_64-unknown-linux-gnu.zip"
+          echo "$AST_GREP_SHA256  $RUNNER_TEMP/ast-grep.zip" | sha256sum --check --strict
+          unzip -q "$RUNNER_TEMP/ast-grep.zip" -d "$RUNNER_TEMP/ast-grep"
+          echo "$RUNNER_TEMP/ast-grep" >> "$GITHUB_PATH"
 
       - name: Run BATS behavioral tests
         run: tests/bats/bats-core/bin/bats tests/bats/hooks/ tests/bats/unit/
@@ -197,7 +207,11 @@ jobs:
       # server, whose entry point calls discover_binary() and exits 1 if ast-grep
       # is absent — so the server must have ast-grep on PATH to reply to initialize.
       - name: Install ast-grep CLI
-        run: uv tool install ast-grep-cli
+        run: |
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/ast-grep.zip" "https://github.com/ast-grep/ast-grep/releases/download/$AST_GREP_VERSION/app-x86_64-unknown-linux-gnu.zip"
+          echo "$AST_GREP_SHA256  $RUNNER_TEMP/ast-grep.zip" | sha256sum --check --strict
+          unzip -q "$RUNNER_TEMP/ast-grep.zip" -d "$RUNNER_TEMP/ast-grep"
+          echo "$RUNNER_TEMP/ast-grep" >> "$GITHUB_PATH"
 
       # Both projects, matching `just test-pytest`. statusline/ keeps its own
       # project and target-version, so it needs a second invocation rather than
@@ -234,7 +248,11 @@ jobs:
       # validate-plugin.sh --check mcp starts the real omca MCP server, whose
       # entry point calls discover_binary() and exits 1 if ast-grep is absent.
       - name: Install ast-grep CLI
-        run: uv tool install ast-grep-cli
+        run: |
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/ast-grep.zip" "https://github.com/ast-grep/ast-grep/releases/download/$AST_GREP_VERSION/app-x86_64-unknown-linux-gnu.zip"
+          echo "$AST_GREP_SHA256  $RUNNER_TEMP/ast-grep.zip" | sha256sum --check --strict
+          unzip -q "$RUNNER_TEMP/ast-grep.zip" -d "$RUNNER_TEMP/ast-grep"
+          echo "$RUNNER_TEMP/ast-grep" >> "$GITHUB_PATH"
 
       - name: Run MCP validation
         run: bash scripts/validate-plugin.sh --check mcp
@@ -265,7 +283,11 @@ jobs:
       # The smoke test loads the plugin in OpenCode, which starts the omca MCP
       # server, and that server exits 1 if ast-grep is absent.
       - name: Install ast-grep CLI
-        run: uv tool install ast-grep-cli
+        run: |
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/ast-grep.zip" "https://github.com/ast-grep/ast-grep/releases/download/$AST_GREP_VERSION/app-x86_64-unknown-linux-gnu.zip"
+          echo "$AST_GREP_SHA256  $RUNNER_TEMP/ast-grep.zip" | sha256sum --check --strict
+          unzip -q "$RUNNER_TEMP/ast-grep.zip" -d "$RUNNER_TEMP/ast-grep"
+          echo "$RUNNER_TEMP/ast-grep" >> "$GITHUB_PATH"
 
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
@@ -336,6 +358,14 @@ jobs:
 
       - name: Mod tests
         run: claude plugin test .
+
+      # servers/tools/ast.spec.ts runs the real ast-grep binary.
+      - name: Install ast-grep CLI
+        run: |
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/ast-grep.zip" "https://github.com/ast-grep/ast-grep/releases/download/$AST_GREP_VERSION/app-x86_64-unknown-linux-gnu.zip"
+          echo "$AST_GREP_SHA256  $RUNNER_TEMP/ast-grep.zip" | sha256sum --check --strict
+          unzip -q "$RUNNER_TEMP/ast-grep.zip" -d "$RUNNER_TEMP/ast-grep"
+          echo "$RUNNER_TEMP/ast-grep" >> "$GITHUB_PATH"
 
       - name: Bun spec tests
         run: bun test src servers statusline scripts opencode
