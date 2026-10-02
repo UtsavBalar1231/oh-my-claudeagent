@@ -1,0 +1,50 @@
+{
+  "git": {
+    "repo": false
+  },
+  "payload": {
+    "session_id": "d0dfbbc9-d951-464e-bffa-01ddd301392f",
+    "transcript_path": "/tmp/transcripts/d0dfbbc9.jsonl",
+    "cwd": "@ROOT@/plain",
+    "scratchpad_dir": "@ROOT@/scratch",
+    "effort": {
+      "level": "medium"
+    },
+    "model": {
+      "id": "claude-opus-5-5",
+      "display_name": "Opus 5.5"
+    },
+    "workspace": {
+      "current_dir": "@ROOT@/plain",
+      "project_dir": "@ROOT@/plain",
+      "added_dirs": []
+    },
+    "version": "2.1.287",
+    "output_style": {
+      "name": "default"
+    },
+    "cost": {
+      "total_cost_usd": 0,
+      "total_duration_ms": 774,
+      "total_api_duration_ms": 0,
+      "total_lines_added": 0,
+      "total_lines_removed": 0
+    },
+    "context_window": {
+      "total_input_tokens": 0,
+      "total_output_tokens": 0,
+      "context_window_size": 1000000,
+      "current_usage": null,
+      "used_percentage": null,
+      "remaining_percentage": null
+    },
+    "exceeds_200k_tokens": false,
+    "fast_mode": false,
+    "thinking": {
+      "enabled": true
+    },
+    "vim": {
+      "mode": "INSERT"
+    }
+  }
+}

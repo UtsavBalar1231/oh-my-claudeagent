@@ -1,0 +1,28 @@
+{
+  "git": {
+    "repo": false
+  },
+  "payload": {
+    "model": {
+      "id": "claude-opus-5-5",
+      "display_name": "Sonnet 5"
+    },
+    "workspace": {
+      "current_dir": "@ROOT@/plain",
+      "project_dir": "@ROOT@/plain",
+      "added_dirs": []
+    },
+    "session_name": "quiet",
+    "output_style": {
+      "name": "default"
+    },
+    "context_window": {
+      "context_window_size": 200000,
+      "used_percentage": 2.5
+    },
+    "cost": {
+      "total_cost_usd": 0.02,
+      "total_duration_ms": 999
+    }
+  }
+}

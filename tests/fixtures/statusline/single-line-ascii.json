@@ -1,0 +1,18 @@
+{
+  "env": {
+    "CLAUDE_STATUSLINE_NERD_FONT": "0"
+  },
+  "git": {
+    "repo": false
+  },
+  "payload": {
+    "model": {
+      "display_name": "claude-3-5-sonnet"
+    },
+    "context_window": {
+      "context_window_size": 200000,
+      "used_percentage": 10.0
+    },
+    "cost": {}
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "env": {
+    "COLUMNS": "40"
+  },
+  "git": {
+    "repo": true,
+    "branch": "main",
+    "staged": 1,
+    "modified": 1,
+    "untracked": 3,
+    "remote": "https://gitlab.com/acme/dirty.git"
+  },
+  "payload": {
+    "model": {
+      "id": "claude-opus-5-5",
+      "display_name": "Opus 5.5"
+    },
+    "workspace": {
+      "current_dir": "@ROOT@/dirty",
+      "project_dir": "@ROOT@/dirty",
+      "added_dirs": []
+    },
+    "session_id": "11111111-2222-3333-4444-555555555555",
+    "version": "2.1.287",
+    "context_window": {
+      "context_window_size": 200000,
+      "used_percentage": 34.0
+    },
+    "cost": {
+      "total_cost_usd": 1.5,
+      "total_duration_ms": 125000
+    },
+    "effort": {
+      "level": "xhigh"
+    },
+    "rate_limits": {
+      "five_hour": {
+        "used_percentage": 30.0,
+        "resets_at": 1791219600
+      },
+      "seven_day": {
+        "used_percentage": 70.0
+      }
+    }
+  }
+}

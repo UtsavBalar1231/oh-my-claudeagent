@@ -1,0 +1,19 @@
+{
+  "env": {
+    "COLUMNS": "30",
+    "CLAUDE_STATUSLINE_NERD_FONT": "0"
+  },
+  "git": {
+    "repo": false
+  },
+  "payload": {
+    "model": {
+      "display_name": "MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM"
+    },
+    "context_window": {
+      "context_window_size": 200000,
+      "used_percentage": 10.0
+    },
+    "cost": {}
+  }
+}

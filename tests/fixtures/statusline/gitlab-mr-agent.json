@@ -1,0 +1,53 @@
+{
+  "env": {
+    "COLUMNS": "200"
+  },
+  "git": {
+    "repo": true,
+    "branch": "main",
+    "staged": 1,
+    "modified": 1,
+    "untracked": 3,
+    "remote": "https://gitlab.com/acme/dirty.git"
+  },
+  "payload": {
+    "model": {
+      "id": "claude-opus-5-5",
+      "display_name": "Opus 5.5"
+    },
+    "workspace": {
+      "current_dir": "@ROOT@/dirty",
+      "project_dir": "@ROOT@/dirty",
+      "added_dirs": [
+        "@ROOT@/plain"
+      ],
+      "repo": {
+        "host": "gitlab.com",
+        "owner": "acme",
+        "name": "dirty"
+      }
+    },
+    "session_id": "11111111-2222-3333-4444-555555555555",
+    "version": "2.1.287",
+    "context_window": {
+      "context_window_size": 200000,
+      "used_percentage": 34.0
+    },
+    "cost": {
+      "total_cost_usd": 1.5,
+      "total_duration_ms": 125000
+    },
+    "pr": {
+      "number": 7,
+      "url": "https://gitlab.com/acme/dirty/-/merge_requests/7",
+      "review_state": "changes_requested",
+      "kind": "mr"
+    },
+    "agent": {
+      "name": "executor"
+    },
+    "output_style": {
+      "name": "OMCA Default"
+    }
+  }
+}

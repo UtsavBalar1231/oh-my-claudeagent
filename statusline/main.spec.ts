@@ -1,0 +1,60 @@
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+const MAIN = join(import.meta.dir, "main.ts");
+
+let root = "";
+
+beforeEach(() => {
+  root = realpathSync(mkdtempSync(join(tmpdir(), "omca-statusline-main-")));
+});
+
+afterEach(() => {
+  rmSync(root, { recursive: true, force: true });
+});
+
+function run(stdin: string, env: Record<string, string> = {}): { stdout: string; exitCode: number } {
+  const result = Bun.spawnSync([process.execPath, MAIN], {
+    stdin: new TextEncoder().encode(stdin),
+    env: { ...process.env, CLAUDE_STATUSLINE_NERD_FONT: "0", COLUMNS: "300", TMPDIR: root, ...env },
+  });
+  return { stdout: result.stdout.toString(), exitCode: result.exitCode };
+}
+
+describe("fallback", () => {
+  test.each([
+    ["input that is not JSON", "not json"],
+    ["an empty input", ""],
+    ["a payload without a model", "{}"],
+    ["a payload with an empty model", '{"model": {}}'],
+    ["a payload that is null", "null"],
+    ["a payload that is a list", "[]"],
+  ])("%s prints the placeholder and exits cleanly", (_, stdin) => {
+    expect(run(stdin)).toEqual({ stdout: "[claude]\n", exitCode: 0 });
+  });
+});
+
+describe("git cache", () => {
+  test("a git read is reused until the cache lifetime from the environment runs out", () => {
+    const project = join(root, "project");
+    mkdirSync(project);
+    Bun.spawnSync(["git", "-C", project, "init", "-q", "-b", "main"]);
+    const payload = JSON.stringify({ model: { display_name: "m" }, workspace: { project_dir: project } });
+
+    const first = run(payload).stdout;
+    writeFileSync(join(project, "new.txt"), "x\n");
+
+    expect(first).not.toContain("?1");
+    expect(readdirSync(root).filter((name) => name.startsWith("omca-statusline-git-"))).toHaveLength(1);
+    expect(run(payload).stdout).toBe(first);
+    expect(run(payload, { CLAUDE_STATUSLINE_CACHE_TTL: "0" }).stdout).toContain("?1");
+  });
+
+  test("a payload without a project directory renders the single line without touching git", () => {
+    const { stdout } = run('{"model": {"display_name": "m"}}');
+    expect(stdout.split("\n")).toHaveLength(2);
+    expect(readdirSync(root)).toEqual([]);
+  });
+});

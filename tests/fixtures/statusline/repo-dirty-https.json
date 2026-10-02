@@ -1,0 +1,32 @@
+{
+  "git": {
+    "repo": false
+  },
+  "repo": "dirty",
+  "payload": {
+    "model": {
+      "id": "claude-opus-5-5",
+      "display_name": "Opus 5.5"
+    },
+    "workspace": {
+      "current_dir": "@ROOT@/dirty",
+      "project_dir": "@ROOT@/dirty",
+      "added_dirs": []
+    },
+    "session_id": "11111111-2222-3333-4444-555555555555",
+    "version": "2.1.287",
+    "context_window": {
+      "context_window_size": 200000,
+      "used_percentage": 61.0,
+      "total_input_tokens": 45000,
+      "total_output_tokens": 1200
+    },
+    "cost": {
+      "total_cost_usd": 1.5,
+      "total_duration_ms": 125000,
+      "total_lines_added": 120,
+      "total_lines_removed": 8,
+      "total_api_duration_ms": 45999
+    }
+  }
+}

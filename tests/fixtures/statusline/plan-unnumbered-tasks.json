@@ -1,0 +1,47 @@
+{
+  "git": {
+    "repo": false
+  },
+  "files": {
+    "plan-notes/.omca/state/boulder.json": {
+      "plans": {
+        "p": {
+          "active_plan": "@ROOT@/plan-notes/plan.md",
+          "started_at": "2026-10-01T00:00:00Z",
+          "session_ids": [
+            "11111111-2222-3333-4444-555555555555"
+          ],
+          "agent": "sisyphus"
+        }
+      },
+      "bindings": {
+        "11111111-2222-3333-4444-555555555555": {
+          "plan_name": "p",
+          "bound_at": 1786000000
+        }
+      }
+    },
+    "plan-notes/plan.md": "# Plan\n\n- [ ] just a note\n- [x] another note\n"
+  },
+  "payload": {
+    "model": {
+      "id": "claude-opus-5-5",
+      "display_name": "Opus 5.5"
+    },
+    "workspace": {
+      "current_dir": "@ROOT@/plan-notes",
+      "project_dir": "@ROOT@/plan-notes",
+      "added_dirs": []
+    },
+    "session_id": "11111111-2222-3333-4444-555555555555",
+    "version": "2.1.287",
+    "context_window": {
+      "context_window_size": 200000,
+      "used_percentage": 34.0
+    },
+    "cost": {
+      "total_cost_usd": 1.5,
+      "total_duration_ms": 125000
+    }
+  }
+}

@@ -1,26 +1,28 @@
 # Statusline
 
-`cc-statusline`, a standalone daemon-backed status renderer for Claude Code. Own
-Python project (`pyproject.toml`/`uv.lock`), separate from `servers/`.
+The main status line renderer for Claude Code, in TypeScript on bun, plus the Python
+renderer for the per-subagent tasks panel. Read `README.md` first for what the line shows and
+how it is configured.
 
 ## Layout
 
-- `core.py`: rendering logic. Reads the statusline JSON payload, resolves the bound
-  boulder plan, formats the multi-line/single-line output.
-- `daemon.py` / `client.py` / `direct.py`: daemon architecture. `daemon.py` runs a
-  long-lived process that pre-warms state; `client.py` talks to it over a socket;
-  `direct.py` is the no-daemon fallback path.
-- `git.py`: git branch/status/PR-segment collection.
-- `config.py`: user-configurable thresholds and toggles.
-- `subagent.py`: reads live subagent model info for display.
-- `protocol.py` / `types.py`: the daemon wire protocol and shared type definitions.
-- `tests/`: pytest suite (`just test-pytest` runs both `servers/` and `statusline/`).
-- `README.md`: full user-facing description of what the statusline shows and how the
-  daemon architecture works. Read that before this file for behavior questions.
+- `main.ts`: entry point. Reads the payload from stdin, reads git, prints the render, and
+  prints `[claude]` when anything fails.
+- `render.ts`: payload types and line composition. `render(data, git, env, now)` takes the
+  environment and the clock as arguments so specs control both.
+- `git.ts`: branch, status counts, remote, and the 5-second cache in the temp directory.
+- `config.ts`: environment-variable settings.
+- `fixtures.spec.ts`, `render.spec.ts`, `git.spec.ts`, `main.spec.ts`: `bun test statusline`.
+  The recorded cases live in `tests/fixtures/statusline/`.
+- `subagent.py`, `core.py`, `types.py`, `tests/`: the Python subagent renderer and the helpers
+  it imports. It is a separate uv project (`pyproject.toml`, `uv.lock`) that `just test-pytest`
+  and `just lint-python` still cover.
 
 ## Conventions
 
-Statusline reads `.omca/state/boulder.json` directly rather than going through the MCP
-tool, since it must render outside a tool-call context. `servers/tools/_boulder_core.py`
-is the authority on that file's schema and on `resolve_bound_plan`, which this code calls
-with `strict=True`.
+The renderer reads `.omca/state/boulder.json` directly because it runs outside any tool call,
+and resolves the plan through `src/core/boulder.ts` with `strict` set, so a session without
+its own binding never shows another session's plan. It never writes the file.
+
+Rounding of exact binary ties goes to the even neighbour (`fixed` in `render.ts`). The recorded
+fixtures need it, so do not replace it with `toFixed` or `Math.round`.

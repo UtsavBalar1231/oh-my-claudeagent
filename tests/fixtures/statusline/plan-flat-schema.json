@@ -1,0 +1,34 @@
+{
+  "git": {
+    "repo": false
+  },
+  "files": {
+    "plan-flat/.omca/state/boulder.json": {
+      "active_plan": "@ROOT@/plan-flat/plan.md",
+      "plan_name": "p",
+      "started_at": "2026-10-01T00:00:00Z"
+    },
+    "plan-flat/plan.md": "# Plan\n- [ ] 1. Task 1 that has a deliberately long label so the eighty character cap on the label is exercised here\n- [ ] 2. Task 2 that has a deliberately long label so the eighty character cap on the label is exercised here\n"
+  },
+  "payload": {
+    "model": {
+      "id": "claude-opus-5-5",
+      "display_name": "Opus 5.5"
+    },
+    "workspace": {
+      "current_dir": "@ROOT@/plan-flat",
+      "project_dir": "@ROOT@/plan-flat",
+      "added_dirs": []
+    },
+    "session_id": "11111111-2222-3333-4444-555555555555",
+    "version": "2.1.287",
+    "context_window": {
+      "context_window_size": 200000,
+      "used_percentage": 34.0
+    },
+    "cost": {
+      "total_cost_usd": 1.5,
+      "total_duration_ms": 125000
+    }
+  }
+}

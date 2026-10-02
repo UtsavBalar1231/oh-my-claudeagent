@@ -9,7 +9,7 @@ if you want the fix record.
 **Symptom**: with a screen reader, the statusline reads as a stream of escape sequences mixed
 into the text.
 
-**Why**: `statusline/core.py` writes color codes with no capability or preference check.
+**Why**: `statusline/render.ts` writes color codes with no capability or preference check.
 There is no setting that turns them off.
 
 **Workaround**: set `CLAUDE_STATUSLINE_NERD_FONT=0`. That replaces every glyph with a

@@ -287,19 +287,13 @@ isolated git worktrees.
 
 ## Statusline modes
 
-Set via the `statuslineMode` plugin setting (`off`, `direct`, `daemon`) or, for finer
-per-session control, the `CLAUDE_STATUSLINE_MODE` environment variable read directly by
-the statusline client.
+Set via the `statuslineMode` plugin setting (`off`, `direct`, `daemon`).
 
 | Mode | Behavior |
 |---|---|
 | `off` | No OMCA statusline is installed; your own `statusLine` configuration (if any) is left untouched. |
 | `direct` | Renders the statusline inline on every invocation, no background process. Simpler, no daemon to manage, slightly higher per-call latency. This is the default. |
 | `daemon` | A background daemon process pre-computes statusline state so each render is fast; falls back to direct rendering automatically if the daemon is not running. Recommended when you want the statusline to refresh frequently without adding per-call overhead. |
-
-`CLAUDE_STATUSLINE_MODE=daemon` is the client's own default when set, and it falls back to
-direct rendering if the daemon is unavailable; `CLAUDE_STATUSLINE_MODE=direct` always
-skips the daemon and renders inline.
 
 `/oh-my-claudeagent:omca-setup` writes the platform-level `statusLine` and
 `subagentStatusLine` blocks for you (including `hideVimModeIndicator` and a

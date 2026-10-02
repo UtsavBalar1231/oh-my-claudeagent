@@ -1,0 +1,49 @@
+{
+  "git": {
+    "repo": true,
+    "branch": "main",
+    "staged": 2,
+    "modified": 3,
+    "untracked": 1,
+    "remote": "git@github.com:user/myrepo.git"
+  },
+  "payload": {
+    "model": {
+      "display_name": "claude-opus-4-5"
+    },
+    "workspace": {
+      "project_dir": "/home/user/projects/myrepo",
+      "added_dirs": [
+        "/home/user/extra1",
+        "/home/user/extra2"
+      ]
+    },
+    "context_window": {
+      "context_window_size": 200000,
+      "used_percentage": 72.5,
+      "current_usage": {
+        "input_tokens": 100000,
+        "cache_creation_input_tokens": 20000,
+        "cache_read_input_tokens": 5000,
+        "output_tokens": 2000
+      }
+    },
+    "cost": {
+      "total_cost_usd": 1.23,
+      "total_duration_ms": 125000,
+      "total_lines_added": 42,
+      "total_lines_removed": 17
+    },
+    "rate_limits": {
+      "five_hour": {
+        "used_percentage": 45.0,
+        "resets_at": 1700000000
+      },
+      "seven_day": {
+        "used_percentage": 80.0,
+        "resets_at": 1700086400
+      }
+    },
+    "exceeds_200k_tokens": false
+  }
+}

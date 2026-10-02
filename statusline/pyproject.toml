@@ -1,7 +1,7 @@
 [project]
 name = "cc-statusline"
 version = "1.0.0"
-description = "Claude Code statusline with near-instant rendering"
+description = "Claude Code subagent status line"
 requires-python = ">=3.10"
 dependencies = []
 
@@ -9,9 +9,6 @@ dependencies = []
 dev = ["pytest>=8.0", "ruff"]
 
 [project.scripts]
-cc-statusline = "statusline.client:main"
-cc-statusline-daemon = "statusline.daemon:main"
-cc-statusline-direct = "statusline.direct:main"
 cc-statusline-subagent = "statusline.subagent:main"
 
 [build-system]

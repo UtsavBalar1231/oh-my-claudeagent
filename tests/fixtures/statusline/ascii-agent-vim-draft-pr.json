@@ -1,0 +1,79 @@
+{
+  "env": {
+    "CLAUDE_STATUSLINE_NERD_FONT": "0",
+    "COLUMNS": "240"
+  },
+  "git": {
+    "repo": true,
+    "branch": "main",
+    "remote": "git@github.com:acme/plan.git"
+  },
+  "files": {
+    "plan-open/.omca/state/boulder.json": {
+      "plans": {
+        "p": {
+          "active_plan": "@ROOT@/plan-open/plan.md",
+          "started_at": "2026-10-01T00:00:00Z",
+          "session_ids": [
+            "11111111-2222-3333-4444-555555555555"
+          ],
+          "agent": "sisyphus"
+        }
+      },
+      "bindings": {
+        "11111111-2222-3333-4444-555555555555": {
+          "plan_name": "p",
+          "bound_at": 1786000000
+        }
+      }
+    },
+    "plan-open/plan.md": "# Plan\n- [x] 1. Task 1 that has a deliberately long label so the eighty character cap on the label is exercised here\n- [ ] 2. Task 2 that has a deliberately long label so the eighty character cap on the label is exercised here\n- [ ] 3. Task 3 that has a deliberately long label so the eighty character cap on the label is exercised here\n"
+  },
+  "payload": {
+    "model": {
+      "id": "claude-opus-5-5",
+      "display_name": "Opus 5.5"
+    },
+    "workspace": {
+      "current_dir": "@ROOT@/plan-open",
+      "project_dir": "@ROOT@/plan-open",
+      "added_dirs": []
+    },
+    "session_id": "11111111-2222-3333-4444-555555555555",
+    "version": "2.1.287",
+    "context_window": {
+      "context_window_size": 200000,
+      "used_percentage": 34.0
+    },
+    "cost": {
+      "total_cost_usd": 1.5,
+      "total_duration_ms": 125000
+    },
+    "effort": {
+      "level": "max"
+    },
+    "thinking": {
+      "enabled": true
+    },
+    "agent": {
+      "name": "oh-my-claudeagent:sisyphus"
+    },
+    "vim": {
+      "mode": "NORMAL"
+    },
+    "output_style": {
+      "name": "oh-my-claudeagent:OMCA Default"
+    },
+    "pr": {
+      "number": 42,
+      "url": "https://github.com/acme/plan/pull/42",
+      "review_state": "draft"
+    },
+    "rate_limits": {
+      "five_hour": {
+        "used_percentage": 86.0,
+        "resets_at": 1790964000
+      }
+    }
+  }
+}
