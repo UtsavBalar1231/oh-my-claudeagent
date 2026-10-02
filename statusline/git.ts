@@ -19,6 +19,8 @@ export interface GitOptions {
 
 export const NO_REPO: GitInfo = { repo: false, branch: "", staged: 0, modified: 0, untracked: 0, remote: "", remoteFetchedAt: 0 };
 
+export const CACHE_TTL_SECONDS = 5;
+export const GIT_TIMEOUT_MS = 3000;
 const REMOTE_TTL_SECONDS = 60;
 
 export function resolveGitDir(projectDir: string): string | null {

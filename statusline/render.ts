@@ -1,12 +1,12 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
 import { resolveBoundPlan } from "../src/core/boulder.ts";
 import { checkboxStates, nextTaskLabel } from "../src/core/checkboxes.ts";
 import { baseName, inferPlatform } from "../src/core/path.ts";
-import { cells } from "../src/core/ui-kit.ts";
-import { type Config, type Env, readConfig } from "./config.ts";
+import { cells, displayWidth, fitEnd } from "../src/core/ui-kit.ts";
 import type { GitInfo } from "./git.ts";
+
+export type Env = Record<string, string | undefined>;
 
 interface Usage {
   input_tokens?: number | null;
@@ -24,7 +24,6 @@ export interface Payload {
   workspace?: {
     project_dir?: string;
     added_dirs?: string[] | null;
-    repo?: { host?: string; owner?: string; name?: string } | null;
   } | null;
   cwd?: string;
   context_window?: {
@@ -32,25 +31,17 @@ export interface Payload {
     used_percentage?: number | null;
     remaining_percentage?: number | null;
     current_usage?: Usage | null;
-    total_input_tokens?: number | null;
-    total_output_tokens?: number | null;
   } | null;
   cost?: {
     total_cost_usd?: number | null;
     total_duration_ms?: number | null;
-    total_api_duration_ms?: number | null;
     total_lines_added?: number | null;
     total_lines_removed?: number | null;
   } | null;
   rate_limits?: { five_hour?: RateWindow | null; seven_day?: RateWindow | null } | null;
   exceeds_200k_tokens?: boolean | null;
   effort?: { level?: string } | null;
-  thinking?: { enabled?: boolean } | null;
   session_id?: string | null;
-  session_name?: string | null;
-  transcript_path?: string | null;
-  version?: string | null;
-  output_style?: { name?: string } | null;
   agent?: { name?: string } | null;
   worktree?: { name?: string; branch?: string; original_branch?: string } | null;
   vim?: { mode?: string } | null;
@@ -72,23 +63,37 @@ const BOLD = "\x1b[1m";
 export const SEP = ` ${DIM}·${RST} `;
 const FILLED_BLOCK = "▰";
 const EMPTY_BLOCK = "▱";
-const RATE_LIMIT_BAR_WIDTH = 10;
+const ELLIPSIS = "…";
 const DAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 
+const WARN_PERCENT = 60;
+const CRIT_PERCENT = 85;
+const RATE_LIMIT_BAR_WIDTH = 10;
+// The context bar needs 8 blocks to keep the 60 and 85 percent thresholds visible (one block is 12.5 points)
+// and stops at 20, where each block is 5 points and a wider bar adds no information.
+const CONTEXT_BAR_MIN = 8;
+const CONTEXT_BAR_MAX = 20;
+// Claude Code keeps 2 cells of its own plus the 1 cell of `padding` that setup writes free on each side of the
+// status line, and clips what runs into them (measured in a live session), so a line may use only what is left.
+const STATUS_LINE_INSET = 6;
+const COMPACT_BELOW_COLUMNS = 60;
+const SHORT_TERMINAL_LINES = 20;
+const SHORT_MAX_LINES = 2;
+const MAX_LINES = 4;
+// A next-task label cut to fewer cells than this is a fragment, so the plan segment wraps instead.
+const MIN_LABEL_CELLS = 12;
+
 export const NERD_GLYPHS = {
-  branch: "\ue725",
-  folder: "\uf07c",
-  model: "\uf135",
-  clock: "\uf017",
-  vim: "\ue7c5",
-  worktree: "\ue728",
-  style: "\uf10c",
-  warn: "\uf071",
-  fiveHour: "\uf251",
-  weekly: "\uf073",
-  tasks: "\uf0ae",
-  effort: "\uf0e7",
-  thinking: "\uf0eb",
+  branch: "",
+  folder: "",
+  model: "",
+  clock: "",
+  vim: "",
+  worktree: "",
+  fiveHour: "",
+  weekly: "",
+  tasks: "",
+  effort: "",
 };
 
 type Glyphs = Record<keyof typeof NERD_GLYPHS, string>;
@@ -100,34 +105,31 @@ export const ASCII_GLYPHS: Glyphs = {
   clock: "~",
   vim: "V:",
   worktree: "W:",
-  style: "S:",
-  warn: "!",
   fiveHour: "5h",
   weekly: "7d",
   tasks: "T:",
   effort: "E:",
-  thinking: "[T]",
 };
 
 export const AGENT_GLYPHS = new Map([
-  ["explore", "\uf14e"],
-  ["hephaestus", "\uf0ad"],
-  ["librarian", "\uf02d"],
-  ["metis", "\uf002"],
-  ["momus", "\uf075"],
-  ["multimodal-looker", "\uf030"],
-  ["oracle", "\uf06e"],
-  ["prometheus", "\uf06d"],
-  ["sisyphus", "\uef08"],
-  ["executor", "\uf085"],
+  ["explore", ""],
+  ["hephaestus", ""],
+  ["librarian", ""],
+  ["metis", ""],
+  ["momus", ""],
+  ["multimodal-looker", ""],
+  ["oracle", ""],
+  ["prometheus", ""],
+  ["sisyphus", ""],
+  ["executor", ""],
 ]);
-const DEFAULT_AGENT_GLYPH = "\uf007";
+const DEFAULT_AGENT_GLYPH = "";
 
 const PR_STATES = new Map([
-  ["approved", { color: GREEN, nerd: "\uf00c", ascii: "+" }],
-  ["changes_requested", { color: RED, nerd: "\uf00d", ascii: "!" }],
-  ["pending", { color: YELLOW, nerd: "\uf017", ascii: "?" }],
-  ["draft", { color: DIM, nerd: "\uf040", ascii: "d" }],
+  ["approved", { color: GREEN, nerd: "", ascii: "+" }],
+  ["changes_requested", { color: RED, nerd: "", ascii: "!" }],
+  ["pending", { color: YELLOW, nerd: "", ascii: "?" }],
+  ["draft", { color: DIM, nerd: "", ascii: "d" }],
 ]);
 
 interface Ctx {
@@ -135,21 +137,22 @@ interface Ctx {
   git: GitInfo;
   nerd: boolean;
   g: Glyphs;
-  config: Config;
   now: Date;
 }
 
 export function detectNerdFont(env: Env): boolean {
-  for (const name of ["CLAUDE_STATUSLINE_NERD_FONT", "NERD_FONT"]) {
-    const value = env[name];
-    if (value !== undefined) return value.trim() === "1";
-  }
-  return true;
+  const value = env["CLAUDE_STATUSLINE_NERD_FONT"];
+  return value === undefined ? true : value.trim() === "1";
 }
 
+const positiveInt = (value: string | undefined): number | null => (/^\d+$/.test(value ?? "") && Number(value) > 0 ? Number(value) : null);
+
 export function terminalColumns(env: Env): number {
-  const columns = /^\d+$/.test(env.COLUMNS ?? "") ? Number(env.COLUMNS) : 0;
-  return columns > 0 ? columns : 80;
+  return positiveInt(env.COLUMNS) ?? 80;
+}
+
+export function terminalLines(env: Env): number | null {
+  return positiveInt(env.LINES);
 }
 
 export function projectDirOf(data: Payload): string {
@@ -165,7 +168,12 @@ export function fixed(x: number, digits: number): string {
 }
 
 const ANSI = /\x1b\[[0-9;]*m|\x1b\]8;;[^\x07\x1b]*(?:\x07|\x1b\\)/y;
+const ANSI_ALL = new RegExp(ANSI.source, "g");
 const OSC8_CLOSERS = ["\x1b]8;;\x07", "\x1b]8;;\x1b\\"];
+
+const textWidth = (s: string): number => displayWidth(s.replace(ANSI_ALL, ""));
+
+const SEP_WIDTH = textWidth(SEP);
 
 // Counts terminal cells, a wide code point as two. Escape sequences occupy none and are never cut in half; a link still open at the cut is closed.
 export function visibleTruncate(s: string, width: number): string {
@@ -193,9 +201,68 @@ export function visibleTruncate(s: string, width: number): string {
   return `${out}${linkOpen ? OSC8_CLOSERS[0] : ""}${RST}`;
 }
 
-const arrow = (nerd: boolean): string => (nerd ? "\u2192" : "->");
+/** A piece of the status line that is drawn whole. `width` is in terminal cells, between `min` and `max`. */
+export interface Segment {
+  min: number;
+  max: number;
+  grows: boolean;
+  draw(width: number): string;
+}
 
-const fileUrl = (path: string): string => pathToFileURL(path, { windows: inferPlatform(path) === "win32" }).href;
+export function block(text: string): Segment {
+  const width = textWidth(text);
+  return { min: width, max: width, grows: false, draw: () => text };
+}
+
+interface Placed {
+  segment: Segment;
+  width: number;
+}
+
+/**
+ * Fills lines with segments in priority order. A segment that does not fit wraps whole to the next
+ * line. When the lines run out, the segment and every lower one are dropped. A segment wider than
+ * the terminal is skipped, except the first, which a final cut keeps within the width. A growing
+ * segment is placed at its minimum, then takes the free cells left on its line up to its maximum.
+ */
+export function arrange(segments: readonly Segment[], columns: number, maxLines: number): string[] {
+  let line: Placed[] = [];
+  const lines = [line];
+  let used = 0;
+  for (const segment of segments) {
+    const opening = lines.length === 1 && line.length === 0;
+    if (segment.min > columns && !opening) continue;
+    let placed = false;
+    while (!placed) {
+      const room = columns - used - (line.length > 0 ? SEP_WIDTH : 0);
+      if (segment.min <= room || opening) {
+        const width = segment.grows ? segment.min : Math.min(segment.max, Math.max(room, segment.min));
+        used += (line.length > 0 ? SEP_WIDTH : 0) + width;
+        line.push({ segment, width });
+        placed = true;
+      } else if (lines.length < maxLines) {
+        line = [];
+        lines.push(line);
+        used = 0;
+      } else {
+        return lines.map((l) => drawLine(l, columns));
+      }
+    }
+  }
+  return lines.map((l) => drawLine(l, columns));
+}
+
+function drawLine(placed: readonly Placed[], columns: number): string {
+  let spare = columns - placed.reduce((sum, { width }) => sum + width, 0) - SEP_WIDTH * (placed.length - 1);
+  const pieces = placed.map(({ segment, width }) => {
+    const grown = segment.grows ? Math.min(segment.max, width + Math.max(0, spare)) : width;
+    spare -= grown - width;
+    return segment.draw(grown);
+  });
+  return visibleTruncate(pieces.join(SEP), columns);
+}
+
+const arrow = (nerd: boolean): string => (nerd ? "→" : "->");
 
 const osc8 = (url: string, text: string): string => `\x1b]8;;${url}\x07${text}\x1b]8;;\x07`;
 
@@ -204,32 +271,48 @@ function remoteToUrl(remote: string): string {
   return url.endsWith(".git") ? url.slice(0, -".git".length) : url;
 }
 
-function thresholdColor(pct: number, { warnPercent, critPercent }: Config): string {
-  return pct >= critPercent ? RED : pct >= warnPercent ? YELLOW : GREEN;
-}
+const thresholdColor = (pct: number): string => (pct >= CRIT_PERCENT ? RED : pct >= WARN_PERCENT ? YELLOW : GREEN);
 
 export function renderBar(pct: number, width: number, color: string): string {
   const filled = Number(fixed((Math.max(0, Math.min(100, pct)) / 100) * width, 0));
   return `${color}${FILLED_BLOCK}${RST}`.repeat(filled) + `${DIM}${EMPTY_BLOCK}${RST}`.repeat(width - filled);
 }
 
-function contextBar({ data, config }: Ctx): string {
-  const ctx = data.context_window ?? {};
+function contextPercent({ context_window: ctx }: Payload): number | null {
+  if (ctx == null) return null;
   const size = ctx.context_window_size ?? 200000;
-  const sizeLabel = size >= 1000000 ? "1M" : "200k";
-  let pct = ctx.used_percentage ?? (ctx.remaining_percentage != null ? 100 - ctx.remaining_percentage : null);
-  if (pct === null) {
-    const usage = ctx.current_usage;
-    if (usage == null || size <= 0) {
-      return `${DIM}${EMPTY_BLOCK.repeat(config.barWidth)}${RST} ${DIM}[waiting...]${RST}  ${DIM}${sizeLabel}${RST}`;
-    }
-    pct = (((usage.input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0)) / size) * 100;
-  }
-  pct = Math.max(0, Math.min(100, pct));
-  const color = thresholdColor(pct, config);
-  const warn = data.exceeds_200k_tokens && size <= 200000 ? ` ${RED}${BOLD}!${RST}` : "";
-  return `${renderBar(pct, config.barWidth, color)} ${color}${fixed(pct, 0)}%${RST}${warn}  ${DIM}${sizeLabel}${RST}`;
+  const pct = ctx.used_percentage ?? (ctx.remaining_percentage != null ? 100 - ctx.remaining_percentage : null);
+  if (pct !== null) return Math.max(0, Math.min(100, pct));
+  const usage = ctx.current_usage;
+  if (usage == null || size <= 0) return null;
+  const used = (usage.input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0);
+  return Math.max(0, Math.min(100, (used / size) * 100));
 }
+
+const sizeLabel = ({ context_window: ctx }: Payload): string => ((ctx?.context_window_size ?? 200000) >= 1000000 ? "1M" : "200k");
+
+function contextSegment(data: Payload): Segment {
+  const pct = contextPercent(data);
+  const size = `${DIM}${sizeLabel(data)}${RST}`;
+  const color = thresholdColor(pct ?? 0);
+  const warn = data.exceeds_200k_tokens && (data.context_window?.context_window_size ?? 200000) <= 200000 ? ` ${RED}${BOLD}!${RST}` : "";
+  const tail = pct === null ? ` ${DIM}[waiting...]${RST}  ${size}` : ` ${color}${fixed(pct, 0)}%${RST}${warn}  ${size}`;
+  const tailWidth = textWidth(tail);
+  return {
+    min: CONTEXT_BAR_MIN + tailWidth,
+    max: CONTEXT_BAR_MAX + tailWidth,
+    grows: true,
+    draw: (width) => {
+      const barWidth = width - tailWidth;
+      return `${pct === null ? `${DIM}${EMPTY_BLOCK.repeat(barWidth)}${RST}` : renderBar(pct, barWidth, color)}${tail}`;
+    },
+  };
+}
+
+const percentSegment = (data: Payload): Segment | null => {
+  const pct = contextPercent(data);
+  return pct === null ? null : block(`${thresholdColor(pct)}${fixed(pct, 0)}%${RST}`);
+};
 
 export function formatTokens(n: number): string {
   if (n >= 1_000_000) return `${fixed(n / 1_000_000, 1)}M`;
@@ -251,34 +334,48 @@ export function formatResetTime(resetsAt: number | null | undefined, now: Date):
   return reset.toDateString() === now.toDateString() ? time : `${DAYS[reset.getDay()]} ${time}`;
 }
 
-export function composeRepoPr(data: Payload, nerd: boolean): string {
-  const repo = data.workspace?.repo;
-  if (!repo?.name) return "";
-  const label = repo.owner ? `${repo.owner}/${repo.name}` : repo.name;
-  const display = repo.host && repo.owner ? osc8(`https://${repo.host}/${repo.owner}/${repo.name}`, label) : label;
-  const segment = `${DIM}${display}${RST}`;
+export function composePr(data: Payload, nerd: boolean): string {
   const pr = data.pr;
-  if (pr?.number == null) return segment;
+  if (pr?.number == null) return "";
   const number = `${pr.kind === "mr" ? "!" : "#"}${pr.number}`;
   const state = PR_STATES.get(pr.review_state ?? "");
   const stateSuffix = state ? ` ${state.color}${nerd ? state.nerd : state.ascii}${RST}` : "";
-  return `${segment} ${CYAN}${pr.url ? osc8(pr.url, number) : number}${RST}${stateSuffix}`;
+  return `${CYAN}${pr.url ? osc8(pr.url, number) : number}${RST}${stateSuffix}`;
 }
 
-export function todoCounter(projectDir: string, sessionId: string, nerd: boolean): string {
+export interface PlanProgress {
+  done: number;
+  total: number;
+  label: string | null;
+}
+
+export function readPlan(projectDir: string, sessionId: string): PlanProgress | null {
   try {
     const boulder = JSON.parse(readFileSync(join(projectDir, ".omca", "state", "boulder.json"), "utf8"));
     const planPath = resolveBoundPlan(boulder, sessionId, true).active_plan;
-    if (!planPath) return "";
+    if (!planPath) return null;
     const plan = readFileSync(planPath, "utf8");
     const states = checkboxStates(plan);
     const done = states.filter((state) => state === "x").length;
-    if (states.length === 0 || done === states.length) return "";
-    const label = nextTaskLabel(plan);
-    return `${GREEN}${(nerd ? NERD_GLYPHS : ASCII_GLYPHS).tasks} ${done}/${states.length}${RST}${label ? ` ${DIM}${arrow(nerd)} ${label}${RST}` : ""}`;
+    if (states.length === 0 || done === states.length) return null;
+    return { done, total: states.length, label: nextTaskLabel(plan) || null };
   } catch {
-    return "";
+    return null;
   }
+}
+
+function planSegment({ done, total, label }: PlanProgress, { nerd, g }: Ctx): Segment {
+  const count = `${GREEN}${g.tasks} ${done}/${total}${RST}`;
+  if (label === null) return block(count);
+  const head = `${count} ${DIM}${arrow(nerd)} `;
+  const headWidth = textWidth(head);
+  const labelWidth = displayWidth(label);
+  return {
+    min: headWidth + Math.min(labelWidth, MIN_LABEL_CELLS),
+    max: headWidth + labelWidth,
+    grows: false,
+    draw: (width) => `${head}${fitEnd(label, width - headWidth, ELLIPSIS)}${RST}`,
+  };
 }
 
 export function agentGlyph(name: string, nerd: boolean): string {
@@ -286,143 +383,96 @@ export function agentGlyph(name: string, nerd: boolean): string {
   return AGENT_GLYPHS.get(name.replace(/^oh-my-claudeagent:/, "")) ?? DEFAULT_AGENT_GLYPH;
 }
 
-const isOmcaDefault = (style: string): boolean => style.slice(style.indexOf(":") + 1).trim() === "OMCA Default";
+const modelName = ({ data }: Ctx): string => data.model?.display_name ?? "Claude";
 
-const modelSegment = ({ data, g }: Ctx): string => `${CYAN}${g.model} ${data.model?.display_name ?? "Claude"}${RST}`;
+function branchOf({ data, git }: Ctx): string {
+  return data.worktree?.branch || (git.repo ? git.branch : "");
+}
 
-function infoLine(c: Ctx): { line: string; extra: boolean } {
-  const { data, git, nerd, g } = c;
-  const parts = [modelSegment(c)];
-  let extra = false;
+function branchSegment(c: Ctx): Segment | null {
+  const branch = branchOf(c);
+  if (!branch) return null;
+  const { git, g } = c;
+  const counts = [
+    git.modified > 0 ? `${YELLOW}~${git.modified}${RST}` : "",
+    git.staged > 0 ? `${GREEN}+${git.staged}${RST}` : "",
+    git.untracked > 0 ? `${DIM}?${git.untracked}${RST}` : "",
+  ].filter(Boolean);
+  return block(`${WHITE}${g.branch} ${branch}${RST}${counts.length > 0 ? ` ${counts.join("  ")}` : ""}`);
+}
 
-  const effort = `${data.effort?.level ?? ""}`.trim();
-  if (effort) {
-    parts.push(`${YELLOW}${g.effort} ${effort}${RST}`);
-    extra = true;
-  }
-  if (data.thinking?.enabled) {
-    parts.push(`${CYAN}${g.thinking}${RST}`);
-    extra = true;
-  }
-
+function directorySegment({ data, git, g }: Ctx): Segment | null {
   const projectDir = projectDirOf(data);
-  if (projectDir) {
-    const todo = todoCounter(projectDir, data.session_id ?? "", nerd);
-    if (todo) {
-      parts.push(todo);
-      extra = true;
-    }
-  }
-
-  const sessionLabel = data.session_name ?? (data.session_id != null ? data.session_id.slice(0, 8) : null);
-  if (sessionLabel !== null) {
-    parts.push(`${DIM}${data.transcript_path ? osc8(fileUrl(data.transcript_path), sessionLabel) : sessionLabel}${RST}`);
-  }
-
-  const branch = data.worktree?.branch || (git.repo ? git.branch : "");
-  if (branch) {
-    extra = true;
-    parts.push(`${WHITE}${g.branch} ${branch}${RST}`);
-    const counts = [
-      git.modified > 0 ? `${YELLOW}~${git.modified}${RST}` : "",
-      git.staged > 0 ? `${GREEN}+${git.staged}${RST}` : "",
-      git.untracked > 0 ? `${DIM}?${git.untracked}${RST}` : "",
-    ].filter(Boolean);
-    if (counts.length > 0) parts.push(counts.join("  "));
-  }
-
-  const dirName = baseName(inferPlatform(projectDir), projectDir);
-  if (dirName) {
-    const remoteUrl = remoteToUrl(git.remote);
-    parts.push(`${DIM}${g.folder} ${remoteUrl ? osc8(remoteUrl, dirName) : dirName}${RST}`);
-  }
-
-  const addedDirs = data.workspace?.added_dirs?.length ?? 0;
-  if (addedDirs > 0) {
-    extra = true;
-    parts.push(`${DIM}+${addedDirs} dir${addedDirs === 1 ? "" : "s"}${RST}`);
-  }
-
-  const repoPr = composeRepoPr(data, nerd);
-  if (repoPr) {
-    extra = true;
-    parts.push(repoPr);
-  }
-
-  if (data.agent != null) {
-    extra = true;
-    if (data.agent.name) parts.push(`${MAGENTA}${agentGlyph(data.agent.name, nerd)} ${data.agent.name}${RST}`);
-  }
-
-  if (data.worktree != null) {
-    extra = true;
-    const { name, original_branch: original } = data.worktree;
-    if (name) parts.push(`${BLUE}${g.worktree} ${name}${RST}${original ? ` ${DIM}<- ${original}${RST}` : ""}`);
-  }
-
-  const style = data.output_style?.name ?? "default";
-  if (style && style !== "default") {
-    extra = true;
-    parts.push(isOmcaDefault(style) ? `${DIM}${g.style} OMCA Default${RST}` : `${RED}${g.warn} DEGRADED: ${style}${RST}`);
-  }
-
-  if (data.vim != null) {
-    extra = true;
-    if (data.vim.mode) parts.push(`${YELLOW}${g.vim} ${data.vim.mode[0]}${RST}`);
-  }
-
-  if (data.version != null) parts.push(`${DIM}v${data.version}${RST}`);
-  return { line: parts.join(SEP), extra };
+  const name = baseName(inferPlatform(projectDir), projectDir);
+  if (!name) return null;
+  const remoteUrl = remoteToUrl(git.remote);
+  return block(`${DIM}${g.folder} ${remoteUrl ? osc8(remoteUrl, name) : name}${RST}`);
 }
 
-const costSegment = ({ data }: Ctx): string => `${MAGENTA}$${data.cost?.total_cost_usd != null ? fixed(data.cost.total_cost_usd, 2) : "0.00"}${RST}`;
-
-const clockSegment = ({ data, g }: Ctx): string => `${BLUE}${g.clock} ${formatDuration(data.cost?.total_duration_ms)}${RST}`;
-
-function metricsLine(c: Ctx): string {
-  const { data } = c;
-  const parts = [contextBar(c), costSegment(c), clockSegment(c)];
-  const added = data.cost?.total_lines_added ?? 0;
-  const removed = data.cost?.total_lines_removed ?? 0;
-  const changed = [added > 0 ? `${GREEN}+${added}${RST}` : "", removed > 0 ? `${RED}-${removed}${RST}` : ""].filter(Boolean);
-  if (changed.length > 0) parts.push(changed.join("/"));
-  const tokens = (data.context_window?.total_input_tokens ?? 0) + (data.context_window?.total_output_tokens ?? 0);
-  if (tokens > 0) parts.push(`${DIM}${formatTokens(tokens)} tok${RST}`);
-  const apiMs = data.cost?.total_api_duration_ms;
-  if (apiMs != null) parts.push(`${DIM}api ${Math.floor(apiMs / 1000)}s${RST}`);
-  return parts.join(SEP);
-}
-
-function rateLimitLine({ data, g, config, now }: Ctx): string | null {
+function rateLimitSegments({ data, g, now }: Ctx): Segment[] {
   const windows = [
     { window: data.rate_limits?.five_hour, glyph: g.fiveHour },
     { window: data.rate_limits?.seven_day, glyph: g.weekly },
   ];
-  const parts: string[] = [];
-  for (const { window, glyph } of windows) {
+  return windows.flatMap(({ window, glyph }) => {
     const pct = window?.used_percentage;
-    if (pct == null) continue;
-    const color = thresholdColor(pct, config);
+    if (pct == null) return [];
+    const color = thresholdColor(pct);
     const reset = formatResetTime(window?.resets_at, now);
-    parts.push(`${renderBar(pct, RATE_LIMIT_BAR_WIDTH, color)} ${color}${fixed(pct, 0)}%${RST} ${DIM}${glyph} ${RST}${reset ? `(resets ${reset})` : ""}`);
-  }
-  return parts.length > 0 ? parts.join(SEP) : null;
+    return [block(`${renderBar(pct, RATE_LIMIT_BAR_WIDTH, color)} ${color}${fixed(pct, 0)}%${RST} ${DIM}${glyph}${RST}${reset ? ` (resets ${reset})` : ""}`)];
+  });
 }
 
-function degradedTip({ data, nerd }: Ctx): string | null {
-  const style = data.output_style?.name ?? "default";
-  if (!style || style === "default" || isOmcaDefault(style)) return null;
-  const pointer = arrow(nerd);
-  return `${DIM}${pointer} run ${RST}${YELLOW}/oh-my-claudeagent:omca-setup${RST}${DIM} to diagnose / clear pin ${pointer} restart Claude Code to load OMCA Default${RST}`;
+const present = (segments: readonly (Segment | null)[]): Segment[] => segments.filter((s) => s !== null);
+
+function fullSegments(c: Ctx): Segment[] {
+  const { data, nerd, g } = c;
+  const effort = `${data.effort?.level ?? ""}`.trim();
+  const projectDir = projectDirOf(data);
+  const plan = projectDir ? readPlan(projectDir, data.session_id ?? "") : null;
+  const worktree = data.worktree;
+  const pr = composePr(data, nerd);
+  const cost = data.cost;
+  const added = cost?.total_lines_added ?? 0;
+  const removed = cost?.total_lines_removed ?? 0;
+  const changed = [added > 0 ? `${GREEN}+${added}${RST}` : "", removed > 0 ? `${RED}-${removed}${RST}` : ""].filter(Boolean);
+  const addedDirs = data.workspace?.added_dirs?.length ?? 0;
+  return present([
+    block(`${CYAN}${g.model} ${modelName(c)}${RST}${effort ? `${SEP}${YELLOW}${g.effort} ${effort}${RST}` : ""}`),
+    data.vim?.mode ? block(`${YELLOW}${g.vim} ${data.vim.mode[0]}${RST}`) : null,
+    plan ? planSegment(plan, c) : null,
+    contextSegment(data),
+    branchSegment(c),
+    directorySegment(c),
+    data.agent?.name ? block(`${MAGENTA}${agentGlyph(data.agent.name, nerd)} ${data.agent.name}${RST}`) : null,
+    worktree?.name ? block(`${BLUE}${g.worktree} ${worktree.name}${RST}${worktree.original_branch ? ` ${DIM}<- ${worktree.original_branch}${RST}` : ""}`) : null,
+    pr ? block(pr) : null,
+    block(`${MAGENTA}$${cost?.total_cost_usd != null ? fixed(cost.total_cost_usd, 2) : "0.00"}${RST}${SEP}${BLUE}${g.clock} ${formatDuration(cost?.total_duration_ms)}${RST}`),
+    ...rateLimitSegments(c),
+    changed.length > 0 ? block(changed.join("/")) : null,
+    addedDirs > 0 ? block(`${DIM}+${addedDirs} dir${addedDirs === 1 ? "" : "s"}${RST}`) : null,
+  ]);
+}
+
+function compactSegments(c: Ctx): Segment[] {
+  const { data } = c;
+  const projectDir = projectDirOf(data);
+  const plan = projectDir ? readPlan(projectDir, data.session_id ?? "") : null;
+  const branch = branchOf(c);
+  return present([
+    block(`${CYAN}${c.g.model} ${modelName(c)}${RST}`),
+    plan ? block(`${GREEN}${c.g.tasks} ${plan.done}/${plan.total}${RST}`) : null,
+    percentSegment(data),
+    branch ? block(`${WHITE}${c.g.branch} ${branch}${RST}`) : null,
+  ]);
 }
 
 export function render(data: Payload, git: GitInfo, env: Env, now: Date): string {
   const nerd = detectNerdFont(env);
-  const c: Ctx = { data, git, nerd, g: nerd ? NERD_GLYPHS : ASCII_GLYPHS, config: readConfig(env), now };
+  const c: Ctx = { data, git, nerd, g: nerd ? NERD_GLYPHS : ASCII_GLYPHS, now };
   const columns = terminalColumns(env);
-  const { line, extra } = infoLine(c);
-  const lines = git.repo || extra
-    ? [line, metricsLine(c), rateLimitLine(c), degradedTip(c)].filter((l) => l !== null)
-    : [[modelSegment(c), contextBar(c), costSegment(c), clockSegment(c)].join(SEP)];
-  return lines.map((l) => visibleTruncate(l, columns)).join("\n");
+  const width = Math.max(1, columns - STATUS_LINE_INSET);
+  if (columns < COMPACT_BELOW_COLUMNS) return arrange(compactSegments(c), width, 1).join("\n");
+  const rows = terminalLines(env);
+  return arrange(fullSegments(c), width, rows !== null && rows < SHORT_TERMINAL_LINES ? SHORT_MAX_LINES : MAX_LINES).join("\n");
 }

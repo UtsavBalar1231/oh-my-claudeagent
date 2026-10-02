@@ -1,4 +1,5 @@
 {
+  "lastResortCut": true,
   "env": {
     "COLUMNS": "30",
     "CLAUDE_STATUSLINE_NERD_FONT": "0"

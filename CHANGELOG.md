@@ -20,6 +20,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   option; set it again to `on`.
 - `omca-setup` checks dependencies and the runtime, configures the status lines and applies
   the force-style opt-out. Its `--check` and `--doctor` modes point at `/omca doctor`.
+- **The status line adapts to the terminal.** It reads the `COLUMNS` and `LINES` that Claude
+  Code sets and fills lines by priority: model and effort, plan progress with the next open
+  task, the context bar, git branch and counts, the directory, agent, worktree and pull request,
+  cost and duration, the 5 hour and 7 day usage limits, lines changed, and extra directories. A
+  segment that does not fit wraps whole to the next line, and when the lines run out the lowest
+  segments drop first. Only the next-task label is ellipsized. The context bar is 8 to 20 blocks
+  wide and takes the free cells on its line. Under 20 rows it uses at most two lines, otherwise
+  four, and under 60 columns it draws one compact line of model, plan count, context percentage
+  and branch. Widths count terminal cells, so wide characters take two, and lines stop 6 cells
+  short of `COLUMNS`, the 3 cells Claude Code keeps free on each side. A line as wide as
+  `COLUMNS` is clipped by Claude Code with a trailing ellipsis. Subagent rows drop
+  segments by the same rule, in the order name, model, status, effort, context.
+- The directory now shows in every project, not only in a git repository, and the pull request
+  segment shows the number without the repository name.
 
 ### Removed
 
@@ -31,6 +45,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `bin/omca-status`, `bin/omca-doctor` and `bin/omca-subagent-statusline`, and the Python
   status line package. The plugin `settings.json` no longer sets `subagentStatusLine`: Claude
   Code does not resolve `${CLAUDE_PLUGIN_ROOT}` in it, so it never found its script.
+- **The status line's tuning variables.** `CLAUDE_STATUSLINE_BAR_WIDTH` (20),
+  `CLAUDE_STATUSLINE_THRESHOLD_WARN` (60), `CLAUDE_STATUSLINE_THRESHOLD_CRIT` (85),
+  `CLAUDE_STATUSLINE_CACHE_TTL` (5) and `CLAUDE_STATUSLINE_GIT_TIMEOUT` (3) are gone, and
+  `statusline/config.ts` with them. Each value is now a fixed constant at the old default, except
+  the bar width, which follows the free space on its line between 8 and 20 blocks. The generic
+  `NERD_FONT` fallback is no longer read either: `CLAUDE_STATUSLINE_NERD_FONT=0` is the only
+  override, for ASCII glyphs in place of Nerd Font glyphs.
+- **Status line segments** that stay constant within a session, repeat another segment, or have
+  a command of their own: the thinking marker (`[T]`), the session name or id, the Claude Code
+  version (`/omca doctor` reports it), the output style name and the tip line that restored it,
+  the raw token total, the API time, and the repository name beside the pull request.
 
 ### Upgrading
 

@@ -1,48 +1,86 @@
 # Statusline
 
-Renders the Claude Code status line from the JSON payload on stdin: model, plan progress, git
-state, context usage, cost, duration, and usage limits, with ANSI colors and optional Nerd Font
-glyphs. The renderer runs on bun and has no dependencies.
+Renders the Claude Code status line from the JSON payload on stdin: model, plan progress,
+context usage, git state, cost, duration and usage limits, with ANSI colors and optional Nerd
+Font glyphs. It lays itself out from the size of the terminal and takes no tuning settings. The
+renderer runs on bun and has no dependencies.
 
 ---
 
 ## What it shows
 
-In a git project with an active session, the output is up to four lines:
+In a git project with an active session, an 80 column terminal gets four lines. The 7 day
+limit, the lines changed and the extra directories are the lowest segments and do not fit:
 
 ```
-> Opus 5.5 · E: high · T: 1/3 -> Wire up the widget · 11111111 · * main ~2 +1 · > my-project
-▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 34%  200k · $0.12 · ~ 1m 42s · +87/-23
-▰▰▰▱▱▱▱▱▱▱ 28% 5h (resets 4pm) · ▰▰▱▱▱▱▱▱▱▱ 18% 7d (resets thu 9am)
+> Opus 5.5 · E: high · T: 2/4 -> Wire the order summary panel into the pa…
+▰▰▰▰▰▱▱▱▱▱▱▱▱▱ 34%  200k · * feature/checkout-redesign ~3  +2  ?1 · > shop
+A: oh-my-claudeagent:executor · W: checkout-wt <- main · #42 +
+$1.50 · ~ 2m 5s · ▰▰▰▰▱▱▱▱▱▱ 45% 5h (resets 6pm)
 ```
 
-The sample shows the ASCII glyphs; with Nerd Font glyphs on, each label is a glyph instead.
+A 200 column terminal holds every segment on two lines, and a terminal under 60 columns gets one
+compact line:
 
-**Line 1, context info**: model name, effort level, thinking marker, bound plan progress with
-the next open task, session name or id (a link to the transcript when the payload has its path),
-git branch and status counts, project directory name (a link to the remote when there is one),
-extra directories, repository and pull request, active agent, worktree, output style, vim mode,
-and the client version.
+```
+> Opus 5.5 · T: 2/4 · 34% · * main
+```
 
-**Line 2, metrics**: context window usage bar with percentage and window size label, session
-cost, total duration, lines added and removed, token total, API time.
+The samples show the ASCII glyphs. With Nerd Font glyphs on, each label is a glyph instead.
 
-**Line 3, usage limits**: 5-hour and 7-day utilization bars with reset times. Omitted when the
-`rate_limits` field is absent from the payload, which happens for everyone but Claude.ai Pro and
-Max subscribers before the first API response.
+The segments, in priority order. Each appears only when it has something to show.
 
-**Tip line**: shown when the output style is neither `default` nor OMCA Default, with the command
-that restores it.
+1. Model and effort, then the vim mode when vim mode is on (setup hides the platform's own mode
+   indicator, so this is the only one).
+2. Plan progress for the plan bound to the session, with the label of its next open task.
+3. Context window bar with its percentage and window size. A red `!` follows the percentage when
+   the context passes 200k tokens on a 200k window.
+4. Git branch with modified, staged and untracked counts. A session in a worktree shows the
+   worktree's branch.
+5. Project directory name, linked to the remote when there is one.
+6. Active agent, worktree name with the branch it came from, and pull request number with its
+   review state, each its own segment.
+7. Session cost and duration.
+8. Usage limits: the 5 hour window, then the 7 day window, each with a bar and its reset time.
+   They are absent from the payload for everyone but Claude.ai Pro and Max subscribers, and until
+   the first API response.
+9. Lines added and removed.
+10. Extra directories added to the session.
 
-**Single-line fallback**: with no git repository, no agent, no worktree, no vim mode, and nothing
-else extra on line 1, lines 1 and 2 collapse into one line holding the model, bar, cost, and
-duration.
-
-Progress bars are green below 60%, yellow from 60% to 84%, and red from 85%. A red `!` follows
-the percentage when the context passes 200k tokens on a 200k window. Every line is cut to the
-terminal width, so a long line never wraps.
+The status line leaves out what stays constant within a session, repeats another segment, or has
+a command of its own: the thinking marker, the session name or id, the client version, the output
+style name and its restore tip, the token total, the API time and the repository name (the
+directory links to the remote, and the pull request carries its number). `/omca doctor` reports
+the client version.
 
 On any unreadable input, or a payload without a model, the output is `[claude]`.
+
+---
+
+## How it adapts
+
+Claude Code sets `COLUMNS` and `LINES` before it runs the command. A missing or invalid `COLUMNS`
+reads as 80. A missing or invalid `LINES` reads as a tall terminal. Widths are terminal cells, so
+a wide character such as a CJK glyph counts as two.
+
+- **Margins.** Claude Code keeps 2 cells of its own plus the 1 cell of `padding` that setup
+  writes free on each side of the status line, and clips whatever runs into them. Every line is
+  therefore laid out in `COLUMNS` minus 6 cells.
+- **Fill by priority.** Segments fill lines in the order above, three cells apart. A segment that
+  does not fit wraps whole to the next line, and a segment is never cut. A segment wider than the
+  terminal is skipped.
+- **Lines run out.** A terminal under 20 rows gets at most two lines, any other at most four.
+  When the lines are full, the segment that did not fit and every lower one are dropped.
+- **The next-task label** is the only text that is ellipsized, to the room its line has. When
+  fewer than 12 cells of label would fit, the whole plan segment wraps instead.
+- **The context bar** is 8 blocks at the least and 20 at the most, and takes the free cells left
+  on its line. Eight blocks keep the 60% and 85% color thresholds apart (one block is 12.5
+  points), and past 20 blocks a block is under 5 points and the bar adds nothing.
+- **Under 60 terminal columns** the output is one compact line of model, plan count, context percentage
+  and branch, dropping from the right when they do not fit.
+- **Colors and links.** Bars and percentages are green below 60%, yellow from 60% to 84% and red
+  from 85%, fixed values. Links use OSC 8 and always close with their text.
+- **A model name wider than a line** is the one case that is cut, because the line must still fit.
 
 ---
 
@@ -85,30 +123,27 @@ any field.
 
 ## Configuration
 
-All configuration is by environment variable.
+The layout, bar widths, color thresholds, git cache lifetime (5 seconds) and git timeout (3
+seconds) are fixed in the code. These environment variables are read:
 
 | Variable | Default | Effect |
 |---|---|---|
-| `CLAUDE_STATUSLINE_NERD_FONT` | `1` | `1` uses Nerd Font glyphs, anything else uses ASCII. Takes precedence over `NERD_FONT`. |
-| `NERD_FONT` | `1` | Fallback preference when `CLAUDE_STATUSLINE_NERD_FONT` is not set. |
-| `COLUMNS` | `80` | Terminal width the lines are cut to. A value that is not a positive integer is ignored. |
-| `CLAUDE_STATUSLINE_BAR_WIDTH` | `20` | Width of the context bar in blocks. |
-| `CLAUDE_STATUSLINE_THRESHOLD_WARN` | `60` | Percentage where bars turn yellow. |
-| `CLAUDE_STATUSLINE_THRESHOLD_CRIT` | `85` | Percentage where bars turn red. |
-| `CLAUDE_STATUSLINE_CACHE_TTL` | `5` | Seconds a git read is reused. `0` reads git on every render. |
-| `CLAUDE_STATUSLINE_GIT_TIMEOUT` | `3` | Seconds before a git command is abandoned and its counts read as zero. |
+| `CLAUDE_STATUSLINE_NERD_FONT` | `1` | `1` uses Nerd Font glyphs, anything else uses ASCII. Set `0` when the terminal font has no Nerd Font glyphs, or for plain-text output. |
+| `COLUMNS` | `80` | Terminal width in cells. Claude Code sets it. A value that is not a positive integer is ignored. |
+| `LINES` | tall | Terminal height. Claude Code sets it. Under 20 the status line takes at most two lines. |
 | `OMCA_SUBAGENT_STATUSLINE_DUMP` | unset | Path. Appends each raw `subagentStatusLine` stdin payload to this file as JSONL. Opt-in capture for answering platform-payload questions; no rotation. |
 
 Without Nerd Font glyphs the renderer falls back to ASCII: `*` for the branch, `>` for the model
-and folder, `~` for the clock, `E:` for effort, `[T]` for thinking, `T:` for plan progress, `5h`
-and `7d` for the usage windows.
+and folder, `~` for the clock, `E:` for effort, `V:` for vim mode, `W:` for the worktree, `T:`
+for plan progress, `5h` and `7d` for the usage windows.
 
 ---
 
-## Plan token
+## Plan segment
 
-Line 1 shows `<done>/<total>` for the plan bound to the session, followed by the label of its
-first open task cut to 80 characters. The token resolves through `src/core/boulder.ts` in strict
+The plan segment shows `<done>/<total>` for the plan bound to the session, followed by the label
+of its first open task. The label is cut to 80 characters when the plan is read, and further to
+fit its line. The segment resolves through `src/core/boulder.ts` in strict
 mode: it appears only when `.omca/state/boulder.json` has a binding for the payload's
 `session_id` whose plan file still exists and has an open numbered task. A session with no
 binding shows nothing, and so does a plan with every task checked. The renderer only reads the
@@ -116,9 +151,9 @@ registry.
 
 ---
 
-## Rate limits
+## Usage limits
 
-Line 3 comes from the `rate_limits` field of the payload:
+The usage-limit segments come from the `rate_limits` field of the payload:
 
 ```json
 {
@@ -131,7 +166,7 @@ Line 3 comes from the `rate_limits` field of the payload:
 
 Each window is independent and `resets_at` is Unix epoch seconds. A reset later today reads
 `5pm`, any other day reads `thu 5pm`, both in the local time zone. A window without
-`used_percentage` is skipped, and with neither window there is no line.
+`used_percentage` is skipped, and with neither window there is no segment.
 
 ---
 
@@ -143,8 +178,7 @@ modified, and untracked counts. The `origin` URL comes from `git remote get-url 
 honors `url.insteadOf` rewrites and `includeIf` config, and is re-read at most once a minute.
 SSH remotes (`git@host:user/repo.git`) become HTTPS for the link on the directory name.
 
-The result is cached for `CLAUDE_STATUSLINE_CACHE_TTL` seconds in
-`<tmpdir>/omca-statusline-git-<hash>`, where the hash comes from the project directory path.
+The result is cached for 5 seconds in `<tmpdir>/omca-statusline-git-<hash>`, where the hash comes from the project directory path.
 Status and remote run at the same time.
 
 ---
@@ -154,15 +188,17 @@ Status and remote run at the same time.
 | File | Purpose |
 |---|---|
 | `main.ts` | Entry point: reads stdin, reads git, prints the render. |
-| `render.ts` | Payload types, line composition, and every formatting helper. |
+| `render.ts` | Payload types, the segments, the layout (`arrange`), and every formatting helper. |
 | `git.ts` | Branch, status counts, remote, and the cache. |
-| `config.ts` | Environment-variable settings. |
 | `subagent.ts` | Entry point for the subagent rows. |
 | `launcher.ts` | Copied to `~/.claude/omca/statusline.ts`; runs the newest installed renderer. |
 | `*.spec.ts` | `bun test statusline`. |
 
-`fixtures.spec.ts` renders every case in `tests/fixtures/statusline/` and compares it byte for
-byte with the recorded `.txt` file beside it. A case with `repo` runs `main.ts` against a real
+`fixtures.spec.ts` renders every case in `tests/fixtures/statusline/`, compares it byte for byte
+with the recorded `.txt` file beside it, and checks that no line is wider than the case's `COLUMNS` minus 6
+(wide characters count as two) and that no segment is cut. The `width-*` cases run one rich payload
+at 40, 60, 80, 120 and 200 columns and `height-15` at 15 rows. A case with `lastResortCut` set
+skips the cut check. A case with `repo` runs `main.ts` against a real
 git repository the spec builds; every other case calls `render` with a fixed clock
 (`2026-10-02T12:00:00Z`, UTC) and the git state written in the case. Cases with `files` have those
 files written under the temporary root first. After an intended change to the output, rewrite the
@@ -211,15 +247,17 @@ compact token count.
 Each row shows the agent name with any namespace prefix stripped and its themed glyph, the model,
 the status, the configured effort, and context usage. A task without a `name` shows its `label`,
 then its `type`. The model is the task's own `model` field; when that is absent, a task named
-`oh-my-claudeagent:<agent>` takes the tier from that agent's frontmatter. Rows are cut to the
-payload's `columns`, then `COLUMNS`, then 80. Any unreadable input prints nothing, so the tasks
+`oh-my-claudeagent:<agent>` takes the tier from that agent's frontmatter. A row fits the
+payload's `columns`, then `COLUMNS`, then 80, by the same rule as the main line: segments are
+added in the order name, model, status, effort, context, and the first one that does not fit is
+dropped along with every later one. Only a name wider than the row is cut. Any unreadable input prints nothing, so the tasks
 panel keeps its default rows.
 
 ---
 
 ## Agent icons
 
-With Nerd Font glyphs on, line 1 shows an icon next to the active agent name. The lookup strips
+With Nerd Font glyphs on, the status line shows an icon next to the active agent name. The lookup strips
 the `oh-my-claudeagent:` prefix (`oh-my-claudeagent:sisyphus` resolves to `sisyphus`), and any
 name outside the table falls back to `nf-fa-user`.
 

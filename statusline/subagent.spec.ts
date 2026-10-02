@@ -164,6 +164,33 @@ describe("width", () => {
     expect(rows({ columns: 40, tasks: [{ id: "t1", ...long }] }, { COLUMNS: "30" })[0]?.content).toBe(`${W}A: ${"a".repeat(37)}${R}`);
   });
 
+  describe("segments drop by priority within the width", () => {
+    const full = { name: "executor", model: "sonnet", status: "in_progress", effort: "xhigh", tokenCount: 50000, contextWindowSize: 200000 };
+    const at = (columns: number): string | undefined => rows({ columns, tasks: [{ id: "t1", ...full }] })[0]?.content;
+    const parts = [name("executor"), model("Sonnet"), `${Y}in_progress${R}`, `${Y}E: xhigh${R}`, `${D}25% ctx${R}`];
+
+    test.each([
+      [57, 5],
+      [56, 4],
+      [47, 4],
+      [46, 3],
+      [36, 3],
+      [35, 2],
+      [22, 2],
+      [21, 1],
+    ])("%p columns keep the first %p segments", (columns, kept) => {
+      expect(at(columns)).toBe(row(...parts.slice(0, kept)));
+    });
+
+    test("a segment is never cut: a lower one is dropped when a higher one does not fit", () => {
+      expect(at(50)).toBe(row(...parts.slice(0, 4)));
+    });
+
+    test("a name wider than the row is cut alone", () => {
+      expect(rows({ columns: 10, tasks: [{ id: "t1", name: "a".repeat(30), model: "opus" }] })[0]?.content).toBe(`${W}A: ${"a".repeat(7)}${R}`);
+    });
+  });
+
   test("the width falls back to 80", () => {
     expect(rows({ tasks: [{ id: "t1", name: "a".repeat(100) }] })[0]?.content).toBe(`${W}A: ${"a".repeat(77)}${R}`);
   });

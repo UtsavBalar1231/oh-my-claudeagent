@@ -3,7 +3,9 @@ import { join } from "node:path";
 import { parseFrontmatter } from "../src/core/frontmatter.ts";
 import {
   agentGlyph,
+  arrange,
   ASCII_GLYPHS,
+  block,
   detectNerdFont,
   DIM,
   fixed,
@@ -12,9 +14,7 @@ import {
   NERD_GLYPHS,
   RED,
   RST,
-  SEP,
   terminalColumns,
-  visibleTruncate,
   WHITE,
   YELLOW,
 } from "./render.ts";
@@ -90,7 +90,7 @@ function row(task: Task, nerd: boolean, columns: number): string {
         : `${DIM}${formatTokens(tokens)} tok${RST}`,
     );
   }
-  return visibleTruncate(parts.join(SEP), columns);
+  return arrange(parts.map(block), columns, 1).join("");
 }
 
 try {

@@ -297,6 +297,12 @@ The `statusLine` entry carries `padding: 1`, `hideVimModeIndicator: true` and
 file is kept as `~/.claude/settings.json.omca-bak`, and `/oh-my-claudeagent:omca-setup
 --uninstall` removes both entries and the launcher. With `off`, setup leaves both keys alone.
 
+The status line takes no tuning settings. It lays itself out from the `COLUMNS` and `LINES` that
+Claude Code sets, and the bar widths, color thresholds, git cache lifetime and git timeout are
+fixed. The one environment override is `CLAUDE_STATUSLINE_NERD_FONT=0`, which draws ASCII
+glyphs in place of Nerd Font glyphs. See [`statusline/README.md`](../../statusline/README.md) for
+the layout rules.
+
 ## Project rules (`.omca/rules/`)
 
 Two rule directories exist and they load by different mechanisms. `.claude/rules/*.md` is

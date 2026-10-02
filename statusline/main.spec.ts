@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -37,7 +37,9 @@ describe("fallback", () => {
 });
 
 describe("git cache", () => {
-  test("a git read is reused until the cache lifetime from the environment runs out", () => {
+  const cacheFiles = (): string[] => readdirSync(root).filter((name) => name.startsWith("omca-statusline-git-"));
+
+  test("a git read is reused for five seconds and read again after that", () => {
     const project = join(root, "project");
     mkdirSync(project);
     Bun.spawnSync(["git", "-C", project, "init", "-q", "-b", "main"]);
@@ -47,14 +49,18 @@ describe("git cache", () => {
     writeFileSync(join(project, "new.txt"), "x\n");
 
     expect(first).not.toContain("?1");
-    expect(readdirSync(root).filter((name) => name.startsWith("omca-statusline-git-"))).toHaveLength(1);
+    expect(cacheFiles()).toHaveLength(1);
     expect(run(payload).stdout).toBe(first);
-    expect(run(payload, { CLAUDE_STATUSLINE_CACHE_TTL: "0" }).stdout).toContain("?1");
+
+    const aged = new Date(Date.now() - 6000);
+    utimesSync(join(root, cacheFiles()[0] ?? ""), aged, aged);
+    expect(run(payload).stdout).toContain("?1");
   });
 
-  test("a payload without a project directory renders the single line without touching git", () => {
+  test("a payload without a project directory renders without touching git", () => {
     const { stdout } = run('{"model": {"display_name": "m"}}');
     expect(stdout.split("\n")).toHaveLength(2);
+    expect(stdout).toContain("> m");
     expect(readdirSync(root)).toEqual([]);
   });
 });

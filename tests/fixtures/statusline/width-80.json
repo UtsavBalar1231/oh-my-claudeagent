@@ -1,0 +1,97 @@
+{
+  "env": {
+    "CLAUDE_STATUSLINE_NERD_FONT": "0",
+    "COLUMNS": "80"
+  },
+  "git": {
+    "repo": true,
+    "branch": "feature/checkout-redesign",
+    "staged": 2,
+    "modified": 3,
+    "untracked": 1,
+    "remote": "git@github.com:acme/shop.git"
+  },
+  "files": {
+    "width-80/shop/.omca/state/boulder.json": {
+      "plans": {
+        "checkout": {
+          "active_plan": "@ROOT@/width-80/shop/plan.md",
+          "started_at": "2026-10-01T00:00:00Z",
+          "session_ids": [
+            "11111111-2222-3333-4444-555555555555"
+          ],
+          "agent": "sisyphus"
+        }
+      },
+      "bindings": {
+        "11111111-2222-3333-4444-555555555555": {
+          "plan_name": "checkout",
+          "bound_at": 1786000000
+        }
+      }
+    },
+    "width-80/shop/plan.md": "# Plan\n- [x] 1. Scaffold the checkout module\n- [x] 2. Move the cart totals into it\n- [ ] 3. Wire the order summary panel into the payment step and cover it with a test\n- [ ] 4. Replace the legacy confirmation page\n"
+  },
+  "payload": {
+    "model": {
+      "id": "claude-opus-5-5",
+      "display_name": "Opus 5.5"
+    },
+    "workspace": {
+      "current_dir": "@ROOT@/width-80/shop",
+      "project_dir": "@ROOT@/width-80/shop",
+      "added_dirs": [
+        "/home/dev/shared",
+        "/home/dev/tools"
+      ]
+    },
+    "session_id": "11111111-2222-3333-4444-555555555555",
+    "session_name": "checkout-redesign",
+    "version": "2.1.287",
+    "effort": {
+      "level": "high"
+    },
+    "thinking": {
+      "enabled": true
+    },
+    "output_style": {
+      "name": "oh-my-claudeagent:OMCA Default"
+    },
+    "agent": {
+      "name": "oh-my-claudeagent:executor"
+    },
+    "worktree": {
+      "name": "checkout-wt",
+      "original_branch": "main"
+    },
+    "pr": {
+      "number": 42,
+      "url": "https://github.com/acme/shop/pull/42",
+      "review_state": "approved",
+      "kind": "pr"
+    },
+    "context_window": {
+      "context_window_size": 200000,
+      "used_percentage": 34.0,
+      "total_input_tokens": 15000,
+      "total_output_tokens": 1200
+    },
+    "cost": {
+      "total_cost_usd": 1.5,
+      "total_duration_ms": 125000,
+      "total_api_duration_ms": 23000,
+      "total_lines_added": 42,
+      "total_lines_removed": 7
+    },
+    "rate_limits": {
+      "five_hour": {
+        "used_percentage": 45.0,
+        "resets_at": 1790964000
+      },
+      "seven_day": {
+        "used_percentage": 80.0,
+        "resets_at": 1791219600
+      }
+    }
+  }
+}

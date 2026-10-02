@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import type { GitInfo } from "./git.ts";
 import { NO_REPO } from "./git.ts";
+import { displayWidth } from "../src/core/ui-kit.ts";
 import { type Payload, render } from "./render.ts";
 
 process.env.TZ = "UTC";
@@ -25,6 +26,7 @@ const GIT_ENV = {
 
 interface Fixture {
   env?: Record<string, string>;
+  lastResortCut?: boolean;
   git?: Partial<GitInfo>;
   files?: Record<string, unknown>;
   repo?: string;
@@ -89,7 +91,7 @@ function writeFiles(files: Record<string, unknown>): void {
 }
 
 function runMain(payload: Payload, env: Record<string, string>): string {
-  const inherited = Object.fromEntries(Object.entries(process.env).filter(([key]) => !["COLUMNS", "NERD_FONT", "CLAUDE_STATUSLINE_NERD_FONT"].includes(key)));
+  const inherited = Object.fromEntries(Object.entries(process.env).filter(([key]) => !["COLUMNS", "LINES", "CLAUDE_STATUSLINE_NERD_FONT"].includes(key)));
   const result = Bun.spawnSync([process.execPath, MAIN], {
     stdin: new TextEncoder().encode(JSON.stringify(payload)),
     env: { ...inherited, ...GIT_ENV, ...env, TMPDIR: root },
@@ -97,17 +99,67 @@ function runMain(payload: Payload, env: Record<string, string>): string {
   return result.stdout.toString();
 }
 
+// Claude Code keeps 3 cells free on each side, so no line may be wider than COLUMNS minus 6.
+const INSET = 6;
+const RST = "\x1b[0m";
+const SEPARATOR = ` \x1b[90m·${RST} `;
+const ESCAPES = /\x1b\[[0-9;]*m|\x1b\]8;;[^\x07]*\x07/g;
+const BAR_RUN = /(?:\x1b\[[0-9;]*m[▰▱]\x1b\[0m)+|\x1b\[90m▱+\x1b\[0m/g;
+const PLAN_PIECE = /^(\x1b\[32m\S+ \d+\/\d+\x1b\[0m \x1b\[90m(?:->|→) )(.*)\x1b\[0m$/;
+
+const outputLines = (output: string): string[] => output.split("\n").filter(Boolean);
+
+const pieces = (output: string): string[] =>
+  outputLines(output).flatMap((line) => line.slice(0, -RST.length).split(SEPARATOR).map((piece) => piece.replace(BAR_RUN, "▰")));
+
+// A bar draws to the room its line has and the next-task label to the room it is left, so those two
+// compare by shape; any other piece must equal the one the roomiest terminal of its layout draws (the
+// compact layout ends at 59 columns, the full one has no upper end).
+function cutPieces(output: string, wide: string): string[] {
+  const whole = new Set(pieces(wide));
+  const wholeLabels = new Map([...whole].flatMap((piece) => {
+    const match = PLAN_PIECE.exec(piece);
+    return match?.[1] === undefined ? [] : [[match[1], match[2] ?? ""] as const];
+  }));
+  return pieces(output).filter((piece) => {
+    if (whole.has(piece)) return false;
+    const match = PLAN_PIECE.exec(piece);
+    const label = match?.[1] === undefined ? undefined : wholeLabels.get(match[1]);
+    return label === undefined || !label.startsWith((match?.[2] ?? "").replace(/…$/, ""));
+  });
+}
+
+test("the whole-segment check flags a segment cut mid-text and accepts a shortened label", () => {
+  const plan = (label: string): string => `\x1b[32mT: 1/3${RST} \x1b[90m-> ${label}${RST}`;
+  const row = (...parts: string[]): string => `${parts.join(SEPARATOR)}${RST}\n`;
+  const wide = row("alpha", plan("Wire the widget"), "omega");
+  expect(cutPieces(row("alpha", "ome"), wide)).toEqual(["ome"]);
+  expect(cutPieces(row("alpha", plan("Wire the…"), "omega"), wide)).toEqual([]);
+  expect(cutPieces(row("alpha", plan("Wire a…")), wide)).toEqual([plan("Wire a…")]);
+});
+
+function produce(fixture: Fixture, env: Record<string, string>): string {
+  if (fixture.repo) return runMain(fixture.payload, env);
+  writeFiles(fixture.files ?? {});
+  return `${render(fixture.payload, { ...NO_REPO, ...fixture.git }, env, NOW)}\n`;
+}
+
 for (const file of readdirSync(FIXTURES).filter((f) => f.endsWith(".json")).sort()) {
   const name = file.slice(0, -".json".length);
-  test(`${name} renders the recorded bytes`, () => {
+  test(`${name} renders the recorded bytes, within its terminal, with every segment whole`, () => {
     const fixture = load(name);
+    const env = fixture.env ?? {};
     const expected = readFileSync(join(FIXTURES, `${name}.txt`), "utf8");
-    if (fixture.repo) {
-      REPOS[fixture.repo]?.();
-      expect(runMain(fixture.payload, fixture.env ?? {})).toBe(expected);
-      return;
-    }
-    writeFiles(fixture.files ?? {});
-    expect(`${render(fixture.payload, { ...NO_REPO, ...fixture.git }, fixture.env ?? {}, NOW)}\n`).toBe(expected);
+    if (fixture.repo) REPOS[fixture.repo]?.();
+    const output = produce(fixture, env);
+    expect(output).toBe(expected);
+
+    const columns = Number(env["COLUMNS"] ?? 80);
+    for (const line of outputLines(output)) expect(displayWidth(line.replace(ESCAPES, ""))).toBeLessThanOrEqual(Math.max(1, columns - INSET));
+
+    if (fixture.lastResortCut) return;
+    const roomiest = columns < 60 ? "59" : "1000";
+    const wideEnv = Object.fromEntries(Object.entries({ ...env, COLUMNS: roomiest }).filter(([key]) => key !== "LINES"));
+    expect(cutPieces(output, produce(fixture, wideEnv))).toEqual([]);
   });
 }

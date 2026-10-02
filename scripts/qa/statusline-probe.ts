@@ -29,13 +29,13 @@ if (import.meta.main) {
 
       const main = await render(pluginDir, "main.ts", { ...BASE, effort: { level: "high" }, thinking: { enabled: true } });
       checks.check(main.includes("E: high"), "main line: effort marker rendered (E: high)", `main line: effort marker missing from output: ${main}`);
-      checks.check(main.includes("[T]"), "main line: thinking marker rendered ([T])", `main line: thinking marker missing from output: ${main}`);
+      checks.check(!main.includes("[T]"), "main line: no thinking marker even with thinking on", `main line: thinking marker rendered: ${main}`);
 
       const bare = await render(pluginDir, "main.ts", BASE);
       checks.check(
-        !bare.includes("E:") && !bare.includes("[T]"),
-        "main line: no effort or thinking marker when the fields are absent",
-        `main line: markers rendered without input fields: ${bare}`,
+        !bare.includes("E:"),
+        "main line: no effort marker when the field is absent",
+        `main line: effort marker rendered without the field: ${bare}`,
       );
 
       const task = { id: "t1", name: "oh-my-claudeagent:executor", status: "running", model: "sonnet", effort: "high" };
