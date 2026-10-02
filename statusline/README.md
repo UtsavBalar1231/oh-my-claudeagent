@@ -77,7 +77,7 @@ rendering. On any unrecoverable error, `[claude]` is printed.
 
 ## Installation
 
-cc-statusline is deployed by the `omca-setup` skill (Phase 5.6). It copies the `statusline/`
+cc-statusline is deployed by the `omca-setup` skill (Phase 4.6). It copies the `statusline/`
 directory to `~/.claude/statusline/` and runs `uv sync` to install the package in an isolated
 virtual environment.
 

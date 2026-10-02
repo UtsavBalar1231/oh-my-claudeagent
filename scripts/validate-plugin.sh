@@ -1024,19 +1024,18 @@ check_skill_references_exist() {
 check_claudemd_template_packaging() {
 	log "Running claudemd template packaging checks"
 
-	local template_ref
-	template_ref="$(grep -oE '\$\{PLUGIN_ROOT\}/templates/[A-Za-z0-9_.-]+\.md' "${OMCA_SETUP_SKILL_MD}" | head -1)"
-	if [[ -z "${template_ref}" ]]; then
-		fail "claudemd template packaging: no \${PLUGIN_ROOT}/templates/*.md reference found in ${OMCA_SETUP_SKILL_MD}"
+	local template_rel_path="templates/claudemd.md"
+	if grep -qF '"templates", "claudemd.md"' "${REPO_ROOT}/servers/hooks/guidance.ts"; then
+		pass "claudemd template packaging: servers/hooks/guidance.ts reads ${template_rel_path}"
+	else
+		fail "claudemd template packaging: servers/hooks/guidance.ts no longer reads ${template_rel_path}"
 		return 1
 	fi
 
-	local template_rel_path="${template_ref#\$\{PLUGIN_ROOT\}/}"
-	local template_abs_path="${REPO_ROOT}/${template_rel_path}"
-	if [[ -f "${template_abs_path}" ]]; then
-		pass "claudemd template packaging: ${template_rel_path} (referenced by SKILL.md) exists"
+	if [[ -f "${REPO_ROOT}/${template_rel_path}" ]]; then
+		pass "claudemd template packaging: ${template_rel_path} exists"
 	else
-		fail "claudemd template packaging: ${template_rel_path} referenced by SKILL.md but missing at ${template_abs_path}"
+		fail "claudemd template packaging: ${template_rel_path} is missing"
 		return 1
 	fi
 
@@ -1426,6 +1425,8 @@ check_mcp() {
 		fail "mcp tools/list response missing"
 	fi
 
+	# expected-tools.json lists the final single server's tools; health_check is served by the
+	# bun omca-hooks server until the two servers merge.
 	local expected_tool
 	while IFS= read -r expected_tool; do
 		[[ -z "${expected_tool}" ]] && continue
@@ -1434,7 +1435,7 @@ check_mcp() {
 		else
 			fail "mcp tools/list missing ${expected_tool}"
 		fi
-	done < <(jq -r '.[]' "${MCP_FIXTURES_DIR}/expected-tools.json" 2>/dev/null || true)
+	done < <(jq -r '.[] | select(. != "health_check")' "${MCP_FIXTURES_DIR}/expected-tools.json" 2>/dev/null || true)
 
 	rm -rf "${mcp_tmp}"
 }

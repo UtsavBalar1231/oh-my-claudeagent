@@ -1,6 +1,6 @@
 # oh-my-claudeagent orchestration guidance
 
-Claude Code session with **oh-my-claudeagent** (OMCA) installed. OMCA is a multi-agent orchestration layer. This block is user-scope (auto-loaded for every Claude Code session). The output style at `output-styles/omca-default.md` carries the always-on principles, negative constraints, and communication rules; the agent catalog and delegation table live in this file.
+Claude Code session with **oh-my-claudeagent** (OMCA) installed. OMCA is a multi-agent orchestration layer. OMCA's server adds this guidance to the first prompt of each session and again after compaction. The output style at `output-styles/omca-default.md` carries the always-on principles, negative constraints, and communication rules; this guidance carries the agent catalog and the delegation table.
 
 ## Entrypoints
 
@@ -34,6 +34,8 @@ Three tiers. `sonnet` runs the routine workers (explore, executor, librarian) at
 | multimodal-looker | opus             | medium  | Screenshots, PDFs, diagrams, visual inputs                               |
 
 Scale a delegation by picking the agent whose declared tier and effort fit the work. Pass `model="opus"` only when one delegated task needs more judgment than its agent's tier.
+
+To set one delegation's effort, make `[omca-route effort=<low|medium|high|xhigh|max>]` the first line of its prompt. The hint carries no model: the Agent tool's `model` parameter picks the tier.
 
 ## Workflow
 

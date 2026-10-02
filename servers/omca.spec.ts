@@ -17,6 +17,7 @@ const ALL_TOOLS = [
   "ast_test_rule",
   "boulder_write",
   "boulder_progress",
+  "health_check",
   "evidence_log",
   "evidence_read",
   "omca_hook",
@@ -264,8 +265,9 @@ describe("JSON-RPC framing", () => {
 });
 
 describe("tools", () => {
-  test("the hooks role lists exactly omca_hook", async () => {
-    expect((await listTools(startServer("hooks"))).map((tool) => tool.name)).toEqual(["omca_hook"]);
+  test("the hooks role lists exactly health_check and omca_hook, filtering out every other tool", async () => {
+    expect((await listTools(startServer("hooks"))).map((tool) => tool.name)).toEqual(["health_check", "omca_hook"]);
+    expect((await listTools(startServer())).length).toBeGreaterThan(2);
   });
 
   test("without a role the server lists every declared tool", async () => {
@@ -281,7 +283,7 @@ describe("tools", () => {
   });
 
   test("omca_hook is declared exactly", async () => {
-    expect((await listTools(startServer("hooks")))[0]).toEqual(OMCA_HOOK);
+    expect((await listTools(startServer("hooks"))).find((tool) => tool.name === "omca_hook")).toEqual(OMCA_HOOK);
   });
 
   test("omca_hook answers an empty hook result", async () => {

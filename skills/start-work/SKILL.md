@@ -6,6 +6,8 @@ disable-model-invocation: true
 argument-hint: "[plan file] [--worktree <path>]"
 ---
 
+Call `health_check` first. Proceed only when `runtime` is `ok`; otherwise repeat `runtime_reason` to the user, tell them to run `/oh-my-claudeagent:omca-setup`, and stop. If the tool is missing, say OMCA's server is not connected and stop.
+
 # Plan Execution Mode: start-work
 
 This command runs in the main session at depth 0. The `Agent` tool is available,

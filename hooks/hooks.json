@@ -31,6 +31,23 @@
             "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/post-compact-inject.sh\""
           }
         ]
+      },
+      {
+        "matcher": "clear|compact",
+        "hooks": [
+          {
+            "type": "mcp_tool",
+            "server": "plugin:oh-my-claudeagent:omca-hooks",
+            "tool": "omca_hook",
+            "timeout": 10,
+            "input": {
+              "event": "SessionStart",
+              "session_id": "${session_id}",
+              "cwd": "${cwd}",
+              "source": "${source}"
+            }
+          }
+        ]
       }
     ],
     "UserPromptSubmit": [
@@ -40,6 +57,19 @@
             "type": "command",
             "shell": "bash",
             "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/keyword-detector.sh\""
+          },
+          {
+            "type": "mcp_tool",
+            "server": "plugin:oh-my-claudeagent:omca-hooks",
+            "tool": "omca_hook",
+            "timeout": 10,
+            "input": {
+              "event": "UserPromptSubmit",
+              "session_id": "${session_id}",
+              "cwd": "${cwd}",
+              "prompt": "${prompt}",
+              "session_title": "${session_title}"
+            }
           }
         ]
       }
@@ -51,6 +81,18 @@
             "type": "command",
             "shell": "bash",
             "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/slash-command-mode-detector.sh\""
+          },
+          {
+            "type": "mcp_tool",
+            "server": "plugin:oh-my-claudeagent:omca-hooks",
+            "tool": "omca_hook",
+            "timeout": 10,
+            "input": {
+              "event": "UserPromptExpansion",
+              "session_id": "${session_id}",
+              "cwd": "${cwd}",
+              "prompt": "${prompt}"
+            }
           }
         ]
       }

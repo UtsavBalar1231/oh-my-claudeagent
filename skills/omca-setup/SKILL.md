@@ -1,6 +1,6 @@
 ---
 name: omca-setup
-description: Configure ~/.claude/ for oh-my-claudeagent (deps check, block injection, settings, statusline).
+description: Configure ~/.claude/ for oh-my-claudeagent (dependency checks, settings and statusline setup, removal of a leftover 2.x CLAUDE.md block).
 when_to_use: |
   Use when:
   - Installing or updating oh-my-claudeagent for the first time
@@ -26,7 +26,7 @@ allowed-tools:
 
 # omca-setup: Plugin Configuration
 
-One-command setup: update orchestration block in `~/.claude/CLAUDE.md`, check dependencies, inspect plugin state, print rollout guidance.
+One-command setup: check dependencies, remove a 2.x orchestration block from `~/.claude/CLAUDE.md`, inspect plugin state, print rollout guidance. OMCA's server delivers the orchestration guidance itself on each session's first prompt, so setup writes nothing into `CLAUDE.md`.
 
 **Out of scope**: marketplace install commands, auto-registering in `~/.claude/settings.json`, editing shared/managed settings, enforcing enterprise policy keys (`strictKnownMarketplaces`, `blockedMarketplaces`, `allowManagedHooksOnly`, `allowManagedPermissionRulesOnly`, `allowManagedMcpServersOnly`).
 
@@ -37,7 +37,7 @@ One-command setup: update orchestration block in `~/.claude/CLAUDE.md`, check de
 - Install: `/plugin marketplace add UtsavBalar1231/oh-my-claudeagent` then `/plugin install oh-my-claudeagent@omca`
 - Update: `/plugin marketplace update omca` then `/plugin install oh-my-claudeagent@omca`
 - Apply in-session: Claude Code reloads plugins itself after a `/plugin` install or update. Run `/reload-plugins` (with `--force` if it warns about the prompt cache) only when the install summary says a change is still pending, or after a `claude plugin` command run in another terminal.
-- `/reload-skills` re-scans skill directories only. It does not reload `~/.claude/CLAUDE.md`, so the block setup writes there takes effect in the next session.
+- `/reload-skills` re-scans skill directories only.
 
 **`--bare` caveat**: `claude --bare` skips plugin, hooks, skills, MCP, and CLAUDE.md auto-discovery. Run setup in normal (non-`--bare`) sessions.
 
@@ -108,82 +108,32 @@ Record each result (binary path + version or "not found") for the health report.
 
 ---
 
-### Phase 3: Backup and Read Existing
+### Phase 3: Remove the 2.x Block
 
-**If `~/.claude/CLAUDE.md` exists:**
+The 2.x setup wrote the orchestration guidance into `~/.claude/CLAUDE.md` between marker lines. OMCA's server now adds that guidance to each session's first prompt, and it adds nothing while the old block remains, so the two never arrive together. The block then goes stale with every plugin update. This phase offers its removal and writes nothing else.
 
-1. Create a backup:
-   ```bash
-   cp ~/.claude/CLAUDE.md ~/.claude/CLAUDE.md.bak
-   ```
+The file is `$CLAUDE_CONFIG_DIR/CLAUDE.md` when `CLAUDE_CONFIG_DIR` is set and non-empty, otherwise `~/.claude/CLAUDE.md`.
 
-2. Read the existing file:
-   ```
-   Read("~/.claude/CLAUDE.md")
-   ```
+1. If the file does not exist, record "no block" and continue to Phase 4.
 
-3. **Migration check (old developer's format):**
-   - Detect `<!-- OMCA:START -->` OR `<\!-- OMCA:START -->` (with or without backslash escape)
-   - If found: remove everything from the old start marker line through the old end marker line (`<!-- OMCA:END -->` or `<\!-- OMCA:END -->`)
-   - Log to user: "Migrated: removed old OMC block from other developer"
+2. Read the file and look for:
+   - the 2.x block: a line matching `^--- omca-setup\s*$` through a line matching `^--- /omca-setup ---\s*$` (inclusive)
+   - the older format: `<!-- OMCA:START -->` or `<\!-- OMCA:START -->` (with or without the backslash escape) through the matching `<!-- OMCA:END -->` or `<\!-- OMCA:END -->` line
 
-4. **Own block check:**
-   - Detect line matching `^--- omca-setup\s*$`
-   - If found: remove the entire block from `^--- omca-setup\s*$` through `^--- /omca-setup ---\s*$` (inclusive). This is the block Phase 4 writes; removing it here lets Phase 4 write the current template in its place.
-   - If NOT found: no block to remove
+3. If neither is found, record "no block" and continue to Phase 4.
 
-5. Everything remaining after removing detected blocks = **user content** (preserve exactly)
+4. If an opening marker has no closing marker, do not edit the file. Tell the user to remove the block by hand, record "block left in place (unclosed)", and continue.
 
-**If `~/.claude/CLAUDE.md` does NOT exist:**
+5. Otherwise ask the user with `AskUserQuestion` whether to remove the block, saying that OMCA's server holds back its guidance until the block is gone. On yes:
+   - write the unchanged file to `<file>.omca-bak` first, the same backup `/omca doctor` makes
+   - write the file back with each found block removed, keeping every other line verbatim
+   - record "block removed" with the backup path
 
-1. Create the directory:
-   ```bash
-   mkdir -p ~/.claude
-   ```
-
-2. User content = empty string
+   On no, record "block kept at the user's request".
 
 ---
 
-### Phase 4: Write CLAUDE.md
-
-The lightweight output-style (`output-styles/omca-default.md`) carries principles +
-delegation only. Practical operational guidance (entrypoints, agent catalog, workflow,
-parallel-execution, verification, file-reading) lives in `~/.claude/CLAUDE.md` as a
-managed block so users benefit from it even when the output-style is overridden or
-`force-for-plugin` is stripped.
-
-1. Read the orchestration block template at `${PLUGIN_ROOT}/templates/claudemd.md`.
-
-2. Wrap the template body in marker lines so future runs can detect and replace it:
-   ```
-   --- omca-setup
-
-   <template body verbatim>
-
-   --- /omca-setup ---
-   ```
-   The opening marker is `--- omca-setup` (no trailing slash). The closing marker is `--- /omca-setup ---`. These match the regex used in Phase 3 step 4 for idempotent re-injection.
-
-3. Compose the final file in this order:
-   - **User content** (from Phase 3, if any; preserved verbatim)
-   - **Blank line**
-   - **Wrapped orchestration block** (markers + template body)
-
-4. Write the composed content to `~/.claude/CLAUDE.md`.
-
-5. Idempotency: re-running setup detects the existing block via Phase 3 step 4 markers,
-   strips it, and re-injects the current template. User content stays unchanged.
-
-6. If the user wants to OPT OUT of the injection (lightweight output-style ONLY), they can:
-   - Run the skill once to install
-   - Manually delete the block between `--- omca-setup` and `--- /omca-setup ---`
-   - Subsequent setup runs will re-inject; permanent opt-out requires deleting plugin
-     or skipping setup re-runs after updates.
-
----
-
-### Phase 5: Registration Inspection and Rollout Guidance
+### Phase 4: Registration Inspection and Rollout Guidance
 
 1. Read `~/.claude/settings.json` if it exists; otherwise treat user-scope settings as absent.
 
@@ -231,7 +181,7 @@ managed block so users benefit from it even when the output-style is overridden 
 
 ---
 
-### Phase 5.5: Settings Configuration
+### Phase 4.5: Settings Configuration
 
 Apply optional user-scope helper settings to `~/.claude/settings.json` with user confirmation.
 
@@ -278,7 +228,7 @@ Apply optional user-scope helper settings to `~/.claude/settings.json` with user
 
 ---
 
-### Phase 5.6: Statusline Setup
+### Phase 4.6: Statusline Setup
 
 Configure the Claude Code statusline to use the oh-my-claudeagent statusline package.
 
@@ -456,7 +406,7 @@ Configure the Claude Code statusline to use the oh-my-claudeagent statusline pac
 
 ---
 
-### Phase 5.7: Force-Style Opt-Out
+### Phase 4.7: Force-Style Opt-Out
 
 Apply or skip the `disableForceOrchestrationStyle` opt-out based on the user's plugin config.
 
@@ -535,7 +485,7 @@ Apply or skip the `disableForceOrchestrationStyle` opt-out based on the user's p
 
 ---
 
-### Phase 5.8: Detect outputStyle Degraded Mode
+### Phase 4.8: Detect outputStyle Degraded Mode
 
 OMCA's orchestration body lives in `output-styles/omca-default.md` with
 `force-for-plugin: true`, which per the platform spec
@@ -651,7 +601,7 @@ settings unless the user confirms.
 
 ---
 
-### Phase 6: Health Report
+### Phase 5: Health Report
 
 Print a summary to the user:
 
@@ -666,13 +616,13 @@ Dependencies:
   ast-grep: WARN (not found - structural code search unavailable)
 
 Files:
-  ~/.claude/CLAUDE.md      - Block injected (backup: CLAUDE.md.bak)
+  ~/.claude/CLAUDE.md      - [No block | 2.x block removed (backup: CLAUDE.md.omca-bak) | Block kept at the user's request | Block left in place (unclosed)]
   ~/.claude/settings.json  - Inspected only: enabled | local checkout / dev mode | legacy config detected | not configured in user scope
   Plugin root              - ~/.claude/plugins/cache/... | local checkout path
   Git commit            - [short SHA from plugin root]
 
 Platform:
-  CLAUDE.md block   - [Matches templates/claudemd.md | Differs from the shipped template; re-run omca-setup]
+  Guidance          - [Delivered by OMCA's server | Held back while ~/.claude/CLAUDE.md holds the 2.x block]
   Restricted session - [Not detected | CLAUDE_CODE_RESTRICTED=1; user, project and local settings ignored, so OMCA hooks and the MCP server are absent]
   Advisor           - [On: <advisorModel> | Off; enable with /advisor fable | Blocked by <variable>]
 
@@ -767,10 +717,9 @@ Non-destructive health check. No files are modified.
 
 1. Run Phase 1 (Dependency Check). Report PASS/WARN/FAIL for each dep.
 
-2. Check `~/.claude/CLAUDE.md`:
-   - Does own block exist? Report whether it matches `${PLUGIN_ROOT}/templates/claudemd.md`; the block carries no version string
-   - Does old format block exist? Report "migration needed"
-   - No block found? Report "not configured; run omca-setup"
+2. Check `~/.claude/CLAUDE.md` (or `$CLAUDE_CONFIG_DIR/CLAUDE.md` when that is set):
+   - No 2.x block and no old format block: PASS ("OMCA's server delivers the guidance")
+   - Either block present: WARN ("the server holds back its guidance while this block remains, and the block goes stale with each plugin update; run `/oh-my-claudeagent:omca-setup` to remove it")
 
 3. Check `~/.claude/settings.json`:
     - Is the plugin enabled in user settings? Report method (marketplace via enabledPlugins / dev mode via --plugin-dir / legacy plugins array / not registered)
@@ -782,7 +731,7 @@ Non-destructive health check. No files are modified.
    - Do state directories exist?
    - Is `.omca/` in `.gitignore`?
 
-5. Print the Phase 6 health report format with findings (but no "Setup Complete" header; use "Health Check" instead).
+5. Print the Phase 5 health report format with findings (but no "Setup Complete" header; use "Health Check" instead).
 
 ---
 
@@ -796,10 +745,8 @@ This is a different tool from the built-in `/doctor` (alias `/checkup`), which c
 Run Phase 1 (Dependency Check). Report PASS/WARN/FAIL for jq, uv, python3, ast-grep.
 
 ### Check 2: CLAUDE.md Block
-- Does own block exist in `~/.claude/CLAUDE.md`? Report present or absent. The block carries no version string; the drift check below compares its content.
-- Does old format block exist? Report "migration needed".
-- No block? Report "not configured; run omca-setup".
-- Installed block matches the shipped template: PASS. Differs: WARN ("the block between the `--- omca-setup` markers in `~/.claude/CLAUDE.md` no longer matches `${PLUGIN_ROOT}/templates/claudemd.md`, so the agent catalog and delegation guidance loaded every turn are stale; re-run `/oh-my-claudeagent:omca-setup` to refresh the block"). Compare the two bodies; report the result and stop, this mode never rewrites the block. Include this finding in the Phase 6 report.
+- No 2.x `--- omca-setup` block and no old format block in `~/.claude/CLAUDE.md` (or `$CLAUDE_CONFIG_DIR/CLAUDE.md`): PASS ("OMCA's server delivers the guidance").
+- Either block present: WARN ("OMCA's server holds back its guidance while this block remains, and the block goes stale with each plugin update; run `/oh-my-claudeagent:omca-setup` to remove it"). Report the result and stop, this mode never edits the file. Include this finding in the Phase 5 report.
 
 ### Check 3: Permission Namespace Audit
 Read `~/.claude/settings.json` and verify the required permission patterns are present:
@@ -876,9 +823,9 @@ Platform settings and environment variables that change how OMCA behaves without
 - Third-party provider. None of `CLAUDE_CODE_USE_BEDROCK`, `CLAUDE_CODE_USE_ANTHROPIC_AWS`, `CLAUDE_CODE_USE_VERTEX`, or `CLAUDE_CODE_USE_FOUNDRY` set, in the live environment or a settings `env` block: PASS. One set: INFO naming it ("the `sonnet` tier that explore, executor, and librarian declare resolves to Sonnet 4.6 on Claude Platform on AWS and to Sonnet 4.5 on Bedrock, Google Cloud, and Foundry, well behind the Sonnet 5.5 it means on the Anthropic API. If your provider offers a newer Sonnet, set `ANTHROPIC_DEFAULT_SONNET_MODEL` to its full provider model id"), unless `ANTHROPIC_DEFAULT_SONNET_MODEL` is already set, in which case PASS naming its value
 - `env.CLAUDE_CODE_RESTRICTED` unset: PASS. Set to `1`: WARN ("a restricted session ignores user, project, and local settings, so OMCA's hooks and MCP server are absent entirely and every evidence gate, state file, and statusline reading in this report is inert. Start the session without `--restricted` to get the plugin back"). This check reads the environment variable only: a session started with the `--restricted` flag leaves no setting to inspect, so when the variable is absent say that the flag itself is undetectable from inside the session and point at Check 4, where a healthy binary whose tools are still unavailable is the indirect signal
 
-Include all Check 7 findings (including the `refreshInterval` PASS/WARN line) in both the `--doctor` terminal output and the Phase 6 health report. Include the Check 8 `CLAUDE_CODE_RESTRICTED` finding and the Check 2 block-drift finding in both places as well: those two decide whether the rest of the report describes a live plugin at all. The Check 8 advisor finding also goes in both places, as the Phase 6 `Advisor` line.
+Include all Check 7 findings (including the `refreshInterval` PASS/WARN line) in both the `--doctor` terminal output and the Phase 5 health report. Include the Check 8 `CLAUDE_CODE_RESTRICTED` finding and the Check 2 block finding in both places as well: those two decide whether the rest of the report describes a live plugin at all. The Check 8 advisor finding also goes in both places, as the Phase 5 `Advisor` line.
 
-Print the Phase 6 health report format with all findings. Use "Doctor Report" header instead of "Health Check". In the step-g user report (Phase 5.6 step g), add a line under the `~/.claude/settings.json` entry:
+Print the Phase 5 health report format with all findings. Use "Doctor Report" header instead of "Health Check". In the step-g user report (Phase 4.6 step g), add a line under the `~/.claude/settings.json` entry:
 ```
     ~/.claude/settings.json                   - statusLine added (mode: daemon|direct, refreshInterval: 5)
 ```
@@ -887,10 +834,10 @@ Print the Phase 6 health report format with all findings. Use "Doctor Report" he
 
 ## Constraints
 
-- ALWAYS backup `~/.claude/CLAUDE.md` before any write (Phase 3)
+- ALWAYS write `~/.claude/CLAUDE.md.omca-bak` before removing a block (Phase 3)
 - NEVER modify files outside `~/.claude/` and `.omca/` (plus `.gitignore`)
 - NEVER claim marketplace installation or managed policy enforcement unless existing Claude Code settings prove it
 - Apply settings changes with explicit user confirmation via AskUserQuestion; print jq fallback on decline
 - The `allowed-tools` grant covers inspection only: version probes, `jq` reads, `git rev-parse`, `claude mcp list`. It names no `mv`, `cp`, `mkdir`, `rm`, or `uv sync`, so every settings write and every filesystem mutation still goes through the normal permission flow
-- Idempotent: each run strips the block and writes the current template, and user content stays unchanged
+- Idempotent: setup never writes a block, a run after the block is gone changes nothing in `CLAUDE.md`, and user content stays unchanged
 - Migration handles both `<!-- OMCA:START -->` and `<\!-- OMCA:START -->` (escaped and unescaped)

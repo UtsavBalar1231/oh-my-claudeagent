@@ -486,7 +486,7 @@ Plugin-root `settings.json` ships a `subagentStatusLine` default backed by `bin/
 
 **`statusLine.refreshInterval` (v2.7.0, ADOPTED):**
 
-`omca-setup` Phase 5.6 sets `statusLine.refreshInterval: 5` (seconds) in `~/.claude/settings.json` alongside `hideVimModeIndicator`. This is the recommended value for OMCA: the statusline reads disk-cached git metadata (branch, PR state) that updates on roughly a 5 s cadence, so a matching refresh interval keeps the display current without polling faster than the cache. In background-agent idle scenarios — where the model is waiting on a subagent and no tool calls are firing — the platform only refreshes the statusline at this interval, so a value below 5 yields no additional freshness from the disk-cached sources. Doc-claim ceiling: the freshness improvement is specific to disk-sourced fields (`workspace.repo.*`, `pr.*`); fields sourced directly from the active tool call context update on each render regardless of this setting.
+`omca-setup` Phase 4.6 sets `statusLine.refreshInterval: 5` (seconds) in `~/.claude/settings.json` alongside `hideVimModeIndicator`. This is the recommended value for OMCA: the statusline reads disk-cached git metadata (branch, PR state) that updates on roughly a 5 s cadence, so a matching refresh interval keeps the display current without polling faster than the cache. In background-agent idle scenarios — where the model is waiting on a subagent and no tool calls are firing — the platform only refreshes the statusline at this interval, so a value below 5 yields no additional freshness from the disk-cached sources. Doc-claim ceiling: the freshness improvement is specific to disk-sourced fields (`workspace.repo.*`, `pr.*`); fields sourced directly from the active tool call context update on each render regardless of this setting.
 
 **Statusline platform additions (v2.1.141–v2.1.167):**
 
@@ -1088,9 +1088,9 @@ Copy agent files to `~/.claude/agents/` (user-scope agents retain it).
 `-- INSERT --` row beneath the user's `statusLine` output. The OMCA statusline
 already renders `vim.mode` on line 1, so the row is duplicate noise. Set
 `statusLine.hideVimModeIndicator: true` to suppress the platform row
-(documented in `https://code.claude.com/docs/en/statusline`); `omca-setup` Phase 5.6
+(documented in `https://code.claude.com/docs/en/statusline`); `omca-setup` Phase 4.6
 sets this automatically on first run and back-fills it on re-run for users with
-an existing `statusLine` config. Phase 5.6 also sets `statusLine.refreshInterval: 5`
+an existing `statusLine` config. Phase 4.6 also sets `statusLine.refreshInterval: 5`
 alongside `hideVimModeIndicator` — see the `statusLine.refreshInterval` entry in the
 `bin/` section above for the cache-TTL rationale. (Earlier versions of this document
 did not mention `refreshInterval`; it was added in the 2026-06 feature sweep.)
@@ -1447,7 +1447,7 @@ Features introduced in this window that OMCA consciously declines to adopt:
 |---------|-----------|-------|
 | `duration_ms` coaching in `bash-error-recovery.sh` | v2.7.0 | Added two branches: text-regex timeout detection (placed first in deterministic chain) and `duration_ms` ≥ 120 s fallback for slow-failure coaching (run_in_background / larger-timeout / narrower-scope). Payload probe confirmed `duration_ms` present in PostToolUseFailure Bash payloads |
 | `delegate-retry.sh` `duration_ms` branch | deferred | Agent-failure PostToolUseFailure payload structure not confirmed by probe contract — `duration_ms` coverage for Agent failures is pending a dedicated probe session |
-| `statusLine.refreshInterval: 5` | v2.7.0 | Applied via `omca-setup` Phase 5.6; both create and merge jq variants updated. Rationale: disk-sourced statusline reads git cache files that update on a ~5 s cadence; background-agent idle scenarios benefit from a matching refresh ceiling. Doc-claim ceiling: freshness improvement covers disk-sourced and idle-fan-out scenarios only |
+| `statusLine.refreshInterval: 5` | v2.7.0 | Applied via `omca-setup` Phase 4.6; both create and merge jq variants updated. Rationale: disk-sourced statusline reads git cache files that update on a ~5 s cadence; background-agent idle scenarios benefit from a matching refresh ceiling. Doc-claim ceiling: freshness improvement covers disk-sourced and idle-fan-out scenarios only |
 
 **Adopted this sync (v2.1.168–v2.1.197):**
 

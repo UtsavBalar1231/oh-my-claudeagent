@@ -6,6 +6,8 @@ disable-model-invocation: true
 argument-hint: "[work description]"
 ---
 
+Call `health_check` first. Proceed only when `runtime` is `ok`; otherwise repeat `runtime_reason` to the user, tell them to run `/oh-my-claudeagent:omca-setup`, and stop. If the tool is missing, say OMCA's server is not connected and stop.
+
 # Plan Command: Prometheus Planning Entrypoint
 
 Invoke prometheus planning protocol at depth 0, in this session. Run the protocol yourself rather than handing the plan to a `prometheus` subagent: a subagent runs without `AskUserQuestion`, and in a headless run its result may not land. User provides work description via `$ARGUMENTS`.

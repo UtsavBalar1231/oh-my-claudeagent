@@ -44,7 +44,7 @@ const INSTRUCTIONS = [
 
 const MODERN_PROTOCOL = "2026-07-28";
 const LEGACY_PROTOCOL = "2025-11-25";
-const HOOKS_ROLE_TOOLS = new Set(["omca_hook"]);
+const HOOKS_ROLE_TOOLS = new Set(["omca_hook", "health_check"]);
 
 const role = process.env.OMCA_SERVER_ROLE;
 if (role !== undefined && role !== "hooks") {

@@ -4,6 +4,9 @@ export type Session = {
   readonly id: string;
   stampedAt?: number;
   verification?: Verification;
+  isGuided?: boolean;
+  isTitleChecked?: boolean;
+  promptAt?: number;
 };
 
 export const MAX_SESSIONS = 32;
@@ -17,6 +20,8 @@ const sessions = new Map<string, Session>();
 let latest: string | undefined;
 
 export const latestSessionId = (): string | undefined => latest;
+
+export const findSession = (id: string): Session | undefined => sessions.get(id);
 
 export function touchSession(id: string): Session {
   latest = id;
