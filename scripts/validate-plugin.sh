@@ -8,9 +8,7 @@ HOOKS_JSON="${REPO_ROOT}/hooks/hooks.json"
 PLUGIN_JSON="${REPO_ROOT}/.claude-plugin/plugin.json"
 DEFAULT_MARKETPLACE_JSON="${REPO_ROOT}/.claude-plugin/marketplace.json"
 MCP_JSON="${REPO_ROOT}/.mcp.json"
-HOOK_FIXTURES_DIR="${REPO_ROOT}/tests/fixtures/hooks"
 MCP_FIXTURES_DIR="${REPO_ROOT}/tests/fixtures/mcp"
-MCP_SERVER_PROJECT="${REPO_ROOT}/servers"
 OMCA_MD="${REPO_ROOT}/OMCA.md"
 OMCA_SETUP_SKILL_MD="${REPO_ROOT}/skills/omca-setup/SKILL.md"
 README_MD="${REPO_ROOT}/README.md"
@@ -332,26 +330,6 @@ check_policy_posture_alignment() {
 	done
 }
 
-resolve_hook_commands() {
-	local event_name="$1"
-	local matcher_value="$2"
-
-	if [[ -n "${matcher_value}" ]]; then
-		jq -r --arg event "${event_name}" --arg matcher "${matcher_value}" '
-			.hooks[$event][]?
-			| select(((.matcher // "") | split("|")) | index($matcher))
-			| .hooks[]?.command // empty
-		' "${HOOKS_JSON}"
-		return 0
-	fi
-
-	jq -r --arg event "${event_name}" '
-		.hooks[$event][]?
-		| select((has("matcher") | not) or (.matcher == null) or (.matcher == ""))
-		| .hooks[]?.command // empty
-	' "${HOOKS_JSON}"
-}
-
 resolve_hook_path() {
 	local raw_command="$1"
 	# Handlers use shell form with the placeholder quoted ("${CLAUDE_PLUGIN_ROOT}/scripts/x.sh")
@@ -517,39 +495,6 @@ run_script_with_payload() {
 	esac
 
 	rm -rf "${run_dir}"
-	return 0
-}
-
-run_registered_hooks() {
-	local label="$1"
-	local event_name="$2"
-	local matcher_value="$3"
-	local payload_path="$4"
-	local project_root="$5"
-	local output_expectation="$6"
-
-	local commands
-	commands="$(resolve_hook_commands "${event_name}" "${matcher_value}")"
-
-	if [[ -z "${commands}" ]]; then
-		skip "${label}: no matching hook command registered"
-		return 2
-	fi
-
-	local script_command
-	while IFS= read -r script_command; do
-		[[ -z "${script_command}" ]] && continue
-		local script_path
-		script_path="$(resolve_hook_path "${script_command}")"
-
-		if [[ ! -f "${script_path}" ]]; then
-			fail "${label}: hook command points to missing script (${script_path})"
-			continue
-		fi
-
-		run_script_with_payload "${label} ($(basename "${script_path}"))" "${script_path}" "${payload_path}" "${project_root}" "${output_expectation}"
-	done <<<"${commands}"
-
 	return 0
 }
 
@@ -925,30 +870,7 @@ check_claims() {
 		fi
 	fi
 
-	if jq -e '.mcpServers["omca"].command == "uv"' "${MCP_JSON}" >/dev/null 2>&1; then
-		pass "mcp registry uses uv for omca server"
-	else
-		fail "mcp registry omca command should be 'uv'"
-	fi
-
 	validate_json_file "${REPO_ROOT}/servers/categories.json" "categories config"
-
-	if [[ ! -f "${REPO_ROOT}/servers/ast-grep-server.py" ]]; then
-		pass "ast-grep-server.py removed"
-	else
-		fail "ast-grep-server.py still exists (should have been removed)"
-	fi
-	if [[ ! -f "${REPO_ROOT}/servers/omca-state-server.py" ]]; then
-		pass "omca-state-server.py removed"
-	else
-		fail "omca-state-server.py still exists (should have been removed)"
-	fi
-
-	if [[ ! -f "${REPO_ROOT}/servers/agent-metadata.json" ]]; then
-		pass "agent-metadata.json removed (OMCA-internal metadata fields deprecated)"
-	else
-		fail "agent-metadata.json still exists (should have been removed with costTier/category fields)"
-	fi
 
 	local plugin_version marketplace_version
 	# Reverted helper migration: validate-plugin.sh has distinct error-handling requirements.
@@ -1038,65 +960,6 @@ check_claudemd_template_packaging() {
 	fi
 }
 
-check_hook_fixtures_exist() {
-	local fixtures=(
-		"pretooluse-task-agent.json"
-		"pretooluse-write.json"
-		"permissionrequest-bash.json"
-		"permissionrequest-exitplanmode.json"
-		"sessionstart-compact.json"
-		"taskcompleted-basic.json"
-		"taskcompleted-with-evidence.json"
-		"taskcompleted-with-edits-no-evidence.json"
-		"stop-basic.json"
-		"subagentstart-basic.json"
-		"posttoolusefailure-bash.json"
-		"posttoolusefailure-read.json"
-	)
-
-	local file_name
-	for file_name in "${fixtures[@]}"; do
-		validate_json_file "${HOOK_FIXTURES_DIR}/${file_name}" "hook fixture ${file_name}"
-	done
-}
-
-prepare_hook_fixture_repo() {
-	local repo_root="$1"
-
-	mkdir -p "${repo_root}/.claude" "${repo_root}/.claude-plugin" "${repo_root}/hooks"
-	touch \
-		"${repo_root}/.claude/settings.json" \
-		"${repo_root}/.mcp.json" \
-		"${repo_root}/AGENTS.md" \
-		"${repo_root}/CLAUDE.md" \
-		"${repo_root}/hooks/hooks.json" \
-		"${repo_root}/.claude-plugin/plugin.json" \
-		"${repo_root}/settings.json"
-
-	git -C "${repo_root}" init -q >/dev/null 2>&1 || {
-		fail "hook fixture repo setup: git init failed for ${repo_root}"
-		return 1
-	}
-
-	printf 'fixture repo\n' >"${repo_root}/fixture.txt"
-	git -C "${repo_root}" add fixture.txt >/dev/null 2>&1 || {
-		fail "hook fixture repo setup: git add failed for ${repo_root}"
-		return 1
-	}
-
-	GIT_AUTHOR_NAME="OMCA Fixture" \
-		GIT_AUTHOR_EMAIL="fixture@example.com" \
-		GIT_COMMITTER_NAME="OMCA Fixture" \
-		GIT_COMMITTER_EMAIL="fixture@example.com" \
-		git -C "${repo_root}" commit -q -m "fixture" >/dev/null 2>&1 || {
-		fail "hook fixture repo setup: git commit failed for ${repo_root}"
-		return 1
-	}
-
-	pass "hook fixture repo setup: initialized git repo at ${repo_root}"
-	return 0
-}
-
 check_mcp_tool_hook_server_names() {
 	log "Running mcp_tool hook server-name checks"
 
@@ -1138,8 +1001,7 @@ check_hook_scripts_executable() {
 	log "Running hook script executability checks"
 
 	# A shell-form handler without the executable bit fails at dispatch, so the guard it
-	# implements silently never runs. Missing-file resolution is already covered by
-	# run_registered_hooks, so only paths that exist are judged here.
+	# implements silently never runs. Only paths that exist are judged here.
 	local raw_command script_path rel_path
 	local found=0
 	local clean=1
@@ -1197,30 +1059,6 @@ check_hooks() {
 	check_mcp_tool_hook_server_names
 	check_hook_scripts_executable
 	check_hook_handler_shell_field
-	check_hook_fixtures_exist
-
-	local tmp_root
-	tmp_root="$(mktemp -d)"
-	mkdir -p "${tmp_root}/.omca/state" "${tmp_root}/.omca/logs"
-	prepare_hook_fixture_repo "${tmp_root}"
-
-	local pretool_write_payload="${tmp_root}/pretooluse-write.runtime.json"
-	local permission_payload="${HOOK_FIXTURES_DIR}/permissionrequest-bash.json"
-
-	local existing_file="${tmp_root}/existing.txt"
-	touch "${existing_file}"
-	jq --arg file "${existing_file}" '.tool_input.file_path = $file' "${HOOK_FIXTURES_DIR}/pretooluse-write.json" >"${pretool_write_payload}"
-
-	run_registered_hooks "PreToolUse Write" "PreToolUse" "Write" "${pretool_write_payload}" "${tmp_root}" "json-optional"
-	run_registered_hooks "PermissionRequest Bash" "PermissionRequest" "Bash" "${permission_payload}" "${tmp_root}" "json-optional"
-
-	local stop_payload="${HOOK_FIXTURES_DIR}/stop-basic.json"
-	run_registered_hooks "Stop default (no state)" "Stop" "" "${stop_payload}" "${tmp_root}" "json-optional"
-
-	local subagentstart_payload="${HOOK_FIXTURES_DIR}/subagentstart-basic.json"
-	run_registered_hooks "SubagentStart basic" "SubagentStart" "" "${subagentstart_payload}" "${tmp_root}" "json-required"
-
-	rm -rf "${tmp_root}"
 }
 
 check_mcp() {
@@ -1231,11 +1069,6 @@ check_mcp() {
 	validate_json_file "${MCP_FIXTURES_DIR}/initialized-notification.json" "mcp fixture initialized notification"
 	validate_json_file "${MCP_FIXTURES_DIR}/tools-list.json" "mcp fixture tools/list"
 	validate_json_file "${MCP_FIXTURES_DIR}/expected-tools.json" "mcp fixture expected tools"
-
-	if [[ ! -d "${MCP_SERVER_PROJECT}" ]]; then
-		fail "mcp server project directory missing at ${MCP_SERVER_PROJECT}"
-		return 1
-	fi
 
 	local mcp_tmp
 	mcp_tmp="$(mktemp -d)"
@@ -1249,7 +1082,7 @@ check_mcp() {
 		printf '\n'
 		cat "${MCP_FIXTURES_DIR}/tools-list.json" || true
 		printf '\n'
-	} | timeout 45 uv run --project "${MCP_SERVER_PROJECT}" python "${MCP_SERVER_PROJECT}/omca-mcp.py" >"${stdout_file}" 2>"${stderr_file}"
+	} | (cd "${mcp_tmp}" && timeout 45 bun "${REPO_ROOT}/servers/omca.ts") >"${stdout_file}" 2>"${stderr_file}"
 	local mcp_status=$?
 
 	if [[ "${mcp_status}" -ne 0 ]]; then
@@ -1284,8 +1117,6 @@ check_mcp() {
 		fail "mcp tools/list response missing"
 	fi
 
-	# expected-tools.json lists the final single server's tools; health_check is served by the
-	# bun omca-hooks server until the two servers merge.
 	local expected_tool
 	while IFS= read -r expected_tool; do
 		[[ -z "${expected_tool}" ]] && continue
@@ -1294,7 +1125,7 @@ check_mcp() {
 		else
 			fail "mcp tools/list missing ${expected_tool}"
 		fi
-	done < <(jq -r '.[] | select(. != "health_check")' "${MCP_FIXTURES_DIR}/expected-tools.json" 2>/dev/null || true)
+	done < <(jq -r '.[]' "${MCP_FIXTURES_DIR}/expected-tools.json" 2>/dev/null || true)
 
 	rm -rf "${mcp_tmp}"
 }

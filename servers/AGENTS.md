@@ -1,41 +1,38 @@
 # Servers
 
-The `omca` MCP server: an `MCPServer` Python app exposing OMCA's tools (boulder plan
-registry, evidence log, notepads, ast-grep search, filesystem helpers).
-
-It is built on the official `mcp` Python SDK 2.x, which implements MCP spec revision
-2026-07-28 and serves both that revision and every 2025-era client from the same stdio
-server.
+The `omca` MCP server: one bun process over stdio that serves OMCA's tools to the model
+(boulder plan registry, evidence log, notepads, ast-grep search, filesystem helpers,
+catalogs) and answers the `omca_hook` calls the settings hooks make. It speaks MCP spec
+revision 2026-07-28 and every 2025-era client from the same stdio loop, with no SDK.
 
 ## Layout
 
-- `omca-mcp.py`: server entry point, launched via `uv run --project servers` from
-  `.mcp.json`.
-- `tools/`: one module per tool family (`boulder.py`, `evidence.py`, `notepad.py`,
-  `ast.py`, `filesystem.py`, `catalog.py`, `validate_plan_write.py`). `_common.py` and
-  `_boulder_core.py` hold shared, non-tool internals (session-id resolution, plan
-  registry read logic). `boulder_resolve.py` is the bash-callable shim scripts use to
-  read the same registry without hand-parsing JSON.
-- `tests/`: pytest suite (`just test-pytest`), one `test_*.py` per tool module plus
-  startup/latency checks.
+- `omca.ts`: entry point, launched as `bun servers/omca.ts` from `.mcp.json`. Declares the
+  tool list, handles the handshake and `tools/call`, and runs the shutdown handler.
+- `jsonrpc.ts`: the line-delimited JSON-RPC dispatcher.
+- `io.ts`: state-directory resolution, the temp-plus-rename writer and the lock protocol.
+- `lifecycle.ts`: start-up housekeeping (registry GC, ledger rotation, record pruning).
+- `tools/`: one module per tool family (`boulder.ts`, `evidence.ts`, `notepad.ts`, `ast.ts`,
+  `filesystem.ts`, `sessions.ts`, `catalog.ts`) plus `hook.ts`, the `omca_hook` entry point.
+  Each module has its spec beside it.
+- `hooks/`: one handler per hook behavior, wired into `registry.ts`. Shared logic lives in
+  `src/core/`.
 - `categories.json`: model-tier routing table for OMCA agent categories.
-- `pyproject.toml` / `uv.lock`: dependency management; add deps here, then
-  `uv lock --project servers`.
+- `tests/fixtures/mcp/expected-tools.json`: the tool names the model sees. `omca.spec.ts`
+  asserts `tools/list` equals it plus `omca_hook`.
 
 ## Conventions
 
-- ruff targets py310 at line-length 88, rule set `E, F, B, C4, SIM, I, UP, PIE, PGH, RUF`.
-  E501 is ignored because the formatter owns line length. B008 is ignored globally because
-  `MCPServer` needs `Field()` in parameter defaults to carry tool descriptions.
-- Format with `uv run --project servers ruff format servers/`, lint with
-  `uv run --project servers ruff check servers/`. Four-space indent, LF endings.
-- Define tools with `MCPServer` decorators (`@mcp.tool()`) and describe each parameter with
-  `Field()`. Keep a tool docstring under 2KB; Claude Code truncates past that.
-- There is no root `pyproject.toml`. Python tooling stays inside `servers/`.
+- The tool contract is language-neutral: tool names and input schemas are named by agents,
+  skills and user allowlists as `mcp__plugin_oh-my-claudeagent_omca__<tool>`, so changing
+  one is a breaking change. `.claude/rules/mcp-server.md` has the declaration contract.
+- Run the specs with `just test-mcp` (`bun test servers`); `just typecheck-ts` covers this
+  directory through `tsconfig.runtime.json`.
+- Keep a tool description under 2,048 characters; Claude Code truncates past that.
 
 The state files these tools read and write are `boulder.json` (a session-bound plan
 registry keyed `plans[plan_name]` and `bindings[session_id]`),
 `verification-evidence.json` (the append-only evidence log, `output_snippet` capped at
-2000 characters), and the notepad tree under `.omca/state/notepads/`. Read
-`servers/tools/_boulder_core.py` for the resolution ladder rather than hand-parsing
-`boulder.json` anywhere else.
+2000 characters), and the notepad tree under `.omca/notepads/`. Read `resolveBoundPlan` in
+`src/core/boulder.ts` for the resolution ladder rather than hand-parsing `boulder.json`
+anywhere else.

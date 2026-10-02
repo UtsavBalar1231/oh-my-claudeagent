@@ -24,24 +24,13 @@ const USAGE = "Usage: bun scripts/package.ts <dest_dir> [--version <N.N.N>]\n   
 // matches the last path components at any depth, as rsync's --exclude does.
 export const EXCLUDES = [
   ".git/",
-  ".omc/",
   ".omca/",
-  ".mypy_cache/",
-  ".pytest_cache/",
-  ".ruff_cache/",
-  ".venv/",
-  "UPGRADE.md",
-  "TODO.md",
   "CLAUDE.md",
-  ".sisyphus/",
   ".claude/",
-  ".in_use/",
   "benchmarks/",
   "docs/design/",
   "tests/",
   "scripts/qa/",
-  "*.pyc",
-  "__pycache__/",
   "node_modules/",
 ] as const;
 

@@ -52,13 +52,6 @@ function validModels(raw: unknown): Record<string, ModelRef> {
   return out
 }
 
-function astGrepAvailable() {
-  const env = process.env.AST_GREP_BIN
-  if ((env && Bun.which(env)) || Bun.which("ast-grep")) return true
-  const sg = Bun.which("sg")
-  return !!sg && Bun.spawnSync([sg, "--version"]).stdout.toString().toLowerCase().includes("ast-grep")
-}
-
 async function register(name: string, fn: () => Promise<unknown>) {
   try {
     await fn()
@@ -133,14 +126,10 @@ async function setup(ctx: Context) {
   })
 
   await register("mcp", async () => {
-    if (!Bun.which("uv") || !astGrepAvailable()) {
-      console.error("omca: MCP server not registered; it needs uv and ast-grep on PATH")
-      return
-    }
     const config: Mcp.ServerConfig = {
       type: "local",
-      command: ["uv", "run", "--project", join(root, "servers"), "python", join(root, "servers/omca-mcp.py")],
-      environment: { CLAUDE_PROJECT_ROOT: projectRoot, CLAUDE_PROJECT_DIR: projectRoot, CLAUDE_PLUGIN_ROOT: root },
+      command: [process.execPath, join(root, "servers/omca.ts")],
+      environment: { BUN_BE_BUN: "1", CLAUDE_PROJECT_ROOT: projectRoot, CLAUDE_PROJECT_DIR: projectRoot, CLAUDE_PLUGIN_ROOT: root },
       codemode: false,
       timeout: { startup: 120000 },
     }

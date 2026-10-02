@@ -41,7 +41,7 @@ const read = (root: string, path: string): string => readFileSync(join(root, pat
 
 const entry = (i: number) => ({ type: "test", command: `run ${i}`, exit_code: 0, output_snippet: "ok", timestamp: "2026-10-01T00:00:00Z" });
 
-function seedDurable(root: string): { registry: string; ledger: string } {
+function seedDurable(root: string): void {
   put(root, "done.md", "- [x] 1. one\n");
   put(root, "live.md", "- [ ] 1. one\n");
   const registry = JSON.stringify({
@@ -54,14 +54,13 @@ function seedDurable(root: string): { registry: string; ledger: string } {
   const ledger = JSON.stringify({ entries: Array.from({ length: 1001 }, (_, i) => entry(i)) });
   put(root, ".omca/state/boulder.json", registry);
   put(root, ".omca/evidence/verification-evidence.json", ledger);
-  return { registry, ledger };
 }
 
 describe("start-up work", () => {
-  test("the server that serves the model's tools prunes the plan registry and rotates the evidence ledger", async () => {
+  test("the server prunes the plan registry and rotates the evidence ledger", async () => {
     const root = project();
     seedDurable(root);
-    await startWork(root, true, NOW);
+    await startWork(root, NOW);
     expect(JSON.parse(read(root, ".omca/state/boulder.json"))).toEqual({
       plans: { live: { active_plan: join(root, "live.md"), started_at: "2026-10-01T00:00:00Z", session_ids: ["s1"] } },
       bindings: { s1: { plan_name: "live", bound_at: 1_786_000_000 } },
@@ -71,15 +70,6 @@ describe("start-up work", () => {
     expect([live.length, live[0].command, archived.length, archived.at(-1).command]).toEqual([500, "run 501", 501, "run 500"]);
   });
 
-  test("the hooks-only server leaves the plan registry and the evidence ledger byte-identical", async () => {
-    const root = project();
-    const { registry, ledger } = seedDurable(root);
-    await startWork(root, false, NOW);
-    expect(read(root, ".omca/state/boulder.json")).toBe(registry);
-    expect(files(root, ".omca/evidence")).toEqual(["verification-evidence.json"]);
-    expect(read(root, ".omca/evidence/verification-evidence.json")).toBe(ledger);
-  });
-
   test("delegation records and feedback files older than 90 days go, newer ones stay, and an emptied record directory goes", async () => {
     const root = project();
     put(root, ".omca/metrics/s-old/a1.json", "{}", 91 * DAY_MS);
@@ -87,7 +77,7 @@ describe("start-up work", () => {
     put(root, ".omca/metrics/s-mixed/a3.json", "{}", 89 * DAY_MS);
     put(root, ".omca/feedback/s-old.json", "{}", 91 * DAY_MS);
     put(root, ".omca/feedback/s-new.json", "{}", 89 * DAY_MS);
-    await startWork(root, false, NOW);
+    await startWork(root, NOW);
     expect(readdirSync(join(root, ".omca", "metrics"))).toEqual(["s-mixed"]);
     expect(files(root, ".omca/metrics")).toEqual(["s-mixed/a3.json"]);
     expect(files(root, ".omca/feedback")).toEqual(["s-new.json"]);
@@ -100,7 +90,7 @@ describe("start-up work", () => {
       put(root, `.omca/state/${dir}/new.json`, "{}", 23 * HOUR_MS);
       put(root, `.omca/state/${dir}/old.json.tmp`, "{}", 25 * HOUR_MS);
     }
-    await startWork(root, false, NOW);
+    await startWork(root, NOW);
     expect(files(root, ".omca/state/mod")).toEqual(["new.json", "old.json.tmp"]);
     expect(files(root, ".omca/state/session")).toEqual(["new.json", "old.json.tmp"]);
   });
@@ -111,7 +101,7 @@ describe("start-up work", () => {
     put(root, ".omca/state/mod/old.json", "{}", 25 * HOUR_MS);
     const errors = spyOn(console, "error").mockImplementation(() => {});
     try {
-      await startWork(root, true, NOW);
+      await startWork(root, NOW);
       expect(errors.mock.calls.map(([message]) => message)).toEqual(["omca: start-up evidence ledger rotation failed:"]);
     } finally {
       errors.mockRestore();

@@ -9,29 +9,12 @@ default:
 
 # Run all linters
 [group('lint')]
-lint: lint-shell lint-python
+lint: lint-shell
 
 # Lint shell scripts with shellcheck
 [group('lint')]
 lint-shell:
 	shellcheck scripts/*.sh
-
-# Lint Python with ruff
-[group('lint')]
-lint-python:
-	uv run --project servers ruff check servers/
-
-# ── Format ────────────────────────────────────────────────────────
-
-# Format Python with ruff
-[group('format')]
-fmt:
-	uv run --project servers ruff format servers/
-
-# Check Python formatting without changes
-[group('format')]
-fmt-check:
-	uv run --project servers ruff format --check servers/
 
 # ── Test ──────────────────────────────────────────────────────────
 
@@ -50,10 +33,10 @@ test-claims:
 test-hooks:
 	bash scripts/validate-plugin.sh --check hooks
 
-# Run MCP validation only (requires ast-grep)
+# Run the MCP server specs (requires ast-grep)
 [group('test')]
 test-mcp:
-	bash scripts/validate-plugin.sh --check mcp
+	bun test servers
 
 # Run the OpenCode adapter suite (typecheck, unit tests, smoke, model path); skips without bun or opencode
 [group('test')]
@@ -81,11 +64,6 @@ test-mod:
 [group('test')]
 test-bun:
 	bun test src servers statusline scripts opencode
-
-# Run the pytest suite
-[group('test')]
-test-pytest:
-	uv run --project servers pytest servers/tests/ -v
 
 # Run BATS behavioral tests for hook scripts
 [group('test')]
@@ -125,12 +103,6 @@ bench *args:
 	bun scripts/bench.ts {{ args }}
 
 # ── Typecheck ────────────────────────────────────────────────────
-
-# Type-check servers/ with pyright (pinned as a servers/ dev dependency). Note: the pyright PyPI wrapper downloads/runs a Node
-# runtime on first execution -- CI installs Node via actions/setup-node for this reason.
-[group('test')]
-typecheck:
-	uv run --project servers pyright
 
 # Type-check the mod project (engine types only) and the bun runtime project
 [group('test')]
@@ -180,7 +152,6 @@ new-hook event script-name:
 # Install dev tools and pre-commit hooks
 [group('dev')]
 setup:
-	uv sync --project servers --group dev
 	just install-hooks
 
 # Install pre-commit git hooks
@@ -198,8 +169,7 @@ run-hooks:
 doctor:
 	@echo "=== oh-my-claudeagent Doctor ==="
 	@which jq >/dev/null 2>&1 && echo "jq: $(jq --version)" || echo "jq: NOT FOUND (required)"
-	@which uv >/dev/null 2>&1 && echo "uv: $(uv --version)" || echo "uv: NOT FOUND (required)"
-	@python3 --version 2>/dev/null || echo "python3: NOT FOUND (required)"
+	@which bun >/dev/null 2>&1 && echo "bun: $(bun --version)" || echo "bun: NOT FOUND (required)"
 	@which ast-grep >/dev/null 2>&1 && echo "ast-grep: $(ast-grep --version 2>&1 | head -1)" || (which sg >/dev/null 2>&1 && echo "ast-grep (sg): $(sg --version 2>&1 | head -1)" || echo "ast-grep: NOT FOUND (required)")
 	@which shellcheck >/dev/null 2>&1 && echo "shellcheck: $(shellcheck --version | grep version: | head -1)" || echo "shellcheck: NOT FOUND (recommended)"
 	@which pre-commit >/dev/null 2>&1 && echo "pre-commit: $(pre-commit --version)" || echo "pre-commit: NOT FOUND (recommended)"
@@ -291,13 +261,13 @@ eval-consistency:
 
 # Run all test suites (structural + behavioral + MCP)
 [group('test')]
-test-all: test test-bats test-pytest test-mcp
+test-all: test test-bats test-mcp test-bun
 
 # ── CI ────────────────────────────────────────────────────────────
 
-# Run full CI pipeline (format check + lint + typecheck + test + mcp + manifest + opencode + TypeScript checks)
+# Run full CI pipeline (lint + test + bats + mcp + manifest + opencode + TypeScript checks)
 [group('ci')]
-ci: fmt-check lint typecheck test test-bats test-pytest test-mcp validate-manifest test-opencode typecheck-ts test-mod test-bun validate-mod
+ci: lint test test-bats test-mcp validate-manifest test-opencode typecheck-ts test-mod test-bun validate-mod
 
 # ── Release ──────────────────────────────────────────────────────
 
@@ -334,19 +304,9 @@ release version="":
 		.plugins[0].version = $v
 	' .claude-plugin/marketplace.json > /tmp/marketplace-tmp.json
 	mv /tmp/marketplace-tmp.json .claude-plugin/marketplace.json
-	# Sync version into servers/pyproject.toml (portable sed)
-	if sed --version >/dev/null 2>&1; then
-		sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" servers/pyproject.toml
-	else
-		sed -i '' "s/^version = \".*\"/version = \"${VERSION}\"/" servers/pyproject.toml
-	fi
 	echo "Synced version: $VERSION"
-	# Update lockfile after pyproject.toml version change
-	uv lock --project servers
-	echo "Updated uv.lock"
 	# Commit 1: version bump across all manifests
-	git add .claude-plugin/plugin.json .claude-plugin/marketplace.json \
-		servers/pyproject.toml servers/uv.lock package.json
+	git add .claude-plugin/plugin.json .claude-plugin/marketplace.json package.json
 	git commit -m "chore(release): bump version to ${VERSION}"
 	echo "Committed version bump"
 	# Commit 2: stamp the version-bump commit SHA into marketplace.json

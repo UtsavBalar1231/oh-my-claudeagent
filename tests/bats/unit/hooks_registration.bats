@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
-# hooks/hooks.json: structural coverage that validate-plugin.sh's fixture-replay
-# checks alone would not catch.
+# hooks/hooks.json: structural coverage that validate-plugin.sh's registration checks
+# alone would not catch.
 
 load '../test_helper'
 
@@ -18,9 +18,9 @@ HOOKS_JSON="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)/hooks/hooks.json"
 	assert_success
 }
 
-# validate-plugin.sh --check hooks asserts the stdout shape of every hook script it
-# replays. The script is sourced with VALIDATE_PLUGIN_SOURCE_ONLY=1 so the helper can be
-# driven against fixture scripts without running any check.
+# validate-plugin.sh keeps a stdout-shape helper for command-form hook scripts, of which
+# none are registered today. The script is sourced with VALIDATE_PLUGIN_SOURCE_ONLY=1 so the
+# helper can be driven against fixture scripts without running any check.
 VALIDATE_PLUGIN="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)/scripts/validate-plugin.sh"
 
 run_shape_check() {

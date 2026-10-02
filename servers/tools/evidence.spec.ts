@@ -64,7 +64,6 @@ function seedLedger(root: string, count: number, make = entry): object[] {
 
 function startServer(project: string, env: Record<string, string>) {
   const childEnv = { ...process.env, ...env };
-  delete childEnv.OMCA_SERVER_ROLE;
   if (!("CLAUDE_CODE_SESSION_ID" in env)) delete childEnv.CLAUDE_CODE_SESSION_ID;
   const proc = Bun.spawn([process.execPath, SERVER], { cwd: project, env: childEnv, stdin: "pipe", stdout: "pipe", stderr: "ignore" });
   servers.push(proc);

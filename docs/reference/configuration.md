@@ -115,7 +115,7 @@ basename is present in `OMCA_DISABLED_HOOKS`.
 
 Selects how far `comment-gate` goes when it finds a slop comment in a source file you
 are writing or editing. It is a separate axis from `OMCA_DISABLED_HOOKS`, which turns the
-hook off entirely. The omca-hooks server reads it from its own environment, which is Claude
+hook off entirely. The omca server reads it from its own environment, which is Claude
 Code's, so set it before launching.
 
 | Value | Behavior |
@@ -124,7 +124,7 @@ Code's, so set it before launching.
 | `advise` | **Default.** Shadow mode: the gate computes the same deny decision it would make under `deny`, records it, and then lets the write through with an advisory note instead of blocking. |
 | `deny` | Blocks the write. AI-attribution and placeholder findings always block; heuristic findings block once per file-and-findings signature in a session and then fail open, so a genuine non-obvious comment cannot trap an edit in a retry loop. |
 
-Shadow-mode decisions are written to the omca-hooks server's stderr, which is the MCP
+Shadow-mode decisions are written to the omca server's stderr, which is the MCP
 server log, as `omca: comment-gate would deny (<tier>) <file>` lines. Read those first to judge how the heuristics behave on your
 own code, then switch to `deny` once the rate looks right:
 

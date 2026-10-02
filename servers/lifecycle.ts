@@ -29,19 +29,12 @@ function pruneJson(dir: string, cutoffMs: number, depth = 1): void {
   }
 }
 
-/**
- * The server's start-up housekeeping. Only the server that serves the model's tools writes the
- * plan registry and the evidence ledger, so `servesTools` gates the registry GC and the ledger
- * rotation. Each step logs its own failure and the rest still run.
- */
-export async function startWork(root: string, servesTools: boolean, now = Date.now()): Promise<void> {
+/** The server's start-up housekeeping. Each step logs its own failure and the rest still run. */
+export async function startWork(root: string, now = Date.now()): Promise<void> {
   const omca = join(root, ".omca");
-  const durable: Array<[string, () => unknown]> = [
+  const steps: Array<[string, () => unknown]> = [
     ["plan registry GC", () => gcRegistry(root)],
     ["evidence ledger rotation", () => rotateLedger(root, new Date(now))],
-  ];
-  const steps: Array<[string, () => unknown]> = [
-    ...(servesTools ? durable : []),
     ["delegation record prune", () => pruneJson(join(omca, "metrics"), now - RECORD_MAX_AGE_MS)],
     ["feedback prune", () => pruneJson(join(omca, "feedback"), now - RECORD_MAX_AGE_MS)],
     ["mod marker prune", () => pruneJson(join(omca, "state", "mod"), now - MARKER_MAX_AGE_MS)],

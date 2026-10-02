@@ -9,36 +9,10 @@ const CLIENT_TEXT_CAP_CHARS = 2048;
 const MAX_RESULT_SIZE_CEILING = 500_000;
 const MAX_RESULT_SIZE_TOOLS = ["evidence_read", "file_read", "ast_search", "session_search"];
 const WRITE_TOOLS = ["ast_replace", "boulder_write", "evidence_log", "omca_hook", "notepad_write", "notepad_compact"];
-const ALL_TOOLS = [
-  "ast_search",
-  "ast_replace",
-  "ast_find_rule",
-  "ast_dump_tree",
-  "ast_test_rule",
-  "boulder_write",
-  "boulder_progress",
-  "health_check",
-  "agents_list",
-  "categories_list",
-  "evidence_log",
-  "evidence_read",
-  "file_read",
-  "omca_hook",
-  "notepad_write",
-  "notepad_read",
-  "notepad_list",
-  "notepad_compact",
-  "session_search",
-];
+const EXPECTED_TOOLS: string[] = JSON.parse(readFileSync(join(import.meta.dir, "..", "tests", "fixtures", "mcp", "expected-tools.json"), "utf8"));
 const PROPERTY_NAME = /^[A-Za-z0-9_.-]{1,64}$/;
 
 const VERSION: string = JSON.parse(readFileSync(join(import.meta.dir, "..", ".claude-plugin", "plugin.json"), "utf8")).version;
-const PYTHON_INSTRUCTIONS = (() => {
-  const source = readFileSync(join(import.meta.dir, "omca-mcp.py"), "utf8");
-  const literal = /^INSTRUCTIONS = """\\\n([\s\S]*?)"""$/m.exec(source)?.[1];
-  if (literal === undefined) throw new Error("INSTRUCTIONS literal not found in omca-mcp.py");
-  return literal.replaceAll("\\\n", "");
-})();
 
 const OMCA_HOOK = {
   name: "omca_hook",
@@ -80,13 +54,10 @@ afterEach(() => {
   }
 });
 
-function startServer(role?: "hooks"): Server {
+function startServer(): Server {
   const project = realpathSync(mkdtempSync(join(tmpdir(), "omca-server-")));
   expect(Bun.spawnSync(["git", "init", "-q", project]).exitCode).toBe(0);
-  const env = { ...process.env };
-  delete env.OMCA_SERVER_ROLE;
-  if (role) env.OMCA_SERVER_ROLE = role;
-  const proc = Bun.spawn([process.execPath, SERVER], { cwd: project, env, stdin: "pipe", stdout: "pipe", stderr: "pipe" });
+  const proc = Bun.spawn([process.execPath, SERVER], { cwd: project, env: { ...process.env }, stdin: "pipe", stdout: "pipe", stderr: "pipe" });
   const reader = proc.stdout.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -136,7 +107,7 @@ describe("handshake", () => {
       result: {
         supportedVersions: ["2026-07-28", "2025-11-25"],
         capabilities: { tools: { listChanged: false } },
-        instructions: PYTHON_INSTRUCTIONS,
+        instructions: expect.any(String),
         ttlMs: 0,
         cacheScope: "private",
         resultType: "complete",
@@ -156,7 +127,7 @@ describe("handshake", () => {
       protocolVersion: "2025-11-25",
       capabilities: { tools: { listChanged: false } },
       serverInfo: { name: "omca", version: VERSION },
-      instructions: PYTHON_INSTRUCTIONS,
+      instructions: expect.any(String),
     });
     server.send({ jsonrpc: "2.0", method: "notifications/initialized" });
     expect((await server.request("ping")).result).toEqual({});
@@ -167,15 +138,6 @@ describe("handshake", () => {
     expect((await server.request("initialize", {})).error).toEqual({
       code: -32602,
       message: "initialize: protocolVersion must be a string",
-    });
-  });
-
-  test("the hooks role sends no instructions, since the Python server already does", async () => {
-    const server = startServer("hooks");
-    expect((await server.request("initialize", { protocolVersion: "2025-11-25" })).result).toEqual({
-      protocolVersion: "2025-11-25",
-      capabilities: { tools: { listChanged: false } },
-      serverInfo: { name: "omca", version: VERSION },
     });
   });
 
@@ -226,7 +188,7 @@ describe("JSON-RPC framing", () => {
   });
 
   test("two in-flight tools/call requests both answer, matched by id", async () => {
-    const server = startServer("hooks");
+    const server = startServer();
     const call = (id: number, event: string) => ({
       jsonrpc: "2.0",
       id,
@@ -269,13 +231,9 @@ describe("JSON-RPC framing", () => {
 });
 
 describe("tools", () => {
-  test("the hooks role lists exactly health_check and omca_hook, filtering out every other tool", async () => {
-    expect((await listTools(startServer("hooks"))).map((tool) => tool.name)).toEqual(["health_check", "omca_hook"]);
-    expect((await listTools(startServer())).length).toBeGreaterThan(2);
-  });
-
-  test("without a role the server lists every declared tool", async () => {
-    expect((await listTools(startServer())).map((tool) => tool.name)).toEqual(ALL_TOOLS);
+  test("tools/list is the model's tools from the fixture plus omca_hook", async () => {
+    const names = (await listTools(startServer())).map((tool) => tool.name);
+    expect(names.toSorted()).toEqual([...EXPECTED_TOOLS, "omca_hook"].toSorted());
   });
 
   test("tools/list tells the client not to cache the list and marks the result complete", async () => {
@@ -287,11 +245,11 @@ describe("tools", () => {
   });
 
   test("omca_hook is declared exactly", async () => {
-    expect((await listTools(startServer("hooks"))).find((tool) => tool.name === "omca_hook")).toEqual(OMCA_HOOK);
+    expect((await listTools(startServer())).find((tool) => tool.name === "omca_hook")).toEqual(OMCA_HOOK);
   });
 
   test("omca_hook answers an empty hook result", async () => {
-    const server = startServer("hooks");
+    const server = startServer();
     expect((await server.request("tools/call", { name: "omca_hook", arguments: { event: "Stop" } })).result).toEqual({
       content: [{ type: "text", text: "{}" }],
       resultType: "complete",
@@ -299,7 +257,7 @@ describe("tools", () => {
   });
 
   test("omca_hook without an event is a tool error, not a protocol error", async () => {
-    const server = startServer("hooks");
+    const server = startServer();
     expect((await server.request("tools/call", { name: "omca_hook", arguments: {} })).result).toEqual({
       content: [{ type: "text", text: "omca_hook: event must be a string" }],
       isError: true,
@@ -308,10 +266,10 @@ describe("tools", () => {
   });
 
   test("an unknown tool and non-object arguments are invalid-params errors", async () => {
-    const server = startServer("hooks");
-    expect((await server.request("tools/call", { name: "evidence_log", arguments: {} })).error).toEqual({
+    const server = startServer();
+    expect((await server.request("tools/call", { name: "no_such_tool", arguments: {} })).error).toEqual({
       code: -32602,
-      message: "Unknown tool: evidence_log",
+      message: "Unknown tool: no_such_tool",
     });
     expect((await server.request("tools/call", { name: "omca_hook", arguments: "x" })).error).toEqual({
       code: -32602,
@@ -347,8 +305,10 @@ describe("tool declaration contract", () => {
     expect(tools.filter((tool) => !tool.annotations.readOnlyHint).map((tool) => tool.name)).toEqual(WRITE_TOOLS);
   });
 
-  test("the server instructions fit the client cap", () => {
-    expect(PYTHON_INSTRUCTIONS.length).toBeLessThanOrEqual(CLIENT_TEXT_CAP_CHARS);
+  test("the server instructions fit the client cap and name every tool the model is meant to call", async () => {
+    const result = (await startServer().request("initialize", { protocolVersion: "2025-11-25" })).result as { instructions: string };
+    expect(result.instructions.length).toBeLessThanOrEqual(CLIENT_TEXT_CAP_CHARS);
+    expect(EXPECTED_TOOLS.filter((name) => !result.instructions.includes(`\`${name}\``))).toEqual([]);
   });
 });
 

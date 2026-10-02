@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { dispatch, type Payload } from "./registry.ts";
+import { dispatch } from "./registry.ts";
 import { findSession, touchSession } from "./session-state.ts";
 
 const REPO = join(import.meta.dir, "..", "..");
@@ -74,10 +74,8 @@ describe("compaction", () => {
     expect(findSession(id)?.compactedAt).toBe(NOW);
   });
 
-  test("golden: the compact fixture, which carries no session id, re-injects the template alone", async () => {
-    const fixture = JSON.parse(readFileSync(join(REPO, "tests", "fixtures", "hooks", "sessionstart-compact.json"), "utf8"));
-    const { hook_event_name: event, ...fields } = fixture;
-    expect(await dispatch({ event, ...fields } as Payload, project(), NOW)).toEqual(context(TEMPLATE));
+  test("a compact payload that carries no session id re-injects the template alone", async () => {
+    expect(await dispatch({ event: "SessionStart", source: "compact" }, project(), NOW)).toEqual(context(TEMPLATE));
   });
 });
 

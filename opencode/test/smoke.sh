@@ -69,9 +69,8 @@ git -C "${clone}" add -A
 commit "${clone}" package
 workspace "${C}" "$(jq -cn --arg spec "oh-my-claudeagent@git+file://${clone}" '{plugins: [$spec]}')"
 
-UV_CACHE_DIR=${UV_CACHE_DIR:-$(uv cache dir)}
 OPENCODE_PASSWORD=$(od -An -tx1 -N16 /dev/urandom | tr -d ' \n')
-export UV_CACHE_DIR OPENCODE_PASSWORD OPENCODE_DB=:memory:
+export OPENCODE_PASSWORD OPENCODE_DB=:memory:
 export XDG_CONFIG_HOME=${tmp}/config XDG_DATA_HOME=${tmp}/data XDG_CACHE_HOME=${tmp}/cache
 port=$(python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')
 base=http://127.0.0.1:${port}

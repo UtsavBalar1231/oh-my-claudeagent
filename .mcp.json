@@ -1,18 +1,8 @@
 {
   "mcpServers": {
     "omca": {
-      "command": "uv",
-      "args": ["run", "--project", "${CLAUDE_PLUGIN_ROOT}/servers", "python", "${CLAUDE_PLUGIN_ROOT}/servers/omca-mcp.py"],
-      "env": {
-        "UV_PROJECT_ENVIRONMENT": "${CLAUDE_PLUGIN_DATA}/.venv"
-      }
-    },
-    "omca-hooks": {
       "command": "bun",
       "args": ["${CLAUDE_PLUGIN_ROOT}/servers/omca.ts"],
-      "env": {
-        "OMCA_SERVER_ROLE": "hooks"
-      },
       "alwaysLoad": true
     },
     "grep": {

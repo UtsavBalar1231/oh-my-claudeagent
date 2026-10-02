@@ -72,7 +72,7 @@ test("hooks.json routes every Write and Edit PreToolUse call to omca_hook in one
       hooks: [
         {
           type: "mcp_tool",
-          server: "plugin:oh-my-claudeagent:omca-hooks",
+          server: "plugin:oh-my-claudeagent:omca",
           tool: "omca_hook",
           timeout: 10,
           input: {

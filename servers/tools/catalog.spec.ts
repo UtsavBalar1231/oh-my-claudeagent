@@ -47,7 +47,7 @@ function gitProject(): string {
 
 function startServer(env: Record<string, string | undefined> = {}) {
   const project = gitProject();
-  const serverEnv: Record<string, string | undefined> = { ...process.env, OMCA_SERVER_ROLE: "hooks", CLAUDE_CONFIG_DIR: tempDir("config") };
+  const serverEnv: Record<string, string | undefined> = { ...process.env, CLAUDE_CONFIG_DIR: tempDir("config") };
   delete serverEnv.OMCA_HOOK_TRACE;
   delete serverEnv.AI_AGENT;
   delete serverEnv.AST_GREP_BIN;

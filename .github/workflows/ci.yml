@@ -33,9 +33,9 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          python-version: "3.12"
+          bun-version: 1.4.2
 
       - name: Run validation suites
         run: bash scripts/validate-plugin.sh --check claims --check hooks
@@ -49,71 +49,6 @@ jobs:
             echo ""
             echo "### If this fails"
             echo "The plugin manifest or a hook definition is malformed or out of sync. Run \`bash scripts/validate-plugin.sh --check claims --check hooks\` locally to see the exact failure."
-          } >> "$GITHUB_STEP_SUMMARY"
-
-  lint-python:
-    name: Lint Python
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-        with:
-          persist-credentials: false
-
-      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
-
-      - name: Install ruff
-        run: uv tool install ruff
-
-      - name: Check formatting (servers)
-        run: ruff format --check servers/
-
-      - name: Lint (servers)
-        run: ruff check servers/
-
-      - name: Job summary
-        if: always()
-        run: |
-          {
-            echo "### What this job checks"
-            echo "Python formatting and lint rules for servers/, via ruff (mirrors \`just fmt-check lint-python\`)."
-            echo ""
-            echo "### If this fails"
-            echo "A file is unformatted or violates a ruff rule. Run \`just fmt\` and \`just lint-python\` locally to fix."
-          } >> "$GITHUB_STEP_SUMMARY"
-
-  typecheck:
-    name: Typecheck
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-        with:
-          persist-credentials: false
-
-      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
-
-      # pyright's PyPI wrapper runs the real (Node-based) pyright binary under the
-      # hood, downloading/invoking Node at execution time -- so Node must be on PATH.
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-
-      - name: Install typecheck dependencies
-        run: uv sync --project servers --group dev
-
-      - name: Run pyright
-        run: uv run --project servers pyright
-
-      - name: Job summary
-        if: always()
-        run: |
-          {
-            echo "### What this job checks"
-            echo "Static types across servers/, via pyright (mirrors \`just typecheck\`)."
-            echo ""
-            echo "### If this fails"
-            echo "A type error was introduced. Run \`just typecheck\` locally to see the exact file/line."
           } >> "$GITHUB_STEP_SUMMARY"
 
   lint-shell:
@@ -151,17 +86,9 @@ jobs:
           persist-credentials: false
           submodules: true
 
-      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
-
-      - name: Pre-warm omca MCP venv
-        run: uv sync --project servers
-
-      - name: Install ast-grep CLI
-        run: |
-          curl -fsSL --retry 3 -o "$RUNNER_TEMP/ast-grep.zip" "https://github.com/ast-grep/ast-grep/releases/download/$AST_GREP_VERSION/app-x86_64-unknown-linux-gnu.zip"
-          echo "$AST_GREP_SHA256  $RUNNER_TEMP/ast-grep.zip" | sha256sum --check --strict
-          unzip -q "$RUNNER_TEMP/ast-grep.zip" -d "$RUNNER_TEMP/ast-grep"
-          echo "$RUNNER_TEMP/ast-grep" >> "$GITHUB_PATH"
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
 
       - name: Run BATS behavioral tests
         run: tests/bats/bats-core/bin/bats tests/bats/hooks/ tests/bats/unit/
@@ -171,58 +98,14 @@ jobs:
         run: |
           {
             echo "### What this job checks"
-            echo "Hook script and shared-library behavior under tests/bats/hooks/ and tests/bats/unit/, via bats-core (mirrors \`just test-bats\`)."
+            echo "The validator's golden replay under tests/bats/hooks/ and the workflow, frontmatter and registration contracts under tests/bats/unit/, via bats-core (mirrors \`just test-bats\`)."
             echo ""
             echo "### If this fails"
-            echo "A hook script or a common.sh helper regressed. Run \`tests/bats/bats-core/bin/bats tests/bats/hooks/ tests/bats/unit/\` locally (after \`git submodule update --init\`) to see the failing test."
-          } >> "$GITHUB_STEP_SUMMARY"
-
-  test-pytest:
-    name: pytest MCP Tests
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-        with:
-          persist-credentials: false
-
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
-        with:
-          python-version: "3.12"
-
-      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
-
-      - name: Install test dependencies
-        run: |
-          uv sync --project servers --group dev
-
-      # The startup-latency and signal-shutdown tests spawn the real omca MCP
-      # server, whose entry point calls discover_binary() and exits 1 if ast-grep
-      # is absent — so the server must have ast-grep on PATH to reply to initialize.
-      - name: Install ast-grep CLI
-        run: |
-          curl -fsSL --retry 3 -o "$RUNNER_TEMP/ast-grep.zip" "https://github.com/ast-grep/ast-grep/releases/download/$AST_GREP_VERSION/app-x86_64-unknown-linux-gnu.zip"
-          echo "$AST_GREP_SHA256  $RUNNER_TEMP/ast-grep.zip" | sha256sum --check --strict
-          unzip -q "$RUNNER_TEMP/ast-grep.zip" -d "$RUNNER_TEMP/ast-grep"
-          echo "$RUNNER_TEMP/ast-grep" >> "$GITHUB_PATH"
-
-      - name: Run pytest (servers)
-        run: uv run --project servers pytest servers/tests/ -v --tb=short
-
-      - name: Job summary
-        if: always()
-        run: |
-          {
-            echo "### What this job checks"
-            echo "Unit tests under servers/tests/, via pytest (mirrors \`just test-pytest\`)."
-            echo ""
-            echo "### If this fails"
-            echo "An MCP tool regressed. Run \`just test-pytest\` locally to see the failing test and traceback."
+            echo "The validator output or a workflow, frontmatter or registration contract drifted. Run \`tests/bats/bats-core/bin/bats tests/bats/hooks/ tests/bats/unit/\` locally (after \`git submodule update --init\`) to see the failing test."
           } >> "$GITHUB_STEP_SUMMARY"
 
   test-mcp:
-    name: MCP Validation
+    name: MCP Server Specs
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -231,10 +114,11 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
 
-      # validate-plugin.sh --check mcp starts the real omca MCP server, whose
-      # entry point calls discover_binary() and exits 1 if ast-grep is absent.
+      # servers/tools/ast.spec.ts runs the real ast-grep binary.
       - name: Install ast-grep CLI
         run: |
           curl -fsSL --retry 3 -o "$RUNNER_TEMP/ast-grep.zip" "https://github.com/ast-grep/ast-grep/releases/download/$AST_GREP_VERSION/app-x86_64-unknown-linux-gnu.zip"
@@ -242,18 +126,18 @@ jobs:
           unzip -q "$RUNNER_TEMP/ast-grep.zip" -d "$RUNNER_TEMP/ast-grep"
           echo "$RUNNER_TEMP/ast-grep" >> "$GITHUB_PATH"
 
-      - name: Run MCP validation
-        run: bash scripts/validate-plugin.sh --check mcp
+      - name: Run MCP server specs
+        run: bun test servers
 
       - name: Job summary
         if: always()
         run: |
           {
             echo "### What this job checks"
-            echo "The omca MCP server starts and responds to initialize/list-tools, via \`just test-mcp\`."
+            echo "The omca MCP server specs under servers/: the handshake, the tool list, every tool and every hook handler, via \`just test-mcp\`."
             echo ""
             echo "### If this fails"
-            echo "The MCP server failed to start or misreports its tool list, often due to a missing ast-grep binary or a broken tool registration. Run \`bash scripts/validate-plugin.sh --check mcp\` locally to see the exact failure."
+            echo "A server spec failed: the server did not start, misreports its tool list, or a tool or hook handler regressed. Run \`just test-mcp\` locally to see the failing spec."
           } >> "$GITHUB_STEP_SUMMARY"
 
   test-opencode:
@@ -266,10 +150,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
-
-      # The smoke test loads the plugin in OpenCode, which starts the omca MCP
-      # server, and that server exits 1 if ast-grep is absent.
+      # The omca MCP server OpenCode starts runs the ast-grep binary for its ast_* tools.
       - name: Install ast-grep CLI
         run: |
           curl -fsSL --retry 3 -o "$RUNNER_TEMP/ast-grep.zip" "https://github.com/ast-grep/ast-grep/releases/download/$AST_GREP_VERSION/app-x86_64-unknown-linux-gnu.zip"

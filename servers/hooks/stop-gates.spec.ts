@@ -955,7 +955,7 @@ describe("the Stop handler", () => {
         hooks: [
           {
             type: "mcp_tool",
-            server: "plugin:oh-my-claudeagent:omca-hooks",
+            server: "plugin:oh-my-claudeagent:omca",
             tool: "omca_hook",
             timeout: 15,
             input: {

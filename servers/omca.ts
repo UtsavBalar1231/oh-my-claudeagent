@@ -45,15 +45,8 @@ const INSTRUCTIONS = [
 
 const MODERN_PROTOCOL = "2026-07-28";
 const FALLBACK_PROTOCOL = "2025-11-25";
-const HOOKS_ROLE_TOOLS = new Set(["omca_hook", "health_check"]);
 
-const role = process.env.OMCA_SERVER_ROLE;
-if (role !== undefined && role !== "hooks") {
-  console.error(`omca: unknown OMCA_SERVER_ROLE "${role}"; expected "hooks" or unset`);
-  process.exit(2);
-}
-
-const declared = [
+const tools = [
   ...astTools,
   ...boulderTools,
   ...catalogTools,
@@ -63,15 +56,12 @@ const declared = [
   ...notepadTools,
   ...sessionTools,
 ];
-const tools = role === "hooks" ? declared.filter((tool) => HOOKS_ROLE_TOOLS.has(tool.name)) : declared;
 const toolsByName = new Map(tools.map((tool) => [tool.name, tool]));
 const toolList = tools.map(({ call, ...declaration }) => declaration);
 
 const manifestUrl = new URL("../.claude-plugin/plugin.json", import.meta.url);
 const serverInfo = { name: "omca", version: String(JSON.parse(readFileSync(manifestUrl, "utf8")).version) };
 const capabilities = { tools: { listChanged: false } };
-// The hooks-role server runs beside the Python server, which already sends these instructions.
-const instructions = role === "hooks" ? {} : { instructions: INSTRUCTIONS };
 // The tool list is fixed for the life of the process, but a client cache that outlives it
 // would serve a stale list after a plugin update, so the client re-lists instead of caching.
 const listCache = { ttlMs: 0, cacheScope: "private" };
@@ -96,7 +86,7 @@ const handlers: Record<string, Handler> = {
   "server/discover": () => ({
     supportedVersions: [MODERN_PROTOCOL, FALLBACK_PROTOCOL],
     capabilities,
-    ...instructions,
+    instructions: INSTRUCTIONS,
     ...listCache,
     ...complete,
     _meta: { "io.modelcontextprotocol/serverInfo": serverInfo },
@@ -105,7 +95,7 @@ const handlers: Record<string, Handler> = {
     if (typeof params.protocolVersion !== "string") {
       throw new RpcError(INVALID_PARAMS, "initialize: protocolVersion must be a string");
     }
-    return { protocolVersion: params.protocolVersion, capabilities, serverInfo, ...instructions };
+    return { protocolVersion: params.protocolVersion, capabilities, serverInfo, instructions: INSTRUCTIONS };
   },
   "notifications/initialized": () => undefined,
   ping: () => ({}),
@@ -131,7 +121,7 @@ for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) process.on(signal
 
 const root = projectRoot(process.cwd());
 ensureStateDir(root);
-void startWork(root, role !== "hooks");
+void startWork(root);
 
 const feed = createDispatcher(handlers, (line) => process.stdout.write(line));
 process.stdin.setEncoding("utf8");

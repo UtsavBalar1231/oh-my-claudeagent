@@ -32,7 +32,7 @@ import type { Script, Turn } from "./mock-model.ts";
 
 const GUARD_DENY = /tool\.check Bash [^ ]+: .* -> deny by plugin oh-my-claudeagent: Destructive rm -rf blocked/;
 const ANY_PLUGIN_DENY = /-> deny by plugin oh-my-claudeagent/;
-const HOOK_CALL = /Hooks: mcp_tool calling plugin:oh-my-claudeagent:omca-hooks\/omca_hook/g;
+const HOOK_CALL = /Hooks: mcp_tool calling plugin:oh-my-claudeagent:omca\/omca_hook/g;
 const PLAN_DENY_MARKER = "PLAN-CHECKBOX-VERIFY";
 const PLAN_WITHOUT_CHECKBOXES = "## Work Objectives\n\nSome text with no checkboxes.\n";
 const CANARY = "stale-build-cache";

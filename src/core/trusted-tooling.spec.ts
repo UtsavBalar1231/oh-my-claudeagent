@@ -1,11 +1,5 @@
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { isTrustedTooling } from "./trusted-tooling.ts";
-
-const FIXTURES = join(import.meta.dir, "..", "..", "tests", "fixtures", "hooks");
-const fixtureCommand = (name: string): string =>
-  (JSON.parse(readFileSync(join(FIXTURES, name), "utf8")) as { tool_input: { command: string } }).tool_input.command;
 
 const allowed = (command: string) => expect(isTrustedTooling(command)).toBe(true);
 const declined = (command: string) => expect(isTrustedTooling(command)).toBe(false);
@@ -32,7 +26,7 @@ test("jq whose single-quoted filter contains a pipe defers to the platform", () 
   declined("jq -r '.a | .b' f.json"));
 test("jq with a quoted separator is not auto-allowed", () => declined('jq -r ".a | .b" f.json'));
 
-test("if Bash(npm *): npm test is allowed", () => allowed(fixtureCommand("permissionrequest-npm-test.json")));
+test("if Bash(npm *): npm test is allowed", () => allowed("npm test"));
 test("if Bash(npm *): npm run build is allowed", () => allowed("npm run build"));
 test("if Bash(npm *): npm run test is allowed", () => allowed("npm run test"));
 test("if Bash(npm *): npm ci is allowed", () => allowed("npm ci"));
@@ -44,12 +38,12 @@ test("if Bash(npm *): npm i falls through (no decision)", () => declined("npm i 
 test("if Bash(npm *): npm publish falls through (no decision)", () => declined("npm publish"));
 test("if Bash(npm *): npm exec falls through (no decision)", () => declined("npm exec some-tool"));
 
-test("if Bash(jq *): jq query is allowed", () => allowed(fixtureCommand("permissionrequest-jq.json")));
+test("if Bash(jq *): jq query is allowed", () => allowed("jq '.foo' bar.json"));
 test("if Bash(jq *): jq -r is allowed", () => allowed("jq -r .name package.json"));
 test("if Bash(jq *): jq --rawfile produces no decision (falls through)", () =>
   declined("jq --rawfile data file.txt . input.json"));
 
-test("if Bash(uv *): uv run python script.py is allowed", () => allowed(fixtureCommand("permissionrequest-uv.json")));
+test("if Bash(uv *): uv run python script.py is allowed", () => allowed("uv run python script.py"));
 test("if Bash(uv *): uv run --project servers ruff check is allowed", () =>
   allowed("uv run --project servers ruff check servers/"));
 test("if Bash(uv *): uv sync is allowed", () => allowed("uv sync"));

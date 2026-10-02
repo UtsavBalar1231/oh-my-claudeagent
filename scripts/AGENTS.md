@@ -9,10 +9,9 @@ under `hooks/` and the server handlers under `servers/hooks/`.
 - Top-level scripts: repository tooling, such as `validate-plugin.sh`, `package.ts`
   (`bun scripts/package.ts <dest>` copies the shipped tree, `--dry-run` prints its file list),
   `bench.ts` and `parity-titles.ts`.
-- `lib/common.sh`: shared bash helpers (the stdin payload reader, state-dir resolution).
-  Source it rather than reimplementing an idiom already there.
-- `bin/run-hook-in-scratch.sh`: runs a hook script against a scratch copy of state
-  for manual testing.
+- `postedit-check.ts`: runs `just typecheck-ts` after an edit to a `.ts` file and reports the
+  first lines of a failure as hook context. The local project settings call it from a
+  `PostToolUse` entry.
 - `qa/`: the manual QA harness (`just qa`), packaging-excluded. TypeScript on bun.
   `session-smoke.ts` and `hook-live-probe.ts` drive `claude -p` with the packaged plugin
   against the mock model (`mock-model.ts`), in a scratch project with its own
@@ -49,7 +48,6 @@ Hook-authoring conventions for a script here:
   restatement of a matched command, not a fallback for an unmatched one.
 - Keep state under `.omca/state/` relative to `CLAUDE_PROJECT_ROOT`, never `~/.claude/`.
 - Reference the plugin root as `$(dirname "$0")/..`.
-- Source `lib/common.sh` and use its helpers rather than reimplementing an idiom.
 - Give every numeric constant a single-line derivation comment within two lines above it.
   Write `UNDOCUMENTED` when the rationale is not discoverable rather than guessing.
 - Do not cite plan task numbers or plan filenames in a comment. Write the invariant.

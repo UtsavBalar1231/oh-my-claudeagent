@@ -100,8 +100,7 @@ for the trap and the one-setting workaround.
 
 - Claude Code CLI v2.1.271 or later (older clients cannot load a plugin whose `userConfig` declares `options`)
 - `jq`
-- `uv`
-- `python3` 3.10+
+- `bun` 1.4.2 or later
 - `ast-grep` CLI (`ast-grep` or `sg`)
 
 ### For LLM agents
@@ -111,7 +110,7 @@ install:
 
 ```
 Run /oh-my-claudeagent:omca-setup, then verify: (1) it reports dependencies OK
-(jq, uv, python3, ast-grep all found), (2) it confirms ~/.claude/settings.json
+(jq, bun, ast-grep all found), (2) it confirms ~/.claude/settings.json
 was updated with the orchestration block, (3) it prints a final summary with no
 FAIL lines. If any check fails, run /oh-my-claudeagent:omca-setup --doctor and
 report the output. That flag is this skill's own read-only report, scoped to OMCA
@@ -153,7 +152,7 @@ To load a local checkout instead, point at its `opencode/` directory:
 inherits the parent session's model. To override one agent, set `agents.omca-<name>.model`
 in your own config, which merges over the plugin's agent.
 
-Prerequisites: `uv`, ast-grep (`ast-grep` or `sg`), `bash` 4.3+ and `jq`.
+Prerequisites: ast-grep (`ast-grep` or `sg`), `bash` 4.3+ and `jq`.
 
 ### What ships
 
@@ -165,8 +164,8 @@ Prerequisites: `uv`, ast-grep (`ast-grep` or `sg`), `bash` 4.3+ and `jq`.
 - Commands: `/omca-metis`, `/omca-momus`, `/omca-hephaestus`. Each asks the primary agent
   to launch that subagent.
 - MCP: the `omca` server with the evidence, notepad, AST and `file_read` tools, exposed as
-  `omca_<tool>` (for example `omca_evidence_log`). It is registered only when `uv` and
-  ast-grep are on PATH, and its first launch runs `uv sync`.
+  `omca_<tool>` (for example `omca_evidence_log`). It runs on the bun that runs OpenCode,
+  and its `ast_*` tools need ast-grep on PATH.
 - Guardrails: `permission-filter.sh`, `git-destructive-deny.sh` and the comment gate
   run on model and user shell commands and on file edits, and block the call on deny.
   Comment enforcement blocks only with `OMCA_COMMENT_GATE=deny` set. A blocked `!` shell
@@ -186,8 +185,6 @@ guard), and the statusline.
 
 - `.omca/` at the workspace root: guard state and logs from the first guarded command, and
   evidence and notepads from the MCP tools.
-- A Python virtual environment (`.venv`) in the installed package's `servers` directory,
-  created by the first `uv sync`.
 
 ### Maintainer note
 

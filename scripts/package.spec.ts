@@ -12,33 +12,22 @@ const SHIPPED: Record<string, string> = {
   "docs/guide.md": "guide\n",
   "hooks/hooks.json": "{}\n",
   "scripts/package.ts": "ts\n",
-  "servers/m.py": "py\n",
+  "servers/m.ts": "ts\n",
   "statusline/main.ts": "ts\n",
 };
 
 const EXCLUDED: Record<string, string> = {
   ".git/HEAD": "x",
-  ".omc/a": "x",
   ".omca/state/b.json": "x",
-  ".mypy_cache/a": "x",
-  ".pytest_cache/a": "x",
-  ".ruff_cache/a": "x",
-  ".venv/bin/python": "x",
-  ".sisyphus/a": "x",
   ".claude/settings.json": "x",
-  ".in_use/lock": "x",
   "benchmarks/perf/r.json": "x",
   "docs/design/d.md": "x",
   "docs/CLAUDE.md": "x",
   "tests/t.spec.ts": "x",
-  "servers/tests/y.py": "x",
+  "servers/tests/y.ts": "x",
   "scripts/qa/lib.ts": "x",
-  "servers/m.pyc": "x",
-  "servers/__pycache__/m.py": "x",
   "node_modules/m/index.js": "x",
   "CLAUDE.md": "x",
-  "TODO.md": "x",
-  "UPGRADE.md": "x",
 };
 
 let root = "";
@@ -93,13 +82,13 @@ describe("packageTree", () => {
       "gone/deep/x.txt": "x",
       "README.md": "stale readme\n",
       "agents": "a file where the agents directory belongs",
-      ".venv/keep": "x",
+      ".omca/keep": "x",
       "docs/stale.md": "x",
     });
 
     packageTree(root, dest);
 
-    expect(filesUnder(dest)).toEqual([...Object.keys(SHIPPED), ".venv/keep"].sort());
+    expect(filesUnder(dest)).toEqual([...Object.keys(SHIPPED), ".omca/keep"].sort());
     expect(readFileSync(join(dest, "README.md"), "utf8")).toBe("readme\n");
     expect(existsSync(join(dest, "gone"))).toBe(false);
   });

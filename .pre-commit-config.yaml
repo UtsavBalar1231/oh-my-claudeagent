@@ -46,14 +46,6 @@ repos:
         files: '^scripts/.*\.sh$'
         exclude: '\.bats$'
 
-  # Python
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.11
-    hooks:
-      - id: ruff-format
-      - id: ruff-check
-        args: [--fix, --exit-non-zero-on-fix]
-
   # GHA workflow validation
   - repo: https://github.com/python-jsonschema/check-jsonschema
     rev: 0.37.1

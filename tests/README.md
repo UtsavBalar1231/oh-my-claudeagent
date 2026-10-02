@@ -8,18 +8,16 @@ This directory contains behavioral and integration tests for oh-my-claudeagent.
 tests/
   bats/
     bats-core/      # BATS test framework (git submodule)
-    hooks/          # BATS behavioral tests for hook scripts
+    hooks/          # golden replay of validate-plugin.sh, sisyphus contract canary
+    unit/           # validator, workflow and frontmatter contract tests
   evals/            # Eval tasks and run scripts
   fixtures/
-    hooks/          # JSON payloads for hook validation (validate-plugin.sh)
-    mcp/            # JSON-RPC requests for MCP server validation
+    mcp/            # JSON-RPC requests and the expected tool list for the MCP server
+  mod/              # mod tests, run by `claude plugin test .`
 ```
 
-Python MCP tool tests live alongside the server code:
-
-```
-servers/tests/      # pytest tests for omca MCP tools
-```
+Bun specs (`*.spec.ts`) live beside the code they cover, under `src/`, `servers/`,
+`statusline/`, `scripts/` and `opencode/`.
 
 ## Running Tests Locally
 
@@ -30,77 +28,55 @@ just test-all
 # Layer 1: structural validation (claims + hooks format)
 just test
 
-# Layer 2: BATS behavioral tests (hook behavior, content assertions)
+# Layer 2: BATS contract tests (validator golden replay, workflows, frontmatter)
 git submodule update --init   # pull bats-core if not present
 just test-bats
 
-# Layer 3: pytest MCP tool tests
-just test-pytest
-
-# Layer 4: MCP server startup + tool listing (requires ast-grep)
+# Layer 3: MCP server specs (requires ast-grep)
 just test-mcp
+
+# Layer 4: every bun spec
+just test-bun
 ```
 
-## Adding a New BATS Hook Test
+## Adding a BATS Test
 
-1. Create `tests/bats/hooks/your-hook-name.bats` by copying an existing file as a template.
+1. Create `tests/bats/unit/your-test-name.bats` by copying an existing file as a template.
 2. Each test function follows the pattern:
 
 ```bash
-@test "your-hook: description of expected behavior" {
-  INPUT='{"key": "value"}'
-  OUTPUT=$(echo "$INPUT" | bash scripts/your-hook.sh)
-  [ $? -eq 0 ]
-  echo "$OUTPUT" | grep -q "expected_string"
-}
+@test "your-area: description of expected behavior" {
 ```
 
 3. Run `just test-bats` to verify locally before committing.
 
-## Adding a New pytest MCP Tool Test
+## Adding a Bun Spec
 
-1. Create `servers/tests/test_your_tool.py` by copying an existing `test_*.py` file.
-2. Each test follows the pattern:
-
-```python
-def test_your_tool_behavior(tmp_path):
-    # Arrange: set up state
-    # Act: call the tool function directly
-    result = your_tool(param="value")
-    # Assert: check output
-    assert "expected" in result
-```
-
-3. Run `just test-pytest` to verify locally.
+Put `your-module.spec.ts` beside the module and import from `bun:test`. A spec that spawns a
+process passes `env` explicitly, because `Bun.spawn` without `env` does not see runtime
+`process.env` changes. Run it with `bun test <path>`.
 
 ## CI Integration
 
-CI runs all four layers on every push and pull request to `main`:
+CI runs these jobs on every push and pull request to `main`:
 
-| Job | Command | Trigger |
-|-----|---------|---------|
-| `validate` | `validate-plugin.sh --check claims --check hooks` | All pushes |
-| `test-bats` | `bats tests/bats/hooks/` | All pushes (submodules: true) |
-| `test-pytest` | `pytest servers/tests/ -v --tb=short` | All pushes |
-| `lint-python` | `ruff format --check` + `ruff check` | All pushes |
-| `lint-shell` | `shellcheck scripts/*.sh` | All pushes |
-
-Note: the `validate` job's MCP check (`--check mcp`) is excluded from CI because it requires the ast-grep CLI binary, which is not available in the standard CI runner. Run `just test-mcp` locally after changes to the MCP server.
+| Job | Command |
+|-----|---------|
+| `validate` | `validate-plugin.sh --check claims --check hooks` |
+| `lint-shell` | `shellcheck scripts/*.sh` |
+| `test-bats` | `bats tests/bats/hooks/ tests/bats/unit/` (submodules: true) |
+| `test-mcp` | `bun test servers` |
+| `test-opencode` | the OpenCode adapter suite |
+| `typescript` | both tsc projects, the mod tests and the bun specs |
+| `validate-manifest` | `claude plugin validate . --strict` |
 
 ## Running Hooks Ad-hoc
 
-Hook scripts read and write state from `${CLAUDE_PROJECT_ROOT}/.omca/state/`. If `CLAUDE_PROJECT_ROOT` is unset it defaults to `$(pwd)`, so running a hook script directly (e.g. `bash scripts/<hook>.sh`) **without setting the variable first will mutate your real `.omca/state/` files** in the current working directory.
-
-### Preferred: use the scratch wrapper
-
-`scripts/bin/run-hook-in-scratch.sh` creates a temporary project root, sets `CLAUDE_PROJECT_ROOT` to it, pipes your JSON payload to the named hook script, and cleans up afterward:
-
-```bash
-echo '{"session_id":"s1"}' | scripts/bin/run-hook-in-scratch.sh <hook>.sh
-```
-
-Pass any hook script name (relative to `scripts/`) as the first argument. The wrapper accepts JSON on stdin and forwards all arguments after the script name to the hook.
+Hooks are `mcp_tool` entries that call `omca_hook` on the server. To exercise a handler
+without a session, send a `tools/call` request for `omca_hook` to `bun servers/omca.ts` from
+a scratch directory, since the server roots its `.omca/` state at the git top level of its
+working directory.
 
 ### Why BATS tests are already safe
 
-BATS tests isolate state automatically. `tests/bats/test_helper.bash` lines 13-22 set `CLAUDE_PROJECT_ROOT` to a per-test temp dir (`$BATS_TEST_TMPDIR/project`) and create the required subdirectories before each test. No real `.omca/state/` is ever touched during `just test-bats`.
+BATS tests isolate state automatically. `tests/bats/test_helper.bash` sets `CLAUDE_PROJECT_ROOT` to a per-test temp dir (`$BATS_TEST_TMPDIR/project`) and creates the required subdirectories before each test. No real `.omca/state/` is ever touched during `just test-bats`.

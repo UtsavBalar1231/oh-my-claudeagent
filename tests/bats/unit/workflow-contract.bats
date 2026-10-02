@@ -8,20 +8,16 @@
 #
 # Pinned pairing table (leaf recipe -> substring expected in ci.yml). A pin is needed wherever
 # ci.yml invokes the same underlying command differently than the justfile recipe body does (for
-# example, a globally installed tool instead of `uv run --project servers`). Each pin is also
+# example, a globally installed tool instead of the recipe's wrapper). Each pin is also
 # asserted to be an actual substring of the recipe's own body, so a pin cannot silently drift
 # from the real command, only from CI's coverage of it.
 #
 # | leaf recipe | ci.yml pattern                                                    | why it differs from the recipe body |
 # |-------------|--------------------------------------------------------------------|--------------------------------------|
-# | fmt-check   | ruff format --check servers/                                        | CI installs ruff globally (`uv tool install ruff`), not via `uv run --project servers`; statusline/ coverage runs alongside but isn't separately pinned here |
 # | lint-shell  | shellcheck scripts/*.sh                                             | identical invocation; scripts/*.sh is non-recursive by design |
-# | lint-python | ruff check servers/                                                 | same normalization as fmt-check |
-# | typecheck   | uv run --project servers pyright                                    | identical invocation; pyrightconfig.json covers servers/ + statusline/ in one run |
 # | test        | bash scripts/validate-plugin.sh --check claims --check hooks       | identical invocation |
 # | test-bats   | tests/bats/bats-core/bin/bats tests/bats/hooks/ tests/bats/unit/    | identical invocation; must cover BOTH suite dirs |
-# | test-pytest | uv run --project servers pytest servers/tests/                     | identical invocation modulo trailing -v/--tb flags |
-# | test-mcp    | bash scripts/validate-plugin.sh --check mcp                        | identical invocation |
+# | test-mcp    | bun test servers                                                    | identical invocation |
 # | validate-manifest | claude plugin validate . --strict                             | identical invocation; the recipe's `command -v claude` guard makes it skip locally, so CI installs the CLI to keep the step enforcing |
 # | test-opencode | bun test opencode/                                               | identical invocation; the recipe skips without bun or opencode, so CI installs both to keep the step enforcing |
 # | typecheck-ts | bun x tsc --noEmit -p tsconfig.runtime.json                         | identical invocation; the recipe's first line checks the mod project, and CI runs both lines |
@@ -55,7 +51,7 @@ _recipe_body() {
 }
 
 # Recursively expand a recipe name to its leaf steps: recipes with a real body are leaves;
-# recipes with only a dependency list (no body, e.g. `lint: lint-shell lint-python`) expand
+# recipes with only a dependency list (no body, e.g. `lint: lint-shell`) expand
 # into their dependencies instead.
 _resolve_leaf_steps() {
 	local name="$1" file="$2"
@@ -81,14 +77,10 @@ _resolve_leaf_steps() {
 # Pinned leaf-step -> ci.yml coverage pattern table (see header comment for rationale).
 _step_pattern() {
 	case "$1" in
-		fmt-check) echo "ruff format --check servers/" ;;
 		lint-shell) echo "shellcheck scripts/*.sh" ;;
-		lint-python) echo "ruff check servers/" ;;
-		typecheck) echo "uv run --project servers pyright" ;;
 		test) echo "bash scripts/validate-plugin.sh --check claims --check hooks" ;;
 		test-bats) echo "tests/bats/bats-core/bin/bats tests/bats/hooks/ tests/bats/unit/" ;;
-		test-pytest) echo "uv run --project servers pytest servers/tests/" ;;
-		test-mcp) echo "bash scripts/validate-plugin.sh --check mcp" ;;
+		test-mcp) echo "bun test servers" ;;
 		validate-manifest) echo "claude plugin validate . --strict" ;;
 		test-opencode) echo "bun test opencode/" ;;
 		typecheck-ts) echo "bun x tsc --noEmit -p tsconfig.runtime.json" ;;
@@ -102,7 +94,7 @@ _step_pattern() {
 @test "just ci recipe chain resolves to the expected leaf steps" {
 	local steps
 	steps=$(_resolve_leaf_steps ci "$CLAUDE_PLUGIN_ROOT/justfile" | sort -u | tr '\n' ' ')
-	[ "$steps" = "fmt-check lint-python lint-shell test test-bats test-bun test-mcp test-mod test-opencode test-pytest typecheck typecheck-ts validate-manifest validate-mod " ]
+	[ "$steps" = "lint-shell test test-bats test-bun test-mcp test-mod test-opencode typecheck-ts validate-manifest validate-mod " ]
 }
 
 @test "every just ci leaf step has a pinned ci.yml coverage pattern" {
@@ -159,15 +151,10 @@ _step_pattern() {
 	grep -qF -- "$(_step_pattern test-bats)" "$CLAUDE_PLUGIN_ROOT/.github/workflows/release.yml"
 }
 
-@test "release.yml runs the pytest gate" {
-	grep -qF -- "$(_step_pattern test-pytest)" "$CLAUDE_PLUGIN_ROOT/.github/workflows/release.yml"
-}
-
-@test "release.yml's release job needs the validate, test-bats, and test-pytest gates" {
+@test "release.yml's release job needs the validate and test-bats gates" {
 	local needs_line
 	needs_line=$(awk '/^  release:/ { found = 1 } found && /needs:/ { print; exit }' \
 		"$CLAUDE_PLUGIN_ROOT/.github/workflows/release.yml")
 	[[ "$needs_line" == *"validate"* ]]
 	[[ "$needs_line" == *"test-bats"* ]]
-	[[ "$needs_line" == *"test-pytest"* ]]
 }

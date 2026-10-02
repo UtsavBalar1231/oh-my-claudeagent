@@ -557,8 +557,8 @@ Or from inside a Claude Code session:
 
 ### Setup
 
-After installing, run `/oh-my-claudeagent:omca-setup`. This checks dependencies (`jq`,
-`uv`, `python3` 3.10+), injects the orchestration block into `~/.claude/CLAUDE.md`,
+After installing, run `/oh-my-claudeagent:omca-setup`. This checks dependencies (`bun` 1.4.2
+or later and `ast-grep`), injects the orchestration block into `~/.claude/CLAUDE.md`,
 offers to apply permission rules, and prints a health report. Use `--check` for read-only
 health check, `--uninstall` to remove.
 
@@ -789,9 +789,9 @@ When context is long and quality is degrading:
 
 Three MCP servers are bundled via `.mcp.json` and launched by Claude Code.
 
-### omca (local Python MCPServer server)
+### omca (local bun server)
 
-Unified server for structural code search, plan tracking, verification, notepads, and filesystem access.
+Unified server for structural code search, plan tracking, verification, notepads, and filesystem access. It also answers the `omca_hook` calls the settings hooks make; the model does not call that tool.
 
 **AST tools** — Structural code search using ast-grep:
 
@@ -849,10 +849,10 @@ Prefer context7 over WebFetch for well-known libraries.
 **stdio servers receive session env vars (v2.1.154, ADOPTED):**
 
 stdio MCP servers now receive `CLAUDE_CODE_SESSION_ID` and `CLAUDECODE=1` in their
-environment at launch. The `omca` server's `_resolve_session_id()` helper in
-`servers/tools/_common.py` uses `os.environ.get("CLAUDE_CODE_SESSION_ID", "")` as a
-fallback when no explicit `session_id` parameter is passed. Adopted in `boulder_write`
-(v2.1.141–v2.1.167 sync).
+environment at launch. `boulder_write` in `servers/tools/boulder.ts` uses the id the most
+recent hook call delivered when no explicit `session_id` parameter is passed, and falls back
+to `CLAUDE_CODE_SESSION_ID` only before any hook has arrived, because `/clear` keeps the
+server process and its environment keeps the old id (v2.1.141–v2.1.167 sync).
 
 **`dependencies` in `plugin.json` (v2.1.141–v2.1.167, not adopted):**
 
@@ -911,15 +911,15 @@ All runtime state lives in `.omca/` (gitignored by default):
 
 `boulder.json` is a session-bound plan **registry**, not a single-plan pointer: multiple
 plans can be tracked concurrently under `plans[plan_name]`, and each session binds to
-exactly one of them via `bindings[session_id]`. `servers/tools/_boulder_core.py` holds the
-schema and the `resolve_bound_plan` ladder every reader calls.
+exactly one of them via `bindings[session_id]`. `src/core/boulder.ts` holds the
+schema and the `resolveBoundPlan` ladder every reader calls.
 
 1. Prometheus creates a plan at `<plans-dir>/{name}.md` or the active plan-mode file
 2. `boulder_write(active_plan, plan_name, session_id)` upserts `plans[plan_name]` (preserving `started_at`, appending `session_id` to `session_ids`) and binds this session to it; `.omca/plans/` mirrors the plan for compatibility
 3. `/start-work` reads `boulder_progress()` (resolves the calling session's bound plan when no explicit `plan_path`/`plan_name` is given) to resume from the last completed task
 4. Sisyphus/start-work checks `boulder_progress` to track which tasks remain
 5. The final-verification Stop gate resolves this session's bound plan and confirms a matching `final_verification` evidence entry exists when that plan's checkboxes show it complete
-6. The server that serves `boulder_write` unbinds, in its shutdown handler, every session id it bound, giving up within 50 ms when the registry lock is busy; a plan itself is never deleted while incomplete or still bound by another session. At start it drops bindings to missing plans and unbound plans that are complete or missing their file. A 7-day age backstop in `boulder_write` also prunes stale bindings and unbound, checkbox-complete plans, for a server killed before it could unbind. The hooks-only `omca-hooks` server does neither
+6. The server unbinds, in its shutdown handler, every session id it bound, giving up within 50 ms when the registry lock is busy; a plan itself is never deleted while incomplete or still bound by another session. At start it drops bindings to missing plans and unbound plans that are complete or missing their file. A 7-day age backstop in `boulder_write` also prunes stale bindings and unbound, checkbox-complete plans, for a server killed before it could unbind
 
 ### Evidence Workflow
 
@@ -1020,7 +1020,7 @@ it. Resuming is manual, with `/oh-my-claudeagent:start-work`.
 
 ## Troubleshooting
 
-**MCP tools not available:** Check `ast-grep`/`sg` and `uv` are installed. Run
+**MCP tools not available:** Check `bun` and `ast-grep`/`sg` are installed. Run
 `/oh-my-claudeagent:omca-setup --check`. Run `/reload-plugins` to restart MCP servers.
 
 **Subagent nesting depth:** `/oh-my-claudeagent:start-work` runs inline in the main
@@ -1085,7 +1085,7 @@ The current session ID is injected into the Bash tool subprocess environment, ma
 
 Absolute path to the active project root. Hooks already received this value; v2.1.139 extends it to MCP stdio servers and to plugin command/`args:` strings, where `${CLAUDE_PROJECT_DIR}` is substituted at exec time. Use it for project-scoped paths in `.claude/settings.json` hook entries (the plugin's own hooks in `hooks/hooks.json` should keep using `${CLAUDE_PLUGIN_ROOT}`, which resolves to the installed plugin root and survives marketplace cache refreshes).
 
-The bundled `omca` MCP stdio server inherits this variable through its environment; it reads state from `${HOOK_PROJECT_ROOT}` (set in `scripts/lib/common.sh`) rather than `${CLAUDE_PROJECT_DIR}` to preserve user overrides of the state directory. Renaming the internal variable is a separate concern with backward-compatibility implications and is not in scope here.
+The bundled `omca` MCP stdio server inherits this variable through its environment, but it roots its `.omca/` state at the git top level of its working directory rather than at `${CLAUDE_PROJECT_DIR}`.
 
 ### `CLAUDE_EFFORT` (v2.1.133)
 
@@ -1115,7 +1115,7 @@ ceilings next to the 20-concurrent-subagent cap. Exceeding it serializes silentl
 hand-authored parallel group wider than 10 reads as a hang.
 
 `CLAUDE_CODE_MCP_AUTO_BACKGROUND_MS` controls when a slow MCP tool call is auto-backgrounded
-(two minutes by default). `servers/tools/ast.py`'s own timeout is longer than that, so a
+(two minutes by default). `servers/tools/ast.ts`'s own timeout is longer than that, so a
 whole-tree scan backgrounds before it times out; narrower `paths`/`globs` is the documented
 mitigation rather than lowering the timeout.
 
@@ -1311,17 +1311,16 @@ render in-session. No OMCA file changes required; this is a platform rendering i
 ## OMC (oh-my-claudecode) Adoptions
 
 A sibling project, oh-my-claudecode (OMC), independently solved several problems OMCA
-also has. This sync ported five of its ideas, adapted to OMCA's bash+Python idiom rather
-than copied verbatim.
+also has. This sync ported five of its ideas, adapted to OMCA's idiom rather than copied
+verbatim.
 
 **Adopted:**
 
 | Feature | Notes |
 |---------|-------|
-| Session-bound plan registry | `boulder.json` moved from a single `active_plan` pointer to `{plans: {<plan_name>: {...}}, bindings: {<session_id>: {plan_name, bound_at}}}`. Fixes the clobber where two concurrent sessions working different plans overwrote each other's state. `resolve_bound_plan()` (`servers/tools/_boulder_core.py`) is the one pure-read resolution ladder every consumer calls, via direct import in Python or the `boulder_resolve.py` shim from bash |
+| Session-bound plan registry | `boulder.json` moved from a single `active_plan` pointer to `{plans: {<plan_name>: {...}}, bindings: {<session_id>: {plan_name, bound_at}}}`. Fixes the clobber where two concurrent sessions working different plans overwrote each other's state. `resolveBoundPlan()` (`src/core/boulder.ts`) is the one pure-read resolution ladder every consumer imports |
 | drift-guard hard-block Stop hook | New drift guard: when the last assistant turn reads as a completion claim ("done", "fixed", "implemented", etc., unless negated) but the diff still contains a stub marker, the Stop is blocked with the offending `file:line`. A focused-test marker is only looked for in JavaScript and TypeScript sources, where such a test can actually run; an unfinished-implementation marker and an unimplemented-error throw are looked for in any language. Self-clearing — fixing the stub removes the marker. A repeated block is bounded separately by a per-gate block budget in the server's session state, capped at 5 blocks per gate and restored on the gate's clean path. Kill switch: `OMCA_DISABLED_HOOKS=drift-guard` |
 | context-injector hardening | The context injector now dedups injections by content-hash+realpath, keyed per session in the server's session state, instead of re-injecting on every matching file access. The project-root walk for both the `.omca/rules` scan and the AGENTS.md/README terminator now resolves worktree-safely (a linked worktree's `.git` is a file, not a directory, so the walk tests `-e` not `-d`), so a worktree session no longer walks up into the parent repo |
-| stdin-read timeout | `scripts/lib/common.sh`'s shared `HOOK_INPUT=$(cat)` read now wraps in `timeout 5 cat`, discarding on exit 124 rather than hanging indefinitely if stdin is never closed. Blocking hooks treat an empty-from-timeout read as fail-closed-or-warn, not a silent pass |
 | Compaction content round-trip | The mod's `session.compact` feature names the session's next 10 open plan tasks in the summarizer's instructions, instead of leaving compaction to rely on whatever the model happened to keep in its own summary |
 
 **Reframed, not ported as-is:**
@@ -1594,7 +1593,7 @@ tables under Core Concepts and Agent Reference are the live state.
 | `useAutoModeDuringPlan` (default `true`) | Governs whether prometheus, metis, and momus shell calls prompt one by one. Not read from shared project settings |
 | `pluginConfigs` is not read from project `.claude/settings.json` as of v2.1.207 | A `pluginConfigs` block in a repo-committed settings file is a silent no-op. The preset examples say so now |
 | Agent-frontmatter hooks require the agent's folder to be trusted | For OMCA's primary install path, the plugin cache, that never happens, so frontmatter hooks would fail silently. This is what makes the hooks.json-only convention load-bearing rather than stylistic |
-| MCP tool calls auto-background after two minutes | `servers/tools/ast.py`'s 300-second timeout is past that threshold, so a slow whole-tree scan backgrounds before its own timeout fires. Do not lower the timeout; narrower `paths`/`globs` is the documented mitigation. `CLAUDE_CODE_MCP_AUTO_BACKGROUND_MS` is the knob |
+| MCP tool calls auto-background after two minutes | `servers/tools/ast.ts`'s 300-second timeout is past that threshold, so a slow whole-tree scan backgrounds before its own timeout fires. Do not lower the timeout; narrower `paths`/`globs` is the documented mitigation. `CLAUDE_CODE_MCP_AUTO_BACKGROUND_MS` is the knob |
 | Plugin MCP servers torn down on mid-session re-sync (v2.1.210), not reconnecting after an idle web session woke (v2.1.211) | Two confirmed ways the `omca` server vanishes mid-plan. Operator remedy: run past v2.1.211, and re-issue the tool call rather than skipping the evidence step |
 | Plan approval could overwrite the plan file with a stale snapshot (v2.1.210) | Resurrecting checked boxes falsifies both checkbox-derived completion and `plan_sha256` evidence binding, so the practical version floor for plan-driven work is v2.1.210 |
 | Plan-mode Bash could mutate files unprompted before v2.1.212 | prometheus, metis, and momus all grant Bash and none asserts read-only |
@@ -1697,5 +1696,5 @@ just test-hooks
 Full CI pipeline:
 
 ```bash
-just ci    # fmt-check + lint + test
+just ci    # lint + test + bats + mcp + opencode + TypeScript checks
 ```

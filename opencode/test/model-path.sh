@@ -26,8 +26,7 @@ fail() {
 
 free_port() { python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])'; }
 
-UV_CACHE_DIR=${UV_CACHE_DIR:-$(uv cache dir)}
-export UV_CACHE_DIR XDG_CONFIG_HOME="${tmp}/config" XDG_DATA_HOME="${tmp}/data" XDG_CACHE_HOME="${tmp}/cache" OPENCODE_DB=":memory:"
+export XDG_CONFIG_HOME="${tmp}/config" XDG_DATA_HOME="${tmp}/data" XDG_CACHE_HOME="${tmp}/cache" OPENCODE_DB=":memory:"
 OPENCODE_PASSWORD=$(python3 -c 'import secrets; print(secrets.token_hex(16))')
 export OPENCODE_PASSWORD
 export STUB_LOG="${tmp}/requests.jsonl"

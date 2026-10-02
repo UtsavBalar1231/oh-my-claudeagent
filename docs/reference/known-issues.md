@@ -134,14 +134,13 @@ once; `json-error-recovery.sh` says the same thing when it sees that error.
 **Symptom**: a new session inherits a stale session title or resolves a plan you thought was
 finished with.
 
-**Why**: the server that serves `boulder_write` unbinds the session ids it bound in its
-shutdown handler, which gives up after 50 ms when another writer holds the registry lock, and
-a `SIGKILL` skips it entirely. The hooks-only `omca-hooks` server binds nothing, so while it
-runs beside the tool server the 7-day `boulder_write` backstop is the only pruning.
+**Why**: the server unbinds the session ids it bound in its shutdown handler, which gives up
+after 50 ms when another writer holds the registry lock, and a `SIGKILL` skips it entirely.
+The 7-day `boulder_write` backstop is then the only pruning until the next server start.
 
-**Workaround**: none needed in practice. The server that serves `boulder_write` prunes, at
-start, bindings pointing at nothing and plans that are unbound and finished, and every
-`boulder_write` prunes bindings older than 7 days.
+**Workaround**: none needed in practice. The server prunes, at start, bindings pointing at
+nothing and plans that are unbound and finished, and every `boulder_write` prunes bindings
+older than 7 days.
 
 ## `worktree.baseRef` hides unpushed commits by default
 

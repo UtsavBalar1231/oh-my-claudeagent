@@ -312,9 +312,7 @@ describe("through the server", () => {
   type Reply = { id: number; result?: { content: Array<{ type: string; text: string }>; isError?: boolean; resultType: string; tools?: unknown[] } };
 
   async function withServer(run: (request: (method: string, params?: Record<string, unknown>) => Promise<Reply>) => Promise<void>) {
-    const env = { ...process.env };
-    delete env.OMCA_SERVER_ROLE;
-    const proc = Bun.spawn([process.execPath, SERVER], { cwd: project, env, stdin: "pipe", stdout: "pipe", stderr: "ignore" });
+    const proc = Bun.spawn([process.execPath, SERVER], { cwd: project, env: { ...process.env }, stdin: "pipe", stdout: "pipe", stderr: "ignore" });
     const reader = proc.stdout.getReader();
     const decoder = new TextDecoder();
     let buffer = "";

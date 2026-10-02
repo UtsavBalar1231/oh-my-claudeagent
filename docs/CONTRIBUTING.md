@@ -2,13 +2,12 @@
 
 ## Prerequisites
 
-- `jq`, used by all hook scripts
-- `uv`, Python dependency management for MCP servers
-- `python3` 3.10+, MCP server runtime
+- `jq`, used by the validator and the shell scripts
+- `bun` 1.4.2 or later, runtime for the MCP server, the hooks module, the status line and the scripts
 - `ast-grep` CLI (`ast-grep` or `sg`), structural code-search tools
 - `just`, task runner for dev commands
 
-Run `just setup` to install dev dependencies (ruff, pre-commit) and git hooks.
+Run `just setup` to install the pre-commit git hooks.
 
 Structural changes to a directory (new file, moved entry point, changed layout) update that directory's `AGENTS.md` in the same change.
 
@@ -71,19 +70,18 @@ Key rules:
 ## Testing
 
 ```bash
-just ci              # full pipeline: fmt-check + lint + typecheck + test + bats + pytest + mcp
+just ci              # full pipeline: lint + test + bats + mcp + manifest + opencode + TypeScript checks
 just test            # structural validation only (claims + hooks), not the full suite
 just test-claims     # manifest, hook-registry, and frontmatter contract checks
-just test-hooks      # hook scripts with fixture payloads
+just test-hooks      # hooks.json registration and server-name checks
 just test-bats       # behavioral tests (run `git submodule update --init` first)
-just test-mcp        # MCP server tool listing (requires ast-grep CLI)
+just test-mcp        # MCP server specs (requires ast-grep CLI)
 just qa              # manual QA against the mock model: session smoke, install verify, live hook probe, statusline probe, worktree and route-effort checks
-just lint            # shellcheck + ruff
-just fmt-check       # format check without changes
+just lint            # shellcheck
+just typecheck-ts    # both tsc projects
 ```
 
-Add fixture payloads to `tests/fixtures/hooks/` for new hook scripts. Use `just ci` before
-claiming a change is verified; `just test` alone is a structural subset.
+Use `just ci` before claiming a change is verified; `just test` alone is a structural subset.
 
 ## Post-fix verification for race and timing bugs
 
@@ -105,8 +103,8 @@ original failure. Follow this checklist:
 ## Release process
 
 `just release [version]` is the whole process. It requires a clean working tree, then bumps
-the version in `servers/pyproject.toml`, `.claude-plugin/plugin.json`, and
-`.claude-plugin/marketplace.json` together, commits, stamps the resulting HEAD SHA into
+the version in `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json` and
+`package.json` together, commits, stamps the resulting HEAD SHA into
 `marketplace.json` for deterministic installs, and tags. Add the CHANGELOG entry for the
 version first; the recipe validates that it exists.
 

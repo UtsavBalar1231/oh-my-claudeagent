@@ -64,7 +64,7 @@ test("hooks.json routes a Bash PermissionRequest to omca_hook", () => {
   );
   expect(entries).toContainEqual({
     type: "mcp_tool",
-    server: "plugin:oh-my-claudeagent:omca-hooks",
+    server: "plugin:oh-my-claudeagent:omca",
     tool: "omca_hook",
     timeout: 10,
     input: {

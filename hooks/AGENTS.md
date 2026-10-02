@@ -88,7 +88,7 @@ event is unregistered on purpose; `OMCA.md` carries the per-event reason.
   The common case is a jq filter with a pipe: `jq -r '.a | .b' f.json` now gets the normal
   platform permission prompt. That friction is deliberate. Teaching the scan to skip quoted
   regions is how a guardrail becomes a hole, because a genuinely compound command could then
-  hide its separator inside quotes. `tests/bats/hooks/permission_handlers.bats` pins the
+  hide its separator inside quotes. `src/core/trusted-tooling.spec.ts` pins the
   behavior so it cannot be "fixed" by accident.
 - Hook lifecycle ownership stays Claude-native. OMCA supplies the mod's module and
   `type: mcp_tool` handlers whose `tool` is `omca_hook`; no `type: command` handler
