@@ -1,4 +1,4 @@
-import type { AgentInfo, On, RenderElement, RenderSurface } from "claude-code";
+import type { AgentInfo, On, RenderElement, RenderSurface, StateRead } from "claude-code";
 import { mock, type MockClock } from "claude-code/testing";
 import { joinPath, normalizePath, type Platform } from "../../src/core/path.ts";
 import { displayWidth } from "../../src/core/ui-kit.ts";
@@ -48,6 +48,7 @@ export type World = {
   settings: Record<string, unknown>;
   agents: AgentInfo[];
   reads: string[];
+  holds: Map<string, Promise<void>>;
   focused: string[];
   opened: unknown[];
   logs: string[];
@@ -80,6 +81,7 @@ export function world(
     settings,
     agents: [],
     reads: [],
+    holds: new Map(),
     focused: [],
     opened: [],
     logs: [],
@@ -90,20 +92,24 @@ export function world(
   on("session.id", () => ({ value: SESSION }));
   on("settings.read", () => ({ value: w.settings }));
   on("agent.list", () => ({ value: w.agents }));
-  on("fs.read", (_$, e) => {
+  on("fs.read", async (_$, e) => {
     w.reads.push(spelled(e.path));
+    await w.holds.get(key(e.path));
     const file = w.files.get(key(e.path));
     return file === undefined ? { deny: `ENOENT: no such file, ${spelled(e.path)}` } : { value: file.text };
   });
-  on("fs.exists", (_$, e) => ({
-    value: w.files.has(key(e.path)) || [...w.files.keys()].some((path) => path.startsWith(`${key(e.path)}/`)),
-  }));
+  on("fs.exists", (_$, e) => {
+    w.reads.push(spelled(e.path));
+    return { value: w.files.has(key(e.path)) || [...w.files.keys()].some((path) => path.startsWith(`${key(e.path)}/`)) };
+  });
   on("fs.stat", (_$, e) => {
+    w.reads.push(spelled(e.path));
     const file = w.files.get(key(e.path));
     if (file === undefined) return { deny: `ENOENT: no such file, ${spelled(e.path)}` };
     return { value: { kind: "file", size: file.text.length, mtimeMs: file.mtimeMs, isLink: false } };
   });
   on("fs.list", (_$, e) => {
+    w.reads.push(spelled(e.path));
     const dir = key(e.path);
     const files = [...w.files.entries()]
       .filter(([path]) => parent(path) === dir)
@@ -128,6 +134,31 @@ export function world(
   on("ui.panes", () => ({ value: [] }));
   on("ui.focus", (_$, e) => (w.focused.push(e.element ?? ""), {}));
   return w;
+}
+
+/** Holds every `fs.read` of the file until the returned function runs. */
+export function hold(w: World, path: string): () => void {
+  let release = () => {};
+  w.holds.set(normalizePath(w.layout.platform, w.spelled(path)), new Promise<void>((resolve) => (release = resolve)));
+  return release;
+}
+
+/**
+ * Answers `$.state` from memory, with the one thing the real host does that a plugin cannot:
+ * `reset` empties an atom, as /clear, /resume and /branch do. A write redraws nothing here, so
+ * a test calls `redraw` on what it mounted.
+ */
+export function resettableState(on: On): { reset: (key: string) => void } {
+  const atoms = new Map<string, StateRead>();
+  const at = (e: { plugin: string; key: string }) => `${e.plugin}:${e.key}`;
+  on("state.get", (_$, e) => ({ value: atoms.get(at(e)) ?? { value: undefined, version: 0 } }));
+  on("state.set", (_$, e) => {
+    const version = atoms.get(at(e))?.version ?? 0;
+    if (e.ifVersion !== undefined && e.ifVersion !== version) return { value: { isSet: false, version } };
+    atoms.set(at(e), { value: e.value, version: version + 1 });
+    return { value: { isSet: true, version: version + 1 } };
+  });
+  return { reset: (key) => void atoms.delete(`${PLUGIN}:${key}`) };
 }
 
 export function write(w: World, path: string, text: string): void {

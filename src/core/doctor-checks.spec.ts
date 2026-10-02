@@ -13,10 +13,10 @@ const BASE: Inputs = {
   hook: { kind: "seen", lastHookAt: NOW / 1000 - 30 },
   now: NOW,
   settings: {
-    pluginConfigs: { "oh-my-claudeagent@omca": { options: { showBand: false, guardMode: "deny" } } },
     advisorModel: "fable",
     statusLine: { ...STATUS_LINE, refreshInterval: 5 },
   },
+  options: { showBand: false, guardMode: "deny", raw: { showBand: false, guardMode: "deny" } },
   env: {},
   userSettings: null,
 };
@@ -103,24 +103,24 @@ test("ast-grep or sg", () => {
   });
 });
 
-test.each<[unknown, Omit<Check, "id" | "label">]>([
-  [undefined, { level: "info", detail: "No pluginConfigs entry, so the defaults apply: showBand on, guardMode dialog" }],
-  [{ "other@omca": { options: {} } }, { level: "info", detail: "No pluginConfigs entry, so the defaults apply: showBand on, guardMode dialog" }],
-  [{ "oh-my-claudeagent@inline": {} }, { level: "ok", detail: "showBand on, guardMode dialog, from oh-my-claudeagent@inline" }],
-  [
-    { "oh-my-claudeagent@omca": { options: { showBand: false, guardMode: "deny" } } },
-    { level: "ok", detail: "showBand off, guardMode deny, from oh-my-claudeagent@omca" },
-  ],
-  [
-    { "oh-my-claudeagent@omca": { options: { guardMode: "ask" } } },
-    { level: "warn", detail: 'guardMode "ask" is not dialog or deny; dialog applies' },
-  ],
-  [
-    { "oh-my-claudeagent@omca": { options: { showBand: "yes" } } },
-    { level: "warn", detail: 'showBand "yes" is not true or false; on applies' },
-  ],
-])("pluginConfigs %p", (pluginConfigs, expected) => {
-  expect(run({ settings: { pluginConfigs } }, "options")).toEqual(expected);
+const options = (raw: Record<string, unknown>, showBand = true, guardMode: "dialog" | "deny" = "dialog") => ({ showBand, guardMode, raw });
+
+test.each<[string, Inputs["options"], Omit<Check, "id" | "label">]>([
+  ["nothing set", options({}), { level: "info", detail: "Neither option is set, so the defaults apply: showBand on, guardMode dialog" }],
+  ["another option only", options({ enableKeywordTriggers: true }), { level: "info", detail: "Neither option is set, so the defaults apply: showBand on, guardMode dialog" }],
+  ["both set", options({ showBand: false, guardMode: "deny" }, false, "deny"), { level: "ok", detail: "showBand off, guardMode deny" }],
+  ["guardMode only", options({ guardMode: "dialog" }), { level: "ok", detail: "showBand on, guardMode dialog" }],
+  ["guardMode refused", options({ guardMode: "ask" }), { level: "warn", detail: 'guardMode "ask" is not dialog or deny; dialog applies' }],
+  ["showBand refused", options({ showBand: "yes" }), { level: "warn", detail: 'showBand "yes" is not true or false; on applies' }],
+])("plugin options: %s", (_label, input, expected) => {
+  expect(run({ options: input }, "options")).toEqual(expected);
+});
+
+test("the options check ignores any pluginConfigs in settings", () => {
+  const settings = { pluginConfigs: { "oh-my-claudeagent@omca": { options: { showBand: false, guardMode: "deny" } } } };
+  expect(run({ settings, options: options({}) }, "options")?.detail).toBe(
+    "Neither option is set, so the defaults apply: showBand on, guardMode dialog",
+  );
 });
 
 test.each<[string | undefined, Omit<Check, "id" | "label">]>([

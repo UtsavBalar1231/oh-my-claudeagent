@@ -284,15 +284,9 @@ test("the router splits the first word from the rest and keeps the rest verbatim
 });
 
 test("options default to a shown band and the dialog guard, and take the stored values", async () => {
-  expect(readOptions({})).toEqual({ showBand: true, guardMode: "dialog", enableKeywordTriggers: false });
-  expect(readOptions({ showBand: false, guardMode: "deny", enableKeywordTriggers: true })).toEqual({
-    showBand: false,
-    guardMode: "deny",
-    enableKeywordTriggers: true,
-  });
-  expect(readOptions({ showBand: "false", guardMode: "DENY", enableKeywordTriggers: "true" })).toEqual({
-    showBand: true,
-    guardMode: "dialog",
-    enableKeywordTriggers: false,
-  });
+  expect(readOptions({})).toEqual({ showBand: true, guardMode: "dialog", enableKeywordTriggers: false, raw: {} });
+  const stored = { showBand: false, guardMode: "deny", enableKeywordTriggers: true };
+  expect(readOptions(stored)).toEqual({ showBand: false, guardMode: "deny", enableKeywordTriggers: true, raw: stored });
+  const refused = { showBand: "false", guardMode: "DENY", enableKeywordTriggers: "true" };
+  expect(readOptions(refused)).toEqual({ showBand: true, guardMode: "dialog", enableKeywordTriggers: false, raw: refused });
 });

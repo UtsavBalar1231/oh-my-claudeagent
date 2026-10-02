@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { checkboxStates } from "./checkboxes.ts";
 import { windowOf } from "./list-window.ts";
 import type { Env } from "./path.ts";
 import {
@@ -63,6 +64,15 @@ test("a task page drops its own checkbox line and un-indents its details", () =>
     ["2. Next", "- Do: it"],
   ]);
   expect(readable(bare)).toEqual([1, 2]);
+});
+
+test("an upper-case X is no task, so the parser and the checkbox module count the same", () => {
+  const text = "# P\n\n## TODOs\n- [x] 1. a\n- [X] 2. b\n- [ ] 3. c\n";
+  const plan = parsePlan(text);
+  const states = checkboxStates(text);
+  expect([plan.done, plan.total]).toEqual([1, 2]);
+  expect([states.filter((state) => state === "x").length, states.length]).toEqual([1, 2]);
+  expect(plan.pages.flatMap((page) => (page.task === undefined ? [] : [page.task.n]))).toEqual([1, 3]);
 });
 
 test("long pages split under the Markdown cap and control characters are stripped", () => {

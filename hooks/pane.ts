@@ -125,6 +125,10 @@ export function patchPane(host: Host, change: (pane: Pane) => Pane): Promise<voi
 
 async function refresh(host: Host, tab?: Tab): Promise<void> {
   const root = await host.session.root();
+  if ((await host.state.pane.get()).value === undefined) {
+    evidence.reset();
+    notepad.reset();
+  }
   const [ledger, pad] = await Promise.all([evidence.read(host, root), notepad.read(host, root)]);
   await plan.sync(host);
   if (tab === undefined && ledger === undefined && pad === undefined) return;

@@ -135,14 +135,14 @@ function refocus(host: Host, key: string, isKeyboardLost = false): void {
 }
 
 async function load(host: Host, path: string, keepPlace = false): Promise<void> {
-  const previous = (await host.state.plan.get()).value;
+  const { value: previous, version } = await host.state.plan.get();
   const readAt = await host.clock.now();
   const isSame = keepPlace && previous?.path === path && loadedFrom !== "";
   try {
     const { mtimeMs } = await host.fs.stat(path);
     const plan = parsePlan(await host.fs.read(path));
+    if (!(await host.state.plan.set({ path, ...plan, readAt }, { ifVersion: version })).isSet) return;
     loadedFrom = `${path}:${mtimeMs}`;
-    await host.state.plan.set({ path, ...plan, readAt });
     isCursorSet = true;
     if (!isSame) {
       mode = "contents";
@@ -152,8 +152,8 @@ async function load(host: Host, path: string, keepPlace = false): Promise<void> 
     if (mode === "page" && page >= plan.pages.length) mode = "contents";
     cursor = keptCursor(plan, cursor);
   } catch (error) {
+    if (!(await host.state.plan.set({ path, error: reason(error), readAt }, { ifVersion: version })).isSet) return;
     loadedFrom = `${path}:failed`;
-    await host.state.plan.set({ path, error: reason(error), readAt });
     if (!isSame || mode === "page") mode = "contents";
   }
 }

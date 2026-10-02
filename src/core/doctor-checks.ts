@@ -26,6 +26,7 @@ export type Inputs = {
   hook: HookState;
   now: number;
   settings: Readonly<Record<string, unknown>>;
+  options: { showBand: boolean; guardMode: "dialog" | "deny"; raw: Readonly<Record<string, unknown>> };
   env: Env;
   userSettings: string | null;
 };
@@ -114,21 +115,17 @@ function astGrepCheck(found: Inputs["astGrep"]): Check {
     : check("ast-grep", "ast-grep", "ok", `${found.name} ${found.version} is on PATH`);
 }
 
-function optionsCheck(settings: Inputs["settings"]): Check {
-  const configs = record(settings["pluginConfigs"]) ?? {};
-  const key = Object.keys(configs).find((name) => name.startsWith("oh-my-claudeagent@"));
-  if (key === undefined) {
-    return check("options", "Options", "info", "No pluginConfigs entry, so the defaults apply: showBand on, guardMode dialog");
+function optionsCheck({ showBand, guardMode, raw }: Inputs["options"]): Check {
+  if (raw["showBand"] !== undefined && typeof raw["showBand"] !== "boolean") {
+    return check("options", "Options", "warn", `showBand ${JSON.stringify(raw["showBand"])} is not true or false; on applies`);
   }
-  const options = record(record(configs[key])?.["options"]) ?? {};
-  const { showBand = true, guardMode = "dialog" } = options;
-  if (typeof showBand !== "boolean") {
-    return check("options", "Options", "warn", `showBand ${JSON.stringify(showBand)} is not true or false; on applies`);
+  if (raw["guardMode"] !== undefined && raw["guardMode"] !== "dialog" && raw["guardMode"] !== "deny") {
+    return check("options", "Options", "warn", `guardMode ${JSON.stringify(raw["guardMode"])} is not dialog or deny; dialog applies`);
   }
-  if (guardMode !== "dialog" && guardMode !== "deny") {
-    return check("options", "Options", "warn", `guardMode ${JSON.stringify(guardMode)} is not dialog or deny; dialog applies`);
-  }
-  return check("options", "Options", "ok", `showBand ${showBand ? "on" : "off"}, guardMode ${guardMode}, from ${key}`);
+  const effective = `showBand ${showBand ? "on" : "off"}, guardMode ${guardMode}`;
+  return raw["showBand"] === undefined && raw["guardMode"] === undefined
+    ? check("options", "Options", "info", `Neither option is set, so the defaults apply: ${effective}`)
+    : check("options", "Options", "ok", effective);
 }
 
 function modelForceCheck(env: Env): Check {
@@ -213,7 +210,7 @@ export function doctorChecks(inputs: Inputs): Check[] {
     bunCheck(inputs.bunVersion),
     hookCheck(inputs.hook, inputs.now),
     astGrepCheck(inputs.astGrep),
-    optionsCheck(inputs.settings),
+    optionsCheck(inputs.options),
     modelForceCheck(inputs.env),
     effortCheck(inputs.settings["maxEffortLevel"]),
     modsCheck(inputs.settings),

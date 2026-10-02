@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { displayWidth } from "../src/core/ui-kit.ts";
 import { NO_REPO } from "./git.ts";
 import type { GitInfo } from "./git.ts";
 import {
@@ -144,8 +145,15 @@ describe("visible truncation", () => {
     expect(visibleTruncate("hi", 40)).toBe(`hi${R}`);
   });
 
-  test("a code point outside the BMP counts as one column", () => {
-    expect(visibleTruncate("\u{1f600}\u{1f600}\u{1f600}", 2)).toBe(`\u{1f600}\u{1f600}${R}`);
+  test("a narrow code point outside the BMP counts as one column and is kept whole", () => {
+    expect(visibleTruncate("\u{10000}\u{10000}\u{10000}", 2)).toBe(`\u{10000}\u{10000}${R}`);
+  });
+
+  test("a wide code point counts as two columns", () => {
+    expect(visibleTruncate("\u{1f600}\u{1f600}\u{1f600}", 4)).toBe(`\u{1f600}\u{1f600}${R}`);
+    expect(visibleTruncate("\u{1f600}\u{1f600}", 3)).toBe(`\u{1f600}${R}`);
+    expect(visibleTruncate("日本語の長いブランチ名です", 10)).toBe(`日本語の長${R}`);
+    expect(displayWidth(visibleTruncate("日本語の長いブランチ名です", 9).replace(R, ""))).toBe(8);
   });
 
   test("a width of zero leaves nothing", () => {

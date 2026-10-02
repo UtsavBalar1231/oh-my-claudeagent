@@ -15,7 +15,7 @@ const LEDGER = ".omca/evidence/verification-evidence.json";
 // into one trailing redraw, short enough that the band never visibly lags.
 const QUIET_MS = 100;
 
-type Snapshot = { band: Band; planText: string | null; ledgerPath: string };
+type Snapshot = { band: Band; hasFinalVerification: boolean };
 
 let isAscii = false;
 let shownActions = 0;
@@ -92,7 +92,15 @@ async function readSnapshot(host: Host): Promise<Snapshot> {
       })
     : null;
 
-  return { band: { plan, verification, error: errors[0] ?? null, readAt }, planText, ledgerPath };
+  const hasFinalVerification =
+    plan !== null &&
+    planText !== null &&
+    isPlanComplete(plan) &&
+    (await attempt(LEDGER, async () =>
+      hasPassingFinalVerification(await readJson(host, ledgerPath), await sha256(planText)),
+    )) === true;
+
+  return { band: { plan, verification, error: errors[0] ?? null, readAt }, hasFinalVerification };
 }
 
 function countTasks(text: string): { done: number; total: number } {
@@ -105,17 +113,13 @@ async function sha256(text: string): Promise<string> {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-async function actionsFor(host: Host, { band, planText, ledgerPath }: Snapshot): Promise<NextAction[]> {
+async function actionsFor(host: Host, { band, hasFinalVerification }: Snapshot): Promise<NextAction[]> {
   const agents = (await host.state.agents.get()).value ?? {};
-  const isComplete = band.plan !== null && isPlanComplete(band.plan);
   return nextActions({
     plan: band.plan,
     verification: band.verification,
     isAgentRunning: Object.values(agents).some((agent) => agent.status === "running"),
-    hasFinalVerification:
-      isComplete &&
-      planText !== null &&
-      hasPassingFinalVerification(await readJson(host, ledgerPath), await sha256(planText)),
+    hasFinalVerification,
   });
 }
 

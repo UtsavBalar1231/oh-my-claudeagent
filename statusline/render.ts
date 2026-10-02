@@ -4,6 +4,7 @@ import { pathToFileURL } from "node:url";
 import { resolveBoundPlan } from "../src/core/boulder.ts";
 import { checkboxStates, nextTaskLabel } from "../src/core/checkboxes.ts";
 import { baseName, inferPlatform } from "../src/core/path.ts";
+import { cells } from "../src/core/ui-kit.ts";
 import { type Config, type Env, readConfig } from "./config.ts";
 import type { GitInfo } from "./git.ts";
 
@@ -166,7 +167,7 @@ export function fixed(x: number, digits: number): string {
 const ANSI = /\x1b\[[0-9;]*m|\x1b\]8;;[^\x07\x1b]*(?:\x07|\x1b\\)/y;
 const OSC8_CLOSERS = ["\x1b]8;;\x07", "\x1b]8;;\x1b\\"];
 
-// Escape sequences occupy no columns and are never cut in half; a link still open at the cut is closed.
+// Counts terminal cells, a wide code point as two. Escape sequences occupy none and are never cut in half; a link still open at the cut is closed.
 export function visibleTruncate(s: string, width: number): string {
   if (width <= 0) return "";
   let out = "";
@@ -181,10 +182,12 @@ export function visibleTruncate(s: string, width: number): string {
       i += escape.length;
       continue;
     }
-    if (visible >= width) break;
-    const char = String.fromCodePoint(s.codePointAt(i) ?? 0);
+    const codePoint = s.codePointAt(i) ?? 0;
+    const room = cells(codePoint);
+    if (visible + room > width) break;
+    const char = String.fromCodePoint(codePoint);
     out += char;
-    visible++;
+    visible += room;
     i += char.length;
   }
   return `${out}${linkOpen ? OSC8_CLOSERS[0] : ""}${RST}`;

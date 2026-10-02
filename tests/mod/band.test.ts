@@ -257,6 +257,31 @@ test("a complete plan with a passing final verification for its current bytes of
   });
 });
 
+test("an unreadable ledger on a complete plan names the failure and still offers the final verification", async ($, on) => {
+  const disk = bound(46, 46, { [LEDGER]: "{ not json" });
+  world(on, disk);
+  await start($);
+  await turn($);
+
+  await onEachSurface($, async (band) => {
+    expect(await statusRow(band)).toMatch(
+      /^✗ Cannot read \.omca\/evidence\/verification-evidence\.json: \S[^\n]*$/,
+    );
+    expect(await buttons(band)).toEqual([
+      { key: "final-verification", label: "Run final verification", hotkey: "1", plain: true },
+    ]);
+  });
+
+  const scoped = { type: "final_verification", exit_code: 0, plan_sha256: await sha256(planText(46, 46)) };
+  disk.set(LEDGER, { text: ledger([scoped]), mtimeMs: BEFORE_RUN_MS });
+  await turn($);
+
+  await onEachSurface($, async (band) => {
+    expect(await statusRow(band)).toBe("widget-rewrite 46/46 tasks · no verification yet");
+    expect(await buttons(band)).toEqual([{ key: "review", label: "Review with oracle", hotkey: "1", plain: true }]);
+  });
+});
+
 test("an unlogged verification comes before the final verification", async ($, on) => {
   world(on, bound(46, 46, { [STATUS]: statusFile("just test"), [LEDGER]: ledger([]) }));
   await start($);

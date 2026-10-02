@@ -7,7 +7,6 @@ import { bodyColumns, cellsAcross, LAYOUTS, pane, POSIX, rows, run, SESSION, SIZ
 const NOW_S = Date.UTC(2026, 9, 2, 12, 0, 0) / 1000;
 const USER = {
   advisorModel: "fable",
-  pluginConfigs: { "oh-my-claudeagent@inline": { options: { guardMode: "deny" } } },
   statusLine: { type: "command", command: "omca-statusline" },
 };
 const USER_TEXT = `${JSON.stringify(USER, null, 2)}\n`;
@@ -57,7 +56,7 @@ const CHECKS = [
   "✓ bun           bun 1.4.2 is on PATH; Desktop and VS Code start .mcp.json with the GUI's PATH, which can lack ~/.bun/bin",
   "✓ omca server   Last hook call 2 min ago",
   "✓ ast-grep      sg 0.39.0 is on PATH",
-  "✓ Options       showBand on, guardMode deny, from oh-my-claudeagent@inline",
+  "✓ Options       showBand on, guardMode deny",
   "✓ Agent models  Each agent keeps the model tier it declares",
   "✓ Effort cap    No maxEffortLevel, so agents run at the effort they declare",
   "✓ Mod policy    Mods you install may load",
@@ -76,7 +75,7 @@ for (const layout of LAYOUTS) {
     [SETTINGS]: USER_TEXT,
   };
 
-  test(`/omca doctor opens the Doctor tab, draws the loading state while the checks run, then one marked row per check, problems first${suffix}`, async ($, on) => {
+  test(`/omca doctor opens the Doctor tab, draws the loading state while the checks run, then one marked row per check, problems first${suffix}`, { options: { guardMode: "deny" } }, async ($, on) => {
     const w = engine(on, world(on, FILES, structuredClone(USER), {}, layout), { hold: true });
 
     const pending = $.command.run(run("doctor", 120));
@@ -123,8 +122,8 @@ for (const layout of LAYOUTS) {
       "  Backup: ~/.claude/settings.json.omca-bak",
       "  --- ~/.claude/settings.json.omca-bak",
       "  +++ ~/.claude/settings.json",
-      "  @@ -9,6 +9,7 @@",
-      "   },",
+      "  @@ -2,6 +2,7 @@",
+      "   \"advisorModel\": \"fable\",",
       "   \"statusLine\": {",
       "     \"type\": \"command\",",
       "-    \"command\": \"omca-statusline\"",
@@ -246,7 +245,7 @@ for (const layout of LAYOUTS) {
     expect(w.writes).toEqual([`${SETTINGS}.omca-bak`, SETTINGS]);
   });
 
-  test(`OMCA_ASCII draws the doctor's marks and separators from the ASCII set${suffix}`, async ($, on) => {
+  test(`OMCA_ASCII draws the doctor's marks and separators from the ASCII set${suffix}`, { options: { guardMode: "deny" } }, async ($, on) => {
     engine(on, world(on, FILES, structuredClone(USER), { OMCA_ASCII: "1" }, layout));
     await $.command.run(run("doctor", 80));
     const ui = await $.ui.mount(pane("terminal", { columns: 80, rows: 40, placement: "inline" }));
@@ -259,3 +258,13 @@ for (const layout of LAYOUTS) {
     await ui.unmount();
   });
 }
+
+test("the Options row reports the options the mod loaded with, whatever settings.json holds", { options: { showBand: false } }, async ($, on) => {
+  const configs = { pluginConfigs: { "oh-my-claudeagent@omca": { options: { showBand: true, guardMode: "deny" } } } };
+  engine(on, world(on, {}, configs));
+  await $.command.run(run("doctor", 120));
+  const ui = await $.ui.mount(pane("terminal", WIDE));
+
+  expect(body(await ui.drawn()).find((row) => row.includes("Options"))).toBe("✓ Options       showBand off, guardMode dialog");
+  await ui.unmount();
+});

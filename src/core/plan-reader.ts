@@ -11,7 +11,7 @@ const RECENT_PLANS = 30;
 export const CONTENTS_CAP = 400;
 
 const HEADING = /^(#{1,3})\s+(.+?)\s*#*\s*$/;
-const TASK = /^- \[([ xX])\] (\d+)\.\s*(.*)$/;
+const TASK = /^- \[([ x])\] (\d+)\.\s*(.*)$/;
 const FENCE = /^\s*(```|~~~)/;
 const TAB = 9;
 const NEWLINE = 10;
@@ -70,7 +70,7 @@ export function parsePlan(source: string): Plan {
     }
     const task = inFence ? null : TASK.exec(line);
     if (task) {
-      const isDone = task[1] !== " ";
+      const isDone = task[1] === "x";
       total += 1;
       if (isDone) done += 1;
       flush({ title: `${task[2]}. ${task[3] ?? ""}`, level: 4, body: "", task: { n: Number(task[2]), done: isDone } });

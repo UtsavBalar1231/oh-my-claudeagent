@@ -1,4 +1,4 @@
-import type { EngineInterface, PluginState, StateRead, StateSetOptions, StateSetResult } from "claude-code";
+import type { EngineInterface, PluginOptions, PluginState, StateRead, StateSetOptions, StateSetResult } from "claude-code";
 
 export type State = PluginState["oh-my-claudeagent"];
 
@@ -11,6 +11,7 @@ export type Options = {
   showBand: boolean;
   guardMode: "dialog" | "deny";
   enableKeywordTriggers: boolean;
+  raw: PluginOptions;
 };
 
 type Env = () => Promise<string | undefined>;

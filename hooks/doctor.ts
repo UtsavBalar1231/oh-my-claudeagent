@@ -106,6 +106,7 @@ async function check(host: Host): Promise<Doctor["checks"]> {
     hook,
     now,
     settings,
+    options: host.options,
     env,
     userSettings,
   });

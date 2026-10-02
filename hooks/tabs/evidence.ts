@@ -22,6 +22,10 @@ const TYPE_LABEL: Readonly<Record<Entry["type"], string>> = {
 
 let signature: string | undefined;
 
+export const reset = (): void => {
+  signature = undefined;
+};
+
 const isType = (value: unknown): value is Entry["type"] => EVIDENCE_TYPES.some((type) => type === value);
 
 function parseLedger(text: string): Entry[] {

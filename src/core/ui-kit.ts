@@ -72,7 +72,7 @@ export function usableColumns(bodyColumns: number): number {
   return Math.max(0, bodyColumns - GUTTER);
 }
 
-function cells(codePoint: number): number {
+export function cells(codePoint: number): number {
   if ((codePoint >= 0x300 && codePoint <= 0x36f) || (codePoint >= 0x200b && codePoint <= 0x200f)) return 0;
   if ((codePoint >= 0xfe00 && codePoint <= 0xfe0f) || (codePoint >= 0x20d0 && codePoint <= 0x20ff)) return 0;
   const isWide =

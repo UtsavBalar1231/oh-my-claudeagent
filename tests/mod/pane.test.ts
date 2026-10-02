@@ -6,10 +6,12 @@ import {
   BOULDER,
   bodyColumns,
   cellsAcross,
+  hold,
   LAYOUTS,
   LEDGER,
   pane,
   POSIX,
+  resettableState,
   ROOT,
   rows,
   run,
@@ -259,6 +261,51 @@ test("n, p and t page through the plan, and t returns to the row the pages came 
   await ui.unmount();
 });
 
+test("a plan picked while the timer is still reading the bound plan stays shown", async ($, on) => {
+  const other = `${ROOT}/plans/other.md`;
+  const w = world(on, { ...FILES, [other]: "# Another plan\n\n## TODOs\n\n- [ ] 1. Only task\n" }, { plansDirectory: "./plans" });
+  await $.command.run(run("plan"));
+  const ui = await $.ui.mount(pane("terminal", { columns: 120, rows: 40, placement: "dock" }));
+  await ui.press({ key: "l" });
+  const pick = (await ui.findAll({ type: "Button" })).find((button) => button.props["label"] === "other")?.key ?? "";
+  expect(pick).toStartWith("pick-");
+
+  write(w, PLAN_PATH, `${PLAN}\n- [ ] 47. Added after the pane loaded it`);
+  const release = hold(w, PLAN_PATH);
+  const ticking = w.clock.advance(2000);
+  await w.clock.settle();
+  const pressing = ui.press({ key: pick });
+  await w.clock.settle();
+  release();
+  await Promise.all([ticking, pressing]);
+  await w.clock.settle();
+
+  expect(await ui.find({ type: "Text", text: "Another plan" })).toBeDefined();
+  expect(await ui.find({ type: "Text", text: TITLE })).toBeUndefined();
+  await ui.unmount();
+});
+
+test("the Evidence and Notepad tabs load again after the session state is reset", async ($, on) => {
+  const atoms = resettableState(on);
+  const w = world(on, FILES);
+  await $.command.run(run(""));
+  const ui = await $.ui.mount(pane("terminal", { columns: 120, rows: 40, placement: "dock" }));
+  const first = async (key: string) => {
+    await ui.press({ key });
+    await ui.redraw();
+    return rows(await ui.drawn())[3];
+  };
+  expect(await first("3")).toBe("5 most recent entries, newest first");
+  expect(await first("4")).toBe("Notepad for sample");
+
+  atoms.reset("pane");
+  await w.clock.advance(2000);
+
+  expect(await first("3")).toBe("5 most recent entries, newest first");
+  expect(await first("4")).toBe("Notepad for sample");
+  await ui.unmount();
+});
+
 test("the contents list fills the inline body and a focus move re-centres it on the ring's position", async ($, on) => {
   const w = world(on, FILES);
   await $.command.run(run("plan", 80));
@@ -371,7 +418,7 @@ test("the pane timer ends a row the agent list no longer holds and picks up new 
   await ui.unmount();
 });
 
-test("drawing the pane reads no file, whatever the tab, size or surface", async ($, on) => {
+test("drawing the pane reads, stats and lists nothing, whatever the tab, size or surface", async ($, on) => {
   const w = world(on, FILES);
   agentEngine(on);
   await $.command.run(run(""));
@@ -381,12 +428,16 @@ test("drawing the pane reads no file, whatever the tab, size or surface", async 
   for (const size of SIZES) {
     for (const surface of ["terminal", "desktop"] as const) {
       const ui = await $.ui.mount(pane(surface, size));
-      for (const key of ["2", "3", "4", "5", "6", "7", "1"]) await ui.press({ key });
-      await ui.redraw();
+      expect(w.reads, `${size.columns} ${size.placement} ${surface} mount`).toEqual([]);
+      for (const key of ["2", "3", "4", "5", "6", "7", "1"]) {
+        await ui.press({ key });
+        w.reads.length = 0;
+        await ui.redraw();
+        expect(w.reads, `${size.columns} ${size.placement} ${surface} tab ${key}`).toEqual([]);
+      }
       await ui.unmount();
     }
   }
-  expect(w.reads).toEqual([]);
 });
 
 test("every row stays inside the body less the close-mark gutter at 80, 120 and 200 columns, docked and inline", async ($, on) => {

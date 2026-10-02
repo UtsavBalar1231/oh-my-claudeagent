@@ -12,6 +12,10 @@ const BOULDER = ".omca/state/boulder.json";
 
 let signature: string | undefined;
 
+export const reset = (): void => {
+  signature = undefined;
+};
+
 async function boundPlanName(host: Host, root: string): Promise<{ name: string; seen: string } | undefined> {
   const path = `${root}/${BOULDER}`;
   if (!(await host.fs.exists(path))) return undefined;
