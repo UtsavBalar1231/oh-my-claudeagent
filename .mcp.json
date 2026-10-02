@@ -7,6 +7,14 @@
         "UV_PROJECT_ENVIRONMENT": "${CLAUDE_PLUGIN_DATA}/.venv"
       }
     },
+    "omca-hooks": {
+      "command": "bun",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/servers/omca.ts"],
+      "env": {
+        "OMCA_SERVER_ROLE": "hooks"
+      },
+      "alwaysLoad": true
+    },
     "grep": {
       "type": "http",
       "url": "https://mcp.grep.app"
