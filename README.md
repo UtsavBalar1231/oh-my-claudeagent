@@ -62,10 +62,10 @@ For GitHub Enterprise Server, use full git URLs in the source:
 Rebuild the locally-installed plugin cache from your dev tree:
 
 ```bash
-bash scripts/package-plugin.sh ~/.claude/plugins/cache/omca/oh-my-claudeagent/$(jq -r .version .claude-plugin/plugin.json)/
+bun scripts/package.ts ~/.claude/plugins/cache/omca/oh-my-claudeagent/$(jq -r .version .claude-plugin/plugin.json)/
 ```
 
-Use `--dry-run` first to preview the file list. The script excludes dev artifacts (`.omca/`, `.mypy_cache/`, `UPGRADE.md`, `tests/`, etc.) that should not ship.
+Run `bun scripts/package.ts --dry-run` first to print the file list. The script excludes dev artifacts (`.omca/`, `.mypy_cache/`, `UPGRADE.md`, `tests/`, etc.) that should not ship.
 
 ### Uninstall
 

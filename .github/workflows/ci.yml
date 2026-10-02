@@ -127,17 +127,17 @@ jobs:
           persist-credentials: false
 
       - name: ShellCheck
-        run: shellcheck scripts/*.sh scripts/qa/*.sh scripts/qa/lib/*.sh
+        run: shellcheck scripts/*.sh
 
       - name: Job summary
         if: always()
         run: |
           {
             echo "### What this job checks"
-            echo "Shell script quality across scripts/*.sh and scripts/qa/**/*.sh, via shellcheck (mirrors \`just lint-shell\`)."
+            echo "Shell script quality across scripts/*.sh, via shellcheck (mirrors \`just lint-shell\`)."
             echo ""
             echo "### If this fails"
-            echo "A hook or qa-harness script has a shellcheck violation. Run \`just lint-shell\` locally to see the exact warning and file/line."
+            echo "A shell script has a shellcheck violation. Run \`just lint-shell\` locally to see the exact warning and file/line."
           } >> "$GITHUB_STEP_SUMMARY"
 
   test-bats:

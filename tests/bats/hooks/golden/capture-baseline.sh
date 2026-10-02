@@ -52,7 +52,7 @@ fixture_sid() {
 }
 
 # Run one hook variant.
-# $1 = hook script basename (e.g. package-plugin.sh)
+# $1 = hook script basename (e.g. validate-plugin.sh)
 # $2 = fixture directory (absolute path)
 # $3 = work tmpdir for this invocation
 # Outputs: stdout_file, stderr_file, exit_code_file, state_diff_file under $3/out/
@@ -89,7 +89,7 @@ run_hook_variant() {
 
 	local hook_path="${HOOKS_DIR}/${hook_script}"
 
-	# Special handling for CLI-mode fixtures (validate-plugin.sh, package-plugin.sh)
+	# Special handling for CLI-mode fixtures (validate-plugin.sh)
 	local cli_mode
 	cli_mode=$(jq -r '._cli_mode // false' "${input_json}" 2>/dev/null)
 	local extra_args=""

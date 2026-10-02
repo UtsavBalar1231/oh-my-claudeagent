@@ -12,6 +12,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
+import { packageTree } from "../package.ts";
 import { type Script, startServer } from "./mock-model.ts";
 
 const REPO = join(import.meta.dir, "..", "..");
@@ -91,7 +92,6 @@ async function main(): Promise<boolean> {
   const { values } = parseArgs({ options: { "mutate-unfiltered-tool-call": { type: "boolean", default: false } } });
   const mutated = values["mutate-unfiltered-tool-call"];
   if (!Bun.which("claude")) throw new Error("claude is not on PATH");
-  if (!Bun.which("rsync")) throw new Error("rsync, which package-plugin.sh needs, is not on PATH");
 
   const scratch = mkdtempSync(join(tmpdir(), "omca-worktree-bash-"));
   const server = startServer({ port: 0, accessLogPath: join(scratch, "access.log"), script });
@@ -101,7 +101,7 @@ async function main(): Promise<boolean> {
     const configDir = join(scratch, "config");
     mkdirSync(project);
     mkdirSync(configDir);
-    run(["bash", join(REPO, "scripts", "package-plugin.sh"), plugin], REPO);
+    packageTree(REPO, plugin);
     if (mutated) mutate(plugin);
     run(["git", "init", "--quiet"], project);
     run(["git", "-c", "user.name=qa", "-c", "user.email=qa@localhost", "commit", "--quiet", "--allow-empty", "-m", "init"], project);

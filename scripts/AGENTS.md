@@ -6,15 +6,20 @@ under `hooks/` and the server handlers under `servers/hooks/`.
 
 ## Layout
 
-- Top-level scripts: repository tooling, such as `validate-plugin.sh`,
-  `package-plugin.sh`, `bench.ts` and `parity-titles.ts`.
+- Top-level scripts: repository tooling, such as `validate-plugin.sh`, `package.ts`
+  (`bun scripts/package.ts <dest>` copies the shipped tree, `--dry-run` prints its file list),
+  `bench.ts` and `parity-titles.ts`.
 - `lib/common.sh`: shared bash helpers (the stdin payload reader, state-dir resolution).
   Source it rather than reimplementing an idiom already there.
 - `bin/run-hook-in-scratch.sh`: runs a hook script against a scratch copy of state
   for manual testing.
-- `qa/`: the manual QA harness (`just qa`), packaging-excluded. Installs, live-probes
-  hooks, and exercises the statusline against a real plugin install. `qa/lib/qa-common.sh`
-  holds its isolation helpers.
+- `qa/`: the manual QA harness (`just qa`), packaging-excluded. TypeScript on bun.
+  `session-smoke.ts` and `hook-live-probe.ts` drive `claude -p` with the packaged plugin
+  against the mock model (`mock-model.ts`), in a scratch project with its own
+  `CLAUDE_CONFIG_DIR`. `install-verify.ts` and `statusline-probe.ts` check the packaged
+  tree itself. `worktree-bash.ts` and `route-effort.ts`
+  back `just qa-worktree-bash` and `just qa-route-effort`. `qa/lib.ts` holds the shared
+  helpers: checks, scratch directories, the `claude -p` launcher and the real-config drift watch.
 
 ## Conventions
 

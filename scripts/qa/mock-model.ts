@@ -127,8 +127,8 @@ function arrivalTime(d: Date): string {
   return `${date} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
 }
 
-// session-smoke.sh greps the log for `"path": "/v1/messages` and `"client": "127.0.0.1"`,
-// so entries keep the `": "` and `", "` separators JSON.stringify would drop.
+// Entries keep the `": "` and `", "` separators JSON.stringify would drop, so the log stays
+// greppable by key and value.
 function jsonLine(entry: Record<string, LogValue>): string {
   const fields = Object.entries(entry).map(([k, v]) => `${JSON.stringify(k)}: ${JSON.stringify(v)}`);
   return `{${fields.join(", ")}}\n`;

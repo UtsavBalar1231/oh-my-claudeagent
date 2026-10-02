@@ -290,7 +290,7 @@ describe("routing", () => {
 });
 
 describe("access log", () => {
-  test("writes one JSONL line per request in the format session-smoke greps", async () => {
+  test("writes one JSONL line per request, with the key and value separators kept", async () => {
     await post("/v1/messages?beta=true", {}, { Authorization: "Bearer s3cret" });
 
     expect(withoutTimestamps(readLog())).toBe(

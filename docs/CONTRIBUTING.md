@@ -77,6 +77,7 @@ just test-claims     # manifest, hook-registry, and frontmatter contract checks
 just test-hooks      # hook scripts with fixture payloads
 just test-bats       # behavioral tests (run `git submodule update --init` first)
 just test-mcp        # MCP server tool listing (requires ast-grep CLI)
+just qa              # manual QA against the mock model: session smoke, install verify, live hook probe, statusline probe, worktree and route-effort checks
 just lint            # shellcheck + ruff
 just fmt-check       # format check without changes
 ```

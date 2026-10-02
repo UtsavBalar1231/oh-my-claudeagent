@@ -94,10 +94,6 @@ _run_fixture() {
 	diff "${baseline}/state-diff.txt" "${work_dir}/state-diff.norm"
 }
 
-@test "golden: package-plugin/dry-run" {
-	_run_fixture "package-plugin" "dry-run"
-}
-
 @test "golden: validate-plugin/known-good" {
 	_run_fixture "validate-plugin" "known-good"
 }

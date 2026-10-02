@@ -1025,21 +1025,17 @@ check_claudemd_template_packaging() {
 		return 1
 	fi
 
-	local package_tmp
-	package_tmp="$(mktemp -d)"
-	if ! bash "${REPO_ROOT}/scripts/package-plugin.sh" "${package_tmp}" >/dev/null 2>&1; then
-		fail "claudemd template packaging: package-plugin.sh failed against ${package_tmp}"
-		rm -rf "${package_tmp}"
+	local package_list
+	if ! package_list="$(bun "${REPO_ROOT}/scripts/package.ts" --dry-run 2>/dev/null)"; then
+		fail "claudemd template packaging: scripts/package.ts --dry-run failed"
 		return 1
 	fi
 
-	if [[ -f "${package_tmp}/${template_rel_path}" ]]; then
-		pass "claudemd template packaging: package-plugin.sh ships ${template_rel_path}"
+	if grep -qxF "${template_rel_path}" <<<"${package_list}"; then
+		pass "claudemd template packaging: scripts/package.ts ships ${template_rel_path}"
 	else
-		fail "claudemd template packaging: package-plugin.sh does not ship ${template_rel_path} (check EXCLUDES in package-plugin.sh)"
+		fail "claudemd template packaging: scripts/package.ts does not ship ${template_rel_path} (check EXCLUDES in scripts/package.ts)"
 	fi
-
-	rm -rf "${package_tmp}"
 }
 
 check_hook_fixtures_exist() {

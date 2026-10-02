@@ -11,12 +11,10 @@ default:
 [group('lint')]
 lint: lint-shell lint-python
 
-# Lint shell scripts with shellcheck. scripts/*.sh is non-recursive by design, so
-# scripts/qa/ (the qa harness, packaging-excluded) is listed explicitly rather than
-# widening the glob to every subdirectory.
+# Lint shell scripts with shellcheck
 [group('lint')]
 lint-shell:
-	shellcheck scripts/*.sh scripts/qa/*.sh scripts/qa/lib/*.sh
+	shellcheck scripts/*.sh
 
 # Lint Python with ruff
 [group('lint')]
@@ -94,17 +92,17 @@ test-pytest:
 test-bats:
 	tests/bats/bats-core/bin/bats tests/bats/hooks/ tests/bats/unit/
 
-# Run the claude-code-qa harness: packaged-plugin install/hook/statusline probes plus
-# a skip-by-default session smoke test. Maintainer pre-release step, NOT part of CI --
-# it launches real `claude` sessions against a scratch project under the real HOME
-# (see scripts/qa/lib/qa-common.sh for the isolation model), so it stays local/manual.
+# Run the manual QA harness: session smoke, install verify, the live hook probe, the statusline probe,
+# then the worktree-bash and route-effort checks. Maintainer pre-release step, NOT part of CI: it launches
+# real `claude` sessions against the mock model, each in a scratch project with its own CLAUDE_CONFIG_DIR.
 [group('test')]
 qa:
-	bash scripts/qa/install-verify.sh
-	bash scripts/qa/hook-live-probe.sh
-	bash scripts/qa/statusline-probe.sh
-	bash scripts/qa/session-smoke.sh
-	bun scripts/qa/worktree-bash.ts
+	bun scripts/qa/session-smoke.ts
+	bun scripts/qa/install-verify.ts
+	bun scripts/qa/hook-live-probe.ts
+	bun scripts/qa/statusline-probe.ts
+	just qa-worktree-bash
+	just qa-route-effort
 
 # Capture tests/mod/visual/<view>.json in tmux against the mock model at 80, 120 and 200 columns
 [group('test')]

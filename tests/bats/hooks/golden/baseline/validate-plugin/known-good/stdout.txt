@@ -46,7 +46,7 @@
 [validate-plugin] Running claudemd template packaging checks
 [validate-plugin] PASS: claudemd template packaging: servers/hooks/guidance.ts reads templates/claudemd.md
 [validate-plugin] PASS: claudemd template packaging: templates/claudemd.md exists
-[validate-plugin] PASS: claudemd template packaging: package-plugin.sh ships templates/claudemd.md
+[validate-plugin] PASS: claudemd template packaging: scripts/package.ts ships templates/claudemd.md
 [validate-plugin] Running skill references existence checks
 [validate-plugin] PASS: skill references: debugging SKILL.md reference references/diagnostics.md exists
 [validate-plugin] PASS: skill references: debugging SKILL.md reference references/methodology.md exists
