@@ -37,9 +37,8 @@ Hook-authoring conventions for a script here:
   `hookSpecificOutput.permissionDecision` for `PreToolUse`,
   `hookSpecificOutput.decision.behavior` for `PermissionRequest`. The branch is required,
   not a hedge against an open question. See the two-shape branch in `permission-filter.sh`
-  for the reference implementation, and `.claude/rules/hook-scripts.md` for the full
-  contract. Block from a `Stop` hook with `{"decision": "block", "reason": "..."}` on
-  stdout and `exit 0`.
+  for the reference implementation. Block from a `Stop` hook with
+  `{"decision": "block", "reason": "..."}` on stdout and `exit 0`.
 - A deny gate never allows a command it failed to recognise. Silence, `exit 0` with no
   stdout, is the answer to a command the pattern does not match; a trailing allow
   auto-approves everything the gate missed. A command the gate positively recognised and
