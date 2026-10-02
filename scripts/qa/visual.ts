@@ -13,7 +13,7 @@
 //   fixture     <root>/fixtures/<name>/, copied as the session's cwd, with "{{cwd}}" in its
 //               files replaced by that cwd; absent or null, an empty directory
 // Writes <root>/<view>-<cols>.txt for 80x40 (an inline pane), 120x40 and 200x50 (docked).
-import { cpSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
@@ -146,8 +146,7 @@ async function exited(pid: number): Promise<void> {
 }
 
 async function captureAt(view: View, root: string, cols: number, rows: number): Promise<string> {
-  const scratch = join(tmpdir(), `omca-visual-${cols}x${rows}`);
-  rmSync(scratch, { recursive: true, force: true });
+  const scratch = mkdtempSync(join(tmpdir(), `omca-visual-${cols}x${rows}-`));
   const cwd = join(scratch, "cwd");
   const config = join(scratch, "config");
   const script: Script =
@@ -158,7 +157,6 @@ async function captureAt(view: View, root: string, cols: number, rows: number): 
   const tmux = new Tmux(`omca-visual-${process.pid}`);
   let claudePid: number | undefined;
   try {
-    mkdirSync(scratch);
     if (view.fixture === null) mkdirSync(cwd);
     else copyFixture(join(root, "fixtures", view.fixture), cwd);
     mkdirSync(config);
