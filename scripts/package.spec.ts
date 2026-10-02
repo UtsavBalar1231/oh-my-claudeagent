@@ -18,6 +18,8 @@ const SHIPPED: Record<string, string> = {
 
 const EXCLUDED: Record<string, string> = {
   ".git/HEAD": "x",
+  ".github/assets/hero.svg": "x",
+  ".github/workflows/ci.yml": "x",
   ".omca/state/b.json": "x",
   ".claude/settings.json": "x",
   "benchmarks/perf/r.json": "x",
@@ -26,6 +28,8 @@ const EXCLUDED: Record<string, string> = {
   "tests/t.spec.ts": "x",
   "servers/tests/y.ts": "x",
   "scripts/qa/lib.ts": "x",
+  "scripts/docs/screenshots.ts": "x",
+  "scripts/docs/fonts/JetBrainsMono-Regular.ttf": "x",
   "node_modules/m/index.js": "x",
   "CLAUDE.md": "x",
 };

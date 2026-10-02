@@ -76,7 +76,7 @@ export function copyFixture(from: string, to: string): void {
   }
 }
 
-function sessionEnv(): Record<string, string> {
+export function sessionEnv(): Record<string, string> {
   const env: Record<string, string> = {};
   for (const [key, value] of Object.entries(process.env)) {
     if (value !== undefined && !/^(CLAUDE|ANTHROPIC|TMUX)/.test(key)) env[key] = value;
@@ -84,24 +84,36 @@ function sessionEnv(): Record<string, string> {
   return env;
 }
 
-const quote = (text: string) => `'${text.replaceAll("'", `'\\''`)}'`;
+export const mockSessionEnv = (port: number | undefined): string[] => [
+  "-e", "DISABLE_AUTOUPDATER=1",
+  "-e", `ANTHROPIC_BASE_URL=http://127.0.0.1:${port}`,
+  "-e", "ANTHROPIC_AUTH_TOKEN=mock-key",
+];
 
-class Tmux {
+export const quote = (text: string) => `'${text.replaceAll("'", `'\\''`)}'`;
+
+export class Tmux {
   readonly socket: string;
+  readonly flags: readonly string[];
   readonly target = "visual";
 
-  constructor(socket: string) {
+  constructor(socket: string, flags: readonly string[] = []) {
     this.socket = socket;
+    this.flags = flags;
   }
 
   run(args: readonly string[]): string {
-    const result = Bun.spawnSync(["tmux", "-L", this.socket, ...args], { env: sessionEnv() });
+    const result = Bun.spawnSync(["tmux", "-L", this.socket, ...this.flags, ...args], { env: sessionEnv() });
     if (result.exitCode !== 0) throw new Error(`tmux ${args[0]}: ${result.stderr.toString().trim()}`);
     return result.stdout.toString();
   }
 
   screen(): string {
     return this.run(["capture-pane", "-p", "-t", this.target]);
+  }
+
+  styledScreen(): string {
+    return this.run(["capture-pane", "-p", "-e", "-N", "-t", this.target]);
   }
 
   send(...keys: string[]): void {
@@ -138,7 +150,7 @@ class Tmux {
 
 // Claude Code writes its plugin data directory while it exits, so the scratch directory is
 // removed only once the process is gone.
-async function exited(pid: number): Promise<void> {
+export async function exited(pid: number): Promise<void> {
   const deadline = Date.now() + EXIT_TIMEOUT_MS;
   while (Date.now() < deadline) {
     try {
@@ -149,6 +161,33 @@ async function exited(pid: number): Promise<void> {
     await Bun.sleep(POLL_MS);
   }
   throw new Error(`claude (pid ${pid}) did not exit within ${EXIT_TIMEOUT_MS} ms`);
+}
+
+// Answers the folder-trust dialog when it shows, then waits for the input box and a still screen.
+export async function reachPrompt(tmux: Tmux): Promise<void> {
+  const first = await tmux.waitFor(
+    (screen) => screen.includes(TRUST) || PROMPT.test(screen),
+    START_TIMEOUT_MS,
+    "the folder-trust dialog or the prompt",
+  );
+  if (first.includes(TRUST)) {
+    let sentAt = 0;
+    await tmux.waitFor(
+      (screen) => {
+        if (TRUST_SELECTED.test(screen)) return true;
+        if (Date.now() - sentAt > RESEND_MS && TRUST_UNSELECTED.test(screen)) {
+          tmux.send("Down");
+          sentAt = Date.now();
+        }
+        return false;
+      },
+      START_TIMEOUT_MS,
+      `"${TRUST}" to be selected`,
+    );
+    tmux.send("Enter");
+  }
+  await tmux.waitFor((screen) => PROMPT.test(screen), START_TIMEOUT_MS, "the input prompt");
+  await tmux.settle(tmux.screen());
 }
 
 async function captureAt(view: View, root: string, cols: number, rows: number): Promise<string> {
@@ -172,35 +211,11 @@ async function captureAt(view: View, root: string, cols: number, rows: number): 
     tmux.run([
       "new-session", "-d", "-s", tmux.target, "-x", String(cols), "-y", String(rows), "-c", cwd,
       "-e", `CLAUDE_CONFIG_DIR=${config}`,
-      "-e", "DISABLE_AUTOUPDATER=1",
-      "-e", `ANTHROPIC_BASE_URL=http://127.0.0.1:${mock.port}`,
-      "-e", "ANTHROPIC_AUTH_TOKEN=mock-key",
+      ...mockSessionEnv(mock.port),
       claude,
     ]);
     claudePid = Number(tmux.run(["display-message", "-p", "-t", tmux.target, "#{pane_pid}"]).trim());
-    const first = await tmux.waitFor(
-      (screen) => screen.includes(TRUST) || PROMPT.test(screen),
-      START_TIMEOUT_MS,
-      "the folder-trust dialog or the prompt",
-    );
-    if (first.includes(TRUST)) {
-      let sentAt = 0;
-      await tmux.waitFor(
-        (screen) => {
-          if (TRUST_SELECTED.test(screen)) return true;
-          if (Date.now() - sentAt > RESEND_MS && TRUST_UNSELECTED.test(screen)) {
-            tmux.send("Down");
-            sentAt = Date.now();
-          }
-          return false;
-        },
-        START_TIMEOUT_MS,
-        `"${TRUST}" to be selected`,
-      );
-      tmux.send("Enter");
-    }
-    await tmux.waitFor((screen) => PROMPT.test(screen), START_TIMEOUT_MS, "the input prompt");
-    await tmux.settle(tmux.screen());
+    await reachPrompt(tmux);
 
     tmux.send("-l", view.command);
     const typed = await tmux.waitFor(

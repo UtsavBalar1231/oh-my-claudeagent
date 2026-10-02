@@ -24,6 +24,7 @@ const USAGE = "Usage: bun scripts/package.ts <dest_dir> [--version <N.N.N>]\n   
 // matches the last path components at any depth, as rsync's --exclude does.
 export const EXCLUDES = [
   ".git/",
+  ".github/",
   ".omca/",
   "CLAUDE.md",
   ".claude/",
@@ -31,6 +32,7 @@ export const EXCLUDES = [
   "docs/design/",
   "tests/",
   "scripts/qa/",
+  "scripts/docs/",
   "node_modules/",
 ] as const;
 

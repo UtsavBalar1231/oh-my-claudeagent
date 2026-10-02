@@ -13,10 +13,11 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
+      # The .ans captures are padded to the session width, and the OFL texts are verbatim copies.
       - id: trailing-whitespace
-        exclude: '\.patch$'
+        exclude: '\.patch$|^\.github/assets/src/|^scripts/docs/fonts/.*\.txt$'
       - id: end-of-file-fixer
-        exclude: '\.patch$'
+        exclude: '\.patch$|^scripts/docs/fonts/.*\.txt$'
       - id: check-merge-conflict
       - id: check-json
         # These fixtures are deliberately malformed: the boulder resolver's

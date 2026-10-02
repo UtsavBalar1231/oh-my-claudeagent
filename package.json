@@ -12,6 +12,7 @@
   "devDependencies": {
     "@opencode/plugin": "2.0.18",
     "@types/bun": "1.4.2",
+    "subset-font": "2.9.0",
     "typescript": "7.0.2"
   }
 }

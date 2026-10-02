@@ -6,6 +6,9 @@ end_of_line = lf
 insert_final_newline = true
 trim_trailing_whitespace = true
 
+[*.ans]
+trim_trailing_whitespace = false
+
 [*.sh]
 indent_style = tab
 
