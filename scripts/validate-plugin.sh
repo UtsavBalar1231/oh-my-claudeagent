@@ -1334,7 +1334,6 @@ check_hooks() {
 	local pretool_write_payload="${tmp_root}/pretooluse-write.runtime.json"
 	local permission_payload="${HOOK_FIXTURES_DIR}/permissionrequest-bash.json"
 	local session_compact_payload="${HOOK_FIXTURES_DIR}/sessionstart-compact.json"
-	local task_payload="${HOOK_FIXTURES_DIR}/taskcompleted-basic.json"
 
 	local existing_file="${tmp_root}/existing.txt"
 	touch "${existing_file}"
@@ -1345,8 +1344,6 @@ check_hooks() {
 
 	printf 'compact fixture context' >"${tmp_root}/.omca/state/compaction-context.md"
 	run_registered_hooks "SessionStart compact" "SessionStart" "compact" "${session_compact_payload}" "${tmp_root}" "json-required"
-
-	run_registered_hooks "TaskCompleted default" "TaskCompleted" "" "${task_payload}" "${tmp_root}" "empty"
 
 	local stop_payload="${HOOK_FIXTURES_DIR}/stop-basic.json"
 	run_registered_hooks "Stop default (no state)" "Stop" "" "${stop_payload}" "${tmp_root}" "json-optional"

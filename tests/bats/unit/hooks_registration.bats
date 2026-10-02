@@ -42,7 +42,7 @@ HOOKS_JSON="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)/hooks/hooks.json"
 
 @test "hooks.json: tool-loop-detector.sh is no longer registered under PostToolUse" {
 	run jq -e '
-		[.hooks.PostToolUse[]?.hooks[]?.command | select(test("tool-loop-detector\\.sh\"?$"))] | length == 0
+		[.hooks.PostToolUse[]?.hooks[]? | (.command // "") | select(test("tool-loop-detector\\.sh\"?$"))] | length == 0
 	' "$HOOKS_JSON"
 	assert_success
 }

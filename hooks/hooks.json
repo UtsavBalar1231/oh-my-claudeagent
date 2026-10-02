@@ -276,9 +276,20 @@
         "matcher": "Bash",
         "hooks": [
           {
-            "type": "command",
-            "shell": "bash",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/verification-command-recorder.sh\""
+            "type": "mcp_tool",
+            "server": "plugin:oh-my-claudeagent:omca-hooks",
+            "tool": "omca_hook",
+            "timeout": 10,
+            "input": {
+              "event": "PostToolUse",
+              "session_id": "${session_id}",
+              "cwd": "${cwd}",
+              "agent_id": "${agent_id}",
+              "agent_type": "${agent_type}",
+              "tool_name": "${tool_name}",
+              "tool_input": "${tool_input}",
+              "tool_response": "${tool_response}"
+            }
           }
         ]
       }
@@ -420,9 +431,20 @@
       {
         "hooks": [
           {
-            "type": "command",
-            "shell": "bash",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/task-completed-verify.sh\""
+            "type": "mcp_tool",
+            "server": "plugin:oh-my-claudeagent:omca-hooks",
+            "tool": "omca_hook",
+            "timeout": 10,
+            "input": {
+              "event": "TaskCompleted",
+              "session_id": "${session_id}",
+              "cwd": "${cwd}",
+              "agent_id": "${agent_id}",
+              "agent_type": "${agent_type}",
+              "tool_name": "${tool_name}",
+              "tool_input": "${tool_input}",
+              "tool_response": "${tool_response}"
+            }
           }
         ]
       }

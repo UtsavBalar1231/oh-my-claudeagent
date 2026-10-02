@@ -16,51 +16,6 @@ setup() {
 	export CLAUDE_SESSION_ID="bats-pipeline-session"
 }
 
-# ─── c. Evidence → Task-Completion pipeline ──────────────────────────────────
-# Write valid verification-evidence.json → task-completed-verify reads and allows
-
-@test "pipeline c: valid fresh evidence allows task-completed-verify" {
-	local now
-	now=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-
-	# Write valid verification-evidence.json with proper schema
-	mkdir -p "$CLAUDE_PROJECT_ROOT/.omca/evidence"
-	cat > "$CLAUDE_PROJECT_ROOT/.omca/evidence/verification-evidence.json" <<-EOF
-	{
-	  "entries": [
-	    {
-	      "type": "test",
-	      "command": "just test",
-	      "exit_code": 0,
-	      "output_snippet": "10 tests passed",
-	      "timestamp": "$now"
-	    }
-	  ]
-	}
-	EOF
-
-	# task-completed-verify should allow (evidence is fresh and valid)
-	run_hook "task-completed-verify.sh" '{"task_description":"verify tests pass"}'
-	assert_success
-}
-
-# ─── d. Recorder → Task-Completion pipeline ─────────────────────────────────
-# verification-command-recorder writes the slot → task-completed-verify reads it and
-# blocks, because no evidence postdates the verification it recorded.
-
-@test "pipeline d: a recorded verification with no evidence after it blocks task-completed-verify" {
-	# Explicitly remove evidence from previous pipeline test (shared BATS_FILE_TMPDIR)
-	rm -f "$CLAUDE_PROJECT_ROOT/.omca/evidence/verification-evidence.json"
-
-	run_hook "verification-command-recorder.sh" '{"tool_input":{"command":"just test"}}'
-	assert_success
-	[ -f "$CLAUDE_PROJECT_ROOT/.omca/state/last-verification-command.json" ]
-
-	run_hook "task-completed-verify.sh" '{"task_description":"all tests pass after fix"}'
-	assert [ "$status" -eq 2 ]
-	assert_output --partial "just test"
-}
-
 # ─── f. Compaction context pipeline ──────────────────────────────────────────
 # pre-compact writes context, post-compact-inject restores
 

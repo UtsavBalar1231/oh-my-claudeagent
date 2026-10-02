@@ -198,17 +198,17 @@ check_bash_guard_positive_control() {
 		"Bash guard positive control: ${canary}/stale.o disappeared — the turn did more than the one command"
 }
 
-# check_verification_recorder — the registration test for verification-command-recorder.sh.
-# Its bats suite drives the script on stdin, which proves the runner regex and the slot
+# check_verification_recorder — the registration test for the omca_hook verification recorder.
+# Its bun specs call the handler directly, which proves the runner regex and the status
 # write but says nothing about whether the platform ever hands it a payload.
-# The assertion is therefore the slot FILE landing in the scratch project's own state
-# directory: only a real dispatch to a registered handler can create it.
+# The assertion is therefore the session status FILE landing in the scratch project's own
+# state directory: only a real dispatch to the registered mcp_tool entry can create it.
 #
 # `make check` is the runner used because it needs no toolchain beyond make itself, and
 # the target is seeded into the scratch project so the command exits 0 — a failing Bash
 # call routes to PostToolUseFailure, where this handler is not registered.
 check_verification_recorder() {
-	local project package log slot
+	local project package log status_dir
 	project="$(qa_new_scratch_project)"
 	package="$(qa_build_package)"
 	QA_CLEANUP_DIRS+=("${project}" "${package}")
@@ -220,11 +220,11 @@ check_verification_recorder() {
 	qa_claude_probe "${project}" "${package}" "${log}" \
 		'Run exactly this one Bash command, verbatim: make check. Run no other command and use no other tool.'
 
-	slot="${project}/.omca/state/last-verification-command.json"
-	if [[ -f "${slot}" ]] && grep -q 'make check' "${slot}" 2>/dev/null; then
-		qa_pass "PostToolUse recorder: verification-command-recorder wrote the slot for a real Bash turn"
+	status_dir="${project}/.omca/state/session"
+	if grep -qs 'make check' "${status_dir}"/*.json; then
+		qa_pass "PostToolUse recorder: the omca_hook recorder wrote the session status file for a real Bash turn"
 	else
-		qa_fail "PostToolUse recorder: no slot at ${slot} after a real \`make check\` turn — the handler is unwired, or the model never ran the command (see ${log})"
+		qa_fail "PostToolUse recorder: no status file under ${status_dir} names \`make check\` after a real turn — the handler is unwired, or the model never ran the command (see ${log})"
 	fi
 }
 

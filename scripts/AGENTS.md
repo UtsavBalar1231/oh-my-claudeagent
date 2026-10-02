@@ -6,7 +6,7 @@ a manual QA harness.
 ## Layout
 
 - Top-level `*.sh`: one script per hook handler (e.g. `session-init.sh`,
-  `task-completed-verify.sh`, `subagent-start.sh`). Each is wired to an event in
+  `subagent-start.sh`). Each is wired to an event in
   `hooks/hooks.json`; an unregistered script is dead code.
 - `lib/common.sh`: shared bash helpers (logging, state-dir resolution, session-id
   lookup). Source it rather than reimplementing an idiom already there.

@@ -337,7 +337,7 @@ default only on Claude 3.x, Opus 4 through 4.7, Sonnet 4 through 4.6, and Haiku 
 model, including what the roster's `opus` and `fable` aliases resolve to on the Anthropic API, goes
 without them unless `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` is set. A subagent gets them only when the
 session has them. With the task tools withheld and agent teams off, neither
-trigger occurs, so `task-completed-verify.sh` never runs. Treat it as an opt-in gate rather than a
+trigger occurs, so the TaskCompleted gate never runs. Treat it as an opt-in gate rather than a
 guarantee: the three Stop gates are what enforce evidence discipline by default.
 
 **New platform events (v2.1.141–v2.1.167):**
@@ -390,8 +390,11 @@ that the two combine, and how a block presents in the transcript when both are e
 unverified. Emitting both would also deliver the same text twice, so the blocking pair alone
 is what `block_exit()` in `scripts/lib/common.sh` writes.
 
-Among the turn-gate and task-gate hooks, `task-completed-verify.sh` is now the only one that
-blocks via exit 2.
+The TaskCompleted gate is an `mcp_tool` entry served by the omca server's `omca_hook` tool,
+and it blocks with the same `decision: block` plus `reason` pair. The hooks reference documents
+only exit 2 and `continue: false` for that event, but on client 2.1.287 the client holds the
+task open on a `decision: block` from an `mcp_tool` hook and returns the reason to Claude as
+the `TaskUpdate` result.
 
 The deny hooks are a separate family with their own shapes. `PreToolUse` accepts either
 stderr text plus exit 2 or a `hookSpecificOutput.permissionDecision: "deny"` payload with
@@ -960,10 +963,10 @@ After every build, test, or lint command:
 evidence_log(evidence_type="build", command="just ci", exit_code=0, output_snippet="all checks passed")
 ```
 
-The `task-completed-verify` hook blocks task completion (exit 2) if evidence is stale
-(> 5 minutes) and the task text implies verification was needed. Evidence gating is
-keyword-aware — tasks without verification keywords (test, build, lint, verify) skip
-strict evidence requirements.
+A Bash call that runs a verification runner (a test, lint, build or typecheck command,
+not a quoted mention of one) is recorded for the session. Marking a task completed is then
+blocked while that command is under an hour old and the evidence ledger has not been
+written since it ran. The task's name plays no part in the verdict.
 
 ### Rules
 
