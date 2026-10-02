@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "types": ["bun-types"],
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "exactOptionalPropertyTypes": true
+  },
+  "include": ["src", "servers", "statusline", "scripts"]
+}

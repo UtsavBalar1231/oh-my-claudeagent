@@ -5,6 +5,9 @@ ci:
   autoupdate_schedule: weekly
   skip: [zizmor]
 
+# Engine-generated type snapshot: committed byte for byte as the client writes it.
+exclude: '^\.claude-plugin/types/'
+
 repos:
   # General hygiene
   - repo: https://github.com/pre-commit/pre-commit-hooks

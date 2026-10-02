@@ -78,6 +78,12 @@ test-opencode:
 	bash opencode/test/smoke.sh
 	bash opencode/test/model-path.sh
 
+# Run the mod tests (tests/mod/*.test.ts). The argument is the plugin root; a test
+# directory finds no hooks module.
+[group('test')]
+test-mod:
+	claude plugin test .
+
 # Run pytest suites for both Python projects. Split invocations for the same reason as
 # lint-python: servers/ and statusline/ are separate uv projects with their own configs
 # and their own dev dependencies, so one pytest run cannot cover both.
@@ -111,6 +117,12 @@ qa:
 [group('test')]
 typecheck:
 	uv run --project servers pyright
+
+# Type-check the mod project (engine types only) and the bun runtime project
+[group('test')]
+typecheck-ts:
+	bun x tsc --noEmit -p tsconfig.json
+	bun x tsc --noEmit -p tsconfig.runtime.json
 
 # ── Scaffold ──────────────────────────────────────────────────────
 
@@ -218,6 +230,19 @@ validate-manifest:
 	command -v claude >/dev/null 2>&1 || { echo "claude CLI not found, skipping"; exit 0; }
 	claude plugin validate . --strict
 	claude plugin validate .claude-plugin/plugin.json
+
+# Validate the manifest and the hooks module. The manifest path is the target that opens
+# register.ts; the repo root reads only marketplace.json. --strict is dropped while a local
+# CLAUDE.md sits at the root, since its warning would fail every run.
+[group('validate')]
+validate-mod:
+	claude plugin validate .claude-plugin/plugin.json $([[ -e CLAUDE.md ]] || echo --strict)
+
+# Refresh the committed engine types snapshot in .claude-plugin/types/, which only a
+# session load writes
+[group('validate')]
+types:
+	claude -p --plugin-dir . "exit"
 
 # Smoke test — verify plugin loads correctly (requires claude CLI)
 [group('validate')]

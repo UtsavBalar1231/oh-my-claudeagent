@@ -12,6 +12,7 @@
   "homepage": "https://github.com/UtsavBalar1231/oh-my-claudeagent",
   "repository": "https://github.com/UtsavBalar1231/oh-my-claudeagent",
   "license": "MIT",
+  "types": "./types/index.d.ts",
   "keywords": [
     "agents",
     "orchestration",
