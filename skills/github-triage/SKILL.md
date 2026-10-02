@@ -9,7 +9,7 @@ when_to_use: |
 model: opus
 argument-hint: "[repo] [--issues-only | --prs-only]"
 effort: medium
-disallowed-tools: [Write, Edit]
+disallowed-tools: [Edit]
 ---
 
 # GitHub Triage: Unified Issue & PR Processor
@@ -72,16 +72,14 @@ Run no shell command to create the directory: the Write tool creates it when the
 
 ## PHASE 2: FETCH OPEN ITEM METADATA ONLY
 
-```bash
-REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+When no repo argument was given, run `gh repo view --json nameWithOwner -q .nameWithOwner` and use the `owner/name` it prints as `{REPO}` from here on.
 
+```bash
 # Issues: all open metadata only. Do not request body/comments here; control characters can break batching.
-gh issue list --repo $REPO --state open --limit 500 \
-  --json number,title,state,createdAt,updatedAt,labels,author
+gh issue list --repo {REPO} --state open --limit 500 --json number,title,state,createdAt,updatedAt,labels,author
 
 # PRs: all open metadata only. Subagents fetch body/comments/reviews/files per item.
-gh pr list --repo $REPO --state open --limit 500 \
-  --json number,title,state,createdAt,updatedAt,labels,author,headRefName,baseRefName,isDraft,mergeable,reviewDecision,statusCheckRollup
+gh pr list --repo {REPO} --state open --limit 500 --json number,title,state,createdAt,updatedAt,labels,author,headRefName,baseRefName,isDraft,mergeable,reviewDecision,statusCheckRollup
 ```
 
 If either returns exactly 500 results, paginate using `--search "created:<LAST_CREATED_AT"` until exhausted.
