@@ -139,7 +139,7 @@ test("each passthrough dispatcher calls next once and returns its answer", async
   expect(await $.session.start({ cwd: "/work", surface: "terminal", isInteractive: true })).toEqual({ cwd: "/engine" });
   expect(await $.turn.start({ text: "hi", turnId: "t-1" })).toEqual({ turnId: "t-1" });
   expect(
-    await $.turn.complete({ answer: "done", durationMs: 4, isAborted: false, turnId: "t-1", reason: "answer" }),
+    await $.turn.complete({ answer: "done", durationMs: 4, isAborted: false, turnId: "t-1", reason: "answer", agentId: "a-1" }),
   ).toEqual({ text: "done!" });
   expect(
     await $.agent.spawn({
@@ -166,7 +166,6 @@ test("each passthrough dispatcher calls next once and returns its answer", async
   ).toEqual({});
   expect(await $.command.run({ ...RUN, command: "omca", args: "" })).toEqual({ text: "engine output" });
   expect(await $.command.run({ ...RUN, command: "omca", args: "plan my-plan" })).toEqual({ text: "engine output" });
-  expect(await $.command.run({ ...RUN, command: "omca-rate", args: "up good" })).toEqual({ text: "engine output" });
   expect(calls).toEqual([
     "session.start",
     "turn.start",
@@ -176,7 +175,6 @@ test("each passthrough dispatcher calls next once and returns its answer", async
     "ui.focus",
     "command.run omca ",
     "command.run omca plan my-plan",
-    "command.run omca-rate up good",
   ]);
 });
 

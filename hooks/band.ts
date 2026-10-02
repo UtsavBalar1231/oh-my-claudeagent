@@ -49,7 +49,7 @@ async function readJson(host: Host, path: string): Promise<unknown> {
   return (await host.fs.exists(path)) ? JSON.parse(await host.fs.read(path)) : undefined;
 }
 
-function verificationOf(status: unknown): { command: string; at: number } | null {
+export function verificationOf(status: unknown): { command: string; at: number } | null {
   if (typeof status !== "object" || status === null || !("verification" in status)) return null;
   const { verification } = status;
   if (typeof verification !== "object" || verification === null) return null;

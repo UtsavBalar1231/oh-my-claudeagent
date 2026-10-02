@@ -1,0 +1,6 @@
+{
+  "command": "Run the tests",
+  "keys": ["/omca-rate up good", "Enter", "/omca", "Enter", "5"],
+  "mockScript": "footer",
+  "fixture": "footer"
+}

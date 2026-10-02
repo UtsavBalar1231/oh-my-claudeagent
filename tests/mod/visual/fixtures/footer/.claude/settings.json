@@ -1,0 +1,4 @@
+{
+  "plansDirectory": "{{cwd}}/plans",
+  "permissions": { "allow": ["Bash(just test)"] }
+}

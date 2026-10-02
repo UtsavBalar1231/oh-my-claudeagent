@@ -1,0 +1,50 @@
+                                                                                                             │1: Agents  2: Plan  3: Evidence  4: Notepad  5: Feedback  6: Stats  7: Doctor            ✕
+ ▐▛███▛█   Claude Code v2.1.287                                                                              │───────────────────────────────────────────────────────────────────────────────────────
+▝▜██████▀  Opus 5.5 · API Usage Billing                                                                      │u: Up  d: Down  rate the last turn
+ ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/.cache/tmp/omca-visual-200x50-GLAbaU/cwd                          │1 rating, newest first · 1 up, 0 down
+                                                                                                             │↑ up    10-02 20:10  good
+▎ Auto mode is now Claude Code's default permission mode.                                                    │
+▎ Auto mode lets Claude handle permission prompts automatically. Claude checks each tool call for risky      │
+▎ actions and prompt injection before executing, runs the ones it assesses as lower-risk, and blocks the     │
+▎ rest.                                                                                                      │
+▎ https://code.claude.com/docs/en/permission-modes                                                           │
+                                                                                                             │
+❯ Run the tests                                                                                              │
+                                                                                                             │
+  Ran 1 shell command                                                                                        │
+                                                                                                             │
+● The tests ran.                                                                                             │
+                                                                                                             │
+✻ Churned for 0s · done 8:10 PM                                                                              │
+                                                                                                             │
+● oh-my-claudeagent: 0s · 1 in 1 out · ! no evidence: just test                                              │
+                                                                                                             │
+❯ /omca-rate up good                                                                                         │
+  ⎿  oh-my-claudeagent: Rated the last turn up: "good".                                                      │
+                                                                                                             │
+                                                                                                             │
+                                                                                                             │
+                                                                                                             │
+                                                                                                             │
+                                                                                                             │
+                                                                                                             │
+                                                                                                             │
+                                                                                                             │
+                                                                                                             │
+                                                                                                             │
+                                                                                                             │
+                                                                                                             │
+                                                                                                             │
+                                                                                                             │
+                                                                                                             │
+                                                                                                             │
+                                                                                                             │
+                                                                                                             │
+                                                                                                             │
+                                                                                                             │
+                                                                                                             │
+                                                                                         ◐ medium · /effort  │
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── oh-my-claudeagent:sisyphus ─
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ auto mode on (shift+tab to cycle) · ← for agents

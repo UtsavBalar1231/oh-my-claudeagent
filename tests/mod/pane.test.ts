@@ -183,7 +183,10 @@ test("each tab key shows its tab, on the terminal and the desktop", async ($, on
     expect(await ui.find({ type: "Text", text: "Learnings" })).toBeDefined();
 
     await ui.press({ key: "5" });
-    expect(await body()).toEqual(["No feedback has been recorded in this session."]);
+    expect(await body()).toEqual([
+      "u: Up  d: Down  rate the session (no turn yet)",
+      "No feedback has been recorded in this session.",
+    ]);
     await ui.press({ key: "6" });
     expect(await body()).toEqual(["No delegation statistics have been collected yet."]);
     await ui.press({ key: "7" });
