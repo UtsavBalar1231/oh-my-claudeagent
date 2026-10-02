@@ -14,8 +14,7 @@ async function writeMarker(host: Host): Promise<undefined> {
     host.log(`mod-marker: the session id ${JSON.stringify(sessionId)} cannot name a file`);
     return undefined;
   }
-  const { raw: _raw, ...options } = host.options;
-  const marker = { written_at: now, version, options };
+  const marker = { written_at: now, version, options: host.options };
   await host.fs.write(`${root}/.omca/state/mod/${sessionId}.json`, `${JSON.stringify(marker)}\n`);
   return undefined;
 }

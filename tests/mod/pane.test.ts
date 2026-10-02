@@ -285,6 +285,32 @@ test("a plan picked while the timer is still reading the bound plan stays shown"
   await ui.unmount();
 });
 
+test("a plan picked wins even when the timer's write lands while the pick is still reading", async ($, on) => {
+  const other = `${ROOT}/plans/other.md`;
+  const w = world(on, { ...FILES, [other]: "# Another plan\n\n## TODOs\n\n- [ ] 1. Only task\n" }, { plansDirectory: "./plans" });
+  await $.command.run(run("plan"));
+  const ui = await $.ui.mount(pane("terminal", { columns: 120, rows: 40, placement: "dock" }));
+  await ui.press({ key: "l" });
+  const pick = (await ui.findAll({ type: "Button" })).find((button) => button.props["label"] === "other")?.key ?? "";
+  expect(pick).toStartWith("pick-");
+
+  const release = hold(w, other);
+  const pressing = ui.press({ key: pick });
+  await w.clock.settle();
+  write(w, PLAN_PATH, `${PLAN}\n- [ ] 47. Added after the pane loaded it`);
+  const readsOfBound = () => w.reads.filter((path) => path === PLAN_PATH).length;
+  const before = readsOfBound();
+  await w.clock.advance(2000);
+  expect(readsOfBound()).toBeGreaterThan(before);
+  release();
+  await pressing;
+  await w.clock.settle();
+
+  expect(await ui.find({ type: "Text", text: "Another plan" })).toBeDefined();
+  expect(await ui.find({ type: "Text", text: TITLE })).toBeUndefined();
+  await ui.unmount();
+});
+
 test("the Evidence and Notepad tabs load again after the session state is reset", async ($, on) => {
   const atoms = resettableState(on);
   const w = world(on, FILES);

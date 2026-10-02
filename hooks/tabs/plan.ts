@@ -135,14 +135,19 @@ function refocus(host: Host, key: string, isKeyboardLost = false): void {
   );
 }
 
-async function load(host: Host, path: string, keepPlace = false): Promise<void> {
+// The tick yields to any write that lands while it reads, so it never reverts what a person
+// just chose; a person's own load always lands.
+type Load = { keepPlace?: boolean; isTick?: boolean };
+
+async function load(host: Host, path: string, { keepPlace = false, isTick = false }: Load = {}): Promise<void> {
   const { value: previous, version } = await host.state.plan.get();
   const readAt = await host.clock.now();
   const isSame = keepPlace && previous?.path === path && loadedFrom !== "";
+  const written = (value: State["plan"]) => host.state.plan.set(value, isTick ? { ifVersion: version } : undefined);
   try {
     const { mtimeMs } = await host.fs.stat(path);
     const plan = parsePlan(await host.fs.read(path));
-    if (!(await host.state.plan.set({ path, ...plan, readAt }, { ifVersion: version })).isSet) return;
+    if (!(await written({ path, ...plan, readAt })).isSet) return;
     loadedFrom = `${path}:${mtimeMs}`;
     isCursorSet = true;
     if (!isSame) {
@@ -153,7 +158,7 @@ async function load(host: Host, path: string, keepPlace = false): Promise<void> 
     if (mode === "page" && page >= plan.pages.length) mode = "contents";
     cursor = keptCursor(plan, cursor);
   } catch (error) {
-    if (!(await host.state.plan.set({ path, error: reason(error), readAt }, { ifVersion: version })).isSet) return;
+    if (!(await written({ path, error: reason(error), readAt })).isSet) return;
     loadedFrom = `${path}:failed`;
     if (!isSame || mode === "page") mode = "contents";
   }
@@ -185,23 +190,23 @@ async function boundPath(host: Host): Promise<string | undefined> {
   }
 }
 
-async function showBound(host: Host): Promise<void> {
+async function showBound(host: Host, isTick = false): Promise<void> {
   const bound = await boundPath(host);
   if (bound === undefined) await listPlans(host);
-  else await load(host, bound);
+  else await load(host, bound, { isTick });
 }
 
 export async function sync(host: Host): Promise<void> {
   const plan = (await host.state.plan.get()).value;
   if (plan === undefined) {
-    if (mode !== "plans") await showBound(host);
+    if (mode !== "plans") await showBound(host, true);
     return;
   }
   const seen = await host.fs.stat(plan.path).then(
     ({ mtimeMs }) => `${plan.path}:${mtimeMs}`,
     () => `${plan.path}:failed`,
   );
-  if (seen !== loadedFrom) await load(host, plan.path, true);
+  if (seen !== loadedFrom) await load(host, plan.path, { keepPlace: true, isTick: true });
 }
 
 export const command: Subcommand = async (host, e, args) => {
@@ -401,7 +406,7 @@ function contentsView(host: Host, view: View, plan: Loaded): RenderElement[] {
 
 async function reload(host: Host): Promise<void> {
   const plan = (await host.state.plan.get()).value;
-  if (plan !== undefined) await load(host, plan.path, true);
+  if (plan !== undefined) await load(host, plan.path, { keepPlace: true });
   host.ui.invalidate();
 }
 

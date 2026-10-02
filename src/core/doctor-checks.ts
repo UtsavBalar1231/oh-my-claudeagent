@@ -26,7 +26,7 @@ export type Inputs = {
   hook: HookState;
   now: number;
   settings: Readonly<Record<string, unknown>>;
-  options: { showBand: boolean; guardMode: "dialog" | "deny"; raw: Readonly<Record<string, unknown>> };
+  options: { showBand: boolean; guardMode: "dialog" | "deny" };
   env: Env;
   userSettings: string | null;
 };
@@ -115,17 +115,8 @@ function astGrepCheck(found: Inputs["astGrep"]): Check {
     : check("ast-grep", "ast-grep", "ok", `${found.name} ${found.version} is on PATH`);
 }
 
-function optionsCheck({ showBand, guardMode, raw }: Inputs["options"]): Check {
-  if (raw["showBand"] !== undefined && typeof raw["showBand"] !== "boolean") {
-    return check("options", "Options", "warn", `showBand ${JSON.stringify(raw["showBand"])} is not true or false; on applies`);
-  }
-  if (raw["guardMode"] !== undefined && raw["guardMode"] !== "dialog" && raw["guardMode"] !== "deny") {
-    return check("options", "Options", "warn", `guardMode ${JSON.stringify(raw["guardMode"])} is not dialog or deny; dialog applies`);
-  }
-  const effective = `showBand ${showBand ? "on" : "off"}, guardMode ${guardMode}`;
-  return raw["showBand"] === undefined && raw["guardMode"] === undefined
-    ? check("options", "Options", "info", `Neither option is set, so the defaults apply: ${effective}`)
-    : check("options", "Options", "ok", effective);
+function optionsCheck({ showBand, guardMode }: Inputs["options"]): Check {
+  return check("options", "Options", "ok", `showBand ${showBand ? "on" : "off"}, guardMode ${guardMode}`);
 }
 
 function modelForceCheck(env: Env): Check {
