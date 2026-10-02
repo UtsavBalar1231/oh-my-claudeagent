@@ -182,18 +182,6 @@ _run_fixture() {
 	_run_fixture "package-plugin" "dry-run"
 }
 
-@test "golden: permission-filter/allow-npm" {
-	_run_fixture "permission-filter" "allow-npm"
-}
-
-@test "golden: permission-filter/deny-rm-rf" {
-	_run_fixture "permission-filter" "deny-rm-rf"
-}
-
-@test "golden: permission-filter/allow-jq" {
-	_run_fixture "permission-filter" "allow-jq"
-}
-
 @test "golden: post-compact-inject/no-context-file" {
 	_run_fixture "post-compact-inject" "no-context-file"
 }

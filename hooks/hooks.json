@@ -86,16 +86,6 @@
           {
             "type": "command",
             "shell": "bash",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh\""
-          },
-          {
-            "type": "command",
-            "shell": "bash",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/git-destructive-deny.sh\""
-          },
-          {
-            "type": "command",
-            "shell": "bash",
             "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/executor-grep-deny.sh\""
           }
         ]
@@ -157,62 +147,20 @@
           {
             "type": "command",
             "shell": "bash",
-            "if": "Bash(*rm *)",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh\""
-          },
-          {
-            "type": "command",
-            "shell": "bash",
-            "if": "Bash(npm *)",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh\""
-          },
-          {
-            "type": "command",
-            "shell": "bash",
-            "if": "Bash(jq *)",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh\""
-          },
-          {
-            "type": "command",
-            "shell": "bash",
-            "if": "Bash(uv *)",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh\""
-          },
-          {
-            "type": "command",
-            "shell": "bash",
-            "if": "Bash(*sudo *)",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh\""
-          },
-          {
-            "type": "command",
-            "shell": "bash",
-            "if": "Bash(bun *)",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh\""
-          },
-          {
-            "type": "command",
-            "shell": "bash",
-            "if": "Bash(yarn *)",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh\""
-          },
-          {
-            "type": "command",
-            "shell": "bash",
-            "if": "Bash(pnpm *)",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/permission-filter.sh\""
-          },
-          {
-            "type": "command",
-            "shell": "bash",
-            "if": "Bash(git *)",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/git-destructive-deny.sh\""
-          },
-          {
-            "type": "command",
-            "shell": "bash",
             "if": "Bash(grep *)",
             "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/executor-grep-deny.sh\""
+          },
+          {
+            "type": "mcp_tool",
+            "server": "plugin:oh-my-claudeagent:omca-hooks",
+            "tool": "omca_hook",
+            "timeout": 10,
+            "input": {
+              "event": "PermissionRequest",
+              "session_id": "${session_id}",
+              "tool_name": "${tool_name}",
+              "tool_input": "${tool_input}"
+            }
           }
         ]
       }

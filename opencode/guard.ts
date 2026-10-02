@@ -1,6 +1,7 @@
 import { existsSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { basename, join, resolve } from "node:path"
+import { classify, enabledFindings, reasonFor } from "../src/core/destructive.ts"
 
 export type GuardResult = { deny: true; reason: string } | { deny: false }
 
@@ -63,17 +64,18 @@ export async function runGuard(
 
 const script = (root: string, name: string) => join(root, "scripts", `${name}.sh`)
 
-export async function checkShell(
-  root: string,
-  command: string,
-  opts: { cwd: string; projectRoot: string },
-): Promise<GuardResult> {
-  const payload = { tool_name: "Bash", hook_event_name: "PreToolUse", tool_input: { command } }
-  for (const name of ["permission-filter", "git-destructive-deny"]) {
-    const result = await runGuard(script(root, name), payload, opts)
-    if (result.deny) return result
-  }
-  return ALLOW
+// OpenCode has no dialog to hold a command in, so it decides as `guardMode: deny` does: what
+// 2.21.0 denied is denied, and a review-only match runs.
+export function checkShell(command: string): GuardResult {
+  const found = classify(command)
+  const finding =
+    found === undefined || found.kind === "catastrophic"
+      ? found
+      : enabledFindings(found, {
+          disabledHooks: process.env.OMCA_DISABLED_HOOKS,
+          gitOptOut: process.env.OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY,
+        })
+  return finding === undefined || finding.kind === "review-only" ? ALLOW : { deny: true, reason: reasonFor(finding) }
 }
 
 type EditPayload = { tool_name: string; hook_event_name: "PreToolUse"; tool_input: Record<string, unknown> }
@@ -132,10 +134,7 @@ export async function checkEdit(
 export async function guardSelfTest(root: string): Promise<string[]> {
   const tmp = mkdtempSync(join(tmpdir(), "omca-"))
   const opts = { cwd: tmp, projectRoot: tmp }
-  const shell = (command: string) => ({ tool_name: "Bash", hook_event_name: "PreToolUse", tool_input: { command } })
   const cases: [string, unknown][] = [
-    ["permission-filter", shell("rm -rf /")],
-    ["git-destructive-deny", shell("git reset --hard HEAD~1")],
     [
       "write-guard",
       {

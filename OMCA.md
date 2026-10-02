@@ -400,7 +400,7 @@ The deny hooks are a separate family with their own shapes. `PreToolUse` accepts
 stderr text plus exit 2 or a `hookSpecificOutput.permissionDecision: "deny"` payload with
 exit 0; `PermissionRequest` reads `hookSpecificOutput.decision.behavior`. Every guard
 registered on both events branches on `hook_event_name` and writes the shape that event
-reads: `permission-filter.sh`, `git-destructive-deny.sh`, and `executor-grep-deny.sh`. Exit 2 does not deny on `PermissionRequest`: the per-event table
+reads, as `executor-grep-deny.sh` does. Exit 2 does not deny on `PermissionRequest`: the per-event table
 in `claude-code-docs/docs/hooks.md` gives that event a blocking column of "No", the
 permission flow proceeds unchanged, and the stderr is discarded. Deny through the
 `decision` object instead. That makes the branch required rather than a hedge, since the
@@ -1298,37 +1298,35 @@ Important keys:
 
 Keep `teammateMode: "auto"` as the default collaboration baseline unless your org policy overrides it.
 
-`scripts/permission-filter.sh` does not auto-allow arbitrary commands — it only auto-approves
-known-safe package managers (npm, yarn, pnpm, bun), jq, and uv run/sync, and blocks a
-recursive removal whose target is the root, home, the working directory, or a directory
-directly under root or home. A command containing a command separator, a redirect, or a
-command substitution takes neither branch: it falls through to the platform decision, because
-hook `if:` matching is per-subcommand and the filter only ever saw the first one. A carriage
-return is matched alongside those, as hardening for shells that terminate a statement on a
-bare CR, which bash does not. Globs, tilde, and `$VAR` expansion still take the fast path,
-since none of them can introduce a second command. Auto mode now absorbs the dangerous-`rm` dialog itself, so
-the deny branch is no longer backed by a platform prompt and must not be deleted as
-duplicated behavior.
+OMCA's trusted-tooling fast path does not auto-allow arbitrary commands. The server's
+`PermissionRequest` handler (`servers/hooks/trusted-tooling.ts`) allows only the package
+managers' safe subcommands (npm, yarn, pnpm and bun `run`, `test`, `ci`, `list` and `view`),
+`jq` without `--rawfile`, and `uv run` and `uv sync`. A command containing a command separator,
+a redirect, or a command substitution is never allowed, because the handler inspects only the
+leading command. A carriage return is matched alongside those, as hardening for shells that
+terminate a statement on a bare CR, which bash does not. Globs, tilde, and `$VAR` expansion
+still take the fast path, since none of them can introduce a second command.
 
-The two branches are registered on two different events, and the difference is load-bearing.
-`PermissionRequest` fires only when a permission dialog is about to be shown, while
-`PreToolUse` fires before tool execution regardless of permission status
-(`claude-code-docs/docs/hooks.md`, PermissionRequest input). A deny registered only on
-`PermissionRequest` is therefore inert for every command that never produces a dialog, and
-under `permissions.defaultMode: "auto"` the classifier resolves most shell commands without
-one, so "no dialog" is the normal path rather than an edge case. The `rm -rf` deny is now
-registered on `PreToolUse` as well, with matcher `Bash` and no `if` filter. The
-trusted-tooling fast path stays on `PermissionRequest` alone.
+The destructive-command guard lives in the mod, on `tool.check` for Bash
+(`hooks/bash-guard.ts`, with its patterns in `src/core/destructive.ts`). A recursive removal
+whose target is the root, home, the working directory, or a directory directly under root or
+home is denied outright. The destructive git family (hard reset, stash, clean, restore,
+recursive `git rm`, path checkout), any other recursive removal, and a force push are held in a
+confirmation dialog that lists what they would touch. "Run it" hands the call back to the
+normal permission evaluation; any other answer, a dismissed dialog, or a failed one denies.
+Where no dialog can show (`claude -p`), or with the `guardMode` option set to `deny`, the guard
+decides exactly as 2.21.0 did: the git family is denied, and a recursive removal of a deeper
+path or a force push runs. Auto mode now absorbs the dangerous-`rm` dialog itself, so the guard is not backed by a
+platform prompt and must not be deleted as duplicated behavior.
 
-Do not consolidate the two. On `PreToolUse`, `permissionDecision: "allow"` skips the
-permission prompt, so the auto-mode classifier and any interactive confirmation never run for
-that command; only explicit `deny` and `ask` rules from settings still evaluate. Moving the
-fast path to `PreToolUse` to have one registration instead of two would turn an auto-allow
-covering six known tools into a silent bypass of the operator's whole permission posture for
-those commands, which is a larger hole than the inert deny the split exists to fix. Both
-`permission-filter.sh` and `git-destructive-deny.sh` carry an early `exit 0` on
-`hook_event_name == PreToolUse`, placed after the deny and before the first allow, to hold
-that line.
+The two halves sit on different events, and the difference is load-bearing. `tool.check` runs
+before every Bash call in every permission mode, so the guard never depends on a dialog being
+shown, and it never returns `allow`, which would skip the auto-mode classifier.
+`PermissionRequest` fires only when a permission dialog is about to be shown, so the fast path
+there can only remove a prompt the user would otherwise see. Do not move the fast path
+anywhere earlier: an allow ahead of the permission evaluation would turn a convenience covering
+six known tools into a silent bypass of the operator's whole permission posture for those
+commands.
 
 Protected paths sit outside all of this: writes under `.claude/**` are never auto-approved,
 and the protected-path check runs before allow rules entirely, so an

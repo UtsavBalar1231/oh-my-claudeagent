@@ -1,0 +1,418 @@
+import type { On, ProcessRunResult } from "claude-code";
+import { expect, test, type Engine } from "claude-code/testing";
+
+const ENGINE = { decision: "ask", reason: "Bash(rm:*) asks", rule: "Bash(rm:*)" } as const;
+const RM_CATASTROPHIC =
+  "Destructive rm -rf blocked: the target is the filesystem root, home, the working directory, or a directory directly under root or home. Name a deeper path explicitly.";
+const REFUSED = "The user refused this command in OMCA's review. Do not retry it; ask the user how to proceed.";
+const GIT =
+  "Destructive git command blocked. If working tree is dirty, REPORT and STOP — never modify history. Set OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY=1 to override for testing.";
+
+type Node = { kind: "file" | "dir" | "other"; entries?: number; isLink?: boolean };
+type World = {
+  env?: Record<string, string>;
+  surfaces?: ("terminal" | "desktop")[];
+  files?: Record<string, Node>;
+  git?: Record<string, Partial<ProcessRunResult>>;
+  answer?: string;
+  failExists?: string;
+};
+type Question = { question: string; header: string; options: { label: string }[] };
+
+function world(on: On, w: World = {}) {
+  const asked: { question: string; header: string; options: string[] }[] = [];
+  const checked: unknown[] = [];
+  const env: Record<string, string> = { HOME: "/home/u", ...w.env };
+  const files = w.files ?? {};
+  // The engine resolves a relative path against the session's folder before the hook sees it.
+  const nodeAt = (path: string) =>
+    Object.entries(files).find(([name]) => path === name || path.endsWith(`/${name}`))?.[1];
+  on("ui.log", () => ({ value: undefined }));
+  on("env.get", (_$, e) => ({ value: env[e.name] }));
+  on("session.surfaces", () => ({ value: w.surfaces ?? ["terminal"] }));
+  on("fs.exists", (_$, e) => {
+    if (w.failExists !== undefined && e.path.endsWith(`/${w.failExists}`)) {
+      return { deny: `EACCES: permission denied, access '${w.failExists}'` };
+    }
+    return { value: nodeAt(e.path) !== undefined };
+  });
+  on("fs.stat", (_$, e) => {
+    const node = nodeAt(e.path);
+    if (node === undefined) throw new Error(`ENOENT: ${e.path}`);
+    return { value: { kind: node.kind, size: 0, mtimeMs: 0, isLink: node.isLink ?? false } };
+  });
+  on("fs.list", (_$, e) => ({
+    value: Array.from({ length: nodeAt(e.path)?.entries ?? 0 }, (_, i) => ({
+      name: `e${i}`,
+      kind: "file" as const,
+      size: 0,
+      mtimeMs: 0,
+      isLink: false,
+    })),
+  }));
+  on("process.run", (_$, e) => {
+    const result = w.git?.[e.argv.join(" ")];
+    if (result === undefined) throw new Error(`unexpected process.run ${e.argv.join(" ")}`);
+    return {
+      value: { exitCode: 0, stdout: "", stderr: "", isStdoutTruncated: false, isStderrTruncated: false, ...result },
+    };
+  });
+  on("tool.call", { tool: "AskUserQuestion" }, (_$, e) => {
+    const [q] = (e as unknown as { questions: Question[] }).questions;
+    if (q === undefined) throw new Error("no question");
+    asked.push({ question: q.question, header: q.header, options: q.options.map((o) => o.label) });
+    if (w.answer === "fail") throw new Error("the dialog failed");
+    if (w.answer === "dismiss") return { deny: "The user doesn't want to proceed with this tool use." };
+    return { result: { questions: [], answers: { [q.question]: w.answer ?? "Refuse" } } };
+  });
+  on("tool.check", (_$, e) => (checked.push(e), ENGINE));
+  return { asked, checked };
+}
+
+const check = ($: Engine, command: string) => $.tool.check({ tool: "Bash", input: { command } });
+
+const BUILD_WORLD: World = {
+  files: {
+    build: { kind: "dir", entries: 4 },
+    "notes.txt": { kind: "file" },
+    "/home/u/.cache/omca": { kind: "dir", isLink: true },
+  },
+};
+const BUILD_COMMAND = "rm -rf build notes.txt ghost ~/.cache/omca *.o";
+const BUILD_QUESTION = [
+  "OMCA held this command for your review:",
+  "  rm -rf build notes.txt ghost ~/.cache/omca *.o",
+  "It would remove:",
+  "  build          dir, 4 entries",
+  "  notes.txt      file",
+  "  ghost          not found",
+  "  ~/.cache/omca  link",
+  "  *.o            not expanded",
+  "Run it?",
+].join("\n");
+const LONG_PATH = `src/${"deep/".repeat(14)}leaf.txt`;
+
+test("golden: permission-filter/deny-rm-rf", async ($, on) => {
+  const { asked, checked } = world(on);
+
+  expect(await check($, "rm -rf ~")).toEqual({ decision: "deny", reason: RM_CATASTROPHIC });
+  expect(asked).toEqual([]);
+  expect(checked).toEqual([]);
+});
+
+test("a catastrophic removal is denied with no dialog, even with every kill switch set", async ($, on) => {
+  const { asked, checked } = world(on, {
+    env: { OMCA_DISABLED_HOOKS: "all", OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY: "1" },
+  });
+
+  expect(await check($, "cd /x && sudo rm -rf /usr")).toEqual({ decision: "deny", reason: RM_CATASTROPHIC });
+  expect(asked).toEqual([]);
+  expect(checked).toEqual([]);
+});
+
+test("a reviewable removal asks with every target's kind and entry count, Refuse first", async ($, on) => {
+  const { asked, checked } = world(on, BUILD_WORLD);
+
+  expect(await check($, BUILD_COMMAND)).toEqual({ decision: "deny", reason: REFUSED });
+  expect(asked).toEqual([{ question: BUILD_QUESTION, header: "OMCA guard", options: ["Refuse", "Run it"] }]);
+  expect(checked).toEqual([]);
+});
+
+test("Run it passes the call to the engine and returns its decision unchanged", async ($, on) => {
+  const { asked, checked } = world(on, { ...BUILD_WORLD, answer: "Run it" });
+
+  expect(await check($, BUILD_COMMAND)).toEqual(ENGINE);
+  expect(asked.map((a) => a.question)).toEqual([BUILD_QUESTION]);
+  expect(checked).toEqual([{ tool: "Bash", input: { command: BUILD_COMMAND } }]);
+});
+
+test("a Run it is never reused: the same command asks again on its next call", async ($, on) => {
+  const { asked, checked } = world(on, { ...BUILD_WORLD, answer: "Run it" });
+
+  await check($, BUILD_COMMAND);
+  await check($, BUILD_COMMAND);
+
+  expect(asked).toHaveLength(2);
+  expect(checked).toHaveLength(2);
+});
+
+test("a dismissed dialog denies", async ($, on) => {
+  const { asked, checked } = world(on, { ...BUILD_WORLD, answer: "dismiss" });
+
+  expect(await check($, BUILD_COMMAND)).toEqual({ decision: "deny", reason: REFUSED });
+  expect(asked).toHaveLength(1);
+  expect(checked).toEqual([]);
+});
+
+test("a dialog that fails denies", async ($, on) => {
+  const { asked, checked } = world(on, { ...BUILD_WORLD, answer: "fail" });
+
+  expect(await check($, BUILD_COMMAND)).toEqual({ decision: "deny", reason: REFUSED });
+  expect(asked).toHaveLength(1);
+  expect(checked).toEqual([]);
+});
+
+test("an answer typed under Other denies", async ($, on) => {
+  const { checked } = world(on, { ...BUILD_WORLD, answer: "run it please" });
+
+  expect(await check($, BUILD_COMMAND)).toEqual({ decision: "deny", reason: REFUSED });
+  expect(checked).toEqual([]);
+});
+
+test("with no surface to draw on, nothing asks: legacy-deny denies and review-only runs as in 2.21.0", async ($, on) => {
+  const { asked, checked } = world(on, { ...BUILD_WORLD, surfaces: [] });
+
+  expect(await check($, "rm -rf build")).toEqual(ENGINE);
+  expect(await check($, "git push --force origin main")).toEqual(ENGINE);
+  expect(await check($, "git reset --hard")).toEqual({ decision: "deny", reason: GIT });
+  expect(await check($, "rm -rf build; git stash")).toEqual({ decision: "deny", reason: GIT });
+  expect(asked).toEqual([]);
+  expect(checked).toEqual([
+    { tool: "Bash", input: { command: "rm -rf build" } },
+    { tool: "Bash", input: { command: "git push --force origin main" } },
+  ]);
+});
+
+test("guardMode deny decides exactly as 2.21.0 did, without asking", { options: { guardMode: "deny" } }, async ($, on) => {
+  const { asked, checked } = world(on, BUILD_WORLD);
+
+  expect(await check($, "rm -rf build")).toEqual(ENGINE);
+  expect(await check($, "git push --force origin main")).toEqual(ENGINE);
+  expect(await check($, "rm -rf build; git stash")).toEqual({ decision: "deny", reason: GIT });
+  expect(await check($, "rm -rf ~")).toEqual({ decision: "deny", reason: RM_CATASTROPHIC });
+  expect(asked).toEqual([]);
+  expect(checked).toHaveLength(2);
+});
+
+test("a gatherer that throws still asks, with a one-line reason in place of the targets", async ($, on) => {
+  const { asked } = world(on, { ...BUILD_WORLD, failExists: "notes.txt" });
+
+  expect(await check($, "rm -rf build notes.txt")).toEqual({ decision: "deny", reason: REFUSED });
+  expect(asked.map((a) => a.question)).toEqual([
+    [
+      "OMCA held this command for your review:",
+      "  rm -rf build notes.txt",
+      "! Could not check what it would touch: EACCES: permission denied, access 'not…",
+      "Run it?",
+    ].join("\n"),
+  ]);
+});
+
+test("a hard reset shows its tracked change count and the diff stat", async ($, on) => {
+  const { asked } = world(on, {
+    git: {
+      "git status --porcelain": { stdout: " M src/a.ts\nM  src/b.ts\n?? scratch.txt\n" },
+      "git diff --stat=76 HEAD": {
+        stdout: " src/a.ts | 4 ++--\n src/b.ts | 1 +\n 2 files changed, 3 insertions(+), 2 deletions(-)\n",
+      },
+    },
+  });
+
+  expect(await check($, "git reset --hard")).toEqual({ decision: "deny", reason: GIT });
+  expect(asked.map((a) => a.question)).toEqual([
+    [
+      "OMCA held this command for your review:",
+      "  git reset --hard",
+      "git reset --hard discards 2 uncommitted changes:",
+      "   src/a.ts | 4 ++--",
+      "   src/b.ts | 1 +",
+      "   2 files changed, 3 insertions(+), 2 deletions(-)",
+      "Run it?",
+    ].join("\n"),
+  ]);
+});
+
+test("a hard reset outside a repository asks with git's first error line", async ($, on) => {
+  const { asked } = world(on, {
+    git: { "git status --porcelain": { exitCode: 128, stderr: "fatal: not a git repository: .git\nmore\n" } },
+  });
+
+  await check($, "git reset --hard");
+
+  expect(asked.map((a) => a.question)).toEqual([
+    [
+      "OMCA held this command for your review:",
+      "  git reset --hard",
+      "! Could not check what it would touch: fatal: not a git repository: .git",
+      "Run it?",
+    ].join("\n"),
+  ]);
+});
+
+test("a force push lists the commits it drops, capped at 20 with a count of the rest", async ($, on) => {
+  const commits = Array.from({ length: 22 }, (_, i) => `c${String(i).padStart(6, "0")} commit ${i}`);
+  const { asked } = world(on, {
+    git: { "git log --oneline origin/main --not HEAD": { stdout: `${commits.join("\n")}\n` } },
+  });
+
+  expect(await check($, "git push --force origin main")).toEqual({ decision: "deny", reason: REFUSED });
+  expect(asked.map((a) => a.question)).toEqual([
+    [
+      "OMCA held this command for your review:",
+      "  git push --force origin main",
+      "git push --force drops 22 commits from origin/main:",
+      ...commits.slice(0, 20).map((line) => `  ${line}`),
+      "  and 2 more commits",
+      "Run it?",
+    ].join("\n"),
+  ]);
+});
+
+test("a force push with no remote named compares against the push target", async ($, on) => {
+  const { asked } = world(on, { git: { "git log --oneline @{push} --not HEAD": { stdout: "" } } });
+
+  await check($, "git push -f");
+
+  expect(asked.map((a) => a.question)).toEqual([
+    [
+      "OMCA held this command for your review:",
+      "  git push -f",
+      "git push --force: @{push} has no commits missing from HEAD.",
+      "Run it?",
+    ].join("\n"),
+  ]);
+});
+
+test("a git operation with nothing to gather names its effect", async ($, on) => {
+  const { asked } = world(on);
+
+  await check($, "git clean -fdx");
+
+  expect(asked.map((a) => a.question)).toEqual([
+    ["OMCA held this command for your review:", "  git clean -fdx", "git clean deletes untracked files.", "Run it?"].join(
+      "\n",
+    ),
+  ]);
+});
+
+test("more than 20 targets list the first 20 and count the rest", async ($, on) => {
+  const targets = Array.from({ length: 23 }, (_, i) => `t${String(i).padStart(2, "0")}`);
+  const { asked } = world(on, { files: Object.fromEntries(targets.map((t) => [t, { kind: "file" as const }])) });
+
+  await check($, `rm -rf ${targets.join(" ")}`);
+
+  const lines = asked[0]?.question.split("\n") ?? [];
+  expect(lines.slice(3, 5)).toEqual(["  t00  file", "  t01  file"]);
+  expect(lines.slice(22)).toEqual(["  t19  file", "  and 3 more", "Run it?"]);
+  expect(lines).toHaveLength(25);
+});
+
+test("a long path is middle-truncated to the dialog width, with an ASCII ellipsis under OMCA_ASCII", async ($, on) => {
+  const { asked } = world(on, { env: { OMCA_ASCII: "1" }, files: { [LONG_PATH]: { kind: "file" } } });
+
+  await check($, `rm -r ${LONG_PATH}`);
+
+  expect(asked[0]?.question.split("\n").slice(1, 4)).toEqual([
+    "  rm -r src/deep/deep/deep/deep/deep/deep/deep/deep/deep/deep/deep/deep/dee...",
+    "It would remove:",
+    "  src/deep/deep/deep/deep/deep/deep/...deep/deep/deep/deep/deep/leaf.txt  file",
+  ]);
+});
+
+test("a long path uses the Unicode ellipsis by default", async ($, on) => {
+  const { asked } = world(on, { files: { [LONG_PATH]: { kind: "file" } } });
+
+  await check($, `rm -r ${LONG_PATH}`);
+
+  expect(asked[0]?.question.split("\n").slice(1, 4)).toEqual([
+    "  rm -r src/deep/deep/deep/deep/deep/deep/deep/deep/deep/deep/deep/deep/deep/…",
+    "It would remove:",
+    "  src/deep/deep/deep/deep/deep/deep/d…/deep/deep/deep/deep/deep/leaf.txt  file",
+  ]);
+});
+
+test("a quoted mention of a destructive command passes through untouched", async ($, on) => {
+  const { asked, checked } = world(on);
+
+  expect(await check($, 'echo "rm -rf /"')).toEqual(ENGINE);
+  expect(await check($, 'git commit -m "drop git reset --hard"')).toEqual(ENGINE);
+  expect(asked).toEqual([]);
+  expect(checked).toHaveLength(2);
+});
+
+test("permission-filter: jq gets no allow on PreToolUse", async ($, on) => {
+  world(on);
+  expect(await check($, "jq . file.json")).toEqual(ENGINE);
+});
+
+test("permission-filter: npm run gets no allow on PreToolUse", async ($, on) => {
+  world(on);
+  expect(await check($, "npm run build")).toEqual(ENGINE);
+});
+
+test("permission-filter: uv run gets no allow on PreToolUse", async ($, on) => {
+  world(on);
+  expect(await check($, "uv run pytest")).toEqual(ENGINE);
+});
+
+test("git-destructive-deny: git status gets no allow on PreToolUse", async ($, on) => {
+  world(on);
+  expect(await check($, "git status")).toEqual(ENGINE);
+});
+
+test("git-destructive-deny: no non-deny path emits behavior allow", async ($, on) => {
+  world(on, { answer: "Run it", git: { "git log --oneline @{push} --not HEAD": { stdout: "" } } });
+  const commands = ["git status", "git log", "git config --local core.hooksPath /tmp/evil", "git push --force", "git fetch"];
+
+  for (const command of commands) expect(await check($, command)).toEqual(ENGINE);
+});
+
+test("git-destructive-deny: opt-out via OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY=1 allows reset --hard", async ($, on) => {
+  const { asked } = world(on, { env: { OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY: "1" } });
+
+  expect(await check($, "git reset --hard")).toEqual(ENGINE);
+  expect(await check($, "git push -f")).toEqual(ENGINE);
+  expect(asked).toEqual([]);
+});
+
+test("the git opt-out takes only the value 1", async ($, on) => {
+  world(on, { surfaces: [], env: { OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY: "true" } });
+
+  expect(await check($, "git reset --hard")).toEqual({ decision: "deny", reason: GIT });
+});
+
+test("git-destructive-deny: OMCA_DISABLED_HOOKS listing this hook allows reset --hard", async ($, on) => {
+  const { asked } = world(on, { env: { OMCA_DISABLED_HOOKS: "drift-guard,git-destructive-deny" } });
+
+  expect(await check($, "git reset --hard")).toEqual(ENGINE);
+  expect(asked).toEqual([]);
+});
+
+test("git-destructive-deny: OMCA_DISABLED_HOOKS listing a different hook still denies reset --hard", async ($, on) => {
+  world(on, { surfaces: [], env: { OMCA_DISABLED_HOOKS: "other-hook" } });
+
+  expect(await check($, "git reset --hard")).toEqual({ decision: "deny", reason: GIT });
+});
+
+test("OMCA_DISABLED_HOOKS listing permission-filter stops the removal review, never the catastrophic deny", async ($, on) => {
+  const { asked } = world(on, { surfaces: [], env: { OMCA_DISABLED_HOOKS: "permission-filter" } });
+
+  expect(await check($, "rm -rf build")).toEqual(ENGINE);
+  expect(await check($, "rm -rf build; git stash")).toEqual({ decision: "deny", reason: GIT });
+  expect(await check($, "rm -rf /")).toEqual({ decision: "deny", reason: RM_CATASTROPHIC });
+  expect(asked).toEqual([]);
+});
+
+const silentWithoutDialog = async ($: Engine, on: On, command: string) => {
+  const { asked, checked } = world(on, { surfaces: [] });
+  expect(await check($, command)).toEqual(ENGINE);
+  expect(asked).toEqual([]);
+  expect(checked).toEqual([{ tool: "Bash", input: { command } }]);
+};
+
+test("permission-filter: rm -rf of a nested temp path is silent on PreToolUse", ($, on) =>
+  silentWithoutDialog($, on, "rm -rf /tmp/omca-canary"));
+
+test("permission-filter: a loop cleaning a pid-suffixed scratch dir is silent", ($, on) =>
+  silentWithoutDialog(
+    $,
+    on,
+    'for d in a b; do mkdir -p /tmp/x$$; dpkg-deb -x $d/p.deb /tmp/x$$; md5sum $(find /tmp/x$$ -name "*.so"); rm -rf /tmp/x$$; done',
+  ));
+
+test("permission-filter: rm -rf of a relative build dir is silent", ($, on) =>
+  silentWithoutDialog($, on, "cd /x && rm -rf build dist/out"));
+
+test("permission-filter: rm -rf two levels under home is silent", ($, on) => silentWithoutDialog($, on, "rm -rf ~/.cache/foo"));
+
+test("permission-filter: a deeper variable-led path is silent", ($, on) => silentWithoutDialog($, on, "rm -rf $DIR/build/out"));

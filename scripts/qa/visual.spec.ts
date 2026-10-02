@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { copyFixture, parseView } from "./visual.ts";
+import { copyFixture, parseView, withoutBlink } from "./visual.ts";
 
 const VISUAL = join(import.meta.dir, "visual.ts");
 const temps: string[] = [];
@@ -97,3 +97,12 @@ test.skipIf(Bun.which("tmux") === null || Bun.which("claude") === null)(
   },
   120_000,
 );
+
+test("withoutBlink masks only a bullet that leads its line, so both blink phases compare equal", () => {
+  const lit = "❯ Clean the build\n\n● Removing the build output\n  ⎿  $ rm -rf build\n│ ● not a pending tool";
+  const dark = "❯ Clean the build\n\n  Removing the build output\n  ⎿  $ rm -rf build\n│ ● not a pending tool";
+
+  expect(withoutBlink(lit)).toBe(withoutBlink(dark));
+  expect(withoutBlink(lit)).toBe(dark);
+  expect(withoutBlink("● Removing the build output")).not.toBe(withoutBlink("● Removed the build output"));
+});

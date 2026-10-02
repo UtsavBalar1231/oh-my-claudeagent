@@ -1,6 +1,6 @@
 import type { Agent, Mcp, Plugin, Skill } from "@opencode/plugin"
 import type { CommandInvocation } from "@opencode/plugin/promise/command"
-import { dirname, join, resolve } from "node:path"
+import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { checkEdit, checkShell, guardSelfTest, type GuardResult } from "./guard.ts"
 import { generate, parseModelRef, type Prompts } from "./lib.ts"
@@ -181,7 +181,7 @@ async function setup(ctx: Context) {
   await register("shell guard hook", () =>
     ctx.shell.hook(
       "create.before",
-      guarded("shell guard", async (event) => enforce(await checkShell(root, event.command, { cwd: event.cwd, projectRoot }))),
+      guarded("shell guard", async (event) => enforce(checkShell(event.command))),
     ),
   )
 
@@ -191,8 +191,7 @@ async function setup(ctx: Context) {
       guarded("tool guard", async (event) => {
         const input = (event.input ?? {}) as Record<string, unknown>
         if (event.tool === "shell") {
-          const workdir = typeof input.workdir === "string" ? input.workdir : "."
-          enforce(await checkShell(root, String(input.command ?? ""), { cwd: resolve(projectRoot, workdir), projectRoot }))
+          enforce(checkShell(String(input.command ?? "")))
         } else if (EDIT_TOOLS.includes(event.tool)) {
           enforce(await checkEdit(root, event.tool, input, projectRoot))
         }

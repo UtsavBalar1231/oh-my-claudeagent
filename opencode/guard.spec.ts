@@ -6,9 +6,17 @@ import { checkEdit, checkShell, guardSelfTest, runGuard } from "./guard.ts"
 
 const root = join(import.meta.dir, "..")
 
+const RM_CATASTROPHIC =
+  "Destructive rm -rf blocked: the target is the filesystem root, home, the working directory, or a directory directly under root or home. Name a deeper path explicitly."
+const GIT =
+  "Destructive git command blocked. If working tree is dirty, REPORT and STOP — never modify history. Set OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY=1 to override for testing."
+
 let tmp: string
 let errorSpy: ReturnType<typeof spyOn>
-const savedGate = process.env.OMCA_COMMENT_GATE
+const savedEnv = {
+  OMCA_COMMENT_GATE: process.env.OMCA_COMMENT_GATE,
+  OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY: process.env.OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY,
+}
 
 beforeEach(() => {
   tmp = mkdtempSync(join(tmpdir(), "omca-guard-"))
@@ -17,8 +25,10 @@ beforeEach(() => {
 
 afterEach(() => {
   errorSpy.mockRestore()
-  if (savedGate === undefined) delete process.env.OMCA_COMMENT_GATE
-  else process.env.OMCA_COMMENT_GATE = savedGate
+  for (const [name, value] of Object.entries(savedEnv)) {
+    if (value === undefined) delete process.env[name]
+    else process.env[name] = value
+  }
   rmSync(tmp, { recursive: true, force: true })
 })
 
@@ -31,28 +41,35 @@ function tempScript(body: string) {
 }
 
 describe("decisions", () => {
-  test("git-destructive-deny denies a hard reset", async () => {
-    const result = await checkShell(root, "git reset --hard HEAD~1", opts())
-    expect(result.deny).toBe(true)
-    if (result.deny) expect(result.reason).toContain("Destructive git command blocked")
-    expect(errorSpy).toHaveBeenCalledTimes(0)
+  test("a hard reset is denied with the git reason", () => {
+    expect(checkShell("git reset --hard HEAD~1")).toEqual({ deny: true, reason: GIT })
   })
 
-  test("git status is allowed", async () => {
-    expect(await checkShell(root, "git status", opts())).toEqual({ deny: false })
-    expect(errorSpy).toHaveBeenCalledTimes(0)
+  test("git status is allowed", () => {
+    expect(checkShell("git status")).toEqual({ deny: false })
   })
 
-  test("permission-filter denies a recursive removal of /home", async () => {
-    const result = await checkShell(root, "rm -rf /home", opts())
-    expect(result.deny).toBe(true)
-    if (result.deny) expect(result.reason).toContain("Destructive rm -rf blocked")
-    expect(errorSpy).toHaveBeenCalledTimes(0)
+  test("a recursive removal of /home is denied as catastrophic", () => {
+    expect(checkShell("rm -rf /home")).toEqual({ deny: true, reason: RM_CATASTROPHIC })
   })
 
-  test("a recursive removal of build is allowed", async () => {
-    expect(await checkShell(root, "rm -rf build", opts())).toEqual({ deny: false })
-    expect(errorSpy).toHaveBeenCalledTimes(0)
+  test("a review-only match runs as in 2.21.0, since there is no dialog to hold it in", () => {
+    expect(checkShell("rm -rf build")).toEqual({ deny: false })
+    expect(checkShell("git push --force origin main")).toEqual({ deny: false })
+  })
+
+  test("a legacy-deny match alongside a review-only one is denied with the git reason", () => {
+    expect(checkShell("rm -rf build && git stash")).toEqual({ deny: true, reason: GIT })
+  })
+
+  test("a quoted mention of a destructive command is allowed", () => {
+    expect(checkShell('git commit -m "stop using rm -rf / and git reset --hard"')).toEqual({ deny: false })
+  })
+
+  test("the git kill switch turns off the git deny, never the catastrophic one", () => {
+    process.env.OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY = "1"
+    expect(checkShell("git reset --hard")).toEqual({ deny: false })
+    expect(checkShell("rm -rf ~")).toEqual({ deny: true, reason: RM_CATASTROPHIC })
   })
 
   test("write-guard denies a write to the evidence ledger", async () => {

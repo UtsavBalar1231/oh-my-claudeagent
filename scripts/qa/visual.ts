@@ -43,6 +43,10 @@ const TRUST_UNSELECTED = /❯\s*No, exit/;
 
 export type View = { command: string; keys: string[]; mockScript: string | null; fixture: string | null };
 
+// While a tool call waits on a dialog, the engine blinks the bullet that leads its line, so two
+// captures of an unchanged screen differ there; the settle check compares them with it masked.
+export const withoutBlink = (screen: string): string => screen.replace(/^● /gm, "  ");
+
 const isName = (value: unknown): value is string => typeof value === "string" && /^[\w.-]+$/.test(value);
 
 export function parseView(text: string): View {
@@ -115,13 +119,15 @@ class Tmux {
   }
 
   async settle(before: string): Promise<string> {
-    await this.waitFor((screen) => screen !== before, CHANGE_TIMEOUT_MS, "a change").catch(() => before);
-    let last = this.screen();
+    const settled = withoutBlink(before);
+    await this.waitFor((screen) => withoutBlink(screen) !== settled, CHANGE_TIMEOUT_MS, "a change").catch(() => before);
+    let last = withoutBlink(this.screen());
     let stable = 0;
     return this.waitFor(
       (screen) => {
-        stable = screen === last ? stable + 1 : 0;
-        last = screen;
+        const masked = withoutBlink(screen);
+        stable = masked === last ? stable + 1 : 0;
+        last = masked;
         return stable >= STABLE_POLLS;
       },
       SETTLE_TIMEOUT_MS,

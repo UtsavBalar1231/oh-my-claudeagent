@@ -102,12 +102,12 @@ test("the module registers exactly the dispatchers, env reads and atoms of the c
 
 test("the Bash check passes the engine's verdict through once, unchanged", async ($, on) => {
   const seen: unknown[] = [];
-  on("tool.check", (_$, e) => (seen.push(e), { decision: "ask", reason: "Bash(rm:*) asks" }));
+  on("tool.check", (_$, e) => (seen.push(e), { decision: "ask", reason: "Bash(ls:*) asks" }));
 
-  const verdict = await $.tool.check({ tool: "Bash", input: { command: "rm -rf build" } });
+  const verdict = await $.tool.check({ tool: "Bash", input: { command: "ls build" } });
 
-  expect(verdict).toEqual({ decision: "ask", reason: "Bash(rm:*) asks" });
-  expect(seen).toEqual([{ tool: "Bash", input: { command: "rm -rf build" } }]);
+  expect(verdict).toEqual({ decision: "ask", reason: "Bash(ls:*) asks" });
+  expect(seen).toEqual([{ tool: "Bash", input: { command: "ls build" } }]);
 });
 
 test("a Bash check whose dispatcher fails is denied by the registration's catch", async ($) => {
