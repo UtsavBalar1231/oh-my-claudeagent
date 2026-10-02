@@ -46,9 +46,9 @@ const DOCK_CHROME_ROWS = 8;
 const INLINE_CHROME_ROWS = 4;
 const DATE = 10;
 const KEY_GAP = 3;
-// Esc hands the keyboard to the prompt after the close hook has answered, so the pane asks
-// for it back a beat later: at 0 ms the request was lost, at 100 ms it held (2.1.287, tmux).
-const KEYBOARD_BACK_MS = 150;
+// Esc hands the keyboard to the prompt even when the pane refuses to close, and how soon the
+// pane can take it back varies with load, so it asks at growing delays until it holds it.
+const REGAIN_DELAYS_MS = [0, 50, 150, 400] as const;
 
 let mode: Mode = "contents";
 let cursor = 0;
@@ -78,17 +78,56 @@ function keptCursor(plan: Pick<Loaded, "pages">, index: number): number {
   return listed.find((at) => at >= index) ?? listed.at(-1) ?? 0;
 }
 
+export type Keyboard = {
+  regain: () => Promise<void>;
+  isHeld: () => Promise<boolean>;
+  after: (ms: number, run: () => Promise<void>) => void;
+  log: (text: string) => void;
+};
+
+export function regainKeyboard(keyboard: Keyboard, then: () => Promise<void>): void {
+  const attempt = (index: number): void => {
+    const delay = REGAIN_DELAYS_MS[index];
+    if (delay === undefined) {
+      keyboard.log(`omca plan could not take the keyboard back after ${REGAIN_DELAYS_MS.length} attempts`);
+      return;
+    }
+    keyboard.after(delay, async () => {
+      try {
+        await keyboard.regain();
+        if (await keyboard.isHeld()) await then();
+        else attempt(index + 1);
+      } catch (error) {
+        keyboard.log(`omca plan could not take the keyboard back: ${reason(error)}`);
+      }
+    });
+  };
+  attempt(0);
+}
+
 function refocus(host: Host, key: string, isKeyboardLost = false): void {
-  host.clock.after(isKeyboardLost ? KEYBOARD_BACK_MS : 0, async () => {
+  const focusRow = async () => {
     try {
-      if (isKeyboardLost) await regainFocus(host);
       host.ui.invalidate();
       const { deny } = await host.ui.focus({ requestId: PANE, key });
       if (deny !== undefined) host.log(`omca plan could not refocus ${key}: ${deny}`);
     } catch (error) {
       host.log(`omca plan could not refocus ${key}: ${reason(error)}`);
     }
-  });
+  };
+  if (!isKeyboardLost) {
+    host.clock.after(0, focusRow);
+    return;
+  }
+  regainKeyboard(
+    {
+      regain: () => regainFocus(host),
+      isHeld: async () => (await host.ui.panes()).some((pane) => pane.id === PANE && pane.isFocused),
+      after: (ms, run) => void host.clock.after(ms, run),
+      log: host.log,
+    },
+    focusRow,
+  );
 }
 
 async function load(host: Host, path: string, keepPlace = false): Promise<void> {

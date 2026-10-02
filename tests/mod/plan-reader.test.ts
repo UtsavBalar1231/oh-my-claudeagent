@@ -1,4 +1,5 @@
 import { expect, test } from "claude-code/testing";
+import { type Keyboard, regainKeyboard } from "../../hooks/tabs/plan.ts";
 import { BOULDER, HOME, PLANS, pane, run, SESSION, world } from "./world.ts";
 
 const PLAN = [
@@ -97,4 +98,33 @@ test("an unreadable plan shows the reason instead of failing", async ($, on) => 
   expect(await ui.find({ type: "Text", text: "ENOENT: no such file, /home/u/.claude/plans/missing.md" })).toBeDefined();
   expect(await ui.find({ key: "l" })).toBeDefined();
   await ui.unmount();
+});
+
+// A test cannot raise the person's Esc, so the schedule runs against a keyboard of its own.
+async function keyboardHeldAfter(failures: number) {
+  const seen = { waits: [] as number[], regains: 0, refocused: 0, logs: [] as string[] };
+  const queue: (() => Promise<void>)[] = [];
+  const keyboard: Keyboard = {
+    regain: async () => void (seen.regains += 1),
+    isHeld: async () => seen.regains > failures,
+    after: (ms, run) => void (seen.waits.push(ms), queue.push(run)),
+    log: (text) => void seen.logs.push(text),
+  };
+  regainKeyboard(keyboard, async () => void (seen.refocused += 1));
+  for (let next = queue.shift(); next !== undefined; next = queue.shift()) await next();
+  return seen;
+}
+
+test("after Esc the pane asks for the keyboard back at growing delays and stops once it holds it", async () => {
+  expect(await keyboardHeldAfter(2)).toEqual({ waits: [0, 50, 150], regains: 3, refocused: 1, logs: [] });
+  expect(await keyboardHeldAfter(0)).toEqual({ waits: [0], regains: 1, refocused: 1, logs: [] });
+});
+
+test("a keyboard that never comes back is asked for four times and logged once", async () => {
+  expect(await keyboardHeldAfter(9)).toEqual({
+    waits: [0, 50, 150, 400],
+    regains: 4,
+    refocused: 0,
+    logs: ["omca plan could not take the keyboard back after 4 attempts"],
+  });
 });
