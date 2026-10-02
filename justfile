@@ -5,17 +5,6 @@ set shell := ["bash", "-euo", "pipefail", "-c"]
 default:
 	@just --list
 
-# ── Lint ─────────────────────────────────────────────────────────
-
-# Run all linters
-[group('lint')]
-lint: lint-shell
-
-# Lint shell scripts with shellcheck
-[group('lint')]
-lint-shell:
-	shellcheck scripts/*.sh
-
 # ── Test ──────────────────────────────────────────────────────────
 
 # Run the validation checks; the engine group skips without the claude CLI
@@ -39,7 +28,7 @@ test-mcp:
 	bun test servers
 	bun scripts/validate.ts --check mcp
 
-# Run the OpenCode adapter suite (typecheck, unit tests, smoke, model path); skips without bun or opencode
+# Run the OpenCode adapter suite (typecheck, then every spec, including the real-OpenCode smoke and model-path specs); skips without bun or opencode
 [group('test')]
 test-opencode:
 	#!/usr/bin/env bash
@@ -51,8 +40,6 @@ test-opencode:
 	bun install --frozen-lockfile
 	bun run typecheck
 	bun test opencode/
-	bash opencode/test/smoke.sh
-	bash opencode/test/model-path.sh
 
 # Run the mod tests (tests/mod/*.test.ts). The argument is the plugin root; a test
 # directory finds no hooks module.
@@ -126,23 +113,6 @@ new-agent name:
 	@echo "Created agents/{{name}}.md — update description, model, and disallowedTools"
 	@echo "Remember to update: servers/categories.json and the <agent_catalog> block in output-styles/omca-default.md"
 
-# Scaffold a new hook script
-[group('scaffold')]
-new-hook event script-name:
-	@echo '#!/usr/bin/env bash' > scripts/{{script-name}}.sh
-	@echo '# {{event}} hook: {{script-name}}' >> scripts/{{script-name}}.sh
-	@echo '' >> scripts/{{script-name}}.sh
-	@echo 'INPUT=$$(cat)' >> scripts/{{script-name}}.sh
-	@echo 'PROJECT_ROOT=$$(echo "$$INPUT" | jq -r '"'"'.project_root // ""'"'"' 2>/dev/null)' >> scripts/{{script-name}}.sh
-	@echo 'STATE_DIR="$${PROJECT_ROOT:-.}/.omca/state"' >> scripts/{{script-name}}.sh
-	@echo 'mkdir -p "$$STATE_DIR"' >> scripts/{{script-name}}.sh
-	@echo '' >> scripts/{{script-name}}.sh
-	@echo '# TODO: Add hook logic here' >> scripts/{{script-name}}.sh
-	@echo '' >> scripts/{{script-name}}.sh
-	@echo 'exit 0' >> scripts/{{script-name}}.sh
-	@chmod +x scripts/{{script-name}}.sh
-	@echo "Created scripts/{{script-name}}.sh — register in hooks/hooks.json under {{event}}"
-
 # ── Dev ───────────────────────────────────────────────────────────
 
 # Install dev tools and pre-commit hooks
@@ -167,7 +137,6 @@ doctor:
 	@which jq >/dev/null 2>&1 && echo "jq: $(jq --version)" || echo "jq: NOT FOUND (required)"
 	@which bun >/dev/null 2>&1 && echo "bun: $(bun --version)" || echo "bun: NOT FOUND (required)"
 	@which ast-grep >/dev/null 2>&1 && echo "ast-grep: $(ast-grep --version 2>&1 | head -1)" || (which sg >/dev/null 2>&1 && echo "ast-grep (sg): $(sg --version 2>&1 | head -1)" || echo "ast-grep: NOT FOUND (required)")
-	@which shellcheck >/dev/null 2>&1 && echo "shellcheck: $(shellcheck --version | grep version: | head -1)" || echo "shellcheck: NOT FOUND (recommended)"
 	@which pre-commit >/dev/null 2>&1 && echo "pre-commit: $(pre-commit --version)" || echo "pre-commit: NOT FOUND (recommended)"
 
 # Watch all OMCA log files in real-time
@@ -248,7 +217,7 @@ eval-consistency:
 	@echo "  pass^3  — passes on all 3 runs (strict consistency)"
 	@echo ""
 	@echo "Available tasks:"
-	@bash tests/evals/run-eval.sh
+	@bun scripts/qa/eval-tasks.ts
 	@echo ""
 	@echo "To run a task: claude -p \"\$$(jq -r '.prompt' tests/evals/tasks/<name>.json)\" --plugin-dir . | tee output.log"
 	@echo "Record results in tests/evals/results/<task>-trial-N.json"
@@ -260,9 +229,9 @@ test-all: test test-mcp test-bun
 
 # ── CI ────────────────────────────────────────────────────────────
 
-# Run full CI pipeline (lint + test + mcp + manifest + opencode + TypeScript checks)
+# Run full CI pipeline (test + mcp + manifest + opencode + TypeScript checks)
 [group('ci')]
-ci: lint test test-mcp validate-manifest test-opencode typecheck-ts test-mod test-bun validate-mod
+ci: test test-mcp validate-manifest test-opencode typecheck-ts test-mod test-bun validate-mod
 
 # ── Release ──────────────────────────────────────────────────────
 

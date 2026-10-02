@@ -6,8 +6,6 @@ import { checks, SHEBANG_ALLOWLIST, shebangScripts } from "./tree.ts";
 
 afterEach(cleanup);
 
-const ALLOWED = Object.fromEntries(Object.keys(SHEBANG_ALLOWLIST).map((path) => [path, "#!/usr/bin/env bash\necho ok\n"]));
-
 describe("core imports", () => {
   test.each([
     ['import { readFileSync } from "node:fs";', "named import"],
@@ -52,8 +50,8 @@ describe("test file location", () => {
 });
 
 describe("shebang scripts", () => {
-  test("the allowlisted scripts alone pass", async () => {
-    expect(await runNamed(checks, "shebang scripts", fixture(ALLOWED))).toMatchObject({ status: "pass" });
+  test("a tree without interpreter scripts passes", async () => {
+    expect(await runNamed(checks, "shebang scripts", fixture({ "scripts/tool.ts": "#!/usr/bin/env bun\n" }))).toMatchObject({ status: "pass" });
   });
 
   test.each([
@@ -66,7 +64,7 @@ describe("shebang scripts", () => {
     "#!/usr/bin/env -S python3 -u",
     "#! /bin/bash -e",
   ])("a new script with %p fails", async (shebang) => {
-    const ctx = fixture({ ...ALLOWED, "scripts/new-hook.sh": `${shebang}\nexit 0\n` });
+    const ctx = fixture({ "scripts/new-hook.sh": `${shebang}\nexit 0\n` });
     expect(await runNamed(checks, "shebang scripts", ctx)).toEqual({
       status: "fail",
       detail: "scripts/new-hook.sh has a python, bash or sh shebang",
@@ -76,31 +74,17 @@ describe("shebang scripts", () => {
   test.each(["#!/usr/bin/env bun", "#!/usr/bin/env node", "#!/usr/bin/env fish", "#!/bin/zsh", "echo bash", "# #!/bin/bash"])(
     "%p is not a python, bash or sh shebang",
     async (first) => {
-      const ctx = fixture({ ...ALLOWED, "scripts/tool.ts": `${first}\n` });
+      const ctx = fixture({ "scripts/tool.ts": `${first}\n` });
       expect(await runNamed(checks, "shebang scripts", ctx)).toMatchObject({ status: "pass" });
     },
   );
 
-  test("an allowlisted script that lost its shebang or was deleted fails as stale", async () => {
-    const path = "tests/evals/run-eval.sh";
-    const stripped = fixture({ ...ALLOWED, [path]: "echo ok\n" });
-    expect(await runNamed(checks, "shebang scripts", stripped)).toEqual({
-      status: "fail",
-      detail: `${path} is allowlisted but is gone or has no such shebang`,
-    });
-    const gone = fixture({ ...ALLOWED, [path]: null });
-    expect(await runNamed(checks, "shebang scripts", gone)).toEqual({
-      status: "fail",
-      detail: `${path} is allowlisted but is gone or has no such shebang`,
-    });
+  test("the allowlist is empty", () => {
+    expect(SHEBANG_ALLOWLIST).toEqual({});
   });
 
-  test("every allowlist entry carries a reason", () => {
-    for (const [path, reason] of Object.entries(SHEBANG_ALLOWLIST)) expect([path, reason.length > 10]).toEqual([path, true]);
-  });
-
-  test("the real tree's shebang scripts are exactly the allowlisted ones", () => {
+  test("the real tree has no python, bash or sh script", () => {
     const ctx = createContext(join(import.meta.dir, "..", ".."));
-    expect(shebangScripts(ctx).sort()).toEqual(Object.keys(SHEBANG_ALLOWLIST).sort());
+    expect(shebangScripts(ctx)).toEqual([]);
   });
 });

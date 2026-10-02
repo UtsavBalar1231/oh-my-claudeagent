@@ -132,12 +132,6 @@ own code, then switch to `deny` once the rate looks right:
 OMCA_COMMENT_GATE=deny
 ```
 
-### Other environment variables
-
-| Variable | Purpose |
-|---|---|
-| `OMCA_PROBE_OUTPUT` | Output file path for the one-shot `UserPromptSubmit` payload capture script used during hook development. Not part of normal operation, and not registered as a permanent hook; only relevant if you are debugging the hook payload shape yourself. |
-
 ### Platform environment variables OMCA depends on
 
 These are read by the client, not by OMCA. Scope for both is the session environment, or an

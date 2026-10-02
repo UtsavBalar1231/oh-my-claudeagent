@@ -6,7 +6,7 @@ This directory contains behavioral and integration tests for oh-my-claudeagent.
 
 ```
 tests/
-  evals/            # Eval tasks and run scripts
+  evals/            # Eval task definitions, listed by `just eval-consistency`
   fixtures/
     mcp/            # JSON-RPC requests and the expected tool list for the MCP server
   mod/              # mod tests, run by `claude plugin test .`
@@ -29,6 +29,9 @@ just test-mcp
 
 # Layer 3: every bun spec, including the validator specs and the workflow contract
 just test-bun
+
+# The OpenCode adapter: typecheck and every opencode/ spec (needs opencode on PATH)
+just test-opencode
 ```
 
 ## Adding a Bun Spec
@@ -37,6 +40,12 @@ Put `your-module.spec.ts` beside the module and import from `bun:test`. A spec t
 process passes `env` explicitly, because `Bun.spawn` without `env` does not see runtime
 `process.env` changes. Run it with `bun test <path>`.
 
+A spec that drives the `opencode` binary also passes `stdin: "ignore"`, because `opencode run`
+reads a piped stdin to EOF and hangs when the caller's stdin is an open pipe, and sets `PWD`
+beside `cwd`, because it resolves its directory from `PWD`. It runs OpenCode against a private
+copy of the plugin: OpenCode reloads a plugin when any file under the plugin's `opencode/`
+directory or its imported sources changes.
+
 ## CI Integration
 
 CI runs these jobs on every push and pull request to `main`:
@@ -44,9 +53,8 @@ CI runs these jobs on every push and pull request to `main`:
 | Job | Command |
 |-----|---------|
 | `validate` | `bun scripts/validate.ts --check claims --check hooks --check mod --check tree --check engine` |
-| `lint-shell` | `shellcheck scripts/*.sh` |
 | `test-mcp` | `bun test servers` and `bun scripts/validate.ts --check mcp` |
-| `test-opencode` | the OpenCode adapter suite |
+| `test-opencode` | the OpenCode adapter: typecheck, then `bun test opencode/`, whose smoke and model-path specs run against a real OpenCode install |
 | `typescript` | both tsc projects, the mod tests and the bun specs |
 | `validate-manifest` | `claude plugin validate . --strict` |
 

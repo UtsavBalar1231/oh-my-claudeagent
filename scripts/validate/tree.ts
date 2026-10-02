@@ -2,14 +2,9 @@ import { closeSync, openSync, readSync } from "node:fs";
 import { join } from "node:path";
 import { type Check, type Context, type Outcome, readText, verdict } from "./core.ts";
 
-// A script that still needs a shebang, and why. A new interpreter script fails the check until
-// it is added here with its reason, and an entry whose file lost its shebang fails as stale.
-export const SHEBANG_ALLOWLIST: Readonly<Record<string, string>> = {
-  "opencode/test/smoke.sh": "run by `just test-opencode` and the OpenCode CI job against a real OpenCode install",
-  "opencode/test/model-path.sh": "run by `just test-opencode` and the OpenCode CI job against a real OpenCode install",
-  "tests/evals/run-eval.sh": "run by `just eval-consistency` to list the eval tasks",
-  "scripts/probe-userpromptsubmit-payload.sh": "one-shot payload probe a maintainer registers by hand, never in hooks.json",
-};
+// A python, bash or sh script that may stay, and why. The list is empty, so any such script fails
+// the check until it is added here with its reason; an entry whose file lost its shebang fails as stale.
+export const SHEBANG_ALLOWLIST: Readonly<Record<string, string>> = {};
 
 const SHEBANG = /^#![ \t]*(?:\S*\/env[ \t]+(?:-S[ \t]+)?)?(?:\S*\/)?(?:python[\d.]*|bash|sh)(?:[ \t]|$)/;
 const NODE_OR_BUN_IMPORT = /\b(?:from|import|require)\s*\(?\s*["'](?:node|bun):/;
@@ -35,7 +30,7 @@ function shebangs(ctx: Context): Outcome {
     ...found.filter((path) => !(path in SHEBANG_ALLOWLIST)).map((path) => `${path} has a python, bash or sh shebang`),
     ...Object.keys(SHEBANG_ALLOWLIST).filter((path) => !found.includes(path)).map((path) => `${path} is allowlisted but is gone or has no such shebang`),
   ];
-  return verdict(problems, `${found.length} tracked scripts carry a shebang, each allowlisted with a reason`);
+  return verdict(problems, `${found.length} tracked python, bash or sh scripts, each allowlisted with a reason`);
 }
 
 function coreImports(ctx: Context): Outcome {

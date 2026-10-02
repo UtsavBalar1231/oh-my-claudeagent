@@ -1,16 +1,15 @@
 # oh-my-claudeagent eval harness
 
-`run-eval.sh` lists the available fixtures. There is no automated runner: a trial is one
-live `claude -p` turn, launched by hand inside a throwaway git worktree, and scored from
-the diff that turn left behind. This file is the procedure. Follow it verbatim so two
-trials taken weeks apart remain comparable.
+`bun scripts/qa/eval-tasks.ts` (`just eval-consistency`) lists the available fixtures.
+There is no automated runner: a trial is one live `claude -p` turn, launched by hand
+inside a throwaway git worktree, and scored from the diff that turn left behind. This
+file is the procedure. Follow it verbatim so two trials taken weeks apart remain comparable.
 
 ## Directory structure
 
 ```
 tests/evals/
   README.md          this file
-  run-eval.sh        lists the available task definitions
   tasks/             task definition files (JSON)
     single-file-edit.json
     multi-file-search.json
@@ -51,7 +50,7 @@ Only `diff-latitude.json` carries a diff-size target, and it is the only fixture
 edit exactly or produce no code at all, so their line counts measure nothing.
 
 `diff-latitude` target: a correct solution adds about five lines to
-`tests/evals/run-eval.sh`. One argument check plus a skip inside the existing loop is
+`scripts/qa/eval-tasks.ts`. One argument check plus a filter on the listed tasks is
 enough. Added configuration knobs, a usage function, argument validation beyond the one
 flag, helper abstractions, or comments narrating the loop all push the count toward
 sixty while passing the same check. The fixture prompt says nothing about brevity on
@@ -206,7 +205,7 @@ batch, and do not spend the remaining turns.
 
 ## Writing new tasks
 
-Add a `.json` file to `tests/evals/tasks/` following the schema above. `run-eval.sh`
-picks it up from the glob with no change. Keep prompts realistic, keep
+Add a `.json` file to `tests/evals/tasks/` following the schema above. `eval-tasks.ts`
+picks it up from the directory with no change. Keep prompts realistic, keep
 `success_criteria` checkable against the worktree, and check any `expected_tools` entry
 against the tools actually available on this platform.

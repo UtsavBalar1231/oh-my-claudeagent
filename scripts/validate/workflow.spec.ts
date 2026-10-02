@@ -11,7 +11,6 @@ const RELEASE = readFileSync(join(REPO, ".github", "workflows", "release.yml"), 
 // command differently from the recipe body; each pin is also asserted to be a substring of the
 // recipe's own body, so a pin cannot drift from the real command, only from CI's coverage of it.
 const PINS: Readonly<Record<string, string>> = {
-  "lint-shell": "shellcheck scripts/*.sh",
   test: "bun scripts/validate.ts --check claims --check hooks --check mod --check tree --check engine",
   "test-mcp": "bun test servers",
   "validate-manifest": "claude plugin validate . --strict",
@@ -48,7 +47,7 @@ const ciLeaves = [...new Set(leafSteps("ci"))].sort();
 
 describe("workflow contract", () => {
   test("just ci recipe chain resolves to the expected leaf steps", () => {
-    expect(ciLeaves.join(" ")).toBe("lint-shell test test-bun test-mcp test-mod test-opencode typecheck-ts validate-manifest validate-mod");
+    expect(ciLeaves.join(" ")).toBe("test test-bun test-mcp test-mod test-opencode typecheck-ts validate-manifest validate-mod");
   });
 
   test("every just ci leaf step has a pinned ci.yml coverage pattern", () => {

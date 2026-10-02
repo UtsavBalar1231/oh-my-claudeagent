@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- `jq`, used by the validator and the shell scripts
+- `jq`, used by the release recipe and the commands `just eval-consistency` prints
 - `bun` 1.4.2 or later, runtime for the MCP server, the hooks module, the status line and the scripts
 - `ast-grep` CLI (`ast-grep` or `sg`), structural code-search tools
 - `just`, task runner for dev commands
@@ -13,25 +13,17 @@ Structural changes to a directory (new file, moved entry point, changed layout) 
 
 ## Adding a hook
 
-Two steps are required. Skipping either produces dead code ([ADR-009](adr/README.md#adr-009)):
+A hook is TypeScript in one of two homes. Skipping the registration step produces dead code:
 
-1. **Create the script** at `scripts/name.sh`. Follow conventions:
-   - Read payload from stdin via `jq`
-   - Write state atomically (`tmp=$(mktemp) && ... && mv "$tmp" target.json`)
-   - Exit 0 by default; degrade gracefully when state files are absent
-   - Do NOT use `set -euo pipefail`
+1. **Write the feature.** A feature that needs only mod-reachable events lives in the mod: a module that `hooks/register.ts`, the only file that calls `on()`, dispatches to. A feature that needs a settings-hook event (`PreToolUse` with agent fields, `PermissionRequest`, `PostToolUse`, `UserPromptSubmit`, `SubagentStart`, `TaskCompleted`, `Stop`) is a handler under `servers/hooks/`. Put a `*.spec.ts` beside it.
 
-2. **Register in `hooks/hooks.json`**:
-   ```json
-   {
-     "matcher": "EventName",
-     "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/scripts/name.sh" }]
-   }
-   ```
+2. **Register it.** A server handler is mapped to its event and matcher in `servers/hooks/registry.ts`, and the event has an `mcp_tool` entry in `hooks/hooks.json` that calls the `omca_hook` tool. A handler the registry does not reach is dead code.
+
+No hook is a shell or python script: `bun scripts/validate.ts --check tree` fails on any tracked file with a bash, sh or python shebang.
 
 Use the `if` field for argument-level filtering on tool events (`PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `PermissionRequest`): `"if": "Bash(git *)"`, permission rule syntax, reduces process spawning. Do not use on security-critical or dual-purpose hooks where a narrow filter would silently disable coverage.
 
-Each hook runs as a fresh process, so an edit to the body of `scripts/name.sh` applies on the next invocation. A change to `hooks/hooks.json` is registration, not script content, and applies only once the plugin is loaded again: closing the `/plugin` menu reloads it for you, and so does starting a new session.
+A change to `hooks/hooks.json` or to a handler applies only once the plugin is loaded again: closing the `/plugin` menu reloads it for you, and so does starting a new session.
 
 ## Adding an agent
 
@@ -70,14 +62,14 @@ Key rules:
 ## Testing
 
 ```bash
-just ci              # full pipeline: lint + test + mcp + manifest + opencode + TypeScript checks
+just ci              # full pipeline: test + mcp + manifest + opencode + TypeScript checks
 just test            # structural validation only (claims, hooks, mod, tree, engine), not the full suite
 just test-claims     # manifest, frontmatter, docs and policy checks
 just test-hooks      # hooks.json handler shape, SessionStart matcher and registry checks
 just test-mcp        # MCP server specs (requires ast-grep CLI) and the handshake check
 just test-bun        # every bun spec, including the validator specs
 just qa              # manual QA against the mock model: session smoke, install verify, live hook probe, statusline probe, worktree and route-effort checks
-just lint            # shellcheck
+just test-opencode   # OpenCode adapter: typecheck and every opencode/ spec, run against a real OpenCode install
 just typecheck-ts    # both tsc projects
 ```
 

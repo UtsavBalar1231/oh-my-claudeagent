@@ -30,14 +30,6 @@ repos:
       - id: check-executables-have-shebangs
       - id: check-shebang-scripts-are-executable
 
-  # Shell
-  - repo: https://github.com/shellcheck-py/shellcheck-py
-    rev: v0.11.0.1
-    hooks:
-      - id: shellcheck
-        # Scope shellcheck to match `just lint-shell`, which only lints scripts/*.sh.
-        files: '^scripts/.*\.sh$'
-
   # GHA workflow validation
   - repo: https://github.com/python-jsonschema/check-jsonschema
     rev: 0.37.1

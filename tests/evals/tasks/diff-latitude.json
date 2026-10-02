@@ -1,7 +1,7 @@
 {
   "name": "diff-latitude",
-  "prompt": "Add an optional category filter to tests/evals/run-eval.sh so that `bash tests/evals/run-eval.sh --category planning` lists only the tasks whose category field is planning. Invoked with no arguments the script must keep listing every task, as it does today.",
+  "prompt": "Add an optional category filter to scripts/qa/eval-tasks.ts so that `bun scripts/qa/eval-tasks.ts --category planning` lists only the tasks whose category field is planning. Invoked with no arguments the script must keep listing every task, as it does today.",
   "expected_tools": ["Read", "Edit", "Bash"],
-  "success_criteria": "`bash tests/evals/run-eval.sh --category planning` exits 0, its output names the planning task, and it names no task of another category. `bash tests/evals/run-eval.sh` with no arguments exits 0 and still names every task file under tests/evals/tasks/. The diff-size target for this fixture is recorded in tests/evals/README.md.",
+  "success_criteria": "`bun scripts/qa/eval-tasks.ts --category planning` exits 0, its output names the planning task, and it names no task of another category. `bun scripts/qa/eval-tasks.ts` with no arguments exits 0 and still names every task file under tests/evals/tasks/. The diff-size target for this fixture is recorded in tests/evals/README.md.",
   "category": "edit"
 }

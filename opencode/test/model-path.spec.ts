@@ -1,0 +1,202 @@
+import { afterAll, beforeAll, describe, expect, test } from "bun:test"
+import { closeSync, openSync, readFileSync, writeFileSync } from "node:fs"
+import { join } from "node:path"
+import { commit, countLines, git, type Listing, opencodeBin, removeDir, repo, scratchDir, type Server, snapshot, startServer, until, writeConfig } from "./harness.ts"
+
+type Message = { role?: string; content?: unknown }
+type Request = { messages?: Message[]; tools?: { function: { name: string } }[] }
+type Named = { name?: string; parentID?: string | null; status?: { status?: string } }
+type Fixture = { root: string; ws: string; server: Server; stub: Bun.Subprocess; stubFd: number; stubLog: string; baseline: number }
+
+const SLOW = 240_000
+const EXPLORER = "# Explorer - Codebase Search Specialist"
+const EVIDENCE = "Evidence before claims"
+let fixture: Fixture | undefined
+
+function need(): Fixture {
+  if (!fixture) throw new Error("the OpenCode server did not start")
+  return fixture
+}
+
+function text(content: unknown): string {
+  if (typeof content === "string") return content
+  if (Array.isArray(content)) return content.map((part) => (part as { text?: string } | null)?.text).filter((part) => part !== undefined).join("\n")
+  return ""
+}
+
+function allRequests(): Request[] {
+  const raw = readFileSync(need().stubLog, "utf8")
+  return raw.split("\n").filter(Boolean).map((line) => JSON.parse(line) as Request)
+}
+
+const requests = () => allRequests().slice(need().baseline)
+
+const system = (request: Request) =>
+  (request.messages ?? [])
+    .filter((message) => message.role === "system")
+    .map((message) => text(message.content))
+    .join("\n")
+
+const lastIsTool = (request: Request) => request.messages?.at(-1)?.role === "tool"
+const lastText = (request: Request) => text(request.messages?.at(-1)?.content)
+const toolNames = (request: Request) => (request.tools ?? []).map((tool) => tool.function.name)
+const toolResultsSince = (start: number) => requests().slice(start).filter(lastIsTool).map(lastText).join("\n")
+
+function diagnostics(): string {
+  const log = need().server.log()
+  const summary = requests().map((request, i) => {
+    const names = toolNames(request)
+    return `#${i} ${request.messages?.at(-1)?.role} tools=${names.length} evidence_log=${names.includes("omca_evidence_log")} explorer=${system(request).includes(EXPLORER)}${names.includes("omca_evidence_log") ? "" : ` [${names.join(",")}]`}`
+  })
+  const counts = `plugin loads=${countLines(log, "loading plugin")}, mcp connects=${countLines(log, "mcp connected")}`
+  return `${counts}\n${summary.join("\n")}\nserver log tail:\n${log.split("\n").slice(-20).join("\n")}`
+}
+
+function verify(ok: boolean, message: string): void {
+  if (!ok) throw new Error(`${message}\n${diagnostics()}`)
+}
+
+async function collect(proc: Bun.Subprocess<"ignore", "pipe", "pipe">): Promise<string> {
+  const [out, err] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited])
+  return out + err
+}
+
+async function opencode(args: string[], timeoutMs: number): Promise<string> {
+  const { ws, server } = need()
+  // `opencode run` reads a piped stdin to EOF, so an inherited open pipe would hang it; it takes its directory from PWD, which `cwd` leaves alone.
+  const proc = Bun.spawn([opencodeBin ?? "opencode", ...args], { cwd: ws, env: { ...server.env, PWD: ws }, stdin: "ignore", stdout: "pipe", stderr: "pipe" })
+  const timer = setTimeout(() => proc.kill(), timeoutMs)
+  try {
+    return await collect(proc)
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+const run = (scenario: string) => opencode(["run", "--server", need().server.base, "--model", "stub/scripted", "--auto", "--format", "json", `OMCA-SCENARIO:${scenario}`], 180_000)
+
+describe.skipIf(!opencodeBin)("opencode model path", () => {
+  beforeAll(async () => {
+    const root = scratchDir("model-path")
+    const stubLog = join(root, "requests.jsonl")
+    const stubOut = join(root, "stub.out")
+    writeFileSync(stubLog, "")
+    const stubFd = openSync(stubOut, "a")
+    const stub = Bun.spawn([process.execPath, join(repo, "opencode", "test", "stub-provider.ts")], {
+      env: { ...process.env, STUB_LOG: stubLog },
+      stdin: "ignore",
+      stdout: stubFd,
+      stderr: stubFd,
+    })
+    const stubPort = await until("stub started", 5000, async () => readFileSync(stubOut, "utf8").match(/^listening (\d+)/m)?.[1], () => readFileSync(stubOut, "utf8"))
+
+    const ws = join(root, "ws")
+    writeConfig(ws, {
+      model: "stub/scripted",
+      providers: {
+        stub: {
+          package: "@opencode/ai/providers/openai-compatible",
+          settings: { baseURL: `http://127.0.0.1:${stubPort}/v1`, apiKey: "stub" },
+          models: { scripted: { capabilities: { tools: true, input: ["text"], output: ["text"] }, limit: { context: 200000, output: 32000 } } },
+        },
+      },
+      plugins: [{ package: join(snapshot(join(root, "plugin")), "opencode") }],
+    })
+    git(ws, "init", "-q")
+    writeFileSync(join(ws, "file.txt"), "one\n")
+    git(ws, "add", "file.txt")
+    commit(ws, "one")
+    writeFileSync(join(ws, "file.txt"), "two\n")
+    commit(ws, "two", "-a")
+
+    const server = await startServer(root, ws)
+    fixture = { root, ws, server, stub, stubFd, stubLog, baseline: 0 }
+
+    await until("opencode models lists stub/scripted", 30_000, async () => (await opencode(["models", "--server", server.base], 20_000)).includes("stub/scripted"), server.last)
+    await until(
+      "omca MCP server connected",
+      90_000,
+      async () => {
+        const { body } = await server.api<Listing<Named>>("GET", "/api/mcp", ws)
+        return (body?.data ?? []).some((mcp) => mcp.name === "omca" && mcp.status?.status === "connected")
+      },
+      server.last,
+    )
+    await until(
+      "omca tools reach the model",
+      60_000,
+      async () => {
+        await run("warm-up")
+        const last = allRequests().filter((request) => (request.tools?.length ?? 0) > 0).at(-1)
+        return last !== undefined && toolNames(last).includes("omca_evidence_log")
+      },
+      server.last,
+    )
+    need().baseline = allRequests().length
+  }, SLOW)
+
+  afterAll(async () => {
+    if (!fixture) return
+    await fixture.server.stop()
+    fixture.stub.kill()
+    await fixture.stub.exited
+    closeSync(fixture.stubFd)
+    removeDir(fixture.root)
+  }, SLOW)
+
+  const head = () => git(need().ws, "rev-parse", "HEAD")
+  let headBefore = ""
+
+  test("shell-reset: the guard denial reaches the model and HEAD stays", async () => {
+    headBefore = head()
+    const start = requests().length
+    await run("shell-reset")
+    verify(head() === headBefore, "shell-reset: HEAD moved")
+    verify(toolResultsSince(start).includes("omca guard:"), "shell-reset: no omca guard denial reached the model")
+  }, SLOW)
+
+  test("subagent: the omca-explore child session sees the guard denial", async () => {
+    const { server, ws } = need()
+    const start = requests().length
+    await run("subagent")
+    const sessions = await server.api<Listing<Named>>("GET", "/api/session", ws)
+    verify((sessions.body?.data ?? []).some((session) => session.parentID != null), `subagent: no child session: ${sessions.text}`)
+    verify(requests().some((request) => system(request).includes(EXPLORER)), "subagent: no request carried the omca-explore system")
+    verify(head() === headBefore, "subagent: HEAD moved")
+    const childResult = requests()
+      .slice(start)
+      .filter((request) => lastIsTool(request) && system(request).includes(EXPLORER))
+      .map(lastText)
+      .join("\n")
+    verify(childResult.includes("omca guard:"), "subagent: no omca guard denial reached the omca-explore child")
+  }, SLOW)
+
+  test("context: build requests carry the evidence rule and omca-explore requests do not", () => {
+    verify(
+      requests().some((request) => request.tools != null && !system(request).includes(EXPLORER) && system(request).includes(EVIDENCE)),
+      `context: no build request contains '${EVIDENCE}'`,
+    )
+    verify(!requests().some((request) => system(request).includes(EXPLORER) && system(request).includes(EVIDENCE)), `context: the omca-explore request contains '${EVIDENCE}'`)
+  })
+
+  test("tools: build requests expose omca_evidence_log and none expose omca_session_search", () => {
+    const buildTools = requests()
+      .filter((request) => (request.tools?.length ?? 0) > 0 && !system(request).includes(EXPLORER))
+      .map(toolNames)
+    verify(buildTools.length > 0, "tools: no build request carried tools")
+    verify(
+      buildTools.every((names) => names.includes("omca_evidence_log")),
+      "tools: a build request lacks omca_evidence_log",
+    )
+    verify(!requests().some((request) => toolNames(request).includes("omca_session_search")), "tools: a request exposes omca_session_search")
+  })
+
+  test("skill-load: the skill result names /omca-handoff without untranslated text", async () => {
+    const start = requests().length
+    await run("skill-load")
+    const result = toolResultsSince(start)
+    verify(result !== "", "skill-load: no follow-up request carried the skill result")
+    verify(result.includes("/omca-handoff"), "skill-load: skill result lacks /omca-handoff")
+    verify(!result.includes("oh-my-claudeagent:"), "skill-load: skill result contains untranslated oh-my-claudeagent: text")
+  }, SLOW)
+})

@@ -51,30 +51,6 @@ jobs:
             echo "The plugin manifest, a hook definition, the mod's registrations or the repository layout is malformed or out of sync. Run \`bun scripts/validate.ts --check claims --check hooks --check mod --check tree --check engine\` locally to see the exact failure."
           } >> "$GITHUB_STEP_SUMMARY"
 
-  lint-shell:
-    name: Lint Shell
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-        with:
-          persist-credentials: false
-
-      - name: ShellCheck
-        run: shellcheck scripts/*.sh
-
-      - name: Job summary
-        if: always()
-        run: |
-          {
-            echo "### What this job checks"
-            echo "Shell script quality across scripts/*.sh, via shellcheck (mirrors \`just lint-shell\`)."
-            echo ""
-            echo "### If this fails"
-            echo "A shell script has a shellcheck violation. Run \`just lint-shell\` locally to see the exact warning and file/line."
-          } >> "$GITHUB_STEP_SUMMARY"
-
   test-mcp:
     name: MCP Server Specs
     runs-on: ubuntu-latest
@@ -147,14 +123,8 @@ jobs:
       - name: Typecheck
         run: bun run typecheck
 
-      - name: Unit tests
+      - name: Specs, including the smoke and model-path runs against OpenCode
         run: bun test opencode/
-
-      - name: Smoke test
-        run: bash opencode/test/smoke.sh
-
-      - name: Model path test
-        run: bash opencode/test/model-path.sh
 
       - name: Job summary
         if: always()
