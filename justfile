@@ -119,6 +119,11 @@ qa:
 visual view:
 	bun scripts/qa/visual.ts {{ view }}
 
+# Benchmark the working tree (or --candidate-ref) against --baseline-ref, via the mock model
+[group('test')]
+bench *args:
+	bun scripts/bench.ts {{ args }}
+
 # ── Typecheck ────────────────────────────────────────────────────
 
 # Type-check servers/ and statusline/ with pyright (pinned as a servers/ dev

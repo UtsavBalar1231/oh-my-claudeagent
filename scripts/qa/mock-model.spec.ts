@@ -43,7 +43,8 @@ const logEntries = () =>
     .split("\n")
     .filter(Boolean)
     .map((line) => JSON.parse(line) as Record<string, unknown>);
-const withoutTimestamp = (line: string) => line.replace(/"ts": "[^"]*"/, '"ts": "T"');
+const withoutTimestamps = (line: string) =>
+  line.replace(/"ts": "[^"]*"/, '"ts": "T"').replace(/"arrival_ms": \d+/, '"arrival_ms": 0');
 
 const okText = [{ type: "text", text: "ok" }];
 const bashTurn: Turn = { content: [{ type: "tool_use", name: "Bash", input: { command: "true" } }] };
@@ -292,9 +293,20 @@ describe("access log", () => {
   test("writes one JSONL line per request in the format session-smoke greps", async () => {
     await post("/v1/messages?beta=true", {}, { Authorization: "Bearer s3cret" });
 
-    expect(withoutTimestamp(readLog())).toBe(
-      '{"ts": "T", "client": "127.0.0.1", "method": "POST", "path": "/v1/messages?beta=true", "mode": "json", "has_credential": true, "queue": "main", "turn": null, "tool_results": 0}\n',
+    expect(withoutTimestamps(readLog())).toBe(
+      '{"ts": "T", "client": "127.0.0.1", "method": "POST", "path": "/v1/messages?beta=true", "mode": "json", "has_credential": true, "queue": "main", "turn": null, "tool_results": 0, "arrival_ms": 0}\n',
     );
+  });
+
+  test("records the arrival as epoch milliseconds between the send and the reply", async () => {
+    const sent = Date.now();
+    await post("/v1/messages", {});
+    const replied = Date.now();
+
+    const arrival = logEntries()[0]?.arrival_ms;
+    expect(Number.isInteger(arrival)).toBe(true);
+    expect(arrival as number).toBeGreaterThanOrEqual(sent);
+    expect(arrival as number).toBeLessThanOrEqual(replied);
   });
 
   test("records the arrival time as dd/Mon/yyyy hh:mm:ss", async () => {

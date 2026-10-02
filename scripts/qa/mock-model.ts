@@ -190,6 +190,7 @@ export function startServer({
     hostname: "127.0.0.1",
     port,
     async fetch(req, server) {
+      const arrived = new Date();
       if (req.method !== "POST") return new Response("Unsupported method", { status: 501 });
       const url = new URL(req.url);
       if (!url.pathname.startsWith("/v1/messages")) {
@@ -205,7 +206,7 @@ export function startServer({
         appendFileSync(
           accessLogPath,
           jsonLine({
-            ts: arrivalTime(new Date()),
+            ts: arrivalTime(arrived),
             client: server.requestIP(req)?.address ?? "",
             method: "POST",
             path: url.pathname + url.search,
@@ -214,6 +215,7 @@ export function startServer({
             queue,
             turn,
             tool_results: countToolResults(body.messages),
+            arrival_ms: arrived.getTime(),
           }),
         );
       }
