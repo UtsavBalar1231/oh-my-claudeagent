@@ -34,7 +34,10 @@ function engine(on: On, deny?: string): { spawned: Spawn[]; stepped: Step[]; log
   const spawned: Spawn[] = [];
   const stepped: Step[] = [];
   const logged: string[] = [];
-  on("ui.log", (_$, e) => (logged.push(e.text), { value: undefined }));
+  on("ui.log", (_$, e) => {
+    if (e.text.startsWith("route:")) logged.push(e.text);
+    return { value: undefined };
+  });
   on("agent.spawn", (_$, e) => {
     spawned.push(e);
     return deny === undefined ? { model: e.model ?? "claude-opus-5-5", agentId: `agent-${e.tool_use_id}` } : { deny };

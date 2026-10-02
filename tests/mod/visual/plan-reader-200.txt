@@ -1,0 +1,50 @@
+                                                                                                             │1: Agents  2: Plan  3: Evidence  4: Notepad  5: Feedback  6: Stats  7: Doctor            ✕
+ ▐▛███▛█   Claude Code v2.1.287                                                                              │───────────────────────────────────────────────────────────────────────────────────────
+▝▜██████▀  Opus 5.5 · API Usage Billing                                                                      │Ship the sample widget service rewrite
+ ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/.cache/tmp/omca-visual-200x50-tJAA4S/cwd                          │12/46 tasks done · ~/.cache/tmp/omca-visual-200x50-tJAA4S/cwd/plans/46-task-plan.md
+                                                                                                             │───────────────────────────────────────────────────────────────────────────────────────
+                                                                                                             │  ↑ 5 more
+                                                                                                             │  Design decisions
+                                                                                                             │  TODOs
+                                                                                                             │    Milestone 0: Foundations
+                                                                                                             │      [x] 1. Port the window and the recorder onto the shared parser
+                                                                                                             │      [x] 2. Port the ledger and the router onto the shared harness
+                                                                                                             │      [x] 3. Port the fixture and the tracker onto the shared snapshot
+                                                                                                             │      [x] 4. Port the theme and the band onto the shared gate
+                                                                                                             │      [x] 5. Port the probe and the reader onto the shared guard
+                                                                                                             │      [x] 6. Port the recorder and the parser onto the shared pane
+                                                                                                             │      [x] 7. Rename every `widget_id` column reference in the export path, the import…
+                                                                                                             │      [x] 8. Port the tracker and the snapshot onto the shared ledger
+                                                                                                             │    Milestone 1: Core features
+                                                                                                             │      [x] 9. Port the band and the gate onto the shared fixture
+                                                                                                             │      [x] 10. Port the reader and the guard onto the shared theme
+                                                                                                             │      [x] 11. Port the parser and the pane onto the shared probe
+                                                                                                             │      [x] 12. Port the harness and the window onto the shared recorder
+                                                                                                             │      [ ] 13. Port the snapshot and the ledger onto the shared router
+                                                                                                             │❯     [ ] 14. Port the gate and the fixture onto the shared tracker
+                                                                                                             │      [ ] 15. Port the guard and the theme onto the shared band
+                                                                                                             │      [ ] 16. Port the pane and the probe onto the shared reader
+                                                                                                             │      [ ] 17. Port the window and the recorder onto the shared parser
+                                                                                                             │      [ ] 18. Port the ledger and the router onto the shared harness
+                                                                                                             │    Milestone 2: Views and feedback
+                                                                                                             │      [ ] 19. Port the fixture and the tracker onto the shared snapshot
+                                                                                                             │      [ ] 20. Port the theme and the band onto the shared gate
+                                                                                                             │      [ ] 21. Port the probe and the reader onto the shared guard
+                                                                                                             │      [ ] 22. Port the recorder and the parser onto the shared pane
+                                                                                                             │      [ ] 23. Render the 日本語 and 한국어 labels in the router view at full width
+                                                                                                             │      [ ] 24. Port the tracker and the snapshot onto the shared ledger
+                                                                                                             │      [ ] 25. Port the band and the gate onto the shared fixture
+                                                                                                             │      [ ] 26. Port the reader and the guard onto the shared theme
+                                                                                                             │      [ ] 27. Port the parser and the pane onto the shared probe
+                                                                                                             │      [ ] 28. Port the harness and the window onto the shared recorder
+                                                                                                             │    Milestone 3: Ports
+                                                                                                             │      [ ] 29. Port the snapshot and the ledger onto the shared router
+                                                                                                             │  ↓ 20 more
+                                                                                                             │───────────────────────────────────────────────────────────────────────────────────────
+                                                                                                             │r: Reload   l: Plans
+46-task-plan 12/46 tasks · no verification yet                                                            [-]│↑↓ move · enter open · esc close
+                                                                                         ◐ medium · /effort  │
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── OMCA: 46-task-plan ─
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏸ manual mode on · ? for shortcuts · ← for agents

@@ -1,0 +1,19 @@
+{
+  "main": [
+    {
+      "content": [
+        {
+          "type": "tool_use",
+          "name": "Agent",
+          "input": {
+            "subagent_type": "oh-my-claudeagent:executor",
+            "description": "Fix the parser",
+            "prompt": "Fix the heading parser so fenced lines are skipped."
+          }
+        }
+      ]
+    },
+    { "content": [{ "type": "text", "text": "The executor fixed the parser." }] }
+  ],
+  "subagent": [{ "content": [{ "type": "text", "text": "Fixed the heading parser." }] }]
+}

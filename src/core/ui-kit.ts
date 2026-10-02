@@ -127,6 +127,14 @@ export function fitMiddle(text: string, width: number, ellipsis: string): string
   return `${head(chars, front)}${ellipsis}${tail(chars, room - front)}`;
 }
 
+export function padEnd(text: string, width: number): string {
+  return `${text}${" ".repeat(Math.max(0, width - displayWidth(text)))}`;
+}
+
+export function padStart(text: string, width: number): string {
+  return `${" ".repeat(Math.max(0, width - displayWidth(text)))}${text}`;
+}
+
 export type ViewState<T> =
   | { kind: "loading" }
   | { kind: "error"; reason: string }

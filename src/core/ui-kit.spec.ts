@@ -8,6 +8,8 @@ import {
   keyHint,
   levelMark,
   notice,
+  padEnd,
+  padStart,
   tabKey,
   usableColumns,
   viewState,
@@ -131,6 +133,15 @@ describe("keys and layout", () => {
 
   test("the right gutter keeps three columns free", () => {
     expect([80, 3, 2, 0].map(usableColumns)).toEqual([77, 0, 0, 0]);
+  });
+});
+
+describe("padding", () => {
+  test("pads to display width, wide characters counting two cells, and never cuts", () => {
+    expect(padEnd("ab", 5)).toBe("ab   ");
+    expect(padStart("ab", 5)).toBe("   ab");
+    expect(padEnd("日本", 6)).toBe("日本  ");
+    expect(padStart("12.3k", 3)).toBe("12.3k");
   });
 });
 

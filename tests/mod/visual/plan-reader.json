@@ -1,0 +1,5 @@
+{
+  "command": "/omca plan",
+  "keys": ["Down", "Enter", "n", "p", "t"],
+  "fixture": "pane"
+}

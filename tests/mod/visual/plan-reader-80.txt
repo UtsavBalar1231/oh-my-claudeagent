@@ -1,0 +1,40 @@
+
+ ▐▛███▛█   Claude Code v2.1.287
+▝▜██████▀  Opus 5.5 · API Usage Billing
+ ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/omca-visual-80x40-ww4YFz/cwd
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ 1: Agents 2: Plan 3: Evidence 4: Notepad 5: Feedback 6: Stats 7: Doctor    ✕ │
+│ Ship the sample widget service rewrite · 12/46 tasks done                    │
+│   ↑ 19 more                                                                  │
+│       [x] 11. Port the parser and the pane onto the shared probe             │
+│       [x] 12. Port the harness and the window onto the shared recorder       │
+│       [ ] 13. Port the snapshot and the ledger onto the shared router        │
+│ ❯     [ ] 14. Port the gate and the fixture onto the shared tracker          │
+│       [ ] 15. Port the guard and the theme onto the shared band              │
+│       [ ] 16. Port the pane and the probe onto the shared reader             │
+│   ↓ 35 more                                                                  │
+│ r: Reload   l: Plans   ↑↓ move · enter open · esc close                      │
+╰──────────────────────────────────────────────────────────────────────────────╯
+46-task-plan 12/46 tasks · no verification yet                               [-]
+                                                            ◐ medium · /effort
+─────────────────────────────────────────────────────────── OMCA: 46-task-plan ─
+❯ 
+────────────────────────────────────────────────────────────────────────────────
+  ⏸ manual mode on · ? for shortcuts · ← for agents

@@ -45,7 +45,11 @@ declare module "claude-code" {
             text: string;
           }[];
         } | null;
-        error: string | null;
+        plans: {
+          dir: string;
+          files: readonly { name: string; path: string; mtimeMs: number }[];
+        } | null;
+        errors: { evidence: string | null; notepad: string | null; plans: string | null };
         readAt: number;
       };
       status: {
