@@ -1,3 +1,5 @@
+import { isRecord } from "./tool-input.ts";
+
 export interface PlanEntry {
   active_plan?: string;
   started_at?: string;
@@ -22,23 +24,17 @@ export interface BoundPlan {
   worktree_path: string;
 }
 
-type Dict = Record<string, unknown>;
-
-function isDict(value: unknown): value is Dict {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 function emptyRegistry(): Registry {
   return { plans: {}, bindings: {} };
 }
 
 /** Registry view of parsed boulder.json: a `plans` or `bindings` that is not an object reads as empty. */
 export function asRegistry(data: unknown): Registry {
-  if (!isDict(data)) return emptyRegistry();
+  if (!isRecord(data)) return emptyRegistry();
   const { plans, bindings } = data;
   return {
-    plans: isDict(plans) ? (plans as Registry["plans"]) : {},
-    bindings: isDict(bindings) ? (bindings as Registry["bindings"]) : {},
+    plans: isRecord(plans) ? (plans as Registry["plans"]) : {},
+    bindings: isRecord(bindings) ? (bindings as Registry["bindings"]) : {},
   };
 }
 

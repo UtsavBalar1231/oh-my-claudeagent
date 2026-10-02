@@ -1,9 +1,11 @@
+import { EFFORTS } from "./route-hint.ts";
+import { isRecord } from "./tool-input.ts";
 import type { Level } from "./ui-kit.ts";
 
 export type Fix = "add-refresh-interval";
 export type Check = { id: string; label: string; level: Level; detail: string; fix?: Fix };
 
-export type Env = Readonly<{
+export type DoctorEnv = Readonly<{
   CLAUDE_CODE_SUBAGENT_MODEL_FORCE?: string | undefined;
   CLAUDE_CODE_DISABLE_ADVISOR_TOOL?: string | undefined;
   DISABLE_TELEMETRY?: string | undefined;
@@ -27,7 +29,7 @@ export type Inputs = {
   now: number;
   settings: Readonly<Record<string, unknown>>;
   options: { showBand: boolean; guardMode: "dialog" | "deny" };
-  env: Env;
+  env: DoctorEnv;
   userSettings: string | null;
   isStyleForced: boolean | null;
 };
@@ -35,7 +37,6 @@ export type Inputs = {
 export const ENGINE_FLOOR = "2.1.287";
 export const BUN_FLOOR = "1.4.2";
 const FRESH_MS = 10 * 60_000;
-const EFFORTS = ["low", "medium", "high", "xhigh", "max"];
 
 type Version = readonly [number, number, number];
 
@@ -49,8 +50,13 @@ function isOlder(version: Version, floor: string): boolean {
   return version[0] !== a ? version[0] < a : version[1] !== b ? version[1] < b : version[2] < c;
 }
 
-const record = (value: unknown): Readonly<Record<string, unknown>> | undefined =>
-  typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined;
+// `settings.pluginConfigs[plugin].options`, or undefined when any link is not an object.
+function pluginOptions(settings: Inputs["settings"], plugin: string): Readonly<Record<string, unknown>> | undefined {
+  const configs = settings["pluginConfigs"];
+  const config = isRecord(configs) ? configs[plugin] : undefined;
+  const options = isRecord(config) ? config["options"] : undefined;
+  return isRecord(options) ? options : undefined;
+}
 
 const isOn = (value: string | undefined) => value !== undefined && !/^(|0|false|no|off)$/i.test(value.trim());
 
@@ -120,26 +126,28 @@ function optionsCheck({ showBand, guardMode }: Inputs["options"]): Check {
   return check("options", "Options", "ok", `showBand ${showBand ? "on" : "off"}, guardMode ${guardMode}`);
 }
 
-function modelForceCheck(env: Env): Check {
+function modelForceCheck(env: DoctorEnv): Check {
   return isOn(env.CLAUDE_CODE_SUBAGENT_MODEL_FORCE)
     ? check("model-force", "Agent models", "warn", "CLAUDE_CODE_SUBAGENT_MODEL_FORCE puts every agent on one model, oracle included")
     : check("model-force", "Agent models", "ok", "Each agent keeps the model tier it declares");
 }
 
+const LEVELS: readonly string[] = EFFORTS;
+
 function effortCheck(cap: unknown): Check {
   if (cap === undefined) return check("effort", "Effort cap", "ok", "No maxEffortLevel, so agents run at the effort they declare");
-  const rank = typeof cap === "string" ? EFFORTS.indexOf(cap) : -1;
+  const rank = typeof cap === "string" ? LEVELS.indexOf(cap) : -1;
   if (rank < 0) return check("effort", "Effort cap", "warn", `maxEffortLevel ${JSON.stringify(cap)} is not a known level`);
-  if (rank >= EFFORTS.indexOf("xhigh")) {
+  if (rank >= LEVELS.indexOf("xhigh")) {
     return check("effort", "Effort cap", "ok", `maxEffortLevel ${cap} leaves every declared effort in place`);
   }
-  return rank === EFFORTS.indexOf("high")
+  return rank === LEVELS.indexOf("high")
     ? check("effort", "Effort cap", "warn", "maxEffortLevel high holds oracle below the xhigh it declares")
     : check("effort", "Effort cap", "warn", `maxEffortLevel ${cap} holds every agent below the effort it declares`);
 }
 
 function modsCheck(settings: Inputs["settings"]): Check {
-  const guard = record(record(record(settings["pluginConfigs"])?.["cc-plugin-sec-default@builtin"])?.["options"]);
+  const guard = pluginOptions(settings, "cc-plugin-sec-default@builtin");
   return settings["allowManagedModsOnly"] === true || guard?.["allowManagedModsOnly"] === true
     ? check("mods", "Mod policy", "warn", "allowManagedModsOnly loads OMCA's mod only if your organization installed it")
     : check("mods", "Mod policy", "ok", "Mods you install may load");
@@ -160,7 +168,7 @@ const isOmcaStyle = (style: string) => style.slice(style.indexOf(":") + 1).trim(
 function outputStyleCheck(settings: Inputs["settings"], isForced: boolean | null): Check {
   const configured = settings["outputStyle"];
   const active = typeof configured === "string" && configured !== "" ? configured : "default";
-  const options = record(record(record(settings["pluginConfigs"])?.["oh-my-claudeagent@omca"])?.["options"]);
+  const options = pluginOptions(settings, "oh-my-claudeagent@omca");
   if (isForced === true) return check("style", "Output style", "ok", "OMCA Default is forced by the plugin");
   if (options?.["disableForceOrchestrationStyle"] === true) {
     return check("style", "Output style", "ok", `disableForceOrchestrationStyle is on, so your outputStyle ${active} applies`);
@@ -177,7 +185,7 @@ function outputStyleCheck(settings: Inputs["settings"], isForced: boolean | null
   );
 }
 
-function advisorCheck(settings: Inputs["settings"], env: Env): Check {
+function advisorCheck(settings: Inputs["settings"], env: DoctorEnv): Check {
   const blockers: readonly (readonly [string, boolean])[] = [
     ["CLAUDE_CODE_DISABLE_ADVISOR_TOOL", isOn(env.CLAUDE_CODE_DISABLE_ADVISOR_TOOL)],
     ["DISABLE_TELEMETRY", env.DISABLE_TELEMETRY !== undefined],
@@ -196,8 +204,8 @@ function advisorCheck(settings: Inputs["settings"], env: Env): Check {
 }
 
 function statusLineCheck(settings: Inputs["settings"], userSettings: string | null): Check {
-  const statusLine = record(settings["statusLine"]);
-  if (statusLine === undefined) return check("statusline", "Status line", "info", "No statusLine is set");
+  const statusLine = settings["statusLine"];
+  if (!isRecord(statusLine)) return check("statusline", "Status line", "info", "No statusLine is set");
   const interval = statusLine["refreshInterval"];
   if (typeof interval === "number" && interval >= 1) {
     return check("statusline", "Status line", "ok", `Refreshes every ${interval} s as well as on events`);
@@ -239,7 +247,8 @@ const BYTE_ORDER_MARK = 0xfeff;
 
 function parseObject(text: string): Readonly<Record<string, unknown>> | undefined {
   try {
-    return record(JSON.parse(text.charCodeAt(0) === BYTE_ORDER_MARK ? text.slice(1) : text));
+    const parsed: unknown = JSON.parse(text.charCodeAt(0) === BYTE_ORDER_MARK ? text.slice(1) : text);
+    return isRecord(parsed) ? parsed : undefined;
   } catch {
     return undefined;
   }
@@ -288,8 +297,8 @@ function statusLineSpan(text: string): { open: number; close: number } | undefin
 // when the object spans lines, so every byte outside the insertion stays as it was.
 export function addRefreshInterval(text: string): string | undefined {
   const before = parseObject(text);
-  const statusLine = record(before?.["statusLine"]);
-  if (before === undefined || statusLine === undefined || "refreshInterval" in statusLine) return undefined;
+  const statusLine = before?.["statusLine"];
+  if (before === undefined || !isRecord(statusLine) || "refreshInterval" in statusLine) return undefined;
   const span = statusLineSpan(text);
   if (span === undefined || span.close < 0) return undefined;
   let last = span.close - 1;

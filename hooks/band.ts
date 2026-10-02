@@ -1,9 +1,9 @@
 import type { ElementTable, RenderElement, TextProps } from "claude-code";
 import { type Band, bandView, BUTTON_GAP, oneLine, type Span, type Tone } from "../src/core/band-model.ts";
 import { resolveBoundPlan } from "../src/core/boulder.ts";
-import { checkboxStates } from "../src/core/checkboxes.ts";
+import { allTasksDone, checkboxStates } from "../src/core/checkboxes.ts";
 import { ledgerCoversSlot } from "../src/core/evidence.ts";
-import { hasPassingFinalVerification, isPlanComplete, type NextAction, nextActions } from "../src/core/next-actions.ts";
+import { hasPassingFinalVerification, type NextAction, nextActions } from "../src/core/next-actions.ts";
 import { BOULDER, LEDGER, statusPath, verificationOf } from "../src/core/omca-paths.ts";
 import { COLORS, glyphs, isAsciiRequested } from "../src/core/ui-kit.ts";
 import type { Features } from "./dispatch.ts";
@@ -64,7 +64,7 @@ async function readSnapshot(host: Host): Promise<Snapshot> {
   const hasFinalVerification =
     plan !== null &&
     planText !== null &&
-    isPlanComplete(plan) &&
+    allTasksDone(plan) &&
     (await attempt(LEDGER, async () =>
       hasPassingFinalVerification(await readJson(host, ledgerPath), await sha256(planText)),
     )) === true;

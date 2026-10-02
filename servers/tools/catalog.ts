@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { parseFrontmatter } from "../../src/core/frontmatter.ts";
-import { isSafeSessionId } from "../../src/core/session-id.ts";
+import { isSafeId } from "../../src/core/session-id.ts";
 import { findSession, latestSessionId } from "../hooks/session-state.ts";
 import { ledgerPath } from "../hooks/status-file.ts";
 import { projectRoot } from "../io.ts";
@@ -36,7 +36,7 @@ const rootOf = (args: Record<string, unknown>): string => projectRoot(stringArg(
 const isDirectory = (path: string): boolean => statSync(path, { throwIfNoEntry: false })?.isDirectory() ?? false;
 
 function markerWrittenAt(root: string, sessionId: string): number | undefined {
-  if (!isSafeSessionId(sessionId)) return undefined;
+  if (!isSafeId(sessionId)) return undefined;
   try {
     const marker: unknown = JSON.parse(readFileSync(join(root, ".omca", "state", "mod", `${sessionId}.json`), "utf8"));
     const at = typeof marker === "object" && marker !== null && "written_at" in marker ? marker.written_at : undefined;

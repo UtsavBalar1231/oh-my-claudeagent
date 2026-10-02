@@ -65,8 +65,11 @@ export function nextTaskLabel(content: string): string | null {
   return `${chars.slice(0, MAX_LABEL_LEN - 1).join("").trimEnd()}…`;
 }
 
-/** A plan with no numbered checkboxes is never complete. */
+/** The one completeness rule, by counts: at least one task and every task done. */
+export const allTasksDone = ({ done, total }: { done: number; total: number }): boolean => total > 0 && done === total;
+
+/** The same rule read from the plan's text: a plan with no numbered checkboxes is never complete. */
 export function planIsComplete(content: string): boolean {
   const states = checkboxStates(content);
-  return states.length > 0 && states.every((s) => s === "x");
+  return allTasksDone({ done: states.filter((state) => state === "x").length, total: states.length });
 }

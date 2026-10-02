@@ -169,7 +169,7 @@ export function formatTokens(tokens: number): string {
   return `${(tokens / 1_000_000).toFixed(1)}M`;
 }
 
-const two = (value: number) => String(value).padStart(2, "0");
+export const two = (value: number) => String(value).padStart(2, "0");
 
 export function formatWhen(at: number | string): string {
   const date = new Date(at);

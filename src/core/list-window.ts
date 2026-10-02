@@ -1,4 +1,4 @@
-export type Span = { start: number; end: number };
+export type ListSlice = { start: number; end: number };
 
 /** A list drawn as a window: its length, the selected index, and the indices that take focus. */
 export type FocusList = { total: number; current: number; rows: readonly number[] };
@@ -10,7 +10,7 @@ export type Placement = { start: number; isRefocusNeeded: boolean };
 
 export type FocusMove = { kind: "wrap" } | { kind: "move"; landing: number; start: number };
 
-export function windowOf(total: number, cursor: number, size: number): Span {
+export function windowOf(total: number, cursor: number, size: number): ListSlice {
   const span = Math.max(1, Math.min(size, total));
   const start = Math.max(0, Math.min(total - span, cursor - Math.floor(span / 2)));
   return { start, end: start + span };

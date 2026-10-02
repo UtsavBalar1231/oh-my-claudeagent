@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { isSafeSessionId, isWindowsSafeName } from "./session-id.ts";
+import { isSafeId, isWindowsSafeName } from "./session-id.ts";
 
 test.each<[string, boolean]>([
   ["00000000-0000-4000-8000-000000000001", true],
@@ -22,8 +22,8 @@ test.each<[string, boolean]>([
   ["console", true],
   ["com0", true],
   ["con-1", true],
-])("isSafeSessionId(%p) is %p", (id, expected) => {
-  expect(isSafeSessionId(id)).toBe(expected);
+])("isSafeId(%p) is %p", (id, expected) => {
+  expect(isSafeId(id)).toBe(expected);
 });
 
 describe("isWindowsSafeName", () => {

@@ -1,7 +1,7 @@
 import type { RenderElement } from "claude-code";
 import { aggregate, type LedgerRecord, METRICS_DIR, parseRecords } from "../../src/core/ledger.ts";
 import { PRICING_AS_OF } from "../../src/core/pricing.ts";
-import { isSafeSessionId } from "../../src/core/session-id.ts";
+import { isSafeId } from "../../src/core/session-id.ts";
 import { displayWidth, fitEnd, formatDuration, formatTokens, padEnd, padStart, shortType } from "../../src/core/ui-kit.ts";
 import { type Host, reason, type State } from "../host.ts";
 import type { Subcommand } from "../omca-router.ts";
@@ -19,7 +19,7 @@ const finished = (row: Row) => row.outcomes.completed + row.outcomes.aborted + r
 
 async function readRecords(host: Host, dir: string): Promise<{ records: LedgerRecord[]; sessions: number; skipped: number }> {
   if (!(await host.fs.exists(dir))) return { records: [], sessions: 0, skipped: 0 };
-  const sessions = (await host.fs.list(dir)).filter((entry) => entry.kind === "dir" && isSafeSessionId(entry.name));
+  const sessions = (await host.fs.list(dir)).filter((entry) => entry.kind === "dir" && isSafeId(entry.name));
   const perSession = await Promise.all(
     sessions.map(async ({ name }) => {
       const files = (await host.fs.list(`${dir}/${name}`)).filter((entry) => entry.kind === "file" && entry.name.endsWith(".json"));

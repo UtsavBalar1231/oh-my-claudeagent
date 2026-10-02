@@ -73,6 +73,9 @@ describe("added lines", () => {
 describe("stub findings", () => {
   const cases: [string, string, boolean][] = [
     ["a.sh", `# ${UNFINISHED} the parser`, true],
+    ["a.sh", `# ${UNFINISHED} the pagination path once the API exposes a cursor`, false],
+    ["a.sh", `# ${UNFINISHED} #42`, false],
+    ["a.sh", "# todo: implement", true],
     ["a.sh", `MARKER='${UNFINISHED}'`, false],
     ["notes.md", `${UNFINISHED} the parser`, false],
     ["suite.bats", `@test "${UNFINISHED} is reported" {`, false],

@@ -1,4 +1,4 @@
-import { isSafeSessionId } from "../src/core/session-id.ts";
+import { isSafeId } from "../src/core/session-id.ts";
 import type { Features } from "./dispatch.ts";
 import { type Host, pluginVersion } from "./host.ts";
 
@@ -10,7 +10,7 @@ async function writeMarker(host: Host): Promise<undefined> {
     host.clock.now(),
     pluginVersion(host),
   ]);
-  if (!isSafeSessionId(sessionId)) {
+  if (!isSafeId(sessionId)) {
     host.log(`mod-marker: the session id ${JSON.stringify(sessionId)} cannot name a file`);
     return undefined;
   }

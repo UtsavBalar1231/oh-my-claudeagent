@@ -1,4 +1,5 @@
-import { isSafeSessionId, isWindowsSafeName } from "./session-id.ts";
+import { isSafeId } from "./session-id.ts";
+import { isRecord } from "./tool-input.ts";
 
 export const METRICS_DIR = ".omca/metrics";
 
@@ -33,11 +34,9 @@ export type StatsRow = {
   evidenceRate: number;
 };
 
-const SAFE_AGENT_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
-
 /** The record's path, or undefined when either id could leave the metrics directory. */
 export function recordPath(root: string, sessionId: string, agentId: string): string | undefined {
-  if (!isSafeSessionId(sessionId) || !SAFE_AGENT_ID.test(agentId) || !isWindowsSafeName(agentId)) return undefined;
+  if (!isSafeId(sessionId) || !isSafeId(agentId)) return undefined;
   return `${root}/${METRICS_DIR}/${sessionId}/${agentId}.json`;
 }
 
@@ -49,10 +48,10 @@ export function outcomeOf(turn: { isAborted: boolean; answer: string }): Exclude
 /** True when any evidence entry's timestamp falls inside [startMs, endMs], both ends included. */
 export function isEvidenceLogged(ledgerText: string, startMs: number, endMs: number): boolean {
   const data: unknown = JSON.parse(ledgerText);
-  const entries = typeof data === "object" && data !== null && "entries" in data ? data.entries : undefined;
+  const entries = isRecord(data) ? data["entries"] : undefined;
   if (!Array.isArray(entries)) throw new Error("the evidence ledger holds no entries list");
   return entries.some((entry: unknown) => {
-    const timestamp = typeof entry === "object" && entry !== null && "timestamp" in entry ? entry.timestamp : undefined;
+    const timestamp = isRecord(entry) ? entry["timestamp"] : undefined;
     const at = typeof timestamp === "string" ? Date.parse(timestamp) : Number.NaN;
     return at >= startMs && at <= endMs;
   });
@@ -69,8 +68,8 @@ export function parseRecord(text: string): LedgerRecord | undefined {
   } catch {
     return undefined;
   }
-  if (typeof data !== "object" || data === null || Array.isArray(data)) return undefined;
-  const r = data as Record<string, unknown>;
+  if (!isRecord(data)) return undefined;
+  const r = data;
   const isValid =
     typeof r["session_id"] === "string" &&
     typeof r["agent_id"] === "string" &&
@@ -110,7 +109,11 @@ const UNITS_PER_USD = 1e8;
 
 export function aggregate(records: readonly LedgerRecord[]): StatsRow[] {
   const groups = new Map<string, LedgerRecord[]>();
-  for (const record of records) groups.set(record.agent_type, [...(groups.get(record.agent_type) ?? []), record]);
+  for (const record of records) {
+    const group = groups.get(record.agent_type);
+    if (group === undefined) groups.set(record.agent_type, [record]);
+    else group.push(record);
+  }
   return [...groups]
     .map(([agentType, group]): StatsRow => {
       const finished = group.filter((record) => record.outcome !== "running");

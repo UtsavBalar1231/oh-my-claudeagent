@@ -10,7 +10,7 @@ import { handle as planWriteGuard } from "./plan-write-guard.ts";
 import { type Session, touchSession } from "./session-state.ts";
 import { handle as sessionStart } from "./session-start.ts";
 import { handle as slashModeDetector } from "./slash-mode-detector.ts";
-import { isSafeSessionId, stampIfDue } from "./status-file.ts";
+import { isSafeId, stampIfDue } from "./status-file.ts";
 import { handle as stopGates } from "./stop-gates.ts";
 import { handle as subagentContext } from "./subagent-context.ts";
 import { handle as taskCompleted } from "./task-completed.ts";
@@ -104,7 +104,7 @@ const failureDeny = (name: string, error: unknown): Output => ({
 
 function sessionOf(id: unknown): Session | undefined {
   if (typeof id !== "string" || id === "") return undefined;
-  if (isSafeSessionId(id)) return touchSession(id);
+  if (isSafeId(id)) return touchSession(id);
   console.error(`omca: ignoring hook session state for an unsafe session id ${JSON.stringify(id)}`);
   return undefined;
 }

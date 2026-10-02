@@ -1,4 +1,4 @@
-import { isSafeSessionId } from "../src/core/session-id.ts";
+import { isSafeId } from "../src/core/session-id.ts";
 import type { Features } from "./dispatch.ts";
 import { type Host, reason } from "./host.ts";
 
@@ -30,7 +30,7 @@ function isRating(value: unknown): value is Rating {
 
 async function fileOf(host: Host): Promise<{ sessionId: string; path: string }> {
   const [root, sessionId] = await Promise.all([host.session.root(), host.session.id()]);
-  if (!isSafeSessionId(sessionId)) throw new Error(`the session id "${sessionId}" cannot name a file`);
+  if (!isSafeId(sessionId)) throw new Error(`the session id "${sessionId}" cannot name a file`);
   return { sessionId, path: `${root}/.omca/feedback/${sessionId}.json` };
 }
 

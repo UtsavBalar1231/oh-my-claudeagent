@@ -1,4 +1,4 @@
-const SAFE_SESSION_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
+const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 const WINDOWS_DEVICE_NAME = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
 
 /**
@@ -8,5 +8,5 @@ const WINDOWS_DEVICE_NAME = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
 export const isWindowsSafeName = (name: string): boolean =>
   !name.endsWith(".") && !WINDOWS_DEVICE_NAME.test(name.split(".")[0] ?? "");
 
-/** True when the id can name a file under `.omca/state/` without leaving its directory. */
-export const isSafeSessionId = (id: string): boolean => SAFE_SESSION_ID.test(id) && isWindowsSafeName(id);
+/** True when a session or agent id can name a file or directory under `.omca/` without leaving it. */
+export const isSafeId = (id: string): boolean => SAFE_ID.test(id) && isWindowsSafeName(id);

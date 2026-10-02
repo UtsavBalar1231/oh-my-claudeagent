@@ -17,7 +17,7 @@ const TRAILING_GLOBS = /(?:\/(?:\*|\.\*))+\/*$/;
 // Drive mounts as each platform spells them: Git Bash and Cygwin on Windows, WSL's /mnt on
 // Linux, volumes on macOS.
 const MOUNTS: Readonly<Record<Platform, RegExp>> = {
-  win32: /^\/(?:(?:cygdrive|mnt)\/)?[A-Za-z](?=\/|$)/,
+  win32: /^\/(?:cygdrive|mnt)\/[A-Za-z](?=\/|$)/,
   linux: /^\/mnt\/[A-Za-z](?=\/|$)/,
   darwin: /^\/Volumes\/[^/]+(?=\/|$)/,
 };
@@ -116,23 +116,22 @@ function isCatastrophicRelative(text: string, ctx: Context): boolean {
  * always sets it. A trailing glob removes its parent's contents, which is the parent's loss.
  */
 export function isCatastrophicTarget(word: string, ctx: Context): boolean {
-  const target = word.replace(/["']/g, "");
-  const home = homeRest(target, true);
+  const home = homeRest(word, true);
   if (home !== undefined) return partsBelow(home, true).length <= 1;
-  const here = CWD_REFERENCE[ctx.shell].exec(target)?.[1];
+  const here = CWD_REFERENCE[ctx.shell].exec(word)?.[1];
   if (here !== undefined) {
     const relative = ctx.shell === "powershell" ? here.replaceAll("\\", "/") : here;
     return partsBelow(relative, false).every((part) => part === "..") || isCatastrophicRelative(relative, ctx);
   }
-  const variable = variableAt(target);
+  const variable = variableAt(word);
   if (variable !== undefined) {
     const { name, rest } = variable;
-    if (USER_DATA.test(name) && !CLIMBS.test(rest)) return /^(?:[\\/].*)?$/s.test(rest) && partsBelow(rest, true).length === 0;
+    if (USER_DATA.test(name) && !CLIMBS.test(rest)) return SEPARATED.test(rest) && partsBelow(rest, true).length === 0;
     if (!/^[\\/]/.test(rest)) return false;
     if (ALWAYS_SET.test(name) && !CLIMBS.test(rest)) return false;
     return partsBelow(rest, true).length <= 1;
   }
-  const slashed = ctx.shell === "powershell" || inferPlatform(target) === "win32" ? target.replaceAll("\\", "/") : target;
+  const slashed = ctx.shell === "powershell" || inferPlatform(word) === "win32" ? word.replaceAll("\\", "/") : word;
   const text = /^[A-Za-z]:$/.test(slashed) ? `${slashed}/` : slashed;
   if (text.startsWith("/") || /^[A-Za-z]:\//.test(text)) return isCatastrophicPath(text, ctx);
   return partsBelow(text, false).every((part) => part === "..") || isCatastrophicRelative(text, ctx);

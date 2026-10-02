@@ -1,3 +1,5 @@
+import { isRecord } from "./tool-input.ts";
+
 export const EVIDENCE_TYPES = [
   "build",
   "test",
@@ -31,13 +33,12 @@ const TRUTHY_FIELDS = ["type", "command", "output_snippet", "timestamp"];
 
 /** The structural check the TaskCompleted gate applies to a ledger it did not write. */
 export function isWellFormedLedger(data: unknown): boolean {
-  if (typeof data !== "object" || data === null) return false;
-  const entries = (data as { entries?: unknown }).entries;
+  if (!isRecord(data)) return false;
+  const entries = data["entries"];
   if (!Array.isArray(entries) || entries.length === 0) return false;
   return entries.every((entry: unknown) => {
-    if (typeof entry !== "object" || entry === null) return false;
-    const e = entry as Record<string, unknown>;
+    if (!isRecord(entry)) return false;
     // Unlike the fields above, the gate tests exit_code only against null, so 0 and false pass.
-    return TRUTHY_FIELDS.every((k) => present(e[k])) && e["exit_code"] != null;
+    return TRUTHY_FIELDS.every((k) => present(entry[k])) && entry["exit_code"] != null;
   });
 }

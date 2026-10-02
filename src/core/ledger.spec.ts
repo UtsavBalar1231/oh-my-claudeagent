@@ -169,6 +169,17 @@ describe("aggregate", () => {
     ]);
   });
 
+  test("groups a long run of one agent type in linear time", () => {
+    const records = Array.from({ length: 60_000 }, (_, i) => record({ agent_id: `a${i}` }));
+    const times = [0, 1, 2].map(() => {
+      const start = performance.now();
+      aggregate(records);
+      return performance.now() - start;
+    });
+    expect(Math.min(...times)).toBeLessThan(500);
+    expect(aggregate(records)[0]?.count).toBe(60_000);
+  });
+
   test("sums costs without float drift: ten runs at $0.1 total exactly $1", () => {
     const rows = aggregate(Array.from({ length: 10 }, (_, i) => record({ agent_id: `a${i}`, estimated_cost_usd: 0.1 })));
     expect(rows[0]?.estimatedCostUsd).toBe(1);

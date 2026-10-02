@@ -38,7 +38,7 @@ const GIT_SUBCOMMAND = `(?<subcommand>reset["']?${S}+--hard|stash(?!${H}+(?:list
 
 function gitPatterns(commandPosition: string, wrapper: string, git: string) {
   const wrapped = wrapper === "" ? "" : `(?:${S}*${wrapper})?`;
-  const at = `(?<=^|${commandPosition}|[$]\\()${wrapped}${S}*${PREFIX}${commandWord(git)}${S}+${GIT_GLOBALS}`;
+  const at = `(?<=^|${commandPosition})${wrapped}${S}*${PREFIX}${commandWord(git)}${S}+${GIT_GLOBALS}`;
   return {
     git: new RegExp(`${at}["']?${GIT_SUBCOMMAND}["']?(?=[ \\t\\n\\v\\f\\r);&|<>\`]|$)`, "g"),
     push: new RegExp(`${at}push(?=${S}|$)(?<args>[^;&|)\`\\n\\r]*)`, "g"),
@@ -69,12 +69,12 @@ type Heredoc = { word: string; stripsTabs: boolean; isQuoted: boolean };
 
 const HEREDOC = /^<<(-?)[ \t]*(?:'([^'\n]*)'|"([^"\n]*)"|\\([A-Za-z_][A-Za-z0-9_.-]*)|([A-Za-z_][A-Za-z0-9_.-]*))/;
 
-type Span = { depth: number; isInBackticks: boolean };
+type OpenSubstitution = { depth: number; isInBackticks: boolean };
 
 // An unquoted heredoc body is text in which only a `$(...)` or backtick span runs, and a span can
 // cross lines. The span is kept as the command it is, a backslash-escaped character is text, and
 // every other character becomes `_`. `span` carries the open span from one line to the next.
-function blankLine(line: string, span: Span): string {
+function blankLine(line: string, span: OpenSubstitution): string {
   let out = "";
   for (let i = 0; i < line.length; i++) {
     const ch = line.charAt(i);
@@ -107,7 +107,7 @@ function blankBodies(command: string, from: number, pending: readonly Heredoc[])
   let out = "";
   let at = from;
   for (const { word, stripsTabs, isQuoted } of pending) {
-    const span: Span = { depth: 0, isInBackticks: false };
+    const span: OpenSubstitution = { depth: 0, isInBackticks: false };
     while (at < command.length) {
       const eol = command.indexOf("\n", at);
       const line = command.slice(at, eol === -1 ? command.length : eol);
@@ -196,7 +196,8 @@ export function neutralizeQuotedPositions(command: string): string {
   return out;
 }
 
-const trimLines = (command: string) => command.replace(/^[ \t\v\f\r]+/gm, "");
+/** The command with each line's leading horizontal whitespace removed, so an indented line is read at its command position. */
+export const trimLines = (command: string): string => command.replace(/^[ \t\v\f\r]+/gm, "");
 
 /** Splits an argument list into words the way the shell would, quotes removed and `\ ` read as a space, for display. */
 export function shellWords(text: string): string[] {
@@ -231,16 +232,17 @@ export function shellWords(text: string): string[] {
   return words;
 }
 
-function operands(words: readonly string[]): string[] {
+/** Words before the first `--` that start with `-` are options; every other word, and every word after `--`, is an operand. */
+function splitOptions(words: readonly string[]): { options: string[]; operands: string[] } {
+  const options: string[] = [];
+  const operands: string[] = [];
   let isEndOfOptions = false;
-  return words.filter((word) => {
-    if (isEndOfOptions) return true;
-    if (word === "--") {
-      isEndOfOptions = true;
-      return false;
-    }
-    return !word.startsWith("-");
-  });
+  for (const word of words) {
+    if (isEndOfOptions) operands.push(word);
+    else if (word === "--") isEndOfOptions = true;
+    else (word.startsWith("-") ? options : operands).push(word);
+  }
+  return { options, operands };
 }
 
 function removals(command: string, scan: string, ctx: Context): { isCatastrophic: boolean; removals: Removal[] } {
@@ -253,32 +255,32 @@ function removals(command: string, scan: string, ctx: Context): { isCatastrophic
     if (scanned.replace(CWD_SUBSTITUTION.bash, "").includes("$(") || args?.[2] === "`") {
       return { isCatastrophic: true, removals: [] };
     }
-    const words = shellWords(command.slice(offset, offset + scanned.length));
-    let isEndOfOptions = false;
-    for (const word of words) {
-      if (!isEndOfOptions && word === "--") isEndOfOptions = true;
-      else if (!isEndOfOptions && word === "--no-preserve-root") return { isCatastrophic: true, removals: [] };
-      else if ((isEndOfOptions || !word.startsWith("-")) && isCatastrophicTarget(word, ctx)) {
-        return { isCatastrophic: true, removals: [] };
-      }
+    const { options, operands } = splitOptions(shellWords(command.slice(offset, offset + scanned.length)));
+    if (options.includes("--no-preserve-root") || operands.some((word) => isCatastrophicTarget(word, ctx))) {
+      return { isCatastrophic: true, removals: [] };
     }
-    found.push({ targets: operands(words) });
+    found.push({ targets: operands });
   }
   return { isCatastrophic: false, removals: found };
 }
 
-const TREE_OPERATIONS = ["reset --hard", "stash", "clean", "restore", "rm -r", "checkout --"] as const;
-
-const treeOperation = (subcommand: string): GitOperation =>
-  TREE_OPERATIONS.find((operation) => subcommand.startsWith(operation.split(" ")[0] ?? operation)) ?? "reset --hard";
+function treeOperation(subcommand: string): GitOperation {
+  if (subcommand.startsWith("reset")) return "reset --hard";
+  if (subcommand.startsWith("stash")) return "stash";
+  if (subcommand.startsWith("clean")) return "clean";
+  if (subcommand.startsWith("restore")) return "restore";
+  if (subcommand.startsWith("rm")) return "rm -r";
+  return "checkout --";
+}
 
 function forcePush(args: string): GitFinding | undefined {
   const words = shellWords(args);
+  const { operands } = splitOptions(words);
   const isForced =
     words.some((word) => /^(-[a-zA-Z]*f[a-zA-Z]*|--force|--force-with-lease(=.*)?)$/.test(word)) ||
-    operands(words).slice(1).some((refspec) => refspec.startsWith("+"));
+    operands.slice(1).some((refspec) => refspec.startsWith("+"));
   if (!isForced) return undefined;
-  const [remote, refspec] = operands(words);
+  const [remote, refspec] = operands;
   const branch = refspec?.replace(/^\+/, "").split(":").at(-1)?.replace(/^refs\/heads\//, "");
   return {
     operation: "push --force",

@@ -1,4 +1,5 @@
 import { baseName, SHAPE_PLATFORM, toPosix } from "./path.ts";
+import { hasReference, isPlaceholderTodo } from "./todo.ts";
 import { inputText } from "./tool-input.ts";
 
 export type CommentGateMode = "off" | "advise" | "deny";
@@ -59,14 +60,6 @@ function addedLines(input: unknown): string[] {
   return (inputText(input, "content") || inputText(input, "new_string")).split("\n");
 }
 
-const hasReference = (text: string): boolean => /#\d+|[A-Z]+-\d+|@[A-Za-z]/.test(text);
-
-// A bare `TODO: implement` is a placeholder; one that goes on to say what and why is a plan.
-const MIN_PLACEHOLDER_CONTEXT_WORDS = 3;
-function isPlaceholderTodo(line: string): boolean {
-  const rest = /todo:\s*implement\w*\b(.*)$/.exec(line.toLowerCase())?.[1];
-  return rest !== undefined && !hasReference(line) && rest.trim().split(/\s+/).filter(Boolean).length < MIN_PLACEHOLDER_CONTEXT_WORDS;
-}
 
 // A literal attribution or placeholder on a comment line is near-certain slop, which is why
 // these are the only findings that always deny. The phrases must open the comment body, so a

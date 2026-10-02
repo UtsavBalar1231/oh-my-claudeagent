@@ -1,17 +1,17 @@
 import { statSync } from "node:fs";
 import { join } from "node:path";
 import { ledgerCoversSlot } from "../../src/core/evidence.ts";
-import { isSafeSessionId } from "../../src/core/session-id.ts";
+import { isSafeId } from "../../src/core/session-id.ts";
 import { writeFileAtomic } from "../io.ts";
 import type { Session } from "./session-state.ts";
 
-export { isSafeSessionId };
+export { isSafeId };
 
 export const STAMP_INTERVAL_MS = 5_000;
 const LEDGER = join(".omca", "evidence", "verification-evidence.json");
 
 export function statusPath(root: string, sessionId: string): string {
-  if (!isSafeSessionId(sessionId)) throw new Error(`unsafe session id in a state path: ${JSON.stringify(sessionId)}`);
+  if (!isSafeId(sessionId)) throw new Error(`unsafe session id in a state path: ${JSON.stringify(sessionId)}`);
   return join(root, ".omca", "state", "session", `${sessionId}.json`);
 }
 

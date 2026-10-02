@@ -1,4 +1,6 @@
 import { isSlotRecent, ledgerCoversSlot } from "./evidence.ts";
+import { isRecord } from "./tool-input.ts";
+import { two } from "./ui-kit.ts";
 
 export type Verification = { command: string; at: number; exit_code: number | null };
 
@@ -44,18 +46,15 @@ export function keepsSlot(previous: Verification | undefined, ledgerMtimeSeconds
 
 /** Display only: the Bash tool_response shape is undocumented, so anything else is null. */
 export function exitCodeOf(toolResponse: unknown): number | null {
-  if (typeof toolResponse !== "object" || toolResponse === null || Array.isArray(toolResponse)) return null;
-  const response = toolResponse as Record<string, unknown>;
-  const code = response["exitCode"] ?? response["exit_code"];
+  if (!isRecord(toolResponse)) return null;
+  const code = toolResponse["exitCode"] ?? toolResponse["exit_code"];
   return typeof code === "number" ? code : null;
 }
-
-const pad2 = (n: number) => String(n).padStart(2, "0");
 
 export function unloggedReason({ command, at }: Verification): string {
   const ran = new Date(at * 1000);
   return (
-    `You ran \`${command}\` at ${pad2(ran.getHours())}:${pad2(ran.getMinutes())} but logged no evidence after it. ` +
+    `You ran \`${command}\` at ${two(ran.getHours())}:${two(ran.getMinutes())} but logged no evidence after it. ` +
     "Log the real result with evidence_log, including a non-zero exit_code if it failed. " +
     `Example: evidence_log(evidence_type="test", command="${command}", exit_code=0, output_snippet="10 passed")`
   );

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { checkboxStates, MAX_LABEL_LEN, nextTaskLabel, outsideFences, planIsComplete } from "./checkboxes.ts";
+import { allTasksDone, checkboxStates, MAX_LABEL_LEN, nextTaskLabel, outsideFences, planIsComplete } from "./checkboxes.ts";
 import { parsePlan } from "./plan-reader.ts";
 
 describe("checkboxStates", () => {
@@ -125,6 +125,24 @@ describe("nextTaskLabel", () => {
   test("counts characters outside the BMP as one each", () => {
     const label = "😀".repeat(100);
     expect(nextTaskLabel(`- [ ] 1. ${label}\n`)).toBe(`${"😀".repeat(79)}…`);
+  });
+});
+
+describe("allTasksDone", () => {
+  test.each([
+    [{ done: 2, total: 2 }, true],
+    [{ done: 1, total: 2 }, false],
+    [{ done: 0, total: 0 }, false],
+    [{ done: 0, total: 3 }, false],
+  ])("%p is %p", (counts, expected) => {
+    expect(allTasksDone(counts)).toBe(expected);
+  });
+
+  test("agrees with planIsComplete on the counts of the same plan", () => {
+    for (const plan of ["- [x] 1. a\n- [x] 2. b\n", "- [x] 1. a\n- [ ] 2. b\n", "no tasks\n"]) {
+      const states = checkboxStates(plan);
+      expect(allTasksDone({ done: states.filter((state) => state === "x").length, total: states.length })).toBe(planIsComplete(plan));
+    }
   });
 });
 

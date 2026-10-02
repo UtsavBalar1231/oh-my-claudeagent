@@ -697,8 +697,8 @@ describe("drift-guard", () => {
 
   test("drift-guard: the prose carve-out does not leak to code files", async () => {
     const run = seeded();
-    write(run.root, "script.sh", `# ${UNFINISHED} the pagination path\n`);
-    expect(await claim(run)).toEqual(drift(`script.sh:1  # ${UNFINISHED} the pagination path`));
+    write(run.root, "script.sh", `# ${UNFINISHED} pagination\n`);
+    expect(await claim(run)).toEqual(drift(`script.sh:1  # ${UNFINISHED} pagination`));
   });
 
   test("drift-guard: a marker as a shell string constant is not a finding", async () => {

@@ -1,3 +1,5 @@
+import { isPlaceholderTodo } from "./todo.ts";
+
 export type Candidate = { readonly file: string; readonly line: number; readonly text: string };
 
 const CLAIM = /\b(done|complete|completed|finished|implemented|fixed|resolved|ready (to|for) (merge|review))\b/g;
@@ -6,7 +8,6 @@ const NEGATION = /(\b(not|no|nothing|none|never|un[a-z]+ished|incomplete|yet to|
 const SENTENCE_BREAK = /[.!?;:\n]/;
 
 const FOCUSED_TEST = /\b(describe|context|it|test|bench|suite|specify|concurrent|serial|sequential)\.only\b/;
-const UNFINISHED = "TODO: implement";
 const NOT_IMPLEMENTED_THROW = /throw new [A-Za-z]*Error\(["'].*not implemented/;
 const RUNNABLE_TEST_FILE = /\.(js|jsx|ts|tsx|mjs|cjs)$/;
 // A document cannot hold an executable stub, so a marker in one is always a mention.
@@ -30,7 +31,7 @@ export function hasCompletionClaim(message: string): boolean {
 }
 
 export const hasStubMarker = (text: string): boolean =>
-  FOCUSED_TEST.test(text) || text.includes(UNFINISHED) || NOT_IMPLEMENTED_THROW.test(text);
+  FOCUSED_TEST.test(text) || isPlaceholderTodo(text) || NOT_IMPLEMENTED_THROW.test(text);
 
 /** The added lines of a `git diff --unified=0`, numbered as in the new file. */
 export function addedLines(diff: string): Candidate[] {
@@ -70,5 +71,5 @@ export function isStubFinding({ file, text }: Candidate): boolean {
   if (PROSE_FILE.test(file) || BATS_TEST_DECLARATION.test(text)) return false;
   if (NOT_IMPLEMENTED_THROW.test(text)) return true;
   const unquoted = stripQuotes(text, ["'", '"']);
-  return unquoted.includes(UNFINISHED) || (RUNNABLE_TEST_FILE.test(file) && FOCUSED_TEST.test(unquoted));
+  return isPlaceholderTodo(unquoted) || (RUNNABLE_TEST_FILE.test(file) && FOCUSED_TEST.test(unquoted));
 }

@@ -2,14 +2,14 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { isHookDisabled } from "../../src/core/kill-switch.ts";
 import { matchKeywordModes } from "../../src/core/keywords.ts";
-import { isSafeSessionId } from "../../src/core/session-id.ts";
+import { isSafeId } from "../../src/core/session-id.ts";
 import type { Handler } from "./registry.ts";
 import { announceOnce } from "./session-state.ts";
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null;
 
 function keywordTriggersEnabled(root: string, sessionId: unknown): boolean {
-  if (typeof sessionId !== "string" || !isSafeSessionId(sessionId)) return false;
+  if (typeof sessionId !== "string" || !isSafeId(sessionId)) return false;
   let text: string;
   try {
     text = readFileSync(join(root, ".omca", "state", "mod", `${sessionId}.json`), "utf8");
