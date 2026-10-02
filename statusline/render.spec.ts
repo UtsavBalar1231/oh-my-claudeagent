@@ -10,6 +10,7 @@ import {
   arrange,
   block,
   composePr,
+  DEFAULT_MAIN_AGENT,
   detectNerdFont,
   fixed,
   formatResetTime,
@@ -461,7 +462,7 @@ describe("segments", () => {
 
   test.each([
     ["sisyphus", "A:"],
-    ["oh-my-claudeagent:sisyphus", "A:"],
+    ["oh-my-claudeagent:prometheus", "A:"],
   ])("agent %s is marked %s without Nerd Font", (name, glyph) => {
     expect(one({ model, agent: { name } })).toBe([MODEL, WAITING, `${M}${glyph} ${name}${R}`, COST_ZERO].join(S));
   });
@@ -478,6 +479,11 @@ describe("segments", () => {
   test("every shipped agent has its own glyph", () => {
     const shipped = readdirSync(join(import.meta.dir, "..", "agents")).filter((f) => f.endsWith(".md")).map((f) => f.slice(0, -".md".length));
     expect(shipped.filter((name) => !AGENT_GLYPHS.has(name))).toEqual([]);
+  });
+
+  test("the plugin's default main agent shows nothing, and that default is the one settings.json sets", () => {
+    expect(one({ model, agent: { name: DEFAULT_MAIN_AGENT } })).toBe([MODEL, WAITING, COST_ZERO].join(S));
+    expect(JSON.parse(readFileSync(join(import.meta.dir, "..", "settings.json"), "utf8")).agent).toBe(DEFAULT_MAIN_AGENT);
   });
 
   test("an agent without a name shows nothing", () => {

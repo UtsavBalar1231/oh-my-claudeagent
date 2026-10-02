@@ -58,6 +58,8 @@ export const GREEN = "\x1b[32m";
 export const YELLOW = "\x1b[33m";
 export const RED = "\x1b[31m";
 const MAGENTA = "\x1b[35m";
+// The plugin's settings.json starts every session on this agent, so naming it tells nothing.
+export const DEFAULT_MAIN_AGENT = "oh-my-claudeagent:sisyphus";
 const BLUE = "\x1b[34m";
 const BOLD = "\x1b[1m";
 export const SEP = ` ${DIM}·${RST} `;
@@ -444,7 +446,7 @@ function fullSegments(c: Ctx): Segment[] {
     contextSegment(data),
     branchSegment(c),
     directorySegment(c),
-    data.agent?.name ? block(`${MAGENTA}${agentGlyph(data.agent.name, nerd)} ${data.agent.name}${RST}`) : null,
+    data.agent?.name && data.agent.name !== DEFAULT_MAIN_AGENT ? block(`${MAGENTA}${agentGlyph(data.agent.name, nerd)} ${data.agent.name}${RST}`) : null,
     worktree?.name ? block(`${BLUE}${g.worktree} ${worktree.name}${RST}${worktree.original_branch ? ` ${DIM}<- ${worktree.original_branch}${RST}` : ""}`) : null,
     pr ? block(pr) : null,
     block(`${MAGENTA}$${cost?.total_cost_usd != null ? fixed(cost.total_cost_usd, 2) : "0.00"}${RST}${SEP}${BLUE}${g.clock} ${formatDuration(cost?.total_duration_ms)}${RST}`),
