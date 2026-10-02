@@ -12,38 +12,15 @@ defaults:
     shell: bash
 
 jobs:
-  validate:
-    name: Validate Plugin
-    runs-on: ubuntu-latest
+  ci:
+    name: CI
     permissions:
       contents: read
-    steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-        with:
-          persist-credentials: false
-
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version: 1.4.2
-          no-cache: true
-
-      - name: Run validation
-        run: bun scripts/validate.ts --check claims --check hooks --check mod --check tree --check engine
-
-      - name: Job summary
-        if: always()
-        run: |
-          {
-            echo "### What this job checks"
-            echo "Plugin claims (manifests, frontmatter, docs), hook registration, the mod's registrations and the repository layout, via \`just test\`."
-            echo ""
-            echo "### If this fails"
-            echo "The plugin manifest or a hook definition is malformed or out of sync. This gate must pass before a release is created."
-          } >> "$GITHUB_STEP_SUMMARY"
+    uses: ./.github/workflows/ci.yml
 
   release:
     name: Create Release
-    needs: [validate]
+    needs: [ci]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -71,7 +48,7 @@ jobs:
         run: |
           {
             echo "### What this job checks"
-            echo "Tag version matches plugin.json, then creates the GitHub release (runs only after validate passes)."
+            echo "Tag version matches plugin.json, then creates the GitHub release (runs only after every CI job passes)."
             echo ""
             echo "### If this fails"
             echo "Either the tag/version mismatch check failed, or the release creation step failed. Check the step logs above for which one."

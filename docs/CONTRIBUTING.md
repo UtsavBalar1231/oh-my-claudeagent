@@ -2,10 +2,11 @@
 
 ## Prerequisites
 
-- `jq`, used by the release recipe and the commands `just eval-consistency` prints
+- `jq`, used by the commands `just eval-consistency` prints
 - `bun` 1.4.2 or later, runtime for the MCP server, the hooks module, the status line and the scripts
 - `ast-grep` CLI (`ast-grep` or `sg`), structural code-search tools
 - `just`, task runner for dev commands
+- `uv`, which `just bench` uses to install a baseline whose status line is the Python renderer
 
 Run `just setup` to install the pre-commit git hooks.
 
@@ -62,15 +63,16 @@ Key rules:
 ## Testing
 
 ```bash
-just ci              # full pipeline: test + mcp + manifest + opencode + TypeScript checks
+just ci              # full pipeline: typecheck, every validator group, mod tests, bun specs, MCP, manifest, opencode
 just test            # structural validation only (claims, hooks, mod, tree, engine), not the full suite
 just test-claims     # manifest, frontmatter, docs and policy checks
 just test-hooks      # hooks.json handler shape, SessionStart matcher and registry checks
 just test-mcp        # MCP server specs (requires ast-grep CLI) and the handshake check
 just test-bun        # every bun spec, including the validator specs
-just qa              # manual QA against the mock model: session smoke, install verify, live hook probe, statusline probe, worktree and route-effort checks
+just qa              # manual QA against the mock model: session smoke, install verify, live hook probe, statusline probe, live MCP probe, worktree and route-effort checks
 just test-opencode   # OpenCode adapter: typecheck and every opencode/ spec, run against a real OpenCode install
 just typecheck-ts    # both tsc projects
+just validate        # every validator group (bun scripts/validate.ts)
 ```
 
 Use `just ci` before claiming a change is verified; `just test` alone is a structural subset.
@@ -94,10 +96,12 @@ original failure. Follow this checklist:
 
 ## Release process
 
-`just release [version]` is the whole process. It requires a clean working tree, then bumps
-the version in `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json` and
-`package.json` together, commits, stamps the resulting HEAD SHA into
-`marketplace.json` for deterministic installs, and tags. Add the CHANGELOG entry for the
-version first; the recipe validates that it exists.
+`just release <version>` is the whole process. It runs `scripts/release.ts`, which requires a clean
+tracked tree, a `## [<version>]` heading in `CHANGELOG.md` and no existing tag for the version,
+then writes the version into `.claude-plugin/plugin.json`, both version fields of
+`.claude-plugin/marketplace.json` and `package.json`, and commits the bump. A second commit
+records the bump commit's SHA in `marketplace.json` for deterministic installs, and the tag goes
+on the bump commit, not on the stamp commit. The script never pushes: push the branch and the
+tag yourself. Add the CHANGELOG entry for the version first.
 
 Prefer the recipe over hand-editing the three version fields, which must stay identical.

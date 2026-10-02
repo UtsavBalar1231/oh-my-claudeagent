@@ -3,7 +3,7 @@ ci:
   autofix_prs: true
   autoupdate_commit_msg: "ci: pre-commit autoupdate"
   autoupdate_schedule: weekly
-  skip: [zizmor]
+  skip: [zizmor, typecheck-ts]
 
 # Engine-generated type snapshot: committed byte for byte as the client writes it.
 exclude: '^\.claude-plugin/types/'
@@ -41,3 +41,13 @@ repos:
     rev: v1.24.1
     hooks:
       - id: zizmor
+
+  # Both tsc projects, the same check CI runs; the recipe needs bun and just on PATH
+  - repo: local
+    hooks:
+      - id: typecheck-ts
+        name: typecheck-ts
+        entry: just typecheck-ts
+        language: system
+        files: '\.tsx?$|^tsconfig[^/]*\.json$|^package\.json$'
+        pass_filenames: false

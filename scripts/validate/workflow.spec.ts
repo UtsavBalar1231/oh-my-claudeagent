@@ -11,7 +11,7 @@ const RELEASE = readFileSync(join(REPO, ".github", "workflows", "release.yml"), 
 // command differently from the recipe body; each pin is also asserted to be a substring of the
 // recipe's own body, so a pin cannot drift from the real command, only from CI's coverage of it.
 const PINS: Readonly<Record<string, string>> = {
-  test: "bun scripts/validate.ts --check claims --check hooks --check mod --check tree --check engine",
+  validate: "bun scripts/validate.ts",
   "test-mcp": "bun test servers",
   "validate-manifest": "claude plugin validate . --strict",
   "test-opencode": "bun test opencode/",
@@ -47,7 +47,7 @@ const ciLeaves = [...new Set(leafSteps("ci"))].sort();
 
 describe("workflow contract", () => {
   test("just ci recipe chain resolves to the expected leaf steps", () => {
-    expect(ciLeaves.join(" ")).toBe("test test-bun test-mcp test-mod test-opencode typecheck-ts validate-manifest validate-mod");
+    expect(ciLeaves.join(" ")).toBe("test-bun test-mcp test-mod test-opencode typecheck-ts validate validate-manifest validate-mod");
   });
 
   test("every just ci leaf step has a pinned ci.yml coverage pattern", () => {
@@ -74,13 +74,18 @@ describe("workflow contract", () => {
     expect(CI.includes(PINS["test-mcp"] ?? "\0")).toBe(true);
   });
 
-  test("release.yml runs the claims+hooks validate gate", () => {
-    expect(RELEASE.includes(PINS.test ?? "\0")).toBe(true);
+  test("ci.yml is callable, and release.yml runs it as the gate its release job needs", () => {
+    expect(CI).toMatch(/^ {2}workflow_call:/m);
+    expect(RELEASE).toContain("uses: ./.github/workflows/ci.yml");
+    const lines = RELEASE.split("\n");
+    const needs = lines.slice(lines.findIndex((line) => line.startsWith("  release:"))).find((line) => line.includes("needs:"));
+    expect(needs?.trim()).toBe("needs: [ci]");
   });
 
-  test("release.yml's release job needs the validate gate", () => {
-    const needs = RELEASE.split("\n").slice(RELEASE.split("\n").findIndex((line) => line.startsWith("  release:"))).find((line) => line.includes("needs:"));
-    expect(needs?.trim()).toBe("needs: [validate]");
+  test("every setup-bun step in ci.yml opts out of the cache, since a tag push runs it through release.yml", () => {
+    const steps = CI.split("\n").flatMap((line, index, lines) => (line.includes("oven-sh/setup-bun@") ? [lines.slice(index, index + 4).join("\n")] : []));
+    expect(steps.length).toBeGreaterThan(0);
+    expect(steps.filter((step) => !step.includes("no-cache: true"))).toEqual([]);
   });
 
   test("neither workflow runs bats or checks out submodules", () => {

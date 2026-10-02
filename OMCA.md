@@ -1696,5 +1696,5 @@ just test-hooks
 Full CI pipeline:
 
 ```bash
-just ci    # lint + test + mcp + opencode + TypeScript checks
+just ci    # typecheck, every validator group, mod tests, bun specs, MCP, manifest, opencode
 ```

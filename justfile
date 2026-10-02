@@ -54,7 +54,7 @@ test-bun:
 	bun test src servers statusline scripts opencode
 
 # Run the manual QA harness: session smoke, install verify, the live hook probe, the statusline probe,
-# then the worktree-bash and route-effort checks. Maintainer pre-release step, NOT part of CI: it launches
+# the live MCP probe, then the worktree-bash and route-effort checks. Maintainer pre-release step, NOT part of CI: it launches
 # real `claude` sessions against the mock model, each in a scratch project with its own CLAUDE_CONFIG_DIR.
 [group('test')]
 qa:
@@ -62,6 +62,7 @@ qa:
 	bun scripts/qa/install-verify.ts
 	bun scripts/qa/hook-live-probe.ts
 	bun scripts/qa/statusline-probe.ts
+	bun scripts/qa/mcp-live.ts
 	just qa-worktree-bash
 	just qa-route-effort
 
@@ -139,22 +140,20 @@ doctor:
 	@which ast-grep >/dev/null 2>&1 && echo "ast-grep: $(ast-grep --version 2>&1 | head -1)" || (which sg >/dev/null 2>&1 && echo "ast-grep (sg): $(sg --version 2>&1 | head -1)" || echo "ast-grep: NOT FOUND (required)")
 	@which pre-commit >/dev/null 2>&1 && echo "pre-commit: $(pre-commit --version)" || echo "pre-commit: NOT FOUND (recommended)"
 
-# Watch all OMCA log files in real-time
-[group('dev')]
-watch-logs:
-	@tail -f .omca/logs/*.jsonl 2>/dev/null || echo "No log files found in .omca/logs/"
+# ── Docs ──────────────────────────────────────────────────────────
 
-# ── Dev tools ────────────────────────────────────────────────────
-
-# Analyze current session logs
-[group('dev')]
-analyze-session:
-	@echo "=== Session Analysis ==="
-	@echo "Agents spawned: $(cat .omca/logs/subagents.jsonl 2>/dev/null | wc -l)"
-	@echo "Evidence entries: $(jq '.entries | length' .omca/state/verification-evidence.json 2>/dev/null || echo 0)"
-	@echo "Hook errors: $(cat .omca/logs/hook-errors.jsonl 2>/dev/null | wc -l)"
+# Recapture the README screens in tmux against the mock model, then render them to SVG
+[group('docs')]
+screenshots:
+	bun scripts/docs/screenshots.ts
+	bun scripts/docs/render-svg.ts
 
 # ── Validate ─────────────────────────────────────────────────────
+
+# Run every validator group; the engine group skips without the claude CLI
+[group('validate')]
+validate:
+	bun scripts/validate.ts
 
 # Validate plugin structure with claude CLI (requires claude in PATH).
 # Both positionals are needed: the repo root resolves only marketplace.json (whose plugin entry
@@ -229,64 +228,13 @@ test-all: test test-mcp test-bun
 
 # ── CI ────────────────────────────────────────────────────────────
 
-# Run full CI pipeline (test + mcp + manifest + opencode + TypeScript checks)
+# Run full CI pipeline (typecheck, every validator group, mod tests, bun specs, MCP, manifest, opencode)
 [group('ci')]
-ci: test test-mcp validate-manifest test-opencode typecheck-ts test-mod test-bun validate-mod
+ci: typecheck-ts validate test-mod test-bun test-mcp validate-mod validate-manifest test-opencode
 
 # ── Release ──────────────────────────────────────────────────────
 
-# Bump version, commit, stamp SHA, and tag. Usage: just release [version]
+# Bump the version, commit, stamp the bump commit's SHA in a second commit, and tag the bump commit. Never pushes. Usage: just release <version>
 [group('release')]
-release version="":
-	#!/usr/bin/env bash
-	set -euo pipefail
-	# Guard: abort if working tree is dirty
-	if ! git diff --quiet || ! git diff --cached --quiet; then
-		echo "ERROR: working tree has uncommitted changes. Commit or stash first." >&2
-		exit 1
-	fi
-	VERSION="{{ version }}"
-	if [[ -z "${VERSION}" ]]; then
-		VERSION=$(jq -r '.version' .claude-plugin/plugin.json)
-	else
-		# Validate CHANGELOG has an entry for this version
-		if ! grep -q "## \[${VERSION}\]" CHANGELOG.md; then
-			echo "ERROR: no CHANGELOG.md entry for version ${VERSION}. Add one first." >&2
-			exit 1
-		fi
-		# Update plugin.json with provided version
-		jq --arg v "${VERSION}" '.version = $v' .claude-plugin/plugin.json > /tmp/plugin-tmp.json
-		mv /tmp/plugin-tmp.json .claude-plugin/plugin.json
-		echo "Updated plugin.json: $VERSION"
-		jq --arg v "${VERSION}" '.version = $v' package.json > /tmp/package-tmp.json
-		mv /tmp/package-tmp.json package.json
-		echo "Updated package.json: $VERSION"
-	fi
-	# Sync version into marketplace.json (SHA stamped in a separate commit below)
-	jq --arg v "${VERSION}" '
-		.metadata.version = $v |
-		.plugins[0].version = $v
-	' .claude-plugin/marketplace.json > /tmp/marketplace-tmp.json
-	mv /tmp/marketplace-tmp.json .claude-plugin/marketplace.json
-	echo "Synced version: $VERSION"
-	# Commit 1: version bump across all manifests
-	git add .claude-plugin/plugin.json .claude-plugin/marketplace.json package.json
-	git commit -m "chore(release): bump version to ${VERSION}"
-	echo "Committed version bump"
-	# Commit 2: stamp the version-bump commit SHA into marketplace.json
-	# (A commit can't contain its own SHA, so this must be a separate commit.
-	#  Claude Code reads marketplace.json from HEAD but fetches the plugin tree
-	#  at the stamped SHA — which is commit 1 with the correct version.)
-	RELEASE_SHA=$(git rev-parse HEAD)
-	jq --arg sha "$RELEASE_SHA" '.plugins[0].source.sha = $sha' \
-		.claude-plugin/marketplace.json > /tmp/marketplace-tmp.json
-	mv /tmp/marketplace-tmp.json .claude-plugin/marketplace.json
-	git add .claude-plugin/marketplace.json
-	git commit -m "chore(release): stamp v${VERSION} SHA"
-	echo "Stamped SHA: $RELEASE_SHA"
-	# Tag the version-bump commit (not the SHA-stamp commit)
-	git tag -f "v${VERSION}" "$RELEASE_SHA"
-	echo "Tagged v${VERSION} at ${RELEASE_SHA:0:7}"
-	echo ""
-	echo "Release ${VERSION} ready. Push with:"
-	echo "  git push origin main --tags"
+release version:
+	bun scripts/release.ts '{{ version }}'
