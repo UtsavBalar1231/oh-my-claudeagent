@@ -18,13 +18,17 @@ const ALL_TOOLS = [
   "boulder_write",
   "boulder_progress",
   "health_check",
+  "agents_list",
+  "categories_list",
   "evidence_log",
   "evidence_read",
+  "file_read",
   "omca_hook",
   "notepad_write",
   "notepad_read",
   "notepad_list",
   "notepad_compact",
+  "session_search",
 ];
 const PROPERTY_NAME = /^[A-Za-z0-9_.-]{1,64}$/;
 

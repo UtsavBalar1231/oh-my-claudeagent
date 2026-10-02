@@ -57,7 +57,7 @@ describe("declarations", () => {
     }
   });
 
-  test("required arguments and the section enum match the Python tools", () => {
+  test("required arguments and the section enum are exact", () => {
     expect(tools.map(({ name, inputSchema }) => [name, inputSchema.required ?? []])).toEqual([
       ["notepad_write", ["plan_name", "section", "content"]],
       ["notepad_read", ["plan_name"]],
