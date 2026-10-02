@@ -1,5 +1,15 @@
 import { expect, test } from "bun:test";
-import { MAX_SESSIONS, touchSession } from "./session-state.ts";
+import { latestSessionId, MAX_SESSIONS, touchSession } from "./session-state.ts";
+
+test("the latest session id is the one the most recent hook call touched", () => {
+  const before = crypto.randomUUID();
+  const after = crypto.randomUUID();
+  touchSession(before);
+  touchSession(after);
+  expect(latestSessionId()).toBe(after);
+  touchSession(before);
+  expect(latestSessionId()).toBe(before);
+});
 
 test("the same id returns the same session", () => {
   const id = crypto.randomUUID();
