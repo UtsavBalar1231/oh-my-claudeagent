@@ -1,7 +1,8 @@
 import { resolve } from "node:path"
 import { type DenyOnce, judgeWrite } from "../src/core/comments.ts"
-import { classify, reasonFor } from "../src/core/destructive.ts"
+import { classify, type Context, reasonFor } from "../src/core/destructive.ts"
 import { isHookDisabled } from "../src/core/kill-switch.ts"
+import { homeDir, toPlatform } from "../src/core/path.ts"
 
 export type GuardResult = { deny: true; reason: string } | { deny: false }
 
@@ -9,8 +10,13 @@ const ALLOW: GuardResult = { deny: false }
 
 // OpenCode has no dialog to hold a command in, so it decides as `guardMode: deny` does: a
 // catastrophic or blocking match is denied, and an advisory one runs.
+function shellContext(): Context {
+  const home = homeDir(process.env)
+  return { shell: "bash", cwd: process.cwd(), platform: toPlatform(process.platform), ...(home !== undefined && { home }) }
+}
+
 export function checkShell(command: string): GuardResult {
-  const finding = classify(command)
+  const finding = classify(command, shellContext())
   if (finding === undefined || finding.kind === "advisory") return ALLOW
   if (finding.kind === "blocking" && isHookDisabled(process.env.OMCA_DISABLED_HOOKS, "bash-guard")) return ALLOW
   return { deny: true, reason: reasonFor(finding) }

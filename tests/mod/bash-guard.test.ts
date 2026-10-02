@@ -1,5 +1,6 @@
 import type { On, ProcessRunResult } from "claude-code";
 import { expect, test, type Engine } from "claude-code/testing";
+import { type Layout, WINDOWS, world as sessionWorld } from "./world.ts";
 
 const ENGINE = { decision: "ask", reason: "Bash(rm:*) asks", rule: "Bash(rm:*)" } as const;
 const RM_CATASTROPHIC =
@@ -16,6 +17,9 @@ type World = {
   git?: Record<string, Partial<ProcessRunResult>>;
   answer?: string;
   failExists?: string;
+  cwd?: string;
+  layout?: Layout;
+  contents?: Record<string, string>;
 };
 type Question = { question: string; header: string; options: { label: string }[] };
 
@@ -27,29 +31,35 @@ function world(on: On, w: World = {}) {
   // The engine resolves a relative path against the session's folder before the hook sees it.
   const nodeAt = (path: string) =>
     Object.entries(files).find(([name]) => path === name || path.endsWith(`/${name}`))?.[1];
-  on("ui.log", () => ({ value: undefined }));
-  on("env.get", (_$, e) => ({ value: env[e.name] }));
+  if (w.layout !== undefined) {
+    sessionWorld(on, w.contents ?? {}, {}, w.env ?? {}, w.layout);
+  } else {
+    on("ui.log", () => ({ value: undefined }));
+    on("env.get", (_$, e) => ({ value: env[e.name] }));
+    on("session.root", () => ({ value: "/work" }));
+    on("fs.exists", (_$, e) => {
+      if (w.failExists !== undefined && e.path.endsWith(`/${w.failExists}`)) {
+        return { deny: `EACCES: permission denied, access '${w.failExists}'` };
+      }
+      return { value: nodeAt(e.path) !== undefined };
+    });
+    on("fs.stat", (_$, e) => {
+      const node = nodeAt(e.path);
+      if (node === undefined) throw new Error(`ENOENT: ${e.path}`);
+      return { value: { kind: node.kind, size: 0, mtimeMs: 0, isLink: node.isLink ?? false } };
+    });
+    on("fs.list", (_$, e) => ({
+      value: Array.from({ length: nodeAt(e.path)?.entries ?? 0 }, (_, i) => ({
+        name: `e${i}`,
+        kind: "file" as const,
+        size: 0,
+        mtimeMs: 0,
+        isLink: false,
+      })),
+    }));
+  }
+  on("session.cwd", () => ({ value: w.cwd ?? w.layout?.root ?? "/work/sub" }));
   on("session.surfaces", () => ({ value: w.surfaces ?? ["terminal"] }));
-  on("fs.exists", (_$, e) => {
-    if (w.failExists !== undefined && e.path.endsWith(`/${w.failExists}`)) {
-      return { deny: `EACCES: permission denied, access '${w.failExists}'` };
-    }
-    return { value: nodeAt(e.path) !== undefined };
-  });
-  on("fs.stat", (_$, e) => {
-    const node = nodeAt(e.path);
-    if (node === undefined) throw new Error(`ENOENT: ${e.path}`);
-    return { value: { kind: node.kind, size: 0, mtimeMs: 0, isLink: node.isLink ?? false } };
-  });
-  on("fs.list", (_$, e) => ({
-    value: Array.from({ length: nodeAt(e.path)?.entries ?? 0 }, (_, i) => ({
-      name: `e${i}`,
-      kind: "file" as const,
-      size: 0,
-      mtimeMs: 0,
-      isLink: false,
-    })),
-  }));
   on("process.run", (_$, e) => {
     const result = w.git?.[e.argv.join(" ")];
     if (result === undefined) throw new Error(`unexpected process.run ${e.argv.join(" ")}`);
@@ -69,7 +79,8 @@ function world(on: On, w: World = {}) {
   return { asked, checked };
 }
 
-const check = ($: Engine, command: string) => $.tool.check({ tool: "Bash", input: { command } });
+const check = ($: Engine, command: string, tool = "Bash") => $.tool.check({ tool, input: { command } });
+const powershell = ($: Engine, command: string) => check($, command, "PowerShell");
 
 const BUILD_WORLD: World = {
   files: {
@@ -393,3 +404,223 @@ test("rm -rf of a relative build dir is silent", ($, on) =>
 test("rm -rf two levels under home is silent", ($, on) => silentWithoutDialog($, on, "rm -rf ~/.cache/foo"));
 
 test("a deeper variable-led path is silent", ($, on) => silentWithoutDialog($, on, "rm -rf $DIR/build/out"));
+
+test("a PowerShell recursive removal of a drive root is denied with no dialog", async ($, on) => {
+  const { asked, checked } = world(on);
+
+  expect(await powershell($, "Remove-Item -Recurse -Force C:\\")).toEqual({ decision: "deny", reason: RM_CATASTROPHIC });
+  expect(await powershell($, "cmd /c rd /s /q C:\\")).toEqual({ decision: "deny", reason: RM_CATASTROPHIC });
+  expect(asked).toEqual([]);
+  expect(checked).toEqual([]);
+});
+
+test("a catastrophic PowerShell removal is denied even with the guard switched off", async ($, on) => {
+  const { asked, checked } = world(on, { env: { OMCA_DISABLED_HOOKS: "all" }, surfaces: [] });
+
+  expect(await powershell($, "ri -r -fo $env:USERPROFILE")).toEqual({ decision: "deny", reason: RM_CATASTROPHIC });
+  expect(asked).toEqual([]);
+  expect(checked).toEqual([]);
+});
+
+test("a PowerShell hard reset is denied where no dialog can show it", async ($, on) => {
+  const quiet = world(on, { surfaces: [] });
+  expect(await powershell($, "git.exe reset --hard")).toEqual({ decision: "deny", reason: GIT });
+  expect(await powershell($, '& "C:\\Program Files\\Git\\cmd\\git.exe" stash')).toEqual({ decision: "deny", reason: GIT });
+  expect(quiet.asked).toEqual([]);
+  expect(quiet.checked).toEqual([]);
+});
+
+test("a PowerShell advisory removal asks with its targets, and the engine's verdict follows a Run it", async ($, on) => {
+  const { asked, checked } = world(on, { ...BUILD_WORLD, answer: "Run it" });
+  const command = "Remove-Item -Recurse -Force build, notes.txt, ghost";
+
+  expect(await powershell($, command)).toEqual(ENGINE);
+  expect(asked).toEqual([
+    {
+      question: [
+        "OMCA held this command for your review:",
+        `  ${command}`,
+        "It would remove:",
+        "  build      dir, 4 entries",
+        "  notes.txt  file",
+        "  ghost      not found",
+        "Run it?",
+      ].join("\n"),
+      header: "OMCA guard",
+      options: ["Refuse", "Run it"],
+    },
+  ]);
+  expect(checked).toEqual([{ tool: "PowerShell", input: { command } }]);
+});
+
+test("a refused PowerShell removal is denied", async ($, on) => {
+  const refusing = world(on, BUILD_WORLD);
+  expect(await powershell($, "Remove-Item -Recurse build")).toEqual({ decision: "deny", reason: REFUSED });
+  expect(refusing.checked).toEqual([]);
+});
+
+test("with no surface a PowerShell advisory match runs and a blocking one is denied", async ($, on) => {
+  const { asked, checked } = world(on, { surfaces: [] });
+
+  expect(await powershell($, "Remove-Item -Recurse -Force build")).toEqual(ENGINE);
+  expect(await powershell($, "git.exe push --force origin main")).toEqual(ENGINE);
+  expect(await powershell($, "Remove-Item -Recurse build; git clean -fd")).toEqual({ decision: "deny", reason: GIT });
+  expect(asked).toEqual([]);
+  expect(checked).toHaveLength(2);
+});
+
+test("a PowerShell mention of a destructive command passes through untouched", async ($, on) => {
+  const { asked, checked } = world(on);
+
+  expect(await powershell($, "Write-Host 'Remove-Item -Recurse C:\\'")).toEqual(ENGINE);
+  expect(await powershell($, "# Remove-Item -Recurse C:\\")).toEqual(ENGINE);
+  expect(await powershell($, 'git commit -m "never git.exe reset --hard"')).toEqual(ENGINE);
+  expect(await powershell($, "@'\nRemove-Item -Recurse C:\\\n'@ | Set-Content clean.ps1")).toEqual(ENGINE);
+  expect(asked).toEqual([]);
+  expect(checked).toHaveLength(4);
+});
+
+test("no PowerShell path emits behavior allow", async ($, on) => {
+  world(on, { answer: "Run it", git: { "git log --oneline @{push} --not HEAD": { stdout: "" } } });
+  const commands = ["git status", "Get-ChildItem", "git.exe push --force", "Remove-Item -Recurse build", "Write-Host 'hi'"];
+
+  for (const command of commands) expect(await powershell($, command)).toEqual(ENGINE);
+});
+
+test("a tool that only looks like a shell never reaches the guard", async ($, on) => {
+  const { asked } = world(on);
+
+  await expect($.tool.check({ tool: "PowerShellX", input: { command: "rm -rf /" } })).resolves.toEqual(ENGINE);
+  await expect($.tool.check({ tool: "NotBash", input: { command: "rm -rf /" } })).resolves.toEqual(ENGINE);
+  expect(asked).toEqual([]);
+});
+
+test("home, the working directory and their parents are denied in any spelling, with no dialog", async ($, on) => {
+  const { asked, checked } = world(on, { cwd: "/work/sub" });
+  const denied = { decision: "deny", reason: RM_CATASTROPHIC };
+
+  expect(await check($, "rm -rf /home/u")).toEqual(denied);
+  expect(await check($, "rm -rf /home/u/*")).toEqual(denied);
+  expect(await check($, "rm -rf /home/u/dev")).toEqual(denied);
+  expect(await check($, "rm -rf /work")).toEqual(denied);
+  expect(await check($, "rm -rf /work/sub/")).toEqual(denied);
+  expect(await check($, "rm -rf /work/other/../sub")).toEqual(denied);
+  expect(await powershell($, "Remove-Item -Recurse /work/sub")).toEqual(denied);
+  expect(asked).toEqual([]);
+  expect(checked).toEqual([]);
+});
+
+test("a path below home or the working directory is still held for review", async ($, on) => {
+  const { asked, checked } = world(on, { cwd: "/work/sub", surfaces: [] });
+
+  expect(await check($, "rm -rf /home/u/dev/build")).toEqual(ENGINE);
+  expect(await check($, "rm -rf /work/sub/build")).toEqual(ENGINE);
+  expect(await check($, "rm -rf /home/user2")).toEqual(ENGINE);
+  expect(asked).toEqual([]);
+  expect(checked).toHaveLength(3);
+});
+
+test("drive roots, Git Bash mounts and share roots are denied under a POSIX layout too", async ($, on) => {
+  world(on);
+
+  for (const command of ["rm -rf C:\\", "rm -rf /c", "rm -rf /mnt/c", "rm -rf //srv/share", "rm -rf $USERPROFILE/*"]) {
+    expect(await check($, command)).toEqual({ decision: "deny", reason: RM_CATASTROPHIC });
+  }
+});
+
+test("under a POSIX layout a one-letter top directory is an ordinary path, not a Git Bash drive", async ($, on) => {
+  const { asked, checked } = world(on, { surfaces: [] });
+
+  expect(await check($, "rm -rf /c/Users")).toEqual(ENGINE);
+  expect(await check($, "rm -rf /d/build")).toEqual(ENGINE);
+  expect(asked).toEqual([]);
+  expect(checked).toHaveLength(2);
+});
+
+test("a variable that is always set no longer makes a removal catastrophic", async ($, on) => {
+  const { asked, checked } = world(on, { surfaces: [] });
+
+  expect(await check($, 'rm -rf "$TMPDIR/foo"')).toEqual(ENGINE);
+  expect(await check($, "rm -rf $XDG_CACHE_HOME/omca")).toEqual(ENGINE);
+  expect(await powershell($, "Remove-Item -Recurse -Force $env:TEMP\\x")).toEqual(ENGINE);
+  expect(await check($, "rm -rf $DIR/*")).toEqual({ decision: "deny", reason: RM_CATASTROPHIC });
+  expect(asked).toEqual([]);
+  expect(checked).toHaveLength(3);
+});
+
+test("a quoted heredoc body is not a command, and a command after it still is", async ($, on) => {
+  const { asked, checked } = world(on);
+
+  expect(await check($, "cat <<'EOF'\nrm -rf /\ngit reset --hard\nEOF")).toEqual(ENGINE);
+  expect(await check($, "cat <<'EOF'\nnotes\nEOF\nrm -rf /")).toEqual({ decision: "deny", reason: RM_CATASTROPHIC });
+  expect(asked).toEqual([]);
+  expect(checked).toHaveLength(1);
+});
+
+test("git behind a path or an .exe suffix is guarded", async ($, on) => {
+  world(on, { surfaces: [] });
+
+  expect(await check($, "/usr/bin/git reset --hard")).toEqual({ decision: "deny", reason: GIT });
+  expect(await check($, "git.exe stash")).toEqual({ decision: "deny", reason: GIT });
+  expect(await check($, 'git -C "C:\\My Repo" clean -fd')).toEqual({ decision: "deny", reason: GIT });
+  expect(await check($, "command rm -rf ~")).toEqual({ decision: "deny", reason: RM_CATASTROPHIC });
+});
+
+const WINDOWS_WORLD: World = {
+  layout: WINDOWS,
+  contents: { "c:\\work\\notes.txt": "", "C:\\work\\other.txt": "", "C:\\Users\\u\\sub\\old.txt": "" },
+};
+
+test("on Windows the home from USERPROFILE and the working directory are denied in any spelling", async ($, on) => {
+  const { asked, checked } = world(on, WINDOWS_WORLD);
+  const denied = { decision: "deny", reason: RM_CATASTROPHIC };
+
+  expect(await powershell($, "Remove-Item -Recurse -Force C:\\Users\\u")).toEqual(denied);
+  expect(await powershell($, "Remove-Item -Recurse -Force c:/users/U/*")).toEqual(denied);
+  expect(await powershell($, "Remove-Item -Recurse -Force $env:USERPROFILE\\Documents")).toEqual(denied);
+  expect(await powershell($, "Remove-Item -Recurse C:\\work")).toEqual(denied);
+  expect(await powershell($, "rd /s /q C:\\work\\")).toEqual(denied);
+  expect(await check($, "rm -rf /c/Users/u")).toEqual(denied);
+  expect(await check($, "rm -rf /c/work")).toEqual(denied);
+  expect(asked).toEqual([]);
+  expect(checked).toEqual([]);
+});
+
+test("on Windows a Git Bash path and a tilde are read as the files they name", async ($, on) => {
+  const { asked } = world(on, WINDOWS_WORLD);
+
+  await check($, "rm -rf /c/work/notes.txt C:\\work\\other.txt ~/sub/old.txt ghost.txt");
+
+  expect(asked.map((a) => a.question)).toEqual([
+    [
+      "OMCA held this command for your review:",
+      "  rm -rf /c/work/notes.txt C:\\work\\other.txt ~/sub/old.txt ghost.txt",
+      "It would remove:",
+      "  /c/work/notes.txt  file",
+      "  C:\\work\\other.txt  file",
+      "  ~/sub/old.txt      file",
+      "  ghost.txt          not found",
+      "Run it?",
+    ].join("\n"),
+  ]);
+});
+
+test("on Windows a PowerShell removal lists its drive-spelled targets", async ($, on) => {
+  const { asked, checked } = world(on, { ...WINDOWS_WORLD, answer: "Run it" });
+  const command = "ri -r C:\\work\\other.txt, ~\\sub\\old.txt, $env:TEMP\\x, missing.txt";
+
+  expect(await powershell($, command)).toEqual(ENGINE);
+  expect(asked.map((a) => a.question)).toEqual([
+    [
+      "OMCA held this command for your review:",
+      `  ${command}`,
+      "It would remove:",
+      "  C:\\work\\other.txt  file",
+      "  ~\\sub\\old.txt      file",
+      "  $env:TEMP\\x        not expanded",
+      "  missing.txt        not found",
+      "Run it?",
+    ].join("\n"),
+  ]);
+  expect(checked).toEqual([{ tool: "PowerShell", input: { command } }]);
+});

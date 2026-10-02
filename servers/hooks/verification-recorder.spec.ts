@@ -29,6 +29,14 @@ function project(): string {
   return root;
 }
 
+const POWERSHELL_NOTE = {
+  hookSpecificOutput: {
+    hookEventName: "PostToolUse",
+    classifierContext:
+      "This PowerShell call ran one of this repository's own verification runners (test, lint, build, or typecheck).",
+  },
+};
+
 const bash = (sessionId: string, fields: Record<string, unknown>): Payload => ({
   event: "PostToolUse",
   session_id: sessionId,
@@ -98,6 +106,59 @@ describe("recognised runners", () => {
       expect(await record(root, sessionId, command)).toEqual({});
       nothingRecorded(root, sessionId);
     }
+  });
+});
+
+describe("PowerShell and Windows runner names", () => {
+  test("recorder: a PowerShell verification records a slot and answers a PowerShell note", async () => {
+    const root = project();
+    const sessionId = crypto.randomUUID();
+    const payload = { ...bash(sessionId, { tool_input: { command: "npm.cmd test" }, tool_response: { exitCode: 1 } }), tool_name: "PowerShell" };
+    expect(await dispatch(payload, root, NOW)).toEqual(POWERSHELL_NOTE);
+    expect(JSON.parse(readFileSync(statusPath(root, sessionId), "utf8"))).toEqual({
+      session_id: sessionId,
+      last_hook_at: NOW_S,
+      verification: { command: "npm.cmd test", at: NOW_S, exit_code: 1, evidence_logged: false },
+    });
+    expect(touchSession(sessionId).verification).toEqual({ command: "npm.cmd test", at: NOW_S, exit_code: 1 });
+  });
+
+  test("recorder: a PowerShell call that is not a verification records nothing", async () => {
+    const root = project();
+    const sessionId = crypto.randomUUID();
+    const payload = (command: string) => ({ ...bash(sessionId, { tool_input: { command } }), tool_name: "PowerShell" });
+    for (const command of ["Get-ChildItem", "Write-Host 'bun.exe test'", 'Write-Host "npm.cmd test"', "git commit -m 'run just test'"]) {
+      expect(await dispatch(payload(command), root, NOW)).toEqual({});
+    }
+    nothingRecorded(root, sessionId);
+  });
+
+  test("recorder: the .cmd and .exe runner names record under Bash too", async () => {
+    const root = project();
+    for (const command of ["bun.exe test", "npm.cmd test", "tsc.cmd --noEmit", "just.exe ci"]) {
+      const sessionId = crypto.randomUUID();
+      expect(await record(root, sessionId, command)).toEqual(NOTE);
+      expect(slot(root, sessionId)).toMatchObject({ command });
+    }
+  });
+
+  test("recorder: a tool whose name only starts like a shell records nothing", async () => {
+    const root = project();
+    const sessionId = crypto.randomUUID();
+    for (const tool_name of ["PowerShellX", "Bash2", "powershell", "bash"]) {
+      const payload = { ...bash(sessionId, { tool_input: { command: "just test" } }), tool_name };
+      expect(await dispatch(payload, root, NOW)).toEqual({});
+    }
+    nothingRecorded(root, sessionId);
+  });
+
+  test("recorder: OMCA_DISABLED_HOOKS listing this hook silences a PowerShell call too", async () => {
+    const root = project();
+    const sessionId = crypto.randomUUID();
+    process.env.OMCA_DISABLED_HOOKS = "verification-recorder";
+    const payload = { ...bash(sessionId, { tool_input: { command: "just test" } }), tool_name: "PowerShell" };
+    expect(await dispatch(payload, root, NOW)).toEqual({});
+    nothingRecorded(root, sessionId);
   });
 });
 

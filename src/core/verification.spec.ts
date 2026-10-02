@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { MAX_SLOT_AGE_SECONDS } from "./evidence.ts";
 import {
   blankQuotedSpans,
+  classifierNote,
   exitCodeOf,
   isVerificationCommand,
   keepsSlot,
@@ -34,6 +35,23 @@ describe("isVerificationCommand", () => {
     "(bun test)",
     "true | npm test",
     "  just test",
+    "npm.cmd test",
+    "bun.exe test",
+    "pnpm.cmd run lint",
+    "yarn.cmd run build",
+    "just.exe test-hooks",
+    "pytest.exe -q",
+    "cargo.exe clippy",
+    "go.exe vet ./...",
+    "make.exe check",
+    "bats.exe tests",
+    "tsc.cmd --noEmit",
+    "ruff.exe check .",
+    "shellcheck.exe x.sh",
+    "uv.exe run pytest",
+    "cd C:\\repo; npm.cmd test",
+    "& npm.cmd test",
+    "cd x && bun.exe test",
   ])("records %p", (command) => {
     expect(isVerificationCommand(command)).toBe(true);
   });
@@ -53,12 +71,31 @@ describe("isVerificationCommand", () => {
     'git commit -m "make npm test pass"',
     "git commit -m 'run just test before merging'",
     'gh pr create --body "ran just ci; all green"',
+    "npm.cmdx test",
+    "bun.exe run dev",
+    "npm.cmd install",
+    "just.exe fmt",
+    "Write-Host 'npm.cmd test'",
+    'Write-Host "bun.exe test"',
+    "git commit -m 'run npm.cmd test first'",
+    "echo bun.exe test",
   ])("ignores %p", (command) => {
     expect(isVerificationCommand(command)).toBe(false);
   });
 
   test("a runner after a quoted mention still records", () => {
     expect(isVerificationCommand('git commit -m "wip" && npm test')).toBe(true);
+  });
+});
+
+describe("classifierNote", () => {
+  test("names the tool and keeps one fixed sentence", () => {
+    expect(classifierNote("Bash")).toBe(
+      "This Bash call ran one of this repository's own verification runners (test, lint, build, or typecheck).",
+    );
+    expect(classifierNote("PowerShell")).toBe(
+      "This PowerShell call ran one of this repository's own verification runners (test, lint, build, or typecheck).",
+    );
   });
 });
 

@@ -151,7 +151,7 @@ export const register: Register = (on, pluginOptions) => {
   const paneRender = featuresFor("ui.render Pane", { pane });
   const sessionCompact = featuresFor("session.compact", { compact });
 
-  on("tool.check", { tool: "Bash" }, ($, e, next) =>
+  on("tool.check", { tool: /^(?:Bash|PowerShell)$/ }, ($, e, next) =>
     dispatch(bindHost($, options), "tool.check", bash, e, next, guardFailed),
   ).catch((_$, _e, next) => guardFailed(next.error.message ?? next.error.kind));
   on("session.start", ($, e, next) => dispatch(bindHost($, options), "session.start", sessionStart, e, next));

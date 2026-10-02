@@ -1,6 +1,8 @@
 import type { EventResult } from "claude-code";
-import { classify, type GitFinding, type Reviewable, reasonFor } from "../src/core/destructive.ts";
+import { type Context, classify, type GitFinding, type Reviewable, reasonFor } from "../src/core/destructive.ts";
 import { isHookDisabled } from "../src/core/kill-switch.ts";
+import { homeDir, joinPath, toPosix } from "../src/core/path.ts";
+import { homeRest, platformOf } from "../src/core/targets.ts";
 import { displayWidth, fitEnd, fitMiddle, type Glyphs, glyphs, isAsciiRequested } from "../src/core/ui-kit.ts";
 import type { Features } from "./dispatch.ts";
 import type { Host } from "./host.ts";
@@ -34,17 +36,16 @@ async function git(host: Host, argv: readonly string[]): Promise<string[]> {
   return stdout.split("\n").filter((line) => line.trim() !== "");
 }
 
-async function expandHome(host: Host, target: string): Promise<string | undefined> {
-  const home = /^(~|\$HOME|\$\{HOME\})(\/.*)?$/.exec(target);
-  if (home !== null) {
-    const dir = await host.env.HOME();
-    return dir === undefined ? undefined : `${dir}${home[2] ?? ""}`;
-  }
-  return /[$`*?[~]/.test(target) ? undefined : target;
+function resolved(target: string, ctx: Context): string | undefined {
+  const platform = platformOf(ctx);
+  const rest = homeRest(target);
+  if (rest !== undefined) return ctx.home === undefined ? undefined : joinPath(platform, ctx.home, rest);
+  if (/[$`*?[~%]/.test(target)) return undefined;
+  return toPosix(platform, target);
 }
 
-async function kindOf(host: Host, target: string): Promise<string> {
-  const path = await expandHome(host, target);
+async function kindOf(host: Host, target: string, ctx: Context): Promise<string> {
+  const path = resolved(target, ctx);
   if (path === undefined) return "not expanded";
   if (!(await host.fs.exists(path))) return "not found";
   const stat = await host.fs.stat(path);
@@ -56,10 +57,10 @@ async function kindOf(host: Host, target: string): Promise<string> {
   return stat.kind;
 }
 
-async function removalLines(host: Host, targets: readonly string[], g: Glyphs): Promise<string[]> {
+async function removalLines(host: Host, targets: readonly string[], g: Glyphs, ctx: Context): Promise<string[]> {
   if (targets.length === 0) return ["It names no target."];
   const shown = targets.slice(0, LIMIT);
-  const kinds = await Promise.all(shown.map((target) => kindOf(host, target)));
+  const kinds = await Promise.all(shown.map((target) => kindOf(host, target, ctx)));
   const kindWidth = Math.max(...kinds.map(displayWidth));
   const nameWidth = Math.min(Math.max(...shown.map(displayWidth)), WIDTH - 4 - kindWidth);
   const rows = shown.map((target, i) => {
@@ -119,7 +120,7 @@ async function gathered(gather: () => Promise<string[]> | string[], g: Glyphs): 
   }
 }
 
-async function question(host: Host, command: string, finding: Reviewable, g: Glyphs): Promise<string> {
+async function question(host: Host, command: string, finding: Reviewable, g: Glyphs, ctx: Context): Promise<string> {
   const commandLines = command.trim().split("\n");
   const shownCommand =
     commandLines.length > COMMAND_LINES
@@ -127,18 +128,43 @@ async function question(host: Host, command: string, finding: Reviewable, g: Gly
       : commandLines;
   const targets = finding.removals.flatMap((removal) => removal.targets);
   const sections = await Promise.all([
-    ...(finding.removals.length > 0 ? [gathered(() => removalLines(host, targets, g), g)] : []),
+    ...(finding.removals.length > 0 ? [gathered(() => removalLines(host, targets, g, ctx), g)] : []),
     ...finding.git.map((operation) => gathered(() => gitLines(host, operation), g)),
   ]);
   const lines = ["OMCA held this command for your review:", ...indent(shownCommand), ...sections.flat(), "Run it?"];
   return lines.map((line) => fitEnd(line, WIDTH, g.ellipsis)).join("\n");
 }
 
+const shellOf = (tool: string): Context["shell"] => (tool === "PowerShell" ? "powershell" : "bash");
+
+async function contextOf(host: Host, shell: Context["shell"]): Promise<Context> {
+  const [HOME, USERPROFILE, HOMEDRIVE, HOMEPATH, cwd, root] = await Promise.all([
+    host.env.HOME(),
+    host.env.USERPROFILE(),
+    host.env.HOMEDRIVE(),
+    host.env.HOMEPATH(),
+    host.session.cwd().catch(() => undefined),
+    host.session.root().catch(() => undefined),
+  ]);
+  const home = homeDir({ HOME, USERPROFILE, HOMEDRIVE, HOMEPATH });
+  return {
+    shell,
+    ...(home !== undefined && { home }),
+    ...(cwd !== undefined && { cwd }),
+    ...(root !== undefined && { root }),
+  };
+}
+
 export const bashGuard: Features = {
   "tool.check": {
     pre: async (host, e) => {
       const command = commandOf(e.input);
-      const finding = classify(command);
+      const shell = shellOf(e.tool);
+      const first = classify(command, { shell });
+      if (first === undefined) return undefined;
+      if (first.kind === "catastrophic") return deny(reasonFor(first));
+      const ctx = await contextOf(host, shell);
+      const finding = classify(command, ctx);
       if (finding === undefined) return undefined;
       if (finding.kind === "catastrophic") return deny(reasonFor(finding));
       if (isHookDisabled(await host.env.OMCA_DISABLED_HOOKS(), "bash-guard")) return undefined;
@@ -146,7 +172,7 @@ export const bashGuard: Features = {
       const canAsk = host.options.guardMode === "dialog" && (await host.session.surfaces()).length > 0;
       if (!canAsk) return finding.kind === "blocking" ? deny(reason) : undefined;
       const g = glyphs(isAsciiRequested(await host.env.OMCA_ASCII()));
-      const text = await question(host, command, finding, g);
+      const text = await question(host, command, finding, g, ctx);
       const answer = await host.ui.ask(text, { header: "OMCA guard", options: [REFUSE, RUN] }).catch(() => undefined);
       return answer === RUN ? undefined : deny(reason);
     },

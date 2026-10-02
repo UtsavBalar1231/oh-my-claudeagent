@@ -36,6 +36,11 @@ const BASH_RULES: readonly Rule[] = [
 const BASH_SLOW_ADVICE =
   "Command ran for over 2 minutes before failing. Consider run_in_background=true, a larger timeout param, or narrowing scope (e.g. run a single test file).";
 
+const POWERSHELL_RULES: readonly Rule[] = [
+  [/is not recognized as the name of a cmdlet/i, "Command not found. The cmdlet, function, script or program is not installed or not on PATH. Try: Get-Command <name>"],
+  [/Cannot find path|The system cannot find the path specified/i, "Path not found. Check the spelling and the working directory. Try: Get-ChildItem <parent folder>"],
+];
+
 const READ_RULES: readonly Rule[] = [
   [/no such file|not found|ENOENT/i, "File not found. Search for the name with find or rg --files, or check whether the path changed."],
   [
@@ -101,6 +106,12 @@ function bash(error: string, durationMs: number): Recovery | undefined {
   };
 }
 
+function powershell(error: string): Recovery | undefined {
+  const advice = adviceFor(POWERSHELL_RULES, error);
+  if (advice === undefined) return;
+  return { kind: "powershell_error", error, message: (_retry, breaker) => `[POWERSHELL ERROR RECOVERY] ${withBreaker(advice, breaker)}` };
+}
+
 function read(error: string): Recovery | undefined {
   const advice = adviceFor(READ_RULES, error);
   if (advice === undefined) return;
@@ -123,6 +134,8 @@ function classify(tool: string, payload: Payload): string | Recovery | undefined
       return agent(error || "Unknown error", payload.tool_input);
     case "Bash":
       return bash(error, Number(payload.duration_ms));
+    case "PowerShell":
+      return powershell(error);
     case "Read":
       return read(error);
     default:

@@ -1,22 +1,39 @@
-const S = "[ \\t\\n\\v\\f\\r]";
-const NS = "[^ \\t\\n\\v\\f\\r]";
+import {
+  neutralizePowershell,
+  POWERSHELL_CMD_WRAPPER,
+  POWERSHELL_COMMAND_POSITION,
+  powershellRemovals,
+} from "./powershell.ts";
+import { anyCase, ARGUMENT, type Context, commandWord, NS, type Removal, S } from "./shell.ts";
+import { isCatastrophicTarget } from "./targets.ts";
+
+export type { Context, Removal } from "./shell.ts";
+
 // Leading `VAR=value` assignments and an `env` wrapper run the same command, so the command
 // position admits them.
 const ENV_ASSIGN = `([A-Za-z_][A-Za-z0-9_]*=("[^"]*"|'[^']*'|[^ \\t\\n\\v\\f\\r;&|\`"']*)${S}+)*`;
-const PREFIX = `${S}*${ENV_ASSIGN}(sudo${S}+)?(env${S}+)?${ENV_ASSIGN}`;
+const PREFIX = `${S}*${ENV_ASSIGN}(sudo${S}+)?(env${S}+)?(command${S}+(-p${S}+)?)?${ENV_ASSIGN}`;
 
 const RM = new RegExp(
-  `(^|[;&|()\`\\n\\r])${PREFIX}rm${S}+((-[a-zA-Z]+|--[a-zA-Z-]+)${S}+)*(-[a-zA-Z]*[rR][a-zA-Z]*|--recursive)(${S}|$)`,
+  `(^|[;&|()\`\\n\\r])${PREFIX}${commandWord("rm")}${S}+((-[a-zA-Z]+|--[a-zA-Z-]+)${S}+)*(-[a-zA-Z]*[rR][a-zA-Z]*|--recursive)(${S}|$)`,
 );
 // One invocation's arguments run to the next separator; a `)` ends them too, so a removal
 // inside `$(...)` does not swallow the rest of the outer command.
 const RM_ARGS = /^([^;&|)`\n\r]*)([^]?)/;
 
-const GIT_GLOBALS = `((-C${S}+${NS}+|-c${S}+${NS}+|-c${NS}+|--git-dir[= \\t\\n\\v\\f\\r]${NS}+|--work-tree[= \\t\\n\\v\\f\\r]${NS}+|--no-pager|--paginate|-p|--bare|--literal-pathspecs|--no-replace-objects)${S}+)*`;
+const GIT_GLOBALS = `((-C${S}+${ARGUMENT}|-c${S}+${ARGUMENT}|-c${NS}+|--git-dir[= \\t\\n\\v\\f\\r]${ARGUMENT}|--work-tree[= \\t\\n\\v\\f\\r]${ARGUMENT}|--no-pager|--paginate|-p|--bare|--literal-pathspecs|--no-replace-objects)${S}+)*`;
 const GIT_SUBCOMMAND = `(?<subcommand>reset["']?${S}+--hard|stash|clean|restore|rm${S}+-[a-zA-Z]*[rR][a-zA-Z]*|checkout(${S}+[^ \\t\\n\\v\\f\\r;&|\`]+)*${S}+--)`;
-const GIT_AT = `(?<=^|[;&|(\`\\n\\r]|[$]\\()${PREFIX}git${S}+${GIT_GLOBALS}`;
-const GIT = new RegExp(`${GIT_AT}["']?${GIT_SUBCOMMAND}["']?(?=[ \\t\\n\\v\\f\\r);&|<>\`]|$)`, "g");
-const PUSH = new RegExp(`${GIT_AT}push(?=${S}|$)(?<args>[^;&|)\`\\n\\r]*)`, "g");
+
+function gitPatterns(commandPosition: string, wrapper: string, git: string) {
+  const at = `(?<=^|${commandPosition}|[$]\\()${S}*${wrapper}${PREFIX}${commandWord(git)}${S}+${GIT_GLOBALS}`;
+  return {
+    git: new RegExp(`${at}["']?${GIT_SUBCOMMAND}["']?(?=[ \\t\\n\\v\\f\\r);&|<>\`]|$)`, "g"),
+    push: new RegExp(`${at}push(?=${S}|$)(?<args>[^;&|)\`\\n\\r]*)`, "g"),
+  };
+}
+const BASH_GIT = gitPatterns("[;&|(`\\n\\r]", "", "git");
+const POWERSHELL_GIT = gitPatterns(POWERSHELL_COMMAND_POSITION, POWERSHELL_CMD_WRAPPER, anyCase("git"));
+const BASH: Context = { shell: "bash" };
 
 export const RM_CATASTROPHIC_REASON =
   "Destructive rm -rf blocked: the target is the filesystem root, home, the working directory, or a directory directly under root or home. Name a deeper path explicitly.";
@@ -27,7 +44,6 @@ export const GIT_REASON =
 
 export type GitOperation = "reset --hard" | "stash" | "clean" | "restore" | "rm -r" | "checkout --" | "push --force";
 export type GitFinding = { operation: GitOperation; remote?: string; branch?: string };
-export type Removal = { targets: string[] };
 /**
  * `blocking` holds a git operation that discards work in the tree or the index, denied where no
  * dialog can show it; `advisory` holds only a recursive rm of a deeper path or a force push,
@@ -36,77 +52,88 @@ export type Removal = { targets: string[] };
 export type Reviewable = { kind: "blocking" | "advisory"; removals: Removal[]; git: GitFinding[] };
 export type Finding = { kind: "catastrophic" } | Reviewable;
 
+type Heredoc = { word: string; stripsTabs: boolean };
+
+// Only a heredoc whose delimiter is quoted is inert: an unquoted body still runs `$(...)`.
+const QUOTED_HEREDOC = /^<<(-?)[ \t]*(?:'([^'\n]*)'|"([^"\n]*)"|\\([A-Za-z_][A-Za-z0-9_.-]*))/;
+
+function blankBodies(command: string, from: number, pending: readonly Heredoc[]): string {
+  let out = "";
+  let at = from;
+  for (const { word, stripsTabs } of pending) {
+    while (at < command.length) {
+      const eol = command.indexOf("\n", at);
+      const line = command.slice(at, eol === -1 ? command.length : eol);
+      const isTerminator = (stripsTabs ? line.replace(/^\t+/, "") : line).replace(/\r$/, "") === word;
+      out += (isTerminator ? line : "_".repeat(line.length)) + (eol === -1 ? "" : "\n");
+      at += line.length + 1;
+      if (isTerminator) break;
+    }
+  }
+  return out;
+}
+
 /**
  * Blanks the characters that open a command position inside a quoted span, so a mention is
  * never read as an invocation: `; & | ( )`, newline and CR become `_`, and inside single quotes
- * `$` and backtick too. Length is preserved. An unbalanced quote reads the rest as quoted,
- * which under-matches rather than over-matches.
+ * `$` and backtick too. The body of a heredoc with a quoted delimiter becomes `_` whole. Length
+ * is preserved. An unbalanced quote reads the rest as quoted, which under-matches rather than
+ * over-matches.
  */
 export function neutralizeQuotedPositions(command: string): string {
   let quote = "";
   let out = "";
-  for (const ch of command) {
-    let next = ch;
+  const pending: Heredoc[] = [];
+  for (let i = 0; i < command.length; i++) {
+    const ch = command.charAt(i);
+    const next = command.charAt(i + 1);
     if (quote !== "") {
+      const isBlanked = ";&|()\n\r".includes(ch) || (quote === "'" && (ch === "$" || ch === "`"));
+      out += isBlanked ? "_" : ch;
       if (ch === quote) quote = "";
-      else if (";&|()\n\r".includes(ch)) next = "_";
-      else if (quote === "'" && (ch === "$" || ch === "`")) next = "_";
     } else if (ch === "'" || ch === '"') {
       quote = ch;
+      out += ch;
+    } else if (ch === "\n" && pending.length > 0) {
+      const bodies = blankBodies(command, i + 1, pending);
+      pending.length = 0;
+      out += ch + bodies;
+      i += bodies.length;
+    } else if (ch === "<" && next === "<" && command.charAt(i - 1) !== "<") {
+      const heredoc = QUOTED_HEREDOC.exec(command.slice(i));
+      if (heredoc === null) {
+        out += ch;
+      } else {
+        pending.push({ word: heredoc[2] ?? heredoc[3] ?? heredoc[4] ?? "", stripsTabs: heredoc[1] === "-" });
+        out += heredoc[0];
+        i += heredoc[0].length - 1;
+      }
+    } else {
+      out += ch;
     }
-    out += next;
   }
   return out;
 }
 
 const trimLines = (command: string) => command.replace(/^[ \t\v\f\r]+/gm, "");
 
-/**
- * Only a target whose loss is machine-wide is catastrophic: the root, home, the working
- * directory or a parent of it, and anything directly under the root or home. A leading `$VAR`
- * reads as empty, since `rm -rf "$DIR/"*` with DIR unset is the classic way to reach `/`; a
- * trailing glob removes its parent's contents, which is the parent's loss.
- */
-export function isCatastrophicTarget(word: string): boolean {
-  const target = word.replace(/["']/g, "");
-  let rest = target;
-  let limit = 0;
-  const home = /^(~[^/]*|\$HOME|\$\{HOME\})(\/.*)?$/.exec(target);
-  const variable = /^\$(\{[A-Za-z_][A-Za-z0-9_]*\}|[A-Za-z_][A-Za-z0-9_]*)(.*)$/.exec(target);
-  if (home !== null) {
-    rest = home[2] ?? "";
-    limit = 1;
-  } else if (variable !== null) {
-    rest = variable[2] ?? "";
-    limit = 1;
-    if (!rest.startsWith("/")) return false;
-  } else if (target.startsWith("/")) {
-    limit = 1;
-  }
-  const kept: string[] = [];
-  for (const part of rest.split("/")) {
-    if (part === "" || part === ".") continue;
-    if (part === "..") {
-      if (kept.length > 0 && kept.at(-1) !== "..") kept.pop();
-      else if (limit === 0) kept.push("..");
-    } else kept.push(part);
-  }
-  while (kept.at(-1) === "*" || kept.at(-1) === ".*") kept.pop();
-  return limit === 0 ? kept.every((part) => part === "..") : kept.length <= limit;
-}
-
-/** Splits an argument list into words the way the shell would, quotes removed, for display. */
+/** Splits an argument list into words the way the shell would, quotes removed and `\ ` read as a space, for display. */
 export function shellWords(text: string): string[] {
   const words: string[] = [];
   let word = "";
   let quote = "";
   let isOpen = false;
-  for (const ch of text) {
+  for (let i = 0; i < text.length; i++) {
+    const ch = text.charAt(i);
     if (quote !== "") {
       if (ch === quote) quote = "";
       else word += ch;
     } else if (ch === "'" || ch === '"') {
       quote = ch;
+      isOpen = true;
+    } else if (ch === "\\" && /[ \t]/.test(text.charAt(i + 1))) {
+      word += text.charAt(i + 1);
+      i++;
       isOpen = true;
     } else if (/[ \t\n\v\f\r]/.test(ch)) {
       if (isOpen) words.push(word);
@@ -133,7 +160,7 @@ function operands(words: readonly string[]): string[] {
   });
 }
 
-function removals(command: string, scan: string): { isCatastrophic: boolean; removals: Removal[] } {
+function removals(command: string, scan: string, ctx: Context): { isCatastrophic: boolean; removals: Removal[] } {
   const found: Removal[] = [];
   let offset = 0;
   for (let match = RM.exec(scan); match !== null; match = RM.exec(scan.slice(offset))) {
@@ -141,16 +168,16 @@ function removals(command: string, scan: string): { isCatastrophic: boolean; rem
     const args = RM_ARGS.exec(scan.slice(offset));
     const scanned = args?.[1] ?? "";
     if (scanned.includes("$(") || args?.[2] === "`") return { isCatastrophic: true, removals: [] };
-    const words = scanned.split(/[ \t\n]+/).filter((word) => word !== "");
+    const words = shellWords(command.slice(offset, offset + scanned.length));
     let isEndOfOptions = false;
     for (const word of words) {
       if (!isEndOfOptions && word === "--") isEndOfOptions = true;
       else if (!isEndOfOptions && word === "--no-preserve-root") return { isCatastrophic: true, removals: [] };
-      else if ((isEndOfOptions || !word.startsWith("-")) && isCatastrophicTarget(word)) {
+      else if ((isEndOfOptions || !word.startsWith("-")) && isCatastrophicTarget(word, ctx)) {
         return { isCatastrophic: true, removals: [] };
       }
     }
-    found.push({ targets: operands(shellWords(command.slice(offset, offset + scanned.length))) });
+    found.push({ targets: operands(words) });
   }
   return { isCatastrophic: false, removals: found };
 }
@@ -175,15 +202,15 @@ function forcePush(args: string): GitFinding | undefined {
   };
 }
 
-function gitFindings(command: string, scan: string): GitFinding[] {
-  const found = [...scan.matchAll(GIT)].map((match) => ({
+function gitFindings(command: string, scan: string, { git, push }: typeof BASH_GIT): GitFinding[] {
+  const found = [...scan.matchAll(git)].map((match) => ({
     index: match.index,
     operation: treeOperation(match.groups?.["subcommand"] ?? ""),
   }));
-  for (const match of scan.matchAll(PUSH)) {
+  for (const match of scan.matchAll(push)) {
     const end = match.index + match[0].length;
-    const push = forcePush(command.slice(end - (match.groups?.["args"] ?? "").length, end));
-    if (push !== undefined) found.push({ index: match.index, ...push });
+    const finding = forcePush(command.slice(end - (match.groups?.["args"] ?? "").length, end));
+    if (finding !== undefined) found.push({ index: match.index, ...finding });
   }
   return found.sort((a, b) => a.index - b.index).map(({ index: _, ...finding }) => finding);
 }
@@ -195,17 +222,19 @@ function reviewable(removals: Removal[], git: GitFinding[]): Reviewable | undefi
 }
 
 /**
- * Classifies a Bash command: a recursive rm of a machine-wide target (or with a substituted
- * target, or `--no-preserve-root`) is catastrophic; a hard reset, stash, clean, restore, recursive
- * git rm or path checkout is blocking; any other recursive rm and a force push are advisory. A
- * match needs a command position, so a quoted mention is not one.
+ * Classifies a Bash or PowerShell command: a recursive removal of a machine-wide target (or with
+ * a substituted target, or `--no-preserve-root`) is catastrophic; a hard reset, stash, clean,
+ * restore, recursive git rm or path checkout is blocking; any other recursive removal and a force
+ * push are advisory. A match needs a command position, so a quoted mention is not one. `ctx`
+ * names the shell and what is known of the session: its home, working directory and project root.
  */
-export function classify(command: string): Finding | undefined {
+export function classify(command: string, ctx: Context = BASH): Finding | undefined {
   const trimmed = trimLines(command);
-  const scan = neutralizeQuotedPositions(trimmed);
-  const rm = removals(trimmed, scan);
+  const isPowershell = ctx.shell === "powershell";
+  const scan = isPowershell ? neutralizePowershell(trimmed) : neutralizeQuotedPositions(trimmed);
+  const rm = isPowershell ? powershellRemovals(trimmed, scan, ctx) : removals(trimmed, scan, ctx);
   if (rm.isCatastrophic) return { kind: "catastrophic" };
-  return reviewable(rm.removals, gitFindings(trimmed, scan));
+  return reviewable(rm.removals, gitFindings(trimmed, scan, isPowershell ? POWERSHELL_GIT : BASH_GIT));
 }
 
 /** The deny reason for each kind; an advisory match is denied only by a refusal. */

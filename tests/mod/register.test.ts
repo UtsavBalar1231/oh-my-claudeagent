@@ -122,8 +122,30 @@ test("a Bash check whose dispatcher fails is denied by the registration's catch"
   });
 });
 
-test("the deny catch covers Bash alone: another tool's failed check is not turned into a deny", async ($) => {
+test("the PowerShell check passes the engine's verdict through once, unchanged", async ($, on) => {
+  const seen: unknown[] = [];
+  on("tool.check", (_$, e) => (seen.push(e), { decision: "ask", reason: "PowerShell(Get-ChildItem) asks" }));
+
+  const verdict = await $.tool.check({ tool: "PowerShell", input: { command: "Get-ChildItem build" } });
+
+  expect(verdict).toEqual({ decision: "ask", reason: "PowerShell(Get-ChildItem) asks" });
+  expect(seen).toEqual([{ tool: "PowerShell", input: { command: "Get-ChildItem build" } }]);
+});
+
+test("a PowerShell check whose dispatcher fails is denied by the registration's catch", async ($) => {
+  const verdict = await $.tool.check({ tool: "PowerShell", input: { command: "Get-Date" } });
+
+  expect(verdict).toEqual({
+    decision: "deny",
+    reason: "OMCA's Bash guard failed, so the command was refused: no implementation for tool.check",
+  });
+});
+
+test("the deny catch covers the two shell tools alone: another tool's failed check is not turned into a deny", async ($) => {
   await expect($.tool.check({ tool: "Read", input: { file_path: "a.md" } })).rejects.toThrow(
+    /no implementation for tool.check/,
+  );
+  await expect($.tool.check({ tool: "PowerShellX", input: { command: "Get-Date" } })).rejects.toThrow(
     /no implementation for tool.check/,
   );
 });

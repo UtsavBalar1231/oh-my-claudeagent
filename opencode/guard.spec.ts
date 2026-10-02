@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 import { checkEdit, checkShell } from "./guard.ts"
 
 const RM_CATASTROPHIC =
@@ -14,6 +14,7 @@ let errorSpy: ReturnType<typeof spyOn>
 const savedEnv = {
   OMCA_COMMENT_GATE: process.env.OMCA_COMMENT_GATE,
   OMCA_DISABLED_HOOKS: process.env.OMCA_DISABLED_HOOKS,
+  HOME: process.env.HOME,
 }
 
 beforeEach(() => {
@@ -62,6 +63,40 @@ describe("decisions", () => {
     process.env.OMCA_DISABLED_HOOKS = "verification-recorder,bash-guard"
     expect(checkShell("git reset --hard")).toEqual({ deny: false })
     expect(checkShell("rm -rf ~")).toEqual({ deny: true, reason: RM_CATASTROPHIC })
+  })
+
+  test("the working directory and its parents are denied, a path below it runs", () => {
+    const cwd = process.cwd()
+    const denied = { deny: true, reason: RM_CATASTROPHIC }
+    expect(checkShell(`rm -rf ${cwd}`)).toEqual(denied)
+    expect(checkShell(`rm -rf ${cwd}/*`)).toEqual(denied)
+    expect(checkShell(`rm -rf ${dirname(cwd)}`)).toEqual(denied)
+    expect(checkShell(`rm -rf ${cwd}/build/out`)).toEqual({ deny: false })
+  })
+
+  test("home is read from the environment, in any spelling", () => {
+    process.env.HOME = "/home/bob"
+    const denied = { deny: true, reason: RM_CATASTROPHIC }
+    expect(checkShell("rm -rf /home/bob")).toEqual(denied)
+    expect(checkShell("rm -rf /home/bob/dev")).toEqual(denied)
+    expect(checkShell("rm -rf $USERPROFILE")).toEqual(denied)
+    expect(checkShell("rm -rf /home/bob/dev/x")).toEqual({ deny: false })
+  })
+
+  test("drive roots and Git Bash mounts are denied, and an always-set variable is not", () => {
+    const denied = { deny: true, reason: RM_CATASTROPHIC }
+    expect(checkShell("rm -rf C:\\")).toEqual(denied)
+    expect(checkShell("rm -rf /c")).toEqual(denied)
+    expect(checkShell("rm -rf /c/Users")).toEqual(process.platform === "win32" ? denied : { deny: false })
+    expect(checkShell("rm -rf //srv/share")).toEqual(denied)
+    expect(checkShell('rm -rf "$TMPDIR/foo"')).toEqual({ deny: false })
+  })
+
+  test("git behind an .exe suffix or a path is denied, and a quoted heredoc body is not a command", () => {
+    expect(checkShell("git.exe reset --hard")).toEqual({ deny: true, reason: GIT })
+    expect(checkShell('"C:\\Program Files\\Git\\cmd\\git.exe" stash')).toEqual({ deny: true, reason: GIT })
+    expect(checkShell("cat <<'EOF'\nrm -rf /\ngit reset --hard\nEOF")).toEqual({ deny: false })
+    expect(checkShell("cat <<'EOF'\nnotes\nEOF\nrm -rf /")).toEqual({ deny: true, reason: RM_CATASTROPHIC })
   })
 
   test("a write to a new file is allowed", () => {

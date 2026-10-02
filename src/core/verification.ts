@@ -6,12 +6,15 @@ export type Verification = { command: string; at: number; exit_code: number | nu
 // false negative, never a false block; the list grows only when a real runner goes unrecorded.
 // `test` and `lint` take a suffix because the suffix narrows the check; `build` and `fmt`
 // cannot, since build-and-deploy ships and fmt rewrites. The separator anchor keeps a flag
-// value such as `--include=pytest` from reading as an invocation.
-const RUNNER =
-  /(^|[;&|(])\s*(just\s+((test|lint)(-[A-Za-z0-9_]+)*|ci|fmt-check|typecheck|build)|(npm|pnpm|yarn|bun)\s+(test|run\s+(test|lint|build))|pytest|cargo\s+(test|build|check|clippy)|go\s+(test|build|vet)|make\s+(test|check|lint)|bats|tsc|ruff\s+check|shellcheck|uv\s+run\s[^;&|]*pytest)([^-A-Za-z0-9_]|$)/;
+// value such as `--include=pytest` from reading as an invocation. A Windows shim name
+// (`npm.cmd`, `bun.exe`) is the same runner.
+const EXT = String.raw`(?:\.(?:cmd|exe))?`;
+const RUNNER = new RegExp(
+  String.raw`(^|[;&|(])\s*(just${EXT}\s+((test|lint)(-[A-Za-z0-9_]+)*|ci|fmt-check|typecheck|build)|(npm|pnpm|yarn|bun)${EXT}\s+(test|run\s+(test|lint|build))|pytest${EXT}|cargo${EXT}\s+(test|build|check|clippy)|go${EXT}\s+(test|build|vet)|make${EXT}\s+(test|check|lint)|bats${EXT}|tsc${EXT}|ruff${EXT}\s+check|shellcheck${EXT}|uv${EXT}\s+run\s[^;&|]*pytest)([^-A-Za-z0-9_]|$)`,
+);
 
-export const CLASSIFIER_NOTE =
-  "This Bash call ran one of this repository's own verification runners (test, lint, build, or typecheck).";
+export const classifierNote = (tool: string): string =>
+  `This ${tool} call ran one of this repository's own verification runners (test, lint, build, or typecheck).`;
 
 export const INVALID_LEDGER_REASON =
   "Verification evidence has invalid schema. Use the evidence_log MCP tool (NOT manual file writes). Required: entries[] with type, command, exit_code, output_snippet, timestamp fields.";

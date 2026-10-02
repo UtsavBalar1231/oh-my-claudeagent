@@ -61,6 +61,7 @@ function session(sessionId: string = crypto.randomUUID()): Failures {
 const edit = (error?: string) => ({ tool_name: "Edit", tool_input: { file_path: "/tmp/foo.sh" }, ...(error !== undefined && { error }) });
 const agent = (error?: string, type = "oh-my-claudeagent:executor") => ({ tool_name: "Agent", tool_input: { subagent_type: type }, ...(error !== undefined && { error }) });
 const bash = (error?: string, extra: Record<string, unknown> = {}) => ({ tool_name: "Bash", tool_input: { command: "run-it" }, ...(error !== undefined && { error }), ...extra });
+const powershell = (error?: string, extra: Record<string, unknown> = {}) => ({ tool_name: "PowerShell", tool_input: { command: "run-it" }, ...(error !== undefined && { error }), ...extra });
 const read = (error?: string) => ({ tool_name: "Read", tool_input: { file_path: "/tmp/f" }, ...(error !== undefined && { error }) });
 const tool = (name: string, error?: string) => ({ tool_name: name, ...(error !== undefined && { error }) });
 
@@ -287,6 +288,60 @@ describe("Bash failures", () => {
   });
 });
 
+const NOT_A_CMDLET = "[POWERSHELL ERROR RECOVERY] Command not found. The cmdlet, function, script or program is not installed or not on PATH. Try: Get-Command <name>";
+const NO_SUCH_PATH = "[POWERSHELL ERROR RECOVERY] Path not found. Check the spelling and the working directory. Try: Get-ChildItem <parent folder>";
+
+describe("PowerShell failures", () => {
+  test("an unknown command gets Get-Command advice", async () => {
+    expect(await session().report(powershell("foobar : The term 'foobar' is not recognized as the name of a cmdlet, function, script file, or operable program."))).toBe(NOT_A_CMDLET);
+  });
+
+  test("a missing path gets listing advice, in both of PowerShell's wordings", async () => {
+    expect(await session().report(powershell("Get-Content : Cannot find path 'C:\\nope.txt' because it does not exist."))).toBe(NO_SUCH_PATH);
+    expect(await session().report(powershell("The system cannot find the path specified."))).toBe(NO_SUCH_PATH);
+  });
+
+  test("a JSON parse error is never read with the JSON-error rule", async () => {
+    for (const error of ["ConvertFrom-Json : Invalid JSON primitive: x.", "SyntaxError: Unexpected token } in JSON", "malformed JSON", "parse error"]) {
+      const { report, sessionId } = session();
+      expect(await report(powershell(error))).toBeUndefined();
+      expect(counts(sessionId)).toBeUndefined();
+    }
+  });
+
+  test("Bash's command-not-found and timeout rules do not apply to it", async () => {
+    expect(await session().report(powershell("foobar: command not found"))).toBeUndefined();
+    expect(await session().report(powershell("Command timed out after 60000ms", { duration_ms: 60000 }))).toBeUndefined();
+    expect(await session().report(powershell("some completely unknown error", { duration_ms: 300000 }))).toBeUndefined();
+  });
+
+  test("an unrecognised error adds no advice and is not counted", async () => {
+    const { report, sessionId } = session();
+    expect(await report(powershell("something else broke"))).toBeUndefined();
+    expect(await report(powershell())).toBeUndefined();
+    expect(counts(sessionId)).toBeUndefined();
+  });
+
+  test("a message under a field the client does not send produces no advice", async () => {
+    expect(await session().report({ tool_name: "PowerShell", tool_input: { command: "x" }, tool_error: "x : The term 'x' is not recognized as the name of a cmdlet" })).toBeUndefined();
+  });
+
+  test("it counts under its own key and the third failure carries the breaker", async () => {
+    const { report, sessionId } = session();
+    await report(powershell("a : The term 'a' is not recognized as the name of a cmdlet"), NOW);
+    await report(powershell("b : The term 'b' is not recognized as the name of a cmdlet"), NOW + 1);
+    expect(await report(powershell("c : The term 'c' is not recognized as the name of a cmdlet"), NOW + 2)).toBe(
+      `${NOT_A_CMDLET} ${breaker("1) a : The term 'a' is not recognized as the name of a cmdlet 2) b : The term 'b' is not recognized as the name of a cmdlet 3) c : The term 'c' is not recognized as the name of a cmdlet")}`,
+    );
+    expect([...(counts(sessionId) ?? [])].map(([key, { count }]) => [key, count])).toEqual([["PowerShell:powershell_error", 3]]);
+  });
+
+  test("OMCA_DISABLED_HOOKS naming failure-recovery silences it", async () => {
+    process.env.OMCA_DISABLED_HOOKS = "failure-recovery";
+    expect(await session().report(powershell("x : The term 'x' is not recognized as the name of a cmdlet"))).toBeUndefined();
+  });
+});
+
 describe("Read failures", () => {
   test("a missing file gets a search suggestion", async () => {
     expect(await session().report(read("No such file or directory: /nonexistent/file.txt"))).toBe(
@@ -367,6 +422,7 @@ describe("failures of any other tool", () => {
 
   test.each([
     ["Bash", undefined],
+    ["PowerShell", undefined],
     ["Edit", "[ERROR RECOVERY] Type: unknown | Tool: Edit | Retry: 1/3\n"],
     ["Agent", "[ERROR RECOVERY] Type: unknown | Tool: Agent | Retry: 1/3\n[DELEGATE RETRY]"],
     ["Grep", undefined],
