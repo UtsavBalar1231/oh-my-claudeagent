@@ -1,14 +1,11 @@
 # Tests
 
 Behavioral and integration tests for the plugin. Bun specs (`*.spec.ts`) live beside the
-code they cover, such as `servers/` and `src/`, rather than here; mod tests are in `mod/`.
+code they cover, such as `servers/`, `src/` and `scripts/`, rather than here; mod tests are in
+`mod/`.
 
 ## Layout
 
-- `bats/hooks/`: the golden replay of `validate-plugin.sh` and the sisyphus contract canary
-  (`just test-bats`). `bats/bats-core` is a git submodule; run `git submodule update --init`
-  first.
-- `bats/unit/`: BATS contract tests for the validator, the workflows and the frontmatter.
 - `fixtures/mcp/`: JSON-RPC requests and the golden `expected-tools.json` baseline,
   which `servers/omca.spec.ts` and the validator's MCP check read.
 - `fixtures/boulder-schemas/`: sample `boulder.json` shapes for registry tests.

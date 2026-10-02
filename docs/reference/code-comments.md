@@ -6,7 +6,7 @@ upstream source file. Where a rule has no first-party source, it says so in plac
 
 `sources verified 2026-07-29`
 
-The link checker in `scripts/validate-plugin.sh` (`check_docs_accuracy`) scans only README.md,
+The docs accuracy check in `scripts/validate/docs.ts` scans only README.md,
 OMCA.md, and CONTRIBUTING.md, so nothing revalidates the URLs in this file automatically. Treat
 the stamp above as the vintage and re-verify before relying on a quote in a review. Every
 per-language source is indexed in the Sources table at the end.

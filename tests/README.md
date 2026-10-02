@@ -6,10 +6,6 @@ This directory contains behavioral and integration tests for oh-my-claudeagent.
 
 ```
 tests/
-  bats/
-    bats-core/      # BATS test framework (git submodule)
-    hooks/          # golden replay of validate-plugin.sh, sisyphus contract canary
-    unit/           # validator, workflow and frontmatter contract tests
   evals/            # Eval tasks and run scripts
   fixtures/
     mcp/            # JSON-RPC requests and the expected tool list for the MCP server
@@ -25,30 +21,15 @@ Bun specs (`*.spec.ts`) live beside the code they cover, under `src/`, `servers/
 # All layers at once
 just test-all
 
-# Layer 1: structural validation (claims + hooks format)
+# Layer 1: structural validation (claims, hooks, mod, tree and engine checks)
 just test
 
-# Layer 2: BATS contract tests (validator golden replay, workflows, frontmatter)
-git submodule update --init   # pull bats-core if not present
-just test-bats
-
-# Layer 3: MCP server specs (requires ast-grep)
+# Layer 2: MCP server specs and the handshake check (requires ast-grep)
 just test-mcp
 
-# Layer 4: every bun spec
+# Layer 3: every bun spec, including the validator specs and the workflow contract
 just test-bun
 ```
-
-## Adding a BATS Test
-
-1. Create `tests/bats/unit/your-test-name.bats` by copying an existing file as a template.
-2. Each test function follows the pattern:
-
-```bash
-@test "your-area: description of expected behavior" {
-```
-
-3. Run `just test-bats` to verify locally before committing.
 
 ## Adding a Bun Spec
 
@@ -62,10 +43,9 @@ CI runs these jobs on every push and pull request to `main`:
 
 | Job | Command |
 |-----|---------|
-| `validate` | `validate-plugin.sh --check claims --check hooks` |
+| `validate` | `bun scripts/validate.ts --check claims --check hooks --check mod --check tree --check engine` |
 | `lint-shell` | `shellcheck scripts/*.sh` |
-| `test-bats` | `bats tests/bats/hooks/ tests/bats/unit/` (submodules: true) |
-| `test-mcp` | `bun test servers` |
+| `test-mcp` | `bun test servers` and `bun scripts/validate.ts --check mcp` |
 | `test-opencode` | the OpenCode adapter suite |
 | `typescript` | both tsc projects, the mod tests and the bun specs |
 | `validate-manifest` | `claude plugin validate . --strict` |
@@ -76,7 +56,3 @@ Hooks are `mcp_tool` entries that call `omca_hook` on the server. To exercise a 
 without a session, send a `tools/call` request for `omca_hook` to `bun servers/omca.ts` from
 a scratch directory, since the server roots its `.omca/` state at the git top level of its
 working directory.
-
-### Why BATS tests are already safe
-
-BATS tests isolate state automatically. `tests/bats/test_helper.bash` sets `CLAUDE_PROJECT_ROOT` to a per-test temp dir (`$BATS_TEST_TMPDIR/project`) and creates the required subdirectories before each test. No real `.omca/state/` is ever touched during `just test-bats`.

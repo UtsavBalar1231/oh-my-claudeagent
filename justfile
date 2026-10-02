@@ -18,25 +18,26 @@ lint-shell:
 
 # ── Test ──────────────────────────────────────────────────────────
 
-# Run all validation suites
+# Run the validation checks; the engine group skips without the claude CLI
 [group('test')]
 test:
-	bash scripts/validate-plugin.sh --check claims --check hooks
+	bun scripts/validate.ts --check claims --check hooks --check mod --check tree --check engine
 
 # Run claims validation only
 [group('test')]
 test-claims:
-	bash scripts/validate-plugin.sh --check claims
+	bun scripts/validate.ts --check claims
 
 # Run hooks validation only
 [group('test')]
 test-hooks:
-	bash scripts/validate-plugin.sh --check hooks
+	bun scripts/validate.ts --check hooks
 
-# Run the MCP server specs (requires ast-grep)
+# Run the MCP server specs (requires ast-grep) and the handshake check against the real server
 [group('test')]
 test-mcp:
 	bun test servers
+	bun scripts/validate.ts --check mcp
 
 # Run the OpenCode adapter suite (typecheck, unit tests, smoke, model path); skips without bun or opencode
 [group('test')]
@@ -64,11 +65,6 @@ test-mod:
 [group('test')]
 test-bun:
 	bun test src servers statusline scripts opencode
-
-# Run BATS behavioral tests for hook scripts
-[group('test')]
-test-bats:
-	tests/bats/bats-core/bin/bats tests/bats/hooks/ tests/bats/unit/
 
 # Run the manual QA harness: session smoke, install verify, the live hook probe, the statusline probe,
 # then the worktree-bash and route-effort checks. Maintainer pre-release step, NOT part of CI: it launches
@@ -173,7 +169,6 @@ doctor:
 	@which ast-grep >/dev/null 2>&1 && echo "ast-grep: $(ast-grep --version 2>&1 | head -1)" || (which sg >/dev/null 2>&1 && echo "ast-grep (sg): $(sg --version 2>&1 | head -1)" || echo "ast-grep: NOT FOUND (required)")
 	@which shellcheck >/dev/null 2>&1 && echo "shellcheck: $(shellcheck --version | grep version: | head -1)" || echo "shellcheck: NOT FOUND (recommended)"
 	@which pre-commit >/dev/null 2>&1 && echo "pre-commit: $(pre-commit --version)" || echo "pre-commit: NOT FOUND (recommended)"
-	@[[ -x tests/bats/bats-core/bin/bats ]] && echo "  bats: $(tests/bats/bats-core/bin/bats --version)" || echo "  bats: NOT FOUND (run: git submodule update --init)"
 
 # Watch all OMCA log files in real-time
 [group('dev')]
@@ -259,15 +254,15 @@ eval-consistency:
 	@echo "Record results in tests/evals/results/<task>-trial-N.json"
 	@echo "Automated multi-run execution is future work."
 
-# Run all test suites (structural + behavioral + MCP)
+# Run all test suites (structural + MCP + every bun spec)
 [group('test')]
-test-all: test test-bats test-mcp test-bun
+test-all: test test-mcp test-bun
 
 # ── CI ────────────────────────────────────────────────────────────
 
-# Run full CI pipeline (lint + test + bats + mcp + manifest + opencode + TypeScript checks)
+# Run full CI pipeline (lint + test + mcp + manifest + opencode + TypeScript checks)
 [group('ci')]
-ci: lint test test-bats test-mcp validate-manifest test-opencode typecheck-ts test-mod test-bun validate-mod
+ci: lint test test-mcp validate-manifest test-opencode typecheck-ts test-mod test-bun validate-mod
 
 # ── Release ──────────────────────────────────────────────────────
 

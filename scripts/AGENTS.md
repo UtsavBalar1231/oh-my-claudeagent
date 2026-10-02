@@ -1,14 +1,21 @@
 # Scripts
 
-Repository tooling (plugin validation, packaging, the bench, the parity-title check),
+Repository tooling (plugin validation, packaging, the bench),
 supporting libraries and a manual QA harness. No hook handler lives here: hooks are the mod
 under `hooks/` and the server handlers under `servers/hooks/`.
 
 ## Layout
 
-- Top-level scripts: repository tooling, such as `validate-plugin.sh`, `package.ts`
-  (`bun scripts/package.ts <dest>` copies the shipped tree, `--dry-run` prints its file list),
-  `bench.ts` and `parity-titles.ts`.
+- Top-level scripts: repository tooling, such as `validate.ts`, `package.ts`
+  (`bun scripts/package.ts <dest>` copies the shipped tree, `--dry-run` prints its file list)
+  and `bench.ts`.
+- `validate.ts` and `validate/`: the plugin validator. `bun scripts/validate.ts [--check <group>]...`
+  runs the groups `claims`, `hooks`, `mod`, `tree`, `engine` and `mcp` (all of them by default),
+  prints one line per check and a final `Summary:` line, and exits 1 on any failure. Each check
+  family is one module under `validate/` with its `*.spec.ts` beside it, and
+  `validate/allowlist.txt` holds the depersonalization exceptions. `engine` runs
+  `claude plugin validate` and skips without the claude CLI. A script that needs a python, bash
+  or sh shebang is allowlisted with its reason in `validate/tree.ts`.
 - `postedit-check.ts`: runs `just typecheck-ts` after an edit to a `.ts` file and reports the
   first lines of a failure as hook context. The local project settings call it from a
   `PostToolUse` entry.

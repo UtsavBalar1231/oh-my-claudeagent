@@ -225,7 +225,7 @@ bodies receive the full user prompt via the platform's natural expansion path in
 
 SKILL.md files can declare a `hooks:` block to register hook handlers that are active
 only while the skill is running. OMCA does not adopt this because hooks declared in
-skill frontmatter are invisible to `scripts/validate-plugin.sh`, which validates hooks
+skill frontmatter are invisible to `scripts/validate.ts`, which reads hooks
 only from `hooks/hooks.json`. All OMCA hook registration stays in `hooks/hooks.json`.
 
 **`skillOverrides`, `skillListingBudgetFraction`, `maxSkillDescriptionChars` settings (v2.1.141–v2.1.167, not adopted):**
@@ -272,9 +272,8 @@ provide:
 
 **Hook events OMCA handles:**
 
-This table is the documented mirror of `jq -r '.hooks | keys[]' hooks/hooks.json`, and
-`scripts/validate-plugin.sh` fails if the two disagree in either direction. Add an event
-row only when a handler is actually registered for it.
+This table mirrors the event keys of `hooks/hooks.json`. Add an event row only when a
+handler is actually registered for it.
 
 | Event | Category |
 |-------|----------|
@@ -341,8 +340,7 @@ guarantee: the three Stop gates are what enforce evidence discipline by default.
 The table heading's version range covers the first five rows; `DirectoryAdded` postdates it
 and is dated in its own row.
 
-The non-adopted events are tracked in `validate-plugin.sh`'s `new_platform_events` array. The validator skips them when no handler is present and
-passes when one is present — no failures on absence.
+The non-adopted events have no entry in `hooks/hooks.json`, and the validator does not require one.
 
 **Stop / SubagentStop — new input fields (v2.1.145):**
 
@@ -1368,7 +1366,7 @@ Features introduced in this window that OMCA consciously declines to adopt:
 | Feature | Version | Reason |
 |---------|---------|--------|
 | `hookSpecificOutput.additionalContext` on Stop/SubagentStop | v2.1.163 | Co-existence with `decision:block` is undocumented (schema inconclusive); the platform reads a hook's stdout JSON on every exit code, and exit 2 is the one outcome that JSON cannot override, so an `additionalContext` emitted beside a block cannot soften the block and its delivery alongside one is unspecified |
-| `MessageDisplay`, `Elicitation`, `ElicitationResult` hook handlers | v2.1.152 | No OMCA use case; tracked in `new_platform_events` validator array (skip-on-absent semantics) |
+| `MessageDisplay`, `Elicitation`, `ElicitationResult` hook handlers | v2.1.152 | No OMCA use case; no handler registered |
 | `skills:` preload frontmatter | v2.1.150 | Adds context-window cost on every session; OMCA's lazy slash-command / keyword paths are sufficient |
 | `Agent(type=...)` spawn-allowlist in agent frontmatter | v2.1.148 | Sisyphus needs unrestricted spawn access to the full agent roster; an allowlist would require updating on every new specialist addition |
 | `defaultEnabled: false` in plugin.json | v2.1.154 | OMCA is designed to activate immediately on install; inactive-by-default would break first-session experience |
@@ -1376,7 +1374,7 @@ Features introduced in this window that OMCA consciously declines to adopt:
 | `prompt`, `agent`, and `http` hook types | (standing) | Declined on cost and determinism, not on handler-type purity: `hooks/hooks.json` already registers `mcp_tool` handlers (`omca_hook`) alongside its `command` handlers, so "OMCA is `type: command` only" is not the reason and must not be cited as one. A `prompt` or `agent` handler puts a model call in the path of every matching tool event, which a plan-write validator resolves deterministically for free, and `http` adds a network dependency to a gate that must work offline |
 | Monitors, Themes, Channels, LSP | (standing) | No current OMCA use case |
 | `arguments:` in skill frontmatter | evaluated 2026-06 | Shell-style positional binding truncates free-form input — a slash command like `/oh-my-claudeagent:plan fix the auth bug` would bind only `$task="fix"`, discarding the rest. OMCA skills receive the full user prompt via natural expansion instead |
-| `hooks:` in skill frontmatter | evaluated 2026-06 | Skill-frontmatter hooks are not visible to `validate-plugin.sh` (validates hooks only from `hooks/hooks.json`). All hook registration stays in `hooks/hooks.json` |
+| `hooks:` in skill frontmatter | evaluated 2026-06 | Skill-frontmatter hooks are not visible to `scripts/validate.ts` (reads hooks only from `hooks/hooks.json`). All hook registration stays in `hooks/hooks.json` |
 | `skillOverrides` / `skillListingBudgetFraction` / `maxSkillDescriptionChars` settings | evaluated 2026-06 | User-preference settings only; `skillOverrides` does not apply to plugin-shipped skills. No plugin-side adoption possible or needed |
 | `initialPrompt` in agent frontmatter | evaluated 2026-06 | Fires an unconditional billable model turn per subagent; the `subagent-context` handler already injects boulder context as `additionalContext` at zero turn cost |
 | `SessionStart` `watchPaths` output | DROPPED | No `FileChanged` handler remains: the mod re-reads the evidence ledger and the plan registry on `turn.complete` and on an open pane's timer |
@@ -1536,7 +1534,7 @@ section and in `CLAUDE.md`; neither is set by OMCA.
 | `disable-model-invocation: true` on handoff | Replaces a workaround that told users to disable the whole plugin, and retires a `skillOverrides` recommendation this ledger already called inert for plugin skills. The `handoff` keyword now degrades to an advisory nudge toward the slash command and is described that way everywhere |
 | Subagents background by default (v2.1.198) | Every "no `run_in_background`" instruction described the opposite of what happens. The fix at the time was to pass the flag as `false` at every fan-out call site. That fix was superseded from v2.1.232, which removes the parameter from the Agent tool in an interactive session: there is no flag to pass and no foreground path to ask for. The call sites now carry the fan-out paragraph under Agent Reference instead |
 | `plansDirectory` resolution | `~/.claude/plans` was hardcoded as both the authoring and the discovery surface, so with the setting on, prometheus wrote where `/start-work` no longer looked. Both now resolve the directory: the setting when present (relative to the project root), else `~/.claude/plans`, with an active plan-mode path overriding |
-| Hook event tables regenerated from the registry | The table advertised nine events with no handler, omitted `PermissionDenied`, and pointed at two scripts deleted in the v2.10 refactor. `scripts/validate-plugin.sh` now diffs the table against `jq -r '.hooks \| keys[]'` in both directions, so it cannot re-drift silently |
+| Hook event tables regenerated from the registry | The table advertised nine events with no handler, omitted `PermissionDenied`, and pointed at two scripts deleted in the v2.10 refactor. The table now mirrors the event keys of `hooks/hooks.json` |
 | `last_assistant_message` on Stop/SubagentStop | Both Stop hooks read the final assistant turn from the payload field first, with the transcript tail kept as fallback because the transcript is not guaranteed to hold the final message at Stop time. The undocumented `.messages` probe is gone. drift-guard's whole purpose is catching a completion claim in that message, so a miss there was a silent guard failure |
 | Stop hooks block via `decision: block` | The plan-continuation, final-verification, and drift gates answer with Stop decision-control JSON (`decision` plus `reason`, nothing else) instead of writing to stderr and exiting 2. The deny hooks are unaffected: each writes the shape its event reads, branching on `hook_event_name` (see the Stop / SubagentStop section above) |
 | Tier aliases in agent frontmatter | Every agent declares a tier alias (`opus`, `sonnet`, `fable`) instead of a pinned generation id, so a provider resolves it to the newest generation its allowlist permits and nothing goes stale on the next model release. `omca-setup` no longer writes `ANTHROPIC_DEFAULT_OPUS_MODEL`: a default-model pin overrides the alias and reintroduces exactly the staleness the alias removes |
@@ -1653,8 +1651,8 @@ tables under Core Concepts and Agent Reference are the live state.
 | `skillOverrides` for plugin-shipped skills | Does not apply to plugin skills at all. Superseded for the handoff case by `disable-model-invocation` |
 | Skill re-invocation no longer duplicating instructions | No OMCA text ever discouraged re-invocation for context reasons, and the repeatedly-invoked skills are the small ones. Recording it would log a non-event |
 | `effortLevel` daemon-fork fix | A settings key OMCA does not set, on a spawn path no OMCA agent uses |
-| Subagents less likely to re-delegate | A tendency, not a hard block. The injected block it would justify trimming is mostly barrier and output-contract text addressing a different failure mode, and trimming it means regenerating golden baselines and two bats suites to save under a kilobyte per spawn, while weakening the one agent that can still spawn |
-| Project verify-skill rewrite frequency | The local verify skill is gitignored, platform-managed, and ships to nobody. `just ci` plus `scripts/validate-plugin.sh` are the authoritative definitions in tracked files |
+| Subagents less likely to re-delegate | A tendency, not a hard block. The injected block it would justify trimming is mostly barrier and output-contract text addressing a different failure mode, and trimming it means regenerating the pinned baselines and the specs that read that text to save under a kilobyte per spawn, while weakening the one agent that can still spawn |
+| Project verify-skill rewrite frequency | The local verify skill is gitignored, platform-managed, and ships to nobody. `just ci` plus `scripts/validate.ts` are the authoritative definitions in tracked files |
 | `--json-schema` invalid-schema and `format` fixes | No `--json-schema` consumer. Agents return prose with headers by contract, and the leaf-worker output mandate depends on that; a structured-output contract would be a separate design change |
 | `/commit-push-pr` push allow-set widening | Permissions are Claude-native's. OMCA authors no push guardrail, and adding one would duplicate the platform's auto-mode git handling |
 | `/code-review` quality deltas between model generations | Model-quality deltas shift every release and OMCA's pins are justified on role fit, not benchmark position |
@@ -1689,12 +1687,12 @@ tables under Core Concepts and Agent Reference are the live state.
 When updating plugin docs or runtime contracts, verify with:
 
 ```bash
-bash scripts/validate-plugin.sh
+bun scripts/validate.ts
 just test-hooks
 ```
 
 Full CI pipeline:
 
 ```bash
-just ci    # lint + test + bats + mcp + opencode + TypeScript checks
+just ci    # lint + test + mcp + opencode + TypeScript checks
 ```

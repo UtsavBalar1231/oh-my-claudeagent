@@ -133,7 +133,7 @@ standards recommend"); emoji as structure; boldface on whole sentences. Headings
 case, instructions are imperative mood and present tense.
 
 Preserve byte-identical: YAML frontmatter (a skill `description:` is trigger-matched and
-character-capped, so rewording it changes behavior and can fail `scripts/validate-plugin.sh`);
+character-capped, so rewording it changes behavior and can fail `scripts/validate.ts`);
 headings other code greps for; code blocks and output-format template blocks; tool names, file
 paths, and bracketed tokens such as `[VERIFICATION]`. When a preserved string violates a rule
 above, leave it and note the conflict rather than editing it.

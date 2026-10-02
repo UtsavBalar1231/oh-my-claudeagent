@@ -28,52 +28,22 @@ jobs:
           no-cache: true
 
       - name: Run validation
-        run: bash scripts/validate-plugin.sh --check claims --check hooks
+        run: bun scripts/validate.ts --check claims --check hooks --check mod --check tree --check engine
 
       - name: Job summary
         if: always()
         run: |
           {
             echo "### What this job checks"
-            echo "Plugin claims (manifest/schema) and hook registration, via \`just test\`."
+            echo "Plugin claims (manifests, frontmatter, docs), hook registration, the mod's registrations and the repository layout, via \`just test\`."
             echo ""
             echo "### If this fails"
             echo "The plugin manifest or a hook definition is malformed or out of sync. This gate must pass before a release is created."
           } >> "$GITHUB_STEP_SUMMARY"
 
-  test-bats:
-    name: BATS Hook Tests
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-        with:
-          persist-credentials: false
-          submodules: true
-
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version: 1.4.2
-          no-cache: true
-
-      - name: Run BATS behavioral tests
-        run: tests/bats/bats-core/bin/bats tests/bats/hooks/ tests/bats/unit/
-
-      - name: Job summary
-        if: always()
-        run: |
-          {
-            echo "### What this job checks"
-            echo "The validator's golden replay under tests/bats/hooks/ and the workflow, frontmatter and registration contracts under tests/bats/unit/, via bats-core (mirrors \`just test-bats\`)."
-            echo ""
-            echo "### If this fails"
-            echo "The validator output or a workflow, frontmatter or registration contract drifted. This gate must pass before a release is created."
-          } >> "$GITHUB_STEP_SUMMARY"
-
   release:
     name: Create Release
-    needs: [validate, test-bats]
+    needs: [validate]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -101,7 +71,7 @@ jobs:
         run: |
           {
             echo "### What this job checks"
-            echo "Tag version matches plugin.json, then creates the GitHub release (runs only after validate and test-bats both pass)."
+            echo "Tag version matches plugin.json, then creates the GitHub release (runs only after validate passes)."
             echo ""
             echo "### If this fails"
             echo "Either the tag/version mismatch check failed, or the release creation step failed. Check the step logs above for which one."

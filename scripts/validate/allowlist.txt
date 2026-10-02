@@ -1,16 +1,12 @@
-# Depersonalization allowlist — consulted by check_depersonalization() in validate-plugin.sh
+# Depersonalization allowlist, read by the depersonalization check in scripts/validate/docs.ts
 # Format: <repo-relative-path>:<matched-text>
 # One entry per line; a line starting with # is a comment. Justification follows on
 # the next comment line. Untracked dev artifacts never enter this file.
-
-# servers/tests/test_filesystem.py:SECRET=hunter2\n
-# Test fixture .env content asserting the sensitive-file denylist blocks access.
-# "hunter2" is a well-known fake password used in test fixtures, not a real secret.
-servers/tests/test_filesystem.py:SECRET=hunter2\n
 
 # Dummy token handed to the visual-capture session pointed at the local mock Messages API server.
 scripts/qa/visual.ts:ANTHROPIC_AUTH_TOKEN=mock-key
 
 # servers/tools/filesystem.spec.ts:SECRET=hunter2\n
-# The same fake .env fixture, in the bun port of the sensitive-file denylist tests.
+# A fake .env fixture in the sensitive-file denylist tests. "hunter2" is a well-known fake
+# password used in test fixtures, not a real secret.
 servers/tools/filesystem.spec.ts:SECRET=hunter2\n

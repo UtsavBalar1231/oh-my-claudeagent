@@ -81,8 +81,8 @@ A prose pass must not touch the following. Each is load-bearing at runtime or in
 - **YAML frontmatter** in `agents/*.md` and `skills/*/SKILL.md`. A skill `description:` is
   trigger-matched by the platform and character-capped (1,536 hard, 512 soft in this repo),
   so rewording it changes which prompts invoke the skill and can fail
-  `scripts/validate-plugin.sh`.
-- **Headings that other code greps for.** `tests/bats/unit/prometheus_template.bats` asserts
+  `scripts/validate.ts`.
+- **Headings that other code greps for.** `scripts/validate/agent-prompts.spec.ts` asserts
   on the literal `### Completion Signaling` in `agents/prometheus.md`. Grep before renaming
   any heading.
 - **Code blocks and output-format template blocks.** The text inside a fenced block is data,

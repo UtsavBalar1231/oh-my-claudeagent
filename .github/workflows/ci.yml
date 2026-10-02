@@ -38,17 +38,17 @@ jobs:
           bun-version: 1.4.2
 
       - name: Run validation suites
-        run: bash scripts/validate-plugin.sh --check claims --check hooks
+        run: bun scripts/validate.ts --check claims --check hooks --check mod --check tree --check engine
 
       - name: Job summary
         if: always()
         run: |
           {
             echo "### What this job checks"
-            echo "Plugin claims (manifest/schema) and hook registration, via \`just test\`."
+            echo "Plugin claims (manifests, frontmatter, docs), hook registration, the mod's registrations and the repository layout, via \`just test\`. The engine checks skip here because the claude CLI is not installed; the TypeScript job runs them."
             echo ""
             echo "### If this fails"
-            echo "The plugin manifest or a hook definition is malformed or out of sync. Run \`bash scripts/validate-plugin.sh --check claims --check hooks\` locally to see the exact failure."
+            echo "The plugin manifest, a hook definition, the mod's registrations or the repository layout is malformed or out of sync. Run \`bun scripts/validate.ts --check claims --check hooks --check mod --check tree --check engine\` locally to see the exact failure."
           } >> "$GITHUB_STEP_SUMMARY"
 
   lint-shell:
@@ -73,35 +73,6 @@ jobs:
             echo ""
             echo "### If this fails"
             echo "A shell script has a shellcheck violation. Run \`just lint-shell\` locally to see the exact warning and file/line."
-          } >> "$GITHUB_STEP_SUMMARY"
-
-  test-bats:
-    name: BATS Hook Tests
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-        with:
-          persist-credentials: false
-          submodules: true
-
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version: 1.4.2
-
-      - name: Run BATS behavioral tests
-        run: tests/bats/bats-core/bin/bats tests/bats/hooks/ tests/bats/unit/
-
-      - name: Job summary
-        if: always()
-        run: |
-          {
-            echo "### What this job checks"
-            echo "The validator's golden replay under tests/bats/hooks/ and the workflow, frontmatter and registration contracts under tests/bats/unit/, via bats-core (mirrors \`just test-bats\`)."
-            echo ""
-            echo "### If this fails"
-            echo "The validator output or a workflow, frontmatter or registration contract drifted. Run \`tests/bats/bats-core/bin/bats tests/bats/hooks/ tests/bats/unit/\` locally (after \`git submodule update --init\`) to see the failing test."
           } >> "$GITHUB_STEP_SUMMARY"
 
   test-mcp:
@@ -129,12 +100,15 @@ jobs:
       - name: Run MCP server specs
         run: bun test servers
 
+      - name: Check the MCP handshake against the real server
+        run: bun scripts/validate.ts --check mcp
+
       - name: Job summary
         if: always()
         run: |
           {
             echo "### What this job checks"
-            echo "The omca MCP server specs under servers/: the handshake, the tool list, every tool and every hook handler, via \`just test-mcp\`."
+            echo "The omca MCP server specs under servers/: the handshake, the tool list, every tool and every hook handler, plus the validator's handshake against the real server, via \`just test-mcp\`."
             echo ""
             echo "### If this fails"
             echo "A server spec failed: the server did not start, misreports its tool list, or a tool or hook handler regressed. Run \`just test-mcp\` locally to see the failing spec."
@@ -242,12 +216,15 @@ jobs:
       - name: Validate manifest and hooks module
         run: claude plugin validate .claude-plugin/plugin.json --strict
 
+      - name: Check the mod against the engine
+        run: bun scripts/validate.ts --check engine
+
       - name: Job summary
         if: always()
         run: |
           {
             echo "### What this job checks"
-            echo "The TypeScript hooks module and shared code on Claude Code 2.1.287: both tsc projects, the mod tests, the bun spec files, and \`claude plugin validate\` on the manifest (mirrors \`just typecheck-ts test-mod test-bun validate-mod\`)."
+            echo "The TypeScript hooks module and shared code on Claude Code 2.1.287: both tsc projects, the mod tests, the bun spec files, \`claude plugin validate\` on the manifest, and the engine checks on its output (mirrors \`just typecheck-ts test-mod test-bun validate-mod\`)."
             echo ""
             echo "### If this fails"
             echo "A type error, a failing test, or a manifest or hooks-module validation error. Run the matching \`just\` recipe locally with Claude Code 2.1.287 and bun 1.4.2 to see the exact failure."

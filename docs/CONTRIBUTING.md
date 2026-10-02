@@ -51,7 +51,7 @@ memory: project                   # optional; enables persistent project memory
 Key rules:
 - Declare the tier alias in `model:`, not a full generation ID. The alias tracks the platform's current model for that tier, so the frontmatter never goes stale. The roster uses three tiers: `sonnet` for routine workers whose scope the orchestrator fixes (search, scoped implementation, docs lookup), `opus` for agents whose output turns on judgment, and `fable` for oracle-class reasoning. `haiku` remains a valid per-call override but is not what a new agent declares.
 - Pick `effort:` deliberately, alongside the tier. `low` suits short scoped work that is not intelligence-sensitive, `medium` is the Sonnet 5.5 and Opus 5.5 default for day-to-day work with a clear scope, `high` is the intelligence-sensitive default for orchestration and planning, `xhigh` buys deeper reasoning for oracle. Reserve `xhigh` and `max` for a measured quality gain: Opus 5.5 thinks more per turn at a given level than Opus 5 did.
-- Use `disallowedTools:` to restrict capabilities, never `tools:`. `tools:` is a strict allowlist that blocks MCP tool inheritance, and an incomplete list launches the agent with no usable tools. `scripts/validate-plugin.sh` fails on a `tools:` key in agent frontmatter.
+- Use `disallowedTools:` to restrict capabilities, never `tools:`. `tools:` is a strict allowlist that blocks MCP tool inheritance, and an incomplete list launches the agent with no usable tools. `bun scripts/validate.ts --check claims` fails on a `tools:` key in agent frontmatter.
 - Keep `name:` free of `:`. The platform rejects an agent whose frontmatter name holds a colon, so the agent never loads. The `oh-my-claudeagent:` prefix used at call sites is added by the platform.
 - Do not declare `permissionMode:`. Claude Code strips it from plugin agents for security.
 - Add the agent to the agent catalog table in `templates/claudemd.md`
@@ -64,18 +64,18 @@ Key rules:
 2. Follow existing frontmatter format (`name`, `description`, `argument-hint` if applicable)
 3. If the skill should be keyword-activated, add a detection pattern to `src/core/keywords.ts`
 4. A skill that omits `context: fork` expands inline in whatever session invoked it, so one invoked from the main session runs at depth 0 and keeps that session's `Agent` tool. That is what an orchestrator skill needs; `start-work` is the worked example, fanning out to `executor` agents from an inline body. `context: fork` does the opposite. It runs the body in a forked subagent one level down, where the platform may withhold the `Agent` tool depending on the configured spawn depth, so do not reach for it when the body has to delegate.
-5. **Skill descriptions have a 512-character soft cap and a 1,536-character hard cap** (the platform truncates at the hard cap; older clients may truncate at the soft cap). Run `validate-plugin.sh` before committing; it warns at 512 and fails at 1,536. Move longer trigger phrases or usage notes into the SKILL.md body.
+5. **Skill descriptions have a 512-character soft cap and a 1,536-character hard cap** (the platform truncates at the hard cap; older clients may truncate at the soft cap). Run `just test-claims` before committing; it counts `description` plus `when_to_use`, warns at 512 and fails at 1,536. Move longer trigger phrases or usage notes into the SKILL.md body.
 6. **Do not leak hook internals.** Skills describe WHAT users do; hooks automate HOW. Unless the skill's primary purpose IS hook configuration or diagnosis, skills must NOT mention: raw `.omca/state/*.json` file paths (use the `boulder_write`, `boulder_progress` MCP tools from the omca server instead), hook script names (`task-completed-verify.sh`, etc.), hook event names (`PreToolUse`, `Stop`, etc.), or hook env vars (`HOOK_INPUT`, `HOOK_STATE_DIR`). Recognized exceptions: `omca-setup` (installs hooks), `stop-continuation` (clears hook-managed state). Exposing file paths forces users to understand internal layouts they cannot control, and forces every future hook refactor to update skill prose.
 
 ## Testing
 
 ```bash
-just ci              # full pipeline: lint + test + bats + mcp + manifest + opencode + TypeScript checks
-just test            # structural validation only (claims + hooks), not the full suite
-just test-claims     # manifest, hook-registry, and frontmatter contract checks
-just test-hooks      # hooks.json registration and server-name checks
-just test-bats       # behavioral tests (run `git submodule update --init` first)
-just test-mcp        # MCP server specs (requires ast-grep CLI)
+just ci              # full pipeline: lint + test + mcp + manifest + opencode + TypeScript checks
+just test            # structural validation only (claims, hooks, mod, tree, engine), not the full suite
+just test-claims     # manifest, frontmatter, docs and policy checks
+just test-hooks      # hooks.json handler shape, SessionStart matcher and registry checks
+just test-mcp        # MCP server specs (requires ast-grep CLI) and the handshake check
+just test-bun        # every bun spec, including the validator specs
 just qa              # manual QA against the mock model: session smoke, install verify, live hook probe, statusline probe, worktree and route-effort checks
 just lint            # shellcheck
 just typecheck-ts    # both tsc projects
