@@ -84,6 +84,9 @@ describe("recordPath", () => {
     ["s1", ""],
     ["s1", "-a"],
     ["s1", "a".repeat(129)],
+    ["s1", "nul"],
+    ["s1", "COM1"],
+    ["CON", "a-1"],
   ])("refuses session %p agent %p", (sessionId, agentId) => {
     expect(recordPath("/work", sessionId, agentId)).toBeUndefined();
   });

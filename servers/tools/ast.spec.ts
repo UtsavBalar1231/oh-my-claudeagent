@@ -2,12 +2,12 @@ import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { discoverBinary, extensionMismatch, gitWorktreeRoots, patternWarning, tools } from "./ast.ts";
+import { discoverBinary, extensionMismatch, gitWorktreeRoots, patternWarning, resolveNative, run, tools } from "./ast.ts";
 
 const ENV_KEYS = ["PATH", "AST_GREP_BIN", "CLAUDE_PROJECT_DIR"] as const;
 const MAIN_PY = "print('hello')\nx = 1\nold_func(x)\n";
 const INSTALL_HINT =
-  "ast-grep binary not found (looked for $AST_GREP_BIN, ast-grep and sg on PATH).\n\nInstall options:\n  cargo install ast-grep --locked\n  brew install ast-grep\n  npm install -g @ast-grep/cli\n  pacman -S ast-grep";
+  "ast-grep binary not found (looked for $AST_GREP_BIN, ast-grep and sg on PATH).\n\nInstall options:\n  cargo install ast-grep --locked\n  brew install ast-grep\n  npm install -g @ast-grep/cli\n  pacman -S ast-grep\n  pip install ast-grep-cli\n  scoop install main/ast-grep";
 const CAPPED = "[TRUNCATED] Output exceeded AST MCP caps\n\n";
 const NO_RULE_MATCH =
   "No matches found.\n\nHint: If using relational rules (has, inside, follows, precedes), try adding `stopBy: end` to search the entire subtree.";
@@ -195,6 +195,63 @@ describe("binary discovery", () => {
     expect(() => discoverBinary()).toThrow(INSTALL_HINT);
     const sg = executable(dir, "sg", "echo ast-grep 0.45.3");
     expect(discoverBinary()).toBe(sg);
+  });
+});
+
+describe("Windows shims", () => {
+  const layout = (...files: string[]) => {
+    const dir = tempDir();
+    for (const file of files) {
+      mkdirSync(dirname(join(dir, file)), { recursive: true });
+      writeFileSync(join(dir, file), "");
+    }
+    return dir;
+  };
+  const CLI = join("node_modules", "@ast-grep", "cli");
+
+  test.each(["ast-grep.cmd", "AST-GREP.CMD", "ast-grep.bat", "ast-grep.ps1"])("%s resolves to the native binary beside it", (shim) => {
+    const dir = layout(shim, join(CLI, "ast-grep.exe"));
+    expect(resolveNative(join(dir, shim), "win32")).toBe(join(dir, CLI, "ast-grep.exe"));
+  });
+
+  test("sg.cmd resolves to sg.exe", () => {
+    const dir = layout("sg.cmd", join(CLI, "sg.exe"), join(CLI, "ast-grep.exe"));
+    expect(resolveNative(join(dir, "sg.cmd"), "win32")).toBe(join(dir, CLI, "sg.exe"));
+  });
+
+  test("a shim with no native binary beside it is refused with cargo, pip and scoop routes", () => {
+    const dir = layout("ast-grep.cmd", join(CLI, "package.json"));
+    const refusal = () => resolveNative(join(dir, "ast-grep.cmd"), "win32");
+    expect(refusal).toThrow("a batch shim");
+    expect(refusal).toThrow("no ast-grep.exe sits beside it");
+    for (const route of ["cargo install ast-grep --locked", "pip install ast-grep-cli", "scoop install main/ast-grep"]) {
+      expect(refusal).toThrow(route);
+    }
+  });
+
+  test("an .exe, and any path off Windows, is returned untouched", () => {
+    const dir = layout("ast-grep.cmd");
+    expect(resolveNative("C:\\tools\\ast-grep.exe", "win32")).toBe("C:\\tools\\ast-grep.exe");
+    expect(resolveNative(join(dir, "ast-grep.cmd"), "linux")).toBe(join(dir, "ast-grep.cmd"));
+    expect(resolveNative(join(dir, "ast-grep.cmd"), "darwin")).toBe(join(dir, "ast-grep.cmd"));
+  });
+});
+
+describe("timeout", () => {
+  test("a process that outlives the limit is killed and reported by elapsed time, with no signalCode needed", async () => {
+    project();
+    const dir = tempDir();
+    process.env.AST_GREP_BIN = executable(dir, "ast-grep", "exec sleep 5");
+    const started = performance.now();
+    await expect(run(["run"], { timeoutMs: 200 })).rejects.toThrow("Command timed out after 0.2s");
+    expect(performance.now() - started).toBeLessThan(3_000);
+  });
+
+  test("a process that finishes inside the limit is not reported as timed out", async () => {
+    project();
+    const dir = tempDir();
+    process.env.AST_GREP_BIN = executable(dir, "ast-grep", "echo '[]'");
+    expect((await run(["run"], { timeoutMs: 5_000 })).stdout.length).toBeGreaterThan(0);
   });
 });
 

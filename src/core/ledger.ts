@@ -1,4 +1,4 @@
-import { isSafeSessionId } from "./session-id.ts";
+import { isSafeSessionId, isWindowsSafeName } from "./session-id.ts";
 
 export const METRICS_DIR = ".omca/metrics";
 
@@ -37,7 +37,7 @@ const SAFE_AGENT_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 
 /** The record's path, or undefined when either id could leave the metrics directory. */
 export function recordPath(root: string, sessionId: string, agentId: string): string | undefined {
-  if (!isSafeSessionId(sessionId) || !SAFE_AGENT_ID.test(agentId)) return undefined;
+  if (!isSafeSessionId(sessionId) || !SAFE_AGENT_ID.test(agentId) || !isWindowsSafeName(agentId)) return undefined;
   return `${root}/${METRICS_DIR}/${sessionId}/${agentId}.json`;
 }
 

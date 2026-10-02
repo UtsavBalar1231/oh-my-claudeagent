@@ -14,7 +14,7 @@ const unquote = (value: string): string => /^(["'])(.*)\1$/.exec(value)?.[2] ?? 
  * returning a wrong value. Quoted items cannot contain commas and `#` is never a comment mid-line.
  */
 export function parseFrontmatter(text: string): Frontmatter | undefined {
-  const lines = text.split(/\r?\n/);
+  const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/);
   if (lines[0] !== "---") return undefined;
   const end = lines.indexOf("---", 1);
   if (end === -1) return undefined;

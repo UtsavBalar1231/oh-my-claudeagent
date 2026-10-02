@@ -145,7 +145,7 @@ describe("notepad tools", () => {
   });
 
   describe("plan_name validation", () => {
-    const bad = ["", "../escape", "a/b", "/abs", ".hidden", "..", "-lead", "with space", "x".repeat(129), "tab\t"];
+    const bad = ["", "../escape", "a/b", "/abs", ".hidden", "..", "-lead", "with space", "x".repeat(129), "tab\t", "CON", "nul", "Com1", "LPT9", "aux.md", "con.txt", "plan."];
 
     for (const plan of bad) {
       test(`every tool rejects the plan name ${JSON.stringify(plan.length > 20 ? `${plan.slice(0, 8)}...(${plan.length})` : plan)} before touching a path`, async () => {

@@ -106,18 +106,30 @@ const handlers: Record<string, Handler> = {
 // The client sends SIGTERM 100 ms after SIGINT, so the unbind gives up on a busy lock well before then.
 const SHUTDOWN_LOCK_WAIT_MS = 50;
 
-function shutdown(): void {
+let isUnbound = false;
+
+function unbind(): void {
+  if (isUnbound) return;
+  isUnbound = true;
   try {
     unbindBoundSessions(Date.now() + SHUTDOWN_LOCK_WAIT_MS);
   } catch (error) {
     console.error("omca: unbinding this process's sessions at exit failed:", error);
   }
+}
+
+function shutdown(): void {
+  unbind();
   process.exit(0);
 }
 
 // The client ends a session with SIGINT, then SIGTERM 100 ms later and SIGKILL about 500 ms
-// after the SIGINT, and never closes stdin. A killed tmux pane sends SIGHUP first.
-for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) process.on(signal, shutdown);
+// after the SIGINT, and never closes stdin. A killed tmux pane sends SIGHUP first. Windows
+// delivers no SIGTERM: it ends a console process with SIGBREAK or by closing its stdin.
+const SHUTDOWN_SIGNALS: NodeJS.Signals[] = ["SIGINT", "SIGTERM", "SIGHUP"];
+if (process.platform === "win32") SHUTDOWN_SIGNALS.push("SIGBREAK");
+for (const signal of SHUTDOWN_SIGNALS) process.on(signal, shutdown);
+process.on("exit", unbind);
 
 const root = projectRoot(process.cwd());
 ensureStateDir(root);
@@ -126,3 +138,5 @@ void startWork(root);
 const feed = createDispatcher(handlers, (line) => process.stdout.write(line));
 process.stdin.setEncoding("utf8");
 process.stdin.on("data", feed);
+process.stdin.on("end", shutdown);
+process.stdin.on("close", shutdown);

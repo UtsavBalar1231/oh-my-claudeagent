@@ -116,7 +116,7 @@ describe("blankQuotedSpans", () => {
 
 describe("keepsSlot", () => {
   test("keeps a slot no evidence followed", () => {
-    expect(keepsSlot({ command: "just test", at: 100, exit_code: null }, 99, 200)).toBe(true);
+    expect(keepsSlot({ command: "just test", at: 100, exit_code: null }, 97, 200)).toBe(true);
   });
 
   test("replaces a slot evidence covered, including evidence in the same second", () => {
@@ -129,8 +129,8 @@ describe("keepsSlot", () => {
 
   test("replaces an unsatisfied slot once the gate treats it as stale", () => {
     const slot = { command: "just test", at: 100, exit_code: null };
-    expect(keepsSlot(slot, 99, 100 + MAX_SLOT_AGE_SECONDS)).toBe(true);
-    expect(keepsSlot(slot, 99, 101 + MAX_SLOT_AGE_SECONDS)).toBe(false);
+    expect(keepsSlot(slot, 97, 100 + MAX_SLOT_AGE_SECONDS)).toBe(true);
+    expect(keepsSlot(slot, 97, 101 + MAX_SLOT_AGE_SECONDS)).toBe(false);
   });
 });
 

@@ -5,6 +5,7 @@ import {
   isWellFormedLedger,
   ledgerCoversSlot,
   MAX_SLOT_AGE_SECONDS,
+  MTIME_SLACK_SECONDS,
 } from "./evidence.ts";
 
 const entry = {
@@ -42,8 +43,14 @@ describe("ledgerCoversSlot", () => {
     expect(ledgerCoversSlot(501, 500)).toBe(true);
   });
 
-  test("a ledger last written before the verification does not cover it", () => {
-    expect(ledgerCoversSlot(499, 500)).toBe(false);
+  test("a ledger last written within the mtime slack before the verification still covers it", () => {
+    expect(MTIME_SLACK_SECONDS).toBe(2);
+    expect(ledgerCoversSlot(499, 500)).toBe(true);
+    expect(ledgerCoversSlot(498, 500)).toBe(true);
+  });
+
+  test("a ledger last written more than the slack before the verification does not cover it", () => {
+    expect(ledgerCoversSlot(497, 500)).toBe(false);
   });
 
   test("a missing ledger, treated as mtime 0, does not cover a real verification", () => {

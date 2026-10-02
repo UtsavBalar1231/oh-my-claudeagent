@@ -364,6 +364,17 @@ describe("shutdown", () => {
     expect(plans.live.session_ids).toEqual(["other", "before-clear", "after-clear"]);
   });
 
+  test("closing stdin unbinds the session ids and exits 0, because Windows sends no signal", async () => {
+    const server = startServer();
+    const registry = await bindAcrossClear(server);
+    server.proc.stdin.end();
+    expect(await server.proc.exited).toBe(0);
+    expect(server.proc.signalCode).toBeNull();
+    const { bindings } = JSON.parse(readFileSync(registry, "utf8"));
+    expect(bindings).toEqual({ other: OTHER_BINDING });
+    expect(await new Response(server.proc.stderr).text()).toBe("");
+  });
+
   test("SIGINT with the registry lock held skips the unbind, says so, and still exits 0 within 100 ms", async () => {
     const server = startServer();
     const registry = await bindAcrossClear(server);

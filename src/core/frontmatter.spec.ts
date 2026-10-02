@@ -52,6 +52,11 @@ test("blank lines and whole-line comments are skipped, and CRLF line endings par
   });
 });
 
+test("a leading byte-order mark does not hide the block, with LF or CRLF endings", () => {
+  expect(parseFrontmatter("\uFEFF---\nname: a\n---\nBody")).toEqual({ name: "a" });
+  expect(parseFrontmatter("\uFEFF---\r\nname: a\r\nmodel: opus\r\n---\r\nBody")).toEqual({ name: "a", model: "opus" });
+});
+
 test("an inner --- line in the body does not extend the block", () => {
   expect(parseFrontmatter("---\nname: a\n---\ntext\n---\nmodel: x\n---\n")).toEqual({ name: "a" });
 });

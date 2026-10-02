@@ -10,6 +10,23 @@ describe("parseRule", () => {
     });
   });
 
+  test("CRLF line endings leave no carriage return in the pattern or the body", () => {
+    expect(parseRule("# pattern: *.py\r\nUse snake_case.\r\nNo globals.\r\n\r\n")).toEqual({
+      pattern: "*.py",
+      body: "Use snake_case.\nNo globals.",
+      isTruncated: false,
+    });
+  });
+
+  test("a leading byte-order mark does not hide the pattern header", () => {
+    expect(parseRule("\uFEFF# pattern: *.py\nUse snake_case.\n")).toEqual({
+      pattern: "*.py",
+      body: "Use snake_case.",
+      isTruncated: false,
+    });
+    expect(parseRule("\uFEFF# pattern: *.py\r\nbody\r\n")?.pattern).toBe("*.py");
+  });
+
   test("a body over the cap is cut to the cap and marked truncated", () => {
     expect(parseRule(`# pattern: *.py\n${"x".repeat(RULE_BODY_CAP + 1)}`)).toEqual({
       pattern: "*.py",

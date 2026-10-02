@@ -48,7 +48,7 @@ const META_CUE = /the\s+(phrase|keyword|trigger|literal)|trigger\s+phrase|docume
 function withoutPastes(prompt: string): string {
   let isPasted = false;
   return prompt
-    .split("\n")
+    .split(/\r?\n/)
     .filter((line) => {
       if (PASTE_OPEN.test(line)) {
         isPasted = true;

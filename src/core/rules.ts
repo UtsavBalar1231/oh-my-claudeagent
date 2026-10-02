@@ -15,7 +15,8 @@ export type Part = { readonly path: string; readonly text: string };
 const withoutTrailingNewlines = (text: string): string => text.replace(/\n+$/, "");
 
 /** A rule's first line is `# pattern: <glob>`. A rule whose body is blank injects nothing. */
-export function parseRule(text: string): Rule | undefined {
+export function parseRule(source: string): Rule | undefined {
+  const text = source.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n");
   const newline = text.indexOf("\n");
   const first = newline === -1 ? text : text.slice(0, newline);
   const tail = newline === -1 ? "" : withoutTrailingNewlines(text.slice(newline + 1));

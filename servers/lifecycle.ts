@@ -16,15 +16,22 @@ function entriesOf(dir: string) {
   }
 }
 
-/** Deletes the `.json` files under `dir`, one directory level deep, last written before `cutoffMs`, and the directories that leaves empty. */
+/**
+ * Deletes the `.json` files under `dir`, one directory level deep, last written before `cutoffMs`, and the directories that leaves empty.
+ * An entry that cannot be removed, such as a file another process holds open, is logged and skipped so the rest still go.
+ */
 function pruneJson(dir: string, cutoffMs: number, depth = 1): void {
   for (const entry of entriesOf(dir)) {
     const path = join(dir, entry.name);
-    if (entry.isDirectory() && depth > 0) {
-      pruneJson(path, cutoffMs, depth - 1);
-      if (readdirSync(path).length === 0) rmdirSync(path);
-    } else if (entry.isFile() && entry.name.endsWith(".json") && statSync(path).mtimeMs < cutoffMs) {
-      rmSync(path, { force: true });
+    try {
+      if (entry.isDirectory() && depth > 0) {
+        pruneJson(path, cutoffMs, depth - 1);
+        if (readdirSync(path).length === 0) rmdirSync(path);
+      } else if (entry.isFile() && entry.name.endsWith(".json") && statSync(path).mtimeMs < cutoffMs) {
+        rmSync(path, { force: true });
+      }
+    } catch (error) {
+      console.error(`omca: start-up prune left ${path}:`, error);
     }
   }
 }

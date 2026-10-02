@@ -1,5 +1,5 @@
 import { existsSync, realpathSync, statSync } from "node:fs";
-import { extname, isAbsolute, relative, resolve, sep } from "node:path";
+import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import type { Tool } from "../omca.ts";
 
 const LANGUAGES = [
@@ -83,15 +83,23 @@ const MAX_JSON_OUTPUT_BYTES = 1024 * 1024;
 const SEARCH_MAX_RESULT_CHARS = 200_000;
 const OUTPUT_CAPPED = "[TRUNCATED] Output exceeded AST MCP caps\n\n";
 
-const INSTALL_HINT = [
-  "ast-grep binary not found (looked for $AST_GREP_BIN, ast-grep and sg on PATH).",
-  "",
-  "Install options:",
+const INSTALL_OPTIONS = [
   "  cargo install ast-grep --locked",
   "  brew install ast-grep",
   "  npm install -g @ast-grep/cli",
   "  pacman -S ast-grep",
+  "  pip install ast-grep-cli",
+  "  scoop install main/ast-grep",
+];
+
+const INSTALL_HINT = [
+  "ast-grep binary not found (looked for $AST_GREP_BIN, ast-grep and sg on PATH).",
+  "",
+  "Install options:",
+  ...INSTALL_OPTIONS,
 ].join("\n");
+
+const WINDOWS_SHIM = /\.(cmd|bat|ps1)$/i;
 
 type Args = Record<string, unknown>;
 type Match = {
@@ -104,37 +112,79 @@ type Match = {
   range?: { start?: { line?: number; column?: number } };
 };
 
+/**
+ * On Windows a `.cmd`, `.bat` or `.ps1` shim is replaced by the native binary the npm package
+ * keeps beside it. A shim cannot carry the multi-line `--inline-rules` YAML, and cmd.exe parses
+ * the shell metacharacters in a pattern, so with no native binary the call is refused.
+ */
+export function resolveNative(path: string, platform: NodeJS.Platform = process.platform): string {
+  if (platform !== "win32" || !WINDOWS_SHIM.test(path)) return path;
+  const name = basename(path).replace(WINDOWS_SHIM, "") === "sg" ? "sg.exe" : "ast-grep.exe";
+  const native = join(dirname(path), "node_modules", "@ast-grep", "cli", name);
+  if (existsSync(native)) return native;
+  throw new Error(
+    [
+      `ast-grep resolved to ${path}, a batch shim that cannot pass multi-line rules or shell metacharacters intact, and no ${name} sits beside it.`,
+      "",
+      "Install a native binary:",
+      ...INSTALL_OPTIONS,
+    ].join("\n"),
+  );
+}
+
 export function discoverBinary(): string {
   const path = process.env.PATH ?? "";
   const configured = process.env.AST_GREP_BIN;
   if (configured) {
-    if (Bun.which(configured, { PATH: path }) !== null) return configured;
+    const resolved = Bun.which(configured, { PATH: path });
+    if (resolved !== null) return WINDOWS_SHIM.test(resolved) ? resolveNative(resolved) : configured;
     console.error(`omca: $AST_GREP_BIN=${configured} not found in PATH`);
   }
+  let refusal: Error | undefined;
   for (const name of ["ast-grep", "sg"]) {
-    const found = Bun.which(name, { PATH: path });
-    if (found === null) continue;
+    const which = Bun.which(name, { PATH: path });
+    if (which === null) continue;
+    let found: string;
+    try {
+      found = resolveNative(which);
+    } catch (error) {
+      if (!(error instanceof Error)) throw error;
+      refusal ??= error;
+      continue;
+    }
     // `sg` is also the shadow-utils newgrp alias, so a hit is accepted only if it identifies itself.
-    const version = Bun.spawnSync([found, "--version"], { stdin: "ignore", stderr: "ignore", timeout: 5_000 });
+    const version = Bun.spawnSync([found, "--version"], {
+      stdin: "ignore",
+      stderr: "ignore",
+      timeout: 5_000,
+      windowsHide: true,
+    });
     if (version.stdout.toString().toLowerCase().includes("ast-grep")) return found;
   }
-  throw new Error(INSTALL_HINT);
+  throw refusal ?? new Error(INSTALL_HINT);
 }
 
-async function run(argv: string[], options: { input?: string; allowExit1?: boolean } = {}) {
+export async function run(
+  argv: string[],
+  options: { input?: string; allowExit1?: boolean; timeoutMs?: number } = {},
+) {
+  const timeoutMs = options.timeoutMs ?? TIMEOUT_MS;
+  const started = performance.now();
   const proc = Bun.spawn([discoverBinary(), ...argv], {
     cwd: workspace(),
     stdin: options.input === undefined ? "ignore" : Buffer.from(options.input),
     stdout: "pipe",
     stderr: "pipe",
-    timeout: TIMEOUT_MS,
+    timeout: timeoutMs,
+    windowsHide: true,
   });
   const [stdout, stderrBytes, exitCode] = await Promise.all([
     new Response(proc.stdout).bytes(),
     new Response(proc.stderr).bytes(),
     proc.exited,
   ]);
-  if (proc.signalCode === "SIGTERM") throw new Error(`Command timed out after ${TIMEOUT_MS / 1000}s`);
+  // Windows ends a timed-out process without setting signalCode, so the clock is the evidence.
+  if (performance.now() - started >= timeoutMs) throw new Error(`Command timed out after ${timeoutMs / 1000}s`);
   const stderr = new TextDecoder().decode(stderrBytes);
   // `run` exits 1 on no match; a `scan` rule of severity error exits 1 on a match.
   if (exitCode !== 0 && !(options.allowExit1 && exitCode === 1)) {
@@ -158,7 +208,12 @@ function within(root: string, candidate: string): boolean {
 
 export function gitWorktreeRoots(dir: string): string[] {
   try {
-    const git = Bun.spawnSync(["git", "worktree", "list", "--porcelain"], { cwd: dir, stderr: "ignore", timeout: 5_000 });
+    const git = Bun.spawnSync(["git", "worktree", "list", "--porcelain"], {
+      cwd: dir,
+      stderr: "ignore",
+      timeout: 5_000,
+      windowsHide: true,
+    });
     if (git.exitCode !== 0) return [];
     return git.stdout
       .toString()

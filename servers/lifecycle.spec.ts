@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test";
+import * as fs from "node:fs";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
@@ -93,6 +94,33 @@ describe("start-up work", () => {
     await startWork(root, NOW);
     expect(files(root, ".omca/state/mod")).toEqual(["new.json", "old.json.tmp"]);
     expect(files(root, ".omca/state/session")).toEqual(["new.json", "old.json.tmp"]);
+  });
+
+  test("a file that cannot be removed is logged and the entries after it are still pruned", async () => {
+    const root = project();
+    for (const name of ["a", "b", "c"]) put(root, `.omca/state/mod/${name}.json`, "{}", 25 * HOUR_MS);
+    put(root, ".omca/metrics/s-1/locked.json", "{}", 91 * DAY_MS);
+    put(root, ".omca/metrics/s-1/free.json", "{}", 91 * DAY_MS);
+    const real = fs.rmSync;
+    const remove = spyOn(fs, "rmSync").mockImplementation((path, options) => {
+      if (String(path).endsWith("b.json") || String(path).endsWith("locked.json")) {
+        throw Object.assign(new Error("EBUSY: resource busy or locked"), { code: "EBUSY" });
+      }
+      real(path, options);
+    });
+    const errors = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await startWork(root, NOW);
+      expect(errors.mock.calls.map(([message]) => message)).toEqual([
+        `omca: start-up prune left ${join(root, ".omca/metrics/s-1/locked.json")}:`,
+        `omca: start-up prune left ${join(root, ".omca/state/mod/b.json")}:`,
+      ]);
+    } finally {
+      remove.mockRestore();
+      errors.mockRestore();
+    }
+    expect(files(root, ".omca/state/mod")).toEqual(["b.json"]);
+    expect(files(root, ".omca/metrics")).toEqual(["s-1/locked.json"]);
   });
 
   test("a step that fails is logged and the steps after it still run", async () => {

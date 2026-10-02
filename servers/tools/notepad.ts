@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { isWindowsSafeName } from "../../src/core/session-id.ts";
 import { ensureStateDir, projectRoot, withLock, writeFileAtomic } from "../io.ts";
 import type { Tool } from "../omca.ts";
 
@@ -23,7 +24,7 @@ function stringArg(args: Record<string, unknown>, name: string, fallback?: strin
 }
 
 function toPlan(plan: string): string {
-  if (!PLAN_NAME.test(plan)) throw new Error(`plan_name must match ${PLAN_NAME.source}; got ${JSON.stringify(plan)}`);
+  if (!PLAN_NAME.test(plan) || !isWindowsSafeName(plan)) throw new Error(`plan_name must match ${PLAN_NAME.source}; got ${JSON.stringify(plan)}`);
   return plan;
 }
 

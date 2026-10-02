@@ -80,6 +80,11 @@ describe("text the user did not type", () => {
     expect(modesOf(`look at this log\n${paste("error: build broken at step 3")}\nwhat failed?`)).toEqual([]);
   });
 
+  test("a paste with CRLF line endings is still ignored", () => {
+    expect(modesOf('look at this\r\n<pasted_content id="a1b2">\r\nerror: build broken\r\n</pasted_content id="a1b2">\r\nwhat failed?')).toEqual([]);
+    expect(modesOf('<pasted_content id="a1b2">\r\nsome log\r\n</pasted_content id="a1b2">\r\nfix build please')).toEqual(["hephaestus"]);
+  });
+
   test("a phrase typed outside the paste still fires", () => {
     expect(modesOf(`${paste("some log line")}\nfix build please`)).toEqual(["hephaestus"]);
   });
