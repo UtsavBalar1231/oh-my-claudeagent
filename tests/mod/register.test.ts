@@ -41,6 +41,7 @@ test("the module registers exactly the dispatchers, env reads and atoms of the c
         "prompt.edit",
         "ui.close",
         "ui.focus",
+        "ui.scroll",
         "command.run",
         "ui.render",
         "session.compact",
@@ -154,6 +155,7 @@ test("each passthrough dispatcher calls next once and returns its answer", async
   on("agent.spawn", () => (calls.push("agent.spawn"), { model: "claude-sonnet-5-5", agentId: "a-1" }));
   on("session.compact", (_$, e) => (calls.push("session.compact"), { messages: e.messages.slice(-1) }));
   on("ui.focus", () => (calls.push("ui.focus"), {}));
+  on("ui.scroll", () => (calls.push("ui.scroll"), {}));
   on("command.run", (_$, e) => (calls.push(`command.run ${e.command} ${e.args}`), { text: "engine output" }));
 
   expect(await $.session.start({ cwd: "/work", surface: "terminal", isInteractive: true })).toEqual({ cwd: "/engine" });
@@ -184,6 +186,9 @@ test("each passthrough dispatcher calls next once and returns its answer", async
   expect(
     await $.ui.focus({ component: "Pane", requestId: "omca", element: "row-1", origin: { kind: "person" } }),
   ).toEqual({});
+  expect(
+    await $.ui.scroll({ component: "Pane", requestId: "omca", offset: 0, by: 1, bodyRows: 8, contentRows: 20, origin: { kind: "person" } }),
+  ).toEqual({});
   expect(await $.command.run({ ...RUN, command: "omca", args: "" })).toEqual({ text: "engine output" });
   expect(await $.command.run({ ...RUN, command: "omca", args: "plan my-plan" })).toEqual({ text: "engine output" });
   expect(calls).toEqual([
@@ -193,6 +198,7 @@ test("each passthrough dispatcher calls next once and returns its answer", async
     "agent.spawn",
     "session.compact",
     "ui.focus",
+    "ui.scroll",
     "command.run omca ",
     "command.run omca plan my-plan",
   ]);

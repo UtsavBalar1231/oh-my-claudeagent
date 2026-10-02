@@ -19,6 +19,7 @@ const BASE: Inputs = {
   options: { showBand: false, guardMode: "deny" },
   env: {},
   userSettings: null,
+  isStyleForced: true,
 };
 
 const run = (change: Partial<Inputs>, id: string): Omit<Check, "id" | "label"> | undefined => {
@@ -40,9 +41,62 @@ test("the checks come in a fixed order with their labels, all ok or info on a he
     ["effort", "Effort cap", "ok"],
     ["mods", "Mod policy", "ok"],
     ["hooks", "Hooks", "ok"],
+    ["style", "Output style", "ok"],
     ["advisor", "Advisor", "ok"],
     ["statusline", "Status line", "ok"],
   ]);
+});
+
+test("a passing check states what it found and carries no advisory clause", () => {
+  const passing = doctorChecks(BASE).filter((check) => check.level === "ok");
+  expect(passing.length).toBeGreaterThan(0);
+  expect(passing.filter((check) => check.detail.includes(";"))).toEqual([]);
+});
+
+describe("output style", () => {
+  const OPTED_OUT = { pluginConfigs: { "oh-my-claudeagent@omca": { options: { disableForceOrchestrationStyle: true } } } };
+
+  test("forced by the plugin is ok, whatever outputStyle holds", () => {
+    expect(run({ isStyleForced: true, settings: { ...BASE.settings, outputStyle: "Explanatory" } }, "style")).toEqual({
+      level: "ok",
+      detail: "OMCA Default is forced by the plugin",
+    });
+  });
+
+  test("an opt-out is ok and names the style that applies instead", () => {
+    expect(run({ isStyleForced: false, settings: { ...OPTED_OUT, outputStyle: "Explanatory" } }, "style")).toEqual({
+      level: "ok",
+      detail: "disableForceOrchestrationStyle is on, so your outputStyle Explanatory applies",
+    });
+    expect(run({ isStyleForced: false, settings: OPTED_OUT }, "style")?.detail).toBe(
+      "disableForceOrchestrationStyle is on, so your outputStyle default applies",
+    );
+  });
+
+  test("not forced and not opted out warns with the active style and the way back", () => {
+    expect(run({ isStyleForced: false, settings: { ...BASE.settings, outputStyle: "Explanatory" } }, "style")).toEqual({
+      level: "warn",
+      detail:
+        "Explanatory is the active output style and OMCA Default is not forced; update or reinstall the plugin to restore its force-for-plugin line, or choose OMCA Default in /config",
+    });
+    expect(run({ isStyleForced: false, settings: BASE.settings }, "style")?.detail).toStartWith("default is the active output style");
+  });
+
+  test("choosing OMCA Default yourself is ok, under either spelling", () => {
+    for (const outputStyle of ["OMCA Default", "oh-my-claudeagent:OMCA Default"]) {
+      expect(run({ isStyleForced: false, settings: { outputStyle } }, "style")).toEqual({
+        level: "ok",
+        detail: "OMCA Default is the selected output style",
+      });
+    }
+  });
+
+  test("an unreadable style file warns that the answer is unknown", () => {
+    expect(run({ isStyleForced: null, settings: { outputStyle: "Explanatory" } }, "style")).toEqual({
+      level: "warn",
+      detail: "Could not read the plugin's output style file, so whether OMCA Default is forced is unknown; outputStyle is Explanatory",
+    });
+  });
 });
 
 test("mod version", () => {
@@ -62,15 +116,16 @@ test.each<[string, Omit<Check, "id" | "label">]>([
 });
 
 test.each<[string | null, Omit<Check, "id" | "label">]>([
+  ["1.4.2", { level: "ok", detail: "bun 1.4.2 is on PATH" }],
+  ["1.4.1", { level: "fail", detail: "bun 1.4.1 is older than 1.4.2, which the omca server needs" }],
   [
-    "1.4.2",
+    null,
     {
-      level: "ok",
-      detail: "bun 1.4.2 is on PATH; Desktop and VS Code start .mcp.json with the GUI's PATH, which can lack ~/.bun/bin",
+      level: "fail",
+      detail:
+        "bun is not on this session's PATH, and the omca server runs on bun; Desktop and VS Code start .mcp.json with the GUI's PATH, which can lack ~/.bun/bin",
     },
   ],
-  ["1.4.1", { level: "fail", detail: "bun 1.4.1 is older than 1.4.2, which the omca server needs" }],
-  [null, { level: "fail", detail: "bun is not on this session's PATH, and the omca server runs on bun" }],
   ["", { level: "warn", detail: 'bun --version printed "", not a version' }],
 ])("bun %p", (bunVersion, expected) => {
   expect(run({ bunVersion }, "bun")).toEqual(expected);

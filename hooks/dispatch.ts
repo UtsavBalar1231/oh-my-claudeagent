@@ -11,6 +11,7 @@ type Sites = {
   "prompt.edit": [Args<"prompt.edit">, EventResult<"prompt.edit">];
   "ui.close": [Args<"ui.close">, EventResult<"ui.close">];
   "ui.focus": [Args<"ui.focus">, EventResult<"ui.focus">];
+  "ui.scroll": [Args<"ui.scroll">, EventResult<"ui.scroll">];
   "command.run": [Args<"command.run">, EventResult<"command.run">];
   "ui.render AbovePrompt": [RenderInput<"AbovePrompt">, RenderElement];
   "ui.render Pane": [RenderInput<"Pane">, RenderElement];

@@ -123,6 +123,29 @@ export function fitMiddle(text: string, width: number, ellipsis: string): string
   return `${head(chars, front)}${ellipsis}${tail(chars, room - front)}`;
 }
 
+export function wrapText(text: string, width: number): string[] {
+  const room = Math.max(1, width);
+  const lines: string[] = [];
+  let line = "";
+  for (const word of text.split(" ")) {
+    if (word === "") continue;
+    if (line !== "" && displayWidth(line) + 1 + displayWidth(word) <= room) {
+      line = `${line} ${word}`;
+      continue;
+    }
+    if (line !== "") lines.push(line);
+    let rest = word;
+    while (rest !== "" && displayWidth(rest) > room) {
+      const piece = head([...rest], room) || String.fromCodePoint(rest.codePointAt(0) ?? 0);
+      lines.push(piece);
+      rest = rest.slice(piece.length);
+    }
+    line = rest;
+  }
+  if (line !== "" || lines.length === 0) lines.push(line);
+  return lines;
+}
+
 export function padEnd(text: string, width: number): string {
   return `${text}${" ".repeat(Math.max(0, width - displayWidth(text)))}`;
 }

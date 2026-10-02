@@ -357,6 +357,14 @@ export const pane: Features = {
       return (await host.state.pane.get()).value?.tab === "plan" ? plan.focus(host, e) : undefined;
     },
   },
+  "ui.scroll": {
+    async pre(host, e) {
+      if (e.requestId !== PANE || e.origin.kind !== "person") return undefined;
+      if ((await host.state.pane.get()).value?.tab !== "doctor" || !doctor.scroll(e.by)) return undefined;
+      host.ui.invalidate();
+      return { answer: {} };
+    },
+  },
   "ui.render Pane": {
     async pre(host, e) {
       if (e.requestId !== PANE) return undefined;

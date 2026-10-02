@@ -141,6 +141,7 @@ export const register: Register = (on, pluginOptions) => {
   const promptEdit = featuresFor("prompt.edit", { band });
   const paneClose = featuresFor("ui.close", { pane });
   const paneFocus = featuresFor("ui.focus", { pane });
+  const paneScroll = featuresFor("ui.scroll", { pane });
   const omca = featuresFor("command.run", { router });
   const rate = featuresFor("command.run", { feedback });
   const bandRender = featuresFor("ui.render AbovePrompt", { band });
@@ -160,6 +161,9 @@ export const register: Register = (on, pluginOptions) => {
   on("prompt.edit", ($, e, next) => dispatch(bindHost($, options), "prompt.edit", promptEdit, e, next));
   on("ui.close", ($, e, next) => dispatch(bindHost($, options), "ui.close", paneClose, e, next));
   on("ui.focus", ($, e, next) => dispatch(bindHost($, options), "ui.focus", paneFocus, e, next));
+  on("ui.scroll", { component: "Pane" }, ($, e, next) =>
+    dispatch(bindHost($, options), "ui.scroll", paneScroll, e, next),
+  );
   on("command.run", { command: "omca" }, ($, e, next) =>
     dispatch(bindHost($, options), "command.run omca", omca, e, next),
   );

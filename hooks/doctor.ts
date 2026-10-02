@@ -1,4 +1,5 @@
 import { addRefreshInterval, doctorChecks, type Fix, type HookState, unifiedDiff } from "../src/core/doctor-checks.ts";
+import { parseFrontmatter } from "../src/core/frontmatter.ts";
 import { statusPath } from "../src/core/omca-paths.ts";
 import { joinPath, type Platform, tildePath } from "../src/core/path.ts";
 import { type Host, pluginVersion, reason, type State, update } from "./host.ts";
@@ -65,9 +66,19 @@ async function hookState(host: Host): Promise<HookState> {
   }
 }
 
+async function isStyleForced(host: Host): Promise<boolean | null> {
+  try {
+    const text = await host.fs.read(`${host.plugin.root}/output-styles/omca-default.md`);
+    return parseFrontmatter(text)?.["force-for-plugin"] === "true";
+  } catch (error) {
+    host.log(`omca doctor cannot read the output style: ${reason(error)}`);
+    return null;
+  }
+}
+
 async function check(host: Host): Promise<Doctor["checks"]> {
   const paths = await where(host);
-  const [mod, engine, bun, ast, hook, now, settings, userSettings] = await Promise.all([
+  const [mod, engine, bun, ast, hook, now, settings, userSettings, isForced] = await Promise.all([
     pluginVersion(host),
     host.session.version(),
     output(host, ["bun", "--version"]),
@@ -76,6 +87,7 @@ async function check(host: Host): Promise<Doctor["checks"]> {
     host.clock.now(),
     host.settings.read(),
     paths.settings === undefined ? null : readIfPresent(host, paths.settings),
+    isStyleForced(host),
   ]);
   const env = {
     CLAUDE_CODE_SUBAGENT_MODEL_FORCE: await host.env.CLAUDE_CODE_SUBAGENT_MODEL_FORCE(),
@@ -96,6 +108,7 @@ async function check(host: Host): Promise<Doctor["checks"]> {
     options: host.options,
     env,
     userSettings,
+    isStyleForced: isForced,
   });
   seen.clear();
   for (const { fix } of checks) {

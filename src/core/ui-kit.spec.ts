@@ -15,6 +15,7 @@ import {
   padStart,
   shortType,
   usableColumns,
+  wrapText,
 } from "./ui-kit.ts";
 
 const E = glyphs(false).ellipsis;
@@ -197,4 +198,25 @@ test("a time reads month-day hour:minute in the local zone, from milliseconds or
 test("an agent type loses its plugin prefix", () => {
   expect(shortType("oh-my-claudeagent:executor")).toBe("executor");
   expect(shortType("explore")).toBe("explore");
+});
+
+describe("wrapText", () => {
+  test("breaks between words, never past the width", () => {
+    expect(wrapText("one two three four", 9)).toEqual(["one two", "three", "four"]);
+    expect(wrapText("one two three four", 18)).toEqual(["one two three four"]);
+  });
+
+  test("a word longer than the width is cut at the width", () => {
+    expect(wrapText("a /very/long/path b", 6)).toEqual(["a", "/very/", "long/p", "ath b"]);
+  });
+
+  test("counts cells, so wide characters take two", () => {
+    expect(wrapText("日本語 日本語", 6)).toEqual(["日本語", "日本語"]);
+    expect(wrapText("日本語", 1)).toEqual(["日", "本", "語"]);
+  });
+
+  test("empty text is one empty line, and a width under 1 acts as 1", () => {
+    expect(wrapText("", 10)).toEqual([""]);
+    expect(wrapText("ab", 0)).toEqual(["a", "b"]);
+  });
 });

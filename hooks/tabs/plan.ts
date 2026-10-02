@@ -8,6 +8,7 @@ import {
   chunks,
   firstOpenTask,
   isReadable,
+  type Page,
   type PlanFile,
   parsePlan,
   planTarget,
@@ -60,6 +61,8 @@ let loadedFrom = "";
 let drawn: { [L in List]?: Drawn } = {};
 let planned: { list: List; start: number } | undefined;
 let isRingOnRow = false;
+
+const markOf = ({ task }: Page) => (task === undefined ? "" : task.done ? "[x] " : "[ ] ");
 
 const isLoaded = (plan: State["plan"] | undefined): plan is Loaded => plan !== undefined && "pages" in plan;
 
@@ -357,8 +360,7 @@ function contentsView(host: Host, view: View, plan: Loaded): RenderElement[] {
   const rows = plan.pages.slice(start, end).map((section, offset) => {
     const index = start + offset;
     const indent = "  ".repeat(Math.max(0, section.level - 2));
-    const mark = section.task === undefined ? "" : section.task.done ? "[x] " : "[ ] ";
-    const label = fitEnd(`${indent}${mark}${section.title}`, view.width - 2, ellipsis);
+    const label = fitEnd(`${indent}${markOf(section)}${section.title}`, view.width - 2, ellipsis);
     const isCurrent = index === cursor;
     if (!isReadable(section)) return pointerRow(view, `line-${index}`, false, Text({ bold: true, children: [label] }));
     return pointerRow(
@@ -375,7 +377,6 @@ function contentsView(host: Host, view: View, plan: Loaded): RenderElement[] {
           mode = "page";
           page = index;
           host.ui.invalidate();
-          refocus(host, KEYS.next);
         }),
       }),
     );
@@ -437,7 +438,9 @@ function pageView(host: Host, view: View, plan: Loaded): RenderElement[] {
     host.ui.invalidate();
   };
   const counter = `${position + 1} / ${order.length}`;
-  const mark = section.task === undefined ? "" : section.task.done ? "[x] " : "[ ] ";
+  const mark = markOf(section);
+  const nextIndex = order[position + 1];
+  const upcoming = nextIndex === undefined ? undefined : plan.pages[nextIndex];
   const body =
     section.body === ""
       ? [Text({ dimColor: true, children: ["No details under this task."] })]
@@ -466,6 +469,9 @@ function pageView(host: Host, view: View, plan: Loaded): RenderElement[] {
     Text({ children: [" "] }),
     ...body,
     Text({ children: [" "] }),
+    ...(upcoming === undefined
+      ? []
+      : [Text({ dimColor: true, children: [fitEnd(`next: ${markOf(upcoming)}${upcoming.title}`, view.width, ellipsis)] })]),
     Text({ dimColor: true, children: [keyHint([[`${view.g.up}${view.g.down}`, "scroll"], [KEYS.back, "contents"]], view.g)] }),
   ];
 }

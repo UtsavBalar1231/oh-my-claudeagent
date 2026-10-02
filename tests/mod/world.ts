@@ -10,6 +10,7 @@ export const SESSION = "s1";
 export const PLANS = `${HOME}/.claude/plans`;
 export const LEDGER = `${ROOT}/.omca/evidence/verification-evidence.json`;
 export const BOULDER = `${ROOT}/.omca/state/boulder.json`;
+export const OUTPUT_STYLE = "---\nname: OMCA Default\nkeep-coding-instructions: true\nforce-for-plugin: true\n---\n\n# oh-my-claudeagent\n";
 
 // Where the session runs: the platform's path shape and the environment that names its home.
 // `root` and `home` are spelled as the engine reports them; the other paths are normalized, the way the mod writes them.
@@ -53,6 +54,7 @@ export type World = {
   opened: unknown[];
   logs: string[];
   clock: MockClock;
+  style: string | undefined;
 };
 
 const parent = (path: string) => path.slice(0, path.lastIndexOf("/"));
@@ -86,12 +88,17 @@ export function world(
     opened: [],
     logs: [],
     clock: mock.clock(on, { now: Date.UTC(2026, 9, 2, 12, 0, 0) }),
+    style: OUTPUT_STYLE,
   };
   mock.env(on, { ...layout.env, ...env });
   on("session.root", () => ({ value: layout.root }));
   on("session.id", () => ({ value: SESSION }));
   on("settings.read", () => ({ value: w.settings }));
   on("agent.list", () => ({ value: w.agents }));
+  on("fs.read", { path: /[\\/]output-styles[\\/]omca-default\.md$/ }, (_$, e) => {
+    w.reads.push(spelled(e.path));
+    return w.style === undefined ? { deny: `ENOENT: no such file, ${spelled(e.path)}` } : { value: w.style };
+  });
   on("fs.read", async (_$, e) => {
     w.reads.push(spelled(e.path));
     await w.holds.get(key(e.path));

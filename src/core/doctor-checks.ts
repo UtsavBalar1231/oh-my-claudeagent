@@ -29,6 +29,7 @@ export type Inputs = {
   options: { showBand: boolean; guardMode: "dialog" | "deny" };
   env: Env;
   userSettings: string | null;
+  isStyleForced: boolean | null;
 };
 
 export const ENGINE_FLOOR = "2.1.287";
@@ -72,19 +73,19 @@ function engineCheck(text: string): Check {
 
 function bunCheck(text: string | null): Check {
   if (text === null) {
-    return check("bun", "bun", "fail", "bun is not on this session's PATH, and the omca server runs on bun");
+    return check(
+      "bun",
+      "bun",
+      "fail",
+      "bun is not on this session's PATH, and the omca server runs on bun; Desktop and VS Code start .mcp.json with the GUI's PATH, which can lack ~/.bun/bin",
+    );
   }
   const version = parseVersion(text);
   if (version === undefined) return check("bun", "bun", "warn", `bun --version printed "${text}", not a version`);
   if (isOlder(version, BUN_FLOOR)) {
     return check("bun", "bun", "fail", `bun ${text} is older than ${BUN_FLOOR}, which the omca server needs`);
   }
-  return check(
-    "bun",
-    "bun",
-    "ok",
-    `bun ${text} is on PATH; Desktop and VS Code start .mcp.json with the GUI's PATH, which can lack ~/.bun/bin`,
-  );
+  return check("bun", "bun", "ok", `bun ${text} is on PATH`);
 }
 
 function ago(ms: number): string {
@@ -154,6 +155,28 @@ function hooksCheck(settings: Inputs["settings"]): Check {
   return check("hooks", "Hooks", "ok", "Neither disableAllHooks nor allowManagedHooksOnly is set");
 }
 
+const isOmcaStyle = (style: string) => style.slice(style.indexOf(":") + 1).trim() === "OMCA Default";
+
+function outputStyleCheck(settings: Inputs["settings"], isForced: boolean | null): Check {
+  const configured = settings["outputStyle"];
+  const active = typeof configured === "string" && configured !== "" ? configured : "default";
+  const options = record(record(record(settings["pluginConfigs"])?.["oh-my-claudeagent@omca"])?.["options"]);
+  if (isForced === true) return check("style", "Output style", "ok", "OMCA Default is forced by the plugin");
+  if (options?.["disableForceOrchestrationStyle"] === true) {
+    return check("style", "Output style", "ok", `disableForceOrchestrationStyle is on, so your outputStyle ${active} applies`);
+  }
+  if (isOmcaStyle(active)) return check("style", "Output style", "ok", "OMCA Default is the selected output style");
+  if (isForced === null) {
+    return check("style", "Output style", "warn", `Could not read the plugin's output style file, so whether OMCA Default is forced is unknown; outputStyle is ${active}`);
+  }
+  return check(
+    "style",
+    "Output style",
+    "warn",
+    `${active} is the active output style and OMCA Default is not forced; update or reinstall the plugin to restore its force-for-plugin line, or choose OMCA Default in /config`,
+  );
+}
+
 function advisorCheck(settings: Inputs["settings"], env: Env): Check {
   const blockers: readonly (readonly [string, boolean])[] = [
     ["CLAUDE_CODE_DISABLE_ADVISOR_TOOL", isOn(env.CLAUDE_CODE_DISABLE_ADVISOR_TOOL)],
@@ -206,6 +229,7 @@ export function doctorChecks(inputs: Inputs): Check[] {
     effortCheck(inputs.settings["maxEffortLevel"]),
     modsCheck(inputs.settings),
     hooksCheck(inputs.settings),
+    outputStyleCheck(inputs.settings, inputs.isStyleForced),
     advisorCheck(inputs.settings, inputs.env),
     statusLineCheck(inputs.settings, inputs.userSettings),
   ];

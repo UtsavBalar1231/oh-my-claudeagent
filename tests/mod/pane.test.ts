@@ -234,6 +234,8 @@ test("n, p and t page through the plan, and t returns to the row the pages came 
   const ui = await $.ui.mount(pane("terminal", { columns: 120, rows: 40, placement: "dock" }));
   const page = async () => rows(await ui.drawn()).slice(3, 7);
 
+  await w.clock.settle();
+  const logged = w.logs.length;
   await ui.press({ key: `row-${pageOf(13)}` });
   await w.clock.settle();
   expect(await page()).toEqual([
@@ -243,7 +245,8 @@ test("n, p and t page through the plan, and t returns to the row the pages came 
     "[ ] 13. Port step 13 onto the shared harness",
   ]);
   expect(await ui.find({ key: `md-${pageOf(13)}-0`, text: "- Do: step 13 in detail." })).toBeDefined();
-  expect(w.logs.at(-1)).toBe("omca plan could not refocus n: no implementation for ui.focus");
+  expect(rows(await ui.drawn())).toContain("next: [ ] 14. Port step 14 onto the shared harness");
+  expect(w.logs.slice(logged)).toEqual([]);
 
   await ui.press({ key: "n" });
   await ui.press({ key: "n" });
@@ -258,6 +261,22 @@ test("n, p and t page through the plan, and t returns to the row the pages came 
   expect((await ui.find({ key: `row-${pageOf(13)}` }))?.props["autoFocus"]).toBeUndefined();
   // The test kit cannot resolve a plugin's own $.ui.focus, so the refocus shows as its refusal.
   expect(w.logs.at(-1)).toBe(`omca plan could not refocus row-${pageOf(14)}: no implementation for ui.focus`);
+  await ui.unmount();
+});
+
+test("a page names the task after it, and the last page names none", async ($, on) => {
+  world(on, FILES);
+  await $.command.run(run("plan"));
+  const ui = await $.ui.mount(pane("terminal", { columns: 120, rows: 40, placement: "dock" }));
+  const next = async () => rows(await ui.drawn()).filter((row) => row.startsWith("next: "));
+
+  await ui.press({ key: `row-${pageOf(13)}` });
+  expect(await next()).toEqual(["next: [ ] 14. Port step 14 onto the shared harness"]);
+  await ui.press({ key: "p" });
+  expect(await next()).toEqual(["next: [ ] 13. Port step 13 onto the shared harness"]);
+  for (let presses = 0; presses < 40; presses += 1) await ui.press({ key: "n" });
+  expect(await ui.find({ type: "Text", text: "[ ] 46. Port step 46 onto the shared harness" })).toBeDefined();
+  expect(await next()).toEqual([]);
   await ui.unmount();
 });
 
@@ -493,6 +512,12 @@ test("every row stays inside the body less the close-mark gutter at 80, 120 and 
           for (const child of topRows(await ui.drawn())) {
             expect(cellsAcross(child), `${size.columns} ${size.placement} page`).toBeLessThanOrEqual(room);
           }
+          await ui.press({ key: "p" });
+          expect(rows(await ui.drawn()).find((row) => row.startsWith("next: "))).toStartWith("next: [x] 7. Rename every widget_id");
+          for (const child of topRows(await ui.drawn())) {
+            expect(cellsAcross(child), `${size.columns} ${size.placement} page before the long title`).toBeLessThanOrEqual(room);
+          }
+          await ui.press({ key: "n" });
           await ui.press({ key: "t" });
         }
         for (const child of topRows(await ui.drawn())) {
