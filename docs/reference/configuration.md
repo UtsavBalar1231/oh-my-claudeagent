@@ -84,7 +84,6 @@ Hooks that honor `OMCA_DISABLED_HOOKS` (grep `isHookDisabled` in `servers/hooks/
 | `stop-gates` | Turns off all three Stop gates below at once: `plan-continuation`, `final-verification`, and `drift-guard`. |
 | `final-verification` | Blocks session Stop when the bound plan is fully checked off but no `final_verification` evidence entry with exit code 0 matches the plan's current SHA-256. |
 | `plan-continuation` | Blocks session Stop when the bound plan still has unchecked numbered tasks, nudging the agent to keep going instead of stopping mid-plan. |
-| `tool-loop` | Warns once when one agent runs the same batch of tool calls three times in a row, a common sign of a blind retry loop. Each agent keeps its own streak. |
 | `failure-recovery` | Advises on a failed Edit, Agent, Bash, Read, or MCP tool call. From a tool's third failure within five minutes it adds a stuck-loop note that names the advisor, then oracle. |
 | `git-destructive-deny` | Denies git subcommands that discard working-tree state: `reset --hard`, `stash`, `clean`, `restore`, `rm -r` (any clustered flag containing `r` or `R`), and a `checkout` whose arguments include a `--` pathspec separator. Matches at any command position and through an optional `sudo` prefix and leading git global options (`-C`, `-c`, `--git-dir`, `--work-tree`, `--no-pager`, and siblings). |
 | `drift-guard` | Blocks session Stop when the last assistant turn reads as a completion claim but the working tree still contains stub markers on changed lines. |

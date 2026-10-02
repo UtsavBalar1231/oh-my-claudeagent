@@ -287,7 +287,6 @@ row only when a handler is actually registered for it.
 | `PermissionDenied` | Tool lifecycle |
 | `PostToolUse` | Tool lifecycle |
 | `PostToolUseFailure` | Tool lifecycle |
-| `PostToolBatch` | Tool lifecycle |
 | `Stop` | Lifecycle |
 | `TaskCompleted` | Task lifecycle |
 
@@ -301,9 +300,7 @@ drift guard in that order and answers with the first block. `SessionStart` for `
 guidance template, the session id, and the bound plan's name, path, next open task and
 notepad line; on `clear` it hands the guidance back to the session's next prompt.
 
-`PostToolBatch` carries the loop detector, which fires once per resolved batch and reads
-the `tool_calls` array, so a signature can no longer be shredded by interleaved subagent
-calls the way a per-call `PostToolUse` slot was. `Setup` fires only under `claude --init-only`, `claude -p --init`, and
+`Setup` fires only under `claude --init-only`, `claude -p --init`, and
 `claude -p --maintenance`, so the dependency check runs on the `init` matcher and the
 stale-marker and log sweeps run on `maintenance`, off the per-session startup path.
 
@@ -335,7 +332,7 @@ guarantee: the three Stop gates are what enforce evidence discipline by default.
 | Event | Added | Status | Notes |
 |-------|-------|--------|-------|
 | `MessageDisplay` | v2.1.152 | Not adopted | Display-only terminal overlay; `displayContent` never reaches the transcript or context. Re-confirmed not-adopted 2026-07-01: screen/transcript divergence conflicts with evidence-first design, and every candidate use serves better via durable `additionalContext`/evidence |
-| `PostToolBatch` | v2.1.152 | Adopted | Carries the loop detector. The handler reads the `tool_calls` array, and each entry's `tool_response` is the serialized string the model sees, not `PostToolUse`'s structured output object |
+| `PostToolBatch` | v2.1.152 | Not adopted | The batch loop detector that rode it warned on legitimate repeats, such as polling or re-running a check after an edit, far more often than on real loops. Repeated failures are caught by the failure-recovery breaker instead |
 | `Elicitation` | v2.1.152 | Not adopted | Fires when the model issues an elicitation request |
 | `ElicitationResult` | v2.1.152 | Not adopted | Fires with the elicitation response |
 | `Setup` | v2.1.152 | Not adopted | Non-interactive provisioning event. The dependency report it would carry is already available through `/omca doctor`, and the housekeeping sweeps already run on `SessionStart`, where they are needed. A handler here would be a third entry point to work that has two |
@@ -346,13 +343,6 @@ and is dated in its own row.
 
 The non-adopted events are tracked in `validate-plugin.sh`'s `new_platform_events` array. The validator skips them when no handler is present and
 passes when one is present — no failures on absence.
-
-**PostToolBatch history:** an earlier handler named post-tool-batch.sh carried same-file
-parallel-edit warnings and a batch-consolidated delegation reminder, and was dropped in the
-v2.10 minimize-to-core refactor alongside agent-usage-reminder.sh. Neither script is in the
-current tree, and the event's re-adoption does not restore them. What rides the event now is
-the loop detector, which needs the batch shape for correctness rather than for consolidation:
-a per-call slot cannot tell one agent repeating itself from three agents interleaving.
 
 **Stop / SubagentStop — new input fields (v2.1.145):**
 
@@ -1140,14 +1130,6 @@ nor hinders the three-strike counter.
 `CLAUDE_CODE_SESSIONEND_HOOKS_TIMEOUT_MS` has no effect on OMCA, which registers no
 `SessionEnd` hook: the server unbinds the session ids it bound in its own shutdown handler.
 
-### `prompt_id` (hook input field, v2.1.196)
-
-`prompt_id` is a common hook input field carrying the id of the user prompt in flight. It is
-absent until the first user input of a session. The tool-loop handler stamps it into each
-agent's window so a repeated signature carried across a user turn boundary no longer reads as
-the third call of a streak. A `PostToolBatch` payload carries `agent_id` (empty on the main
-thread), which keys the window, so concurrent agents never share one streak.
-
 ### `CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN` (v2.1.132)
 
 Set to `1` to opt out of the fullscreen alternate-screen renderer and keep the conversation in the terminal's native scrollback buffer. Useful for terminal multiplexers managing their own scrollback, or when capturing conversation output via pipe.
@@ -1388,7 +1370,6 @@ Features introduced in this window that OMCA consciously declines to adopt:
 |---------|---------|--------|
 | `hookSpecificOutput.additionalContext` on Stop/SubagentStop | v2.1.163 | Co-existence with `decision:block` is undocumented (schema inconclusive); the platform reads a hook's stdout JSON on every exit code, and exit 2 is the one outcome that JSON cannot override, so an `additionalContext` emitted beside a block cannot soften the block and its delivery alongside one is unspecified |
 | `MessageDisplay`, `Elicitation`, `ElicitationResult` hook handlers | v2.1.152 | No OMCA use case; tracked in `new_platform_events` validator array (skip-on-absent semantics) |
-| `PostToolBatch` blocking semantics | v2.1.152 | The event is registered, but its handler only injects `additionalContext`. A `decision: block` there stops the agentic loop before the next model call, which is a heavier response than a loop nudge warrants |
 | `skills:` preload frontmatter | v2.1.150 | Adds context-window cost on every session; OMCA's lazy slash-command / keyword paths are sufficient |
 | `Agent(type=...)` spawn-allowlist in agent frontmatter | v2.1.148 | Sisyphus needs unrestricted spawn access to the full agent roster; an allowlist would require updating on every new specialist addition |
 | `defaultEnabled: false` in plugin.json | v2.1.154 | OMCA is designed to activate immediately on install; inactive-by-default would break first-session experience |
@@ -1568,7 +1549,6 @@ section and in `CLAUDE.md`; neither is set by OMCA.
 | `subagentStatusLine` per-task `effort` and `contextWindowSize` | OMCA authors the effort values in agent frontmatter, so per-row effort is free signal, and a percentage-of-window row beats a raw token count when tasks run on different windows. Per-task `effort` is a bare string or int, not the main line's dict |
 | MCP connect diagnostics in the doctor | The health check probed only the stdio server and punted on the two HTTP servers, which is precisely where `claude mcp list` and `/mcp` surface HTTP status and error text. Hidden leading or trailing whitespace in a configured URL is named as a cause of a URL that looks right but never connects |
 | `--doctor` namespaced and scoped | The platform's `/doctor` (alias `/checkup`) is now fix-capable. OMCA's own `--doctor` is read-only and OMCA-scoped, so it is now written as `/oh-my-claudeagent:omca-setup --doctor` with "fix my setup" routed to the built-in. `just doctor` is a third, contributor-facing surface |
-| `prompt_id` replaces a faked turn boundary | The loop detector's one-slot window reset only on signature change, so a repeat carried across a user turn could read as the third call of a streak. The window now stamps `prompt_id` and resets on either change. An absent field compares equal on both sides, so older clients and pre-existing state files behave as before |
 | Agent `name:` values containing `:` fail CI | The platform hard-rejects such an agent at load time. No shipped file violates it, but the scaffold could produce one, so the validator and `just new-agent` both refuse it now |
 | `DirectoryAdded` tracked, not adopted | Tracking half only: the event exists as a changelog line with no section, matcher table, or input schema, so a handler would be built on a guessed payload |
 | The `tools: Read` carve-out removed | The rules file, the validator, and `agents/multimodal-looker.md` all described an exception no shipped agent uses. Since `tools:` is a strict allowlist whose mis-listing launches an agent with zero tools, the carve-out invited a contributor to restore it. Any `tools:` key is now a validator failure |
@@ -1640,7 +1620,6 @@ tables under Core Concepts and Agent Reference are the live state.
 | Exit-2 blocks land even when stdout JSON fails schema validation (v2.1.214) | Audit came back clean: every OMCA blocking path writes to stderr only. The stderr-only convention is load-bearing, not stylistic |
 | Hook infrastructure errors are not user rejections (v2.1.212) | OMCA emits `continue: false` nowhere, so only this half applies, and it holds reliably from v2.1.212 |
 | `continueOnBlock` is a `type: prompt` / `type: agent` field | Not a PostToolUse field. OMCA registers no handler of either type (its non-`command` handler is the `mcp_tool` plan-write validator, which the field does not cover), so the standing "future hooks declare `continueOnBlock: true`" advice was never actionable |
-| `PostToolBatch` blocking semantics are now documented | The documented shape is what made the event usable: the loop detector now rides it. Caveat for anyone porting a handler: `tool_calls[].tool_response` is the serialized string, not PostToolUse's structured output |
 | `once` and the http/prompt/agent handler types | `once` is structurally inert given that skill-frontmatter hooks are a standing non-adoption, and `allowedEnvVars` is moot with no http handlers |
 | `maxTurns` in agent frontmatter | Shipped in v2.2.0 and reverted after user-observed truncation. Recording it here so its absence is distinguishable from ignorance, which is how it got re-added last time |
 | Multi-second slowdown with many deny/ask rules, fixed v2.1.208 | The version floor to cite when recommending `/fewer-permission-prompts`. OMCA's own allow set is nowhere near pathological |
@@ -1693,7 +1672,7 @@ tables under Core Concepts and Agent Reference are the live state.
 | Skill and plugin frontmatter booleans accepting yes/no/on/off | The validator performs no boolean-value validation to relax. Canonical `false` is what the `background:` change writes |
 | Memory `modified` timestamp | Claude Code never adds frontmatter to a file that has none, and the only file the consolidation skill writes is the frontmatter-less memory index. The stamp is rewritten on every write, so a preserve-verbatim guideline would state a false invariant |
 | `background: true` on explore and librarian | Adopted in v2.2.0 and removed in v2.8.2 because a background task notification carries only a trigger and an output path, which produced confabulated stub replies and indefinite re-querying of finished agents. Re-adding recreates that loop |
-| `maxTurns` | Shipped and reverted in v2.2.0 after user-observed truncation. Runaway control lives at the hook layer instead: the error-count breaker and the tool-loop detector both fire at three |
+| `maxTurns` | Shipped and reverted in v2.2.0 after user-observed truncation. Runaway control lives at the hook layer instead: the error-count breaker fires at a tool's third failure |
 | Plugin `workflows` manifest field | The delivery mechanism for a dynamic-workflow rewrite that is itself declined. Adopting the field with no script ships an empty component path |
 | Dynamic workflows as a replacement for `/start-work` | Two blockers. Hook coupling: a workflow runtime driving agents in code produces no Stop events for the plan-continuation and final-verification gates to gate on. And representation: a workflow holds its plan in a script, while OMCA's plan is a markdown file whose checkboxes are the progress record and whose sha256 scopes the evidence log. A script-held plan has no checkbox to flip and no file to hash, so every gate downstream of the plan file loses its input. Resumability and out-of-context intermediate results are the capabilities OMCA genuinely lacks here. For the narrower case a workflow is usually reached for, many independent units of the same shape, `/batch` is the escape hatch: it fans out without asking OMCA to give up the plan file |
 | `/loop` as OMCA's persistence mechanism | It is a timer that re-issues a prompt, with no completion condition and no verification, so a looped `/start-work` re-runs whether or not the previous pass advanced anything. OMCA's persistence is the plan file's checkboxes plus the evidence gates, which is a different guarantee. `/loop` stays documented as the lightest way to keep a session re-running until the user stops it, and it is not wired into any OMCA command |

@@ -177,25 +177,6 @@
         ]
       }
     ],
-    "PostToolBatch": [
-      {
-        "hooks": [
-          {
-            "type": "mcp_tool",
-            "server": "plugin:oh-my-claudeagent:omca-hooks",
-            "tool": "omca_hook",
-            "timeout": 10,
-            "input": {
-              "event": "PostToolBatch",
-              "session_id": "${session_id}",
-              "agent_id": "${agent_id}",
-              "prompt_id": "${prompt_id}",
-              "tool_calls": "${tool_calls}"
-            }
-          }
-        ]
-      }
-    ],
     "PostToolUseFailure": [
       {
         "hooks": [

@@ -6,7 +6,7 @@
 
 Registered here: `SessionStart`, `UserPromptSubmit`, `UserPromptExpansion`,
 `SubagentStart`, `PreToolUse`, `PermissionRequest`, `PermissionDenied`,
-`PostToolUse`, `PostToolBatch`, `PostToolUseFailure`, `Stop`, `TaskCompleted`.
+`PostToolUse`, `PostToolUseFailure`, `Stop`, `TaskCompleted`.
 
 Regenerate that list with `jq -r '.hooks | keys[]' hooks/hooks.json`. Every other platform
 event is unregistered on purpose; `OMCA.md` carries the per-event reason.

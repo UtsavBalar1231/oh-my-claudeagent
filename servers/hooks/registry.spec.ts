@@ -35,7 +35,6 @@ describe("registry", () => {
       PermissionRequest: ["trusted-tooling"],
       PostToolUse: ["verification-recorder", "context-injector", "plan-format-warn", "empty-task-response"],
       PostToolUseFailure: ["failure-recovery"],
-      PostToolBatch: ["tool-loop"],
       UserPromptSubmit: ["guidance", "keyword-detector"],
       UserPromptExpansion: ["guidance", "slash-mode-detector"],
       SubagentStart: ["subagent-context"],

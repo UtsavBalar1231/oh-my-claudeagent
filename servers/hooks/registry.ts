@@ -14,7 +14,6 @@ import { isSafeSessionId, stampIfDue } from "./status-file.ts";
 import { handle as stopGates } from "./stop-gates.ts";
 import { handle as subagentContext } from "./subagent-context.ts";
 import { handle as taskCompleted } from "./task-completed.ts";
-import { handle as toolLoop } from "./tool-loop.ts";
 import { handle as trustedTooling } from "./trusted-tooling.ts";
 import { handle as verificationRecorder } from "./verification-recorder.ts";
 
@@ -44,7 +43,6 @@ export const REGISTRY: Readonly<Record<string, readonly (readonly [string, Handl
     ["empty-task-response", emptyTaskResponse],
   ],
   PostToolUseFailure: [["failure-recovery", failureRecovery]],
-  PostToolBatch: [["tool-loop", toolLoop]],
   UserPromptSubmit: [
     ["guidance", guidance],
     ["keyword-detector", keywordDetector],

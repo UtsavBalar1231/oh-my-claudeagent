@@ -23,6 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- **The tool-loop detector.** It warned when one agent ran the same batch of tool calls three
+  times in a row, and it fired on legitimate repeats such as polling or re-running a check
+  after an edit far more often than on real loops. OMCA no longer registers `PostToolBatch`,
+  and `tool-loop` is no longer a name `OMCA_DISABLED_HOOKS` recognizes. Repeated failures still
+  trip the failure-recovery breaker at a tool's third failure.
 - `bin/omca-status`, `bin/omca-doctor` and `bin/omca-subagent-statusline`, and the Python
   status line package. The plugin `settings.json` no longer sets `subagentStatusLine`: Claude
   Code does not resolve `${CLAUDE_PLUGIN_ROOT}` in it, so it never found its script.

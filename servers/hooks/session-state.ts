@@ -15,7 +15,6 @@ export type Session = {
   announcedModes?: Set<string>;
   commentGate?: DenyOnce;
   errorCounts?: Map<string, ErrorCount>;
-  toolLoopWindows?: Map<string, { signature: string; count: number; promptId: string }>;
   stopBlocks?: StopLedger;
   planBackoff?: Backoff;
 };

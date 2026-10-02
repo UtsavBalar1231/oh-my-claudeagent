@@ -420,7 +420,7 @@ describe("session scope and switches", () => {
   });
 
   test("naming another hook leaves it on", async () => {
-    process.env.OMCA_DISABLED_HOOKS = "tool-loop";
+    process.env.OMCA_DISABLED_HOOKS = "comment-gate";
     expect(await session().report(bash("foobar: command not found"))).toBe(COMMAND_NOT_FOUND);
   });
 });
