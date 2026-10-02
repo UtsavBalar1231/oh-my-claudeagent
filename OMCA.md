@@ -338,7 +338,7 @@ guarantee: the three Stop gates are what enforce evidence discipline by default.
 | `PostToolBatch` | v2.1.152 | Adopted | Carries the loop detector. The handler reads the `tool_calls` array, and each entry's `tool_response` is the serialized string the model sees, not `PostToolUse`'s structured output object |
 | `Elicitation` | v2.1.152 | Not adopted | Fires when the model issues an elicitation request |
 | `ElicitationResult` | v2.1.152 | Not adopted | Fires with the elicitation response |
-| `Setup` | v2.1.152 | Not adopted | Non-interactive provisioning event. The dependency report it would carry is already available without a session through `bin/omca-doctor`, and the housekeeping sweeps already run on `SessionStart`, where they are needed. A handler here would be a third entry point to work that has two |
+| `Setup` | v2.1.152 | Not adopted | Non-interactive provisioning event. The dependency report it would carry is already available through `/omca doctor`, and the housekeeping sweeps already run on `SessionStart`, where they are needed. A handler here would be a third entry point to work that has two |
 | `DirectoryAdded` | v2.1.219 | Not adopted (PROVISIONAL) | Tracked only. The event exists as a changelog line with no section, no matcher table, and no input schema in the hooks reference, so a handler would be built on a guessed payload |
 
 The table heading's version range covers the first five rows; `DirectoryAdded` postdates it
@@ -459,33 +459,25 @@ Hooks communicate via stdout JSON:
 {"hookSpecificOutput": {"hookEventName": "Stop", "decision": {"behavior": "block"}}}
 ```
 
-### bin/
+### Status lines
 
-Added in v2.1.91 (changelog.md:895). Plugins can ship executable scripts or binaries under a `bin/` directory at the plugin root. Claude Code prepends that directory to the Bash tool's `PATH` for the duration of the session, so any executable placed there is available as a bare command without specifying a full path. Files must have the executable bit set (`chmod +x`) and a `#!/usr/bin/env bash` (or equivalent) shebang.
-
-OMCA ships:
-- `bin/omca-status` — print active boulder, evidence summary, and plan completion status
-- `bin/omca-doctor` — read-only health check (dependencies, settings, state directories, MCP server)
-
-Both scripts are invokable from any Bash tool call as bare commands: `omca-status` and `omca-doctor`. They read the project's `.omca/state/` and `~/.claude/settings.json` only, and never mutate state.
-
-Plugin-root `settings.json` ships a `subagentStatusLine` default backed by `bin/omca-subagent-statusline`. Users can override per-project by setting their own `subagentStatusLine` in `~/.claude/settings.json` or a project-level settings file. Omitting all overrides falls back to the platform's default `name · description · token count` row.
+`/oh-my-claudeagent:omca-setup` writes `statusLine` and `subagentStatusLine` into `~/.claude/settings.json`, both running the launcher it copies to `~/.claude/omca/statusline.ts`; the launcher runs `statusline/main.ts` or `statusline/subagent.ts` from the newest installed plugin version. A plugin-root `settings.json` cannot do this: Claude Code drops its `statusLine`, and keeps its `subagentStatusLine` without substituting or setting `${CLAUDE_PLUGIN_ROOT}` for the command (measured on 2.1.287), so the plugin's own `settings.json` sets only `agent`.
 
 **`statusLine.refreshInterval` (v2.7.0, ADOPTED):**
 
-`omca-setup` Phase 4.6 sets `statusLine.refreshInterval: 5` (seconds) in `~/.claude/settings.json` alongside `hideVimModeIndicator`. This is the recommended value for OMCA: the statusline reads disk-cached git metadata (branch, PR state) that updates on roughly a 5 s cadence, so a matching refresh interval keeps the display current without polling faster than the cache. In background-agent idle scenarios — where the model is waiting on a subagent and no tool calls are firing — the platform only refreshes the statusline at this interval, so a value below 5 yields no additional freshness from the disk-cached sources. Doc-claim ceiling: the freshness improvement is specific to disk-sourced fields (`workspace.repo.*`, `pr.*`); fields sourced directly from the active tool call context update on each render regardless of this setting.
+`omca-setup` sets `statusLine.refreshInterval: 5` (seconds) in `~/.claude/settings.json` alongside `hideVimModeIndicator`. This is the recommended value for OMCA: the statusline reads disk-cached git metadata (branch, PR state) that updates on roughly a 5 s cadence, so a matching refresh interval keeps the display current without polling faster than the cache. In background-agent idle scenarios — where the model is waiting on a subagent and no tool calls are firing — the platform only refreshes the statusline at this interval, so a value below 5 yields no additional freshness from the disk-cached sources. Doc-claim ceiling: the freshness improvement is specific to disk-sourced fields (`workspace.repo.*`, `pr.*`); fields sourced directly from the active tool call context update on each render regardless of this setting.
 
 **Statusline platform additions (v2.1.141–v2.1.167):**
 
-New fields added to the statusline input JSON payload, adopted in `statusline/core.py`:
+New fields added to the statusline input JSON payload, adopted in `statusline/render.ts` and `statusline/subagent.ts`:
 
 | Field | Version | Adopted | Notes |
 |-------|---------|---------|-------|
 | `workspace.repo.{host,owner,name}` | v2.1.145 | Yes | Repo identity segment; OSC 8 link to `https://{host}/{owner}/{name}` when all three present |
 | `pr.{number,url,review_state}` | v2.1.145 | Yes | PR number (#N) with optional OSC 8 link; review_state → glyph (approved=+/green, changes_requested=!/red, pending=?/yellow, draft=d/dim) |
-| `COLUMNS` / `LINES` env vars | v2.1.153 | Yes — `COLUMNS` fallback in `bin/omca-subagent-statusline` | Payload `columns` still wins; env vars complement when payload absent |
-| `context_window.remaining_percentage` | v2.1.153 | Yes — `_render_context_bar` uses it when `pct` arg is None | Falls back to `current_usage` calculation; explicit `pct` still wins |
-| per-task `effort` (`subagentStatusLine`) | v2.1.214 | Yes, `statusline/subagent.py` renders it per row | **Different shape from the main line.** Here it is a bare string or int, not the main line's `{"level": ...}` dict, so the main-line read cannot be copied. Absent means the subagent inherited the session level, and absence renders nothing |
+| `COLUMNS` / `LINES` env vars | v2.1.153 | Yes, `COLUMNS` fallback in `statusline/subagent.ts` | Payload `columns` still wins; env vars complement when payload absent |
+| `context_window.remaining_percentage` | v2.1.153 | Yes, the context bar uses it when `used_percentage` is absent | Falls back to the `current_usage` calculation; `used_percentage` still wins |
+| per-task `effort` (`subagentStatusLine`) | v2.1.214 | Yes, `statusline/subagent.ts` renders it per row | **Different shape from the main line.** Here it is a bare string or int, not the main line's `{"level": ...}` dict, so the main-line read cannot be copied. Absent means the subagent inherited the session level, and absence renders nothing |
 | `contextWindowSize` (`subagentStatusLine`) | v2.1.205 | Yes, the row renders `N% ctx` when it is a positive int | Falls back to the raw `N.Nk tok` form when the field is absent, so tasks on different window sizes stay comparable when the platform supplies it |
 
 Main-line `effort.level` uses the platform enum `low`/`medium`/`high`/`xhigh`/`max`. `high`
@@ -1449,7 +1441,7 @@ conversation runs in that family (`claude-code-docs/docs/sub-agents.md`, "Choose
 user who picks an older Opus runs every `opus` agent on it. That spread is the accepted cost of not having a
 pinned id go stale on the next release. No `opus` agent declares `xhigh` any more, so the
 Foundry fallback from `xhigh` to `high` on Opus 4.6 no longer lowers any of them. The statusline still shows the true generation per subagent row, because
-`statusline/subagent.py` prefers the payload's resolved `model` field and only falls back to
+`statusline/subagent.ts` prefers the payload's resolved `model` field and only falls back to
 the frontmatter-derived label when the payload omits it.
 
 `modelOverrides` in settings is the named provider-portability escape hatch for a deployment
@@ -1540,7 +1532,7 @@ rather than harmful. It was never part of `omca-setup`'s auto-merged settings se
 Screen-reader users should set `CLAUDE_STATUSLINE_NERD_FONT=0`, which yields plain-text
 glyphs today. OMCA does not document a `CLAUDE_AX_SCREEN_READER` branch as working, because
 neither the settings nor the flag form is confirmed to reach the statusline environment. The
-larger accessibility gap is `statusline/core.py`'s unconditional ANSI escapes, tracked in
+larger accessibility gap is `statusline/render.ts`'s unconditional ANSI escapes, tracked in
 `docs/reference/known-issues.md`.
 
 `CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY` (default 10) and

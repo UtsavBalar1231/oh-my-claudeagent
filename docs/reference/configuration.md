@@ -15,7 +15,7 @@ injection mechanism.
 | Reduce permission prompts, cap model tiers, or scope auto mode | [Recommended settings.json blocks](#recommended-settingsjson-blocks) |
 | Make the sandbox network allowlist fail closed | [Sandbox network settings](#sandbox-network-settings) |
 | Configure git worktree isolation for spawned agents | [Worktree settings](#worktree-settings) |
-| Pick between daemon and direct statusline rendering | [Statusline modes](#statusline-modes) |
+| Turn OMCA's status lines on or off | [Status lines](#status-lines) |
 | Write a project rule that auto-injects when a file is touched | [Project rules (`.omca/rules/`)](#project-rules-omcarules) |
 | See two ready-made starting configs | [`docs/examples/`](../examples/) |
 
@@ -31,7 +31,7 @@ plugin's own installer prompts during `/oh-my-claudeagent:omca-setup`.
 | Key | Type | Default | What it does |
 |---|---|---|---|
 | `enableKeywordTriggers` | boolean | `false` | Legacy compatibility setting. When enabled, plain-English phrases in your prompts (e.g. "fix build") can activate OMCA workflows without a slash command. Off by default because keyword matching is imprecise; slash commands are the preferred entrypoint. |
-| `statuslineMode` | string: `off`, `direct`, `daemon` | `direct` | Which statusline renderer to use. See [Statusline modes](#statusline-modes). |
+| `statuslineMode` | string: `off`, `on` | `on` | Whether `/oh-my-claudeagent:omca-setup` configures the status lines. See [Status lines](#status-lines). |
 | `disableForceOrchestrationStyle` | boolean | `false` | When `true`, strips `force-for-plugin: true` from the installed `output-styles/omca-default.md` cache copy, so your own `outputStyle` setting takes precedence over the plugin's orchestration style. The strip happens at `/oh-my-claudeagent:omca-setup` time and must be re-applied after every plugin update, since the cache copy can be overwritten. |
 
 Example:
@@ -42,7 +42,7 @@ Example:
     "oh-my-claudeagent@omca": {
       "options": {
         "enableKeywordTriggers": false,
-        "statuslineMode": "direct"
+        "statuslineMode": "on"
       }
     }
   }
@@ -287,20 +287,16 @@ isolated git worktrees.
 }
 ```
 
-## Statusline modes
+## Status lines
 
-Set via the `statuslineMode` plugin setting (`off`, `direct`, `daemon`).
-
-| Mode | Behavior |
-|---|---|
-| `off` | No OMCA statusline is installed; your own `statusLine` configuration (if any) is left untouched. |
-| `direct` | Renders the statusline inline on every invocation, no background process. Simpler, no daemon to manage, slightly higher per-call latency. This is the default. |
-| `daemon` | A background daemon process pre-computes statusline state so each render is fast; falls back to direct rendering automatically if the daemon is not running. Recommended when you want the statusline to refresh frequently without adding per-call overhead. |
-
-`/oh-my-claudeagent:omca-setup` writes the platform-level `statusLine` and
-`subagentStatusLine` blocks for you (including `hideVimModeIndicator` and a
-`refreshInterval` so the statusline keeps polling during idle background-agent runs);
-re-run it if those fields are ever missing.
+With `statuslineMode` at `on`, the default, `/oh-my-claudeagent:omca-setup` prints a diff of
+`~/.claude/settings.json` and, once you confirm it, sets `statusLine` and `subagentStatusLine`
+to run `~/.claude/omca/statusline.ts` with your absolute bun path. That launcher runs the
+renderer from the newest installed plugin version, so plugin updates need no second setup run.
+The `statusLine` entry carries `padding: 1`, `hideVimModeIndicator: true` and
+`refreshInterval: 5`, so the line keeps polling during idle background-agent runs. The previous
+file is kept as `~/.claude/settings.json.omca-bak`, and `/oh-my-claudeagent:omca-setup
+--uninstall` removes both entries and the launcher. With `off`, setup leaves both keys alone.
 
 ## Project rules (`.omca/rules/`)
 

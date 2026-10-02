@@ -18,28 +18,22 @@ lint: lint-shell lint-python
 lint-shell:
 	shellcheck scripts/*.sh scripts/qa/*.sh scripts/qa/lib/*.sh
 
-# Lint Python with ruff. servers/ and statusline/ carry separate ruff configs
-# (py310 vs py312 target-version) since statusline's stdlib usage (e.g. datetime.UTC)
-# needs py312; each gets its own `uv run --project` invocation rather than one
-# config silently overriding the other.
+# Lint Python with ruff
 [group('lint')]
 lint-python:
 	uv run --project servers ruff check servers/
-	uv run --project statusline ruff check statusline/
 
 # ── Format ────────────────────────────────────────────────────────
 
-# Format Python with ruff. Two invocations for the same reason as lint-python.
+# Format Python with ruff
 [group('format')]
 fmt:
 	uv run --project servers ruff format servers/
-	uv run --project statusline ruff format statusline/
 
 # Check Python formatting without changes
 [group('format')]
 fmt-check:
 	uv run --project servers ruff format --check servers/
-	uv run --project statusline ruff format --check statusline/
 
 # ── Test ──────────────────────────────────────────────────────────
 
@@ -90,13 +84,10 @@ test-mod:
 test-bun:
 	bun test src servers statusline scripts opencode
 
-# Run pytest suites for both Python projects. Split invocations for the same reason as
-# lint-python: servers/ and statusline/ are separate uv projects with their own configs
-# and their own dev dependencies, so one pytest run cannot cover both.
+# Run the pytest suite
 [group('test')]
 test-pytest:
 	uv run --project servers pytest servers/tests/ -v
-	uv run --project statusline --extra dev pytest statusline/tests/ -v
 
 # Run BATS behavioral tests for hook scripts
 [group('test')]
@@ -137,9 +128,7 @@ bench *args:
 
 # ── Typecheck ────────────────────────────────────────────────────
 
-# Type-check servers/ and statusline/ with pyright (pinned as a servers/ dev
-# dependency; the root pyrightconfig.json covers both dirs via executionEnvironments,
-# so one invocation is enough). Note: the pyright PyPI wrapper downloads/runs a Node
+# Type-check servers/ with pyright (pinned as a servers/ dev dependency). Note: the pyright PyPI wrapper downloads/runs a Node
 # runtime on first execution -- CI installs Node via actions/setup-node for this reason.
 [group('test')]
 typecheck:

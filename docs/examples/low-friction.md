@@ -24,7 +24,7 @@ stopped by a gate.
     "oh-my-claudeagent@omca": {
       "options": {
         "enableKeywordTriggers": true,
-        "statuslineMode": "direct"
+        "statuslineMode": "on"
       }
     }
   }
@@ -36,8 +36,8 @@ stopped by a gate.
 - `enableKeywordTriggers: true` lets phrases like "fix build" activate OMCA workflows
   without requiring the matching slash command: convenient for fast, conversational
   iteration, at the cost of occasional false-positive activation.
-- `statuslineMode: "direct"` avoids managing a background daemon process, trading a
-  small amount of per-render latency for simplicity.
+- `statuslineMode: "on"` is the default, spelled out: `/oh-my-claudeagent:omca-setup`
+  offers to point both status lines at OMCA's renderer.
 
 ```bash
 # Loosen the evidence gates for this session. Useful when you're prototyping and

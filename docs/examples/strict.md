@@ -25,7 +25,7 @@ agent to stop and ask rather than guess.
     "oh-my-claudeagent@omca": {
       "options": {
         "enableKeywordTriggers": false,
-        "statuslineMode": "daemon"
+        "statuslineMode": "off"
       }
     }
   },
@@ -43,8 +43,8 @@ this preset to a repo makes the plugin-settings half a silent no-op.
   repo state (`git push`, `git commit`) stays in `ask` so a human confirms it explicitly.
 - `enableKeywordTriggers: false` keeps every workflow entrypoint on explicit slash
   commands, eliminating false-positive activation from conversational phrasing.
-- `statuslineMode: "daemon"` keeps the statusline responsive without adding per-call
-  overhead to every tool invocation, useful when watching a long session closely.
+- `statuslineMode: "off"` makes `/oh-my-claudeagent:omca-setup` leave your `statusLine`
+  and `subagentStatusLine` alone, so setup proposes no change to your user settings.
 - `/handoff` needs no entry here. It ships with `disable-model-invocation: true`, so the
   model cannot self-invoke it; the `skillOverrides` block this preset used to carry did
   nothing, since that key does not apply to plugin-shipped skills.

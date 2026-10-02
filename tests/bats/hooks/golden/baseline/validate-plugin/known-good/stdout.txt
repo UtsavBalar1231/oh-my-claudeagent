@@ -29,7 +29,7 @@
 [validate-plugin] PASS: skill description length: init-deep description is 84 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: metis description is 109 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: momus description is 139 chars (within 512 soft cap)
-[validate-plugin] PASS: skill description length: omca-setup description is 128 chars (within 512 soft cap)
+[validate-plugin] PASS: skill description length: omca-setup description is 120 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: plan description is 89 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: refactor description is 95 chars (within 512 soft cap)
 [validate-plugin] PASS: skill description length: remove-ai-slops description is 297 chars (within 512 soft cap)
@@ -76,8 +76,12 @@
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/register.ts'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/validate-plugin.sh'
-[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'statusline/core.py'
-[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'statusline/subagent.py'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'statusline/main.ts'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'statusline/subagent.ts'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'statusline/render.ts'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'statusline/subagent.ts'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'statusline/subagent.ts'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'statusline/subagent.ts'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'statusline/README.md'
 [validate-plugin] SKIP: docs accuracy: OMCA.md:<LINE> references untracked, gitignored path '.claude/settings.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'skills/start-work/SKILL.md'
@@ -100,11 +104,11 @@
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
-[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'statusline/subagent.py'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'statusline/subagent.ts'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'agents/sisyphus.md'
 [validate-plugin] SKIP: docs accuracy: OMCA.md:<LINE> references untracked, gitignored path '.claude/settings.json'
 [validate-plugin] SKIP: docs accuracy: OMCA.md:<LINE> references untracked, gitignored path '.claude/settings.local.json'
-[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'statusline/core.py'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'statusline/render.ts'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'docs/reference/known-issues.md'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
@@ -189,4 +193,4 @@
 [validate-plugin] PASS: mcp tools/list contains categories_list
 [validate-plugin] PASS: mcp tools/list contains file_read
 [validate-plugin] PASS: mcp tools/list contains session_search
-[validate-plugin] Summary: 167 passed, 0 failed, 12 skipped, 0 warned
+[validate-plugin] Summary: 171 passed, 0 failed, 12 skipped, 0 warned

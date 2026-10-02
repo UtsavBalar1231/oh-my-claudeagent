@@ -1,5 +1,5 @@
 {
-  "include": ["statusline", "servers"],
+  "include": ["servers"],
   "exclude": [
     "**/.venv",
     "**/__pycache__",
@@ -8,7 +8,6 @@
   ],
   "pythonVersion": "3.13",
   "executionEnvironments": [
-    { "root": "statusline", "extraPaths": ["."] },
     { "root": "servers", "extraPaths": ["."] }
   ],
   "typeCheckingMode": "basic"

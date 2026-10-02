@@ -1,7 +1,3 @@
 {
-  "agent": "oh-my-claudeagent:sisyphus",
-  "subagentStatusLine": {
-    "type": "command",
-    "command": "${CLAUDE_PLUGIN_ROOT}/bin/omca-subagent-statusline"
-  }
+  "agent": "oh-my-claudeagent:sisyphus"
 }

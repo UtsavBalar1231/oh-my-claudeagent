@@ -1,8 +1,7 @@
 # Statusline
 
-The main status line renderer for Claude Code, in TypeScript on bun, plus the Python
-renderer for the per-subagent tasks panel. Read `README.md` first for what the line shows and
-how it is configured.
+The main status line and the per-subagent tasks panel renderers for Claude Code, in TypeScript
+on bun. Read `README.md` first for what they show and how they are configured.
 
 ## Layout
 
@@ -14,9 +13,12 @@ how it is configured.
 - `config.ts`: environment-variable settings.
 - `fixtures.spec.ts`, `render.spec.ts`, `git.spec.ts`, `main.spec.ts`: `bun test statusline`.
   The recorded cases live in `tests/fixtures/statusline/`.
-- `subagent.py`, `core.py`, `types.py`, `tests/`: the Python subagent renderer and the helpers
-  it imports. It is a separate uv project (`pyproject.toml`, `uv.lock`) that `just test-pytest`
-  and `just lint-python` still cover.
+- `subagent.ts`: entry point for the subagent rows. It shares the palette, glyphs and width
+  helpers exported by `render.ts`.
+- `launcher.ts`: setup copies it to `~/.claude/omca/statusline.ts`, outside the plugin, so it
+  imports nothing relative. It runs `main.ts`, or `subagent.ts` with `--subagent`, from the newest
+  installed plugin version.
+- `subagent.spec.ts`, `launcher.spec.ts`: run the entry points as processes and compare stdout.
 
 ## Conventions
 

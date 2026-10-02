@@ -53,18 +53,26 @@ echo '{"model": {"display_name": "Opus 5.5"}, "context_window": {"used_percentag
   | bun statusline/main.ts
 ```
 
-To register it with Claude Code, point the `statusLine` key in `~/.claude/settings.json` at the
-script:
+`/oh-my-claudeagent:omca-setup` registers it. It copies `launcher.ts` to
+`~/.claude/omca/statusline.ts` and, after you confirm the printed diff, sets the `statusLine` key
+in `~/.claude/settings.json`:
 
 ```json
 "statusLine": {
   "type": "command",
-  "command": "bun /path/to/statusline/main.ts",
+  "command": "/home/you/.bun/bin/bun /home/you/.claude/omca/statusline.ts",
   "padding": 1,
   "refreshInterval": 5,
   "hideVimModeIndicator": true
 }
 ```
+
+A plugin `settings.json` cannot carry `statusLine` (Claude Code drops the key), so the command
+goes through the launcher. It runs `main.ts` from the newest version directory under
+`~/.claude/plugins/cache/omca/oh-my-claudeagent/`, comparing version numbers numerically, so the
+status line follows plugin updates without another setup run. `CLAUDE_CONFIG_DIR` replaces
+`~/.claude` in that path. With no installed version, as in a `--plugin-dir` checkout, it prints
+`omca: no installed plugin version found`.
 
 `refreshInterval: 5` re-runs the command every 5 seconds, which keeps disk-sourced state (git
 status and plan progress) current while the session sits idle between background-agent
@@ -148,6 +156,8 @@ Status and remote run at the same time.
 | `render.ts` | Payload types, line composition, and every formatting helper. |
 | `git.ts` | Branch, status counts, remote, and the cache. |
 | `config.ts` | Environment-variable settings. |
+| `subagent.ts` | Entry point for the subagent rows. |
+| `launcher.ts` | Copied to `~/.claude/omca/statusline.ts`; runs the newest installed renderer. |
 | `*.spec.ts` | `bun test statusline`. |
 
 `fixtures.spec.ts` renders every case in `tests/fixtures/statusline/` and compares it byte for
@@ -165,15 +175,19 @@ Rounding follows round-half-to-even for exact binary ties (`72.5%` reads `72%`, 
 ## Per-subagent status line
 
 `subagentStatusLine` is separate from `statusLine`: it renders one row per active subagent in the
-tasks panel instead of one line for the main session. It is still the Python renderer in
-`subagent.py`, wired in `~/.claude/settings.json`:
+tasks panel instead of one line for the main session. `subagent.ts` renders it, reached through
+the same launcher with `--subagent`, which setup writes beside `statusLine`:
 
 ```json
 "subagentStatusLine": {
   "type": "command",
-  "command": "~/.claude/statusline/.venv/bin/cc-statusline-subagent"
+  "command": "/home/you/.bun/bin/bun /home/you/.claude/omca/statusline.ts --subagent"
 }
 ```
+
+A plugin `settings.json` does keep `subagentStatusLine`, but Claude Code neither substitutes
+`${CLAUDE_PLUGIN_ROOT}` in its command nor sets that variable for it (measured on 2.1.287), so a
+plugin-relative command cannot find its script.
 
 **Input** (stdin): one JSON object with a `tasks` array (each task carries `id`, `name`, `type`,
 `status`, `description`, `label`, `startTime`, `model`, `effort`, `contextWindowSize`,
@@ -193,12 +207,12 @@ compact token count.
 **Output** (stdout): one JSON line per task to override its row,
 `{"id": "<task id>", "content": "<row body>"}`.
 
-Each row shows the agent name with the namespace prefix stripped and its themed glyph, its real
-model, status, configured effort, and context usage. The model comes from
-`.omca/state/subagent-models.json`, which the SubagentStart hook writes: join on `task.id` to the
-map key first, then fall back to a `task.name` or `task.type` match against `agent_type`. A task
-with no entry renders without a model rather than failing, because the renderer only reads that
-file and must never break the tasks panel.
+Each row shows the agent name with any namespace prefix stripped and its themed glyph, the model,
+the status, the configured effort, and context usage. A task without a `name` shows its `label`,
+then its `type`. The model is the task's own `model` field; when that is absent, a task named
+`oh-my-claudeagent:<agent>` takes the tier from that agent's frontmatter. Rows are cut to the
+payload's `columns`, then `COLUMNS`, then 80. Any unreadable input prints nothing, so the tasks
+panel keeps its default rows.
 
 ---
 

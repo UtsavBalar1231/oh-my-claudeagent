@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **The status lines run on bun through a launcher.** `/oh-my-claudeagent:omca-setup` copies
+  `statusline/launcher.ts` to `~/.claude/omca/statusline.ts`, prints a diff of
+  `~/.claude/settings.json`, and after you confirm it sets `statusLine` and
+  `subagentStatusLine` to that launcher, keeping the previous file as
+  `settings.json.omca-bak`. The launcher runs the renderer from the newest installed plugin
+  version, so a plugin update no longer needs a second setup run. `--uninstall` removes both
+  entries and the launcher.
+- `statuslineMode` takes `on` or `off`. A saved `direct` or `daemon` value is no longer an
+  option; set it again to `on`.
+- `omca-setup` checks dependencies and the runtime, configures the status lines and applies
+  the force-style opt-out. Its `--check` and `--doctor` modes point at `/omca doctor`.
+
+### Removed
+
+- `bin/omca-status`, `bin/omca-doctor` and `bin/omca-subagent-statusline`, and the Python
+  status line package. The plugin `settings.json` no longer sets `subagentStatusLine`: Claude
+  Code does not resolve `${CLAUDE_PLUGIN_ROOT}` in it, so it never found its script.
+
+### Upgrading
+
+Setup leaves what earlier versions installed in place. Once the new status line works, you can
+delete `~/.claude/statusline/`, the `--- omca-setup` block in `~/.claude/CLAUDE.md`, and the
+`Bash(jq *)`, `Bash(uv run *)` and `Bash(uv sync *)` entries setup added to
+`permissions.allow` in `~/.claude/settings.json`.
+
 ## [2.21.0] - 2026-09-30
 
 ### Added

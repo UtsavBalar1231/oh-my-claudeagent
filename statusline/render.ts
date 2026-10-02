@@ -56,23 +56,23 @@ export interface Payload {
 
 export const FALLBACK = "[claude]";
 
-const RST = "\x1b[0m";
-const DIM = "\x1b[90m";
+export const RST = "\x1b[0m";
+export const DIM = "\x1b[90m";
 const CYAN = "\x1b[36m";
-const WHITE = "\x1b[37m";
-const GREEN = "\x1b[32m";
-const YELLOW = "\x1b[33m";
-const RED = "\x1b[31m";
+export const WHITE = "\x1b[37m";
+export const GREEN = "\x1b[32m";
+export const YELLOW = "\x1b[33m";
+export const RED = "\x1b[31m";
 const MAGENTA = "\x1b[35m";
 const BLUE = "\x1b[34m";
 const BOLD = "\x1b[1m";
-const SEP = ` ${DIM}·${RST} `;
+export const SEP = ` ${DIM}·${RST} `;
 const FILLED_BLOCK = "▰";
 const EMPTY_BLOCK = "▱";
 const RATE_LIMIT_BAR_WIDTH = 10;
 const DAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 
-const NERD_GLYPHS = {
+export const NERD_GLYPHS = {
   branch: "\ue725",
   folder: "\uf07c",
   model: "\uf135",
@@ -90,7 +90,7 @@ const NERD_GLYPHS = {
 
 type Glyphs = Record<keyof typeof NERD_GLYPHS, string>;
 
-const ASCII_GLYPHS: Glyphs = {
+export const ASCII_GLYPHS: Glyphs = {
   branch: "*",
   folder: ">",
   model: ">",
@@ -224,7 +224,7 @@ function contextBar({ data, config }: Ctx): string {
   return `${renderBar(pct, config.barWidth, color)} ${color}${fixed(pct, 0)}%${RST}${warn}  ${DIM}${sizeLabel}${RST}`;
 }
 
-function formatTokens(n: number): string {
+export function formatTokens(n: number): string {
   if (n >= 1_000_000) return `${fixed(n / 1_000_000, 1)}M`;
   if (n >= 1_000) return `${fixed(n / 1_000, 1)}k`;
   return String(n);
@@ -274,7 +274,7 @@ export function todoCounter(projectDir: string, sessionId: string, nerd: boolean
   }
 }
 
-function agentGlyph(name: string, nerd: boolean): string {
+export function agentGlyph(name: string, nerd: boolean): string {
   if (!nerd) return "A:";
   return AGENT_GLYPHS.get(name.replace(/^oh-my-claudeagent:/, "")) ?? DEFAULT_AGENT_GLYPH;
 }

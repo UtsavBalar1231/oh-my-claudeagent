@@ -32,13 +32,12 @@
     "statuslineMode": {
       "title": "Statusline mode",
       "type": "string",
-      "default": "direct",
+      "default": "on",
       "options": [
         "off",
-        "direct",
-        "daemon"
+        "on"
       ],
-      "description": "Preferred OMCA statusline mode: off, direct, or daemon.",
+      "description": "on lets /oh-my-claudeagent:omca-setup point your status line and the subagent status line at OMCA's renderer; off makes setup leave both alone.",
       "sensitive": false
     },
     "disableForceOrchestrationStyle": {

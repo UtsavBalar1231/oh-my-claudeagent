@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": ["Read(.omca/**)", "Edit(.omca/**)"]
+  },
+  "enabledPlugins": {
+    "oh-my-claudeagent@omca": true
+  },
+  "theme": "dark"
+}
