@@ -11,8 +11,7 @@ copy it.
 
 ## Scope
 
-`scripts/comment-checker.sh` exits early on non-source extensions, so Markdown never reaches
-the mechanical comment gate. No hook, linter, or test enforces prose style. This document is
+The comment gate exits early on non-source extensions, so Markdown never reaches it. No hook, linter, or test enforces prose style. This document is
 the only policy covering it, and it is enforced by review.
 
 ## Voice

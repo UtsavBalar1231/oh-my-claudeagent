@@ -70,7 +70,6 @@
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'agents/sisyphus.md'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'servers/categories.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'templates/claudemd.md'
-[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/subagent-start.sh'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/validate-plugin.sh'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
@@ -90,9 +89,7 @@
 [validate-plugin] SKIP: docs accuracy: OMCA.md:<LINE> references untracked, gitignored path '.claude/settings.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/lib/common.sh'
-[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/delegate-retry.sh'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'servers/tools/ast.py'
-[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/tool-loop-detector.sh'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'templates/claudemd.md'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'servers/hooks/trusted-tooling.ts'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/bash-guard.ts'
@@ -121,7 +118,6 @@
 [validate-plugin] SKIP: docs accuracy: OMCA.md:<LINE> references untracked, gitignored path '.claude/settings.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'servers/tools/ast.py'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/validate-plugin.sh'
-[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'statusline/core.py'
 [validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md cites existing recipe 'just setup'
 [validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md cites existing recipe 'just ci'
 [validate-plugin] PASS: docs accuracy: docs/CONTRIBUTING.md cites existing recipe 'just test'
@@ -139,7 +135,11 @@
 [validate-plugin] PASS: mcp_tool hook 'omca_hook' server FQN 'plugin:oh-my-claudeagent:omca-hooks' matches plugin name + registered MCP server 'omca-hooks'
 [validate-plugin] PASS: mcp_tool hook 'omca_hook' server FQN 'plugin:oh-my-claudeagent:omca-hooks' matches plugin name + registered MCP server 'omca-hooks'
 [validate-plugin] PASS: mcp_tool hook 'omca_hook' server FQN 'plugin:oh-my-claudeagent:omca-hooks' matches plugin name + registered MCP server 'omca-hooks'
-[validate-plugin] PASS: mcp_tool hook 'validate_plan_write' server FQN 'plugin:oh-my-claudeagent:omca' matches plugin name + registered MCP server 'omca'
+[validate-plugin] PASS: mcp_tool hook 'omca_hook' server FQN 'plugin:oh-my-claudeagent:omca-hooks' matches plugin name + registered MCP server 'omca-hooks'
+[validate-plugin] PASS: mcp_tool hook 'omca_hook' server FQN 'plugin:oh-my-claudeagent:omca-hooks' matches plugin name + registered MCP server 'omca-hooks'
+[validate-plugin] PASS: mcp_tool hook 'omca_hook' server FQN 'plugin:oh-my-claudeagent:omca-hooks' matches plugin name + registered MCP server 'omca-hooks'
+[validate-plugin] PASS: mcp_tool hook 'omca_hook' server FQN 'plugin:oh-my-claudeagent:omca-hooks' matches plugin name + registered MCP server 'omca-hooks'
+[validate-plugin] PASS: mcp_tool hook 'omca_hook' server FQN 'plugin:oh-my-claudeagent:omca-hooks' matches plugin name + registered MCP server 'omca-hooks'
 [validate-plugin] PASS: mcp_tool hook 'omca_hook' server FQN 'plugin:oh-my-claudeagent:omca-hooks' matches plugin name + registered MCP server 'omca-hooks'
 [validate-plugin] PASS: mcp_tool hook 'omca_hook' server FQN 'plugin:oh-my-claudeagent:omca-hooks' matches plugin name + registered MCP server 'omca-hooks'
 [validate-plugin] PASS: mcp_tool hook 'omca_hook' server FQN 'plugin:oh-my-claudeagent:omca-hooks' matches plugin name + registered MCP server 'omca-hooks'
@@ -161,8 +161,7 @@
 [validate-plugin] PASS: hook fixture posttoolusefailure-bash.json: valid JSON (<REPO_ROOT>/tests/fixtures/hooks/posttoolusefailure-bash.json)
 [validate-plugin] PASS: hook fixture posttoolusefailure-read.json: valid JSON (<REPO_ROOT>/tests/fixtures/hooks/posttoolusefailure-read.json)
 [validate-plugin] PASS: hook fixture repo setup: initialized git repo at <TMPFILE>
-[validate-plugin] PASS: PreToolUse Write (comment-checker.sh): stdout shape is plain text or one single-line JSON object
-[validate-plugin] PASS: PreToolUse Write (comment-checker.sh): script succeeded
+[validate-plugin] SKIP: PreToolUse Write: no matching hook command registered
 [validate-plugin] SKIP: PermissionRequest Bash: no matching hook command registered
 [validate-plugin] PASS: SessionStart compact (post-compact-inject.sh): stdout shape is plain text or one single-line JSON object
 [validate-plugin] PASS: SessionStart compact (post-compact-inject.sh): script succeeded with valid JSON output
@@ -172,8 +171,7 @@
 [validate-plugin] PASS: Stop default (no state) (final-verification-evidence.sh): script succeeded
 [validate-plugin] PASS: Stop default (no state) (drift-guard.sh): stdout shape is plain text or one single-line JSON object
 [validate-plugin] PASS: Stop default (no state) (drift-guard.sh): script succeeded
-[validate-plugin] PASS: SubagentStart basic (subagent-start.sh): stdout shape is plain text or one single-line JSON object
-[validate-plugin] PASS: SubagentStart basic (subagent-start.sh): script succeeded with valid JSON output
+[validate-plugin] SKIP: SubagentStart basic: no matching hook command registered
 [validate-plugin] Running mcp checks
 [validate-plugin] PASS: mcp registry: valid JSON (<REPO_ROOT>/.mcp.json)
 [validate-plugin] PASS: mcp fixture initialize: valid JSON (<REPO_ROOT>/tests/fixtures/mcp/initialize.json)
@@ -199,4 +197,4 @@
 [validate-plugin] PASS: mcp tools/list contains categories_list
 [validate-plugin] PASS: mcp tools/list contains file_read
 [validate-plugin] PASS: mcp tools/list contains session_search
-[validate-plugin] Summary: 180 passed, 0 failed, 9 skipped, 0 warned
+[validate-plugin] Summary: 176 passed, 0 failed, 11 skipped, 0 warned

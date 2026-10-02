@@ -231,7 +231,6 @@ analyze-session:
 	@echo "=== Session Analysis ==="
 	@echo "Agents spawned: $(cat .omca/logs/subagents.jsonl 2>/dev/null | wc -l)"
 	@echo "Evidence entries: $(jq '.entries | length' .omca/state/verification-evidence.json 2>/dev/null || echo 0)"
-	@echo "Error counts: $(jq 'to_entries | map(.value) | add // 0' .omca/state/error-counts.json 2>/dev/null || echo 0)"
 	@echo "Hook errors: $(cat .omca/logs/hook-errors.jsonl 2>/dev/null | wc -l)"
 
 # ── Validate ─────────────────────────────────────────────────────

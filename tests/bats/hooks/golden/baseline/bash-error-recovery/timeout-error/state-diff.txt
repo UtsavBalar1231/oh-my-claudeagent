@@ -1,2 +1,0 @@
-Only in /state-after: error-counts.json
-Only in /state-after: error-counts.json.lock

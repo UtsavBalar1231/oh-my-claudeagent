@@ -1,8 +1,7 @@
 #!/usr/bin/env bats
 # hooks/hooks.json: structural coverage for the Phase-4 wiring: asserts the
-# scripts plan-continuation-guard.sh and tool-loop-detector.sh are registered
-# under the exact event/matcher shapes
-# their own headers declare, rather than trusting validate-plugin.sh's
+# script plan-continuation-guard.sh is registered under the exact event/matcher
+# shape its own header declares, rather than trusting validate-plugin.sh's
 # fixture-replay checks alone to catch a missing or mis-matchered entry.
 
 load '../test_helper'
@@ -30,21 +29,6 @@ HOOKS_JSON="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)/hooks/hooks.json"
 		| $guard_idx < $fv_idx
 	' "$HOOKS_JSON"
 	assert_output "true"
-}
-
-@test "hooks.json: tool-loop-detector.sh is registered under PostToolBatch with no matcher" {
-	run jq -e '
-		.hooks.PostToolBatch
-		| any((has("matcher") | not) and (.hooks[]?.command | test("tool-loop-detector\\.sh\"?$")))
-	' "$HOOKS_JSON"
-	assert_success
-}
-
-@test "hooks.json: tool-loop-detector.sh is no longer registered under PostToolUse" {
-	run jq -e '
-		[.hooks.PostToolUse[]?.hooks[]? | (.command // "") | select(test("tool-loop-detector\\.sh\"?$"))] | length == 0
-	' "$HOOKS_JSON"
-	assert_success
 }
 
 @test "hooks.json: delegation-reminder.sh is not registered" {

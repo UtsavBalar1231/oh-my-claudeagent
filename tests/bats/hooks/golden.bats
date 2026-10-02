@@ -94,64 +94,12 @@ _run_fixture() {
 	diff "${baseline}/state-diff.txt" "${work_dir}/state-diff.norm"
 }
 
-@test "golden: bash-error-recovery/command-not-found" {
-	_run_fixture "bash-error-recovery" "command-not-found"
-}
-
-@test "golden: bash-error-recovery/permission-denied" {
-	_run_fixture "bash-error-recovery" "permission-denied"
-}
-
-@test "golden: bash-error-recovery/test-failure" {
-	_run_fixture "bash-error-recovery" "test-failure"
-}
-
-@test "golden: bash-error-recovery/timeout-error" {
-	_run_fixture "bash-error-recovery" "timeout-error"
-}
-
-@test "golden: bash-error-recovery/slow-failure" {
-	_run_fixture "bash-error-recovery" "slow-failure"
-}
-
-@test "golden: comment-checker/ai-attribution" {
-	_run_fixture "comment-checker" "ai-attribution"
-}
-
-@test "golden: comment-checker/clean-code" {
-	_run_fixture "comment-checker" "clean-code"
-}
-
-@test "golden: delegate-retry/nesting-limit" {
-	_run_fixture "delegate-retry" "nesting-limit"
-}
-
-@test "golden: delegate-retry/rate-limit" {
-	_run_fixture "delegate-retry" "rate-limit"
-}
-
-@test "golden: edit-error-recovery/not-found" {
-	_run_fixture "edit-error-recovery" "not-found"
-}
-
-@test "golden: edit-error-recovery/transient" {
-	_run_fixture "edit-error-recovery" "transient"
-}
-
 @test "golden: final-verification-evidence/no-active-plan" {
 	_run_fixture "final-verification-evidence" "no-active-plan"
 }
 
 @test "golden: final-verification-evidence/recursion-guard" {
 	_run_fixture "final-verification-evidence" "recursion-guard"
-}
-
-@test "golden: json-error-recovery/ast-grep-not-found" {
-	_run_fixture "json-error-recovery" "ast-grep-not-found"
-}
-
-@test "golden: json-error-recovery/mcp-timeout" {
-	_run_fixture "json-error-recovery" "mcp-timeout"
 }
 
 @test "golden: package-plugin/dry-run" {
@@ -170,14 +118,6 @@ _run_fixture() {
 	_run_fixture "pre-compact" "ralph-active"
 }
 
-@test "golden: read-error-recovery/file-not-found" {
-	_run_fixture "read-error-recovery" "file-not-found"
-}
-
-@test "golden: read-error-recovery/is-directory" {
-	_run_fixture "read-error-recovery" "is-directory"
-}
-
 @test "golden: session-cleanup/normal" {
 	_run_fixture "session-cleanup" "normal"
 }
@@ -192,18 +132,6 @@ _run_fixture() {
 
 @test "golden: session-init/compact" {
 	_run_fixture "session-init" "compact"
-}
-
-@test "golden: subagent-start/sisyphus" {
-	_run_fixture "subagent-start" "sisyphus"
-}
-
-@test "golden: subagent-start/executor" {
-	_run_fixture "subagent-start" "executor"
-}
-
-@test "golden: subagent-start/explore" {
-	_run_fixture "subagent-start" "explore"
 }
 
 @test "golden: validate-plugin/known-good" {

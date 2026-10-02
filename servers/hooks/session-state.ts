@@ -1,3 +1,5 @@
+import type { DenyOnce } from "../../src/core/comments.ts";
+import type { ErrorCount } from "../../src/core/error-counts.ts";
 import type { Verification } from "../../src/core/verification.ts";
 
 export type Session = {
@@ -9,6 +11,9 @@ export type Session = {
   promptAt?: number;
   injectedContext?: Set<string>;
   announcedModes?: Set<string>;
+  commentGate?: DenyOnce;
+  errorCounts?: Map<string, ErrorCount>;
+  toolLoopWindows?: Map<string, { signature: string; count: number; promptId: string }>;
 };
 
 export const MAX_SESSIONS = 32;

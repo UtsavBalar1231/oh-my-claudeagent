@@ -167,11 +167,11 @@ Prerequisites: `uv`, ast-grep (`ast-grep` or `sg`), `bash` 4.3+ and `jq`.
 - MCP: the `omca` server with the evidence, notepad, AST and `file_read` tools, exposed as
   `omca_<tool>` (for example `omca_evidence_log`). It is registered only when `uv` and
   ast-grep are on PATH, and its first launch runs `uv sync`.
-- Guardrails: `permission-filter.sh`, `git-destructive-deny.sh` and `comment-checker.sh`
+- Guardrails: `permission-filter.sh`, `git-destructive-deny.sh` and the comment gate
   run on model and user shell commands and on file edits, and block the call on deny.
   Comment enforcement blocks only with `OMCA_COMMENT_GATE=deny` set. A blocked `!` shell
   command shows as a failed command without the reason; the reason goes to the OpenCode
-  server log. `comment-checker.sh` needs `bash` 4.3+ and `jq`.
+  server log.
 - Output style: OMCA's working discipline is injected into primary agents only (for
   example `build` and `plan`).
 

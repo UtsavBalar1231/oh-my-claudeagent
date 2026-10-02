@@ -83,13 +83,17 @@ list; a hook not on it ignores the variable entirely):
 |---|---|
 | `final-verification-evidence` | Blocks session Stop when the bound plan is fully checked off but no `final_verification` evidence entry has been logged for it. |
 | `plan-continuation-guard` | Blocks session Stop when the bound plan still has unchecked numbered tasks, nudging the agent to keep going instead of stopping mid-plan. |
-| `tool-loop-detector` | Warns when the same tool call repeats several times in a row, a common sign of a blind retry loop. |
+| `tool-loop` | Warns once when one agent runs the same batch of tool calls three times in a row, a common sign of a blind retry loop. Each agent keeps its own streak. |
+| `failure-recovery` | Advises on a failed Edit, Agent, Bash, Read, or MCP tool call. From a tool's third failure within five minutes it adds a stuck-loop note that names the advisor, then oracle. |
 | `git-destructive-deny` | Denies git subcommands that discard working-tree state: `reset --hard`, `stash`, `clean`, `restore`, `rm -r` (any clustered flag containing `r` or `R`), and a `checkout` whose arguments include a `--` pathspec separator. Matches at any command position and through an optional `sudo` prefix and leading git global options (`-C`, `-c`, `--git-dir`, `--work-tree`, `--no-pager`, and siblings). |
 | `drift-guard` | Blocks session Stop when the last assistant turn reads as a completion claim but the working tree still contains stub markers on changed lines. |
 | `plan-format-warn` | Warns when a plan file's checkboxes don't follow the numbered `- [ ] N.` form that progress tracking depends on. |
-| `comment-checker` | Pre-write gate over comments in source files: flags AI attribution, narration that restates the next line, decorative separators, filler qualifiers, and context-free TODOs. Whether a finding blocks the write is set by [`OMCA_COMMENT_GATE`](#omca_comment_gate-the-comment-gates-enforcement-level). |
+| `plan-write-guard` | Denies a Write or Edit that gives a plan file under a `plans/` directory no numbered `- [ ] N.` checkbox, because progress tracking and the Stop hooks count only numbered checkboxes. |
+| `comment-gate` | Pre-write gate over comments in source files: flags AI attribution, narration that restates the next line, decorative separators, filler qualifiers, and context-free TODOs. Whether a finding blocks the write is set by [`OMCA_COMMENT_GATE`](#omca_comment_gate-the-comment-gates-enforcement-level). |
 | `context-injector` | Injects nearby `AGENTS.md`/`README.md` excerpts and matching rule bodies (both plugin-shipped `rules/` and project `.omca/rules/`) when you read or edit a file. |
 | `empty-task-response` | Advises when a delegated agent's report is empty or trivially short, or lacks the section headers its agent's output format requires. |
+| `subagent-context` | Injects the agent protocol, date, output mandate, role guidance, and the bound plan's context into every subagent when it starts. |
+| `permission-coach` | Tells the model it may retry after the auto-mode classifier denies a Bash command. |
 
 Set the variable in your shell profile, in a wrapper script, or per-invocation, depending
 on whether the override should be permanent or one-off.
@@ -109,18 +113,19 @@ basename is present in `OMCA_DISABLED_HOOKS`.
 
 ### `OMCA_COMMENT_GATE`: the comment gate's enforcement level
 
-Selects how far `comment-checker` goes when it finds a slop comment in a source file you
+Selects how far `comment-gate` goes when it finds a slop comment in a source file you
 are writing or editing. It is a separate axis from `OMCA_DISABLED_HOOKS`, which turns the
-hook off entirely.
+hook off entirely. The omca-hooks server reads it from its own environment, which is Claude
+Code's, so set it before launching.
 
 | Value | Behavior |
 |---|---|
 | `off` | The hook exits immediately. No findings, no advice, nothing recorded. |
 | `advise` | **Default.** Shadow mode: the gate computes the same deny decision it would make under `deny`, records it, and then lets the write through with an advisory note instead of blocking. |
-| `deny` | Blocks the write. AI-attribution and placeholder findings always block; heuristic findings block once per file-and-findings signature and then fail open, so a genuine non-obvious comment cannot trap an edit in a retry loop. |
+| `deny` | Blocks the write. AI-attribution and placeholder findings always block; heuristic findings block once per file-and-findings signature in a session and then fail open, so a genuine non-obvious comment cannot trap an edit in a retry loop. |
 
-Shadow-mode decisions are recorded to `.omca/logs/hook-info.jsonl` as `would-deny` entries
-naming the tier and the file. Read those first to judge how the heuristics behave on your
+Shadow-mode decisions are written to the omca-hooks server's stderr, which is the MCP
+server log, as `omca: comment-gate would deny (<tier>) <file>` lines. Read those first to judge how the heuristics behave on your
 own code, then switch to `deny` once the rate looks right:
 
 ```bash
@@ -191,7 +196,7 @@ no-op.
   Nobody but you can write it.
 - Omitting the literal `"$defaults"` from an `autoMode` array replaces the built-in ruleset
   entirely, including the rule against transcript tampering.
-- `disableAutoMode: "disable"` makes `permission-denied-coach.sh` unreachable, since the
+- `disableAutoMode: "disable"` makes the `permission-coach` handler unreachable, since the
   classifier never runs.
 - `autoMode.classifyAllShell` (Boolean, default `false`, read from user or managed settings,
   the same sources as `autoMode` itself) sends every Bash and PowerShell command through the

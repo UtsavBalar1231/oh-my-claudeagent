@@ -38,7 +38,7 @@ qa_claude_probe() {
 GUARD_DENY_RE='tool\.check Bash [^ ]+: .* -> deny by plugin oh-my-claudeagent: Destructive rm -rf blocked'
 
 # check_pretooluse_deny — a zero-checkbox plan-shaped Write must be denied by the
-# validate_plan_write mcp_tool hook (Write|Edit matcher). Also feeds check_stop_negative
+# plan-write-guard handler behind the omca_hook entry (Write|Edit matcher). Also feeds check_stop_negative
 # below: the same turn's Stop event is inspected there so this only costs one API call.
 check_pretooluse_deny() {
 	local project package log
@@ -54,7 +54,7 @@ check_pretooluse_deny() {
 		'Use the Write tool to create a file at plans/no-checkboxes.md with exactly this content and nothing else: "## Work Objectives\n\nSome text with no checkboxes."'
 
 	if grep -q 'PLAN-CHECKBOX-VERIFY' "${log}" 2>/dev/null; then
-		qa_pass "PreToolUse deny: validate_plan_write fired on the zero-checkbox plan write"
+		qa_pass "PreToolUse deny: plan-write-guard fired on the zero-checkbox plan write"
 	else
 		qa_fail "PreToolUse deny: no PLAN-CHECKBOX-VERIFY denial found in debug log ${log}"
 	fi

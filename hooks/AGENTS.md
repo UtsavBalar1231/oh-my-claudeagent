@@ -5,7 +5,7 @@
 ## Hook events
 
 Registered here: `SessionStart`, `UserPromptSubmit`, `UserPromptExpansion`,
-`SubagentStart`, `SubagentStop`, `PreToolUse`, `PermissionRequest`, `PermissionDenied`,
+`SubagentStart`, `PreToolUse`, `PermissionRequest`, `PermissionDenied`,
 `PostToolUse`, `PostToolUseFailure`, `Stop`, `TaskCompleted`, `PreCompact`, `SessionEnd`.
 
 Regenerate that list with `jq -r '.hooks | keys[]' hooks/hooks.json`. Every other platform
@@ -15,8 +15,9 @@ event is unregistered on purpose; `OMCA.md` carries the per-event reason.
 
 - `UserPromptSubmit` and `UserPromptExpansion` route to the server's `keyword-detector` and
   `slash-mode-detector` handlers.
-- `PermissionDenied` routes to `permission-denied-coach.sh`, which turns an auto-mode
-  classifier denial into retry guidance.
+- `SubagentStart` routes to the server's `subagent-context` handler, and `PermissionDenied`
+  to its `permission-coach` handler, which answers an auto-mode classifier denial of a Bash
+  call with `retry: true`.
 - `permission-filter.sh` has two roles, and they are registered on different events.
   The deny of a recursive removal runs on `PreToolUse` and on `PermissionRequest`, both
   with matcher `Bash`. The auto-allow of a narrow trusted-tooling set (npm, yarn, pnpm,
@@ -81,6 +82,6 @@ event is unregistered on purpose; `OMCA.md` carries the per-event reason.
   hide its separator inside quotes. `tests/bats/hooks/permission_handlers.bats` pins the
   behavior so it cannot be "fixed" by accident.
 - Hook lifecycle ownership stays Claude-native. OMCA supplies the handlers: `type: command`
-  for every shell handler, plus one `type: mcp_tool` handler whose `tool` is
-  `validate_plan_write`. Query `hooks/hooks.json` for the current handler types rather than
+  for every shell handler, plus `type: mcp_tool` handlers whose `tool` is
+  `omca_hook`. Query `hooks/hooks.json` for the current handler types rather than
   assuming a single kind.

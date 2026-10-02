@@ -1,1 +1,0 @@
-{"hookSpecificOutput": {"hookEventName": "PreToolUse", "additionalContext": "[COMMENT CHECK] Detected AI slop comment patterns. Remove the quoted comments with a follow-up Edit unless they encode a non-obvious why. AI attribution comment detected. \n"}}

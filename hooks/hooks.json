@@ -93,22 +93,16 @@
       {
         "hooks": [
           {
-            "type": "command",
-            "shell": "bash",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/subagent-start.sh\"",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
-    "SubagentStop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "shell": "bash",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/subagent-stop.sh\"",
-            "timeout": 5
+            "type": "mcp_tool",
+            "server": "plugin:oh-my-claudeagent:omca-hooks",
+            "tool": "omca_hook",
+            "timeout": 10,
+            "input": {
+              "event": "SubagentStart",
+              "session_id": "${session_id}",
+              "agent_id": "${agent_id}",
+              "agent_type": "${agent_type}"
+            }
           }
         ]
       }
@@ -118,27 +112,16 @@
         "matcher": "Write|Edit",
         "hooks": [
           {
-            "type": "command",
-            "shell": "bash",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/comment-checker.sh\"",
-            "timeout": 5,
-            "statusMessage": "Checking comments"
-          }
-        ]
-      },
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
             "type": "mcp_tool",
-            "server": "plugin:oh-my-claudeagent:omca",
-            "tool": "validate_plan_write",
+            "server": "plugin:oh-my-claudeagent:omca-hooks",
+            "tool": "omca_hook",
+            "timeout": 10,
             "input": {
+              "event": "PreToolUse",
+              "session_id": "${session_id}",
+              "cwd": "${cwd}",
               "tool_name": "${tool_name}",
-              "file_path": "${tool_input.file_path}",
-              "content": "${tool_input.content}",
-              "new_string": "${tool_input.new_string}",
-              "old_string": "${tool_input.old_string}"
+              "tool_input": "${tool_input}"
             }
           }
         ]
@@ -167,9 +150,15 @@
       {
         "hooks": [
           {
-            "type": "command",
-            "shell": "bash",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/permission-denied-coach.sh\""
+            "type": "mcp_tool",
+            "server": "plugin:oh-my-claudeagent:omca-hooks",
+            "tool": "omca_hook",
+            "timeout": 10,
+            "input": {
+              "event": "PermissionDenied",
+              "session_id": "${session_id}",
+              "tool_name": "${tool_name}"
+            }
           }
         ]
       }
@@ -222,64 +211,38 @@
       {
         "hooks": [
           {
-            "type": "command",
-            "shell": "bash",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/tool-loop-detector.sh\""
+            "type": "mcp_tool",
+            "server": "plugin:oh-my-claudeagent:omca-hooks",
+            "tool": "omca_hook",
+            "timeout": 10,
+            "input": {
+              "event": "PostToolBatch",
+              "session_id": "${session_id}",
+              "agent_id": "${agent_id}",
+              "prompt_id": "${prompt_id}",
+              "tool_calls": "${tool_calls}"
+            }
           }
         ]
       }
     ],
     "PostToolUseFailure": [
       {
-        "matcher": "Edit",
         "hooks": [
           {
-            "type": "command",
-            "shell": "bash",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/edit-error-recovery.sh\"",
-            "statusMessage": "Analyzing Edit failure"
-          }
-        ]
-      },
-      {
-        "matcher": "Agent",
-        "hooks": [
-          {
-            "type": "command",
-            "shell": "bash",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/delegate-retry.sh\""
-          }
-        ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "shell": "bash",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/bash-error-recovery.sh\"",
-            "statusMessage": "Analyzing Bash failure"
-          }
-        ]
-      },
-      {
-        "matcher": "Read",
-        "hooks": [
-          {
-            "type": "command",
-            "shell": "bash",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/read-error-recovery.sh\"",
-            "statusMessage": "Analyzing Read failure"
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "shell": "bash",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/json-error-recovery.sh\"",
-            "statusMessage": "Analyzing tool-output failure"
+            "type": "mcp_tool",
+            "server": "plugin:oh-my-claudeagent:omca-hooks",
+            "tool": "omca_hook",
+            "timeout": 10,
+            "input": {
+              "event": "PostToolUseFailure",
+              "session_id": "${session_id}",
+              "agent_id": "${agent_id}",
+              "tool_name": "${tool_name}",
+              "tool_input": "${tool_input}",
+              "error": "${error}",
+              "duration_ms": "${duration_ms}"
+            }
           }
         ]
       }

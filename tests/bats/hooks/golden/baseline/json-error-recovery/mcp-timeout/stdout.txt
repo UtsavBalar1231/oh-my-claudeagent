@@ -1,1 +1,0 @@
-{"hookSpecificOutput": {"hookEventName": "PostToolUseFailure", "additionalContext": "[MCP ERROR RECOVERY] MCP tool timed out. The codebase may be too large for this operation. Try narrowing the search scope.\n"}}

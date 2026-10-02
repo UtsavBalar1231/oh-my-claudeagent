@@ -1,8 +1,8 @@
 #!/usr/bin/env bats
 # Unit tests for the portability and state-safety hardening in scripts/lib/common.sh:
 # the timeout/gtimeout/cat probe, the fail-open signal on an unparseable payload,
-# sha256_of_stdin fallback, the BSD-safe epoch_ns value probe, concurrency-safe and
-# self-healing JSON read-modify-write, and the Stop-event block ledger.
+# sha256_of_stdin fallback, the BSD-safe epoch_ns value probe, and the Stop-event
+# block ledger.
 
 load '../test_helper'
 
@@ -165,153 +165,9 @@ EOF
 	assert_output 'rc=0'
 }
 
-_bsd_date_path() {
-	local bin
-	bin=$(_path_without date)
-	cat > "$bin/date" <<'EOF'
-#!/usr/bin/env bash
-if [[ "$1" == "+%s%N" ]]; then printf '1785843035N\n'; exit 0; fi
-exec /bin/date "$@"
-EOF
-	chmod +x "$bin/date"
-	printf '%s\n' "$bin"
-}
-
 @test "timing capture: no hook captures a start stamp via the exit-status-only date probe" {
 	run grep -rn 'date +%s%N' "$CLAUDE_PLUGIN_ROOT/scripts"
 	assert_output --partial 'lib/common.sh'
-	refute_output --partial 'scripts/comment-checker.sh'
-	refute_output --partial 'scripts/subagent-stop.sh'
-	refute_output --partial 'scripts/subagent-start.sh'
-	refute_output --partial 'scripts/tool-loop-detector.sh'
-}
-
-@test "timing capture: a hook records a timing row on a BSD-shaped date" {
-	local bin payload
-	bin=$(_bsd_date_path)
-	mkdir -p "$BATS_TEST_TMPDIR/p"
-	payload=$(jq -nc --arg f "$BATS_TEST_TMPDIR/p/sample.py" \
-		'{"tool_name":"Write","tool_input":{"file_path":$f,"content":"x = 1\n"},"agent_id":"a1","agent_type":"oh-my-claudeagent:executor","tool_response":"ok"}')
-
-	run env -i PATH="$bin" HOME="$HOME" CLAUDE_PROJECT_ROOT="$BATS_TEST_TMPDIR/p" \
-		CLAUDE_PLUGIN_ROOT="$CLAUDE_PLUGIN_ROOT" \
-		HOOK_STATE_DIR="$BATS_TEST_TMPDIR/state" HOOK_LOG_DIR="$BATS_TEST_TMPDIR/logs" \
-		"$bin/bash" "$CLAUDE_PLUGIN_ROOT/scripts/comment-checker.sh" <<< "$payload"
-
-	run jq -r '.ms' "$BATS_TEST_TMPDIR/logs/hook-timing.jsonl"
-	assert_success
-	[[ "$output" =~ ^[0-9]+$ ]]
-}
-
-# ─── f. concurrency-safe, self-healing RMW ───────────────────────────────────
-
-@test "error_count_bump: N=5 concurrent bumps preserve every bump" {
-	run bash -c "
-		cd '$CLAUDE_PLUGIN_ROOT'
-		for i in 1 2 3 4 5; do
-			(
-				export HOOK_STATE_DIR='$BATS_TEST_TMPDIR/state' HOOK_LOG_DIR='$BATS_TEST_TMPDIR/logs' HOOK_INPUT='{}'
-				source '$COMMON'
-				error_count_bump concurrent \"err\$i\" > /dev/null
-			) &
-		done
-		wait
-		jq -r '.concurrent.count' '$BATS_TEST_TMPDIR/state/error-counts.json'
-	"
-	assert_success
-	assert_output '5'
-}
-
-@test "error_count_bump: a corrupt error-counts.json self-heals to a valid file" {
-	mkdir -p "$BATS_TEST_TMPDIR/state"
-	printf 'THIS IS NOT JSON {' > "$BATS_TEST_TMPDIR/state/error-counts.json"
-
-	_lib 'error_count_bump healme "boom"'
-	assert_success
-	assert_output '1'
-
-	run jq -r '.healme.count' "$BATS_TEST_TMPDIR/state/error-counts.json"
-	assert_success
-	assert_output '1'
-}
-
-@test "error_count_bump: a zero-byte error-counts.json self-heals" {
-	mkdir -p "$BATS_TEST_TMPDIR/state"
-	: > "$BATS_TEST_TMPDIR/state/error-counts.json"
-
-	# `jq . </dev/null` exits 0 and prints nothing, so an exit-status-only guard
-	# let the empty string through and the model literally received "Retry: /3".
-	_lib 'error_count_bump zerobyte "boom"'
-	assert_success
-	assert_output '1'
-
-	run jq -r '.zerobyte.count' "$BATS_TEST_TMPDIR/state/error-counts.json"
-	assert_success
-	assert_output '1'
-}
-
-@test "error_count_bump: a cross-device TMPDIR does not drop bumps" {
-	# The temp file now lands beside the target, so the mv is a rename. Pointing
-	# TMPDIR at a non-existent path proves the write no longer depends on it.
-	run bash -c "
-		cd '$CLAUDE_PLUGIN_ROOT'
-		export HOOK_STATE_DIR='$BATS_TEST_TMPDIR/state' HOOK_LOG_DIR='$BATS_TEST_TMPDIR/logs' HOOK_INPUT='{}'
-		export TMPDIR='/nonexistent-tmpdir'
-		source '$COMMON'
-		error_count_bump xdev 'boom'
-	"
-	assert_success
-	assert_output '1'
-}
-
-@test "error_count_bump: an unwritable state dir still echoes a usable count" {
-	mkdir -p "$BATS_TEST_TMPDIR/state"
-	chmod a-w "$BATS_TEST_TMPDIR/state"
-	_lib 'error_count_bump lockfail "boom"'
-	chmod u+w "$BATS_TEST_TMPDIR/state"
-	assert_success
-	assert_output '1'
-}
-
-@test "error_count_bump: a single bump is correct without flock" {
-	local bin
-	bin=$(_path_without flock)
-	run env -i PATH="$bin" HOME="$HOME" HOOK_STATE_DIR="$BATS_TEST_TMPDIR/state" \
-		HOOK_LOG_DIR="$BATS_TEST_TMPDIR/logs" HOOK_INPUT='{}' \
-		"$bin/bash" -c "cd '$CLAUDE_PLUGIN_ROOT'; source '$COMMON'; error_count_bump noflock 'boom'"
-	assert_success
-	assert_output '1'
-}
-
-@test "error_count_bump: concurrent bumps do not lose updates without flock" {
-	local bin
-	bin=$(_path_without flock)
-	run env -i PATH="$bin" HOME="$HOME" "$bin/bash" -c "
-		cd '$CLAUDE_PLUGIN_ROOT'
-		for i in 1 2 3 4 5 6 7 8 9 10; do
-			(
-				export HOOK_STATE_DIR='$BATS_TEST_TMPDIR/state' HOOK_LOG_DIR='$BATS_TEST_TMPDIR/logs' HOOK_INPUT='{}'
-				source '$COMMON'
-				error_count_bump raced \"err\$i\" > /dev/null
-			) &
-		done
-		wait
-		jq -r '.raced.count' '$BATS_TEST_TMPDIR/state/error-counts.json'
-	"
-	assert_success
-	assert_output '10'
-}
-
-@test "error_count_bump: a stale lock directory does not wedge the next bump" {
-	local bin
-	bin=$(_path_without flock)
-	mkdir -p "$BATS_TEST_TMPDIR/state/error-counts.json.lockdir"
-	touch -d '1 hour ago' "$BATS_TEST_TMPDIR/state/error-counts.json.lockdir"
-	run env -i PATH="$bin" HOME="$HOME" HOOK_STATE_DIR="$BATS_TEST_TMPDIR/state" \
-		HOOK_LOG_DIR="$BATS_TEST_TMPDIR/logs" HOOK_INPUT='{}' \
-		"$bin/bash" -c "cd '$CLAUDE_PLUGIN_ROOT'; source '$COMMON'; error_count_bump stale 'boom'"
-	assert_success
-	assert_output '1'
 }
 
 # ─── g. Stop-event block ledger ──────────────────────────────────────────────
@@ -417,13 +273,13 @@ EOF
 }
 
 @test "hook_is_disabled: 'all' inside a comma list still disables every hook" {
-	_lib 'OMCA_DISABLED_HOOKS="comment-checker,all" hook_is_disabled drift-guard && echo disabled || echo enabled'
+	_lib 'OMCA_DISABLED_HOOKS="comment-gate,all" hook_is_disabled drift-guard && echo disabled || echo enabled'
 	assert_success
 	assert_output 'disabled'
 }
 
 @test "hook_is_disabled: an unrelated list leaves the hook enabled" {
-	_lib 'OMCA_DISABLED_HOOKS="comment-checker,post-edit" hook_is_disabled drift-guard && echo disabled || echo enabled'
+	_lib 'OMCA_DISABLED_HOOKS="comment-gate,post-edit" hook_is_disabled drift-guard && echo disabled || echo enabled'
 	assert_success
 	assert_output 'enabled'
 }

@@ -66,8 +66,6 @@ if [[ "${REASON}" != "resume" ]] && (( OWNS_SHARED_STATE )); then
 		"${STATE_DIR}/session.json"
 		"${STATE_DIR}/recent-edits.json"
 		"${STATE_DIR}/injected-context-dirs.json"
-		# Per-session delegate-error counters — reset by session-init.sh on next start.
-		"${STATE_DIR}/error-counts.json"
 	)
 
 	for file in "${TEMP_FILES[@]}"; do

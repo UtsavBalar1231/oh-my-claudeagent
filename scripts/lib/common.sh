@@ -28,9 +28,6 @@ HOOK_STATE_DIR="${HOOK_STATE_DIR:-${HOOK_PROJECT_ROOT}/.omca/state}"
 HOOK_LOG_DIR="${HOOK_LOG_DIR:-${HOOK_PROJECT_ROOT}/.omca/logs}"
 HOOK_MODE_STATE_SUFFIX="-state.json"
 
-# 300s (5min): a clean window this long resets an error-counter key; prevents permanently tripped breakers.
-ERROR_COUNT_DECAY_SECONDS=300
-
 mkdir -p "${HOOK_STATE_DIR}" "${HOOK_LOG_DIR}" 2>/dev/null
 
 # Messages carry caller-supplied text: file paths, quoted findings, error
@@ -155,49 +152,6 @@ json_rmw() {
 	fi
 	rm -f "${tmp}"
 	return 1
-}
-
-# Usage: NEW_COUNT=$(error_count_bump <key> <error-summary>)
-error_count_bump() {
-	local key="$1"
-	local error_summary="$2"
-	local file="${HOOK_STATE_DIR}/error-counts.json"
-	error_summary=$(printf '%s' "${error_summary}" | tr '\n' ' ' | cut -c1-160)
-	with_state_lock "${file}" error_count_bump_body "${file}" "${key}" "${error_summary}"
-}
-
-error_count_bump_body() {
-	local file="$1" key="$2" error_summary="$3"
-	local now
-	now=$(date +%s)
-
-	# shellcheck disable=SC2016 # jq filter: $vars are jq bindings passed via --arg, not shell
-	if json_rmw "${file}" '
-		def entry_of($k):
-			(.[$k] // 0) as $v |
-			if ($v | type) == "number" then {count: $v, last_failure_at: null, last_errors: []}
-			else $v end;
-		(entry_of($key)) as $e |
-		(if ($e.last_failure_at != null) and (($now - $e.last_failure_at) > $decay)
-			then {count: 0, last_errors: []}
-			else {count: $e.count, last_errors: $e.last_errors} end) as $carried |
-		.[$key] = {
-			count: ($carried.count + 1),
-			last_failure_at: $now,
-			last_errors: ([$err] + $carried.last_errors)[0:3]
-		}
-	' --arg key "${key}" --arg err "${error_summary}" \
-		--argjson now "${now}" --argjson decay "${ERROR_COUNT_DECAY_SECONDS}"; then
-		jq -r --arg key "${key}" '.[$key].count' "${file}" 2>/dev/null || echo 1
-	else
-		log_hook_error "update failed for error-counts.json key=${key}" "$(basename "$0")"
-		echo 1
-	fi
-}
-
-section_header() {
-	local title="$1"
-	printf '\n─── %s ─────────────────────────────────────\n' "${title}"
 }
 
 mode_is_active() {

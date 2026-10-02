@@ -48,8 +48,10 @@ describe("registry", () => {
 
   test("a payload no handler acts on answers {} on every event", async () => {
     const root = project();
-    const answers = await Promise.all(Object.keys(REGISTRY).map((event) => dispatch({ event, tool_name: "Read" }, root, NOW)));
-    expect(answers).toEqual(Object.keys(REGISTRY).map(() => ({})));
+    // Every subagent gets context, so no SubagentStart payload goes unanswered.
+    const events = Object.keys(REGISTRY).filter((event) => event !== "SubagentStart");
+    const answers = await Promise.all(events.map((event) => dispatch({ event, tool_name: "Read" }, root, NOW)));
+    expect(answers).toEqual(events.map(() => ({})));
   });
 
   test("an unknown event answers {} and names the event on stderr", async () => {

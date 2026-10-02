@@ -1,10 +1,8 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { checkEdit, checkShell, runGuard } from "./guard.ts"
-
-const root = join(import.meta.dir, "..")
+import { checkEdit, checkShell } from "./guard.ts"
 
 const RM_CATASTROPHIC =
   "Destructive rm -rf blocked: the target is the filesystem root, home, the working directory, or a directory directly under root or home. Name a deeper path explicitly."
@@ -19,6 +17,8 @@ const savedEnv = {
 }
 
 beforeEach(() => {
+  delete process.env.OMCA_COMMENT_GATE
+  delete process.env.OMCA_DISABLED_HOOKS
   tmp = mkdtempSync(join(tmpdir(), "omca-guard-"))
   errorSpy = spyOn(console, "error").mockImplementation(() => {})
 })
@@ -31,14 +31,6 @@ afterEach(() => {
   }
   rmSync(tmp, { recursive: true, force: true })
 })
-
-const opts = () => ({ cwd: tmp, projectRoot: tmp })
-
-function tempScript(body: string) {
-  const file = join(tmp, "guard.sh")
-  writeFileSync(file, `#!/bin/bash\n${body}\n`)
-  return file
-}
 
 describe("decisions", () => {
   test("a hard reset is denied with the git reason", () => {
@@ -72,55 +64,85 @@ describe("decisions", () => {
     expect(checkShell("rm -rf ~")).toEqual({ deny: true, reason: RM_CATASTROPHIC })
   })
 
-  test("a write to a new file is allowed", async () => {
-    expect(await checkEdit(root, "write", { path: join(tmp, "new.txt"), content: "hi" }, tmp)).toEqual({
-      deny: false,
-    })
-    expect(errorSpy).toHaveBeenCalledTimes(0)
-  })
-
-  test("comment-checker denies a restating comment when the gate is deny", async () => {
-    process.env.OMCA_COMMENT_GATE = "deny"
-    const content = '# set the user name\nuser_name="$input_value"'
-    const result = await checkEdit(root, "write", { path: "/repo/scripts/foo.sh", content }, tmp)
-    expect(result.deny).toBe(true)
-    if (result.deny) expect(result.reason).toContain("restates the following code line")
-    expect(errorSpy).toHaveBeenCalledTimes(0)
-  })
-
-  test("comment-checker skips a Markdown patch section", async () => {
-    process.env.OMCA_COMMENT_GATE = "deny"
-    const patchText = "*** Begin Patch\n*** Add File: a.md\n+# Install\n+Install it\n*** End Patch"
-    expect(await checkEdit(root, "patch", { patchText }, tmp)).toEqual({ deny: false })
-    expect(errorSpy).toHaveBeenCalledTimes(0)
-  })
-
-  test("comment-checker denies a restating comment in a source-file patch", async () => {
-    process.env.OMCA_COMMENT_GATE = "deny"
-    const patchText =
-      '*** Begin Patch\n*** Add File: scripts/foo.sh\n+# set the user name\n+user_name="$input_value"\n*** End Patch'
-    const result = await checkEdit(root, "patch", { patchText }, tmp)
-    expect(result.deny).toBe(true)
-    if (result.deny) expect(result.reason).toContain("restates the following code line")
+  test("a write to a new file is allowed", () => {
+    expect(checkEdit("write", { path: join(tmp, "new.txt"), content: "hi" }, tmp)).toEqual({ deny: false })
     expect(errorSpy).toHaveBeenCalledTimes(0)
   })
 })
 
-describe("failure modes allow and log once", () => {
-  test("nonexistent script", async () => {
-    expect(await runGuard(join(tmp, "missing.sh"), {}, opts())).toEqual({ deny: false })
-    expect(errorSpy).toHaveBeenCalledTimes(1)
+describe("the comment gate", () => {
+  const RESTATES = 'Comment restates the following code line ("set the user name"): delete it, or replace it with the non-obvious why.'
+  const slop = '# set the user name\nuser_name="$input_value"'
+
+  test("a restating comment in a written file is denied when the gate is deny", () => {
+    process.env.OMCA_COMMENT_GATE = "deny"
+    const result = checkEdit("write", { path: "/repo/scripts/denied.sh", content: slop }, tmp)
+    expect(result).toEqual({ deny: true, reason: expect.stringContaining(`Blocked: comment slop. ${RESTATES} The convention:`) })
+    expect(errorSpy).toHaveBeenCalledTimes(0)
   })
 
-  test("timeout returns promptly", async () => {
-    const started = performance.now()
-    expect(await runGuard(tempScript("exec sleep 5"), {}, { ...opts(), timeoutMs: 200 })).toEqual({ deny: false })
-    expect(performance.now() - started).toBeLessThan(2000)
-    expect(errorSpy).toHaveBeenCalledTimes(1)
+  test("the same finding in the same file passes on the retry and is denied again after", () => {
+    process.env.OMCA_COMMENT_GATE = "deny"
+    const attempt = () => checkEdit("write", { path: "/repo/scripts/retried.sh", content: slop }, tmp).deny
+    expect([attempt(), attempt(), attempt()]).toEqual([true, false, true])
   })
 
-  test("exit 127", async () => {
-    expect(await runGuard(tempScript("exit 127"), {}, opts())).toEqual({ deny: false })
-    expect(errorSpy).toHaveBeenCalledTimes(1)
+  test("an attribution comment is denied on every attempt", () => {
+    process.env.OMCA_COMMENT_GATE = "deny"
+    const attempt = () => checkEdit("edit", { path: "/repo/a.py", newString: "# AI-generated helper\nx = 1" }, tmp)
+    const denied = { deny: true, reason: expect.stringContaining("Blocked: AI-attribution or placeholder comment. AI attribution comment detected.") }
+    expect(attempt()).toEqual(denied)
+    expect(attempt()).toEqual(denied)
+  })
+
+  test("a restating comment in a source-file patch is denied", () => {
+    process.env.OMCA_COMMENT_GATE = "deny"
+    const patchText = `*** Begin Patch\n*** Add File: scripts/patched.sh\n+# set the user name\n+user_name="$input_value"\n*** End Patch`
+    expect(checkEdit("patch", { patchText }, tmp)).toEqual({ deny: true, reason: expect.stringContaining(RESTATES) })
+    expect(errorSpy).toHaveBeenCalledTimes(0)
+  })
+
+  test("a patch is judged one file at a time, so a Markdown section does not hide a source section", () => {
+    process.env.OMCA_COMMENT_GATE = "deny"
+    const patchText = [
+      "*** Begin Patch",
+      "*** Add File: a.md",
+      "+# Install",
+      "+Install it",
+      "*** Add File: sections.py",
+      "+# AI-generated helper",
+      "+x = 1",
+      "*** End Patch",
+    ].join("\n")
+    expect(checkEdit("patch", { patchText }, tmp)).toEqual({ deny: true, reason: expect.stringContaining("AI attribution comment detected.") })
+  })
+
+  test("a Markdown patch section is skipped", () => {
+    process.env.OMCA_COMMENT_GATE = "deny"
+    const patchText = "*** Begin Patch\n*** Add File: a.md\n+# Install\n+Install it\n*** End Patch"
+    expect(checkEdit("patch", { patchText }, tmp)).toEqual({ deny: false })
+    expect(errorSpy).toHaveBeenCalledTimes(0)
+  })
+
+  test("the advise and off levels allow a write the deny level would block", () => {
+    const input = { path: "/repo/a.py", content: "# AI-generated helper\nx = 1" }
+    for (const level of [undefined, "advise", "off"]) {
+      if (level === undefined) delete process.env.OMCA_COMMENT_GATE
+      else process.env.OMCA_COMMENT_GATE = level
+      expect(checkEdit("write", input, tmp)).toEqual({ deny: false })
+    }
+  })
+
+  test("comment-gate in OMCA_DISABLED_HOOKS allows a write the gate would deny", () => {
+    process.env.OMCA_COMMENT_GATE = "deny"
+    const input = { path: "/repo/a.py", content: "# AI-generated helper\nx = 1" }
+    expect(checkEdit("write", input, tmp).deny).toBe(true)
+    process.env.OMCA_DISABLED_HOOKS = "comment-gate"
+    expect(checkEdit("write", input, tmp)).toEqual({ deny: false })
+  })
+
+  test("a tool that writes no file is allowed", () => {
+    process.env.OMCA_COMMENT_GATE = "deny"
+    expect(checkEdit("read", { path: "/repo/a.py", content: "# AI-generated helper" }, tmp)).toEqual({ deny: false })
   })
 })

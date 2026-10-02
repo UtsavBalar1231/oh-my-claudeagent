@@ -35,7 +35,7 @@ run_cleanup() {
 
 @test "session-cleanup: removes ephemeral state files on stop" {
 	for f in session.json recent-edits.json \
-		injected-context-dirs.json error-counts.json; do
+		injected-context-dirs.json; do
 		write_state "$f" '{"stale":true}'
 	done
 
@@ -43,7 +43,7 @@ run_cleanup() {
 	assert_success
 
 	for f in session.json recent-edits.json \
-		injected-context-dirs.json error-counts.json; do
+		injected-context-dirs.json; do
 		assert [ ! -f "$CLAUDE_PROJECT_ROOT/.omca/state/$f" ]
 	done
 }

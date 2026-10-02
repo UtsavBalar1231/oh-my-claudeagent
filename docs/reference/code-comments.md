@@ -386,7 +386,7 @@ This list is the input contract for the cleanup skill.
     (`O(n log n)`) is a contract a caller depends on and cannot cheaply rederive.
 12. **Project-local mandated comments.** The magic-number derivation comments this repo
     requires for every numeric constant in its shell scripts are CI-pinned in
-    `tests/bats/hooks/misc_hooks.bats`, so stripping them as "narrating comments"
+    `servers/hooks/comment-gate.spec.ts`, so stripping them as "narrating comments"
     turns a cleanup into a test failure. Any repo with its own mandated-comment rule gets the
     same protection; check for one before running a cleanup pass.
 

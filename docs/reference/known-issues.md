@@ -4,23 +4,6 @@ Live limitations and traps you can hit in normal use, one entry per issue. Resol
 issues are removed from this page rather than kept as history. Check `CHANGELOG.md`
 if you want the fix record.
 
-## The repeated-tool-call nudge still keeps one window for the whole session
-
-**Symptom**: during a wide fan-out, an agent that genuinely repeats the same work three times
-gets no nudge.
-
-**Why**: `tool-loop-detector.sh` runs on `PostToolBatch`, which fires once per resolved batch
-and carries the whole `tool_calls` array. That fixed the original problem, where parallel
-calls from different agents interleaved into one another's signature at the individual-call
-level. What remains is smaller: the window is still a single file,
-`.omca/state/tool-loop-window.json`, holding one `signature`/`count`/`prompt_id` triple, so
-batches from agents running at the same time can still overwrite each other's signature and
-reset a streak.
-
-**Workaround**: none needed for correctness. The nudge is advisory and the detector never
-blocks, so treat its absence during parallel fan-out as uninformative rather than as evidence
-that no loop happened.
-
 ## The statusline emits ANSI color escapes unconditionally
 
 **Symptom**: with a screen reader, the statusline reads as a stream of escape sequences mixed

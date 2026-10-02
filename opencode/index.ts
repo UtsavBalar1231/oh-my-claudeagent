@@ -180,7 +180,7 @@ async function setup(ctx: Context) {
         if (event.tool === "shell") {
           enforce(checkShell(String(input.command ?? "")))
         } else if (EDIT_TOOLS.includes(event.tool)) {
-          enforce(await checkEdit(root, event.tool, input, projectRoot))
+          enforce(checkEdit(event.tool, input, projectRoot))
         }
       }),
     ),

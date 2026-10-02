@@ -126,7 +126,7 @@ plugin agents. To retain `permissionMode`, copy agent files to `~/.claude/agents
 
 Agent files can declare an `initialPrompt:` field that fires an unconditional model turn
 at session start, before any user message. OMCA does not adopt this because
-`scripts/subagent-start.sh` already injects boulder plan context and mode banners as
+the server's `subagent-context` handler already injects boulder plan context as
 `additionalContext` on `SubagentStart` — the same information at zero model-turn cost.
 Adding an `initialPrompt` would consume a billable turn per subagent instantiation with
 no new information benefit.
@@ -281,7 +281,6 @@ row only when a handler is actually registered for it.
 | `UserPromptSubmit` | Lifecycle |
 | `UserPromptExpansion` | Lifecycle |
 | `SubagentStart` | Lifecycle |
-| `SubagentStop` | Lifecycle |
 | `PreToolUse` | Tool lifecycle |
 | `PermissionRequest` | Tool lifecycle |
 | `PermissionDenied` | Tool lifecycle |
@@ -295,8 +294,9 @@ row only when a handler is actually registered for it.
 | `SessionEnd` | Lifecycle |
 | `FileChanged` | Filesystem |
 
-`PermissionDenied` routes to `permission-denied-coach.sh`, which turns an auto-mode
-classifier denial into retry guidance. `UserPromptSubmit` and
+`SubagentStart` routes to the server's `subagent-context` handler and `PermissionDenied`
+to its `permission-coach` handler, which returns `retry: true` for a denied Bash call after
+an auto-mode classifier denial. `UserPromptSubmit` and
 `UserPromptExpansion` carry the server's keyword and slash-mode detectors.
 
 `PostToolBatch` carries the loop detector, which fires once per resolved batch and reads
@@ -934,7 +934,6 @@ All runtime state lives in `.omca/` (gitignored by default):
 - `state/boulder.json` — Session-bound plan registry: one entry per plan under `plans[plan_name]`, one binding per session under `bindings[session_id]`
 - `evidence/verification-evidence.json` — Verification records
 - `state/compaction-context.md` — Saved state for compaction survival
-- `state/subagent-models.json` — Live subagent id → resolved model name, for the statusline renderer
 - `state/notepads/{plan-name}/` — Per-plan notepad sections
 - `plans/{name}.md` — Compatibility mirror/resume surface for native plans, maintained by boulder
 - `logs/` — Session and subagent audit logs
@@ -1131,7 +1130,7 @@ Two ceilings bound how wide and how deep a fan-out can go. Neither is set by OMC
 | `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` | 20 (v2.1.217) | In-flight ceiling. `Concurrent subagent limit reached` explicitly says not to retry: wait for in-flight agents and read their results. ultracode sessions are exempt |
 | `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` | moved (v2.1.217 set 1, v2.1.219 raised it to 3) | The docs page still describes the pre-v2.1.219 behavior, so cite the changelog. Do not write prose that depends on the number |
 
-`scripts/delegate-retry.sh` returns early on the concurrency limit string, before the error
+The failure-recovery handler returns early on the concurrency limit string, before the error
 counter, so a platform ceiling can never advance the three-strike breaker toward an oracle
 escalation.
 
@@ -1154,7 +1153,7 @@ mitigation rather than lowering the timeout.
 retries `429` and `529` capacity errors indefinitely, and as of v2.1.199 raises the default
 retry count for other transient errors (server errors, timeouts, dropped connections) to 300
 and lifts the cap of 15 on an explicit `CLAUDE_CODE_MAX_RETRIES`. It is the documented
-recommendation for unattended and CI runs. OMCA leaves it to the operator: `delegate-retry.sh`
+recommendation for unattended and CI runs. OMCA leaves it to the operator: the failure-recovery handler
 counts subagent-level failures, which are a different plane, so this variable neither helps
 nor hinders the three-strike counter.
 
@@ -1170,9 +1169,10 @@ declares none of its own, so setting it is what gives `session-cleanup.sh` more 
 ### `prompt_id` (hook input field, v2.1.196)
 
 `prompt_id` is a common hook input field carrying the id of the user prompt in flight. It is
-absent until the first user input of a session. `scripts/tool-loop-detector.sh` stamps it into
-its one-slot window so a repeated signature carried across a user turn boundary no longer
-reads as the third call of a streak.
+absent until the first user input of a session. The tool-loop handler stamps it into each
+agent's window so a repeated signature carried across a user turn boundary no longer reads as
+the third call of a streak. A `PostToolBatch` payload carries `agent_id` (empty on the main
+thread), which keys the window, so concurrent agents never share one streak.
 
 ### `CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN` (v2.1.132)
 
@@ -1214,7 +1214,7 @@ Enables auto permission mode for Bedrock, Vertex, and AWS Bedrock Foundry deploy
 where it used to be off by default. As of v2.1.207 auto mode is on by default on those
 providers too, so this variable is now only a way to force it on where a deployment has
 turned it off. Under `disableAutoMode: "disable"`, auto mode never runs and
-`permission-denied-coach.sh` is unreachable. Relevant for OMCA users running in managed cloud deployments who want auto-mode
+the `permission-coach` handler is unreachable. Relevant for OMCA users running in managed cloud deployments who want auto-mode
 orchestration without the bypass-permissions confirmation flow.
 
 ### `agent` setting — honored for dispatched sessions (v2.1.157)
@@ -1367,7 +1367,6 @@ than copied verbatim.
 | context-injector hardening | The context injector now dedups injections by content-hash+realpath (reusing `injected-context-dirs.json`, which `session-init.sh` already resets every `SessionStart`) instead of re-injecting on every matching file access. The project-root walk for both the `.omca/rules` scan and the AGENTS.md/README terminator now resolves worktree-safely (a linked worktree's `.git` is a file, not a directory, so the walk tests `-e` not `-d`), so a worktree session no longer walks up into the parent repo |
 | stdin-read timeout | `scripts/lib/common.sh`'s shared `HOOK_INPUT=$(cat)` read now wraps in `timeout 5 cat`, discarding on exit 124 rather than hanging indefinitely if stdin is never closed. Blocking hooks (`final-verification-evidence.sh`, `drift-guard.sh`, `task-completed-verify.sh`) treat an empty-from-timeout read as fail-closed-or-warn, not a silent pass |
 | Compaction content round-trip | `pre-compact.sh` now inlines the session's next 10 unchecked plan tasks and the 5 most recent notepad decisions (tasks first, so they survive `post-compact-inject.sh`'s downstream line cap), instead of leaving compaction to rely on whatever the model happened to keep in its own summary |
-| Per-subagent statusline model | `subagent-start.sh` now records each live subagent's resolved display model (e.g. `Sonnet`, `Opus 4.8`) in `subagent-models.json`; the statusline renders it per running task instead of showing only the parent session's model |
 
 **Reframed, not ported as-is:**
 
@@ -1420,12 +1419,12 @@ Features introduced in this window that OMCA consciously declines to adopt:
 | `Agent(type=...)` spawn-allowlist in agent frontmatter | v2.1.148 | Sisyphus needs unrestricted spawn access to the full agent roster; an allowlist would require updating on every new specialist addition |
 | `defaultEnabled: false` in plugin.json | v2.1.154 | OMCA is designed to activate immediately on install; inactive-by-default would break first-session experience |
 | `reloadSkills` in SessionStart output | v2.1.152 | No OMCA use case identified |
-| `prompt`, `agent`, and `http` hook types | (standing) | Declined on cost and determinism, not on handler-type purity: `hooks/hooks.json` already registers an `mcp_tool` handler (`validate_plan_write`) alongside its `command` handlers, so "OMCA is `type: command` only" is not the reason and must not be cited as one. A `prompt` or `agent` handler puts a model call in the path of every matching tool event, which a plan-write validator resolves deterministically for free, and `http` adds a network dependency to a gate that must work offline |
+| `prompt`, `agent`, and `http` hook types | (standing) | Declined on cost and determinism, not on handler-type purity: `hooks/hooks.json` already registers `mcp_tool` handlers (`omca_hook`) alongside its `command` handlers, so "OMCA is `type: command` only" is not the reason and must not be cited as one. A `prompt` or `agent` handler puts a model call in the path of every matching tool event, which a plan-write validator resolves deterministically for free, and `http` adds a network dependency to a gate that must work offline |
 | Monitors, Themes, Channels, LSP | (standing) | No current OMCA use case |
 | `arguments:` in skill frontmatter | evaluated 2026-06 | Shell-style positional binding truncates free-form input — a slash command like `/oh-my-claudeagent:plan fix the auth bug` would bind only `$task="fix"`, discarding the rest. OMCA skills receive the full user prompt via natural expansion instead |
 | `hooks:` in skill frontmatter | evaluated 2026-06 | Skill-frontmatter hooks are not visible to `validate-plugin.sh` (validates hooks only from `hooks/hooks.json`). All hook registration stays in `hooks/hooks.json` |
 | `skillOverrides` / `skillListingBudgetFraction` / `maxSkillDescriptionChars` settings | evaluated 2026-06 | User-preference settings only; `skillOverrides` does not apply to plugin-shipped skills. No plugin-side adoption possible or needed |
-| `initialPrompt` in agent frontmatter | evaluated 2026-06 | Fires an unconditional billable model turn per subagent; `subagent-start.sh` already injects boulder context as `additionalContext` at zero turn cost |
+| `initialPrompt` in agent frontmatter | evaluated 2026-06 | Fires an unconditional billable model turn per subagent; the `subagent-context` handler already injects boulder context as `additionalContext` at zero turn cost |
 | `SessionStart` `watchPaths` output | ADOPTED 2026-08 | Live probing showed the matcher's watch half registers cwd-relative names that do not exist, so `FileChanged` never fired. `session-init.sh` now returns both absolute paths and the handler dispatches. See the `FileChanged` section above |
 | `PostToolUse` `updatedToolOutput` | evaluated 2026-06 | Rewriting tool output post-hoc is adversarial to evidence integrity — OMCA's verification model requires the model to see literal command output |
 | `plugin.json` `dependencies` field | evaluated 2026-06 | OMCA has no runtime inter-plugin dependencies; field has no consumers in this plugin |
@@ -1441,8 +1440,8 @@ Features introduced in this window that OMCA consciously declines to adopt:
 
 | Feature | Adopted in | Notes |
 |---------|-----------|-------|
-| `duration_ms` coaching in `bash-error-recovery.sh` | v2.7.0 | Added two branches: text-regex timeout detection (placed first in deterministic chain) and `duration_ms` ≥ 120 s fallback for slow-failure coaching (run_in_background / larger-timeout / narrower-scope). Payload probe confirmed `duration_ms` present in PostToolUseFailure Bash payloads |
-| `delegate-retry.sh` `duration_ms` branch | deferred | Agent-failure PostToolUseFailure payload structure not confirmed by probe contract — `duration_ms` coverage for Agent failures is pending a dedicated probe session |
+| `duration_ms` coaching in the Bash failure handler | v2.7.0 | Added two branches: text-regex timeout detection (placed first in deterministic chain) and `duration_ms` ≥ 120 s fallback for slow-failure coaching (run_in_background / larger-timeout / narrower-scope). Payload probe confirmed `duration_ms` present in PostToolUseFailure Bash payloads |
+| `duration_ms` branch in the Agent failure handler | deferred | Agent-failure PostToolUseFailure payload structure not confirmed by probe contract — `duration_ms` coverage for Agent failures is pending a dedicated probe session |
 | `statusLine.refreshInterval: 5` | v2.7.0 | Applied via `omca-setup` Phase 4.6; both create and merge jq variants updated. Rationale: disk-sourced statusline reads git cache files that update on a ~5 s cadence; background-agent idle scenarios benefit from a matching refresh ceiling. Doc-claim ceiling: freshness improvement covers disk-sourced and idle-fan-out scenarios only |
 
 **Adopted this sync (v2.1.168–v2.1.197):**
@@ -1546,8 +1545,8 @@ it and `--check` can at most warn.
 `autoMode.environment` is per-organization prose OMCA cannot infer, the same class as
 `fallbackModel[]`. Its scope is user settings, `--settings`, or managed settings only, never
 project `.claude/settings.json` and never `.claude/settings.local.json`, so no future
-`omca-setup` phase may emit an `autoMode` block into project settings. When
-`permission-denied-coach.sh` fires on something that should have been allowed, inspect the
+`omca-setup` phase may emit an `autoMode` block into project settings. When the
+`permission-coach` handler fires on something that should have been allowed, inspect the
 effective ruleset with `claude auto-mode defaults`, `claude auto-mode config`, `claude
 auto-mode critique`, and `claude auto-mode reset`.
 
@@ -1577,7 +1576,7 @@ section and in `CLAUDE.md`; neither is set by OMCA.
 | Hook `timeout` is seconds, not milliseconds | The two `"timeout": 5000` values in `hooks/hooks.json` were 83-minute caps, the opposite of the intended 5-second tightening, and are now `5`. The per-event defaults range from 1.5 seconds for `SessionEnd` up to 600 for a `command` handler |
 | Quoted shell form on every command handler | Each handler invokes `${CLAUDE_PLUGIN_ROOT}/scripts/...`, which resolves into the marketplace cache under the user's home; in shell form a space anywhere in that path splits the command, so every `command` value now quotes the placeholder. Exec form (`args` present) was tried and rejected: it spawns `command` as a real executable with no shell, and a `.sh` file is not executable on native Windows, so every handler would fail to spawn there with no error signal, and setting `args` also makes the platform ignore the `shell` field. Exec form stays available for handlers whose `command` is a genuine cross-platform binary |
 | `shell: "bash"` pinned on every `type: command` handler | Not a Windows-only field, which is how this ledger used to dismiss it. Shell form runs the command under `sh -c` on Unix and falls back to PowerShell on Windows when Git Bash is absent, and neither is a shell a `.sh` handler written against bash can be fed to safely. Pinning `bash` names the interpreter on both platforms instead of inheriting whichever one the host resolves to. Every `command` handler in `hooks/hooks.json` now carries it |
-| `statusMessage` on user-perceived slow handlers | Spinner labels on `session-init.sh`, `context-injector.sh`, `comment-checker.sh`, and the `*-error-recovery.sh` family. Not blanket-applied: most handlers finish in milliseconds and a label for them reads as noise |
+| `statusMessage` on user-perceived slow handlers | Spinner labels on `session-init.sh` and `context-injector.sh`. Not blanket-applied: most handlers finish in milliseconds and a label for them reads as noise |
 | Compound-command fall-through in the trusted-tooling fast path | Hook `if:` matching is per-subcommand, so `jq . a.json && rm -rf ~/x` reached the jq auto-allow branch. A command whose trimmed text contains a command separator, a redirect, or a command substitution now falls through to the platform decision: `\|`, `;`, `&`, `<`, `>`, a backtick, `$(`, a literal newline, or a carriage return. The bare `&` covers `&&` and `&>`, the newline covers multi-line commands, and the carriage return is hardening for shells that terminate a statement on a bare CR, which bash does not. Globs, tilde, and `$VAR` expansion still take the fast path, since none of them can introduce a second command. The `rm -rf` deny branch still runs first, so the deny path is unchanged |
 | `context: fork` skills pin `background: false` | Forked skills background by default from v2.1.218, and a backgrounded fork gets the narrower background-subagent tool set with its result a turn later. metis, momus, and hephaestus pin `false` so momus's OKAY/REJECT verdict stays inline for the bounded review loop and hephaestus's edits stay inside `/rewind` checkpoint coverage |
 | `disable-model-invocation: true` on handoff | Replaces a workaround that told users to disable the whole plugin, and retires a `skillOverrides` recommendation this ledger already called inert for plugin skills. The `handoff` keyword now degrades to an advisory nudge toward the slash command and is described that way everywhere |
@@ -1586,12 +1585,12 @@ section and in `CLAUDE.md`; neither is set by OMCA.
 | Hook event tables regenerated from the registry | The table advertised nine events with no handler, omitted `PermissionDenied`, and pointed at two scripts deleted in the v2.10 refactor. `scripts/validate-plugin.sh` now diffs the table against `jq -r '.hooks \| keys[]'` in both directions, so it cannot re-drift silently |
 | `last_assistant_message` on Stop/SubagentStop | Both Stop hooks read the final assistant turn from the payload field first, with the transcript tail kept as fallback because the transcript is not guaranteed to hold the final message at Stop time. The undocumented `.messages` probe is gone. drift-guard's whole purpose is catching a completion claim in that message, so a miss there was a silent guard failure |
 | Stop hooks block via `decision: block` | `plan-continuation-guard.sh`, `final-verification-evidence.sh`, and `drift-guard.sh` now write Stop decision-control JSON (`decision` plus `reason`, nothing else) and exit 0 instead of writing to stderr and exiting 2. `task-completed-verify.sh` is the only turn-gate or task-gate hook left that blocks via exit 2. The deny hooks are unaffected: each writes the shape its event reads, branching on `hook_event_name` (see the Stop / SubagentStop section above) |
-| Tier aliases in agent frontmatter | Every agent declares a tier alias (`opus`, `sonnet`, `fable`) instead of a pinned generation id, so a provider resolves it to the newest generation its allowlist permits and nothing goes stale on the next model release. The subagent-start display map gained alias arms above its full-id arms, which remain only as frontmatter compatibility for an agent file that pins a generation again; the hook reads frontmatter, not the spawning call. And `omca-setup` no longer writes `ANTHROPIC_DEFAULT_OPUS_MODEL`: a default-model pin overrides the alias and reintroduces exactly the staleness the alias removes |
+| Tier aliases in agent frontmatter | Every agent declares a tier alias (`opus`, `sonnet`, `fable`) instead of a pinned generation id, so a provider resolves it to the newest generation its allowlist permits and nothing goes stale on the next model release. `omca-setup` no longer writes `ANTHROPIC_DEFAULT_OPUS_MODEL`: a default-model pin overrides the alias and reintroduces exactly the staleness the alias removes |
 | `Write(.omca/**)` dropped from the recommended allowlist | `Write`/`NotebookEdit`/`Glob` path rules are accepted but never match, and now emit a startup warning. `Edit(.omca/**)` plus `Read(.omca/**)` covers the intent, since `Edit` governs every file-editing tool including `Write`. The doctor's stale-entry warnings flag the removed rule for already-configured users |
-| Spawn budgets: session cap, concurrency cap, depth default | `delegate-retry.sh` gained early-return branches for the concurrency and session ceilings, returning before the error counter so an infrastructure limit can never advance the three-strike breaker toward oracle. `skills/start-work/SKILL.md` gained a parallel-group width note, and `github-triage` gained a total-item cap with an explicit skipped-item list instead of silent truncation |
+| Spawn budgets: session cap, concurrency cap, depth default | The Agent failure handler gained early-return branches for the concurrency and session ceilings, returning before the error counter so an infrastructure limit can never advance the three-strike breaker toward oracle. `skills/start-work/SKILL.md` gained a parallel-group width note, and `github-triage` gained a total-item cap with an explicit skipped-item list instead of silent truncation |
 | `file_read` no longer materializes whole files | The reader called `read_text().splitlines()` unconditionally and the size guard applied only to unbounded reads, so a bounded read of a huge file loaded all of it and could emit one unbounded line. It now streams the window with `islice` while still counting total lines for the footer, and caps any single line at 2000 characters with a truncation marker. The size ceiling was deliberately not extended to bounded reads: offset/limit is the documented escape hatch for large files |
 | `session_search` scans spilled tool results | Large tool outputs now spill to `<slug>/<session>/tool-results/*.txt` with only a preview inlined, so a flat `*.jsonl` glob under-reported on exactly the queries the tool exists for. Sidecar hits are searched with the same excerpt budget under role `tool`, ordered by file mtime since sidecars carry no timestamp. `<session>/subagents/` is deliberately out of scope |
-| MCP "not connected" is classified | The `omca` server is plugin-provided, so `evidence_log` and `boulder_write` fail during any reconnect window. `json-error-recovery.sh` matched neither the bare nor the wrapped form of that error and exited silently. The new branch points at `claude mcp list` / `/mcp` and states that the evidence call must be retried, not skipped |
+| MCP "not connected" is classified | The `omca` server is plugin-provided, so `evidence_log` and `boulder_write` fail during any reconnect window. The MCP failure handler matched neither the bare nor the wrapped form of that error and exited silently. The new branch points at `claude mcp list` / `/mcp` and states that the evidence call must be retried, not skipped |
 | `subagentStatusLine` per-task `effort` and `contextWindowSize` | OMCA authors the effort values in agent frontmatter, so per-row effort is free signal, and a percentage-of-window row beats a raw token count when tasks run on different windows. Per-task `effort` is a bare string or int, not the main line's dict |
 | MCP connect diagnostics in the doctor | The health check probed only the stdio server and punted on the two HTTP servers, which is precisely where `claude mcp list` and `/mcp` surface HTTP status and error text. Hidden leading or trailing whitespace in a configured URL is named as a cause of a URL that looks right but never connects |
 | `--doctor` namespaced and scoped | The platform's `/doctor` (alias `/checkup`) is now fix-capable. OMCA's own `--doctor` is read-only and OMCA-scoped, so it is now written as `/oh-my-claudeagent:omca-setup --doctor` with "fix my setup" routed to the built-in. `just doctor` is a third, contributor-facing surface |
@@ -1626,18 +1625,18 @@ tables under Core Concepts and Agent Reference are the live state.
 
 | Fact | Consequence for OMCA |
 |------|----------------------|
-| Subagent rate-limit and API errors reported to the parent | Partial output returns as a success, so `delegate-retry.sh` never sees it. The real residual is that `RETRYABLE_PATTERNS` has no `usage.limit` or "terminated early" pattern, so the documented payload falls to the generic branch |
+| Subagent rate-limit and API errors reported to the parent | Partial output returns as a success, so the failure-recovery handler never sees it. The real residual is that its retryable-pattern list has no `usage.limit` or "terminated early" pattern, so the documented payload falls to the generic branch |
 | `AskUserQuestion` no longer auto-continues | prometheus's interview stalls indefinitely in `-p` and background runs. Unattended runs must not depend on a question resolving itself |
 | Stacked slash-skill invocations | `/metis /momus` is now typable. The answer stays `/oh-my-claudeagent:plan`, which already sequences them |
-| `CLAUDE_CODE_RETRY_WATCHDOG` | An API-retry knob, not a delegation one: it retries `429`/`529` capacity errors indefinitely and, as of v2.1.199, raises the transient-error retry default to 300 and lifts the cap on an explicit `CLAUDE_CODE_MAX_RETRIES`. Documented as the recommendation for unattended and CI runs. It does not touch `delegate-retry.sh`'s counter either way, so the choice is the operator's |
+| `CLAUDE_CODE_RETRY_WATCHDOG` | An API-retry knob, not a delegation one: it retries `429`/`529` capacity errors indefinitely and, as of v2.1.199, raises the transient-error retry default to 300 and lifts the cap on an explicit `CLAUDE_CODE_MAX_RETRIES`. Documented as the recommendation for unattended and CI runs. It does not touch the failure-recovery counter either way, so the choice is the operator's |
 | Project-scoped plugins load from worktrees (v2.1.200) | Below that version, a `--plugin-dir` install meant worktree-isolated runs executed with no OMCA hooks and no MCP server. This checkout is project-scoped |
 | Protected paths: `.claude/**` writes are never auto-approved | The protected-path check precedes allow rules entirely, so `permissions.allow: ["Edit(.claude/**)"]` has no effect. Setup flows that expect it to work half-complete |
 | `EnterWorktree` confirms outside `.claude/worktrees/` | No `EnterWorktree` callsite exists; `--worktree` is prompt-injected paths plus boulder bookkeeping |
 | Auto mode absorbs dangerous-`rm` dialogs | The platform dialog is no longer the backstop behind `permission-filter.sh`'s deny branch, so nobody should delete that branch as duplicated platform behavior. It also meant the branch was not reached at all while the script sat on `PermissionRequest` alone: no dialog, no event, no deny. Fixed by registering the deny on `PreToolUse` too |
 | `rm -rf` inside `$(…)`, backticks, and `<(…)` now prompts even in bypass and auto mode | The platform does check inside command substitution. The residual on OMCA's side is the `^` anchor on the deny regex, deliberately kept: an unanchored pattern would deny `grep -rn "rm -rf" scripts/` |
 | Bash permission analysis fails closed | File-descriptor redirects, commands over 10,000 characters, and zsh subscripts now fail closed rather than being parsed optimistically |
-| Auto-mode classifier is Sonnet 5, validated and pinned per session | Correcting a stale "not currently used by OMCA" clause: `PermissionDenied` is registered and `permission-denied-coach.sh` returns `retry: true` inside `hookSpecificOutput`, the only place the platform reads it for this event |
-| Auto mode is on by default on Bedrock, Vertex, and Foundry as of v2.1.207 | The opt-in that older OMCA prose described as required is no longer required. Under `disableAutoMode: "disable"`, `permission-denied-coach.sh` is unreachable |
+| Auto-mode classifier is Sonnet 5, validated and pinned per session | Correcting a stale "not currently used by OMCA" clause: `PermissionDenied` is registered and the `permission-coach` handler returns `retry: true` inside `hookSpecificOutput`, the only place the platform reads it for this event |
+| Auto mode is on by default on Bedrock, Vertex, and Foundry as of v2.1.207 | The opt-in that older OMCA prose described as required is no longer required. Under `disableAutoMode: "disable"`, the `permission-coach` handler is unreachable |
 | `useAutoModeDuringPlan` (default `true`) | Governs whether prometheus, metis, and momus shell calls prompt one by one. Not read from shared project settings |
 | `pluginConfigs` is not read from project `.claude/settings.json` as of v2.1.207 | A `pluginConfigs` block in a repo-committed settings file is a silent no-op. The preset examples say so now |
 | Agent-frontmatter hooks require the agent's folder to be trusted | For OMCA's primary install path, the plugin cache, that never happens, so frontmatter hooks would fail silently. This is what makes the hooks.json-only convention load-bearing rather than stylistic |
@@ -1688,7 +1687,6 @@ tables under Core Concepts and Agent Reference are the live state.
 | `skillListingMaxDescChars` | The 1,536 figure is now a settable default rather than a fixed platform limit. OMCA's thresholds need no change, since the 512 soft cap keeps every description far below either number |
 | `effortLevel`, `fastMode`, `fastModePerSessionOptIn` | Agent frontmatter `effort:` overrides the session level from `/effort`, `--effort`, `modelSettings`, or `effortLevel`; the `CLAUDE_CODE_EFFORT_LEVEL` variable and a `maxEffortLevel` cap still win over frontmatter. A top-level user `effortLevel` does not apply to Opus 5.5 or newer models. OMCA depends on frontmatter winning over the settings default, so the chain is worth having written down |
 | `alwaysThinkingEnabled` and `MAX_THINKING_TOKENS` | `thinking.enabled` is a documented statusline payload field (`statusline.md`: whether extended thinking is enabled for the session), so the render has a real input source and needs no OMCA change. The half that matters is the models that cannot turn thinking off: `MAX_THINKING_TOKENS=0` disables thinking on the Anthropic API except on Opus 5.5 and the Fable models, so every roster row keeps the thinking marker even at `0` |
-| Subagent model override reverted on resume before v2.1.211 | `subagent-models.json` records the frontmatter model, not the effective one. That divergence is exactly why the subagent statusline prefers the payload field |
 | `mcp_server_errors` | A headless stream-json field available only with `--mcp-config`. It is a headless-only diagnostic, separate from the interactive `claude mcp list` and `/mcp` path, and does not belong in the doctor's checks |
 | `SessionStart` hook streaming and idle reaping (v2.1.204) | A mid-hook reap leaves `session-init.sh`'s state resets half applied. Measured runtime is well under the budget, so no `timeout` is warranted for that reason |
 | `SessionStart` source `"fork"` | A fork's SessionStart wipes the live parent's per-subagent model map, dedup map, and counters, and overwrites the shared session file so the parent's SessionEnd deletes the wrong boulder binding. But `"fork"` is the wrong gate to fix it on: background sessions report `"startup"` while `/branch` and `--fork-session --resume` report `"fork"` and want the reset. The safe half is preferring the payload's own `session_id` in `session-cleanup.sh` |
@@ -1727,7 +1725,6 @@ tables under Core Concepts and Agent Reference are the live state.
 | `/loop` as OMCA's persistence mechanism | It is a timer that re-issues a prompt, with no completion condition and no verification, so a looped `/start-work` re-runs whether or not the previous pass advanced anything. OMCA's persistence is the plan file's checkboxes plus the evidence gates, which is a different guarantee. `/loop` stays documented as the lightest way to keep a session re-running until the user stops it, and it is not wired into any OMCA command |
 | `/schedule` with routines | Claude-native owns trigger firing, and a routine that carries the work would run it outside the session that holds the boulder binding, so a scheduled `/start-work` would either bind a fresh plan registry entry per firing or find none at all. Neither is a progress record. Nothing in OMCA reads or writes a routine, so the ownership line stays where the Ownership Model puts it |
 | Channels for agent-to-agent coordination | OMCA's fan-out is a tree, not a mesh: a spawned agent is a leaf by contract, with no siblings to address and its deliverable returning in its own task notification. Channels solve peer coordination between long-lived teammates, which is the native teams surface, and adopting them would mean giving leaf workers a second communication path that no OMCA gate observes |
-| Shrinking `subagent-models.json` to drop resolved entries | The file looks like a per-spawn cache with a redundant delete on `SubagentStop`, but the delete is what makes it a live set: `statusline/core.py` renders the active-agent count from the number of entries, so an entry left behind turns "running now" into "spawned this session". Removing the file or the delete breaks the count in opposite directions |
 | The advisor tool as an oracle replacement | Three blockers: Anthropic-API only while OMCA supports Bedrock and Vertex, a Fable-class main model would need a Fable-class advisor and none is offered, and it is experimental. Its full-transcript-context advantage is real, as a user-side complement |
 | Nested subagent stream-json forwarding at depth 2 and beyond | No stream-json consumer. Revisit only if the nesting policy changes |
 | `asyncRewake` | The proposed fit misreads `post-edit.sh`, which only logs and always exits 0. The format-and-lint hook is synchronous and project-local, so adopting this would need carve-outs in two load-bearing rules for no gain |
