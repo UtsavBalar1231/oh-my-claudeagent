@@ -85,12 +85,25 @@ Oracle stays the escalation for a question that needs an independent investigati
 
 Size the fan-out to the independent tracks in the task, not to how hard it feels: no agent for a single-file task in a known location, one agent per distinct question for comparative research, one per independent module for cross-cutting work. Splitting one modest job across several agents costs more than it saves.
 
-Reasoning effort scales both ways: up for hard work, down for trivial. Route to the agent whose declared tier and effort fit:
+Reasoning effort scales both ways: up for hard work, down for trivial. Two levers set it for a delegated task. The first is the agent: pick the one whose declared tier and effort fit. The second is a routing hint on the first line of the prompt, for one task that needs a different effort than its agent declares:
+
+```text
+[omca-route effort=<low|medium|high|xhigh|max>]
+```
+
+OMCA's mod strips the line before the agent reads its prompt and runs that subagent at the hinted effort. With no hint, the agent's own `effort:` applies. A line that does not parse stays in the prompt and changes nothing. The hint reaches OMCA's own agents on every machine; where managed settings load the security guard, it reaches no others.
+
+- `low`: mechanical edits the prompt spells out (a rename, a version bump, a one-line fix) and lookups whose answer is a fact.
+- `medium`: a scoped change that follows a pattern the prompt names.
+- `high`: the worker default. explore, executor and librarian declare it, so send no hint.
+- `xhigh` or `max`: hard reasoning only, such as an open design choice or a bug that survived a first fix. `max` is the slowest and most expensive level.
+
+The hint sets effort only: a different tier for one task goes through the Agent tool's `model` parameter (Model Routing, below), which a permission rule such as `Agent(model:opus)` can match.
 
 ```text
 Edit(...)                                               // trivial → do it inline, lightly
-Agent(subagent_type="oh-my-claudeagent:explore", ...)   // scoped lookup (sonnet, high)
-Agent(subagent_type="oh-my-claudeagent:executor", ...)  // standard implementation (sonnet, high)
+Agent(subagent_type="oh-my-claudeagent:explore", prompt="[omca-route effort=low]\n...")  // fact lookup (sonnet, low)
+Agent(subagent_type="oh-my-claudeagent:executor", ...)  // standard implementation (sonnet, high, no hint)
 Agent(subagent_type="oh-my-claudeagent:oracle", ...)    // hard / stuck / architectural → escalate up (fable, xhigh)
 ```
 

@@ -120,6 +120,11 @@ qa:
 visual view:
 	bun scripts/qa/visual.ts {{ view }}
 
+# Check against the mock model that a routing hint runs the subagent at effort low, with a no-hint control
+[group('test')]
+qa-route-effort:
+	bun scripts/qa/route-effort.ts
+
 # Check against the mock model that Bash works in an isolation: worktree subagent with the mod and its mcp_tool hooks loaded
 [group('test')]
 qa-worktree-bash *args:

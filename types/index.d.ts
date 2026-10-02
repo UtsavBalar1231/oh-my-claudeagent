@@ -15,10 +15,7 @@ declare module "claude-code" {
         };
       };
       routes: {
-        readonly [agentId: string]: {
-          effort: "low" | "medium" | "high" | "xhigh" | "max" | null;
-          model: "sonnet" | "opus" | "fable" | null;
-        };
+        readonly [agentId: string]: "low" | "medium" | "high" | "xhigh" | "max";
       };
       nextActions: readonly {
         kind: "log-evidence" | "start-work" | "final-verification" | "review";

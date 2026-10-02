@@ -386,6 +386,15 @@ describe("access log", () => {
 
     expect(logEntries().map((e) => e.tool_results)).toEqual([0, 0]);
   });
+
+  test("logs the effort a request's output_config carries, and no effort field without one", async () => {
+    await post("/v1/messages", { output_config: { effort: "low" } });
+    await post("/v1/messages", { output_config: {} });
+    await post("/v1/messages", {});
+
+    expect(logEntries().map((e) => e.effort)).toEqual(["low", undefined, undefined]);
+    expect(readLog().match(/"effort"/g)).toEqual(['"effort"']);
+  });
 });
 
 describe("command line", () => {

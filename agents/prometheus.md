@@ -327,6 +327,7 @@ For a wording call the five rules do not cover, delete the phrase or replace it 
   - Done when: {runnable command or observable state}
   - Depends: {task numbers, or omit}
   - Must NOT: {exclusion, or omit}
+  - Effort: {low | medium | high | xhigh | max, or omit}
 - [ ] 2. [P] {a task safe to run in parallel carries the [P] marker}
   - File: `{exact path}`
   - Done when: {...}
@@ -347,6 +348,8 @@ For a wording call the five rules do not cover, delete the phrase or replace it 
 - Sub-bullets sit immediately beneath their own checkbox line, contiguous, with no blank line between them, so the orchestrator can quote a task whole.
 
 Omit an optional line rather than emitting it empty: a task with no dependencies has no `Depends:` line at all. Sections beyond the template are allowed only when the work genuinely needs them.
+
+`Effort:` sets the reasoning effort of the agent that runs the task; start-work turns it into a routing hint on the first line of that delegation. Write it only when the task differs from the worker default of `high`: `low` for a mechanical edit or a lookup, `medium` for a scoped change that follows a named pattern, `xhigh` or `max` only for a task that needs hard reasoning, such as an open design choice.
 
 <!-- Plan has no completion checklist. After the final_verification evidence entry is logged, the start-work command writes a sidecar at .omca/notes/<plan>-completion.md. Plan file stays frozen. -->
 

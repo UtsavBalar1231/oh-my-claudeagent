@@ -159,6 +159,13 @@ function countToolResults(messages: unknown): number {
   return Array.isArray(content) ? content.filter((b) => isObject(b) && b.type === "tool_result").length : 0;
 }
 
+// Claude Code sends the effort as `output_config.effort` (measured on 2.1.287). The log
+// carries the field only when the request does.
+function effortField(body: Record<string, unknown>): { effort?: string | number } {
+  const effort = isObject(body.output_config) ? body.output_config.effort : undefined;
+  return typeof effort === "string" || typeof effort === "number" ? { effort } : {};
+}
+
 export type ServerOptions = {
   port: number;
   accessLogPath?: string;
@@ -216,6 +223,7 @@ export function startServer({
             turn,
             tool_results: countToolResults(body.messages),
             arrival_ms: arrived.getTime(),
+            ...effortField(body),
           }),
         );
       }
