@@ -9,17 +9,21 @@ import { CWD_SUBSTITUTION, isCatastrophicTarget } from "./targets.ts";
 
 export type { Context, Removal } from "./shell.ts";
 
-// Leading `VAR=value` assignments and `sudo`, `env` and `command` wrappers run the same command, so
-// the command position admits them. A chain stops at a separator, and the wrappers have no empty
-// branch, so each chain splits one way and no two command positions scan the same token.
+// Leading `VAR=value` assignments, shell keywords that take a command (`then`, `do`, `!`, `{`, `time`, ...)
+// and `sudo`, `env` and `command` wrappers run the same command, so the command position admits
+// them. A chain stops at a separator, and the wrappers have no empty branch, so each chain splits
+// one way and no two command positions scan the same token.
 const H = "[ \\t\\v\\f]";
 const ENV_ASSIGN = `(?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|[^ \\t\\n\\v\\f\\r;&|()\`"']*)${H}+)*`;
+const KEYWORDS = `(?:(?:then|do|else|elif|if|while|until|time|exec|nohup|nice|!|\\{)${S}+)*`;
+const SUDO_FLAGS = `(?:-[AbEHiKknPSsvV]+${S}+|-[ughpCDrtTU]${S}*${NS}+${S}+|--(?:[a-z-]+(?:=${NS}*)?)?${S}+)*`;
+const ENV_FLAGS = `(?:-i${S}+|-[uCS]${S}*${NS}+${S}+|--(?:[a-z-]+(?:=${NS}*)?)?${S}+)*`;
 const COMMAND_WRAPPER = `command${S}+(?:-p${S}+)?`;
-const WRAPPERS = `(?:sudo${S}+(?:env${S}+)?(?:${COMMAND_WRAPPER})?|env${S}+(?:${COMMAND_WRAPPER})?|${COMMAND_WRAPPER})`;
-const PREFIX = `${ENV_ASSIGN}(?:${WRAPPERS}${ENV_ASSIGN})?`;
+const WRAPPERS = `(?:sudo${S}+${SUDO_FLAGS}(?:env${S}+${ENV_FLAGS})?(?:${COMMAND_WRAPPER})?|env${S}+${ENV_FLAGS}(?:${COMMAND_WRAPPER})?|${COMMAND_WRAPPER})`;
+const PREFIX = `${KEYWORDS}${ENV_ASSIGN}(?:${WRAPPERS}${ENV_ASSIGN})?`;
 
 const RM = new RegExp(
-  `(^|[;&|()\`\\n\\r])${S}*${PREFIX}${commandWord("rm")}${S}+((-[a-zA-Z]+|--[a-zA-Z-]+)${S}+)*(-[a-zA-Z]*[rR][a-zA-Z]*|--recursive)(${S}|$)`,
+  `(^|[;&|()\`\\n\\r])${S}*${PREFIX}${commandWord("rm")}${S}+((-[a-zA-Z]+|--[a-zA-Z-]+)${S}+)*(-(?=[a-zA-Z]*[rR])[a-zA-Z]+|--recursive)(${S}|$)`,
 );
 // One invocation's arguments run to the next separator; a `)` ends them too, so a removal
 // inside `$(...)` does not swallow the rest of the outer command. A substitution that reads as
@@ -27,7 +31,10 @@ const RM = new RegExp(
 const RM_ARGS = new RegExp(`^((?:${CWD_SUBSTITUTION.bash.source}|[^;&|)\`\\n\\r])*)([^]?)`);
 
 const GIT_GLOBALS = `((-C${S}+${ARGUMENT}|-c${S}+${ARGUMENT}|-c${NS}+|--git-dir[= \\t\\n\\v\\f\\r]${ARGUMENT}|--work-tree[= \\t\\n\\v\\f\\r]${ARGUMENT}|--no-pager|--paginate|-p|--bare|--literal-pathspecs|--no-replace-objects)${S}+)*`;
-const GIT_SUBCOMMAND = `(?<subcommand>reset["']?${S}+--hard|stash|clean|restore|rm${S}+-[a-zA-Z]*[rR][a-zA-Z]*|checkout(${S}+[^ \\t\\n\\v\\f\\r;&|\`]+)*${S}+--)`;
+const GIT_TOKEN = "[^ \\t\\n\\v\\f\\r;&|`]+";
+// A recursive `git rm` whatever flags precede `-r`, a path-restoring checkout, a stash that is not
+// `list` or `show`, and a clean that is not a dry run. Arguments are read within one line (`${H}`), so a later line's `.` or `-n` is not this command's.
+const GIT_SUBCOMMAND = `(?<subcommand>reset["']?${S}+--hard|stash(?!${H}+(?:list|show)(?=${S}|$))|clean(?!(?:${H}+${GIT_TOKEN})*?${H}+(?:-[a-zA-Z]*n[a-zA-Z]*|--dry-run)(?=${S}|$))|restore|rm(?:${H}+-[a-zA-Z-]+)*${H}+-[a-zA-Z]*[rR][a-zA-Z]*|checkout(?:${H}+${GIT_TOKEN})*${H}+(?:--|\\.(?:[\\/]${NS}*)?))`;
 
 function gitPatterns(commandPosition: string, wrapper: string, git: string) {
   const wrapped = wrapper === "" ? "" : `(?:${S}*${wrapper})?`;
@@ -58,20 +65,54 @@ export type GitFinding = { operation: GitOperation; remote?: string; branch?: st
 export type Reviewable = { kind: "blocking" | "advisory"; removals: Removal[]; git: GitFinding[] };
 export type Finding = { kind: "catastrophic" } | Reviewable;
 
-type Heredoc = { word: string; stripsTabs: boolean };
+type Heredoc = { word: string; stripsTabs: boolean; isQuoted: boolean };
 
-// Only a heredoc whose delimiter is quoted is inert: an unquoted body still runs `$(...)`.
-const QUOTED_HEREDOC = /^<<(-?)[ \t]*(?:'([^'\n]*)'|"([^"\n]*)"|\\([A-Za-z_][A-Za-z0-9_.-]*))/;
+const HEREDOC = /^<<(-?)[ \t]*(?:'([^'\n]*)'|"([^"\n]*)"|\\([A-Za-z_][A-Za-z0-9_.-]*)|([A-Za-z_][A-Za-z0-9_.-]*))/;
+
+type Span = { depth: number; isInBackticks: boolean };
+
+// An unquoted heredoc body is text in which only a `$(...)` or backtick span runs, and a span can
+// cross lines. The span is kept as the command it is, a backslash-escaped character is text, and
+// every other character becomes `_`. `span` carries the open span from one line to the next.
+function blankLine(line: string, span: Span): string {
+  let out = "";
+  for (let i = 0; i < line.length; i++) {
+    const ch = line.charAt(i);
+    if (span.depth === 0 && !span.isInBackticks) {
+      if (ch === "\\") {
+        out += i + 1 < line.length ? "__" : "_";
+        i++;
+        continue;
+      }
+      if (ch === "$" && line.charAt(i + 1) === "(") {
+        span.depth = 1;
+        out += "$(";
+        i++;
+      } else if (ch === "`") {
+        span.isInBackticks = true;
+        out += ch;
+      } else {
+        out += "_";
+      }
+      continue;
+    }
+    if (span.isInBackticks) span.isInBackticks = ch !== "`";
+    else span.depth += ch === "(" ? 1 : ch === ")" ? -1 : 0;
+    out += ch;
+  }
+  return out;
+}
 
 function blankBodies(command: string, from: number, pending: readonly Heredoc[]): string {
   let out = "";
   let at = from;
-  for (const { word, stripsTabs } of pending) {
+  for (const { word, stripsTabs, isQuoted } of pending) {
+    const span: Span = { depth: 0, isInBackticks: false };
     while (at < command.length) {
       const eol = command.indexOf("\n", at);
       const line = command.slice(at, eol === -1 ? command.length : eol);
       const isTerminator = (stripsTabs ? line.replace(/^\t+/, "") : line).replace(/\r$/, "") === word;
-      out += (isTerminator ? line : "_".repeat(line.length)) + (eol === -1 ? "" : "\n");
+      out += (isTerminator ? line : isQuoted ? "_".repeat(line.length) : blankLine(line, span)) + (eol === -1 ? "" : "\n");
       at += line.length + 1;
       if (isTerminator) break;
     }
@@ -82,11 +123,13 @@ function blankBodies(command: string, from: number, pending: readonly Heredoc[])
 type Frame = { kind: "'" | '"' | "$(" | "`"; depth: number };
 
 /**
- * Blanks the characters that open a command position inside a quoted span, so a mention is
- * never read as an invocation: `; & | ( )`, newline and CR become `_`, and inside single quotes
- * `$` and backtick too. A `$(...)` or backtick substitution inside double quotes runs, so its
- * text is left as the command it is, unless a backslash escapes the opener. The body of a heredoc
- * with a quoted delimiter becomes `_` whole. Length is preserved. An unbalanced quote reads the
+ * Blanks the characters that open a command position where they are text, so a mention is never
+ * read as an invocation. Inside a quoted span `; & | ( )`, newline and CR become `_`, and inside
+ * single quotes `$` and backtick too; outside quotes the same characters become `_` when a
+ * backslash escapes them, and a backslash-newline reads as two spaces. A `$(...)` or backtick
+ * substitution inside double quotes runs, so its text is left as the command it is, unless a
+ * backslash escapes the opener. A heredoc body with a quoted delimiter becomes `_` whole; an
+ * unquoted one keeps only its substitutions. Length is preserved. An unbalanced quote reads the
  * rest as quoted, which under-matches rather than over-matches.
  */
 export function neutralizeQuotedPositions(command: string): string {
@@ -101,7 +144,7 @@ export function neutralizeQuotedPositions(command: string): string {
       out += ";&|()\n\r$`".includes(ch) ? "_" : ch;
       if (ch === "'") frames.pop();
     } else if (top?.kind === '"') {
-      if (ch === "\\" && (next === "$" || next === "`" || next === "\\")) {
+      if (ch === "\\" && (next === "$" || next === "`" || next === "\\" || next === '"')) {
         out += ch + (next === "\\" ? next : "_");
         i++;
       } else if (ch === "$" && next === "(") {
@@ -121,6 +164,9 @@ export function neutralizeQuotedPositions(command: string): string {
     } else if (ch === ")" && top?.kind === "$(" && top.depth === 0) {
       frames.pop();
       out += ch;
+    } else if (ch === "\\" && next !== "") {
+      out += next === "\n" ? "  " : `\\${";&|()`'\"$<>".includes(next) ? "_" : next}`;
+      i++;
     } else if (ch === "'" || ch === '"') {
       frames.push({ kind: ch, depth: 0 });
       out += ch;
@@ -130,11 +176,15 @@ export function neutralizeQuotedPositions(command: string): string {
       out += ch + bodies;
       i += bodies.length;
     } else if (ch === "<" && next === "<" && command.charAt(i - 1) !== "<" && frames.length === 0) {
-      const heredoc = QUOTED_HEREDOC.exec(command.slice(i));
+      const heredoc = HEREDOC.exec(command.slice(i));
       if (heredoc === null) {
         out += ch;
       } else {
-        pending.push({ word: heredoc[2] ?? heredoc[3] ?? heredoc[4] ?? "", stripsTabs: heredoc[1] === "-" });
+        pending.push({
+          word: heredoc[2] ?? heredoc[3] ?? heredoc[4] ?? heredoc[5] ?? "",
+          stripsTabs: heredoc[1] === "-",
+          isQuoted: heredoc[5] === undefined,
+        });
         out += heredoc[0];
         i += heredoc[0].length - 1;
       }
@@ -162,6 +212,8 @@ export function shellWords(text: string): string[] {
     } else if (ch === "'" || ch === '"') {
       quote = ch;
       isOpen = true;
+    } else if (ch === "\\" && text.charAt(i + 1) === "\n") {
+      i++;
     } else if (ch === "\\" && /[ \t]/.test(text.charAt(i + 1))) {
       word += text.charAt(i + 1);
       i++;

@@ -709,3 +709,202 @@ describe("the command prefix scan stays linear", () => {
     none(`${"A=b ".repeat(500)}echo rm -rf build`);
   });
 });
+
+describe("a backslash escape", () => {
+  test("a continued command reads as one line", () => {
+    removal("rm -rf \\\n  ./build \\\n  ./dist", "./build", "./dist");
+    removal("rm -rf \\\n  build", "build");
+    catastrophic("rm -rf \\\n/");
+    catastrophic("rm -rf \\\n  ~/");
+  });
+
+  test("an escaped quote does not close a double-quoted span", () => {
+    none('echo "see \\"a; rm -rf /\\" docs"');
+    none('git commit -m "guard: block \\"cd /; rm -rf ~\\" too"');
+    none('git commit -m "note: \\"foo && git reset --hard\\" is bad"');
+    catastrophic('echo "a"; rm -rf /');
+    catastrophic('echo "a \\" b"; rm -rf /');
+  });
+
+  test("an escaped separator or parenthesis is an argument, not a command position", () => {
+    none("echo \\; rm -rf /");
+    none("echo x \\; rm -rf /");
+    none("echo \\( rm -rf / \\)");
+    none("echo \\| git reset --hard");
+    catastrophic("echo \\\\; rm -rf /");
+    catastrophic("echo \\; ; rm -rf /");
+  });
+
+  test("an escaped space stays one argument", () => {
+    removal("rm -rf my\\ build", "my build");
+    removal("rm -rf ./x\\ y", "./x y");
+  });
+
+  test("the scan keeps the length of the command", () => {
+    for (const command of ["rm -rf \\\n./a", "echo \\; rm", 'echo "\\"; rm"', "x \\\\; y"]) {
+      expect(neutralizeQuotedPositions(command)).toHaveLength(command.length);
+    }
+    expect(neutralizeQuotedPositions("echo \\; rm")).toBe("echo \\_ rm");
+    expect(neutralizeQuotedPositions("rm \\\n-rf")).toBe("rm   -rf");
+  });
+
+  test("shellWords reads a backslash-newline as nothing", () => {
+    expect(shellWords("-rf \\\n  ./a \\\n  ./b")).toEqual(["-rf", "./a", "./b"]);
+    expect(shellWords("a\\\nb")).toEqual(["ab"]);
+  });
+});
+
+describe("the command position", () => {
+  test.each([
+    "{ rm -rf /; }",
+    "x; { sudo -E rm -rf ~; }",
+    "if true; then rm -rf /; fi",
+    "if true\nthen\n  rm -rf /\nfi",
+    "for d in a; do rm -rf /; done",
+    "if false; then :; else rm -rf /; fi",
+    "if false; then :; elif true; then rm -rf /; fi",
+    "while rm -rf /; do :; done",
+    "until rm -rf /; do :; done",
+    "! rm -rf /",
+    "sudo -E rm -rf /",
+    "sudo -n rm -rf /",
+    "sudo -u root rm -rf /",
+    "sudo -u root -E rm -rf /",
+    "sudo --preserve-env rm -rf /",
+    "sudo -- rm -rf /",
+    "env -i rm -rf /",
+    "env -u X rm -rf /",
+    "exec rm -rf /",
+    "time rm -rf /",
+    "nohup rm -rf /",
+    "nice rm -rf /",
+  ])("a catastrophic removal behind %j is caught", (command) => {
+    catastrophic(command);
+  });
+
+  test("a git operation behind a keyword or brace group is caught", () => {
+    git("if true; then git reset --hard; fi", "reset --hard");
+    git("{ git stash; }", "stash");
+    git("sudo -E git clean -fd", "clean");
+  });
+
+  test.each([
+    "echo rm -rf then",
+    "echo time rm -rf /",
+    "echo then rm -rf /",
+    "echo { rm -rf / }",
+    "echo {rm -rf /}",
+    'git commit -m "fix { rm -rf / } handling"',
+    "echo '{ rm -rf / }'",
+    "echo ! rm -rf /",
+    "docker rm -rf /",
+    "echo sudo -E rm -rf /",
+  ])("a mention of a removal in %j is not one", (command) => {
+    none(command);
+  });
+});
+
+describe("the recursive flag group stays linear", () => {
+  test("a long run of one flag letter classifies in under 50 ms", () => {
+    const start = (command: string) => {
+      const times = [0, 1, 2].map(() => {
+        const at = performance.now();
+        classify(command);
+        return performance.now() - at;
+      });
+      return Math.min(...times);
+    };
+    expect(start(`rm -${"r".repeat(60_000)};`)).toBeLessThan(50);
+    expect(start(`sudo ${"-E ".repeat(20_000)}ls`)).toBeLessThan(50);
+    expect(start(`; ${"then ".repeat(20_000)}ls`)).toBeLessThan(50);
+  });
+
+  test("a flag group that holds r is still recursive, in any position and case", () => {
+    catastrophic("rm -r /");
+    catastrophic("rm -fr /");
+    catastrophic("rm -rf /");
+    catastrophic("rm -Rf /");
+    catastrophic("rm -vrf /");
+    catastrophic("rm --recursive /");
+    catastrophic("rm -f -r /");
+    none("rm -f /");
+    none("rm -v /");
+  });
+});
+
+describe("an unquoted heredoc body", () => {
+  test("is text, so a script or note it writes is not run", () => {
+    none("cat > clean.sh <<EOF\n#!/bin/sh\nrm -rf /tmp/*\nEOF");
+    none('cat > clean.sh <<EOF\nrm -rf "$BUILD_DIR"/*\nEOF');
+    none("cat > notes.md <<EOF\nrun git reset --hard first; then rm -rf ~\nEOF");
+    none("cat <<-EOF\n\trm -rf /\n\tEOF");
+    none("cat <<EOF\nrm -rf /");
+    none("cat <<EOF\n\\$(rm -rf ~)\nEOF");
+  });
+
+  test("still runs a substitution it holds", () => {
+    catastrophic("cat <<EOF\n$(rm -rf ~)\nEOF");
+    catastrophic("cat <<EOF\n`rm -rf ~`\nEOF");
+    catastrophic("cat <<EOF\nx $(echo; rm -rf ~) y\nEOF");
+    catastrophic("cat <<EOF\n$(\nrm -rf ~\n)\nEOF");
+    git("cat <<EOF\n$(git stash)\nEOF", "stash");
+  });
+
+  test("is text again after a closed substitution", () => {
+    none("cat <<EOF\n$(echo hi) then rm -rf /\nEOF");
+    none("cat <<EOF\n`echo hi`; rm -rf /\nEOF");
+  });
+
+  test("ends at its terminator, after which a command runs", () => {
+    catastrophic("cat <<EOF\nnotes\nEOF\nrm -rf /");
+    catastrophic("rm -rf / <<EOF\nnotes\nEOF");
+    catastrophic("cat <<-EOF\n\tnotes\n\tEOF\nrm -rf /");
+  });
+
+  test("keeps the length of the command", () => {
+    const command = "cat <<EOF\nrm -rf /; x $(y; z) w\nEOF\nls";
+    expect(neutralizeQuotedPositions(command)).toBe("cat <<EOF\n____________$(y; z)__\nEOF\nls");
+  });
+});
+
+describe("git operations that read or only name a path", () => {
+  test("a stash listing or inspection is not a stash", () => {
+    none("git stash list");
+    none("git stash show -p");
+    none("git stash show");
+    git("git stash", "stash");
+    git("git stash pop", "stash");
+    git("git stash push -m list", "stash");
+    git("git stash\nshow", "stash");
+  });
+
+  test("a clean dry run is not a clean", () => {
+    none("git clean -n");
+    none("git clean -fdn");
+    none("git clean -fd --dry-run");
+    none("git clean --dry-run -fd");
+    git("git clean -fd", "clean");
+    git("git clean -fdx", "clean");
+    git("git clean -fd\nls -n", "clean");
+    git("git clean -fd; ls -n", "clean");
+  });
+
+  test("a checkout of `.` restores the tree, and a checkout of a name does not", () => {
+    git("git checkout .", "checkout --");
+    git("git checkout HEAD .", "checkout --");
+    git("git checkout ./src", "checkout --");
+    git("git checkout main -- .", "checkout --");
+    none("git checkout main");
+    none("git checkout .github");
+    none("git checkout -b x");
+    none("git checkout main\ncp -r build .");
+  });
+
+  test("a recursive git rm is caught whatever order its flags come in", () => {
+    git("git rm -r --cached x", "rm -r");
+    git("git rm --cached -r x", "rm -r");
+    git("git rm -f -r x", "rm -r");
+    none("git rm --cached x");
+    none("git rm x");
+  });
+});

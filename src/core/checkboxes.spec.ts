@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { checkboxStates, MAX_LABEL_LEN, nextTaskLabel, planIsComplete } from "./checkboxes.ts";
+import { checkboxStates, MAX_LABEL_LEN, nextTaskLabel, outsideFences, planIsComplete } from "./checkboxes.ts";
+import { parsePlan } from "./plan-reader.ts";
 
 describe("checkboxStates", () => {
   test("lists numbered checkboxes in order and ignores unnumbered ones", () => {
@@ -28,6 +29,44 @@ describe("checkboxStates", () => {
     ["no period", "- [ ] 1 task"],
   ])("does not count a checkbox that is %s", (_label, line) => {
     expect(checkboxStates(line)).toEqual([]);
+  });
+
+  test("does not count a task inside a code fence, so an example never holds a plan open", () => {
+    const plan = "- [x] 1. Done\n```md\n- [ ] 2. example task\n```\n~~~\n- [ ] 3. another\n~~~\n  ```\n- [ ] 4. indented fence\n  ```\n";
+    expect(checkboxStates(plan)).toEqual(["x"]);
+    expect(planIsComplete(plan)).toBe(true);
+    expect(nextTaskLabel(plan)).toBeNull();
+  });
+
+  test("counts a task before and after a fence, with the line numbering kept", () => {
+    const plan = "- [ ] 1. before\n```\n- [x] 2. inside\n```\n- [ ] 3. after\n";
+    expect(checkboxStates(plan)).toEqual([" ", " "]);
+    expect(outsideFences(plan).split("\n")).toHaveLength(plan.split("\n").length);
+  });
+
+  test("an unclosed fence hides the rest, as a reader draws it", () => {
+    expect(checkboxStates("- [ ] 1. a\n```\n- [ ] 2. b\n")).toEqual([" "]);
+  });
+
+  test("counts a task on the first line of a file that starts with a byte-order mark", () => {
+    const plan = "﻿- [ ] 1. a\n- [x] 2. b\n";
+    expect(checkboxStates(plan)).toEqual([" ", "x"]);
+    expect(planIsComplete(plan)).toBe(false);
+    expect(nextTaskLabel(plan)).toBe("a");
+  });
+
+  test("agrees with the plan reader on a plan with fences and a mark", () => {
+    const plan = "﻿# Ship\n\n- [x] 1. Done\n```md\n- [ ] 2. example\n```\n- [ ] 3. open\n";
+    const parsed = parsePlan(plan);
+    expect([parsed.done, parsed.total]).toEqual([1, 2]);
+    expect(checkboxStates(plan)).toEqual(["x", " "]);
+  });
+});
+
+describe("outsideFences", () => {
+  test("blanks fenced lines and fence lines, and leaves the rest", () => {
+    expect(outsideFences("a\n```ts\nb\n```\nc")).toBe("a\n\n\n\nc");
+    expect(outsideFences("a\r\nb")).toBe("a\nb");
   });
 });
 
@@ -59,6 +98,10 @@ describe("nextTaskLabel", () => {
 
   test("an unchecked task with no text yields an empty label, not null", () => {
     expect(nextTaskLabel("- [ ] 1.\n")).toBe("");
+  });
+
+  test("an empty task line does not take the next task's text as its label", () => {
+    expect(nextTaskLabel("- [ ] 1.\n- [ ] 2. next\n")).toBe("");
   });
 
   test("truncates a long label to 80 characters ending in an ellipsis", () => {

@@ -62,6 +62,16 @@ describe("Write judges the content", () => {
     expect(planWriteDenial("Write", { file_path: "/home/user/.claude/plans/README.md", content })).toBeUndefined();
   });
 
+  test("a task shown only inside a code fence is not a numbered task", () => {
+    const fenced = "## TODOs\n\n```md\n- [ ] 1. example task\n```\n";
+    expect(planWriteDenial("Write", { file_path: PLAN, content: fenced })).toBe(denial(PLAN));
+    expect(planWriteDenial("Write", { file_path: PLAN, content: `${fenced}\n- [ ] 1. real task\n` })).toBeUndefined();
+  });
+
+  test("a task on the first line of a file with a byte-order mark counts", () => {
+    expect(planWriteDenial("Write", { file_path: AGENT_PLAN, content: "﻿- [ ] 1. First task\n" })).toBeUndefined();
+  });
+
   test("a heading that is not at the start of a line is not a plan heading", () => {
     expect(planWriteDenial("Write", { file_path: "/home/user/.claude/plans/README.md", content: "see ## TODOs below\n" })).toBeUndefined();
   });
@@ -95,6 +105,11 @@ describe("Edit judges the new_string", () => {
   test("a new_string that rewrites the heading with only checked tasks is allowed", () => {
     const input = { file_path: PLAN, old_string: "## TODOs", new_string: "## TODOs\n\n- [x] 1. Done task\n" };
     expect(planWriteDenial("Edit", input)).toBeUndefined();
+  });
+
+  test("a new_string whose only task is inside a code fence is denied", () => {
+    const input = { file_path: PLAN, old_string: "## TODOs", new_string: "## TODOs\n\n```\n- [ ] 1. example\n```\n" };
+    expect(planWriteDenial("Edit", input)).toBe(denial(PLAN));
   });
 
   test("a path outside a plans directory is allowed", () => {

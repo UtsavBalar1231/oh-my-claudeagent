@@ -1,4 +1,7 @@
+import { clean, FENCE, TASK_LINE } from "./checkboxes.ts";
 import { configDir, type Env, expandTilde, homeDir, isAbsolutePath, isInside, joinPath, normalizePath, type Platform, toPosix } from "./path.ts";
+
+export { clean } from "./checkboxes.ts";
 
 export type Task = { n: number; done: boolean };
 export type Page = { title: string; level: number; body: string; task?: Task };
@@ -11,31 +14,6 @@ const RECENT_PLANS = 30;
 export const CONTENTS_CAP = 400;
 
 const HEADING = /^(#{1,3})\s+(.+?)\s*#*\s*$/;
-const TASK = /^- \[([ x])\] (\d+)\.\s*(.*)$/;
-const FENCE = /^\s*(```|~~~)/;
-const TAB = 9;
-const NEWLINE = 10;
-
-// Filtered by char code: the engine's parser refuses a regex literal holding `\u0000`-style
-// escapes and fails the whole module.
-function isUnsafe(code: number): boolean {
-  return (
-    (code < 32 && code !== TAB && code !== NEWLINE) ||
-    (code >= 0x7f && code <= 0x9f) ||
-    (code >= 0x200b && code <= 0x200f) ||
-    (code >= 0x2028 && code <= 0x202e) ||
-    (code >= 0x2060 && code <= 0x206f) ||
-    code === 0xfeff
-  );
-}
-
-export function clean(text: string): string {
-  let out = "";
-  for (const char of text.replace(/\r\n?/g, "\n")) {
-    if (!isUnsafe(char.codePointAt(0) ?? 0)) out += char;
-  }
-  return out;
-}
 
 export function parsePlan(source: string): Plan {
   const pages: Page[] = [];
@@ -68,7 +46,7 @@ export function parsePlan(source: string): Plan {
       flush({ title: text, level, body: "" });
       continue;
     }
-    const task = inFence ? null : TASK.exec(line);
+    const task = inFence ? null : TASK_LINE.exec(line);
     if (task) {
       const isDone = task[1] === "x";
       total += 1;
