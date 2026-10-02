@@ -1,0 +1,6 @@
+{
+  "main": [
+    { "content": [{ "type": "tool_use", "name": "Bash", "input": { "command": "just test", "description": "Run the tests" } }] },
+    { "content": [{ "type": "text", "text": "The tests ran." }] }
+  ]
+}

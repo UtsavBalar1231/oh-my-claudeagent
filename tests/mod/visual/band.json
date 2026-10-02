@@ -1,0 +1,5 @@
+{
+  "command": "Run the tests",
+  "mockScript": "band",
+  "fixture": "band"
+}

@@ -1,0 +1,2 @@
+test:
+	@echo "12 passed"
