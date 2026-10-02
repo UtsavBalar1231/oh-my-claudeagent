@@ -59,10 +59,21 @@ export type World = {
 
 const parent = (path: string) => path.slice(0, path.lastIndexOf("/"));
 
-// The test engine resolves a path that is not POSIX-absolute against its own directory before a
-// handler sees it, so a drive or backslash UNC path arrives as `<cwd>/C:\x`. A real Windows
-// engine passes it as written, which is the spelling this restores.
+// The test engine resolves a path that is not absolute on its host against its own directory
+// before a handler sees it. On a POSIX host a drive or backslash UNC path arrives as `<cwd>/C:\x`;
+// a real Windows engine passes it as written, which is the spelling this restores.
 const WINDOWS_SPELLING = /^\/.*?\/(?=[A-Za-z]:[\\/]|\\\\)/;
+const DRIVE = /^[A-Za-z]:(?=[\\/])/;
+
+/**
+ * A Windows host resolves a POSIX-absolute path such as `/work/x` to `D:\work\x` and writes the
+ * separators of a drive path as backslashes, where the mod wrote `/work/x` and `C:/work/x`. This
+ * restores the mod's spelling so a handler sees the same string on every host.
+ */
+export function hostSpelling(path: string, platform: Platform): string {
+  if (!DRIVE.test(path)) return path;
+  return (platform === "win32" ? path : path.replace(DRIVE, "")).replace(/\\/g, "/");
+}
 
 // The engine's file, session, settings, pane and clock calls answered from memory. A file is
 // found under any spelling of its path: separators and `.` or `..` parts are resolved the way
@@ -74,7 +85,7 @@ export function world(
   env: Readonly<Record<string, string>> = {},
   layout: Layout = POSIX,
 ): World {
-  const spelled = (path: string) => (layout.platform === "win32" ? path.replace(WINDOWS_SPELLING, "") : path);
+  const spelled = (path: string) => hostSpelling(layout.platform === "win32" ? path.replace(WINDOWS_SPELLING, "") : path, layout.platform);
   const key = (path: string) => normalizePath(layout.platform, spelled(path));
   const w: World = {
     layout,

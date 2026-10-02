@@ -33,7 +33,7 @@ const CONTINUE: Output = feedback(
 
 const corruptRegistry = (root: string): Output =>
   feedback(
-    `[PLAN CONTINUATION] ${root}/.omca/state/boulder.json is not valid JSON, so this session's plan state cannot be resolved and ` +
+    `[PLAN CONTINUATION] ${join(root, ".omca", "state", "boulder.json")} is not valid JSON, so this session's plan state cannot be resolved and ` +
       "plan-scoped enforcement is off. Repair or delete the file (boulder_write rewrites it), then stop again. Set " +
       "OMCA_DISABLED_HOOKS=plan-continuation to bypass.",
   );
@@ -50,7 +50,7 @@ const unverified = (plan: string): Output =>
   );
 
 const corruptLedger = (root: string): Output =>
-  feedback(`[FINAL VERIFICATION] Evidence file corrupt. Repair ${root}/.omca/evidence/verification-evidence.json before stopping.`);
+  feedback(`[FINAL VERIFICATION] Evidence file corrupt. Repair ${join(root, ".omca", "evidence", "verification-evidence.json")} before stopping.`);
 
 const drift = (...findings: string[]): Output =>
   feedback(
@@ -501,7 +501,7 @@ describe("final verification", () => {
       writeRegistry(run.root, "NOT JSON {");
       expect(await run.stop()).toEqual({});
       expect(errors.mock.calls).toEqual([
-        [`omca: final-verification: ${run.root}/.omca/state/boulder.json is not valid JSON, so no plan resolves and this gate is not enforcing. Repair or delete the file.`],
+        [`omca: final-verification: ${join(run.root, ".omca", "state", "boulder.json")} is not valid JSON, so no plan resolves and this gate is not enforcing. Repair or delete the file.`],
       ]);
     } finally {
       errors.mockRestore();

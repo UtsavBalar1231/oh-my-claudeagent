@@ -103,8 +103,8 @@ describe("hook stamp", () => {
 describe("session id validation", () => {
   test("a UUID and the fixture ids map to a file under .omca/state/session", () => {
     const id = crypto.randomUUID();
-    expect(statusPath("/p", id)).toBe(`/p/.omca/state/session/${id}.json`);
-    expect(statusPath("/p", "fixture-sid-001")).toBe("/p/.omca/state/session/fixture-sid-001.json");
+    expect(statusPath("/p", id)).toBe(join("/p", ".omca", "state", "session", `${id}.json`));
+    expect(statusPath("/p", "fixture-sid-001")).toBe(join("/p", ".omca", "state", "session", "fixture-sid-001.json"));
   });
 
   test.each(["", "..", "../escape", "a/b", "a\0b", ".hidden", "a.json", "x".repeat(129)])("rejects %p before it reaches a path", (id) => {

@@ -1,6 +1,7 @@
 import type { Args, On } from "claude-code";
 import { type Engine, type EngineCall, expect, mock, type Mounted, test } from "claude-code/testing";
 import { displayWidth } from "../../src/core/ui-kit.ts";
+import { hostSpelling } from "./world.ts";
 
 const PLUGIN = "oh-my-claudeagent";
 const SESSION = "00000000-0000-4000-8000-0000000000aa";
@@ -68,15 +69,16 @@ function world(on: On, disk: Files): World {
     const text = `${e.text.slice(0, e.start)}${e.inputText}${e.text.slice(e.end)}`;
     return { text, cursor: e.start + e.inputText.length };
   });
-  on("fs.exists", (_$, e) => ({ value: disk.has(e.path) }));
+  const spelled = (path: string) => hostSpelling(path, "linux");
+  on("fs.exists", (_$, e) => ({ value: disk.has(spelled(e.path)) }));
   on("fs.read", (_$, e) => {
-    const file = disk.get(e.path);
-    if (file === undefined) throw new Error(`ENOENT: no such file or directory, open '${e.path}'`);
+    const file = disk.get(spelled(e.path));
+    if (file === undefined) throw new Error(`ENOENT: no such file or directory, open '${spelled(e.path)}'`);
     return { value: file.text };
   });
   on("fs.stat", (_$, e) => {
-    const file = disk.get(e.path);
-    if (file === undefined) throw new Error(`ENOENT: no such file or directory, stat '${e.path}'`);
+    const file = disk.get(spelled(e.path));
+    if (file === undefined) throw new Error(`ENOENT: no such file or directory, stat '${spelled(e.path)}'`);
     return { value: { kind: "file", size: file.text.length, mtimeMs: file.mtimeMs, isLink: false } };
   });
   on("prompt.fill", (_$, e) => (fills.push(e.text), { isFilled: true }));

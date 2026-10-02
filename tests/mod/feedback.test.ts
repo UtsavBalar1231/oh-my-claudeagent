@@ -13,7 +13,7 @@ function engine(on: On): { w: World; registered: CommandSpec[] } {
   const registered: CommandSpec[] = [];
   on("session.start", (_$, e) => ({ cwd: e.cwd }));
   on("command.register", (_$, e) => (registered.push(e), { value: { command: e.name } }));
-  on("fs.write", (_$, e) => (w.files.set(e.path, { text: e.text, mtimeMs: w.clock.now() }), { value: undefined }));
+  on("fs.write", (_$, e) => (w.files.set(w.spelled(e.path), { text: e.text, mtimeMs: w.clock.now() }), { value: undefined }));
   on("session.usage", () => ({ value: { startedAt: 0, context: { window: 200_000 }, rateLimits: [] } }));
   on("turn.start", (_$, e) => ({ turnId: e.turnId }));
   on("turn.complete", (_$, e) => ({ text: e.answer }));

@@ -61,6 +61,14 @@ export function snapshot(dest: string): string {
   return dest
 }
 
+// A process holds its working directory open on Windows, and OpenCode starts the omca MCP server as a
+// child in the project directory. Killing the parent alone leaves that child running there, so the
+// scratch directory stays busy. `taskkill /T` ends the whole tree.
+function endTree(proc: Bun.Subprocess): void {
+  if (process.platform === "win32") Bun.spawnSync(["taskkill", "/pid", String(proc.pid), "/T", "/F"], { env: { ...process.env }, stdin: "ignore", stdout: "ignore", stderr: "ignore" })
+  else proc.kill()
+}
+
 export function freePort(): number {
   const probe = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response("") })
   const port = probe.port
@@ -145,7 +153,7 @@ export async function startServer(root: string, cwd: string): Promise<Server> {
       }
     },
     async stop() {
-      proc.kill()
+      endTree(proc)
       const exited = await Promise.race([proc.exited.then(() => true), Bun.sleep(5000).then(() => false)])
       if (!exited) {
         proc.kill("SIGKILL")

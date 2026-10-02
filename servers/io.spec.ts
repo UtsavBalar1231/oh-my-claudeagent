@@ -64,7 +64,7 @@ describe("projectRoot", () => {
       expect(projectRoot(dir)).toBe(dir);
       expect(errors).toHaveBeenCalledTimes(1);
       expect(String(errors.mock.calls[0]?.[0])).toMatch(
-        new RegExp(`^omca: git rev-parse --show-toplevel failed in ${dir}; using it as the project root: fatal: bad config`),
+        new RegExp(`^omca: git rev-parse --show-toplevel failed in ${RegExp.escape(dir)}; using it as the project root: fatal: bad config`),
       );
     } finally {
       errors.mockRestore();
@@ -496,6 +496,10 @@ describe("under injected filesystem faults", () => {
   });
 });
 
+// Every entry is one serialized read, write and rename, about 18 ms on a Windows runner, so the last of
+// 800 waiters queues for far longer than the 10 s default wait. The wait is the load's, not the lock's.
+const WAIT_MS = 120_000;
+
 describe("withLock across processes", () => {
   const appender = () => {
     const path = join(dir, "append.ts");
@@ -510,7 +514,7 @@ await Promise.all(
       const entries = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : [];
       entries.push(label + "-" + i);
       writeFileAtomic(file, JSON.stringify(entries));
-    }),
+    }, ${WAIT_MS}),
   ),
 );
 `,
@@ -546,5 +550,5 @@ await Promise.all(
     const entries = await appendConcurrently(8, 100);
     expect(entries.sort()).toEqual(expected(8, 100));
     expect(readdirSync(dir).sort()).toEqual(["append.ts", "ledger.json"]);
-  }, 30_000);
+  }, WAIT_MS);
 });

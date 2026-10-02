@@ -59,14 +59,14 @@ describe("AGENTS.md and README.md on Read", () => {
     const { root } = project();
     write(join(root, "subdir", "AGENTS.md"), "# My Agents Guide\n");
     const file = write(join(root, "subdir", "file.txt"), "");
-    expect(await session(root)("Read", file)).toBe(`[AGENTS.md from ${root}/subdir]: # My Agents Guide`);
+    expect(await session(root)("Read", file)).toBe(`[AGENTS.md from ${join(root, "subdir")}]: # My Agents Guide`);
   });
 
   test("AGENTS.md: injection label includes directory path", async () => {
     const { root } = project();
     write(join(root, "subdir", "AGENTS.md"), "agent content here\n");
     const file = write(join(root, "subdir", "file.txt"), "");
-    expect(await session(root)("Read", file)).toStartWith(`[AGENTS.md from ${root}/subdir]: `);
+    expect(await session(root)("Read", file)).toStartWith(`[AGENTS.md from ${join(root, "subdir")}]: `);
   });
 
   test("AGENTS.md and README.md from every directory up to the project root inject nearest first", async () => {
@@ -76,7 +76,7 @@ describe("AGENTS.md and README.md on Read", () => {
     write(join(root, "a", "README.md"), "# A README\n");
     const file = write(join(root, "a", "b", "file.txt"), "");
     expect(await session(root)("Read", file)).toBe(
-      [`[AGENTS.md from ${root}/a]: # A Agents`, `[README.md from ${root}/a]: # A README`, `[README.md from ${root}]: # Root README`].join("\n"),
+      [`[AGENTS.md from ${join(root, "a")}]: # A Agents`, `[README.md from ${join(root, "a")}]: # A README`, `[README.md from ${root}]: # Root README`].join("\n"),
     );
   });
 
@@ -94,7 +94,7 @@ describe("AGENTS.md and README.md on Read", () => {
     write(join(root, "subdir", "AGENTS.md"), "# Gated Agents Guide\n");
     const file = write(join(root, "subdir", "file.txt"), "");
     process.env.OMCA_NATIVE_AGENTS_MD = "1";
-    expect(await session(root)("Read", file)).toBe(`[AGENTS.md from ${root}/subdir]: # Gated Agents Guide`);
+    expect(await session(root)("Read", file)).toBe(`[AGENTS.md from ${join(root, "subdir")}]: # Gated Agents Guide`);
   });
 
   test("OMCA_NATIVE_AGENTS_MD=1: a .claude/CLAUDE.md or CLAUDE.local.md also keeps the excerpt", async () => {
@@ -104,7 +104,7 @@ describe("AGENTS.md and README.md on Read", () => {
       write(join(root, "subdir", "AGENTS.md"), "# Gated Agents Guide\n");
       const file = write(join(root, "subdir", "file.txt"), "");
       process.env.OMCA_NATIVE_AGENTS_MD = "1";
-      expect(await session(root)("Read", file)).toBe(`[AGENTS.md from ${root}/subdir]: # Gated Agents Guide`);
+      expect(await session(root)("Read", file)).toBe(`[AGENTS.md from ${join(root, "subdir")}]: # Gated Agents Guide`);
     }
   });
 
@@ -112,7 +112,7 @@ describe("AGENTS.md and README.md on Read", () => {
     const { root } = project();
     write(join(root, "subdir", "AGENTS.md"), "# Default Path Agents\n");
     const file = write(join(root, "subdir", "file.txt"), "");
-    expect(await session(root)("Read", file)).toBe(`[AGENTS.md from ${root}/subdir]: # Default Path Agents`);
+    expect(await session(root)("Read", file)).toBe(`[AGENTS.md from ${join(root, "subdir")}]: # Default Path Agents`);
   });
 
   test("OMCA_NATIVE_AGENTS_MD=1: README.md excerpt is unaffected by the AGENTS.md skip", async () => {
@@ -121,21 +121,21 @@ describe("AGENTS.md and README.md on Read", () => {
     write(join(root, "subdir", "README.md"), "# Kept README\n");
     const file = write(join(root, "subdir", "file.txt"), "");
     process.env.OMCA_NATIVE_AGENTS_MD = "1";
-    expect(await session(root)("Read", file)).toBe(`[README.md from ${root}/subdir]: # Kept README`);
+    expect(await session(root)("Read", file)).toBe(`[README.md from ${join(root, "subdir")}]: # Kept README`);
   });
 
   test("README.md: injected when reading a file in a dir containing README.md", async () => {
     const { root } = project();
     write(join(root, "subdir", "README.md"), "# Project README\n");
     const file = write(join(root, "subdir", "file.txt"), "");
-    expect(await session(root)("Read", file)).toBe(`[README.md from ${root}/subdir]: # Project README`);
+    expect(await session(root)("Read", file)).toBe(`[README.md from ${join(root, "subdir")}]: # Project README`);
   });
 
   test("README.md: injection label includes directory path", async () => {
     const { root } = project();
     write(join(root, "subdir", "README.md"), "readme content\n");
     const file = write(join(root, "subdir", "file.txt"), "");
-    expect(await session(root)("Read", file)).toStartWith(`[README.md from ${root}/subdir]: `);
+    expect(await session(root)("Read", file)).toStartWith(`[README.md from ${join(root, "subdir")}]: `);
   });
 
   test("AGENTS.md: NOT injected for Write events (Read-only directory traversal)", async () => {
@@ -144,7 +144,7 @@ describe("AGENTS.md and README.md on Read", () => {
     const file = write(join(root, "subdir", "file.txt"), "");
     const inject = session(root);
     expect(await inject("Write", file)).toBeUndefined();
-    expect(await inject("Read", file)).toBe(`[AGENTS.md from ${root}/subdir]: # Secret Agent Docs`);
+    expect(await inject("Read", file)).toBe(`[AGENTS.md from ${join(root, "subdir")}]: # Secret Agent Docs`);
   });
 
   test("README.md: NOT injected for Write events", async () => {
@@ -158,7 +158,7 @@ describe("AGENTS.md and README.md on Read", () => {
     const { root } = project();
     const agents = write(join(root, "subdir", "AGENTS.md"), "x".repeat(2500));
     const file = write(join(root, "subdir", "file.txt"), "");
-    expect(await session(root)("Read", file)).toBe(`[AGENTS.md from ${root}/subdir]:  (truncated, read full file at ${agents})`);
+    expect(await session(root)("Read", file)).toBe(`[AGENTS.md from ${join(root, "subdir")}]:  (truncated, read full file at ${agents})`);
   });
 });
 
@@ -168,7 +168,7 @@ describe("directory dedup", () => {
     write(join(root, "subdir", "AGENTS.md"), "# Unique Agent Content\n");
     const file = write(join(root, "subdir", "file.txt"), "");
     const inject = session(root);
-    expect(await inject("Read", file)).toBe(`[AGENTS.md from ${root}/subdir]: # Unique Agent Content`);
+    expect(await inject("Read", file)).toBe(`[AGENTS.md from ${join(root, "subdir")}]: # Unique Agent Content`);
     expect(await inject("Read", file)).toBeUndefined();
   });
 
@@ -178,10 +178,10 @@ describe("directory dedup", () => {
     at(agents, 1_700_000_000);
     const file = write(join(root, "subdir", "file.txt"), "");
     const inject = session(root);
-    expect(await inject("Read", file)).toBe(`[AGENTS.md from ${root}/subdir]: # Original content`);
+    expect(await inject("Read", file)).toBe(`[AGENTS.md from ${join(root, "subdir")}]: # Original content`);
     write(agents, "# Updated content\n");
     at(agents, 1_700_000_001);
-    expect(await inject("Read", file)).toBe(`[AGENTS.md from ${root}/subdir]: # Updated content`);
+    expect(await inject("Read", file)).toBe(`[AGENTS.md from ${join(root, "subdir")}]: # Updated content`);
   });
 
   test("pipeline g: context-injector caches dir A, skips on second call, injects dir B", async () => {
@@ -205,7 +205,7 @@ describe("directory dedup", () => {
     const first = session(root);
     await first("Read", file);
     expect(await first("Read", file)).toBeUndefined();
-    expect(await session(root)("Read", file)).toBe(`[AGENTS.md from ${root}/subdir]: # Per Session`);
+    expect(await session(root)("Read", file)).toBe(`[AGENTS.md from ${join(root, "subdir")}]: # Per Session`);
   });
 });
 
@@ -461,12 +461,12 @@ describe("context budget", () => {
     const inject = session(root);
     expect(labels(await inject("Read", file))).toEqual([
       `[AGENTS.md from ${deep}]`,
-      `[AGENTS.md from ${root}/d/e/d2]`,
-      `[AGENTS.md from ${root}/d]`,
+      `[AGENTS.md from ${join(root, "d", "e", "d2")}]`,
+      `[AGENTS.md from ${join(root, "d")}]`,
       "[Rule: *.txt]",
-      `[context budget reached, 1 item(s) deferred to a later event: ${root}/d/README.md]`,
+      `[context budget reached, 1 item(s) deferred to a later event: ${join(root, "d", "README.md")}]`,
     ]);
-    expect(labels(await inject("Read", file))).toEqual([`[AGENTS.md from ${root}/d]`, `[README.md from ${root}/d]`]);
+    expect(labels(await inject("Read", file))).toEqual([`[AGENTS.md from ${join(root, "d")}]`, `[README.md from ${join(root, "d")}]`]);
     expect(await inject("Read", file)).toBeUndefined();
   });
 });

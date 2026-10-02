@@ -33,7 +33,7 @@ function engine(on: On, files: Readonly<Record<string, string>> = {}): { w: Worl
   const w = world(on, files);
   const writes: [string, unknown][] = [];
   on("fs.write", (_$, e) => {
-    writes.push([e.path, JSON.parse(e.text)]);
+    writes.push([w.spelled(e.path), JSON.parse(e.text)]);
     write(w, e.path, e.text);
     return { value: undefined };
   });

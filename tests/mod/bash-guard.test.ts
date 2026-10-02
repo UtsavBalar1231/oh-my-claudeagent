@@ -1,6 +1,6 @@
 import type { On, ProcessRunResult } from "claude-code";
 import { expect, test, type Engine } from "claude-code/testing";
-import { type Layout, WINDOWS, world as sessionWorld } from "./world.ts";
+import { hostSpelling, type Layout, WINDOWS, world as sessionWorld } from "./world.ts";
 
 const ENGINE = { decision: "ask", reason: "Bash(rm:*) asks", rule: "Bash(rm:*)" } as const;
 const RM_CATASTROPHIC =
@@ -29,8 +29,10 @@ function world(on: On, w: World = {}) {
   const env: Record<string, string> = { HOME: "/home/u", ...w.env };
   const files = w.files ?? {};
   // The engine resolves a relative path against the session's folder before the hook sees it.
-  const nodeAt = (path: string) =>
-    Object.entries(files).find(([name]) => path === name || path.endsWith(`/${name}`))?.[1];
+  const nodeAt = (raw: string) => {
+    const path = hostSpelling(raw, "linux");
+    return Object.entries(files).find(([name]) => path === name || path.endsWith(`/${name}`))?.[1];
+  };
   if (w.layout !== undefined) {
     sessionWorld(on, w.contents ?? {}, {}, w.env ?? {}, w.layout);
   } else {
@@ -38,14 +40,14 @@ function world(on: On, w: World = {}) {
     on("env.get", (_$, e) => ({ value: env[e.name] }));
     on("session.root", () => ({ value: "/work" }));
     on("fs.exists", (_$, e) => {
-      if (w.failExists !== undefined && e.path.endsWith(`/${w.failExists}`)) {
+      if (w.failExists !== undefined && hostSpelling(e.path, "linux").endsWith(`/${w.failExists}`)) {
         return { deny: `EACCES: permission denied, access '${w.failExists}'` };
       }
       return { value: nodeAt(e.path) !== undefined };
     });
     on("fs.stat", (_$, e) => {
       const node = nodeAt(e.path);
-      if (node === undefined) throw new Error(`ENOENT: ${e.path}`);
+      if (node === undefined) throw new Error(`ENOENT: ${hostSpelling(e.path, "linux")}`);
       return { value: { kind: node.kind, size: 0, mtimeMs: 0, isLink: node.isLink ?? false } };
     });
     on("fs.list", (_$, e) => ({

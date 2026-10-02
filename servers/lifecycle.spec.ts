@@ -2,7 +2,7 @@ import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import * as fs from "node:fs";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, relative } from "node:path";
+import { dirname, join, relative, sep } from "node:path";
 import { startWork } from "./lifecycle.ts";
 
 const NOW = Date.UTC(2026, 9, 15, 12);
@@ -34,7 +34,7 @@ function files(root: string, dir: string): string[] {
   if (!existsSync(base)) return [];
   return readdirSync(base, { recursive: true, withFileTypes: true })
     .filter((entry) => entry.isFile())
-    .map((entry) => relative(base, join(entry.parentPath, entry.name)))
+    .map((entry) => relative(base, join(entry.parentPath, entry.name)).replaceAll(sep, "/"))
     .sort();
 }
 

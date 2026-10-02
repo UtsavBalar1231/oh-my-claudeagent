@@ -9,6 +9,7 @@ const WARM_UP = 20;
 const MEDIAN_CEILING_MS = 3;
 const BURST_CALLS = 20;
 const BURST_ROUNDS = 5;
+const BURST_TIMEOUT_MS = 60_000;
 
 type Server = {
   proc: Bun.Subprocess<"pipe", "pipe", "pipe">;
@@ -150,7 +151,10 @@ describe("omca_hook over stdio", () => {
     expect(median).toBeLessThanOrEqual(MEDIAN_CEILING_MS);
   });
 
-  test(`omca_hook keeps a median of at most ${MEDIAN_CEILING_MS} ms while the same server answers a ${BURST_CALLS}-call Bash burst that logs evidence on every call`, async () => {
+  // The server handles a hook and a ledger write on one thread, so a hook queued behind a write waits
+  // out its fsync, which costs 0.4 ms on Linux and several ms on a macOS or Windows runner. The bound
+  // is the ceiling above the median of the same run's writes made alone, not a fixed time.
+  test(`omca_hook keeps a median within ${MEDIAN_CEILING_MS} ms of an evidence_log write while the same server answers a ${BURST_CALLS}-call Bash burst that logs evidence on every call`, async () => {
     const server = startServer(false);
     const sessionId = crypto.randomUUID();
     const evidence = (i: number): Record<string, unknown> => ({
@@ -160,10 +164,15 @@ describe("omca_hook over stdio", () => {
       output_snippet: "ok",
       working_directory: server.project,
     });
+    const writes: number[] = [];
     for (let i = 0; i < WARM_UP; i++) {
       await server.hook(bashCall(sessionId, "ls -la"));
+      const started = performance.now();
       await server.call("evidence_log", evidence(i));
+      writes.push(performance.now() - started);
     }
+    writes.sort((a, b) => a - b);
+    const writeMedian = ((writes[WARM_UP / 2 - 1] ?? 0) + (writes[WARM_UP / 2] ?? 0)) / 2;
     const samples: number[] = [];
     const timed = async (args: Record<string, string>): Promise<void> => {
       const started = performance.now();
@@ -183,8 +192,8 @@ describe("omca_hook over stdio", () => {
     samples.sort((a, b) => a - b);
     const median = ((samples[samples.length / 2 - 1] ?? 0) + (samples[samples.length / 2] ?? 0)) / 2;
     console.log(
-      `omca_hook round trip under a ${BURST_CALLS}-call burst with an evidence_log write queued ahead of each PreToolUse (${samples.length} hook calls): median ${median.toFixed(3)} ms, p95 ${samples[Math.floor(samples.length * 0.95)]?.toFixed(3)} ms, max ${samples.at(-1)?.toFixed(3)} ms`,
+      `omca_hook round trip under a ${BURST_CALLS}-call burst with an evidence_log write queued ahead of each PreToolUse (${samples.length} hook calls): median ${median.toFixed(3)} ms, p95 ${samples[Math.floor(samples.length * 0.95)]?.toFixed(3)} ms, max ${samples.at(-1)?.toFixed(3)} ms, against a write alone at median ${writeMedian.toFixed(3)} ms`,
     );
-    expect(median).toBeLessThanOrEqual(MEDIAN_CEILING_MS);
-  });
+    expect(median).toBeLessThanOrEqual(writeMedian + MEDIAN_CEILING_MS);
+  }, BURST_TIMEOUT_MS);
 });
