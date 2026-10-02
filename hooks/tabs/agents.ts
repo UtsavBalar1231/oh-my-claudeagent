@@ -1,5 +1,5 @@
 import type { RenderElement } from "claude-code";
-import { COLORS, fitEnd, levelMark, padEnd, padStart, displayWidth } from "../../src/core/ui-kit.ts";
+import { COLORS, displayWidth, fitEnd, formatDuration, formatTokens, levelMark, padEnd, padStart } from "../../src/core/ui-kit.ts";
 import type { State } from "../host.ts";
 import { noticeRow, type TabView, type View } from "../pane.ts";
 
@@ -15,21 +15,6 @@ const MIN_DESCRIPTION = 6;
 
 const shortType = (type: string) => type.slice(type.lastIndexOf(":") + 1);
 const shortModel = (model: string) => model.replace(/^claude-/, "").replace(/-\d{8}$/, "");
-
-function duration(ms: number): string {
-  const seconds = Math.max(0, Math.floor(ms / 1000));
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m${String(seconds % 60).padStart(2, "0")}s`;
-  return `${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, "0")}m`;
-}
-
-function count(tokens: number): string {
-  if (tokens < 1000) return String(tokens);
-  if (tokens < 100_000) return `${(tokens / 1000).toFixed(1)}k`;
-  if (tokens < 1_000_000) return `${Math.round(tokens / 1000)}k`;
-  return `${(tokens / 1_000_000).toFixed(1)}M`;
-}
 
 function mark(row: Row, view: View): { glyph: string; color: string } {
   switch (row.status) {
@@ -79,8 +64,8 @@ export const view: TabView = async (host, view) => {
         ? ""
         : fitEnd(` ${view.g.dot} ${row.description}`, room, view.g.ellipsis);
     const effort = row.effort === null ? view.g.dot : String(row.effort);
-    const time = duration((row.endedAt ?? view.now) - row.startedAt);
-    const tokens = count(row.inputTokens + row.outputTokens);
+    const time = formatDuration((row.endedAt ?? view.now) - row.startedAt);
+    const tokens = formatTokens(row.inputTokens + row.outputTokens);
     return Box({
       key: `agent-${id}`,
       flexDirection: "row",

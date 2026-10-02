@@ -1,0 +1,15 @@
+{
+  "session_id": "6f1c2a7e-3b9d-4c51-9a0e-2d4b8f7c1e01",
+  "agent_id": "a51e0d7c9b2f4e88",
+  "agent_type": "oh-my-claudeagent:executor",
+  "model": "claude-sonnet-5-5",
+  "effort": "high",
+  "started_at": "2026-10-01T09:20:41.000Z",
+  "ended_at": "2026-10-01T09:22:17.000Z",
+  "duration_ms": 96000,
+  "input_tokens": 158000,
+  "output_tokens": 7200,
+  "estimated_cost_usd": 0.3608,
+  "outcome": "aborted",
+  "evidence_logged": false
+}

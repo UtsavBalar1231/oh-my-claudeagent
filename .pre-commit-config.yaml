@@ -19,9 +19,10 @@ repos:
         exclude: '\.patch$'
       - id: check-merge-conflict
       - id: check-json
-        # These corpus fixtures are deliberately malformed to exercise the
-        # boulder resolver's corrupt/half-written JSON handling.
-        exclude: '^tests/fixtures/boulder-schemas/(corrupt|half-written)\.json$'
+        # These fixtures are deliberately malformed: the boulder resolver's
+        # corrupt and half-written registry cases, and a torn ledger record the
+        # Stats tab must skip.
+        exclude: '^tests/fixtures/boulder-schemas/(corrupt|half-written)\.json$|^tests/mod/visual/fixtures/stats/\.omca/metrics/b83e5d10-7a42-4f6c-8e19-c5a0d2f4e902/a8f2a0c4e6b84d10\.json$'
       - id: check-yaml
       - id: check-toml
       - id: check-added-large-files

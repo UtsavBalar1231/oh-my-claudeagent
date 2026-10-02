@@ -59,7 +59,7 @@ export function world(
     return { value: { kind: "file", size: file.text.length, mtimeMs: file.mtimeMs, isLink: false } };
   });
   on("fs.list", (_$, e) => {
-    const entries = [...w.files.entries()]
+    const files = [...w.files.entries()]
       .filter(([path]) => parent(path) === e.path)
       .map(([path, file]) => ({
         name: path.slice(e.path.length + 1),
@@ -68,6 +68,12 @@ export function world(
         mtimeMs: file.mtimeMs,
         isLink: false,
       }));
+    const dirs = new Set(
+      [...w.files.keys()]
+        .filter((path) => path.startsWith(`${e.path}/`) && parent(path) !== e.path)
+        .map((path) => path.slice(e.path.length + 1).split("/")[0] ?? ""),
+    );
+    const entries = [...files, ...[...dirs].map((name) => ({ name, kind: "dir" as const, size: 0, mtimeMs: 0, isLink: false }))];
     return entries.length === 0 ? { deny: `ENOENT: no such directory, ${e.path}` } : { value: entries };
   });
   on("ui.open", (_$, e) => (w.opened.push(e), { value: { isPlaced: true } }));

@@ -1,0 +1,15 @@
+{
+  "session_id": "b83e5d10-7a42-4f6c-8e19-c5a0d2f4e902",
+  "agent_id": "a2c8d6e4f0b14a29",
+  "agent_type": "oh-my-claudeagent:explore",
+  "model": "claude-haiku-4-5",
+  "effort": "low",
+  "started_at": "2026-10-02T08:31:15.000Z",
+  "ended_at": "2026-10-02T08:31:33.000Z",
+  "duration_ms": 18000,
+  "input_tokens": 22000,
+  "output_tokens": 0,
+  "estimated_cost_usd": 0.022,
+  "outcome": "empty",
+  "evidence_logged": false
+}

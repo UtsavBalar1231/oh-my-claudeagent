@@ -200,8 +200,9 @@ export function rule(view: View): RenderElement {
   return view.kit.Text({ dimColor: true, children: [view.g.rule.repeat(view.width)] });
 }
 
-function selectTab(host: Host, tab: Tab): Promise<void> {
-  return patchPane(host, (pane) => (pane.tab === tab ? pane : { ...pane, tab }));
+async function selectTab(host: Host, tab: Tab): Promise<void> {
+  if (tab === "stats") await stats.load(host);
+  await patchPane(host, (pane) => (pane.tab === tab ? pane : { ...pane, tab }));
 }
 
 // The narrower gap is used only when it keeps every tab on one row, which saves an inline row.

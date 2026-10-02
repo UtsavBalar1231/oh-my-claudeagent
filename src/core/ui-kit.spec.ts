@@ -3,6 +3,8 @@ import {
   displayWidth,
   fitEnd,
   fitMiddle,
+  formatDuration,
+  formatTokens,
   glyphs,
   isAsciiRequested,
   keyHint,
@@ -169,5 +171,36 @@ describe("view states", () => {
       isDim: false,
     });
     expect(notice({ kind: "error", reason: "ENOENT" }, words, glyphs(true), 40).text).toBe("x ENOENT");
+  });
+});
+
+describe("formatDuration", () => {
+  test.each([
+    [-5, "0s"],
+    [999, "0s"],
+    [59_999, "59s"],
+    [60_000, "1m00s"],
+    [66_000, "1m06s"],
+    [3_599_999, "59m59s"],
+    [3_600_000, "1h00m"],
+    [5_430_000, "1h30m"],
+  ])("%p ms is %p", (ms, text) => {
+    expect(formatDuration(ms)).toBe(text);
+  });
+});
+
+describe("formatTokens", () => {
+  test.each([
+    [0, "0"],
+    [999, "999"],
+    [1000, "1.0k"],
+    [13_500, "13.5k"],
+    [99_949, "99.9k"],
+    [129_000, "129k"],
+    [999_499, "999k"],
+    [1_041_500, "1.0M"],
+    [12_340_000, "12.3M"],
+  ])("%p tokens is %p", (tokens, text) => {
+    expect(formatTokens(tokens)).toBe(text);
   });
 });

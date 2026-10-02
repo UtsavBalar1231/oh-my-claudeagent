@@ -81,6 +81,7 @@ declare module "claude-code" {
           inputTokens: number;
           outputTokens: number;
           estimatedCostUsd: number;
+          unpriced: number;
           outcomes: { running: number; completed: number; aborted: number; empty: number };
           evidenceRate: number;
         }[];
