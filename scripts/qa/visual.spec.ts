@@ -68,7 +68,7 @@ const SIZES = [
 ] as const;
 
 test.skipIf(Bun.which("tmux") === null || Bun.which("claude") === null)(
-  "a stub view is captured at all three sizes from a real session against the mock",
+  "a stub view is captured at all three sizes from a real session against the mock (skipped where tmux or claude is not installed)",
   async () => {
     const root = temp("omca-visual-root-");
     mkdirSync(join(root, "scripts"));
@@ -80,7 +80,7 @@ test.skipIf(Bun.which("tmux") === null || Bun.which("claude") === null)(
     );
     writeFileSync(join(root, "fixtures", "stub", "README.md"), "fixture\n");
 
-    const run = Bun.spawn(["bun", VISUAL, "stub", "--root", root], { stdout: "pipe", stderr: "pipe" });
+    const run = Bun.spawn([process.execPath, VISUAL, "stub", "--root", root], { env: process.env, stdout: "pipe", stderr: "pipe" });
     const [code, stdout, stderr] = await Promise.all([run.exited, new Response(run.stdout).text(), new Response(run.stderr).text()]);
 
     expect({ code, stderr }).toEqual({ code: 0, stderr: "" });
@@ -93,7 +93,7 @@ test.skipIf(Bun.which("tmux") === null || Bun.which("claude") === null)(
       expect(lines.some((line) => line.includes("● visual stub ok"))).toBe(true);
       expect(existsSync(join(tmpdir(), `omca-visual-${cols}x${rows}`))).toBe(false);
     }
-    expect(Bun.spawnSync(["tmux", "-L", `omca-visual-${run.pid}`, "list-sessions"]).exitCode).not.toBe(0);
+    expect(Bun.spawnSync(["tmux", "-L", `omca-visual-${run.pid}`, "list-sessions"], { env: process.env }).exitCode).not.toBe(0);
   },
   120_000,
 );

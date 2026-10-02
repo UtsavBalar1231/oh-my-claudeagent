@@ -20,7 +20,7 @@ afterEach(() => {
 function project(): string {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "omca-evidence-")));
   roots.push(root);
-  expect(Bun.spawnSync(["git", "init", "-q", root]).exitCode).toBe(0);
+  expect(Bun.spawnSync(["git", "init", "-q", root], { env: process.env }).exitCode).toBe(0);
   return root;
 }
 

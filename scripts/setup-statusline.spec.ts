@@ -1,12 +1,15 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { BUN_NAME, homeEnv, specEnv, symlinkOrCopy } from "../tests/fixtures/spec-env.ts";
 
 const REPO = join(import.meta.dir, "..");
 const SCRIPT = join(REPO, "scripts", "setup-statusline.ts");
 const LAUNCHER_SOURCE = join(REPO, "statusline", "launcher.ts");
 const FIXTURES = join(REPO, "tests", "fixtures", "settings");
+
+const posix = (path: string): string => path.replaceAll("\\", "/");
 
 let root = "";
 let home = "";
@@ -17,12 +20,12 @@ let settings = "";
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "omca-setup-"));
   home = join(root, "home");
-  bun = join(root, "bin", "bun");
+  bun = join(root, "bin", BUN_NAME);
   launcher = join(home, ".claude", "omca", "statusline.ts");
   settings = join(root, "settings.json");
   mkdirSync(join(root, "bin"));
   mkdirSync(home);
-  symlinkSync(process.execPath, bun);
+  symlinkOrCopy(process.execPath, bun);
 });
 
 afterEach(() => {
@@ -30,7 +33,7 @@ afterEach(() => {
 });
 
 function fixtureText(name: string): string {
-  return readFileSync(join(FIXTURES, name), "utf8").replaceAll("@BUN@", bun).replaceAll("@HOME@", home);
+  return readFileSync(join(FIXTURES, name), "utf8").replaceAll("@BUN@", posix(bun)).replaceAll("@HOME@", posix(home));
 }
 
 function fixture(name: string): string {
@@ -39,14 +42,14 @@ function fixture(name: string): string {
   return text;
 }
 
-function runWith(env: Record<string, string>, ...args: string[]): { stdout: string; stderr: string; exitCode: number } {
-  const result = Bun.spawnSync([process.execPath, SCRIPT, "--settings", settings, ...args], { env, stdin: "ignore" });
+function runWith(env: Record<string, string | undefined>, ...args: string[]): { stdout: string; stderr: string; exitCode: number } {
+  const result = Bun.spawnSync([process.execPath, SCRIPT, "--settings", settings, ...args], { env: specEnv({ CLAUDE_CONFIG_DIR: undefined, ...env }), stdin: "ignore" });
   return { stdout: result.stdout.toString(), stderr: result.stderr.toString(), exitCode: result.exitCode };
 }
 
-const run = (...args: string[]) => runWith({ HOME: home, PATH: join(root, "bin") }, ...args);
+const run = (...args: string[]) => runWith({ ...homeEnv(home), PATH: join(root, "bin") }, ...args);
 
-const command = (program = bun, script = launcher, flags = "") => `\\"${program}\\" \\"${script}\\"${flags}`;
+const command = (program = bun, script = launcher, flags = "") => `\\"${posix(program)}\\" \\"${posix(script)}\\"${flags}`;
 
 const statusLine = (indent: string) =>
   [
@@ -202,10 +205,10 @@ describe("install", () => {
     const config = join(root, "my config");
     const moved = join(config, "omca", "statusline.ts");
 
-    expect(runWith({ HOME: home, CLAUDE_CONFIG_DIR: config, PATH: join(root, "bin") }, "--yes").exitCode).toBe(0);
+    expect(runWith({ ...homeEnv(home), CLAUDE_CONFIG_DIR: config, PATH: join(root, "bin") }, "--yes").exitCode).toBe(0);
     const written = JSON.parse(readFileSync(settings, "utf8"));
-    expect(written.statusLine.command).toBe(`"${bun}" "${moved}"`);
-    expect(written.subagentStatusLine.command).toBe(`"${bun}" "${moved}" --subagent`);
+    expect(written.statusLine.command).toBe(`"${posix(bun)}" "${posix(moved)}"`);
+    expect(written.subagentStatusLine.command).toBe(`"${posix(bun)}" "${posix(moved)}" --subagent`);
     expect(readFileSync(moved, "utf8")).toBe(readFileSync(LAUNCHER_SOURCE, "utf8"));
     expect(existsSync(launcher)).toBe(false);
   });
@@ -213,20 +216,20 @@ describe("install", () => {
   test("with HOME unset the launcher goes under USERPROFILE", () => {
     fixture("no-statusline.json");
 
-    expect(runWith({ USERPROFILE: home, PATH: join(root, "bin") }, "--yes").exitCode).toBe(0);
+    expect(runWith({ HOME: undefined, USERPROFILE: home, PATH: join(root, "bin") }, "--yes").exitCode).toBe(0);
     expect(readFileSync(launcher, "utf8")).toBe(readFileSync(LAUNCHER_SOURCE, "utf8"));
-    expect(JSON.parse(readFileSync(settings, "utf8")).statusLine.command).toBe(`"${bun}" "${launcher}"`);
+    expect(JSON.parse(readFileSync(settings, "utf8")).statusLine.command).toBe(`"${posix(bun)}" "${posix(launcher)}"`);
   });
 
   test("a program path with a space stays one quoted argument, and uninstall still recognizes the entry", () => {
     fixture("no-statusline.json");
-    const spaced = join(root, "bun dir", "bun");
+    const spaced = join(root, "bun dir", BUN_NAME);
     mkdirSync(join(root, "bun dir"));
-    symlinkSync(process.execPath, spaced);
-    const env = { HOME: home, PATH: join(root, "bun dir") };
+    symlinkOrCopy(process.execPath, spaced);
+    const env = { ...homeEnv(home), PATH: join(root, "bun dir") };
 
     expect(runWith(env, "--yes").exitCode).toBe(0);
-    expect(JSON.parse(readFileSync(settings, "utf8")).statusLine.command).toBe(`"${spaced}" "${launcher}"`);
+    expect(JSON.parse(readFileSync(settings, "utf8")).statusLine.command).toBe(`"${posix(spaced)}" "${posix(launcher)}"`);
     expect(runWith(env, "--uninstall", "--yes").exitCode).toBe(0);
     expect(readFileSync(settings, "utf8")).toBe(fixtureText("no-statusline.json"));
   });
@@ -280,7 +283,7 @@ describe("refusals", () => {
   });
 
   test("a missing --settings prints the usage", () => {
-    const result = Bun.spawnSync([process.execPath, SCRIPT], { env: { HOME: home, PATH: join(root, "bin") } });
+    const result = Bun.spawnSync([process.execPath, SCRIPT], { env: specEnv({ ...homeEnv(home), PATH: join(root, "bin") }) });
     expect(result.stderr.toString()).toBe("omca setup: usage: bun scripts/setup-statusline.ts --settings <path> [--yes] [--uninstall]\n");
     expect(result.exitCode).toBe(2);
   });

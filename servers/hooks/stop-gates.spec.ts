@@ -77,7 +77,7 @@ function project(): string {
 }
 
 function git(root: string, ...args: string[]): void {
-  const result = Bun.spawnSync(["git", ...args], { cwd: root, stdout: "ignore", stderr: "pipe" });
+  const result = Bun.spawnSync(["git", ...args], { cwd: root, env: process.env, stdout: "ignore", stderr: "pipe" });
   if (result.exitCode !== 0) throw new Error(`git ${args.join(" ")}: ${result.stderr.toString()}`);
 }
 
@@ -803,7 +803,7 @@ describe("drift-guard", () => {
 
   test("drift-guard: an external diff driver cannot replace the parse input", async () => {
     const run = seeded("a.js");
-    git(run.root, "config", "diff.external", "/bin/true");
+    git(run.root, "config", "diff.external", "true");
     append(run.root, "a.js", "it.only('t', () => {})\n");
     expect(await claim(run)).toEqual(drift("a.js:2  it.only('t', () => {})"));
   });

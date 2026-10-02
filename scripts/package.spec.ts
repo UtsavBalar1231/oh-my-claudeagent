@@ -72,7 +72,7 @@ describe("packageTree", () => {
     for (const [path, text] of Object.entries(SHIPPED)) expect(readFileSync(join(dest, path), "utf8")).toBe(text);
   });
 
-  test.skipIf(process.platform === "win32")("keeps the executable bit", () => {
+  test.skipIf(process.platform === "win32")("keeps the executable bit (skipped on Windows: it has no executable bit)", () => {
     chmodSync(join(root, "scripts", "package.ts"), 0o755);
 
     packageTree(root, dest);
@@ -140,7 +140,7 @@ describe("main", () => {
 
 describe("the repository tree", () => {
   test("`bun scripts/package.ts --dry-run` lists the shipped template and not the QA harness or tests", () => {
-    const result = Bun.spawnSync([process.execPath, join(import.meta.dir, "package.ts"), "--dry-run"], { stdout: "pipe", stderr: "pipe" });
+    const result = Bun.spawnSync([process.execPath, join(import.meta.dir, "package.ts"), "--dry-run"], { env: process.env, stdout: "pipe", stderr: "pipe" });
     const lines = result.stdout.toString().split("\n");
 
     expect(result.exitCode).toBe(0);

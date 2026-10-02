@@ -28,7 +28,7 @@ afterEach(() => {
 
 function startServer(trace: boolean): Server {
   const project = realpathSync(mkdtempSync(join(tmpdir(), "omca-hook-")));
-  expect(Bun.spawnSync(["git", "init", "-q", project]).exitCode).toBe(0);
+  expect(Bun.spawnSync(["git", "init", "-q", project], { env: process.env }).exitCode).toBe(0);
   const env: Record<string, string | undefined> = { ...process.env };
   delete env.OMCA_DISABLED_HOOKS;
   delete env.OMCA_HOOK_TRACE;

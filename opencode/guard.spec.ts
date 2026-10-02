@@ -15,6 +15,7 @@ const savedEnv = {
   OMCA_COMMENT_GATE: process.env.OMCA_COMMENT_GATE,
   OMCA_DISABLED_HOOKS: process.env.OMCA_DISABLED_HOOKS,
   HOME: process.env.HOME,
+  USERPROFILE: process.env.USERPROFILE,
 }
 
 beforeEach(() => {
@@ -76,6 +77,7 @@ describe("decisions", () => {
 
   test("home is read from the environment, in any spelling", () => {
     process.env.HOME = "/home/bob"
+    process.env.USERPROFILE = "/home/bob"
     const denied = { deny: true, reason: RM_CATASTROPHIC }
     expect(checkShell("rm -rf /home/bob")).toEqual(denied)
     expect(checkShell("rm -rf /home/bob/dev")).toEqual(denied)

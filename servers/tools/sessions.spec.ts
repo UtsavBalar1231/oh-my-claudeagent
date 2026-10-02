@@ -27,7 +27,7 @@ beforeEach(() => {
   base = realpathSync(mkdtempSync(join(tmpdir(), "omca-sessions-")));
   project = join(base, "project");
   mkdirSync(project);
-  expect(Bun.spawnSync(["git", "init", "-q", project]).exitCode).toBe(0);
+  expect(Bun.spawnSync(["git", "init", "-q", project], { env: process.env }).exitCode).toBe(0);
   slug = project.replace(/[^A-Za-z0-9]/g, "-");
   process.env.OMCA_TRANSCRIPTS_ROOT = join(base, "projects");
   projectDir = join(base, "projects", slug);
@@ -313,7 +313,7 @@ test("a plain tool result still matches while spilled results exist", async () =
 test("a project with no transcript directory returns no matches and a note naming the directory", async () => {
   const other = join(base, "other");
   mkdirSync(other);
-  expect(Bun.spawnSync(["git", "init", "-q", other]).exitCode).toBe(0);
+  expect(Bun.spawnSync(["git", "init", "-q", other], { env: process.env }).exitCode).toBe(0);
   const otherSlug = other.replace(/[^A-Za-z0-9]/g, "-");
   expect(await search({ query: "anything", project_path: other })).toEqual({
     query: "anything",

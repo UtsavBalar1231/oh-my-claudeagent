@@ -114,7 +114,7 @@ test("an empty file says so", async () => {
   expect(await read({ path: write("empty.txt", "") })).toBe("(empty file)");
 });
 
-test("a symlink is followed to its target", async () => {
+test.skipIf(process.platform === "win32")("a symlink is followed to its target (skipped on Windows: creating a symlink needs a privilege)", async () => {
   const target = write("target.txt", "symlinked content\n");
   const link = join(dir, "link.txt");
   symlinkSync(target, link);
@@ -145,12 +145,15 @@ test("a multi-byte character split across read chunks decodes intact", async () 
   expect(second).toBe(row(2, "end"));
 });
 
-test("a missing path, a directory and a FIFO are refused in plain text", async () => {
+test("a missing path and a directory are refused in plain text", async () => {
   const missing = join(dir, "nonexistent.txt");
   expect(await read({ path: missing })).toBe(`File not found: ${missing}`);
   expect(await read({ path: dir })).toBe(`Path is a directory, not a file: ${dir}`);
+});
+
+test.skipIf(process.platform === "win32")("a FIFO is refused in plain text (skipped on Windows: it has no FIFOs)", async () => {
   const fifo = join(dir, "pipe");
-  expect(Bun.spawnSync(["mkfifo", fifo]).exitCode).toBe(0);
+  expect(Bun.spawnSync(["mkfifo", fifo], { env: process.env }).exitCode).toBe(0);
   expect(await read({ path: fifo })).toBe(`Not a regular file (device/pipe/socket): ${fifo}`);
 });
 
@@ -225,14 +228,14 @@ test.each<[Platform, string]>([
   expect(isSensitivePath(platform, path)).toBe(false);
 });
 
-test("a symlink is judged by the file it points at", async () => {
+test.skipIf(process.platform === "win32")("a symlink is judged by the file it points at (skipped on Windows: creating a symlink needs a privilege)", async () => {
   const target = write(".env", "SECRET=hunter2\n");
   const link = join(dir, "notes.txt");
   symlinkSync(target, link);
   expect(await read({ path: link })).toBe(`Access denied: ${link} matches sensitive file pattern`);
 });
 
-test.skipIf(!existsSync("/etc/shadow"))("/etc/shadow is denied", async () => {
+test.skipIf(!existsSync("/etc/shadow"))("/etc/shadow is denied (skipped where /etc/shadow does not exist)", async () => {
   expect(await read({ path: "/etc/shadow" })).toBe("Access denied: /etc/shadow matches sensitive file pattern");
 });
 

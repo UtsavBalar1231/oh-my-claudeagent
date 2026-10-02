@@ -5,6 +5,7 @@ import { dirname, join } from "node:path";
 import type { GitInfo } from "./git.ts";
 import { NO_REPO } from "./git.ts";
 import { displayWidth } from "../src/core/ui-kit.ts";
+import { specEnv, tmpEnv } from "../tests/fixtures/spec-env.ts";
 import { type Payload, render } from "./render.ts";
 
 process.env.TZ = "UTC";
@@ -79,7 +80,7 @@ const REPOS: Record<string, () => void> = {
 };
 
 function load(name: string): Fixture {
-  return JSON.parse(readFileSync(join(FIXTURES, `${name}.json`), "utf8").replaceAll("@ROOT@", root));
+  return JSON.parse(readFileSync(join(FIXTURES, `${name}.json`), "utf8").replaceAll("@ROOT@", JSON.stringify(root).slice(1, -1)));
 }
 
 function writeFiles(files: Record<string, unknown>): void {
@@ -91,10 +92,9 @@ function writeFiles(files: Record<string, unknown>): void {
 }
 
 function runMain(payload: Payload, env: Record<string, string>): string {
-  const inherited = Object.fromEntries(Object.entries(process.env).filter(([key]) => !["COLUMNS", "LINES", "CLAUDE_STATUSLINE_NERD_FONT"].includes(key)));
   const result = Bun.spawnSync([process.execPath, MAIN], {
     stdin: new TextEncoder().encode(JSON.stringify(payload)),
-    env: { ...inherited, ...GIT_ENV, ...env, TMPDIR: root },
+    env: specEnv({ COLUMNS: undefined, LINES: undefined, CLAUDE_STATUSLINE_NERD_FONT: undefined, ...GIT_ENV, ...env, ...tmpEnv(root) }),
   });
   return result.stdout.toString();
 }

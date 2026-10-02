@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { fakeExec } from "../../tests/fixtures/fake-exec.ts";
+import { setPath } from "../../tests/fixtures/spec-env.ts";
 import { discoverBinary, extensionMismatch, gitWorktreeRoots, patternWarning, resolveNative, run, tools } from "./ast.ts";
 
 const ENV_KEYS = ["PATH", "AST_GREP_BIN", "CLAUDE_PROJECT_DIR"] as const;
@@ -52,13 +54,6 @@ function project(files: Record<string, string> = {}): string {
   return dir;
 }
 
-function executable(dir: string, name: string, body: string): string {
-  const path = join(dir, name);
-  writeFileSync(path, `#!/bin/sh\n${body}\n`);
-  chmodSync(path, 0o755);
-  return path;
-}
-
 type Reply = { stdout?: string; stderr?: string; exit?: number };
 
 function fakeBinary(replies: Reply[] = []) {
@@ -69,18 +64,23 @@ function fakeBinary(replies: Reply[] = []) {
     if (stderr !== undefined) writeFileSync(join(dir, `stderr.${n}`), stderr);
     if (exit !== undefined) writeFileSync(join(dir, `exit.${n}`), String(exit));
   });
-  process.env.AST_GREP_BIN = executable(
+  process.env.AST_GREP_BIN = fakeExec(
     dir,
     "ast-grep",
     [
-      'dir=$(dirname "$0")',
-      'n=$(($(cat "$dir/count" 2>/dev/null || echo 0) + 1))',
-      'echo "$n" > "$dir/count"',
-      `printf '%s\\0' "$@" > "$dir/argv.$n"`,
-      'cat > "$dir/stdin.$n"',
-      '[ -f "$dir/stderr.$n" ] && cat "$dir/stderr.$n" >&2',
-      '[ -f "$dir/stdout.$n" ] && cat "$dir/stdout.$n"',
-      'exit "$(cat "$dir/exit.$n" 2>/dev/null || echo 0)"',
+      'import { existsSync, readFileSync, writeFileSync } from "node:fs";',
+      'import { join } from "node:path";',
+      `const dir = ${JSON.stringify(dir)};`,
+      "const read = (name) => (existsSync(join(dir, name)) ? readFileSync(join(dir, name), 'utf8') : undefined);",
+      "const n = Number(read('count') ?? 0) + 1;",
+      "writeFileSync(join(dir, 'count'), String(n));",
+      "writeFileSync(join(dir, `argv.${n}`), process.argv.slice(2).map((arg) => `${arg}\\0`).join(''));",
+      "writeFileSync(join(dir, `stdin.${n}`), await Bun.stdin.text());",
+      "const stderr = read(`stderr.${n}`);",
+      "if (stderr !== undefined) process.stderr.write(stderr);",
+      "const stdout = read(`stdout.${n}`);",
+      "if (stdout !== undefined) process.stdout.write(stdout);",
+      "process.exitCode = Number(read(`exit.${n}`) ?? 0);",
     ].join("\n"),
   );
   const argv = (n: number) => readFileSync(join(dir, `argv.${n}`), "utf8").split("\0").slice(0, -1);
@@ -93,7 +93,7 @@ function fakeBinary(replies: Reply[] = []) {
 
 function git(cwd: string, ...args: string[]): void {
   const identity = ["-c", "user.name=spec", "-c", "user.email=spec@example.com", "-c", "commit.gpgsign=false"];
-  expect(Bun.spawnSync(["git", ...identity, ...args], { cwd }).exitCode).toBe(0);
+  expect(Bun.spawnSync(["git", ...identity, ...args], { cwd, env: process.env }).exitCode).toBe(0);
 }
 
 function repoWithWorktree(): { main: string; linked: string } {
@@ -154,7 +154,7 @@ describe("binary discovery", () => {
   test("with no binary on PATH every tool returns the error naming ast-grep and how to install it", async () => {
     project({ "main.py": MAIN_PY });
     delete process.env.AST_GREP_BIN;
-    process.env.PATH = "";
+    setPath("");
     const calls: Array<[string, Record<string, unknown>]> = [
       ["ast_search", { pattern: "print($$$A)", lang: "python" }],
       ["ast_replace", { pattern: "old_func($X)", rewrite: "new_func($X)", lang: "python" }],
@@ -167,16 +167,17 @@ describe("binary discovery", () => {
 
   test("$AST_GREP_BIN wins over a binary on PATH", () => {
     const dir = tempDir();
-    executable(dir, "ast-grep", "echo ast-grep 1.0.0");
-    process.env.PATH = dir;
-    process.env.AST_GREP_BIN = executable(dir, "configured", "echo configured");
-    expect(discoverBinary()).toBe(join(dir, "configured"));
+    fakeExec(dir, "ast-grep", 'console.log("ast-grep 1.0.0");');
+    setPath(dir);
+    const configured = fakeExec(dir, "configured", 'console.log("configured");');
+    process.env.AST_GREP_BIN = configured;
+    expect(discoverBinary()).toBe(configured);
   });
 
   test("an unusable $AST_GREP_BIN is reported and discovery falls back to PATH", () => {
     const dir = tempDir();
-    const found = executable(dir, "ast-grep", "echo ast-grep 1.0.0");
-    process.env.PATH = dir;
+    const found = fakeExec(dir, "ast-grep", 'console.log("ast-grep 1.0.0");');
+    setPath(dir);
     process.env.AST_GREP_BIN = join(dir, "missing");
     const warn = spyOn(console, "error").mockImplementation(() => {});
     try {
@@ -190,10 +191,10 @@ describe("binary discovery", () => {
   test("sg is used only when it identifies itself as ast-grep", () => {
     const dir = tempDir();
     delete process.env.AST_GREP_BIN;
-    process.env.PATH = dir;
-    executable(dir, "sg", "echo newgrp 4.18");
+    setPath(dir);
+    fakeExec(dir, "sg", 'console.log("newgrp 4.18");');
     expect(() => discoverBinary()).toThrow(INSTALL_HINT);
-    const sg = executable(dir, "sg", "echo ast-grep 0.45.3");
+    const sg = fakeExec(dir, "sg", 'console.log("ast-grep 0.45.3");');
     expect(discoverBinary()).toBe(sg);
   });
 });
@@ -241,7 +242,7 @@ describe("timeout", () => {
   test("a process that outlives the limit is killed and reported by elapsed time, with no signalCode needed", async () => {
     project();
     const dir = tempDir();
-    process.env.AST_GREP_BIN = executable(dir, "ast-grep", "exec sleep 5");
+    process.env.AST_GREP_BIN = fakeExec(dir, "ast-grep", "await Bun.sleep(5000);");
     const started = performance.now();
     await expect(run(["run"], { timeoutMs: 200 })).rejects.toThrow("Command timed out after 0.2s");
     expect(performance.now() - started).toBeLessThan(3_000);
@@ -250,7 +251,7 @@ describe("timeout", () => {
   test("a process that finishes inside the limit is not reported as timed out", async () => {
     project();
     const dir = tempDir();
-    process.env.AST_GREP_BIN = executable(dir, "ast-grep", "echo '[]'");
+    process.env.AST_GREP_BIN = fakeExec(dir, "ast-grep", 'console.log("[]");');
     expect((await run(["run"], { timeoutMs: 5_000 })).stdout.length).toBeGreaterThan(0);
   });
 });
@@ -413,7 +414,7 @@ describe("ast_search", () => {
     expect(gitWorktreeRoots(tempDir())).toEqual([]);
   });
 
-  test("ast_search rejects symlink escape", async () => {
+  test.skipIf(process.platform === "win32")("ast_search rejects symlink escape (skipped on Windows: creating a symlink needs a privilege)", async () => {
     const workspace = project();
     symlinkSync(tempDir(), join(workspace, "escape"), "dir");
     expect(await failure(call("ast_search", { pattern: "$X", lang: "python", paths: ["escape"] }))).toBe(

@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { symlinkOrCopy } from "../../tests/fixtures/spec-env.ts";
 import { upTo } from "./context-injector.ts";
 import { dispatch } from "./registry.ts";
 
@@ -407,7 +408,7 @@ describe("rule dedup", () => {
   test("two rule paths with the same body both inject, a symlink included, since the key is the path as given", async () => {
     const { root, rule } = project();
     const real = rule("real-rule.md", "# pattern: *.py\nSymlink rule content.");
-    symlinkSync(real, join(root, ".omca", "rules", "alias-rule.md"));
+    symlinkOrCopy(real, join(root, ".omca", "rules", "alias-rule.md"));
     const file = write(join(root, "main.py"), "");
     const inject = session(root);
     expect(await inject("Read", file)).toBe("[Rule: *.py]: Symlink rule content.\n[Rule: *.py]: Symlink rule content.");
@@ -506,7 +507,7 @@ describe("kill switch and golden fixtures", () => {
   for (const tool of ["Read", "Write", "Edit"]) {
     test(`${tool.toLowerCase()}-no-agents replays to an empty answer`, async () => {
       const { root } = project();
-      const fixture = { hook_event_name: "PostToolUse", tool_name: tool, tool_input: { file_path: "/tmp/testfile.txt" }, session_id: "fixture-sid-001" };
+      const fixture = { hook_event_name: "PostToolUse", tool_name: tool, tool_input: { file_path: join(root, "testfile.txt") }, session_id: "fixture-sid-001" };
       expect(await dispatch({ ...fixture, event: fixture.hook_event_name }, root, NOW)).toEqual({});
     });
   }

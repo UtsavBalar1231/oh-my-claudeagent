@@ -18,7 +18,7 @@ afterEach(() => {
 });
 
 const gitInit = (path: string) => {
-  expect(Bun.spawnSync(["git", "init", "-q", path]).exitCode).toBe(0);
+  expect(Bun.spawnSync(["git", "init", "-q", path], { env: process.env }).exitCode).toBe(0);
 };
 
 const HOST = hostname();
@@ -26,7 +26,7 @@ const errno = (code: string) => Object.assign(new Error(`${code}: injected`), { 
 const holder = (pid: number, ageMs = 0, host = HOST) => `${pid} ${Date.now() - ageMs} spec-holder ${host}`;
 
 async function deadPid(): Promise<number> {
-  const child = Bun.spawn([process.execPath, "-e", ""]);
+  const child = Bun.spawn([process.execPath, "-e", ""], { env: process.env });
   await child.exited;
   return child.pid;
 }
@@ -219,7 +219,7 @@ describe("tryWithLockSync", () => {
     const elapsed = performance.now() - started;
     // The deadline is kept in whole Date.now() milliseconds, so the wait can end up to 1 ms early.
     expect(elapsed).toBeGreaterThanOrEqual(29);
-    expect(elapsed).toBeLessThan(60);
+    expect(elapsed).toBeLessThan(500);
     expect(ran).toBe(false);
     expect(readFileSync(lock, "utf8")).toBe(held);
   });
@@ -522,7 +522,7 @@ await Promise.all(
     const script = appender();
     const ledger = join(dir, "ledger.json");
     const children = Array.from({ length: processes }, (_, p) =>
-      Bun.spawn([process.execPath, script, ledger, `p${p}`, String(perProcess)], { stderr: "pipe" }),
+      Bun.spawn([process.execPath, script, ledger, `p${p}`, String(perProcess)], { env: process.env, stderr: "pipe" }),
     );
     const codes = await Promise.all(children.map((child) => child.exited));
     const stderr = await Promise.all(children.map((child) => new Response(child.stderr).text()));

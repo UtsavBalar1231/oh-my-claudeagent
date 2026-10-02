@@ -60,7 +60,9 @@ const cacheFile = (): string => {
 const cached = (overrides: Partial<GitInfo>): GitInfo => ({ ...NO_REPO, repo: true, branch: "cached", remoteFetchedAt: Date.now() / 1000, ...overrides });
 
 function seedCache(dir: string, info: GitInfo, ageSeconds = 0): void {
-  const probe = Bun.spawnSync(["bun", "-e", `process.stdout.write(new Bun.CryptoHasher("md5").update(${JSON.stringify(dir)}).digest("hex").slice(0, 8))`]);
+  const probe = Bun.spawnSync([process.execPath, "-e", `process.stdout.write(new Bun.CryptoHasher("md5").update(${JSON.stringify(dir)}).digest("hex").slice(0, 8))`], {
+    env: process.env,
+  });
   const path = join(cacheDir, `omca-statusline-git-${probe.stdout.toString()}`);
   writeFileSync(path, JSON.stringify(info));
   const stamp = Date.now() / 1000 - ageSeconds;
@@ -173,7 +175,7 @@ describe("git info", () => {
   test("a detached head reads its short hash", async () => {
     const dir = repo("detached");
     git(dir, "checkout", "-q", "--detach", "HEAD");
-    const head = Bun.spawnSync(["git", "-C", dir, "rev-parse", "--short=7", "HEAD"]).stdout.toString().trim();
+    const head = Bun.spawnSync(["git", "-C", dir, "rev-parse", "--short=7", "HEAD"], { env: process.env }).stdout.toString().trim();
     expect((await getGitInfo(dir, options())).branch).toBe(`(detached:${head})`);
   });
 
@@ -187,7 +189,7 @@ describe("git info", () => {
     expect(await getGitInfo(root, options())).toEqual(NO_REPO);
   });
 
-  test("a status that outlives the timeout leaves zero counts", async () => {
+  test.skipIf(process.platform === "win32")("a status that outlives the timeout leaves zero counts (skipped on Windows: the fsmonitor hook is a #!/bin/sh script)", async () => {
     const dir = repo("slow");
     const hook = join(root, "slow-hook.sh");
     writeFileSync(hook, "#!/bin/sh\nexec sleep 5\n", { mode: 0o755 });

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { specEnv, tmpEnv } from "../tests/fixtures/spec-env.ts";
 
 const MAIN = join(import.meta.dir, "main.ts");
 
@@ -18,7 +19,7 @@ afterEach(() => {
 function run(stdin: string, env: Record<string, string> = {}): { stdout: string; exitCode: number } {
   const result = Bun.spawnSync([process.execPath, MAIN], {
     stdin: new TextEncoder().encode(stdin),
-    env: { ...process.env, CLAUDE_STATUSLINE_NERD_FONT: "0", COLUMNS: "300", TMPDIR: root, ...env },
+    env: specEnv({ CLAUDE_STATUSLINE_NERD_FONT: "0", COLUMNS: "300", ...tmpEnv(root), ...env }),
   });
   return { stdout: result.stdout.toString(), exitCode: result.exitCode };
 }
@@ -42,7 +43,7 @@ describe("git cache", () => {
   test("a git read is reused for five seconds and read again after that", () => {
     const project = join(root, "project");
     mkdirSync(project);
-    Bun.spawnSync(["git", "-C", project, "init", "-q", "-b", "main"]);
+    Bun.spawnSync(["git", "-C", project, "init", "-q", "-b", "main"], { env: process.env });
     const payload = JSON.stringify({ model: { display_name: "m" }, workspace: { project_dir: project } });
 
     const first = run(payload).stdout;

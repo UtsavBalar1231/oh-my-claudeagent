@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { specEnv } from "../tests/fixtures/spec-env.ts";
 
 const SUBAGENT = join(import.meta.dir, "subagent.ts");
 
@@ -28,10 +29,9 @@ afterEach(() => {
 });
 
 function run(stdin: string, env: Record<string, string> = {}): { stdout: string; exitCode: number } {
-  const inherited = Object.fromEntries(Object.entries(process.env).filter(([key]) => !["COLUMNS", "OMCA_SUBAGENT_STATUSLINE_DUMP"].includes(key)));
   const result = Bun.spawnSync([process.execPath, SUBAGENT], {
     stdin: new TextEncoder().encode(stdin),
-    env: { ...inherited, CLAUDE_STATUSLINE_NERD_FONT: "0", ...env },
+    env: specEnv({ COLUMNS: undefined, OMCA_SUBAGENT_STATUSLINE_DUMP: undefined, CLAUDE_STATUSLINE_NERD_FONT: "0", ...env }),
   });
   return { stdout: result.stdout.toString(), exitCode: result.exitCode };
 }

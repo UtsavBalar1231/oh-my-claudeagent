@@ -63,7 +63,7 @@ describe("createScratch", () => {
   test("project is a git repository with a committer identity", () => {
     const scratch = createScratch(print);
     const project = scratch.project();
-    const git = (...args: string[]) => Bun.spawnSync(["git", "-C", project, ...args], { stdout: "pipe" }).stdout.toString().trim();
+    const git = (...args: string[]) => Bun.spawnSync(["git", "-C", project, ...args], { env: process.env, stdout: "pipe" }).stdout.toString().trim();
 
     expect(git("rev-parse", "--is-inside-work-tree")).toBe("true");
     expect(git("config", "user.email")).toBe("qa@example.invalid");

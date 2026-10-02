@@ -414,7 +414,7 @@ describe("access log", () => {
 describe("command line", () => {
   const spawned: ReturnType<typeof Bun.spawn>[] = [];
   const spawnMock = (...args: string[]) => {
-    const proc = Bun.spawn(["bun", SCRIPT, ...args], { stdout: "pipe", stderr: "pipe" });
+    const proc = Bun.spawn([process.execPath, SCRIPT, ...args], { env: process.env, stdout: "pipe", stderr: "pipe" });
     spawned.push(proc);
     return proc;
   };
@@ -434,7 +434,7 @@ describe("command line", () => {
     return path;
   };
 
-  test("prints the bound port as its first line, serves on it, and exits 0 on SIGTERM", async () => {
+  test.skipIf(process.platform === "win32")("prints the bound port as its first line, serves on it, and exits 0 on SIGTERM (skipped on Windows: it has no SIGTERM)", async () => {
     const proc = spawnMock("--port", "0");
     const port = await readPort(proc);
     expect(Number.isInteger(port) && port > 0).toBe(true);

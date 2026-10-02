@@ -15,7 +15,7 @@ let project: string;
 
 beforeEach(() => {
   project = realpathSync(mkdtempSync(join(tmpdir(), "omca-notepad-")));
-  expect(Bun.spawnSync(["git", "init", "-q", project]).exitCode).toBe(0);
+  expect(Bun.spawnSync(["git", "init", "-q", project], { env: process.env }).exitCode).toBe(0);
 });
 
 afterEach(() => {
@@ -292,7 +292,7 @@ await Promise.all(
     const script = join(project, "append.ts");
     writeFileSync(script, appender);
     const children = Array.from({ length: 6 }, (_, p) =>
-      Bun.spawn([process.execPath, script, `p${p}`, "20"], { cwd: project, stdout: "ignore", stderr: "pipe" }),
+      Bun.spawn([process.execPath, script, `p${p}`, "20"], { cwd: project, env: process.env, stdout: "ignore", stderr: "pipe" }),
     );
     const codes = await Promise.all(children.map((child) => child.exited));
     const stderr = await Promise.all(children.map((child) => new Response(child.stderr).text()));

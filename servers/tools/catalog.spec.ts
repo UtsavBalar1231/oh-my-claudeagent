@@ -1,7 +1,9 @@
 import { afterEach, expect, test } from "bun:test";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { fakeExec } from "../../tests/fixtures/fake-exec.ts";
+import { specEnv } from "../../tests/fixtures/spec-env.ts";
 import { tools } from "./catalog.ts";
 
 const SERVER = join(import.meta.dir, "..", "omca.ts");
@@ -41,19 +43,15 @@ function tempDir(prefix: string): string {
 
 function gitProject(): string {
   const project = tempDir("project");
-  expect(Bun.spawnSync(["git", "init", "-q", project]).exitCode).toBe(0);
+  expect(Bun.spawnSync(["git", "init", "-q", project], { env: process.env }).exitCode).toBe(0);
   return project;
 }
 
 function startServer(env: Record<string, string | undefined> = {}) {
   const project = gitProject();
-  const serverEnv: Record<string, string | undefined> = { ...process.env, CLAUDE_CONFIG_DIR: tempDir("config") };
-  delete serverEnv.OMCA_HOOK_TRACE;
-  delete serverEnv.AI_AGENT;
-  delete serverEnv.AST_GREP_BIN;
   const proc = Bun.spawn([process.execPath, SERVER], {
     cwd: project,
-    env: { ...serverEnv, ...env },
+    env: specEnv({ CLAUDE_CONFIG_DIR: tempDir("config"), OMCA_HOOK_TRACE: undefined, AI_AGENT: undefined, AST_GREP_BIN: undefined, ...env }),
     stdin: "pipe",
     stdout: "pipe",
     stderr: "pipe",
@@ -141,9 +139,7 @@ test.each([
 });
 
 test("health_check names the ast-grep binary the server resolves", async () => {
-  const bin = join(tempDir("bin"), "fake-ast-grep");
-  writeFileSync(bin, "#!/bin/sh\necho ast-grep 0.0.0\n");
-  chmodSync(bin, 0o755);
+  const bin = fakeExec(tempDir("bin"), "fake-ast-grep", 'console.log("ast-grep 0.0.0");');
   const { report } = startServer({ AST_GREP_BIN: bin });
   expect((await report()).ast_grep).toEqual({ path: bin });
 });
