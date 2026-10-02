@@ -16,9 +16,9 @@ disallowed-tools: [Write, Edit]
 
 ## Tool Restrictions
 
-Read-only GitHub and repository analysis. Do not modify repo files or GitHub state. Local report writes are allowed only under `/tmp/opencode/github-triage-{datetime}/`. MCP tools: `notepad_write`, `evidence_log`, `ast_search`.
+Read-only GitHub and repository analysis. Do not modify repo files or GitHub state. Local report writes are allowed only under `.omca/scratch/github-triage-{datetime}/` in the project root. MCP tools: `notepad_write`, `evidence_log`, `ast_search`.
 
-Fetch open issue/PR metadata, classify each, spawn 1 background executor per item. Each subagent fetches full details for its item and writes a report under `/tmp/opencode/github-triage-{datetime}/`. Never take destructive action.
+Fetch open issue/PR metadata, classify each, spawn 1 background executor per item. Each subagent fetches full details for its item and writes a report under `.omca/scratch/github-triage-{datetime}/` in the project root. Never take destructive action.
 
 ## Zero-Action Policy
 
@@ -57,19 +57,16 @@ Applies to: bug root cause (file + line), "feature exists" (cite where), "fix co
 | Execution mode | Background, by platform default. There is no parameter to set |
 | Parallelism | Bounded batches, max 5 concurrent agents |
 | Total items per run | No platform cap. Bound the run yourself and record the overflow (see below) |
-| Result storage | `issue-{number}.md` or `pr-{number}.md` under `/tmp/opencode/github-triage-{datetime}/` |
+| Result storage | `issue-{number}.md` or `pr-{number}.md` under `.omca/scratch/github-triage-{datetime}/` in the project root |
 | Final collection | Orchestrator reads all reports and writes `SUMMARY.md` |
 
 ---
 
 ## PHASE 1: SETUP OUTPUT DIRECTORY
 
-```bash
-DATETIME=$(date +%Y%m%d-%H%M%S)
-OUTDIR="/tmp/opencode/github-triage-${DATETIME}"
-mkdir -p "${OUTDIR}"
-echo "Reports will be written to: ${OUTDIR}"
-```
+Set `{OUTDIR}` to the absolute path `<project root>/.omca/scratch/github-triage-<datetime>`, where `<datetime>` is the current date and time as `YYYYMMDD-HHMMSS`. When the session context gives only the date, append a short word of your own so two runs on one day get different directories. OMCA's server writes `.omca/.gitignore` when it starts, so reports stay out of commits.
+
+Run no shell command to create the directory: the Write tool creates it when the first report is written. Tell the user the path now: `Reports will be written to: {OUTDIR}`.
 
 ---
 
@@ -485,7 +482,7 @@ Tell the user the output directory path when complete.
 
 When invoked:
 
-1. Create output directory: `/tmp/opencode/github-triage-{datetime}/`
+1. Choose the output directory: `.omca/scratch/github-triage-{datetime}/` under the project root, created by the first Write
 2. Fetch open issue + PR metadata via gh CLI (paginate if 500 reached; no body/comments initially)
 3. Classify each item (ISSUE_QUESTION, ISSUE_BUG, ISSUE_FEATURE, ISSUE_OTHER, PR_BUGFIX, PR_OTHER)
 4. Decide the run-size bound; log any overflow to `{OUTDIR}/SKIPPED.md`

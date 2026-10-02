@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { asRegistry, type PlanEntry, type Registry, resolveBoundPlan } from "../../src/core/boulder.ts";
@@ -188,14 +189,15 @@ function boulderProgress(args: Record<string, unknown>): string {
     if (!planPath) return "No active plan found in boulder state.";
   }
 
-  let content: string;
+  let bytes: Buffer;
   try {
-    content = readFileSync(planPath, "utf8");
+    bytes = readFileSync(planPath);
   } catch (error) {
     if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
     const missing = { error: true, plan_missing: true, plan_path: planPath, message: `Plan file not found: ${planPath}.` };
     return JSON.stringify(missing, null, 2);
   }
+  const content = bytes.toString("utf8");
   const states = checkboxStates(content);
   const completed = states.filter((state) => state === "x").length;
   return JSON.stringify(
@@ -205,6 +207,7 @@ function boulderProgress(args: Record<string, unknown>): string {
       remaining: states.length - completed,
       is_complete: planIsComplete(content),
       plan_path: planPath,
+      plan_sha256: createHash("sha256").update(bytes).digest("hex"),
       next_task_label: nextTaskLabel(content),
     },
     null,
@@ -246,7 +249,7 @@ export const tools: Tool[] = [
   {
     name: "boulder_progress",
     description:
-      "Count a plan file's numbered checkboxes (`- [ ] N.` and `- [x] N.`; unnumbered boxes are ignored) and return progress. Use to report plan status or to find the next task. With plan_path, reads that file. Otherwise it looks up plan_name in the registry, or else this session's binding; a session with no binding falls back to the only registered plan, or to the most recently started one, which may belong to another session, so pass plan_name or plan_path when several plans exist. Returns JSON with total, completed, remaining, is_complete, plan_path, and next_task_label (the first unchecked task, truncated to 80 chars, or null when none remain); a JSON error object with plan_missing when the plan file is gone; or a plain message when no plan resolves.",
+      "Count a plan file's numbered checkboxes (`- [ ] N.` and `- [x] N.`; unnumbered boxes are ignored) and return progress. Use to report plan status or to find the next task. With plan_path, reads that file. Otherwise it looks up plan_name in the registry, or else this session's binding; a session with no binding falls back to the only registered plan, or to the most recently started one, which may belong to another session, so pass plan_name or plan_path when several plans exist. Returns JSON with total, completed, remaining, is_complete, plan_path, plan_sha256 (hex SHA-256 of the plan file's current bytes, the value evidence_log takes for a final_verification entry), and next_task_label (the first unchecked task, truncated to 80 chars, or null when none remain); a JSON error object with plan_missing when the plan file is gone; or a plain message when no plan resolves.",
     inputSchema: {
       type: "object",
       properties: {

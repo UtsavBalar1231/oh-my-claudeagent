@@ -128,6 +128,25 @@ describe("install", () => {
     expect(readFileSync(launcher, "utf8")).toBe(readFileSync(LAUNCHER_SOURCE, "utf8"));
   });
 
+  test("a settings file that starts with a byte-order mark is accepted and keeps the mark", () => {
+    const bom = "\uFEFF";
+    const before = bom + fixtureText("no-statusline.json");
+    writeFileSync(settings, before);
+
+    const preview = run();
+    expect(preview).toMatchObject({ stderr: "", exitCode: 0 });
+    expect(preview.stdout).toContain(`+${NO_STATUSLINE_AFTER().split("\n")[8]}`);
+    expect(readFileSync(settings, "utf8")).toBe(before);
+
+    expect(run("--yes").exitCode).toBe(0);
+    expect(readFileSync(settings, "utf8")).toBe(bom + NO_STATUSLINE_AFTER());
+    expect(readFileSync(`${settings}.omca-bak`, "utf8")).toBe(before);
+
+    expect(run("--uninstall", "--yes").exitCode).toBe(0);
+    expect(readFileSync(settings, "utf8").startsWith(bom)).toBe(true);
+    expect(JSON.parse(readFileSync(settings, "utf8").slice(bom.length))).toEqual(JSON.parse(fixtureText("no-statusline.json")));
+  });
+
   test("a statusLine pointing elsewhere is replaced in place, keeping the file's indentation", () => {
     const before = fixture("other-statusline.json");
     const diff = [

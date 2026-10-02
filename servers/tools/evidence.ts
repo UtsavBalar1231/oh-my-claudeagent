@@ -163,7 +163,7 @@ export const tools: Tool[] = [
           type: "string",
           default: "",
           description:
-            "Hex SHA-256 of the plan file's current bytes, the first field of `sha256sum <plan file>`. Set it on final_verification entries so the verdict applies only to this version of the plan; leave empty for other types.",
+            "Hex SHA-256 of the plan file's current bytes, as `boulder_progress` returns it in `plan_sha256`. Set it on final_verification entries so the verdict applies only to this version of the plan; leave empty for other types.",
         },
       },
       required: ["evidence_type", "command", "exit_code", "output_snippet"],

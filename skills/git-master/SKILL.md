@@ -33,13 +33,15 @@ Three specializations: Commit Architect (atomic commits, style detection), Rebas
 
 ## Non-Interactive Environment
 
-Claude Code cannot answer an editor or a credential prompt, so a git command that can open one needs it disabled. Prefix these commands: `git commit` without `-m`, `git rebase` (including `-i --autosquash` and `--continue`), `git merge`, and `git push`.
+Claude Code cannot answer an editor or a credential prompt, so a git command that can open an editor needs it disabled. Pass the editor as a git option, which works the same in bash, Git Bash and PowerShell where a `NAME=value git ...` prefix does not. Add it to these commands: `git commit` without `-m`, `git rebase` (including `-i --autosquash` and `--continue`), and `git merge`.
 
 ```bash
-GIT_EDITOR=: EDITOR=: GIT_SEQUENCE_EDITOR=: GIT_PAGER=cat GIT_TERMINAL_PROMPT=0 git <command>
+git -c core.editor=true <command>
 ```
 
-Run read-only commands (`status`, `diff`, `log`, `show`, `blame`, `branch`, `rev-parse`, `merge-base`) without the prefix. They never open an editor, the shell has no terminal for a pager, and an allow rule does not match past an assignment of a variable Claude Code does not treat as safe, so the prefix can turn a pre-approved read into a permission prompt.
+`core.editor=true` also serves as the editor for the `rebase -i` todo list, so an autosquash runs without stopping. A credential prompt needs a terminal the shell does not have, so a `git push` that needs credentials fails instead of waiting; report that failure rather than retrying.
+
+Run read-only commands (`status`, `diff`, `log`, `show`, `blame`, `branch`, `rev-parse`, `merge-base`) without the option. They never open an editor, the shell has no terminal for a pager, and an allow rule written for the plain command may not match one with extra options, so the option can turn a pre-approved read into a permission prompt.
 
 ## MODE DETECTION (FIRST STEP)
 
@@ -78,10 +80,12 @@ git log -30 --pretty=format:"%s"
 
 # Group 3: Branch context
 git branch --show-current
-git merge-base HEAD main 2>/dev/null || git merge-base HEAD master 2>/dev/null
-git rev-parse --abbrev-ref @{upstream} 2>/dev/null || echo "NO_UPSTREAM"
-git log --oneline $(git merge-base HEAD main 2>/dev/null || git merge-base HEAD master 2>/dev/null)..HEAD 2>/dev/null
+git merge-base HEAD main
+git rev-parse --abbrev-ref "@{upstream}"
+git log --oneline main..HEAD
 ```
+
+These use `main` as the default branch; use `master` where that is the default (`git branch --list main master` shows which exists). When `git merge-base` fails, that branch name does not exist or shares no history with HEAD, so try the other name. When `git rev-parse --abbrev-ref "@{upstream}"` fails, the branch has no upstream: record `NO_UPSTREAM`. Quote `"@{upstream}"`, because PowerShell reads an unquoted `@{` as the start of a hashtable.
 
 ## PHASE 1: Style Detection
 
@@ -183,8 +187,8 @@ git log -1 --oneline
 # Check working directory clean
 git status
 
-# Review new history
-git log --oneline $(git merge-base HEAD main 2>/dev/null || git merge-base HEAD master)..HEAD
+# Review new history (use master in place of main where that is the default branch)
+git log --oneline main..HEAD
 ```
 
 ## Quick Reference: Style Detection
@@ -215,30 +219,32 @@ Before any history rewrite (rebase, amend, reset), confirm all four before runni
 1. **Current branch is known**: `git branch --show-current` output captured this session, not assumed.
 2. **Dirty work is accounted for**: `git status` shows clean, or uncommitted changes are identified and the user has agreed to how they're handled. You can commit them. Stashing or discarding them is the user's step: OMCA's guard holds `git stash`, `git restore`, `git checkout -- <path>`, `git clean`, and `git reset --hard` from this shell for the user's review, and denies them where no dialog can show.
 3. **Push state is known**: has-upstream and ahead/behind checked (Phase 0 Group 3); determines AGGRESSIVE vs CAREFUL rewrite above.
-4. **Recovery path is named**: state the abort command (`git rebase --abort`, `git reset --keep ORIG_HEAD`) and the reflog fallback (`git reflog` + `git reset --keep HEAD@{N}`) before executing, so recovery is one command away if the rewrite goes wrong. `--keep` moves back to the old commit and refuses to overwrite uncommitted changes. The guard holds `--hard` for review.
+4. **Recovery path is named**: state the abort command (`git rebase --abort`, `git reset --keep ORIG_HEAD`) and the reflog fallback (`git reflog` + `git reset --keep "HEAD@{N}"`) before executing, so recovery is one command away if the rewrite goes wrong. `--keep` moves back to the old commit and refuses to overwrite uncommitted changes. The guard holds `--hard` for review.
 
 If any of the four is unconfirmed, stop and gather it; do not proceed on assumption.
 
 ## PHASE R2: Rebase Execution
 
-Rebases must be fully non-interactive. Use the environment prefix from Non-Interactive Environment on every command that rewrites history. Do not open editors. If conflicts occur, stop after reporting the conflicted files and exact next commands. Do not guess conflict resolutions unless the user explicitly requested conflict fixing.
+Rebases must be fully non-interactive. Use the `git -c core.editor=true` option from Non-Interactive Environment on every command that rewrites history. Do not open editors. If conflicts occur, stop after reporting the conflicted files and exact next commands. Do not guess conflict resolutions unless the user explicitly requested conflict fixing.
 
 ```bash
-# Find merge-base
-MERGE_BASE=$(git merge-base HEAD main 2>/dev/null || git merge-base HEAD master)
+# Find merge-base (use master in place of main where that is the default branch)
+git merge-base HEAD main
 
-# For SQUASH (combine all into one):
-GIT_EDITOR=: EDITOR=: GIT_SEQUENCE_EDITOR=: GIT_PAGER=cat GIT_TERMINAL_PROMPT=0 git reset --soft $MERGE_BASE
-GIT_EDITOR=: EDITOR=: GIT_SEQUENCE_EDITOR=: GIT_PAGER=cat GIT_TERMINAL_PROMPT=0 git commit -m "Combined: <summarize all changes>"
+# For SQUASH (combine all into one), with <merge-base> the commit id printed above:
+git -c core.editor=true reset --soft <merge-base>
+git -c core.editor=true commit -m "Combined: <summarize all changes>"
 
 # For AUTOSQUASH (non-interactive editor disabled):
-GIT_EDITOR=: EDITOR=: GIT_SEQUENCE_EDITOR=: GIT_PAGER=cat GIT_TERMINAL_PROMPT=0 git rebase -i --autosquash $MERGE_BASE
+git -c core.editor=true rebase -i --autosquash <merge-base>
 ```
+
+Paste the printed commit id in place of `<merge-base>`; no shell substitution is involved, so the commands run the same in every shell.
 
 After any successful rewrite of pushed history, push only when explicitly requested, and use:
 
 ```bash
-GIT_EDITOR=: EDITOR=: GIT_SEQUENCE_EDITOR=: GIT_PAGER=cat GIT_TERMINAL_PROMPT=0 git push --force-with-lease
+git push --force-with-lease
 ```
 
 # HISTORY SEARCH MODE (Phase H1-H3)

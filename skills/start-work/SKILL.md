@@ -429,15 +429,14 @@ When you have the `advisor` tool, call it once your own verdict is COMPLETE and 
 you log it. It has read every delegation and verification in this session and answers
 what you missed. A gap it names that the diff confirms makes the verdict INCOMPLETE.
 
-Before logging the verdict, compute the plan file's own hash so the Stop gate can
+Before logging the verdict, read the plan file's own hash so the Stop gate can
 scope the evidence to this exact plan run rather than any `final_verification` entry
-that happens to be lying around:
+that happens to be lying around. Call `boulder_progress` with the plan's `plan_path`
+and take `plan_sha256` from its result: it is the SHA-256 of the plan file's current
+bytes, and no shell command is needed to compute it. Call it after the last edit to
+the plan file, because any later edit changes the hash.
 
-```bash
-sha256sum "<absolute path to plan file>"
-```
-
-Pass the resulting hash as `plan_sha256` on the `final_verification` call:
+Pass that value as `plan_sha256` on the `final_verification` call:
 
 ```
 evidence_log(
@@ -445,7 +444,7 @@ evidence_log(
   command="completeness review: COMPLETE",
   exit_code=0,
   output_snippet="COMPLETE, all requirements met",
-  plan_sha256="<sha256sum output>"
+  plan_sha256="<plan_sha256 from boulder_progress>"
 )
 ```
 
@@ -500,7 +499,7 @@ evidence_log(
   command="completeness review: COMPLETE",
   exit_code=0,
   output_snippet="COMPLETE, all N requirements met, no constraints violated",
-  plan_sha256="<sha256sum of the plan file>"
+  plan_sha256="<plan_sha256 from boulder_progress>"
 )
 ```
 

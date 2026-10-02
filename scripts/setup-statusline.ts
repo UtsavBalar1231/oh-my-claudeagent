@@ -106,7 +106,9 @@ const wanted = {
 };
 
 const exists = existsSync(path);
-const before = exists ? readFileSync(path, "utf8") : "";
+const raw = exists ? readFileSync(path, "utf8") : "";
+const bom = raw.startsWith("\uFEFF") ? "\uFEFF" : "";
+const before = raw.slice(bom.length);
 const base = exists ? before : "{}\n";
 let settings: unknown;
 try {
@@ -153,9 +155,9 @@ try {
     copyFileSync(LAUNCHER_SOURCE, launcher);
   }
   if (after !== base) {
-    if (exists) writeFileSync(`${path}.omca-bak`, before);
+    if (exists) writeFileSync(`${path}.omca-bak`, raw);
     mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, after);
+    writeFileSync(path, bom + after);
   }
   if (launcherChanges && options.uninstall) rmSync(launcher);
 } catch (error) {

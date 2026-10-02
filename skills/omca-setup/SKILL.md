@@ -16,7 +16,7 @@ allowed-tools:
   - Bash(bun --version)
   - Bash(ast-grep --version)
   - Bash(sg --version)
-  - Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/setup-statusline.ts *)
+  - Bash(bun "${CLAUDE_PLUGIN_ROOT}/scripts/setup-statusline.ts" *)
   - mcp__plugin_oh-my-claudeagent_omca__health_check
 ---
 
@@ -69,7 +69,7 @@ The `statuslineMode` plugin option is `${user_config.statuslineMode}`. Claude Co
 1. Preview the change:
 
    ```bash
-   bun ${CLAUDE_PLUGIN_ROOT}/scripts/setup-statusline.ts --settings ~/.claude/settings.json
+   bun "${CLAUDE_PLUGIN_ROOT}/scripts/setup-statusline.ts" --settings ~/.claude/settings.json
    ```
 
    It writes nothing. It prints `Already configured: ...` when there is nothing to do; report that and end the phase. Otherwise it prints a unified diff of `~/.claude/settings.json` and the launcher it would copy. It sets `statusLine` to the absolute bun path plus `~/.claude/omca/statusline.ts` with `padding: 1`, `refreshInterval: 5` and `hideVimModeIndicator: true`, and `subagentStatusLine` to the same command with `--subagent`. Any other `statusLine` or `subagentStatusLine` is replaced, and every other key and byte of the file stays as it is. When it exits 1, report its one-line reason and end the phase.
@@ -79,7 +79,7 @@ The `statuslineMode` plugin option is `${user_config.statuslineMode}`. Claude Co
 3. On yes, apply it:
 
    ```bash
-   bun ${CLAUDE_PLUGIN_ROOT}/scripts/setup-statusline.ts --settings ~/.claude/settings.json --yes
+   bun "${CLAUDE_PLUGIN_ROOT}/scripts/setup-statusline.ts" --settings ~/.claude/settings.json --yes
    ```
 
    On no, change nothing and print that command so the user can run it later.
@@ -109,7 +109,7 @@ Force style  stripped | already stripped | skipped
 1. Preview what setup wrote:
 
    ```bash
-   bun ${CLAUDE_PLUGIN_ROOT}/scripts/setup-statusline.ts --settings ~/.claude/settings.json --uninstall
+   bun "${CLAUDE_PLUGIN_ROOT}/scripts/setup-statusline.ts" --settings ~/.claude/settings.json --uninstall
    ```
 
    It removes a `statusLine` or `subagentStatusLine` only when it runs OMCA's launcher, and the launcher file itself. When it prints `Nothing to remove: ...`, report that and go to step 3.

@@ -385,9 +385,18 @@ describe("start-time GC", () => {
 });
 
 describe("boulder_progress", () => {
+  const sha256 = (planPath: string) => new Bun.CryptoHasher("sha256").update(readFileSync(planPath)).digest("hex");
   const result = (planPath: string, total: number, completed: number, nextTaskLabel: string | null) =>
     JSON.stringify(
-      { total, completed, remaining: total - completed, is_complete: total > 0 && completed === total, plan_path: planPath, next_task_label: nextTaskLabel },
+      {
+        total,
+        completed,
+        remaining: total - completed,
+        is_complete: total > 0 && completed === total,
+        plan_path: planPath,
+        plan_sha256: sha256(planPath),
+        next_task_label: nextTaskLabel,
+      },
       null,
       2,
     );
@@ -397,6 +406,19 @@ describe("boulder_progress", () => {
     const plan = planFile(root, "plan.md", "# My Plan\n\n- [x] 1. Task one done\n- [ ] 2. Task two pending\n- [ ] 3. Task three pending\n");
     await write(root, "progress-plan", "sess-001", plan);
     expect(await progress(root, { session_id: "sess-001" })).toBe(result(plan, 3, 1, "Task two pending"));
+  });
+
+  test("boulder_progress returns the SHA-256 of the plan file's bytes", async () => {
+    const root = project();
+    const plan = planFile(root, "plan.md", "# Fixture plan\n\n- [x] 1. one\n- [ ] 2. two\n");
+    expect(JSON.parse(await progress(root, { plan_path: plan })).plan_sha256).toBe("4fb2594d8a01fe5b99ab89b1b4db02ef0f9784389a895e12334d477d61985c95");
+  });
+
+  test("boulder_progress hashes bytes that are not valid UTF-8 as they are on disk", async () => {
+    const root = project();
+    const plan = join(root, "plan.md");
+    writeFileSync(plan, Buffer.from([0x2d, 0x20, 0x5b, 0x20, 0x5d, 0x20, 0x31, 0x2e, 0x20, 0xff, 0x0d, 0x0a]));
+    expect(JSON.parse(await progress(root, { plan_path: plan })).plan_sha256).toBe(sha256(plan));
   });
 
   test("boulder_progress by plan name", async () => {
