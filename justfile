@@ -114,6 +114,11 @@ qa:
 	bash scripts/qa/statusline-probe.sh
 	bash scripts/qa/session-smoke.sh
 
+# Capture tests/mod/visual/<view>.json in tmux against the mock model at 80, 120 and 200 columns
+[group('test')]
+visual view:
+	bun scripts/qa/visual.ts {{ view }}
+
 # ── Typecheck ────────────────────────────────────────────────────
 
 # Type-check servers/ and statusline/ with pyright (pinned as a servers/ dev

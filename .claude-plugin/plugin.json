@@ -47,6 +47,24 @@
       "default": false,
       "description": "When true, removes the force-for-plugin: true line from the installed output-styles/omca-default.md cache copy so your own outputStyle setting takes precedence instead of the plugin's orchestration style. The strip is applied at /oh-my-claudeagent:omca-setup time; you must re-run omca-setup after every plugin update (or /plugin marketplace update omca) because the cache copy may be overwritten and the strip will need re-application.",
       "sensitive": false
+    },
+    "showBand": {
+      "title": "Show the band above the prompt",
+      "type": "boolean",
+      "default": true,
+      "description": "When false, the band with the bound plan, the last verification and the suggested next actions is not drawn.",
+      "sensitive": false
+    },
+    "guardMode": {
+      "title": "Destructive Bash guard mode",
+      "type": "string",
+      "default": "dialog",
+      "options": [
+        "dialog",
+        "deny"
+      ],
+      "description": "dialog asks before a destructive Bash command runs where a dialog can show and denies elsewhere; deny refuses every destructive command, as 2.21.0 did.",
+      "sensitive": false
     }
   }
 }
