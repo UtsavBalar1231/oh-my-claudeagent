@@ -10,7 +10,6 @@ if (!log) throw new Error("STUB_LOG is required")
 
 const SCENARIOS: Record<string, { tool: string; args: Json }> = {
   "shell-reset": { tool: "shell", args: { command: "git reset --hard HEAD~1" } },
-  "write-evidence": { tool: "write", args: { path: ".omca/evidence/verification-evidence.json", content: "{}" } },
   subagent: { tool: "subagent", args: { description: "omca stub", prompt: "OMCA-SCENARIO:shell-reset" } },
   "skill-load": { tool: "skill", args: { id: "omca-handoff" } },
 }

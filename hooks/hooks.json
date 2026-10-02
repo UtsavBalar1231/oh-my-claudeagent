@@ -115,36 +115,6 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "shell": "bash",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/executor-grep-deny.sh\""
-          }
-        ]
-      },
-      {
-        "matcher": "Grep",
-        "hooks": [
-          {
-            "type": "command",
-            "shell": "bash",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/executor-grep-deny.sh\""
-          }
-        ]
-      },
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "shell": "bash",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/write-guard.sh\""
-          }
-        ]
-      },
-      {
         "matcher": "Write|Edit",
         "hooks": [
           {
@@ -178,12 +148,6 @@
       {
         "matcher": "Bash",
         "hooks": [
-          {
-            "type": "command",
-            "shell": "bash",
-            "if": "Bash(grep *)",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/executor-grep-deny.sh\""
-          },
           {
             "type": "mcp_tool",
             "server": "plugin:oh-my-claudeagent:omca-hooks",

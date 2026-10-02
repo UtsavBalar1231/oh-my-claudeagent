@@ -141,7 +141,7 @@ self_test() {
 	local sabotage_dir
 	sabotage_dir="$(mktemp -d "${TMPDIR:-/tmp}/qa-sabotage-XXXXXX")"
 	cp -a "${pkg}/." "${sabotage_dir}/"
-	rm -f "${sabotage_dir}/scripts/write-guard.sh"
+	rm -f "${sabotage_dir}/scripts/comment-checker.sh"
 	local sabotage_out
 	# Run inside a command-substitution subshell: check_hook_script_paths's own FAIL
 	# (the expected trigger) increments a subshell-local QA_FAIL_COUNT that never

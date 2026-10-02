@@ -161,12 +161,9 @@
 [validate-plugin] PASS: hook fixture posttoolusefailure-bash.json: valid JSON (<REPO_ROOT>/tests/fixtures/hooks/posttoolusefailure-bash.json)
 [validate-plugin] PASS: hook fixture posttoolusefailure-read.json: valid JSON (<REPO_ROOT>/tests/fixtures/hooks/posttoolusefailure-read.json)
 [validate-plugin] PASS: hook fixture repo setup: initialized git repo at <TMPFILE>
-[validate-plugin] PASS: PreToolUse Write (write-guard.sh): stdout shape is plain text or one single-line JSON object
-[validate-plugin] PASS: PreToolUse Write (write-guard.sh): script succeeded
 [validate-plugin] PASS: PreToolUse Write (comment-checker.sh): stdout shape is plain text or one single-line JSON object
 [validate-plugin] PASS: PreToolUse Write (comment-checker.sh): script succeeded
-[validate-plugin] PASS: PermissionRequest Bash (executor-grep-deny.sh): stdout shape is plain text or one single-line JSON object
-[validate-plugin] PASS: PermissionRequest Bash (executor-grep-deny.sh): script succeeded
+[validate-plugin] SKIP: PermissionRequest Bash: no matching hook command registered
 [validate-plugin] PASS: SessionStart compact (post-compact-inject.sh): stdout shape is plain text or one single-line JSON object
 [validate-plugin] PASS: SessionStart compact (post-compact-inject.sh): script succeeded with valid JSON output
 [validate-plugin] PASS: Stop default (no state) (plan-continuation-guard.sh): stdout shape is plain text or one single-line JSON object
@@ -202,4 +199,4 @@
 [validate-plugin] PASS: mcp tools/list contains categories_list
 [validate-plugin] PASS: mcp tools/list contains file_read
 [validate-plugin] PASS: mcp tools/list contains session_search
-[validate-plugin] Summary: 184 passed, 0 failed, 8 skipped, 0 warned
+[validate-plugin] Summary: 180 passed, 0 failed, 9 skipped, 0 warned

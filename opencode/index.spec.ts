@@ -1,6 +1,6 @@
 import type { Plugin } from "@opencode/plugin"
 import { afterEach, beforeEach, expect, spyOn, test } from "bun:test"
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { isAbsolute, join } from "node:path"
 import plugin from "./index.ts"
@@ -100,8 +100,6 @@ async function fireContext(fake: ReturnType<typeof fakeContext>, agent: string) 
   return event
 }
 
-const inactiveLine = (system: Rec[]) => system.some((s) => String(s.text).startsWith("OMCA guardrails are inactive on this host"))
-
 const modelErrors = () =>
   errorSpy.mock.calls.filter((args: unknown[]) => String(args[0]).startsWith("omca: ignoring models."))
 
@@ -165,25 +163,6 @@ test("the context hook looks up an agent's mode once and never for omca subagent
   await fireContext(fake, "build")
   await fireContext(fake, "omca-explore")
   expect(fake.gets).toEqual(["build"])
-})
-
-test("a primary agent is told when the guard self-test fails", async () => {
-  const shim = mkdtempSync(join(tmpdir(), "omca-shim-"))
-  dirs.push(shim)
-  writeFileSync(join(shim, "jq"), "#!/bin/sh\nexit 127\n")
-  chmodSync(join(shim, "jq"), 0o755)
-  const savedPath = process.env.PATH
-  process.env.PATH = `${shim}:${savedPath}`
-  try {
-    const fake = fakeContext()
-    await plugin.setup(fake.ctx)
-    expect(inactiveLine((await fireContext(fake, "build")).system)).toBe(true)
-  } finally {
-    process.env.PATH = savedPath
-  }
-  const fake = fakeContext()
-  await plugin.setup(fake.ctx)
-  expect(inactiveLine((await fireContext(fake, "build")).system)).toBe(false)
 })
 
 test("command arguments are substituted literally", async () => {

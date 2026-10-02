@@ -1,11 +1,9 @@
 #!/bin/bash
 # FileChanged observer for the two state files OMCA treats as authoritative: the
-# evidence ledger and the plan registry. write-guard.sh denies Write/Edit against
-# them, but that guard is keyed on tool name, so a Bash redirect or a `python -c`
-# rewrites either file without tripping it. FileChanged fires off a filesystem
-# watcher regardless of what wrote the file, which closes the observation gap.
-# It cannot close the enforcement gap: the event has no decision control and
-# cannot block the write. Detection only.
+# evidence ledger and the plan registry. FileChanged fires off a filesystem watcher
+# regardless of what wrote the file, so a direct edit outside the omca MCP tools is
+# observed. The event has no decision control and cannot block the write. Detection
+# only.
 #
 # The matcher value is resolved as a cwd-relative watch path AND matched against
 # the changed file's basename to pick hook groups. Our targets live in

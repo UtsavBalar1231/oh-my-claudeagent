@@ -308,8 +308,8 @@ leaves a record. `Setup` fires only under `claude --init-only`, `claude -p --ini
 `claude -p --maintenance`, so the dependency check runs on the `init` matcher and the
 stale-marker and log sweeps run on `maintenance`, off the per-session startup path.
 `FileChanged` watches the evidence ledger and the boulder registry: it is driven by a
-filesystem watcher rather than by tool names, so it sees a mutation that no `Write`-scoped
-guard can. It has no decision control, so it detects and logs and never blocks.
+filesystem watcher rather than by tool names, so it sees a mutation from any writer. It has
+no decision control, so it detects and logs and never blocks.
 
 A `FileChanged` matcher is two things at once. As a watch list it takes literal filenames
 resolved against the working directory; as a filter it is matched against the changed
@@ -400,7 +400,7 @@ The deny hooks are a separate family with their own shapes. `PreToolUse` accepts
 stderr text plus exit 2 or a `hookSpecificOutput.permissionDecision: "deny"` payload with
 exit 0; `PermissionRequest` reads `hookSpecificOutput.decision.behavior`. Every guard
 registered on both events branches on `hook_event_name` and writes the shape that event
-reads, as `executor-grep-deny.sh` does. Exit 2 does not deny on `PermissionRequest`: the per-event table
+reads. Exit 2 does not deny on `PermissionRequest`: the per-event table
 in `claude-code-docs/docs/hooks.md` gives that event a blocking column of "No", the
 permission flow proceeds unchanged, and the stderr is discarded. Deny through the
 `decision` object instead. That makes the branch required rather than a hedge, since the

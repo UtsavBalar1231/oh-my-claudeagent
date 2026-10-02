@@ -1,5 +1,4 @@
-import { existsSync, mkdtempSync, rmSync } from "node:fs"
-import { tmpdir } from "node:os"
+import { existsSync } from "node:fs"
 import { basename, join, resolve } from "node:path"
 import { classify, reasonFor } from "../src/core/destructive.ts"
 import { isHookDisabled } from "../src/core/kill-switch.ts"
@@ -76,35 +75,21 @@ export function checkShell(command: string): GuardResult {
 
 type EditPayload = { tool_name: string; hook_event_name: "PreToolUse"; tool_input: Record<string, unknown> }
 
-function editPayloads(tool: string, input: Record<string, unknown>, projectRoot: string) {
+function editPayloads(tool: string, input: Record<string, unknown>, projectRoot: string): EditPayload[] {
   const payload = (tool_name: string, tool_input: Record<string, unknown>): EditPayload => ({
     tool_name,
     hook_event_name: "PreToolUse",
     tool_input,
   })
   const path = (p: unknown) => resolve(projectRoot, String(p))
-  if (tool === "write") {
-    const p = payload("Write", { file_path: path(input.path), content: input.content })
-    return { writes: [p], comments: [p] }
-  }
-  if (tool === "edit") {
-    const p = payload("Edit", { file_path: path(input.path), old_string: input.oldString, new_string: input.newString })
-    return { writes: [p], comments: [p] }
-  }
-  if (tool !== "patch") return { writes: [], comments: [] }
+  if (tool === "write") return [payload("Write", { file_path: path(input.path), content: input.content })]
+  if (tool === "edit") return [payload("Edit", { file_path: path(input.path), old_string: input.oldString, new_string: input.newString })]
+  if (tool !== "patch") return []
   const text = String(input.patchText ?? "")
   const headers = [...text.matchAll(/^\*\*\* (Add|Update|Delete) File: (.+)$/gm)]
-  const writes: EditPayload[] = []
-  const comments: EditPayload[] = []
-  headers.forEach((header, i) => {
-    const section = text.slice(header.index, headers[i + 1]?.index)
-    const p = payload("Edit", { file_path: path(header[2].trim()), patchText: section })
-    writes.push(p)
-    comments.push(p)
-    const move = section.match(/^\*\*\* Move to: (.+)$/m)
-    if (move) writes.push(payload("Edit", { file_path: path(move[1].trim()), patchText: section }))
-  })
-  return { writes, comments }
+  return headers.map((header, i) =>
+    payload("Edit", { file_path: path(header[2].trim()), patchText: text.slice(header.index, headers[i + 1]?.index) }),
+  )
 }
 
 export async function checkEdit(
@@ -113,41 +98,11 @@ export async function checkEdit(
   input: Record<string, unknown>,
   projectRoot: string,
 ): Promise<GuardResult> {
-  const { writes, comments } = editPayloads(tool, input, projectRoot)
-  const opts = { cwd: projectRoot, projectRoot }
-  for (const p of writes) {
-    const result = await runGuard(script(root, "write-guard"), p, opts)
-    if (result.deny) return result
-  }
   if (process.env.OMCA_COMMENT_GATE !== "deny") return ALLOW
-  for (const p of comments) {
+  const opts = { cwd: projectRoot, projectRoot }
+  for (const p of editPayloads(tool, input, projectRoot)) {
     const result = await runGuard(script(root, "comment-checker"), p, opts)
     if (result.deny) return result
   }
   return ALLOW
-}
-
-export async function guardSelfTest(root: string): Promise<string[]> {
-  const tmp = mkdtempSync(join(tmpdir(), "omca-"))
-  const opts = { cwd: tmp, projectRoot: tmp }
-  const cases: [string, unknown][] = [
-    [
-      "write-guard",
-      {
-        tool_name: "Write",
-        hook_event_name: "PreToolUse",
-        tool_input: { file_path: join(tmp, ".omca", "evidence", "verification-evidence.json"), content: "{}" },
-      },
-    ],
-  ]
-  const failed: string[] = []
-  try {
-    for (const [name, payload] of cases) {
-      const file = script(root, name)
-      if (!(await runGuard(file, payload, opts)).deny) failed.push(basename(file))
-    }
-  } finally {
-    rmSync(tmp, { recursive: true, force: true })
-  }
-  return failed
 }

@@ -183,8 +183,7 @@ if [[ -n "$(jq -r '.session_title // ""' <<< "${HOOK_INPUT}")" ]]; then
 fi
 
 # Seed the FileChanged watch list with the two files whose integrity nothing else
-# observes: write-guard.sh protects the evidence ledger by tool name, so a Bash
-# redirect or a script that rewrites either file is invisible to it.
+# observes.
 jq -n \
 	--argjson ctx "${CONTEXT}" \
 	--arg title "${SESSION_TITLE:+OMCA: ${SESSION_TITLE}}" \

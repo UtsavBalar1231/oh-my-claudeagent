@@ -176,10 +176,9 @@ yourself.
 
 Pick the search tool by what you are matching. `ast_search` when the target is
 syntactic: a signature, a class shape, an import form, a call site. `rg` when it is
-literal text. `Read` with offset/limit once you know the file. `Grep` and Bash `grep`
-on code files are denied for you, and the deny costs a round trip, so do not open with
-one. `ast_search` reaches this repository and its git worktrees; for a path outside
-those, a vendored SDK or an unrelated checkout, use `rg` and `file_read`.
+literal text. `Read` with offset/limit once you know the file. `ast_search` reaches
+this repository and its git worktrees; for a path outside those, a vendored SDK or an
+unrelated checkout, use `rg` and `file_read`.
 
 A search too broad to run inline is a scoping problem, not a delegation problem:
 narrow it by path, by symbol, or by file type until it fits. If a task truly needs a

@@ -209,15 +209,3 @@ _run_fixture() {
 @test "golden: validate-plugin/known-good" {
 	_run_fixture "validate-plugin" "known-good"
 }
-
-@test "golden: write-guard/evidence-file" {
-	_run_fixture "write-guard" "evidence-file"
-}
-
-@test "golden: write-guard/existing-file" {
-	_run_fixture "write-guard" "existing-file"
-}
-
-@test "golden: write-guard/new-file" {
-	_run_fixture "write-guard" "new-file"
-}

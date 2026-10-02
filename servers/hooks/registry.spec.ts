@@ -31,7 +31,7 @@ describe("registry", () => {
   test("lists every planned handler per event, in order", () => {
     const names = Object.fromEntries(Object.entries(REGISTRY).map(([event, handlers]) => [event, handlers.map(([name]) => name)]));
     expect(names).toEqual({
-      PreToolUse: ["executor-grep-guard", "write-guard", "plan-write-guard", "comment-gate"],
+      PreToolUse: ["plan-write-guard", "comment-gate"],
       PermissionRequest: ["trusted-tooling"],
       PostToolUse: ["verification-recorder", "context-injector", "plan-format-warn", "empty-task-response"],
       PostToolUseFailure: ["failure-recovery"],
@@ -67,15 +67,15 @@ describe("error isolation", () => {
   test("a throwing PreToolUse handler yields the deny JSON, which wins over context", async () => {
     const errors = quietErrors();
     try {
-      const registry = { PreToolUse: [["ctx", context("PreToolUse", "a")], ["write-guard", boom]] as const };
+      const registry = { PreToolUse: [["ctx", context("PreToolUse", "a")], ["comment-gate", boom]] as const };
       expect(await dispatch({ event: "PreToolUse" }, project(), NOW, registry)).toEqual({
         hookSpecificOutput: {
           hookEventName: "PreToolUse",
           permissionDecision: "deny",
-          permissionDecisionReason: "OMCA's write-guard check failed, so this call is denied: bad pattern",
+          permissionDecisionReason: "OMCA's comment-gate check failed, so this call is denied: bad pattern",
         },
       });
-      expect(errors.mock.calls[0]?.[0]).toBe("omca: PreToolUse handler write-guard failed:");
+      expect(errors.mock.calls[0]?.[0]).toBe("omca: PreToolUse handler comment-gate failed:");
     } finally {
       errors.mockRestore();
     }

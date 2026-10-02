@@ -1,7 +1,6 @@
 import { handle as commentGate } from "./comment-gate.ts";
 import { handle as contextInjector } from "./context-injector.ts";
 import { handle as emptyTaskResponse } from "./empty-task-response.ts";
-import { handle as executorGrepGuard } from "./executor-grep-guard.ts";
 import { handle as failureRecovery } from "./failure-recovery.ts";
 import { handle as guidance } from "./guidance.ts";
 import { handle as keywordDetector } from "./keyword-detector.ts";
@@ -18,7 +17,6 @@ import { handle as taskCompleted } from "./task-completed.ts";
 import { handle as toolLoop } from "./tool-loop.ts";
 import { handle as trustedTooling } from "./trusted-tooling.ts";
 import { handle as verificationRecorder } from "./verification-recorder.ts";
-import { handle as writeGuard } from "./write-guard.ts";
 
 /** The hook payload as the handlers see it: object-valued fields already decoded. */
 export type Payload = Readonly<Record<string, unknown>> & { readonly event: string };
@@ -35,8 +33,6 @@ export type Handler = (payload: Payload, context: Context) => Output | undefined
 
 export const REGISTRY: Readonly<Record<string, readonly (readonly [string, Handler])[]>> = {
   PreToolUse: [
-    ["executor-grep-guard", executorGrepGuard],
-    ["write-guard", writeGuard],
     ["plan-write-guard", planWriteGuard],
     ["comment-gate", commentGate],
   ],

@@ -417,13 +417,13 @@ EOF
 }
 
 @test "hook_is_disabled: 'all' inside a comma list still disables every hook" {
-	_lib 'OMCA_DISABLED_HOOKS="write-guard,all" hook_is_disabled drift-guard && echo disabled || echo enabled'
+	_lib 'OMCA_DISABLED_HOOKS="comment-checker,all" hook_is_disabled drift-guard && echo disabled || echo enabled'
 	assert_success
 	assert_output 'disabled'
 }
 
 @test "hook_is_disabled: an unrelated list leaves the hook enabled" {
-	_lib 'OMCA_DISABLED_HOOKS="write-guard,post-edit" hook_is_disabled drift-guard && echo disabled || echo enabled'
+	_lib 'OMCA_DISABLED_HOOKS="comment-checker,post-edit" hook_is_disabled drift-guard && echo disabled || echo enabled'
 	assert_success
 	assert_output 'enabled'
 }

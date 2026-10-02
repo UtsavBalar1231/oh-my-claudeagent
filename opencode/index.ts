@@ -2,7 +2,7 @@ import type { Agent, Mcp, Plugin, Skill } from "@opencode/plugin"
 import type { CommandInvocation } from "@opencode/plugin/promise/command"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
-import { checkEdit, checkShell, guardSelfTest, type GuardResult } from "./guard.ts"
+import { checkEdit, checkShell, type GuardResult } from "./guard.ts"
 import { generate, parseModelRef, type Prompts } from "./lib.ts"
 
 type Context = Plugin.Context
@@ -12,8 +12,6 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)))
 const TIERS = ["opus", "sonnet", "fable"]
 const HIDDEN_TOOLS = ["omca_session_search", "omca_agents_list", "omca_categories_list", "omca_validate_plan_write", "omca_boulder_write"]
 const EDIT_TOOLS = ["write", "edit", "patch"]
-const GUARDS_INACTIVE =
-  "OMCA guardrails are inactive on this host (the guard scripts could not run). Ask the user for explicit confirmation before any destructive git or rm command."
 
 let prompts: Prompts | undefined
 
@@ -84,16 +82,6 @@ async function setup(ctx: Context) {
   const projectRoot = ctx.location.directory
   const data = loadPrompts()
 
-  const guardsInactive = guardSelfTest(root).then(
-    (failed) => {
-      if (failed.length) console.error(`omca: guard self-test failed for ${failed.join(", ")}; the guards need bash 4.3+ and jq`)
-      return failed.length > 0
-    },
-    (err) => {
-      console.error(`omca: guard self-test failed; the guards need bash 4.3+ and jq: ${err}`)
-      return true
-    },
-  )
   const omcaAgents = new Set(data.agents.map((a) => a.id))
   const getsOutputStyle = new Map<string, boolean>()
 
@@ -173,7 +161,6 @@ async function setup(ctx: Context) {
         }
         if (!primary) return
         if (data.outputStyle) event.system.push({ type: "text", text: data.outputStyle })
-        if (await guardsInactive) event.system.push({ type: "text", text: GUARDS_INACTIVE })
       }),
     ),
   )

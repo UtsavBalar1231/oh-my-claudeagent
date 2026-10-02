@@ -115,13 +115,6 @@ result=$(tool_results_since "${start}")
 pass shell-reset
 
 start=$(wc -l <"${STUB_LOG}")
-run write-evidence
-[[ ! -e "${ws}/.omca/evidence/verification-evidence.json" ]] || fail write-evidence "evidence file was created"
-result=$(tool_results_since "${start}")
-[[ "${result}" == *"omca guard:"* ]] || fail write-evidence "no omca guard denial reached the model"
-pass write-evidence
-
-start=$(wc -l <"${STUB_LOG}")
 run subagent
 sessions=$(api session)
 jq -e '.data[]? | select(.parentID != null)' <<<"${sessions}" >/dev/null || fail subagent "no child session: ${sessions}"

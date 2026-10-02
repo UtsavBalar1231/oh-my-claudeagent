@@ -4,60 +4,7 @@
 load '../test_helper'
 
 # ---------------------------------------------------------------------------
-# a. write-guard: overwrite warning for existing file
-# ---------------------------------------------------------------------------
-
-@test "write-guard: warns when target file already exists" {
-	local target="$CLAUDE_PROJECT_ROOT/existing-file.txt"
-	printf 'content' > "$target"
-
-	local payload
-	payload=$(printf '{"tool_name":"Write","tool_input":{"file_path":"%s"}}' "$target")
-
-	run_hook "write-guard.sh" "$payload"
-	assert_success
-	ctx=$(get_context)
-	assert [ -n "$ctx" ]
-	echo "$ctx" | grep -qi "Detected manual write"
-}
-
-# ---------------------------------------------------------------------------
-# b. write-guard: no warning for non-existent file
-# ---------------------------------------------------------------------------
-
-@test "write-guard: no warning when target file does not exist" {
-	local target="$CLAUDE_PROJECT_ROOT/new-file-does-not-exist.txt"
-	# Ensure the file does not exist
-	rm -f "$target"
-
-	local payload
-	payload=$(printf '{"tool_name":"Write","tool_input":{"file_path":"%s"}}' "$target")
-
-	run_hook "write-guard.sh" "$payload"
-	assert_success
-	assert_output ""
-}
-
-# ---------------------------------------------------------------------------
-# c. write-guard: evidence intercept for verification-evidence.json
-# ---------------------------------------------------------------------------
-
-@test "write-guard: intercepts writes targeting verification-evidence.json" {
-	local target="$CLAUDE_PROJECT_ROOT/.omca/state/verification-evidence.json"
-
-	local payload
-	payload=$(printf '{"tool_name":"Write","tool_input":{"file_path":"%s"}}' "$target")
-
-	run_hook "write-guard.sh" "$payload"
-	assert_success
-
-	local decision
-	decision=$(echo "$output" | jq -r '.hookSpecificOutput.permissionDecision // empty')
-	[ "$decision" = "deny" ]
-}
-
-# ---------------------------------------------------------------------------
-# d. comment-checker: warns on TODO: implement
+# a. comment-checker: warns on TODO: implement
 # ---------------------------------------------------------------------------
 
 @test "comment-checker: warns when content contains 'TODO: implement'" {

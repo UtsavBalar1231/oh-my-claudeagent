@@ -147,7 +147,7 @@ _log_hook_error() {
 @test "session-init: reports the distinct hooks that errored since the last session start" {
 	_log_hook_error "drift-guard.sh"
 	_log_hook_error "drift-guard.sh"
-	_log_hook_error "write-guard.sh"
+	_log_hook_error "comment-checker.sh"
 
 	run_hook "session-init.sh" '{"session_id":"sess-a","source":"startup"}'
 	assert_success
@@ -155,7 +155,7 @@ _log_hook_error() {
 	ctx=$(get_context)
 	[[ "$ctx" == *"[HOOK ERRORS] 2 hook(s)"* ]]
 	[[ "$ctx" == *"drift-guard.sh"* ]]
-	[[ "$ctx" == *"write-guard.sh"* ]]
+	[[ "$ctx" == *"comment-checker.sh"* ]]
 }
 
 @test "session-init: says nothing about hook errors when none are new" {

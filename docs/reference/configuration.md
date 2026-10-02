@@ -84,7 +84,6 @@ list; a hook not on it ignores the variable entirely):
 | `final-verification-evidence` | Blocks session Stop when the bound plan is fully checked off but no `final_verification` evidence entry has been logged for it. |
 | `plan-continuation-guard` | Blocks session Stop when the bound plan still has unchecked numbered tasks, nudging the agent to keep going instead of stopping mid-plan. |
 | `tool-loop-detector` | Warns when the same tool call repeats several times in a row, a common sign of a blind retry loop. |
-| `write-guard` | Denies writes to protected paths — `verification-evidence.json` and anything under `.omca/notepads/` — on `Write` and `Edit` alike, and additionally warns before a `Write` call overwrites an existing file. |
 | `git-destructive-deny` | Denies git subcommands that discard working-tree state: `reset --hard`, `stash`, `clean`, `restore`, `rm -r` (any clustered flag containing `r` or `R`), and a `checkout` whose arguments include a `--` pathspec separator. Matches at any command position and through an optional `sudo` prefix and leading git global options (`-C`, `-c`, `--git-dir`, `--work-tree`, `--no-pager`, and siblings). |
 | `drift-guard` | Blocks session Stop when the last assistant turn reads as a completion claim but the working tree still contains stub markers on changed lines. |
 | `plan-format-warn` | Warns when a plan file's checkboxes don't follow the numbered `- [ ] N.` form that progress tracking depends on. |

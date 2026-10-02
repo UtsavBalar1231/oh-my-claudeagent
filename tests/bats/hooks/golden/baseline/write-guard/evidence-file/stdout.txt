@@ -1,1 +1,0 @@
-{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Manual writes to verification-evidence.json are forbidden. Use the evidence_log MCP tool instead."}}

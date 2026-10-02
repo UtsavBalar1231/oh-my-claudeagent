@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { checkEdit, checkShell, guardSelfTest, runGuard } from "./guard.ts"
+import { checkEdit, checkShell, runGuard } from "./guard.ts"
 
 const root = join(import.meta.dir, "..")
 
@@ -72,14 +72,6 @@ describe("decisions", () => {
     expect(checkShell("rm -rf ~")).toEqual({ deny: true, reason: RM_CATASTROPHIC })
   })
 
-  test("write-guard denies a write to the evidence ledger", async () => {
-    const path = join(tmp, ".omca", "evidence", "verification-evidence.json")
-    const result = await checkEdit(root, "write", { path, content: "{}" }, tmp)
-    expect(result.deny).toBe(true)
-    if (result.deny) expect(result.reason).toContain("evidence_log")
-    expect(errorSpy).toHaveBeenCalledTimes(0)
-  })
-
   test("a write to a new file is allowed", async () => {
     expect(await checkEdit(root, "write", { path: join(tmp, "new.txt"), content: "hi" }, tmp)).toEqual({
       deny: false,
@@ -112,22 +104,6 @@ describe("decisions", () => {
     if (result.deny) expect(result.reason).toContain("restates the following code line")
     expect(errorSpy).toHaveBeenCalledTimes(0)
   })
-
-  test("write-guard denies a patch that moves a file onto the evidence ledger", async () => {
-    const patchText =
-      "*** Begin Patch\n*** Update File: notes.txt\n*** Move to: .omca/evidence/verification-evidence.json\n@@\n-a\n+b\n*** End Patch"
-    const result = await checkEdit(root, "patch", { patchText }, tmp)
-    expect(result.deny).toBe(true)
-    if (result.deny) expect(result.reason).toContain("evidence_log")
-    expect(errorSpy).toHaveBeenCalledTimes(0)
-  })
-
-  test("write-guard denies a patch that adds the evidence ledger", async () => {
-    const patchText = "*** Begin Patch\n*** Add File: .omca/evidence/verification-evidence.json\n+{}\n*** End Patch"
-    const result = await checkEdit(root, "patch", { patchText }, tmp)
-    expect(result.deny).toBe(true)
-    expect(errorSpy).toHaveBeenCalledTimes(0)
-  })
 })
 
 describe("failure modes allow and log once", () => {
@@ -146,25 +122,5 @@ describe("failure modes allow and log once", () => {
   test("exit 127", async () => {
     expect(await runGuard(tempScript("exit 127"), {}, opts())).toEqual({ deny: false })
     expect(errorSpy).toHaveBeenCalledTimes(1)
-  })
-})
-
-describe("guardSelfTest", () => {
-  test("passes with the real toolchain", async () => {
-    expect(await guardSelfTest(root)).toEqual([])
-  })
-
-  test("reports scripts when jq is broken", async () => {
-    const shim = join(tmp, "shim")
-    mkdirSync(shim)
-    writeFileSync(join(shim, "jq"), "#!/bin/sh\nexit 127\n")
-    chmodSync(join(shim, "jq"), 0o755)
-    const savedPath = process.env.PATH
-    process.env.PATH = `${shim}:${savedPath}`
-    try {
-      expect((await guardSelfTest(root)).length).toBeGreaterThan(0)
-    } finally {
-      process.env.PATH = savedPath
-    }
   })
 })
