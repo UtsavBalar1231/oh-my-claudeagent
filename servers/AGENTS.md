@@ -9,7 +9,8 @@ revision 2026-07-28 and every 2025-era client from the same stdio loop, with no 
 
 - `omca.ts`: entry point, launched as `bun servers/omca.ts` from `.mcp.json`. Declares the
   tool list, handles the handshake and `tools/call`, and runs the shutdown handler.
-- `jsonrpc.ts`: the line-delimited JSON-RPC dispatcher.
+- `jsonrpc.ts`: the line-delimited JSON-RPC dispatcher, with per-request cancellation.
+- `progress.ts`: the throttled `notifications/progress` reporter and the context a tool receives.
 - `io.ts`: state-directory resolution, the temp-plus-rename writer and the lock protocol.
 - `lifecycle.ts`: start-up housekeeping (registry GC, ledger rotation, record pruning).
 - `tools/`: one module per tool family (`boulder.ts`, `evidence.ts`, `notepad.ts`, `ast.ts`,

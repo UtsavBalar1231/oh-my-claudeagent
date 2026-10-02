@@ -24,7 +24,7 @@ export const tools: Tool[] = [
       required: ["event"],
       additionalProperties: { type: "string" },
     },
-    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    annotations: { title: "OMCA hook entry point", readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     call: async (args) => {
       const { event } = args;
       if (typeof event !== "string") throw new Error("omca_hook: event must be a string");

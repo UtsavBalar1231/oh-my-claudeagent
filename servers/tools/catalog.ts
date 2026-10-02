@@ -148,7 +148,7 @@ export const tools: Tool[] = [
     description:
       "Report whether OMCA's runtime is active in this session, plus the client version, the ast-grep binary and the state files. `runtime` is `ok` when this session's settings hooks have reached the server and the OMCA mod has marked the session since the last prompt; otherwise it is `hooks_inactive` or `mod_absent`, and `runtime_reason` names the likely cause. The orchestration skills call this first and stop unless `runtime` is `ok`. `client_version` is null when the client does not export its version. `ast_grep` is `{path}` or `{error}`. `state` gives the state directory as `present` or `absent` and `boulder.json` and `verification-evidence.json` as `absent`, `valid` or `invalid` JSON.",
     inputSchema: { type: "object", properties: { working_directory: WORKING_DIRECTORY } },
-    annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+    annotations: { title: "Check OMCA health", readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     _meta: {
       "anthropic/searchHint": "whether OMCA's hooks and mod are running, and the ast-grep binary and state files are in order",
     },
@@ -159,7 +159,7 @@ export const tools: Tool[] = [
     description:
       'Return a JSON array with one entry per agent file in the plugin\'s agents/ directory: name, description (the frontmatter description), default_model (the frontmatter model alias, "sonnet" when absent), and cost_tier (premium for fable, expensive for opus, cheap for sonnet and unknown values, free for haiku). The Agent tool\'s own agent list already carries names and descriptions; use this when the model or cost tier matters.',
     inputSchema: { type: "object", properties: {} },
-    annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+    annotations: { title: "List agents", readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     _meta: { "anthropic/searchHint": "agent roster with descriptions, default model and cost tier, for delegation routing" },
     call: agentsList,
   },
@@ -173,7 +173,7 @@ export const tools: Tool[] = [
         working_directory: { type: "string", default: "", description: "Unused — reads from plugin dir. Kept for API consistency." },
       },
     },
-    annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+    annotations: { title: "List model categories", readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     _meta: { "anthropic/searchHint": "agent category to model tier mapping" },
     call: categoriesList,
   },

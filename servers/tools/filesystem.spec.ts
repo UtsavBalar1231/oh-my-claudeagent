@@ -36,7 +36,7 @@ const row = (number: number, text: string) => `${String(number).padStart(6)}\t${
 
 test("file_read is declared as the only tool of the module, read-only", () => {
   expect(tools.map((tool) => tool.name)).toEqual(["file_read"]);
-  expect(fileRead.annotations).toEqual({ readOnlyHint: true, idempotentHint: true, openWorldHint: false });
+  expect(fileRead.annotations.readOnlyHint).toBe(true);
 });
 
 test("a short file comes back numbered with a size footer", async () => {

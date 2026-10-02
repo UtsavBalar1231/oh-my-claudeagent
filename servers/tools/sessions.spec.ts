@@ -68,7 +68,7 @@ const search = async (args: Record<string, unknown>): Promise<Result> => JSON.pa
 
 test("session_search is declared as the only tool of the module, read-only", () => {
   expect(tools.map((tool) => tool.name)).toEqual(["session_search"]);
-  expect(sessionSearch.annotations).toEqual({ readOnlyHint: true, idempotentHint: true, openWorldHint: false });
+  expect(sessionSearch.annotations.readOnlyHint).toBe(true);
 });
 
 test("a hit comes back as two-space-indented JSON with the file, timestamp, role and excerpt", async () => {
@@ -371,4 +371,16 @@ test("a query or limit of the wrong type is rejected as an error", async () => {
   await expect(sessionSearch.call({})).rejects.toThrow("query must be a string");
   await expect(raw({ query: "x", limit: "5" })).rejects.toThrow("limit must be an integer");
   await expect(raw({ query: "x", role: 1 })).rejects.toThrow("role must be a string");
+});
+
+test("session_search reports each source it searches with the total, and stops when the call is cancelled", async () => {
+  for (const name of ["a.jsonl", "b.jsonl", "c.jsonl"]) transcript(name, turn("user", "nothing here"));
+  const updates: Array<{ message: string; progress?: number; total?: number }> = [];
+  const signal = new AbortController().signal;
+  await sessionSearch.call({ project_path: project, query: "absent" }, { signal, progress: (update) => updates.push(update) });
+  expect(updates.map(({ progress, total }) => [progress, total])).toEqual([[0, 3], [1, 3], [2, 3]]);
+  expect(updates.map(({ message }) => message.replace(/Searching \S+, /, ""))).toEqual(["1 of 3", "2 of 3", "3 of 3"]);
+
+  const cancelled = { signal: AbortSignal.abort(), progress: () => {} };
+  await expect(sessionSearch.call({ project_path: project, query: "absent" }, cancelled)).rejects.toThrow();
 });

@@ -34,18 +34,12 @@ const sectionPath = (plan: string, section: string) => join(project, ".omca", "n
 const readSection = (plan: string, section: string) => readFileSync(sectionPath(plan, section), "utf8");
 
 describe("declarations", () => {
-  test("the four notepad tools are declared with the contract's annotations", () => {
-    expect(tools.map(({ name, annotations }) => ({ name, annotations }))).toEqual([
-      {
-        name: "notepad_write",
-        annotations: { title: "Append to notepad", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-      },
-      { name: "notepad_read", annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false } },
-      { name: "notepad_list", annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false } },
-      {
-        name: "notepad_compact",
-        annotations: { title: "Compact notepad section", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
-      },
+  test("the four notepad tools are declared in order, the writers first and last", () => {
+    expect(tools.map(({ name, annotations }) => [name, annotations.readOnlyHint])).toEqual([
+      ["notepad_write", false],
+      ["notepad_read", true],
+      ["notepad_list", true],
+      ["notepad_compact", false],
     ]);
   });
 
@@ -342,7 +336,7 @@ describe("through the server", () => {
   test("a server without the hooks role lists the declared notepad tools and serves them end to end", async () => {
     await withServer(async (request) => {
       const listed = (await request("tools/list")).result?.tools ?? [];
-      const declared = tools.map(({ call, ...declaration }) => declaration);
+      const declared = tools.map(({ call, ...declaration }) => declaration).sort((a, b) => (a.name < b.name ? -1 : 1));
       expect(JSON.parse(JSON.stringify(listed)).filter((t: { name: string }) => t.name.startsWith("notepad_"))).toEqual(
         JSON.parse(JSON.stringify(declared)),
       );

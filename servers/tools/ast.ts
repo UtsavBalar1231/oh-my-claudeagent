@@ -1,6 +1,7 @@
 import { existsSync, realpathSync, statSync } from "node:fs";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import type { Tool } from "../omca.ts";
+import { IDLE_CONTEXT, type Progress } from "../progress.ts";
 
 const LANGUAGES = [
   "bash",
@@ -75,6 +76,7 @@ const LANG_EXTENSIONS: Record<string, Language> = {
 };
 
 const TIMEOUT_MS = 300_000;
+const HEARTBEAT_MS = 1_000;
 const MAX_RESULTS_DEFAULT = 500;
 const MAX_RESULT_CAP = 500;
 const MAX_JSON_OUTPUT_BYTES = 1024 * 1024;
@@ -166,9 +168,11 @@ export function discoverBinary(): string {
 
 export async function run(
   argv: string[],
-  options: { input?: string; allowExit1?: boolean; timeoutMs?: number } = {},
+  options: { input?: string; allowExit1?: boolean; timeoutMs?: number; signal?: AbortSignal; progress?: Progress } = {},
 ) {
   const timeoutMs = options.timeoutMs ?? TIMEOUT_MS;
+  const { signal, progress } = options;
+  signal?.throwIfAborted();
   const started = performance.now();
   const proc = Bun.spawn([discoverBinary(), ...argv], {
     cwd: workspace(),
@@ -177,12 +181,26 @@ export async function run(
     stderr: "pipe",
     timeout: timeoutMs,
     windowsHide: true,
+    ...(signal && { signal }),
   });
-  const [stdout, stderrBytes, exitCode] = await Promise.all([
-    new Response(proc.stdout).bytes(),
-    new Response(proc.stderr).bytes(),
-    proc.exited,
-  ]);
+  progress?.({ message: "ast-grep running" });
+  const heartbeat =
+    progress &&
+    setInterval(
+      () => progress({ message: `ast-grep running, ${Math.round((performance.now() - started) / 1000)}s` }),
+      HEARTBEAT_MS,
+    );
+  let stdout: Uint8Array, stderrBytes: Uint8Array, exitCode: number;
+  try {
+    [stdout, stderrBytes, exitCode] = await Promise.all([
+      new Response(proc.stdout).bytes(),
+      new Response(proc.stderr).bytes(),
+      proc.exited,
+    ]);
+  } finally {
+    clearInterval(heartbeat);
+  }
+  signal?.throwIfAborted();
   // Windows ends a timed-out process without setting signalCode, so the clock is the evidence.
   if (performance.now() - started >= timeoutMs) throw new Error(`Command timed out after ${timeoutMs / 1000}s`);
   const stderr = new TextDecoder().decode(stderrBytes);
@@ -498,13 +516,13 @@ export const tools: Tool[] = [
       },
       required: ["pattern", "lang"],
     },
-    annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+    annotations: { title: "Search code by AST pattern", readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     _meta: {
       "anthropic/searchHint":
         "structural code search by syntax pattern across 25 languages; use instead of grep when the pattern is syntactic",
       "anthropic/maxResultSizeChars": SEARCH_MAX_RESULT_CHARS,
     },
-    call: async (args) => {
+    call: async (args, ctx = IDLE_CONTEXT) => {
       const a = reader("ast_search", args);
       const pattern = a.string("pattern");
       const lang = a.choice("lang", LANGUAGES);
@@ -525,7 +543,7 @@ export const tools: Tool[] = [
           "--",
           ...paths,
         ],
-        { allowExit1: true },
+        { allowExit1: true, ...ctx },
       );
       const { matches, truncated } = parseMatches(result.stdout);
       if (matches.length === 0) return zeroMatchMessage(pattern, lang, result.stderr, paths);
@@ -564,7 +582,7 @@ export const tools: Tool[] = [
       openWorldHint: false,
     },
     _meta: { "anthropic/searchHint": "AST-aware structural find-and-replace refactor across files" },
-    call: async (args) => {
+    call: async (args, ctx = IDLE_CONTEXT) => {
       const a = reader("ast_replace", args);
       const pattern = a.string("pattern");
       const rewrite = a.string("rewrite");
@@ -574,7 +592,7 @@ export const tools: Tool[] = [
       const dryRun = a.boolean("dry_run", true);
       const rule = [`--pattern=${pattern}`, `--rewrite=${rewrite}`, "--lang", lang];
       const scope = [...globArgs(globs), "--", ...paths];
-      const preview = await run(["run", ...rule, "--json=compact", ...scope], { allowExit1: true });
+      const preview = await run(["run", ...rule, "--json=compact", ...scope], { allowExit1: true, ...ctx });
       const { matches, truncated } = parseMatches(preview.stdout);
       if (matches.length === 0) return zeroMatchMessage(pattern, lang, preview.stderr, paths, true);
       if (!dryRun) {
@@ -586,7 +604,7 @@ export const tools: Tool[] = [
           );
         }
         try {
-          await run(["run", ...rule, "--update-all", ...scope]);
+          await run(["run", ...rule, "--update-all", ...scope], ctx);
         } catch (error) {
           throw new Error(`Replace failed: ${error instanceof Error ? error.message : error}`);
         }
@@ -618,12 +636,12 @@ export const tools: Tool[] = [
       },
       required: ["rule_yaml"],
     },
-    annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+    annotations: { title: "Search code by YAML rule", readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     _meta: {
       "anthropic/searchHint":
         "YAML rule search with kind/has/inside/follows/precedes combinators for context-sensitive matches",
     },
-    call: async (args) => {
+    call: async (args, ctx = IDLE_CONTEXT) => {
       const a = reader("ast_find_rule", args);
       const ruleYaml = a.string("rule_yaml");
       const paths = normalizePaths(a.strings("paths"));
@@ -631,6 +649,7 @@ export const tools: Tool[] = [
       const format = a.choice("output_format", ["text", "json"], "text");
       const result = await run(["scan", `--inline-rules=${ruleYaml}`, "--json=compact", "--", ...paths], {
         allowExit1: true,
+        ...ctx,
       });
       const { matches, truncated } = parseMatches(result.stdout);
       if (matches.length === 0) return "No matches found";
@@ -657,16 +676,16 @@ export const tools: Tool[] = [
       },
       required: ["code", "language"],
     },
-    annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+    annotations: { title: "Dump a snippet's syntax tree", readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     _meta: { "anthropic/searchHint": "dump the AST/CST of a snippet to build or debug an ast-grep pattern" },
-    call: async (args) => {
+    call: async (args, ctx = IDLE_CONTEXT) => {
       const a = reader("ast_dump_tree", args);
       const code = a.string("code");
       const language = a.choice("language", LANGUAGES);
       const format = a.choice("format", ["cst", "ast", "pattern"], "cst");
       const result = await run(
         ["run", `--pattern=${code}`, "--lang", language, `--debug-query=${format}`, "--stdin"],
-        { input: code, allowExit1: true },
+        { input: code, allowExit1: true, ...ctx },
       );
       return result.stderr.trim() || "No syntax tree output. The code may be empty or unparseable.";
     },
@@ -691,17 +710,18 @@ export const tools: Tool[] = [
       },
       required: ["code", "rule_yaml"],
     },
-    annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+    annotations: { title: "Test a YAML rule on a snippet", readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     _meta: {
       "anthropic/searchHint": "validate an ast-grep YAML rule against a snippet before running it repo-wide",
     },
-    call: async (args) => {
+    call: async (args, ctx = IDLE_CONTEXT) => {
       const a = reader("ast_test_rule", args);
       const code = a.string("code");
       const ruleYaml = a.string("rule_yaml");
       const result = await run(["scan", `--inline-rules=${ruleYaml}`, "--stdin", "--json=compact"], {
         input: code,
         allowExit1: true,
+        ...ctx,
       });
       const { matches, truncated } = parseMatches(result.stdout);
       if (matches.length === 0) return NO_RULE_MATCH;

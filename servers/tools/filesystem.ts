@@ -193,7 +193,7 @@ export const tools: Tool[] = [
       },
       required: ["path"],
     },
-    annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+    annotations: { title: "Read a file", readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     _meta: {
       "anthropic/searchHint": "read a file outside the project root, with line numbers and a token estimate",
       "anthropic/maxResultSizeChars": MAX_RESULT_CHARS,

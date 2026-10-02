@@ -107,7 +107,7 @@ export const tools: Tool[] = [
       },
       required: ["plan_name"],
     },
-    annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+    annotations: { title: "Read notepad", readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     _meta: { "anthropic/searchHint": "recall learnings, issues, decisions, and problems recorded for a plan" },
     call: (args) => {
       const plan = toPlan(stringArg(args, "plan_name"));
@@ -133,7 +133,7 @@ export const tools: Tool[] = [
         working_directory: WORKING_DIRECTORY,
       },
     },
-    annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+    annotations: { title: "List notepads", readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     _meta: { "anthropic/searchHint": "discover which plans have notepads and which sections exist" },
     call: (args) => {
       const plan = stringArg(args, "plan_name", "");

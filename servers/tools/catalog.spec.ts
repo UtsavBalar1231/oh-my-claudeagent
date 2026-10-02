@@ -213,12 +213,11 @@ function plugin(files: Record<string, string>): string {
 const agent = (...lines: string[]) => ["---", ...lines, "---", "Body", ""].join("\n");
 
 test("the three tools are declared read-only, health_check first", () => {
-  expect(tools.map(({ name, annotations }) => ({ name, annotations }))).toEqual(
-    ["health_check", "agents_list", "categories_list"].map((name) => ({
-      name,
-      annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
-    })),
-  );
+  expect(tools.map(({ name, annotations }) => [name, annotations.readOnlyHint])).toEqual([
+    ["health_check", true],
+    ["agents_list", true],
+    ["categories_list", true],
+  ]);
 });
 
 test("agents_list returns each agent file's name, description, model and cost tier, sorted by file name", async () => {

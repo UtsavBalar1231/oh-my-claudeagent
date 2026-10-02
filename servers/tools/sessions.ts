@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { projectRoot } from "../io.ts";
 import { isObject } from "../jsonrpc.ts";
 import type { Tool } from "../omca.ts";
+import { IDLE_CONTEXT } from "../progress.ts";
 import { integerArg, isMissing, readLines, stringArg } from "./filesystem.ts";
 
 const DEFAULT_LIMIT = 10;
@@ -89,9 +90,11 @@ async function searchTranscript(
   role: string,
   spilled: ReadonlySet<string>,
   keep: number,
+  signal: AbortSignal,
 ): Promise<Match[]> {
   const found: Match[] = [];
   for await (const line of readLines(source.path, new TextDecoder())) {
+    signal.throwIfAborted();
     let record: unknown;
     try {
       record = JSON.parse(line);
@@ -114,7 +117,7 @@ async function searchTranscript(
 }
 
 /** The first hit in a spilled tool result as a one-element list, or none. Reads one chunk at a time. */
-async function searchSidecar(source: Source, query: string): Promise<Match[]> {
+async function searchSidecar(source: Source, query: string, signal: AbortSignal): Promise<Match[]> {
   const decoder = new TextDecoder();
   // Between chunks only the left context and a hit straddling the chunk boundary must survive.
   const keepTail = EXCERPT_RADIUS + query.length - 1;
@@ -128,6 +131,7 @@ async function searchSidecar(source: Source, query: string): Promise<Match[]> {
   ];
   let text = "";
   for await (const chunk of createReadStream(source.path)) {
+    signal.throwIfAborted();
     text += decoder.decode(chunk, { stream: true });
     const hit = text.toLowerCase().indexOf(query);
     if (hit === -1) text = text.slice(-keepTail);
@@ -138,7 +142,7 @@ async function searchSidecar(source: Source, query: string): Promise<Match[]> {
   return hit === -1 ? [] : toMatch(text, hit);
 }
 
-async function sessionSearch(args: Record<string, unknown>): Promise<string> {
+async function sessionSearch(args: Record<string, unknown>, { signal, progress } = IDLE_CONTEXT): Promise<string> {
   const query = stringArg(args, "query");
   const root = projectRoot(stringArg(args, "project_path", "") || process.cwd());
   const requestedRole = stringArg(args, "role", "");
@@ -157,10 +161,12 @@ async function sessionSearch(args: Record<string, unknown>): Promise<string> {
   const queryLower = query.toLowerCase();
   const matches: Match[] = [];
   let truncated = false;
-  for (const source of sources) {
+  for (const [index, source] of sources.entries()) {
+    signal.throwIfAborted();
+    progress({ message: `Searching ${source.label}, ${index + 1} of ${sources.length}`, progress: index, total: sources.length });
     const found = source.sidecar
-      ? await searchSidecar(source, queryLower)
-      : await searchTranscript(source, queryLower, role, spilled, limit + 1);
+      ? await searchSidecar(source, queryLower, signal)
+      : await searchTranscript(source, queryLower, role, spilled, limit + 1, signal);
     const room = limit - matches.length;
     matches.push(...found.slice(0, room));
     if (found.length > room) {
@@ -195,7 +201,7 @@ export const tools: Tool[] = [
       },
       required: ["query"],
     },
-    annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+    annotations: { title: "Search session transcripts", readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     _meta: {
       "anthropic/searchHint": "search this project's past Claude Code session transcripts",
       "anthropic/maxResultSizeChars": MAX_RESULT_CHARS,

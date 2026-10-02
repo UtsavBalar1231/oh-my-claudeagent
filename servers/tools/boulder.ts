@@ -239,7 +239,7 @@ export const tools: Tool[] = [
     annotations: {
       title: "Register work plan",
       readOnlyHint: false,
-      destructiveHint: false,
+      destructiveHint: true,
       idempotentHint: true,
       openWorldHint: false,
     },
@@ -267,7 +267,7 @@ export const tools: Tool[] = [
         working_directory: WORKING_DIRECTORY,
       },
     },
-    annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+    annotations: { title: "Check plan progress", readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     _meta: {
       "anthropic/searchHint": "plan task progress: completed and remaining checkboxes, plus the next task label",
       "anthropic/alwaysLoad": true,

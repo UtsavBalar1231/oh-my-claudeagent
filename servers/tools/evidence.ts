@@ -186,7 +186,7 @@ export const tools: Tool[] = [
     description:
       "Return every entry in the project's verification evidence log as JSON, oldest first, or a no-evidence message. The log is never cleared and is shared by all sessions in the project, so it holds entries from earlier sessions and other plans; there is no filter or paging, and each output_snippet is capped at 2,000 characters. Use it to confirm what was logged, for example evidence a subagent reports.",
     inputSchema: { type: "object", properties: { working_directory: WORKING_DIRECTORY } },
-    annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+    annotations: { title: "Read verification evidence", readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     _meta: {
       "anthropic/searchHint": "review all logged verification evidence before claiming a task complete",
       "anthropic/maxResultSizeChars": EVIDENCE_MAX_RESULT_CHARS,

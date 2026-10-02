@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fakeExec } from "../../tests/fixtures/fake-exec.ts";
@@ -253,6 +253,65 @@ describe("timeout", () => {
     const dir = tempDir();
     process.env.AST_GREP_BIN = fakeExec(dir, "ast-grep", 'console.log("[]");');
     expect((await run(["run"], { timeoutMs: 5_000 })).stdout.length).toBeGreaterThan(0);
+  });
+});
+
+describe("cancellation and progress", () => {
+  const isAlive = (pid: number): boolean => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  test("aborting the signal kills the ast-grep child and run rejects", async () => {
+    project();
+    const dir = tempDir();
+    const pidFile = join(dir, "pid");
+    process.env.AST_GREP_BIN = fakeExec(dir, "ast-grep", `require("node:fs").writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));\nawait Bun.sleep(20000);`);
+    const controller = new AbortController();
+    const running = run(["run"], { signal: controller.signal });
+    const outcome = running.then(
+      () => "resolved",
+      (error: Error) => error.name,
+    );
+    const deadline = Date.now() + 10_000;
+    while (!(existsSync(pidFile) && readFileSync(pidFile, "utf8") !== "")) {
+      if (Date.now() > deadline) throw new Error("the fake ast-grep never started");
+      await Bun.sleep(20);
+    }
+    const pid = Number(readFileSync(pidFile, "utf8"));
+    controller.abort();
+    expect(await outcome).toBe("AbortError");
+    expect(isAlive(pid)).toBe(false);
+  });
+
+  test("a signal that is already aborted never starts the binary", async () => {
+    project();
+    const dir = tempDir();
+    const marker = join(dir, "started");
+    process.env.AST_GREP_BIN = fakeExec(dir, "ast-grep", `require("node:fs").writeFileSync(${JSON.stringify(marker)}, "x");`);
+    await expect(run(["run"], { signal: AbortSignal.abort() })).rejects.toThrow();
+    expect(existsSync(marker)).toBe(false);
+  });
+
+  test("run reports that ast-grep is running, then once a second with the elapsed time", async () => {
+    project();
+    process.env.AST_GREP_BIN = fakeExec(tempDir(), "ast-grep", 'await Bun.sleep(1300);\nconsole.log("[]");');
+    const messages: string[] = [];
+    await run(["run"], { progress: ({ message }) => messages.push(message) });
+    expect(messages).toEqual(["ast-grep running", "ast-grep running, 1s"]);
+  });
+
+  test("a call through a tool hands the context's signal and progress to run", async () => {
+    project({ "main.py": MAIN_PY });
+    process.env.AST_GREP_BIN = fakeExec(tempDir(), "ast-grep", 'console.log("[]");');
+    const messages: string[] = [];
+    const search = tools.find((tool) => tool.name === "ast_search");
+    await search?.call({ pattern: "x", lang: "python" }, { signal: new AbortController().signal, progress: ({ message }) => messages.push(message) });
+    expect(messages).toEqual(["ast-grep running"]);
   });
 });
 
