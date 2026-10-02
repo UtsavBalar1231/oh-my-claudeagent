@@ -1,8 +1,7 @@
 #!/usr/bin/env bats
 # Unit tests for the portability and state-safety hardening in scripts/lib/common.sh:
 # the timeout/gtimeout/cat probe, the fail-open signal on an unparseable payload,
-# sha256_of_stdin fallback, the BSD-safe epoch_ns value probe, and the Stop-event
-# block ledger.
+# and the BSD-safe epoch_ns value probe.
 
 load '../test_helper'
 
@@ -103,33 +102,6 @@ _path_without() {
 	assert_output '0'
 }
 
-# ─── d. sha256_of_stdin ──────────────────────────────────────────────────────────────
-
-@test "sha256_of_stdin: matches sha256sum for a known input" {
-	_lib 'printf "abc" | sha256_of_stdin'
-	assert_success
-	assert_output 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'
-}
-
-@test "sha256_of_stdin: falls back to shasum when sha256sum is absent" {
-	local bin
-	bin=$(_path_without sha256sum)
-	run env -i PATH="$bin" HOME="$HOME" CLAUDE_PROJECT_ROOT="$BATS_TEST_TMPDIR/p" HOOK_INPUT='{}' \
-		"$bin/bash" -c "cd '$CLAUDE_PLUGIN_ROOT'; source '$COMMON'; printf 'abc' | sha256_of_stdin"
-	assert_success
-	assert_output 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'
-}
-
-@test "sha256_of_stdin: with no digest tool prints the sentinel, never an empty string" {
-	local bin
-	bin=$(_path_without sha256sum shasum)
-	run env -i PATH="$bin" HOME="$HOME" CLAUDE_PROJECT_ROOT="$BATS_TEST_TMPDIR/p" HOOK_INPUT='{}' \
-		"$bin/bash" -c "cd '$CLAUDE_PLUGIN_ROOT'; source '$COMMON'; printf 'abc' | sha256_of_stdin"
-	assert_success
-	assert_output 'no-digest'
-	refute_output ''
-}
-
 # ─── e. epoch_ns BSD probe ──────────────────────────────────────────────────
 
 @test "epoch_ns: returns all-digit nanoseconds on GNU date" {
@@ -170,95 +142,7 @@ EOF
 	assert_output --partial 'lib/common.sh'
 }
 
-# ─── g. Stop-event block ledger ──────────────────────────────────────────────
-
-@test "stop_block_allowed: allows up to the hard cap, then refuses" {
-	_lib 'for i in 1 2 3 4 5 6 7; do stop_block_allowed drift-guard && echo allow || echo cap; done'
-	assert_success
-	assert_line --index 0 'allow'
-	assert_line --index 4 'allow'
-	assert_line --index 5 'cap'
-	assert_line --index 6 'cap'
-}
-
-@test "stop_block_allowed: caps each gate independently" {
-	_lib 'for i in 1 2 3 4 5; do stop_block_allowed gate-a >/dev/null; done
-	      stop_block_allowed gate-a && echo a-allow || echo a-cap
-	      stop_block_allowed gate-b && echo b-allow || echo b-cap'
-	assert_success
-	assert_line --index 0 'a-cap'
-	assert_line --index 1 'b-allow'
-}
-
-@test "stop_blocks_reset: clears the ledger so the budget is full again" {
-	_lib 'for i in 1 2 3 4 5; do stop_block_allowed g >/dev/null; done
-	      stop_blocks_reset
-	      stop_block_allowed g && echo allow || echo cap'
-	assert_success
-	assert_output 'allow'
-}
-
-@test "stop_blocks_reset: a gate argument clears only that gate's key" {
-	_lib 'for i in 1 2 3 4 5; do stop_block_allowed gate-a >/dev/null; done
-	      for i in 1 2 3 4 5; do stop_block_allowed gate-b >/dev/null; done
-	      stop_blocks_reset gate-a
-	      stop_block_allowed gate-a && echo a-allow || echo a-cap
-	      stop_block_allowed gate-b && echo b-allow || echo b-cap'
-	assert_success
-	assert_line --index 0 'a-allow'
-	assert_line --index 1 'b-cap'
-}
-
-@test "stop_blocks_reset: a gate argument leaves the ledger file valid JSON" {
-	_lib 'stop_block_allowed gate-a >/dev/null
-	      stop_blocks_reset gate-a'
-	assert_success
-	run jq -r 'has("gate-a")' "$BATS_TEST_TMPDIR/state/stop-blocks.json"
-	assert_success
-	assert_output 'false'
-}
-
-@test "stop_blocks_reset: a gate reset on an unwritable state dir still returns 0" {
-	mkdir -p "$BATS_TEST_TMPDIR/state"
-	chmod a-w "$BATS_TEST_TMPDIR/state"
-	_lib 'stop_blocks_reset gate-a; echo "rc=$?"'
-	chmod u+w "$BATS_TEST_TMPDIR/state"
-	assert_success
-	assert_output 'rc=0'
-}
-
-@test "stop_block_allowed: an unwritable state dir fails open (refuses to block)" {
-	mkdir -p "$BATS_TEST_TMPDIR/state"
-	chmod a-w "$BATS_TEST_TMPDIR/state"
-	_lib 'stop_block_allowed drift-guard && echo allow || echo fail-open'
-	chmod u+w "$BATS_TEST_TMPDIR/state"
-	assert_success
-	assert_output 'fail-open'
-}
-
-@test "stop_block_allowed: a corrupt ledger fails open and heals for the next Stop" {
-	mkdir -p "$BATS_TEST_TMPDIR/state"
-	printf 'not json' > "$BATS_TEST_TMPDIR/state/stop-blocks.json"
-
-	_lib 'stop_block_allowed drift-guard && echo allow || echo fail-open'
-	assert_success
-	assert_output 'fail-open'
-
-	run jq -e . "$BATS_TEST_TMPDIR/state/stop-blocks.json"
-	assert_success
-}
-
-@test "stop_block_allowed: no jq fails open" {
-	local bin
-	bin=$(_path_without jq)
-	run env -i PATH="$bin" HOME="$HOME" HOOK_STATE_DIR="$BATS_TEST_TMPDIR/state" \
-		HOOK_LOG_DIR="$BATS_TEST_TMPDIR/logs" HOOK_INPUT='{}' \
-		"$bin/bash" -c "cd '$CLAUDE_PLUGIN_ROOT'; source '$COMMON'; stop_block_allowed g && echo allow || echo fail-open"
-	assert_success
-	assert_output 'fail-open'
-}
-
-# ─── h. kill-switch `all` token and block_exit fallback ──────────────────────
+# ─── h. kill-switch `all` token ──────────────────────
 
 @test "hook_is_disabled: the 'all' token disables every hook" {
 	_lib 'OMCA_DISABLED_HOOKS=all hook_is_disabled drift-guard && echo disabled || echo enabled'
@@ -282,22 +166,4 @@ EOF
 	_lib 'OMCA_DISABLED_HOOKS="comment-gate,post-edit" hook_is_disabled drift-guard && echo disabled || echo enabled'
 	assert_success
 	assert_output 'enabled'
-}
-
-@test "block_exit: the static fallback names the gate and the bypass" {
-	local gate="$BATS_TEST_TMPDIR/my-stop-gate.sh"
-	cat > "$gate" <<EOF
-#!/usr/bin/env bash
-export HOOK_STATE_DIR='$BATS_TEST_TMPDIR/state' HOOK_LOG_DIR='$BATS_TEST_TMPDIR/logs' HOOK_INPUT='{}'
-source '$CLAUDE_PLUGIN_ROOT/$COMMON'
-# Force the encode failure the fallback exists for.
-jq() { return 1; }
-block_exit "some reason"
-EOF
-	run bash "$gate"
-	assert_success
-	assert_output --partial 'my-stop-gate'
-	assert_output --partial 'OMCA_DISABLED_HOOKS'
-	run jq -e '.decision == "block" and (.reason | length > 0)' <<< "$output"
-	assert_success
 }

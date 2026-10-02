@@ -55,13 +55,13 @@ this preset to a repo makes the plugin-settings half a silent no-op.
   this setting prevents.
 
 Leave every OMCA hook at its default. Do not set `OMCA_DISABLED_HOOKS` or any of the
-legacy `OMCA_HOOK_DISABLE_*` flags. The evidence gates (`final-verification-evidence`,
-`plan-continuation-guard`), the destructive-git guard, and the completion-stub guard
+legacy `OMCA_HOOK_DISABLE_*` flags. The evidence gates (`final-verification`,
+`plan-continuation`), the destructive-git guard, and the completion-stub guard
 (`drift-guard`) are exactly the checks a strict setup wants enforced:
 
-- `final-verification-evidence` guarantees a completed plan has a logged verification
+- `final-verification` guarantees a completed plan has a logged verification
   verdict before the session can end.
-- `plan-continuation-guard` guarantees the agent doesn't stop with unchecked plan tasks
+- `plan-continuation` guarantees the agent doesn't stop with unchecked plan tasks
   remaining.
 - `git-destructive-deny` blocks `git reset --hard`, `git stash`, `git checkout --`,
   `git clean`, and `git restore` from being run through the agent at all.

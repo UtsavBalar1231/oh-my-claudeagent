@@ -47,19 +47,6 @@ log_hook_info() {
 		'{timestamp: $ts, level: "info", hook: $hook, message: $msg}' >>"${HOOK_LOG_DIR}/hook-info.jsonl" 2>/dev/null
 }
 
-SHA256_UNAVAILABLE="no-digest"
-
-sha256_of_stdin() {
-	if command -v sha256sum >/dev/null 2>&1; then
-		sha256sum | cut -d' ' -f1
-	elif command -v shasum >/dev/null 2>&1; then
-		shasum -a 256 | cut -d' ' -f1
-	else
-		cat >/dev/null
-		printf '%s\n' "${SHA256_UNAVAILABLE}"
-	fi
-}
-
 epoch_ns() {
 	local ns
 	ns=$(date +%s%N 2>/dev/null)
@@ -68,90 +55,6 @@ epoch_ns() {
 	else
 		printf '%s000000000\n' "$(date +%s)"
 	fi
-}
-
-STATE_LOCK_SPIN_ATTEMPTS=50
-STATE_LOCK_SPIN_SLEEP_SECONDS=0.1
-STATE_LOCK_ABANDONED_AFTER_SECONDS=60
-
-reclaim_state_lockdir_if_abandoned() {
-	local lockdir="$1"
-	local now mtime
-	now=$(date +%s)
-	mtime=$(stat -c %Y "${lockdir}" 2>/dev/null || stat -f %m "${lockdir}" 2>/dev/null)
-	[[ "${mtime}" =~ ^[0-9]+$ ]] || return 1
-	(( now - mtime > STATE_LOCK_ABANDONED_AFTER_SECONDS )) || return 1
-	rmdir "${lockdir}" 2>/dev/null
-}
-
-acquire_state_lockdir_or_give_up() {
-	local lockdir="$1"
-	local attempt
-	for (( attempt = 0; attempt < STATE_LOCK_SPIN_ATTEMPTS; attempt++ )); do
-		mkdir "${lockdir}" 2>/dev/null && return 0
-		reclaim_state_lockdir_if_abandoned "${lockdir}" && continue
-		sleep "${STATE_LOCK_SPIN_SLEEP_SECONDS}"
-	done
-	return 1
-}
-
-run_body_holding_state_lockdir() {
-	local lockdir="$1"
-	shift
-	(
-		STATE_LOCKDIR="${lockdir}"
-		trap 'rmdir "${STATE_LOCKDIR}" 2>/dev/null' EXIT INT TERM HUP
-		"$@"
-	)
-}
-
-with_state_lock() {
-	local file="$1"
-	shift
-	local dir
-	dir=$(dirname "${file}")
-
-	if [[ ! -d "${dir}" || ! -w "${dir}" ]]; then
-		"$@"
-		return $?
-	fi
-
-	if command -v flock >/dev/null 2>&1; then
-		(
-			flock -w 5 200 || log_hook_error "flock wait timed out on $(basename "${file}"), proceeding unlocked" "$(basename "$0")"
-			"$@"
-		) 200>"${file}.lock"
-		return $?
-	fi
-
-	if ! acquire_state_lockdir_or_give_up "${file}.lockdir"; then
-		log_hook_error "lock spin exhausted on $(basename "${file}"), proceeding unlocked" "$(basename "$0")"
-		"$@"
-		return $?
-	fi
-	run_body_holding_state_lockdir "${file}.lockdir" "$@"
-}
-
-json_base() {
-	local base
-	base=$(jq -c . "$1" 2>/dev/null) || base='{}'
-	[[ -z "${base}" || "${base}" == "null" ]] && base='{}'
-	printf '%s\n' "${base}"
-}
-
-json_rmw() {
-	local file="$1"
-	local filter="$2"
-	shift 2
-	local dir tmp
-	dir=$(dirname "${file}")
-	mkdir -p "${dir}" 2>/dev/null
-	tmp=$(mktemp -p "${dir}" 2>/dev/null || mktemp "${dir}/.omca-rmw.XXXXXX" 2>/dev/null) || return 1
-	if json_base "${file}" | jq "$@" "${filter}" >"${tmp}" 2>/dev/null && [[ -s "${tmp}" ]]; then
-		mv "${tmp}" "${file}" 2>/dev/null && return 0
-	fi
-	rm -f "${tmp}"
-	return 1
 }
 
 mode_is_active() {
@@ -222,46 +125,6 @@ hook_timing_log() {
 		>> "${HOOK_LOG_DIR}/hook-timing.jsonl" 2>/dev/null
 }
 
-HARD_CAP_BLOCKS=5
-STOP_BLOCKS_FILE="${HOOK_STATE_DIR}/stop-blocks.json"
-
-stop_block_allowed() {
-	local gate="$1"
-	[[ -n "${gate}" ]] || return 1
-	command -v jq >/dev/null 2>&1 || return 1
-	[[ -d "${HOOK_STATE_DIR}" && -w "${HOOK_STATE_DIR}" ]] || return 1
-
-	local count=0
-	if [[ -f "${STOP_BLOCKS_FILE}" ]]; then
-		if ! count=$(jq -er --arg g "${gate}" '(.[$g] // 0) | numbers // 0' "${STOP_BLOCKS_FILE}" 2>/dev/null); then
-			printf '{}\n' >"${STOP_BLOCKS_FILE}" 2>/dev/null
-			return 1
-		fi
-		[[ "${count}" =~ ^[0-9]+$ ]] || count=0
-	fi
-	((count < HARD_CAP_BLOCKS)) || return 1
-
-	# shellcheck disable=SC2016 # jq filter: $vars are jq bindings passed via --arg, not shell
-	with_state_lock "${STOP_BLOCKS_FILE}" \
-		json_rmw "${STOP_BLOCKS_FILE}" '.[$g] = ((.[$g] // 0 | numbers // 0) + 1)' --arg g "${gate}" \
-		|| return 1
-	return 0
-}
-
-stop_blocks_reset() {
-	local gate="$1"
-	if [[ -z "${gate}" ]]; then
-		rm -f "${STOP_BLOCKS_FILE}" 2>/dev/null
-		return 0
-	fi
-	[[ -f "${STOP_BLOCKS_FILE}" ]] || return 0
-	# shellcheck disable=SC2016 # jq filter: $vars are jq bindings passed via --arg, not shell
-	with_state_lock "${STOP_BLOCKS_FILE}" \
-		json_rmw "${STOP_BLOCKS_FILE}" 'del(.[$g])' --arg g "${gate}" \
-		|| log_hook_error "stop-blocks reset failed for gate=${gate}" "$(basename "$0")"
-	return 0
-}
-
 # Resolve the canonical evidence file path: <root>/.omca/evidence/verification-evidence.json.
 # STATE_DIR is expected to be <root>/.omca/state.
 # Usage: EVIDENCE_FILE=$(resolve_evidence_file "${STATE_DIR}")
@@ -270,32 +133,6 @@ resolve_evidence_file() {
 	local root
 	root="${state_dir%/state}"
 	printf '%s\n' "${root}/evidence/verification-evidence.json"
-}
-
-# Parse plan-file checkboxes with the same semantics as the Python CHECKBOX_RE
-# (servers/tools/_boulder_core.py: `^- \[([ x])\] \d+\.`, case-insensitive on x)
-# so bash callers and boulder_progress/statusline agree on the same counts.
-# Emits four space-separated integers: unchecked checked total raw_unchecked.
-#   unchecked:     numbered `- [ ] N.` lines
-#   checked:       numbered `- [x] N.` / `- [X] N.` lines
-#   total:         unchecked + checked
-#   raw_unchecked: any `- [ ] ` line regardless of numbering; raw_unchecked >
-#                    unchecked means malformed/unnumbered boxes are present
-# Usage: read -r unchecked checked total raw_unchecked < <(count_plan_checkboxes "$plan_file")
-count_plan_checkboxes() {
-	local plan_file="$1"
-	local unchecked checked raw_unchecked
-
-	if [[ ! -f "${plan_file}" ]]; then
-		printf '0 0 0 0\n'
-		return 0
-	fi
-
-	unchecked=$(grep -cE '^- \[ \] [0-9]+\.' "${plan_file}" || true)
-	checked=$(grep -cE '^- \[[xX]\] [0-9]+\.' "${plan_file}" || true)
-	raw_unchecked=$(grep -cE '^- \[ \] ' "${plan_file}" || true)
-
-	printf '%d %d %d %d\n' "${unchecked}" "${checked}" "$((unchecked + checked))" "${raw_unchecked}"
 }
 
 # Checks OMCA_DISABLED_HOOKS, a comma- and/or whitespace-separated list of
@@ -342,60 +179,4 @@ neutralize_quoted_positions() {
 		out+="${ch}"
 	done
 	printf '%s' "${out}"
-}
-
-# Blank the contents of every <delim>-delimited span whose closing delimiter falls on
-# the SAME line, leaving the delimiters themselves in place, so a scanner reading the
-# result sees a mention as an empty span rather than as text it can match. This is the
-# opposite transform from neutralize_quoted_positions, which preserves quoted text and
-# only defuses the metacharacters inside it.
-# A delimiter with no partner before the next newline is literal (`don't`): it is
-# emitted unchanged, so an apostrophe can never swallow the rest of its line.
-# Arguments:
-#   $1 - the raw text
-#   $2 - a single-character delimiter
-# Outputs:
-#   The stripped text on STDOUT, no trailing newline.
-strip_paired_spans() {
-	local s="$1" delim="$2" out="" i ch rest line_rest before_close
-	local n=${#s}
-	for ((i = 0; i < n; i++)); do
-		ch="${s:i:1}"
-		if [[ "${ch}" != "${delim}" ]]; then
-			out+="${ch}"
-			continue
-		fi
-		rest="${s:i+1}"
-		line_rest="${rest%%$'\n'*}"
-		before_close="${line_rest%%"${delim}"*}"
-		if [[ "${before_close}" == "${line_rest}" ]]; then
-			out+="${ch}"
-			continue
-		fi
-		out+="${delim}${delim}"
-		i=$((i + ${#before_close} + 1))
-	done
-	printf '%s' "${out}"
-}
-
-# Block a Stop with <reason> and exit 0. `decision`+`reason` is the pair that
-# prevents the stop; hookSpecificOutput.additionalContext is the platform's
-# non-blocking alternative for the event, not a modifier, so emitting both
-# would deliver the same text twice. A block is signalled by stdout alone, so
-# the static fallback keeps a jq failure from turning a block into an allow.
-# Usage: block_exit "<reason text>"
-block_exit() {
-	local reason="$1"
-	local payload
-	if payload=$(jq -n --arg reason "${reason}" '{"decision":"block","reason":$reason}' 2>/dev/null) \
-		&& [[ -n "${payload}" ]]; then
-		printf '%s\n' "${payload}"
-	else
-		log_hook_error "jq failed to encode Stop block reason, emitting static block payload" "$(basename "$0")"
-		local gate
-		gate=$(basename "$0" .sh | tr -cd '[:alnum:]._-')
-		printf '{"decision":"block","reason":"The OMCA Stop gate %s blocked this stop but its reason text could not be encoded. See .omca/logs/hook-errors.jsonl. To bypass, set OMCA_DISABLED_HOOKS=%s (or OMCA_DISABLED_HOOKS=all) and stop again."}\n' \
-			"${gate}" "${gate}"
-	fi
-	exit 0
 }

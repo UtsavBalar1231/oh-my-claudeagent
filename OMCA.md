@@ -288,7 +288,6 @@ row only when a handler is actually registered for it.
 | `PostToolUseFailure` | Tool lifecycle |
 | `PostToolBatch` | Tool lifecycle |
 | `Stop` | Lifecycle |
-| `StopFailure` | Lifecycle |
 | `TaskCompleted` | Task lifecycle |
 | `PreCompact` | Memory |
 | `SessionEnd` | Lifecycle |
@@ -297,14 +296,13 @@ row only when a handler is actually registered for it.
 `SubagentStart` routes to the server's `subagent-context` handler and `PermissionDenied`
 to its `permission-coach` handler, which returns `retry: true` for a denied Bash call after
 an auto-mode classifier denial. `UserPromptSubmit` and
-`UserPromptExpansion` carry the server's keyword and slash-mode detectors.
+`UserPromptExpansion` carry the server's keyword and slash-mode detectors. `Stop` routes to
+the server's `stop-gates` handler, which runs plan continuation, final verification, and the
+drift guard in that order and answers with the first block.
 
 `PostToolBatch` carries the loop detector, which fires once per resolved batch and reads
 the `tool_calls` array, so a signature can no longer be shredded by interleaved subagent
-calls the way a per-call `PostToolUse` slot was. `StopFailure` fires instead of `Stop` when
-a turn ends in an API error, which is the case the plan gates never see; its handler
-appends the `error` class and `error_details` to `.omca/logs/` so an interrupted plan run
-leaves a record. `Setup` fires only under `claude --init-only`, `claude -p --init`, and
+calls the way a per-call `PostToolUse` slot was. `Setup` fires only under `claude --init-only`, `claude -p --init`, and
 `claude -p --maintenance`, so the dependency check runs on the `init` matcher and the
 stale-marker and log sweeps run on `maintenance`, off the per-session startup path.
 `FileChanged` watches the evidence ledger and the boulder registry: it is driven by a
@@ -373,14 +371,13 @@ The Stop and SubagentStop hook payloads now include two additional fields:
 | `background_tasks` | array | Platform-managed background tasks running at Stop time |
 | `session_crons` | array | Scheduled cron jobs registered for the session |
 
-OMCA's Stop hook (`final-verification-evidence.sh`) does not consult these fields — it checks only boulder state and evidence. Background tasks are orthogonal to the completeness check. (Verified by test: the v2.1.145 Stop payload change has zero behavioral impact on OMCA hooks.)
+Plan continuation reads `background_tasks`: an entry whose status is not terminal means the turn is paused until that work wakes it, so the gate allows the stop and refunds its block budget. Final verification and the drift guard do not consult either field; a completion claim made while executors still write files is exactly the drift that guard exists to catch.
 
 **Stop / SubagentStop — `additionalContext` output (v2.1.163):**
 
-Partially adopted. All three Stop hooks (`plan-continuation-guard.sh`,
-`final-verification-evidence.sh`, `drift-guard.sh`) now block by writing Stop
-decision-control JSON to stdout and exiting 0, instead of writing to stderr and exiting 2.
-What they emit is `decision: block` plus `reason`, and nothing else.
+Partially adopted. The three Stop gates block with Stop decision-control JSON, returned
+from the `omca_hook` tool of an `mcp_tool` entry: `decision: block` plus `reason`, and
+nothing else.
 
 `additionalContext` is **not** emitted alongside it. The Stop decision-control section of
 `claude-code-docs/docs/hooks.md` presents `hookSpecificOutput.additionalContext` as the
@@ -388,7 +385,7 @@ alternative to blocking, for non-error feedback that keeps the conversation goin
 `decision: block` example carries no `additionalContext` field. Nothing in the docs states
 that the two combine, and how a block presents in the transcript when both are emitted is
 unverified. Emitting both would also deliver the same text twice, so the blocking pair alone
-is what `block_exit()` in `scripts/lib/common.sh` writes.
+is what the `stop-gates` handler returns.
 
 The TaskCompleted gate is an `mcp_tool` entry served by the omca server's `omca_hook` tool,
 and it blocks with the same `decision: block` plus `reason` pair. The hooks reference documents
@@ -419,9 +416,9 @@ unconditional exit 2; that shape is inert on half its registrations.
 **Stop hook block cap (v2.1.143):**
 
 The platform enforces a maximum of 8 consecutive Stop blocks per session. The cap is
-configurable via `CLAUDE_CODE_STOP_HOOK_BLOCK_CAP` (env var). OMCA's Stop hook
-(`final-verification-evidence.sh`) does not block the Stop event unless the plan
-is complete but evidence is missing — it never emits a persistence-style block.
+configurable via `CLAUDE_CODE_STOP_HOOK_BLOCK_CAP` (env var). Each OMCA Stop gate spends at
+most 5 blocks per session from its own budget before it fails open, and gets the budget
+back once its condition is met.
 (Adopted in the v2.1.141–v2.1.167 sync.)
 
 **`SessionStart` `watchPaths` output (v2.1.141–v2.1.167, adopted):**
@@ -797,7 +794,7 @@ agent per item in parallel. Zero-action policy: never merges, closes, or edits i
    -> Delegates each task to executor
    -> Verifies with build/typecheck/tests after each
    -> Marks checkboxes in plan file
-   -> Final completeness check via final-verification-evidence.sh
+   -> Final completeness check by the final-verification Stop gate
 
 4. Resume after interruption with /oh-my-claudeagent:start-work
    -> Boulder state resumes from last completed task
@@ -950,7 +947,7 @@ schema and the `resolve_bound_plan` ladder every reader calls.
 2. `boulder_write(active_plan, plan_name, session_id)` upserts `plans[plan_name]` (preserving `started_at`, appending `session_id` to `session_ids`) and binds this session to it; `.omca/plans/` mirrors the plan for compatibility
 3. `/start-work` reads `boulder_progress()` (resolves the calling session's bound plan when no explicit `plan_path`/`plan_name` is given) to resume from the last completed task
 4. Sisyphus/start-work checks `boulder_progress` to track which tasks remain
-5. The final-verification-evidence.sh Stop hook resolves this session's bound plan and confirms a matching `final_verification` evidence entry exists when that plan's checkboxes show it complete
+5. The final-verification Stop gate resolves this session's bound plan and confirms a matching `final_verification` evidence entry exists when that plan's checkboxes show it complete
 6. `SessionEnd` (`session-cleanup.sh`) removes only the ending session's binding; a plan itself is never deleted while incomplete or still bound by another session. A 7-day age backstop in `boulder_write`'s `_gc_prune()` also prunes stale bindings and unbound, checkbox-complete plans, for sessions that never hit a clean `SessionEnd`
 
 ### Evidence Workflow
@@ -1041,10 +1038,8 @@ alongside it. The plan gates therefore never see such a turn: a plan run interru
 rate limit or a server error ends with every checkbox where it was and no gate output.
 
 A hook cannot change that. The platform discards a `StopFailure` handler's stdout and exit
-code, so the event supports no decision control at all. What OMCA's handler does is record
-it: the `error` class and `error_details` are appended to `.omca/logs/`, which turns a
-silent death into a diagnosable one. Resuming is still manual, with
-`/oh-my-claudeagent:start-work`.
+code, so the event supports no decision control at all, and OMCA registers no handler for
+it. Resuming is manual, with `/oh-my-claudeagent:start-work`.
 
 ---
 
@@ -1363,9 +1358,9 @@ than copied verbatim.
 | Feature | Notes |
 |---------|-------|
 | Session-bound plan registry | `boulder.json` moved from a single `active_plan` pointer to `{plans: {<plan_name>: {...}}, bindings: {<session_id>: {plan_name, bound_at}}}`. Fixes the clobber where two concurrent sessions working different plans overwrote each other's state. `resolve_bound_plan()` (`servers/tools/_boulder_core.py`) is the one pure-read resolution ladder every consumer calls, via direct import in Python or the `boulder_resolve.py` shim from bash |
-| drift-guard hard-block Stop hook | New `scripts/drift-guard.sh`: when the last assistant turn reads as a completion claim ("done", "fixed", "implemented", etc., unless negated) but the diff still contains a stub marker, the Stop is blocked with the offending `file:line`. A focused-test marker is only looked for in JavaScript and TypeScript sources, where such a test can actually run; an unfinished-implementation marker and an unimplemented-error throw are looked for in any language. Self-clearing — fixing the stub removes the marker. A repeated block is bounded separately by the shared per-gate Stop-block ledger at `.omca/state/stop-blocks.json`, capped at 5 blocks per gate and reset on the gate's clean path. Kill-switch: `OMCA_HOOK_DISABLE_DRIFT_GUARD` |
+| drift-guard hard-block Stop hook | New drift guard: when the last assistant turn reads as a completion claim ("done", "fixed", "implemented", etc., unless negated) but the diff still contains a stub marker, the Stop is blocked with the offending `file:line`. A focused-test marker is only looked for in JavaScript and TypeScript sources, where such a test can actually run; an unfinished-implementation marker and an unimplemented-error throw are looked for in any language. Self-clearing — fixing the stub removes the marker. A repeated block is bounded separately by a per-gate block budget in the server's session state, capped at 5 blocks per gate and restored on the gate's clean path. Kill switch: `OMCA_DISABLED_HOOKS=drift-guard` |
 | context-injector hardening | The context injector now dedups injections by content-hash+realpath (reusing `injected-context-dirs.json`, which `session-init.sh` already resets every `SessionStart`) instead of re-injecting on every matching file access. The project-root walk for both the `.omca/rules` scan and the AGENTS.md/README terminator now resolves worktree-safely (a linked worktree's `.git` is a file, not a directory, so the walk tests `-e` not `-d`), so a worktree session no longer walks up into the parent repo |
-| stdin-read timeout | `scripts/lib/common.sh`'s shared `HOOK_INPUT=$(cat)` read now wraps in `timeout 5 cat`, discarding on exit 124 rather than hanging indefinitely if stdin is never closed. Blocking hooks (`final-verification-evidence.sh`, `drift-guard.sh`, `task-completed-verify.sh`) treat an empty-from-timeout read as fail-closed-or-warn, not a silent pass |
+| stdin-read timeout | `scripts/lib/common.sh`'s shared `HOOK_INPUT=$(cat)` read now wraps in `timeout 5 cat`, discarding on exit 124 rather than hanging indefinitely if stdin is never closed. Blocking hooks treat an empty-from-timeout read as fail-closed-or-warn, not a silent pass |
 | Compaction content round-trip | `pre-compact.sh` now inlines the session's next 10 unchecked plan tasks and the 5 most recent notepad decisions (tasks first, so they survive `post-compact-inject.sh`'s downstream line cap), instead of leaving compaction to rely on whatever the model happened to keep in its own summary |
 
 **Reframed, not ported as-is:**
@@ -1392,13 +1387,13 @@ built on top of it, rather than inferred from the docs):
   tailing the transcript JSONL. The fallback matters because the transcript file is not
   guaranteed to contain the final message at Stop time on all versions, which for
   drift-guard would be a silent guard failure rather than a visible error. The user-role
-  rail in `plan-continuation-guard.sh` stays transcript-only, since the payload carries no
+  rail of the plan-continuation gate stays transcript-only, since the payload carries no
   equivalent field for the user turn.
 - When multiple `Stop` hooks are registered, the platform dispatches all of them in
   parallel: one hook's decision can never short-circuit a sibling's execution, and any
   single hook returning `decision: block` blocks the stop regardless of what the others
-  return. drift-guard was built to be correct standing alone, with no assumption about
-  ordering relative to `final-verification-evidence.sh`.
+  return. OMCA now registers one `Stop` entry whose handler runs its three gates in a fixed
+  order and answers with the first block, and each gate is still correct standing alone.
 - `CLAUDE_CODE_SESSION_ID` is the confirmed binding key for anything running as an MCP
   tool or agent process (live-observed in-session); bash hook scripts keep the existing
   three-tier fallback (`CLAUDE_SESSION_ID` env, then the hook payload's `session_id`,
@@ -1584,7 +1579,7 @@ section and in `CLAUDE.md`; neither is set by OMCA.
 | `plansDirectory` resolution | `~/.claude/plans` was hardcoded as both the authoring and the discovery surface, so with the setting on, prometheus wrote where `/start-work` no longer looked. Both now resolve the directory: the setting when present (relative to the project root), else `~/.claude/plans`, with an active plan-mode path overriding |
 | Hook event tables regenerated from the registry | The table advertised nine events with no handler, omitted `PermissionDenied`, and pointed at two scripts deleted in the v2.10 refactor. `scripts/validate-plugin.sh` now diffs the table against `jq -r '.hooks \| keys[]'` in both directions, so it cannot re-drift silently |
 | `last_assistant_message` on Stop/SubagentStop | Both Stop hooks read the final assistant turn from the payload field first, with the transcript tail kept as fallback because the transcript is not guaranteed to hold the final message at Stop time. The undocumented `.messages` probe is gone. drift-guard's whole purpose is catching a completion claim in that message, so a miss there was a silent guard failure |
-| Stop hooks block via `decision: block` | `plan-continuation-guard.sh`, `final-verification-evidence.sh`, and `drift-guard.sh` now write Stop decision-control JSON (`decision` plus `reason`, nothing else) and exit 0 instead of writing to stderr and exiting 2. `task-completed-verify.sh` is the only turn-gate or task-gate hook left that blocks via exit 2. The deny hooks are unaffected: each writes the shape its event reads, branching on `hook_event_name` (see the Stop / SubagentStop section above) |
+| Stop hooks block via `decision: block` | The plan-continuation, final-verification, and drift gates answer with Stop decision-control JSON (`decision` plus `reason`, nothing else) instead of writing to stderr and exiting 2. The deny hooks are unaffected: each writes the shape its event reads, branching on `hook_event_name` (see the Stop / SubagentStop section above) |
 | Tier aliases in agent frontmatter | Every agent declares a tier alias (`opus`, `sonnet`, `fable`) instead of a pinned generation id, so a provider resolves it to the newest generation its allowlist permits and nothing goes stale on the next model release. `omca-setup` no longer writes `ANTHROPIC_DEFAULT_OPUS_MODEL`: a default-model pin overrides the alias and reintroduces exactly the staleness the alias removes |
 | `Write(.omca/**)` dropped from the recommended allowlist | `Write`/`NotebookEdit`/`Glob` path rules are accepted but never match, and now emit a startup warning. `Edit(.omca/**)` plus `Read(.omca/**)` covers the intent, since `Edit` governs every file-editing tool including `Write`. The doctor's stale-entry warnings flag the removed rule for already-configured users |
 | Spawn budgets: session cap, concurrency cap, depth default | The Agent failure handler gained early-return branches for the concurrency and session ceilings, returning before the error counter so an infrastructure limit can never advance the three-strike breaker toward oracle. `skills/start-work/SKILL.md` gained a parallel-group width note, and `github-triage` gained a total-item cap with an explicit skipped-item list instead of silent truncation |
@@ -1721,7 +1716,7 @@ tables under Core Concepts and Agent Reference are the live state.
 | `background: true` on explore and librarian | Adopted in v2.2.0 and removed in v2.8.2 because a background task notification carries only a trigger and an output path, which produced confabulated stub replies and indefinite re-querying of finished agents. Re-adding recreates that loop |
 | `maxTurns` | Shipped and reverted in v2.2.0 after user-observed truncation. Runaway control lives at the hook layer instead: the error-count breaker and the tool-loop detector both fire at three |
 | Plugin `workflows` manifest field | The delivery mechanism for a dynamic-workflow rewrite that is itself declined. Adopting the field with no script ships an empty component path |
-| Dynamic workflows as a replacement for `/start-work` | Two blockers. Hook coupling: a workflow runtime driving agents in code produces no Stop events for `plan-continuation-guard.sh` and `final-verification-evidence.sh` to gate on. And representation: a workflow holds its plan in a script, while OMCA's plan is a markdown file whose checkboxes are the progress record and whose sha256 scopes the evidence log. A script-held plan has no checkbox to flip and no file to hash, so every gate downstream of the plan file loses its input. Resumability and out-of-context intermediate results are the capabilities OMCA genuinely lacks here. For the narrower case a workflow is usually reached for, many independent units of the same shape, `/batch` is the escape hatch: it fans out without asking OMCA to give up the plan file |
+| Dynamic workflows as a replacement for `/start-work` | Two blockers. Hook coupling: a workflow runtime driving agents in code produces no Stop events for the plan-continuation and final-verification gates to gate on. And representation: a workflow holds its plan in a script, while OMCA's plan is a markdown file whose checkboxes are the progress record and whose sha256 scopes the evidence log. A script-held plan has no checkbox to flip and no file to hash, so every gate downstream of the plan file loses its input. Resumability and out-of-context intermediate results are the capabilities OMCA genuinely lacks here. For the narrower case a workflow is usually reached for, many independent units of the same shape, `/batch` is the escape hatch: it fans out without asking OMCA to give up the plan file |
 | `/loop` as OMCA's persistence mechanism | It is a timer that re-issues a prompt, with no completion condition and no verification, so a looped `/start-work` re-runs whether or not the previous pass advanced anything. OMCA's persistence is the plan file's checkboxes plus the evidence gates, which is a different guarantee. `/loop` stays documented as the lightest way to keep a session re-running until the user stops it, and it is not wired into any OMCA command |
 | `/schedule` with routines | Claude-native owns trigger firing, and a routine that carries the work would run it outside the session that holds the boulder binding, so a scheduled `/start-work` would either bind a fresh plan registry entry per firing or find none at all. Neither is a progress record. Nothing in OMCA reads or writes a routine, so the ownership line stays where the Ownership Model puts it |
 | Channels for agent-to-agent coordination | OMCA's fan-out is a tree, not a mesh: a spawned agent is a leaf by contract, with no siblings to address and its deliverable returning in its own task notification. Channels solve peer coordination between long-lived teammates, which is the native teams surface, and adopting them would mean giving leaf workers a second communication path that no OMCA gate observes |

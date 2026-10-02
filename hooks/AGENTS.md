@@ -18,6 +18,10 @@ event is unregistered on purpose; `OMCA.md` carries the per-event reason.
 - `SubagentStart` routes to the server's `subagent-context` handler, and `PermissionDenied`
   to its `permission-coach` handler, which answers an auto-mode classifier denial of a Bash
   call with `retry: true`.
+- `Stop` routes to the server's `stop-gates` handler, which runs plan continuation, final
+  verification, and the drift guard in that order and answers with the first block.
+  `OMCA_DISABLED_HOOKS=stop-gates` turns off all three; `plan-continuation`,
+  `final-verification`, or `drift-guard` turns off one.
 - `permission-filter.sh` has two roles, and they are registered on different events.
   The deny of a recursive removal runs on `PreToolUse` and on `PermissionRequest`, both
   with matcher `Bash`. The auto-allow of a narrow trusted-tooling set (npm, yarn, pnpm,

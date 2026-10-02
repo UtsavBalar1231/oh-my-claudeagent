@@ -60,10 +60,10 @@ no-op for the rest of the session.
 
 ```bash
 # Turn off the plan-continuation guard for this session
-OMCA_DISABLED_HOOKS=plan-continuation-guard
+OMCA_DISABLED_HOOKS=plan-continuation
 
 # Turn off more than one hook
-OMCA_DISABLED_HOOKS="plan-continuation-guard,drift-guard"
+OMCA_DISABLED_HOOKS="plan-continuation,drift-guard"
 
 # Turn off every OMCA hook at once (`*` is equivalent)
 OMCA_DISABLED_HOOKS=all
@@ -81,8 +81,9 @@ list; a hook not on it ignores the variable entirely):
 
 | Hook basename | What it normally does |
 |---|---|
-| `final-verification-evidence` | Blocks session Stop when the bound plan is fully checked off but no `final_verification` evidence entry has been logged for it. |
-| `plan-continuation-guard` | Blocks session Stop when the bound plan still has unchecked numbered tasks, nudging the agent to keep going instead of stopping mid-plan. |
+| `stop-gates` | Turns off all three Stop gates below at once: `plan-continuation`, `final-verification`, and `drift-guard`. |
+| `final-verification` | Blocks session Stop when the bound plan is fully checked off but no `final_verification` evidence entry with exit code 0 matches the plan's current SHA-256. |
+| `plan-continuation` | Blocks session Stop when the bound plan still has unchecked numbered tasks, nudging the agent to keep going instead of stopping mid-plan. |
 | `tool-loop` | Warns once when one agent runs the same batch of tool calls three times in a row, a common sign of a blind retry loop. Each agent keeps its own streak. |
 | `failure-recovery` | Advises on a failed Edit, Agent, Bash, Read, or MCP tool call. From a tool's third failure within five minutes it adds a stuck-loop note that names the advisor, then oracle. |
 | `git-destructive-deny` | Denies git subcommands that discard working-tree state: `reset --hard`, `stash`, `clean`, `restore`, `rm -r` (any clustered flag containing `r` or `R`), and a `checkout` whose arguments include a `--` pathspec separator. Matches at any command position and through an optional `sudo` prefix and leading git global options (`-C`, `-c`, `--git-dir`, `--work-tree`, `--no-pager`, and siblings). |
@@ -107,8 +108,6 @@ basename is present in `OMCA_DISABLED_HOOKS`.
 
 | Variable | Value | Disables |
 |---|---|---|
-| `OMCA_HOOK_DISABLE_FINAL_VERIFY` | `1` | `final-verification-evidence`: same effect as adding `final-verification-evidence` to `OMCA_DISABLED_HOOKS`. |
-| `OMCA_HOOK_DISABLE_DRIFT_GUARD` | `1` | `drift-guard`: the check that blocks a completion claim while stub markers remain on newly added lines. |
 | `OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY` | `1` | `git-destructive-deny`: the guard that blocks `git reset --hard`, `git stash`, `git checkout --`, `git clean`, and `git restore` from being run through the agent. |
 
 ### `OMCA_COMMENT_GATE`: the comment gate's enforcement level

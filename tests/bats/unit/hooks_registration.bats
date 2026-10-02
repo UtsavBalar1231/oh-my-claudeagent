@@ -1,8 +1,6 @@
 #!/usr/bin/env bats
-# hooks/hooks.json: structural coverage for the Phase-4 wiring: asserts the
-# script plan-continuation-guard.sh is registered under the exact event/matcher
-# shape its own header declares, rather than trusting validate-plugin.sh's
-# fixture-replay checks alone to catch a missing or mis-matchered entry.
+# hooks/hooks.json: structural coverage that validate-plugin.sh's fixture-replay
+# checks alone would not catch.
 
 load '../test_helper'
 
@@ -11,24 +9,6 @@ HOOKS_JSON="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)/hooks/hooks.json"
 @test "hooks.json: is valid JSON" {
 	run jq . "$HOOKS_JSON"
 	assert_success
-}
-
-@test "hooks.json: plan-continuation-guard.sh is registered under Stop" {
-	run jq -e '
-		.hooks.Stop
-		| any(.hooks[]?.command | test("plan-continuation-guard\\.sh\"?$"))
-	' "$HOOKS_JSON"
-	assert_success
-}
-
-@test "hooks.json: plan-continuation-guard.sh precedes final-verification-evidence.sh in the Stop array" {
-	run jq -r '
-		[.hooks.Stop[] | .hooks[]?.command] as $cmds
-		| ($cmds | to_entries | map(select(.value | test("plan-continuation-guard\\.sh\"?$")))[0].key) as $guard_idx
-		| ($cmds | to_entries | map(select(.value | test("final-verification-evidence\\.sh\"?$")))[0].key) as $fv_idx
-		| $guard_idx < $fv_idx
-	' "$HOOKS_JSON"
-	assert_output "true"
 }
 
 @test "hooks.json: delegation-reminder.sh is not registered" {

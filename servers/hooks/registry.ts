@@ -60,7 +60,7 @@ export const REGISTRY: Readonly<Record<string, readonly (readonly [string, Handl
   SessionStart: [["session-start", sessionStart]],
 };
 
-const OBJECT_FIELDS = ["tool_input", "tool_response", "tool_calls"];
+const OBJECT_FIELDS = ["tool_input", "tool_response", "tool_calls", "background_tasks"];
 
 // The client substitutes an absent path as "", an object as JSON, and a string as the raw
 // string, so text that is not JSON is the field's own string value.

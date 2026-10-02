@@ -42,10 +42,10 @@ stopped by a gate.
 ```bash
 # Loosen the evidence gates for this session. Useful when you're prototyping and
 # don't want the Stop hooks blocking on missing final_verification evidence yet.
-OMCA_DISABLED_HOOKS="final-verification-evidence,plan-continuation-guard"
+OMCA_DISABLED_HOOKS="final-verification,plan-continuation"
 ```
 
-- Disabling `final-verification-evidence` and `plan-continuation-guard` removes the
+- Disabling `final-verification` and `plan-continuation` removes the
   two Stop-time gates that otherwise require a completed plan to have logged evidence
   and finished all its tasks before the session can end. Appropriate for exploratory
   work where you plan to circle back and verify later, not for work you intend to ship

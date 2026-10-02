@@ -68,23 +68,23 @@ check_pretooluse_deny() {
 }
 
 # check_stop_negative <debug_log> <project_dir> — no bound plan in this scratch
-# project, so all three registered Stop hooks must report a silent, non-blocking
-# success. Shares the deny probe's turn rather than spending a second API call.
+# project, so the registered Stop hook must report a silent, non-blocking success.
+# Shares the deny probe's turn rather than spending a second API call.
 check_stop_negative() {
 	local log="$1" project="$2"
 	local stop_hits
 	stop_hits=$(grep -c 'Hook Stop (Stop) success' "${log}" 2>/dev/null || true)
-	if [[ "${stop_hits:-0}" -ge 3 ]]; then
-		qa_pass "Stop negative: all 3 registered Stop hooks completed (${stop_hits} success lines)"
+	if [[ "${stop_hits:-0}" -ge 1 ]]; then
+		qa_pass "Stop negative: the registered Stop hook completed (${stop_hits} success lines)"
 	else
-		qa_fail "Stop negative: expected 3 Stop hook completions, saw ${stop_hits:-0} in ${log}"
+		qa_fail "Stop negative: expected a Stop hook completion, saw ${stop_hits:-0} in ${log}"
 	fi
 	if [[ ! -f "${project}/.omca/state/boulder.json" ]]; then
 		qa_pass "Stop negative: no boulder.json bound in the scratch project"
 	else
 		qa_fail "Stop negative: unexpected boulder.json in scratch project ${project}"
 	fi
-	if grep -q 'permissionDecision.*deny' "${log}" && grep -A2 'plan-continuation-guard\|final-verification-evidence\|drift-guard' "${log}" | grep -q 'block'; then
+	if grep -q 'Hook Stop (.*omca_hook) returned permissionDecision: deny' "${log}"; then
 		qa_fail "Stop negative: a Stop hook reported block with no bound plan"
 	else
 		qa_pass "Stop negative: no Stop hook reported a block"

@@ -1,5 +1,6 @@
 import type { DenyOnce } from "../../src/core/comments.ts";
 import type { ErrorCount } from "../../src/core/error-counts.ts";
+import type { Backoff, StopLedger } from "../../src/core/stop-ledger.ts";
 import type { Verification } from "../../src/core/verification.ts";
 
 export type Session = {
@@ -14,6 +15,8 @@ export type Session = {
   commentGate?: DenyOnce;
   errorCounts?: Map<string, ErrorCount>;
   toolLoopWindows?: Map<string, { signature: string; count: number; promptId: string }>;
+  stopBlocks?: StopLedger;
+  planBackoff?: Backoff;
 };
 
 export const MAX_SESSIONS = 32;

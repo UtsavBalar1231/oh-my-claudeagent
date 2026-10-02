@@ -94,14 +94,6 @@ _run_fixture() {
 	diff "${baseline}/state-diff.txt" "${work_dir}/state-diff.norm"
 }
 
-@test "golden: final-verification-evidence/no-active-plan" {
-	_run_fixture "final-verification-evidence" "no-active-plan"
-}
-
-@test "golden: final-verification-evidence/recursion-guard" {
-	_run_fixture "final-verification-evidence" "recursion-guard"
-}
-
 @test "golden: package-plugin/dry-run" {
 	_run_fixture "package-plugin" "dry-run"
 }
