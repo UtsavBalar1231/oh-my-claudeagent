@@ -53,7 +53,7 @@ afterEach(() => {
 });
 
 const gate = (toolInput: Record<string, unknown>, tool = "Write") =>
-  dispatch({ event: "PreToolUse", session_id: sessionId, tool_name: tool, tool_input: toolInput }, root, NOW);
+  dispatch({ event: "PreToolUse", session_id: sessionId, tool_name: tool, tool_input: { file_path: "/repo/a.py", ...toolInput } }, root, NOW);
 const write = (file_path: string, content: string) => gate({ file_path, content });
 const inDenyMode = () => {
   process.env.OMCA_COMMENT_GATE = "deny";
@@ -62,26 +62,16 @@ const inDenyMode = () => {
 describe("tier 1 and tier 2 findings in the default advise mode", () => {
   test("warns when content contains 'TODO: implement'", async () => {
     const content = "function foo() {\n  // TODO: implement this\n  return null;\n}";
-    expect(await gate({ content })).toEqual(advice(PLACEHOLDER, bareTodo("TODO: implement this")));
+    expect(await gate({ file_path: "/repo/a.js", content })).toEqual(advice(PLACEHOLDER, bareTodo("TODO: implement this")));
   });
 
   test("warns for Edit new_string content", async () => {
     const dirty = "function foo() {\n  // TODO: implement this\n  return null;\n}";
-    expect(await gate({ old_string: "", new_string: dirty }, "Edit")).toEqual(advice(PLACEHOLDER, bareTodo("TODO: implement this")));
+    expect(await gate({ file_path: "/repo/a.js", old_string: "", new_string: dirty }, "Edit")).toEqual(advice(PLACEHOLDER, bareTodo("TODO: implement this")));
   });
 
   test("no warning for clean Edit new_string content", async () => {
     expect(await gate({ old_string: "", new_string: "function foo() {\n  return 1;\n}" }, "Edit")).toEqual({});
-  });
-
-  test("warns for apply_patch added lines", async () => {
-    const patchText = "*** Begin Patch\n*** Update File: example.py\n@@\n def foo():\n+    # AI-generated helper\n+    return 1\n-    return 0\n*** End Patch";
-    expect(await gate({ patchText }, "Edit")).toEqual(advice(ATTRIBUTION));
-  });
-
-  test("ignores the removed and context lines of a patch", async () => {
-    const patchText = "*** Begin Patch\n*** Update File: example.py\n@@\n # AI-generated helper\n-# AI-generated old\n+    return 1\n*** End Patch";
-    expect(await gate({ patchText }, "Edit")).toEqual({});
   });
 
   test("warns on code-restating comment", async () => {
@@ -338,6 +328,14 @@ describe("a tier-2 denial is given once per file and finding", () => {
     expect(await write("/repo/a.py", slop)).toEqual(blockedForSlop(sentence));
     expect(await write("/repo/a.py", slop)).toEqual(advice(sentence));
     expect(await write("/repo/a.py", slop)).toEqual(blockedForSlop(sentence));
+  });
+
+  test("two files written in turn each get their own retry", async () => {
+    inDenyMode();
+    expect(await write("/repo/a.py", slop)).toEqual(blockedForSlop(sentence));
+    expect(await write("/repo/b.py", slop)).toEqual(blockedForSlop(sentence));
+    expect(await write("/repo/a.py", slop)).toEqual(advice(sentence));
+    expect(await write("/repo/b.py", slop)).toEqual(advice(sentence));
   });
 
   test("the same finding in another file is denied", async () => {

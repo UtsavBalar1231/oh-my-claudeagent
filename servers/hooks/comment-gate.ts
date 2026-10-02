@@ -9,7 +9,7 @@ export const handle: Handler = (payload, { session }) => {
   const mode = commentGateMode(process.env.OMCA_COMMENT_GATE);
   if ((tool !== "Write" && tool !== "Edit") || mode === "off" || isHookDisabled(process.env.OMCA_DISABLED_HOOKS, "comment-gate")) return;
   try {
-    const slot = session === undefined ? undefined : (session.commentGate ??= {});
+    const slot = session === undefined ? undefined : (session.commentGate ??= new Map());
     const verdict = judgeWrite(mode, payload.tool_input, slot);
     if (verdict === undefined) return;
     if (verdict.kind === "deny") return preToolUseDeny(verdict.reason);

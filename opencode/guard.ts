@@ -22,6 +22,14 @@ export function checkShell(command: string): GuardResult {
   return { deny: true, reason: reasonFor(finding) }
 }
 
+// The `+` lines of one file's section of a patch, the text the comment gate judges.
+const addedLines = (section: string): string =>
+  section
+    .split("\n")
+    .filter((line) => line.startsWith("+") && !line.startsWith("+++"))
+    .map((line) => line.slice(1))
+    .join("\n")
+
 function editInputs(tool: string, input: Record<string, unknown>, projectRoot: string): Record<string, unknown>[] {
   const path = (p: unknown) => resolve(projectRoot, String(p))
   if (tool === "write") return [{ file_path: path(input.path), content: input.content }]
@@ -31,13 +39,13 @@ function editInputs(tool: string, input: Record<string, unknown>, projectRoot: s
   const headers = [...text.matchAll(/^\*\*\* (Add|Update|Delete) File: (.+)$/gm)]
   return headers.map((header, i) => ({
     file_path: path(header[2].trim()),
-    patchText: text.slice(header.index, headers[i + 1]?.index),
+    content: addedLines(text.slice(header.index, headers[i + 1]?.index)),
   }))
 }
 
 // A second attempt at a finding the gate has just denied passes, so the adapter process keeps
 // the last denial for as long as it runs.
-const lastDenial: DenyOnce = {}
+const lastDenial: DenyOnce = new Map()
 
 export function checkEdit(tool: string, input: Record<string, unknown>, projectRoot: string): GuardResult {
   if (process.env.OMCA_COMMENT_GATE !== "deny" || isHookDisabled(process.env.OMCA_DISABLED_HOOKS, "comment-gate")) return ALLOW

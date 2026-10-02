@@ -3,8 +3,8 @@ import { inputText } from "./tool-input.ts";
 
 export type CommentGateMode = "off" | "advise" | "deny";
 
-/** Holds the finding a tier-2 deny last blocked, so the same finding on the same file passes on the retry. */
-export type DenyOnce = { signature?: string };
+/** Holds, per file path, the finding a tier-2 deny last blocked, so the same finding on the same file passes on the retry. */
+export type DenyOnce = Map<string, string>;
 
 export type Verdict =
   | { kind: "deny"; reason: string }
@@ -17,7 +17,6 @@ const DISABLE_FILE_MARKER = "comment-gate-disable-file";
 const DISABLE_FILE_WINDOW = 5;
 const MAX_COMMENT_RUN = 5;
 const MAX_SLOP_FINDINGS = 5;
-const PATCH_FIELDS = ["patchText", "input", "patch", "command"];
 
 // A comment marker is chosen by language. Applying one the language lacks is a false positive
 // (`#` opens a preprocessor directive in C, and Lua has neither `#` nor `//`), so a language
@@ -40,10 +39,8 @@ const MARKERS_BY_EXTENSION = new Map(
   ).flatMap(([markers, extensions]) => extensions.split(" ").map((extension): [string, readonly string[]] => [extension, markers])),
 );
 const MARKERS_BY_NAME = new Map(["Makefile", "Dockerfile", "justfile", "Justfile"].map((name): [string, readonly string[]] => [name, ["#"]]));
-const MARKERS_WITHOUT_PATH = ["#", "//"];
 
 function markersOf(filePath: string): readonly string[] | undefined {
-  if (filePath === "") return MARKERS_WITHOUT_PATH;
   const name = baseName(SHAPE_PLATFORM, filePath);
   const dot = name.lastIndexOf(".");
   return (dot < 0 ? undefined : MARKERS_BY_EXTENSION.get(name.slice(dot + 1))) ?? MARKERS_BY_NAME.get(name);
@@ -57,14 +54,19 @@ function syntaxOf(markers: readonly string[]): Syntax {
 
 export const commentGateMode = (value: string | undefined): CommentGateMode => (value === "off" || value === "deny" ? value : "advise");
 
-/** The lines a write adds: whole content and replacement strings as given, and the `+` lines of a patch. */
+/** The lines a write adds: a Write's `content` or an Edit's `new_string`. */
 function addedLines(input: unknown): string[] {
-  const written = [inputText(input, "content"), inputText(input, "new_string")].flatMap((text) => text.split("\n"));
-  const patched = PATCH_FIELDS.flatMap((field) => inputText(input, field).split("\n")).filter((line) => line.startsWith("+") && !line.startsWith("+++"));
-  return [...written, ...patched.map((line) => line.slice(1))];
+  return (inputText(input, "content") || inputText(input, "new_string")).split("\n");
 }
 
 const hasReference = (text: string): boolean => /#\d+|[A-Z]+-\d+|@[A-Za-z]/.test(text);
+
+// A bare `TODO: implement` is a placeholder; one that goes on to say what and why is a plan.
+const MIN_PLACEHOLDER_CONTEXT_WORDS = 3;
+function isPlaceholderTodo(line: string): boolean {
+  const rest = /todo:\s*implement\w*\b(.*)$/.exec(line.toLowerCase())?.[1];
+  return rest !== undefined && !hasReference(line) && rest.trim().split(/\s+/).filter(Boolean).length < MIN_PLACEHOLDER_CONTEXT_WORDS;
+}
 
 // A literal attribution or placeholder on a comment line is near-certain slop, which is why
 // these are the only findings that always deny. The phrases must open the comment body, so a
@@ -79,7 +81,7 @@ function attributionFindings(lines: readonly string[], { comment, marker }: Synt
     const body = lowered.replace(marker, "");
     attribution ||= body.startsWith("ai-generated");
     authorship ||= body.startsWith("this code was written by");
-    placeholder ||= /todo:\s*implement/.test(lowered) && !hasReference(line);
+    placeholder ||= isPlaceholderTodo(line);
   }
   const findings: string[] = [];
   if (attribution) findings.push("AI attribution comment detected.");
@@ -153,7 +155,7 @@ function isOneLiner(lines: readonly string[], definition: number, indent: number
 const DEFINITION = /^(\s*)(?:def|function|fn|func)\s+([A-Za-z_]\w*)\s*\(/;
 // A magic number's derivation comment restates its constant by construction, and the codebase
 // requires it, so the shape is exempt rather than the rule blocked.
-const NUMERIC_CONSTANT = /^\s*[A-Za-z_]\w*\s*=\s*-?[0-9]/;
+const NUMERIC_CONSTANT = /^\s*(?:\w+\s+)*[A-Za-z_]\w*(?:\s*:\s*[\w<>[\]]+)?\s*=\s*-?[0-9]/;
 // A tool directive addresses the tool, not a reader, so its overlap with the line below is the
 // directive naming its own target. Anchored at the comment body so a comment that merely
 // mentions a linter is still judged as prose.
@@ -230,11 +232,11 @@ export function judgeWrite(mode: "advise" | "deny", input: unknown, slot: DenyOn
   if (attribution.length > 0) return { kind: "deny", reason: `Blocked: AI-attribution or placeholder comment. ${attribution.join(" ")} ${KEEP_NOTICE}` };
   if (slop.length === 0 || slot === undefined) return advise(undefined);
 
-  const signature = `${filePath}\n${slop.map(({ quoted }) => quoted).join("")}`;
-  if (slot.signature === signature) {
-    delete slot.signature;
+  const signature = slop.map(({ quoted }) => quoted).join("\n");
+  if (slot.get(filePath) === signature) {
+    slot.delete(filePath);
     return advise(undefined);
   }
-  slot.signature = signature;
+  slot.set(filePath, signature);
   return { kind: "deny", reason: `Blocked: comment slop. ${sentences.join(" ")} ${KEEP_NOTICE}` };
 }

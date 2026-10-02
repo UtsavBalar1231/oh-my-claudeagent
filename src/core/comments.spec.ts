@@ -57,8 +57,6 @@ describe("the comment marker follows the file", () => {
     ["/r/a.php", "//"],
     ["/r/a.tf", "#"],
     ["/r/.sh", "#"],
-    ["", "#"],
-    ["", "//"],
     ["C:\\proj\\a.py", "#"],
     ["C:/proj/a.go", "//"],
     ["C:\\proj.d\\Makefile", "#"],
@@ -131,6 +129,25 @@ describe("the one-line function check", () => {
 });
 
 describe("restating", () => {
+  test.each([
+    ["a TypeScript const", "/r/a.ts", "// 5 minutes in ms\nconst FIVE_MINUTES_MS = 300_000;"],
+    ["an exported const", "/r/a.ts", "// 300 seconds of decay\nexport const DECAY_SECONDS = 300;"],
+    ["a Rust typed const", "/r/a.rs", "// 5 minutes in ms\nconst FIVE_MINUTES_MS: u64 = 300_000;"],
+    ["a pub static", "/r/a.rs", "// 5 minutes in ms\npub static FIVE_MINUTES_MS: u64 = 300_000;"],
+    ["a Python assignment", "/r/a.py", "# 5 minutes in ms\nFIVE_MINUTES_MS = 300_000"],
+  ])("the derivation of a magic number is exempt: %s", (_label, path, content) => {
+    expect(judge(path, content)).toBeUndefined();
+  });
+
+  test("a const whose value is not a number is still judged", () => {
+    expect(judge("/r/a.ts", "// 5 minutes in ms\nconst FIVE_MINUTES_MS = compute(5);")).toEqual(
+      advised("tier2", restates("5 minutes in ms")),
+    );
+    expect(judge("/r/a.ts", "// the default retry count\nconst DEFAULT_RETRY_COUNT = 3;")).toEqual(
+      advised("tier2", restates("the default retry count")),
+    );
+  });
+
   test("a comment with digits over a line that is not a numeric constant is still judged", () => {
     expect(judge("/r/a.py", "# 3600 seconds in an hour\nhour_seconds = compute(hour)")).toEqual(advised("tier2", restates("3600 seconds in an hour")));
   });
@@ -194,24 +211,53 @@ describe("findings", () => {
 describe("deny mode", () => {
   const slop = { file_path: "/r/a.py", content: "# set the user name\nuser_name = input_value" };
 
-  test("a deny names the finding and leaves the memory holding it", () => {
-    const slot: DenyOnce = {};
+  test("a deny names the finding and a retry passes and empties the memory", () => {
+    const slot: DenyOnce = new Map();
     const verdict = judgeWrite("deny", slop, slot);
     expect(verdict).toMatchObject({ kind: "deny", reason: expect.stringContaining(restates("set the user name")) });
+    expect(slot.size).toBe(1);
     expect(judgeWrite("deny", slop, slot)).toEqual(advised(undefined, restates("set the user name")));
-    expect(slot).toEqual({});
+    expect(slot.size).toBe(0);
   });
 
   test("with no memory a tier-2 finding advises rather than denies", () => {
     expect(judgeWrite("deny", slop, undefined)).toEqual(advised(undefined, restates("set the user name")));
   });
 
-  test("the memory holds the last denial only", () => {
-    const slot: DenyOnce = {};
+  test("each file keeps its own denial, so interleaved writers each get their retry", () => {
+    const slot: DenyOnce = new Map();
     const other = { file_path: "/r/b.py", content: slop.content };
-    expect(judgeWrite("deny", slop, slot)?.kind).toBe("deny");
-    expect(judgeWrite("deny", other, slot)?.kind).toBe("deny");
-    expect(judgeWrite("deny", slop, slot)?.kind).toBe("deny");
+    expect([slop, other, slop, other].map((input) => judgeWrite("deny", input, slot)?.kind)).toEqual(["deny", "deny", "advise", "advise"]);
+    expect(slot.size).toBe(0);
+  });
+
+  test("a different finding on the same file is denied again", () => {
+    const slot: DenyOnce = new Map();
+    const changed = { file_path: slop.file_path, content: "# obviously this\nx = 1" };
+    expect([slop, changed, changed].map((input) => judgeWrite("deny", input, slot)?.kind)).toEqual(["deny", "deny", "advise"]);
+  });
+
+  test("an attribution comment is denied every time, whatever the memory holds", () => {
+    const slot: DenyOnce = new Map();
+    const input = { file_path: "/r/a.py", content: "# AI-generated helper\nx = 1" };
+    expect([input, input].map((write) => judgeWrite("deny", write, slot)?.kind)).toEqual(["deny", "deny"]);
+  });
+
+  test.each([
+    ["a bare placeholder", "// TODO: implement"],
+    ["a placeholder with one word", "// TODO: implement this"],
+    ["a placeholder in the noun form", "// TODO: implementation"],
+  ])("%s is denied", (_label, comment) => {
+    const verdict = judgeWrite("deny", { file_path: "/r/a.ts", content: `${comment}\nfetch(url);` }, new Map());
+    expect(verdict).toMatchObject({ kind: "deny", reason: expect.stringContaining("Unimplemented TODO placeholder detected.") });
+  });
+
+  test.each([
+    ["a TODO that says what and why", "// TODO: implement the fallback path once the upstream exposes a retry budget"],
+    ["a placeholder with an issue reference", "// TODO: implement #123"],
+    ["a placeholder with a ticket reference", "// TODO: implement PROJ-42"],
+  ])("%s passes", (_label, comment) => {
+    expect(judgeWrite("deny", { file_path: "/r/a.ts", content: `${comment}\nfetch(url);` }, new Map())).toBeUndefined();
   });
 });
 
@@ -221,15 +267,29 @@ describe("what is read", () => {
     expect(judgeWrite("advise", { file_path: "/r/a.py", new_string: text }, undefined)).toEqual(judgeWrite("advise", { file_path: "/r/a.py", content: text }, undefined));
   });
 
-  test("patch fields other than patchText are read, and +++ headers are not content", () => {
-    const patch = "--- a/a.py\n+++ b/a.py\n+# AI-generated helper\n+x = 1";
+  test("only content and new_string are read, so a patch field judges nothing", () => {
     for (const field of ["patchText", "input", "patch", "command"]) {
-      expect(judgeWrite("advise", { file_path: "/r/a.py", [field]: patch }, undefined)).toEqual(advised("tier1", "AI attribution comment detected."));
+      expect(judgeWrite("advise", { file_path: "/r/a.py", [field]: "+# AI-generated helper\n+x = 1" }, undefined)).toBeUndefined();
     }
   });
 
-  test("a patch's +++ header line is never a comment", () => {
-    expect(judgeWrite("advise", { file_path: "/r/a.py", patchText: "+++ # AI-generated\n+x = 1" }, undefined)).toBeUndefined();
+  test("an input with no file path judges nothing", () => {
+    expect(judgeWrite("deny", { content: "# AI-generated helper\nx = 1" }, new Map())).toBeUndefined();
+  });
+
+  describe("the disable marker window", () => {
+    const marker = "comment-gate-disable-file";
+    const body = Array.from({ length: 4 }, () => "x = 1").join("\n");
+    const slop = "# set the user name\nuser_name = input_value";
+
+    test.each(["content", "new_string"])("a marker on line 5 of a %s passes, so a Write and an Edit read alike", (field) => {
+      expect(judgeWrite("deny", { file_path: "/r/a.py", [field]: `${body}\n# ${marker}\n${slop}` }, new Map())).toBeUndefined();
+    });
+
+    test.each(["content", "new_string"])("a marker on line 6 of a %s is outside the window", (field) => {
+      const input = { file_path: "/r/a.py", [field]: `${body}\nx = 2\n# ${marker}\n${slop}` };
+      expect(judgeWrite("deny", input, new Map())?.kind).toBe("deny");
+    });
   });
 
   test("a tool input that is not an object judges nothing", () => {
