@@ -125,6 +125,7 @@ export type ClaudeRun = {
   sessionId?: string;
   streamJson?: boolean;
   timeoutMs?: number;
+  env?: Record<string, string>;
 };
 
 export type ClaudeResult = { code: number; stdout: string; stderr: string };
@@ -157,6 +158,7 @@ export async function runClaude(run: ClaudeRun): Promise<ClaudeResult> {
       ANTHROPIC_BASE_URL: `http://127.0.0.1:${run.port}`,
       ANTHROPIC_AUTH_TOKEN: "mock-token",
       ...(run.hookTrace ? { OMCA_HOOK_TRACE: "1" } : {}),
+      ...run.env,
     }),
   });
   const [code, stdout, stderr] = await Promise.all([proc.exited, new Response(proc.stdout).text(), new Response(proc.stderr).text()]);

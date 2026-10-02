@@ -43,6 +43,13 @@ function leafSteps(name: string): string[] {
   return dependencies.length === 0 ? [name] : dependencies.flatMap(leafSteps);
 }
 
+function jobBlock(name: string): string {
+  const lines = CI.split("\n");
+  const rest = lines.slice(lines.findIndex((line) => line.startsWith(`  ${name}:`)) + 1);
+  const end = rest.findIndex((line) => /^ {2}[a-zA-Z_-]+:/.test(line));
+  return rest.slice(0, end === -1 ? undefined : end).join("\n");
+}
+
 const ciLeaves = [...new Set(leafSteps("ci"))].sort();
 
 describe("workflow contract", () => {
@@ -86,6 +93,21 @@ describe("workflow contract", () => {
     const steps = CI.split("\n").flatMap((line, index, lines) => (line.includes("oven-sh/setup-bun@") ? [lines.slice(index, index + 4).join("\n")] : []));
     expect(steps.length).toBeGreaterThan(0);
     expect(steps.filter((step) => !step.includes("no-cache: true"))).toEqual([]);
+  });
+
+  test("every job but the latest-client manifest check runs on linux, macOS and windows without failing fast", () => {
+    for (const job of ["validate", "test-mcp", "test-opencode", "typescript", "smoke"]) {
+      const block = jobBlock(job);
+      expect(block).toContain("os: [ubuntu-latest, macos-latest, windows-latest]");
+      expect(block).toContain("fail-fast: false");
+      expect(block).toContain("runs-on: ${{ matrix.os }}");
+    }
+    expect(jobBlock("validate-manifest")).toContain("runs-on: ubuntu-latest");
+  });
+
+  test("ci.yml pins an ast-grep archive digest for each OS and a spec floor that is a whole number", () => {
+    for (const os of ["LINUX", "MACOS", "WINDOWS"]) expect(CI).toMatch(new RegExp(`^ {2}AST_GREP_SHA256_${os}: [0-9a-f]{64}$`, "m"));
+    expect(CI).toMatch(/^ {2}BUN_SPEC_FLOOR: "[1-9][0-9]*"$/m);
   });
 
   test("neither workflow runs bats or checks out submodules", () => {
