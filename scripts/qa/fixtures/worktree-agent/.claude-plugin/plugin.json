@@ -1,0 +1,5 @@
+{
+  "name": "omca-qa-worktree",
+  "version": "0.0.0",
+  "description": "QA fixture: a worktree-isolated agent that runs the commands it is given."
+}

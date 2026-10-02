@@ -113,11 +113,17 @@ qa:
 	bash scripts/qa/hook-live-probe.sh
 	bash scripts/qa/statusline-probe.sh
 	bash scripts/qa/session-smoke.sh
+	bun scripts/qa/worktree-bash.ts
 
 # Capture tests/mod/visual/<view>.json in tmux against the mock model at 80, 120 and 200 columns
 [group('test')]
 visual view:
 	bun scripts/qa/visual.ts {{ view }}
+
+# Check against the mock model that Bash works in an isolation: worktree subagent with the mod and its mcp_tool hooks loaded
+[group('test')]
+qa-worktree-bash *args:
+	bun scripts/qa/worktree-bash.ts {{ args }}
 
 # Benchmark the working tree (or --candidate-ref) against --baseline-ref, via the mock model
 [group('test')]
