@@ -18,13 +18,9 @@ export function listSources(): Source[] {
 }
 
 export const PHRASES: [string, string][] = [
-  ["`boulder_write`, `evidence_read`, `notepad_read`, `ast_search`, and `file_read` are discovery-deferred, so load each through ToolSearch before calling it; only `evidence_log`, `boulder_progress`, and `notepad_write` are loaded eagerly.", ""],
-  ["; load it through ToolSearch", ""],
-  [" (load `ast_search` and `file_read` through ToolSearch when you need them)", ""],
   [", plus `TaskList()` counts where that tool exists", ""],
   [", and from `TaskList()` state where that tool exists", ""],
   [", supplemented by `TaskList()` where available", ""],
-  ["Sisyphus-Junior", "OMCA executor"],
   ["[oracle | sisyphus]", "[omca-oracle | the primary agent]"],
   ["Recommend consulting oracle", "Recommend consulting omca-oracle"],
   ["consult oracle", "consult the omca-oracle subagent"],

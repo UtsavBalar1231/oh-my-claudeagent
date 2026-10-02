@@ -65,7 +65,7 @@ binding.
      entry hasn't been garbage-collected yet.
    - Plan files not yet in the registry, found by searching:
      - `<plans-dir>/*.md` (canonical native plans)
-     - `.omca/plans/*.md` (compatibility surface)
+     - `.omca/plans/*.md` (project-local plans)
      labeled `[available]`.
 
    `<plans-dir>` is the platform's plans directory: the `plansDirectory` setting when
@@ -127,13 +127,12 @@ Without `--worktree`:
 1. The resolved plan's registry entry (`plans[plan_name].worktree_path`) is set
    (resume case) → use it. `worktree_path` is per-plan, not global, a session
    resuming a different plan than its own last one gets that plan's worktree, not
-   whatever it used previously.
+   its own last plan's.
 2. Otherwise → show setup prompt, store via `boulder_write`.
 
 ### Boulder Write (BEFORE Delegating)
 
-After plan is selected, before any delegation. `boulder_write` is a deferred tool, so
-hydrate it with `ToolSearch({query: "select:boulder_write", max_results: 1})` first:
+After the plan is selected, before any delegation:
 
 ```
 boulder_write(
@@ -259,11 +258,10 @@ A sub-bullet the plan omits is simply absent; do not invent one. Copying it into
 target section does not replace quoting it in §1: §1 carries the task as written, the
 other sections carry it as instructions.
 
-**Older plans use a different shape.** Plans written before the sub-bullet template
-carry bolded fields instead: `**What to do**`, `**Acceptance Criteria**`,
-`**Must NOT do**`. Quote whichever shape the task actually uses rather than assuming
-the sub-bullet form, and map the bolded fields the same way: `**Acceptance Criteria**`
-to §2, `**Must NOT do**` to §4. A plan is one shape or the other, never both. If a task
+**A plan may use bolded fields instead of sub-bullets**: `**What to do**`,
+`**Acceptance Criteria**`, `**Must NOT do**`. Quote whichever shape the task actually uses
+rather than assuming the sub-bullet form, and map the bolded fields the same way:
+`**Acceptance Criteria**` to §2, `**Must NOT do**` to §4. A plan is one shape or the other, never both. If a task
 has neither shape, the checkbox line is all there is, and §1 says so explicitly so the
 executor knows the thinness is the plan's, not a truncation.
 
@@ -349,9 +347,9 @@ left, say how many results remain and end the response.
 
 ### 2.3 Verify After Every Delegation
 
-Re-run the task's `Done when:` command (its `**Acceptance Criteria**` check in an older
-plan) yourself and confirm it passes; that is the per-task mechanical check. Run the
-project-level build and test suite once the whole parallel group has landed, not after
+Re-run the task's `Done when:` command (its `**Acceptance Criteria**` check in a plan
+that uses bolded fields) yourself and confirm it passes; that is the per-task mechanical
+check. Run the project-level build and test suite once the whole parallel group has landed, not after
 each task: sibling executors edit the same working tree, so a mid-group run reports
 their unfinished edits as this task's failure. If the group suite fails, re-open
 (`- [x]` to `- [ ]`) every task in the group whose diff the failure touches before you
@@ -574,10 +572,6 @@ just flaky" is not evidence.
 - **`notepad_write`**: Blockers/audit breadcrumbs (learnings, issues, decisions, problems)
 - **`notepad_read`**: Fallback audit notes when relevant to a pending task
 - Never `rm -f` on `.omca/state/`: use MCP tools
-
-Only `evidence_log`, `boulder_progress`, and `notepad_write` load eagerly. `boulder_write`, `evidence_read`, `notepad_read`, `ast_search`, and `file_read` are deferred, so hydrate the schema with `ToolSearch({query: "select:<name>", max_results: 1})` before the first call or it fails with an `InputValidationError`.
-
-`boulder_write` is the one to watch: this command requires it before any delegation, so it is the first MCP call of every plan run and a missing-tool error there stops the run at step one. Hydrate it in the same message that reads the plan.
 
 ## Critical Rules
 

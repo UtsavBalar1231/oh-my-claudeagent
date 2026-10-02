@@ -25,7 +25,7 @@ Three tiers. `sonnet` runs the routine workers (explore, executor, librarian) at
 | Agent             | Model            | Effort  | Use when                                                                 |
 | ----------------- | ---------------- | ------- | ------------------------------------------------------------------------ |
 | sisyphus          | opus             | high    | Orchestration: free-form and plan execution (via `/start-work` command) |
-| prometheus        | opus             | high    | Interviewing the user, Socratic deep-dive, producing structured plans    |
+| prometheus        | opus             | high    | Interviewing the user, deep-dive dialogue, producing structured plans    |
 | metis             | opus             | high    | Pre-execution gap analysis on a draft plan                               |
 | momus             | opus             | high    | Critical review of a draft plan for clarity and risk                     |
 | executor          | sonnet           | high    | Focused implementation of a known, scoped task                           |
@@ -43,7 +43,7 @@ To set one delegation's effort, make `[omca-route effort=<low|medium|high|xhigh|
 
 Pipeline: **prometheus → metis → momus → user approval → `/oh-my-claudeagent:start-work`.**
 
-1. `prometheus` interviews user (optionally in Socratic Interview Mode), drafts plan.
+1. `prometheus` interviews the user and drafts the plan. When the user wants to understand or research something rather than get a plan, it runs an interview and returns a synthesis, with no plan file.
 2. `metis` gap-analyzes the draft.
 3. `momus` reviews for clarity, verifiability, completeness.
 4. **User approves** (ExitPlanMode or confirmation).

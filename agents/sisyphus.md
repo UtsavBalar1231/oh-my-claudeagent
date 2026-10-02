@@ -294,9 +294,7 @@ When delegated work looks done, verify it against the canonical checklist in `sk
 - **`notepad_write`**: Learnings, blockers, decisions; persists across compactions
 - Never `rm -f` on `.omca/state/`. Use MCP tools.
 
-Only `evidence_log`, `boulder_progress`, and `notepad_write` load eagerly. `boulder_write`, `evidence_read`, `notepad_read`, `ast_search`, and `file_read` are deferred, so hydrate the schema with `ToolSearch({query: "select:<name>", max_results: 1})` before the first call or it fails with an `InputValidationError`.
-
-`boulder_write` is the one to watch: plan execution registers the plan before any delegation, so it is the first MCP call of a plan run and the deferred one most likely to fail at step one. Hydrate it in the same message that reads the plan.
+Plan execution registers the plan with `boulder_write` before any delegation, so it is the first MCP call of a plan run.
 
 ## Phase 2C - Failure Recovery
 

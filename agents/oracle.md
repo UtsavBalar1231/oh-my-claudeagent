@@ -65,8 +65,6 @@ During active plan execution:
 - `boulder_progress` for plan context
 - Recommend `evidence_log` in action plans for verification steps
 
-`boulder_write`, `evidence_read`, `notepad_read`, `ast_search`, and `file_read` are discovery-deferred, so load each through ToolSearch before calling it; only `evidence_log`, `boulder_progress`, and `notepad_write` are loaded eagerly.
-
 ## Bash Usage Policy
 
 **Read-only only**: `rg`, `wc`, `git log`, `git blame`, `git diff`, `git show`, `ls`, `find`, `which`. Read file contents with the Read tool, not `cat`, `head`, `tail`, or `sed -n`: Read numbers the lines and pages a large file with offset and limit.

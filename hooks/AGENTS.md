@@ -27,69 +27,47 @@ event is unregistered on purpose; `OMCA.md` carries the per-event reason.
   verification, and the drift guard in that order and answers with the first block.
   `OMCA_DISABLED_HOOKS=stop-gates` turns off all three; `plan-continuation`,
   `final-verification`, or `drift-guard` turns off one.
-- `permission-filter.sh` has two roles, and they are registered on different events.
-  The deny of a recursive removal runs on `PreToolUse` and on `PermissionRequest`, both
-  with matcher `Bash`. The auto-allow of a narrow trusted-tooling set (npm, yarn, pnpm,
-  bun, jq, `uv run`/`uv sync`) runs on `PermissionRequest` only.
+- The destructive-command guard lives in the mod, on `tool.check` for Bash and PowerShell
+  (`hooks/bash-guard.ts`, with its patterns in `src/core/destructive.ts`). A recursive removal
+  whose target is the filesystem root, home, the working directory, or a directory directly
+  under root or home is denied outright. The destructive git family (hard reset, stash, clean,
+  restore, recursive `git rm`, path checkout), any other recursive removal, and a force push are
+  held for review. Where a dialog can show and the `guardMode` option is `dialog`, the guard asks
+  the user and only "Run it" lets the call continue. Otherwise the git family that discards work
+  is denied and a recursive removal of a deeper path or a force push runs.
+  `OMCA_DISABLED_HOOKS=bash-guard` turns the review off and never the outright deny.
 
-  The reason for the split: `PermissionRequest` fires only when a permission dialog is
-  about to be shown, while `PreToolUse` fires before tool execution regardless of
-  permission status (`claude-code-docs/docs/hooks.md`, PermissionRequest input). A deny
-  registered only on `PermissionRequest` is therefore inert for any command that never
-  produces a dialog, and under `permissions.defaultMode: "auto"` the classifier resolves
-  most shell commands without one, so that is the common case. Before the `PreToolUse`
-  registration existed, a real headless turn ran `rm -rf` on a canary directory with no
-  denial while the same command fed to the script on stdin denied correctly. Every doc
-  that described this deny as unconditional was wrong for as long as the script was
-  registered on `PermissionRequest` alone.
-
-  The auto-allow must stay off `PreToolUse` permanently. A `PreToolUse`
-  `permissionDecision: "allow"` skips the permission prompt, so the auto-mode classifier
-  and any interactive confirmation never run for that command; only explicit `deny` and
-  `ask` rules from settings still apply. Consolidating the two events into one handler
-  for tidiness would convert a six-tool convenience into a silent standing bypass of the
-  user's permission posture, which is a worse hole than the inert deny it would be
-  cleaning up after. `permission-filter.sh` encodes this as an early `exit 0` on
-  `hook_event_name == PreToolUse`, sitting after the deny and before the first allow. It is
-  the only script that needs the guard, because it is the only one whose allow is a blanket
-  fast path keyed on a tool name rather than on a command the script parsed in full.
-
-  `git-destructive-deny.sh` is registered on both events too. It is deny-only: it emits
-  an allow on no path, so a command it does not recognise gets silence, never an allow.
-
-  It branches its output on `hook_event_name`, because the two events read a
-  decision from different places: `PreToolUse` from stderr plus `exit 2` or from
-  `hookSpecificOutput.permissionDecision`, `PermissionRequest` from
-  `hookSpecificOutput.decision.behavior` with `exit 0`. The branch is required, not a hedge.
-  Exit code 2 is not honored on `PermissionRequest`: the permission flow proceeds unchanged
-  and the stderr is discarded, so only the `decision` object can deny there. Do not collapse
-  the branch. `git-destructive-deny.sh`'s former trailing allow for every git command it did
-  not deny was deleted, because it auto-approved everything the pattern failed to recognise,
-  and a deny gate's answer to an unrecognised command is silence.
-
-  The deny matches a recursive removal at any command position:
-  string start, after a separator, or inside a subshell or command substitution. Anchoring
-  on command position is what keeps a literal mention out of scope, since the `rm` in
-  `grep -rn "rm -rf" scripts/` follows a quote rather than a separator. That deny branch
-  runs before the operator check, so a compound command carrying a recursive removal is
-  denied rather than deferred, and it must not be deleted as duplicated platform behavior
-  now that auto mode adjudicates the dangerous-`rm` case without a dialog.
-  `git-destructive-deny.sh` matches its destructive-git set at the same command positions,
-  and it no longer emits an allow for a compound command at all: a command carrying an
-  operator falls through to the platform instead of being auto-approved because its head
-  happened to be a git subcommand.
-- A command containing a command separator, a redirect, or a
-  command substitution falls through to the platform decision instead of taking the fast
-  path, because per-subcommand `if:` matching means only the first subcommand is what the
-  filter saw. A carriage return is matched too, as hardening for shells that terminate a
-  statement on a bare CR, which bash does not. Globs, tilde, and `$VAR` expansion still
-  take the fast path: none of them can introduce a second command. The operator scan is
-  quote-blind, so a command whose quoted argument contains an operator loses the fast path.
-  The common case is a jq filter with a pipe: `jq -r '.a | .b' f.json` now gets the normal
-  platform permission prompt. That friction is deliberate. Teaching the scan to skip quoted
-  regions is how a guardrail becomes a hole, because a genuinely compound command could then
-  hide its separator inside quotes. `src/core/trusted-tooling.spec.ts` pins the
-  behavior so it cannot be "fixed" by accident.
-- Hook lifecycle ownership stays Claude-native. OMCA supplies the mod's module and
-  `type: mcp_tool` handlers whose `tool` is `omca_hook`; no `type: command` handler
-  remains. Start-up pruning and the exit unbind run in the server process, not in a hook.
+  The patterns match at any command position: string start, after a separator, or inside a
+  subshell or command substitution, behind `sudo`, `env`, `command` and `VAR=value` prefixes.
+  Anchoring on command position keeps a literal mention out of scope, since the `rm` in
+  `grep -rn "rm -rf" scripts/` follows a quote rather than a separator. `tool.check` runs
+  before every Bash call in every permission mode, so the guard never depends on a dialog being
+  shown. A deny registered only on `PermissionRequest` would be inert for any command that never
+  produces a dialog, which under `permissions.defaultMode: "auto"` is the common case. Auto mode
+  also adjudicates the dangerous-`rm` case without a dialog, but the guard is not backed by that
+  and must not be deleted as duplicated platform behavior.
+- `tool.check` never returns an allow, because an allow there skips the auto-mode classifier.
+  The auto-allow of a narrow trusted-tooling set lives in the server's `PermissionRequest`
+  handler (`servers/hooks/trusted-tooling.ts`, with its rules in
+  `src/core/trusted-tooling.ts`): the `run`, `test`, `ci`, `list` and `view` subcommands of npm,
+  yarn, pnpm and bun, `jq` without `--rawfile`, and `uv run` and `uv sync`. `PermissionRequest`
+  fires only when a permission dialog is about to be shown, so that handler can only remove a
+  prompt the user would otherwise see. It must stay off `PreToolUse`: a `PreToolUse`
+  `permissionDecision: "allow"` skips the permission prompt, so the auto-mode classifier and any
+  interactive confirmation never run for that command, and only explicit `deny` and `ask` rules
+  from settings still apply. Moving it there would convert a six-tool convenience into a silent
+  standing bypass of the user's permission posture.
+- A command containing a command separator, a redirect, or a command substitution falls through
+  to the platform decision instead of taking the fast path, because per-subcommand `if:`
+  matching means only the first subcommand is what the handler saw. A carriage return is matched
+  too, as hardening for shells that terminate a statement on a bare CR, which bash does not.
+  Globs, tilde, and `$VAR` expansion take the fast path: none of them can introduce a second
+  command. The operator scan is quote-blind, so a command whose quoted argument contains an
+  operator loses the fast path. The common case is a jq filter with a pipe:
+  `jq -r '.a | .b' f.json` gets the normal platform permission prompt. That friction is
+  deliberate. Teaching the scan to skip quoted regions is how a guardrail becomes a hole,
+  because a genuinely compound command could then hide its separator inside quotes.
+  `src/core/trusted-tooling.spec.ts` pins the behavior so it cannot be "fixed" by accident.
+- Hook lifecycle ownership is Claude-native. OMCA supplies the mod's module and
+  `type: mcp_tool` handlers whose `tool` is `omca_hook`, and every registered handler is of that
+  type. Start-up pruning and the exit unbind run in the server process, not in a hook.

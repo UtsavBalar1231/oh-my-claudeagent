@@ -170,7 +170,7 @@ export const tools: Tool[] = [
     inputSchema: {
       type: "object",
       properties: {
-        working_directory: { type: "string", default: "", description: "Unused — reads from plugin dir. Kept for API consistency." },
+        working_directory: { type: "string", default: "", description: "Unused; the table is read from the plugin directory." },
       },
     },
     annotations: { title: "List model categories", readOnlyHint: true, idempotentHint: true, openWorldHint: false },

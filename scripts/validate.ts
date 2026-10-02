@@ -14,10 +14,18 @@ import * as mcp from "./validate/mcp.ts";
 import * as mod from "./validate/mod.ts";
 import * as policy from "./validate/policy.ts";
 import * as portability from "./validate/portability.ts";
+import * as promptHistory from "./validate/prompt-history.ts";
 import * as tree from "./validate/tree.ts";
 
 export const GROUPS: Readonly<Record<string, readonly Check[]>> = {
-  claims: [...manifest.checks, ...frontmatter.checks, ...policy.checks, ...portability.checks, ...docs.checks],
+  claims: [
+    ...manifest.checks,
+    ...frontmatter.checks,
+    ...policy.checks,
+    ...portability.checks,
+    ...docs.checks,
+    ...promptHistory.checks,
+  ],
   hooks: hooks.checks,
   mod: mod.checks,
   tree: tree.checks,

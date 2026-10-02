@@ -228,7 +228,7 @@ export const tools: Tool[] = [
         session_id: {
           type: "string",
           description:
-            "This session's platform UUID, as shown in the SessionStart context ('Session <id> initialized'). An empty string uses the session of the most recent OMCA hook call, or the server's CLAUDE_CODE_SESSION_ID before any hook has run. Any other value binds a session that does not exist, and the Stop hooks will not see the plan.",
+            "This session's platform UUID, as shown on the 'Session <id>' line OMCA adds to the session's first prompt. An empty string uses the session of the most recent OMCA hook call, or the server's CLAUDE_CODE_SESSION_ID before any hook has run. Any other value binds a session that does not exist, and the Stop hooks will not see the plan.",
         },
         agent: { type: "string", default: "sisyphus", description: "Agent managing this plan" },
         worktree_path: { type: "string", default: "", description: "Git worktree path if using worktrees" },

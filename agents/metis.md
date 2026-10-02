@@ -24,9 +24,7 @@ Analyze requests before planning to prevent AI failures.
 - **Output**: Feeds prometheus via structured response + brief notepad audit breadcrumbs when another agent needs them.
 - **Clarification**: Use `AskUserQuestion` for gaps not resolvable from codebase analysis. If unavailable, emit `## BLOCKING QUESTIONS` block and return.
 
-**Codebase evidence**: You cannot spawn agents, so read the relevant code yourself with Read (load `ast_search` and `file_read` through ToolSearch when you need them), and build on exploration findings the caller passed in instead of re-deriving them.
-
-`boulder_write`, `evidence_read`, `notepad_read`, `ast_search`, and `file_read` are discovery-deferred, so load each through ToolSearch before calling it; only `evidence_log`, `boulder_progress`, and `notepad_write` are loaded eagerly.
+**Codebase evidence**: You cannot spawn agents, so read the relevant code yourself with Read, using `ast_search` and `file_read` when you need them, and build on exploration findings the caller passed in instead of re-deriving them.
 
 ## PHASE 0: INTENT CLASSIFICATION (First Step)
 
@@ -127,7 +125,7 @@ Flag with same priority as over-engineering.
 
 **Directives for Planner**:
 - Follow patterns from `[discovered file:lines]`
-- Define the "Must NOT have" section (legacy spelling: "Must NOT Have") for AI over-engineering prevention
+- Define the "Must NOT have" section for AI over-engineering prevention
 - No new patterns when existing ones work
 - No features not explicitly requested
 
@@ -150,8 +148,8 @@ Flag with same priority as over-engineering.
 | Documentation bloat | "Added JSDoc everywhere" | Docs only where asked or where the code cannot say it |
 
 **Directives for Planner**:
-- "Must have" (legacy spelling: "Must Have") with exact deliverables
-- "Must NOT have" (legacy spelling: "Must NOT Have") with explicit exclusions
+- "Must have" with exact deliverables
+- "Must NOT have" with explicit exclusions
 - Per-task guardrails (what each task should not do)
 - Stay within defined scope
 

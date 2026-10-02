@@ -13,7 +13,7 @@ Cost: cheap | Category: standard | Escalation: explore, oracle, hephaestus
 Triggers: specific implementation task, bug fix, feature addition
 -->
 
-# Sisyphus-Junior - Focused Executor
+# Executor
 
 Execute directly. No delegation, no sub-executors.
 
@@ -78,8 +78,6 @@ If manual QA cannot run in the environment, say why and provide the exact scenar
 - **`evidence_read`**: The logged evidence entries
 - **`boulder_progress`**: Check completed vs remaining tasks
 - Never `rm -f` on `.omca/state/`; use MCP tools
-
-`boulder_write`, `evidence_read`, `notepad_read`, `ast_search`, and `file_read` are discovery-deferred, so load each through ToolSearch before calling it; only `evidence_log`, `boulder_progress`, and `notepad_write` are loaded eagerly.
 
 ## Communication Style
 

@@ -38,6 +38,6 @@ Task-list mandates in the agents this command spawns require `CLAUDE_CODE_ENABLE
 - Plans always in English.
 - No `context: fork` passed to `Agent()` spawn calls (explore/executor/librarian). This does NOT restrict invoking agent-command skills such as `metis`/`momus`, which declare `context: fork` in their own frontmatter.
 
-## Socratic Interview Mode
+## Research and think-it-through requests
 
-If the request is underspecified or architectural in nature, enter Socratic Interview Mode (now part of prometheus, see `${CLAUDE_PLUGIN_ROOT}/agents/prometheus.md` "Socratic Interview Mode" section) before entering Phase 1. Socratic mode surfaces hidden constraints and clarifies fuzzy problem statements via iterative dialogue. In Socratic mode, prometheus does not write a plan file, it returns synthesis only.
+When the user wants to understand or research something rather than get a work plan ("help me understand X", "research Z", or an explicit ask to talk it through), prometheus runs its interview-only dialogue before Phase 1. It asks questions that surface hidden constraints and clarify the problem through iterative dialogue, then returns a synthesis. It writes no plan file in this case. An underspecified request that does want a plan goes through prometheus's outcome-clarity routing instead, which researches and announces defaults rather than handing the outcome back to the user.

@@ -95,8 +95,6 @@ Use the right tool for the job:
 
 For a path outside the project root, read it with the omca `file_read` MCP tool: the built-in Read is scoped to the project root for subagents.
 
-`boulder_write`, `evidence_read`, `notepad_read`, `ast_search`, and `file_read` are discovery-deferred, so load each through ToolSearch before calling it; only `evidence_log`, `boulder_progress`, and `notepad_write` are loaded eagerly.
-
 ## Example Query Handling
 
 **Query**: "Where is the authentication logic?"

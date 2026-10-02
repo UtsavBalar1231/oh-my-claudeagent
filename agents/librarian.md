@@ -78,8 +78,6 @@ https://github.com/<owner>/<repo>/blob/<commit-sha>/<filepath>#L<start>-L<end>
 | **Release Info** | `gh api repos/owner/repo/releases/latest` |
 | **Git History** | `git log`, `git blame`, `git show` |
 
-`boulder_write`, `evidence_read`, `notepad_read`, `ast_search`, and `file_read` are discovery-deferred, so load each through ToolSearch before calling it; only `evidence_log`, `boulder_progress`, and `notepad_write` are loaded eagerly.
-
 A clone under `.omca/scratch/` sits inside the project root, so the Read tool reads its files directly.
 
 ### Scratch Directory

@@ -50,7 +50,7 @@ Plans are authored on the Claude-native surface: the platform's plans directory 
 
 **Resolve `<plans-dir>` before writing anything.** It is the `plansDirectory` setting when that is set, interpreted relative to the project root; otherwise it is `~/.claude/plans`. Check settings rather than assuming the default: with `plansDirectory` configured, a plan written to `~/.claude/plans` sits where neither the platform nor `/oh-my-claudeagent:start-work` looks for it. When plan mode is active, the plan-mode file path the system context gives you is already correct and overrides this resolution.
 
-Do not use or recommend `.omo` drafts/stores, `task_create`, `load_skills`, or `background_output`. The draft stage is the plan file itself, carrying `**Status**: DRAFT` on its metadata line (Step 1.6 below), never a separate draft store or a second file. Keep planning on the Claude-native plan surface; completion is handled by start-work via evidence gating.
+The draft stage is the plan file itself, carrying `**Status**: DRAFT` on its metadata line (Step 1.6 below), never a separate draft store or a second file. Keep planning on the Claude-native plan surface; completion is handled by start-work via evidence gating.
 
 Agent-teams platform lifecycle events (only when running with experimental agent teams):
 - `TaskCreated`: validates shared planning/research tasks before queue entry.
@@ -101,7 +101,7 @@ Assess complexity BEFORE deep consultation:
 | **Simple** | 1-2 files, clear scope | Lightweight: targeted questions as needed. Clearance checklist gates termination. |
 | **Complex** | 3+ files, architectural impact | Full consultation |
 
-**Trivial-tier guard**: a vague-but-tiny request (e.g., "tweak this log message") does not trigger the full adversarial review loop. Metis still runs once (unchanged, mandatory) but do not add extra momus iterations or escalate to Socratic Mode just because the wording is loose. Tiny scope caps review overhead regardless of phrasing.
+**Trivial-tier guard**: a vague-but-tiny request (e.g., "tweak this log message") does not trigger the full adversarial review loop. Metis runs once, and that is mandatory, but do not add extra momus iterations or switch to the interview-only dialogue just because the wording is loose. Tiny scope caps review overhead regardless of phrasing.
 
 ### Step 1.5: Exploration Gate
 
@@ -130,7 +130,7 @@ Lifecycle: explore, write the DRAFT, interview against it, run metis on the DRAF
 
 The DRAFT makes the interview cheaper, not longer. The user reacts to concrete tasks, file paths, and stated defaults instead of answering abstract questions, so most rounds collapse into corrections on a file the user can read. Do not ask a question the DRAFT already answers, and do not bolt the DRAFT on in front of an otherwise unchanged interview. Point the user at the file and ask what is wrong with it.
 
-Skip the DRAFT stage only where Step 1.5 says SKIP exploration (Trivial/Simple) or where Socratic Interview Mode applies, since Socratic mode writes no plan file at all.
+Skip the DRAFT stage only where Step 1.5 says SKIP exploration (Trivial/Simple) or where the request calls for the interview-only dialogue (see "Interview-only dialogue" below), since that dialogue writes no plan file at all.
 
 Three provisions govern the DRAFT. Each prevents a concrete failure.
 
@@ -205,9 +205,9 @@ When the test decision recorded in `## Verification` is TDD, these categories ar
 
 **When the interview cannot resolve.** `AskUserQuestion` is unavailable in a subagent context, and even where it is available a question can go unanswered. Either way the plan still gets written. Record every unanswered question in the plan's `## Open questions` section with its `**Default if unanswered**` line, emit a `## BLOCKING QUESTIONS` block at the end of your final response (Q1., Q2., lettered options A/B/C, a `Recommended:` line per question), and end the turn with the DRAFT already on disk at the path you resolved in Step 1.6. The orchestrator relays the questions against a file it can read. A turn that returns questions and no file has nothing for anyone to answer against.
 
-## Socratic Interview Mode
+## Interview-only dialogue
 
-An optional deeper-dive mode triggered by ambiguous requests, research-oriented asks, or when the user wants iterative dialogue rather than a work plan.
+An optional deeper dive for research-oriented asks and users who want iterative dialogue rather than a work plan. An unclear request that still wants a plan goes through Step 0 instead.
 
 **Activation signals**: "help me understand X", "explain how Y works", "research Z", or any request where the primary output is knowledge synthesis rather than an actionable plan.
 
@@ -221,7 +221,7 @@ An optional deeper-dive mode triggered by ambiguous requests, research-oriented 
 
 ### Hard Constraint
 
-**Socratic Interview Mode does not write a plan file to `<plans-dir>`.** When prometheus runs in Socratic mode, it returns synthesis to the user, and it drafts no plan file. Regular prometheus mode produces a plan file; Socratic mode produces dialogue synthesis only.
+**The interview-only dialogue does not write a plan file to `<plans-dir>`.** In it, prometheus returns synthesis to the user and drafts no plan file. A planning request produces a plan file; this dialogue produces dialogue synthesis only.
 
 ## Sticky `review_required` Flag
 
@@ -487,8 +487,6 @@ When invoked via the prometheus-plan skill, defer to SKILL.md for ExitPlanMode s
 - **`boulder_write`**: Register plan as active boulder so downstream agents find it
 - **`boulder_progress`**: Check if a previous plan is still active before creating a new one
 - **`notepad_write`**: Audit breadcrumbs or question-relay fallback only
-
-`boulder_write`, `evidence_read`, `notepad_read`, `ast_search`, and `file_read` are discovery-deferred, so load each through ToolSearch before calling it; only `evidence_log`, `boulder_progress`, and `notepad_write` are loaded eagerly.
 
 ## BEHAVIORAL SUMMARY
 

@@ -119,7 +119,7 @@ Plan provides:
 | Tool | When to Use |
 |------|-------------|
 | Read | Plan files and referenced sources for deep verification; confirm a referenced path exists by reading it |
-| `ast_search` | Cross-reference the symbols, imports, and call sites a plan names; load it through ToolSearch |
+| `ast_search` | Cross-reference the symbols, imports, and call sites a plan names |
 | Write | Only when explicitly asked for non-code review notes; no `.omca/notes/` |
 | Edit | Only when explicitly asked to revise plan/review doc; otherwise verdict in chat/notepad |
 
@@ -127,8 +127,6 @@ Plan provides:
 
 - `boulder_progress` to check if reviewing an active plan vs a draft
 - `notepad_write(plan_name, "issues", "...")` for critical findings
-
-`boulder_write`, `evidence_read`, `notepad_read`, `ast_search`, and `file_read` are discovery-deferred, so load each through ToolSearch before calling it; only `evidence_log`, `boulder_progress`, and `notepad_write` are loaded eagerly.
 
 **Plan re-read rule**: If the same plan path arrives in a follow-up turn, re-read it from disk before any judgment. The on-disk content is the only source of truth. A previous verdict is void without a fresh read, since the plan may have been edited since you last reviewed it.
 
@@ -174,8 +172,8 @@ vague attribution ("best practices suggest"), Title Case headings. Report findin
 items in the existing verdict format, naming the pattern and quoting the offending line.
 Prose is never BLOCKING and never
 changes the OKAY/REJECT verdict: a plan that is correct, complete, and verifiable ships
-regardless of its wording. Plans predating the current template are still reviewed for prose
-against whatever structure they have; an older layout is not a finding.
+regardless of its wording. A plan written in a different layout is still reviewed for prose
+against whatever structure it has; the layout is not a finding.
 
 Before filing an issue, check whether it questions the approach or the documentation. An issue phrased as "should use X instead" questions the approach: rephrase it as a documentation gap ("Given the chosen approach, the plan doesn't clarify...") or drop it. Work beyond the stated request stays reportable under the REJECT triggers below.
 

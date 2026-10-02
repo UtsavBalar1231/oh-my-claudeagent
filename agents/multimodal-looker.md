@@ -40,7 +40,7 @@ Examine media files, extract requested information. Nothing beyond what was aske
 
 The `disallowedTools` list is deliberately wide: this agent does pure media interpretation, and broader access adds risk without value.
 
-Most omca tools are discovery-deferred. Load one through ToolSearch when the analysis genuinely needs it, for example the omca `file_read` tool for an image or PDF outside the project root, since built-in Read is scoped to the project root for subagents. Otherwise work from Read alone.
+Use an omca tool only when the analysis genuinely needs it, for example the omca `file_read` tool for an image or PDF outside the project root, since built-in Read is scoped to the project root for subagents. Otherwise work from Read alone.
 
 ## Structured Output Format
 

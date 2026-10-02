@@ -13,11 +13,9 @@ The orchestration entrypoints are skills here too: `plan` (`skills/plan/SKILL.md
 a user can invoke them, and both omit `context: fork` so the body runs inline in the invoking
 session, where the `Agent` tool is available and orchestration happens at depth 0.
 
-Skills removed in v2.10: `cancel-ralph`, `stop-continuation`, `ralph`, `ultrawork`, `ulw-loop`. Also deleted: `sisyphus-orchestrate`, `atlas`, `prometheus-plan`.
-
 ## Public surface note
 
-The hard cutover docs treat slash commands as the primary public surface. Keyword-trigger compatibility, if a user keeps it locally, is outside the default supported onboarding story.
+Slash commands are the primary public surface. Keyword triggers are an opt-in a user enables locally and are outside the default supported onboarding story.
 
 ## Hook Internals Boundary
 
@@ -26,9 +24,9 @@ Skills describe WHAT users do. Hooks are internal infrastructure that automates 
 **Forbidden in skills** (unless listed as an exception below):
 
 - Raw file paths like `.omca/state/*.json`: use `boulder_write`, `boulder_progress` MCP tools from the omca server instead
-- Hook script names (`task-completed-verify.sh`, etc.)
+- Hook handler names (`task-completed`, `stop-gates`, etc.)
 - Hook event names used only in `hooks/hooks.json` (`PreToolUse`, `PostToolUse`, `Stop`, etc.): these are platform contracts, not user-facing concepts
-- Hook-specific environment variables (`HOOK_INPUT`, `HOOK_STATE_DIR`)
+- Hook-specific environment variables (`OMCA_DISABLED_HOOKS`, etc.)
 
 **Exceptions (legitimate hook knowledge)**:
 
