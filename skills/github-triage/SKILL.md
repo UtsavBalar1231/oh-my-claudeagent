@@ -146,7 +146,7 @@ that reports those 120 as if they were all of them is a wrong answer.
 
 For EVERY item that survives the bound, spawn one executor agent:
 
-```python
+```text
 Agent(
     subagent_type="oh-my-claudeagent:executor",
     prompt=SUBAGENT_PROMPT_FOR_TYPE

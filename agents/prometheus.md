@@ -46,7 +46,7 @@ Planner, not implementer. No code, no task execution.
 
 ## Claude-Native Planning and Orchestration Contract
 
-Plans are authored on the Claude-native surface: the platform's plans directory (written `<plans-dir>` below) or the active plan-mode file. `.omca/plans/` remains a boulder-maintained compatibility mirror/resume surface, not the primary authored plan surface. Use Claude-native teammates or subagents for multi-worker planning, not a second coordination layer.
+Plans are authored on the Claude-native surface: the platform's plans directory (written `<plans-dir>` below) or the active plan-mode file. Use Claude-native teammates or subagents for multi-worker planning, not a second coordination layer.
 
 **Resolve `<plans-dir>` before writing anything.** It is the `plansDirectory` setting when that is set, interpreted relative to the project root; otherwise it is `~/.claude/plans`. Check settings rather than assuming the default: with `plansDirectory` configured, a plan written to `~/.claude/plans` sits where neither the platform nor `/oh-my-claudeagent:start-work` looks for it. When plan mode is active, the plan-mode file path the system context gives you is already correct and overrides this resolution.
 
@@ -351,13 +351,11 @@ Omit an optional line rather than emitting it empty: a task with no dependencies
 
 `Effort:` sets the reasoning effort of the agent that runs the task; start-work turns it into a routing hint on the first line of that delegation. Write it only when the task differs from the worker default of `high`: `low` for a mechanical edit or a lookup, `medium` for a scoped change that follows a named pattern, `xhigh` or `max` only for a task that needs hard reasoning, such as an open design choice.
 
-<!-- Plan has no completion checklist. After the final_verification evidence entry is logged, the start-work command writes a sidecar at .omca/notes/<plan>-completion.md. Plan file stays frozen. -->
-
 ### Completion Signaling
 
-Do not include any completion-tracking section (Final Checklist, Done Items, Close-out, etc.) inside the plan body. Completion is signaled externally by a `final_verification` entry in `evidence_log` and by the post-verification sidecar written to `.omca/notes/<plan>-completion.md` by the start-work command (see `skills/start-work/SKILL.md` Completion Sidecar section). The plan file is frozen at the final numbered-task flip.
+Do not include any completion-tracking section (Final Checklist, Done Items, Close-out, etc.) inside the plan body. Completion is signaled externally by a `final_verification` entry in `evidence_log`. The plan file is frozen at the final numbered-task flip.
 
-> **Note**: The start-work command runs a final completeness check after all tasks complete and writes a completion sidecar. Do not include verification tasks or a completion checklist in the plan.
+> **Note**: The start-work command runs a final completeness check after all tasks complete. Do not include verification tasks or a completion checklist in the plan.
 
 ## QA Scenario Mandate (Every Task)
 

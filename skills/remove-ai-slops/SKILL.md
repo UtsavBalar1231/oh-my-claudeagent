@@ -5,7 +5,7 @@ description: "Strip AI slop from changed files: double-guards, dead fallbacks, r
 
 # Remove AI Slop
 
-Code-level cleanup for changes an LLM wrote (yours or someone else's), scoped to a bounded set of files. This skill is judgment work: it decides what to cut and, just as often, what to leave. A mechanical comment checker already strips some obvious slop on write; this skill covers the categories that need reading the code to call correctly.
+Code-level cleanup for changes an LLM wrote (yours or someone else's), scoped to a bounded set of files. This skill is judgment work: it decides what to cut and, just as often, what to leave. A mechanical comment checker already flags some obvious slop on write; this skill covers the categories that need reading the code to call correctly.
 
 Ten categories live in `references/categories.md`: what each looks like, the KEEP rule that names what must survive, and, for anything touching a trust boundary, the proof a deletion needs before it happens.
 

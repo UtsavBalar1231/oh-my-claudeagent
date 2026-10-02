@@ -7,7 +7,7 @@ force-for-plugin: true
 
 # oh-my-claudeagent
 
-This is an orchestration-capable coding session: do the work yourself by default, and hand sizeable, self-contained work to the specialist built for it. Staged planning and evidence-first verification are available for anything big enough to need them. Per-agent routing tables and phase checklists live in the specialist agents and the omca-setup guidance, not here, so they do not weigh on every turn.
+This is an orchestration-capable coding session: do the work yourself by default, and hand sizeable, self-contained work to the specialist built for it. Staged planning and evidence-first verification are available for anything big enough to need them. Per-agent routing tables and phase checklists live in the specialist agents and the guidance OMCA adds to the session's first prompt, not here, so they do not weigh on every turn.
 
 ## Principles
 
@@ -41,21 +41,20 @@ Write the minimum that solves the problem. Before adding code, walk the ladder i
 When you spawn agents for independent work, send the Agent calls in one message rather than one per turn.
 
 Spawn a subagent with the Agent tool and do not pass `run_in_background`. In an interactive
-session on Claude Code v2.1.232 or later, fork mode is on by default and the platform
-removes that parameter from the Agent tool, so your call returns at once with a launch
-acknowledgement, an agent id, and an output file path, and the subagent runs in the
-background whether or not you wanted the foreground. Read the deliverable from the
-`<result>` block of the `<task-notification>` system message that arrives in a later turn;
-that block carries the agent's complete final message, so treat it as the deliverable and
-relay what matters from it to the user. Do not read or tail the output file: for a subagent
-it is the full JSONL transcript rather than a plain result, and reading it will overflow
-your context. Under `claude -p` and in the Agent SDK fork mode is off by default, and the
-platform may instead run a subagent in the foreground and hand you its result as the Agent
-tool's return value, so accept either path and never claim a result you have not actually
-received. While an agent is outstanding, carry on with work that does not overlap what it
-was asked to do, rather than predicting, fabricating, or polling for a result that has not
-arrived. When no non-overlapping work is left, end the turn; never send a bare holding
-message on two consecutive turns for the same agents.
+session, fork mode is on by default and the platform removes that parameter from the Agent
+tool, so your call returns at once with a launch acknowledgement, an agent id, and an output
+file path, and the subagent runs in the background whether or not you wanted the foreground.
+Read the deliverable from the `<result>` block of the `<task-notification>` system message
+that arrives in a later turn; that block carries the agent's complete final message, so
+treat it as the deliverable and relay what matters from it to the user. Do not read or tail
+the output file: for a subagent it is the full JSONL transcript rather than a plain result,
+and reading it will overflow your context. Under `claude -p` and in the Agent SDK, fork mode
+is off by default, and the platform may instead run a subagent in the foreground and hand
+you its result as the Agent tool's return value, so accept either path and never claim a
+result you have not actually received. While an agent is outstanding, carry on with work
+that does not overlap what it was asked to do, rather than predicting, fabricating, or
+polling for a result that has not arrived. When no non-overlapping work is left, end the
+turn; never send a bare holding message on two consecutive turns for the same agents.
 
 ## Examples
 

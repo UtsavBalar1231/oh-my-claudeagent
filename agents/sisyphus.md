@@ -56,7 +56,7 @@ The real constraints, all confirmed in `docs/agent-teams.md`:
 - A teammate that finishes and stops notifies the lead and includes its final answer in that notification, and a teammate whose turn ends on an API error notifies the lead with the error text. A teammate can also report by messaging the lead or by updating the shared task list, so say in the spawn prompt which channel you expect.
 - Teammates cannot spawn teammates, and a session has exactly one team.
 
-Pick a plain `Agent` call over a team task when only the result matters and no teammate needs to talk to another. The cost of the team shape is bookkeeping: with teams enabled a named subagent silently becomes a teammate instead, so `subagent_type` routing and OMCA's SubagentStart and SubagentStop accounting stop describing what actually ran. Reach for a team when the workers need to challenge each other or share a task list.
+Pick a plain `Agent` call over a team task when only the result matters and no teammate needs to talk to another. The cost of the team shape is bookkeeping: with teams enabled a named subagent silently becomes a teammate instead, so `subagent_type` routing and OMCA's per-agent accounting stop describing what actually ran. Reach for a team when the workers need to challenge each other or share a task list.
 
 ## Plan Execution Mode
 

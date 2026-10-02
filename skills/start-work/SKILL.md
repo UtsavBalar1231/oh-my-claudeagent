@@ -144,8 +144,8 @@ boulder_write(
 )
 ```
 
-`<current session id>` is the platform session UUID (the `Session <id> initialized`
-value from the SessionStart context, same as the transcript filename), not a
+`<current session id>` is the platform session UUID (the `Session <id>` line OMCA adds
+to the session's first prompt, same as the transcript filename), not a
 locally-generated banner id. Passing the wrong id here is what desyncs the
 statusline TODO counter and every other session-id-keyed lookup against it.
 
@@ -460,8 +460,7 @@ by a retry counter.
 
 The Stop hook enforces this gate: it blocks session end when the plan is fully
 checked but no `final_verification` evidence entry (exit_code=0) exists. A logged
-verdict opens the gate permanently. Set `OMCA_HOOK_DISABLE_FINAL_VERIFY=1` only
-in emergencies.
+verdict opens the gate permanently.
 
 Do not report completion until `final_verification` evidence is logged.
 

@@ -213,9 +213,9 @@ git log --oneline $(git merge-base HEAD main 2>/dev/null || git merge-base HEAD 
 Before any history rewrite (rebase, amend, reset), confirm all four before running the mutating command:
 
 1. **Current branch is known**: `git branch --show-current` output captured this session, not assumed.
-2. **Dirty work is accounted for**: `git status` shows clean, or uncommitted changes are identified and the user has agreed to how they're handled. You can commit them. Stashing or discarding them is the user's step: OMCA's destructive-git guard denies `git stash`, `git restore`, `git checkout -- <path>`, `git clean`, and `git reset --hard` from this shell.
+2. **Dirty work is accounted for**: `git status` shows clean, or uncommitted changes are identified and the user has agreed to how they're handled. You can commit them. Stashing or discarding them is the user's step: OMCA's guard holds `git stash`, `git restore`, `git checkout -- <path>`, `git clean`, and `git reset --hard` from this shell for the user's review, and denies them where no dialog can show.
 3. **Push state is known**: has-upstream and ahead/behind checked (Phase 0 Group 3); determines AGGRESSIVE vs CAREFUL rewrite above.
-4. **Recovery path is named**: state the abort command (`git rebase --abort`, `git reset --keep ORIG_HEAD`) and the reflog fallback (`git reflog` + `git reset --keep HEAD@{N}`) before executing, so recovery is one command away if the rewrite goes wrong. `--keep` moves back to the old commit and refuses to overwrite uncommitted changes; the guard denies `--hard`.
+4. **Recovery path is named**: state the abort command (`git rebase --abort`, `git reset --keep ORIG_HEAD`) and the reflog fallback (`git reflog` + `git reset --keep HEAD@{N}`) before executing, so recovery is one command away if the rewrite goes wrong. `--keep` moves back to the old commit and refuses to overwrite uncommitted changes. The guard holds `--hard` for review.
 
 If any of the four is unconfirmed, stop and gather it; do not proceed on assumption.
 
