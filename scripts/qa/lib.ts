@@ -122,6 +122,8 @@ export type ClaudeRun = {
   debugFile?: string;
   hookTrace?: boolean;
   permissionMode?: string;
+  sessionId?: string;
+  streamJson?: boolean;
   timeoutMs?: number;
 };
 
@@ -138,8 +140,9 @@ export async function runClaude(run: ClaudeRun): Promise<ClaudeResult> {
     "project,local",
     "--permission-mode",
     run.permissionMode ?? "bypassPermissions",
+    ...(run.sessionId === undefined ? [] : ["--session-id", run.sessionId]),
     "--output-format",
-    "text",
+    ...(run.streamJson ? ["stream-json", "--verbose", "--include-hook-events"] : ["text"]),
     ...(run.debugFile === undefined ? [] : ["--debug", "hooks", "--debug-file", run.debugFile]),
   ];
   const proc = Bun.spawn(argv, {
@@ -162,8 +165,13 @@ export async function runClaude(run: ClaudeRun): Promise<ClaudeResult> {
 
 export type Mock = { port: number; accessLog: string; stop: () => Promise<void> };
 
-export function startMock(accessLog: string, script?: Script): Mock {
-  const server = startServer({ port: 0, accessLogPath: accessLog, ...(script === undefined ? {} : { script }) });
+export function startMock(accessLog: string, script?: Script, bodyLog?: string): Mock {
+  const server = startServer({
+    port: 0,
+    accessLogPath: accessLog,
+    ...(bodyLog === undefined ? {} : { bodyLogPath: bodyLog }),
+    ...(script === undefined ? {} : { script }),
+  });
   return { port: server.port ?? 0, accessLog, stop: () => server.stop(true) };
 }
 
@@ -175,6 +183,8 @@ export type AccessEntry = {
   tool_results: number;
 };
 
+export type BodyEntry = { queue: "main" | "subagent"; turn: number | null; body: string };
+
 export function parseJsonLines<T>(text: string): T[] {
   return text
     .split("\n")
@@ -184,7 +194,7 @@ export function parseJsonLines<T>(text: string): T[] {
 
 export const readJsonLines = <T>(path: string): T[] => (existsSync(path) ? parseJsonLines<T>(readFileSync(path, "utf8")) : []);
 
-export type TraceEntry = { event: string; tool_name?: string; agent_type?: string; output: "deny" | "block" | "context" | "empty" };
+export type TraceEntry = { event: string; tool_name?: string; agent_type?: string; output: "deny" | "block" | "continue" | "context" | "empty" };
 
 export function traceCount(trace: readonly TraceEntry[], event: string, toolName?: string): number {
   return trace.filter((entry) => entry.event === event && (toolName === undefined || entry.tool_name === toolName)).length;

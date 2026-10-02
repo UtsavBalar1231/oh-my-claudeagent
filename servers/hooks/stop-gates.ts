@@ -252,6 +252,8 @@ const GATES: readonly (readonly [StopGate, Gate])[] = [
   ["drift-guard", driftGuard],
 ];
 
+// A `decision: "block"` from a Stop hook continues the turn too, but the client files it as a
+// hook error. `additionalContext` keeps the turn going as feedback under the same loop limits.
 export const handle: Handler = async (payload, context) => {
   const disabled = process.env.OMCA_DISABLED_HOOKS;
   if (payload.stop_hook_active === "true" || isHookDisabled(disabled, "stop-gates")) return undefined;
@@ -266,7 +268,7 @@ export const handle: Handler = async (payload, context) => {
     if (isHookDisabled(disabled, name)) continue;
     try {
       const reason = await gate(turn);
-      if (reason !== undefined) return { decision: "block", reason };
+      if (reason !== undefined) return { hookSpecificOutput: { hookEventName: "Stop", additionalContext: reason } };
     } catch (error) {
       console.error(`omca: the ${name} Stop gate failed:`, error);
     }

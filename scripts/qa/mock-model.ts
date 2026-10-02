@@ -134,9 +134,9 @@ function jsonLine(entry: Record<string, LogValue>): string {
   return `{${fields.join(", ")}}\n`;
 }
 
-async function readRequestBody(req: Request): Promise<Record<string, unknown>> {
+function parseBody(text: string): Record<string, unknown> {
   try {
-    const body: unknown = JSON.parse(await req.text());
+    const body: unknown = JSON.parse(text);
     return isObject(body) ? body : {};
   } catch {
     return {};
@@ -169,6 +169,7 @@ function effortField(body: Record<string, unknown>): { effort?: string | number 
 export type ServerOptions = {
   port: number;
   accessLogPath?: string;
+  bodyLogPath?: string;
   script?: Script;
   subagentMarker?: string;
 };
@@ -176,6 +177,7 @@ export type ServerOptions = {
 export function startServer({
   port,
   accessLogPath,
+  bodyLogPath,
   script = { main: [], subagent: [] },
   subagentMarker = DEFAULT_SUBAGENT_MARKER,
 }: ServerOptions): Bun.Server<undefined> {
@@ -204,7 +206,8 @@ export function startServer({
         return new Response("mock-model.ts only serves /v1/messages", { status: 404 });
       }
 
-      const body = await readRequestBody(req);
+      const rawBody = await req.text();
+      const body = parseBody(rawBody);
       const streaming = Boolean(body.stream);
       const queue: QueueName = systemText(body.system).includes(subagentMarker) ? "subagent" : "main";
       const { turn, content } = serve(queue);
@@ -227,6 +230,8 @@ export function startServer({
           }),
         );
       }
+
+      if (bodyLogPath) appendFileSync(bodyLogPath, `${JSON.stringify({ queue, turn, body: rawBody })}\n`);
 
       if (streaming) {
         return new Response(sseBody(content), {

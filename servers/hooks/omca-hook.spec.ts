@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -94,6 +94,37 @@ describe("omca_hook over stdio", () => {
     expect(trace.map(({ at, ...rest }) => [typeof at === "string" && !Number.isNaN(Date.parse(at)), rest])).toEqual([
       [true, { event: "PostToolUse", session_id: sessionId, agent_id: "", agent_type: "", tool_name: "Bash", output: "context" }],
       [true, { event: "TaskCompleted", session_id: sessionId, agent_id: "", agent_type: "", tool_name: "", output: "block" }],
+    ]);
+  });
+
+  test("a bound plan's Stop answers with additionalContext once, then {} on the stop_hook_active retry", async () => {
+    const server = startServer(true);
+    const sessionId = crypto.randomUUID();
+    const plan = join(server.project, "plan.md");
+    writeFileSync(plan, "# Plan\n\n- [ ] 1. First task\n");
+    mkdirSync(join(server.project, ".omca", "state"), { recursive: true });
+    const registry = {
+      plans: { demo: { active_plan: plan, started_at: "2026-01-01T00:00:00Z", session_ids: [sessionId], agent: "sisyphus" } },
+      bindings: { [sessionId]: { plan_name: "demo", bound_at: Math.floor(Date.now() / 1000) } },
+    };
+    writeFileSync(join(server.project, ".omca", "state", "boulder.json"), JSON.stringify(registry));
+    const stop = { event: "Stop", session_id: sessionId, transcript_path: "", last_assistant_message: "", background_tasks: "" };
+
+    expect(JSON.parse(await server.hook({ ...stop, stop_hook_active: "false" }))).toEqual({
+      hookSpecificOutput: {
+        hookEventName: "Stop",
+        additionalContext:
+          "[PLAN CONTINUATION] The bound plan 'demo' still has 1 unchecked tasks (next: First task). Continue with the next task. " +
+          "If its work is already done and reviewed, flip its checkbox. If it cannot proceed without the user, record why with notepad_write and " +
+          "ask the user; a turn that asks the user is not blocked.",
+      },
+    });
+    expect(await server.hook({ ...stop, stop_hook_active: "true" })).toBe("{}");
+
+    const trace = readFileSync(join(server.project, ".omca", "state", "hook-trace.jsonl"), "utf8").trim().split("\n").map((line) => JSON.parse(line));
+    expect(trace.map(({ event, output }) => [event, output])).toEqual([
+      ["Stop", "continue"],
+      ["Stop", "empty"],
     ]);
   });
 

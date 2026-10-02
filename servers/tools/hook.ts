@@ -10,7 +10,8 @@ const tracePath = process.env.OMCA_HOOK_TRACE === "1" ? join(root, ".omca", "sta
 function kind(output: Output): string {
   if (isDeny(output)) return "deny";
   if (isBlock(output)) return "block";
-  return output.hookSpecificOutput === undefined ? "empty" : "context";
+  if (output.hookSpecificOutput === undefined) return "empty";
+  return output.hookSpecificOutput.hookEventName === "Stop" ? "continue" : "context";
 }
 
 export const tools: Tool[] = [

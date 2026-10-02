@@ -355,20 +355,23 @@ Plan continuation reads `background_tasks`: an entry whose status is not termina
 
 **Stop / SubagentStop — `additionalContext` output (v2.1.163):**
 
-Partially adopted. The three Stop gates block with Stop decision-control JSON, returned
-from the `omca_hook` tool of an `mcp_tool` entry: `decision: block` plus `reason`, and
-nothing else.
+Adopted. The three Stop gates continue the turn with
+`{"hookSpecificOutput":{"hookEventName":"Stop","additionalContext":"<reason>"}}`, returned from
+the `omca_hook` tool of an `mcp_tool` entry. The field set is exactly that: no `decision`, no
+`isError`, no `structuredContent`, and `hookEventName` is required, since an `additionalContext`
+without it fails schema validation.
 
-`additionalContext` is **not** emitted alongside it. The Stop decision-control section of
-`claude-code-docs/docs/hooks.md` presents `hookSpecificOutput.additionalContext` as the
-alternative to blocking, for non-error feedback that keeps the conversation going, and its
-`decision: block` example carries no `additionalContext` field. Nothing in the docs states
-that the two combine, and how a block presents in the transcript when both are emitted is
-unverified. Emitting both would also deliver the same text twice, so the blocking pair alone
-is what the `stop-gates` handler returns.
+The client treats `decision: "block"` from a Stop hook as an error. Probed on 2.1.287, it still
+continues the turn, but it records the hook in `hookErrors`, emits the `stop-hook-error`
+notification and draws "Stop hook error: ...". `additionalContext` continues the turn too, draws
+"Stop hook feedback: ..." with no error notice, and shows the model the reason as a system reminder
+reading `Stop hook additional context: <reason>`. Both shapes run under the same loop protections:
+the `stop_hook_active` input and the cap on consecutive continuations. A tool result with
+`isError: true` disables the gate instead of firing it.
 
 The TaskCompleted gate is an `mcp_tool` entry served by the omca server's `omca_hook` tool,
-and it blocks with the same `decision: block` plus `reason` pair. The hooks reference documents
+and it blocks with the `decision: block` plus `reason` pair, the only shape the client honors for
+that event. The hooks reference documents
 only exit 2 and `continue: false` for that event, but on client 2.1.287 the client holds the
 task open on a `decision: block` from an `mcp_tool` hook and returns the reason to Claude as
 the `TaskUpdate` result.
@@ -444,7 +447,7 @@ for argument-level filtering on tool events (`PreToolUse`, `PostToolUse`,
 Hooks communicate via stdout JSON:
 ```json
 {"hookSpecificOutput": {"hookEventName": "EVENT", "additionalContext": "..."}}
-{"hookSpecificOutput": {"hookEventName": "Stop", "decision": {"behavior": "block"}}}
+{"hookSpecificOutput": {"hookEventName": "Stop", "additionalContext": "..."}}
 ```
 
 ### Status lines
@@ -647,7 +650,7 @@ steps max, effort estimates (Quick/Short/Medium/Large).
 **explore** searches with ast_search and rg (Grep and Glob where the session has them). Spawn one per independent area of a wide investigation.
 
 **librarian** — Uses context7 for library docs, and may create shallow read-only
-dependency clones under `/tmp/opencode` for source investigation.
+dependency clones under `.omca/scratch/` for source investigation.
 
 **Backgrounding is the platform's default, not a per-agent policy.** It is not something
 OMCA chooses for explore and librarian, and there is no longer a flag to opt out of it.
@@ -1351,7 +1354,7 @@ built on top of it, rather than inferred from the docs):
   parallel: one hook's decision can never short-circuit a sibling's execution, and any
   single hook returning `decision: block` blocks the stop regardless of what the others
   return. OMCA now registers one `Stop` entry whose handler runs its three gates in a fixed
-  order and answers with the first block, and each gate is still correct standing alone.
+  order and answers with the first gate that fires, and each gate is still correct standing alone.
 - `CLAUDE_CODE_SESSION_ID` is the confirmed binding key for anything running as an MCP
   tool or agent process (live-observed in-session); bash hook scripts keep the existing
   three-tier fallback (`CLAUDE_SESSION_ID` env, then the hook payload's `session_id`,
@@ -1365,7 +1368,6 @@ Features introduced in this window that OMCA consciously declines to adopt:
 
 | Feature | Version | Reason |
 |---------|---------|--------|
-| `hookSpecificOutput.additionalContext` on Stop/SubagentStop | v2.1.163 | Co-existence with `decision:block` is undocumented (schema inconclusive); the platform reads a hook's stdout JSON on every exit code, and exit 2 is the one outcome that JSON cannot override, so an `additionalContext` emitted beside a block cannot soften the block and its delivery alongside one is unspecified |
 | `MessageDisplay`, `Elicitation`, `ElicitationResult` hook handlers | v2.1.152 | No OMCA use case; no handler registered |
 | `skills:` preload frontmatter | v2.1.150 | Adds context-window cost on every session; OMCA's lazy slash-command / keyword paths are sufficient |
 | `Agent(type=...)` spawn-allowlist in agent frontmatter | v2.1.148 | Sisyphus needs unrestricted spawn access to the full agent roster; an allowlist would require updating on every new specialist addition |
@@ -1536,7 +1538,7 @@ section and in `CLAUDE.md`; neither is set by OMCA.
 | `plansDirectory` resolution | `~/.claude/plans` was hardcoded as both the authoring and the discovery surface, so with the setting on, prometheus wrote where `/start-work` no longer looked. Both now resolve the directory: the setting when present (relative to the project root), else `~/.claude/plans`, with an active plan-mode path overriding |
 | Hook event tables regenerated from the registry | The table advertised nine events with no handler, omitted `PermissionDenied`, and pointed at two scripts deleted in the v2.10 refactor. The table now mirrors the event keys of `hooks/hooks.json` |
 | `last_assistant_message` on Stop/SubagentStop | Both Stop hooks read the final assistant turn from the payload field first, with the transcript tail kept as fallback because the transcript is not guaranteed to hold the final message at Stop time. The undocumented `.messages` probe is gone. drift-guard's whole purpose is catching a completion claim in that message, so a miss there was a silent guard failure |
-| Stop hooks block via `decision: block` | The plan-continuation, final-verification, and drift gates answer with Stop decision-control JSON (`decision` plus `reason`, nothing else) instead of writing to stderr and exiting 2. The deny hooks are unaffected: each writes the shape its event reads, branching on `hook_event_name` (see the Stop / SubagentStop section above) |
+| Stop gates continue through `additionalContext` | The plan-continuation, final-verification, and drift gates answer with `hookSpecificOutput.additionalContext` (`hookEventName: "Stop"`) instead of `decision: block` plus `reason`, because the client labels a Stop block "Stop hook error" and raises the `stop-hook-error` notification while `additionalContext` continues the turn as "Stop hook feedback". The reason text is unchanged. `TaskCompleted` keeps `decision: block`, the only shape the client honors for that event. The deny hooks are unaffected: each writes the shape its event reads, branching on `hook_event_name` (see the Stop / SubagentStop section above) |
 | Tier aliases in agent frontmatter | Every agent declares a tier alias (`opus`, `sonnet`, `fable`) instead of a pinned generation id, so a provider resolves it to the newest generation its allowlist permits and nothing goes stale on the next model release. `omca-setup` no longer writes `ANTHROPIC_DEFAULT_OPUS_MODEL`: a default-model pin overrides the alias and reintroduces exactly the staleness the alias removes |
 | `Write(.omca/**)` dropped from the recommended allowlist | `Write`/`NotebookEdit`/`Glob` path rules are accepted but never match, and now emit a startup warning. `Edit(.omca/**)` plus `Read(.omca/**)` covers the intent, since `Edit` governs every file-editing tool including `Write`. The doctor's stale-entry warnings flag the removed rule for already-configured users |
 | Spawn budgets: session cap, concurrency cap, depth default | The Agent failure handler gained early-return branches for the concurrency and session ceilings, returning before the error counter so an infrastructure limit can never advance the three-strike breaker toward oracle. `skills/start-work/SKILL.md` gained a parallel-group width note, and `github-triage` gained a total-item cap with an explicit skipped-item list instead of silent truncation |

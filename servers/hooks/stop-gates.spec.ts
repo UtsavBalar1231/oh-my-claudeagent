@@ -23,45 +23,40 @@ const MALFORMED_PLAN = "# My Plan\n\n- [ ] Task without a number\n";
 const RUNNING_SUBAGENT = [{ id: "task-001", type: "subagent", status: "running", description: "executor wave", agent_type: "oh-my-claudeagent:executor" }];
 const FINISHED_SUBAGENT = [{ ...RUNNING_SUBAGENT[0], status: "completed" }];
 
-const CONTINUE: Output = {
-  decision: "block",
-  reason:
-    "[PLAN CONTINUATION] The bound plan 'test-plan' still has 1 unchecked tasks (next: Second task not done). Continue with the next task. " +
+const feedback = (additionalContext: string): Output => ({ hookSpecificOutput: { hookEventName: "Stop", additionalContext } });
+
+const CONTINUE: Output = feedback(
+  "[PLAN CONTINUATION] The bound plan 'test-plan' still has 1 unchecked tasks (next: Second task not done). Continue with the next task. " +
     "If its work is already done and reviewed, flip its checkbox. If it cannot proceed without the user, record why with notepad_write and " +
     "ask the user; a turn that asks the user is not blocked.",
-};
+);
 
-const corruptRegistry = (root: string): Output => ({
-  decision: "block",
-  reason:
+const corruptRegistry = (root: string): Output =>
+  feedback(
     `[PLAN CONTINUATION] ${root}/.omca/state/boulder.json is not valid JSON, so this session's plan state cannot be resolved and ` +
-    "plan-scoped enforcement is off. Repair or delete the file (boulder_write rewrites it), then stop again. Set " +
-    "OMCA_DISABLED_HOOKS=plan-continuation to bypass.",
-});
+      "plan-scoped enforcement is off. Repair or delete the file (boulder_write rewrites it), then stop again. Set " +
+      "OMCA_DISABLED_HOOKS=plan-continuation to bypass.",
+  );
 
 const sha256 = (path: string): string => createHash("sha256").update(readFileSync(path)).digest("hex");
 
-const unverified = (plan: string): Output => ({
-  decision: "block",
-  reason:
+const unverified = (plan: string): Output =>
+  feedback(
     `[FINAL VERIFICATION] Every task in plan '${plan}' is checked, but no final_verification evidence matches its current contents. ` +
-    "Record the verdict of the plan's completeness review, running the review first if it has not run: " +
-    'evidence_log(evidence_type="final_verification", command="<what the review covered>", exit_code=<0 for COMPLETE, 1 for INCOMPLETE>, ' +
-    `output_snippet="<verdict>", plan_sha256="${sha256(plan)}"). An INCOMPLETE verdict means fixing the gap and reviewing again. ` +
-    "Set OMCA_DISABLED_HOOKS=final-verification to bypass.",
-});
+      "Record the verdict of the plan's completeness review, running the review first if it has not run: " +
+      'evidence_log(evidence_type="final_verification", command="<what the review covered>", exit_code=<0 for COMPLETE, 1 for INCOMPLETE>, ' +
+      `output_snippet="<verdict>", plan_sha256="${sha256(plan)}"). An INCOMPLETE verdict means fixing the gap and reviewing again. ` +
+      "Set OMCA_DISABLED_HOOKS=final-verification to bypass.",
+  );
 
-const corruptLedger = (root: string): Output => ({
-  decision: "block",
-  reason: `[FINAL VERIFICATION] Evidence file corrupt. Repair ${root}/.omca/evidence/verification-evidence.json before stopping.`,
-});
+const corruptLedger = (root: string): Output =>
+  feedback(`[FINAL VERIFICATION] Evidence file corrupt. Repair ${root}/.omca/evidence/verification-evidence.json before stopping.`);
 
-const drift = (...findings: string[]): Output => ({
-  decision: "block",
-  reason:
+const drift = (...findings: string[]): Output =>
+  feedback(
     `[DRIFT GUARD] Completion claimed but stub markers remain on added/untracked lines:\n${findings.map((line) => `${line}\n`).join("")}\n` +
-    "Resolve the stubs before claiming done, or stop claiming completion. Set OMCA_DISABLED_HOOKS=drift-guard to bypass.",
-});
+      "Resolve the stubs before claiming done, or stop claiming completion. Set OMCA_DISABLED_HOOKS=drift-guard to bypass.",
+  );
 
 const roots: string[] = [];
 
@@ -881,7 +876,7 @@ describe("stop ledger", () => {
 
   test("stop ledger: a gate's own reset clears only its own key", async () => {
     const run = completeRepository();
-    expect((await stops(run, 3)).map((answer) => answer.decision)).toEqual(["block", "block", "block"]);
+    expect((await stops(run, 3)).map((answer) => answer.hookSpecificOutput?.hookEventName)).toEqual(["Stop", "Stop", "Stop"]);
     onlyGate("drift-guard");
     append(run.root, "a.js", "it.only('t', () => {})\n");
     expect(await run.stop({ last_assistant_message: "Done." })).toEqual(drift("a.js:2  it.only('t', () => {})"));
@@ -896,7 +891,7 @@ describe("disjointness matrix", () => {
     const fired: StopGate[] = [];
     for (const gate of GATES) {
       onlyGate(gate);
-      if ((await run.stop({ last_assistant_message: CLAIM })).decision === "block") fired.push(gate);
+      if ((await run.stop({ last_assistant_message: CLAIM })).hookSpecificOutput !== undefined) fired.push(gate);
     }
     return fired;
   }

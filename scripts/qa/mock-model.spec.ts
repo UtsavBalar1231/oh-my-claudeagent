@@ -11,7 +11,7 @@ let dir: string;
 let logPath: string;
 let server: Bun.Server<undefined>;
 
-const boot = async (options: { script?: Script; subagentMarker?: string } = {}) => {
+const boot = async (options: { script?: Script; subagentMarker?: string; bodyLogPath?: string } = {}) => {
   await server?.stop(true);
   server = startServer({ port: 0, accessLogPath: logPath, ...options });
 };
@@ -58,6 +58,20 @@ beforeEach(async () => {
 afterEach(async () => {
   await server.stop(true);
   rmSync(dir, { recursive: true, force: true });
+});
+
+describe("request body log", () => {
+  test("records each request's queue, turn and raw body", async () => {
+    const bodyLogPath = join(dir, "bodies.log");
+    await boot({ bodyLogPath, script: { main: [{ content: [{ type: "text", text: "first" }] }], subagent: [] } });
+    await post("/v1/messages", '{"messages":["x"]}');
+    await post("/v1/messages", "not json");
+    const lines = readFileSync(bodyLogPath, "utf8").split("\n").filter(Boolean).map((line) => JSON.parse(line));
+    expect(lines).toEqual([
+      { queue: "main", turn: 0, body: '{"messages":["x"]}' },
+      { queue: "main", turn: null, body: "not json" },
+    ]);
+  });
 });
 
 describe("fixed reply without a script", () => {
