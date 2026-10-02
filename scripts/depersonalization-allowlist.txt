@@ -10,3 +10,6 @@ servers/tests/test_filesystem.py:SECRET=hunter2\n
 
 # Dummy key handed to a claude process pointed at the local mock Messages API server.
 scripts/qa/mock-model-e2e.sh:ANTHROPIC_API_KEY=mock-key
+
+# Dummy token handed to the visual-capture session pointed at the local mock Messages API server.
+scripts/qa/visual.ts:ANTHROPIC_AUTH_TOKEN=mock-key
