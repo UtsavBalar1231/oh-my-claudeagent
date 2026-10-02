@@ -223,9 +223,11 @@ export function doctorChecks(inputs: Inputs): Check[] {
   ];
 }
 
+const BYTE_ORDER_MARK = 0xfeff;
+
 function parseObject(text: string): Readonly<Record<string, unknown>> | undefined {
   try {
-    return record(JSON.parse(text));
+    return record(JSON.parse(text.charCodeAt(0) === BYTE_ORDER_MARK ? text.slice(1) : text));
   } catch {
     return undefined;
   }

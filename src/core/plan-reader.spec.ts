@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { windowOf } from "./list-window.ts";
+import type { Env } from "./path.ts";
 import {
   chunks,
   clean,
@@ -12,7 +13,6 @@ import {
   plansDirectory,
   readable,
   recentPlans,
-  tildePath,
 } from "./plan-reader.ts";
 import { fitMiddle } from "./ui-kit.ts";
 
@@ -83,8 +83,6 @@ test("the list window centres on the cursor and clamps at both ends", () => {
   expect(windowOf(3, 2, 10)).toEqual({ start: 0, end: 3 });
   expect(fitMiddle("/home/u/.claude/plans/a-very-long-plan-name.md", 20, "…")).toBe("/home/u/.c…n-name.md");
   expect(fitMiddle("short", 20, "…")).toBe("short");
-  expect(tildePath("/home/u/.claude/plans/x.md", "/home/u")).toBe("~/.claude/plans/x.md");
-  expect(tildePath("/tmp/x.md", "/home/u")).toBe("/tmp/x.md");
 });
 
 test("the shared 46-task fixture parses into one page per heading and task, its long task in several chunks", () => {
@@ -98,23 +96,74 @@ test("the shared 46-task fixture parses into one page per heading and task, its 
   expect(chunks(long?.body ?? "").length).toBeGreaterThan(1);
 });
 
+const POSIX_ENV = { HOME: "/home/u" };
+const DEFAULT_PLANS = "/home/u/.claude/plans";
+
 test("plansDirectory resolves inside the project root and otherwise keeps the client default", () => {
-  expect(plansDirectory(undefined, "/work", "/home/u")).toBe("/home/u/.claude/plans");
-  expect(plansDirectory("  ", "/work", "/home/u")).toBe("/home/u/.claude/plans");
-  expect(plansDirectory(42, "/work", "/home/u")).toBe("/home/u/.claude/plans");
-  expect(plansDirectory("./plans", "/work", "/home/u")).toBe("/work/plans");
-  expect(plansDirectory("docs/./plans/", "/work", "/home/u")).toBe("/work/docs/plans");
-  expect(plansDirectory("/work/plans", "/work", "/home/u")).toBe("/work/plans");
-  expect(plansDirectory("../elsewhere", "/work", "/home/u")).toBe("/home/u/.claude/plans");
-  expect(plansDirectory("/workshop/plans", "/work", "/home/u")).toBe("/home/u/.claude/plans");
+  const plans = (setting: unknown, root = "/work", env: Env = POSIX_ENV) => plansDirectory("linux", setting, root, env);
+  expect(plans(undefined)).toBe(DEFAULT_PLANS);
+  expect(plans("  ")).toBe(DEFAULT_PLANS);
+  expect(plans(42)).toBe(DEFAULT_PLANS);
+  expect(plans("./plans")).toBe("/work/plans");
+  expect(plans("docs/./plans/")).toBe("/work/docs/plans");
+  expect(plans("/work/plans")).toBe("/work/plans");
+  expect(plans("../elsewhere")).toBe(DEFAULT_PLANS);
+  expect(plans("/workshop/plans")).toBe(DEFAULT_PLANS);
+  expect(plans("~/plans")).toBe(DEFAULT_PLANS);
+  expect(plans("~/plans", "/home/u")).toBe("/home/u/plans");
+});
+
+test("the default plans directory follows CLAUDE_CONFIG_DIR, and is undefined when no home resolves", () => {
+  expect(plansDirectory("linux", undefined, "/work", { HOME: "/home/u", CLAUDE_CONFIG_DIR: "/cfg" })).toBe("/cfg/plans");
+  expect(plansDirectory("linux", undefined, "/work", { CLAUDE_CONFIG_DIR: "/cfg" })).toBe("/cfg/plans");
+  expect(plansDirectory("linux", undefined, "/work", {})).toBeUndefined();
+  expect(plansDirectory("linux", undefined, "/work", { HOME: "" })).toBeUndefined();
+  expect(plansDirectory("linux", "  ", "/work", {})).toBeUndefined();
+  expect(plansDirectory("linux", "../elsewhere", "/work", {})).toBeUndefined();
+  expect(plansDirectory("linux", "./plans", "/work", {})).toBe("/work/plans");
+  expect(plansDirectory("linux", "~/plans", "/work", {})).toBeUndefined();
+});
+
+test("plansDirectory reads drive, UNC, Git Bash and mixed-case roots", () => {
+  const user = { USERPROFILE: "C:\\Users\\x" };
+  expect(plansDirectory("win32", ".plans", "C:\\proj", user)).toBe("C:/proj/.plans");
+  expect(plansDirectory("win32", "docs\\plans", "C:\\proj", user)).toBe("C:/proj/docs/plans");
+  expect(plansDirectory("win32", "C:\\proj\\plans", "C:\\proj", user)).toBe("C:/proj/plans");
+  expect(plansDirectory("win32", "c:/PROJ/plans", "C:\\proj", user)).toBe("c:/PROJ/plans");
+  expect(plansDirectory("win32", "D:\\plans", "C:\\proj", user)).toBe("C:/Users/x/.claude/plans");
+  expect(plansDirectory("win32", "..\\plans", "C:\\proj", user)).toBe("C:/Users/x/.claude/plans");
+  expect(plansDirectory("win32", undefined, "C:\\proj", user)).toBe("C:/Users/x/.claude/plans");
+  expect(plansDirectory("win32", undefined, "C:\\proj", { HOMEDRIVE: "C:", HOMEPATH: "\\Users\\x" })).toBe("C:/Users/x/.claude/plans");
+  expect(plansDirectory("win32", "~\\plans", "C:\\Users\\x", user)).toBe("C:/Users/x/plans");
+  expect(plansDirectory("win32", "plans", "/c/proj", user)).toBe("c:/proj/plans");
+  expect(plansDirectory("win32", "share\\plans", "\\\\srv\\share\\proj", user)).toBe("//srv/share/proj/share/plans");
+  expect(plansDirectory("win32", "\\\\srv\\share\\proj\\plans", "\\\\srv\\share\\proj", user)).toBe("//srv/share/proj/plans");
+  expect(plansDirectory("darwin", "plans", "/Users/Me/proj", { HOME: "/Users/Me" })).toBe("/Users/Me/proj/plans");
+  expect(plansDirectory("darwin", "/users/me/PROJ/plans", "/Users/Me/proj", { HOME: "/Users/Me" })).toBe("/users/me/PROJ/plans");
 });
 
 test("a plan argument is a name in the plans directory, a home path, an absolute path or a root-relative path", () => {
-  expect(planTarget("ship", "/home/u", "/work", "/work/plans")).toBe("/work/plans/ship.md");
-  expect(planTarget(" ship.md ", "/home/u", "/work", "/work/plans")).toBe("/work/plans/ship.md");
-  expect(planTarget("~/notes/p.md", "/home/u", "/work", "/work/plans")).toBe("/home/u/notes/p.md");
-  expect(planTarget("/tmp/p.md", "/home/u", "/work", "/work/plans")).toBe("/tmp/p.md");
-  expect(planTarget("docs/../plans/p.md", "/home/u", "/work", "/work/plans")).toBe("/work/plans/p.md");
+  const target = (argument: string) => planTarget("linux", argument, "/home/u", "/work", "/work/plans");
+  expect(target("ship")).toBe("/work/plans/ship.md");
+  expect(target(" ship.md ")).toBe("/work/plans/ship.md");
+  expect(target("~/notes/p.md")).toBe("/home/u/notes/p.md");
+  expect(target("/tmp/p.md")).toBe("/tmp/p.md");
+  expect(target("docs/../plans/p.md")).toBe("/work/plans/p.md");
+  expect(target("~ship")).toBe("/work/plans/~ship.md");
+  expect(planTarget("linux", "~/p.md", "", "/work", "/work/plans")).toBe("~/p.md");
+});
+
+test("a plan argument on Windows accepts drive, UNC, Git Bash and backslash forms", () => {
+  const target = (argument: string) => planTarget("win32", argument, "C:\\Users\\x", "C:\\proj", "C:/Users/x/.claude/plans");
+  expect(target("ship")).toBe("C:/Users/x/.claude/plans/ship.md");
+  expect(target("~\\notes\\p.md")).toBe("C:/Users/x/notes/p.md");
+  expect(target("~/notes/p.md")).toBe("C:/Users/x/notes/p.md");
+  expect(target("D:\\plans\\p.md")).toBe("D:\\plans\\p.md");
+  expect(target("C:/plans/p.md")).toBe("C:/plans/p.md");
+  expect(target("/c/plans/p.md")).toBe("/c/plans/p.md");
+  expect(target("\\\\srv\\share\\p.md")).toBe("\\\\srv\\share\\p.md");
+  expect(target("docs\\..\\plans\\p.md")).toBe("C:/proj/plans/p.md");
+  expect(planTarget("win32", "~\\p.md", "", "C:\\proj", "C:/plans")).toBe("~\\p.md");
 });
 
 test("recent plans are Markdown files only, newest first, capped", () => {

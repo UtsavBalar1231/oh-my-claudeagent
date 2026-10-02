@@ -22,6 +22,9 @@ export type Host = {
   log: (text: string) => void;
   env: {
     HOME: Env;
+    USERPROFILE: Env;
+    HOMEDRIVE: Env;
+    HOMEPATH: Env;
     CLAUDE_CONFIG_DIR: Env;
     OMCA_ASCII: Env;
     OMCA_DISABLED_HOOKS: Env;

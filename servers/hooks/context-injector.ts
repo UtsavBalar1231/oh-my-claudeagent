@@ -2,13 +2,15 @@ import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, isAbsolute, join } from "node:path";
 import { isHookDisabled } from "../../src/core/kill-switch.ts";
+import { type Platform, samePath, toPlatform } from "../../src/core/path.ts";
 import { docPart, pack, type Part, parseRule, type Rule, rulePart } from "../../src/core/rules.ts";
+import { pluginRoot } from "../plugin-root.ts";
 import type { Handler } from "./registry.ts";
 
 type RuleFile = { readonly path: string; mtimeMs: number | undefined; rule: Rule | undefined };
 type Group = { readonly key: string; readonly parts: readonly Part[] };
 
-const PLUGIN_ROOT = join(import.meta.dir, "..", "..");
+const PLATFORM = toPlatform(process.platform);
 const indexes = new Map<string, { stamp: string; files: RuleFile[] }>();
 
 const statOf = (path: string) => statSync(path, { throwIfNoEntry: false });
@@ -20,10 +22,10 @@ const filePathOf = (toolInput: unknown): string =>
     ? toolInput.file_path
     : "";
 
-function* upTo(dir: string, root: string): Generator<string> {
+export function* upTo(platform: Platform, dir: string, root: string): Generator<string> {
   for (let current = dir; ; current = dirname(current)) {
     yield current;
-    if (current === root || dirname(current) === current) return;
+    if (samePath(platform, current, root) || dirname(current) === current) return;
   }
 }
 
@@ -52,7 +54,7 @@ function listRuleFiles(dirs: readonly string[]): RuleFile[] {
 }
 
 function rulesOf(root: string): RuleFile[] {
-  const dirs = [join(root, ".omca", "rules"), join(process.env.CLAUDE_PLUGIN_ROOT || PLUGIN_ROOT, "rules")];
+  const dirs = [join(root, ".omca", "rules"), join(pluginRoot(), "rules")];
   const key = dirs.join("\0");
   const stamp = dirs.map((dir) => statOf(dir)?.mtimeMs).join("\0");
   let index = indexes.get(key);
@@ -71,7 +73,7 @@ function rulesOf(root: string): RuleFile[] {
 }
 
 const hasProjectClaudeMd = (dir: string, root: string): boolean =>
-  [...upTo(dir, root)].some((current) =>
+  [...upTo(PLATFORM, dir, root)].some((current) =>
     ["CLAUDE.md", join(".claude", "CLAUDE.md"), "CLAUDE.local.md"].some((name) => isFile(join(current, name))),
   );
 
@@ -79,7 +81,7 @@ function docGroups(fileDir: string, root: string, injected: ReadonlySet<string>)
   // Native AGENTS.md loading is documented as active only while no project CLAUDE.md is on the
   // path, and no hook-readable signal says whether it is live, so skipping is opt-in.
   const names = process.env.OMCA_NATIVE_AGENTS_MD === "1" && !hasProjectClaudeMd(fileDir, root) ? ["README.md"] : ["AGENTS.md", "README.md"];
-  return [...upTo(fileDir, root)].flatMap((dir) => {
+  return [...upTo(PLATFORM, fileDir, root)].flatMap((dir) => {
     const key = `dir\0${dir}\0${statOf(join(dir, "AGENTS.md"))?.mtimeMs ?? ""}`;
     if (injected.has(key)) return [];
     const parts = names.flatMap((name) => {

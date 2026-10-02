@@ -1,7 +1,9 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { resolveBoundPlan } from "../src/core/boulder.ts";
 import { checkboxStates, nextTaskLabel } from "../src/core/checkboxes.ts";
+import { baseName, inferPlatform } from "../src/core/path.ts";
 import { type Config, type Env, readConfig } from "./config.ts";
 import type { GitInfo } from "./git.ts";
 
@@ -190,6 +192,8 @@ export function visibleTruncate(s: string, width: number): string {
 
 const arrow = (nerd: boolean): string => (nerd ? "\u2192" : "->");
 
+const fileUrl = (path: string): string => pathToFileURL(path, { windows: inferPlatform(path) === "win32" }).href;
+
 const osc8 = (url: string, text: string): string => `\x1b]8;;${url}\x07${text}\x1b]8;;\x07`;
 
 function remoteToUrl(remote: string): string {
@@ -309,7 +313,7 @@ function infoLine(c: Ctx): { line: string; extra: boolean } {
 
   const sessionLabel = data.session_name ?? (data.session_id != null ? data.session_id.slice(0, 8) : null);
   if (sessionLabel !== null) {
-    parts.push(`${DIM}${data.transcript_path ? osc8(`file://${data.transcript_path}`, sessionLabel) : sessionLabel}${RST}`);
+    parts.push(`${DIM}${data.transcript_path ? osc8(fileUrl(data.transcript_path), sessionLabel) : sessionLabel}${RST}`);
   }
 
   const branch = data.worktree?.branch || (git.repo ? git.branch : "");
@@ -324,7 +328,7 @@ function infoLine(c: Ctx): { line: string; extra: boolean } {
     if (counts.length > 0) parts.push(counts.join("  "));
   }
 
-  const dirName = projectDir.slice(projectDir.lastIndexOf("/") + 1);
+  const dirName = baseName(inferPlatform(projectDir), projectDir);
   if (dirName) {
     const remoteUrl = remoteToUrl(git.remote);
     parts.push(`${DIM}${g.folder} ${remoteUrl ? osc8(remoteUrl, dirName) : dirName}${RST}`);

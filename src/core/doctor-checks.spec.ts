@@ -221,6 +221,11 @@ describe("status line", () => {
       detail: stale,
     });
     expect(run({ settings, userSettings: "{ not json" }, "statusline")).toEqual({ level: "warn", detail: stale });
+    expect(run({ settings, userSettings: `${String.fromCharCode(0xfeff)}${USER_SETTINGS}` }, "statusline")).toEqual({
+      level: "warn",
+      detail: stale,
+      fix: "add-refresh-interval",
+    });
   });
 });
 
@@ -248,6 +253,18 @@ describe("refreshInterval rewrite", () => {
     expect(addRefreshInterval('{"env": {"statusLine": {"a": 1}}, "statusLine": {"type": "command"}}')).toBe(
       '{"env": {"statusLine": {"a": 1}}, "statusLine": {"type": "command", "refreshInterval": 5}}',
     );
+  });
+
+  test("a byte order mark is skipped to parse and stays on the file", () => {
+    const bom = String.fromCharCode(0xfeff);
+    expect(addRefreshInterval(`${bom}${USER_SETTINGS}`)).toBe(
+      `${bom}{\n  "statusLine": {\n    "type": "command",\n    "command": "omca-statusline",\n    "refreshInterval": 5\n  }\n}\n`,
+    );
+    expect(addRefreshInterval(`${bom}{"statusLine": {"type": "command"}, "a": 1}`)).toBe(
+      `${bom}{"statusLine": {"type": "command", "refreshInterval": 5}, "a": 1}`,
+    );
+    expect(addRefreshInterval(`${bom}{"statusLine": {"type": "command", "refreshInterval": 2}}`)).toBeUndefined();
+    expect(addRefreshInterval(`${bom}${bom}${USER_SETTINGS}`)).toBeUndefined();
   });
 
   test("nothing to add, nowhere to add it, or a file that is not JSON", () => {

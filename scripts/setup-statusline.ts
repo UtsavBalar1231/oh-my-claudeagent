@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { parseArgs } from "node:util";
 import { unifiedDiff } from "../src/core/doctor-checks.ts";
+import { configDir, toPlatform, toPosix } from "../src/core/path.ts";
 
 type Member = { key: string; start: number; valueStart: number; end: number };
 
@@ -78,10 +79,11 @@ function removeMember(text: string, key: string): string {
   return text.slice(0, open + 1) + text.slice(close);
 }
 
-const argsAfterBun = (command: string): string => command.slice(command.indexOf(" "));
-
-function isOurs(entry: unknown, command: string): boolean {
-  return typeof entry === "object" && entry !== null && "command" in entry && typeof entry.command === "string" && argsAfterBun(entry.command) === argsAfterBun(command);
+// An entry is ours when its command ends with our launcher and flags, however the program and
+// the launcher are quoted or slashed; the program's path may hold spaces.
+function isOurs(entry: unknown, suffix: string): boolean {
+  if (typeof entry !== "object" || entry === null || !("command" in entry) || typeof entry.command !== "string") return false;
+  return entry.command.replaceAll("\\", "/").replaceAll('"', "").endsWith(suffix);
 }
 
 let options: { settings?: string | undefined; yes: boolean; uninstall: boolean };
@@ -94,10 +96,13 @@ try {
 }
 const path = options.settings ?? fail(USAGE, 2);
 const bun = Bun.which("bun") ?? fail("bun is not on PATH");
-const launcher = join(homedir(), ".claude", "omca", "statusline.ts");
+const launcher = join(configDir(process.env) ?? join(homedir(), ".claude"), "omca", "statusline.ts");
+const platform = toPlatform(process.platform);
+const [bunPath, launcherPath] = [bun, launcher].map((path) => toPosix(platform, path));
+const [bunArg, launcherArg] = [bunPath, launcherPath].map((path) => `"${path}"`);
 const wanted = {
-  statusLine: { type: "command", command: `${bun} ${launcher}`, padding: 1, refreshInterval: 5, hideVimModeIndicator: true },
-  subagentStatusLine: { type: "command", command: `${bun} ${launcher} --subagent` },
+  statusLine: { type: "command", command: `${bunArg} ${launcherArg}`, padding: 1, refreshInterval: 5, hideVimModeIndicator: true },
+  subagentStatusLine: { type: "command", command: `${bunArg} ${launcherArg} --subagent` },
 };
 
 const exists = existsSync(path);
@@ -116,7 +121,7 @@ const expected: Record<string, unknown> = { ...settings };
 let after = base;
 for (const [key, value] of Object.entries(wanted)) {
   const sibling = key === "statusLine" ? "subagentStatusLine" : "statusLine";
-  if (options.uninstall && isOurs(current[key], value.command)) {
+  if (options.uninstall && isOurs(current[key], key === "statusLine" ? launcherPath : `${launcherPath} --subagent`)) {
     after = removeMember(after, key);
     delete expected[key];
   } else if (!options.uninstall && !Bun.deepEquals(current[key], value, true)) {

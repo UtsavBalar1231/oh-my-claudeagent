@@ -29,25 +29,30 @@ afterEach(() => {
   rmSync(root, { recursive: true, force: true });
 });
 
+function fixtureText(name: string): string {
+  return readFileSync(join(FIXTURES, name), "utf8").replaceAll("@BUN@", bun).replaceAll("@HOME@", home);
+}
+
 function fixture(name: string): string {
-  const text = readFileSync(join(FIXTURES, name), "utf8").replaceAll("@BUN@", bun).replaceAll("@HOME@", home);
+  const text = fixtureText(name);
   writeFileSync(settings, text);
   return text;
 }
 
-function run(...args: string[]): { stdout: string; stderr: string; exitCode: number } {
-  const result = Bun.spawnSync([process.execPath, SCRIPT, "--settings", settings, ...args], {
-    env: { HOME: home, PATH: join(root, "bin") },
-    stdin: "ignore",
-  });
+function runWith(env: Record<string, string>, ...args: string[]): { stdout: string; stderr: string; exitCode: number } {
+  const result = Bun.spawnSync([process.execPath, SCRIPT, "--settings", settings, ...args], { env, stdin: "ignore" });
   return { stdout: result.stdout.toString(), stderr: result.stderr.toString(), exitCode: result.exitCode };
 }
+
+const run = (...args: string[]) => runWith({ HOME: home, PATH: join(root, "bin") }, ...args);
+
+const command = (program = bun, script = launcher, flags = "") => `\\"${program}\\" \\"${script}\\"${flags}`;
 
 const statusLine = (indent: string) =>
   [
     `"statusLine": {`,
     `${indent}"type": "command",`,
-    `${indent}"command": "${bun} ${launcher}",`,
+    `${indent}"command": "${command()}",`,
     `${indent}"padding": 1,`,
     `${indent}"refreshInterval": 5,`,
     `${indent}"hideVimModeIndicator": true`,
@@ -55,7 +60,7 @@ const statusLine = (indent: string) =>
   ];
 
 const subagentStatusLine = (indent: string) =>
-  [`"subagentStatusLine": {`, `${indent}"type": "command",`, `${indent}"command": "${bun} ${launcher} --subagent"`, `}`];
+  [`"subagentStatusLine": {`, `${indent}"type": "command",`, `${indent}"command": "${command(bun, launcher, " --subagent")}"`, `}`];
 
 const header = () => [`--- ${settings}`, `+++ ${settings}`];
 const copyLine = () => `copy ${LAUNCHER_SOURCE} to ${launcher}`;
@@ -160,6 +165,53 @@ describe("install", () => {
     expect(existsSync(`${settings}.omca-bak`)).toBe(false);
   });
 
+  test("an entry written without quotes is upgraded to the quoted form, and a second run changes nothing", () => {
+    const quoted = fixture("omca-statusline.json");
+    const unquoted = fixture("omca-statusline-unquoted.json");
+    expect(unquoted).not.toBe(quoted);
+    mkdirSync(join(home, ".claude", "omca"), { recursive: true });
+    writeFileSync(launcher, readFileSync(LAUNCHER_SOURCE));
+
+    expect(run("--yes").exitCode).toBe(0);
+    expect(readFileSync(settings, "utf8")).toBe(quoted);
+    expect(readFileSync(`${settings}.omca-bak`, "utf8")).toBe(unquoted);
+    expect(run("--yes")).toEqual({ stdout: `Already configured: ${settings} runs both status lines through ${launcher}.\n`, stderr: "", exitCode: 0 });
+  });
+
+  test("CLAUDE_CONFIG_DIR moves the launcher and the commands that name it", () => {
+    fixture("no-statusline.json");
+    const config = join(root, "my config");
+    const moved = join(config, "omca", "statusline.ts");
+
+    expect(runWith({ HOME: home, CLAUDE_CONFIG_DIR: config, PATH: join(root, "bin") }, "--yes").exitCode).toBe(0);
+    const written = JSON.parse(readFileSync(settings, "utf8"));
+    expect(written.statusLine.command).toBe(`"${bun}" "${moved}"`);
+    expect(written.subagentStatusLine.command).toBe(`"${bun}" "${moved}" --subagent`);
+    expect(readFileSync(moved, "utf8")).toBe(readFileSync(LAUNCHER_SOURCE, "utf8"));
+    expect(existsSync(launcher)).toBe(false);
+  });
+
+  test("with HOME unset the launcher goes under USERPROFILE", () => {
+    fixture("no-statusline.json");
+
+    expect(runWith({ USERPROFILE: home, PATH: join(root, "bin") }, "--yes").exitCode).toBe(0);
+    expect(readFileSync(launcher, "utf8")).toBe(readFileSync(LAUNCHER_SOURCE, "utf8"));
+    expect(JSON.parse(readFileSync(settings, "utf8")).statusLine.command).toBe(`"${bun}" "${launcher}"`);
+  });
+
+  test("a program path with a space stays one quoted argument, and uninstall still recognizes the entry", () => {
+    fixture("no-statusline.json");
+    const spaced = join(root, "bun dir", "bun");
+    mkdirSync(join(root, "bun dir"));
+    symlinkSync(process.execPath, spaced);
+    const env = { HOME: home, PATH: join(root, "bun dir") };
+
+    expect(runWith(env, "--yes").exitCode).toBe(0);
+    expect(JSON.parse(readFileSync(settings, "utf8")).statusLine.command).toBe(`"${spaced}" "${launcher}"`);
+    expect(runWith(env, "--uninstall", "--yes").exitCode).toBe(0);
+    expect(readFileSync(settings, "utf8")).toBe(fixtureText("no-statusline.json"));
+  });
+
   test("a missing launcher is installed without touching settings that already point at it", () => {
     const before = fixture("omca-statusline.json");
 
@@ -239,6 +291,13 @@ describe("uninstall", () => {
     expect(readFileSync(settings, "utf8")).toBe('{\n  "theme": "dark"\n}\n');
     expect(readFileSync(`${settings}.omca-bak`, "utf8")).toBe(before);
     expect(existsSync(launcher)).toBe(false);
+  });
+
+  test("entries written without quotes are removed too", () => {
+    fixture("omca-statusline-unquoted.json");
+
+    expect(run("--uninstall", "--yes").exitCode).toBe(0);
+    expect(readFileSync(settings, "utf8")).toBe('{\n  "theme": "dark"\n}\n');
   });
 
   test("a statusLine that is not OMCA's is left alone", () => {

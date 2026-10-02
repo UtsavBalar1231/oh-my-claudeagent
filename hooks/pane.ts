@@ -1,4 +1,5 @@
 import type { CommandRunResult, Elements, PaneOpenArgs, RenderElement, Timer } from "claude-code";
+import { type Env, homeDir, inferPlatform, type Platform } from "../src/core/path.ts";
 import {
   COLORS,
   displayWidth,
@@ -47,6 +48,7 @@ export type View = {
   rows: number;
   isInline: boolean;
   home: string;
+  platform: Platform;
   now: number;
   press: Press;
 };
@@ -89,6 +91,17 @@ let isTicking = false;
 let now = 0;
 let inlineRows = INLINE_ROWS;
 let viewportRows = 0;
+
+export async function envOf(host: Host): Promise<Env> {
+  const [HOME, USERPROFILE, HOMEDRIVE, HOMEPATH, CLAUDE_CONFIG_DIR] = await Promise.all([
+    host.env.HOME(),
+    host.env.USERPROFILE(),
+    host.env.HOMEDRIVE(),
+    host.env.HOMEPATH(),
+    host.env.CLAUDE_CONFIG_DIR(),
+  ]);
+  return { HOME, USERPROFILE, HOMEDRIVE, HOMEPATH, CLAUDE_CONFIG_DIR };
+}
 
 // The engine prefixes a refused call's message with the plugin and the call, `<plugin>: $.fs.read: `.
 export const reason = (error: unknown): string =>
@@ -246,7 +259,8 @@ async function draw(host: Host, e: Input<"ui.render Pane">): Promise<RenderEleme
   const width = usableColumns(e.props.bodyColumns);
   const isInline = e.props.placement !== "dock";
   const rows = bodyRows(host, e, isInline);
-  const [ascii, home, pane] = await Promise.all([host.env.OMCA_ASCII(), host.env.HOME(), host.state.pane.get()]);
+  const [ascii, env, pane] = await Promise.all([host.env.OMCA_ASCII(), envOf(host), host.state.pane.get()]);
+  const home = homeDir(env) ?? "";
   const g = glyphs(isAsciiRequested(ascii));
   const active = pane.value?.tab ?? "agents";
   const press: Press = (work) => async () => {
@@ -275,7 +289,7 @@ async function draw(host: Host, e: Input<"ui.render Pane">): Promise<RenderEleme
     }),
   );
   const chrome = tabs.length + (isInline ? 0 : 1);
-  const view: View = { kit, g, width, rows: Math.max(0, rows - chrome), isInline, home: home ?? "", now, press };
+  const view: View = { kit, g, width, rows: Math.max(0, rows - chrome), isInline, home, platform: inferPlatform(home), now, press };
   let body: readonly RenderElement[];
   try {
     body = await viewOf(active)(host, view);

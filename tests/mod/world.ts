@@ -1,5 +1,6 @@
 import type { AgentInfo, On, RenderElement, RenderSurface } from "claude-code";
 import { mock, type MockClock } from "claude-code/testing";
+import { joinPath, normalizePath, type Platform } from "../../src/core/path.ts";
 import { displayWidth } from "../../src/core/ui-kit.ts";
 
 export const PLUGIN = "oh-my-claudeagent";
@@ -10,7 +11,39 @@ export const PLANS = `${HOME}/.claude/plans`;
 export const LEDGER = `${ROOT}/.omca/evidence/verification-evidence.json`;
 export const BOULDER = `${ROOT}/.omca/state/boulder.json`;
 
+// Where the session runs: the platform's path shape and the environment that names its home.
+// `root` and `home` are spelled as the engine reports them; the other paths are normalized, the way the mod writes them.
+export type Layout = {
+  name: string;
+  platform: Platform;
+  root: string;
+  home: string;
+  env: Readonly<Record<string, string>>;
+  plans: string;
+  settings: string;
+  boulder: string;
+};
+
+function layoutOf(name: string, platform: Platform, root: string, home: string, env: Record<string, string>): Layout {
+  return {
+    name,
+    platform,
+    root,
+    home,
+    env,
+    plans: joinPath(platform, home, ".claude", "plans"),
+    settings: joinPath(platform, home, ".claude", "settings.json"),
+    boulder: joinPath(platform, root, ".omca", "state", "boulder.json"),
+  };
+}
+
+export const POSIX = layoutOf("posix", "linux", ROOT, HOME, { HOME });
+export const WINDOWS = layoutOf("win32", "win32", "C:\\work", "C:\\Users\\u", { USERPROFILE: "C:\\Users\\u" });
+export const LAYOUTS: readonly Layout[] = [POSIX, WINDOWS];
+
 export type World = {
+  layout: Layout;
+  spelled: (path: string) => string;
   files: Map<string, { text: string; mtimeMs: number }>;
   settings: Record<string, unknown>;
   agents: AgentInfo[];
@@ -23,15 +56,27 @@ export type World = {
 
 const parent = (path: string) => path.slice(0, path.lastIndexOf("/"));
 
-// The engine's file, session, settings, pane and clock calls answered from memory.
+// The test engine resolves a path that is not POSIX-absolute against its own directory before a
+// handler sees it, so a drive or backslash UNC path arrives as `<cwd>/C:\x`. A real Windows
+// engine passes it as written, which is the spelling this restores.
+const WINDOWS_SPELLING = /^\/.*?\/(?=[A-Za-z]:[\\/]|\\\\)/;
+
+// The engine's file, session, settings, pane and clock calls answered from memory. A file is
+// found under any spelling of its path: separators and `.` or `..` parts are resolved the way
+// the platform's file system would.
 export function world(
   on: On,
   files: Readonly<Record<string, string>> = {},
   settings: Record<string, unknown> = {},
   env: Readonly<Record<string, string>> = {},
+  layout: Layout = POSIX,
 ): World {
+  const spelled = (path: string) => (layout.platform === "win32" ? path.replace(WINDOWS_SPELLING, "") : path);
+  const key = (path: string) => normalizePath(layout.platform, spelled(path));
   const w: World = {
-    files: new Map(Object.entries(files).map(([path, text], index) => [path, { text, mtimeMs: 1_000 + index }])),
+    layout,
+    spelled,
+    files: new Map(Object.entries(files).map(([path, text], index) => [key(path), { text, mtimeMs: 1_000 + index }])),
     settings,
     agents: [],
     reads: [],
@@ -40,29 +85,30 @@ export function world(
     logs: [],
     clock: mock.clock(on, { now: Date.UTC(2026, 9, 2, 12, 0, 0) }),
   };
-  mock.env(on, { HOME, ...env });
-  on("session.root", () => ({ value: ROOT }));
+  mock.env(on, { ...layout.env, ...env });
+  on("session.root", () => ({ value: layout.root }));
   on("session.id", () => ({ value: SESSION }));
   on("settings.read", () => ({ value: w.settings }));
   on("agent.list", () => ({ value: w.agents }));
   on("fs.read", (_$, e) => {
-    w.reads.push(e.path);
-    const file = w.files.get(e.path);
-    return file === undefined ? { deny: `ENOENT: no such file, ${e.path}` } : { value: file.text };
+    w.reads.push(spelled(e.path));
+    const file = w.files.get(key(e.path));
+    return file === undefined ? { deny: `ENOENT: no such file, ${spelled(e.path)}` } : { value: file.text };
   });
   on("fs.exists", (_$, e) => ({
-    value: w.files.has(e.path) || [...w.files.keys()].some((path) => path.startsWith(`${e.path}/`)),
+    value: w.files.has(key(e.path)) || [...w.files.keys()].some((path) => path.startsWith(`${key(e.path)}/`)),
   }));
   on("fs.stat", (_$, e) => {
-    const file = w.files.get(e.path);
-    if (file === undefined) return { deny: `ENOENT: no such file, ${e.path}` };
+    const file = w.files.get(key(e.path));
+    if (file === undefined) return { deny: `ENOENT: no such file, ${spelled(e.path)}` };
     return { value: { kind: "file", size: file.text.length, mtimeMs: file.mtimeMs, isLink: false } };
   });
   on("fs.list", (_$, e) => {
+    const dir = key(e.path);
     const files = [...w.files.entries()]
-      .filter(([path]) => parent(path) === e.path)
+      .filter(([path]) => parent(path) === dir)
       .map(([path, file]) => ({
-        name: path.slice(e.path.length + 1),
+        name: path.slice(dir.length + 1),
         kind: "file" as const,
         size: file.text.length,
         mtimeMs: file.mtimeMs,
@@ -70,11 +116,11 @@ export function world(
       }));
     const dirs = new Set(
       [...w.files.keys()]
-        .filter((path) => path.startsWith(`${e.path}/`) && parent(path) !== e.path)
-        .map((path) => path.slice(e.path.length + 1).split("/")[0] ?? ""),
+        .filter((path) => path.startsWith(`${dir}/`) && parent(path) !== dir)
+        .map((path) => path.slice(dir.length + 1).split("/")[0] ?? ""),
     );
     const entries = [...files, ...[...dirs].map((name) => ({ name, kind: "dir" as const, size: 0, mtimeMs: 0, isLink: false }))];
-    return entries.length === 0 ? { deny: `ENOENT: no such directory, ${e.path}` } : { value: entries };
+    return entries.length === 0 ? { deny: `ENOENT: no such directory, ${spelled(e.path)}` } : { value: entries };
   });
   on("ui.open", (_$, e) => (w.opened.push(e), { value: { isPlaced: true } }));
   on("ui.close", () => ({ value: undefined }));
@@ -85,7 +131,8 @@ export function world(
 }
 
 export function write(w: World, path: string, text: string): void {
-  w.files.set(path, { text, mtimeMs: (w.files.get(path)?.mtimeMs ?? 1_000) + 1 });
+  const key = normalizePath(w.layout.platform, w.spelled(path));
+  w.files.set(key, { text, mtimeMs: (w.files.get(key)?.mtimeMs ?? 1_000) + 1 });
 }
 
 export const run = (args: string, columns = 120) =>

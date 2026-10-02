@@ -1,3 +1,4 @@
+import { baseName, SHAPE_PLATFORM, toPosix } from "./path.ts";
 import { inputText } from "./tool-input.ts";
 
 export type CommentGateMode = "off" | "advise" | "deny";
@@ -43,7 +44,7 @@ const MARKERS_WITHOUT_PATH = ["#", "//"];
 
 function markersOf(filePath: string): readonly string[] | undefined {
   if (filePath === "") return MARKERS_WITHOUT_PATH;
-  const name = filePath.slice(filePath.lastIndexOf("/") + 1);
+  const name = baseName(SHAPE_PLATFORM, filePath);
   const dot = name.lastIndexOf(".");
   return (dot < 0 ? undefined : MARKERS_BY_EXTENSION.get(name.slice(dot + 1))) ?? MARKERS_BY_NAME.get(name);
 }
@@ -213,7 +214,7 @@ const KEEP_NOTICE = `The convention: names, types, and structure carry the what,
 export function judgeWrite(mode: "advise" | "deny", input: unknown, slot: DenyOnce | undefined): Verdict | undefined {
   const filePath = inputText(input, "file_path");
   const markers = markersOf(filePath);
-  if (markers === undefined || filePath.includes("/tests/")) return undefined;
+  if (markers === undefined || toPosix(SHAPE_PLATFORM, filePath).includes("/tests/")) return undefined;
   const lines = addedLines(input);
   if (lines.slice(0, DISABLE_FILE_WINDOW).some((line) => line.includes(DISABLE_FILE_MARKER))) return undefined;
   const syntax = syntaxOf(markers);

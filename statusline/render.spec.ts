@@ -425,6 +425,32 @@ describe("info line", () => {
     );
   });
 
+  test.each([
+    ["/tmp/my dir/s#1.jsonl", "file:///tmp/my%20dir/s%231.jsonl"],
+    ["/Users/Me/.claude/projects/p/s.jsonl", "file:///Users/Me/.claude/projects/p/s.jsonl"],
+    ["C:\\Users\\x y\\.claude\\projects\\p\\s.jsonl", "file:///C:/Users/x%20y/.claude/projects/p/s.jsonl"],
+    ["C:/Users/x/s.jsonl", "file:///C:/Users/x/s.jsonl"],
+    ["\\\\srv\\share\\p\\s.jsonl", "file://srv/share/p/s.jsonl"],
+  ])("the transcript path %p links as %p", (transcript_path, url) => {
+    expect(line1({ model, session_name: "my-sess", transcript_path })).toBe(
+      `${C}> claude${R}${S}${D}${link(url, "my-sess")}${R}${S}${W}* main${R}`,
+    );
+  });
+
+  test.each([
+    ["/home/user/projects/myrepo", "myrepo"],
+    ["/Users/Me/My Repo", "My Repo"],
+    ["C:\\Users\\x\\proj", "proj"],
+    ["C:/Users/x/proj/", "proj"],
+    ["\\\\srv\\share\\proj", "proj"],
+  ])("the folder segment of project %p is %p", (project_dir, name) => {
+    expect(line1({ model, workspace: { project_dir } })).toBe(`${C}> claude${R}${S}${W}* main${R}${S}${D}> ${name}${R}`);
+  });
+
+  test.each(["/", "C:\\", "\\\\srv\\share"])("the project root %p shows no folder segment", (project_dir) => {
+    expect(line1({ model, workspace: { project_dir } })).toBe(`${C}> claude${R}${S}${W}* main${R}`);
+  });
+
   test("a worktree branch replaces the repository branch", () => {
     expect(line1({ model, worktree: { name: "wt", branch: "feature/x", original_branch: "main" } })).toBe(
       `${C}> claude${R}${S}${W}* feature/x${R}${S}${B}W: wt${R} ${D}<- main${R}`,

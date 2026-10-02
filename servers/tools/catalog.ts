@@ -6,6 +6,7 @@ import { findSession, latestSessionId } from "../hooks/session-state.ts";
 import { ledgerPath } from "../hooks/status-file.ts";
 import { projectRoot } from "../io.ts";
 import type { Tool } from "../omca.ts";
+import { pluginRoot } from "../plugin-root.ts";
 import { discoverBinary } from "./ast.ts";
 import { isMissing, stringArg } from "./filesystem.ts";
 
@@ -31,7 +32,6 @@ const CATEGORIES_MALFORMED = '{"error": "categories.json is malformed"}';
 
 const WORKING_DIRECTORY = { type: "string", default: "", description: "Project root (auto-detected from git)" };
 
-const pluginRoot = (): string => process.env.CLAUDE_PLUGIN_ROOT || join(import.meta.dir, "..", "..");
 const rootOf = (args: Record<string, unknown>): string => projectRoot(stringArg(args, "working_directory", "") || process.cwd());
 const isDirectory = (path: string): boolean => statSync(path, { throwIfNoEntry: false })?.isDirectory() ?? false;
 

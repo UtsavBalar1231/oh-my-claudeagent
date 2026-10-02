@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { resolveBoundPlan } from "../../src/core/boulder.ts";
 import { nextTaskLabel } from "../../src/core/checkboxes.ts";
+import { pluginRoot } from "../plugin-root.ts";
 import type { Handler } from "./registry.ts";
 import type { Session } from "./session-state.ts";
 import { statusPath } from "./status-file.ts";
@@ -9,8 +10,7 @@ import { statusPath } from "./status-file.ts";
 let template: string | undefined;
 
 export function guidanceTemplate(): string {
-  const root = process.env.CLAUDE_PLUGIN_ROOT || join(import.meta.dir, "..", "..");
-  template ??= readFileSync(join(root, "templates", "claudemd.md"), "utf8");
+  template ??= readFileSync(join(pluginRoot(), "templates", "claudemd.md"), "utf8");
   return template;
 }
 

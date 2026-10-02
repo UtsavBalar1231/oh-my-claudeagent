@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { upTo } from "./context-injector.ts";
 import { dispatch } from "./registry.ts";
 
 const NOW = 1_786_000_000_000;
@@ -509,4 +510,22 @@ describe("kill switch and golden fixtures", () => {
       expect(await dispatch({ ...fixture, event: fixture.hook_event_name }, root, NOW)).toEqual({});
     });
   }
+});
+
+describe("the walk up to the project root", () => {
+  const climb = (...args: Parameters<typeof upTo>) => [...upTo(...args)];
+
+  test("stops at the root, and at the file system root when the root is never met", () => {
+    expect(climb("linux", "/work/a/b", "/work")).toEqual(["/work/a/b", "/work/a", "/work"]);
+    expect(climb("linux", "/work/a/b", "/work/")).toEqual(["/work/a/b", "/work/a", "/work"]);
+    expect(climb("linux", "/work/a", "/work/a")).toEqual(["/work/a"]);
+    expect(climb("linux", "/other/a", "/work")).toEqual(["/other/a", "/other", "/"]);
+  });
+
+  test("a root spelled in another case ends the walk on macOS and Windows only", () => {
+    expect(climb("darwin", "/Volumes/Me/proj/a/b", "/volumes/me/PROJ")).toEqual(["/Volumes/Me/proj/a/b", "/Volumes/Me/proj/a", "/Volumes/Me/proj"]);
+    expect(climb("win32", "C:/proj/a/b", "c:/PROJ")).toEqual(["C:/proj/a/b", "C:/proj/a", "C:/proj"]);
+    expect(climb("win32", "C:/proj/a/b", "c:\\proj\\")).toEqual(["C:/proj/a/b", "C:/proj/a", "C:/proj"]);
+    expect(climb("linux", "/Volumes/Me/proj/a", "/volumes/me/proj")).toEqual(["/Volumes/Me/proj/a", "/Volumes/Me/proj", "/Volumes/Me", "/Volumes", "/"]);
+  });
 });

@@ -2,7 +2,8 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { tools } from "./filesystem.ts";
+import type { Platform } from "../../src/core/path.ts";
+import { isSensitivePath, tools } from "./filesystem.ts";
 
 const fileRead = (() => {
   const found = tools.find((tool) => tool.name === "file_read");
@@ -183,6 +184,45 @@ test.each([
 test.each([".envrc", "notes.env", "credential.txt", "environment.txt", "ssh/config", "id_dsa"])("%s is not denied", async (name) => {
   const path = write(name, "fine\n");
   expect(await read({ path })).toBe([row(1, "fine"), "", "(~1 tokens (5 B), 1 lines total)"].join("\n"));
+});
+
+test.each<[Platform, string]>([
+  ["win32", "C:\\Users\\x\\.ssh\\id_rsa"],
+  ["win32", "C:\\Users\\x\\.aws\\credentials"],
+  ["win32", "C:/Data/x/.gnupg/pubring.kbx"],
+  ["win32", "C:\\proj\\.env"],
+  ["win32", "C:\\proj\\app\\.env.local"],
+  ["win32", "c:\\PROJ\\.ENV"],
+  ["win32", "C:\\Users\\X\\.SSH\\config"],
+  ["win32", "C:\\proj\\.env:Zone.Identifier"],
+  ["win32", "C:\\proj\\.env::$DATA"],
+  ["win32", "C:\\proj\\.env."],
+  ["win32", "C:\\proj\\.env "],
+  ["win32", "C:\\proj\\.ssh\\..\\.ssh\\id_rsa"],
+  ["win32", "\\\\srv\\share\\.gnupg\\key"],
+  ["win32", "/c/Data/x/.ssh/id_rsa"],
+  ["win32", "C:\\proj\\Secrets.txt"],
+  ["darwin", "/Volumes/x/.ENV"],
+  ["darwin", "/Volumes/x/.SSH/id_rsa"],
+  ["darwin", "/Volumes/x/AWS/.aws/Credentials"],
+  ["linux", "/srv/u/.env"],
+  ["linux", "/srv/u/.ssh/id_rsa"],
+  ["linux", "/etc/shadow"],
+])("isSensitivePath(%s, %p) is true", (platform, path) => {
+  expect(isSensitivePath(platform, path)).toBe(true);
+});
+
+test.each<[Platform, string]>([
+  ["win32", "C:\\proj\\src\\index.ts"],
+  ["win32", "C:\\proj\\environment.txt"],
+  ["win32", "C:\\Users\\x\\.sshkeys\\a"],
+  ["win32", "C:\\proj\\notes:stream"],
+  ["darwin", "/Volumes/x/Project/App.ts"],
+  ["linux", "/srv/u/.ENV"],
+  ["linux", "/srv/u/.envrc"],
+  ["linux", "/etc/shadow.bak"],
+])("isSensitivePath(%s, %p) is false", (platform, path) => {
+  expect(isSensitivePath(platform, path)).toBe(false);
 });
 
 test("a symlink is judged by the file it points at", async () => {

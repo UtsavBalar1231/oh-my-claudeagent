@@ -55,6 +55,13 @@ test("CLAUDE_CONFIG_DIR replaces ~/.claude", () => {
   expect(run([], { HOME: root, CLAUDE_CONFIG_DIR: join(root, "config") }).stdout).toBe("main 3.1.0 payload\n");
 });
 
+test("a config directory with a space, a hash and a percent sign still reaches the renderer", () => {
+  const configDir = join(root, "my config #1 100%");
+  install(configDir, "3.1.0");
+  expect(run([], { HOME: root, CLAUDE_CONFIG_DIR: configDir })).toEqual({ stdout: "main 3.1.0 payload\n", exitCode: 0 });
+  expect(run(["--subagent"], { HOME: root, CLAUDE_CONFIG_DIR: configDir })).toEqual({ stdout: "subagent 3.1.0 payload\n", exitCode: 0 });
+});
+
 test("with no cache directory the main line prints a notice and exits cleanly", () => {
   expect(run([], { HOME: root })).toEqual({ stdout: "omca: no installed plugin version found\n", exitCode: 0 });
 });

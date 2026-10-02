@@ -14,7 +14,9 @@ const ROLES = ["user", "assistant", "tool"];
 const MAX_RESULT_CHARS = 100_000;
 // The client replaces a spilled tool result inline with a pointer to the sidecar plus a prefix of
 // its body, so the same text lives in two places.
-const SPILL_POINTER = /(\/\S+\/tool-results\/[^\s/]+\.txt)/;
+// The client names the path after "saved to: ", and it may hold spaces; any other mention must be one token.
+const SPILL_TAIL = String.raw`[\\/]tool-results[\\/][^\s\\/]+\.txt`;
+const SPILL_POINTER = new RegExp(String.raw`saved to: ([^\r\n]*?${SPILL_TAIL})|((?:[A-Za-z]:[\\/]|\\\\|/)\S+${SPILL_TAIL})`);
 
 type Match = { file: string; timestamp: string; role: string; excerpt: string };
 type Source = { path: string; label: string; mtimeMs: number; sidecar: boolean };
@@ -70,8 +72,13 @@ function textsOf(type: string, content: unknown): Array<[string, string]> {
   });
 }
 
+export function spillPointer(text: string): string | undefined {
+  const found = SPILL_POINTER.exec(text);
+  return found?.[1] ?? found?.[2];
+}
+
 function isSpilledCopy(text: string, spilled: ReadonlySet<string>): boolean {
-  const pointer = SPILL_POINTER.exec(text)?.[1];
+  const pointer = spillPointer(text);
   return pointer !== undefined && existsSync(pointer) && spilled.has(realpathSync(pointer));
 }
 

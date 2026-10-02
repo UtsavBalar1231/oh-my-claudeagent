@@ -59,6 +59,12 @@ describe("the comment marker follows the file", () => {
     ["/r/.sh", "#"],
     ["", "#"],
     ["", "//"],
+    ["C:\\proj\\a.py", "#"],
+    ["C:/proj/a.go", "//"],
+    ["C:\\proj.d\\Makefile", "#"],
+    ["\\\\srv\\share\\a.ts", "//"],
+    ["/c/proj/a.lua", "--"],
+    ["/Users/Me/Proj/a.rb", "#"],
   ])("%p reads %p as a comment", (path, marker) => {
     expect(judge(path, narration(marker))).toEqual(advised("tier2", restates("set the user name")));
   });
@@ -80,8 +86,25 @@ describe("the comment marker follows the file", () => {
     ["/r/Makefile.bak", "#"],
     ["/r/not-a-Makefile", "#"],
     ["/r/py", "#"],
+    ["C:\\proj.d\\py", "#"],
+    ["C:\\proj\\a.py", "//"],
   ])("%p does not read %p as a comment", (path, marker) => {
     expect(judge(path, narration(marker))).toBeUndefined();
+  });
+});
+
+describe("a test directory is exempt", () => {
+  const narration = "# set the user name\nuser_name = input_value";
+
+  test.each(["/r/tests/a.py", "C:\\r\\tests\\a.py", "C:/r/tests/a.py", "\\\\srv\\share\\tests\\a.py", "/c/r/tests/a.py", "/Users/Me/r/tests/a.py"])(
+    "%p is not judged",
+    (path) => {
+      expect(judge(path, narration)).toBeUndefined();
+    },
+  );
+
+  test.each(["/r/testsuite/a.py", "C:\\r\\testsuite\\a.py"])("%p is judged", (path) => {
+    expect(judge(path, narration)).toEqual(advised("tier2", restates("set the user name")));
   });
 });
 

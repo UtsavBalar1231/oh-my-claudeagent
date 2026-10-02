@@ -1,9 +1,9 @@
 import { addRefreshInterval, doctorChecks, type Fix, type HookState, unifiedDiff } from "../src/core/doctor-checks.ts";
-import { tildePath } from "../src/core/plan-reader.ts";
+import { configDir, homeDir, inferPlatform, joinPath, type Platform, tildePath } from "../src/core/path.ts";
 import { isSafeSessionId } from "../src/core/session-id.ts";
 import { update } from "./agents-tracker.ts";
 import type { Host, State } from "./host.ts";
-import { reason } from "./pane.ts";
+import { envOf, reason } from "./pane.ts";
 
 type Doctor = State["doctor"];
 
@@ -26,10 +26,12 @@ const patch = (host: Host, change: Partial<Doctor>) =>
     ...change,
   }));
 
-async function where(host: Host): Promise<{ home: string; settings: string }> {
-  const [config, home = ""] = await Promise.all([host.env.CLAUDE_CONFIG_DIR(), host.env.HOME()]);
-  const dir = config !== undefined && config !== "" ? config : `${home}/.claude`;
-  return { home, settings: `${dir}/settings.json` };
+async function where(host: Host): Promise<{ platform: Platform; home: string; settings: string | undefined }> {
+  const env = await envOf(host);
+  const home = homeDir(env) ?? "";
+  const config = configDir(env);
+  const platform = inferPlatform(home, config ?? "");
+  return { platform, home, settings: config === undefined ? undefined : joinPath(platform, config, "settings.json") };
 }
 
 async function readIfPresent(host: Host, path: string): Promise<string | null> {
@@ -86,7 +88,7 @@ async function check(host: Host): Promise<Doctor["checks"]> {
     hookState(host),
     host.clock.now(),
     host.settings.read(),
-    readIfPresent(host, paths.settings),
+    paths.settings === undefined ? null : readIfPresent(host, paths.settings),
   ]);
   const env = {
     CLAUDE_CODE_SUBAGENT_MODEL_FORCE: await host.env.CLAUDE_CODE_SUBAGENT_MODEL_FORCE(),
@@ -109,7 +111,9 @@ async function check(host: Host): Promise<Doctor["checks"]> {
   });
   seen.clear();
   for (const { fix } of checks) {
-    if (fix === "add-refresh-interval" && userSettings !== null) seen.set(fix, { path: paths.settings, text: userSettings });
+    if (fix === "add-refresh-interval" && paths.settings !== undefined && userSettings !== null) {
+      seen.set(fix, { path: paths.settings, text: userSettings });
+    }
   }
   return checks;
 }
@@ -131,8 +135,8 @@ async function runChecks(host: Host): Promise<void> {
 async function applyFix(host: Host, fix: Fix): Promise<string | null> {
   const target = seen.get(fix);
   if (target === undefined) return "Nothing to fix; press r to run the checks again";
-  const { home } = await where(host);
-  const label = tildePath(target.path, home);
+  const { platform, home } = await where(host);
+  const label = tildePath(platform, target.path, home);
   const backup = `${target.path}.omca-bak`;
   let current: string;
   try {
@@ -145,14 +149,14 @@ async function applyFix(host: Host, fix: Fix): Promise<string | null> {
   try {
     await host.fs.write(backup, current);
   } catch (error) {
-    return `Could not write the backup ${tildePath(backup, home)}, so ${label} is unchanged: ${reason(error)}`;
+    return `Could not write the backup ${tildePath(platform, backup, home)}, so ${label} is unchanged: ${reason(error)}`;
   }
   try {
     await host.fs.write(target.path, after);
   } catch (error) {
-    return `Could not write ${label}: ${reason(error)}; ${tildePath(backup, home)} holds the original`;
+    return `Could not write ${label}: ${reason(error)}; ${tildePath(platform, backup, home)} holds the original`;
   }
-  const diff = unifiedDiff(tildePath(backup, home), label, current, after);
+  const diff = unifiedDiff(tildePath(platform, backup, home), label, current, after);
   await patch(host, { applied: { fix, path: target.path, backupPath: backup, diff } });
   return null;
 }

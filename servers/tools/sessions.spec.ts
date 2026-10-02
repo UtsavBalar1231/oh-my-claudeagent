@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { tools } from "./sessions.ts";
+import { spillPointer, tools } from "./sessions.ts";
 
 const sessionSearch = (() => {
   const found = tools.find((tool) => tool.name === "session_search");
@@ -268,6 +268,34 @@ test("the inline pointer to a scanned spilled result is not reported a second ti
   transcript("sess-a.jsonl", turn("user", [toolResult(pointer(path, body.slice(0, 200)))]));
   expect((await search({ query: "needle in the spill" })).matches.map((match) => match.file)).toEqual(["sess-a/tool-results/spill1.txt"]);
 });
+
+test("the inline pointer to a scanned spilled result in a directory with spaces is not reported a second time", async () => {
+  const body = `needle in the spaced spill${"y".repeat(500)}`;
+  const path = sidecar("sess a", "spill1.txt", body);
+  transcript("sess-a.jsonl", turn("user", [toolResult(pointer(path, body.slice(0, 200)))]));
+  expect((await search({ query: "needle in the spaced spill" })).matches.map((match) => match.file)).toEqual(["sess a/tool-results/spill1.txt"]);
+});
+
+test.each([
+  ["POSIX path", pointer("/srv/u/.claude/projects/p/s1/tool-results/abc.txt", "x"), "/srv/u/.claude/projects/p/s1/tool-results/abc.txt"],
+  ["path with spaces", pointer("/srv/Me Too/.claude/projects/p/s 1/tool-results/abc.txt", "x"), "/srv/Me Too/.claude/projects/p/s 1/tool-results/abc.txt"],
+  ["drive path", pointer("C:\\Users\\x\\.claude\\projects\\p\\s1\\tool-results\\abc.txt", "x"), "C:\\Users\\x\\.claude\\projects\\p\\s1\\tool-results\\abc.txt"],
+  ["drive path with spaces", pointer("C:\\Users\\Me Too\\.claude\\projects\\p\\tool-results\\abc.txt", "x"), "C:\\Users\\Me Too\\.claude\\projects\\p\\tool-results\\abc.txt"],
+  ["forward-slash drive path", pointer("C:/Volumes/x/.claude/projects/p/s1/tool-results/abc.txt", "x"), "C:/Volumes/x/.claude/projects/p/s1/tool-results/abc.txt"],
+  ["UNC path", pointer("\\\\srv\\share\\.claude\\projects\\p\\tool-results\\abc.txt", "x"), "\\\\srv\\share\\.claude\\projects\\p\\tool-results\\abc.txt"],
+  ["bare mention", "see /srv/u/p/tool-results/abc.txt for more", "/srv/u/p/tool-results/abc.txt"],
+  ["bare drive mention", "see C:\\p\\tool-results\\abc.txt for more", "C:\\p\\tool-results\\abc.txt"],
+  ["a number before the path", "line 5/6 saved to: /h/p/tool-results/abc.txt", "/h/p/tool-results/abc.txt"],
+])("the spill pointer in %s is read whole", (_name, text, expected) => {
+  expect(spillPointer(text)).toBe(expected);
+});
+
+test.each(["no pointer here", "/srv/u/p/tool-results/abc.md", "/srv/u/p/tool-results/dir/abc.txt", "tool-results/abc.txt", "C:\\p\\results\\abc.txt"])(
+  "%p holds no spill pointer",
+  (text) => {
+    expect(spillPointer(text)).toBeUndefined();
+  },
+);
 
 test("the inline pointer to a spilled result that is gone still matches", async () => {
   const path = join(projectDir, "sess-a", "tool-results", "swept.txt");

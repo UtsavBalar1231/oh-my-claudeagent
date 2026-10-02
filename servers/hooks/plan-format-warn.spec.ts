@@ -40,6 +40,13 @@ test("plan-format-warn: an Edit that leaves a malformed line warns the same way"
   );
 });
 
+test("plan-format-warn: a plan under a mixed-case home directory is judged like any other", async () => {
+  const { root, path } = file("Users/Me/.claude/plans/test-plan.md", "- [ ] Task 1: malformed\n- [x] 2. Done\n");
+  expect(await warn(root, path)).toBe(
+    [`[PLAN-FORMAT-WARN] ${path} has 1 checkbox line(s) that will not be counted as numbered tasks:`, "1:- [ ] Task 1: malformed", FIX].join("\n"),
+  );
+});
+
 test("plan-format-warn: more than five malformed lines are named up to five with a count of the rest", async () => {
   const boxes = Array.from({ length: 7 }, (_, i) => `- [ ] step ${i + 1}`);
   const { root, path } = file("plans/long.md", `- [ ] 1. Numbered\n${boxes.join("\n")}\n`);

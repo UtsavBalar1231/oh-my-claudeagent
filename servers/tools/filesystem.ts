@@ -1,6 +1,7 @@
 import { appendFileSync, closeSync, createReadStream, mkdirSync, openSync, readSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { expandTilde, normalizePath, type Platform, toPlatform } from "../../src/core/path.ts";
 import type { Tool } from "../omca.ts";
 
 const DEFAULT_LIMIT = 5000;
@@ -12,7 +13,9 @@ const MAX_LINE_CHARS = 2000;
 // source file whole, so ordinary reads are not spilled to disk, and stays under the client's ceiling.
 const MAX_RESULT_CHARS = 200_000;
 const AUDIT_LOG = join(".omca", "logs", "file-access.jsonl");
+const PLATFORM = toPlatform(process.platform);
 const SENSITIVE_PATH = /\/\.(?:ssh|gnupg|aws)\/|\/\.env(?:$|\.)|\/(?:credentials|id_rsa|id_ed25519)|secret|^\/etc\/g?shadow$/;
+const SENSITIVE_PATH_ANY_CASE = new RegExp(SENSITIVE_PATH.source, "i");
 
 type Args = Record<string, unknown>;
 type Decoder = { decode(chunk?: Buffer, options?: { stream: boolean }): string };
@@ -80,7 +83,16 @@ function hasNullByte(file: string): boolean {
   }
 }
 
-const expandHome = (path: string): string => (path === "~" || path.startsWith("~/") ? join(homedir(), path.slice(1)) : path);
+const expandHome = (path: string): string => expandTilde(PLATFORM, path, homedir()) ?? path;
+
+// Windows names `file:stream` the stream of `file`, and drops trailing dots and spaces from a name.
+const withoutWindowsAliases = (path: string): string => path.replace(/(?<=[^/:]):[^/]*$/, "").replace(/[. ]+$/, "");
+
+export function isSensitivePath(platform: Platform, path: string): boolean {
+  const posix = normalizePath(platform, path);
+  const checked = platform === "win32" ? withoutWindowsAliases(posix) : posix;
+  return (platform === "linux" ? SENSITIVE_PATH : SENSITIVE_PATH_ANY_CASE).test(checked);
+}
 
 /** The resolved file and its size, or the plain-text reason the read is refused. */
 function inspect(path: string, unlimited: boolean): { file: string; size: number } | string {
@@ -94,7 +106,7 @@ function inspect(path: string, unlimited: boolean): { file: string; size: number
   const stat = statSync(file);
   if (stat.isDirectory()) return `Path is a directory, not a file: ${path}`;
   if (!stat.isFile()) return `Not a regular file (device/pipe/socket): ${path}`;
-  if (SENSITIVE_PATH.test(file)) return `Access denied: ${path} matches sensitive file pattern`;
+  if (isSensitivePath(PLATFORM, file)) return `Access denied: ${path} matches sensitive file pattern`;
   if (unlimited && stat.size > MAX_UNLIMITED_BYTES) {
     return `File too large for unlimited read: ${humanSize(stat.size)} (max ${humanSize(MAX_UNLIMITED_BYTES)}). Use offset and limit to read in chunks.`;
   }

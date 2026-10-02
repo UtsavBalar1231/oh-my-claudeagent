@@ -112,3 +112,29 @@ describe("other input", () => {
     expect(planWriteDenial("Write", "## TODOs")).toBeUndefined();
   });
 });
+
+describe("Windows and macOS paths", () => {
+  const prose = "# My Plan\n\n## TODOs\n\nno checkboxes here, just prose\n";
+
+  test.each([
+    "C:\\Users\\x\\.claude\\plans\\my-plan.md",
+    "C:/Users/x/.claude/plans/my-plan.md",
+    "/c/Users/x/.claude/plans/my-plan.md",
+    "\\\\srv\\share\\.claude\\plans\\my-plan.md",
+    "/Users/Me/.claude/plans/my-plan.md",
+  ])("a plan at %p with no checkbox is denied", (file_path) => {
+    expect(planWriteDenial("Write", { file_path, content: prose })).toBe(denial(file_path));
+  });
+
+  test.each(["C:\\Users\\x\\.claude\\plans\\cool-agent-deadbeef.md", "\\\\srv\\share\\plans\\cool-agent-deadbeef.md"])(
+    "the agent plan name at %p is read from its last segment",
+    (file_path) => {
+      expect(planWriteDenial("Write", { file_path, content: "# Agent Plan\n\nno boxes\n" })).toBe(denial(file_path));
+      expect(planWriteDenial("Write", { file_path, content: "# Agent Plan\n\n- [ ] 1. First\n" })).toBeUndefined();
+    },
+  );
+
+  test("a prose file outside any plans directory is left alone", () => {
+    expect(planWriteDenial("Write", { file_path: "C:\\Users\\x\\notes\\p-agent-1.md", content: prose })).toBeUndefined();
+  });
+});

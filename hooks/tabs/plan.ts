@@ -1,6 +1,7 @@
 import type { RenderElement } from "claude-code";
 import { resolveBoundPlan } from "../../src/core/boulder.ts";
 import { type Drawn, drawnAt, type FocusList, focusMove, placeWindow } from "../../src/core/list-window.ts";
+import { homeDir, inferPlatform, type Platform, samePath, tildePath } from "../../src/core/path.ts";
 import {
   CONTENTS_CAP,
   chunks,
@@ -12,13 +13,13 @@ import {
   plansDirectory,
   readable,
   recentPlans,
-  tildePath,
 } from "../../src/core/plan-reader.ts";
 import { displayWidth, fitEnd, fitMiddle, KEYS, keyHint } from "../../src/core/ui-kit.ts";
 import type { Input, Phase } from "../dispatch.ts";
 import type { Host, State } from "../host.ts";
 import type { Subcommand } from "../omca-router.ts";
 import {
+  envOf,
   keyButton,
   noticeRow,
   open,
@@ -39,6 +40,7 @@ type Key = readonly [hotkey: string, label: string, work: () => unknown, isOff?:
 const ROW = "row-";
 const PICK = "pick-";
 const BOULDER = ".omca/state/boulder.json";
+const UNRESOLVED_PLANS = "~/.claude/plans";
 const MIN_LIST_ROWS = 3;
 // Docked: title, meta, rule, two edge lines, rule, key row, hint line.
 const DOCK_CHROME_ROWS = 8;
@@ -62,9 +64,11 @@ let isRingOnRow = false;
 
 const isLoaded = (plan: State["plan"] | undefined): plan is Loaded => plan !== undefined && "pages" in plan;
 
-async function where(host: Host): Promise<{ root: string; home: string; dir: string }> {
-  const [root, home, settings] = await Promise.all([host.session.root(), host.env.HOME(), host.settings.read()]);
-  return { root, home: home ?? "", dir: plansDirectory(settings["plansDirectory"], root, home ?? "") };
+async function where(host: Host): Promise<{ platform: Platform; root: string; home: string; dir: string }> {
+  const [root, env, settings] = await Promise.all([host.session.root(), envOf(host), host.settings.read()]);
+  const home = homeDir(env) ?? "";
+  const platform = inferPlatform(root, home);
+  return { platform, root, home, dir: plansDirectory(platform, settings["plansDirectory"], root, env) ?? UNRESOLVED_PLANS };
 }
 
 function startCursor(plan: Pick<Loaded, "pages">): number {
@@ -155,14 +159,14 @@ async function load(host: Host, path: string, keepPlace = false): Promise<void> 
 }
 
 async function listPlans(host: Host): Promise<void> {
-  const { home, dir } = await where(host);
+  const { platform, home, dir } = await where(host);
   try {
     const files = (await host.fs.exists(dir)) ? recentPlans(await host.fs.list(dir), dir) : [];
     await patchPane(host, (pane) => ({ ...pane, plans: { dir, files }, errors: { ...pane.errors, plans: null } }));
     const current = (await host.state.plan.get()).value?.path;
-    pick = Math.max(0, files.findIndex((file) => file.path === current));
+    pick = Math.max(0, files.findIndex((file) => current !== undefined && samePath(platform, file.path, current)));
   } catch (error) {
-    const failure = `Could not list ${tildePath(dir, home)}: ${reason(error)}`;
+    const failure = `Could not list ${tildePath(platform, dir, home)}: ${reason(error)}`;
     await patchPane(host, (pane) => ({ ...pane, plans: { dir, files: [] }, errors: { ...pane.errors, plans: failure } }));
   }
   mode = "plans";
@@ -202,8 +206,8 @@ export async function sync(host: Host): Promise<void> {
 export const command: Subcommand = async (host, e, args) => {
   if (args.trim() === "") await showBound(host);
   else {
-    const { root, home, dir } = await where(host);
-    await load(host, planTarget(args, home, root, dir));
+    const { platform, root, home, dir } = await where(host);
+    await load(host, planTarget(platform, args, home, root, dir));
   }
   const answer = await open(host, e, "plan");
   refocus(host, mode === "plans" ? `${PICK}${pick}` : `${ROW}${cursor}`);
@@ -376,7 +380,7 @@ function contentsView(host: Host, view: View, plan: Loaded): RenderElement[] {
   const below = list.total - end;
   return frame(view, {
     title: plan.title,
-    meta: `${lead}${fitMiddle(tildePath(plan.path, view.home), view.width - displayWidth(lead), ellipsis)}`,
+    meta: `${lead}${fitMiddle(tildePath(view.platform, plan.path, view.home), view.width - displayWidth(lead), ellipsis)}`,
     shortMeta: progress,
     above: start > 0 ? `  ${view.g.up} ${start} more` : "",
     below:
@@ -474,7 +478,7 @@ function plansView(host: Host, view: View, pane: State["pane"] | undefined, plan
   if (pane.errors.plans !== null) {
     return [noticeRow(view, { kind: "error", reason: pane.errors.plans }, words), keyRow(view, keys, KEY_GAP)];
   }
-  const dir = tildePath(listing.dir, view.home);
+  const dir = tildePath(view.platform, listing.dir, view.home);
   if (listing.files.length === 0) {
     const lead = plan === undefined ? "No plan is bound to this session. No plans in " : "No plans in ";
     const empty = `${lead}${fitMiddle(dir, view.width - displayWidth(lead) - 1, ellipsis)}.`;
@@ -529,7 +533,7 @@ function plansView(host: Host, view: View, pane: State["pane"] | undefined, plan
 
 function errorView(host: Host, view: View, plan: Extract<State["plan"], { error: string }>): RenderElement[] {
   const lead = "Could not read ";
-  const path = fitMiddle(tildePath(plan.path, view.home), view.width - 2 - lead.length, view.g.ellipsis);
+  const path = fitMiddle(tildePath(view.platform, plan.path, view.home), view.width - 2 - lead.length, view.g.ellipsis);
   return [
     noticeRow(view, { kind: "error", reason: `${lead}${path}` }, { loading: "", empty: "" }),
     view.kit.Text({ dimColor: true, children: [fitEnd(plan.error, view.width, view.g.ellipsis)] }),

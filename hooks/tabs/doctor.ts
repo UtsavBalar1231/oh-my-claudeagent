@@ -1,6 +1,6 @@
 import type { RenderElement } from "claude-code";
 import type { Fix } from "../../src/core/doctor-checks.ts";
-import { tildePath } from "../../src/core/plan-reader.ts";
+import { tildePath } from "../../src/core/path.ts";
 import { COLORS, displayWidth, fitEnd, KEYS, levelMark, padEnd } from "../../src/core/ui-kit.ts";
 import * as doctor from "../doctor.ts";
 import type { Host, State } from "../host.ts";
@@ -73,8 +73,8 @@ function appliedRows(view: View, applied: Applied): RenderElement[] {
   const shown = lines.slice(0, DIFF_ROWS);
   const { glyph, color } = levelMark("ok", view.g);
   return [
-    Text({ wrap: "wrap", children: [Text({ color, children: [`${glyph} `] }), `${FIXES[applied.fix].done} ${tildePath(applied.path, view.home)}`] }),
-    Text({ dimColor: true, wrap: "wrap", children: [`  Backup: ${tildePath(applied.backupPath, view.home)}`] }),
+    Text({ wrap: "wrap", children: [Text({ color, children: [`${glyph} `] }), `${FIXES[applied.fix].done} ${tildePath(view.platform, applied.path, view.home)}`] }),
+    Text({ dimColor: true, wrap: "wrap", children: [`  Backup: ${tildePath(view.platform, applied.backupPath, view.home)}`] }),
     ...shown.map((line, index) =>
       Text({ ...diffColor(line, index), children: [`  ${fitEnd(line, view.width - 2, ellipsis)}`] }),
     ),

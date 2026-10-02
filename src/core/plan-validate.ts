@@ -1,3 +1,4 @@
+import { baseName, SHAPE_PLATFORM } from "./path.ts";
 import { isPlanPath } from "./plan-path.ts";
 import { inputText } from "./tool-input.ts";
 
@@ -15,7 +16,7 @@ export function planWriteDenial(tool: string, input: unknown): string | undefine
   if (!isPlanPath(filePath)) return undefined;
   const body = inputText(input, tool === "Write" ? "content" : "new_string");
   // An Edit replaces part of a plan, so only one that rewrites a plan heading is judged as a whole plan.
-  const isNamedPlan = tool === "Write" && AGENT_PLAN_NAME.test(filePath.slice(filePath.lastIndexOf("/") + 1));
+  const isNamedPlan = tool === "Write" && AGENT_PLAN_NAME.test(baseName(SHAPE_PLATFORM, filePath));
   if (!(PLAN_HEADING.test(body) || isNamedPlan) || NUMBERED_TASK.test(body)) return undefined;
   return `[PLAN-CHECKBOX-VERIFY] Plan file ${filePath} has no numbered task checkbox. Write each task as \`- [ ] 1. <task>\`; plan progress and the Stop hooks count only numbered checkboxes.`;
 }

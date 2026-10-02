@@ -1,3 +1,5 @@
+import { configDir, type Env, expandTilde, homeDir, isAbsolutePath, isInside, joinPath, normalizePath, type Platform, toPosix } from "./path.ts";
+
 export type Task = { n: number; done: boolean };
 export type Page = { title: string; level: number; body: string; task?: Task };
 export type Plan = { title: string; pages: Page[]; done: number; total: number };
@@ -113,36 +115,26 @@ export function firstOpenTask(plan: { readonly pages: readonly Page[] }): number
   return open >= 0 ? open : (readable(plan)[0] ?? 0);
 }
 
-export function tildePath(path: string, home: string): string {
-  return home !== "" && path.startsWith(`${home}/`) ? `~${path.slice(home.length)}` : path;
-}
-
-function normalize(path: string): string {
-  const parts: string[] = [];
-  for (const part of path.split("/")) {
-    if (part === "" || part === ".") continue;
-    if (part === "..") parts.pop();
-    else parts.push(part);
-  }
-  return `/${parts.join("/")}`;
-}
-
 // `plansDirectory` resolves against the project root, and the client keeps its default,
-// `~/.claude/plans`, when the setting is unset or resolves outside the root.
-export function plansDirectory(setting: unknown, root: string, home: string): string {
-  const fallback = `${home}/.claude/plans`;
+// `<config dir>/plans`, when the setting is unset or resolves outside the root. It is undefined
+// when that default cannot be located.
+export function plansDirectory(platform: Platform, setting: unknown, root: string, env: Env): string | undefined {
+  const config = configDir(env);
+  const fallback = config === undefined ? undefined : joinPath(platform, config, "plans");
   if (typeof setting !== "string" || setting.trim() === "") return fallback;
-  const resolved = normalize(setting.startsWith("/") ? setting : `${root}/${setting}`);
-  const base = normalize(root);
-  return resolved === base || resolved.startsWith(`${base}/`) ? resolved : fallback;
+  const expanded = expandTilde(platform, setting.trim(), homeDir(env));
+  if (expanded === undefined) return fallback;
+  const resolved = isAbsolutePath(platform, expanded) ? normalizePath(platform, expanded) : joinPath(platform, root, expanded);
+  return isInside(platform, root, resolved) ? resolved : fallback;
 }
 
-export function planTarget(argument: string, home: string, root: string, dir: string): string {
+export function planTarget(platform: Platform, argument: string, home: string, root: string, dir: string): string {
   const wanted = argument.trim();
-  if (wanted.startsWith("~/")) return `${home}/${wanted.slice(2)}`;
-  if (wanted.startsWith("/")) return wanted;
-  if (wanted.includes("/")) return normalize(`${root}/${wanted}`);
-  return `${dir}/${wanted.endsWith(".md") ? wanted : `${wanted}.md`}`;
+  const expanded = expandTilde(platform, wanted, home);
+  if (expanded !== wanted) return expanded ?? wanted;
+  if (isAbsolutePath(platform, wanted)) return wanted;
+  if (toPosix(platform, wanted).includes("/")) return joinPath(platform, root, wanted);
+  return joinPath(platform, dir, wanted.endsWith(".md") ? wanted : `${wanted}.md`);
 }
 
 export function recentPlans(

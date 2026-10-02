@@ -1,14 +1,14 @@
 {
   "statusLine": {
     "type": "command",
-    "command": "\"@BUN@\" \"@HOME@/.claude/omca/statusline.ts\"",
+    "command": "@BUN@ @HOME@/.claude/omca/statusline.ts",
     "padding": 1,
     "refreshInterval": 5,
     "hideVimModeIndicator": true
   },
   "subagentStatusLine": {
     "type": "command",
-    "command": "\"@BUN@\" \"@HOME@/.claude/omca/statusline.ts\" --subagent"
+    "command": "@BUN@ @HOME@/.claude/omca/statusline.ts --subagent"
   },
   "theme": "dark"
 }

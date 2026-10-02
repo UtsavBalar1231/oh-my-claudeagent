@@ -1,12 +1,15 @@
 import type { TurnUsage } from "claude-code";
 import { expect, type Plugin, test } from "claude-code/testing";
+import { joinPath } from "../../src/core/path.ts";
 import { usableColumns } from "../../src/core/ui-kit.ts";
 import {
   BOULDER,
   bodyColumns,
   cellsAcross,
+  LAYOUTS,
   LEDGER,
   pane,
+  POSIX,
   ROOT,
   rows,
   run,
@@ -197,20 +200,31 @@ test("each tab key shows its tab, on the terminal and the desktop", async ($, on
   }
 });
 
-test("/omca plan opens the Plan tab on the bound plan, a name in plansDirectory, or a path", async ($, on) => {
-  const w = world(on, FILES, { plansDirectory: "./plans" });
-  const meta = { type: "Text", text: `12/46 tasks done · ${PLAN_PATH}` } as const;
+for (const layout of LAYOUTS) {
+  const planPath = joinPath(layout.platform, layout.root, "plans", "sample.md");
+  const spellings = layout === POSIX ? [planPath] : [planPath, planPath.replaceAll("/", "\\")];
 
-  for (const args of ["plan", "plan sample", "plan plans/sample.md", `plan ${PLAN_PATH}`]) {
-    w.opened.length = 0;
-    expect(await $.command.run(run(args))).toEqual({});
-    expect(w.opened).toEqual([{ id: "omca", title: "OMCA", focus: true, closeOnEscape: true, rows: 12, columns: 56 }]);
-    const ui = await $.ui.mount(pane("terminal"));
-    expect(await ui.find(meta)).toBeDefined();
-    expect((await ui.find({ key: `row-${pageOf(13)}` }))?.props["autoFocus"]).toBe(true);
-    await ui.unmount();
-  }
-});
+  test(`/omca plan opens the Plan tab on the bound plan, a name in plansDirectory, or a path${layout === POSIX ? "" : ` (${layout.name})`}`, async ($, on) => {
+    const bound = { plans: { sample: { active_plan: planPath } }, bindings: { [SESSION]: { plan_name: "sample" } } };
+    const w = world(on, { [planPath]: PLAN, [layout.boulder]: JSON.stringify(bound) }, { plansDirectory: "./plans" }, {}, layout);
+    const wanted: (readonly [string, string])[] = [
+      ["plan", planPath],
+      ["plan sample", planPath],
+      ["plan plans/sample.md", planPath],
+      ...spellings.map((spelling): readonly [string, string] => [`plan ${spelling}`, spelling]),
+    ];
+
+    for (const [args, shown] of wanted) {
+      w.opened.length = 0;
+      expect(await $.command.run(run(args))).toEqual({});
+      expect(w.opened).toEqual([{ id: "omca", title: "OMCA", focus: true, closeOnEscape: true, rows: 12, columns: 56 }]);
+      const ui = await $.ui.mount(pane("terminal"));
+      expect(await ui.find({ type: "Text", text: `12/46 tasks done · ${shown}` }), args).toBeDefined();
+      expect((await ui.find({ key: `row-${pageOf(13)}` }))?.props["autoFocus"]).toBe(true);
+      await ui.unmount();
+    }
+  });
+}
 
 test("n, p and t page through the plan, and t returns to the row the pages came from", async ($, on) => {
   const w = world(on, FILES);

@@ -54,13 +54,14 @@ echo '{"model": {"display_name": "Opus 5.5"}, "context_window": {"used_percentag
 ```
 
 `/oh-my-claudeagent:omca-setup` registers it. It copies `launcher.ts` to
-`~/.claude/omca/statusline.ts` and, after you confirm the printed diff, sets the `statusLine` key
-in `~/.claude/settings.json`:
+`~/.claude/omca/statusline.ts` (under `CLAUDE_CONFIG_DIR` when it is set) and, after you confirm
+the printed diff, sets the `statusLine` key in `~/.claude/settings.json`. Both paths are written
+in forward-slash form and double-quoted, so a path with spaces or a Windows drive survives:
 
 ```json
 "statusLine": {
   "type": "command",
-  "command": "/home/you/.bun/bin/bun /home/you/.claude/omca/statusline.ts",
+  "command": "\"/home/you/.bun/bin/bun\" \"/home/you/.claude/omca/statusline.ts\"",
   "padding": 1,
   "refreshInterval": 5,
   "hideVimModeIndicator": true
@@ -181,7 +182,7 @@ the same launcher with `--subagent`, which setup writes beside `statusLine`:
 ```json
 "subagentStatusLine": {
   "type": "command",
-  "command": "/home/you/.bun/bin/bun /home/you/.claude/omca/statusline.ts --subagent"
+  "command": "\"/home/you/.bun/bin/bun\" \"/home/you/.claude/omca/statusline.ts\" --subagent"
 }
 ```
 
