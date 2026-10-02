@@ -7,3 +7,6 @@
 # Test fixture .env content asserting the sensitive-file denylist blocks access.
 # "hunter2" is a well-known fake password used in test fixtures, not a real secret.
 servers/tests/test_filesystem.py:SECRET=hunter2\n
+
+# Dummy key handed to a claude process pointed at the local mock Messages API server.
+scripts/qa/mock-model-e2e.sh:ANTHROPIC_API_KEY=mock-key

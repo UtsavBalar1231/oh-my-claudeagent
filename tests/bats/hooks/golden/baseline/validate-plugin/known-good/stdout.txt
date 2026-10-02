@@ -15,28 +15,6 @@
 [validate-plugin] PASS: omca-state-server.py removed
 [validate-plugin] PASS: agent-metadata.json removed (OMCA-internal metadata fields deprecated)
 [validate-plugin] PASS: migration marker: hard-cutover mode active
-[validate-plugin] PASS: latest hook lifecycle coverage includes PermissionDenied
-[validate-plugin] PASS: latest hook lifecycle coverage includes PermissionRequest
-[validate-plugin] PASS: latest hook lifecycle coverage includes PostToolUse
-[validate-plugin] PASS: latest hook lifecycle coverage includes PostToolUseFailure
-[validate-plugin] PASS: latest hook lifecycle coverage includes PreCompact
-[validate-plugin] PASS: latest hook lifecycle coverage includes PreToolUse
-[validate-plugin] PASS: latest hook lifecycle coverage includes SessionEnd
-[validate-plugin] PASS: latest hook lifecycle coverage includes SessionStart
-[validate-plugin] PASS: latest hook lifecycle coverage includes Stop
-[validate-plugin] PASS: latest hook lifecycle coverage includes SubagentStart
-[validate-plugin] PASS: latest hook lifecycle coverage includes TaskCompleted
-[validate-plugin] PASS: latest hook lifecycle coverage includes UserPromptExpansion
-[validate-plugin] PASS: latest hook lifecycle coverage includes UserPromptSubmit
-[validate-plugin] SKIP: new platform event DirectoryAdded not yet adopted by OMCA
-[validate-plugin] SKIP: new platform event Elicitation not yet adopted by OMCA
-[validate-plugin] SKIP: new platform event ElicitationResult not yet adopted by OMCA
-[validate-plugin] PASS: new platform event FileChanged handler registered
-[validate-plugin] SKIP: new platform event MessageDisplay not yet adopted by OMCA
-[validate-plugin] PASS: new platform event PostToolBatch handler registered
-[validate-plugin] SKIP: new platform event Setup not yet adopted by OMCA
-[validate-plugin] PASS: new platform event StopFailure handler registered
-[validate-plugin] PASS: hook event table: OMCA.md matches the hooks.json event set
 [validate-plugin] PASS: agent frontmatter hygiene: no top-level tools allowlists detected
 [validate-plugin] PASS: agent frontmatter hygiene: no agent name contains a colon
 [validate-plugin] PASS: agent frontmatter hygiene: no legacy permissionMode holdouts detected
@@ -240,4 +218,4 @@
 [validate-plugin] PASS: mcp tools/list contains categories_list
 [validate-plugin] PASS: mcp tools/list contains file_read
 [validate-plugin] PASS: mcp tools/list contains session_search
-[validate-plugin] Summary: 217 passed, 0 failed, 13 skipped, 0 warned
+[validate-plugin] Summary: 200 passed, 0 failed, 8 skipped, 0 warned

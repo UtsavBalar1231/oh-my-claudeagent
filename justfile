@@ -84,6 +84,12 @@ test-opencode:
 test-mod:
 	claude plugin test .
 
+# Run the bun spec files (*.spec.ts) under the explicit roots; bun test also collects
+# *.test.ts, so a bare `bun test` would load mod tests that need the engine's test module.
+[group('test')]
+test-bun:
+	bun test src servers statusline scripts opencode
+
 # Run pytest suites for both Python projects. Split invocations for the same reason as
 # lint-python: servers/ and statusline/ are separate uv projects with their own configs
 # and their own dev dependencies, so one pytest run cannot cover both.
@@ -283,9 +289,9 @@ test-all: test test-bats test-pytest test-mcp
 
 # ── CI ────────────────────────────────────────────────────────────
 
-# Run full CI pipeline (format check + lint + typecheck + test + mcp + manifest + opencode)
+# Run full CI pipeline (format check + lint + typecheck + test + mcp + manifest + opencode + TypeScript checks)
 [group('ci')]
-ci: fmt-check lint typecheck test test-bats test-pytest test-mcp validate-manifest test-opencode
+ci: fmt-check lint typecheck test test-bats test-pytest test-mcp validate-manifest test-opencode typecheck-ts test-mod test-bun validate-mod
 
 # ── Release ──────────────────────────────────────────────────────
 

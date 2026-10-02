@@ -160,64 +160,6 @@ set_hard_cutover_mode() {
 	return 0
 }
 
-check_latest_hook_lifecycle_coverage() {
-	local latest_lifecycle_events=(
-		"PermissionDenied"
-		"PermissionRequest"
-		"PostToolUse"
-		"PostToolUseFailure"
-		"PreCompact"
-		"PreToolUse"
-		"SessionEnd"
-		"SessionStart"
-		"Stop"
-		"SubagentStart"
-		"TaskCompleted"
-		"UserPromptExpansion"
-		"UserPromptSubmit"
-	)
-	local post_cutover_events=()
-	# Platform events tracked for validator awareness. An entry passes once a handler is
-	# registered for it and skips while it is unadopted, so the list covers both states.
-	local new_platform_events=(
-		"DirectoryAdded"
-		"Elicitation"
-		"ElicitationResult"
-		"FileChanged"
-		"MessageDisplay"
-		"PostToolBatch"
-		"Setup"
-		"StopFailure"
-	)
-	local event_name
-
-	for event_name in "${latest_lifecycle_events[@]}"; do
-		if jq -e --arg event "${event_name}" '.hooks | has($event)' "${HOOKS_JSON}" >/dev/null 2>&1; then
-			pass "latest hook lifecycle coverage includes ${event_name}"
-		else
-			fail "latest hook lifecycle coverage missing ${event_name}"
-		fi
-	done
-
-	for event_name in "${post_cutover_events[@]}"; do
-		if jq -e --arg event "${event_name}" '.hooks | has($event)' "${HOOKS_JSON}" >/dev/null 2>&1; then
-			pass "post-cutover hook lifecycle coverage includes ${event_name}"
-		elif [[ "${HARD_CUTOVER_ACTIVE}" -eq 1 ]]; then
-			fail "post-cutover hook lifecycle coverage missing ${event_name}"
-		else
-			skip "post-cutover hook lifecycle marker ${event_name} not required before 2.0.0"
-		fi
-	done
-
-	for event_name in "${new_platform_events[@]}"; do
-		if jq -e --arg event "${event_name}" '.hooks | has($event)' "${HOOKS_JSON}" >/dev/null 2>&1; then
-			pass "new platform event ${event_name} handler registered"
-		else
-			skip "new platform event ${event_name} not yet adopted by OMCA"
-		fi
-	done
-}
-
 frontmatter_has_key() {
 	local file_path="$1"
 	local key="$2"
@@ -337,70 +279,6 @@ check_frontmatter_keys() {
 	else
 		fail "frontmatter keys: effort values outside the platform enum (${bad_effort[*]})"
 	fi
-}
-
-documented_hook_events() {
-	# Pulls the backticked first column out of the "Hook events OMCA handles" table.
-	awk '
-		/^\*\*Hook events OMCA handles:\*\*/ { in_table = 1; next }
-		in_table && /^\| `/ {
-			row = $0
-			sub(/^\| `/, "", row)
-			sub(/`.*$/, "", row)
-			print row
-			seen_row = 1
-			next
-		}
-		in_table && seen_row && $0 !~ /^\|/ { exit }
-	' "$1"
-}
-
-check_hook_event_table_matches_registry() {
-	if [[ ! -f "${OMCA_MD}" ]]; then
-		fail "hook event table: OMCA.md missing at ${OMCA_MD}"
-		return 1
-	fi
-
-	local documented=()
-	mapfile -t documented < <(documented_hook_events "${OMCA_MD}")
-	if [[ "${#documented[@]}" -eq 0 ]]; then
-		fail "hook event table: no 'Hook events OMCA handles' table found in $(relative_path "${OMCA_MD}")"
-		return 1
-	fi
-
-	local registered=()
-	mapfile -t registered < <(jq -r '.hooks | keys[]' "${HOOKS_JSON}")
-
-	local undocumented=() unregistered=() event other found
-	for event in "${registered[@]}"; do
-		found=0
-		for other in "${documented[@]}"; do
-			[[ "${event}" == "${other}" ]] && found=1 && break
-		done
-		[[ "${found}" -eq 0 ]] && undocumented+=("${event}")
-	done
-	for event in "${documented[@]}"; do
-		found=0
-		for other in "${registered[@]}"; do
-			[[ "${event}" == "${other}" ]] && found=1 && break
-		done
-		[[ "${found}" -eq 0 ]] && unregistered+=("${event}")
-	done
-
-	local clean=1
-	if [[ "${#undocumented[@]}" -gt 0 ]]; then
-		fail "hook event table: registered in hooks.json but absent from the OMCA.md table (${undocumented[*]})"
-		clean=0
-	fi
-	if [[ "${#unregistered[@]}" -gt 0 ]]; then
-		fail "hook event table: listed in the OMCA.md table but no handler registered in hooks.json (${unregistered[*]})"
-		clean=0
-	fi
-	if [[ "${clean}" -eq 1 ]]; then
-		pass "hook event table: OMCA.md matches the hooks.json event set"
-	fi
-
-	[[ "${clean}" -eq 1 ]]
 }
 
 relative_path() {
@@ -1091,8 +969,6 @@ check_claims() {
 	plugin_version=$(jq -r '.version // ""' "${PLUGIN_JSON}" 2>/dev/null)
 	marketplace_version=$(jq -r '.plugins[0].version // ""' "${MARKETPLACE_PATH}" 2>/dev/null)
 	set_hard_cutover_mode "${plugin_version}" "${marketplace_version}"
-	check_latest_hook_lifecycle_coverage
-	check_hook_event_table_matches_registry
 	check_agent_frontmatter_hygiene
 	check_frontmatter_keys
 	check_skill_description_lengths

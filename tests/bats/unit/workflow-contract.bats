@@ -24,6 +24,10 @@
 # | test-mcp    | bash scripts/validate-plugin.sh --check mcp                        | identical invocation |
 # | validate-manifest | claude plugin validate . --strict                             | identical invocation; the recipe's `command -v claude` guard makes it skip locally, so CI installs the CLI to keep the step enforcing |
 # | test-opencode | bun test opencode/                                               | identical invocation; the recipe skips without bun or opencode, so CI installs both to keep the step enforcing |
+# | typecheck-ts | bun x tsc --noEmit -p tsconfig.runtime.json                         | identical invocation; the recipe's first line checks the mod project, and CI runs both lines |
+# | test-mod    | claude plugin test .                                                | identical invocation; CI installs the pinned Claude Code the command needs |
+# | test-bun    | bun test src servers statusline scripts opencode                    | identical invocation; explicit roots keep bun from collecting the mod's *.test.ts files |
+# | validate-mod | claude plugin validate .claude-plugin/plugin.json                  | the recipe drops --strict while a local CLAUDE.md exists; CI has none and passes --strict |
 
 load '../test_helper'
 
@@ -87,6 +91,10 @@ _step_pattern() {
 		test-mcp) echo "bash scripts/validate-plugin.sh --check mcp" ;;
 		validate-manifest) echo "claude plugin validate . --strict" ;;
 		test-opencode) echo "bun test opencode/" ;;
+		typecheck-ts) echo "bun x tsc --noEmit -p tsconfig.runtime.json" ;;
+		test-mod) echo "claude plugin test ." ;;
+		test-bun) echo "bun test src servers statusline scripts opencode" ;;
+		validate-mod) echo "claude plugin validate .claude-plugin/plugin.json" ;;
 		*) echo "" ;;
 	esac
 }
@@ -94,7 +102,7 @@ _step_pattern() {
 @test "just ci recipe chain resolves to the expected leaf steps" {
 	local steps
 	steps=$(_resolve_leaf_steps ci "$CLAUDE_PLUGIN_ROOT/justfile" | sort -u | tr '\n' ' ')
-	[ "$steps" = "fmt-check lint-python lint-shell test test-bats test-mcp test-opencode test-pytest typecheck validate-manifest " ]
+	[ "$steps" = "fmt-check lint-python lint-shell test test-bats test-bun test-mcp test-mod test-opencode test-pytest typecheck typecheck-ts validate-manifest validate-mod " ]
 }
 
 @test "every just ci leaf step has a pinned ci.yml coverage pattern" {
