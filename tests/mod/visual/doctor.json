@@ -1,0 +1,4 @@
+{
+  "command": "/omca doctor",
+  "fixture": "doctor"
+}

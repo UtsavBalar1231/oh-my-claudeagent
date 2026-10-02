@@ -1,3 +1,191 @@
-import type { Features } from "./dispatch.ts";
+import {
+  addRefreshInterval,
+  doctorChecks,
+  type Fix,
+  type HookState,
+  removeSetupBlock,
+  unifiedDiff,
+} from "../src/core/doctor-checks.ts";
+import { tildePath } from "../src/core/plan-reader.ts";
+import { isSafeSessionId } from "../src/core/session-id.ts";
+import { update } from "./agents-tracker.ts";
+import type { Host, State } from "./host.ts";
+import { reason } from "./pane.ts";
 
-export const doctor: Features = {};
+type Doctor = State["doctor"];
+
+const RUN_TIMEOUT_MS = 10_000;
+const REWRITE: Readonly<Record<Fix, (text: string) => string | undefined>> = {
+  "remove-setup-block": removeSetupBlock,
+  "add-refresh-interval": addRefreshInterval,
+};
+
+const seen = new Map<Fix, { path: string; text: string }>();
+let isBusy = false;
+
+const patch = (host: Host, change: Partial<Doctor>) =>
+  update(host.state.doctor, (doctor) => ({
+    isRunning: false,
+    checks: [],
+    applied: null,
+    error: null,
+    ranAt: 0,
+    ...doctor,
+    ...change,
+  }));
+
+async function where(host: Host): Promise<{ home: string; settings: string; claudeMd: string }> {
+  const [config, home = ""] = await Promise.all([host.env.CLAUDE_CONFIG_DIR(), host.env.HOME()]);
+  const dir = config !== undefined && config !== "" ? config : `${home}/.claude`;
+  return { home, settings: `${dir}/settings.json`, claudeMd: `${dir}/CLAUDE.md` };
+}
+
+async function readIfPresent(host: Host, path: string): Promise<string | null> {
+  return (await host.fs.exists(path)) ? host.fs.read(path) : null;
+}
+
+async function output(host: Host, argv: readonly string[]): Promise<string | null> {
+  try {
+    const { exitCode, stdout } = await host.process.run(argv, { timeoutMs: RUN_TIMEOUT_MS });
+    return exitCode === 0 ? stdout.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+async function astGrep(host: Host): Promise<{ name: string; version: string } | null> {
+  for (const name of ["ast-grep", "sg"]) {
+    const text = await output(host, [name, "--version"]);
+    if (text?.startsWith("ast-grep ")) return { name, version: text.slice("ast-grep ".length) };
+  }
+  return null;
+}
+
+async function modVersion(host: Host): Promise<string | null> {
+  try {
+    const manifest: unknown = JSON.parse(await host.fs.read(`${host.plugin.root}/.claude-plugin/plugin.json`));
+    const version = typeof manifest === "object" && manifest !== null && "version" in manifest ? manifest.version : null;
+    return typeof version === "string" ? version : null;
+  } catch {
+    return null;
+  }
+}
+
+async function hookState(host: Host): Promise<HookState> {
+  const id = await host.session.id();
+  if (!isSafeSessionId(id)) return { kind: "unsafe-id" };
+  try {
+    const text = await readIfPresent(host, `${await host.session.root()}/.omca/state/session/${id}.json`);
+    const status: unknown = text === null ? null : JSON.parse(text);
+    const at = typeof status === "object" && status !== null && "last_hook_at" in status ? status.last_hook_at : null;
+    return typeof at === "number" ? { kind: "seen", lastHookAt: at } : { kind: "missing" };
+  } catch (error) {
+    return { kind: "unreadable", reason: reason(error) };
+  }
+}
+
+async function check(host: Host): Promise<Doctor["checks"]> {
+  const paths = await where(host);
+  const [mod, engine, bun, ast, hook, now, settings, userSettings, claudeMd] = await Promise.all([
+    modVersion(host),
+    host.session.version(),
+    output(host, ["bun", "--version"]),
+    astGrep(host),
+    hookState(host),
+    host.clock.now(),
+    host.settings.read(),
+    readIfPresent(host, paths.settings),
+    readIfPresent(host, paths.claudeMd),
+  ]);
+  const env = {
+    CLAUDE_CODE_SUBAGENT_MODEL_FORCE: await host.env.CLAUDE_CODE_SUBAGENT_MODEL_FORCE(),
+    CLAUDE_CODE_DISABLE_ADVISOR_TOOL: await host.env.CLAUDE_CODE_DISABLE_ADVISOR_TOOL(),
+    DISABLE_TELEMETRY: await host.env.DISABLE_TELEMETRY(),
+    DO_NOT_TRACK: await host.env.DO_NOT_TRACK(),
+    DISABLE_GROWTHBOOK: await host.env.DISABLE_GROWTHBOOK(),
+    CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: await host.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC(),
+  };
+  const checks = doctorChecks({
+    modVersion: mod,
+    engineVersion: engine.base ?? engine.version,
+    bunVersion: bun,
+    astGrep: ast,
+    hook,
+    now,
+    settings,
+    env,
+    userSettings,
+    claudeMd: { path: tildePath(paths.claudeMd, paths.home), text: claudeMd },
+  });
+  seen.clear();
+  for (const { fix } of checks) {
+    if (fix === "remove-setup-block" && claudeMd !== null) seen.set(fix, { path: paths.claudeMd, text: claudeMd });
+    if (fix === "add-refresh-interval" && userSettings !== null) seen.set(fix, { path: paths.settings, text: userSettings });
+  }
+  return checks;
+}
+
+export const markRunning = (host: Host): Promise<void> => patch(host, { isRunning: true, error: null });
+
+async function runChecks(host: Host): Promise<void> {
+  await markRunning(host);
+  host.ui.invalidate();
+  try {
+    const checks = await check(host);
+    await patch(host, { isRunning: false, checks, ranAt: await host.clock.now() });
+  } catch (error) {
+    await patch(host, { isRunning: false, checks: [], error: `The checks failed: ${reason(error)}`, ranAt: await host.clock.now() });
+  }
+  host.ui.invalidate();
+}
+
+async function applyFix(host: Host, fix: Fix): Promise<string | null> {
+  const target = seen.get(fix);
+  if (target === undefined) return "Nothing to fix; press r to run the checks again";
+  const { home } = await where(host);
+  const label = tildePath(target.path, home);
+  const backup = `${target.path}.omca-bak`;
+  let current: string;
+  try {
+    current = await host.fs.read(target.path);
+  } catch (error) {
+    return `Could not read ${label}: ${reason(error)}`;
+  }
+  const after = current === target.text ? REWRITE[fix](current) : undefined;
+  if (after === undefined) return `${label} changed since the check, so it was left alone; press r to check again`;
+  try {
+    await host.fs.write(backup, current);
+  } catch (error) {
+    return `Could not write the backup ${tildePath(backup, home)}, so ${label} is unchanged: ${reason(error)}`;
+  }
+  try {
+    await host.fs.write(target.path, after);
+  } catch (error) {
+    return `Could not write ${label}: ${reason(error)}; ${tildePath(backup, home)} holds the original`;
+  }
+  const diff = unifiedDiff(tildePath(backup, home), label, current, after);
+  await patch(host, { applied: { fix, path: target.path, backupPath: backup, diff } });
+  return null;
+}
+
+async function exclusive(work: () => Promise<void>): Promise<void> {
+  if (isBusy) return;
+  isBusy = true;
+  try {
+    await work();
+  } finally {
+    isBusy = false;
+  }
+}
+
+export const run = (host: Host): Promise<void> => exclusive(() => runChecks(host));
+
+export const fix = (host: Host, which: Fix): Promise<void> =>
+  exclusive(async () => {
+    const error = await applyFix(host, which);
+    if (error === null) await runChecks(host);
+    else {
+      await patch(host, { error });
+      host.ui.invalidate();
+    }
+  });

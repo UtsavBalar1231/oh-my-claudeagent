@@ -20,6 +20,7 @@ function bindHost($: EngineInterface, options: Options): Host {
     log: (text) => $.ui.log(text, { to: "debug" }),
     env: {
       HOME: () => $.env.get("HOME"),
+      CLAUDE_CONFIG_DIR: () => $.env.get("CLAUDE_CONFIG_DIR"),
       OMCA_ASCII: () => $.env.get("OMCA_ASCII"),
       OMCA_DISABLED_HOOKS: () => $.env.get("OMCA_DISABLED_HOOKS"),
       OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY: () => $.env.get("OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY"),

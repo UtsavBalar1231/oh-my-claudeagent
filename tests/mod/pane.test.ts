@@ -187,7 +187,7 @@ test("each tab key shows its tab, on the terminal and the desktop", async ($, on
     await ui.press({ key: "6" });
     expect(await body()).toEqual(["No delegation statistics have been collected yet."]);
     await ui.press({ key: "7" });
-    expect(await body()).toEqual(["The doctor checks have not run in this session."]);
+    expect(await body()).toEqual(["The doctor checks have not run in this session.", "r: Run checks"]);
     await ui.press({ key: "1" });
     expect(await body()).toEqual(["No subagent has run in this session yet."]);
     await ui.unmount();

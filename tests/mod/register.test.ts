@@ -85,6 +85,7 @@ test("the module registers exactly the dispatchers, env reads and atoms of the c
           "CLAUDE_CODE_DISABLE_ADVISOR_TOOL",
           "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
           "CLAUDE_CODE_SUBAGENT_MODEL_FORCE",
+          "CLAUDE_CONFIG_DIR",
           "DISABLE_GROWTHBOOK",
           "DISABLE_TELEMETRY",
           "DO_NOT_TRACK",
