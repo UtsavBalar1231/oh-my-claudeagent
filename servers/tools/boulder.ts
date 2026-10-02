@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { asRegistry, type PlanEntry, type Registry, resolveBoundPlan } from "../../src/core/boulder.ts";
 import { checkboxStates, nextTaskLabel, planIsComplete } from "../../src/core/checkboxes.ts";
 import { latestSessionId } from "../hooks/session-state.ts";
-import { ensureStateDir, projectRoot, withLock, writeFileAtomic } from "../io.ts";
+import { ensureStateDir, projectRoot, tryWithLockSync, withLock, writeFileAtomic } from "../io.ts";
 import type { Tool } from "../omca.ts";
 
 export const GC_MAX_AGE_SECONDS = 7 * 24 * 3600;
@@ -108,6 +108,29 @@ export async function gcRegistry(root: string): Promise<PruneSummary> {
     if (summary.pruned_plans.length > 0 || summary.pruned_bindings.length > 0) writeRegistry(path, registry);
     return summary;
   });
+}
+
+/**
+ * Removes the binding of every session id `boulder_write` bound in this process. Runs inside a
+ * signal handler, so it never waits past `deadline`; a registry whose lock is busy until then
+ * keeps its bindings, which the start-time and write-time GC reclaim.
+ */
+export function unbindBoundSessions(deadline: number): void {
+  for (const [root, sessionIds] of bound) {
+    const path = registryPath(root);
+    if (!existsSync(path)) continue;
+    const isDone = tryWithLockSync(
+      `${path}.lock`,
+      () => {
+        const registry = asRegistry(readRaw(path));
+        const before = Object.keys(registry.bindings).length;
+        for (const sessionId of sessionIds) delete registry.bindings[sessionId];
+        if (Object.keys(registry.bindings).length !== before) writeRegistry(path, registry);
+      },
+      Math.max(0, deadline - Date.now()),
+    );
+    if (!isDone) console.error(`omca: ${path}.lock stayed busy, so session ids ${[...sessionIds].join(", ")} stay bound`);
+  }
 }
 
 // Object.fromEntries defines keys as own data properties, so a name like `__proto__` is stored

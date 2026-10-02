@@ -140,15 +140,8 @@ function askedUserThisTurn(entries: readonly (Json | undefined)[]): boolean {
 const hasLiveBackgroundTask = (tasks: unknown): boolean =>
   Array.isArray(tasks) && tasks.some((task) => isObject(task) && !TERMINAL_TASK_STATUS.test(String(task.status ?? "running").toLowerCase()));
 
-function isFreshCompaction(root: string, nowSeconds: number): boolean {
-  let stamp: string;
-  try {
-    stamp = withoutTrailingNewlines(readFileSync(join(root, ".omca", "state", "last-compaction-at"), "utf8"));
-  } catch {
-    return false;
-  }
-  return /^\d+$/.test(stamp) && nowSeconds - Number(stamp) < COMPACTION_FRESH_SECONDS;
-}
+const isFreshCompaction = (session: Session | undefined, now: number): boolean =>
+  session?.compactedAt !== undefined && now - session.compactedAt < COMPACTION_FRESH_SECONDS * 1000;
 
 function isStaleBinding(root: string, boundAt: unknown, nowSeconds: number): boolean {
   if (typeof boundAt !== "number" || !Number.isInteger(boundAt) || boundAt < 0) return false;
@@ -172,7 +165,7 @@ const planContinuation: Gate = async (turn) => {
   }
   const nowSeconds = seconds(context.now);
   if (PAUSE_REQUEST.test(lastText(await turn.transcript(), "user").toLowerCase().replaceAll("'", ""))) return undefined;
-  if (isFreshCompaction(root, nowSeconds)) return undefined;
+  if (isFreshCompaction(session, context.now)) return undefined;
   if (isStaleBinding(root, plan.boundAt, nowSeconds)) return undefined;
   if (BLOCKING_QUESTIONS.test(await assistantText(turn)) || askedUserThisTurn(await turn.transcript())) return undefined;
   if (session === undefined) return undefined;

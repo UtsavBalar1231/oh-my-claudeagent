@@ -38,7 +38,6 @@ HARD_CUTOVER_ACTIVE=0
 
 MARKETPLACE_PATH="${DEFAULT_MARKETPLACE_JSON}"
 MARKETPLACE_OVERRIDE=0
-HOOK_CASE=""
 
 declare -a CHECKS=()
 
@@ -72,25 +71,12 @@ Usage: bash scripts/validate-plugin.sh [options]
 
 Options:
   --check <claims|hooks|mcp>   Run a specific check (repeatable)
-  --case <name>                Named hook scenario (supports: compaction-race)
   --marketplace <path>         Override marketplace JSON path
   --help                       Show this help text
 
 Defaults:
   - No --check flags -> runs claims, hooks, and mcp checks
-  - --case applies only to hooks checks
 USAGE
-}
-
-contains_check() {
-	local needle="$1"
-	local item
-	for item in "${CHECKS[@]}"; do
-		if [[ "${item}" == "${needle}" ]]; then
-			return 0
-		fi
-	done
-	return 1
 }
 
 validate_json_file() {
@@ -1115,114 +1101,6 @@ prepare_hook_fixture_repo() {
 	return 0
 }
 
-run_compaction_race_case() {
-	local payload_path="$1"
-	local project_root="$2"
-
-	local session_script="${REPO_ROOT}/scripts/session-init.sh"
-	local post_script="${REPO_ROOT}/scripts/post-compact-inject.sh"
-
-	if [[ ! -f "${session_script}" ]] || [[ ! -f "${post_script}" ]]; then
-		fail "compaction-race case requires session-init.sh and post-compact-inject.sh"
-		return 1
-	fi
-
-	mkdir -p "${project_root}/.omca/state" "${project_root}/.omca/logs"
-	printf 'fixture compaction context' >"${project_root}/.omca/state/compaction-context.md"
-
-	local race_dir
-	race_dir="$(mktemp -d)"
-	local session_out="${race_dir}/session.out"
-	local session_err="${race_dir}/session.err"
-	local post_out="${race_dir}/post.out"
-	local post_err="${race_dir}/post.err"
-	local post_second_out="${race_dir}/post-second.out"
-	local post_second_err="${race_dir}/post-second.err"
-	local session_context_file="${race_dir}/session-context.txt"
-	local post_context_file="${race_dir}/post-context.txt"
-
-	CLAUDE_PROJECT_ROOT="${project_root}" CLAUDE_PLUGIN_ROOT="${REPO_ROOT}" CLAUDE_SESSION_ID="race-session" bash "${session_script}" <"${payload_path}" >"${session_out}" 2>"${session_err}" &
-	local pid1=$!
-	CLAUDE_PROJECT_ROOT="${project_root}" CLAUDE_PLUGIN_ROOT="${REPO_ROOT}" CLAUDE_SESSION_ID="race-session" bash "${post_script}" <"${payload_path}" >"${post_out}" 2>"${post_err}" &
-	local pid2=$!
-
-	wait "${pid1}"
-	local status1=$?
-	wait "${pid2}"
-	local status2=$?
-
-	if [[ "${status1}" -ne 0 ]] || [[ "${status2}" -ne 0 ]]; then
-		fail "compaction-race case: scripts exited with non-zero status (${status1}, ${status2})"
-		rm -rf "${race_dir}"
-		return 1
-	fi
-
-	if [[ -s "${session_out}" ]] && ! jq . "${session_out}" >/dev/null 2>&1; then
-		fail "compaction-race case: session-init output is not valid JSON"
-		rm -rf "${race_dir}"
-		return 1
-	fi
-
-	if [[ -s "${post_out}" ]] && ! jq . "${post_out}" >/dev/null 2>&1; then
-		fail "compaction-race case: post-compact-inject output is not valid JSON"
-		rm -rf "${race_dir}"
-		return 1
-	fi
-
-	if [[ ! -s "${session_out}" ]]; then
-		fail "compaction-race case: session-init produced empty output"
-		rm -rf "${race_dir}"
-		return 1
-	fi
-
-	if [[ ! -s "${post_out}" ]]; then
-		fail "compaction-race case: first post-compact restore produced empty output"
-		rm -rf "${race_dir}"
-		return 1
-	fi
-
-	# Reverted helper migration: complex expression with output redirected to file, not stdout.
-	jq -r '.hookSpecificOutput.additionalContext // ""' "${session_out}" >"${session_context_file}"
-	jq -r '.hookSpecificOutput.additionalContext // ""' "${post_out}" >"${post_context_file}"
-
-	if grep -q 'Post-compaction state detected\|POST-COMPACTION CONTEXT RESTORE\|fixture compaction context' "${session_context_file}"; then
-		fail "compaction-race case: session-init still handled compaction restore content"
-		rm -rf "${race_dir}"
-		return 1
-	fi
-
-	if ! grep -q 'fixture compaction context' "${post_context_file}"; then
-		fail "compaction-race case: post-compact-inject did not restore compaction context"
-		rm -rf "${race_dir}"
-		return 1
-	fi
-
-	if [[ -f "${project_root}/.omca/state/compaction-context.md" ]]; then
-		fail "compaction-race case: compaction context file still exists after restore"
-		rm -rf "${race_dir}"
-		return 1
-	fi
-
-	CLAUDE_PROJECT_ROOT="${project_root}" CLAUDE_PLUGIN_ROOT="${REPO_ROOT}" CLAUDE_SESSION_ID="race-session" bash "${post_script}" >"${post_second_out}" 2>"${post_second_err}"
-	local status3=$?
-
-	if [[ "${status3}" -ne 0 ]]; then
-		fail "compaction-race case: second post-compact-inject exited with non-zero status (${status3})"
-		rm -rf "${race_dir}"
-		return 1
-	fi
-
-	if [[ -s "${post_second_out}" ]]; then
-		fail "compaction-race case: second post-compact-inject should not emit duplicate restore output"
-		rm -rf "${race_dir}"
-		return 1
-	fi
-
-	pass "compaction-race case executed with valid outputs"
-	rm -rf "${race_dir}"
-	return 0
-}
-
 check_mcp_tool_hook_server_names() {
 	log "Running mcp_tool hook server-name checks"
 
@@ -1332,7 +1210,6 @@ check_hooks() {
 
 	local pretool_write_payload="${tmp_root}/pretooluse-write.runtime.json"
 	local permission_payload="${HOOK_FIXTURES_DIR}/permissionrequest-bash.json"
-	local session_compact_payload="${HOOK_FIXTURES_DIR}/sessionstart-compact.json"
 
 	local existing_file="${tmp_root}/existing.txt"
 	touch "${existing_file}"
@@ -1341,25 +1218,11 @@ check_hooks() {
 	run_registered_hooks "PreToolUse Write" "PreToolUse" "Write" "${pretool_write_payload}" "${tmp_root}" "json-optional"
 	run_registered_hooks "PermissionRequest Bash" "PermissionRequest" "Bash" "${permission_payload}" "${tmp_root}" "json-optional"
 
-	printf 'compact fixture context' >"${tmp_root}/.omca/state/compaction-context.md"
-	run_registered_hooks "SessionStart compact" "SessionStart" "compact" "${session_compact_payload}" "${tmp_root}" "json-required"
-
 	local stop_payload="${HOOK_FIXTURES_DIR}/stop-basic.json"
 	run_registered_hooks "Stop default (no state)" "Stop" "" "${stop_payload}" "${tmp_root}" "json-optional"
 
 	local subagentstart_payload="${HOOK_FIXTURES_DIR}/subagentstart-basic.json"
 	run_registered_hooks "SubagentStart basic" "SubagentStart" "" "${subagentstart_payload}" "${tmp_root}" "json-required"
-
-	if [[ -n "${HOOK_CASE}" ]]; then
-		case "${HOOK_CASE}" in
-		compaction-race)
-			run_compaction_race_case "${session_compact_payload}" "${tmp_root}"
-			;;
-		*)
-			fail "Unsupported hook case '${HOOK_CASE}'. Supported: compaction-race"
-			;;
-		esac
-	fi
 
 	rm -rf "${tmp_root}"
 }
@@ -1465,15 +1328,6 @@ while [[ $# -gt 0 ]]; do
 			;;
 		esac
 		;;
-	--case)
-		if [[ -z "$2" ]]; then
-			log "Missing value for --case"
-			usage
-			exit 2
-		fi
-		HOOK_CASE="$2"
-		shift 2
-		;;
 	--marketplace)
 		if [[ -z "$2" ]]; then
 			log "Missing value for --marketplace"
@@ -1500,16 +1354,8 @@ if [[ ${#CHECKS[@]} -eq 0 ]]; then
 	CHECKS=("claims" "hooks" "mcp")
 fi
 
-if [[ -n "${HOOK_CASE}" ]] && ! contains_check "hooks"; then
-	log "--case applies only to hooks checks; include '--check hooks'"
-	exit 2
-fi
-
 log "Repository root: ${REPO_ROOT}"
 log "Requested checks: ${CHECKS[*]}"
-if [[ -n "${HOOK_CASE}" ]]; then
-	log "Hook case: ${HOOK_CASE}"
-fi
 if [[ "${MARKETPLACE_OVERRIDE}" -eq 1 ]]; then
 	log "Marketplace override: ${MARKETPLACE_PATH}"
 fi

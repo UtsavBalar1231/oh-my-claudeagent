@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, realpathSync, rmSync, statSync } from "node:fs";
+import { mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createDispatcher, type Handler } from "./jsonrpc.ts";
@@ -365,4 +365,53 @@ describe("shutdown", () => {
       expect(elapsed).toBeLessThan(100);
     });
   }
+
+  const OTHER_BINDING = { plan_name: "live", bound_at: Math.floor(Date.now() / 1000) };
+
+  async function bindAcrossClear(server: Server): Promise<string> {
+    await server.request("initialize", { protocolVersion: "2025-11-25", capabilities: {}, clientInfo: { name: "spec", version: "0" } });
+    server.send({ jsonrpc: "2.0", method: "notifications/initialized" });
+    const plan = join(server.project, "live.md");
+    writeFileSync(plan, "- [ ] 1. one\n");
+    const registry = join(server.project, ".omca", "state", "boulder.json");
+    writeFileSync(
+      registry,
+      JSON.stringify({ plans: { live: { active_plan: plan, started_at: "2026-10-02T10:00:00Z", session_ids: ["other"] } }, bindings: { other: OTHER_BINDING } }),
+    );
+    const call = (name: string, args: Message) => server.request("tools/call", { name, arguments: args });
+    await call("boulder_write", { active_plan: plan, plan_name: "live", session_id: "before-clear" });
+    await call("omca_hook", { event: "SessionStart", session_id: "after-clear", cwd: server.project, source: "clear" });
+    await call("boulder_write", { active_plan: plan, plan_name: "live", session_id: "" });
+    expect(Object.keys(JSON.parse(readFileSync(registry, "utf8")).bindings)).toEqual(["other", "before-clear", "after-clear"]);
+    return registry;
+  }
+
+  async function interrupt(server: Server): Promise<{ elapsed: number; stderr: string }> {
+    const sent = performance.now();
+    server.proc.kill("SIGINT");
+    expect(await server.proc.exited).toBe(0);
+    const elapsed = performance.now() - sent;
+    return { elapsed, stderr: await new Response(server.proc.stderr).text() };
+  }
+
+  test("SIGINT unbinds the session ids bound before and after /clear within 100 ms and leaves other sessions bound", async () => {
+    const server = startServer();
+    const registry = await bindAcrossClear(server);
+    const { elapsed } = await interrupt(server);
+    expect(elapsed).toBeLessThan(100);
+    const { plans, bindings } = JSON.parse(readFileSync(registry, "utf8"));
+    expect(bindings).toEqual({ other: OTHER_BINDING });
+    expect(plans.live.session_ids).toEqual(["other", "before-clear", "after-clear"]);
+  });
+
+  test("SIGINT with the registry lock held skips the unbind, says so, and still exits 0 within 100 ms", async () => {
+    const server = startServer();
+    const registry = await bindAcrossClear(server);
+    const before = readFileSync(registry, "utf8");
+    writeFileSync(`${registry}.lock`, `${process.pid} ${Date.now()} spec-holder`);
+    const { elapsed, stderr } = await interrupt(server);
+    expect(elapsed).toBeLessThan(100);
+    expect(readFileSync(registry, "utf8")).toBe(before);
+    expect(stderr).toBe(`omca: ${registry}.lock stayed busy, so session ids before-clear, after-clear stay bound\n`);
+  });
 });

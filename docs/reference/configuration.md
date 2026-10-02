@@ -76,8 +76,8 @@ is getting in the way during a specific session.
 Two reserved tokens, `all` and `*`, match every hook regardless of the rest of the list, so
 `OMCA_DISABLED_HOOKS=all` disables the whole set in one step.
 
-Hooks that honor `OMCA_DISABLED_HOOKS` (grep `hook_is_disabled` in `scripts/` for the live
-list; a hook not on it ignores the variable entirely):
+Hooks that honor `OMCA_DISABLED_HOOKS` (grep `isHookDisabled` in `servers/hooks/` and
+`hooks/` for the live list; a hook not on it ignores the variable entirely):
 
 | Hook basename | What it normally does |
 |---|---|
@@ -95,6 +95,8 @@ list; a hook not on it ignores the variable entirely):
 | `empty-task-response` | Advises when a delegated agent's report is empty or trivially short, or lacks the section headers its agent's output format requires. |
 | `subagent-context` | Injects the agent protocol, date, output mandate, role guidance, and the bound plan's context into every subagent when it starts. |
 | `permission-coach` | Tells the model it may retry after the auto-mode classifier denies a Bash command. |
+| `session-start` | After a compaction, re-injects the guidance template, the session id, and the bound plan's name, path, next open task and notepad line; after `/clear`, hands the guidance back to the session's next prompt. |
+| `compact` | Tells the compaction summarizer to keep the bound plan and its first ten open tasks. |
 
 Set the variable in your shell profile, in a wrapper script, or per-invocation, depending
 on whether the override should be permanent or one-off.

@@ -307,10 +307,10 @@ describe("plan continuation", () => {
   test("plan continuation: a compaction in the last minute allows Stop", async () => {
     const run = session();
     bind(run, UNCHECKED_PLAN);
-    const stamp = join(run.root, ".omca", "state", "last-compaction-at");
-    writeFileSync(stamp, `${NOW_S - 59}\n`);
+    const compact = (at: number) => dispatch({ event: "SessionStart", session_id: run.sessionId, cwd: run.root, source: "compact" }, run.root, at);
+    await compact(NOW - 59 * SECOND);
     expect(await run.stop()).toEqual({});
-    writeFileSync(stamp, `${NOW_S - 60}\n`);
+    await compact(NOW - 60 * SECOND);
     expect(await run.stop()).toEqual(CONTINUE);
   });
 

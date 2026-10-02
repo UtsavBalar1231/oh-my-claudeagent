@@ -6,7 +6,7 @@
 
 Registered here: `SessionStart`, `UserPromptSubmit`, `UserPromptExpansion`,
 `SubagentStart`, `PreToolUse`, `PermissionRequest`, `PermissionDenied`,
-`PostToolUse`, `PostToolUseFailure`, `Stop`, `TaskCompleted`, `PreCompact`, `SessionEnd`.
+`PostToolUse`, `PostToolBatch`, `PostToolUseFailure`, `Stop`, `TaskCompleted`.
 
 Regenerate that list with `jq -r '.hooks | keys[]' hooks/hooks.json`. Every other platform
 event is unregistered on purpose; `OMCA.md` carries the per-event reason.
@@ -14,7 +14,12 @@ event is unregistered on purpose; `OMCA.md` carries the per-event reason.
 ## Current runtime contract
 
 - `UserPromptSubmit` and `UserPromptExpansion` route to the server's `keyword-detector` and
-  `slash-mode-detector` handlers.
+  `slash-mode-detector` handlers, and both to its `guidance` handler, which injects the
+  guidance template, the session id and the bound plan's context on a session's first prompt.
+- `SessionStart` for `clear` or `compact` routes to the server's `session-start` handler,
+  which re-injects that context after a compaction and hands it back to the next prompt
+  after `/clear`. The mod's `session.compact` feature (`compact.ts`) tells the summarizer to
+  keep the bound plan and its open tasks.
 - `SubagentStart` routes to the server's `subagent-context` handler, and `PermissionDenied`
   to its `permission-coach` handler, which answers an auto-mode classifier denial of a Bash
   call with `retry: true`.
@@ -85,7 +90,6 @@ event is unregistered on purpose; `OMCA.md` carries the per-event reason.
   regions is how a guardrail becomes a hole, because a genuinely compound command could then
   hide its separator inside quotes. `tests/bats/hooks/permission_handlers.bats` pins the
   behavior so it cannot be "fixed" by accident.
-- Hook lifecycle ownership stays Claude-native. OMCA supplies the handlers: `type: command`
-  for every shell handler, plus `type: mcp_tool` handlers whose `tool` is
-  `omca_hook`. Query `hooks/hooks.json` for the current handler types rather than
-  assuming a single kind.
+- Hook lifecycle ownership stays Claude-native. OMCA supplies the mod's module and
+  `type: mcp_tool` handlers whose `tool` is `omca_hook`; no `type: command` handler
+  remains. Start-up pruning and the exit unbind run in the server process, not in a hook.

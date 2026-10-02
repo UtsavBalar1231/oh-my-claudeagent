@@ -1,9 +1,10 @@
 #!/usr/bin/env bun
 import { readFileSync } from "node:fs";
-import { ensureStateDir, exitHooks, projectRoot } from "./io.ts";
+import { ensureStateDir, projectRoot } from "./io.ts";
 import { createDispatcher, INVALID_PARAMS, isObject, RpcError, type Handler } from "./jsonrpc.ts";
+import { startWork } from "./lifecycle.ts";
 import { tools as astTools } from "./tools/ast.ts";
-import { tools as boulderTools } from "./tools/boulder.ts";
+import { tools as boulderTools, unbindBoundSessions } from "./tools/boulder.ts";
 import { tools as catalogTools } from "./tools/catalog.ts";
 import { tools as evidenceTools } from "./tools/evidence.ts";
 import { tools as filesystemTools } from "./tools/filesystem.ts";
@@ -112,13 +113,14 @@ const handlers: Record<string, Handler> = {
   "tools/call": callTool,
 };
 
+// The client sends SIGTERM 100 ms after SIGINT, so the unbind gives up on a busy lock well before then.
+const SHUTDOWN_LOCK_WAIT_MS = 50;
+
 function shutdown(): void {
-  for (const hook of exitHooks) {
-    try {
-      hook();
-    } catch (error) {
-      console.error("omca: exit hook failed:", error);
-    }
+  try {
+    unbindBoundSessions(Date.now() + SHUTDOWN_LOCK_WAIT_MS);
+  } catch (error) {
+    console.error("omca: unbinding this process's sessions at exit failed:", error);
   }
   process.exit(0);
 }
@@ -127,7 +129,9 @@ function shutdown(): void {
 // after the SIGINT, and never closes stdin. A killed tmux pane sends SIGHUP first.
 for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) process.on(signal, shutdown);
 
-ensureStateDir(projectRoot(process.cwd()));
+const root = projectRoot(process.cwd());
+ensureStateDir(root);
+void startWork(root, role !== "hooks");
 
 const feed = createDispatcher(handlers, (line) => process.stdout.write(line));
 process.stdin.setEncoding("utf8");

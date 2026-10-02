@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { resolveBoundPlan } from "../../src/core/boulder.ts";
+import { nextTaskLabel } from "../../src/core/checkboxes.ts";
 import type { Handler } from "./registry.ts";
 import type { Session } from "./session-state.ts";
 import { statusPath } from "./status-file.ts";
@@ -15,15 +16,37 @@ export function guidanceTemplate(): string {
 
 const isMissing = (error: unknown): boolean => error instanceof Error && "code" in error && error.code === "ENOENT";
 
-function planTitle(root: string, sessionId: string): string | undefined {
+type BoundPlan = { name: string; path: string; content: string };
+
+function readBoundPlan(root: string, sessionId: string): BoundPlan | undefined {
   try {
     const registry: unknown = JSON.parse(readFileSync(join(root, ".omca", "state", "boulder.json"), "utf8"));
     const plan = resolveBoundPlan(registry, sessionId, true);
-    return "plan_name" in plan && existsSync(plan.active_plan) ? `OMCA: ${plan.plan_name}` : undefined;
+    if (!("plan_name" in plan)) return undefined;
+    return { name: plan.plan_name, path: plan.active_plan, content: readFileSync(plan.active_plan, "utf8") };
   } catch (error) {
-    if (!isMissing(error)) console.error("omca: guidance could not read the plan registry for the session title:", error);
+    if (!isMissing(error)) console.error("omca: guidance could not read this session's bound plan:", error);
     return undefined;
   }
+}
+
+const planContext = ({ name, path, content }: BoundPlan): string =>
+  [
+    `[ACTIVE PLAN] ${name}: ${path}`,
+    `[NEXT TASK] ${nextTaskLabel(content) ?? "None open: every numbered task is checked."}`,
+    `[NOTEPAD] Record discoveries, decisions and blockers with notepad_write('${name}', section, content); the sections are learnings, issues, decisions and problems.`,
+  ].join("\n");
+
+/** The template, then the session's id and its bound plan when there is a session to name. */
+export function guidanceContext(root: string, sessionId: string | undefined): string {
+  if (sessionId === undefined) return guidanceTemplate();
+  const plan = readBoundPlan(root, sessionId);
+  return [guidanceTemplate(), `Session ${sessionId}`, ...(plan === undefined ? [] : [planContext(plan)])].join("\n");
+}
+
+function planTitle(root: string, sessionId: string): string | undefined {
+  const plan = readBoundPlan(root, sessionId);
+  return plan === undefined ? undefined : `OMCA: ${plan.name}`;
 }
 
 // `claude --resume` keeps the session id but starts a new server, whose first hook call for the
@@ -37,7 +60,7 @@ export const handle: Handler = (payload, { root, now, session }) => {
   if (session === undefined) return;
   session.promptAt = now;
   const isHeldBack = session.isGuided || isResumed(root, session);
-  const context = isHeldBack ? undefined : `${guidanceTemplate()}\nSession ${session.id}`;
+  const context = isHeldBack ? undefined : guidanceContext(root, session.id);
   session.isGuided = true;
   // A typed slash command raises UserPromptExpansion before UserPromptSubmit, and only
   // UserPromptSubmit can set the title, so the title waits for the session's first one.

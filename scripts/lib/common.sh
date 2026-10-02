@@ -30,23 +30,6 @@ HOOK_MODE_STATE_SUFFIX="-state.json"
 
 mkdir -p "${HOOK_STATE_DIR}" "${HOOK_LOG_DIR}" 2>/dev/null
 
-# Messages carry caller-supplied text: file paths, quoted findings, error
-# output. jq builds the record so a quote or backslash in that text cannot
-# break the line, which shell interpolation could not guarantee.
-log_hook_error() {
-	local msg="$1"
-	local hook_name="${2:-$(basename "$0")}"
-	jq -cn --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg hook "${hook_name}" --arg msg "${msg}" \
-		'{timestamp: $ts, hook: $hook, error: $msg}' >>"${HOOK_LOG_DIR}/hook-errors.jsonl" 2>/dev/null
-}
-
-log_hook_info() {
-	local msg="$1"
-	local hook_name="${2:-$(basename "$0")}"
-	jq -cn --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg hook "${hook_name}" --arg msg "${msg}" \
-		'{timestamp: $ts, level: "info", hook: $hook, message: $msg}' >>"${HOOK_LOG_DIR}/hook-info.jsonl" 2>/dev/null
-}
-
 epoch_ns() {
 	local ns
 	ns=$(date +%s%N 2>/dev/null)
@@ -72,36 +55,6 @@ mode_is_active() {
 	[[ "${status}" == "active" ]]
 }
 
-# Session path layout: ~/.claude/projects/<encoded-cwd>/<session-id>.jsonl
-# <encoded-cwd>: working directory with every non-alphanumeric char → "-"
-# (e.g. /home/user/my-project → -home-user-my-project; platform-applied, OMCA reads only)
-# Resolve session ID: tries CLAUDE_SESSION_ID env, HOOK_INPUT .session_id, session.json .sessionId.
-# Prints empty string (returns 0) when none found.
-resolve_session_id() {
-	local sid
-	for sid in "${CLAUDE_SESSION_ID:-}" \
-	           "$(jq -r '.session_id // ""' <<< "${HOOK_INPUT:-{}}" 2>/dev/null)" \
-	           "$(jq -r '.sessionId // ""' "${HOOK_STATE_DIR:-/nonexistent}/session.json" 2>/dev/null)"; do
-		case "${sid}" in
-			""|"null"|"unknown") continue ;;
-			*) printf '%s\n' "${sid}"; return 0 ;;
-		esac
-	done
-	return 0
-}
-
-# Read a JSON field with default. Returns default when file is absent or jq fails.
-# Usage: jq_read <file> <jq-expr-with-default>
-jq_read() {
-	local file="$1"
-	local expr="$2"
-	if [[ ! -f "${file}" ]]; then
-		jq -rn "${expr}" 2>/dev/null || true
-		return 0
-	fi
-	jq -r "${expr}" "${file}" 2>/dev/null || true
-}
-
 # Emit hookSpecificOutput JSON with JSON-escaped message.
 # Usage: emit_context <hookEventName> <plain-text-message>
 emit_context() {
@@ -123,31 +76,6 @@ hook_timing_log() {
 	ms=$(( (end_ns - start_ns) / 1000000 ))
 	echo "{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"hook\":\"$(basename "$0")\",\"ms\":${ms}}" \
 		>> "${HOOK_LOG_DIR}/hook-timing.jsonl" 2>/dev/null
-}
-
-# Resolve the canonical evidence file path: <root>/.omca/evidence/verification-evidence.json.
-# STATE_DIR is expected to be <root>/.omca/state.
-# Usage: EVIDENCE_FILE=$(resolve_evidence_file "${STATE_DIR}")
-resolve_evidence_file() {
-	local state_dir="$1"
-	local root
-	root="${state_dir%/state}"
-	printf '%s\n' "${root}/evidence/verification-evidence.json"
-}
-
-# Checks OMCA_DISABLED_HOOKS, a comma- and/or whitespace-separated list of
-# Usage: hook_is_disabled "final-verification-evidence" && exit 0
-hook_is_disabled() {
-	local name="$1"
-	local list="${OMCA_DISABLED_HOOKS:-}"
-	[[ -z "${list}" ]] && return 1
-	local padded=" ${list//,/ } "
-	[[ "${padded}" == *" all "* || "${padded}" == *" * "* ]] && return 0
-	local entry
-	for entry in ${list//,/ }; do
-		[[ "${entry}" == "${name}" ]] && return 0
-	done
-	return 1
 }
 
 # Blank out the characters that open a command position when they occur inside a

@@ -3,36 +3,6 @@
   "hooks": {
     "SessionStart": [
       {
-        "hooks": [
-          {
-            "type": "command",
-            "shell": "bash",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/gc-in-use-markers.sh\""
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "shell": "bash",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/session-init.sh\"",
-            "timeout": 5,
-            "statusMessage": "Loading OMCA session context"
-          }
-        ]
-      },
-      {
-        "matcher": "compact",
-        "hooks": [
-          {
-            "type": "command",
-            "shell": "bash",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/post-compact-inject.sh\""
-          }
-        ]
-      },
-      {
         "matcher": "clear|compact",
         "hooks": [
           {
@@ -268,30 +238,6 @@
         ]
       }
     ],
-    "PreCompact": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "shell": "bash",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/pre-compact.sh\"",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
-    "SessionEnd": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "shell": "bash",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/session-cleanup.sh\"",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
     "TaskCompleted": [
       {
         "hooks": [
@@ -310,18 +256,6 @@
               "tool_input": "${tool_input}",
               "tool_response": "${tool_response}"
             }
-          }
-        ]
-      }
-    ],
-    "FileChanged": [
-      {
-        "matcher": "verification-evidence.json|boulder.json",
-        "hooks": [
-          {
-            "type": "command",
-            "shell": "bash",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/file-changed-log.sh\""
           }
         ]
       }

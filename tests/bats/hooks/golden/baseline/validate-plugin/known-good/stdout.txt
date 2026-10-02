@@ -73,6 +73,7 @@
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/validate-plugin.sh'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
+[validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/register.ts'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'hooks/hooks.json'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'scripts/validate-plugin.sh'
 [validate-plugin] PASS: docs accuracy: OMCA.md references existing path 'statusline/core.py'
@@ -143,7 +144,7 @@
 [validate-plugin] PASS: mcp_tool hook 'omca_hook' server FQN 'plugin:oh-my-claudeagent:omca-hooks' matches plugin name + registered MCP server 'omca-hooks'
 [validate-plugin] PASS: mcp_tool hook 'omca_hook' server FQN 'plugin:oh-my-claudeagent:omca-hooks' matches plugin name + registered MCP server 'omca-hooks'
 [validate-plugin] Running hook script executability checks
-[validate-plugin] PASS: hook executability: every registered command handler script is executable
+[validate-plugin] SKIP: hook executability: no resolvable command handler scripts registered in <REPO_ROOT>/hooks/hooks.json
 [validate-plugin] Running hook handler shell-field checks
 [validate-plugin] PASS: hook handler shell field: every type:command handler declares shell
 [validate-plugin] PASS: hook fixture pretooluse-task-agent.json: valid JSON (<REPO_ROOT>/tests/fixtures/hooks/pretooluse-task-agent.json)
@@ -161,8 +162,6 @@
 [validate-plugin] PASS: hook fixture repo setup: initialized git repo at <TMPFILE>
 [validate-plugin] SKIP: PreToolUse Write: no matching hook command registered
 [validate-plugin] SKIP: PermissionRequest Bash: no matching hook command registered
-[validate-plugin] PASS: SessionStart compact (post-compact-inject.sh): stdout shape is plain text or one single-line JSON object
-[validate-plugin] PASS: SessionStart compact (post-compact-inject.sh): script succeeded with valid JSON output
 [validate-plugin] SKIP: Stop default (no state): no matching hook command registered
 [validate-plugin] SKIP: SubagentStart basic: no matching hook command registered
 [validate-plugin] Running mcp checks
@@ -190,4 +189,4 @@
 [validate-plugin] PASS: mcp tools/list contains categories_list
 [validate-plugin] PASS: mcp tools/list contains file_read
 [validate-plugin] PASS: mcp tools/list contains session_search
-[validate-plugin] Summary: 169 passed, 0 failed, 11 skipped, 0 warned
+[validate-plugin] Summary: 167 passed, 0 failed, 12 skipped, 0 warned

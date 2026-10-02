@@ -129,18 +129,19 @@ fixed in v2.1.210 and the idle-wake reconnect in v2.1.211, so v2.1.211 is the fl
 **Workaround**: re-issue the tool call. Do not skip the evidence step because the call failed
 once; `json-error-recovery.sh` says the same thing when it sees that error.
 
-## A killed SessionEnd hook leaves this session's plan binding behind
+## A plan binding can outlive its session
 
 **Symptom**: a new session inherits a stale session title or resolves a plan you thought was
 finished with.
 
-**Why**: the platform's `SessionEnd` budget is 1.5 seconds and can only be raised by a
-per-hook `timeout` in a *settings file*. A `timeout` in a plugin's own `hooks.json` never
-raises it, so `session-cleanup.sh` can be killed before it deletes this session's binding.
+**Why**: the server that serves `boulder_write` unbinds the session ids it bound in its
+shutdown handler, which gives up after 50 ms when another writer holds the registry lock, and
+a `SIGKILL` skips it entirely. The hooks-only `omca-hooks` server binds nothing, so while it
+runs beside the tool server the 7-day `boulder_write` backstop is the only pruning.
 
-**Workaround**: none needed in practice. The next `SessionStart` runs the boulder garbage
-collector, which prunes bindings pointing at nothing and plans that are unbound and finished.
-Raising the handler's `timeout` value does not help and is not the fix.
+**Workaround**: none needed in practice. The server that serves `boulder_write` prunes, at
+start, bindings pointing at nothing and plans that are unbound and finished, and every
+`boulder_write` prunes bindings older than 7 days.
 
 ## `worktree.baseRef` hides unpushed commits by default
 

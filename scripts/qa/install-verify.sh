@@ -26,9 +26,9 @@ check_plugin_validate() {
 	fi
 }
 
-# check_hook_script_paths <package_dir> — every ${CLAUDE_PLUGIN_ROOT}/... command in
-# hooks.json must resolve to a real file inside the package.
-check_hook_script_paths() {
+# check_hook_modules <package_dir> — every module hooks.json names must resolve to a
+# real file inside the package.
+check_hook_modules() {
 	local package_dir="$1"
 	local hooks_json="${package_dir}/hooks/hooks.json"
 	if [[ ! -f "${hooks_json}" ]]; then
@@ -36,31 +36,18 @@ check_hook_script_paths() {
 		return
 	fi
 	local missing=0 checked=0
-	local cmd rel_path
-	while IFS= read -r cmd; do
-		[[ -z "${cmd}" ]] && continue
+	local module
+	while IFS= read -r module; do
 		checked=$((checked + 1))
-		# Handlers quote the placeholder so a space in the install path survives
-		# word splitting. The shell strips those quotes before exec; this check
-		# must do the same or every path resolves to a nonexistent file.
-		if [[ "${cmd}" == '"'*'"' ]]; then
-			cmd="${cmd:1:${#cmd}-2}"
-		fi
-		rel_path="${cmd#\$\{CLAUDE_PLUGIN_ROOT\}/}"
-		if [[ ! -f "${package_dir}/${rel_path}" ]]; then
-			qa_fail "hook command does not resolve in package: ${cmd}"
-			missing=$((missing + 1))
-		elif [[ ! -x "${package_dir}/${rel_path}" ]]; then
-			# Shell form honors the shebang, so a lost executable bit surfaces
-			# only once the platform tries to spawn the handler.
-			qa_fail "hook script is not executable in package: ${cmd}"
+		if [[ ! -f "${package_dir}/hooks/${module}" ]]; then
+			qa_fail "hook module does not resolve in package: ${module}"
 			missing=$((missing + 1))
 		fi
-	done < <(jq -r '[.. | objects | select(.type? == "command") | .command] | .[]' "${hooks_json}")
+	done < <(jq -r '.modules[]?' "${hooks_json}")
 	if [[ "${checked}" -eq 0 ]]; then
-		qa_fail "no command hooks found to check in ${hooks_json}"
+		qa_fail "no hook modules named in ${hooks_json}"
 	elif [[ "${missing}" -eq 0 ]]; then
-		qa_pass "all ${checked} hook command paths resolve and are executable inside the packaged tree"
+		qa_pass "all ${checked} hook modules resolve inside the packaged tree"
 	fi
 }
 
@@ -123,7 +110,7 @@ check_claudemd_template() {
 run_all_checks() {
 	local package_dir="$1"
 	check_plugin_validate "${package_dir}"
-	check_hook_script_paths "${package_dir}"
+	check_hook_modules "${package_dir}"
 	check_mcp_handshake "${package_dir}"
 	check_claudemd_template "${package_dir}"
 }
@@ -137,18 +124,18 @@ self_test() {
 	QA_CLEANUP_DIRS+=("${pkg}")
 	run_all_checks "${pkg}"
 
-	echo "[install-verify --self-test] sabotage proof: remove a hook script from a COPY"
+	echo "[install-verify --self-test] sabotage proof: remove the hook module from a COPY"
 	local sabotage_dir
 	sabotage_dir="$(mktemp -d "${TMPDIR:-/tmp}/qa-sabotage-XXXXXX")"
 	cp -a "${pkg}/." "${sabotage_dir}/"
-	rm -f "${sabotage_dir}/scripts/session-init.sh"
+	rm -f "${sabotage_dir}/hooks/register.ts"
 	local sabotage_out
-	# Run inside a command-substitution subshell: check_hook_script_paths's own FAIL
+	# Run inside a command-substitution subshell: check_hook_modules's own FAIL
 	# (the expected trigger) increments a subshell-local QA_FAIL_COUNT that never
 	# leaks back to this process, so the self-test's own tally stays clean.
-	sabotage_out="$(check_hook_script_paths "${sabotage_dir}" 2>&1)"
+	sabotage_out="$(check_hook_modules "${sabotage_dir}" 2>&1)"
 	if grep -q 'does not resolve in package' <<<"${sabotage_out}"; then
-		qa_pass "sabotaged package (missing hook script) correctly failed install-verify"
+		qa_pass "sabotaged package (missing hook module) correctly failed install-verify"
 	else
 		qa_fail "sabotaged package did NOT fail install-verify — guard is not effective"
 	fi

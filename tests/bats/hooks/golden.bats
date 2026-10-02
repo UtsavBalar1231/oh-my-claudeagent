@@ -98,34 +98,6 @@ _run_fixture() {
 	_run_fixture "package-plugin" "dry-run"
 }
 
-@test "golden: post-compact-inject/no-context-file" {
-	_run_fixture "post-compact-inject" "no-context-file"
-}
-
-@test "golden: pre-compact/happy-path" {
-	_run_fixture "pre-compact" "happy-path"
-}
-
-@test "golden: pre-compact/ralph-active" {
-	_run_fixture "pre-compact" "ralph-active"
-}
-
-@test "golden: session-cleanup/normal" {
-	_run_fixture "session-cleanup" "normal"
-}
-
-@test "golden: session-cleanup/resume" {
-	_run_fixture "session-cleanup" "resume"
-}
-
-@test "golden: session-init/startup" {
-	_run_fixture "session-init" "startup"
-}
-
-@test "golden: session-init/compact" {
-	_run_fixture "session-init" "compact"
-}
-
 @test "golden: validate-plugin/known-good" {
 	_run_fixture "validate-plugin" "known-good"
 }

@@ -10,6 +10,7 @@ export type Session = {
   isGuided?: boolean;
   isTitleChecked?: boolean;
   promptAt?: number;
+  compactedAt?: number;
   injectedContext?: Set<string>;
   announcedModes?: Set<string>;
   commentGate?: DenyOnce;

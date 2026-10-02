@@ -16,8 +16,6 @@ const OMCA_GITIGNORE = "*\n!/rules/\n";
 export const LOCK_STALE_MS = 30_000;
 const LOCK_TIMEOUT_MS = 10_000;
 
-export const exitHooks: Array<() => void> = [];
-
 const hasCode = (error: unknown, code: string): boolean =>
   error instanceof Error && "code" in error && error.code === code;
 
@@ -129,6 +127,20 @@ function breakStale(lockPath: string): boolean {
   return true;
 }
 
+function tryAcquire(lockPath: string, nonce: string): string | undefined {
+  for (;;) {
+    const held = `${process.pid} ${Date.now()} ${nonce}`;
+    if (tryLink(lockPath, held)) return held;
+    const current = readOrNull(lockPath);
+    if (current === null || !isStale(current) || !breakStale(lockPath)) return undefined;
+  }
+}
+
+function release(lockPath: string, held: string): void {
+  if (readOrNull(lockPath) === held) unlinkSync(lockPath);
+  else console.error(`omca: ${lockPath} no longer holds this holder's token; left in place`);
+}
+
 export async function withLock<T>(
   lockPath: string,
   fn: () => T | Promise<T>,
@@ -137,19 +149,31 @@ export async function withLock<T>(
   mkdirSync(dirname(lockPath), { recursive: true });
   const nonce = crypto.randomUUID();
   const deadline = Date.now() + timeoutMs;
-  let held: string;
-  for (;;) {
-    held = `${process.pid} ${Date.now()} ${nonce}`;
-    if (tryLink(lockPath, held)) break;
-    const current = readOrNull(lockPath);
-    if (current !== null && isStale(current) && breakStale(lockPath)) continue;
+  let held: string | undefined;
+  while ((held = tryAcquire(lockPath, nonce)) === undefined) {
     if (Date.now() >= deadline) throw new Error(`timed out after ${timeoutMs} ms waiting for ${lockPath}`);
     await Bun.sleep(1 + Math.random() * 4);
   }
   try {
     return await fn();
   } finally {
-    if (readOrNull(lockPath) === held) unlinkSync(lockPath);
-    else console.error(`omca: ${lockPath} no longer holds this holder's token; left in place`);
+    release(lockPath, held);
+  }
+}
+
+/** Runs `fn` under the lock if it can be taken within `waitMs`; returns false, having run nothing, when it cannot. */
+export function tryWithLockSync(lockPath: string, fn: () => void, waitMs: number): boolean {
+  const nonce = crypto.randomUUID();
+  const deadline = Date.now() + waitMs;
+  let held: string | undefined;
+  while ((held = tryAcquire(lockPath, nonce)) === undefined) {
+    if (Date.now() >= deadline) return false;
+    Bun.sleepSync(1);
+  }
+  try {
+    fn();
+    return true;
+  } finally {
+    release(lockPath, held);
   }
 }

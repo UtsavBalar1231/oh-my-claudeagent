@@ -1,1 +1,0 @@
-<REPO_ROOT>/scripts/session-cleanup.sh: line 17: <TMPFILE>/.omca/logs/hook-errors.jsonl: No such file or directory

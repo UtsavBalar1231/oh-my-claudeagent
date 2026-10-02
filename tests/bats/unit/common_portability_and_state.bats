@@ -141,29 +141,3 @@ EOF
 	run grep -rn 'date +%s%N' "$CLAUDE_PLUGIN_ROOT/scripts"
 	assert_output --partial 'lib/common.sh'
 }
-
-# ─── h. kill-switch `all` token ──────────────────────
-
-@test "hook_is_disabled: the 'all' token disables every hook" {
-	_lib 'OMCA_DISABLED_HOOKS=all hook_is_disabled drift-guard && echo disabled || echo enabled'
-	assert_success
-	assert_output 'disabled'
-}
-
-@test "hook_is_disabled: the '*' token disables every hook without globbing" {
-	_lib 'OMCA_DISABLED_HOOKS="*" hook_is_disabled drift-guard && echo disabled || echo enabled'
-	assert_success
-	assert_output 'disabled'
-}
-
-@test "hook_is_disabled: 'all' inside a comma list still disables every hook" {
-	_lib 'OMCA_DISABLED_HOOKS="comment-gate,all" hook_is_disabled drift-guard && echo disabled || echo enabled'
-	assert_success
-	assert_output 'disabled'
-}
-
-@test "hook_is_disabled: an unrelated list leaves the hook enabled" {
-	_lib 'OMCA_DISABLED_HOOKS="comment-gate,post-edit" hook_is_disabled drift-guard && echo disabled || echo enabled'
-	assert_success
-	assert_output 'enabled'
-}

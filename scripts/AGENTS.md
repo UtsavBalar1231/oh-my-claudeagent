@@ -1,15 +1,15 @@
 # Scripts
 
-Shell hook handlers registered in `hooks/hooks.json`, plus supporting libraries and
-a manual QA harness.
+Repository tooling (plugin validation, packaging, the bench, the parity-title check),
+supporting libraries and a manual QA harness. No hook handler lives here: hooks are the mod
+under `hooks/` and the server handlers under `servers/hooks/`.
 
 ## Layout
 
-- Top-level `*.sh`: one script per hook handler (e.g. `session-init.sh`,
-  `pre-compact.sh`). Each is wired to an event in
-  `hooks/hooks.json`; an unregistered script is dead code.
-- `lib/common.sh`: shared bash helpers (logging, state-dir resolution, session-id
-  lookup). Source it rather than reimplementing an idiom already there.
+- Top-level scripts: repository tooling, such as `validate-plugin.sh`,
+  `package-plugin.sh`, `bench.ts` and `parity-titles.ts`.
+- `lib/common.sh`: shared bash helpers (the stdin payload reader, state-dir resolution).
+  Source it rather than reimplementing an idiom already there.
 - `bin/run-hook-in-scratch.sh`: runs a hook script against a scratch copy of state
   for manual testing.
 - `qa/`: the manual QA harness (`just qa`), packaging-excluded. Installs, live-probes

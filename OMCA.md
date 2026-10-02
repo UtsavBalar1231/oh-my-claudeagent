@@ -260,13 +260,14 @@ no OMCA files are affected.
 
 ### Hooks
 
-Hooks are bash scripts in `scripts/*.sh`, registered in `hooks/hooks.json`. They run on
-Claude Code lifecycle events and provide:
+Hooks run in two homes: the mod (`hooks/register.ts`) and `mcp_tool` settings hooks in
+`hooks/hooks.json` that the omca server answers. They run on Claude Code lifecycle events and
+provide:
 
 - Context injection (AGENTS.md, rules, notepad directives)
 - Permission auto-approval for known-safe package managers (npm, yarn, pnpm, bun), jq, and uv run/sync. Blocks a recursive removal whose target is the root, home, the working directory, or a directory directly under root or home.
 - Error recovery suggestions (re-read after failed Edit, escalate after failed Agent)
-- Compaction survival (state saved pre-compact, re-injected post-compact)
+- Compaction survival (the summarizer is told to keep the bound plan and its open tasks, and the plan's context is re-injected afterwards)
 - Verification gating (TaskCompleted blocked without fresh evidence, on the sessions where that event can fire; see below)
 
 **Hook events OMCA handles:**
@@ -289,40 +290,31 @@ row only when a handler is actually registered for it.
 | `PostToolBatch` | Tool lifecycle |
 | `Stop` | Lifecycle |
 | `TaskCompleted` | Task lifecycle |
-| `PreCompact` | Memory |
-| `SessionEnd` | Lifecycle |
-| `FileChanged` | Filesystem |
 
 `SubagentStart` routes to the server's `subagent-context` handler and `PermissionDenied`
 to its `permission-coach` handler, which returns `retry: true` for a denied Bash call after
 an auto-mode classifier denial. `UserPromptSubmit` and
 `UserPromptExpansion` carry the server's keyword and slash-mode detectors. `Stop` routes to
 the server's `stop-gates` handler, which runs plan continuation, final verification, and the
-drift guard in that order and answers with the first block.
+drift guard in that order and answers with the first block. `SessionStart` for `clear` or
+`compact` routes to the server's `session-start` handler: on `compact` it re-injects the
+guidance template, the session id, and the bound plan's name, path, next open task and
+notepad line; on `clear` it hands the guidance back to the session's next prompt.
 
 `PostToolBatch` carries the loop detector, which fires once per resolved batch and reads
 the `tool_calls` array, so a signature can no longer be shredded by interleaved subagent
 calls the way a per-call `PostToolUse` slot was. `Setup` fires only under `claude --init-only`, `claude -p --init`, and
 `claude -p --maintenance`, so the dependency check runs on the `init` matcher and the
 stale-marker and log sweeps run on `maintenance`, off the per-session startup path.
-`FileChanged` watches the evidence ledger and the boulder registry: it is driven by a
-filesystem watcher rather than by tool names, so it sees a mutation from any writer. It has
-no decision control, so it detects and logs and never blocks.
-
-A `FileChanged` matcher is two things at once. As a watch list it takes literal filenames
-resolved against the working directory; as a filter it is matched against the changed
-file's basename to pick which hook groups run. OMCA's two targets live in subdirectories,
-so only the basename register can select them, which is why the registered matcher is the
-two bare basenames. The watch half comes from `session-init.sh`, which returns both
-absolute paths in `SessionStart` `watchPaths`. Dropping that emission silently disables
-the handler, because the matcher alone watches cwd-relative names that do not exist.
-Measured on client 2.1.245.
 
 **Registered platform events OMCA does not handle:**
 
 | Event | Why no handler |
 |-------|----------------|
 | `PostCompact` | Compaction re-injection runs on `SessionStart` with reason `compact` instead, which is where the restored context can still reach the model. `compact_summary` is genuinely uncaptured but has no consumer |
+| `PreCompact` | The mod's `session.compact` feature rewrites the summarizer's instructions with the bound plan and its open tasks, which a settings hook cannot do |
+| `SessionEnd` | Its budget is 1.5 seconds and a kill mid-write loses the work. The server unbinds the session ids it bound in its own shutdown handler instead |
+| `FileChanged` | The mod re-reads the evidence ledger and the plan registry on `turn.complete` and on an open pane's timer, which sees a change from any writer |
 | `Notification` | Desktop notification delivery was removed in the v2.10 minimize-to-core refactor; hooks also no longer have terminal access |
 | `ConfigChange`, `CwdChanged` | Observability-only in OMCA's prior handlers, removed in the same refactor. Neither reports a state change any OMCA runtime reader consumes |
 | `WorktreeCreate`, `WorktreeRemove` | Worktree isolation policy is Claude-native's. `--worktree` delegation is prompt-injected paths plus boulder bookkeeping, so there is nothing for a worktree hook to add |
@@ -410,7 +402,7 @@ unconditional exit 2; that shape is inert on half its registrations.
 
 | Field | Adopted by OMCA | Notes |
 |-------|----------------|-------|
-| `sessionTitle` | Yes — `session-init.sh` emits `"OMCA: <plan_name>"` when boulder is active | Sets the session title in the platform UI |
+| `sessionTitle` | Yes, from `UserPromptSubmit`: `mcp_tool` hooks are skipped for `SessionStart` at launch, so the `guidance` handler titles a plan-bound session `"OMCA: <plan_name>"` on its first prompt, unless the user named it | Sets the session title in the platform UI |
 | `reloadSkills` | No | Boolean; forces a skill reload on session start — no OMCA use case |
 
 **Stop hook block cap (v2.1.143):**
@@ -421,14 +413,12 @@ most 5 blocks per session from its own budget before it fails open, and gets the
 back once its condition is met.
 (Adopted in the v2.1.141–v2.1.167 sync.)
 
-**`SessionStart` `watchPaths` output (v2.1.141–v2.1.167, adopted):**
+**`SessionStart` `watchPaths` output (v2.1.141–v2.1.167, not adopted):**
 
-`SessionStart` hooks return a `watchPaths` array to register file-system paths for
-`FileChanged` event delivery. `session-init.sh` returns the absolute paths of the evidence
-ledger and the plan registry, and that emission is what arms the watcher. The matcher
-cannot do it alone: its segments resolve against the working directory, so the two bare
-basenames name files that do not exist at the repo root. Removing the `watchPaths`
-emission disables `file-changed-log.sh` silently, with nothing reporting the gap.
+`SessionStart` hooks can return a `watchPaths` array to register file-system paths for
+`FileChanged` event delivery. OMCA registers no `FileChanged` handler, so it returns none:
+the mod re-reads the evidence ledger and the plan registry on `turn.complete` and on an open
+pane's timer.
 
 **`PostToolUse` `updatedToolOutput` field (v2.1.141–v2.1.167, not adopted):**
 
@@ -930,7 +920,6 @@ All runtime state lives in `.omca/` (gitignored by default):
 
 - `state/boulder.json` — Session-bound plan registry: one entry per plan under `plans[plan_name]`, one binding per session under `bindings[session_id]`
 - `evidence/verification-evidence.json` — Verification records
-- `state/compaction-context.md` — Saved state for compaction survival
 - `state/notepads/{plan-name}/` — Per-plan notepad sections
 - `plans/{name}.md` — Compatibility mirror/resume surface for native plans, maintained by boulder
 - `logs/` — Session and subagent audit logs
@@ -948,7 +937,7 @@ schema and the `resolve_bound_plan` ladder every reader calls.
 3. `/start-work` reads `boulder_progress()` (resolves the calling session's bound plan when no explicit `plan_path`/`plan_name` is given) to resume from the last completed task
 4. Sisyphus/start-work checks `boulder_progress` to track which tasks remain
 5. The final-verification Stop gate resolves this session's bound plan and confirms a matching `final_verification` evidence entry exists when that plan's checkboxes show it complete
-6. `SessionEnd` (`session-cleanup.sh`) removes only the ending session's binding; a plan itself is never deleted while incomplete or still bound by another session. A 7-day age backstop in `boulder_write`'s `_gc_prune()` also prunes stale bindings and unbound, checkbox-complete plans, for sessions that never hit a clean `SessionEnd`
+6. The server that serves `boulder_write` unbinds, in its shutdown handler, every session id it bound, giving up within 50 ms when the registry lock is busy; a plan itself is never deleted while incomplete or still bound by another session. At start it drops bindings to missing plans and unbound plans that are complete or missing their file. A 7-day age backstop in `boulder_write` also prunes stale bindings and unbound, checkbox-complete plans, for a server killed before it could unbind. The hooks-only `omca-hooks` server does neither
 
 ### Evidence Workflow
 
@@ -1024,12 +1013,16 @@ Type `@agent-oh-my-claudeagent:<name>` to guarantee delegation to a specific age
 
 ### Compaction Survival
 
-When the context window fills, the plugin preserves state across compaction via two
-scripts: `pre-compact.sh` (PreCompact) saves state, and `post-compact-inject.sh` fires on
-`SessionStart` with reason `compact`, not on PostCompact. Active plans and task state
-survive compaction. There is no `PostCompact` handler: by the time that event fires the
-restored context is already assembled, so the injection has to ride the following
-`SessionStart` to reach the model at all.
+When the context window fills, two features carry the bound plan across compaction. The
+mod's `session.compact` feature appends the plan's name, path and first ten open tasks to the
+summarizer's instructions, after any text typed after `/compact`; a subagent's own compaction
+is left alone. The server's `session-start` handler then answers `SessionStart` with reason
+`compact` by re-injecting the guidance template, the session id, and the plan's name, path,
+next open task and notepad line, and records the time so the plan-continuation gate allows a
+stop in the minute that follows. There is no `PostCompact` handler: by the time that event
+fires the restored context is already assembled, so the injection has to ride the following
+`SessionStart` to reach the model at all. `OMCA_DISABLED_HOOKS=compact` and
+`OMCA_DISABLED_HOOKS=session-start` turn the two halves off.
 
 ### StopFailure limitation
 
@@ -1152,14 +1145,8 @@ recommendation for unattended and CI runs. OMCA leaves it to the operator: the f
 counts subagent-level failures, which are a different plane, so this variable neither helps
 nor hinders the three-strike counter.
 
-`CLAUDE_CODE_SESSIONEND_HOOKS_TIMEOUT_MS` is the only lever that can raise the SessionEnd
-budget for OMCA, and it is user-side: a `timeout` declared in a plugin-provided `hooks.json`
-never raises it, and only a per-hook `timeout` in a settings file does, up to a 60 second
-ceiling. Since v2.1.268 the variable also becomes the timeout for each `SessionEnd` hook that
-declares none of its own, so setting it is what gives `session-cleanup.sh` more than the
-1.5 second default. Leave it unset and a kill at 1.5 seconds leaves this session's
-`bindings[session_id]` entry in `boulder.json` behind, with recovery falling to the
-`SessionStart` GC in `session-init.sh`.
+`CLAUDE_CODE_SESSIONEND_HOOKS_TIMEOUT_MS` has no effect on OMCA, which registers no
+`SessionEnd` hook: the server unbinds the session ids it bound in its own shutdown handler.
 
 ### `prompt_id` (hook input field, v2.1.196)
 
@@ -1359,9 +1346,9 @@ than copied verbatim.
 |---------|-------|
 | Session-bound plan registry | `boulder.json` moved from a single `active_plan` pointer to `{plans: {<plan_name>: {...}}, bindings: {<session_id>: {plan_name, bound_at}}}`. Fixes the clobber where two concurrent sessions working different plans overwrote each other's state. `resolve_bound_plan()` (`servers/tools/_boulder_core.py`) is the one pure-read resolution ladder every consumer calls, via direct import in Python or the `boulder_resolve.py` shim from bash |
 | drift-guard hard-block Stop hook | New drift guard: when the last assistant turn reads as a completion claim ("done", "fixed", "implemented", etc., unless negated) but the diff still contains a stub marker, the Stop is blocked with the offending `file:line`. A focused-test marker is only looked for in JavaScript and TypeScript sources, where such a test can actually run; an unfinished-implementation marker and an unimplemented-error throw are looked for in any language. Self-clearing — fixing the stub removes the marker. A repeated block is bounded separately by a per-gate block budget in the server's session state, capped at 5 blocks per gate and restored on the gate's clean path. Kill switch: `OMCA_DISABLED_HOOKS=drift-guard` |
-| context-injector hardening | The context injector now dedups injections by content-hash+realpath (reusing `injected-context-dirs.json`, which `session-init.sh` already resets every `SessionStart`) instead of re-injecting on every matching file access. The project-root walk for both the `.omca/rules` scan and the AGENTS.md/README terminator now resolves worktree-safely (a linked worktree's `.git` is a file, not a directory, so the walk tests `-e` not `-d`), so a worktree session no longer walks up into the parent repo |
+| context-injector hardening | The context injector now dedups injections by content-hash+realpath, keyed per session in the server's session state, instead of re-injecting on every matching file access. The project-root walk for both the `.omca/rules` scan and the AGENTS.md/README terminator now resolves worktree-safely (a linked worktree's `.git` is a file, not a directory, so the walk tests `-e` not `-d`), so a worktree session no longer walks up into the parent repo |
 | stdin-read timeout | `scripts/lib/common.sh`'s shared `HOOK_INPUT=$(cat)` read now wraps in `timeout 5 cat`, discarding on exit 124 rather than hanging indefinitely if stdin is never closed. Blocking hooks treat an empty-from-timeout read as fail-closed-or-warn, not a silent pass |
-| Compaction content round-trip | `pre-compact.sh` now inlines the session's next 10 unchecked plan tasks and the 5 most recent notepad decisions (tasks first, so they survive `post-compact-inject.sh`'s downstream line cap), instead of leaving compaction to rely on whatever the model happened to keep in its own summary |
+| Compaction content round-trip | The mod's `session.compact` feature names the session's next 10 open plan tasks in the summarizer's instructions, instead of leaving compaction to rely on whatever the model happened to keep in its own summary |
 
 **Reframed, not ported as-is:**
 
@@ -1420,7 +1407,7 @@ Features introduced in this window that OMCA consciously declines to adopt:
 | `hooks:` in skill frontmatter | evaluated 2026-06 | Skill-frontmatter hooks are not visible to `validate-plugin.sh` (validates hooks only from `hooks/hooks.json`). All hook registration stays in `hooks/hooks.json` |
 | `skillOverrides` / `skillListingBudgetFraction` / `maxSkillDescriptionChars` settings | evaluated 2026-06 | User-preference settings only; `skillOverrides` does not apply to plugin-shipped skills. No plugin-side adoption possible or needed |
 | `initialPrompt` in agent frontmatter | evaluated 2026-06 | Fires an unconditional billable model turn per subagent; the `subagent-context` handler already injects boulder context as `additionalContext` at zero turn cost |
-| `SessionStart` `watchPaths` output | ADOPTED 2026-08 | Live probing showed the matcher's watch half registers cwd-relative names that do not exist, so `FileChanged` never fired. `session-init.sh` now returns both absolute paths and the handler dispatches. See the `FileChanged` section above |
+| `SessionStart` `watchPaths` output | DROPPED | No `FileChanged` handler remains: the mod re-reads the evidence ledger and the plan registry on `turn.complete` and on an open pane's timer |
 | `PostToolUse` `updatedToolOutput` | evaluated 2026-06 | Rewriting tool output post-hoc is adversarial to evidence integrity — OMCA's verification model requires the model to see literal command output |
 | `plugin.json` `dependencies` field | evaluated 2026-06 | OMCA has no runtime inter-plugin dependencies; field has no consumers in this plugin |
 | MCP `headersHelper` and WebSocket (`ws`) transport | evaluated 2026-06 | All OMCA MCP servers use stdio; no auth-header injection or WebSocket transport needed |
@@ -1445,7 +1432,7 @@ Features introduced in this window that OMCA consciously declines to adopt:
 |---------|-------|
 | `[1m]` auto-strip alignment | v2.1.173 dropped the `[1m]` context-window suffix from model identifiers platform-side; OMCA's agent docs and tables use bare model identifiers throughout |
 | Per-agent `effort:` tuning | Orchestrator and planners at xhigh, oracle at max; executor, hephaestus, librarian, and multimodal-looker at medium, explore at low. Retuned for Opus 5.5 and Fable 5.1: planners at high, oracle at xhigh. Sonnet 5.5 later put explore, executor, and librarian on `sonnet` at high |
-| `sessionTitle` from boulder.json | Already adopted (v2.1.152, `session-init.sh`); re-verified against v2.1.197 and now guarded against an absent boulder file |
+| `sessionTitle` from boulder.json | Adopted; the `guidance` handler sets it on the session's first `UserPromptSubmit` and never over a title the user set |
 | Model generation move | Agent roster: oracle on `fable`, orchestrators/planners on `opus`, workers on `sonnet`; haiku retired |
 
 **Provider-alias caveat:** every OMCA agent declares a tier alias in `model:` frontmatter
@@ -1571,7 +1558,7 @@ section and in `CLAUDE.md`; neither is set by OMCA.
 | Hook `timeout` is seconds, not milliseconds | The two `"timeout": 5000` values in `hooks/hooks.json` were 83-minute caps, the opposite of the intended 5-second tightening, and are now `5`. The per-event defaults range from 1.5 seconds for `SessionEnd` up to 600 for a `command` handler |
 | Quoted shell form on every command handler | Each handler invokes `${CLAUDE_PLUGIN_ROOT}/scripts/...`, which resolves into the marketplace cache under the user's home; in shell form a space anywhere in that path splits the command, so every `command` value now quotes the placeholder. Exec form (`args` present) was tried and rejected: it spawns `command` as a real executable with no shell, and a `.sh` file is not executable on native Windows, so every handler would fail to spawn there with no error signal, and setting `args` also makes the platform ignore the `shell` field. Exec form stays available for handlers whose `command` is a genuine cross-platform binary |
 | `shell: "bash"` pinned on every `type: command` handler | Not a Windows-only field, which is how this ledger used to dismiss it. Shell form runs the command under `sh -c` on Unix and falls back to PowerShell on Windows when Git Bash is absent, and neither is a shell a `.sh` handler written against bash can be fed to safely. Pinning `bash` names the interpreter on both platforms instead of inheriting whichever one the host resolves to. Every `command` handler in `hooks/hooks.json` now carries it |
-| `statusMessage` on user-perceived slow handlers | Spinner labels on `session-init.sh` and `context-injector.sh`. Not blanket-applied: most handlers finish in milliseconds and a label for them reads as noise |
+| `statusMessage` on user-perceived slow handlers | No handler carries one: every hook finishes in milliseconds, and a label for them reads as noise |
 | Compound-command fall-through in the trusted-tooling fast path | Hook `if:` matching is per-subcommand, so `jq . a.json && rm -rf ~/x` reached the jq auto-allow branch. A command whose trimmed text contains a command separator, a redirect, or a command substitution now falls through to the platform decision: `\|`, `;`, `&`, `<`, `>`, a backtick, `$(`, a literal newline, or a carriage return. The bare `&` covers `&&` and `&>`, the newline covers multi-line commands, and the carriage return is hardening for shells that terminate a statement on a bare CR, which bash does not. Globs, tilde, and `$VAR` expansion still take the fast path, since none of them can introduce a second command. The `rm -rf` deny branch still runs first, so the deny path is unchanged |
 | `context: fork` skills pin `background: false` | Forked skills background by default from v2.1.218, and a backgrounded fork gets the narrower background-subagent tool set with its result a turn later. metis, momus, and hephaestus pin `false` so momus's OKAY/REJECT verdict stays inline for the bounded review loop and hephaestus's edits stay inside `/rewind` checkpoint coverage |
 | `disable-model-invocation: true` on handoff | Replaces a workaround that told users to disable the whole plugin, and retires a `skillOverrides` recommendation this ledger already called inert for plugin skills. The `handoff` keyword now degrades to an advisory nudge toward the slash command and is described that way everywhere |
@@ -1683,9 +1670,9 @@ tables under Core Concepts and Agent Reference are the live state.
 | `effortLevel`, `fastMode`, `fastModePerSessionOptIn` | Agent frontmatter `effort:` overrides the session level from `/effort`, `--effort`, `modelSettings`, or `effortLevel`; the `CLAUDE_CODE_EFFORT_LEVEL` variable and a `maxEffortLevel` cap still win over frontmatter. A top-level user `effortLevel` does not apply to Opus 5.5 or newer models. OMCA depends on frontmatter winning over the settings default, so the chain is worth having written down |
 | `alwaysThinkingEnabled` and `MAX_THINKING_TOKENS` | `thinking.enabled` is a documented statusline payload field (`statusline.md`: whether extended thinking is enabled for the session), so the render has a real input source and needs no OMCA change. The half that matters is the models that cannot turn thinking off: `MAX_THINKING_TOKENS=0` disables thinking on the Anthropic API except on Opus 5.5 and the Fable models, so every roster row keeps the thinking marker even at `0` |
 | `mcp_server_errors` | A headless stream-json field available only with `--mcp-config`. It is a headless-only diagnostic, separate from the interactive `claude mcp list` and `/mcp` path, and does not belong in the doctor's checks |
-| `SessionStart` hook streaming and idle reaping (v2.1.204) | A mid-hook reap leaves `session-init.sh`'s state resets half applied. Measured runtime is well under the budget, so no `timeout` is warranted for that reason |
-| `SessionStart` source `"fork"` | A fork's SessionStart wipes the live parent's per-subagent model map, dedup map, and counters, and overwrites the shared session file so the parent's SessionEnd deletes the wrong boulder binding. But `"fork"` is the wrong gate to fix it on: background sessions report `"startup"` while `/branch` and `--fork-session --resume` report `"fork"` and want the reset. The safe half is preferring the payload's own `session_id` in `session-cleanup.sh` |
-| `SessionEnd` reason `bypass_permissions_disabled` removed in v2.1.234 | Docs completeness only. `session-cleanup.sh` branches on the reason string, but the only value it tests for is `resume`, so it never saw this one and needs no change. Recorded so its absence from the reason set reads as removal rather than an omission |
+| `SessionStart` hook streaming and idle reaping (v2.1.204) | The `session-start` handler keeps its state in server memory and returns in milliseconds, so a reap has nothing half applied to leave behind |
+| `SessionStart` source `"fork"` | OMCA's `SessionStart` entry matches only `clear` and `compact`, and server session state is keyed by the payload's `session_id`, so a fork never resets a live parent's state |
+| `SessionEnd` reason `bypass_permissions_disabled` removed in v2.1.234 | Docs completeness only. OMCA registers no `SessionEnd` hook. Recorded so its absence from the reason set reads as removal rather than an omission |
 
 **Deliberate non-adoptions this sync:**
 
@@ -1704,10 +1691,10 @@ tables under Core Concepts and Agent Reference are the live state.
 | Integer env vars accepting scientific notation | OMCA parses no numeric env vars, and the hook `timeout` field is a JSON number rather than an env var |
 | Backgrounded `cd` reporting an unchanged cwd | The correction arrives in the tool result the model reads. OMCA has no absolute-path rail of its own to cite it against; that rail is platform-injected |
 | Late-appearing `.claude/*` symlink sandbox reconciliation | Sandboxing is Claude-native's. OMCA creates no `.claude/*` symlinks and keeps no state under `.claude/` |
-| `CLAUDE_CODE_PROCESS_WRAPPER` | No OMCA surface reads process ancestry. The in-use-marker sweeper uses liveness checks on platform-written markers, which a wrapper in the chain does not change |
+| `CLAUDE_CODE_PROCESS_WRAPPER` | No OMCA surface reads process ancestry |
 | Malformed bracket patterns in globs | All OMCA rule globs are bracket-free, no ignore or worktree-include file exists, and the injector's bash pattern match treats a malformed group as a literal |
 | Compound `cd` with only a `/dev/null` redirect | `permission-filter.sh` never inspects redirects, so those commands fall through to the platform decision identically before and after |
-| Spurious prompt-injection warnings | OMCA's injected context is the trusted plugin-script class the fix stops flagging. The adjacent thing OMCA owns, sanitizing notepad content on post-compact injection, addresses a different concern |
+| Spurious prompt-injection warnings | OMCA's injected context is the trusted plugin-script class the fix stops flagging. The adjacent thing OMCA owns, the context it re-injects after a compaction, carries only the guidance template and the bound plan's own name, path and next task |
 | Launcher-overwrite `/doctor` report | Launcher and auto-updater are Claude-native install machinery. Adding a launcher probe to `omca-setup` would duplicate a native check and produce a finding OMCA cannot remediate |
 | `EndConversation` tool | Un-denyable by construction, main-conversation-only, and invisible to `PreToolUse`, `PostToolUse`, and `PermissionRequest`. Adding it to a `disallowedTools` list would be a rule the platform ignores |
 | `pkill -f` self-match fix | No `pkill` callsite exists; the marker sweeper uses a liveness check |

@@ -1,10 +1,9 @@
-import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeAll, describe, expect, spyOn, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { handle as guidance } from "./guidance.ts";
 import { dispatch, type Output, type Payload } from "./registry.ts";
-import { handle as sessionStart } from "./session-start.ts";
 import { findSession, touchSession } from "./session-state.ts";
 import { statusPath } from "./status-file.ts";
 
@@ -53,9 +52,13 @@ const prompt = (event: "UserPromptSubmit" | "UserPromptExpansion", sessionId: st
 const run = (payload: Payload, root = project(), now = NOW): Output | undefined =>
   guidance(payload, { root, now, session: touchSession(String(payload.session_id)) }) as Output | undefined;
 
-const injected = (event: string, sessionId: string): Output => ({
-  hookSpecificOutput: { hookEventName: event, additionalContext: `${TEMPLATE}\nSession ${sessionId}` },
+const injected = (event: string, sessionId: string, plan = ""): Output => ({
+  hookSpecificOutput: { hookEventName: event, additionalContext: `${TEMPLATE}\nSession ${sessionId}${plan}` },
 });
+
+const planLines = (path: string, next: string): string =>
+  `\n[ACTIVE PLAN] hello-plan: ${path}\n[NEXT TASK] ${next}\n` +
+  "[NOTEPAD] Record discoveries, decisions and blockers with notepad_write('hello-plan', section, content); the sections are learnings, issues, decisions and problems.";
 
 describe("first-prompt guidance", () => {
   test("the first prompt of a session gets the template and its Session line", () => {
@@ -126,6 +129,42 @@ describe("first-prompt guidance", () => {
   });
 });
 
+describe("bound plan context", () => {
+  test("the first prompt of a plan-bound session carries the plan's name, path, next open task and notepad line", () => {
+    const root = project();
+    const id = crypto.randomUUID();
+    const plan = join(root, "hello-plan.md");
+    writeFileSync(plan, "# Hello\n\n- [x] 1. Write the parser\n- [ ] 2. Say hello\n- [ ] 3. Say goodbye\n");
+    bind(root, id, plan);
+    expect(run(prompt("UserPromptExpansion", id), root)).toEqual(injected("UserPromptExpansion", id, planLines(plan, "Say hello")));
+  });
+
+  test("a plan whose numbered tasks are all checked says none is open", () => {
+    const root = project();
+    const id = crypto.randomUUID();
+    const plan = join(root, "hello-plan.md");
+    writeFileSync(plan, "- [x] 1. Say hello\n");
+    bind(root, id, plan);
+    expect(run(prompt("UserPromptExpansion", id), root)).toEqual(
+      injected("UserPromptExpansion", id, planLines(plan, "None open: every numbered task is checked.")),
+    );
+  });
+
+  test("an unreadable registry is logged and the template still goes out", () => {
+    const root = project();
+    const id = crypto.randomUUID();
+    mkdirSync(join(root, ".omca", "state"), { recursive: true });
+    writeFileSync(join(root, ".omca", "state", "boulder.json"), "{not json");
+    const errors = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      expect(run(prompt("UserPromptExpansion", id), root)).toEqual(injected("UserPromptExpansion", id));
+      expect(errors.mock.calls.map(([message]) => message)).toEqual(["omca: guidance could not read this session's bound plan:"]);
+    } finally {
+      errors.mockRestore();
+    }
+  });
+});
+
 describe("session title", () => {
   test("the first UserPromptSubmit titles the session after its bound plan", () => {
     const root = project();
@@ -136,7 +175,7 @@ describe("session title", () => {
     expect(run(prompt("UserPromptSubmit", id), root)).toEqual({
       hookSpecificOutput: {
         hookEventName: "UserPromptSubmit",
-        additionalContext: `${TEMPLATE}\nSession ${id}`,
+        additionalContext: `${TEMPLATE}\nSession ${id}${planLines(plan, "Say hello")}`,
         sessionTitle: "OMCA: hello-plan",
       },
     });
@@ -149,7 +188,7 @@ describe("session title", () => {
     const plan = join(root, "hello-plan.md");
     writeFileSync(plan, "- [ ] 1. Say hello\n");
     bind(root, id, plan);
-    expect(run(prompt("UserPromptExpansion", id), root)).toEqual(injected("UserPromptExpansion", id));
+    expect(run(prompt("UserPromptExpansion", id), root)).toEqual(injected("UserPromptExpansion", id, planLines(plan, "Say hello")));
     expect(run(prompt("UserPromptSubmit", id), root)).toEqual({
       hookSpecificOutput: { hookEventName: "UserPromptSubmit", sessionTitle: "OMCA: hello-plan" },
     });
@@ -161,7 +200,9 @@ describe("session title", () => {
     const plan = join(root, "hello-plan.md");
     writeFileSync(plan, "- [ ] 1. Say hello\n");
     bind(root, id, plan);
-    expect(run(prompt("UserPromptSubmit", id, { session_title: "my session" }), root)).toEqual(injected("UserPromptSubmit", id));
+    expect(run(prompt("UserPromptSubmit", id, { session_title: "my session" }), root)).toEqual(
+      injected("UserPromptSubmit", id, planLines(plan, "Say hello")),
+    );
   });
 
   test("an unbound session, a bound plan whose file is gone, and a missing registry set no title", () => {
@@ -176,17 +217,8 @@ describe("session title", () => {
   });
 });
 
-describe("compaction", () => {
-  const start = (source: string): Payload => ({ event: "SessionStart", session_id: crypto.randomUUID(), cwd: "/work", source });
-  const context = { root: "/work", now: NOW, session: undefined };
-
-  test("SessionStart for compact adds the template again", () => {
-    expect(sessionStart(start("compact"), context)).toEqual({
-      hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: TEMPLATE },
-    });
-  });
-
-  test("SessionStart for clear adds nothing, since the new session's first prompt carries the template", () => {
-    expect(sessionStart(start("clear"), context)).toBeUndefined();
+describe("output style", () => {
+  test("output-styles/omca-default.md: carries the minimal-code coding discipline", () => {
+    expect(readFileSync(join(REPO, "output-styles", "omca-default.md"), "utf8")).toContain("Write the minimum that solves the problem");
   });
 });
