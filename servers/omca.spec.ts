@@ -8,8 +8,8 @@ const SERVER = join(import.meta.dir, "omca.ts");
 const CLIENT_TEXT_CAP_CHARS = 2048;
 const MAX_RESULT_SIZE_CEILING = 500_000;
 const MAX_RESULT_SIZE_TOOLS = ["evidence_read", "file_read", "ast_search", "session_search"];
-const WRITE_TOOLS = ["omca_hook"];
-const ALL_TOOLS = ["omca_hook"];
+const WRITE_TOOLS = ["omca_hook", "notepad_write", "notepad_compact"];
+const ALL_TOOLS = ["omca_hook", "notepad_write", "notepad_read", "notepad_list", "notepad_compact"];
 const PROPERTY_NAME = /^[A-Za-z0-9_.-]{1,64}$/;
 
 const VERSION: string = JSON.parse(readFileSync(join(import.meta.dir, "..", ".claude-plugin", "plugin.json"), "utf8")).version;
