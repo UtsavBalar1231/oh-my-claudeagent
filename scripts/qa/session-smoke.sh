@@ -4,9 +4,9 @@
 # inference (mock or real API), so unlike the other four it does not run unconditionally.
 #
 # Backend selection:
-#   1. scripts/qa/mock-model.py exists and QA_FORCE_REAL_API != 1 -> mock-backed,
+#   1. scripts/qa/mock-model.ts exists and QA_FORCE_REAL_API != 1 -> mock-backed,
 #      runs by default (deterministic, no real API spend, no subscription-auth
-#      dependency). This is the default path now that mock-model.py exists.
+#      dependency). This is the default path now that mock-model.ts exists.
 #   2. QA_ALLOW_REAL_API=1 (or QA_FORCE_REAL_API=1) -> one real-API headless turn.
 #   3. Neither, and no mock present -> SKIPPED banner, exit 0. This is a PASS.
 #
@@ -17,7 +17,7 @@ QA_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "${QA_DIR}/lib/qa-common.sh"
 
 CLAUDE_BIN="${QA_CLAUDE_BIN:-claude}"
-MOCK_MODEL_PY="${QA_DIR}/mock-model.py"
+MOCK_MODEL_TS="${QA_DIR}/mock-model.ts"
 
 # Known OMCA agent basenames (agents/*.md in this repo), used to assert the session
 # surface actually reflects the packaged agent catalog rather than a generic response.
@@ -89,14 +89,14 @@ run_real_api_smoke() {
 	assert_state_dir_created "${project}"
 }
 
-# run_mock_backed_smoke <mock_py> — contract mock-model.py satisfies:
-# `python3 <mock_py> --port <N> --access-log <path>` starts an HTTP listener on
+# run_mock_backed_smoke <mock_ts> — contract mock-model.ts satisfies:
+# `bun <mock_ts> --port <N> --access-log <path>` starts an HTTP listener on
 # 127.0.0.1:<N> shaped like the Messages API (per .omca/notes/mock-model-verdict.md's
 # SUPPORTED env contract: requests hit <base>/v1/messages, real Authorization headers
 # pass through), logs each request as JSONL, and exits cleanly on SIGTERM.
 # ANTHROPIC_BASE_URL is scoped to the claude subprocess only.
 run_mock_backed_smoke() {
-	local mock_py="$1"
+	local mock_ts="$1"
 	local port project package output mock_pid access_log
 	port=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1])')
 	project="$(qa_new_scratch_project)"
@@ -107,14 +107,14 @@ run_mock_backed_smoke() {
 	QA_CLEANUP_DIRS+=("${package}")
 	access_log="${project}/.qa-mock-access.log"
 
-	python3 "${mock_py}" --port "${port}" --access-log "${access_log}" &
+	bun "${mock_ts}" --port "${port}" --access-log "${access_log}" &
 	mock_pid=$!
 	local waited=0
 	while ! (exec 3<>"/dev/tcp/127.0.0.1/${port}") 2>/dev/null; do
 		sleep 0.2
 		waited=$((waited + 1))
 		if [[ "${waited}" -gt 25 ]]; then
-			qa_fail "mock-model.py did not start listening on 127.0.0.1:${port} within 5s"
+			qa_fail "mock-model.ts did not start listening on 127.0.0.1:${port} within 5s"
 			kill "${mock_pid}" 2>/dev/null || true
 			return
 		fi
@@ -160,14 +160,14 @@ fi
 trap qa_teardown EXIT
 qa_drift_capture
 
-if [[ -f "${MOCK_MODEL_PY}" && "${QA_FORCE_REAL_API:-}" != "1" ]]; then
-	qa_log "mock-model.py present: running mock-backed smoke"
-	run_mock_backed_smoke "${MOCK_MODEL_PY}"
+if [[ -f "${MOCK_MODEL_TS}" && "${QA_FORCE_REAL_API:-}" != "1" ]]; then
+	qa_log "mock-model.ts present: running mock-backed smoke"
+	run_mock_backed_smoke "${MOCK_MODEL_TS}"
 elif [[ "${QA_ALLOW_REAL_API:-}" == "1" ]]; then
 	qa_log "QA_ALLOW_REAL_API=1: running real-API smoke"
 	run_real_api_smoke
 else
-	qa_log "SKIPPED: scripts/qa/mock-model.py is missing and QA_ALLOW_REAL_API is not 1. Set QA_ALLOW_REAL_API=1 to run a real-API turn, or restore mock-model.py for a deterministic default."
+	qa_log "SKIPPED: scripts/qa/mock-model.ts is missing and QA_ALLOW_REAL_API is not 1. Set QA_ALLOW_REAL_API=1 to run a real-API turn, or restore mock-model.ts for a deterministic default."
 	exit 0
 fi
 
