@@ -1,22 +1,15 @@
 import { ledgerCoversSlot } from "../src/core/evidence.ts";
 import { footerLine } from "../src/core/footer.ts";
-import { isSafeSessionId } from "../src/core/session-id.ts";
+import { LEDGER, statusPath, verificationOf } from "../src/core/omca-paths.ts";
 import { glyphs, isAsciiRequested } from "../src/core/ui-kit.ts";
-import { verificationOf } from "./band.ts";
 import type { Features } from "./dispatch.ts";
-import { noteMainTurn } from "./feedback.ts";
-import type { Host } from "./host.ts";
-
-const LEDGER = ".omca/evidence/verification-evidence.json";
-
-const reason = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+import { type Host, reason } from "./host.ts";
 
 async function unloggedSince(host: Host, startMs: number): Promise<string | null> {
   const [root, sessionId] = await Promise.all([host.session.root(), host.session.id()]);
-  if (!isSafeSessionId(sessionId)) return null;
-  const statusPath = `${root}/.omca/state/session/${sessionId}.json`;
-  if (!(await host.fs.exists(statusPath))) return null;
-  const slot = verificationOf(JSON.parse(await host.fs.read(statusPath)));
+  const statusFile = statusPath(root, sessionId);
+  if (statusFile === undefined || !(await host.fs.exists(statusFile))) return null;
+  const slot = verificationOf(JSON.parse(await host.fs.read(statusFile)));
   if (slot === null || slot.at < Math.floor(startMs / 1000)) return null;
   const ledgerPath = `${root}/${LEDGER}`;
   const ledgerSeconds = (await host.fs.exists(ledgerPath))
@@ -36,7 +29,6 @@ export const footer: Features = {
   "turn.complete": {
     async post(host, e, result) {
       if (e.agentId !== undefined) return undefined;
-      noteMainTurn(e.turnId);
       const [{ value: sample }, usage, now, ascii] = await Promise.all([
         host.state.costSample.get(),
         host.session.usage(),

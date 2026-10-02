@@ -1,5 +1,5 @@
 import type { RenderElement } from "claude-code";
-import { COLORS, displayWidth, fitEnd, formatDuration, formatTokens, levelMark, padEnd, padStart } from "../../src/core/ui-kit.ts";
+import { COLORS, displayWidth, fitEnd, formatDuration, formatTokens, levelMark, padEnd, padStart, shortType } from "../../src/core/ui-kit.ts";
 import type { State } from "../host.ts";
 import { noticeRow, type TabView, type View } from "../pane.ts";
 
@@ -13,7 +13,6 @@ const GAP = "  ";
 const MIN_NAME = 10;
 const MIN_DESCRIPTION = 6;
 
-const shortType = (type: string) => type.slice(type.lastIndexOf(":") + 1);
 const shortModel = (model: string) => model.replace(/^claude-/, "").replace(/-\d{8}$/, "");
 
 function mark(row: Row, view: View): { glyph: string; color: string } {

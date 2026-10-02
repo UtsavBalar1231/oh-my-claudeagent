@@ -1,12 +1,11 @@
 import { isEvidenceLogged, type LedgerRecord, outcomeOf, parseRecord, recordPath } from "../src/core/ledger.ts";
+import { LEDGER } from "../src/core/omca-paths.ts";
 import { estimateCostUsd } from "../src/core/pricing.ts";
 import type { Features } from "./dispatch.ts";
-import type { Host, State } from "./host.ts";
-import { reason } from "./pane.ts";
+import { type Host, reason, type State } from "./host.ts";
 
 type Row = State["agents"][string];
 
-const EVIDENCE = ".omca/evidence/verification-evidence.json";
 const NO_USAGE = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
 
 async function locate(host: Host, agentId: string): Promise<{ root: string; sessionId: string; path: string } | undefined> {
@@ -36,11 +35,11 @@ const running = (sessionId: string, agentId: string, row: Row): LedgerRecord => 
 
 // null when the ledger exists but cannot be read: unknown, not "no evidence".
 async function evidenceLogged(host: Host, root: string, startMs: number, endMs: number): Promise<boolean | null> {
-  const path = `${root}/${EVIDENCE}`;
+  const path = `${root}/${LEDGER}`;
   try {
     return (await host.fs.exists(path)) && isEvidenceLogged(await host.fs.read(path), startMs, endMs);
   } catch (error) {
-    host.log(`ledger: could not read ${EVIDENCE}: ${reason(error)}`);
+    host.log(`ledger: could not read ${LEDGER}: ${reason(error)}`);
     return null;
   }
 }

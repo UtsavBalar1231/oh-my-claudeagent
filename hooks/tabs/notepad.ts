@@ -1,14 +1,14 @@
 import { resolveBoundPlan } from "../../src/core/boulder.ts";
+import { BOULDER } from "../../src/core/omca-paths.ts";
 import { chunks, clean } from "../../src/core/plan-reader.ts";
 import { fitEnd } from "../../src/core/ui-kit.ts";
-import type { Host, State } from "../host.ts";
-import { noticeRow, reason, type TabView } from "../pane.ts";
+import { type Host, reason, type State } from "../host.ts";
+import { noticeRow, type TabView } from "../pane.ts";
 
 type Notepad = NonNullable<State["pane"]["notepad"]>;
 type Section = Notepad["sections"][number]["name"];
 
 const SECTIONS: readonly Section[] = ["learnings", "issues", "decisions", "problems"];
-const BOULDER = ".omca/state/boulder.json";
 
 let signature: string | undefined;
 

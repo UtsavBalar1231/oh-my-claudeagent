@@ -1,5 +1,5 @@
 import type { RenderElement } from "claude-code";
-import { COLORS, displayWidth, fitEnd, padEnd } from "../../src/core/ui-kit.ts";
+import { COLORS, displayWidth, fitEnd, formatWhen, padEnd } from "../../src/core/ui-kit.ts";
 import { type Rating, rate, shown, type Verdict } from "../feedback.ts";
 import type { Host } from "../host.ts";
 import { keyButton, noticeRow, type TabView, type View } from "../pane.ts";
@@ -8,12 +8,6 @@ const BUTTON_GAP = 2;
 const VERDICT = 4;
 const GAP = "  ";
 const WORDS = { loading: "", empty: "No feedback has been recorded in this session." };
-
-const two = (value: number) => String(value).padStart(2, "0");
-const when = (at: string) => {
-  const date = new Date(at);
-  return `${two(date.getMonth() + 1)}-${two(date.getDate())} ${two(date.getHours())}:${two(date.getMinutes())}`;
-};
 
 function actions(host: Host, view: View, hasTurn: boolean): RenderElement {
   const press = (verdict: Verdict) => async () => {
@@ -34,7 +28,7 @@ function actions(host: Host, view: View, hasTurn: boolean): RenderElement {
 function row(view: View, rating: Rating, index: number): RenderElement {
   const { Box, Text } = view.kit;
   const isUp = rating.rating === "up";
-  const fixed = `${padEnd(rating.rating, VERDICT)}${GAP}${when(rating.at)}${GAP}`;
+  const fixed = `${padEnd(rating.rating, VERDICT)}${GAP}${formatWhen(rating.at)}${GAP}`;
   const note = fitEnd(rating.note ?? "", view.width - 2 - displayWidth(fixed), view.g.ellipsis);
   return Box({
     key: `rating-${index}`,

@@ -1,19 +1,8 @@
 import { isSafeSessionId } from "../src/core/session-id.ts";
 import type { Features } from "./dispatch.ts";
-import type { Host } from "./host.ts";
+import { type Host, pluginVersion } from "./host.ts";
 
-// The marker proves the mod runs, so an unreadable manifest costs the version, not the marker.
-async function pluginVersion(host: Host): Promise<string | null> {
-  try {
-    const manifest: unknown = JSON.parse(await host.fs.read(`${host.plugin.root}/.claude-plugin/plugin.json`));
-    const version = typeof manifest === "object" && manifest !== null && "version" in manifest ? manifest.version : null;
-    return typeof version === "string" ? version : null;
-  } catch (error) {
-    host.log(`mod-marker: cannot read the plugin version: ${error instanceof Error ? error.message : String(error)}`);
-    return null;
-  }
-}
-
+// An unreadable manifest costs the marker its version, not the marker itself.
 async function writeMarker(host: Host): Promise<undefined> {
   const [root, sessionId, now, version] = await Promise.all([
     host.session.root(),

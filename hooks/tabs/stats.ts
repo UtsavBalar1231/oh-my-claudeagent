@@ -2,10 +2,10 @@ import type { RenderElement } from "claude-code";
 import { aggregate, type LedgerRecord, METRICS_DIR, parseRecords } from "../../src/core/ledger.ts";
 import { PRICING_AS_OF } from "../../src/core/pricing.ts";
 import { isSafeSessionId } from "../../src/core/session-id.ts";
-import { displayWidth, fitEnd, formatDuration, formatTokens, padEnd, padStart } from "../../src/core/ui-kit.ts";
-import type { Host, State } from "../host.ts";
+import { displayWidth, fitEnd, formatDuration, formatTokens, padEnd, padStart, shortType } from "../../src/core/ui-kit.ts";
+import { type Host, reason, type State } from "../host.ts";
 import type { Subcommand } from "../omca-router.ts";
-import { keyButton, noticeRow, open, reason, type TabView, type View } from "../pane.ts";
+import { keyButton, noticeRow, open, type TabView, type View } from "../pane.ts";
 
 type Stats = State["stats"];
 type Row = Stats["rows"][number];
@@ -88,15 +88,12 @@ const KEEP_ORDER: readonly Name[] = ["runs", "cost", "evidence", "median", "toke
 
 function layout(width: number, names: readonly string[]): { name: number; columns: Column[] } {
   const longest = Math.max(displayWidth("agent"), ...names.map(displayWidth));
-  for (let kept = KEEP_ORDER.length; kept >= 0; kept -= 1) {
+  for (let kept = KEEP_ORDER.length; ; kept -= 1) {
     const columns = ORDER.filter((name) => KEEP_ORDER.slice(0, kept).includes(name)).map((name) => COLUMNS[name]);
     const room = width - columns.reduce((sum, column) => sum + GAP.length + column.width, 0);
     if (room >= Math.min(MIN_NAME, longest) || kept === 0) return { name: Math.max(1, Math.min(room, longest)), columns };
   }
-  return { name: width, columns: [] };
 }
-
-const shortType = (type: string) => type.slice(type.lastIndexOf(":") + 1);
 
 function summary(stats: Stats, g: View["g"], width: number): string {
   const total = stats.rows.reduce((sum, row) => sum + row.count, 0);

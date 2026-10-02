@@ -1,6 +1,6 @@
 import { isSafeSessionId } from "../src/core/session-id.ts";
 import type { Features } from "./dispatch.ts";
-import type { Host } from "./host.ts";
+import { type Host, reason } from "./host.ts";
 
 export type Verdict = "up" | "down";
 export type Rating = { turn_id: string | null; at: string; rating: Verdict; note?: string };
@@ -11,17 +11,11 @@ let lastTurnId: string | null = null;
 let ratings: readonly Rating[] = [];
 let failure: string | null = null;
 
-const reason = (error: unknown): string => (error instanceof Error ? error.message : String(error));
-
 export const shown = (): { ratings: readonly Rating[]; error: string | null; hasTurn: boolean } => ({
   ratings,
   error: failure,
   hasTurn: lastTurnId !== null,
 });
-
-export function noteMainTurn(turnId: string): void {
-  lastTurnId = turnId;
-}
 
 function isRating(value: unknown): value is Rating {
   if (typeof value !== "object" || value === null) return false;
@@ -82,6 +76,12 @@ export const feedback: Features = {
         ratings = [];
         failure = `Could not read this session's feedback: ${reason(error)}`;
       }
+      return undefined;
+    },
+  },
+  "turn.complete": {
+    post(_host, e) {
+      if (e.agentId === undefined) lastTurnId = e.turnId;
       return undefined;
     },
   },

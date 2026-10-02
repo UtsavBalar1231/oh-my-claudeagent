@@ -1,10 +1,10 @@
 import { resolveBoundPlan } from "../src/core/boulder.ts";
 import { isHookDisabled } from "../src/core/kill-switch.ts";
+import { BOULDER } from "../src/core/omca-paths.ts";
 import { parsePlan } from "../src/core/plan-reader.ts";
 import type { Features } from "./dispatch.ts";
 import type { Host } from "./host.ts";
 
-const BOULDER = ".omca/state/boulder.json";
 // The summarizer needs the next steps, not the whole plan; the file keeps the rest.
 const MAX_OPEN_TASKS = 10;
 

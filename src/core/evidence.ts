@@ -8,16 +8,6 @@ export const EVIDENCE_TYPES = [
 
 export type EvidenceType = (typeof EVIDENCE_TYPES)[number];
 
-export interface EvidenceEntry {
-  type: EvidenceType;
-  command: string;
-  exit_code: number;
-  output_snippet: string;
-  timestamp: string;
-  verified_by?: string;
-  plan_sha256?: string;
-}
-
 // A verification older than this belongs to earlier work, not the task completing now.
 export const MAX_SLOT_AGE_SECONDS = 3600;
 

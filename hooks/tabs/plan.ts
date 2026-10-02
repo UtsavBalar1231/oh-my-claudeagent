@@ -1,7 +1,8 @@
 import type { RenderElement } from "claude-code";
 import { resolveBoundPlan } from "../../src/core/boulder.ts";
 import { type Drawn, drawnAt, type FocusList, focusMove, placeWindow } from "../../src/core/list-window.ts";
-import { homeDir, inferPlatform, type Platform, samePath, tildePath } from "../../src/core/path.ts";
+import { BOULDER } from "../../src/core/omca-paths.ts";
+import { type Platform, samePath, tildePath } from "../../src/core/path.ts";
 import {
   CONTENTS_CAP,
   chunks,
@@ -16,18 +17,17 @@ import {
 } from "../../src/core/plan-reader.ts";
 import { displayWidth, fitEnd, fitMiddle, KEYS, keyHint } from "../../src/core/ui-kit.ts";
 import type { Input, Phase } from "../dispatch.ts";
-import type { Host, State } from "../host.ts";
+import { type Host, reason, type State } from "../host.ts";
 import type { Subcommand } from "../omca-router.ts";
 import {
-  envOf,
   keyButton,
   noticeRow,
   open,
   PANE,
   patchPane,
-  reason,
   regainFocus,
   rule,
+  sessionOf,
   type TabView,
   type View,
 } from "../pane.ts";
@@ -39,7 +39,6 @@ type Key = readonly [hotkey: string, label: string, work: () => unknown, isOff?:
 
 const ROW = "row-";
 const PICK = "pick-";
-const BOULDER = ".omca/state/boulder.json";
 const UNRESOLVED_PLANS = "~/.claude/plans";
 const MIN_LIST_ROWS = 3;
 // Docked: title, meta, rule, two edge lines, rule, key row, hint line.
@@ -65,9 +64,11 @@ let isRingOnRow = false;
 const isLoaded = (plan: State["plan"] | undefined): plan is Loaded => plan !== undefined && "pages" in plan;
 
 async function where(host: Host): Promise<{ platform: Platform; root: string; home: string; dir: string }> {
-  const [root, env, settings] = await Promise.all([host.session.root(), envOf(host), host.settings.read()]);
-  const home = homeDir(env) ?? "";
-  const platform = inferPlatform(root, home);
+  const [root, { env, platform, home }, settings] = await Promise.all([
+    host.session.root(),
+    sessionOf(host),
+    host.settings.read(),
+  ]);
   return { platform, root, home, dir: plansDirectory(platform, settings["plansDirectory"], root, env) ?? UNRESOLVED_PLANS };
 }
 

@@ -1,5 +1,6 @@
 import { parseRouteHint, type Effort } from "../src/core/route-hint.ts";
 import type { Features } from "./dispatch.ts";
+import { update } from "./host.ts";
 
 const hinted = new Map<string, Effort>();
 
@@ -16,12 +17,8 @@ export const route: Features = {
       const effort = hinted.get(e.tool_use_id);
       hinted.delete(e.tool_use_id);
       if (effort === undefined || result.agentId === undefined) return undefined;
-      const agentId = result.agentId;
-      let written;
-      do {
-        const { value = {}, version } = await host.state.routes.get();
-        written = await host.state.routes.set({ ...value, [agentId]: effort }, { ifVersion: version });
-      } while (!written.isSet);
+      const { agentId } = result;
+      await update(host.state.routes, (routes) => ({ ...routes, [agentId]: effort }));
       return undefined;
     },
   },

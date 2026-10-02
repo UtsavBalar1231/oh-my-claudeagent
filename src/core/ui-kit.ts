@@ -56,17 +56,13 @@ export const KEYS = {
   back: "esc",
 } as const;
 
-export function tabKey(index: number): string | undefined {
-  return Number.isInteger(index) && index >= 0 && index < 9 ? String(index + 1) : undefined;
-}
-
 export function keyHint(pairs: readonly (readonly [key: string, label: string])[], g: Glyphs): string {
   return pairs.map(([key, label]) => `${key} ${label}`).join(` ${g.dot} `);
 }
 
 // The engine draws a pane's close mark over the last body columns of the topmost visible
 // row, whichever row that is after scrolling, so every row leaves them free.
-export const GUTTER = 3;
+const GUTTER = 3;
 
 export function usableColumns(bodyColumns: number): number {
   return Math.max(0, bodyColumns - GUTTER);
@@ -150,17 +146,20 @@ export function formatTokens(tokens: number): string {
   return `${(tokens / 1_000_000).toFixed(1)}M`;
 }
 
+const two = (value: number) => String(value).padStart(2, "0");
+
+export function formatWhen(at: number | string): string {
+  const date = new Date(at);
+  return `${two(date.getMonth() + 1)}-${two(date.getDate())} ${two(date.getHours())}:${two(date.getMinutes())}`;
+}
+
+export const shortType = (type: string): string => type.slice(type.lastIndexOf(":") + 1);
+
 export type ViewState<T> =
   | { kind: "loading" }
   | { kind: "error"; reason: string }
   | { kind: "empty" }
   | { kind: "populated"; value: T };
-
-export function viewState<T>(value: T | undefined, error: string | null, isEmpty: (value: T) => boolean): ViewState<T> {
-  if (error !== null) return { kind: "error", reason: error };
-  if (value === undefined) return { kind: "loading" };
-  return isEmpty(value) ? { kind: "empty" } : { kind: "populated", value };
-}
 
 export type Notice = { text: string; color: Color; isDim: boolean };
 

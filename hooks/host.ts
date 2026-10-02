@@ -46,11 +46,8 @@ export type Host = {
   process: { run: Engine["process"]["run"] };
   ui: {
     open: Engine["ui"]["open"];
-    close: Engine["ui"]["close"];
     panes: Engine["ui"]["panes"];
     ask: Engine["ui"]["ask"];
-    toast: Engine["ui"]["toast"];
-    status: Engine["ui"]["status"];
     invalidate: () => void;
     focus: Engine["ui"]["focus"];
     resolve: Engine["ui"]["resolve"];
@@ -62,7 +59,6 @@ export type Host = {
     surfaces: Engine["session"]["surfaces"];
     usage: Engine["session"]["usage"];
     version: Engine["session"]["version"];
-    model: Engine["session"]["model"];
   };
   settings: { read: Engine["settings"]["read"] };
   agent: { list: Engine["agent"]["list"] };
@@ -75,3 +71,35 @@ export type Host = {
   prompt: { fill: Engine["prompt"]["fill"] };
   state: { [K in keyof State]: AtomHost<K> };
 };
+
+const WRITE_ATTEMPTS = 3;
+
+// Several hooks write one atom between awaits, so each write is read, changed and set at the
+// version it read. A change that returns the value unchanged writes nothing and redraws nothing.
+export async function update<K extends keyof State>(
+  atom: AtomHost<K>,
+  change: (value: State[K] | undefined) => State[K] | undefined,
+): Promise<void> {
+  for (let attempt = 0; attempt < WRITE_ATTEMPTS; attempt += 1) {
+    const { value, version } = await atom.get();
+    const next = change(value);
+    if (next === undefined || next === value) return;
+    if ((await atom.set(next, { ifVersion: version })).isSet) return;
+  }
+  throw new Error(`the state changed under ${WRITE_ATTEMPTS} writes in a row`);
+}
+
+// The engine prefixes a refused call's message with the plugin and the call, `<plugin>: $.fs.read: `.
+export const reason = (error: unknown): string =>
+  (error instanceof Error ? error.message : String(error)).replace(/^[\w-]+: \$\.[\w.]+: /, "");
+
+export async function pluginVersion(host: Host): Promise<string | null> {
+  try {
+    const manifest: unknown = JSON.parse(await host.fs.read(`${host.plugin.root}/.claude-plugin/plugin.json`));
+    const version = typeof manifest === "object" && manifest !== null && "version" in manifest ? manifest.version : null;
+    return typeof version === "string" ? version : null;
+  } catch (error) {
+    host.log(`cannot read the plugin version: ${reason(error)}`);
+    return null;
+  }
+}

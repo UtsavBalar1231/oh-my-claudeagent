@@ -1,26 +1,9 @@
 import type { AgentInfo, TurnUsage } from "claude-code";
 import type { Features } from "./dispatch.ts";
-import type { AtomHost, Host, State } from "./host.ts";
+import { type Host, type State, update } from "./host.ts";
 
 type Row = State["agents"][string];
 type Status = Row["status"];
-
-const WRITE_ATTEMPTS = 3;
-
-// Several hooks write one atom between awaits, so each write is read, changed and set at the
-// version it read. A change that returns the value unchanged writes nothing and redraws nothing.
-export async function update<K extends keyof State>(
-  atom: AtomHost<K>,
-  change: (value: State[K] | undefined) => State[K] | undefined,
-): Promise<void> {
-  for (let attempt = 0; attempt < WRITE_ATTEMPTS; attempt += 1) {
-    const { value, version } = await atom.get();
-    const next = change(value);
-    if (next === undefined || next === value) return;
-    if ((await atom.set(next, { ifVersion: version })).isSet) return;
-  }
-  throw new Error(`the state changed under ${WRITE_ATTEMPTS} writes in a row`);
-}
 
 const inputTokens = (usage: TurnUsage) =>
   usage.input_tokens + usage.cache_read_input_tokens + usage.cache_creation_input_tokens;
@@ -33,7 +16,7 @@ function edit(host: Host, id: string, change: (row: Row) => Row): Promise<void> 
   });
 }
 
-export function endAgent(host: Host, id: string, status: Status, usage: TurnUsage | undefined, at: number): Promise<void> {
+function endAgent(host: Host, id: string, status: Status, usage: TurnUsage | undefined, at: number): Promise<void> {
   return edit(host, id, (row) => ({
     ...row,
     status,
@@ -78,6 +61,12 @@ export const agentsTracker: Features = {
           status: "running",
         },
       }));
+      return undefined;
+    },
+  },
+  "turn.complete": {
+    async post(host, e) {
+      if (e.agentId !== undefined) await endAgent(host, e.agentId, e.reason, e.usage, await host.clock.now());
       return undefined;
     },
   },

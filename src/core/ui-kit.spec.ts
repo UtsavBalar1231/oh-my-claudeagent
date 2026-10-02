@@ -5,6 +5,7 @@ import {
   fitMiddle,
   formatDuration,
   formatTokens,
+  formatWhen,
   glyphs,
   isAsciiRequested,
   keyHint,
@@ -12,9 +13,8 @@ import {
   notice,
   padEnd,
   padStart,
-  tabKey,
+  shortType,
   usableColumns,
-  viewState,
 } from "./ui-kit.ts";
 
 const E = glyphs(false).ellipsis;
@@ -122,11 +122,6 @@ describe("glyphs", () => {
 });
 
 describe("keys and layout", () => {
-  test("digits 1 to 9 name the first nine tabs and nothing past them", () => {
-    expect([0, 1, 8].map(tabKey)).toEqual(["1", "2", "9"]);
-    expect([-1, 9, 1.5].map(tabKey)).toEqual([undefined, undefined, undefined]);
-  });
-
   test("a key hint joins each key and label with the shared separator", () => {
     const pairs = [["n", "next"], ["p", "prev"], ["esc", "back"]] as const;
     expect(keyHint(pairs, glyphs(false))).toBe("n next · p prev · esc back");
@@ -147,19 +142,7 @@ describe("padding", () => {
   });
 });
 
-describe("view states", () => {
-  const isEmpty = (rows: readonly string[]) => rows.length === 0;
-
-  test("an error wins, an absent value is loading, then empty or populated", () => {
-    expect(viewState<readonly string[]>(undefined, null, isEmpty)).toEqual({ kind: "loading" });
-    expect(viewState<readonly string[]>([], "boulder.json is not JSON", isEmpty)).toEqual({
-      kind: "error",
-      reason: "boulder.json is not JSON",
-    });
-    expect(viewState<readonly string[]>([], null, isEmpty)).toEqual({ kind: "empty" });
-    expect(viewState<readonly string[]>(["a"], null, isEmpty)).toEqual({ kind: "populated", value: ["a"] });
-  });
-
+describe("notices", () => {
   test("each non-populated state draws one fitted line in its own color", () => {
     const words = { loading: "Reading the plan", empty: "No plan is bound to this session." };
     const g = glyphs(false);
@@ -203,4 +186,15 @@ describe("formatTokens", () => {
   ])("%p tokens is %p", (tokens, text) => {
     expect(formatTokens(tokens)).toBe(text);
   });
+});
+
+test("a time reads month-day hour:minute in the local zone, from milliseconds or an ISO string", () => {
+  const at = new Date(2026, 9, 2, 9, 5);
+  expect(formatWhen(at.getTime())).toBe("10-02 09:05");
+  expect(formatWhen(at.toISOString())).toBe("10-02 09:05");
+});
+
+test("an agent type loses its plugin prefix", () => {
+  expect(shortType("oh-my-claudeagent:executor")).toBe("executor");
+  expect(shortType("explore")).toBe("explore");
 });

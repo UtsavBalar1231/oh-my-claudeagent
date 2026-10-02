@@ -43,11 +43,8 @@ function bindHost($: EngineInterface, options: Options): Host {
     process: { run: (argv, init) => $.process.run(argv, init) },
     ui: {
       open: (args) => $.ui.open(args),
-      close: (args) => $.ui.close(args),
       panes: () => $.ui.panes(),
       ask: (question, choices) => $.ui.ask(question, choices),
-      toast: (text, toastOptions) => $.ui.toast(text, toastOptions),
-      status: (text) => $.ui.status(text),
       invalidate: () => $.ui.invalidate("ui.render"),
       focus: (args) => $.ui.focus(args),
       resolve: (e) => $.ui.resolve(e),
@@ -59,7 +56,6 @@ function bindHost($: EngineInterface, options: Options): Host {
       surfaces: () => $.session.surfaces(),
       usage: (args) => $.session.usage(args),
       version: () => $.session.version(),
-      model: () => $.session.model(),
     },
     settings: { read: (args) => $.settings.read(args) },
     agent: { list: () => $.agent.list() },
@@ -141,7 +137,7 @@ export const register: Register = (on, pluginOptions) => {
   const sessionStart = featuresFor("session.start", { pane, feedback, modMarker, band });
   const turnStart = featuresFor("turn.start", { footer, modMarker });
   const turnStep = featuresFor("turn.step", { route, ledger, agentsTracker });
-  const turnComplete = featuresFor("turn.complete", { band, pane, ledger, footer });
+  const turnComplete = featuresFor("turn.complete", { band, agentsTracker, pane, ledger, feedback, footer });
   const agentSpawn = featuresFor("agent.spawn", { route, agentsTracker, ledger });
   const promptEdit = featuresFor("prompt.edit", { band });
   const paneClose = featuresFor("ui.close", { pane });

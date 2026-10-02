@@ -61,7 +61,6 @@ test("the module registers exactly the dispatchers, env reads and atoms of the c
         "prompt.fill",
         "session.cwd",
         "session.id",
-        "session.model",
         "session.root",
         "session.surfaces",
         "session.usage",
@@ -70,15 +69,12 @@ test("the module registers exactly the dispatchers, env reads and atoms of the c
         "state.get",
         "state.set",
         "ui.ask",
-        "ui.close",
         "ui.focus",
         "ui.invalidate",
         "ui.log",
         "ui.open",
         "ui.panes",
         "ui.resolve",
-        "ui.status",
-        "ui.toast",
       ],
       env: {
         reads: [
@@ -251,7 +247,7 @@ test("the band and pane render dispatchers fall through to the engine's drawing 
     plugin: PLUGIN,
     surface: "terminal",
     component: "Pane",
-    requestId: "omca",
+    requestId: "elsewhere",
     props: {
       title: "omca",
       isFocused: true,

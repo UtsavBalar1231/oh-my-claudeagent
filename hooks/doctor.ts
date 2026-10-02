@@ -1,9 +1,8 @@
 import { addRefreshInterval, doctorChecks, type Fix, type HookState, unifiedDiff } from "../src/core/doctor-checks.ts";
-import { configDir, homeDir, inferPlatform, joinPath, type Platform, tildePath } from "../src/core/path.ts";
-import { isSafeSessionId } from "../src/core/session-id.ts";
-import { update } from "./agents-tracker.ts";
-import type { Host, State } from "./host.ts";
-import { envOf, reason } from "./pane.ts";
+import { statusPath } from "../src/core/omca-paths.ts";
+import { joinPath, type Platform, tildePath } from "../src/core/path.ts";
+import { type Host, pluginVersion, reason, type State, update } from "./host.ts";
+import { sessionOf } from "./pane.ts";
 
 type Doctor = State["doctor"];
 
@@ -27,10 +26,7 @@ const patch = (host: Host, change: Partial<Doctor>) =>
   }));
 
 async function where(host: Host): Promise<{ platform: Platform; home: string; settings: string | undefined }> {
-  const env = await envOf(host);
-  const home = homeDir(env) ?? "";
-  const config = configDir(env);
-  const platform = inferPlatform(home, config ?? "");
+  const { platform, home, config } = await sessionOf(host);
   return { platform, home, settings: config === undefined ? undefined : joinPath(platform, config, "settings.json") };
 }
 
@@ -55,21 +51,12 @@ async function astGrep(host: Host): Promise<{ name: string; version: string } | 
   return null;
 }
 
-async function modVersion(host: Host): Promise<string | null> {
-  try {
-    const manifest: unknown = JSON.parse(await host.fs.read(`${host.plugin.root}/.claude-plugin/plugin.json`));
-    const version = typeof manifest === "object" && manifest !== null && "version" in manifest ? manifest.version : null;
-    return typeof version === "string" ? version : null;
-  } catch {
-    return null;
-  }
-}
-
 async function hookState(host: Host): Promise<HookState> {
-  const id = await host.session.id();
-  if (!isSafeSessionId(id)) return { kind: "unsafe-id" };
+  const [root, id] = await Promise.all([host.session.root(), host.session.id()]);
+  const path = statusPath(root, id);
+  if (path === undefined) return { kind: "unsafe-id" };
   try {
-    const text = await readIfPresent(host, `${await host.session.root()}/.omca/state/session/${id}.json`);
+    const text = await readIfPresent(host, path);
     const status: unknown = text === null ? null : JSON.parse(text);
     const at = typeof status === "object" && status !== null && "last_hook_at" in status ? status.last_hook_at : null;
     return typeof at === "number" ? { kind: "seen", lastHookAt: at } : { kind: "missing" };
@@ -81,7 +68,7 @@ async function hookState(host: Host): Promise<HookState> {
 async function check(host: Host): Promise<Doctor["checks"]> {
   const paths = await where(host);
   const [mod, engine, bun, ast, hook, now, settings, userSettings] = await Promise.all([
-    modVersion(host),
+    pluginVersion(host),
     host.session.version(),
     output(host, ["bun", "--version"]),
     astGrep(host),

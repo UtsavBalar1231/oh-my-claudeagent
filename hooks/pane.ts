@@ -1,5 +1,5 @@
 import type { CommandRunResult, Elements, PaneOpenArgs, RenderElement, Timer } from "claude-code";
-import { type Env, homeDir, inferPlatform, type Platform } from "../src/core/path.ts";
+import { configDir, type Env, homeDir, inferPlatform, type Platform } from "../src/core/path.ts";
 import {
   COLORS,
   displayWidth,
@@ -7,13 +7,12 @@ import {
   glyphs,
   isAsciiRequested,
   notice,
-  tabKey,
   usableColumns,
   type ViewState,
 } from "../src/core/ui-kit.ts";
-import { endAgent, reconcile, update } from "./agents-tracker.ts";
+import { reconcile } from "./agents-tracker.ts";
 import type { Features, Input } from "./dispatch.ts";
-import type { Host, State } from "./host.ts";
+import { type Host, reason, type State, update } from "./host.ts";
 import type { Subcommand } from "./omca-router.ts";
 import * as agents from "./tabs/agents.ts";
 import * as doctor from "./tabs/doctor.ts";
@@ -92,7 +91,7 @@ let now = 0;
 let inlineRows = INLINE_ROWS;
 let viewportRows = 0;
 
-export async function envOf(host: Host): Promise<Env> {
+async function envOf(host: Host): Promise<Env> {
   const [HOME, USERPROFILE, HOMEDRIVE, HOMEPATH, CLAUDE_CONFIG_DIR] = await Promise.all([
     host.env.HOME(),
     host.env.USERPROFILE(),
@@ -103,9 +102,24 @@ export async function envOf(host: Host): Promise<Env> {
   return { HOME, USERPROFILE, HOMEDRIVE, HOMEPATH, CLAUDE_CONFIG_DIR };
 }
 
-// The engine prefixes a refused call's message with the plugin and the call, `<plugin>: $.fs.read: `.
-export const reason = (error: unknown): string =>
-  (error instanceof Error ? error.message : String(error)).replace(/^[\w-]+: \$\.\w+\.\w+: /, "");
+export type Session = { env: Env; platform: Platform; home: string; config: string | undefined; isAscii: boolean };
+
+const UNRESOLVED: Session = { env: {}, platform: "linux", home: "", config: undefined, isAscii: false };
+let session: Session | undefined;
+
+async function resolveSession(host: Host): Promise<Session> {
+  const [root, env, ascii] = await Promise.all([host.session.root(), envOf(host), host.env.OMCA_ASCII()]);
+  const home = homeDir(env) ?? "";
+  const config = configDir(env);
+  return { env, platform: inferPlatform(root, home, config ?? ""), home, config, isAscii: isAsciiRequested(ascii) };
+}
+
+// The environment holds for the life of the session, so it is read once, outside any drawing.
+export async function sessionOf(host: Host): Promise<Session> {
+  session ??= await resolveSession(host);
+  return session;
+}
+
 const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
 
 export function patchPane(host: Host, change: (pane: Pane) => Pane): Promise<void> {
@@ -176,6 +190,7 @@ function stop(): void {
 }
 
 export async function open(host: Host, e: Input<"command.run">, tab: Tab): Promise<CommandRunResult> {
+  await sessionOf(host);
   now = await host.clock.now();
   await refresh(host, tab);
   const columns = clamp(Math.round(e.presentation.columns * DOCK_SHARE), DOCK_MIN_COLUMNS, DOCK_MAX_COLUMNS);
@@ -224,7 +239,7 @@ async function selectTab(host: Host, tab: Tab): Promise<void> {
 
 // The narrower gap is used only when it keeps every tab on one row, which saves an inline row.
 function tabRows(width: number): { gap: number; rows: (readonly [Tab, string, string])[][] } {
-  const cells = TABS.map(([id, label], index) => [id, label, tabKey(index) ?? ""] as const);
+  const cells = TABS.map(([id, label], index) => [id, label, String(index + 1)] as const);
   const cellWidth = ([, label, key]: readonly [Tab, string, string]) => displayWidth(`${key}: ${label}`);
   const oneRow = (gap: number) => cells.reduce((sum, cell) => sum + cellWidth(cell), 0) + gap * (cells.length - 1);
   const gap = oneRow(TAB_GAP) <= width || oneRow(1) > width ? TAB_GAP : 1;
@@ -263,9 +278,9 @@ async function draw(host: Host, e: Input<"ui.render Pane">): Promise<RenderEleme
   const width = usableColumns(e.props.bodyColumns);
   const isInline = e.props.placement !== "dock";
   const rows = bodyRows(host, e, isInline);
-  const [ascii, env, pane] = await Promise.all([host.env.OMCA_ASCII(), envOf(host), host.state.pane.get()]);
-  const home = homeDir(env) ?? "";
-  const g = glyphs(isAsciiRequested(ascii));
+  const { home, platform, isAscii } = session ?? UNRESOLVED;
+  const pane = await host.state.pane.get();
+  const g = glyphs(isAscii);
   const active = pane.value?.tab ?? "agents";
   const press: Press = (work) => async () => {
     try {
@@ -293,7 +308,7 @@ async function draw(host: Host, e: Input<"ui.render Pane">): Promise<RenderEleme
     }),
   );
   const chrome = tabs.length + (isInline ? 0 : 1);
-  const view: View = { kit, g, width, rows: Math.max(0, rows - chrome), isInline, home, platform: inferPlatform(home), now, press };
+  const view: View = { kit, g, width, rows: Math.max(0, rows - chrome), isInline, home, platform, now, press };
   let body: readonly RenderElement[];
   try {
     body = await viewOf(active)(host, view);
@@ -314,13 +329,13 @@ export const pane: Features = {
         argumentHint: "[plan [name|path]|stats|doctor]",
         immediate: true,
       });
+      await sessionOf(host);
       if ((await host.ui.panes()).some((open) => open.id === PANE)) start(host);
       return undefined;
     },
   },
   "turn.complete": {
-    async post(host, e) {
-      if (e.agentId !== undefined) await endAgent(host, e.agentId, e.reason, e.usage, await host.clock.now());
+    async post(host) {
       if (timer !== undefined) await refresh(host);
       return undefined;
     },

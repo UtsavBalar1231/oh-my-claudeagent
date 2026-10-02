@@ -23,7 +23,7 @@ test("session start writes the marker with its time, the plugin version and the 
   await start($);
   const manifest = w.reads.find((path) => path.endsWith("/.claude-plugin/plugin.json")) ?? "";
   expect(marker(w)).toEqual({ written_at: STARTED_MS, version: null, options: { showBand: true, guardMode: "dialog", enableKeywordTriggers: false } });
-  expect(w.logs.some((line) => line.startsWith("mod-marker: cannot read the plugin version"))).toBe(true);
+  expect(w.logs.some((line) => line.startsWith("cannot read the plugin version"))).toBe(true);
 
   write(w, manifest, '{ "name": "oh-my-claudeagent", "version": "3.0.0" }');
   await w.clock.advance(60_000);

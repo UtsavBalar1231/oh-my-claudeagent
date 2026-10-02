@@ -1,5 +1,5 @@
 import type { Args, On } from "claude-code";
-import { type Engine, type EngineCall, expect, mock, type MockClock, type Mounted, test } from "claude-code/testing";
+import { type Engine, type EngineCall, expect, mock, type Mounted, test } from "claude-code/testing";
 import { displayWidth } from "../../src/core/ui-kit.ts";
 
 const PLUGIN = "oh-my-claudeagent";
@@ -21,7 +21,7 @@ const START_FILL = `/oh-my-claudeagent:start-work ${PLAN_PATH}`;
 
 type Files = Map<string, { text: string; mtimeMs: number }>;
 type Band = Mounted<"terminal" | "desktop", "AbovePrompt">;
-type World = { clock: MockClock; fills: string[]; submits: string[]; logs: string[]; invalidations: () => number };
+type World = { fills: string[]; submits: string[]; logs: string[] };
 
 function planText(done: number, total: number): string {
   const tasks = Array.from({ length: total }, (_, i) => `- [${i < done ? "x" : " "}] ${i + 1}. Port module ${i + 1}`);
@@ -58,8 +58,7 @@ function world(on: On, disk: Files): World {
   const fills: string[] = [];
   const submits: string[] = [];
   const logs: string[] = [];
-  let invalidations = 0;
-  const clock = mock.clock(on, { now: NOW_MS });
+  mock.clock(on, { now: NOW_MS });
   mock.env(on, {});
   on("session.id", () => ({ value: SESSION }));
   on("session.root", () => ({ value: ROOT }));
@@ -80,7 +79,6 @@ function world(on: On, disk: Files): World {
     if (file === undefined) throw new Error(`ENOENT: no such file or directory, stat '${e.path}'`);
     return { value: { kind: "file", size: file.text.length, mtimeMs: file.mtimeMs, isLink: false } };
   });
-  on("ui.invalidate", () => ((invalidations += 1), { value: undefined }));
   on("prompt.fill", (_$, e) => (fills.push(e.text), { isFilled: true }));
   on("prompt.submit", (_$, e) => (submits.push(e.text), { text: e.text }));
   on("ui.log", (_$, e) => (logs.push(e.text), { value: undefined }));
@@ -89,7 +87,7 @@ function world(on: On, disk: Files): World {
     const { Text } = $.ui.resolve(e);
     return Text({ children: ["engine band"] });
   });
-  return { clock, fills, submits, logs, invalidations: () => invalidations };
+  return { fills, submits, logs };
 }
 
 const start = ($: Engine) => $.session.start({ cwd: ROOT, surface: "terminal", isInteractive: true });
@@ -523,35 +521,35 @@ test(
   },
 );
 
-test("a burst of turn ends redraws at most twice, and the next burst redraws again", async ($, on) => {
+test("a burst of turn ends leaves the mounted band on the last state, drawn without any invalidate", async ($, on) => {
   const disk = bound(12, 46);
-  const { clock, invalidations } = world(on, disk);
+  world(on, disk);
   await start($);
-  await clock.advance(1000);
-  const atStart = invalidations();
+  const band = await mount($, "terminal");
+  expect(await statusRow(band)).toBe("widget-rewrite 12/46 tasks · no verification yet");
 
   for (let n = 0; n < 8; n++) {
     disk.set(STATUS, { text: statusFile(`just test ${n}`), mtimeMs: BEFORE_RUN_MS });
     await turn($, n % 2 === 0 ? undefined : `agent-${n}`);
   }
-  expect(invalidations() - atStart).toBe(1);
-  await clock.advance(1000);
-  expect(invalidations() - atStart).toBe(2);
+
+  expect(await statusRow(band)).toBe("widget-rewrite 12/46 tasks · ! just test 7 evidence not logged");
+  expect((await buttons(band)).map((button) => button.key)).toEqual(["log-evidence", "start-work"]);
 
   disk.set(STATUS, { text: statusFile("just test again"), mtimeMs: BEFORE_RUN_MS });
   await turn($);
-  expect(invalidations() - atStart).toBe(3);
+  expect(await statusRow(band)).toBe("widget-rewrite 12/46 tasks · ! just test again evidence not logged");
 });
 
-test("a turn that changes nothing redraws nothing", async ($, on) => {
-  const { clock, invalidations } = world(on, bound(12, 46));
+test("a turn that changes nothing leaves the drawn band as it was", async ($, on) => {
+  world(on, bound(12, 46));
   await start($);
   await turn($);
-  await clock.advance(1000);
-  const settled = invalidations();
+  const band = await mount($, "terminal");
+  const before = [await texts(band), await buttons(band)];
 
   await turn($);
   await turn($, "agent-1");
-  await clock.advance(1000);
-  expect(invalidations()).toBe(settled);
+
+  expect([await texts(band), await buttons(band)]).toEqual(before);
 });

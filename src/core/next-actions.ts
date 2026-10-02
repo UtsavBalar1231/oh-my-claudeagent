@@ -9,8 +9,6 @@ export type ActionFacts = {
   hasFinalVerification: boolean;
 };
 
-export const MAX_ACTIONS = 3;
-
 export const isPlanComplete = (plan: { done: number; total: number }): boolean =>
   plan.total > 0 && plan.done === plan.total;
 
@@ -37,7 +35,7 @@ export function nextActions({ plan, verification, isAgentRunning, hasFinalVerifi
           },
     );
   }
-  return actions.slice(0, MAX_ACTIONS);
+  return actions;
 }
 
 type LedgerEntry = { type?: unknown; exit_code?: unknown; plan_sha256?: unknown };

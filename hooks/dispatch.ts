@@ -1,5 +1,5 @@
 import type { Args, EventResult, Frozen, RenderElement, RenderInput } from "claude-code";
-import type { Host } from "./host.ts";
+import { type Host, reason } from "./host.ts";
 
 type Sites = {
   "tool.check": [Args<"tool.check">, EventResult<"tool.check">];
@@ -49,9 +49,9 @@ async function attempt<T>(host: Logs, where: string, call: () => Awaitable<T>): 
   try {
     return { value: await call() };
   } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
-    host.log(`${where} failed: ${reason}`);
-    return { reason };
+    const failure = reason(error);
+    host.log(`${where} failed: ${failure}`);
+    return { reason: failure };
   }
 }
 

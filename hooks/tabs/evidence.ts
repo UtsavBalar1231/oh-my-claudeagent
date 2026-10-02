@@ -1,12 +1,12 @@
 import type { RenderElement } from "claude-code";
 import { EVIDENCE_TYPES } from "../../src/core/evidence.ts";
-import { COLORS, fitEnd, levelMark, padEnd, padStart } from "../../src/core/ui-kit.ts";
-import type { Host, State } from "../host.ts";
-import { noticeRow, reason, type TabView } from "../pane.ts";
+import { LEDGER } from "../../src/core/omca-paths.ts";
+import { COLORS, fitEnd, formatWhen, levelMark, padEnd, padStart } from "../../src/core/ui-kit.ts";
+import { type Host, reason, type State } from "../host.ts";
+import { noticeRow, type TabView } from "../pane.ts";
 
 type Entry = State["pane"]["evidence"][number];
 
-const LEDGER = ".omca/evidence/verification-evidence.json";
 const NEWEST = 20;
 const TYPE = 6;
 const EXIT = 4;
@@ -75,12 +75,6 @@ export async function read(host: Host, root: string): Promise<{ entries: Entry[]
   }
 }
 
-const two = (value: number) => String(value).padStart(2, "0");
-const when = (at: number) => {
-  const date = new Date(at);
-  return `${two(date.getMonth() + 1)}-${two(date.getDate())} ${two(date.getHours())}:${two(date.getMinutes())}`;
-};
-
 export const view: TabView = async (host, view) => {
   const pane = (await host.state.pane.get()).value;
   const words = { loading: "Reading the evidence ledger", empty: "No verification evidence has been logged here yet." };
@@ -99,7 +93,7 @@ export const view: TabView = async (host, view) => {
         Text({ color, children: [`${glyph} `] }),
         Text({ children: [`${padEnd(TYPE_LABEL[entry.type], TYPE)}${GAP}${padEnd(fitEnd(entry.command, commandWidth, view.g.ellipsis), commandWidth)}${GAP}`] }),
         Text(entry.exitCode === 0 ? { dimColor: true, children: [exit] } : { color: COLORS.fail, children: [exit] }),
-        Text({ dimColor: true, children: [`${GAP}${when(entry.at)}`] }),
+        Text({ dimColor: true, children: [`${GAP}${formatWhen(entry.at)}`] }),
       ],
     });
   };

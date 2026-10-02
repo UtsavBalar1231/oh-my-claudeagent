@@ -5,7 +5,7 @@ import { homeDir, joinPath, toPosix } from "../src/core/path.ts";
 import { homeRest, platformOf } from "../src/core/targets.ts";
 import { displayWidth, fitEnd, fitMiddle, type Glyphs, glyphs, isAsciiRequested } from "../src/core/ui-kit.ts";
 import type { Features } from "./dispatch.ts";
-import type { Host } from "./host.ts";
+import { type Host, reason } from "./host.ts";
 
 const RUN = "Run it";
 const REFUSE = "Refuse";
@@ -15,8 +15,6 @@ const WIDTH = 78;
 const LIMIT = 20;
 const COMMAND_LINES = 3;
 const GIT_TIMEOUT_MS = 5000;
-// A rejected `$` call reads `<plugin>: $.<noun>.<verb>: <cause>`; the dialog has room for the cause.
-const ENGINE_PREFIX = /^[\w-]+: \$\.[\w.]+: /;
 
 const deny = (reason: string): { answer: EventResult<"tool.check"> } => ({ answer: { decision: "deny", reason } });
 
@@ -115,8 +113,7 @@ async function gathered(gather: () => Promise<string[]> | string[], g: Glyphs): 
   try {
     return await gather();
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return [`${g.warn} Could not check what it would touch: ${message.replace(ENGINE_PREFIX, "")}`];
+    return [`${g.warn} Could not check what it would touch: ${reason(error)}`];
   }
 }
 
@@ -168,13 +165,13 @@ export const bashGuard: Features = {
       if (finding === undefined) return undefined;
       if (finding.kind === "catastrophic") return deny(reasonFor(finding));
       if (isHookDisabled(await host.env.OMCA_DISABLED_HOOKS(), "bash-guard")) return undefined;
-      const reason = reasonFor(finding);
+      const refusal = reasonFor(finding);
       const canAsk = host.options.guardMode === "dialog" && (await host.session.surfaces()).length > 0;
-      if (!canAsk) return finding.kind === "blocking" ? deny(reason) : undefined;
+      if (!canAsk) return finding.kind === "blocking" ? deny(refusal) : undefined;
       const g = glyphs(isAsciiRequested(await host.env.OMCA_ASCII()));
       const text = await question(host, command, finding, g, ctx);
       const answer = await host.ui.ask(text, { header: "OMCA guard", options: [REFUSE, RUN] }).catch(() => undefined);
-      return answer === RUN ? undefined : deny(reason);
+      return answer === RUN ? undefined : deny(refusal);
     },
   },
 };
