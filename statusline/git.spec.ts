@@ -36,7 +36,7 @@ afterEach(() => {
 const options = (overrides: Partial<GitOptions> = {}): GitOptions => ({ cacheDir, ttlSeconds: 5, timeoutMs: 3000, ...overrides });
 
 function git(cwd: string, ...args: string[]): void {
-  const result = Bun.spawnSync(["git", "-C", cwd, ...args]);
+  const result = Bun.spawnSync(["git", "-C", cwd, ...args], { env: process.env });
   if (result.exitCode !== 0) throw new Error(`git ${args.join(" ")}: ${result.stderr.toString()}`);
 }
 
