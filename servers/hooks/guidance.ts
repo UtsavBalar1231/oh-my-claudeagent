@@ -1,8 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { resolveBoundPlan } from "../../src/core/boulder.ts";
-import { setupBlock } from "../../src/core/doctor-checks.ts";
 import type { Handler } from "./registry.ts";
 import type { Session } from "./session-state.ts";
 import { statusPath } from "./status-file.ts";
@@ -16,18 +14,6 @@ export function guidanceTemplate(): string {
 }
 
 const isMissing = (error: unknown): boolean => error instanceof Error && "code" in error && error.code === "ENOENT";
-
-/** True while the user's CLAUDE.md still holds the 2.x block, which already carries this guidance. */
-export function holdsSetupBlock(): boolean {
-  const config = process.env.CLAUDE_CONFIG_DIR;
-  const dir = config !== undefined && config !== "" ? config : join(process.env.HOME ?? homedir(), ".claude");
-  try {
-    return setupBlock(readFileSync(join(dir, "CLAUDE.md"), "utf8")) !== null;
-  } catch (error) {
-    if (isMissing(error)) return false;
-    throw error;
-  }
-}
 
 function planTitle(root: string, sessionId: string): string | undefined {
   try {
@@ -50,7 +36,7 @@ const isResumed = (root: string, session: Session): boolean =>
 export const handle: Handler = (payload, { root, now, session }) => {
   if (session === undefined) return;
   session.promptAt = now;
-  const isHeldBack = session.isGuided || isResumed(root, session) || holdsSetupBlock();
+  const isHeldBack = session.isGuided || isResumed(root, session);
   const context = isHeldBack ? undefined : `${guidanceTemplate()}\nSession ${session.id}`;
   session.isGuided = true;
   // A typed slash command raises UserPromptExpansion before UserPromptSubmit, and only

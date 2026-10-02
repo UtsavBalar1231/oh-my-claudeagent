@@ -6,8 +6,6 @@ import { bodyColumns, cellsAcross, HOME, pane, ROOT, rows, run, SESSION, SIZES, 
 const CLAUDE_MD = `${HOME}/.claude/CLAUDE.md`;
 const SETTINGS = `${HOME}/.claude/settings.json`;
 const NOW_S = Date.UTC(2026, 9, 2, 12, 0, 0) / 1000;
-const BLOCK = "--- omca-setup\n\n# oh-my-claudeagent orchestration guidance\n\n--- /omca-setup ---\n";
-const MINE = `# Mine\n\n${BLOCK}`;
 const USER = {
   advisorModel: "fable",
   pluginConfigs: { "oh-my-claudeagent@inline": { options: { guardMode: "deny" } } },
@@ -16,7 +14,7 @@ const USER = {
 const USER_TEXT = `${JSON.stringify(USER, null, 2)}\n`;
 const FILES = {
   [`${ROOT}/.omca/state/session/${SESSION}.json`]: JSON.stringify({ session_id: SESSION, last_hook_at: NOW_S - 120, verification: null }),
-  [CLAUDE_MD]: MINE,
+  [CLAUDE_MD]: "# Mine\n",
   [SETTINGS]: USER_TEXT,
 };
 const WIDE = { columns: 120, rows: 40, placement: "inline" } as const;
@@ -72,7 +70,6 @@ const CHECKS = [
   "✓ Advisor       advisorModel fable, and nothing here keeps it off",
 ];
 const STATUS_ROW = `! Status line   No refreshInterval, so it redraws on events only and goes stale while agents run${PAD}i: Add refreshInterval 5`;
-const BLOCK_ROW = `! CLAUDE.md     ~/.claude/CLAUDE.md holds the 2.x omca-setup block, which v3 replaces by delivering that guidance itself${PAD}b: Remove the omca-setup block`;
 
 test("/omca doctor opens the Doctor tab, draws the loading state while the checks run, then one marked row per check, problems first", async ($, on) => {
   const w = engine(on, world(on, FILES, structuredClone(USER)), { hold: true });
@@ -86,59 +83,22 @@ test("/omca doctor opens the Doctor tab, draws the loading state while the check
 
   expect(w.opened).toEqual([{ id: "omca", title: "OMCA", focus: true, closeOnEscape: true, rows: 12, columns: 56 }]);
   expect(body(await ui.drawn())).toEqual([
-    `r: Run again   3 warn · 10 ok · checked ${local(NOW_S)}`,
+    `r: Run again   2 warn · 10 ok · checked ${local(NOW_S)}`,
     "! OMCA          Could not read this mod's version from its manifest",
     STATUS_ROW,
-    BLOCK_ROW,
     ...CHECKS,
   ]);
-  expect(w.reads).not.toContain(`${HOME}/.claude/CLAUDE.md.omca-bak`);
+  expect(w.reads).not.toContain(CLAUDE_MD);
   expect(w.writes).toEqual([]);
 
   const manifest = w.reads.find((path) => path.endsWith("/.claude-plugin/plugin.json")) ?? "";
   write(w, manifest, '{ "name": "oh-my-claudeagent", "version": "3.0.0" }');
   await ui.press({ key: "r" });
-  expect(body(await ui.drawn()).slice(0, 4)).toEqual([
-    `r: Run again   2 warn · 11 ok · checked ${local(NOW_S)}`,
+  expect(body(await ui.drawn()).slice(0, 3)).toEqual([
+    `r: Run again   1 warn · 11 ok · checked ${local(NOW_S)}`,
     STATUS_ROW,
-    BLOCK_ROW,
     "✓ OMCA          oh-my-claudeagent 3.0.0 is loaded",
   ]);
-  await ui.unmount();
-});
-
-test("b backs up CLAUDE.md, then removes the block, and shows the diff and the backup path", async ($, on) => {
-  const w = engine(on, world(on, FILES, structuredClone(USER)));
-  await $.command.run(run("doctor", 120));
-  const ui = await $.ui.mount(pane("terminal", WIDE));
-
-  await ui.press({ key: "b" });
-
-  expect(w.writes).toEqual([`${CLAUDE_MD}.omca-bak`, CLAUDE_MD]);
-  expect(w.files.get(`${CLAUDE_MD}.omca-bak`)?.text).toBe(MINE);
-  expect(w.files.get(CLAUDE_MD)?.text).toBe("# Mine\n\n");
-  expect(body(await ui.drawn())).toEqual([
-    `r: Run again   2 warn · 11 ok · checked ${local(NOW_S)}`,
-    "✓ Removed the omca-setup block from ~/.claude/CLAUDE.md",
-    "  Backup: ~/.claude/CLAUDE.md.omca-bak",
-    "  --- ~/.claude/CLAUDE.md.omca-bak",
-    "  +++ ~/.claude/CLAUDE.md",
-    "  @@ -1,7 +1,2 @@",
-    "   # Mine",
-    "   ",
-    "  ---- omca-setup",
-    "  -",
-    "  -# oh-my-claudeagent orchestration guidance",
-    "  -",
-    "  ---- /omca-setup ---",
-    "! OMCA          Could not read this mod's version from its manifest",
-    STATUS_ROW,
-    ...CHECKS,
-    "✓ CLAUDE.md     No omca-setup block in ~/.claude/CLAUDE.md",
-  ]);
-  expect((await ui.find({ type: "Text", text: "  -# oh-my-claudeagent orchestration guidance" }))?.props["color"]).toBe("error");
-  expect((await ui.find({ type: "Text", text: "  ---- omca-setup" }))?.props["color"]).toBe("error");
-  expect((await ui.find({ type: "Text", text: "  --- ~/.claude/CLAUDE.md.omca-bak" }))?.props["dimColor"]).toBe(true);
   await ui.unmount();
 });
 
@@ -168,6 +128,9 @@ test("i backs up settings.json, then adds refreshInterval inside statusLine at t
     "   }",
     " }",
   ].map((line, index) => (index < 5 ? line : `  ${line}`)));
+  expect((await ui.find({ type: "Text", text: '  -    "command": "omca-statusline"' }))?.props["color"]).toBe("error");
+  expect((await ui.find({ type: "Text", text: '  +    "refreshInterval": 5' }))?.props["color"]).toBe("success");
+  expect((await ui.find({ type: "Text", text: "  --- ~/.claude/settings.json.omca-bak" }))?.props["dimColor"]).toBe(true);
   expect(await ui.find({ key: "i" })).toBeUndefined();
   await ui.unmount();
 });
@@ -177,13 +140,13 @@ test("a fix refuses a file that changed since the check, and writes nothing", as
   await $.command.run(run("doctor", 120));
   const ui = await $.ui.mount(pane("terminal", WIDE));
 
-  write(w, CLAUDE_MD, `${MINE}# Added later\n`);
-  await ui.press({ key: "b" });
+  write(w, SETTINGS, `${USER_TEXT}\n`);
+  await ui.press({ key: "i" });
 
   expect(w.writes).toEqual([]);
-  expect(w.files.get(CLAUDE_MD)?.text).toBe(`${MINE}# Added later\n`);
+  expect(w.files.get(SETTINGS)?.text).toBe(`${USER_TEXT}\n`);
   expect(body(await ui.drawn())[1]).toBe(
-    "✗ ~/.claude/CLAUDE.md changed since the check, so it was left alone; press r to check again",
+    "✗ ~/.claude/settings.json changed since the check, so it was left alone; press r to check again",
   );
   await ui.unmount();
 });
@@ -204,17 +167,15 @@ test("a failed backup aborts the fix before the file is touched", async ($, on) 
   await ui.unmount();
 });
 
-test("CLAUDE_CONFIG_DIR moves the files the doctor reads and fixes, and HOME/.claude is never read", async ($, on) => {
-  const files = { [`/cfg/CLAUDE.md`]: MINE, [`/cfg/settings.json`]: USER_TEXT, [CLAUDE_MD]: "# Not this one\n" };
+test("CLAUDE_CONFIG_DIR moves the settings file the doctor reads and fixes, and HOME/.claude is never read", async ($, on) => {
+  const files = { [`/cfg/settings.json`]: USER_TEXT, [SETTINGS]: "{}\n" };
   const w = engine(on, world(on, files, structuredClone(USER), { CLAUDE_CONFIG_DIR: "/cfg" }));
   await $.command.run(run("doctor", 120));
   const ui = await $.ui.mount(pane("terminal", WIDE));
 
-  expect(body(await ui.drawn()).find((row) => row.startsWith("! CLAUDE.md"))).toBe(
-    `! CLAUDE.md     /cfg/CLAUDE.md holds the 2.x omca-setup block, which v3 replaces by delivering that guidance itself${PAD}b: Remove the omca-setup block`,
-  );
-  await ui.press({ key: "b" });
-  expect(w.writes).toEqual(["/cfg/CLAUDE.md.omca-bak", "/cfg/CLAUDE.md"]);
+  expect(body(await ui.drawn()).find((row) => row.startsWith("! Status line"))).toBe(STATUS_ROW);
+  await ui.press({ key: "i" });
+  expect(w.writes).toEqual(["/cfg/settings.json.omca-bak", "/cfg/settings.json"]);
   expect(w.reads.filter((path) => path.startsWith(`${HOME}/.claude/`))).toEqual([]);
   await ui.unmount();
 });
@@ -232,14 +193,14 @@ test("the tab's empty state offers r, and a failed run shows its reason with r t
   expect(rows(await ui.drawn()).slice(-2)).toEqual(["✗ The checks failed: version unavailable", "r: Run again"]);
   isDenied = false;
   await ui.press({ key: "r" });
-  expect(rows(await ui.drawn()).find((row) => row.startsWith("! CLAUDE.md"))).toBe(
-    "! CLAUDE.md  ~/.claude/CLAUDE.md holds the 2.x omca-setup block, which v3 replaces by delivering that guidance itself  b: Remove the omca-setup block",
+  expect(rows(await ui.drawn()).find((row) => row.startsWith("! Status line"))).toBe(
+    "! Status line  No refreshInterval, so it redraws on events only and goes stale while agents run  i: Add refreshInterval 5",
   );
   await ui.unmount();
 });
 
-test("the tab's hotkeys are r, b and i, never a pane key, and every row fits at 80, 120 and 200 columns on both surfaces", async ($, on) => {
-  const w = engine(on, world(on, FILES, structuredClone(USER)), { refuse: [`${CLAUDE_MD}.omca-bak`] });
+test("the tab's hotkeys are r and i, never a pane key, and every row fits at 80, 120 and 200 columns on both surfaces", async ($, on) => {
+  const w = engine(on, world(on, FILES, structuredClone(USER)));
   await $.command.run(run("doctor"));
   w.reads.length = 0;
 
@@ -247,19 +208,20 @@ test("the tab's hotkeys are r, b and i, never a pane key, and every row fits at 
     for (const surface of ["terminal", "desktop"] as const) {
       const room = usableColumns(bodyColumns(size));
       const ui = await $.ui.mount(pane(surface, size));
+      const keys = async () =>
+        (await ui.findAll({ type: "Button" })).map((button) => String(button.props["hotkey"])).filter((key) => !/^[1-9]$/.test(key)).sort();
       if (w.writes.length === 0) {
-        await ui.press({ key: "b" });
+        expect(await keys()).toEqual(["i", "r"]);
         await ui.press({ key: "i" });
       }
-      const keys = (await ui.findAll({ type: "Button" })).map((button) => button.props["hotkey"]);
-      expect(keys.filter((key) => !/^[1-9]$/.test(String(key))).sort()).toEqual(["b", "r"]);
+      expect(await keys()).toEqual(["r"]);
       for (const child of topRows(await ui.drawn())) {
         expect(cellsAcross(child), `${size.columns} ${size.placement} ${surface}`).toBeLessThanOrEqual(room);
       }
       await ui.unmount();
     }
   }
-  expect(w.writes).toEqual([`${CLAUDE_MD}.omca-bak`, `${SETTINGS}.omca-bak`, SETTINGS]);
+  expect(w.writes).toEqual([`${SETTINGS}.omca-bak`, SETTINGS]);
 });
 
 test("OMCA_ASCII draws the doctor's marks and separators from the ASCII set", async ($, on) => {
@@ -267,7 +229,7 @@ test("OMCA_ASCII draws the doctor's marks and separators from the ASCII set", as
   await $.command.run(run("doctor", 80));
   const ui = await $.ui.mount(pane("terminal", { columns: 80, rows: 40, placement: "inline" }));
   const drawn = body(await ui.drawn());
-  expect(drawn[0]).toBe(`r: Run again   3 warn - 10 ok - checked ${local(NOW_S)}`);
+  expect(drawn[0]).toBe(`r: Run again   2 warn - 10 ok - checked ${local(NOW_S)}`);
   expect(drawn[1]).toBe("! OMCA          Could not read this mod's version from its manifest");
   expect(drawn).toContain("+ Claude Code   2.1.287 meets the 2.1.287 floor");
   const isAscii = (row: string) => [...row].every((char) => char.charCodeAt(0) >= 32 && char.charCodeAt(0) < 127);

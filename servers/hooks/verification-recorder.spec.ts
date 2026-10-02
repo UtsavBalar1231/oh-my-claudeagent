@@ -220,7 +220,7 @@ describe("kill switch and malformed input", () => {
   test("recorder: OMCA_DISABLED_HOOKS listing this hook records nothing", async () => {
     const root = project();
     const sessionId = crypto.randomUUID();
-    process.env.OMCA_DISABLED_HOOKS = "verification-command-recorder";
+    process.env.OMCA_DISABLED_HOOKS = "verification-recorder";
     expect(await record(root, sessionId, "just test")).toEqual({});
     nothingRecorded(root, sessionId);
   });

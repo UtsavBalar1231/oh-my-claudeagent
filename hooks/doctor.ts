@@ -1,11 +1,4 @@
-import {
-  addRefreshInterval,
-  doctorChecks,
-  type Fix,
-  type HookState,
-  removeSetupBlock,
-  unifiedDiff,
-} from "../src/core/doctor-checks.ts";
+import { addRefreshInterval, doctorChecks, type Fix, type HookState, unifiedDiff } from "../src/core/doctor-checks.ts";
 import { tildePath } from "../src/core/plan-reader.ts";
 import { isSafeSessionId } from "../src/core/session-id.ts";
 import { update } from "./agents-tracker.ts";
@@ -16,7 +9,6 @@ type Doctor = State["doctor"];
 
 const RUN_TIMEOUT_MS = 10_000;
 const REWRITE: Readonly<Record<Fix, (text: string) => string | undefined>> = {
-  "remove-setup-block": removeSetupBlock,
   "add-refresh-interval": addRefreshInterval,
 };
 
@@ -34,10 +26,10 @@ const patch = (host: Host, change: Partial<Doctor>) =>
     ...change,
   }));
 
-async function where(host: Host): Promise<{ home: string; settings: string; claudeMd: string }> {
+async function where(host: Host): Promise<{ home: string; settings: string }> {
   const [config, home = ""] = await Promise.all([host.env.CLAUDE_CONFIG_DIR(), host.env.HOME()]);
   const dir = config !== undefined && config !== "" ? config : `${home}/.claude`;
-  return { home, settings: `${dir}/settings.json`, claudeMd: `${dir}/CLAUDE.md` };
+  return { home, settings: `${dir}/settings.json` };
 }
 
 async function readIfPresent(host: Host, path: string): Promise<string | null> {
@@ -86,7 +78,7 @@ async function hookState(host: Host): Promise<HookState> {
 
 async function check(host: Host): Promise<Doctor["checks"]> {
   const paths = await where(host);
-  const [mod, engine, bun, ast, hook, now, settings, userSettings, claudeMd] = await Promise.all([
+  const [mod, engine, bun, ast, hook, now, settings, userSettings] = await Promise.all([
     modVersion(host),
     host.session.version(),
     output(host, ["bun", "--version"]),
@@ -95,7 +87,6 @@ async function check(host: Host): Promise<Doctor["checks"]> {
     host.clock.now(),
     host.settings.read(),
     readIfPresent(host, paths.settings),
-    readIfPresent(host, paths.claudeMd),
   ]);
   const env = {
     CLAUDE_CODE_SUBAGENT_MODEL_FORCE: await host.env.CLAUDE_CODE_SUBAGENT_MODEL_FORCE(),
@@ -115,11 +106,9 @@ async function check(host: Host): Promise<Doctor["checks"]> {
     settings,
     env,
     userSettings,
-    claudeMd: { path: tildePath(paths.claudeMd, paths.home), text: claudeMd },
   });
   seen.clear();
   for (const { fix } of checks) {
-    if (fix === "remove-setup-block" && claudeMd !== null) seen.set(fix, { path: paths.claudeMd, text: claudeMd });
     if (fix === "add-refresh-interval" && userSettings !== null) seen.set(fix, { path: paths.settings, text: userSettings });
   }
   return checks;

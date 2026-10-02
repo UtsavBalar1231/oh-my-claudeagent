@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { normalize, resolveBoundPlan } from "./boulder.ts";
+import { asRegistry, resolveBoundPlan } from "./boulder.ts";
 
 const FIXTURES = join(import.meta.dir, "../../tests/fixtures/boulder-schemas");
 
@@ -27,11 +27,6 @@ const PLAN_A = {
 const PLAN_B = {
   plan_name: "plan-b",
   active_plan: "/home/user/.claude/plans/plan-b.md",
-  worktree_path: "",
-};
-const LEGACY = {
-  plan_name: "legacy-plan",
-  active_plan: "/home/user/.claude/plans/legacy-plan.md",
   worktree_path: "",
 };
 
@@ -93,10 +88,6 @@ describe("resolveBoundPlan lenient", () => {
     expect(resolveBoundPlan({ plans: {}, bindings: {} }, "sess-x")).toEqual({});
   });
 
-  test("the old flat schema resolves through the sole-plan fallback", () => {
-    expect(resolveBoundPlan(fixture("old-flat"), "unbound-session")).toEqual(LEGACY);
-  });
-
   test("a binding to a missing plan falls through to the sole plan", () => {
     const data = fixture("single-plan");
     data["bindings"] = { "sess-x": { plan_name: "ghost", bound_at: 1 } };
@@ -142,10 +133,6 @@ describe("resolveBoundPlan strict", () => {
     expect(resolveBoundPlan(fixture("two-plan"), "unknown-session", true)).toEqual({});
   });
 
-  test("the old flat schema never resolves, because migration creates no bindings", () => {
-    expect(resolveBoundPlan(fixture("old-flat"), "unbound-session", true)).toEqual({});
-  });
-
   test("a binding to a missing plan gets nothing", () => {
     expect(resolveBoundPlan(twoPlansBoundTo("ghost"), "sess-x", true)).toEqual({});
   });
@@ -177,66 +164,18 @@ describe("resolveBoundPlan on unreadable files", () => {
 });
 
 describe("resolveBoundPlan purity", () => {
-  test("resolving the old flat fixture leaves the input unchanged", () => {
-    const data = fixture("old-flat");
+  test("resolving leaves the input unchanged", () => {
+    const data = twoPlansBoundTo("plan-a");
     const before = structuredClone(data);
-    resolveBoundPlan(data, "sess-legacy-1");
+    resolveBoundPlan(data, "sess-x");
     expect(data).toEqual(before);
   });
 });
 
-describe("normalize", () => {
-  test("the old flat fixture becomes a one-plan registry with no bindings", () => {
-    expect(normalize(fixture("old-flat"))).toEqual({
-      plans: {
-        "legacy-plan": {
-          active_plan: "/home/user/.claude/plans/legacy-plan.md",
-          started_at: "2026-01-01T00:00:00Z",
-          session_ids: ["sess-legacy-1", "sess-legacy-2"],
-          agent: "sisyphus",
-        },
-      },
-      bindings: {},
-    });
-  });
-
-  test("a flat file's worktree_path is kept when non-empty", () => {
-    const flat = { ...fixture("old-flat"), worktree_path: "/repo/.claude/worktrees/legacy" };
-    expect(normalize(flat).plans["legacy-plan"]?.worktree_path).toBe(
-      "/repo/.claude/worktrees/legacy",
-    );
-  });
-
-  test("a flat file with only the required keys gets the defaults", () => {
-    expect(normalize({ active_plan: "/p/x.md", plan_name: "x" })).toEqual({
-      plans: { x: { active_plan: "/p/x.md", started_at: "", session_ids: [], agent: "sisyphus" } },
-      bindings: {},
-    });
-  });
-
-  test("a flat file without plan_name becomes an empty registry", () => {
-    expect(normalize({ active_plan: "/p/x.md", started_at: "2026-01-01T00:00:00Z" })).toEqual({
-      plans: {},
-      bindings: {},
-    });
-  });
-
-  test("migrated session_ids are a copy of the input list", () => {
-    const flat = fixture("old-flat");
-    normalize(flat).plans["legacy-plan"]?.session_ids?.push("intruder");
-    expect(flat["session_ids"]).toEqual(["sess-legacy-1", "sess-legacy-2"]);
-  });
-
-  test("an active_plan next to a plans key is a registry, not a flat file", () => {
-    expect(normalize({ active_plan: "/p/x.md", plan_name: "x", plans: {} })).toEqual({
-      plans: {},
-      bindings: {},
-    });
-  });
-
+describe("asRegistry", () => {
   test("a registry fixture passes through unchanged", () => {
     const registry = fixture("two-plan");
-    expect<unknown>(normalize(registry)).toEqual(registry);
+    expect<unknown>(asRegistry(registry)).toEqual(registry);
   });
 
   test.each([
@@ -245,15 +184,16 @@ describe("normalize", () => {
     ["a string", "plans"],
     ["a number", 7],
     ["an empty object", {}],
+    ["an object with neither plans nor bindings", { active_plan: "/p/x.md", plan_name: "x" }],
   ])("%s becomes an empty registry", (_label, input) => {
-    expect(normalize(input)).toEqual({ plans: {}, bindings: {} });
+    expect(asRegistry(input)).toEqual({ plans: {}, bindings: {} });
   });
 
   test("a non-object plans or bindings value is replaced by an empty one", () => {
-    expect(normalize({ plans: [], bindings: "x" })).toEqual({ plans: {}, bindings: {} });
+    expect(asRegistry({ plans: [], bindings: "x" })).toEqual({ plans: {}, bindings: {} });
   });
 
-  test("the half-written fixture normalizes to an empty registry via the reader fallback", () => {
-    expect(normalize(readOrEmpty("half-written"))).toEqual({ plans: {}, bindings: {} });
+  test("the half-written fixture reads as an empty registry via the reader fallback", () => {
+    expect(asRegistry(readOrEmpty("half-written"))).toEqual({ plans: {}, bindings: {} });
   });
 });

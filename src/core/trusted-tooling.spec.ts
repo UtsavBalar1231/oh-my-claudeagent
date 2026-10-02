@@ -10,27 +10,27 @@ const fixtureCommand = (name: string): string =>
 const allowed = (command: string) => expect(isTrustedTooling(command)).toBe(true);
 const declined = (command: string) => expect(isTrustedTooling(command)).toBe(false);
 
-test("permission-filter: npm run build is allowed", () => allowed("npm run build"));
-test("permission-filter: npm install falls through (no auto-allow)", () => declined("npm install express"));
-test("permission-filter: uv run is allowed", () => allowed("uv run --project servers ruff check servers/"));
-test("permission-filter: jq is allowed", () => allowed("jq . file.json"));
+test("npm run build is allowed", () => allowed("npm run build"));
+test("npm install falls through (no auto-allow)", () => declined("npm install express"));
+test("uv run is allowed", () => allowed("uv run --project servers ruff check servers/"));
+test("jq is allowed", () => allowed("jq . file.json"));
 
-test("permission-filter: && compound falls through", () => declined("jq . a.json && cat b.json"));
-test("permission-filter: || compound falls through", () => declined("jq . a.json || cat b.json"));
-test("permission-filter: semicolon compound falls through", () => declined("jq . a.json; cat b.json"));
-test("permission-filter: pipeline falls through", () => declined("jq . a.json | sh"));
-test("permission-filter: backtick substitution falls through", () => declined("jq . `cat name`"));
-test("permission-filter: dollar-paren substitution falls through", () => declined("jq . $(cat name)"));
-test("permission-filter: output redirect falls through", () => declined("jq . a.json > /tmp/out"));
-test("permission-filter: append redirect falls through", () => declined("npm test >> /tmp/log"));
-test("permission-filter: input redirect falls through", () => declined("jq . < a.json"));
-test("permission-filter: stderr redirect falls through", () => declined("uv run pytest 2> /tmp/err"));
-test("permission-filter: merged redirect falls through", () => declined("uv sync &> /tmp/err"));
-test("permission-filter: background separator falls through", () => declined("jq . a.json & cat b.json"));
-test("permission-filter: newline separator falls through", () => declined("jq . a.json\ncat b.json"));
-test("permission-filter: jq whose single-quoted filter contains a pipe defers to the platform", () =>
+test("&& compound falls through", () => declined("jq . a.json && cat b.json"));
+test("|| compound falls through", () => declined("jq . a.json || cat b.json"));
+test("semicolon compound falls through", () => declined("jq . a.json; cat b.json"));
+test("pipeline falls through", () => declined("jq . a.json | sh"));
+test("backtick substitution falls through", () => declined("jq . `cat name`"));
+test("dollar-paren substitution falls through", () => declined("jq . $(cat name)"));
+test("output redirect falls through", () => declined("jq . a.json > /tmp/out"));
+test("append redirect falls through", () => declined("npm test >> /tmp/log"));
+test("input redirect falls through", () => declined("jq . < a.json"));
+test("stderr redirect falls through", () => declined("uv run pytest 2> /tmp/err"));
+test("merged redirect falls through", () => declined("uv sync &> /tmp/err"));
+test("background separator falls through", () => declined("jq . a.json & cat b.json"));
+test("newline separator falls through", () => declined("jq . a.json\ncat b.json"));
+test("jq whose single-quoted filter contains a pipe defers to the platform", () =>
   declined("jq -r '.a | .b' f.json"));
-test("permission-filter: jq with a quoted separator is not auto-allowed", () => declined('jq -r ".a | .b" f.json'));
+test("jq with a quoted separator is not auto-allowed", () => declined('jq -r ".a | .b" f.json'));
 
 test("if Bash(npm *): npm test is allowed", () => allowed(fixtureCommand("permissionrequest-npm-test.json")));
 test("if Bash(npm *): npm run build is allowed", () => allowed("npm run build"));
@@ -71,7 +71,7 @@ test("if Bash(pnpm *): pnpm ci is allowed", () => allowed("pnpm ci"));
 test("if Bash(pnpm *): pnpm install falls through (no decision)", () => declined("pnpm install"));
 test("if Bash(pnpm *): pnpm add <package> falls through (no decision)", () => declined("pnpm add express"));
 
-test("leading blanks are trimmed and a trailing newline is dropped, as the 2.x sed and $() did", () => {
+test("leading blanks are trimmed and a trailing newline is dropped", () => {
   allowed("   npm test");
   allowed("npm test\n");
   declined("npm test\nrm -rf x");

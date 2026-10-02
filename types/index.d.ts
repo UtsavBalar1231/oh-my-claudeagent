@@ -99,10 +99,10 @@ declare module "claude-code" {
           label: string;
           level: "ok" | "warn" | "fail" | "info";
           detail: string;
-          fix?: "remove-setup-block" | "add-refresh-interval";
+          fix?: "add-refresh-interval";
         }[];
         applied: {
-          fix: "remove-setup-block" | "add-refresh-interval";
+          fix: "add-refresh-interval";
           path: string;
           backupPath: string;
           diff: string;

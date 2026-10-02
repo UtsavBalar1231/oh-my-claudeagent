@@ -23,7 +23,6 @@ function bindHost($: EngineInterface, options: Options): Host {
       CLAUDE_CONFIG_DIR: () => $.env.get("CLAUDE_CONFIG_DIR"),
       OMCA_ASCII: () => $.env.get("OMCA_ASCII"),
       OMCA_DISABLED_HOOKS: () => $.env.get("OMCA_DISABLED_HOOKS"),
-      OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY: () => $.env.get("OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY"),
       CLAUDE_CODE_SUBAGENT_MODEL_FORCE: () => $.env.get("CLAUDE_CODE_SUBAGENT_MODEL_FORCE"),
       CLAUDE_CODE_DISABLE_ADVISOR_TOOL: () => $.env.get("CLAUDE_CODE_DISABLE_ADVISOR_TOOL"),
       DISABLE_TELEMETRY: () => $.env.get("DISABLE_TELEMETRY"),

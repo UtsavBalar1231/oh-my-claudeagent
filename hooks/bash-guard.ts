@@ -1,5 +1,6 @@
 import type { EventResult } from "claude-code";
-import { classify, enabledFindings, type GitFinding, type Reviewable, reasonFor } from "../src/core/destructive.ts";
+import { classify, type GitFinding, type Reviewable, reasonFor } from "../src/core/destructive.ts";
+import { isHookDisabled } from "../src/core/kill-switch.ts";
 import { displayWidth, fitEnd, fitMiddle, type Glyphs, glyphs, isAsciiRequested } from "../src/core/ui-kit.ts";
 import type { Features } from "./dispatch.ts";
 import type { Host } from "./host.ts";
@@ -137,17 +138,13 @@ export const bashGuard: Features = {
   "tool.check": {
     pre: async (host, e) => {
       const command = commandOf(e.input);
-      const found = classify(command);
-      if (found === undefined) return undefined;
-      if (found.kind === "catastrophic") return deny(reasonFor(found));
-      const finding = enabledFindings(found, {
-        disabledHooks: await host.env.OMCA_DISABLED_HOOKS(),
-        gitOptOut: await host.env.OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY(),
-      });
+      const finding = classify(command);
       if (finding === undefined) return undefined;
+      if (finding.kind === "catastrophic") return deny(reasonFor(finding));
+      if (isHookDisabled(await host.env.OMCA_DISABLED_HOOKS(), "bash-guard")) return undefined;
       const reason = reasonFor(finding);
       const canAsk = host.options.guardMode === "dialog" && (await host.session.surfaces()).length > 0;
-      if (!canAsk) return finding.kind === "legacy-deny" ? deny(reason) : undefined;
+      if (!canAsk) return finding.kind === "blocking" ? deny(reason) : undefined;
       const g = glyphs(isAsciiRequested(await host.env.OMCA_ASCII()));
       const text = await question(host, command, finding, g);
       const answer = await host.ui.ask(text, { header: "OMCA guard", options: [REFUSE, RUN] }).catch(() => undefined);

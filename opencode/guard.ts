@@ -1,7 +1,8 @@
 import { existsSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { basename, join, resolve } from "node:path"
-import { classify, enabledFindings, reasonFor } from "../src/core/destructive.ts"
+import { classify, reasonFor } from "../src/core/destructive.ts"
+import { isHookDisabled } from "../src/core/kill-switch.ts"
 
 export type GuardResult = { deny: true; reason: string } | { deny: false }
 
@@ -64,18 +65,13 @@ export async function runGuard(
 
 const script = (root: string, name: string) => join(root, "scripts", `${name}.sh`)
 
-// OpenCode has no dialog to hold a command in, so it decides as `guardMode: deny` does: what
-// 2.21.0 denied is denied, and a review-only match runs.
+// OpenCode has no dialog to hold a command in, so it decides as `guardMode: deny` does: a
+// catastrophic or blocking match is denied, and an advisory one runs.
 export function checkShell(command: string): GuardResult {
-  const found = classify(command)
-  const finding =
-    found === undefined || found.kind === "catastrophic"
-      ? found
-      : enabledFindings(found, {
-          disabledHooks: process.env.OMCA_DISABLED_HOOKS,
-          gitOptOut: process.env.OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY,
-        })
-  return finding === undefined || finding.kind === "review-only" ? ALLOW : { deny: true, reason: reasonFor(finding) }
+  const finding = classify(command)
+  if (finding === undefined || finding.kind === "advisory") return ALLOW
+  if (finding.kind === "blocking" && isHookDisabled(process.env.OMCA_DISABLED_HOOKS, "bash-guard")) return ALLOW
+  return { deny: true, reason: reasonFor(finding) }
 }
 
 type EditPayload = { tool_name: string; hook_event_name: "PreToolUse"; tool_input: Record<string, unknown> }

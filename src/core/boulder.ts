@@ -32,27 +32,9 @@ function emptyRegistry(): Registry {
   return { plans: {}, bindings: {} };
 }
 
-// The old single-plan file: a top-level `active_plan` and no registry keys.
-function migrateFlat(data: Dict): Registry {
-  const name = data["plan_name"];
-  if (typeof name !== "string" || name === "") return emptyRegistry();
-  const entry: PlanEntry = {
-    active_plan: (data["active_plan"] as string | undefined) ?? "",
-    started_at: (data["started_at"] as string | undefined) ?? "",
-    session_ids: [...((data["session_ids"] as string[] | undefined) ?? [])],
-    agent: (data["agent"] as string | undefined) ?? "sisyphus",
-  };
-  const worktree = data["worktree_path"];
-  if (typeof worktree === "string" && worktree !== "") entry.worktree_path = worktree;
-  return { plans: { [name]: entry }, bindings: {} };
-}
-
-/** Registry-shaped view of parsed boulder.json. Pure: the file is never rewritten. */
-export function normalize(data: unknown): Registry {
+/** Registry view of parsed boulder.json: a `plans` or `bindings` that is not an object reads as empty. */
+export function asRegistry(data: unknown): Registry {
   if (!isDict(data)) return emptyRegistry();
-  if (Object.hasOwn(data, "active_plan") && !Object.hasOwn(data, "plans")) {
-    return migrateFlat(data);
-  }
   const { plans, bindings } = data;
   return {
     plans: isDict(plans) ? (plans as Registry["plans"]) : {},
@@ -78,7 +60,7 @@ export function resolveBoundPlan(
   sessionId: string,
   strict = false,
 ): BoundPlan | Record<string, never> {
-  const { plans, bindings } = normalize(data);
+  const { plans, bindings } = asRegistry(data);
 
   const name = sessionId ? bindings[sessionId]?.plan_name : undefined;
   if (name !== undefined && Object.hasOwn(plans, name)) {

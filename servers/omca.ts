@@ -43,7 +43,7 @@ const INSTRUCTIONS = [
 ].join("\n");
 
 const MODERN_PROTOCOL = "2026-07-28";
-const LEGACY_PROTOCOL = "2025-11-25";
+const FALLBACK_PROTOCOL = "2025-11-25";
 const HOOKS_ROLE_TOOLS = new Set(["omca_hook", "health_check"]);
 
 const role = process.env.OMCA_SERVER_ROLE;
@@ -93,7 +93,7 @@ async function callTool(params: Record<string, unknown>) {
 
 const handlers: Record<string, Handler> = {
   "server/discover": () => ({
-    supportedVersions: [MODERN_PROTOCOL, LEGACY_PROTOCOL],
+    supportedVersions: [MODERN_PROTOCOL, FALLBACK_PROTOCOL],
     capabilities,
     ...instructions,
     ...listCache,

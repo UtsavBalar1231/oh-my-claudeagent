@@ -1,6 +1,6 @@
 import type { Level } from "./ui-kit.ts";
 
-export type Fix = "remove-setup-block" | "add-refresh-interval";
+export type Fix = "add-refresh-interval";
 export type Check = { id: string; label: string; level: Level; detail: string; fix?: Fix };
 
 export type Env = Readonly<{
@@ -28,15 +28,12 @@ export type Inputs = {
   settings: Readonly<Record<string, unknown>>;
   env: Env;
   userSettings: string | null;
-  claudeMd: { path: string; text: string | null };
 };
 
 export const ENGINE_FLOOR = "2.1.287";
 export const BUN_FLOOR = "1.4.2";
 const FRESH_MS = 10 * 60_000;
 const EFFORTS = ["low", "medium", "high", "xhigh", "max"];
-const OPEN = /^--- omca-setup\s*$/;
-const CLOSE = /^--- \/omca-setup ---\s*$/;
 
 type Version = readonly [number, number, number];
 
@@ -209,21 +206,6 @@ function statusLineCheck(settings: Inputs["settings"], userSettings: string | nu
   );
 }
 
-function setupBlockCheck({ path, text }: Inputs["claudeMd"]): Check {
-  const block = text === null ? null : setupBlock(text);
-  if (block === null) return check("setup-block", "CLAUDE.md", "ok", `No omca-setup block in ${path}`);
-  if (block === "unclosed") {
-    return check("setup-block", "CLAUDE.md", "warn", `${path} opens an omca-setup block that never closes; remove it by hand`);
-  }
-  return check(
-    "setup-block",
-    "CLAUDE.md",
-    "warn",
-    `${path} holds the 2.x omca-setup block, which v3 replaces by delivering that guidance itself`,
-    "remove-setup-block",
-  );
-}
-
 export function doctorChecks(inputs: Inputs): Check[] {
   return [
     modCheck(inputs.modVersion),
@@ -238,7 +220,6 @@ export function doctorChecks(inputs: Inputs): Check[] {
     hooksCheck(inputs.settings),
     advisorCheck(inputs.settings, inputs.env),
     statusLineCheck(inputs.settings, inputs.userSettings),
-    setupBlockCheck(inputs.claudeMd),
   ];
 }
 
@@ -248,24 +229,6 @@ function parseObject(text: string): Readonly<Record<string, unknown>> | undefine
   } catch {
     return undefined;
   }
-}
-
-/** The block's span from its opening marker's first character to past its closing marker's line end. */
-export function setupBlock(text: string): { from: number; to: number } | "unclosed" | null {
-  let at = 0;
-  let from: number | undefined;
-  for (const line of text.split("\n")) {
-    const end = at + line.length + 1;
-    if (from === undefined && OPEN.test(line)) from = at;
-    else if (from !== undefined && CLOSE.test(line)) return { from, to: Math.min(end, text.length) };
-    at = end;
-  }
-  return from === undefined ? null : "unclosed";
-}
-
-export function removeSetupBlock(text: string): string | undefined {
-  const block = setupBlock(text);
-  return block === null || block === "unclosed" ? undefined : text.slice(0, block.from) + text.slice(block.to);
 }
 
 function stringEnd(text: string, quote: number): number {

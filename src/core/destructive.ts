@@ -1,5 +1,3 @@
-import { isHookDisabled } from "./kill-switch.ts";
-
 const S = "[ \\t\\n\\v\\f\\r]";
 const NS = "[^ \\t\\n\\v\\f\\r]";
 // Leading `VAR=value` assignments and an `env` wrapper run the same command, so the command
@@ -25,17 +23,17 @@ export const RM_CATASTROPHIC_REASON =
 export const REVIEW_REFUSED_REASON =
   "The user refused this command in OMCA's review. Do not retry it; ask the user how to proceed.";
 export const GIT_REASON =
-  "Destructive git command blocked. If working tree is dirty, REPORT and STOP — never modify history. Set OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY=1 to override for testing.";
+  "Destructive git command blocked. If working tree is dirty, REPORT and STOP — never modify history. Set OMCA_DISABLED_HOOKS=bash-guard to turn this check off for testing.";
 
 export type GitOperation = "reset --hard" | "stash" | "clean" | "restore" | "rm -r" | "checkout --" | "push --force";
 export type GitFinding = { operation: GitOperation; remote?: string; branch?: string };
 export type Removal = { targets: string[] };
 /**
- * `legacy-deny` holds a git operation 2.21.0 denied outright; `review-only` holds only what 2.21.0
- * let through (a recursive rm of a deeper path, a force push), so where no dialog can show it
- * runs as it did there.
+ * `blocking` holds a git operation that discards work in the tree or the index, denied where no
+ * dialog can show it; `advisory` holds only a recursive rm of a deeper path or a force push,
+ * which runs where no dialog can show it.
  */
-export type Reviewable = { kind: "legacy-deny" | "review-only"; removals: Removal[]; git: GitFinding[] };
+export type Reviewable = { kind: "blocking" | "advisory"; removals: Removal[]; git: GitFinding[] };
 export type Finding = { kind: "catastrophic" } | Reviewable;
 
 /**
@@ -61,7 +59,6 @@ export function neutralizeQuotedPositions(command: string): string {
   return out;
 }
 
-// Each line loses its leading blanks, as the 2.x guards trimmed with sed.
 const trimLines = (command: string) => command.replace(/^[ \t\v\f\r]+/gm, "");
 
 /**
@@ -193,16 +190,15 @@ function gitFindings(command: string, scan: string): GitFinding[] {
 
 function reviewable(removals: Removal[], git: GitFinding[]): Reviewable | undefined {
   if (removals.length === 0 && git.length === 0) return undefined;
-  const isLegacyDeny = git.some((finding) => finding.operation !== "push --force");
-  return { kind: isLegacyDeny ? "legacy-deny" : "review-only", removals, git };
+  const isBlocking = git.some((finding) => finding.operation !== "push --force");
+  return { kind: isBlocking ? "blocking" : "advisory", removals, git };
 }
 
 /**
  * Classifies a Bash command: a recursive rm of a machine-wide target (or with a substituted
- * target, or `--no-preserve-root`) is catastrophic; the git family 2.21.0 denied (hard reset,
- * stash, clean, restore, recursive git rm, path checkout) is legacy-deny; any other recursive rm
- * and a force push are review-only. A match needs a command position, so a quoted mention is
- * not one.
+ * target, or `--no-preserve-root`) is catastrophic; a hard reset, stash, clean, restore, recursive
+ * git rm or path checkout is blocking; any other recursive rm and a force push are advisory. A
+ * match needs a command position, so a quoted mention is not one.
  */
 export function classify(command: string): Finding | undefined {
   const trimmed = trimLines(command);
@@ -212,28 +208,14 @@ export function classify(command: string): Finding | undefined {
   return reviewable(rm.removals, gitFindings(trimmed, scan));
 }
 
-/**
- * Drops what the 2.x kill switches turn off: `git-destructive-deny` in `OMCA_DISABLED_HOOKS` or
- * `OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY=1` for the git family, `permission-filter` for the
- * removal review. The catastrophic deny has no switch, as in 2.x.
- */
-export function enabledFindings(
-  finding: Reviewable,
-  env: { disabledHooks: string | undefined; gitOptOut: string | undefined },
-): Reviewable | undefined {
-  const removals = isHookDisabled(env.disabledHooks, "permission-filter") ? [] : finding.removals;
-  const isGitOff = env.gitOptOut === "1" || isHookDisabled(env.disabledHooks, "git-destructive-deny");
-  return reviewable(removals, isGitOff ? [] : finding.git);
-}
-
-/** The 2.21.0 message for what it denied; a review-only match is denied only by a refusal. */
+/** The deny reason for each kind; an advisory match is denied only by a refusal. */
 export function reasonFor(finding: Finding): string {
   switch (finding.kind) {
     case "catastrophic":
       return RM_CATASTROPHIC_REASON;
-    case "legacy-deny":
+    case "blocking":
       return GIT_REASON;
-    case "review-only":
+    case "advisory":
       return REVIEW_REFUSED_REASON;
   }
 }

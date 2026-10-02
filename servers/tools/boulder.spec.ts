@@ -212,44 +212,11 @@ describe("session id resolution through the server", () => {
   });
 });
 
-describe("flat-schema migration", () => {
-  test("migration preserves started_at and session_ids", async () => {
-    const root = project();
-    seedRegistry(root, fixture("old-flat"));
-    const flat = JSON.parse(fixture("old-flat"));
-    await write(root, flat.plan_name, "sess-legacy-3", flat.active_plan);
-    const { plans, bindings } = registry(root);
-    expect(read(registryFile(root))).toBe(
-      json({
-        plans: {
-          "legacy-plan": {
-            active_plan: flat.active_plan,
-            started_at: "2026-01-01T00:00:00Z",
-            session_ids: ["sess-legacy-1", "sess-legacy-2", "sess-legacy-3"],
-            agent: "sisyphus",
-          },
-        },
-        bindings: { "sess-legacy-3": { plan_name: "legacy-plan", bound_at: bindings["sess-legacy-3"].bound_at } },
-      }),
-    );
-    expect(plans["legacy-plan"]).not.toHaveProperty("worktree_path");
-  });
-
-  test("boulder_progress on an old flat file never writes it", async () => {
-    const root = project();
-    seedRegistry(root, fixture("old-flat"));
-    await progress(root, { session_id: "sess-legacy-1" });
-    await progress(root, { plan_name: "legacy-plan" });
-    expect(read(registryFile(root))).toBe(fixture("old-flat"));
-  });
-});
-
 describe("boulder_progress resolution matches the lenient resolver", () => {
   const missing = (path: string) =>
     JSON.stringify({ error: true, plan_missing: true, plan_path: path, message: `Plan file not found: ${path}.` }, null, 2);
 
   for (const [name, sessionId, plan] of [
-    ["old-flat", "sess-legacy-1", "/home/user/.claude/plans/legacy-plan.md"],
     ["single-plan", "no-such-session", "/home/user/.claude/plans/plan-a.md"],
     ["two-plan", "no-such-session", "/home/user/.claude/plans/plan-b.md"],
   ] as const) {
@@ -391,28 +358,6 @@ describe("start-time GC", () => {
     seedRegistry(root, JSON.stringify({ plans: { done: entry(planFile(root, "done.md", COMPLETE)) }, bindings: {} }));
     expect(await gcRegistry(root)).toEqual({ pruned_plans: ["done"], pruned_bindings: [] });
     expect(read(registryFile(root))).toBe(json({ plans: {}, bindings: {} }));
-  });
-
-  test("flat schema completed plan pruned to empty registry", async () => {
-    const root = project();
-    seedRegistry(root, JSON.stringify({ active_plan: planFile(root, "old.md", COMPLETE), plan_name: "old-plan", agent: "sisyphus" }));
-    expect(await gcRegistry(root)).toEqual({ pruned_plans: ["old-plan"], pruned_bindings: [] });
-    expect(read(registryFile(root))).toBe(json({ plans: {}, bindings: {} }));
-  });
-
-  test("flat schema without a plan_name is rewritten as an empty registry", async () => {
-    const root = project();
-    seedRegistry(root, JSON.stringify({ active_plan: "/tmp/x.md" }));
-    expect(await gcRegistry(root)).toEqual({ pruned_plans: [], pruned_bindings: [] });
-    expect(read(registryFile(root))).toBe(json({ plans: {}, bindings: {} }));
-  });
-
-  test("flat schema incomplete plan left untouched", async () => {
-    const root = project();
-    const text = JSON.stringify({ active_plan: planFile(root, "wip.md", INCOMPLETE), plan_name: "wip-plan" });
-    seedRegistry(root, text);
-    expect(await gcRegistry(root)).toEqual({ pruned_plans: [], pruned_bindings: [] });
-    expect(read(registryFile(root))).toBe(text);
   });
 
   test("bound plan survives", async () => {

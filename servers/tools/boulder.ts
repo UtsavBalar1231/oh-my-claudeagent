@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { normalize, type PlanEntry, type Registry, resolveBoundPlan } from "../../src/core/boulder.ts";
+import { asRegistry, type PlanEntry, type Registry, resolveBoundPlan } from "../../src/core/boulder.ts";
 import { checkboxStates, nextTaskLabel, planIsComplete } from "../../src/core/checkboxes.ts";
 import { latestSessionId } from "../hooks/session-state.ts";
 import { ensureStateDir, projectRoot, withLock, writeFileAtomic } from "../io.ts";
@@ -103,12 +103,9 @@ export async function gcRegistry(root: string): Promise<PruneSummary> {
   const path = registryPath(root);
   if (!existsSync(path)) return { pruned_plans: [], pruned_bindings: [] };
   return withLock(`${path}.lock`, () => {
-    const raw = readRaw(path);
-    const registry = normalize(raw);
+    const registry = asRegistry(readRaw(path));
     const summary = pruneUnbound(registry);
-    const flatWithoutPlans =
-      typeof raw === "object" && raw !== null && "active_plan" in raw && !("plans" in raw) && Object.keys(registry.plans).length === 0;
-    if (summary.pruned_plans.length > 0 || summary.pruned_bindings.length > 0 || flatWithoutPlans) writeRegistry(path, registry);
+    if (summary.pruned_plans.length > 0 || summary.pruned_bindings.length > 0) writeRegistry(path, registry);
     return summary;
   });
 }
@@ -128,7 +125,7 @@ async function boulderWrite(args: Record<string, unknown>): Promise<string> {
   const path = join(ensureStateDir(root), "boulder.json");
 
   const sessions = await withLock(`${path}.lock`, () => {
-    const registry = normalize(readRaw(path));
+    const registry = asRegistry(readRaw(path));
     const existing: PlanEntry = Object.hasOwn(registry.plans, planName) ? (registry.plans[planName] as PlanEntry) : {};
     const sessionIds = Array.isArray(existing.session_ids) ? [...existing.session_ids] : [];
     if (sessionId && !sessionIds.includes(sessionId)) sessionIds.push(sessionId);
@@ -160,7 +157,7 @@ function boulderProgress(args: Record<string, unknown>): string {
   if (!planPath) {
     const raw = readRaw(registryPath(rootOf(workingDirectory)));
     if (planName) {
-      const { plans } = normalize(raw);
+      const { plans } = asRegistry(raw);
       planPath = (Object.hasOwn(plans, planName) && plans[planName]?.active_plan) || "";
     } else {
       planPath = resolveBoundPlan(raw, sessionIdOr(sessionId)).active_plan ?? "";

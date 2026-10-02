@@ -145,11 +145,10 @@ describe("evidence_log", () => {
     expect(entries(root).map((e: object) => "plan_sha256" in e)).toEqual([false, false]);
   });
 
-  test("evidence_log writes to new path only", async () => {
+  test("evidence_log leaves only the ledger in .omca/evidence", async () => {
     const root = project();
     await log(root);
     expect(readdirSync(join(root, ".omca", "evidence")).sort()).toEqual(["verification-evidence.json"]);
-    expect(existsSync(join(root, ".omca", "state", "verification-evidence.json"))).toBe(false);
   });
 
   test("evidence_log resolves a subdirectory to the git root", async () => {
@@ -227,13 +226,6 @@ describe("evidence_read", () => {
 
   test("evidence_read handles missing file", async () => {
     expect(await call("evidence_read", { working_directory: project() })).toBe("No verification evidence recorded.");
-  });
-
-  test("evidence_read ignores legacy path", async () => {
-    const root = project();
-    mkdirSync(join(root, ".omca", "state"), { recursive: true });
-    writeFileSync(join(root, ".omca", "state", "verification-evidence.json"), json({ entries: [entry(0)] }));
-    expect(await call("evidence_read", { working_directory: root })).toBe("No verification evidence recorded.");
   });
 
   test("evidence_read treats a corrupt or empty ledger as no evidence", async () => {

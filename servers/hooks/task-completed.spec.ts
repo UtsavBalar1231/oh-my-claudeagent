@@ -216,7 +216,7 @@ describe("kill switch", () => {
     const root = project();
     const sessionId = crypto.randomUUID();
     await record(root, sessionId);
-    process.env.OMCA_DISABLED_HOOKS = "task-completed-verify";
+    process.env.OMCA_DISABLED_HOOKS = "task-completed";
     expect(await complete(root, sessionId)).toEqual({});
   });
 
@@ -233,16 +233,5 @@ describe("golden fixtures", () => {
   test("no-evidence replays to an empty answer", async () => {
     const fixture = { hook_event_name: "TaskCompleted", task_description: "Implement feature X", session_id: "fixture-sid-101" };
     expect(await dispatch({ ...fixture, event: fixture.hook_event_name }, project(), NOW)).toEqual({});
-  });
-
-  test("with-evidence replays to an empty answer over the seeded legacy ledger", async () => {
-    const root = project();
-    writeLedger(
-      join(root, ".omca", "state", "verification-evidence.json"),
-      '{"entries":[{"type":"test","command":"just test","exit_code":0,"output_snippet":"10 passed","timestamp":"2026-01-01T00:00:00Z"}]}',
-      NOW_S - 600,
-    );
-    const fixture = { hook_event_name: "TaskCompleted", task_description: "Implement feature X", session_id: "fixture-sid-102" };
-    expect(await dispatch({ ...fixture, event: fixture.hook_event_name }, root, NOW)).toEqual({});
   });
 });

@@ -127,7 +127,7 @@ describe("withLock", () => {
   });
 
   const staleLocks: Array<[string, () => Promise<string>]> = [
-    ["a legacy empty lock", async () => ""],
+    ["an empty lock", async () => ""],
     ["an unparsable lock", async () => "not a lock"],
     ["a dead-pid lock", async () => `${await deadPid()} ${Date.now()} dead-holder`],
   ];

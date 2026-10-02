@@ -1,13 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  addRefreshInterval,
-  type Check,
-  doctorChecks,
-  type Inputs,
-  removeSetupBlock,
-  setupBlock,
-  unifiedDiff,
-} from "./doctor-checks.ts";
+import { addRefreshInterval, type Check, doctorChecks, type Inputs, unifiedDiff } from "./doctor-checks.ts";
 
 const NOW = Date.UTC(2026, 9, 2, 12, 0, 0);
 const STATUS_LINE = { type: "command", command: "omca-statusline" };
@@ -27,7 +19,6 @@ const BASE: Inputs = {
   },
   env: {},
   userSettings: null,
-  claudeMd: { path: "~/.claude/CLAUDE.md", text: "# Mine\n" },
 };
 
 const run = (change: Partial<Inputs>, id: string): Omit<Check, "id" | "label"> | undefined => {
@@ -51,7 +42,6 @@ test("the checks come in a fixed order with their labels, all ok or info on a he
     ["hooks", "Hooks", "ok"],
     ["advisor", "Advisor", "ok"],
     ["statusline", "Status line", "ok"],
-    ["setup-block", "CLAUDE.md", "ok"],
   ]);
 });
 
@@ -234,50 +224,6 @@ describe("status line", () => {
   });
 });
 
-describe("omca-setup block", () => {
-  const BLOCK = "--- omca-setup\n\n# oh-my-claudeagent orchestration guidance\n\n--- /omca-setup ---\n";
-
-  test.each<[string | null, Omit<Check, "id" | "label">]>([
-    [null, { level: "ok", detail: "No omca-setup block in ~/.claude/CLAUDE.md" }],
-    ["# Mine\n--- omca-setup is a phrase here\n", { level: "ok", detail: "No omca-setup block in ~/.claude/CLAUDE.md" }],
-    [
-      `# Mine\n\n${BLOCK}`,
-      {
-        level: "warn",
-        detail: "~/.claude/CLAUDE.md holds the 2.x omca-setup block, which v3 replaces by delivering that guidance itself",
-        fix: "remove-setup-block",
-      },
-    ],
-    [
-      "# Mine\n--- omca-setup\nunfinished\n",
-      { level: "warn", detail: "~/.claude/CLAUDE.md opens an omca-setup block that never closes; remove it by hand" },
-    ],
-  ])("CLAUDE.md %p", (text, expected) => {
-    expect(run({ claudeMd: { path: "~/.claude/CLAUDE.md", text } }, "setup-block")).toEqual(expected);
-  });
-
-  test("removal drops the marker lines and what lies between, and keeps every other byte", () => {
-    expect(removeSetupBlock(`# Mine\n\n${BLOCK}\n# After\n`)).toBe("# Mine\n\n\n# After\n");
-    expect(removeSetupBlock(`${BLOCK}tail`)).toBe("tail");
-  });
-
-  test("removal keeps CRLF line endings and trailing marker spaces count as the marker", () => {
-    const crlf = "# Mine\r\n--- omca-setup  \r\nbody\r\n--- /omca-setup ---\r\n# After\r\n";
-    expect(removeSetupBlock(crlf)).toBe("# Mine\r\n# After\r\n");
-  });
-
-  test("removal at the end of a file without a trailing newline", () => {
-    expect(removeSetupBlock("# Mine\n--- omca-setup\nbody\n--- /omca-setup ---")).toBe("# Mine\n");
-  });
-
-  test("no block or an unclosed one is not rewritten", () => {
-    expect(removeSetupBlock("# Mine\n")).toBeUndefined();
-    expect(removeSetupBlock("--- omca-setup\nbody\n")).toBeUndefined();
-    expect(setupBlock("--- omca-setup\nbody\n")).toBe("unclosed");
-    expect(setupBlock("x\n--- omca-setup\n--- /omca-setup ---\ny")).toEqual({ from: 2, to: 37 });
-  });
-});
-
 describe("refreshInterval rewrite", () => {
   test("adds the member after the last one at the object's indent, two spaces", () => {
     expect(addRefreshInterval(USER_SETTINGS)).toBe(
@@ -333,9 +279,10 @@ describe("unified diff", () => {
   });
 
   test("a removal far from either end, from CRLF text", () => {
-    const before = ["1", "2", "3", "4", "--- omca-setup", "x", "--- /omca-setup ---", "5", "6", "7", "8", ""].join("\r\n");
-    expect(unifiedDiff("b", "a", before, removeSetupBlock(before) ?? "")).toBe(
-      ["--- b", "+++ a", "@@ -2,9 +2,6 @@", " 2", " 3", " 4", "---- omca-setup", "-x", "---- /omca-setup ---", " 5", " 6", " 7"].join("\n"),
+    const before = ["1", "2", "3", "4", "x", "y", "z", "5", "6", "7", "8", ""].join("\r\n");
+    const after = ["1", "2", "3", "4", "5", "6", "7", "8", ""].join("\r\n");
+    expect(unifiedDiff("b", "a", before, after)).toBe(
+      ["--- b", "+++ a", "@@ -2,9 +2,6 @@", " 2", " 3", " 4", "-x", "-y", "-z", " 5", " 6", " 7"].join("\n"),
     );
   });
 

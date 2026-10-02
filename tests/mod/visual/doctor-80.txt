@@ -1,7 +1,7 @@
 
  ▐▛███▛█   Claude Code v2.1.287
 ▝▜██████▀  Opus 5.5 · API Usage Billing
- ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/omca-visual-80x40-kxbkW0/cwd
+ ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/omca-visual-80x40-X5H5cc/cwd
 
 ▎ Auto mode is now Claude Code's default permission mode.
 ▎ Auto mode lets Claude handle permission prompts automatically. Claude checks
@@ -22,7 +22,7 @@
 
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ 1: Agents 2: Plan 3: Evidence 4: Notepad 5: Feedback 6: Stats 7: Doctor    ✕ │
-│ r: Run again   1 warn · 3 info · 9 ok · checked 20:11                        │
+│ r: Run again   1 warn · 3 info · 8 ok · checked 20:57                        │
 │ ! omca server   No hook has reached the server in this session yet           │
 │ · Options       No pluginConfigs entry, so the defaults apply: showBand      │
 │                 on, guardMode dialog                                         │

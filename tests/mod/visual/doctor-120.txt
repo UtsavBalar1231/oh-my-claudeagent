@@ -1,7 +1,7 @@
                                                                │1: Agents  2: Plan  3: Evidence  4: Notepad            ✕
  ▐▛███▛█   Claude Code v2.1.287                                │5: Feedback  6: Stats  7: Doctor
 ▝▜██████▀  Opus 5.5 · API Usage Billing                        │─────────────────────────────────────────────────────
- ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/cwd               │r: Run again   1 warn · 3 info · 9 ok · checked 20:11
+ ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/cwd               │r: Run again   1 warn · 3 info · 8 ok · checked 20:57
                                                                │! omca server
 ▎ Auto mode is now Claude Code's default permission mode.      │  No hook has reached the server in this session yet
 ▎ Auto mode lets Claude handle permission prompts              │· Options
@@ -32,7 +32,7 @@
                                                                │✓ Hooks
                                                                │  Neither disableAllHooks nor allowManagedHooksOnly
                                                                │  is set
-                                                               │✓ CLAUDE.md
+                                                               │
                                            ◐ medium · /effort  │
 ─────────────────────────────────────────────────────────────────────────────────────────── oh-my-claudeagent:sisyphus ─
 ❯ 

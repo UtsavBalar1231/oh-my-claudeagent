@@ -17,7 +17,6 @@ const STACKED_BELOW = 64;
 const DIFF_ROWS = 16;
 const SEVERITY: Readonly<Record<Check["level"], number>> = { fail: 0, warn: 1, info: 2, ok: 3 };
 const FIXES: Readonly<Record<Fix, { key: string; label: string; done: string }>> = {
-  "remove-setup-block": { key: "b", label: "Remove the omca-setup block", done: "Removed the omca-setup block from" },
   "add-refresh-interval": { key: "i", label: "Add refreshInterval 5", done: "Added refreshInterval 5 to statusLine in" },
 };
 

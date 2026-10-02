@@ -19,7 +19,7 @@ function readLedger(root: string): unknown {
 // name could only demand evidence for a command nobody ran.
 export const handle: Handler = (_payload, { root, now, session }) => {
   const verification = session?.verification;
-  if (verification === undefined || isHookDisabled(process.env.OMCA_DISABLED_HOOKS, "task-completed-verify")) return;
+  if (verification === undefined || isHookDisabled(process.env.OMCA_DISABLED_HOOKS, "task-completed")) return;
   if (!isSlotRecent(seconds(now), verification.at)) return;
   if (!ledgerCoversSlot(ledgerMtimeSeconds(root), verification.at)) {
     return { decision: "block", reason: unloggedReason(verification) };

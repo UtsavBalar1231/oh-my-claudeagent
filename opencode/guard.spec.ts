@@ -9,13 +9,13 @@ const root = join(import.meta.dir, "..")
 const RM_CATASTROPHIC =
   "Destructive rm -rf blocked: the target is the filesystem root, home, the working directory, or a directory directly under root or home. Name a deeper path explicitly."
 const GIT =
-  "Destructive git command blocked. If working tree is dirty, REPORT and STOP — never modify history. Set OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY=1 to override for testing."
+  "Destructive git command blocked. If working tree is dirty, REPORT and STOP — never modify history. Set OMCA_DISABLED_HOOKS=bash-guard to turn this check off for testing."
 
 let tmp: string
 let errorSpy: ReturnType<typeof spyOn>
 const savedEnv = {
   OMCA_COMMENT_GATE: process.env.OMCA_COMMENT_GATE,
-  OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY: process.env.OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY,
+  OMCA_DISABLED_HOOKS: process.env.OMCA_DISABLED_HOOKS,
 }
 
 beforeEach(() => {
@@ -53,12 +53,12 @@ describe("decisions", () => {
     expect(checkShell("rm -rf /home")).toEqual({ deny: true, reason: RM_CATASTROPHIC })
   })
 
-  test("a review-only match runs as in 2.21.0, since there is no dialog to hold it in", () => {
+  test("an advisory match runs, since there is no dialog to hold it in", () => {
     expect(checkShell("rm -rf build")).toEqual({ deny: false })
     expect(checkShell("git push --force origin main")).toEqual({ deny: false })
   })
 
-  test("a legacy-deny match alongside a review-only one is denied with the git reason", () => {
+  test("a blocking match alongside an advisory one is denied with the git reason", () => {
     expect(checkShell("rm -rf build && git stash")).toEqual({ deny: true, reason: GIT })
   })
 
@@ -66,8 +66,8 @@ describe("decisions", () => {
     expect(checkShell('git commit -m "stop using rm -rf / and git reset --hard"')).toEqual({ deny: false })
   })
 
-  test("the git kill switch turns off the git deny, never the catastrophic one", () => {
-    process.env.OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY = "1"
+  test("bash-guard in OMCA_DISABLED_HOOKS turns off the git deny, never the catastrophic one", () => {
+    process.env.OMCA_DISABLED_HOOKS = "verification-recorder,bash-guard"
     expect(checkShell("git reset --hard")).toEqual({ deny: false })
     expect(checkShell("rm -rf ~")).toEqual({ deny: true, reason: RM_CATASTROPHIC })
   })

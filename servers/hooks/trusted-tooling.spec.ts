@@ -18,27 +18,19 @@ const permissionRequest = (command: string, registry?: Parameters<typeof dispatc
     registry,
   );
 
-test("golden: permission-filter/allow-npm", async () => {
+test("npm run build is auto-allowed on PermissionRequest", async () => {
   expect(await permissionRequest("npm run build")).toEqual(ALLOW);
 });
 
-test("golden: permission-filter/allow-jq", async () => {
+test("jq is auto-allowed on PermissionRequest", async () => {
   expect(await permissionRequest("jq . file.json")).toEqual(ALLOW);
 });
 
-test("permission-filter: jq still auto-allows on PermissionRequest", async () => {
-  expect(await permissionRequest("jq . file.json")).toEqual(ALLOW);
-});
-
-test("git-destructive-deny: git status emits no allow on PermissionRequest", async () => {
+test("git status gets no allow on PermissionRequest", async () => {
   expect(await permissionRequest("git status")).toEqual({});
 });
 
-test("git-destructive-deny: git status gets no allow on PermissionRequest either", async () => {
-  expect(await permissionRequest("git status")).toEqual({});
-});
-
-test("git-destructive-deny: a core.hooksPath rewrite is never auto-approved", async () => {
+test("a core.hooksPath rewrite is never auto-allowed", async () => {
   expect(await permissionRequest("git config --local core.hooksPath /tmp/evil")).toEqual({});
 });
 
@@ -65,7 +57,7 @@ test("a failing PermissionRequest handler answers nothing, so nothing is allowed
   }
 });
 
-test("hooks.json: PermissionRequest Bash registrations are retained", () => {
+test("hooks.json routes a Bash PermissionRequest to omca_hook", () => {
   const hooks = JSON.parse(readFileSync(HOOKS, "utf8")).hooks;
   const entries = hooks.PermissionRequest.filter((group: { matcher?: string }) => group.matcher === "Bash").flatMap(
     (group: { hooks: unknown[] }) => group.hooks,
@@ -82,5 +74,4 @@ test("hooks.json: PermissionRequest Bash registrations are retained", () => {
       tool_input: "${tool_input}",
     },
   });
-  expect(JSON.stringify(hooks)).not.toMatch(/permission-filter|git-destructive-deny/);
 });

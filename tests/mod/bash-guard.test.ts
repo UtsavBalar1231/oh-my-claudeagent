@@ -6,7 +6,7 @@ const RM_CATASTROPHIC =
   "Destructive rm -rf blocked: the target is the filesystem root, home, the working directory, or a directory directly under root or home. Name a deeper path explicitly.";
 const REFUSED = "The user refused this command in OMCA's review. Do not retry it; ask the user how to proceed.";
 const GIT =
-  "Destructive git command blocked. If working tree is dirty, REPORT and STOP — never modify history. Set OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY=1 to override for testing.";
+  "Destructive git command blocked. If working tree is dirty, REPORT and STOP — never modify history. Set OMCA_DISABLED_HOOKS=bash-guard to turn this check off for testing.";
 
 type Node = { kind: "file" | "dir" | "other"; entries?: number; isLink?: boolean };
 type World = {
@@ -92,7 +92,7 @@ const BUILD_QUESTION = [
 ].join("\n");
 const LONG_PATH = `src/${"deep/".repeat(14)}leaf.txt`;
 
-test("golden: permission-filter/deny-rm-rf", async ($, on) => {
+test("rm -rf ~ is denied with no dialog", async ($, on) => {
   const { asked, checked } = world(on);
 
   expect(await check($, "rm -rf ~")).toEqual({ decision: "deny", reason: RM_CATASTROPHIC });
@@ -100,10 +100,8 @@ test("golden: permission-filter/deny-rm-rf", async ($, on) => {
   expect(checked).toEqual([]);
 });
 
-test("a catastrophic removal is denied with no dialog, even with every kill switch set", async ($, on) => {
-  const { asked, checked } = world(on, {
-    env: { OMCA_DISABLED_HOOKS: "all", OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY: "1" },
-  });
+test("a catastrophic removal is denied with no dialog, even with OMCA_DISABLED_HOOKS set to all", async ($, on) => {
+  const { asked, checked } = world(on, { env: { OMCA_DISABLED_HOOKS: "all" } });
 
   expect(await check($, "cd /x && sudo rm -rf /usr")).toEqual({ decision: "deny", reason: RM_CATASTROPHIC });
   expect(asked).toEqual([]);
@@ -159,7 +157,7 @@ test("an answer typed under Other denies", async ($, on) => {
   expect(checked).toEqual([]);
 });
 
-test("with no surface to draw on, nothing asks: legacy-deny denies and review-only runs as in 2.21.0", async ($, on) => {
+test("with no surface to draw on, nothing asks: a blocking match denies and an advisory one runs", async ($, on) => {
   const { asked, checked } = world(on, { ...BUILD_WORLD, surfaces: [] });
 
   expect(await check($, "rm -rf build")).toEqual(ENGINE);
@@ -173,7 +171,7 @@ test("with no surface to draw on, nothing asks: legacy-deny denies and review-on
   ]);
 });
 
-test("guardMode deny decides exactly as 2.21.0 did, without asking", { options: { guardMode: "deny" } }, async ($, on) => {
+test("guardMode deny decides without asking: blocking and catastrophic matches deny, advisory ones run", { options: { guardMode: "deny" } }, async ($, on) => {
   const { asked, checked } = world(on, BUILD_WORLD);
 
   expect(await check($, "rm -rf build")).toEqual(ENGINE);
@@ -330,67 +328,46 @@ test("a quoted mention of a destructive command passes through untouched", async
   expect(checked).toHaveLength(2);
 });
 
-test("permission-filter: jq gets no allow on PreToolUse", async ($, on) => {
+test("jq gets no allow on PreToolUse", async ($, on) => {
   world(on);
   expect(await check($, "jq . file.json")).toEqual(ENGINE);
 });
 
-test("permission-filter: npm run gets no allow on PreToolUse", async ($, on) => {
+test("npm run gets no allow on PreToolUse", async ($, on) => {
   world(on);
   expect(await check($, "npm run build")).toEqual(ENGINE);
 });
 
-test("permission-filter: uv run gets no allow on PreToolUse", async ($, on) => {
+test("uv run gets no allow on PreToolUse", async ($, on) => {
   world(on);
   expect(await check($, "uv run pytest")).toEqual(ENGINE);
 });
 
-test("git-destructive-deny: git status gets no allow on PreToolUse", async ($, on) => {
+test("git status gets no allow on PreToolUse", async ($, on) => {
   world(on);
   expect(await check($, "git status")).toEqual(ENGINE);
 });
 
-test("git-destructive-deny: no non-deny path emits behavior allow", async ($, on) => {
+test("no non-deny path emits behavior allow", async ($, on) => {
   world(on, { answer: "Run it", git: { "git log --oneline @{push} --not HEAD": { stdout: "" } } });
   const commands = ["git status", "git log", "git config --local core.hooksPath /tmp/evil", "git push --force", "git fetch"];
 
   for (const command of commands) expect(await check($, command)).toEqual(ENGINE);
 });
 
-test("git-destructive-deny: opt-out via OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY=1 allows reset --hard", async ($, on) => {
-  const { asked } = world(on, { env: { OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY: "1" } });
+test("bash-guard in OMCA_DISABLED_HOOKS turns off every match but the catastrophic one, with no dialog", async ($, on) => {
+  const { asked } = world(on, { env: { OMCA_DISABLED_HOOKS: "verification-recorder,bash-guard" } });
 
   expect(await check($, "git reset --hard")).toEqual(ENGINE);
-  expect(await check($, "git push -f")).toEqual(ENGINE);
+  expect(await check($, "rm -rf build; git push -f")).toEqual(ENGINE);
+  expect(await check($, "rm -rf /")).toEqual({ decision: "deny", reason: RM_CATASTROPHIC });
   expect(asked).toEqual([]);
 });
 
-test("the git opt-out takes only the value 1", async ($, on) => {
-  world(on, { surfaces: [], env: { OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY: "true" } });
-
-  expect(await check($, "git reset --hard")).toEqual({ decision: "deny", reason: GIT });
-});
-
-test("git-destructive-deny: OMCA_DISABLED_HOOKS listing this hook allows reset --hard", async ($, on) => {
-  const { asked } = world(on, { env: { OMCA_DISABLED_HOOKS: "drift-guard,git-destructive-deny" } });
-
-  expect(await check($, "git reset --hard")).toEqual(ENGINE);
-  expect(asked).toEqual([]);
-});
-
-test("git-destructive-deny: OMCA_DISABLED_HOOKS listing a different hook still denies reset --hard", async ($, on) => {
+test("OMCA_DISABLED_HOOKS listing a different hook still denies reset --hard", async ($, on) => {
   world(on, { surfaces: [], env: { OMCA_DISABLED_HOOKS: "other-hook" } });
 
   expect(await check($, "git reset --hard")).toEqual({ decision: "deny", reason: GIT });
-});
-
-test("OMCA_DISABLED_HOOKS listing permission-filter stops the removal review, never the catastrophic deny", async ($, on) => {
-  const { asked } = world(on, { surfaces: [], env: { OMCA_DISABLED_HOOKS: "permission-filter" } });
-
-  expect(await check($, "rm -rf build")).toEqual(ENGINE);
-  expect(await check($, "rm -rf build; git stash")).toEqual({ decision: "deny", reason: GIT });
-  expect(await check($, "rm -rf /")).toEqual({ decision: "deny", reason: RM_CATASTROPHIC });
-  expect(asked).toEqual([]);
 });
 
 const silentWithoutDialog = async ($: Engine, on: On, command: string) => {
@@ -400,19 +377,19 @@ const silentWithoutDialog = async ($: Engine, on: On, command: string) => {
   expect(checked).toEqual([{ tool: "Bash", input: { command } }]);
 };
 
-test("permission-filter: rm -rf of a nested temp path is silent on PreToolUse", ($, on) =>
+test("rm -rf of a nested temp path is silent", ($, on) =>
   silentWithoutDialog($, on, "rm -rf /tmp/omca-canary"));
 
-test("permission-filter: a loop cleaning a pid-suffixed scratch dir is silent", ($, on) =>
+test("a loop cleaning a pid-suffixed scratch dir is silent", ($, on) =>
   silentWithoutDialog(
     $,
     on,
     'for d in a b; do mkdir -p /tmp/x$$; dpkg-deb -x $d/p.deb /tmp/x$$; md5sum $(find /tmp/x$$ -name "*.so"); rm -rf /tmp/x$$; done',
   ));
 
-test("permission-filter: rm -rf of a relative build dir is silent", ($, on) =>
+test("rm -rf of a relative build dir is silent", ($, on) =>
   silentWithoutDialog($, on, "cd /x && rm -rf build dist/out"));
 
-test("permission-filter: rm -rf two levels under home is silent", ($, on) => silentWithoutDialog($, on, "rm -rf ~/.cache/foo"));
+test("rm -rf two levels under home is silent", ($, on) => silentWithoutDialog($, on, "rm -rf ~/.cache/foo"));
 
-test("permission-filter: a deeper variable-led path is silent", ($, on) => silentWithoutDialog($, on, "rm -rf $DIR/build/out"));
+test("a deeper variable-led path is silent", ($, on) => silentWithoutDialog($, on, "rm -rf $DIR/build/out"));

@@ -39,7 +39,7 @@ export const PHRASES: [string, string][] = [
   ["explore/librarian agents", "omca-explore/omca-librarian subagents"],
   ["in explore prompts", "in omca-explore prompts"],
   ["`${CLAUDE_PLUGIN_ROOT}/agents/momus.md`", "the omca-momus agent instructions"],
-  [" and the omca-setup guidance", ""],
+  [" and the guidance OMCA adds to the session's first prompt", ""],
   ["## Bash Usage Policy", "## Shell Usage Policy"],
   [": Read numbers the lines", ": the read tool numbers the lines"],
   ["the omca `file_read` MCP tool", "`file_read`"],

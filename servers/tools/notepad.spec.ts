@@ -86,12 +86,6 @@ describe("notepad tools", () => {
       expect(readSection("append-plan", "issues")).toBe(entry("Entry one") + entry("Entry two"));
     });
 
-    test("notepad_write places the new entry at the canonical path only", async () => {
-      await write("new-path-plan", "decisions", "New path entry");
-      expect(readSection("new-path-plan", "decisions")).toBe(entry("New path entry"));
-      expect(existsSync(join(project, ".omca", "state", "notepads"))).toBe(false);
-    });
-
     test("notepad_write accepts every declared section", async () => {
       for (const section of SECTIONS) {
         await write("accept-plan", section, `entry for ${section}`);
@@ -197,13 +191,6 @@ describe("notepad tools", () => {
       expect(await call("notepad_read", { plan_name: "half-plan", section: "learnings" })).toBe("No notepad entries found for plan: half-plan");
       mkdirSync(join(project, ".omca", "notepads", "bare-plan"), { recursive: true });
       expect(await call("notepad_read", { plan_name: "bare-plan" })).toBe("No notepad entries found for plan: bare-plan");
-    });
-
-    test("notepad_read ignores the legacy .omca/state/notepads path", async () => {
-      const legacy = join(project, ".omca", "state", "notepads", "legacy-plan");
-      mkdirSync(legacy, { recursive: true });
-      writeFileSync(join(legacy, "learnings.md"), "## legacy entry\n\nLegacy content\n");
-      expect(await call("notepad_read", { plan_name: "legacy-plan", section: "learnings" })).toBe("No notepad found for plan: legacy-plan");
     });
 
     test("notepad_read rejects an unknown section", async () => {

@@ -92,7 +92,6 @@ test("the module registers exactly the dispatchers, env reads and atoms of the c
           "HOME",
           "OMCA_ASCII",
           "OMCA_DISABLED_HOOKS",
-          "OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY",
         ],
         writes: [],
       },

@@ -9,7 +9,7 @@ const commandOf = (toolInput: unknown): string =>
     : "";
 
 export const handle: Handler = (payload, { root, now, session }) => {
-  if (payload.tool_name !== "Bash" || isHookDisabled(process.env.OMCA_DISABLED_HOOKS, "verification-command-recorder")) return;
+  if (payload.tool_name !== "Bash" || isHookDisabled(process.env.OMCA_DISABLED_HOOKS, "verification-recorder")) return;
   const command = commandOf(payload.tool_input);
   if (!isVerificationCommand(command)) return;
   if (session !== undefined && !keepsSlot(session.verification, ledgerMtimeSeconds(root), seconds(now))) {
