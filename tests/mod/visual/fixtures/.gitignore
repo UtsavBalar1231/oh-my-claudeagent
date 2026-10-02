@@ -1,0 +1,5 @@
+# Fixtures model a project directory, so they carry the .claude/ and .omca/ trees the root
+# .gitignore excludes everywhere else.
+!.claude/
+!.omca/
+!state/
