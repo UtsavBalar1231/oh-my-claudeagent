@@ -364,3 +364,9 @@ describe("golden fixtures", () => {
     nothingRecorded(root, "fixture-sid-002");
   });
 });
+
+test("hooks.json sends Bash and PowerShell results to the recorder, and only Bash permission requests to trusted tooling", () => {
+  const hooks = JSON.parse(readFileSync(join(import.meta.dir, "..", "..", "hooks", "hooks.json"), "utf8")).hooks;
+  expect(hooks.PostToolUse.map((group: { matcher: string }) => group.matcher)).toContain("Bash|PowerShell");
+  expect(hooks.PermissionRequest.map((group: { matcher: string }) => group.matcher)).toEqual(["Bash"]);
+});
