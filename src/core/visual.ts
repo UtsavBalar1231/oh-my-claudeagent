@@ -198,12 +198,13 @@ const DOTS = {
   ascii: { ok: "o", fail: "x", warn: "!", info: "." },
 } as const;
 
-export type BarParts = { done: number; active?: number; failed?: number; todo: number };
+export type BarParts = { done: number; active?: number; failed?: number; blocked?: number; todo: number };
 
 const SEGMENTS = [
   { part: "done", tone: "ok", ascii: "#" },
   { part: "active", tone: "active", ascii: "=" },
   { part: "failed", tone: "fail", ascii: "x" },
+  { part: "blocked", tone: "warn", ascii: "/" },
   { part: "todo", tone: "track", ascii: "." },
 ] as const;
 
@@ -245,7 +246,7 @@ function coalesce(pieces: readonly Piece[]): Piece[] {
 
 const partsOf = (parts: BarParts) => SEGMENTS.map(({ part }) => Math.max(0, Math.floor(parts[part] ?? 0)));
 
-/** A bar of exactly `width` cells: eighth-block seams in Unicode, `[##==x..]` in ASCII. */
+/** A bar of exactly `width` cells: eighth-block seams in Unicode, `[##==x/..]` in ASCII. */
 export function bar(parts: BarParts, width: number, ascii: boolean): Piece[] {
   if (width <= 0) return [];
   const values = partsOf(parts);

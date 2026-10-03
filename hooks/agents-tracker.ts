@@ -1,6 +1,7 @@
 import type { AgentInfo, TurnUsage } from "claude-code";
 import { oneLine } from "../src/core/band-model.ts";
 import { firstLine, lastLine, toolDetail } from "../src/core/mission.ts";
+import { taskReference } from "../src/core/plan-reader.ts";
 import { fitEnd, type Glyphs, glyphs, isAsciiRequested } from "../src/core/ui-kit.ts";
 import { redact } from "../src/core/visual.ts";
 import type { Features } from "./dispatch.ts";
@@ -74,6 +75,7 @@ export const agentsTracker: Features = {
       if (result.deny !== undefined || result.agentId === undefined) return undefined;
       const { agentId, model } = result;
       const startedAt = await host.clock.now();
+      const task = taskReference(e.prompt, e.description);
       await update(host.state.agents, (agents) => ({
         ...agents,
         [agentId]: {
@@ -86,6 +88,7 @@ export const agentsTracker: Features = {
           inputTokens: 0,
           outputTokens: 0,
           status: "running",
+          ...(task === undefined ? {} : { task }),
         },
       }));
       const prompt = await masked(host, e.prompt, PROMPT_CELLS);

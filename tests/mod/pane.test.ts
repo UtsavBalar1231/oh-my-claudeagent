@@ -166,7 +166,10 @@ test("each tab key shows its tab, on the terminal and the desktop", async ($, on
     const body = async () => rows(await ui.drawn()).slice(3);
 
     await ui.press({ key: "2" });
-    expect((await body()).slice(0, 2)).toEqual([TITLE, `12/46 tasks done · ${PLAN_PATH}`]);
+    expect((await body()).slice(0, 2)).toEqual([
+      `${TITLE}██████▎█████████████████ 12/46no task lists a file to provenext 13 Port step 13 onto the shared harness`,
+      "  ↑ 4 more",
+    ]);
     expect((await ui.find({ key: "2" }))?.props["dimColor"]).toBeUndefined();
     expect((await ui.find({ key: "1" }))?.props["dimColor"]).toBe(true);
 
@@ -219,6 +222,8 @@ for (const layout of LAYOUTS) {
       expect(await $.command.run(run(args))).toEqual({});
       expect(w.opened).toEqual([{ id: "omca", title: "OMCA", focus: true, closeOnEscape: true, rows: 12, columns: 56 }]);
       const ui = await $.ui.mount(pane("terminal"));
+      expect((await ui.find({ key: "task-13" }))?.props["autoFocus"], args).toBe(true);
+      await ui.press({ key: "t" });
       expect(await ui.find({ type: "Text", text: `12/46 tasks done · ${shown}` }), args).toBeDefined();
       expect((await ui.find({ key: `row-${pageOf(13)}` }))?.props["autoFocus"]).toBe(true);
       await ui.unmount();
@@ -232,6 +237,7 @@ test("n, p and t page through the plan, and t returns to the row the pages came 
   const ui = await $.ui.mount(pane("terminal", { columns: 120, rows: 40, placement: "dock" }));
   const page = async () => rows(await ui.drawn()).slice(3, 7);
 
+  await ui.press({ key: "t" });
   await w.clock.settle();
   const logged = w.logs.length;
   await ui.press({ key: `row-${pageOf(13)}` });
@@ -268,6 +274,7 @@ test("a page names the task after it, and the last page names none", async ($, o
   const ui = await $.ui.mount(pane("terminal", { columns: 120, rows: 40, placement: "dock" }));
   const next = async () => rows(await ui.drawn()).filter((row) => row.startsWith("next: "));
 
+  await ui.press({ key: "t" });
   await ui.press({ key: `row-${pageOf(13)}` });
   expect(await next()).toEqual(["next: [ ] 14. Port step 14 onto the shared harness"]);
   await ui.press({ key: "p" });
@@ -355,6 +362,7 @@ test("the contents list fills the inline body and a focus move re-centres it on 
   await $.command.run(run("plan", 80));
   const ui = await $.ui.mount(pane("terminal", { columns: 80, rows: 40, placement: "inline" }));
   const task = (n: number, mark = n <= 12 ? "x" : " ") => `      [${mark}] ${n}. Port step ${n} onto the shared harness`;
+  await ui.press({ key: "t" });
 
   expect(rows(await ui.drawn())).toEqual([
     "1: Agents 2: Plan 3: Evidence 4: Notepad 5: Feedback 6: Stats 7: Doctor",
@@ -367,7 +375,7 @@ test("the contents list fills the inline body and a focus move re-centres it on 
     task(14),
     task(15),
     "  ↓ 34 more",
-    "r: Reload   l: Plans   ↑↓ move · enter open · esc close",
+    "b: Board   r: Reload   l: Plans   ↑↓ move · enter open · esc close",
   ]);
 
   await $.ui.focus({ component: "Pane", requestId: "omca", element: `row-${pageOf(14)}`, origin: { kind: "person" } });
@@ -499,6 +507,22 @@ test("every row stays inside the body less the close-mark gutter at 80, 120 and 
         await ui.press({ key });
         views.push(key);
         if (key === "2") {
+          const fits = async (where: string) => {
+            for (const child of topRows(await ui.drawn())) {
+              expect(cellsAcross(child), `${size.columns} ${size.placement} ${where}`).toBeLessThanOrEqual(room);
+            }
+          };
+          await fits("board");
+          const row = (await ui.findAll({ type: "Button" })).find((button) => button.props["autoFocus"] === true);
+          await ui.press({ key: row?.key ?? "" });
+          const detail = { type: "Text", text: `7. ${LONG_TITLE}` } as const;
+          for (let presses = 0; presses < 10 && (await ui.find(detail)) === undefined; presses += 1) {
+            await ui.press({ key: "p" });
+          }
+          expect(await ui.find(detail)).toBeDefined();
+          await fits("task detail");
+          await ui.press({ key: "b" });
+          await ui.press({ key: "t" });
           const current = (await ui.findAll({ type: "Button" })).find((button) => button.props["autoFocus"] === true);
           await ui.press({ key: current?.key ?? "" });
           const heading = { type: "Text", text: `[x] 7. ${LONG_TITLE}` } as const;
@@ -516,6 +540,8 @@ test("every row stays inside the body less the close-mark gutter at 80, 120 and 
           }
           await ui.press({ key: "n" });
           await ui.press({ key: "t" });
+          await fits("sections");
+          await ui.press({ key: "b" });
         }
         for (const child of topRows(await ui.drawn())) {
           expect(cellsAcross(child), `${size.columns} ${size.placement} tab ${key}`).toBeLessThanOrEqual(room);
@@ -535,9 +561,12 @@ test("OMCA_ASCII draws every glyph from the ASCII set", async ($, on) => {
   const ui = await $.ui.mount(pane("terminal", { columns: 80, rows: 40, placement: "inline" }));
 
   const drawn = rows(await ui.drawn());
-  expect(drawn[2]).toBe("  ^ 13 more");
-  expect(drawn.find((row) => row.startsWith(">"))).toBe(">     [ ] 13. Port step 13 onto the shared harness");
-  expect(drawn.at(-1)).toBe("r: Reload   l: Plans   ^v move - enter open - esc close");
+  expect(drawn.slice(1, 4)).toEqual([
+    "Ship the sample widg... [##......] 12/46 no task lists a file to prove @1",
+    "  ^ 12 more",
+    "+ 11 Port step 11 onto the shared harness                                ",
+  ]);
+  expect(drawn.at(-1)).toBe("x: Failing  f: Find  t: Sections  l: Plans");
   await ui.press({ key: "1" });
   expect((await ui.find({ key: "lane-a-1" }))?.text).toStartWith("@ executor - Fix the parser");
   const isAscii = (row: string) => [...row].every((char) => char.charCodeAt(0) >= 32 && char.charCodeAt(0) < 127);

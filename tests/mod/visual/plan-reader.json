@@ -1,5 +1,6 @@
 {
-  "command": "/omca plan",
-  "keys": ["Down", "Enter", "n", "p", "t"],
-  "fixture": "pane"
+  "command": "Start task 5 with the executor",
+  "keys": ["/omca plan", "Enter"],
+  "mockScript": "plan-reader",
+  "fixture": "plan-reader"
 }

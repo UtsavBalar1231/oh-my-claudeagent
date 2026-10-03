@@ -5,15 +5,21 @@ import { checkboxStates } from "./checkboxes.ts";
 import { windowOf } from "./list-window.ts";
 import type { Env } from "./path.ts";
 import {
+  boardOf,
+  checksOf,
   chunks,
   clean,
+  fieldsOf,
   firstOpenTask,
   MARKDOWN_CHUNK,
   parsePlan,
+  pathsOf,
   planTarget,
   plansDirectory,
   readable,
   recentPlans,
+  taskMarkdown,
+  taskReference,
 } from "./plan-reader.ts";
 import { fitMiddle } from "./ui-kit.ts";
 
@@ -191,4 +197,110 @@ test("recent plans are Markdown files only, newest first, capped", () => {
     { name: "old", path: "/p/old.md", mtimeMs: 1 },
   ]);
   expect(recentPlans(entries, "/p", 2).map((file) => file.name)).toEqual(["new", "mid"]);
+});
+
+const BOARD = [
+  "# Ship it",
+  "",
+  "**Scope**: 4 files | **Parallel Execution**: NO | **Status**: FINAL",
+  "",
+  "## TODOs",
+  "- [x] 1. Set up",
+  "### Milestone 1: Core",
+  "",
+  "- [x] 2. [P] Build the core",
+  "  - File: `src/core.ts` (new), `src/core.spec.ts`, `justfile` (`bench` recipe), `docs/` (dir)",
+  "  - Do: write the core.",
+  "    Keep it small.",
+  "  - Done when: `bun test src/core.spec.ts` exits 0 and `CORE_FLAG` is unset.",
+  "  - Depends: 1",
+  "- [ ] 3. Wire the band",
+  "  - File: src/band.ts, src/*.ts, README",
+  "  - Done when: `just ci` and `just validate --check claims` exit 0.",
+  "  - Depends: 2, 2, 3, 99; and the review",
+  "  - Must NOT: touch the server.",
+  "### Milestone 2: Empty heading",
+  "## Deferred backlog",
+  "### UI",
+  "- **The Hill** (L). Not a task.",
+  "- [ ] not numbered",
+  "",
+].join("\n");
+
+test("the board groups tasks by the heading above them and reads each task's fields", () => {
+  const plan = parsePlan(BOARD);
+  const board = boardOf(plan);
+  expect(board.status).toBe("FINAL");
+  expect(board.groups).toEqual([
+    { title: "TODOs", tasks: [1] },
+    { title: "Milestone 1: Core", tasks: [2, 3] },
+  ]);
+  expect(board.cards.map(({ n, done, title, group, page, files, depends, checks }) => ({ n, done, title, group, page, files, depends, checks }))).toEqual([
+    { n: 1, done: true, title: "Set up", group: 0, page: 2, files: [], depends: [], checks: [] },
+    {
+      n: 2,
+      done: true,
+      title: "[P] Build the core",
+      group: 1,
+      page: 4,
+      files: ["src/core.ts", "src/core.spec.ts", "justfile"],
+      depends: [1],
+      checks: ["bun test src/core.spec.ts"],
+    },
+    {
+      n: 3,
+      done: false,
+      title: "Wire the band",
+      group: 1,
+      page: 5,
+      files: ["src/band.ts"],
+      depends: [2],
+      checks: ["just ci", "just validate --check claims"],
+    },
+  ]);
+  expect(board.cards[2]?.fields).toEqual([
+    { name: "File", text: "src/band.ts, src/*.ts, README" },
+    { name: "Done when", text: "`just ci` and `just validate --check claims` exit 0." },
+    { name: "Depends", text: "2, 2, 3, 99; and the review" },
+    { name: "Must NOT", text: "touch the server." },
+  ]);
+});
+
+test("a plan's plain bullets are never tasks, and its Status is read only before the first task", () => {
+  const board = boardOf(parsePlan(BOARD));
+  expect(board.cards.map((card) => card.n)).toEqual([1, 2, 3]);
+  expect(boardOf(parsePlan("# P\n\n## TODOs\n- [ ] 1. A\n\n**Status**: DRAFT\n")).status).toBeNull();
+  expect(boardOf(parsePlan("# P\n\nStatus: draft\n\n- [ ] 1. A\n")).status).toBe("DRAFT");
+  expect(boardOf(parsePlan("# P\n\n## Why\nNo tasks.\n"))).toEqual({ status: null, groups: [], cards: [] });
+});
+
+test("fields continue on deeper lines and text before the first field is kept unnamed", () => {
+  expect(fieldsOf("A note.\n- Do: one\n  two\n\n- Done when: `x y`")).toEqual([
+    { name: "", text: "A note." },
+    { name: "Do", text: "one\ntwo" },
+    { name: "Done when", text: "`x y`" },
+  ]);
+});
+
+test("pathsOf takes one path per listed item and leaves globs, directories and annotations out", () => {
+  expect(pathsOf("`a.ts` (new, generated), `b/c.ts`, `d/` (scratch), `e/**/*.ts`, `a.ts`")).toEqual(["a.ts", "b/c.ts"]);
+  expect(pathsOf("spike record `spike.md` in the ADR directory")).toEqual(["spike.md"]);
+  expect(pathsOf("src/a.ts (new), notes, /abs/b.md")).toEqual(["src/a.ts", "/abs/b.md"]);
+  expect(pathsOf("")).toEqual([]);
+});
+
+test("checksOf keeps the code spans that carry an argument", () => {
+  expect(checksOf("`just ci` exits 0, `FLAG` unset, `bun test a.spec.ts` passes")).toEqual(["just ci", "bun test a.spec.ts"]);
+});
+
+test("taskReference reads the task a delegation names on its first line, then in its description", () => {
+  expect(taskReference("Task 43: port the parser\nDepends on task 12")).toBe(43);
+  expect(taskReference("  task #7 now")).toBe(7);
+  expect(taskReference("1. TASK: Build the board\n2. Task 9", "Task 12 board")).toBe(12);
+  expect(taskReference("Fix the parser", "Fix it")).toBeUndefined();
+});
+
+test("taskMarkdown writes the task back as the plan spells it", () => {
+  const card = boardOf(parsePlan(BOARD)).cards[2];
+  expect(card === undefined ? "" : taskMarkdown(card, "- File: a.ts\n\n- Do: b")).toBe("- [ ] 3. Wire the band\n  - File: a.ts\n\n  - Do: b");
 });

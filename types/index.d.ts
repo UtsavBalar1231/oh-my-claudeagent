@@ -12,6 +12,7 @@ declare module "claude-code" {
           inputTokens: number;
           outputTokens: number;
           status: "running" | "answer" | "aborted" | "refusal" | "error" | "gone";
+          task?: number;
         };
       };
       lanes: {

@@ -93,6 +93,133 @@ export function firstOpenTask(plan: { readonly pages: readonly Page[] }): number
   return open >= 0 ? open : (readable(plan)[0] ?? 0);
 }
 
+export type Field = { name: string; text: string };
+export type Card = {
+  n: number;
+  done: boolean;
+  title: string;
+  group: number;
+  page: number;
+  fields: Field[];
+  files: string[];
+  depends: number[];
+  checks: string[];
+};
+export type Group = { title: string; tasks: number[] };
+export type Board = { status: "FINAL" | "DRAFT" | null; groups: Group[]; cards: Card[] };
+
+const FIELD = /^- ([A-Z][\w ()-]*?):\s*(.*)$/;
+const STATUS = /\*{0,2}Status\*{0,2}:\s*\*{0,2}\s*(FINAL|DRAFT)\b/i;
+const SPAN = /`([^`]+)`/g;
+const GLOB = /[*?{}<>$|]/;
+
+/** A task's `- Name: text` sub-bullets in order; deeper lines continue the field above them. */
+export function fieldsOf(body: string): Field[] {
+  const fields: Field[] = [];
+  for (const line of body.split("\n")) {
+    const field = FIELD.exec(line);
+    const last = fields.at(-1);
+    if (field !== null) fields.push({ name: field[1] ?? "", text: (field[2] ?? "").trim() });
+    else if (last !== undefined && line.trim() !== "") last.text = `${last.text}\n${line.trim()}`;
+    else if (line.trim() !== "") fields.push({ name: "", text: line.trim() });
+  }
+  return fields;
+}
+
+// Commas inside parentheses belong to an annotation such as `(new, generated)`.
+function segments(text: string): string[] {
+  const out: string[] = [];
+  let depth = 0;
+  let current = "";
+  for (const char of text) {
+    if (char === "(") depth += 1;
+    if (char === ")") depth = Math.max(0, depth - 1);
+    if (char === "," && depth === 0) {
+      out.push(current);
+      current = "";
+    } else current += char;
+  }
+  return [...out, current].map((part) => part.trim()).filter((part) => part !== "");
+}
+
+/**
+ * The paths a `File:` line lists: the first code span of each comma-separated item, or its first
+ * word when the line has no code spans. Directories, globs and annotations are left out.
+ */
+export function pathsOf(text: string): string[] {
+  const hasSpans = text.includes("`");
+  const paths = segments(text).flatMap((part) => {
+    const path = hasSpans ? (/`([^`]+)`/.exec(part)?.[1] ?? "") : (part.split(/\s+/)[0] ?? "");
+    const isPath = path !== "" && !/\s/.test(path) && !GLOB.test(path) && !path.endsWith("/") && (hasSpans || /[./]/.test(path));
+    return isPath ? [path] : [];
+  });
+  return [...new Set(paths)];
+}
+
+/** The code spans of a `Done when:` line that read as commands: those with an argument. */
+export function checksOf(text: string): string[] {
+  return [...text.matchAll(SPAN)].map((match) => (match[1] ?? "").trim()).filter((span) => /\s/.test(span));
+}
+
+const fieldText = (fields: readonly Field[], ...names: string[]) =>
+  fields.filter((field) => names.includes(field.name.toLowerCase())).map((field) => field.text).join(", ");
+
+/** The plan as a board: its Status, its tasks, and the `##`/`###` headings that hold them. */
+export function boardOf(plan: { readonly pages: readonly Page[] }): Board {
+  const groups: Group[] = [];
+  const cards: Card[] = [];
+  let status: Board["status"] = null;
+  let heading = "Tasks";
+  let open: Group | undefined;
+  for (const [page, section] of plan.pages.entries()) {
+    const { task } = section;
+    if (task === undefined) {
+      if (cards.length === 0 && status === null) {
+        const found = STATUS.exec(section.body)?.[1]?.toUpperCase();
+        if (found === "FINAL" || found === "DRAFT") status = found;
+      }
+      if (section.level <= 3) {
+        heading = section.title;
+        open = undefined;
+      }
+      continue;
+    }
+    if (open === undefined) {
+      open = { title: heading, tasks: [] };
+      groups.push(open);
+    }
+    open.tasks.push(task.n);
+    const fields = fieldsOf(section.body);
+    cards.push({
+      n: task.n,
+      done: task.done,
+      title: section.title.replace(/^\d+\.\s*/, ""),
+      group: groups.length - 1,
+      page,
+      fields,
+      files: pathsOf(fieldText(fields, "file", "files")),
+      depends: [...(fieldText(fields, "depends", "depends on").match(/\b\d+\b/g) ?? [])].map(Number),
+      checks: checksOf(fieldText(fields, "done when")),
+    });
+  }
+  const known = new Set(cards.map((card) => card.n));
+  for (const card of cards) card.depends = [...new Set(card.depends)].filter((n) => n !== card.n && known.has(n));
+  return { status, groups, cards };
+}
+
+/** The task a delegation names on its first line (`Task 43: …`), else in its description. */
+export function taskReference(prompt: string, description = ""): number | undefined {
+  const named = (text: string) => /\btask\s+#?(\d+)\b/i.exec(text)?.[1];
+  const found = named(prompt.trimStart().split("\n")[0] ?? "") ?? named(description);
+  return found === undefined ? undefined : Number(found);
+}
+
+/** The task as the plan writes it, for the clipboard. */
+export function taskMarkdown(card: Card, body: string): string {
+  const head = `- [${card.done ? "x" : " "}] ${card.n}. ${card.title}`;
+  return body === "" ? head : `${head}\n${body.split("\n").map((line) => (line === "" ? "" : `  ${line}`)).join("\n")}`;
+}
+
 // `plansDirectory` resolves against the project root, and the client keeps its default,
 // `<config dir>/plans`, when the setting is unset or resolves outside the root. It is undefined
 // when that default cannot be located.
