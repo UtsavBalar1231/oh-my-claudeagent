@@ -10,7 +10,7 @@ type ModelRef = NonNullable<Agent.Info["model"]>
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)))
 const TIERS = ["opus", "sonnet", "fable"]
-const HIDDEN_TOOLS = ["omca_session_search", "omca_agents_list", "omca_categories_list", "omca_validate_plan_write", "omca_boulder_write"]
+const HIDDEN_TOOLS = ["omca_session_search", "omca_agents_list", "omca_categories_list", "omca_boulder_write"]
 const EDIT_TOOLS = ["write", "edit", "patch"]
 
 let prompts: Prompts | undefined

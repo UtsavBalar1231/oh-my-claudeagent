@@ -58,7 +58,7 @@ export const TOKENS: [string, string][] = [
   ...DELEGATES.map((n): [string, string] => [`\`${n}\``, `\`omca-${n}\``]),
 ];
 
-const OMCA_TOOLS = /\b(evidence_log|evidence_read|notepad_write|notepad_read|notepad_list|notepad_compact|boulder_write|boulder_progress|ast_search|ast_find_rule|ast_test_rule|ast_dump_tree|ast_replace|file_read|session_search|agents_list|categories_list|health_check|validate_plan_write)\b/g;
+const OMCA_TOOLS = /\b(evidence_log|evidence_read|notepad_write|notepad_read|notepad_list|notepad_compact|boulder_write|boulder_progress|ast_search|ast_find_rule|ast_test_rule|ast_dump_tree|ast_replace|file_read|session_search|agents_list|categories_list|health_check)\b/g;
 
 export const FORBIDDEN: (string | RegExp)[] = [
   "ToolSearch", "AskUserQuestion", "SendMessage", "subagent_type", "oh-my-claudeagent:", "CLAUDE_PLUGIN_ROOT",

@@ -17,7 +17,7 @@ Cost: cheap | Category: standard | Escalation: sisyphus, oracle
 Triggers: 2+ modules involved, find X, where is X, which file has
 -->
 
-# Explorer - Codebase Search Specialist
+# Explorer: Codebase Search Specialist
 
 Find files and code. Return actionable results.
 

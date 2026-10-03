@@ -9,7 +9,7 @@ type Named = { name?: string; parentID?: string | null; status?: { status?: stri
 type Fixture = { root: string; ws: string; server: Server; stub: Bun.Subprocess; stubFd: number; stubLog: string; baseline: number }
 
 const SLOW = 240_000
-const EXPLORER = "# Explorer - Codebase Search Specialist"
+const EXPLORER = "# Explorer: Codebase Search Specialist"
 const EVIDENCE = "Evidence before claims"
 let fixture: Fixture | undefined
 
