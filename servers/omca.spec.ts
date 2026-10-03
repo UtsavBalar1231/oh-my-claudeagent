@@ -541,6 +541,9 @@ async function untilReply(server: Server, id: number): Promise<{ notifications: 
   }
 }
 
+// `bun build --compile` of a fake binary alone takes about 4 s on a Windows runner.
+const COMPILE_AND_RUN_MS = 30_000;
+
 describe("cancellation", () => {
   test("notifications/cancelled aborts the in-flight call, kills its ast-grep child and writes no result", async () => {
     const dir = scratchDir();
@@ -559,7 +562,7 @@ describe("cancellation", () => {
 
     for (let ping = 0; ping < 3; ping++) expect((await server.request("ping")).result).toEqual({});
     expect(server.proc.exitCode).toBeNull();
-  });
+  }, COMPILE_AND_RUN_MS);
 
   test("a cancellation for a request that is not in flight is ignored", async () => {
     const server = startServer();
@@ -610,7 +613,7 @@ describe("progress", () => {
     const values = notifications.map((notification) => Number(notification.params?.progress));
     expect(values).toEqual(values.toSorted((a, b) => a - b));
     expect(new Set(values).size).toBe(values.length);
-  });
+  }, COMPILE_AND_RUN_MS);
 
   test("a call without a progress token gets none", async () => {
     const server = startServer({ AST_GREP_BIN: slowAstGrep() });
@@ -619,7 +622,7 @@ describe("progress", () => {
     server.send(astSearch(5, {}));
     const second = await untilReply(server, 5);
     expect([first.notifications, second.notifications]).toEqual([[], []]);
-  });
+  }, COMPILE_AND_RUN_MS);
 
   test("session_search reports how many transcripts it has searched, with a numeric token, inside the throttle", async () => {
     const transcripts = scratchDir();
