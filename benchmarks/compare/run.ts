@@ -91,7 +91,7 @@ const fileCount = (path: string, extra: string[] = []): number =>
   existsSync(path) ? run(["find", path, ...extra, "-type", "f"]).split("\n").filter(Boolean).length : 0;
 
 const PLUGIN_DIR = "/cfg/plugins/cache/";
-const hostFilter = (hosts: string[]): string[] => hosts.filter((h) => !/\.ts\.net$/.test(h));
+const hostFilter = (hosts: string[]): string[] => hosts.filter((h) => !h.endsWith(".ts.net"));
 
 async function installStage(): Promise<void> {
   ensureNetwork(file);
