@@ -1,13 +1,18 @@
 import type { RenderElement } from "claude-code";
-import { displayWidth, fitEnd, formatWhen, padEnd } from "../../src/core/ui-kit.ts";
-import { TONE_KEYS } from "../../src/core/visual.ts";
+import { displayWidth, fitEnd, formatWhen } from "../../src/core/ui-kit.ts";
+import { chip, type Piece, redact, TONE_KEYS } from "../../src/core/visual.ts";
 import { type Rating, rate, shown, type Verdict } from "../feedback.ts";
 import type { Host } from "../host.ts";
 import { keyButton, noticeRow, type TabView, type View } from "../pane.ts";
+import { Card, Row } from "../ui.ts";
 
 const BUTTON_GAP = 2;
-const VERDICT = 4;
 const GAP = "  ";
+// The wider verdict chip, ` ↓ DOWN `, and the space after it.
+const CHIP = 9;
+const CARD_FRAME = 4;
+// The card's top border, title and bottom border.
+const CARD_ROWS = 3;
 const WORDS = { loading: "", empty: "No feedback has been recorded in this session." };
 
 function actions(host: Host, view: View, hasTurn: boolean): RenderElement {
@@ -26,20 +31,19 @@ function actions(host: Host, view: View, hasTurn: boolean): RenderElement {
   });
 }
 
-function row(view: View, rating: Rating, index: number): RenderElement {
-  const { Box, Text } = view.kit;
+function row(view: View, rating: Rating, index: number, inner: number): RenderElement {
   const isUp = rating.rating === "up";
-  const fixed = `${padEnd(rating.rating, VERDICT)}${GAP}${formatWhen(rating.at)}${GAP}`;
-  const note = fitEnd(rating.note ?? "", view.width - 2 - displayWidth(fixed), view.g.ellipsis);
-  return Box({
-    key: `rating-${index}`,
-    flexDirection: "row",
-    children: [
-      Text({ color: isUp ? TONE_KEYS.ok : TONE_KEYS.fail, children: [`${isUp ? view.g.up : view.g.down} `] }),
-      Text({ children: [fixed] }),
-      Text({ dimColor: true, children: [note] }),
-    ],
-  });
+  const badge = chip(`${isUp ? view.g.up : view.g.down} ${isUp ? "UP" : "DOWN"}`, isUp ? "ok" : "fail", view.isAscii);
+  const when = `${formatWhen(rating.at)}${GAP}`;
+  const room = inner - CHIP - displayWidth(when);
+  const note = fitEnd(redact(rating.note ?? "", view.home, view.g.mask).text, room, view.g.ellipsis);
+  const pieces: Piece[] = [
+    badge,
+    { text: " ".repeat(CHIP - displayWidth(badge.text)) },
+    { text: when, color: TONE_KEYS.muted },
+    ...(note === "" ? [] : [{ text: note }]),
+  ];
+  return Row(view.kit, { key: `rating-${index}`, pieces });
 }
 
 export const view: TabView = async (host, view) => {
@@ -48,18 +52,25 @@ export const view: TabView = async (host, view) => {
   if (error !== null) return [...head, noticeRow(view, { kind: "error", reason: error }, WORDS)];
   if (ratings.length === 0) return [...head, noticeRow(view, { kind: "empty" }, WORDS)];
   const ups = ratings.filter((rating) => rating.rating === "up").length;
-  const plural = ratings.length === 1 ? "rating" : "ratings";
-  const summary = `${ratings.length} ${plural}, newest first ${view.g.dot} ${ups} up, ${ratings.length - ups} down`;
-  const room = Math.max(1, view.rows - 2);
+  const downs = ratings.length - ups;
+  const inner = view.width - CARD_FRAME;
+  const title = `${ratings.length} ${ratings.length === 1 ? "rating" : "ratings"}, newest first ${view.g.dot} ${view.g.up} ${ups} up ${view.g.dot} ${view.g.down} ${downs} down`;
+  const room = Math.max(1, view.rows - head.length - CARD_ROWS);
   const newest = [...ratings].reverse();
-  const listed = newest.length > room ? newest.slice(0, room - 1) : newest;
-  const { Text } = view.kit;
+  const listed = newest.length > room ? newest.slice(0, Math.max(1, room - 1)) : newest;
   return [
     ...head,
-    Text({ dimColor: true, children: [fitEnd(summary, view.width, view.g.ellipsis)] }),
-    ...listed.map((rating, index) => row(view, rating, index)),
-    ...(listed.length < newest.length
-      ? [Text({ dimColor: true, children: [`  ${view.g.down} ${newest.length - listed.length} more`] })]
-      : []),
+    Card(view.kit, {
+      key: "ratings",
+      title: fitEnd(title, inner, view.g.ellipsis),
+      tone: downs > 0 ? "warn" : "ok",
+      width: view.width,
+      children: [
+        ...listed.map((rating, index) => row(view, rating, index, inner)),
+        ...(listed.length < newest.length
+          ? [view.kit.Text({ dimColor: true, children: [`${view.g.down} ${newest.length - listed.length} more`] })]
+          : []),
+      ],
+    }),
   ];
 };

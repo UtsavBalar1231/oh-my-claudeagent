@@ -1,21 +1,26 @@
 import type { RenderElement } from "claude-code";
 import { aggregate, type LedgerRecord, METRICS_DIR, parseRecords } from "../../src/core/ledger.ts";
-import { PRICING_AS_OF } from "../../src/core/pricing.ts";
+import { formatUsd, PRICING_AS_OF } from "../../src/core/pricing.ts";
 import { isSafeId } from "../../src/core/session-id.ts";
 import { displayWidth, fitEnd, formatDuration, formatTokens, padEnd, padStart, shortType } from "../../src/core/ui-kit.ts";
+import { agentKey, fitPieces, type Piece, spark, stack, TONE_KEYS } from "../../src/core/visual.ts";
 import { type Host, reason, type State } from "../host.ts";
 import type { Subcommand } from "../omca-router.ts";
 import { keyButton, noticeRow, open, type TabView, type View } from "../pane.ts";
+import { Card, Line, Row } from "../ui.ts";
 
 type Stats = State["stats"];
-type Row = Stats["rows"][number];
+type StatsRow = Stats["rows"][number];
 
 const GAP = "  ";
 const MIN_NAME = 10;
-const RELOAD = "r: Reload";
+const COLUMN_GAP = 1;
+const CARD_FRAME = 4;
+// The sparkline never needs more cells than the widest body.
+const TURNS_KEPT = 200;
 
 const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`;
-const finished = (row: Row) => row.outcomes.completed + row.outcomes.aborted + row.outcomes.empty;
+const finished = (row: StatsRow) => row.outcomes.completed + row.outcomes.aborted + row.outcomes.empty;
 
 async function readRecords(host: Host, dir: string): Promise<{ records: LedgerRecord[]; sessions: number; skipped: number }> {
   if (!(await host.fs.exists(dir))) return { records: [], sessions: 0, skipped: 0 };
@@ -33,14 +38,29 @@ async function readRecords(host: Host, dir: string): Promise<{ records: LedgerRe
   };
 }
 
+function turnsOf(records: readonly LedgerRecord[]): Stats["turns"] {
+  return records
+    .filter((record) => record.outcome !== "running")
+    .toSorted((a, b) => Date.parse(a.started_at) - Date.parse(b.started_at) || a.agent_id.localeCompare(b.agent_id))
+    .slice(-TURNS_KEPT)
+    .map((record) => ({ agentType: record.agent_type, tokens: record.input_tokens + record.output_tokens }));
+}
+
 export async function load(host: Host): Promise<void> {
   const [root, readAt] = await Promise.all([host.session.root(), host.clock.now()]);
   const base = { pricingAsOf: PRICING_AS_OF, readAt };
   try {
     const { records, sessions, skipped } = await readRecords(host, `${root}/${METRICS_DIR}`);
-    await host.state.stats.set({ ...base, rows: aggregate(records), sessions, skipped, error: null });
+    await host.state.stats.set({ ...base, rows: aggregate(records), turns: turnsOf(records), sessions, skipped, error: null });
   } catch (error) {
-    await host.state.stats.set({ ...base, rows: [], sessions: 0, skipped: 0, error: `Could not read ${METRICS_DIR}: ${reason(error)}` });
+    await host.state.stats.set({
+      ...base,
+      rows: [],
+      turns: [],
+      sessions: 0,
+      skipped: 0,
+      error: `Could not read ${METRICS_DIR}: ${reason(error)}`,
+    });
   }
 }
 
@@ -49,48 +69,82 @@ export const command: Subcommand = async (host, e) => {
   return open(host, e, "stats");
 };
 
-// Rounded through the pricing table's integer unit, so $2.855 shows as $2.86 rather than as
-// the float just below it.
-function money(usd: number): string {
-  const cents = Math.round(Math.round(usd * 1e8) / 1e6);
-  if (cents === 0 && usd > 0) return "<$0.01";
-  return `$${(cents / 100).toFixed(2)}`;
+type Column = { header: string; width: number; cell: (row: StatsRow, view: View, most: number) => Piece[] };
+
+const right = (text: string, width: number, color?: Piece["color"]): Piece[] => [
+  { text: padStart(text, width), ...(color === undefined ? {} : { color }) },
+];
+
+function evidenceColor(rate: number): Piece["color"] {
+  if (rate >= 1) return TONE_KEYS.ok;
+  return rate <= 0 ? TONE_KEYS.fail : TONE_KEYS.warn;
 }
 
-type Column = { header: string; width: number; cell: (row: Row, g: View["g"]) => string };
+const BAR = 10;
+const OUTCOME = 4;
 
 // Drawn in ORDER; a narrow body keeps the columns earliest in KEEP_ORDER and drops the rest whole.
 const COLUMNS = {
-  runs: { header: "runs", width: 4, cell: (row) => String(row.count) },
-  median: { header: "median", width: 6, cell: (row, g) => (finished(row) === 0 ? g.dot : formatDuration(row.medianDurationMs)) },
-  tokens: { header: "tokens", width: 6, cell: (row) => formatTokens(row.inputTokens + row.outputTokens) },
+  bar: {
+    header: "",
+    width: BAR,
+    cell: (row, view, most) =>
+      stack(
+        [
+          { value: row.count, color: agentKey(row.agentType), ascii: "#" },
+          { value: most - row.count, color: TONE_KEYS.track, ascii: "." },
+        ],
+        BAR,
+        view.isAscii,
+      ),
+  },
+  runs: { header: "runs", width: 4, cell: (row) => right(String(row.count), 4) },
+  median: {
+    header: "median",
+    width: 6,
+    cell: (row, view) => (finished(row) === 0 ? right(view.g.dot, 6, TONE_KEYS.muted) : right(formatDuration(row.medianDurationMs), 6)),
+  },
+  tokens: { header: "tokens", width: 6, cell: (row) => right(formatTokens(row.inputTokens + row.outputTokens), 6) },
   cost: {
     header: "est. cost",
     width: 9,
-    cell: (row, g) => {
-      if (finished(row) === 0) return g.dot;
-      if (row.unpriced === finished(row)) return "n/a";
-      return `${money(row.estimatedCostUsd)}${row.unpriced > 0 ? "+" : ""}`;
+    cell: (row, view) => {
+      if (finished(row) === 0) return right(view.g.dot, 9, TONE_KEYS.muted);
+      if (row.unpriced === finished(row)) return right("n/a", 9, TONE_KEYS.muted);
+      return right(`${formatUsd(row.estimatedCostUsd)}${row.unpriced > 0 ? "+" : ""}`, 9);
     },
   },
-  evidence: { header: "evidence", width: 8, cell: (row, g) => (finished(row) === 0 ? g.dot : `${Math.round(row.evidenceRate * 100)}%`) },
+  evidence: {
+    header: "evidence",
+    width: 8,
+    cell: (row, view) =>
+      finished(row) === 0
+        ? right(view.g.dot, 8, TONE_KEYS.muted)
+        : right(`${Math.round(row.evidenceRate * 100)}%`, 8, evidenceColor(row.evidenceRate)),
+  },
   outcomes: {
-    header: `${padStart("done", 4)}${GAP}${padStart("abort", 5)}${GAP}${padStart("empty", 5)}`,
-    width: 18,
-    cell: (row) =>
-      `${padStart(String(row.outcomes.completed), 4)}${GAP}${padStart(String(row.outcomes.aborted), 5)}${GAP}${padStart(String(row.outcomes.empty), 5)}`,
+    header: padEnd("outcomes", OUTCOME * 3),
+    width: OUTCOME * 3,
+    cell: (row, view) =>
+      (
+        [
+          [view.g.check, row.outcomes.completed, TONE_KEYS.ok],
+          [view.g.cross, row.outcomes.aborted, TONE_KEYS.fail],
+          [view.g.warn, row.outcomes.empty, TONE_KEYS.warn],
+        ] as const
+      ).map(([glyph, count, color]) => ({ text: padEnd(`${glyph}${count}`, OUTCOME), color: count === 0 ? TONE_KEYS.muted : color })),
   },
 } as const satisfies Record<string, Column>;
 
 type Name = keyof typeof COLUMNS;
-const ORDER: readonly Name[] = ["runs", "median", "tokens", "cost", "evidence", "outcomes"];
-const KEEP_ORDER: readonly Name[] = ["runs", "cost", "evidence", "median", "tokens", "outcomes"];
+const ORDER: readonly Name[] = ["bar", "runs", "median", "tokens", "cost", "evidence", "outcomes"];
+const KEEP_ORDER: readonly Name[] = ["runs", "cost", "evidence", "bar", "median", "tokens", "outcomes"];
 
-function layout(width: number, names: readonly string[]): { name: number; columns: Column[] } {
+function layout(width: number, names: readonly string[], lead: number): { name: number; columns: Column[] } {
   const longest = Math.max(displayWidth("agent"), ...names.map(displayWidth));
   for (let kept = KEEP_ORDER.length; ; kept -= 1) {
     const columns = ORDER.filter((name) => KEEP_ORDER.slice(0, kept).includes(name)).map((name) => COLUMNS[name]);
-    const room = width - columns.reduce((sum, column) => sum + GAP.length + column.width, 0);
+    const room = width - lead - columns.reduce((sum, column) => sum + GAP.length + column.width, 0);
     if (room >= Math.min(MIN_NAME, longest) || kept === 0) return { name: Math.max(1, Math.min(room, longest)), columns };
   }
 }
@@ -105,17 +159,132 @@ function summary(stats: Stats, g: View["g"], width: number): string {
       ...(stats.skipped > 0 ? [skipped] : []),
     ].join(` ${g.dot} `);
   const full = line(`${plural(stats.skipped, "unreadable record")} skipped`);
-  return displayWidth(full) <= width ? full : line(`${stats.skipped} skipped`);
+  return fitEnd(displayWidth(full) <= width ? full : line(`${stats.skipped} skipped`), width, g.ellipsis);
 }
 
-function notes(stats: Stats, g: View["g"]): string | undefined {
+function agentsCard(stats: Stats, view: View, width: number): RenderElement {
+  const inner = width - CARD_FRAME;
+  const lead = displayWidth(`${view.g.agent} `);
+  const { name, columns } = layout(inner, stats.rows.map((row) => shortType(row.agentType)), lead);
+  const most = Math.max(1, ...stats.rows.map((row) => row.count));
+  const cells = (pieces: readonly Piece[][]) => pieces.flatMap((piece) => [{ text: GAP }, ...piece]);
+  const head = `${" ".repeat(lead)}${padEnd("agent", name)}${columns.map((column) => `${GAP}${padStart(column.header, column.width)}`).join("")}`;
+  return Card(view.kit, {
+    key: "stats-agents",
+    title: fitEnd(`Agents ${view.g.dot} ${plural(stats.rows.length, "type")}`, inner, view.g.ellipsis),
+    tone: "info",
+    width,
+    children: [
+      view.kit.Text({ dimColor: true, children: [head] }),
+      ...stats.rows.map((row) => {
+        const color = agentKey(row.agentType);
+        return Row(view.kit, {
+          key: `stats-${row.agentType}`,
+          pieces: [
+            { text: `${view.g.agent} `, color },
+            { text: padEnd(fitEnd(shortType(row.agentType), name, view.g.ellipsis), name), color },
+            ...cells(columns.map((column) => column.cell(row, view, most))),
+          ],
+        });
+      }),
+    ],
+  });
+}
+
+function tokensCard(stats: Stats, view: View, width: number): RenderElement | undefined {
+  if (stats.turns.length === 0) return undefined;
+  const inner = width - CARD_FRAME;
+  const peak = Math.max(...stats.turns.map((turn) => turn.tokens));
+  const note = ` peak ${formatTokens(peak)}`;
+  const shown = stats.turns.slice(-Math.max(1, inner - displayWidth(note)));
+  const strip = [...spark(shown.map((turn) => turn.tokens), view.isAscii)].map((cell, index) => ({
+    text: cell,
+    color: agentKey(shown[index]?.agentType ?? ""),
+  }));
+  const isCut = shown.length < stats.turns.length;
+  return Card(view.kit, {
+    key: "stats-tokens",
+    title: fitEnd(`Tokens per turn ${view.g.dot} ${isCut ? `last ${shown.length} of ` : ""}${plural(stats.turns.length, "turn")}`, inner, view.g.ellipsis),
+    tone: "info",
+    width,
+    children: [Line(view.kit, fitPieces([...strip, { text: note, color: TONE_KEYS.muted }], inner, view.g.ellipsis))],
+  });
+}
+
+function costNotes(stats: Stats, g: View["g"]): string {
   const partial = stats.rows.filter((row) => row.unpriced > 0 && row.unpriced < finished(row));
   const excluded = partial.reduce((sum, row) => sum + row.unpriced, 0);
-  const notes = [
+  return [
     ...(excluded > 0 ? [`+ excludes ${plural(excluded, "unpriced run")}`] : []),
     ...(stats.rows.some((row) => row.unpriced > 0 && row.unpriced === finished(row)) ? ["n/a: no listed price"] : []),
-  ];
-  return notes.length === 0 ? undefined : notes.join(` ${g.dot} `);
+    `${stats.pricingAsOf} list prices`,
+  ].join(` ${g.dot} `);
+}
+
+// Without color, the ASCII meter tells agents apart by these marks, which its legend repeats.
+const METER_MARKS = ["#", "=", "+", "*", "%", "&", "~", "o"] as const;
+const meterMark = (index: number): string => METER_MARKS[index % METER_MARKS.length] ?? "#";
+
+// Whole entries, costliest first, as many as fit beside a count of the rest.
+function legendOf(shares: readonly StatsRow[], view: View, width: number): Piece[] {
+  const entries = shares.map((row, index) => [
+    { text: `${view.isAscii ? meterMark(index) : view.g.agent} `, color: agentKey(row.agentType) },
+    { text: `${shortType(row.agentType)} ${formatUsd(row.estimatedCostUsd)}` },
+  ]);
+  const widthOf = (pieces: readonly Piece[]) => pieces.reduce((sum, piece) => sum + displayWidth(piece.text), 0);
+  const out: Piece[] = [];
+  for (const [index, entry] of entries.entries()) {
+    const left = entries.length - index - 1;
+    const more = left === 0 ? 0 : displayWidth(`${GAP}+${left} more`);
+    const next = [...(index === 0 ? [] : [{ text: GAP }]), ...entry];
+    if (widthOf(out) + widthOf(next) + more > width) {
+      return [...out, { text: `${out.length === 0 ? "" : GAP}+${entries.length - index} more`, color: TONE_KEYS.muted }];
+    }
+    out.push(...next);
+  }
+  return out;
+}
+
+function costCard(stats: Stats, view: View, width: number): RenderElement {
+  const { Text } = view.kit;
+  const inner = width - CARD_FRAME;
+  const priced = stats.rows.filter((row) => finished(row) > row.unpriced);
+  const title = fitEnd("Estimated cost", inner, view.g.ellipsis);
+  if (priced.length === 0) {
+    return Card(view.kit, {
+      key: "stats-cost",
+      title,
+      tone: "warn",
+      width,
+      children: [Text({ dimColor: true, wrap: "wrap", children: ["No finished run has a listed price, so no cost is shown"] })],
+    });
+  }
+  const total = priced.reduce((sum, row) => sum + row.estimatedCostUsd, 0);
+  const money = `${formatUsd(total)}${stats.rows.some((row) => row.unpriced > 0) ? "+" : ""}`;
+  const shares = priced.filter((row) => row.estimatedCostUsd > 0).toSorted((a, b) => b.estimatedCostUsd - a.estimatedCostUsd);
+  const meter = stack(
+    shares.length === 0
+      ? [{ value: 1, color: TONE_KEYS.track, ascii: "." }]
+      : shares.map((row, index) => ({ value: row.estimatedCostUsd, color: agentKey(row.agentType), ascii: meterMark(index) })),
+    Math.max(0, inner - displayWidth(money) - 1),
+    view.isAscii,
+  );
+  const legend = legendOf(shares, view, inner);
+  return Card(view.kit, {
+    key: "stats-cost",
+    title,
+    tone: "ok",
+    width,
+    children: [
+      Line(view.kit, fitPieces([{ text: money, bold: true }, { text: " " }, ...meter], inner, view.g.ellipsis)),
+      ...(legend.length === 0 ? [] : [Line(view.kit, fitPieces(legend, inner, view.g.ellipsis))]),
+      Text({ dimColor: true, wrap: "wrap", children: [costNotes(stats, view.g)] }),
+    ],
+  });
+}
+
+function sideBySide(view: View, key: string, cards: readonly RenderElement[], width: number): RenderElement {
+  return view.kit.Box({ key, flexDirection: "row", columnGap: COLUMN_GAP, width: width * cards.length + COLUMN_GAP * (cards.length - 1), children: cards });
 }
 
 export const view: TabView = async (host, view) => {
@@ -124,39 +293,23 @@ export const view: TabView = async (host, view) => {
   const reload = () => keyButton(view, "r", "Reload", () => load(host));
   if (stats === undefined) return [noticeRow(view, { kind: "loading" }, words)];
   if (stats.error !== null) return [noticeRow(view, { kind: "error", reason: stats.error }, words), reload()];
-  const { Box, Text } = view.kit;
+  const { Text } = view.kit;
   if (stats.rows.length === 0) {
     return [
       noticeRow(view, { kind: "empty" }, words),
       ...(stats.skipped > 0 ? [Text({ dimColor: true, children: [`${plural(stats.skipped, "unreadable record")} skipped`] })] : []),
+      reload(),
     ];
   }
-  const note = notes(stats, view.g);
-  const { name, columns } = layout(view.width, stats.rows.map((row) => shortType(row.agentType)));
-  const line = (label: string, cells: readonly string[]) =>
-    `${padEnd(fitEnd(label, name, view.g.ellipsis), name)}${columns.map((column, index) => `${GAP}${padStart(cells[index] ?? "", column.width)}`).join("")}`;
-  const room = Math.max(1, view.rows - 3 - (note === undefined ? 0 : 1));
-  const shown = stats.rows.length > room ? stats.rows.slice(0, room - 1) : stats.rows;
-  const rows: RenderElement[] = shown.map((row) =>
-    Box({
-      key: `stats-${row.agentType}`,
-      children: [Text({ children: [line(shortType(row.agentType), columns.map((column) => column.cell(row, view.g)))] })],
-    }),
-  );
-  const more = stats.rows.length - shown.length;
+  const half = Math.floor((view.width - COLUMN_GAP) / 2);
+  const isSplit = view.tier === "split";
+  const tokens = tokensCard(stats, view, isSplit ? half : view.width);
+  const cost = costCard(stats, view, isSplit ? half : view.width);
+  const lower = isSplit && tokens !== undefined ? [sideBySide(view, "stats-lower", [tokens, cost], half)] : [...(tokens === undefined ? [] : [tokens]), cost];
   return [
-    Text({ dimColor: true, children: [fitEnd(summary(stats, view.g, view.width), view.width, view.g.ellipsis)] }),
-    Text({ dimColor: true, children: [line("agent", columns.map((column) => column.header))] }),
-    ...rows,
-    ...(more > 0 ? [Text({ dimColor: true, children: [`  ${view.g.down} ${plural(more, "more agent type")}`] })] : []),
-    ...(note === undefined ? [] : [Text({ dimColor: true, children: [fitEnd(note, view.width, view.g.ellipsis)] })]),
-    Box({
-      key: "stats-keys",
-      flexDirection: "row",
-      children: [
-        reload(),
-        Text({ dimColor: true, children: [fitEnd(`${GAP}estimated at ${stats.pricingAsOf} list prices`, view.width - RELOAD.length, view.g.ellipsis)] }),
-      ],
-    }),
+    Text({ dimColor: true, children: [summary(stats, view.g, view.width)] }),
+    agentsCard(stats, view, view.width),
+    ...lower,
+    reload(),
   ];
 };

@@ -32,6 +32,8 @@ declare module "claude-code" {
         tab: "agents" | "plan" | "evidence" | "notepad" | "feedback" | "stats" | "doctor";
         notepad: {
           planName: string;
+          bound: string | null;
+          plans: readonly string[];
           sections: readonly {
             name: "learnings" | "issues" | "decisions" | "problems";
             text: string;
@@ -91,6 +93,7 @@ declare module "claude-code" {
           outcomes: { running: number; completed: number; aborted: number; empty: number };
           evidenceRate: number;
         }[];
+        turns: readonly { agentType: string; tokens: number }[];
         sessions: number;
         skipped: number;
         pricingAsOf: string;
@@ -106,6 +109,7 @@ declare module "claude-code" {
           level: "ok" | "warn" | "fail" | "info";
           detail: string;
           fix?: "add-refresh-interval";
+          prompt?: string;
         }[];
         applied: {
           fix: "add-refresh-interval";

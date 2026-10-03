@@ -4,12 +4,12 @@
   "agent_type": "oh-my-claudeagent:executor",
   "model": "claude-sonnet-5-5",
   "effort": "high",
-  "started_at": "2026-10-01T09:20:41.000Z",
-  "ended_at": "2026-10-01T09:22:17.000Z",
+  "started_at": "2026-10-01T09:31:00.000Z",
+  "ended_at": "2026-10-01T09:32:36.000Z",
   "duration_ms": 96000,
   "input_tokens": 158000,
-  "output_tokens": 7200,
-  "estimated_cost_usd": 0.3608,
+  "output_tokens": 6200,
+  "estimated_cost_usd": 0.378,
   "outcome": "aborted",
   "evidence_logged": false
 }

@@ -3,7 +3,10 @@ import { isRecord } from "./tool-input.ts";
 import type { Level } from "./visual.ts";
 
 export type Fix = "add-refresh-interval";
-export type Check = { id: string; label: string; level: Level; detail: string; fix?: Fix };
+/** `prompt` is a command the person can run to fix the check; the Doctor tab fills the prompt with it and never submits. */
+export type Check = { id: string; label: string; level: Level; detail: string; fix?: Fix; prompt?: string };
+
+export const SETUP_COMMAND = "/oh-my-claudeagent:omca-setup";
 
 export type DoctorEnv = Readonly<{
   CLAUDE_CODE_SUBAGENT_MODEL_FORCE?: string | undefined;
@@ -60,8 +63,16 @@ function pluginOptions(settings: Inputs["settings"], plugin: string): Readonly<R
 
 const isOn = (value: string | undefined) => value !== undefined && !/^(|0|false|no|off)$/i.test(value.trim());
 
-const check = (id: string, label: string, level: Level, detail: string, fix?: Fix): Check =>
-  fix === undefined ? { id, label, level, detail } : { id, label, level, detail, fix };
+const check = (id: string, label: string, level: Level, detail: string, act: { fix?: Fix | undefined; prompt?: string } = {}): Check => ({
+  id,
+  label,
+  level,
+  detail,
+  ...(act.fix === undefined ? {} : { fix: act.fix }),
+  ...(act.prompt === undefined ? {} : { prompt: act.prompt }),
+});
+
+const MCP = { prompt: "/mcp" };
 
 function modCheck(version: string | null): Check {
   return version === null
@@ -104,14 +115,14 @@ function hookCheck(hook: HookState, now: number): Check {
     case "unsafe-id":
       return check("server", "omca server", "warn", "The session id cannot name a status file, so it was not read");
     case "unreadable":
-      return check("server", "omca server", "warn", `Could not read the session status file: ${hook.reason}`);
+      return check("server", "omca server", "warn", `Could not read the session status file: ${hook.reason}`, MCP);
     case "missing":
-      return check("server", "omca server", "warn", "No hook has reached the server in this session yet");
+      return check("server", "omca server", "warn", "No hook has reached the server in this session yet", MCP);
     case "seen": {
       const age = now - hook.lastHookAt * 1000;
       return age <= FRESH_MS
         ? check("server", "omca server", "ok", `Last hook call ${ago(age)}`)
-        : check("server", "omca server", "warn", `Last hook call ${ago(age)}; hooks may have stopped reaching it`);
+        : check("server", "omca server", "warn", `Last hook call ${ago(age)}; hooks may have stopped reaching it`, MCP);
     }
   }
 }
@@ -182,6 +193,7 @@ function outputStyleCheck(settings: Inputs["settings"], isForced: boolean | null
     "Output style",
     "warn",
     `${active} is the active output style and OMCA Default is not forced; update or reinstall the plugin to restore its force-for-plugin line, or choose OMCA Default in /config`,
+    { prompt: "/config" },
   );
 }
 
@@ -200,18 +212,22 @@ function advisorCheck(settings: Inputs["settings"], env: DoctorEnv): Check {
   const model = settings["advisorModel"];
   return typeof model === "string" && model !== ""
     ? check("advisor", "Advisor", "ok", `advisorModel ${model}, and nothing here keeps it off`)
-    : check("advisor", "Advisor", "info", "No advisorModel; /advisor fable turns the advisor on");
+    : check("advisor", "Advisor", "info", "No advisorModel; /advisor fable turns the advisor on", { prompt: "/advisor fable" });
 }
 
 function statusLineCheck(settings: Inputs["settings"], userSettings: string | null): Check {
   const statusLine = settings["statusLine"];
-  if (!isRecord(statusLine)) return check("statusline", "Status line", "info", "No statusLine is set");
+  if (!isRecord(statusLine)) {
+    return check("statusline", "Status line", "info", "No statusLine is set", { prompt: SETUP_COMMAND });
+  }
   const interval = statusLine["refreshInterval"];
   if (typeof interval === "number" && interval >= 1) {
     return check("statusline", "Status line", "ok", `Refreshes every ${interval} s as well as on events`);
   }
   if (interval !== undefined) {
-    return check("statusline", "Status line", "warn", `refreshInterval ${JSON.stringify(interval)} is not a number of seconds of at least 1`);
+    return check("statusline", "Status line", "warn", `refreshInterval ${JSON.stringify(interval)} is not a number of seconds of at least 1`, {
+      prompt: SETUP_COMMAND,
+    });
   }
   const user = userSettings === null ? undefined : parseObject(userSettings);
   const isUsers = JSON.stringify(user?.["statusLine"]) === JSON.stringify(statusLine);
@@ -221,7 +237,7 @@ function statusLineCheck(settings: Inputs["settings"], userSettings: string | nu
     "Status line",
     "warn",
     "No refreshInterval, so it redraws on events only and goes stale while agents run",
-    isFixable ? "add-refresh-interval" : undefined,
+    isFixable ? { fix: "add-refresh-interval" } : { prompt: SETUP_COMMAND },
   );
 }
 

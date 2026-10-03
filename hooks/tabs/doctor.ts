@@ -3,17 +3,23 @@ import type { Fix } from "../../src/core/doctor-checks.ts";
 import { lastStart, stepStart, windowEnd } from "../../src/core/list-window.ts";
 import { tildePath } from "../../src/core/path.ts";
 import { displayWidth, fitEnd, KEYS, padEnd, wrapText } from "../../src/core/ui-kit.ts";
-import { levelMark, type ThemeKey, TONE_KEYS } from "../../src/core/visual.ts";
+import { chip, fitPieces, levelMark, type Piece, type ThemeKey, TONE_KEYS } from "../../src/core/visual.ts";
 import * as doctor from "../doctor.ts";
 import type { Host, State } from "../host.ts";
 import type { Subcommand } from "../omca-router.ts";
 import { keyButton, noticeRow, open, type TabView, type View } from "../pane.ts";
+import { Line } from "../ui.ts";
 
 type Check = State["doctor"]["checks"][number];
 type Applied = NonNullable<State["doctor"]["applied"]>;
 
 const LABEL = 14;
 const GAP = 3;
+// The widest chip, `! WARN` padded in Unicode or bracketed in ASCII, and the space after it.
+const CHIP = 9;
+const WORDS: Readonly<Record<Check["level"], string>> = { ok: "OK", warn: "WARN", fail: "FAIL", info: "INFO" };
+// One key per check that names a command to run; r and i are taken, and digits switch tabs.
+const PROMPT_KEYS: Readonly<Record<string, string>> = { server: "m", style: "c", advisor: "a", statusline: "s" };
 // Below this a detail column would be too narrow for the longest variable name it quotes.
 const STACKED_BELOW = 64;
 const DIFF_ROWS = 16;
@@ -44,42 +50,58 @@ export const command: Subcommand = async (host, e) => {
   return answer;
 };
 
-function summary(checks: readonly Check[], dot: string): string {
-  const counts = (["fail", "warn", "info", "ok"] as const)
+function summary(checks: readonly Check[], g: View["g"]): Piece[] {
+  return (["fail", "warn", "info", "ok"] as const)
     .map((level) => [level, checks.filter((check) => check.level === level).length] as const)
-    .filter(([, count]) => count > 0);
-  return counts.map(([level, count]) => `${count} ${level}`).join(` ${dot} `);
+    .filter(([, count]) => count > 0)
+    .flatMap(([level, count], index) => {
+      const { glyph, color } = levelMark(level, g);
+      return [...(index === 0 ? [] : [{ text: "  " }]), { text: `${glyph} ${count} ${level}`, color }];
+    });
 }
 
 type Rows = { element: RenderElement; height: number };
 
+const widthOf = (pieces: readonly Piece[]) => pieces.reduce((sum, piece) => sum + displayWidth(piece.text), 0);
+
 function checkRows(host: Host, view: View, check: Check): Rows {
-  const { Box, Text } = view.kit;
-  const { glyph, color } = levelMark(check.level, view.g);
+  const { Box, Button, Text } = view.kit;
+  const { glyph } = levelMark(check.level, view.g);
   const isStacked = view.width < STACKED_BELOW;
-  const indent = isStacked ? 2 : 2 + LABEL;
-  const mark = Text({ color, children: [`${glyph} `] });
+  const indent = isStacked ? 2 : CHIP + LABEL;
+  const badge = chip(`${glyph} ${WORDS[check.level]}`, check.level, view.isAscii);
+  const lead: Piece[] = [badge, { text: " ".repeat(Math.max(1, CHIP - displayWidth(badge.text))) }];
   const detail = wrapText(check.detail, view.width - indent);
-  const line = (lead: RenderElement[], text: string) =>
-    Box({ flexDirection: "row", children: [...lead, Text({ children: [text] })] });
+  const line = (pieces: readonly Piece[]) => Line(view.kit, pieces);
   const lines = isStacked
-    ? [
-        Box({ flexDirection: "row", children: [mark, Text({ bold: true, children: [check.label] })] }),
-        ...detail.map((text) => line([Text({ children: ["  "] })], text)),
-      ]
+    ? [line([...lead, { text: check.label, bold: true }]), ...detail.map((text) => line([{ text: `  ${text}` }]))]
     : detail.map((text, index) =>
-        line(index === 0 ? [mark, Text({ children: [padEnd(check.label, LABEL)] })] : [Text({ children: [" ".repeat(indent)] })], text),
+        line(index === 0 ? [...lead, { text: padEnd(check.label, LABEL), bold: true }, { text }] : [{ text: `${" ".repeat(indent)}${text}` }]),
       );
-  const fixRow = (which: Fix) =>
-    Box({
-      flexDirection: "row",
-      children: [
-        Text({ children: [" ".repeat(indent)] }),
-        keyButton(view, FIXES[which].key, FIXES[which].label, () => doctor.fix(host, which)),
-      ],
-    });
-  const children = check.fix === undefined ? lines : [...lines, fixRow(check.fix)];
-  return { element: Box({ key: `check-${check.id}`, flexDirection: "column", children }), height: children.length };
+  const room = Math.max(1, view.width - indent - displayWidth("x: "));
+  const { fix, prompt } = check;
+  const actions = [
+    ...(fix === undefined ? [] : [keyButton(view, FIXES[fix].key, FIXES[fix].label, () => doctor.fix(host, fix))]),
+    ...(prompt === undefined
+      ? []
+      : [
+          Button({
+            key: `prompt-${check.id}`,
+            ...(PROMPT_KEYS[check.id] === undefined ? {} : { hotkey: PROMPT_KEYS[check.id] }),
+            label: fitEnd(`Use ${prompt}`, room, view.g.ellipsis),
+            plain: true,
+            onPress: view.press(() => host.prompt.fill({ text: prompt })),
+          }),
+        ]),
+  ];
+  const children = [
+    ...lines,
+    ...actions.map((action, index) => Box({ key: `action-${check.id}-${index}`, flexDirection: "row", children: [Text({ children: [" ".repeat(indent)] }), action] })),
+  ];
+  return {
+    element: Box({ key: `check-${check.id}`, flexDirection: "column", hover: { backgroundColor: TONE_KEYS.focus }, children }),
+    height: children.length,
+  };
 }
 
 function diffColor(line: string, index: number): { color?: ThemeKey; dimColor?: boolean } {
@@ -124,14 +146,16 @@ export const view: TabView = async (host, view) => {
     return [noticeRow(view, { kind: "empty" }, words), runKey("Run checks")];
   }
   const button = runKey("Run again");
-  const status = state.isRunning
-    ? `Running the checks${view.g.ellipsis}`
-    : `${summary(state.checks, view.g.dot)} ${view.g.dot} checked ${new Date(state.ranAt).toTimeString().slice(0, 5)}`;
   const room = view.width - displayWidth(`${KEYS.reload}: Run again`) - GAP;
+  const counts = summary(state.checks, view.g);
+  const checked: Piece = { text: `  checked ${new Date(state.ranAt).toTimeString().slice(0, 5)}`, color: TONE_KEYS.muted };
+  const status: Piece[] = state.isRunning
+    ? [{ text: `Running the checks${view.g.ellipsis}`, color: TONE_KEYS.muted }]
+    : [...counts, ...(widthOf([...counts, checked]) <= room ? [checked] : [])];
   const error = state.error === null ? undefined : `${view.g.cross} ${state.error}`;
   const applied = state.applied === null ? undefined : appliedRows(view, state.applied);
   const head = [
-    Box({ key: "head", flexDirection: "row", columnGap: GAP, children: [button, Text({ dimColor: true, children: [fitEnd(status, room, view.g.ellipsis)] })] }),
+    Box({ key: "head", flexDirection: "row", columnGap: GAP, children: [button, Line(view.kit, fitPieces(status, room, view.g.ellipsis))] }),
     ...(error === undefined ? [] : [Text({ color: TONE_KEYS.fail, wrap: "wrap", children: [error] })]),
     ...(applied?.elements ?? []),
   ];

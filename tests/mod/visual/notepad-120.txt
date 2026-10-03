@@ -1,0 +1,40 @@
+                                                               │1: Agents  2: Plan  3: Evidence  4: Notepad            ✕
+ ▐▛███▛█   Claude Code v2.1.288                                │5: Feedback  6: Stats  7: Doctor
+▝▜██████▀  Opus 5.5 · API Usage Billing                        │─────────────────────────────────────────────────────
+ ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/cwd               │checkout-redesign  BOUND  · 10 entries · 1 masked
+                                                               │f: Find  l: Plans (3)
+                                                               │╭───────────────────────────────────────────────────╮
+                                                               ││ Learnings · 3 entries                             │
+                                                               ││ ── 10-01 15:12 ────────────────────────────────── │
+                                                               ││ The cart totals were computed in three places.    │
+                                                               ││ CheckoutPage, OrderEmail and the receipt PDF now  │
+                                                               ││ all call totals(cart) from src/cart/totals.ts.    │
+                                                               ││ ── 10-02 16:35 ────────────────────────────────── │
+                                                               ││ - Tax rounds per line, not per order; the old     │
+                                                               ││   code rounded once and drifted by a cent.        │
+                                                               ││ - Shipping is free from $50.00 after discounts,   │
+                                                               ││   so discount runs before shipping.               │
+                                                               ││ ── 10-03 13:47 ────────────────────────────────── │
+                                                               ││ The staging gateway rejects amounts with more     │
+                                                               ││ than two decimals. formatMinor() converts before  │
+                                                               ││ every request.                                    │
+                                                               │╰───────────────────────────────────────────────────╯
+                                                               │╭───────────────────────────────────────────────────╮
+                                                               ││ Issues · 2 entries                                │
+                                                               ││ ── 10-01 20:50 ────────────────────────────────── │
+                                                               ││ just test fails on a clean checkout until the     │
+                                                               ││ payments sandbox is up. The README says to export │
+                                                               ││ PAYMENTS_SANDBOX_TOKEN=‹masked› first; that       │
+                                                               ││ token belongs in the team vault, not in the       │
+                                                               ││ README.                                           │
+                                                               ││ ── 10-02 22:18 ────────────────────────────────── │
+                                                               ││ The summary panel jumps by one row when a coupon  │
+                                                               ││ is applied on narrow screens.                     │
+                                                               │╰───────────────────────────────────────────────────╯
+                                                               │╭───────────────────────────────────────────────────╮
+checkout-redesign 2/4 tasks · no verification yet           [-]││ Decisions · 3 entries                             │
+                                           ◐ medium · /effort  │
+─────────────────────────────────────────────────────────────────────────────────────────── oh-my-claudeagent:sisyphus ─
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏸ manual mode on · ? for shortcuts · ← for agents

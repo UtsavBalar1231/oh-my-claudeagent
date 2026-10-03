@@ -1,0 +1,15 @@
+{
+  "session_id": "b83e5d10-7a42-4f6c-8e19-c5a0d2f4e902",
+  "agent_id": "a5c8f1e4b7d04a63",
+  "agent_type": "oh-my-claudeagent:oracle",
+  "model": "claude-fable-5-1",
+  "effort": "xhigh",
+  "started_at": "2026-10-02T10:44:02.000Z",
+  "ended_at": "2026-10-02T10:49:58.000Z",
+  "duration_ms": 356000,
+  "input_tokens": 198000,
+  "output_tokens": 8800,
+  "estimated_cost_usd": 2.42,
+  "outcome": "completed",
+  "evidence_logged": false
+}

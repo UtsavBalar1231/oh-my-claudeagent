@@ -1,3 +1,5 @@
 {
-  "plansDirectory": "{{cwd}}/plans"
+  "plansDirectory": "{{cwd}}/plans",
+  "maxEffortLevel": "high",
+  "statusLine": { "type": "command", "command": "printf omca", "padding": 0 }
 }

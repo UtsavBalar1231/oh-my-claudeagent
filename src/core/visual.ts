@@ -275,6 +275,39 @@ export function bar(parts: BarParts, width: number, ascii: boolean): Piece[] {
   return coalesce(cells);
 }
 
+/** The pieces cut to `width` cells: the one that crosses the edge ends in the ellipsis, the rest are dropped. */
+export function fitPieces(pieces: readonly Piece[], width: number, ellipsis: string): Piece[] {
+  const out: Piece[] = [];
+  let used = 0;
+  for (const [index, piece] of pieces.entries()) {
+    const cells = displayWidth(piece.text);
+    const rest = pieces.slice(index + 1).reduce((sum, next) => sum + displayWidth(next.text), 0);
+    if (used + cells + rest <= width) return [...out, ...pieces.slice(index)];
+    if (used + cells >= width) {
+      // The trailing space makes a piece that exactly fills the room still end in the ellipsis.
+      const text = fitEnd(rest > 0 ? `${piece.text} ` : piece.text, width - used, ellipsis);
+      return text === "" ? out : [...out, { ...piece, text }];
+    }
+    out.push(piece);
+    used += cells;
+  }
+  return out;
+}
+
+export type Segment = { value: number; color: ThemeKey; ascii: string };
+
+/** A bar of exactly `width` whole cells shared among the segments by value, each in its own color. */
+export function stack(segments: readonly Segment[], width: number, ascii: boolean): Piece[] {
+  if (width <= 0) return [];
+  const isBracketed = ascii && width >= 3;
+  const sizes = allocate(segments.map((segment) => Math.max(0, segment.value)), isBracketed ? width - 2 : width);
+  const cells = sizes.flatMap((size, index) => {
+    const segment = segments[index];
+    return segment === undefined || size === 0 ? [] : [{ text: (ascii ? segment.ascii : BLOCK).repeat(size), color: segment.color }];
+  });
+  return isBracketed ? [{ text: "[" }, ...coalesce(cells), { text: "]" }] : coalesce(cells);
+}
+
 /** One cell per value, scaled from zero to the largest value. */
 export function spark(values: readonly number[], ascii: boolean): string {
   const levels = ascii ? SPARK.ascii : SPARK.unicode;
@@ -387,7 +420,7 @@ export function isValidDiff(source: string): boolean {
 const SECRETS: readonly { pattern: RegExp; keep?: (match: string, ...groups: string[]) => string }[] = [
   { pattern: /-----BEGIN [A-Z ]*PRIVATE KEY-----(?:[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----|[\s\S]*$)/g },
   {
-    pattern: /(?<![A-Za-z0-9])([A-Za-z0-9_-]*(?:password|passwd|token|secret|api_key))(\s*=\s*)(?:"[^"\n]*"|'[^'\n]*'|[^\s"'&;,‹]+)/gi,
+    pattern: /(?<![A-Za-z0-9])([A-Za-z0-9_-]*(?:password|passwd|token|secret|api_key))(\s*=\s*)(?:"[^"\n]*"|'[^'\n]*'|[^\s"'`&;,‹]+)/gi,
     keep: (_match, key = "", equals = "") => `${key}${equals}`,
   },
   { pattern: /\b([Bb]earer\s+)[A-Za-z0-9._~+/-]{8,}=*/g, keep: (_match, word = "") => word },

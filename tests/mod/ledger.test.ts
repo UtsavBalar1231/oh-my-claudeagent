@@ -1,4 +1,4 @@
-import type { Args, On, TurnUsage } from "claude-code";
+import type { Args, On, RenderElement, TurnUsage } from "claude-code";
 import { type Engine, expect, type Mounted as MountedPane, test } from "claude-code/testing";
 import { sha256Hex } from "../../src/core/evidence.ts";
 import type { LedgerRecord } from "../../src/core/ledger.ts";
@@ -23,6 +23,23 @@ import {
 } from "./world.ts";
 
 const METRICS = `${ROOT}/.omca/metrics`;
+
+type Node = { type: string; props?: Record<string, unknown>; children?: unknown };
+const isNode = (value: unknown): value is Node => typeof value === "object" && value !== null && "type" in value;
+const childrenOf = (node: Node): unknown[] => (Array.isArray(node.children) ? node.children : node.children === undefined ? [] : [node.children]);
+const textOf = (element: unknown): string => {
+  if (typeof element === "string") return element;
+  if (!isNode(element)) return "";
+  if (element.type === "Button") return `${String(element.props?.["hotkey"])}: ${String(element.props?.["label"])}`;
+  return childrenOf(element).map(textOf).join("");
+};
+
+// The rows a tree draws, a column Box such as a card spread into the rows it holds.
+function rowsOf(tree: RenderElement): string[] {
+  const spread = (element: unknown): string[] =>
+    isNode(element) && element.type === "Box" && element.props?.["flexDirection"] === "column" ? childrenOf(element).flatMap(spread) : [textOf(element)];
+  return topRows(tree).flatMap(spread);
+}
 const SURFACES = ["terminal", "desktop"] as const;
 
 const usage = (model: string, input: number, output: number, cacheRead = 0, cacheWrite = 0): TurnUsage => ({
@@ -156,12 +173,19 @@ test("each delegation is written running at spawn and overwritten once when its 
   expect(await $.command.run(run("stats"))).toEqual({});
   for (const surface of SURFACES) {
     const ui = await $.ui.mount(pane(surface, { columns: 120, rows: 40, placement: "dock" }));
-    expect(rows(await ui.drawn()).slice(3)).toEqual([
+    expect(rowsOf(await ui.drawn()).slice(3)).toEqual([
       "2 delegations in 1 session",
-      "agent     runs  median  tokens  est. cost  evidence",
-      "executor     1   1m30s   13.5k      $0.01      100%",
-      "explore      1   1m15s       0      $0.00        0%",
-      "r: Reload  estimated at 2026-10-02 list prices",
+      "Agents · 2 types",
+      "  agent     runs  est. cost  evidence",
+      "◆ executor     1      $0.01      100%",
+      "◆ explore      1      $0.00        0%",
+      "Tokens per turn · 2 turns",
+      "█▁ peak 13.5k",
+      "Estimated cost",
+      `$0.01 ${"█".repeat(41)}`,
+      "◆ executor $0.01",
+      "2026-10-02 list prices",
+      "r: Reload",
     ]);
     await ui.unmount();
   }
@@ -230,28 +254,42 @@ test("the Stats tab aggregates two sessions by agent type with exact rows, on th
   expect(await $.command.run(run("stats", 200))).toEqual({});
   const summary = "7 delegations in 2 sessions · 1 running · 1 unreadable record skipped";
 
+  const notes = "+ excludes 1 unpriced run · n/a: no listed price · 2026-10-02 list prices";
+
   for (const surface of SURFACES) {
-    const wide = await $.ui.mount(pane(surface, { columns: 200, rows: 50, placement: "inline" }));
-    expect(rows(await wide.drawn()).slice(1)).toEqual([
+    const wide = await $.ui.mount(pane(surface, { columns: 200, rows: 50, placement: "dock" }));
+    expect(rowsOf(await wide.drawn()).slice(2)).toEqual([
       summary,
-      "agent     runs  median  tokens  est. cost  evidence  done  abort  empty",
-      "executor     3   1m30s    1.0M      $2.86       67%     2      1      0",
-      "explore      3     15s   12.0k     $0.01+        0%     1      0      1",
-      "oracle       1   6m40s    129k        n/a      100%     1      0      0",
-      "+ excludes 1 unpriced run · n/a: no listed price",
-      "r: Reload  estimated at 2026-10-02 list prices",
+      "Agents · 3 types",
+      "  agent                 runs  median  tokens  est. cost  evidence  outcomes    ",
+      `◆ executor  ${"█".repeat(10)}     3   1m30s    1.0M      $2.86       67%  ✓2  ✗1  !0  `,
+      `◆ explore   ${"█".repeat(10)}     3     15s   12.0k     $0.01+        0%  ✓1  ✗0  !1  `,
+      `◆ oracle    ${"█".repeat(10)}     1   6m40s    129k        n/a      100%  ✓1  ✗0  !0  `,
+      "Tokens per turn · 6 turns",
+      "▁█▁▂▁▁ peak 990k",
+      "Estimated cost",
+      `$2.87+ ${"█".repeat(74)}`,
+      "◆ executor $2.86  ◆ explore $0.01",
+      notes,
+      "r: Reload",
     ]);
     await wide.unmount();
 
     const narrow = await $.ui.mount(pane(surface, { columns: 120, rows: 40, placement: "dock" }));
-    expect(rows(await narrow.drawn()).slice(3)).toEqual([
+    expect(rowsOf(await narrow.drawn()).slice(3)).toEqual([
       "7 delegations in 2 sessions · 1 running · 1 skipped",
-      "agent     runs  median  tokens  est. cost  evidence",
-      "executor     3   1m30s    1.0M      $2.86       67%",
-      "explore      3     15s   12.0k     $0.01+        0%",
-      "oracle       1   6m40s    129k        n/a      100%",
-      "+ excludes 1 unpriced run · n/a: no listed price",
-      "r: Reload  estimated at 2026-10-02 list prices",
+      "Agents · 3 types",
+      "  agent     runs  est. cost  evidence",
+      "◆ executor     3      $2.86       67%",
+      "◆ explore      3     $0.01+        0%",
+      "◆ oracle       1        n/a      100%",
+      "Tokens per turn · 6 turns",
+      "▁█▁▂▁▁ peak 990k",
+      "Estimated cost",
+      `$2.87+ ${"█".repeat(40)}`,
+      "◆ executor $2.86  ◆ explore $0.01",
+      notes,
+      "r: Reload",
     ]);
     await narrow.unmount();
   }
@@ -280,12 +318,12 @@ test("digit 6 reads the records afresh each time, r reloads a drawn table, and a
   const body = async () => rows(await ui.drawn()).slice(3);
 
   await ui.press({ key: "6" });
-  expect(await body()).toEqual(["No delegation statistics have been collected yet."]);
+  expect(await body()).toEqual(["No delegation statistics have been collected yet.", "r: Reload"]);
 
   write(w, `${METRICS}/${S1}/broken.json`, "{");
   await ui.press({ key: "1" });
   await ui.press({ key: "6" });
-  expect(await body()).toEqual(["No delegation statistics have been collected yet.", "1 unreadable record skipped"]);
+  expect(await body()).toEqual(["No delegation statistics have been collected yet.", "1 unreadable record skipped", "r: Reload"]);
 
   write(w, `${METRICS}/${S1}/a-e1.json`, record(S1, "a-e1", {}));
   await ui.press({ key: "1" });
@@ -303,10 +341,20 @@ test("OMCA_ASCII draws the Stats tab from the ASCII set", async ($, on) => {
   world(on, FIXTURE, {}, { OMCA_ASCII: "1" });
   await $.command.run(run("stats", 80));
   const ui = await $.ui.mount(pane("terminal", { columns: 80, rows: 40, placement: "inline" }));
-  const drawn = rows(await ui.drawn());
-  expect(drawn.slice(1, 3)).toEqual([
+  const drawn = rowsOf(await ui.drawn());
+  expect(drawn.slice(1, 13)).toEqual([
     "7 delegations in 2 sessions - 1 running - 1 unreadable record skipped",
-    "agent     runs  median  tokens  est. cost  evidence  done  abort  empty",
+    "Agents - 3 types",
+    "  agent                 runs  median  tokens  est. cost  evidence",
+    "@ executor  [########]     3   1m30s    1.0M      $2.86       67%",
+    "@ explore   [########]     3     15s   12.0k     $0.01+        0%",
+    "@ oracle    [###.....]     1   6m40s    129k        n/a      100%",
+    "Tokens per turn - 6 turns",
+    ".@.:.. peak 990k",
+    "Estimated cost",
+    `$2.87+ [${"#".repeat(59)}=]`,
+    "# executor $2.86  = explore $0.01",
+    "+ excludes 1 unpriced run - n/a: no listed price - 2026-10-02 list prices",
   ]);
   const isAscii = (row: string) => [...row].every((char) => char.charCodeAt(0) >= 32 && char.charCodeAt(0) < 127);
   expect(drawn.filter((row) => !isAscii(row))).toEqual([]);
@@ -351,9 +399,6 @@ async function proofFiles(planSha?: string): Promise<Record<string, string>> {
   return { [PLAN_PATH]: PLAN_TEXT, [BOULDER]: BOUND, [LEDGER]: JSON.stringify({ entries: runs(sha) }) };
 }
 
-type Node = { type: string; props?: Record<string, unknown>; children?: unknown };
-const isNode = (value: unknown): value is Node => typeof value === "object" && value !== null && "type" in value;
-const kids = (node: Node): unknown[] => (Array.isArray(node.children) ? node.children : node.children === undefined ? [] : [node.children]);
 
 // The drawing as text, one entry per terminal row: a bordered Box is framed, a Code block's
 // lines are marked `│`, an Input is bracketed, and a row Box lays its children side by side.
@@ -363,7 +408,7 @@ function lines(element: unknown): string[] {
   const props = element.props ?? {};
   switch (element.type) {
     case "Text":
-      return [kids(element).map((child) => lines(child).join("")).join("")];
+      return [childrenOf(element).map((child) => lines(child).join("")).join("")];
     case "Button":
       return [`${String(props["hotkey"])}: ${String(props["label"])}`];
     case "Code":
@@ -371,7 +416,7 @@ function lines(element: unknown): string[] {
     case "Input":
       return [`[${String(props["label"])}${String(props["value"]) || String(props["placeholder"])}]`];
     case "Box": {
-      const children = kids(element);
+      const children = childrenOf(element);
       if (props["flexDirection"] === "row") {
         const columns = children.map(lines);
         const widths = children.map((child, index) => {
@@ -396,7 +441,7 @@ function lines(element: unknown): string[] {
 function nodeByKey(element: unknown, key: string): Node | undefined {
   if (!isNode(element)) return undefined;
   if (element.props?.["key"] === key) return element;
-  for (const child of kids(element)) {
+  for (const child of childrenOf(element)) {
     const found = nodeByKey(child, key);
     if (found !== undefined) return found;
   }
@@ -405,11 +450,11 @@ function nodeByKey(element: unknown, key: string): Node | undefined {
 
 // A row's runs as drawn: each piece's text and the colors it carries.
 function runsOf(row: Node | undefined): { text: string; color?: unknown; backgroundColor?: unknown; bold?: unknown }[] {
-  const line = row === undefined ? undefined : kids(row)[0];
-  return (isNode(line) ? kids(line) : []).flatMap((piece) => {
+  const line = row === undefined ? undefined : childrenOf(row)[0];
+  return (isNode(line) ? childrenOf(line) : []).flatMap((piece) => {
     if (!isNode(piece)) return [];
     const { color, backgroundColor, bold } = piece.props ?? {};
-    return [{ text: kids(piece).join(""), ...(color === undefined ? {} : { color }), ...(backgroundColor === undefined ? {} : { backgroundColor }), ...(bold === undefined ? {} : { bold }) }];
+    return [{ text: childrenOf(piece).join(""), ...(color === undefined ? {} : { color }), ...(backgroundColor === undefined ? {} : { backgroundColor }), ...(bold === undefined ? {} : { bold }) }];
   });
 }
 
@@ -536,7 +581,7 @@ test("wide: the list beside a card of the focused entry, which follows the focus
   ]);
   expect(nodeByKey(await ui.drawn(), "detail-2")?.props).toMatchObject({ borderColor: "error", width: 41 });
   const split = nodeByKey(await ui.drawn(), "split");
-  expect(kids(split ?? { type: "Box" }).map((column) => (isNode(column) ? column.props : undefined))).toEqual([
+  expect(childrenOf(split ?? { type: "Box" }).map((column) => (isNode(column) ? column.props : undefined))).toEqual([
     { flexDirection: "column", width: 47 },
     { flexDirection: "column" },
   ]);
@@ -575,9 +620,9 @@ test("rows draw each type and exit in its own tone, the program bold, masks dim,
     { text: "curl", color: "text", bold: true },
     { text: " -H 'Authorization: B….example/run && just test", color: "text", bold: true },
   ]);
-  const meta = kids(nodeByKey(opened, "detail-3") ?? { type: "Box" }).at(-1);
+  const meta = childrenOf(nodeByKey(opened, "detail-3") ?? { type: "Box" }).at(-1);
   expect(lines(meta)).toEqual(["2026-10-02 10:20:00 · ◆ executor · ‹masked› 2 masked"]);
-  expect(isNode(meta) ? kids(meta).map((piece) => (isNode(piece) ? piece.props?.["color"] : undefined)) : []).toEqual([
+  expect(isNode(meta) ? childrenOf(meta).map((piece) => (isNode(piece) ? piece.props?.["color"] : undefined)) : []).toEqual([
     "inactive",
     "inactive",
     "green_FOR_SUBAGENTS_ONLY",

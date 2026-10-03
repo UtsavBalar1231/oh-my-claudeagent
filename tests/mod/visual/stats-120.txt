@@ -1,31 +1,31 @@
                                                                │1: Agents  2: Plan  3: Evidence  4: Notepad            ✕
  ▐▛███▛█   Claude Code v2.1.288                                │5: Feedback  6: Stats  7: Doctor
 ▝▜██████▀  Opus 5.5 · API Usage Billing                        │─────────────────────────────────────────────────────
- ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/cwd               │8 delegations in 2 sessions · 1 running · 1 skipped
-                                                               │agent     runs  median  tokens  est. cost  evidence
-                                                               │executor     4   3m04s    1.1M      $2.58       67%
-                                                               │explore      3     27s    119k     $0.17+        0%
-                                                               │oracle       1   6m52s    257k      $3.41      100%
-                                                               │+ excludes 1 unpriced run
-                                                               │r: Reload  estimated at 2026-10-02 list prices
-                                                               │
-                                                               │
-                                                               │
-                                                               │
-                                                               │
-                                                               │
-                                                               │
-                                                               │
-                                                               │
-                                                               │
-                                                               │
-                                                               │
-                                                               │
-                                                               │
-                                                               │
-                                                               │
-                                                               │
-                                                               │
+ ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/cwd               │20 delegations in 3 sessions · 1 running · 1 skipped
+                                                               │╭───────────────────────────────────────────────────╮
+                                                               ││ Agents · 8 types                                  │
+                                                               ││   agent       runs  est. cost  evidence           │
+                                                               ││ ◆ executor       8      $6.86       86%           │
+                                                               ││ ◆ explore        4     $0.31+        0%           │
+                                                               ││ ◆ librarian      2      $0.40       50%           │
+                                                               ││ ◆ oracle         2      $5.27       50%           │
+                                                               ││ ◆ hephaestus     1      $0.65      100%           │
+                                                               ││ ◆ metis          1      $0.34        0%           │
+                                                               ││ ◆ momus          1      $0.39        0%           │
+                                                               ││ ◆ prometheus     1      $0.67        0%           │
+                                                               │╰───────────────────────────────────────────────────╯
+                                                               │╭───────────────────────────────────────────────────╮
+                                                               ││ Tokens per turn · 19 turns                        │
+                                                               ││ ▂▂▂▂▆▄▃▂▇▁▁▅▂█▃▂▄▆▂ peak 631k                     │
+                                                               │╰───────────────────────────────────────────────────╯
+                                                               │╭───────────────────────────────────────────────────╮
+                                                               ││ Estimated cost                                    │
+                                                               ││ $14.89+ █████████████████████████████████████████ │
+                                                               ││ ◆ executor $6.86  ◆ oracle $5.27  +6 more         │
+                                                               ││ + excludes 1 unpriced run · 2026-10-02 list       │
+                                                               ││ prices                                            │
+                                                               │╰───────────────────────────────────────────────────╯
+                                                               │r: Reload
                                                                │
                                                                │
                                                                │

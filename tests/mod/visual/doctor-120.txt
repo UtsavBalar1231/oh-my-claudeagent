@@ -1,40 +1,40 @@
                                                                │1: Agents  2: Plan  3: Evidence  4: Notepad            ✕
  ▐▛███▛█   Claude Code v2.1.288                                │5: Feedback  6: Stats  7: Doctor
 ▝▜██████▀  Opus 5.5 · API Usage Billing                        │─────────────────────────────────────────────────────
- ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/cwd               │r: Run again   1 warn · 2 info · 10 ok · checked 13:…
-                                                               │! omca server
-▎ Auto mode is now Claude Code's default permission mode.      │  No hook has reached the server in this session yet
-▎ Auto mode lets Claude handle permission prompts              │· Advisor
-▎ automatically. Claude checks each tool call for risky actions│  No advisorModel; /advisor fable turns the advisor
-▎ and prompt injection before executing, runs the ones it      │  on
-▎ assesses as lower-risk, and blocks the rest.                 │· Status line
-▎ https://code.claude.com/docs/en/permission-modes             │  No statusLine is set
-                                                               │✓ OMCA
+ ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/cwd               │r: Run again   ! 3 warn  · 1 info  ✓ 9 ok
+                                                               │
+▎ Auto mode is now Claude Code's default permission mode.      │ ! WARN  omca server
+▎ Auto mode lets Claude handle permission prompts              │  No hook has reached the server in this session yet
+▎ automatically. Claude checks each tool call for risky actions│  m: Use /mcp
+▎ and prompt injection before executing, runs the ones it      │ ! WARN  Effort cap
+▎ assesses as lower-risk, and blocks the rest.                 │  maxEffortLevel high holds oracle below the xhigh it
+▎ https://code.claude.com/docs/en/permission-modes             │  declares
+                                                               │ ! WARN  Status line
+                                                               │  No refreshInterval, so it redraws on events only
+                                                               │  and goes stale while agents run
+                                                               │  s: Use /oh-my-claudeagent:omca-setup
+                                                               │ · INFO  Advisor
+                                                               │  No advisorModel; /advisor fable turns the advisor
+                                                               │  on
+                                                               │  a: Use /advisor fable
+                                                               │ ✓ OK    OMCA
                                                                │  oh-my-claudeagent 2.21.0 is loaded
-                                                               │✓ Claude Code
+                                                               │ ✓ OK    Claude Code
                                                                │  2.1.288 meets the 2.1.288 floor
-                                                               │✓ bun
+                                                               │ ✓ OK    bun
                                                                │  bun 1.4.2 is on PATH
-                                                               │✓ ast-grep
+                                                               │ ✓ OK    ast-grep
                                                                │  ast-grep 0.44.1 is on PATH
-                                                               │✓ Options
+                                                               │ ✓ OK    Options
                                                                │  showBand on, guardMode dialog
-                                                               │✓ Agent models
+                                                               │ ✓ OK    Agent models
                                                                │  Each agent keeps the model tier it declares
-                                                               │✓ Effort cap
-                                                               │  No maxEffortLevel, so agents run at the effort they
-                                                               │  declare
-                                                               │✓ Mod policy
+                                                               │ ✓ OK    Mod policy
                                                                │  Mods you install may load
-                                                               │✓ Hooks
-                                                               │  Neither disableAllHooks nor allowManagedHooksOnly
-                                                               │  is set
-                                                               │✓ Output style
-                                                               │  OMCA Default is forced by the plugin
-                                                               │
-                                                               │
+                                                               │  ↓ 2 more · ↑↓ scroll
                                            ◐ medium · /effort  │
 ─────────────────────────────────────────────────────────────────────────────────────────── oh-my-claudeagent:sisyphus ─
 ❯ 
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  omca
   ⏵⏵ auto mode on (shift+tab to cycle) · ← for agents

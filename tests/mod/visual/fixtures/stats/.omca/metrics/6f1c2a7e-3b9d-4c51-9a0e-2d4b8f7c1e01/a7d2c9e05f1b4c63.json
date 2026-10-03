@@ -4,12 +4,12 @@
   "agent_type": "oh-my-claudeagent:oracle",
   "model": "claude-fable-5-1",
   "effort": "xhigh",
-  "started_at": "2026-10-01T10:02:00.000Z",
-  "ended_at": "2026-10-01T10:08:52.000Z",
+  "started_at": "2026-10-01T09:20:30.000Z",
+  "ended_at": "2026-10-01T09:27:22.000Z",
   "duration_ms": 412000,
   "input_tokens": 236000,
-  "output_tokens": 21000,
-  "estimated_cost_usd": 3.41,
+  "output_tokens": 9800,
+  "estimated_cost_usd": 2.85,
   "outcome": "completed",
   "evidence_logged": true
 }

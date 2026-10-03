@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { estimateCostUsd } from "./pricing.ts";
+import { estimateCostUsd, formatUsd } from "./pricing.ts";
 
 const usage = (input: number, output: number, cacheRead = 0, cacheWrite = 0) => ({
   input_tokens: input,
@@ -26,4 +26,14 @@ test.each([
 
 test.each(["mock-model", "claude-3-5-haiku-20241022", "claude-opus-9-9", "gpt-5", ""])("%p has no sourced price", (model) => {
   expect(estimateCostUsd(model, usage(1000, 1000))).toBeNull();
+});
+
+test.each([
+  [2.855, "$2.86"],
+  [0.0135, "$0.01"],
+  [0.004, "<$0.01"],
+  [0, "$0.00"],
+  [1234.5, "$1234.50"],
+])("$%p formats as %p", (usd, text) => {
+  expect(formatUsd(usd)).toBe(text);
 });

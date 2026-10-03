@@ -2,7 +2,7 @@ import type { On, RenderElement } from "claude-code";
 import { expect, test } from "claude-code/testing";
 import { joinPath } from "../../src/core/path.ts";
 import { usableColumns } from "../../src/core/ui-kit.ts";
-import { bodyColumns, cellsAcross, LAYOUTS, pane, POSIX, rows, run, SESSION, SIZES, type Size, topRows, type World, world, write } from "./world.ts";
+import { bodyColumns, cellsAcross, LAYOUTS, pane, POSIX, ROOT, rows, run, SESSION, SIZES, type Size, topRows, type World, world, write } from "./world.ts";
 
 const NOW_S = Date.UTC(2026, 9, 2, 12, 0, 0) / 1000;
 const USER = {
@@ -11,7 +11,7 @@ const USER = {
 };
 const USER_TEXT = `${JSON.stringify(USER, null, 2)}\n`;
 const WIDE = { columns: 200, rows: 50, placement: "dock" } as const;
-const PAD = " ".repeat(16);
+const PAD = " ".repeat(23);
 
 type Engine = World & { writes: string[]; release: () => void; started: Promise<void> };
 
@@ -66,19 +66,19 @@ function body(tree: RenderElement): string[] {
 }
 
 const CHECKS = [
-  "✓ Claude Code   2.1.288 meets the 2.1.288 floor",
-  "✓ bun           bun 1.4.2 is on PATH",
-  "✓ omca server   Last hook call 2 min ago",
-  "✓ ast-grep      sg 0.39.0 is on PATH",
-  "✓ Options       showBand on, guardMode deny",
-  "✓ Agent models  Each agent keeps the model tier it declares",
-  "✓ Effort cap    No maxEffortLevel, so agents run at the effort they declare",
-  "✓ Mod policy    Mods you install may load",
-  "✓ Hooks         Neither disableAllHooks nor allowManagedHooksOnly is set",
-  "✓ Output style  OMCA Default is forced by the plugin",
-  "✓ Advisor       advisorModel fable, and nothing here keeps it off",
+  " ✓ OK    Claude Code   2.1.288 meets the 2.1.288 floor",
+  " ✓ OK    bun           bun 1.4.2 is on PATH",
+  " ✓ OK    omca server   Last hook call 2 min ago",
+  " ✓ OK    ast-grep      sg 0.39.0 is on PATH",
+  " ✓ OK    Options       showBand on, guardMode deny",
+  " ✓ OK    Agent models  Each agent keeps the model tier it declares",
+  " ✓ OK    Effort cap    No maxEffortLevel, so agents run at the effort they declare",
+  " ✓ OK    Mod policy    Mods you install may load",
+  " ✓ OK    Hooks         Neither disableAllHooks nor allowManagedHooksOnly is set",
+  " ✓ OK    Output style  OMCA Default is forced by the plugin",
+  " ✓ OK    Advisor       advisorModel fable, and nothing here keeps it off",
 ];
-const STATUS_ROW = `! Status line   No refreshInterval, so it redraws on events only and goes stale while${PAD}agents run${PAD}i: Add refreshInterval 5`;
+const STATUS_ROW = ` ! WARN  Status line   No refreshInterval, so it redraws on events only and goes${PAD}stale while agents run${PAD}i: Add refreshInterval 5`;
 
 for (const layout of LAYOUTS) {
   const suffix = layout === POSIX ? "" : ` (${layout.name})`;
@@ -102,8 +102,8 @@ for (const layout of LAYOUTS) {
 
     expect(w.opened).toEqual([{ id: "omca", title: "OMCA", focus: true, closeOnEscape: true, rows: 12, columns: 56 }]);
     expect(body(await ui.drawn())).toEqual([
-      `r: Run again   2 warn · 11 ok · checked ${local(NOW_S)}`,
-      "! OMCA          Could not read this mod's version from its manifest",
+      `r: Run again   ! 2 warn  ✓ 11 ok  checked ${local(NOW_S)}`,
+      " ! WARN  OMCA          Could not read this mod's version from its manifest",
       STATUS_ROW,
       ...CHECKS,
     ]);
@@ -114,9 +114,9 @@ for (const layout of LAYOUTS) {
     write(w, manifest, '{ "name": "oh-my-claudeagent", "version": "3.0.0" }');
     await ui.press({ key: "r" });
     expect(body(await ui.drawn()).slice(0, 3)).toEqual([
-      `r: Run again   1 warn · 12 ok · checked ${local(NOW_S)}`,
+      `r: Run again   ! 1 warn  ✓ 12 ok  checked ${local(NOW_S)}`,
       STATUS_ROW,
-      "✓ OMCA          oh-my-claudeagent 3.0.0 is loaded",
+      " ✓ OK    OMCA          oh-my-claudeagent 3.0.0 is loaded",
     ]);
     await ui.unmount();
   });
@@ -209,7 +209,7 @@ for (const layout of LAYOUTS) {
     await $.command.run(run("doctor", 120));
     const ui = await $.ui.mount(pane("terminal", WIDE));
 
-    expect(body(await ui.drawn()).find((row) => row.startsWith("! Status line"))).toBe(STATUS_ROW);
+    expect(body(await ui.drawn()).find((row) => row.startsWith(" ! WARN  Status line"))).toBe(STATUS_ROW);
     await ui.press({ key: "i" });
     expect(w.writes).toEqual([`${moved}.omca-bak`, moved]);
     expect(w.reads.filter((path) => path.startsWith(`${layout.home}/.claude/`) || path.startsWith(`${layout.home}\\.claude`))).toEqual([]);
@@ -229,8 +229,8 @@ for (const layout of LAYOUTS) {
     expect(rows(await ui.drawn()).slice(-2)).toEqual(["✗ The checks failed: version unavailable", "r: Run again"]);
     isDenied = false;
     await ui.press({ key: "r" });
-    expect(rows(await ui.drawn()).find((row) => row.startsWith("! Status line"))).toBe(
-      "! Status line  No refreshInterval, so it redraws on events only  and goes stale while agents run  i: Add refreshInterval 5",
+    expect(rows(await ui.drawn()).find((row) => row.startsWith(" ! WARN  Status line"))).toBe(
+      " ! WARN  Status line  No refreshInterval, so it redraws on events only  and goes stale while agents run  i: Add refreshInterval 5",
     );
     await ui.unmount();
   });
@@ -249,6 +249,8 @@ for (const layout of LAYOUTS) {
         if (w.writes.length === 0) {
           expect(await keys()).toEqual(["i", "r"]);
           await ui.press({ key: "i" });
+          w.settings = { ...structuredClone(USER), statusLine: { ...USER.statusLine, refreshInterval: 5 } };
+          await ui.press({ key: "r" });
         }
         expect(await keys()).toEqual(["r"]);
         for (const child of topRows(await ui.drawn())) {
@@ -265,10 +267,10 @@ for (const layout of LAYOUTS) {
     await $.command.run(run("doctor", 80));
     const ui = await $.ui.mount(pane("terminal", { columns: 80, rows: 40, placement: "inline" }));
     const drawn = body(await ui.drawn());
-    expect(drawn[0]).toBe(`r: Run again   2 warn - 11 ok - checked ${local(NOW_S)}`);
-    expect(drawn[2]).toBe("! OMCA          Could not read this mod's version from its manifest");
-    expect(drawn).toContain("+ Claude Code   2.1.288 meets the 2.1.288 floor");
-    expect(drawn.at(-2)).toBe("  v 8 more - ^v scroll");
+    expect(drawn[0]).toBe(`r: Run again   ! 2 warn  + 11 ok  checked ${local(NOW_S)}`);
+    expect(drawn[2]).toBe(`[! WARN] OMCA          Could not read this mod's version from its${PAD}manifest`);
+    expect(drawn).toContain("[+ OK]   Claude Code   2.1.288 meets the 2.1.288 floor");
+    expect(drawn.at(-2)).toBe("  v 9 more - ^v scroll");
     const isAscii = (row: string) => [...row].every((char) => char.charCodeAt(0) >= 32 && char.charCodeAt(0) < 127);
     expect(rows(await ui.drawn()).filter((row) => !isAscii(row))).toEqual([]);
     await ui.unmount();
@@ -281,14 +283,14 @@ test("the Options row reports the options the mod loaded with, whatever settings
   await $.command.run(run("doctor", 120));
   const ui = await $.ui.mount(pane("terminal", WIDE));
 
-  expect(body(await ui.drawn()).find((row) => row.includes("Options"))).toBe("✓ Options       showBand off, guardMode dialog");
+  expect(body(await ui.drawn()).find((row) => row.includes("Options"))).toBe(" ✓ OK    Options       showBand off, guardMode dialog");
   await ui.unmount();
 });
 
 const SCROLL = { component: "Pane", requestId: "omca", offset: 0, origin: { kind: "person" } } as const;
 
 for (const [placement, columns, expectedCut] of [
-  ["dock", 120, [true, false, false]],
+  ["dock", 120, [true, true, false]],
   ["inline", 80, [true, true, true]],
 ] as const) {
   test(`${placement}: at 30, 40 and 50 rows the Doctor list fits the body, names what is below, and scrolls`, async ($, on) => {
@@ -331,11 +333,11 @@ test("the arrows, a page key and the wheel move the Doctor list by whole checks,
   const edges = async () => bodyLines(await ui.drawn()).filter((row) => row.includes("more"));
 
   expect((await titles())[0]).toBe("check-mod");
-  expect(await edges()).toEqual(["  ↓ 5 more · ↑↓ scroll"]);
+  expect(await edges()).toEqual(["  ↓ 6 more · ↑↓ scroll"]);
 
   await scroll(1);
   expect((await titles())[0]).toBe("check-server");
-  expect(await edges()).toEqual(["  ↑ 1 more", "  ↓ 4 more · ↑↓ scroll"]);
+  expect(await edges()).toEqual(["  ↑ 1 more", "  ↓ 5 more · ↑↓ scroll"]);
 
   await scroll(26);
   expect(await edges()).toEqual(["  ↑ 4 more"]);
@@ -345,7 +347,7 @@ test("the arrows, a page key and the wheel move the Doctor list by whole checks,
   expect(await edges()).toEqual(["  ↑ 4 more"]);
 
   await scroll(-3);
-  expect(await edges()).toEqual(["  ↑ 2 more", "  ↓ 2 more · ↑↓ scroll"]);
+  expect(await edges()).toEqual(["  ↑ 3 more", "  ↓ 2 more · ↑↓ scroll"]);
 
   await scroll(-100);
   expect((await titles())[0]).toBe("check-mod");
@@ -400,9 +402,9 @@ test("a Doctor list that fits leaves the arrows to the engine, and so does every
 
 function styleRow(drawn: RenderElement): string | undefined {
   const all = bodyLines(drawn);
-  const start = all.findIndex((row) => /^[!✓] Output style/.test(row));
+  const start = all.findIndex((row) => / (?:WARN|OK) +Output style/.test(row));
   if (start < 0) return undefined;
-  const length = all.slice(start + 1).findIndex((row) => /^[!✓·] /.test(row));
+  const length = all.slice(start + 1).findIndex((row) => /^ [!✓·] [A-Z]+ /.test(row));
   return all
     .slice(start, length < 0 ? undefined : start + 1 + length)
     .join(" ")
@@ -414,7 +416,7 @@ test("the Output style row is ok while the plugin forces its style, and says not
   await $.command.run(run("doctor", 120));
   const ui = await $.ui.mount(pane("terminal", WIDE));
 
-  expect(styleRow(await ui.drawn())).toBe("✓ Output style OMCA Default is forced by the plugin");
+  expect(styleRow(await ui.drawn())).toBe(" ✓ OK Output style OMCA Default is forced by the plugin");
   await ui.unmount();
 });
 
@@ -428,7 +430,7 @@ test("the Output style row is ok when the user opted out of the forced style, an
   await $.command.run(run("doctor", 120));
   const ui = await $.ui.mount(pane("terminal", WIDE));
 
-  expect(styleRow(await ui.drawn())).toBe("✓ Output style disableForceOrchestrationStyle is on, so your outputStyle Explanatory applies");
+  expect(styleRow(await ui.drawn())).toBe(" ✓ OK Output style disableForceOrchestrationStyle is on, so your outputStyle Explanatory applies");
   await ui.unmount();
 });
 
@@ -440,8 +442,88 @@ test("the Output style row warns with the active style and the way back when the
   const ui = await $.ui.mount(pane("terminal", WIDE));
 
   const row = styleRow(await ui.drawn()) ?? "";
-  expect(row).toStartWith("! Output style Explanatory is the active output style and OMCA Default is not forced;");
+  expect(row).toStartWith(" ! WARN Output style Explanatory is the active output style and OMCA Default is not forced;");
   expect(row).toContain("update or reinstall the plugin to restore its force-for-plugin line");
   expect(row).toContain("or choose OMCA Default in /config");
+  await ui.unmount();
+});
+
+function node(element: unknown, key: string): Node | undefined {
+  if (!isNode(element)) return undefined;
+  if (element.props?.["key"] === key) return element;
+  return childrenOf(element).reduce<Node | undefined>((found, child) => found ?? node(child, key), undefined);
+}
+
+const piece = (props: Record<string, unknown>, run: string) => ({ type: "Text", ...(Object.keys(props).length === 0 ? {} : { props }), children: [run] });
+const line = (...pieces: unknown[]) => ({ type: "Text", props: { wrap: "truncate-end" }, children: pieces });
+
+test("a row is a chip with the level's glyph and word on its tone, the label bold, and it lights on hover; the head counts each level in its tone", async ($, on) => {
+  const status = { [`${ROOT}/.omca/state/session/${SESSION}.json`]: JSON.stringify({ session_id: SESSION, last_hook_at: NOW_S - 120 }) };
+  engine(on, world(on, status, structuredClone(USER)));
+  await $.command.run(run("doctor", 120));
+  const ui = await $.ui.mount(pane("terminal", WIDE));
+  const drawn = await ui.drawn();
+
+  expect(childrenOf(node(drawn, "head") ?? { type: "" })[1]).toEqual(
+    line(
+      piece({ color: "warning" }, "! 2 warn"),
+      piece({}, "  "),
+      piece({ color: "success" }, "✓ 11 ok"),
+      piece({ color: "inactive" }, `  checked ${local(NOW_S)}`),
+    ),
+  );
+  expect(topRows(drawn)).toContainEqual({
+    type: "Box",
+    props: { key: "check-engine", flexDirection: "column" },
+    hover: { backgroundColor: "selectionBg" },
+    children: [
+      line(
+        piece({ color: "inverseText", backgroundColor: "success", bold: true }, " ✓ OK "),
+        piece({}, "   "),
+        piece({ bold: true }, "Claude Code   "),
+        piece({}, "2.1.288 meets the 2.1.288 floor"),
+      ),
+    ],
+  });
+  expect(childrenOf(node(drawn, "check-mod") ?? { type: "" })[0]).toEqual(
+    line(
+      piece({ color: "inverseText", backgroundColor: "warning", bold: true }, " ! WARN "),
+      piece({}, " "),
+      piece({ bold: true }, "OMCA          "),
+      piece({}, "Could not read this mod's version from its manifest"),
+    ),
+  );
+  await ui.unmount();
+});
+
+test("a check that names a command offers it on its own key, which fills the prompt and never submits", async ($, on) => {
+  engine(on, world(on, {}, {}));
+  const fills: string[] = [];
+  on("prompt.fill", (_$, e) => (fills.push(e.text), { isFilled: true }));
+  await $.command.run(run("doctor", 120));
+  const ui = await $.ui.mount(pane("terminal", WIDE));
+
+  expect(node(await ui.drawn(), "action-advisor-0")).toEqual({
+    type: "Box",
+    props: { key: "action-advisor-0", flexDirection: "row" },
+    children: [
+      piece({}, " ".repeat(23)),
+      { type: "Button", props: { key: "prompt-advisor", hotkey: "a", label: "Use /advisor fable", plain: true }, press: expect.anything() },
+    ],
+  });
+  expect(rows(await ui.drawn()).filter((row) => row.includes(": Use /"))).toEqual([
+    ` ! WARN  omca server   No hook has reached the server in this session yet${PAD}m: Use /mcp`,
+    ` · INFO  Advisor       No advisorModel; /advisor fable turns the advisor on${PAD}a: Use /advisor fable`,
+    ` · INFO  Status line   No statusLine is set${PAD}s: Use /oh-my-claudeagent:omca-setup`,
+  ]);
+
+  const offered = (await ui.findAll({ type: "Button" })).flatMap((found) => (found.key?.startsWith("prompt-") === true ? [[found.key, found.props["hotkey"]]] : []));
+  expect(offered).toEqual([
+    ["prompt-server", "m"],
+    ["prompt-advisor", "a"],
+    ["prompt-statusline", "s"],
+  ]);
+  for (const key of ["prompt-advisor", "prompt-server", "prompt-statusline"]) await ui.press({ key });
+  expect(fills).toEqual(["/advisor fable", "/mcp", "/oh-my-claudeagent:omca-setup"]);
   await ui.unmount();
 });

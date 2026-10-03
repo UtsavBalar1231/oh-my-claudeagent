@@ -181,9 +181,9 @@ test("each tab key shows its tab, on the terminal and the desktop", async ($, on
     ]);
 
     await ui.press({ key: "4" });
-    expect((await body())[0]).toBe("Notepad for sample");
+    expect((await body())[0]).toBe("sample  BOUND  · 1 entry");
     expect(await ui.find({ type: "Markdown", text: "- The ledger rotates at 1,000 entries.\n- Session ids come from the payload." })).toBeDefined();
-    expect(await ui.find({ type: "Text", text: "Learnings" })).toBeDefined();
+    expect(await ui.find({ type: "Text", text: "Learnings · 1 entry" })).toBeDefined();
 
     await ui.press({ key: "5" });
     expect(await body()).toEqual([
@@ -191,7 +191,7 @@ test("each tab key shows its tab, on the terminal and the desktop", async ($, on
       "No feedback has been recorded in this session.",
     ]);
     await ui.press({ key: "6" });
-    expect(await body()).toEqual(["No delegation statistics have been collected yet."]);
+    expect(await body()).toEqual(["No delegation statistics have been collected yet.", "r: Reload"]);
     await ui.press({ key: "7" });
     expect(await body()).toEqual(["The doctor checks have not run in this session.", "r: Run checks"]);
     await ui.press({ key: "1" });
@@ -339,14 +339,14 @@ test("the Evidence and Notepad tabs load again after the session state is reset"
     return rows(await ui.drawn())[3];
   };
   expect(await first("3")).toStartWith("FINAL VERIFICATION · sample COMPLETE");
-  expect(await first("4")).toBe("Notepad for sample");
+  expect(await first("4")).toBe("sample  BOUND  · 1 entry");
 
   atoms.reset("pane");
   atoms.reset("ledger");
   await w.clock.advance(2000);
 
   expect(await first("3")).toStartWith("FINAL VERIFICATION · sample COMPLETE");
-  expect(await first("4")).toBe("Notepad for sample");
+  expect(await first("4")).toBe("sample  BOUND  · 1 entry");
   await ui.unmount();
 });
 

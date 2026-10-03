@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { addRefreshInterval, type Check, doctorChecks, type Inputs, unifiedDiff } from "./doctor-checks.ts";
+import { addRefreshInterval, type Check, doctorChecks, type Inputs, SETUP_COMMAND, unifiedDiff } from "./doctor-checks.ts";
 
 const NOW = Date.UTC(2026, 9, 2, 12, 0, 0);
 const STATUS_LINE = { type: "command", command: "omca-statusline" };
@@ -51,6 +51,7 @@ test("a passing check states what it found and carries no advisory clause", () =
   const passing = doctorChecks(BASE).filter((check) => check.level === "ok");
   expect(passing.length).toBeGreaterThan(0);
   expect(passing.filter((check) => check.detail.includes(";"))).toEqual([]);
+  expect(passing.filter((check) => check.prompt !== undefined || check.fix !== undefined)).toEqual([]);
 });
 
 describe("output style", () => {
@@ -78,6 +79,7 @@ describe("output style", () => {
       level: "warn",
       detail:
         "Explanatory is the active output style and OMCA Default is not forced; update or reinstall the plugin to restore its force-for-plugin line, or choose OMCA Default in /config",
+      prompt: "/config",
     });
     expect(run({ isStyleForced: false, settings: BASE.settings }, "style")?.detail).toStartWith("default is the active output style");
   });
@@ -136,14 +138,14 @@ test.each<[Inputs["hook"], Omit<Check, "id" | "label">]>([
   [{ kind: "seen", lastHookAt: NOW / 1000 - 600 }, { level: "ok", detail: "Last hook call 10 min ago" }],
   [
     { kind: "seen", lastHookAt: NOW / 1000 - 601 },
-    { level: "warn", detail: "Last hook call 10 min ago; hooks may have stopped reaching it" },
+    { level: "warn", detail: "Last hook call 10 min ago; hooks may have stopped reaching it", prompt: "/mcp" },
   ],
   [{ kind: "seen", lastHookAt: NOW / 1000 + 5 }, { level: "ok", detail: "Last hook call under a minute ago" }],
-  [{ kind: "missing" }, { level: "warn", detail: "No hook has reached the server in this session yet" }],
+  [{ kind: "missing" }, { level: "warn", detail: "No hook has reached the server in this session yet", prompt: "/mcp" }],
   [{ kind: "unsafe-id" }, { level: "warn", detail: "The session id cannot name a status file, so it was not read" }],
   [
     { kind: "unreadable", reason: "Unexpected end of JSON input" },
-    { level: "warn", detail: "Could not read the session status file: Unexpected end of JSON input" },
+    { level: "warn", detail: "Could not read the session status file: Unexpected end of JSON input", prompt: "/mcp" },
   ],
 ])("server hook state %p", (hook, expected) => {
   expect(run({ hook }, "server")).toEqual(expected);
@@ -213,8 +215,8 @@ test.each<[Record<string, unknown>, Omit<Check, "id" | "label">]>([
 
 test.each<[Record<string, unknown>, Inputs["env"], Omit<Check, "id" | "label">]>([
   [{ advisorModel: "fable" }, {}, { level: "ok", detail: "advisorModel fable, and nothing here keeps it off" }],
-  [{}, {}, { level: "info", detail: "No advisorModel; /advisor fable turns the advisor on" }],
-  [{}, { DO_NOT_TRACK: "0" }, { level: "info", detail: "No advisorModel; /advisor fable turns the advisor on" }],
+  [{}, {}, { level: "info", detail: "No advisorModel; /advisor fable turns the advisor on", prompt: "/advisor fable" }],
+  [{}, { DO_NOT_TRACK: "0" }, { level: "info", detail: "No advisorModel; /advisor fable turns the advisor on", prompt: "/advisor fable" }],
   [
     { advisorModel: "fable" },
     { DISABLE_TELEMETRY: "0" },
@@ -248,28 +250,27 @@ describe("status line", () => {
   const stale = "No refreshInterval, so it redraws on events only and goes stale while agents run";
 
   test("absent, set, or set to something that is not seconds", () => {
-    expect(run({ settings: {} }, "statusline")).toEqual({ level: "info", detail: "No statusLine is set" });
+    expect(run({ settings: {} }, "statusline")).toEqual({ level: "info", detail: "No statusLine is set", prompt: SETUP_COMMAND });
     expect(run({}, "statusline")).toEqual({ level: "ok", detail: "Refreshes every 5 s as well as on events" });
     expect(run({ settings: { statusLine: { ...STATUS_LINE, refreshInterval: 0 } } }, "statusline")).toEqual({
       level: "warn",
       detail: "refreshInterval 0 is not a number of seconds of at least 1",
+      prompt: SETUP_COMMAND,
     });
   });
 
-  test("missing refreshInterval offers the fix only when the user's file holds the statusLine in force", () => {
+  test("missing refreshInterval offers the fix only when the user's file holds the statusLine in force, and setup otherwise", () => {
     const settings = { statusLine: STATUS_LINE };
+    const setup = { level: "warn" as const, detail: stale, prompt: SETUP_COMMAND };
     expect(run({ settings, userSettings: USER_SETTINGS }, "statusline")).toEqual({
       level: "warn",
       detail: stale,
       fix: "add-refresh-interval",
     });
-    expect(run({ settings, userSettings: null }, "statusline")).toEqual({ level: "warn", detail: stale });
-    expect(run({ settings, userSettings: "{}" }, "statusline")).toEqual({ level: "warn", detail: stale });
-    expect(run({ settings: { statusLine: { ...STATUS_LINE, padding: 1 } }, userSettings: USER_SETTINGS }, "statusline")).toEqual({
-      level: "warn",
-      detail: stale,
-    });
-    expect(run({ settings, userSettings: "{ not json" }, "statusline")).toEqual({ level: "warn", detail: stale });
+    expect(run({ settings, userSettings: null }, "statusline")).toEqual(setup);
+    expect(run({ settings, userSettings: "{}" }, "statusline")).toEqual(setup);
+    expect(run({ settings: { statusLine: { ...STATUS_LINE, padding: 1 } }, userSettings: USER_SETTINGS }, "statusline")).toEqual(setup);
+    expect(run({ settings, userSettings: "{ not json" }, "statusline")).toEqual(setup);
     expect(run({ settings, userSettings: `${String.fromCharCode(0xfeff)}${USER_SETTINGS}` }, "statusline")).toEqual({
       level: "warn",
       detail: stale,

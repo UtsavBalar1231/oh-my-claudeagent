@@ -57,3 +57,13 @@ export function estimateCostUsd(model: string, usage: Usage): number | null {
     usage.output_tokens * price.output;
   return cents / 1e8;
 }
+
+/**
+ * Dollars to the cent, rounded through the table's integer unit so $2.855 shows as $2.86
+ * rather than as the float just below it; a cost under a cent but above zero is `<$0.01`.
+ */
+export function formatUsd(usd: number): string {
+  const cents = Math.round(Math.round(usd * 1e8) / 1e6);
+  if (cents === 0 && usd > 0) return "<$0.01";
+  return `$${(cents / 100).toFixed(2)}`;
+}

@@ -2,6 +2,7 @@ import type { CommandSpec, On } from "claude-code";
 import { type Engine, expect, test } from "claude-code/testing";
 import { USAGE } from "../../hooks/feedback.ts";
 import { usableColumns } from "../../src/core/ui-kit.ts";
+import type { RenderElement } from "claude-code";
 import { bodyColumns, cellsAcross, pane, ROOT, rows, run, SESSION, SIZES, topRows, type World, world } from "./world.ts";
 
 const FILE = `${ROOT}/.omca/feedback/${SESSION}.json`;
@@ -33,6 +34,24 @@ const complete = ($: Engine, turnId: string, agentId?: string) =>
   });
 
 const rate = ($: Engine, args: string) => $.command.run({ ...run(args), command: "omca-rate" });
+
+type Node = { type: string; props?: Record<string, unknown>; children?: unknown };
+const isNode = (value: unknown): value is Node => typeof value === "object" && value !== null && "type" in value;
+const childrenOf = (node: Node): unknown[] => (Array.isArray(node.children) ? node.children : node.children === undefined ? [] : [node.children]);
+function textOf(element: unknown): string {
+  if (typeof element === "string") return element;
+  if (!isNode(element)) return "";
+  if (element.type === "Button") return `${String(element.props?.["hotkey"])}: ${String(element.props?.["label"])}`;
+  const gap = " ".repeat(typeof element.props?.["columnGap"] === "number" ? element.props["columnGap"] : 0);
+  return childrenOf(element).map(textOf).join(gap);
+}
+
+// The rows a tree draws, a column Box such as a card spread into the rows it holds.
+function lines(tree: RenderElement): string[] {
+  const spread = (element: unknown): string[] =>
+    isNode(element) && element.type === "Box" && element.props?.["flexDirection"] === "column" ? childrenOf(element).flatMap(spread) : [textOf(element)];
+  return topRows(tree).flatMap(spread);
+}
 
 const saved = (ratings: readonly object[]) => `${JSON.stringify({ session_id: SESSION, ratings }, null, 2)}\n`;
 
@@ -160,7 +179,7 @@ for (const surface of ["terminal", "desktop"] as const) {
     await complete($, "t-1");
     await $.command.run(run(""));
     const ui = await $.ui.mount(pane(surface, { columns: 120, rows: 40, placement: "dock" }));
-    const body = async () => rows(await ui.drawn()).slice(3);
+    const body = async () => lines(await ui.drawn()).slice(3);
     await ui.press({ key: "5" });
     expect(await body()).toEqual(["u: Up  d: Down  rate the last turn", "No feedback has been recorded in this session."]);
 
@@ -177,9 +196,9 @@ for (const surface of ["terminal", "desktop"] as const) {
     );
     expect(await body()).toEqual([
       "u: Up  d: Down  rate the last turn",
-      "2 ratings, newest first · 1 up, 1 down",
-      `↓ down  ${local(later)}  `,
-      `↑ up    ${local(AT)}  `,
+      "2 ratings, newest first · ↑ 1 up · ↓ 1 down",
+      ` ↓ DOWN  ${local(later)}  `,
+      ` ↑ UP    ${local(AT)}  `,
     ]);
     await ui.unmount();
   });
@@ -197,9 +216,9 @@ test("the Feedback tab shows a note, a read failure and every row inside the gut
       const room = usableColumns(bodyColumns(size));
       const ui = await $.ui.mount(pane(surface, size));
       await ui.press({ key: "5" });
-      const drawn = rows(await ui.drawn());
-      const row = drawn.find((text) => text.startsWith("↓ down"));
-      expect(row?.startsWith(`↓ down  ${local(AT)}  the footer named`), `${size.columns} ${size.placement}`).toBe(true);
+      const drawn = lines(await ui.drawn());
+      const row = drawn.find((text) => text.startsWith(" ↓ DOWN"));
+      expect(row?.startsWith(` ↓ DOWN  ${local(AT)}  the footer named`), `${size.columns} ${size.placement}`).toBe(true);
       for (const child of topRows(await ui.drawn())) {
         expect(cellsAcross(child), `${size.columns} ${size.placement} ${surface}`).toBeLessThanOrEqual(room);
       }
@@ -214,6 +233,94 @@ test("the Feedback tab shows a note, a read failure and every row inside the gut
   expect(rows(await ui.drawn()).slice(2)).toEqual([
     "u: Up  d: Down  rate the session (no turn yet)",
     "✗ Could not read this session's feedback: it holds no ratings list",
+  ]);
+  await ui.unmount();
+});
+
+const piece = (props: Record<string, unknown>, run: string) => ({ type: "Text", ...(Object.keys(props).length === 0 ? {} : { props }), children: [run] });
+const lit = (props: Record<string, unknown>, run: string) => ({ ...piece(props, run), hover: { color: "text" } });
+const ratingRow = (key: string, ...pieces: unknown[]) => ({
+  type: "Box",
+  props: { key, flexDirection: "row" },
+  hover: { backgroundColor: "selectionBg" },
+  children: [{ type: "Text", props: { wrap: "truncate-end" }, children: pieces }],
+});
+
+test("the ratings card is tinted by whether any rating is down, each row a verdict chip, a muted time and the note with secrets masked", async ($, on) => {
+  const { w } = engine(on);
+  await start($);
+  await complete($, "t-1");
+  await rate($, "up");
+  await w.clock.advance(60_000);
+  await rate($, "down the deploy printed password=hunter2 again");
+  await $.command.run(run(""));
+  const ui = await $.ui.mount(pane("terminal", { columns: 200, rows: 50, placement: "dock" }));
+  await ui.press({ key: "5" });
+  const later = "2026-10-02T12:01:00.000Z";
+
+  expect(topRows(await ui.drawn()).at(-1)).toEqual({
+    type: "Box",
+    props: { key: "ratings", flexDirection: "column", borderStyle: "round", borderColor: "warning", paddingX: 1, width: 85 },
+    children: [
+      piece({ bold: true, color: "text", wrap: "truncate-end" }, "2 ratings, newest first · ↑ 1 up · ↓ 1 down"),
+      ratingRow(
+        "rating-0",
+        piece({ color: "inverseText", backgroundColor: "error", bold: true }, " ↓ DOWN "),
+        lit({}, " "),
+        lit({ color: "inactive" }, `${local(later)}  `),
+        lit({}, "the deploy printed password=‹masked› again"),
+      ),
+      ratingRow(
+        "rating-1",
+        piece({ color: "inverseText", backgroundColor: "success", bold: true }, " ↑ UP "),
+        lit({}, "   "),
+        lit({ color: "inactive" }, `${local(AT)}  `),
+      ),
+    ],
+  });
+  await ui.unmount();
+});
+
+test("all-up ratings draw the card in the ok tone, and a short body names the ratings it cut", async ($, on) => {
+  const { w } = engine(on);
+  for (let at = 0; at < 9; at += 1) {
+    await rate($, "up");
+    await w.clock.advance(60_000);
+  }
+  await $.command.run(run(""));
+  const ui = await $.ui.mount(pane("terminal", { columns: 80, rows: 40, placement: "inline" }));
+  await ui.press({ key: "5" });
+
+  const card = topRows(await ui.drawn()).at(-1);
+  expect(isNode(card) ? card.props?.["borderColor"] : undefined).toBe("success");
+  expect(lines(await ui.drawn()).slice(1)).toEqual([
+    "u: Up  d: Down  rate the session (no turn yet)",
+    "9 ratings, newest first · ↑ 9 up · ↓ 0 down",
+    ` ↑ UP    ${local("2026-10-02T12:08:00.000Z")}  `,
+    ` ↑ UP    ${local("2026-10-02T12:07:00.000Z")}  `,
+    ` ↑ UP    ${local("2026-10-02T12:06:00.000Z")}  `,
+    ` ↑ UP    ${local("2026-10-02T12:05:00.000Z")}  `,
+    ` ↑ UP    ${local("2026-10-02T12:04:00.000Z")}  `,
+    "↓ 4 more",
+  ]);
+  await ui.unmount();
+});
+
+test("OMCA_ASCII draws the verdict chips and arrows from the ASCII set", async ($, on) => {
+  const w = world(on, {}, {}, { OMCA_ASCII: "1" });
+  on("session.start", (_$, e) => ({ cwd: e.cwd }));
+  on("command.register", (_$, e) => ({ value: { command: e.name } }));
+  on("fs.write", (_$, e) => (w.files.set(w.spelled(e.path), { text: e.text, mtimeMs: w.clock.now() }), { value: undefined }));
+  await start($);
+  await rate($, "down");
+  await rate($, "up");
+  await $.command.run(run(""));
+  const ui = await $.ui.mount(pane("terminal", { columns: 120, rows: 40, placement: "dock" }));
+  await ui.press({ key: "5" });
+  expect(lines(await ui.drawn()).slice(4)).toEqual([
+    "2 ratings, newest first - ^ 1 up - v 1 down",
+    `[^ UP]   ${local(AT)}  `,
+    `[v DOWN] ${local(AT)}  `,
   ]);
   await ui.unmount();
 });

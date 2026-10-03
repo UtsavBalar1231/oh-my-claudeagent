@@ -11,6 +11,7 @@ import {
   chip,
   DRAWN_PAIRS,
   dots,
+  fitPieces,
   isValidDiff,
   levelMark,
   notice,
@@ -19,6 +20,7 @@ import {
   ROSTER,
   rule,
   spark,
+  stack,
   THEME_KEYS,
   type ThemeKey,
   themeKey,
@@ -149,6 +151,61 @@ describe("bar", () => {
   });
 });
 
+describe("fitPieces", () => {
+  const a: Piece = { text: "abc", color: "success" };
+  const b: Piece = { text: "def", color: "error" };
+
+  test("keeps pieces that fit and cuts the one crossing the edge with an ellipsis", () => {
+    expect(fitPieces([a, b], 6, "…")).toEqual([a, b]);
+    expect(fitPieces([a, b], 5, "…")).toEqual([a, { text: "d…", color: "error" }]);
+    expect(fitPieces([a, b], 3, "…")).toEqual([{ text: "ab…", color: "success" }]);
+    expect(fitPieces([a, b], 4, "...")).toEqual([a, { text: ".", color: "error" }]);
+    expect(fitPieces([a, b], 0, "…")).toEqual([]);
+  });
+
+  test("never exceeds its width", () => {
+    for (let width = 0; width <= 8; width += 1) expect(cellsOf(fitPieces([a, chip("WARN", "warn", false), b], width, "…"))).toBeLessThanOrEqual(width);
+  });
+});
+
+describe("stack", () => {
+  const green = { color: "green_FOR_SUBAGENTS_ONLY", ascii: "#" } as const;
+  const blue = { color: "blue_FOR_SUBAGENTS_ONLY", ascii: "=" } as const;
+  const track = { color: "rate_limit_empty", ascii: "." } as const;
+
+  test("shares whole cells by value, each segment one run in its own key", () => {
+    expect(stack([{ ...green, value: 3 }, { ...blue, value: 1 }], 8, false)).toEqual([
+      { text: "██████", color: "green_FOR_SUBAGENTS_ONLY" },
+      { text: "██", color: "blue_FOR_SUBAGENTS_ONLY" },
+    ]);
+    expect(stack([{ ...green, value: 1 }, { ...track, value: 99 }], 10, false)).toEqual([
+      { text: "█", color: "green_FOR_SUBAGENTS_ONLY" },
+      { text: "█████████", color: "rate_limit_empty" },
+    ]);
+  });
+
+  test("ASCII is bracketed in each segment's own character, and a zero width is nothing", () => {
+    expect(stack([{ ...green, value: 2 }, { ...blue, value: 0 }, { ...track, value: 2 }], 6, true)).toEqual([
+      { text: "[" },
+      { text: "##", color: "green_FOR_SUBAGENTS_ONLY" },
+      { text: "..", color: "rate_limit_empty" },
+      { text: "]" },
+    ]);
+    expect(stack([{ ...green, value: 2 }], 0, false)).toEqual([]);
+  });
+
+  test("is exactly its width for every split", () => {
+    for (const ascii of [false, true]) {
+      for (let width = 0; width <= 20; width += 1) {
+        for (const values of [[0, 0], [5, 0, 1], [1, 1, 1, 100]]) {
+          const pieces = stack(values.map((value) => ({ ...green, value })), width, ascii);
+          expect({ ascii, width, values, cells: cellsOf(pieces) }).toEqual({ ascii, width, values, cells: width });
+        }
+      }
+    }
+  });
+});
+
 describe("spark and dots", () => {
   test("a spark scales from zero to the largest value", () => {
     expect(spark([0, 1, 2, 4, 8], false)).toBe("▁▂▃▅█");
@@ -264,6 +321,7 @@ describe("redact", () => {
     ["cut off: -----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXk", "cut off: ‹masked›", 1],
     ["secret=-----BEGIN PRIVATE KEY-----\nAAA\n-----END PRIVATE KEY-----", "secret=‹masked›", 1],
     ["token=sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWx", "token=‹masked›", 1],
+    ["export `PAYMENTS_TOKEN=tok_4f9a2c7e1b8d6035` first", "export `PAYMENTS_TOKEN=‹masked›` first", 1],
   ])("masks %p", (text, expected, masked) => {
     expect(redact(text, HOME)).toEqual({ text: expected, masked });
   });
