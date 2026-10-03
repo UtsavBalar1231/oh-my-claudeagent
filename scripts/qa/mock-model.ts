@@ -202,8 +202,11 @@ export function startServer({
       if (url.pathname === "/v1/messages/count_tokens") return Response.json({ input_tokens: tokensOf(rawBody) });
       const body = parseBody(rawBody);
       const streaming = Boolean(body.stream);
+      // Claude Code's side requests, such as naming the session, send an empty tools list. They get
+      // the fallback reply and never spend a scripted turn.
+      const isSide = Array.isArray(body.tools) && body.tools.length === 0;
       const queue: QueueName = systemText(body.system).includes(SUBAGENT_MARKER) ? "subagent" : "main";
-      const { turn, content } = serve(queue);
+      const { turn, content } = isSide ? { turn: null, content: [{ type: "text", text: RESPONSE_TEXT }] as Served[] } : serve(queue);
 
       if (accessLogPath) {
         appendFileSync(
@@ -211,7 +214,7 @@ export function startServer({
           jsonLine({
             client: server.requestIP(req)?.address ?? "",
             path: url.pathname + url.search,
-            queue,
+            queue: isSide ? "side" : queue,
             turn,
             tool_results: countToolResults(body.messages),
             arrival_ms: arrived.getTime(),
@@ -220,7 +223,7 @@ export function startServer({
         );
       }
 
-      if (bodyLogPath) appendFileSync(bodyLogPath, `${JSON.stringify({ queue, turn, body: rawBody })}\n`);
+      if (bodyLogPath) appendFileSync(bodyLogPath, `${JSON.stringify({ queue: isSide ? "side" : queue, turn, body: rawBody })}\n`);
 
       if (streaming) {
         return new Response(sseBody(content, tokensOf(rawBody)), {
