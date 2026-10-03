@@ -12,6 +12,9 @@ const SCENARIOS: Record<string, { tool: string; args: Json }> = {
   "shell-reset": { tool: "shell", args: { command: "git reset --hard HEAD~1" } },
   subagent: { tool: "subagent", args: { description: "omca stub", prompt: "OMCA-SCENARIO:shell-reset" } },
   "skill-load": { tool: "skill", args: { id: "omca-handoff" } },
+  "slop-write": { tool: "write", args: { path: "slop.sh", content: '# set the user name\nuser_name="$input_value"\n' } },
+  "explore-write": { tool: "subagent", args: { description: "omca stub", prompt: "OMCA-SCENARIO:write-file" } },
+  "write-file": { tool: "write", args: { path: "explored.txt", content: "explored\n" } },
 }
 const SUBAGENT_ID = "omca-explore"
 
@@ -83,7 +86,7 @@ function complete(id: string, model: string, call: Call | undefined) {
 let seq = 0
 const server = Bun.serve({
   hostname: "127.0.0.1",
-  port: Number(process.env.STUB_PORT ?? process.argv[2] ?? 0),
+  port: 0,
   async fetch(req) {
     const url = new URL(req.url)
     if (req.method !== "POST" || url.pathname !== "/v1/chat/completions") return new Response("not found", { status: 404 })

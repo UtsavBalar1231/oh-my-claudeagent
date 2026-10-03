@@ -1,12 +1,33 @@
 import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { BARE_TARGET, FORBIDDEN, PHRASES, applyOverlay, dropSections, generate, listSources, parseModelRef, prepare, splitFrontmatter, stripSource } from "./lib.ts";
+import { PHRASES, applyOverlay, dropSections, generate, listSources, parseModelRef, prepare, splitFrontmatter, stripSource } from "./lib.ts";
 
 const root = join(import.meta.dir, "..");
 const data = generate(root);
-const agent = (id: string) => data.agents.find((a) => a.id === id)!;
-const skill = (id: string) => data.skills.find((s) => s.id === id)!;
+
+function found<T>(value: T | undefined, what: string): T {
+  if (value === undefined) throw new Error(`${what} not found`);
+  return value;
+}
+
+const agent = (id: string) => found(data.agents.find((a) => a.id === id), id);
+const skill = (id: string) => found(data.skills.find((s) => s.id === id), id);
+
+const FORBIDDEN: (string | RegExp)[] = [
+  "ToolSearch", "AskUserQuestion", "SendMessage", "subagent_type", "oh-my-claudeagent:", "CLAUDE_PLUGIN_ROOT",
+  "TaskCreate", "TaskList", "TodoWrite", "ExitPlanMode", "task-notification", "Agent(", "mcp__plugin_",
+  "run_in_background", "CLAUDE.md", "~/.claude", "omca-plan", "omca-start-work", "<!--", /sisyphus/i, /prometheus/i,
+  /\bBash\b/, /\b(Read|Edit|Write|Grep|Glob|WebFetch|WebSearch) tool\b/, /\b(Write|Edit|Agent)\//,
+  /\b[a-z]+ Read\b(?!-)/, /\| (Read|Write|Edit) \|/, /\bRead\(/,
+];
+
+const TARGETS = "(explore|oracle|librarian|executor|hephaestus|metis|momus)";
+const BARE_TARGET = new RegExp(
+  `(\\b(spawn(ing)?|consult(ing)?|launch|recommend)\\s+(the\\s+)?|→\\s*|\\[\\s*)\`?${TARGETS}\\b(?!-)` +
+    `|\\bgo to\\s+${TARGETS}\\b(?!-)|\\bwith\\s+${TARGETS}\\b(?![-\\w]|\\s+[a-z])|\\(${TARGETS}\\)|(?<!-)\\b${TARGETS} re-analysis`,
+  "i",
+);
 
 const texts: [string, string][] = [
   ...data.agents.flatMap((a): [string, string][] => [[`${a.id} description`, String(a.description)], [`${a.id} system`, String(a.system)]]),
@@ -47,9 +68,8 @@ describe("generated prompts", () => {
   test("every overlay heading exists in its source", () => {
     const sources = listSources();
     for (const file of readdirSync(join(import.meta.dir, "overlays"))) {
-      const src = sources.find((s) => `${s.overlay}.md` === file);
-      expect(src, `${file} has no source`).toBeDefined();
-      const { body } = splitFrontmatter(readFileSync(join(root, src!.relPath), "utf8"), src!.relPath);
+      const src = found(sources.find((s) => `${s.overlay}.md` === file), `${file} source`);
+      const { body } = splitFrontmatter(readFileSync(join(root, src.relPath), "utf8"), src.relPath);
       const { missing } = applyOverlay(stripSource(body), readFileSync(join(import.meta.dir, "overlays", file), "utf8"));
       expect(missing, file).toEqual([]);
     }
@@ -57,7 +77,7 @@ describe("generated prompts", () => {
 
   test("agent fields", () => {
     const explore = agent("omca-explore");
-    expect(explore.steps).toBe(30);
+    expect("steps" in explore).toBe(false);
     expect(explore.deny).toEqual(["edit", "subagent"]);
     expect(explore.color).toBe("#3b82f6");
     expect(explore.tier).toBe("sonnet");
@@ -95,9 +115,15 @@ test("BARE_TARGET catches noun-position agent names but not the verb explore", (
   }
 });
 
+test("FORBIDDEN catches Claude Code tool names but not the verbs or Read-only", () => {
+  const caught = (s: string) => FORBIDDEN.some((p) => (typeof p === "string" ? s.includes(p) : p.test(s)));
+  for (const s of ["No Write/Edit/Agent.", "Otherwise work from Read alone.", "| Read | Plan files |", "`Read(file_path)`"]) expect(caught(s), s).toBe(true);
+  for (const s of ["Read-only advisor.", "Read the target files first.", "Write the final report.", "| Read file contents | `read` |"]) expect(caught(s), s).toBe(false);
+});
+
 test("parseModelRef", () => {
   expect(parseModelRef("anthropic/claude-opus-5-5#high")).toEqual({ providerID: "anthropic", id: "claude-opus-5-5", variant: "high" });
-  expect("variant" in parseModelRef("anthropic/claude-opus-5-5")!).toBe(false);
+  expect(parseModelRef("anthropic/claude-opus-5-5")).toEqual({ providerID: "anthropic", id: "claude-opus-5-5" });
   expect(parseModelRef("bad")).toBeUndefined();
   expect(parseModelRef("/x")).toBeUndefined();
   expect(parseModelRef(42)).toBeUndefined();

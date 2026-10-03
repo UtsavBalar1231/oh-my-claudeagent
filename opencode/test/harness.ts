@@ -10,7 +10,6 @@ type Env = Record<string, string | undefined>
 export type Agent = {
   id: string
   mode?: string
-  steps?: number
   system?: string
   model?: { providerID: string; id: string } | null
   permissions?: { action: string; effect: string }[]
@@ -100,10 +99,11 @@ export type Server = {
   stop(): Promise<void>
 }
 
-export async function startServer(root: string, cwd: string): Promise<Server> {
+export async function startServer(root: string, cwd: string, extraEnv: Env = {}): Promise<Server> {
   const password = crypto.randomUUID()
   const env: Env = {
     ...process.env,
+    ...extraEnv,
     PWD: cwd,
     OPENCODE_PASSWORD: password,
     OPENCODE_DB: ":memory:",

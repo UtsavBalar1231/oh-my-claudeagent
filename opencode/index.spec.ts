@@ -94,9 +94,21 @@ function fakeContext(options: Rec = {}, agentThrows = false) {
   return { ctx: ctx as unknown as Plugin.Context, agents, skills, commands, mcp, hooks, prompts, gets }
 }
 
+function hook(fake: ReturnType<typeof fakeContext>, name: string): Hook {
+  const registered = fake.hooks[name]
+  if (registered === undefined) throw new Error(`no ${name} hook`)
+  return registered
+}
+
+function command(fake: ReturnType<typeof fakeContext>, name: string): Command {
+  const found = fake.commands.find((c) => c.name === name)
+  if (found === undefined) throw new Error(`no ${name} command`)
+  return found
+}
+
 async function fireContext(fake: ReturnType<typeof fakeContext>, agent: string) {
-  const event = { agent, tools: { omca_session_search: {}, omca_evidence_log: {} }, system: [] as Rec[] }
-  await fake.hooks["session.context"]!(event)
+  const event = { agent, tools: { omca_session_search: {}, omca_omca_hook: {}, omca_health_check: {}, omca_evidence_log: {} }, system: [] as Rec[] }
+  await hook(fake, "session.context")(event)
   return event
 }
 
@@ -133,13 +145,24 @@ test("skills carry an absolute path and no relPath", async () => {
 test("a command prompts the session with its template and arguments", async () => {
   const fake = fakeContext()
   await plugin.setup(fake.ctx)
-  const momus = fake.commands.find((c) => c.name === "omca-momus")
-  expect(momus).toBeDefined()
-  await momus!.execute({ sessionID: "ses_1", prompt: { text: "p.md" }, delivery: "queue" })
+  await command(fake, "omca-momus").execute({ sessionID: "ses_1", prompt: { text: "p.md" }, delivery: "queue" })
   expect(fake.prompts).toHaveLength(1)
   expect(fake.prompts[0]).toMatchObject({ sessionID: "ses_1", delivery: "queue" })
-  expect(String(fake.prompts[0]!.text)).toContain("omca-momus")
-  expect(String(fake.prompts[0]!.text)).toContain("p.md")
+  expect(String(fake.prompts[0]?.text)).toContain("omca-momus")
+  expect(String(fake.prompts[0]?.text)).toContain("p.md")
+})
+
+test("a command keeps its attachments and drops mention offsets into the replaced text", async () => {
+  const fake = fakeContext()
+  await plugin.setup(fake.ctx)
+  const mention = { start: 0, end: 5, text: "@p.md" }
+  await command(fake, "omca-momus").execute({
+    sessionID: "ses_1",
+    prompt: { text: "@p.md", files: [{ uri: "file:///p.md", name: "p.md", mention }], agents: [{ name: "omca-explore", mention }], skills: [{ id: "omca-debugging" }] },
+    delivery: "queue",
+  })
+  expect(fake.prompts[0]).toMatchObject({ files: [{ uri: "file:///p.md", name: "p.md" }], agents: [{ name: "omca-explore" }], skills: [{ id: "omca-debugging" }] })
+  expect(JSON.stringify(fake.prompts[0])).not.toContain('"mention"')
 })
 
 test("the context hook pushes the output style only for a primary agent and hides tools for all", async () => {
@@ -149,8 +172,7 @@ test("the context hook pushes the output style only for a primary agent and hide
   const primary = await fire("build")
   expect(primary.system).toHaveLength(1)
   expect(primary.system[0]).toMatchObject({ type: "text" })
-  expect(primary.tools).not.toHaveProperty("omca_session_search")
-  expect(primary.tools).toHaveProperty("omca_evidence_log")
+  expect(Object.keys(primary.tools)).toEqual(["omca_evidence_log"])
   const sub = await fire("omca-explore")
   expect(sub.system).toHaveLength(0)
   expect(sub.tools).not.toHaveProperty("omca_session_search")
@@ -168,17 +190,31 @@ test("the context hook looks up an agent's mode once and never for omca subagent
 test("command arguments are substituted literally", async () => {
   const fake = fakeContext()
   await plugin.setup(fake.ctx)
-  const momus = fake.commands.find((c) => c.name === "omca-momus")!
-  await momus.execute({ sessionID: "ses_1", prompt: { text: "p.md $& $$" }, delivery: "queue" })
-  expect(String(fake.prompts[0]!.text)).toContain("p.md $& $$")
+  await command(fake, "omca-momus").execute({ sessionID: "ses_1", prompt: { text: "p.md $& $$" }, delivery: "queue" })
+  expect(String(fake.prompts[0]?.text)).toContain("p.md $& $$")
 })
 
 test("the tool hook denies a destructive git command and allows git status", async () => {
   const fake = fakeContext()
   await plugin.setup(fake.ctx)
-  const fire = (command: string) => fake.hooks["tool.execute.before"]!({ tool: "shell", input: { command } })
+  const fire = (command: string) => hook(fake, "tool.execute.before")({ tool: "shell", input: { command } })
   await expect(fire("git reset --hard HEAD~1")).rejects.toThrow("omca guard: ")
   await expect(fire("git status")).resolves.toBeUndefined()
+})
+
+test("the shell hook reads the command in the shell that will run it", async () => {
+  const fake = fakeContext()
+  await plugin.setup(fake.ctx)
+  const fire = (command: string, shell: string) => hook(fake, "shell.create.before")({ command, shell, cwd: fake.ctx.location.directory, timeout: 0, env: {} })
+  await expect(fire("rd /s /q C:\\", "C:\\Windows\\System32\\cmd.exe")).rejects.toThrow("omca guard: Destructive rm -rf blocked")
+  await expect(fire("Remove-Item -Recurse -Force ~", "pwsh")).rejects.toThrow("omca guard: Destructive rm -rf blocked")
+  await expect(fire("git status", "/bin/zsh")).resolves.toBeUndefined()
+})
+
+test("the shell hook refuses a command its guard fails on", async () => {
+  const fake = fakeContext()
+  await plugin.setup(fake.ctx)
+  await expect(hook(fake, "shell.create.before")({ command: 42, shell: "/bin/bash" })).rejects.toThrow("omca guard: OMCA's shell guard failed, so the command was refused")
 })
 
 test("a throwing agent transform does not stop setup or the hooks", async () => {

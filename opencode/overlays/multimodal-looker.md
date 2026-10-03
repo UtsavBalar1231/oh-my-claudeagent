@@ -8,4 +8,4 @@
 3. Return structured, actionable information
 4. The main agent skips the raw file, which saves context tokens
 
-Use `omca_file_read` for an image or PDF outside the workspace. Otherwise work from Read alone.
+Use `omca_file_read` for an image or PDF outside the workspace. Otherwise work from the `read` tool alone.

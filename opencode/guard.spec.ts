@@ -3,9 +3,10 @@ import { execFileSync } from "node:child_process"
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
-import { checkEdit, checkShell } from "./guard.ts"
+import { checkEdit, checkShell, shellKind } from "./guard.ts"
 
-const shell = (command: string) => checkShell(command, process.cwd())
+const BASH = "/bin/bash"
+const shell = (command: string) => checkShell(command, process.cwd(), BASH)
 
 const RM_CATASTROPHIC =
   "Destructive rm -rf blocked: the target is the filesystem root, home, the working directory, or a directory directly under root or home. Name a deeper path explicitly."
@@ -86,9 +87,9 @@ describe("decisions", () => {
   test("the project directory is guarded when the process runs from its parent", () => {
     const project = join(tmp, "work", "proj")
     const denied = { deny: true, reason: RM_CATASTROPHIC }
-    expect(checkShell(`rm -rf ${project}`, project)).toEqual(denied)
-    expect(checkShell(`rm -rf ${project}/*`, project)).toEqual(denied)
-    expect(checkShell(`rm -rf ${project}/build`, project)).toEqual({ deny: false })
+    expect(checkShell(`rm -rf ${project}`, project, BASH)).toEqual(denied)
+    expect(checkShell(`rm -rf ${project}/*`, project, BASH)).toEqual(denied)
+    expect(checkShell(`rm -rf ${project}/build`, project, BASH)).toEqual({ deny: false })
   })
 
   test("home is read from the environment, in any spelling", () => {
@@ -139,6 +140,30 @@ describe("decisions", () => {
   })
 })
 
+describe("the shell the command runs in", () => {
+  const denied = { deny: true, reason: RM_CATASTROPHIC }
+  const root = "C:\\proj"
+
+  test("cmd and PowerShell removals of a drive root or home are denied", () => {
+    expect(checkShell("rd /s /q C:\\", root, "C:\\Windows\\System32\\cmd.exe")).toEqual(denied)
+    expect(checkShell("del /s /q C:\\*", root, "powershell.exe")).toEqual(denied)
+    expect(checkShell("Remove-Item -Recurse -Force ~", root, "C:\\Program Files\\PowerShell\\7\\pwsh.exe")).toEqual(denied)
+  })
+
+  test("the sh family is read as bash, whatever the path or case", () => {
+    expect(shellKind("/usr/bin/zsh")).toBe("bash")
+    expect(shellKind("C:\\Program Files\\Git\\bin\\BASH.EXE")).toBe("bash")
+    expect(shellKind("sh")).toBe("bash")
+    expect(shellKind("pwsh")).toBe("powershell")
+    expect(shellKind("cmd.exe")).toBe("powershell")
+  })
+
+  test("a command the guard cannot read is refused", () => {
+    const result = checkShell(42 as unknown as string, root, BASH)
+    expect(result).toEqual({ deny: true, reason: expect.stringContaining("OMCA's shell guard failed, so the command was refused: ") })
+  })
+})
+
 describe("a force push to the default branch", () => {
   const repo = (branch: string, originHead?: string): string => {
     const dir = join(tmp, `repo-${branch}-${originHead ?? "none"}`)
@@ -152,28 +177,28 @@ describe("a force push to the default branch", () => {
 
   test("is denied by name, and a force push to another branch runs", () => {
     const dir = repo("dev")
-    expect(checkShell("git push --force origin main", dir)).toEqual(denied)
-    expect(checkShell("git push origin +HEAD:master", dir)).toEqual(denied)
-    expect(checkShell("git push --force-with-lease origin dev", dir)).toEqual({ deny: false })
+    expect(checkShell("git push --force origin main", dir, BASH)).toEqual(denied)
+    expect(checkShell("git push origin +HEAD:master", dir, BASH)).toEqual(denied)
+    expect(checkShell("git push --force-with-lease origin dev", dir, BASH)).toEqual({ deny: false })
   })
 
   test("is denied when the push names no branch and the checked-out one is the default", () => {
-    expect(checkShell("git push -f", repo("main"))).toEqual(denied)
-    expect(checkShell("git push --force origin", repo("master"))).toEqual(denied)
-    expect(checkShell("git push -f", repo("topic"))).toEqual({ deny: false })
+    expect(checkShell("git push -f", repo("main"), BASH)).toEqual(denied)
+    expect(checkShell("git push --force origin", repo("master"), BASH)).toEqual(denied)
+    expect(checkShell("git push -f", repo("topic"), BASH)).toEqual({ deny: false })
   })
 
   test("follows the branch origin/HEAD names, and then main is an ordinary branch", () => {
     const dir = repo("develop", "develop")
-    expect(checkShell("git push -f origin develop", dir)).toEqual(denied)
-    expect(checkShell("git push -f", dir)).toEqual(denied)
-    expect(checkShell("git push -f origin main", dir)).toEqual({ deny: false })
+    expect(checkShell("git push -f origin develop", dir, BASH)).toEqual(denied)
+    expect(checkShell("git push -f", dir, BASH)).toEqual(denied)
+    expect(checkShell("git push -f origin main", dir, BASH)).toEqual({ deny: false })
   })
 
   test("outside a repository, main and master are the default by name", () => {
     process.env.GIT_DIR = join(tmp, "no-repository")
-    expect(checkShell("git push -f origin main", tmp)).toEqual(denied)
-    expect(checkShell("git push -f", tmp)).toEqual({ deny: false })
+    expect(checkShell("git push -f origin main", tmp, BASH)).toEqual(denied)
+    expect(checkShell("git push -f", tmp, BASH)).toEqual({ deny: false })
   })
 })
 

@@ -1,11 +1,11 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-export const AGENT_STEMS = ["explore", "oracle", "librarian", "multimodal-looker", "metis", "momus", "hephaestus", "executor"];
-export const SKILL_DIRS = ["debugging", "remove-ai-slops", "refactor", "git-master", "handoff"];
-export const COMMAND_DIRS = ["metis", "momus", "hephaestus"];
+const AGENT_STEMS = ["explore", "oracle", "librarian", "multimodal-looker", "metis", "momus", "hephaestus", "executor"];
+const SKILL_DIRS = ["debugging", "remove-ai-slops", "refactor", "git-master", "handoff"];
+const COMMAND_DIRS = ["metis", "momus", "hephaestus"];
 
-export type SourceKind = "agent" | "skill" | "command" | "outputStyle";
+type SourceKind = "agent" | "skill" | "command" | "outputStyle";
 export type Source = { kind: SourceKind; key: string; relPath: string; overlay?: string };
 
 export function listSources(): Source[] {
@@ -32,22 +32,31 @@ export const PHRASES: [string, string][] = [
   ["→ oracle", "→ omca-oracle"],
   ["→ hephaestus", "→ omca-hephaestus"],
   ["→ executor", "→ omca-executor"],
-  ["explore/librarian agents", "omca-explore/omca-librarian subagents"],
   ["in explore prompts", "in omca-explore prompts"],
   ["`${CLAUDE_PLUGIN_ROOT}/agents/momus.md`", "the omca-momus agent instructions"],
-  [" and the guidance OMCA adds to the session's first prompt", ""],
   ["## Bash Usage Policy", "## Shell Usage Policy"],
-  [": Read numbers the lines", ": the read tool numbers the lines"],
   ["the omca `file_read` MCP tool", "`file_read`"],
   ["those go to hephaestus", "those go to omca-hephaestus"],
   ["## Boundary with hephaestus", "## Boundary with omca-hephaestus"],
   ["feature implementation (executor), architecture (oracle), refactoring (executor)", "feature implementation (omca-executor), architecture (omca-oracle), refactoring (omca-executor)"],
   ["running metis re-analysis", "running omca-metis re-analysis"],
+  ["No Write/Edit/Agent.", "No write, edit or subagent tools."],
+  ["Recommend sisyphus orchestration.", "Recommend that the primary agent orchestrate it."],
+  ["Prometheus plans must leave", "Plans from the planner must leave"],
+  ["read the relevant code yourself with Read,", "read the relevant code yourself with the `read` tool,"],
+  ["| Read | Plan files", "| `read` | Plan files"],
+  ["| Write | Only when", "| `write` | Only when"],
+  ["| Edit | Only when", "| `edit` | Only when"],
+  ["media Read can't interpret", "media the `read` tool can't interpret"],
+  ["(use Read)", "(use the `read` tool)"],
+  ["(need Read's literal content)", "(they need the literal content the `read` tool returns)"],
+  ["`Read(file_path, pages=\"1-5\")`", "the `read` tool on a page range, such as pages 1 to 5"],
+  ["or Edit for targeted changes", "or the `edit` tool for targeted changes"],
 ];
 
 const DELEGATES = ["explore", "oracle", "librarian", "executor", "hephaestus", "metis", "momus", "multimodal-looker"];
 
-export const TOKENS: [string, string][] = [
+const TOKENS: [string, string][] = [
   ["oh-my-claudeagent:", "omca-"],
   ["AskUserQuestion", "question"],
   ["`Skill`", "`skill`"],
@@ -59,20 +68,6 @@ export const TOKENS: [string, string][] = [
 ];
 
 const OMCA_TOOLS = /\b(evidence_log|evidence_read|notepad_write|notepad_read|notepad_list|notepad_compact|boulder_write|boulder_progress|ast_search|ast_find_rule|ast_test_rule|ast_dump_tree|ast_replace|file_read|session_search|agents_list|categories_list|health_check)\b/g;
-
-export const FORBIDDEN: (string | RegExp)[] = [
-  "ToolSearch", "AskUserQuestion", "SendMessage", "subagent_type", "oh-my-claudeagent:", "CLAUDE_PLUGIN_ROOT",
-  "TaskCreate", "TaskList", "TodoWrite", "ExitPlanMode", "task-notification", "Agent(", "mcp__plugin_",
-  "run_in_background", "CLAUDE.md", "~/.claude", "omca-plan", "omca-start-work", "<!--", /sisyphus/i, /prometheus/i,
-  /\bBash\b/, /\b(Read|Edit|Write|Grep|Glob|WebFetch|WebSearch) tool\b/,
-];
-
-const TARGETS = "(explore|oracle|librarian|executor|hephaestus|metis|momus)";
-export const BARE_TARGET = new RegExp(
-  `(\\b(spawn(ing)?|consult(ing)?|launch|recommend)\\s+(the\\s+)?|→\\s*|\\[\\s*)\`?${TARGETS}\\b(?!-)` +
-    `|\\bgo to\\s+${TARGETS}\\b(?!-)|\\bwith\\s+${TARGETS}\\b(?![-\\w]|\\s+[a-z])|\\(${TARGETS}\\)|(?<!-)\\b${TARGETS} re-analysis`,
-  "i",
-);
 
 const COLORS: Record<string, string> = {
   red: "#ef4444", blue: "#3b82f6", green: "#22c55e", yellow: "#eab308",
@@ -88,10 +83,10 @@ type Frontmatter = Record<string, unknown>;
 
 export function splitFrontmatter(text: string, file: string): { data: Frontmatter; body: string } {
   const m = /^---\n([\s\S]*?)\n---\n/.exec(text);
-  if (!m) return { data: {}, body: text };
+  if (m?.[1] === undefined) return { data: {}, body: text };
   let data: unknown;
   try {
-    data = Bun.YAML.parse(m[1]!);
+    data = Bun.YAML.parse(m[1]);
   } catch (err) {
     throw new Error(`${file}: frontmatter does not parse: ${err}`);
   }
@@ -107,19 +102,16 @@ function headings(lines: string[]): Heading[] {
   lines.forEach((line, i) => {
     if (line.startsWith("```") || line.startsWith("~~~")) fenced = !fenced;
     const m = fenced ? null : /^(#{1,6})\s+(.*?)\s*$/.exec(line);
-    if (m) out.push({ line: i, level: m[1]!.length, text: m[2]! });
+    if (m?.[1] !== undefined && m[2] !== undefined) out.push({ line: i, level: m[1].length, text: m[2] });
   });
   return out;
 }
 
-function sectionEnd(hs: Heading[], index: number, total: number): number {
-  const h = hs[index]!;
-  return hs.slice(index + 1).find((n) => n.level <= h.level)?.line ?? total;
-}
+const sectionEnd = (hs: Heading[], h: Heading, total: number): number => hs.find((n) => n.line > h.line && n.level <= h.level)?.line ?? total;
 
 function trimBlankEnd(lines: string[]): string[] {
   let end = lines.length;
-  while (end > 0 && lines[end - 1]!.trim() === "") end--;
+  while (end > 0 && lines[end - 1]?.trim() === "") end--;
   return lines.slice(0, end);
 }
 
@@ -127,9 +119,9 @@ export function dropSections(text: string, titles: string[]): string {
   let lines = text.split("\n");
   for (;;) {
     const hs = headings(lines);
-    const i = hs.findIndex((h) => titles.includes(h.text));
-    if (i < 0) return lines.join("\n");
-    lines = [...lines.slice(0, hs[i]!.line), ...lines.slice(sectionEnd(hs, i, lines.length))];
+    const h = hs.find((x) => titles.includes(x.text));
+    if (h === undefined) return lines.join("\n");
+    lines = [...lines.slice(0, h.line), ...lines.slice(sectionEnd(hs, h, lines.length))];
   }
 }
 
@@ -137,23 +129,21 @@ export function applyOverlay(source: string, overlay: string): { text: string; m
   const oLines = overlay.split("\n");
   const oHs = headings(oLines);
   const blocks: { level: number; text: string; lines: string[] }[] = [];
-  for (let i = 0; i < oHs.length; ) {
-    const end = sectionEnd(oHs, i, oLines.length);
-    blocks.push({ level: oHs[i]!.level, text: oHs[i]!.text, lines: trimBlankEnd(oLines.slice(oHs[i]!.line, end)) });
-    const next = oHs.findIndex((h) => h.line >= end);
-    i = next < 0 ? oHs.length : next;
+  for (let h = oHs[0]; h !== undefined; ) {
+    const end = sectionEnd(oHs, h, oLines.length);
+    blocks.push({ level: h.level, text: h.text, lines: trimBlankEnd(oLines.slice(h.line, end)) });
+    h = oHs.find((n) => n.line >= end);
   }
   let lines = source.split("\n");
   const missing: string[] = [];
   for (const block of blocks) {
     const hs = headings(lines);
-    const i = hs.findIndex((h) => h.level === block.level && h.text === block.text);
-    if (i < 0) {
+    const h = hs.find((x) => x.level === block.level && x.text === block.text);
+    if (h === undefined) {
       missing.push(`${"#".repeat(block.level)} ${block.text}`);
       continue;
     }
-    const end = sectionEnd(hs, i, lines.length);
-    lines = [...lines.slice(0, hs[i]!.line), ...block.lines, "", ...lines.slice(end)];
+    lines = [...lines.slice(0, h.line), ...block.lines, "", ...lines.slice(sectionEnd(hs, h, lines.length))];
   }
   return { text: lines.join("\n"), missing };
 }
@@ -174,7 +164,7 @@ export function prepare(root: string, src: Source): { data: Frontmatter; text: s
   return { data, text };
 }
 
-export function translate(text: string): string {
+function translate(text: string): string {
   for (const [from, to] of [...PHRASES, ...TOKENS]) text = text.replaceAll(from, to);
   const article = (m: string, at: number, s: string) =>
     m.startsWith("The") || (!/^the\s/i.test(m) && /(^|[.!?]\s+|\n)$/.test(s.slice(Math.max(0, at - 3), at))) ? "The" : "the";
@@ -196,9 +186,9 @@ function str(data: Frontmatter, key: string, file: string): string {
   return value;
 }
 
-export type PromptAgent = { id: string; tier: string; description: string; system: string; steps?: number; color?: string; deny: string[] };
-export type PromptSkill = { id: string; name: string; description: string; relPath: string; content: string; autoinvoke?: boolean };
-export type PromptCommand = { name: string; description: string; template: string };
+type PromptAgent = { id: string; tier: string; description: string; system: string; color?: string; deny: string[] };
+type PromptSkill = { id: string; name: string; description: string; relPath: string; content: string; autoinvoke?: boolean };
+type PromptCommand = { name: string; description: string; template: string };
 export type Prompts = { agents: PromptAgent[]; skills: PromptSkill[]; commands: PromptCommand[]; outputStyle: string };
 
 export function generate(root: string): Prompts {
@@ -211,14 +201,13 @@ export function generate(root: string): Prompts {
     const id = `omca-${src.key}`;
     if (src.kind === "agent") {
       const names: unknown[] = Array.isArray(data.disallowedTools) ? data.disallowedTools : [];
-      const deny = [...new Set(names.flatMap((n) => (typeof n === "string" && DENY[n] ? [DENY[n]] : [])))].sort();
+      const deny = [...new Set(names.flatMap((n) => (typeof n === "string" ? (DENY[n] ?? []) : [])))].sort();
       const color = typeof data.color === "string" ? COLORS[data.color] : undefined;
       agents.push({
         id,
         tier: str(data, "model", src.relPath),
         description: translate(str(data, "description", src.relPath)),
         system: body(text),
-        ...(typeof data.maxTurns === "number" ? { steps: data.maxTurns } : {}),
         ...(color ? { color } : {}),
         deny,
       });

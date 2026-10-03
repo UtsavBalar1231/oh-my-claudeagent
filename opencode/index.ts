@@ -10,7 +10,7 @@ type ModelRef = NonNullable<Agent.Info["model"]>
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)))
 const TIERS = ["opus", "sonnet", "fable"]
-const HIDDEN_TOOLS = ["omca_session_search", "omca_agents_list", "omca_categories_list", "omca_boulder_write"]
+const HIDDEN_TOOLS = ["omca_session_search", "omca_agents_list", "omca_categories_list", "omca_boulder_write", "omca_omca_hook", "omca_health_check"]
 const EDIT_TOOLS = ["write", "edit", "patch"]
 
 let prompts: Prompts | undefined
@@ -34,6 +34,21 @@ class GuardDeny extends Error {
 
 function enforce(result: GuardResult) {
   if (result.deny) throw new GuardDeny(result.reason)
+}
+
+// The plugin API does not expose the shell the shell tool runs in. OpenCode falls back to $SHELL
+// when none is configured; without one on Windows this assumes PowerShell. The shell hook that
+// fires for the same command carries the real shell.
+const toolShell = (): string => process.env.SHELL ?? (process.platform === "win32" ? "powershell" : "bash")
+
+// Mention offsets index the typed text, which the template replaces, so only the attachments carry over.
+function expand(prompt: CommandInvocation["prompt"], template: string) {
+  return {
+    text: template.replaceAll("$ARGUMENTS", () => prompt.text),
+    ...(prompt.files && { files: prompt.files.map(({ uri, name, description }) => ({ uri, ...(name !== undefined && { name }), ...(description !== undefined && { description }) })) }),
+    ...(prompt.agents && { agents: prompt.agents.map(({ name }) => ({ name })) }),
+    ...(prompt.skills && { skills: prompt.skills.map(({ id }) => ({ id })) }),
+  }
 }
 
 function validModels(raw: unknown): Record<string, ModelRef> {
@@ -88,7 +103,6 @@ async function setup(ctx: Context) {
         hidden: false,
         description: a.description,
         system: a.system,
-        ...(a.steps === undefined ? {} : { steps: a.steps }),
         ...(a.color === undefined ? {} : { color: a.color }),
         ...(model ? { model } : {}),
       }
@@ -117,7 +131,7 @@ async function setup(ctx: Context) {
       name,
       description,
       execute: async ({ sessionID, prompt, delivery }: CommandInvocation) => {
-        await ctx.session.prompt({ ...prompt, sessionID, delivery, text: template.replaceAll("$ARGUMENTS", () => prompt.text) })
+        await ctx.session.prompt({ ...expand(prompt, template), sessionID, delivery })
       },
     }))
     await ctx.command.transform((editor) => {
@@ -129,9 +143,8 @@ async function setup(ctx: Context) {
     const config: Mcp.ServerConfig = {
       type: "local",
       command: [process.execPath, join(root, "servers/omca.ts")],
-      environment: { BUN_BE_BUN: "1", CLAUDE_PROJECT_ROOT: projectRoot, CLAUDE_PROJECT_DIR: projectRoot, CLAUDE_PLUGIN_ROOT: root },
+      environment: { BUN_BE_BUN: "1", CLAUDE_PROJECT_DIR: projectRoot, CLAUDE_PLUGIN_ROOT: root },
       codemode: false,
-      timeout: { startup: 120000 },
     }
     await ctx.mcp.transform((editor) => editor.set("omca", config))
   })
@@ -144,7 +157,7 @@ async function setup(ctx: Context) {
         if (!event.agent || omcaAgents.has(event.agent)) return
         let primary = getsOutputStyle.get(event.agent)
         if (primary === undefined) {
-          const agent: Awaited<ReturnType<Context["agent"]["get"]>> = await ctx.agent.get({ agentID: event.agent })
+          const agent = await ctx.agent.get({ agentID: event.agent })
           primary = agent.data.mode === "primary" || agent.data.mode === "all"
           getsOutputStyle.set(event.agent, primary)
         }
@@ -157,7 +170,7 @@ async function setup(ctx: Context) {
   await register("shell guard hook", () =>
     ctx.shell.hook(
       "create.before",
-      guarded("shell guard", async (event) => enforce(checkShell(event.command, projectRoot))),
+      guarded("shell guard", async (event) => enforce(checkShell(event.command, projectRoot, event.shell))),
     ),
   )
 
@@ -167,7 +180,7 @@ async function setup(ctx: Context) {
       guarded("tool guard", async (event) => {
         const input = (event.input ?? {}) as Record<string, unknown>
         if (event.tool === "shell") {
-          enforce(checkShell(String(input.command ?? ""), projectRoot))
+          enforce(checkShell(String(input.command ?? ""), projectRoot, toolShell()))
         } else if (EDIT_TOOLS.includes(event.tool)) {
           enforce(checkEdit(event.tool, input, projectRoot))
         }

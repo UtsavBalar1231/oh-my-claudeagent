@@ -1,16 +1,21 @@
 import { afterAll, beforeAll, describe, test } from "bun:test"
-import { closeSync, openSync, readFileSync, writeFileSync } from "node:fs"
+import { closeSync, existsSync, openSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { commit, countLines, git, type Listing, opencodeBin, removeDir, repo, scratchDir, type Server, snapshot, startServer, until, writeConfig } from "./harness.ts"
 
 type Message = { role?: string; content?: unknown }
-type Request = { messages?: Message[]; tools?: { function: { name: string } }[] }
+type Request = { model?: string; messages?: Message[]; tools?: { function: { name: string } }[] }
 type Named = { name?: string; parentID?: string | null; status?: { status?: string } }
 type Fixture = { root: string; ws: string; server: Server; stub: Bun.Subprocess; stubFd: number; stubLog: string; baseline: number }
 
 const SLOW = 240_000
 const EXPLORER = "# Explorer: Codebase Search Specialist"
 const EVIDENCE = "Evidence before claims"
+const VISIBLE_OMCA_TOOLS = [
+  "omca_ast_dump_tree", "omca_ast_find_rule", "omca_ast_replace", "omca_ast_search", "omca_ast_test_rule",
+  "omca_boulder_progress", "omca_evidence_log", "omca_evidence_read", "omca_file_read",
+  "omca_notepad_compact", "omca_notepad_list", "omca_notepad_read", "omca_notepad_write",
+]
 let fixture: Fixture | undefined
 
 function need(): Fixture {
@@ -117,10 +122,13 @@ describe.skipIf(!opencodeBin)("opencode model path", () => {
         stub: {
           package: "@opencode/ai/providers/openai-compatible",
           settings: { baseURL: `http://127.0.0.1:${stubPort}/v1`, apiKey: "stub" },
-          models: { scripted: { capabilities: { tools: true, input: ["text"], output: ["text"] }, limit: { context: 200000, output: 32000 } } },
+          models: {
+            scripted: { capabilities: { tools: true, input: ["text"], output: ["text"] }, limit: { context: 200000, output: 32000 } },
+            "scripted-sonnet": { capabilities: { tools: true, input: ["text"], output: ["text"] }, limit: { context: 200000, output: 32000 } },
+          },
         },
       },
-      plugins: [{ package: join(snapshot(join(root, "plugin")), "opencode") }],
+      plugins: [{ package: join(snapshot(join(root, "plugin")), "opencode"), options: { models: { sonnet: "stub/scripted-sonnet" } } }],
     })
     git(ws, "init", "-q")
     writeFileSync(join(ws, "file.txt"), "one\n")
@@ -129,7 +137,7 @@ describe.skipIf(!opencodeBin)("opencode model path", () => {
     writeFileSync(join(ws, "file.txt"), "two\n")
     commit(ws, "two", "-a")
 
-    const server = await startServer(root, ws)
+    const server = await startServer(root, ws, { OMCA_COMMENT_GATE: "deny" })
     fixture = { root, ws, server, stub, stubFd, stubLog, baseline: 0 }
 
     await until("opencode models lists stub/scripted", 30_000, async () => (await opencode(["models", "--server", server.base], 20_000)).includes("stub/scripted"), server.last)
@@ -193,20 +201,39 @@ describe.skipIf(!opencodeBin)("opencode model path", () => {
       `context: no build request contains '${EVIDENCE}'`,
     )
     verify(!requests().some((request) => system(request).includes(EXPLORER) && system(request).includes(EVIDENCE)), `context: the omca-explore request contains '${EVIDENCE}'`)
-  })
+  }, SLOW)
 
-  test("tools: build requests expose omca_evidence_log and none expose omca_session_search", async () => {
+  test("tools: every build request exposes exactly the visible omca tools", async () => {
     await ranAll()
     const buildTools = requests()
       .filter((request) => (request.tools?.length ?? 0) > 0 && !system(request).includes(EXPLORER))
-      .map(toolNames)
+      .map((request) => toolNames(request).filter((name) => name.startsWith("omca_")).sort())
     verify(buildTools.length > 0, "tools: no build request carried tools")
-    verify(
-      buildTools.every((names) => names.includes("omca_evidence_log")),
-      "tools: a build request lacks omca_evidence_log",
-    )
-    verify(!requests().some((request) => toolNames(request).includes("omca_session_search")), "tools: a request exposes omca_session_search")
-  })
+    const wrong = buildTools.filter((names) => names.join(",") !== VISIBLE_OMCA_TOOLS.join(","))
+    verify(wrong.length === 0, `tools: a build request exposes ${wrong[0]?.join(",")} instead of ${VISIBLE_OMCA_TOOLS.join(",")}`)
+  }, SLOW)
+
+  test("models: omca-explore requests go to the sonnet override and build requests to the default", async () => {
+    await ranAll()
+    const explorer = requests().filter((request) => system(request).includes(EXPLORER))
+    verify(explorer.length > 0, "models: no omca-explore request")
+    verify(explorer.every((request) => request.model === "scripted-sonnet"), `models: omca-explore went to ${explorer.map((request) => request.model).join(",")}`)
+    verify(requests().filter((request) => !system(request).includes(EXPLORER)).every((request) => request.model === "scripted"), "models: a build request left the default model")
+  }, SLOW)
+
+  test("slop-write: the comment gate denial reaches the model and the file is not written", async () => {
+    const scenario = await ran("slop-write")
+    verify(toolResults(scenario).includes("omca guard: Blocked: comment slop."), "slop-write: no comment gate denial reached the model")
+    verify(!existsSync(join(need().ws, "slop.sh")), "slop-write: slop.sh was written")
+  }, SLOW)
+
+  test("explore-write: omca-explore cannot write a file", async () => {
+    const scenario = await ran("explore-write")
+    const explorer = during(scenario).filter((request) => system(request).includes(EXPLORER))
+    verify(explorer.length > 0, "explore-write: no request carried the omca-explore system")
+    verify(explorer.every((request) => !toolNames(request).some((name) => ["write", "edit", "patch"].includes(name))), "explore-write: omca-explore was offered a write tool")
+    verify(!existsSync(join(need().ws, "explored.txt")), "explore-write: explored.txt was written")
+  }, SLOW)
 
   test("skill-load: the skill result names /omca-handoff without untranslated text", async () => {
     const result = toolResults(await ran("skill-load"))

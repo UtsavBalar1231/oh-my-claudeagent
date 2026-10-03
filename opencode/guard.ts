@@ -8,12 +8,14 @@ import { homeDir, toPlatform } from "../src/core/path.ts"
 export type GuardResult = { deny: true; reason: string } | { deny: false }
 
 const ALLOW: GuardResult = { deny: false }
+const SH_FAMILY = ["sh", "bash", "zsh"]
 
-// OpenCode has no dialog to hold a command in, so it decides as `guardMode: deny` does: a
-// catastrophic or blocking match is denied, and an advisory one runs.
-function shellContext(projectRoot: string): Context {
+export const shellKind = (shell: string): Context["shell"] =>
+  SH_FAMILY.includes(shell.replace(/^.*[\\/]/, "").toLowerCase().replace(/\.exe$/, "")) ? "bash" : "powershell"
+
+function shellContext(projectRoot: string, shell: string): Context {
   const home = homeDir(process.env)
-  return { shell: "bash", cwd: projectRoot, root: projectRoot, platform: toPlatform(process.platform), ...(home !== undefined && { home }) }
+  return { shell: shellKind(shell), cwd: projectRoot, root: projectRoot, platform: toPlatform(process.platform), ...(home !== undefined && { home }) }
 }
 
 function symbolicRef(projectRoot: string, name: string): string | undefined {
@@ -35,16 +37,22 @@ function branches(projectRoot: string): Pick<Context, "branch" | "defaultBranch"
 const isPush = (finding: Finding | undefined): boolean =>
   finding !== undefined && finding.kind !== "catastrophic" && finding.git.some((git) => git.operation === "push --force")
 
-export function checkShell(command: string, projectRoot: string): GuardResult {
-  const ctx = shellContext(projectRoot)
-  const first = classify(command, ctx)
-  const finding = isPush(first) ? classify(command, { ...ctx, ...branches(projectRoot) }) : first
-  if (finding === undefined || finding.kind === "advisory") return ALLOW
-  if (finding.kind === "blocking" && isHookDisabled(process.env.OMCA_DISABLED_HOOKS, "bash-guard")) return ALLOW
-  return { deny: true, reason: reasonFor(finding) }
+// OpenCode has no dialog to hold a command in, so it decides as `guardMode: deny` does: a
+// catastrophic or blocking match is denied, and an advisory one runs. A guard that fails refuses
+// the command, as the mod's guard does.
+export function checkShell(command: string, projectRoot: string, shell: string): GuardResult {
+  try {
+    const ctx = shellContext(projectRoot, shell)
+    const first = classify(command, ctx)
+    const finding = isPush(first) ? classify(command, { ...ctx, ...branches(projectRoot) }) : first
+    if (finding === undefined || finding.kind === "advisory") return ALLOW
+    if (finding.kind === "blocking" && isHookDisabled(process.env.OMCA_DISABLED_HOOKS, "bash-guard")) return ALLOW
+    return { deny: true, reason: reasonFor(finding) }
+  } catch (err) {
+    return { deny: true, reason: `OMCA's shell guard failed, so the command was refused: ${err instanceof Error ? err.message : String(err)}` }
+  }
 }
 
-// The `+` lines of one file's section of a patch, the text the comment gate judges.
 const addedLines = (section: string): string =>
   section
     .split("\n")
@@ -58,15 +66,15 @@ function editInputs(tool: string, input: Record<string, unknown>, projectRoot: s
   if (tool === "edit") return [{ file_path: path(input.path), new_string: input.newString }]
   if (tool !== "patch") return []
   const text = String(input.patchText ?? "")
-  const headers = [...text.matchAll(/^\*\*\* (Add|Update|Delete) File: (.+)$/gm)]
+  const headers = [...text.matchAll(/^\*\*\* (?:Add|Update|Delete) File: (.+)$/gm)]
   return headers.map((header, i) => ({
-    file_path: path(header[2].trim()),
+    file_path: path((header[1] ?? "").trim()),
     content: addedLines(text.slice(header.index, headers[i + 1]?.index)),
   }))
 }
 
-// A second attempt at a finding the gate has just denied passes, so the adapter process keeps
-// the last denial for as long as it runs.
+// The gate lets a repeat of the finding it last denied through, so the adapter process keeps
+// that denial for as long as it runs.
 const lastDenial: DenyOnce = new Map()
 
 export function checkEdit(tool: string, input: Record<string, unknown>, projectRoot: string): GuardResult {
