@@ -388,7 +388,7 @@ export const CLIPS: readonly Clip[] = [
       { type: "/omca" },
       { key: "Enter" },
       { until: has("1: Agents"), mark: "pane", hold: 0 },
-      { until: has("just watch summary", "just watch draft", "just watch flags"), mark: "lanes", hold: 6_000, targets: { "tool-row": /\S Bash just watch \w+/ } },
+      { until: has("just watch summary", "just watch draft", "just watch flags"), mark: "lanes", hold: 6_000, targets: { "tool-row": /\S Bash just watch \w+/, "lane-model": /\S+ {2,}high {2,}\d+s/ } },
     ],
   },
   { name: "clip-board", format: "clip", cols: CLIP_COLS, rows: CLIP_ROWS, script: PLAN_SCRIPT, steps: BOARD_STEPS },
@@ -449,7 +449,11 @@ export const CLIPS: readonly Clip[] = [
       // Claude Code collapses a finished call to one line, so the marks wait for those lines.
       { until: has("Ran 1 shell command", "The suite passes"), mark: "tests-pass", hold: 0 },
       { until: has("Called plugin:oh-my-claudeagent:omca"), mark: "evidence-logged", hold: 0 },
-      { until: (screen) => /COMPLETE\s+matches/.test(screen), mark: "complete", targets: { "complete-chip": /COMPLETE(?=\s+matches)/ } },
+      {
+        until: (screen) => /COMPLETE\s+matches/.test(screen),
+        mark: "complete",
+        targets: { "complete-chip": /COMPLETE(?=\s+matches)/, "verdict-line": /COMPLETE\s+matches the current plan · \d\d-\d\d \d\d:\d\d/ },
+      },
       // The drift guard and the final-verification gate both let this stop through.
       { until: (screen) => !screen.includes("Stop hook"), hold: 1_200 },
     ],
@@ -467,7 +471,11 @@ export const CLIPS: readonly Clip[] = [
     steps: [
       { type: "Pick up the next task on the plan" },
       { key: "Enter" },
-      { until: has("The executor is on task 7"), hold: 1_200 },
+      {
+        until: has("The executor is on task 7"),
+        hold: 1_200,
+        targets: { band: /\d+\/\d+ · next [^\n│]*?(?= {2}|│|\n|$)/, "cost-row": /\$\d+\.\d\d · / },
+      },
       ...command("/omca"),
       { until: has("1: Agents", "Wire the order summary panel"), mark: "agents-tab" },
       { key: "2", gap: 0 },
@@ -475,9 +483,9 @@ export const CLIPS: readonly Clip[] = [
       { key: "3", gap: 0 },
       { until: has("Final verification"), mark: "evidence-tab" },
       { key: "4", gap: 0 },
-      { until: has("Learnings · "), mark: "notepad-tab" },
+      { until: has("Learnings · "), mark: "notepad-tab", targets: { "notepad-card": /╭─+╮(?=[^\n]*\n[^\n]*Learnings · \d+ entr)/ } },
       { key: "6", gap: 0 },
-      { until: has("delegations in"), mark: "stats-tab" },
+      { until: has("delegations in"), mark: "stats-tab", targets: { "stats-header": /agent +runs +median +tokens[^\n│]*outcomes/ } },
       { key: "5", gap: 0 },
       { until: has("rate the last turn"), mark: "feedback-tab", hold: 1_200 },
       { key: "u", gap: 0 },

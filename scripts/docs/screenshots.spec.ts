@@ -72,7 +72,7 @@ describe("CLIPS", () => {
     expect(marks(clip("clip-plan"))).toEqual(["cmd-typed", "dialog", "key-choice", "plan-written"]);
     expect(targets(clip("clip-plan"))).toEqual(["question"]);
     expect(marks(clip("clip-delegate"))).toEqual(["cmd-typed", "spawned", "pane", "lanes"]);
-    expect(targets(clip("clip-delegate"))).toEqual(["tool-row"]);
+    expect(targets(clip("clip-delegate"))).toEqual(["tool-row", "lane-model"]);
     for (const name of ["clip-board", "clip-board-light"]) {
       expect(marks(clip(name))).toEqual(["cmd-typed", "board", "focus-moved", "task-open"]);
       expect(targets(clip(name))).toEqual(["proven-chip", "unproven-chip"]);
@@ -81,7 +81,20 @@ describe("CLIPS", () => {
     expect(targets(clip("clip-guard"))).toEqual(["discard-lines"]);
     expect(marks(clip("clip-verify"))).toEqual(["cmd-typed", "tests-pass", "evidence-logged", "complete"]);
     expect(marks(clip("clip-tour"))).toEqual(["cmd-typed", "agents-tab", "plan-tab", "evidence-tab", "notepad-tab", "stats-tab", "feedback-tab", "rated"]);
-    expect(targets(clip("clip-verify"))).toEqual(["complete-chip"]);
+    expect(targets(clip("clip-verify"))).toEqual(["complete-chip", "verdict-line"]);
+    expect(targets(clip("clip-tour"))).toEqual(["band", "cost-row", "notepad-card", "stats-header"]);
+  });
+
+  // Each row is a split screen: the transcript, the pane's edge at column 12, then the pane.
+  test.each([
+    ["clip-tour", "band", "██ 6/14 · next 7 Wire the panel · 1 running     [-]│pane", { row: 0, col: 3, len: 40, rows: 1 }],
+    ["clip-tour", "cost-row", "  ↯ 6/14\n  $0.04 · ⏱ 11s", { row: 1, col: 2, len: 7, rows: 1 }],
+    ["clip-tour", "notepad-card", "│╭── x ──╮\n│╭────╮ ╭────╮\n││ Learnings · 3 entries", { row: 1, col: 1, len: 6, rows: 1 }],
+    ["clip-tour", "stats-header", "abc│  agent   runs  median  tokens  est. cost  evidence  outcomes   │", { row: 0, col: 6, len: 59, rows: 1 }],
+    ["clip-delegate", "lane-model", "x │ executor · Wire the panel    sonnet-5-5  high       7s", { row: 0, col: 33, len: 25, rows: 1 }],
+    ["clip-verify", "verdict-line", "x │  COMPLETE  matches the current plan · 10-04 13:35   │", { row: 0, col: 5, len: 48, rows: 1 }],
+  ])("%s's %s target finds one row", (name, targetName, screen, span) => {
+    expect(locate(screen, target(clip(name), targetName) ?? /^$/)).toEqual(span);
   });
 
   test("the plain clips leave the plugin out and pair with an OMCA clip on the same prompt", () => {
