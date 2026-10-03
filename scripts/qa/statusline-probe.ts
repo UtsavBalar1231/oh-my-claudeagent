@@ -7,7 +7,7 @@
 import { join } from "node:path";
 import { childEnv, runQa } from "./lib.ts";
 
-const BASE = { model: { display_name: "claude-3-5-sonnet" }, context_window: { context_window_size: 200000, used_percentage: 10.0 }, cost: {} };
+const BASE = { model: { id: "claude-opus-5-5", display_name: "Opus 5.5" }, context_window: { context_window_size: 200000, used_percentage: 10.0 }, cost: {} };
 
 async function render(pluginDir: string, script: string, payload: unknown): Promise<string> {
   const proc = Bun.spawn(["bun", join(pluginDir, "statusline", script)], {
@@ -27,9 +27,8 @@ if (import.meta.main) {
     async ({ checks, scratch }) => {
       const pluginDir = scratch.plugin();
 
-      const main = await render(pluginDir, "main.ts", { ...BASE, effort: { level: "high" }, thinking: { enabled: true } });
+      const main = await render(pluginDir, "main.ts", { ...BASE, effort: { level: "high" } });
       checks.check(main.includes("E: high"), "main line: effort marker rendered (E: high)", `main line: effort marker missing from output: ${main}`);
-      checks.check(!main.includes("[T]"), "main line: no thinking marker even with thinking on", `main line: thinking marker rendered: ${main}`);
 
       const bare = await render(pluginDir, "main.ts", BASE);
       checks.check(

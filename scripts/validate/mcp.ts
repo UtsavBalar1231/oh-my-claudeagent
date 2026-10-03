@@ -31,12 +31,12 @@ export function judgeHandshake(result: Run, expectedTools: readonly string[]): O
   return verdict(problems, `initialize and tools/list answered, ${expectedTools.length} expected tools listed`);
 }
 
-function readFixtures(ctx: Context): { expected: string[]; input: string } | string {
+function readFixtures(root: string): { expected: string[]; input: string } | string {
   let name = "";
   try {
     const json = (file: string): unknown => {
       name = file;
-      return readJson(join(ctx.root, FIXTURES, file));
+      return readJson(join(root, FIXTURES, file));
     };
     const expected = asList(json("expected-tools.json")).filter((tool) => typeof tool === "string");
     return { expected, input: HANDSHAKE.map((file) => `${JSON.stringify(json(file))}\n`).join("") };
@@ -45,17 +45,20 @@ function readFixtures(ctx: Context): { expected: string[]; input: string } | str
   }
 }
 
-function handshake(ctx: Context): Outcome {
-  const fixtures = readFixtures(ctx);
+/** Sends the handshake fixtures under `root` to the server at `server`, run in a scratch repository, and judges its answers. */
+export function serverHandshake(root: string, server: string): Outcome {
+  const fixtures = readFixtures(root);
   if (typeof fixtures === "string") return { status: "fail", detail: fixtures };
   const { expected, input } = fixtures;
   const scratch = mkdtempSync(join(tmpdir(), "omca-mcp-handshake-"));
   try {
     run(["git", "init", "-q"], scratch);
-    return judgeHandshake(run([process.execPath, join(ctx.root, "servers", "omca.ts")], scratch, { input, timeoutMs: TIMEOUT_MS }), expected);
+    return judgeHandshake(run([process.execPath, server], scratch, { input, timeoutMs: TIMEOUT_MS }), expected);
   } finally {
     rmSync(scratch, { recursive: true, force: true });
   }
 }
+
+const handshake = (ctx: Context): Outcome => serverHandshake(ctx.root, join(ctx.root, "servers", "omca.ts"));
 
 export const checks: readonly Check[] = [{ name: "mcp handshake", run: handshake }];

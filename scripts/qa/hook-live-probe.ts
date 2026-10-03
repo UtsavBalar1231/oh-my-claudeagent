@@ -19,29 +19,31 @@
 // Exit: 0 pass, 1 a check failed, 2 the run could not be set up.
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import type { Run } from "../validate/core.ts";
 import {
   type AccessEntry,
   type BodyEntry,
+  CANARY,
   type Checks,
-  type ClaudeResult,
+  call,
+  guardDenies,
+  hookCalls,
   localhostOnly,
   parseJsonLines,
+  pluginDenies,
   type Qa,
   readJsonLines,
   runClaude,
   runQa,
+  say,
   startMock,
   type TraceEntry,
   traceCount,
 } from "./lib.ts";
 import type { Script, Turn } from "./mock-model.ts";
 
-const GUARD_DENY = /tool\.check Bash [^ ]+: .* -> deny by plugin oh-my-claudeagent: Destructive rm -rf blocked/;
-const ANY_PLUGIN_DENY = /-> deny by plugin oh-my-claudeagent/;
-const HOOK_CALL = /Hooks: mcp_tool calling plugin:oh-my-claudeagent:omca\/omca_hook/g;
 const PLAN_DENY_MARKER = "PLAN-CHECKBOX-VERIFY";
 const PLAN_WITHOUT_CHECKBOXES = "## Work Objectives\n\nSome text with no checkboxes.\n";
-const CANARY = "stale-build-cache";
 const STOP_SESSION = "5c1f0f6e-3a47-4d52-9b0e-7d1a2c8e4b91";
 const STOP_PLAN = "# Plan\n\n## TODOs\n\n- [ ] 1. Write the parser\n- [ ] 2. Write the printer\n";
 const STOP_CONTEXT = "Stop hook additional context: [PLAN CONTINUATION]";
@@ -67,8 +69,6 @@ type Family = {
   control: (checks: Checks, o: Observed, label: string) => void;
 };
 
-const call = (name: string, input: Record<string, unknown>): Turn => ({ content: [{ type: "tool_use", name, input }] });
-const say = (text: string): Turn => ({ content: [{ type: "text", text }] });
 const bash = (command: string): Turn => call("Bash", { command, description: "probe command" });
 
 type Notice = { type?: string; subtype?: string; key?: string };
@@ -141,14 +141,14 @@ const FAMILIES: Family[] = [
       seedFile(project, join(CANARY, "decoy.txt"), "decoy\n");
     },
     plugin(checks, o, label) {
-      const denials = o.debug.split("\n").filter((line) => ANY_PLUGIN_DENY.test(line));
-      checks.check(denials.length === 1 && GUARD_DENY.test(denials[0] ?? ""), `${label}: the mod's tool.check guard denied the recursive removal and nothing else`, `${label}: expected exactly one tool.check deny from the Bash guard, saw ${JSON.stringify(denials)}`);
+      const denials = pluginDenies(o.debug);
+      checks.check(denials.length === 1 && guardDenies(o.debug, "Bash").length === 1, `${label}: the mod's tool.check guard denied the recursive removal and nothing else`, `${label}: expected exactly one tool.check deny from the Bash guard, saw ${JSON.stringify(denials)}`);
       checks.check(!existsSync(join(o.project, CANARY, "decoy.txt")), `${label}: non-recursive rm still ran`, `${label}: ${CANARY}/decoy.txt is still present, so the guard denied a command it must not touch or the turn never ran it`);
       checks.check(existsSync(join(o.project, CANARY, "stale.o")), `${label}: ${CANARY}/stale.o survived the destructive command`, `${label}: ${CANARY}/stale.o was removed despite the deny`);
     },
     control(checks, o, label) {
       noPluginTrace(checks, o, label);
-      checks.check(!ANY_PLUGIN_DENY.test(o.debug), `${label}: no guard deny without the plugin`, `${label}: a guard deny line appeared without the plugin`);
+      checks.check(pluginDenies(o.debug).length === 0, `${label}: no guard deny without the plugin`, `${label}: a guard deny line appeared without the plugin`);
       checks.check(!existsSync(join(o.project, CANARY)), `${label}: the same command removes ${CANARY} without the plugin`, `${label}: ${CANARY} survived without the plugin, so the scenario proves nothing`);
     },
   },
@@ -214,7 +214,7 @@ async function observe({ scratch, checks }: Qa, family: Family, pluginDir: strin
   const expected = pluginDir === undefined ? (family.controlServed ?? script.main.length) : script.main.length;
   const bodyLog = join(logDir, "bodies.log");
   const mock = startMock(join(logDir, "access.log"), script, bodyLog);
-  let result: ClaudeResult;
+  let result: Run;
   try {
     result = await runClaude({
       cwd: project,
@@ -240,7 +240,7 @@ async function observe({ scratch, checks }: Qa, family: Family, pluginDir: strin
     project,
     trace: readJsonLines<TraceEntry>(join(project, ".omca", "state", "hook-trace.jsonl")),
     debug,
-    clientCalls: debug.match(HOOK_CALL)?.length ?? 0,
+    clientCalls: hookCalls(debug),
     stdout: result.stdout,
     bodies: readJsonLines<BodyEntry>(bodyLog),
   };

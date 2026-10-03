@@ -23,10 +23,10 @@ describe("policy markers", () => {
   });
 
   test("a posture marker missing from the omca-setup skill fails", async () => {
-    const ctx = fixture({ "skills/omca-setup/SKILL.md": without(VALID["skills/omca-setup/SKILL.md"], 'teammateMode: "auto"') });
+    const ctx = fixture({ "skills/omca-setup/SKILL.md": without(VALID["skills/omca-setup/SKILL.md"], "allowManagedPermissionRulesOnly") });
     expect(await policy.run(ctx)).toEqual({
       status: "fail",
-      detail: 'skills/omca-setup/SKILL.md lacks auto mode marker (teammateMode: "auto")',
+      detail: "skills/omca-setup/SKILL.md lacks managed settings boundary marker (allowManagedPermissionRulesOnly)",
     });
   });
 

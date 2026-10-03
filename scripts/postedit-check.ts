@@ -1,10 +1,11 @@
 #!/usr/bin/env bun
 import { join } from "node:path";
 import { isRecord } from "../src/core/tool-input.ts";
+import { envWithout } from "./validate/core.ts";
 
 const CONTEXT_LINES = 20;
 
-export type Typecheck = () => { ok: boolean; output: string };
+type Typecheck = () => { ok: boolean; output: string };
 
 function editedTypeScript(stdin: string): boolean {
   let payload: unknown;
@@ -28,13 +29,11 @@ export function report(stdin: string, typecheck: Typecheck): string {
 }
 
 function justTypecheck(): ReturnType<Typecheck> {
-  const run = Bun.spawnSync(["just", "typecheck"], { cwd: join(import.meta.dir, ".."), stdout: "pipe", stderr: "pipe" });
+  const run = Bun.spawnSync(["just", "typecheck"], { cwd: join(import.meta.dir, ".."), env: envWithout(/^GIT_/), stdout: "pipe", stderr: "pipe" });
   return { ok: run.exitCode === 0, output: `${run.stdout.toString()}${run.stderr.toString()}` };
 }
 
 if (import.meta.main) {
-  void Bun.stdin.text().then((stdin) => {
-    const out = report(stdin, justTypecheck);
-    if (out !== "") process.stdout.write(`${out}\n`);
-  });
+  const out = report(await Bun.stdin.text(), justTypecheck);
+  if (out !== "") process.stdout.write(`${out}\n`);
 }

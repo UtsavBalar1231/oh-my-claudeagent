@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { listTasks, render, TASKS_DIR } from "./eval-tasks.ts";
@@ -30,10 +30,12 @@ describe("listTasks", () => {
     expect(() => listTasks(dir)).toThrow("broken.json: expected string name and category fields");
   });
 
-  test("reads every shipped task definition", () => {
+  test("names every task definition after its file and gives it a one-word category", () => {
+    const stems = readdirSync(TASKS_DIR).filter((file) => file.endsWith(".json")).sort().map((file) => file.replace(/\.json$/, ""));
     const tasks = listTasks(TASKS_DIR);
-    expect(tasks.length).toBeGreaterThan(0);
-    for (const task of tasks) expect(task.name.length * task.category.length).toBeGreaterThan(0);
+    expect(stems).not.toEqual([]);
+    expect(tasks.map((task) => task.name)).toEqual(stems);
+    for (const task of tasks) expect(task.category).toMatch(/^[a-z]+$/);
   });
 });
 

@@ -3,29 +3,26 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const REPO = join(import.meta.dir, "..", "..");
-const JUSTFILE = readFileSync(join(REPO, "justfile"), "utf8");
-const CI = readFileSync(join(REPO, ".github", "workflows", "ci.yml"), "utf8");
-const RELEASE = readFileSync(join(REPO, ".github", "workflows", "release.yml"), "utf8");
+const read = (path: string): string => readFileSync(join(REPO, path), "utf8");
+const JUSTFILE = read("justfile");
 
-// Leaf recipe -> the substring ci.yml must contain. A pin is needed wherever ci.yml runs the same
-// command differently from the recipe body; each pin is also asserted to be a substring of the
-// recipe's own body, so a pin cannot drift from the real command, only from CI's coverage of it.
-const PINS: Readonly<Record<string, string>> = {
-  validate: "bun scripts/validate.ts",
-  "test-opencode": "bun test opencode/",
-  typecheck: "bun x --bun tsc --noEmit -p tsconfig.runtime.json",
-  lint: "bun x --bun oxlint --deny-warnings src servers statusline scripts hooks opencode tests benchmarks/compare",
-  "test-mod": "claude plugin test .",
-  test: "bun test --parallel src servers statusline scripts opencode benchmarks/compare",
+type Step = { name?: string; uses?: string; run?: string; if?: string; with?: Record<string, unknown> };
+type Job = { "runs-on": string; strategy?: { "fail-fast": boolean; matrix: { os: string[] } }; env?: Record<string, string>; steps: Step[] };
+type Workflow = { on: Record<string, unknown>; jobs: Record<string, Job> };
+
+const parse = <T>(path: string): T => Bun.YAML.parse(read(path)) as T;
+const CI = parse<Workflow>(".github/workflows/ci.yml");
+const RELEASE = parse<Workflow>(".github/workflows/release.yml");
+const AST_GREP = parse<{ runs: { steps: Step[] } }>(".github/actions/ast-grep/action.yml");
+
+const job = (name: string): Job => {
+  const found = CI.jobs[name];
+  if (found === undefined) throw new Error(`ci.yml has no ${name} job`);
+  return found;
 };
 
-// The MCP job runs the server specs on their own, so no recipe pins it.
-const MCP_SPECS = "bun test servers";
-
 // A recipe header is its name, any parameters, then the colon: `validate *args:` and `ci: lint test`.
-const isHeader = (name: string) => (line: string) => new RegExp(`^${name}(?: [^:=]*)?:`).test(line);
-
-const header = (name: string) => JUSTFILE.split("\n").find(isHeader(name));
+const isHeader = (name: string) => (line: string) => new RegExp(`^${name}(?: [^:=]*)?:(?!=)`).test(line);
 
 function recipeBody(name: string): string[] {
   const lines = JUSTFILE.split("\n");
@@ -43,120 +40,108 @@ function recipeBody(name: string): string[] {
 // A recipe with a body is a leaf; one with only a dependency list expands into its dependencies.
 function leafSteps(name: string): string[] {
   if (recipeBody(name).length > 0) return [name];
-  const dependencies = (header(name) ?? "").slice((header(name) ?? "").indexOf(":") + 1).split(/\s+/).filter((dep) => dep !== "" && !dep.includes("="));
+  const header = JUSTFILE.split("\n").find(isHeader(name)) ?? "";
+  const dependencies = header.slice(header.indexOf(":") + 1).split(/\s+/).filter((dep) => dep !== "" && !dep.includes("="));
   return dependencies.length === 0 ? [name] : dependencies.flatMap(leafSteps);
 }
 
-function jobBlock(name: string): string {
-  const lines = CI.split("\n");
-  const rest = lines.slice(lines.findIndex((line) => line.startsWith(`  ${name}:`)) + 1);
-  const end = rest.findIndex((line) => /^ {2}[a-zA-Z_-]+:/.test(line));
-  return rest.slice(0, end === -1 ? undefined : end).join("\n");
-}
-
-const SPEC_ROOTS = /^ {6}BUN_SPEC_ROOTS: (.+)$/m.exec(jobBlock("typescript"))?.[1] ?? "";
-const CI_EXPANDED = CI.replaceAll("$BUN_SPEC_ROOTS", SPEC_ROOTS);
-
 const ciLeaves = [...new Set(leafSteps("ci"))].sort();
+const SPEC_ROOTS = job("typescript").env?.["BUN_SPEC_ROOTS"] ?? "";
+
+/** Each command a ci.yml step runs, with the spec roots expanded; installs, setup and summaries are not commands under test. */
+const ciCommands = Object.values(CI.jobs)
+  .flatMap((ci) => ci.steps)
+  .filter((step) => step.run !== undefined && !/^(Install|Job summary)/.test(step.name ?? ""))
+  .flatMap((step) => (step.run ?? "").split("\n").map((line) => line.trim().replaceAll("$BUN_SPEC_ROOTS", SPEC_ROOTS)))
+  .filter((line) => line !== "");
+
+/** The command each line of a `just ci` leaf recipe runs, without its forwarded arguments. */
+const recipeCommands = ciLeaves.flatMap((leaf) => recipeBody(leaf).map((line) => line.replace(/\s*\{\{ *\w+ *\}\}/g, "")));
+
+const startsCommand = (command: string, recipe: string): boolean => command === recipe || command.startsWith(`${recipe} `);
+
+const CI_ONLY_REASONS: Readonly<Record<string, string>> = {
+  [`bun scripts/qa/junit-complete.ts "$RUNNER_TEMP/bun-junit.xml" ${SPEC_ROOTS}`]: "bun on Windows can crash and exit 0, which only CI's JUnit report shows",
+  [`bun test --parallel --randomize --seed=\${{ github.run_number }} ${SPEC_ROOTS}`]: "a fresh seed per run, which a local recipe has no source for",
+  "claude plugin validate . --strict": "the latest published client rather than the pinned one",
+  "claude plugin validate .claude-plugin/plugin.json --strict": "the latest published client rather than the pinned one",
+};
 
 describe("workflow contract", () => {
-  test("just ci recipe chain resolves to the expected leaf steps", () => {
-    expect(ciLeaves.join(" ")).toBe("lint test test-mod test-opencode typecheck validate");
+  test("just ci resolves to the expected leaf recipes", () => {
+    expect(ciLeaves).toEqual(["lint", "smoke", "test", "test-mod", "test-opencode", "typecheck", "validate"]);
   });
 
-  test("every just ci leaf step has a pinned ci.yml coverage pattern", () => {
-    expect(ciLeaves.filter((step) => PINS[step] === undefined)).toEqual([]);
+  test("ci.yml runs every command of every just ci recipe", () => {
+    expect(recipeCommands.filter((recipe) => !ciCommands.some((command) => startsCommand(command, recipe)))).toEqual([]);
   });
 
-  test("each pinned pattern is a real substring of its recipe's own body", () => {
-    expect(ciLeaves.filter((step) => !recipeBody(step).join("\n").includes(PINS[step] ?? "\0"))).toEqual([]);
+  test("every command ci.yml runs belongs to a just ci recipe or has a reason to run in CI only", () => {
+    const unexplained = ciCommands.filter((command) => !recipeCommands.some((recipe) => startsCommand(command, recipe)) && CI_ONLY_REASONS[command] === undefined);
+    expect(unexplained).toEqual([]);
   });
 
-  test("ci.yml covers every just ci leaf step's pinned pattern", () => {
-    expect(ciLeaves.filter((step) => !CI_EXPANDED.includes(PINS[step] ?? "\0"))).toEqual([]);
-  });
-
-  test("the MCP job runs the server specs and the handshake check, and the manifest job validates strictly", () => {
-    expect(jobBlock("test-mcp")).toContain(`run: ${MCP_SPECS}`);
-    expect(jobBlock("test-mcp")).toContain("run: bun scripts/validate.ts --check mcp");
-    expect(jobBlock("validate-manifest")).toContain("run: claude plugin validate . --strict");
-    expect(jobBlock("validate-manifest")).toContain("run: claude plugin validate .claude-plugin/plugin.json");
-  });
-
-  test("negative sanity: removing the test-mcp job from a ci.yml copy makes coverage fail", () => {
-    const copy: string[] = [];
-    let skipping = false;
-    for (const line of CI.split("\n")) {
-      if (line.startsWith("  test-mcp:")) skipping = true;
-      else if (skipping && /^ {2}[a-zA-Z_-]+:/.test(line)) skipping = false;
-      if (!skipping) copy.push(line);
-    }
-    expect(copy.join("\n").includes(MCP_SPECS)).toBe(false);
-    expect(CI_EXPANDED.includes(MCP_SPECS)).toBe(true);
+  test("every CI-only entry is still a command ci.yml runs", () => {
+    expect(Object.keys(CI_ONLY_REASONS).filter((command) => !ciCommands.includes(command))).toEqual([]);
   });
 
   test("ci.yml is callable, and release.yml runs it as the gate its release job needs", () => {
-    expect(CI).toMatch(/^ {2}workflow_call:/m);
-    expect(RELEASE).toContain("uses: ./.github/workflows/ci.yml");
-    const lines = RELEASE.split("\n");
-    const needs = lines.slice(lines.findIndex((line) => line.startsWith("  release:"))).find((line) => line.includes("needs:"));
-    expect(needs?.trim()).toBe("needs: [ci]");
+    expect(CI.on).toHaveProperty("workflow_call");
+    expect(RELEASE.jobs["ci"]).toMatchObject({ uses: "./.github/workflows/ci.yml" });
+    expect(RELEASE.jobs["release"]).toMatchObject({ needs: ["ci"] });
+  });
+
+  test("the release job checks every version field against the tag and takes its notes from CHANGELOG.md", () => {
+    const runs = (RELEASE.jobs["release"]?.steps ?? []).map((step) => step.run ?? "").join("\n");
+    for (const field of [".claude-plugin/plugin.json .version", ".claude-plugin/marketplace.json .metadata.version", ".claude-plugin/marketplace.json .plugins[0].version", "package.json .version"]) {
+      expect(runs).toContain(`"${field}"`);
+    }
+    expect(runs).toContain('--notes-file "$RUNNER_TEMP/notes.md"');
+    expect(runs).not.toContain("--generate-notes");
   });
 
   test("every setup-bun step in ci.yml opts out of the cache, since a tag push runs it through release.yml", () => {
-    const steps = CI.split("\n").flatMap((line, index, lines) => (line.includes("oven-sh/setup-bun@") ? [lines.slice(index, index + 4).join("\n")] : []));
+    const steps = Object.values(CI.jobs).flatMap((ci) => ci.steps).filter((step) => step.uses?.startsWith("oven-sh/setup-bun@"));
     expect(steps.length).toBeGreaterThan(0);
-    expect(steps.filter((step) => !step.includes("no-cache: true"))).toEqual([]);
+    expect(steps.filter((step) => step.with?.["no-cache"] !== true)).toEqual([]);
   });
 
   test("every job but the latest-client manifest check runs on linux, macOS and windows without failing fast", () => {
-    for (const job of ["validate", "test-mcp", "test-opencode", "typescript", "smoke"]) {
-      const block = jobBlock(job);
-      expect(block).toContain("os: [ubuntu-latest, macos-latest, windows-latest]");
-      expect(block).toContain("fail-fast: false");
-      expect(block).toContain("runs-on: ${{ matrix.os }}");
+    for (const name of Object.keys(CI.jobs).filter((name) => name !== "validate-manifest")) {
+      expect(job(name).strategy).toEqual({ "fail-fast": false, matrix: { os: ["ubuntu-latest", "macos-latest", "windows-latest"] } });
+      expect(job(name)["runs-on"]).toBe("${{ matrix.os }}");
     }
-    expect(jobBlock("validate-manifest")).toContain("runs-on: ubuntu-latest");
+    expect(job("validate-manifest")["runs-on"]).toBe("ubuntu-latest");
   });
 
-  test("ci.yml pins an ast-grep archive digest for each OS", () => {
-    for (const os of ["LINUX", "MACOS", "WINDOWS"]) expect(CI).toMatch(new RegExp(`^ {2}AST_GREP_SHA256_${os}: [0-9a-f]{64}$`, "m"));
+  test("ast-grep comes from the local action, which pins an archive digest for each OS", () => {
+    const users = Object.entries(CI.jobs).filter(([, ci]) => ci.steps.some((step) => step.uses === "./.github/actions/ast-grep")).map(([name]) => name);
+    expect(users.sort()).toEqual(["test-opencode", "typescript"]);
+    expect(read(".github/workflows/ci.yml")).not.toContain("ast-grep/releases/download");
+    expect(AST_GREP.runs.steps.map((step) => step.if)).toEqual(["runner.os == 'Linux'", "runner.os == 'macOS'", "runner.os == 'Windows'"]);
+    expect(read(".github/actions/ast-grep/action.yml").match(/^ {8}AST_GREP_SHA256: [0-9a-f]{64}$/gm)).toHaveLength(3);
   });
 
-  test("the spec run is checked for completeness on the report and the roots the bun test step used, with no hand-kept count", () => {
-    const steps = jobBlock("typescript");
-    const testRun = /run: bun test --parallel (\S+) --reporter=junit --reporter-outfile="([^"]+)"/.exec(steps);
-    const checkRun = /run: bun scripts\/qa\/junit-complete\.ts "([^"]+)" (\S+)$/m.exec(steps);
+  test("the spec run is checked for completeness on the report and the roots the bun test step used", () => {
+    const runs = job("typescript").steps.map((step) => step.run ?? "");
+    const testRun = runs.map((run) => /^bun test --parallel (\S+) --reporter=junit --reporter-outfile="([^"]+)"$/.exec(run)).find(Boolean);
+    const checkRun = runs.map((run) => /^bun scripts\/qa\/junit-complete\.ts "([^"]+)" (\S+)$/.exec(run)).find(Boolean);
     expect(testRun?.[1]).toBe("$BUN_SPEC_ROOTS");
     expect(checkRun?.[1]).toBe(testRun?.[2]);
     expect(checkRun?.[2]).toBe(testRun?.[1]);
-    expect(CI.match(/BUN_SPEC_ROOTS:/g)).toHaveLength(1);
     expect(recipeBody("test")).toEqual([`bun test --parallel ${SPEC_ROOTS}`]);
-    expect(CI).not.toContain("BUN_SPEC_FLOOR");
   });
 
-  test("a seeded random-order run on the same roots follows the ordered run and puts its seed in the step name", () => {
-    const step = /- name: Bun spec tests in random order \(seed \$\{\{ github\.run_number \}\}\)\n\s+if: runner\.os == 'Linux'\n\s+run: (.+)$/m.exec(jobBlock("typescript"));
-    expect(step?.[1]).toBe("bun test --parallel --randomize --seed=${{ github.run_number }} $BUN_SPEC_ROOTS");
+  test("a seeded random-order run on the same roots runs on Linux and puts its seed in the step name", () => {
+    const step = job("typescript").steps.find((candidate) => candidate.run?.includes("--randomize"));
+    expect(step).toEqual({
+      name: "Bun spec tests in random order (seed ${{ github.run_number }})",
+      if: "runner.os == 'Linux'",
+      run: "bun test --parallel --randomize --seed=${{ github.run_number }} $BUN_SPEC_ROOTS",
+    });
   });
 
   test("the validate recipe forwards its arguments to the validator", () => {
     expect(JUSTFILE).toContain("\nvalidate *args:\n\tbun scripts/validate.ts {{ args }}\n");
-  });
-
-  test("the compare recipe runs the Docker comparison harness with its arguments", () => {
-    expect(JUSTFILE).toContain("\ncompare *args:\n\tbun benchmarks/compare/run.ts {{ args }}\n");
-  });
-
-  test("neither workflow runs bats or checks out submodules", () => {
-    for (const workflow of [CI, RELEASE]) {
-      expect(workflow).not.toContain("bats");
-      expect(workflow).not.toContain("submodules");
-    }
-  });
-
-  test("the justfile defines no bats recipe and the ci recipe names none", () => {
-    expect(JUSTFILE).not.toContain("bats");
-    expect(ciLeaves).not.toContain("test-bats");
   });
 });

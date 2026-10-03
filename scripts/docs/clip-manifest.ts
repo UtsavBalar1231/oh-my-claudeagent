@@ -19,6 +19,7 @@ export type ClipManifest = {
 
 type Json = Record<string, unknown>;
 
+// video/src/footage.ts mirrors this file line for line, so it imports nothing, src/core's isRecord included.
 const isObject = (value: unknown): value is Json => typeof value === "object" && value !== null && !Array.isArray(value);
 
 function object(value: unknown, where: string): Json {

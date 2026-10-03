@@ -1,15 +1,7 @@
-ci:
-  autofix_commit_msg: "ci: auto-fix from pre-commit hooks"
-  autofix_prs: true
-  autoupdate_commit_msg: "ci: pre-commit autoupdate"
-  autoupdate_schedule: weekly
-  skip: [zizmor, typecheck]
-
 # Engine-generated type snapshot: committed byte for byte as the client writes it.
 exclude: '^\.claude-plugin/types/'
 
 repos:
-  # General hygiene
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
@@ -30,24 +22,22 @@ repos:
       - id: check-executables-have-shebangs
       - id: check-shebang-scripts-are-executable
 
-  # GHA workflow validation
   - repo: https://github.com/python-jsonschema/check-jsonschema
     rev: 0.37.1
     hooks:
       - id: check-github-workflows
 
-  # GHA security scanning
   - repo: https://github.com/zizmorcore/zizmor-pre-commit
     rev: v1.24.1
     hooks:
       - id: zizmor
 
-  # Both tsc projects, the same check CI runs; the recipe needs bun and just on PATH
+  # The recipe needs bun and just on PATH.
   - repo: local
     hooks:
       - id: typecheck
         name: typecheck
         entry: just typecheck
         language: system
-        files: '\.tsx?$|^tsconfig[^/]*\.json$|^package\.json$'
+        files: '\.tsx?$|^tsconfig[^/]*\.json$|^opencode/tsconfig\.json$|^package\.json$'
         pass_filenames: false

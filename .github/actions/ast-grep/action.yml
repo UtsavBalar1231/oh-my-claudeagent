@@ -1,0 +1,60 @@
+name: Install ast-grep
+description: Puts one pinned ast-grep release on PATH after checking the archive's SHA-256.
+
+# Each digest is the SHA-256 of the archive the matching runner downloads (linux x64, macOS arm64
+# for macos-latest, windows x64), taken from the release's published asset digests and re-checked
+# against a download, so a version bump changes all three. Each step appends a fixed directory under
+# RUNNER_TEMP to GITHUB_PATH, and no input reaches what it writes.
+inputs:
+  version:
+    description: The ast-grep release the digests below belong to.
+    default: 0.45.3
+runs:
+  using: composite
+  steps:
+    - name: Install ast-grep (Linux)
+      if: runner.os == 'Linux'
+      shell: bash
+      env:
+        AST_GREP_VERSION: ${{ inputs.version }}
+        AST_GREP_SHA256: f8ac830881339d1edee6b2652f54798c0f4da5a827f2db38a08ee31117783ce8
+      run: | # zizmor: ignore[github-env]
+        archive="$RUNNER_TEMP/ast-grep.zip"
+        curl -fsSL --retry 3 -o "$archive" "https://github.com/ast-grep/ast-grep/releases/download/$AST_GREP_VERSION/app-x86_64-unknown-linux-gnu.zip"
+        echo "$AST_GREP_SHA256  $archive" | sha256sum --check --strict
+        unzip -q "$archive" -d "$RUNNER_TEMP/ast-grep"
+        echo "$RUNNER_TEMP/ast-grep" >> "$GITHUB_PATH"
+
+    # macos-latest is Apple silicon, so the aarch64 archive is the one that runs.
+    - name: Install ast-grep (macOS)
+      if: runner.os == 'macOS'
+      shell: bash
+      env:
+        AST_GREP_VERSION: ${{ inputs.version }}
+        AST_GREP_SHA256: 6d2279dea5bea2ad79c66ea93f5fe54ba926e398a8a26de76c56db68fe59eac6
+      run: | # zizmor: ignore[github-env]
+        [[ "$(uname -m)" == arm64 ]]
+        archive="$RUNNER_TEMP/ast-grep.zip"
+        curl -fsSL --retry 3 -o "$archive" "https://github.com/ast-grep/ast-grep/releases/download/$AST_GREP_VERSION/app-aarch64-apple-darwin.zip"
+        echo "$AST_GREP_SHA256  $archive" | shasum -a 256 --check -
+        unzip -q "$archive" -d "$RUNNER_TEMP/ast-grep"
+        echo "$RUNNER_TEMP/ast-grep" >> "$GITHUB_PATH"
+
+    # The server refuses a .cmd shim, so the archive's native ast-grep.exe is the binary on PATH.
+    - name: Install ast-grep (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      env:
+        AST_GREP_VERSION: ${{ inputs.version }}
+        AST_GREP_SHA256: 3751b7d6be7fd39a80df1180ffe7e053903dcf92d3190e5a8336ff1746af9059
+      run: | # zizmor: ignore[github-env]
+        $ProgressPreference = 'SilentlyContinue'
+        $archive = Join-Path $env:RUNNER_TEMP 'ast-grep.zip'
+        $url = "https://github.com/ast-grep/ast-grep/releases/download/$env:AST_GREP_VERSION/app-x86_64-pc-windows-msvc.zip"
+        Invoke-WebRequest -Uri $url -OutFile $archive -MaximumRetryCount 3 -RetryIntervalSec 2
+        $actual = (Get-FileHash -Algorithm SHA256 -Path $archive).Hash
+        if ($actual -ne $env:AST_GREP_SHA256) { throw "ast-grep archive digest $actual does not match $env:AST_GREP_SHA256" }
+        $destination = Join-Path $env:RUNNER_TEMP 'ast-grep'
+        Expand-Archive -Path $archive -DestinationPath $destination
+        if (-not (Test-Path -Path (Join-Path $destination 'ast-grep.exe'))) { throw 'the archive holds no ast-grep.exe' }
+        Add-Content -Path $env:GITHUB_PATH -Value $destination -Encoding utf8

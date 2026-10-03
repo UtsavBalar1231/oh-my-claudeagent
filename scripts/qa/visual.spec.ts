@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { copyFixture, parseView, teardown, withoutBlink } from "./visual.ts";
+import { copyFixture, maskClock, maskScratch, parseView, teardown, withoutBlink } from "./visual.ts";
 
 const VISUAL = join(import.meta.dir, "visual.ts");
 const temps: string[] = [];
@@ -59,6 +59,58 @@ test("copyFixture copies the tree and points {{cwd}} at the copy", () => {
   );
   expect(readFileSync(join(to, "notes.md"), "utf8")).toBe("no token here\n");
   expect(readFileSync(join(from, ".omca", "state", "boulder.json"), "utf8")).toContain("{{cwd}}");
+});
+
+test("copyFixture takes a plan boulder.json names from the shared plans when the fixture lacks it, and keeps the fixture's own", () => {
+  const from = temp("omca-visual-fixture-");
+  const shared = temp("omca-visual-shared-");
+  const to = join(temp("omca-visual-copy-"), "cwd");
+  mkdirSync(join(from, ".omca", "state"), { recursive: true });
+  mkdirSync(join(from, "plans"));
+  writeFileSync(join(from, ".omca", "state", "boulder.json"), '{"a":"{{cwd}}/plans/shared.md","b":"{{cwd}}/plans/own.md","c":"{{cwd}}/plans/nowhere.md"}');
+  writeFileSync(join(from, "plans", "own.md"), "fixture's own\n");
+  writeFileSync(join(shared, "shared.md"), "shared plan\n");
+  writeFileSync(join(shared, "own.md"), "shared copy\n");
+
+  copyFixture(from, to, shared);
+
+  expect(readdirSync(join(to, "plans")).sort()).toEqual(["own.md", "shared.md"]);
+  expect(readFileSync(join(to, "plans", "shared.md"), "utf8")).toBe("shared plan\n");
+  expect(readFileSync(join(to, "plans", "own.md"), "utf8")).toBe("fixture's own\n");
+});
+
+test("the band and pane fixtures get the 46-task plan from tests/fixtures/plans", () => {
+  const plan = readFileSync(join(import.meta.dir, "..", "..", "tests", "fixtures", "plans", "46-task-plan.md"), "utf8");
+  for (const fixture of ["band", "pane"]) {
+    const to = join(temp(`omca-visual-${fixture}-`), "cwd");
+    copyFixture(join(import.meta.dir, "..", "..", "tests", "mod", "visual", "fixtures", fixture), to);
+    expect(readFileSync(join(to, "plans", "46-task-plan.md"), "utf8")).toBe(plan);
+  }
+});
+
+test("maskScratch replaces the scratch directory's random suffix wherever the screen shows it", () => {
+  const scratch = join(tmpdir(), "omca-visual-120x40-Ab3dE9");
+  const screen = `cwd ${scratch}/cwd\n…ual-120x40-Ab3dE9/cwd │ Ab3dE`;
+
+  expect(maskScratch(screen, scratch)).toBe(`cwd ${join(tmpdir(), "omca-visual-120x40-XXXXXX")}/cwd\n…ual-120x40-XXXXXX/cwd │ Ab3dE`);
+});
+
+test("maskClock fixes the live session's times and keeps a line's width beside a pane", () => {
+  const screen = [
+    "✻ Sautéed for 0s · done 1:36 PM          │ pane",
+    "r: Run again   ✓ 9 ok  checked 16:42",
+    "  ↑ UP    10-03 13:36  good",
+    "  13:35  FINAL    ✓  0  just ci",
+    "✻ Baked for 2s · done 10:07 PM",
+  ].join("\n");
+
+  expect(maskClock(screen).split("\n")).toEqual([
+    "✻ Worked for 0s · done HH:MM             │ pane",
+    "r: Run again   ✓ 9 ok  checked HH:MM",
+    "  ↑ UP    MM-DD HH:MM  good",
+    "  13:35  FINAL    ✓  0  just ci",
+    "✻ Worked for 2s · done HH:MM",
+  ]);
 });
 
 const SIZES = [

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { guardDenies, hookCalls, offeredTools, pluginDenies, smokeScript } from "./ci-smoke.ts";
+import { offeredTools, smokeScript } from "./ci-smoke.ts";
+import { guardDenies, hookCalls, pluginDenies } from "./lib.ts";
 
 const REASON = "Destructive rm -rf blocked: the target is the filesystem root, home, the working directory, or a directory directly under root or home. Name a deeper path explicitly.";
 const BASH_DENY = `2026-10-02T21:20:39.671Z [DEBUG] tool.check Bash toolu_mock_1: unevaluated -> deny by plugin oh-my-claudeagent: ${REASON}`;

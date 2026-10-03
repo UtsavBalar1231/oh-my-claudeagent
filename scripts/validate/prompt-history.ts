@@ -3,16 +3,18 @@ import { type Check, type Context, type Outcome, readText, verdict } from "./cor
 // A prompt states what to do now: the model cannot resolve a rename, a release number or a mode
 // label from OMCA's past, and a prompt that needs a deferred omca tool gives the exact `select:` name
 // instead of a blanket "discovery-deferred" claim. The scope is the markdown the model reads plus the
-// TypeScript under servers/ and hooks/, scanned whole, since a regex cannot tell a message from a comment.
+// shipped TypeScript under servers/, hooks/, src/ and statusline/, scanned whole, since a regex cannot
+// tell a message from a comment.
 const MARKDOWN = [
   /^agents\/[^/]+\.md$/,
   /^skills\/.+\.md$/,
   /^output-styles\/[^/]+\.md$/,
   /^templates\/[^/]+\.md$/,
+  /^rules\/[^/]+\.md$/,
   /^opencode\/overlays\/[^/]+\.md$/,
   /(?:^|\/)AGENTS\.md$/,
 ];
-const SOURCE = [/^servers\/.+\.ts$/, /^hooks\/.+\.ts$/];
+const SOURCE = [/^servers\/.+\.ts$/, /^hooks\/.+\.ts$/, /^src\/.+\.ts$/, /^statusline\/.+\.ts$/];
 
 type Phrase = { label: string; pattern: RegExp; inSource: boolean };
 
@@ -64,6 +66,12 @@ export const ALLOWED: readonly Allowed[] = [
     phrase: "legacy",
     line: "Legacy/Chaotic",
     reason: "a class of the user's codebase that sisyphus assesses",
+  },
+  {
+    file: "rules/comments-go.md",
+    phrase: "deprecated",
+    line: "`Deprecated:` paragraphs",
+    reason: "the Go doc-comment convention in the user's code, which tooling reads",
   },
   {
     file: "skills/debugging/references/methodology.md",

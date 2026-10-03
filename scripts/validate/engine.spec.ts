@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { checks, forbiddenCalls, judgeCalls, judgeValidate } from "./engine.ts";
+import { forbiddenCalls, judgeCalls, judgeValidate } from "./engine.ts";
 
 const REAL_OUTPUT = [
   "Validating hooks: /plugin/hooks/hooks.json",
@@ -13,10 +13,6 @@ const withCalls = (...calls: string[]) =>
   `  ❯ ./register.ts calls: ${calls.map((call) => `$.${call} (via bindHost)`).join(", ")}\n`;
 
 describe("engine checks", () => {
-  test("the group validates the manifest, then the marketplace under --strict, then reads the calls line", () => {
-    expect(checks.map((check) => check.name)).toEqual(["validate manifest", "validate marketplace", "mod calls line"]);
-  });
-
   test("a strict marketplace run that exits 0 passes and names what it accepted", () => {
     expect(judgeValidate({ code: 0, stdout: "", stderr: "" }, "the marketplace under --strict")).toEqual({
       status: "pass",

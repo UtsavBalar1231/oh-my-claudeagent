@@ -3,7 +3,8 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { packageTree } from "../package.ts";
-import { type Script, startServer } from "./mock-model.ts";
+import { envWithout, type Run } from "../validate/core.ts";
+import { type Script, startServer, type Turn } from "./mock-model.ts";
 
 export const REPO = join(import.meta.dir, "..", "..");
 
@@ -49,7 +50,7 @@ export function createScratch(log: Print) {
     project(): string {
       const path = dir("project");
       const git = (...args: string[]): void => {
-        const { exitCode, stderr } = Bun.spawnSync(["git", "-C", path, ...args], { stdout: "pipe", stderr: "pipe" });
+        const { exitCode, stderr } = Bun.spawnSync(["git", "-C", path, ...args], { env: childEnv(), stdout: "pipe", stderr: "pipe" });
         if (exitCode !== 0) throw new Error(`git ${args.join(" ")} exited ${exitCode}: ${stderr.toString().trim()}`);
       };
       git("init", "-q");
@@ -105,12 +106,37 @@ export function watchDrift(home: string = homedir()) {
 }
 
 // A nested session must not inherit this session's id, socket, model settings or kill switches.
-export function childEnv(extra: Record<string, string> = {}): Record<string, string> {
-  const env: Record<string, string> = {};
-  for (const [key, value] of Object.entries(process.env)) {
-    if (value !== undefined && !/^(CLAUDE|ANTHROPIC|OMCA)/.test(key)) env[key] = value;
+export const childEnv = (extra: Record<string, string> = {}): Record<string, string> => envWithout(/^(CLAUDE|ANTHROPIC|OMCA)/, extra);
+
+const cleanups = new Set<() => unknown>();
+let interrupted = false;
+
+async function onSignal(signal: NodeJS.Signals): Promise<void> {
+  if (interrupted) return;
+  interrupted = true;
+  for (const cleanup of [...cleanups].reverse()) {
+    try {
+      await cleanup();
+    } catch (error) {
+      console.error(`cleanup after ${signal} failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
-  return { ...env, ...extra };
+  process.exit(signal === "SIGINT" ? 130 : 143);
+}
+
+/** Runs `cleanup`, newest registration first, when SIGINT or SIGTERM arrives before the returned release is called, then exits as the signal would. */
+export function cleanupOnSignal(cleanup: () => unknown): () => void {
+  if (cleanups.size === 0) {
+    process.on("SIGINT", onSignal);
+    process.on("SIGTERM", onSignal);
+  }
+  cleanups.add(cleanup);
+  return () => {
+    cleanups.delete(cleanup);
+    if (cleanups.size > 0) return;
+    process.off("SIGINT", onSignal);
+    process.off("SIGTERM", onSignal);
+  };
 }
 
 export type ClaudeRun = {
@@ -129,14 +155,12 @@ export type ClaudeRun = {
   env?: Record<string, string>;
 };
 
-export type ClaudeResult = { code: number; stdout: string; stderr: string };
-
 export function claudeBin(): string {
   const bin = process.env.QA_CLAUDE_BIN ?? "claude";
   return Bun.which(bin) ?? bin;
 }
 
-export async function runClaude(run: ClaudeRun): Promise<ClaudeResult> {
+export async function runClaude(run: ClaudeRun): Promise<Run> {
   const argv = [
     claudeBin(),
     "-p",
@@ -202,6 +226,27 @@ export function parseJsonLines<T>(text: string): T[] {
 
 export const readJsonLines = <T>(path: string): T[] => (existsSync(path) ? parseJsonLines<T>(readFileSync(path, "utf8")) : []);
 
+/** A directory the guard reads as a root when its variable is empty, so a recursive removal of it is denied. */
+export const CANARY = "stale-build-cache";
+
+const HOOK_CALL = /Hooks: mcp_tool calling plugin:oh-my-claudeagent:omca\/omca_hook/g;
+const DENY_REASON = "Destructive rm -rf blocked";
+
+export const call = (name: string, input: Record<string, unknown>): Turn => ({ content: [{ type: "tool_use", name, input }] });
+export const say = (text: string): Turn => ({ content: [{ type: "text", text }] });
+
+/** How many omca_hook calls the client's `--debug-file` records. */
+export const hookCalls = (debug: string): number => debug.match(HOOK_CALL)?.length ?? 0;
+
+/** The debug-file lines in which the mod's tool.check guard denied a recursive removal through `tool`. */
+export function guardDenies(debug: string, tool: "Bash" | "PowerShell"): string[] {
+  const deny = new RegExp(`tool\\.check ${tool} [^ ]+: .* -> deny by plugin oh-my-claudeagent: ${DENY_REASON}`);
+  return debug.split(/\r?\n/).filter((line) => deny.test(line));
+}
+
+/** Every debug-file line in which the plugin denied a call, whatever the tool or reason. */
+export const pluginDenies = (debug: string): string[] => debug.split(/\r?\n/).filter((line) => line.includes("-> deny by plugin oh-my-claudeagent"));
+
 export type TraceEntry = { event: string; tool_name?: string; agent_type?: string; output: "deny" | "block" | "continue" | "context" | "empty" };
 
 export function traceCount(trace: readonly TraceEntry[], event: string, toolName?: string): number {
@@ -221,12 +266,14 @@ export async function runQa(name: string, body: (qa: Qa) => Promise<void>, optio
   const scratch = createScratch(checks.log);
   const drift = options.watchRealConfig ? watchDrift() : undefined;
   let setupFailed = false;
+  const release = cleanupOnSignal(() => scratch.cleanup());
   try {
     await body({ checks, scratch });
   } catch (error) {
     setupFailed = true;
     console.error(`${name}: setup failed: ${error instanceof Error ? error.message : String(error)}`);
   } finally {
+    release();
     scratch.cleanup();
   }
   const drifted = drift?.changed() ?? [];

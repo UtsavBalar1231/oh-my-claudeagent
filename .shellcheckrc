@@ -1,8 +1,0 @@
-shell=bash
-enable=all
-# Don't follow sourced files — scripts run in plugin context
-disable=SC1091
-# Variables set by environment/hooks (CLAUDE_PROJECT_ROOT, etc.)
-disable=SC2154
-# Pipelines intentionally mask return values — scripts avoid set -euo pipefail by design
-disable=SC2312

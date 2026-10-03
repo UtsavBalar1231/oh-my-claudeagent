@@ -1,2 +1,2 @@
 [test]
-preload = ["./scripts/qa/canonical-tmp.ts", "./scripts/qa/plain-output.ts"]
+preload = ["./tests/fixtures/canonical-tmp.ts", "./tests/fixtures/plain-output.ts"]

@@ -13,14 +13,7 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# One ast-grep release. Each digest is the SHA-256 of the archive the matching runner downloads
-# (linux x64, macOS arm64 for macos-latest, windows x64), taken from the release's published asset
-# digests and re-checked against a download, so a version bump changes all three.
 env:
-  AST_GREP_VERSION: 0.45.3
-  AST_GREP_SHA256_LINUX: f8ac830881339d1edee6b2652f54798c0f4da5a827f2db38a08ee31117783ce8
-  AST_GREP_SHA256_MACOS: 6d2279dea5bea2ad79c66ea93f5fe54ba926e398a8a26de76c56db68fe59eac6
-  AST_GREP_SHA256_WINDOWS: 3751b7d6be7fd39a80df1180ffe7e053903dcf92d3190e5a8336ff1746af9059
   CLAUDE_CODE_VERSION: 2.1.288
 
 defaults:
@@ -62,80 +55,6 @@ jobs:
             echo "The plugin manifest, a hook definition, the mod's registrations or the repository layout is malformed or out of sync. Run \`just validate\` locally to see the exact failure."
           } >> "$GITHUB_STEP_SUMMARY"
 
-  test-mcp:
-    name: MCP Server Specs (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-        with:
-          persist-credentials: false
-
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version: 1.4.2
-          no-cache: true
-
-      # servers/tools/ast.spec.ts runs the real ast-grep binary.
-      - name: Install ast-grep (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          archive="$RUNNER_TEMP/ast-grep.zip"
-          curl -fsSL --retry 3 -o "$archive" "https://github.com/ast-grep/ast-grep/releases/download/$AST_GREP_VERSION/app-x86_64-unknown-linux-gnu.zip"
-          echo "$AST_GREP_SHA256_LINUX  $archive" | sha256sum --check --strict
-          unzip -q "$archive" -d "$RUNNER_TEMP/ast-grep"
-          echo "$RUNNER_TEMP/ast-grep" >> "$GITHUB_PATH"
-
-      # macos-latest is Apple silicon, so the aarch64 archive is the one that runs.
-      - name: Install ast-grep (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          [[ "$(uname -m)" == arm64 ]]
-          archive="$RUNNER_TEMP/ast-grep.zip"
-          curl -fsSL --retry 3 -o "$archive" "https://github.com/ast-grep/ast-grep/releases/download/$AST_GREP_VERSION/app-aarch64-apple-darwin.zip"
-          echo "$AST_GREP_SHA256_MACOS  $archive" | shasum -a 256 --check -
-          unzip -q "$archive" -d "$RUNNER_TEMP/ast-grep"
-          echo "$RUNNER_TEMP/ast-grep" >> "$GITHUB_PATH"
-
-      # The server refuses a .cmd shim, so the archive's native ast-grep.exe is the binary on PATH.
-      - name: Install ast-grep (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $ProgressPreference = 'SilentlyContinue'
-          $archive = Join-Path $env:RUNNER_TEMP 'ast-grep.zip'
-          $url = "https://github.com/ast-grep/ast-grep/releases/download/$env:AST_GREP_VERSION/app-x86_64-pc-windows-msvc.zip"
-          Invoke-WebRequest -Uri $url -OutFile $archive -MaximumRetryCount 3 -RetryIntervalSec 2
-          $actual = (Get-FileHash -Algorithm SHA256 -Path $archive).Hash
-          if ($actual -ne $env:AST_GREP_SHA256_WINDOWS) { throw "ast-grep archive digest $actual does not match $env:AST_GREP_SHA256_WINDOWS" }
-          $destination = Join-Path $env:RUNNER_TEMP 'ast-grep'
-          Expand-Archive -Path $archive -DestinationPath $destination
-          if (-not (Test-Path -Path (Join-Path $destination 'ast-grep.exe'))) { throw 'the archive holds no ast-grep.exe' }
-          Add-Content -Path $env:GITHUB_PATH -Value $destination -Encoding utf8
-
-      - name: Run MCP server specs
-        run: bun test servers
-
-      - name: Check the MCP handshake against the real server
-        run: bun scripts/validate.ts --check mcp
-
-      - name: Job summary
-        if: always()
-        run: |
-          {
-            echo "### What this job checks ($RUNNER_OS)"
-            echo "The omca MCP server specs under servers/: the handshake, the tool list, every tool and every hook handler, plus the validator's handshake against the real server, via \`bun test servers\` and \`just validate --check mcp\`."
-            echo ""
-            echo "### If this fails"
-            echo "A server spec failed: the server did not start, misreports its tool list, or a tool or hook handler regressed. Run \`bun test servers\` and \`just validate --check mcp\` locally to see the failing spec."
-          } >> "$GITHUB_STEP_SUMMARY"
-
   # OpenCode ships a native build for each of these runners, so its specs run on all three.
   test-opencode:
     name: OpenCode Adapter (${{ matrix.os }})
@@ -153,41 +72,7 @@ jobs:
           persist-credentials: false
 
       # The omca MCP server OpenCode starts runs the ast-grep binary for its ast_* tools.
-      - name: Install ast-grep (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          archive="$RUNNER_TEMP/ast-grep.zip"
-          curl -fsSL --retry 3 -o "$archive" "https://github.com/ast-grep/ast-grep/releases/download/$AST_GREP_VERSION/app-x86_64-unknown-linux-gnu.zip"
-          echo "$AST_GREP_SHA256_LINUX  $archive" | sha256sum --check --strict
-          unzip -q "$archive" -d "$RUNNER_TEMP/ast-grep"
-          echo "$RUNNER_TEMP/ast-grep" >> "$GITHUB_PATH"
-
-      # macos-latest is Apple silicon, so the aarch64 archive is the one that runs.
-      - name: Install ast-grep (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          [[ "$(uname -m)" == arm64 ]]
-          archive="$RUNNER_TEMP/ast-grep.zip"
-          curl -fsSL --retry 3 -o "$archive" "https://github.com/ast-grep/ast-grep/releases/download/$AST_GREP_VERSION/app-aarch64-apple-darwin.zip"
-          echo "$AST_GREP_SHA256_MACOS  $archive" | shasum -a 256 --check -
-          unzip -q "$archive" -d "$RUNNER_TEMP/ast-grep"
-          echo "$RUNNER_TEMP/ast-grep" >> "$GITHUB_PATH"
-
-      # The server refuses a .cmd shim, so the archive's native ast-grep.exe is the binary on PATH.
-      - name: Install ast-grep (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $ProgressPreference = 'SilentlyContinue'
-          $archive = Join-Path $env:RUNNER_TEMP 'ast-grep.zip'
-          $url = "https://github.com/ast-grep/ast-grep/releases/download/$env:AST_GREP_VERSION/app-x86_64-pc-windows-msvc.zip"
-          Invoke-WebRequest -Uri $url -OutFile $archive -MaximumRetryCount 3 -RetryIntervalSec 2
-          $actual = (Get-FileHash -Algorithm SHA256 -Path $archive).Hash
-          if ($actual -ne $env:AST_GREP_SHA256_WINDOWS) { throw "ast-grep archive digest $actual does not match $env:AST_GREP_SHA256_WINDOWS" }
-          $destination = Join-Path $env:RUNNER_TEMP 'ast-grep'
-          Expand-Archive -Path $archive -DestinationPath $destination
-          if (-not (Test-Path -Path (Join-Path $destination 'ast-grep.exe'))) { throw 'the archive holds no ast-grep.exe' }
-          Add-Content -Path $env:GITHUB_PATH -Value $destination -Encoding utf8
+      - uses: ./.github/actions/ast-grep
 
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
@@ -195,15 +80,14 @@ jobs:
           no-cache: true
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 24
 
       - name: Install OpenCode CLI
         run: npm i -g @opencode/cli@2.0.18
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
-
-      - name: Typecheck
-        run: bun run typecheck
 
       - name: Specs, including the smoke and model-path runs against OpenCode
         run: bun test opencode/
@@ -213,7 +97,7 @@ jobs:
         run: |
           {
             echo "### What this job checks ($RUNNER_OS)"
-            echo "The OpenCode adapter typechecks, passes its unit tests, and loads in a real OpenCode 2.0.18 install, via the commands in \`just test-opencode\`."
+            echo "The OpenCode adapter passes its unit tests and loads in a real OpenCode 2.0.18 install, via \`just test-opencode\`. The TypeScript job typechecks it."
             echo ""
             echo "### If this fails"
             echo "The adapter's prompt translation or its runtime wiring drifted from what OpenCode expects. Run \`just test-opencode\` locally with bun and opencode on PATH to see the exact failure."
@@ -231,7 +115,7 @@ jobs:
       contents: read
     env:
       DISABLE_AUTOUPDATER: "1"
-      BUN_SPEC_ROOTS: src servers statusline scripts opencode benchmarks/compare
+      BUN_SPEC_ROOTS: src servers statusline scripts benchmarks/compare
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
@@ -271,46 +155,13 @@ jobs:
         run: |
           bun x --bun tsc --noEmit -p tsconfig.json
           bun x --bun tsc --noEmit -p tsconfig.runtime.json
+          bun x --bun tsc --noEmit -p opencode
 
       - name: Mod tests
         run: claude plugin test .
 
       # servers/tools/ast.spec.ts runs the real ast-grep binary.
-      - name: Install ast-grep (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          archive="$RUNNER_TEMP/ast-grep.zip"
-          curl -fsSL --retry 3 -o "$archive" "https://github.com/ast-grep/ast-grep/releases/download/$AST_GREP_VERSION/app-x86_64-unknown-linux-gnu.zip"
-          echo "$AST_GREP_SHA256_LINUX  $archive" | sha256sum --check --strict
-          unzip -q "$archive" -d "$RUNNER_TEMP/ast-grep"
-          echo "$RUNNER_TEMP/ast-grep" >> "$GITHUB_PATH"
-
-      # macos-latest is Apple silicon, so the aarch64 archive is the one that runs.
-      - name: Install ast-grep (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          [[ "$(uname -m)" == arm64 ]]
-          archive="$RUNNER_TEMP/ast-grep.zip"
-          curl -fsSL --retry 3 -o "$archive" "https://github.com/ast-grep/ast-grep/releases/download/$AST_GREP_VERSION/app-aarch64-apple-darwin.zip"
-          echo "$AST_GREP_SHA256_MACOS  $archive" | shasum -a 256 --check -
-          unzip -q "$archive" -d "$RUNNER_TEMP/ast-grep"
-          echo "$RUNNER_TEMP/ast-grep" >> "$GITHUB_PATH"
-
-      # The server refuses a .cmd shim, so the archive's native ast-grep.exe is the binary on PATH.
-      - name: Install ast-grep (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $ProgressPreference = 'SilentlyContinue'
-          $archive = Join-Path $env:RUNNER_TEMP 'ast-grep.zip'
-          $url = "https://github.com/ast-grep/ast-grep/releases/download/$env:AST_GREP_VERSION/app-x86_64-pc-windows-msvc.zip"
-          Invoke-WebRequest -Uri $url -OutFile $archive -MaximumRetryCount 3 -RetryIntervalSec 2
-          $actual = (Get-FileHash -Algorithm SHA256 -Path $archive).Hash
-          if ($actual -ne $env:AST_GREP_SHA256_WINDOWS) { throw "ast-grep archive digest $actual does not match $env:AST_GREP_SHA256_WINDOWS" }
-          $destination = Join-Path $env:RUNNER_TEMP 'ast-grep'
-          Expand-Archive -Path $archive -DestinationPath $destination
-          if (-not (Test-Path -Path (Join-Path $destination 'ast-grep.exe'))) { throw 'the archive holds no ast-grep.exe' }
-          Add-Content -Path $env:GITHUB_PATH -Value $destination -Encoding utf8
+      - uses: ./.github/actions/ast-grep
 
       - name: Bun spec tests
         run: bun test --parallel $BUN_SPEC_ROOTS --reporter=junit --reporter-outfile="$RUNNER_TEMP/bun-junit.xml"
@@ -327,9 +178,6 @@ jobs:
         if: runner.os == 'Linux'
         run: bun test --parallel --randomize --seed=${{ github.run_number }} $BUN_SPEC_ROOTS
 
-      - name: Validate manifest and hooks module
-        run: claude plugin validate .claude-plugin/plugin.json --strict
-
       - name: Check the mod against the engine
         run: bun scripts/validate.ts --check engine
 
@@ -338,7 +186,7 @@ jobs:
         run: |
           {
             echo "### What this job checks ($RUNNER_OS)"
-            echo "The TypeScript hooks module and shared code on Claude Code $CLAUDE_CODE_VERSION: oxlint, both tsc projects, the mod tests, the bun spec files in parallel with a check that the run listed every spec file, then once more in a seeded random order on Linux, \`claude plugin validate\` on the manifest, and the engine checks on its output (mirrors \`just lint\`, \`typecheck\`, \`test\`, \`test-mod\` and \`validate --check engine\`)."
+            echo "The TypeScript hooks module and shared code on Claude Code $CLAUDE_CODE_VERSION: oxlint, the three tsc projects, the mod tests, the bun spec files in parallel with a check that the run listed every spec file, then once more in a seeded random order on Linux, and the engine checks, which run \`claude plugin validate --strict\` on a packaged copy (mirrors \`just lint\`, \`typecheck\`, \`test\`, \`test-mod\` and \`validate --check engine\`)."
             echo ""
             echo "### If this fails"
             echo "A lint finding, a type error, a failing test, a spec run that crashed or stopped before every spec file ran, or a manifest or hooks-module validation error. Run the matching \`just\` recipe locally with Claude Code $CLAUDE_CODE_VERSION and bun 1.4.2 to see the exact failure."
@@ -394,43 +242,45 @@ jobs:
             echo "A real \`claude -p\` session with the packaged plugin loaded, against the mock model with a scratch project and config directory: the server answers omca_hook calls and the mod's tool.check guard denies a recursive removal (through PowerShell as well on Windows, when the session offers that tool)."
             echo ""
             echo "### If this fails"
-            echo "The plugin did not load in a real session on this OS, or its guard did not run. Run \`bun scripts/qa/ci-smoke.ts\` locally with Claude Code $CLAUDE_CODE_VERSION on PATH; the debug log it reads is quoted in the failed check."
+            echo "The plugin did not load in a real session on this OS, or its guard did not run. Run \`just smoke\` locally with Claude Code $CLAUDE_CODE_VERSION on PATH; the debug log it reads is quoted in the failed check."
           } >> "$GITHUB_STEP_SUMMARY"
 
-  # The manifest checks read local JSON, so one runner is enough; the typescript job already runs
-  # `claude plugin validate` on every OS. This job installs the latest published client, not the
-  # pinned one, to catch a manifest the newest platform schema rejects.
+  # The manifest checks read local files, so one runner is enough; the typescript job runs them on
+  # every OS with the pinned client. This job installs the latest published client instead, to catch
+  # a manifest the newest platform schema rejects. The validator needs no authentication.
   validate-manifest:
     name: Manifest Validation
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
+    env:
+      DISABLE_AUTOUPDATER: "1"
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           persist-credentials: false
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 24
 
-      # `just validate --check engine` skips itself when the claude CLI is absent, so CI
-      # installs the CLI to make the step enforce rather than no-op. The validator
-      # reads local files only and needs no authentication.
       - name: Install Claude Code CLI
         run: npm i -g @anthropic-ai/claude-code
 
-      - name: Validate plugin manifest
+      - name: Validate the marketplace
         run: claude plugin validate . --strict
 
-      - name: Validate plugin manifest, skills, and agents
-        run: claude plugin validate .claude-plugin/plugin.json
+      - name: Validate the plugin manifest, its skills, agents and hooks module
+        run: claude plugin validate .claude-plugin/plugin.json --strict
 
       - name: Job summary
         if: always()
         run: |
           {
             echo "### What this job checks"
-            echo "The plugin manifest against the platform's own schema, by running \`claude plugin validate . --strict\` directly. The engine group of \`just validate\` runs the same check but skips itself when the CLI is absent, so this job installs the CLI and calls the validator rather than the recipe."
+            echo "The marketplace and the plugin manifest, with its skills, agents and hooks module, against the latest published client's schema, via \`claude plugin validate . --strict\` and \`claude plugin validate .claude-plugin/plugin.json --strict\`."
             echo ""
             echo "### If this fails"
-            echo "A field in \`.claude-plugin/plugin.json\` or \`.claude-plugin/marketplace.json\` is malformed or unknown to the installed CLI. Run \`claude plugin validate . --strict\` locally to see the exact failure."
+            echo "A field in \`.claude-plugin/plugin.json\` or \`.claude-plugin/marketplace.json\`, or a skill, agent or hooks module, is malformed or unknown to the newest client. Run both commands locally with the latest claude CLI to see the exact failure."
           } >> "$GITHUB_STEP_SUMMARY"

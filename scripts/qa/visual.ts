@@ -11,15 +11,20 @@
 //   mockScript  <root>/scripts/<name>.json, the {main, subagent} turns mock-model.ts serves;
 //               absent or null, every request is answered "ok"
 //   fixture     <root>/fixtures/<name>/, copied as the session's cwd, with "{{cwd}}" in its
-//               files replaced by that cwd; absent or null, an empty directory
-// Writes <root>/<view>-<cols>.txt for 80x40 (an inline pane), 120x40 and 200x50 (docked).
-import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+//               files replaced by that cwd; absent or null, an empty directory. A plan its
+//               boulder.json names but does not hold is taken from tests/fixtures/plans/.
+// Writes <root>/<view>-<cols>.txt for 80x40 (an inline pane), 120x40 and 200x50 (docked), with
+// the scratch directory's random suffix and the live session's own times masked.
+import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { parseArgs } from "node:util";
+import { envWithout } from "../validate/core.ts";
+import { cleanupOnSignal, REPO } from "./lib.ts";
 import { parseScript, type Script, startServer } from "./mock-model.ts";
 
-const REPO = join(import.meta.dir, "..", "..");
+const SHARED_PLANS = join(REPO, "tests", "fixtures", "plans");
+const MKDTEMP_SUFFIX = 6;
 const SESSION_ID = "00000000-0000-4000-8000-000000000001";
 const SIZES = [
   [80, 40],
@@ -66,8 +71,16 @@ export function parseView(text: string): View {
   return { command, keys, mockScript, fixture };
 }
 
-export function copyFixture(from: string, to: string): void {
+export function copyFixture(from: string, to: string, sharedPlans: string = SHARED_PLANS): void {
   cpSync(from, to, { recursive: true });
+  const boulder = join(from, ".omca", "state", "boulder.json");
+  const named = existsSync(boulder) ? [...readFileSync(boulder, "utf8").matchAll(/\{\{cwd\}\}\/plans\/([\w.-]+\.md)/g)] : [];
+  for (const [, name = ""] of named) {
+    const target = join(to, "plans", name);
+    if (existsSync(target) || !existsSync(join(sharedPlans, name))) continue;
+    mkdirSync(join(to, "plans"), { recursive: true });
+    copyFileSync(join(sharedPlans, name), target);
+  }
   for (const entry of readdirSync(to, { recursive: true, withFileTypes: true })) {
     if (!entry.isFile()) continue;
     const path = join(entry.parentPath, entry.name);
@@ -76,13 +89,25 @@ export function copyFixture(from: string, to: string): void {
   }
 }
 
-export function sessionEnv(): Record<string, string> {
-  const env: Record<string, string> = {};
-  for (const [key, value] of Object.entries(process.env)) {
-    if (value !== undefined && !/^(CLAUDE|ANTHROPIC|TMUX)/.test(key)) env[key] = value;
-  }
-  return env;
-}
+export const sessionEnv = (): Record<string, string> => envWithout(/^(CLAUDE|ANTHROPIC|TMUX)/);
+
+/** The screen with the random suffix `mkdtemp` gave `scratch` replaced by as many X, so a capture does not change from run to run. */
+export const maskScratch = (screen: string, scratch: string): string => screen.replaceAll(basename(scratch).slice(-MKDTEMP_SUFFIX), "X".repeat(MKDTEMP_SUFFIX));
+
+/**
+ * The screen with the live session's own times fixed: the turn timer's line, whose verb Claude Code
+ * picks at random, the Doctor's check time and a rating's time. Padding keeps a line's width where
+ * a pane is drawn beside it, so the pane stays in its column.
+ */
+export const maskClock = (screen: string): string =>
+  screen
+    .replace(/✻ \S+ for (\d+s) · done \d{1,2}:\d{2} [AP]M */g, (line: string, took: string, at: number, whole: string) => {
+      const masked = `✻ Worked for ${took} · done HH:MM`;
+      const isLineEnd = at + line.length === whole.length || whole[at + line.length] === "\n";
+      return isLineEnd ? masked : masked.padEnd(line.length);
+    })
+    .replace(/checked \d\d:\d\d/g, "checked HH:MM")
+    .replace(/\b(UP|DOWN)( +)\d\d-\d\d \d\d:\d\d/g, "$1$2MM-DD HH:MM");
 
 export const mockSessionEnv = (port: number | undefined): string[] => [
   "-e", "DISABLE_AUTOUPDATER=1",
@@ -224,6 +249,14 @@ async function captureAt(view: View, root: string, cols: number, rows: number): 
   const mock = startServer({ port: 0, script });
   const tmux = new Tmux(`omca-visual-${process.pid}`);
   let claudePid: number | undefined;
+  const stop = () =>
+    teardown(
+      () => Bun.spawnSync(["tmux", "-L", tmux.socket, "kill-server"], { env: sessionEnv() }),
+      () => claudePid !== undefined && exited(claudePid),
+      () => mock.stop(true),
+      () => rmSync(scratch, { recursive: true, force: true }),
+    );
+  const release = cleanupOnSignal(stop);
   try {
     if (view.fixture === null) mkdirSync(cwd);
     else copyFixture(join(root, "fixtures", view.fixture), cwd);
@@ -254,14 +287,10 @@ async function captureAt(view: View, root: string, cols: number, rows: number): 
       tmux.send(key);
       screen = await tmux.settle(screen);
     }
-    return screen;
+    return maskClock(maskScratch(screen, scratch));
   } finally {
-    await teardown(
-      () => Bun.spawnSync(["tmux", "-L", tmux.socket, "kill-server"], { env: sessionEnv() }),
-      () => claudePid !== undefined && exited(claudePid),
-      () => mock.stop(true),
-      () => rmSync(scratch, { recursive: true, force: true }),
-    );
+    release();
+    await stop();
   }
 }
 

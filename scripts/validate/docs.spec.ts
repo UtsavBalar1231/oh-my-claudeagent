@@ -71,14 +71,41 @@ describe("depersonalization", () => {
     expect(await runNamed(checks, "depersonalization", otherText)).toMatchObject({ status: "fail" });
   });
 
-  test("files outside the shipped roots are not scanned", async () => {
-    const ctx = fixture({ "tests/data.md": `${HOME}\n`, "CHANGELOG.md": `${HOME}\n` });
+  test("a JSON credential key and an Anthropic API key fail", async () => {
+    const key = `sk-${"ant"}-api03-abcdefgh`;
+    const ctx = fixture({ "settings.json": `{\n  "ANTHROPIC_API_${"KEY"}": "${key}"\n}\n` });
+    expect(await runNamed(checks, "depersonalization", ctx)).toEqual({
+      status: "fail",
+      detail: [
+        `settings.json:2: credential-looking JSON key '"ANTHROPIC_API_${"KEY"}": "${key}"'`,
+        `settings.json:2: Anthropic API key '${key}'`,
+      ].join("; "),
+    });
+  });
+
+  test("a JSON credential key holding a placeholder or a variable passes", async () => {
+    const ctx = fixture({ "settings.json": `{ "API_${"KEY"}": "<key>", "GH_${"TOKEN"}": "$GH_TOKEN", "X_${"SECRET"}": "" }\n` });
     expect(await runNamed(checks, "depersonalization", ctx)).toMatchObject({ status: "pass" });
   });
 
-  test("a tree with nothing under the scan roots fails", async () => {
-    const ctx = fixture({}, { tracked: () => ["CHANGELOG.md"] });
-    expect(await runNamed(checks, "depersonalization", ctx)).toEqual({ status: "fail", detail: "no tracked files found under the scan roots" });
+  test("every shipped file is scanned, CHANGELOG.md included, and nothing packaging leaves out", async () => {
+    const shipped = fixture({ "CHANGELOG.md": `${HOME}\n` });
+    expect(await runNamed(checks, "depersonalization", shipped)).toMatchObject({ status: "fail" });
+    const unshipped = fixture({ "tests/data.md": `${HOME}\n`, "scripts/qa/x.ts": `${HOME}\n`, "servers/a.spec.ts": `${HOME}\n` });
+    expect(await runNamed(checks, "depersonalization", unshipped)).toMatchObject({ status: "pass" });
+  });
+
+  test("an allowlist entry that matches nothing fails", async () => {
+    const ctx = fixture({ "scripts/validate/allowlist.txt": `# why\nagents/gone.md:${TOKEN}\n` });
+    expect(await runNamed(checks, "depersonalization", ctx)).toEqual({
+      status: "fail",
+      detail: `scripts/validate/allowlist.txt entry 'agents/gone.md:${TOKEN}' matches nothing`,
+    });
+  });
+
+  test("a tree that ships nothing fails", async () => {
+    const ctx = fixture({}, { tracked: () => ["tests/t.spec.ts"] });
+    expect(await runNamed(checks, "depersonalization", ctx)).toEqual({ status: "fail", detail: "the tree ships no files to scan" });
   });
 });
 
@@ -114,9 +141,13 @@ describe("docs accuracy", () => {
     });
   });
 
-  test("a stale path next to a removal note is documented history, not a reference", async () => {
-    const ctx = fixture({ "README.md": "`scripts/gone.sh` was removed in 3.0.\n" });
-    expect(await runNamed(checks, "docs accuracy", ctx)).toMatchObject({ status: "pass" });
+  test("only recipe headers count as recipes, not settings, aliases or recipe bodies", async () => {
+    const justfile = 'set shell := ["bash", "-c"]\nalias t := test\n\n@quiet:\n\ttrue\n\ntest *args:\n\tlint\n';
+    const ctx = fixture({ justfile, "README.md": "`just quiet` `just test` `just set` `just alias` `just lint`\n" });
+    expect(await runNamed(checks, "docs accuracy", ctx)).toEqual({
+      status: "fail",
+      detail: ["set", "alias", "lint"].map((name) => `README.md:1 cites 'just ${name}' which is not a justfile recipe`).join("; "),
+    });
   });
 
   test("scaffold placeholders, bare file names and unknown top-level names are not path claims", async () => {

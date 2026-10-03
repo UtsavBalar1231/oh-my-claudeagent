@@ -19,5 +19,5 @@
     "exactOptionalPropertyTypes": true
   },
   "include": ["src", "servers", "statusline", "scripts", "benchmarks/compare"],
-  "exclude": ["benchmarks/compare/fixtures", "benchmarks/compare/results"]
+  "exclude": ["benchmarks/compare/fixtures", "benchmarks/compare/results", "scripts/docs/fixtures"]
 }

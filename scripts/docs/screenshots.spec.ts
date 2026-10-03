@@ -16,7 +16,7 @@ describe("SHOTS", () => {
     }
   });
 
-  test("captures every README scene as a still and the two clips as GIFs", () => {
+  test("captures every README scene as a still and the two animated scenes as GIFs", () => {
     expect(SHOTS.filter((shot) => shot.format === "png").map((shot) => shot.name)).toEqual(["hero", "band", "plan", "evidence", "agents", "guard", "doctor", "statusline"]);
     expect(SHOTS.filter((shot) => shot.format === "gif").map((shot) => shot.name)).toEqual(["pane-tour", "guard-dialog"]);
   });

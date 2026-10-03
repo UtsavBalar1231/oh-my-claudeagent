@@ -7,7 +7,7 @@ import { join } from "node:path";
 
 export const TASKS_DIR = join(import.meta.dir, "..", "..", "tests", "evals", "tasks");
 
-export type EvalTask = { name: string; category: string };
+type EvalTask = { name: string; category: string };
 
 function parseTask(file: string, text: string): EvalTask {
   const parsed: unknown = JSON.parse(text);

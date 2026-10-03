@@ -1,12 +1,7 @@
-# Depersonalization allowlist, read by the depersonalization check in scripts/validate/docs.ts
-# Format: <repo-relative-path>:<matched-text>
-# One entry per line; a line starting with # is a comment. Justification follows on
-# the next comment line. Untracked dev artifacts never enter this file.
+# Depersonalization allowlist, read by the depersonalization check in scripts/validate/docs.ts.
+# Format: <repo-relative-path>:<matched-text>, one entry per line.
+# Put the justification on a comment line directly above its entry. An entry that matches
+# nothing in the shipped tree fails the check. Untracked dev artifacts never enter this file.
 
-# Dummy token handed to the visual-capture session pointed at the local mock Messages API server.
-scripts/qa/visual.ts:ANTHROPIC_AUTH_TOKEN=mock-key
-
-# servers/tools/filesystem.spec.ts:SECRET=hunter2\n
-# A fake .env fixture in the sensitive-file denylist tests. "hunter2" is a well-known fake
-# password used in test fixtures, not a real secret.
-servers/tools/filesystem.spec.ts:SECRET=hunter2\n
+# A placeholder home directory in the status line setup examples, like /home/user.
+statusline/README.md:/home/you

@@ -3,14 +3,11 @@ import { join } from "node:path";
 import { GROUPS, main, runChecks } from "./validate.ts";
 import { type Check, createContext, run } from "./validate/core.ts";
 import { cleanup, fixture, json, makeTree, VALID } from "./validate/fixture.ts";
-import { SHEBANG_ALLOWLIST } from "./validate/tree.ts";
 
 afterEach(cleanup);
 
-const SHEBANG_FILES = Object.fromEntries(Object.keys(SHEBANG_ALLOWLIST).map((path) => [path, "#!/usr/bin/env bash\n"]));
-
 function gitTree(patch: Record<string, string> = {}): string {
-  const root = makeTree({ ...VALID, ...SHEBANG_FILES, ...patch });
+  const root = makeTree({ ...VALID, ...patch });
   expect(run(["git", "init", "-q"], root).code).toBe(0);
   expect(run(["git", "add", "-A"], root).code).toBe(0);
   return root;

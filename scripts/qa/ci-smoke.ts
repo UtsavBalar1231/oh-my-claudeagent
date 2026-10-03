@@ -12,26 +12,26 @@
 // Exit: 0 pass, 1 a check failed, 2 the run could not be set up.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { type AccessEntry, localhostOnly, parseJsonLines, type Qa, readJsonLines, runClaude, runQa, startMock, type TraceEntry } from "./lib.ts";
-import type { Script, Turn } from "./mock-model.ts";
+import {
+  type AccessEntry,
+  CANARY,
+  call,
+  guardDenies,
+  hookCalls,
+  localhostOnly,
+  parseJsonLines,
+  pluginDenies,
+  type Qa,
+  readJsonLines,
+  runClaude,
+  runQa,
+  say,
+  startMock,
+  type TraceEntry,
+} from "./lib.ts";
+import type { Script } from "./mock-model.ts";
 
-const CANARY = "stale-build-cache";
 const POWERSHELL_TARGET = "C:\\omca-ci-smoke-no-such-dir";
-const HOOK_CALL = /Hooks: mcp_tool calling plugin:oh-my-claudeagent:omca\/omca_hook/g;
-const DENY_REASON = "Destructive rm -rf blocked";
-
-type Tool = "Bash" | "PowerShell";
-
-export const hookCalls = (debug: string): number => debug.match(HOOK_CALL)?.length ?? 0;
-
-export function guardDenies(debug: string, tool: Tool): string[] {
-  const deny = new RegExp(`tool\\.check ${tool} [^ ]+: .* -> deny by plugin oh-my-claudeagent: ${DENY_REASON}`);
-  return debug.split(/\r?\n/).filter((line) => deny.test(line));
-}
-
-export function pluginDenies(debug: string): string[] {
-  return debug.split(/\r?\n/).filter((line) => line.includes("-> deny by plugin oh-my-claudeagent"));
-}
 
 type Init = { type?: string; subtype?: string; tools?: unknown };
 
@@ -39,9 +39,6 @@ export function offeredTools(streamJson: string): string[] {
   const init = parseJsonLines<Init>(streamJson).find((line) => line.type === "system" && line.subtype === "init");
   return Array.isArray(init?.tools) ? init.tools.filter((tool): tool is string => typeof tool === "string") : [];
 }
-
-const call = (name: string, input: Record<string, unknown>): Turn => ({ content: [{ type: "tool_use", name, input }] });
-const say = (text: string): Turn => ({ content: [{ type: "text", text }] });
 
 export function smokeScript(withPowerShell: boolean): Script {
   const bash = call("Bash", { command: `CACHE="$PWD/${CANARY}"; rm -rf "$CACHE"/`, description: "smoke command" });

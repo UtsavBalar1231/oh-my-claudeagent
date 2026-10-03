@@ -4,7 +4,7 @@
 // Usage: bun scripts/validate.ts [--check <name>]... [--marketplace <path>]
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { type Check, type Context, createContext, type Outcome, type Status } from "./validate/core.ts";
+import { type Check, type Context, createContext, type Outcome, type Run, type Status } from "./validate/core.ts";
 import * as docs from "./validate/docs.ts";
 import * as engine from "./validate/engine.ts";
 import * as frontmatter from "./validate/frontmatter.ts";
@@ -44,8 +44,6 @@ Options:
 
 With no --check, every group runs. The engine group skips without the claude CLI.`;
 
-export type Result = { code: number; stdout: string; stderr: string };
-
 const LABEL: Record<Status, string> = { pass: "PASS", fail: "FAIL", skip: "SKIP", warn: "WARN" };
 
 async function runCheck(check: Check, ctx: Context): Promise<Outcome> {
@@ -68,7 +66,7 @@ export async function runChecks(checks: readonly Check[], ctx: Context): Promise
   return { lines, failed: counts.fail > 0 };
 }
 
-export async function main(args: string[], root: string): Promise<Result> {
+export async function main(args: string[], root: string): Promise<Run> {
   let parsed: ReturnType<typeof parse>;
   try {
     parsed = parse(args);

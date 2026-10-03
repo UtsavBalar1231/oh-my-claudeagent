@@ -1,18 +1,19 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, posix } from "node:path";
 import { specEnv } from "../tests/fixtures/spec-env.ts";
-import { listPackageFiles, main, packageTree } from "./package.ts";
+import { listPackageFiles, main, packageTree, refusal } from "./package.ts";
+import { gitTracked } from "./validate/core.ts";
 
 const SHIPPED: Record<string, string> = {
-  ".claude-plugin/plugin.json": '{"version":"9.9.9"}\n',
+  ".claude-plugin/plugin.json": '{"name":"oh-my-claudeagent","version":"9.9.9"}\n',
   ".gitignore": "x\n",
   "README.md": "readme\n",
   "agents/a.md": "agent\n",
   "docs/guide.md": "guide\n",
   "hooks/hooks.json": "{}\n",
-  "scripts/package.ts": "ts\n",
+  "scripts/setup-statusline.ts": "ts\n",
   "servers/m.ts": "ts\n",
   "statusline/main.ts": "ts\n",
   ".claude-plugin/types/tsconfig.json": "{}\n",
@@ -28,7 +29,14 @@ const EXCLUDED: Record<string, string> = {
   "docs/CLAUDE.md": "x",
   "tests/t.spec.ts": "x",
   "servers/tests/y.ts": "x",
+  "scripts/package.ts": "x",
+  "scripts/validate/core.ts": "x",
   "scripts/qa/lib.ts": "x",
+  "servers/m.spec.ts": "x",
+  "justfile": "x",
+  ".pre-commit-config.yaml": "x",
+  ".editorconfig": "x",
+  "CONTRIBUTING.md": "x",
   "scripts/docs/screenshots.ts": "x",
   "scripts/docs/fixtures/acme-app/justfile": "x",
   "node_modules/m/index.js": "x",
@@ -143,21 +151,23 @@ describe("packageTree", () => {
   });
 
   test.skipIf(process.platform === "win32")("keeps the executable bit (skipped on Windows: it has no executable bit)", () => {
-    chmodSync(join(root, "scripts", "package.ts"), 0o755);
+    chmodSync(join(root, "scripts", "setup-statusline.ts"), 0o755);
 
     packageTree(root, dest);
 
-    expect(statSync(join(dest, "scripts", "package.ts")).mode & 0o777).toBe(0o755);
+    expect(statSync(join(dest, "scripts", "setup-statusline.ts")).mode & 0o777).toBe(0o755);
   });
 
   test("replaces an earlier copy: stale files and directories go, excluded names stay, a file where a directory belongs is replaced", () => {
     seed(dest, {
+      ".claude-plugin/plugin.json": '{"name":"oh-my-claudeagent"}\n',
       "old.txt": "x",
       "gone/deep/x.txt": "x",
       "README.md": "stale readme\n",
       "agents": "a file where the agents directory belongs",
       ".omca/keep": "x",
       "docs/stale.md": "x",
+      "scripts/package.ts": "x",
     });
 
     packageTree(root, dest);
@@ -165,6 +175,46 @@ describe("packageTree", () => {
     expect(filesUnder(dest)).toEqual([...Object.keys(SHIPPED), ".omca/keep"].sort());
     expect(readFileSync(join(dest, "README.md"), "utf8")).toBe("readme\n");
     expect(existsSync(join(dest, "gone"))).toBe(false);
+  });
+});
+
+describe("a destination that packaging would wreck", () => {
+  test("refuses the repository and every directory that holds it, and touches nothing", () => {
+    const scratch = dirname(root);
+    const before = filesUnder(scratch);
+
+    for (const target of [root, scratch, join(root, "agents", "..")]) {
+      expect(refusal(root, target)).toBe(`${target} is the repository or a directory that holds it`);
+      expect(() => packageTree(root, target)).toThrow(`refusing to package into ${target} is the repository or a directory that holds it`);
+    }
+    expect(filesUnder(scratch)).toEqual(before);
+  });
+
+  test("refuses a non-empty directory that is not an earlier package, and touches nothing", () => {
+    seed(dest, { "notes.txt": "mine\n", ".claude-plugin/plugin.json": '{"name":"another-plugin"}\n' });
+
+    expect(() => packageTree(root, dest)).toThrow(`refusing to package into ${dest} is not empty and is not an earlier oh-my-claudeagent package`);
+    expect(filesUnder(dest)).toEqual([".claude-plugin/plugin.json", "notes.txt"]);
+  });
+
+  test("accepts a missing directory, an empty one and an earlier package", () => {
+    expect(refusal(root, dest)).toBeUndefined();
+    mkdirSync(dest);
+    expect(refusal(root, dest)).toBeUndefined();
+    packageTree(root, dest);
+    expect(refusal(root, dest)).toBeUndefined();
+  });
+
+  test.each([["."], [".."]])("`package.ts %s` run from the repository refuses with exit 1 and touches nothing", (target) => {
+    const scratch = dirname(root);
+    const before = filesUnder(scratch);
+
+    const outcome = main([target], root, root);
+
+    expect(outcome.code).toBe(1);
+    expect(outcome.stdout).toBe("");
+    expect(outcome.stderr).toBe(`ERROR: refusing to package into ${join(root, target)} is the repository or a directory that holds it\n`);
+    expect(filesUnder(scratch)).toEqual(before);
   });
 });
 
@@ -205,15 +255,68 @@ describe("main", () => {
   });
 });
 
+const REPO = join(import.meta.dir, "..");
+
+/** The shipped paths a file names: its relative imports, paths it joins onto its own directory, `${CLAUDE_PLUGIN_ROOT}` paths and the mod modules. */
+function namedPaths(file: string, text: string): string[] {
+  const from = (base: string, path: string): string => posix.normalize(posix.join(base, path));
+  const dir = posix.dirname(file);
+  const named = [...text.matchAll(/\$\{CLAUDE_PLUGIN_ROOT\}\/([\w./-]*\w)/g)].map((match) => match[1] ?? "");
+  if (file.endsWith(".ts")) {
+    for (const match of text.matchAll(/(?:\bfrom\s*|\bimport\s*\(?\s*)"(\.\.?\/[^"]+)"/g)) named.push(from(dir, match[1] ?? ""));
+    for (const match of text.matchAll(/new URL\("(\.\.?\/[^"]+)", import\.meta\.url\)/g)) named.push(from(dir, match[1] ?? ""));
+    for (const match of text.matchAll(/join\(import\.meta\.dir((?:,\s*"[^"]+")+)\)/g)) {
+      named.push(from(dir, [...(match[1] ?? "").matchAll(/"([^"]+)"/g)].map((part) => part[1] ?? "").join("/")));
+    }
+  }
+  if (file === "hooks/hooks.json") for (const module of JSON.parse(text).modules ?? []) named.push(from(dir, String(module)));
+  return named;
+}
+
 describe("the repository tree", () => {
-  test("`bun scripts/package.ts --dry-run` lists the shipped template and not the QA harness or tests", () => {
-    const result = Bun.spawnSync([process.execPath, join(import.meta.dir, "package.ts"), "--dry-run"], { env: process.env, stdout: "pipe", stderr: "pipe" });
-    const lines = result.stdout.toString().split("\n");
+  const shipped = listPackageFiles(gitTracked(REPO));
+
+  test("`bun scripts/package.ts --dry-run` ships the template and the status line setup, and no tests, specs or repository tooling", () => {
+    const result = Bun.spawnSync([process.execPath, join(import.meta.dir, "package.ts"), "--dry-run"], { env: specEnv(), stdout: "pipe", stderr: "pipe" });
+    const lines = result.stdout.toString().trimEnd().split("\n");
 
     expect(result.exitCode).toBe(0);
-    expect(lines).toContain("templates/claudemd.md");
-    expect(lines).toContain("scripts/package.ts");
-    expect(lines.filter((line) => /^scripts\/qa\/|(^|\/)tests\//.test(line))).toEqual([]);
-    expect(lines.filter((line) => /^(package\.json|bun\.lock|bunfig\.toml|tsconfig(\.runtime)?\.json|\.?opencode\/|video\/)/.test(line))).toEqual([]);
+    expect(lines).toEqual(shipped);
+    expect(lines.filter((line) => line.startsWith("scripts/"))).toEqual(["scripts/setup-statusline.ts"]);
+    expect(lines.filter((line) => /\.spec\.ts$|(^|\/)tests\//.test(line))).toEqual([]);
+    const tooling = /^(package\.json|bun\.lock|bunfig\.toml|tsconfig(\.runtime)?\.json|\.oxlintrc\.json|justfile|\.pre-commit-config\.yaml|\.editorconfig|CONTRIBUTING\.md|\.?opencode\/|video\/)/;
+    expect(lines.filter((line) => tooling.test(line))).toEqual([]);
+  });
+
+  test("namedPaths reads each form of reference relative to the naming file", () => {
+    const text = [
+      'import { a } from "../src/core/a.ts";',
+      'export * from "./b.ts";',
+      'const c = await import("./c.ts");',
+      'const d = new URL("../.claude-plugin/plugin.json", import.meta.url);',
+      'const e = join(import.meta.dir, "..", "statusline", "launcher.ts");',
+      'const f = join(import.meta.dir, `${name}.md`);',
+      'run bun "${CLAUDE_PLUGIN_ROOT}/servers/omca.ts".',
+    ].join("\n");
+
+    expect(namedPaths("scripts/x.ts", text)).toEqual([
+      "servers/omca.ts",
+      "src/core/a.ts",
+      "scripts/b.ts",
+      "scripts/c.ts",
+      ".claude-plugin/plugin.json",
+      "statusline/launcher.ts",
+    ]);
+    expect(namedPaths("hooks/hooks.json", '{"modules": ["./register.ts"]}')).toEqual(["hooks/register.ts"]);
+  });
+
+  test("every relative import and every path a shipped file names resolves inside the shipped tree", () => {
+    const inside = new Set(shipped);
+    const dangling = shipped
+      .filter((file) => /\.(ts|md|json)$/.test(file) && file !== "CHANGELOG.md")
+      .flatMap((file) => namedPaths(file, readFileSync(join(REPO, file), "utf8")).map((path) => `${file} -> ${path}`))
+      .filter((reference) => !inside.has(reference.split(" -> ")[1] ?? ""));
+
+    expect(dangling).toEqual([]);
   });
 });

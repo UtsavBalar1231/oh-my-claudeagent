@@ -6,7 +6,6 @@ type Marker = { text: string; label: string };
 
 const POSTURE_DOCS = ["docs/references.md", "skills/omca-setup/SKILL.md"];
 const POSTURE_MARKERS: readonly Marker[] = [
-  { text: 'teammateMode: "auto"', label: "auto mode" },
   { text: "allowManagedPermissionRulesOnly", label: "managed settings boundary" },
   { text: "sandbox.failIfUnavailable", label: "sandbox fail-closed" },
 ];

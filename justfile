@@ -5,16 +5,17 @@ default:
 	@just --list
 
 # Run everything CI runs
-ci: lint typecheck validate test test-mod test-opencode
+ci: lint typecheck validate test test-mod test-opencode smoke
 
 # Lint the TypeScript with oxlint, failing on warnings
 lint:
 	bun x --bun oxlint --deny-warnings src servers statusline scripts hooks opencode tests benchmarks/compare
 
-# Type check the mod project and the bun runtime project
+# Type check the mod project, the bun runtime project and the OpenCode adapter
 typecheck:
 	bun x --bun tsc --noEmit -p tsconfig.json
 	bun x --bun tsc --noEmit -p tsconfig.runtime.json
+	bun x --bun tsc --noEmit -p opencode
 
 # Run every validator group, or the ones named with --check; the engine group skips without the claude CLI
 validate *args:
@@ -22,23 +23,19 @@ validate *args:
 
 # Run the bun specs; the roots are explicit because a bare bun test also collects the mod tests
 test:
-	bun test --parallel src servers statusline scripts opencode benchmarks/compare
+	bun test --parallel src servers statusline scripts benchmarks/compare
 
 # Run the mod tests; the argument is the plugin root
 test-mod:
 	claude plugin test .
 
-# Run the OpenCode adapter suite, which skips without bun or opencode
+# Run the OpenCode adapter specs; the ones that load OpenCode skip themselves without opencode on PATH
 test-opencode:
-	#!/usr/bin/env bash
-	set -euo pipefail
-	if ! command -v bun >/dev/null 2>&1 || ! command -v opencode >/dev/null 2>&1; then
-		echo "SKIP test-opencode: bun or opencode not on PATH"
-		exit 0
-	fi
-	bun install --frozen-lockfile
-	bun run typecheck
 	bun test opencode/
+
+# Run one headless session with the packaged plugin against the mock model; needs the claude CLI
+smoke:
+	bun scripts/qa/ci-smoke.ts
 
 # Run the manual QA harness against the mock model before a release; CI does not run it
 qa:

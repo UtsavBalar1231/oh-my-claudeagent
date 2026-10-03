@@ -77,11 +77,11 @@ describe("createScratch", () => {
     scratch.cleanup();
   });
 
-  test("plugin is the packaged tree: it ships the template and omits the QA harness", () => {
+  test("plugin is the packaged tree: it holds the hooks and omits the QA harness", () => {
     const scratch = createScratch(print);
     const plugin = scratch.plugin();
 
-    expect(existsSync(join(plugin, "templates", "claudemd.md"))).toBe(true);
+    expect(existsSync(join(plugin, "hooks", "hooks.json"))).toBe(true);
     expect(existsSync(join(plugin, "scripts", "qa"))).toBe(false);
 
     scratch.cleanup();
@@ -235,11 +235,16 @@ describe("claudeBin", () => {
   });
 });
 
-describe("the QA scripts share one child environment and one claude runner", () => {
-  test("no script outside lib.ts defines its own childEnv or runClaude", () => {
-    const scripts = join(import.meta.dir, "..");
-    const files = [...new Bun.Glob("qa/*.ts").scanSync(scripts), "bench.ts"].filter((file) => !file.endsWith(".spec.ts") && file !== "qa/lib.ts");
-    const offenders = files.filter((file) => /^(?:async )?function (?:childEnv|runClaude)\b/m.test(readFileSync(join(scripts, file), "utf8"))).sort();
-    expect(offenders).toEqual([]);
+describe("the scripts share one environment filter and one claude runner", () => {
+  const scripts = join(import.meta.dir, "..");
+  const sources = [...new Bun.Glob("**/*.ts").scanSync(scripts)].filter((file) => !file.endsWith(".spec.ts")).map((file) => file.replaceAll("\\", "/"));
+  const offenders = (pattern: RegExp, owner: string) => sources.filter((file) => file !== owner && pattern.test(readFileSync(join(scripts, file), "utf8"))).sort();
+
+  test("only validate/core.ts walks process.env to build a child environment", () => {
+    expect(offenders(/Object\.(?:entries|keys)\(process\.env\)/, "validate/core.ts")).toEqual([]);
+  });
+
+  test("no script outside lib.ts defines its own childEnv, runClaude or debug-log matchers", () => {
+    expect(offenders(/^(?:export )?(?:async )?(?:function|const) (?:childEnv|runClaude|hookCalls|guardDenies|pluginDenies)\b/m, "qa/lib.ts")).toEqual([]);
   });
 });

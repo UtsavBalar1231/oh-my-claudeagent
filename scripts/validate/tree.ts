@@ -2,10 +2,7 @@ import { closeSync, openSync, readSync } from "node:fs";
 import { join } from "node:path";
 import { type Check, type Context, type Outcome, readText, verdict } from "./core.ts";
 
-// A python, bash or sh script that may stay, and why. The list is empty, so any such script fails
-// the check until it is added here with its reason; an entry whose file lost its shebang fails as stale.
-export const SHEBANG_ALLOWLIST: Readonly<Record<string, string>> = {};
-
+const SCRIPT_EXTENSION = /\.(?:py|sh|bash)$/;
 const SHEBANG = /^#![ \t]*(?:\S*\/env[ \t]+(?:-S[ \t]+)?)?(?:\S*\/)?(?:python[\d.]*|bash|sh)(?:[ \t]|$)/;
 const NODE_OR_BUN_IMPORT = /\b(?:from|import|require)\s*\(?\s*["'](?:node|bun):/;
 
@@ -20,17 +17,13 @@ function firstLine(path: string): string {
   }
 }
 
-export function shebangScripts(ctx: Context): string[] {
-  return ctx.tracked().filter((path) => SHEBANG.test(firstLine(join(ctx.root, path))));
+export function shellOrPythonScripts(ctx: Context): string[] {
+  return ctx.tracked().filter((path) => SCRIPT_EXTENSION.test(path) || SHEBANG.test(firstLine(join(ctx.root, path))));
 }
 
-function shebangs(ctx: Context): Outcome {
-  const found = shebangScripts(ctx);
-  const problems = [
-    ...found.filter((path) => !(path in SHEBANG_ALLOWLIST)).map((path) => `${path} has a python, bash or sh shebang`),
-    ...Object.keys(SHEBANG_ALLOWLIST).filter((path) => !found.includes(path)).map((path) => `${path} is allowlisted but is gone or has no such shebang`),
-  ];
-  return verdict(problems, `${found.length} tracked python, bash or sh scripts, each allowlisted with a reason`);
+function shellOrPython(ctx: Context): Outcome {
+  const problems = shellOrPythonScripts(ctx).map((path) => `${path} is a python, bash or sh script`);
+  return verdict(problems, "no tracked python, bash or sh script");
 }
 
 function coreImports(ctx: Context): Outcome {
@@ -47,5 +40,5 @@ function testFileLocation(ctx: Context): Outcome {
 export const checks: readonly Check[] = [
   { name: "core imports", run: coreImports },
   { name: "test file location", run: testFileLocation },
-  { name: "shebang scripts", run: shebangs },
+  { name: "shell and python scripts", run: shellOrPython },
 ];

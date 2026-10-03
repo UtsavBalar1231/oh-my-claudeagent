@@ -6,11 +6,9 @@ import { isRecord } from "../../src/core/tool-input.ts";
 const RESPONSE_TEXT = "ok";
 const MOCK_MODEL_ID = "claude-mock";
 const MESSAGE_ID = "msg_mock_static";
-const CREDENTIAL_HEADERS = ["authorization", "x-api-key"];
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 // Claude Code stamps `cc_is_subagent=true` into the billing-header block of every subagent
-// request's system prompt and omits it from the main thread's (measured on 2.1.287).
-const DEFAULT_SUBAGENT_MARKER = "cc_is_subagent=true";
+// request's system prompt and omits it from the main thread's.
+const SUBAGENT_MARKER = "cc_is_subagent=true";
 
 type Block =
   | { type: "text"; text: string }
@@ -118,13 +116,6 @@ function sseBody(content: Served[]): string {
   return events.map(([event, data]) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`).join("");
 }
 
-const pad2 = (n: number) => String(n).padStart(2, "0");
-
-function arrivalTime(d: Date): string {
-  const date = `${pad2(d.getDate())}/${MONTHS[d.getMonth()]}/${d.getFullYear()}`;
-  return `${date} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
-}
-
 // Entries keep the `": "` and `", "` separators JSON.stringify would drop, so the log stays
 // greppable by key and value.
 function jsonLine(entry: Record<string, LogValue>): string {
@@ -157,8 +148,8 @@ function countToolResults(messages: unknown): number {
   return Array.isArray(content) ? content.filter((b) => isRecord(b) && b.type === "tool_result").length : 0;
 }
 
-// Claude Code sends the effort as `output_config.effort` (measured on 2.1.287). The log
-// carries the field only when the request does.
+// Claude Code sends the effort as `output_config.effort`. The log carries the field only when
+// the request does.
 function effortField(body: Record<string, unknown>): { effort?: string | number } {
   const effort = isRecord(body.output_config) ? body.output_config.effort : undefined;
   return typeof effort === "string" || typeof effort === "number" ? { effort } : {};
@@ -169,7 +160,6 @@ export type ServerOptions = {
   accessLogPath?: string;
   bodyLogPath?: string;
   script?: Script;
-  subagentMarker?: string;
 };
 
 export function startServer({
@@ -177,7 +167,6 @@ export function startServer({
   accessLogPath,
   bodyLogPath,
   script = { main: [], subagent: [] },
-  subagentMarker = DEFAULT_SUBAGENT_MARKER,
 }: ServerOptions): Bun.Server<undefined> {
   const cursor: Record<QueueName, number> = { main: 0, subagent: 0 };
   let toolSeq = 0;
@@ -207,19 +196,15 @@ export function startServer({
       const rawBody = await req.text();
       const body = parseBody(rawBody);
       const streaming = Boolean(body.stream);
-      const queue: QueueName = systemText(body.system).includes(subagentMarker) ? "subagent" : "main";
+      const queue: QueueName = systemText(body.system).includes(SUBAGENT_MARKER) ? "subagent" : "main";
       const { turn, content } = serve(queue);
 
       if (accessLogPath) {
         appendFileSync(
           accessLogPath,
           jsonLine({
-            ts: arrivalTime(arrived),
             client: server.requestIP(req)?.address ?? "",
-            method: "POST",
             path: url.pathname + url.search,
-            mode: streaming ? "sse" : "json",
-            has_credential: CREDENTIAL_HEADERS.some((h) => req.headers.has(h)),
             queue,
             turn,
             tool_results: countToolResults(body.messages),
@@ -257,7 +242,6 @@ if (import.meta.main) {
       port: { type: "string", default: "0" },
       "access-log": { type: "string" },
       script: { type: "string" },
-      "subagent-marker": { type: "string" },
     },
   });
   const port = Number(values.port);
@@ -271,7 +255,6 @@ if (import.meta.main) {
     port,
     ...(values["access-log"] !== undefined && { accessLogPath: values["access-log"] }),
     ...(script !== undefined && { script }),
-    ...(values["subagent-marker"] !== undefined && { subagentMarker: values["subagent-marker"] }),
   });
   process.stdout.write(`${server.port}\n`);
   for (const signal of ["SIGTERM", "SIGINT"]) process.on(signal, () => process.exit(0));

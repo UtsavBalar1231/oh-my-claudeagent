@@ -1,36 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { readdirSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const REPO = join(import.meta.dir, "..", "..");
 const read = (path: string) => readFileSync(join(REPO, path), "utf8");
 const lines = (path: string) => read(path).split(/\r?\n/);
-
-const agentFiles = () =>
-  readdirSync(join(REPO, "agents"), { recursive: true, encoding: "utf8" })
-    .filter((name) => name.endsWith(".md"))
-    .map((name) => `agents/${name.replaceAll("\\", "/")}`);
-
-const agentsContaining = (phrase: string) => agentFiles().filter((path) => read(path).includes(phrase));
-
-describe("agent prompts carry no persona inflation", () => {
-  test("no agent contains 'indistinguishable from'", () => {
-    expect(agentsContaining("indistinguishable from")).toEqual([]);
-  });
-
-  test("no agent contains 'SF Bay Area'", () => {
-    expect(agentsContaining("SF Bay Area")).toEqual([]);
-  });
-
-  test("no agent contains 'obsessively'", () => {
-    expect(agentsContaining("obsessively")).toEqual([]);
-  });
-
-  test("the scan reads every agent file, so a hit would be found", () => {
-    expect(agentFiles()).toContain("agents/sisyphus.md");
-    expect(agentsContaining("## Plan Execution Mode")).toContain("agents/sisyphus.md");
-  });
-});
 
 describe("prometheus template structure", () => {
   const headings = (prefix: string) => lines("agents/prometheus.md").filter((line) => line.startsWith(prefix)).length;

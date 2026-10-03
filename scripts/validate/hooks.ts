@@ -1,6 +1,7 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { asList, asRecord, type Check, type Context, exists, isRecord, type Outcome, readJson, verdict } from "./core.ts";
+import { isRecord } from "../../src/core/tool-input.ts";
+import { asList, asRecord, type Check, type Context, type Outcome, readJson, verdict } from "./core.ts";
 
 const SERVER = "plugin:oh-my-claudeagent:omca";
 const SERVER_KEY = "omca";
@@ -53,11 +54,11 @@ function modules(ctx: Context): Outcome {
 
 const IMPORT = /(?:from|import)\s*\(?\s*["'](\.{1,2}\/[^"']+)["']/g;
 
-export function reachableFrom(entry: string): Set<string> {
+function reachableFrom(entry: string): Set<string> {
   const seen = new Set<string>();
   const queue = [entry];
   for (let file = queue.pop(); file !== undefined; file = queue.pop()) {
-    if (seen.has(file) || !exists(file)) continue;
+    if (seen.has(file) || !existsSync(file)) continue;
     seen.add(file);
     for (const [, specifier = ""] of readFileSync(file, "utf8").matchAll(IMPORT)) queue.push(join(dirname(file), specifier));
   }
@@ -67,7 +68,7 @@ export function reachableFrom(entry: string): Set<string> {
 function registryReach(ctx: Context): Outcome {
   const dir = join(ctx.root, "servers", "hooks");
   const registry = join(dir, "registry.ts");
-  if (!exists(registry)) return { status: "fail", detail: "servers/hooks/registry.ts is missing" };
+  if (!existsSync(registry)) return { status: "fail", detail: "servers/hooks/registry.ts is missing" };
   const reached = reachableFrom(registry);
   const handlers = readdirSync(dir).filter((name) => name.endsWith(".ts") && !name.endsWith(".spec.ts"));
   const dead = handlers.filter((name) => !reached.has(join(dir, name)));

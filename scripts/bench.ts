@@ -3,10 +3,9 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFile
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { parseArgs } from "node:util";
-import { childEnv } from "./qa/lib.ts";
+import { childEnv, cleanupOnSignal, REPO } from "./qa/lib.ts";
 import { type Script, startServer } from "./qa/mock-model.ts";
 
-const REPO = join(import.meta.dir, "..");
 const RESULTS_DIR = join(REPO, "benchmarks", "perf", "results");
 const PAIRS = 50;
 const WARMUP_PAIRS = 1;
@@ -90,7 +89,7 @@ export function mcpCommand(mcpJson: string, root: string, dataDir: string): { cm
 }
 
 function run(cmd: string[], cwd = REPO): string {
-  const r = Bun.spawnSync(cmd, { cwd, stdout: "pipe", stderr: "pipe" });
+  const r = Bun.spawnSync(cmd, { cwd, env: childEnv(), stdout: "pipe", stderr: "pipe" });
   if (r.exitCode !== 0) throw new Error(`${cmd.join(" ")} exited ${r.exitCode}: ${r.stderr.toString().trim()}`);
   return r.stdout.toString().trim();
 }
@@ -99,7 +98,7 @@ type Packaged = { sha: string; dirty: string[] };
 
 // The working tree can change while a bench runs, so the copy is taken once up front and
 // its dirty paths are recorded with the results.
-function packageTree(ref: string | null, dest: string): Packaged {
+function checkoutTree(ref: string | null, dest: string): Packaged {
   if (ref === null) {
     const dirty = run(["git", "status", "--porcelain"]).split("\n").filter(Boolean);
     const files = run(["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"]).split("\0");
@@ -116,8 +115,8 @@ function packageTree(ref: string | null, dest: string): Packaged {
   return { sha, dirty: [] };
 }
 
-// The Python renderer is deployed the way omca-setup installs it: the package files under
-// statusline/, the servers/tools resolver beside them, and a uv venv over the copy.
+// A ref whose status line is the Python renderer installs it with uv, as that ref's omca-setup does:
+// the package files under statusline/, the servers/tools resolver beside them, and a venv over the copy.
 function installStatusline(root: string, dest: string): string[] {
   const bunRenderer = join(root, "statusline", "main.ts");
   if (existsSync(bunRenderer)) return ["bun", bunRenderer];
@@ -214,11 +213,11 @@ async function runSession(arm: Arm, scenario: Scenario, scratch: string): Promis
   }
 }
 
-export type SessionPair = { order: [Side, Side]; baseline: SessionLog; candidate: SessionLog; noplugin: SessionLog };
+type SessionPair = { order: [Side, Side]; baseline: SessionLog; candidate: SessionLog; noplugin: SessionLog };
 
 // Each side runs with the plugin; the no-plugin control runs between them and is the
 // zero both sides' overhead is measured from.
-export async function measureSessions(
+async function measureSessions(
   arms: Record<Side | "noplugin", Arm>,
   scenario: Scenario,
   scratch: string,
@@ -249,7 +248,7 @@ async function* lines(stream: ReadableStream<Uint8Array>): AsyncGenerator<string
   }
 }
 
-export type McpSample = { cold_start_ms: number; evidence_log_ms: number };
+type McpSample = { cold_start_ms: number; evidence_log_ms: number };
 
 async function mcpSession(root: string, arm: Arm, scratch: string): Promise<McpSample> {
   const { cmd, env } = mcpCommand(readFileSync(join(root, ".mcp.json"), "utf8"), root, arm.dataDir);
@@ -375,12 +374,17 @@ async function main(): Promise<void> {
   const candidateRef = values["candidate-ref"] ?? null;
   const scratch = mkdtempSync(join(tmpdir(), "omca-bench-"));
   const worktrees: string[] = [];
+  const cleanup = () => {
+    for (const wt of worktrees) Bun.spawnSync(["git", "worktree", "remove", "--force", wt], { cwd: REPO, env: childEnv() });
+    rmSync(scratch, { recursive: true, force: true });
+  };
+  const release = cleanupOnSignal(cleanup);
   try {
     const roots = {} as Record<Side, string>;
     const packaged = {} as Record<Side, Packaged>;
     for (const [side, ref] of [["baseline", baselineRef], ["candidate", candidateRef]] as const) {
       roots[side] = join(scratch, `plugin-${side}`);
-      packaged[side] = packageTree(ref, roots[side]);
+      packaged[side] = checkoutTree(ref, roots[side]);
       if (ref !== null) worktrees.push(roots[side]);
     }
     const arm = (name: string, pluginDir: string | null): Arm => {
@@ -442,8 +446,8 @@ async function main(): Promise<void> {
     );
     console.log(`results: ${out}`);
   } finally {
-    for (const wt of worktrees) Bun.spawnSync(["git", "worktree", "remove", "--force", wt], { cwd: REPO });
-    rmSync(scratch, { recursive: true, force: true });
+    release();
+    cleanup();
   }
 }
 

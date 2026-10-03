@@ -51,12 +51,15 @@ describe("prompt history", () => {
       "skills/demo/references/more.md",
       "output-styles/style.md",
       "templates/extra.md",
+      "rules/demo.md",
       "opencode/overlays/demo.md",
       "AGENTS.md",
       "hooks/AGENTS.md",
       "servers/tools/demo.ts",
       "servers/hooks/demo.ts",
       "hooks/demo.ts",
+      "src/core/demo.ts",
+      "statusline/demo.ts",
     ]) {
       const result = await check({ [path]: "Replaces the old script, formerly called helper.\n" });
       expect(result.status).toBe("fail");
@@ -72,7 +75,8 @@ describe("prompt history", () => {
       "docs/guide.md": text,
       "servers/hooks/demo.spec.ts": text,
       "scripts/validate/demo.ts": text,
-      "src/core/demo.ts": text,
+      "src/core/demo.spec.ts": text,
+      "statusline/demo.spec.ts": text,
     });
     expect(result).toMatchObject({ status: "pass" });
   });

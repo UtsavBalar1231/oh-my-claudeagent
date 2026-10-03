@@ -12,6 +12,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { packageTree } from "./package.ts";
+import type { Run } from "./validate/core.ts";
 
 const USAGE = "Usage: bun scripts/release.ts <version>";
 export const SEMVER = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?(?:\+[0-9A-Za-z][0-9A-Za-z.-]*)?$/;
@@ -19,21 +20,29 @@ const PLUGIN = ".claude-plugin/plugin.json";
 const MARKETPLACE = ".claude-plugin/marketplace.json";
 const PACKAGE = "package.json";
 const MANIFESTS = [PLUGIN, MARKETPLACE, PACKAGE];
-export const PLUGIN_BRANCH = "plugin";
+const PLUGIN_BRANCH = "plugin";
+const MAIN_BRANCH = "main";
 export const PLUGIN_URL = "https://github.com/UtsavBalar1231/oh-my-claudeagent.git";
 
 type Versioned = { version: string };
 type MarketplacePlugin = Versioned & { source: Record<string, string> };
 type Marketplace = { metadata: Versioned; plugins: [MarketplacePlugin, ...MarketplacePlugin[]] };
-export type Outcome = { code: number; stdout: string; stderr: string };
+
+const spawnGit = (root: string, args: string[], env: Record<string, string> = {}) =>
+  Bun.spawnSync(["git", ...args], { cwd: root, env: { ...process.env, ...env }, stdout: "pipe", stderr: "pipe" });
 
 function git(root: string, args: string[], env: Record<string, string> = {}): string {
-  const run = Bun.spawnSync(["git", ...args], { cwd: root, env: { ...process.env, ...env }, stdout: "pipe", stderr: "pipe" });
+  const run = spawnGit(root, args, env);
   if (run.exitCode !== 0) {
     throw new Error(`git ${args.join(" ")} failed:\n${run.stdout.toString()}${run.stderr.toString()}`.trimEnd());
   }
   return run.stdout.toString().trim();
 }
+
+const tipOf = (root: string, ref: string): string => git(root, ["for-each-ref", "--format=%(objectname)", ref]);
+
+const isAncestor = (root: string, ancestor: string, descendant: string): boolean =>
+  spawnGit(root, ["merge-base", "--is-ancestor", ancestor, descendant]).exitCode === 0;
 
 function edit<T>(root: string, path: string, change: (json: T) => void): void {
   const file = join(root, path);
@@ -47,6 +56,16 @@ function refuse(root: string, version: string): string | undefined {
   if (git(root, ["status", "--porcelain", "--untracked-files=no"]) !== "") {
     return "the working tree has uncommitted changes; commit or stash them first";
   }
+  if (git(root, ["branch", "--show-current"]) !== MAIN_BRANCH) return `releases are cut from ${MAIN_BRANCH}; check it out first`;
+  const originMain = tipOf(root, `refs/remotes/origin/${MAIN_BRANCH}`);
+  if (originMain !== git(root, ["rev-parse", "HEAD"])) {
+    return `${MAIN_BRANCH} is not even with origin/${MAIN_BRANCH}; fetch, then pull or push until they match`;
+  }
+  const remotePlugin = tipOf(root, `refs/remotes/origin/${PLUGIN_BRANCH}`);
+  const localPlugin = pluginTip(root);
+  if (remotePlugin !== "" && localPlugin !== "" && !isAncestor(root, remotePlugin, localPlugin)) {
+    return `the local ${PLUGIN_BRANCH} branch does not contain origin/${PLUGIN_BRANCH}; run git branch -f ${PLUGIN_BRANCH} origin/${PLUGIN_BRANCH}`;
+  }
   const heading = `## [${version}]`;
   if (!readFileSync(join(root, "CHANGELOG.md"), "utf8").split(/\r?\n/).some((line) => line.startsWith(heading))) {
     return `CHANGELOG.md has no ${heading} entry; add one first`;
@@ -57,7 +76,10 @@ function refuse(root: string, version: string): string | undefined {
   return undefined;
 }
 
-const pluginTip = (root: string): string => git(root, ["for-each-ref", "--format=%(objectname)", `refs/heads/${PLUGIN_BRANCH}`]);
+const pluginTip = (root: string): string => tipOf(root, `refs/heads/${PLUGIN_BRANCH}`);
+
+/** The packaged commit's parent: the local branch, or in a fresh clone the remote one, so the branch never restarts as an orphan. */
+const pluginParent = (root: string): string => pluginTip(root) || tipOf(root, `refs/remotes/origin/${PLUGIN_BRANCH}`);
 
 function commitPackaged(root: string, version: string, tag: string): string {
   const scratch = mkdtempSync(join(tmpdir(), "omca-release-"));
@@ -72,7 +94,7 @@ function commitPackaged(root: string, version: string, tag: string): string {
     }
     const env = { GIT_DIR: git(root, ["rev-parse", "--absolute-git-dir"]), GIT_WORK_TREE: packaged, GIT_INDEX_FILE: join(scratch, "index") };
     git(packaged, ["add", "--force", "--all"], env);
-    const parent = pluginTip(root);
+    const parent = pluginParent(root);
     const commit = git(packaged, ["commit-tree", git(packaged, ["write-tree"], env), ...(parent === "" ? [] : ["-p", parent]), "-m", `chore(release): package v${version}`], env);
     git(root, ["update-ref", `refs/heads/${PLUGIN_BRANCH}`, commit]);
     return commit;
@@ -125,7 +147,7 @@ export function release(root: string, version: string): { bump: string; plugin: 
   }
 }
 
-export function main(args: string[], root: string): Outcome {
+export function main(args: string[], root: string): Run {
   const [version, ...extra] = args;
   if (version === undefined || extra.length > 0) {
     const problem = version === undefined ? "Missing <version>" : `Unexpected argument: ${extra[0]}`;
@@ -141,9 +163,8 @@ export function main(args: string[], root: string): Outcome {
       `Stamped ${plugin} in ${MARKETPLACE} at ${stamp.slice(0, 7)}`,
       `Tagged v${version} at ${bump.slice(0, 7)} and plugin-v${version} at ${plugin.slice(0, 7)}`,
       "",
-      `Release ${version} is ready. Push the ${PLUGIN_BRANCH} branch first: the stamped SHA must exist on the remote before the main commits that name it.`,
-      `  git push origin ${PLUGIN_BRANCH} plugin-v${version}`,
-      `  git push origin HEAD v${version}`,
+      `Release ${version} is ready. Push both branches and both tags at once, so the stamped SHA never names a commit the remote lacks:`,
+      `  git push --atomic origin ${MAIN_BRANCH} ${PLUGIN_BRANCH} v${version} plugin-v${version}`,
       "",
     ].join("\n");
     return { code: 0, stdout, stderr: "" };

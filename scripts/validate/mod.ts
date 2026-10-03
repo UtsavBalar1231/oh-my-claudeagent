@@ -1,6 +1,6 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { type Check, type Context, exists, type Outcome, pass, verdict } from "./core.ts";
+import { type Check, type Context, type Outcome, pass, verdict } from "./core.ts";
 
 export const REGISTER = "hooks/register.ts";
 
@@ -29,7 +29,7 @@ function reachesGuarded(pattern: string): boolean {
 
 export function hookSources(ctx: Context): Source[] {
   const dir = join(ctx.root, "hooks");
-  if (!exists(dir)) return [];
+  if (!existsSync(dir)) return [];
   return readdirSync(dir, { recursive: true, encoding: "utf8" })
     .map((name) => name.replaceAll("\\", "/"))
     .filter((name) => name.endsWith(".ts") && !name.endsWith(".spec.ts"))

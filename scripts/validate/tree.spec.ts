@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import { createContext } from "./core.ts";
 import { cleanup, fixture, runNamed } from "./fixture.ts";
-import { checks, SHEBANG_ALLOWLIST, shebangScripts } from "./tree.ts";
+import { checks, shellOrPythonScripts } from "./tree.ts";
 
 afterEach(cleanup);
 
@@ -49,9 +49,11 @@ describe("test file location", () => {
   });
 });
 
-describe("shebang scripts", () => {
+describe("shell and python scripts", () => {
+  const check = (patch: Record<string, string>) => runNamed(checks, "shell and python scripts", fixture(patch));
+
   test("a tree without interpreter scripts passes", async () => {
-    expect(await runNamed(checks, "shebang scripts", fixture({ "scripts/tool.ts": "#!/usr/bin/env bun\n" }))).toMatchObject({ status: "pass" });
+    expect(await check({ "scripts/tool.ts": "#!/usr/bin/env bun\n" })).toEqual({ status: "pass", detail: "no tracked python, bash or sh script" });
   });
 
   test.each([
@@ -63,28 +65,25 @@ describe("shebang scripts", () => {
     "#!/usr/bin/python",
     "#!/usr/bin/env -S python3 -u",
     "#! /bin/bash -e",
-  ])("a new script with %p fails", async (shebang) => {
-    const ctx = fixture({ "scripts/new-hook.sh": `${shebang}\nexit 0\n` });
-    expect(await runNamed(checks, "shebang scripts", ctx)).toEqual({
+  ])("a script with %p fails whatever its name", async (shebang) => {
+    expect(await check({ "scripts/new-hook": `${shebang}\nexit 0\n` })).toEqual({
       status: "fail",
-      detail: "scripts/new-hook.sh has a python, bash or sh shebang",
+      detail: "scripts/new-hook is a python, bash or sh script",
     });
+  });
+
+  test.each(["servers/x.py", "scripts/hook.sh", "hooks/run.bash"])("%s fails with no shebang", async (path) => {
+    expect(await check({ [path]: "print(1)\n" })).toEqual({ status: "fail", detail: `${path} is a python, bash or sh script` });
   });
 
   test.each(["#!/usr/bin/env bun", "#!/usr/bin/env node", "#!/usr/bin/env fish", "#!/bin/zsh", "echo bash", "# #!/bin/bash"])(
     "%p is not a python, bash or sh shebang",
     async (first) => {
-      const ctx = fixture({ "scripts/tool.ts": `${first}\n` });
-      expect(await runNamed(checks, "shebang scripts", ctx)).toMatchObject({ status: "pass" });
+      expect(await check({ "scripts/tool.ts": `${first}\n` })).toMatchObject({ status: "pass" });
     },
   );
 
-  test("the allowlist is empty", () => {
-    expect(SHEBANG_ALLOWLIST).toEqual({});
-  });
-
   test("the real tree has no python, bash or sh script", () => {
-    const ctx = createContext(join(import.meta.dir, "..", ".."));
-    expect(shebangScripts(ctx)).toEqual([]);
+    expect(shellOrPythonScripts(createContext(join(import.meta.dir, "..", "..")))).toEqual([]);
   });
 });

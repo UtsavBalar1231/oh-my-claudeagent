@@ -15,16 +15,16 @@ import { dirname, join } from "node:path";
 import { parseArgs } from "node:util";
 import type { Subprocess } from "bun";
 import { packageTree } from "../package.ts";
+import { cleanupOnSignal, REPO } from "../qa/lib.ts";
 import { type Script, startServer } from "../qa/mock-model.ts";
 import { exited, mockSessionEnv, quote, reachPrompt, sessionEnv, teardown, TERMINAL_OPTIONS, Tmux, TRUECOLOR_ENV } from "../qa/visual.ts";
 import type { ClipManifest } from "./clip-manifest.ts";
 import { assertPrivate, machineValues, SCRATCH_PREFIX } from "./privacy.ts";
 
-const REPO = join(import.meta.dir, "..", "..");
 const FIXTURE = join(import.meta.dir, "fixtures", "acme-app");
-export const ASSET_DIR = join(REPO, ".github", "assets");
-export const FOOTAGE_DIR = join(REPO, "video", "public", "footage");
-const SOCKET = "omca-shots";
+const ASSET_DIR = join(REPO, ".github", "assets");
+const FOOTAGE_DIR = join(REPO, "video", "public", "footage");
+const SOCKET = `omca-shots-${process.pid}`;
 const KITTY_CLASS = "omca-shots";
 const SESSION_ID = "00000000-0000-4000-8000-000000000001";
 const PLAN_NAME = "checkout-redesign";
@@ -32,7 +32,7 @@ const POLL_MS = 150;
 const READY_TIMEOUT_MS = 30_000;
 const WINDOW_TIMEOUT_MS = 15_000;
 const RUN_TIMEOUT_MS = 120_000;
-export const FONT_FAMILIES = ["JetBrains Mono", "JetBrainsMono Nerd Font Mono"] as const;
+const FONT_FAMILIES = ["JetBrains Mono", "JetBrainsMono Nerd Font Mono"] as const;
 const FONT_SIZE = 14;
 const PADDING = 12;
 const DPI = 96;
@@ -949,7 +949,7 @@ function finishClip(shot: Clip, { raw, log, played, window, outDir, scratch, env
   return out;
 }
 
-export async function captureShot(shot: Shot, outDir: string): Promise<string> {
+async function captureShot(shot: Shot, outDir: string): Promise<string> {
   const scratch = mkdtempSync(join(tmpdir(), SCRATCH_PREFIX));
   const home = join(scratch, "home");
   const project = join(home, "acme-app");
@@ -963,6 +963,17 @@ export async function captureShot(shot: Shot, outDir: string): Promise<string> {
   const children: Subprocess[] = [];
   let claudePid: number | undefined;
   let recording: Recording | undefined;
+  const stopAll = () =>
+    teardown(
+      () => recording?.stopWatch(),
+      () => Bun.spawnSync(["tmux", "-L", SOCKET, "-f", "/dev/null", "kill-server"], { env }),
+      () => claudePid !== undefined && exited(claudePid),
+      ...[...children].reverse().map((child) => () => stop(child)),
+      () => proxy?.stop(true),
+      () => mock?.stop(true),
+      () => rmSync(scratch, { recursive: true, force: true }),
+    );
+  const release = cleanupOnSignal(stopAll);
   try {
     mkdirSync(project, { recursive: true });
     mkdirSync(config);
@@ -1064,8 +1075,8 @@ export async function captureShot(shot: Shot, outDir: string): Promise<string> {
     }
     const raw = join(scratch, `${shot.name}.raw.${shot.format === "gif" ? "mkv" : "png"}`);
     const out = join(outDir, `${shot.name}.${shot.format}`);
-    const isClip = shot.format === "gif";
-    if (isClip) {
+    const isGif = shot.format === "gif";
+    if (isGif) {
       isPrivate();
       recording = record(window, RECORD_FPS, raw, display, screenEnv, isPrivate);
       children.push(recording.ffmpeg);
@@ -1078,11 +1089,11 @@ export async function captureShot(shot: Shot, outDir: string): Promise<string> {
       tmux.send("-l", shot.command);
     }
     let screen = await tmux.waitFor((current) => current.includes(shot.command.slice(0, 20)), READY_TIMEOUT_MS, "the command to be typed");
-    if (isClip) await Bun.sleep(KEY_PAUSE_MS / 2);
+    if (isGif) await Bun.sleep(KEY_PAUSE_MS / 2);
     tmux.send("Enter");
     screen = await tmux.settle(screen);
     for (const key of shot.keys) {
-      if (isClip) await Bun.sleep(KEY_PAUSE_MS);
+      if (isGif) await Bun.sleep(KEY_PAUSE_MS);
       tmux.send(key);
       screen = await tmux.settle(screen);
     }
@@ -1114,15 +1125,8 @@ export async function captureShot(shot: Shot, outDir: string): Promise<string> {
     }
     return out;
   } finally {
-    await teardown(
-      () => recording?.stopWatch(),
-      () => Bun.spawnSync(["tmux", "-L", SOCKET, "-f", "/dev/null", "kill-server"], { env }),
-      () => claudePid !== undefined && exited(claudePid),
-      ...children.reverse().map((child) => () => stop(child)),
-      () => proxy?.stop(true),
-      () => mock?.stop(true),
-      () => rmSync(scratch, { recursive: true, force: true }),
-    );
+    release();
+    await stopAll();
   }
 }
 

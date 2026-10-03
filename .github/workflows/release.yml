@@ -29,27 +29,41 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Validate version matches tag
+      - name: Validate every version field matches the tag
         run: |
-          PLUGIN_VERSION=$(jq -r '.version' .claude-plugin/plugin.json)
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
-          if [[ "$PLUGIN_VERSION" != "$TAG_VERSION" ]]; then
-            echo "::error::plugin.json version ($PLUGIN_VERSION) does not match tag ($TAG_VERSION)"
+          version="${GITHUB_REF_NAME#v}"
+          failed=0
+          for field in ".claude-plugin/plugin.json .version" ".claude-plugin/marketplace.json .metadata.version" ".claude-plugin/marketplace.json .plugins[0].version" "package.json .version"; do
+            read -r file query <<< "$field"
+            actual="$(jq -r "$query" "$file")"
+            if [[ "$actual" != "$version" ]]; then
+              echo "::error::$file $query is $actual, the tag says $version"
+              failed=1
+            fi
+          done
+          exit "$failed"
+
+      - name: Take the release notes from CHANGELOG.md
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v heading="## [$version]" 'index($0, heading) == 1 { found = 1; next } found && /^## \[/ { exit } found { print }' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          if ! grep -q '[^[:space:]]' "$RUNNER_TEMP/notes.md"; then
+            echo "::error::CHANGELOG.md has no ## [$version] section, or it is empty"
             exit 1
           fi
 
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${GITHUB_REF_NAME}" --generate-notes --latest
+        run: gh release create "${GITHUB_REF_NAME}" --notes-file "$RUNNER_TEMP/notes.md" --latest
 
       - name: Job summary
         if: always()
         run: |
           {
             echo "### What this job checks"
-            echo "Tag version matches plugin.json, then creates the GitHub release (runs only after every CI job passes)."
+            echo "The tag's version matches plugin.json, both version fields of marketplace.json and package.json, then the GitHub release is created with the tag's CHANGELOG.md section as its notes (runs only after every CI job passes)."
             echo ""
             echo "### If this fails"
-            echo "Either the tag/version mismatch check failed, or the release creation step failed. Check the step logs above for which one."
+            echo "A version field disagrees with the tag, CHANGELOG.md has no section for the version, or the release creation step failed. The step logs above name which one."
           } >> "$GITHUB_STEP_SUMMARY"

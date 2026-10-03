@@ -11,7 +11,7 @@ let dir: string;
 let logPath: string;
 let server: Bun.Server<undefined>;
 
-const boot = async (options: { script?: Script; subagentMarker?: string; bodyLogPath?: string } = {}) => {
+const boot = async (options: { script?: Script; bodyLogPath?: string } = {}) => {
   await server?.stop(true);
   server = startServer({ port: 0, accessLogPath: logPath, ...options });
 };
@@ -43,8 +43,7 @@ const logEntries = () =>
     .split("\n")
     .filter(Boolean)
     .map((line) => JSON.parse(line) as Record<string, unknown>);
-const withoutTimestamps = (line: string) =>
-  line.replace(/"ts": "[^"]*"/, '"ts": "T"').replace(/"arrival_ms": \d+/, '"arrival_ms": 0');
+const withoutArrival = (line: string) => line.replace(/"arrival_ms": \d+/, '"arrival_ms": 0');
 
 const okText = [{ type: "text", text: "ok" }];
 const bashTurn: Turn = { content: [{ type: "tool_use", name: "Bash", input: { command: "true" } }] };
@@ -97,7 +96,7 @@ describe("fixed reply without a script", () => {
 
     expect(res.status).toBe(200);
     expect(((await res.json()) as { content: unknown }).content).toEqual(okText);
-    expect(readLog()).toContain('"mode": "json"');
+    expect(logEntries()).toHaveLength(1);
   });
 
   test("sends event-stream headers for a streaming request", async () => {
@@ -273,13 +272,6 @@ describe("queue routing", () => {
     expect(textOf(await postJson())).toBe("main-reply");
   });
 
-  test("routes on a custom --subagent-marker instead of the default", async () => {
-    await boot({ script: twoQueues, subagentMarker: "SUB-X" });
-
-    expect(textOf(await postJson({ system: "cc_is_subagent=true" }))).toBe("main-reply");
-    expect(textOf(await postJson({ system: "has SUB-X inside" }))).toBe("sub-reply");
-  });
-
   test("answers a subagent request with ok when the subagent queue is empty", async () => {
     await boot({ script: { main: twoQueues.main, subagent: [] } });
 
@@ -307,9 +299,7 @@ describe("access log", () => {
   test("writes one JSONL line per request, with the key and value separators kept", async () => {
     await post("/v1/messages?beta=true", {}, { Authorization: "Bearer s3cret" });
 
-    expect(withoutTimestamps(readLog())).toBe(
-      '{"ts": "T", "client": "127.0.0.1", "method": "POST", "path": "/v1/messages?beta=true", "mode": "json", "has_credential": true, "queue": "main", "turn": null, "tool_results": 0, "arrival_ms": 0}\n',
-    );
+    expect(withoutArrival(readLog())).toBe('{"client": "127.0.0.1", "path": "/v1/messages?beta=true", "queue": "main", "turn": null, "tool_results": 0, "arrival_ms": 0}\n');
   });
 
   test("records the arrival as epoch milliseconds between the send and the reply", async () => {
@@ -323,31 +313,12 @@ describe("access log", () => {
     expect(arrival as number).toBeLessThanOrEqual(replied);
   });
 
-  test("records the arrival time as dd/Mon/yyyy hh:mm:ss", async () => {
-    await post("/v1/messages", {});
-
-    const ts = (JSON.parse(readLog()) as { ts: string }).ts;
-    expect(ts).toMatch(/^\d{2}\/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\/\d{4} \d{2}:\d{2}:\d{2}$/);
-  });
-
-  test("marks a streaming request as sse", async () => {
-    await post("/v1/messages", { stream: true });
-
-    expect(readLog()).toContain('"mode": "sse"');
-  });
-
-  test("records has_credential false when no credential header is sent", async () => {
-    await post("/v1/messages", {});
-
-    expect(readLog()).toContain('"has_credential": false');
-  });
-
-  test("counts an x-api-key header as a credential and never logs its value", async () => {
-    await post("/v1/messages", {}, { "X-Api-Key": "k3y" });
+  test("never logs a credential header's value", async () => {
+    await post("/v1/messages", {}, { "X-Api-Key": "k3y", Authorization: "Bearer s3cret" });
 
     const line = readLog();
-    expect(line).toContain('"has_credential": true');
     expect(line).not.toContain("k3y");
+    expect(line).not.toContain("s3cret");
   });
 
   test("appends successive requests in arrival order", async () => {
@@ -456,18 +427,6 @@ describe("command line", () => {
     };
 
     expect(body.content).toEqual([{ type: "text", text: "from file" }]);
-  });
-
-  test("routes on --subagent-marker", async () => {
-    const path = scriptFile(JSON.stringify({ subagent: [{ content: [{ type: "text", text: "sub" }] }] }));
-    const proc = spawnMock("--port", "0", "--script", path, "--subagent-marker", "SUB-X");
-    const port = await readPort(proc);
-
-    const body = (await (
-      await fetch(`http://127.0.0.1:${port}/v1/messages`, { method: "POST", body: JSON.stringify({ system: "SUB-X" }) })
-    ).json()) as { content: unknown };
-
-    expect(body.content).toEqual([{ type: "text", text: "sub" }]);
   });
 
   test("rejects a non-numeric --port with exit code 2", async () => {

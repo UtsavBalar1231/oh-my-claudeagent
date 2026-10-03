@@ -15,12 +15,10 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fakeExec } from "../../tests/fixtures/fake-exec.ts";
 import { specEnv } from "../../tests/fixtures/spec-env.ts";
-import { packageTree } from "../package.ts";
-import { type Checks, runQa, type Scratch } from "./lib.ts";
+import { type Checks, cleanupOnSignal, runQa, type Scratch } from "./lib.ts";
 import { type Script, startServer } from "./mock-model.ts";
 import { exited, mockSessionEnv, quote, reachPrompt, sessionEnv, teardown, Tmux } from "./visual.ts";
 
-const REPO = join(import.meta.dir, "..", "..");
 const SESSION_ID = "00000000-0000-4000-8000-000000000002";
 const SEARCH = "mcp__plugin_oh-my-claudeagent_omca__ast_search";
 const PROMPT_TEXT = "Search the code for x";
@@ -85,8 +83,7 @@ async function runMode(mode: Mode, checks: Checks, scratch: Scratch): Promise<vo
   const pidFile = join(dir, "ast-grep.pid");
   const debugFile = join(dir, "claude-debug.log");
   mkdirSync(config);
-  const plugin = scratch.dir("plugin");
-  packageTree(REPO, plugin);
+  const plugin = scratch.plugin();
   const declared = await declaredAnnotations(plugin, project);
   const fake = fakeExec(
     dir,
@@ -103,6 +100,14 @@ async function runMode(mode: Mode, checks: Checks, scratch: Scratch): Promise<vo
   const tmux = new Tmux(`omca-mcp-live-${process.pid}`, ["-f", "/dev/null"]);
   let claudePid: number | undefined;
   let fakePid: number | undefined;
+  const stopProcesses = () =>
+    teardown(
+      () => Bun.spawnSync(["tmux", "-L", tmux.socket, "-f", "/dev/null", "kill-server"], { env: sessionEnv() }),
+      () => claudePid !== undefined && exited(claudePid),
+      () => fakePid !== undefined && isAlive(fakePid) && process.kill(fakePid),
+      () => mock.stop(true),
+    );
+  const release = cleanupOnSignal(stopProcesses);
   try {
     tmux.run([
       "new-session", "-d", "-s", tmux.target, "-x", "140", "-y", "50", "-c", project,
@@ -161,11 +166,9 @@ async function runMode(mode: Mode, checks: Checks, scratch: Scratch): Promise<vo
       `${tag}: /mcp rows are wrong for ${wrong.map((tool) => tool.title).join(", ")}`,
     );
   } finally {
+    release();
     await teardown(
-      () => Bun.spawnSync(["tmux", "-L", tmux.socket, "-f", "/dev/null", "kill-server"], { env: sessionEnv() }),
-      () => claudePid !== undefined && exited(claudePid),
-      () => fakePid !== undefined && isAlive(fakePid) && process.kill(fakePid),
-      () => mock.stop(true),
+      stopProcesses,
       () => {
         const noTmux = Bun.spawnSync(["tmux", "-L", tmux.socket, "-f", "/dev/null", "list-sessions"], { env: sessionEnv(), stdout: "pipe", stderr: "pipe" }).exitCode !== 0;
         checks.check(

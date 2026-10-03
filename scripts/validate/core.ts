@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { isRecord } from "../../src/core/tool-input.ts";
 
 export type Status = "pass" | "fail" | "skip" | "warn";
 export type Outcome = { status: Status; detail: string };
@@ -22,9 +23,6 @@ export function verdict(problems: readonly string[], passed: string): Outcome {
   return problems.length === 0 ? pass(passed) : { status: "fail", detail: problems.join("; ") };
 }
 
-export const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
-
 export const asRecord = (value: unknown): Record<string, unknown> => (isRecord(value) ? value : {});
 
 export const asList = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
@@ -33,13 +31,14 @@ export const text = (value: unknown): string | undefined => (typeof value === "s
 
 export const readJson = (path: string): unknown => JSON.parse(readFileSync(path, "utf8"));
 
+/** What a finished child process left: its exit code and its output. */
 export type Run = { code: number; stdout: string; stderr: string };
 
-/** The environment a child process gets: the caller's, minus the git variables that would redirect git. */
-export function childEnv(extra: Readonly<Record<string, string>> = {}): Record<string, string> {
+/** The caller's environment without the variables whose names match `drop`, with `extra` applied last. */
+export function envWithout(drop: RegExp, extra: Readonly<Record<string, string>> = {}): Record<string, string> {
   const env: Record<string, string> = {};
   for (const [key, value] of Object.entries(process.env)) {
-    if (value !== undefined && !key.startsWith("GIT_")) env[key] = value;
+    if (value !== undefined && !drop.test(key)) env[key] = value;
   }
   return { ...env, ...extra };
 }
@@ -48,7 +47,7 @@ export function run(argv: readonly string[], cwd: string, options: { input?: str
   try {
     const proc = Bun.spawnSync([...argv], {
       cwd,
-      env: childEnv(),
+      env: envWithout(/^GIT_/),
       stdin: options.input === undefined ? "ignore" : Buffer.from(options.input),
       stdout: "pipe",
       stderr: "pipe",
@@ -85,10 +84,8 @@ export function readText(root: string, path: string): string {
   return readFileSync(join(root, path), "utf8");
 }
 
-export const exists = existsSync;
-
 export function listFiles(dir: string, suffix: string): string[] {
-  if (!exists(dir)) return [];
+  if (!existsSync(dir)) return [];
   return readdirSync(dir)
     .filter((name) => name.endsWith(suffix))
     .sort()
