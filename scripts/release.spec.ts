@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -13,6 +13,10 @@ const MARKETPLACE = `${JSON.stringify(
 )}\n`;
 const PACKAGE = '{\n  "name": "demo",\n  "version": "1.0.0"\n}\n';
 const CHANGELOG = "# Changelog\n\n## [Unreleased]\n\n## [3.0.0-rc.1] - 2026-10-03\n\n- Added a thing.\n";
+
+// Each test and its setup drive a dozen git processes, and one can take seconds on a Windows runner.
+const GIT_HEAVY_MS = 60_000;
+setDefaultTimeout(GIT_HEAVY_MS);
 
 let scratch = "";
 let root = "";
@@ -71,11 +75,11 @@ beforeEach(() => {
   gitIn(scratch, "init", "-q", "--bare", "-b", "main", origin);
   git("remote", "add", "origin", origin);
   publish();
-});
+}, GIT_HEAVY_MS);
 
 afterEach(() => {
-  rmSync(scratch, { recursive: true, force: true });
-});
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+}, GIT_HEAVY_MS);
 
 describe("release", () => {
   test("bumps every version field, tags the bump, packages it and stamps the packaged commit", () => {
@@ -232,7 +236,7 @@ describe("the remote", () => {
     } finally {
       root = previous;
     }
-  }, 60_000);
+  });
 
   test("refuses when the local plugin branch is behind origin/plugin", () => {
     main(["3.0.0-rc.1"], root);
