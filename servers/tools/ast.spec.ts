@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { fakeExec } from "../../tests/fixtures/fake-exec.ts";
+import { fakeExec, removeExecDir } from "../../tests/fixtures/fake-exec.ts";
 import { setPath } from "../../tests/fixtures/spec-env.ts";
 import { discoverBinary, extensionMismatch, gitWorktreeRoots, patternWarning, resolveNative, run, tools } from "./ast.ts";
 
@@ -29,13 +29,13 @@ beforeEach(() => {
   }
 });
 
-afterEach(() => {
+afterEach(async () => {
   for (const key of ENV_KEYS) {
     const value = savedEnv[key];
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;
   }
-  for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  for (const dir of dirs.splice(0)) await removeExecDir(dir);
 });
 
 function tempDir(): string {
