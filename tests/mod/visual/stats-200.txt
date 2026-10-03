@@ -1,12 +1,12 @@
                                                                                                              │1: Agents  2: Plan  3: Evidence  4: Notepad  5: Feedback  6: Stats  7: Doctor            ✕
- ▐▛███▛█   Claude Code v2.1.287                                                                              │───────────────────────────────────────────────────────────────────────────────────────
+ ▐▛███▛█   Claude Code v2.1.288                                                                              │───────────────────────────────────────────────────────────────────────────────────────
 ▝▜██████▀  Opus 5.5 · API Usage Billing                                                                      │8 delegations in 2 sessions · 1 running · 1 unreadable record skipped
- ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/.cache/tmp/omca-visual-200x50-zImjr9/cwd                          │agent     runs  median  tokens  est. cost  evidence  done  abort  empty
+ ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/.cache/tmp/omca-visual-200x50-zL47AV/cwd                          │agent     runs  median  tokens  est. cost  evidence  done  abort  empty
                                                                                                              │executor     4   3m04s    1.1M      $2.58       67%     2      1      0
                                                                                                              │explore      3     27s    119k     $0.17+        0%     2      0      1
-● oh-my-claudeagent: reloaded (12 hooks: tool.check, session.start, turn.start, turn.step,                   │oracle       1   6m52s    257k      $3.41      100%     1      0      0
-  turn.complete, agent.spawn, prompt.edit, ui.close, ui.focus, command.run, ui.render,                       │+ excludes 1 unpriced run
-  session.compact)                                                                                           │r: Reload  estimated at 2026-10-02 list prices
+                                                                                                             │oracle       1   6m52s    257k      $3.41      100%     1      0      0
+                                                                                                             │+ excludes 1 unpriced run
+                                                                                                             │r: Reload  estimated at 2026-10-02 list prices
                                                                                                              │
                                                                                                              │
                                                                                                              │

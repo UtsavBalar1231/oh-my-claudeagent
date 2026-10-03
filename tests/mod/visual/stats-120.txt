@@ -1,5 +1,5 @@
                                                                │1: Agents  2: Plan  3: Evidence  4: Notepad            ✕
- ▐▛███▛█   Claude Code v2.1.287                                │5: Feedback  6: Stats  7: Doctor
+ ▐▛███▛█   Claude Code v2.1.288                                │5: Feedback  6: Stats  7: Doctor
 ▝▜██████▀  Opus 5.5 · API Usage Billing                        │─────────────────────────────────────────────────────
  ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/cwd               │8 delegations in 2 sessions · 1 running · 1 skipped
                                                                │agent     runs  median  tokens  est. cost  evidence

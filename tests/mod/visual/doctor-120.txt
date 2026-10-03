@@ -1,27 +1,24 @@
                                                                │1: Agents  2: Plan  3: Evidence  4: Notepad            ✕
- ▐▛███▛█   Claude Code v2.1.287                                │5: Feedback  6: Stats  7: Doctor
+ ▐▛███▛█   Claude Code v2.1.288                                │5: Feedback  6: Stats  7: Doctor
 ▝▜██████▀  Opus 5.5 · API Usage Billing                        │─────────────────────────────────────────────────────
- ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/cwd               │r: Run again   1 warn · 3 info · 8 ok · checked 20:57
+ ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/cwd               │r: Run again   1 warn · 2 info · 10 ok · checked 13:…
                                                                │! omca server
 ▎ Auto mode is now Claude Code's default permission mode.      │  No hook has reached the server in this session yet
-▎ Auto mode lets Claude handle permission prompts              │· Options
-▎ automatically. Claude checks each tool call for risky actions│  No pluginConfigs entry, so the defaults apply:
-▎ and prompt injection before executing, runs the ones it      │  showBand on, guardMode dialog
-▎ assesses as lower-risk, and blocks the rest.                 │· Advisor
-▎ https://code.claude.com/docs/en/permission-modes             │  No advisorModel; /advisor fable turns the advisor
-                                                               │  on
-                                                               │· Status line
-                                                               │  No statusLine is set
+▎ Auto mode lets Claude handle permission prompts              │· Advisor
+▎ automatically. Claude checks each tool call for risky actions│  No advisorModel; /advisor fable turns the advisor
+▎ and prompt injection before executing, runs the ones it      │  on
+▎ assesses as lower-risk, and blocks the rest.                 │· Status line
+▎ https://code.claude.com/docs/en/permission-modes             │  No statusLine is set
                                                                │✓ OMCA
                                                                │  oh-my-claudeagent 2.21.0 is loaded
                                                                │✓ Claude Code
-                                                               │  2.1.287 meets the 2.1.287 floor
+                                                               │  2.1.288 meets the 2.1.288 floor
                                                                │✓ bun
-                                                               │  bun 1.4.2 is on PATH; Desktop and VS Code start
-                                                               │  .mcp.json with the GUI's PATH, which can lack
-                                                               │  ~/.bun/bin
+                                                               │  bun 1.4.2 is on PATH
                                                                │✓ ast-grep
                                                                │  ast-grep 0.44.1 is on PATH
+                                                               │✓ Options
+                                                               │  showBand on, guardMode dialog
                                                                │✓ Agent models
                                                                │  Each agent keeps the model tier it declares
                                                                │✓ Effort cap
@@ -32,6 +29,9 @@
                                                                │✓ Hooks
                                                                │  Neither disableAllHooks nor allowManagedHooksOnly
                                                                │  is set
+                                                               │✓ Output style
+                                                               │  OMCA Default is forced by the plugin
+                                                               │
                                                                │
                                            ◐ medium · /effort  │
 ─────────────────────────────────────────────────────────────────────────────────────────── oh-my-claudeagent:sisyphus ─

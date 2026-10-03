@@ -1,11 +1,10 @@
                                                                │1: Agents  2: Plan  3: Evidence  4: Notepad            ✕
- ▐▛███▛█   Claude Code v2.1.287                                │5: Feedback  6: Stats  7: Doctor
+ ▐▛███▛█   Claude Code v2.1.288                                │5: Feedback  6: Stats  7: Doctor
 ▝▜██████▀  Opus 5.5 · API Usage Billing                        │─────────────────────────────────────────────────────
  ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/cwd               │Ship the sample widget service rewrite
                                                                │12/46 tasks done · ~/.cache/tmp/omca…/46-task-plan.md
                                                                │─────────────────────────────────────────────────────
-                                                               │  ↑ 10 more
-                                                               │      [x] 3. Port the fixture and the tracker onto t…
+                                                               │  ↑ 11 more
                                                                │      [x] 4. Port the theme and the band onto the sh…
                                                                │      [x] 5. Port the probe and the reader onto the…
                                                                │      [x] 6. Port the recorder and the parser onto t…
@@ -32,9 +31,10 @@
                                                                │  ↓ 26 more
                                                                │─────────────────────────────────────────────────────
                                                                │r: Reload   l: Plans
-46-task-plan 12/46 tasks · no verification yet              [-]│↑↓ move · enter open · esc close
+                                                               │↑↓ move · enter open · esc close
+46-task-plan 12/46 tasks · no verification yet              [-]│
                                            ◐ medium · /effort  │
-─────────────────────────────────────────────────────────────────────────────────────────────────── OMCA: 46-task-plan ─
+─────────────────────────────────────────────────────────────────────────────────────────── oh-my-claudeagent:sisyphus ─
 ❯ 
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
   ⏸ manual mode on · ? for shortcuts · ← for agents

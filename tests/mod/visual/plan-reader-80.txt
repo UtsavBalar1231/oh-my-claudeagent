@@ -1,7 +1,7 @@
 
- ▐▛███▛█   Claude Code v2.1.287
+ ▐▛███▛█   Claude Code v2.1.288
 ▝▜██████▀  Opus 5.5 · API Usage Billing
- ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/omca-visual-80x40-ww4YFz/cwd
+ ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/omca-visual-80x40-BzR7E2/cwd
 
 
 
@@ -34,7 +34,7 @@
 ╰──────────────────────────────────────────────────────────────────────────────╯
 46-task-plan 12/46 tasks · no verification yet                               [-]
                                                             ◐ medium · /effort
-─────────────────────────────────────────────────────────── OMCA: 46-task-plan ─
+─────────────────────────────────────────────────── oh-my-claudeagent:sisyphus ─
 ❯ 
 ────────────────────────────────────────────────────────────────────────────────
   ⏸ manual mode on · ? for shortcuts · ← for agents

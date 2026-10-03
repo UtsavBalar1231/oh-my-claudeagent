@@ -1,20 +1,20 @@
                                                                                                              │1: Agents  2: Plan  3: Evidence  4: Notepad  5: Feedback  6: Stats  7: Doctor            ✕
- ▐▛███▛█   Claude Code v2.1.287                                                                              │───────────────────────────────────────────────────────────────────────────────────────
-▝▜██████▀  Opus 5.5 · API Usage Billing                                                                      │r: Run again   1 warn · 3 info · 8 ok · checked 20:57
- ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/.cache/tmp/omca-visual-200x50-pHohss/cwd                          │! omca server   No hook has reached the server in this session yet
-                                                                                                             │· Options       No pluginConfigs entry, so the defaults apply: showBand on, guardMode
-▎ Auto mode is now Claude Code's default permission mode.                                                    │                dialog
-▎ Auto mode lets Claude handle permission prompts automatically. Claude checks each tool call for risky      │· Advisor       No advisorModel; /advisor fable turns the advisor on
-▎ actions and prompt injection before executing, runs the ones it assesses as lower-risk, and blocks the     │· Status line   No statusLine is set
-▎ rest.                                                                                                      │✓ OMCA          oh-my-claudeagent 2.21.0 is loaded
-▎ https://code.claude.com/docs/en/permission-modes                                                           │✓ Claude Code   2.1.287 meets the 2.1.287 floor
-                                                                                                             │✓ bun           bun 1.4.2 is on PATH; Desktop and VS Code start .mcp.json with the
-                                                                                                             │                GUI's PATH, which can lack ~/.bun/bin
-                                                                                                             │✓ ast-grep      ast-grep 0.44.1 is on PATH
+ ▐▛███▛█   Claude Code v2.1.288                                                                              │───────────────────────────────────────────────────────────────────────────────────────
+▝▜██████▀  Opus 5.5 · API Usage Billing                                                                      │r: Run again   1 warn · 2 info · 10 ok · checked 13:36
+ ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/.cache/tmp/omca-visual-200x50-wq6vJA/cwd                          │! omca server   No hook has reached the server in this session yet
+                                                                                                             │· Advisor       No advisorModel; /advisor fable turns the advisor on
+▎ Auto mode is now Claude Code's default permission mode.                                                    │· Status line   No statusLine is set
+▎ Auto mode lets Claude handle permission prompts automatically. Claude checks each tool call for risky      │✓ OMCA          oh-my-claudeagent 2.21.0 is loaded
+▎ actions and prompt injection before executing, runs the ones it assesses as lower-risk, and blocks the     │✓ Claude Code   2.1.288 meets the 2.1.288 floor
+▎ rest.                                                                                                      │✓ bun           bun 1.4.2 is on PATH
+▎ https://code.claude.com/docs/en/permission-modes                                                           │✓ ast-grep      ast-grep 0.44.1 is on PATH
+                                                                                                             │✓ Options       showBand on, guardMode dialog
                                                                                                              │✓ Agent models  Each agent keeps the model tier it declares
                                                                                                              │✓ Effort cap    No maxEffortLevel, so agents run at the effort they declare
                                                                                                              │✓ Mod policy    Mods you install may load
                                                                                                              │✓ Hooks         Neither disableAllHooks nor allowManagedHooksOnly is set
+                                                                                                             │✓ Output style  OMCA Default is forced by the plugin
+                                                                                                             │
                                                                                                              │
                                                                                                              │
                                                                                                              │

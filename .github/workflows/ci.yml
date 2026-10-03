@@ -19,7 +19,7 @@ concurrency:
 #
 # BUN_SPEC_FLOOR is the fewest tests a bun spec run must pass. Windows skips the specs that need
 # POSIX signals, FIFOs, symlink privilege, tmux, /etc/shadow or an installed OpenCode, 30 in all,
-# and the floor is the suite's 3596 tests when it was set, less those 30. A run that crashes part
+# and the floor is the suite's 3706 tests when it was set, less those 30. A run that crashes part
 # way (bun issue 40376 on Windows) falls short of it or writes no report. Raise it when the suite
 # grows.
 env:
@@ -28,7 +28,7 @@ env:
   AST_GREP_SHA256_MACOS: 6d2279dea5bea2ad79c66ea93f5fe54ba926e398a8a26de76c56db68fe59eac6
   AST_GREP_SHA256_WINDOWS: 3751b7d6be7fd39a80df1180ffe7e053903dcf92d3190e5a8336ff1746af9059
   CLAUDE_CODE_VERSION: 2.1.288
-  BUN_SPEC_FLOOR: "3566"
+  BUN_SPEC_FLOOR: "3676"
 
 defaults:
   run:
