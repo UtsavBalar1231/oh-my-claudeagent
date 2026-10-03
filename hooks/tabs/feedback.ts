@@ -1,5 +1,6 @@
 import type { RenderElement } from "claude-code";
-import { COLORS, displayWidth, fitEnd, formatWhen, padEnd } from "../../src/core/ui-kit.ts";
+import { displayWidth, fitEnd, formatWhen, padEnd } from "../../src/core/ui-kit.ts";
+import { TONE_KEYS } from "../../src/core/visual.ts";
 import { type Rating, rate, shown, type Verdict } from "../feedback.ts";
 import type { Host } from "../host.ts";
 import { keyButton, noticeRow, type TabView, type View } from "../pane.ts";
@@ -34,7 +35,7 @@ function row(view: View, rating: Rating, index: number): RenderElement {
     key: `rating-${index}`,
     flexDirection: "row",
     children: [
-      Text({ color: isUp ? COLORS.ok : COLORS.fail, children: [`${isUp ? view.g.up : view.g.down} `] }),
+      Text({ color: isUp ? TONE_KEYS.ok : TONE_KEYS.fail, children: [`${isUp ? view.g.up : view.g.down} `] }),
       Text({ children: [fixed] }),
       Text({ dimColor: true, children: [note] }),
     ],

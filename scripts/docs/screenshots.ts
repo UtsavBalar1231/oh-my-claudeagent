@@ -11,7 +11,7 @@ import { parseArgs } from "node:util";
 import type { Subprocess } from "bun";
 import { packageTree } from "../package.ts";
 import { type Script, startServer } from "../qa/mock-model.ts";
-import { exited, mockSessionEnv, quote, reachPrompt, sessionEnv, teardown, Tmux } from "../qa/visual.ts";
+import { exited, mockSessionEnv, quote, reachPrompt, sessionEnv, teardown, TERMINAL_OPTIONS, Tmux, TRUECOLOR_ENV } from "../qa/visual.ts";
 import { assertPrivate, machineValues, SCRATCH_PREFIX } from "./privacy.ts";
 
 const REPO = join(import.meta.dir, "..", "..");
@@ -301,19 +301,19 @@ export async function captureShot(shot: Shot, outDir: string): Promise<string> {
     if (ready === undefined) throw new Error(`Xvfb did not start on ${display}: ${(await new Response(xvfb.stderr).text()).trim()}`);
 
     tmux.run([
+      ...TERMINAL_OPTIONS,
       "new-session", "-d", "-s", tmux.target, "-x", String(shot.cols), "-y", String(shot.rows), "-c", project,
       "-e", `HOME=${home}`,
       "-e", `CLAUDE_CONFIG_DIR=${config}`,
       "-e", `TMPDIR=${join(scratch, "tmp")}`,
       ...mockSessionEnv(mock.port),
-      "-e", "COLORTERM=truecolor",
+      ...TRUECOLOR_ENV,
       "-e", "OMCA_DISABLED_HOOKS=stop-gates",
       `claude --plugin-dir ${quote(plugin)} --session-id ${SESSION_ID}`,
       // kitty's attached client would otherwise take a row for the tmux status bar, and Claude Code
-      // shows a hint row when tmux has mouse or focus events off.
+      // shows a hint row when tmux has mouse events off.
       ";", "set-option", "-g", "status", "off",
       ";", "set-option", "-g", "mouse", "on",
-      ";", "set-option", "-g", "focus-events", "on",
     ]);
     claudePid = Number(tmux.run(["display-message", "-p", "-t", tmux.target, "#{pane_pid}"]).trim());
 

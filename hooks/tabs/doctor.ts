@@ -2,7 +2,8 @@ import type { RenderElement } from "claude-code";
 import type { Fix } from "../../src/core/doctor-checks.ts";
 import { lastStart, stepStart, windowEnd } from "../../src/core/list-window.ts";
 import { tildePath } from "../../src/core/path.ts";
-import { COLORS, displayWidth, fitEnd, KEYS, levelMark, padEnd, wrapText } from "../../src/core/ui-kit.ts";
+import { displayWidth, fitEnd, KEYS, padEnd, wrapText } from "../../src/core/ui-kit.ts";
+import { levelMark, type ThemeKey, TONE_KEYS } from "../../src/core/visual.ts";
 import * as doctor from "../doctor.ts";
 import type { Host, State } from "../host.ts";
 import type { Subcommand } from "../omca-router.ts";
@@ -81,10 +82,10 @@ function checkRows(host: Host, view: View, check: Check): Rows {
   return { element: Box({ key: `check-${check.id}`, flexDirection: "column", children }), height: children.length };
 }
 
-function diffColor(line: string, index: number): { color?: (typeof COLORS)[keyof typeof COLORS]; dimColor?: boolean } {
+function diffColor(line: string, index: number): { color?: ThemeKey; dimColor?: boolean } {
   if (index < 2 || line.startsWith("@@")) return { dimColor: true };
-  if (line.startsWith("+")) return { color: COLORS.ok };
-  if (line.startsWith("-")) return { color: COLORS.fail };
+  if (line.startsWith("+")) return { color: TONE_KEYS.ok };
+  if (line.startsWith("-")) return { color: TONE_KEYS.fail };
   return {};
 }
 
@@ -131,7 +132,7 @@ export const view: TabView = async (host, view) => {
   const applied = state.applied === null ? undefined : appliedRows(view, state.applied);
   const head = [
     Box({ key: "head", flexDirection: "row", columnGap: GAP, children: [button, Text({ dimColor: true, children: [fitEnd(status, room, view.g.ellipsis)] })] }),
-    ...(error === undefined ? [] : [Text({ color: COLORS.fail, wrap: "wrap", children: [error] })]),
+    ...(error === undefined ? [] : [Text({ color: TONE_KEYS.fail, wrap: "wrap", children: [error] })]),
     ...(applied?.elements ?? []),
   ];
   const headHeight = 1 + (error === undefined ? 0 : wrapText(error, view.width).length) + (applied?.height ?? 0);

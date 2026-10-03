@@ -92,6 +92,17 @@ export const mockSessionEnv = (port: number | undefined): string[] => [
 
 export const quote = (text: string) => `'${text.replaceAll("'", `'\\''`)}'`;
 
+// Claude Code clamps to 256 colors inside tmux unless CLAUDE_CODE_TMUX_TRUECOLOR is set, so a
+// capture would hold approximations of the theme's colors. tmux's default TERM=screen drops
+// italics, tmux passes 24-bit color to an attached terminal only with its RGB feature, and
+// Claude Code shows a hint row when tmux has focus events off.
+export const TRUECOLOR_ENV = ["-e", "CLAUDE_CODE_TMUX_TRUECOLOR=1", "-e", "COLORTERM=truecolor"] as const;
+export const TERMINAL_OPTIONS = [
+  "set-option", "-g", "default-terminal", "tmux-256color", ";",
+  "set-option", "-ga", "terminal-features", "*:RGB", ";",
+  "set-option", "-g", "focus-events", "on", ";",
+] as const;
+
 export class Tmux {
   readonly socket: string;
   readonly flags: readonly string[];
@@ -221,8 +232,10 @@ async function captureAt(view: View, root: string, cols: number, rows: number): 
     writeFileSync(join(config, "settings.json"), JSON.stringify({ tui: "fullscreen" }));
     const claude = `claude --plugin-dir ${quote(REPO)} --session-id ${SESSION_ID}`;
     tmux.run([
+      ...TERMINAL_OPTIONS,
       "new-session", "-d", "-s", tmux.target, "-x", String(cols), "-y", String(rows), "-c", cwd,
       "-e", `CLAUDE_CONFIG_DIR=${config}`,
+      ...TRUECOLOR_ENV,
       ...mockSessionEnv(mock.port),
       claude,
     ]);

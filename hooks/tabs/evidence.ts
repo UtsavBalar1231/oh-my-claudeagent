@@ -1,7 +1,8 @@
 import type { RenderElement } from "claude-code";
 import { EVIDENCE_TYPES } from "../../src/core/evidence.ts";
 import { LEDGER } from "../../src/core/omca-paths.ts";
-import { COLORS, fitEnd, formatWhen, levelMark, padEnd, padStart } from "../../src/core/ui-kit.ts";
+import { fitEnd, formatWhen, padEnd, padStart } from "../../src/core/ui-kit.ts";
+import { levelMark, TONE_KEYS } from "../../src/core/visual.ts";
 import { type Host, reason, type State } from "../host.ts";
 import { noticeRow, type TabView } from "../pane.ts";
 
@@ -92,7 +93,7 @@ export const view: TabView = async (host, view) => {
       children: [
         Text({ color, children: [`${glyph} `] }),
         Text({ children: [`${padEnd(TYPE_LABEL[entry.type], TYPE)}${GAP}${padEnd(fitEnd(entry.command, commandWidth, view.g.ellipsis), commandWidth)}${GAP}`] }),
-        Text(entry.exitCode === 0 ? { dimColor: true, children: [exit] } : { color: COLORS.fail, children: [exit] }),
+        Text(entry.exitCode === 0 ? { dimColor: true, children: [exit] } : { color: TONE_KEYS.fail, children: [exit] }),
         Text({ dimColor: true, children: [`${GAP}${formatWhen(entry.at)}`] }),
       ],
     });

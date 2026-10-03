@@ -1,15 +1,7 @@
-import type { CommandRunResult, Elements, RenderElement, Timer } from "claude-code";
+import type { CommandRunResult, RenderElement, Timer } from "claude-code";
 import { configDir, type Env, homeDir, inferPlatform, type Platform } from "../src/core/path.ts";
-import {
-  COLORS,
-  displayWidth,
-  type Glyphs,
-  glyphs,
-  isAsciiRequested,
-  notice,
-  usableColumns,
-  type ViewState,
-} from "../src/core/ui-kit.ts";
+import { displayWidth, type Glyphs, glyphs, isAsciiRequested, usableColumns } from "../src/core/ui-kit.ts";
+import { notice, TONE_KEYS, type ViewState, type WidthTier, widthTier } from "../src/core/visual.ts";
 import { reconcile } from "./agents-tracker.ts";
 import type { Features, Input } from "./dispatch.ts";
 import { type Host, reason, type State, update } from "./host.ts";
@@ -21,6 +13,7 @@ import * as feedback from "./tabs/feedback.ts";
 import * as notepad from "./tabs/notepad.ts";
 import * as plan from "./tabs/plan.ts";
 import * as stats from "./tabs/stats.ts";
+import { type Kit, kitOf } from "./ui.ts";
 
 export const PANE = "omca";
 const TICK_MS = 2000;
@@ -38,12 +31,13 @@ const TAB_GAP = 2;
 
 type Pane = State["pane"];
 export type Tab = Pane["tab"];
-export type Kit = Pick<Elements["mobile"], "Box" | "Text" | "Button" | "Markdown">;
 export type Press = (work: () => unknown) => () => Promise<void>;
 export type View = {
   kit: Kit;
   g: Glyphs;
+  isAscii: boolean;
   width: number;
+  tier: WidthTier;
   rows: number;
   isInline: boolean;
   home: string;
@@ -221,7 +215,7 @@ export function keyButton(view: View, hotkey: string, label: string, work: () =>
 }
 
 export function rule(view: View): RenderElement {
-  return view.kit.Text({ dimColor: true, children: [view.g.rule.repeat(view.width)] });
+  return view.kit.Text({ color: TONE_KEYS.rule, children: [view.g.rule.repeat(view.width)] });
 }
 
 async function selectTab(host: Host, tab: Tab): Promise<void> {
@@ -265,8 +259,8 @@ function bodyRows(host: Host, e: Input<"ui.render Pane">, isInline: boolean): nu
 }
 
 async function draw(host: Host, e: Input<"ui.render Pane">): Promise<RenderElement> {
-  const { Box, Text, Button, Markdown } = host.ui.resolve(e);
-  const kit = { Box, Text, Button, Markdown };
+  const kit = kitOf(host.ui.resolve(e), e.surface);
+  const { Box, Text, Button } = kit;
   const width = usableColumns(e.props.bodyColumns);
   const isInline = e.props.placement !== "dock";
   const rows = bodyRows(host, e, isInline);
@@ -300,13 +294,14 @@ async function draw(host: Host, e: Input<"ui.render Pane">): Promise<RenderEleme
     }),
   );
   const chrome = tabs.length + (isInline ? 0 : 1);
-  const view: View = { kit, g, width, rows: Math.max(0, rows - chrome), isInline, home, platform, now, press };
+  const tier = widthTier(e.props.bodyColumns);
+  const view: View = { kit, g, isAscii, width, tier, rows: Math.max(0, rows - chrome), isInline, home, platform, now, press };
   let body: readonly RenderElement[];
   try {
     body = await viewOf(active)(host, view);
   } catch (error) {
     host.log(`omca ${active} tab failed: ${reason(error)}`);
-    body = [Text({ color: COLORS.fail, children: [`${g.cross} The ${active} tab failed: ${reason(error)}`] })];
+    body = [Text({ color: TONE_KEYS.fail, children: [`${g.cross} The ${active} tab failed: ${reason(error)}`] })];
   }
   const children = [...tabs, ...(isInline ? [] : [rule(view)]), ...body];
   return Box({ flexDirection: "column", width, ...(isInline ? { minHeight: rows } : {}), children });

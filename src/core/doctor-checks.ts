@@ -1,6 +1,6 @@
 import { EFFORTS } from "./route-hint.ts";
 import { isRecord } from "./tool-input.ts";
-import type { Level } from "./ui-kit.ts";
+import type { Level } from "./visual.ts";
 
 export type Fix = "add-refresh-interval";
 export type Check = { id: string; label: string; level: Level; detail: string; fix?: Fix };

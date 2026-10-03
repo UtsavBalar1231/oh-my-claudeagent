@@ -9,8 +9,6 @@ import {
   glyphs,
   isAsciiRequested,
   keyHint,
-  levelMark,
-  notice,
   padEnd,
   padStart,
   shortType,
@@ -107,18 +105,10 @@ describe("glyphs", () => {
     for (const [name, glyph] of Object.entries(ascii)) {
       expect({ name, ascii: /^[\x20-\x7e]+$/.test(glyph) }).toEqual({ name, ascii: true });
     }
-    for (const name of ["pointer", "check", "cross", "warn", "running", "pending", "up", "down", "dot", "rule"] as const) {
+    for (const name of ["pointer", "check", "cross", "warn", "running", "pending", "up", "down", "dot", "rule", "progress", "blocked", "agent"] as const) {
       expect({ name, unicode: displayWidth(unicode[name]), ascii: ascii[name].length }).toEqual({ name, unicode: 1, ascii: 1 });
     }
     expect(fitEnd("hello world", 6, ascii.ellipsis)).toBe("hel...");
-  });
-
-  test("level marks pair one glyph with one theme color", () => {
-    const g = glyphs(true);
-    expect(levelMark("ok", g)).toEqual({ glyph: "+", color: "success" });
-    expect(levelMark("warn", g)).toEqual({ glyph: "!", color: "warning" });
-    expect(levelMark("fail", g)).toEqual({ glyph: "x", color: "error" });
-    expect(levelMark("info", g)).toEqual({ glyph: "-", color: "inactive" });
   });
 });
 
@@ -140,21 +130,6 @@ describe("padding", () => {
     expect(padStart("ab", 5)).toBe("   ab");
     expect(padEnd("日本", 6)).toBe("日本  ");
     expect(padStart("12.3k", 3)).toBe("12.3k");
-  });
-});
-
-describe("notices", () => {
-  test("each non-populated state draws one fitted line in its own color", () => {
-    const words = { loading: "Reading the plan", empty: "No plan is bound to this session." };
-    const g = glyphs(false);
-    expect(notice({ kind: "loading" }, words, g, 40)).toEqual({ text: "Reading the plan…", color: "inactive", isDim: true });
-    expect(notice({ kind: "empty" }, words, g, 20)).toEqual({ text: "No plan is bound to…", color: "inactive", isDim: true });
-    expect(notice({ kind: "error", reason: "ENOENT: plan.md" }, words, g, 12)).toEqual({
-      text: "✗ ENOENT: p…",
-      color: "error",
-      isDim: false,
-    });
-    expect(notice({ kind: "error", reason: "ENOENT" }, words, glyphs(true), 40).text).toBe("x ENOENT");
   });
 });
 

@@ -1,5 +1,6 @@
 import type { RenderElement } from "claude-code";
-import { COLORS, displayWidth, fitEnd, formatDuration, formatTokens, levelMark, padEnd, padStart, shortType } from "../../src/core/ui-kit.ts";
+import { displayWidth, fitEnd, formatDuration, formatTokens, padEnd, padStart, shortType } from "../../src/core/ui-kit.ts";
+import { levelMark, type ThemeKey, TONE_KEYS } from "../../src/core/visual.ts";
 import type { State } from "../host.ts";
 import { noticeRow, type TabView, type View } from "../pane.ts";
 
@@ -15,10 +16,10 @@ const MIN_DESCRIPTION = 6;
 
 const shortModel = (model: string) => model.replace(/^claude-/, "").replace(/-\d{8}$/, "");
 
-function mark(row: Row, view: View): { glyph: string; color: string } {
+function mark(row: Row, view: View): { glyph: string; color: ThemeKey } {
   switch (row.status) {
     case "running":
-      return { glyph: view.g.running, color: COLORS.accent };
+      return { glyph: view.g.running, color: TONE_KEYS.active };
     case "answer":
       return levelMark("ok", view.g);
     case "aborted":
@@ -27,7 +28,7 @@ function mark(row: Row, view: View): { glyph: string; color: string } {
     case "error":
       return levelMark("fail", view.g);
     case "gone":
-      return { glyph: view.g.pending, color: COLORS.muted };
+      return { glyph: view.g.pending, color: TONE_KEYS.muted };
   }
 }
 

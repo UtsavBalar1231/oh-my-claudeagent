@@ -1,14 +1,3 @@
-export const COLORS = {
-  accent: "claude",
-  ok: "success",
-  fail: "error",
-  warn: "warning",
-  info: "suggestion",
-  muted: "inactive",
-} as const;
-
-export type Color = (typeof COLORS)[keyof typeof COLORS];
-
 const UNICODE = {
   pointer: "❯",
   check: "✓",
@@ -21,6 +10,10 @@ const UNICODE = {
   dot: "·",
   rule: "─",
   ellipsis: "…",
+  progress: "◐",
+  blocked: "⊘",
+  agent: "◆",
+  mask: "‹masked›",
 } as const;
 
 export type Glyphs = { readonly [K in keyof typeof UNICODE]: string };
@@ -37,6 +30,10 @@ const ASCII: Glyphs = {
   dot: "-",
   rule: "-",
   ellipsis: "...",
+  progress: "~",
+  blocked: "/",
+  agent: "@",
+  mask: "<masked>",
 };
 
 export function isAsciiRequested(value: string | undefined): boolean {
@@ -177,42 +174,3 @@ export function formatWhen(at: number | string): string {
 }
 
 export const shortType = (type: string): string => type.slice(type.lastIndexOf(":") + 1);
-
-export type ViewState<T> =
-  | { kind: "loading" }
-  | { kind: "error"; reason: string }
-  | { kind: "empty" }
-  | { kind: "populated"; value: T };
-
-export type Notice = { text: string; color: Color; isDim: boolean };
-
-export function notice(
-  state: Exclude<ViewState<unknown>, { kind: "populated" }>,
-  words: { loading: string; empty: string },
-  g: Glyphs,
-  width: number,
-): Notice {
-  switch (state.kind) {
-    case "loading":
-      return { text: fitEnd(`${words.loading}${g.ellipsis}`, width, g.ellipsis), color: COLORS.muted, isDim: true };
-    case "empty":
-      return { text: fitEnd(words.empty, width, g.ellipsis), color: COLORS.muted, isDim: true };
-    case "error":
-      return { text: fitEnd(`${g.cross} ${state.reason}`, width, g.ellipsis), color: COLORS.fail, isDim: false };
-  }
-}
-
-export type Level = "ok" | "warn" | "fail" | "info";
-
-export function levelMark(level: Level, g: Glyphs): { glyph: string; color: Color } {
-  switch (level) {
-    case "ok":
-      return { glyph: g.check, color: COLORS.ok };
-    case "warn":
-      return { glyph: g.warn, color: COLORS.warn };
-    case "fail":
-      return { glyph: g.cross, color: COLORS.fail };
-    case "info":
-      return { glyph: g.dot, color: COLORS.muted };
-  }
-}

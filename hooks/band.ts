@@ -1,13 +1,15 @@
-import type { ElementTable, RenderElement, TextProps } from "claude-code";
+import type { RenderElement } from "claude-code";
 import { type Band, bandView, BUTTON_GAP, oneLine, type Span, type Tone } from "../src/core/band-model.ts";
 import { resolveBoundPlan } from "../src/core/boulder.ts";
 import { allTasksDone, checkboxStates } from "../src/core/checkboxes.ts";
 import { ledgerCoversSlot } from "../src/core/evidence.ts";
 import { hasPassingFinalVerification, type NextAction, nextActions } from "../src/core/next-actions.ts";
 import { BOULDER, LEDGER, statusPath, verificationOf } from "../src/core/omca-paths.ts";
-import { COLORS, glyphs, isAsciiRequested } from "../src/core/ui-kit.ts";
+import { glyphs, isAsciiRequested } from "../src/core/ui-kit.ts";
+import { TONE_KEYS } from "../src/core/visual.ts";
 import type { Features } from "./dispatch.ts";
 import { type Host, reason } from "./host.ts";
+import { type Kit, kitOf, type TextStyle } from "./ui.ts";
 
 type Snapshot = { band: Band; hasFinalVerification: boolean };
 
@@ -105,16 +107,16 @@ async function writeActions(host: Host, actions: readonly NextAction[]): Promise
   if (JSON.stringify(value) !== JSON.stringify(actions)) await host.state.nextActions.set(actions);
 }
 
-const TONES: Record<Tone, TextProps> = {
+const TONES: Record<Tone, TextStyle> = {
   title: { bold: true },
   plain: {},
   muted: { dimColor: true },
-  ok: { color: COLORS.ok },
-  warn: { color: COLORS.warn },
-  fail: { color: COLORS.fail },
+  ok: { color: TONE_KEYS.ok },
+  warn: { color: TONE_KEYS.warn },
+  fail: { color: TONE_KEYS.fail },
 };
 
-const row = ({ Text }: ElementTable, spans: readonly Span[]): RenderElement =>
+const row = ({ Text }: Kit, spans: readonly Span[]): RenderElement =>
   Text({ wrap: "truncate-end", children: spans.map((span) => Text({ ...TONES[span.tone], children: [span.text] })) });
 
 export const band: Features = {
@@ -151,7 +153,7 @@ export const band: Features = {
       ]);
       const view = bandView(snapshot, actions, e.props.bodyColumns, glyphs(isAscii));
       if (view === undefined) return undefined;
-      const kit = host.ui.resolve(e);
+      const kit = kitOf(host.ui.resolve(e), e.surface);
       const { Box, Button } = kit;
       const rows = [Box({ key: "status", children: [row(kit, view.status)] })];
       if (view.buttons.length > 0) {
