@@ -27,6 +27,10 @@ revision 2026-07-28 and every 2025-era client from the same stdio loop, with no 
 - The tool contract is language-neutral: tool names and input schemas are named by agents,
   skills and user allowlists as `mcp__plugin_oh-my-claudeagent_omca__<tool>`, so changing
   one is a breaking change. `.claude/rules/mcp-server.md` has the declaration contract.
+- Only `evidence_log`, `boulder_progress` and `notepad_write` declare
+  `_meta["anthropic/alwaysLoad"]: true`, and `.mcp.json` sets no server-level `alwaysLoad`, so
+  every other tool waits behind tool search. `OMCA_TOOLS` in `hooks/subagent-context.ts` states
+  the loading rule once, for the server instructions and the SubagentStart context.
 - Run the specs with `just test-mcp` (`bun test servers`); `just typecheck-ts` covers this
   directory through `tsconfig.runtime.json`.
 - Keep a tool description under 2,048 characters; Claude Code truncates past that.

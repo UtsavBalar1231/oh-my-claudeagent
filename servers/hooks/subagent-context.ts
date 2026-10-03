@@ -12,6 +12,8 @@ const OUTPUT_MANDATE =
   "[OUTPUT MANDATE] Your text response is the ONLY output the orchestrator receives. Tool call results and intermediate reasoning are NOT forwarded. Structure your response according to your agent's defined output format.";
 const FILE_TOOLS =
   "[FILE TOOLS] Read files with the Read tool, not cat, head, tail, or sed -n in Bash: Read numbers the lines and pages a large file with offset and limit.";
+export const OMCA_TOOLS =
+  "`evidence_log`, `boulder_progress` and `notepad_write` are always available. Load any other omca tool with ToolSearch first, by its full name: `select:mcp__plugin_oh-my-claudeagent_omca__ast_search`. A guessed prefix finds nothing.";
 
 const EDITING_GUIDANCE = [
   "[EDITS] Change an existing file with Edit, which touches only the lines that need it, rather than rewriting it with Write or a shell heredoc. Read the file before you Edit it, so old_string matches its current content.",
@@ -69,6 +71,7 @@ export const handle: Handler = (payload, { root, now }) => {
     `\n[CURRENT DATE] Today is ${date}.`,
     `\n${OUTPUT_MANDATE}`,
     `\n${FILE_TOOLS}`,
+    `\n[OMCA TOOLS] ${OMCA_TOOLS}`,
     plan.length > 0 ? section("Plan Context", lines(plan)) : "",
     guidance.length > 0 ? section("Execution Guidance", lines(guidance)) : "",
     isOrchestrator ? "" : section("Worker Output Contract", `${LEAF_WORKER}\n${NEVER_STUB}`),

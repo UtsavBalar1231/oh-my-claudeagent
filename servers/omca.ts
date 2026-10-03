@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import { readFileSync } from "node:fs";
+import { OMCA_TOOLS } from "./hooks/subagent-context.ts";
 import { ensureStateDir, projectRoot } from "./io.ts";
 import { isRecord } from "../src/core/tool-input.ts";
 import { type Context, createDispatcher, INVALID_PARAMS, RpcError, type Handler, type Params } from "./jsonrpc.ts";
@@ -32,7 +33,7 @@ export type Tool = {
 const INSTRUCTIONS = [
   "oh-my-claudeagent (OMCA) tools: verification evidence, work-plan tracking, notepads that survive compaction, structural code search, and reads outside the project root. State lives under `.omca/` and is written only through these tools; never hand-edit it.",
   "",
-  "`evidence_log`, `boulder_progress` and `notepad_write` are always available. Load any other omca tool with ToolSearch first, by its full name: `select:mcp__plugin_oh-my-claudeagent_omca__ast_search`. A guessed prefix finds nothing.",
+  OMCA_TOOLS,
   "",
   "Reach for a tool when:",
   "",

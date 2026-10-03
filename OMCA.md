@@ -789,6 +789,8 @@ Three MCP servers are bundled via `.mcp.json` and launched by Claude Code.
 
 Unified server for structural code search, plan tracking, verification, notepads, and filesystem access. It also answers the `omca_hook` calls the settings hooks make; the model does not call that tool.
 
+Only `evidence_log`, `boulder_progress` and `notepad_write` load with the first request. Every other omca tool, `omca_hook` included, waits behind tool search and loads with `select:mcp__plugin_oh-my-claudeagent_omca__<tool>`, which saves about 3,750 tokens on every request where tool search is on. The server instructions carry that rule to the main session and the SubagentStart context carries it to subagents, which do not receive server instructions. Hooks call the server directly, so deferral does not affect them, and the UserPromptSubmit hook holds the first turn until the server is up. Under a gateway or base URL that turns tool search off, every tool loads up front.
+
 **AST tools** — Structural code search using ast-grep:
 
 | Tool | Purpose |

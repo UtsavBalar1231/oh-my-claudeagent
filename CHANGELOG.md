@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Most omca tools load on demand.** Only `evidence_log`, `boulder_progress` and
+  `notepad_write` load with the first request; the rest load through tool search by their full
+  name, which saves about 3,750 tokens per request where tool search is on.
 - **The status lines run on bun through a launcher.** `/oh-my-claudeagent:omca-setup` copies
   `statusline/launcher.ts` to `~/.claude/omca/statusline.ts`, prints a diff of
   `~/.claude/settings.json`, and after you confirm it sets `statusLine` and
