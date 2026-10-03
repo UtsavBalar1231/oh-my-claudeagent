@@ -106,8 +106,8 @@ describe("chip", () => {
   });
 
   test("a column chip pads inside its background in Unicode and after its brackets in ASCII", () => {
-    expect(columnChip("TEST", "neutral", false, 6)).toEqual([{ text: " TEST   ", color: "text", backgroundColor: "selectionBg", bold: true }]);
-    expect(columnChip("TEST", "neutral", true, 6)).toEqual([{ text: "[TEST]", color: "text", backgroundColor: "selectionBg", bold: true }, { text: "  " }]);
+    expect(columnChip("TEST", "neutral", false, 6)).toEqual([{ text: " TEST   ", color: "text", backgroundColor: "userMessageBackground", bold: true }]);
+    expect(columnChip("TEST", "neutral", true, 6)).toEqual([{ text: "[TEST]", color: "text", backgroundColor: "userMessageBackground", bold: true }, { text: "  " }]);
     expect(columnChip("FINAL", "plan", true, 6)).toEqual([{ text: "[FINAL]", color: "inverseText", backgroundColor: "planMode", bold: true }, { text: " " }]);
     expect(columnChip("MANUAL", "neutral", true, 6).map((piece) => piece.text)).toEqual(["[MANUAL]"]);
   });
@@ -419,13 +419,13 @@ describe("contrast", () => {
     }
   });
 
-  test("every chip tone is a drawn pair, and a neutral chip is text on the focus wash", () => {
+  test("every chip tone is a drawn pair, and a neutral chip is text on the raised surface", () => {
     for (const tone of [...CHIP_TONES, "neutral"] as const) {
       const { color, backgroundColor } = chip("X", tone, false);
       const isDrawn = DRAWN_PAIRS.some((pair) => pair.fg === color && pair.bg === backgroundColor);
       expect({ tone, isDrawn }).toEqual({ tone, isDrawn: true });
     }
-    expect(chip("TEST", "neutral", false)).toEqual({ text: " TEST ", color: "text", backgroundColor: "selectionBg", bold: true });
+    expect(chip("TEST", "neutral", false)).toEqual({ text: " TEST ", color: "text", backgroundColor: "userMessageBackground", bold: true });
   });
 
   test("a bar track is a quiet mark on the pane in both themes, never as loud as data", () => {

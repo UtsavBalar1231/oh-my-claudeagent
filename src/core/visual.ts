@@ -143,12 +143,13 @@ export const DRAWN_PAIRS: readonly Pair[] = [
   { fg: ON_SURFACE, bg: TONE_KEYS.focus, isShortBold: false },
 ];
 
-// A label that carries no state, such as an evidence type, is `text` on `selectionBg`.
+// A label that carries no state, such as an evidence type, is `text` on the raised surface: on
+// `selectionBg` a column of them read as the focused row.
 export type ChipKind = ChipTone | "neutral";
 
 export function chip(label: string, kind: ChipKind, ascii: boolean): Piece {
   const text = fitEnd(label, CHIP_MAX, ascii ? "..." : "…");
-  const colors = kind === "neutral" ? { color: ON_SURFACE, backgroundColor: TONE_KEYS.focus } : { color: CHIP_TEXT, backgroundColor: TONE_KEYS[kind] };
+  const colors = kind === "neutral" ? { color: ON_SURFACE, backgroundColor: TONE_KEYS.raised } : { color: CHIP_TEXT, backgroundColor: TONE_KEYS[kind] };
   return { text: ascii ? `[${text}]` : ` ${text} `, ...colors, bold: true };
 }
 
