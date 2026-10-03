@@ -108,10 +108,12 @@ in forward-slash form and double-quoted, so a path with spaces or a Windows driv
 ```
 
 A plugin `settings.json` cannot carry `statusLine` (Claude Code drops the key), so the command
-goes through the launcher. It runs `main.ts` from the newest version directory under
-`~/.claude/plugins/cache/omca/oh-my-claudeagent/`, comparing version numbers numerically, so the
-status line follows plugin updates without another setup run. `CLAUDE_CONFIG_DIR` replaces
-`~/.claude` in that path. With no installed version, as in a `--plugin-dir` checkout, it prints
+goes through the launcher. It reads where Claude Code installed the plugin from
+`~/.claude/plugins/installed_plugins.json`, under any marketplace name and version, skips an
+install that `enabledPlugins` in `~/.claude/settings.json` switches off or that has no renderer
+(a 2.x one), and runs `main.ts` from the most recently updated of the rest. The status line
+therefore follows plugin updates without another setup run. `CLAUDE_CONFIG_DIR` replaces
+`~/.claude` in those paths. With no installed version, as in a `--plugin-dir` checkout, it prints
 `omca: no installed plugin version found`.
 
 `refreshInterval: 5` re-runs the command every 5 seconds, which keeps disk-sourced state (git
@@ -209,7 +211,7 @@ Status and remote run at the same time.
 | `render.ts` | Payload types, the segments, the layout (`arrange`), and every formatting helper. |
 | `git.ts` | Branch, status counts, remote, and the cache. |
 | `subagent.ts` | Entry point for the subagent rows. |
-| `launcher.ts` | Copied to `~/.claude/omca/statusline.ts`; runs the newest installed renderer. |
+| `launcher.ts` | Copied to `~/.claude/omca/statusline.ts`; runs the renderer of the enabled install Claude Code updated last. |
 | `*.spec.ts` | `bun test statusline`. |
 
 `fixtures.spec.ts` renders every case in `tests/fixtures/statusline/`, compares it byte for byte

@@ -18,8 +18,9 @@ on bun. Read `README.md` first for what they show and how they are configured.
 - `subagent.ts`: entry point for the subagent rows. It shares the palette, glyphs and width
   helpers exported by `render.ts`.
 - `launcher.ts`: setup copies it to `~/.claude/omca/statusline.ts`, outside the plugin, so it
-  imports nothing relative. It runs `main.ts`, or `subagent.ts` with `--subagent`, from the newest
-  installed plugin version.
+  imports nothing relative. It runs `main.ts`, or `subagent.ts` with `--subagent`, from the
+  enabled install that `plugins/installed_plugins.json` records most recently, under any
+  marketplace name and version.
 - `subagent.spec.ts`, `launcher.spec.ts`: run the entry points as processes and compare stdout.
 
 ## Conventions

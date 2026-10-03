@@ -84,7 +84,7 @@ The `statuslineMode` plugin option is `${user_config.statuslineMode}`. Claude Co
 
    On no, change nothing and print that command so the user can run it later.
 
-The launcher runs the renderer from the newest installed plugin version, so a plugin update needs no second setup run. In a `--plugin-dir` checkout, with no installed version, the status line reads `omca: no installed plugin version found`.
+The launcher runs the renderer of the enabled plugin install that Claude Code recorded most recently, under any marketplace, so a plugin update needs no second setup run. In a `--plugin-dir` checkout, with no installed version, the status line reads `omca: no installed plugin version found`.
 
 ### Phase 4: Force-style opt-out
 
