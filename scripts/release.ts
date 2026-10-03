@@ -8,10 +8,11 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const USAGE = "Usage: bun scripts/release.ts <version>";
-const VERSION = /^\d+\.\d+\.\d+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$/;
+export const SEMVER = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?(?:\+[0-9A-Za-z][0-9A-Za-z.-]*)?$/;
 const PLUGIN = ".claude-plugin/plugin.json";
 const MARKETPLACE = ".claude-plugin/marketplace.json";
 const PACKAGE = "package.json";
+const MANIFESTS = [PLUGIN, MARKETPLACE, PACKAGE];
 
 type Versioned = { version: string };
 type Marketplace = { metadata: Versioned; plugins: Array<Versioned & { source: { sha?: string } }> };
@@ -33,7 +34,7 @@ function edit<T>(root: string, path: string, change: (json: T) => void): void {
 }
 
 function refuse(root: string, version: string): string | undefined {
-  if (!VERSION.test(version)) return `"${version}" is not a version such as 3.0.0 or 3.0.0-rc.1`;
+  if (!SEMVER.test(version)) return `"${version}" is not a version such as 3.0.0 or 3.0.0-rc.1`;
   if (git(root, ["status", "--porcelain", "--untracked-files=no"]) !== "") {
     return "the working tree has uncommitted changes; commit or stash them first";
   }
@@ -46,29 +47,37 @@ function refuse(root: string, version: string): string | undefined {
 }
 
 export function release(root: string, version: string): { bump: string; stamp: string } {
-  edit<Versioned>(root, PLUGIN, (json) => {
-    json.version = version;
-  });
-  edit<Marketplace>(root, MARKETPLACE, (json) => {
-    json.metadata.version = version;
-    json.plugins[0].version = version;
-  });
-  edit<Versioned>(root, PACKAGE, (json) => {
-    json.version = version;
-  });
-  git(root, ["add", PLUGIN, MARKETPLACE, PACKAGE]);
-  git(root, ["commit", "-m", `chore(release): bump version to ${version}`]);
-  const bump = git(root, ["rev-parse", "HEAD"]);
+  const start = git(root, ["rev-parse", "HEAD"]);
+  try {
+    edit<Versioned>(root, PLUGIN, (json) => {
+      json.version = version;
+    });
+    edit<Marketplace>(root, MARKETPLACE, (json) => {
+      json.metadata.version = version;
+      json.plugins[0].version = version;
+    });
+    edit<Versioned>(root, PACKAGE, (json) => {
+      json.version = version;
+    });
+    git(root, ["add", ...MANIFESTS]);
+    git(root, ["commit", "-m", `chore(release): bump version to ${version}`]);
+    const bump = git(root, ["rev-parse", "HEAD"]);
 
-  edit<Marketplace>(root, MARKETPLACE, (json) => {
-    json.plugins[0].source.sha = bump;
-  });
-  git(root, ["add", MARKETPLACE]);
-  git(root, ["commit", "-m", `chore(release): stamp v${version} SHA`]);
-  const stamp = git(root, ["rev-parse", "HEAD"]);
+    edit<Marketplace>(root, MARKETPLACE, (json) => {
+      json.plugins[0].source.sha = bump;
+    });
+    git(root, ["add", MARKETPLACE]);
+    git(root, ["commit", "-m", `chore(release): stamp v${version} SHA`]);
+    const stamp = git(root, ["rev-parse", "HEAD"]);
 
-  git(root, ["tag", `v${version}`, bump]);
-  return { bump, stamp };
+    git(root, ["tag", `v${version}`, bump]);
+    return { bump, stamp };
+  } catch (error) {
+    // The manifests were clean when the run began, so restoring only them loses nothing the run did not write.
+    git(root, ["restore", `--source=${start}`, "--staged", "--worktree", "--", ...MANIFESTS]);
+    git(root, ["reset", "--keep", start]);
+    throw new Error(`${error instanceof Error ? error.message : String(error)}\nrestored the tree to ${start}`);
+  }
 }
 
 export function main(args: string[], root: string): Outcome {

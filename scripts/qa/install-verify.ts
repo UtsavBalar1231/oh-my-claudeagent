@@ -7,7 +7,7 @@
 // Exit: 0 pass, 1 a check failed, 2 the run could not be set up.
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { type Checks, childEnv, REPO, runQa } from "./lib.ts";
+import { type Checks, childEnv, claudeBin, REPO, runQa } from "./lib.ts";
 
 const FIXTURES = join(REPO, "tests", "fixtures", "mcp");
 const HANDSHAKE_TIMEOUT_MS = 45_000;
@@ -30,15 +30,16 @@ export function checkHookModules(checks: Checks, pluginDir: string): void {
   else if (missing.length === 0) checks.pass(`all ${modules.length} hook modules resolve inside the packaged tree`);
 }
 
-async function checkPluginValidate(checks: Checks, pluginDir: string, configDir: string): Promise<void> {
-  const proc = Bun.spawn([Bun.which(process.env.QA_CLAUDE_BIN ?? "claude") ?? "claude", "plugin", "validate", pluginDir], {
+export async function checkPluginValidate(checks: Checks, pluginDir: string, configDir: string): Promise<void> {
+  const manifest = join(pluginDir, ".claude-plugin", "plugin.json");
+  const proc = Bun.spawn([claudeBin(), "plugin", "validate", manifest], {
     stdin: "ignore",
     stdout: "pipe",
     stderr: "pipe",
     env: childEnv({ CLAUDE_CONFIG_DIR: configDir, DISABLE_AUTOUPDATER: "1" }),
   });
   const [code, stdout, stderr] = await Promise.all([proc.exited, new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
-  checks.check(code === 0, `claude plugin validate: ${pluginDir}`, `claude plugin validate exited ${code}: ${(stdout + stderr).trim()}`);
+  checks.check(code === 0, `claude plugin validate: ${manifest}`, `claude plugin validate exited ${code}: ${(stdout + stderr).trim()}`);
 }
 
 async function handshake(argv: string[], cwd: string, requests: string[]): Promise<{ responses: Map<number, RpcResponse>; stderr: string }> {

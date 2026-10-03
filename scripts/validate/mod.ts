@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { type Check, type Context, exists, type Outcome, verdict } from "./core.ts";
+import { type Check, type Context, exists, type Outcome, pass, verdict } from "./core.ts";
 
 export const REGISTER = "hooks/register.ts";
 
@@ -86,9 +86,17 @@ export function compactMessages(sources: readonly Source[]): Outcome {
   return verdict(problems, "no session.compact handler answers with messages");
 }
 
+function registerPresent(ctx: Context): Outcome {
+  const source = hookSources(ctx).find((candidate) => candidate.path === REGISTER);
+  if (source === undefined) return { status: "fail", detail: `${REGISTER} is missing` };
+  const count = registrations([source]).length;
+  return count === 0 ? { status: "fail", detail: `${REGISTER} registers no on() handler` } : pass(`${REGISTER} makes ${count} registrations`);
+}
+
 const onSources = (check: (sources: readonly Source[]) => Outcome) => (ctx: Context) => check(hookSources(ctx));
 
 export const checks: readonly Check[] = [
+  { name: "mod register.ts", run: registerPresent },
   { name: "mod guarded events", run: onSources(guardedEvents) },
   { name: "mod on() location", run: onSources(onLocation) },
   { name: "mod tool.call filter", run: onSources(toolCall) },

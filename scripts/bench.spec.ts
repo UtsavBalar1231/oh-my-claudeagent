@@ -1,4 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { specEnv, tmpEnv } from "../tests/fixtures/spec-env.ts";
 import { agentScenario, bashScenario, mcpCommand, median, pairOrder, readSessionLog, type SessionLog, summarize } from "./bench.ts";
 
 const logLine = (fields: { client?: string; queue?: string; tool_results?: number; arrival_ms: number }) =>
@@ -37,6 +41,11 @@ describe("summarize", () => {
 
   test("gives a negative difference when the candidate is faster", () => {
     expect(summarize([8, 8], [6, 7]).median_paired_diff).toBe(-1.5);
+  });
+
+  test("gives no percentage when the baseline median is zero or negative", () => {
+    expect(summarize([0, 0, 0], [1, 2, 3]).median_paired_diff_pct).toBeNull();
+    expect(summarize([-2, -1, -3], [1, 2, 3]).median_paired_diff_pct).toBeNull();
   });
 
   test("refuses samples of different lengths", () => {
@@ -142,5 +151,25 @@ describe("mcpCommand", () => {
 
   test("refuses a config without an omca server", () => {
     expect(() => mcpCommand(JSON.stringify({ mcpServers: {} }), "/p", "/d")).toThrow("no omca server in .mcp.json");
+  });
+});
+
+describe("a bad ref", () => {
+  test("reports the ref error itself and leaves no scratch directory behind", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "omca-bench-spec-"));
+    try {
+      const run = Bun.spawnSync([process.execPath, join(import.meta.dir, "bench.ts"), "--baseline-ref", "omca-no-such-ref"], {
+        env: specEnv(tmpEnv(tmp)),
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+      const stderr = run.stderr.toString();
+      expect(run.exitCode).toBe(1);
+      expect(stderr).toContain("omca-no-such-ref^{commit} exited 128");
+      expect(stderr).not.toContain("worktree remove");
+      expect(readdirSync(tmp)).toEqual([]);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
   });
 });

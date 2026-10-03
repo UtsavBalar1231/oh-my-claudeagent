@@ -39,6 +39,7 @@ function handlerShape(ctx: Context): Outcome {
 
 function sessionStartMatcher(ctx: Context): Outcome {
   const groups = asList(asRecord(hooksJson(ctx).hooks).SessionStart).map(asRecord);
+  if (groups.length === 0) return { status: "fail", detail: "hooks.json has no SessionStart entry" };
   const problems = groups.flatMap((group, index) =>
     group.matcher === SESSION_START_MATCHER ? [] : [`SessionStart entry ${index + 1} has matcher ${JSON.stringify(group.matcher)}, expected "${SESSION_START_MATCHER}"`],
   );

@@ -8,9 +8,19 @@ const marketplace = (plugin: Record<string, unknown>, metadata: Record<string, u
   json({ name: "omca", metadata, plugins: [{ name: "oh-my-claudeagent", version: "1.2.3", ...plugin }] });
 
 describe("manifest checks", () => {
-  test("every check passes on a consistent tree", async () => {
+  test("every check passes on a consistent tree, skipping only the source check that has no path source to read", async () => {
     const ctx = fixture();
-    for (const check of checks) expect(await check.run(ctx)).toMatchObject({ status: "pass" });
+    for (const check of checks) {
+      const expected = check.name === "marketplace source" ? "skip" : "pass";
+      expect(await check.run(ctx)).toMatchObject({ status: expected });
+    }
+  });
+
+  test("marketplace source: a tree with no string source skips and names why", async () => {
+    expect(await runNamed(checks, "marketplace source", fixture())).toEqual({
+      status: "skip",
+      detail: "no marketplace plugin has a path source, only a github or other object source",
+    });
   });
 
   test("json valid: a file that does not parse fails and is named", async () => {
@@ -81,6 +91,17 @@ describe("manifest checks", () => {
         status: "fail",
         detail: 'package.json version is "0.0.1", plugin.json says "1.2.3"',
       });
+    });
+
+    test("build metadata is semver, and an empty one is not", async () => {
+      const at = (version: string) =>
+        fixture({
+          ".claude-plugin/plugin.json": json({ name: "oh-my-claudeagent", version }),
+          ".claude-plugin/marketplace.json": marketplace({ version }, { version }),
+          "package.json": json({ version }),
+        });
+      expect(await runNamed(checks, "versions equal", at("1.2.3+build"))).toMatchObject({ status: "pass" });
+      expect(await runNamed(checks, "versions equal", at("1.2.3+"))).toEqual({ status: "fail", detail: 'plugin.json version "1.2.3+" is not semver' });
     });
 
     test("a plugin.json version that is not semver fails even when all four agree", async () => {

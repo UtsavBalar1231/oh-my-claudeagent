@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { specEnv } from "../tests/fixtures/spec-env.ts";
@@ -78,6 +78,40 @@ describe("release", () => {
   });
 });
 
+describe("a failed release", () => {
+  const hook = (script: string) => {
+    write(".git/hooks/pre-commit", `#!/bin/sh\n${script}\n`)
+    chmodSync(join(root, ".git/hooks/pre-commit"), 0o755)
+  }
+  const manifests = () => [".claude-plugin/plugin.json", ".claude-plugin/marketplace.json", "package.json"].map((path) => readFileSync(join(root, path), "utf8"))
+
+  test("a pre-commit hook that rejects the bump leaves the tree, HEAD and tags as they were", () => {
+    hook("exit 1")
+    const head = git("rev-parse", "HEAD")
+    const before = manifests()
+    const { code, stderr } = main(["3.0.0-rc.1"], root)
+    expect(code).toBe(1)
+    expect(stderr).toContain(`restored the tree to ${head}`)
+    expect(git("status", "--porcelain")).toBe("")
+    expect(git("rev-parse", "HEAD")).toBe(head)
+    expect(git("tag", "--list")).toBe("")
+    expect(manifests()).toEqual(before)
+    hook("exit 0")
+    expect(main(["3.0.0-rc.1"], root).code).toBe(0)
+  })
+
+  test("a failure after the bump commit rewinds to the starting commit and keeps no tag", () => {
+    hook('[ "$(git rev-list --count HEAD)" -gt 1 ] && exit 1\nexit 0')
+    const head = git("rev-parse", "HEAD")
+    const { code, stderr } = main(["3.0.0-rc.1"], root)
+    expect(code).toBe(1)
+    expect(stderr).toContain(`restored the tree to ${head}`)
+    expect(git("status", "--porcelain")).toBe("")
+    expect(git("rev-parse", "HEAD")).toBe(head)
+    expect(git("tag", "--list")).toBe("")
+  })
+})
+
 describe("main", () => {
   test("a release prints how to push and has no remote to push to", () => {
     const { code, stdout, stderr } = main(["3.0.0-rc.1"], root);
@@ -109,8 +143,17 @@ describe("main", () => {
     expect(json("package.json").version).toBe("1.0.0");
   });
 
+  test("accepts a version with build metadata, as the manifest check does", () => {
+    write("CHANGELOG.md", `${CHANGELOG}\n## [3.0.0+build.5] - 2026-10-04\n`);
+    git("commit", "-q", "-am", "changelog");
+    const { code, stderr } = main(["3.0.0+build.5"], root);
+    expect(stderr).toBe("");
+    expect(code).toBe(0);
+    expect(git("tag", "--list")).toBe("v3.0.0+build.5");
+  });
+
   test("refuses a version that is not semver", () => {
-    for (const version of ["3", "v3.0.0", "3.0.0 -x", "3.0.0-"]) {
+    for (const version of ["3", "v3.0.0", "3.0.0 -x", "3.0.0-", "3.0.0+"]) {
       expect(main([version], root).stderr).toContain("is not a version");
     }
   });

@@ -36,6 +36,25 @@ describe("depersonalization", () => {
     });
   });
 
+  test("a home path with no trailing slash fails at a line end, before whitespace, a quote or a bracket", async () => {
+    const lines = [`CLAUDE_CONFIG_DIR=${"/ho"}me/alice`, `cd ${"/Us"}ers/bob && ls`, `"${"/ho"}me/carol"`, `(${"/ho"}me/dave)`];
+    const ctx = fixture({ "agents/leak.md": `${lines.join("\n")}\n` });
+    expect(await runNamed(checks, "depersonalization", ctx)).toEqual({
+      status: "fail",
+      detail: ["/ho" + "me/alice", "/Us" + "ers/bob", "/ho" + "me/carol", "/ho" + "me/dave"]
+        .map((path, index) => `agents/leak.md:${index + 1}: home-path literal '${path}'`)
+        .join("; "),
+    });
+  });
+
+  test("a placeholder and an allowlisted path pass with or without the trailing slash", async () => {
+    const ctx = fixture({
+      "agents/leak.md": `${"/ho"}me/user\n${"/Us"}ers/user/\n${"/ho"}me/alice\n${"/ho"}me/bob/\n`,
+      "scripts/validate/allowlist.txt": `agents/leak.md:${"/ho"}me/alice/\nagents/leak.md:${"/ho"}me/bob\n`,
+    });
+    expect(await runNamed(checks, "depersonalization", ctx)).toMatchObject({ status: "pass" });
+  });
+
   test("documentation placeholders and variable references are not leaks", async () => {
     const ctx = leak(`${"/ho"}me/user/x ${"/Us"}ers/user/x GITHUB_${"TOKEN"}=$VALUE GITHUB_${"TOKEN"}=<token> API_${"KEY"}="x"`);
     expect(await runNamed(checks, "depersonalization", ctx)).toMatchObject({ status: "pass" });
@@ -59,6 +78,13 @@ describe("depersonalization", () => {
   test("a tree with nothing under the scan roots fails", async () => {
     const ctx = fixture({}, { tracked: () => ["CHANGELOG.md"] });
     expect(await runNamed(checks, "depersonalization", ctx)).toEqual({ status: "fail", detail: "no tracked files found under the scan roots" });
+  });
+});
+
+describe("phantom payload fields on an empty tree", () => {
+  test("a tree with no hook handler file fails", async () => {
+    const ctx = fixture({}, { tracked: () => ["agents/demo.md"] });
+    expect(await runNamed(checks, "phantom payload fields", ctx)).toEqual({ status: "fail", detail: "no hook handler files found to scan" });
   });
 });
 

@@ -30,10 +30,10 @@ describe("main", () => {
     expect(lines.at(-1)).toBe(`Summary: ${count} passed, 0 failed, 0 skipped, 0 warned`);
   });
 
-  test("the claims group passes on a consistent tree and skips the references check that has nothing to read", async () => {
+  test("the claims group passes on a consistent tree and skips the source and references checks that have nothing to read", async () => {
     const result = await main(["--check", "claims"], gitTree());
     expect(result.code).toBe(0);
-    expect(summary(result.stdout)).toBe(`Summary: ${GROUPS.claims.length - 1} passed, 0 failed, 1 skipped, 0 warned`);
+    expect(summary(result.stdout)).toBe(`Summary: ${GROUPS.claims.length - 2} passed, 0 failed, 2 skipped, 0 warned`);
   });
 
   test("a failing check exits 1, prints its FAIL line and counts it in the summary", async () => {
@@ -54,7 +54,7 @@ describe("main", () => {
   test("--marketplace points the marketplace checks at another file and requires ./ path sources", async () => {
     const root = gitTree({ "other-marketplace.json": json({ name: "x", metadata: { version: "1.2.3" }, plugins: [{ name: "oh-my-claudeagent", version: "1.2.3", source: "." }] }) });
     const plain = await main(["--check", "claims"], root);
-    expect(plain.stdout).toContain("PASS: marketplace source:");
+    expect(plain.stdout).toContain("SKIP: marketplace source:");
     const override = await main(["--check", "claims", "--marketplace", join(root, "other-marketplace.json")], root);
     expect(override.code).toBe(1);
     expect(override.stdout).toContain("FAIL: marketplace source: oh-my-claudeagent source '.' is not a ./ path\n");

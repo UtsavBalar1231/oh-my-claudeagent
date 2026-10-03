@@ -4,6 +4,8 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { checkEdit, checkShell } from "./guard.ts"
 
+const shell = (command: string) => checkShell(command, process.cwd())
+
 const RM_CATASTROPHIC =
   "Destructive rm -rf blocked: the target is the filesystem root, home, the working directory, or a directory directly under root or home. Name a deeper path explicitly."
 const GIT =
@@ -36,69 +38,77 @@ afterEach(() => {
 
 describe("decisions", () => {
   test("a hard reset is denied with the git reason", () => {
-    expect(checkShell("git reset --hard HEAD~1")).toEqual({ deny: true, reason: GIT })
+    expect(shell("git reset --hard HEAD~1")).toEqual({ deny: true, reason: GIT })
   })
 
   test("git status is allowed", () => {
-    expect(checkShell("git status")).toEqual({ deny: false })
+    expect(shell("git status")).toEqual({ deny: false })
   })
 
   test("a recursive removal of /home is denied as catastrophic", () => {
-    expect(checkShell("rm -rf /home")).toEqual({ deny: true, reason: RM_CATASTROPHIC })
+    expect(shell("rm -rf /home")).toEqual({ deny: true, reason: RM_CATASTROPHIC })
   })
 
   test("an advisory match runs, since there is no dialog to hold it in", () => {
-    expect(checkShell("rm -rf build")).toEqual({ deny: false })
-    expect(checkShell("git push --force origin main")).toEqual({ deny: false })
+    expect(shell("rm -rf build")).toEqual({ deny: false })
+    expect(shell("git push --force origin main")).toEqual({ deny: false })
   })
 
   test("a blocking match alongside an advisory one is denied with the git reason", () => {
-    expect(checkShell("rm -rf build && git stash")).toEqual({ deny: true, reason: GIT })
+    expect(shell("rm -rf build && git stash")).toEqual({ deny: true, reason: GIT })
   })
 
   test("a quoted mention of a destructive command is allowed", () => {
-    expect(checkShell('git commit -m "stop using rm -rf / and git reset --hard"')).toEqual({ deny: false })
+    expect(shell('git commit -m "stop using rm -rf / and git reset --hard"')).toEqual({ deny: false })
   })
 
   test("bash-guard in OMCA_DISABLED_HOOKS turns off the git deny, never the catastrophic one", () => {
     process.env.OMCA_DISABLED_HOOKS = "verification-recorder,bash-guard"
-    expect(checkShell("git reset --hard")).toEqual({ deny: false })
-    expect(checkShell("rm -rf ~")).toEqual({ deny: true, reason: RM_CATASTROPHIC })
+    expect(shell("git reset --hard")).toEqual({ deny: false })
+    expect(shell("rm -rf ~")).toEqual({ deny: true, reason: RM_CATASTROPHIC })
   })
 
   test("the working directory and its parents are denied, a path below it runs", () => {
     const cwd = process.cwd()
     const denied = { deny: true, reason: RM_CATASTROPHIC }
-    expect(checkShell(`rm -rf ${cwd}`)).toEqual(denied)
-    expect(checkShell(`rm -rf ${cwd}/*`)).toEqual(denied)
-    expect(checkShell(`rm -rf ${dirname(cwd)}`)).toEqual(denied)
-    expect(checkShell(`rm -rf ${cwd}/build/out`)).toEqual({ deny: false })
+    expect(shell(`rm -rf ${cwd}`)).toEqual(denied)
+    expect(shell(`rm -rf ${cwd}/*`)).toEqual(denied)
+    expect(shell(`rm -rf ${dirname(cwd)}`)).toEqual(denied)
+    expect(shell(`rm -rf ${cwd}/build/out`)).toEqual({ deny: false })
+  })
+
+  test("the project directory is guarded when the process runs from its parent", () => {
+    const project = join(tmp, "work", "proj")
+    const denied = { deny: true, reason: RM_CATASTROPHIC }
+    expect(checkShell(`rm -rf ${project}`, project)).toEqual(denied)
+    expect(checkShell(`rm -rf ${project}/*`, project)).toEqual(denied)
+    expect(checkShell(`rm -rf ${project}/build`, project)).toEqual({ deny: false })
   })
 
   test("home is read from the environment, in any spelling", () => {
     process.env.HOME = "/home/bob"
     process.env.USERPROFILE = "/home/bob"
     const denied = { deny: true, reason: RM_CATASTROPHIC }
-    expect(checkShell("rm -rf /home/bob")).toEqual(denied)
-    expect(checkShell("rm -rf /home/bob/dev")).toEqual(denied)
-    expect(checkShell("rm -rf $USERPROFILE")).toEqual(denied)
-    expect(checkShell("rm -rf /home/bob/dev/x")).toEqual({ deny: false })
+    expect(shell("rm -rf /home/bob")).toEqual(denied)
+    expect(shell("rm -rf /home/bob/dev")).toEqual(denied)
+    expect(shell("rm -rf $USERPROFILE")).toEqual(denied)
+    expect(shell("rm -rf /home/bob/dev/x")).toEqual({ deny: false })
   })
 
   test("drive roots and Git Bash mounts are denied, and an always-set variable is not", () => {
     const denied = { deny: true, reason: RM_CATASTROPHIC }
-    expect(checkShell("rm -rf C:\\")).toEqual(denied)
-    expect(checkShell("rm -rf /c")).toEqual(denied)
-    expect(checkShell("rm -rf /c/Users")).toEqual(process.platform === "win32" ? denied : { deny: false })
-    expect(checkShell("rm -rf //srv/share")).toEqual(denied)
-    expect(checkShell('rm -rf "$TMPDIR/foo"')).toEqual({ deny: false })
+    expect(shell("rm -rf C:\\")).toEqual(denied)
+    expect(shell("rm -rf /c")).toEqual(denied)
+    expect(shell("rm -rf /c/Users")).toEqual(process.platform === "win32" ? denied : { deny: false })
+    expect(shell("rm -rf //srv/share")).toEqual(denied)
+    expect(shell('rm -rf "$TMPDIR/foo"')).toEqual({ deny: false })
   })
 
   test("git behind an .exe suffix or a path is denied, and a quoted heredoc body is not a command", () => {
-    expect(checkShell("git.exe reset --hard")).toEqual({ deny: true, reason: GIT })
-    expect(checkShell('"C:\\Program Files\\Git\\cmd\\git.exe" stash')).toEqual({ deny: true, reason: GIT })
-    expect(checkShell("cat <<'EOF'\nrm -rf /\ngit reset --hard\nEOF")).toEqual({ deny: false })
-    expect(checkShell("cat <<'EOF'\nnotes\nEOF\nrm -rf /")).toEqual({ deny: true, reason: RM_CATASTROPHIC })
+    expect(shell("git.exe reset --hard")).toEqual({ deny: true, reason: GIT })
+    expect(shell('"C:\\Program Files\\Git\\cmd\\git.exe" stash')).toEqual({ deny: true, reason: GIT })
+    expect(shell("cat <<'EOF'\nrm -rf /\ngit reset --hard\nEOF")).toEqual({ deny: false })
+    expect(shell("cat <<'EOF'\nnotes\nEOF\nrm -rf /")).toEqual({ deny: true, reason: RM_CATASTROPHIC })
   })
 
   test("a write to a new file is allowed", () => {

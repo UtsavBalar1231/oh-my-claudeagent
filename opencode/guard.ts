@@ -10,13 +10,13 @@ const ALLOW: GuardResult = { deny: false }
 
 // OpenCode has no dialog to hold a command in, so it decides as `guardMode: deny` does: a
 // catastrophic or blocking match is denied, and an advisory one runs.
-function shellContext(): Context {
+function shellContext(projectRoot: string): Context {
   const home = homeDir(process.env)
-  return { shell: "bash", cwd: process.cwd(), platform: toPlatform(process.platform), ...(home !== undefined && { home }) }
+  return { shell: "bash", cwd: projectRoot, root: projectRoot, platform: toPlatform(process.platform), ...(home !== undefined && { home }) }
 }
 
-export function checkShell(command: string): GuardResult {
-  const finding = classify(command, shellContext())
+export function checkShell(command: string, projectRoot: string): GuardResult {
+  const finding = classify(command, shellContext(projectRoot))
   if (finding === undefined || finding.kind === "advisory") return ALLOW
   if (finding.kind === "blocking" && isHookDisabled(process.env.OMCA_DISABLED_HOOKS, "bash-guard")) return ALLOW
   return { deny: true, reason: reasonFor(finding) }

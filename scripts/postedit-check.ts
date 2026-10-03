@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { join } from "node:path";
-import { isObject } from "../servers/jsonrpc.ts";
+import { isRecord } from "../src/core/tool-input.ts";
 
 const CONTEXT_LINES = 20;
 
@@ -13,8 +13,8 @@ function editedTypeScript(stdin: string): boolean {
   } catch {
     return false;
   }
-  const input = isObject(payload) ? payload.tool_input : undefined;
-  const file = isObject(input) ? input.file_path : undefined;
+  const input = isRecord(payload) ? payload.tool_input : undefined;
+  const file = isRecord(input) ? input.file_path : undefined;
   return typeof file === "string" && file.endsWith(".ts");
 }
 

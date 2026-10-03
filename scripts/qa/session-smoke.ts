@@ -10,7 +10,7 @@
 // Exit: 0 pass or skipped, 1 a check failed, 2 the run could not be set up.
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { type AccessEntry, type Checks, localhostOnly, type Qa, readJsonLines, runClaude, runQa, startMock } from "./lib.ts";
+import { type AccessEntry, type Checks, claudeBin, localhostOnly, type Qa, readJsonLines, runClaude, runQa, startMock } from "./lib.ts";
 
 const KNOWN_AGENTS = ["executor", "explore", "hephaestus", "librarian", "oracle", "prometheus", "sisyphus", "metis", "momus"];
 const MIN_AGENT_NAMES = 2;
@@ -48,7 +48,7 @@ async function realApiSmoke({ checks, scratch }: Qa): Promise<void> {
   const plugin = scratch.plugin();
   const proc = Bun.spawn(
     [
-      Bun.which(process.env.QA_CLAUDE_BIN ?? "claude") ?? "claude",
+      claudeBin(),
       "-p",
       "Call the agents_list tool from the omca MCP server and print only the returned agent names, one per line, no other commentary.",
       "--plugin-dir",

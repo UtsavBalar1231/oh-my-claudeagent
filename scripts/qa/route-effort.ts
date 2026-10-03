@@ -5,15 +5,12 @@
 //
 // Usage: bun scripts/qa/route-effort.ts
 // Exit: 0 pass, 1 an assertion failed, 2 the run could not be set up.
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { type Script, startServer } from "./mock-model.ts";
+import { type Qa, readJsonLines, REPO, runClaude, runQa, startMock } from "./lib.ts";
+import type { Script } from "./mock-model.ts";
 
-const REPO = join(import.meta.dir, "..", "..");
 const MODEL = "opus";
 const HINT = "[omca-route effort=low]";
-const CLAUDE_TIMEOUT_MS = 120_000;
 
 type Entry = { client: string; queue: "main" | "subagent"; effort?: string | number };
 type Run = { name: string; prompt: string; subagentEffort: (effort: Entry["effort"]) => boolean; expected: string };
@@ -31,60 +28,30 @@ function scriptFor(prompt: string): Script {
   };
 }
 
-async function runClaude(cwd: string, port: number): Promise<void> {
-  const env: Record<string, string | undefined> = {
-    ...process.env,
-    DISABLE_AUTOUPDATER: "1",
-    ANTHROPIC_BASE_URL: `http://127.0.0.1:${port}`,
-    ANTHROPIC_AUTH_TOKEN: "mock-token",
-    ANTHROPIC_API_KEY: undefined,
-  };
-  const argv = ["claude", "-p", "run the probe", "--model", MODEL, "--plugin-dir", REPO, "--setting-sources", "project,local"];
-  const proc = Bun.spawn([...argv, "--permission-mode", "bypassPermissions", "--output-format", "text"], {
-    cwd,
-    env,
-    stdin: "ignore",
-    stdout: "pipe",
-    stderr: "pipe",
-    timeout: CLAUDE_TIMEOUT_MS,
-  });
-  const code = await proc.exited;
-  if (code !== 0) {
-    const output = (await new Response(proc.stdout).text()) + (await new Response(proc.stderr).text());
-    throw new Error(`claude -p exited ${code}${proc.signalCode ? ` (${proc.signalCode})` : ""}: ${output.trim()}`);
-  }
-}
-
-async function scenario(scratch: string, run: Run): Promise<boolean> {
-  const dir = join(scratch, run.name);
-  const cwd = join(dir, "cwd");
-  const logPath = join(dir, "access.log");
-  mkdirSync(cwd, { recursive: true });
-  const server = startServer({ port: 0, accessLogPath: logPath, script: scriptFor(run.prompt) });
+async function scenario({ checks, scratch }: Qa, run: Run): Promise<void> {
+  const mock = startMock(join(scratch.dir("mock"), "access.log"), scriptFor(run.prompt));
+  let result;
   try {
-    await runClaude(cwd, server.port ?? 0);
+    result = await runClaude({ cwd: scratch.project(), prompt: "run the probe", plugins: [REPO], model: MODEL, port: mock.port, configDir: scratch.dir("config") });
   } finally {
-    await server.stop(true);
+    await mock.stop();
   }
+  if (result.code !== 0) throw new Error(`claude -p exited ${result.code}: ${(result.stdout + result.stderr).trim()}`);
 
-  const lines = readFileSync(logPath, "utf8").split("\n").filter(Boolean);
-  const entries = lines.map((line) => JSON.parse(line) as Entry);
+  const entries = readJsonLines<Entry>(mock.accessLog);
   const main = entries.filter((e) => e.queue === "main");
   const subagent = entries.filter((e) => e.queue === "subagent");
-  const checks: [string, boolean][] = [
-    ["every request came from 127.0.0.1", entries.every((e) => e.client === "127.0.0.1")],
-    ["the subagent made at least one request", subagent.length > 0],
-    [`every subagent request carries ${run.expected}`, subagent.every((e) => run.subagentEffort(e.effort))],
-    ["the main thread made at least one request", main.length > 0],
-    ["every main request carries an effort other than low", main.every((e) => e.effort !== undefined && e.effort !== "low")],
-  ];
-
-  console.log(`${run.name}: prompt first line ${JSON.stringify(run.prompt.split("\n")[0])}`);
-  for (const [index, line] of lines.entries()) {
-    if (entries[index]?.queue === "subagent" || index === 0) console.log(`  ${line}`);
+  const label = (text: string) => `${run.name}: ${text}`;
+  checks.log(`${run.name}: prompt first line ${JSON.stringify(run.prompt.split("\n")[0])}`);
+  for (const [index, entry] of entries.entries()) {
+    if (entry.queue === "subagent" || index === 0) checks.log(`  ${JSON.stringify(entry)}`);
   }
-  for (const [label, ok] of checks) console.log(`  ${ok ? "PASS" : "FAIL"} ${label}`);
-  return checks.every(([, ok]) => ok);
+  const verify = (ok: boolean, text: string) => checks.check(ok, label(text), label(text));
+  verify(entries.every((e) => e.client === "127.0.0.1"), "every request came from 127.0.0.1");
+  verify(subagent.length > 0, "the subagent made at least one request");
+  verify(subagent.every((e) => run.subagentEffort(e.effort)), `every subagent request carries ${run.expected}`);
+  verify(main.length > 0, "the main thread made at least one request");
+  verify(main.every((e) => e.effort !== undefined && e.effort !== "low"), "every main request carries an effort other than low");
 }
 
 const TASK = "Say hi.";
@@ -98,14 +65,10 @@ const RUNS: Run[] = [
   },
 ];
 
-const scratch = mkdtempSync(join(tmpdir(), "omca-route-effort-"));
-try {
-  const results: boolean[] = [];
-  for (const run of RUNS) results.push(await scenario(scratch, run));
-  process.exitCode = results.every(Boolean) ? 0 : 1;
-} catch (error) {
-  console.error(`route-effort: setup failed: ${error instanceof Error ? error.message : String(error)}`);
-  process.exitCode = 2;
-} finally {
-  rmSync(scratch, { recursive: true, force: true });
-}
+await runQa(
+  "route-effort",
+  async (qa) => {
+    for (const run of RUNS) await scenario(qa, run);
+  },
+  { watchRealConfig: true },
+);

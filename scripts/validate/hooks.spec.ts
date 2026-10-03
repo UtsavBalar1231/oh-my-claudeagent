@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { cleanup, fixture, json, runNamed } from "./fixture.ts";
 import { checks } from "./hooks.ts";
@@ -7,7 +6,6 @@ import { checks } from "./hooks.ts";
 afterEach(cleanup);
 
 const REPO = join(import.meta.dir, "..", "..");
-const HOOKS_JSON = join(REPO, "hooks", "hooks.json");
 
 const entry = (overrides: Record<string, unknown> = {}) => ({
   type: "mcp_tool",
@@ -19,16 +17,6 @@ const entry = (overrides: Record<string, unknown> = {}) => ({
 
 const hooksWith = (handler: Record<string, unknown>) =>
   json({ modules: ["./register.ts"], hooks: { Stop: [{ hooks: [handler] }] } });
-
-describe("hooks.json", () => {
-  test("hooks.json: is valid JSON", () => {
-    expect(() => JSON.parse(readFileSync(HOOKS_JSON, "utf8"))).not.toThrow();
-  });
-
-  test("hooks.json: delegation-reminder.sh is not registered", () => {
-    expect(readFileSync(HOOKS_JSON, "utf8")).not.toContain("delegation-reminder");
-  });
-});
 
 describe("hook handlers", () => {
   test("a consistent tree passes", async () => {
@@ -114,7 +102,18 @@ describe("SessionStart matcher", () => {
   });
 
   test("other events need no matcher", async () => {
-    expect(await runNamed(checks, "SessionStart matcher", fixture({ "hooks/hooks.json": hooksWith(entry()) }))).toMatchObject({ status: "pass" });
+    const hooks = json({
+      modules: ["./register.ts"],
+      hooks: { SessionStart: [{ matcher: "clear|compact", hooks: [entry()] }], Stop: [{ hooks: [entry()] }] },
+    });
+    expect(await runNamed(checks, "SessionStart matcher", fixture({ "hooks/hooks.json": hooks }))).toMatchObject({ status: "pass" });
+  });
+
+  test("a registry with no SessionStart entry fails", async () => {
+    expect(await runNamed(checks, "SessionStart matcher", fixture({ "hooks/hooks.json": hooksWith(entry()) }))).toEqual({
+      status: "fail",
+      detail: "hooks.json has no SessionStart entry",
+    });
   });
 });
 

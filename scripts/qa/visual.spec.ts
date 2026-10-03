@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { copyFixture, parseView, withoutBlink } from "./visual.ts";
+import { copyFixture, parseView, teardown, withoutBlink } from "./visual.ts";
 
 const VISUAL = join(import.meta.dir, "visual.ts");
 const temps: string[] = [];
@@ -105,4 +105,24 @@ test("withoutBlink masks only a bullet that leads its line, so both blink phases
   expect(withoutBlink(lit)).toBe(withoutBlink(dark));
   expect(withoutBlink(lit)).toBe(dark);
   expect(withoutBlink("● Removing the build output")).not.toBe(withoutBlink("● Removed the build output"));
+});
+
+describe("teardown", () => {
+  test("runs every step in order even when earlier ones throw, then rethrows the first error", async () => {
+    const ran: string[] = [];
+    const step = (name: string, error?: Error) => async () => {
+      await Bun.sleep(1);
+      ran.push(name);
+      if (error !== undefined) throw error;
+    };
+    const first = new Error("first");
+    await expect(teardown(step("a"), step("b", first), step("c", new Error("second")), step("d"))).rejects.toBe(first);
+    expect(ran).toEqual(["a", "b", "c", "d"]);
+  });
+
+  test("resolves when no step throws", async () => {
+    const ran: string[] = [];
+    await teardown(() => void ran.push("a"), async () => void ran.push("b"));
+    expect(ran).toEqual(["a", "b"]);
+  });
 });

@@ -113,10 +113,6 @@ describe("main", () => {
     expect(filesUnder(dest)).toEqual(Object.keys(SHIPPED).sort());
   });
 
-  test("--version overrides the manifest version", () => {
-    expect(main([dest, "--version", "1.2.3"], root).stdout).toBe(`packaging v1.2.3 → ${dest}\n`);
-  });
-
   test("reports an unknown version when the manifest is unreadable", () => {
     rmSync(join(root, ".claude-plugin", "plugin.json"));
 
@@ -126,6 +122,7 @@ describe("main", () => {
   test.each([
     [[], "Missing <dest_dir>"],
     [["--bogus", dest], "Unknown option '--bogus'"],
+    [[dest, "--version", "1.2.3"], "Unknown option '--version'"],
     [[dest, "second"], "Unexpected argument: second"],
   ])("rejects %j with exit 1, the problem and the usage", (args, problem) => {
     const outcome = main(args, root);

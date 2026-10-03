@@ -1,8 +1,8 @@
 import { join } from "node:path";
-import { asList, asRecord, type Check, type Context, type Outcome, readJson, relative, text, verdict } from "./core.ts";
+import { SEMVER } from "../release.ts";
+import { asList, asRecord, type Check, type Context, type Outcome, readJson, relative, skip, text, verdict } from "./core.ts";
 
 const PLUGIN_NAME = "oh-my-claudeagent";
-const SEMVER = /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/;
 
 const pluginJson = (ctx: Context) => join(ctx.root, ".claude-plugin", "plugin.json");
 const packageJson = (ctx: Context) => join(ctx.root, "package.json");
@@ -45,11 +45,14 @@ function marketplaceEntry(ctx: Context): Outcome {
 }
 
 function marketplaceSource(ctx: Context): Outcome {
-  const problems = marketplacePlugins(ctx).flatMap((plugin) => {
+  const sources = marketplacePlugins(ctx).flatMap((plugin) => {
     const source = text(plugin.source);
-    if (source === undefined) return [];
+    return source === undefined ? [] : [{ name: text(plugin.name) ?? "plugin", source }];
+  });
+  if (sources.length === 0) return skip("no marketplace plugin has a path source, only a github or other object source");
+  const problems = sources.flatMap(({ name, source }) => {
     const allowed = ctx.marketplaceOverride ? source.startsWith("./") : source === "." || source.startsWith("./");
-    return allowed ? [] : [`${text(plugin.name) ?? "plugin"} source '${source}' is not a ./ path`];
+    return allowed ? [] : [`${name} source '${source}' is not a ./ path`];
   });
   return verdict(problems, "every path source in the marketplace starts with ./");
 }

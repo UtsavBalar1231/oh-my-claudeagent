@@ -157,7 +157,7 @@ async function setup(ctx: Context) {
   await register("shell guard hook", () =>
     ctx.shell.hook(
       "create.before",
-      guarded("shell guard", async (event) => enforce(checkShell(event.command))),
+      guarded("shell guard", async (event) => enforce(checkShell(event.command, projectRoot))),
     ),
   )
 
@@ -167,7 +167,7 @@ async function setup(ctx: Context) {
       guarded("tool guard", async (event) => {
         const input = (event.input ?? {}) as Record<string, unknown>
         if (event.tool === "shell") {
-          enforce(checkShell(String(input.command ?? "")))
+          enforce(checkShell(String(input.command ?? ""), projectRoot))
         } else if (EDIT_TOOLS.includes(event.tool)) {
           enforce(checkEdit(event.tool, input, projectRoot))
         }

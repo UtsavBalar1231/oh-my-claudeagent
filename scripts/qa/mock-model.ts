@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { appendFileSync, readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
+import { isRecord } from "../../src/core/tool-input.ts";
 
 const RESPONSE_TEXT = "ok";
 const MOCK_MODEL_ID = "claude-mock";
@@ -22,14 +23,11 @@ type Served =
   | { type: "tool_use"; id: string; name: string; input: Record<string, unknown> };
 type LogValue = string | boolean | number | null;
 
-const isObject = (v: unknown): v is Record<string, unknown> =>
-  typeof v === "object" && v !== null && !Array.isArray(v);
-
 function parseBlock(raw: unknown, where: string): Block {
-  if (isObject(raw) && raw.type === "text" && typeof raw.text === "string") {
+  if (isRecord(raw) && raw.type === "text" && typeof raw.text === "string") {
     return { type: "text", text: raw.text };
   }
-  if (isObject(raw) && raw.type === "tool_use" && typeof raw.name === "string" && isObject(raw.input)) {
+  if (isRecord(raw) && raw.type === "tool_use" && typeof raw.name === "string" && isRecord(raw.input)) {
     return { type: "tool_use", name: raw.name, input: raw.input };
   }
   throw new Error(`${where} is not a text block or a tool_use block with an object input`);
@@ -39,7 +37,7 @@ function parseTurns(raw: unknown, queue: QueueName): Turn[] {
   if (raw === undefined) return [];
   if (!Array.isArray(raw)) throw new Error(`"${queue}" must be an array of turns`);
   return raw.map((turn, i) => {
-    if (!isObject(turn) || !Array.isArray(turn.content)) {
+    if (!isRecord(turn) || !Array.isArray(turn.content)) {
       throw new Error(`${queue}[${i}] needs a "content" array`);
     }
     return {
@@ -50,7 +48,7 @@ function parseTurns(raw: unknown, queue: QueueName): Turn[] {
 
 export function parseScript(text: string): Script {
   const raw: unknown = JSON.parse(text);
-  if (!isObject(raw)) throw new Error("the script must be a JSON object");
+  if (!isRecord(raw)) throw new Error("the script must be a JSON object");
   return { main: parseTurns(raw.main, "main"), subagent: parseTurns(raw.subagent, "subagent") };
 }
 
@@ -137,7 +135,7 @@ function jsonLine(entry: Record<string, LogValue>): string {
 function parseBody(text: string): Record<string, unknown> {
   try {
     const body: unknown = JSON.parse(text);
-    return isObject(body) ? body : {};
+    return isRecord(body) ? body : {};
   } catch {
     return {};
   }
@@ -146,23 +144,23 @@ function parseBody(text: string): Record<string, unknown> {
 function systemText(system: unknown): string {
   if (typeof system === "string") return system;
   if (!Array.isArray(system)) return "";
-  return system.map((block) => (isObject(block) && typeof block.text === "string" ? block.text : "")).join("\n");
+  return system.map((block) => (isRecord(block) && typeof block.text === "string" ? block.text : "")).join("\n");
 }
 
 // Claude Code sometimes appends a system-role reminder after the user message that carries
 // the tool results, so the count reads the last user message, not the last message.
 function countToolResults(messages: unknown): number {
   const lastUser = Array.isArray(messages)
-    ? messages.findLast((m) => isObject(m) && m.role === "user")
+    ? messages.findLast((m) => isRecord(m) && m.role === "user")
     : undefined;
-  const content = isObject(lastUser) ? lastUser.content : undefined;
-  return Array.isArray(content) ? content.filter((b) => isObject(b) && b.type === "tool_result").length : 0;
+  const content = isRecord(lastUser) ? lastUser.content : undefined;
+  return Array.isArray(content) ? content.filter((b) => isRecord(b) && b.type === "tool_result").length : 0;
 }
 
 // Claude Code sends the effort as `output_config.effort` (measured on 2.1.287). The log
 // carries the field only when the request does.
 function effortField(body: Record<string, unknown>): { effort?: string | number } {
-  const effort = isObject(body.output_config) ? body.output_config.effort : undefined;
+  const effort = isRecord(body.output_config) ? body.output_config.effort : undefined;
   return typeof effort === "string" || typeof effort === "number" ? { effort } : {};
 }
 

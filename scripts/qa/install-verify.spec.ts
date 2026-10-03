@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { checkHookModules } from "./install-verify.ts";
-import { createChecks } from "./lib.ts";
+import { checkHookModules, checkPluginValidate } from "./install-verify.ts";
+import { createChecks, createScratch } from "./lib.ts";
 
 let plugin = "";
 let lines: string[] = [];
@@ -61,4 +61,28 @@ describe("checkHookModules", () => {
 
     expect(lines).toEqual([`[qa] FAIL: hooks.json missing from packaged tree at ${join(plugin, "hooks", "hooks.json")}`]);
   });
+});
+
+describe.skipIf(Bun.which("claude") === null)("checkPluginValidate", () => {
+  const validate = async (breakManifest: boolean) => {
+    const scratch = createScratch(() => {});
+    try {
+      const packaged = scratch.plugin();
+      if (breakManifest) writeFileSync(join(packaged, ".claude-plugin", "plugin.json"), "{ broken");
+      const checks = createChecks((line) => void lines.push(line));
+      await checkPluginValidate(checks, packaged, scratch.dir("config"));
+      return checks.counts;
+    } finally {
+      scratch.cleanup();
+    }
+  };
+
+  test("a packaged tree with a valid manifest passes", async () => {
+    expect(await validate(false)).toEqual({ passed: 1, failed: 0 });
+  }, 60_000);
+
+  test("a packaged tree whose plugin.json does not parse fails", async () => {
+    expect(await validate(true)).toEqual({ passed: 0, failed: 1 });
+    expect(lines[0]).toStartWith("[qa] FAIL: claude plugin validate exited 1: ");
+  }, 60_000);
 });

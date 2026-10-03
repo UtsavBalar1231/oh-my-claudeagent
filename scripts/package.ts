@@ -2,7 +2,7 @@
 // Copies the shipped plugin tree into <dest>, replacing what an earlier copy left there.
 // With --dry-run it prints the files that would ship, one path per line, and writes nothing.
 //
-// Usage: bun scripts/package.ts <dest_dir> [--version <N.N.N>]
+// Usage: bun scripts/package.ts <dest_dir>
 //        bun scripts/package.ts --dry-run
 import {
   copyFileSync,
@@ -18,7 +18,7 @@ import {
 import { dirname, join } from "node:path";
 import { parseArgs } from "node:util";
 
-const USAGE = "Usage: bun scripts/package.ts <dest_dir> [--version <N.N.N>]\n       bun scripts/package.ts --dry-run";
+const USAGE = "Usage: bun scripts/package.ts <dest_dir>\n       bun scripts/package.ts --dry-run";
 
 // A pattern with a trailing slash names a directory. A pattern without a leading slash
 // matches the last path components at any depth, as rsync's --exclude does.
@@ -116,7 +116,7 @@ function manifestVersion(root: string): string {
 
 export type Outcome = { code: number; stdout: string; stderr: string };
 
-const OPTIONS = { "dry-run": { type: "boolean" }, version: { type: "string" } } as const;
+const OPTIONS = { "dry-run": { type: "boolean" } } as const;
 const parse = (args: string[]) => parseArgs({ args, options: OPTIONS, allowPositionals: true });
 
 export function main(args: string[], root: string): Outcome {
@@ -134,7 +134,7 @@ export function main(args: string[], root: string): Outcome {
     return { code: 1, stdout: "", stderr: `${problem}\n${USAGE}\n` };
   }
   packageTree(root, dest);
-  return { code: 0, stdout: `packaging v${values.version ?? manifestVersion(root)} → ${dest}\n`, stderr: "" };
+  return { code: 0, stdout: `packaging v${manifestVersion(root)} → ${dest}\n`, stderr: "" };
 }
 
 if (import.meta.main) {

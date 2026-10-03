@@ -30,7 +30,7 @@ export function createChecks(print: Print = console.log) {
     check: (ok: boolean, passMessage: string, failMessage: string): void => (ok ? pass(passMessage) : fail(failMessage)),
     summary(name: string): boolean {
       log(`${name}: ${counts.passed} passed, ${counts.failed} failed`);
-      return counts.failed === 0;
+      return counts.failed === 0 && counts.passed > 0;
     },
   };
 }
@@ -122,6 +122,7 @@ export type ClaudeRun = {
   debugFile?: string;
   hookTrace?: boolean;
   permissionMode?: string;
+  model?: string;
   sessionId?: string;
   streamJson?: boolean;
   timeoutMs?: number;
@@ -130,12 +131,17 @@ export type ClaudeRun = {
 
 export type ClaudeResult = { code: number; stdout: string; stderr: string };
 
-export async function runClaude(run: ClaudeRun): Promise<ClaudeResult> {
+export function claudeBin(): string {
   const bin = process.env.QA_CLAUDE_BIN ?? "claude";
+  return Bun.which(bin) ?? bin;
+}
+
+export async function runClaude(run: ClaudeRun): Promise<ClaudeResult> {
   const argv = [
-    Bun.which(bin) ?? bin,
+    claudeBin(),
     "-p",
     run.prompt,
+    ...(run.model === undefined ? [] : ["--model", run.model]),
     ...(run.plugins ?? []).flatMap((plugin) => ["--plugin-dir", plugin]),
     "--setting-sources",
     "project,local",

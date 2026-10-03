@@ -13,6 +13,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { packageTree } from "../package.ts";
+import { childEnv } from "./lib.ts";
 import { type Script, startServer } from "./mock-model.ts";
 
 const REPO = join(import.meta.dir, "..", "..");
@@ -39,15 +40,6 @@ const script: Script = {
     { content: [{ type: "text", text: "done" }] },
   ],
 };
-
-// A nested session must not inherit this session's id, socket or model settings.
-function childEnv(extra: Record<string, string>): Record<string, string> {
-  const env: Record<string, string> = {};
-  for (const [k, v] of Object.entries(process.env)) {
-    if (v !== undefined && !/^(CLAUDE|ANTHROPIC)/.test(k)) env[k] = v;
-  }
-  return { ...env, ...extra };
-}
 
 function run(cmd: string[], cwd: string): void {
   const r = Bun.spawnSync(cmd, { cwd, stdout: "pipe", stderr: "pipe" });

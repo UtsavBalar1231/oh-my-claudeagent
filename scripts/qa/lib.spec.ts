@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { type AccessEntry, childEnv, createChecks, createScratch, localhostOnly, parseJsonLines, readJsonLines, type TraceEntry, traceCount, watchDrift } from "./lib.ts";
+import { type AccessEntry, childEnv, claudeBin, createChecks, createScratch, localhostOnly, parseJsonLines, readJsonLines, type TraceEntry, traceCount, watchDrift } from "./lib.ts";
 
 let lines: string[] = [];
 const print = (line: string): void => void lines.push(line);
@@ -34,6 +34,11 @@ describe("createChecks", () => {
     expect(failing.summary("probe")).toBe(false);
 
     expect(lines).toEqual(["[qa] PASS: a", "[qa] probe: 1 passed, 0 failed", "[qa] FAIL: b", "[qa] probe: 0 passed, 1 failed"]);
+  });
+
+  test("summary is false when no check ran", () => {
+    expect(createChecks(print).summary("probe")).toBe(false);
+    expect(lines).toEqual(["[qa] probe: 0 passed, 0 failed"]);
   });
 });
 
@@ -209,5 +214,32 @@ describe("log helpers", () => {
     expect(readJsonLines<TraceEntry>(join(dir, "t.jsonl"))).toEqual([{ event: "Stop", output: "empty" }]);
     expect(readJsonLines(join(dir, "missing.jsonl"))).toEqual([]);
     rmSync(dir, { recursive: true });
+  });
+});
+
+describe("claudeBin", () => {
+  const saved = process.env.QA_CLAUDE_BIN;
+
+  afterEach(() => {
+    if (saved === undefined) delete process.env.QA_CLAUDE_BIN;
+    else process.env.QA_CLAUDE_BIN = saved;
+  });
+
+  test("resolves QA_CLAUDE_BIN on PATH, keeps a name PATH does not know, and defaults to claude", () => {
+    process.env.QA_CLAUDE_BIN = "bun";
+    expect(claudeBin()).toBe(Bun.which("bun") ?? "");
+    process.env.QA_CLAUDE_BIN = "omca-no-such-claude";
+    expect(claudeBin()).toBe("omca-no-such-claude");
+    delete process.env.QA_CLAUDE_BIN;
+    expect(claudeBin()).toBe(Bun.which("claude") ?? "claude");
+  });
+});
+
+describe("the QA scripts share one child environment and one claude runner", () => {
+  test("no script outside lib.ts defines its own childEnv or runClaude", () => {
+    const scripts = join(import.meta.dir, "..");
+    const files = [...new Bun.Glob("qa/*.ts").scanSync(scripts), "bench.ts"].filter((file) => !file.endsWith(".spec.ts") && file !== "qa/lib.ts");
+    const offenders = files.filter((file) => /^(?:async )?function (?:childEnv|runClaude)\b/m.test(readFileSync(join(scripts, file), "utf8"))).sort();
+    expect(offenders).toEqual([]);
   });
 });

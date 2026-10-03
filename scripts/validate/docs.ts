@@ -7,11 +7,12 @@ const ALLOWLIST = "scripts/validate/allowlist.txt";
 const SCAN_ROOTS = ["agents/", "skills/", "scripts/", "servers/", "templates/", "output-styles/", "docs/"];
 const SCAN_FILES = ["README.md", "OMCA.md"];
 
-// "/home/user/" and "/Users/user/" are documentation placeholders, filtered after matching so a
+// "/home/user" and "/Users/user" are documentation placeholders, filtered after matching so a
 // real account named "user" still shows up in the pattern.
-const PLACEHOLDERS = new Set(["/home/user/", "/Users/user/"]);
+const PLACEHOLDERS = new Set(["/home/user", "/Users/user"]);
+const withoutTrailingSlash = (path: string): string => path.replace(/\/$/, "");
 const LEAK_PATTERNS: readonly { label: string; pattern: RegExp }[] = [
-  { label: "home-path literal", pattern: /(?:\/home\/|\/Users\/)[A-Za-z0-9_.-]+\//g },
+  { label: "home-path literal", pattern: /(?:\/home\/|\/Users\/)[A-Za-z0-9_.-]+(?:\/|(?=$|[\s"'`)\]}>]))/g },
   { label: "windows home-path literal", pattern: /C:\\Users\\[A-Za-z0-9_.-]+/g },
   // A *_TOKEN, *_API_KEY or *_SECRET assignment whose value is not an obvious placeholder.
   { label: "credential-looking literal", pattern: /[A-Z0-9_]*(?:TOKEN|API_KEY|SECRET)=[^$<"\s][^"\s]*/g },
@@ -24,7 +25,8 @@ function allowlisted(ctx: Context): Set<string> {
   return new Set(
     readFileSync(path, "utf8")
       .split(/\r?\n/)
-      .filter((line) => line !== "" && !line.startsWith("#")),
+      .filter((line) => line !== "" && !line.startsWith("#"))
+      .map(withoutTrailingSlash),
   );
 }
 
@@ -45,7 +47,8 @@ function depersonalization(ctx: Context): Outcome {
     lines.forEach((line, index) => {
       for (const { label, pattern } of LEAK_PATTERNS) {
         for (const [matched] of line.matchAll(pattern)) {
-          if (PLACEHOLDERS.has(matched) || allowed.has(`${file}:${matched}`)) continue;
+          const bare = withoutTrailingSlash(matched);
+          if (PLACEHOLDERS.has(bare) || allowed.has(`${file}:${bare}`)) continue;
           problems.push(`${file}:${index + 1}: ${label} '${matched}'`);
         }
       }
@@ -143,6 +146,7 @@ function phantomFields(ctx: Context): Outcome {
   const handlers = ctx
     .tracked()
     .filter((path) => /^(?:hooks|servers\/hooks)\/[^/]+\.ts$/.test(path) && !path.endsWith(".spec.ts"));
+  if (handlers.length === 0) return { status: "fail", detail: "no hook handler files found to scan" };
   const problems = handlers.flatMap((file) =>
     readText(ctx.root, file)
       .split(/\r?\n/)

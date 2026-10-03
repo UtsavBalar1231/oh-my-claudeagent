@@ -3,6 +3,7 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFile
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { parseArgs } from "node:util";
+import { childEnv } from "./qa/lib.ts";
 import { type Script, startServer } from "./qa/mock-model.ts";
 
 const REPO = join(import.meta.dir, "..");
@@ -22,7 +23,7 @@ export type Summary = {
   baseline_median: number;
   candidate_median: number;
   median_paired_diff: number;
-  median_paired_diff_pct: number;
+  median_paired_diff_pct: number | null;
 };
 export type SessionLog = {
   first_request_ms: number;
@@ -48,7 +49,7 @@ export function summarize(baseline: number[], candidate: number[]): Summary {
     baseline_median: baselineMedian,
     candidate_median: median(candidate),
     median_paired_diff: diff,
-    median_paired_diff_pct: (100 * diff) / baselineMedian,
+    median_paired_diff_pct: baselineMedian > 0 ? (100 * diff) / baselineMedian : null,
   };
 }
 
@@ -86,15 +87,6 @@ export function mcpCommand(mcpJson: string, root: string, dataDir: string): { cm
     cmd: [entry.command, ...entry.args].map(expand),
     env: Object.fromEntries(Object.entries(entry.env ?? {}).map(([k, v]) => [k, expand(v)])),
   };
-}
-
-// A nested session must not inherit this session's id, socket or model settings.
-function childEnv(extra: Record<string, string>): Record<string, string> {
-  const env: Record<string, string> = {};
-  for (const [k, v] of Object.entries(process.env)) {
-    if (v !== undefined && !/^(CLAUDE|ANTHROPIC)/.test(k)) env[k] = v;
-  }
-  return { ...env, ...extra };
 }
 
 function run(cmd: string[], cwd = REPO): string {
@@ -361,7 +353,7 @@ async function measurePairs<T>(measure: (side: Side) => Promise<T>): Promise<Rec
   return out;
 }
 
-const fmt = (n: number) => n.toFixed(2).padStart(10);
+const fmt = (n: number | null) => (n === null ? "n/a" : n.toFixed(2)).padStart(10);
 
 function printTable(summary: Record<string, Summary>): void {
   console.log(`${"metric (ms)".padEnd(36)}${"baseline".padStart(10)}${"candidate".padStart(10)}${"diff".padStart(10)}${"diff %".padStart(10)}`);
@@ -388,8 +380,8 @@ async function main(): Promise<void> {
     const packaged = {} as Record<Side, Packaged>;
     for (const [side, ref] of [["baseline", baselineRef], ["candidate", candidateRef]] as const) {
       roots[side] = join(scratch, `plugin-${side}`);
-      if (ref !== null) worktrees.push(roots[side]);
       packaged[side] = packageTree(ref, roots[side]);
+      if (ref !== null) worktrees.push(roots[side]);
     }
     const arm = (name: string, pluginDir: string | null): Arm => {
       const dirs = { configDir: join(scratch, name, "config"), dataDir: join(scratch, name, "data"), tmpDir: join(scratch, name, "tmp") };
@@ -450,7 +442,7 @@ async function main(): Promise<void> {
     );
     console.log(`results: ${out}`);
   } finally {
-    for (const wt of worktrees) run(["git", "worktree", "remove", "--force", wt]);
+    for (const wt of worktrees) Bun.spawnSync(["git", "worktree", "remove", "--force", wt], { cwd: REPO });
     rmSync(scratch, { recursive: true, force: true });
   }
 }

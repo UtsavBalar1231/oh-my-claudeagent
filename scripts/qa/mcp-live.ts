@@ -18,7 +18,7 @@ import { specEnv } from "../../tests/fixtures/spec-env.ts";
 import { packageTree } from "../package.ts";
 import { type Checks, runQa, type Scratch } from "./lib.ts";
 import { type Script, startServer } from "./mock-model.ts";
-import { exited, mockSessionEnv, quote, reachPrompt, sessionEnv, Tmux } from "./visual.ts";
+import { exited, mockSessionEnv, quote, reachPrompt, sessionEnv, teardown, Tmux } from "./visual.ts";
 
 const REPO = join(import.meta.dir, "..", "..");
 const SESSION_ID = "00000000-0000-4000-8000-000000000002";
@@ -161,15 +161,19 @@ async function runMode(mode: Mode, checks: Checks, scratch: Scratch): Promise<vo
       `${tag}: /mcp rows are wrong for ${wrong.map((tool) => tool.title).join(", ")}`,
     );
   } finally {
-    Bun.spawnSync(["tmux", "-L", tmux.socket, "-f", "/dev/null", "kill-server"], { env: sessionEnv() });
-    if (claudePid !== undefined) await exited(claudePid);
-    if (fakePid !== undefined && isAlive(fakePid)) process.kill(fakePid);
-    await mock.stop(true);
-    const noTmux = Bun.spawnSync(["tmux", "-L", tmux.socket, "-f", "/dev/null", "list-sessions"], { env: sessionEnv(), stdout: "pipe", stderr: "pipe" }).exitCode !== 0;
-    checks.check(
-      noTmux && (claudePid === undefined || !isAlive(claudePid)) && (fakePid === undefined || !isAlive(fakePid)),
-      `${tag}: teardown left no tmux server, claude process or fake ast-grep`,
-      `${tag}: teardown left a process behind`,
+    await teardown(
+      () => Bun.spawnSync(["tmux", "-L", tmux.socket, "-f", "/dev/null", "kill-server"], { env: sessionEnv() }),
+      () => claudePid !== undefined && exited(claudePid),
+      () => fakePid !== undefined && isAlive(fakePid) && process.kill(fakePid),
+      () => mock.stop(true),
+      () => {
+        const noTmux = Bun.spawnSync(["tmux", "-L", tmux.socket, "-f", "/dev/null", "list-sessions"], { env: sessionEnv(), stdout: "pipe", stderr: "pipe" }).exitCode !== 0;
+        checks.check(
+          noTmux && (claudePid === undefined || !isAlive(claudePid)) && (fakePid === undefined || !isAlive(fakePid)),
+          `${tag}: teardown left no tmux server, claude process or fake ast-grep`,
+          `${tag}: teardown left a process behind`,
+        );
+      },
     );
   }
 }

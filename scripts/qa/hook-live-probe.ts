@@ -206,7 +206,7 @@ const FAMILIES: Family[] = [
   },
 ];
 
-async function observe({ scratch }: Qa, family: Family, pluginDir: string | undefined, label: string, checks: Checks): Promise<Observed> {
+async function observe({ scratch, checks }: Qa, family: Family, pluginDir: string | undefined, label: string): Promise<Observed> {
   const project = scratch.project();
   family.seed?.(project);
   const logDir = scratch.dir("log");
@@ -261,12 +261,12 @@ if (import.meta.main) {
       const pluginDir = qa.scratch.plugin();
       for (const family of FAMILIES) {
         const withPlugin = `${family.name} [plugin]`;
-        const o = await observe(qa, family, pluginDir, withPlugin, qa.checks);
+        const o = await observe(qa, family, pluginDir, withPlugin);
         checkSessionEvents(qa.checks, o, withPlugin, family.boundPlan === true);
         family.plugin(qa.checks, o, withPlugin);
 
         const withoutPlugin = `${family.name} [control]`;
-        family.control(qa.checks, await observe(qa, family, undefined, withoutPlugin, qa.checks), withoutPlugin);
+        family.control(qa.checks, await observe(qa, family, undefined, withoutPlugin), withoutPlugin);
       }
     },
     { watchRealConfig: true },

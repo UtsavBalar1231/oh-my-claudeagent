@@ -163,6 +163,18 @@ export async function exited(pid: number): Promise<void> {
   throw new Error(`claude (pid ${pid}) did not exit within ${EXIT_TIMEOUT_MS} ms`);
 }
 
+export async function teardown(...steps: Array<() => unknown>): Promise<void> {
+  let failure: { error: unknown } | undefined;
+  for (const step of steps) {
+    try {
+      await step();
+    } catch (error) {
+      failure ??= { error };
+    }
+  }
+  if (failure !== undefined) throw failure.error;
+}
+
 // Answers the folder-trust dialog when it shows, then waits for the input box and a still screen.
 export async function reachPrompt(tmux: Tmux): Promise<void> {
   const first = await tmux.waitFor(
@@ -231,10 +243,12 @@ async function captureAt(view: View, root: string, cols: number, rows: number): 
     }
     return screen;
   } finally {
-    Bun.spawnSync(["tmux", "-L", tmux.socket, "kill-server"], { env: sessionEnv() });
-    if (claudePid !== undefined) await exited(claudePid);
-    await mock.stop(true);
-    rmSync(scratch, { recursive: true, force: true });
+    await teardown(
+      () => Bun.spawnSync(["tmux", "-L", tmux.socket, "kill-server"], { env: sessionEnv() }),
+      () => claudePid !== undefined && exited(claudePid),
+      () => mock.stop(true),
+      () => rmSync(scratch, { recursive: true, force: true }),
+    );
   }
 }
 

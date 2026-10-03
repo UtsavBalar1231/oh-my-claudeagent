@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { packageTree } from "../package.ts";
 import { type Script, startServer } from "../qa/mock-model.ts";
-import { exited, mockSessionEnv, quote, reachPrompt, sessionEnv, Tmux } from "../qa/visual.ts";
+import { exited, mockSessionEnv, quote, reachPrompt, sessionEnv, teardown, Tmux } from "../qa/visual.ts";
 import { formatAnsi, padRow, parseAnsi } from "./ansi.ts";
 import { maskRows } from "./mask.ts";
 
@@ -218,10 +218,12 @@ export async function captureShot(shot: Shot): Promise<Capture> {
       await Bun.sleep(POLL_MS);
     }
   } finally {
-    Bun.spawnSync(["tmux", "-L", SOCKET, "-f", "/dev/null", "kill-server"], { env: sessionEnv() });
-    if (claudePid !== undefined) await exited(claudePid);
-    await mock.stop(true);
-    rmSync(scratch, { recursive: true, force: true });
+    await teardown(
+      () => Bun.spawnSync(["tmux", "-L", SOCKET, "-f", "/dev/null", "kill-server"], { env: sessionEnv() }),
+      () => claudePid !== undefined && exited(claudePid),
+      () => mock.stop(true),
+      () => rmSync(scratch, { recursive: true, force: true }),
+    );
   }
 }
 

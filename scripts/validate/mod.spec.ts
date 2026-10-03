@@ -1,6 +1,7 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import { createContext } from "./core.ts";
+import { cleanup, fixture, runNamed } from "./fixture.ts";
 import {
   checks,
   compactMessages,
@@ -14,6 +15,8 @@ import {
   toolCall,
   toolCheckAllow,
 } from "./mod.ts";
+
+afterEach(cleanup);
 
 const register = (...lines: string[]): Source[] => [{ path: REGISTER, text: lines.join("\n") }];
 const other = (path: string, text: string): Source => ({ path, text });
@@ -159,6 +162,23 @@ describe("mod duplicate registration", () => {
 
   test("the same event twice with no matcher fails", () => {
     expect(duplicateRegistration(register('on("turn.start", a);', 'on("turn.start", b);')).status).toBe("fail");
+  });
+});
+
+describe("mod register.ts", () => {
+  test("a missing register.ts fails, and so does one with no registration", async () => {
+    expect(await runNamed(checks, "mod register.ts", fixture({ "hooks/register.ts": null }))).toEqual({
+      status: "fail",
+      detail: `${REGISTER} is missing`,
+    });
+    expect(await runNamed(checks, "mod register.ts", fixture({ "hooks/register.ts": "export {};\n" }))).toEqual({
+      status: "fail",
+      detail: `${REGISTER} registers no on() handler`,
+    });
+  });
+
+  test("a register.ts with registrations passes", async () => {
+    expect(await runNamed(checks, "mod register.ts", fixture())).toEqual({ status: "pass", detail: `${REGISTER} makes 2 registrations` });
   });
 });
 
