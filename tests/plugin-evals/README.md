@@ -21,6 +21,7 @@ Each case seeds a small bun project in a git repository with `fixture.sh` and gr
 - `direct-lookup-no-delegation`: a lookup two searches answer spawns no subagent.
 - `read-tool-for-files`: a file is read with Read, never `cat`, `head`, `tail` or `sed`.
 - `executor-report-shape`: a delegated executor reports with its `STATUS:` and `SLOP PASS:` lines.
+- `wide-survey-fans-out`: a survey of three independent areas goes to parallel explore agents. Its outcome varies run to run, so give it five runs. It is the case that moves when always-on prose changes: with the shipped output style and guidance, seven of eight runs fanned out; with a shorter Fan-out section, one of five did, and on Claude Code's own system prompt without sisyphus, one of five.
 
 They start the real `omca` server, since a mocked tool carries a placeholder description, so they need `--mocks off`, grants for Bash, Edit and the omca tools, and `--scaffold`.
 
