@@ -107,6 +107,9 @@ const ESCAPES = /\x1b\[[0-9;]*m|\x1b\]8;;[^\x07]*\x07/g;
 const BAR_RUN = /(?:\x1b\[[0-9;]*m[▰▱]\x1b\[0m)+|\x1b\[90m▱+\x1b\[0m/g;
 const PLAN_PIECE = /^(\x1b\[32m\S+ \d+\/\d+\x1b\[0m \x1b\[90m(?:->|→) )(.*)\x1b\[0m$/;
 
+// White and bright white vanish on a light background; text that needs to stand out uses the default foreground.
+const NEAR_WHITE = /\x1b\[(?:[0-9;]*;)?(?:37|97|38;5;(?:7|15|25[0-5]))(?:;[0-9;]*)?m/;
+
 const outputLines = (output: string): string[] => output.split("\n").filter(Boolean);
 
 const pieces = (output: string): string[] =>
@@ -153,6 +156,7 @@ for (const file of readdirSync(FIXTURES).filter((f) => f.endsWith(".json")).sort
     if (fixture.repo) REPOS[fixture.repo]?.();
     const output = produce(fixture, env);
     expect(output).toBe(expected);
+    expect(output).not.toMatch(NEAR_WHITE);
 
     const columns = Number(env["COLUMNS"] ?? 80);
     for (const line of outputLines(output)) expect(displayWidth(line.replace(ESCAPES, ""))).toBeLessThanOrEqual(Math.max(1, columns - INSET));

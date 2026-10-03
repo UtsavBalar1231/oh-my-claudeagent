@@ -38,6 +38,8 @@ export const footer: Features = {
       const isSampled = sample?.turnId === e.turnId;
       const before = isSampled ? sample.usd : null;
       const after = usage.cost?.usd;
+      // A five-hour or seven-day window means a subscription, where the engine's dollar figure is not what the account pays.
+      const isSubscription = usage.rateLimits.some(({ kind }) => kind === "five_hour" || kind === "seven_day");
       let unlogged: string | null = null;
       try {
         unlogged = await unloggedSince(host, isSampled ? sample.at : now - e.durationMs);
@@ -54,7 +56,7 @@ export const footer: Features = {
                   input: e.usage.input_tokens + e.usage.cache_read_input_tokens + e.usage.cache_creation_input_tokens,
                   output: e.usage.output_tokens,
                 },
-          costUsd: before === null || after === undefined ? null : after - before,
+          costUsd: isSubscription || before === null || after === undefined ? null : after - before,
           unlogged,
         },
         glyphs(isAsciiRequested(ascii)),

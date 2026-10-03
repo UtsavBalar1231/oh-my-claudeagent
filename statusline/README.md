@@ -9,18 +9,41 @@ renderer runs on bun and has no dependencies.
 
 ## What it shows
 
-In a git project with an active session, an 80 column terminal gets four lines. The 7 day
-limit, the lines changed and the extra directories are the lowest segments and do not fit:
+From 60 columns up the status line is three rows, each starting on its own line:
+
+1. **Session:** model and effort, the vim mode when vim mode is on (setup hides the platform's
+   own mode indicator, so this is the only one), the active agent, and plan progress for the plan
+   bound to the session with the label of its next open task.
+2. **Workspace:** the context window bar with its percentage and window size, the git branch
+   with modified, staged and untracked counts, the project directory name (linked to the remote
+   when there is one), the worktree name with the branch it came from, the pull request number
+   with its review state, lines added and removed, and extra directories added to the session.
+   A red `!` follows the percentage when the context passes 200k tokens on a 200k window, and a
+   session in a worktree shows the worktree's branch.
+3. **Usage:** the session cost and duration, the 5 hour and 7 day usage limits, each with a bar
+   and its reset time, and the spend limit.
+
+Each segment appears only when it has something to show, and a row with nothing to show is left
+out. A 200 column terminal shows each row on one line:
 
 ```
-> Opus 5.5 · E: high · T: 2/4 -> Wire the order summary panel into the pa…
+> Opus 5.5 · E: high · A: oh-my-claudeagent:executor · T: 2/4 -> Wire the order summary panel into the payment step and cover it with a test
+▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱ 34%  200k · * feature/checkout-redesign ~3  +2  ?1 · > shop · W: checkout-wt <- main · #42 + · +42/-7 · +2 dirs
+~ 2m 5s · ▰▰▰▰▱▱▱▱▱▱ 45% 5h (resets 6pm) · ▰▰▰▰▰▰▰▰▱▱ 80% 7d (resets mon 5pm)
+```
+
+An 80 column terminal wraps the session row onto two lines, and to stay within four lines it
+gives up the lowest-ranked segments (the worktree, pull request, lines changed, extra directories
+and the 7 day limit) so the duration and the 5 hour limit stay:
+
+```
+> Opus 5.5 · E: high · A: oh-my-claudeagent:executor
+T: 2/4 -> Wire the order summary panel into the payment step and cover it…
 ▰▰▰▰▰▱▱▱▱▱▱▱▱▱ 34%  200k · * feature/checkout-redesign ~3  +2  ?1 · > shop
-A: oh-my-claudeagent:executor · W: checkout-wt <- main · #42 +
-$1.50 · ~ 2m 5s · ▰▰▰▰▱▱▱▱▱▱ 45% 5h (resets 6pm)
+~ 2m 5s · ▰▰▰▰▱▱▱▱▱▱ 45% 5h (resets 6pm)
 ```
 
-A 200 column terminal holds every segment on two lines, and a terminal under 60 columns gets one
-compact line:
+A terminal under 60 columns gets one compact line:
 
 ```
 > Opus 5.5 · T: 2/4 · 34% · * main
@@ -28,25 +51,12 @@ compact line:
 
 The samples show the ASCII glyphs. With Nerd Font glyphs on, each label is a glyph instead.
 
-The segments, in priority order. Each appears only when it has something to show.
-
-1. Model and effort, then the vim mode when vim mode is on (setup hides the platform's own mode
-   indicator, so this is the only one).
-2. Plan progress for the plan bound to the session, with the label of its next open task.
-3. Context window bar with its percentage and window size. A red `!` follows the percentage when
-   the context passes 200k tokens on a 200k window.
-4. Git branch with modified, staged and untracked counts. A session in a worktree shows the
-   worktree's branch.
-5. Project directory name, linked to the remote when there is one.
-6. Active agent, worktree name with the branch it came from, and pull request number with its
-   review state, each its own segment.
-7. Session cost and duration.
-8. Usage limits: the 5 hour window, then the 7 day window, each with a bar and its reset time.
-   They are absent from the payload for everyone but Claude.ai Pro and Max subscribers, and until
-   the first API response. Behind a Claude apps gateway with a spend limit, the dollars spent
-   against the limit follow them.
-9. Lines added and removed.
-10. Extra directories added to the session.
+**Cost** shows only for an account billed by the token. The payload says nothing about the
+account type, but `rate_limits` carries a `five_hour` or `seven_day` window only for Claude.ai Pro
+and Max subscribers, so a payload with either window shows no cost. Otherwise the cost shows once
+it is above zero, which also keeps a subscriber's first frames, before the first API response
+brings the windows, from showing `$0.00`. Behind a Claude apps gateway that reports only a
+`spend_limit`, the account is billed by spend and keeps its cost. The duration always shows.
 
 The status line leaves out what stays constant within a session, repeats another segment, or has
 a command of its own: the thinking marker, the session name or id, the client version, the output
@@ -67,11 +77,14 @@ a wide character such as a CJK glyph counts as two.
 - **Margins.** Claude Code keeps 2 cells of its own plus the 1 cell of `padding` that setup
   writes free on each side of the status line, and clips whatever runs into them. Every line is
   therefore laid out in `COLUMNS` minus 6 cells.
-- **Fill by priority.** Segments fill lines in the order above, three cells apart. A segment that
-  does not fit wraps whole to the next line, and a segment is never cut. A segment wider than the
-  terminal is skipped.
+- **Rows.** Each row starts on its own line, whatever the width. Within a row, segments fill the
+  line in the order above, three cells apart. A segment that does not fit wraps whole to the next
+  line of its row, and a segment is never cut. A segment wider than the terminal is skipped.
 - **Lines run out.** A terminal under 20 rows gets at most two lines, any other at most four.
-  When the lines are full, the segment that did not fit and every lower one are dropped.
+  When the rows need more, segments give way one at a time in a fixed order across all three
+  rows, the least useful first: extra directories, lines changed, the spend limit, the 7 day
+  limit, the pull request, the worktree, the vim mode, the agent, the directory, the 5 hour
+  limit, the cost and duration, the branch, the context bar, then the plan. The model always stays.
 - **The next-task label** is the only text that is ellipsized, to the room its line has. When
   fewer than 12 cells of label would fit, the whole plan segment wraps instead.
 - **The context bar** is 8 blocks at the least and 20 at the most, and takes the free cells left
@@ -80,7 +93,9 @@ a wide character such as a CJK glyph counts as two.
 - **Under 60 terminal columns** the output is one compact line of model, plan count, context percentage
   and branch, dropping from the right when they do not fit.
 - **Colors and links.** Bars and percentages are green below 60%, yellow from 60% to 84% and red
-  from 85%, fixed values. Links use OSC 8 and always close with their text.
+  from 85%, fixed values. The branch and a subagent row's name draw in the terminal's default
+  foreground, the name in bold, never in white, so they read on light and dark backgrounds.
+  Links use OSC 8 and always close with their text.
 - **A model name wider than a line** is the one case that is cut, because the line must still fit.
 
 ---
@@ -268,9 +283,9 @@ Each row shows the agent name with any namespace prefix stripped and its themed 
 the status, the configured effort, and context usage. A task without a `name` shows its `label`,
 then its `type`. The model is the task's own `model` field; when that is absent, a task named
 `oh-my-claudeagent:<agent>` takes the tier from that agent's frontmatter. A row fits the
-payload's `columns`, then `COLUMNS`, then 80, by the same rule as the main line: segments are
-added in the order name, model, status, effort, context, and the first one that does not fit is
-dropped along with every later one. Only a name wider than the row is cut. Any unreadable input prints nothing, so the tasks
+payload's `columns`, then `COLUMNS`, then 80, on one line: segments are added in the order name,
+model, status, effort, context, and the first one that does not fit is dropped along with every
+later one. Only a name wider than the row is cut. Any unreadable input prints nothing, so the tasks
 panel keeps its default rows.
 
 ---

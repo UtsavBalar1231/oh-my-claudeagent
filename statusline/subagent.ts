@@ -6,6 +6,7 @@ import {
   arrange,
   ASCII_GLYPHS,
   block,
+  BOLD,
   detectNerdFont,
   DIM,
   fixed,
@@ -15,7 +16,6 @@ import {
   RED,
   RST,
   terminalColumns,
-  WHITE,
   YELLOW,
 } from "./render.ts";
 
@@ -71,7 +71,7 @@ function effortLabel(effort: Task["effort"]): string {
 function row(task: Task, nerd: boolean, columns: number): string {
   const g = nerd ? NERD_GLYPHS : ASCII_GLYPHS;
   const name = task.name ? task.name.slice(task.name.lastIndexOf(":") + 1) : task.label || task.type || "agent";
-  const parts = [`${WHITE}${agentGlyph(name, nerd)} ${name}${RST}`];
+  const parts = [`${BOLD}${agentGlyph(name, nerd)} ${name}${RST}`];
 
   const model = friendlyModel(task.model || frontmatterModel(task.name ?? ""));
   if (model) parts.push(`${DIM}${g.model} ${model}${RST}`);

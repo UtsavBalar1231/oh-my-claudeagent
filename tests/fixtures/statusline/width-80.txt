@@ -1,4 +1,4 @@
-[36m> Opus 5.5[0m [90m·[0m [33mE: high[0m [90m·[0m [32mT: 2/4[0m [90m-> Wire the order summary panel into the pa…[0m[0m
-[32m▰[0m[32m▰[0m[32m▰[0m[32m▰[0m[32m▰[0m[90m▱[0m[90m▱[0m[90m▱[0m[90m▱[0m[90m▱[0m[90m▱[0m[90m▱[0m[90m▱[0m[90m▱[0m [32m34%[0m  [90m200k[0m [90m·[0m [37m* feature/checkout-redesign[0m [33m~3[0m  [32m+2[0m  [90m?1[0m [90m·[0m [90m> ]8;;https://github.com/acme/shopshop]8;;[0m[0m
-[35mA: oh-my-claudeagent:executor[0m [90m·[0m [34mW: checkout-wt[0m [90m<- main[0m [90m·[0m [36m]8;;https://github.com/acme/shop/pull/42#42]8;;[0m [32m+[0m[0m
-[35m$1.50[0m [90m·[0m [34m~ 2m 5s[0m [90m·[0m [32m▰[0m[32m▰[0m[32m▰[0m[32m▰[0m[90m▱[0m[90m▱[0m[90m▱[0m[90m▱[0m[90m▱[0m[90m▱[0m [32m45%[0m [90m5h[0m (resets 6pm)[0m
+[36m> Opus 5.5[0m [90m·[0m [33mE: high[0m [90m·[0m [35mA: oh-my-claudeagent:executor[0m[0m
+[32mT: 2/4[0m [90m-> Wire the order summary panel into the payment step and cover it…[0m[0m
+[32m▰[0m[32m▰[0m[32m▰[0m[32m▰[0m[32m▰[0m[90m▱[0m[90m▱[0m[90m▱[0m[90m▱[0m[90m▱[0m[90m▱[0m[90m▱[0m[90m▱[0m[90m▱[0m [32m34%[0m  [90m200k[0m [90m·[0m * feature/checkout-redesign [33m~3[0m  [32m+2[0m  [90m?1[0m [90m·[0m [90m> ]8;;https://github.com/acme/shopshop]8;;[0m[0m
+[34m~ 2m 5s[0m [90m·[0m [32m▰[0m[32m▰[0m[32m▰[0m[32m▰[0m[90m▱[0m[90m▱[0m[90m▱[0m[90m▱[0m[90m▱[0m[90m▱[0m [32m45%[0m [90m5h[0m (resets 6pm)[0m

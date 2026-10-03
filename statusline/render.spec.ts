@@ -20,6 +20,8 @@ import {
   render,
   renderBar,
   type Segment,
+  stackRows,
+  type Ranked,
   terminalColumns,
   terminalLines,
   visibleTruncate,
@@ -30,7 +32,6 @@ process.env.TZ = "UTC";
 const R = "\x1b[0m";
 const D = "\x1b[90m";
 const C = "\x1b[36m";
-const W = "\x1b[37m";
 const G = "\x1b[32m";
 const Y = "\x1b[33m";
 const RED = "\x1b[31m";
@@ -60,16 +61,13 @@ function lines(data: Payload, git: GitInfo = ON_BRANCH, env: Record<string, stri
     });
 }
 
-function one(data: Payload, git: GitInfo = NO_REPO, env: Record<string, string> = ASCII): string {
-  const rendered = lines(data, git, env);
-  expect(rendered).toHaveLength(1);
-  return rendered[0] ?? "";
-}
+const rows = (data: Payload, git: GitInfo = NO_REPO, env: Record<string, string> = ASCII): string[] => lines(data, git, env);
 
 const BAR_10 = `${filled(G, 2)}${empty(18)} ${G}10%${R}  ${D}200k${R}`;
 const WAITING = `${D}${"▱".repeat(20)}${R} ${D}[waiting...]${R}  ${D}200k${R}`;
-const costClock = (cost: string, duration: string): string => `${M}${cost}${R}${S}${B}~ ${duration}${R}`;
-const COST_ZERO = costClock("$0.00", "0m 0s");
+const clock = (duration: string): string => `${B}~ ${duration}${R}`;
+const costClock = (cost: string, duration: string): string => `${M}${cost}${R}${S}${clock(duration)}`;
+const ZERO = clock("0m 0s");
 const modelOf = (name: string): string => `${C}> ${name}${R}`;
 const MODEL = modelOf("claude");
 
@@ -282,7 +280,7 @@ describe("plan segment", () => {
 
   test("the segment reads count, arrow and label", () => {
     bind(THREE_OF_TEN);
-    expect(rendered(ASCII)).toEqual([[`${C}> m${R}`, `${G}T: 3/10${R} ${D}-> Pending 4${R}`, WAITING, `${D}> ${basename(dir)}${R}`, COST_ZERO].join(S)]);
+    expect(rendered(ASCII)).toEqual([[`${C}> m${R}`, `${G}T: 3/10${R} ${D}-> Pending 4${R}`].join(S), [WAITING, `${D}> ${basename(dir)}${R}`].join(S), ZERO]);
   });
 
   test("the Nerd Font segment uses the task glyph and a unicode arrow", () => {
@@ -298,7 +296,7 @@ describe("plan segment", () => {
   test("a task without a label gives only the count", () => {
     bind("- [x] 1. Done\n- [ ] 2.\n");
     expect(plan()).toEqual({ done: 1, total: 2, label: null });
-    expect(rendered(ASCII)[0]).toContain(`${S}${G}T: 1/2${R}${S}`);
+    expect(rendered(ASCII)[0]).toBe([`${C}> m${R}`, `${G}T: 1/2${R}`].join(S));
   });
 
   test("a label is cut to 80 characters with an ellipsis", () => {
@@ -393,42 +391,46 @@ describe("plan segment", () => {
 
 describe("segments", () => {
   const model = { display_name: "claude" };
-  const branch = `${W}* main${R}`;
+  const branch = "* main";
 
   test("a model without a name reads Claude", () => {
-    expect(one({ model: {}, cost: {} })).toStartWith(`${C}> Claude${R}`);
+    expect(rows({ model: {}, cost: {} })[0]).toBe(`${C}> Claude${R}`);
   });
 
   test.each(["low", "medium", "high", "xhigh", "max"])("effort level %s follows the model", (level) => {
-    expect(one({ model, effort: { level } }, ON_BRANCH)).toBe([`${C}> claude${R}${S}${Y}E: ${level}${R}`, WAITING, branch, COST_ZERO].join(S));
+    expect(rows({ model, effort: { level } }, ON_BRANCH)).toEqual([`${C}> claude${R}${S}${Y}E: ${level}${R}`, [WAITING, branch].join(S), ZERO]);
   });
 
   test("effort uses Nerd Font glyphs when enabled", () => {
-    expect(one({ model, effort: { level: "high" } }, NO_REPO, NERD)).toStartWith(`${C}\uf135 claude${R}${S}${Y}\uf0e7 high${R}${S}`);
+    expect(rows({ model, effort: { level: "high" } }, NO_REPO, NERD)[0]).toBe(`${C}\uf135 claude${R}${S}${Y}\uf0e7 high${R}`);
   });
 
   test("vim mode shows its first letter right after the model", () => {
-    expect(one({ model, vim: { mode: "normal" } })).toBe([MODEL, `${Y}V: n${R}`, WAITING, COST_ZERO].join(S));
+    expect(rows({ model, vim: { mode: "normal" } })).toEqual([[MODEL, `${Y}V: n${R}`].join(S), WAITING, ZERO]);
   });
 
   test("a worktree branch replaces the repository branch and the worktree name follows", () => {
-    expect(one({ model, worktree: { name: "wt", branch: "feature/x", original_branch: "main" } }, ON_BRANCH)).toBe(
-      [MODEL, WAITING, `${W}* feature/x${R}`, `${B}W: wt${R} ${D}<- main${R}`, COST_ZERO].join(S),
-    );
+    expect(rows({ model, worktree: { name: "wt", branch: "feature/x", original_branch: "main" } }, ON_BRANCH)).toEqual([
+      MODEL,
+      [WAITING, "* feature/x", `${B}W: wt${R} ${D}<- main${R}`].join(S),
+      ZERO,
+    ]);
   });
 
   test("a worktree without a name shows no worktree segment", () => {
-    expect(one({ model, worktree: {} })).toBe([MODEL, WAITING, COST_ZERO].join(S));
+    expect(rows({ model, worktree: {} })).toEqual([MODEL, WAITING, ZERO]);
   });
 
   test("branch counts show modified, staged and untracked in that order", () => {
-    expect(one({ model }, { ...ON_BRANCH, modified: 3, staged: 2, untracked: 1 })).toBe(
-      [MODEL, WAITING, `${W}* main${R} ${Y}~3${R}  ${G}+2${R}  ${D}?1${R}`, COST_ZERO].join(S),
-    );
+    expect(rows({ model }, { ...ON_BRANCH, modified: 3, staged: 2, untracked: 1 })).toEqual([
+      MODEL,
+      [WAITING, `* main ${Y}~3${R}  ${G}+2${R}  ${D}?1${R}`].join(S),
+      ZERO,
+    ]);
   });
 
   test("a repository without a branch shows none", () => {
-    expect(one({ model }, { ...ON_BRANCH, branch: "" })).toBe([MODEL, WAITING, COST_ZERO].join(S));
+    expect(rows({ model }, { ...ON_BRANCH, branch: "" })).toEqual([MODEL, WAITING, ZERO]);
   });
 
   test.each([
@@ -438,33 +440,35 @@ describe("segments", () => {
     ["C:/Users/x/proj/", "proj"],
     ["\\\\srv\\share\\proj", "proj"],
   ])("the folder segment of project %p is %p", (project_dir, name) => {
-    expect(one({ model, workspace: { project_dir } }, ON_BRANCH)).toBe([MODEL, WAITING, branch, `${D}> ${name}${R}`, COST_ZERO].join(S));
+    expect(rows({ model, workspace: { project_dir } }, ON_BRANCH)).toEqual([MODEL, [WAITING, branch, `${D}> ${name}${R}`].join(S), ZERO]);
   });
 
   test.each(["/", "C:\\", "\\\\srv\\share"])("the project root %p shows no folder segment", (project_dir) => {
-    expect(one({ model, workspace: { project_dir } }, ON_BRANCH)).toBe([MODEL, WAITING, branch, COST_ZERO].join(S));
+    expect(rows({ model, workspace: { project_dir } }, ON_BRANCH)).toEqual([MODEL, [WAITING, branch].join(S), ZERO]);
   });
 
   test("an SSH remote links the directory to its web address", () => {
     const git = { ...ON_BRANCH, remote: "git@github.com:user/repo.git" };
-    expect(one({ model, cwd: "/work/repo" }, git)).toBe(
-      [MODEL, WAITING, branch, `${D}> ${link("https://github.com/user/repo", "repo")}${R}`, COST_ZERO].join(S),
-    );
+    expect(rows({ model, cwd: "/work/repo" }, git)).toEqual([
+      MODEL,
+      [WAITING, branch, `${D}> ${link("https://github.com/user/repo", "repo")}${R}`].join(S),
+      ZERO,
+    ]);
   });
 
   test.each([
     [1, "+1 dir"],
     [2, "+2 dirs"],
-  ])("%p added directories read %p and come last", (count, text) => {
+  ])("%p added directories read %p and end the workspace row", (count, text) => {
     const added = Array.from({ length: count }, (_, i) => `/x${i}`);
-    expect(one({ model, workspace: { added_dirs: added } })).toBe([MODEL, WAITING, COST_ZERO, `${D}${text}${R}`].join(S));
+    expect(rows({ model, workspace: { added_dirs: added } })).toEqual([MODEL, [WAITING, `${D}${text}${R}`].join(S), ZERO]);
   });
 
   test.each([
     ["sisyphus", "A:"],
     ["oh-my-claudeagent:prometheus", "A:"],
   ])("agent %s is marked %s without Nerd Font", (name, glyph) => {
-    expect(one({ model, agent: { name } })).toBe([MODEL, WAITING, `${M}${glyph} ${name}${R}`, COST_ZERO].join(S));
+    expect(rows({ model, agent: { name } })).toEqual([[MODEL, `${M}${glyph} ${name}${R}`].join(S), WAITING, ZERO]);
   });
 
   test.each([
@@ -473,7 +477,7 @@ describe("segments", () => {
     ["someone-else", "\uf007"],
     ["constructor", "\uf007"],
   ])("agent %s gets glyph %p with Nerd Font", (name, glyph) => {
-    expect(one({ model, agent: { name } }, NO_REPO, NERD)).toContain(`${M}${glyph} ${name}${R}`);
+    expect(rows({ model, agent: { name } }, NO_REPO, NERD)[0]).toEndWith(`${M}${glyph} ${name}${R}`);
   });
 
   test("every shipped agent has its own glyph", () => {
@@ -482,15 +486,15 @@ describe("segments", () => {
   });
 
   test("the plugin's default main agent shows nothing, and that default is the one settings.json sets", () => {
-    expect(one({ model, agent: { name: DEFAULT_MAIN_AGENT } })).toBe([MODEL, WAITING, COST_ZERO].join(S));
+    expect(rows({ model, agent: { name: DEFAULT_MAIN_AGENT } })).toEqual([MODEL, WAITING, ZERO]);
     expect(JSON.parse(readFileSync(join(import.meta.dir, "..", "settings.json"), "utf8")).agent).toBe(DEFAULT_MAIN_AGENT);
   });
 
   test("an agent without a name shows nothing", () => {
-    expect(one({ model, agent: {} })).toBe([MODEL, WAITING, COST_ZERO].join(S));
+    expect(rows({ model, agent: {} })).toEqual([MODEL, WAITING, ZERO]);
   });
 
-  test("agent, worktree and pull request come after the directory and before cost", () => {
+  test("the agent follows the model, and worktree and pull request follow the directory", () => {
     const data: Payload = {
       model,
       workspace: { project_dir: "/work/repo" },
@@ -498,11 +502,11 @@ describe("segments", () => {
       worktree: { name: "wt" },
       pr: { number: 3 },
     };
-    expect(one(data, ON_BRANCH)).toBe([MODEL, WAITING, branch, `${D}> repo${R}`, `${M}A: sisyphus${R}`, `${B}W: wt${R}`, `${C}#3${R}`, COST_ZERO].join(S));
+    expect(rows(data, ON_BRANCH)).toEqual([[MODEL, `${M}A: sisyphus${R}`].join(S), [WAITING, branch, `${D}> repo${R}`, `${B}W: wt${R}`, `${C}#3${R}`].join(S), ZERO]);
   });
 
   test("a payload without a repository shows no pull request segment", () => {
-    expect(one({ model, pr: { url: "https://x/1" } })).toBe([MODEL, WAITING, COST_ZERO].join(S));
+    expect(rows({ model, pr: { url: "https://x/1" } })).toEqual([MODEL, WAITING, ZERO]);
   });
 
   test("the cut segments are never drawn", () => {
@@ -528,15 +532,14 @@ describe("segments", () => {
 });
 
 describe("metrics segments", () => {
-  const metrics = (data: Payload): string => one(data, NO_REPO);
+  const metrics = (data: Payload): string[] => rows(data);
   const MODEL_M = modelOf("m");
 
   test.each([
     [{ total_cost_usd: 1.23 }, "$1.23"],
-    [{}, "$0.00"],
     [{ total_cost_usd: 0.125 }, "$0.12"],
-  ])("cost %o reads %s", (cost, text) => {
-    expect(metrics(withCost(cost))).toBe([MODEL_M, BAR_10, costClock(text, "0m 0s")].join(S));
+  ])("cost %o reads %s before the duration", (cost, text) => {
+    expect(metrics(withCost(cost))).toEqual([MODEL_M, BAR_10, costClock(text, "0m 0s")]);
   });
 
   test.each([
@@ -546,7 +549,7 @@ describe("metrics segments", () => {
     [90000, "1m 30s"],
     [3600000, "60m 0s"],
   ])("a duration of %p ms reads %s", (ms, text) => {
-    expect(metrics(withCost({ total_duration_ms: ms }))).toBe([MODEL_M, BAR_10, costClock("$0.00", text)].join(S));
+    expect(metrics(withCost({ total_duration_ms: ms }))).toEqual([MODEL_M, BAR_10, clock(text)]);
   });
 
   test.each([
@@ -554,11 +557,41 @@ describe("metrics segments", () => {
     [{ total_lines_added: 42 }, `${G}+42${R}`],
     [{ total_lines_removed: 17 }, `${RED}-17${R}`],
   ])("changed lines %o read %s", (cost, text) => {
-    expect(metrics(withCost(cost))).toBe([MODEL_M, BAR_10, COST_ZERO, text].join(S));
+    expect(metrics(withCost(cost))).toEqual([MODEL_M, [BAR_10, text].join(S), ZERO]);
   });
 
   test("zero changed lines are left out", () => {
-    expect(metrics(withCost({ total_lines_added: 0, total_lines_removed: 0 }))).toBe([MODEL_M, BAR_10, COST_ZERO].join(S));
+    expect(metrics(withCost({ total_lines_added: 0, total_lines_removed: 0 }))).toEqual([MODEL_M, BAR_10, ZERO]);
+  });
+});
+
+describe("cost by account", () => {
+  const FIVE_HOUR = { used_percentage: 45 };
+  const at = (cost: number | undefined, limits?: Payload["rate_limits"]): string =>
+    rows({ ...withCost({ total_duration_ms: 125000, ...(cost === undefined ? {} : { total_cost_usd: cost }) }), ...(limits === undefined ? {} : { rate_limits: limits }) })[2] ?? "";
+
+  test("an API account sees its cost before the duration", () => {
+    expect(at(1.5)).toBe(costClock("$1.50", "2m 5s"));
+    expect(at(1.5, null)).toBe(costClock("$1.50", "2m 5s"));
+    expect(at(1.5, {})).toBe(costClock("$1.50", "2m 5s"));
+  });
+
+  test.each([
+    ["five_hour", { five_hour: FIVE_HOUR }],
+    ["seven_day", { seven_day: FIVE_HOUR }],
+    ["five_hour without a reading", { five_hour: { resets_at: 1 } }],
+    ["seven_day beside a spend_limit", { seven_day: FIVE_HOUR, spend_limit: { used_usd: 1, limit_usd: 10 } }],
+  ] as [string, Payload["rate_limits"]][])("a subscription window (%s) hides the cost and keeps the duration", (_, limits) => {
+    expect(at(1.5, limits)).toStartWith(clock("2m 5s"));
+    expect(visible(at(1.5, limits))).not.toContain("$1.50");
+  });
+
+  test("a gateway that reports only a spend limit bills by spend and keeps the cost", () => {
+    expect(at(1.5, { spend_limit: { used_usd: 1, limit_usd: 10 } })).toBe([costClock("$1.50", "2m 5s"), `${G}S: $1.00/$10${R}`].join(S));
+  });
+
+  test.each([[0], [undefined]])("a cost of %p, as before the first response, is hidden", (cost) => {
+    expect(at(cost)).toBe(clock("2m 5s"));
   });
 });
 
@@ -566,9 +599,9 @@ describe("usage limits", () => {
   const model = { display_name: "claude" };
   const window = (pct: number, glyph: string, reset: string, color = G, blocks = Math.round(pct / 10)): string =>
     `${filled(color, blocks)}${empty(10 - blocks)} ${color}${pct}%${R} ${D}${glyph}${R}${reset}`;
-  const base = [MODEL, WAITING, COST_ZERO];
+  const usage = (...segments: string[]): string[] => [MODEL, WAITING, [ZERO, ...segments].join(S)];
 
-  test("each window is its own segment after cost, five hours first", () => {
+  test("each window is its own segment after the duration, five hours first", () => {
     const data: Payload = {
       model,
       rate_limits: {
@@ -576,37 +609,36 @@ describe("usage limits", () => {
         seven_day: { used_percentage: 80, resets_at: Date.parse("2026-10-05T17:00:00Z") / 1000 },
       },
     };
-    expect(one(data)).toBe([...base, window(45, "5h", " (resets 6pm)", G, 4), window(80, "7d", " (resets mon 5pm)", Y)].join(S));
+    expect(rows(data)).toEqual(usage(window(45, "5h", " (resets 6pm)", G, 4), window(80, "7d", " (resets mon 5pm)", Y)));
   });
 
   test("a window with no readable reset time is left bare", () => {
-    expect(one({ model, rate_limits: { five_hour: { used_percentage: 45, resets_at: null } } })).toBe([...base, window(45, "5h", "", G, 4)].join(S));
+    expect(rows({ model, rate_limits: { five_hour: { used_percentage: 45, resets_at: null } } })).toEqual(usage(window(45, "5h", "", G, 4)));
   });
 
   test("a window without a percentage is skipped", () => {
-    expect(one({ model, rate_limits: { five_hour: { resets_at: 1 }, seven_day: { used_percentage: 60 } } })).toBe([...base, window(60, "7d", "", Y)].join(S));
+    expect(rows({ model, rate_limits: { five_hour: { resets_at: 1 }, seven_day: { used_percentage: 60 } } })).toEqual(usage(window(60, "7d", "", Y)));
   });
 
   test("a window is coloured by the same thresholds as the context bar", () => {
-    const text = one({ model, rate_limits: { five_hour: { used_percentage: 91 } } });
-    expect(text).toContain(`${RED}91%${R}`);
+    expect(rows({ model, rate_limits: { five_hour: { used_percentage: 91 } } })[2]).toContain(`${RED}91%${R}`);
   });
 });
 
 describe("spend limit", () => {
   const model = { display_name: "claude" };
-  const base = [MODEL, WAITING, COST_ZERO];
+  const base = [MODEL, WAITING, ZERO];
   const spend = (limit: NonNullable<NonNullable<Payload["rate_limits"]>["spend_limit"]>): Payload => ({ model, rate_limits: { spend_limit: limit } });
 
-  test("dollars spent and the limit follow cost, with the period, in ASCII and in Nerd Font glyphs", () => {
+  test("dollars spent and the limit follow the duration, with the period, in ASCII and in Nerd Font glyphs", () => {
     const data = spend({ used_percentage: 62.8, used_usd: 314.12, limit_usd: 500, period: "monthly" });
-    expect(one(data)).toBe([...base, `${Y}S: $314.12/$500${R} ${D}mo${R}`].join(S));
-    expect(one(data, NO_REPO, NERD)).toContain(`${Y}\uf0d6 $314.12/$500${R} ${D}mo${R}`);
+    expect(rows(data)).toEqual([MODEL, WAITING, [ZERO, `${Y}S: $314.12/$500${R} ${D}mo${R}`].join(S)]);
+    expect(rows(data, NO_REPO, NERD)[2]).toEndWith(`${Y}\uf0d6 $314.12/$500${R} ${D}mo${R}`);
   });
 
   test("each period reads as its short word, and an unknown or absent period leaves none", () => {
     const label = (period: string | null | undefined): string =>
-      one(spend({ used_percentage: 10, used_usd: 1, limit_usd: 10, ...(period === undefined ? {} : { period }) })).split(S).at(-1) ?? "";
+      rows(spend({ used_percentage: 10, used_usd: 1, limit_usd: 10, ...(period === undefined ? {} : { period }) })).at(-1)?.split(S).at(-1) ?? "";
     expect(label("daily")).toBe(`${G}S: $1.00/$10${R} ${D}day${R}`);
     expect(label("weekly")).toBe(`${G}S: $1.00/$10${R} ${D}wk${R}`);
     expect(label("monthly")).toBe(`${G}S: $1.00/$10${R} ${D}mo${R}`);
@@ -616,36 +648,35 @@ describe("spend limit", () => {
   });
 
   test("a limit with cents keeps them, and the colour comes from the dollars when no percentage came", () => {
-    expect(one(spend({ used_usd: 90, limit_usd: 100.5 }))).toEndWith(`${RED}S: $90.00/$100.50${R}`);
-    expect(one(spend({ used_usd: 61, limit_usd: 100 }))).toEndWith(`${Y}S: $61.00/$100${R}`);
-    expect(one(spend({ used_usd: 5, limit_usd: 0 }))).toEndWith(`${G}S: $5.00/$0${R}`);
+    expect(rows(spend({ used_usd: 90, limit_usd: 100.5 }))[2]).toEndWith(`${RED}S: $90.00/$100.50${R}`);
+    expect(rows(spend({ used_usd: 61, limit_usd: 100 }))[2]).toEndWith(`${Y}S: $61.00/$100${R}`);
+    expect(rows(spend({ used_usd: 5, limit_usd: 0 }))[2]).toEndWith(`${G}S: $5.00/$0${R}`);
   });
 
   test("the reported percentage colours the segment when both are present", () => {
-    expect(one(spend({ used_percentage: 120, used_usd: 1, limit_usd: 100 }))).toEndWith(`${RED}S: $1.00/$100${R}`);
+    expect(rows(spend({ used_percentage: 120, used_usd: 1, limit_usd: 100 }))[2]).toEndWith(`${RED}S: $1.00/$100${R}`);
   });
 
   test("without both dollar amounts there is no segment, whatever else the limit carries", () => {
     for (const limit of [{ used_percentage: 63, resets_at: 1 }, { used_usd: 3 }, { limit_usd: 10 }, { used_usd: null, limit_usd: 10 }, {}]) {
-      expect(one(spend(limit))).toBe(base.join(S));
+      expect(rows(spend(limit))).toEqual(base);
     }
-    expect(one({ model, rate_limits: { spend_limit: null } })).toBe(base.join(S));
+    expect(rows({ model, rate_limits: { spend_limit: null } })).toEqual(base);
   });
 
-  test("it sits after the usage windows and before the changed lines", () => {
+  test("it ends the usage row, after the usage windows", () => {
     const data: Payload = {
       model,
       cost: { total_lines_added: 4 },
       rate_limits: { five_hour: { used_percentage: 45 }, spend_limit: { used_percentage: 10, used_usd: 1, limit_usd: 10 } },
     };
-    const parts = one(data).split(S);
-    expect(parts.slice(-3)).toEqual([`${filled(G, 4)}${empty(6)} ${G}45%${R} ${D}5h${R}`, `${G}S: $1.00/$10${R}`, `${G}+4${R}`]);
+    expect(rows(data)[2]?.split(S)).toEqual([ZERO, `${filled(G, 4)}${empty(6)} ${G}45%${R} ${D}5h${R}`, `${G}S: $1.00/$10${R}`]);
   });
 });
 
 describe("context bar", () => {
   const bar = (context: NonNullable<Payload["context_window"]>, exceeds = false): string =>
-    one({ model: { display_name: "m" }, context_window: context, exceeds_200k_tokens: exceeds, cost: {} }).split(S)[1] ?? "";
+    rows({ model: { display_name: "m" }, context_window: context, exceeds_200k_tokens: exceeds, cost: {} })[1] ?? "";
   const label = (size: string): string => `${D}${size}${R}`;
 
   test("the used percentage is drawn and the window labelled", () => {
@@ -704,37 +735,34 @@ describe("context bar", () => {
   });
 
   describe("width follows the free space on its line", () => {
-    const wide = (columns: number): string =>
-      one({ model: { display_name: "m" }, context_window: { context_window_size: 200000, used_percentage: 10 } }, NO_REPO, { ...ASCII, COLUMNS: String(columns) });
+    const workspace = (context: NonNullable<Payload["context_window"]>, branch: string, columns: number): string[] =>
+      lines({ model: { display_name: "m" }, context_window: { context_window_size: 200000, ...context }, cost: {} }, { ...ON_BRANCH, branch }, {
+        ...ASCII,
+        COLUMNS: String(columns),
+      });
     const blocks = (line: string): number => (visible(line).match(/[▰▱]/g) ?? []).length;
 
     test("a full line leaves the bar at 8 blocks", () => {
-      const line = lines({ model: { display_name: "x".repeat(37) }, context_window: { context_window_size: 200000, used_percentage: 10 }, cost: {} }, NO_REPO, {
-        ...ASCII,
-        COLUMNS: usable(60),
-      });
-      expect(line).toHaveLength(2);
-      expect(blocks(line[0] ?? "")).toBe(8);
-      expect(displayWidth(visible(line[0] ?? ""))).toBe(60);
+      const line = workspace({ used_percentage: 10 }, "x".repeat(37), Number(usable(60)));
+      expect(line).toHaveLength(3);
+      expect(blocks(line[1] ?? "")).toBe(8);
+      expect(displayWidth(visible(line[1] ?? ""))).toBe(60);
     });
 
     test("spare cells go to the bar", () => {
-      const line = lines({ model: { display_name: "x".repeat(27) }, context_window: { context_window_size: 200000, used_percentage: 10 }, cost: {} }, NO_REPO, {
-        ...ASCII,
-        COLUMNS: usable(60),
-      });
-      expect(blocks(line[0] ?? "")).toBe(18);
-      expect(displayWidth(visible(line[0] ?? ""))).toBe(60);
+      const line = workspace({ used_percentage: 10 }, "x".repeat(27), Number(usable(60)));
+      expect(blocks(line[1] ?? "")).toBe(18);
+      expect(displayWidth(visible(line[1] ?? ""))).toBe(60);
     });
 
     test("a roomy line stops at 20 blocks", () => {
-      expect(blocks(wide(200))).toBe(20);
+      expect(blocks(workspace({ used_percentage: 10 }, "main", 200)[1] ?? "")).toBe(20);
     });
 
     test("the waiting placeholder follows the same width", () => {
-      const line = lines({ model: { display_name: "x".repeat(28) }, context_window: { context_window_size: 200000 }, cost: {} }, NO_REPO, { ...ASCII, COLUMNS: usable(60) });
-      expect(blocks(line[0] ?? "")).toBe(8);
-      expect(displayWidth(visible(line[0] ?? ""))).toBe(60);
+      const line = workspace({}, "x".repeat(28), Number(usable(60)));
+      expect(blocks(line[1] ?? "")).toBe(8);
+      expect(displayWidth(visible(line[1] ?? ""))).toBe(60);
     });
   });
 });
@@ -791,6 +819,39 @@ describe("arrange", () => {
   });
 });
 
+describe("stacked rows", () => {
+  const stacked = (rows: readonly (readonly Ranked[])[], columns: number, maxLines: number): string[] =>
+    stackRows(rows, columns, maxLines).map((line) => visible(line).replace(/ · /g, "|"));
+  const ranked = (text: string, rank: number): Ranked => ({ segment: block(text), rank });
+  const [A, B2, C2, D2, E, F] = ["aaaa", "bbbb", "cccc", "dddd", "eeee", "ffff"].map(ranked) as [Ranked, Ranked, Ranked, Ranked, Ranked, Ranked];
+
+  test("each row starts its own line however wide the terminal", () => {
+    expect(stacked([[A, B2], [C2, D2], [E, F]], 200, 4)).toEqual(["aaaa|bbbb", "cccc|dddd", "eeee|ffff"]);
+  });
+
+  test("an empty row is left out", () => {
+    expect(stacked([[A], [], [E]], 200, 4)).toEqual(["aaaa", "eeee"]);
+  });
+
+  test("a row too wide for the terminal wraps within itself", () => {
+    expect(stacked([[A, B2], [C2, D2, E], [F]], 11, 4)).toEqual(["aaaa|bbbb", "cccc|dddd", "eeee", "ffff"]);
+  });
+
+  test("past the line budget the highest rank goes first, and rank 0 always stays", () => {
+    const rows = [[A, B2], [C2, D2], [E, F]];
+    expect(stacked(rows, 4, 6)).toEqual(["aaaa", "bbbb", "cccc", "dddd", "eeee", "ffff"]);
+    expect(stacked(rows, 4, 5)).toEqual(["aaaa", "bbbb", "cccc", "dddd", "eeee"]);
+    expect(stacked(rows, 4, 4)).toEqual(["aaaa", "bbbb", "cccc", "dddd"]);
+    expect(stacked(rows, 4, 3)).toEqual(["aaaa", "bbbb", "cccc"]);
+    expect(stacked(rows, 4, 1)).toEqual(["aaaa"]);
+  });
+
+  test("a lower row's head outlasts a higher row's tail", () => {
+    const rows = [[ranked("aaaa", 0)], [ranked("cccc", 2), ranked("tail", 13)], [ranked("time", 4)]];
+    expect(stacked(rows, 4, 3)).toEqual(["aaaa", "cccc", "time"]);
+  });
+});
+
 describe("layout", () => {
   const model = { display_name: "claude" };
   const SESSION = "layout-session";
@@ -840,6 +901,40 @@ describe("layout", () => {
     expect(lines(data, richGit, { ...ASCII, COLUMNS: "50" })[0]).toContain(` ${RED}90%${R}`);
   });
 
+  const SESSION_ROW = "> Opus 5.5 · E: high · T: 1/3 -> Wire the order summary panel into the payment step and cover it with a test";
+  const USAGE_ROW = "~ 2m 5s · ▰▰▰▰▱▱▱▱▱▱ 45% 5h (resets 6pm) · ▰▰▰▰▰▰▰▰▱▱ 80% 7d (resets mon 5pm)";
+  const branchOf = (bar: string): string => `${bar} 34%  200k · * v3-typescript-mods ~3  +2  ?1`;
+  const BAR_20 = "▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱";
+
+  test("at 120 columns each row starts its own line, and the workspace row wraps within itself", () => {
+    expect(at(120).map(visible)).toEqual([
+      SESSION_ROW,
+      `${branchOf("▰▰▰▰▱▱▱▱▱▱▱▱")} · > ${basename(dir)} · W: wt <- main · #42 +`,
+      "+42/-7 · +2 dirs",
+      USAGE_ROW,
+    ]);
+  });
+
+  test.each([200, 300])("at %p columns each row is one line of its own", (columns) => {
+    expect(at(columns).map(visible)).toEqual([SESSION_ROW, `${branchOf(BAR_20)} · > ${basename(dir)} · W: wt <- main · #42 + · +42/-7 · +2 dirs`, USAGE_ROW]);
+  });
+
+  test("at 80 columns the rows wrap, and the lowest-ranked segments drop so the time and 5 hour limit stay", () => {
+    expect(at(80).map(visible)).toEqual([
+      "> Opus 5.5 · E: high · T: 1/3 -> Wire the order summary panel into the pa…",
+      branchOf(BAR_20),
+      `> ${basename(dir)} · W: wt <- main · #42 +`,
+      "~ 2m 5s · ▰▰▰▰▱▱▱▱▱▱ 45% 5h (resets 6pm)",
+    ]);
+  });
+
+  test("a short terminal keeps only the highest-ranked segments: model, plan, context and branch", () => {
+    expect(at(80, 19).map(visible)).toEqual([
+      "> Opus 5.5 · E: high · T: 1/3 -> Wire the order summary panel into the pa…",
+      branchOf(BAR_20),
+    ]);
+  });
+
   test("a terminal of 60 columns gets the full layout", () => {
     expect(at(60).length).toBeGreaterThan(1);
     expect(at(60)[0]).toContain("E: high");
@@ -867,7 +962,7 @@ describe("layout", () => {
   });
 
   test("a wide terminal shows the whole label", () => {
-    expect(at(200).map(visible)[0]).toContain("-> Wire the order summary panel into the payment step and cover it with a test ·");
+    expect(at(200).map(visible)[0]).toBe("> Opus 5.5 · E: high · T: 1/3 -> Wire the order summary panel into the payment step and cover it with a test");
   });
 
   test("the label wraps with its segment instead of being squeezed under 12 cells", () => {

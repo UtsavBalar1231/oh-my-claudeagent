@@ -38,11 +38,12 @@ change how OMCA runs. A check with a known fix offers a key that fills the promp
 
 <img src=".github/assets/doctor.png" width="680" alt="The Doctor tab counts 1 warning, 1 info row and 11 passing checks. The warning says maxEffortLevel high holds oracle below the xhigh it declares, the info row offers a: Use /advisor fable, and the passing rows cover OMCA, Claude Code, bun, the omca server, ast-grep, the options, the agent models, the mod policy, the hooks, the output style and the status line.">
 
-The status line shows the model, the plan's next task, the context window, git state, cost and
-usage limits, and fits itself to the terminal's width. The subagent status line gives each
+The status line shows the session (model, agent and the plan's next task), the workspace (context
+window and git state) and usage (duration, usage limits, and cost for accounts billed by the
+token) on rows of their own, and fits itself to the terminal's width. The subagent status line gives each
 running agent a row.
 
-<img src=".github/assets/statusline.png" width="900" alt="The OMCA status line under the prompt shows the model and effort, plan progress with the next task, a context bar, the git branch with change counts, the project, and the session cost and duration, and below it one row for each of two running subagents with its model, state and effort.">
+<img src=".github/assets/statusline.png" width="900" alt="The OMCA status line under the prompt shows three rows: the model, effort and plan progress with the next task; a context bar, the git branch with change counts and the project; and the session cost and duration. Below it, one row for each of two running subagents shows its model, state and effort.">
 
 In motion: `/omca plan` opens the board, Down moves the focus, Enter opens the task as a page,
 and the number keys switch between the pane's tabs.

@@ -55,9 +55,9 @@ qa:
 visual view:
 	bun scripts/qa/visual.ts {{ view }}
 
-# Recapture the README screens against the mock model
-screenshots:
-	bun scripts/docs/screenshots.ts
+# Recapture the README screens against the mock model; name shots, or `clips` for the video footage
+screenshots *args:
+	bun scripts/docs/screenshots.ts {{ args }}
 
 # Render the demo video into video/out
 video *args:

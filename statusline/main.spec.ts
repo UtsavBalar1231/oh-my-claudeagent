@@ -60,7 +60,7 @@ describe("git cache", () => {
 
   test("a payload without a project directory renders without touching git", () => {
     const { stdout } = run('{"model": {"display_name": "m"}}');
-    expect(stdout.split("\n")).toHaveLength(2);
+    expect(stdout.trimEnd().split("\n")).toHaveLength(3);
     expect(stdout).toContain("> m");
     expect(readdirSync(root)).toEqual([]);
   });

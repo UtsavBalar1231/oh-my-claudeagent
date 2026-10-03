@@ -338,12 +338,17 @@ pane's Feedback tab.
 
 ## The status line
 
-Once setup has configured it, the status line shows, in priority order: the model and effort,
-the bound plan's progress and next task, a context bar, git state, the project, the active
-agent, the worktree and pull request, the session's cost and duration, your usage limits, lines
-changed, and extra directories. It fits the segments to the terminal's width and height and never
-cuts one in half. The usage limits appear for Claude.ai Pro and Max subscribers. Behind a Claude
-apps gateway with a spend limit, the dollars spent against that limit follow them.
+Once setup has configured it, the status line shows three rows, each on its own line: the
+session (model and effort, vim mode, the active agent, and the bound plan's progress and next
+task), the workspace (a context bar, git state, the project, the worktree and pull request, lines
+changed and extra directories), and usage (the session's cost and duration, your usage limits and
+a spend limit). A row too wide for the terminal wraps onto more lines, and when the rows need more
+lines than the terminal allows, the end of the usage row goes first, then the end of the workspace
+row. No segment is cut in half, and a terminal under 60 columns gets one compact line.
+
+The usage limits appear for Claude.ai Pro and Max subscribers, and the cost shows only when they
+are absent, since a subscription is not billed by the token. Behind a Claude apps gateway that
+reports only a spend limit, the cost shows, followed by the dollars spent against that limit.
 
 The subagent status line gives each running agent a row with its model, state, effort and
 context use.

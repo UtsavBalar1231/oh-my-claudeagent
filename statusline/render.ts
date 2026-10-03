@@ -59,7 +59,6 @@ export const FALLBACK = "[claude]";
 export const RST = "\x1b[0m";
 export const DIM = "\x1b[90m";
 const CYAN = "\x1b[36m";
-export const WHITE = "\x1b[37m";
 export const GREEN = "\x1b[32m";
 export const YELLOW = "\x1b[33m";
 export const RED = "\x1b[31m";
@@ -67,7 +66,7 @@ const MAGENTA = "\x1b[35m";
 // The plugin's settings.json starts every session on this agent, so naming it tells nothing.
 export const DEFAULT_MAIN_AGENT = "oh-my-claudeagent:sisyphus";
 const BLUE = "\x1b[34m";
-const BOLD = "\x1b[1m";
+export const BOLD = "\x1b[1m";
 export const SEP = ` ${DIM}·${RST} `;
 const FILLED_BLOCK = "▰";
 const EMPTY_BLOCK = "▱";
@@ -408,7 +407,7 @@ function branchSegment(c: Ctx): Segment | null {
     git.staged > 0 ? `${GREEN}+${git.staged}${RST}` : "",
     git.untracked > 0 ? `${DIM}?${git.untracked}${RST}` : "",
   ].filter(Boolean);
-  return block(`${WHITE}${g.branch} ${branch}${RST}${counts.length > 0 ? ` ${counts.join("  ")}` : ""}`);
+  return block(`${g.branch} ${branch}${counts.length > 0 ? ` ${counts.join("  ")}` : ""}`);
 }
 
 function directorySegment({ data, git, g }: Ctx): Segment | null {
@@ -419,18 +418,14 @@ function directorySegment({ data, git, g }: Ctx): Segment | null {
   return block(`${DIM}${g.folder} ${remoteUrl ? osc8(remoteUrl, name) : name}${RST}`);
 }
 
-function rateLimitSegments({ data, g, now }: Ctx): Segment[] {
-  const windows = [
-    { window: data.rate_limits?.five_hour, glyph: g.fiveHour },
-    { window: data.rate_limits?.seven_day, glyph: g.weekly },
-  ];
-  return windows.flatMap(({ window, glyph }) => {
-    const pct = window?.used_percentage;
-    if (pct == null) return [];
-    const color = thresholdColor(pct);
-    const reset = formatResetTime(window?.resets_at, now);
-    return [block(`${renderBar(pct, RATE_LIMIT_BAR_WIDTH, color)} ${color}${fixed(pct, 0)}%${RST} ${DIM}${glyph}${RST}${reset ? ` (resets ${reset})` : ""}`)];
-  });
+function rateLimitSegment({ data, g, now }: Ctx, which: "five_hour" | "seven_day"): Segment | null {
+  const window = data.rate_limits?.[which];
+  const pct = window?.used_percentage;
+  if (pct == null) return null;
+  const color = thresholdColor(pct);
+  const reset = formatResetTime(window?.resets_at, now);
+  const glyph = which === "five_hour" ? g.fiveHour : g.weekly;
+  return block(`${renderBar(pct, RATE_LIMIT_BAR_WIDTH, color)} ${color}${fixed(pct, 0)}%${RST} ${DIM}${glyph}${RST}${reset ? ` (resets ${reset})` : ""}`);
 }
 
 const SPEND_PERIODS = new Map([
@@ -452,34 +447,96 @@ function spendSegment({ data, g }: Ctx): Segment | null {
 
 const present = (segments: readonly (Segment | null)[]): Segment[] => segments.filter((s) => s !== null);
 
-function fullSegments(c: Ctx): Segment[] {
+const isSubscription = ({ rate_limits: limits }: Payload): boolean => limits?.five_hour != null || limits?.seven_day != null;
+
+function costSegment({ data, g }: Ctx): Segment {
+  const usd = data.cost?.total_cost_usd ?? 0;
+  const cost = !isSubscription(data) && usd > 0 ? `${MAGENTA}$${fixed(usd, 2)}${RST}${SEP}` : "";
+  return block(`${cost}${BLUE}${g.clock} ${formatDuration(data.cost?.total_duration_ms)}${RST}`);
+}
+
+/** The full view's rows, session, workspace and usage, each its segments in priority order. */
+export interface Ranked {
+  segment: Segment;
+  rank: number;
+}
+
+// The order segments give way in when the rows run past the line budget, across rows, so a narrow
+// terminal keeps its time and 5 hour limit before the workspace row's lines-changed tail.
+const RANK = {
+  model: 0,
+  plan: 1,
+  context: 2,
+  branch: 3,
+  cost: 4,
+  fiveHour: 5,
+  directory: 6,
+  agent: 7,
+  vim: 8,
+  worktree: 9,
+  pr: 10,
+  sevenDay: 11,
+  spend: 12,
+  changed: 13,
+  dirs: 14,
+} as const;
+
+const ranked = (rank: number, segment: Segment | null): Ranked[] => (segment === null ? [] : [{ segment, rank }]);
+
+function fullRows(c: Ctx): Ranked[][] {
   const { data, nerd, g } = c;
   const effort = `${data.effort?.level ?? ""}`.trim();
   const projectDir = projectDirOf(data);
   const plan = projectDir ? readPlan(projectDir, data.session_id ?? "") : null;
   const worktree = data.worktree;
   const pr = composePr(data, nerd);
-  const cost = data.cost;
-  const added = cost?.total_lines_added ?? 0;
-  const removed = cost?.total_lines_removed ?? 0;
+  const added = data.cost?.total_lines_added ?? 0;
+  const removed = data.cost?.total_lines_removed ?? 0;
   const changed = [added > 0 ? `${GREEN}+${added}${RST}` : "", removed > 0 ? `${RED}-${removed}${RST}` : ""].filter(Boolean);
   const addedDirs = data.workspace?.added_dirs?.length ?? 0;
-  return present([
-    block(`${CYAN}${g.model} ${modelName(c)}${RST}${effort ? `${SEP}${YELLOW}${g.effort} ${effort}${RST}` : ""}`),
-    data.vim?.mode ? block(`${YELLOW}${g.vim} ${data.vim.mode[0]}${RST}`) : null,
-    plan ? planSegment(plan, c) : null,
-    contextSegment(data),
-    branchSegment(c),
-    directorySegment(c),
-    data.agent?.name && data.agent.name !== DEFAULT_MAIN_AGENT ? block(`${MAGENTA}${agentGlyph(data.agent.name, nerd)} ${data.agent.name}${RST}`) : null,
-    worktree?.name ? block(`${BLUE}${g.worktree} ${worktree.name}${RST}${worktree.original_branch ? ` ${DIM}<- ${worktree.original_branch}${RST}` : ""}`) : null,
-    pr ? block(pr) : null,
-    block(`${MAGENTA}$${cost?.total_cost_usd != null ? fixed(cost.total_cost_usd, 2) : "0.00"}${RST}${SEP}${BLUE}${g.clock} ${formatDuration(cost?.total_duration_ms)}${RST}`),
-    ...rateLimitSegments(c),
-    spendSegment(c),
-    changed.length > 0 ? block(changed.join("/")) : null,
-    addedDirs > 0 ? block(`${DIM}+${addedDirs} dir${addedDirs === 1 ? "" : "s"}${RST}`) : null,
-  ]);
+  return [
+    [
+      ...ranked(RANK.model, block(`${CYAN}${g.model} ${modelName(c)}${RST}${effort ? `${SEP}${YELLOW}${g.effort} ${effort}${RST}` : ""}`)),
+      ...ranked(RANK.vim, data.vim?.mode ? block(`${YELLOW}${g.vim} ${data.vim.mode[0]}${RST}`) : null),
+      ...ranked(RANK.agent, data.agent?.name && data.agent.name !== DEFAULT_MAIN_AGENT ? block(`${MAGENTA}${agentGlyph(data.agent.name, nerd)} ${data.agent.name}${RST}`) : null),
+      ...ranked(RANK.plan, plan ? planSegment(plan, c) : null),
+    ],
+    [
+      ...ranked(RANK.context, contextSegment(data)),
+      ...ranked(RANK.branch, branchSegment(c)),
+      ...ranked(RANK.directory, directorySegment(c)),
+      ...ranked(RANK.worktree, worktree?.name ? block(`${BLUE}${g.worktree} ${worktree.name}${RST}${worktree.original_branch ? ` ${DIM}<- ${worktree.original_branch}${RST}` : ""}`) : null),
+      ...ranked(RANK.pr, pr ? block(pr) : null),
+      ...ranked(RANK.changed, changed.length > 0 ? block(changed.join("/")) : null),
+      ...ranked(RANK.dirs, addedDirs > 0 ? block(`${DIM}+${addedDirs} dir${addedDirs === 1 ? "" : "s"}${RST}`) : null),
+    ],
+    [
+      ...ranked(RANK.cost, costSegment(c)),
+      ...ranked(RANK.fiveHour, rateLimitSegment(c, "five_hour")),
+      ...ranked(RANK.sevenDay, rateLimitSegment(c, "seven_day")),
+      ...ranked(RANK.spend, spendSegment(c)),
+    ],
+  ];
+}
+
+/**
+ * Starts each row on its own line and wraps a row within itself. While the lines run past
+ * `maxLines`, the segment with the highest rank in any row is dropped; rank 0 always stays.
+ */
+export function stackRows(rows: readonly (readonly Ranked[])[], columns: number, maxLines: number): string[] {
+  const kept = rows.map((row) => [...row]);
+  for (;;) {
+    const lines = kept.flatMap((row) => (row.length > 0 ? arrange(row.map(({ segment }) => segment), columns, maxLines) : []));
+    if (lines.length <= maxLines) return lines;
+    let worst: { row: number; index: number; rank: number } | undefined;
+    kept.forEach((row, rowIndex) =>
+      row.forEach(({ rank }, index) => {
+        if (rank > 0 && (worst === undefined || rank > worst.rank)) worst = { row: rowIndex, index, rank };
+      }),
+    );
+    if (worst === undefined) return lines;
+    kept[worst.row]?.splice(worst.index, 1);
+  }
 }
 
 function compactSegments(c: Ctx): Segment[] {
@@ -491,7 +548,7 @@ function compactSegments(c: Ctx): Segment[] {
     block(`${CYAN}${c.g.model} ${modelName(c)}${RST}`),
     plan ? block(`${GREEN}${c.g.tasks} ${plan.done}/${plan.total}${RST}`) : null,
     percentSegment(data),
-    branch ? block(`${WHITE}${c.g.branch} ${branch}${RST}`) : null,
+    branch ? block(`${c.g.branch} ${branch}`) : null,
   ]);
 }
 
@@ -502,5 +559,5 @@ export function render(data: Payload, git: GitInfo, env: Env, now: Date): string
   const width = Math.max(1, columns - STATUS_LINE_INSET);
   if (columns < COMPACT_BELOW_COLUMNS) return arrange(compactSegments(c), width, 1).join("\n");
   const rows = terminalLines(env);
-  return arrange(fullSegments(c), width, rows !== null && rows < SHORT_TERMINAL_LINES ? SHORT_MAX_LINES : MAX_LINES).join("\n");
+  return stackRows(fullRows(c), width, rows !== null && rows < SHORT_TERMINAL_LINES ? SHORT_MAX_LINES : MAX_LINES).join("\n");
 }

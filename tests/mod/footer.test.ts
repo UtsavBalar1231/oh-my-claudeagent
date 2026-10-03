@@ -1,4 +1,4 @@
-import type { On, TurnUsage } from "claude-code";
+import type { On, SessionRateLimit, TurnUsage } from "claude-code";
 import { type Engine, expect, test } from "claude-code/testing";
 import { displayWidth } from "../../src/core/ui-kit.ts";
 import { LEDGER, ROOT, SESSION, type World, world } from "./world.ts";
@@ -16,16 +16,16 @@ const USAGE: TurnUsage = {
   model: "claude-opus-5-5",
 };
 
-type Meter = { usd: number | undefined };
+type Meter = { usd: number | undefined; rateLimits: SessionRateLimit[] };
 
 function engine(on: On, files: Readonly<Record<string, string>> = {}, env: Readonly<Record<string, string>> = {}) {
   const w = world(on, files, {}, env);
-  const meter: Meter = { usd: 0.25 };
+  const meter: Meter = { usd: 0.25, rateLimits: [] };
   on("session.usage", () => ({
     value: {
       startedAt: STARTED_MS,
       context: { window: 200_000 },
-      rateLimits: [],
+      rateLimits: meter.rateLimits,
       ...(meter.usd === undefined ? {} : { cost: { usd: meter.usd } }),
     },
   }));
@@ -61,6 +61,33 @@ test("a main turn ends with its duration, tokens and the engine's cost since it 
   await $.turn.start({ text: "Run the tests", turnId: "t-1" });
 
   expect(await turn($, w, meter, 0.2812)).toEqual({ text: "4s · 12.3k in 845 out · $0.0312 engine cost" });
+});
+
+for (const kind of ["five_hour", "seven_day"]) {
+  test(`a subscription's ${kind} window leaves the cost out`, async ($, on) => {
+    const { w, meter } = engine(on);
+    meter.rateLimits = [{ kind, percentUsed: 23.5 }];
+    await $.turn.start({ text: "Run the tests", turnId: "t-1" });
+
+    expect(await turn($, w, meter, 0.2812)).toEqual({ text: "4s · 12.3k in 845 out" });
+  });
+}
+
+test("a gateway's spend limit alone keeps the cost", async ($, on) => {
+  const { w, meter } = engine(on);
+  meter.rateLimits = [{ kind: "spend_limit", percentUsed: 62.8 }];
+  await $.turn.start({ text: "Run the tests", turnId: "t-1" });
+
+  expect(await turn($, w, meter, 0.2812)).toEqual({ text: "4s · 12.3k in 845 out · $0.0312 engine cost" });
+});
+
+test("a subscription keeps the unlogged-verification warning in the cost's place", async ($, on) => {
+  const { w, meter } = engine(on, { [STATUS]: statusFile("just test", STARTED_S + 2) });
+  ledgerAt(w, STARTED_S - 600);
+  meter.rateLimits = [{ kind: "five_hour", percentUsed: 23.5 }];
+  await $.turn.start({ text: "Run the tests", turnId: "t-1" });
+
+  expect(await turn($, w, meter, 0.2812)).toEqual({ text: "4s · 12.3k in 845 out · ! no evidence: just test" });
 });
 
 test("a verification this turn that the ledger has not caught up with is named in the footer", async ($, on) => {

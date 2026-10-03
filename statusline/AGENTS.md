@@ -10,7 +10,9 @@ on bun. Read `README.md` first for what they show and how they are configured.
 - `render.ts`: payload types, the segments and the layout. `render(data, git, env, now)` takes the
   environment and the clock as arguments so specs control both. `arrange` fills lines with
   `Segment` values (a `min` and `max` width in cells, and a `draw` for a given width) in priority
-  order; `subagent.ts` calls it too.
+  order; `subagent.ts` calls it too. `fullRows` gives the session, workspace and usage rows, and
+  `stackRows` starts each on its own line, wraps it with `arrange`, and while the lines run past
+  the budget drops the segment with the highest `RANK` in any row.
 - `git.ts`: branch, status counts, remote, and the 5-second cache in the temp directory.
 - `fixtures.spec.ts`, `render.spec.ts`, `git.spec.ts`, `main.spec.ts`: `bun test statusline`.
   The recorded cases live in `tests/fixtures/statusline/`; each case also asserts that no line
@@ -32,7 +34,7 @@ its own binding never shows another session's plan. It never writes the file.
 The renderer takes no tuning settings. `COLUMNS` and `LINES` from Claude Code size the layout.
 Lines use `COLUMNS` minus the 3 cells Claude Code keeps free on each side, measured in a live
 session. The only override is `CLAUDE_STATUSLINE_NERD_FONT=0`. A new segment is an entry in
-`fullSegments` at its priority position, built as a `block` when its width is fixed. Keep a
+its row in `fullRows`, at its priority position, built as a `block` when its width is fixed. Keep a
 segment whole: only the next-task label may be ellipsized, and only the context bar may change
 width. The bar's 8 to 20 block range and the 60 and 85 percent color thresholds are constants in
 `render.ts`.

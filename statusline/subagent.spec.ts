@@ -8,13 +8,13 @@ const SUBAGENT = join(import.meta.dir, "subagent.ts");
 
 const R = "\x1b[0m";
 const D = "\x1b[90m";
-const W = "\x1b[37m";
+const BOLD = "\x1b[1m";
 const G = "\x1b[32m";
 const Y = "\x1b[33m";
 const RED = "\x1b[31m";
 const S = ` ${D}·${R} `;
 
-const name = (label: string, glyph = "A:") => `${W}${glyph} ${label}${R}`;
+const name = (label: string, glyph = "A:") => `${BOLD}${glyph} ${label}${R}`;
 const model = (label: string, glyph = ">") => `${D}${glyph} ${label}${R}`;
 const row = (...segments: string[]) => `${segments.join(S)}${R}`;
 
@@ -153,15 +153,15 @@ describe("width", () => {
   const long = { name: "a".repeat(50) };
 
   test("the payload columns cut the row", () => {
-    expect(rows({ columns: 40, tasks: [{ id: "t1", ...long }] })[0]?.content).toBe(`${W}A: ${"a".repeat(37)}${R}`);
+    expect(rows({ columns: 40, tasks: [{ id: "t1", ...long }] })[0]?.content).toBe(`${BOLD}A: ${"a".repeat(37)}${R}`);
   });
 
   test("COLUMNS applies when the payload has none", () => {
-    expect(rows({ tasks: [{ id: "t1", ...long }] }, { COLUMNS: "30" })[0]?.content).toBe(`${W}A: ${"a".repeat(27)}${R}`);
+    expect(rows({ tasks: [{ id: "t1", ...long }] }, { COLUMNS: "30" })[0]?.content).toBe(`${BOLD}A: ${"a".repeat(27)}${R}`);
   });
 
   test("the payload columns win over COLUMNS", () => {
-    expect(rows({ columns: 40, tasks: [{ id: "t1", ...long }] }, { COLUMNS: "30" })[0]?.content).toBe(`${W}A: ${"a".repeat(37)}${R}`);
+    expect(rows({ columns: 40, tasks: [{ id: "t1", ...long }] }, { COLUMNS: "30" })[0]?.content).toBe(`${BOLD}A: ${"a".repeat(37)}${R}`);
   });
 
   describe("segments drop by priority within the width", () => {
@@ -187,12 +187,12 @@ describe("width", () => {
     });
 
     test("a name wider than the row is cut alone", () => {
-      expect(rows({ columns: 10, tasks: [{ id: "t1", name: "a".repeat(30), model: "opus" }] })[0]?.content).toBe(`${W}A: ${"a".repeat(7)}${R}`);
+      expect(rows({ columns: 10, tasks: [{ id: "t1", name: "a".repeat(30), model: "opus" }] })[0]?.content).toBe(`${BOLD}A: ${"a".repeat(7)}${R}`);
     });
   });
 
   test("the width falls back to 80", () => {
-    expect(rows({ tasks: [{ id: "t1", name: "a".repeat(100) }] })[0]?.content).toBe(`${W}A: ${"a".repeat(77)}${R}`);
+    expect(rows({ tasks: [{ id: "t1", name: "a".repeat(100) }] })[0]?.content).toBe(`${BOLD}A: ${"a".repeat(77)}${R}`);
   });
 });
 
@@ -233,4 +233,23 @@ describe("payload dump", () => {
       `${JSON.stringify({ id: "a", content: row(name("x")) })}\n`,
     );
   });
+});
+
+test("no row draws in white or bright white, which vanish on a light background", () => {
+  const tasks = ["running", "pending", "completed", "failed", "unknown"].map((status, i) => ({
+    id: `t${i}`,
+    name: "oh-my-claudeagent:executor",
+    status,
+    model: "sonnet",
+    effort: "high",
+    tokenCount: 50_000,
+    contextWindowSize: 200_000,
+  }));
+  for (const nerd of ["0", "1"]) {
+    for (const { content } of rows({ columns: 200, tasks }, { CLAUDE_STATUSLINE_NERD_FONT: nerd })) {
+      const colors = [...content.matchAll(/\[([0-9;]*)m/g)].flatMap((match) => (match[1] ?? "").split(";"));
+      expect(colors).not.toContain("37");
+      expect(colors).not.toContain("97");
+    }
+  }
 });
