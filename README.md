@@ -1,209 +1,87 @@
 # oh-my-claudeagent
 
-Multi-agent system for Claude Code. Specialist agents for planning, execution, review, debugging, research — with persistence, parallel execution, and natural language activation.
+<img src=".github/assets/hero.svg" alt="A Claude Code session on the left hands task 7 of a checkout plan to the executor agent, while the OMCA pane on the right shows the plan's contents with six of fourteen tasks checked and the cursor on task 7.">
 
-## Installation
+oh-my-claudeagent (OMCA) is a Claude Code plugin that plans work with you, hands each task to a
+specialist agent, and keeps a session from calling work done before a verification has been
+logged.
+
+## What you see
+
+The band above the prompt names the plan bound to the session, its progress, the last
+verification and whether its evidence was logged. The numbered buttons fill the prompt with the
+next step.
+
+<img src=".github/assets/band.svg" alt="The band above the prompt reads checkout-redesign 6/14 tasks and warns that the evidence for just test was not logged, with buttons 1: Log evidence and 2: Start work below it.">
+
+`/omca plan` opens the plan reader: the plan's contents, then one task at a time.
+
+<img src=".github/assets/plan.svg" alt="The Plan tab of the OMCA pane shows task 7, Wire the order summary panel, with its file, its done-when line and its dependency, and the keys t: Contents, p: Prev, n: Next and r: Reload.">
+
+The guard holds a destructive shell command for your review and shows what it would touch.
+
+<img src=".github/assets/guard.svg" alt="A dialog headed OMCA guard says OMCA held rm -rf build for review, that it would remove the build directory with 4 entries, and offers Refuse or Run it.">
+
+`/omca doctor` checks the client, bun, the server, ast-grep, the options and the settings that
+change how OMCA runs.
+
+<img src=".github/assets/doctor.svg" alt="The Doctor tab of the OMCA pane lists checks for OMCA, Claude Code, bun, the omca server, ast-grep, the options, the agent models, the effort cap, the mod policy, the hooks, the output style, the advisor and the status line, each with a mark and a one-line result.">
+
+The status line shows the model, the plan's next task, the context window, git state, cost and
+usage limits, and fits itself to the terminal's width. The subagent status line gives each
+running agent a row.
+
+<img src=".github/assets/statusline.svg" alt="The OMCA status line under the prompt shows the model and effort, plan progress with the next task, a context bar, the git branch with change counts, the project, and the session cost and duration, and below it one row for each of two running subagents with its model, state and effort.">
+
+## Install
 
 ```bash
 claude plugin marketplace add UtsavBalar1231/oh-my-claudeagent
 claude plugin install oh-my-claudeagent@omca
 ```
 
-Or from inside a Claude Code session:
+The marketplace installs from the `plugin` branch, a packaged tree with no `package.json` or
+lockfile, so installing fetches no npm dependencies.
 
-```
-/plugin marketplace add UtsavBalar1231/oh-my-claudeagent
-/plugin install oh-my-claudeagent@omca
-```
+Inside a session, the same steps are `/plugin marketplace add UtsavBalar1231/oh-my-claudeagent`
+and `/plugin install oh-my-claudeagent@omca`. Then run `/oh-my-claudeagent:omca-setup`, which
+checks the requirements below and offers to point your status line at OMCA's renderer.
 
-### Team Setup
+## Your first plan
 
-Add to your project's `.claude/settings.json` so team members get the plugin automatically in local sessions (cloud sessions load only plugins synced from claude.ai):
+1. Run `/oh-my-claudeagent:plan add rate limiting to the login endpoint`. The planner asks
+   what it needs to know, has the plan reviewed, and writes it to your plans directory.
+2. Run `/oh-my-claudeagent:start-work`. The session hands each task to an executor, records a
+   verification after each one, and checks the plan's boxes as tasks finish.
+3. Open `/omca` to watch the agents, the plan, the evidence and the notepad while it runs.
 
-```json
-{
-  "extraKnownMarketplaces": {
-    "omca": {
-      "source": {
-        "source": "github",
-        "repo": "UtsavBalar1231/oh-my-claudeagent"
-      }
-    }
-  },
-  "enabledPlugins": {
-    "oh-my-claudeagent@omca": true
-  }
-}
-```
-
-For GitHub Enterprise Server, use full git URLs in the source:
-
-```json
-{
-  "extraKnownMarketplaces": {
-    "omca": {
-      "source": {
-        "source": "git",
-        "url": "git@github.example.com:org/oh-my-claudeagent.git"
-      }
-    }
-  }
-}
-```
-
-### Update
-
-```bash
-/plugin marketplace update omca
-```
-
-### Local cache rebuild
-
-Rebuild the locally-installed plugin cache from your dev tree:
-
-```bash
-bun scripts/package.ts ~/.claude/plugins/cache/omca/oh-my-claudeagent/$(jq -r .version .claude-plugin/plugin.json)/
-```
-
-Run `bun scripts/package.ts --dry-run` first to print the file list. The script excludes `.git/`, `.github/`, `.omca/`, `CLAUDE.md`, `.claude/`, `benchmarks/`, `docs/design/`, `tests/`, `scripts/qa/`, `scripts/docs/` and `node_modules/`.
-
-### Uninstall
-
-```bash
-/plugin uninstall oh-my-claudeagent@omca
-```
-
-## Quick Start
-
-Run `/oh-my-claudeagent:omca-setup` to configure and verify dependencies. Then:
-
-- "create plan for [your task]" — planning pipeline
-- `/oh-my-claudeagent:start-work` — execute a ready plan
-- `/loop 10m /oh-my-claudeagent:start-work` — re-run on a timer via native `/loop` (lightweight, not a verified persistence loop)
-
-## What You Get
-
-Specialist agents, skills via slash commands or keyword triggers, bundled MCP servers
-(omca: structural search + state, grep.app: public code search, context7: library docs),
-hooks for persistence, context injection, and a destructive-command guard. Comment conventions for
-Bash, Python, kernel C and headers, Rust, and Go plus a Markdown prose convention ship in
-`rules/` and are injected when you edit a matching file; override or disable any of them
-from your project's `.omca/rules/`.
-
-### Heads-up — `worktree.baseRef` and unpushed commits
-
-Worktree-isolated agents can silently miss your unpushed local commits. See
-[Known Issues](docs/reference/known-issues.md#worktreebaseref-hides-unpushed-commits-by-default)
-for the trap and the one-setting workaround.
+When the session tries to stop with tasks unchecked, or with every task checked and no final
+verification logged, OMCA sends it back to work with the reason.
 
 ## Requirements
 
-- Claude Code CLI v2.1.288 or later
-- `jq`
-- `bun` 1.4.2 or later
-- `ast-grep` CLI (`ast-grep` or `sg`)
+- Claude Code 2.1.288 or later. Tested with 2.1.288.
+- bun 1.4.2 or later, on the `PATH` Claude Code starts with. The `omca` server, its hooks and
+  the status line run on bun.
+- `ast-grep` (or `sg`), optional. Only the structural code search tools need it.
 
-### For LLM agents
-
-If you're an agent installing this plugin on someone's behalf, paste this after
-install:
-
-```
-Run /oh-my-claudeagent:omca-setup, then verify: (1) it reports dependencies OK
-(jq, bun, ast-grep all found), (2) it confirms ~/.claude/settings.json
-was updated with the orchestration block, (3) it prints a final summary with no
-FAIL lines. If any check fails, run /oh-my-claudeagent:omca-setup --doctor and
-report the output. That flag is this skill's own read-only report, scoped to OMCA
-configuration; it changes nothing. The platform's separate built-in /doctor
-(alias /checkup) is the fix-capable one.
-```
-
-## OpenCode V2
-
-The `opencode/` directory is an adapter that loads OMCA's specialists, skills, MCP server
-and guardrails into OpenCode. It is tested against OpenCode 2.0.18. The entry point is
-`opencode/index.ts`, exported from `package.json`.
-
-### Install
-
-Add the plugin to your OpenCode config, installed from git:
-
-```jsonc
-{
-  "plugins": [
-    {
-      "package": "oh-my-claudeagent@git+https://github.com/UtsavBalar1231/oh-my-claudeagent.git",
-      "options": { "models": { "opus": "anthropic/claude-opus-5-5", "fable": "anthropic/claude-fable-5-1" } }
-    }
-  ]
-}
-```
-
-To load a local checkout instead, point at its `opencode/` directory:
-
-```jsonc
-{
-  "plugins": ["/path/to/oh-my-claudeagent/opencode"]
-}
-```
-
-`options.models` maps OMCA's `opus`, `sonnet` and `fable` tiers to OpenCode model ids, in
-`provider/model` form with an optional `#variant`. Without it, every `omca-*` subagent
-inherits the parent session's model. To override one agent, set `agents.omca-<name>.model`
-in your own config, which merges over the plugin's agent.
-
-Prerequisites: ast-grep (`ast-grep` or `sg`), `bash` 4.3+ and `jq`.
-
-### What ships
-
-- Subagents: `omca-explore`, `omca-oracle`, `omca-librarian`, `omca-multimodal-looker`,
-  `omca-metis`, `omca-momus`, `omca-hephaestus`, `omca-executor`.
-- Skills: `omca-debugging`, `omca-remove-ai-slops`, `omca-refactor`, `omca-git-master`,
-  `omca-handoff`. All are slash-invocable. `/omca-handoff` is not advertised to the
-  model, so it runs when you type it.
-- Commands: `/omca-metis`, `/omca-momus`, `/omca-hephaestus`. Each asks the primary agent
-  to launch that subagent.
-- MCP: the `omca` server with the evidence, notepad, AST and `file_read` tools, exposed as
-  `omca_<tool>` (for example `omca_evidence_log`). It runs on the bun that runs OpenCode,
-  and its `ast_*` tools need ast-grep on PATH.
-- Guardrails: the destructive-command guard and the comment gate
-  run on model and user shell commands and on file edits, and block the call on deny.
-  Comment enforcement blocks only with `OMCA_COMMENT_GATE=deny` set. A blocked `!` shell
-  command shows as a failed command without the reason; the reason goes to the OpenCode
-  server log.
-- Output style: OMCA's working discipline is injected into primary agents only (for
-  example `build` and `plan`).
-
-Every id carries the `omca-` prefix, so OpenCode's built-ins (`build`, `plan`, `general`,
-`explore`) are untouched.
-
-Not included: the sisyphus orchestrator, the prometheus planner, `plan` and `start-work`
-with boulder plan tracking, the Stop gates (plan continuation, final verification, drift
-guard), and the statusline.
-
-### Files it creates
-
-- `.omca/` at the workspace root: guard state and logs from the first guarded command, and
-  evidence and notepads from the MCP tools.
-
-### Maintainer note
-
-The adapter translates `agents/`, `skills/` and `output-styles/` into OpenCode prompts when
-the plugin loads, so there is no build step. `bun test opencode/` checks the translated text
-for Claude-only tool names and paths; an edit that introduces one fails that test. Do not
-add a `build` or `prepare` script to `package.json`: npm runs those as a preparation step
-when a git dependency is installed, which fails under OpenCode.
+Linux, macOS and Windows are covered by CI.
 
 ## Documentation
 
-- `OMCA.md` — Complete guide: agents, skills, workflows, MCP tools, runtime state, troubleshooting
-- `CLAUDE.md` — Contributor internals: hook map, cross-file patterns, adding components
-- [`docs/reference/known-issues.md`](docs/reference/known-issues.md): live limitations and workarounds
-- [`docs/reference/configuration.md`](docs/reference/configuration.md): every user-facing setting, env var, and settings.json block
+- [Usage](docs/usage.md): setup, planning, the band and pane, the guard, the doctor, ratings,
+  the status line and troubleshooting.
+- [Reference](docs/references.md): agents, skills, MCP tools, hooks and kill switches,
+  configuration, state files, where each feature works, and the comparison with similar
+  plugins.
+- [Contributing](CONTRIBUTING.md): development setup, adding agents, skills and hooks, and the
+  prose and comment policy.
+- [Changelog](CHANGELOG.md).
 
 ## Acknowledgments
 
-Based on [oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent) by [@code-yeongyu](https://github.com/code-yeongyu).
+Based on [oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent) by
+[@code-yeongyu](https://github.com/code-yeongyu).
 
 ## License
 

@@ -99,10 +99,18 @@ describe("docs accuracy", () => {
   });
 
   test("a path under a repo directory that is not tracked fails", async () => {
-    const ctx = fixture({ "docs/CONTRIBUTING.md": "Line one\nSee `scripts/gone.sh`.\n" });
+    const ctx = fixture({ "CONTRIBUTING.md": "Line one\nSee `scripts/gone.sh`.\n" });
     expect(await runNamed(checks, "docs accuracy", ctx)).toEqual({
       status: "fail",
-      detail: "docs/CONTRIBUTING.md:2 references 'scripts/gone.sh' which does not exist in the repo",
+      detail: "CONTRIBUTING.md:2 references 'scripts/gone.sh' which does not exist in the repo",
+    });
+  });
+
+  test("a page under docs/ is read too", async () => {
+    const ctx = fixture({ "docs/usage.md": "Run `just gone`.\n" });
+    expect(await runNamed(checks, "docs accuracy", ctx)).toEqual({
+      status: "fail",
+      detail: "docs/usage.md:1 cites 'just gone' which is not a justfile recipe",
     });
   });
 
@@ -125,6 +133,47 @@ describe("docs accuracy", () => {
   test("a tree without a justfile fails", async () => {
     const ctx = fixture({ justfile: null });
     expect(await runNamed(checks, "docs accuracy", ctx)).toEqual({ status: "fail", detail: `justfile missing at ${join(ctx.root, "justfile")}` });
+  });
+});
+
+describe("doc links", () => {
+  test("links and images that resolve from each page pass", async () => {
+    const ctx = fixture({
+      "README.md": '[Usage](docs/usage.md) and <img src=".github/assets/hero.svg" alt="A pane.">\n![Shot](./docs/usage.md#install)\n',
+      "docs/usage.md": "[Reference](references.md#agents), [statusline](../statusline/) and [up](../README.md)\n",
+      "docs/references.md": "[Hooks](#hooks)\n",
+      ".github/assets/hero.svg": "<svg/>\n",
+      "statusline/README.md": "x\n",
+    });
+    expect(await runNamed(checks, "doc links", ctx)).toMatchObject({ status: "pass" });
+  });
+
+  test("a link or image that resolves to nothing fails at its line", async () => {
+    const ctx = fixture({
+      "README.md": 'Intro\n[Old guide](GUIDE.md)\n<img src=".github/assets/gone.svg" alt="x">\n',
+      "docs/usage.md": "[Known issues](reference/known-issues.md#trap)\n[Outside](../../elsewhere.md)\n",
+    });
+    expect(await runNamed(checks, "doc links", ctx)).toEqual({
+      status: "fail",
+      detail: [
+        "README.md:2 links to 'GUIDE.md', which is not in the repo",
+        "README.md:3 links to '.github/assets/gone.svg', which is not in the repo",
+        "docs/usage.md:1 links to 'reference/known-issues.md#trap', which is not in the repo",
+        "docs/usage.md:2 links to '../../elsewhere.md', which is not in the repo",
+      ].join("; "),
+    });
+  });
+
+  test("external links, anchors, code spans and fenced blocks are not checked", async () => {
+    const ctx = fixture({
+      "CONTRIBUTING.md": "[Site](https://example.com) [Mail](mailto:a@b.c) [Here](#top) `[x](gone.md)`\n```md\n[y](gone.md)\n```\n",
+    });
+    expect(await runNamed(checks, "doc links", ctx)).toMatchObject({ status: "pass" });
+  });
+
+  test("a markdown file outside docs/ and the two root pages is not read", async () => {
+    const ctx = fixture({ "tests/README.md": "[x](gone.md)\n", "docs/sub/page.md": "[y](gone.md)\n" });
+    expect(await runNamed(checks, "doc links", ctx)).toMatchObject({ status: "pass" });
   });
 });
 

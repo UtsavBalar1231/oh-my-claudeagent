@@ -14,11 +14,11 @@ describe("policy markers", () => {
     expect(await policy.run(fixture())).toMatchObject({ status: "pass" });
   });
 
-  test("a posture marker missing from OMCA.md fails and names the marker", async () => {
-    const ctx = fixture({ "OMCA.md": without(VALID["OMCA.md"], "sandbox.failIfUnavailable") });
+  test("a posture marker missing from docs/references.md fails and names the marker", async () => {
+    const ctx = fixture({ "docs/references.md": without(VALID["docs/references.md"], "sandbox.failIfUnavailable") });
     expect(await policy.run(ctx)).toEqual({
       status: "fail",
-      detail: "OMCA.md lacks sandbox fail-closed marker (sandbox.failIfUnavailable)",
+      detail: "docs/references.md lacks sandbox fail-closed marker (sandbox.failIfUnavailable)",
     });
   });
 
@@ -31,14 +31,14 @@ describe("policy markers", () => {
   });
 
   test("a doc with no statement that the permission filter does not auto-allow fails", async () => {
-    const ctx = fixture({ "OMCA.md": without(VALID["OMCA.md"], "does not auto-allow") });
-    expect(await policy.run(ctx)).toEqual({ status: "fail", detail: "OMCA.md lacks the non-bypassing permission filter guidance" });
+    const ctx = fixture({ "docs/references.md": without(VALID["docs/references.md"], "does not auto-allow") });
+    expect(await policy.run(ctx)).toEqual({ status: "fail", detail: "docs/references.md lacks the non-bypassing permission filter guidance" });
   });
 
-  test("each hook model marker is required in OMCA.md", async () => {
+  test("each hook model marker is required in docs/references.md", async () => {
     const markers = ["hooks/register.ts", "mcp_tool", "omca_hook", "tool.check", "OMCA_DISABLED_HOOKS", "boulder.json", "verification-evidence.json"];
     for (const marker of markers) {
-      const result = await policy.run(fixture({ "OMCA.md": without(VALID["OMCA.md"], marker) }));
+      const result = await policy.run(fixture({ "docs/references.md": without(VALID["docs/references.md"], marker) }));
       expect(result.status).toBe("fail");
       expect(result.detail).toContain(`(${marker})`);
     }

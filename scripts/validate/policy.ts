@@ -4,7 +4,7 @@ import { type Check, type Context, type Outcome, readText, verdict } from "./cor
 
 type Marker = { text: string; label: string };
 
-const POSTURE_DOCS = ["OMCA.md", "skills/omca-setup/SKILL.md"];
+const POSTURE_DOCS = ["docs/references.md", "skills/omca-setup/SKILL.md"];
 const POSTURE_MARKERS: readonly Marker[] = [
   { text: 'teammateMode: "auto"', label: "auto mode" },
   { text: "allowManagedPermissionRulesOnly", label: "managed settings boundary" },
@@ -12,7 +12,7 @@ const POSTURE_MARKERS: readonly Marker[] = [
 ];
 const NON_BYPASSING = /does not auto-allow|never auto-allow|no auto-allow/i;
 
-const HOOK_MODEL_DOC = "OMCA.md";
+const HOOK_MODEL_DOC = "docs/references.md";
 const HOOK_MODEL_MARKERS: readonly Marker[] = [
   { text: "hooks/register.ts", label: "the mod module" },
   { text: "mcp_tool", label: "the settings hook handler type" },

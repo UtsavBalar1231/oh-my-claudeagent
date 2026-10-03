@@ -15,14 +15,21 @@ under `servers/hooks/`. Every file is TypeScript on bun.
   recipe chain to the jobs in `.github/workflows/ci.yml` and to the release workflow. The `tree`
   check fails a tracked python, bash or sh script, because its allowlist is empty.
 - `package.ts`: `bun scripts/package.ts <dest>` copies the shipped tree, and `--dry-run` prints
-  its file list.
+  its file list. Only files git tracks ship. The root `package.json`, `bun.lock`, `bunfig.toml`,
+  `tsconfig.json`, `tsconfig.runtime.json`, `opencode/` and `.opencode/` are excluded, because
+  Claude Code installs npm packages whenever the plugin root holds `package.json` and a lockfile.
+  A leading `/` in `EXCLUDES` anchors a pattern at the root.
 - `release.ts`: `bun scripts/release.ts <version>`, behind `just release <version>`. It refuses a
   version that is not semver, a tracked change in the working tree, a version with no
-  `## [<version>]` heading in `CHANGELOG.md`, and a tag that already exists. It writes the version
-  into `.claude-plugin/plugin.json`, both version fields of `.claude-plugin/marketplace.json` and
-  `package.json`, commits the bump, records the bump commit's SHA in `marketplace.json` in a
-  child commit, and tags the bump commit. It never pushes. A failure part way restores the
-  manifests and resets to the HEAD it started from with `git reset --keep`, then says so.
+  `## [<version>]` heading in `CHANGELOG.md`, and an existing `v<version>` or `plugin-v<version>`
+  tag. It writes the version into `.claude-plugin/plugin.json`, both version fields of
+  `.claude-plugin/marketplace.json` and `package.json`, commits the bump and tags it
+  `v<version>`. It checks that tag out into a temporary worktree, runs `packageTree`, and commits
+  the result to the orphan `plugin` branch tagged `plugin-v<version>`. A child commit of the bump
+  rewrites the marketplace plugin source to a `url` source on `ref: plugin` with that commit's
+  `sha`. It never pushes and prints the push order, `plugin` and its tag first. A failure part
+  way restores the manifests, resets to the starting HEAD with `git reset --keep`, deletes both
+  tags and puts `plugin` back on its previous tip, then says so.
 - `bench.ts`: `just bench`. Runs the working tree or `--candidate-ref` against `--baseline-ref`
   through the mock model. It builds each ref in a git worktree. A ref whose status line is the
   Python renderer, such as v2.21.0, is installed with `uv sync`, so `uv` must be on PATH for it.

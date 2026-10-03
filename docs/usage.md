@@ -1,0 +1,354 @@
+# Using oh-my-claudeagent
+
+This page walks through the tasks you do with OMCA. Every agent, tool, hook, option and state
+file is listed in the [reference](references.md).
+
+## Install and set up
+
+### Install
+
+```bash
+claude plugin marketplace add UtsavBalar1231/oh-my-claudeagent
+claude plugin install oh-my-claudeagent@omca
+```
+
+Inside a session the same steps are:
+
+```
+/plugin marketplace add UtsavBalar1231/oh-my-claudeagent
+/plugin install oh-my-claudeagent@omca
+```
+
+OMCA needs Claude Code 2.1.288 or later and bun 1.4.2 or later. `ast-grep` (or `sg`) is
+optional: without it the `ast_*` tools return an error and everything else works.
+
+### Run setup
+
+Run `/oh-my-claudeagent:omca-setup` once after installing. It checks the Claude Code and bun
+versions, looks for ast-grep, asks the `omca` server whether it is running, and then offers to
+point your status line and subagent status line at OMCA's renderer. Before it changes
+`~/.claude/settings.json` it prints the diff and asks; the previous file is kept as
+`~/.claude/settings.json.omca-bak`. It writes nothing into any `CLAUDE.md`: the `omca` server
+gives each session OMCA's guidance on its first prompt.
+
+`/oh-my-claudeagent:omca-setup --uninstall` removes the status line entries and the launcher.
+`--check` and `--doctor` send you to `/omca doctor`.
+
+### Share it with a team
+
+Add this to a project's `.claude/settings.json` so everyone who opens the repository in a local
+session gets the plugin. Cloud sessions load only the plugins synced from claude.ai.
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "omca": { "source": { "source": "github", "repo": "UtsavBalar1231/oh-my-claudeagent" } }
+  },
+  "enabledPlugins": { "oh-my-claudeagent@omca": true }
+}
+```
+
+For GitHub Enterprise Server, use `{ "source": "git", "url": "<clone URL>" }` as the source.
+
+### Update and uninstall
+
+Update with `/plugin marketplace update omca`. The status line launcher follows the newest
+installed version, so an update needs no second setup run.
+
+To remove OMCA, run `/oh-my-claudeagent:omca-setup --uninstall`, then
+`/plugin uninstall oh-my-claudeagent@omca` and `/plugin marketplace remove omca`. Each project
+keeps its `.omca/` directory until you delete it.
+
+### Use it from OpenCode
+
+The `opencode/` directory loads OMCA's specialists, skills, MCP server and guards into OpenCode
+2.0.18. Add it to your OpenCode config from git:
+
+```jsonc
+{
+  "plugins": [
+    {
+      "package": "oh-my-claudeagent@git+https://github.com/UtsavBalar1231/oh-my-claudeagent.git",
+      "options": { "models": { "opus": "anthropic/claude-opus-5-5", "fable": "anthropic/claude-fable-5-1" } }
+    }
+  ]
+}
+```
+
+To load a local checkout instead, list the path of its `opencode/` directory under `plugins`.
+
+`options.models` maps OMCA's `opus`, `sonnet` and `fable` tiers to OpenCode model ids, in
+`provider/model` form with an optional `#variant`. Without it, every `omca-*` subagent runs on
+the parent session's model. To override one agent, set `agents.omca-<name>.model` in your own
+config. The `ast_*` tools need ast-grep on `PATH`.
+
+What OpenCode gets:
+
+- Subagents `omca-explore`, `omca-oracle`, `omca-librarian`, `omca-multimodal-looker`,
+  `omca-metis`, `omca-momus`, `omca-hephaestus` and `omca-executor`.
+- Skills `omca-debugging`, `omca-remove-ai-slops`, `omca-refactor`, `omca-git-master` and
+  `omca-handoff`, each slash-invocable. `/omca-handoff` is not offered to the model.
+- Commands `/omca-metis`, `/omca-momus` and `/omca-hephaestus`, each asking the primary agent to
+  launch that subagent.
+- The `omca` server's evidence, notepad, AST and `file_read` tools, named `omca_<tool>`.
+- The destructive-command guard and the comment gate on model and user shell commands and on
+  file edits. The comment gate blocks only with `OMCA_COMMENT_GATE=deny`. A blocked `!` command
+  shows as a failed command; the reason goes to the OpenCode server log.
+- OMCA's working discipline, injected into primary agents such as `build` and `plan`.
+
+Every id carries the `omca-` prefix, so OpenCode's own `build`, `plan`, `general` and `explore`
+are untouched. The adapter leaves out the sisyphus orchestrator, the prometheus planner, `plan`
+and `start-work` with plan tracking, the stop gates and the status line.
+
+## Plan and run work
+
+### Make a plan
+
+Run `/oh-my-claudeagent:plan <what you want done>`. The prometheus agent interviews you for what
+the plan needs, consults metis for gaps, writes the plan, and has momus review it. The plan
+lands in your plans directory: the `plansDirectory` setting when you set one, relative to the
+project, and `~/.claude/plans` otherwise. Each task is a numbered checkbox, `- [ ] 1. ...`;
+progress tracking counts only numbered boxes.
+
+For a request that needs exploring before anyone can plan it, ask prometheus for its Socratic
+interview: it asks, synthesizes, and stops with research findings instead of a plan file.
+
+### Run it
+
+Run `/oh-my-claudeagent:start-work`, or `/oh-my-claudeagent:start-work <plan file>` to pick a
+plan. The session binds itself to the plan, hands each task to an executor agent (in parallel
+where the plan allows it), records a verification for each task, and checks its box when the
+task is done. Add `--worktree <path>` to have every task work in an existing git worktree.
+
+To resume after an interruption, run `/oh-my-claudeagent:start-work` again. It continues from the
+first unchecked task.
+
+`/loop 10m /oh-my-claudeagent:start-work` re-runs the command on a timer. That is a repeat, not
+a check: it runs again whether or not the last pass got anywhere. OMCA's own persistence is the
+plan's checkboxes and the stop gates below.
+
+### What keeps a session honest
+
+After any build, test, lint or typecheck command, the agent logs the result with
+`evidence_log`. These checks run when a session tries to stop:
+
+- **Plan continuation**: the bound plan still has unchecked tasks.
+- **Final verification**: every task is checked, but no `final_verification` entry with exit
+  code 0 matches the plan's current content.
+- **Drift guard**: the last reply claims the work is done while a changed line still holds a
+  stub marker.
+
+Each one continues the turn with its reason. A check gives up after five continuations in a
+session and gets its budget back once its condition clears, so a stuck check cannot trap a
+session.
+
+When the task tools are on (`CLAUDE_CODE_ENABLE_TODO_TOOLS=1`, or agent teams), marking a task
+complete is also refused while a verification command under an hour old has not been logged.
+
+### Hand off a long session
+
+When the context is long, run `/oh-my-claudeagent:handoff`. It gathers git state, the plan and
+the notepad into a block you paste as the first message of a new session. Only you can start it;
+the model cannot.
+
+### Ask a specialist directly
+
+Type `@agent-oh-my-claudeagent:<name>` to send a request to one agent, for example
+`@agent-oh-my-claudeagent:oracle what is the right shape for this cache?`.
+
+## The band, the pane and the plan reader
+
+### The band
+
+The band sits above the prompt. It shows the plan bound to this session with its progress, the
+last verification command, and whether its evidence was logged. Below it, numbered buttons offer
+the next step: log the evidence, start work, run the final verification, or review the changes
+with oracle. Press a button's digit in an empty prompt, or click it, to fill the prompt with that
+step; nothing runs until you send it. Typing anything else clears the buttons.
+
+Set the `showBand` option to `false` to hide it.
+
+### The pane
+
+`/omca` opens the OMCA pane on its Agents tab. Each tab has a digit key:
+
+1. **Agents**: each subagent of this session with its model, effort, time and tokens.
+2. **Plan**: the plan reader.
+3. **Evidence**: the verification entries logged in this project.
+4. **Notepad**: the bound plan's notepad sections.
+5. **Feedback**: your ratings for this session.
+6. **Stats**: delegation outcomes by agent type, across the project's recorded sessions.
+7. **Doctor**: the checks described below.
+
+`/omca plan`, `/omca stats` and `/omca doctor` open the pane on that tab. Press Ctrl+X then Tab,
+or click the pane, to focus it. Esc, the close mark in the pane's corner, or Ctrl+X then X close
+it.
+
+### The plan reader
+
+`/omca plan` opens the bound plan; `/omca plan <name or path>` opens another. The reader starts
+on the plan's contents with the cursor on the first open task.
+
+| Key | In the contents | On a task | In the plan list |
+| --- | --- | --- | --- |
+| Up, Down | Move | Scroll | Move |
+| Enter | Open the section | | Open the plan |
+| Page Up, Page Down, Home, End | Page through the list | Scroll | Page through the list |
+| `n`, `p` | | Next or previous task | |
+| `t` | | Back to the contents | Back to the contents |
+| `l` | Recent plans | | |
+| `r` | Reload | Reload | Reload |
+| Esc | Close the pane | Close the pane | Close the pane |
+
+The reader reloads the file when it changes on disk, and keeps your place when it does.
+
+## The guard
+
+OMCA's guard checks every Bash and PowerShell command before it runs, including commands handed
+to another interpreter: `bash -c`, `sh -c`, `eval`, a heredoc fed to a shell, `pwsh -Command`,
+`cmd /c` and `Invoke-Expression` with a literal string. It also sees through wrappers such as
+`sudo`, `env`, `timeout`, `nice`, `nohup`, `stdbuf`, `ionice`, `chrt`, `setsid`, `time` and
+`xargs`.
+
+A recursive removal of the filesystem root, your home, the project or a folder directly under
+root or home is always refused, in every permission mode.
+
+A force push to the default branch and `git commit --no-verify` (or `-n`) are held for your
+review, and refused wherever no dialog can show, in every permission mode including
+bypassPermissions. The same goes for the git commands that discard work: `git reset --hard`,
+`git stash`, `git clean`, `git restore`, a recursive `git rm`, and `git checkout` with a `--`
+path. The default branch is the one `origin/HEAD` names, or `main` and `master` when it names
+none, read from local refs without a network call.
+
+A force push to any other branch, any other recursive removal, and an `xargs rm -rf` whose
+targets can't be known in advance are held for your review in an interactive session and allowed
+to run where no dialog can be shown.
+
+Set `OMCA_DISABLED_HOOKS=bash-guard` to turn off everything except the catastrophic-removal
+check.
+
+### The review dialog
+
+The dialog shows the command and what it would touch: each removal target with its kind and
+entry count, the uncommitted changes a hard reset discards, or the commits a force push drops
+from the remote. Choose **Run it** to hand the command back to the normal permission checks.
+**Refuse**, a dismissed dialog, or a failed one refuses it, and Claude is told not to retry.
+
+The dialog shows in the terminal and the Desktop app. In `claude -p`, the Agent SDK and the VS
+Code chat panel nothing can show it, so a held command is decided without you, as above.
+
+### `guardMode`
+
+The `guardMode` option is `dialog` by default. Set it to `deny` to skip the dialog everywhere:
+the work-discarding git commands, a force push to the default branch and `--no-verify` are
+refused, and a force push to another branch or a deeper recursive removal runs.
+
+### Permissions
+
+OMCA's hooks never auto-allow a command: they refuse, ask or advise, and an allow comes only
+from the permission rules in your settings. To stop the prompts for package scripts you trust,
+add allow rules such as `Bash(bun run *)` to your settings, or run `/fewer-permission-prompts`,
+which proposes rules from your past sessions.
+
+## The doctor
+
+`/omca doctor` opens the Doctor tab and runs its checks:
+
+- the OMCA version that is loaded, and whether Claude Code meets the 2.1.288 floor;
+- whether bun 1.4.2 or later is on the session's `PATH`;
+- when a hook last reached the `omca` server;
+- whether `ast-grep` or `sg` is on `PATH`;
+- the `showBand` and `guardMode` options;
+- `CLAUDE_CODE_SUBAGENT_MODEL_FORCE`, which puts every agent on one model;
+- a `maxEffortLevel` cap that holds agents below their declared effort;
+- `allowManagedModsOnly`, `disableAllHooks` and `allowManagedHooksOnly`;
+- which output style applies;
+- whether the advisor can run, and which setting keeps it off when it cannot;
+- the status line's `refreshInterval`.
+
+Press `r` to run the checks again. When the status line has no `refreshInterval`, press `i` to
+add `refreshInterval: 5`; the doctor shows the diff it wrote and keeps a backup.
+
+## Rate a turn
+
+`/omca-rate up` or `/omca-rate down` rates the last turn, with an optional note after the
+verdict. With no note typed, the text you have selected becomes the note, cut to 200 characters,
+and the reply says so. Ratings are kept in `.omca/feedback/<session id>.json` and listed in the
+pane's Feedback tab.
+
+## The status line
+
+Once setup has configured it, the status line shows, in priority order: the model and effort,
+the bound plan's progress and next task, a context bar, git state, the project, the active
+agent, the worktree and pull request, the session's cost and duration, your usage limits, lines
+changed, and extra directories. It fits the segments to the terminal's width and height and never
+cuts one in half. The usage limits appear for Claude.ai Pro and Max subscribers. Behind a Claude
+apps gateway with a spend limit, the dollars spent against that limit follow them.
+
+The subagent status line gives each running agent a row with its model, state, effort and
+context use.
+
+Set `CLAUDE_STATUSLINE_NERD_FONT=0` for ASCII glyphs. [`statusline/README.md`](../statusline/README.md)
+has the layout rules.
+
+## Project rules
+
+A Markdown file in your project's `.omca/rules/` whose first line is `# pattern: <glob>` is
+added to Claude's context the first time in a session that Claude reads, writes or edits a file
+whose name matches the glob. Its body is capped at 1000 characters. OMCA ships comment rules for
+Bash, Python, C and headers, Rust and Go, and a prose rule for Markdown. A file of the same name
+in `.omca/rules/` replaces a shipped rule, and an empty one turns it off. OMCA keeps
+`.omca/rules/` out of its own `.gitignore`, so you can commit your rules.
+
+## Desktop and VS Code
+
+Desktop and VS Code start `.mcp.json` with the GUI's `PATH`, which can lack `~/.bun/bin`. When
+it does, the `omca` server never starts, and the MCP tools, the injected guidance and the stop
+gates are off. At session start OMCA writes a line in the transcript that bun is not on `PATH`,
+and the Doctor tab reports bun as missing. Make bun reachable from the app's `PATH`, for example
+by linking it into a directory the app searches, and restart the app.
+
+The VS Code chat panel runs OMCA's hooks but draws none of its interface: no band, no pane and
+no guard dialog ([anthropics/claude-code#99045](https://github.com/anthropics/claude-code/issues/99045)).
+The [availability table](references.md#where-each-feature-works) lists each feature by app.
+
+## Troubleshooting
+
+**The `omca` tools are missing.** At session start the mod asks Claude Code whether the `omca`
+server connected, and when it did not, it writes one line in the transcript. Either bun is not on
+`PATH`: install bun 1.4.2 or later and restart Claude Code (for Desktop and VS Code, see above).
+Or the server failed: the line gives Claude Code's reason, and `/mcp` shows the server's state.
+A server listed there as pending approval needs your approval.
+
+**`evidence_log` fails partway through a plan.** The server was reconnecting or reloading. Call
+the tool again; do not skip the evidence.
+
+**The band, the pane and the guard are gone.** The mod is not running. On the first prompt of a
+session the `omca` server shows a message once when that happens, saying the Bash guard, band and
+pane are off. Run `/plugin` and check that OMCA is listed under mods active. Mods are off when
+your organization sets `allowManagedModsOnly`, `allowManagedHooksOnly` or `disableAllHooks`, when
+Anthropic turns them off remotely, or after the mod worker crashes three times. A session where
+nothing draws, such as `claude -p` or the VS Code chat panel, runs the guard but shows no band or
+pane. `OMCA_DISABLED_HOOKS=mod-notice` silences the message.
+
+**Nothing from OMCA runs at all.** A session started with `--restricted` or
+`CLAUDE_CODE_RESTRICTED=1` ignores user, project and local settings, so the plugin never loads.
+
+**A plan run stopped with no message.** A turn that ends in an API error, such as a rate limit,
+skips the stop checks. Resume with `/oh-my-claudeagent:start-work`.
+
+**A worktree agent cannot see your latest commits.** New worktrees branch from
+`origin/<default branch>` by default, so unpushed commits are missing. Set
+`"worktree": { "baseRef": "head" }` in your user settings to branch from your local HEAD.
+
+**A write under `.claude/` still prompts.** Claude Code never auto-approves writes there, and an
+`Edit(.claude/**)` allow rule cannot change that.
+
+**Setup changed nothing and asked nothing.** Under the `dontAsk` permission mode, every write
+that would prompt is denied instead. Run setup in a mode that can prompt.
+
+**A hook change does not take effect.** Close the `/plugin` menu or start a new session; for a
+`--plugin-dir` checkout, run `/reload-plugins`.
+
+**The status line is hard to read with a screen reader.** `CLAUDE_STATUSLINE_NERD_FONT=0`
+replaces the glyphs with text. The status line still writes color escapes.

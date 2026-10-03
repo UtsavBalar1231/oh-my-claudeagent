@@ -1,11 +1,11 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, posix } from "node:path";
 import { listPackageFiles } from "../package.ts";
 import { type Check, type Context, exists, listFiles, type Outcome, pass, readText, run, skip, verdict } from "./core.ts";
 
 const ALLOWLIST = "scripts/validate/allowlist.txt";
 const SCAN_ROOTS = ["agents/", "skills/", "scripts/", "servers/", "templates/", "output-styles/", "docs/"];
-const SCAN_FILES = ["README.md", "OMCA.md"];
+const SCAN_FILES = ["README.md", "CONTRIBUTING.md"];
 
 // "/home/user" and "/Users/user" are documentation placeholders, filtered after matching so a
 // real account named "user" still shows up in the pattern.
@@ -57,7 +57,7 @@ function depersonalization(ctx: Context): Outcome {
   return verdict(problems, `no home-path, credential or bearer-token literals in ${files.length} tracked shipped files`);
 }
 
-const DOCS = ["README.md", "OMCA.md", "docs/CONTRIBUTING.md"];
+const isDoc = (path: string): boolean => SCAN_FILES.includes(path) || /^docs\/[^/]+\.md$/.test(path);
 const TOP_LEVEL = new Set([
   "agents", "bin", "docs", "hooks", "opencode", "output-styles", "rules", "scripts", "servers", "skills", "statusline",
   "templates", "tests", ".claude", ".claude-plugin", ".github", ".omca",
@@ -77,9 +77,10 @@ function docsAccuracy(ctx: Context): Outcome {
       .flatMap((line) => /^[a-zA-Z][a-zA-Z0-9_-]*/.exec(line)?.[0] ?? []),
   );
   const tracked = new Set(ctx.tracked());
+  const docs = [...tracked].filter(isDoc);
   const problems: string[] = [];
   let checked = 0;
-  for (const doc of DOCS) {
+  for (const doc of docs) {
     if (!exists(join(ctx.root, doc))) continue;
     const lines = readText(ctx.root, doc).split(/\r?\n/);
     lines.forEach((line, index) => {
@@ -100,7 +101,37 @@ function docsAccuracy(ctx: Context): Outcome {
       }
     });
   }
-  return verdict(problems, `${checked} recipe and path references in ${DOCS.join(", ")} resolve`);
+  return verdict(problems, `${checked} recipe and path references in ${docs.join(", ")} resolve`);
+}
+
+const LINK = /!?\[[^\]]*\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)|<img\b[^>]*\bsrc="([^"]+)"/g;
+const EXTERNAL = /^(?:[a-z][a-z0-9+.-]*:|#)/i;
+
+// Fenced blocks and code spans hold examples, not links.
+function linkTargets(source: string): { line: number; target: string }[] {
+  let isFenced = false;
+  return source.split(/\r?\n/).flatMap((text, index) => {
+    if (/^\s*(?:```|~~~)/.test(text)) isFenced = !isFenced;
+    if (isFenced) return [];
+    return [...text.replace(/`[^`]*`/g, "").matchAll(LINK)].map((match) => ({ line: index + 1, target: match[1] ?? match[2] ?? "" }));
+  });
+}
+
+function docLinks(ctx: Context): Outcome {
+  const tracked = ctx.tracked();
+  const docs = tracked.filter(isDoc);
+  const present = (path: string) => tracked.some((file) => file === path || file.startsWith(`${path}/`));
+  const problems: string[] = [];
+  let checked = 0;
+  for (const doc of docs) {
+    for (const { line, target } of linkTargets(readText(ctx.root, doc))) {
+      if (EXTERNAL.test(target)) continue;
+      checked += 1;
+      const path = posix.normalize(posix.join(posix.dirname(doc), decodeURI(target.replace(/[#?].*$/, "")))).replace(/\/$/, "");
+      if (path.startsWith("../") || !present(path)) problems.push(`${doc}:${line} links to '${target}', which is not in the repo`);
+    }
+  }
+  return verdict(problems, `${checked} relative links and images in ${docs.join(", ")} resolve`);
 }
 
 function skillReferences(ctx: Context): Outcome {
@@ -161,4 +192,5 @@ export const checks: readonly Check[] = [
   { name: "phantom payload fields", run: phantomFields },
   { name: "depersonalization", run: depersonalization },
   { name: "docs accuracy", run: docsAccuracy },
+  { name: "doc links", run: docLinks },
 ];
