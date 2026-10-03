@@ -307,36 +307,40 @@ WSL.
 
 ## Comparison with similar plugins
 
-Measured on 2026-10-03 with Claude Code 2.1.287, OMCA at commit `bf5248f`, in Docker (Ubuntu
+Measured on 2026-10-03 with Claude Code 2.1.288, OMCA at commit `1061e97`, in Docker (Ubuntu
 24.04, bun 1.4.2), every request answered by a local mock model with no network egress, over 20
-paired rounds. The other arms were oh-my-claudecode 5.6.0, claude-code-harness 5.15.0, ruflo
-3.51.1 (with and without its npm dependencies pre-seeded), ECC 2.2.3, superpowers 6.4.2, a
-wshobson/agents bundle, and a baseline with no plugin.
+paired rounds after one discarded warm-up round. The other arms were oh-my-claudecode 5.6.0,
+claude-code-harness 5.15.0, ruflo 3.51.1 (with and without its npm dependencies pre-seeded), ECC
+2.2.3, superpowers 6.4.2, a wshobson/agents bundle, and a baseline with no plugin.
 
-Later changes have not been measured yet. Two of them cut OMCA's per-request tokens: the
-sisyphus prompt is about 2,950 tokens shorter, and deferring every `omca` tool except
-`evidence_log`, `boulder_progress` and `notepad_write` saves about 3,750. The guard now also holds
-a force push to the default branch and `git commit --no-verify`, which the guard table predates.
-A release now installs from a packaged branch without `package.json` or `bun.lock`, which removes
-the install-time download described below. A session whose `omca` server did not start now says so
-in the transcript, and the server says so when the mod is not running.
+This run replaces the one made earlier the same day with Claude Code 2.1.287. Per-request tokens
+fell from +19,438 to +12,679 (tool search on) because the sisyphus prompt is shorter and most
+`omca` tools are now deferred. The guard now blocks a force push to the default branch and
+`git commit --no-verify`, and the release no longer ships a `package.json` or `bun.lock`, so the
+install has nothing to download. Startup is the one number that moved the wrong way, from +190 ms
+to +248 ms.
 
 ### Where OMCA is worse
 
-- **Context per request.** OMCA adds the most of any arm: about 19,440 estimated tokens per
-  request with tool search on (next: ECC, about 10,830). The parts: the sisyphus prompt in the
-  system prompt (about 8,680), the `omca` tools (about 5,290), the guidance injected on the first
-  prompt (about 2,170), the output style (about 1,470), the agent and skill listing (about 1,460)
-  and the server instructions (about 540).
+- **Context per request.** With tool search on, OMCA adds the most of any arm: +12,679 estimated
+  tokens per request (next: ECC, +10,791). The parts, as medians that do not sum exactly: the
+  sisyphus prompt in the system prompt (+5,676), the `omca` tools (+1,490, the three always-loaded
+  tools plus the names of the deferred ones), the guidance injected on the first prompt (+2,194),
+  the output style (+1,473), the agent and skill listing (+1,460) and the server instructions
+  (+549). With tool search off, which is how this harness ships tools, OMCA adds +16,307 and
+  pre-seeded ruflo adds more (+70,904) because it declares 358 MCP tools.
 - **bun is required.** Every settings hook and every tool runs in one bun server. With bun
-  hidden, a session had no OMCA tools, no injected guidance and no stop gate, and showed no
-  error. The guard, which runs in the mod, still worked.
-- **Install-time download.** Claude Code runs `bun install` on install because the plugin
-  ships a `package.json` and `bun.lock`. Offline the plugin is 2.8 MiB; an online install grew
-  it to 169.1 MiB. Only oh-my-claudecode ended larger.
-- **Startup.** The first request came 190 ms after the baseline's: later than
-  claude-code-harness (56 ms), superpowers and wshobson/agents (16 to 17 ms), level with
-  oh-my-claudecode and pre-seeded ruflo, earlier than ECC and offline ruflo (over 2 s).
+  hidden, a session had no OMCA tools (19 became 0), no injected guidance, no stop gate, and
+  showed no error. The guard, which runs in the mod, still blocked `rm -rf /` and
+  `git reset --hard`.
+- **Startup.** The first request came 248 ms after the baseline's: later than
+  oh-my-claudecode (+188 ms), pre-seeded ruflo (+192 ms), claude-code-harness (+56 ms),
+  superpowers and wshobson/agents (+11 and +17 ms), earlier than ECC and offline ruflo (over
+  2 s). Claude Code waits for MCP servers to connect before the first request, so the bun server
+  is part of this.
+- **Per-call overhead.** +5.8 ms per Bash call and +5.0 ms per Read call over baseline, with 2.0
+  process launches per Bash call against the baseline's 1.9. superpowers (+0.0 ms Bash) and
+  wshobson/agents (+0.6 ms), which register almost no hooks, were lower.
 - **Network at start.** The bundled `grep` and `context7` servers try to reach mcp.grep.app and
   mcp.context7.com.
 - **Files in the project.** A first session wrote 11 files under `.omca/` and `.claude/`, and a
@@ -344,54 +348,64 @@ in the transcript, and the server says so when the mod is not running.
 
 ### Where OMCA is not worse
 
-- **Per-call overhead.** 5.4 ms per Bash call and 5.0 ms per Read call over baseline, with 2.0
-  process launches per Bash call against the baseline's 1.9. Only superpowers and
-  wshobson/agents, which register almost no hooks, were lower.
-- **Offline footprint.** 2.8 MiB in 299 files, smaller than claude-code-harness, ECC and
-  oh-my-claudecode.
+- **Guard.** OMCA blocked all five destructive commands, including `git reset --hard`, a force
+  push to `main` and `git commit --no-verify`. claude-code-harness blocked four of the five (not
+  `git reset --hard`). ECC blocked three outright and gated `git reset --hard` and the force push
+  once, then ran them on retry. The other arms left what Claude Code's own check leaves: the two
+  `rm -rf` commands blocked, the other three run.
+- **Install.** The offline install took 206 ms, contacted no host and ran no dependency fetch: no
+  `node_modules`, so no online probe was needed. The plugin is 2.9 MiB in 282 files, smaller than
+  claude-code-harness, ECC and oh-my-claudecode.
 - **Stop gate.** OMCA was the only arm that continued a scripted stop with plan tasks unchecked.
 - **Your files.** No arm, OMCA included, edited a `CLAUDE.md`, and OMCA wrote no settings beyond
   the entries Claude Code writes for every install.
 
 ### Measurements
 
-| Arm | Tokens per request vs baseline, tool search on | First request vs baseline | Per Bash call vs baseline | Offline install |
-| --- | --- | --- | --- | --- |
-| OMCA | +19,438 | +190 ms | +5.4 ms | 2.8 MiB, 299 files |
-| oh-my-claudecode | +3,567 | +181 ms | +99.3 ms | 67.5 MiB, 7,077 files |
-| claude-code-harness | +2,381 | +56 ms | +23.4 ms | 78.3 MiB, 1,752 files |
-| ruflo, pre-seeded | +5,034 | +194 ms | +277.1 ms | 440.9 KiB, 108 files |
-| ruflo, offline | +780 | +2,131 ms | timed out | 440.9 KiB, 108 files |
-| ECC | +10,832 | +2,156 ms | +73.3 ms | 55.0 MiB, 4,212 files |
-| superpowers | +1,579 | +17 ms | -0.1 ms | 1.9 MiB, 229 files |
-| wshobson/agents | +2,894 | +16 ms | +0.5 ms | 521.5 KiB, 85 files |
+| Arm | Tokens per request vs baseline, tool search on | Tool search off | First request vs baseline | Per Bash call vs baseline | Per Read call vs baseline | Offline install |
+| --- | --- | --- | --- | --- | --- | --- |
+| OMCA | +12,679 | +16,307 | +248 ms | +5.8 ms | +5.0 ms | 2.9 MiB, 282 files |
+| oh-my-claudecode | +3,566 | +11,714 | +188 ms | +101.0 ms | +105.0 ms | 67.5 MiB, 7,077 files |
+| claude-code-harness | +2,380 | +2,381 | +56 ms | +22.6 ms | +20.0 ms | 78.3 MiB, 1,752 files |
+| ruflo, pre-seeded | +5,034 | +70,904 | +192 ms | +275.2 ms | +10.6 ms | 440.9 KiB, 108 files |
+| ruflo, offline | +779 | +907 | +2,135 ms | timed out | +0.6 ms (2 runs) | 440.9 KiB, 108 files |
+| ECC | +10,791 | +10,918 | +2,160 ms | +73.2 ms | +44.4 ms | 55.0 MiB, 4,212 files |
+| superpowers | +1,578 | +1,579 | +11 ms | +0.0 ms | +0.7 ms | 1.9 MiB, 229 files |
+| wshobson/agents | +2,894 | +2,894 | +17 ms | +0.6 ms | +1.0 ms | 521.5 KiB, 85 files |
 
-Guard corpus, one command per session under bypassPermissions, so only hooks can stop it:
+Guard corpus, each command issued twice in a session under bypassPermissions, so only hooks can
+stop it:
 
 | Arm | `rm -rf /` | `rm -rf ~` | `git reset --hard` | `git push --force origin main` | `git commit --no-verify` | `ls` |
 | --- | --- | --- | --- | --- | --- | --- |
 | baseline | blocked by Claude Code | blocked by Claude Code | ran | ran | ran | ran |
-| OMCA | blocked | blocked | blocked | ran | ran | ran |
+| OMCA | blocked | blocked | blocked | blocked | blocked | ran |
 | claude-code-harness | blocked | blocked | ran | blocked | blocked | ran |
 | ECC | blocked | blocked | ran on retry | ran on retry | blocked | blocked |
 | oh-my-claudecode, superpowers, wshobson/agents, ruflo | blocked by Claude Code or the plugin | blocked by Claude Code | ran | ran | ran | ran |
+
+The online install probe was not run for OMCA on this date, because its offline install tried no
+registry host. The earlier figure of 169.1 MiB came from a tree that shipped a `package.json`.
 
 ### Method
 
 - **Tokens** are `ceil(characters / 4)` over each request body the mock received, split into
   system prompt, tools, listings, output style, server instructions and hook context, excluding
-  the prompt text. Claude's tokenizer is not available offline, so these are estimates. Values
-  are medians over the paired runs. The tool-search row sets `ENABLE_TOOL_SEARCH=true`, the
-  closer match to first-party traffic.
-- **Startup** is the time from process start to the mock's first request, as the median of the
-  paired differences against baseline.
+  the prompt text. Claude's tokenizer is not available offline, so these are estimates, and the
+  ratios between arms are more reliable than the absolute values. Values are medians over the
+  paired runs. The tool-search column sets `ENABLE_TOOL_SEARCH=true` (3 rounds), the closer
+  match to first-party traffic, where MCP tools are deferred; Claude Code turns tool search off
+  when the API host is not first-party, as in this harness.
+- **First request** is the time from process start to the mock's first request, as the median of
+  the paired differences against baseline.
 - **Per-call overhead** is the time from the first to the last request over 20 scripted `true`
   Bash calls (or 10 Read calls), divided by the call count, as the median paired difference.
   Process launches come from `strace -f -e trace=execve`.
 - **Install footprint** is the plugin cache after a hermetic install from a directory
-  marketplace; the online figure repeats the install once with network access.
-- **Guard corpus** runs one Bash call per session under `--permission-mode bypassPermissions`
-  and counts a command as run when its effect is observable.
+  marketplace, with the network host list taken from `strace` on each install step.
+- **Guard corpus** runs one Bash command per session, issued twice, under
+  `--permission-mode bypassPermissions`, and counts a command as run when its effect is
+  observable. A gate that refuses once and lets the retry through shows as ran on retry.
 - **Stop gate** writes a plan with two unchecked tasks, binds the session to it where the arm
   supports that, and ends the turn.
 
