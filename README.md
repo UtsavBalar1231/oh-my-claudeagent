@@ -1,5 +1,7 @@
 # oh-my-claudeagent
 
+**Claude Code, with receipts.**
+
 <img src=".github/assets/hero.png" width="1000" alt="A Claude Code session on the left hands task 7 of the checkout plan to the executor, while the OMCA pane on the right shows the plan board at 6 of 14 tasks, with proof on the done tasks, the executor on task 7 and task 7's detail beside the list.">
 
 oh-my-claudeagent (OMCA) is a Claude Code plugin that plans work with you, hands each task to a
