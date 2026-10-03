@@ -24,7 +24,7 @@ allowed-tools:
 
 Checks what OMCA needs, then points the status line and the subagent status line at OMCA's renderer. The only file outside the plugin it writes is `~/.claude/settings.json` (two keys), plus the launcher at `~/.claude/omca/statusline.ts`, and only after the user confirms the printed change. OMCA's server delivers the orchestration guidance on each session's first prompt, so setup writes nothing into `CLAUDE.md`.
 
-**Policy baseline**: Claude Code's native settings are authoritative. `teammateMode: "auto"` is normal. Managed settings are non-overridable policy, and keys such as `allowManagedPermissionRulesOnly`, `allowManagedHooksOnly` and `sandbox.failIfUnavailable` belong there; this skill never writes or enforces them. OMCA does not auto-allow arbitrary commands. Its mod and hooks ask in a review dialog before a destructive Bash command runs and deny catastrophic removals outright. When a permission prompt is about to appear, OMCA's server auto-approves only a short list of package-manager, JSON-query and project-runner commands, and never a compound command.
+**Policy baseline**: Claude Code's native settings are authoritative. `teammateMode: "auto"` is normal. Managed settings are non-overridable policy, and keys such as `allowManagedPermissionRulesOnly`, `allowManagedHooksOnly` and `sandbox.failIfUnavailable` belong there; this skill never writes or enforces them. OMCA's hooks never auto-allow a command, so allow decisions come from the permission rules in the user's settings, and `/fewer-permission-prompts` proposes them from past transcripts. Its mod and hooks ask in a review dialog before a destructive Bash command runs and deny catastrophic removals outright.
 
 ## Mode detection
 

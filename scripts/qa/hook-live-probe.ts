@@ -7,8 +7,8 @@
 //
 // The sessions run in bypassPermissions: under auto mode the classifier would send its own
 // requests to the mock and consume scripted turns. The mod's tool.check guard runs in both
-// modes. Events that need auto mode, a slash command or task tools (PermissionRequest,
-// PermissionDenied, UserPromptExpansion, SessionStart on clear or compact, TaskCompleted) are
+// modes. Events that need auto mode, a slash command or task tools (PermissionDenied,
+// UserPromptExpansion, SessionStart on clear or compact, TaskCompleted) are
 // not driven here.
 //
 // The Stop family binds the session to a plan with unchecked tasks. It asserts that the gate

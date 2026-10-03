@@ -85,7 +85,7 @@ Run `/oh-my-claudeagent:omca-setup` to configure and verify dependencies. Then:
 
 Specialist agents, skills via slash commands or keyword triggers, bundled MCP servers
 (omca: structural search + state, grep.app: public code search, context7: library docs),
-hooks for persistence, context injection, and auto-approval. Comment conventions for
+hooks for persistence, context injection, and a destructive-command guard. Comment conventions for
 Bash, Python, kernel C and headers, Rust, and Go plus a Markdown prose convention ship in
 `rules/` and are injected when you edit a matching file; override or disable any of them
 from your project's `.omca/rules/`.
@@ -166,7 +166,7 @@ Prerequisites: ast-grep (`ast-grep` or `sg`), `bash` 4.3+ and `jq`.
 - MCP: the `omca` server with the evidence, notepad, AST and `file_read` tools, exposed as
   `omca_<tool>` (for example `omca_evidence_log`). It runs on the bun that runs OpenCode,
   and its `ast_*` tools need ast-grep on PATH.
-- Guardrails: `permission-filter.sh`, `git-destructive-deny.sh` and the comment gate
+- Guardrails: the destructive-command guard and the comment gate
   run on model and user shell commands and on file edits, and block the call on deny.
   Comment enforcement blocks only with `OMCA_COMMENT_GATE=deny` set. A blocked `!` shell
   command shows as a failed command without the reason; the reason goes to the OpenCode

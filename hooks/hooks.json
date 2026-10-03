@@ -97,25 +97,6 @@
         ]
       }
     ],
-    "PermissionRequest": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "mcp_tool",
-            "server": "plugin:oh-my-claudeagent:omca",
-            "tool": "omca_hook",
-            "timeout": 10,
-            "input": {
-              "event": "PermissionRequest",
-              "session_id": "${session_id}",
-              "tool_name": "${tool_name}",
-              "tool_input": "${tool_input}"
-            }
-          }
-        ]
-      }
-    ],
     "PermissionDenied": [
       {
         "hooks": [

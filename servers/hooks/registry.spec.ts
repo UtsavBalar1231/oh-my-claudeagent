@@ -32,7 +32,6 @@ describe("registry", () => {
     const names = Object.fromEntries(Object.entries(REGISTRY).map(([event, handlers]) => [event, handlers.map(([name]) => name)]));
     expect(names).toEqual({
       PreToolUse: ["plan-write-guard", "comment-gate"],
-      PermissionRequest: ["trusted-tooling"],
       PostToolUse: ["verification-recorder", "context-injector", "plan-format-warn", "empty-task-response"],
       PostToolUseFailure: ["failure-recovery"],
       UserPromptSubmit: ["guidance", "keyword-detector"],
@@ -77,17 +76,6 @@ describe("event names that exist on every object", () => {
 });
 
 describe("error isolation", () => {
-  test("a throwing PermissionRequest handler yields {}, so the dialog shows and nothing is allowed", async () => {
-    const errors = quietErrors();
-    try {
-      const registry = { PermissionRequest: [["trusted-tooling", boom]] as const };
-      expect(await dispatch({ event: "PermissionRequest" }, project(), NOW, registry)).toEqual({});
-      expect(errors).toHaveBeenCalledTimes(1);
-    } finally {
-      errors.mockRestore();
-    }
-  });
-
   test("a throwing handler on any other event drops only its own answer and logs to stderr", async () => {
     const errors = quietErrors();
     try {

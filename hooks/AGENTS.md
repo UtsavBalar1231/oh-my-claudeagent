@@ -5,8 +5,8 @@
 ## Hook events
 
 Registered here: `SessionStart`, `UserPromptSubmit`, `UserPromptExpansion`,
-`SubagentStart`, `PreToolUse`, `PermissionRequest`, `PermissionDenied`,
-`PostToolUse`, `PostToolUseFailure`, `Stop`, `TaskCompleted`.
+`SubagentStart`, `PreToolUse`, `PermissionDenied`, `PostToolUse`,
+`PostToolUseFailure`, `Stop`, `TaskCompleted`.
 
 Regenerate that list with `jq -r '.hooks | keys[]' hooks/hooks.json`. Every other platform
 event is unregistered on purpose; `OMCA.md` carries the per-event reason.
@@ -50,28 +50,12 @@ event is unregistered on purpose; `OMCA.md` carries the per-event reason.
   destructive git family, force pushes and other recursive removals, so it must not be deleted
   as duplicated platform behavior.
 - `tool.check` never returns an allow, because an allow there skips the auto-mode classifier.
-  The auto-allow of a narrow trusted-tooling set lives in the server's `PermissionRequest`
-  handler (`servers/hooks/trusted-tooling.ts`, with its rules in
-  `src/core/trusted-tooling.ts`): the `run`, `test`, `ci`, `list` and `view` subcommands of npm,
-  yarn, pnpm and bun, `jq` without `--rawfile`, and `uv run` and `uv sync`. `PermissionRequest`
-  fires when a permission dialog is about to be shown and where a call that cannot prompt would
-  otherwise be auto-denied, such as `-p` outside `dontAsk`, so that handler can only turn a
-  prompt or an auto-denial into an allow. It must stay off `PreToolUse`: a `PreToolUse`
-  `permissionDecision: "allow"` skips the permission prompt, so the auto-mode classifier and any
-  interactive confirmation never run for that command, and only explicit `deny` and `ask` rules
-  from settings still apply. Moving it there would convert a six-tool convenience into a silent
-  standing bypass of the user's permission posture.
-- A command containing a command separator, a redirect, or a command substitution falls through
-  to the platform decision instead of taking the fast path, because per-subcommand `if:`
-  matching means only the first subcommand is what the handler saw. A carriage return is matched
-  too, as hardening for shells that terminate a statement on a bare CR, which bash does not.
-  Globs, tilde, and `$VAR` expansion take the fast path: none of them can introduce a second
-  command. The operator scan is quote-blind, so a command whose quoted argument contains an
-  operator loses the fast path. The common case is a jq filter with a pipe:
-  `jq -r '.a | .b' f.json` gets the normal platform permission prompt. That friction is
-  deliberate. Teaching the scan to skip quoted regions is how a guardrail becomes a hole,
-  because a genuinely compound command could then hide its separator inside quotes.
-  `src/core/trusted-tooling.spec.ts` pins the behavior so it cannot be "fixed" by accident.
+  No OMCA hook returns an allow on any event: hooks deny, ask or steer, and allow decisions come
+  from the permission rules in the user's settings. Nothing is registered on `PermissionRequest`,
+  which fires where a call that cannot prompt, such as `-p` outside `dontAsk`, would otherwise
+  be auto-denied, so a hook allow there would run a command the platform refuses. To cut
+  prompts for a tool the user trusts, point them to an allow rule in settings or to
+  `/fewer-permission-prompts`.
 - Hook lifecycle ownership is Claude-native. OMCA supplies the mod's module and
   `type: mcp_tool` handlers whose `tool` is `omca_hook`, and every registered handler is of that
   type. Start-up pruning and the exit unbind run in the server process, not in a hook.

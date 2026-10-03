@@ -56,6 +56,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a command of their own: the thinking marker (`[T]`), the session name or id, the Claude Code
   version (`/omca doctor` reports it), the output style name and the tip line that restored it,
   the raw token total, the API time, and the repository name beside the pull request.
+- **The trusted-tooling fast path.** The `PermissionRequest` hook that auto-allowed `npm`, `bun`,
+  `yarn` and `pnpm` `run`, `test`, `ci`, `list` and `view`, `jq` and `uv run` and `uv sync` is gone.
+  Since Claude Code 2.1.285 that event also fires where `-p` would auto-deny, so the allow ran
+  project code the platform had refused; add `permissions.allow` rules or run
+  `/fewer-permission-prompts` for the commands you trust.
 
 ### Upgrading
 

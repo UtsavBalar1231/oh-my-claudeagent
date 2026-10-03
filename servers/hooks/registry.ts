@@ -15,7 +15,6 @@ import { stampIfDue } from "./status-file.ts";
 import { handle as stopGates } from "./stop-gates.ts";
 import { handle as subagentContext } from "./subagent-context.ts";
 import { handle as taskCompleted } from "./task-completed.ts";
-import { handle as trustedTooling } from "./trusted-tooling.ts";
 import { handle as verificationRecorder } from "./verification-recorder.ts";
 
 /** The hook payload as the handlers see it: object-valued fields already decoded. */
@@ -36,7 +35,6 @@ export const REGISTRY: Readonly<Record<string, readonly (readonly [string, Handl
     ["plan-write-guard", planWriteGuard],
     ["comment-gate", commentGate],
   ],
-  PermissionRequest: [["trusted-tooling", trustedTooling]],
   PostToolUse: [
     ["verification-recorder", verificationRecorder],
     ["context-injector", contextInjector],

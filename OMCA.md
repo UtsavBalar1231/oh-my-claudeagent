@@ -265,7 +265,7 @@ Hooks run in two homes: the mod (`hooks/register.ts`) and `mcp_tool` settings ho
 provide:
 
 - Context injection (AGENTS.md, rules, notepad directives)
-- Permission auto-approval for known-safe package managers (npm, yarn, pnpm, bun), jq, and uv run/sync. Blocks a recursive removal whose target is the root, home, the working directory, or a directory directly under root or home.
+- Destructive-command guard: blocks a recursive removal whose target is the root, home, the working directory, or a directory directly under root or home.
 - Error recovery suggestions (re-read after failed Edit, escalate after failed Agent)
 - Compaction survival (the summarizer is told to keep the bound plan and its open tasks, and the plan's context is re-injected afterwards)
 - Verification gating (TaskCompleted blocked without fresh evidence, on the sessions where that event can fire; see below)
@@ -282,7 +282,6 @@ handler is actually registered for it.
 | `UserPromptExpansion` | Lifecycle |
 | `SubagentStart` | Lifecycle |
 | `PreToolUse` | Tool lifecycle |
-| `PermissionRequest` | Tool lifecycle |
 | `PermissionDenied` | Tool lifecycle |
 | `PostToolUse` | Tool lifecycle |
 | `PostToolUseFailure` | Tool lifecycle |
@@ -309,6 +308,7 @@ records why it stays unregistered.
 
 | Event | Why no handler |
 |-------|----------------|
+| `PermissionRequest` | OMCA hooks never allow, and this event fires where a call that cannot prompt would be auto-denied, so a handler could only deny or run what the platform refuses. The guard's deny runs on `tool.check`, which fires in every permission mode |
 | `PostCompact` | Compaction re-injection runs on `SessionStart` with reason `compact` instead, which is where the restored context can still reach the model. `compact_summary` is genuinely uncaptured but has no consumer |
 | `PreCompact` | The mod's `session.compact` feature rewrites the summarizer's instructions with the bound plan and its open tasks, which a settings hook cannot do |
 | `SessionEnd` | Its budget is 1.5 seconds and a kill mid-write loses the work. The server unbinds the session ids it bound in its own shutdown handler instead |
@@ -378,16 +378,9 @@ only exit 2 and `continue: false` for that event, but on client 2.1.287 the clie
 task open on a `decision: block` from an `mcp_tool` hook and returns the reason to Claude as
 the `TaskUpdate` result.
 
-The deny hooks are a separate family with their own shapes. `PreToolUse` accepts either
+The deny hooks are a separate family with their own shape. `PreToolUse` accepts either
 stderr text plus exit 2 or a `hookSpecificOutput.permissionDecision: "deny"` payload with
-exit 0; `PermissionRequest` reads `hookSpecificOutput.decision.behavior`. Every guard
-registered on both events branches on `hook_event_name` and writes the shape that event
-reads. Exit 2 does not deny on `PermissionRequest`: the per-event table
-in `claude-code-docs/docs/hooks.md` gives that event a blocking column of "No", the
-permission flow proceeds unchanged, and the stderr is discarded. Deny through the
-`decision` object instead. That makes the branch required rather than a hedge, since the
-`PermissionRequest` half has no other way to deny. Never collapse it into a single
-unconditional exit 2; that shape is inert on half its registrations.
+exit 0.
 
 **SessionStart — new output fields (v2.1.152):**
 
@@ -1256,14 +1249,15 @@ Important keys:
 
 Keep `teammateMode: "auto"` as the default collaboration baseline unless your org policy overrides it.
 
-OMCA's trusted-tooling fast path does not auto-allow arbitrary commands. The server's
-`PermissionRequest` handler (`servers/hooks/trusted-tooling.ts`) allows only the package
-managers' safe subcommands (npm, yarn, pnpm and bun `run`, `test`, `ci`, `list` and `view`),
-`jq` without `--rawfile`, and `uv run` and `uv sync`. A command containing a command separator,
-a redirect, or a command substitution is never allowed, because the handler inspects only the
-leading command. A carriage return is matched alongside those, as hardening for shells that
-terminate a statement on a bare CR, which bash does not. Globs, tilde, and `$VAR` expansion
-still take the fast path, since none of them can introduce a second command.
+OMCA's hooks never auto-allow a command: they deny, ask or steer, and an allow decision
+belongs to the permission rules in your settings. To stop the prompts for a tool you trust,
+add an allow rule such as `Bash(npm run *)` to a settings file, or run
+`/fewer-permission-prompts`, which proposes rules from your transcripts. OMCA registers no hook
+on `PermissionRequest`. That event fires when a permission dialog is about to be shown and, since
+v2.1.285, where a call that cannot prompt would otherwise be auto-denied, including `-p` outside
+`dontAsk`. An allow from a hook there turns that denial into a run of project code. Probed on
+2.1.288, `bun run mark` was denied in `-p` without OMCA and ran with the former fast path, which
+is why it was removed.
 
 The destructive-command guard lives in the mod, on `tool.check` for Bash
 (`hooks/bash-guard.ts`, with its patterns in `src/core/destructive.ts`). A recursive removal
@@ -1282,16 +1276,9 @@ Agent SDK, the VS Code chat panel, the Desktop app). The auto-mode classifier do
 these removals. The guard stays because it covers more than critical paths: removals outside
 that list, the destructive git family, and force pushes, none of which the platform check sees.
 
-The two halves sit on different events, and the difference is load-bearing. `tool.check` runs
-before every Bash call in every permission mode, so the guard never depends on a dialog being
-shown, and it never returns `allow`, which would skip the auto-mode classifier.
-`PermissionRequest` fires when a permission dialog is about to be shown, and since v2.1.285 also
-where a call that cannot prompt would otherwise be auto-denied, including `-p` outside `dontAsk`.
-It never fires for a call the permission evaluation already allowed, so the fast path there can
-only turn a prompt or an auto-denial into an allow. Do not move the fast path
-anywhere earlier: an allow ahead of the permission evaluation would turn a convenience covering
-six known tools into a silent bypass of the operator's whole permission posture for those
-commands.
+`tool.check` runs before every Bash call in every permission mode, so the guard never depends
+on a dialog being shown, and it never returns `allow`, which would skip the auto-mode
+classifier.
 
 Protected paths sit outside all of this: writes under `.claude/**` are never auto-approved,
 and the protected-path check runs before allow rules entirely, so an
@@ -1460,11 +1447,11 @@ blocked on it.
 | `type: agent` / `type: prompt` semantic evidence verifier on `TaskCompleted` | v2.1.197 spec | NO-GO. Docs mark `type: agent` experimental/may-change; would roughly double LLM call volume on the task-completion path versus the existing zero-cost bash+jq gate (`task-completed-verify.sh`); targets a hypothetical mismatch failure mode with no observed incident history, while the existing deterministic hard gates (schema + freshness checks) already cover the failure modes actually seen in production. Re-evaluate only if `type: agent` graduates out of experimental and a real semantic-mismatch incident is observed |
 | `worktree.bgIsolation` | v2.1.143 | Claude-native owns worktree isolation policy; OMCA documents the `worktree.baseRef` hazard (see CLAUDE.md) but does not set this key — no OMCA workflow depends on background-isolation defaults differing from the platform default |
 | `sandbox.credentials` | v2.1.187 | Managed-settings-adjacent credential-scoping key; outside OMCA's ownership boundary (sandboxing is Claude-native's domain per the Ownership Model above) |
-| `autoMode.classifyAllShell` | v2.1.193 | Would route every Bash call through the auto-mode classifier, not just unmatched ones; OMCA's `permission-filter.sh` already fast-paths known-safe tooling deterministically — classifying all shell calls would add latency without changing OMCA's allow/deny outcomes |
+| `autoMode.classifyAllShell` | v2.1.193 | Would route every Bash call through the auto-mode classifier, not just unmatched ones; OMCA's guard runs on `tool.check` in every permission mode whatever the classifier decides, so classifying all shell calls would add latency without changing OMCA's deny outcomes |
 | `enforceAvailableModels` | v2.1.175 | The stale-pin hazard that held this back is gone: OMCA agent frontmatter now carries tier aliases only, and on the Anthropic API and Claude Platform on AWS a family alias resolves to the newest version the allowlist permits, so there is no id left to go stale. Safe to recommend once a deployment's own settings are free of pinned ids. OMCA still does not enable it by default, since the allowlist it enforces is the org's to write |
 | `fallbackModel[]` | v2.1.166 | Documented above under Environment Variables; not auto-set by OMCA because the right fallback chain depends on the user's model availability and provider, which OMCA cannot infer |
 | `disableBundledSkills` | v2.1.169 | User-preference key for suppressing platform-bundled skills; orthogonal to OMCA's own skill set, no plugin-side action needed |
-| `autoMode` destructive-git default-block | v2.1.183 | Overlaps OMCA's own `scripts/git-master`-adjacent destructive-git denial in `permission-filter.sh` (`sudo rm -rf` guardrail). Complementary, not adopted as a replacement. OMCA's deny runs regardless of `autoMode` state now that it is registered on `PreToolUse` as well as `PermissionRequest`; while it sat on `PermissionRequest` alone, auto mode suppressed the dialog and the deny never ran, so that independence is a property of the current wiring rather than something that was always true |
+| `autoMode` destructive-git default-block | v2.1.183 | Overlaps OMCA's own destructive-git denial in the `tool.check` guard (`hooks/bash-guard.ts`). Complementary, not adopted as a replacement. OMCA's guard runs on `tool.check`, in every permission mode, so its decision does not depend on `autoMode` state |
 | `Agent(type)` deny enforcement | v2.1.186 | No OMCA agent declares a `type` field; nothing to enforce against yet |
 | Nested `.claude/` closest-wins precedence | v2.1.178 | Affects multi-root or nested-project layouts; OMCA's state lives under a single `.omca/` root per `CLAUDE_PROJECT_DIR` and does not nest |
 | Background-subagent permission-prompt | v2.1.186 | Background `Agent` calls now surface permission prompts the same as foreground; this is platform UX, not a setting OMCA wires |
@@ -1543,7 +1530,6 @@ section and in `CLAUDE.md`; neither is set by OMCA.
 | Quoted shell form on every command handler | Each handler invokes `${CLAUDE_PLUGIN_ROOT}/scripts/...`, which resolves into the marketplace cache under the user's home; in shell form a space anywhere in that path splits the command, so every `command` value now quotes the placeholder. Exec form (`args` present) was tried and rejected: it spawns `command` as a real executable with no shell, and a `.sh` file is not executable on native Windows, so every handler would fail to spawn there with no error signal, and setting `args` also makes the platform ignore the `shell` field. Exec form stays available for handlers whose `command` is a genuine cross-platform binary |
 | `shell: "bash"` pinned on every `type: command` handler | Not a Windows-only field, which is how this ledger used to dismiss it. Shell form runs the command under `sh -c` on Unix and falls back to PowerShell on Windows when Git Bash is absent, and neither is a shell a `.sh` handler written against bash can be fed to safely. Pinning `bash` names the interpreter on both platforms instead of inheriting whichever one the host resolves to. Every `command` handler in `hooks/hooks.json` now carries it |
 | `statusMessage` on user-perceived slow handlers | No handler carries one: every hook finishes in milliseconds, and a label for them reads as noise |
-| Compound-command fall-through in the trusted-tooling fast path | Hook `if:` matching is per-subcommand, so `jq . a.json && rm -rf ~/x` reached the jq auto-allow branch. A command whose trimmed text contains a command separator, a redirect, or a command substitution now falls through to the platform decision: `\|`, `;`, `&`, `<`, `>`, a backtick, `$(`, a literal newline, or a carriage return. The bare `&` covers `&&` and `&>`, the newline covers multi-line commands, and the carriage return is hardening for shells that terminate a statement on a bare CR, which bash does not. Globs, tilde, and `$VAR` expansion still take the fast path, since none of them can introduce a second command. The `rm -rf` deny branch still runs first, so the deny path is unchanged |
 | `context: fork` skills pin `background: false` | Forked skills background by default from v2.1.218, and a backgrounded fork gets the narrower background-subagent tool set with its result a turn later. metis, momus, and hephaestus pin `false` so momus's OKAY/REJECT verdict stays inline for the bounded review loop and hephaestus's edits stay inside `/rewind` checkpoint coverage |
 | `disable-model-invocation: true` on handoff | Replaces a workaround that told users to disable the whole plugin, and retires a `skillOverrides` recommendation this ledger already called inert for plugin skills. The `handoff` keyword now degrades to an advisory nudge toward the slash command and is described that way everywhere |
 | Subagents background by default (v2.1.198) | Every "no `run_in_background`" instruction described the opposite of what happens. The fix at the time was to pass the flag as `false` at every fan-out call site. That fix was superseded from v2.1.232, which removes the parameter from the Agent tool in an interactive session: there is no flag to pass and no foreground path to ask for. The call sites now carry the fan-out paragraph under Agent Reference instead |
@@ -1675,7 +1661,7 @@ tables under Core Concepts and Agent Reference are the live state.
 | Late-appearing `.claude/*` symlink sandbox reconciliation | Sandboxing is Claude-native's. OMCA creates no `.claude/*` symlinks and keeps no state under `.claude/` |
 | `CLAUDE_CODE_PROCESS_WRAPPER` | No OMCA surface reads process ancestry |
 | Malformed bracket patterns in globs | All OMCA rule globs are bracket-free, no ignore or worktree-include file exists, and the injector's bash pattern match treats a malformed group as a literal |
-| Compound `cd` with only a `/dev/null` redirect | `permission-filter.sh` never inspects redirects, so those commands fall through to the platform decision identically before and after |
+| Compound `cd` with only a `/dev/null` redirect | OMCA registers no hook that decides permissions, so those commands reach the platform decision unchanged |
 | Spurious prompt-injection warnings | OMCA's injected context is the trusted plugin-script class the fix stops flagging. The adjacent thing OMCA owns, the context it re-injects after a compaction, carries only the guidance template and the bound plan's own name, path and next task |
 | Launcher-overwrite `/doctor` report | Launcher and auto-updater are Claude-native install machinery. Adding a launcher probe to `omca-setup` would duplicate a native check and produce a finding OMCA cannot remediate |
 | `EndConversation` tool | Un-denyable by construction, main-conversation-only, and invisible to `PreToolUse`, `PostToolUse`, and `PermissionRequest`. Adding it to a `disallowedTools` list would be a rule the platform ignores |
