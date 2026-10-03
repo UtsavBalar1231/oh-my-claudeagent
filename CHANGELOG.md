@@ -5,24 +5,165 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [3.0.0] - 2026-10-03
+
+OMCA 3 rewrites the plugin's runtime in TypeScript on bun. One `omca` MCP server serves the
+model's tools and every settings hook, and a Claude Code mod draws OMCA's interface inside the
+session and runs the destructive-command guard. Python, uv and the bash hook scripts are gone,
+and the plugin runs on Linux, macOS and native Windows.
+
+**This release needs Claude Code 2.1.288 or later and bun 1.4.2 or later,** with bun on the
+`PATH` Claude Code starts with. `ast-grep` (or `sg`) stays optional; only the `ast_*` tools need
+it. On 2.1.287 the band could end a fullscreen session when the background-tasks dialog opened,
+and 2.1.288 adds the text selection `/omca-rate` reads.
+
+**Read [Upgrading](#upgrading) before you update.** A 2.x session and a 3.x session must not run
+in the same project at once, and the `CLAUDE.md` block that 2.x setup wrote has to be deleted by
+hand.
+
+### Added
+
+- **The `/omca` pane.** `/omca` opens a pane with Agents, Plan, Evidence, Notepad, Feedback,
+  Stats and Doctor tabs, each on a digit key. The Agents tab tracks every subagent of the session
+  with its model, effort, time and tokens. `/omca plan`, `/omca stats` and `/omca doctor` open the
+  pane on that tab. Ctrl+X then Tab, or a click, focuses it; Esc, the close mark or Ctrl+X then X
+  closes it.
+- **The plan reader.** `/omca plan` opens the bound plan and `/omca plan <name or path>` opens
+  another, on a contents list with checkbox marks and the cursor on the first open task. Each
+  heading or task is its own page. `n` and `p` move between tasks, `t` returns to the contents,
+  `l` lists the recent plans from `plansDirectory`, `r` reloads, and Page Up, Page Down, Home and
+  End page through the lists. It reloads when the file changes on disk and keeps your place.
+- **The band.** Above the prompt, the band shows the bound plan with its progress, the last
+  verification command and whether its evidence was logged. After each turn it offers the next
+  step on numbered buttons: log the evidence, start work, run the final verification, or review
+  the changes with oracle. Pressing a button's digit in an empty prompt, or clicking it, fills the
+  prompt and runs nothing until you send it. The `showBand` option hides the band.
+- **`/omca doctor`.** It checks the loaded OMCA version, the Claude Code floor, bun on the
+  session's `PATH`, when a hook last reached the `omca` server, `ast-grep`, the `showBand` and
+  `guardMode` options, `CLAUDE_CODE_SUBAGENT_MODEL_FORCE`, a `maxEffortLevel` cap,
+  `allowManagedModsOnly`, `disableAllHooks` and `allowManagedHooksOnly`, the output style in
+  force, what keeps the advisor off, and the status line's `refreshInterval`. Problems sort to the
+  top and the list scrolls. `r` runs the checks again, and `i` adds `refreshInterval: 5` to a
+  status line that lacks it, after re-reading the file, writing `settings.json.omca-bak` and
+  showing the diff.
+- **Ratings.** `/omca-rate up` or `/omca-rate down` rates the last turn, with an optional note.
+  With no note typed, the text selected on screen becomes the note, cut to 200 characters, and the
+  reply says so. Ratings are kept in `.omca/feedback/<session id>.json` and listed in the
+  Feedback tab.
+- **A turn footer.** After each main-loop turn the mod prints the turn's duration, input and
+  output tokens and cost. When a verification ran that turn with no evidence logged after it, a
+  warning naming the command takes the cost's place.
+- **A delegation ledger and the Stats tab.** Each subagent gets a record under
+  `.omca/metrics/<session id>/` with its type, model, effort, tokens, duration, outcome, whether
+  evidence was logged during it, and an estimated cost from a dated price table that cites its
+  source for every row. A model with no sourced price stays unpriced rather than guessed. The
+  Stats tab aggregates the records by agent type.
+- **Per-delegation effort.** A delegation prompt may start with
+  `[omca-route effort=<level>]`. The mod strips the line and runs that subagent at that effort.
+  The hint carries no model: the Agent tool's own `model` parameter picks the tier, where
+  permission rules can see it. The orchestrator, planner and start-work prompts say when to emit
+  each level.
+- **The destructive-command guard runs in the mod and can ask before it refuses.** It checks
+  every Bash and PowerShell command and sorts a match into one of these classes:
+  - Catastrophic: a recursive removal of the filesystem root, your home, the project, or a folder
+    directly under root or home. Refused in every permission mode, with no dialog.
+  - Blocking: a force push to the default branch in any spelling (`--force`,
+    `--force-with-lease`, `--force-if-includes`, a `+` refspec, `--mirror`, or no refspec while on
+    that branch), `git commit --no-verify` or `-n`, `git reset --hard`, `git stash`, `git clean`,
+    `git restore`, a recursive `git rm`, and `git checkout` with a `--` path. Held for your review
+    in an interactive session and refused where no dialog can show, in every permission mode
+    including `bypassPermissions`. The default branch is the one `origin/HEAD` names, or `main`
+    and `master` when it names none, read from local refs with no network call.
+  - Advisory: a force push to any other branch, any other recursive removal, and `xargs rm -rf`,
+    whose targets are unknown in advance. Held for review in an interactive session and allowed
+    to run where no dialog can show.
+
+  The review dialog lists what the command would touch: each removal target with its kind and
+  entry count, the uncommitted changes a hard reset discards, or the commits a force push drops
+  from the remote. Refuse is listed first, so a stray Enter refuses; Run it hands the command back
+  to the normal permission checks, and the guard never allows a command on its own. The
+  `guardMode` option is `dialog` by default; `deny` skips the dialog everywhere.
+
+  The guard reads commands handed to another interpreter, up to four levels deep: `bash -c`,
+  `sh -c` and `zsh -c` scripts, `eval`, heredocs and here-strings fed to a shell, `pwsh` and
+  `powershell -Command`, `cmd /c`, `Invoke-Expression`, and a command substitution inside double
+  quotes. It sees past `sudo`, `env`, `timeout`, `nice`, `nohup`, `stdbuf`, `ionice`, `chrt`,
+  `setsid` and `time`, shell keywords, brace groups and backslash escapes, and resolves a relative
+  target against the session's working directory, so `rm -rf ..` from the project root is caught.
+  For PowerShell it reads `Remove-Item` and its aliases with `-Recurse`, cmd's `rd`, `rmdir` and
+  `del`, and the guarded git forms, and treats `-WhatIf` as no removal. Drive roots, the Git Bash,
+  Cygwin, WSL `/mnt` and macOS `/Volumes` mounts, and share roots count as catastrophic targets.
+- **Each half of OMCA says when the other is missing.** At session start the mod writes one
+  transcript line when the `omca` server is not connected: bun is missing (Desktop and VS Code may
+  start with a GUI `PATH` that lacks it), or the server failed for the reason Claude Code gives.
+  On the launch session's first prompt the server says once, as a system message, that the mod is
+  not running, so the guard, band and pane are off. `OMCA_DISABLED_HOOKS=mod-notice` silences
+  that message.
+- `health_check` reports whether this session's runtime is live (`ok`, or `hooks_inactive` or
+  `mod_absent` with the likely cause), along with the client version, the `ast-grep` binary and
+  the state files. The plan and start-work skills call it first and stop when the runtime is not
+  live.
+- A session's first prompt carries the bound plan's name, path, next open task and notepad line,
+  and the server titles the session `OMCA: <plan>` unless it already has a name.
+- The `omca` server speaks the 2026-07-28 MCP handshake through `server/discover` and falls back
+  to `initialize`. Escape or a call's timeout cancels the call and stops any `ast-grep` it
+  started. The `ast_*` tools and `session_search` report progress under the tool line, every tool
+  has a title for `/mcp`, and `boulder_write` is marked destructive.
+- `boulder_progress` returns `plan_sha256`, the hash of the plan file's current bytes, so
+  start-work no longer runs `sha256sum`.
+- **Linux, macOS and native Windows.** CI runs the specs, typechecks, the validator and a live
+  smoke session on all three. On Windows, verification commands run through the PowerShell tool
+  count toward the evidence gates, failure recovery has PowerShell advice, and paths with drive
+  letters, UNC shares, Git Bash `/c/...` forms and case-insensitive spellings resolve correctly.
+  Where hard links are refused (FAT, exFAT, SMB and some FUSE mounts) the state lock falls back to
+  a lock directory. Rules, frontmatter and pasted prompts accept a byte-order mark and CRLF line
+  endings. The shipped skills avoid `sha256sum`, `/tmp` and unquoted plugin paths, and setup
+  accepts a `settings.json` that starts with a byte-order mark.
+- The `showBand` and `guardMode` plugin options, and `OMCA_ASCII=1`, which draws the band, pane,
+  footer and dialog with ASCII glyphs.
 
 ### Changed
 
+- **One bun server.** `.mcp.json` starts a single `omca` server, `bun servers/omca.ts`, that
+  answers the model's tools and every `hooks.json` entry through its `omca_hook` tool. No command
+  hook remains. Every tool keeps its name, schema and result text. The OpenCode adapter starts
+  the same server through OpenCode's own executable and runs the comment gate and plan checks in
+  process.
+- **OMCA's guidance comes from the server.** It is added to a session's first prompt and again
+  after a compaction, and setup writes nothing into any `CLAUDE.md`. A resumed session is not
+  guided twice, and a session started by `/clear` is guided afresh. Before a compaction the mod
+  asks the summarizer to keep the bound plan and its open tasks.
+- **The stop gates continue a session as hook feedback.** Plan continuation, final verification
+  and the drift guard run in that order from one Stop handler and continue the turn with their
+  reason, which Claude Code draws as "Stop hook feedback" instead of "Stop hook error". Each keeps
+  its back-off and its budget, refilled once its condition clears. `OMCA_DISABLED_HOOKS` turns
+  them off with `stop-gates`, or one at a time with `plan-continuation`, `final-verification` or
+  `drift-guard`.
 - **Most omca tools load on demand.** Only `evidence_log`, `boulder_progress` and
   `notepad_write` load with the first request; the rest load through tool search by their full
-  name, which saves about 3,750 tokens per request where tool search is on.
+  name, which saves about 3,750 tokens per request where tool search is on. Subagents are told the
+  same rule at start, since they do not receive server instructions. Hooks call the server
+  directly and are unaffected.
+- **The sisyphus prompt is a little over half its old size.** It drops what the output style and
+  the first-prompt guidance already say and keeps every instruction only it carries, falling from
+  about 6,700 to about 3,800 tokens on every main-session request.
+- **The plugin installs from a packaged branch.** `just release` commits the shipped tree,
+  without `package.json`, `bun.lock`, `bunfig.toml`, the typecheck configs or the OpenCode
+  adapter, to the orphan `plugin` branch tagged `plugin-v<version>`, and `marketplace.json` pins
+  that commit through a `url` source. A marketplace install no longer fetches about 166 MiB of
+  development dependencies.
 - **The status lines run on bun through a launcher.** `/oh-my-claudeagent:omca-setup` copies
   `statusline/launcher.ts` to `~/.claude/omca/statusline.ts`, prints a diff of
   `~/.claude/settings.json`, and after you confirm it sets `statusLine` and
   `subagentStatusLine` to that launcher, keeping the previous file as
   `settings.json.omca-bak`. The launcher runs the renderer from the newest installed plugin
   version, so a plugin update no longer needs a second setup run. `--uninstall` removes both
-  entries and the launcher.
+  entries and the launcher. A render takes about 4 ms, against about 22 ms before.
 - `statuslineMode` takes `on` or `off`. A saved `direct` or `daemon` value is no longer an
   option; set it again to `on`.
-- `omca-setup` checks dependencies and the runtime, configures the status lines and applies
-  the force-style opt-out. Its `--check` and `--doctor` modes point at `/omca doctor`.
+- `omca-setup` checks the Claude Code and bun versions, `ast-grep` and the runtime, configures the
+  status lines and applies the force-style opt-out. Its `--check` and `--doctor` modes point at
+  `/omca doctor`.
 - **The status line adapts to the terminal.** It reads the `COLUMNS` and `LINES` that Claude
   Code sets and fills lines by priority: model and effort, plan progress with the next open
   task, the context bar, git branch and counts, the directory, agent, worktree and pull request,
@@ -36,18 +177,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `COLUMNS` is clipped by Claude Code with a trailing ellipsis. Subagent rows drop
   segments by the same rule, in the order name, model, status, effort, context.
 - The directory now shows in every project, not only in a git repository, and the pull request
-  segment shows the number without the repository name.
+  segment shows the number without the repository name. The agent segment appears only when the
+  session's main agent is not sisyphus, and behind a Claude apps gateway with a spend limit, the
+  spend against that limit follows the usage limits.
+- **`OMCA_DISABLED_HOOKS` takes the 3.x feature names** listed in `docs/references.md`, and `all`
+  or `*` turns off every one. `bash-guard` turns off every blocking and advisory match; a
+  catastrophic removal is still refused.
+- **The comment gate judges only the lines an edit adds.** Named numeric constants in TypeScript
+  and Rust are no longer flagged as magic numbers, `TODO: implement` is judged in context, and the
+  deny-once memory is kept per file, so a second file in the same turn gets its own first deny.
+  The whole-file opt-out marker is now `comment-gate-disable-file`.
+- The plan-checkbox check no longer refuses a finished plan whose tasks are all checked, and
+  judges a small Edit to a plan only when it rewrites a plan heading.
+- Rule and context injection rebuilds its index when a rule directory or rule file changes, and
+  injects each rule body once per session until it changes.
+- The evidence ledger rotates at start: once the live file passes 1 MiB or 1,000 entries, all but
+  the newest 500 move to a monthly archive. The server prunes mod markers and session status files
+  after 24 hours, and delegation records and ratings after 90 days.
+- The docs are `README.md`, `docs/usage.md` and `docs/references.md`, and `CONTRIBUTING.md` sits
+  at the repository root.
+- For contributors: `just ci` runs on bun alone (typecheck, validator, mod tests, bun specs, MCP
+  specs, mod and manifest validation, OpenCode specs). The validator is `bun scripts/validate.ts`,
+  the bats suites and the shellcheck lint are retired, and the repository holds no shell or Python
+  file. `just release <version>` refuses a dirty tree, a missing changelog entry or an existing
+  tag, and restores the tree if it fails part way.
+
+### Fixed
+
+- A forgotten `evidence_log` no longer turns off the task-completion check for the rest of the
+  session: once an unlogged verification is older than the check's one-hour window, a newer
+  verification replaces it.
+- `notepad_*` checks `plan_name` before it names a path, which closes a `../` escape from the
+  notepads directory, and `notepad_compact` rewrites a section under the same lock as
+  `notepad_write`, so a concurrent append is no longer lost.
+- `evidence_log` refuses to replace a ledger it cannot parse instead of starting a new one over
+  the audit trail, and caps `command` and `verified_by`.
+- `ast_*` no longer reads a pattern starting with a hyphen as an option, and a matching rule with
+  `severity: error` no longer discards the scan's matches.
+- `file_read` no longer skips its size guard for a negative limit, cuts an overlong line while
+  streaming, and matches sensitive paths case-insensitively and without NTFS stream suffixes on
+  every platform. `session_search` scans transcripts in linear time and honors
+  `CLAUDE_CONFIG_DIR`.
+- A server hook handler that throws now fails open on every event, so a bug in OMCA cannot block
+  a tool call.
+- The plan reader counts only `- [x] N.` as done, the same rule the band, status line and stop
+  gates use, so an upper-case `X` no longer makes them disagree.
+- `github-triage` can write its `SKIPPED.md` and `SUMMARY.md` reports; it disallowed the Write
+  tool and could not finish a run.
 
 ### Removed
 
+- **The Python runtime.** The Python MCP server, its lockfiles and the Python status line package
+  are gone, and uv is no longer a dependency.
+- **The bash hook scripts.** Every hook is a server handler or a mod feature. With them go the
+  executor grep guard, which denied `grep` for the executor agent, and the write guard, which
+  denied direct writes to the evidence ledger and notepads; the MCP tools remain the supported
+  writers.
+- `bin/omca-status`, `bin/omca-doctor` and `bin/omca-subagent-statusline`. The plugin
+  `settings.json` no longer sets `subagentStatusLine`: Claude Code does not resolve
+  `${CLAUDE_PLUGIN_ROOT}` in it, so it never found its script.
+- Daemon status line mode and the status line's agent-count segment.
+- **The log-only writers under `.omca/logs/`:** the post-edit log and its stale-log sweep, the
+  `StopFailure` log, the file-changed log, the hook error log, the teammate audit line and the
+  subagent-stop bookkeeping. OMCA no longer registers `FileChanged`, `StopFailure` or
+  `SubagentStop`. `file_read` still writes its audit log, `.omca/logs/file-access.jsonl`.
+- The `validate_plan_write` tool, and the cache-writing option of `agents_list`.
 - **The tool-loop detector.** It warned when one agent ran the same batch of tool calls three
   times in a row, and it fired on legitimate repeats such as polling or re-running a check
   after an edit far more often than on real loops. OMCA no longer registers `PostToolBatch`,
   and `tool-loop` is no longer a name `OMCA_DISABLED_HOOKS` recognizes. Repeated failures still
   trip the failure-recovery breaker at a tool's third failure.
-- `bin/omca-status`, `bin/omca-doctor` and `bin/omca-subagent-statusline`, and the Python
-  status line package. The plugin `settings.json` no longer sets `subagentStatusLine`: Claude
-  Code does not resolve `${CLAUDE_PLUGIN_ROOT}` in it, so it never found its script.
+- **Setup's `CLAUDE.md` phases.** Setup no longer writes, updates or removes the
+  `--- omca-setup` block in `~/.claude/CLAUDE.md`.
+- `OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY` and the 2.x hook names in `OMCA_DISABLED_HOOKS`.
 - **The status line's tuning variables.** `CLAUDE_STATUSLINE_BAR_WIDTH` (20),
   `CLAUDE_STATUSLINE_THRESHOLD_WARN` (60), `CLAUDE_STATUSLINE_THRESHOLD_CRIT` (85),
   `CLAUDE_STATUSLINE_CACHE_TTL` (5) and `CLAUDE_STATUSLINE_GIT_TIMEOUT` (3) are gone, and
@@ -62,15 +264,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The trusted-tooling fast path.** The `PermissionRequest` hook that auto-allowed `npm`, `bun`,
   `yarn` and `pnpm` `run`, `test`, `ci`, `list` and `view`, `jq` and `uv run` and `uv sync` is gone.
   Since Claude Code 2.1.285 that event also fires where `-p` would auto-deny, so the allow ran
-  project code the platform had refused; add `permissions.allow` rules or run
-  `/fewer-permission-prompts` for the commands you trust.
+  project code the platform had refused. OMCA registers nothing on `PermissionRequest` and never
+  auto-allows a command; add `permissions.allow` rules or run `/fewer-permission-prompts` for the
+  commands you trust.
+- `OMCA.md`, `docs/reference/` and `docs/examples/`. Their content lives in `README.md`,
+  `docs/usage.md` and `docs/references.md`.
 
 ### Upgrading
 
-Setup leaves what earlier versions installed in place. Once the new status line works, you can
-delete `~/.claude/statusline/`, the `--- omca-setup` block in `~/.claude/CLAUDE.md`, and the
-`Bash(jq *)`, `Bash(uv run *)` and `Bash(uv sync *)` entries setup added to
-`permissions.allow` in `~/.claude/settings.json`.
+1. Install Claude Code 2.1.288 or later and bun 1.4.2 or later. Desktop and VS Code start the
+   `omca` server with the GUI's `PATH`, so make bun reachable from it.
+2. Close every 2.x session in a project before you start a 3.x session there, and do not run the
+   two at once. The 2.x Python server and the 3.x server lock `.omca/` state in different ways
+   that do not exclude each other, so concurrent writes to the evidence ledger or the plan
+   registry can be lost.
+3. Update with `/plugin marketplace update omca` and restart Claude Code.
+4. Delete the `--- omca-setup` block from `~/.claude/CLAUDE.md` (under `CLAUDE_CONFIG_DIR` when
+   you set it) by hand. The server now delivers the same guidance, and neither setup nor
+   `/omca doctor` removes the old block.
+5. Run `/oh-my-claudeagent:omca-setup` to point both status lines at the launcher. Setup leaves
+   what earlier versions installed in place. Once the new status line works, you can delete
+   `~/.claude/statusline/` and the `Bash(jq *)`, `Bash(uv run *)` and `Bash(uv sync *)` entries
+   setup added to `permissions.allow` in `~/.claude/settings.json`.
+6. Set `statuslineMode` to `on` if it holds `direct` or `daemon`.
+7. Check `OMCA_DISABLED_HOOKS` against the names in `docs/references.md`, and drop
+   `OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY`. `OMCA_DISABLED_HOOKS=bash-guard` turns off the
+   guard's blocking and advisory classes.
+8. Replace any `comment-checker-disable-file` marker with `comment-gate-disable-file`.
+9. If you relied on the trusted-tooling auto-allow, add allow rules such as `Bash(bun run *)` or
+   run `/fewer-permission-prompts`.
+
+State files that 2.x left under `.omca/state/` are no longer read, and `.omca/logs/` no longer
+grows apart from `file-access.jsonl`. You can delete them.
 
 ## [2.21.0] - 2026-09-30
 
