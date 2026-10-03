@@ -54,6 +54,7 @@ export type World = {
   selection: UiSelection | undefined;
   opened: unknown[];
   logs: string[];
+  said: string[];
   clock: MockClock;
   style: string | undefined;
 };
@@ -100,6 +101,7 @@ export function world(
     selection: undefined,
     opened: [],
     logs: [],
+    said: [],
     clock: mock.clock(on, { now: Date.UTC(2026, 9, 2, 12, 0, 0) }),
     style: OUTPUT_STYLE,
   };
@@ -150,7 +152,7 @@ export function world(
   });
   on("ui.open", (_$, e) => (w.opened.push(e), { value: { isPlaced: true } }));
   on("ui.close", () => ({ value: undefined }));
-  on("ui.log", (_$, e) => (w.logs.push(e.text), { value: undefined }));
+  on("ui.log", (_$, e) => (w.logs.push(e.text), e.to === "debug" || w.said.push(e.text), { value: undefined }));
   on("ui.panes", () => ({ value: [] }));
   on("ui.focus", (_$, e) => (w.focused.push(e.element ?? ""), {}));
   on("ui.selection", () => ({ value: w.selection }));

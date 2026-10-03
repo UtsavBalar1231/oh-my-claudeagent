@@ -34,7 +34,7 @@ describe("registry", () => {
       PreToolUse: ["plan-write-guard", "comment-gate"],
       PostToolUse: ["verification-recorder", "context-injector", "plan-format-warn", "empty-task-response"],
       PostToolUseFailure: ["failure-recovery"],
-      UserPromptSubmit: ["guidance", "keyword-detector"],
+      UserPromptSubmit: ["mod-notice", "guidance", "keyword-detector"],
       UserPromptExpansion: ["guidance", "slash-mode-detector"],
       SubagentStart: ["subagent-context"],
       PermissionDenied: ["permission-coach"],
@@ -140,6 +140,29 @@ describe("answer precedence", () => {
     expect(await dispatch({ event: "PostToolUse" }, project(), NOW, registry)).toEqual({
       hookSpecificOutput: { hookEventName: "PostToolUse", classifierContext: "note", additionalContext: "one\n\ntwo" },
     });
+  });
+});
+
+describe("system messages", () => {
+  test("system messages concatenate in handler order beside the context", async () => {
+    const registry = {
+      UserPromptSubmit: [
+        ["a", answer({ systemMessage: "one" })],
+        ["b", context("UserPromptSubmit", "note")],
+        ["c", answer({ systemMessage: "two" })],
+      ] as const,
+    };
+    expect(await dispatch({ event: "UserPromptSubmit" }, project(), NOW, registry)).toEqual({
+      hookSpecificOutput: { hookEventName: "UserPromptSubmit", additionalContext: "note" },
+      systemMessage: "one\n\ntwo",
+    });
+  });
+
+  test("a system message survives a block", async () => {
+    const registry = {
+      Stop: [["a", answer({ systemMessage: "heads up" })], ["b", answer({ decision: "block", reason: "no" })]] as const,
+    };
+    expect(await dispatch({ event: "Stop" }, project(), NOW, registry)).toEqual({ decision: "block", reason: "no", systemMessage: "heads up" });
   });
 });
 

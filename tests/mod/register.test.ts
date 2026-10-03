@@ -58,6 +58,7 @@ test("the module registers exactly the dispatchers, env reads and atoms of the c
         "fs.read",
         "fs.stat",
         "fs.write",
+        "mcp.connect",
         "process.run",
         "prompt.fill",
         "session.cwd",

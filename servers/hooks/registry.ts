@@ -5,6 +5,7 @@ import { handle as emptyTaskResponse } from "./empty-task-response.ts";
 import { handle as failureRecovery } from "./failure-recovery.ts";
 import { handle as guidance } from "./guidance.ts";
 import { handle as keywordDetector } from "./keyword-detector.ts";
+import { handle as modNotice } from "./mod-notice.ts";
 import { handle as permissionCoach } from "./permission-coach.ts";
 import { handle as planFormatWarn } from "./plan-format-warn.ts";
 import { handle as planWriteGuard } from "./plan-write-guard.ts";
@@ -21,6 +22,7 @@ import { handle as verificationRecorder } from "./verification-recorder.ts";
 export type Payload = Readonly<Record<string, unknown>> & { readonly event: string };
 
 export type Output = {
+  systemMessage?: string;
   decision?: "block";
   reason?: string;
   hookSpecificOutput?: { hookEventName: string; [field: string]: unknown };
@@ -43,6 +45,7 @@ export const REGISTRY: Readonly<Record<string, readonly (readonly [string, Handl
   ],
   PostToolUseFailure: [["failure-recovery", failureRecovery]],
   UserPromptSubmit: [
+    ["mod-notice", modNotice],
     ["guidance", guidance],
     ["keyword-detector", keywordDetector],
   ],
@@ -78,6 +81,12 @@ export const isDeny = (output: Output): boolean => output.hookSpecificOutput?.pe
 export const isBlock = (output: Output): boolean => output.decision === "block";
 
 function combine(answers: readonly Output[]): Output {
+  const messages = answers.flatMap(({ systemMessage }) => (systemMessage === undefined ? [] : [systemMessage]));
+  const output = combineDecision(answers);
+  return messages.length === 0 ? output : { ...output, systemMessage: messages.join("\n\n") };
+}
+
+function combineDecision(answers: readonly Output[]): Output {
   const decisive = answers.find(isDeny) ?? answers.find(isBlock);
   if (decisive !== undefined) return decisive;
   let merged: Output["hookSpecificOutput"];

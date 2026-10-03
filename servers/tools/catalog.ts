@@ -1,9 +1,8 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { parseFrontmatter } from "../../src/core/frontmatter.ts";
-import { isSafeId } from "../../src/core/session-id.ts";
 import { findSession, latestSessionId } from "../hooks/session-state.ts";
-import { ledgerPath } from "../hooks/status-file.ts";
+import { ledgerPath, markerWrittenAt } from "../hooks/status-file.ts";
 import { isMissing } from "../io.ts";
 import type { Tool } from "../omca.ts";
 import { pluginRoot } from "../plugin-root.ts";
@@ -31,18 +30,6 @@ const CATEGORIES_MISSING = '{"error": "categories.json not found"}';
 const CATEGORIES_MALFORMED = '{"error": "categories.json is malformed"}';
 
 const isDirectory = (path: string): boolean => statSync(path, { throwIfNoEntry: false })?.isDirectory() ?? false;
-
-function markerWrittenAt(root: string, sessionId: string): number | undefined {
-  if (!isSafeId(sessionId)) return undefined;
-  try {
-    const marker: unknown = JSON.parse(readFileSync(join(root, ".omca", "state", "mod", `${sessionId}.json`), "utf8"));
-    const at = typeof marker === "object" && marker !== null && "written_at" in marker ? marker.written_at : undefined;
-    return typeof at === "number" ? at : undefined;
-  } catch (error) {
-    if (isMissing(error)) return undefined;
-    throw error;
-  }
-}
 
 export function runtimeOf(root: string): Runtime {
   const sessionId = latestSessionId();

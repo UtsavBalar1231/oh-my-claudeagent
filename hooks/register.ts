@@ -12,6 +12,7 @@ import { modMarker } from "./mod-marker.ts";
 import { router } from "./omca-router.ts";
 import { pane } from "./pane.ts";
 import { route } from "./route.ts";
+import { serverCheck } from "./server-check.ts";
 
 function bindHost($: EngineInterface, options: Options): Host {
   return {
@@ -41,7 +42,9 @@ function bindHost($: EngineInterface, options: Options): Host {
       exists: (path) => $.fs.exists(path),
     },
     process: { run: (argv, init) => $.process.run(argv, init) },
+    mcp: { connect: (server) => $.mcp.connect(server) },
     ui: {
+      say: (text) => $.ui.log(text),
       open: (args) => $.ui.open(args),
       panes: () => $.ui.panes(),
       ask: (question, choices) => $.ui.ask(question, choices),
@@ -134,7 +137,7 @@ const guardFailed = (reason: string): EventResult<"tool.check"> => ({
 export const register: Register = (on, pluginOptions) => {
   const options = readOptions(pluginOptions);
   const bash = featuresFor("tool.check", { bashGuard });
-  const sessionStart = featuresFor("session.start", { pane, feedback, modMarker, band });
+  const sessionStart = featuresFor("session.start", { pane, feedback, modMarker, band, serverCheck });
   const turnStart = featuresFor("turn.start", { footer, modMarker });
   const turnStep = featuresFor("turn.step", { route, ledger, agentsTracker });
   const turnComplete = featuresFor("turn.complete", { band, agentsTracker, pane, ledger, feedback, footer });

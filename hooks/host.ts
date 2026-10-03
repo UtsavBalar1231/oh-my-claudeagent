@@ -43,7 +43,9 @@ export type Host = {
     exists: Engine["fs"]["exists"];
   };
   process: { run: Engine["process"]["run"] };
+  mcp: { connect: Engine["mcp"]["connect"] };
   ui: {
+    say: (text: string) => void;
     open: Engine["ui"]["open"];
     panes: Engine["ui"]["panes"];
     ask: Engine["ui"]["ask"];

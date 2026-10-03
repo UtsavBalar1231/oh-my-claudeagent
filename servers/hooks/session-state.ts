@@ -9,6 +9,7 @@ export type Session = {
   verification?: Verification;
   isGuided?: boolean;
   isTitleChecked?: boolean;
+  isModChecked?: boolean;
   promptAt?: number;
   compactedAt?: number;
   injectedContext?: Set<string>;

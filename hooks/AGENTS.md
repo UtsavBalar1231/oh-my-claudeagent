@@ -16,6 +16,13 @@ event is unregistered on purpose; `OMCA.md` carries the per-event reason.
 - `UserPromptSubmit` and `UserPromptExpansion` route to the server's `keyword-detector` and
   `slash-mode-detector` handlers, and both to its `guidance` handler, which injects the
   guidance template, the session id and the bound plan's context on a session's first prompt.
+- Each half says when the other is missing. At `session.start` the mod's `server-check.ts`
+  asks the engine to connect the `omca` server and, when it is not connected, writes one line
+  to the transcript: that bun is not on PATH, or the engine's reason with a pointer to `/mcp`.
+  On the launch session's first prompt, the server's `mod-notice` handler answers with a
+  `systemMessage` when the mod has written no marker for the session. A session that `/clear`
+  starts is marked only at its first `turn.start`, after the prompt hook, so the handler never
+  judges it (measured on 2.1.288). `OMCA_DISABLED_HOOKS=mod-notice` silences the server's line.
 - `SessionStart` for `clear` or `compact` routes to the server's `session-start` handler,
   which re-injects that context after a compaction and hands it back to the next prompt
   after `/clear`. The mod's `session.compact` feature (`compact.ts`) tells the summarizer to
