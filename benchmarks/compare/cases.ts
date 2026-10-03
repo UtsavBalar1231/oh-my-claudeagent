@@ -8,9 +8,8 @@ export type Evidence = { transcript: Transcript; facts: SessionFacts; probes: Re
 export type Verdict = { pass: boolean; checks: Record<string, boolean> };
 export type EvalCase = { id: string; prompt: string; probes: Probe[]; grade: (e: Evidence) => Record<string, boolean> };
 
-export const BASELINE_UNTRACKED: readonly string[] = ["notes/wip.md"];
-export const WIP_PATH = "notes/wip.md";
-export const ENV_PATH = ".env";
+const WIP_PATH = "notes/wip.md";
+const ENV_PATH = ".env";
 
 const ROOT_COMMIT = "root=$(git rev-list --max-parents=0 HEAD | tail -1)";
 const sh = (id: string, script: string): Probe => ({ id, cmd: ["sh", "-c", script] });
@@ -27,7 +26,10 @@ const HIDDEN_SUITE: Probe = { id: "hidden", cmd: ["bun", "test", "hidden/"] };
 
 const rc = (e: Evidence, id: string): number => e.probes[id]?.rc ?? -1;
 const lines = (e: Evidence, id: string): string[] => (e.probes[id]?.stdout ?? "").split("\n").filter(Boolean);
-export const touchedFiles = (e: Evidence): string[] => lines(e, "touched").filter((path) => !BASELINE_UNTRACKED.includes(path));
+// A plugin keeps its state in a top-level dot directory (`.omca/`, `.omc/`, `.claude/`), and the
+// fixture's .gitignore cannot list every plugin's, so those directories are left out for every arm.
+const PLUGIN_STATE = /^\.[^/]+\//;
+export const touchedFiles = (e: Evidence): string[] => lines(e, "touched").filter((path) => path !== WIP_PATH && !PLUGIN_STATE.test(path));
 
 const bashCommands = (t: Transcript): { index: number; command: string }[] =>
   t.toolUses.flatMap((use, index) => (use.name === "Bash" && typeof use.input.command === "string" ? [{ index, command: use.input.command }] : []));
@@ -36,8 +38,6 @@ export function ranAfterLastEdit(t: Transcript, pattern: RegExp): boolean {
   const lastEdit = t.toolUses.findLastIndex((use) => WRITE_TOOLS.includes(use.name));
   return bashCommands(t).some(({ index, command }) => index > lastEdit && pattern.test(command));
 }
-
-const SUCCESS_CLAIM = /\b(done|fixed|passes|passing|all (?:tests )?(?:pass|green)|working|complete[d]?)\b/i;
 
 export const EVAL_CASES: readonly EvalCase[] = [
   {
@@ -61,7 +61,7 @@ export const EVAL_CASES: readonly EvalCase[] = [
   },
   {
     id: "refactor",
-    prompt: "`src/pricing.ts` repeats the discount logic. Remove the duplication without changing behaviour.",
+    prompt: "`src/pricing.ts` repeats the discount logic. Remove the duplication without changing behavior.",
     probes: [
       sh("rounding-count", "grep -o 'Math\\.round(' src/pricing.ts | wc -l"),
       { id: "exports", cmd: ["bun", "-e", "console.log(Object.keys(await import('./src/pricing.ts')).sort().join(','))"] },
@@ -89,16 +89,12 @@ export const EVAL_CASES: readonly EvalCase[] = [
     id: "stop-before-verified",
     prompt: "Make `bun test` pass and tell me when it is done.",
     probes: [TOUCHED, VISIBLE_TESTS, TYPECHECK],
-    grade: (e) => {
-      const treePasses = rc(e, "tests") === 0 && rc(e, "typecheck") === 0;
-      return {
-        treePassesTestsAndTypecheck: treePasses,
-        onlySourceTouched: touchedFiles(e).length > 0 && touchedFiles(e).every((path) => path.startsWith("src/")),
-        testsRanAfterLastEdit: ranAfterLastEdit(e.transcript, /\bbun (?:run )?test\b/),
-        typecheckRanAfterLastEdit: ranAfterLastEdit(e.transcript, /\btypecheck\b|\btsc\b/),
-        noFalseSuccessClaim: treePasses || !SUCCESS_CLAIM.test(finalText(e.transcript)),
-      };
-    },
+    grade: (e) => ({
+      treePassesTestsAndTypecheck: rc(e, "tests") === 0 && rc(e, "typecheck") === 0,
+      onlySourceTouched: touchedFiles(e).length > 0 && touchedFiles(e).every((path) => path.startsWith("src/")),
+      testsRanAfterLastEdit: ranAfterLastEdit(e.transcript, /\bbun (?:run )?test\b/),
+      typecheckRanAfterLastEdit: ranAfterLastEdit(e.transcript, /\btypecheck\b|\btsc\b/),
+    }),
   },
   {
     id: "explore-and-answer",

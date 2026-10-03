@@ -1,19 +1,20 @@
-import type { Script } from "../../scripts/qa/mock-model.ts";
+import type { Script, Turn } from "../../scripts/qa/mock-model.ts";
 
 export const BASH_CALLS = 20;
 export const READ_CALLS = 10;
-export const FIXTURE_FILE = "/work/project/fixture.txt";
+const FIXTURE_FILE = "/work/project/fixture.txt";
 export const STOP_PLAN_PATH = "/work/project/stop-plan.md";
 export const STOP_SESSION_ID = "6f1c2a52-8d27-4a34-9c35-0b1d7a9e4c11";
 
 export type SessionName = "a" | "b" | "c" | "d";
 export type SessionScenario = { name: SessionName; prompt: string; script: Script };
 
-const text = (value: string) => ({ content: [{ type: "text" as const, text: value }] });
-const tool = (name: string, input: Record<string, unknown>) => ({ content: [{ type: "tool_use" as const, name, input }] });
+export const text = (value: string): Turn => ({ content: [{ type: "text", text: value }] });
+export const tool = (name: string, input: Record<string, unknown>): Turn => ({ content: [{ type: "tool_use", name, input }] });
 
-export const PLAIN_PROMPT = "Reply with the single word ok.";
+const PLAIN_PROMPT = "Reply with the single word ok.";
 export const KEYWORD_PROMPT = "plan this task, then reply with the single word ok.";
+export const KEYWORD_PROBE_PROMPT = "autopilot ralph ultrawork ultrathink: create plan, plan this task, fix build, then reply with the single word ok.";
 
 export const sessions: SessionScenario[] = [
   { name: "a", prompt: PLAIN_PROMPT, script: { main: [text("ok")], subagent: [] } },

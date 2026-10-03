@@ -2,7 +2,7 @@ import { copyFileSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { HERE } from "./harness.ts";
 
-export const EVAL_FIXTURES = join(HERE, "fixtures", "eval");
+const EVAL_FIXTURES = join(HERE, "fixtures", "eval");
 const SUFFIX = ".fixture";
 
 export function materialize(source: string, dest: string): void {

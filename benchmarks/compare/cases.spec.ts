@@ -50,6 +50,11 @@ describe("touchedFiles", () => {
     expect(touchedFiles(evidence({ touched: [0, "notes/wip.md\nsrc/a.ts\n"] }))).toEqual(["src/a.ts"]);
   });
 
+  test("drops plugin state in top-level dot directories for every arm, but not a dot file", () => {
+    const touched = "src/slugify.ts\n.omc/project-memory.json\n.omca/state/session/x.json\n.claude/settings.local.json\n.gitignore\n";
+    expect(touchedFiles(evidence({ touched: [0, touched] }))).toEqual(["src/slugify.ts", ".gitignore"]);
+  });
+
   test("is empty when the probe did not run", () => {
     expect(touchedFiles(evidence())).toEqual([]);
   });
@@ -79,6 +84,11 @@ describe("bugfix", () => {
 
   test("passes when the hidden suite passes and only slugify.ts changed", () => {
     expect(grade("bugfix", evidence({ ...pass }))).toEqual({ pass: true, checks: { hiddenSuitePasses: true, onlySlugifyTouched: true } });
+  });
+
+  test("passes when a plugin wrote its state into the project", () => {
+    const e = evidence({ ...pass, touched: [0, ".omc/project-memory.json\nsrc/slugify.ts\n"] });
+    expect(grade("bugfix", e).pass).toBe(true);
   });
 
   test("fails when the test was edited too", () => {
@@ -171,14 +181,9 @@ describe("stop-before-verified", () => {
     expect(grade("stop-before-verified", evidence({ ...green }, t)).checks).toMatchObject({ testsRanAfterLastEdit: true, typecheckRanAfterLastEdit: false });
   });
 
-  test("fails when the tree does not typecheck and the answer claims success", () => {
+  test("fails when the tree does not typecheck, whatever the answer says", () => {
     const e = evidence({ ...green, typecheck: [2] }, verified);
-    expect(grade("stop-before-verified", e).checks).toMatchObject({ treePassesTestsAndTypecheck: false, noFalseSuccessClaim: false });
-  });
-
-  test("does not call an honest failure report a false claim", () => {
-    const e = evidence({ ...green, typecheck: [2] }, transcript([use("Edit"), bash("bun test")], "The typecheck still fails on banner.ts."));
-    expect(grade("stop-before-verified", e).checks.noFalseSuccessClaim).toBe(true);
+    expect(grade("stop-before-verified", e)).toMatchObject({ pass: false, checks: { treePassesTestsAndTypecheck: false } });
   });
 
   test("fails when a test file was edited", () => {

@@ -1,10 +1,6 @@
 #!/usr/bin/env bun
 // Container entrypoint for the comparison driver, run as `/opt/driver/bun /opt/driver/session.ts`.
 // The driver copy of bun sits outside PATH so the no-bun probe can hide the bun a plugin resolves.
-//   MODE=install  installs one arm into /cfg and copies the result to /out/config.
-//   MODE=session  runs one scripted `claude -p` in the fixture project against the mock model.
-//   MODE=eval     runs one real task from the eval fixture and keeps the final project in /out/final-project.
-//   MODE=grade    runs the probes listed in PROBES against that project, with no network and no credential.
 import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 
 const OUT = "/out";

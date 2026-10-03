@@ -57,8 +57,7 @@
       ],
       "details": [
         "claude-code-harness"
-      ],
-      "platform": "linux/amd64 only"
+      ]
     },
     {
       "id": "ruflo",
@@ -79,15 +78,13 @@
         "ruflo-swarm",
         "ruflo-mods"
       ],
-      "preseed": "none: hooks fall back to npx and the network is closed, so the offline failure is recorded as a finding",
       "limited": {
         "sessions": [
           "b",
           "c"
         ],
         "rounds": 2,
-        "timeoutS": 90,
-        "reason": "each Bash call blocks on an offline npx fallback in the PreToolUse and PostToolUse hooks"
+        "timeoutS": 90
       },
       "inEval": false
     },
@@ -110,7 +107,6 @@
         "ruflo-swarm",
         "ruflo-mods"
       ],
-      "preseed": "npm install -g ruflo@3.51.1 in Dockerfile.ruflo-seed, so the hooks and the MCP launcher find a local ruflo binary",
       "imageVariant": "ruflo-seed"
     },
     {
@@ -138,8 +134,7 @@
         "pluginName": "superpowers",
         "repo": "https://github.com/obra/superpowers",
         "sha": "8ca22dba9a94f28898bbce59f2537ff4d87c747d",
-        "version": "6.4.2",
-        "note": "obra/superpowers-marketplace has no commit that pins 6.4.2: its HEAD (ff9fa8a) pins 6.3.0 and its plugin source is an unpinned git URL. The arm keeps the marketplace name so the id matches, and installs the plugin from the v6.4.2 tag commit."
+        "version": "6.4.2"
       },
       "install": [
         "superpowers@superpowers-marketplace"

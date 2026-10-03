@@ -1,9 +1,9 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, renameSync, rmSync, writeFileSync, writeSync } from "node:fs";
 import { join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { median } from "./analyze.ts";
 import { type EvalCase, EVAL_CASES, type Probe, type ProbeResult, type SessionFacts, type Verdict, verdictOf } from "./cases.ts";
-import { addLoad, fixedOverhead, type Load, runLoad, TASK_SHAPES, weighted, ZERO_LOAD, FALLBACK_FIXED_TOKENS } from "./cost.ts";
+import { fixedOverhead, itemsLoad, weighted, FALLBACK_FIXED_TOKENS } from "./cost.ts";
 import { readTokenFile, redact, TOKEN_FILE_ENV, TokenFileError } from "./credential.ts";
 import { type Attempt, ALLOWED_ENDPOINTS, startEgressProxy } from "./egress.ts";
 import { prepareCaseFixture } from "./eval-fixture.ts";
@@ -15,6 +15,7 @@ import {
   DRIVER_COMMAND,
   DRIVER_MOUNT,
   DUMMY_TOKEN,
+  dockerRun,
   ensureNetwork,
   imageFor,
   LABEL,
@@ -25,10 +26,10 @@ import {
   treeDir,
 } from "./harness.ts";
 import { REFERENCE } from "./reference.ts";
+import { text, tool } from "./scenarios.ts";
 import { finalText, hitUsageLimit, parseTranscript, type Usage } from "./transcript.ts";
 import type { Script } from "../../scripts/qa/mock-model.ts";
 
-export const DEFAULT_RUNS_PER_CASE = 3;
 export const DEFAULT_BATCH_SIZE = 12;
 export const DEFAULT_MODEL = "claude-sonnet-5-5";
 export const DEFAULT_MAX_TURNS = 100;
@@ -36,7 +37,7 @@ export const DEFAULT_BUDGET_USD = 2;
 export const DEFAULT_TIMEOUT_S = 600;
 const PLUGIN_TURN_FACTOR = 1.3;
 const CONSECUTIVE_INFRA_FAILURES = 2;
-const SCRUB_LIMIT_BYTES = 8 * 1024 * 1024;
+const SCRUB_CHUNK_BYTES = 1024 * 1024;
 const EXIT_USAGE_LIMIT = 3;
 
 export type WorkItem = { arm: string; caseId: string; run: number };
@@ -55,11 +56,7 @@ export function workList(arms: readonly string[], caseIds: readonly string[], ru
 export type Estimate = { requests: number; input: number; output: number; load: number };
 
 function estimateItems(items: readonly WorkItem[], overheads: Readonly<Record<string, number>>, turnFactor: number): Estimate {
-  const total = items.reduce<Load>((sum, item) => {
-    const shape = TASK_SHAPES[item.caseId];
-    if (shape === undefined) throw new Error(`no task shape for case ${item.caseId}`);
-    return addLoad(sum, runLoad(shape, overheads[item.arm] ?? FALLBACK_FIXED_TOKENS, item.arm === "baseline" ? 1 : turnFactor));
-  }, ZERO_LOAD);
+  const total = itemsLoad(items, overheads, turnFactor);
   return { requests: total.requests, input: total.cacheRead + total.cacheWrite + total.uncached, output: total.output, load: weighted(total) };
 }
 
@@ -127,7 +124,7 @@ export function renderPlan(plan: Plan, tokenFile: string | null): string {
   return [
     "Eval plan",
     ...rows.map(([label, value]) => `  ${label.padEnd(18)}${value}`),
-    `  The first figure keeps every arm at the measured request counts; the second gives each plugin arm ${Math.round((PLUGIN_TURN_FACTOR - 1) * 100)} percent more turns.${plan.overheadsMeasured ? "" : ` No hermetic results were found, so every arm is assumed to add ${FALLBACK_FIXED_TOKENS.toLocaleString("en-US")} tokens per request.`}`,
+    `  The first figure keeps every arm at the assumed request counts; the second gives each plugin arm ${Math.round((PLUGIN_TURN_FACTOR - 1) * 100)} percent more turns.${plan.overheadsMeasured ? "" : ` No hermetic results were found, so every arm is assumed to add ${FALLBACK_FIXED_TOKENS.toLocaleString("en-US")} tokens per request.`}`,
     "  The subscription's own weighting of usage is not published; compare the load against the share of the usage window the first batch consumes.",
   ].join("\n");
 }
@@ -188,12 +185,6 @@ export function gradeCommand(file: ArmsFile, out: string, hidden: string | null,
   return { argv, env: {} };
 }
 
-async function dockerRun(command: DockerCommand): Promise<{ rc: number; stderr: string }> {
-  const proc = Bun.spawn(command.argv, { stdout: "pipe", stderr: "pipe", stdin: "ignore", env: { ...process.env, ...command.env } });
-  const [rc, , stderr] = await Promise.all([proc.exited, new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
-  return { rc, stderr };
-}
-
 export type RunRecord = {
   arm: string;
   caseId: string;
@@ -221,14 +212,44 @@ export function loadRecords(runsDir: string): RunRecord[] {
     .map((path) => JSON.parse(readFileSync(join(root, path), "utf8")) as RunRecord);
 }
 
-export function scrub(dir: string, token: string): void {
-  for (const relative of new Bun.Glob("**/*").scanSync({ cwd: dir, dot: true, onlyFiles: true })) {
-    const path = join(dir, relative);
-    const size = Bun.file(path).size;
-    if (size === 0 || size > SCRUB_LIMIT_BYTES) continue;
-    const text = readFileSync(path, "utf8");
-    if (text.includes(token)) writeFileSync(path, redact(text, token));
+// Streams the file in chunks, holding back the last token length minus one bytes of each chunk so
+// a token split across two chunks is still found. Bytes are compared, so binary files survive.
+function redactFile(path: string, token: Buffer, replacement: Buffer): void {
+  const input = openSync(path, "r");
+  const temp = `${path}.scrub`;
+  const output = openSync(temp, "w");
+  let found = false;
+  try {
+    const chunk = Buffer.alloc(SCRUB_CHUNK_BYTES);
+    let pending = Buffer.alloc(0);
+    for (;;) {
+      const read = readSync(input, chunk, 0, chunk.length, null);
+      const data = Buffer.concat([pending, chunk.subarray(0, read)]);
+      const safeEnd = read === 0 ? data.length : Math.max(0, data.length - (token.length - 1));
+      let at = 0;
+      for (let hit = data.indexOf(token); hit !== -1 && hit < safeEnd; hit = data.indexOf(token, at)) {
+        writeSync(output, data.subarray(at, hit));
+        writeSync(output, replacement);
+        at = hit + token.length;
+        found = true;
+      }
+      const keepFrom = Math.max(at, safeEnd);
+      writeSync(output, data.subarray(at, keepFrom));
+      pending = data.subarray(keepFrom);
+      if (read === 0) break;
+    }
+  } finally {
+    closeSync(input);
+    closeSync(output);
   }
+  if (found) renameSync(temp, path);
+  else rmSync(temp);
+}
+
+export function scrub(dir: string, token: string): void {
+  const needle = Buffer.from(token);
+  const replacement = Buffer.from(redact(token, token));
+  for (const relative of new Bun.Glob("**/*").scanSync({ cwd: dir, dot: true, onlyFiles: true })) redactFile(join(dir, relative), needle, replacement);
 }
 
 const readJson = <T>(path: string, fallback: T): T => (existsSync(path) ? (JSON.parse(readFileSync(path, "utf8")) as T) : fallback);
@@ -249,7 +270,17 @@ export type EvalContext = {
 
 type Outcome = { kind: "recorded"; record: RunRecord } | { kind: "usage-limit" } | { kind: "infra-failure"; detail: string };
 
-export async function runItem(ctx: EvalContext, item: WorkItem, evalCase: EvalCase, scripts?: Script): Promise<Outcome> {
+async function runItem(ctx: EvalContext, item: WorkItem, evalCase: EvalCase, scripts?: Script): Promise<Outcome> {
+  const secret = ctx.backend.kind === "max" ? ctx.backend.token : null;
+  try {
+    return await recordItem(ctx, item, evalCase, scripts);
+  } finally {
+    const out = runDir(ctx.runsDir, item);
+    if (secret !== null && existsSync(out)) scrub(out, secret);
+  }
+}
+
+async function recordItem(ctx: EvalContext, item: WorkItem, evalCase: EvalCase, scripts?: Script): Promise<Outcome> {
   const arm = ctx.file.arms.find((a) => a.id === item.arm) as Arm;
   const out = runDir(ctx.runsDir, item);
   rmSync(out, { recursive: true, force: true });
@@ -266,7 +297,8 @@ export async function runItem(ctx: EvalContext, item: WorkItem, evalCase: EvalCa
   const secret = backend.kind === "max" ? backend.token : null;
   let session: { rc: number; stderr: string };
   try {
-    session = await dockerRun(sessionCommand({ file: ctx.file, arm, prompt: evalCase.prompt, out, project: fixture.project, model: ctx.model, effort: ctx.effort, maxTurns: ctx.maxTurns, budgetUsd: ctx.budgetUsd, timeoutS: ctx.timeoutS, backend }));
+    const command = sessionCommand({ file: ctx.file, arm, prompt: evalCase.prompt, out, project: fixture.project, model: ctx.model, effort: ctx.effort, maxTurns: ctx.maxTurns, budgetUsd: ctx.budgetUsd, timeoutS: ctx.timeoutS, backend });
+    session = await dockerRun(command.argv, command.env);
   } finally {
     await endpoint?.stop();
   }
@@ -282,7 +314,7 @@ export async function runItem(ctx: EvalContext, item: WorkItem, evalCase: EvalCa
 
   const facts = readJson<SessionFacts | null>(join(out, "session-facts.json"), null);
   if (facts !== null && evalCase.probes.length > 0) {
-    const grade = await dockerRun(gradeCommand(ctx.file, out, fixture.hidden, evalCase.probes));
+    const grade = await dockerRun(gradeCommand(ctx.file, out, fixture.hidden, evalCase.probes).argv);
     if (grade.rc !== 0) ctx.log(`grade container for ${itemKey(item)} exited ${grade.rc}`);
   }
   const probes = Object.fromEntries(readJson<ProbeResult[]>(join(out, "probes.json"), []).map((p) => [p.id, p]));
@@ -304,7 +336,6 @@ export async function runItem(ctx: EvalContext, item: WorkItem, evalCase: EvalCa
     finalText: safe(finalText(transcript)).slice(0, 2000),
   };
   if (!ctx.keepRaw) rmSync(join(out, "final-project"), { recursive: true, force: true });
-  if (secret !== null) scrub(out, secret);
   writeFileSync(join(out, "result.json"), `${JSON.stringify(record, null, 1)}\n`);
   return { kind: "recorded", record };
 }
@@ -398,6 +429,21 @@ export function selectCases(ids: readonly string[]): EvalCase[] {
   return ids.length === 0 ? [...EVAL_CASES] : EVAL_CASES.filter((c) => ids.includes(c.id));
 }
 
+export function resumeCommand(o: Pick<EvalOptions, "date" | "armIds" | "caseIds" | "runsPerCase" | "batchSize" | "model" | "effort" | "maxTurns" | "budgetUsd" | "timeoutS">): string {
+  const flags = [
+    ...o.armIds.flatMap((arm) => ["--arm", arm]),
+    ...o.caseIds.flatMap((id) => ["--case", id]),
+    "--runs-per-case", String(o.runsPerCase),
+    "--batch-size", String(o.batchSize),
+    "--model", o.model,
+    ...(o.effort === null ? [] : ["--effort", o.effort]),
+    "--max-turns", String(o.maxTurns),
+    "--max-budget-usd", String(o.budgetUsd),
+    "--timeout", String(o.timeoutS),
+  ];
+  return ["bun benchmarks/compare/run.ts eval --real --date", o.date, ...flags, "--token-file <file>"].join(" ");
+}
+
 export async function runEval(o: EvalOptions): Promise<number> {
   const cases = selectCases(o.caseIds);
   const armIds = o.file.arms.filter((a) => a.inEval !== false && (o.armIds.length === 0 || o.armIds.includes(a.id))).map((a) => a.id);
@@ -484,16 +530,15 @@ export async function runEval(o: EvalOptions): Promise<number> {
     await proxy.stop();
   }
   reportLeftovers(o.log);
-  const recorded = loadRecords(o.runsDir).length;
+  const keys = new Set(loadRecords(o.runsDir).map(itemKey));
+  const recorded = list.filter((item) => keys.has(itemKey(item))).length;
   const remaining = plan.total - recorded;
   o.log(`Batch used ${fmtM(used)}M input-token equivalents against an estimate of ${fmtM(plan.batchEstimate[0].load)}M to ${fmtM(plan.batchEstimate[1].load)}M. ${recorded} of ${plan.total} runs are recorded, ${remaining} left.`);
-  if (remaining > 0) o.log(`Resume with: bun benchmarks/compare/run.ts eval --real --date ${o.date} --token-file <file>`);
+  if (remaining > 0) o.log(`Resume with: ${resumeCommand(o)}`);
   writeEvalReport({ runsDir: o.runsDir, model: o.model, log: o.log }, armIds, plan.caseIds, o.date, o.resultsDir);
   return exit;
 }
 
-const tool = (name: string, input: Record<string, unknown>): { content: [{ type: "tool_use"; name: string; input: Record<string, unknown> }] } => ({ content: [{ type: "tool_use", name, input }] });
-const text = (value: string): { content: [{ type: "text"; text: string }] } => ({ content: [{ type: "text", text: value }] });
 const PROJECT_ROOT = "/work/project";
 
 export function rehearsalScript(caseId: string, outcome: "solve" | "idle"): Script {

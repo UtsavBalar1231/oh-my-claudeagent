@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import { packageTree } from "../../scripts/package.ts";
 import { type Script, startServer } from "../../scripts/qa/mock-model.ts";
+import { isRecord } from "../../src/core/tool-input.ts";
 
 export const HERE = import.meta.dir;
 const REPO = join(HERE, "..", "..");
@@ -11,11 +12,12 @@ export const LABEL = "omca-compare=1";
 export const DRIVER_COMMAND = ["/opt/driver/bun", "/opt/driver/session.ts"];
 export const DRIVER_MOUNT = `${join(HERE, "session.ts")}:/opt/driver/session.ts:ro`;
 export const DUMMY_TOKEN = "mock-token";
+export const SESSION_TIMEOUT_S = 150;
 
 export type TreeSpec =
   | { kind: "local-head"; marketplaceName: string }
   | { kind: "repo"; repo: string; sha: string; version: string }
-  | { kind: "synthetic-single"; marketplaceName: string; pluginName: string; repo: string; sha: string; version: string; note: string };
+  | { kind: "synthetic-single"; marketplaceName: string; pluginName: string; repo: string; sha: string; version: string };
 
 export type Arm = {
   id: string;
@@ -23,11 +25,9 @@ export type Arm = {
   tree: TreeSpec | null;
   install: string[];
   details: string[];
-  platform?: string;
-  preseed?: string;
   imageVariant?: string;
   inEval?: false;
-  limited?: { sessions: string[]; rounds: number; timeoutS: number; reason: string };
+  limited?: { sessions: string[]; rounds: number; timeoutS: number };
 };
 
 export type ArmsFile = { claude: string; network: { name: string; subnet: string; gateway: string }; arms: Arm[] };
@@ -52,7 +52,7 @@ export function run(cmd: string[], options: { cwd?: string; env?: Record<string,
 
 export const treeDir = (armId: string): string => join(CACHE, "trees", armId);
 export const templateDir = (armId: string): string => join(CACHE, "work", armId, "config");
-export const installOutDir = (armId: string): string => join(CACHE, "work", armId, "install-out");
+const installOutDir = (armId: string): string => join(CACHE, "work", armId, "install-out");
 
 const repoCheckout = (repo: string): string => join(CACHE, "repos", basename(repo));
 
@@ -161,8 +161,6 @@ export type SessionResult = {
   stderr: string;
 };
 
-const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
-
 export function readText(path: string): string {
   return existsSync(path) ? readFileSync(path, "utf8") : "";
 }
@@ -216,6 +214,12 @@ export function startMockEndpoint(file: ArmsFile, script: Script, accessLogPath:
   };
 }
 
+export async function dockerRun(argv: string[], env: Record<string, string> = {}): Promise<{ rc: number; stderr: string }> {
+  const proc = Bun.spawn(argv, { stdout: "pipe", stderr: "pipe", stdin: "ignore", env: { ...process.env, ...env } });
+  const [rc, , stderr] = await Promise.all([proc.exited, new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
+  return { rc, stderr };
+}
+
 export async function runSession(file: ArmsFile, spec: SessionSpec): Promise<SessionResult> {
   rmSync(spec.out, { recursive: true, force: true });
   mkdirSync(spec.out, { recursive: true });
@@ -242,8 +246,7 @@ export async function runSession(file: ArmsFile, spec: SessionSpec): Promise<Ses
     docker.push("-v", `${templateDir(spec.arm.id)}:/template:ro`, "-v", `${treeDir(spec.arm.id)}:/market/${spec.arm.id}:ro`);
   }
   docker.push(...(spec.dockerArgs ?? []), imageFor(file, spec.arm), ...DRIVER_COMMAND);
-  const proc = Bun.spawn(docker, { stdout: "pipe", stderr: "pipe", stdin: "ignore" });
-  const [dockerRc, , stderr] = await Promise.all([proc.exited, new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
+  const { rc: dockerRc, stderr } = await dockerRun(docker);
   await endpoint.stop();
   const metaText = readText(join(spec.out, "meta.json"));
   return {
@@ -275,8 +278,7 @@ export async function runInstall(file: ArmsFile, arm: Arm, options: { snap: bool
   };
   for (const [key, value] of Object.entries(env)) docker.push("-e", `${key}=${value}`);
   docker.push("-v", `${out}:/out`, "-v", `${treeDir(arm.id)}:/market/${arm.id}:ro`, "-v", DRIVER_MOUNT, imageFor(file, arm), ...DRIVER_COMMAND);
-  const proc = Bun.spawn(docker, { stdout: "pipe", stderr: "pipe", stdin: "ignore" });
-  const [dockerRc, , stderr] = await Promise.all([proc.exited, new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
+  const { rc: dockerRc, stderr } = await dockerRun(docker);
   const stepsText = readText(join(out, "install", "steps.jsonl"));
   const steps = stepsText
     .split("\n")

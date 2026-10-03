@@ -14,6 +14,7 @@ import {
   renderEvalReport,
   renderPlan,
   rehearsalPasses,
+  resumeCommand,
   rehearsalScript,
   type RunRecord,
   scrub,
@@ -82,7 +83,7 @@ describe("buildPlan", () => {
     expect(plan.batch.map(itemKey)).toEqual(["plug/bugfix/0", "plug/explore-and-answer/0"]);
   });
 
-  test("estimates a batch at the measured request counts and with plugin turns scaled", () => {
+  test("estimates a batch at the assumed request counts and with plugin turns scaled", () => {
     const plan = buildPlan(input({ done: new Set(["baseline/bugfix/0"]), batchSize: 1 }));
     expect(plan.batch.map(itemKey)).toEqual(["plug/bugfix/0"]);
     expect(plan.batchEstimate.map((e) => e.requests)).toEqual([16, 21]);
@@ -252,6 +253,35 @@ describe("scrub", () => {
     expect(readFileSync(join(dir, "a.txt"), "utf8")).toBe("line [redacted] end\n");
     expect(readFileSync(join(dir, "sub", "b.jsonl"), "utf8")).toBe('{"env":"[redacted]"}\n{"x":1}\n');
     expect(readFileSync(join(dir, "clean.txt"), "utf8")).toBe("nothing\n");
+  });
+
+  test("redacts a file of any size, including a token split across two read chunks", () => {
+    const dir = scratch();
+    const chunk = 1024 * 1024;
+    const big = `${"a".repeat(chunk - 5)}${FAKE_TOKEN}${"b".repeat(chunk * 9)}${FAKE_TOKEN}`;
+    writeFileSync(join(dir, "transcript.jsonl"), big);
+    scrub(dir, FAKE_TOKEN);
+    const after = readFileSync(join(dir, "transcript.jsonl"), "utf8");
+    expect(after.includes(FAKE_TOKEN)).toBe(false);
+    expect(after.length).toBe(big.length - 2 * (FAKE_TOKEN.length - "[redacted]".length));
+    expect(existsSync(join(dir, "transcript.jsonl.scrub"))).toBe(false);
+  });
+
+  test("leaves the bytes of a binary file without the token unchanged", () => {
+    const dir = scratch();
+    const bytes = Uint8Array.from([0, 255, 254, 10, 13, 128]);
+    writeFileSync(join(dir, "blob.bin"), bytes);
+    scrub(dir, FAKE_TOKEN);
+    expect([...readFileSync(join(dir, "blob.bin"))]).toEqual([...bytes]);
+  });
+});
+
+describe("resumeCommand", () => {
+  test("repeats every flag that shapes the suite", () => {
+    const options = { date: "2026-10-09", armIds: ["omca", "baseline"], caseIds: ["bugfix"], runsPerCase: 2, batchSize: 4, model: "m", effort: "high", maxTurns: 50, budgetUsd: 1.5, timeoutS: 300 };
+    expect(resumeCommand(options)).toBe(
+      "bun benchmarks/compare/run.ts eval --real --date 2026-10-09 --arm omca --arm baseline --case bugfix --runs-per-case 2 --batch-size 4 --model m --effort high --max-turns 50 --max-budget-usd 1.5 --timeout 300 --token-file <file>",
+    );
   });
 });
 

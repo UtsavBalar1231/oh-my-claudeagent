@@ -1,0 +1,15 @@
+{
+  "fixture": "single-file-edit",
+  "arm": "B",
+  "commit": "9bda59d1eae98c17a9cf01725cad6373289aad74",
+  "candidate_file": "agents/executor.md",
+  "trial_index": 2,
+  "exit_code": 0,
+  "lines_added": 1,
+  "lines_deleted": 0,
+  "files_touched": 1,
+  "verdict": "pass",
+  "verdict_reason": "comment present on line 2 of scripts/session-init.sh, no other line changed, validate-plugin.sh exit 0",
+  "plugin_root": "<worktree>/skills",
+  "duration_seconds": 12
+}

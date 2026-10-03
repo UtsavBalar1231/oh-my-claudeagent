@@ -1,0 +1,15 @@
+{
+  "fixture": "diff-latitude",
+  "arm": "A",
+  "commit": "e0f46f737f5a023ca16a7b8a9c73c9cc6ec4aec8",
+  "candidate_file": null,
+  "trial_index": 1,
+  "exit_code": 0,
+  "lines_added": 58,
+  "lines_deleted": 4,
+  "files_touched": 2,
+  "verdict": "pass",
+  "verdict_reason": "filter lists only planning, bare run lists every task",
+  "plugin_root": "<worktree>/skills",
+  "duration_seconds": 88
+}

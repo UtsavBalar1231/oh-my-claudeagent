@@ -15,11 +15,23 @@ tests/evals/
     multi-file-search.json
     bug-fix.json
     planning.json
-    research.json
     diff-latitude.json
+  unscored/          fixtures whose criteria need judgment, kept out of tasks/
+    research.json
   results/           trial records, one JSON file per trial
+    pre-1255d95/     every batch recorded before the fixtures were rewritten
     turn-count.txt   running total of live trial turns
 ```
+
+Every recorded batch sits under `results/pre-1255d95/`. Those trials ran against the
+fixtures as they stood before commit 1255d95, which rewrote `bug-fix`, `single-file-edit`,
+`multi-file-search` and `research`; `pre-1255d95/baseline/summary.json` still scores
+`bug-fix` against the old target. No comparison may use them. Record a new baseline
+under `results/baseline/` before measuring anything against the current fixtures.
+
+`unscored/research.json` is not listed by `eval-tasks.ts`. Its criteria (real external
+sources, a comparison grounded in the handler, an actionable finding) need a reader's
+judgment, and the procedure below keeps no transcript to check cited URLs against.
 
 ## Task definition schema
 
@@ -64,7 +76,7 @@ directory. Build a throwaway worktree, run the turn inside it, read the diff, th
 remove it.
 
 ```bash
-REPO=/home/utsav/dev/softs/oh-my-claudeagent
+REPO=$(git rev-parse --show-toplevel)
 WT=$(mktemp -d "${TMPDIR:-/tmp}/eval-XXXXXX")/wt
 COMMIT=$(git -C "$REPO" rev-parse HEAD)
 FIXTURE=diff-latitude
@@ -107,16 +119,15 @@ Every detail in that snippet is load-bearing:
 - `--plugin-dir "$WT"` points the run at the worktree's own copy of the plugin. The
   installed marketplace copy also loads in a `claude -p` session. Confirm which root
   served the run by reading the `skillsPath` value from the debug log, and record it in
-  the trial record. Measured on this harness, `--plugin-dir` wins: every baseline trial
-  reported the worktree's own `skills` directory.
+  the trial record. Measured on this harness, `--plugin-dir` wins: every trial in
+  `results/pre-1255d95/baseline/` reported the worktree's own `skills` directory.
 - `--permission-mode bypassPermissions`, not `acceptEdits`. Under `acceptEdits` the
   client refused an Edit to a hook script belonging to a loaded plugin, and in headless
-  mode that refusal is final. That was measured while `single-file-edit` and `bug-fix`
-  targeted shell hook scripts. They now target `scripts/qa/mcp-live.ts` and
-  `src/core/keywords.ts`, which are not hook scripts. Whether `acceptEdits` would now
-  suffice is unmeasured, so bypass mode stays for comparability with the recorded trials.
+  mode that refusal is final. `single-file-edit` and `bug-fix` target
+  `scripts/qa/mcp-live.ts` and `src/core/keywords.ts`, which are not hook scripts, and
+  whether `acceptEdits` suffices for them is unmeasured, so bypass mode stays.
   Bypass mode is safe here only because the run is confined to a throwaway worktree.
-  Apply it to every fixture and every arm, so it cannot favour one arm.
+  Apply it to every fixture and every arm, so it cannot favor one arm.
 - The `env -u` list is mandatory. A nested `claude -p` inherits the parent session's
   identity and messaging variables, which pulls in the parent project's settings and
   makes the run something other than a fresh session. Dropping `CLAUDE_CODE_SESSION_ID`
@@ -132,8 +143,8 @@ Every detail in that snippet is load-bearing:
 - The worktree lives outside the repository. A worktree under the repo would be picked
   up by file searches and by `git status`.
 - `diff.patch` is kept so a trial can be re-scored without spending another live turn.
-  Two baseline fixtures were misscored by a scorer that was too narrow, and without a
-  saved diff the only remedy is a rerun.
+  A scorer that is too narrow misscores a fixture, and without a saved diff the only
+  remedy is a rerun.
 
 After a batch, print `jq '.bindings' .omca/state/boulder.json` from the main checkout
 and confirm this session's binding survived.
@@ -157,18 +168,24 @@ batch (`baseline`, or the label of the measurement being run). Fields:
 | Field | Meaning |
 |---|---|
 | `fixture` | the task file's `name` |
-| `arm` | opaque arm label, `A` or `B` |
+| `arm` | opaque arm label, an uppercase letter (`A`, `B`, `C`, ...), or `control` for an untreated reference turn |
 | `commit` | the commit the worktree was built from |
-| `candidate_file` | path of the prompt file copied into the worktree, or null |
-| `trial_index` | 1, 2 or 3 within this arm and fixture |
+| `candidate_file` | path of the prompt file copied into the worktree, space-separated when several were, or null |
+| `trial_index` | 1-based position of the trial within its arm and fixture |
 | `exit_code` | exit status of the `claude -p` turn |
 | `lines_added` | insertions from `git diff --shortstat` inside the worktree |
 | `lines_deleted` | deletions from the same command |
 | `files_touched` | number of rows from `git diff --numstat` inside the worktree |
 | `verdict` | `pass` or `fail` against the fixture's `success_criteria` |
 | `verdict_reason` | one line, naming the criterion that decided it |
-| `plugin_root` | the `skillsPath` the run actually loaded from |
+| `plugin_root` | the `skillsPath` the run actually loaded from, written as `<worktree>/skills`; empty or a note when it was not captured |
 | `duration_seconds` | wall clock for the turn |
+
+A batch may add measurements read from the turn's output. `pre-1255d95/read-edit-rebaseline`
+records no `plugin_root` and adds `silent_turn_reminders`, `main_tool_calls`,
+`agent_calls`, `text_blocks`, `num_turns`, `cost_usd`, `api_duration_ms`,
+`output_tokens`, `result_chars`, `read_calls`, `edit_calls` and `write_calls`.
+Name each added field in the batch's `summary.json`.
 
 `arm` is opaque on purpose. The mapping from arm label to what that arm contained lives
 in a file outside `results/`, so a verdict can be assigned without knowing which arm is

@@ -2,7 +2,30 @@
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
-import { blockedBy, breakdown, type Breakdown, diffSnapshots, tokens, totalChars, parseConnectTrace, parseExecveTrace, parseSnapshot, type SnapDiff } from "./analyze.ts";
+import {
+  blockedBy,
+  breakdown,
+  continuationAfterDone,
+  diffSnapshots,
+  filterDiff,
+  type FirstRunRecord,
+  type GuardRecord,
+  inSubnet,
+  type InstallRecord,
+  mainThread,
+  type NoBunRecord,
+  parseConnectTrace,
+  parseExecveTrace,
+  parseSnapshot,
+  type StopRecord,
+  type TimingRecord,
+  tokens,
+  toolResults,
+  type ToolSearchRecord,
+  totalChars,
+  typedDiff,
+  withoutSearchSuffixes,
+} from "./analyze.ts";
 import {
   type Arm,
   CACHE,
@@ -17,12 +40,14 @@ import {
   run,
   runInstall,
   runSession,
+  SESSION_TIMEOUT_S,
   type SessionResult,
   templateDir,
 } from "./harness.ts";
-import { type EvalOptions, DEFAULT_BATCH_SIZE, DEFAULT_BUDGET_USD, DEFAULT_MAX_TURNS, DEFAULT_MODEL, DEFAULT_RUNS_PER_CASE, DEFAULT_TIMEOUT_S, runEval, runRehearsal, selectCases, writeEvalReport } from "./eval.ts";
+import { DEFAULT_RUNS_PER_CASE } from "./cost.ts";
+import { type EvalOptions, DEFAULT_BATCH_SIZE, DEFAULT_BUDGET_USD, DEFAULT_MAX_TURNS, DEFAULT_MODEL, DEFAULT_TIMEOUT_S, runEval, runRehearsal, selectCases, writeEvalReport } from "./eval.ts";
 import { renderMarkdown } from "./report.ts";
-import { guardCases, guardScript, type GuardCase, sessions, STOP_PLAN_PATH, STOP_SESSION_ID, stopExpectedRequests, stopScript } from "./scenarios.ts";
+import { guardCases, guardScript, type GuardCase, KEYWORD_PROBE_PROMPT, sessions, STOP_PLAN_PATH, STOP_SESSION_ID, stopExpectedRequests, stopScript } from "./scenarios.ts";
 
 const USAGE = `Usage: bun benchmarks/compare/run.ts <command> [options]
 Commands: build, prepare, install, online, first-run, timing, toolsearch, keywords, guards, stop, nobun, report, all,
@@ -70,28 +95,11 @@ const writeJson = (name: string, value: unknown): void => writeFileSync(jsonPath
 const installed = (arm: Arm): boolean => arm.tree === null || existsSync(templateDir(arm.id));
 const lastOf = <T>(xs: T[]): T | undefined => xs[xs.length - 1];
 
-export type InstallRecord = {
-  arm: string;
-  ok: boolean;
-  steps: { step: number; cmd: string; rc: number; ms: number; error: string }[];
-  install_ms: number;
-  cache_bytes: number;
-  cache_files: number;
-  node_modules_files: number;
-  config_bytes: number;
-  details: Record<string, string>;
-  outside_plugin_dir: SnapDiff;
-  network: { hosts: string[]; connects: string[] };
-  settings_keys: string[];
-  online: { install_ms: number; cache_bytes: number; cache_files: number; node_modules_files: number; node_modules_bytes: number } | null;
-};
-
 const dirBytes = (path: string): number => (existsSync(path) ? Number(run(["du", "-sb", path]).split("\t")[0]) : 0);
 const fileCount = (path: string, extra: string[] = []): number =>
   existsSync(path) ? run(["find", path, ...extra, "-type", "f"]).split("\n").filter(Boolean).length : 0;
 
 const PLUGIN_DIR = "/cfg/plugins/cache/";
-const hostFilter = (hosts: string[]): string[] => hosts.filter((h) => !h.endsWith(".ts.net"));
 
 async function installStage(): Promise<void> {
   ensureNetwork(file);
@@ -109,7 +117,7 @@ async function installStage(): Promise<void> {
     const out = result.out;
     const steps = result.steps.map((s) => ({ ...s, error: readText(join(out, "install", `${s.step}.err`)).trim().slice(0, 600) }));
     const diff = diffSnapshots(parseSnapshot(readText(join(out, "snap-0-before.tsv"))), parseSnapshot(readText(join(out, "snap-1-after-install.tsv"))));
-    const keep = (paths: string[]): string[] => paths.filter((p) => !p.startsWith(PLUGIN_DIR));
+
     const config = templateDir(arm.id);
     const settings = readText(join(config, "settings.json"));
     const details: Record<string, string> = {};
@@ -126,8 +134,8 @@ async function installStage(): Promise<void> {
       node_modules_files: fileCount(join(config, "plugins", "cache"), ["-path", "*/node_modules/*"]),
       config_bytes: dirBytes(config),
       details,
-      outside_plugin_dir: { created: keep(diff.created), modified: keep(diff.modified), deleted: keep(diff.deleted) },
-      network: { hosts: hostFilter(network.hosts), connects: network.connects },
+      outside_plugin_dir: filterDiff(diff, (p) => !p.startsWith(PLUGIN_DIR)),
+      network: { hosts: withoutSearchSuffixes(network.hosts), connects: network.connects },
       settings_keys: settings === "" ? [] : Object.keys(JSON.parse(settings) as Record<string, unknown>),
       online: null,
     };
@@ -159,20 +167,6 @@ async function onlineStage(): Promise<void> {
   }
 }
 
-export type FirstRunRecord = {
-  arm: string;
-  rc: number;
-  debug_errors: number;
-  debug_error_samples: string[];
-  registered: string;
-  mods: { module: string; events: string }[];
-  session_diff: SnapDiff;
-  project_diff: SnapDiff;
-  network: { hosts: string[]; connects: string[] };
-  exec_a: { total: number; byExe: Record<string, number> } | null;
-  exec_b: { total: number; byExe: Record<string, number> } | null;
-};
-
 async function firstRunStage(): Promise<void> {
   ensureNetwork(file);
   const records = readJson<Record<string, FirstRunRecord>>("first-run", {});
@@ -183,7 +177,7 @@ async function firstRunStage(): Promise<void> {
     if (!installed(arm)) continue;
     log(`first-run ${arm.id}`);
     const base = join(runsDir, "first-run", arm.id);
-    const first = await runSession(file, { arm, prompt: scenarioA.prompt, script: scenarioA.script, out: join(base, "snap"), snap: true, debugHooks: true, timeoutS: 150 });
+    const first = await runSession(file, { arm, prompt: scenarioA.prompt, script: scenarioA.script, out: join(base, "snap"), snap: true, debugHooks: true, timeoutS: SESSION_TIMEOUT_S });
     const debug = readText(join(base, "snap", "debug.log")).split("\n");
     const errors = debug.filter((l) => l.includes("[ERROR]"));
     const registered = debug.find((l) => /Registered \d+ hooks from \d+ plugins/.test(l))?.replace(/^\S+ \[DEBUG\] /, "") ?? "";
@@ -194,15 +188,13 @@ async function firstRunStage(): Promise<void> {
     const s0 = parseSnapshot(readText(join(base, "snap", "snap-s0-before-session.tsv")));
     const s2 = parseSnapshot(readText(join(base, "snap", "snap-s2-after-session.tsv")));
     const diff = diffSnapshots(s0, s2);
-    const inProject = (p: string): boolean => p.startsWith("/work/project/") && !p.startsWith("/work/project/.git/");
-    const outside = (paths: string[]): string[] => paths.filter((p) => !p.startsWith(PLUGIN_DIR) && !p.startsWith("/work/project/.git/") && !p.startsWith("/work/project/"));
-    const sessionDiff: SnapDiff = { created: outside(diff.created), modified: outside(diff.modified), deleted: outside(diff.deleted) };
-    const projectDiff: SnapDiff = { created: diff.created.filter(inProject), modified: diff.modified.filter(inProject), deleted: diff.deleted.filter(inProject) };
+    const sessionDiff = filterDiff(diff, (p) => !p.startsWith(PLUGIN_DIR) && !p.startsWith("/work/project/"));
+    const projectDiff = filterDiff(diff, (p) => p.startsWith("/work/project/") && !p.startsWith("/work/project/.git/"));
 
-    const connect = await runSession(file, { arm, prompt: scenarioA.prompt, script: scenarioA.script, out: join(base, "connect"), trace: "connect", timeoutS: 150 });
+    const connect = await runSession(file, { arm, prompt: scenarioA.prompt, script: scenarioA.script, out: join(base, "connect"), trace: "connect", timeoutS: SESSION_TIMEOUT_S });
     const net = parseConnectTrace(readText(join(connect.out, "connect.txt")), [file.network.gateway]);
-    const execA = await runSession(file, { arm, prompt: scenarioA.prompt, script: scenarioA.script, out: join(base, "exec-a"), trace: "execve", timeoutS: 150 });
-    const execB = await runSession(file, { arm, prompt: scenarioB.prompt, script: scenarioB.script, out: join(base, "exec-b"), trace: "execve", timeoutS: arm.limited?.timeoutS ?? 150 });
+    const execA = await runSession(file, { arm, prompt: scenarioA.prompt, script: scenarioA.script, out: join(base, "exec-a"), trace: "execve", timeoutS: SESSION_TIMEOUT_S });
+    const execB = await runSession(file, { arm, prompt: scenarioB.prompt, script: scenarioB.script, out: join(base, "exec-b"), trace: "execve", timeoutS: arm.limited?.timeoutS ?? SESSION_TIMEOUT_S });
     records[arm.id] = {
       arm: arm.id,
       rc: first.meta?.rc ?? -1,
@@ -212,7 +204,7 @@ async function firstRunStage(): Promise<void> {
       mods,
       session_diff: sessionDiff,
       project_diff: projectDiff,
-      network: { hosts: hostFilter(net.hosts), connects: net.connects },
+      network: { hosts: withoutSearchSuffixes(net.hosts), connects: net.connects },
       exec_a: execA.meta?.rc === 0 ? parseExecveTrace(readText(join(execA.out, "strace.txt"))) : null,
       exec_b: execB.meta?.rc === 0 ? parseExecveTrace(readText(join(execB.out, "strace.txt"))) : null,
     };
@@ -221,42 +213,19 @@ async function firstRunStage(): Promise<void> {
   }
 }
 
-export type TimingRecord = {
-  arm: string;
-  kind: string;
-  round: number;
-  rc: number;
-  requests: number;
-  first_request_ms: number | null;
-  window_ms: number | null;
-  wall_ms: number | null;
-  tools_n: number | null;
-  tools_mcp_n: number | null;
-  first: Breakdown | null;
-  last: Breakdown | null;
-  final_tool_results: number;
-  foreign_clients: string[];
-  stderr: string;
-};
-
 const rotate = <T>(xs: T[], by: number): T[] => xs.map((_, i) => xs[(i + by) % xs.length] as T);
 
-function toolResultsIn(body: Record<string, unknown> | undefined): number {
-  const messages = Array.isArray(body?.messages) ? (body?.messages as unknown[]) : [];
-  const lastUser = messages.findLast((m) => typeof m === "object" && m !== null && (m as { role?: string }).role === "user") as { content?: unknown } | undefined;
-  return Array.isArray(lastUser?.content) ? lastUser.content.filter((b) => (b as { type?: string }).type === "tool_result").length : 0;
-}
-
 function timingRecord(arm: Arm, kind: string, round: number, r: SessionResult): TimingRecord {
-  const first = r.recorded[0];
-  const last = lastOf(r.recorded);
+  const main = mainThread(r.recorded);
+  const first = main[0];
+  const last = lastOf(main);
   const startMs = r.meta === null ? null : r.meta.start_ns / 1e6;
   return {
     arm: arm.id,
     kind,
     round,
     rc: r.meta?.rc ?? -1,
-    requests: r.recorded.length,
+    requests: main.length,
     first_request_ms: first === undefined || startMs === null ? null : first.arrival_ms - startMs,
     window_ms: first === undefined || last === undefined ? null : last.arrival_ms - first.arrival_ms,
     wall_ms: r.meta === null ? null : (r.meta.end_ns - r.meta.start_ns) / 1e6,
@@ -264,8 +233,8 @@ function timingRecord(arm: Arm, kind: string, round: number, r: SessionResult): 
     tools_mcp_n: first === undefined ? null : breakdown(first.body).tools_mcp_n,
     first: first === undefined ? null : breakdown(first.body),
     last: last === undefined ? null : breakdown(last.body),
-    final_tool_results: toolResultsIn(last?.body),
-    foreign_clients: [...new Set(r.clients)].filter((c) => !c.startsWith("172.31.77.")),
+    final_tool_results: toolResults(last?.body).count,
+    foreign_clients: [...new Set(r.clients)].filter((c) => !inSubnet(c, file.network.subnet)),
     stderr: r.stderr.slice(0, 200),
   };
 }
@@ -296,12 +265,13 @@ async function timingStage(): Promise<void> {
           prompt: scenario.prompt,
           script: scenario.script,
           out,
-          timeoutS: limitedHere ? limit?.timeoutS ?? 150 : 150,
+          timeoutS: limitedHere ? limit?.timeoutS ?? SESSION_TIMEOUT_S : SESSION_TIMEOUT_S,
         });
         const record = timingRecord(arm, scenario.name, round, result);
         appendFileSync(path, `${JSON.stringify(record)}\n`);
         if (round === 0) {
-          for (const [label, request] of [["first", result.recorded[0]], ["last", lastOf(result.recorded)]] as const) {
+          const main = mainThread(result.recorded);
+          for (const [label, request] of [["first", main[0]], ["last", lastOf(main)]] as const) {
             if (request !== undefined) writeFileSync(join(rawDir, `${arm.id}-${scenario.name}-${label}.json`), JSON.stringify(request.body));
           }
         }
@@ -313,10 +283,7 @@ async function timingStage(): Promise<void> {
   }
 }
 
-export type ToolSearchRecord = { arm: string; round: number; rc: number; tools_n: number | null; first: Breakdown | null };
-
 const PROBE_ROUNDS = 3;
-const KEYWORD_PROBE_PROMPT = "autopilot ralph ultrawork ultrathink: create plan, plan this task, fix build, then reply with the single word ok.";
 
 async function probeStage(name: string, prompt: string, env: Record<string, string>): Promise<void> {
   ensureNetwork(file);
@@ -336,7 +303,7 @@ async function probeStage(name: string, prompt: string, env: Record<string, stri
     for (const arm of rotate(arms, round)) {
       if (done.has(`${arm.id}/${round}`)) continue;
       const out = join(runsDir, name, `${arm.id}-${round}`);
-      const result = await runSession(file, { arm, prompt, script: scenario.script, out, env, timeoutS: 150 });
+      const result = await runSession(file, { arm, prompt, script: scenario.script, out, env, timeoutS: SESSION_TIMEOUT_S });
       const first = result.recorded[0];
       const record: ToolSearchRecord = {
         arm: arm.id,
@@ -360,30 +327,6 @@ function scenarioPrompt(name: string): string {
   const scenario = sessions.find((s) => s.name === name);
   if (scenario === undefined) throw new Error(`scenario ${name} is required`);
   return scenario.prompt;
-}
-
-export type GuardRecord = {
-  arm: string;
-  id: string;
-  command: string;
-  destructive: boolean;
-  ran: boolean;
-  blocked_by: string;
-  result_text: string;
-  is_error: boolean;
-  attempts: number;
-  blocked_first: boolean;
-};
-
-function resultTexts(body: Record<string, unknown> | undefined): { text: string; isError: boolean } {
-  const messages = Array.isArray(body?.messages) ? (body?.messages as unknown[]) : [];
-  const lastUser = messages.findLast((m) => typeof m === "object" && m !== null && (m as { role?: string }).role === "user") as { content?: unknown } | undefined;
-  const blocks = Array.isArray(lastUser?.content) ? (lastUser.content as { type?: string; content?: unknown; is_error?: boolean }[]) : [];
-  const results = blocks.filter((b) => b.type === "tool_result");
-  const text = results
-    .map((b) => (typeof b.content === "string" ? b.content : Array.isArray(b.content) ? b.content.map((c) => (c as { text?: string }).text ?? "").join("") : ""))
-    .join("\n");
-  return { text, isError: results.some((b) => b.is_error === true) };
 }
 
 function guardRan(guard: GuardCase, text: string, isError: boolean, out: string): boolean {
@@ -419,8 +362,8 @@ async function guardsStage(): Promise<void> {
       if (records.some((r) => r.arm === arm.id && r.id === guard.id)) continue;
       const out = join(runsDir, "guards", `${arm.id}-${guard.id}`);
       const result = await runSession(file, { arm, prompt: "Run the command.", script: guardScript(guard.command, attempts === 2), out, timeoutS: attempts === 2 ? 120 : 200 });
-      const first = resultTexts(result.recorded[1]?.body);
-      const last = resultTexts(lastOf(result.recorded)?.body);
+      const first = toolResults(result.recorded[1]?.body);
+      const last = toolResults(lastOf(result.recorded)?.body);
       const text = attempts === 2 ? `${first.text}\n${last.text}` : last.text;
       const isError = attempts === 2 ? first.isError && last.isError : last.isError;
       const ran = guardRan(guard, text, isError, out);
@@ -444,30 +387,23 @@ async function guardsStage(): Promise<void> {
   }
 }
 
-export type NoBunRecord = {
-  mcp_tools: number | null;
-  first_request_tokens: number | null;
-  hook_context_tokens: number | null;
-  system_tokens: number | null;
-  guards: { id: string; ran: boolean; text: string }[];
-  stop_forced: boolean;
-  stderr: string;
-};
-
 const MASK_BUN = ["-v", "/dev/null:/usr/local/bin/bun:ro"];
 
 async function noBunStage(): Promise<void> {
   ensureNetwork(file);
   const arm = file.arms.find((a) => a.id === "omca");
   const scenario = sessions.find((s) => s.name === "a");
-  if (arm === undefined || scenario === undefined || !installed(arm)) return;
+  if (arm === undefined || scenario === undefined || !installed(arm)) {
+    log("nobun: skipped, the OMCA arm is not installed");
+    return;
+  }
   const first = await runSession(file, { arm, prompt: scenario.prompt, script: scenario.script, out: join(runsDir, "nobun", "a"), dockerArgs: MASK_BUN, timeoutS: 120 });
   const b = first.recorded[0] === undefined ? null : breakdown(first.recorded[0].body);
   const guards: NoBunRecord["guards"] = [];
   for (const guard of guardCases.filter((g) => ["rm-rf-root", "git-reset-hard"].includes(g.id))) {
     const out = join(runsDir, "nobun", guard.id);
     const result = await runSession(file, { arm, prompt: "Run the command.", script: guardScript(guard.command, false), out, dockerArgs: MASK_BUN, timeoutS: 120 });
-    const { text, isError } = resultTexts(lastOf(result.recorded)?.body);
+    const { text, isError } = toolResults(lastOf(result.recorded)?.body);
     guards.push({ id: guard.id, ran: guardRan(guard, text, isError, out), text: text.slice(0, 200) });
   }
   const stopOut = join(runsDir, "nobun", "stop");
@@ -486,33 +422,6 @@ async function noBunStage(): Promise<void> {
   rmSync(join(runsDir, "nobun"), { recursive: true, force: true });
 }
 
-export type StopRecord = {
-  arm: string;
-  requests: number;
-  expected_requests: number;
-  forced_continue: boolean;
-  plan_written: boolean;
-  gate_text: string;
-  tool_results: string;
-};
-
-const textOf = (content: unknown): string =>
-  typeof content === "string" ? content : Array.isArray(content) ? content.map((b) => (b as { text?: string }).text ?? "").join("\n") : "";
-
-function continuationAfterDone(bodies: Record<string, unknown>[]): string | null {
-  const mainSystem = JSON.stringify(bodies[0]?.system);
-  for (const body of bodies) {
-    if (JSON.stringify(body.system) !== mainSystem) continue;
-    const messages = Array.isArray(body.messages) ? (body.messages as { role?: string; content?: unknown }[]) : [];
-    const at = messages.findLastIndex((m) => m.role === "assistant" && textOf(m.content).trim() === "done");
-    if (at < 0) continue;
-    const tail = messages.slice(at + 1).map((m) => textOf(m.content)).join("\n");
-    const gate = tail.search(/Stop hook/);
-    return tail.slice(Math.max(gate, 0)).replace(/\s+/g, " ").slice(0, 400);
-  }
-  return null;
-}
-
 async function stopStage(): Promise<void> {
   ensureNetwork(file);
   mkdirSync(rawDir, { recursive: true });
@@ -527,7 +436,7 @@ async function stopStage(): Promise<void> {
       out,
       sessionId: STOP_SESSION_ID,
       projectListing: true,
-      timeoutS: 150,
+      timeoutS: SESSION_TIMEOUT_S,
     });
     const expected = stopExpectedRequests(arm.id);
     const lastBody = lastOf(result.recorded)?.body;
@@ -539,7 +448,7 @@ async function stopStage(): Promise<void> {
       forced_continue: continuation !== null,
       plan_written: readText(join(out, "project-listing.tsv")).includes(STOP_PLAN_PATH.split("/").at(-1) as string),
       gate_text: continuation ?? "",
-      tool_results: resultTexts(result.recorded[1]?.body).text.slice(0, 300),
+      tool_results: toolResults(result.recorded[1]?.body).text.slice(0, 300),
     });
     if (lastBody !== undefined) writeFileSync(join(rawDir, `stop-${arm.id}-last.json`), JSON.stringify(lastBody));
     writeJson("stop", records);
@@ -562,17 +471,33 @@ const readProbe = (name: string): ToolSearchRecord[] =>
     ? readFileSync(join(runsDir, `${name}.jsonl`), "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l) as ToolSearchRecord)
     : [];
 
+const readTrees = (): Record<string, string> =>
+  existsSync(join(CACHE, "trees.json")) ? (JSON.parse(readFileSync(join(CACHE, "trees.json"), "utf8")) as Record<string, string>) : {};
+
+const recordedVersions = (): string[] =>
+  existsSync(rawDir)
+    ? [...new Set(readdirSync(rawDir).flatMap((name) => [...readText(join(rawDir, name)).matchAll(/cc_version=(\d+\.\d+\.\d+)/g)].map((m) => m[1] ?? "")))].sort()
+    : [];
+
+const dockerfileArgs = (): Record<string, string> =>
+  Object.fromEntries([...readText(join(HERE, "Dockerfile")).matchAll(/^(?:ARG (\w+)=|(FROM) )(\S+)$/gm)].map((m) => [m[1] ?? m[2] ?? "", m[3] ?? ""]));
+
 function reportStage(): void {
+  const timing = existsSync(join(runsDir, "timing.jsonl"))
+    ? readFileSync(join(runsDir, "timing.jsonl"), "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l) as TimingRecord)
+    : [];
+  const install = readJson<Record<string, InstallRecord>>("install", {});
+  const firstRun = readJson<Record<string, FirstRunRecord>>("first-run", {});
   const raw = {
     date,
-    rounds,
+    rounds: Math.max(-1, ...timing.map((r) => r.round)) + 1,
+    claudeVersions: recordedVersions(),
+    image: dockerfileArgs(),
     file,
-    treeShas: JSON.parse(readFileSync(join(CACHE, "trees.json"), "utf8")) as Record<string, string>,
-    install: readJson<Record<string, InstallRecord>>("install", {}),
-    firstRun: readJson<Record<string, FirstRunRecord>>("first-run", {}),
-    timing: existsSync(join(runsDir, "timing.jsonl"))
-      ? readFileSync(join(runsDir, "timing.jsonl"), "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l) as TimingRecord)
-      : [],
+    treeShas: readTrees(),
+    install: Object.fromEntries(Object.entries(install).map(([id, r]) => [id, { ...r, outside_plugin_dir: typedDiff(r.outside_plugin_dir) }])),
+    firstRun: Object.fromEntries(Object.entries(firstRun).map(([id, r]) => [id, { ...r, session_diff: typedDiff(r.session_diff), project_diff: typedDiff(r.project_diff) }])),
+    timing,
     guards: readJson<GuardRecord[]>("guards", []),
     stop: readJson<StopRecord[]>("stop", []),
     noBun: readJson<NoBunRecord | null>("nobun", null),
@@ -646,7 +571,7 @@ async function main(): Promise<void> {
   const stages: Record<string, () => void | Promise<void>> = {
     build: buildImages,
     prepare: () => {
-      const shas = existsSync(join(CACHE, "trees.json")) ? (JSON.parse(readFileSync(join(CACHE, "trees.json"), "utf8")) as Record<string, string>) : {};
+      const shas = readTrees();
       for (const arm of selected) {
         const tree = prepareTree(arm);
         if (tree !== null) shas[arm.id] = tree.sha;

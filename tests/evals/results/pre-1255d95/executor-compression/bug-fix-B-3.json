@@ -1,0 +1,15 @@
+{
+  "fixture": "bug-fix",
+  "arm": "B",
+  "commit": "9bda59d1eae98c17a9cf01725cad6373289aad74",
+  "candidate_file": "agents/executor.md",
+  "trial_index": 3,
+  "exit_code": 0,
+  "lines_added": 21,
+  "lines_deleted": 1,
+  "files_touched": 2,
+  "verdict": "pass",
+  "verdict_reason": "standalone handoff announces, substring does not, validate-plugin.sh exit 0",
+  "plugin_root": "<worktree>/skills",
+  "duration_seconds": 40
+}

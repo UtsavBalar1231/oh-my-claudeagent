@@ -2,10 +2,9 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { type Breakdown, CATEGORIES } from "./analyze.ts";
+import { type Breakdown, CATEGORIES, type InstallRecord, type TimingRecord } from "./analyze.ts";
 import type { Arm, ArmsFile } from "./harness.ts";
 import { type RawResults, renderMarkdown } from "./report.ts";
-import type { InstallRecord, TimingRecord } from "./run.ts";
 
 const baseline: Arm = { id: "baseline", label: "baseline", tree: null, install: [], details: [] };
 const omca: Arm = {
@@ -74,6 +73,8 @@ writeFileSync(
 const raw: RawResults = {
   date: "2026-01-01",
   rounds: 3,
+  claudeVersions: ["9.9.9"],
+  image: { FROM: "ubuntu:99.04", NODE_VERSION: "1.2.3", BUN_VERSION: "4.5.6" },
   file: FILE,
   treeShas: { omca: "abcdef0123456789" },
   install: { omca: install },
@@ -107,7 +108,7 @@ const lines = markdown.split("\n");
 describe("renderMarkdown", () => {
   test("opens with the date, client version and round count", () => {
     expect(lines[0]).toBe("# Plugin comparison results, 2026-01-01");
-    expect(lines[2]).toContain("Claude Code 9.9.9 in Docker");
+    expect(lines[2]).toContain("Claude Code 9.9.9 (read from the recorded request bodies) in Docker, image from `Dockerfile` (ubuntu:99.04, node 1.2.3, bun 4.5.6");
     expect(lines[2]).toContain("3 paired rounds plus one discarded warm-up round");
   });
 
@@ -149,13 +150,13 @@ describe("renderMarkdown", () => {
   });
 
   test("shows whether the scripted stop was continued", () => {
-    expect(lines).toContain("| OMCA | 3 (expected 3 without a gate) | **continued** | Stop hook blocked |");
-    expect(lines).toContain("| baseline | 2 (expected 2 without a gate) | stopped | - |");
+    expect(lines).toContain("| OMCA | yes | 3 (expected 3 without a gate) | **continued** | Stop hook blocked |");
+    expect(lines).toContain("| baseline | yes | 2 (expected 2 without a gate) | stopped | - |");
   });
 
   test("derives the guard and stop-gate findings from the records", () => {
     expect(markdown).toContain("OMCA blocked `rm -rf /`, but `git push --force origin main` ran.");
-    expect(markdown).toContain("Arms whose scripted stop was continued: omca.");
+    expect(markdown).toContain("Arms whose scripted stop was continued: OMCA.");
   });
 
   test("states no OMCA tool, hook or prompt-size count that the data does not carry", () => {
@@ -165,5 +166,113 @@ describe("renderMarkdown", () => {
   test("skips the no-bun section when the probe was not run", () => {
     expect(markdown).not.toContain("OMCA with bun hidden");
     expect(results.omca_without_bun).toBeUndefined();
+  });
+});
+
+describe("renderMarkdown with data that contradicts the usual findings", () => {
+  const other: Arm = { id: "other", label: "Other", tree: { kind: "local-head", marketplaceName: "o" }, install: ["o@o"], details: ["o"] };
+  const file: ArmsFile = { ...FILE, arms: [baseline, omca, other] };
+  const OTHER_CHARS = { system_prompt: 40000, tools_builtin: 8000 };
+  const run = (arm: string, kind: string, round: number, chars: Record<string, number>, over: Partial<TimingRecord> = {}): TimingRecord => ({
+    ...timing(arm, round, 100, chars),
+    kind,
+    ...over,
+  });
+  const execs = (a: number, b: number) => ({ exec_a: { total: a, byExe: {} }, exec_b: { total: b, byExe: {} } });
+  const firstRun = (arm: string, project: { path: string; type: string }[], exec: ReturnType<typeof execs>) => ({
+    arm,
+    rc: 0,
+    debug_errors: 0,
+    debug_error_samples: [],
+    registered: "",
+    mods: [],
+    session_diff: { created: [], modified: [], deleted: [] },
+    project_diff: { created: project, modified: [], deleted: [] },
+    network: { hosts: [], connects: [] },
+    ...exec,
+  });
+  const contrary: RawResults = {
+    ...raw,
+    rounds: 2,
+    file,
+    install: { omca: { ...install, cache_bytes: 9_000_000 }, other: { ...install, arm: "other", cache_bytes: 1_000, network: { hosts: [], connects: [] } } },
+    firstRun: {
+      baseline: firstRun("baseline", [], execs(10, 30)),
+      omca: firstRun("omca", [{ path: "/work/project/.omca", type: "d" }, { path: "/work/project/.omca/state.json", type: "f" }], execs(10, 50)),
+      other: firstRun("other", [], execs(10, 30)),
+    },
+    timing: [0, 1].flatMap((round) => [
+      run("baseline", "a", round, BASELINE_CHARS),
+      run("omca", "a", round, OMCA_CHARS),
+      run("other", "a", round, OTHER_CHARS),
+      run("baseline", "b", round, BASELINE_CHARS, { window_ms: 200, last: breakdown({ ...BASELINE_CHARS, conversation: 4000 }) }),
+      run("omca", "b", round, OMCA_CHARS, { window_ms: 200, last: breakdown({ ...OMCA_CHARS, conversation: 4000 }) }),
+      run("other", "b", round, OTHER_CHARS, { rc: 124, requests: 2 }),
+    ]),
+    guards: [
+      { arm: "omca", id: "rm-rf-root", command: "rm -rf /", destructive: true, ran: true, blocked_by: "", result_text: "", is_error: false, attempts: 2, blocked_first: false },
+      { arm: "omca", id: "git-reset-hard", command: "git reset --hard", destructive: true, ran: false, blocked_by: "plugin oh-my-claudeagent", result_text: "denied by plugin oh-my-claudeagent", is_error: true, attempts: 2, blocked_first: true },
+      { arm: "other", id: "ls", command: "ls", destructive: false, ran: false, blocked_by: "", result_text: "PreToolUse:Bash hook error: Present the facts, then retry the same operation.", is_error: true, attempts: 1, blocked_first: true },
+    ],
+    stop: [
+      { arm: "omca", requests: 2, expected_requests: 3, forced_continue: false, plan_written: true, gate_text: "", tool_results: "" },
+      { arm: "other", requests: 2, expected_requests: 2, forced_continue: false, plan_written: false, gate_text: "", tool_results: "Write blocked by a gate" },
+    ],
+    toolSearch: [0, 1].flatMap((round) => [
+      { arm: "baseline", round, rc: 0, tools_n: 5, first: breakdown(BASELINE_CHARS) },
+      { arm: "omca", round, rc: 0, tools_n: 5, first: breakdown(OMCA_CHARS) },
+      { arm: "other", round, rc: 0, tools_n: 5, first: breakdown(OTHER_CHARS) },
+    ]),
+    noBun: { mcp_tools: 3, first_request_tokens: 10, hook_context_tokens: 0, system_tokens: 0, guards: [{ id: "rm-rf-root", ran: true, text: "" }, { id: "git-reset-hard", ran: false, text: "" }], stop_forced: false, stderr: "" },
+    configDirs: {},
+  };
+  const out = renderMarkdown(contrary).markdown;
+  const outLines = out.split("\n");
+  const worse = out.slice(out.indexOf("Worse:"), out.indexOf("Not worse:"));
+  const notWorse = out.slice(out.indexOf("Not worse:"), out.indexOf("Stop gate, not a comparison"));
+
+  test("does not call OMCA's context the largest when another arm adds more", () => {
+    expect(out).not.toContain("the largest addition of any plugin arm");
+    expect(out).toContain("The largest addition is Other, at +9,000, with tool search off and Other, at +9,000, with it on.");
+    expect(notWorse).toContain("**Context per request.** OMCA adds +3,100");
+  });
+
+  test("files the footprint, churn and project writes by the data", () => {
+    expect(worse).toContain("**Offline install footprint** is 8.6 MiB in 12 files. Against the other plugin arms: smaller: Other.");
+    expect(worse).toContain("**Process churn** is 2.0 `execve` per Bash call against 1.0 for baseline. Against the other plugin arms: fewer: Other.");
+    expect(notWorse).toContain("**Writes in the project.** A first session wrote 1 file into the project (`/work/project/.omca`)");
+    expect(notWorse).toContain("by the project count: about level: Other.");
+  });
+
+  test("counts files, not directories, when the run recorded types", () => {
+    expect(outLines.find((l) => l.startsWith("| OMCA | ") && l.includes("/work/project/.omca"))).toContain("| 1 file: `/work/project/.omca` |");
+    expect(out).toContain("The counts are files; directories are left out.");
+  });
+
+  test("reads the with-bun guard and stop results from the records, and cites no unmeasured error", () => {
+    expect(outLines).toContain("| Bash guard (`rm -rf /` and `git reset --hard`) | RAN, blocked | RAN, blocked |");
+    expect(outLines).toContain("| Stop gate continued a plan-bound session | no | no |");
+    expect(out).not.toMatch(/no error in the session|shows no error/);
+  });
+
+  test("states the mock's attempts and marks a fact gate on a benign command as a mock artifact", () => {
+    expect(out).toContain("The mock issues the same Bash call twice per session, and once for Other, under");
+    expect(out).toContain("blocked (PreToolUse:Bash hook script; mock artifact)");
+  });
+
+  test("marks an arm that wrote no plan file n/a and keeps the stop result out of the comparison", () => {
+    expect(outLines).toContain("| Other | no | 2 (expected 2 without a gate) | n/a (no plan file to stop on) | - |");
+    expect(notWorse).not.toContain("Stop gate");
+    expect(out).toContain("Arms whose scripted stop was continued: none.");
+  });
+
+  test("leaves the conversation out of the Turn N total and reports timed-out runs as such", () => {
+    expect(outLines).toContain("| OMCA | 3,000 | 2,000 | 1,000 | 0 | 0 | 0 | 100 | 0 | 6,100 | **+3100** | sys +2000, tools +1000, lists +0, style +0, mcp-instr +0, hook +100, other +0 |");
+    expect(out).toContain("n/a (2 of 2 runs hit the 150 s timeout; median 2 of 21 requests)");
+  });
+
+  test("quotes the bun bullet only from the probe it ran", () => {
+    expect(out).toContain("**Without bun.** The probe in section 9 hid bun: the first request carried 3 MCP tools and 0 hook-context tokens, the stop gate did not continue a plan-bound session, and the Bash guard let through `rm -rf /` and `git reset --hard`.");
+    expect(renderMarkdown({ ...contrary, noBun: null }).markdown).not.toContain("section 9");
   });
 });

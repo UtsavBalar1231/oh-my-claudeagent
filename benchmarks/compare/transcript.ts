@@ -1,3 +1,5 @@
+import { isRecord } from "../../src/core/tool-input.ts";
+
 export type Usage = { input: number; output: number; cacheWrite: number; cacheRead: number };
 export type ToolUse = { name: string; input: Record<string, unknown> };
 export type RunResult = { isError: boolean; subtype: string; turns: number; durationMs: number; usage: Usage; text: string };
@@ -5,7 +7,6 @@ export type Transcript = { toolUses: ToolUse[]; lastAssistantText: string; resul
 
 export const WRITE_TOOLS: readonly string[] = ["Edit", "MultiEdit", "Write", "NotebookEdit"];
 
-const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const num = (v: unknown): number => (typeof v === "number" ? v : 0);
 
 export function parseTranscript(text: string): Transcript {

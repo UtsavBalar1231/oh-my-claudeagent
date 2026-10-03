@@ -1,0 +1,15 @@
+{
+  "fixture": "planning",
+  "arm": "B",
+  "commit": "f02fff778d37cf8077b7f918b2960aaa44456015",
+  "candidate_file": "agents/sisyphus.md, output-styles/omca-default.md, skills/plan/SKILL.md, skills/start-work/SKILL.md",
+  "trial_index": 1,
+  "exit_code": 0,
+  "lines_added": 0,
+  "lines_deleted": 0,
+  "files_touched": 0,
+  "verdict": "partial",
+  "verdict_reason": "lead planned directly and wrote ~/.claude/plans/scribe-agent.md covering the agent file, the templates/claudemd.md catalog row, a skill and hook integration, and a test strategy; no step names servers/categories.json, so criterion 2 is not met verbatim",
+  "plugin_root": "<worktree>/skills",
+  "duration_seconds": 855
+}

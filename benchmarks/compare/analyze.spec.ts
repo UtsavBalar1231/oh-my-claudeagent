@@ -10,10 +10,16 @@ import {
   parseConnectTrace,
   parseExecveTrace,
   parseSnapshot,
+  continuationAfterDone,
+  inSubnet,
   stats,
   tokens,
+  toolResults,
   totalChars,
+  typedDiff,
   unescapeStrace,
+  UNKNOWN_TYPE,
+  withoutSearchSuffixes,
 } from "./analyze.ts";
 
 describe("tokens", () => {
@@ -115,7 +121,47 @@ describe("snapshots", () => {
   });
 
   test("reports created, modified and deleted paths and ignores directory size changes", () => {
-    expect(diffSnapshots(before, after)).toEqual({ created: ["/work/new"], modified: ["/work/edit"], deleted: ["/work/gone"] });
+    expect(diffSnapshots(before, after)).toEqual({ created: [{ path: "/work/new", type: "f" }], modified: [{ path: "/work/edit", type: "f" }], deleted: [{ path: "/work/gone", type: "f" }] });
+  });
+
+  test("carries each entry's type, so a new directory is not counted as a file", () => {
+    const grown = parseSnapshot(["d\t4096\t-\t/work", "d\t4096\t-\t/work/state", ""].join("\n"));
+    expect(diffSnapshots(parseSnapshot("d\t4096\t-\t/work\n"), grown).created).toEqual([{ path: "/work/state", type: "d" }]);
+  });
+
+  test("reads a stored diff of plain paths as entries of unknown type", () => {
+    expect(typedDiff({ created: ["/a", { path: "/b", type: "f" }], modified: [], deleted: [] })).toEqual({ created: [{ path: "/a", type: UNKNOWN_TYPE }, { path: "/b", type: "f" }], modified: [], deleted: [] });
+  });
+});
+
+describe("withoutSearchSuffixes", () => {
+  test("drops a name the resolver retried with a search domain appended", () => {
+    expect(withoutSearchSuffixes(["mcp.grep.app", "mcp.grep.app.tail1234.ts.net", "mcp.grep.app.lan", "registry.npmjs.org"])).toEqual(["mcp.grep.app", "registry.npmjs.org"]);
+  });
+});
+
+describe("inSubnet", () => {
+  test("matches an address inside the network, in IPv4 or IPv4-mapped form", () => {
+    expect(inSubnet("172.31.77.9", "172.31.77.0/24")).toBe(true);
+    expect(inSubnet("::ffff:172.31.77.9", "172.31.77.0/24")).toBe(true);
+    expect(inSubnet("172.31.78.9", "172.31.77.0/24")).toBe(false);
+  });
+});
+
+describe("toolResults and continuationAfterDone", () => {
+  const user = (content: unknown) => ({ role: "user", content });
+  const done = { role: "assistant", content: [{ type: "text", text: "done" }] };
+
+  test("reads the results of the last user message, past a trailing reminder", () => {
+    const body = { messages: [user([{ type: "tool_result", content: [{ type: "text", text: "a" }, { type: "text", text: "b" }], is_error: true }]), { role: "system", content: "reminder" }] };
+    expect(toolResults(body)).toEqual({ count: 1, text: "ab", isError: true });
+  });
+
+  test("counts a continuation only on the main thread", () => {
+    const main = { system: "main", messages: [done, user("Stop hook feedback: keep going")] };
+    const hook = { system: "hook", messages: [done, user("Stop hook feedback: from a hook model call")] };
+    expect(continuationAfterDone([{ system: "main", messages: [] }, hook])).toBeNull();
+    expect(continuationAfterDone([{ system: "main", messages: [] }, main])).toBe("Stop hook feedback: keep going");
   });
 });
 

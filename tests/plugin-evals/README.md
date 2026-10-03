@@ -1,6 +1,6 @@
 # Plugin evals
 
-Cases for `claude plugin eval` (Claude Code 2.1.269 or later) that grade the health gate shared by the planning skills. Each case runs the skill's slash command against a mocked `omca` server whose `health_check` reports a runtime that is not `ok`, then checks that the skill called `health_check`, pointed at `/oh-my-claudeagent:omca-setup`, and delegated nothing:
+Cases for `claude plugin eval` that grade the health gate shared by the planning skills. Each case runs the skill's slash command against a mocked `omca` server whose `health_check` reports a runtime that is not `ok`, then checks that the skill called `health_check`, pointed at `/oh-my-claudeagent:omca-setup`, and delegated nothing:
 
 - `plan-stops-on-degraded-runtime` for `/oh-my-claudeagent:plan`
 - `start-work-stops-on-degraded-runtime` for `/oh-my-claudeagent:start-work`

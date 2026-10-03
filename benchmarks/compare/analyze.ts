@@ -1,3 +1,5 @@
+import { isRecord } from "../../src/core/tool-input.ts";
+
 export const CATEGORIES = [
   "system_prompt",
   "tools_builtin",
@@ -20,8 +22,6 @@ export type Breakdown = { chars: Record<Category, number>; prompt_chars: number;
 
 const CHARS_PER_TOKEN = 4;
 export const tokens = (chars: number): number => Math.ceil(chars / CHARS_PER_TOKEN);
-
-const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
 const MARKERS: { label: Category; pattern: RegExp }[] = [
   { label: "environment", pattern: /(?:^|\n)# Environment\n/g },
@@ -181,6 +181,16 @@ export function dnsName(bytes: number[]): string | null {
 
 export type NetworkAttempts = { hosts: string[]; connects: string[] };
 
+/** Drops a queried name that extends another queried name, the resolver's search-domain retries of it. */
+export const withoutSearchSuffixes = (hosts: string[]): string[] => hosts.filter((h) => !hosts.some((other) => other !== h && h.startsWith(`${other}.`)));
+
+export function inSubnet(address: string, cidr: string): boolean {
+  const [base = "", bits = "32"] = cidr.split("/");
+  const toInt = (ip: string): number => ip.replace(/^::ffff:/, "").split(".").reduce((n, octet) => n * 256 + Number(octet), 0);
+  const size = 2 ** (32 - Number(bits));
+  return Math.floor(toInt(address) / size) === Math.floor(toInt(base) / size);
+}
+
 export function parseConnectTrace(text: string, ignoreAddresses: string[]): NetworkAttempts {
   const hosts = new Set<string>();
   const connects = new Set<string>();
@@ -230,19 +240,36 @@ export function parseSnapshot(text: string): Map<string, SnapEntry> {
   return out;
 }
 
-export type SnapDiff = { created: string[]; modified: string[]; deleted: string[] };
+export type SnapChange = { path: string; type: string };
+export type SnapDiff = { created: SnapChange[]; modified: SnapChange[]; deleted: SnapChange[] };
+
+export const UNKNOWN_TYPE = "?";
 
 export function diffSnapshots(before: Map<string, SnapEntry>, after: Map<string, SnapEntry>): SnapDiff {
-  const created: string[] = [];
-  const modified: string[] = [];
-  const deleted: string[] = [];
+  const created: SnapChange[] = [];
+  const modified: SnapChange[] = [];
+  const deleted: SnapChange[] = [];
   for (const [path, entry] of after) {
     const old = before.get(path);
-    if (old === undefined) created.push(path);
-    else if (entry.type === "f" && (old.size !== entry.size || old.sum !== entry.sum)) modified.push(path);
+    if (old === undefined) created.push({ path, type: entry.type });
+    else if (entry.type === "f" && (old.size !== entry.size || old.sum !== entry.sum)) modified.push({ path, type: entry.type });
   }
-  for (const path of before.keys()) if (!after.has(path)) deleted.push(path);
+  for (const [path, entry] of before) if (!after.has(path)) deleted.push({ path, type: entry.type });
   return { created, modified, deleted };
+}
+
+export const filterDiff = (diff: SnapDiff, keep: (path: string) => boolean): SnapDiff => ({
+  created: diff.created.filter((c) => keep(c.path)),
+  modified: diff.modified.filter((c) => keep(c.path)),
+  deleted: diff.deleted.filter((c) => keep(c.path)),
+});
+
+type StoredDiff = { created: (string | SnapChange)[]; modified: (string | SnapChange)[]; deleted: (string | SnapChange)[] };
+
+/** Reads a diff stored with plain paths, from a run that did not record each entry's type, as typed changes of unknown type. */
+export function typedDiff(diff: StoredDiff): SnapDiff {
+  const typed = (list: (string | SnapChange)[]): SnapChange[] => list.map((c) => (typeof c === "string" ? { path: c, type: UNKNOWN_TYPE } : c));
+  return { created: typed(diff.created), modified: typed(diff.modified), deleted: typed(diff.deleted) };
 }
 
 const UNIT = 1024;
@@ -261,3 +288,125 @@ export function blockedBy(text: string): string {
   if (hook !== null) return `${hook[1]} hook script`;
   return text === "" ? "" : "unattributed";
 }
+
+type Message = { role?: string; content?: unknown };
+type ResultBlock = { type?: string; content?: unknown; is_error?: boolean };
+
+const messagesOf = (body: Record<string, unknown> | undefined): Message[] => (Array.isArray(body?.messages) ? (body.messages as Message[]) : []);
+
+export const textOf = (content: unknown, separator = "\n"): string =>
+  typeof content === "string" ? content : Array.isArray(content) ? content.map((b) => (isRecord(b) && typeof b.text === "string" ? b.text : "")).join(separator) : "";
+
+// Claude Code can append a system-role reminder after the user message that carries the tool
+// results, so the results are read from the last user message, not the last message.
+export function toolResults(body: Record<string, unknown> | undefined): { count: number; text: string; isError: boolean } {
+  const lastUser = messagesOf(body).findLast((m) => m.role === "user");
+  const results = (Array.isArray(lastUser?.content) ? (lastUser.content as ResultBlock[]) : []).filter((b) => b.type === "tool_result");
+  return {
+    count: results.length,
+    text: results.map((b) => textOf(b.content, "")).join("\n"),
+    isError: results.some((b) => b.is_error === true),
+  };
+}
+
+/** The bodies of the main thread: the requests that carry the first request's system prompt. */
+export function mainThread<T extends { body: Record<string, unknown> }>(requests: T[]): T[] {
+  const system = JSON.stringify(requests[0]?.body.system);
+  return requests.filter((r) => JSON.stringify(r.body.system) === system);
+}
+
+/** The text that follows the scripted `done` reply in a main-thread request, from the stop hook's words on; null when no request continued past it. */
+export function continuationAfterDone(bodies: Record<string, unknown>[]): string | null {
+  for (const body of mainThread(bodies.map((b) => ({ body: b })))) {
+    const messages = messagesOf(body.body);
+    const at = messages.findLastIndex((m) => m.role === "assistant" && textOf(m.content).trim() === "done");
+    if (at < 0) continue;
+    const tail = messages.slice(at + 1).map((m) => textOf(m.content)).join("\n");
+    const gate = tail.search(/Stop hook/);
+    return tail.slice(Math.max(gate, 0)).replace(/\s+/g, " ").slice(0, 400);
+  }
+  return null;
+}
+
+export type InstallRecord = {
+  arm: string;
+  ok: boolean;
+  steps: { step: number; cmd: string; rc: number; ms: number; error: string }[];
+  install_ms: number;
+  cache_bytes: number;
+  cache_files: number;
+  node_modules_files: number;
+  config_bytes: number;
+  details: Record<string, string>;
+  outside_plugin_dir: SnapDiff;
+  network: NetworkAttempts;
+  settings_keys: string[];
+  online: { install_ms: number; cache_bytes: number; cache_files: number; node_modules_files: number; node_modules_bytes: number } | null;
+};
+
+export type FirstRunRecord = {
+  arm: string;
+  rc: number;
+  debug_errors: number;
+  debug_error_samples: string[];
+  registered: string;
+  mods: { module: string; events: string }[];
+  session_diff: SnapDiff;
+  project_diff: SnapDiff;
+  network: NetworkAttempts;
+  exec_a: ExecCount | null;
+  exec_b: ExecCount | null;
+};
+
+export type TimingRecord = {
+  arm: string;
+  kind: string;
+  round: number;
+  rc: number;
+  requests: number;
+  first_request_ms: number | null;
+  window_ms: number | null;
+  wall_ms: number | null;
+  tools_n: number | null;
+  tools_mcp_n: number | null;
+  first: Breakdown | null;
+  last: Breakdown | null;
+  final_tool_results: number;
+  foreign_clients: string[];
+  stderr: string;
+};
+
+export type ToolSearchRecord = { arm: string; round: number; rc: number; tools_n: number | null; first: Breakdown | null };
+
+export type GuardRecord = {
+  arm: string;
+  id: string;
+  command: string;
+  destructive: boolean;
+  ran: boolean;
+  blocked_by: string;
+  result_text: string;
+  is_error: boolean;
+  attempts: number;
+  blocked_first: boolean;
+};
+
+export type NoBunRecord = {
+  mcp_tools: number | null;
+  first_request_tokens: number | null;
+  hook_context_tokens: number | null;
+  system_tokens: number | null;
+  guards: { id: string; ran: boolean; text: string }[];
+  stop_forced: boolean;
+  stderr: string;
+};
+
+export type StopRecord = {
+  arm: string;
+  requests: number;
+  expected_requests: number;
+  forced_continue: boolean;
+  plan_written: boolean;
+  gate_text: string;
+  tool_results: string;
+};

@@ -1,0 +1,15 @@
+{
+  "fixture": "planning",
+  "arm": "A",
+  "commit": "e0f46f737f5a023ca16a7b8a9c73c9cc6ec4aec8",
+  "candidate_file": null,
+  "trial_index": 3,
+  "exit_code": 0,
+  "lines_added": 0,
+  "lines_deleted": 0,
+  "files_touched": 0,
+  "verdict": "pass",
+  "verdict_reason": "plan file <worktree>/.omca/plans/add-scribe-agent.md covers all four required elements",
+  "plugin_root": "<worktree>/skills",
+  "duration_seconds": 93
+}
