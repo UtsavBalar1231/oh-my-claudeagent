@@ -24,28 +24,53 @@ hand.
 ### Added
 
 - **The `/omca` pane.** `/omca` opens a pane with Agents, Plan, Evidence, Notepad, Feedback,
-  Stats and Doctor tabs, each on a digit key. The Agents tab tracks every subagent of the session
-  with its model, effort, time and tokens. `/omca plan`, `/omca stats` and `/omca doctor` open the
-  pane on that tab. Ctrl+X then Tab, or a click, focuses it; Esc, the close mark or Ctrl+X then X
-  closes it.
-- **The plan reader.** `/omca plan` opens the bound plan and `/omca plan <name or path>` opens
-  another, on a contents list with checkbox marks and the cursor on the first open task. Each
-  heading or task is its own page. `n` and `p` move between tasks, `t` returns to the contents,
-  `l` lists the recent plans from `plansDirectory`, `r` reloads, and Page Up, Page Down, Home and
-  End page through the lists. It reloads when the file changes on disk and keeps your place.
-- **The band.** Above the prompt, the band shows the bound plan with its progress, the last
-  verification command and whether its evidence was logged. After each turn it offers the next
-  step on numbered buttons: log the evidence, start work, run the final verification, or review
-  the changes with oracle. Pressing a button's digit in an empty prompt, or clicking it, fills the
-  prompt and runs nothing until you send it. The `showBand` option hides the band.
+  Stats and Doctor tabs, each on a digit key. Every color is a Claude Code theme key, so the pane
+  and the band follow the theme you pick, a custom one in `~/.claude/themes/` included, and every
+  state also carries a glyph and a word. Secrets in commands, output and notes are drawn as
+  `‹masked›` and your home folder as `~`, and `OMCA_ASCII=1` draws everything from an ASCII set.
+  `/omca plan`, `/omca stats` and `/omca doctor` open the pane on that tab. Ctrl+X then Tab, or a
+  click, focuses it; Esc, the close mark or Ctrl+X then X closes it.
+- **The Agents tab.** Each running subagent gets a lane with its task, model and effort, tokens,
+  elapsed time and a strip of its recent tool calls by kind. A finished agent shrinks to one line
+  with the first line of its result and its duration. Pointing at a lane, or `d`, shows its prompt
+  and last output.
+- **The plan board.** `/omca plan` opens the bound plan and `/omca plan <name or path>` opens
+  another. A plan with numbered tasks opens on a board: the plan's status, a progress bar, proof
+  counts, the next task and the running agents, then the tasks by milestone, each with its state,
+  its proof chip, the agent working on it and the tasks it waits for. A task's proof compares its
+  `File:` paths with the evidence log: the newest test, build or lint run since they changed makes
+  it PROVEN or FAILED, and no such run leaves it UNPROVEN. The focused task's detail (its steps,
+  done-when commands, dependencies, file ages and the runs that bear on it) sits beside the list in
+  a wide pane, under its row in a narrower one, or on its own page. `r` fills the prompt to run
+  the task's check, `s` to start work from it, `c` copies it, `e` switches to the Evidence tab,
+  `o` and `x` keep open or failing tasks, and `f` finds tasks by text. `t` opens the plan's
+  sections, which is also where a plan without numbered tasks opens, and `l` lists the recent
+  plans from `plansDirectory`. The board reloads when the file changes on disk and keeps your
+  place.
+- **The proof ledger.** The Evidence tab opens on a verdict for the bound plan's final
+  verification: COMPLETE when a passing one matches the plan file as it is now, STALE when the plan
+  changed after it passed, MISSING otherwise, with the last 30 exit codes as a strip of dots. Below
+  it the logged runs are grouped by day, and the focused run shows its command and output with
+  secrets masked. `b`, `e`, `l`, `m` and `v` keep one type, `x` keeps failures, `f` finds runs by
+  command, `c` copies the command and `r` fills a rerun request.
+- **The Notepad tab.** One card per section of the bound plan's notepad, each entry under its
+  date. `f` finds text in the entries and `l` picks another plan's notepad.
+- **The band.** Above the prompt, the band shows the bound plan's progress as a bar with its done
+  and total tasks, the next open task, the proven, unproven and failed counts, a verification
+  command whose evidence was not logged, and how many agents are running, dropping segments as the
+  window narrows. After each turn it offers the next step on numbered buttons: log the evidence,
+  start work, run the final verification, or review the changes with oracle. Pressing a button's
+  digit in an empty prompt, or clicking it, fills the prompt and runs nothing until you send it.
+  The `showBand` option hides the band.
 - **`/omca doctor`.** It checks the loaded OMCA version, the Claude Code floor, bun on the
   session's `PATH`, when a hook last reached the `omca` server, `ast-grep`, the `showBand` and
   `guardMode` options, `CLAUDE_CODE_SUBAGENT_MODEL_FORCE`, a `maxEffortLevel` cap,
   `allowManagedModsOnly`, `disableAllHooks` and `allowManagedHooksOnly`, the output style in
-  force, what keeps the advisor off, and the status line's `refreshInterval`. Problems sort to the
-  top and the list scrolls. `r` runs the checks again, and `i` adds `refreshInterval: 5` to a
-  status line that lacks it, after re-reading the file, writing `settings.json.omca-bak` and
-  showing the diff.
+  force, what keeps the advisor off, and the status line's `refreshInterval`. Each row leads with
+  an OK, WARN, FAIL or INFO chip, problems sort to the top and the list scrolls. A check with a
+  known remedy offers a key that fills the prompt with it. `r` runs the checks again, and `i` adds
+  `refreshInterval: 5` to a status line that lacks it, after re-reading the file, writing
+  `settings.json.omca-bak` and showing the diff.
 - **Ratings.** `/omca-rate up` or `/omca-rate down` rates the last turn, with an optional note.
   With no note typed, the text selected on screen becomes the note, cut to 200 characters, and the
   reply says so. Ratings are kept in `.omca/feedback/<session id>.json` and listed in the
@@ -57,7 +82,8 @@ hand.
   `.omca/metrics/<session id>/` with its type, model, effort, tokens, duration, outcome, whether
   evidence was logged during it, and an estimated cost from a dated price table that cites its
   source for every row. A model with no sourced price stays unpriced rather than guessed. The
-  Stats tab aggregates the records by agent type.
+  Stats tab aggregates the records by agent type: runs and evidence rate per agent, tokens per
+  finished delegation, and the estimated cost split by agent.
 - **Per-delegation effort.** A delegation prompt may start with
   `[omca-route effort=<level>]`. The mod strips the line and runs that subagent at that effort.
   The hint carries no model: the Agent tool's own `model` parameter picks the tier, where
