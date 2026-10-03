@@ -7,6 +7,7 @@ This directory contains behavioral and integration tests for oh-my-claudeagent.
 ```
 tests/
   evals/            # Eval task definitions, listed by `just eval-consistency`
+  plugin-evals/     # `claude plugin eval` cases for the planning skills; see its README
   fixtures/
     mcp/            # JSON-RPC requests and the expected tool list for the MCP server
   mod/              # mod tests, run by `claude plugin test .`

@@ -10,6 +10,7 @@ code they cover, such as `servers/`, `src/` and `scripts/`, rather than here; mo
   which `servers/omca.spec.ts` and the validator's MCP check read.
 - `fixtures/boulder-schemas/`: sample `boulder.json` shapes for registry tests.
 - `evals/`: eval task definitions for agent-quality checks, listed by `just eval-consistency` (`scripts/qa/eval-tasks.ts`).
+- `plugin-evals/`: `claude plugin eval` cases for the planning skills' health gate. They call a real model, so they run by hand; `plugin-evals/README.md` has the commands.
 - `README.md`: full instructions for running and adding tests in each layer. Read
   that before this file for how-to details.
 
