@@ -48,7 +48,7 @@ The band above the prompt shows the bound plan's progress, the next open task, h
 proven, unproven and failed, a verification whose evidence was not logged, and how many agents
 are running. The numbered buttons fill the prompt with the next step.
 
-<img src=".github/assets/band.png" width="680" alt="The band above the prompt reads 6/14, next 7 Wire the order summary panel, 6 proven, 1 unproven and 0 failed, warns that the evidence for just test was not logged, and counts 1 running agent, with the button 1: Log evidence below it.">
+<img src=".github/assets/band.png" width="680" alt="The band above the prompt reads 6/14, next 7 Wire the order summary panel, 6 proven and 1 unproven, warns that the evidence for just test was not logged, and counts 1 running agent, with the button 1: Log evidence below it.">
 
 `/omca plan` opens the plan board: the tasks grouped by milestone, each with its state, its proof
 and the agent working on it. A wide pane shows the focused task's detail beside the list.
@@ -58,12 +58,12 @@ and the agent working on it. A wide pane shows the focused task's detail beside 
 The Evidence tab is the proof ledger: a verdict on the plan's final verification, then every
 logged run grouped by day.
 
-<img src=".github/assets/evidence.png" width="680" alt="The Evidence tab shows the final verification for checkout-redesign as MISSING, since the last one exited 1, then fourteen runs grouped under three days, each with its time, type, exit code and command. The focused run, a manual payment smoke test, is open beside the list with its API key masked.">
+<img src=".github/assets/evidence.png" width="680" alt="The Evidence tab shows the final verification for checkout-redesign as MISSING, since the last one exited 1, with a line marking build, test, lint and manual as passing on their newest runs. Below it, fourteen runs are grouped under three days, each with its outcome, time, type and command. The focused run, a manual payment smoke test, is open beside the list with its exit code and its API key masked.">
 
 The Agents tab gives each running subagent a lane with its task, model, effort and current tool
 call, and shrinks a finished one to a line.
 
-<img src=".github/assets/agents.png" width="680" alt="The Agents tab shows two running executors, one on Wire the order summary panel and one on Persist the draft order, each with its model, effort and the watch command it is running, and one finished explore agent on a single line with the first line of its result.">
+<img src=".github/assets/agents.png" width="680" alt="The Agents tab shows two running executors, one on Wire the order summary panel and one on Persist the draft order, each with its icon, model and effort, the watch command it is running and its count of tool calls, and one finished explore agent on a single line with the first line of its result.">
 
 The guard holds a destructive shell command for your review and shows what it would touch.
 

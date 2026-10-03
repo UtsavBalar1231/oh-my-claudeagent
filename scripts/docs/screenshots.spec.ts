@@ -72,7 +72,7 @@ describe("CLIPS", () => {
     expect(marks(clip("clip-plan"))).toEqual(["cmd-typed", "dialog", "key-choice", "plan-written"]);
     expect(targets(clip("clip-plan"))).toEqual(["question"]);
     expect(marks(clip("clip-delegate"))).toEqual(["cmd-typed", "spawned", "pane", "lanes"]);
-    expect(targets(clip("clip-delegate"))).toEqual(["tool-strip"]);
+    expect(targets(clip("clip-delegate"))).toEqual(["tool-row"]);
     for (const name of ["clip-board", "clip-board-light"]) {
       expect(marks(clip(name))).toEqual(["cmd-typed", "board", "focus-moved", "task-open"]);
       expect(targets(clip(name))).toEqual(["proven-chip", "unproven-chip"]);
