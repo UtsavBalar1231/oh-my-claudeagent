@@ -289,7 +289,7 @@ When you have the `advisor` tool, call it once clearance passes and before the m
 
 Write to `<plans-dir>/{name}.md` (no plan mode) or the active plan-mode file path.
 
-Where a DRAFT was written in Step 1.6, this phase does not create a second file. It rewrites that same path in place with a single full-file `Write` whose metadata line reads `**Status**: FINAL`, never an Edit of the Status line alone. `boulder_write` runs only after that write lands.
+Where a DRAFT was written in Step 1.6, this phase does not create a second file. It rewrites that same path in place with a single full-file `Write` whose metadata line reads `**Status**: FINAL`, never an Edit of the Status line alone. `boulder_write` runs only after that write lands; load it if needed: `ToolSearch({query: "select:mcp__plugin_oh-my-claudeagent_omca__boulder_write", max_results: 1})`.
 
 **Decision-complete mandate**: The implementer should need zero judgment calls. Every task must state the chosen approach, concrete targets, inputs/data, exclusions, references, verification, and expected evidence. If a judgment call remains, resolve it by exploration or user question before momus review.
 
@@ -453,7 +453,7 @@ On reaching the User Confirmation Gate (below), record the gate state: `notepad_
 
 **Noncommittal reply** (e.g. "ok", "sure", an unrelated tangent): emit ONE short line naming the pending approval; do not re-explore, do not restate the whole brief. Example: "Still waiting on your call: start implementation, run metis, or modify the plan?"
 
-**Later turn, including after compaction**: before re-running exploration or re-interviewing, check `notepad_read(plan_name, "decisions")` for a recorded gate. If found and unresolved, resume at the gate instead of restarting the interview.
+**Later turn, including after compaction**: before re-running exploration or re-interviewing, check `notepad_read(plan_name, "decisions")` for a recorded gate (load it if needed: `ToolSearch({query: "select:mcp__plugin_oh-my-claudeagent_omca__notepad_read", max_results: 1})`). If found and unresolved, resume at the gate instead of restarting the interview.
 
 ### After Plan Completion
 

@@ -2,8 +2,7 @@
   "mcpServers": {
     "omca": {
       "command": "bun",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/servers/omca.ts"],
-      "alwaysLoad": true
+      "args": ["${CLAUDE_PLUGIN_ROOT}/servers/omca.ts"]
     },
     "grep": {
       "type": "http",

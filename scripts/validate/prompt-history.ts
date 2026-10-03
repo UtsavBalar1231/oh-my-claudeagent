@@ -1,9 +1,9 @@
 import { type Check, type Context, type Outcome, readText, verdict } from "./core.ts";
 
 // A prompt states what to do now: the model cannot resolve a rename, a release number or a mode
-// label from OMCA's past, and the server loads every omca tool up front, so a "deferred" claim is
-// stale. The scope is the markdown the model reads plus the TypeScript under servers/ and hooks/,
-// scanned whole, since a regex cannot tell a message from a comment.
+// label from OMCA's past, and a prompt that needs a deferred omca tool gives the exact `select:` name
+// instead of a blanket "discovery-deferred" claim. The scope is the markdown the model reads plus the
+// TypeScript under servers/ and hooks/, scanned whole, since a regex cannot tell a message from a comment.
 const MARKDOWN = [
   /^agents\/[^/]+\.md$/,
   /^skills\/.+\.md$/,

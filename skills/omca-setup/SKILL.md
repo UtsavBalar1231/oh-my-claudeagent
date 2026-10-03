@@ -60,7 +60,7 @@ When `ast-grep` is missing, run `sg --version` instead. Either one is PASS. Neit
 
 ### Phase 2: Runtime check
 
-Call the `health_check` tool. When `runtime` is `ok`, report PASS. Otherwise report the `runtime` value and `runtime_reason` verbatim, and continue: the status line works without the runtime. When the tool itself is missing, OMCA's server is not connected; report that and continue.
+Call the `health_check` tool, loading it if needed: `ToolSearch({query: "select:mcp__plugin_oh-my-claudeagent_omca__health_check", max_results: 1})`. When `runtime` is `ok`, report PASS. Otherwise report the `runtime` value and `runtime_reason` verbatim, and continue: the status line works without the runtime. When the tool is still missing, OMCA's server is not connected; report that and continue.
 
 ### Phase 3: Status line
 

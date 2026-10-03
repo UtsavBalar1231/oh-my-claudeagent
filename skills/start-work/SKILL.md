@@ -6,7 +6,7 @@ disable-model-invocation: true
 argument-hint: "[plan file] [--worktree <path>]"
 ---
 
-Call `health_check` first. Proceed only when `runtime` is `ok`; otherwise repeat `runtime_reason` to the user, tell them to run `/oh-my-claudeagent:omca-setup`, and stop. If the tool is missing, say OMCA's server is not connected and stop.
+Call `health_check` first, loading it and `boulder_write` if needed: `ToolSearch({query: "select:mcp__plugin_oh-my-claudeagent_omca__health_check,mcp__plugin_oh-my-claudeagent_omca__boulder_write", max_results: 2})`. Proceed only when `runtime` is `ok`; otherwise repeat `runtime_reason` to the user, tell them to run `/oh-my-claudeagent:omca-setup`, and stop. If the tool is still missing, say OMCA's server is not connected and stop.
 
 # Plan Execution Mode: start-work
 
@@ -527,7 +527,7 @@ progress a user sees during a long run.
 critical failure.
 
 At each phase boundary (or, in unphased plans, roughly every few completed
-tasks), review the plan's notepad `issues` section via `notepad_read` and
+tasks), review the plan's notepad `issues` section via `notepad_read` (load it if needed: `ToolSearch({query: "select:mcp__plugin_oh-my-claudeagent_omca__notepad_read", max_results: 1})`) and
 disposition every open entry: schedule it as a task, defer it with a stated
 reason, or reject it with a stated reason. Entries left silently unaddressed
 accumulate into gaps the completeness check will not catch, since it reviews
@@ -568,7 +568,7 @@ just flaky" is not evidence.
 - **`boulder_write`**: Write/update execution metadata (active plan, session ID, worktree path)
 - **`boulder_progress`**: Task completion counts and active plan info
 - **`evidence_log`**: after every verification command; no evidence, no done
-- **`evidence_read`**: Before final report to summarize all results
+- **`evidence_read`**: Before final report to summarize all results; load it if needed: `ToolSearch({query: "select:mcp__plugin_oh-my-claudeagent_omca__evidence_read", max_results: 1})`
 - **`notepad_write`**: Blockers/audit breadcrumbs (learnings, issues, decisions, problems)
 - **`notepad_read`**: Fallback audit notes when relevant to a pending task
 - Never `rm -f` on `.omca/state/`: use MCP tools

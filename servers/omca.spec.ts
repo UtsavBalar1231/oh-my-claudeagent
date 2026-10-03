@@ -11,6 +11,8 @@ const SERVER = join(import.meta.dir, "omca.ts");
 const CLIENT_TEXT_CAP_CHARS = 2048;
 const MAX_RESULT_SIZE_CEILING = 500_000;
 const MAX_RESULT_SIZE_TOOLS = ["evidence_read", "file_read", "ast_search", "session_search"];
+const ALWAYS_LOADED_TOOLS = ["boulder_progress", "evidence_log", "notepad_write"];
+const TOOL_PREFIX = "mcp__plugin_oh-my-claudeagent_omca__";
 const WRITE_TOOLS = ["ast_replace", "boulder_write", "evidence_log", "notepad_compact", "notepad_write", "omca_hook"];
 const MODERN = "2026-07-28";
 const FALLBACK = "2025-11-25";
@@ -484,6 +486,19 @@ describe("tool declaration contract", () => {
     expect(violations).toEqual([]);
     expect(new Set(tools.map((tool) => tool.name)).size).toBe(tools.length);
     expect(tools.filter((tool) => !tool.annotations.readOnlyHint).map((tool) => tool.name)).toEqual(WRITE_TOOLS);
+  });
+
+  test("exactly the always-loaded tools are marked, and the server entry leaves the rest deferred", async () => {
+    const marked = (await listTools(startServer())).filter((tool) => tool._meta?.["anthropic/alwaysLoad"] === true).map((tool) => tool.name);
+    expect(marked.toSorted()).toEqual(ALWAYS_LOADED_TOOLS);
+    const config = JSON.parse(readFileSync(join(import.meta.dir, "..", ".mcp.json"), "utf8"));
+    expect(config.mcpServers.omca).not.toHaveProperty("alwaysLoad");
+  });
+
+  test("the instructions tell the model how to load a deferred tool by its full name", async () => {
+    const { instructions } = (await startServer().request("initialize", { protocolVersion: "2025-11-25" })).result as { instructions: string };
+    expect(instructions).toContain("`evidence_log`, `boulder_progress` and `notepad_write` are always available");
+    expect(instructions).toContain(`select:${TOOL_PREFIX}ast_search`);
   });
 
   test("the server instructions fit the client cap and name every tool the model is meant to call", async () => {
