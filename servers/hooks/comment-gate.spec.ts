@@ -135,6 +135,14 @@ describe("tier 1 and tier 2 findings in the default advise mode", () => {
     expect(await gate({ content: "# handles the edge case for empty input\nfoo()" })).toEqual({});
   });
 
+  test("a filler word inside a code span is a command name, not a qualifier", async () => {
+    expect(await gate({ content: "# CI runs `just ci` on every push\nfoo()" })).toEqual({});
+  });
+
+  test("a filler word outside the code span still warns", async () => {
+    expect(await gate({ content: "# just run `make` on every push\nfoo()" })).toEqual(advice(filler("just run `make` on every push")));
+  });
+
   test("warns on decorative separator comment", async () => {
     expect(await gate({ content: "# ====================\nfoo()" })).toEqual(advice(separator("====================")));
   });

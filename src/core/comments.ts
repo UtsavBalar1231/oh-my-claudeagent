@@ -168,7 +168,9 @@ function slopFindings(lines: readonly string[], syntax: Syntax): Slop[] {
       continue;
     }
 
-    if (/(?:^|[^a-z])(?:obviously|clearly|simply|just|basically)(?:[^a-z]|$)/.test(lowered)) {
+    // A code span names a command or identifier, such as the task runner, not a qualifier.
+    const prose = lowered.replace(/`[^`]*`/g, " ");
+    if (/(?:^|[^a-z])(?:obviously|clearly|simply|just|basically)(?:[^a-z]|$)/.test(prose)) {
       add(`Filler-word comment ("${text}"): delete it.`, text);
     }
 
