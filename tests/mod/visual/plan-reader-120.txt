@@ -29,7 +29,7 @@
                                                                │r: Run check  s: Start here  c: Copy  e: Evidence
                                                                │o: Open only  x: Failing  f: Find  t: Sections
                                                                │l: Plans
-billing-export 4/9 tasks · no verification yet              [-]│↑↓ move · enter open · esc close
+██▎██ 4/9 · next 5 Reconcile tota… · ✓4 !2 ✗0 · ◆ 1 running [-]│↑↓ move · enter open · esc close
                                            ◐ medium · /effort  │
 ───────────────────────────────────────────────────────────────────────────────────────────────── OMCA: billing-export ─
 ❯ 

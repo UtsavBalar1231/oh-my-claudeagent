@@ -1,7 +1,7 @@
 
  ▐▛███▛█   Claude Code v2.1.288
 ▝▜██████▀  Opus 5.5 · API Usage Billing
- ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/omca-visual-80x40-1WLeiR/cwd
+ ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/omca-visual-80x40-xTy2Qf/cwd
 
 
 
@@ -32,7 +32,7 @@
 │ b: Build  e: Test  l: Lint  m: Manual  v: Final  x: Fails  c: Copy           │
 │ r: Rerun  f: Find  3/16 · ↑↓ move                                            │
 ╰──────────────────────────────────────────────────────────────────────────────╯
-proof-ledger 6/6 tasks · no verification yet                                 [-]
+█████ 6/6                                                                    [-]
                                                             ◐ medium · /effort
 ─────────────────────────────────────────────────── oh-my-claudeagent:sisyphus ─
 ❯ 

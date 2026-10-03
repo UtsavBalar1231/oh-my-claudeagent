@@ -107,7 +107,7 @@ test("the agents card draws each agent in its roster color with a bar of its run
       lit({ color: BLUE }, "explore "),
       gap,
       lit({ color: BLUE }, "█████"),
-      lit({ color: "rate_limit_empty" }, "█████"),
+      lit({ color: "subtle" }, "█████"),
       gap,
       lit({}, "   1"),
       gap,
@@ -129,7 +129,7 @@ test("the agents card draws each agent in its roster color with a bar of its run
       lit({ color: PURPLE }, "oracle  "),
       gap,
       lit({ color: PURPLE }, "█████"),
-      lit({ color: "rate_limit_empty" }, "█████"),
+      lit({ color: "subtle" }, "█████"),
       gap,
       lit({}, "   1"),
       gap,
@@ -223,4 +223,31 @@ test("after the stats atom resets the tab says it is reading, and r is its only 
   expect(topRows(await ui.drawn()).slice(2)).toEqual([text({ color: "inactive", dimColor: true }, "Reading the delegation records…")]);
   expect(rows(await ui.drawn())).toHaveLength(3);
   await ui.unmount();
+});
+
+test("a table taller than its window draws a more-below cue over the window's last row, until the engine's own height says the end shows", async ($, on) => {
+  world(on, FILES);
+  on("ui.scroll", () => ({}));
+  await $.command.run(run("stats", 120));
+  const SHORT: Size = { columns: 120, rows: 20, placement: "dock" };
+  const mount = pane("terminal", SHORT);
+  const ui = (offset: number) => $.ui.mount({ ...mount, props: { ...mount.props, scroll: { offset, bodyRows: 16 } } });
+  const cueAt = async (offset: number) => {
+    const drawn = await ui(offset);
+    const cue = node(await drawn.drawn(), "more-cue");
+    await drawn.unmount();
+    return cue;
+  };
+
+  const cue = await cueAt(0);
+  expect(cue?.props).toEqual({ key: "more-cue", position: "absolute", top: 15, left: 0, width: bodyColumns(SHORT) - 3 });
+  expect(childrenOf(cue ?? { type: "" })).toEqual([text({ dimColor: true }, "  ↓ more · ↑↓ scroll".padEnd(bodyColumns(SHORT) - 3))]);
+  expect((await cueAt(4))?.props?.["top"]).toBe(19);
+  expect(await cueAt(40)).toBeUndefined();
+
+  const drawn = await ui(0);
+  await $.ui.scroll({ component: "Pane", requestId: "omca", offset: 0, by: 1, bodyRows: 16, contentRows: 16, origin: { kind: "person" } });
+  await drawn.redraw();
+  expect(node(await drawn.drawn(), "more-cue")).toBeUndefined();
+  await drawn.unmount();
 });

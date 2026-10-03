@@ -1,7 +1,7 @@
 
  ▐▛███▛█   Claude Code v2.1.288
 ▝▜██████▀  Opus 5.5 · API Usage Billing
- ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/omca-visual-80x40-uYBkK3/cwd
+ ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/omca-visual-80x40-lAnVSI/cwd
 
 
 
@@ -30,9 +30,9 @@
 │ │ OrderEmail and the receipt PDF now all call totals(cart) from         │    │
 │ │ src/cart/totals.ts.                                                   │    │
 │ │ ── 10-02 16:35 ────────────────────────────────────────────────────── │    │
-│ │ - Tax rounds per line, not per order; the old code rounded once and   │    │
+│   ↓ more · ↑↓ scroll                                                         │
 ╰──────────────────────────────────────────────────────────────────────────────╯
-checkout-redesign 2/4 tasks · no verification yet                            [-]
+██▌██ 2/4 · next 3 Show the saved payment methods                            [-]
                                                             ◐ medium · /effort
 ─────────────────────────────────────────────────── oh-my-claudeagent:sisyphus ─
 ❯ 

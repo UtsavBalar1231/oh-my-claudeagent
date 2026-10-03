@@ -506,6 +506,10 @@ test("narrow: the verdict card, the day-grouped timeline and the focused entry o
     " ",
   ]);
   expect(nodeByKey(await ui.drawn(), "verdict")?.props).toMatchObject({ borderStyle: "round", borderColor: "success" });
+  const verdict = nodeByKey(await ui.drawn(), "verdict");
+  const runs = childrenOf(verdict ?? { type: "Box" }).flatMap((line) => runsOf({ type: "Box", children: [line] }));
+  const tallyColors = ["build", "lint", "final"].map((word) => runs.find((run) => run.text === word));
+  expect(tallyColors).toEqual([{ text: "build" }, { text: "lint" }, { text: "final", color: "planMode" }]);
   await ui.unmount();
 });
 
@@ -588,14 +592,14 @@ test("wide: the list beside a card of the focused entry, which follows the focus
   await ui.unmount();
 });
 
-test("rows draw each type and exit in its own tone, the program bold, masks dim, and the agent in its identity color", async ($, on) => {
+test("rows draw each type neutral but the final verification, each exit in its tone, the program bold, masks dim, and the agent in its identity color", async ($, on) => {
   world(on, await proofFiles());
   const ui = await openEvidence($, DOCK_200);
   const tree = await ui.drawn();
   expect(runsOf(nodeByKey(tree, "entry-3"))).toEqual([
     { text: "  " },
     { text: "10:20 ", color: "inactive" },
-    { text: " TEST   ", color: "inverseText", backgroundColor: "permission", bold: true },
+    { text: " TEST   ", color: "text", backgroundColor: "selectionBg", bold: true },
     { text: " " },
     { text: " ✓ 0 ", color: "inverseText", backgroundColor: "success", bold: true },
     { text: " " },
@@ -605,9 +609,9 @@ test("rows draw each type and exit in its own tone, the program bold, masks dim,
   ]);
   expect(nodeByKey(tree, "entry-3")?.props).toEqual({ key: "entry-3", flexDirection: "row" });
   const chips = (key: string) => runsOf(nodeByKey(tree, key)).filter((run) => run.backgroundColor !== undefined);
-  expect(chips("entry-0").map((run) => [run.text, run.backgroundColor])).toEqual([[" BUILD  ", "claude"], [" ✓ 0 ", "success"]]);
-  expect(chips("entry-1").map((run) => [run.text, run.backgroundColor])).toEqual([[" LINT   ", "warning"], [" ✗ 1 ", "error"]]);
-  expect(chips("entry-4").map((run) => [run.text, run.backgroundColor])).toEqual([[" MANUAL ", "inactive"], [" ✓ 0 ", "success"]]);
+  expect(chips("entry-0").map((run) => [run.text, run.backgroundColor])).toEqual([[" BUILD  ", "selectionBg"], [" ✓ 0 ", "success"]]);
+  expect(chips("entry-1").map((run) => [run.text, run.backgroundColor])).toEqual([[" LINT   ", "selectionBg"], [" ✗ 1 ", "error"]]);
+  expect(chips("entry-4").map((run) => [run.text, run.backgroundColor])).toEqual([[" MANUAL ", "selectionBg"], [" ✓ 0 ", "success"]]);
   expect(chips("entry-5").map((run) => [run.text, run.backgroundColor])).toEqual([[" FINAL  ", "planMode"], [" ✓ 0 ", "success"]]);
   expect(runsOf(nodeByKey(tree, "entry-1")).at(-1)).toEqual({ text: " ◆ explore ", color: "blue_FOR_SUBAGENTS_ONLY" });
   expect(nodeByKey(tree, "entry-5")?.props).toEqual({ key: "entry-5", flexDirection: "row", backgroundColor: "selectionBg" });
@@ -860,15 +864,19 @@ test("OMCA_ASCII draws the Evidence tab from the ASCII set", async ($, on) => {
   expect(await body(ui, INLINE_80)).toEqual([
     "[COMPLETE] sample  oxxooo last 6  10-02 11:45  @ sisyphus  build 1 ...",
     "-- Fri 2026-10-02 -- [#####.] 3/4 ---------------------------------------",
-    "> 11:45 [FINAL ] [+ 0] just ci                                 @ sisyphus",
+    "> 11:45 [FINAL]  [+ 0] just ci                                 @ sisyphus",
     "    │COMPLETE",
     "    2026-10-02 11:45:00 - @ sisyphus",
     "  11:00 [MANUAL] [+ 0] bun scripts/qa/visual.ts evidence       @ sisyphus",
-    "  10:20 [TEST  ] [+ 0] curl -H 'Authoriza...e/run && just test @ executor",
-    "  10:00 [TEST  ] [x 1] just test-mod                           @ executor",
+    "  10:20 [TEST]   [+ 0] curl -H 'Authoriza...e/run && just test @ executor",
+    "  10:00 [TEST]   [x 1] just test-mod                           @ executor",
     "b: Build  e: Test  l: Lint  m: Manual  v: Final  x: Fails  c: Copy",
     "r: Rerun  f: Find  1/6 - ^v move",
     " ",
+  ]);
+  expect(runsOf(nodeByKey(await ui.drawn(), "entry-3")).slice(2, 4)).toEqual([
+    { text: "[TEST]", color: "text", backgroundColor: "selectionBg", bold: true },
+    { text: "  " },
   ]);
   const isAscii = (row: string) => [...row].every((char) => char.charCodeAt(0) >= 32 && char.charCodeAt(0) < 127);
   await $.ui.scroll({ ...SCROLL, by: 2, bodyRows: 10, contentRows: 11 });

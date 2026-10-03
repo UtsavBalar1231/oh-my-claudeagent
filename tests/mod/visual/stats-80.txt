@@ -1,7 +1,7 @@
 
  ▐▛███▛█   Claude Code v2.1.288
 ▝▜██████▀  Opus 5.5 · API Usage Billing
- ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/omca-visual-80x40-1bXcO1/cwd
+ ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/omca-visual-80x40-BQxrWN/cwd
 
 
 
@@ -31,7 +31,7 @@
 │ │ ◆ librarian   ██████████     2   1m05s    162k      $0.40       50%   │    │
 │ │ ◆ oracle      ██████████     2   6m24s    453k      $5.27       50%   │    │
 │ │ ◆ hephaestus  ██████████     1   2m23s    129k      $0.65      100%   │    │
-│ │ ◆ metis       ██████████     1   3m08s   60.1k      $0.34        0%   │    │
+│   ↓ more · ↑↓ scroll                                                         │
 ╰──────────────────────────────────────────────────────────────────────────────╯
                                                             ◐ medium · /effort
 ─────────────────────────────────────────────────── oh-my-claudeagent:sisyphus ─

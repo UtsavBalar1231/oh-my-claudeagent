@@ -153,7 +153,7 @@ test("the lane widens with the body, keeping the model chip, at 80 and 200 colum
   await at200.unmount();
 });
 
-test("tool calls draw one glyph each in their kind's key; identity and the clock in theirs", async ($, on) => {
+test("tool calls draw one glyph each in their kind's key, the current tool's name in text, identity in its key and the clock muted", async ($, on) => {
   await threeAgents($, on);
   const ui = await $.ui.mount(pane("terminal", INLINE_80));
   const lane = await ui.find({ key: "tools-a-1" });
@@ -169,7 +169,7 @@ test("tool calls draw one glyph each in their kind's key; identity and the clock
     [" ", undefined, undefined],
     ["◐", "claude", undefined],
     [" ", undefined, undefined],
-    ["Bash", "rainbow_orange", undefined],
+    ["Bash", "text", undefined],
     [" bun test src/parser.spec.ts", undefined, undefined],
   ]);
   expect(styled(head).filter(([text]) => text.trim() !== "")).toEqual([
@@ -179,7 +179,7 @@ test("tool calls draw one glyph each in their kind's key; identity and the clock
     [" sonnet-5-5 ", "inverseText", "permission"],
     [" high ", "inverseText", "inactive"],
     ["4.5k", "inactive", undefined],
-    ["    0s", "claude", undefined],
+    ["    0s", "inactive", undefined],
   ]);
   const explore = await ui.find({ key: "tools-a-2" });
   expect(styled(explore).find(([text]) => text === "◇")).toEqual(["◇", "rainbow_indigo", undefined]);

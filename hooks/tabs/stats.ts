@@ -173,6 +173,7 @@ function agentsCard(stats: Stats, view: View, width: number): RenderElement {
     key: "stats-agents",
     title: fitEnd(`Agents ${view.g.dot} ${plural(stats.rows.length, "type")}`, inner, view.g.ellipsis),
     tone: "info",
+    isAscii: view.isAscii,
     width,
     children: [
       view.kit.Text({ dimColor: true, children: [head] }),
@@ -206,6 +207,7 @@ function tokensCard(stats: Stats, view: View, width: number): RenderElement | un
     key: "stats-tokens",
     title: fitEnd(`Tokens per turn ${view.g.dot} ${isCut ? `last ${shown.length} of ` : ""}${plural(stats.turns.length, "turn")}`, inner, view.g.ellipsis),
     tone: "info",
+    isAscii: view.isAscii,
     width,
     children: [Line(view.kit, fitPieces([...strip, { text: note, color: TONE_KEYS.muted }], inner, view.g.ellipsis))],
   });
@@ -255,6 +257,7 @@ function costCard(stats: Stats, view: View, width: number): RenderElement {
       key: "stats-cost",
       title,
       tone: "warn",
+      isAscii: view.isAscii,
       width,
       children: [Text({ dimColor: true, wrap: "wrap", children: ["No finished run has a listed price, so no cost is shown"] })],
     });
@@ -274,6 +277,7 @@ function costCard(stats: Stats, view: View, width: number): RenderElement {
     key: "stats-cost",
     title,
     tone: "ok",
+    isAscii: view.isAscii,
     width,
     children: [
       Line(view.kit, fitPieces([{ text: money, bold: true }, { text: " " }, ...meter], inner, view.g.ellipsis)),

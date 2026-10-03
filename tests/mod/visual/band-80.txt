@@ -1,7 +1,7 @@
 
  ▐▛███▛█   Claude Code v2.1.288
 ▝▜██████▀  Opus 5.5 · API Usage Billing
- ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/omca-visual-80x40-h8xpww/cwd
+ ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/omca-visual-80x40-Ntq2ms/cwd
 
 
 ❯ Run the tests
@@ -28,7 +28,7 @@
 
 
 
-▰▱▱▱▱ 12/46 · next 13 Port the snapsh… · ! just test not logged · ◆ 1 running[-]
+█▎███ 12/46 · next 13 Port the snaps… · ! just test not logged · ◆ 1 running [-]
 1: Log evidence
                                                             ◐ medium · /effort
 ─────────────────────────────────────────────────────────── OMCA: 46-task-plan ─

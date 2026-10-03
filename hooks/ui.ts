@@ -9,6 +9,7 @@ import type {
   LinkProps,
   MarkdownProps,
   RenderElement,
+  RenderNode,
   RenderSurface,
   TextHoverProps,
   TextProps,
@@ -80,20 +81,24 @@ export const Rule = (
   tally?: { done: number; total: number },
 ): RenderElement => Line(kit, rule(width, g, ascii, label, tally));
 
+// The engine's border styles: `classic` draws its corners and edges with `+`, `-` and `|`.
+const border = (isAscii: boolean) => (isAscii ? "classic" : "round");
+
 export type CardSpec = {
   key: string;
   title: string;
   tone: Paint;
+  isAscii: boolean;
   isRaised?: boolean;
   width?: number;
   children: readonly RenderElement[];
 };
 
-export function Card(kit: Kit, { key, title, tone, isRaised = false, width, children }: CardSpec): RenderElement {
+export function Card(kit: Kit, { key, title, tone, isAscii, isRaised = false, width, children }: CardSpec): RenderElement {
   return kit.Box({
     key,
     flexDirection: "column",
-    borderStyle: "round",
+    borderStyle: border(isAscii),
     borderColor: themeKey(tone),
     paddingX: 1,
     ...(width === undefined ? {} : { width }),
@@ -128,6 +133,7 @@ export type HoverCardSpec = {
   anchor: readonly RenderElement[];
   title: string;
   tone: Paint;
+  isAscii: boolean;
   lines: readonly RenderElement[];
   top?: number;
   left?: number;
@@ -135,7 +141,7 @@ export type HoverCardSpec = {
 };
 
 /** A card drawn over the rows below its anchor while the pointer is on the anchor; nothing reflows. */
-export function HoverCard(kit: Kit, { key, anchor, title, tone, lines, top = 1, left = 2, width }: HoverCardSpec): RenderElement {
+export function HoverCard(kit: Kit, { key, anchor, title, tone, isAscii, lines, top = 1, left = 2, width }: HoverCardSpec): RenderElement {
   return kit.Box({
     key,
     flexDirection: "column",
@@ -148,7 +154,7 @@ export function HoverCard(kit: Kit, { key, anchor, title, tone, lines, top = 1, 
         display: "none",
         hover: { display: "flex" },
         flexDirection: "column",
-        borderStyle: "round",
+        borderStyle: border(isAscii),
         borderColor: themeKey(tone),
         backgroundColor: TONE_KEYS.raised,
         paddingX: 1,
@@ -171,7 +177,7 @@ export type ScopedCardSpec = Omit<HoverCardSpec, "anchor" | "top" | "left" | "wi
  * An absolute Box paints over only the rows before it, so a card that must cover the rows after
  * its anchor is drawn after them, at the end of the tree, and placed by its offsets.
  */
-export function ScopedCard(kit: Kit, { key, scope, title, tone, lines, top, left, width }: ScopedCardSpec): RenderElement {
+export function ScopedCard(kit: Kit, { key, scope, title, tone, isAscii, lines, top, left, width }: ScopedCardSpec): RenderElement {
   return kit.Box({
     key,
     position: "absolute",
@@ -181,7 +187,7 @@ export function ScopedCard(kit: Kit, { key, scope, title, tone, lines, top, left
     display: "none",
     hover: { display: "flex", scope },
     flexDirection: "column",
-    borderStyle: "round",
+    borderStyle: border(isAscii),
     borderColor: themeKey(tone),
     backgroundColor: TONE_KEYS.raised,
     paddingX: 1,
@@ -220,4 +226,41 @@ export function Field(kit: Kit, { key, label, placeholder, value, onInput, onSub
     ...(onInput === undefined ? {} : { onInput }),
     onSubmit,
   });
+}
+
+const textOf = (node: RenderNode): string =>
+  typeof node === "string" ? node : node.type === "Text" ? (node.children ?? []).map(textOf).join("") : "";
+const numberOf = (value: unknown): number => (typeof value === "number" ? value : 0);
+
+/**
+ * The fewest rows a tree can take once drawn: a Text, Link or Markdown that wraps counts one row,
+ * code one per line, and a Box out of the flow none, so a tree this tall at least is never shorter.
+ */
+export function rowsAtLeast(node: RenderNode): number {
+  if (typeof node === "string") return node === "" ? 0 : 1;
+  switch (node.type) {
+    case "Text":
+      return textOf(node) === "" ? 0 : 1;
+    case "Markdown":
+      return node.props.text.trim() === "" ? 0 : 1;
+    case "Code":
+      return node.props.source.split("\n").length;
+    case "Button":
+    case "Input":
+    case "Select":
+    case "Link":
+      return 1;
+    case "Box": {
+      const props = node.props ?? {};
+      if (props["display"] === "none" || props["position"] === "absolute") return 0;
+      const rows = (node.children ?? []).map(rowsAtLeast);
+      const isRow = props["flexDirection"] !== "column";
+      const gap = numberOf(props["rowGap"] ?? props["gap"]);
+      const inner = isRow ? Math.max(0, ...rows) : rows.reduce((sum, height) => sum + height, 0) + gap * Math.max(0, rows.length - 1);
+      const border = typeof props["borderStyle"] === "string" ? 2 : 0;
+      return Math.max(inner + border, numberOf(props["minHeight"]), numberOf(props["height"]));
+    }
+    default:
+      return 0;
+  }
 }

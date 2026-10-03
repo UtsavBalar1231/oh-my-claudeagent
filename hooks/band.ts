@@ -8,7 +8,7 @@ import { BOULDER, LEDGER, statusPath, verificationOf } from "../src/core/omca-pa
 import { isAbsolutePath, joinPath } from "../src/core/path.ts";
 import { boardOf, parsePlan } from "../src/core/plan-reader.ts";
 import { parseRuns, proofOf, proofSummary } from "../src/core/proof.ts";
-import { glyphs, isAsciiRequested } from "../src/core/ui-kit.ts";
+import { isAsciiRequested } from "../src/core/ui-kit.ts";
 import { TONE_KEYS } from "../src/core/visual.ts";
 import type { Features } from "./dispatch.ts";
 import { type Host, reason } from "./host.ts";
@@ -136,12 +136,10 @@ const TONES: Record<Tone, TextStyle> = {
   warn: { color: TONE_KEYS.warn },
   fail: { color: TONE_KEYS.fail },
   active: { color: TONE_KEYS.active },
-  fill: { color: TONE_KEYS.fill },
-  track: { color: TONE_KEYS.track },
 };
 
 const row = ({ Text }: Kit, spans: readonly Span[]): RenderElement =>
-  Text({ wrap: "truncate-end", children: spans.map((span) => Text({ ...TONES[span.tone], children: [span.text] })) });
+  Text({ wrap: "truncate-end", children: spans.map(({ text, tone, ...keys }) => Text({ ...TONES[tone], ...keys, children: [text] })) });
 
 export const band: Features = {
   "session.start": {
@@ -177,7 +175,7 @@ export const band: Features = {
         host.state.agents.get(),
       ]);
       const running = Object.values(agents).filter((agent) => agent.endedAt === null).length;
-      const view = bandView(snapshot, actions, e.props.bodyColumns, glyphs(isAscii), running);
+      const view = bandView(snapshot, actions, e.props.bodyColumns, isAscii, running);
       if (view === undefined) return undefined;
       const kit = kitOf(host.ui.resolve(e), e.surface);
       const { Box, Button } = kit;

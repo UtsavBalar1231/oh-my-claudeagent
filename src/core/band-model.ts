@@ -1,6 +1,7 @@
 import { outsideFences, TASK_LINE } from "./checkboxes.ts";
 import type { NextAction, NextActionKind } from "./next-actions.ts";
-import { displayWidth, fitEnd, type Glyphs, usableColumns } from "./ui-kit.ts";
+import { displayWidth, fitEnd, type Glyphs, glyphs, usableColumns } from "./ui-kit.ts";
+import { bar, type ThemeKey } from "./visual.ts";
 
 export type NextTask = { n: number; title: string };
 export type Proof = { proven: number; unproven: number; failed: number };
@@ -13,8 +14,9 @@ export type Band = {
   readAt: number;
 };
 
-export type Tone = "title" | "plain" | "muted" | "ok" | "warn" | "fail" | "active" | "fill" | "track";
-export type Span = { text: string; tone: Tone };
+export type Tone = "title" | "plain" | "muted" | "ok" | "warn" | "fail" | "active";
+// The progress bar's cells carry their own keys, a seam cell two.
+export type Span = { text: string; tone: Tone; color?: ThemeKey; backgroundColor?: ThemeKey };
 export type BandButton = { key: NextActionKind; hotkey: string; label: string; prompt: string };
 export type BandView = { status: readonly Span[]; buttons: readonly BandButton[] };
 
@@ -28,6 +30,9 @@ const COMPACT: Words = { noPlan: "no plan", logged: " logged", unlogged: " not l
 const MIN_FLEXIBLE = 14;
 const BAR_CELLS = 5;
 export const BUTTON_GAP = 3;
+// The engine draws the band's collapse mark, `[-]`, over the last three columns of its first row,
+// so the status row stops one column short of it.
+const MARK_CELLS = 4;
 // A plain Button draws its hotkey, a colon and a space before the label.
 const HOTKEY_CELLS = 3;
 
@@ -85,13 +90,6 @@ export function planTally(text: string): { done: number; total: number; next: Ne
 
 const widthOf = (spans: readonly Span[]): number => spans.reduce((sum, span) => sum + displayWidth(span.text), 0);
 
-/** Five cells: any progress shows one, and only a finished plan fills them all. */
-export function progressCells(done: number, total: number): number {
-  if (total <= 0 || done <= 0) return 0;
-  if (done >= total) return BAR_CELLS;
-  return Math.min(BAR_CELLS - 1, Math.max(1, Math.round((done / total) * BAR_CELLS)));
-}
-
 type Segment = Ranked & { parts: Part[] };
 
 const segment = (priority: number, parts: Part[]): Segment => ({
@@ -110,21 +108,15 @@ function proofParts({ proven, unproven, failed }: Proof, g: Glyphs): Part[] {
   ];
 }
 
-function statusSegments(band: Band, words: Words, g: Glyphs, running: number): Segment[] {
+function statusSegments(band: Band, words: Words, g: Glyphs, ascii: boolean, running: number): Segment[] {
   if (band.error !== null) return [segment(0, [{ text: `${g.cross} ${oneLine(band.error)}`, tone: "fail", isFlexible: true }])];
   const { plan, verification, proof } = band;
   const segments: Segment[] = [];
   if (plan === null) {
     segments.push(segment(PRIORITY.progress, [{ text: words.noPlan, tone: "muted" }]));
   } else {
-    const filled = progressCells(plan.done, plan.total);
-    segments.push(
-      segment(PRIORITY.progress, [
-        { text: g.filled.repeat(filled), tone: "fill" },
-        { text: g.empty.repeat(BAR_CELLS - filled), tone: "track" },
-        { text: ` ${plan.done}/${plan.total}`, tone: "muted" },
-      ]),
-    );
+    const cells = bar({ done: plan.done, todo: plan.total - plan.done }, BAR_CELLS, ascii).map((piece): Span => ({ ...piece, tone: "plain" }));
+    segments.push(segment(PRIORITY.progress, [...cells, { text: ` ${plan.done}/${plan.total}`, tone: "muted" }]));
     if (plan.next !== null) {
       segments.push(
         segment(PRIORITY.next, [
@@ -147,7 +139,12 @@ function statusSegments(band: Band, words: Words, g: Glyphs, running: number): S
     );
   }
   if (running > 0) {
-    segments.push(segment(PRIORITY.running, [{ text: `${g.agent} ${running} running`, tone: "active" }]));
+    segments.push(
+      segment(PRIORITY.running, [
+        { text: `${g.agent} `, tone: "active" },
+        { text: `${running} running`, tone: "plain" },
+      ]),
+    );
   }
   return segments;
 }
@@ -165,10 +162,7 @@ function fitParts(parts: readonly Part[], width: number, g: Glyphs): Span[] {
     width - fixedWidth(parts),
   );
   let flexible = 0;
-  return parts.map(({ text, tone, isFlexible }) => ({
-    text: isFlexible ? fitEnd(text, sizes[flexible++] ?? 0, g.ellipsis) : text,
-    tone,
-  }));
+  return parts.map(({ isFlexible, ...span }) => (isFlexible ? { ...span, text: fitEnd(span.text, sizes[flexible++] ?? 0, g.ellipsis) } : span));
 }
 
 function clip(spans: readonly Span[], width: number, g: Glyphs): Span[] {
@@ -178,7 +172,7 @@ function clip(spans: readonly Span[], width: number, g: Glyphs): Span[] {
   for (const span of spans) {
     const cells = displayWidth(span.text);
     if (cells >= left) {
-      out.push({ text: fitEnd(`${span.text}${g.ellipsis}`, left, g.ellipsis), tone: span.tone });
+      out.push({ ...span, text: fitEnd(`${span.text}${g.ellipsis}`, left, g.ellipsis) });
       break;
     }
     if (cells > 0) out.push(span);
@@ -187,11 +181,12 @@ function clip(spans: readonly Span[], width: number, g: Glyphs): Span[] {
   return out.filter((span) => span.text !== "");
 }
 
-function statusRow(band: Band, width: number, g: Glyphs, running: number): Span[] {
+function statusRow(band: Band, width: number, ascii: boolean, running: number): Span[] {
+  const g = glyphs(ascii);
   const gap = displayWidth(` ${g.dot} `);
-  const full = statusSegments(band, FULL, g, running);
+  const full = statusSegments(band, FULL, g, ascii, running);
   const kept = arrange(full, width, gap);
-  const chosen = kept.length === full.length ? kept : arrange(statusSegments(band, COMPACT, g, running), width, gap);
+  const chosen = kept.length === full.length ? kept : arrange(statusSegments(band, COMPACT, g, ascii, running), width, gap);
   return clip(fitParts(joined(chosen, g), width, g), width, g);
 }
 
@@ -214,10 +209,12 @@ export function bandView(
   band: Band | undefined,
   actions: readonly NextAction[],
   columns: number,
-  g: Glyphs,
+  ascii: boolean,
   running = 0,
 ): BandView | undefined {
   if (band === undefined || (band.plan === null && band.error === null && actions.length === 0)) return undefined;
-  const width = usableColumns(columns);
-  return { status: statusRow(band, width, g, running), buttons: buttonRow(actions, width, g) };
+  return {
+    status: statusRow(band, Math.max(0, columns - MARK_CELLS), ascii, running),
+    buttons: buttonRow(actions, usableColumns(columns), glyphs(ascii)),
+  };
 }

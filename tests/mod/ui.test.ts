@@ -2,7 +2,7 @@ import type { On, RenderElement, RenderSurface } from "claude-code";
 import { type Engine, expect, test } from "claude-code/testing";
 import { glyphs } from "../../src/core/ui-kit.ts";
 import { chip, type Paint } from "../../src/core/visual.ts";
-import { Bar, Card, Chip, CodeBlock, Field, HoverCard, type Kit, kitOf, Row, Rule } from "../../hooks/ui.ts";
+import { Bar, Card, Chip, CodeBlock, Field, HoverCard, type Kit, kitOf, Row, Rule, rowsAtLeast, ScopedCard } from "../../hooks/ui.ts";
 import { PLUGIN } from "./world.ts";
 
 type ColorOf<C, Prop extends string> = C extends (props: infer P) => unknown ? (P extends { [K in Prop]?: infer V } ? V : never) : never;
@@ -70,8 +70,8 @@ test("a bar and a rule draw their pieces as runs of one line", async ($, on) => 
     text(
       { wrap: "truncate-end" },
       text({ color: "success" }, "███"),
-      text({ color: "success", backgroundColor: "rate_limit_empty" }, "▍"),
-      text({ color: "rate_limit_empty" }, "████"),
+      text({ color: "success", backgroundColor: "subtle" }, "▍"),
+      text({ color: "subtle" }, "████"),
     ),
   );
   expect(await drawn((kit) => Rule(kit, 16, glyphs(true), true, "Tasks", { done: 1, total: 2 }))).toEqual(
@@ -90,16 +90,46 @@ test("a bar and a rule draw their pieces as runs of one line", async ($, on) => 
 test("a card is a round border in its tone with a bold title, filled when raised", async ($, on) => {
   const drawn = gallery($, on);
   const body = (kit: Kit) => [kit.Text({ children: ["Done when: just ci exits 0"] })];
-  expect(await drawn((kit) => Card(kit, { key: "c", title: "Task 43", tone: "active", isRaised: true, width: 40, children: body(kit) }))).toEqual({
+  expect(await drawn((kit) => Card(kit, { key: "c", title: "Task 43", tone: "active", isAscii: false, isRaised: true, width: 40, children: body(kit) }))).toEqual({
     type: "Box",
     props: { key: "c", flexDirection: "column", borderStyle: "round", borderColor: "claude", paddingX: 1, width: 40, backgroundColor: "userMessageBackground" },
     children: [text({ bold: true, color: "text", wrap: "truncate-end" }, "Task 43"), text({}, "Done when: just ci exits 0")],
   });
-  expect(await drawn((kit) => Card(kit, { key: "c", title: "Plan", tone: "planMode", children: [] }))).toEqual({
+  expect(await drawn((kit) => Card(kit, { key: "c", title: "Plan", tone: "planMode", isAscii: false, children: [] }))).toEqual({
     type: "Box",
     props: { key: "c", flexDirection: "column", borderStyle: "round", borderColor: "planMode", paddingX: 1 },
     children: [text({ bold: true, color: "text", wrap: "truncate-end" }, "Plan")],
   });
+});
+
+test("in ASCII mode every card draws the engine's classic border", async ($, on) => {
+  const drawn = gallery($, on);
+  const lines = (kit: Kit) => [kit.Text({ children: ["3 proving entries"] })];
+  const classic = { props: { borderStyle: "classic" } };
+  expect(await drawn((kit) => Card(kit, { key: "c", title: "Plan", tone: "plan", isAscii: true, children: [] }))).toMatchObject(classic);
+  expect(
+    await drawn((kit) => HoverCard(kit, { key: "h", anchor: [kit.Text({ children: ["43"] })], title: "Task 43", tone: "plan", isAscii: true, lines: lines(kit) })),
+  ).toMatchObject({ children: [{}, classic] });
+  expect(
+    await drawn((kit) => ScopedCard(kit, { key: "s", scope: "lane", title: "executor", tone: "plan", isAscii: true, lines: lines(kit), top: 0, left: 2, width: 30 })),
+  ).toMatchObject(classic);
+});
+
+test("a tree's fewest rows: one per text or markdown, code by line, a border two, a row its tallest, nothing out of the flow", async ($, on) => {
+  const drawn = gallery($, on);
+  const tree = await drawn((kit) =>
+    kit.Box({
+      flexDirection: "column",
+      children: [
+        Card(kit, { key: "c", title: "Learnings", tone: "info", isAscii: false, children: [kit.Markdown({ text: "a long paragraph" }), kit.Markdown({ text: " " })] }),
+        kit.Box({ flexDirection: "row", children: [kit.Text({ children: ["a"] }), kit.Box({ flexDirection: "column", children: [kit.Text({ children: ["b"] }), kit.Text({ children: ["c"] })] })] }),
+        CodeBlock(kit, { source: "one\ntwo" }),
+        kit.Box({ position: "absolute", top: 0, children: [kit.Text({ children: ["over"] })] }),
+        kit.Text({ children: [""] }),
+      ],
+    }),
+  );
+  expect(rowsAtLeast(tree)).toBe(4 + 2 + 2);
 });
 
 test("a row lights selectionBg on hover, holds it bold when focused, and dims when done; a chip keeps its colors", async ($, on) => {
@@ -133,6 +163,7 @@ test("a hover card sits absolutely under its anchor, hidden until the pointer is
         anchor: [kit.Text({ children: ["◐ 43 Record the final verification"] })],
         title: "Task 43",
         tone: "active",
+        isAscii: false,
         lines: [kit.Text({ children: ["3 proving entries"] })],
       }),
     ),

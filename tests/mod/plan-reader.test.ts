@@ -411,10 +411,10 @@ test("the board shows the plan's Status, progress, proof and next task, then eac
       { text: " · ", color: "inactive" },
       { text: "! 1 unproven", color: "warning" },
       { text: " · ", color: "inactive" },
-      { text: "✗ 0 failed", color: "error" },
+      { text: "✗ 0 failed", color: "inactive" },
       { text: "next ", color: "inactive" },
       { text: "3 ", color: "claude", bold: true },
-      { text: "Draw the board", color: "claude" },
+      { text: "Draw the board", color: "text" },
     ]);
     await ui.unmount();
   }
@@ -446,7 +446,7 @@ test("each row carries its state as a glyph, a word and a color, and done rows a
   expect(await row(5)).toEqual([{ text: "○ " }, { text: "5" }, { text: "Write the docs" }]);
 
   await $.ui.focus({ component: "Pane", requestId: "omca", element: "task-4", origin: { kind: "person" } });
-  expect((await row(3)).slice(0, 3)).toEqual([{ text: "○ " }, { text: "3" }, { text: "Draw the board", color: "claude", bold: true }]);
+  expect((await row(3)).slice(0, 3)).toEqual([{ text: "○ " }, { text: "3" }, { text: "Draw the board", color: "text", bold: true }]);
   await ui.unmount();
 });
 
@@ -527,6 +527,18 @@ test("the inline tier expands the focused task under its row", async ($, on) => 
   await ui.unmount();
 });
 
+test("an inline expansion whose listed files cannot be read says so, as the task page does", async ($, on) => {
+  boardWorld(on, PASSING, {}, BOARD.replace("  - File: `hooks/plan.ts`", "  - File: `hooks/missing.ts`"));
+  const ui = await mountBoard($, INLINE_TIER);
+  const drawn = rows(await ui.drawn());
+  const at = drawn.findIndex((row) => row.startsWith("○ 3 "));
+  expect(drawn.slice(at + 3, at + 5)).toEqual(["     hooks/missing.ts not found", "     None of its files can be read, so no run can prove it."]);
+  expect(spans(await ui.find({ key: "x-evidence" })).filter((span) => span.text.trim() !== "")).toEqual([
+    { text: "None of its files can be read, so no run can prove it.", color: "inactive" },
+  ]);
+  await ui.unmount();
+});
+
 test("the split tier draws the focused task's detail beside the list", async ($, on) => {
   boardWorld(on);
   const ui = await mountBoard($, SPLIT);
@@ -543,6 +555,20 @@ test("the split tier draws the focused task's detail beside the list", async ($,
   ]);
   expect(rows(await ui.drawn()).some((row) => row.includes("hooks/plan.ts") && row.includes("changed 15m ago"))).toBe(true);
   expect(spans(detail).find((span) => span.text === "changed 15m ago")).toEqual({ text: "changed 15m ago", color: "warning" });
+  await ui.unmount();
+});
+
+test("a file changed moments ago reads changed just now, never now ago", async ($, on) => {
+  const { w } = boardWorld(on);
+  w.files.set(`${ROOT}/hooks/plan.ts`, { text: "x", mtimeMs: NOW - 1000 });
+  const ui = await mountBoard($, SPLIT);
+  await ui.press({ key: "task-3" });
+  const drawn = rows(await ui.drawn());
+  expect(drawn.filter((row) => row.includes("just now")).map((row) => row.trim().replace(/\s+/g, " "))).toEqual([
+    "hooks/plan.ts changed just now",
+    "! No test, build or lint run since its files changed just now.",
+  ]);
+  expect(drawn.some((row) => row.includes("now ago"))).toBe(false);
   await ui.unmount();
 });
 

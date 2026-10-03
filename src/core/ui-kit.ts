@@ -14,8 +14,6 @@ const UNICODE = {
   blocked: "⊘",
   agent: "◆",
   mask: "‹masked›",
-  filled: "▰",
-  empty: "▱",
 } as const;
 
 export type Glyphs = { readonly [K in keyof typeof UNICODE]: string };
@@ -36,8 +34,6 @@ const ASCII: Glyphs = {
   blocked: "/",
   agent: "@",
   mask: "<masked>",
-  filled: "#",
-  empty: "-",
 };
 
 export function isAsciiRequested(value: string | undefined): boolean {

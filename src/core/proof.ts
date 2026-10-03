@@ -73,3 +73,9 @@ export function ago(ms: number): string {
   const hours = Math.floor(minutes / 60);
   return hours < 48 ? `${hours}h` : `${Math.floor(hours / 24)}d`;
 }
+
+/** The elapsed time as words: `just now`, `42s ago`, `5m ago`. */
+export function timeAgo(ms: number): string {
+  const elapsed = ago(ms);
+  return elapsed === "now" ? "just now" : `${elapsed} ago`;
+}

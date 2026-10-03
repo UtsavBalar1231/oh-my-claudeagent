@@ -64,6 +64,7 @@ export const view: TabView = async (host, view) => {
       key: "ratings",
       title: fitEnd(title, inner, view.g.ellipsis),
       tone: downs > 0 ? "warn" : "ok",
+      isAscii: view.isAscii,
       width: view.width,
       children: [
         ...listed.map((rating, index) => row(view, rating, index, inner)),

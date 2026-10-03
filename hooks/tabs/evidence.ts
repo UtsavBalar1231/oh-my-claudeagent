@@ -18,7 +18,7 @@ import {
 } from "../../src/core/evidence.ts";
 import { BOULDER, LEDGER } from "../../src/core/omca-paths.ts";
 import { displayWidth, fitEnd, fitMiddle, padEnd, shortType, wrapText } from "../../src/core/ui-kit.ts";
-import { agentKey, chip, type ChipTone, dots, type Piece, redact, rule, TONE_KEYS } from "../../src/core/visual.ts";
+import { agentKey, chip, type ChipKind, type ChipTone, columnChip, dots, type Piece, redact, rule, TONE_KEYS } from "../../src/core/visual.ts";
 import type { Input } from "../dispatch.ts";
 import { type Host, reason, type State } from "../host.ts";
 import { noticeRow, PANE, type TabView, type View } from "../pane.ts";
@@ -29,13 +29,8 @@ type Entry = Ledger["entries"][number];
 type Bound = { name: string; path: string } | { name: string; error: string } | null;
 type Block = { element: RenderElement; height: number };
 
-const TYPE_TONES: Readonly<Record<EvidenceType, ChipTone>> = {
-  test: "info",
-  build: "active",
-  lint: "warn",
-  manual: "muted",
-  final_verification: "plan",
-};
+// A type is a category, not a state, so only the final verification, the plan's own, takes a tone.
+const typeKind = (type: EvidenceType): ChipKind => (type === "final_verification" ? "plan" : "neutral");
 const TYPE_KEYS: readonly (readonly [hotkey: string, type: EvidenceType, label: string])[] = [
   ["b", "build", "Build"],
   ["e", "test", "Test"],
@@ -184,7 +179,7 @@ function exitChip(view: View, code: number): Piece {
   return chip(`${glyph}${String(code).padStart(2)}`, code === 0 ? "ok" : "fail", view.isAscii);
 }
 
-const typeChip = (view: View, type: EvidenceType) => chip(padEnd(TYPE_LABELS[type], TYPE_CELLS), TYPE_TONES[type], view.isAscii);
+const typeChip = (view: View, type: EvidenceType) => columnChip(TYPE_LABELS[type], typeKind(type), view.isAscii, TYPE_CELLS);
 
 function agentPieces(view: View, verifiedBy: string | null, cells: number): Piece[] {
   if (cells === 0) return [];
@@ -253,7 +248,7 @@ function tallyGroups(view: View, entries: readonly Entry[]): Piece[][] {
   const levels = recentLevels(entries, RECENT);
   const strip: Piece[] = [...dots(levels, view.isAscii), { text: ` last ${levels.length}`, color: TONE_KEYS.muted }];
   const counts = tallies(entries).map((tally): Piece[] => [
-    { text: TYPE_LABELS[tally.type].toLowerCase(), color: TONE_KEYS[TYPE_TONES[tally.type]] },
+    { text: TYPE_LABELS[tally.type].toLowerCase(), ...(tally.type === "final_verification" ? { color: TONE_KEYS.plan } : {}) },
     { text: ` ${tally.runs}` },
     ...(tally.failed === 0 ? [] : [{ text: ` ${view.g.cross}${tally.failed}`, color: TONE_KEYS.fail }]),
   ]);
@@ -282,7 +277,7 @@ function header(view: View, ledger: Ledger): Block {
   const inner = view.width - 4;
   const lines = [...wrapGroups(groups, inner, sep), ...wrapGroups(tally, inner, { text: "  " })];
   return {
-    element: Card(view.kit, { key: "verdict", title: fitEnd(title, inner, view.g.ellipsis), tone, children: lines.map((pieces) => line(view, pieces, inner)) }),
+    element: Card(view.kit, { key: "verdict", title: fitEnd(title, inner, view.g.ellipsis), tone, isAscii: view.isAscii, children: lines.map((pieces) => line(view, pieces, inner)) }),
     height: 3 + lines.length,
   };
 }
@@ -303,7 +298,7 @@ function entryRow(view: View, entry: Entry, index: number, layout: Layout, isFoc
   const pieces: Piece[] = [
     { text: isFocused ? `${view.g.pointer} ` : "  " },
     { text: `${clockOf(entry.at)} `, color: TONE_KEYS.muted },
-    typeChip(view, entry.type),
+    ...typeChip(view, entry.type),
     { text: " " },
     exitChip(view, entry.exitCode),
     { text: " " },
@@ -533,6 +528,7 @@ function detailCard(view: View, entry: Entry, index: number, width: number, room
     key: `detail-${index}`,
     title: `${TYPE_LABELS[entry.type]} ${view.g.dot} exit ${entry.exitCode}`,
     tone: entry.exitCode === 0 ? "ok" : "fail",
+    isAscii: view.isAscii,
     width,
     children: blocks.map((block) => block.element),
   });

@@ -32,7 +32,7 @@
                                                                │  16:10  MANUAL   ✓ 0  just visual plan-reader      ◆
                                                                │  14:35  TEST     ✓ 0  bun test src/core            ◆
                                                                │b: Build  e: Test  l: Lint  m: Manual  v: Final
-proof-ledger 6/6 tasks · no verification yet                [-]│x: Fails  c: Copy  r: Rerun  f: Find  3/16 · ↑↓ move
+█████ 6/6                                                   [-]│x: Fails  c: Copy  r: Rerun  f: Find  3/16 · ↑↓ move
                                            ◐ medium · /effort  │
 ─────────────────────────────────────────────────────────────────────────────────────────── oh-my-claudeagent:sisyphus ─
 ❯ 

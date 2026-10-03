@@ -69,6 +69,7 @@ function card(view: View, { lane, at, height }: Placed, end: number): RenderElem
     scope: scopeOf(lane),
     title: fitEnd(`${shortType(lane.type)} ${g.dot} ${lane.description}`, inner, g.ellipsis),
     tone: agentKey(lane.type),
+    isAscii: view.isAscii,
     lines,
     top: top - end,
     left: CARD_LEFT,

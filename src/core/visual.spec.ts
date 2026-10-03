@@ -9,6 +9,7 @@ import {
   bar,
   CHIP_TONES,
   chip,
+  columnChip,
   DRAWN_PAIRS,
   dots,
   fitPieces,
@@ -53,8 +54,7 @@ describe("palette", () => {
       rule: "subtle",
       focus: "selectionBg",
       raised: "userMessageBackground",
-      fill: "rate_limit_fill",
-      track: "rate_limit_empty",
+      track: "subtle",
     });
     expect(themeKey("fail")).toBe("error");
     expect(themeKey("error")).toBe("error");
@@ -104,6 +104,13 @@ describe("chip", () => {
     expect(chip("A VERY LONG LABEL", "warn", false).text).toBe(" A VERY LONG… ");
     expect(chip("A VERY LONG LABEL", "warn", true).text).toBe("[A VERY LO...]");
   });
+
+  test("a column chip pads inside its background in Unicode and after its brackets in ASCII", () => {
+    expect(columnChip("TEST", "neutral", false, 6)).toEqual([{ text: " TEST   ", color: "text", backgroundColor: "selectionBg", bold: true }]);
+    expect(columnChip("TEST", "neutral", true, 6)).toEqual([{ text: "[TEST]", color: "text", backgroundColor: "selectionBg", bold: true }, { text: "  " }]);
+    expect(columnChip("FINAL", "plan", true, 6)).toEqual([{ text: "[FINAL]", color: "inverseText", backgroundColor: "planMode", bold: true }, { text: " " }]);
+    expect(columnChip("MANUAL", "neutral", true, 6).map((piece) => piece.text)).toEqual(["[MANUAL]"]);
+  });
 });
 
 describe("bar", () => {
@@ -111,17 +118,17 @@ describe("bar", () => {
     expect(bar({ done: 59, active: 2, failed: 1, todo: 6 }, 10, false)).toEqual([
       { text: "████████", color: "success" },
       { text: "▊", color: "success", backgroundColor: "claude" },
-      { text: "▏", color: "error", backgroundColor: "rate_limit_empty" },
+      { text: "▏", color: "error", backgroundColor: "subtle" },
     ]);
     expect(bar({ done: 3, todo: 4 }, 8, false)).toEqual([
       { text: "███", color: "success" },
-      { text: "▍", color: "success", backgroundColor: "rate_limit_empty" },
-      { text: "████", color: "rate_limit_empty" },
+      { text: "▍", color: "success", backgroundColor: "subtle" },
+      { text: "████", color: "subtle" },
     ]);
   });
 
   test("draws an empty plan as all track and a zero width as nothing", () => {
-    expect(bar({ done: 0, todo: 0 }, 4, false)).toEqual([{ text: "████", color: "rate_limit_empty" }]);
+    expect(bar({ done: 0, todo: 0 }, 4, false)).toEqual([{ text: "████", color: "subtle" }]);
     expect(bar({ done: 3, todo: 1 }, 0, false)).toEqual([]);
   });
 
@@ -131,12 +138,12 @@ describe("bar", () => {
       { text: "#######", color: "success" },
       { text: "=", color: "claude" },
       { text: "x", color: "error" },
-      { text: ".", color: "rate_limit_empty" },
+      { text: ".", color: "subtle" },
       { text: "]" },
     ]);
     expect(bar({ done: 4, todo: 4 }, 2, true)).toEqual([
       { text: "#", color: "success" },
-      { text: ".", color: "rate_limit_empty" },
+      { text: ".", color: "subtle" },
     ]);
   });
 
@@ -171,7 +178,7 @@ describe("fitPieces", () => {
 describe("stack", () => {
   const green = { color: "green_FOR_SUBAGENTS_ONLY", ascii: "#" } as const;
   const blue = { color: "blue_FOR_SUBAGENTS_ONLY", ascii: "=" } as const;
-  const track = { color: "rate_limit_empty", ascii: "." } as const;
+  const track = { color: "subtle", ascii: "." } as const;
 
   test("shares whole cells by value, each segment one run in its own key", () => {
     expect(stack([{ ...green, value: 3 }, { ...blue, value: 1 }], 8, false)).toEqual([
@@ -180,7 +187,7 @@ describe("stack", () => {
     ]);
     expect(stack([{ ...green, value: 1 }, { ...track, value: 99 }], 10, false)).toEqual([
       { text: "█", color: "green_FOR_SUBAGENTS_ONLY" },
-      { text: "█████████", color: "rate_limit_empty" },
+      { text: "█████████", color: "subtle" },
     ]);
   });
 
@@ -188,7 +195,7 @@ describe("stack", () => {
     expect(stack([{ ...green, value: 2 }, { ...blue, value: 0 }, { ...track, value: 2 }], 6, true)).toEqual([
       { text: "[" },
       { text: "##", color: "green_FOR_SUBAGENTS_ONLY" },
-      { text: "..", color: "rate_limit_empty" },
+      { text: "..", color: "subtle" },
       { text: "]" },
     ]);
     expect(stack([{ ...green, value: 2 }], 0, false)).toEqual([]);
@@ -241,8 +248,8 @@ describe("rule", () => {
       line("──"),
       { text: " " },
       { text: "██████", color: "success" },
-      { text: "▉", color: "success", backgroundColor: "rate_limit_empty" },
-      { text: "█", color: "rate_limit_empty" },
+      { text: "▉", color: "success", backgroundColor: "subtle" },
+      { text: "█", color: "subtle" },
       { text: " 6/7 " },
       line("────────"),
     ]);
@@ -365,7 +372,6 @@ describe("contrast", () => {
       subtle: "#665c54",
       selectionBg: "#504945",
       userMessageBackground: "#1d2021",
-      rate_limit_fill: "#ebbcba",
       rate_limit_empty: "#3c3836",
     },
     light: {
@@ -381,7 +387,6 @@ describe("contrast", () => {
       subtle: "#afafaf",
       selectionBg: "#b4d5ff",
       userMessageBackground: "#f0f0f0",
-      rate_limit_fill: "#5769f7",
       rate_limit_empty: "#272f6f",
     },
   };
@@ -414,11 +419,20 @@ describe("contrast", () => {
     }
   });
 
-  test("every chip tone is a drawn pair", () => {
-    for (const tone of CHIP_TONES) {
+  test("every chip tone is a drawn pair, and a neutral chip is text on the focus wash", () => {
+    for (const tone of [...CHIP_TONES, "neutral"] as const) {
       const { color, backgroundColor } = chip("X", tone, false);
-      const isDrawn = DRAWN_PAIRS.some((pair) => pair.fg === color && pair.bg === backgroundColor && pair.isShortBold);
+      const isDrawn = DRAWN_PAIRS.some((pair) => pair.fg === color && pair.bg === backgroundColor);
       expect({ tone, isDrawn }).toEqual({ tone, isDrawn: true });
+    }
+    expect(chip("TEST", "neutral", false)).toEqual({ text: " TEST ", color: "text", backgroundColor: "selectionBg", bold: true });
+  });
+
+  test("a bar track is a quiet mark on the pane in both themes, never as loud as data", () => {
+    const PANE = { wallpaper: "#262626", light: "#f5f5f5" } as const;
+    for (const theme of ["wallpaper", "light"] as const) {
+      const measured = round(ratio(HEX[theme][TONE_KEYS.track] ?? "", PANE[theme]));
+      expect({ theme, isQuiet: measured >= 1.5 && measured <= 3 }).toEqual({ theme, isQuiet: true });
     }
   });
 

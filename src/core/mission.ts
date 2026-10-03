@@ -1,7 +1,7 @@
 import { arrange, oneLine } from "./band-model.ts";
 import { inputText } from "./tool-input.ts";
 import { displayWidth, fitEnd, formatDuration, formatTokens, type Glyphs, padEnd, shortType } from "./ui-kit.ts";
-import { agentKey, chip, levelMark, type Piece, redact, type ThemeKey, TONE_KEYS, type WidthTier } from "./visual.ts";
+import { agentKey, chip, levelMark, ON_SURFACE, type Piece, redact, type ThemeKey, TONE_KEYS, type WidthTier } from "./visual.ts";
 
 export type ToolKind = "read" | "edit" | "bash" | "mcp" | "agent" | "other";
 
@@ -145,7 +145,7 @@ function headRow(lane: Lane, look: LaneLook): Piece[] {
     side(4, [chip(shortModel(lane.model), "info", ascii)]),
     ...(lane.effort === null ? [] : [side(3, [chip(String(lane.effort), "muted", ascii)])]),
     side(2, [{ text: formatTokens(lane.inputTokens + lane.outputTokens), color: TONE_KEYS.muted }]),
-    side(1, [{ text: formatDuration(now - lane.startedAt).padStart(ELAPSED), color: TONE_KEYS.active, bold: true }]),
+    side(1, [{ text: formatDuration(now - lane.startedAt).padStart(ELAPSED), color: TONE_KEYS.muted }]),
   ];
   const kept = arrange(sides, width, 1);
   const right = kept.filter((side) => side.priority !== 0).flatMap((side) => [{ text: " " }, ...side.pieces]);
@@ -165,7 +165,7 @@ function toolRow(lane: Lane, look: LaneLook, home: string, mask: string): Piece[
     return pieces;
   }
   const label = fitEnd(toolLabel(lane.tool.name), Math.max(0, width - cellsOf(pieces)), g.ellipsis);
-  pieces.push({ text: label, color: TOOL_KINDS[toolKind(lane.tool.name)].key, bold: true });
+  pieces.push({ text: label, color: ON_SURFACE, bold: true });
   const detail = redactLine(lane.tool.detail, home, mask);
   const room = width - cellsOf(pieces) - 1;
   if (detail !== "" && room > 0) pieces.push({ text: ` ${fitEnd(detail, room, g.ellipsis)}` });
@@ -228,7 +228,7 @@ export function summaryRow(lanes: readonly Lane[], look: LaneLook): Piece[] {
   const tokens = lanes.reduce((sum, lane) => sum + lane.inputTokens + lane.outputTokens, 0);
   const pieces: Piece[] = [
     { text: `${g.agent} `, color: running > 0 ? TONE_KEYS.active : TONE_KEYS.muted },
-    { text: `${running} running`, ...(running > 0 ? { color: TONE_KEYS.active, bold: true as const } : { color: TONE_KEYS.muted }) },
+    { text: `${running} running`, ...(running > 0 ? { color: ON_SURFACE, bold: true as const } : { color: TONE_KEYS.muted }) },
     { text: ` ${g.dot} ${lanes.length - running} finished ${g.dot} ${formatTokens(tokens)} tokens`, color: TONE_KEYS.muted },
   ];
   return cellsOf(pieces) <= width ? pieces : pieces.slice(0, 2);

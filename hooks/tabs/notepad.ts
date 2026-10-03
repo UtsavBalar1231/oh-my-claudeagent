@@ -160,6 +160,7 @@ function sectionCard(view: View, section: Shown, width: number): RenderElement {
     key: `section-${section.name}`,
     title: fitEnd(`${heading(section.name)} ${view.g.dot} ${count}`, inner, view.g.ellipsis),
     tone: TONES[section.name],
+    isAscii: view.isAscii,
     width,
     children: body,
   });

@@ -1,9 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { arrange, type Band, bandView, BUTTON_GAP, oneLine, planTally, progressCells, share, type Span } from "./band-model.ts";
+import { arrange, type Band, bandView, BUTTON_GAP, oneLine, planTally, share, type Span } from "./band-model.ts";
 import { type NextAction, nextActions } from "./next-actions.ts";
-import { displayWidth, glyphs, usableColumns } from "./ui-kit.ts";
+import { displayWidth, usableColumns } from "./ui-kit.ts";
 
-const G = glyphs(false);
 const PLAN = {
   name: "widget-rewrite",
   path: "/work/plans/widget-rewrite.md",
@@ -25,8 +24,8 @@ const band = (fields: Partial<Band>): Band => ({ plan: null, verification: null,
 const actionsOf = (b: Band): NextAction[] =>
   nextActions({ plan: b.plan, verification: b.verification, isAgentRunning: false, hasFinalVerification: false });
 const text = (spans: readonly Span[]): string => spans.map((span) => span.text).join("");
-const status = (b: Band, columns: number, g = G, running = 0): string =>
-  text(bandView(b, actionsOf(b), columns, g, running)?.status ?? []);
+const status = (b: Band, columns: number, ascii = false, running = 0): string =>
+  text(bandView(b, actionsOf(b), columns, ascii, running)?.status ?? []);
 
 describe("share", () => {
   test.each<[number[], number, number[]]>([
@@ -86,31 +85,20 @@ describe("planTally", () => {
   });
 });
 
-test.each<[number, number, number]>([
-  [0, 46, 0],
-  [1, 46, 1],
-  [12, 46, 1],
-  [23, 46, 3],
-  [45, 46, 4],
-  [46, 46, 5],
-  [0, 0, 0],
-])("progressCells(%p, %p) fills %p of five", (done, total, cells) => {
-  expect(progressCells(done, total)).toBe(cells);
-});
-
 describe("bandView", () => {
   test("draws nothing before the first snapshot", () => {
-    expect(bandView(undefined, [], 120, G)).toBeUndefined();
+    expect(bandView(undefined, [], 120, false)).toBeUndefined();
   });
 
   test("draws nothing with no plan, no error and no action, even after a logged verification", () => {
-    expect(bandView(band({ verification: LOGGED }), [], 120, G)).toBeUndefined();
+    expect(bandView(band({ verification: LOGGED }), [], 120, false)).toBeUndefined();
   });
 
-  test("a bound plan: a five-cell bar in the fill and track keys, the count, and the next task", () => {
-    expect(bandView(band({ plan: PLAN }), [], 120, G)?.status).toEqual([
-      { text: "▰", tone: "fill" },
-      { text: "▱▱▱▱", tone: "track" },
+  test("a bound plan: the pane's five-cell bar in the fill and track keys, the count after a space, and the next task", () => {
+    expect(bandView(band({ plan: PLAN }), [], 120, false)?.status).toEqual([
+      { text: "█", color: "success", tone: "plain" },
+      { text: "▎", color: "success", backgroundColor: "subtle", tone: "plain" },
+      { text: "███", color: "subtle", tone: "plain" },
       { text: " 12/46", tone: "muted" },
       { text: " · ", tone: "muted" },
       { text: "next ", tone: "muted" },
@@ -120,11 +108,11 @@ describe("bandView", () => {
   });
 
   test("a finished plan fills the bar and names no next task", () => {
-    expect(status(band({ plan: { ...PLAN, done: 46, next: null } }), 120)).toBe("▰▰▰▰▰ 46/46");
+    expect(status(band({ plan: { ...PLAN, done: 46, next: null } }), 120)).toBe("█████ 46/46");
   });
 
   test("a bound plan with an unlogged verification", () => {
-    expect(bandView(band({ plan: PLAN, verification: UNLOGGED }), [], 120, G)?.status.slice(7)).toEqual([
+    expect(bandView(band({ plan: PLAN, verification: UNLOGGED }), [], 120, false)?.status.slice(8)).toEqual([
       { text: " · ", tone: "muted" },
       { text: "! ", tone: "warn" },
       { text: "just test", tone: "plain" },
@@ -133,7 +121,7 @@ describe("bandView", () => {
   });
 
   test("a bound plan with a logged verification", () => {
-    expect(bandView(band({ plan: PLAN, verification: LOGGED }), [], 120, G)?.status.slice(7)).toEqual([
+    expect(bandView(band({ plan: PLAN, verification: LOGGED }), [], 120, false)?.status.slice(8)).toEqual([
       { text: " · ", tone: "muted" },
       { text: "✓ ", tone: "ok" },
       { text: "just test", tone: "plain" },
@@ -143,7 +131,7 @@ describe("bandView", () => {
 
   test("proof counts are drawn only when the band carries them, a zero count muted", () => {
     expect(status(band({ plan: PLAN }), 120)).not.toContain("✓");
-    expect(bandView(band({ plan: PLAN, proof: PROOF }), [], 120, G)?.status.slice(7)).toEqual([
+    expect(bandView(band({ plan: PLAN, proof: PROOF }), [], 120, false)?.status.slice(8)).toEqual([
       { text: " · ", tone: "muted" },
       { text: "✓52", tone: "ok" },
       { text: " ", tone: "muted" },
@@ -151,7 +139,7 @@ describe("bandView", () => {
       { text: " ", tone: "muted" },
       { text: "✗0", tone: "muted" },
     ]);
-    expect(bandView(band({ plan: PLAN, proof: { proven: 0, unproven: 0, failed: 3 } }), [], 120, G)?.status.slice(8)).toEqual([
+    expect(bandView(band({ plan: PLAN, proof: { proven: 0, unproven: 0, failed: 3 } }), [], 120, false)?.status.slice(9)).toEqual([
       { text: "✓0", tone: "muted" },
       { text: " ", tone: "muted" },
       { text: "!0", tone: "muted" },
@@ -160,28 +148,29 @@ describe("bandView", () => {
     ]);
   });
 
-  test("running agents are counted in the active tone, and none running draws nothing", () => {
-    expect(bandView(band({ plan: PLAN }), [], 120, G, 2)?.status.slice(-2)).toEqual([
+  test("running agents: the glyph in the active tone, the words plain; none running draws nothing", () => {
+    expect(bandView(band({ plan: PLAN }), [], 120, false, 2)?.status.slice(-3)).toEqual([
       { text: " · ", tone: "muted" },
-      { text: "◆ 2 running", tone: "active" },
+      { text: "◆ ", tone: "active" },
+      { text: "2 running", tone: "plain" },
     ]);
     expect(status(band({ plan: PLAN }), 120)).not.toContain("running");
   });
 
   test("everything known, in the order of the design", () => {
-    expect(status(FULL, 203, G, 2)).toBe(
-      "▰▰▰▰▱ 59/68 · next 43 Record the final verification for the release · ✓52 !4 ✗0 · ! just test evidence not logged · ◆ 2 running",
+    expect(status(FULL, 203, false, 2)).toBe(
+      "████▍ 59/68 · next 43 Record the final verification for the release · ✓52 !4 ✗0 · ! just test evidence not logged · ◆ 2 running",
     );
   });
 
   test("as the band narrows, segments drop by priority: verification, proof, next task, running agents", () => {
-    const at = (columns: number) => status(FULL, columns, G, 2);
-    expect(at(120)).toBe("▰▰▰▰▱ 59/68 · next 43 Record the final verification for… · ✓52 !4 ✗0 · ! just test evidence not logged · ◆ 2 running");
-    expect(at(90)).toBe("▰▰▰▰▱ 59/68 · next 43 Record the fi… · ✓52 !4 ✗0 · ! just test not logged · ◆ 2 running");
-    expect(at(80)).toBe("▰▰▰▰▱ 59/68 · next 43 Record the final verificatio… · ✓52 !4 ✗0 · ◆ 2 running");
-    expect(at(60)).toBe("▰▰▰▰▱ 59/68 · next 43 Record the final ver… · ◆ 2 running");
-    expect(at(50)).toBe("▰▰▰▰▱ 59/68 · ◆ 2 running");
-    expect(at(20)).toBe("▰▰▰▰▱ 59/68");
+    const at = (columns: number) => status(FULL, columns, false, 2);
+    expect(at(120)).toBe("████▍ 59/68 · next 43 Record the final verification for… · ✓52 !4 ✗0 · ! just test evidence not logged · ◆ 2 running");
+    expect(at(91)).toBe("████▍ 59/68 · next 43 Record the fi… · ✓52 !4 ✗0 · ! just test not logged · ◆ 2 running");
+    expect(at(80)).toBe("████▍ 59/68 · next 43 Record the final verificati… · ✓52 !4 ✗0 · ◆ 2 running");
+    expect(at(60)).toBe("████▍ 59/68 · next 43 Record the final ve… · ◆ 2 running");
+    expect(at(50)).toBe("████▍ 59/68 · ◆ 2 running");
+    expect(at(20)).toBe("████▍ 59/68");
   });
 
   test("no plan, with an unlogged verification that has an action", () => {
@@ -192,20 +181,19 @@ describe("bandView", () => {
 
   test("a read error is one line in the fail tone, whatever else is known", () => {
     const b = band({ plan: PLAN, verification: UNLOGGED, error: "Cannot read .omca/state/boulder.json:\nUnexpected token" });
-    expect(bandView(b, [], 120, G, 2)?.status).toEqual([
+    expect(bandView(b, [], 120, false, 2)?.status).toEqual([
       { text: "✗ Cannot read .omca/state/boulder.json: Unexpected token", tone: "fail" },
     ]);
   });
 
   test("ASCII glyphs replace every symbol", () => {
-    const ascii = glyphs(true);
-    expect(status(FULL, 203, ascii, 2)).toBe(
-      "####- 59/68 - next 43 Record the final verification for the release - +52 !4 x0 - ! just test evidence not logged - @ 2 running",
+    expect(status(FULL, 203, true, 2)).toBe(
+      "[##.] 59/68 - next 43 Record the final verification for the release - +52 !4 x0 - ! just test evidence not logged - @ 2 running",
     );
-    expect(status(band({ plan: PLAN, verification: LOGGED }), 120, ascii)).toBe(
-      "#---- 12/46 - next 13 Port module 13 - + just test evidence logged",
+    expect(status(band({ plan: PLAN, verification: LOGGED }), 120, true)).toBe(
+      "[#..] 12/46 - next 13 Port module 13 - + just test evidence logged",
     );
-    expect(status(band({ error: "boom" }), 120, ascii)).toBe("x boom");
+    expect(status(band({ error: "boom" }), 120, true)).toBe("x boom");
   });
 
   test("a command or a title spanning lines or holding control characters reads as one line", () => {
@@ -213,12 +201,12 @@ describe("bandView", () => {
       plan: { ...PLAN, next: { n: 13, title: "Port\tmodule\n13" } },
       verification: { ...LOGGED, command: "just\ttest \\\n  --verbose\u001b[31m" },
     });
-    expect(status(b, 120)).toBe("▰▱▱▱▱ 12/46 · next 13 Port module 13 · ✓ just test \\ --verbose [31m evidence logged");
+    expect(status(b, 120)).toBe("█▎███ 12/46 · next 13 Port module 13 · ✓ just test \\ --verbose [31m evidence logged");
   });
 
   test("hotkeys number the actions in priority order and fill with the exact prompt", () => {
     const b = band({ plan: PLAN, verification: UNLOGGED });
-    expect(bandView(b, actionsOf(b), 120, G)?.buttons).toEqual([
+    expect(bandView(b, actionsOf(b), 120, false)?.buttons).toEqual([
       {
         key: "log-evidence",
         hotkey: "1",
@@ -236,10 +224,14 @@ describe("bandView", () => {
 
   test("button labels share a row too narrow for both", () => {
     const b = band({ plan: PLAN, verification: UNLOGGED });
-    expect(bandView(b, actionsOf(b), 20, G)?.buttons.map((button) => button.label)).toEqual(["Log…", "Sta…"]);
+    expect(bandView(b, actionsOf(b), 20, false)?.buttons.map((button) => button.label)).toEqual(["Log…", "Sta…"]);
   });
 
-  test("no row is ever wider than the usable columns, at every width from 12 to 200", () => {
+  test("a full status row stops a space short of the engine's three-cell collapse mark", () => {
+    for (const columns of [60, 80, 120]) expect(displayWidth(status(FULL, columns, false, 2)), `at ${columns}`).toBe(columns - 4);
+  });
+
+  test("no row is ever wider than the room it has, at every width from 12 to 200", () => {
     const long = { ...UNLOGGED, command: "x".repeat(300) };
     const bands = [
       band({ plan: PLAN }),
@@ -253,10 +245,10 @@ describe("bandView", () => {
     for (let columns = 12; columns <= 200; columns++) {
       const width = usableColumns(columns);
       for (const b of bands) {
-        const view = bandView(b, actionsOf(b), columns, G, 3);
+        const view = bandView(b, actionsOf(b), columns, false, 3);
         const buttons = view?.buttons ?? [];
         const buttonCells = buttons.reduce((sum, button) => sum + 3 + displayWidth(button.label), 0);
-        expect(displayWidth(text(view?.status ?? [])), `status at ${columns}`).toBeLessThanOrEqual(width);
+        expect(displayWidth(text(view?.status ?? [])), `status at ${columns}`).toBeLessThanOrEqual(columns - 4);
         expect(buttonCells + Math.max(0, buttons.length - 1) * BUTTON_GAP, `buttons at ${columns}`).toBeLessThanOrEqual(width);
       }
     }

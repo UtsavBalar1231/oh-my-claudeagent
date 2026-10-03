@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { ago, parseRuns, proofOf, proofSummary, type Run } from "./proof.ts";
+import { ago, parseRuns, proofOf, proofSummary, type Run, timeAgo } from "./proof.ts";
 
 const T = Date.UTC(2026, 9, 2, 12, 0, 0);
 const MIN = 60_000;
@@ -107,4 +107,8 @@ test("ago reads elapsed time at the coarsest useful unit", () => {
     "2d",
     "now",
   ]);
+});
+
+test("timeAgo reads as words: just now, then the elapsed time and ago", () => {
+  expect([0, 4_999, 5_000, 5 * MIN, 48 * 60 * MIN].map(timeAgo)).toEqual(["just now", "just now", "5s ago", "5m ago", "2d ago"]);
 });

@@ -20,7 +20,7 @@ import {
   recentPlans,
   taskMarkdown,
 } from "../../src/core/plan-reader.ts";
-import { ago, parseRuns, type Proof, proofOf, proofSummary, type Run, type Verdict } from "../../src/core/proof.ts";
+import { ago, parseRuns, type Proof, proofOf, proofSummary, type Run, timeAgo, type Verdict } from "../../src/core/proof.ts";
 import { displayWidth, fitEnd, fitMiddle, KEYS, keyHint, padStart, shortType } from "../../src/core/ui-kit.ts";
 import {
   agentKey,
@@ -98,6 +98,7 @@ const SPLIT_SHARE = 0.55;
 const HEADER_BAR = 24;
 const COMPACT_BAR = 10;
 const EVIDENCE_SHOWN = 3;
+const UNREADABLE = "None of its files can be read, so no run can prove it.";
 
 const STATUS: Readonly<Record<Status, { word: string; tone: ChipTone; color: ThemeKey | undefined }>> = {
   done: { word: "DONE", tone: "ok", color: TONE_KEYS.ok },
@@ -607,7 +608,7 @@ function proofPieces(view: View, ctx: Ctx, isShort: boolean): Piece[] {
   const sep: Piece = { text: isShort ? " " : ` ${view.g.dot} `, color: TONE_KEYS.muted };
   const part = (level: Level, count: number, word: string): Piece => {
     const { glyph, color } = levelMark(level, view.g);
-    return { text: isShort ? `${glyph}${count}` : `${glyph} ${count} ${word}`, color };
+    return { text: isShort ? `${glyph}${count}` : `${glyph} ${count} ${word}`, color: count === 0 ? TONE_KEYS.muted : color };
   };
   return [part("ok", proven, "proven"), sep, part("warn", unproven, "unproven"), sep, part("fail", failed, "failed")];
 }
@@ -670,7 +671,7 @@ function header(view: View, ctx: Ctx, isCard: boolean): RenderElement[] {
       : [
           { text: "next ", color: TONE_KEYS.muted },
           { text: `${next.n} `, bold: true, color: TONE_KEYS.active },
-          { text: next.title, color: TONE_KEYS.active },
+          { text: next.title, color: ON_SURFACE },
         ],
     ...(running.length === 0 ? [] : [running]),
   ];
@@ -679,6 +680,7 @@ function header(view: View, ctx: Ctx, isCard: boolean): RenderElement[] {
       key: "plan-header",
       title: fitEnd(plan.title, inner, ellipsis),
       tone: next === undefined ? "ok" : "plan",
+      isAscii: view.isAscii,
       width: view.width,
       children: lines.map((pieces) => Line(view.kit, fitPieces(pieces, inner, ellipsis))),
     }),
@@ -721,7 +723,7 @@ function taskRow(host: Host, view: View, ctx: Ctx, card: Card, width: number, nu
   const title: Piece = card.done
     ? { text: titleText, color: TONE_KEYS.muted }
     : isNext
-      ? { text: titleText, color: TONE_KEYS.active, bold: true }
+      ? { text: titleText, color: ON_SURFACE, bold: true }
       : { text: titleText };
   const color = STATUS[status].color;
   const paint = ({ text, ...style }: Piece) => {
@@ -876,7 +878,7 @@ function filesLines(view: View, card: Card, verdict: Verdict | undefined, width:
         ? { text: "" }
         : at === null
           ? { text: "not found", color: TONE_KEYS.muted }
-          : { text: `changed ${ago(view.now - at)} ago`, color: isLatest ? TONE_KEYS.warn : TONE_KEYS.muted };
+          : { text: `changed ${timeAgo(view.now - at)}`, color: isLatest ? TONE_KEYS.warn : TONE_KEYS.muted };
     const path = fitMiddle(masked(view, file), Math.max(4, width - displayWidth(when.text) - 3), view.g.ellipsis);
     const pad = " ".repeat(Math.max(1, width - 2 - displayWidth(path) - displayWidth(when.text)));
     return Line(view.kit, [{ text: "  " }, { text: path }, { text: pad }, when]);
@@ -886,7 +888,7 @@ function filesLines(view: View, card: Card, verdict: Verdict | undefined, width:
 function runLine(view: View, run: Run, width: number): RenderElement {
   const { glyph, color } = levelMark(run.exitCode === 0 ? "ok" : "fail", view.g);
   const head = `  ${glyph} ${run.type} `;
-  const tail = ` exit ${run.exitCode} ${view.g.dot} ${ago(view.now - run.at)} ago`;
+  const tail = ` exit ${run.exitCode} ${view.g.dot} ${timeAgo(view.now - run.at)}`;
   const command = fitEnd(masked(view, run.command), Math.max(4, width - displayWidth(head) - displayWidth(tail)), view.g.ellipsis);
   return Line(view.kit, [
     { text: `  ${glyph} `, color },
@@ -900,10 +902,10 @@ function evidenceLines(view: View, card: Card, verdict: Verdict | undefined, wid
   const say = (text: string, color: ThemeKey) => Line(view.kit, [{ text: fitEnd(`  ${text}`, width, view.g.ellipsis), color }]);
   if (facts.ledgerError !== null) return [say(`${view.g.cross} ledger unreadable: ${facts.ledgerError}`, TONE_KEYS.fail)];
   if (card.files.length === 0) return [say("Lists no files, so no run can prove it.", TONE_KEYS.muted)];
-  if (verdict === undefined) return [say("None of its files can be read, so no run can prove it.", TONE_KEYS.muted)];
+  if (verdict === undefined) return [say(UNREADABLE, TONE_KEYS.muted)];
   if (verdict.since.length > 0) return verdict.since.slice(0, EVIDENCE_SHOWN).map((run) => runLine(view, run, width));
   return [
-    say(`${view.g.warn} No test, build or lint run since its files changed ${ago(view.now - verdict.changedAt)} ago.`, TONE_KEYS.warn),
+    say(`${view.g.warn} No test, build or lint run since its files changed ${timeAgo(view.now - verdict.changedAt)}.`, TONE_KEYS.warn),
     ...(verdict.lastPass === undefined ? [] : [say("Last pass, before that change:", TONE_KEYS.muted), runLine(view, verdict.lastPass, width)]),
   ];
 }
@@ -992,12 +994,14 @@ function expansion(view: View, card: Card, width: number): RenderElement[] {
   const evidence: Piece[] =
     card.files.length === 0
       ? [{ text: "no files to prove", color: TONE_KEYS.muted }]
-      : newest === undefined || mark === undefined
-        ? [{ text: `${view.g.warn} no run since its files changed`, color: TONE_KEYS.warn }]
-        : [
-            { text: mark.glyph, color: mark.color },
-            { text: ` ${newest.type} exit ${newest.exitCode} ${view.g.dot} ${masked(view, newest.command)} ${view.g.dot} ${ago(view.now - newest.at)} ago` },
-          ];
+      : verdict === undefined
+        ? [{ text: UNREADABLE, color: TONE_KEYS.muted }]
+        : newest === undefined || mark === undefined
+          ? [{ text: `${view.g.warn} no run since its files changed`, color: TONE_KEYS.warn }]
+          : [
+              { text: mark.glyph, color: mark.color },
+              { text: ` ${newest.type} exit ${newest.exitCode} ${view.g.dot} ${masked(view, newest.command)} ${view.g.dot} ${timeAgo(view.now - newest.at)}` },
+            ];
   const row = (key: string, pieces: Piece[]) =>
     view.kit.Box({ key, children: [Line(view.kit, [{ text: indent }, ...fitPieces(pieces, room, view.g.ellipsis)])] });
   return [

@@ -32,7 +32,7 @@
                                                                ││ is applied on narrow screens.                     │
                                                                │╰───────────────────────────────────────────────────╯
                                                                │╭───────────────────────────────────────────────────╮
-checkout-redesign 2/4 tasks · no verification yet           [-]││ Decisions · 3 entries                             │
+██▌██ 2/4 · next 3 Show the saved payment methods           [-]│  ↓ more · ↑↓ scroll
                                            ◐ medium · /effort  │
 ─────────────────────────────────────────────────────────────────────────────────────────── oh-my-claudeagent:sisyphus ─
 ❯ 

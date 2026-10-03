@@ -1,7 +1,7 @@
                                                                                                              │1: Agents  2: Plan  3: Evidence  4: Notepad  5: Feedback  6: Stats  7: Doctor            ✕
  ▐▛███▛█   Claude Code v2.1.288                                                                              │───────────────────────────────────────────────────────────────────────────────────────
 ▝▜██████▀  Opus 5.5 · API Usage Billing                                                                      │╭─────────────────────────────────────────────────────────────────────────────────────╮
- ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/.cache/tmp/omca-visual-200x50-8YFnrN/cwd                          ││ FINAL VERIFICATION · proof-ledger                                                   │
+ ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/.cache/tmp/omca-visual-200x50-ws4EFW/cwd                          ││ FINAL VERIFICATION · proof-ledger                                                   │
                                                                                                              ││  COMPLETE  matches the plan as it is now · 10-02 13:35 · ◆ sisyphus                 │
                                                                                                              ││ ●✗●●●✗●●✗●✗●●●●● last 16  build 2  test 6 ✗1  lint 4 ✗2  manual 2  final 2 ✗1       │
                                                                                                              │╰─────────────────────────────────────────────────────────────────────────────────────╯
@@ -42,7 +42,7 @@
                                                                                                              │
                                                                                                              │
                                                                                                              │b: Build  e: Test  l: Lint  m: Manual  v: Final  x: Fails  c: Copy  r: Rerun  f: Find
-proof-ledger 6/6 tasks · no verification yet                                                              [-]│3/16 · ↑↓ move
+█████ 6/6                                                                                                 [-]│3/16 · ↑↓ move
                                                                                          ◐ medium · /effort  │
 ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── oh-my-claudeagent:sisyphus ─
 ❯ 

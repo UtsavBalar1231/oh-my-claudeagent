@@ -1,4 +1,4 @@
-import { displayWidth, fitEnd, type Glyphs, glyphs, shortType } from "./ui-kit.ts";
+import { displayWidth, fitEnd, type Glyphs, glyphs, padEnd, shortType } from "./ui-kit.ts";
 
 // Every key here draws its theme's value for a mod, measured on 2.1.288 under a custom theme and
 // the built-in light theme. `link`, `thinking` and `messageActionsBackground` draw nothing for a
@@ -81,8 +81,8 @@ export const TONE_KEYS = {
   rule: "subtle",
   focus: "selectionBg",
   raised: "userMessageBackground",
-  fill: "rate_limit_fill",
-  track: "rate_limit_empty",
+  // `rate_limit_empty` draws #272f6f in the light theme, 11:1 on the pane, so an empty track read as filled.
+  track: "subtle",
 } as const satisfies Record<string, ThemeKey>;
 
 export type Tone = keyof typeof TONE_KEYS;
@@ -143,9 +143,21 @@ export const DRAWN_PAIRS: readonly Pair[] = [
   { fg: ON_SURFACE, bg: TONE_KEYS.focus, isShortBold: false },
 ];
 
-export function chip(label: string, tone: ChipTone, ascii: boolean): Piece {
+// A label that carries no state, such as an evidence type, is `text` on `selectionBg`.
+export type ChipKind = ChipTone | "neutral";
+
+export function chip(label: string, kind: ChipKind, ascii: boolean): Piece {
   const text = fitEnd(label, CHIP_MAX, ascii ? "..." : "…");
-  return { text: ascii ? `[${text}]` : ` ${text} `, color: CHIP_TEXT, backgroundColor: TONE_KEYS[tone], bold: true };
+  const colors = kind === "neutral" ? { color: ON_SURFACE, backgroundColor: TONE_KEYS.focus } : { color: CHIP_TEXT, backgroundColor: TONE_KEYS[kind] };
+  return { text: ascii ? `[${text}]` : ` ${text} `, ...colors, bold: true };
+}
+
+/** A chip padded to `cells` for a column: inside its background in Unicode, after its brackets in ASCII. */
+export function columnChip(label: string, kind: ChipKind, ascii: boolean, cells: number): Piece[] {
+  if (!ascii) return [chip(padEnd(label, cells), kind, false)];
+  const piece = chip(label, kind, true);
+  const pad = cells + 2 - displayWidth(piece.text);
+  return pad > 0 ? [piece, { text: " ".repeat(pad) }] : [piece];
 }
 
 export type Level = "ok" | "warn" | "fail" | "info";

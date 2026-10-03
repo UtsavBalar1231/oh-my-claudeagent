@@ -137,7 +137,7 @@ test("the spinner turns one frame a second of the clock", () => {
 });
 
 describe("laneRows", () => {
-  test("at a wide body: identity, task, model and effort chips, tokens and elapsed; the strip and current tool below", () => {
+  test("at a wide body: identity, task, model and effort chips, tokens and elapsed; the strip in kind colors and the current tool's name in text below", () => {
     const [head = [], tools = []] = laneRows(lane(), look(73), HOME);
     expect(head).toEqual([
       { text: "◆ ", color: "green_FOR_SUBAGENTS_ONLY" },
@@ -150,7 +150,7 @@ describe("laneRows", () => {
       { text: " " },
       { text: "4.5k", color: "inactive" },
       { text: " " },
-      { text: " 1m06s", color: "claude", bold: true },
+      { text: " 1m06s", color: "inactive" },
     ]);
     expect(tools).toEqual([
       { text: "  " },
@@ -160,7 +160,7 @@ describe("laneRows", () => {
       { text: " " },
       { text: "◑", color: "claude" },
       { text: " " },
-      { text: "Bash", color: "rainbow_orange", bold: true },
+      { text: "Bash", color: "text", bold: true },
       { text: " bun test src/parser.spec.ts" },
     ]);
     expect(displayWidth(text(head))).toBe(73);
@@ -262,10 +262,10 @@ test("statusMark gives every status its glyph and tone", () => {
 describe("summaryRow", () => {
   const lanes = [lane(), lane({ id: "a-2" }), lane({ id: "a-3", endedAt: START + 1000, status: "answer" })];
 
-  test("counts running and finished agents and sums their tokens", () => {
+  test("counts running and finished agents and sums their tokens, the glyph in the active tone and the words in text", () => {
     expect(summaryRow(lanes, look(51))).toEqual([
       { text: "◆ ", color: "claude" },
-      { text: "2 running", color: "claude", bold: true },
+      { text: "2 running", color: "text", bold: true },
       { text: " · 1 finished · 13.5k tokens", color: "inactive" },
     ]);
   });

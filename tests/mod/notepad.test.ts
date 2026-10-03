@@ -27,8 +27,9 @@ const line = (pieces: readonly Piece[]) => text({ wrap: "truncate-end" }, ...pie
 const button = (key: string, label: string) => ({ type: "Button", props: { key, label, hotkey: key, plain: true }, press: expect.anything() });
 const markdown = (key: string, source: string) => ({ type: "Markdown", props: { text: source, key } });
 const dated = (width: number, at: number, ascii = false) => line(rule(width, glyphs(ascii), ascii, formatWhen(at)));
-const card = (key: string, border: string, width: number, title: string, ...children: unknown[]) =>
-  box({ key, flexDirection: "column", borderStyle: "round", borderColor: border, paddingX: 1, width }, text({ bold: true, color: "text", wrap: "truncate-end" }, title), ...children);
+const styledCard = (borderStyle: string, key: string, border: string, width: number, title: string, ...children: unknown[]) =>
+  box({ key, flexDirection: "column", borderStyle, borderColor: border, paddingX: 1, width }, text({ bold: true, color: "text", wrap: "truncate-end" }, title), ...children);
+const card = (key: string, border: string, width: number, title: string, ...children: unknown[]) => styledCard("round", key, border, width, title, ...children);
 const quiet = text({ dimColor: true }, "Nothing recorded yet");
 
 // The tab and rule rows the pane draws above a tab's body.
@@ -202,7 +203,7 @@ test("the empty and error states: no notepad anywhere, an empty bound notepad, a
   await ui.unmount();
 });
 
-test("OMCA_ASCII draws the notepad's rules, chip, separators and masks from the ASCII set", async ($, on) => {
+test("OMCA_ASCII draws the notepad's card borders, rules, chip, separators and masks from the ASCII set", async ($, on) => {
   world(on, FILES, {}, { OMCA_ASCII: "1" });
   const size: Size = { columns: 80, rows: 40, placement: "inline" };
   const ui = await open($, size);
@@ -211,7 +212,7 @@ test("OMCA_ASCII draws the notepad's rules, chip, separators and masks from the 
 
   expect(drawn[chrome(size)]).toBe("sample [BOUND] - 3 entries - 1 masked");
   expect(topRows(await ui.drawn())).toContainEqual(
-    card("section-issues", "warning", inner + 4, "Issues - 1 entry", dated(inner, ISSUE_AT, true), markdown("note-issues-0-0", "export `API_TOKEN=<masked>` first")),
+    styledCard("classic", "section-issues", "warning", inner + 4, "Issues - 1 entry", dated(inner, ISSUE_AT, true), markdown("note-issues-0-0", "export `API_TOKEN=<masked>` first")),
   );
   const isAscii = (row: string) => [...row].every((char) => char.charCodeAt(0) >= 32 && char.charCodeAt(0) < 127);
   expect(drawn.filter((row) => !isAscii(row))).toEqual([]);
@@ -246,4 +247,17 @@ test("every notepad row fits the body less the gutter at each size and surface, 
       await ui.unmount();
     }
   }
+});
+
+test("a notepad taller than the docked body draws a more-below cue over its last row, and none where it fits", async ($, on) => {
+  world(on, FILES);
+  const SHORT: Size = { columns: 120, rows: 14, placement: "dock" };
+  const lastRow = async (size: Size) => {
+    const ui = await open($, size);
+    const row = rows(await ui.drawn()).at(-1);
+    await ui.unmount();
+    return row;
+  };
+  expect(await lastRow(SHORT)).toBe("  ↓ more · ↑↓ scroll".padEnd(usableColumns(bodyColumns(SHORT))));
+  expect(await lastRow(DOCK_200)).not.toContain("more");
 });
