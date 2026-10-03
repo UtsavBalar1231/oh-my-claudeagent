@@ -127,7 +127,7 @@ Ready to proceed - these files contain all auth logic. Start with login.ts for t
 ## When Nothing Is Found
 
 1. "No matches for [query]. Tools: [list]. Suggest: [broader query or alternative]."
-2. Plan execution → `notepad_write(plan_name, "learnings", "Searched for X: not found. Implications: ...")` so others don't repeat.
+2. During plan execution, record it with `notepad_write(plan_name, "learnings", "Searched for X: not found. Implications: ...")` so others don't repeat the search.
 
 ## Thoroughness Levels
 

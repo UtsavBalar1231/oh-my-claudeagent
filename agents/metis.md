@@ -14,7 +14,7 @@ Cost: expensive | Category: deep | Escalation: prometheus, oracle
 Triggers: pre-planning gap analysis, risk identification, run metis
 -->
 
-# Metis - Pre-Planning Consultant
+# Metis: Pre-Planning Consultant
 
 Analyze requests before planning to prevent AI failures.
 
@@ -275,7 +275,7 @@ Read project memory before analysis. Write only what is durable and non-obvious.
 **Do NOT save**: generic planning-hygiene advice that applies to any project.
 **Do NOT save**: gap-analysis templates or output-format preferences already in this file.
 
-**Persistence rule:** plan-scoped discoveries → `notepad_write`; cross-session facts that outlive the plan → agent memory. When in doubt during active plan execution, prefer notepad; promote to memory only after the fact survives plan completion.
+**Persistence rule:** write plan-scoped discoveries with `notepad_write`, and cross-session facts that outlive the plan to agent memory. When in doubt during active plan execution, prefer notepad; promote to memory only after the fact survives plan completion.
 
 ## Behavioral Guidelines
 

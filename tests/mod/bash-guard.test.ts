@@ -7,7 +7,7 @@ const RM_CATASTROPHIC =
   "Destructive rm -rf blocked: the target is the filesystem root, home, the working directory, or a directory directly under root or home. Name a deeper path explicitly.";
 const REFUSED = "The user refused this command in OMCA's review. Do not retry it; ask the user how to proceed.";
 const GIT =
-  "Destructive git command blocked. If working tree is dirty, REPORT and STOP — never modify history. Set OMCA_DISABLED_HOOKS=bash-guard to turn this check off for testing.";
+  "Destructive git command blocked. If the working tree is dirty, REPORT and STOP. Never modify history. Set OMCA_DISABLED_HOOKS=bash-guard to turn this check off for testing.";
 const FORCE_PUSH =
   "Force push to the default branch blocked: it rewrites history everyone else has pulled. Push to another branch, or ask the user to push. Set OMCA_DISABLED_HOOKS=bash-guard to turn this check off for testing.";
 const NO_VERIFY =

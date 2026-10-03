@@ -106,4 +106,4 @@ where supported, and move to the next step only when the current one verifies.
 
 1. `librarian` for recommended modern alternative
 2. No auto-upgrade unless user requests migration
-3. Migration requested → fetch latest API docs first
+3. When the user requests migration, fetch the latest API docs first

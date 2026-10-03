@@ -43,7 +43,7 @@ export const tools: Tool[] = [
   {
     name: "notepad_write",
     description:
-      "Append content to a notepad section during plan execution. Use to record learnings, issues, decisions, or problems discovered while working. Always appends, never overwrites — safe to call multiple times. Returns confirmation with the updated section path.",
+      "Append content to a notepad section during plan execution. Use to record learnings, issues, decisions, or problems discovered while working. Always appends and never overwrites, so it is safe to call multiple times. Returns confirmation with the updated section path.",
     inputSchema: {
       type: "object",
       properties: {
@@ -80,7 +80,7 @@ export const tools: Tool[] = [
       });
       const result = `Appended to ${plan}/${section}.md`;
       if (size <= WARN_BYTES) return result;
-      return `${result}\n[WARNING: section file is ${Math.floor(size / 1024)}KB — consider running notepad_compact to reduce size]`;
+      return `${result}\n[WARNING: section file is ${Math.floor(size / 1024)}KB. Consider running notepad_compact to reduce size]`;
     },
   },
   {
@@ -168,7 +168,7 @@ export const tools: Tool[] = [
       if (!existsSync(path)) return `Section '${section}' not found for plan '${plan}'`;
       return withLock(`${path}.lock`, () => {
         const lines = readFileSync(path, "utf8").trim().split("\n");
-        if (lines.length <= KEEP_LINES) return `Section '${section}' has ${lines.length} lines — no compaction needed`;
+        if (lines.length <= KEEP_LINES) return `Section '${section}' has ${lines.length} lines and needs no compaction`;
         const removed = lines.length - KEEP_LINES;
         writeFileAtomic(path, `[Compacted: ${removed} earlier lines removed]\n${lines.slice(-KEEP_LINES).join("\n")}\n`);
         return `Compacted '${section}': removed ${removed} old lines, kept last ${KEEP_LINES}`;

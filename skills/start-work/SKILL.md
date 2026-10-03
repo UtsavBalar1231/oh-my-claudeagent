@@ -40,8 +40,8 @@ Run plan execution from a session where the Agent tool is available:
 
 ### Plan Mode Handling
 
-Plan mode active → call `ExitPlanMode` first. Plugin agents have `permissionMode`
-stripped, delegated agents inherit parent session context.
+When plan mode is active, call `ExitPlanMode` first. Plugin agents have `permissionMode`
+stripped, and delegated agents inherit the parent session's context.
 
 ### Finding the Active Plan
 
@@ -50,16 +50,16 @@ stripped, delegated agents inherit parent session context.
 (`bindings[session_id]`). Plan selection in this step is what creates or updates that
 binding.
 
-1. Check `boulder_progress()`, it resolves this session's bound plan from the
+1. Check `boulder_progress()`. It resolves this session's bound plan from the
    registry (explicit binding → sole registered plan → most-recently-started plan).
    If it resolves to a valid file with unchecked boxes, resume that work directly
    (skip steps 2-3).
 
-2. No bound plan resolves (or the bound plan is fully checked) → build the selection
+2. When no bound plan resolves (or the bound plan is fully checked), build the selection
    list from two sources:
    - The registry's OTHER concurrently-active plans (`plans[plan_name]` entries not
-     bound to this session), each labeled `[active]`, these are plans other sessions
-     are mid-execution on. **Exclude any plan whose checkboxes are all checked**,
+     bound to this session), each labeled `[active]`. These are plans other sessions
+     are mid-execution on. **Exclude any plan whose checkboxes are all checked**:
      completion is derived from the plan file's `- [x]` boxes, not a stored flag, so
      a fully-checked plan never appears in the selection list even if its registry
      entry hasn't been garbage-collected yet.
@@ -82,11 +82,11 @@ binding.
 A plan may carry a `**Status**:` field on its metadata line. Read it before executing,
 resuming, or auto-selecting a plan:
 
-- `Status` says `FINAL` → executable.
-- No `Status` field anywhere in the plan → executable. Plans written before this field
+- `Status` says `FINAL`: executable.
+- No `Status` field anywhere in the plan: executable. Plans written before this field
   existed carry no status line, and a missing field must never block execution.
 - `Status` is present but says anything other than `FINAL` (`DRAFT` being the common
-  case) → REFUSE to execute it. A draft is a plan the user is still being interviewed
+  case): REFUSE to execute it. A draft is a plan the user is still being interviewed
   about, and executing one runs work nobody agreed to.
 
 On a refusal, emit this and return without delegating anything:
@@ -104,14 +104,14 @@ Once the plan's Status line reads FINAL, re-run:
 A refused plan is also excluded from the selection list, so a single draft never
 auto-selects. If every candidate is a draft, say so rather than picking one.
 
-- **This session already resolves to a bound plan with unchecked boxes** → append
-  session (re-run `boulder_write`, which is idempotent), continue work.
-- **No bound plan, or the bound plan is complete** → list available plans (per above,
+- **This session already resolves to a bound plan with unchecked boxes**: append the
+  session (re-run `boulder_write`, which is idempotent) and continue work.
+- **No bound plan, or the bound plan is complete**: list available plans (per above,
   completed plans excluded).
-  - Single plan found → auto-select.
-  - Multiple plans → present list, ask user to choose. Selecting a plan calls
+  - One plan found: auto-select it.
+  - Several plans: present the list and ask the user to choose. Selecting a plan calls
     `boulder_write`, which both upserts `plans[plan_name]` and sets
-    `bindings[session_id]` to that plan, this is what "binds" the session.
+    `bindings[session_id]` to that plan. This is what "binds" the session.
 
 ### Argument Handling
 
@@ -119,16 +119,16 @@ If `[plan file]` argument is provided, use that path directly, skip search.
 
 If `--worktree <path>` is provided:
 1. Validate: `git rev-parse --show-toplevel` inside path.
-2. Valid → store in boulder via `boulder_write`, inject worktree instructions
+2. If valid, store it in boulder via `boulder_write` and inject worktree instructions
    into ALL delegation prompts (all ops target worktree paths).
-3. Invalid → show setup: `git worktree add <path> <branch>`.
+3. If invalid, show setup: `git worktree add <path> <branch>`.
 
 Without `--worktree`:
-1. The resolved plan's registry entry (`plans[plan_name].worktree_path`) is set
-   (resume case) → use it. `worktree_path` is per-plan, not global, a session
+1. If the resolved plan's registry entry (`plans[plan_name].worktree_path`) is set
+   (resume case), use it. `worktree_path` is per-plan, not global: a session
    resuming a different plan than its own last one gets that plan's worktree, not
    its own last plan's.
-2. Otherwise → show setup prompt, store via `boulder_write`.
+2. Otherwise, show the setup prompt and store the path via `boulder_write`.
 
 ### Boulder Write (BEFORE Delegating)
 
@@ -148,8 +148,8 @@ to the session's first prompt, same as the transcript filename), not a
 locally-generated banner id. Passing the wrong id here is what desyncs the
 statusline TODO counter and every other session-id-keyed lookup against it.
 
-`boulder_write` enforces deduplication and preserves `started_at`. Plan body
-stays at its authoritative location, boulder stores a pointer only.
+`boulder_write` enforces deduplication and preserves `started_at`. The plan body
+stays at its authoritative location; boulder stores a pointer only.
 
 ### Output Formats
 
@@ -463,7 +463,7 @@ Do not report completion until `final_verification` evidence is logged.
 
 ## Evidence Logging Mandate
 
-Use `evidence_log` after every verification command. No evidence, no done.
+Use `evidence_log` after every verification command. Without evidence, nothing is done.
 
 The `TaskCompleted` hook backs this up, but it does not gate every path to completion:
 it fires only when a task is closed through `TaskUpdate` or when a teammate ends its
@@ -515,8 +515,8 @@ Session end is blocked until a `final_verification` entry with `exit_code=0` exi
 
 ## Auto-Continue Policy
 
-Do not ask "should I continue" between plan steps. After verification passes →
-immediately delegate next task.
+Do not ask "should I continue" between plan steps. After verification passes,
+immediately delegate the next task.
 
 After each checkbox flip, write the user a short note: which task finished, what
 verified it, and what runs next. Claude Code collapses thinking by default, so
@@ -544,8 +544,8 @@ the plan's checkboxes, not the notepad.
 
 ### Failure Handling
 
-Max 3 retries per task. Blocked after 3 → `notepad_write(plan_name, "issues", ...)`,
-continue to independent tasks. After 2+ tasks in same area fail → ask user
+Max 3 retries per task. When a task is still blocked after 3, record it with `notepad_write(plan_name, "issues", ...)`
+and continue to independent tasks. When 2+ tasks in the same area fail, ask the user
 whether to run metis re-analysis.
 
 When relaunching a task after a failed executor attempt, the fresh delegation
@@ -567,7 +567,7 @@ just flaky" is not evidence.
 
 - **`boulder_write`**: Write/update execution metadata (active plan, session ID, worktree path)
 - **`boulder_progress`**: Task completion counts and active plan info
-- **`evidence_log`**: after every verification command; no evidence, no done
+- **`evidence_log`**: after every verification command; without evidence, nothing is done
 - **`evidence_read`**: Before final report to summarize all results; load it if needed: `ToolSearch({query: "select:mcp__plugin_oh-my-claudeagent_omca__evidence_read", max_results: 1})`
 - **`notepad_write`**: Blockers/audit breadcrumbs (learnings, issues, decisions, problems)
 - **`notepad_read`**: Fallback audit notes when relevant to a pending task

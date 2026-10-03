@@ -71,7 +71,7 @@ incomplete deliverable because you could not hand the search off.
 
 ## Escalation Rules
 
-Outside scope → report, don't attempt:
+When the work is outside your scope, report it and do not attempt it:
 - Planning needed → "Recommend a planning pass."
 - Architecture review → "Recommend consulting omca-oracle."
 - Research → search yourself; if the fan-out is beyond you, "Recommend spawning omca-explore."

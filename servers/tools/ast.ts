@@ -624,7 +624,7 @@ export const tools: Tool[] = [
   {
     name: "ast_find_rule",
     description:
-      "Search code using a YAML rule with advanced combinators (kind, has, inside, follows, precedes, all, any, not). Use when ast_search patterns are insufficient — for context-sensitive matches like \"function calls inside a class\" or \"imports followed by usage\". Returns file:line:col with matched code and rule ID.",
+      "Search code using a YAML rule with advanced combinators (kind, has, inside, follows, precedes, all, any, not). Use when ast_search patterns are insufficient, such as for context-sensitive matches like \"function calls inside a class\" or \"imports followed by usage\". Returns file:line:col with matched code and rule ID.",
     inputSchema: {
       type: "object",
       properties: {
@@ -669,7 +669,7 @@ export const tools: Tool[] = [
   {
     name: "ast_dump_tree",
     description:
-      "Dump the syntax tree of a code snippet. Use when building or debugging AST patterns — 'cst' shows full concrete syntax (use on target code), 'pattern' shows how ast-grep interprets a pattern (use when pattern doesn't match), 'ast' gives a simplified view. Returns tree output to stderr (captured here as the return value).",
+      "Dump the syntax tree of a code snippet. Use when building or debugging AST patterns. 'cst' shows full concrete syntax (use on target code), 'pattern' shows how ast-grep interprets a pattern (use when pattern doesn't match), 'ast' gives a simplified view. Returns tree output to stderr (captured here as the return value).",
     inputSchema: {
       type: "object",
       properties: {

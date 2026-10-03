@@ -11,7 +11,7 @@ effort: high
 
 Review the work plan at: $ARGUMENTS
 
-No path specified → ask the user for the plan file path. Accept a FILE PATH only, not an inline plan, todo list, or text summary.
+When no path is specified, ask the user for the plan file path. Accept a FILE PATH only, not an inline plan, todo list, or text summary.
 
 Follow momus workflow: read the plan, deep-verify every file reference, apply the five evaluation criteria, run falsification on the 2 most critical tasks, and return the Final Verdict (OKAY / REJECT with confidence, justification, and priority-tiered issues).
 

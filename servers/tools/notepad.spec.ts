@@ -122,10 +122,10 @@ describe("notepad tools", () => {
       const overhead = Buffer.byteLength(entry(""));
       expect(await write("big", "issues", "x".repeat(50 * 1024 - overhead))).toBe("Appended to big/issues.md");
       expect(await write("big", "problems", "x".repeat(50 * 1024 - overhead + 1))).toBe(
-        "Appended to big/problems.md\n[WARNING: section file is 50KB — consider running notepad_compact to reduce size]",
+        "Appended to big/problems.md\n[WARNING: section file is 50KB. Consider running notepad_compact to reduce size]",
       );
       expect(await write("big", "learnings", "é".repeat(30_000))).toBe(
-        "Appended to big/learnings.md\n[WARNING: section file is 58KB — consider running notepad_compact to reduce size]",
+        "Appended to big/learnings.md\n[WARNING: section file is 58KB. Consider running notepad_compact to reduce size]",
       );
     });
   });
@@ -221,7 +221,7 @@ describe("notepad tools", () => {
     test("notepad_compact reports no compaction needed for a short section and leaves it untouched", async () => {
       await write("compact-plan", "learnings", "Short content");
       expect(await call("notepad_compact", { plan_name: "compact-plan", section: "learnings" })).toBe(
-        "Section 'learnings' has 3 lines — no compaction needed",
+        "Section 'learnings' has 3 lines and needs no compaction",
       );
       expect(readSection("compact-plan", "learnings")).toBe(entry("Short content"));
     });
@@ -241,7 +241,7 @@ describe("notepad tools", () => {
       mkdirSync(join(project, ".omca", "notepads", "edge"), { recursive: true });
       writeFileSync(sectionPath("edge", "issues"), `\n  ${lines(20).join("\n")}\n\n`);
       expect(await call("notepad_compact", { plan_name: "edge", section: "issues" })).toBe(
-        "Section 'issues' has 20 lines — no compaction needed",
+        "Section 'issues' has 20 lines and needs no compaction",
       );
       writeFileSync(sectionPath("edge", "issues"), `${lines(21).join("\n")}\n`);
       expect(await call("notepad_compact", { plan_name: "edge", section: "issues" })).toBe(

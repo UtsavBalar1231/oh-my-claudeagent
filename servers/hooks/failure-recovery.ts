@@ -58,7 +58,7 @@ const MCP_RULES: readonly Rule[] = [
     /not.*connected/i,
     "MCP server not connected. The omca server is plugin-provided, so it is unavailable during a reconnect window or after a plugin reload. Check server health with 'claude mcp list' or /mcp, which report connection status and the server's own error text. Then retry the call: evidence logging via evidence_log must be retried, never skipped, or the completion claim has no evidence behind it.",
   ],
-  [/invalid.*yaml|yaml.*parse|YAML.*error/i, "Invalid YAML in ast-grep rule. Check rule syntax — use ast_test_rule to validate before ast_find_rule."],
+  [/invalid.*yaml|yaml.*parse|YAML.*error/i, "Invalid YAML in ast-grep rule. Check rule syntax. Use ast_test_rule to validate before ast_find_rule."],
   [/mcp.*error|tool.*unavailable|server.*not.*running/i, "MCP server error. The omca server may need restart. Try: /reload-plugins"],
 ];
 const MALFORMED_JSON = /(invalid JSON|malformed JSON|parse error|SyntaxError|Unexpected token|JSON\.parse)/i;

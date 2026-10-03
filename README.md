@@ -65,7 +65,7 @@ verification logged, OMCA sends it back to work with the reason.
   the status line run on bun.
 - `ast-grep` (or `sg`), optional. Only the structural code search tools need it.
 
-Linux, macOS and Windows are covered by CI.
+CI runs on Linux, macOS and Windows.
 
 ## Documentation
 

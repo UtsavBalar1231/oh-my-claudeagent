@@ -91,7 +91,7 @@ export const RM_CATASTROPHIC_REASON =
 export const REVIEW_REFUSED_REASON =
   "The user refused this command in OMCA's review. Do not retry it; ask the user how to proceed.";
 export const GIT_REASON =
-  "Destructive git command blocked. If working tree is dirty, REPORT and STOP — never modify history. Set OMCA_DISABLED_HOOKS=bash-guard to turn this check off for testing.";
+  "Destructive git command blocked. If the working tree is dirty, REPORT and STOP. Never modify history. Set OMCA_DISABLED_HOOKS=bash-guard to turn this check off for testing.";
 export const FORCE_PUSH_REASON =
   "Force push to the default branch blocked: it rewrites history everyone else has pulled. Push to another branch, or ask the user to push. Set OMCA_DISABLED_HOOKS=bash-guard to turn this check off for testing.";
 export const NO_VERIFY_REASON =

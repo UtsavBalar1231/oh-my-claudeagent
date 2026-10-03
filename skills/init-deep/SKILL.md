@@ -118,7 +118,7 @@ Remove generic advice and anything a parent file already says. Keep the reason a
 
 ## Anti-Patterns
 
-- Ignoring existing → ALWAYS read first, even with --create-new
-- Over-documenting → not every dir needs AGENTS.md
-- Redundancy → child never repeats parent
-- Generic content → remove anything applying to ALL projects
+- Ignoring existing files: ALWAYS read first, even with --create-new
+- Over-documenting: not every dir needs AGENTS.md
+- Redundancy: a child never repeats its parent
+- Generic content: remove anything that applies to ALL projects

@@ -16,7 +16,7 @@ Cost: free | Category: standard | Escalation: explore, executor
 Triggers: external library mentioned, library docs, SDK research, OSS examples
 -->
 
-# Librarian - Open-Source Research Specialist
+# Librarian: Open-Source Research Specialist
 
 Answer questions about OSS libraries with GitHub permalink evidence.
 

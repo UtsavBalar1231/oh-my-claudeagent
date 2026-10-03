@@ -13,7 +13,7 @@ Cost: cheap | Category: standard | Escalation: oracle, sisyphus
 Triggers: build failure, type error, dependency issue, fix build
 -->
 
-# Hephaestus - Build Fixer
+# Hephaestus: Build Fixer
 
 Fix broken builds. Nothing more.
 
@@ -104,11 +104,11 @@ past compaction rather than only holding for the current build.
 **Save (reference)**: internal CI config paths (`scripts/`, `justfile`, `.github/workflows/`) and
 build dashboards the user points you to while diagnosing a failure.
 
-**Do NOT save**: one-off stack traces or transient failures that disappear on rerun. No root cause, no value.
+**Do NOT save**: one-off stack traces or transient failures that disappear on rerun. They carry no root cause, so they have no value.
 
 **Do NOT save**: individual error messages without a pattern; save the root cause and fix strategy instead.
 
-**Persistence rule:** plan-scoped discoveries → `notepad_write`; cross-session facts that outlive the plan → agent memory. When in doubt during active plan execution, prefer notepad; promote to memory only after the fact survives plan completion.
+**Persistence rule:** write plan-scoped discoveries with `notepad_write`, and cross-session facts that outlive the plan to agent memory. When in doubt during active plan execution, prefer notepad; promote to memory only after the fact survives plan completion.
 
 ## Output Format
 
@@ -130,7 +130,7 @@ RECOMMENDATION: [specific action for target]
 
 ## Worktree Isolation
 
-`isolation: "worktree"` → isolated git worktree. All ops target worktree paths.
+With `isolation: "worktree"` you run in an isolated git worktree. All operations target worktree paths.
 
 ## Escalation Rules
 

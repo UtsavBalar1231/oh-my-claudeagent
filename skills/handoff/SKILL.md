@@ -23,7 +23,7 @@ allowed-tools:
   - mcp__plugin_oh-my-claudeagent_omca__notepad_list
 ---
 
-# Handoff - Session Context Summarization
+# Handoff: Session Context Summarization
 
 ## Tool Restrictions
 
@@ -33,7 +33,7 @@ Self-contained handoff summary for new-session continuation.
 
 ## PHASE 0: VALIDATE
 
-Confirm meaningful work exists. Nearly empty session → inform user nothing to hand off.
+Confirm meaningful work exists. For a nearly empty session, tell the user there is nothing to hand off.
 
 ## PHASE 1: GATHER CONTEXT
 

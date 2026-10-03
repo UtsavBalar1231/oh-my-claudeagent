@@ -18,7 +18,7 @@ disallowed-tools: [Agent]
 
 Fix the following build issue: $ARGUMENTS
 
-No issue specified → run the build command to discover failures, then diagnose and fix.
+When no issue is specified, run the build command to discover failures, then diagnose and fix.
 
 Hephaestus workflow: reproduce, diagnose root cause, minimal fix, verify build passes. Repeat until exit 0.
 

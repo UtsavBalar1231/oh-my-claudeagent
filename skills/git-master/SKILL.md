@@ -39,7 +39,7 @@ Claude Code cannot answer an editor or a credential prompt, so a git command tha
 git -c core.editor=true <command>
 ```
 
-`core.editor=true` also serves as the editor for the `rebase -i` todo list, so an autosquash runs without stopping. A credential prompt needs a terminal the shell does not have, so a `git push` that needs credentials fails instead of waiting; report that failure rather than retrying.
+`core.editor=true` is also the editor for the `rebase -i` todo list, so an autosquash runs without stopping. A credential prompt needs a terminal the shell does not have, so a `git push` that needs credentials fails instead of waiting; report that failure rather than retrying.
 
 Run read-only commands (`status`, `diff`, `log`, `show`, `blame`, `branch`, `rev-parse`, `merge-base`) without the option. They never open an editor, the shell has no terminal for a pager, and an allow rule written for the plain command may not match one with extra options, so the option can turn a pre-approved read into a permission prompt.
 
@@ -207,7 +207,7 @@ git log --oneline main..HEAD
 
 | Condition | Risk Level | Action |
 |-----------|------------|--------|
-| On main/master | CRITICAL | **ABORT** - never rebase main |
+| On main/master | CRITICAL | **ABORT**: never rebase main |
 | Dirty working directory | WARNING | Stop and ask how to handle the changes. Never hide user changes silently. |
 | Pushed commits exist | WARNING | Requires explicit permission before rewrite. `--force-with-lease` only. |
 | All commits local | SAFE | Proceed freely |

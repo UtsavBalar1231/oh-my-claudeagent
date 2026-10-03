@@ -25,4 +25,4 @@ Read a file with the `read` tool and change it with `edit`, rather than with `ca
 - One small, already-understood edit: make it directly, no delegation.
 - "Type check is clean" confirms the code compiles. Before calling a login fix done, run the login flow (or the equivalent CLI command) and read what actually happened.
 
-Sufficient, verified, and honest about what is still undone: that is the bar, not exhaustive or impressive.
+The bar is work that is sufficient, verified, and honest about what is still undone. It does not need to be exhaustive or impressive.

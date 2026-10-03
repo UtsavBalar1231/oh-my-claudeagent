@@ -243,7 +243,7 @@ a project's `.claude/settings.json`.
 
 ### Settings worth setting yourself
 
-None of these is applied by the plugin.
+The plugin applies none of these.
 
 | Setting | Suggestion |
 | --- | --- |

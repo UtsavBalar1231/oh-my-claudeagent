@@ -406,7 +406,7 @@ describe("failures of any other tool", () => {
 
   test("an invalid YAML rule points at ast_test_rule", async () => {
     expect(await session().report(tool("mcp__omca__ast_find_rule", "invalid yaml at line 3"))).toBe(
-      "[MCP ERROR RECOVERY] Invalid YAML in ast-grep rule. Check rule syntax — use ast_test_rule to validate before ast_find_rule.",
+      "[MCP ERROR RECOVERY] Invalid YAML in ast-grep rule. Check rule syntax. Use ast_test_rule to validate before ast_find_rule.",
     );
   });
 

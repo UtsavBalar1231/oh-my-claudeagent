@@ -41,7 +41,7 @@ CLAIM: "The handler for X is in Y"
 EVIDENCE: https://github.com/{REPO}/blob/{COMMIT_SHA}/path/to/file.py#L42
 ```
 
-No commit-SHA permalink = cannot make the claim. Write "UNVERIFIED" instead.
+Without a commit-SHA permalink, do not make the claim. Write "UNVERIFIED" instead.
 
 Applies to: bug root cause (file + line), "feature exists" (cite where), "fix correct" (cite what), any code reference.
 
