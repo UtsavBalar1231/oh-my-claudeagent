@@ -15,7 +15,7 @@
 
 ✻ Waiting for 1 background agent to finish
 
-● oh-my-claudeagent: 0s · 1 in 1 out · $0.0001 engine cost
+● oh-my-claudeagent: 0s · 38.6k in 17 out · $0.5088 engine cost
 
 
 ╭──────────────────────────────────────────────────────────────────────────────╮

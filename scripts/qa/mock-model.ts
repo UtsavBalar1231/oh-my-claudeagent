@@ -53,7 +53,11 @@ export function parseScript(text: string): Script {
 const stopReason = (content: Served[]) =>
   content.some((block) => block.type === "tool_use") ? "tool_use" : "end_turn";
 
-function jsonMessage(content: Served[]) {
+// Usage is sized from the request and the reply at about four characters a token, so a session's
+// token and cost displays show numbers of the size a real model would report.
+const tokensOf = (text: string): number => Math.max(1, Math.ceil(text.length / 4));
+
+function jsonMessage(content: Served[], inputTokens: number) {
   return {
     id: MESSAGE_ID,
     type: "message",
@@ -62,7 +66,7 @@ function jsonMessage(content: Served[]) {
     model: MOCK_MODEL_ID,
     stop_reason: stopReason(content),
     stop_sequence: null,
-    usage: { input_tokens: 1, output_tokens: 1 },
+    usage: { input_tokens: inputTokens, output_tokens: tokensOf(JSON.stringify(content)) },
   };
 }
 
@@ -84,7 +88,7 @@ function blockEvents(block: Served, index: number): SseEvent[] {
   ];
 }
 
-function sseBody(content: Served[]): string {
+function sseBody(content: Served[], inputTokens: number): string {
   const events: SseEvent[] = [
     [
       "message_start",
@@ -98,7 +102,7 @@ function sseBody(content: Served[]): string {
           model: MOCK_MODEL_ID,
           stop_reason: null,
           stop_sequence: null,
-          usage: { input_tokens: 1, output_tokens: 0 },
+          usage: { input_tokens: inputTokens, output_tokens: 0 },
         },
       },
     ],
@@ -108,7 +112,7 @@ function sseBody(content: Served[]): string {
       {
         type: "message_delta",
         delta: { stop_reason: stopReason(content), stop_sequence: null },
-        usage: { output_tokens: 1 },
+        usage: { output_tokens: tokensOf(JSON.stringify(content)) },
       },
     ],
     ["message_stop", { type: "message_stop" }],
@@ -194,6 +198,8 @@ export function startServer({
       }
 
       const rawBody = await req.text();
+      // Claude Code counts tokens once a reply's usage is large enough; a count is not a model turn.
+      if (url.pathname === "/v1/messages/count_tokens") return Response.json({ input_tokens: tokensOf(rawBody) });
       const body = parseBody(rawBody);
       const streaming = Boolean(body.stream);
       const queue: QueueName = systemText(body.system).includes(SUBAGENT_MARKER) ? "subagent" : "main";
@@ -217,11 +223,11 @@ export function startServer({
       if (bodyLogPath) appendFileSync(bodyLogPath, `${JSON.stringify({ queue, turn, body: rawBody })}\n`);
 
       if (streaming) {
-        return new Response(sseBody(content), {
+        return new Response(sseBody(content, tokensOf(rawBody)), {
           headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
         });
       }
-      return Response.json(jsonMessage(content));
+      return Response.json(jsonMessage(content, tokensOf(rawBody)));
     },
   });
 }

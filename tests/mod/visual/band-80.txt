@@ -15,7 +15,7 @@
 
 ✻ Waiting for 1 background agent to finish
 
-● oh-my-claudeagent: 0s · 1 in 1 out ·  no evidence: just test
+● oh-my-claudeagent: 0s · 40.1k in 21 out ·  no evidence: just test
 
 
 
@@ -37,4 +37,4 @@
   ⏸ manual mode on · ? for shortcuts · ← for agents · ↓ to manage
 
   ● main
-  ◯ oh-my-claudeagent:executor  Port the snapshot onto the r… 0s · ↓ 15 tokens
+  ◯ oh-my-claudeagent:executor  Port the snapshot onto th… 0s · ↓ 24.4k tokens

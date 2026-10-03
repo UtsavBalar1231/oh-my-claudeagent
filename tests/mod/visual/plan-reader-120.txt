@@ -15,8 +15,8 @@
                                                                │── Milestone 1: Exporter ── █████▍██ 2/3 ────────────
 ✻ Waiting for 1 background agent to finish                     │ 3 Write rows in the schema's order        UNPROVEN
                                                                │ 4 Round negative totals toward zero         PROVEN
-● oh-my-claudeagent: 0s · 1 in 1 out · $0.0001 engine          │ 5 Reconcile totals against…    executor  UNPROVEN
-  cost                                                         │     Sum each customer's rows and compare with the i…
+● oh-my-claudeagent: 0s · 40.4k in 17 out · $0.5263            │ 5 Reconcile totals against…    executor  UNPROVEN
+  engine cost                                                  │     Sum each customer's rows and compare with the i…
                                                                │     $ DB_PASSWORD=‹masked› just test-db
                                                                │     src/report/totals.ts 5s · src/report/totals.spe…
                                                                │      no run since its files changed
@@ -37,4 +37,4 @@
   ⏸ manual mode on · ? for shortcuts · ← for agents · ↓ to manage
 
   ● main
-  ◯ oh-my-claudeagent:executor  Reconcile totals                                                      2s · ↓ 19 tokens
+  ◯ oh-my-claudeagent:executor  Reconcile totals                                                   2s · ↓ 24.4k tokens

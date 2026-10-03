@@ -87,8 +87,13 @@ describe("fixed reply without a script", () => {
       model: "claude-mock",
       stop_reason: "end_turn",
       stop_sequence: null,
-      usage: { input_tokens: 1, output_tokens: 1 },
+      usage: { input_tokens: 4, output_tokens: 8 },
     });
+  });
+
+  test("sizes usage at about four characters a token of the request and the reply", async () => {
+    const reply = (await postJson({ messages: ["x".repeat(4000)] })) as { usage: unknown };
+    expect(reply.usage).toEqual({ input_tokens: 1005, output_tokens: 8 });
   });
 
   test("treats a malformed body as a non-streaming request", async () => {
@@ -127,7 +132,7 @@ describe("fixed reply without a script", () => {
       data: {
         type: "message_delta",
         delta: { stop_reason: "end_turn", stop_sequence: null },
-        usage: { output_tokens: 1 },
+        usage: { output_tokens: 8 },
       },
     });
   });
@@ -157,6 +162,17 @@ describe("scripted turns", () => {
     const texts = [await postJson(), await postJson()].map((b) => (b as { content: { text: string }[] }).content[0]?.text);
 
     expect(texts).toEqual(["one", "two"]);
+  });
+
+  test("answers a token count without spending a turn or writing an access log line", async () => {
+    await boot({ script: { main: [{ content: [{ type: "text", text: "one" }] }], subagent: [] } });
+
+    const counted = await (await post("/v1/messages/count_tokens?beta=true", { messages: [] })).json();
+    const reply = (await postJson()) as { content: { text: string }[] };
+
+    expect(counted).toEqual({ input_tokens: 4 });
+    expect(reply.content[0]?.text).toBe("one");
+    expect(logEntries().map((entry) => entry.path)).toEqual(["/v1/messages"]);
   });
 
   test("serves a scripted tool_use turn as stop_reason tool_use with a mock id", async () => {

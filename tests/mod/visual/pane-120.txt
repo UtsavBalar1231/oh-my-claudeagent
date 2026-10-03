@@ -1,31 +1,31 @@
                                                                │1: Agents  2: Plan  3: Evidence  4: Notepad            ✕
  ▐▛███▛█   Claude Code v2.1.288                                │5: Feedback  6: Stats  7: Doctor
 ▝▜██████▀  Opus 5.5 · API Usage Billing                        │─────────────────────────────────────────────────────
- ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/cwd               │ executor · Fix the heading parser     high       2s
-                                                               │  · Bash sleep 90                             3 calls
+ ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/cwd               │ explore · Map the router callers      high       2s
+                                                               │  ✶ Bash sleep 90                             3 calls
                                                                │ oracle · Review the ledger design     xhigh      2s
-❯ Fix the parser with the executor                             │  · Bash sleep 90                             3 calls
-                                                               │ explore · The rotation is safe: a crash mi…      0s
-● 3 background agents launched (↓ to manage)                   │d: Details  2 running · 1 finished · 14 tokens
+❯ Fix the parser with the executor                             │  ✶ Bash sleep 90                             3 calls
+                                                               │ executor · The rotation is safe: a crash m…      0s
+● 3 background agents launched (↓ to manage)                   │d: Details  2 running · 1 finished · 159k tokens
    ├ oh-my-claudeagent:executor (Fix the heading parser)       │
    ├ oh-my-claudeagent:explore (Map the router callers)        │
    └ oh-my-claudeagent:oracle (Review the ledger design)       │
                                                                │
-● ok                                                           │
+● Three agents are on it.                                      │
                                                                │
 ✻ Waiting for 3 background agents to finish                    │
                                                                │
-● oh-my-claudeagent: 0s · 1 in 1 out · $0.0003 engine          │
-  cost                                                         │
+● oh-my-claudeagent: 0s · 40.8k in 13 out · $1.21              │
+  engine cost                                                  │
                                                                │
-● Agent "Map the router callers" finished · 0s                 │
+● Agent "Fix the heading parser" finished · 0s                 │
                                                                │
 ● ok                                                           │
                                                                │
 ✻ Waiting for 2 background agents to finish                    │
                                                                │
-● oh-my-claudeagent: 0s · 1 in 1 out · $0.0000 engine          │
-  cost                                                         │
+● oh-my-claudeagent: 0s · 41.1k in 8 out · $0.1648             │
+  engine cost                                                  │
                                                                │
                                                                │
 █▎███ 12/46 · next 13 Port the snapshot and… ·  2 running  [-]│
@@ -36,5 +36,5 @@
   ⏸ manual mode on · /tasks to see subagents · ← for agents · ↓ to manage
 
   ● main
-  ◯ oh-my-claudeagent:executor  Fix the heading parser                                                3s · ↓ 42 tokens
-  ◯ oh-my-claudeagent:oracle    Review the ledger design                                              2s · ↓ 21 tokens
+  ◯ oh-my-claudeagent:explore  Map the router callers                                              3s · ↓ 25.7k tokens
+  ◯ oh-my-claudeagent:oracle   Review the ledger design                                            2s · ↓ 21.9k tokens
