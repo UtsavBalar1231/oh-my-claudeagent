@@ -241,13 +241,31 @@ describe("git", () => {
     expect(classify(command, PS)).toEqual({ kind: "blocking", removals: [], git: [{ operation }] }),
   );
 
-  test("a force push is advisory and a blocking operation outranks it", () => {
-    expect(classify("git.exe push --force origin main", PS)).toEqual({
+  test("a force push to another branch is advisory and a blocking operation outranks it", () => {
+    expect(classify("git.exe push --force origin dev", PS)).toEqual({
       kind: "advisory",
       removals: [],
-      git: [{ operation: "push --force", remote: "origin", branch: "main" }],
+      git: [{ operation: "push --force", remote: "origin", branch: "dev" }],
     });
     expect(classOf("git push -f; git stash")).toBe("blocking");
+  });
+
+  test("a force push to the default branch is blocking, by name, by origin/HEAD or as the checked-out branch", () => {
+    const main = { operation: "push --force", remote: "origin", branch: "main" } as const;
+    expect(classify("git.exe push --force origin main", PS)).toEqual({ kind: "blocking", removals: [], git: [main] });
+    expect(classify("& git push origin +main", PS)).toEqual({ kind: "blocking", removals: [], git: [main] });
+    expect(classOf("git push --force-with-lease origin master")).toBe("blocking");
+    expect(classOf("git push -f", { shell: "powershell", branch: "main" })).toBe("blocking");
+    expect(classOf("git push -f", { shell: "powershell", branch: "dev" })).toBe("advisory");
+    expect(classOf("git push -f origin trunk", { shell: "powershell", defaultBranch: "trunk" })).toBe("blocking");
+    expect(classOf("git push -f origin main", { shell: "powershell", defaultBranch: "trunk" })).toBe("advisory");
+  });
+
+  test("a commit that skips its hooks is blocking, and a message naming the flag is not", () => {
+    const commit = { operation: "commit --no-verify" } as const;
+    expect(classify("git commit --no-verify -m 'x'", PS)).toEqual({ kind: "blocking", removals: [], git: [commit] });
+    expect(classify("git.exe commit -nm 'x'", PS)).toEqual({ kind: "blocking", removals: [], git: [commit] });
+    expect(classOf("git commit -m 'skip -n and --no-verify'")).toBe("none");
   });
 
   test.each([
@@ -512,4 +530,64 @@ describe("powershellWords", () => {
   test("a backslash is a path separator, not an escape", () => {
     expect(powershellWords('C:\\a\\ b "C:\\My Repo\\"')).toEqual(["C:\\a\\", "b", "C:\\My Repo\\"]);
   });
+});
+
+describe("a nested command", () => {
+  test.each([
+    'pwsh -Command "Remove-Item -Recurse C:\\"',
+    "pwsh -c 'Remove-Item -Recurse $HOME'",
+    "pwsh.exe -NoProfile -NonInteractive -Command Remove-Item -Recurse C:\\",
+    "pwsh -Comm 'ri -r ~'",
+    'powershell -Command "Remove-Item -Recurse -Force C:\\Windows"',
+    "powershell.exe -c rm -r C:\\",
+    '& "C:\\Program Files\\PowerShell\\7\\pwsh.exe" -c "Remove-Item -Recurse C:\\"',
+    'cmd /c "cd build && rd /s /q C:\\"',
+    "cmd /d /c rd /s /q C:\\",
+    'cmd.exe /C "del /s /q C:\\*"',
+    'Invoke-Expression "Remove-Item -Recurse C:\\"',
+    "iex 'Remove-Item -Recurse $HOME'",
+    "Invoke-Expression -Command 'rd /s /q C:\\'",
+    "bash -c 'rm -rf ~'",
+    "wsl.exe; sh -c 'rm -rf /'",
+    "pwsh -c \"cmd /c 'rd /s /q C:\\'\"",
+  ])("%s is catastrophic", (command) => expect(classOf(command)).toBe("catastrophic"));
+
+  test.each([
+    ["pwsh -c 'git reset --hard'", "reset --hard"],
+    ['cmd /c "git stash && echo done"', "stash"],
+    ["iex 'git clean -fdx'", "clean"],
+    ["bash -c 'git commit -n -m x'", "commit --no-verify"],
+  ] as const)("%s is blocking", (command, operation) =>
+    expect(classify(command, PS)).toEqual({ kind: "blocking", removals: [], git: [{ operation }] }),
+  );
+
+  test("a force push to the default branch inside pwsh or cmd is blocking", () => {
+    expect(classOf("pwsh -c 'git push -f origin main'")).toBe("blocking");
+    expect(classOf('cmd /c "git push --force origin master"')).toBe("blocking");
+    expect(classOf("pwsh -c 'git push -f origin dev'")).toBe("advisory");
+  });
+
+  test("a removal inside pwsh or cmd keeps its targets as written", () => {
+    expect(classify('cmd /c rd /s /q "C:\\My Dir\\build"', PS)).toEqual({
+      kind: "advisory",
+      removals: [{ targets: ["C:\\My Dir\\build"] }],
+      git: [],
+    });
+    expect(classify("pwsh -c 'Remove-Item -Recurse build, dist'", PS)).toEqual({
+      kind: "advisory",
+      removals: [{ targets: ["build", "dist"] }],
+      git: [],
+    });
+  });
+
+  test.each([
+    'Write-Host "pwsh -c \'Remove-Item -Recurse C:\\\'"',
+    "Write-Host 'iex \"Remove-Item -Recurse C:\\\"'",
+    "# cmd /c rd /s /q C:\\",
+    "pwsh -File clean.ps1 -c 'Remove-Item -Recurse C:\\'",
+    "pwsh -c 'Write-Host \"Remove-Item -Recurse C:\\\"'",
+    "iex $command",
+    "Invoke-Expression (Get-Content clean.ps1 -Raw)",
+    "cmd /c dir C:\\",
+  ])("%s runs nothing destructive", (command) => expect(classOf(command)).toBe("none"));
 });

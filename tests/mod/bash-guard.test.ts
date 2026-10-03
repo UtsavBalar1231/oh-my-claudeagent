@@ -8,6 +8,15 @@ const RM_CATASTROPHIC =
 const REFUSED = "The user refused this command in OMCA's review. Do not retry it; ask the user how to proceed.";
 const GIT =
   "Destructive git command blocked. If working tree is dirty, REPORT and STOP — never modify history. Set OMCA_DISABLED_HOOKS=bash-guard to turn this check off for testing.";
+const FORCE_PUSH =
+  "Force push to the default branch blocked: it rewrites history everyone else has pulled. Push to another branch, or ask the user to push. Set OMCA_DISABLED_HOOKS=bash-guard to turn this check off for testing.";
+const NO_VERIFY =
+  "git commit --no-verify blocked: it skips the repository's commit hooks. Fix what the hook reports and commit without the flag. Set OMCA_DISABLED_HOOKS=bash-guard to turn this check off for testing.";
+const branches = (branch: string, originHead?: string): Record<string, Partial<ProcessRunResult>> => ({
+  "git symbolic-ref --quiet --short HEAD": { stdout: `${branch}\n` },
+  "git symbolic-ref --quiet --short refs/remotes/origin/HEAD":
+    originHead === undefined ? { exitCode: 1 } : { stdout: `origin/${originHead}\n` },
+});
 
 type Node = { kind: "file" | "dir" | "other"; entries?: number; isLink?: boolean };
 type World = {
@@ -171,26 +180,30 @@ test("an answer typed under Other denies", async ($, on) => {
 });
 
 test("with no surface to draw on, nothing asks: a blocking match denies and an advisory one runs", async ($, on) => {
-  const { asked, checked } = world(on, { ...BUILD_WORLD, surfaces: [] });
+  const { asked, checked } = world(on, { ...BUILD_WORLD, surfaces: [], git: branches("dev") });
 
   expect(await check($, "rm -rf build")).toEqual(ENGINE);
-  expect(await check($, "git push --force origin main")).toEqual(ENGINE);
+  expect(await check($, "git push --force origin dev")).toEqual(ENGINE);
   expect(await check($, "git reset --hard")).toEqual({ decision: "deny", reason: GIT });
   expect(await check($, "rm -rf build; git stash")).toEqual({ decision: "deny", reason: GIT });
+  expect(await check($, "git push --force origin main")).toEqual({ decision: "deny", reason: FORCE_PUSH });
+  expect(await check($, "git commit --no-verify -m x")).toEqual({ decision: "deny", reason: NO_VERIFY });
   expect(asked).toEqual([]);
   expect(checked).toEqual([
     { tool: "Bash", input: { command: "rm -rf build" } },
-    { tool: "Bash", input: { command: "git push --force origin main" } },
+    { tool: "Bash", input: { command: "git push --force origin dev" } },
   ]);
 });
 
 test("guardMode deny decides without asking: blocking and catastrophic matches deny, advisory ones run", { options: { guardMode: "deny" } }, async ($, on) => {
-  const { asked, checked } = world(on, BUILD_WORLD);
+  const { asked, checked } = world(on, { ...BUILD_WORLD, git: branches("dev") });
 
   expect(await check($, "rm -rf build")).toEqual(ENGINE);
-  expect(await check($, "git push --force origin main")).toEqual(ENGINE);
+  expect(await check($, "git push --force origin dev")).toEqual(ENGINE);
   expect(await check($, "rm -rf build; git stash")).toEqual({ decision: "deny", reason: GIT });
   expect(await check($, "rm -rf ~")).toEqual({ decision: "deny", reason: RM_CATASTROPHIC });
+  expect(await check($, "git push --force origin main")).toEqual({ decision: "deny", reason: FORCE_PUSH });
+  expect(await check($, "git commit -n -m x")).toEqual({ decision: "deny", reason: NO_VERIFY });
   expect(asked).toEqual([]);
   expect(checked).toHaveLength(2);
 });
@@ -253,20 +266,97 @@ test("a hard reset outside a repository asks with git's first error line", async
 test("a force push lists the commits it drops, capped at 20 with a count of the rest", async ($, on) => {
   const commits = Array.from({ length: 22 }, (_, i) => `c${String(i).padStart(6, "0")} commit ${i}`);
   const { asked } = world(on, {
-    git: { "git log --oneline origin/main --not HEAD": { stdout: `${commits.join("\n")}\n` } },
+    git: { ...branches("dev"), "git log --oneline origin/dev --not HEAD": { stdout: `${commits.join("\n")}\n` } },
   });
 
-  expect(await check($, "git push --force origin main")).toEqual({ decision: "deny", reason: REFUSED });
+  expect(await check($, "git push --force origin dev")).toEqual({ decision: "deny", reason: REFUSED });
   expect(asked.map((a) => a.question)).toEqual([
     [
       "OMCA held this command for your review:",
-      "  git push --force origin main",
-      "git push --force drops 22 commits from origin/main:",
+      "  git push --force origin dev",
+      "git push --force drops 22 commits from origin/dev:",
       ...commits.slice(0, 20).map((line) => `  ${line}`),
       "  and 2 more commits",
       "Run it?",
     ].join("\n"),
   ]);
+});
+
+test("a force push to the default branch asks the same way, and a refusal names the force push", async ($, on) => {
+  const { asked } = world(on, {
+    git: { ...branches("dev"), "git log --oneline origin/main --not HEAD": { stdout: "c000001 lost\n" } },
+  });
+
+  expect(await check($, "git push --force origin main")).toEqual({ decision: "deny", reason: FORCE_PUSH });
+  expect(asked.map((a) => a.question)).toEqual([
+    [
+      "OMCA held this command for your review:",
+      "  git push --force origin main",
+      "git push --force drops 1 commit from origin/main:",
+      "  c000001 lost",
+      "Run it?",
+    ].join("\n"),
+  ]);
+});
+
+test("a push that names no branch is judged by the checked-out one, read from local refs", async ($, on) => {
+  world(on, { surfaces: [], git: branches("main") });
+  expect(await check($, "git push -f")).toEqual({ decision: "deny", reason: FORCE_PUSH });
+  expect(await check($, "git push --force origin")).toEqual({ decision: "deny", reason: FORCE_PUSH });
+  expect(await check($, "git push -f origin HEAD")).toEqual({ decision: "deny", reason: FORCE_PUSH });
+});
+
+test("origin/HEAD names the default branch, and a push to main is then an ordinary force push", async ($, on) => {
+  const { checked } = world(on, { surfaces: [], git: branches("develop", "develop") });
+  expect(await check($, "git push -f")).toEqual({ decision: "deny", reason: FORCE_PUSH });
+  expect(await check($, "git push -f origin develop")).toEqual({ decision: "deny", reason: FORCE_PUSH });
+  expect(await check($, "git push -f origin main")).toEqual(ENGINE);
+  expect(checked).toEqual([{ tool: "Bash", input: { command: "git push -f origin main" } }]);
+});
+
+test("when git cannot read the branches, main and master are the default by name", async ($, on) => {
+  world(on, {
+    surfaces: [],
+    git: {
+      "git symbolic-ref --quiet --short HEAD": { exitCode: 128, stderr: "fatal: not a git repository\n" },
+      "git symbolic-ref --quiet --short refs/remotes/origin/HEAD": { exitCode: 128, stderr: "fatal: not a git repository\n" },
+    },
+  });
+  expect(await check($, "git push -f origin master")).toEqual({ decision: "deny", reason: FORCE_PUSH });
+  expect(await check($, "git push -f")).toEqual(ENGINE);
+});
+
+test("a commit that skips its hooks asks with its effect, and a refusal names the skipped hooks", async ($, on) => {
+  const { asked } = world(on);
+
+  expect(await check($, "git commit --no-verify -m wip")).toEqual({ decision: "deny", reason: NO_VERIFY });
+  expect(asked.map((a) => a.question)).toEqual([
+    [
+      "OMCA held this command for your review:",
+      "  git commit --no-verify -m wip",
+      "git commit --no-verify skips the repository's pre-commit and commit-msg hooks.",
+      "Run it?",
+    ].join("\n"),
+  ]);
+});
+
+test("a removal handed to a shell, eval or a heredoc, or behind timeout, is judged as the command it runs", async ($, on) => {
+  const { asked, checked } = world(on, { surfaces: [] });
+  const denied = { decision: "deny", reason: RM_CATASTROPHIC };
+
+  expect(await check($, "bash -c 'rm -rf ~'")).toEqual(denied);
+  expect(await check($, `sh -c 'rm -rf "$HOME"'`)).toEqual(denied);
+  expect(await check($, "sudo bash -lc 'rm -rf /'")).toEqual(denied);
+  expect(await check($, 'eval "rm -rf /"')).toEqual(denied);
+  expect(await check($, "bash <<EOF\nrm -rf /\nEOF")).toEqual(denied);
+  expect(await check($, "timeout 5 rm -rf ~")).toEqual(denied);
+  expect(await powershell($, "pwsh -Command \"Remove-Item -Recurse $HOME\"")).toEqual(denied);
+  expect(await powershell($, 'cmd /c "cd x && rd /s /q C:\\"')).toEqual(denied);
+  expect(await check($, 'env bash -c "git reset --hard"')).toEqual({ decision: "deny", reason: GIT });
+  expect(await check($, "xargs rm -rf")).toEqual(ENGINE);
+  expect(await check($, "echo \"bash -c 'rm -rf ~'\"")).toEqual(ENGINE);
+  expect(asked).toEqual([]);
+  expect(checked).toHaveLength(2);
 });
 
 test("a force push with no remote named compares against the push target", async ($, on) => {
@@ -462,11 +552,13 @@ test("a refused PowerShell removal is denied", async ($, on) => {
 });
 
 test("with no surface a PowerShell advisory match runs and a blocking one is denied", async ($, on) => {
-  const { asked, checked } = world(on, { surfaces: [] });
+  const { asked, checked } = world(on, { surfaces: [], git: branches("dev") });
 
   expect(await powershell($, "Remove-Item -Recurse -Force build")).toEqual(ENGINE);
-  expect(await powershell($, "git.exe push --force origin main")).toEqual(ENGINE);
+  expect(await powershell($, "git.exe push --force origin dev")).toEqual(ENGINE);
   expect(await powershell($, "Remove-Item -Recurse build; git clean -fd")).toEqual({ decision: "deny", reason: GIT });
+  expect(await powershell($, "git.exe push --force origin main")).toEqual({ decision: "deny", reason: FORCE_PUSH });
+  expect(await powershell($, "git commit --no-verify -m 'x'")).toEqual({ decision: "deny", reason: NO_VERIFY });
   expect(asked).toEqual([]);
   expect(checked).toHaveLength(2);
 });

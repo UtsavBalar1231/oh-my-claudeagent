@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
-import { mkdtempSync, rmSync } from "node:fs"
+import { execFileSync } from "node:child_process"
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { checkEdit, checkShell } from "./guard.ts"
@@ -10,6 +11,10 @@ const RM_CATASTROPHIC =
   "Destructive rm -rf blocked: the target is the filesystem root, home, the working directory, or a directory directly under root or home. Name a deeper path explicitly."
 const GIT =
   "Destructive git command blocked. If working tree is dirty, REPORT and STOP — never modify history. Set OMCA_DISABLED_HOOKS=bash-guard to turn this check off for testing."
+const FORCE_PUSH =
+  "Force push to the default branch blocked: it rewrites history everyone else has pulled. Push to another branch, or ask the user to push. Set OMCA_DISABLED_HOOKS=bash-guard to turn this check off for testing."
+const NO_VERIFY =
+  "git commit --no-verify blocked: it skips the repository's commit hooks. Fix what the hook reports and commit without the flag. Set OMCA_DISABLED_HOOKS=bash-guard to turn this check off for testing."
 
 let tmp: string
 let errorSpy: ReturnType<typeof spyOn>
@@ -18,6 +23,7 @@ const savedEnv = {
   OMCA_DISABLED_HOOKS: process.env.OMCA_DISABLED_HOOKS,
   HOME: process.env.HOME,
   USERPROFILE: process.env.USERPROFILE,
+  GIT_DIR: process.env.GIT_DIR,
 }
 
 beforeEach(() => {
@@ -51,7 +57,7 @@ describe("decisions", () => {
 
   test("an advisory match runs, since there is no dialog to hold it in", () => {
     expect(shell("rm -rf build")).toEqual({ deny: false })
-    expect(shell("git push --force origin main")).toEqual({ deny: false })
+    expect(shell("git push --force origin feature/x")).toEqual({ deny: false })
   })
 
   test("a blocking match alongside an advisory one is denied with the git reason", () => {
@@ -111,9 +117,63 @@ describe("decisions", () => {
     expect(shell("cat <<'EOF'\nnotes\nEOF\nrm -rf /")).toEqual({ deny: true, reason: RM_CATASTROPHIC })
   })
 
+  test("a nested or wrapped removal of home is denied as catastrophic", () => {
+    const denied = { deny: true, reason: RM_CATASTROPHIC }
+    expect(shell("bash -c 'rm -rf ~'")).toEqual(denied)
+    expect(shell("eval \"rm -rf /\"")).toEqual(denied)
+    expect(shell("timeout 5 rm -rf ~")).toEqual(denied)
+    expect(shell("bash <<'EOF'\nrm -rf /\nEOF")).toEqual(denied)
+    expect(shell("xargs rm -rf")).toEqual({ deny: false })
+  })
+
+  test("a commit that skips its hooks is denied, and bash-guard in OMCA_DISABLED_HOOKS lets it run", () => {
+    expect(shell("git commit --no-verify -m x")).toEqual({ deny: true, reason: NO_VERIFY })
+    expect(shell("sh -c 'git commit -n -m x'")).toEqual({ deny: true, reason: NO_VERIFY })
+    process.env.OMCA_DISABLED_HOOKS = "bash-guard"
+    expect(shell("git commit --no-verify -m x")).toEqual({ deny: false })
+  })
+
   test("a write to a new file is allowed", () => {
     expect(checkEdit("write", { path: join(tmp, "new.txt"), content: "hi" }, tmp)).toEqual({ deny: false })
     expect(errorSpy).toHaveBeenCalledTimes(0)
+  })
+})
+
+describe("a force push to the default branch", () => {
+  const repo = (branch: string, originHead?: string): string => {
+    const dir = join(tmp, `repo-${branch}-${originHead ?? "none"}`)
+    mkdirSync(dir)
+    const git = (...args: string[]) => execFileSync("git", args, { cwd: dir, stdio: "ignore" })
+    git("init", "--quiet", "--initial-branch", branch)
+    if (originHead !== undefined) git("symbolic-ref", "refs/remotes/origin/HEAD", `refs/remotes/origin/${originHead}`)
+    return dir
+  }
+  const denied = { deny: true, reason: FORCE_PUSH }
+
+  test("is denied by name, and a force push to another branch runs", () => {
+    const dir = repo("dev")
+    expect(checkShell("git push --force origin main", dir)).toEqual(denied)
+    expect(checkShell("git push origin +HEAD:master", dir)).toEqual(denied)
+    expect(checkShell("git push --force-with-lease origin dev", dir)).toEqual({ deny: false })
+  })
+
+  test("is denied when the push names no branch and the checked-out one is the default", () => {
+    expect(checkShell("git push -f", repo("main"))).toEqual(denied)
+    expect(checkShell("git push --force origin", repo("master"))).toEqual(denied)
+    expect(checkShell("git push -f", repo("topic"))).toEqual({ deny: false })
+  })
+
+  test("follows the branch origin/HEAD names, and then main is an ordinary branch", () => {
+    const dir = repo("develop", "develop")
+    expect(checkShell("git push -f origin develop", dir)).toEqual(denied)
+    expect(checkShell("git push -f", dir)).toEqual(denied)
+    expect(checkShell("git push -f origin main", dir)).toEqual({ deny: false })
+  })
+
+  test("outside a repository, main and master are the default by name", () => {
+    process.env.GIT_DIR = join(tmp, "no-repository")
+    expect(checkShell("git push -f origin main", tmp)).toEqual(denied)
+    expect(checkShell("git push -f", tmp)).toEqual({ deny: false })
   })
 })
 

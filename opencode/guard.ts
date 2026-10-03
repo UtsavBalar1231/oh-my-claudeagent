@@ -1,6 +1,7 @@
+import { execFileSync } from "node:child_process"
 import { resolve } from "node:path"
 import { type DenyOnce, judgeWrite } from "../src/core/comments.ts"
-import { classify, type Context, reasonFor } from "../src/core/destructive.ts"
+import { classify, type Context, type Finding, reasonFor } from "../src/core/destructive.ts"
 import { isHookDisabled } from "../src/core/kill-switch.ts"
 import { homeDir, toPlatform } from "../src/core/path.ts"
 
@@ -15,8 +16,29 @@ function shellContext(projectRoot: string): Context {
   return { shell: "bash", cwd: projectRoot, root: projectRoot, platform: toPlatform(process.platform), ...(home !== undefined && { home }) }
 }
 
+function symbolicRef(projectRoot: string, name: string): string | undefined {
+  try {
+    const ref = execFileSync("git", ["symbolic-ref", "--quiet", "--short", name], { cwd: projectRoot, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 5000 })
+    return ref.trim() || undefined
+  } catch {
+    return undefined
+  }
+}
+
+// Read from local refs only, so deciding never waits on the network.
+function branches(projectRoot: string): Pick<Context, "branch" | "defaultBranch"> {
+  const branch = symbolicRef(projectRoot, "HEAD")
+  const originHead = symbolicRef(projectRoot, "refs/remotes/origin/HEAD")
+  return { ...(branch !== undefined && { branch }), ...(originHead !== undefined && { defaultBranch: originHead.replace(/^origin\//, "") }) }
+}
+
+const isPush = (finding: Finding | undefined): boolean =>
+  finding !== undefined && finding.kind !== "catastrophic" && finding.git.some((git) => git.operation === "push --force")
+
 export function checkShell(command: string, projectRoot: string): GuardResult {
-  const finding = classify(command, shellContext(projectRoot))
+  const ctx = shellContext(projectRoot)
+  const first = classify(command, ctx)
+  const finding = isPush(first) ? classify(command, { ...ctx, ...branches(projectRoot) }) : first
   if (finding === undefined || finding.kind === "advisory") return ALLOW
   if (finding.kind === "blocking" && isHookDisabled(process.env.OMCA_DISABLED_HOOKS, "bash-guard")) return ALLOW
   return { deny: true, reason: reasonFor(finding) }

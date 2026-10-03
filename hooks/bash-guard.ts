@@ -75,6 +75,7 @@ const TREE_EFFECT: Record<Exclude<GitFinding["operation"], "reset --hard" | "pus
   restore: "git restore discards changes to the files it names.",
   "rm -r": "git rm -r deletes tracked files from the working tree.",
   "checkout --": "git checkout -- discards changes to the paths it names.",
+  "commit --no-verify": "git commit --no-verify skips the repository's pre-commit and commit-msg hooks.",
 };
 
 async function resetLines(host: Host): Promise<string[]> {
@@ -134,14 +135,30 @@ async function question(host: Host, command: string, finding: Reviewable, g: Gly
 
 const shellOf = (tool: string): Context["shell"] => (tool === "PowerShell" ? "powershell" : "bash");
 
-async function contextOf(host: Host, shell: Context["shell"]): Promise<Context> {
-  const [HOME, USERPROFILE, HOMEDRIVE, HOMEPATH, cwd, root] = await Promise.all([
+const symbolicRef = (host: Host, name: string): Promise<string | undefined> =>
+  git(host, ["symbolic-ref", "--quiet", "--short", name]).then(
+    ([line]) => line,
+    () => undefined,
+  );
+
+// Read from local refs only, so deciding never waits on the network.
+async function branchesOf(host: Host): Promise<Pick<Context, "branch" | "defaultBranch">> {
+  const [branch, originHead] = await Promise.all([symbolicRef(host, "HEAD"), symbolicRef(host, "refs/remotes/origin/HEAD")]);
+  return {
+    ...(branch !== undefined && { branch }),
+    ...(originHead !== undefined && { defaultBranch: originHead.replace(/^origin\//, "") }),
+  };
+}
+
+async function contextOf(host: Host, shell: Context["shell"], isPush: boolean): Promise<Context> {
+  const [HOME, USERPROFILE, HOMEDRIVE, HOMEPATH, cwd, root, branches] = await Promise.all([
     host.env.HOME(),
     host.env.USERPROFILE(),
     host.env.HOMEDRIVE(),
     host.env.HOMEPATH(),
     host.session.cwd().catch(() => undefined),
     host.session.root().catch(() => undefined),
+    isPush ? branchesOf(host) : {},
   ]);
   const home = homeDir({ HOME, USERPROFILE, HOMEDRIVE, HOMEPATH });
   return {
@@ -149,6 +166,7 @@ async function contextOf(host: Host, shell: Context["shell"]): Promise<Context> 
     ...(home !== undefined && { home }),
     ...(cwd !== undefined && { cwd }),
     ...(root !== undefined && { root }),
+    ...branches,
   };
 }
 
@@ -160,7 +178,7 @@ export const bashGuard: Features = {
       const first = classify(command, { shell });
       if (first === undefined) return undefined;
       if (first.kind === "catastrophic") return deny(reasonFor(first));
-      const ctx = await contextOf(host, shell);
+      const ctx = await contextOf(host, shell, first.git.some((finding) => finding.operation === "push --force"));
       const finding = classify(command, ctx);
       if (finding === undefined) return undefined;
       if (finding.kind === "catastrophic") return deny(reasonFor(finding));

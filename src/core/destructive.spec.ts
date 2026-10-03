@@ -2,8 +2,10 @@ import { describe, expect, test } from "bun:test";
 import {
   classify,
   type Context,
+  FORCE_PUSH_REASON,
   type GitOperation,
   GIT_REASON,
+  NO_VERIFY_REASON,
   neutralizeQuotedPositions,
   RM_CATASTROPHIC_REASON,
   REVIEW_REFUSED_REASON,
@@ -111,11 +113,11 @@ test("a plain read-only git command is not a match", () => untouched("git status
 test("a commit message naming reset --hard is not a match", () =>
   none('git commit -m "drop git reset --hard"'));
 
-test("a force push is advisory and names its remote and branch", () => {
-  expect(classify("git push --force origin main")).toEqual({
+test("a force push to another branch is advisory and names its remote and branch", () => {
+  expect(classify("git push --force origin dev")).toEqual({
     kind: "advisory",
     removals: [],
-    git: [{ operation: "push --force", remote: "origin", branch: "main" }],
+    git: [{ operation: "push --force", remote: "origin", branch: "dev" }],
   });
   expect(classify("git push -f")).toEqual({ kind: "advisory", removals: [], git: [{ operation: "push --force" }] });
   expect(classify("git push origin +HEAD:refs/heads/topic")).toEqual({
@@ -825,6 +827,19 @@ describe("the recursive flag group stays linear", () => {
     expect(fastest(command(80_000)) / fastest(command(20_000))).toBeLessThan(10);
   }, 60_000);
 
+  test.each([
+    ["deep eval", (count: number) => `${"eval ".repeat(count)}ls`],
+    ["a long -c script", (count: number) => `bash -c '${"ls; ".repeat(count)}'`],
+    ["sibling shells", (count: number) => "bash -c 'ls'; ".repeat(count)],
+    ["shells nested in substitutions", (count: number) => `${'bash -c "$('.repeat(count)}ls${')"'.repeat(count)}`],
+    ["heredocs read by shells", (count: number) => "bash <<EOF\nls\nEOF\n".repeat(count)],
+    ["a wrapper chain", (count: number) => `${"timeout 5 nice -n 1 ".repeat(count)}ls`],
+    ["wrapper options", (count: number) => `xargs ${"-0 ".repeat(count)}ls`],
+    ["commits nested in substitutions", (count: number) => `${'git commit -m "$('.repeat(count)}x${')"'.repeat(count)}`],
+  ])("nesting, %s: four times the input takes under ten times as long", (_, command) => {
+    expect(fastest(command(20_000)) / fastest(command(5_000))).toBeLessThan(10);
+  }, 60_000);
+
   test("a flag group that holds r is still recursive, in any position and case", () => {
     catastrophic("rm -r /");
     catastrophic("rm -fr /");
@@ -913,4 +928,238 @@ describe("git operations that read or only name a path", () => {
     none("git rm --cached x");
     none("git rm x");
   });
+});
+
+const push = (remote?: string, branch?: string) => ({
+  operation: "push --force" as const,
+  ...(remote !== undefined && { remote }),
+  ...(branch !== undefined && { branch }),
+});
+const blockingPush = (command: string, ctx: Context | undefined, finding: ReturnType<typeof push>) =>
+  expect(classify(command, ctx)).toEqual({ kind: "blocking", removals: [], git: [finding] });
+const advisoryPush = (command: string, ctx: Context | undefined, finding: ReturnType<typeof push>) =>
+  expect(classify(command, ctx)).toEqual({ kind: "advisory", removals: [], git: [finding] });
+
+describe("a force push to the default branch", () => {
+  const ON_MAIN = bashIn({ branch: "main" });
+  const ON_DEV = bashIn({ branch: "dev" });
+  const DEVELOP = bashIn({ branch: "develop", defaultBranch: "develop" });
+
+  test.each([
+    ["git push --force origin main", push("origin", "main")],
+    ["git push -f origin main", push("origin", "main")],
+    ["git push origin main -f", push("origin", "main")],
+    ["git push -uf origin main", push("origin", "main")],
+    ["git push --force-with-lease origin main", push("origin", "main")],
+    ["git push --force-with-lease=main:abc123 origin main", push("origin", "main")],
+    ["git push --force-if-includes origin main", push("origin", "main")],
+    ["git push origin +main", push("origin", "main")],
+    ["git push origin +HEAD:main", push("origin", "main")],
+    ["git push origin +HEAD:refs/heads/main", push("origin", "main")],
+    ["git push -f origin HEAD:master", push("origin", "master")],
+    ["git push origin topic +main", push("origin", "topic")],
+    ["git push --mirror", push()],
+    ["git push --all -f origin", push("origin")],
+    ["git -C /repo push -f origin main", push("origin", "main")],
+    ["sudo git push -f origin main", push("origin", "main")],
+  ])("%s is blocking", (command, finding) => blockingPush(command, undefined, finding));
+
+  test.each([
+    ["git push -f", push()],
+    ["git push --force origin", push("origin")],
+    ["git push -f origin HEAD", push("origin", "HEAD")],
+    ["git push --force-with-lease", push()],
+  ])("%s on the default branch is blocking, on another branch advisory, and on an unknown one advisory", (command, finding) => {
+    blockingPush(command, ON_MAIN, finding);
+    advisoryPush(command, ON_DEV, finding);
+    advisoryPush(command, undefined, finding);
+  });
+
+  test("a force push to another branch, or a + refspec only to another branch, stays advisory", () => {
+    advisoryPush("git push -f origin dev", undefined, push("origin", "dev"));
+    advisoryPush("git push origin +topic main", undefined, push("origin", "topic"));
+    advisoryPush("git push -f origin main:refs/heads/mainline", undefined, push("origin", "mainline"));
+    advisoryPush("git push -f origin HEAD", ON_DEV, push("origin", "HEAD"));
+  });
+
+  test("origin/HEAD names the default branch, and then main and master are ordinary branches", () => {
+    blockingPush("git push -f origin develop", DEVELOP, push("origin", "develop"));
+    blockingPush("git push -f", DEVELOP, push());
+    advisoryPush("git push -f origin main", DEVELOP, push("origin", "main"));
+    advisoryPush("git push -f origin master", DEVELOP, push("origin", "master"));
+  });
+
+  test("a push that does not force, or a mention of a force push, is not a match", () => {
+    none("git push origin main");
+    none("git push --all origin");
+    none("git push -u origin main");
+    none('git commit -m "never git push -f origin main"');
+    none("echo 'git push --force origin main'");
+  });
+
+  test("the deny reason names the force push, and a tree operation beside it keeps the git reason", () => {
+    const pushed = classify("git push -f origin main");
+    expect(pushed === undefined ? "" : reasonFor(pushed)).toBe(FORCE_PUSH_REASON);
+    const reset = classify("git push -f origin main && git reset --hard");
+    expect(reset === undefined ? "" : reasonFor(reset)).toBe(GIT_REASON);
+    const both = classify("git push -f origin dev; git commit -n -m x");
+    expect(both === undefined ? "" : reasonFor(both)).toBe(NO_VERIFY_REASON);
+  });
+});
+
+describe("a commit that skips its hooks", () => {
+  test.each([
+    "git commit --no-verify -m x",
+    "git commit -m x --no-verify",
+    "git commit --no-veri -m x",
+    "git commit -n -m x",
+    "git commit -nm x",
+    "git commit -anm x",
+    "git commit --amend --no-edit -n",
+    'git commit -m "$(cat <<\'EOF\'\nmessage\nEOF\n)" --no-verify',
+    "git -C /repo commit --no-verify",
+    "FOO=1 git commit -n",
+  ])("%s is blocking", (command) => git(command, "commit --no-verify"));
+
+  test.each([
+    "git commit -m x",
+    "git commit -mn",
+    "git commit -m -n",
+    "git commit --message -n",
+    'git commit -m "skip -n and --no-verify"',
+    "git commit -n --verify -m x",
+    "git commit -- -n",
+    "git push --no-verify",
+    "echo git commit --no-verify",
+    "git commit -m 'git commit --no-verify'",
+  ])("%s is not a hook-skipping commit", (command) => none(command));
+
+  test("the deny reason names the skipped hooks", () => {
+    const finding = classify("git commit --no-verify -m x");
+    expect(finding === undefined ? "" : reasonFor(finding)).toBe(NO_VERIFY_REASON);
+  });
+});
+
+describe("a nested command", () => {
+  test.each([
+    'bash -c "rm -rf /"',
+    "sh -c 'rm -rf ~'",
+    'sh -c \'rm -rf "$HOME"\'',
+    "bash -lc 'rm -rf /'",
+    "bash -e -c 'rm -rf /'",
+    "bash --norc -c 'rm -rf /'",
+    "bash -o pipefail -c 'rm -rf /'",
+    "zsh -c 'rm -rf ~'",
+    "dash -c 'rm -rf ~'",
+    "ksh -c 'rm -rf ~'",
+    "/bin/sh -c 'rm -rf ~'",
+    'sudo bash -c "rm -rf /"',
+    'sudo -u root sh -c "cd /tmp && rm -rf ~"',
+    'env bash -c "rm -rf /"',
+    'eval "rm -rf /"',
+    "eval rm -rf /",
+    'echo ok && eval "cd /x; rm -rf ~"',
+    'bash -c "echo \\"hi\\"; rm -rf /"',
+    "bash -c \"bash -c 'rm -rf /'\"",
+    'echo "$(bash -c \'rm -rf ~\')"',
+    "bash <<EOF\nrm -rf /\nEOF",
+    "bash <<'EOF'\nrm -rf /\nEOF",
+    "sudo bash <<-EOF\n\trm -rf ~\n\tEOF",
+    "bash -s <<EOF\nrm -rf ~\nEOF",
+    "bash -s -- arg <<EOF\nrm -rf ~\nEOF",
+    "bash <<< 'rm -rf /'",
+    "bash -c 'eval \"rm -rf /\"'",
+    "pwsh -c 'Remove-Item -Recurse C:\\'",
+    "eval eval eval eval rm -rf /",
+  ])("%s is catastrophic", (command) => catastrophic(command));
+
+  test.each([
+    ['env bash -c "git reset --hard"', "reset --hard"],
+    ["bash -c 'git stash'", "stash"],
+    ["bash <<EOF\ngit clean -fdx\nEOF", "clean"],
+    ["eval 'git checkout -- .'", "checkout --"],
+    ["bash -c 'git commit --no-verify -m x'", "commit --no-verify"],
+  ] as const)("%s is blocking", (command, operation) => git(command, operation));
+
+  test("a force push to the default branch inside a shell is blocking", () => {
+    blockingPush("bash -c 'git push -f origin main'", undefined, push("origin", "main"));
+    advisoryPush("sh -c 'git push -f origin dev'", undefined, push("origin", "dev"));
+  });
+
+  test("a removal inside a shell is held for review with its targets", () => {
+    removal("bash -c 'rm -rf build'", "build");
+    removal("eval rm -rf 'my build'", "my", "build");
+    removal("bash <<EOF\nrm -rf dist\nEOF", "dist");
+  });
+
+  test.each([
+    "echo \"bash -c 'rm -rf /'\"",
+    "git commit -m \"run bash -c 'rm -rf /' never\"",
+    "bash -c 'echo rm -rf /'",
+    "bash script.sh",
+    "bash script.sh 'rm -rf /'",
+    "bash script.sh <<EOF\nrm -rf /\nEOF",
+    "bash -c 'ls' <<EOF\nrm -rf /\nEOF",
+    "cat <<'EOF'\nbash -c 'rm -rf /'\nEOF",
+    "cat <<EOF\nrm -rf /\nEOF",
+    "echo eval rm -rf /",
+    "grep -rn 'eval \"rm -rf /\"' .",
+    "bash -c \"$CMD\"",
+    "eval \"$CMD\"",
+  ])("%s runs nothing destructive", (command) => none(command));
+
+  test("a finding a substitution shows to both levels is reported once, and findings keep command order", () => {
+    git('bash -c "$(git stash)"', "stash");
+    git("bash <<EOF\n$(git stash)\nEOF", "stash");
+    expect(classify("rm -rf a; bash -c 'rm -rf b'; rm -rf c")).toEqual({
+      kind: "advisory",
+      removals: [{ targets: ["a"] }, { targets: ["b"] }, { targets: ["c"] }],
+      git: [],
+    });
+  });
+});
+
+describe("a wrapper that runs the command it is given", () => {
+  test.each([
+    "timeout 5 rm -rf ~",
+    "timeout 5s rm -rf ~",
+    "timeout -s KILL 5 rm -rf ~",
+    "timeout --signal=KILL -k 2 1.5m rm -rf ~",
+    "timeout --foreground 5 rm -rf /",
+    "nice -n 10 rm -rf /",
+    "nice -10 rm -rf /",
+    "nohup rm -rf /",
+    "stdbuf -oL rm -rf /",
+    "stdbuf -o L -e0 rm -rf /",
+    "ionice -c3 rm -rf /",
+    "ionice -c 2 -n 7 rm -rf /",
+    "chrt -f 10 rm -rf /",
+    "chrt --idle 0 rm -rf /",
+    "setsid -f rm -rf /",
+    "time rm -rf /",
+    "time -p rm -rf /",
+    "xargs rm -rf /",
+    "xargs -0 -n 1 rm -rf ~",
+    "sudo timeout 5 nice -n 5 rm -rf /",
+    "FOO=1 timeout 5 rm -rf ~",
+  ])("%s is catastrophic", (command) => catastrophic(command));
+
+  test("a git operation behind a wrapper is blocking", () => {
+    git("timeout 30 git reset --hard", "reset --hard");
+    git("nice -n 5 git clean -fdx", "clean");
+    git("sudo timeout 5 nice -n 5 git stash", "stash");
+  });
+
+  test("xargs feeds rm targets nobody can see, so it is held for review with the ones it names", () => {
+    removal("xargs rm -rf");
+    removal("find . -name '*.o' | xargs -0 rm -rf");
+    removal("find . -name build | xargs -I {} rm -rf {}", "{}");
+  });
+
+  test.each([
+    "echo timeout 5 rm -rf ~",
+    "timeout 5 ls rm -rf ~",
+    "nice ls rm -rf /",
+    "xargs echo rm -rf /",
+  ])("%s runs nothing destructive", (command) => none(command));
 });

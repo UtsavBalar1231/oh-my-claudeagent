@@ -3,7 +3,8 @@ import type { Platform } from "./path.ts";
 /**
  * What the guard knows about the session a command runs in. `home`, `cwd` and `root` are the
  * absolute paths the client reports, in whatever spelling it uses; `platform` is read from them
- * when it is absent.
+ * when it is absent. `branch` is the checked-out branch and `defaultBranch` the one
+ * `refs/remotes/origin/HEAD` names; without it, `main` and `master` are the default.
  */
 export type Context = {
   shell: "bash" | "powershell";
@@ -11,6 +12,8 @@ export type Context = {
   cwd?: string;
   root?: string;
   platform?: Platform;
+  branch?: string;
+  defaultBranch?: string;
 };
 
 export type Removal = { targets: string[] };

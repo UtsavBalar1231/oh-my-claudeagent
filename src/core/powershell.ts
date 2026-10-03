@@ -3,11 +3,9 @@ import { anyCase, type Context, commandWord, type Removal, S } from "./shell.ts"
 import { CWD_SUBSTITUTION, isCatastrophicTarget } from "./targets.ts";
 
 export const POWERSHELL_COMMAND_POSITION = "[;&|(){}\\n\\r]";
-// `cmd /c` runs the next word as a command, quoted or not, but only where `cmd` itself is one.
-export const POWERSHELL_CMD_WRAPPER = `${anyCase("cmd")}(?:\\.${anyCase("exe")})?${S}+/[cCkK]${S}+"?`;
 
 const REMOVAL = new RegExp(
-  `(^|${POWERSHELL_COMMAND_POSITION})${S}*(?:&${S}+)?(?:${POWERSHELL_CMD_WRAPPER})?(?<word>${commandWord(anyCase("Remove-Item|ri|rm|del|erase|rd|rmdir"))})(?=${S}|$)`,
+  `(^|${POWERSHELL_COMMAND_POSITION})${S}*(?:&${S}+)?(?<word>${commandWord(anyCase("Remove-Item|ri|rm|del|erase|rd|rmdir"))})(?=${S}|$)`,
   "g",
 );
 const CMD_NAMES = new Set(["del", "erase", "rd", "rmdir"]);
@@ -126,12 +124,15 @@ export function neutralizePowershell(command: string): string {
   return out;
 }
 
+/** A word of an argument list with its quotes removed, and the offset in the list where it starts. */
+export type Word = { text: string; start: number };
+
 /** Splits arguments into words as PowerShell does: quotes removed, a backtick escapes, and a comma or white space ends a word. */
-export function powershellWords(text: string): string[] {
-  const words: string[] = [];
+export function powershellWordSpans(text: string): Word[] {
+  const words: Word[] = [];
   let word = "";
   let quote = "";
-  let isOpen = false;
+  let start = -1;
   for (let i = 0; i < text.length; i++) {
     const ch = text.charAt(i);
     const next = text.charAt(i + 1);
@@ -144,25 +145,24 @@ export function powershellWords(text: string): string[] {
         word += ch;
         i++;
       } else quote = "";
-    } else if (ch === "'" || ch === '"') {
-      quote = ch;
-      isOpen = true;
-    } else if (ch === "`") {
-      word += next;
-      i++;
-      isOpen = true;
     } else if (/[ \t\n\v\f\r,]/.test(ch)) {
-      if (isOpen) words.push(word);
+      if (start !== -1) words.push({ text: word, start });
       word = "";
-      isOpen = false;
+      start = -1;
     } else {
-      word += ch;
-      isOpen = true;
+      if (start === -1) start = i;
+      if (ch === "'" || ch === '"') quote = ch;
+      else if (ch === "`") {
+        word += next;
+        i++;
+      } else word += ch;
     }
   }
-  if (isOpen) words.push(word);
+  if (start !== -1) words.push({ text: word, start });
   return words;
 }
+
+export const powershellWords = (text: string): string[] => powershellWordSpans(text).map((word) => word.text);
 
 function parameterKind(name: string): string | undefined {
   const lower = name.toLowerCase();
@@ -174,7 +174,7 @@ function parameterKind(name: string): string | undefined {
 
 // Arguments end at the next statement separator, an unbalanced `)`, a `}` and a comment. A
 // `${name}` variable holds its own braces.
-function argumentsEnd(command: string, scan: string, from: number): number {
+export function powershellArgumentsEnd(command: string, scan: string, from: number): number {
   let depth = 0;
   for (let i = from; i < scan.length; i++) {
     const ch = scan.charAt(i);
@@ -222,19 +222,19 @@ function parse(
 }
 
 /**
- * The recursive removals in a PowerShell command: `Remove-Item` and its aliases with `-Recurse`
- * (any unambiguous prefix of it), and the cmd forms `rd /s`, `rmdir /s` and `del /s`, also behind
- * `cmd /c`. A substituted target is catastrophic, as in sh.
+ * The recursive removals in a PowerShell command, each at the offset of its command word:
+ * `Remove-Item` and its aliases with `-Recurse` (any unambiguous prefix of it), and the cmd forms
+ * `rd /s`, `rmdir /s` and `del /s`. A substituted target is catastrophic, as in sh.
  */
 export function powershellRemovals(
   command: string,
   scan: string,
   ctx: Context,
-): { isCatastrophic: boolean; removals: Removal[] } {
-  const found: Removal[] = [];
+): { isCatastrophic: boolean; removals: (Removal & { index: number })[] } {
+  const found: (Removal & { index: number })[] = [];
   for (const match of scan.matchAll(REMOVAL)) {
     const start = match.index + match[0].length;
-    const end = argumentsEnd(command, scan, start);
+    const end = powershellArgumentsEnd(command, scan, start);
     const word = (match.groups?.["word"] ?? "").replace(/^["']|["']$/g, "");
     const name = baseName("win32", word).toLowerCase().replace(/\.exe$/, "");
     const { isRecursive, isDryRun, targets } = parse(name, powershellWords(command.slice(start, end)));
@@ -243,7 +243,7 @@ export function powershellRemovals(
     if (isSubstituted || targets.some((target) => isCatastrophicTarget(target, ctx))) {
       return { isCatastrophic: true, removals: [] };
     }
-    found.push({ targets });
+    found.push({ index: start - (match.groups?.["word"] ?? "").length, targets });
   }
   return { isCatastrophic: false, removals: found };
 }
