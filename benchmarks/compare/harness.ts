@@ -105,11 +105,12 @@ export function prepareTree(arm: Arm): PreparedTree | null {
     return { armId: arm.id, sha: spec.sha, dir: dest };
   }
   const sha = run(["git", "rev-parse", "HEAD"]).trim();
+  const tracked = run(["git", "ls-tree", "-r", "-z", "--name-only", sha]).split("\0").filter((path) => path !== "");
   const staging = mkdtempSync(join(CACHE, "omca-head-"));
   try {
     exportTree(REPO, sha, staging);
     rmSync(dest, { recursive: true, force: true });
-    packageTree(staging, dest);
+    packageTree(staging, dest, tracked);
   } finally {
     rmSync(staging, { recursive: true, force: true });
   }

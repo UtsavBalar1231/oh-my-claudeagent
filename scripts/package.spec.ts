@@ -113,6 +113,16 @@ describe("packageTree", () => {
     for (const [path, text] of Object.entries(SHIPPED)) expect(readFileSync(join(dest, path), "utf8")).toBe(text);
   });
 
+  test("packages a tree that is not a repository from the tracked list it is given", () => {
+    const exported = join(dirname(root), "exported");
+    seed(exported, { ...SHIPPED, ...EXCLUDED, ...UNTRACKED });
+
+    const files = packageTree(exported, dest, [...Object.keys(SHIPPED), ...Object.keys(EXCLUDED)]);
+
+    expect(files).toEqual(Object.keys(SHIPPED).sort());
+    expect(filesUnder(dest)).toEqual(Object.keys(SHIPPED).sort());
+  });
+
   test("never ships an untracked file", () => {
     const files = packageTree(root, dest);
 

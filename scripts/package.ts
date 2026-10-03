@@ -92,8 +92,9 @@ function prune(dest: string, parts: string[], files: ReadonlySet<string>, direct
   }
 }
 
-export function packageTree(root: string, dest: string): string[] {
-  const files = listPackageFiles(gitTracked(root));
+/** Copies the shipped files of `root` to `dest`; `tracked` lists them for a tree that is not a repository, such as an export of one commit. */
+export function packageTree(root: string, dest: string, tracked: readonly string[] = gitTracked(root)): string[] {
+  const files = listPackageFiles(tracked);
   const directories = new Set<string>();
   for (const file of files) {
     const parts = file.split("/").slice(0, -1);
