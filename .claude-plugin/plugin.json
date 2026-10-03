@@ -3,7 +3,7 @@
   "name": "oh-my-claudeagent",
   "displayName": "Oh My ClaudeAgent",
   "version": "2.21.0",
-  "description": "Multi-agent orchestration for Claude Code. Specialist agents handle planning, execution, code review, debugging, and research with evidence-based verification.",
+  "description": "Claude Code, with receipts. Plans with you, hands each task to a specialist agent, and keeps a session from calling work done until a verification is logged.",
   "author": {
     "name": "UtsavBalar1231",
     "email": "utsavbalar1231@gmail.com",
