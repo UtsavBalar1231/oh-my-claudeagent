@@ -11,12 +11,16 @@ type Command = { name: string; execute: (input: Rec) => Promise<void> }
 
 let dirs: string[] = []
 let errorSpy: ReturnType<typeof spyOn>
+const savedSwitch = process.env.OMCA_DISABLED_HOOKS
 
 beforeEach(() => {
+  delete process.env.OMCA_DISABLED_HOOKS
   errorSpy = spyOn(console, "error").mockImplementation(() => {})
 })
 
 afterEach(() => {
+  if (savedSwitch === undefined) delete process.env.OMCA_DISABLED_HOOKS
+  else process.env.OMCA_DISABLED_HOOKS = savedSwitch
   errorSpy.mockRestore()
   for (const dir of dirs) rmSync(dir, { recursive: true, force: true })
   dirs = []

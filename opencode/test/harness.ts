@@ -101,8 +101,11 @@ export type Server = {
 
 export async function startServer(root: string, cwd: string, extraEnv: Env = {}): Promise<Server> {
   const password = crypto.randomUUID()
+  // A kill switch such as OMCA_DISABLED_HOOKS in the developer's environment would turn off the
+  // features under test, so only extraEnv sets OMCA variables.
+  const inherited = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("OMCA_")))
   const env: Env = {
-    ...process.env,
+    ...inherited,
     ...extraEnv,
     PWD: cwd,
     OPENCODE_PASSWORD: password,
