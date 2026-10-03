@@ -48,6 +48,7 @@ function bindHost($: EngineInterface, options: Options): Host {
       invalidate: () => $.ui.invalidate("ui.render"),
       focus: (args) => $.ui.focus(args),
       resolve: (e) => $.ui.resolve(e),
+      selection: () => $.ui.selection(),
     },
     session: {
       id: () => $.session.id(),

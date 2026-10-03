@@ -50,6 +50,7 @@ export type Host = {
     invalidate: () => void;
     focus: Engine["ui"]["focus"];
     resolve: Engine["ui"]["resolve"];
+    selection: Engine["ui"]["selection"];
   };
   session: {
     id: Engine["session"]["id"];

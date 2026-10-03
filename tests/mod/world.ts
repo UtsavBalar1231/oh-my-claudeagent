@@ -1,4 +1,4 @@
-import type { AgentInfo, On, RenderElement, RenderSurface, StateRead } from "claude-code";
+import type { AgentInfo, On, RenderElement, RenderSurface, StateRead, UiSelection } from "claude-code";
 import { mock, type MockClock } from "claude-code/testing";
 import { joinPath, normalizePath, type Platform } from "../../src/core/path.ts";
 import { displayWidth } from "../../src/core/ui-kit.ts";
@@ -51,6 +51,7 @@ export type World = {
   reads: string[];
   holds: Map<string, Promise<void>>;
   focused: string[];
+  selection: UiSelection | undefined;
   opened: unknown[];
   logs: string[];
   clock: MockClock;
@@ -96,6 +97,7 @@ export function world(
     reads: [],
     holds: new Map(),
     focused: [],
+    selection: undefined,
     opened: [],
     logs: [],
     clock: mock.clock(on, { now: Date.UTC(2026, 9, 2, 12, 0, 0) }),
@@ -151,6 +153,7 @@ export function world(
   on("ui.log", (_$, e) => (w.logs.push(e.text), { value: undefined }));
   on("ui.panes", () => ({ value: [] }));
   on("ui.focus", (_$, e) => (w.focused.push(e.element ?? ""), {}));
+  on("ui.selection", () => ({ value: w.selection }));
   return w;
 }
 

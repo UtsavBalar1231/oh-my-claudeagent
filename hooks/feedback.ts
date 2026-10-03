@@ -7,6 +7,8 @@ export type Rating = { turn_id: string | null; at: string; rating: Verdict; note
 
 export const USAGE = "Usage: /omca-rate up|down [note]";
 
+const SELECTED_NOTE_LIMIT = 200;
+
 let lastTurnId: string | null = null;
 let ratings: readonly Rating[] = [];
 let failure: string | null = null;
@@ -42,7 +44,13 @@ async function load(host: Host, path: string): Promise<unknown[]> {
   return entries;
 }
 
-export async function rate(host: Host, verdict: Verdict, note: string): Promise<string> {
+async function selectedNote(host: Host): Promise<string> {
+  const words = ((await host.ui.selection())?.text ?? "").trim().replace(/\s+/g, " ");
+  const letters = [...words];
+  return letters.length > SELECTED_NOTE_LIMIT ? `${letters.slice(0, SELECTED_NOTE_LIMIT - 1).join("")}…` : words;
+}
+
+export async function rate(host: Host, verdict: Verdict, note: string, fromSelection = false): Promise<string> {
   try {
     const { sessionId, path } = await fileOf(host);
     const entries = await load(host, path);
@@ -52,7 +60,8 @@ export async function rate(host: Host, verdict: Verdict, note: string): Promise<
     ratings = [...entries.filter(isRating), rating];
     failure = null;
     const subject = lastTurnId === null ? "the session (no turn yet)" : "the last turn";
-    return `Rated ${subject} ${verdict}${note === "" ? "" : `: "${note}"`}.`;
+    const source = fromSelection ? " with the selected text as the note" : "";
+    return `Rated ${subject} ${verdict}${source}${note === "" ? "" : `: "${note}"`}.`;
   } catch (error) {
     failure = `Could not record the rating: ${reason(error)}`;
     return failure;
@@ -90,7 +99,9 @@ export const feedback: Features = {
       const match = /^(up|down)(?:\s+(.*))?$/s.exec(e.args.trim());
       const verdict = match?.[1];
       if (verdict !== "up" && verdict !== "down") return { answer: { text: USAGE } };
-      return { answer: { text: await rate(host, verdict, (match?.[2] ?? "").trim()) } };
+      const typed = (match?.[2] ?? "").trim();
+      const selected = typed === "" ? await selectedNote(host) : "";
+      return { answer: { text: await rate(host, verdict, typed === "" ? selected : typed, selected !== "") } };
     },
   },
 };

@@ -74,6 +74,56 @@ test("/omca-rate rates the last main turn, keeping a note's inner spaces, and ap
   );
 });
 
+test("/omca-rate with no note takes the selected text as the note, whitespace collapsed, and says so", async ($, on) => {
+  const { w } = engine(on);
+  await start($);
+  await complete($, "t-1");
+  w.selection = { text: "  the footer named\n  the wrong   command\n", requestId: "toolu_01" };
+
+  expect(await rate($, "down")).toEqual({
+    text: 'Rated the last turn down with the selected text as the note: "the footer named the wrong command".',
+  });
+  expect(w.files.get(FILE)?.text).toBe(
+    saved([{ turn_id: "t-1", at: AT, rating: "down", note: "the footer named the wrong command" }]),
+  );
+});
+
+test("a selection longer than 200 characters is cut to 200 ending in an ellipsis", async ($, on) => {
+  const { w } = engine(on);
+  await start($);
+  w.selection = { text: "é".repeat(250) };
+
+  await rate($, "up");
+  const [entry] = JSON.parse(w.files.get(FILE)?.text ?? "{}").ratings;
+  expect(entry.note).toBe(`${"é".repeat(199)}…`);
+});
+
+test("a typed note wins over a selection, which is not asked for its text", async ($, on) => {
+  const { w } = engine(on);
+  await start($);
+  await complete($, "t-1");
+  w.selection = { text: "selected words", requestId: "toolu_01" };
+
+  expect(await rate($, "up typed words")).toEqual({ text: 'Rated the last turn up: "typed words".' });
+  expect(w.files.get(FILE)?.text).toBe(saved([{ turn_id: "t-1", at: AT, rating: "up", note: "typed words" }]));
+});
+
+test("with no note and nothing selected, or only blanks selected, the rating carries no note", async ($, on) => {
+  const { w } = engine(on);
+  await start($);
+  await complete($, "t-1");
+
+  expect(await rate($, "up")).toEqual({ text: "Rated the last turn up." });
+  w.selection = { text: " \n " };
+  expect(await rate($, "down")).toEqual({ text: "Rated the last turn down." });
+  expect(w.files.get(FILE)?.text).toBe(
+    saved([
+      { turn_id: "t-1", at: AT, rating: "up" },
+      { turn_id: "t-1", at: AT, rating: "down" },
+    ]),
+  );
+});
+
 test("before any turn completes, a rating is for the session and says so", async ($, on) => {
   const { w } = engine(on);
   await start($);

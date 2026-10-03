@@ -1,6 +1,6 @@
 import type { RenderElement } from "claude-code";
 import { resolveBoundPlan } from "../../src/core/boulder.ts";
-import { type Drawn, drawnAt, type FocusList, focusMove, placeWindow } from "../../src/core/list-window.ts";
+import { type Drawn, drawnAt, type FocusList, focusMove, placeWindow, windowOf } from "../../src/core/list-window.ts";
 import { BOULDER } from "../../src/core/omca-paths.ts";
 import { type Platform, samePath, tildePath } from "../../src/core/path.ts";
 import {
@@ -26,7 +26,6 @@ import {
   open,
   PANE,
   patchPane,
-  regainFocus,
   rule,
   sessionOf,
   type TabView,
@@ -48,9 +47,6 @@ const DOCK_CHROME_ROWS = 8;
 const INLINE_CHROME_ROWS = 4;
 const DATE = 10;
 const KEY_GAP = 3;
-// Esc hands the keyboard to the prompt even when the pane refuses to close, and how soon the
-// pane can take it back varies with load, so it asks at growing delays until it holds it.
-const REGAIN_DELAYS_MS = [0, 50, 150, 400] as const;
 
 let mode: Mode = "contents";
 let cursor = 0;
@@ -86,35 +82,8 @@ function keptCursor(plan: Pick<Loaded, "pages">, index: number): number {
   return listed.find((at) => at >= index) ?? listed.at(-1) ?? 0;
 }
 
-export type Keyboard = {
-  regain: () => Promise<void>;
-  isHeld: () => Promise<boolean>;
-  after: (ms: number, run: () => Promise<void>) => void;
-  log: (text: string) => void;
-};
-
-export function regainKeyboard(keyboard: Keyboard, then: () => Promise<void>): void {
-  const attempt = (index: number): void => {
-    const delay = REGAIN_DELAYS_MS[index];
-    if (delay === undefined) {
-      keyboard.log(`omca plan could not take the keyboard back after ${REGAIN_DELAYS_MS.length} attempts`);
-      return;
-    }
-    keyboard.after(delay, async () => {
-      try {
-        await keyboard.regain();
-        if (await keyboard.isHeld()) await then();
-        else attempt(index + 1);
-      } catch (error) {
-        keyboard.log(`omca plan could not take the keyboard back: ${reason(error)}`);
-      }
-    });
-  };
-  attempt(0);
-}
-
-function refocus(host: Host, key: string, isKeyboardLost = false): void {
-  const focusRow = async () => {
+function refocus(host: Host, key: string): void {
+  host.clock.after(0, async () => {
     try {
       host.ui.invalidate();
       const { deny } = await host.ui.focus({ requestId: PANE, key });
@@ -122,20 +91,7 @@ function refocus(host: Host, key: string, isKeyboardLost = false): void {
     } catch (error) {
       host.log(`omca plan could not refocus ${key}: ${reason(error)}`);
     }
-  };
-  if (!isKeyboardLost) {
-    host.clock.after(0, focusRow);
-    return;
-  }
-  regainKeyboard(
-    {
-      regain: () => regainFocus(host),
-      isHeld: async () => (await host.ui.panes()).some((pane) => pane.id === PANE && pane.isFocused),
-      after: (ms, run) => void host.clock.after(ms, run),
-      log: host.log,
-    },
-    focusRow,
-  );
+  });
 }
 
 // The tick yields to any write that lands while it reads, so it never reverts what a person
@@ -223,17 +179,11 @@ export const command: Subcommand = async (host, e, args) => {
   return answer;
 };
 
-function toContents(host: Host, isKeyboardLost = false): void {
+function toContents(host: Host): void {
   if (mode === "page") cursor = page;
   mode = "contents";
   host.ui.invalidate();
-  refocus(host, `${ROW}${cursor}`, isKeyboardLost);
-}
-
-export async function back(host: Host): Promise<boolean> {
-  const isBack = mode === "page" || (mode === "plans" && isLoaded((await host.state.plan.get()).value));
-  if (isBack) toContents(host, true);
-  return isBack;
+  refocus(host, `${ROW}${cursor}`);
 }
 
 function listOf(plan: Loaded): FocusList {
@@ -245,16 +195,25 @@ function picksOf(files: readonly PlanFile[]): FocusList {
   return { total: files.length, current: pick, rows: files.map((_, index) => index) };
 }
 
+async function focusListOf(host: Host, list: List): Promise<FocusList | undefined> {
+  const [plan, pane] = await Promise.all([host.state.plan.get(), host.state.pane.get()]);
+  if (list === "plans") {
+    const files = pane.value?.plans?.files;
+    return files === undefined ? undefined : picksOf(files);
+  }
+  return isLoaded(plan.value) ? listOf(plan.value) : undefined;
+}
+
+const listShown = (): List | undefined => (mode === "plans" ? "plans" : mode === "contents" ? "contents" : undefined);
+
 export async function focus(host: Host, e: Input<"ui.focus">): Promise<Phase<Input<"ui.focus">, { deny?: string }> | undefined> {
-  const list: List | undefined = mode === "plans" ? "plans" : mode === "contents" ? "contents" : undefined;
+  const list = listShown();
   const prefix = list === "plans" ? PICK : ROW;
   const picked = list !== undefined && e.element?.startsWith(prefix) === true ? Number(e.element.slice(prefix.length)) : Number.NaN;
   isRingOnRow = Number.isInteger(picked);
   const last = list === undefined ? undefined : drawn[list];
   if (!isRingOnRow || list === undefined || last === undefined) return undefined;
-  const [plan, pane] = await Promise.all([host.state.plan.get(), host.state.pane.get()]);
-  const files = pane.value?.plans?.files;
-  const focusList = list === "plans" ? (files === undefined ? undefined : picksOf(files)) : isLoaded(plan.value) ? listOf(plan.value) : undefined;
+  const focusList = await focusListOf(host, list);
   if (focusList === undefined) return undefined;
   const move = focusMove(focusList, last, picked);
   if (move.kind === "wrap") return { answer: {} };
@@ -263,6 +222,30 @@ export async function focus(host: Host, e: Input<"ui.focus">): Promise<Phase<Inp
   else cursor = picked;
   host.ui.invalidate();
   return { event: { ...e, element: `${prefix}${move.landing}` } };
+}
+
+// The two lists draw their own window, so the engine has nothing to scroll for these keys. A page key
+// asks for `bodyRows`, Home and End for `contentRows`; where the two are equal the key is read as a page key.
+export async function scroll(host: Host, e: Input<"ui.scroll">): Promise<boolean> {
+  const list = listShown();
+  const last = list === undefined ? undefined : drawn[list];
+  const isPage = Math.abs(e.by) === e.bodyRows;
+  const isEnd = !isPage && Math.abs(e.by) === e.contentRows;
+  if (list === undefined || last === undefined || (!isPage && !isEnd)) return false;
+  const focusList = await focusListOf(host, list);
+  if (focusList === undefined || focusList.rows.length === 0) return false;
+  const { rows, total, current } = focusList;
+  const shown = rows.filter((index) => index >= last.start && index < last.start + last.size).length;
+  const at = Math.max(0, rows.indexOf(current));
+  const to = isEnd ? (e.by > 0 ? rows.length - 1 : 0) : Math.max(0, Math.min(rows.length - 1, at + Math.sign(e.by) * Math.max(1, shown)));
+  const target = rows[to] ?? current;
+  if (target === current) return true;
+  if (list === "plans") pick = target;
+  else cursor = target;
+  planned = { list, start: windowOf(total, target, last.size).start };
+  host.ui.invalidate();
+  refocus(host, `${list === "plans" ? PICK : ROW}${target}`);
+  return true;
 }
 
 function place(host: Host, list: List, focusList: FocusList, size: number, key: (index: number) => string): number {
@@ -274,8 +257,14 @@ function place(host: Host, list: List, focusList: FocusList, size: number, key: 
   return placed.start;
 }
 
-const listRows = (view: View) =>
-  Math.max(MIN_LIST_ROWS, view.rows - (view.isInline ? INLINE_CHROME_ROWS : DOCK_CHROME_ROWS));
+// A docked list that has to be cut leaves its tree one row short of the body, so the rows a page key
+// asks for (the body's) differ from the rows Home and End ask for (the tree's). An inline tree is
+// padded to the body, so there the two stay equal.
+const listRows = (view: View, total: number) => {
+  if (view.isInline) return Math.max(MIN_LIST_ROWS, view.rows - INLINE_CHROME_ROWS);
+  const room = Math.max(MIN_LIST_ROWS, view.rows - DOCK_CHROME_ROWS);
+  return total <= room ? room : Math.max(MIN_LIST_ROWS, room - 1);
+};
 
 function keyRow(view: View, keys: readonly Key[], gap: number): RenderElement {
   return view.kit.Box({
@@ -340,8 +329,8 @@ function pointerRow(view: View, key: string, isCurrent: boolean, child: RenderEl
   });
 }
 
-const moveHint = (view: View, close: string) =>
-  keyHint([[`${view.g.up}${view.g.down}`, "move"], ["enter", "open"], [KEYS.back, close]], view.g);
+const moveHint = (view: View) =>
+  keyHint([[`${view.g.up}${view.g.down}`, "move"], ["enter", "open"], [KEYS.back, "close"]], view.g);
 
 function contentsView(host: Host, view: View, plan: Loaded): RenderElement[] {
   const { Button, Text } = view.kit;
@@ -354,7 +343,7 @@ function contentsView(host: Host, view: View, plan: Loaded): RenderElement[] {
   if (list.rows.length === 0) {
     return [noticeRow(view, { kind: "empty" }, { loading: "", empty: `${plan.title} has no sections to read.` })];
   }
-  const size = listRows(view);
+  const size = listRows(view, list.total);
   const start = place(host, "contents", list, size, (index) => `${ROW}${index}`);
   const end = Math.min(list.total, start + size);
   const rows = plan.pages.slice(start, end).map((section, offset) => {
@@ -401,7 +390,7 @@ function contentsView(host: Host, view: View, plan: Loaded): RenderElement[] {
       [KEYS.reload, "Reload", () => reload(host)],
       [KEYS.list, "Plans", () => showPlans(host)],
     ],
-    hint: moveHint(view, "close"),
+    hint: moveHint(view),
   });
 }
 
@@ -472,7 +461,7 @@ function pageView(host: Host, view: View, plan: Loaded): RenderElement[] {
     ...(upcoming === undefined
       ? []
       : [Text({ dimColor: true, children: [fitEnd(`next: ${markOf(upcoming)}${upcoming.title}`, view.width, ellipsis)] })]),
-    Text({ dimColor: true, children: [keyHint([[`${view.g.up}${view.g.down}`, "scroll"], [KEYS.back, "contents"]], view.g)] }),
+    Text({ dimColor: true, children: [keyHint([[`${view.g.up}${view.g.down}`, "scroll"], [KEYS.back, "close"]], view.g)] }),
   ];
 }
 
@@ -497,7 +486,7 @@ function plansView(host: Host, view: View, pane: State["pane"] | undefined, plan
     return [noticeRow(view, { kind: "empty" }, { ...words, empty }), keyRow(view, keys, KEY_GAP)];
   }
   const list = picksOf(listing.files);
-  const size = listRows(view);
+  const size = listRows(view, list.total);
   const start = place(host, "plans", list, size, (index) => `${PICK}${index}`);
   const end = Math.min(list.total, start + size);
   const rows = listing.files.slice(start, end).map((file, offset) => {
@@ -539,7 +528,7 @@ function plansView(host: Host, view: View, pane: State["pane"] | undefined, plan
     below: end < list.total ? `  ${view.g.down} ${list.total - end} more` : "",
     rows,
     keys,
-    hint: moveHint(view, hasPlan ? "back" : "close"),
+    hint: moveHint(view),
   });
 }
 

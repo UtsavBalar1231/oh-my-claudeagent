@@ -1,4 +1,4 @@
-import type { CommandRunResult, Elements, PaneOpenArgs, RenderElement, Timer } from "claude-code";
+import type { CommandRunResult, Elements, RenderElement, Timer } from "claude-code";
 import { configDir, type Env, homeDir, inferPlatform, type Platform } from "../src/core/path.ts";
 import {
   COLORS,
@@ -85,7 +85,6 @@ function viewOf(tab: Tab): TabView {
 }
 
 let timer: Timer | undefined;
-let opened: PaneOpenArgs | undefined;
 let isTicking = false;
 let now = 0;
 let inlineRows = INLINE_ROWS;
@@ -194,16 +193,9 @@ export async function open(host: Host, e: Input<"command.run">, tab: Tab): Promi
   now = await host.clock.now();
   await refresh(host, tab);
   const columns = clamp(Math.round(e.presentation.columns * DOCK_SHARE), DOCK_MIN_COLUMNS, DOCK_MAX_COLUMNS);
-  opened = { id: PANE, title: "OMCA", focus: true, closeOnEscape: true, rows: INLINE_ROWS, columns };
-  await host.ui.open(opened);
+  await host.ui.open({ id: PANE, title: "OMCA", focus: true, closeOnEscape: true, rows: INLINE_ROWS, columns });
   start(host);
   return {};
-}
-
-// Esc hands the keyboard back to the prompt even when the pane refuses to close, so a pane
-// that stays open asks for it again the way it was opened.
-export async function regainFocus(host: Host): Promise<void> {
-  if (opened !== undefined) await host.ui.open(opened);
 }
 
 export const command: Subcommand = (host, e) => open(host, e, "agents");
@@ -341,13 +333,8 @@ export const pane: Features = {
     },
   },
   "ui.close": {
-    async pre(host, e) {
-      if (e.id !== PANE) return undefined;
-      const tab = (await host.state.pane.get()).value?.tab;
-      if (e.origin.kind === "person" && tab === "plan" && (await plan.back(host))) {
-        return { answer: { deny: "back to the plan contents" } };
-      }
-      stop();
+    pre(_host, e) {
+      if (e.id === PANE) stop();
       return undefined;
     },
   },
@@ -360,7 +347,9 @@ export const pane: Features = {
   "ui.scroll": {
     async pre(host, e) {
       if (e.requestId !== PANE || e.origin.kind !== "person") return undefined;
-      if ((await host.state.pane.get()).value?.tab !== "doctor" || !doctor.scroll(e.by, e.contentRows)) return undefined;
+      const tab = (await host.state.pane.get()).value?.tab;
+      if (tab === "plan") return (await plan.scroll(host, e)) ? { answer: {} } : undefined;
+      if (tab !== "doctor" || !doctor.scroll(e.by, e.contentRows)) return undefined;
       host.ui.invalidate();
       return { answer: {} };
     },

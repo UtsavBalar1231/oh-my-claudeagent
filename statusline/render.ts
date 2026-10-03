@@ -19,6 +19,12 @@ interface RateWindow {
   resets_at?: number | null;
 }
 
+interface SpendLimit extends RateWindow {
+  used_usd?: number | null;
+  limit_usd?: number | null;
+  period?: string | null;
+}
+
 export interface Payload {
   model?: { display_name?: string } | null;
   workspace?: {
@@ -38,7 +44,7 @@ export interface Payload {
     total_lines_added?: number | null;
     total_lines_removed?: number | null;
   } | null;
-  rate_limits?: { five_hour?: RateWindow | null; seven_day?: RateWindow | null } | null;
+  rate_limits?: { five_hour?: RateWindow | null; seven_day?: RateWindow | null; spend_limit?: SpendLimit | null } | null;
   exceeds_200k_tokens?: boolean | null;
   effort?: { level?: string } | null;
   session_id?: string | null;
@@ -94,6 +100,7 @@ export const NERD_GLYPHS = {
   worktree: "",
   fiveHour: "",
   weekly: "",
+  spend: "",
   tasks: "",
   effort: "",
 };
@@ -109,6 +116,7 @@ export const ASCII_GLYPHS: Glyphs = {
   worktree: "W:",
   fiveHour: "5h",
   weekly: "7d",
+  spend: "S:",
   tasks: "T:",
   effort: "E:",
 };
@@ -425,6 +433,23 @@ function rateLimitSegments({ data, g, now }: Ctx): Segment[] {
   });
 }
 
+const SPEND_PERIODS = new Map([
+  ["daily", "day"],
+  ["weekly", "wk"],
+  ["monthly", "mo"],
+]);
+
+function spendSegment({ data, g }: Ctx): Segment | null {
+  const spend = data.rate_limits?.spend_limit;
+  const used = spend?.used_usd;
+  const limit = spend?.limit_usd;
+  if (used == null || limit == null) return null;
+  const pct = spend?.used_percentage ?? (limit > 0 ? (used / limit) * 100 : 0);
+  const period = SPEND_PERIODS.get(spend?.period ?? "");
+  const cap = Number.isInteger(limit) ? String(limit) : fixed(limit, 2);
+  return block(`${thresholdColor(pct)}${g.spend} $${fixed(used, 2)}/$${cap}${RST}${period ? ` ${DIM}${period}${RST}` : ""}`);
+}
+
 const present = (segments: readonly (Segment | null)[]): Segment[] => segments.filter((s) => s !== null);
 
 function fullSegments(c: Ctx): Segment[] {
@@ -451,6 +476,7 @@ function fullSegments(c: Ctx): Segment[] {
     pr ? block(pr) : null,
     block(`${MAGENTA}$${cost?.total_cost_usd != null ? fixed(cost.total_cost_usd, 2) : "0.00"}${RST}${SEP}${BLUE}${g.clock} ${formatDuration(cost?.total_duration_ms)}${RST}`),
     ...rateLimitSegments(c),
+    spendSegment(c),
     changed.length > 0 ? block(changed.join("/")) : null,
     addedDirs > 0 ? block(`${DIM}+${addedDirs} dir${addedDirs === 1 ? "" : "s"}${RST}`) : null,
   ]);

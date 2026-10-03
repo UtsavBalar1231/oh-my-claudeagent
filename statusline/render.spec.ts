@@ -593,6 +593,56 @@ describe("usage limits", () => {
   });
 });
 
+describe("spend limit", () => {
+  const model = { display_name: "claude" };
+  const base = [MODEL, WAITING, COST_ZERO];
+  const spend = (limit: NonNullable<NonNullable<Payload["rate_limits"]>["spend_limit"]>): Payload => ({ model, rate_limits: { spend_limit: limit } });
+
+  test("dollars spent and the limit follow cost, with the period, in ASCII and in Nerd Font glyphs", () => {
+    const data = spend({ used_percentage: 62.8, used_usd: 314.12, limit_usd: 500, period: "monthly" });
+    expect(one(data)).toBe([...base, `${Y}S: $314.12/$500${R} ${D}mo${R}`].join(S));
+    expect(one(data, NO_REPO, NERD)).toContain(`${Y}\uf0d6 $314.12/$500${R} ${D}mo${R}`);
+  });
+
+  test("each period reads as its short word, and an unknown or absent period leaves none", () => {
+    const label = (period: string | null | undefined): string =>
+      one(spend({ used_percentage: 10, used_usd: 1, limit_usd: 10, ...(period === undefined ? {} : { period }) })).split(S).at(-1) ?? "";
+    expect(label("daily")).toBe(`${G}S: $1.00/$10${R} ${D}day${R}`);
+    expect(label("weekly")).toBe(`${G}S: $1.00/$10${R} ${D}wk${R}`);
+    expect(label("monthly")).toBe(`${G}S: $1.00/$10${R} ${D}mo${R}`);
+    expect(label("quarterly")).toBe(`${G}S: $1.00/$10${R}`);
+    expect(label(null)).toBe(`${G}S: $1.00/$10${R}`);
+    expect(label(undefined)).toBe(`${G}S: $1.00/$10${R}`);
+  });
+
+  test("a limit with cents keeps them, and the colour comes from the dollars when no percentage came", () => {
+    expect(one(spend({ used_usd: 90, limit_usd: 100.5 }))).toEndWith(`${RED}S: $90.00/$100.50${R}`);
+    expect(one(spend({ used_usd: 61, limit_usd: 100 }))).toEndWith(`${Y}S: $61.00/$100${R}`);
+    expect(one(spend({ used_usd: 5, limit_usd: 0 }))).toEndWith(`${G}S: $5.00/$0${R}`);
+  });
+
+  test("the reported percentage colours the segment when both are present", () => {
+    expect(one(spend({ used_percentage: 120, used_usd: 1, limit_usd: 100 }))).toEndWith(`${RED}S: $1.00/$100${R}`);
+  });
+
+  test("without both dollar amounts there is no segment, whatever else the limit carries", () => {
+    for (const limit of [{ used_percentage: 63, resets_at: 1 }, { used_usd: 3 }, { limit_usd: 10 }, { used_usd: null, limit_usd: 10 }, {}]) {
+      expect(one(spend(limit))).toBe(base.join(S));
+    }
+    expect(one({ model, rate_limits: { spend_limit: null } })).toBe(base.join(S));
+  });
+
+  test("it sits after the usage windows and before the changed lines", () => {
+    const data: Payload = {
+      model,
+      cost: { total_lines_added: 4 },
+      rate_limits: { five_hour: { used_percentage: 45 }, spend_limit: { used_percentage: 10, used_usd: 1, limit_usd: 10 } },
+    };
+    const parts = one(data).split(S);
+    expect(parts.slice(-3)).toEqual([`${filled(G, 4)}${empty(6)} ${G}45%${R} ${D}5h${R}`, `${G}S: $1.00/$10${R}`, `${G}+4${R}`]);
+  });
+});
+
 describe("context bar", () => {
   const bar = (context: NonNullable<Payload["context_window"]>, exceeds = false): string =>
     one({ model: { display_name: "m" }, context_window: context, exceeds_200k_tokens: exceeds, cost: {} }).split(S)[1] ?? "";

@@ -43,7 +43,8 @@ The segments, in priority order. Each appears only when it has something to show
 7. Session cost and duration.
 8. Usage limits: the 5 hour window, then the 7 day window, each with a bar and its reset time.
    They are absent from the payload for everyone but Claude.ai Pro and Max subscribers, and until
-   the first API response.
+   the first API response. Behind a Claude apps gateway with a spend limit, the dollars spent
+   against the limit follow them.
 9. Lines added and removed.
 10. Extra directories added to the session.
 
@@ -167,6 +168,23 @@ The usage-limit segments come from the `rate_limits` field of the payload:
 Each window is independent and `resets_at` is Unix epoch seconds. A reset later today reads
 `5pm`, any other day reads `thu 5pm`, both in the local time zone. A window without
 `used_percentage` is skipped, and with neither window there is no segment.
+
+Behind a Claude apps gateway with a spend limit, the payload can also carry
+`rate_limits.spend_limit`:
+
+```json
+{
+  "rate_limits": {
+    "spend_limit": { "used_percentage": 62.8, "resets_at": 1738857600, "used_usd": 314.12, "limit_usd": 500, "period": "monthly" }
+  }
+}
+```
+
+The spend segment reads `$314.12/$500 mo` after the usage windows, with a leading `S:` or a Nerd
+Font glyph. `period` reads `day`, `wk` or `mo` for `daily`, `weekly` or `monthly`. The segment
+needs both `used_usd` and `limit_usd`, which the gateway reports separately and can leave out,
+so a `spend_limit` with only a percentage draws nothing. It takes the same green, yellow and red
+thresholds as the context bar from `used_percentage`, or from the dollars when no percentage came.
 
 ---
 

@@ -1,6 +1,6 @@
-import { expect, test } from "claude-code/testing";
-import { type Keyboard, regainKeyboard } from "../../hooks/tabs/plan.ts";
-import { LAYOUTS, POSIX, pane, run, SESSION, world } from "./world.ts";
+import type { On } from "claude-code";
+import { type Engine, expect, test } from "claude-code/testing";
+import { LAYOUTS, POSIX, pane, run, SESSION, type Size, world } from "./world.ts";
 
 const PLAN = [
   "# Ship the thing",
@@ -125,31 +125,83 @@ for (const layout of LAYOUTS) {
   });
 }
 
-// A test cannot raise the person's Esc, so the schedule runs against a keyboard of its own.
-async function keyboardHeldAfter(failures: number) {
-  const seen = { waits: [] as number[], regains: 0, refocused: 0, logs: [] as string[] };
-  const queue: (() => Promise<void>)[] = [];
-  const keyboard: Keyboard = {
-    regain: async () => void (seen.regains += 1),
-    isHeld: async () => seen.regains > failures,
-    after: (ms, run) => void (seen.waits.push(ms), queue.push(run)),
-    log: (text) => void seen.logs.push(text),
+const SCROLL = { component: "Pane", requestId: "omca", offset: 0, origin: { kind: "person" } } as const;
+const LONG = ["# Long", "", "## TODOs", ...Array.from({ length: 30 }, (_, i) => `- [ ] ${i + 1}. Task ${i + 1}`), ""].join("\n");
+
+const FILES = Object.fromEntries(Array.from({ length: 6 }, (_, i) => [`${POSIX.plans}/plan-${i}.md`, LONG]));
+
+const DOCK: Size = { columns: 120, rows: 20, placement: "dock" };
+
+async function windowed($: Engine, on: On, files: Record<string, string>, args: string, size: Size = DOCK) {
+  world(on, files);
+  const engine: number[] = [];
+  on("ui.scroll", (_$, e) => (engine.push(e.by), {}));
+  await $.command.run(run(args));
+  const ui = await $.ui.mount(pane("terminal", size));
+  const current = async () => (await ui.findAll({ type: "Button" })).filter((b) => b.props["autoFocus"] === true).map((b) => b.key);
+  const key = async (by: number, contentRows = 15, bodyRows = 16) => {
+    await $.ui.scroll({ ...SCROLL, by, bodyRows, contentRows });
+    return current();
   };
-  regainKeyboard(keyboard, async () => void (seen.refocused += 1));
-  for (let next = queue.shift(); next !== undefined; next = queue.shift()) await next();
-  return seen;
+  return { ui, engine, current, key };
 }
 
-test("after Esc the pane asks for the keyboard back at growing delays and stops once it holds it", async () => {
-  expect(await keyboardHeldAfter(2)).toEqual({ waits: [0, 50, 150], regains: 3, refocused: 1, logs: [] });
-  expect(await keyboardHeldAfter(0)).toEqual({ waits: [0], regains: 1, refocused: 1, logs: [] });
+test("on the Contents list a page key moves the pointer by the rows the window shows, Home and End go to the ends, and the wheel is left to the engine", async ($, on) => {
+  const { ui, engine, current, key } = await windowed($, on, { [`${POSIX.plans}/long.md`]: LONG }, "plan long");
+  expect(await current()).toEqual(["row-1"]);
+
+  expect(await key(16)).toEqual(["row-4"]);
+  expect(await key(16)).toEqual(["row-8"]);
+  expect(await key(-16)).toEqual(["row-4"]);
+  expect(await key(15)).toEqual(["row-30"]);
+  expect(await key(16)).toEqual(["row-30"]);
+  expect(await key(-15)).toEqual(["row-1"]);
+  expect(await key(-16)).toEqual(["row-1"]);
+  expect(engine).toEqual([]);
+
+  expect(await key(1)).toEqual(["row-1"]);
+  expect(await key(-3)).toEqual(["row-1"]);
+  expect(engine).toEqual([1, -3]);
+  await ui.unmount();
 });
 
-test("a keyboard that never comes back is asked for four times and logged once", async () => {
-  expect(await keyboardHeldAfter(9)).toEqual({
-    waits: [0, 50, 150, 400],
-    regains: 4,
-    refocused: 0,
-    logs: ["omca plan could not take the keyboard back after 4 attempts"],
-  });
+test("where the body and the tree are the same height a page key pages and does not jump to the end", async ($, on) => {
+  const { ui, current, key } = await windowed($, on, { [`${POSIX.plans}/long.md`]: LONG }, "plan long", { columns: 80, rows: 40, placement: "inline" });
+  expect(await current()).toEqual(["row-1"]);
+  expect(await key(12, 12, 12)).toEqual(["row-6"]);
+  expect(await key(-12, 12, 12)).toEqual(["row-1"]);
+  await ui.unmount();
+});
+
+test("on the Plans list a page key and Home and End move the pointer over the plans", async ($, on) => {
+  const { ui, current, key } = await windowed($, on, FILES, "plan");
+  expect(await current()).toEqual(["pick-0"]);
+
+  expect(await key(15)).toEqual(["pick-5"]);
+  expect(await key(-15)).toEqual(["pick-0"]);
+  expect(await key(16)).toEqual(["pick-4"]);
+  expect(await key(-16)).toEqual(["pick-0"]);
+  await ui.unmount();
+});
+
+test("on a section's page the scroll keys reach the engine, which scrolls the page", async ($, on) => {
+  const { ui, engine, key } = await windowed($, on, { [`${POSIX.plans}/long.md`]: LONG }, "plan long");
+  await ui.press({ key: "row-1" });
+
+  for (const by of [16, 31, -31, -16, 1]) await key(by, 31);
+  expect(engine).toEqual([16, 31, -31, -16, 1]);
+  await ui.unmount();
+});
+
+test("every Plan view names Esc as the way out, and a section's page names it beside the scroll keys", async ($, on) => {
+  const { ui } = await windowed($, on, { [`${POSIX.plans}/long.md`]: LONG }, "plan long");
+  expect(await ui.find({ type: "Text", text: "↑↓ move · enter open · esc close" })).toBeDefined();
+
+  await ui.press({ key: "l" });
+  expect(await ui.find({ type: "Text", text: "↑↓ move · enter open · esc close" })).toBeDefined();
+
+  await ui.press({ key: "pick-0" });
+  await ui.press({ key: "row-1" });
+  expect(await ui.find({ type: "Text", text: "↑↓ scroll · esc close" })).toBeDefined();
+  await ui.unmount();
 });
