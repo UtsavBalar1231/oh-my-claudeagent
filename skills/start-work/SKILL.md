@@ -8,18 +8,18 @@ argument-hint: "[plan file] [--worktree <path>]"
 
 Call `health_check` first, loading it and `boulder_write` if needed: `ToolSearch({query: "select:mcp__plugin_oh-my-claudeagent_omca__health_check,mcp__plugin_oh-my-claudeagent_omca__boulder_write", max_results: 2})`. Proceed only when `runtime` is `ok`; otherwise repeat `runtime_reason` to the user, tell them to run `/oh-my-claudeagent:omca-setup`, and stop. If the tool is still missing, say OMCA's server is not connected and stop.
 
-# Plan Execution Mode: start-work
+# Plan execution mode: start-work
 
 This command runs in the main session at depth 0. The `Agent` tool is available,
 so orchestration is real: parallel fan-out to `executor`, specialist escalation
-via `hephaestus`/`explore`/`librarian` as needed. No depth-1 degradation.
+via `hephaestus`/`explore`/`librarian` as needed.
 
 The platform's native Workflow tool is not a substitute for this command. A workflow run
 is driven by the platform's own runtime, so its agents never call `evidence_log`, never
-bind a plan through boulder, and are never seen by the TaskCompleted gate or the Stop
-gates. That makes it a separate lane, not a replacement for plan execution here.
+bind a plan, and OMCA's plan gates never see them. That makes it a separate lane, not a
+replacement for plan execution here.
 
-## Refusal Clause
+## Refusal clause
 
 This command body runs in the main session at depth 0. If the `Agent` tool is not in
 your tool list (a `--tools`, `--disallowedTools`, or deny-rule restriction removed it),
@@ -36,37 +36,29 @@ Run plan execution from a session where the Agent tool is available:
   /oh-my-claudeagent:start-work <plan>
 ```
 
-## Plan Discovery Logic (Step 0)
+## Plan discovery logic (step 0)
 
-### Plan Mode Handling
+### Plan mode handling
 
-When plan mode is active, call `ExitPlanMode` first. Plugin agents have `permissionMode`
-stripped, and delegated agents inherit the parent session's context.
+When plan mode is active, call `ExitPlanMode` first. Plugin agents cannot set their own
+`permissionMode`, so delegated agents inherit plan mode and could not edit.
 
-### Finding the Active Plan
+### Finding the active plan
 
-`boulder.json` is a registry: several plans can be tracked concurrently
-(`plans[plan_name]`), and each session is bound to at most one of them
-(`bindings[session_id]`). Plan selection in this step is what creates or updates that
-binding.
+OMCA tracks several plans at once, and each session is bound to at most one of them.
+Plan selection in this step is what binds this session.
 
-1. Check `boulder_progress()`. It resolves this session's bound plan from the
-   registry (explicit binding → sole registered plan → most-recently-started plan).
-   If it resolves to a valid file with unchecked boxes, resume that work directly
-   (skip steps 2-3).
+1. When the guidance OMCA added to this session carries an `[ACTIVE PLAN] <name>: <path>`
+   line, this session is bound to that plan. If the file has unchecked boxes, resume
+   it directly (skip steps 2-3); `boulder_progress(plan_name="<name>")` gives the counts.
 
-2. When no bound plan resolves (or the bound plan is fully checked), build the selection
-   list from two sources:
-   - The registry's OTHER concurrently-active plans (`plans[plan_name]` entries not
-     bound to this session), each labeled `[active]`. These are plans other sessions
-     are mid-execution on. **Exclude any plan whose checkboxes are all checked**:
-     completion is derived from the plan file's `- [x]` boxes, not a stored flag, so
-     a fully-checked plan never appears in the selection list even if its registry
-     entry hasn't been garbage-collected yet.
-   - Plan files not yet in the registry, found by searching:
-     - `<plans-dir>/*.md` (canonical native plans)
-     - `.omca/plans/*.md` (project-local plans)
-     labeled `[available]`.
+2. Otherwise, or when that plan is fully checked, build the selection list from two
+   sources:
+   - The plan `boulder_progress()` returns, labeled `[active]`. With no binding it
+     returns the only registered plan or the most recently started one, which may be
+     another session's. **Exclude it when its checkboxes are all checked**: completion
+     is derived from the plan file's `- [x]` boxes, not a stored flag.
+   - Plan files in `<plans-dir>/*.md`, labeled `[available]`.
 
    `<plans-dir>` is the platform's plans directory: the `plansDirectory` setting when
    it is set (a path relative to the project root), otherwise `~/.claude/plans`. Read
@@ -75,7 +67,7 @@ binding.
 
 3. Merge results, deduplicate by absolute path.
 
-### Decision Logic
+### Decision logic
 
 #### Draft gate (checked before anything is executed)
 
@@ -83,8 +75,8 @@ A plan may carry a `**Status**:` field on its metadata line. Read it before exec
 resuming, or auto-selecting a plan:
 
 - `Status` says `FINAL`: executable.
-- No `Status` field anywhere in the plan: executable. Plans written before this field
-  existed carry no status line, and a missing field must never block execution.
+- No `Status` field anywhere in the plan: executable. A missing field never blocks
+  execution.
 - `Status` is present but says anything other than `FINAL` (`DRAFT` being the common
   case): REFUSE to execute it. A draft is a plan the user is still being interviewed
   about, and executing one runs work nobody agreed to.
@@ -110,10 +102,9 @@ auto-selects. If every candidate is a draft, say so rather than picking one.
   completed plans excluded).
   - One plan found: auto-select it.
   - Several plans: present the list and ask the user to choose. Selecting a plan calls
-    `boulder_write`, which both upserts `plans[plan_name]` and sets
-    `bindings[session_id]` to that plan. This is what "binds" the session.
+    `boulder_write`, which registers the plan and binds this session to it.
 
-### Argument Handling
+### Argument handling
 
 If `[plan file]` argument is provided, use that path directly, skip search.
 
@@ -123,14 +114,10 @@ If `--worktree <path>` is provided:
    into ALL delegation prompts (all ops target worktree paths).
 3. If invalid, show setup: `git worktree add <path> <branch>`.
 
-Without `--worktree`:
-1. If the resolved plan's registry entry (`plans[plan_name].worktree_path`) is set
-   (resume case), use it. `worktree_path` is per-plan, not global: a session
-   resuming a different plan than its own last one gets that plan's worktree, not
-   its own last plan's.
-2. Otherwise, show the setup prompt and store the path via `boulder_write`.
+Without `--worktree`, run in the current checkout; `boulder_write` keeps a
+`worktree_path` stored earlier for the plan.
 
-### Boulder Write (BEFORE Delegating)
+### Boulder write (before delegating)
 
 After the plan is selected, before any delegation:
 
@@ -138,8 +125,7 @@ After the plan is selected, before any delegation:
 boulder_write(
   active_plan="<absolute path to plan file>",
   plan_name="<plan name>",
-  session_id="<current session id>",
-  agent="sisyphus"
+  session_id="<current session id>"
 )
 ```
 
@@ -151,7 +137,7 @@ statusline TODO counter and every other session-id-keyed lookup against it.
 `boulder_write` enforces deduplication and preserves `started_at`. The plan body
 stays at its authoritative location; boulder stores a pointer only.
 
-### Output Formats
+### Output formats
 
 When listing plans for selection:
 ```
@@ -169,7 +155,6 @@ Resuming Work Session
 
 Active Plan: {plan-name}
 Progress: {completed}/{total} tasks
-Worktree: {worktree_path or "not set"}
 
 Reading plan and continuing from last incomplete task...
 ```
@@ -183,7 +168,7 @@ Plan: {plan-name}
 Reading plan and beginning execution...
 ```
 
-## Step 1: Register and Analyze
+## Step 1: register and analyze
 
 1. `boulder_write(active_plan="<path>", plan_name="<name>", session_id="<current>")`, before delegating.
 2. Read the full plan file.
@@ -286,7 +271,7 @@ default and needs no hint.
 A task whose plan text leaves a design choice open goes out with `model="opus"` on that
 one call; a task the plan fully specifies needs no override.
 
-## Parallel Execution Semantics
+## Parallel execution semantics
 
 ### 2.1 Parallelization
 
@@ -325,13 +310,14 @@ into sub-batches and run them back to back. Count agents already running from an
 earlier batch, since they still hold their slots. That ceiling is not enforced in
 ultracode sessions.
 
-There is no per-session total limit on how many subagents a session may spawn, so
-concurrency is the only platform ceiling. It is not the cost ceiling: each spawn
+There is no per-session total limit on how many subagents a session may spawn. Tool calls
+in one message run at most 10 at a time by default (`CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY`),
+so a group wider than 10 runs partly in sequence. Neither ceiling is the cost ceiling: each spawn
 re-establishes context and each report costs a read. Spawn executors for plan tasks, and
 reach for `explore` or `librarian` only when a delegation needs a fact that a few reads
 of your own cannot supply.
 
-### 2.2 Result Collection
+### 2.2 Result collection
 
 A parallel group is several Agent calls in one message. Each returns a launch
 acknowledgement immediately, and each deliverable arrives later in the `<result>` block
@@ -345,7 +331,7 @@ tasks still running. Hold group-wide steps (the project-level build and test run
 next dependent wave) until every result in the group is in. When waiting is all that is
 left, say how many results remain and end the response.
 
-### 2.3 Verify After Every Delegation
+### 2.3 Verify after every delegation
 
 Re-run the task's `Done when:` command (its `**Acceptance Criteria**` check in a plan
 that uses bolded fields) yourself and confirm it passes; that is the per-task mechanical
@@ -397,8 +383,8 @@ verified: a leftover process or bound port is not complete.
 
 Only once the review above passes: edit plan file `- [ ]` → `- [x]`. The successful
 Edit is the confirmation, since an Edit whose text does not match fails instead of
-landing. Flip the box before the next delegation: `boulder_progress`, the Stop gate, and
-a resumed session all read progress from these boxes.
+landing. Flip the box before the next delegation: `boulder_progress`, OMCA's plan gates,
+and a resumed session all read progress from these boxes.
 
 ## Completeness Check
 
@@ -427,7 +413,7 @@ When you have the `advisor` tool, call it once your own verdict is COMPLETE and 
 you log it. It has read every delegation and verification in this session and answers
 what you missed. A gap it names that the diff confirms makes the verdict INCOMPLETE.
 
-Before logging the verdict, read the plan file's own hash so the Stop gate can
+Before logging the verdict, read the plan file's own hash so OMCA's completion gate can
 scope the evidence to this exact plan run rather than any `final_verification` entry
 that happens to be lying around. Call `boulder_progress` with the plan's `plan_path`
 and take `plan_sha256` from its result: it is the SHA-256 of the plan file's current
@@ -455,27 +441,27 @@ On INCOMPLETE: fix the specific gap, re-run the completeness review, log a fresh
 fix-and-rerun cycle itself: it terminates when the gap is actually closed, not
 by a retry counter.
 
-The Stop hook enforces this gate: it blocks session end when the plan is fully
-checked but no `final_verification` evidence entry (exit_code=0) exists. A logged
-verdict opens the gate permanently.
+OMCA enforces this gate: it keeps the session from ending while the plan is fully
+checked and no `final_verification` entry with `exit_code=0` matches it. A logged
+verdict opens the gate until the plan file changes.
 
 Do not report completion until `final_verification` evidence is logged.
 
-## Evidence Logging Mandate
+## Evidence logging mandate
 
 Use `evidence_log` after every verification command. Without evidence, nothing is done.
 
-The `TaskCompleted` hook backs this up, but it does not gate every path to completion:
-it fires only when a task is closed through `TaskUpdate` or when a teammate ends its
-turn, so a run that never touches the task list is never gated by it. Treat the mandate
-as yours to honor rather than as something the hook will catch for you.
+OMCA's task-completion check backs this up, but it does not gate every path to
+completion: it runs only when a task is closed through `TaskUpdate` or when a teammate
+ends its turn, so a run that never touches the task list is never gated by it. Treat the
+mandate as yours to honor rather than as something the check will catch for you.
 
 Task-list tools are a precondition, not a given. Claude Code provides
 `TaskCreate`/`TaskUpdate` by default only on Claude 3.x, Opus 4 through 4.7, Sonnet 4
 through 4.6, and Haiku 4.5. Every other model, including the ones the `opus` and `fable`
 aliases resolve to on the Anthropic API, goes without them unless
 `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` is set in the environment. Without that variable the
-task list is unavailable and the `TaskCompleted` hook has nothing to fire on.
+task list is unavailable and the task-completion check has nothing to run on.
 
 Standard pattern:
 ```
@@ -511,9 +497,9 @@ Evidence type table:
 | `manual`             | Manual QA scenario                            |
 | `final_verification` | End-of-plan completeness verdict (COMPLETE)   |
 
-Session end is blocked until a `final_verification` entry with `exit_code=0` exists.
+Session end is blocked until a `final_verification` entry with `exit_code=0` matches the plan file's current hash.
 
-## Auto-Continue Policy
+## Auto-continue policy
 
 Do not ask "should I continue" between plan steps. After verification passes,
 immediately delegate the next task.
@@ -533,7 +519,7 @@ reason, or reject it with a stated reason. Entries left silently unaddressed
 accumulate into gaps the completeness check will not catch, since it reviews
 the plan's checkboxes, not the notepad.
 
-### Stop Conditions
+### Stop conditions
 
 | Condition    | Signal                                                | Action                                             |
 |--------------|-------------------------------------------------------|-----------------------------------------------------|
@@ -542,7 +528,7 @@ the plan's checkboxes, not the notepad.
 | **PAUSE**    | 2 consecutive independent task failures               | Document failures, pause, ask user for guidance    |
 | **ABORT**    | 3+ consecutive waves with zero net progress           | Stop all work, document state, present to user     |
 
-### Failure Handling
+### Failure handling
 
 Max 3 retries per task. When a task is still blocked after 3, record it with `notepad_write(plan_name, "issues", ...)`
 and continue to independent tasks. When 2+ tasks in the same area fail, ask the user
@@ -563,7 +549,7 @@ dismissed as a false positive without evidence proving the failure itself was
 spurious (e.g. a flaky-test rerun that then passes, logged). "That's probably
 just flaky" is not evidence.
 
-## MCP Tool Reference
+## MCP tool reference
 
 - **`boulder_write`**: Write/update execution metadata (active plan, session ID, worktree path)
 - **`boulder_progress`**: Task completion counts and active plan info
@@ -573,7 +559,7 @@ just flaky" is not evidence.
 - **`notepad_read`**: Fallback audit notes when relevant to a pending task
 - Never `rm -f` on `.omca/state/`: use MCP tools
 
-## Critical Rules
+## Critical rules
 
 - `boulder_write` before delegating; tracks execution metadata
 - Read the full plan before delegating

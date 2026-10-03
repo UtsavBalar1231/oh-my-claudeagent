@@ -2,7 +2,7 @@
 
 ## Header comment rules
 
-Comments tell WHAT the code does, not HOW. Never explain how the code works: write code
+A declaration's doc comment says what it does; never explain how. Write code
 whose working is obvious instead.
 
 A header carries the contract, so the doc comment belongs at the head of the declaration

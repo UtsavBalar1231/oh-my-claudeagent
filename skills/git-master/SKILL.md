@@ -21,7 +21,7 @@ allowed-tools:
   - mcp__plugin_oh-my-claudeagent_omca__evidence_log
 ---
 
-# Git Master Agent
+# Git master agent
 
 ## Tool Restrictions
 
@@ -43,28 +43,28 @@ git -c core.editor=true <command>
 
 Run read-only commands (`status`, `diff`, `log`, `show`, `blame`, `branch`, `rev-parse`, `merge-base`) without the option. They never open an editor, the shell has no terminal for a pager, and an allow rule written for the plain command may not match one with extra options, so the option can turn a pre-approved read into a permission prompt.
 
-## MODE DETECTION (FIRST STEP)
+## Mode detection (first step)
 
 | User Request Pattern | Mode | Jump To |
 |---------------------|------|---------|
 | "commit", changes to commit | `COMMIT` | Phase 0-5 |
-| "rebase", "squash", "cleanup history" | `REBASE` | Phase R1-R4 |
-| "find when", "who changed", "git blame", "bisect" | `HISTORY_SEARCH` | Phase H1-H3 |
+| "rebase", "squash", "cleanup history" | `REBASE` | Phase R1-R2 |
+| "find when", "who changed", "git blame", "bisect" | `HISTORY_SEARCH` | Search Commands |
 | "what changed", "is this clean", "check status", "what's staged" (purely investigative) | `STATUS` | STATUS MODE |
 
 Don't default to COMMIT mode: a request to inspect state is STATUS, and committing, rewriting, or searching history happens only when the request asks for it.
 
-## STATUS MODE (investigate-only)
+## STATUS mode (investigate-only)
 
 For requests that only ask to inspect repo state: nothing to commit, rewrite, or search history for. Run read-only commands (`git status`, `git diff`, `git log --oneline`, `git branch -vv`), report findings, and stop. No `git add`, `git commit`, `git rebase`, `git reset`, or any command that mutates the working tree, index, or history. If the findings reveal work that plausibly needs a commit or rebase, say so and wait; do not switch modes without the user asking.
 
-## CORE PRINCIPLE: ATOMIC COMMITS BY DEFAULT
+## Core principle: atomic commits by default
 
 Each commit carries one concern: a change someone can review, revert, and explain on its own. Split when the changed files hold more than one concern, and keep one commit when they are one inseparable change. An implementation and the tests that exercise it land in the same commit wherever the test file lives, so each commit can build and pass on its own.
 
 A different directory, component type, or new-versus-modified file is a signal that concerns may differ, not a rule: a new module and the one-line import that wires it in are one concern. File count calls only for scrutiny, and a planned commit that spans many files needs the one-sentence justification described in Phase 3.
 
-## PHASE 0: Parallel Context Gathering (MANDATORY)
+## Phase 0: parallel context gathering (mandatory)
 
 Execute ALL in parallel:
 
@@ -87,9 +87,9 @@ git log --oneline main..HEAD
 
 These use `main` as the default branch; use `master` where that is the default (`git branch --list main master` shows which exists). When `git merge-base` fails, that branch name does not exist or shares no history with HEAD, so try the other name. When `git rev-parse --abbrev-ref "@{upstream}"` fails, the branch has no upstream: record `NO_UPSTREAM`. Quote `"@{upstream}"`, because PowerShell reads an unquoted `@{` as the start of a hashtable.
 
-## PHASE 1: Style Detection
+## Phase 1: style detection
 
-### Language/Script Detection
+### Language/script detection
 ```
 Inspect git log -30 for the dominant human language/script and tone.
 Examples: English, Korean, Japanese, Chinese, mixed, emoji-heavy, terse keywords.
@@ -100,7 +100,7 @@ DECISION:
 - Do not force a Korean/English binary.
 ```
 
-### Commit Style Classification
+### Commit style classification
 
 | Style | Pattern | Example |
 |-------|---------|---------|
@@ -109,7 +109,7 @@ DECISION:
 | `SHORT` | Minimal keywords | `format`, `lint` |
 | `SENTENCE` | Full sentence style | `Implemented the new login flow` |
 
-## PHASE 2: Branch Context Analysis
+## Phase 2: branch context analysis
 
 ```
 BRANCH_STATE:
@@ -123,13 +123,13 @@ REWRITE_SAFETY:
   - has_upstream=true, commits pushed: CAREFUL_REWRITE (explicit permission required before rewrite, `--force-with-lease` only if pushing)
 ```
 
-## PHASE 3: Atomic Unit Planning (BLOCKING)
+## Phase 3: atomic unit planning (BLOCKING)
 
-### Identify Atomic Concerns FIRST
+### Identify atomic concerns first
 
 Group files by independently reviewable concern. Use file count only to trigger scrutiny: if one planned commit touches many files, write a concrete justification for why those files must land together.
 
-### Implementation + Test Pairing (MANDATORY)
+### Implementation + test pairing (mandatory)
 ```
 Keep each test file in the commit with the implementation it tests, even when the two live in different directories.
 
@@ -140,7 +140,7 @@ Test patterns to match:
 - *.spec.ts <-> *.ts
 ```
 
-### MANDATORY OUTPUT:
+### Mandatory output:
 ```
 COMMIT PLAN
 ===========
@@ -154,7 +154,7 @@ COMMIT 1: [message in detected style]
   Justification: implementation + its test
 ```
 
-### MANDATORY JUSTIFICATION
+### Mandatory justification
 
 For each planned commit with multiple files, write ONE sentence naming the atomic concern.
 If you cannot write it, SPLIT.
@@ -162,9 +162,9 @@ If you cannot write it, SPLIT.
 Valid: "implementation file + its direct test", "migration + model that would break without both"
 Invalid: "all related to feature X", "they were changed together"
 
-## PHASE 4: Commit Execution
+## Phase 4: commit execution
 
-### Execute Commits
+### Execute commits
 For each new commit group, in dependency order:
 
 ```bash
@@ -181,7 +181,7 @@ git commit -m "<message-matching-detected-style>"
 git log -1 --oneline
 ```
 
-## PHASE 5: Verification & Cleanup
+## Phase 5: verification & cleanup
 
 ```bash
 # Check working directory clean
@@ -191,7 +191,7 @@ git status
 git log --oneline main..HEAD
 ```
 
-## Quick Reference: Style Detection
+## Quick reference: style detection
 
 | If git log shows... | Use this style |
 |---------------------|----------------|
@@ -201,9 +201,9 @@ git log --oneline main..HEAD
 | `format`, `lint` | SHORT |
 | Mix of above | Use MAJORITY |
 
-# REBASE MODE (Phase R1-R4)
+# REBASE mode (phase R1-R2)
 
-## PHASE R1: Safety Assessment
+## Phase R1: safety assessment
 
 | Condition | Risk Level | Action |
 |-----------|------------|--------|
@@ -223,17 +223,17 @@ Before any history rewrite (rebase, amend, reset), confirm all four before runni
 
 If any of the four is unconfirmed, stop and gather it; do not proceed on assumption.
 
-## PHASE R2: Rebase Execution
+## Phase R2: rebase execution
 
-Rebases must be fully non-interactive. Use the `git -c core.editor=true` option from Non-Interactive Environment on every command that rewrites history. Do not open editors. If conflicts occur, stop after reporting the conflicted files and exact next commands. Do not guess conflict resolutions unless the user explicitly requested conflict fixing.
+Rebases must be fully non-interactive. Use the `git -c core.editor=true` option from Non-Interactive Environment on every rebase. Do not open editors. If conflicts occur, stop after reporting the conflicted files and exact next commands. Do not guess conflict resolutions unless the user explicitly requested conflict fixing.
 
 ```bash
 # Find merge-base (use master in place of main where that is the default branch)
 git merge-base HEAD main
 
 # For SQUASH (combine all into one), with <merge-base> the commit id printed above:
-git -c core.editor=true reset --soft <merge-base>
-git -c core.editor=true commit -m "Combined: <summarize all changes>"
+git reset --soft <merge-base>
+git commit -m "Combined: <summarize all changes>"
 
 # For AUTOSQUASH (non-interactive editor disabled):
 git -c core.editor=true rebase -i --autosquash <merge-base>
@@ -247,9 +247,9 @@ After any successful rewrite of pushed history, push only when explicitly reques
 git push --force-with-lease
 ```
 
-# HISTORY SEARCH MODE (Phase H1-H3)
+# History search mode
 
-## Search Commands
+## Search commands
 
 | Goal | Command |
 |------|---------|
@@ -260,7 +260,7 @@ git push --force-with-lease
 | When did bug start? | `git bisect start && git bisect bad && git bisect good <tag>` |
 | File history | `git log --follow -- path/file.py` |
 
-## PR Evidence Attachment
+## PR evidence attachment
 
 When a PR body needs visual evidence (screenshots, recordings) of a change:
 
@@ -268,6 +268,6 @@ When a PR body needs visual evidence (screenshots, recordings) of a change:
 - Never commit temporary evidence images to the repository: they bloat history and outlive their purpose.
 - Never repurpose release artifacts as PR evidence: releases and PR evidence are different lifecycles; conflating them makes releases untrustworthy as a source of truth.
 
-## History Safety
+## History safety
 
 In every mode, rewrite pushed history only with the user's explicit permission, and push such a rewrite with `--force-with-lease`, never `--force`.

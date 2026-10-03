@@ -2,7 +2,7 @@
 
 ## C comment rules
 
-Comments tell WHAT the code does, not HOW. Never explain how the code works: write code
+A function's head comment says what it does; never explain how. Write code
 whose working is obvious instead.
 
 Keep comments at the head of the function. In-function comments exist only to flag

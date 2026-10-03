@@ -1,6 +1,6 @@
 ---
 name: handoff
-description: Create a detailed context summary for seamless continuation in a new session.
+description: Write a self-contained context summary that a new session can continue from.
 when_to_use: |
   Use when:
   - Context window is getting long or session quality is degrading
@@ -23,9 +23,9 @@ allowed-tools:
   - mcp__plugin_oh-my-claudeagent_omca__notepad_list
 ---
 
-# Handoff: Session Context Summarization
+# Handoff: session context summarization
 
-## Tool Restrictions
+## Tool restrictions
 
 Read-only. No Write/Edit/Agent. MCP tools: `boulder_progress`, `notepad_read`, `notepad_list`. `boulder_write` is deliberately absent: it is the only writer of the plan registry, and a summarizer has nothing to register.
 
@@ -46,7 +46,7 @@ git branch --show-current
 git log --oneline -5
 ```
 
-Also: `boulder_progress()`, `notepad_read` for active plan sections (load it if needed: `ToolSearch({query: "select:mcp__plugin_oh-my-claudeagent_omca__notepad_read", max_results: 1})`), the plan files in `<plans-dir>` (the `plansDirectory` setting when set, relative to the project root, otherwise `~/.claude/plans`), and `.omca/plans/` when it exists. `TaskList()` too where it exists, but Claude Code provides it by default only on Claude 3.x, Opus 4 through 4.7, Sonnet 4 through 4.6, and Haiku 4.5 unless `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` is set, so treat the plan file's numbered checkboxes and `boulder_progress()` as the primary source and `TaskList()` as a supplement.
+Also: `boulder_progress()`, `notepad_read` for active plan sections (load it if needed: `ToolSearch({query: "select:mcp__plugin_oh-my-claudeagent_omca__notepad_read", max_results: 1})`), the plan files in `<plans-dir>` (the `plansDirectory` setting when set, relative to the project root, otherwise `~/.claude/plans`). Treat the plan file's numbered checkboxes and `boulder_progress()` as the primary source, and `TaskList()`, where that tool exists, as a supplement.
 
 ## PHASE 2: EXTRACT
 
@@ -85,7 +85,6 @@ Plan: [plan-name]
 - issues: N entries - [one-line summary of open issue if any]
 - decisions: N entries - [list verbatim from notepad decisions section, one per line]
 - problems: N entries - [summary if non-zero]
-- questions: N entries - [list open questions if non-zero]
 
 WORK COMPLETED
 --------------
@@ -147,8 +146,8 @@ TO CONTINUE IN A NEW SESSION:
 
 Handoff is a user-driven workflow, so this skill sets `disable-model-invocation: true`: it
 runs only when you type `/oh-my-claudeagent:handoff`. Claude cannot load it on its own, and
-it is not preloaded into subagents. The "handoff" keyword the OMCA keyword detector watches
-for is an advisory nudge that suggests running the command; it does not start the workflow.
+it is not preloaded into subagents. With keyword triggers on, a prompt that says "handoff"
+gets a one-line hint suggesting the command; the hint does not start the workflow.
 
 ## Constraints
 

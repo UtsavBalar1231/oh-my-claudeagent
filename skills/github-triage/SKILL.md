@@ -12,15 +12,15 @@ effort: medium
 disallowed-tools: [Edit]
 ---
 
-# GitHub Triage: Unified Issue & PR Processor
+# GitHub triage: issue and PR processor
 
-## Tool Restrictions
+## Tool restrictions
 
 Read-only GitHub and repository analysis. Do not modify repo files or GitHub state. Local report writes are allowed only under `.omca/scratch/github-triage-{datetime}/` in the project root. MCP tools: `notepad_write`, `evidence_log`, `ast_search`.
 
 Fetch open issue/PR metadata, classify each, spawn 1 background executor per item. Each subagent fetches full details for its item and writes a report under `.omca/scratch/github-triage-{datetime}/` in the project root. Never take destructive action.
 
-## Zero-Action Policy
+## Zero-action policy
 
 This skill reads and reports; a human maintainer decides what happens to every item, and a mutation made during triage takes that decision away. Run only these read-only commands:
 
@@ -31,7 +31,7 @@ This skill reads and reports; a human maintainer decides what happens to every i
 
 Never run a `gh` command that merges, closes, edits, comments on, labels, or reviews an item (`gh pr merge`, `gh pr close`, `gh issue close`, `gh issue edit`, `gh pr edit`, `gh pr review`), and never call `gh api` with `POST`, `PUT`, `PATCH`, or `DELETE`.
 
-## Evidence Rule (MANDATORY)
+## Evidence rule (mandatory)
 
 Every factual claim MUST cite a GitHub permalink containing a commit SHA. Branch permalinks (`blob/main`, `blob/master`, branch names) are forbidden.
 
@@ -45,7 +45,7 @@ Without a commit-SHA permalink, do not make the claim. Write "UNVERIFIED" instea
 
 Applies to: bug root cause (file + line), "feature exists" (cite where), "fix correct" (cite what), any code reference.
 
-## ARCHITECTURE
+## Architecture
 
 ```
 1 issue or PR  =  1 Agent(subagent_type="oh-my-claudeagent:executor")
@@ -54,7 +54,7 @@ Applies to: bug root cause (file + line), "feature exists" (cite where), "fix co
 | Rule | Value |
 |------|-------|
 | Agent type for ALL items | `oh-my-claudeagent:executor` |
-| Execution mode | Background, by platform default. There is no parameter to set |
+| Execution mode | Background in an interactive session, where fork mode removes `run_in_background`; under `claude -p` and the Agent SDK a subagent may run in the foreground and return its result directly. Accept either |
 | Parallelism | Bounded batches, max 5 concurrent agents |
 | Total items per run | No platform cap. Bound the run yourself and record the overflow (see below) |
 | Result storage | `issue-{number}.md` or `pr-{number}.md` under `.omca/scratch/github-triage-{datetime}/` in the project root |
@@ -62,7 +62,7 @@ Applies to: bug root cause (file + line), "feature exists" (cite where), "fix co
 
 ---
 
-## PHASE 1: SETUP OUTPUT DIRECTORY
+## Phase 1: setup output directory
 
 Set `{OUTDIR}` to the absolute path `<project root>/.omca/scratch/github-triage-<datetime>`, where `<datetime>` is the current date and time as `YYYYMMDD-HHMMSS`. When the session context gives only the date, append a short word of your own so two runs on one day get different directories. OMCA's server writes `.omca/.gitignore` when it starts, so reports stay out of commits.
 
@@ -70,7 +70,7 @@ Run no shell command to create the directory: the Write tool creates it when the
 
 ---
 
-## PHASE 2: FETCH OPEN ITEM METADATA ONLY
+## Phase 2: fetch open item metadata only
 
 When no repo argument was given, run `gh repo view --json nameWithOwner -q .nameWithOwner` and use the `owner/name` it prints as `{REPO}` from here on.
 
@@ -86,7 +86,7 @@ If either returns exactly 500 results, paginate using `--search "created:<LAST_C
 
 ---
 
-## PHASE 3: CLASSIFY EACH ITEM
+## Phase 3: classify each item
 
 For each item, determine its type from metadata only: title, labels, author, and PR state fields. Do not fetch body/comments during classification.
 
@@ -110,9 +110,9 @@ Title prefixes and labels are strong signals. A `?` in a title is weak, because 
 
 ---
 
-## PHASE 4: SPAWN 1 BACKGROUND AGENT PER ITEM
+## Phase 4: spawn 1 background agent per item
 
-### Run-size bound (decide BEFORE spawning anything)
+### Run-size bound (decide before spawning anything)
 
 No platform ceiling limits how many subagents a session spawns in total. The only
 spawn limit that applies here is the concurrent one: the Agent tool refuses a spawn
@@ -154,7 +154,7 @@ Launch agents in batches of up to 5 concurrent. Wait for batch to complete befor
 
 ---
 
-## SUBAGENT PROMPT TEMPLATES
+## Subagent prompt templates
 
 ### SUBAGENT_ISSUE_QUESTION
 
@@ -431,7 +431,7 @@ Report format:
 
 ---
 
-## PHASE 5: COLLECT RESULTS AND WRITE SUMMARY
+## Phase 5: collect results and write summary
 
 After all background agents complete, read every per-item report from `{OUTDIR}/`
 (`SKIPPED.md` is not a report; carry its count into the summary instead):
@@ -476,7 +476,7 @@ Tell the user the output directory path when complete.
 
 ---
 
-## QUICK START
+## Quick start
 
 When invoked:
 

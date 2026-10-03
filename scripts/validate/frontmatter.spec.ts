@@ -61,6 +61,14 @@ describe("agent frontmatter", () => {
     });
   });
 
+  test("a maxTurns key fails", async () => {
+    const ctx = fixture({ "agents/demo.md": agent("name: demo", "maxTurns: 30") });
+    expect(await runNamed(checks, "agent frontmatter", ctx)).toEqual({
+      status: "fail",
+      detail: "agents/demo.md: maxTurns truncates the agent mid-task, let it stop on its own conditions",
+    });
+  });
+
   test("a directory with no agent files fails", async () => {
     const ctx = fixture({ "agents/demo.md": null });
     const result = await runNamed(checks, "agent frontmatter", ctx);

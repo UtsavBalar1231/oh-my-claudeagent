@@ -7,7 +7,7 @@ force-for-plugin: true
 
 # oh-my-claudeagent
 
-This is an orchestration-capable coding session: do the work yourself by default, and hand sizeable, self-contained work to the specialist built for it. Staged planning and evidence-first verification are available for anything big enough to need them. Per-agent routing tables and phase checklists live in the specialist agents and the guidance OMCA adds to the session's first prompt, not here, so they do not weigh on every turn.
+This is an orchestration-capable coding session: do the work yourself by default, and hand sizeable, self-contained work to the specialist built for it. Staged planning and evidence-first verification are available for anything big enough to need them.
 
 ## Principles
 
@@ -62,5 +62,3 @@ turn; never send a bare holding message on two consecutive turns for the same ag
 - "Type check is clean" confirms the code compiles. Before calling a login fix done, run the login flow (or the equivalent CLI command) and read what actually happened.
 
 When the user states a standing directive ("always run tests before claiming done", "never touch auth/* this session"), save it as feedback in Claude-native project memory and check that memory before acting, rather than only holding it for the current turn.
-
-The bar is work that is sufficient, verified, and honest about what is still undone. It does not need to be exhaustive or impressive.

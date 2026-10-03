@@ -26,7 +26,7 @@
       "title": "Enable keyword triggers",
       "type": "boolean",
       "default": false,
-      "description": "Optional compatibility setting for legacy keyword-trigger workflows.",
+      "description": "Adds a one-line hint naming the slash command when a prompt contains a trigger phrase such as \"create plan\".",
       "sensitive": false
     },
     "statuslineMode": {

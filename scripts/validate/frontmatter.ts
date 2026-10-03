@@ -96,8 +96,11 @@ function agentHygiene(ctx: Context): Outcome {
     if ((scalar(lines, "name") ?? "").includes(":")) {
       problems.push(`${name}: name must not contain ':', the platform rejects the agent at load time`);
     }
+    if (topLevelKeys(lines).includes("maxTurns")) {
+      problems.push(`${name}: maxTurns truncates the agent mid-task, let it stop on its own conditions`);
+    }
   }
-  return verdict(problems, `${files.length} agents: no tools allowlist and no colon in a name`);
+  return verdict(problems, `${files.length} agents: no tools allowlist, no maxTurns and no colon in a name`);
 }
 
 function frontmatterKeys(ctx: Context): Outcome {

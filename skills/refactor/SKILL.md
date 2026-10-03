@@ -1,12 +1,12 @@
 ---
 name: refactor
-description: Intelligent refactoring with codebase awareness, test verification, and step-by-step execution.
+description: Use when restructuring code without changing its behavior, such as extracting a module or migrating off an API. Maps the affected code, plans the steps, and runs the tests after each change.
 user-invocable: true
 argument-hint: "[target file or module]"
 effort: high
 ---
 
-# Intelligent Refactor
+# Refactor
 
 ## Usage
 
@@ -31,7 +31,7 @@ Options:
     - aggressive: Allow broader changes with adequate coverage
 ```
 
-Deterministic refactoring with codebase awareness: understand intent, map codebase, assess risk, plan the steps, execute with ast-grep MCP tools, verify after each change.
+Understand the intent, map the codebase, assess risk, plan the steps, execute with the ast-grep MCP tools, and verify after each change.
 
 ## PHASE 0: INTENT GATE
 
@@ -57,7 +57,7 @@ prompt.
 
 Dependency graph and impact zones from Phase 1:
 
-### Impact Zones
+### Impact zones
 
 | Zone | Risk Level | Action |
 |------|------------|--------|
@@ -95,7 +95,7 @@ If a verification fails, revert that step to get back to green, then diagnose fr
 
 Full test suite, type check, lint, build, final diagnostics. Record each with `evidence_log`, including its real exit code.
 
-## CRITICAL RULES
+## Critical rules
 
 A refactor preserves behavior, so never hide a behavior change to get green: no type
 suppression (`as any`, `@ts-ignore`, `@ts-expect-error`), and no deleting or weakening a

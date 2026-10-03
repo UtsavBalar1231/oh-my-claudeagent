@@ -1,9 +1,9 @@
 ---
 name: consolidate-memory
-description: Consolidate agent project memories and notepad learnings into a unified summary
+description: Use when a plan finishes or agent memories have piled up. Merges agent project memories and notepad learnings into the project's auto-memory index.
 ---
 
-# Consolidate Memory
+# Consolidate memory
 
 Consolidate session knowledge into persistent memory.
 
@@ -14,7 +14,7 @@ Consolidate session knowledge into persistent memory.
    - user scope: `~/.claude/agent-memory/*/MEMORY.md`
    - project scope: `.claude/agent-memory/*/MEMORY.md` (platform writes project memories here, resolving from the project root)
 3. Identify learnings, patterns, decisions worth preserving
-4. Update project MEMORY.md: concise, deduplicated
+4. Update the project's auto-memory index, `~/.claude/projects/<project>/memory/MEMORY.md` (or `MEMORY.md` under the `autoMemoryDirectory` setting when set): concise, deduplicated
 5. Note what was kept vs too session-specific
 
 ## Guidelines

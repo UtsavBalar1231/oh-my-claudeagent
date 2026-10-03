@@ -16,11 +16,9 @@ A bug is not fixed until you can explain why it happened, not just that it stopp
 5. **Fix**, once a hypothesis is confirmed by observation, not by a plausible story about the code.
 6. **Verify the repro is gone AND adjacent behavior is unchanged.** Re-run the original repro plus the nearest related paths. A fix that silences the symptom without touching the mechanism will resurface elsewhere.
 
-See `references/methodology.md` for what makes a hypothesis good and how instrumentation discipline works in practice.
-
 ## Escalation
 
-After two failed fix attempts on the same bug, stop iterating alone and consult oracle, handing over the attempt timeline: what each hypothesis was, what the discriminating test showed, and why it was ruled out. Two failed rounds is a signal that the mental model of the system is wrong, not that the third attempt will get lucky.
+After two failed fix attempts on the same bug, stop iterating alone. Call the `advisor` tool first when you have it; when it is off or its guidance does not unblock you, consult oracle, handing over the attempt timeline: what each hypothesis was, what the discriminating test showed, and why it was ruled out. Two failed rounds is a signal that the mental model of the system is wrong, not that the third attempt will get lucky.
 
 ## Artifact hygiene
 

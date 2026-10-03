@@ -1,6 +1,6 @@
-# Slop Categories
+# Slop categories
 
-Ten categories. Each has: what it looks like, a KEEP rule for what must not be deleted, and, where the code touches a trust boundary, the proof a deletion needs before it happens.
+Each category has: what it looks like, a KEEP rule for what must not be deleted, and, where the code touches a trust boundary, the proof a deletion needs before it happens.
 
 **Trust boundary**, for the proof requirement below: any point where data crosses from something you don't control into something you do. User input, an external API response, a file read from disk, a network payload, a config value supplied at runtime.
 
