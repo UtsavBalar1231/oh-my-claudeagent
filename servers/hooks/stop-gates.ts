@@ -8,9 +8,11 @@ import { addedLines, type Candidate, hasCompletionClaim, hasStubMarker, isStubFi
 import { isHookDisabled } from "../../src/core/kill-switch.ts";
 import { hasPassingFinalVerification } from "../../src/core/next-actions.ts";
 import { FRESH_BACKOFF, spendBlock, type StopGate, stepBackoff } from "../../src/core/stop-ledger.ts";
+import { field, isRecord, text } from "../../src/core/tool-input.ts";
+import { hasCode } from "../io.ts";
 import type { Context, Handler, Payload } from "./registry.ts";
 import type { Session } from "./session-state.ts";
-import { ledgerMtimeSeconds, ledgerPath, seconds } from "./status-file.ts";
+import { ledgerMtimeSeconds, ledgerPath, registryPath, seconds } from "./status-file.ts";
 
 type Json = Readonly<Record<string, unknown>>;
 type Parsed = { kind: "absent" } | { kind: "corrupt" } | { kind: "ok"; data: unknown };
@@ -23,25 +25,24 @@ const COMPACTION_FRESH_SECONDS = 60;
 const STALE_BINDING_SECONDS = 86_400;
 // About 1 ms of scan per file; a larger change set is machine-generated.
 const MAX_CHANGED_FILES = 500;
+// Past this a file is generated or data, not worth a read at every Stop.
+const MAX_UNTRACKED_BYTES = 1024 * 1024;
+const BINARY_SNIFF_BYTES = 8192;
 const TERMINAL_TASK_STATUS = /^(completed?|failed|error|killed|cancell?ed|timed?_?out|done)$/;
 const PAUSE_REQUEST = /\b(pause|stop here|thats enough|later|hold off|take a break)\b/;
 const BLOCKING_QUESTIONS = /^[^\S\n]*#{1,6}[^\S\n]*BLOCKING QUESTIONS/im;
 const NEXT_TASK = /^- \[ \] \d+\.[^\S\n]*(.*)$/m;
 const GIT_DIFF = ["-c", "diff.mnemonicPrefix=false", "-c", "diff.noprefix=false", "-c", "core.quotePath=false", "diff", "--no-ext-diff", "HEAD"];
 
-const isObject = (value: unknown): value is Json => typeof value === "object" && value !== null && !Array.isArray(value);
-const field = (value: unknown, key: string): unknown => (isObject(value) ? value[key] : undefined);
-const text = (value: unknown): string => (typeof value === "string" ? value : "");
 const withoutTrailingNewlines = (value: string): string => value.replace(/\n+$/, "");
 const nonEmptyLines = (value: string): string[] => value.split("\n").filter(Boolean);
-const registryPath = (root: string): string => join(root, ".omca", "state", "boulder.json");
 
 function parseFile(path: string, isCorrupt: (data: unknown) => boolean): Parsed {
   let raw: string;
   try {
     raw = readFileSync(path, "utf8");
   } catch (error) {
-    if (field(error, "code") === "ENOENT") return { kind: "absent" };
+    if (hasCode(error, "ENOENT")) return { kind: "absent" };
     return { kind: "corrupt" };
   }
   try {
@@ -85,7 +86,7 @@ async function readTranscript(path: unknown): Promise<(Json | undefined)[]> {
     .map((line) => {
       try {
         const entry: unknown = JSON.parse(line);
-        return isObject(entry) ? entry : undefined;
+        return isRecord(entry) ? entry : undefined;
       } catch {
         return undefined;
       }
@@ -138,7 +139,7 @@ function askedUserThisTurn(entries: readonly (Json | undefined)[]): boolean {
 // A spawned subagent is a background task, so every parallel wave ends a turn this way; the
 // turn is paused until the work wakes it, not stalled mid-plan.
 const hasLiveBackgroundTask = (tasks: unknown): boolean =>
-  Array.isArray(tasks) && tasks.some((task) => isObject(task) && !TERMINAL_TASK_STATUS.test(String(task.status ?? "running").toLowerCase()));
+  Array.isArray(tasks) && tasks.some((task) => isRecord(task) && !TERMINAL_TASK_STATUS.test(String(task.status ?? "running").toLowerCase()));
 
 const isFreshCompaction = (session: Session | undefined, now: number): boolean =>
   session?.compactedAt !== undefined && now - session.compactedAt < COMPACTION_FRESH_SECONDS * 1000;
@@ -208,11 +209,11 @@ async function untrackedLines(root: string, files: readonly string[]): Promise<C
   const perFile = await Promise.all(
     files.map(async (file) => {
       const path = join(root, file);
-      if (!statSync(path, { throwIfNoEntry: false })?.isFile()) return [];
-      const bytes = await readFile(path);
-      if (bytes.includes(0)) return [];
-      return bytes
-        .toString("utf8")
+      const stat = statSync(path, { throwIfNoEntry: false });
+      if (!stat?.isFile() || stat.size > MAX_UNTRACKED_BYTES) return [];
+      const content = Bun.file(path);
+      if ((await content.slice(0, BINARY_SNIFF_BYTES).bytes()).includes(0)) return [];
+      return (await content.text())
         .split("\n")
         .flatMap((line, index) => (hasStubMarker(line) ? [{ file, line: index + 1, text: line }] : []));
     }),

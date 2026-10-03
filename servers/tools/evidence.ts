@@ -1,13 +1,17 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { EVIDENCE_TYPES, type EvidenceType } from "../../src/core/evidence.ts";
+import { isRecord } from "../../src/core/tool-input.ts";
 import { latestSessionId, touchSession } from "../hooks/session-state.ts";
 import { ledgerPath, writeStatus } from "../hooks/status-file.ts";
-import { ensureStateDir, projectRoot, withLock, writeFileAtomic } from "../io.ts";
-import { isObject } from "../jsonrpc.ts";
+import { ensureStateDir, hasCode, withLock, writeFileAtomic } from "../io.ts";
 import type { Tool } from "../omca.ts";
+import { isoTimestamp, rootOf, stringArg, stringReader, WORKING_DIRECTORY } from "./args.ts";
 
 export const SNIPPET_MAX_CHARS = 2000;
+export const COMMAND_MAX_CHARS = 2000;
+export const VERIFIED_BY_MAX_CHARS = 200;
+const SHA256_HEX = /^[0-9a-f]{64}$/;
 // A full read is many 2,000-character snippets; 100,000 holds about 50, well under the client's 500,000 ceiling.
 const EVIDENCE_MAX_RESULT_CHARS = 100_000;
 // The mod reads the ledger through $.fs.read, which fails past 4 MiB.
@@ -17,22 +21,11 @@ export const KEEP_ENTRIES = 500;
 
 type Ledger = Record<string, unknown> & { entries: unknown[] };
 
-const WORKING_DIRECTORY = { type: "string", default: "", description: "Project root (auto-detected from git)" };
-
-function stringArg(args: Record<string, unknown>, tool: string, name: string, fallback?: string): string {
-  const value = args[name];
-  if (value === undefined && fallback !== undefined) return fallback;
-  if (typeof value !== "string") throw new Error(`${tool}: ${name} must be a string`);
-  return value;
-}
-
-const rootOf = (workingDirectory: string): string => projectRoot(workingDirectory || process.cwd());
-
 function readText(path: string): string | undefined {
   try {
     return readFileSync(path, "utf8");
   } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") return undefined;
+    if (hasCode(error, "ENOENT")) return undefined;
     throw error;
   }
 }
@@ -45,7 +38,7 @@ function parseLedger(path: string, text: string): Ledger {
   } catch {
     data = undefined;
   }
-  if (!isObject(data) || !(data.entries === undefined || Array.isArray(data.entries))) {
+  if (!isRecord(data) || !(data.entries === undefined || Array.isArray(data.entries))) {
     throw new Error(`${path} is not an evidence ledger ({"entries": [...]}); move it aside to keep logging evidence`);
   }
   return { ...data, entries: Array.isArray(data.entries) ? data.entries : [] };
@@ -56,9 +49,9 @@ function readLedger(path: string): Ledger {
   return text === undefined ? { entries: [] } : parseLedger(path, text);
 }
 
-const writeJson = (path: string, data: unknown): void => writeFileAtomic(path, `${JSON.stringify(data, null, 2)}\n`);
+const capped = (value: string, max: number): string => (value.length > max ? Array.from(value).slice(0, max).join("") : value);
 
-const timestamp = (): string => new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
+const writeJson = (path: string, data: unknown): void => writeFileAtomic(path, `${JSON.stringify(data, null, 2)}\n`);
 
 function updateStatus(root: string): void {
   const sessionId = latestSessionId();
@@ -71,25 +64,27 @@ function updateStatus(root: string): void {
 }
 
 async function evidenceLog(args: Record<string, unknown>): Promise<string> {
-  const type = stringArg(args, "evidence_log", "evidence_type");
+  const arg = stringReader(args, "evidence_log");
+  const type = arg("evidence_type");
   if (!(EVIDENCE_TYPES as readonly string[]).includes(type)) {
     throw new Error(`evidence_log: evidence_type must be one of ${EVIDENCE_TYPES.join(", ")}`);
   }
-  const command = stringArg(args, "evidence_log", "command");
+  const command = arg("command");
   const exitCode = args.exit_code;
   if (typeof exitCode !== "number" || !Number.isInteger(exitCode)) throw new Error("evidence_log: exit_code must be an integer");
-  const snippet = stringArg(args, "evidence_log", "output_snippet");
-  const verifiedBy = stringArg(args, "evidence_log", "verified_by", "");
-  const planSha256 = stringArg(args, "evidence_log", "plan_sha256", "");
-  const root = rootOf(stringArg(args, "evidence_log", "working_directory", ""));
+  const snippet = arg("output_snippet");
+  const verifiedBy = arg("verified_by", "");
+  const planSha256 = arg("plan_sha256", "");
+  if (planSha256 !== "" && !SHA256_HEX.test(planSha256)) throw new Error("evidence_log: plan_sha256 must be 64 lowercase hex digits or empty");
+  const root = rootOf(arg("working_directory", ""));
 
   const entry = {
     type: type as EvidenceType,
-    command,
+    command: capped(command, COMMAND_MAX_CHARS),
     exit_code: exitCode,
-    output_snippet: snippet.length > SNIPPET_MAX_CHARS ? Array.from(snippet).slice(0, SNIPPET_MAX_CHARS).join("") : snippet,
-    timestamp: timestamp(),
-    ...(verifiedBy && { verified_by: verifiedBy }),
+    output_snippet: capped(snippet, SNIPPET_MAX_CHARS),
+    timestamp: isoTimestamp(),
+    ...(verifiedBy && { verified_by: capped(verifiedBy, VERIFIED_BY_MAX_CHARS) }),
     ...(planSha256 && { plan_sha256: planSha256 }),
   };
   ensureStateDir(root);
@@ -105,7 +100,7 @@ async function evidenceLog(args: Record<string, unknown>): Promise<string> {
 }
 
 function evidenceRead(args: Record<string, unknown>): string {
-  const path = ledgerPath(rootOf(stringArg(args, "evidence_read", "working_directory", "")));
+  const path = ledgerPath(rootOf(stringArg(args, "working_directory", "", "evidence_read")));
   let entries: unknown;
   try {
     entries = JSON.parse(readText(path) ?? "{}").entries;

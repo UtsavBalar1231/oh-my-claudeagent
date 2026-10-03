@@ -4,6 +4,7 @@ import { basename, dirname, isAbsolute, join } from "node:path";
 import { isHookDisabled } from "../../src/core/kill-switch.ts";
 import { type Platform, samePath, toPlatform } from "../../src/core/path.ts";
 import { docPart, pack, type Part, parseRule, type Rule, rulePart } from "../../src/core/rules.ts";
+import { inputText } from "../../src/core/tool-input.ts";
 import { pluginRoot } from "../plugin-root.ts";
 import type { Handler } from "./registry.ts";
 
@@ -16,11 +17,6 @@ const indexes = new Map<string, { stamp: string; files: RuleFile[] }>();
 const statOf = (path: string) => statSync(path, { throwIfNoEntry: false });
 const isFile = (path: string): boolean => statOf(path)?.isFile() === true;
 const sha256 = (text: string): string => createHash("sha256").update(text).digest("hex");
-
-const filePathOf = (toolInput: unknown): string =>
-  typeof toolInput === "object" && toolInput !== null && "file_path" in toolInput && typeof toolInput.file_path === "string"
-    ? toolInput.file_path
-    : "";
 
 export function* upTo(platform: Platform, dir: string, root: string): Generator<string> {
   for (let current = dir; ; current = dirname(current)) {
@@ -103,7 +99,7 @@ function ruleGroups(fileName: string, root: string, injected: ReadonlySet<string
 export const handle: Handler = (payload, { root, session }) => {
   const tool = payload.tool_name;
   if ((tool !== "Read" && tool !== "Write" && tool !== "Edit") || isHookDisabled(process.env.OMCA_DISABLED_HOOKS, "context-injector")) return;
-  const filePath = filePathOf(payload.tool_input);
+  const filePath = inputText(payload.tool_input, "file_path");
   if (!isAbsolute(filePath) || !isFile(filePath)) return;
   const fileDir = dirname(filePath);
   const projectRoot = projectRootOf(fileDir, root);

@@ -197,6 +197,23 @@ describe("binary discovery", () => {
     const sg = fakeExec(dir, "sg", 'console.log("ast-grep 0.45.3");');
     expect(discoverBinary()).toBe(sg);
   });
+  test("discovery runs the binary's --version once per AST_GREP_BIN and PATH value", () => {
+    delete process.env.AST_GREP_BIN;
+    const counted = () => {
+      const dir = tempDir();
+      const counter = join(dir, "count");
+      const script = `import { appendFileSync } from "node:fs"; appendFileSync(${JSON.stringify(counter)}, "x"); console.log("ast-grep 1.0.0");`;
+      return { dir, binary: fakeExec(dir, "ast-grep", script), runs: () => (existsSync(counter) ? readFileSync(counter, "utf8") : "") };
+    };
+    const first = counted();
+    const second = counted();
+    setPath(first.dir);
+    expect([discoverBinary(), discoverBinary()]).toEqual([first.binary, first.binary]);
+    expect(first.runs()).toBe("x");
+    setPath(second.dir);
+    expect(discoverBinary()).toBe(second.binary);
+    expect([first.runs(), second.runs()]).toEqual(["x", "x"]);
+  });
 });
 
 describe("Windows shims", () => {
@@ -252,7 +269,7 @@ describe("timeout", () => {
     project();
     const dir = tempDir();
     process.env.AST_GREP_BIN = fakeExec(dir, "ast-grep", 'console.log("[]");');
-    expect((await run(["run"], { timeoutMs: 5_000 })).stdout.length).toBeGreaterThan(0);
+    expect(new TextDecoder().decode((await run(["run"], { timeoutMs: 5_000 })).stdout)).toBe("[]\n");
   });
 });
 
@@ -443,6 +460,24 @@ describe("ast_search", () => {
     const fake = fakeBinary([{ stdout: "[]" }]);
     await call("ast_search", { pattern: "$X", lang: "python", paths: [join(workspace, "src")] });
     expect(fake.argv(1).slice(-2)).toEqual(["--", "src"]);
+  });
+
+  test.skipIf(process.platform === "win32")("ast_search judges an existing path by its canonical spelling, so another spelling of a workspace path is accepted (skipped on Windows: creating a symlink needs a privilege)", async () => {
+    const workspace = project({ "src/a.py": "x = 1\n" });
+    const alias = join(tempDir(), "alias");
+    symlinkSync(join(workspace, "src"), alias, "dir");
+    const fake = fakeBinary([{ stdout: "[]" }]);
+    await call("ast_search", { pattern: "$X", lang: "python", paths: [alias] });
+    expect(fake.argv(1).slice(-2)).toEqual(["--", "src"]);
+  });
+
+  test.skipIf(process.platform === "win32")("ast_search falls back to the literal spelling only for a path that does not exist (skipped on Windows: creating a symlink needs a privilege)", async () => {
+    const workspace = project({ "src/a.py": "x = 1\n" });
+    const alias = join(tempDir(), "alias");
+    symlinkSync(join(workspace, "src"), alias, "dir");
+    expect(await failure(call("ast_search", { pattern: "$X", lang: "python", paths: [join(alias, "missing")] }))).toBe(
+      `Path escapes workspace: ${join(alias, "missing")}`,
+    );
   });
 
   test("ast_search accepts sibling git worktree", async () => {

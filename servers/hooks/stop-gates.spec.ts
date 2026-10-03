@@ -602,6 +602,14 @@ describe("drift-guard", () => {
     expect(await claim(run)).toEqual({});
   });
 
+  test("drift-guard: an untracked file over 1 MiB is not scanned, and one at the limit is", async () => {
+    const run = seeded();
+    write(run.root, "huge.log", `${UNFINISHED}\n${"x".repeat(1024 * 1024)}`);
+    expect(await claim(run)).toEqual({});
+    write(run.root, "limit.log", `${UNFINISHED}\n${"x".repeat(1024 * 1024 - UNFINISHED.length - 1)}`);
+    expect(await claim(run)).toEqual(drift(`limit.log:1  ${UNFINISHED}`));
+  });
+
   test("drift-guard: non-git directory fails open (allows Stop)", async () => {
     const run = session();
     write(run.root, "new.sh", `${UNFINISHED}\n`);

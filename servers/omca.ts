@@ -1,7 +1,8 @@
 #!/usr/bin/env bun
 import { readFileSync } from "node:fs";
 import { ensureStateDir, projectRoot } from "./io.ts";
-import { type Context, createDispatcher, INVALID_PARAMS, isObject, RpcError, type Handler, type Params } from "./jsonrpc.ts";
+import { isRecord } from "../src/core/tool-input.ts";
+import { type Context, createDispatcher, INVALID_PARAMS, RpcError, type Handler, type Params } from "./jsonrpc.ts";
 import { startWork } from "./lifecycle.ts";
 import { createProgress, type ToolContext } from "./progress.ts";
 import { tools as astTools } from "./tools/ast.ts";
@@ -75,7 +76,7 @@ const complete = { resultType: "complete" };
 const toolError = (text: string) => ({ content: [{ type: "text", text }], isError: true, ...complete });
 
 function rejectUnsupportedVersion(params: Params): void {
-  const requested = isObject(params._meta) ? params._meta[PROTOCOL_VERSION_META] : undefined;
+  const requested = isRecord(params._meta) ? params._meta[PROTOCOL_VERSION_META] : undefined;
   if (typeof requested !== "string" || SUPPORTED_PROTOCOLS.includes(requested)) return;
   throw new RpcError(UNSUPPORTED_PROTOCOL_VERSION, `Unsupported protocol version: ${requested}`, {
     supported: SUPPORTED_PROTOCOLS,
@@ -84,7 +85,7 @@ function rejectUnsupportedVersion(params: Params): void {
 }
 
 function progressFor(params: Params, { signal, notify }: Context) {
-  const token = isObject(params._meta) ? params._meta.progressToken : undefined;
+  const token = isRecord(params._meta) ? params._meta.progressToken : undefined;
   if (typeof token !== "string" && typeof token !== "number") return undefined;
   return createProgress({ token, signal, send: (update) => notify("notifications/progress", update) });
 }
@@ -93,7 +94,7 @@ async function callTool(params: Params, context: Context) {
   const tool = typeof params.name === "string" ? toolsByName.get(params.name) : undefined;
   if (!tool) throw new RpcError(INVALID_PARAMS, `Unknown tool: ${String(params.name)}`);
   const args = params.arguments ?? {};
-  if (!isObject(args)) return toolError(`${tool.name}: arguments must be an object`);
+  if (!isRecord(args)) return toolError(`${tool.name}: arguments must be an object`);
   const progress = progressFor(params, context);
   try {
     const text = await tool.call(args, { signal: context.signal, progress: progress?.report ?? (() => {}) });
@@ -119,7 +120,8 @@ const handlers: Record<string, Handler> = {
     if (typeof params.protocolVersion !== "string") {
       throw new RpcError(INVALID_PARAMS, "initialize: protocolVersion must be a string");
     }
-    return { protocolVersion: params.protocolVersion, capabilities, serverInfo, instructions: INSTRUCTIONS };
+    const protocolVersion = SUPPORTED_PROTOCOLS.includes(params.protocolVersion) ? params.protocolVersion : MODERN_PROTOCOL;
+    return { protocolVersion, capabilities, serverInfo, instructions: INSTRUCTIONS };
   },
   "notifications/initialized": () => undefined,
   ping: () => ({}),

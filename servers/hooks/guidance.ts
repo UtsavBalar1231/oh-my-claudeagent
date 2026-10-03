@@ -2,10 +2,11 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { resolveBoundPlan } from "../../src/core/boulder.ts";
 import { nextTaskLabel } from "../../src/core/checkboxes.ts";
+import { hasCode } from "../io.ts";
 import { pluginRoot } from "../plugin-root.ts";
 import type { Handler } from "./registry.ts";
 import type { Session } from "./session-state.ts";
-import { statusPath } from "./status-file.ts";
+import { registryPath, statusPath } from "./status-file.ts";
 
 let template: string | undefined;
 
@@ -14,18 +15,16 @@ export function guidanceTemplate(): string {
   return template;
 }
 
-const isMissing = (error: unknown): boolean => error instanceof Error && "code" in error && error.code === "ENOENT";
-
 type BoundPlan = { name: string; path: string; content: string };
 
 function readBoundPlan(root: string, sessionId: string): BoundPlan | undefined {
   try {
-    const registry: unknown = JSON.parse(readFileSync(join(root, ".omca", "state", "boulder.json"), "utf8"));
+    const registry: unknown = JSON.parse(readFileSync(registryPath(root), "utf8"));
     const plan = resolveBoundPlan(registry, sessionId, true);
     if (!("plan_name" in plan)) return undefined;
     return { name: plan.plan_name, path: plan.active_plan, content: readFileSync(plan.active_plan, "utf8") };
   } catch (error) {
-    if (!isMissing(error)) console.error("omca: guidance could not read this session's bound plan:", error);
+    if (!hasCode(error, "ENOENT")) console.error("omca: guidance could not read this session's bound plan:", error);
     return undefined;
   }
 }

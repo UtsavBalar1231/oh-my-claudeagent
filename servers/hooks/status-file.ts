@@ -1,21 +1,20 @@
 import { statSync } from "node:fs";
 import { join } from "node:path";
 import { ledgerCoversSlot } from "../../src/core/evidence.ts";
-import { isSafeId } from "../../src/core/session-id.ts";
-import { writeFileAtomic } from "../io.ts";
+import { BOULDER, LEDGER, statusPath as sessionStatusPath } from "../../src/core/omca-paths.ts";
+import { hasCode, writeFileAtomic } from "../io.ts";
 import type { Session } from "./session-state.ts";
 
-export { isSafeId };
-
 export const STAMP_INTERVAL_MS = 5_000;
-const LEDGER = join(".omca", "evidence", "verification-evidence.json");
 
 export function statusPath(root: string, sessionId: string): string {
-  if (!isSafeId(sessionId)) throw new Error(`unsafe session id in a state path: ${JSON.stringify(sessionId)}`);
-  return join(root, ".omca", "state", "session", `${sessionId}.json`);
+  const path = sessionStatusPath(root, sessionId);
+  if (path === undefined) throw new Error(`unsafe session id in a state path: ${JSON.stringify(sessionId)}`);
+  return join(path);
 }
 
 export const ledgerPath = (root: string): string => join(root, LEDGER);
+export const registryPath = (root: string): string => join(root, BOULDER);
 
 export const seconds = (ms: number): number => Math.floor(ms / 1000);
 
@@ -23,7 +22,7 @@ export function ledgerMtimeSeconds(root: string): number {
   try {
     return seconds(statSync(ledgerPath(root)).mtimeMs);
   } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") return 0;
+    if (hasCode(error, "ENOENT")) return 0;
     throw error;
   }
 }

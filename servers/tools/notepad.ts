@@ -1,8 +1,9 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { isWindowsSafeName } from "../../src/core/session-id.ts";
-import { ensureStateDir, projectRoot, withLock, writeFileAtomic } from "../io.ts";
+import { ensureStateDir, withLock, writeFileAtomic } from "../io.ts";
 import type { Tool } from "../omca.ts";
+import { isoTimestamp, rootOf, stringArg, WORKING_DIRECTORY } from "./args.ts";
 
 const SECTIONS = ["learnings", "issues", "decisions", "problems"] as const;
 type Section = (typeof SECTIONS)[number];
@@ -11,17 +12,10 @@ const PLAN_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const WARN_BYTES = 50 * 1024;
 const KEEP_LINES = 20;
 
-const WORKING_DIRECTORY = { type: "string", default: "", description: "Project root (auto-detected from git)" };
 const SECTION = { type: "string", enum: SECTIONS };
 
 const isDir = (path: string) => statSync(path, { throwIfNoEntry: false })?.isDirectory() ?? false;
 const isFile = (path: string) => statSync(path, { throwIfNoEntry: false })?.isFile() ?? false;
-
-function stringArg(args: Record<string, unknown>, name: string, fallback?: string): string {
-  const value = args[name] ?? fallback;
-  if (typeof value !== "string") throw new Error(`${name} must be a string`);
-  return value;
-}
 
 function toPlan(plan: string): string {
   if (!PLAN_NAME.test(plan) || !isWindowsSafeName(plan)) throw new Error(`plan_name must match ${PLAN_NAME.source}; got ${JSON.stringify(plan)}`);
@@ -34,7 +28,7 @@ function toSection(value: unknown): Section {
   return section;
 }
 
-const rootOf = (args: Record<string, unknown>) => projectRoot(stringArg(args, "working_directory", "") || process.cwd());
+const rootArg = (args: Record<string, unknown>) => rootOf(stringArg(args, "working_directory", ""));
 const notepadsOf = (root: string) => join(root, ".omca", "notepads");
 
 function sectionNames(dir: string): string {
@@ -75,13 +69,12 @@ export const tools: Tool[] = [
       const plan = toPlan(stringArg(args, "plan_name"));
       const section = toSection(args.section);
       const content = stringArg(args, "content");
-      const root = rootOf(args);
+      const root = rootArg(args);
       ensureStateDir(root);
       const path = join(notepadsOf(root), plan, `${section}.md`);
       const size = await withLock(`${path}.lock`, () => {
-        const timestamp = new Date().toISOString().replace(/\.\d+Z$/, "Z");
         const existing = existsSync(path) ? readFileSync(path, "utf8") : "";
-        const next = `${existing}\n## ${timestamp}\n\n${content}\n`;
+        const next = `${existing}\n## ${isoTimestamp()}\n\n${content}\n`;
         writeFileAtomic(path, next);
         return Buffer.byteLength(next);
       });
@@ -112,7 +105,7 @@ export const tools: Tool[] = [
     call: (args) => {
       const plan = toPlan(stringArg(args, "plan_name"));
       const section = args.section == null ? undefined : toSection(args.section);
-      const dir = join(notepadsOf(rootOf(args)), plan);
+      const dir = join(notepadsOf(rootArg(args)), plan);
       if (!isDir(dir)) return `No notepad found for plan: ${plan}`;
       const blocks = (section === undefined ? SECTIONS : [section]).flatMap((name) => {
         const path = join(dir, `${name}.md`);
@@ -137,7 +130,7 @@ export const tools: Tool[] = [
     _meta: { "anthropic/searchHint": "discover which plans have notepads and which sections exist" },
     call: (args) => {
       const plan = stringArg(args, "plan_name", "");
-      const notepads = notepadsOf(rootOf(args));
+      const notepads = notepadsOf(rootArg(args));
       if (plan !== "") {
         const dir = join(notepads, toPlan(plan));
         return isDir(dir) ? `Plan: ${plan}\nSections: ${sectionNames(dir)}` : `No notepad found for plan: ${plan}`;
@@ -171,7 +164,7 @@ export const tools: Tool[] = [
     call: async (args) => {
       const plan = toPlan(stringArg(args, "plan_name"));
       const section = toSection(args.section);
-      const path = join(notepadsOf(rootOf(args)), plan, `${section}.md`);
+      const path = join(notepadsOf(rootArg(args)), plan, `${section}.md`);
       if (!existsSync(path)) return `Section '${section}' not found for plan '${plan}'`;
       return withLock(`${path}.lock`, () => {
         const lines = readFileSync(path, "utf8").trim().split("\n");

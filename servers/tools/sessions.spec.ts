@@ -297,6 +297,26 @@ test.each(["no pointer here", "/srv/u/p/tool-results/abc.md", "/srv/u/p/tool-res
   },
 );
 
+test.each([
+  ["slash-separated segments", "a/".repeat(100_000)],
+  ["segments before a tool-results directory without a file", `${"a/".repeat(50_000)}tool-results`],
+  ["repeated saved-to labels with no path", "saved to: ".repeat(10_000)],
+])("a long text of %s is scanned in linear time and holds no spill pointer", (_name, text) => {
+  const started = performance.now();
+  expect(spillPointer(text)).toBeUndefined();
+  expect(performance.now() - started).toBeLessThan(1000);
+});
+
+test("a spill path after a long run of slashes is still found", () => {
+  const path = "/h/p/tool-results/abc.txt";
+  expect(spillPointer(`${"a/".repeat(50_000)} saved to: ${path}`)).toBe(path);
+});
+
+test("the earlier of a bare path and a saved-to path wins", () => {
+  expect(spillPointer("see /a/tool-results/x.txt, saved to: /b/tool-results/y.txt")).toBe("/a/tool-results/x.txt");
+  expect(spillPointer("saved to: /b c/tool-results/y.txt then /a/tool-results/x.txt")).toBe("/b c/tool-results/y.txt");
+});
+
 test("the inline pointer to a spilled result that is gone still matches", async () => {
   const path = join(projectDir, "sess-a", "tool-results", "swept.txt");
   transcript("sess-a.jsonl", turn("user", [toolResult(pointer(path, "needle in the spill"))]));

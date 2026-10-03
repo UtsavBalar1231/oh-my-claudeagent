@@ -1,5 +1,6 @@
 import { readdirSync, rmdirSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { hasCode } from "./io.ts";
 import { gcRegistry } from "./tools/boulder.ts";
 import { rotateLedger } from "./tools/evidence.ts";
 
@@ -11,7 +12,7 @@ function entriesOf(dir: string) {
   try {
     return readdirSync(dir, { withFileTypes: true });
   } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") return [];
+    if (hasCode(error, "ENOENT")) return [];
     throw error;
   }
 }

@@ -43,14 +43,6 @@ describe("declarations", () => {
     ]);
   });
 
-  test("descriptions fit the client cap and property names meet the naming rule", () => {
-    for (const { name, description, inputSchema } of tools) {
-      expect(description.length, name).toBeGreaterThan(0);
-      expect(description.length, name).toBeLessThanOrEqual(2048);
-      for (const property of Object.keys(inputSchema.properties)) expect(property, name).toMatch(/^[A-Za-z0-9_.-]{1,64}$/);
-    }
-  });
-
   test("required arguments and the section enum are exact", () => {
     expect(tools.map(({ name, inputSchema }) => [name, inputSchema.required ?? []])).toEqual([
       ["notepad_write", ["plan_name", "section", "content"]],

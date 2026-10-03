@@ -1,4 +1,5 @@
 import { isHookDisabled } from "../../src/core/kill-switch.ts";
+import { field, text } from "../../src/core/tool-input.ts";
 import type { Handler, Payload } from "./registry.ts";
 
 export const POOR_OUTPUT =
@@ -21,10 +22,6 @@ const MAX_TRANSITIONAL = 200;
 const TRANSITIONAL =
   /^(let me|now let me|i'll |good\.|now i|ok,? let me|checking|looking at|reading |searching|next,? |i need to|i should|let's |i want to|i'm going to|i will )/;
 
-const field = (value: unknown, key: string): unknown =>
-  typeof value === "object" && value !== null ? (value as Record<string, unknown>)[key] : undefined;
-const text = (value: unknown): string => (typeof value === "string" ? value : "");
-
 // The report travels in the SubagentHandback payload under auto mode; otherwise a completed Agent
 // result carries it, while a launch acknowledgement or a pointer at a hand-back carries none.
 function delivered(payload: Payload): { report: string; agentType: string } | undefined {
@@ -39,8 +36,7 @@ function delivered(payload: Payload): { report: string; agentType: string } | un
 }
 
 // A harness note can be prepended as one bracketed line; the report is what follows it.
-const withoutHarnessNote = (report: string): string =>
-  /^\[[\s\S]*\]/.test(report) ? (report.includes("\n") ? report.slice(report.indexOf("\n") + 1) : "") : report;
+const withoutHarnessNote = (report: string): string => report.replace(/^\[[^\n]*\](?:\n|$)/, "");
 
 function isPoor(report: string): boolean {
   if (report.trim() === "") return true;

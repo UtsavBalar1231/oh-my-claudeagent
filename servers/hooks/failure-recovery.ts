@@ -1,5 +1,6 @@
 import { breakerNote, bumpErrorCount } from "../../src/core/error-counts.ts";
 import { isHookDisabled } from "../../src/core/kill-switch.ts";
+import { field, text } from "../../src/core/tool-input.ts";
 import type { Handler, Payload } from "./registry.ts";
 
 type Recovery = { kind: string; error: string; message: (retry: number, breaker: string) => string | undefined };
@@ -62,9 +63,6 @@ const MCP_RULES: readonly Rule[] = [
 ];
 const MALFORMED_JSON = /(invalid JSON|malformed JSON|parse error|SyntaxError|Unexpected token|JSON\.parse)/i;
 
-const text = (value: unknown): string => (typeof value === "string" ? value : "");
-const field = (value: unknown, key: string): unknown =>
-  typeof value === "object" && value !== null ? (value as Record<string, unknown>)[key] : undefined;
 const adviceFor = (rules: readonly Rule[], error: string): string | undefined => rules.find(([pattern]) => pattern.test(error))?.[1];
 const withBreaker = (advice: string, breaker: string): string => [advice, breaker].filter(Boolean).join(" ");
 const detail = (error: string): string => error.slice(0, DETAIL_CHARS).replace(/\n+$/, "");

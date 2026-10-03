@@ -1,3 +1,5 @@
+import { isRecord } from "../src/core/tool-input.ts";
+
 const PARSE_ERROR = -32700;
 const INVALID_REQUEST = -32600;
 const METHOD_NOT_FOUND = -32601;
@@ -28,9 +30,6 @@ export class RpcError extends Error {
   }
 }
 
-export const isObject = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
-
 const isId = (value: unknown): value is Id =>
   typeof value === "string" || typeof value === "number" || value === null;
 
@@ -44,25 +43,25 @@ export function createDispatcher(
   const inflight = new Map<Id, AbortController>();
 
   async function dispatch(message: unknown): Promise<void> {
-    const id = isObject(message) ? message.id : undefined;
+    const id = isRecord(message) ? message.id : undefined;
     if (id !== undefined && !isId(id)) {
       reply(null, { error: { code: INVALID_REQUEST, message: "Invalid Request" } });
       return;
     }
-    if (!isObject(message) || message.jsonrpc !== "2.0" || typeof message.method !== "string") {
+    if (!isRecord(message) || message.jsonrpc !== "2.0" || typeof message.method !== "string") {
       reply(id ?? null, { error: { code: INVALID_REQUEST, message: "Invalid Request" } });
       return;
     }
     const { method } = message;
     const params = message.params ?? {};
     if (id === undefined && method === CANCELLED) {
-      if (isObject(params) && isId(params.requestId)) inflight.get(params.requestId)?.abort();
+      if (isRecord(params) && isId(params.requestId)) inflight.get(params.requestId)?.abort();
       return;
     }
     const controller = new AbortController();
     if (id !== undefined) inflight.set(id, controller);
     try {
-      if (!isObject(params)) throw new RpcError(INVALID_PARAMS, `${method}: params must be an object`);
+      if (!isRecord(params)) throw new RpcError(INVALID_PARAMS, `${method}: params must be an object`);
       const handler = handlers[method];
       if (!handler) throw new RpcError(METHOD_NOT_FOUND, `Method not found: ${method}`);
       const result = await handler(params, { signal: controller.signal, notify });

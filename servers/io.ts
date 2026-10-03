@@ -34,7 +34,10 @@ const LOCK_FORMAT = /^([1-9]\d*) (\d+) \S+(?: (\S+))?$/;
 const errorCode = (error: unknown): string | undefined =>
   error instanceof Error && "code" in error && typeof error.code === "string" ? error.code : undefined;
 
-const hasCode = (error: unknown, code: string): boolean => errorCode(error) === code;
+export const hasCode = (error: unknown, code: string): boolean => errorCode(error) === code;
+
+/** True when the path, or a directory on the way to it, does not exist. */
+export const isMissing = (error: unknown): boolean => hasCode(error, "ENOENT") || hasCode(error, "ENOTDIR");
 
 const isIn = (codes: ReadonlySet<string>, error: unknown): boolean => {
   const code = errorCode(error);

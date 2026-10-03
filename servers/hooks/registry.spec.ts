@@ -64,24 +64,19 @@ describe("registry", () => {
   });
 });
 
-describe("error isolation", () => {
-  test("a throwing PreToolUse handler yields the deny JSON, which wins over context", async () => {
+describe("event names that exist on every object", () => {
+  test.each(["constructor", "__proto__", "toString", "hasOwnProperty"])("%s has no handlers, answers {} and is named on stderr", async (event) => {
     const errors = quietErrors();
     try {
-      const registry = { PreToolUse: [["ctx", context("PreToolUse", "a")], ["comment-gate", boom]] as const };
-      expect(await dispatch({ event: "PreToolUse" }, project(), NOW, registry)).toEqual({
-        hookSpecificOutput: {
-          hookEventName: "PreToolUse",
-          permissionDecision: "deny",
-          permissionDecisionReason: "OMCA's comment-gate check failed, so this call is denied: bad pattern",
-        },
-      });
-      expect(errors.mock.calls[0]?.[0]).toBe("omca: PreToolUse handler comment-gate failed:");
+      expect(await dispatch({ event }, project(), NOW)).toEqual({});
+      expect(errors.mock.calls).toEqual([[`omca: omca_hook has no handlers for event ${JSON.stringify(event)}`]]);
     } finally {
       errors.mockRestore();
     }
   });
+});
 
+describe("error isolation", () => {
   test("a throwing PermissionRequest handler yields {}, so the dialog shows and nothing is allowed", async () => {
     const errors = quietErrors();
     try {

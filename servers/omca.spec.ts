@@ -148,6 +148,17 @@ describe("handshake", () => {
     expect((await server.request("ping")).result).toEqual({});
   });
 
+  test.each([
+    [MODERN, MODERN],
+    [FALLBACK, FALLBACK],
+    ["2099-01-01", MODERN],
+    ["2024-11-05", MODERN],
+    ["", MODERN],
+  ])("initialize naming %p is answered with %p", async (requested, answered) => {
+    const reply = await startServer().request("initialize", { protocolVersion: requested, capabilities: {}, clientInfo: { name: "spec", version: "0" } });
+    expect((reply.result as { protocolVersion: string }).protocolVersion).toBe(answered);
+  });
+
   test("initialize without a protocol version is an invalid-params error", async () => {
     const server = startServer();
     expect((await server.request("initialize", {})).error).toEqual({

@@ -1,11 +1,12 @@
 import { createReadStream, existsSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { projectRoot } from "../io.ts";
-import { isObject } from "../jsonrpc.ts";
+import { isRecord } from "../../src/core/tool-input.ts";
+import { isMissing } from "../io.ts";
 import type { Tool } from "../omca.ts";
 import { IDLE_CONTEXT } from "../progress.ts";
-import { integerArg, isMissing, readLines, stringArg } from "./filesystem.ts";
+import { integerArg, isoTimestamp, rootOf, stringArg } from "./args.ts";
+import { readLines } from "./filesystem.ts";
 
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 50;
@@ -17,7 +18,12 @@ const MAX_RESULT_CHARS = 100_000;
 // its body, so the same text lives in two places.
 // The client names the path after "saved to: ", and it may hold spaces; any other mention must be one token.
 const SPILL_TAIL = String.raw`[\\/]tool-results[\\/][^\s\\/]+\.txt`;
-const SPILL_POINTER = new RegExp(String.raw`saved to: ([^\r\n]*?${SPILL_TAIL})|((?:[A-Za-z]:[\\/]|\\\\|/)\S+${SPILL_TAIL})`);
+const SAVED_TO = "saved to: ";
+const SPILL_DIRECTORY = "tool-results";
+const SAVED_TO_POINTER = new RegExp(String.raw`saved to: ([^\r\n]*?${SPILL_TAIL})`, "y");
+const PATH_PREFIX = /[A-Za-z]:[\\/]|\\\\|\//;
+const PATH_POINTER = new RegExp(String.raw`(?:[A-Za-z]:[\\/]|\\\\|/)\S+${SPILL_TAIL}`, "y");
+const LINE_BREAK = /[\r\n]/g;
 
 type Match = { file: string; timestamp: string; role: string; excerpt: string };
 type Source = { path: string; label: string; mtimeMs: number; sidecar: boolean };
@@ -61,21 +67,63 @@ function textsOf(type: string, content: unknown): Array<[string, string]> {
   if (typeof content === "string") return content === "" ? [] : [[type, content]];
   if (!Array.isArray(content)) return [];
   return content.flatMap((block): Array<[string, string]> => {
-    if (!isObject(block)) return [];
+    if (!isRecord(block)) return [];
     if (block.type === "text") return typeof block.text === "string" && block.text !== "" ? [[type, block.text]] : [];
     if (block.type === "tool_use") return [["tool", JSON.stringify(block.input ?? {})]];
     if (block.type !== "tool_result") return [];
     if (typeof block.content === "string") return [["tool", block.content]];
     if (!Array.isArray(block.content)) return [];
     return block.content.flatMap((part): Array<[string, string]> =>
-      isObject(part) && part.type === "text" ? [["tool", typeof part.text === "string" ? part.text : ""]] : [],
+      isRecord(part) && part.type === "text" ? [["tool", typeof part.text === "string" ? part.text : ""]] : [],
     );
   });
 }
 
+type Pointer = { start: number; path: string };
+
+const isSpace = (char: string | undefined): boolean => char !== undefined && /\s/.test(char);
+
+// Within one line only the first "saved to: " can match, because a later one sees a suffix of the
+// text the first one already searched.
+function savedToPointer(text: string): Pointer | undefined {
+  let at = text.indexOf(SAVED_TO);
+  while (at !== -1) {
+    SAVED_TO_POINTER.lastIndex = at;
+    const found = SAVED_TO_POINTER.exec(text)?.[1];
+    if (found !== undefined) return { start: at, path: found };
+    LINE_BREAK.lastIndex = at;
+    const lineEnd = LINE_BREAK.exec(text);
+    if (lineEnd === null) return undefined;
+    at = text.indexOf(SAVED_TO, lineEnd.index);
+  }
+  return undefined;
+}
+
+// Within one whitespace-delimited token only the first path prefix can match, because a later prefix
+// ends no earlier and leaves no more room before the directory.
+function pathPointer(text: string): Pointer | undefined {
+  let at = text.indexOf(SPILL_DIRECTORY);
+  while (at !== -1) {
+    let start = at;
+    while (start > 0 && !isSpace(text[start - 1])) start--;
+    let end = at;
+    while (end < text.length && !isSpace(text[end])) end++;
+    const prefix = text.slice(start, end).search(PATH_PREFIX);
+    if (prefix !== -1) {
+      PATH_POINTER.lastIndex = start + prefix;
+      const found = PATH_POINTER.exec(text)?.[0];
+      if (found !== undefined) return { start: start + prefix, path: found };
+    }
+    at = text.indexOf(SPILL_DIRECTORY, end);
+  }
+  return undefined;
+}
+
 export function spillPointer(text: string): string | undefined {
-  const found = SPILL_POINTER.exec(text);
-  return found?.[1] ?? found?.[2];
+  const saved = savedToPointer(text);
+  const bare = pathPointer(text);
+  if (saved === undefined || bare === undefined) return (saved ?? bare)?.path;
+  return (saved.start < bare.start ? saved : bare).path;
 }
 
 function isSpilledCopy(text: string, spilled: ReadonlySet<string>): boolean {
@@ -101,7 +149,7 @@ async function searchTranscript(
     } catch {
       continue;
     }
-    if (!isObject(record) || (record.type !== "user" && record.type !== "assistant") || !isObject(record.message)) continue;
+    if (!isRecord(record) || (record.type !== "user" && record.type !== "assistant") || !isRecord(record.message)) continue;
     const timestamp = typeof record.timestamp === "string" ? record.timestamp : "";
     const turn: Match[] = [];
     for (const [textRole, text] of textsOf(record.type, record.message.content)) {
@@ -124,7 +172,7 @@ async function searchSidecar(source: Source, query: string, signal: AbortSignal)
   const toMatch = (text: string, hit: number): Match[] => [
     {
       file: source.label,
-      timestamp: new Date(source.mtimeMs).toISOString().replace(/\.\d{3}Z$/, "Z"),
+      timestamp: isoTimestamp(new Date(source.mtimeMs)),
       role: "tool",
       excerpt: excerptAround(text, hit, query.length),
     },
@@ -144,7 +192,7 @@ async function searchSidecar(source: Source, query: string, signal: AbortSignal)
 
 async function sessionSearch(args: Record<string, unknown>, { signal, progress } = IDLE_CONTEXT): Promise<string> {
   const query = stringArg(args, "query");
-  const root = projectRoot(stringArg(args, "project_path", "") || process.cwd());
+  const root = rootOf(stringArg(args, "project_path", ""));
   const requestedRole = stringArg(args, "role", "");
   const role = ROLES.includes(requestedRole) ? requestedRole : "";
   const limit = Math.max(1, Math.min(integerArg(args, "limit", DEFAULT_LIMIT), MAX_LIMIT));

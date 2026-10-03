@@ -392,7 +392,7 @@ describe("other calls and failures", () => {
     expect(await dispatch(payload, root, NOW)).toEqual(blockedForAttribution(ATTRIBUTION));
   });
 
-  test("a failure inside the gate lets the write pass and is logged", async () => {
+  test("a failure inside the gate fails open: the write passes and the registry logs it", async () => {
     inDenyMode();
     const session = touchSession(sessionId);
     Object.defineProperty(session, "commentGate", {
@@ -401,7 +401,7 @@ describe("other calls and failures", () => {
       },
     });
     expect(await write("/repo/a.py", "# AI-generated helper\nx = 1")).toEqual({});
-    expect(errors.mock.calls[0]?.[0]).toBe("omca: comment-gate failed, so the write passes:");
+    expect(errors.mock.calls[0]?.[0]).toBe("omca: PreToolUse handler comment-gate failed:");
     expect(String(errors.mock.calls[0]?.[1])).toContain("state is unreadable");
   });
 });

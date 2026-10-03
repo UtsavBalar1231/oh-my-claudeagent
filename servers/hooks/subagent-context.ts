@@ -1,8 +1,9 @@
 import { readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
 import { resolveBoundPlan } from "../../src/core/boulder.ts";
 import { isHookDisabled } from "../../src/core/kill-switch.ts";
+import { hasCode } from "../io.ts";
 import type { Handler } from "./registry.ts";
+import { registryPath } from "./status-file.ts";
 
 const HANDOFF = "emit a '## BLOCKING QUESTIONS' block at the end of your final response (Q1., Q2., lettered options A/B/C, Recommended: line) and return.";
 const AUTONOMOUS = `AskUserQuestion is not available here. Make autonomous decisions when possible; if you need user input, ${HANDOFF} The orchestrator will relay.`;
@@ -31,15 +32,13 @@ const NEVER_STUB =
 const section = (title: string, text: string): string => `\n─── ${title} ${"─".repeat(37)}\n${text}`;
 const lines = (items: readonly string[]): string => items.join("\n");
 
-const isMissing = (error: unknown): boolean => error instanceof Error && "code" in error && error.code === "ENOENT";
-
 function planLines(root: string, sessionId: unknown): string[] {
   if (typeof sessionId !== "string") return [];
   let plan: ReturnType<typeof resolveBoundPlan>;
   try {
-    plan = resolveBoundPlan(JSON.parse(readFileSync(join(root, ".omca", "state", "boulder.json"), "utf8")), sessionId, true);
+    plan = resolveBoundPlan(JSON.parse(readFileSync(registryPath(root), "utf8")), sessionId, true);
   } catch (error) {
-    if (!isMissing(error)) console.error("omca: subagent-context could not read the plan registry:", error);
+    if (!hasCode(error, "ENOENT")) console.error("omca: subagent-context could not read the plan registry:", error);
     return [];
   }
   if (!("plan_name" in plan)) return [];

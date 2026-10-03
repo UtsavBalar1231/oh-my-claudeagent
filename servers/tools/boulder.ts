@@ -4,8 +4,10 @@ import { join } from "node:path";
 import { asRegistry, type PlanEntry, type Registry, resolveBoundPlan } from "../../src/core/boulder.ts";
 import { checkboxStates, nextTaskLabel, planIsComplete } from "../../src/core/checkboxes.ts";
 import { latestSessionId } from "../hooks/session-state.ts";
-import { ensureStateDir, projectRoot, tryWithLockSync, withLock, writeFileAtomic } from "../io.ts";
+import { registryPath } from "../hooks/status-file.ts";
+import { ensureStateDir, hasCode, tryWithLockSync, withLock, writeFileAtomic } from "../io.ts";
 import type { Tool } from "../omca.ts";
+import { isoTimestamp, rootOf, stringReader, WORKING_DIRECTORY } from "./args.ts";
 
 export const GC_MAX_AGE_SECONDS = 7 * 24 * 3600;
 const ISO_SECONDS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
@@ -16,27 +18,16 @@ const bound = new Map<string, Set<string>>();
 /** Project root to the session ids `boulder_write` bound there in this process, for the exit handler to unbind. */
 export const boundSessionsByRoot: ReadonlyMap<string, ReadonlySet<string>> = bound;
 
-const WORKING_DIRECTORY = { type: "string", default: "", description: "Project root (auto-detected from git)" };
-
-function stringArg(args: Record<string, unknown>, tool: string, name: string, fallback?: string): string {
-  const value = args[name];
-  if (value === undefined && fallback !== undefined) return fallback;
-  if (typeof value !== "string") throw new Error(`${tool}: ${name} must be a string`);
-  return value;
-}
-
 const sessionIdOr = (sessionId: string): string =>
   sessionId || (latestSessionId() ?? process.env.CLAUDE_CODE_SESSION_ID ?? "");
 
-const rootOf = (workingDirectory: string): string => projectRoot(workingDirectory || process.cwd());
-const registryPath = (root: string): string => join(root, ".omca", "state", "boulder.json");
 
 function readRaw(path: string): unknown {
   let text: string;
   try {
     text = readFileSync(path, "utf8");
   } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") return {};
+    if (hasCode(error, "ENOENT")) return {};
     throw error;
   }
   try {
@@ -140,12 +131,13 @@ const withKey = <T>(record: Record<string, T>, key: string, value: T): Record<st
   Object.fromEntries([...Object.entries(record), [key, value]]);
 
 async function boulderWrite(args: Record<string, unknown>): Promise<string> {
-  const activePlan = stringArg(args, "boulder_write", "active_plan");
-  const planName = stringArg(args, "boulder_write", "plan_name");
-  const sessionId = sessionIdOr(stringArg(args, "boulder_write", "session_id"));
-  const agent = stringArg(args, "boulder_write", "agent", "sisyphus");
-  const worktreePath = stringArg(args, "boulder_write", "worktree_path", "");
-  const root = rootOf(stringArg(args, "boulder_write", "working_directory", ""));
+  const arg = stringReader(args, "boulder_write");
+  const activePlan = arg("active_plan");
+  const planName = arg("plan_name");
+  const sessionId = sessionIdOr(arg("session_id"));
+  const agent = arg("agent", "sisyphus");
+  const worktreePath = arg("worktree_path", "");
+  const root = rootOf(arg("working_directory", ""));
   const path = join(ensureStateDir(root), "boulder.json");
 
   const sessions = await withLock(`${path}.lock`, () => {
@@ -156,7 +148,7 @@ async function boulderWrite(args: Record<string, unknown>): Promise<string> {
     const worktree = worktreePath || existing.worktree_path || "";
     const entry: PlanEntry = {
       active_plan: activePlan,
-      started_at: existing.started_at || new Date().toISOString().replace(/\.\d{3}Z$/, "Z"),
+      started_at: existing.started_at || isoTimestamp(),
       session_ids: sessionIds,
       agent: agent || existing.agent || "sisyphus",
       ...(worktree && { worktree_path: worktree }),
@@ -174,10 +166,11 @@ async function boulderWrite(args: Record<string, unknown>): Promise<string> {
 }
 
 function boulderProgress(args: Record<string, unknown>): string {
-  let planPath = stringArg(args, "boulder_progress", "plan_path", "");
-  const planName = stringArg(args, "boulder_progress", "plan_name", "");
-  const sessionId = stringArg(args, "boulder_progress", "session_id", "");
-  const workingDirectory = stringArg(args, "boulder_progress", "working_directory", "");
+  const arg = stringReader(args, "boulder_progress");
+  let planPath = arg("plan_path", "");
+  const planName = arg("plan_name", "");
+  const sessionId = arg("session_id", "");
+  const workingDirectory = arg("working_directory", "");
   if (!planPath) {
     const raw = readRaw(registryPath(rootOf(workingDirectory)));
     if (planName) {
@@ -193,7 +186,7 @@ function boulderProgress(args: Record<string, unknown>): string {
   try {
     bytes = readFileSync(planPath);
   } catch (error) {
-    if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
+    if (!hasCode(error, "ENOENT")) throw error;
     const missing = { error: true, plan_missing: true, plan_path: planPath, message: `Plan file not found: ${planPath}.` };
     return JSON.stringify(missing, null, 2);
   }

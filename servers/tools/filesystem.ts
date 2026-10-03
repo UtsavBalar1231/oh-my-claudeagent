@@ -2,7 +2,9 @@ import { appendFileSync, closeSync, createReadStream, mkdirSync, openSync, readS
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { expandTilde, normalizePath, type Platform, toPlatform } from "../../src/core/path.ts";
+import { isMissing, projectRoot } from "../io.ts";
 import type { Tool } from "../omca.ts";
+import { type Args, integerArg, isoTimestamp, stringArg } from "./args.ts";
 
 const DEFAULT_LIMIT = 5000;
 const MAX_UNLIMITED_BYTES = 3 * 1024 * 1024;
@@ -14,40 +16,48 @@ const MAX_LINE_CHARS = 2000;
 const MAX_RESULT_CHARS = 200_000;
 const AUDIT_LOG = join(".omca", "logs", "file-access.jsonl");
 const PLATFORM = toPlatform(process.platform);
-const SENSITIVE_PATH = /\/\.(?:ssh|gnupg|aws)\/|\/\.env(?:$|\.)|\/(?:credentials|id_rsa|id_ed25519)|secret|^\/etc\/g?shadow$/;
-const SENSITIVE_PATH_ANY_CASE = new RegExp(SENSITIVE_PATH.source, "i");
+const SENSITIVE_PATH = /\/\.(?:ssh|gnupg|aws)\/|\/\.env(?:$|\.)|\/(?:credentials|id_rsa|id_ed25519)|secret|^\/etc\/g?shadow$/i;
 
-type Args = Record<string, unknown>;
 type Decoder = { decode(chunk?: Buffer, options?: { stream: boolean }): string };
 
 const LATIN1: Decoder = { decode: (chunk) => chunk?.toString("latin1") ?? "" };
 
-export function stringArg(args: Args, name: string, fallback?: string): string {
-  const value = args[name] ?? fallback;
-  if (typeof value !== "string") throw new Error(`${name} must be a string`);
-  return value;
-}
-
-export function integerArg(args: Args, name: string, fallback: number): number {
-  const value = args[name] ?? fallback;
-  if (typeof value !== "number" || !Number.isInteger(value)) throw new Error(`${name} must be an integer`);
-  return value;
-}
-
-export const isMissing = (error: unknown): boolean =>
-  error instanceof Error && "code" in error && (error.code === "ENOENT" || error.code === "ENOTDIR");
-
-/** Yields the lines of a file without holding more than one decoded chunk and the unfinished line. */
-export async function* readLines(path: string, decoder: Decoder): AsyncGenerator<string> {
-  const withoutCr = (line: string) => (line.endsWith("\r") ? line.slice(0, -1) : line);
-  let pending = "";
+/**
+ * Yields the lines of a file without holding more than one decoded chunk and the unfinished line.
+ * With `maxLineChars` a longer line is cut there while it streams, and carries a marker naming the
+ * characters dropped.
+ */
+export async function* readLines(path: string, decoder: Decoder, maxLineChars = Number.POSITIVE_INFINITY): AsyncGenerator<string> {
+  let kept = "";
+  let dropped = 0;
+  let last = "";
+  const add = (piece: string): void => {
+    if (piece === "") return;
+    last = piece.slice(-1);
+    const room = maxLineChars - kept.length;
+    kept += piece.slice(0, room);
+    dropped += Math.max(0, piece.length - room);
+  };
+  const finish = (): string => {
+    let line = kept;
+    let more = dropped;
+    if (last === "\r") {
+      if (more > 0) more--;
+      else line = line.slice(0, -1);
+    }
+    kept = "";
+    dropped = 0;
+    last = "";
+    return more > 0 ? `${line}... [line truncated, ${more} more chars]` : line;
+  };
   for await (const chunk of createReadStream(path)) {
-    const lines = (pending + decoder.decode(chunk, { stream: true })).split("\n");
-    pending = lines.pop() ?? "";
-    for (const line of lines) yield withoutCr(line);
+    for (const [index, part] of decoder.decode(chunk, { stream: true }).split("\n").entries()) {
+      if (index > 0) yield finish();
+      add(part);
+    }
   }
-  pending += decoder.decode();
-  if (pending !== "") yield withoutCr(pending);
+  add(decoder.decode());
+  if (last !== "") yield finish();
 }
 
 function humanSize(bytes: number): string {
@@ -64,10 +74,9 @@ function humanSize(bytes: number): string {
 
 function audit(path: string, allowed: boolean): void {
   try {
-    const log = join(process.cwd(), AUDIT_LOG);
+    const log = join(projectRoot(process.cwd()), AUDIT_LOG);
     mkdirSync(dirname(log), { recursive: true });
-    const timestamp = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
-    appendFileSync(log, `${JSON.stringify({ path, allowed, timestamp })}\n`);
+    appendFileSync(log, `${JSON.stringify({ path, allowed, timestamp: isoTimestamp() })}\n`);
   } catch (error) {
     console.error("omca: file_read audit entry not written:", error);
   }
@@ -91,7 +100,7 @@ const withoutWindowsAliases = (path: string): string => path.replace(/(?<=[^/:])
 export function isSensitivePath(platform: Platform, path: string): boolean {
   const posix = normalizePath(platform, path);
   const checked = platform === "win32" ? withoutWindowsAliases(posix) : posix;
-  return (platform === "linux" ? SENSITIVE_PATH : SENSITIVE_PATH_ANY_CASE).test(checked);
+  return SENSITIVE_PATH.test(checked);
 }
 
 /** The resolved file and its size, or the plain-text reason the read is refused. */
@@ -117,11 +126,8 @@ function inspect(path: string, unlimited: boolean): { file: string; size: number
 async function collectWindow(file: string, decoder: Decoder, offset: number, limit: number) {
   const window: string[] = [];
   let total = 0;
-  for await (const line of readLines(file, decoder)) {
-    if (total >= offset && (limit <= 0 || window.length < limit)) {
-      const dropped = line.length - MAX_LINE_CHARS;
-      window.push(dropped > 0 ? `${line.slice(0, MAX_LINE_CHARS)}... [line truncated, ${dropped} more chars]` : line);
-    }
+  for await (const line of readLines(file, decoder, MAX_LINE_CHARS)) {
+    if (total >= offset && (limit <= 0 || window.length < limit)) window.push(line);
     total++;
   }
   return { window, total };

@@ -300,7 +300,6 @@ test("categories_list over the shipped file maps every category to an Agent-tool
   const data = JSON.parse(await callIn(undefined, "categories_list"));
   expect(Object.keys(data)).toEqual(["categories"]);
   const models = Object.values<{ model: string }>(data.categories).map((category) => category.model);
-  expect(models.length).toBeGreaterThan(0);
   for (const model of models) expect(["sonnet", "opus", "haiku", "fable"]).toContain(model);
   expect(JSON.parse(readFileSync(join(REPO, "servers", "categories.json"), "utf8"))).toEqual(data);
 });

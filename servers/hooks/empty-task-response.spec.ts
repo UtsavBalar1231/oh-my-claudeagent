@@ -120,6 +120,17 @@ describe("prepended harness note", () => {
   });
 });
 
+describe("a report whose lines start with a bracket", () => {
+  test("empty-task-response: numbered findings are the report, not a harness note", async () => {
+    expect(await handback("[1] parser lives in src/a.ts\n[2] guard lives in src/b.ts", "general-purpose")).toEqual({});
+  });
+
+  test("empty-task-response: a bracketed first line is one harness note whatever the later lines hold", async () => {
+    const report = "[FILES: src/a.ts, src/b.ts]\nANSWER: the guard lives in src/b.ts and the parser in src/a.ts\nNEXT STEPS: none";
+    expect(await handback(report, "oh-my-claudeagent:explore")).toEqual(advisory("explore", "FILES:"));
+  });
+});
+
 describe("a completed Agent result carries the report in content[].text", () => {
   test("empty-task-response: completed Agent result without hand-back is still checked", async () => {
     expect(await agentResult({ status: "completed", content: [{ type: "text", text: UNSTRUCTURED }] })).toEqual(advisory("executor", "STATUS: CHANGES: EVIDENCE:"));

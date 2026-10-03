@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { KEEP_ENTRIES, rotateLedger, SNIPPET_MAX_CHARS, tools } from "./evidence.ts";
+import { COMMAND_MAX_CHARS, KEEP_ENTRIES, rotateLedger, SNIPPET_MAX_CHARS, tools, VERIFIED_BY_MAX_CHARS } from "./evidence.ts";
 
 const SERVER = join(import.meta.dir, "..", "omca.ts");
 const MODULE = join(import.meta.dir, "evidence.ts");
@@ -120,6 +120,15 @@ describe("evidence_log", () => {
     expect(astral.output_snippet).toBe("😀".repeat(SNIPPET_MAX_CHARS));
   });
 
+  test("evidence_log truncates command at 2,000 characters and verified_by at 200", async () => {
+    const root = project();
+    await log(root, { command: "c".repeat(5000), verified_by: "v".repeat(500) });
+    await log(root, { command: "😀".repeat(3000), verified_by: "😀".repeat(300) });
+    const [ascii, astral] = entries(root);
+    expect([ascii.command, ascii.verified_by]).toEqual(["c".repeat(COMMAND_MAX_CHARS), "v".repeat(VERIFIED_BY_MAX_CHARS)]);
+    expect([astral.command, astral.verified_by]).toEqual(["😀".repeat(COMMAND_MAX_CHARS), "😀".repeat(VERIFIED_BY_MAX_CHARS)]);
+  });
+
   test("evidence_log keeps verified_by when given and omits it when empty", async () => {
     const root = project();
     await log(root, { verified_by: "executor" });
@@ -135,6 +144,19 @@ describe("evidence_log", () => {
     const [stored] = entries(root);
     expect(Object.keys(stored)).toEqual(["type", "command", "exit_code", "output_snippet", "timestamp", "verified_by", "plan_sha256"]);
     expect(stored.plan_sha256).toBe(PLAN_SHA);
+  });
+
+  test.each([
+    ["a short digest", "deadbeef"],
+    ["an uppercase digest", "DEADBEEF".repeat(8)],
+    ["a 65-digit digest", `${PLAN_SHA}0`],
+    ["a 10,000-character value", "x".repeat(10_000)],
+  ])("evidence_log refuses %s as plan_sha256", async (_name, planSha256) => {
+    const root = project();
+    await expect(log(root, { evidence_type: "final_verification", plan_sha256: planSha256 })).rejects.toThrow(
+      "evidence_log: plan_sha256 must be 64 lowercase hex digits or empty",
+    );
+    expect(existsSync(ledgerFile(root))).toBe(false);
   });
 
   test("evidence_log without plan_sha256, or with an empty one, omits the key", async () => {

@@ -8,16 +8,12 @@ export const handle: Handler = (payload, { session }) => {
   const tool = inputText(payload, "tool_name");
   const mode = commentGateMode(process.env.OMCA_COMMENT_GATE);
   if ((tool !== "Write" && tool !== "Edit") || mode === "off" || isHookDisabled(process.env.OMCA_DISABLED_HOOKS, "comment-gate")) return;
-  try {
-    const slot = session === undefined ? undefined : (session.commentGate ??= new Map());
-    const verdict = judgeWrite(mode, payload.tool_input, slot);
-    if (verdict === undefined) return;
-    if (verdict.kind === "deny") return preToolUseDeny(verdict.reason);
-    if (verdict.wouldDeny !== undefined) {
-      console.error(`omca: comment-gate would deny (${verdict.wouldDeny}) ${inputText(payload.tool_input, "file_path")}`);
-    }
-    return { hookSpecificOutput: { hookEventName: "PreToolUse", additionalContext: verdict.text } };
-  } catch (error) {
-    console.error("omca: comment-gate failed, so the write passes:", error);
+  const slot = session === undefined ? undefined : (session.commentGate ??= new Map());
+  const verdict = judgeWrite(mode, payload.tool_input, slot);
+  if (verdict === undefined) return;
+  if (verdict.kind === "deny") return preToolUseDeny(verdict.reason);
+  if (verdict.wouldDeny !== undefined) {
+    console.error(`omca: comment-gate would deny (${verdict.wouldDeny}) ${inputText(payload.tool_input, "file_path")}`);
   }
+  return { hookSpecificOutput: { hookEventName: "PreToolUse", additionalContext: verdict.text } };
 };

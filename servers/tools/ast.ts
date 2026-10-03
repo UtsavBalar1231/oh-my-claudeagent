@@ -1,7 +1,9 @@
 import { existsSync, realpathSync, statSync } from "node:fs";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { hasCode } from "../io.ts";
 import type { Tool } from "../omca.ts";
 import { IDLE_CONTEXT, type Progress } from "../progress.ts";
+import { type Args, stringArg } from "./args.ts";
 
 const LANGUAGES = [
   "bash",
@@ -103,7 +105,6 @@ const INSTALL_HINT = [
 
 const WINDOWS_SHIM = /\.(cmd|bat|ps1)$/i;
 
-type Args = Record<string, unknown>;
 type Match = {
   file?: string;
   lines?: string;
@@ -134,7 +135,16 @@ export function resolveNative(path: string, platform: NodeJS.Platform = process.
   );
 }
 
+let discovered: { key: string; binary: string } | undefined;
+
+/** The binary for the current $AST_GREP_BIN and PATH, found once per pair of values. A failed search is not remembered. */
 export function discoverBinary(): string {
+  const key = `${process.env.AST_GREP_BIN ?? ""}\0${process.env.PATH ?? ""}`;
+  if (discovered?.key !== key) discovered = { key, binary: findBinary() };
+  return discovered.binary;
+}
+
+function findBinary(): string {
   const path = process.env.PATH ?? "";
   const configured = process.env.AST_GREP_BIN;
   if (configured) {
@@ -216,7 +226,7 @@ function workspace(): string {
   const configured = ["CLAUDE_PROJECT_DIR", "CLAUDE_PROJECT_ROOT", "HOOK_PROJECT_ROOT"]
     .map((name) => process.env[name])
     .find(Boolean);
-  return realpathSync(configured ?? process.cwd());
+  return realpathSync.native(configured ?? process.cwd());
 }
 
 function within(root: string, candidate: string): boolean {
@@ -239,9 +249,9 @@ export function gitWorktreeRoots(dir: string): string[] {
       .filter((line) => line.startsWith("worktree "))
       .map((line) => line.slice("worktree ".length))
       .filter((root) => existsSync(root))
-      .map((root) => realpathSync(root));
+      .map((root) => realpathSync.native(root));
   } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") return [];
+    if (hasCode(error, "ENOENT")) return [];
     throw error;
   }
 }
@@ -249,7 +259,9 @@ export function gitWorktreeRoots(dir: string): string[] {
 // A path in the workspace comes back workspace-relative, matching the cwd every invocation runs
 // under. A path in a sibling worktree of the same repository is in scope too and has no useful
 // relative spelling, so it stays absolute. The worktree list costs a git call and is read only
-// once a path has failed the workspace check.
+// once a path has failed the workspace check. An existing path is judged by its canonical
+// spelling, which folds case and short names where the filesystem does; one that does not exist
+// yet can only be judged as written.
 function normalizePaths(paths: string[] | undefined): string[] {
   const root = workspace();
   let worktrees: string[] | undefined;
@@ -263,13 +275,13 @@ function normalizePaths(paths: string[] | undefined): string[] {
     if (path.includes("\0")) throw new Error("Path entries must not contain null bytes");
     if (path.startsWith("-")) throw new Error("Path entries must not start with '-'");
     const absolute = resolve(root, path);
-    const home = owner(absolute);
-    if (home === undefined) throw new Error(`Path escapes workspace: ${path}`);
-    if (existsSync(absolute) && owner(realpathSync(absolute)) === undefined) {
-      throw new Error(`Path resolves outside workspace: ${path}`);
+    const canonical = existsSync(absolute) ? realpathSync.native(absolute) : absolute;
+    const home = owner(canonical);
+    if (home === undefined) {
+      throw new Error(owner(absolute) === undefined ? `Path escapes workspace: ${path}` : `Path resolves outside workspace: ${path}`);
     }
-    if (home !== root) return absolute;
-    return relative(root, absolute) || ".";
+    const spelled = within(home, absolute) ? absolute : canonical;
+    return home === root ? relative(root, spelled) || "." : spelled;
   });
 }
 
@@ -448,10 +460,7 @@ function reader(tool: string, args: Args) {
     throw new Error(`${tool}: ${key} must be ${expected}`);
   };
   return {
-    string(key: string): string {
-      const value = args[key];
-      return typeof value === "string" ? value : invalid(key, "a string");
-    },
+    string: (key: string): string => stringArg(args, key, undefined, tool),
     strings(key: string): string[] | undefined {
       const value = args[key];
       if (value === undefined || value === null) return undefined;

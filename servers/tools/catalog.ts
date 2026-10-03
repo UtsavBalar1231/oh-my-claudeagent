@@ -4,11 +4,11 @@ import { parseFrontmatter } from "../../src/core/frontmatter.ts";
 import { isSafeId } from "../../src/core/session-id.ts";
 import { findSession, latestSessionId } from "../hooks/session-state.ts";
 import { ledgerPath } from "../hooks/status-file.ts";
-import { projectRoot } from "../io.ts";
+import { isMissing } from "../io.ts";
 import type { Tool } from "../omca.ts";
 import { pluginRoot } from "../plugin-root.ts";
 import { discoverBinary } from "./ast.ts";
-import { isMissing, stringArg } from "./filesystem.ts";
+import { rootOf, stringArg, WORKING_DIRECTORY } from "./args.ts";
 
 export type Runtime =
   | { runtime: "ok" }
@@ -30,9 +30,6 @@ const costTier = (model: string): string => COST_TIERS.find(([, models]) => mode
 const CATEGORIES_MISSING = '{"error": "categories.json not found"}';
 const CATEGORIES_MALFORMED = '{"error": "categories.json is malformed"}';
 
-const WORKING_DIRECTORY = { type: "string", default: "", description: "Project root (auto-detected from git)" };
-
-const rootOf = (args: Record<string, unknown>): string => projectRoot(stringArg(args, "working_directory", "") || process.cwd());
 const isDirectory = (path: string): boolean => statSync(path, { throwIfNoEntry: false })?.isDirectory() ?? false;
 
 function markerWrittenAt(root: string, sessionId: string): number | undefined {
@@ -88,7 +85,7 @@ function jsonFileState(path: string): "absent" | "valid" | "invalid" {
 }
 
 function healthCheck(args: Record<string, unknown>): string {
-  const root = rootOf(args);
+  const root = rootOf(stringArg(args, "working_directory", ""));
   const stateDir = join(root, ".omca", "state");
   const report = {
     ...runtimeOf(root),

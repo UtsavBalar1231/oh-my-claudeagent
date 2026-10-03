@@ -1,3 +1,4 @@
+import { isSafeId } from "../../src/core/session-id.ts";
 import { handle as commentGate } from "./comment-gate.ts";
 import { handle as contextInjector } from "./context-injector.ts";
 import { handle as emptyTaskResponse } from "./empty-task-response.ts";
@@ -10,7 +11,7 @@ import { handle as planWriteGuard } from "./plan-write-guard.ts";
 import { type Session, touchSession } from "./session-state.ts";
 import { handle as sessionStart } from "./session-start.ts";
 import { handle as slashModeDetector } from "./slash-mode-detector.ts";
-import { isSafeId, stampIfDue } from "./status-file.ts";
+import { stampIfDue } from "./status-file.ts";
 import { handle as stopGates } from "./stop-gates.ts";
 import { handle as subagentContext } from "./subagent-context.ts";
 import { handle as taskCompleted } from "./task-completed.ts";
@@ -94,14 +95,6 @@ function combine(answers: readonly Output[]): Output {
   return merged === undefined ? {} : { hookSpecificOutput: merged };
 }
 
-const failureDeny = (name: string, error: unknown): Output => ({
-  hookSpecificOutput: {
-    hookEventName: "PreToolUse",
-    permissionDecision: "deny",
-    permissionDecisionReason: `OMCA's ${name} check failed, so this call is denied: ${error instanceof Error ? error.message : String(error)}`,
-  },
-});
-
 function sessionOf(id: unknown): Session | undefined {
   if (typeof id !== "string" || id === "") return undefined;
   if (isSafeId(id)) return touchSession(id);
@@ -110,7 +103,7 @@ function sessionOf(id: unknown): Session | undefined {
 }
 
 export async function dispatch(payload: Payload, root: string, now = Date.now(), registry = REGISTRY): Promise<Output> {
-  const handlers = registry[payload.event];
+  const handlers = Object.hasOwn(registry, payload.event) ? registry[payload.event] : undefined;
   if (handlers === undefined) {
     console.error(`omca: omca_hook has no handlers for event ${JSON.stringify(payload.event)}`);
     return {};
@@ -123,7 +116,6 @@ export async function dispatch(payload: Payload, root: string, now = Date.now(),
       if (answer !== undefined) answers.push(answer);
     } catch (error) {
       console.error(`omca: ${payload.event} handler ${name} failed:`, error);
-      if (payload.event === "PreToolUse") answers.push(failureDeny(name, error));
     }
   }
   if (context.session !== undefined) {

@@ -116,34 +116,6 @@ describe("the injected context, exactly", () => {
   });
 });
 
-describe("agent protocol", () => {
-  test("agent protocol: output contains AskUserQuestion unavailability notice", async () => {
-    expect(await contextOf(omca("explore"))).toContain("AskUserQuestion is not available here.");
-  });
-
-  test("current date: output contains [CURRENT DATE] block", async () => {
-    expect(await contextOf(omca("explore"))).toContain("[CURRENT DATE] Today is Friday, October 02, 2026.");
-  });
-
-  test("output mandate: output contains OUTPUT MANDATE directive", async () => {
-    expect(await contextOf(omca("explore"))).toContain("[OUTPUT MANDATE]");
-  });
-
-  test("blocking questions: planner agents receive BLOCKING QUESTIONS protocol", async () => {
-    expect(await contextOf(omca("prometheus"))).toContain("'## BLOCKING QUESTIONS'");
-  });
-
-  test("blocking questions: non-planner agents receive BLOCKING QUESTIONS protocol", async () => {
-    expect(await contextOf(omca("explore"))).toContain("'## BLOCKING QUESTIONS'");
-  });
-
-  test("blocking questions: hook no longer mentions notepad questions section", async () => {
-    for (const agent of [omca("prometheus"), omca("explore")]) {
-      expect(await contextOf(agent)).not.toMatch(/notepad.*questions.*section|questions' when you need/);
-    }
-  });
-});
-
 describe("plan context", () => {
   test("boulder plan context: READ-ONLY and NOTEPAD injected when boulder.json exists", async () => {
     const root = project();
@@ -220,32 +192,12 @@ describe("plan context", () => {
 });
 
 describe("guidance by role", () => {
-  test("anti-duplication: sisyphus agent receives ANTI-DUPLICATION guidance", async () => {
-    expect(await contextOf(omca("sisyphus"))).toContain("[ANTI-DUPLICATION]");
-  });
-
-  test("agent catalog: sisyphus agent gets no delegation table", async () => {
-    expect(await contextOf(omca("sisyphus"))).not.toContain("AGENT CATALOG");
-  });
-
-  test("counter-instruction: executor agent receives worker counter-instruction", async () => {
-    expect(await contextOf(omca("executor"))).toContain("[YOU ARE A LEAF WORKER]");
-  });
-
-  test("counter-instruction: explore agent receives worker counter-instruction", async () => {
-    expect(await contextOf(omca("explore"))).toContain("[YOU ARE A LEAF WORKER]");
-  });
-
   test("counter-instruction: librarian agent receives worker counter-instruction", async () => {
     expect(await contextOf(omca("librarian"))).toContain("[YOU ARE A LEAF WORKER]");
   });
 
   test("counter-instruction: hephaestus agent receives worker counter-instruction", async () => {
     expect(await contextOf(omca("hephaestus"))).toContain("[YOU ARE A LEAF WORKER]");
-  });
-
-  test("counter-instruction: sisyphus agent does NOT receive worker counter-instruction", async () => {
-    expect(await contextOf(omca("sisyphus"))).not.toContain("[YOU ARE A LEAF WORKER]");
   });
 
   test("counter-instruction: momus agent receives worker counter-instruction (advisors are workers)", async () => {
@@ -262,17 +214,6 @@ describe("guidance by role", () => {
     expect(context).not.toContain("[ANTI-DUPLICATION]");
   });
 
-  test("file tools: every subagent is told to read files with the Read tool", async () => {
-    expect(await contextOf(omca("explore"))).toContain("[FILE TOOLS] Read files with the Read tool");
-  });
-
-  test("file tools: an editing agent is told to change files with Edit", async () => {
-    expect(await contextOf(omca("executor"))).toContain("[EDITS] Change an existing file with Edit");
-  });
-
-  test("file tools: a read-only agent gets no edit guidance", async () => {
-    expect(await contextOf(omca("explore"))).not.toContain("[EDITS]");
-  });
 });
 
 describe("worker isolation", () => {

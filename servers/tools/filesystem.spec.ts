@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync,
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import type { Platform } from "../../src/core/path.ts";
-import { isSensitivePath, tools } from "./filesystem.ts";
+import { isSensitivePath, readLines, tools } from "./filesystem.ts";
 
 const fileRead = (() => {
   const found = tools.find((tool) => tool.name === "file_read");
@@ -103,6 +103,29 @@ test("a line over 2000 characters is cut with a marker giving the dropped count"
   expect(await read({ path })).toBe(
     [row(1, `${"q".repeat(2000)}... [line truncated, 3000 more chars]`), "", "(~1250 tokens (4.9 KB), 1 lines total)"].join("\n"),
   );
+});
+
+test("a 100 MB single-line file read with limit 1 is cut at the line cap without holding the line", async () => {
+  const path = join(dir, "bundle.min.js");
+  writeFileSync(path, Buffer.alloc(100 * 1024 * 1024, "q"));
+  const started = performance.now();
+  const result = await read({ path, limit: 1 });
+  expect(performance.now() - started).toBeLessThan(3000);
+  expect(result).toBe(
+    [row(1, `${"q".repeat(2000)}... [line truncated, ${100 * 1024 * 1024 - 2000} more chars]`), "", "(~26214400 tokens (100.0 MB), 1 lines total)"].join("\n"),
+  );
+}, 30_000);
+
+test("readLines cuts a line at the cap across chunks, counts what it drops, and leaves the next line whole", async () => {
+  const path = write("capped.txt", `${"a".repeat(200_000)}\r\nnext\n${"b".repeat(2001)}\r\n${"c".repeat(2000)}\r\n`);
+  const lines: string[] = [];
+  for await (const line of readLines(path, new TextDecoder(), 2000)) lines.push(line);
+  expect(lines).toEqual([
+    `${"a".repeat(2000)}... [line truncated, 198000 more chars]`,
+    "next",
+    `${"b".repeat(2000)}... [line truncated, 1 more chars]`,
+    "c".repeat(2000),
+  ]);
 });
 
 test("an offset past the end says so", async () => {
@@ -221,11 +244,22 @@ test.each<[Platform, string]>([
   ["win32", "C:\\Users\\x\\.sshkeys\\a"],
   ["win32", "C:\\proj\\notes:stream"],
   ["darwin", "/Volumes/x/Project/App.ts"],
-  ["linux", "/srv/u/.ENV"],
   ["linux", "/srv/u/.envrc"],
   ["linux", "/etc/shadow.bak"],
 ])("isSensitivePath(%s, %p) is false", (platform, path) => {
   expect(isSensitivePath(platform, path)).toBe(false);
+});
+
+test.each<[string]>([["/mnt/c/data/.SSH/ID_RSA"], ["/srv/u/.ENV"], ["/srv/u/.Aws/Credentials"], ["/ETC/SHADOW"]])(
+  "%s is denied on Linux: drvfs, CIFS, vfat and casefolded ext4 mounts open it as the lowercase file",
+  (path) => {
+    expect(isSensitivePath("linux", path)).toBe(true);
+  },
+);
+
+test.each([".SSH/config", "app/.ENV.local", "ID_RSA"])("a file named %s is denied on every platform", async (name) => {
+  const path = write(name, "hunter2\n");
+  expect(await read({ path })).toBe(`Access denied: ${path} matches sensitive file pattern`);
 });
 
 test.skipIf(process.platform === "win32")("a symlink is judged by the file it points at (skipped on Windows: creating a symlink needs a privilege)", async () => {
@@ -260,6 +294,19 @@ test("every call is logged to .omca/logs/file-access.jsonl under the working dir
     { path: denied, allowed: false, timestamp },
     { path: join(dir, "missing.txt"), allowed: false, timestamp },
   ]);
+});
+
+test("a call from a subdirectory of a git repository logs under the repository root", async () => {
+  expect(Bun.spawnSync(["git", "init", "-q", dir], { env: process.env }).exitCode).toBe(0);
+  const target = write("pkg/src/code.ts", "export {};\n");
+  process.chdir(dirname(target));
+  await read({ path: target });
+  const entries = readFileSync(join(dir, ".omca", "logs", "file-access.jsonl"), "utf8")
+    .trimEnd()
+    .split("\n")
+    .map((line) => JSON.parse(line));
+  expect(entries).toEqual([{ path: target, allowed: true, timestamp: expect.stringMatching(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/) }]);
+  expect(existsSync(join(dir, "pkg", "src", ".omca"))).toBe(false);
 });
 
 test("a non-string path and a non-integer limit are rejected as errors", async () => {
