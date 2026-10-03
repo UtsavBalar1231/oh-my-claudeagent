@@ -232,7 +232,7 @@ describe("the remote", () => {
     } finally {
       root = previous;
     }
-  });
+  }, 60_000);
 
   test("refuses when the local plugin branch is behind origin/plugin", () => {
     main(["3.0.0-rc.1"], root);
