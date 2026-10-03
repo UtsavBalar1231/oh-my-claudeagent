@@ -302,8 +302,8 @@ decisions in place. A Desktop session in WSL loads no plugins.
 CI runs the validator, the server specs, the type checks and the OpenCode adapter on Linux,
 macOS and Windows against Claude Code 2.1.288. The guard reads Bash and PowerShell commands,
 including `cmd /c` and `Invoke-Expression`, and resolves home and project paths per platform.
-The README screenshots are captured with tmux, so capturing them needs Linux, macOS or WSL;
-rendering them does not.
+The README screenshots are captured with tmux, kitty and Xvfb, so capturing them needs Linux or
+WSL.
 
 ## Comparison with similar plugins
 

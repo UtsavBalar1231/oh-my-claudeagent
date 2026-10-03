@@ -4,9 +4,6 @@
     {
       // These files match, strip or build ANSI escape sequences, so the ESC control character is the point of each regex.
       "files": [
-        "scripts/docs/ansi.ts",
-        "scripts/docs/screenshots.ts",
-        "scripts/docs/screenshots.spec.ts",
         "statusline/render.ts",
         "statusline/render.spec.ts",
         "statusline/fixtures.spec.ts"

@@ -139,10 +139,10 @@ describe("docs accuracy", () => {
 describe("doc links", () => {
   test("links and images that resolve from each page pass", async () => {
     const ctx = fixture({
-      "README.md": '[Usage](docs/usage.md) and <img src=".github/assets/hero.svg" alt="A pane.">\n![Shot](./docs/usage.md#install)\n',
+      "README.md": '[Usage](docs/usage.md) and <img src=".github/assets/hero.png" alt="A pane.">\n![Shot](./docs/usage.md#install)\n',
       "docs/usage.md": "[Reference](references.md#agents), [statusline](../statusline/) and [up](../README.md)\n",
       "docs/references.md": "[Hooks](#hooks)\n",
-      ".github/assets/hero.svg": "<svg/>\n",
+      ".github/assets/hero.png": "png",
       "statusline/README.md": "x\n",
     });
     expect(await runNamed(checks, "doc links", ctx)).toMatchObject({ status: "pass" });
@@ -150,14 +150,14 @@ describe("doc links", () => {
 
   test("a link or image that resolves to nothing fails at its line", async () => {
     const ctx = fixture({
-      "README.md": 'Intro\n[Old guide](GUIDE.md)\n<img src=".github/assets/gone.svg" alt="x">\n',
+      "README.md": 'Intro\n[Old guide](GUIDE.md)\n<img src=".github/assets/gone.png" alt="x">\n',
       "docs/usage.md": "[Known issues](reference/known-issues.md#trap)\n[Outside](../../elsewhere.md)\n",
     });
     expect(await runNamed(checks, "doc links", ctx)).toEqual({
       status: "fail",
       detail: [
         "README.md:2 links to 'GUIDE.md', which is not in the repo",
-        "README.md:3 links to '.github/assets/gone.svg', which is not in the repo",
+        "README.md:3 links to '.github/assets/gone.png', which is not in the repo",
         "docs/usage.md:1 links to 'reference/known-issues.md#trap', which is not in the repo",
         "docs/usage.md:2 links to '../../elsewhere.md', which is not in the repo",
       ].join("; "),

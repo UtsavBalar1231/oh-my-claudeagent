@@ -44,12 +44,16 @@ under `servers/hooks/`. Every file is TypeScript on bun.
 - `postedit-check.ts`: runs `just typecheck-ts` after an edit to a `.ts` file and reports the
   first lines of a failure as hook context. The local project settings call it from a
   `PostToolUse` entry.
-- `docs/`: the README screens. `screenshots.ts` captures real Claude Code sessions in tmux
-  against the mock model into `.github/assets/src/` as masked ANSI files, and `render-svg.ts`
-  renders those to SVG in `.github/assets/` with a subset of the bundled font (`fonts/`).
-  `ansi.ts`, `mask.ts` and `cmap.ts` are their helpers, and `fixtures/acme-app` is the project
-  the sessions open. `just screenshots` runs both scripts in order. Packaging excludes the
-  directory.
+- `docs/`: the README screens. `screenshots.ts` runs real Claude Code sessions in tmux against
+  the mock model, attaches kitty to each one on a private Xvfb display, and writes pixel grabs to
+  `.github/assets/`: a PNG still per scene (ImageMagick `import`, optimized with `magick`) and a
+  GIF per clip (`ffmpeg` x11grab, then palettegen and paletteuse). Each session gets a scratch
+  HOME and config directory with the built-in `dark` theme, and `fixtures/acme-app` is the
+  project it opens. Pixels cannot be masked afterwards, so `privacy.ts` checks the pane's plain
+  text before and after each still and throughout each clip, and refuses the capture when it
+  shows the username, the home path, the hostname or the scratch directory's name. It needs
+  Xvfb, kitty, xdotool, ImageMagick, ffmpeg and a JetBrains Mono font. `just screenshots` runs
+  it. Packaging excludes the directory.
 - `qa/`: the QA harness and the checks CI shares with it, packaging-excluded. `just qa` is the
   manual pre-release run. `ci-smoke.ts` is the CI smoke job: one `claude -p` session with the
   packaged plugin loaded, in which the guard must deny a recursive removal (through PowerShell
