@@ -17,7 +17,7 @@ describe("isVerificationCommand", () => {
     "just typecheck",
     "just build",
     "just test-hooks",
-    "just lint-shell",
+    "just lint-css",
     "npm test",
     "bun test",
     "pnpm run lint",

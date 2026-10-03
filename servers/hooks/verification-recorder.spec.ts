@@ -89,7 +89,7 @@ describe("recognised runners", () => {
 
   test("recorder: a hyphenated test or lint recipe records", async () => {
     const root = project();
-    const commands = ["just test-hooks", "just test-bats", "just test-pytest", "just test-mcp", "just test-all", "just lint-shell", "just lint-python", "just typecheck"];
+    const commands = ["just test-hooks", "just test-unit", "just test-e2e", "just test-mcp", "just test-all", "just lint-css", "just lint-docs", "just typecheck"];
     const recorded = [];
     for (const command of commands) {
       const sessionId = crypto.randomUUID();
