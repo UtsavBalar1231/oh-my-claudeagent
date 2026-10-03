@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
-// Copies the shipped plugin tree into <dest>, replacing what an earlier copy left there.
+// Copies the shipped plugin tree into <dest>, replacing what an earlier copy left there. Only files
+// git tracks ship, so an untracked file in the working tree never reaches an install.
 // With --dry-run it prints the files that would ship, one path per line, and writes nothing.
 //
 // Usage: bun scripts/package.ts <dest_dir>
@@ -17,11 +18,14 @@ import {
 } from "node:fs";
 import { dirname, join } from "node:path";
 import { parseArgs } from "node:util";
+import { gitTracked } from "./validate/core.ts";
 
 const USAGE = "Usage: bun scripts/package.ts <dest_dir>\n       bun scripts/package.ts --dry-run";
 
-// A pattern with a trailing slash names a directory. A pattern without a leading slash
-// matches the last path components at any depth, as rsync's --exclude does.
+// A pattern with a trailing slash names a directory. A pattern with a leading slash matches only
+// from the root. Any other pattern matches the last path components at any depth, as rsync's
+// --exclude does. Claude Code installs npm packages whenever the plugin root holds package.json and
+// a lockfile, so the root manifests, lockfile and typecheck configs stay out of the shipped tree.
 export const EXCLUDES = [
   ".git/",
   ".github/",
@@ -34,21 +38,30 @@ export const EXCLUDES = [
   "scripts/qa/",
   "scripts/docs/",
   "node_modules/",
+  "/package.json",
+  "/bun.lock",
+  "/bunfig.toml",
+  "/tsconfig.json",
+  "/tsconfig.runtime.json",
+  "/opencode/",
+  "/.opencode/",
 ] as const;
 
-type Rule = { directoryOnly: boolean; segments: RegExp[] };
+type Rule = { directoryOnly: boolean; anchored: boolean; segments: RegExp[] };
 
 const segmentPattern = (segment: string): RegExp =>
   new RegExp(`^${segment.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, "[^/]*")}$`);
 
 const RULES: Rule[] = EXCLUDES.map((pattern) => ({
   directoryOnly: pattern.endsWith("/"),
-  segments: pattern.replace(/\/$/, "").split("/").map(segmentPattern),
+  anchored: pattern.startsWith("/"),
+  segments: pattern.replace(/^\//, "").replace(/\/$/, "").split("/").map(segmentPattern),
 }));
 
 function isExcluded(parts: readonly string[], isDirectory: boolean): boolean {
-  return RULES.some(({ directoryOnly, segments }) => {
+  return RULES.some(({ directoryOnly, anchored, segments }) => {
     if (directoryOnly && !isDirectory) return false;
+    if (anchored && parts.length !== segments.length) return false;
     const tail = parts.slice(parts.length - segments.length);
     return tail.length === segments.length && segments.every((segment, i) => segment.test(tail[i] ?? ""));
   });
@@ -56,19 +69,12 @@ function isExcluded(parts: readonly string[], isDirectory: boolean): boolean {
 
 const isLeaf = (entry: Dirent): boolean => !entry.isDirectory();
 
-export function listPackageFiles(root: string): string[] {
-  const files: string[] = [];
-  const walk = (parts: string[]): void => {
-    for (const entry of readdirSync(join(root, ...parts), { withFileTypes: true })) {
-      const next = [...parts, entry.name];
-      if (isExcluded(next, !isLeaf(entry))) continue;
-      if (isLeaf(entry)) files.push(next.join("/"));
-      else walk(next);
-    }
-  };
-  walk([]);
-  return files.sort();
-}
+const isShipped = (path: string): boolean => {
+  const parts = path.split("/");
+  return !parts.some((_, depth) => isExcluded(parts.slice(0, depth + 1), depth < parts.length - 1));
+};
+
+export const listPackageFiles = (tracked: readonly string[]): string[] => tracked.filter(isShipped).sort();
 
 function prune(dest: string, parts: string[], files: ReadonlySet<string>, directories: ReadonlySet<string>): void {
   for (const entry of readdirSync(join(dest, ...parts), { withFileTypes: true })) {
@@ -87,7 +93,7 @@ function prune(dest: string, parts: string[], files: ReadonlySet<string>, direct
 }
 
 export function packageTree(root: string, dest: string): string[] {
-  const files = listPackageFiles(root);
+  const files = listPackageFiles(gitTracked(root));
   const directories = new Set<string>();
   for (const file of files) {
     const parts = file.split("/").slice(0, -1);
@@ -127,7 +133,7 @@ export function main(args: string[], root: string): Outcome {
     return { code: 1, stdout: "", stderr: `${error instanceof Error ? error.message : String(error)}\n${USAGE}\n` };
   }
   const { values, positionals } = parsed;
-  if (values["dry-run"]) return { code: 0, stdout: listPackageFiles(root).map((file) => `${file}\n`).join(""), stderr: "" };
+  if (values["dry-run"]) return { code: 0, stdout: listPackageFiles(gitTracked(root)).map((file) => `${file}\n`).join(""), stderr: "" };
   const [dest, ...extra] = positionals;
   if (dest === undefined || extra.length > 0) {
     const problem = dest === undefined ? "Missing <dest_dir>" : `Unexpected argument: ${extra[0]}`;

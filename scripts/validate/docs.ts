@@ -132,7 +132,7 @@ function claudeMdTemplate(ctx: Context): Outcome {
     return { status: "fail", detail: `${reader} no longer reads ${template}` };
   }
   if (!exists(join(ctx.root, template))) return { status: "fail", detail: `${template} is missing` };
-  if (!listPackageFiles(ctx.root).includes(template)) {
+  if (!listPackageFiles(ctx.tracked()).includes(template)) {
     return { status: "fail", detail: `scripts/package.ts does not ship ${template}, check EXCLUDES` };
   }
   return pass(`${reader} reads ${template} and scripts/package.ts ships it`);

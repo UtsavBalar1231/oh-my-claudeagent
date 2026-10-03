@@ -53,6 +53,31 @@ describe("manifest checks", () => {
     });
   });
 
+  describe("marketplace source, url source", () => {
+    const sha = "a".repeat(40);
+    const urlSource = (fields: Record<string, unknown>) => ({
+      ".claude-plugin/marketplace.json": marketplace({ source: { source: "url", url: "https://github.com/o/r.git", ref: "plugin", sha, ...fields } }),
+    });
+
+    test("an https URL, a ref and a 40-hex SHA pass", async () => {
+      expect(await runNamed(checks, "marketplace source", fixture(urlSource({})))).toMatchObject({ status: "pass" });
+    });
+
+    test("each field is checked on its own", async () => {
+      const failing = async (fields: Record<string, unknown>) => runNamed(checks, "marketplace source", fixture(urlSource(fields)));
+      expect(await failing({ url: "git@github.com:o/r.git" })).toEqual({
+        status: "fail",
+        detail: 'oh-my-claudeagent url source url "git@github.com:o/r.git" is not an https URL',
+      });
+      expect(await failing({ ref: "" })).toEqual({ status: "fail", detail: "oh-my-claudeagent url source has no ref" });
+      expect(await failing({ sha: "A".repeat(40) })).toEqual({
+        status: "fail",
+        detail: `oh-my-claudeagent url source sha "${"A".repeat(40)}" is not a 40-character lowercase hex SHA`,
+      });
+      expect(await failing({ sha: "abc123" })).toMatchObject({ status: "fail" });
+    });
+  });
+
   test("marketplace source: a bare dot passes by default and fails under a marketplace override", async () => {
     const files = { ".claude-plugin/marketplace.json": marketplace({ source: "." }) };
     expect(await runNamed(checks, "marketplace source", fixture(files))).toMatchObject({ status: "pass" });

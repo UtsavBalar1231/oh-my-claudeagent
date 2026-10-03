@@ -45,16 +45,32 @@ function marketplaceEntry(ctx: Context): Outcome {
 }
 
 function marketplaceSource(ctx: Context): Outcome {
-  const sources = marketplacePlugins(ctx).flatMap((plugin) => {
+  const plugins = marketplacePlugins(ctx);
+  const sources = plugins.flatMap((plugin) => {
     const source = text(plugin.source);
     return source === undefined ? [] : [{ name: text(plugin.name) ?? "plugin", source }];
   });
-  if (sources.length === 0) return skip("no marketplace plugin has a path source, only a github or other object source");
-  const problems = sources.flatMap(({ name, source }) => {
-    const allowed = ctx.marketplaceOverride ? source.startsWith("./") : source === "." || source.startsWith("./");
-    return allowed ? [] : [`${name} source '${source}' is not a ./ path`];
+  const urlSources = plugins.flatMap((plugin) => {
+    const source = asRecord(plugin.source);
+    return source.source === "url" ? [{ name: text(plugin.name) ?? "plugin", source }] : [];
   });
-  return verdict(problems, "every path source in the marketplace starts with ./");
+  if (sources.length === 0 && urlSources.length === 0) {
+    return skip("no marketplace plugin has a path source, only a github or other object source");
+  }
+  const problems = [
+    ...sources.flatMap(({ name, source }) => {
+      const allowed = ctx.marketplaceOverride ? source.startsWith("./") : source === "." || source.startsWith("./");
+      return allowed ? [] : [`${name} source '${source}' is not a ./ path`];
+    }),
+    ...urlSources.flatMap(({ name, source }) => {
+      const found: string[] = [];
+      if (!text(source.url)?.startsWith("https://")) found.push(`${name} url source url ${JSON.stringify(source.url)} is not an https URL`);
+      if (!text(source.ref)) found.push(`${name} url source has no ref`);
+      if (!/^[0-9a-f]{40}$/.test(text(source.sha) ?? "")) found.push(`${name} url source sha ${JSON.stringify(source.sha)} is not a 40-character lowercase hex SHA`);
+      return found;
+    }),
+  ];
+  return verdict(problems, "every path source starts with ./ and every url source has an https URL, a ref and a full SHA");
 }
 
 function versionsEqual(ctx: Context): Outcome {

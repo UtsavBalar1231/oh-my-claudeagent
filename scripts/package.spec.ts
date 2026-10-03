@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { specEnv } from "../tests/fixtures/spec-env.ts";
 import { listPackageFiles, main, packageTree } from "./package.ts";
 
 const SHIPPED: Record<string, string> = {
@@ -14,10 +15,11 @@ const SHIPPED: Record<string, string> = {
   "scripts/package.ts": "ts\n",
   "servers/m.ts": "ts\n",
   "statusline/main.ts": "ts\n",
+  ".claude-plugin/types/tsconfig.json": "{}\n",
+  "servers/package.json": "{}\n",
 };
 
 const EXCLUDED: Record<string, string> = {
-  ".git/HEAD": "x",
   ".github/assets/hero.svg": "x",
   ".github/workflows/ci.yml": "x",
   ".omca/state/b.json": "x",
@@ -32,6 +34,20 @@ const EXCLUDED: Record<string, string> = {
   "scripts/docs/fonts/JetBrainsMono-Regular.ttf": "x",
   "node_modules/m/index.js": "x",
   "CLAUDE.md": "x",
+  "package.json": "{}\n",
+  "bun.lock": "x",
+  "bunfig.toml": "x",
+  "tsconfig.json": "{}\n",
+  "tsconfig.runtime.json": "{}\n",
+  "opencode/index.ts": "x",
+  "opencode/overlays/executor.md": "x",
+  ".opencode/plugin.ts": "x",
+};
+
+const UNTRACKED: Record<string, string> = {
+  "agents/untracked.md": "x\n",
+  "notes.txt": "x\n",
+  "scratch/deep/file.ts": "x\n",
 };
 
 let root = "";
@@ -46,11 +62,19 @@ function seed(base: string, files: Record<string, string>): void {
 
 const filesUnder = (base: string): string[] => [...new Bun.Glob("**/*").scanSync({ cwd: base, dot: true, onlyFiles: true })].map((path) => path.replaceAll("\\", "/")).sort();
 
+function git(...args: string[]): void {
+  const run = Bun.spawnSync(["git", "-C", root, ...args], { env: specEnv(), stdout: "pipe", stderr: "pipe" });
+  if (run.exitCode !== 0) throw new Error(`git ${args.join(" ")}: ${run.stderr.toString()}`);
+}
+
 beforeEach(() => {
   const scratch = mkdtempSync(join(tmpdir(), "omca-package-spec-"));
   root = join(scratch, "root");
   dest = join(scratch, "dest");
   seed(root, { ...SHIPPED, ...EXCLUDED });
+  git("init", "-q");
+  git("add", "-A");
+  seed(root, UNTRACKED);
 });
 
 afterEach(() => {
@@ -59,7 +83,23 @@ afterEach(() => {
 
 describe("listPackageFiles", () => {
   test("lists exactly the shipped files, sorted, and drops every excluded name at any depth", () => {
-    expect(listPackageFiles(root)).toEqual(Object.keys(SHIPPED).sort());
+    expect(listPackageFiles([".git/HEAD", ...Object.keys(EXCLUDED), ...Object.keys(SHIPPED)])).toEqual(Object.keys(SHIPPED).sort());
+  });
+
+  test("drops the root manifests, lockfile, typecheck configs and the OpenCode adapter, and keeps a nested file of the same name", () => {
+    const listed = listPackageFiles([
+      "package.json",
+      "bun.lock",
+      "bunfig.toml",
+      "tsconfig.json",
+      "tsconfig.runtime.json",
+      "opencode/index.ts",
+      ".opencode/plugin.ts",
+      "servers/package.json",
+      "docs/opencode/notes.md",
+      ".claude-plugin/types/tsconfig.json",
+    ]);
+    expect(listed).toEqual([".claude-plugin/types/tsconfig.json", "docs/opencode/notes.md", "servers/package.json"]);
   });
 });
 
@@ -70,6 +110,16 @@ describe("packageTree", () => {
     expect(files).toEqual(Object.keys(SHIPPED).sort());
     expect(filesUnder(dest)).toEqual(files);
     for (const [path, text] of Object.entries(SHIPPED)) expect(readFileSync(join(dest, path), "utf8")).toBe(text);
+  });
+
+  test("never ships an untracked file", () => {
+    const files = packageTree(root, dest);
+
+    for (const path of Object.keys(UNTRACKED)) {
+      expect(files).not.toContain(path);
+      expect(existsSync(join(dest, path))).toBe(false);
+    }
+    expect(filesUnder(dest)).toEqual(Object.keys(SHIPPED).sort());
   });
 
   test.skipIf(process.platform === "win32")("keeps the executable bit (skipped on Windows: it has no executable bit)", () => {
@@ -144,5 +194,6 @@ describe("the repository tree", () => {
     expect(lines).toContain("templates/claudemd.md");
     expect(lines).toContain("scripts/package.ts");
     expect(lines.filter((line) => /^scripts\/qa\/|(^|\/)tests\//.test(line))).toEqual([]);
+    expect(lines.filter((line) => /^(package\.json|bun\.lock|bunfig\.toml|tsconfig(\.runtime)?\.json|\.?opencode\/)/.test(line))).toEqual([]);
   });
 });
