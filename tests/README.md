@@ -1,8 +1,8 @@
 # Tests
 
-This directory contains behavioral and integration tests for oh-my-claudeagent.
+Behavioral and integration tests for oh-my-claudeagent.
 
-## Directory Structure
+## Directory structure
 
 ```
 tests/
@@ -23,7 +23,7 @@ tests/
 Bun specs (`*.spec.ts`) live beside the code they cover, under `src/`, `servers/`,
 `statusline/`, `scripts/`, `opencode/` and `benchmarks/compare/`.
 
-## Running Tests Locally
+## Running tests locally
 
 ```bash
 # All layers at once
@@ -45,7 +45,7 @@ just test-mod
 just test-opencode
 ```
 
-## Adding a Bun Spec
+## Adding a bun spec
 
 Put `your-module.spec.ts` beside the module and import from `bun:test`. A spec that spawns a
 process passes `env` explicitly, because `Bun.spawn` without `env` does not see runtime
@@ -57,7 +57,7 @@ beside `cwd`, because it resolves its directory from `PWD`. It runs OpenCode aga
 copy of the plugin: OpenCode reloads a plugin when any file under the plugin's `opencode/`
 directory or its imported sources changes.
 
-## CI Integration
+## CI jobs
 
 CI runs these jobs on a push to `main`, on every pull request and on demand. Every job except
 `validate-manifest` runs on Linux, macOS and Windows:
@@ -67,11 +67,11 @@ CI runs these jobs on a push to `main`, on every pull request and on demand. Eve
 | `validate` | `bun scripts/validate.ts`, every validator group (the engine group skips without the claude CLI) |
 | `test-mcp` | `bun test servers` and `bun scripts/validate.ts --check mcp` |
 | `test-opencode` | the OpenCode adapter: typecheck, then `bun test opencode/`, whose smoke and model-path specs run against a real OpenCode install |
-| `typescript` | both tsc projects, the mod tests, the bun specs with a JUnit report that `scripts/qa/junit-complete.ts` checks for failures and for every spec file, a seeded random-order run on Linux, and the engine checks |
+| `typescript` | oxlint with warnings denied, both tsc projects, the mod tests, the bun specs with a JUnit report that `scripts/qa/junit-complete.ts` checks for failures and for every spec file, a seeded random-order run on Linux, and the engine checks |
 | `smoke` | `bun scripts/qa/ci-smoke.ts`: a real `claude -p` session with the packaged plugin loaded, against the mock model |
 | `validate-manifest` | `claude plugin validate . --strict` on the latest published client |
 
-## Running Hooks Ad-hoc
+## Running hooks ad hoc
 
 Hooks are `mcp_tool` entries that call `omca_hook` on the server. To exercise a handler
 without a session, send a `tools/call` request for `omca_hook` to `bun servers/omca.ts` from

@@ -2,8 +2,8 @@
 
 The `omca` MCP server: one bun process over stdio that serves OMCA's tools to the model
 (boulder plan registry, evidence log, notepads, ast-grep search, filesystem helpers,
-catalogs) and answers the `omca_hook` calls the settings hooks make. It speaks MCP spec
-revision 2026-07-28 and every 2025-era client from the same stdio loop, with no SDK.
+catalogs) and answers the `omca_hook` calls the settings hooks make. It speaks MCP revisions
+2026-07-28 and 2025-11-25 from the same stdio loop, with no SDK.
 
 ## Layout
 
@@ -26,8 +26,8 @@ revision 2026-07-28 and every 2025-era client from the same stdio loop, with no 
 ## Conventions
 
 - Agents, skills and user allowlists name each tool as
-  `mcp__plugin_oh-my-claudeagent_omca__<tool>`, so changing a tool name or input schema is a
-  breaking change. `.claude/rules/mcp-server.md` has the declaration contract.
+  `mcp__plugin_oh-my-claudeagent_omca__<tool>`, so a change to a tool name or input schema
+  breaks them. `.claude/rules/mcp-server.md` has the declaration contract.
 - Only `evidence_log`, `boulder_progress` and `notepad_write` declare
   `_meta["anthropic/alwaysLoad"]: true`, and `.mcp.json` sets no server-level `alwaysLoad`, so
   every other tool waits behind tool search. `OMCA_TOOLS` in `hooks/subagent-context.ts` states

@@ -1,4 +1,4 @@
-# Template Inventory
+# Template inventory
 
 `templates/claudemd.md` is the orchestration guidance OMCA's server delivers. The server's
 guidance handler (`servers/hooks/guidance.ts`) reads it once per server process from

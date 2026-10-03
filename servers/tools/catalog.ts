@@ -41,7 +41,7 @@ export function runtimeOf(root: string): Runtime {
     : { runtime: "mod_absent", runtime_reason: MOD_ABSENT };
 }
 
-/** The client version the launcher exports to its children as `AI_AGENT=claude-code_2-1-287_agent`. */
+/** The client version the launcher exports to its children as `AI_AGENT=claude-code_<major>-<minor>-<patch>_agent`. */
 function clientVersion(): string | null {
   const parts = /^claude-code_(\d+)-(\d+)-(\d+)_/.exec(process.env.AI_AGENT ?? "");
   return parts === null ? null : parts.slice(1).join(".");

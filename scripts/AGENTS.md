@@ -12,12 +12,14 @@ under `servers/hooks/`. Every file is TypeScript on bun.
   family is one module under `validate/` with its `*.spec.ts` beside it, and
   `validate/allowlist.txt` holds the depersonalization exceptions. `engine` runs
   `claude plugin validate` and skips without the claude CLI. `workflow.spec.ts` ties the `just ci`
-  recipe chain to the jobs in `.github/workflows/ci.yml` and to the release workflow. The `tree`
-  check fails a tracked python, bash or sh script, because its allowlist is empty.
+  recipe chain, which starts with `lint`, to the jobs in `.github/workflows/ci.yml` and to the
+  release workflow. The `tree` check fails a tracked python, bash or sh script, because its
+  allowlist is empty.
 - `package.ts`: `bun scripts/package.ts <dest>` copies the shipped tree, and `--dry-run` prints
   its file list. Only files git tracks ship. The root `package.json`, `bun.lock`, `bunfig.toml`,
-  `tsconfig.json`, `tsconfig.runtime.json`, `opencode/` and `.opencode/` are excluded, because
-  Claude Code installs npm packages whenever the plugin root holds `package.json` and a lockfile.
+  `tsconfig.json`, `tsconfig.runtime.json`, `.oxlintrc.json`, `opencode/` and `.opencode/` are
+  excluded, because Claude Code installs npm packages whenever the plugin root holds
+  `package.json` and a lockfile.
   A leading `/` in `EXCLUDES` anchors a pattern at the root.
 - `release.ts`: `bun scripts/release.ts <version>`, behind `just release <version>`. It refuses a
   version that is not semver, a tracked change in the working tree, a version with no

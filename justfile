@@ -122,8 +122,8 @@ new-agent name:
 	@echo "---" >> agents/{{name}}.md
 	@echo "" >> agents/{{name}}.md
 	@echo "# {{name}}" >> agents/{{name}}.md
-	@echo "Created agents/{{name}}.md — update description, model, and disallowedTools"
-	@echo "Remember to update: servers/categories.json and the <agent_catalog> block in output-styles/omca-default.md"
+	@echo "Created agents/{{name}}.md. Update description, model and disallowedTools"
+	@echo "Remember to add the agent to: templates/claudemd.md, docs/references.md, AGENTS.md, and the agent color map in .claude/rules/agent-conventions.md"
 
 # ── Dev ───────────────────────────────────────────────────────────
 
@@ -200,7 +200,7 @@ validate-mod:
 types:
 	claude -p --plugin-dir . "exit"
 
-# Smoke test — verify plugin loads correctly (requires claude CLI)
+# Smoke test: check that the plugin loads (requires the claude CLI)
 [group('validate')]
 smoke-test:
 	@echo "=== Plugin Smoke Test ==="
@@ -223,8 +223,8 @@ eval-consistency:
 	@echo ""
 	@echo "Methodology:"
 	@echo "  Run each task k=3 times independently."
-	@echo "  pass@1  — passes on at least 1 of 3 runs (any success)"
-	@echo "  pass^3  — passes on all 3 runs (strict consistency)"
+	@echo "  pass@1  passes on at least 1 of 3 runs"
+	@echo "  pass^3  passes on all 3 runs"
 	@echo ""
 	@echo "Available tasks:"
 	@bun scripts/qa/eval-tasks.ts

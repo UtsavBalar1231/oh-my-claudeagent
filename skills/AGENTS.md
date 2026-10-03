@@ -1,6 +1,6 @@
-# Skill Inventory
+# Skill inventory
 
-Installed skills live in `skills/*/SKILL.md`.
+Installed skills are `skills/*/SKILL.md`.
 
 ## Skill list
 
@@ -13,23 +13,23 @@ The orchestration entrypoints are skills here too: `plan` (`skills/plan/SKILL.md
 a user can invoke them, and both omit `context: fork` so the body runs inline in the invoking
 session, where the `Agent` tool is available and orchestration happens at depth 0.
 
-## Public surface note
+## Public surface
 
-Slash commands are the primary public surface. Keyword triggers are an opt-in a user enables locally and are outside the default supported onboarding story.
+Slash commands are the primary public surface. Keyword triggers are opt-in, a user enables them locally, and the default onboarding does not cover them.
 
-## Hook Internals Boundary
+## Hook internals boundary
 
-Skills describe WHAT users do. Hooks are internal infrastructure that automates the HOW. Skills must NOT expose hook internals unless their primary purpose IS hook configuration or diagnosis.
+Skills describe what users do. Hooks are internal infrastructure that automates how. A skill does not expose hook internals unless its primary purpose is hook configuration or diagnosis.
 
-**Forbidden in skills** (unless listed as an exception below):
+Forbidden in skills, unless listed as an exception below:
 
-- Raw file paths like `.omca/state/*.json`: use `boulder_write`, `boulder_progress` MCP tools from the omca server instead
+- Raw file paths like `.omca/state/*.json`: use the `boulder_write` and `boulder_progress` MCP tools from the omca server instead
 - Hook handler names (`task-completed`, `stop-gates`, etc.)
-- Hook event names used only in `hooks/hooks.json` (`PreToolUse`, `PostToolUse`, `Stop`, etc.): these are platform contracts, not user-facing concepts
+- Hook event names used only in `hooks/hooks.json` (`PreToolUse`, `PostToolUse`, `Stop`, etc.): these are platform contracts that users never need
 - Hook-specific environment variables (`OMCA_DISABLED_HOOKS`, etc.)
 
-**Exceptions (legitimate hook knowledge)**:
+Exceptions, where hook knowledge is the skill's purpose:
 
 - `omca-setup`: reports on the hooks, the mod and the managed settings that affect OMCA
 
-**Rationale**: Most skills already follow this rule with zero hook references (refactor, github-triage, hephaestus, metis, consolidate-memory, git-master, init-deep). Skills that leak file paths force users to understand internal layouts they can't control, and force future hook refactors to update skill prose.
+Rationale: a skill that leaks a file path forces users to learn internal layouts they cannot control, and every hook refactor then has to update skill prose.

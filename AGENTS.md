@@ -1,31 +1,30 @@
-# Repository Inventory
+# Repository inventory
 
-This repository's inventory is defined by on-disk files. Query with `find`, `ls`, or `jq` against the source directory at read time rather than relying on a maintained count.
+On-disk files define the inventory. Query it with `find`, `ls` or `jq` at read time, and keep no count of it.
 
 ## Agent inventory
 
-Agent definitions live in `agents/*.md`:
+Agent definitions are `agents/*.md`:
 
 `executor`, `explore`, `hephaestus`, `librarian`, `metis`, `momus`, `multimodal-looker`, `oracle`, `prometheus`, `sisyphus`
 
 ## Skill inventory
 
-Skills live in `skills/*/SKILL.md`. Every skill except the orchestration entrypoints below:
+Skills are `skills/*/SKILL.md`. Every skill except the orchestration entrypoints below:
 
 `consolidate-memory`, `debugging`, `git-master`, `github-triage`, `handoff`, `hephaestus`, `init-deep`, `metis`, `momus`, `omca-setup`, `refactor`, `remove-ai-slops`
 
 ## Orchestration entrypoints
 
-The orchestration entrypoints are skills like any other, at `skills/plan/SKILL.md` and
+The orchestration entrypoints are skills at `skills/plan/SKILL.md` and
 `skills/start-work/SKILL.md`, invoked as `/oh-my-claudeagent:plan` and
 `/oh-my-claudeagent:start-work`:
 
 `plan`, `start-work`
 
-Both declare `disable-model-invocation: true`, so they run only when a user types them, and
-neither declares `context: fork`. Omitting `context: fork` is what keeps the body inline in
-the invoking session, where the `Agent` tool is available and orchestration happens at
-depth 0.
+Both declare `disable-model-invocation: true`, so they run only when a user types them.
+Neither declares `context: fork`, which keeps the body inline in the invoking session, where
+the `Agent` tool is available and orchestration happens at depth 0.
 
 ## Runtime notes
 

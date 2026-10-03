@@ -16,10 +16,12 @@ code they cover, such as `servers/`, `src/` and `scripts/`, rather than here; mo
   one for the environment to pass and one for a fake executable that works on Windows.
 - `mod/`: the mod tests, run by `claude plugin test .`. `mod/visual/` holds the view definitions
   and the recorded captures behind `just visual <view>`.
-- `evals/`: eval task definitions for agent-quality checks, listed by `just eval-consistency` (`scripts/qa/eval-tasks.ts`).
-- `plugin-evals/`: `claude plugin eval` cases for the planning skills' health gate. They call a real model, so they run by hand; `plugin-evals/README.md` has the commands.
-- `README.md`: full instructions for running and adding tests in each layer. Read
-  that before this file for how-to details.
+- `evals/`: eval task definitions for agent-quality checks, listed by `just eval-consistency`
+  (`scripts/qa/eval-tasks.ts`).
+- `plugin-evals/`: `claude plugin eval` cases for the planning skills' health gate. They call a
+  real model, so they run by hand. `plugin-evals/README.md` has the commands.
+- `README.md`: how to run and add tests in each layer. Read it before this file for how-to
+  details.
 
 ## Conventions
 

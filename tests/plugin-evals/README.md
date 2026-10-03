@@ -13,7 +13,7 @@ These cases grade the gate only. Interviewing, plan writing, the momus loop and 
 
 A real run calls a model and costs money. Run it only with the maintainer's approval of the estimate.
 
-The dev checkout holds hard links (`node_modules`, the virtual environments), and `claude plugin eval` refuses a plugin tree that has any. Run against a packaged copy, which leaves `tests/` out, so copy the cases in:
+The dev checkout holds hard links (`node_modules`), and `claude plugin eval` refuses a plugin tree that has any. Run against a packaged copy, which leaves `tests/` out, so copy the cases in:
 
 ```bash
 dest=$(mktemp -d)

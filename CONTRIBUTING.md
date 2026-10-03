@@ -18,9 +18,9 @@ Structural changes to a directory (new file, moved entry point, changed layout) 
 
 A hook is TypeScript in one of two homes. Skipping the registration step produces dead code:
 
-1. **Write the feature.** A feature that needs only mod-reachable events lives in the mod: a module that `hooks/register.ts`, the only file that calls `on()`, dispatches to. A feature that needs a settings-hook event (`PreToolUse` with agent fields, `PostToolUse`, `UserPromptSubmit`, `SubagentStart`, `TaskCompleted`, `Stop`) is a handler under `servers/hooks/`. Put a `*.spec.ts` beside it. No handler returns an allow decision and nothing is registered on `PermissionRequest`: a hook may deny, ask or advise, and an allow comes only from the user's permission rules.
+1. **Write the feature.** A feature that needs only mod-reachable events lives in the mod: a module that `hooks/register.ts` dispatches to. `register.ts` is the only file that calls `on()`. A feature that needs a settings-hook event (`PreToolUse` with agent fields, `PostToolUse`, `UserPromptSubmit`, `SubagentStart`, `TaskCompleted`, `Stop`) is a handler under `servers/hooks/`. Put a `*.spec.ts` beside it. No handler returns an allow decision, and nothing is registered on `PermissionRequest`. A hook may deny, ask or advise, and an allow comes only from the user's permission rules.
 
-2. **Register it.** A server handler is mapped to its event and matcher in `servers/hooks/registry.ts`, and the event has an `mcp_tool` entry in `hooks/hooks.json` that calls the `omca_hook` tool. A handler the registry does not reach is dead code.
+2. **Register it.** In `servers/hooks/registry.ts`, map a server handler to its event and matcher. The event also needs an `mcp_tool` entry in `hooks/hooks.json` that calls the `omca_hook` tool. A handler the registry does not reach is dead code.
 
 No hook is a shell or python script: `bun scripts/validate.ts --check tree` fails on any tracked file with a bash, sh or python shebang.
 
@@ -50,8 +50,8 @@ Key rules:
 - Keep `name:` free of `:`. The platform rejects an agent whose frontmatter name holds a colon, so the agent never loads. The `oh-my-claudeagent:` prefix used at call sites is added by the platform.
 - Do not declare `permissionMode:`. Claude Code strips it from plugin agents for security.
 - Add the agent to every list of the roster: the agent catalog table in `templates/claudemd.md`, the agents table in `docs/references.md` and the agent list in the root `AGENTS.md`. `servers/categories.json` maps categories to tiers and changes only when a category does.
-- **`CLAUDE_CODE_SUBAGENT_MODEL` no longer outranks frontmatter.** Since v2.1.251 the order is a per-invocation model first, then the agent definition's `model:` field (`inherit` included), then the environment variable. Every agent on this roster declares `model:`, so the variable is a default that never applies here. The variable that does override a definition is `CLAUDE_CODE_SUBAGENT_MODEL_FORCE` (v2.1.257 or later): with it set, the declared tier is ignored for every agent, oracle's `fable` included.
-- **Do not leak hook internals into agent prompts.** State the behavioral rule, not the enforcement mechanism. Agent prompts must NOT mention: hook handler names (`stop-gates`, `task-completed`, etc.), "X hook" as a noun (`SubagentStart hook`, `Stop hook`, `the final-verification hook`), raw `.omca/state/*.json` file paths, or cross-references to specific plan names/task numbers for enforcement rationale. Describe the behavior instead: *"session termination is blocked until final-verification evidence is present"* not *"the `stop-gates` handler blocks Stop"*. Exception: platform event names like `TaskCreated`, `TaskCompleted`, `TeammateIdle` may appear as API contract references, but do not frame them as "lifecycle hooks"; use "lifecycle events" or "platform lifecycle gates". Naming internal handlers in agent prose creates stale prompts whenever hooks are renamed, refactored, or replaced with MCP tools.
+- Frontmatter outranks `CLAUDE_CODE_SUBAGENT_MODEL` (v2.1.251 or later). The order is a per-invocation model first, then the agent definition's `model:` field (`inherit` included), then the environment variable. Every agent on this roster declares `model:`, so the variable is a default that never applies here. `CLAUDE_CODE_SUBAGENT_MODEL_FORCE` (v2.1.257 or later) does override a definition. With it set, the declared tier is ignored for every agent, oracle's `fable` included.
+- Keep hook internals out of agent prompts. State the behavioral rule and leave out the enforcement mechanism. An agent prompt must not mention hook handler names (`stop-gates`, `task-completed`), "X hook" as a noun (`SubagentStart hook`, `Stop hook`, `the final-verification hook`), raw `.omca/state/*.json` file paths, or specific plan names and task numbers as enforcement rationale. Write *"session termination is blocked until final-verification evidence is present"*, and avoid *"the `stop-gates` handler blocks Stop"*. Platform event names such as `TaskCreated`, `TaskCompleted` and `TeammateIdle` may appear as API contract references. Do not call them "lifecycle hooks"; say "lifecycle events" or "platform lifecycle gates". A prompt that names an internal handler goes stale when the hook is renamed, refactored or replaced with an MCP tool.
 
 ## Adding a skill
 
@@ -59,13 +59,13 @@ Key rules:
 2. Follow existing frontmatter format (`name`, `description`, `argument-hint` if applicable)
 3. If the skill should be keyword-activated, add a detection pattern to `src/core/keywords.ts`
 4. A skill that omits `context: fork` expands inline in whatever session invoked it, so one invoked from the main session runs at depth 0 and keeps that session's `Agent` tool. That is what an orchestrator skill needs; `start-work` is the worked example, fanning out to `executor` agents from an inline body. `context: fork` does the opposite. It runs the body in a forked subagent one level down, where the platform may withhold the `Agent` tool depending on the configured spawn depth, so do not reach for it when the body has to delegate.
-5. **Skill descriptions have a 512-character soft cap and a 1,536-character hard cap** (the platform truncates at the hard cap; older clients may truncate at the soft cap). Run `just test-claims` before committing; it counts `description` plus `when_to_use`, warns at 512 and fails at 1,536. Move longer trigger phrases or usage notes into the SKILL.md body.
-6. **Do not leak hook internals.** Skills describe WHAT users do; hooks automate HOW. Unless the skill's primary purpose IS hook configuration or diagnosis, skills must NOT mention: raw `.omca/state/*.json` file paths (use the `boulder_write`, `boulder_progress` MCP tools from the omca server instead), hook handler names (`task-completed`, `stop-gates`, etc.), hook event names (`PreToolUse`, `Stop`, etc.), or hook env vars (`OMCA_DISABLED_HOOKS`). Recognized exception: `omca-setup` (reports on the hooks, the mod and the managed settings that affect OMCA). Exposing file paths forces users to understand internal layouts they cannot control, and forces every future hook refactor to update skill prose.
+5. Keep a skill description under the 512-character soft cap and the 1,536-character hard cap. The platform truncates at the hard cap, and older clients may truncate at the soft cap. Run `just test-claims` before committing: it counts `description` plus `when_to_use`, warns at 512 and fails at 1,536. Move longer trigger phrases or usage notes into the SKILL.md body.
+6. Keep hook internals out of skills. Skills describe what users do, and hooks automate how. Unless a skill's primary purpose is hook configuration or diagnosis, it must not mention raw `.omca/state/*.json` file paths (use the `boulder_write` and `boulder_progress` MCP tools from the omca server instead), hook handler names (`task-completed`, `stop-gates`), hook event names (`PreToolUse`, `Stop`) or hook env vars (`OMCA_DISABLED_HOOKS`). The recognized exception is `omca-setup`, which reports on the hooks, the mod and the managed settings that affect OMCA. A file path in a skill forces users to learn internal layouts they cannot control, and every hook refactor then has to update skill prose.
 
 ## Testing
 
 ```bash
-just ci              # full pipeline: typecheck, every validator group, mod tests, bun specs, MCP, manifest, opencode
+just ci              # full pipeline: lint, typecheck, every validator group, mod tests, bun specs, MCP, manifest, opencode
 just test            # structural validation only (claims, hooks, mod, tree, engine), not the full suite
 just test-claims     # manifest, frontmatter, docs and policy checks
 just test-hooks      # hooks.json handler shape, SessionStart matcher and registry checks
@@ -76,6 +76,7 @@ just qa              # manual QA against the mock model: session smoke, install 
 just bench           # the working tree against a baseline ref, through the mock model
 just compare         # OMCA against similar plugins in Docker, through a mock model (needs docker)
 just test-opencode   # OpenCode adapter: typecheck and every opencode/ spec, run against a real OpenCode install
+just lint            # oxlint with warnings denied, configured in .oxlintrc.json
 just typecheck-ts    # both tsc projects
 just validate        # every validator group (bun scripts/validate.ts)
 ```
@@ -132,7 +133,7 @@ clean tracked tree, a `## [<version>]` heading in `CHANGELOG.md` and no existing
 `plugin-v<version>` tag. It writes the version into `.claude-plugin/plugin.json`, both version
 fields of `.claude-plugin/marketplace.json` and `package.json`, commits the bump and tags it
 `v<version>`. It then packages that tag's tracked files, which leaves out `package.json`,
-`bun.lock` and the typecheck configs so an install fetches no npm packages, as a commit on the
+`bun.lock`, the typecheck configs and `.oxlintrc.json` so an install fetches no npm packages, as a commit on the
 orphan `plugin` branch tagged `plugin-v<version>`. A second commit on the working branch records
 that packaged commit's SHA in `marketplace.json`, as a `url` source with `ref: plugin`. The script
 never pushes. Push the packaged branch first, because the stamped SHA must exist on the remote
