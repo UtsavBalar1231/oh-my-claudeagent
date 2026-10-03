@@ -207,9 +207,12 @@ no-op.
 - Inspect the effective ruleset with `claude auto-mode defaults`, `claude auto-mode config`,
   `claude auto-mode critique`, and `claude auto-mode reset`.
 
-Auto mode is on by default on Bedrock, Vertex, and Foundry as of v2.1.207;
-`CLAUDE_CODE_ENABLE_AUTO_MODE` is now only a way to force it on where a deployment turned it
-off.
+Auto mode is available by default on Bedrock, Vertex, and Foundry from v2.1.207, and
+`CLAUDE_CODE_ENABLE_AUTO_MODE` has no effect from that version. Since v2.1.284, interactive
+terminal and VS Code sessions start in auto mode on every plan and provider when no permission
+mode is configured, and since v2.1.285 so do `claude -p` and Python Agent SDK sessions on
+third-party providers or with telemetry off. `permissions.defaultMode` and `--permission-mode`
+override the built-in default.
 
 ### Parameter-scoped permission rules
 

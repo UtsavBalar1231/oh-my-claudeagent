@@ -44,90 +44,68 @@ rule can grant a write under `.claude/`. This is platform policy, not an OMCA ho
 
 **Workaround**: none. Write those files yourself, or approve each write interactively.
 
-## The Bash deny guards catch direct invocations only
+## The Bash guard does not look inside nested commands
 
-**Symptom**: you expect `permission-filter.sh` to stop a recursive removal, and a command
-that plainly deletes a tree runs anyway. Same for `git-destructive-deny.sh` and a
-destructive git subcommand.
+**Symptom**: you expect the `bash-guard` check to stop a recursive removal or a destructive
+git command, and a command that plainly does it runs anyway.
 
-**Why**: both guards match a literal command name at a command position. Anything that
-reaches the same operation through another name, another binary, or another process
-sidesteps the pattern. Measured against the current scripts on a `PreToolUse` payload, all
-of these fall through to the platform decision rather than denying:
+**Why**: `classify` in `src/core/destructive.ts` reads the command text for `rm` and `git` at
+a command position. It reads through a path (`/bin/rm`), `\rm`, and the `command`, `env`,
+`sudo`, `nohup`, `nice`, `exec` and `time` prefixes and `VAR=value` assignments, so those deny
+like a bare `rm -rf`. It does not look inside a command that reaches another program as text
+or as arguments. Measured against `classify` on the current checkout, all of these return no
+finding and fall through to the platform decision:
 
-- an absolute or relative path, `/bin/rm -rf DIR`, and likewise `/usr/bin/git reset --hard`
-- a builtin bypass, `command rm -rf DIR`
-- a quoting bypass, `\rm -rf DIR`
-- a wrapper that takes the real command as arguments: `env rm -rf DIR`, `nohup rm -rf DIR`,
-  `timeout 5 rm -rf DIR`, `sudo -u someone rm -rf DIR`
-- a variable assignment prefix, `FOO=1 rm -rf DIR`
-- an argument-fed pipeline, `find DIR -print0 | xargs -0 rm -rf`
-- a nested shell, `bash -c 'rm -rf DIR'`
+- a nested shell, `bash -c 'rm -rf DIR'` or `sh -c "rm -rf DIR"`, and likewise
+  `bash -c 'git reset --hard'`
+- `eval 'rm -rf DIR'`
+- a script fed through a heredoc, `bash <<'EOF'` with `rm -rf DIR` in the body, quoted
+  delimiter or not
+- `timeout 5 rm -rf DIR` and `timeout 5 git reset --hard`
+- an argument-fed pipeline, `find DIR -print0 | xargs -0 rm -rf`, or `xargs git reset --hard`
 - another tool doing the deletion: `find DIR -delete`, or a one-line Python `rmtree`
 
-Flag order, flag case and the long form are no longer part of that list: `rm -Rf DIR`,
-`rm -f -r DIR` and `rm --recursive DIR` deny like `rm -rf DIR`. On the git side, a leading
-global option no longer hides the subcommand, so `git -C DIR reset --hard`,
-`git --git-dir=DIR/.git reset --hard` and `git -c k=v reset --hard` deny, as do
-`git checkout REV -- PATH` and `git rm`.
+Handling of nested shells, `eval`, heredocs and `timeout` is being changed. The remaining
+items stay open: widening the pattern to cover them means either a real shell tokenizer or a
+prefix list that a caller can always step outside of.
 
-Widening the pattern to cover these means either a real shell tokenizer inside a bash hook
-or a prefix list that a caller can always step outside of. Neither turns the guard into
-something it is not.
+The platform covers part of the nested-shell gap. Since v2.1.288 its critical-path check on
+`rm` and `rmdir` reads `sh -c` and `bash -c` scripts, so a nested removal of the root, home or
+the working directory is no longer run unprompted in `bypassPermissions` mode or under a shell
+allow rule. That check does not cover git, `eval`, heredocs, or removals outside critical
+paths.
 
-The removal guard is also scoped by target. It denies only a target whose loss is
+Flag order, flag case and the long form do not matter: `rm -Rf DIR`, `rm -f -r DIR` and
+`rm --recursive DIR` deny like `rm -rf DIR`. A leading git global option does not hide the
+subcommand either, so `git -C DIR reset --hard`, `git --git-dir=DIR/.git reset --hard` and
+`git -c k=v reset --hard` deny, as do `git checkout REV -- PATH` and `git rm`.
+
+The removal guard is also scoped by target. It denies outright only a target whose loss is
 machine-wide: the filesystem root, home, the working directory or a parent of it, a
 directory directly under root or home, a `$VAR/` path that lands there when the variable is
 empty, a substituted target, or `--no-preserve-root`. A deeper path such as
-`rm -rf /tmp/build` or `rm -rf ~/.cache/foo` is left to the platform. It reads the literal
-text, so a symlink at a deep path that points somewhere shallow is not seen.
+`rm -rf /tmp/build` or `rm -rf ~/.cache/foo` goes to a confirmation dialog, and where no
+dialog can show (`claude -p`) it runs. The guard reads the literal text, so a symlink at a
+deep path that points somewhere shallow is not seen.
 
-**Workaround**: treat these hooks as a guardrail against a model reaching for the obvious
+**Workaround**: treat the guard as a check against a model reaching for the obvious
 destructive spelling, not as a security boundary. Anything adversarial, and anything where
 the cost of a wrong deletion is real, needs the platform's own layers: `permissions.deny`
-and `permissions.ask` rules, auto mode's classifier, sandboxing, or simply not granting the
-session write access to the directory in question. The OMCA hooks sit in front of those and
-never replace them.
-
-## Version floors worth knowing
-
-Each of these was a real failure mode below the version named. If you are on an older client,
-expect the behavior described.
-
-| Floor | Below it |
-|---|---|
-| v2.1.200 | Project-scoped plugins did not load from worktrees. A `--plugin-dir` install meant a worktree-isolated run executed with no OMCA hooks and no MCP server. This checkout is project-scoped |
-| v2.1.203 | A worktree-isolated subagent could run Bash in the parent checkout instead of its own worktree |
-| v2.1.205 | On Windows, `worktree.symlinkDirectories` could delete files outside the worktree when the worktree was removed. Do not enable it below this version on Windows |
-| v2.1.207 | `worktree.sparsePaths` left `extensions.worktreeConfig` behind in the repo config after worktree removal, which breaks go-git-based tooling |
-| v2.1.208 | A Grep with an invalid regex or a null byte returned zero results instead of an error, so "not present" and "rejected pattern" looked identical. Many deny or ask rules also cost multiple seconds per call |
-| v2.1.210 | Git mutations from inside a worktree could escape it, and accepting a plan could overwrite the plan file with a stale snapshot. That overwrite resurrects checked boxes, which falsifies both checkbox-derived completion and the `plan_sha256` evidence binding, so v2.1.210 is the practical floor for plan-driven work |
-| v2.1.211 | A hook returning `ask` could be overridden by the auto-mode classifier's allow under unsandboxed Bash. A subagent model override was also reverted on resume |
-| v2.1.212 | A committed `.claude/worktrees` symlink was an escape path, and plan-mode Bash could mutate files unprompted |
-| v2.1.216 | `git -C`, `--git-dir`, and `GIT_DIR`/`GIT_WORK_TREE` could redirect a worktree-isolated subagent's git into the shared checkout, and read-only commands on Windows could reach network paths with no permission prompt |
-| v2.1.217 | Background session isolation did not canonicalize a symlinked working directory, so a session could escape its workspace folder. Concurrent subagents were also uncapped, so a single message could fan out unbounded background agents (the cap arrived here, default 20) |
-| v2.1.218 | Hooks declared in agent frontmatter ran from folders that had never accepted workspace trust |
-| v2.1.221 | A Bash permission check could be bypassed by hiding commands inside a zsh `[[ ]]` regex conditional, and PowerShell permission checks mishandled paths containing quote characters on Windows |
-| v2.1.222 | Worktree isolation still did not cover Bash and file edits in every session type, so an isolated session or its subagents could run destructive git commands against the main checkout. A `PreToolUse` auto-allow hook could also bypass tool restrictions inside background agent tasks, which is the event OMCA's trusted-tooling fast path deliberately stays off |
-| v2.1.223 | A crafted Bash command could hide part of itself from the permission check, and tabs or invisible Unicode could hide part of a command from the approval dialog that was about to grant it |
-| v2.1.224 | Sandbox filesystem deny entries written with a trailing slash (`denyRead: "~/.aws/"`) were silently bypassable, and a project path over 200 characters resolved into another project's session directory, which is the tree `session_search` reads |
-| v2.1.228 | Session cleanup deleted contents inside a project's memory folder |
-| v2.1.232 | A nested git repository inherited trust from its parent directory instead of requiring its own confirmation |
-| v2.1.234 | A session-scoped permission answer, including a deny, was dropped when it was given in response to a background subagent's prompt. Since v2.1.232 every non-teammate subagent spawn runs in the background, so this covers the normal delegation path |
-| v2.1.239 | Hooks failed with `posix_spawn ENOENT` once the session's working directory had been deleted, and the Linux sandbox made a nonexistent `.git/config.worktree` unreadable, which broke every sandboxed git command in a repo carrying `extensions.worktreeConfig` |
-| v2.1.245 | A hook `if` condition such as `Bash(cat *)` fired on unrelated Bash commands whenever the command contained `$()` or backtick substitution followed by more arguments. Startup also crashed outright on Linux distributions shipping glibc 2.44 (Arch, CachyOS, Fedora Rawhide) |
+and `permissions.ask` rules, sandboxing, or simply not granting the session write access to
+the directory in question. Auto mode's classifier reviews most commands but not critical-path
+removals, which the platform handles with its own prompt or denial. The OMCA guard sits in
+front of those and never replaces them.
 
 ## The `omca` MCP server can vanish mid-plan
 
 **Symptom**: `evidence_log` or `boulder_write` fails with a not-connected error partway
 through a plan run.
 
-**Why**: the server is plugin-provided, so it is torn down and restarted on a mid-session
-plugin re-sync, and it needs to reconnect after an idle web session wakes. The teardown was
-fixed in v2.1.210 and the idle-wake reconnect in v2.1.211, so v2.1.211 is the floor for both.
+**Why**: the server is plugin-provided, so the tools fail while it is unavailable, such as
+during a reconnect window or after a plugin reload.
 
 **Workaround**: re-issue the tool call. Do not skip the evidence step because the call failed
-once; `json-error-recovery.sh` says the same thing when it sees that error.
+once; the server's failure-recovery handler says the same thing when it sees that error.
 
 ## A plan binding can outlive its session
 
@@ -182,9 +160,7 @@ OMCA hook fires, the `omca` MCP tools are missing, and nothing gates a completio
 local settings are ignored, so the plugin's hooks and its MCP server are never registered.
 The same mode also removes the built-in tools that run commands or code unless they are named
 individually in `--tools`, which takes away the surface the evidence workflow verifies
-against. Every guarantee this plugin makes is void in such a session. The flag and the
-environment variable both require client v2.1.248 or later; on an older client neither does
-anything.
+against. Every guarantee this plugin makes is void in such a session.
 
 **Workaround**: run without the flag when you need the plugin. `CLAUDE_CODE_RESTRICTED` is an
 environment variable, so `/oh-my-claudeagent:omca-setup --doctor` reports it when it is
@@ -194,17 +170,3 @@ launched.
 
 **Detection**: the variable is ignored inside a settings file's `env` block, so it can only
 have been set in the environment or implied by the flag.
-
-## Evidence logged on an old client can record a false exit code
-
-**Symptom**: an `evidence_log` entry shows `exit_code: 0` for a command that failed.
-
-**Why**: sandboxed Bash commands on Linux reported exit code 0 for failed commands whenever
-the shell was zsh. This repository's shell is zsh, and `evidence_log` stores whatever exit
-code the caller observed, so the stored code can claim success for a command that did not
-succeed. Fixed in client v2.1.275, so a session on v2.1.276 or later is unaffected.
-
-**Workaround**: treat evidence written on a client older than v2.1.275 as unverified. Re-run
-the verification command and log a fresh entry rather than trusting the stored code. The
-entries carry no client version, so the timestamp against your upgrade date is what tells you
-which ones are suspect.

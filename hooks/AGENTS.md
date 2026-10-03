@@ -43,16 +43,20 @@ event is unregistered on purpose; `OMCA.md` carries the per-event reason.
   `grep -rn "rm -rf" scripts/` follows a quote rather than a separator. `tool.check` runs
   before every Bash call in every permission mode, so the guard never depends on a dialog being
   shown. A deny registered only on `PermissionRequest` would be inert for any command that never
-  produces a dialog, which under `permissions.defaultMode: "auto"` is the common case. Auto mode
-  also adjudicates the dangerous-`rm` case without a dialog, but the guard is not backed by that
-  and must not be deleted as duplicated platform behavior.
+  produces a dialog, which under `permissions.defaultMode: "auto"` is the common case. The
+  platform's critical-path check on `rm` and `rmdir`, which also looks inside `sh -c` and
+  `bash -c` scripts, asks in the terminal or denies in auto mode, and the classifier does not
+  review those removals. That check covers critical paths only, while the guard also covers the
+  destructive git family, force pushes and other recursive removals, so it must not be deleted
+  as duplicated platform behavior.
 - `tool.check` never returns an allow, because an allow there skips the auto-mode classifier.
   The auto-allow of a narrow trusted-tooling set lives in the server's `PermissionRequest`
   handler (`servers/hooks/trusted-tooling.ts`, with its rules in
   `src/core/trusted-tooling.ts`): the `run`, `test`, `ci`, `list` and `view` subcommands of npm,
   yarn, pnpm and bun, `jq` without `--rawfile`, and `uv run` and `uv sync`. `PermissionRequest`
-  fires only when a permission dialog is about to be shown, so that handler can only remove a
-  prompt the user would otherwise see. It must stay off `PreToolUse`: a `PreToolUse`
+  fires when a permission dialog is about to be shown and where a call that cannot prompt would
+  otherwise be auto-denied, such as `-p` outside `dontAsk`, so that handler can only turn a
+  prompt or an auto-denial into an allow. It must stay off `PreToolUse`: a `PreToolUse`
   `permissionDecision: "allow"` skips the permission prompt, so the auto-mode classifier and any
   interactive confirmation never run for that command, and only explicit `deny` and `ask` rules
   from settings still apply. Moving it there would convert a six-tool convenience into a silent

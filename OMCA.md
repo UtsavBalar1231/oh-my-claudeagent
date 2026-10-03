@@ -39,7 +39,7 @@ Claude-native plans are canonical. The plans directory is the `plansDirectory` s
 
 **`/goal` vs `/oh-my-claudeagent:start-work`**: `/goal` is a native completion-condition loop. `/start-work` pairs with boulder state and evidence gating for plan-driven work. For timer-based re-runs, use native `/loop` — it is not a verified persistence loop, but it is the lightest way to keep running until you manually stop.
 
-**`/fork`, `/subtask`, `/tasks`, `/doctor`, `/code-review`, `/deep-research`** are all Claude-native. `/fork` opens a background session; `/subtask` is the in-session subagent, user-driven and untracked by boulder or evidence, unlike an `Agent()` delegation. Neither is the skill-frontmatter `context: fork`, which forks a fresh agent context for a skill body. `/tasks` is the native shared task list for in-session teammate coordination; boulder owns cross-session plan binding plus the sha256 and evidence gating, which is why the two are not the same board. `/doctor` (alias `/checkup`) is fix-capable; `/oh-my-claudeagent:omca-setup --doctor` is read-only and OMCA-scoped. `/code-review` owns diff review and `/deep-research` owns per-claim cross-checking; `oracle` and `librarian` keep depth review and version-matched library lookup respectively.
+**`/fork`, `/subtask`, `/tasks`, `/doctor`, `/code-review`, `/deep-research`** are all Claude-native. `/fork` opens a background session; `/subtask` is the in-session subagent, user-driven and untracked by boulder or evidence, unlike an `Agent()` delegation. Neither is the skill-frontmatter `context: fork`, which forks a fresh agent context for a skill body. `/tasks` is the native shared task list for in-session teammate coordination; boulder owns cross-session plan binding plus the sha256 and evidence gating, which is why the two are not the same board. `/doctor` (alias `/checkup`) is fix-capable; `/oh-my-claudeagent:omca-setup --doctor` is read-only and OMCA-scoped. `/code-review` (alias `/review`; `--max-findings <n>|all|default` from v2.1.288 sets how many findings it reports) owns diff review and `/deep-research` owns per-claim cross-checking; `oracle` and `librarian` keep depth review and version-matched library lookup respectively.
 
 **Channels**: Not used — OMCA focuses on in-session orchestration via hooks, subagents, skills.
 
@@ -299,9 +299,11 @@ drift guard in that order and answers with the first block. `SessionStart` for `
 guidance template, the session id, and the bound plan's name, path, next open task and
 notepad line; on `clear` it hands the guidance back to the session's next prompt.
 
-`Setup` fires only under `claude --init-only`, `claude -p --init`, and
-`claude -p --maintenance`, so the dependency check runs on the `init` matcher and the
-stale-marker and log sweeps run on `maintenance`, off the per-session startup path.
+`hooks/hooks.json` has no `Setup` entry. The platform fires `Setup` only under
+`claude --init-only`, `claude -p --init`, and `claude -p --maintenance`, with a `trigger` of
+`init` or `maintenance`, and it never runs `mcp_tool` hooks on it. OMCA's settings hooks are
+all `mcp_tool` entries, so the event could not reach them anyway; the adoption table below
+records why it stays unregistered.
 
 **Registered platform events OMCA does not handle:**
 
@@ -570,10 +572,10 @@ health check, `--uninstall` to remove.
 | `claude plugin install <name>` | Install a plugin from a known marketplace |
 | `claude plugin details <name>` | (v2.1.139+) Show a plugin's component inventory and projected per-session token cost — useful before installing or for diffing cost across versions |
 | `claude plugin list` | List installed plugins; surfaces folder-shadow warnings introduced in v2.1.140 |
-| `claude plugin tag <plugin> <tag>` | Tag an installed plugin version |
+| `claude plugin tag [path]` | Create an annotated git tag for a plugin release, derived from the plugin's manifest version (`--push`, `--dry-run` and other flags apply) |
 | `claude plugin prune` | Remove unused cached plugin versions |
-| `claude project purge` | Remove cached plugin state for the current project |
-| `claude --prune` | Cascade prune: plugins + transitive dependencies |
+| `claude plugin uninstall <plugin> --prune` | Uninstall, then remove auto-installed dependencies that no remaining plugin needs |
+| `claude purge [path]` | (v2.1.288+, formerly `claude project purge`) Delete all local Claude Code state for a project: transcripts, task lists, debug logs, file-edit history, prompt history lines, and the project's entry in `~/.claude.json`. It does not target plugin state and it asks for confirmation; use `--dry-run` to preview |
 
 Run `claude plugin details oh-my-claudeagent` before a major release to capture the pre-bump token-cost projection; compare against the post-bump value to spot accidental cost regressions.
 
@@ -1167,12 +1169,15 @@ effort control.
 
 ### `CLAUDE_CODE_ENABLE_AUTO_MODE` (v2.1.158)
 
-Enables auto permission mode for Bedrock, Vertex, and AWS Bedrock Foundry deployments,
-where it used to be off by default. As of v2.1.207 auto mode is on by default on those
-providers too, so this variable is now only a way to force it on where a deployment has
-turned it off. Under `disableAutoMode: "disable"`, auto mode never runs and
-the `permission-coach` handler is unreachable. Relevant for OMCA users running in managed cloud deployments who want auto-mode
-orchestration without the bypass-permissions confirmation flow.
+Enabled auto permission mode for Bedrock, Vertex, and Foundry deployments from v2.1.158
+through v2.1.206, where it was off until the variable was set. From v2.1.207 auto mode is
+available on those providers by default and the variable is accepted but has no effect.
+Since v2.1.284, interactive terminal and VS Code sessions also start in auto mode on every
+plan and provider when no permission mode is configured (v2.1.283 for third-party providers
+and telemetry-off sessions), and since v2.1.285 `claude -p` and Python Agent SDK sessions on
+third-party providers or with telemetry off do too. `permissions.defaultMode` and
+`--permission-mode` override the built-in default. Under `disableAutoMode: "disable"`, auto
+mode never runs and the `permission-coach` handler is unreachable.
 
 ### `agent` setting — honored for dispatched sessions (v2.1.157)
 
@@ -1269,14 +1274,21 @@ confirmation dialog that lists what they would touch. "Run it" hands the call ba
 normal permission evaluation; any other answer, a dismissed dialog, or a failed one denies.
 Where no dialog can show (`claude -p`), or with the `guardMode` option set to `deny`, the guard
 decides exactly as 2.21.0 did: the git family is denied, and a recursive removal of a deeper
-path or a force push runs. Auto mode now absorbs the dangerous-`rm` dialog itself, so the guard is not backed by a
-platform prompt and must not be deleted as duplicated behavior.
+path or a force push runs. The platform's own critical-path check on `rm` and `rmdir` (root,
+top-level directories, home, the working directory and its parents) also looks inside `sh -c` and
+`bash -c` scripts since v2.1.288. In auto mode it asks in the terminal with a two-minute
+countdown, which denies on expiry, and denies at once where no terminal can show one (`-p`, the
+Agent SDK, the VS Code chat panel, the Desktop app). The auto-mode classifier does not review
+these removals. The guard stays because it covers more than critical paths: removals outside
+that list, the destructive git family, and force pushes, none of which the platform check sees.
 
 The two halves sit on different events, and the difference is load-bearing. `tool.check` runs
 before every Bash call in every permission mode, so the guard never depends on a dialog being
 shown, and it never returns `allow`, which would skip the auto-mode classifier.
-`PermissionRequest` fires only when a permission dialog is about to be shown, so the fast path
-there can only remove a prompt the user would otherwise see. Do not move the fast path
+`PermissionRequest` fires when a permission dialog is about to be shown, and since v2.1.285 also
+where a call that cannot prompt would otherwise be auto-denied, including `-p` outside `dontAsk`.
+It never fires for a call the permission evaluation already allowed, so the fast path there can
+only turn a prompt or an auto-denial into an allow. Do not move the fast path
 anywhere earlier: an allow ahead of the permission evaluation would turn a convenience covering
 six known tools into a silent bypass of the operator's whole permission posture for those
 commands.
@@ -1585,11 +1597,11 @@ tables under Core Concepts and Agent Reference are the live state.
 | Project-scoped plugins load from worktrees (v2.1.200) | Below that version, a `--plugin-dir` install meant worktree-isolated runs executed with no OMCA hooks and no MCP server. This checkout is project-scoped |
 | Protected paths: `.claude/**` writes are never auto-approved | The protected-path check precedes allow rules entirely, so `permissions.allow: ["Edit(.claude/**)"]` has no effect. Setup flows that expect it to work half-complete |
 | `EnterWorktree` confirms outside `.claude/worktrees/` | No `EnterWorktree` callsite exists; `--worktree` is prompt-injected paths plus boulder bookkeeping |
-| Auto mode absorbs dangerous-`rm` dialogs | The platform dialog is no longer the backstop behind `permission-filter.sh`'s deny branch, so nobody should delete that branch as duplicated platform behavior. It also meant the branch was not reached at all while the script sat on `PermissionRequest` alone: no dialog, no event, no deny. Fixed by registering the deny on `PreToolUse` too |
+| Critical-path `rm` handling in auto mode (v2.1.281, extended to `sh -c` and `bash -c` scripts in v2.1.288) | Auto mode asks in the terminal with a two-minute countdown and denies where no terminal exists; the classifier does not review these removals. The platform check covers critical paths only, so the `tool.check` guard in `hooks/bash-guard.ts` is not duplicated behavior and must stay. It runs on `tool.check`, which fires in every permission mode, because a deny on `PermissionRequest` alone is not reached when an auto-allowed call shows no dialog |
 | `rm -rf` inside `$(…)`, backticks, and `<(…)` now prompts even in bypass and auto mode | The platform does check inside command substitution. The residual on OMCA's side is the `^` anchor on the deny regex, deliberately kept: an unanchored pattern would deny `grep -rn "rm -rf" scripts/` |
 | Bash permission analysis fails closed | File-descriptor redirects, commands over 10,000 characters, and zsh subscripts now fail closed rather than being parsed optimistically |
 | Auto-mode classifier is Sonnet 5, validated and pinned per session | Correcting a stale "not currently used by OMCA" clause: `PermissionDenied` is registered and the `permission-coach` handler returns `retry: true` inside `hookSpecificOutput`, the only place the platform reads it for this event |
-| Auto mode is on by default on Bedrock, Vertex, and Foundry as of v2.1.207 | The opt-in that older OMCA prose described as required is no longer required. Under `disableAutoMode: "disable"`, the `permission-coach` handler is unreachable |
+| Auto mode is the built-in starting mode on every plan and provider (v2.1.284 interactive, v2.1.285 `-p` on third-party providers or with telemetry off) | The Bedrock, Vertex, and Foundry opt-in (`CLAUDE_CODE_ENABLE_AUTO_MODE`) has had no effect since v2.1.207. A session with no configured mode can now start in auto, so `permission-coach` is reachable in more sessions. Under `disableAutoMode: "disable"` it is unreachable |
 | `useAutoModeDuringPlan` (default `true`) | Governs whether prometheus, metis, and momus shell calls prompt one by one. Not read from shared project settings |
 | `pluginConfigs` is not read from project `.claude/settings.json` as of v2.1.207 | A `pluginConfigs` block in a repo-committed settings file is a silent no-op. The preset examples say so now |
 | Agent-frontmatter hooks require the agent's folder to be trusted | For OMCA's primary install path, the plugin cache, that never happens, so frontmatter hooks would fail silently. This is what makes the hooks.json-only convention load-bearing rather than stylistic |
@@ -1602,7 +1614,7 @@ tables under Core Concepts and Agent Reference are the live state.
 | WebSearch session cap of 200 | The context7-first prescription already conserves it |
 | `/fork` is a background session; `/subtask` is the in-session subagent | Both are Claude-native. `/subtask` is user-driven and untracked by boulder or evidence, unlike an `Agent()` delegation. Neither is the skill-frontmatter `context: fork` |
 | Bundled `/verify`, `/code-review`, and `/deep-research` are manual-invocation only | No evidence path may be built on implicit skill invocation |
-| `/code-review` vs oracle | Diff review, branch-versus-upstream, `--fix`, `--comment`, effort calibration, and background review with its own context window are Claude-native's. oracle keeps depth review, stuck-debugging escalation, and architecture tradeoffs. `/code-review` is `disable-model-invocation`, so it is not a delegation target |
+| `/code-review` vs oracle | Diff review, branch-versus-upstream, `--fix`, `--comment`, `--max-findings <n>\|all\|default` (v2.1.288), the `/review` alias, effort calibration, and background review with its own context window are Claude-native's. oracle keeps depth review, stuck-debugging escalation, and architecture tradeoffs. `/code-review` is `disable-model-invocation`, so it is not a delegation target |
 | `/deep-research` vs librarian | librarian is version-matched library and API lookup with no verification layer. `/deep-research` is user-invoked and its value is per-claim cross-checking. OMCA's research path has no claim verification, which the no-second-wave rule otherwise papers over |
 | Background agent result honesty | The platform now covers one failure mode the barrier rules partly defended against. The rules stay as defense in depth so a future sync does not strip them |
 | Background task notifications state that no human input occurred | That anti-fabricated-consent wording is platform-injected, not OMCA-authored. No agent body should be edited to claim or restate it |
@@ -1612,7 +1624,7 @@ tables under Core Concepts and Agent Reference are the live state.
 | Positional `$1`/`$2` are preserved verbatim in skill bodies | Removes a latent authoring hazard: an `awk '{print $1}'` inside a SKILL.md body now survives |
 | Memory index warning measures loaded content only | The line and byte thresholds do not count frontmatter |
 | Agent view dispatch resolves a bare first word to a subagent name | `explore`, `executor`, and `oracle` are ordinary English words that plausibly open a dispatch prompt. Hazard note only; nothing is renamed |
-| Teammate frontmatter: `skills` and `mcpServers` are ignored, coordination tools are always kept | `disallowedTools` cannot remove SendMessage or the task tools, and the agent body is appended to the teammate prompt rather than substituted for it, so the Team Eligibility table must not be read as an exclusion mechanism |
+| Teammate frontmatter: a plugin agent spawned by name runs with its own prompt, tools, `disallowedTools` and effort (v2.1.288); `skills` is ignored, `mcpServers` applies to split-pane teammates only, and coordination tools are always kept | Before v2.1.288 a plugin-defined agent spawned as a teammate ran with the defaults. Now `disallowedTools` restricts a teammate like any other agent, but it cannot remove SendMessage or the task tools. An in-process teammate gets the agent body appended to the default prompt, and a split-pane teammate uses it in place of the default |
 | Teammate model and fast mode are fixed at spawn | Per-delegation model routing does not apply to teammates. Native plan approval gates the teammate path |
 | Native shared task list and `/tasks` vs boulder | Native owns in-session teammate coordination; boulder owns cross-session plan binding plus the sha256 and evidence gating. Naming `/tasks` here is what keeps someone from building an OMCA equivalent |
 | `Elicitation`'s requester is an MCP server, not the model | Correcting the event description above |
