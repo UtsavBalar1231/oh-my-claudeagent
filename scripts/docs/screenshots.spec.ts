@@ -56,8 +56,10 @@ describe("CLIPS", () => {
       "clip-guard",
       "clip-verify",
       "clip-board-light",
+      "clip-tour",
     ]);
-    for (const shot of CLIPS) expect([shot.cols, shot.rows]).toEqual([200, 50]);
+    const pairs = ["clip-plain-stop", "clip-plain-reset", "clip-refusal", "clip-guard"];
+    for (const shot of CLIPS) expect([shot.name, shot.cols, shot.rows, shot.font]).toEqual(pairs.includes(shot.name) ? [shot.name, 96, 34, 35] : [shot.name, 200, 50, undefined]);
   });
 
   test("each clip marks the events and names the targets its beat needs", () => {
@@ -78,6 +80,7 @@ describe("CLIPS", () => {
     expect(marks(clip("clip-guard"))).toEqual(["cmd-typed", "dialog", "refused"]);
     expect(targets(clip("clip-guard"))).toEqual(["discard-lines"]);
     expect(marks(clip("clip-verify"))).toEqual(["cmd-typed", "tests-pass", "evidence-logged", "complete"]);
+    expect(marks(clip("clip-tour"))).toEqual(["cmd-typed", "agents-tab", "plan-tab", "evidence-tab", "notepad-tab", "stats-tab", "feedback-tab", "rated"]);
     expect(targets(clip("clip-verify"))).toEqual(["complete-chip"]);
   });
 

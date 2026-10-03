@@ -1,0 +1,15 @@
+{
+  "session_id": "6f1c2a7e-3b9d-4c51-9a0e-2d4b8f7c1e01",
+  "agent_id": "a3f9c2e1b7d04a15",
+  "agent_type": "oh-my-claudeagent:prometheus",
+  "model": "claude-opus-5-5",
+  "effort": "high",
+  "started_at": "2026-10-01T08:40:00.000Z",
+  "ended_at": "2026-10-01T08:46:52.000Z",
+  "duration_ms": 412000,
+  "input_tokens": 96000,
+  "output_tokens": 14200,
+  "estimated_cost_usd": 0.668,
+  "outcome": "completed",
+  "evidence_logged": null
+}

@@ -39,9 +39,10 @@ const DPI = 96;
 // kitty reads its padding in points.
 const PADDING_PX = Math.round((PADDING * DPI) / 72);
 const SCREEN = "3840x2160x24";
-// Dense enough that a 2x zoom inside a 1080p composition stays sharp.
+// Dense enough that a 2x zoom of a 200-column clip inside a 1080p composition stays sharp: 16
+// footage pixels a column.
 const CLIP_FONT_SIZE = 22;
-const CLIP_MIN_WIDTH = 3200;
+const CLIP_MIN_CELL_PX = 16;
 const CLIP_FPS = 30;
 const CLIP_POLL_MS = 50;
 const CLIP_KEY_GAP_MS = 1_200;
@@ -83,6 +84,8 @@ type Scene = {
   allow?: readonly string[];
   // Overrides the session environment, OMCA_DISABLED_HOOKS=stop-gates included.
   env?: Readonly<Record<string, string>>;
+  // Points, for a clip whose columns must stay dense at a narrower width.
+  font?: number;
   // false runs plain Claude Code: no --plugin-dir and no OMCA status line.
   plugin?: false;
   args?: readonly string[];
@@ -140,6 +143,12 @@ const guardReady = (screen: string) => /^● Removing/m.test(screen) && screen.i
 // The board's split tier needs a docked pane body of 90 columns, which 200 columns leaves.
 const CLIP_COLS = 200;
 const CLIP_ROWS = 50;
+// The before-and-after pairs fit the whole terminal in the video window, so Claude Code wraps every
+// line inside the frame and none is cut. The larger font keeps a column dense, and the rows still
+// fit the 2160-pixel screen.
+const PAIR_COLS = 96;
+const PAIR_ROWS = 34;
+const PAIR_FONT = 35;
 const has = (...parts: string[]) => (screen: string) => parts.every((part) => screen.includes(part));
 // On the prompt row itself: the slash-command menu lists a command before it is fully typed.
 const command = (line: string): Step[] => [
@@ -239,8 +248,9 @@ export const CLIPS: readonly Clip[] = [
   {
     name: "clip-plain-stop",
     format: "clip",
-    cols: CLIP_COLS,
-    rows: CLIP_ROWS,
+    cols: PAIR_COLS,
+    rows: PAIR_ROWS,
+    font: PAIR_FONT,
     ...PLAIN,
     script: { main: [{ content: [text("All tasks are complete.")] }], subagent: [] },
     steps: [
@@ -253,8 +263,9 @@ export const CLIPS: readonly Clip[] = [
   {
     name: "clip-plain-reset",
     format: "clip",
-    cols: CLIP_COLS,
-    rows: CLIP_ROWS,
+    cols: PAIR_COLS,
+    rows: PAIR_ROWS,
+    font: PAIR_FONT,
     plugin: false,
     args: [...PLAIN.args, ...BYPASS_ARGS],
     settings: BYPASS_SETTINGS,
@@ -275,8 +286,9 @@ export const CLIPS: readonly Clip[] = [
   {
     name: "clip-refusal",
     format: "clip",
-    cols: CLIP_COLS,
-    rows: CLIP_ROWS,
+    cols: PAIR_COLS,
+    rows: PAIR_ROWS,
+    font: PAIR_FONT,
     env: RUN_GATES,
     script: {
       main: [
@@ -383,8 +395,9 @@ export const CLIPS: readonly Clip[] = [
   {
     name: "clip-guard",
     format: "clip",
-    cols: CLIP_COLS,
-    rows: CLIP_ROWS,
+    cols: PAIR_COLS,
+    rows: PAIR_ROWS,
+    font: PAIR_FONT,
     args: BYPASS_ARGS,
     settings: BYPASS_SETTINGS,
     script: resetScript("Understood. Your changes stay as they are."),
@@ -442,6 +455,35 @@ export const CLIPS: readonly Clip[] = [
     ],
   },
   { name: "clip-board-light", format: "clip", cols: CLIP_COLS, rows: CLIP_ROWS, theme: "light", script: PLAN_SCRIPT, steps: BOARD_STEPS },
+  {
+    // The pane's tabs while an executor works, on a project with notes and delegation history,
+    // ending on a rating of the turn.
+    name: "clip-tour",
+    format: "clip",
+    cols: CLIP_COLS,
+    rows: CLIP_ROWS,
+    fixture: "acme-app-tour",
+    script: PLAN_SCRIPT,
+    steps: [
+      { type: "Pick up the next task on the plan" },
+      { key: "Enter" },
+      { until: has("The executor is on task 7"), hold: 1_200 },
+      ...command("/omca"),
+      { until: has("1: Agents", "Wire the order summary panel"), mark: "agents-tab" },
+      { key: "2", gap: 0 },
+      { until: has("Ship the checkout redesign", "PROVEN"), mark: "plan-tab" },
+      { key: "3", gap: 0 },
+      { until: has("FINAL VERIFICATION"), mark: "evidence-tab" },
+      { key: "4", gap: 0 },
+      { until: has("Learnings · "), mark: "notepad-tab" },
+      { key: "6", gap: 0 },
+      { until: has("delegations in"), mark: "stats-tab" },
+      { key: "5", gap: 0 },
+      { until: has("rate the last turn"), mark: "feedback-tab", hold: 1_200 },
+      { key: "u", gap: 0 },
+      { until: has("1 rating"), mark: "rated" },
+    ],
+  },
 ];
 
 export const SHOTS: readonly Still[] = [
@@ -1034,7 +1076,7 @@ async function captureShot(shot: Shot, outDir: string): Promise<string> {
       [
         "kitty", "--config", "NONE", "--class", KITTY_CLASS,
         "-o", `font_family=${font.family}`,
-        "-o", `font_size=${shot.format === "clip" ? CLIP_FONT_SIZE : FONT_SIZE}`,
+        "-o", `font_size=${shot.format === "clip" ? (shot.font ?? CLIP_FONT_SIZE) : FONT_SIZE}`,
         "-o", `initial_window_width=${shot.cols}c`,
         "-o", `initial_window_height=${shot.rows}c`,
         "-o", "remember_window_size=no",
@@ -1061,7 +1103,8 @@ async function captureShot(shot: Shot, outDir: string): Promise<string> {
     await reachPrompt(tmux);
     const isPrivate = () => assertPrivate(tmux.screen(), forbidden);
     if (shot.format === "clip") {
-      if (window.width < CLIP_MIN_WIDTH) throw new Error(`${shot.name}: the window is ${window.width} px wide, under ${CLIP_MIN_WIDTH}`);
+      const cell = (window.width - 2 * PADDING_PX) / shot.cols;
+      if (cell < CLIP_MIN_CELL_PX) throw new Error(`${shot.name}: a column is ${cell.toFixed(1)} px wide, under ${CLIP_MIN_CELL_PX}`);
       isPrivate();
       // yuv420p needs even dimensions; the odd pixel is right or bottom padding.
       const area = { ...window, width: window.width - (window.width % 2), height: window.height - (window.height % 2) };

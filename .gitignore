@@ -7,7 +7,7 @@ video/out/
 video/public/footage/
 
 # oh-my-claudeagent runtime state
-.omca/
+/.omca/
 
 # Logs
 *.log
