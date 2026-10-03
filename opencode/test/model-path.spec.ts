@@ -31,6 +31,9 @@ function allRequests(): Request[] {
 
 const requests = () => allRequests().slice(need().baseline)
 
+type Scenario = { start: number; end: number; headBefore: string }
+const scenarios = new Map<string, Promise<Scenario>>()
+
 const system = (request: Request) =>
   (request.messages ?? [])
     .filter((message) => message.role === "system")
@@ -40,7 +43,8 @@ const system = (request: Request) =>
 const lastIsTool = (request: Request) => request.messages?.at(-1)?.role === "tool"
 const lastText = (request: Request) => text(request.messages?.at(-1)?.content)
 const toolNames = (request: Request) => (request.tools ?? []).map((tool) => tool.function.name)
-const toolResultsSince = (start: number) => requests().slice(start).filter(lastIsTool).map(lastText).join("\n")
+const during = ({ start, end }: Scenario) => requests().slice(start, end)
+const toolResults = (scenario: Scenario) => during(scenario).filter(lastIsTool).map(lastText).join("\n")
 
 function diagnostics(): string {
   const log = need().server.log()
@@ -74,6 +78,22 @@ async function opencode(args: string[], timeoutMs: number): Promise<string> {
 }
 
 const run = (scenario: string) => opencode(["run", "--server", need().server.base, "--model", "stub/scripted", "--auto", "--format", "json", `OMCA-SCENARIO:${scenario}`], 180_000)
+
+// Runs a scenario the first time any test asks for it, so a test that reads the requests a scenario produced does not depend on the test that usually runs it coming first.
+function ran(name: string): Promise<Scenario> {
+  let scenario = scenarios.get(name)
+  if (!scenario) {
+    const start = requests().length
+    const headBefore = git(need().ws, "rev-parse", "HEAD")
+    scenario = run(name).then(() => ({ start, end: requests().length, headBefore }))
+    scenarios.set(name, scenario)
+  }
+  return scenario
+}
+
+async function ranAll(): Promise<void> {
+  for (const name of ["shell-reset", "subagent", "skill-load"]) await ran(name)
+}
 
 describe.skipIf(!opencodeBin)("opencode model path", () => {
   beforeAll(async () => {
@@ -145,33 +165,29 @@ describe.skipIf(!opencodeBin)("opencode model path", () => {
   }, SLOW)
 
   const head = () => git(need().ws, "rev-parse", "HEAD")
-  let headBefore = ""
 
   test("shell-reset: the guard denial reaches the model and HEAD stays", async () => {
-    headBefore = head()
-    const start = requests().length
-    await run("shell-reset")
-    verify(head() === headBefore, "shell-reset: HEAD moved")
-    verify(toolResultsSince(start).includes("omca guard:"), "shell-reset: no omca guard denial reached the model")
+    const scenario = await ran("shell-reset")
+    verify(head() === scenario.headBefore, "shell-reset: HEAD moved")
+    verify(toolResults(scenario).includes("omca guard:"), "shell-reset: no omca guard denial reached the model")
   }, SLOW)
 
   test("subagent: the omca-explore child session sees the guard denial", async () => {
     const { server, ws } = need()
-    const start = requests().length
-    await run("subagent")
+    const scenario = await ran("subagent")
     const sessions = await server.api<Listing<Named>>("GET", "/api/session", ws)
     verify((sessions.body?.data ?? []).some((session) => session.parentID != null), `subagent: no child session: ${sessions.text}`)
-    verify(requests().some((request) => system(request).includes(EXPLORER)), "subagent: no request carried the omca-explore system")
-    verify(head() === headBefore, "subagent: HEAD moved")
-    const childResult = requests()
-      .slice(start)
+    verify(during(scenario).some((request) => system(request).includes(EXPLORER)), "subagent: no request carried the omca-explore system")
+    verify(head() === scenario.headBefore, "subagent: HEAD moved")
+    const childResult = during(scenario)
       .filter((request) => lastIsTool(request) && system(request).includes(EXPLORER))
       .map(lastText)
       .join("\n")
     verify(childResult.includes("omca guard:"), "subagent: no omca guard denial reached the omca-explore child")
   }, SLOW)
 
-  test("context: build requests carry the evidence rule and omca-explore requests do not", () => {
+  test("context: build requests carry the evidence rule and omca-explore requests do not", async () => {
+    await ranAll()
     verify(
       requests().some((request) => request.tools != null && !system(request).includes(EXPLORER) && system(request).includes(EVIDENCE)),
       `context: no build request contains '${EVIDENCE}'`,
@@ -179,7 +195,8 @@ describe.skipIf(!opencodeBin)("opencode model path", () => {
     verify(!requests().some((request) => system(request).includes(EXPLORER) && system(request).includes(EVIDENCE)), `context: the omca-explore request contains '${EVIDENCE}'`)
   })
 
-  test("tools: build requests expose omca_evidence_log and none expose omca_session_search", () => {
+  test("tools: build requests expose omca_evidence_log and none expose omca_session_search", async () => {
+    await ranAll()
     const buildTools = requests()
       .filter((request) => (request.tools?.length ?? 0) > 0 && !system(request).includes(EXPLORER))
       .map(toolNames)
@@ -192,9 +209,7 @@ describe.skipIf(!opencodeBin)("opencode model path", () => {
   })
 
   test("skill-load: the skill result names /omca-handoff without untranslated text", async () => {
-    const start = requests().length
-    await run("skill-load")
-    const result = toolResultsSince(start)
+    const result = toolResults(await ran("skill-load"))
     verify(result !== "", "skill-load: no follow-up request carried the skill result")
     verify(result.includes("/omca-handoff"), "skill-load: skill result lacks /omca-handoff")
     verify(!result.includes("oh-my-claudeagent:"), "skill-load: skill result contains untranslated oh-my-claudeagent: text")

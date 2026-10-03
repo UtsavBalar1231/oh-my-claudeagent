@@ -310,13 +310,19 @@ jobs:
           Add-Content -Path $env:GITHUB_PATH -Value $destination -Encoding utf8
 
       - name: Bun spec tests
-        run: bun test $BUN_SPEC_ROOTS --reporter=junit --reporter-outfile="$RUNNER_TEMP/bun-junit.xml"
+        run: bun test --parallel $BUN_SPEC_ROOTS --reporter=junit --reporter-outfile="$RUNNER_TEMP/bun-junit.xml"
 
       # Bun on Windows can crash mid-run and still exit 0 (bun issue 40376). The crash leaves no
       # report or a report missing spec files, so the run passes only when the report exists, has
       # no failures and lists every spec file under the roots the step above ran.
       - name: Check the spec run finished
         run: bun scripts/qa/junit-complete.ts "$RUNNER_TEMP/bun-junit.xml" $BUN_SPEC_ROOTS
+
+      # A spec that passes only in file order fails here. Bun prints the seed, and the step name
+      # carries it, so a failure reruns locally with `bun test --parallel --randomize --seed=<seed>`.
+      - name: Bun spec tests in random order (seed ${{ github.run_number }})
+        if: runner.os == 'Linux'
+        run: bun test --parallel --randomize --seed=${{ github.run_number }} $BUN_SPEC_ROOTS
 
       - name: Validate manifest and hooks module
         run: claude plugin validate .claude-plugin/plugin.json --strict
@@ -329,7 +335,7 @@ jobs:
         run: |
           {
             echo "### What this job checks ($RUNNER_OS)"
-            echo "The TypeScript hooks module and shared code on Claude Code $CLAUDE_CODE_VERSION: both tsc projects, the mod tests, the bun spec files with a check that the run listed every spec file, \`claude plugin validate\` on the manifest, and the engine checks on its output (mirrors \`just typecheck-ts test-mod test-bun validate-mod\`)."
+            echo "The TypeScript hooks module and shared code on Claude Code $CLAUDE_CODE_VERSION: both tsc projects, the mod tests, the bun spec files in parallel with a check that the run listed every spec file, then once more in a seeded random order on Linux, \`claude plugin validate\` on the manifest, and the engine checks on its output (mirrors \`just typecheck-ts test-mod test-bun validate-mod\`)."
             echo ""
             echo "### If this fails"
             echo "A type error, a failing test, a spec run that crashed or stopped before every spec file ran, or a manifest or hooks-module validation error. Run the matching \`just\` recipe locally with Claude Code $CLAUDE_CODE_VERSION and bun 1.4.2 to see the exact failure."

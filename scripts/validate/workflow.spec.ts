@@ -17,7 +17,7 @@ const PINS: Readonly<Record<string, string>> = {
   "test-opencode": "bun test opencode/",
   "typecheck-ts": "bun x tsc --noEmit -p tsconfig.runtime.json",
   "test-mod": "claude plugin test .",
-  "test-bun": "bun test src servers statusline scripts opencode",
+  "test-bun": "bun test --parallel src servers statusline scripts opencode",
   "validate-mod": "claude plugin validate .claude-plugin/plugin.json",
 };
 
@@ -114,14 +114,23 @@ describe("workflow contract", () => {
 
   test("the spec run is checked for completeness on the report and the roots the bun test step used, with no hand-kept count", () => {
     const steps = jobBlock("typescript");
-    const testRun = /run: bun test (\S+) --reporter=junit --reporter-outfile="([^"]+)"/.exec(steps);
+    const testRun = /run: bun test --parallel (\S+) --reporter=junit --reporter-outfile="([^"]+)"/.exec(steps);
     const checkRun = /run: bun scripts\/qa\/junit-complete\.ts "([^"]+)" (\S+)$/m.exec(steps);
     expect(testRun?.[1]).toBe("$BUN_SPEC_ROOTS");
     expect(checkRun?.[1]).toBe(testRun?.[2]);
     expect(checkRun?.[2]).toBe(testRun?.[1]);
     expect(CI.match(/BUN_SPEC_ROOTS:/g)).toHaveLength(1);
-    expect(recipeBody("test-bun")).toEqual([`bun test ${SPEC_ROOTS}`]);
+    expect(recipeBody("test-bun")).toEqual([`bun test --parallel ${SPEC_ROOTS}`]);
     expect(CI).not.toContain("BUN_SPEC_FLOOR");
+  });
+
+  test("a seeded random-order run on the same roots follows the ordered run and puts its seed in the step name", () => {
+    const step = /- name: Bun spec tests in random order \(seed \$\{\{ github\.run_number \}\}\)\n\s+if: runner\.os == 'Linux'\n\s+run: (.+)$/m.exec(jobBlock("typescript"));
+    expect(step?.[1]).toBe("bun test --parallel --randomize --seed=${{ github.run_number }} $BUN_SPEC_ROOTS");
+  });
+
+  test("the compare recipe runs the Docker comparison harness with its arguments", () => {
+    expect(JUSTFILE).toContain("\ncompare *args:\n\tbun benchmarks/compare/run.ts {{ args }}\n");
   });
 
   test("neither workflow runs bats or checks out submodules", () => {

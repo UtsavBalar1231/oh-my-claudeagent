@@ -8,7 +8,6 @@ type Named = { id?: string; name?: string; autoinvoke?: boolean; status?: { stat
 
 const SLOW = 120_000
 let fixture: Fixture | undefined
-let agentsInA: Agent[] = []
 
 function need(): Fixture {
   if (!fixture) throw new Error("the OpenCode server did not start")
@@ -34,6 +33,8 @@ async function omcaAgents(dir: string): Promise<Agent[] | undefined> {
 }
 
 const explore = (agents: Agent[] | undefined) => agents?.find((agent) => agent.id === "omca-explore")
+
+const registeredIn = (dir: string) => until(`omca agents registered in ${dir}`, 15_000, () => omcaAgents(dir), need().server.last)
 
 describe.skipIf(!opencodeBin)("opencode plugin smoke", () => {
   beforeAll(async () => {
@@ -62,13 +63,12 @@ describe.skipIf(!opencodeBin)("opencode plugin smoke", () => {
   }, SLOW)
 
   test("8 omca-* agents are registered", async () => {
-    const { server, a } = need()
-    agentsInA = await until("agents registered", 15_000, () => omcaAgents(a), server.last)
-    expect(agentsInA.filter((agent) => agent.id.startsWith("omca-"))).toHaveLength(8)
+    const agents = await registeredIn(need().a)
+    expect(agents.filter((agent) => agent.id.startsWith("omca-"))).toHaveLength(8)
   }, SLOW)
 
-  test("omca-explore is a subagent with steps 30 and edit/subagent denied", () => {
-    const agent = explore(agentsInA)
+  test("omca-explore is a subagent with steps 30 and edit/subagent denied", async () => {
+    const agent = explore(await registeredIn(need().a))
     expect(agent?.mode).toBe("subagent")
     expect(agent?.steps).toBe(30)
     const denied = (agent?.permissions ?? []).filter((permission) => permission.effect === "deny").map((permission) => permission.action)
@@ -76,9 +76,9 @@ describe.skipIf(!opencodeBin)("opencode plugin smoke", () => {
   })
 
   test("omca-explore model is anthropic/claude-sonnet-5-5 in A and unset in B", async () => {
-    const { server, b } = need()
-    expect(explore(agentsInA)?.model).toMatchObject({ providerID: "anthropic", id: "claude-sonnet-5-5" })
-    const agentsInB = await until("agents registered in B", 15_000, () => omcaAgents(b), server.last)
+    const { a, b } = need()
+    expect(explore(await registeredIn(a))?.model).toMatchObject({ providerID: "anthropic", id: "claude-sonnet-5-5" })
+    const agentsInB = await registeredIn(b)
     expect(explore(agentsInB)).toBeDefined()
     expect(explore(agentsInB)?.model ?? null).toBeNull()
   }, SLOW)
@@ -124,6 +124,7 @@ describe.skipIf(!opencodeBin)("opencode plugin smoke", () => {
 
   test("shell guard blocked the reset, kept HEAD, and allowed git status", async () => {
     const { server, a } = need()
+    await registeredIn(a)
     const created = await server.api<Session>("POST", "/api/session", a, { title: "smoke", location: { directory: a } })
     expect(created.body?.data?.location?.directory).toBe(a)
     const session = created.body?.data?.id
@@ -137,7 +138,8 @@ describe.skipIf(!opencodeBin)("opencode plugin smoke", () => {
     expect(status.status).toBeLessThan(300)
   }, SLOW)
 
-  test("log has no disabled plugin line and one ignoring models line", () => {
+  test("log has no disabled plugin line and one ignoring models line", async () => {
+    await registeredIn(need().b)
     const log = need().server.log()
     expect(countLines(log, "disabled plugin after transform failure")).toBe(0)
     expect(countLines(log, "omca: ignoring models.")).toBe(1)

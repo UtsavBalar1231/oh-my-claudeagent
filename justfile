@@ -51,7 +51,7 @@ test-mod:
 # *.test.ts, so a bare `bun test` would load mod tests that need the engine's test module.
 [group('test')]
 test-bun:
-	bun test src servers statusline scripts opencode
+	bun test --parallel src servers statusline scripts opencode
 
 # Run the manual QA harness: session smoke, install verify, the live hook probe, the statusline probe,
 # the live MCP probe, then the worktree-bash (plain, then with an unfiltered tool.call hook) and route-effort checks. Maintainer pre-release step, NOT part of CI: it launches
@@ -86,6 +86,11 @@ qa-worktree-bash *args:
 [group('test')]
 bench *args:
 	bun scripts/bench.ts {{ args }}
+
+# Compare OMCA with similar plugins in Docker against a mock model (needs docker; see benchmarks/compare/README.md)
+[group('test')]
+compare *args:
+	bun benchmarks/compare/run.ts {{ args }}
 
 # ── Typecheck ────────────────────────────────────────────────────
 
@@ -235,7 +240,7 @@ ci: typecheck-ts validate test-mod test-bun test-mcp validate-mod validate-manif
 
 # ── Release ──────────────────────────────────────────────────────
 
-# Bump the version, commit, stamp the bump commit's SHA in a second commit, and tag the bump commit. Never pushes. Usage: just release <version>
+# Bump the version and tag it, commit the packaged tree (no package.json or lockfile) to the `plugin` branch as `plugin-v<version>`, and stamp that commit's SHA in a second commit. Never pushes. Usage: just release <version>
 [group('release')]
 release version:
 	bun scripts/release.ts '{{ version }}'
