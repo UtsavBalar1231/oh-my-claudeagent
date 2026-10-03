@@ -12,7 +12,7 @@ export type Verification = { command: string; at: number; exit_code: number | nu
 // (`npm.cmd`, `bun.exe`) is the same runner.
 const EXT = String.raw`(?:\.(?:cmd|exe))?`;
 const RUNNER = new RegExp(
-  String.raw`(^|[;&|(])\s*(just${EXT}\s+((test|lint)(-[A-Za-z0-9_]+)*|ci|fmt-check|typecheck|build)|(npm|pnpm|yarn|bun)${EXT}\s+(test|run\s+(test|lint|build))|pytest${EXT}|cargo${EXT}\s+(test|build|check|clippy)|go${EXT}\s+(test|build|vet)|make${EXT}\s+(test|check|lint)|bats${EXT}|tsc${EXT}|ruff${EXT}\s+check|shellcheck${EXT}|uv${EXT}\s+run\s[^;&|]*pytest)([^-A-Za-z0-9_]|$)`,
+  String.raw`(^|[;&|(])\s*(just${EXT}\s+((test|lint)(-[A-Za-z0-9_]+)*|ci|fmt-check|typecheck|build|validate|check)|(npm|pnpm|yarn|bun)${EXT}\s+(test|run\s+(test|lint|build))|pytest${EXT}|cargo${EXT}\s+(test|build|check|clippy)|go${EXT}\s+(test|build|vet)|make${EXT}\s+(test|check|lint)|bats${EXT}|tsc${EXT}|ruff${EXT}\s+check|shellcheck${EXT}|uv${EXT}\s+run\s[^;&|]*pytest)([^-A-Za-z0-9_]|$)`,
 );
 
 export const classifierNote = (tool: string): string =>
