@@ -17,7 +17,7 @@ const PINS: Readonly<Record<string, string>> = {
   "test-opencode": "bun test opencode/",
   "typecheck-ts": "bun x tsc --noEmit -p tsconfig.runtime.json",
   "test-mod": "claude plugin test .",
-  "test-bun": "bun test --parallel src servers statusline scripts opencode",
+  "test-bun": "bun test --parallel src servers statusline scripts opencode benchmarks/compare",
   "validate-mod": "claude plugin validate .claude-plugin/plugin.json",
 };
 

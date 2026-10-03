@@ -51,7 +51,7 @@ test-mod:
 # *.test.ts, so a bare `bun test` would load mod tests that need the engine's test module.
 [group('test')]
 test-bun:
-	bun test --parallel src servers statusline scripts opencode
+	bun test --parallel src servers statusline scripts opencode benchmarks/compare
 
 # Run the manual QA harness: session smoke, install verify, the live hook probe, the statusline probe,
 # the live MCP probe, then the worktree-bash (plain, then with an unfiltered tool.call hook) and route-effort checks. Maintainer pre-release step, NOT part of CI: it launches
