@@ -1,6 +1,6 @@
 # oh-my-claudeagent
 
-<img src=".github/assets/hero.png" width="1000" alt="A Claude Code session on the left hands task 7 of a checkout plan to the executor agent, while the OMCA pane on the right shows the plan's contents with six of fourteen tasks checked and the cursor on task 7.">
+<img src=".github/assets/hero.png" width="1000" alt="A Claude Code session on the left hands task 7 of the checkout plan to the executor, while the OMCA pane on the right shows the plan board at 6 of 14 tasks, with proof on the done tasks, the executor on task 7 and task 7's detail beside the list.">
 
 oh-my-claudeagent (OMCA) is a Claude Code plugin that plans work with you, hands each task to a
 specialist agent, and keeps a session from calling work done before a verification has been
@@ -8,24 +8,35 @@ logged.
 
 ## What you see
 
-The band above the prompt names the plan bound to the session, its progress, the last
-verification and whether its evidence was logged. The numbered buttons fill the prompt with the
-next step.
+The band above the prompt shows the bound plan's progress, the next open task, how many tasks are
+proven, unproven and failed, a verification whose evidence was not logged, and how many agents
+are running. The numbered buttons fill the prompt with the next step.
 
-<img src=".github/assets/band.png" width="680" alt="The band above the prompt reads checkout-redesign 6/14 tasks and warns that the evidence for just test was not logged, with buttons 1: Log evidence and 2: Start work below it.">
+<img src=".github/assets/band.png" width="680" alt="The band above the prompt reads 6/14, next 7 Wire the order summary panel, 6 proven, 1 unproven and 0 failed, warns that the evidence for just test was not logged, and counts 1 running agent, with the button 1: Log evidence below it.">
 
-`/omca plan` opens the plan reader: the plan's contents, then one task at a time.
+`/omca plan` opens the plan board: the tasks grouped by milestone, each with its state, its proof
+and the agent working on it. A wide pane shows the focused task's detail beside the list.
 
-<img src=".github/assets/plan.png" width="680" alt="The Plan tab of the OMCA pane shows task 7, Wire the order summary panel, with its file, its done-when line and its dependency, and the keys t: Contents, p: Prev, n: Next and r: Reload.">
+<img src=".github/assets/plan.png" width="680" alt="The Plan tab of the OMCA pane shows the checkout-redesign board at 6 of 14 tasks, with 6 proven, 1 unproven and 4 blocked. Tasks 1 to 6 are done and proven, the executor is on task 7, tasks 8, 9 and 11 are open, and the rest wait on other tasks. Beside the list, task 6, Build the payment step, shows its steps, its done-when command, its dependencies, its file changed 3h ago and the passing runs since then.">
+
+The Evidence tab is the proof ledger: a verdict on the plan's final verification, then every
+logged run grouped by day.
+
+<img src=".github/assets/evidence.png" width="680" alt="The Evidence tab shows the final verification for checkout-redesign as MISSING, since the last one exited 1, then fourteen runs grouped under three days, each with its time, type, exit code and command. The focused run, a manual payment smoke test, is open beside the list with its API key masked.">
+
+The Agents tab gives each running subagent a lane with its task, model, effort and current tool
+call, and shrinks a finished one to a line.
+
+<img src=".github/assets/agents.png" width="680" alt="The Agents tab shows two running executors, one on Wire the order summary panel and one on Persist the draft order, each with its model, effort and the watch command it is running, and one finished explore agent on a single line with the first line of its result.">
 
 The guard holds a destructive shell command for your review and shows what it would touch.
 
 <img src=".github/assets/guard.png" width="680" alt="A dialog headed OMCA guard says OMCA held rm -rf build for review, that it would remove the build directory with 4 entries, and offers Refuse or Run it.">
 
 `/omca doctor` checks the client, bun, the server, ast-grep, the options and the settings that
-change how OMCA runs.
+change how OMCA runs. A check with a known fix offers a key that fills the prompt with it.
 
-<img src=".github/assets/doctor.png" width="680" alt="The Doctor tab of the OMCA pane lists checks for OMCA, Claude Code, bun, the omca server, ast-grep, the options, the agent models, the effort cap, the mod policy, the hooks, the output style, the advisor and the status line, each with a mark and a one-line result.">
+<img src=".github/assets/doctor.png" width="680" alt="The Doctor tab counts 1 warning, 1 info row and 11 passing checks. The warning says maxEffortLevel high holds oracle below the xhigh it declares, the info row offers a: Use /advisor fable, and the passing rows cover OMCA, Claude Code, bun, the omca server, ast-grep, the options, the agent models, the mod policy, the hooks, the output style and the status line.">
 
 The status line shows the model, the plan's next task, the context window, git state, cost and
 usage limits, and fits itself to the terminal's width. The subagent status line gives each
@@ -33,10 +44,10 @@ running agent a row.
 
 <img src=".github/assets/statusline.png" width="900" alt="The OMCA status line under the prompt shows the model and effort, plan progress with the next task, a context bar, the git branch with change counts, the project, and the session cost and duration, and below it one row for each of two running subagents with its model, state and effort.">
 
-In motion: `/omca plan` opens the plan reader, Enter opens the next task, `n` steps to the
-following one, and the number keys switch between the pane's tabs.
+In motion: `/omca plan` opens the board, Down moves the focus, Enter opens the task as a page,
+and the number keys switch between the pane's tabs.
 
-<img src=".github/assets/pane-tour.gif" width="680" alt="An animation: /omca plan is typed and the plan's contents open beside the session with the cursor on task 7, Enter opens task 7, n moves to task 8, keys 1 and 3 switch to the Agents and Evidence tabs, and 2 returns to task 8 on the Plan tab.">
+<img src=".github/assets/pane-tour.gif" width="900" alt="An animation: a prompt hands task 7 to the executor, /omca plan opens the board beside the session with task 7 expanded, Down moves to task 8 and Enter opens it as a page, 1 switches to the Agents tab with the executor's lane, 3 to the Evidence tab, and 2 returns to task 8 on the Plan tab.">
 
 The guard dialog arrives the moment the model asks for a destructive command.
 

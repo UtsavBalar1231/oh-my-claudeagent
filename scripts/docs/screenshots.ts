@@ -4,7 +4,7 @@
 // grab of a real terminal: a PNG still, or a GIF recorded while the scripted keys are typed.
 //
 // Usage: bun scripts/docs/screenshots.ts [<name>...] [--out <dir>]
-import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { parseArgs } from "node:util";
@@ -47,17 +47,34 @@ export type Shot = {
   keys: readonly string[];
   script: Script;
   ready: (screen: string) => boolean;
+  // "pane" keeps only the docked OMCA pane, so its text stays readable at README width.
+  crop?: "pane";
+  settings?: Record<string, unknown>;
 };
 
 const text = (value: string) => ({ type: "text" as const, text: value });
-const bash = (command: string, description: string) => ({ type: "tool_use" as const, name: "Bash", input: { command, description } });
-const executor = (description: string, prompt: string) => ({
-  type: "tool_use" as const,
-  name: "Agent",
-  input: { subagent_type: "oh-my-claudeagent:executor", description, prompt },
-});
+const tool = (name: string, input: Record<string, unknown>) => ({ type: "tool_use" as const, name, input });
+const bash = (command: string, description: string) => tool("Bash", { command, description });
+const agent = (type: string, description: string, prompt: string) =>
+  tool("Agent", { subagent_type: `oh-my-claudeagent:${type}`, description, prompt, run_in_background: true });
+const executor = (description: string, prompt: string) => agent("executor", description, prompt);
 
+// The justfile's watch recipe sleeps, so an agent that reaches it keeps running through the capture.
+const WATCH_SUMMARY = bash("just watch summary", "Run the summary tests in watch mode");
+const TASK_7 = executor("Wire the order summary panel", "Task 7: wire the order summary panel into the payment step.");
+const PLAN_SCRIPT: Script = {
+  main: [
+    { content: [text("Task 7 is next: tasks 1 and 6 are done. I will hand it to the executor."), TASK_7] },
+    { content: [text("The executor is on task 7. Tasks 8, 9 and 11 are open as well.")] },
+  ],
+  subagent: [
+    { content: [tool("Read", { file_path: "src/steps/summary.ts" })] },
+    { content: [tool("Grep", { pattern: "total", path: "src/cart" })] },
+    { content: [WATCH_SUMMARY] },
+  ],
+};
 const NO_SCRIPT: Script = { main: [], subagent: [] };
+const planReady = (screen: string) => screen.includes("executor on 7") && screen.includes("UNPROVEN") && screen.includes("enter open");
 const GUARD_SCRIPT: Script = {
   main: [{ content: [bash("rm -rf build", "Remove the build output")] }, { content: [text("The build is clean.")] }],
   subagent: [],
@@ -72,46 +89,95 @@ export const SHOTS: readonly Shot[] = [
     rows: 50,
     command: "Pick up the next task on the plan",
     keys: ["/omca plan", "Enter"],
-    script: {
-      main: [
-        { content: [text("Task 7 is next. I will hand it to the executor."), executor("Wire the order summary panel", "Wire the order summary panel into the payment step.")] },
-        { content: [text("The executor is working on task 7.")] },
-        { content: [text("The executor finished task 7: the order summary panel is wired into the payment step. It is ready for review.")] },
-      ],
-      subagent: [{ content: [text("Wired the order summary panel into the payment step.")] }],
-    },
-    ready: (screen) => screen.includes("Wire the order summary panel") && screen.includes("tasks done"),
+    script: PLAN_SCRIPT,
+    ready: (screen) => planReady(screen) && screen.includes("7. Wire the order summary panel"),
   },
   {
     name: "band",
     format: "png",
     cols: 120,
-    rows: 40,
+    rows: 30,
     command: "Run the tests",
     keys: [],
-    script: { main: [{ content: [bash("just test", "Run the tests")] }, { content: [text("The tests ran.")] }], subagent: [] },
-    ready: (screen) => screen.includes("evidence not logged"),
+    script: {
+      main: [{ content: [bash("just test", "Run the tests"), TASK_7] }, { content: [text("The tests pass, and the executor is on task 7.")] }],
+      subagent: [{ content: [tool("Read", { file_path: "src/steps/summary.ts" })] }, { content: [WATCH_SUMMARY] }],
+    },
+    ready: (screen) => screen.includes("evidence not logged") && screen.includes("1 running"),
   },
   {
     name: "plan",
     format: "png",
-    cols: 120,
-    rows: 30,
-    command: "/omca plan",
-    keys: ["Enter"],
+    cols: 214,
+    rows: 44,
+    command: "Pick up the next task on the plan",
+    keys: ["/omca plan", "Enter", "Up"],
+    script: PLAN_SCRIPT,
+    ready: (screen) => planReady(screen) && screen.includes("6. Build the payment step"),
+    crop: "pane",
+  },
+  {
+    name: "evidence",
+    format: "png",
+    cols: 214,
+    rows: 32,
+    command: "/omca",
+    keys: ["3"],
     script: NO_SCRIPT,
-    ready: (screen) => screen.includes("Depends: 6"),
+    ready: (screen) => screen.includes("MISSING") && screen.includes("‹masked›"),
+    crop: "pane",
+  },
+  {
+    name: "agents",
+    format: "png",
+    cols: 214,
+    rows: 22,
+    command: "Start the open checkout tasks",
+    keys: ["/omca", "Enter"],
+    // Subagents share one queue of scripted turns, so explore finishes and the first executor
+    // reaches its watch before the second starts, which fixes which agent draws which turn.
+    script: {
+      main: [
+        {
+          content: [
+            text("Task 8 needs the current error messages first; explore will map them."),
+            agent("explore", "Map the validation messages", "Task 8: list every validation message the address and card forms build today."),
+          ],
+        },
+        { content: [text("Explore is mapping the messages.")] },
+        { content: [text("Explore mapped the messages. Tasks 7 and 9 can start now."), TASK_7] },
+        { content: [bash("sleep 3", "Let the first executor settle")] },
+        { content: [executor("Persist the draft order", "Task 9: save the draft order on every step so a reload keeps it.")] },
+        { content: [text("Two executors are running, on tasks 7 and 9.")] },
+      ],
+      subagent: [
+        { content: [tool("Grep", { pattern: "error", path: "src/forms" })] },
+        { content: [tool("Read", { file_path: "src/forms/card.ts" })] },
+        { content: [text("The forms build seven messages: four in src/forms/address.ts and three in src/forms/card.ts.")] },
+        { content: [tool("Read", { file_path: "src/steps/summary.ts" })] },
+        { content: [tool("Grep", { pattern: "total", path: "src/cart" })] },
+        { content: [WATCH_SUMMARY] },
+        { content: [tool("Read", { file_path: "src/cart/totals.ts" })] },
+        { content: [tool("Glob", { pattern: "src/cart/*.ts" })] },
+        { content: [bash("just watch draft", "Run the draft order tests in watch mode")] },
+      ],
+    },
+    ready: (screen) => screen.includes("just watch summary") && screen.includes("just watch draft") && screen.includes("✓ explore"),
+    crop: "pane",
   },
   { name: "guard", format: "png", cols: 120, rows: 26, command: "Clean the build", keys: [], script: GUARD_SCRIPT, ready: guardReady },
   {
     name: "doctor",
     format: "png",
-    cols: 120,
-    rows: 46,
+    cols: 214,
+    rows: 26,
     command: "Say hello",
     keys: ["/omca doctor", "Enter"],
     script: { main: [{ content: [text("Hello.")] }], subagent: [] },
-    ready: (screen) => screen.includes("checked"),
+    ready: (screen) => screen.includes("checked") && screen.includes("WARN"),
+    crop: "pane",
+    // An effort cap below oracle's declared xhigh is a real WARN the doctor explains.
+    settings: { maxEffortLevel: "high" },
   },
   {
     name: "statusline",
@@ -143,12 +209,12 @@ export const SHOTS: readonly Shot[] = [
   {
     name: "pane-tour",
     format: "gif",
-    cols: 120,
-    rows: 30,
-    command: "/omca plan",
-    keys: ["Enter", "n", "1", "3", "2"],
-    script: NO_SCRIPT,
-    ready: (screen) => screen.includes("8. Add inline validation errors") && screen.includes("Depends: 7"),
+    cols: 160,
+    rows: 42,
+    command: "Pick up the next task on the plan",
+    keys: ["/omca plan", "Enter", "Down", "Enter", "1", "3", "2"],
+    script: PLAN_SCRIPT,
+    ready: (screen) => screen.includes("8. Add inline validation errors") && screen.includes("b: Board"),
   },
   { name: "guard-dialog", format: "gif", cols: 120, rows: 26, command: "Clean the build", keys: [], script: GUARD_SCRIPT, ready: guardReady },
 ];
@@ -173,14 +239,59 @@ function git(cwd: string, home: string, ...args: string[]): void {
   run(["git", "-C", cwd, ...args], { ...sessionEnv(), HOME: home, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" });
 }
 
+const MINUTE = 60_000;
+const HOUR = 60 * MINUTE;
+const EXECUTOR = "oh-my-claudeagent:executor";
+const SISYPHUS = "oh-my-claudeagent:sisyphus";
+const HEPHAESTUS = "oh-my-claudeagent:hephaestus";
+
+// Each run's age before the capture, so the day groups and the times beside them read as recent
+// whenever the script runs. The newest test passed after every task file but task 7's changed,
+// which makes tasks 1 to 6 PROVEN and task 7 UNPROVEN.
+const LEDGER: readonly (readonly [age: number, type: string, command: string, exitCode: number, snippet: string, by: string])[] = [
+  [50 * HOUR, "build", "bun run build", 0, "built 38 modules in 1.1 s", EXECUTOR],
+  [49.5 * HOUR, "test", "bun test src/cart", 1, "(fail) tax on a discounted line\n  Expected: 263\n  Received: 315\n 11 pass\n 1 fail", EXECUTOR],
+  [49 * HOUR, "test", "bun test src/cart", 0, " 12 pass\n 0 fail\nRan 12 tests across 2 files. [41.00ms]", EXECUTOR],
+  [47 * HOUR, "lint", "just lint", 0, "Found 0 warnings and 0 errors.", EXECUTOR],
+  [27 * HOUR, "test", "bun test src/forms", 0, " 21 pass\n 0 fail\nRan 21 tests across 2 files. [38.00ms]", EXECUTOR],
+  [25.5 * HOUR, "lint", "just typecheck", 1, "src/steps/address.ts:4:3 - error TS2322: Type 'string' is not assignable to type 'boolean'.", HEPHAESTUS],
+  [25 * HOUR, "lint", "just typecheck", 0, "tsc --noEmit: no errors", HEPHAESTUS],
+  [24.5 * HOUR, "build", "bun run build", 0, "built 41 modules in 1.2 s", EXECUTOR],
+  [23 * HOUR, "final_verification", "just ci", 1, "INCOMPLETE: 9 of 14 tasks are open\nlint, typecheck and test pass; the e2e suite is not written yet", SISYPHUS],
+  [170 * MINUTE, "test", "bun test src/steps", 1, "(fail) a declined card keeps the cart\n  Expected: 3 items\n  Received: 0 items\n 17 pass\n 1 fail", EXECUTOR],
+  [140 * MINUTE, "test", "bun test src/steps", 0, " 18 pass\n 0 fail\nRan 18 tests across 3 files. [212.00ms]", EXECUTOR],
+  [100 * MINUTE, "lint", "just lint", 0, "Found 0 warnings and 0 errors.", EXECUTOR],
+  [45 * MINUTE, "test", "bun test", 0, " 142 pass\n 0 fail\nRan 142 tests across 14 files. [1.84s]", EXECUTOR],
+  [
+    20 * MINUTE,
+    "manual",
+    'PAYMENTS_API_KEY="fake-sandbox-key" bun run smoke:payment',
+    0,
+    "card ending 0002 declined: cart kept, 3 items\ncard ending 4242 accepted: draft order saved\nsmoke passed in 2.8 s",
+    SISYPHUS,
+  ],
+];
+
+const FILE_AGES: readonly (readonly [age: number, files: readonly string[]])[] = [
+  [51 * HOUR, ["src/cart/totals.ts", "src/cart/tax.ts", "config/tax.json"]],
+  [28 * HOUR, ["src/forms/address.ts", "src/forms/card.ts"]],
+  [26 * HOUR, ["src/steps/address.ts"]],
+  [3 * HOUR, ["src/steps/payment.ts"]],
+  [6 * MINUTE, ["src/steps/summary.ts", "src/steps/summary.spec.ts"]],
+];
+
 function writeProject(project: string, home: string): void {
   cpSync(FIXTURE, project, { recursive: true });
   const plan = join(project, "plans", `${PLAN_NAME}.md`);
   mkdirSync(join(project, ".claude"), { recursive: true });
   mkdirSync(join(project, ".omca", "state"), { recursive: true });
+  mkdirSync(join(project, ".omca", "evidence"), { recursive: true });
   writeFileSync(
     join(project, ".claude", "settings.json"),
-    JSON.stringify({ plansDirectory: join(project, "plans"), permissions: { defaultMode: "default", allow: ["Bash(just test)", "Bash(sleep *)"] } }),
+    JSON.stringify({
+      plansDirectory: join(project, "plans"),
+      permissions: { defaultMode: "default", allow: ["Bash(just test)", "Bash(just watch *)", "Bash(sleep *)"] },
+    }),
   );
   writeFileSync(
     join(project, ".omca", "state", "boulder.json"),
@@ -195,10 +306,29 @@ function writeProject(project: string, home: string): void {
   git(project, home, "config", "user.email", "dev@example.invalid");
   git(project, home, "add", "-A");
   git(project, home, "commit", "-q", "-m", "Initial commit");
-  writeFileSync(join(project, "src", "cart.ts"), "export const total = (items: number[]) => items.reduce((a, b) => a + b, 0);\nexport const count = (items: number[]) => items.length;\n");
-  writeFileSync(join(project, "src", "checkout.ts"), 'export const checkout = () => "done";\n');
-  writeFileSync(join(project, "src", "summary.ts"), "export const summary = () => [];\n");
-  git(project, home, "add", "src/summary.ts");
+  writeFileSync(join(project, "src", "steps", "summary.ts"), 'import { total } from "../cart/totals.ts";\n\nexport const summaryPanel = { title: "Order summary", total };\n');
+  writeFileSync(join(project, "src", "steps", "payment.ts"), 'export const paymentStep = (declined?: string) => ({ title: "Payment", keepCart: true, alert: declined ?? "" });\n');
+  writeFileSync(join(project, "src", "steps", "summary.spec.ts"), 'import { expect, test } from "bun:test";\n\ntest.todo("lists items, tax and shipping");\n');
+  git(project, home, "add", "src/steps/summary.spec.ts");
+
+  const now = Date.now();
+  const entries = LEDGER.map(([age, type, command, exitCode, snippet, by]) => ({
+    type,
+    command,
+    exit_code: exitCode,
+    output_snippet: snippet,
+    timestamp: new Date(now - age).toISOString(),
+    verified_by: by,
+  }));
+  const ledger = join(project, ".omca", "evidence", "verification-evidence.json");
+  writeFileSync(ledger, JSON.stringify({ entries }, null, 2));
+  // The band counts a ledger changed within seconds of a verification as its evidence.
+  const lastLogged = new Date(now - Math.min(...LEDGER.map(([age]) => age)));
+  utimesSync(ledger, lastLogged, lastLogged);
+  for (const [age, files] of FILE_AGES) {
+    const at = new Date(now - age);
+    for (const file of files) utimesSync(join(project, file), at, at);
+  }
 }
 
 function findFont(env: Record<string, string>): { family: string; dir: string } {
@@ -248,6 +378,28 @@ function windowOf(env: Record<string, string>): Window | undefined {
   return width > 1 ? { x: Number(geometry["X"]), y: Number(geometry["Y"]), width, height: Number(geometry["HEIGHT"]) } : undefined;
 }
 
+// The docked pane begins at the border column its tab row opens with and ends at the first row
+// without that border. tmux prints one character per cell here, since the rows hold no wide glyphs.
+function paneArea(screen: string, window: Window, shot: Shot): Window {
+  const rows = screen.split("\n").map((row) => [...row]);
+  const column = rows[0]?.indexOf("│") ?? -1;
+  if (column < 0) throw new Error(`${shot.name}: the screen shows no docked pane to crop to`);
+  const end = rows.findIndex((row) => row[column] !== "│");
+  // kitty draws whole cells from the top-left padding and leaves any spare pixels at the bottom
+  // and right, so the window size divided by the grid overstates a cell.
+  const cellWidth = Math.floor((window.width - 2 * PADDING) / shot.cols);
+  const cellHeight = Math.floor((window.height - 2 * PADDING) / shot.rows);
+  // From the middle of the border cell, where kitty draws the line, so no transcript glyph that
+  // overflows its cell shows; to the right padding, so the close mark in the last cell stays whole.
+  const left = PADDING + column * cellWidth + Math.floor(cellWidth / 2) - 1;
+  return {
+    x: window.x + left,
+    y: window.y + PADDING,
+    width: 2 * PADDING + shot.cols * cellWidth - left,
+    height: end * cellHeight,
+  };
+}
+
 function clientSize(tmux: Tmux): string | undefined {
   return tmux.run(["list-clients", "-F", "#{client_width}x#{client_height}"]).trim().split("\n")[0] || undefined;
 }
@@ -285,6 +437,7 @@ export async function captureShot(shot: Shot, outDir: string): Promise<string> {
         tui: "fullscreen",
         statusLine: { type: "command", command: statusline("main.ts"), padding: 1, refreshInterval: 5, hideVimModeIndicator: true },
         subagentStatusLine: { type: "command", command: statusline("subagent.ts") },
+        ...shot.settings,
       }),
     );
 
@@ -331,6 +484,9 @@ export async function captureShot(shot: Shot, outDir: string): Promise<string> {
         "-o", `window_padding_width=${PADDING}`,
         "-o", "cursor_blink_interval=0",
         "-o", "linux_display_server=x11",
+        // kitty widens a symbol the font lacks over the space after it, which ran the last cell of
+        // each progress bar into the count beside it.
+        "-o", "narrow_symbols=U+25A0-U+25FF 1",
         "tmux", "-L", SOCKET, "-f", "/dev/null", "attach-session", "-t", tmux.target,
       ],
       {
@@ -409,8 +565,10 @@ export async function captureShot(shot: Shot, outDir: string): Promise<string> {
       toGif(raw, out, env);
     } else {
       await Bun.sleep(PAINT_MS);
-      assertPrivate(tmux.screen(), forbidden);
-      run(["import", "-silent", "-window", "root", "-crop", `${window.width}x${window.height}+${window.x}+${window.y}`, "+repage", raw], screenEnv);
+      const shown = tmux.screen();
+      assertPrivate(shown, forbidden);
+      const area = shot.crop === "pane" ? paneArea(shown, window, shot) : window;
+      run(["import", "-silent", "-window", "root", "-crop", `${area.width}x${area.height}+${area.x}+${area.y}`, "+repage", raw], screenEnv);
       assertPrivate(tmux.screen(), forbidden);
       run(["magick", raw, "-strip", "-define", "png:compression-level=9", "-define", "png:exclude-chunks=date,time", out], env);
     }

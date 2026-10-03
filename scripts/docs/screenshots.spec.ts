@@ -13,14 +13,19 @@ describe("SHOTS", () => {
   });
 
   test("captures every README scene as a still and the two clips as GIFs", () => {
-    expect(SHOTS.filter((shot) => shot.format === "png").map((shot) => shot.name)).toEqual(["hero", "band", "plan", "guard", "doctor", "statusline"]);
+    expect(SHOTS.filter((shot) => shot.format === "png").map((shot) => shot.name)).toEqual(["hero", "band", "plan", "evidence", "agents", "guard", "doctor", "statusline"]);
     expect(SHOTS.filter((shot) => shot.format === "gif").map((shot) => shot.name)).toEqual(["pane-tour", "guard-dialog"]);
   });
 
-  test("the plan scene is ready only once task 7 is open", () => {
+  test("the plan scene is ready only once the executor holds task 7 and task 6 is focused", () => {
     const plan = SHOTS.find((shot) => shot.name === "plan");
-    expect(plan?.ready("[ ] 7. Wire the order summary panel\n- Depends: 6")).toBe(true);
-    expect(plan?.ready("[ ] 7. Wire the order summary panel")).toBe(false);
+    const board = "◆ executor on 7\n◐ 7 Wire the order summary panel  UNPROVEN\n↑↓ move · enter open";
+    expect(plan?.ready(`${board}\n6. Build the payment step`)).toBe(true);
+    expect(plan?.ready(board)).toBe(false);
+  });
+
+  test("only the pane scenes crop to the pane", () => {
+    expect(SHOTS.filter((shot) => shot.crop === "pane").map((shot) => shot.name)).toEqual(["plan", "evidence", "agents", "doctor"]);
   });
 
   test("the guard scenes are ready only once the dialog holds the command", () => {

@@ -1,2 +1,5 @@
-test:
+test *args:
 	@echo "42 passed"
+
+watch name:
+	@sleep 600
