@@ -33,7 +33,8 @@ revision 2026-07-28 and every 2025-era client from the same stdio loop, with no 
 
 The state files these tools read and write are `boulder.json` (a session-bound plan
 registry keyed `plans[plan_name]` and `bindings[session_id]`),
-`verification-evidence.json` (the append-only evidence log, `output_snippet` capped at
-2000 characters), and the notepad tree under `.omca/notepads/`. Read `resolveBoundPlan` in
+`verification-evidence.json` (the append-only evidence log, `command` and `output_snippet`
+capped at 2000 characters, `verified_by` at 200, `plan_sha256` 64 hex characters or empty), and
+the notepad tree under `.omca/notepads/`. Read `resolveBoundPlan` in
 `src/core/boulder.ts` for the resolution ladder rather than hand-parsing `boulder.json`
 anywhere else.

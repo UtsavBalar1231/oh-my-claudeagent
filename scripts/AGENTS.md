@@ -21,7 +21,8 @@ under `servers/hooks/`. Every file is TypeScript on bun.
   `## [<version>]` heading in `CHANGELOG.md`, and a tag that already exists. It writes the version
   into `.claude-plugin/plugin.json`, both version fields of `.claude-plugin/marketplace.json` and
   `package.json`, commits the bump, records the bump commit's SHA in `marketplace.json` in a
-  child commit, and tags the bump commit. It never pushes.
+  child commit, and tags the bump commit. It never pushes. A failure part way restores the
+  manifests and resets to the HEAD it started from with `git reset --keep`, then says so.
 - `bench.ts`: `just bench`. Runs the working tree or `--candidate-ref` against `--baseline-ref`
   through the mock model. It builds each ref in a git worktree. A ref whose status line is the
   Python renderer, such as v2.21.0, is installed with `uv sync`, so `uv` must be on PATH for it.
