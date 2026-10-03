@@ -110,8 +110,11 @@ Every detail in that snippet is load-bearing:
   the trial record. Measured on this harness, `--plugin-dir` wins: every baseline trial
   reported the worktree's own `skills` directory.
 - `--permission-mode bypassPermissions`, not `acceptEdits`. Under `acceptEdits` the
-  client refuses an Edit to a hook script belonging to a loaded plugin, and in headless
-  mode that refusal is final, so `single-file-edit` and `bug-fix` can never pass.
+  client refused an Edit to a hook script belonging to a loaded plugin, and in headless
+  mode that refusal is final. That was measured while `single-file-edit` and `bug-fix`
+  targeted shell hook scripts. They now target `scripts/qa/mcp-live.ts` and
+  `src/core/keywords.ts`, which are not hook scripts. Whether `acceptEdits` would now
+  suffice is unmeasured, so bypass mode stays for comparability with the recorded trials.
   Bypass mode is safe here only because the run is confined to a throwaway worktree.
   Apply it to every fixture and every arm, so it cannot favour one arm.
 - The `env -u` list is mandatory. A nested `claude -p` inherits the parent session's
@@ -179,8 +182,8 @@ Score behavior, never the shape of the solution. A check that matches a list of 
 constructs fails any correct answer written a different way, and that failure is
 indistinguishable from a model failure once the worktree is gone. Prefer running the
 changed code and comparing what it does: for the `bug-fix` fixture, feed
-`keyword-detector.sh` a standalone mention and a substring mention and compare the
-announcements, rather than grepping the diff for a boundary construct. Before trusting a
+`matchKeywordModes` in `src/core/keywords.ts` a standalone mention and a substring mention
+and compare the modes it returns, rather than grepping the diff for a boundary construct. Before trusting a
 new scorer, exercise it against a synthetic worktree with both a positive and a negative
 case, which costs no live turn.
 

@@ -1,7 +1,7 @@
 {
   "name": "bug-fix",
-  "prompt": "The keyword-detector.sh script uses a pattern that would match 'handoff' anywhere in the prompt, including inside longer words. Add a word-boundary guard so 'handoff' only triggers when it appears as a standalone word or at a word boundary. Show the fix and verify it with a test.",
+  "prompt": "The keyword trigger for the handoff mode in src/core/keywords.ts uses a pattern that matches 'handoff' anywhere in the prompt, including inside longer words such as 'myhandoff'. Add a word-boundary guard so 'handoff' only triggers when it appears as a standalone word. Show the fix and verify it with a test.",
   "expected_tools": ["Read", "Edit", "Bash"],
-  "success_criteria": "The fix uses proper word-boundary matching (e.g., `(^|[^a-zA-Z])handoff([^a-zA-Z]|$)` or `\\bhandoff\\b` via grep -P) to prevent false positives on substrings. A manual test shows 'handoff' triggers but 'myhandoff' does not. Existing validate-plugin tests still pass.",
+  "success_criteria": "Run from the worktree root: `bun -e 'import { matchKeywordModes } from \"./src/core/keywords.ts\"; for (const p of [\"handoff please\", \"time for a handoff.\", \"HANDOFF now\", \"myhandoff\", \"handoffable\"]) console.log(p, \"=>\", matchKeywordModes(p).map((m) => m.name).join(\",\") || \"none\")'`. The first three prompts must print `handoff` and the last two must print `none`. The turn shows its own check that 'handoff' triggers and 'myhandoff' does not, either as a new case in src/core/keywords.spec.ts or as a manual run. `bun test src/core/keywords.spec.ts servers/hooks/keyword-detector.spec.ts` exits 0, so the other trigger phrases (`context is getting long`, `start fresh session`) still fire. Score the behavior above, not the shape of the pattern: `\\b` and an explicit non-letter class both pass.",
   "category": "bugfix"
 }

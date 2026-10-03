@@ -1,7 +1,7 @@
 {
   "name": "single-file-edit",
-  "prompt": "In scripts/session-init.sh, add a comment on the line after the shebang that says '# Session initialization hook: fires on SessionStart events'. Do not change any other lines.",
+  "prompt": "In scripts/qa/mcp-live.ts, change the WAIT_MS constant from 30_000 to 45_000. Do not change any other lines.",
   "expected_tools": ["Read", "Edit"],
-  "success_criteria": "The comment is present on line 2 of scripts/session-init.sh. No other lines changed. Build passes.",
+  "success_criteria": "`git diff --numstat` lists exactly scripts/qa/mcp-live.ts with 1 line added and 1 deleted, and the added line is `const WAIT_MS = 45_000;`. No other file changed and no comment was added. `bun x tsc --noEmit -p tsconfig.runtime.json` exits 0.",
   "category": "edit"
 }
