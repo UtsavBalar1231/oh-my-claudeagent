@@ -164,6 +164,17 @@ describe("scripted turns", () => {
     expect(texts).toEqual(["one", "two"]);
   });
 
+  test("answers a side request, one with an empty tools list, without spending a turn", async () => {
+    await boot({ script: { main: [{ content: [{ type: "text", text: "one" }] }], subagent: [] } });
+
+    const side = (await postJson({ tools: [], messages: [] })) as { content: { text: string }[] };
+    const reply = (await postJson({ tools: [{ name: "Bash" }], messages: [] })) as { content: { text: string }[] };
+
+    expect(side.content[0]?.text).toBe("ok");
+    expect(reply.content[0]?.text).toBe("one");
+    expect(logEntries().map((entry) => [entry.queue, entry.turn])).toEqual([["side", null], ["main", 0]]);
+  });
+
   test("answers a token count without spending a turn or writing an access log line", async () => {
     await boot({ script: { main: [{ content: [{ type: "text", text: "one" }] }], subagent: [] } });
 
