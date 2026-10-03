@@ -76,6 +76,10 @@ function bindHost($: EngineInterface, options: Options): Host {
         get: () => $.state.get({ plugin: "oh-my-claudeagent", key: "agents" }),
         set: (value, setOptions) => $.state.set({ plugin: "oh-my-claudeagent", key: "agents" }, value, setOptions),
       },
+      lanes: {
+        get: () => $.state.get({ plugin: "oh-my-claudeagent", key: "lanes" }),
+        set: (value, setOptions) => $.state.set({ plugin: "oh-my-claudeagent", key: "lanes" }, value, setOptions),
+      },
       routes: {
         get: () => $.state.get({ plugin: "oh-my-claudeagent", key: "routes" }),
         set: (value, setOptions) => $.state.set({ plugin: "oh-my-claudeagent", key: "routes" }, value, setOptions),

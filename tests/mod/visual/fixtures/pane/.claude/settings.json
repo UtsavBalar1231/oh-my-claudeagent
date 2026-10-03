@@ -1,4 +1,7 @@
 {
   "plansDirectory": "{{cwd}}/plans",
-  "permissions": { "defaultMode": "default" }
+  "permissions": {
+    "defaultMode": "default",
+    "allow": ["Bash(ls plans)", "Bash(sleep 90)", "Edit(notes/**)", "mcp__plugin_oh-my-claudeagent_omca__notepad_list"]
+  }
 }

@@ -1,6 +1,23 @@
 {
   "main": [
-    { "content": [{ "type": "tool_use", "name": "Bash", "input": { "command": "just test", "description": "Run the tests" } }] },
-    { "content": [{ "type": "text", "text": "The tests ran." }] }
+    {
+      "content": [
+        { "type": "tool_use", "name": "Bash", "input": { "command": "just test", "description": "Run the tests" } },
+        {
+          "type": "tool_use",
+          "name": "Agent",
+          "input": {
+            "subagent_type": "oh-my-claudeagent:executor",
+            "description": "Port the snapshot onto the router",
+            "prompt": "Port the snapshot and the ledger onto the shared router.",
+            "run_in_background": true
+          }
+        }
+      ]
+    },
+    { "content": [{ "type": "text", "text": "The tests ran and the executor is porting the snapshot." }] }
+  ],
+  "subagent": [
+    { "content": [{ "type": "tool_use", "name": "Bash", "input": { "command": "sleep 90", "description": "Wait for the build" } }] }
   ]
 }

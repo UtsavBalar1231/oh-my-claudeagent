@@ -159,6 +159,36 @@ export function HoverCard(kit: Kit, { key, anchor, title, tone, lines, top = 1, 
   });
 }
 
+export type ScopedCardSpec = Omit<HoverCardSpec, "anchor" | "top" | "left" | "width"> & {
+  scope: string;
+  top: number;
+  left: number;
+  width: number;
+};
+
+/**
+ * A card revealed while any element drawn with the same hover `scope` is under the pointer.
+ * An absolute Box paints over only the rows before it, so a card that must cover the rows after
+ * its anchor is drawn after them, at the end of the tree, and placed by its offsets.
+ */
+export function ScopedCard(kit: Kit, { key, scope, title, tone, lines, top, left, width }: ScopedCardSpec): RenderElement {
+  return kit.Box({
+    key,
+    position: "absolute",
+    top,
+    left,
+    width,
+    display: "none",
+    hover: { display: "flex", scope },
+    flexDirection: "column",
+    borderStyle: "round",
+    borderColor: themeKey(tone),
+    backgroundColor: TONE_KEYS.raised,
+    paddingX: 1,
+    children: [kit.Text({ bold: true, color: ON_SURFACE, wrap: "truncate-end", children: [title] }), ...lines],
+  });
+}
+
 export type CodeSpec = { source: string; language?: string; isDiff?: boolean };
 
 export function CodeBlock(kit: Kit, { source, language, isDiff = false }: CodeSpec): RenderElement {

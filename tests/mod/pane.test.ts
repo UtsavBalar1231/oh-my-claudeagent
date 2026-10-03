@@ -405,17 +405,17 @@ test("an agent row appears on agent.spawn, sums its steps and ends on turn.compl
   const ui = await $.ui.mount(pane("terminal", { columns: 120, rows: 40, placement: "dock" }));
   const body = async () => rows(await ui.drawn()).slice(3);
 
+  const lane = async (key: string) => (await ui.find({ key }))?.text;
+
   await $.agent.spawn(SPAWN);
   w.agents = [{ id: "a-1", description: "Fix the parser", type: "oh-my-claudeagent:executor", status: "running" }];
-  expect(await body()).toEqual([
-    "1 running · 0 finished",
-    "  agent        model         effort    time  tokens",
-    "● executor     sonnet-5-5    ·           0s       0",
-  ]);
+  expect((await body())[0]).toBe("◆ 1 running · 0 finished · 0 tokens");
+  expect(await lane("lane-a-1")).toBe("◆ executor · Fix the parser                0     0s");
+  expect(await lane("tools-a-1")).toBe("  ◐ starting");
 
   await step($.turn.step({ turnId: "t-1", index: 0, model: "claude-sonnet-5-5", effort: "high", messageCount: 1, agentId: "a-1" }));
   await w.clock.advance(66_000);
-  expect((await body())[2]).toBe("● executor     sonnet-5-5    high     1m06s    1.5k");
+  expect(await lane("lane-a-1")).toBe("◆ executor · Fix the parser       high  1.5k  1m06s");
 
   await $.turn.complete({
     answer: "done",
@@ -427,11 +427,9 @@ test("an agent row appears on agent.spawn, sums its steps and ends on turn.compl
     usage: usage(2000, 500),
   });
   await w.clock.advance(4000);
-  expect(await body()).toEqual([
-    "0 running · 1 finished",
-    "  agent        model         effort    time  tokens",
-    "✓ executor     sonnet-5-5    high     1m06s    2.5k",
-  ]);
+  expect((await body())[0]).toBe("◆ 0 running · 1 finished · 2.5k tokens");
+  expect(await lane("done-a-1")).toBe("✓ executor · done                             1m06s");
+  expect(await lane("lane-a-1")).toBeUndefined();
   await ui.unmount();
 });
 
@@ -444,13 +442,13 @@ test("the pane timer ends a row the agent list no longer holds and picks up new 
   w.agents = [{ id: "a-1", description: "Fix the parser", type: "oh-my-claudeagent:executor", status: "running" }];
 
   await w.clock.advance(2000);
-  expect(await ui.find({ type: "Text", text: "1 running · 0 finished" })).toBeDefined();
+  expect(await ui.find({ type: "Text", text: "◆ 1 running · 0 finished · 0 tokens" })).toBeDefined();
 
   w.agents = [];
   write(w, LEDGER, ledger([...ENTRIES, ["test", "just test", 0, "2026-10-02T12:00:00Z"]]));
   await w.clock.advance(2000);
-  expect(await ui.find({ type: "Text", text: "0 running · 1 finished" })).toBeDefined();
-  expect((await ui.find({ key: "agent-a-1" }))?.text).toStartWith("○ executor · Fix the parser");
+  expect(await ui.find({ type: "Text", text: "◆ 0 running · 1 finished · 0 tokens" })).toBeDefined();
+  expect((await ui.find({ key: "done-a-1" }))?.text).toStartWith("○ executor · ended");
   await ui.press({ key: "3" });
   expect(await ui.find({ type: "Text", text: "1/6 · ↑↓ move" })).toBeDefined();
 
@@ -541,7 +539,7 @@ test("OMCA_ASCII draws every glyph from the ASCII set", async ($, on) => {
   expect(drawn.find((row) => row.startsWith(">"))).toBe(">     [ ] 13. Port step 13 onto the shared harness");
   expect(drawn.at(-1)).toBe("r: Reload   l: Plans   ^v move - enter open - esc close");
   await ui.press({ key: "1" });
-  expect(rows(await ui.drawn()).at(-1)).toStartWith("* executor - Fix the parser");
+  expect((await ui.find({ key: "lane-a-1" }))?.text).toStartWith("@ executor - Fix the parser");
   const isAscii = (row: string) => [...row].every((char) => char.charCodeAt(0) >= 32 && char.charCodeAt(0) < 127);
   expect(rows(await ui.drawn()).filter((row) => !isAscii(row))).toEqual([]);
   await ui.unmount();

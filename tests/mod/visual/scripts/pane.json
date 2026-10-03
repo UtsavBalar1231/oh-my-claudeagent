@@ -7,13 +7,44 @@
           "name": "Agent",
           "input": {
             "subagent_type": "oh-my-claudeagent:executor",
-            "description": "Fix the parser",
-            "prompt": "Fix the heading parser so fenced lines are skipped."
+            "description": "Fix the heading parser",
+            "prompt": "Fix the heading parser so fenced lines are skipped. The staging token is password=hunter2-staging; do not print it.",
+            "run_in_background": true
+          }
+        },
+        {
+          "type": "tool_use",
+          "name": "Agent",
+          "input": {
+            "subagent_type": "oh-my-claudeagent:explore",
+            "description": "Map the router callers",
+            "prompt": "Find every caller of the shared router and say which ones bypass the harness.",
+            "run_in_background": true
+          }
+        },
+        {
+          "type": "tool_use",
+          "name": "Agent",
+          "input": {
+            "subagent_type": "oh-my-claudeagent:oracle",
+            "description": "Review the ledger design",
+            "prompt": "Review the ledger rotation design for data loss on a crash mid-write.",
+            "run_in_background": true
           }
         }
       ]
     },
-    { "content": [{ "type": "text", "text": "The executor fixed the parser." }] }
+    { "content": [{ "type": "text", "text": "Three agents are on it." }] }
   ],
-  "subagent": [{ "content": [{ "type": "text", "text": "Fixed the heading parser." }] }]
+  "subagent": [
+    { "content": [{ "type": "tool_use", "name": "Read", "input": { "file_path": "plans/46-task-plan.md" } }] },
+    { "content": [{ "type": "tool_use", "name": "Grep", "input": { "pattern": "router", "path": "plans" } }] },
+    { "content": [{ "type": "tool_use", "name": "Glob", "input": { "pattern": "plans/*.md" } }] },
+    { "content": [{ "type": "tool_use", "name": "Bash", "input": { "command": "ls plans", "description": "List the plans" } }] },
+    { "content": [{ "type": "tool_use", "name": "mcp__plugin_oh-my-claudeagent_omca__notepad_list", "input": {} }] },
+    { "content": [{ "type": "tool_use", "name": "Write", "input": { "file_path": "notes/router-callers.md", "content": "# Router callers\n" } }] },
+    { "content": [{ "type": "tool_use", "name": "Bash", "input": { "command": "sleep 90", "description": "Wait for the build" } }] },
+    { "content": [{ "type": "tool_use", "name": "Bash", "input": { "command": "sleep 90", "description": "Wait for the test run" } }] },
+    { "content": [{ "type": "text", "text": "The rotation is safe: a crash mid-write leaves the previous file whole." }] }
+  ]
 }

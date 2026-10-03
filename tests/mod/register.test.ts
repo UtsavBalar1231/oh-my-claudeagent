@@ -11,6 +11,7 @@ const ATOMS = [
   "costSample",
   "dialogs",
   "doctor",
+  "lanes",
   "ledger",
   "nextActions",
   "pane",

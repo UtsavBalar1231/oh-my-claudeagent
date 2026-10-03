@@ -1,7 +1,7 @@
 import type { RenderElement } from "claude-code";
-import { type Band, bandView, BUTTON_GAP, oneLine, type Span, type Tone } from "../src/core/band-model.ts";
+import { type Band, bandView, BUTTON_GAP, oneLine, planTally, type Span, type Tone } from "../src/core/band-model.ts";
 import { resolveBoundPlan } from "../src/core/boulder.ts";
-import { allTasksDone, checkboxStates } from "../src/core/checkboxes.ts";
+import { allTasksDone } from "../src/core/checkboxes.ts";
 import { ledgerCoversSlot } from "../src/core/evidence.ts";
 import { hasPassingFinalVerification, type NextAction, nextActions } from "../src/core/next-actions.ts";
 import { BOULDER, LEDGER, statusPath, verificationOf } from "../src/core/omca-paths.ts";
@@ -48,7 +48,7 @@ async function readSnapshot(host: Host): Promise<Snapshot> {
   const plan =
     bound === null || planText === null
       ? null
-      : { name: bound.plan_name, path: bound.active_plan, ...countTasks(planText) };
+      : { name: bound.plan_name, path: bound.active_plan, ...planTally(planText) };
 
   const statusFile = statusPath(root, sessionId);
   const verification =
@@ -72,11 +72,6 @@ async function readSnapshot(host: Host): Promise<Snapshot> {
     )) === true;
 
   return { band: { plan, verification, error: errors[0] ?? null, readAt }, hasFinalVerification };
-}
-
-function countTasks(text: string): { done: number; total: number } {
-  const states = checkboxStates(text);
-  return { done: states.filter((state) => state === "x").length, total: states.length };
 }
 
 async function sha256(text: string): Promise<string> {
@@ -114,6 +109,9 @@ const TONES: Record<Tone, TextStyle> = {
   ok: { color: TONE_KEYS.ok },
   warn: { color: TONE_KEYS.warn },
   fail: { color: TONE_KEYS.fail },
+  active: { color: TONE_KEYS.active },
+  fill: { color: TONE_KEYS.fill },
+  track: { color: TONE_KEYS.track },
 };
 
 const row = ({ Text }: Kit, spans: readonly Span[]): RenderElement =>
@@ -147,11 +145,13 @@ export const band: Features = {
   "ui.render AbovePrompt": {
     pre: async (host, e) => {
       if (!host.options.showBand || e.props.hasSurvey) return undefined;
-      const [{ value: snapshot }, { value: actions = [] }] = await Promise.all([
+      const [{ value: snapshot }, { value: actions = [] }, { value: agents = {} }] = await Promise.all([
         host.state.band.get(),
         host.state.nextActions.get(),
+        host.state.agents.get(),
       ]);
-      const view = bandView(snapshot, actions, e.props.bodyColumns, glyphs(isAscii));
+      const running = Object.values(agents).filter((agent) => agent.endedAt === null).length;
+      const view = bandView(snapshot, actions, e.props.bodyColumns, glyphs(isAscii), running);
       if (view === undefined) return undefined;
       const kit = kitOf(host.ui.resolve(e), e.surface);
       const { Box, Button } = kit;

@@ -16,7 +16,9 @@ import * as stats from "./tabs/stats.ts";
 import { type Kit, kitOf } from "./ui.ts";
 
 export const PANE = "omca";
-const TICK_MS = 2000;
+// The Agents tab's elapsed clocks tick each second; files are read again every second tick.
+const TICK_MS = 1000;
+const READ_EVERY = 2;
 // An inline pane gets about a third of the window less two rows on 2.1.287 (11 body rows at
 // 40 terminal rows, 8 at 30) and follows its content's height below that, so every inline
 // drawing is at least that tall: sized from the viewport first, then to what the pane got.
@@ -80,6 +82,7 @@ function viewOf(tab: Tab): TabView {
 
 let timer: Timer | undefined;
 let isTicking = false;
+let ticks = 0;
 let now = 0;
 let inlineRows = INLINE_ROWS;
 let viewportRows = 0;
@@ -150,8 +153,11 @@ async function refresh(host: Host, tab?: Tab): Promise<void> {
 
 async function tick(host: Host): Promise<void> {
   now = await host.clock.now();
-  await reconcile(host, await host.agent.list(), now);
-  await refresh(host);
+  ticks += 1;
+  if (ticks % READ_EVERY === 0) {
+    await reconcile(host, await host.agent.list(), now);
+    await refresh(host);
+  }
   const [pane, rows] = await Promise.all([host.state.pane.get(), host.state.agents.get()]);
   const isRunning = Object.values(rows.value ?? {}).some((row) => row.endedAt === null);
   if (pane.value?.tab === "agents" && isRunning) host.ui.invalidate();
@@ -174,6 +180,7 @@ function start(host: Host): void {
 function stop(): void {
   timer?.cancel();
   timer = undefined;
+  ticks = 0;
 }
 
 export async function open(host: Host, e: Input<"command.run">, tab: Tab): Promise<CommandRunResult> {

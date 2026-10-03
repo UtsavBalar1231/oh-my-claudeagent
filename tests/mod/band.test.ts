@@ -165,7 +165,7 @@ test("a bound plan with no verification shows the plan and no actions until a tu
   await start($);
 
   await onEachSurface($, async (band) => {
-    expect(await statusRow(band)).toBe("widget-rewrite 12/46 tasks · no verification yet");
+    expect(await statusRow(band)).toBe("▰▱▱▱▱ 12/46 · next 13 Port module 13");
     expect(await buttons(band)).toEqual([]);
   });
 });
@@ -176,7 +176,7 @@ test("an unlogged verification shows as not logged and offers to log it before s
   await turn($);
 
   await onEachSurface($, async (band) => {
-    expect(await statusRow(band)).toBe("widget-rewrite 12/46 tasks · ! just test evidence not logged");
+    expect(await statusRow(band)).toBe("▰▱▱▱▱ 12/46 · next 13 Port module 13 · ! just test evidence not logged");
     expect(await buttons(band)).toEqual([
       { key: "log-evidence", label: "Log evidence", hotkey: "1", plain: true },
       { key: "start-work", label: "Start work", hotkey: "2", plain: true },
@@ -190,7 +190,7 @@ test("a ledger written after the run counts as logged, whatever the status file 
   await turn($);
 
   await onEachSurface($, async (band) => {
-    expect(await statusRow(band)).toBe("widget-rewrite 12/46 tasks · ✓ just test evidence logged");
+    expect(await statusRow(band)).toBe("▰▱▱▱▱ 12/46 · next 13 Port module 13 · ✓ just test evidence logged");
     expect(await buttons(band)).toEqual([{ key: "start-work", label: "Start work", hotkey: "1", plain: true }]);
   });
 });
@@ -252,7 +252,7 @@ test("a complete plan with a passing final verification for its current bytes of
   await turn($);
 
   await onEachSurface($, async (band) => {
-    expect(await statusRow(band)).toBe("widget-rewrite 46/46 tasks · no verification yet");
+    expect(await statusRow(band)).toBe("▰▰▰▰▰ 46/46");
     expect(await buttons(band)).toEqual([{ key: "review", label: "Review with oracle", hotkey: "1", plain: true }]);
   });
 });
@@ -277,7 +277,7 @@ test("an unreadable ledger on a complete plan names the failure and still offers
   await turn($);
 
   await onEachSurface($, async (band) => {
-    expect(await statusRow(band)).toBe("widget-rewrite 46/46 tasks · no verification yet");
+    expect(await statusRow(band)).toBe("▰▰▰▰▰ 46/46");
     expect(await buttons(band)).toEqual([{ key: "review", label: "Review with oracle", hotkey: "1", plain: true }]);
   });
 });
@@ -311,9 +311,91 @@ test("start-work is withheld while an agent is running", async ($, on) => {
   await turn($);
 
   await onEachSurface($, async (band) => {
-    expect(await statusRow(band)).toBe("widget-rewrite 12/46 tasks · no verification yet");
+    expect(await statusRow(band)).toBe("▰▱▱▱▱ 12/46 · next 13 Port module 13 · ◆ 1 running");
     expect(await buttons(band)).toEqual([]);
   });
+});
+
+const SPAWN = {
+  prompt: "Port module 13.",
+  description: "port module 13",
+  subagentType: "oh-my-claudeagent:executor",
+  provider: { plugin: PLUGIN, tier: "user" },
+  parentModel: "claude-opus-5-5",
+  background: true,
+  fork: false,
+} as const;
+
+test("the band counts the agents running now and drops the count when the last one ends", async ($, on) => {
+  world(on, bound(12, 46));
+  await start($);
+  const band = await mount($, "terminal");
+  expect(await statusRow(band)).toBe("▰▱▱▱▱ 12/46 · next 13 Port module 13");
+
+  await $.agent.spawn({ ...SPAWN, tool_use_id: "toolu_1" });
+  await $.agent.spawn({ ...SPAWN, tool_use_id: "toolu_2" });
+  await band.redraw();
+  expect(await statusRow(band)).toBe("▰▱▱▱▱ 12/46 · next 13 Port module 13 · ◆ 2 running");
+
+  await turn($, "agent-toolu_1");
+  await band.redraw();
+  expect(await statusRow(band)).toBe("▰▱▱▱▱ 12/46 · next 13 Port module 13 · ◆ 1 running");
+  await turn($, "agent-toolu_2");
+  await band.redraw();
+  expect(await statusRow(band)).toBe("▰▱▱▱▱ 12/46 · next 13 Port module 13");
+});
+
+test("the bar, the count, the next task and the running count draw in their theme keys", async ($, on) => {
+  world(on, bound(12, 46, { [STATUS]: statusFile("just test") }));
+  await start($);
+  await $.agent.spawn({ ...SPAWN, tool_use_id: "toolu_1" });
+  await turn($);
+
+  const band = await mount($, "terminal");
+  const styled = (await band.findAll({ type: "Text" }))
+    .slice(1)
+    .map(({ text, props }) => [text, props["color"] ?? (props["bold"] === true ? "bold" : props["dimColor"] === true ? "dim" : "plain")]);
+  expect(styled).toEqual([
+    ["▰", "rate_limit_fill"],
+    ["▱▱▱▱", "rate_limit_empty"],
+    [" 12/46", "dim"],
+    [" · ", "dim"],
+    ["next ", "dim"],
+    ["13 ", "bold"],
+    ["Port module 13", "plain"],
+    [" · ", "dim"],
+    ["! ", "warning"],
+    ["just test", "plain"],
+    [" evidence not logged", "warning"],
+    [" · ", "dim"],
+    ["◆ 1 running", "claude"],
+  ]);
+});
+
+test("proof counts draw only when the band carries them", async ($, on) => {
+  const atoms = new Map<string, { value: unknown; version: number }>();
+  let proof: object | undefined;
+  on("state.get", (_$, e) => {
+    const read = atoms.get(e.key) ?? { value: undefined, version: 0 };
+    const { value } = read;
+    const isBand = e.key === "band" && proof !== undefined && typeof value === "object" && value !== null;
+    return { value: isBand ? { ...read, value: { ...value, proof } } : read };
+  });
+  on("state.set", (_$, e) => {
+    const version = (atoms.get(e.key)?.version ?? 0) + 1;
+    atoms.set(e.key, { value: e.value, version });
+    return { value: { isSet: true, version } };
+  });
+  world(on, bound(12, 46));
+  await start($);
+  const band = await mount($, "terminal");
+  expect(await statusRow(band)).toBe("▰▱▱▱▱ 12/46 · next 13 Port module 13");
+
+  proof = { proven: 52, unproven: 4, failed: 0 };
+  await band.redraw();
+  expect(await statusRow(band)).toBe("▰▱▱▱▱ 12/46 · next 13 Port module 13 · ✓52 !4 ✗0");
+  const colors = (await band.findAll({ type: "Text" })).filter(({ text }) => /^[✓!✗]\d+$/.test(text)).map(({ props }) => props["color"] ?? "dim");
+  expect(colors).toEqual(["success", "warning", "dim"]);
 });
 
 test("a press fills the prompt with the exact text and never submits", async ($, on) => {
@@ -340,7 +422,7 @@ test("a sub-agent's turn refreshes the plan row and leaves the actions alone", a
   disk.set(STATUS, { text: statusFile("just test"), mtimeMs: BEFORE_RUN_MS });
   await turn($, "agent-1");
   await band.redraw();
-  expect(await statusRow(band)).toBe("widget-rewrite 12/46 tasks · ! just test evidence not logged");
+  expect(await statusRow(band)).toBe("▰▱▱▱▱ 12/46 · next 13 Port module 13 · ! just test evidence not logged");
   expect((await buttons(band)).map((button) => button.key)).toEqual(["start-work"]);
 
   await turn($);
@@ -361,7 +443,7 @@ test("typing into the prompt clears the actions; an edit that leaves it empty do
   await edit($, "", "h");
   await band.redraw();
   expect(await buttons(band)).toEqual([]);
-  expect(await statusRow(band)).toBe("widget-rewrite 12/46 tasks · ! just test evidence not logged");
+  expect(await statusRow(band)).toBe("▰▱▱▱▱ 12/46 · next 13 Port module 13 · ! just test evidence not logged");
 });
 
 test("a bare digit that is a shown hotkey keeps the actions so the engine can press its Button", async ($, on) => {
@@ -425,7 +507,7 @@ test("at 80, 120 and 200 columns on both surfaces the rows read the same and sta
     await onEachSurface(
       $,
       async (band) => {
-        expect(await statusRow(band)).toBe("widget-rewrite 12/46 tasks · ! just test evidence not logged");
+        expect(await statusRow(band)).toBe("▰▱▱▱▱ 12/46 · next 13 Port module 13 · ! just test evidence not logged");
         expect((await buttons(band)).map((button) => `${button.hotkey}: ${button.label}`)).toEqual([
           "1: Log evidence",
           "2: Start work",
@@ -442,7 +524,7 @@ test("at 80, 120 and 200 columns on both surfaces the rows read the same and sta
       $,
       async (band) => {
         const row = (await statusRow(band)) ?? "";
-        expect(row).toMatch(/^widget-rewrite 12\/46 tasks · ! bun test src .*… evidence not logged$/);
+        expect(row).toMatch(/^▰▱▱▱▱ 12\/46 · next 13 Port module 13 · ! bun test src .*… evidence not logged$/);
         expect(displayWidth(row)).toBe(columns - 3);
       },
       columns,
@@ -450,7 +532,7 @@ test("at 80, 120 and 200 columns on both surfaces the rows read the same and sta
   }
   await onEachSurface(
     $,
-    async (band) => expect(await statusRow(band)).toBe(`widget-rewrite 12/46 tasks · ! ${long} evidence not logged`),
+    async (band) => expect(await statusRow(band)).toBe(`▰▱▱▱▱ 12/46 · next 13 Port module 13 · ! ${long} evidence not logged`),
     200,
   );
 });
@@ -508,7 +590,7 @@ test(
     await start($);
     await turn($);
     const band = await mount($, "terminal");
-    expect(await statusRow(band)).toBe("widget-rewrite 12/46 tasks · ! just test evidence not logged");
+    expect(await statusRow(band)).toBe("▰▱▱▱▱ 12/46 · next 13 Port module 13 · ! just test evidence not logged");
 
     const samples: number[] = [];
     for (let n = 0; n < RENDER_SAMPLES; n++) {
@@ -528,19 +610,19 @@ test("a burst of turn ends leaves the mounted band on the last state, drawn with
   world(on, disk);
   await start($);
   const band = await mount($, "terminal");
-  expect(await statusRow(band)).toBe("widget-rewrite 12/46 tasks · no verification yet");
+  expect(await statusRow(band)).toBe("▰▱▱▱▱ 12/46 · next 13 Port module 13");
 
   for (let n = 0; n < 8; n++) {
     disk.set(STATUS, { text: statusFile(`just test ${n}`), mtimeMs: BEFORE_RUN_MS });
     await turn($, n % 2 === 0 ? undefined : `agent-${n}`);
   }
 
-  expect(await statusRow(band)).toBe("widget-rewrite 12/46 tasks · ! just test 7 evidence not logged");
+  expect(await statusRow(band)).toBe("▰▱▱▱▱ 12/46 · next 13 Port module 13 · ! just test 7 evidence not logged");
   expect((await buttons(band)).map((button) => button.key)).toEqual(["log-evidence", "start-work"]);
 
   disk.set(STATUS, { text: statusFile("just test again"), mtimeMs: BEFORE_RUN_MS });
   await turn($);
-  expect(await statusRow(band)).toBe("widget-rewrite 12/46 tasks · ! just test again evidence not logged");
+  expect(await statusRow(band)).toBe("▰▱▱▱▱ 12/46 · next 13 Port module 13 · ! just test again evidence not logged");
 });
 
 test("a turn that changes nothing leaves the drawn band as it was", async ($, on) => {

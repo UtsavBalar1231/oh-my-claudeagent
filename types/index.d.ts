@@ -14,6 +14,16 @@ declare module "claude-code" {
           status: "running" | "answer" | "aborted" | "refusal" | "error" | "gone";
         };
       };
+      lanes: {
+        readonly [agentId: string]: {
+          prompt: string;
+          tools: readonly string[];
+          calls: number;
+          tool: { name: string; detail: string } | null;
+          output: string;
+          result: string;
+        };
+      };
       routes: {
         readonly [agentId: string]: "low" | "medium" | "high" | "xhigh" | "max";
       };
@@ -23,8 +33,15 @@ declare module "claude-code" {
         prompt: string;
       }[];
       band: {
-        plan: { name: string; path: string; done: number; total: number } | null;
+        plan: {
+          name: string;
+          path: string;
+          done: number;
+          total: number;
+          next: { n: number; title: string } | null;
+        } | null;
         verification: { command: string; at: number; isLogged: boolean } | null;
+        proof?: { proven: number; unproven: number; failed: number };
         error: string | null;
         readAt: number;
       };

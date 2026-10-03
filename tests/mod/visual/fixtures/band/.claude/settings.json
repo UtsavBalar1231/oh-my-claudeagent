@@ -1,4 +1,4 @@
 {
   "plansDirectory": "{{cwd}}/plans",
-  "permissions": { "allow": ["Bash(just test)"] }
+  "permissions": { "defaultMode": "default", "allow": ["Bash(just test)", "Bash(sleep 90)"] }
 }
