@@ -25,7 +25,6 @@ const EXCLUDED: Record<string, string> = {
   ".omca/state/b.json": "x",
   ".claude/settings.json": "x",
   "benchmarks/perf/r.json": "x",
-  "docs/design/d.md": "x",
   "docs/CLAUDE.md": "x",
   "tests/t.spec.ts": "x",
   "servers/tests/y.ts": "x",

@@ -9,7 +9,7 @@ Registered here: `SessionStart`, `UserPromptSubmit`, `UserPromptExpansion`,
 `PostToolUseFailure`, `Stop`, `TaskCompleted`.
 
 Regenerate that list with `jq -r '.hooks | keys[]' hooks/hooks.json`. Every other platform
-event is unregistered on purpose; `OMCA.md` carries the per-event reason.
+event is unregistered on purpose; `docs/references.md` carries the per-event reason.
 
 ## Current runtime contract
 

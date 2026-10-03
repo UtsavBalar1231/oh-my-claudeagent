@@ -62,7 +62,7 @@
         "dialog",
         "deny"
       ],
-      "description": "dialog asks before a destructive Bash command runs where a dialog can show and denies elsewhere; deny refuses every destructive command, as 2.21.0 did.",
+      "description": "dialog asks before a risky Bash or PowerShell command runs where a dialog can show; deny, and any session where none can show, refuses a blocking command and lets an advisory one run. A catastrophic removal is refused in both modes.",
       "sensitive": false
     }
   }

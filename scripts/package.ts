@@ -33,7 +33,6 @@ export const EXCLUDES = [
   "CLAUDE.md",
   ".claude/",
   "benchmarks/",
-  "docs/design/",
   "tests/",
   "scripts/qa/",
   "scripts/docs/",
