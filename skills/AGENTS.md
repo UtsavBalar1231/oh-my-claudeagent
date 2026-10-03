@@ -30,6 +30,6 @@ Forbidden in skills, unless listed as an exception below:
 
 Exceptions, where hook knowledge is the skill's purpose:
 
-- `omca-setup`: reports on the hooks, the mod and the managed settings that affect OMCA
+- `omca-setup`: states the hook and managed-settings policy it works under, and sends a diagnosis to `/omca doctor`
 
 Rationale: a skill that leaks a file path forces users to learn internal layouts they cannot control, and every hook refactor then has to update skill prose.

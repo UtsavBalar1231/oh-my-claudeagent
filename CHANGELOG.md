@@ -26,7 +26,8 @@ hand.
 - **The `/omca` pane.** `/omca` opens a pane with Agents, Plan, Evidence, Notepad, Feedback,
   Stats and Doctor tabs, each on a digit key. Every color is a Claude Code theme key, so the pane
   and the band follow the theme you pick, a custom one in `~/.claude/themes/` included, and every
-  state also carries a glyph and a word. Secrets in commands, output and notes are drawn as
+  state also carries a glyph and a word. A state's color goes on its glyph, and the text beside it
+  stays in the theme's text color. Secrets in commands, output and notes are drawn as
   `‹masked›` and your home folder as `~`, and `OMCA_ASCII=1` draws everything from an ASCII set.
   `/omca plan`, `/omca stats` and `/omca doctor` open the pane on that tab. Ctrl+X then Tab, or a
   click, focuses it; Esc, the close mark or Ctrl+X then X closes it.
@@ -41,7 +42,7 @@ hand.
   `File:` paths with the evidence log: the newest test, build or lint run since they changed makes
   it PROVEN or FAILED, and no such run leaves it UNPROVEN. The focused task's detail (its steps,
   done-when commands, dependencies, file ages and the runs that bear on it) sits beside the list in
-  a wide pane, under its row in a narrower one, or on its own page. `r` fills the prompt to run
+  a wide pane, under its row in a narrower one, or on its own page. `k` fills the prompt to run
   the task's check, `s` to start work from it, `c` copies it, `e` switches to the Evidence tab,
   `o` and `x` keep open or failing tasks, and `f` finds tasks by text. `t` opens the plan's
   sections, which is also where a plan without numbered tasks opens, and `l` lists the recent
@@ -51,10 +52,12 @@ hand.
   verification: COMPLETE when a passing one matches the plan file as it is now, STALE when the plan
   changed after it passed, MISSING otherwise, with the last 30 exit codes as a strip of dots. Below
   it the logged runs are grouped by day, and the focused run shows its command and output with
-  secrets masked. `b`, `e`, `l`, `m` and `v` keep one type, `x` keeps failures, `f` finds runs by
-  command, `c` copies the command and `r` fills a rerun request.
+  secrets masked. Each run's exit code chip holds three digits, so codes up to 255 line up. `b`,
+  `t`, `l`, `m` and `v` keep one type, `x` keeps failures, `f` finds runs by command, `c` copies
+  the command and `r` fills a rerun request.
 - **The Notepad tab.** One card per section of the bound plan's notepad, each entry under its
-  date. `f` finds text in the entries and `l` picks another plan's notepad.
+  date. `f` finds text in the entries, `w` clears the search and `l` picks another plan's
+  notepad.
 - **The band.** Above the prompt, the band shows the bound plan's progress as a bar with its done
   and total tasks, the next open task, the proven, unproven and failed counts, a verification
   command whose evidence was not logged, and how many agents are running, dropping segments as the
@@ -74,11 +77,12 @@ hand.
 - **Ratings.** `/omca-rate up` or `/omca-rate down` rates the last turn, with an optional note.
   With no note typed, the text selected on screen becomes the note, cut to 200 characters, and the
   reply says so. Ratings are kept in `.omca/feedback/<session id>.json` and listed in the
-  Feedback tab.
-- **A turn footer.** After each main-loop turn the mod prints the turn's duration, input and
-  output tokens and cost. When a verification ran that turn with no evidence logged after it, a
+  Feedback tab, where `u` and `d` rate the last turn up or down.
+- **A turn footer.** After each main-loop turn the mod prints the turn's duration and its input
+  and output tokens. An account billed by the token also sees the turn's cost, by the same rule
+  as the status line. When a verification ran that turn with no evidence logged after it, a
   warning naming the command takes the cost's place.
-- **A delegation ledger and the Stats tab.** Each subagent gets a record under
+- **Delegation metrics and the Stats tab.** Each subagent gets a record under
   `.omca/metrics/<session id>/` with its type, model, effort, tokens, duration, outcome, whether
   evidence was logged during it, and an estimated cost from a dated price table that cites its
   source for every row. A model with no sourced price stays unpriced rather than guessed. The
@@ -96,7 +100,8 @@ hand.
   - Blocking: a force push to the default branch in any spelling (`--force`,
     `--force-with-lease`, `--force-if-includes`, a `+` refspec, `--mirror`, or no refspec while on
     that branch), `git commit --no-verify` or `-n`, `git reset --hard`, `git stash`, `git clean`,
-    `git restore`, a recursive `git rm`, and `git checkout` with a `--` path. Held for your review
+    a `git restore` that writes the working tree, a recursive `git rm`, and `git checkout` with a
+    `--` path. `git restore --staged` without `--worktree` runs. Held for your review
     in an interactive session and refused where no dialog can show, in every permission mode
     including `bypassPermissions`. The default branch is the one `origin/HEAD` names, or `main`
     and `master` when it names none, read from local refs with no network call.
@@ -116,6 +121,9 @@ hand.
   quotes. It sees past `sudo`, `env`, `timeout`, `nice`, `nohup`, `stdbuf`, `ionice`, `chrt`,
   `setsid` and `time`, shell keywords, brace groups and backslash escapes, and resolves a relative
   target against the session's working directory, so `rm -rf ..` from the project root is caught.
+  It reads `rm` options and the options of `git reset`, `git rm`, `git restore` and `git commit`
+  wherever they stand before `--`, as the tools do, so `rm ~ -rf` and `git reset HEAD --hard`
+  count, and it accepts a long option's abbreviations, such as `--rec` and `--no-pre`.
   For PowerShell it reads `Remove-Item` and its aliases with `-Recurse`, cmd's `rd`, `rmdir` and
   `del`, and the guarded git forms, and treats `-WhatIf` as no removal. Drive roots, the Git Bash,
   Cygwin, WSL `/mnt` and macOS `/Volumes` mounts, and share roots count as catastrophic targets.
@@ -137,6 +145,8 @@ hand.
   has a title for `/mcp`, and `boulder_write` is marked destructive.
 - `boulder_progress` returns `plan_sha256`, the hash of the plan file's current bytes, so
   start-work no longer runs `sha256sum`.
+- `OMCA_HOOK_TRACE=1` makes the server append one line per hook call to
+  `.omca/state/hook-trace.jsonl`: the event, the session, agent and tool, and the kind of answer.
 - **Linux, macOS and native Windows.** CI runs the specs, typechecks, the validator and a live
   smoke session on all three. On Windows, verification commands run through the PowerShell tool
   count toward the evidence gates, failure recovery has PowerShell advice, and paths with drive
@@ -145,8 +155,6 @@ hand.
   a lock directory. Rules, frontmatter and pasted prompts accept a byte-order mark and CRLF line
   endings. The shipped skills avoid `sha256sum`, `/tmp` and unquoted plugin paths, and setup
   accepts a `settings.json` that starts with a byte-order mark.
-- The `showBand` and `guardMode` plugin options, and `OMCA_ASCII=1`, which draws the band, pane,
-  footer and dialog with ASCII glyphs.
 
 ### Changed
 
@@ -156,9 +164,9 @@ hand.
   the same server through OpenCode's own executable and runs the comment gate and plan checks in
   process.
 - **OMCA's guidance comes from the server.** It is added to a session's first prompt and again
-  after a compaction, and setup writes nothing into any `CLAUDE.md`. A resumed session is not
-  guided twice, and a session started by `/clear` is guided afresh. Before a compaction the mod
-  asks the summarizer to keep the bound plan and its open tasks.
+  after a compaction. A resumed session is not guided twice, and a session started by `/clear` is
+  guided afresh. Before a compaction the mod asks the summarizer to keep the bound plan and its
+  open tasks.
 - **The stop gates continue a session as hook feedback.** Plan continuation, final verification
   and the drift guard run in that order from one Stop handler and continue the turn with their
   reason, which Claude Code draws as "Stop hook feedback" instead of "Stop hook error". Each keeps
@@ -173,35 +181,42 @@ hand.
 - **The sisyphus prompt is a little over half its old size.** It drops what the output style and
   the first-prompt guidance already say and keeps every instruction only it carries, falling from
   about 6,700 to about 3,800 tokens on every main-session request.
-- **The plugin installs from a packaged branch.** `just release` commits the shipped tree,
-  without `package.json`, `bun.lock`, `bunfig.toml`, the typecheck configs or the OpenCode
-  adapter, to the orphan `plugin` branch tagged `plugin-v<version>`, and `marketplace.json` pins
-  that commit through a `url` source. A marketplace install no longer fetches about 166 MiB of
-  development dependencies.
+- **The plugin installs from a packaged branch.** `just release` commits the shipped tree to the
+  orphan `plugin` branch tagged `plugin-v<version>`, and `marketplace.json` pins that commit
+  through a `url` source. The shipped tree leaves out the repository tooling: the specs, `tests/`,
+  every script but the status line setup, `package.json`, `bun.lock`, `bunfig.toml`, the
+  typecheck and lint configs, `CONTRIBUTING.md`, the OpenCode adapter and the video project. A
+  marketplace install no longer fetches about 166 MiB of development dependencies.
 - **The status lines run on bun through a launcher.** `/oh-my-claudeagent:omca-setup` copies
   `statusline/launcher.ts` to `~/.claude/omca/statusline.ts`, prints a diff of
   `~/.claude/settings.json`, and after you confirm it sets `statusLine` and
   `subagentStatusLine` to that launcher, keeping the previous file as
-  `settings.json.omca-bak`. The launcher runs the renderer from the newest installed plugin
-  version, so a plugin update no longer needs a second setup run. `--uninstall` removes both
-  entries and the launcher. A render takes about 4 ms, against about 22 ms before.
+  `settings.json.omca-bak`. The launcher runs the renderer from the most recently updated
+  install, so the status line needs no second setup run after a plugin update. The
+  `disableForceOrchestrationStyle` opt-out still needs setup to run again after each update.
+  `--uninstall` removes both entries and the launcher. A render takes about 4 ms, against about
+  22 ms before.
 - `statuslineMode` takes `on` or `off`. A saved `direct` or `daemon` value is no longer an
   option; set it again to `on`.
 - `omca-setup` checks the Claude Code and bun versions, `ast-grep` and the runtime, configures the
   status lines and applies the force-style opt-out. Its `--check` and `--doctor` modes point at
   `/omca doctor`.
 - **The status line adapts to the terminal.** It reads the `COLUMNS` and `LINES` that Claude
-  Code sets and fills lines by priority: model and effort, plan progress with the next open
-  task, the context bar, git branch and counts, the directory, agent, worktree and pull request,
-  cost and duration, the 5 hour and 7 day usage limits, lines changed, and extra directories. A
-  segment that does not fit wraps whole to the next line, and when the lines run out the lowest
-  segments drop first. Only the next-task label is ellipsized. The context bar is 8 to 20 blocks
-  wide and takes the free cells on its line. Under 20 rows it uses at most two lines, otherwise
-  four, and under 60 columns it draws one compact line of model, plan count, context percentage
-  and branch. Widths count terminal cells, so wide characters take two, and lines stop 6 cells
-  short of `COLUMNS`, the 3 cells Claude Code keeps free on each side. A line as wide as
-  `COLUMNS` is clipped by Claude Code with a trailing ellipsis. Subagent rows drop
-  segments by the same rule, in the order name, model, status, effort, context.
+  Code sets. From 60 columns the status line is three rows: session, workspace and usage. Each
+  starts its own line and wraps within itself, and a segment that does not fit wraps whole to the
+  next line of its row. When lines run out, the lowest-ranked segment in any row goes first, and
+  the model always stays. Only the next-task label is ellipsized. The context bar is 8 to 20
+  blocks wide and takes the free cells on its line. Under 20 rows the status line uses at most
+  two lines, otherwise four, and under 60 columns it draws one compact line of model, plan count,
+  context percentage and branch. Widths count terminal cells, so wide characters take two, and
+  lines stop 6 cells short of `COLUMNS`, the 3 cells Claude Code keeps free on each side. A
+  subagent row adds its name, model, status, effort and context in that order and stops at the
+  first that does not fit.
+- Cost shows only when the payload has no 5 hour or 7 day window and the cost is above zero, so a
+  subscriber sees no dollar figure. The turn footer follows the same rule.
+- Durations read `2m05s` on the status line, as they do in the footer and the pane.
+- The sisyphus agent's status line icon is `nf-fa-repeat` (U+F01E), the glyph the agent icon
+  table names.
 - The directory now shows in every project, not only in a git repository, and the pull request
   segment shows the number without the repository name. The agent segment appears only when the
   session's main agent is not sisyphus, and behind a Claude apps gateway with a spend limit, the
@@ -215,6 +230,15 @@ hand.
   The whole-file opt-out marker is now `comment-gate-disable-file`.
 - The plan-checkbox check no longer refuses a finished plan whose tasks are all checked, and
   judges a small Edit to a plan only when it rewrites a plan heading.
+- `/oh-my-claudeagent:plan` writes the plan and no longer binds the session to it.
+  `/oh-my-claudeagent:start-work` registers the plan and binds the session that runs it.
+- `just validate` and `just check` count as verification runs, alongside `just test`, `lint`,
+  `ci`, `typecheck` and `build`.
+- `ast_search` with `output_format: "json"` returns `{truncated, matches}`, and `truncated` says
+  whether more matches exist than it returned.
+- `session_search` refuses an empty query and a `role` other than `user`, `assistant` or `tool`,
+  where it used to match every turn or ignore the filter.
+- `categories_list` takes no input; its unused `working_directory` argument is gone.
 - Rule and context injection rebuilds its index when a rule directory or rule file changes, and
   injects each rule body once per session until it changes.
 - The evidence ledger rotates at start: once the live file passes 1 MiB or 1,000 entries, all but
@@ -222,11 +246,13 @@ hand.
   after 24 hours, and delegation records and ratings after 90 days.
 - The docs are `README.md`, `docs/usage.md` and `docs/references.md`, and `CONTRIBUTING.md` sits
   at the repository root.
-- For contributors: `just ci` runs on bun alone (typecheck, validator, mod tests, bun specs, MCP
-  specs, mod and manifest validation, OpenCode specs). The validator is `bun scripts/validate.ts`,
-  the bats suites and the shellcheck lint are retired, and the repository holds no shell or Python
-  file. `just release <version>` refuses a dirty tree, a missing changelog entry or an existing
-  tag, and restores the tree if it fails part way.
+- For contributors: `just ci` runs lint, typecheck, the validator, the bun specs, the mod tests,
+  the OpenCode specs and a smoke session against the mock model, and needs bun, the claude CLI and
+  ast-grep. The validator is `bun scripts/validate.ts`, the bats suites and the shellcheck lint
+  are retired, and the repository holds no shell or Python file. `just release <version>` refuses
+  a dirty tree, a checkout that is not `main` or not even with `origin/main`, a missing changelog
+  entry or an existing tag, restores the tree if it fails part way, and prints one atomic push of
+  both branches and both tags.
 
 ### Fixed
 
@@ -237,7 +263,10 @@ hand.
   notepads directory, and `notepad_compact` rewrites a section under the same lock as
   `notepad_write`, so a concurrent append is no longer lost.
 - `evidence_log` refuses to replace a ledger it cannot parse instead of starting a new one over
-  the audit trail, and caps `command` and `verified_by`.
+  the audit trail, and caps `command` and `verified_by`. `evidence_read` refuses such a ledger
+  with the same message, where it used to report no evidence.
+- Files under `.omca/rules/` can be committed. The `.omca/.gitignore` the server writes ignored
+  every file inside that directory; the server now rewrites it to keep them.
 - `ast_*` no longer reads a pattern starting with a hyphen as an option, and a matching rule with
   `severity: error` no longer discards the scan's matches.
 - `file_read` no longer skips its size guard for a negative limit, cuts an overlong line while
@@ -267,15 +296,20 @@ hand.
   `StopFailure` log, the file-changed log, the hook error log, the teammate audit line and the
   subagent-stop bookkeeping. OMCA no longer registers `FileChanged`, `StopFailure` or
   `SubagentStop`. `file_read` still writes its audit log, `.omca/logs/file-access.jsonl`.
-- The `validate_plan_write` tool, and the cache-writing option of `agents_list`.
+- The `validate_plan_write` tool, the cache-writing option of `agents_list`, and the `agent`
+  field of `boulder_write` and of the plan registry. A stored `agent` is dropped on the next
+  write.
+- **The `PreCompact` and `SessionEnd` hooks.** The mod's `session.compact` feature shapes the
+  summary, and the server unbinds its sessions when it exits.
 - **The tool-loop detector.** It warned when one agent ran the same batch of tool calls three
   times in a row, and it fired on legitimate repeats such as polling or re-running a check
   after an edit far more often than on real loops. OMCA no longer registers `PostToolBatch`,
   and `tool-loop` is no longer a name `OMCA_DISABLED_HOOKS` recognizes. Repeated failures still
   trip the failure-recovery breaker at a tool's third failure.
-- **Setup's `CLAUDE.md` phases.** Setup no longer writes, updates or removes the
-  `--- omca-setup` block in `~/.claude/CLAUDE.md`.
-- `OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY` and the 2.x hook names in `OMCA_DISABLED_HOOKS`.
+- **Setup's `CLAUDE.md` block.** Setup no longer writes, updates or removes the
+  `--- omca-setup` block in `~/.claude/CLAUDE.md`, and writes nothing into any `CLAUDE.md`.
+- `OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY`. `OMCA_DISABLED_HOOKS=bash-guard` is the switch for
+  the guard.
 - **The status line's tuning variables.** `CLAUDE_STATUSLINE_BAR_WIDTH` (20),
   `CLAUDE_STATUSLINE_THRESHOLD_WARN` (60), `CLAUDE_STATUSLINE_THRESHOLD_CRIT` (85),
   `CLAUDE_STATUSLINE_CACHE_TTL` (5) and `CLAUDE_STATUSLINE_GIT_TIMEOUT` (3) are gone, and
@@ -304,7 +338,8 @@ hand.
    two at once. The 2.x Python server and the 3.x server lock `.omca/` state in different ways
    that do not exclude each other, so concurrent writes to the evidence ledger or the plan
    registry can be lost.
-3. Update with `/plugin marketplace update omca` and restart Claude Code.
+3. Run `claude plugin update oh-my-claudeagent@omca`, or open the plugin on the Installed tab of
+   `/plugin` and choose Update now, then restart Claude Code.
 4. Delete the `--- omca-setup` block from `~/.claude/CLAUDE.md` (under `CLAUDE_CONFIG_DIR` when
    you set it) by hand. The server now delivers the same guidance, and neither setup nor
    `/omca doctor` removes the old block.
@@ -1808,7 +1843,7 @@ See `REPORT-upgrades-2.1.167.md` for the complete audit record.
   duration from `cost.total_api_duration_ms`. Duplicate coverage removed with justification.
 - **servers startup-latency test de-hardcoded** (`servers/tests/test_startup_latency.py`):
   hardcoded `~/.claude/plugins/cache/omca/oh-my-claudeagent/2.0.0` plugin root replaced
-  with a dynamic repo-relative path; machine-specific `/home/utsav` path eliminated.
+  with a dynamic repo-relative path; the machine-specific `/home/<user>` path is gone.
 - **Stale evidence-path string** (`scripts/final-verification-evidence.sh` ~:315):
   `.omca/state/evidence.jsonl` → `.omca/evidence/verification-evidence.json` in the
   user-facing message.
@@ -2468,10 +2503,6 @@ v2.0.0 is the depth-0 orchestration cutover: `commands/` replaces orchestration 
 - **Multimodal-looker constraints**: added binary and device file constraints to prevent
   invalid file reads
 
-[1.5.2]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.5.1...v1.5.2
-[1.5.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.5.0...v1.5.1
-[1.5.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.4.1...v1.5.0
-
 ## [1.4.1] - 2026-03-25
 
 ### Added
@@ -2497,8 +2528,6 @@ v2.0.0 is the depth-0 orchestration cutover: `commands/` replaces orchestration 
   and oracle agents to fix Bash being blocked for external file access. Read-only safety is
   now enforced via `disallowedTools: Write, Edit, Agent` plus an explicit Bash Usage Policy
   section in each agent. Triage and multimodal-looker retain `permissionMode: plan`
-
-[1.4.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.4.0...v1.4.1
 
 ## [1.4.0] - 2026-03-24
 
@@ -2543,8 +2572,6 @@ v2.0.0 is the depth-0 orchestration cutover: `commands/` replaces orchestration 
   tool descriptions
 - **Plan-mode subagents**: injected external path access guidance for plan-mode agents
 - **Documentation**: restored template sections, fixed eval docs formatting
-
-[1.4.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.3.0...v1.4.0
 
 ## [1.3.0] - 2026-03-22
 
@@ -2603,8 +2630,6 @@ v2.0.0 is the depth-0 orchestration cutover: `commands/` replaces orchestration 
 - **ExitPlanMode sequencing**: restructured in skills after momus review
 - **State cleanup**: replaced `rm -f` with `mode_clear` MCP tool in skill scripts
 
-[1.3.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.2.2...v1.3.0
-
 ## [1.2.2] - 2026-03-19
 
 ### Fixed
@@ -2621,8 +2646,6 @@ v2.0.0 is the depth-0 orchestration cutover: `commands/` replaces orchestration 
 - **Hook Script Conventions docs**: CLAUDE.md now documents format-by-event-type
   (hookSpecificOutput vs top-level decision/reason vs exit code 2) instead of
   implying all hooks use the same output wrapper
-
-[1.2.2]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.2.1...v1.2.2
 
 ## [1.2.1] - 2026-03-19
 
@@ -2656,8 +2679,6 @@ v2.0.0 is the depth-0 orchestration cutover: `commands/` replaces orchestration 
   `ralph-state.json` and `boulder.json`, leaving `ultrawork-state.json` orphaned
 - **cancel-ralph documents scope**: added note that it only cancels ralph mode,
   directing users to `stop-continuation` for ultrawork cleanup
-
-[1.2.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.2.0...v1.2.1
 
 ## [1.2.0] - 2026-03-18
 
@@ -2719,8 +2740,6 @@ v2.0.0 is the depth-0 orchestration cutover: `commands/` replaces orchestration 
   sync after v1.1.0 release)
 - Fixed release recipe to sync version into `servers/pyproject.toml` and
   `templates/claudemd.md`
-
-[1.2.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.1.0...v1.2.0
 
 ## [1.1.0] - 2026-03-17
 
@@ -2796,8 +2815,6 @@ v2.0.0 is the depth-0 orchestration cutover: `commands/` replaces orchestration 
 - Set valid SHA in marketplace plugin source for schema validation
 - Made `track-question.sh` executable
 
-[1.1.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.0.0...v1.1.0
-
 ## [1.0.0] - 2026-03-15
 
 Initial public release of oh-my-claudeagent — a markdown-first Claude Code plugin
@@ -2852,4 +2869,52 @@ for multi-agent orchestration.
 - Shellcheck fixes applied across all hook scripts
 - Ruff fixes applied to Python MCP servers
 
+[3.0.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.21.0...v3.0.0
+[2.21.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.20.1...v2.21.0
+[2.20.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.20.0...v2.20.1
+[2.20.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.19.1...v2.20.0
+[2.19.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.19.0...v2.19.1
+[2.19.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.18.1...v2.19.0
+[2.18.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.18.0...v2.18.1
+[2.18.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.17.2...v2.18.0
+[2.17.2]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.17.1...v2.17.2
+[2.17.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.17.0...v2.17.1
+[2.17.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.16.0...v2.17.0
+[2.16.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.15.0...v2.16.0
+[2.15.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.14.1...v2.15.0
+[2.14.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.14.0...v2.14.1
+[2.14.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.13.2...v2.14.0
+[2.13.2]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.13.1...v2.13.2
+[2.13.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.13.0...v2.13.1
+[2.13.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.12.1...v2.13.0
+[2.12.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.12.0...v2.12.1
+[2.12.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.11.0...v2.12.0
+[2.11.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.10.2...v2.11.0
+[2.10.2]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.9.0...v2.10.2
+[2.9.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.8.6...v2.9.0
+[2.8.6]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.8.5...v2.8.6
+[2.8.5]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.8.4...v2.8.5
+[2.8.4]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.8.3...v2.8.4
+[2.8.3]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.8.2...v2.8.3
+[2.8.2]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.8.1...v2.8.2
+[2.8.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.5.2...v2.8.1
+[2.5.2]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.5.1...v2.5.2
+[2.5.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.5.0...v2.5.1
+[2.5.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.4.0...v2.5.0
+[2.4.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.3.0...v2.4.0
+[2.3.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.2.1...v2.3.0
+[2.2.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.2.0...v2.2.1
+[2.2.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.1.0...v2.2.0
+[2.1.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.0.0...v2.1.0
+[2.0.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.5.2...v2.0.0
+[1.5.2]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.5.1...v1.5.2
+[1.5.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.5.0...v1.5.1
+[1.5.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.4.1...v1.5.0
+[1.4.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.4.0...v1.4.1
+[1.4.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.3.0...v1.4.0
+[1.3.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.2.2...v1.3.0
+[1.2.2]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.2.1...v1.2.2
+[1.2.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.2.0...v1.2.1
+[1.2.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/releases/tag/v1.0.0

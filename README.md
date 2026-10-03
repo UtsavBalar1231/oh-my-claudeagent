@@ -6,6 +6,40 @@ oh-my-claudeagent (OMCA) is a Claude Code plugin that plans work with you, hands
 specialist agent, and keeps a session from calling work done before a verification has been
 logged.
 
+## Requirements
+
+- Claude Code 2.1.288 or later. Tested with 2.1.288.
+- bun 1.4.2 or later, on the `PATH` Claude Code starts with. The `omca` server, its hooks and
+  the status line run on bun.
+- `ast-grep` (or `sg`), optional. Only the structural code search tools need it.
+
+CI runs on Linux, macOS and Windows.
+
+## Install
+
+```bash
+claude plugin marketplace add UtsavBalar1231/oh-my-claudeagent
+claude plugin install oh-my-claudeagent@omca
+```
+
+The marketplace installs from the `plugin` branch, a packaged tree with no `package.json` or
+lockfile, so installing fetches no npm dependencies.
+
+Inside a session, the same steps are `/plugin marketplace add UtsavBalar1231/oh-my-claudeagent`
+and `/plugin install oh-my-claudeagent@omca`. Then run `/oh-my-claudeagent:omca-setup`, which
+checks the requirements above and offers to point your status line at OMCA's renderer.
+
+## Your first plan
+
+1. Run `/oh-my-claudeagent:plan add rate limiting to the login endpoint`. The planner asks
+   what it needs to know, has the plan reviewed, and writes it to your plans directory.
+2. Run `/oh-my-claudeagent:start-work`. The session hands each task to an executor, records a
+   verification after each one, and checks the plan's boxes as tasks finish.
+3. Open `/omca` to watch the agents, the plan, the evidence and the notepad while it runs.
+
+When the session tries to stop with tasks unchecked, or with every task checked and no final
+verification logged, OMCA sends it back to work with the reason.
+
 ## What you see
 
 The band above the prompt shows the bound plan's progress, the next open task, how many tasks are
@@ -38,10 +72,10 @@ change how OMCA runs. A check with a known fix offers a key that fills the promp
 
 <img src=".github/assets/doctor.png" width="680" alt="The Doctor tab counts 1 warning, 1 info row and 11 passing checks. The warning says maxEffortLevel high holds oracle below the xhigh it declares, the info row offers a: Use /advisor fable, and the passing rows cover OMCA, Claude Code, bun, the omca server, ast-grep, the options, the agent models, the mod policy, the hooks, the output style and the status line.">
 
-The status line shows the session (model, agent and the plan's next task), the workspace (context
-window and git state) and usage (duration, usage limits, and cost for accounts billed by the
-token) on rows of their own, and fits itself to the terminal's width. The subagent status line gives each
-running agent a row.
+The status line shows the session (model, agent and the plan's next task), the workspace
+(context window and git state) and usage (duration, usage limits, and cost for accounts billed
+by the token) on rows of their own, and fits itself to the terminal's width. The subagent status
+line gives each running agent a row.
 
 <img src=".github/assets/statusline.png" width="900" alt="The OMCA status line under the prompt shows three rows: the model, effort and plan progress with the next task; a context bar, the git branch with change counts and the project; and the session cost and duration. Below it, one row for each of two running subagents shows its model, state and effort.">
 
@@ -53,40 +87,6 @@ and the number keys switch between the pane's tabs.
 The guard dialog arrives the moment the model asks for a destructive command.
 
 <img src=".github/assets/guard-dialog.gif" width="680" alt="An animation: the prompt Clean the build is typed and sent, the model asks to run rm -rf build, and the OMCA guard dialog appears holding the command, listing the build directory it would remove, with Refuse selected.">
-
-## Install
-
-```bash
-claude plugin marketplace add UtsavBalar1231/oh-my-claudeagent
-claude plugin install oh-my-claudeagent@omca
-```
-
-The marketplace installs from the `plugin` branch, a packaged tree with no `package.json` or
-lockfile, so installing fetches no npm dependencies.
-
-Inside a session, the same steps are `/plugin marketplace add UtsavBalar1231/oh-my-claudeagent`
-and `/plugin install oh-my-claudeagent@omca`. Then run `/oh-my-claudeagent:omca-setup`, which
-checks the requirements below and offers to point your status line at OMCA's renderer.
-
-## Your first plan
-
-1. Run `/oh-my-claudeagent:plan add rate limiting to the login endpoint`. The planner asks
-   what it needs to know, has the plan reviewed, and writes it to your plans directory.
-2. Run `/oh-my-claudeagent:start-work`. The session hands each task to an executor, records a
-   verification after each one, and checks the plan's boxes as tasks finish.
-3. Open `/omca` to watch the agents, the plan, the evidence and the notepad while it runs.
-
-When the session tries to stop with tasks unchecked, or with every task checked and no final
-verification logged, OMCA sends it back to work with the reason.
-
-## Requirements
-
-- Claude Code 2.1.288 or later. Tested with 2.1.288.
-- bun 1.4.2 or later, on the `PATH` Claude Code starts with. The `omca` server, its hooks and
-  the status line run on bun.
-- `ast-grep` (or `sg`), optional. Only the structural code search tools need it.
-
-CI runs on Linux, macOS and Windows.
 
 ## Documentation
 

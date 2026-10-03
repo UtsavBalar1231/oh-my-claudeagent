@@ -33,11 +33,13 @@ its own binding never shows another session's plan. It never writes the file.
 
 The renderer takes no tuning settings. `COLUMNS` and `LINES` from Claude Code size the layout.
 Lines use `COLUMNS` minus the 3 cells Claude Code keeps free on each side, measured in a live
-session. The only override is `CLAUDE_STATUSLINE_NERD_FONT=0`. A new segment is an entry in
-its row in `fullRows`, at its priority position, built as a `block` when its width is fixed. Keep a
-segment whole: only the next-task label may be ellipsized, and only the context bar may change
-width. The bar's 8 to 20 block range and the 60 and 85 percent color thresholds are constants in
-`render.ts`.
+session. The only override is `CLAUDE_STATUSLINE_NERD_FONT=0`. `subagent.ts` also reads
+`OMCA_SUBAGENT_STATUSLINE_DUMP`: when set, it appends each raw payload to that file, for
+recording fixtures. A new segment is an entry in its row in `fullRows`, at its priority
+position, built as a `block` when its width is fixed, with an entry in `RANK` that says when it
+gives way. Keep a segment whole: only the next-task label may be ellipsized, and only the context
+bar may change width. The bar's 8 to 20 block range and the 60 and 85 percent color thresholds are
+constants in `render.ts`.
 
-Rounding of exact binary ties goes to the even neighbour (`fixed` in `render.ts`). The recorded
+Rounding of exact binary ties goes to the even neighbor (`fixed` in `render.ts`). The recorded
 fixtures need it, so do not replace it with `toFixed` or `Math.round`.

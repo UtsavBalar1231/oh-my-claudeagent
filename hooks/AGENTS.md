@@ -17,8 +17,9 @@ event is unregistered on purpose; `docs/references.md` carries the per-event rea
 `dispatch.ts`, which runs the features that share the event in a fixed order, each in its own
 try/catch. `host.ts` defines the `Host` closures a feature receives in place of `$`, so a
 feature module takes `host` and never `$`. The features are `bash-guard`, `server-check`,
-`mod-marker`, `compact`, `route`, `agents-tracker`, `ledger`, `band`, `pane` with its `tabs/`,
-`footer`, `doctor`, `feedback` and `omca-router`. Pure logic lives in `src/core/`.
+`mod-marker`, `compact`, `route`, `agents-tracker`, `metrics`, `band`, `pane` with its `tabs/`,
+`footer`, `feedback` and `omca-router`. `doctor.ts` runs the Doctor tab's checks and fixes for
+`tabs/doctor.ts`; it registers no event. Pure logic lives in `src/core/`.
 
 ## Current runtime contract
 
@@ -47,20 +48,21 @@ feature module takes `host` and never `$`. The features are `bash-guard`, `serve
   (`hooks/bash-guard.ts`, with its patterns in `src/core/destructive.ts`). A recursive removal
   whose target is the filesystem root, home, the working directory, or a directory directly
   under root or home is denied outright. The destructive git family (hard reset, stash, clean,
-  restore, recursive `git rm`, path checkout), a force push to the default branch and
-  `git commit --no-verify` are held for review and denied wherever no dialog can show. Any other
-  recursive removal, an `xargs rm -rf` whose targets are not known, and a force push to another
-  branch are held for review and run where no dialog can show. Where a dialog can show and the
-  `guardMode` option is `dialog`, the guard asks the user, and only "Run it" lets the call
-  continue. With `guardMode` set to `deny`, no dialog shows. The default branch is the one
-  `origin/HEAD` names, or `main` and `master` when it names none, read from local refs.
-  `OMCA_DISABLED_HOOKS=bash-guard` turns the review off and never the outright deny.
+  a restore that writes the working tree, recursive `git rm`, path checkout), a force push to the
+  default branch and `git commit --no-verify` are held for review and denied wherever no dialog
+  can show. Any other recursive removal, an `xargs rm -rf` whose targets are not known, and a
+  force push to another branch are held for review and run where no dialog can show. Where a
+  dialog can show and the `guardMode` option is `dialog`, the guard asks the user, and only
+  "Run it" lets the call continue. With `guardMode` set to `deny`, no dialog shows. The default
+  branch is the one `origin/HEAD` names, or `main` and `master` when it names none, read from
+  local refs. `OMCA_DISABLED_HOOKS=bash-guard` turns the review off and never the outright deny.
 
   The patterns match at any command position: string start, after a separator, or inside a
   subshell or command substitution, behind wrappers such as `sudo`, `env`, `command`, `timeout`
-  and `xargs` and `VAR=value` prefixes. The guard also reads commands handed to another
-  interpreter: `bash -c`, `sh -c`, `eval`, a heredoc fed to a shell, `pwsh -Command`, `cmd /c` and
-  `Invoke-Expression` with a literal string. Anchoring on command position keeps a literal
+  and `xargs` and `VAR=value` prefixes. `rm` options and the options of `git reset`, `git rm`,
+  `git restore` and `git commit` count wherever they stand before `--`. The guard also reads
+  commands handed to another interpreter: `bash -c`, `sh -c`, `eval`, a heredoc fed to a shell,
+  `pwsh -Command`, `cmd /c` and `Invoke-Expression` with a literal string. Anchoring on command position keeps a literal
   mention out of scope, since the `rm` in `grep -rn "rm -rf" scripts/` follows a quote rather than
   a separator. `tool.check` runs before every Bash and PowerShell call in every permission mode,
   so the guard never depends on a dialog being shown. The platform's critical-path check on `rm`

@@ -7,20 +7,9 @@ file is listed in the [reference](references.md).
 
 ### Install
 
-```bash
-claude plugin marketplace add UtsavBalar1231/oh-my-claudeagent
-claude plugin install oh-my-claudeagent@omca
-```
-
-Inside a session the same steps are:
-
-```
-/plugin marketplace add UtsavBalar1231/oh-my-claudeagent
-/plugin install oh-my-claudeagent@omca
-```
-
-OMCA needs Claude Code 2.1.288 or later and bun 1.4.2 or later. `ast-grep` (or `sg`) is
-optional: without it the `ast_*` tools return an error and everything else works.
+Install the plugin with the commands in the [README](../README.md#install). OMCA needs Claude
+Code 2.1.288 or later and bun 1.4.2 or later. `ast-grep` (or `sg`) is optional: without it the
+`ast_*` tools return an error and everything else works.
 
 ### Run setup
 
@@ -37,7 +26,8 @@ gives each session OMCA's guidance on its first prompt.
 ### Share it with a team
 
 Add this to a project's `.claude/settings.json` so everyone who opens the repository in a local
-session gets the plugin. Cloud sessions load only the plugins synced from claude.ai.
+session gets the plugin. Cloud sessions skip these settings; an organization distributes plugins
+to them through server-managed settings.
 
 ```json
 {
@@ -52,8 +42,10 @@ For GitHub Enterprise Server, use `{ "source": "git", "url": "<clone URL>" }` as
 
 ### Update and uninstall
 
-Update with `/plugin marketplace update omca`. The status line launcher follows the newest
-installed version, so an update needs no second setup run.
+To update, run `claude plugin update oh-my-claudeagent@omca`, or open the plugin on the
+Installed tab of `/plugin` and choose Update now. Then restart Claude Code. The status line
+launcher runs the renderer from the most recently updated install, so the status line needs no
+second setup run. If you set `disableForceOrchestrationStyle`, run setup again after each update.
 
 To remove OMCA, run `/oh-my-claudeagent:omca-setup --uninstall`, then
 `/plugin uninstall oh-my-claudeagent@omca` and `/plugin marketplace remove omca`. Each project
@@ -90,7 +82,9 @@ What OpenCode gets:
   `omca-handoff`, each slash-invocable. `/omca-handoff` is not offered to the model.
 - Commands `/omca-metis`, `/omca-momus` and `/omca-hephaestus`, each asking the primary agent to
   launch that subagent.
-- The `omca` server's evidence, notepad, AST and `file_read` tools, named `omca_<tool>`.
+- The `omca` server's evidence, notepad, AST, `boulder_progress` and `file_read` tools, named
+  `omca_<tool>`. The adapter hides `boulder_write`, `session_search`, `agents_list`,
+  `categories_list`, `health_check` and `omca_hook`.
 - The destructive-command guard and the comment gate on model and user shell commands and on
   file edits. The comment gate blocks only with `OMCA_COMMENT_GATE=deny`. A blocked `!` command
   shows as a failed command; the reason goes to the OpenCode server log.
@@ -110,8 +104,11 @@ lands in your plans directory: the `plansDirectory` setting when you set one, re
 project, and `~/.claude/plans` otherwise. Each task is a numbered checkbox, `- [ ] 1. ...`;
 progress tracking counts only numbered boxes.
 
-For a request that needs exploring before anyone can plan it, ask prometheus for its Socratic
-interview: it asks, synthesizes, and stops with research findings instead of a plan file.
+To research before planning, ask `/oh-my-claudeagent:plan` to help you understand or research
+the problem. Prometheus interviews you and returns its findings with no plan file.
+
+The plan skill writes the plan and does not bind the session to it. `start-work` registers the
+plan and binds the session that runs it.
 
 ### Run it
 
@@ -121,11 +118,7 @@ where the plan allows it), records a verification for each task, and checks its 
 task is done. Add `--worktree <path>` to have every task work in an existing git worktree.
 
 To resume after an interruption, run `/oh-my-claudeagent:start-work` again. It continues from the
-first unchecked task.
-
-`/loop 10m /oh-my-claudeagent:start-work` re-runs the command on a timer. That is a repeat, not
-a check: it runs again whether or not the last pass got anywhere. OMCA's own persistence is the
-plan's checkboxes and the stop gates below.
+first unchecked task. `/loop` cannot run `start-work` for you, because only you can start it.
 
 ### What keeps a session honest
 
@@ -142,8 +135,10 @@ Each one continues the turn with its reason. A check gives up after five continu
 session and gets its budget back once its condition clears, so a stuck check cannot trap a
 session.
 
-When the task tools are on (`CLAUDE_CODE_ENABLE_TODO_TOOLS=1`, or agent teams), marking a task
-complete is also refused while a verification command under an hour old has not been logged.
+When the task tools are on, marking a task complete is also refused while a verification command
+under an hour old has not been logged. Claude Code turns the task tools on by default only for
+older models, up to Opus 4.7 and Sonnet 4.6; on other models set
+`CLAUDE_CODE_ENABLE_TODO_TOOLS=1`.
 
 ### Hand off a long session
 
@@ -173,6 +168,13 @@ clears the buttons.
 
 Set the `showBand` option to `false` to hide it.
 
+### The turn footer
+
+After each main-session turn, OMCA prints one line with the turn's duration and its input and
+output tokens. An account billed by the token also sees the turn's cost. When a verification
+command ran during the turn and no evidence was logged after it, a warning naming the command
+takes the cost's place.
+
 ### The pane
 
 `/omca` opens the OMCA pane on its Agents tab. Each tab has a digit key:
@@ -184,11 +186,12 @@ Set the `showBand` option to `false` to hide it.
 2. **Plan**: the plan board, below.
 3. **Evidence**: the proof ledger, below.
 4. **Notepad**: one card per section of the bound plan's notepad, each entry under its date. `f`
-   finds text in the entries, `x` clears the search, and `l` picks another plan's notepad.
-5. **Feedback**: your ratings for this session.
+   finds text in the entries, `w` clears the search, and `l` picks another plan's notepad.
+5. **Feedback**: your ratings for this session. `u` rates the last turn up and `d` rates it
+   down.
 6. **Stats**: runs and the evidence rate per agent type, tokens per finished delegation, and the
    estimated cost by agent, across the project's recorded sessions. Runs on a model without a
-   known price are counted as excluded rather than estimated.
+   known price are counted as excluded rather than estimated. `r` reloads the records.
 7. **Doctor**: the checks described below.
 
 `/omca plan`, `/omca stats` and `/omca doctor` open the pane on that tab. Press Ctrl+X then Tab,
@@ -218,7 +221,7 @@ that bear on it.
 | Up, Down | Move | Scroll |
 | Enter | Open the task | |
 | `n`, `p` | | Next or previous task |
-| `r` | Fill the prompt to run the task's check | The same |
+| `k` | Fill the prompt to run the task's check | The same |
 | `s` | Fill the prompt to start work from the task | The same |
 | `c` | Copy the task | The same |
 | `e` | Switch to the Evidence tab | The same |
@@ -230,9 +233,9 @@ that bear on it.
 | `b` | | Back to the board |
 | Esc | Close the pane | Close the pane |
 
-In the sections list Enter opens a section, `b` returns to the board and `r` reloads; on a section
-`n` and `p` step to the next or previous one and `t` returns to the list. The board reloads the
-file when it changes on disk and keeps your place.
+In the sections list Enter opens a section, `b` returns to the board, `r` reloads and `l` lists
+recent plans. On a section, `n` and `p` step to the next or previous one, `r` reloads and `t`
+returns to the list. The board reloads the file when it changes on disk and keeps your place.
 
 #### Proof
 
@@ -253,7 +256,7 @@ command and output.
 
 | Key | Action |
 | --- | --- |
-| `b`, `e`, `l`, `m`, `v` | Show only build, test, lint, manual or final verification runs; again to show all |
+| `b`, `t`, `l`, `m`, `v` | Show only build, test, lint, manual or final verification runs; again to show all |
 | `x` | Show failed runs only |
 | `f` | Find runs by their command |
 | `c` | Copy the focused command as drawn, secrets masked |
@@ -274,8 +277,10 @@ A force push to the default branch and `git commit --no-verify` (or `-n`) are he
 review, and refused wherever no dialog can show, in every permission mode including
 bypassPermissions. The same goes for the git commands that discard work: `git reset --hard`,
 `git stash`, `git clean`, `git restore`, a recursive `git rm`, and `git checkout` with a `--`
-path. The default branch is the one `origin/HEAD` names, or `main` and `master` when it names
-none, read from local refs without a network call.
+path. `git restore --staged` without `--worktree` touches only the index and runs. The guard
+reads `rm` and git options wherever they stand, so `rm ~ -rf` and `git reset HEAD --hard` count.
+The default branch is the one `origin/HEAD` names, or `main` and `master` when it names none,
+read from local refs without a network call.
 
 A force push to any other branch, any other recursive removal, and an `xargs rm -rf` whose
 targets can't be known in advance are held for your review in an interactive session and allowed
@@ -298,7 +303,7 @@ Code chat panel nothing can show it, so a held command is decided without you, a
 
 The `guardMode` option is `dialog` by default. Set it to `deny` to skip the dialog everywhere:
 the work-discarding git commands, a force push to the default branch and `--no-verify` are
-refused, and a force push to another branch or a deeper recursive removal runs.
+refused, and a force push to another branch or any other recursive removal runs.
 
 ### Permissions
 
@@ -326,7 +331,7 @@ which proposes rules from your past sessions.
 Each row leads with OK, WARN, FAIL or INFO. Press `r` to run the checks again. When the status
 line has no `refreshInterval`, press `i` to add `refreshInterval: 5`; the doctor shows the diff it
 wrote and keeps a backup. A check with a known remedy offers a key that fills the prompt with it,
-without sending: `m` for `/mcp`, `a` for `/advisor fable`, `c` for `/config` and `s` for
+without sending: `m` for `/mcp`, `a` for `/advisor fable`, `y` for `/config` and `s` for
 `/oh-my-claudeagent:omca-setup`.
 
 ## Rate a turn
@@ -342,13 +347,17 @@ Once setup has configured it, the status line shows three rows, each on its own 
 session (model and effort, vim mode, the active agent, and the bound plan's progress and next
 task), the workspace (a context bar, git state, the project, the worktree and pull request, lines
 changed and extra directories), and usage (the session's cost and duration, your usage limits and
-a spend limit). A row too wide for the terminal wraps onto more lines, and when the rows need more
-lines than the terminal allows, the end of the usage row goes first, then the end of the workspace
-row. No segment is cut in half, and a terminal under 60 columns gets one compact line.
+a spend limit). A row too wide for the terminal wraps onto more lines. When the rows need more
+lines than the terminal allows, segments give way one at a time across all three rows, least
+useful first: extra directories, lines changed, the spend limit, the 7 day limit, the pull
+request, the worktree, the vim mode, the agent, the directory, the 5 hour limit, the cost and
+duration, the branch, the context bar, then the plan. The model always stays. No segment is cut
+in half, and a terminal under 60 columns gets one compact line.
 
-The usage limits appear for Claude.ai Pro and Max subscribers, and the cost shows only when they
-are absent, since a subscription is not billed by the token. Behind a Claude apps gateway that
-reports only a spend limit, the cost shows, followed by the dollars spent against that limit.
+The usage limits appear for Claude.ai Pro and Max subscribers. The cost shows only when they are
+absent and the cost is above zero, since a subscription is not billed by the token. Behind a
+Claude apps gateway that reports only a spend limit, the cost shows, followed by the dollars spent
+against that limit.
 
 The subagent status line gives each running agent a row with its model, state, effort and
 context use.
@@ -396,6 +405,13 @@ Anthropic turns them off remotely, or after the mod worker crashes three times. 
 nothing draws, such as `claude -p` or the VS Code chat panel, runs the guard but shows no band or
 pane. `OMCA_DISABLED_HOOKS=mod-notice` silences the message.
 
+**`plan` or `start-work` stops before it starts.** Both skills call `health_check` first and
+stop unless the runtime is `ok`, repeating its reason. `hooks_inactive` means no OMCA settings
+hook reached the server in this session: `disableAllHooks` or `allowManagedHooksOnly` is set.
+`mod_absent` means the mod has not marked the session since the last prompt: your organization
+sets `allowManagedModsOnly`, the session started with `--safe-mode`, or the mod worker crashed.
+When the tool itself is missing, the `omca` server is not connected; see the first entry above.
+
 **Nothing from OMCA runs at all.** A session started with `--restricted` or
 `CLAUDE_CODE_RESTRICTED=1` ignores user, project and local settings, so the plugin never loads.
 
@@ -406,8 +422,10 @@ skips the stop checks. Resume with `/oh-my-claudeagent:start-work`.
 `origin/<default branch>` by default, so unpushed commits are missing. Set
 `"worktree": { "baseRef": "head" }` in your user settings to branch from your local HEAD.
 
-**A write under `.claude/` still prompts.** Claude Code never auto-approves writes there, and an
-`Edit(.claude/**)` allow rule cannot change that.
+**A write under `.claude/` still prompts.** In the default and `acceptEdits` modes Claude Code
+prompts for every write there, auto mode sends it to the classifier, and an `Edit(.claude/**)`
+allow rule changes neither. To stop the prompt repeating, choose the option in it that allows
+edits to the `.claude` folder for this session.
 
 **Setup changed nothing and asked nothing.** Under the `dontAsk` permission mode, every write
 that would prompt is denied instead. Run setup in a mode that can prompt.

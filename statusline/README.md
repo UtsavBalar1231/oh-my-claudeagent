@@ -29,7 +29,7 @@ out. A 200 column terminal shows each row on one line:
 ```
 > Opus 5.5 · E: high · A: oh-my-claudeagent:executor · T: 2/4 -> Wire the order summary panel into the payment step and cover it with a test
 ▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱ 34%  200k · * feature/checkout-redesign ~3  +2  ?1 · > shop · W: checkout-wt <- main · #42 + · +42/-7 · +2 dirs
-~ 2m 5s · ▰▰▰▰▱▱▱▱▱▱ 45% 5h (resets 6pm) · ▰▰▰▰▰▰▰▰▱▱ 80% 7d (resets mon 5pm)
+~ 2m05s · ▰▰▰▰▱▱▱▱▱▱ 45% 5h (resets 6pm) · ▰▰▰▰▰▰▰▰▱▱ 80% 7d (resets mon 5pm)
 ```
 
 An 80 column terminal wraps the session row onto two lines, and to stay within four lines it
@@ -40,7 +40,7 @@ and the 7 day limit) so the duration and the 5 hour limit stay:
 > Opus 5.5 · E: high · A: oh-my-claudeagent:executor
 T: 2/4 -> Wire the order summary panel into the payment step and cover it…
 ▰▰▰▰▰▱▱▱▱▱▱▱▱▱ 34%  200k · * feature/checkout-redesign ~3  +2  ?1 · > shop
-~ 2m 5s · ▰▰▰▰▱▱▱▱▱▱ 45% 5h (resets 6pm)
+~ 2m05s · ▰▰▰▰▱▱▱▱▱▱ 45% 5h (resets 6pm)
 ```
 
 A terminal under 60 columns gets one compact line:
@@ -126,7 +126,7 @@ A plugin `settings.json` cannot carry `statusLine` (Claude Code drops the key), 
 goes through the launcher. It reads where Claude Code installed the plugin from
 `~/.claude/plugins/installed_plugins.json`, under any marketplace name and version, skips an
 install that `enabledPlugins` in `~/.claude/settings.json` switches off or that has no renderer
-(a 2.x one), and runs `main.ts` from the most recently updated of the rest. The status line
+(an older install without `statusline/main.ts`), and runs `main.ts` from the most recently updated of the rest. The status line
 therefore follows plugin updates without another setup run. `CLAUDE_CONFIG_DIR` replaces
 `~/.claude` in those paths. With no installed version, as in a `--plugin-dir` checkout, it prints
 `omca: no installed plugin version found`.
@@ -208,7 +208,7 @@ thresholds as the context bar from `used_percentage`, or from the dollars when n
 ## Git info
 
 `git.ts` reads the branch from `.git/HEAD` directly, resolving the git directory from the `.git`
-file in a linked worktree, and runs `git status --porcelain=v2 --branch -u` for the staged,
+file in a linked worktree, and runs `git status --porcelain=v2 -u` for the staged,
 modified, and untracked counts. The `origin` URL comes from `git remote get-url origin`, which
 honors `url.insteadOf` rewrites and `includeIf` config, and is re-read at most once a minute.
 SSH remotes (`git@host:user/repo.git`) become HTTPS for the link on the directory name.
@@ -258,7 +258,7 @@ the same launcher with `--subagent`, which setup writes beside `statusLine`:
 ```
 
 A plugin `settings.json` does keep `subagentStatusLine`, but Claude Code neither substitutes
-`${CLAUDE_PLUGIN_ROOT}` in its command nor sets that variable for it (measured on 2.1.287), so a
+`${CLAUDE_PLUGIN_ROOT}` in its command nor sets that variable for it (measured), so a
 plugin-relative command cannot find its script.
 
 **Input** (stdin): one JSON object with a `tasks` array (each task carries `id`, `name`, `type`,
@@ -298,7 +298,7 @@ name outside the table falls back to `nf-fa-user`.
 
 | Agent | Glyph | Theme |
 |-------|-------|-------|
-| sisyphus | nf-fa-mountain | boulder-pushing myth |
+| sisyphus | nf-fa-repeat | the endless task |
 | prometheus | nf-fa-fire | stolen flame |
 | metis | nf-fa-search | gap analysis |
 | momus | nf-fa-comment | critique |

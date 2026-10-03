@@ -5,12 +5,14 @@
 - `jq`, used by the eval procedure in `tests/evals/README.md`
 - `bun` 1.4.2 or later, runtime for the MCP server, the hooks module, the status line and the scripts
 - `ast-grep` CLI (`ast-grep` or `sg`), structural code-search tools
-- `just`, task runner for dev commands
+- `just`, task runner for dev commands. Its recipes run in bash, so on Windows run them from Git Bash
 - `claude`, Claude Code 2.1.288 or later, which loads the mod: `just test-mod`, the validator's engine group and `just qa` need it
 - `pre-commit`, which runs the git hooks that `just setup` installs
 - `uv`, which `just bench` uses to install a baseline whose status line is the Python renderer
 
 Run `just setup` to install the pre-commit git hooks.
+
+To typecheck after every edit, add a `PostToolUse` hook matching `Write|Edit` to your own `.claude/settings.json` with the command `bun "${CLAUDE_PROJECT_DIR}/scripts/postedit-check.ts"`. After an edit to a `.ts` file it runs `just typecheck` and hands the first lines of a failure back to the session as context.
 
 Structural changes to a directory (new file, moved entry point, changed layout) update that directory's `AGENTS.md` in the same change.
 
@@ -18,7 +20,7 @@ Structural changes to a directory (new file, moved entry point, changed layout) 
 
 A hook is TypeScript in one of two homes. Skipping the registration step produces dead code:
 
-1. **Write the feature.** A feature that needs only mod-reachable events lives in the mod: a module that `hooks/register.ts` dispatches to. `register.ts` is the only file that calls `on()`. A feature that needs a settings-hook event (`PreToolUse` with agent fields, `PostToolUse`, `UserPromptSubmit`, `SubagentStart`, `TaskCompleted`, `Stop`) is a handler under `servers/hooks/`. Put a `*.spec.ts` beside it. No handler returns an allow decision, and nothing is registered on `PermissionRequest`. A hook may deny, ask or advise, and an allow comes only from the user's permission rules.
+1. **Write the feature.** A feature that needs only mod-reachable events lives in the mod: a module that `hooks/register.ts` dispatches to. `register.ts` is the only file that calls `on()`. A feature that needs a settings-hook event (`PreToolUse` with agent fields, `PermissionDenied`, `PostToolUse`, `PostToolUseFailure`, `UserPromptSubmit`, `UserPromptExpansion`, `SubagentStart`, `TaskCompleted`, `Stop`, `SessionStart` for `clear` or `compact`) is a handler under `servers/hooks/`. Put a `*.spec.ts` beside it. No handler returns an allow decision, and nothing is registered on `PermissionRequest`. A hook may deny, ask or advise, and an allow comes only from the user's permission rules.
 
 2. **Register it.** In `servers/hooks/registry.ts`, map a server handler to its event and matcher. The event also needs an `mcp_tool` entry in `hooks/hooks.json` that calls the `omca_hook` tool. A handler the registry does not reach is dead code.
 
@@ -50,7 +52,7 @@ Key rules:
 - Keep `name:` free of `:`. The platform rejects an agent whose frontmatter name holds a colon, so the agent never loads. The `oh-my-claudeagent:` prefix used at call sites is added by the platform.
 - Do not declare `permissionMode:`. Claude Code strips it from plugin agents for security.
 - Add the agent to every list of the roster: the agent catalog table in `templates/claudemd.md`, the agents table in `docs/references.md` and the agent list in the root `AGENTS.md`. `servers/categories.json` maps categories to tiers and changes only when a category does.
-- Frontmatter outranks `CLAUDE_CODE_SUBAGENT_MODEL` (v2.1.251 or later). The order is a per-invocation model first, then the agent definition's `model:` field (`inherit` included), then the environment variable. Every agent on this roster declares `model:`, so the variable is a default that never applies here. `CLAUDE_CODE_SUBAGENT_MODEL_FORCE` (v2.1.257 or later) does override a definition. With it set, the declared tier is ignored for every agent, oracle's `fable` included.
+- Frontmatter outranks `CLAUDE_CODE_SUBAGENT_MODEL`. The order is a per-invocation model first, then the agent definition's `model:` field (`inherit` included), then the environment variable. Every agent on this roster declares `model:`, so the variable is a default that never applies here. `CLAUDE_CODE_SUBAGENT_MODEL_FORCE` does override a definition. With it set, the declared tier is ignored for every agent, oracle's `fable` included.
 - Keep hook internals out of agent prompts. State the behavioral rule and leave out the enforcement mechanism. An agent prompt must not mention hook handler names (`stop-gates`, `task-completed`), "X hook" as a noun (`SubagentStart hook`, `Stop hook`, `the final-verification hook`), raw `.omca/state/*.json` file paths, or specific plan names and task numbers as enforcement rationale. Write *"session termination is blocked until final-verification evidence is present"*, and avoid *"the `stop-gates` handler blocks Stop"*. Platform event names such as `TaskCreated`, `TaskCompleted` and `TeammateIdle` may appear as API contract references. Do not call them "lifecycle hooks"; say "lifecycle events" or "platform lifecycle gates". A prompt that names an internal handler goes stale when the hook is renamed, refactored or replaced with an MCP tool.
 
 ## Adding a skill
@@ -60,19 +62,20 @@ Key rules:
 3. If the skill should be keyword-activated, add a detection pattern to `src/core/keywords.ts`
 4. A skill that omits `context: fork` expands inline in whatever session invoked it, so one invoked from the main session runs at depth 0 and keeps that session's `Agent` tool. That is what an orchestrator skill needs; `start-work` is the worked example, fanning out to `executor` agents from an inline body. `context: fork` does the opposite. It runs the body in a forked subagent one level down, where the platform may withhold the `Agent` tool depending on the configured spawn depth, so do not reach for it when the body has to delegate.
 5. Keep a skill description under the 512-character soft cap and the 1,536-character hard cap. The platform truncates at the hard cap, and older clients may truncate at the soft cap. Run `just validate --check claims` before committing: it counts `description` plus `when_to_use`, warns at 512 and fails at 1,536. Move longer trigger phrases or usage notes into the SKILL.md body.
-6. Keep hook internals out of skills. Skills describe what users do, and hooks automate how. Unless a skill's primary purpose is hook configuration or diagnosis, it must not mention raw `.omca/state/*.json` file paths (use the `boulder_write` and `boulder_progress` MCP tools from the omca server instead), hook handler names (`task-completed`, `stop-gates`), hook event names (`PreToolUse`, `Stop`) or hook env vars (`OMCA_DISABLED_HOOKS`). The recognized exception is `omca-setup`, which reports on the hooks, the mod and the managed settings that affect OMCA. A file path in a skill forces users to learn internal layouts they cannot control, and every hook refactor then has to update skill prose.
+6. Keep hook internals out of skills. Skills describe what users do, and hooks automate how. Unless a skill's primary purpose is hook configuration or diagnosis, it must not mention raw `.omca/state/*.json` file paths (use the `boulder_write` and `boulder_progress` MCP tools from the omca server instead), hook handler names (`task-completed`, `stop-gates`), hook event names (`PreToolUse`, `Stop`) or hook env vars (`OMCA_DISABLED_HOOKS`). The recognized exception is `omca-setup`, which states the hook and managed-settings policy it works under and sends a diagnosis to `/omca doctor`. A file path in a skill forces users to learn internal layouts they cannot control, and every hook refactor then has to update skill prose.
 
 ## Testing
 
 ```bash
-just ci                          # everything CI runs: lint, typecheck, validate, test, test-mod, test-opencode
+just ci                          # everything CI runs: lint, typecheck, validate, test, test-mod, test-opencode, smoke
 just lint                        # oxlint with warnings denied, configured in .oxlintrc.json
-just typecheck                   # both tsc projects
+just typecheck                   # the three tsc projects: the mod, the bun runtime and the OpenCode adapter
 just validate                    # every validator group (bun scripts/validate.ts); the engine group needs the claude CLI
 just validate --check claims     # one validator group; the others are hooks, mod, tree, engine and mcp
-just test                        # every bun spec, including the validator specs
+just test                        # every bun spec outside opencode/, including the validator specs
 just test-mod                    # the mod tests, through claude plugin test .
-just test-opencode               # OpenCode adapter: typecheck and every opencode/ spec, run against a real OpenCode install
+just test-opencode               # every opencode/ spec; the ones that load OpenCode skip without opencode on PATH
+just smoke                       # one claude -p session with the packaged plugin against the mock model
 just qa                          # manual QA against the mock model: session smoke, install verify, live hook probe, statusline probe, live MCP probe, worktree and route-effort checks
 just bench                       # the working tree against a baseline ref, through the mock model
 just compare                     # OMCA against similar plugins in Docker, through a mock model (needs docker)
@@ -80,7 +83,11 @@ just compare                     # OMCA against similar plugins in Docker, throu
 
 Use `just ci` before claiming a change is verified; `just test` runs the bun specs and nothing else.
 
-The server specs under `servers/` need the ast-grep CLI. `just test` runs them with the other specs, and CI also runs `bun test servers` and `just validate --check mcp` as their own job.
+CI runs each recipe's commands directly, `bun scripts/validate.ts` for `just validate` for
+example, not through `just`. `scripts/validate/workflow.spec.ts` checks that CI runs every
+command of the `just ci` recipes and nothing else without a stated reason.
+
+The server specs under `servers/` need the ast-grep CLI. `just test` runs them with the other specs.
 
 `tests/plugin-evals/` holds `claude plugin eval` cases for the health gate the planning skills
 share, `plan-stops-on-degraded-runtime` and `start-work-stops-on-degraded-runtime`. They call a
@@ -102,7 +109,7 @@ original failure. Follow this checklist:
 
 ## Plugin configuration
 
-**Custom paths replace defaults**: the `commands`, `agents`, `skills`, and `outputStyles` fields in `plugin.json` replace the platform's default directories rather than adding to them. To keep the default directory alongside a custom one, include the default path explicitly in the array.
+**Custom paths replace defaults, except for skills**: the `commands`, `agents` and `outputStyles` fields in `plugin.json` replace the platform's default directories. To keep the default directory alongside a custom one, include the default path explicitly in the array. The `skills` field adds to the default `skills/` directory, which is still scanned.
 
 ## Rejected toolchain options
 
@@ -128,17 +135,23 @@ gain.
 ## Release process
 
 `just release <version>` is the whole process. It runs `scripts/release.ts`, which requires a
-clean tracked tree, a `## [<version>]` heading in `CHANGELOG.md` and no existing `v<version>` or
-`plugin-v<version>` tag. It writes the version into `.claude-plugin/plugin.json`, both version
-fields of `.claude-plugin/marketplace.json` and `package.json`, commits the bump and tags it
-`v<version>`. It then packages that tag's tracked files, which leaves out `package.json`,
-`bun.lock`, the typecheck configs and `.oxlintrc.json` so an install fetches no npm packages, as a commit on the
-orphan `plugin` branch tagged `plugin-v<version>`. A second commit on the working branch records
-that packaged commit's SHA in `marketplace.json`, as a `url` source with `ref: plugin`. The script
-never pushes. Push the packaged branch first, because the stamped SHA must exist on the remote
-before any install resolves it: `git push origin plugin plugin-v<version>`, then
-`git push origin HEAD v<version>`. The tag is named `plugin-v<version>` because `release.yml`
-runs on `v*.*.*`. Add the CHANGELOG entry for the version first.
+clean tracked tree, a checkout of `main` even with `origin/main`, a local `plugin` branch that
+contains `origin/plugin`, a `## [<version>]` heading in `CHANGELOG.md` and no existing
+`v<version>` or `plugin-v<version>` tag. It writes the version into
+`.claude-plugin/plugin.json`, both version fields of `.claude-plugin/marketplace.json` and
+`package.json`, commits the bump and tags it `v<version>`.
+
+It then packages that tag's tracked files as a commit on the orphan `plugin` branch tagged
+`plugin-v<version>`. `EXCLUDES` in `scripts/package.ts` leaves out the repository tooling: the
+specs, `tests/`, `scripts/` except `scripts/setup-statusline.ts`, `package.json`, `bun.lock`,
+the typecheck and lint configs, `CONTRIBUTING.md`, the OpenCode adapter and `video/`. Without
+`package.json` and a lockfile, an install fetches no npm packages. A second commit on `main`
+records the packaged commit's SHA in `marketplace.json`, as a `url` source with `ref: plugin`.
+
+The script never pushes. It prints one atomic push of both branches and both tags,
+`git push --atomic origin main plugin v<version> plugin-v<version>`, so the stamped SHA never
+names a commit the remote lacks. The packaged tag is named `plugin-v<version>` because
+`release.yml` runs on `v*.*.*`. Add the CHANGELOG entry for the version first.
 
 Prefer the recipe over hand-editing the three version fields, which must stay identical.
 

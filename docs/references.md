@@ -20,7 +20,7 @@ OMCA neither writes nor overrides them:
 
 | Key | What it does to OMCA |
 | --- | --- |
-| `allowManagedHooksOnly` | Stops OMCA's settings hooks and its mod unless your organization installed the plugin. The stop checks, guidance and guard are then gone |
+| `allowManagedHooksOnly` | Stops OMCA's settings hooks and its mod unless your organization installed the plugin. The stop checks, guidance and guard are then gone, and Claude Code reads `statusLine` and `subagentStatusLine` from managed settings only, so OMCA's status lines stop too |
 | `disableAllHooks` | Stops every hook and mod, OMCA's included |
 | `allowManagedModsOnly` | An option on Claude Code's built-in guard. Stops OMCA's mod (band, pane, doctor, guard) and leaves its settings hooks running |
 | `allowManagedPermissionRulesOnly` | Only managed permission rules apply. OMCA adds none, so nothing of OMCA's changes |
@@ -28,8 +28,7 @@ OMCA neither writes nor overrides them:
 | `strictKnownMarketplaces`, `blockedMarketplaces` | Decide whether the `omca` marketplace can be added |
 | `sandbox.failIfUnavailable` | Fails closed when the sandbox cannot start. OMCA does not depend on it either way |
 
-`teammateMode: "auto"` is a normal baseline for agent teams. The `omca-setup` skill reports on
-these keys and never writes them.
+`/omca doctor` reports `allowManagedModsOnly`, `disableAllHooks` and `allowManagedHooksOnly`.
 
 ## Agents
 
@@ -41,15 +40,15 @@ your provider's model for that family, so the roster never pins a model id. Spaw
 | Agent | Tier | Effort | Role | Limits |
 | --- | --- | --- | --- | --- |
 | sisyphus | opus | high | The main-session orchestrator. The plugin's `settings.json` makes it the session agent. It does small work itself and delegates the rest; under `start-work` it runs the plan | Runs at the session's effort as the main agent |
-| prometheus | opus | high | Interviews you and writes the plan, consulting metis and momus. Its Socratic interview ends in research findings instead of a plan | No Bash |
+| prometheus | opus | high | Interviews you and writes the plan, consulting metis and momus. Asked to help you understand or research a problem, it returns findings instead of a plan | No Bash |
 | metis | opus | high | Gap analysis of a request or draft plan: hidden requirements, scope risks | Read-only, no Bash |
-| momus | opus | high | Reviews a plan for clarity, verifiability and completeness; answers OKAY or REJECT | Read-only, no Bash |
+| momus | opus | high | Reviews a plan for clarity, verifiability and completeness; answers OKAY or REJECT | No Bash. Writes or edits a file only when asked to |
 | oracle | fable | xhigh | Architecture, trade-offs, and debugging that is already stuck | Read-only |
 | explore | sonnet | high | Searches the local codebase | Read-only |
 | librarian | sonnet | high | Library docs and open-source examples, through context7 and grep.app | Read-only |
 | executor | sonnet | high | Implements one scoped task and verifies it before reporting | Does not delegate |
 | hephaestus | opus | medium | Fixes build, type and toolchain failures with minimal diffs | Does not delegate |
-| multimodal-looker | opus | medium | Reads images, PDFs and diagrams | Read-only |
+| multimodal-looker | opus | medium | Reads images, PDFs and diagrams | Read-only, no Bash |
 
 Only sisyphus and prometheus can spawn further agents. `servers/categories.json` maps kinds of
 work to tiers for delegation: `quick`, `standard` and `readonly` to `sonnet`, `deep` to `opus`,
@@ -67,7 +66,7 @@ done. With the advisor off, they escalate to oracle.
 
 | Skill | Run it with | What it does |
 | --- | --- | --- |
-| plan | `/oh-my-claudeagent:plan <task>` | prometheus planning, with metis and momus. Only you can start it |
+| plan | `/oh-my-claudeagent:plan <task>` | prometheus planning, with metis and momus. It writes the plan and leaves binding it to `start-work`. Only you can start it |
 | start-work | `/oh-my-claudeagent:start-work [plan] [--worktree <path>]` | Runs a plan in the main session, delegating each task. Only you can start it |
 | metis | `/oh-my-claudeagent:metis` | Runs metis on a request or plan, in a forked context |
 | momus | `/oh-my-claudeagent:momus <plan>` | Runs momus on a plan, in a forked context |
@@ -88,7 +87,8 @@ The mod adds its own commands: `/omca [plan [name or path] | stats | doctor]` op
 ### Keyword triggers
 
 With the `enableKeywordTriggers` option on, these phrases in a prompt point the session at a
-skill. Quoted or backticked text, pasted text, and prompts from subagents never trigger.
+skill. Double-quoted or backticked text, pasted text, and background-agent notifications never
+trigger.
 
 | Phrase | Points at |
 | --- | --- |
@@ -106,14 +106,14 @@ A slash command activates its mode whether or not the option is on.
 and `context7` (library docs, over HTTP).
 
 Only `evidence_log`, `boulder_progress` and `notepad_write` load with the first request. Every
-other `omca` tool waits behind tool search and loads with
-`ToolSearch` and the query `select:mcp__plugin_oh-my-claudeagent_omca__<tool>`. Where tool search
-is off, for example behind a gateway that is not a first-party host, every tool loads up front.
+other `omca` tool waits behind tool search and loads with `ToolSearch` and the query
+`select:mcp__plugin_oh-my-claudeagent_omca__<tool>`. Where tool search is off, for example behind
+a gateway that is not a first-party host, every tool loads up front.
 
 | Tool | Purpose |
 | --- | --- |
 | `evidence_log` | Record a build, test, lint, manual or `final_verification` result with its real exit code |
-| `evidence_read` | Read the logged entries |
+| `evidence_read` | Read the logged entries. Refuses a ledger it cannot parse |
 | `boulder_write` | Register a plan and bind this session to it |
 | `boulder_progress` | Completed and remaining tasks of the bound plan, and the next one |
 | `notepad_write` | Append to a plan notepad section: `learnings`, `issues`, `decisions` or `problems` |
@@ -130,9 +130,9 @@ is off, for example behind a gateway that is not a first-party host, every tool 
 
 ## Hooks
 
-OMCA's hooks run in the mod and in the server. The mod, `hooks/register.ts`, runs inside Claude Code. The
-settings hooks in `hooks/hooks.json` are `mcp_tool` entries that call the `omca` server's
-`omca_hook` tool, which dispatches through `servers/hooks/registry.ts`.
+OMCA's hooks run in the mod and in the server. The mod, `hooks/register.ts`, runs inside Claude
+Code. The settings hooks in `hooks/hooks.json` are `mcp_tool` entries that call the `omca`
+server's `omca_hook` tool, which dispatches through `servers/hooks/registry.ts`.
 
 ### Mod events
 
@@ -164,8 +164,8 @@ returns an allow, which would skip the auto-mode classifier.
 | `TaskCompleted` | any | `task-completed`: refuses to complete a task while a recent verification is unlogged |
 
 Each stop gate continues the turn at most five times in a session and gets that budget back once
-its condition clears. `TaskCompleted` fires only where the task tools exist, which needs
-`CLAUDE_CODE_ENABLE_TODO_TOOLS=1` on current models or agent teams.
+its condition clears. `TaskCompleted` fires only where the task tools exist: by default on older
+models up to Opus 4.7 and Sonnet 4.6, and on other models with `CLAUDE_CODE_ENABLE_TODO_TOOLS=1`.
 
 Events OMCA leaves unregistered, and why:
 
@@ -177,7 +177,7 @@ Events OMCA leaves unregistered, and why:
 | `FileChanged` | The mod re-reads the evidence ledger and plan registry at each turn's end and on the open pane's timer |
 | `StopFailure` | Claude Code discards a handler's output for it, so it cannot resume a plan |
 | `Setup` | Claude Code runs no `mcp_tool` hook on it, and `/omca doctor` reports the same checks |
-| `SubagentStop`, `TaskCreated`, `TeammateIdle`, `Notification`, `ConfigChange`, `CwdChanged`, `WorktreeCreate`, `WorktreeRemove`, `InstructionsLoaded`, `MessageDisplay`, `PostToolBatch`, `Elicitation`, `ElicitationResult` | No OMCA feature needs them |
+| `SubagentStop`, `TaskCreated`, `TeammateIdle`, `Notification`, `ConfigChange`, `CwdChanged`, `DirectoryAdded`, `WorktreeCreate`, `WorktreeRemove`, `InstructionsLoaded`, `MessageDisplay`, `PostToolBatch`, `PreModelSwitch`, `PostModelSwitch`, `Elicitation`, `ElicitationResult` | No OMCA feature needs them |
 
 ### Kill switches
 
@@ -212,6 +212,7 @@ session. `all` or `*` turns off every one. Set it in the environment Claude Code
 | `CLAUDE_STATUSLINE_NERD_FONT` | `0` draws the status line with ASCII glyphs |
 | `OMCA_NATIVE_AGENTS_MD` | `1` stops the context injector from adding `AGENTS.md` where Claude Code already loads it natively and no project `CLAUDE.md` is on the path |
 | `OMCA_TRANSCRIPTS_ROOT` | The directory `session_search` reads instead of `~/.claude/projects` |
+| `AST_GREP_BIN` | The ast-grep binary the `ast_*` tools run, looked up on `PATH`, before `ast-grep` and `sg` |
 | `OMCA_HOOK_TRACE` | `1` appends every hook call to `.omca/state/hook-trace.jsonl` |
 | `OMCA_SUBAGENT_STATUSLINE_DUMP` | A file to append each raw subagent status line payload to |
 
@@ -226,7 +227,7 @@ a project's `.claude/settings.json`.
 | Option | Default | Effect |
 | --- | --- | --- |
 | `showBand` | `true` | `false` hides the band above the prompt |
-| `guardMode` | `dialog` | `dialog` asks before a held command where a dialog can show. `deny` never asks: a held git command is refused and a deeper removal or a force push to another branch runs |
+| `guardMode` | `dialog` | `dialog` asks before a held command where a dialog can show. `deny` never asks: a held git command is refused, and any other recursive removal or a force push to another branch runs |
 | `enableKeywordTriggers` | `false` | `true` lets plain phrases point at a skill |
 | `statuslineMode` | `on` | `off` makes `omca-setup` leave your status lines alone |
 | `disableForceOrchestrationStyle` | `false` | `true` makes `omca-setup` remove `force-for-plugin` from the installed `output-styles/omca-default.md`, so your own `outputStyle` applies. Run setup again after each update |
@@ -262,8 +263,15 @@ Do not add `Write(<path>)`, `NotebookEdit(<path>)` or `Glob(<path>)` rules: they
 ## State files
 
 OMCA keeps its state in the project's `.omca/` directory, which it gitignores except for
-`.omca/rules/`. Outside the project it writes only what `omca-setup` writes: the status line
-keys in `~/.claude/settings.json`, a backup of that file, and the status line launcher.
+`.omca/rules/`. Outside the project it writes:
+
+- through `omca-setup`, the status line keys in `~/.claude/settings.json`, a backup of that file
+  as `settings.json.omca-bak`, and the status line launcher;
+- through the Doctor tab's `i` fix, `refreshInterval` in the same `settings.json`, with the same
+  backup;
+- through `omca-setup` with `disableForceOrchestrationStyle` on, the installed copy of
+  `output-styles/omca-default.md` in the plugin cache;
+- through bun, its transpile cache under your home directory.
 
 | Path | Written by | Holds |
 | --- | --- | --- |
@@ -275,6 +283,7 @@ keys in `~/.claude/settings.json`, a backup of that file, and the status line la
 | `.omca/feedback/<session id>.json` | `/omca-rate` | Ratings |
 | `.omca/metrics/<session id>/<agent id>.json` | the mod | One record per delegation, read by the Stats tab |
 | `.omca/logs/file-access.jsonl` | `file_read` | One line per call |
+| `.omca/state/hook-trace.jsonl` | the server, with `OMCA_HOOK_TRACE=1` | One line per hook call |
 | `.omca/rules/*.md` | you | Project rules, injected by file name pattern |
 | `~/.claude/omca/statusline.ts` | `omca-setup` | The status line launcher |
 
@@ -285,86 +294,97 @@ a broken file stops the gates that read it.
 
 | Feature | Terminal | Desktop Code tab | `claude -p`, Agent SDK | VS Code chat panel | Managed-settings machine |
 | --- | --- | --- | --- | --- | --- |
-| Agents and skills | Yes | Yes | Yes | Yes | Yes |
+| Agents, and skills other than `plan` and `start-work` | Yes | Yes | Yes | Yes | Yes |
+| `plan` and `start-work`, which stop unless `health_check` reports the runtime `ok` | Yes | When bun is on the app's `PATH` | Yes | When bun is on the app's `PATH` | Unless `allowManagedMcpServersOnly`, `allowManagedHooksOnly`, `disableAllHooks` or `allowManagedModsOnly` |
 | `omca` MCP tools | Yes | When bun is on the app's `PATH` | Yes | When bun is on the app's `PATH` | Unless `allowManagedMcpServersOnly` |
 | Stop checks, guidance, context injection | Yes | When bun is on the app's `PATH` | Yes | When bun is on the app's `PATH` | Unless `allowManagedHooksOnly` or `disableAllHooks` |
 | Guard decisions | Yes | Yes | Yes | Yes | Unless `allowManagedModsOnly`, `allowManagedHooksOnly` or `disableAllHooks` |
 | Guard review dialog | Yes | Yes | No: held commands are decided without you | No: decided as in `-p` | As the guard |
 | Band, pane, plan reader, doctor | Yes | Yes | No | No ([anthropics/claude-code#99045](https://github.com/anthropics/claude-code/issues/99045)) | As the guard |
-| Status line | Yes | Not documented | No | Not documented | Unless `disableAllHooks` |
+| Status line | Yes | Not documented | No | Not documented | Unless `allowManagedHooksOnly` or `disableAllHooks` |
 
 Where the built-in `sec-default` guard loads (a machine whose managed settings set at least one
-key, or a Team or Enterprise sign-in), it runs ahead of OMCA's mod. OMCA's mod only denies, so the guard leaves its
-decisions in place. A Desktop session in WSL loads no plugins.
+key, or a Team or Enterprise sign-in), it runs ahead of OMCA's mod. OMCA's mod only denies, so
+the guard leaves its decisions in place. A Desktop session in WSL loads no plugins.
 
 ## Platform support
 
-CI runs the validator, the server specs, the type checks and the OpenCode adapter on Linux,
-macOS and Windows against Claude Code 2.1.288. The guard reads Bash and PowerShell commands,
-including `cmd /c` and `Invoke-Expression`, and resolves home and project paths per platform.
-The README screenshots are captured with tmux, kitty and Xvfb, so capturing them needs Linux or
-WSL.
+CI runs the validator, the lint, the type checks, the bun specs, the mod tests, a smoke session
+and the OpenCode adapter specs on Linux, macOS and Windows against Claude Code 2.1.288. The
+guard reads Bash and PowerShell commands, including `cmd /c` and `Invoke-Expression`, and
+resolves home and project paths per platform. The README screenshots are captured with tmux,
+kitty and Xvfb, so capturing them needs Linux or WSL.
 
 ## Comparison with similar plugins
 
-Measured on 2026-10-03 with Claude Code 2.1.288, OMCA at commit `1061e97`, in Docker (Ubuntu
-24.04, bun 1.4.2), every request answered by a local mock model with no network egress, over 20
-paired rounds after one discarded warm-up round. The other arms were oh-my-claudecode 5.6.0,
-claude-code-harness 5.15.0, ruflo 3.51.1 (with and without its npm dependencies pre-seeded), ECC
-2.2.3, superpowers 6.4.2, a wshobson/agents bundle, and a baseline with no plugin.
+Measured on 2026-10-03 with Claude Code 2.1.288, read from the recorded request bodies, and OMCA
+at commit `1061e97`. The run used Docker (Ubuntu 24.04, node 22.23.3, bun 1.4.2), answered every
+request from a local mock model with no network egress, and took 20 paired rounds after one
+discarded warm-up round. The other arms were oh-my-claudecode 5.6.0, claude-code-harness 5.15.0,
+ruflo 3.51.1 (with and without its npm dependencies pre-seeded), ECC 2.2.3, superpowers 6.4.2, a
+wshobson/agents bundle, and a baseline with no plugin.
 
-This run replaces the one made earlier the same day with Claude Code 2.1.287. Per-request tokens
-fell from +19,438 to +12,679 (tool search on) because the sisyphus prompt is shorter and most
-`omca` tools are now deferred. The guard now blocks a force push to the default branch and
-`git commit --no-verify`, and the release no longer ships a `package.json` or `bun.lock`, so the
-install has nothing to download. Startup is the one number that moved the wrong way, from +190 ms
-to +248 ms.
+Each comparison is against the other plugin arms. A point sits under "worse" when more of them
+do better than OMCA than do worse. An arm counts as about level when it is within 10 percent of
+OMCA's value, and within 5 ms for times and 0.5 `execve` for process counts.
 
 ### Where OMCA is worse
 
-- **Context per request.** With tool search on, OMCA adds the most of any arm: +12,679 estimated
-  tokens per request (next: ECC, +10,791). The parts, as medians that do not sum exactly: the
-  sisyphus prompt in the system prompt (+5,676), the `omca` tools (+1,490, the three always-loaded
-  tools plus the names of the deferred ones), the guidance injected on the first prompt (+2,194),
-  the output style (+1,473), the agent and skill listing (+1,460) and the server instructions
-  (+549). With tool search off, which is how this harness ships tools, OMCA adds +16,307 and
-  pre-seeded ruflo adds more (+70,904) because it declares 358 MCP tools.
-- **bun is required.** Every settings hook and every tool runs in one bun server. With bun
-  hidden, a session had no OMCA tools (19 became 0), no injected guidance, no stop gate, and
-  showed no error. The guard, which runs in the mod, still blocked `rm -rf /` and
-  `git reset --hard`.
-- **Startup.** The first request came 248 ms after the baseline's: later than
-  oh-my-claudecode (+188 ms), pre-seeded ruflo (+192 ms), claude-code-harness (+56 ms),
-  superpowers and wshobson/agents (+11 and +17 ms), earlier than ECC and offline ruflo (over
-  2 s). Claude Code waits for MCP servers to connect before the first request, so the bun server
-  is part of this.
-- **Per-call overhead.** +5.8 ms per Bash call and +5.0 ms per Read call over baseline, with 2.0
-  process launches per Bash call against the baseline's 1.9. superpowers (+0.0 ms Bash) and
-  wshobson/agents (+0.6 ms), which register almost no hooks, were lower.
-- **Network at start.** The bundled `grep` and `context7` servers try to reach mcp.grep.app and
-  mcp.context7.com.
-- **Files in the project.** A first session wrote 11 files under `.omca/` and `.claude/`, and a
-  bun transpile cache under the home directory.
+- **Context per request.** OMCA adds +16,307 estimated tokens per request in this harness, where
+  tool search is off, and +12,679 with tool search on, the closer match to first-party traffic.
+  With tool search on, every other plugin arm adds less. The largest addition of any arm is
+  pre-seeded ruflo's +70,904 with tool search off, from its 358 MCP tools. OMCA's parts with tool
+  search on, as medians that do not sum exactly: the sisyphus prompt in the system prompt
+  (+5,676), the `omca` tools (+1,490, with 3 MCP tool schemas in the request and the deferred
+  tools as names), the guidance injected on the first prompt (+2,194), the output style (+1,473),
+  the agent and skill listing (+1,460) and the server instructions (+549). `claude plugin
+  details` reports about 1,427 always-on tokens for OMCA, which counts only skill, agent and
+  command names and descriptions.
+- **Without bun.** Every settings hook and every tool runs in one bun server. With bun hidden,
+  the first request carried no MCP tools and no hook context, and the stop gate did not continue
+  a plan-bound session. In `claude -p`, the run showed no error. The guard, which runs in the
+  mod, still blocked `rm -rf /` and `git reset --hard`.
+- **Startup.** The first request came 248 ms after the baseline's. Five arms start earlier:
+  claude-code-harness (+56 ms), superpowers (+11 ms), wshobson/agents (+17 ms),
+  oh-my-claudecode (+188 ms) and pre-seeded ruflo (+192 ms). ECC and offline ruflo start later,
+  over 2 s after the baseline. Claude Code waits for MCP servers to connect before the first
+  request, so the bun server is part of this.
+- **Network at session start.** A session tried to reach mcp.context7.com and mcp.grep.app, for
+  the bundled `context7` and `grep` servers, which the closed network refuses.
+- **Writes.** A first session wrote 11 paths into the project, 8 under `.omca/` and 3 under
+  `.claude/`. It also wrote 28 paths under `~/.bun` and `~/.cache` beyond what the baseline
+  writes. By the project count, six arms wrote fewer and claude-code-harness wrote more.
+- **Install footprint.** The offline install measured 2.9 MiB in 282 files, from the tree at
+  commit `1061e97`. ruflo, superpowers and wshobson/agents are smaller, and oh-my-claudecode,
+  claude-code-harness and ECC are larger. The shipped tree leaves out the specs and the
+  contributor tooling, so it is smaller than the measured one.
 
 ### Where OMCA is not worse
 
+- **Per-call overhead.** +5.8 ms per Bash call and +5.0 ms per Read call over baseline. Per Bash
+  call, oh-my-claudecode, claude-code-harness, pre-seeded ruflo and ECC are slower, and
+  superpowers and wshobson/agents, which register almost no hooks, are faster.
 - **Guard.** OMCA blocked all five destructive commands, including `git reset --hard`, a force
   push to `main` and `git commit --no-verify`. claude-code-harness blocked four of the five (not
   `git reset --hard`). ECC blocked three outright and gated `git reset --hard` and the force push
   once, then ran them on retry. The other arms left what Claude Code's own check leaves: the two
   `rm -rf` commands blocked, the other three run.
-- **Install.** The offline install took 206 ms, contacted no host and ran no dependency fetch: no
-  `node_modules`, so no online probe was needed. The plugin is 2.9 MiB in 282 files, smaller than
-  claude-code-harness, ECC and oh-my-claudecode.
-- **Stop gate.** OMCA was the only arm that continued a scripted stop with plan tasks unchecked.
+- **Process churn.** 2.0 process launches per Bash call against the baseline's 1.9. That is about
+  level with superpowers and wshobson/agents and lower than the other four arms. Every OMCA
+  `hooks.json` handler is an `mcp_tool` call rather than a command.
+- **Install.** The offline install took 206 ms, contacted no host and fetched no dependencies.
 - **Your files.** No arm, OMCA included, edited a `CLAUDE.md`, and OMCA wrote no settings beyond
-  the entries Claude Code writes for every install.
+  the `settings.json` entry Claude Code writes for every install.
+
+The stop gate is a separate note, not a comparison. Only OMCA's run was armed with plugin state,
+a bound plan holding unchecked tasks, so the result says whether each arm stopped in an unarmed
+state, not whose gate is better. OMCA's was the only scripted stop that was continued.
 
 ### Measurements
 
 | Arm | Tokens per request vs baseline, tool search on | Tool search off | First request vs baseline | Per Bash call vs baseline | Per Read call vs baseline | Offline install |
 | --- | --- | --- | --- | --- | --- | --- |
-| OMCA | +12,679 | +16,307 | +248 ms | +5.8 ms | +5.0 ms | 2.9 MiB, 282 files |
+| OMCA | +12,679 | +16,307 | +248 ms | +5.8 ms | +5.0 ms | 2.9 MiB, 282 files (at `1061e97`) |
 | oh-my-claudecode | +3,566 | +11,714 | +188 ms | +101.0 ms | +105.0 ms | 67.5 MiB, 7,077 files |
 | claude-code-harness | +2,380 | +2,381 | +56 ms | +22.6 ms | +20.0 ms | 78.3 MiB, 1,752 files |
 | ruflo, pre-seeded | +5,034 | +70,904 | +192 ms | +275.2 ms | +10.6 ms | 440.9 KiB, 108 files |
@@ -374,18 +394,22 @@ to +248 ms.
 | wshobson/agents | +2,894 | +2,894 | +17 ms | +0.6 ms | +1.0 ms | 521.5 KiB, 85 files |
 
 Guard corpus, each command issued twice in a session under bypassPermissions, so only hooks can
-stop it:
+stop it. Offline ruflo got one call per session under a 90 s limit.
 
 | Arm | `rm -rf /` | `rm -rf ~` | `git reset --hard` | `git push --force origin main` | `git commit --no-verify` | `ls` |
 | --- | --- | --- | --- | --- | --- | --- |
 | baseline | blocked by Claude Code | blocked by Claude Code | ran | ran | ran | ran |
 | OMCA | blocked | blocked | blocked | blocked | blocked | ran |
 | claude-code-harness | blocked | blocked | ran | blocked | blocked | ran |
-| ECC | blocked | blocked | ran on retry | ran on retry | blocked | blocked |
+| ECC | blocked | blocked | ran on retry | ran on retry | blocked | blocked, a mock artifact |
 | oh-my-claudecode, superpowers, wshobson/agents, ruflo | blocked by Claude Code or the plugin | blocked by Claude Code | ran | ran | ran | ran |
 
-The online install probe was not run for OMCA on this date, because its offline install tried no
-registry host. The earlier figure of 169.1 MiB came from a tree that shipped a `package.json`.
+ECC's gate asks the model to present facts and retry. The scripted mock retries without them,
+which a real model would not do, so its blocked `ls` is an artifact of the harness.
+
+The online install probe was not run for OMCA, because its offline install tried no registry
+host. Offline, oh-my-claudecode's install tried the npm registry and reported success after
+60,555 ms.
 
 ### Method
 
@@ -393,21 +417,25 @@ registry host. The earlier figure of 169.1 MiB came from a tree that shipped a `
   system prompt, tools, listings, output style, server instructions and hook context, excluding
   the prompt text. Claude's tokenizer is not available offline, so these are estimates, and the
   ratios between arms are more reliable than the absolute values. Values are medians over the
-  paired runs. The tool-search column sets `ENABLE_TOOL_SEARCH=true` (3 rounds), the closer
-  match to first-party traffic, where MCP tools are deferred; Claude Code turns tool search off
-  when the API host is not first-party, as in this harness.
+  paired runs, and a delta is the difference of two medians. The tool-search column sets
+  `ENABLE_TOOL_SEARCH=true` (3 rounds), the closer match to first-party traffic, where MCP tools
+  are deferred; Claude Code turns tool search off when the API host is not first-party, as in
+  this harness.
 - **First request** is the time from process start to the mock's first request, as the median of
   the paired differences against baseline.
-- **Per-call overhead** is the time from the first to the last request over 20 scripted `true`
-  Bash calls (or 10 Read calls), divided by the call count, as the median paired difference.
-  Process launches come from `strace -f -e trace=execve`.
+- **Per-call overhead** is the time from the first to the last main-thread request over 20
+  scripted `true` Bash calls (or 10 Read calls), divided by the call count, as the median paired
+  difference. Process launches come from `strace -f -e trace=execve`.
 - **Install footprint** is the plugin cache after a hermetic install from a directory
   marketplace, with the network host list taken from `strace` on each install step.
-- **Guard corpus** runs one Bash command per session, issued twice, under
-  `--permission-mode bypassPermissions`, and counts a command as run when its effect is
-  observable. A gate that refuses once and lets the retry through shows as ran on retry.
-- **Stop gate** writes a plan with two unchecked tasks, binds the session to it where the arm
-  supports that, and ends the turn.
+- **Writes** are paths that appear in a snapshot of the home directory, the config directory and
+  the project taken before and after the first session. The run did not record whether a new
+  path is a file or a directory.
+- **Guard corpus** runs one Bash command per session under `--permission-mode
+  bypassPermissions`, and counts a command as run when its effect is observable. A gate that
+  refuses once and lets the retry through shows as ran on retry.
+- **Stop gate** writes a plan with two unchecked tasks, binds the session to it for OMCA only,
+  and ends the turn.
 
 The harness is in `benchmarks/compare/`, which the plugin does not ship. Its results are not
 committed.

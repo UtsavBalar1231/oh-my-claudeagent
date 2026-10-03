@@ -6,7 +6,7 @@ Behavioral and integration tests for oh-my-claudeagent.
 
 ```
 tests/
-  evals/             # Eval task definitions, listed by `bun scripts/qa/eval-tasks.ts`
+  evals/             # Eval tasks, listed by `bun scripts/qa/eval-tasks.ts`, and their trial records
   plugin-evals/      # `claude plugin eval` cases for the planning skills; see its README
   fixtures/
     mcp/             # JSON-RPC requests and the expected tool list for the MCP server
@@ -16,12 +16,15 @@ tests/
     statusline/      # recorded payloads and rendered output for the status line
     spec-env.ts      # the environment a spec passes to a process it spawns
     fake-exec.ts     # a fake executable that runs on Windows too
+    canonical-tmp.ts # bunfig.toml preload: the long form of TEMP on Windows
+    plain-output.ts  # bunfig.toml preload: drops FORCE_COLOR
   mod/               # mod tests, run by `claude plugin test .`
     visual/          # view definitions and recorded captures behind `just visual <view>`
 ```
 
-Bun specs (`*.spec.ts`) live beside the code they cover, under `src/`, `servers/`,
-`statusline/`, `scripts/`, `opencode/` and `benchmarks/compare/`.
+Bun specs (`*.spec.ts`) live beside the code they cover. `just test` runs the ones under `src/`,
+`servers/`, `statusline/`, `scripts/` and `benchmarks/compare/`, and `just test-opencode` runs
+the ones under `opencode/`.
 
 ## Running tests locally
 
@@ -35,14 +38,17 @@ just validate
 # One group, for example the MCP handshake check
 just validate --check mcp
 
-# Every bun spec, including the validator specs and the workflow contract
+# Every bun spec outside opencode/, including the validator specs and the workflow contract
 just test
 
 # The mod tests (needs the claude CLI)
 just test-mod
 
-# The OpenCode adapter: typecheck and every opencode/ spec (needs opencode on PATH)
+# Every opencode/ spec; the ones that load OpenCode skip without opencode on PATH
 just test-opencode
+
+# One claude -p session with the packaged plugin against the mock model (needs the claude CLI)
+just smoke
 ```
 
 ## Adding a bun spec
@@ -64,12 +70,11 @@ CI runs these jobs on a push to `main`, on every pull request and on demand. Eve
 
 | Job | Command |
 |-----|---------|
-| `validate` | `bun scripts/validate.ts`, every validator group (the engine group skips without the claude CLI) |
-| `test-mcp` | `bun test servers` and `bun scripts/validate.ts --check mcp` |
-| `test-opencode` | the OpenCode adapter: typecheck, then `bun test opencode/`, whose smoke and model-path specs run against a real OpenCode install |
-| `typescript` | oxlint with warnings denied, both tsc projects, the mod tests, the bun specs with a JUnit report that `scripts/qa/junit-complete.ts` checks for failures and for every spec file, a seeded random-order run on Linux, and the engine checks |
+| `validate` | `bun scripts/validate.ts`, every validator group including the MCP handshake (the engine group skips without the claude CLI) |
+| `test-opencode` | `bun test opencode/`, whose smoke and model-path specs run against a real OpenCode install |
+| `typescript` | oxlint with warnings denied, the three tsc projects (the mod, the bun runtime and the OpenCode adapter), the mod tests, the bun specs with a JUnit report that `scripts/qa/junit-complete.ts` checks for failures and for every spec file, a seeded random-order run on Linux, and the engine checks, which validate a packaged copy under `--strict` |
 | `smoke` | `bun scripts/qa/ci-smoke.ts`: a real `claude -p` session with the packaged plugin loaded, against the mock model |
-| `validate-manifest` | `claude plugin validate . --strict` on the latest published client |
+| `validate-manifest` | `claude plugin validate . --strict` and `claude plugin validate .claude-plugin/plugin.json --strict` on the latest published client |
 
 ## Running hooks ad hoc
 

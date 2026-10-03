@@ -15,8 +15,8 @@ catalogs) and answers the `omca_hook` calls the settings hooks make. It speaks M
 - `lifecycle.ts`: start-up housekeeping (registry GC, ledger rotation, record pruning).
 - `plugin-root.ts`: the plugin root, `CLAUDE_PLUGIN_ROOT` when it names a directory.
 - `tools/`: one module per tool family (`boulder.ts`, `evidence.ts`, `notepad.ts`, `ast.ts`,
-  `filesystem.ts`, `sessions.ts`, `catalog.ts`) plus `hook.ts`, the `omca_hook` entry point.
-  Each module has its spec beside it.
+  `filesystem.ts`, `sessions.ts`, `catalog.ts`) plus `hook.ts`, the `omca_hook` entry point,
+  and `args.ts`, the shared argument readers. Each tool module has its spec beside it.
 - `hooks/`: one handler per hook behavior, wired into `registry.ts`. Shared logic lives in
   `src/core/`.
 - `categories.json`: model-tier routing table for OMCA agent categories.
