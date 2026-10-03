@@ -83,6 +83,16 @@ describe("shell and python scripts", () => {
     },
   );
 
+  test("only an eval case's fixture.sh under tests/plugin-evals is exempt", async () => {
+    const scaffold = "#!/usr/bin/env bash\nexit 0\n";
+    expect(await check({ "tests/plugin-evals/context/case-a/fixture.sh": scaffold })).toMatchObject({ status: "pass" });
+    expect(await check({ "tests/plugin-evals/context/case-a/setup.sh": scaffold })).toEqual({
+      status: "fail",
+      detail: "tests/plugin-evals/context/case-a/setup.sh is a python, bash or sh script",
+    });
+    expect(await check({ "tests/fixture.sh": scaffold })).toEqual({ status: "fail", detail: "tests/fixture.sh is a python, bash or sh script" });
+  });
+
   test("the real tree has no python, bash or sh script", () => {
     expect(shellOrPythonScripts(createContext(join(import.meta.dir, "..", "..")))).toEqual([]);
   });

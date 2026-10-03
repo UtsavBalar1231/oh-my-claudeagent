@@ -17,8 +17,13 @@ function firstLine(path: string): string {
   }
 }
 
+// `claude plugin eval` runs a case's scaffold_script with bash, and tests/ is never packaged.
+const EVAL_SCAFFOLD = /^tests\/plugin-evals\/.+\/fixture\.sh$/;
+
 export function shellOrPythonScripts(ctx: Context): string[] {
-  return ctx.tracked().filter((path) => SCRIPT_EXTENSION.test(path) || SHEBANG.test(firstLine(join(ctx.root, path))));
+  return ctx
+    .tracked()
+    .filter((path) => !EVAL_SCAFFOLD.test(path) && (SCRIPT_EXTENSION.test(path) || SHEBANG.test(firstLine(join(ctx.root, path)))));
 }
 
 function shellOrPython(ctx: Context): Outcome {
