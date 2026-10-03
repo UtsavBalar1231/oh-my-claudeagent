@@ -2,11 +2,10 @@
 // Runs a real `claude -p` against the scripted mock with the packaged plugin and a fixture
 // plugin whose agent has `isolation: worktree`. The agent runs `pwd`; the result must be a
 // worktree path, not a lost-isolation error, and the plugin's `mcp_tool` PostToolUse hook
-// must have seen the agent. An unfiltered `tool.call` hook breaks Bash in such a subagent
-// (anthropics/claude-code#92533), so --mutate-unfiltered-tool-call adds one to the scratch
-// copy of the packaged tree and the run must then fail.
+// must have seen the agent. --unfiltered-tool-call adds a passthrough `tool.call` hook with no
+// tool filter to the scratch copy of the packaged tree; Bash must keep working in the subagent.
 //
-// Usage: bun scripts/qa/worktree-bash.ts [--mutate-unfiltered-tool-call]
+// Usage: bun scripts/qa/worktree-bash.ts [--unfiltered-tool-call]
 // Exit: 0 pass, 1 an assertion failed, 2 the run could not be set up.
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -73,16 +72,15 @@ function probeResults(configDir: string): Result[] {
   return lines.flatMap(blocks).filter((b) => b.type === "tool_result" && ids.has(b.tool_use_id)).map((b) => ({ text: resultText(b.content), isError: b.is_error === true }));
 }
 
-function mutate(pluginDir: string): void {
+function addUnfilteredToolCall(pluginDir: string): void {
   const path = join(pluginDir, "hooks", "register.ts");
   const source = readFileSync(path, "utf8");
-  if (!source.includes(REGISTER_HEAD)) throw new Error("hooks/register.ts no longer opens `register` as the mutation expects");
+  if (!source.includes(REGISTER_HEAD)) throw new Error("hooks/register.ts no longer opens `register` as the unfiltered hook expects");
   writeFileSync(path, source.replace(REGISTER_HEAD, REGISTER_HEAD + UNFILTERED_TOOL_CALL));
 }
 
 async function main(): Promise<boolean> {
-  const { values } = parseArgs({ options: { "mutate-unfiltered-tool-call": { type: "boolean", default: false } } });
-  const mutated = values["mutate-unfiltered-tool-call"];
+  const { values } = parseArgs({ options: { "unfiltered-tool-call": { type: "boolean", default: false } } });
   if (!Bun.which("claude")) throw new Error("claude is not on PATH");
 
   const scratch = mkdtempSync(join(tmpdir(), "omca-worktree-bash-"));
@@ -94,7 +92,7 @@ async function main(): Promise<boolean> {
     mkdirSync(project);
     mkdirSync(configDir);
     packageTree(REPO, plugin);
-    if (mutated) mutate(plugin);
+    if (values["unfiltered-tool-call"]) addUnfilteredToolCall(plugin);
     run(["git", "init", "--quiet"], project);
     run(["git", "-c", "user.name=qa", "-c", "user.email=qa@localhost", "commit", "--quiet", "--allow-empty", "-m", "init"], project);
 

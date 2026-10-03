@@ -12,7 +12,6 @@ import {
   REGISTER,
   registrations,
   type Source,
-  toolCall,
   toolCheckAllow,
 } from "./mod.ts";
 
@@ -75,37 +74,6 @@ describe("mod on() location", () => {
 
   test("registrations in register.ts alone pass", () => {
     expect(onLocation(register('on("turn.start", hook);'))).toMatchObject({ status: "pass" });
-  });
-});
-
-describe("mod tool.call filter", () => {
-  test("a tool.call registration with no matcher fails", () => {
-    expect(toolCall(register('on("tool.call", hook);'))).toEqual({ status: "fail", detail: `${REGISTER}: on("tool.call") has no tool filter` });
-  });
-
-  test("a tool.call registration whose matcher has no tool key fails", () => {
-    expect(toolCall(register('on("tool.call", { agentId: "x" }, hook);'))).toEqual({
-      status: "fail",
-      detail: `${REGISTER}: on("tool.call", {agentId:"x"}) has no tool filter`,
-    });
-  });
-
-  test("a tool.call registration that names Bash fails, as a string or a pattern", () => {
-    expect(toolCall(register('on("tool.call", { tool: "Bash" }, hook);'))).toEqual({
-      status: "fail",
-      detail: `${REGISTER}: on("tool.call", {tool:"Bash"}) matches Bash`,
-    });
-    expect(toolCall(register('on("tool.call", { tool: /^(?:Bash|Read)$/ }, hook);')).status).toBe("fail");
-  });
-
-  test("a glob or wildcard that reaches tool.call needs a filter too", () => {
-    expect(toolCall(register('on("tool.*", hook);', 'on("*", hook);')).detail).toBe(
-      `${REGISTER}: on("tool.*") has no tool filter; ${REGISTER}: on("*") has no tool filter`,
-    );
-  });
-
-  test("a tool.call registration filtered to another tool passes, and so do other tool events", () => {
-    expect(toolCall(register('on("tool.call", { tool: "Read" }, hook);', 'on("tool.check", { tool: "Bash" }, hook);'))).toMatchObject({ status: "pass" });
   });
 });
 

@@ -44,7 +44,7 @@ Run each command and compare the version it prints:
 claude --version
 ```
 
-PASS at 2.1.287 or later. Otherwise FAIL and **stop**: OMCA's mod needs Claude Code 2.1.287 or later.
+PASS at 2.1.288 or later. Otherwise FAIL and **stop**: OMCA's mod needs Claude Code 2.1.288 or later.
 
 ```bash
 bun --version
@@ -96,7 +96,7 @@ Only the installed cache copy is edited, because a `--plugin-dir` checkout is tr
 
 ```
 === oh-my-claudeagent setup ===
-Claude Code  PASS 2.1.287
+Claude Code  PASS 2.1.288
 bun          PASS 1.4.2
 ast-grep     PASS 0.44.0 | WARN not found
 Runtime      PASS | <runtime>: <runtime_reason>

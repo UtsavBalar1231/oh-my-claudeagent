@@ -32,7 +32,7 @@ function engine(on: On, w: World, options: { hold?: boolean; refuse?: readonly s
     return call.argv[0] === "sg" ? output("ast-grep 0.39.0\n") : { deny: "spawn ast-grep ENOENT" };
   });
   on("session.version", () =>
-    options.isVersionDenied?.() === true ? { deny: "version unavailable" } : { value: { version: "2.1.287", base: "2.1.287" } },
+    options.isVersionDenied?.() === true ? { deny: "version unavailable" } : { value: { version: "2.1.288", base: "2.1.288" } },
   );
   on("fs.write", (_$, call) => {
     const path = w.spelled(call.path);
@@ -66,7 +66,7 @@ function body(tree: RenderElement): string[] {
 }
 
 const CHECKS = [
-  "✓ Claude Code   2.1.287 meets the 2.1.287 floor",
+  "✓ Claude Code   2.1.288 meets the 2.1.288 floor",
   "✓ bun           bun 1.4.2 is on PATH",
   "✓ omca server   Last hook call 2 min ago",
   "✓ ast-grep      sg 0.39.0 is on PATH",
@@ -267,7 +267,7 @@ for (const layout of LAYOUTS) {
     const drawn = body(await ui.drawn());
     expect(drawn[0]).toBe(`r: Run again   2 warn - 11 ok - checked ${local(NOW_S)}`);
     expect(drawn[2]).toBe("! OMCA          Could not read this mod's version from its manifest");
-    expect(drawn).toContain("+ Claude Code   2.1.287 meets the 2.1.287 floor");
+    expect(drawn).toContain("+ Claude Code   2.1.288 meets the 2.1.288 floor");
     expect(drawn.at(-2)).toBe("  v 8 more - ^v scroll");
     const isAscii = (row: string) => [...row].every((char) => char.charCodeAt(0) >= 32 && char.charCodeAt(0) < 127);
     expect(rows(await ui.drawn()).filter((row) => !isAscii(row))).toEqual([]);
@@ -350,6 +350,33 @@ test("the arrows, a page key and the wheel move the Doctor list by whole checks,
   await scroll(-100);
   expect((await titles())[0]).toBe("check-mod");
   expect(handed).toEqual([]);
+  await ui.unmount();
+});
+
+test("Home and End send the Doctor list to its first and last check even when one window is far smaller than the list", async ($, on) => {
+  engine(on, world(on, {}, {}));
+  await $.command.run(run("doctor", 120));
+  const ui = await $.ui.mount(pane("terminal", { columns: 60, rows: 30, placement: "inline" }));
+  const contentRows = bodyLines(await ui.drawn()).length;
+  const key = (by: number) => $.ui.scroll({ ...SCROLL, by, bodyRows: contentRows - 1, contentRows });
+  const titles = async () => (await ui.findAll({ type: "Box" })).flatMap((box) => (box.key?.startsWith("check-") === true ? [box.key] : []));
+  const edges = async () => bodyLines(await ui.drawn()).filter((row) => row.includes("more"));
+
+  expect(contentRows).toBe(9);
+  expect(await titles()).toEqual(["check-mod"]);
+  expect(await edges()).toEqual(["  ↓ 12 more · ↑↓ scroll"]);
+
+  await key(contentRows);
+  expect(await titles()).toEqual(["check-style"]);
+  expect(await edges()).toEqual(["  ↑ 12 more"]);
+
+  await key(-contentRows);
+  expect(await titles()).toEqual(["check-mod"]);
+  expect(await edges()).toEqual(["  ↓ 12 more · ↑↓ scroll"]);
+
+  await key(contentRows - 1);
+  expect(await titles()).not.toEqual(["check-style"]);
+  expect(await edges()).toHaveLength(2);
   await ui.unmount();
 });
 

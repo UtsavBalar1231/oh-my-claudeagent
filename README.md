@@ -65,7 +65,7 @@ Rebuild the locally-installed plugin cache from your dev tree:
 bun scripts/package.ts ~/.claude/plugins/cache/omca/oh-my-claudeagent/$(jq -r .version .claude-plugin/plugin.json)/
 ```
 
-Run `bun scripts/package.ts --dry-run` first to print the file list. The script excludes dev artifacts (`.omca/`, `.mypy_cache/`, `UPGRADE.md`, `tests/`, etc.) that should not ship.
+Run `bun scripts/package.ts --dry-run` first to print the file list. The script excludes `.git/`, `.github/`, `.omca/`, `CLAUDE.md`, `.claude/`, `benchmarks/`, `docs/design/`, `tests/`, `scripts/qa/`, `scripts/docs/` and `node_modules/`.
 
 ### Uninstall
 
@@ -98,7 +98,7 @@ for the trap and the one-setting workaround.
 
 ## Requirements
 
-- Claude Code CLI v2.1.271 or later (older clients cannot load a plugin whose `userConfig` declares `options`)
+- Claude Code CLI v2.1.288 or later
 - `jq`
 - `bun` 1.4.2 or later
 - `ast-grep` CLI (`ast-grep` or `sg`)

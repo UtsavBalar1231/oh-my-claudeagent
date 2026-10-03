@@ -21,9 +21,6 @@ export function registrations(sources: readonly Source[]): Registration[] {
   );
 }
 
-const reaches = (pattern: string, event: string): boolean =>
-  pattern === "*" || pattern === event || (pattern.endsWith(".*") && event.startsWith(pattern.slice(0, -1)));
-
 function reachesGuarded(pattern: string): boolean {
   if (pattern === "*" || pattern.startsWith("!") || pattern.startsWith("classic.")) return true;
   if (pattern.endsWith(".*")) return GUARDED.some((event) => event.startsWith(pattern.slice(0, -1)));
@@ -49,15 +46,6 @@ export function guardedEvents(sources: readonly Source[]): Outcome {
 export function onLocation(sources: readonly Source[]): Outcome {
   const problems = registrations(sources).filter((r) => r.path !== REGISTER).map((r) => `${r.path}: ${r.call} outside ${REGISTER}`);
   return verdict(problems, `every on() call is in ${REGISTER}`);
-}
-
-export function toolCall(sources: readonly Source[]): Outcome {
-  const problems = registrations(sources).flatMap((r) => {
-    if (!reaches(r.event, "tool.call")) return [];
-    if (r.matcher === "" || !/\btool:/.test(r.matcher)) return [`${r.path}: ${r.call} has no tool filter`];
-    return /Bash/.test(r.matcher) ? [`${r.path}: ${r.call} matches Bash`] : [];
-  });
-  return verdict(problems, "no tool.call registration matches Bash or lacks a tool filter");
 }
 
 export function duplicateRegistration(sources: readonly Source[]): Outcome {
@@ -99,7 +87,6 @@ export const checks: readonly Check[] = [
   { name: "mod register.ts", run: registerPresent },
   { name: "mod guarded events", run: onSources(guardedEvents) },
   { name: "mod on() location", run: onSources(onLocation) },
-  { name: "mod tool.call filter", run: onSources(toolCall) },
   { name: "mod tool.check allow", run: onSources(toolCheckAllow) },
   { name: "mod session.compact messages", run: onSources(compactMessages) },
   { name: "mod duplicate registration", run: onSources(duplicateRegistration) },

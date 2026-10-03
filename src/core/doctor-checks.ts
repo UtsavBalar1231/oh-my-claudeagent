@@ -34,7 +34,7 @@ export type Inputs = {
   isStyleForced: boolean | null;
 };
 
-export const ENGINE_FLOOR = "2.1.287";
+export const ENGINE_FLOOR = "2.1.288";
 export const BUN_FLOOR = "1.4.2";
 const FRESH_MS = 10 * 60_000;
 

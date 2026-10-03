@@ -54,7 +54,7 @@ test-bun:
 	bun test src servers statusline scripts opencode
 
 # Run the manual QA harness: session smoke, install verify, the live hook probe, the statusline probe,
-# the live MCP probe, then the worktree-bash and route-effort checks. Maintainer pre-release step, NOT part of CI: it launches
+# the live MCP probe, then the worktree-bash (plain, then with an unfiltered tool.call hook) and route-effort checks. Maintainer pre-release step, NOT part of CI: it launches
 # real `claude` sessions against the mock model, each in a scratch project with its own CLAUDE_CONFIG_DIR.
 [group('test')]
 qa:
@@ -64,6 +64,7 @@ qa:
 	bun scripts/qa/statusline-probe.ts
 	bun scripts/qa/mcp-live.ts
 	just qa-worktree-bash
+	just qa-worktree-bash --unfiltered-tool-call
 	just qa-route-effort
 
 # Capture tests/mod/visual/<view>.json in tmux against the mock model at 80, 120 and 200 columns
@@ -76,7 +77,7 @@ visual view:
 qa-route-effort:
 	bun scripts/qa/route-effort.ts
 
-# Check against the mock model that Bash works in an isolation: worktree subagent with the mod and its mcp_tool hooks loaded
+# Check against the mock model that Bash works in an isolation: worktree subagent with the mod and its mcp_tool hooks loaded; --unfiltered-tool-call adds an unfiltered tool.call hook
 [group('test')]
 qa-worktree-bash *args:
 	bun scripts/qa/worktree-bash.ts {{ args }}

@@ -22,7 +22,7 @@ describe("normalize", () => {
     const out = normalize(capture("\x1b[38;5;246mClaude Code v9.9.9\x1b[39m\nok\n"), 40);
     const rows = out.split("\n").slice(0, 2).map((row) => row.replace(/\x1b\[[0-9;]*m/g, ""));
     expect(rows.map((row) => row.length)).toEqual([40, 40]);
-    expect(rows[0]).toStartWith("Claude Code v2.1.287");
+    expect(rows[0]).toStartWith("Claude Code v2.1.288");
     expect(out).toContain("\x1b[0;38;5;246mClaude Code");
   });
 

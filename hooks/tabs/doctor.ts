@@ -27,9 +27,11 @@ const FIXES: Readonly<Record<Fix, { key: string; label: string; done: string }>>
 let first = 0;
 let laid: { heights: readonly number[]; room: number } | undefined;
 
-export function scroll(by: number): boolean {
+// Home and End ask for the drawn tree's whole height, which is one window here, so they jump to the ends.
+export function scroll(by: number, contentRows: number): boolean {
   if (laid === undefined) return false;
-  first = stepStart(laid.heights, first, by, laid.room);
+  const rows = Math.abs(by) >= contentRows ? Math.sign(by) * laid.heights.reduce((sum, height) => sum + height, 0) : by;
+  first = stepStart(laid.heights, first, rows, laid.room);
   return true;
 }
 

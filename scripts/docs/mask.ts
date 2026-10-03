@@ -1,6 +1,6 @@
 import { type Cell, PLAIN, padRow, type Row, rowWidth } from "./ansi.ts";
 
-export const CLIENT_VERSION = "2.1.287";
+export const CLIENT_VERSION = "2.1.288";
 export const PLUGIN_VERSION = "3.0.0";
 const BUN_VERSION = "1.4.2";
 const AST_GREP_VERSION = "0.44.1";

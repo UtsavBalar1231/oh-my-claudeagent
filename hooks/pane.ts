@@ -360,7 +360,7 @@ export const pane: Features = {
   "ui.scroll": {
     async pre(host, e) {
       if (e.requestId !== PANE || e.origin.kind !== "person") return undefined;
-      if ((await host.state.pane.get()).value?.tab !== "doctor" || !doctor.scroll(e.by)) return undefined;
+      if ((await host.state.pane.get()).value?.tab !== "doctor" || !doctor.scroll(e.by, e.contentRows)) return undefined;
       host.ui.invalidate();
       return { answer: {} };
     },
