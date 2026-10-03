@@ -1,6 +1,6 @@
 # oh-my-claudeagent eval harness
 
-`bun scripts/qa/eval-tasks.ts` (`just eval-consistency`) lists the available fixtures.
+`bun scripts/qa/eval-tasks.ts` lists the available fixtures.
 There is no automated runner: a trial is one live `claude -p` turn, launched by hand
 inside a throwaway git worktree, and scored from the diff that turn left behind. This
 file is the procedure. Follow it verbatim so two trials taken weeks apart remain comparable.

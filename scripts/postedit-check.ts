@@ -28,7 +28,7 @@ export function report(stdin: string, typecheck: Typecheck): string {
 }
 
 function justTypecheck(): ReturnType<Typecheck> {
-  const run = Bun.spawnSync(["just", "typecheck-ts"], { cwd: join(import.meta.dir, ".."), stdout: "pipe", stderr: "pipe" });
+  const run = Bun.spawnSync(["just", "typecheck"], { cwd: join(import.meta.dir, ".."), stdout: "pipe", stderr: "pipe" });
   return { ok: run.exitCode === 0, output: `${run.stdout.toString()}${run.stderr.toString()}` };
 }
 

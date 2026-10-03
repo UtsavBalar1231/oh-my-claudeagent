@@ -12,21 +12,24 @@ const RELEASE = readFileSync(join(REPO, ".github", "workflows", "release.yml"), 
 // recipe's own body, so a pin cannot drift from the real command, only from CI's coverage of it.
 const PINS: Readonly<Record<string, string>> = {
   validate: "bun scripts/validate.ts",
-  "test-mcp": "bun test servers",
-  "validate-manifest": "claude plugin validate . --strict",
   "test-opencode": "bun test opencode/",
-  "typecheck-ts": "bun x --bun tsc --noEmit -p tsconfig.runtime.json",
+  typecheck: "bun x --bun tsc --noEmit -p tsconfig.runtime.json",
   lint: "bun x --bun oxlint --deny-warnings src servers statusline scripts hooks opencode tests benchmarks/compare",
   "test-mod": "claude plugin test .",
-  "test-bun": "bun test --parallel src servers statusline scripts opencode benchmarks/compare",
-  "validate-mod": "claude plugin validate .claude-plugin/plugin.json",
+  test: "bun test --parallel src servers statusline scripts opencode benchmarks/compare",
 };
 
-const header = (name: string) => JUSTFILE.split("\n").find((line) => line.startsWith(`${name}:`));
+// The MCP job runs the server specs on their own, so no recipe pins it.
+const MCP_SPECS = "bun test servers";
+
+// A recipe header is its name, any parameters, then the colon: `validate *args:` and `ci: lint test`.
+const isHeader = (name: string) => (line: string) => new RegExp(`^${name}(?: [^:=]*)?:`).test(line);
+
+const header = (name: string) => JUSTFILE.split("\n").find(isHeader(name));
 
 function recipeBody(name: string): string[] {
   const lines = JUSTFILE.split("\n");
-  const start = lines.findIndex((line) => line.startsWith(`${name}:`));
+  const start = lines.findIndex(isHeader(name));
   if (start === -1) return [];
   const body: string[] = [];
   for (const line of lines.slice(start + 1)) {
@@ -58,7 +61,7 @@ const ciLeaves = [...new Set(leafSteps("ci"))].sort();
 
 describe("workflow contract", () => {
   test("just ci recipe chain resolves to the expected leaf steps", () => {
-    expect(ciLeaves.join(" ")).toBe("lint test-bun test-mcp test-mod test-opencode typecheck-ts validate validate-manifest validate-mod");
+    expect(ciLeaves.join(" ")).toBe("lint test test-mod test-opencode typecheck validate");
   });
 
   test("every just ci leaf step has a pinned ci.yml coverage pattern", () => {
@@ -73,6 +76,13 @@ describe("workflow contract", () => {
     expect(ciLeaves.filter((step) => !CI_EXPANDED.includes(PINS[step] ?? "\0"))).toEqual([]);
   });
 
+  test("the MCP job runs the server specs and the handshake check, and the manifest job validates strictly", () => {
+    expect(jobBlock("test-mcp")).toContain(`run: ${MCP_SPECS}`);
+    expect(jobBlock("test-mcp")).toContain("run: bun scripts/validate.ts --check mcp");
+    expect(jobBlock("validate-manifest")).toContain("run: claude plugin validate . --strict");
+    expect(jobBlock("validate-manifest")).toContain("run: claude plugin validate .claude-plugin/plugin.json");
+  });
+
   test("negative sanity: removing the test-mcp job from a ci.yml copy makes coverage fail", () => {
     const copy: string[] = [];
     let skipping = false;
@@ -81,8 +91,8 @@ describe("workflow contract", () => {
       else if (skipping && /^ {2}[a-zA-Z_-]+:/.test(line)) skipping = false;
       if (!skipping) copy.push(line);
     }
-    expect(copy.join("\n").includes(PINS["test-mcp"] ?? "\0")).toBe(false);
-    expect(CI_EXPANDED.includes(PINS["test-mcp"] ?? "\0")).toBe(true);
+    expect(copy.join("\n").includes(MCP_SPECS)).toBe(false);
+    expect(CI_EXPANDED.includes(MCP_SPECS)).toBe(true);
   });
 
   test("ci.yml is callable, and release.yml runs it as the gate its release job needs", () => {
@@ -121,13 +131,17 @@ describe("workflow contract", () => {
     expect(checkRun?.[1]).toBe(testRun?.[2]);
     expect(checkRun?.[2]).toBe(testRun?.[1]);
     expect(CI.match(/BUN_SPEC_ROOTS:/g)).toHaveLength(1);
-    expect(recipeBody("test-bun")).toEqual([`bun test --parallel ${SPEC_ROOTS}`]);
+    expect(recipeBody("test")).toEqual([`bun test --parallel ${SPEC_ROOTS}`]);
     expect(CI).not.toContain("BUN_SPEC_FLOOR");
   });
 
   test("a seeded random-order run on the same roots follows the ordered run and puts its seed in the step name", () => {
     const step = /- name: Bun spec tests in random order \(seed \$\{\{ github\.run_number \}\}\)\n\s+if: runner\.os == 'Linux'\n\s+run: (.+)$/m.exec(jobBlock("typescript"));
     expect(step?.[1]).toBe("bun test --parallel --randomize --seed=${{ github.run_number }} $BUN_SPEC_ROOTS");
+  });
+
+  test("the validate recipe forwards its arguments to the validator", () => {
+    expect(JUSTFILE).toContain("\nvalidate *args:\n\tbun scripts/validate.ts {{ args }}\n");
   });
 
   test("the compare recipe runs the Docker comparison harness with its arguments", () => {

@@ -359,7 +359,7 @@ Do not include any completion-tracking section (Final Checklist, Done Items, Clo
 
 ## QA Scenario Mandate (Every Task)
 
-**Where the scenario lives**: when a single runnable command proves the task, collapse the whole scenario into that task's `Done when:` line and write no scenario block (e.g. `Done when: \`just test-claims\` exits 0`). Emit the full block below only for a task whose proof has no runnable check, such as a UI flow or a multi-step state inspection. The block then sits under the task's sub-bullets, still contiguous with the checkbox line.
+**Where the scenario lives**: when a single runnable command proves the task, collapse the whole scenario into that task's `Done when:` line and write no scenario block (e.g. `Done when: \`just validate --check claims\` exits 0`). Emit the full block below only for a task whose proof has no runnable check, such as a UI flow or a multi-step state inspection. The block then sits under the task's sub-bullets, still contiguous with the checkbox line.
 
 Every task needs at minimum: 1 happy-path + 1 failure/edge-case scenario. A task that touches a shared entry point (API route, CLI subcommand, shared module) also needs 1 adjacent-surface regression scenario, i.e. the untouched sibling operation still returns its previous result (e.g., "the `/orders` endpoint response is unchanged after modifying `/login`"; "the `list` subcommand output is unchanged after modifying `add`"). Scenarios must be executable by an agent/tool; do not rely on human/manual confirmation.
 

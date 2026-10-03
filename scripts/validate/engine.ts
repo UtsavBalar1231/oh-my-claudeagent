@@ -10,8 +10,8 @@ export function forbiddenCalls(output: string): string[] {
   );
 }
 
-export function judgeValidate(result: Run): Outcome {
-  if (result.code === 0) return pass("claude plugin validate accepts the manifest and the hooks module");
+export function judgeValidate(result: Run, subject = "the manifest and the hooks module"): Outcome {
+  if (result.code === 0) return pass(`claude plugin validate accepts ${subject}`);
   const reason = (result.stderr.trim() || result.stdout.trim()).split(/\r?\n/).slice(0, 8).join(" | ");
   return { status: "fail", detail: `claude plugin validate exited ${result.code}: ${reason}` };
 }
@@ -31,6 +31,11 @@ function validateManifest(ctx: Context): Run {
   return run(["claude", "plugin", "validate", ".claude-plugin/plugin.json", ...strict], ctx.root);
 }
 
+// The repository root reads only marketplace.json, so this run does not open the hooks module.
+function validateMarketplace(ctx: Context): Run {
+  return run(["claude", "plugin", "validate", ".", "--strict"], ctx.root);
+}
+
 const runs = new WeakMap<Context, Run>();
 
 function validated(ctx: Context): Run {
@@ -42,10 +47,11 @@ function validated(ctx: Context): Run {
   return result;
 }
 
-const needsClaude = (judge: (result: Run) => Outcome) => (ctx: Context): Outcome =>
-  Bun.which("claude") === null ? skip("claude CLI not on PATH") : judge(validated(ctx));
+const needsClaude = (check: (ctx: Context) => Outcome) => (ctx: Context): Outcome =>
+  Bun.which("claude") === null ? skip("claude CLI not on PATH") : check(ctx);
 
 export const checks: readonly Check[] = [
-  { name: "validate-mod", run: needsClaude(judgeValidate) },
-  { name: "mod calls line", run: needsClaude(judgeCalls) },
+  { name: "validate manifest", run: needsClaude((ctx) => judgeValidate(validated(ctx))) },
+  { name: "validate marketplace", run: needsClaude((ctx) => judgeValidate(validateMarketplace(ctx), "the marketplace under --strict")) },
+  { name: "mod calls line", run: needsClaude((ctx) => judgeCalls(validated(ctx))) },
 ];

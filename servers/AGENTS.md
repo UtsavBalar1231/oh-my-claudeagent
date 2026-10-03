@@ -32,7 +32,7 @@ catalogs) and answers the `omca_hook` calls the settings hooks make. It speaks M
   `_meta["anthropic/alwaysLoad"]: true`, and `.mcp.json` sets no server-level `alwaysLoad`, so
   every other tool waits behind tool search. `OMCA_TOOLS` in `hooks/subagent-context.ts` states
   the loading rule once, for the server instructions and the SubagentStart context.
-- Run the specs with `just test-mcp` (`bun test servers`); `just typecheck-ts` covers this
+- Run the specs with `bun test servers`, and the handshake check with `just validate --check mcp`; `just typecheck` covers this
   directory through `tsconfig.runtime.json`.
 - Keep a tool description under 2,048 characters; Claude Code truncates past that.
 

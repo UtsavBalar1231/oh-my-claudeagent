@@ -6,7 +6,7 @@ Behavioral and integration tests for oh-my-claudeagent.
 
 ```
 tests/
-  evals/             # Eval task definitions, listed by `just eval-consistency`
+  evals/             # Eval task definitions, listed by `bun scripts/qa/eval-tasks.ts`
   plugin-evals/      # `claude plugin eval` cases for the planning skills; see its README
   fixtures/
     mcp/             # JSON-RPC requests and the expected tool list for the MCP server
@@ -26,17 +26,17 @@ Bun specs (`*.spec.ts`) live beside the code they cover, under `src/`, `servers/
 ## Running tests locally
 
 ```bash
-# All layers at once
-just test-all
+# Everything CI runs
+just ci
 
-# Layer 1: structural validation (claims, hooks, mod, tree and engine checks)
+# Every validator group: claims, hooks, mod, tree, engine and mcp
+just validate
+
+# One group, for example the MCP handshake check
+just validate --check mcp
+
+# Every bun spec, including the validator specs and the workflow contract
 just test
-
-# Layer 2: MCP server specs and the handshake check (requires ast-grep)
-just test-mcp
-
-# Layer 3: every bun spec, including the validator specs and the workflow contract
-just test-bun
 
 # The mod tests (needs the claude CLI)
 just test-mod

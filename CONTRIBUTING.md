@@ -2,11 +2,11 @@
 
 ## Prerequisites
 
-- `jq`, used by the commands `just eval-consistency` prints
+- `jq`, used by the eval procedure in `tests/evals/README.md`
 - `bun` 1.4.2 or later, runtime for the MCP server, the hooks module, the status line and the scripts
 - `ast-grep` CLI (`ast-grep` or `sg`), structural code-search tools
 - `just`, task runner for dev commands
-- `claude`, Claude Code 2.1.288 or later, which loads the mod: `just test-mod`, `just validate-mod`, the validator's engine group and `just qa` need it
+- `claude`, Claude Code 2.1.288 or later, which loads the mod: `just test-mod`, the validator's engine group and `just qa` need it
 - `pre-commit`, which runs the git hooks that `just setup` installs
 - `uv`, which `just bench` uses to install a baseline whose status line is the Python renderer
 
@@ -59,29 +59,28 @@ Key rules:
 2. Follow existing frontmatter format (`name`, `description`, `argument-hint` if applicable)
 3. If the skill should be keyword-activated, add a detection pattern to `src/core/keywords.ts`
 4. A skill that omits `context: fork` expands inline in whatever session invoked it, so one invoked from the main session runs at depth 0 and keeps that session's `Agent` tool. That is what an orchestrator skill needs; `start-work` is the worked example, fanning out to `executor` agents from an inline body. `context: fork` does the opposite. It runs the body in a forked subagent one level down, where the platform may withhold the `Agent` tool depending on the configured spawn depth, so do not reach for it when the body has to delegate.
-5. Keep a skill description under the 512-character soft cap and the 1,536-character hard cap. The platform truncates at the hard cap, and older clients may truncate at the soft cap. Run `just test-claims` before committing: it counts `description` plus `when_to_use`, warns at 512 and fails at 1,536. Move longer trigger phrases or usage notes into the SKILL.md body.
+5. Keep a skill description under the 512-character soft cap and the 1,536-character hard cap. The platform truncates at the hard cap, and older clients may truncate at the soft cap. Run `just validate --check claims` before committing: it counts `description` plus `when_to_use`, warns at 512 and fails at 1,536. Move longer trigger phrases or usage notes into the SKILL.md body.
 6. Keep hook internals out of skills. Skills describe what users do, and hooks automate how. Unless a skill's primary purpose is hook configuration or diagnosis, it must not mention raw `.omca/state/*.json` file paths (use the `boulder_write` and `boulder_progress` MCP tools from the omca server instead), hook handler names (`task-completed`, `stop-gates`), hook event names (`PreToolUse`, `Stop`) or hook env vars (`OMCA_DISABLED_HOOKS`). The recognized exception is `omca-setup`, which reports on the hooks, the mod and the managed settings that affect OMCA. A file path in a skill forces users to learn internal layouts they cannot control, and every hook refactor then has to update skill prose.
 
 ## Testing
 
 ```bash
-just ci              # full pipeline: lint, typecheck, every validator group, mod tests, bun specs, MCP, manifest, opencode
-just test            # structural validation only (claims, hooks, mod, tree, engine), not the full suite
-just test-claims     # manifest, frontmatter, docs and policy checks
-just test-hooks      # hooks.json handler shape, SessionStart matcher and registry checks
-just test-mcp        # MCP server specs (requires ast-grep CLI) and the handshake check
-just test-bun        # every bun spec, including the validator specs
-just test-mod        # the mod tests, through claude plugin test .
-just qa              # manual QA against the mock model: session smoke, install verify, live hook probe, statusline probe, live MCP probe, worktree and route-effort checks
-just bench           # the working tree against a baseline ref, through the mock model
-just compare         # OMCA against similar plugins in Docker, through a mock model (needs docker)
-just test-opencode   # OpenCode adapter: typecheck and every opencode/ spec, run against a real OpenCode install
-just lint            # oxlint with warnings denied, configured in .oxlintrc.json
-just typecheck-ts    # both tsc projects
-just validate        # every validator group (bun scripts/validate.ts)
+just ci                          # everything CI runs: lint, typecheck, validate, test, test-mod, test-opencode
+just lint                        # oxlint with warnings denied, configured in .oxlintrc.json
+just typecheck                   # both tsc projects
+just validate                    # every validator group (bun scripts/validate.ts); the engine group needs the claude CLI
+just validate --check claims     # one validator group; the others are hooks, mod, tree, engine and mcp
+just test                        # every bun spec, including the validator specs
+just test-mod                    # the mod tests, through claude plugin test .
+just test-opencode               # OpenCode adapter: typecheck and every opencode/ spec, run against a real OpenCode install
+just qa                          # manual QA against the mock model: session smoke, install verify, live hook probe, statusline probe, live MCP probe, worktree and route-effort checks
+just bench                       # the working tree against a baseline ref, through the mock model
+just compare                     # OMCA against similar plugins in Docker, through a mock model (needs docker)
 ```
 
-Use `just ci` before claiming a change is verified; `just test` alone is a structural subset.
+Use `just ci` before claiming a change is verified; `just test` runs the bun specs and nothing else.
+
+The server specs under `servers/` need the ast-grep CLI. `just test` runs them with the other specs, and CI also runs `bun test servers` and `just validate --check mcp` as their own job.
 
 `tests/plugin-evals/` holds `claude plugin eval` cases for the health gate the planning skills
 share, `plan-stops-on-degraded-runtime` and `start-work-stops-on-degraded-runtime`. They call a

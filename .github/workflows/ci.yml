@@ -130,10 +130,10 @@ jobs:
         run: |
           {
             echo "### What this job checks ($RUNNER_OS)"
-            echo "The omca MCP server specs under servers/: the handshake, the tool list, every tool and every hook handler, plus the validator's handshake against the real server, via \`just test-mcp\`."
+            echo "The omca MCP server specs under servers/: the handshake, the tool list, every tool and every hook handler, plus the validator's handshake against the real server, via \`bun test servers\` and \`just validate --check mcp\`."
             echo ""
             echo "### If this fails"
-            echo "A server spec failed: the server did not start, misreports its tool list, or a tool or hook handler regressed. Run \`just test-mcp\` locally to see the failing spec."
+            echo "A server spec failed: the server did not start, misreports its tool list, or a tool or hook handler regressed. Run \`bun test servers\` and \`just validate --check mcp\` locally to see the failing spec."
           } >> "$GITHUB_STEP_SUMMARY"
 
   # OpenCode ships a native build for each of these runners, so its specs run on all three.
@@ -338,7 +338,7 @@ jobs:
         run: |
           {
             echo "### What this job checks ($RUNNER_OS)"
-            echo "The TypeScript hooks module and shared code on Claude Code $CLAUDE_CODE_VERSION: oxlint, both tsc projects, the mod tests, the bun spec files in parallel with a check that the run listed every spec file, then once more in a seeded random order on Linux, \`claude plugin validate\` on the manifest, and the engine checks on its output (mirrors \`just lint typecheck-ts test-mod test-bun validate-mod\`)."
+            echo "The TypeScript hooks module and shared code on Claude Code $CLAUDE_CODE_VERSION: oxlint, both tsc projects, the mod tests, the bun spec files in parallel with a check that the run listed every spec file, then once more in a seeded random order on Linux, \`claude plugin validate\` on the manifest, and the engine checks on its output (mirrors \`just lint\`, \`typecheck\`, \`test\`, \`test-mod\` and \`validate --check engine\`)."
             echo ""
             echo "### If this fails"
             echo "A lint finding, a type error, a failing test, a spec run that crashed or stopped before every spec file ran, or a manifest or hooks-module validation error. Run the matching \`just\` recipe locally with Claude Code $CLAUDE_CODE_VERSION and bun 1.4.2 to see the exact failure."
@@ -412,7 +412,7 @@ jobs:
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
 
-      # `just validate-manifest` skips itself when the claude CLI is absent, so CI
+      # `just validate --check engine` skips itself when the claude CLI is absent, so CI
       # installs the CLI to make the step enforce rather than no-op. The validator
       # reads local files only and needs no authentication.
       - name: Install Claude Code CLI
@@ -429,7 +429,7 @@ jobs:
         run: |
           {
             echo "### What this job checks"
-            echo "The plugin manifest against the platform's own schema, by running \`claude plugin validate . --strict\` directly. The \`just validate-manifest\` recipe skips itself when the CLI is absent, so this job installs the CLI and calls the validator rather than the recipe."
+            echo "The plugin manifest against the platform's own schema, by running \`claude plugin validate . --strict\` directly. The engine group of \`just validate\` runs the same check but skips itself when the CLI is absent, so this job installs the CLI and calls the validator rather than the recipe."
             echo ""
             echo "### If this fails"
             echo "A field in \`.claude-plugin/plugin.json\` or \`.claude-plugin/marketplace.json\` is malformed or unknown to the installed CLI. Run \`claude plugin validate . --strict\` locally to see the exact failure."

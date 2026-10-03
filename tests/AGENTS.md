@@ -16,7 +16,7 @@ code they cover, such as `servers/`, `src/` and `scripts/`, rather than here; mo
   one for the environment to pass and one for a fake executable that works on Windows.
 - `mod/`: the mod tests, run by `claude plugin test .`. `mod/visual/` holds the view definitions
   and the recorded captures behind `just visual <view>`.
-- `evals/`: eval task definitions for agent-quality checks, listed by `just eval-consistency`
+- `evals/`: eval task definitions for agent-quality checks, listed by `bun scripts/qa/eval-tasks.ts`
   (`scripts/qa/eval-tasks.ts`).
 - `plugin-evals/`: `claude plugin eval` cases for the planning skills' health gate. They call a
   real model, so they run by hand. `plugin-evals/README.md` has the commands.

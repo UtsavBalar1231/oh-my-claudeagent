@@ -41,7 +41,7 @@ under `servers/hooks/`. Every file is TypeScript on bun.
 - `setup-statusline.ts`: the status line setup behind `/oh-my-claudeagent:omca-setup`. It copies
   `statusline/launcher.ts` to the config directory, prints a diff of the settings file and,
   after confirmation, sets `statusLine` and `subagentStatusLine`. `--uninstall` removes them.
-- `postedit-check.ts`: runs `just typecheck-ts` after an edit to a `.ts` file and reports the
+- `postedit-check.ts`: runs `just typecheck` after an edit to a `.ts` file and reports the
   first lines of a failure as hook context. The local project settings call it from a
   `PostToolUse` entry.
 - `docs/`: the README screens. `screenshots.ts` runs real Claude Code sessions in tmux against
@@ -68,16 +68,16 @@ under `servers/hooks/`. Every file is TypeScript on bun.
   ast-grep that sleeps. It checks the handshake in the client's debug log, the progress line on
   a running tool call, that Escape cancels the call and ends the fake process, and the title
   and badge of each tool in `/mcp`. `install-verify.ts` and `statusline-probe.ts` check the
-  packaged tree itself. `worktree-bash.ts` and `route-effort.ts` back `just qa-worktree-bash`
-  and `just qa-route-effort`. `visual.ts` backs `just visual <view>` and exports the tmux
+  packaged tree itself. `worktree-bash.ts` and `route-effort.ts` are steps of
+  `just qa`. `visual.ts` backs `just visual <view>` and exports the tmux
   helpers `mcp-live.ts` and `docs/screenshots.ts` share. `lib.ts` holds the shared helpers:
   checks, scratch directories, the `claude -p` launcher and the real-config drift watch.
-  `eval-tasks.ts` backs `just eval-consistency` and lists `tests/evals/tasks/*.json`.
+  `eval-tasks.ts` lists `tests/evals/tasks/*.json`.
 
 ## Conventions
 
 - Scripts use erasable syntax and `.ts` import extensions.
-- A spec sits beside the script as `*.spec.ts` and runs under `just test-bun`.
+- A spec sits beside the script as `*.spec.ts` and runs under `just test`.
 - A spec or script that spawns a process passes `env` explicitly.
 - A script that runs on a contributor's machine uses `node:fs` and `Bun.spawn` argv, so it runs
   on Linux, macOS and Windows.
