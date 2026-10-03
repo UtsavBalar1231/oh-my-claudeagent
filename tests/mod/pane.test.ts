@@ -159,8 +159,7 @@ test("/omca opens the pane focused and closable by Esc on the Agents tab, sized 
 test("each tab key shows its tab, on the terminal and the desktop", async ($, on) => {
   world(on, FILES);
   await $.command.run(run(""));
-  const newest = `✓ final   just ci                    0  ${local("2026-10-02T11:45:00Z")}`;
-  const failed = `✗ test    just test-mod              1  ${local("2026-10-02T10:00:00Z")}`;
+  const time = (iso: string) => local(iso).slice(6);
 
   for (const surface of ["terminal", "desktop"] as const) {
     const ui = await $.ui.mount(pane(surface, { columns: 120, rows: 40, placement: "dock" }));
@@ -172,14 +171,13 @@ test("each tab key shows its tab, on the terminal and the desktop", async ($, on
     expect((await ui.find({ key: "1" }))?.props["dimColor"]).toBe(true);
 
     await ui.press({ key: "3" });
-    expect(await body()).toEqual([
-      "5 most recent entries, newest first",
-      `  type    command                 exit  when       `,
-      newest,
-      `✓ test    just test-mod              0  ${local("2026-10-02T10:20:00Z")}`,
-      failed,
-      `✓ lint    just lint                  0  ${local("2026-10-02T09:30:00Z")}`,
-      `✓ build   bun run build              0  ${local("2026-10-02T09:00:00Z")}`,
+    expect(await ui.find({ type: "Text", text: " COMPLETE " })).toBeDefined();
+    expect((await body()).filter((row) => /^[❯ ] \d\d:\d\d /.test(row))).toEqual([
+      `❯ ${time("2026-10-02T11:45:00Z")}  FINAL    ✓ 0  just ci                    ◆`,
+      `  ${time("2026-10-02T10:20:00Z")}  TEST     ✓ 0  just test-mod              ◆`,
+      `  ${time("2026-10-02T10:00:00Z")}  TEST     ✗ 1  just test-mod              ◆`,
+      `  ${time("2026-10-02T09:30:00Z")}  LINT     ✓ 0  just lint                  ◆`,
+      `  ${time("2026-10-02T09:00:00Z")}  BUILD    ✓ 0  bun run build              ◆`,
     ]);
 
     await ui.press({ key: "4" });
@@ -340,13 +338,14 @@ test("the Evidence and Notepad tabs load again after the session state is reset"
     await ui.redraw();
     return rows(await ui.drawn())[3];
   };
-  expect(await first("3")).toBe("5 most recent entries, newest first");
+  expect(await first("3")).toStartWith("FINAL VERIFICATION · sample COMPLETE");
   expect(await first("4")).toBe("Notepad for sample");
 
   atoms.reset("pane");
+  atoms.reset("ledger");
   await w.clock.advance(2000);
 
-  expect(await first("3")).toBe("5 most recent entries, newest first");
+  expect(await first("3")).toStartWith("FINAL VERIFICATION · sample COMPLETE");
   expect(await first("4")).toBe("Notepad for sample");
   await ui.unmount();
 });
@@ -453,7 +452,7 @@ test("the pane timer ends a row the agent list no longer holds and picks up new 
   expect(await ui.find({ type: "Text", text: "0 running · 1 finished" })).toBeDefined();
   expect((await ui.find({ key: "agent-a-1" }))?.text).toStartWith("○ executor · Fix the parser");
   await ui.press({ key: "3" });
-  expect(await ui.find({ type: "Text", text: "6 most recent entries, newest first" })).toBeDefined();
+  expect(await ui.find({ type: "Text", text: "1/6 · ↑↓ move" })).toBeDefined();
 
   await $.command.run(closeRun);
   const reads = w.reads.length;

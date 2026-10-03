@@ -1,0 +1,5 @@
+{
+  "command": "/omca",
+  "keys": ["3", "Down", "Down"],
+  "fixture": "evidence"
+}

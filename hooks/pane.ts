@@ -120,10 +120,9 @@ export function patchPane(host: Host, change: (pane: Pane) => Pane): Promise<voi
     change(
       pane ?? {
         tab: "agents",
-        evidence: [],
         notepad: null,
         plans: null,
-        errors: { evidence: null, notepad: null, plans: null },
+        errors: { notepad: null, plans: null },
         readAt: 0,
       },
     ),
@@ -132,22 +131,17 @@ export function patchPane(host: Host, change: (pane: Pane) => Pane): Promise<voi
 
 async function refresh(host: Host, tab?: Tab): Promise<void> {
   const root = await host.session.root();
-  if ((await host.state.pane.get()).value === undefined) {
-    evidence.reset();
-    notepad.reset();
-  }
-  const [ledger, pad] = await Promise.all([evidence.read(host, root), notepad.read(host, root)]);
+  if ((await host.state.pane.get()).value === undefined) notepad.reset();
+  const [, pad] = await Promise.all([evidence.sync(host, root), notepad.read(host, root)]);
   await plan.sync(host);
-  if (tab === undefined && ledger === undefined && pad === undefined) return;
+  if (tab === undefined && pad === undefined) return;
   const readAt = await host.clock.now();
   await patchPane(host, (pane) => ({
     ...pane,
     ...(tab === undefined ? {} : { tab }),
-    ...(ledger === undefined ? {} : { evidence: ledger.entries }),
     ...(pad === undefined ? {} : { notepad: pad.notepad }),
     errors: {
       ...pane.errors,
-      ...(ledger === undefined ? {} : { evidence: ledger.error }),
       ...(pad === undefined ? {} : { notepad: pad.error }),
     },
     readAt,
@@ -344,6 +338,7 @@ export const pane: Features = {
       if (e.requestId !== PANE || e.origin.kind !== "person") return undefined;
       const tab = (await host.state.pane.get()).value?.tab;
       if (tab === "plan") return (await plan.scroll(host, e)) ? { answer: {} } : undefined;
+      if (tab === "evidence") return evidence.scroll(host, e) ? { answer: {} } : undefined;
       if (tab !== "doctor" || !doctor.scroll(e.by, e.contentRows)) return undefined;
       host.ui.invalidate();
       return { answer: {} };

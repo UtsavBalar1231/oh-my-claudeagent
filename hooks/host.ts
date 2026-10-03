@@ -53,6 +53,7 @@ export type Host = {
     focus: Engine["ui"]["focus"];
     resolve: Engine["ui"]["resolve"];
     selection: Engine["ui"]["selection"];
+    copy: Engine["ui"]["copy"];
   };
   session: {
     id: Engine["session"]["id"];

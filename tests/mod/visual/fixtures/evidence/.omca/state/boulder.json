@@ -1,0 +1,13 @@
+{
+  "plans": {
+    "proof-ledger": {
+      "active_plan": "{{cwd}}/plans/proof-ledger.md",
+      "started_at": "2026-09-30T07:30:00Z",
+      "session_ids": ["00000000-0000-4000-8000-000000000001"],
+      "agent": "sisyphus"
+    }
+  },
+  "bindings": {
+    "00000000-0000-4000-8000-000000000001": { "plan_name": "proof-ledger", "bound_at": 1790752200 }
+  }
+}

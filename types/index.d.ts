@@ -30,14 +30,6 @@ declare module "claude-code" {
       };
       pane: {
         tab: "agents" | "plan" | "evidence" | "notepad" | "feedback" | "stats" | "doctor";
-        evidence: readonly {
-          type: "build" | "test" | "lint" | "manual" | "final_verification";
-          command: string;
-          exitCode: number;
-          at: number;
-          snippet: string;
-          verifiedBy: string | null;
-        }[];
         notepad: {
           planName: string;
           sections: readonly {
@@ -49,7 +41,21 @@ declare module "claude-code" {
           dir: string;
           files: readonly { name: string; path: string; mtimeMs: number }[];
         } | null;
-        errors: { evidence: string | null; notepad: string | null; plans: string | null };
+        errors: { notepad: string | null; plans: string | null };
+        readAt: number;
+      };
+      ledger: {
+        entries: readonly {
+          type: "build" | "test" | "lint" | "manual" | "final_verification";
+          command: string;
+          exitCode: number;
+          at: number;
+          snippet: string;
+          verifiedBy: string | null;
+          planSha: string;
+        }[];
+        plan: { name: string; sha: string } | { name: string; error: string } | null;
+        error: string | null;
         readAt: number;
       };
       status: {

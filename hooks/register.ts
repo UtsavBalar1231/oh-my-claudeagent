@@ -52,6 +52,7 @@ function bindHost($: EngineInterface, options: Options): Host {
       focus: (args) => $.ui.focus(args),
       resolve: (e) => $.ui.resolve(e),
       selection: () => $.ui.selection(),
+      copy: (args) => $.ui.copy(args),
     },
     session: {
       id: () => $.session.id(),
@@ -91,6 +92,10 @@ function bindHost($: EngineInterface, options: Options): Host {
       pane: {
         get: () => $.state.get({ plugin: "oh-my-claudeagent", key: "pane" }),
         set: (value, setOptions) => $.state.set({ plugin: "oh-my-claudeagent", key: "pane" }, value, setOptions),
+      },
+      ledger: {
+        get: () => $.state.get({ plugin: "oh-my-claudeagent", key: "ledger" }),
+        set: (value, setOptions) => $.state.set({ plugin: "oh-my-claudeagent", key: "ledger" }, value, setOptions),
       },
       status: {
         get: () => $.state.get({ plugin: "oh-my-claudeagent", key: "status" }),

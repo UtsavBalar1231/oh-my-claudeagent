@@ -1,0 +1,50 @@
+                                                                                                             │1: Agents  2: Plan  3: Evidence  4: Notepad  5: Feedback  6: Stats  7: Doctor            ✕
+ ▐▛███▛█   Claude Code v2.1.288                                                                              │───────────────────────────────────────────────────────────────────────────────────────
+▝▜██████▀  Opus 5.5 · API Usage Billing                                                                      │╭─────────────────────────────────────────────────────────────────────────────────────╮
+ ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/.cache/tmp/omca-visual-200x50-8YFnrN/cwd                          ││ FINAL VERIFICATION · proof-ledger                                                   │
+                                                                                                             ││  COMPLETE  matches the plan as it is now · 10-02 13:35 · ◆ sisyphus                 │
+                                                                                                             ││ ●✗●●●✗●●✗●✗●●●●● last 16  build 2  test 6 ✗1  lint 4 ✗2  manual 2  final 2 ✗1       │
+                                                                                                             │╰─────────────────────────────────────────────────────────────────────────────────────╯
+                                                                                                             │── Fri 2026-10-02 ── ████████ 4/4 ────────────  ╭─────────────────────────────────────╮
+                                                                                                             │  13:35  FINAL    ✓ 0  just ci &&…l evidence ◆  │ MANUAL · exit 0                     │
+                                                                                                             │  13:00  TEST     ✓ 0  just test-mod         ◆  │ curl -fsS -H 'Authorization: Beare… │
+                                                                                                             │❯ 12:40  MANUAL   ✓ 0  curl -fsS …st/healthz ◆  │ HTTP/2 200                          │
+                                                                                                             │  12:10  TEST     ✓ 0  bun test s…ne scripts ◆  │ x-request-id: 7f3c9a                │
+                                                                                                             │── Thu 2026-10-01 ── ████▋███ 4/7 ────────────  │ {"status":"ok","build":"2026.10.02… │
+                                                                                                             │  18:45  TEST     ✓ 0  just valid…eck engine ◆  │ rerun with DEPLOY_TOKEN=‹masked› t… │
+                                                                                                             │  17:00  FINAL    ✗ 1  just ci &&…l evidence ◆  │ 2026-10-02 12:40:00 · ◆ sisyphus    │
+                                                                                                             │  15:32  LINT     ✓ 0  just typecheck        ◆  │ ‹masked› 2 masked                   │
+                                                                                                             │  15:15  LINT     ✗ 1  just typecheck        ◆  ╰─────────────────────────────────────╯
+                                                                                                             │  14:30  BUILD    ✓ 0  bun run build         ◆
+                                                                                                             │  13:50  TEST     ✓ 0  just test-mod         ◆
+                                                                                                             │  13:25  TEST     ✗ 1  just test-mod         ◆
+                                                                                                             │── Wed 2026-09-30 ── ██████▍█ 4/5 ────────────
+                                                                                                             │  16:10  MANUAL   ✓ 0  just visua…lan-reader ◆
+                                                                                                             │  14:35  TEST     ✓ 0  bun test src/core     ◆
+                                                                                                             │  14:01  LINT     ✓ 0  just lint             ◆
+                                                                                                             │  13:55  LINT     ✗ 1  just lint             ◆
+                                                                                                             │  13:40  BUILD    ✓ 0  bun run build         ◆
+                                                                                                             │
+                                                                                                             │
+                                                                                                             │
+                                                                                                             │
+                                                                                                             │
+                                                                                                             │
+                                                                                                             │
+                                                                                                             │
+                                                                                                             │
+                                                                                                             │
+                                                                                                             │
+                                                                                                             │
+                                                                                                             │
+                                                                                                             │
+                                                                                                             │
+                                                                                                             │
+                                                                                                             │
+                                                                                                             │b: Build  e: Test  l: Lint  m: Manual  v: Final  x: Fails  c: Copy  r: Rerun  f: Find
+proof-ledger 6/6 tasks · no verification yet                                                              [-]│3/16 · ↑↓ move
+                                                                                         ◐ medium · /effort  │
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── oh-my-claudeagent:sisyphus ─
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏸ manual mode on · ? for shortcuts · ← for agents
