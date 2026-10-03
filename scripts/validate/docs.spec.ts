@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { join } from "node:path";
 import { checks } from "./docs.ts";
 import { run } from "./core.ts";
 import { cleanup, fixture, runNamed } from "./fixture.ts";
@@ -123,7 +124,7 @@ describe("docs accuracy", () => {
 
   test("a tree without a justfile fails", async () => {
     const ctx = fixture({ justfile: null });
-    expect(await runNamed(checks, "docs accuracy", ctx)).toEqual({ status: "fail", detail: `justfile missing at ${ctx.root}/justfile` });
+    expect(await runNamed(checks, "docs accuracy", ctx)).toEqual({ status: "fail", detail: `justfile missing at ${join(ctx.root, "justfile")}` });
   });
 });
 

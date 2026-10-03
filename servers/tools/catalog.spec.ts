@@ -30,8 +30,12 @@ type Report = {
 const running: Array<Bun.Subprocess<"pipe", "pipe", "pipe">> = [];
 const temps: string[] = [];
 
-afterEach(() => {
-  for (const proc of running.splice(0)) proc.kill("SIGKILL");
+// A killed process keeps its working directory open on Windows until it has exited, so the directory is removed only after the exit.
+afterEach(async () => {
+  for (const proc of running.splice(0)) {
+    proc.kill("SIGKILL");
+    await proc.exited;
+  }
   for (const path of temps.splice(0)) rmSync(path, { recursive: true, force: true });
 });
 

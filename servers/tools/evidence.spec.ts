@@ -5,6 +5,9 @@ import { join } from "node:path";
 import { COMMAND_MAX_CHARS, KEEP_ENTRIES, rotateLedger, SNIPPET_MAX_CHARS, tools, VERIFIED_BY_MAX_CHARS } from "./evidence.ts";
 
 const SERVER = join(import.meta.dir, "..", "omca.ts");
+// Eight processes append 160 entries one at a time under the ledger lock, about 30 ms an entry on a Windows
+// runner, which outlasts the 5 s default and leaves the workers writing into a directory being removed.
+const CONCURRENT_TIMEOUT_MS = 60_000;
 const MODULE = join(import.meta.dir, "evidence.ts");
 const PLAN_SHA = "deadbeef".repeat(8);
 const ISO_SECONDS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
@@ -12,8 +15,12 @@ const ISO_SECONDS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
 const roots: string[] = [];
 const servers: Bun.Subprocess[] = [];
 
-afterEach(() => {
-  for (const server of servers.splice(0)) server.kill("SIGKILL");
+// A killed process keeps its working directory open on Windows until it has exited, so the directory is removed only after the exit.
+afterEach(async () => {
+  for (const server of servers.splice(0)) {
+    server.kill("SIGKILL");
+    await server.exited;
+  }
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
@@ -235,7 +242,7 @@ describe("evidence_log", () => {
     const expected = workers.flatMap((_, w) => Array.from({ length: perProcess }, (_, i) => `w${w}-${i}`));
     expect(entries(root).map((e: { command: string }) => e.command).sort()).toEqual(expected.sort());
     expect(readdirSync(join(root, ".omca", "evidence"))).toEqual(["verification-evidence.json"]);
-  });
+  }, CONCURRENT_TIMEOUT_MS);
 });
 
 describe("evidence_read", () => {

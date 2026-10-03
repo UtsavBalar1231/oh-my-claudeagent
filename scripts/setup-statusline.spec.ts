@@ -256,7 +256,7 @@ describe("install", () => {
 
     const { stderr, exitCode } = run("--yes");
     expect(exitCode).toBe(1);
-    expect(stderr).toBe(`omca setup: EISDIR: illegal operation on a directory, open '${settings}.omca-bak'\n`);
+    expect(stderr).toMatch(/^omca setup: EISDIR: illegal operation on a directory, (?:open '.*settings\.json\.omca-bak'|write)\n$/);
     expect(readFileSync(settings, "utf8")).toBe(before);
   });
 });

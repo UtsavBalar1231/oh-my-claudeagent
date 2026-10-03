@@ -44,7 +44,7 @@ function seed(base: string, files: Record<string, string>): void {
   }
 }
 
-const filesUnder = (base: string): string[] => [...new Bun.Glob("**/*").scanSync({ cwd: base, dot: true, onlyFiles: true })].sort();
+const filesUnder = (base: string): string[] => [...new Bun.Glob("**/*").scanSync({ cwd: base, dot: true, onlyFiles: true })].map((path) => path.replaceAll("\\", "/")).sort();
 
 beforeEach(() => {
   const scratch = mkdtempSync(join(tmpdir(), "omca-package-spec-"));

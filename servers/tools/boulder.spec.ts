@@ -15,8 +15,12 @@ const ISO_SECONDS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
 const roots: string[] = [];
 const servers: Bun.Subprocess[] = [];
 
-afterEach(() => {
-  for (const server of servers.splice(0)) server.kill("SIGKILL");
+// A killed process keeps its working directory open on Windows until it has exited, so the directory is removed only after the exit.
+afterEach(async () => {
+  for (const server of servers.splice(0)) {
+    server.kill("SIGKILL");
+    await server.exited;
+  }
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 

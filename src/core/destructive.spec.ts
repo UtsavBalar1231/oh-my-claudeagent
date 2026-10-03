@@ -805,19 +805,30 @@ describe("the command position", () => {
 });
 
 describe("the recursive flag group stays linear", () => {
-  test("a long run of one flag letter classifies in under 50 ms", () => {
-    const start = (command: string) => {
-      const times = [0, 1, 2].map(() => {
+  const fastest = (command: string): number =>
+    Math.min(
+      ...[0, 1, 2].map(() => {
         const at = performance.now();
         classify(command);
         return performance.now() - at;
-      });
-      return Math.min(...times);
-    };
-    expect(start(`rm -${"r".repeat(60_000)};`)).toBeLessThan(50);
-    expect(start(`sudo ${"-E ".repeat(20_000)}ls`)).toBeLessThan(50);
-    expect(start(`; ${"then ".repeat(20_000)}ls`)).toBeLessThan(50);
-  });
+      }),
+    );
+
+  // 100k letters take the linear scan a few milliseconds and a quadratic one several seconds on this
+  // laptop, so a bound of a second holds on any runner and still fails the quadratic scan.
+  test("a long run of one flag letter classifies in under a second", () => {
+    expect(fastest(`rm -${"r".repeat(100_000)};`)).toBeLessThan(1_000);
+  }, 60_000);
+
+  // A repeated flag or keyword costs about 2 µs a repetition, which a slow runner triples, so the
+  // bound is a ratio measured in the same run: four times the input takes about four times as long
+  // when the scan is linear and sixteen times as long when it is quadratic.
+  test.each([
+    ["sudo flags", (count: number) => `sudo ${"-E ".repeat(count)}ls`],
+    ["leading keywords", (count: number) => `; ${"then ".repeat(count)}ls`],
+  ])("%s: four times the input takes under ten times as long", (_, command) => {
+    expect(fastest(command(80_000)) / fastest(command(20_000))).toBeLessThan(10);
+  }, 60_000);
 
   test("a flag group that holds r is still recursive, in any position and case", () => {
     catastrophic("rm -r /");

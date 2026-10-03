@@ -55,9 +55,11 @@ type Server = {
 const running: Server[] = [];
 const scratch: string[] = [];
 
-afterEach(() => {
+// A killed process keeps its working directory open on Windows until it has exited, so the directory is removed only after the exit.
+afterEach(async () => {
   for (const server of running.splice(0)) {
     server.proc.kill("SIGKILL");
+    await server.proc.exited;
     rmSync(server.project, { recursive: true, force: true });
   }
   for (const dir of scratch.splice(0)) rmSync(dir, { recursive: true, force: true });

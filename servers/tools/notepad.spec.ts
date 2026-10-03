@@ -322,6 +322,7 @@ describe("through the server", () => {
       await run(request);
     } finally {
       proc.kill("SIGKILL");
+      await proc.exited;
     }
   }
 
