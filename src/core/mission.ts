@@ -1,44 +1,6 @@
 import { inputText } from "./tool-input.ts";
-import { arrange, displayWidth, fitEnd, formatDuration, formatTokens, type Glyphs, oneLine, padEnd, shortType } from "./ui-kit.ts";
-import { agentKey, chip, levelMark, ON_SURFACE, type Piece, piecesWidth, redact, type ThemeKey, TONE_KEYS, type WidthTier } from "./visual.ts";
-
-export type ToolKind = "read" | "edit" | "bash" | "mcp" | "agent" | "other";
-
-// The semantic keys a tool kind might borrow (`ide`, `bashBorder`, `permission`) draw one color
-// under custom themes such as Wallpaper, so kinds take the rainbow scale, the one set of keys
-// every theme keeps apart; the glyph tells them apart without color.
-const TOOL_KINDS: Readonly<Record<ToolKind, { key: ThemeKey; glyph: string; ascii: string }>> = {
-  read: { key: "rainbow_blue", glyph: "○", ascii: "r" },
-  edit: { key: "rainbow_violet", glyph: "✎", ascii: "e" },
-  bash: { key: "rainbow_orange", glyph: "$", ascii: "$" },
-  mcp: { key: "rainbow_indigo", glyph: "◇", ascii: "m" },
-  agent: { key: "rainbow_green", glyph: "◆", ascii: "@" },
-  other: { key: "inactive", glyph: "·", ascii: "." },
-};
-
-const KIND_ORDER: readonly ToolKind[] = ["read", "edit", "bash", "mcp", "agent"];
-
-const KIND_OF: Readonly<Record<string, ToolKind>> = {
-  Read: "read",
-  Grep: "read",
-  Glob: "read",
-  LSP: "read",
-  WebFetch: "read",
-  WebSearch: "read",
-  Edit: "edit",
-  Write: "edit",
-  NotebookEdit: "edit",
-  Bash: "bash",
-  PowerShell: "bash",
-  Monitor: "bash",
-  Agent: "agent",
-  SendMessage: "agent",
-};
-
-export function toolKind(name: string): ToolKind {
-  if (name.startsWith("mcp__")) return "mcp";
-  return Object.hasOwn(KIND_OF, name) ? (KIND_OF[name] ?? "other") : "other";
-}
+import { agentGlyph, COLUMN_GAP, displayWidth, fitEnd, formatDuration, formatTokens, type Glyphs, oneLine, padEnd, padStart, shortType } from "./ui-kit.ts";
+import { agentKey, levelMark, ON_SURFACE, type Piece, piecesWidth, redact, type ThemeKey, TONE_KEYS } from "./visual.ts";
 
 /** `mcp__server__tool` as its tool's own name; every other tool as named. */
 export const toolLabel = (name: string): string => (name.startsWith("mcp__") ? name.slice(name.lastIndexOf("__") + 2) : name);
@@ -86,23 +48,27 @@ export type Lane = {
   outputTokens: number;
   status: Status;
   prompt: string;
-  tools: readonly string[];
   calls: number;
   tool: { name: string; detail: string } | null;
   output: string;
   result: string;
 };
 
-export type LaneLook = { width: number; tier: WidthTier; g: Glyphs; ascii: boolean; now: number };
+/** The model and effort columns' widths, the same on every lane; 0 leaves a column out. */
+export type LaneColumns = { model: number; effort: number };
+
+export type LaneLook = { width: number; g: Glyphs; ascii: boolean; now: number; columns: LaneColumns };
 
 const shortModel = (model: string): string => model.replace(/^claude-/, "").replace(/-\d{8}$/, "");
 
-const SPINNER = { unicode: ["◐", "◓", "◑", "◒"], ascii: ["|", "/", "-", "\\"] } as const;
-const STRIP: Readonly<Record<WidthTier, number>> = { page: 8, inline: 12, split: 24 };
-// The task keeps this many cells, separator included, before the model chip gives way.
+// Claude Code's own working marks, so a lane reads as busy the way the main thread does.
+const SPINNER = { unicode: ["·", "✢", "✳", "✶", "✻", "✽"], ascii: ["|", "/", "-", "\\"] } as const;
+// The task keeps this many cells, separator included, before the model column gives way.
 const MIN_TASK = 20;
 const ELAPSED = 6;
-// The spinner, its space and the tool's name keep this many cells before the strip takes any.
+const MODEL_CELLS = 12;
+const EFFORT_CELLS = 6;
+// The spinner, its space and the tool's name keep this many cells before the call count takes any.
 const TOOL_CELLS = 14;
 
 /** One frame per second of `now`, so a lane turns only while the pane's clock ticks. */
@@ -111,67 +77,70 @@ export function spinner(now: number, ascii: boolean): string {
   return frames[Math.floor(now / 1000) % frames.length] ?? "";
 }
 
+const effortText = (lane: Lane): string => (lane.effort === null ? "" : String(lane.effort));
 
-/** The last `room` calls, oldest first, one glyph each in its kind's color. */
-export function strip(tools: readonly string[], room: number, ascii: boolean): Piece[] {
-  const shown = room <= 0 ? [] : tools.slice(-room);
-  const pieces: Piece[] = [];
-  for (const name of shown) {
-    const kind = TOOL_KINDS[toolKind(name)];
-    const glyph = ascii ? kind.ascii : kind.glyph;
-    const last = pieces.at(-1);
-    if (last !== undefined && last.color === kind.key) pieces[pieces.length - 1] = { ...last, text: `${last.text}${glyph}` };
-    else pieces.push({ text: glyph, color: kind.key });
-  }
-  return pieces;
+/**
+ * The model and effort columns every running lane draws at one width, so they line up: the model
+ * goes first and the effort next while the longest name and the shortest task do not fit.
+ */
+export function laneColumns(lanes: readonly Lane[], width: number): LaneColumns {
+  const running = lanes.filter((lane) => lane.endedAt === null);
+  const identity = Math.max(0, ...running.map((lane) => 2 + displayWidth(shortType(lane.type))));
+  const model = Math.min(MODEL_CELLS, Math.max(0, ...running.map((lane) => displayWidth(shortModel(lane.model)))));
+  const effort = Math.min(EFFORT_CELLS, Math.max(0, ...running.map((lane) => displayWidth(effortText(lane)))));
+  const fixed = identity + MIN_TASK + COLUMN_GAP + ELAPSED;
+  const effortCells = effort === 0 ? 0 : COLUMN_GAP + effort;
+  const modelCells = model === 0 ? 0 : COLUMN_GAP + model;
+  if (fixed + effortCells + modelCells <= width) return { model, effort };
+  if (fixed + effortCells <= width) return { model: 0, effort };
+  return { model: 0, effort: 0 };
 }
 
-type Side = { priority: number; min: number; pieces: Piece[] };
+const gap = (): Piece => ({ text: " ".repeat(COLUMN_GAP) });
 
 function headRow(lane: Lane, look: LaneLook): Piece[] {
-  const { g, ascii, now, width } = look;
-  const key = agentKey(lane.type);
-  const name = shortType(lane.type);
+  const { g, now, width, columns } = look;
   const identity: Piece[] = [
-    { text: `${g.agent} `, color: key },
-    { text: name, color: key, bold: true },
+    { text: `${agentGlyph(lane.type, g)} `, color: agentKey(lane.type) },
+    { text: shortType(lane.type), color: ON_SURFACE, bold: true },
   ];
-  const side = (priority: number, pieces: Piece[]): Side => ({ priority, min: piecesWidth(pieces), pieces });
-  const sides: Side[] = [
-    { priority: 0, min: piecesWidth(identity) + MIN_TASK, pieces: [] },
-    side(4, [chip(shortModel(lane.model), "info", ascii)]),
-    ...(lane.effort === null ? [] : [side(3, [chip(String(lane.effort), "muted", ascii)])]),
-    side(2, [{ text: formatTokens(lane.inputTokens + lane.outputTokens), color: TONE_KEYS.muted }]),
-    side(1, [{ text: formatDuration(now - lane.startedAt).padStart(ELAPSED), color: TONE_KEYS.muted }]),
+  const column = (cells: number, text: string): Piece[] =>
+    cells === 0 ? [] : [gap(), { text: padEnd(fitEnd(text, cells, g.ellipsis), cells), color: TONE_KEYS.muted }];
+  const right: Piece[] = [
+    ...column(columns.model, shortModel(lane.model)),
+    ...column(columns.effort, effortText(lane)),
+    gap(),
+    { text: padStart(formatDuration(now - lane.startedAt), ELAPSED), color: TONE_KEYS.muted },
   ];
-  const kept = arrange(sides, width, 1);
-  const right = kept.filter((side) => side.priority !== 0).flatMap((side) => [{ text: " " }, ...side.pieces]);
-  const room = width - piecesWidth(identity) - piecesWidth(right);
+  const room = Math.max(0, width - piecesWidth(identity) - piecesWidth(right));
   const task = lane.description === "" ? "" : fitEnd(` ${g.dot} ${oneLine(lane.description)}`, room, g.ellipsis);
   return [...identity, { text: padEnd(task, room) }, ...right];
 }
 
+const callCount = (calls: number): string => `${calls} call${calls === 1 ? "" : "s"}`;
+
 function toolRow(lane: Lane, look: LaneLook, home: string, mask: string): Piece[] {
-  const { width, tier, ascii, now, g } = look;
-  const lead: Piece[] = [{ text: "  " }];
-  const marks = strip(lane.tools, Math.min(STRIP[tier], Math.max(0, width - 2 - TOOL_CELLS)), ascii);
-  const spin: Piece = { text: spinner(now, ascii), color: TONE_KEYS.active };
-  const pieces: Piece[] = [...lead, ...marks, ...(marks.length > 0 ? [{ text: " " }] : []), spin, { text: " " }];
+  const { width, ascii, now, g } = look;
+  const count = lane.calls === 0 ? "" : callCount(lane.calls);
+  const marks: Piece[] = count === "" || width < TOOL_CELLS + COLUMN_GAP + displayWidth(count) ? [] : [{ text: count, color: TONE_KEYS.muted }];
+  const tail = marks.length === 0 ? 0 : COLUMN_GAP + piecesWidth(marks);
+  const pieces: Piece[] = [{ text: "  " }, { text: spinner(now, ascii), color: TONE_KEYS.active }, { text: " " }];
   if (lane.tool === null) {
     pieces.push({ text: lane.calls === 0 ? "starting" : "thinking", color: TONE_KEYS.muted });
-    return pieces;
+  } else {
+    const label = fitEnd(toolLabel(lane.tool.name), Math.max(0, width - tail - piecesWidth(pieces)), g.ellipsis);
+    pieces.push({ text: label, color: ON_SURFACE, bold: true });
+    const detail = redactLine(lane.tool.detail, home, mask);
+    const room = width - tail - piecesWidth(pieces) - 1;
+    if (detail !== "" && room > 0) pieces.push({ text: ` ${fitEnd(detail, room, g.ellipsis)}` });
   }
-  const label = fitEnd(toolLabel(lane.tool.name), Math.max(0, width - piecesWidth(pieces)), g.ellipsis);
-  pieces.push({ text: label, color: ON_SURFACE, bold: true });
-  const detail = redactLine(lane.tool.detail, home, mask);
-  const room = width - piecesWidth(pieces) - 1;
-  if (detail !== "" && room > 0) pieces.push({ text: ` ${fitEnd(detail, room, g.ellipsis)}` });
-  return pieces;
+  if (marks.length === 0) return pieces;
+  return [...pieces, { text: " ".repeat(Math.max(0, width - tail - piecesWidth(pieces)) + COLUMN_GAP) }, ...marks];
 }
 
 const redactLine = (text: string, home: string, mask: string): string => redact(text, home, mask).text;
 
-/** A running agent's lane: identity, task and the facts on the right; its tool strip below. */
+/** A running agent's lane: identity, task and the facts on the right; the current tool below, its call count at the right edge. */
 export function laneRows(lane: Lane, look: LaneLook, home: string): Piece[][] {
   return [headRow(lane, look), toolRow(lane, look, home, look.g.mask)];
 }
@@ -207,43 +176,24 @@ export function finishedRow(lane: Lane, look: LaneLook, home: string): Piece[] {
   const word = lane.status === "running" ? "" : STATUS_WORDS[lane.status];
   const result = redactLine(lane.result, home, g.mask);
   const said = lane.status === "answer" && result !== "" ? result : result === "" ? word : `${word} ${g.dot} ${result}`;
-  const duration = formatDuration((lane.endedAt ?? look.now) - lane.startedAt).padStart(ELAPSED);
+  const duration = padStart(formatDuration((lane.endedAt ?? look.now) - lane.startedAt), ELAPSED);
   const head = `${mark.glyph} ${shortType(lane.type)}`;
-  const room = width - displayWidth(head) - 1 - ELAPSED;
-  const body = fitEnd(` ${g.dot} ${said}`, Math.max(0, room), g.ellipsis);
+  const room = Math.max(0, width - displayWidth(head) - COLUMN_GAP - ELAPSED);
+  const body = fitEnd(` ${g.dot} ${said}`, room, g.ellipsis);
   return [
     { text: `${mark.glyph} `, color: mark.color },
-    { text: `${shortType(lane.type)}${padEnd(body, Math.max(0, room))}`, color: TONE_KEYS.muted },
-    { text: ` ${duration}`, color: TONE_KEYS.muted },
+    { text: `${shortType(lane.type)}${padEnd(body, room)}`, color: TONE_KEYS.muted },
+    { text: `${" ".repeat(COLUMN_GAP)}${duration}`, color: TONE_KEYS.muted },
   ];
 }
 
-/** The tab's first row: how many run and finished, and the tokens they spent. */
-export function summaryRow(lanes: readonly Lane[], look: LaneLook): Piece[] {
-  const { g, width } = look;
+/** How many agents run and finished and the tokens they spent, as many parts as fit `width`. */
+export function summaryText(lanes: readonly Lane[], g: Glyphs, width: number): string {
   const running = lanes.filter((lane) => lane.endedAt === null).length;
   const tokens = lanes.reduce((sum, lane) => sum + lane.inputTokens + lane.outputTokens, 0);
-  const pieces: Piece[] = [
-    { text: `${g.agent} `, color: running > 0 ? TONE_KEYS.active : TONE_KEYS.muted },
-    { text: `${running} running`, ...(running > 0 ? { color: ON_SURFACE, bold: true as const } : { color: TONE_KEYS.muted }) },
-    { text: ` ${g.dot} ${lanes.length - running} finished ${g.dot} ${formatTokens(tokens)} tokens`, color: TONE_KEYS.muted },
-  ];
-  return piecesWidth(pieces) <= width ? pieces : pieces.slice(0, 2);
-}
-
-/** The strip's key: each kind's glyph in its color and its name, as far as `width` allows. */
-export function legend(width: number, ascii: boolean): Piece[] {
-  const pieces: Piece[] = [];
-  let used = 0;
-  for (const kind of KIND_ORDER) {
-    const { key, glyph, ascii: plain } = TOOL_KINDS[kind];
-    const mark = ascii ? plain : glyph;
-    const cells = (pieces.length === 0 ? 0 : 1) + displayWidth(mark) + 1 + displayWidth(kind);
-    if (used + cells > width) break;
-    pieces.push(...(pieces.length === 0 ? [] : [{ text: " " }]), { text: mark, color: key }, { text: ` ${kind}`, color: TONE_KEYS.muted });
-    used += cells;
-  }
-  return pieces;
+  const parts = [`${running} running`, `${lanes.length - running} finished`, `${formatTokens(tokens)} tokens`];
+  while (parts.length > 1 && displayWidth(parts.join(` ${g.dot} `)) > width) parts.pop();
+  return fitEnd(parts.join(` ${g.dot} `), width, g.ellipsis);
 }
 
 /** Running lanes first, oldest first so a lane keeps its place; then the finished, newest first. */

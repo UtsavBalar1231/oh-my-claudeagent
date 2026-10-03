@@ -47,7 +47,7 @@ async function load(host: Host, path: string): Promise<unknown[]> {
 
 async function selectedNote(host: Host): Promise<string> {
   const words = ((await host.ui.selection())?.text ?? "").trim().replace(/\s+/g, " ");
-  const { ellipsis } = glyphs((await sessionOf(host)).isAscii);
+  const { ellipsis } = glyphs((await sessionOf(host)).glyphTier);
   const letters = [...words];
   return letters.length > SELECTED_NOTE_LIMIT ? `${letters.slice(0, SELECTED_NOTE_LIMIT - [...ellipsis].length).join("")}${ellipsis}` : words;
 }

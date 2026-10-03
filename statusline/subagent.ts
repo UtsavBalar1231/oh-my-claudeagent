@@ -5,19 +5,20 @@ import { formatTokens, shortType } from "../src/core/ui-kit.ts";
 import {
   agentGlyph,
   arrange,
-  ASCII_GLYPHS,
   block,
   BOLD,
-  detectNerdFont,
   DIM,
   fixed,
+  type Glyphs,
   GREEN,
-  NERD_GLYPHS,
   RED,
   RST,
+  separator,
+  statusGlyphs,
   terminalColumns,
   YELLOW,
 } from "./render.ts";
+import type { GlyphTier } from "../src/core/ui-kit.ts";
 
 interface Task {
   id?: string;
@@ -68,10 +69,9 @@ function effortLabel(effort: Task["effort"]): string {
   return typeof effort === "string" ? effort.trim() : "";
 }
 
-function row(task: Task, nerd: boolean, columns: number): string {
-  const g = nerd ? NERD_GLYPHS : ASCII_GLYPHS;
+function row(task: Task, { tier, g }: { tier: GlyphTier; g: Glyphs }, columns: number): string {
   const name = task.name ? shortType(task.name) : task.label || task.type || "agent";
-  const parts = [`${BOLD}${agentGlyph(name, nerd)} ${name}${RST}`];
+  const parts = [`${BOLD}${agentGlyph(name, tier)} ${name}${RST}`];
 
   const model = friendlyModel(task.model || frontmatterModel(task.name ?? ""));
   if (model) parts.push(`${DIM}${g.model} ${model}${RST}`);
@@ -90,7 +90,7 @@ function row(task: Task, nerd: boolean, columns: number): string {
         : `${DIM}${formatTokens(tokens)} tok${RST}`,
     );
   }
-  return arrange(parts.map(block), columns, 1).join("");
+  return arrange(parts.map(block), columns, 1, separator(g.dot)).join("");
 }
 
 try {
@@ -103,8 +103,8 @@ try {
   }
   const data: { tasks?: unknown; columns?: unknown } | null = JSON.parse(raw);
   const columns = typeof data?.columns === "number" && data.columns > 0 ? data.columns : terminalColumns(process.env);
-  const nerd = detectNerdFont(process.env);
+  const look = statusGlyphs(process.env);
   const tasks: (Task | null)[] = Array.isArray(data?.tasks) ? data.tasks : [];
-  const rows = tasks.flatMap((task) => (task?.id ? [`${JSON.stringify({ id: task.id, content: row(task, nerd, columns) })}\n`] : []));
+  const rows = tasks.flatMap((task) => (task?.id ? [`${JSON.stringify({ id: task.id, content: row(task, look, columns) })}\n`] : []));
   process.stdout.write(rows.join(""));
 } catch {}

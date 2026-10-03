@@ -18,7 +18,7 @@
                                                                │
 ✻ Worked for 0s · done HH:MM                                   │
                                                                │
-● oh-my-claudeagent: 0s · 1 in 1 out · ! no evidence:          │
+● oh-my-claudeagent: 0s · 1 in 1 out ·  no evidence:          │
   just test                                                    │
                                                                │
 ❯ /omca-rate up good                                           │

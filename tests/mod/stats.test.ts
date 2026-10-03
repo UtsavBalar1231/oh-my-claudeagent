@@ -94,7 +94,7 @@ async function statsTab($: Engine, size: Size = DOCK_200): Promise<RenderElement
   return tree;
 }
 
-test("the agents card draws each agent in its roster color with a bar of its runs, and evidence and outcomes with their glyphs in tone", async ($, on) => {
+test("the agents card draws each agent's glyph in its roster color with the name in text, a bar of its runs, and evidence and outcomes with their glyphs in tone", async ($, on) => {
   world(on, FILES);
   const agents = nodeByKey(await statsTab($), "stats-agents");
   const gap = lit({}, "  ");
@@ -105,7 +105,7 @@ test("the agents card draws each agent in its roster color with a bar of its run
     row(
       "stats-oh-my-claudeagent:executor",
       lit({ color: GREEN }, "◆ "),
-      lit({ color: GREEN }, "executor"),
+      lit({}, "executor"),
       gap,
       lit({ color: GREEN }, "██████████"),
       gap,
@@ -120,17 +120,17 @@ test("the agents card draws each agent in its roster color with a bar of its run
       lit({ color: "success" }, "  ✓"),
       lit({}, " 100%"),
       gap,
-      lit({ color: "success" }, "✓"),
-      lit({}, "2  "),
-      lit({ color: "inactive" }, "✗"),
-      lit({ color: "inactive" }, "0  "),
-      lit({ color: "inactive" }, "!"),
-      lit({ color: "inactive" }, "0  "),
+      lit({ color: "success" }, "✓ "),
+      lit({}, "2 "),
+      lit({ color: "inactive" }, "✗ "),
+      lit({ color: "inactive" }, "0 "),
+      lit({ color: "inactive" }, "! "),
+      lit({ color: "inactive" }, "0 "),
     ),
     row(
       "stats-oh-my-claudeagent:explore",
       lit({ color: BLUE }, "◆ "),
-      lit({ color: BLUE }, "explore "),
+      lit({}, "explore "),
       gap,
       lit({ color: BLUE }, "█████"),
       lit({ color: "subtle" }, "█████"),
@@ -146,17 +146,17 @@ test("the agents card draws each agent in its roster color with a bar of its run
       lit({ color: "error" }, "    ✗"),
       lit({}, " 0%"),
       gap,
-      lit({ color: "success" }, "✓"),
-      lit({}, "1  "),
-      lit({ color: "inactive" }, "✗"),
-      lit({ color: "inactive" }, "0  "),
-      lit({ color: "inactive" }, "!"),
-      lit({ color: "inactive" }, "0  "),
+      lit({ color: "success" }, "✓ "),
+      lit({}, "1 "),
+      lit({ color: "inactive" }, "✗ "),
+      lit({ color: "inactive" }, "0 "),
+      lit({ color: "inactive" }, "! "),
+      lit({ color: "inactive" }, "0 "),
     ),
     row(
       "stats-oh-my-claudeagent:oracle",
       lit({ color: PURPLE }, "◆ "),
-      lit({ color: PURPLE }, "oracle  "),
+      lit({}, "oracle  "),
       gap,
       lit({ color: PURPLE }, "█████"),
       lit({ color: "subtle" }, "█████"),
@@ -172,12 +172,12 @@ test("the agents card draws each agent in its roster color with a bar of its run
       lit({ color: "success" }, "  ✓"),
       lit({}, " 100%"),
       gap,
-      lit({ color: "inactive" }, "✓"),
-      lit({ color: "inactive" }, "0  "),
-      lit({ color: "error" }, "✗"),
-      lit({}, "1  "),
-      lit({ color: "inactive" }, "!"),
-      lit({ color: "inactive" }, "0  "),
+      lit({ color: "inactive" }, "✓ "),
+      lit({ color: "inactive" }, "0 "),
+      lit({ color: "error" }, "✗ "),
+      lit({}, "1 "),
+      lit({ color: "inactive" }, "! "),
+      lit({ color: "inactive" }, "0 "),
     ),
   ]);
 });
@@ -233,9 +233,9 @@ test("at the split tier the tokens and cost cards sit side by side at half the b
   world(on, FILES);
   const split: Size = { columns: 200, rows: 50, placement: "inline" };
   const lower = nodeByKey(await statsTab($, split), "stats-lower");
-  const half = Math.floor((bodyColumns(split) - 3 - 1) / 2);
+  const half = Math.floor((bodyColumns(split) - 3 - 2) / 2);
 
-  expect(lower?.props).toEqual({ key: "stats-lower", flexDirection: "row", columnGap: 1, width: half * 2 + 1 });
+  expect(lower?.props).toEqual({ key: "stats-lower", flexDirection: "row", columnGap: 2, width: half * 2 + 2 });
   expect(childrenOf(lower ?? { type: "" }).map((child) => (isNode(child) ? [child.props?.["key"], child.props?.["width"]] : []))).toEqual([
     ["stats-tokens", half],
     ["stats-cost", half],
@@ -302,9 +302,9 @@ test("the Stats tab aggregates two sessions by agent type with exact rows, on th
       summary,
       "Agents · 3 types",
       "  agent                 runs  median  tokens  est. cost  evidence  outcomes    ",
-      `◆ executor  ${"█".repeat(10)}     3   1m30s    1.0M      $2.86     ! 67%  ✓2  ✗1  !0  `,
-      `◆ explore   ${"█".repeat(10)}     3     15s   12.0k     $0.01+      ✗ 0%  ✓1  ✗0  !1  `,
-      `◆ oracle    ${"█".repeat(10)}     1   6m40s    129k        n/a    ✓ 100%  ✓1  ✗0  !0  `,
+      `◆ executor  ${"█".repeat(10)}     3   1m30s    1.0M      $2.86     ! 67%  ✓ 2 ✗ 1 ! 0 `,
+      `◆ explore   ${"█".repeat(10)}     3     15s   12.0k     $0.01+      ✗ 0%  ✓ 1 ✗ 0 ! 1 `,
+      `◆ oracle    ${"█".repeat(10)}     1   6m40s    129k        n/a    ✓ 100%  ✓ 1 ✗ 0 ! 0 `,
       "Tokens per turn · 6 turns",
       "▁█▁▂▁▁ peak 990k",
       "Estimated cost",
@@ -377,8 +377,8 @@ test("digit 6 reads the records afresh each time, r reloads a drawn table, and a
   await ui.unmount();
 });
 
-test("OMCA_ASCII draws the Stats tab from the ASCII set", async ($, on) => {
-  world(on, FIXTURE, {}, { OMCA_ASCII: "1" });
+test("OMCA_GLYPHS=ascii draws the Stats tab from the ASCII set", async ($, on) => {
+  world(on, FIXTURE, {}, { OMCA_GLYPHS: "ascii" });
   await $.command.run(run("stats", 80));
   const ui = await $.ui.mount(pane("terminal", { columns: 80, rows: 40, placement: "inline" }));
   const drawn = spreadRows(await ui.drawn());

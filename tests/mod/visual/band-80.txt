@@ -15,7 +15,7 @@
 
 ✻ Waiting for 1 background agent to finish
 
-● oh-my-claudeagent: 0s · 1 in 1 out · ! no evidence: just test
+● oh-my-claudeagent: 0s · 1 in 1 out ·  no evidence: just test
 
 
 
@@ -28,7 +28,7 @@
 
 
 
-█▎███ 12/46 · next 13 Port the snaps… · ! just test not logged · ◆ 1 running [-]
+█▎███ 12/46 · next 13 Port the snaps… ·  just test not logged ·  1 running [-]
 1: Log evidence
                                                             ◐ medium · /effort
 ─────────────────────────────────────────────────────────── OMCA: 46-task-plan ─

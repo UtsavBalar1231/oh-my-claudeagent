@@ -3,32 +3,19 @@ import {
   dayLabel,
   type EvidenceType,
   type Filter,
+  latestByType,
+  nextTypeFilter,
   parseLedger,
   placeEntries,
-  recentLevels,
   rerunPrompt,
   sha256Hex,
   shownIndices,
-  tallies,
-  TYPE_LABELS,
+  TYPE_WORDS,
   verdictOf,
 } from "../../src/core/evidence.ts";
 import { BOULDER, LEDGER } from "../../src/core/omca-paths.ts";
-import { clockOf, dayOf, displayWidth, fitEnd, fitMiddle, oneLine, padEnd, shortType, wrapText } from "../../src/core/ui-kit.ts";
-import {
-  agentKey,
-  chip,
-  type ChipKind,
-  type ChipTone,
-  columnChip,
-  dots,
-  fitPieces,
-  type Piece,
-  piecesWidth,
-  redact,
-  rule,
-  TONE_KEYS,
-} from "../../src/core/visual.ts";
+import { agentGlyph, clockOf, COLUMN_GAP, dayOf, displayWidth, fitEnd, fitMiddle, oneLine, padEnd, shortType, wrapText } from "../../src/core/ui-kit.ts";
+import { agentKey, chip, type ChipTone, fitPieces, ON_SURFACE, type Piece, piecesWidth, redact, rule, TONE_KEYS } from "../../src/core/visual.ts";
 import type { Input } from "../dispatch.ts";
 import { boundPlanOf, type Host, reason, type State } from "../host.ts";
 import { blanks, noticeRow, refocus, type TabView, type View, wrapAt } from "../pane.ts";
@@ -39,22 +26,13 @@ type Entry = Ledger["entries"][number];
 type Bound = { name: string; path: string } | { name: string; error: string } | null;
 type Block = { element: RenderElement; height: number };
 
-// A type is a category, not a state, so only the final verification, the plan's own, takes a tone.
-const typeKind = (type: EvidenceType): ChipKind => (type === "final_verification" ? "plan" : "neutral");
-const TYPE_KEYS: readonly (readonly [hotkey: string, type: EvidenceType, label: string])[] = [
-  ["b", "build", "Build"],
-  ["t", "test", "Test"],
-  ["l", "lint", "Lint"],
-  ["m", "manual", "Manual"],
-  ["v", "final_verification", "Final"],
-];
-const RECENT = 30;
+const POINTER_CELLS = 2;
+const MARK_CELLS = 1;
+const CLOCK_CELLS = 5;
 const TYPE_CELLS = 6;
 const AGENT_CELLS = 12;
-const KEY_GAP = 2;
 const SEARCH = "search";
-// Pointer, `09:30 `, the type chip and a space, the exit chip (a glyph and a three-digit code) and a space.
-const FIXED_CELLS = 2 + 6 + (TYPE_CELLS + 2) + 1 + 6 + 1;
+const FIXED_CELLS = POINTER_CELLS + MARK_CELLS + COLUMN_GAP + CLOCK_CELLS + COLUMN_GAP + TYPE_CELLS + COLUMN_GAP;
 const MIN_ROOM = 3;
 const MIN_COMMAND = 28;
 const COMMAND_ROWS = 3;
@@ -152,20 +130,32 @@ const masked = (view: View, text: string) => redact(text, view.home, view.g.mask
 const when = (at: number) => `${dayOf(at).slice(5)} ${clockOf(at)}`;
 
 const line = (view: View, pieces: readonly Piece[], room: number) => Line(view.kit, fitPieces(pieces, room, view.g.ellipsis));
+const gap: Piece = { text: " ".repeat(COLUMN_GAP) };
+const words = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`;
+const capital = (word: string) => `${word.slice(0, 1).toUpperCase()}${word.slice(1)}`;
 
-function exitChip(view: View, code: number): Piece {
-  const glyph = code === 0 ? view.g.check : view.g.cross;
-  return chip(`${glyph}${String(code).padStart(3)}`, code === 0 ? "ok" : "fail", view.isAscii);
-}
+const outcome = (view: View, code: number): Piece =>
+  code === 0 ? { text: view.g.check, color: TONE_KEYS.ok } : { text: view.g.cross, color: TONE_KEYS.fail };
 
-const typeChip = (view: View, type: EvidenceType) => columnChip(TYPE_LABELS[type], typeKind(type), view.isAscii, TYPE_CELLS);
+// The final verification, the plan's own, reads bold; every other type is a muted category.
+const typePiece = (type: EvidenceType): Piece =>
+  type === "final_verification"
+    ? { text: padEnd(TYPE_WORDS[type], TYPE_CELLS), color: ON_SURFACE, bold: true }
+    : { text: padEnd(TYPE_WORDS[type], TYPE_CELLS), color: TONE_KEYS.muted };
 
+// The agent's glyph carries its color and the name stays muted; `cells` counts the gap before them.
 function agentPieces(view: View, verifiedBy: string | null, cells: number): Piece[] {
   if (cells === 0) return [];
   if (verifiedBy === null) return [{ text: " ".repeat(cells) }];
-  const color = agentKey(verifiedBy);
-  if (cells <= 2) return [{ text: ` ${view.g.agent}`, color }];
-  return [{ text: ` ${view.g.agent} ${padEnd(fitEnd(shortType(verifiedBy), cells - 3, view.g.ellipsis), cells - 3)}`, color }];
+  const name = cells - COLUMN_GAP - 2;
+  return [gap, { text: agentGlyph(verifiedBy, view.g), color: agentKey(verifiedBy) }, { text: ` ${padEnd(fitEnd(shortType(verifiedBy), name, view.g.ellipsis), name)}`, color: TONE_KEYS.muted }];
+}
+
+function agentMeta(view: View, verifiedBy: string): Piece[] {
+  return [
+    { text: agentGlyph(verifiedBy, view.g), color: agentKey(verifiedBy) },
+    { text: ` ${shortType(verifiedBy)}`, color: TONE_KEYS.muted },
+  ];
 }
 
 // The program bold, each mask dim, so a reader sees what ran and what was hidden at a glance.
@@ -191,61 +181,48 @@ function wrapGroups(groups: readonly (readonly Piece[])[], room: number, sep: Pi
   return lines;
 }
 
-function verdictLine(view: View, ledger: Ledger): { tone: ChipTone; title: string; groups: Piece[][] } {
+function verdictLine(view: View, ledger: Ledger): { tone: ChipTone; title: string; groups: Piece[][]; when: Piece[] } {
   const { plan } = ledger;
   const mark = (label: string, tone: ChipTone, text: string): Piece[] => [chip(label, tone, view.isAscii), { text: ` ${text}` }];
+  const at = (time: number): Piece[] => [{ text: when(time), color: TONE_KEYS.muted }];
   if (plan === null) {
-    return { tone: "muted", title: "FINAL VERIFICATION", groups: [mark("NO PLAN", "muted", "no plan is bound to this session")] };
+    return { tone: "muted", title: "Final verification", groups: [mark("NO PLAN", "muted", "no plan is bound to this session")], when: [] };
   }
-  const title = `FINAL VERIFICATION ${view.g.dot} ${plan.name}`;
-  if ("error" in plan) return { tone: "warn", title, groups: [mark("UNKNOWN", "warn", masked(view, plan.error).text)] };
+  const title = `Final verification ${view.g.dot} ${plan.name}`;
+  if ("error" in plan) return { tone: "warn", title, groups: [mark("UNKNOWN", "warn", masked(view, plan.error).text)], when: [] };
   const verdict = verdictOf(ledger.entries, plan.sha);
-  const agent = (entry: Entry): Piece[][] =>
-    entry.verifiedBy === null ? [] : [[{ text: `${view.g.agent} ${shortType(entry.verifiedBy)}`, color: agentKey(entry.verifiedBy) }]];
   switch (verdict.kind) {
     case "complete":
-      return {
-        tone: "ok",
-        title,
-        groups: [mark("COMPLETE", "ok", "matches the plan as it is now"), [{ text: when(verdict.entry.at) }], ...agent(verdict.entry)],
-      };
+      return { tone: "ok", title, groups: [mark("COMPLETE", "ok", "matches the current plan"), at(verdict.entry.at)], when: at(verdict.entry.at) };
     case "stale":
-      return { tone: "warn", title, groups: [mark("STALE", "warn", "the plan changed after it passed"), [{ text: when(verdict.entry.at) }]] };
+      return { tone: "warn", title, groups: [mark("STALE", "warn", "plan edited since it passed"), at(verdict.entry.at)], when: at(verdict.entry.at) };
     case "missing":
-      return {
-        tone: "fail",
-        title,
-        groups: [
-          mark("MISSING", "fail", "no passing final verification"),
-          ...(verdict.failed === null ? [] : [[{ text: `the last one exited ${verdict.failed.exitCode} at ${when(verdict.failed.at)}` }]]),
-        ],
-      };
+      return verdict.failed === null
+        ? { tone: "fail", title, groups: [mark("MISSING", "fail", "no passing run yet")], when: [] }
+        : {
+            tone: "fail",
+            title,
+            groups: [mark("MISSING", "fail", `last run exited ${verdict.failed.exitCode}`), at(verdict.failed.at)],
+            when: at(verdict.failed.at),
+          };
   }
 }
 
-function tallyGroups(view: View, entries: readonly Entry[]): Piece[][] {
-  const levels = recentLevels(entries, RECENT);
-  const strip: Piece[] = [...dots(levels, view.isAscii), { text: ` last ${levels.length}`, color: TONE_KEYS.muted }];
-  const counts = tallies(entries).map((tally): Piece[] => [
-    { text: TYPE_LABELS[tally.type].toLowerCase(), ...(tally.type === "final_verification" ? { color: TONE_KEYS.plan } : {}) },
-    { text: ` ${tally.runs}` },
-    ...(tally.failed === 0 ? [] : [{ text: ` ${view.g.cross}${tally.failed}`, color: TONE_KEYS.fail }]),
-  ]);
-  return levels.length === 0 ? [] : [strip, ...counts];
+// Each proving type's newest run as a checklist, so a reader sees what is broken now.
+function latestGroups(view: View, entries: readonly Entry[]): Piece[][] {
+  return latestByType(entries).map(({ type, isPassing }) => [outcome(view, isPassing ? 0 : 1), { text: ` ${TYPE_WORDS[type]}` }]);
 }
 
 function header(view: View, ledger: Ledger): Block {
-  const { tone, title, groups } = verdictLine(view, ledger);
-  const tally = tallyGroups(view, ledger.entries);
+  const { tone, title, groups, when: time } = verdictLine(view, ledger);
+  const latest = latestGroups(view, ledger.entries);
   const sep = { text: ` ${view.g.dot} `, color: TONE_KEYS.muted };
   if (view.isInline) {
-    const [lead, ...rest] = groups;
-    const [strip, ...counts] = tally;
-    const pieces: Piece[] = [...(lead?.slice(0, 1) ?? [])];
+    const pieces: Piece[] = [...(groups[0]?.slice(0, 1) ?? [])];
     if (ledger.plan !== null) pieces.push({ text: ` ${ledger.plan.name}`, bold: true });
     const more = { text: ` ${view.g.ellipsis}`, color: TONE_KEYS.muted };
-    for (const group of [...(strip === undefined ? [] : [strip]), ...rest, ...counts]) {
-      const next = [{ text: "  " }, ...group];
+    for (const group of [...latest, ...(time.length === 0 ? [] : [time])]) {
+      const next = [gap, ...group];
       if (piecesWidth(pieces) + piecesWidth(next) > view.width) {
         if (piecesWidth(pieces) + piecesWidth([more]) <= view.width) pieces.push(more);
         break;
@@ -255,7 +232,7 @@ function header(view: View, ledger: Ledger): Block {
     return { element: line(view, pieces, view.width), height: 1 };
   }
   const inner = view.width - 4;
-  const lines = [...wrapGroups(groups, inner, sep), ...wrapGroups(tally, inner, { text: "  " })];
+  const lines = [...wrapGroups(groups, inner, sep), ...wrapGroups(latest, inner, gap)];
   return {
     element: Card(view.kit, { key: "verdict", title: fitEnd(title, inner, view.g.ellipsis), tone, isAscii: view.isAscii, children: lines.map((pieces) => line(view, pieces, inner)) }),
     height: 3 + lines.length,
@@ -264,11 +241,11 @@ function header(view: View, ledger: Ledger): Block {
 
 type Layout = { command: number; agent: number };
 
-// The agent is named only while the command keeps room to read; otherwise its glyph alone carries its color.
+// The agent column shows only while the command keeps room to read; the focused entry's detail names it either way.
 function layoutOf(entries: readonly Entry[], rowWidth: number): Layout {
   const longest = Math.max(0, ...entries.map((entry) => (entry.verifiedBy === null ? 0 : displayWidth(shortType(entry.verifiedBy)))));
-  const named = 3 + Math.min(AGENT_CELLS, longest);
-  const agent = longest === 0 ? 0 : rowWidth - FIXED_CELLS - named >= MIN_COMMAND ? named : 2;
+  const named = COLUMN_GAP + 2 + Math.min(AGENT_CELLS, longest);
+  const agent = longest === 0 || rowWidth - FIXED_CELLS - named < MIN_COMMAND ? 0 : named;
   return { command: Math.max(8, rowWidth - FIXED_CELLS - agent), agent };
 }
 
@@ -277,13 +254,14 @@ function entryRow(view: View, entry: Entry, index: number, layout: Layout, isFoc
   const fitted = fitMiddle(command, layout.command, view.g.ellipsis);
   const pieces: Piece[] = [
     { text: isFocused ? `${view.g.pointer} ` : "  " },
-    { text: `${clockOf(entry.at)} `, color: TONE_KEYS.muted },
-    ...typeChip(view, entry.type),
-    { text: " " },
-    exitChip(view, entry.exitCode),
-    { text: " " },
+    outcome(view, entry.exitCode),
+    gap,
+    { text: clockOf(entry.at), color: TONE_KEYS.muted },
+    gap,
+    typePiece(entry.type),
+    gap,
     ...commandPieces(fitted, view.g.mask),
-    ...(displayWidth(fitted) < layout.command ? [{ text: " ".repeat(layout.command - displayWidth(fitted)) }] : []),
+    ...(layout.agent > 0 && displayWidth(fitted) < layout.command ? [{ text: " ".repeat(layout.command - displayWidth(fitted)) }] : []),
     ...agentPieces(view, entry.verifiedBy, layout.agent),
   ];
   const row = Row(view.kit, { key: `entry-${index}`, pieces: fitPieces(pieces, layout.command + FIXED_CELLS + layout.agent, view.g.ellipsis), isFocused });
@@ -308,8 +286,8 @@ function detail(view: View, entry: Entry, room: number, budget: number, withComm
   const hidden = command.masked + output.masked;
   const meta: Piece[][] = [
     [{ text: `${dayOf(entry.at)} ${clockOf(entry.at, true)}`, color: TONE_KEYS.muted }],
-    ...(entry.verifiedBy === null ? [] : [[{ text: `${view.g.agent} ${shortType(entry.verifiedBy)}`, color: agentKey(entry.verifiedBy) }]]),
-    ...(hidden === 0 ? [] : [[{ text: view.g.mask, color: TONE_KEYS.warn }, { text: ` ${hidden} masked`, color: TONE_KEYS.muted }]]),
+    ...(entry.verifiedBy === null ? [] : [agentMeta(view, entry.verifiedBy)]),
+    ...(hidden === 0 ? [] : [[{ text: `${words(hidden, "secret")} masked`, color: TONE_KEYS.muted }]]),
   ];
   const metaLines = wrapGroups(meta, room, { text: ` ${view.g.dot} `, color: TONE_KEYS.muted });
   const blocks: Block[] = [];
@@ -339,10 +317,10 @@ type Key = readonly [hotkey: string, label: string, work: (surface: RenderSurfac
 function keyRows(view: View, keys: readonly Key[], status: string): RenderElement[] {
   const { Box, Button, Text } = view.kit;
   const cellsOf = (key: Key) => displayWidth(`${key[0]}: ${key[1]}`);
-  const rows = wrapAt(keys, view.width, KEY_GAP, cellsOf);
+  const rows = wrapAt(keys, view.width, COLUMN_GAP, cellsOf);
   const last = rows.at(-1) ?? [];
-  const used = last.reduce((sum, key) => sum + cellsOf(key), 0) + KEY_GAP * Math.max(0, last.length - 1);
-  const room = view.width - used - KEY_GAP;
+  const used = last.reduce((sum, key) => sum + cellsOf(key), 0) + COLUMN_GAP * Math.max(0, last.length - 1);
+  const room = view.width - used - COLUMN_GAP;
   const isBeside = displayWidth(status) <= room;
   const statusText = (cells: number) => Text({ dimColor: true, children: [fitEnd(status, cells, view.g.ellipsis)] });
   const button = ([hotkey, label, work, isOff]: Key) =>
@@ -359,7 +337,7 @@ function keyRows(view: View, keys: readonly Key[], status: string): RenderElemen
       Box({
         key: `keys-${index}`,
         flexDirection: "row",
-        columnGap: KEY_GAP,
+        columnGap: COLUMN_GAP,
         children: [...row.map(button), ...(isBeside && index === rows.length - 1 ? [statusText(room)] : [])],
       }),
     ),
@@ -374,8 +352,8 @@ async function copyCommand(host: Host, text: string, surface: RenderSurface): Pr
 }
 
 function actions(host: Host, view: View, ledger: Ledger, entry: Entry | undefined): Key[] {
-  const toggle = (type: EvidenceType) => () => {
-    filter = { ...filter, type: filter.type === type ? null : type };
+  const cycle = () => {
+    filter = { ...filter, type: nextTypeFilter(ledger.entries, filter.type) };
     resetWindow(host);
   };
   const failures = () => {
@@ -387,25 +365,26 @@ function actions(host: Host, view: View, ledger: Ledger, entry: Entry | undefine
     host.ui.invalidate();
     refocus(host, SEARCH, "evidence");
   };
+  // One key steps through the types, so the filters hold their places whatever is focused.
   const filters: Key[] = [
-    ...TYPE_KEYS.map(([hotkey, type, label]): Key => [hotkey, label, toggle(type), filter.type !== type]),
+    ["t", filter.type === null ? "Type" : capital(TYPE_WORDS[filter.type]), cycle, filter.type === null],
     ["x", "Fails", failures, !filter.isFailuresOnly],
+    ["f", "Find", search, filter.query === ""],
   ];
-  if (entry === undefined) return [...filters, ["f", "Find", search, filter.query === ""]];
+  if (entry === undefined) return filters;
   const command = masked(view, entry.command).text;
   const planSha = ledger.plan !== null && "sha" in ledger.plan ? ledger.plan.sha : null;
   return [
     ...filters,
     ["c", "Copy", (surface) => copyCommand(host, command, surface)],
     ["r", "Rerun", () => host.prompt.fill({ text: rerunPrompt(entry.type, command, planSha) })],
-    ["f", "Find", search, filter.query === ""],
   ];
 }
 
 function statusOf(view: View, at: number, total: number): string {
   const parts = [
     `${at + 1}/${total}`,
-    ...(filter.type === null ? [] : [`${TYPE_LABELS[filter.type].toLowerCase()} only`]),
+    ...(filter.type === null ? [] : [`${TYPE_WORDS[filter.type]} only`]),
     ...(filter.isFailuresOnly ? ["failures only"] : []),
     ...(filter.query.trim() === "" ? [] : [`"${filter.query.trim()}"`]),
     `${view.g.up}${view.g.down} move`,
@@ -437,7 +416,7 @@ function searchField(host: Host, view: View): RenderElement[] {
 
 type Drawn = { elements: RenderElement[]; height: number };
 
-// Newest first, a rule with the day's pass tally above each day, the window kept on the focused
+// Newest first, a rule naming the day above each day's entries, the window kept on the focused
 // entry. `isExpanded` opens that entry under its row; the split tier shows it beside the list.
 function timeline(view: View, ledger: Ledger, shown: readonly number[], current: number, room: number, list: { width: number; isExpanded: boolean }): Drawn {
   const { Box } = view.kit;
@@ -446,7 +425,7 @@ function timeline(view: View, ledger: Ledger, shown: readonly number[], current:
     return entry === undefined ? [] : [{ index, entry }];
   });
   if (items.length === 0) {
-    const empty = "No entry matches the filter. Press its key again to clear it.";
+    const empty = "No entry matches the filter. Press t or x to change it.";
     return { elements: [view.kit.Text({ dimColor: true, wrap: "wrap", children: [empty] })], height: wrapText(empty, list.width).length };
   }
   const layout = layoutOf(ledger.entries, list.width);
@@ -465,12 +444,6 @@ function timeline(view: View, ledger: Ledger, shown: readonly number[], current:
   first = placed.start;
   laid = { shown, perPage: Math.max(1, placed.end - placed.start) };
 
-  const tally = new Map<string, { done: number; total: number }>();
-  for (const [position, { entry }] of items.entries()) {
-    const day = days[position] ?? "";
-    const count = tally.get(day) ?? { done: 0, total: 0 };
-    tally.set(day, { done: count.done + (entry.exitCode === 0 ? 1 : 0), total: count.total + 1 });
-  }
   const elements: RenderElement[] = [];
   let height = 0;
   for (let position = placed.start; position < placed.end; position += 1) {
@@ -478,7 +451,7 @@ function timeline(view: View, ledger: Ledger, shown: readonly number[], current:
     const row = rows[position];
     if (item === undefined || row === undefined) continue;
     if (position === placed.start || opensDay[position] === true) {
-      elements.push(line(view, rule(list.width, view.g, view.isAscii, dayLabel(item.entry.at), tally.get(days[position] ?? "")), list.width));
+      elements.push(line(view, rule(list.width, view.g, view.isAscii, dayLabel(item.entry.at)), list.width));
       height += 1;
     }
     elements.push(row.element);
@@ -497,7 +470,7 @@ function detailCard(view: View, entry: Entry, index: number, width: number, room
   const blocks = detail(view, entry, width - 4, room - 3, true);
   const element = Card(view.kit, {
     key: `detail-${index}`,
-    title: `${TYPE_LABELS[entry.type]} ${view.g.dot} exit ${entry.exitCode}`,
+    title: `${TYPE_WORDS[entry.type]} ${view.g.dot} exit ${entry.exitCode}`,
     tone: entry.exitCode === 0 ? "ok" : "fail",
     isAscii: view.isAscii,
     width,
@@ -534,13 +507,13 @@ export const view: TabView = async (host, view) => {
   const list = timeline(view, ledger, shown, current, room, { width: listWidth, isExpanded: !isSplit });
   let body = list;
   if (isSplit) {
-    const card = detailCard(view, entry, index, view.width - listWidth - KEY_GAP, room);
+    const card = detailCard(view, entry, index, view.width - listWidth - COLUMN_GAP, room);
     body = {
       elements: [
         Box({
           key: "split",
           flexDirection: "row",
-          columnGap: KEY_GAP,
+          columnGap: COLUMN_GAP,
           // The card sits in its own column so the row's height does not stretch it and spread its code blocks apart.
           children: [Box({ flexDirection: "column", width: listWidth, children: list.elements }), Box({ flexDirection: "column", children: card.elements })],
         }),

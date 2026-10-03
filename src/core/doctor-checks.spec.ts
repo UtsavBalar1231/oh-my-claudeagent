@@ -54,6 +54,13 @@ test("a passing check states what it found and carries no advisory clause", () =
   expect(passing.filter((check) => check.prompt !== undefined || check.fix !== undefined)).toEqual([]);
 });
 
+test("an OMCA_GLYPHS value that names no tier warns after the model check; unset or a tier adds no row", () => {
+  expect(run({}, "glyphs")).toBeUndefined();
+  expect(run({ env: { OMCA_GLYPHS: " Unicode " } }, "glyphs")).toBeUndefined();
+  expect(run({ env: { OMCA_GLYPHS: "0" } }, "glyphs")).toEqual({ level: "warn", detail: 'OMCA_GLYPHS="0" is not nerd, unicode or ascii, so Nerd Font glyphs draw' });
+  expect(doctorChecks({ ...BASE, env: { OMCA_GLYPHS: "0" } }).map(({ id }) => id).slice(6, 9)).toEqual(["model-force", "glyphs", "effort"]);
+});
+
 describe("output style", () => {
   const OPTED_OUT = { pluginConfigs: { "oh-my-claudeagent@omca": { options: { disableForceOrchestrationStyle: true } } } };
 

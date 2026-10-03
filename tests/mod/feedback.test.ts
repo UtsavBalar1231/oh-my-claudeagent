@@ -317,8 +317,8 @@ test("all-up ratings draw the card in the ok tone, and a short body names the ra
   await ui.unmount();
 });
 
-test("OMCA_ASCII draws the verdict chips and arrows from the ASCII set", async ($, on) => {
-  const w = world(on, {}, {}, { OMCA_ASCII: "1" });
+test("OMCA_GLYPHS=ascii draws the verdict chips and arrows from the ASCII set", async ($, on) => {
+  const w = world(on, {}, {}, { OMCA_GLYPHS: "ascii" });
   on("session.start", (_$, e) => ({ cwd: e.cwd }));
   on("command.register", (_$, e) => ({ value: { command: e.name } }));
   on("fs.write", (_$, e) => (w.files.set(w.spelled(e.path), { text: e.text, mtimeMs: w.clock.now() }), { value: undefined }));

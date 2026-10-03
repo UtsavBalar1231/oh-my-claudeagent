@@ -32,7 +32,7 @@ const POLL_MS = 150;
 const READY_TIMEOUT_MS = 30_000;
 const WINDOW_TIMEOUT_MS = 15_000;
 const RUN_TIMEOUT_MS = 120_000;
-const FONT_FAMILIES = ["JetBrains Mono", "JetBrainsMono Nerd Font Mono"] as const;
+const FONT_FAMILIES = ["JetBrainsMono Nerd Font Mono", "JetBrains Mono"] as const;
 const FONT_SIZE = 14;
 const PADDING = 12;
 const DPI = 96;
@@ -567,7 +567,7 @@ export const SHOTS: readonly Still[] = [
         { content: [bash("just watch draft", "Run the draft order tests in watch mode")] },
       ],
     },
-    ready: (screen) => screen.includes("just watch summary") && screen.includes("just watch draft") && screen.includes("✓ explore"),
+    ready: (screen) => screen.includes("just watch summary") && screen.includes("just watch draft") && screen.includes("explore · The forms build"),
     crop: "pane",
   },
   { name: "guard", format: "png", cols: 120, rows: 26, command: "Clean the build", keys: [], script: GUARD_SCRIPT, ready: guardReady },

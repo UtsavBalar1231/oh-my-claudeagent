@@ -3,33 +3,33 @@
 ▝▜██████▀  Opus 5.5 · API Usage Billing                        │─────────────────────────────────────────────────────
  ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/cwd               │╭───────────────────────────────────────────────────╮
                                                                ││ Rebuild the billing export on the shared ledger   │
-                                                               ││  FINAL  ██████████▎█▉███████▌██ 4/9 · ⊘ 3 blocked │
-❯ Start task 5 with the executor                               ││ ✓ 4 proven · ! 2 unproven · ✗ 0 failed            │
+                                                               ││  FINAL  ██████████▎█▉███████▌██ 4/9 ·  3 blocked │
+❯ Start task 5 with the executor                               ││  4 proven ·  2 unproven ·  0 failed            │
                                                                ││ next 5 Reconcile totals against the invoice table │
-  Ran 1 shell command                                          ││ ◆ executor on 5                                   │
+  Ran 1 shell command                                          ││  executor on 5                                   │
                                                                │╰───────────────────────────────────────────────────╯
 ● oh-my-claudeagent:executor(Reconcile totals)                 │
   ⎿  Backgrounded agent (↓ to manage · ctrl+o to expand)       │── Milestone 0: Foundations ── ████████ 2/2 ─────────
-                                                               │✓ 1 Define the export schema and its versi…   PROVEN
-● The executor is reconciling the totals.                      │✓ 2 Read the ledger in one pass               PROVEN
+                                                               │ 1 Define the export schema and its versi…   PROVEN
+● The executor is reconciling the totals.                      │ 2 Read the ledger in one pass               PROVEN
                                                                │── Milestone 1: Exporter ── █████▍██ 2/3 ────────────
-✻ Waiting for 1 background agent to finish                     │✓ 3 Write rows in the schema's order        UNPROVEN
-                                                               │✓ 4 Round negative totals toward zero         PROVEN
-● oh-my-claudeagent: 0s · 1 in 1 out · $0.0001 engine          │◐ 5 Reconcile totals against…   ◆ executor  UNPROVEN
+✻ Waiting for 1 background agent to finish                     │ 3 Write rows in the schema's order        UNPROVEN
+                                                               │ 4 Round negative totals toward zero         PROVEN
+● oh-my-claudeagent: 0s · 1 in 1 out · $0.0001 engine          │ 5 Reconcile totals against…    executor  UNPROVEN
   cost                                                         │     Sum each customer's rows and compare with the i…
                                                                │     $ DB_PASSWORD=‹masked› just test-db
-                                                               │     src/report/totals.ts 6s · src/report/totals.spe…
-                                                               │     ! no run since its files changed
+                                                               │     src/report/totals.ts 5s · src/report/totals.spe…
+                                                               │      no run since its files changed
                                                                │── Milestone 2: Rollout ── ████████ 0/4 ─────────────
-                                                               │⊘ 6 Run the new export beside the old…   blocked by 5
-                                                               │○ 7 Document the export columns for finance   PROVEN
-                                                               │⊘ 8 Switch the nightly job to the n…  blocked by 6, 7
-                                                               │⊘ 9 Announce the change to finance       blocked by 8
+                                                               │ 6 Run the new export beside the old…   blocked by 5
+                                                               │ 7 Document the export columns for finance   PROVEN
+                                                               │ 8 Switch the nightly job to the n…  blocked by 6, 7
+                                                               │ 9 Announce the change to finance       blocked by 8
                                                                │
                                                                │k: Run check  s: Start here  c: Copy  e: Evidence
                                                                │o: Open only  x: Failing  f: Find  t: Sections
                                                                │l: Plans
-██▎██ 4/9 · next 5 Reconcile tota… · ✓4 !2 ✗0 · ◆ 1 running [-]│↑↓ move · enter open · esc close
+██▎██ 4/9 · next 5 Reconcile tota… ·  4   2 ·  1 running [-]│↑↓ move · enter open · esc close
                                            ◐ medium · /effort  │
 ───────────────────────────────────────────────────────────────────────────────────────────────── OMCA: billing-export ─
 ❯ 
@@ -37,4 +37,4 @@
   ⏸ manual mode on · ? for shortcuts · ← for agents · ↓ to manage
 
   ● main
-  ◯ oh-my-claudeagent:executor  Reconcile totals                                                      3s · ↓ 19 tokens
+  ◯ oh-my-claudeagent:executor  Reconcile totals                                                      2s · ↓ 19 tokens

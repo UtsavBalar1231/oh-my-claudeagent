@@ -1,5 +1,6 @@
 import { EFFORTS } from "./route-hint.ts";
 import { isRecord } from "./tool-input.ts";
+import { isGlyphTier } from "./ui-kit.ts";
 import type { Level } from "./visual.ts";
 
 export type Fix = "add-refresh-interval";
@@ -15,6 +16,7 @@ type DoctorEnv = Readonly<{
   DO_NOT_TRACK?: string | undefined;
   DISABLE_GROWTHBOOK?: string | undefined;
   CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC?: string | undefined;
+  OMCA_GLYPHS?: string | undefined;
 }>;
 
 export type HookState =
@@ -142,6 +144,13 @@ function modelForceCheck(env: DoctorEnv): Check {
     : check("model-force", "Agent models", "ok", "Each agent keeps the model tier it declares");
 }
 
+// Only a value that names no tier is worth a row: unset or valid, the drawing itself shows the glyphs.
+function glyphsCheck(env: DoctorEnv): Check[] {
+  const value = env.OMCA_GLYPHS?.trim().toLowerCase() ?? "";
+  if (value === "" || isGlyphTier(value)) return [];
+  return [check("glyphs", "Glyphs", "warn", `OMCA_GLYPHS=${JSON.stringify(env.OMCA_GLYPHS)} is not nerd, unicode or ascii, so Nerd Font glyphs draw`)];
+}
+
 const LEVELS: readonly string[] = EFFORTS;
 
 function effortCheck(cap: unknown): Check {
@@ -249,6 +258,7 @@ export function doctorChecks(inputs: Inputs): Check[] {
     astGrepCheck(inputs.astGrep),
     optionsCheck(inputs.options),
     modelForceCheck(inputs.env),
+    ...glyphsCheck(inputs.env),
     effortCheck(inputs.settings["maxEffortLevel"]),
     modsCheck(inputs.settings),
     hooksCheck(inputs.settings),

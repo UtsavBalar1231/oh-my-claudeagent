@@ -6,7 +6,7 @@ import { hasPassingFinalVerification, type NextAction, nextActions } from "../sr
 import { BOULDER, LEDGER, statusPath, verificationOf } from "../src/core/omca-paths.ts";
 import { boardOf, parsePlan } from "../src/core/plan-reader.ts";
 import { proofSummary } from "../src/core/proof.ts";
-import { oneLine } from "../src/core/ui-kit.ts";
+import { type GlyphTier, oneLine } from "../src/core/ui-kit.ts";
 import { TONE_KEYS } from "../src/core/visual.ts";
 import type { Features } from "./dispatch.ts";
 import { boundPlanOf, type Host, ledgerWrittenAt, proofFacts, reason, sessionOf, verdictFor } from "./host.ts";
@@ -14,7 +14,7 @@ import { type Kit, kitOf, type TextStyle } from "./ui.ts";
 
 type Snapshot = { band: Band; hasFinalVerification: boolean };
 
-let isAscii = false;
+let glyphTier: GlyphTier = "nerd";
 let shownActions = 0;
 
 // A bare digit in an empty composer reaches prompt.edit before the engine resolves it as the
@@ -117,7 +117,7 @@ const row = ({ Text }: Kit, spans: readonly Span[]): RenderElement =>
 export const band: Features = {
   "session.start": {
     post: async (host) => {
-      isAscii = (await sessionOf(host)).isAscii;
+      glyphTier = (await sessionOf(host)).glyphTier;
       shownActions = ((await host.state.nextActions.get()).value ?? []).length;
       await writeBand(host, (await readSnapshot(host)).band);
       return undefined;
@@ -148,7 +148,7 @@ export const band: Features = {
         host.state.agents.get(),
       ]);
       const running = Object.values(agents).filter((agent) => agent.endedAt === null).length;
-      const view = bandView(snapshot, actions, e.props.bodyColumns, isAscii, running);
+      const view = bandView(snapshot, actions, e.props.bodyColumns, glyphTier, running);
       if (view === undefined) return undefined;
       const kit = kitOf(host.ui.resolve(e), e.surface);
       const { Box, Button } = kit;

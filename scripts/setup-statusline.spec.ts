@@ -284,7 +284,7 @@ describe("refusals", () => {
 
   test("a missing --settings prints the usage", () => {
     const result = Bun.spawnSync([process.execPath, SCRIPT], { env: specEnv({ ...homeEnv(home), PATH: join(root, "bin") }) });
-    expect(result.stderr.toString()).toBe("omca setup: usage: bun scripts/setup-statusline.ts --settings <path> [--yes] [--uninstall]\n");
+    expect(result.stderr.toString()).toBe("omca setup: usage: bun scripts/setup-statusline.ts --settings <path> [--glyphs nerd|unicode|ascii [--glyphs-only]] [--yes] [--uninstall]\n");
     expect(result.exitCode).toBe(2);
   });
 });
@@ -326,5 +326,27 @@ describe("uninstall", () => {
     const before = fixture("other-statusline.json");
     expect(run("--uninstall", "--yes")).toEqual({ stdout: `Nothing to remove: no OMCA status line in ${settings} and no ${launcher}.\n`, stderr: "", exitCode: 0 });
     expect(readFileSync(settings, "utf8")).toBe(before);
+  });
+});
+
+describe("glyphs", () => {
+  test("--glyphs-only adds OMCA_GLYPHS to env, keeps the other variables and leaves the status lines alone", () => {
+    writeFileSync(settings, '{\n  "model": "opus",\n  "env": { "FOO": "1" }\n}\n');
+    expect(run("--glyphs", "unicode", "--glyphs-only", "--yes").exitCode).toBe(0);
+    expect(JSON.parse(readFileSync(settings, "utf8"))).toEqual({ model: "opus", env: { FOO: "1", OMCA_GLYPHS: "unicode" } });
+    expect(existsSync(launcher)).toBe(false);
+    expect(run("--glyphs", "unicode", "--glyphs-only").stdout).toBe(`Already configured: ${settings} sets OMCA_GLYPHS to unicode.\n`);
+  });
+
+  test("uninstall removes OMCA_GLYPHS and an env it leaves empty", () => {
+    writeFileSync(settings, '{\n  "env": { "OMCA_GLYPHS": "ascii" }\n}\n');
+    expect(run("--uninstall", "--yes").exitCode).toBe(0);
+    expect(JSON.parse(readFileSync(settings, "utf8"))).toEqual({});
+  });
+
+  test("an unknown tier, or --glyphs-only alone, prints the usage", () => {
+    writeFileSync(settings, "{}\n");
+    expect(run("--glyphs", "nerdy").stderr).toStartWith("omca setup: --glyphs takes nerd, unicode or ascii\n");
+    expect(run("--glyphs-only").stderr).toStartWith("omca setup: --glyphs-only needs --glyphs and no --uninstall\n");
   });
 });

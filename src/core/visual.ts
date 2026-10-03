@@ -1,4 +1,4 @@
-import { displayWidth, fitEnd, type Glyphs, glyphs, padEnd, shortType } from "./ui-kit.ts";
+import { displayWidth, fitEnd, type Glyphs, glyphs, shortType } from "./ui-kit.ts";
 
 // Every key here draws its theme's value for a mod, measured on 2.1.288 under a custom theme and
 // the built-in light theme. `link`, `thinking` and `messageActionsBackground` draw nothing for a
@@ -155,14 +155,6 @@ export function chip(label: string, kind: ChipKind, ascii: boolean): Piece {
   return { text: ascii ? `[${text}]` : ` ${text} `, ...colors, bold: true };
 }
 
-/** A chip padded to `cells` for a column: inside its background in Unicode, after its brackets in ASCII. */
-export function columnChip(label: string, kind: ChipKind, ascii: boolean, cells: number): Piece[] {
-  if (!ascii) return [chip(padEnd(label, cells), kind, false)];
-  const piece = chip(label, kind, true);
-  const pad = cells + 2 - displayWidth(piece.text);
-  return pad > 0 ? [piece, { text: " ".repeat(pad) }] : [piece];
-}
-
 export type Level = "ok" | "warn" | "fail" | "info";
 
 export function levelMark(level: Level, g: Glyphs): { glyph: string; color: ThemeKey } {
@@ -174,7 +166,7 @@ export function levelMark(level: Level, g: Glyphs): { glyph: string; color: Them
     case "fail":
       return { glyph: g.cross, color: TONE_KEYS.fail };
     case "info":
-      return { glyph: g.dot, color: TONE_KEYS.muted };
+      return { glyph: g.info, color: TONE_KEYS.muted };
   }
 }
 
@@ -207,10 +199,6 @@ const EIGHTHS = ["▏", "▎", "▍", "▌", "▋", "▊", "▉"] as const;
 const SPARK = {
   unicode: ["▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"],
   ascii: [".", ":", "-", "=", "+", "*", "#", "@"],
-} as const;
-const DOTS = {
-  unicode: { ok: "●", fail: "✗", warn: "!", info: "○" },
-  ascii: { ok: "o", fail: "x", warn: "!", info: "." },
 } as const;
 
 export type BarParts = { done: number; active?: number; failed?: number; blocked?: number; todo: number };
@@ -333,13 +321,6 @@ export function spark(values: readonly number[], ascii: boolean): string {
     .join("");
 }
 
-/** One glyph per outcome, so the strip reads without color too. */
-export function dots(levels: readonly Level[], ascii: boolean): Piece[] {
-  const set = ascii ? DOTS.ascii : DOTS.unicode;
-  const tone = { ok: TONE_KEYS.ok, fail: TONE_KEYS.fail, warn: TONE_KEYS.warn, info: TONE_KEYS.muted } as const;
-  return coalesce(levels.map((level) => ({ text: set[level], color: tone[level] })));
-}
-
 const MINI_BAR = 8;
 // Below this many cells a section label stops reading as a name, so the mini bar goes first.
 const MIN_LABEL = 8;
@@ -451,7 +432,7 @@ const SECRETS: readonly { pattern: RegExp; keep?: (match: string, ...groups: str
 const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** Masks secrets and shortens the home directory to `~`; `masked` counts the secrets only. */
-export function redact(text: string, home: string, mask = glyphs(false).mask): { text: string; masked: number } {
+export function redact(text: string, home: string, mask = glyphs("unicode").mask): { text: string; masked: number } {
   let masked = 0;
   let out = text;
   for (const { pattern, keep } of SECRETS) {

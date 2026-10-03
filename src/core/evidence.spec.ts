@@ -4,16 +4,16 @@ import {
   type Evidence,
   isSlotRecent,
   isWellFormedLedger,
+  latestByType,
   ledgerCoversSlot,
   MAX_SLOT_AGE_SECONDS,
   MTIME_SLACK_SECONDS,
+  nextTypeFilter,
   parseLedger,
   placeEntries,
-  recentLevels,
   rerunPrompt,
   sha256Hex,
   shownIndices,
-  tallies,
   verdictOf,
 } from "./evidence.ts";
 import { clockOf, dayOf } from "./ui-kit.ts";
@@ -187,19 +187,27 @@ describe("verdictOf", () => {
   });
 });
 
-test("tallies count runs and failures per type in ledger type order, leaving out types never run", () => {
-  const entries = [run({ type: "lint" }), run({ exitCode: 1 }), run({}), run({ type: "build", exitCode: 2 }), run({ type: "lint" })];
-  expect(tallies(entries)).toEqual([
-    { type: "build", runs: 1, failed: 1 },
-    { type: "test", runs: 2, failed: 1 },
-    { type: "lint", runs: 2, failed: 0 },
+test("latestByType says whether each proving type's newest run passed, in ledger type order, leaving out final verification and types never run", () => {
+  const entries = [run({ type: "lint", exitCode: 1 }), run({ exitCode: 1 }), run({}), run({ type: "build", exitCode: 2 }), run({ type: "final_verification" })];
+  expect(latestByType(entries)).toEqual([
+    { type: "build", isPassing: false },
+    { type: "test", isPassing: true },
+    { type: "lint", isPassing: false },
   ]);
+  expect(latestByType([])).toEqual([]);
 });
 
-test("recentLevels keeps the last runs oldest first, a non-zero exit failing", () => {
-  const entries = [run({ exitCode: 1 }), run({}), run({ exitCode: 127 }), run({})];
-  expect(recentLevels(entries, 3)).toEqual(["ok", "fail", "ok"]);
-  expect(recentLevels([], 30)).toEqual([]);
+test("nextTypeFilter steps through the types the ledger holds, then back to none", () => {
+  const entries = [run({ type: "lint" }), run({}), run({ type: "final_verification" })];
+  const steps: (string | null)[] = [];
+  let current = nextTypeFilter(entries, null);
+  while (current !== null) {
+    steps.push(current);
+    current = nextTypeFilter(entries, current);
+  }
+  expect(steps).toEqual(["test", "lint", "final_verification"]);
+  expect(nextTypeFilter(entries, "build")).toBe("test");
+  expect(nextTypeFilter([], null)).toBeNull();
 });
 
 describe("shownIndices", () => {

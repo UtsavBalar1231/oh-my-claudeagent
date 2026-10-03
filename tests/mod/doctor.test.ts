@@ -309,8 +309,8 @@ for (const layout of LAYOUTS) {
     expect(w.writes).toEqual([`${SETTINGS}.omca-bak`, SETTINGS]);
   });
 
-  test(`OMCA_ASCII draws the doctor's marks and separators from the ASCII set${suffix}`, { options: { guardMode: "deny" } }, async ($, on) => {
-    engine(on, world(on, FILES, structuredClone(USER), { OMCA_ASCII: "1" }, layout));
+  test(`OMCA_GLYPHS=ascii draws the doctor's marks and separators from the ASCII set${suffix}`, { options: { guardMode: "deny" } }, async ($, on) => {
+    engine(on, world(on, FILES, structuredClone(USER), { OMCA_GLYPHS: "ascii" }, layout));
     await $.command.run(run("doctor", 80));
     const ui = await $.ui.mount(pane("terminal", { columns: 80, rows: 40, placement: "inline" }));
     const drawn = body(await ui.drawn());
@@ -555,8 +555,8 @@ test("a check that names a command offers it on its own key, which fills the pro
   });
   expect(rows(await ui.drawn()).filter((row) => row.includes(": Use /"))).toEqual([
     ` ! WARN  omca server   No hook has reached the server in this session yet${PAD}m: Use /mcp`,
-    ` · INFO  Advisor       No advisorModel; /advisor fable turns the advisor on${PAD}a: Use /advisor fable`,
-    ` · INFO  Status line   No statusLine is set${PAD}s: Use /oh-my-claudeagent:omca-setup`,
+    ` i INFO  Advisor       No advisorModel; /advisor fable turns the advisor on${PAD}a: Use /advisor fable`,
+    ` i INFO  Status line   No statusLine is set${PAD}s: Use /oh-my-claudeagent:omca-setup`,
   ]);
 
   const offered = (await ui.findAll({ type: "Button" })).flatMap((found) => (found.key?.startsWith("prompt-") === true ? [[found.key, found.props["hotkey"]]] : []));

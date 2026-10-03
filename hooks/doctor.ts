@@ -95,6 +95,7 @@ async function check(host: Host): Promise<Doctor["checks"]> {
     DO_NOT_TRACK: await host.env.DO_NOT_TRACK(),
     DISABLE_GROWTHBOOK: await host.env.DISABLE_GROWTHBOOK(),
     CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: await host.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC(),
+    OMCA_GLYPHS: await host.env.OMCA_GLYPHS(),
   };
   const checks = doctorChecks({
     modVersion: mod,

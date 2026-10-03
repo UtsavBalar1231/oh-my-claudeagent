@@ -62,7 +62,7 @@ function world(on: On, disk: Files): World {
   const submits: string[] = [];
   const logs: string[] = [];
   mock.clock(on, { now: NOW_MS });
-  mock.env(on, {});
+  mock.env(on, { OMCA_GLYPHS: "unicode" });
   on("session.id", () => ({ value: SESSION }));
   on("session.root", () => ({ value: ROOT }));
   on("session.start", (_$, e) => ({ cwd: e.cwd }));
@@ -383,15 +383,13 @@ test("proof counts draw only when the band carries them", async ($, on) => {
 
   proof = { proven: 52, unproven: 4, failed: 0 };
   await band.redraw();
-  expect(await statusRow(band)).toBe("█▎███ 12/46 · next 13 Port module 13 · ✓52 !4 ✗0");
-  const colors = (await band.findAll({ type: "Text" })).filter(({ text }) => /^(?:[✓!✗]|\d+)$/.test(text)).map(({ text, props }) => [text, props["color"] ?? "plain"]);
+  expect(await statusRow(band)).toBe("█▎███ 12/46 · next 13 Port module 13 · ✓ 52 proven  ! 4 unproven");
+  const colors = (await band.findAll({ type: "Text" })).filter(({ text }) => /^(?:[✓!✗] |\d+ \w+)$/.test(text)).map(({ text, props }) => [text, props["color"] ?? "plain"]);
   expect(colors).toEqual([
-    ["✓", "success"],
-    ["52", "plain"],
-    ["!", "warning"],
-    ["4", "plain"],
-    ["✗", "inactive"],
-    ["0", "inactive"],
+    ["✓ ", "success"],
+    ["52 proven", "plain"],
+    ["! ", "warning"],
+    ["4 unproven", "plain"],
   ]);
 });
 
@@ -417,11 +415,11 @@ test("the band counts each task's proof from its files' change times and the new
   world(on, disk);
   await start($);
   const band = await mount($, "terminal");
-  expect(await statusRow(band)).toBe("█████ 0/4 · next 1 Port module 1 · ✓1 !1 ✗0");
+  expect(await statusRow(band)).toBe("█████ 0/4 · next 1 Port module 1 · ✓ 1 proven  ! 1 unproven");
 
   disk.set(LEDGER, { text: ledger([run(RAN_AT, 0), run(RAN_AT + 10, 1)]), mtimeMs: AFTER_RUN_MS + 10_000 });
   await turn($);
-  expect(await statusRow(band)).toBe("█████ 0/4 · next 1 Port module 1 · ✓0 !0 ✗2");
+  expect(await statusRow(band)).toBe("█████ 0/4 · next 1 Port module 1 · ✗ 2 failed");
 });
 
 test("a press fills the prompt with the exact text and never submits", async ($, on) => {

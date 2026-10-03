@@ -11,7 +11,7 @@
 
 ❯ Clean the build
 
-  Removing the build output
+● Removing the build output
   ⎿  $ rm -rf build
 ────────────────────────────────────────────────────────────────────────────────
  ☐ OMCA guard

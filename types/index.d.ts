@@ -18,7 +18,6 @@ declare module "claude-code" {
       lanes: {
         readonly [agentId: string]: {
           prompt: string;
-          tools: readonly string[];
           calls: number;
           tool: { name: string; detail: string } | null;
           output: string;

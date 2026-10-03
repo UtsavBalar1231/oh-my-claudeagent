@@ -20,13 +20,13 @@
 
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ 1: Agents 2: Plan 3: Evidence 4: Notepad 5: Feedback 6: Stats 7: Doctor    ✕ │
-│  FINAL  Rebuild the billing export on the sha… ████▍▌██▉█ 4/9 ✓4 !2 ✗0 ◆1    │
+│  FINAL  Rebuild the billing export… ████▍▌██▉█ 4/9  4   2   1 running     │
 │   ↑ 4 more                                                                   │
-│ ✓ 3 Write rows in the schema's order                            UNPROVEN     │
-│ ✓ 4 Round negative totals toward zero                             PROVEN     │
-│ ◐ 5 Reconcile totals against the invoice table      ◆ executor  UNPROVEN     │
+│  3 Write rows in the schema's order                            UNPROVEN     │
+│  4 Round negative totals toward zero                             PROVEN     │
+│  5 Reconcile totals against the invoice table       executor  UNPROVEN     │
 │ ── Milestone 2: Rollout ── ████████ 0/4 ─────────────────────────────────    │
-│ ⊘ 6 Run the new export beside the old one for a week         blocked by 5    │
+│  6 Run the new export beside the old one for a week         blocked by 5    │
 │   ↓ 3 more                                                                   │
 │ k: Run check  s: Start here  c: Copy  e: Evidence  o: Open only              │
 │ x: Failing  f: Find  t: Sections  l: Plans                                   │

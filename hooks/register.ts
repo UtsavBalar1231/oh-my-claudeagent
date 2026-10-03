@@ -25,7 +25,7 @@ function bindHost($: EngineInterface, options: Options): Host {
       HOMEDRIVE: () => $.env.get("HOMEDRIVE"),
       HOMEPATH: () => $.env.get("HOMEPATH"),
       CLAUDE_CONFIG_DIR: () => $.env.get("CLAUDE_CONFIG_DIR"),
-      OMCA_ASCII: () => $.env.get("OMCA_ASCII"),
+      OMCA_GLYPHS: () => $.env.get("OMCA_GLYPHS"),
       OMCA_DISABLED_HOOKS: () => $.env.get("OMCA_DISABLED_HOOKS"),
       CLAUDE_CODE_SUBAGENT_MODEL_FORCE: () => $.env.get("CLAUDE_CODE_SUBAGENT_MODEL_FORCE"),
       CLAUDE_CODE_DISABLE_ADVISOR_TOOL: () => $.env.get("CLAUDE_CODE_DISABLE_ADVISOR_TOOL"),

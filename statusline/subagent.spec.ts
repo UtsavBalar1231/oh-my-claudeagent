@@ -31,7 +31,7 @@ afterEach(() => {
 function run(stdin: string, env: Record<string, string> = {}): { stdout: string; exitCode: number } {
   const result = Bun.spawnSync([process.execPath, SUBAGENT], {
     stdin: new TextEncoder().encode(stdin),
-    env: specEnv({ COLUMNS: undefined, OMCA_SUBAGENT_STATUSLINE_DUMP: undefined, CLAUDE_STATUSLINE_NERD_FONT: "0", ...env }),
+    env: specEnv({ COLUMNS: undefined, OMCA_SUBAGENT_STATUSLINE_DUMP: undefined, OMCA_GLYPHS: "unicode", ...env }),
   });
   return { stdout: result.stdout.toString(), exitCode: result.exitCode };
 }
@@ -145,7 +145,7 @@ describe("segments", () => {
   });
 
   test("Nerd Font glyphs replace the ASCII labels", () => {
-    expect(content({ name: "oh-my-claudeagent:executor", model: "opus", effort: "low" }, { CLAUDE_STATUSLINE_NERD_FONT: "1" })).toBe(
+    expect(content({ name: "oh-my-claudeagent:executor", model: "opus", effort: "low" }, { OMCA_GLYPHS: "nerd" })).toBe(
       row(name("executor", ""), model("Opus", ""), `${Y} low${R}`),
     );
   });
@@ -247,8 +247,8 @@ test("no row draws in white or bright white, which vanish on a light background"
     tokenCount: 50_000,
     contextWindowSize: 200_000,
   }));
-  for (const nerd of ["0", "1"]) {
-    for (const { content } of rows({ columns: 200, tasks }, { CLAUDE_STATUSLINE_NERD_FONT: nerd })) {
+  for (const tier of ["nerd", "unicode", "ascii"]) {
+    for (const { content } of rows({ columns: 200, tasks }, { OMCA_GLYPHS: tier })) {
       const colors = [...content.matchAll(/\[([0-9;]*)m/g)].flatMap((match) => (match[1] ?? "").split(";"));
       expect(colors).not.toContain("37");
       expect(colors).not.toContain("97");

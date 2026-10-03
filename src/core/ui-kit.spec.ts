@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
+  AGENT_ICONS,
+  agentGlyph,
   arrange,
   displayWidth,
   fitEnd,
@@ -8,7 +10,8 @@ import {
   formatTokens,
   formatWhen,
   glyphs,
-  isAsciiRequested,
+  glyphTier,
+  type GlyphTier,
   keyHint,
   oneLine,
   padEnd,
@@ -19,14 +22,15 @@ import {
   wrapText,
 } from "./ui-kit.ts";
 
-const E = glyphs(false).ellipsis;
+const E = glyphs("unicode").ellipsis;
 
 describe("displayWidth", () => {
   test.each([
     ["ascii", "abc", 3],
     ["CJK", "日本", 4],
     ["wide BMP symbols", "✅❌⭐⏰", 8],
-    ["narrow BMP symbols OMCA draws", "✓✗●○◐⊘◆✎◇", 9],
+    ["narrow BMP symbols OMCA draws", "✓✗●○◐⊘◆·✢✳✶✻✽", 13],
+    ["Nerd Font glyphs in the private use area", "\u{f05d}\u{f057}\u{f06a}\u{f085}", 4],
     ["a skin tone joins its emoji", "👍🏽", 2],
     ["a ZWJ family is one glyph", "👨‍👩‍👧", 2],
   ])("%s", (_name, text, width) => {
@@ -105,38 +109,57 @@ describe("fitMiddle", () => {
 });
 
 describe("glyphs", () => {
-  test.each([
-    [undefined, false],
-    ["", false],
-    ["0", false],
-    ["false", false],
-    ["1", true],
-    ["true", true],
-    [" YES ", true],
-    ["on", true],
-  ])("OMCA_ASCII=%p selects ASCII: %p", (value, expected) => {
-    expect(isAsciiRequested(value)).toBe(expected);
+  test.each<[string | undefined, GlyphTier]>([
+    [undefined, "nerd"],
+    ["", "nerd"],
+    ["nerd", "nerd"],
+    [" Unicode ", "unicode"],
+    ["ASCII", "ascii"],
+    ["1", "nerd"],
+    ["0", "nerd"],
+  ])("OMCA_GLYPHS=%p selects %p", (value, expected) => {
+    expect(glyphTier(value)).toBe(expected);
   });
 
   test("the ASCII set replaces every non-ASCII glyph and keeps each status glyph one cell wide", () => {
-    const unicode = glyphs(false);
-    const ascii = glyphs(true);
-    expect(Object.keys(ascii)).toEqual(Object.keys(unicode));
+    const unicode = glyphs("unicode");
+    const ascii = glyphs("ascii");
+    expect(Object.keys(ascii).toSorted()).toEqual(Object.keys(unicode).toSorted());
     for (const [name, glyph] of Object.entries(ascii)) {
       expect({ name, ascii: /^[\x20-\x7e]+$/.test(glyph) }).toEqual({ name, ascii: true });
     }
-    for (const name of ["pointer", "check", "cross", "warn", "running", "pending", "up", "down", "dot", "rule", "vrule", "progress", "blocked", "agent"] as const) {
+    for (const name of ["pointer", "check", "cross", "warn", "info", "running", "pending", "up", "down", "dot", "rule", "vrule", "progress", "blocked", "agent"] as const) {
       expect({ name, unicode: displayWidth(unicode[name]), ascii: ascii[name].length }).toEqual({ name, unicode: 1, ascii: 1 });
     }
     expect(fitEnd("hello world", 6, ascii.ellipsis)).toBe("hel...");
+  });
+
+  test("the Nerd set overrides the status and agent glyphs with one-cell Nerd Font icons and keeps the rest", () => {
+    const nerd = glyphs("nerd");
+    const unicode = glyphs("unicode");
+    const icons = ["check", "cross", "warn", "info", "pending", "running", "progress", "blocked", "agent"] as const;
+    expect(icons.map((name) => nerd[name].codePointAt(0)?.toString(16))).toEqual(["f05d", "f057", "f06a", "f05a", "f10c", "f111", "f192", "f05e", "f007"]);
+    for (const name of icons) expect(displayWidth(nerd[name])).toBe(1);
+    for (const name of ["pointer", "up", "down", "dot", "rule", "vrule", "ellipsis", "mask"] as const) expect(nerd[name]).toBe(unicode[name]);
+    expect([nerd.tier, unicode.tier, glyphs("ascii").tier]).toEqual(["nerd", "unicode", "ascii"]);
+  });
+
+  test("an agent draws its own icon in the Nerd set, the default icon when unknown, and the shared glyph otherwise", () => {
+    const nerd = glyphs("nerd");
+    expect(agentGlyph("oh-my-claudeagent:oracle", nerd)).toBe("\u{f06e}");
+    expect(agentGlyph("executor", nerd)).toBe("\u{f085}");
+    expect(agentGlyph("general-purpose", nerd)).toBe("\u{f007}");
+    expect(agentGlyph("oh-my-claudeagent:oracle", glyphs("unicode"))).toBe("◆");
+    expect(agentGlyph("oh-my-claudeagent:oracle", glyphs("ascii"))).toBe("@");
+    for (const icon of Object.values(AGENT_ICONS)) expect(displayWidth(icon)).toBe(1);
   });
 });
 
 describe("keys and layout", () => {
   test("a key hint joins each key and label with the shared separator", () => {
     const pairs = [["n", "next"], ["p", "prev"], ["esc", "back"]] as const;
-    expect(keyHint(pairs, glyphs(false))).toBe("n next · p prev · esc back");
-    expect(keyHint(pairs, glyphs(true))).toBe("n next - p prev - esc back");
+    expect(keyHint(pairs, glyphs("unicode"))).toBe("n next · p prev · esc back");
+    expect(keyHint(pairs, glyphs("ascii"))).toBe("n next - p prev - esc back");
   });
 
   test("the right gutter keeps three columns free", () => {

@@ -22,7 +22,7 @@ allowed-tools:
 
 # omca-setup
 
-Checks what OMCA needs, then points the status line and the subagent status line at OMCA's renderer. The only file outside the plugin it writes is the user settings file (two keys), plus the launcher `omca/statusline.ts` beside it, and only after the user confirms the printed change. OMCA's server delivers the orchestration guidance on each session's first prompt, so setup writes nothing into `CLAUDE.md`.
+Checks what OMCA needs, asks whether the terminal font draws Nerd Font icons, then points the status line and the subagent status line at OMCA's renderer. The only file outside the plugin it writes is the user settings file (the two status line keys and `env.OMCA_GLYPHS`), plus the launcher `omca/statusline.ts` beside it, and only after the user confirms the printed change. OMCA's server delivers the orchestration guidance on each session's first prompt, so setup writes nothing into `CLAUDE.md`.
 
 The user settings directory is `$CLAUDE_CONFIG_DIR` when that variable is set and not empty, and `~/.claude` otherwise; the launcher goes under the same directory. In bash the settings file is `"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json"`. In PowerShell it is `"$(if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { "$HOME\.claude" })\settings.json"`. `SETTINGS` below stands for that quoted path in the shell the session uses.
 
@@ -64,7 +64,23 @@ When `ast-grep` is missing, run `sg --version` instead. Either one is PASS. Neit
 
 Call the `health_check` tool, loading it if needed: `ToolSearch({query: "select:mcp__plugin_oh-my-claudeagent_omca__health_check", max_results: 1})`. When `runtime` is `ok`, report PASS. Otherwise report the `runtime` value and `runtime_reason` verbatim, and continue: the status line works without the runtime. When the tool is still missing, OMCA's server is not connected; report that and continue.
 
-### Phase 3: status line
+### Phase 3: glyphs
+
+The `/omca` pane, the band and the status line draw Nerd Font icons unless `OMCA_GLYPHS` names `unicode` or `ascii`. No surface can see the terminal's font, so ask.
+
+1. Print this line exactly as written, so the user's terminal draws it: `   ` (a check in a circle, U+F05D, then gears, U+F085, an eye, U+F06E and a terminal prompt, U+F120).
+
+2. Ask with `AskUserQuestion` whether they see four small icons or boxes and blanks. When they see the icons, report `nerd` and end the phase.
+
+3. When they see boxes, preview the change:
+
+   ```bash
+   bun "${CLAUDE_PLUGIN_ROOT}/scripts/setup-statusline.ts" --settings SETTINGS --glyphs unicode --glyphs-only
+   ```
+
+   It prints `Already configured: ...` when the settings already name `unicode`; report that and end the phase. Otherwise show the printed diff unchanged and ask with `AskUserQuestion` whether to apply it. On yes, run the same command with `--yes`; on no, change nothing and print the command. `unicode` keeps every pane and status line glyph inside common monospace fonts; `ascii` is for plain-text output and screen readers.
+
+### Phase 4: status line
 
 The `statuslineMode` plugin option is `${user_config.statuslineMode}`. Claude Code substitutes the option into this file only when the user has set it, so when that still reads as a placeholder instead of `off` or `on`, the default `on` applies. When it is `off`, skip this phase.
 
@@ -88,7 +104,7 @@ The `statuslineMode` plugin option is `${user_config.statuslineMode}`. Claude Co
 
 The launcher runs the renderer of the enabled plugin install that Claude Code recorded most recently, under any marketplace, so a plugin update needs no second setup run. In a `--plugin-dir` checkout, with no installed version, the status line reads `omca: no installed plugin version found`.
 
-### Phase 4: force-style opt-out
+### Phase 5: force-style opt-out
 
 The `disableForceOrchestrationStyle` option is `${user_config.disableForceOrchestrationStyle}`; a placeholder means the default `false`. When it is not `true`, skip this phase.
 
@@ -102,6 +118,7 @@ Claude Code  PASS 2.1.288
 bun          PASS 1.4.2
 ast-grep     PASS 0.44.0 | WARN not found
 Runtime      PASS | <runtime>: <runtime_reason>
+Glyphs       nerd | unicode written | already unicode | declined
 Status line  configured | already configured | declined | off | <reason>
 Force style  stripped | already stripped | skipped
 ```
@@ -114,7 +131,7 @@ Force style  stripped | already stripped | skipped
    bun "${CLAUDE_PLUGIN_ROOT}/scripts/setup-statusline.ts" --settings SETTINGS --uninstall
    ```
 
-   It removes a `statusLine` or `subagentStatusLine` only when it runs OMCA's launcher, and the launcher file itself. When it prints `Nothing to remove: ...`, report that and go to step 3.
+   It removes a `statusLine` or `subagentStatusLine` only when it runs OMCA's launcher, the launcher file itself, and `OMCA_GLYPHS` from `env`. When it prints `Nothing to remove: ...`, report that and go to step 3.
 
 2. Show the diff, ask with `AskUserQuestion`, and on yes run the same command with `--yes`.
 
@@ -122,6 +139,6 @@ Force style  stripped | already stripped | skipped
 
 ## Constraints
 
-- Write only through `scripts/setup-statusline.ts`, after the user confirms the diff it printed, and through the Edit in phase 4.
+- Write only through `scripts/setup-statusline.ts`, after the user confirms the diff it printed, and through the Edit in phase 5.
 - Never edit project, local or managed settings.
 - A second run changes nothing that is already configured.

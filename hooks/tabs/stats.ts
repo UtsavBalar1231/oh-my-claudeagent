@@ -2,7 +2,7 @@ import type { RenderElement } from "claude-code";
 import { aggregate, type MetricsRecord, METRICS_DIR, parseRecords } from "../../src/core/metrics.ts";
 import { formatUsd, PRICING_AS_OF } from "../../src/core/pricing.ts";
 import { isSafeId } from "../../src/core/session-id.ts";
-import { displayWidth, fitEnd, formatDuration, formatTokens, padEnd, padStart, shortType } from "../../src/core/ui-kit.ts";
+import { agentGlyph, COLUMN_GAP, displayWidth, fitEnd, formatDuration, formatTokens, padEnd, padStart, shortType } from "../../src/core/ui-kit.ts";
 import { agentKey, fitPieces, type Level, levelMark, type Piece, piecesWidth, spark, stack, TONE_KEYS } from "../../src/core/visual.ts";
 import { type Host, reason, type State } from "../host.ts";
 import type { Subcommand } from "../omca-router.ts";
@@ -14,7 +14,6 @@ type StatsRow = Stats["rows"][number];
 
 const GAP = "  ";
 const MIN_NAME = 10;
-const COLUMN_GAP = 1;
 const CARD_FRAME = 4;
 // The sparkline never needs more cells than the widest body.
 const TURNS_KEPT = 200;
@@ -135,8 +134,8 @@ const COLUMNS = {
           [view.g.warn, row.outcomes.empty, TONE_KEYS.warn],
         ] as const
       ).flatMap(([glyph, count, color]) => [
-        { text: glyph, color: count === 0 ? TONE_KEYS.muted : color },
-        { text: padEnd(String(count), OUTCOME - displayWidth(glyph)), ...(count === 0 ? { color: TONE_KEYS.muted } : {}) },
+        { text: `${glyph} `, color: count === 0 ? TONE_KEYS.muted : color },
+        { text: padEnd(String(count), OUTCOME - displayWidth(glyph) - 1), ...(count === 0 ? { color: TONE_KEYS.muted } : {}) },
       ]),
   },
 } as const satisfies Record<string, Column>;
@@ -187,8 +186,8 @@ function agentsCard(stats: Stats, view: View, width: number): RenderElement {
         return Row(view.kit, {
           key: `stats-${row.agentType}`,
           pieces: [
-            { text: `${view.g.agent} `, color },
-            { text: padEnd(fitEnd(shortType(row.agentType), name, view.g.ellipsis), name), color },
+            { text: `${agentGlyph(row.agentType, view.g)} `, color },
+            { text: padEnd(fitEnd(shortType(row.agentType), name, view.g.ellipsis), name) },
             ...cells(columns.map((column) => column.cell(row, view, most))),
           ],
         });
@@ -235,7 +234,7 @@ const meterMark = (index: number): string => METER_MARKS[index % METER_MARKS.len
 // Whole entries, costliest first, as many as fit beside a count of the rest.
 function legendOf(shares: readonly StatsRow[], view: View, width: number): Piece[] {
   const entries = shares.map((row, index) => [
-    { text: `${view.isAscii ? meterMark(index) : view.g.agent} `, color: agentKey(row.agentType) },
+    { text: `${view.isAscii ? meterMark(index) : agentGlyph(row.agentType, view.g)} `, color: agentKey(row.agentType) },
     { text: `${shortType(row.agentType)} ${formatUsd(row.estimatedCostUsd)}` },
   ]);
   const out: Piece[] = [];

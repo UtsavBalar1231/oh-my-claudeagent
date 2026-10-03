@@ -41,7 +41,7 @@ const box = element("Box");
 const line = (pieces: readonly Piece[]) => text({ wrap: "truncate-end" }, ...pieces.map(({ text: run, ...style }) => text(style, run)));
 const button = (key: string, label: string) => ({ type: "Button", props: { key, label, hotkey: key, plain: true }, press: expect.anything() });
 const markdown = (key: string, source: string) => ({ type: "Markdown", props: { text: source, key } });
-const dated = (width: number, at: number, ascii = false) => line(rule(width, glyphs(ascii), ascii, formatWhen(at)));
+const dated = (width: number, at: number, ascii = false) => line(rule(width, glyphs(ascii ? "ascii" : "unicode"), ascii, formatWhen(at)));
 const styledCard = (borderStyle: string, key: string, border: string, width: number, title: string, ...children: unknown[]) =>
   box({ key, flexDirection: "column", borderStyle, borderColor: border, paddingX: 1, width }, text({ bold: true, color: "text", wrap: "truncate-end" }, title), ...children);
 const card = (key: string, border: string, width: number, title: string, ...children: unknown[]) => styledCard("round", key, border, width, title, ...children);
@@ -218,8 +218,8 @@ test("the empty and error states: no notepad anywhere, an empty bound notepad, a
   await ui.unmount();
 });
 
-test("OMCA_ASCII draws the notepad's card borders, rules, chip, separators and masks from the ASCII set", async ($, on) => {
-  world(on, FILES, {}, { OMCA_ASCII: "1" });
+test("OMCA_GLYPHS=ascii draws the notepad's card borders, rules, chip, separators and masks from the ASCII set", async ($, on) => {
+  world(on, FILES, {}, { OMCA_GLYPHS: "ascii" });
   const size: Size = { columns: 80, rows: 40, placement: "inline" };
   const ui = await open($, size);
   const inner = usableColumns(bodyColumns(size)) - 4;

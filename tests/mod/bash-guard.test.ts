@@ -36,7 +36,7 @@ type Question = { question: string; header: string; options: { label: string }[]
 function world(on: On, w: World = {}) {
   const asked: { question: string; header: string; options: string[] }[] = [];
   const checked: unknown[] = [];
-  const env: Record<string, string> = { HOME: "/home/u", ...w.env };
+  const env: Record<string, string> = { HOME: "/home/u", OMCA_GLYPHS: "unicode", ...w.env };
   const files = w.files ?? {};
   // The engine resolves a relative path against the session's folder before the hook sees it.
   const nodeAt = (raw: string) => {
@@ -484,8 +484,8 @@ test("more than 20 targets list the first 20 and count the rest", async ($, on) 
   expect(lines).toHaveLength(25);
 });
 
-test("a long path is middle-truncated to the dialog width, with an ASCII ellipsis under OMCA_ASCII", async ($, on) => {
-  const { asked } = world(on, { env: { OMCA_ASCII: "1" }, files: { [LONG_PATH]: { kind: "file" } } });
+test("a long path is middle-truncated to the dialog width, with an ASCII ellipsis under OMCA_GLYPHS=ascii", async ($, on) => {
+  const { asked } = world(on, { env: { OMCA_GLYPHS: "ascii" }, files: { [LONG_PATH]: { kind: "file" } } });
 
   await check($, `rm -r ${LONG_PATH}`);
 

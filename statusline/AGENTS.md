@@ -33,7 +33,7 @@ its own binding never shows another session's plan. It never writes the file.
 
 The renderer takes no tuning settings. `COLUMNS` and `LINES` from Claude Code size the layout.
 Lines use `COLUMNS` minus the 3 cells Claude Code keeps free on each side, measured in a live
-session. The only override is `CLAUDE_STATUSLINE_NERD_FONT=0`. `subagent.ts` also reads
+session. The only override is `OMCA_GLYPHS` (`nerd`, `unicode` or `ascii`), which the mod reads too. `subagent.ts` also reads
 `OMCA_SUBAGENT_STATUSLINE_DUMP`: when set, it appends each raw payload to that file, for
 recording fixtures. A new segment is an entry in its row in `fullRows`, at its priority
 position, built as a `block` when its width is fixed, with an entry in `RANK` that says when it

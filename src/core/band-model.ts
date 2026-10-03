@@ -1,6 +1,6 @@
 import { taskLines } from "./checkboxes.ts";
 import type { NextAction, NextActionKind } from "./next-actions.ts";
-import { arrange, displayWidth, fitEnd, type Glyphs, glyphs, oneLine, type Ranked, share, usableColumns } from "./ui-kit.ts";
+import { arrange, displayWidth, fitEnd, type Glyphs, glyphs, type GlyphTier, oneLine, type Ranked, share, usableColumns } from "./ui-kit.ts";
 import { bar, piecesWidth, type ThemeKey } from "./visual.ts";
 
 export type NextTask = { n: number; title: string };
@@ -21,10 +21,15 @@ export type BandButton = { key: NextActionKind; hotkey: string; label: string; p
 export type BandView = { status: readonly Span[]; buttons: readonly BandButton[] };
 
 type Part = Span & { isFlexible?: true };
-type Words = { noPlan: string; logged: string; unlogged: string };
+type Words = { noPlan: string; logged: string; unlogged: string; proof: Readonly<Record<keyof Proof, string>> };
 
-const FULL: Words = { noPlan: "no plan bound", logged: " evidence logged", unlogged: " evidence not logged" };
-const COMPACT: Words = { noPlan: "no plan", logged: " logged", unlogged: " not logged" };
+const FULL: Words = {
+  noPlan: "no plan bound",
+  logged: " evidence logged",
+  unlogged: " evidence not logged",
+  proof: { proven: " proven", unproven: " unproven", failed: " failed" },
+};
+const COMPACT: Words = { noPlan: "no plan", logged: " logged", unlogged: " not logged", proof: { proven: "", unproven: "", failed: "" } };
 
 // Below this many cells a flexible part (task title, command) stops reading as a name.
 const MIN_FLEXIBLE = 14;
@@ -59,12 +64,20 @@ const segment = (priority: number, parts: Part[]): Segment => ({
   min: parts.reduce((sum, part) => sum + (part.isFlexible ? Math.min(MIN_FLEXIBLE, displayWidth(part.text)) : displayWidth(part.text)), 0),
 });
 
-function proofParts({ proven, unproven, failed }: Proof, g: Glyphs): Part[] {
-  const count = (glyph: string, value: number, tone: Tone): Part[] => [
-    { text: glyph, tone: value > 0 ? tone : "muted" },
-    { text: String(value), tone: value > 0 ? "plain" : "muted" },
-  ];
-  return [...count(g.check, proven, "ok"), { text: " ", tone: "muted" }, ...count(g.warn, unproven, "warn"), { text: " ", tone: "muted" }, ...count(g.cross, failed, "fail")];
+// Only the counts that are not zero, each a glyph and a number, and a word while the band has room.
+function proofParts(proof: Proof, g: Glyphs, words: Words): Part[] {
+  const kinds = [
+    ["proven", g.check, "ok"],
+    ["unproven", g.warn, "warn"],
+    ["failed", g.cross, "fail"],
+  ] as const;
+  return kinds
+    .filter(([kind]) => proof[kind] > 0)
+    .flatMap(([kind, glyph, tone], index): Part[] => [
+      ...(index === 0 ? [] : [{ text: "  ", tone: "muted" as const }]),
+      { text: `${glyph} `, tone },
+      { text: `${proof[kind]}${words.proof[kind]}`, tone: "plain" },
+    ]);
 }
 
 function statusSegments(band: Band, words: Words, g: Glyphs, ascii: boolean, running: number): Segment[] {
@@ -88,7 +101,8 @@ function statusSegments(band: Band, words: Words, g: Glyphs, ascii: boolean, run
       );
     }
   }
-  if (proof !== undefined) segments.push(segment(PRIORITY.proof, proofParts(proof, g)));
+  const proven = proof === undefined ? [] : proofParts(proof, g, words);
+  if (proven.length > 0) segments.push(segment(PRIORITY.proof, proven));
   if (verification !== null) {
     const { isLogged } = verification;
     segments.push(
@@ -142,8 +156,9 @@ function clip(spans: readonly Span[], width: number, g: Glyphs): Span[] {
   return out.filter((span) => span.text !== "");
 }
 
-function statusRow(band: Band, width: number, ascii: boolean, running: number): Span[] {
-  const g = glyphs(ascii);
+function statusRow(band: Band, width: number, tier: GlyphTier, running: number): Span[] {
+  const g = glyphs(tier);
+  const ascii = tier === "ascii";
   const gap = displayWidth(` ${g.dot} `);
   const full = statusSegments(band, FULL, g, ascii, running);
   const kept = arrange(full, width, gap);
@@ -170,12 +185,12 @@ export function bandView(
   band: Band | undefined,
   actions: readonly NextAction[],
   columns: number,
-  ascii: boolean,
+  tier: GlyphTier,
   running = 0,
 ): BandView | undefined {
   if (band === undefined || (band.plan === null && band.error === null && actions.length === 0)) return undefined;
   return {
-    status: statusRow(band, Math.max(0, columns - MARK_CELLS), ascii, running),
-    buttons: buttonRow(actions, usableColumns(columns), glyphs(ascii)),
+    status: statusRow(band, Math.max(0, columns - MARK_CELLS), tier, running),
+    buttons: buttonRow(actions, usableColumns(columns), glyphs(tier)),
   };
 }

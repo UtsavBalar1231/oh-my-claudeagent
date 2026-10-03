@@ -4,10 +4,13 @@ import { dirname, join } from "node:path";
 import { parseArgs } from "node:util";
 import { unifiedDiff } from "../src/core/doctor-checks.ts";
 import { configDir, toPlatform, toPosix } from "../src/core/path.ts";
+import { isRecord } from "../src/core/tool-input.ts";
+import { type GlyphTier, isGlyphTier } from "../src/core/ui-kit.ts";
 
 type Member = { key: string; start: number; valueStart: number; end: number };
 
-const USAGE = "usage: bun scripts/setup-statusline.ts --settings <path> [--yes] [--uninstall]";
+const USAGE = "usage: bun scripts/setup-statusline.ts --settings <path> [--glyphs nerd|unicode|ascii [--glyphs-only]] [--yes] [--uninstall]";
+const GLYPHS_KEY = "OMCA_GLYPHS";
 const LAUNCHER_SOURCE = join(import.meta.dir, "..", "statusline", "launcher.ts");
 
 function fail(message: string, code = 1): never {
@@ -86,15 +89,25 @@ function isOurs(entry: unknown, suffix: string): boolean {
   return entry.command.replaceAll("\\", "/").replaceAll('"', "").endsWith(suffix);
 }
 
-let options: { settings?: string | undefined; yes: boolean; uninstall: boolean };
+let options: { settings?: string | undefined; glyphs?: string | undefined; "glyphs-only": boolean; yes: boolean; uninstall: boolean };
 try {
   options = parseArgs({
-    options: { settings: { type: "string" }, yes: { type: "boolean", default: false }, uninstall: { type: "boolean", default: false } },
+    options: {
+      settings: { type: "string" },
+      glyphs: { type: "string" },
+      "glyphs-only": { type: "boolean", default: false },
+      yes: { type: "boolean", default: false },
+      uninstall: { type: "boolean", default: false },
+    },
   }).values;
 } catch (error) {
   fail(`${reason(error)}\n${USAGE}`, 2);
 }
 const path = options.settings ?? fail(USAGE, 2);
+const glyphs: GlyphTier | undefined =
+  options.glyphs === undefined ? undefined : isGlyphTier(options.glyphs) ? options.glyphs : fail(`--glyphs takes nerd, unicode or ascii\n${USAGE}`, 2);
+const isGlyphsOnly = options["glyphs-only"];
+if (isGlyphsOnly && (glyphs === undefined || options.uninstall)) fail(`--glyphs-only needs --glyphs and no --uninstall\n${USAGE}`, 2);
 const bun = Bun.which("bun") ?? fail("bun is not on PATH");
 const launcher = join(configDir(process.env) ?? join(homedir(), ".claude"), "omca", "statusline.ts");
 const platform = toPlatform(process.platform);
@@ -122,7 +135,7 @@ if (typeof settings !== "object" || settings === null || Array.isArray(settings)
 const current: Record<string, unknown> = { ...settings };
 const expected: Record<string, unknown> = { ...settings };
 let after = base;
-for (const [key, value] of Object.entries(wanted)) {
+for (const [key, value] of Object.entries(isGlyphsOnly ? {} : wanted)) {
   const sibling = key === "statusLine" ? "subagentStatusLine" : "statusLine";
   if (options.uninstall && isOurs(current[key], key === "statusLine" ? launcherPath : `${launcherPath} --subagent`)) {
     after = removeMember(after, key);
@@ -132,12 +145,31 @@ for (const [key, value] of Object.entries(wanted)) {
     expected[key] = value;
   }
 }
+// The glyph set lives in `env`, which the mod and the status line both read; setup adds or removes only its own key there.
+if (current["env"] !== undefined && !isRecord(current["env"])) fail(`${path} holds an env that is not an object; nothing was written`);
+const env: Record<string, unknown> = isRecord(current["env"]) ? { ...current["env"] } : {};
+if (options.uninstall && Object.hasOwn(env, GLYPHS_KEY)) {
+  delete env[GLYPHS_KEY];
+  if (Object.keys(env).length === 0) {
+    after = removeMember(after, "env");
+    delete expected["env"];
+  } else {
+    after = setMember(after, "env", env, "env");
+    expected["env"] = env;
+  }
+} else if (!options.uninstall && glyphs !== undefined && env[GLYPHS_KEY] !== glyphs) {
+  env[GLYPHS_KEY] = glyphs;
+  after = setMember(after, "env", env, "subagentStatusLine");
+  expected["env"] = env;
+}
 if (!Bun.deepEquals(JSON.parse(after), expected, true)) fail(`could not edit ${path} without touching its other keys; nothing was written`);
 
 const launcherInstalled = existsSync(launcher);
-const launcherChanges = options.uninstall ? launcherInstalled : !launcherInstalled || readFileSync(launcher, "utf8") !== readFileSync(LAUNCHER_SOURCE, "utf8");
+const launcherChanges =
+  !isGlyphsOnly && (options.uninstall ? launcherInstalled : !launcherInstalled || readFileSync(launcher, "utf8") !== readFileSync(LAUNCHER_SOURCE, "utf8"));
 if (after === base && !launcherChanges) {
-  console.log(options.uninstall ? `Nothing to remove: no OMCA status line in ${path} and no ${launcher}.` : `Already configured: ${path} runs both status lines through ${launcher}.`);
+  const done = isGlyphsOnly ? `Already configured: ${path} sets ${GLYPHS_KEY} to ${glyphs}.` : `Already configured: ${path} runs both status lines through ${launcher}.`;
+  console.log(options.uninstall ? `Nothing to remove: no OMCA status line in ${path} and no ${launcher}.` : done);
   process.exit(0);
 }
 

@@ -188,7 +188,7 @@ export const bashGuard: Features = {
       const refusal = reasonFor(finding);
       const canAsk = host.options.guardMode === "dialog" && (await host.session.surfaces()).length > 0;
       if (!canAsk) return finding.kind === "blocking" ? deny(refusal) : undefined;
-      const g = glyphs((await sessionOf(host)).isAscii);
+      const g = glyphs((await sessionOf(host)).glyphTier);
       const text = await question(host, command, finding, g, ctx);
       const answer = await host.ui.ask(text, { header: "OMCA guard", options: [REFUSE, RUN] }).catch(() => undefined);
       return answer === RUN ? undefined : deny(refusal);

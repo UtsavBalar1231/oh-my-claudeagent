@@ -716,8 +716,8 @@ test("o keeps open tasks, f opens the Find field, and a filter that matches noth
   await ui.unmount();
 });
 
-test("OMCA_ASCII draws the board, its chips and bars from the ASCII set", async ($, on) => {
-  boardWorld(on, PASSING, { OMCA_ASCII: "1" });
+test("OMCA_GLYPHS=ascii draws the board, its chips and bars from the ASCII set", async ($, on) => {
+  boardWorld(on, PASSING, { OMCA_GLYPHS: "ascii" });
   await $.command.run(run("plan", 80));
   await $.agent.spawn(SPAWN);
   const ui = await $.ui.mount(pane("terminal", PAGE));

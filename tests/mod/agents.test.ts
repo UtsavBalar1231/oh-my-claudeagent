@@ -49,6 +49,8 @@ const finish = ($: Engine, agentId: string, answer: string, reason: "answer" | "
   $.turn.complete({ answer, durationMs: 1000, isAborted: reason === "aborted", turnId: `t-${agentId}`, reason, agentId, usage: usage(2000, 500) });
 
 const isCard = (node: Node) => node.props?.["position"] === "absolute";
+// A tool row: the spinner, the tool and its detail on the left, the call count at the right edge.
+const spread = (left: string, right: string, width = 51) => `${left}${" ".repeat(width - left.length - right.length)}${right}`;
 
 function textOf(element: unknown): string {
   if (typeof element === "string") return element;
@@ -93,45 +95,43 @@ async function threeAgents($: Engine, on: On) {
   return w;
 }
 
-test("each running agent gets a lane: identity, task, chips, tokens and elapsed, then its tool strip and current tool", async ($, on) => {
+test("each running agent gets a lane: identity, task, effort and elapsed, then its current tool and, at the right edge, how many calls it made", async ($, on) => {
   const w = await threeAgents($, on);
   await w.clock.advance(66_000);
   const ui = await $.ui.mount(pane("terminal", DOCK_120));
 
   expect(body(await ui.drawn()).slice(3)).toEqual([
-    "◆ 3 running · 0 finished · 9.0k tokens",
-    "◆ executor · Fix the heading pa…  high  4.5k  1m06s",
-    "  ○○✎$ ◑ Bash bun test src/parser.spec.ts",
-    "◆ explore · Map the router call…  high  3.0k  1m06s",
-    "  ○◇ ◑ ast_search",
-    "◆ oracle · Review the ledger de…  high  1.5k  1m06s",
-    "  ○ ◑ Read plans/p.md",
-    "d: Details   ○ read ✎ edit $ bash ◇ mcp ◆ agent",
+    "◆ executor · Fix the heading parser    high   1m06s",
+    spread("  · Bash bun test src/parser.spec.ts", "4 calls"),
+    "◆ explore · Map the router callers     high   1m06s",
+    spread("  · ast_search", "2 calls"),
+    "◆ oracle · Review the ledger design    high   1m06s",
+    spread("  · Read plans/p.md", "1 call"),
+    "d: Details  3 running · 0 finished · 9.0k tokens",
   ]);
   await ui.unmount();
 });
 
-test("the lane widens with the body, keeping the model chip, at 80 and 200 columns", async ($, on) => {
+test("the lane widens with the body, keeping the model column, at 80 and 200 columns", async ($, on) => {
   const w = await threeAgents($, on);
   await stepAll($, "a-3", 1);
   await w.clock.advance(66_000);
 
   const at80 = await $.ui.mount(pane("terminal", INLINE_80));
-  expect(body(await at80.drawn()).slice(1, 4)).toEqual([
-    "◆ 3 running · 0 finished · 10.5k tokens",
-    "◆ executor · Fix the heading parser        sonnet-5-5   high  4.5k  1m06s",
-    "  ○○✎$ ◑ Bash bun test src/parser.spec.ts",
+  expect(body(await at80.drawn()).slice(1, 3)).toEqual([
+    "◆ executor · Fix the heading parser              sonnet-5-5  high   1m06s",
+    spread("  · Bash bun test src/parser.spec.ts", "4 calls", 73),
   ]);
   await at80.unmount();
 
   const at200 = await $.ui.mount(pane("terminal", INLINE_200));
   const rows = body(await at200.drawn());
-  expect(rows[2]).toBe(`◆ executor · Fix the heading parser${" ".repeat(128)}sonnet-5-5   high  4.5k  1m06s`);
-  expect(rows.at(-1)).toBe("d: Details   ○ read ✎ edit $ bash ◇ mcp ◆ agent");
+  expect(rows[1]).toBe(`◆ executor · Fix the heading parser${" ".repeat(134)}sonnet-5-5  high   1m06s`);
+  expect(rows.at(-1)).toBe("d: Details  3 running · 0 finished · 10.5k tokens");
   await at200.unmount();
 });
 
-test("tool calls draw one glyph each in their kind's key, the current tool's name in text, identity in its key and the clock muted", async ($, on) => {
+test("the current tool's name draws in text with the call count muted at the right edge, the identity glyph in its key, the name in text and the columns muted", async ($, on) => {
   await threeAgents($, on);
   const ui = await $.ui.mount(pane("terminal", INLINE_80));
   const lane = await ui.find({ key: "tools-a-1" });
@@ -141,26 +141,23 @@ test("tool calls draw one glyph each in their kind's key, the current tool's nam
 
   expect(styled(lane)).toEqual([
     ["  ", undefined, undefined],
-    ["○○", "rainbow_blue", undefined],
-    ["✎", "rainbow_violet", undefined],
-    ["$", "rainbow_orange", undefined],
-    [" ", undefined, undefined],
-    ["◐", "claude", undefined],
+    ["·", "claude", undefined],
     [" ", undefined, undefined],
     ["Bash", "text", undefined],
     [" bun test src/parser.spec.ts", undefined, undefined],
+    [" ".repeat(30), undefined, undefined],
+    ["4 calls", "inactive", undefined],
   ]);
   expect(styled(head).filter(([text]) => text.trim() !== "")).toEqual([
     ["◆ ", "green_FOR_SUBAGENTS_ONLY", undefined],
-    ["executor", "green_FOR_SUBAGENTS_ONLY", undefined],
-    [" · Fix the heading parser      ", undefined, undefined],
-    [" sonnet-5-5 ", "inverseText", "permission"],
-    [" high ", "inverseText", "inactive"],
-    ["4.5k", "inactive", undefined],
+    ["executor", "text", undefined],
+    [` · Fix the heading parser${" ".repeat(12)}`, undefined, undefined],
+    ["sonnet-5-5", "inactive", undefined],
+    ["high", "inactive", undefined],
     ["    0s", "inactive", undefined],
   ]);
   const explore = await ui.find({ key: "tools-a-2" });
-  expect(styled(explore).find(([text]) => text === "◇")).toEqual(["◇", "rainbow_indigo", undefined]);
+  expect(styled(explore).at(-1)).toEqual(["2 calls", "inactive", undefined]);
   expect(styled(await ui.find({ key: "lane-a-2" }))[0]).toEqual(["◆ ", "blue_FOR_SUBAGENTS_ONLY", undefined]);
   await ui.unmount();
 });
@@ -175,12 +172,11 @@ test("a finished agent collapses to one dim line with its result and duration, a
   const ui = await $.ui.mount(pane("terminal", DOCK_120));
 
   expect(body(await ui.drawn()).slice(3)).toEqual([
-    "◆ 1 running · 2 finished · 9.5k tokens",
-    "◆ executor · Fix the heading pa…  high  4.5k    15s",
-    "  ○○✎$ ◒ Bash bun test src/parser.spec.ts",
+    "◆ executor · Fix the heading parser    high     15s",
+    spread("  ✶ Bash bun test src/parser.spec.ts", "4 calls"),
     "! oracle · stopped                              15s",
-    "✓ explore · Mapped 14 callers of the router.    12s",
-    "d: Details   ○ read ✎ edit $ bash ◇ mcp ◆ agent",
+    "✓ explore · Mapped 14 callers of the route…     12s",
+    "d: Details  1 running · 2 finished · 9.5k tokens",
   ]);
   const done = await ui.find({ key: "done-a-2" });
   const pieces = isNode(done) ? (childrenOf(childrenOf(done)[0] as Node) as Node[]) : [];
@@ -250,11 +246,11 @@ test("hovering a lane reveals a card, drawn last so it paints over the rows belo
     "afterwards.",
     "Last output",
     "It holds token=‹masked› here",
-    "1 tool call · 2 masked",
+    "1 tool call · 1.5k tokens · 2 secrets masked",
   ]);
   expect(JSON.stringify(await ui.drawn())).not.toContain("s3cr3t");
   expect(JSON.stringify(await ui.drawn())).not.toContain("abcdefghij");
-  expect(body(await ui.drawn())[5]).toBe("  ○ ◐ Read ~/.env");
+  expect(body(await ui.drawn())[4]).toBe(spread("  · Read ~/.env", "1 call"));
   await ui.unmount();
 });
 
@@ -262,7 +258,7 @@ test("a card that cannot fit below its lane in a short inline body is pinned ins
   await threeAgents($, on);
   const ui = await $.ui.mount(pane("terminal", INLINE_80));
   const tops = await Promise.all(["a-1", "a-2", "a-3"].map(async (id) => (await ui.find({ key: `card-${id}` }))?.props["top"]));
-  expect(tops).toEqual([-6, -6, -6]);
+  expect(tops).toEqual([-5, -5, -5]);
   const panel = await ui.find({ key: "card-a-1" });
   expect(isNode(panel) ? childrenOf(panel).map(textOf) : []).toEqual([
     "executor · Fix the heading parser",
@@ -270,7 +266,7 @@ test("a card that cannot fit below its lane in a short inline body is pinned ins
     "Fix the heading parser so fenced lines are skipped.",
     "Last output",
     "Found the heading rule.",
-    "4 tool calls",
+    "4 tool calls · 4.5k tokens",
   ]);
   await ui.unmount();
 });
@@ -288,44 +284,47 @@ test("a prompt is masked before it is cut, so a secret at the cut never shows in
   await ui.unmount();
 });
 
-test("d shows each running lane's prompt and last output under it, and d again hides them", async ($, on) => {
+test("d shows each running lane's prompt, last output and usage under it, and d again hides them", async ($, on) => {
   const w = await threeAgents($, on);
   await finish($, "a-3", "The ledger holds.");
   w.agents = w.agents.slice(0, 2);
   const ui = await $.ui.mount(pane("terminal", DOCK_120));
 
   await ui.press({ key: "d" });
-  expect(body(await ui.drawn()).slice(4)).toEqual([
-    "◆ executor · Fix the heading pa…  high  4.5k     0s",
-    "  ○○✎$ ◐ Bash bun test src/parser.spec.ts",
-    "  prompt Fix the heading parser so fenced lines ar…",
-    "  output Found the heading rule.",
-    "◆ explore · Map the router call…  high  3.0k     0s",
-    "  ○◇ ◐ ast_search",
-    "  prompt Find every caller of the router.",
-    "  output none yet",
+  expect(body(await ui.drawn()).slice(3)).toEqual([
+    "◆ executor · Fix the heading parser    high      0s",
+    spread("  · Bash bun test src/parser.spec.ts", "4 calls"),
+    "  prompt  Fix the heading parser so fenced lines a…",
+    "  output  Found the heading rule.",
+    "  usage   4 tool calls · 4.5k tokens",
+    "◆ explore · Map the router callers     high      0s",
+    spread("  · ast_search", "2 calls"),
+    "  prompt  Find every caller of the router.",
+    "  output  none yet",
+    "  usage   2 tool calls · 3.0k tokens",
     "✓ oracle · The ledger holds.                     0s",
-    "d: Hide details   ○ read ✎ edit $ bash ◇ mcp",
+    "d: Hide details  2 running · 1 finished",
   ]);
 
   await ui.press({ key: "d" });
-  expect(body(await ui.drawn()).at(-1)).toBe("d: Details   ○ read ✎ edit $ bash ◇ mcp ◆ agent");
-  expect(body(await ui.drawn())).not.toContain("  output none yet");
+  expect(body(await ui.drawn()).at(-1)).toBe("d: Details  2 running · 1 finished · 10.0k tokens");
+  expect(body(await ui.drawn())).not.toContain("  output  none yet");
   await ui.unmount();
 });
 
 test("the spinner and the elapsed clocks move once a second while an agent runs", async ($, on) => {
   const w = await threeAgents($, on);
   const ui = await $.ui.mount(pane("terminal", DOCK_120));
-  const lane = async () => body(await ui.drawn()).slice(4, 6);
+  const lane = async () => body(await ui.drawn()).slice(3, 5);
+  const tools = (frame: string) => spread(`  ${frame} Bash bun test src/parser.spec.ts`, "4 calls");
 
-  expect(await lane()).toEqual(["◆ executor · Fix the heading pa…  high  4.5k     0s", "  ○○✎$ ◐ Bash bun test src/parser.spec.ts"]);
+  expect(await lane()).toEqual(["◆ executor · Fix the heading parser    high      0s", tools("·")]);
   await w.clock.advance(1000);
-  expect(await lane()).toEqual(["◆ executor · Fix the heading pa…  high  4.5k     1s", "  ○○✎$ ◓ Bash bun test src/parser.spec.ts"]);
+  expect(await lane()).toEqual(["◆ executor · Fix the heading parser    high      1s", tools("✢")]);
   await w.clock.advance(999);
-  expect((await lane())[1]).toBe("  ○○✎$ ◓ Bash bun test src/parser.spec.ts");
+  expect((await lane())[1]).toBe(tools("✢"));
   await w.clock.advance(1);
-  expect(await lane()).toEqual(["◆ executor · Fix the heading pa…  high  4.5k     2s", "  ○○✎$ ◑ Bash bun test src/parser.spec.ts"]);
+  expect(await lane()).toEqual(["◆ executor · Fix the heading parser    high      2s", tools("✳")]);
   await ui.unmount();
 });
 
@@ -339,10 +338,9 @@ test("agents past the inline body are counted on one row, and the keys row stays
   const ui = await $.ui.mount(pane("terminal", INLINE_80));
 
   const rows = body(await ui.drawn());
-  expect(rows.slice(1, 2)).toEqual(["◆ 5 running · 1 finished · 2.5k tokens"]);
-  expect(rows.filter((row) => row.startsWith("  ◐ starting"))).toHaveLength(3);
-  expect(rows.slice(-2)).toEqual(["… 2 more running · 1 more finished", "d: Details   ○ read ✎ edit $ bash ◇ mcp ◆ agent"]);
-  expect(rows).toHaveLength(10);
+  expect(rows.filter((row) => row.startsWith("  · starting"))).toHaveLength(4);
+  expect(rows.slice(-2)).toEqual(["… 1 more running · 1 more finished", "d: Details  5 running · 1 finished · 2.5k tokens"]);
+  expect(rows).toHaveLength(11);
   await ui.unmount();
 });
 
@@ -360,7 +358,7 @@ test("parallel spawns and steps each keep their own lane", async ($, on) => {
   const ui = await $.ui.mount(pane("terminal", DOCK_120));
 
   const tools = await Promise.all(["a-1", "a-2", "a-3"].map(async (id) => textOf(await ui.find({ key: `tools-${id}` }))));
-  expect(tools).toEqual(["  ○ ◐ Read a.ts", "  $ ◐ Bash just test", "  ✎ ◐ Edit c.ts"]);
+  expect(tools).toEqual([spread("  · Read a.ts", "1 call"), spread("  · Bash just test", "1 call"), spread("  · Edit c.ts", "1 call")]);
   expect(w.logs.filter((line) => line.startsWith("agentsTracker"))).toEqual([]);
   await ui.unmount();
 });
@@ -373,13 +371,13 @@ test("a routed delegation's lane keeps the prompt without its routing line", asy
   w.agents = [{ id: "a-1", description: "", type: "x", status: "running" }];
   await $.ui.mount(pane("terminal", DOCK_120)).then(async (ui) => {
     await ui.press({ key: "d" });
-    expect(body(await ui.drawn())).toContain("  prompt Port module 1.");
+    expect(body(await ui.drawn())).toContain("  prompt  Port module 1.");
     await ui.unmount();
   });
 });
 
-test("OMCA_ASCII draws the lanes, strip, spinner and chips in ASCII", async ($, on) => {
-  const w = world(on, {}, {}, { OMCA_ASCII: "1" });
+test("OMCA_GLYPHS=ascii draws the lanes and the spinner in ASCII", async ($, on) => {
+  const w = world(on, {}, {}, { OMCA_GLYPHS: "ascii" });
   engine(on, STEPS);
   await $.command.run(run(""));
   await $.agent.spawn(spawnOf(1, "executor", "Fix the heading parser", "Fix it."));
@@ -388,11 +386,27 @@ test("OMCA_ASCII draws the lanes, strip, spinner and chips in ASCII", async ($, 
   const ui = await $.ui.mount(pane("terminal", INLINE_80));
 
   expect(body(await ui.drawn()).slice(1)).toEqual([
-    "@ 1 running - 0 finished - 4.5k tokens",
-    "@ executor - Fix the heading parser       [sonnet-5-5] [high] 4.5k     0s",
-    "  rre$ | Bash bun test src/parser.spec.ts",
-    "d: Details   r read e edit $ bash m mcp @ agent",
+    `@ executor - Fix the heading parser${" ".repeat(14)}sonnet-5-5  high      0s`,
+    spread("  | Bash bun test src/parser.spec.ts", "4 calls", 73),
+    "d: Details  1 running - 0 finished - 4.5k tokens",
   ]);
   expect(body(await ui.drawn()).filter((row) => !isAscii(row))).toEqual([]);
+  await ui.unmount();
+});
+
+test("by default each agent draws its own Nerd Font icon, a space after it", async ($, on) => {
+  const w = world(on, {}, {}, { OMCA_GLYPHS: "" });
+  engine(on, STEPS);
+  await $.command.run(run(""));
+  await $.agent.spawn(spawnOf(1, "executor", "Fix the heading parser", "Fix it."));
+  await $.agent.spawn(spawnOf(2, "oracle", "Review the ledger design", "Review it."));
+  w.agents = ["a-1", "a-2"].map((id) => ({ id, description: "", type: "x", status: "running" }));
+  await finish($, "a-2", "The ledger holds.");
+  w.agents = w.agents.slice(0, 1);
+  const ui = await $.ui.mount(pane("terminal", DOCK_120));
+
+  const rows = body(await ui.drawn()).slice(3);
+  expect(rows[0]).toStartWith("\u{f085} executor · ");
+  expect(rows[2]).toStartWith("\u{f05d} oracle · The ledger holds.");
   await ui.unmount();
 });

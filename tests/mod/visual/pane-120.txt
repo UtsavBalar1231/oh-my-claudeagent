@@ -1,13 +1,13 @@
                                                                │1: Agents  2: Plan  3: Evidence  4: Notepad            ✕
  ▐▛███▛█   Claude Code v2.1.288                                │5: Feedback  6: Stats  7: Doctor
 ▝▜██████▀  Opus 5.5 · API Usage Billing                        │─────────────────────────────────────────────────────
- ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/cwd               │◆ 2 running · 1 finished · 14 tokens
-                                                               │◆ executor · Fix the heading parser    high  6     4s
-                                                               │  ○✎$ ◑ Bash sleep 90
-❯ Fix the parser with the executor                             │◆ oracle · Review the ledger design   xhigh  6     4s
-                                                               │  ○◇$ ◑ Bash sleep 90
-● 3 background agents launched (↓ to manage)                   │✓ explore · The rotation is safe: a crash mid…     0s
-   ├ oh-my-claudeagent:executor (Fix the heading parser)       │d: Details   ○ read ✎ edit $ bash ◇ mcp ◆ agent
+ ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/cwd               │ executor · Fix the heading parser     high       2s
+                                                               │  · Bash sleep 90                             3 calls
+                                                               │ oracle · Review the ledger design     xhigh      2s
+❯ Fix the parser with the executor                             │  · Bash sleep 90                             3 calls
+                                                               │ explore · The rotation is safe: a crash mi…      0s
+● 3 background agents launched (↓ to manage)                   │d: Details  2 running · 1 finished · 14 tokens
+   ├ oh-my-claudeagent:executor (Fix the heading parser)       │
    ├ oh-my-claudeagent:explore (Map the router callers)        │
    └ oh-my-claudeagent:oracle (Review the ledger design)       │
                                                                │
@@ -28,7 +28,7 @@
   cost                                                         │
                                                                │
                                                                │
-█▎███ 12/46 · next 13 Port the snapshot and… · ◆ 2 running  [-]│
+█▎███ 12/46 · next 13 Port the snapshot and… ·  2 running  [-]│
                                            ◐ medium · /effort  │
 ─────────────────────────────────────────────────────────────────────────────────────────────────── OMCA: 46-task-plan ─
 ❯ 
@@ -36,5 +36,5 @@
   ⏸ manual mode on · /tasks to see subagents · ← for agents · ↓ to manage
 
   ● main
-  ◯ oh-my-claudeagent:executor  Fix the heading parser                                                5s · ↓ 42 tokens
-  ◯ oh-my-claudeagent:oracle    Review the ledger design                                              4s · ↓ 21 tokens
+  ◯ oh-my-claudeagent:executor  Fix the heading parser                                                3s · ↓ 42 tokens
+  ◯ oh-my-claudeagent:oracle    Review the ledger design                                              2s · ↓ 21 tokens

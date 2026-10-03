@@ -1,8 +1,20 @@
-const UNICODE = {
+export const GLYPH_TIERS = ["nerd", "unicode", "ascii"] as const;
+export type GlyphTier = (typeof GLYPH_TIERS)[number];
+
+export const isGlyphTier = (value: string): value is GlyphTier => GLYPH_TIERS.some((tier) => tier === value);
+
+/** `OMCA_GLYPHS` read as a tier: unset, empty or unknown is `nerd`, since no surface can see the terminal's font. */
+export function glyphTier(value: string | undefined): GlyphTier {
+  const wanted = value?.trim().toLowerCase() ?? "";
+  return isGlyphTier(wanted) ? wanted : "nerd";
+}
+
+const UNICODE_SET = {
   pointer: "❯",
   check: "✓",
   cross: "✗",
   warn: "!",
+  info: "i",
   running: "●",
   pending: "○",
   up: "↑",
@@ -17,13 +29,33 @@ const UNICODE = {
   mask: "‹masked›",
 } as const;
 
-export type Glyphs = { readonly [K in keyof typeof UNICODE]: string };
+export type Glyphs = { readonly tier: GlyphTier } & { readonly [K in keyof typeof UNICODE_SET]: string };
+
+const UNICODE: Glyphs = { tier: "unicode", ...UNICODE_SET };
+
+// Nerd Font glyphs present at the same code point in Nerd Fonts v2 and v3. A plain Nerd Font draws
+// them up to 1.9 cells wide on a one-cell advance, so each one is drawn before a space or a row's end.
+const NERD: Glyphs = {
+  ...UNICODE,
+  tier: "nerd",
+  check: "\u{f05d}",
+  cross: "\u{f057}",
+  warn: "\u{f06a}",
+  info: "\u{f05a}",
+  pending: "\u{f10c}",
+  running: "\u{f111}",
+  progress: "\u{f192}",
+  blocked: "\u{f05e}",
+  agent: "\u{f007}",
+};
 
 const ASCII: Glyphs = {
+  tier: "ascii",
   pointer: ">",
   check: "+",
   cross: "x",
   warn: "!",
+  info: "i",
   running: "*",
   pending: "o",
   up: "^",
@@ -38,13 +70,40 @@ const ASCII: Glyphs = {
   mask: "<masked>",
 };
 
-export function isAsciiRequested(value: string | undefined): boolean {
-  return value !== undefined && /^(1|true|yes|on)$/i.test(value.trim());
+export function glyphs(tier: GlyphTier): Glyphs {
+  switch (tier) {
+    case "nerd":
+      return NERD;
+    case "unicode":
+      return UNICODE;
+    case "ascii":
+      return ASCII;
+  }
 }
 
-export function glyphs(ascii: boolean): Glyphs {
-  return ascii ? ASCII : UNICODE;
+/** Each roster agent's Nerd Font icon, shared with the status line. */
+export const AGENT_ICONS: Readonly<Record<string, string>> = {
+  executor: "\u{f085}",
+  explore: "\u{f14e}",
+  hephaestus: "\u{f0ad}",
+  librarian: "\u{f02d}",
+  metis: "\u{f002}",
+  momus: "\u{f075}",
+  "multimodal-looker": "\u{f030}",
+  oracle: "\u{f06e}",
+  prometheus: "\u{f06d}",
+  sisyphus: "\u{f01e}",
+};
+
+/** The agent's own icon in the Nerd tier, the shared agent glyph in the others. */
+export function agentGlyph(type: string, g: Glyphs): string {
+  if (g.tier !== "nerd") return g.agent;
+  const name = shortType(type);
+  return (Object.hasOwn(AGENT_ICONS, name) ? AGENT_ICONS[name] : undefined) ?? g.agent;
 }
+
+/** The cells between two columns, two keys, or a chip's neighbours, everywhere OMCA draws. */
+export const COLUMN_GAP = 2;
 
 export const KEYS = {
   next: "n",

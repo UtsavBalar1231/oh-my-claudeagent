@@ -28,13 +28,17 @@ hand.
   and the band follow the theme you pick, a custom one in `~/.claude/themes/` included, and every
   state also carries a glyph and a word. A state's color goes on its glyph, and the text beside it
   stays in the theme's text color. Secrets in commands, output and notes are drawn as
-  `‹masked›` and your home folder as `~`, and `OMCA_ASCII=1` draws everything from an ASCII set.
+  `‹masked›` and your home folder as `~`. `OMCA_GLYPHS` picks the glyph set for the pane, the
+  band and the status line alike: `nerd` (the default, Nerd Font icons, an agent's own icon among
+  them), `unicode` for a font without Nerd Font glyphs, or `ascii` for plain text. Setup asks
+  which one your terminal draws.
   `/omca plan`, `/omca stats` and `/omca doctor` open the pane on that tab. Ctrl+X then Tab, or a
   click, focuses it; Esc, the close mark or Ctrl+X then X closes it.
-- **The Agents tab.** Each running subagent gets a lane with its task, model and effort, tokens,
-  elapsed time and a strip of its recent tool calls by kind. A finished agent shrinks to one line
-  with the first line of its result and its duration. Pointing at a lane, or `d`, shows its prompt
-  and last output.
+- **The Agents tab.** Each running subagent gets a lane with its task, model and effort in aligned
+  columns, and its elapsed time; below it, the tool it runs now and how many tool calls it has
+  made. A finished agent shrinks to one line with the first line of its result and its duration.
+  The key row counts the running and finished agents and their tokens. Pointing at a lane, or `d`,
+  shows its prompt, last output, tool calls and tokens.
 - **The plan board.** `/omca plan` opens the bound plan and `/omca plan <name or path>` opens
   another. A plan with numbered tasks opens on a board: the plan's status, a progress bar, proof
   counts, the next task and the running agents, then the tasks by milestone, each with its state,
@@ -50,11 +54,11 @@ hand.
   place.
 - **The proof ledger.** The Evidence tab opens on a verdict for the bound plan's final
   verification: COMPLETE when a passing one matches the plan file as it is now, STALE when the plan
-  changed after it passed, MISSING otherwise, with the last 30 exit codes as a strip of dots. Below
-  it the logged runs are grouped by day, and the focused run shows its command and output with
-  secrets masked. Each run's exit code chip holds three digits, so codes up to 255 line up. `b`,
-  `t`, `l`, `m` and `v` keep one type, `x` keeps failures, `f` finds runs by command, `c` copies
-  the command and `r` fills a rerun request.
+  changed after it passed, MISSING otherwise, and under it whether the newest build, test, lint and
+  manual run each passed. Below it the logged runs are grouped by day, each with its outcome, time,
+  type, command and agent, and the focused run shows its command, output and exit code with
+  secrets masked. `t` steps through the types, `x` keeps failures, `f` finds runs by command, `c`
+  copies the command and `r` fills a rerun request.
 - **The Notepad tab.** One card per section of the bound plan's notepad, each entry under its
   date. `f` finds text in the entries, `w` clears the search and `l` picks another plan's
   notepad.
@@ -354,6 +358,8 @@ hand.
 8. Replace any `comment-checker-disable-file` marker with `comment-gate-disable-file`.
 9. If you relied on the trusted-tooling auto-allow, add allow rules such as `Bash(bun run *)` or
    run `/fewer-permission-prompts`.
+10. Replace `CLAUDE_STATUSLINE_NERD_FONT=0` with `OMCA_GLYPHS=unicode`, which draws the same status
+    line, or `OMCA_GLYPHS=ascii` for plain text. The old variable is no longer read.
 
 State files that 2.x left under `.omca/state/` are no longer read, and `.omca/logs/` no longer
 grows apart from `file-access.jsonl`. You can delete them.

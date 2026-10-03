@@ -1,7 +1,7 @@
 import { windowEnd } from "./list-window.ts";
 import { isRecord } from "./tool-input.ts";
 import { dayOf } from "./ui-kit.ts";
-import { type Level, redact } from "./visual.ts";
+import { redact } from "./visual.ts";
 
 export const EVIDENCE_TYPES = [
   "build",
@@ -13,12 +13,12 @@ export const EVIDENCE_TYPES = [
 
 export type EvidenceType = (typeof EVIDENCE_TYPES)[number];
 
-export const TYPE_LABELS: Readonly<Record<EvidenceType, string>> = {
-  build: "BUILD",
-  test: "TEST",
-  lint: "LINT",
-  manual: "MANUAL",
-  final_verification: "FINAL",
+export const TYPE_WORDS: Readonly<Record<EvidenceType, string>> = {
+  build: "build",
+  test: "test",
+  lint: "lint",
+  manual: "manual",
+  final_verification: "final",
 };
 
 export type Evidence = {
@@ -86,19 +86,26 @@ export function verdictOf(entries: readonly Evidence[], planSha: string): Verdic
   return { kind: "missing", failed: finals[0] ?? null };
 }
 
-export type Tally = { type: EvidenceType; runs: number; failed: number };
+export type Latest = { type: EvidenceType; isPassing: boolean };
 
-/** Runs and failures per type, in ledger type order, leaving out types with no run. */
-export function tallies(entries: readonly Evidence[]): Tally[] {
+/**
+ * Whether each proving type's newest run passed, in ledger type order, leaving out types never run
+ * and the final verification, whose state the verdict reads.
+ */
+export function latestByType(entries: readonly Evidence[]): Latest[] {
   return EVIDENCE_TYPES.flatMap((type) => {
-    const runs = entries.filter((entry) => entry.type === type);
-    return runs.length === 0 ? [] : [{ type, runs: runs.length, failed: runs.filter((entry) => entry.exitCode !== 0).length }];
+    if (type === "final_verification") return [];
+    const last = entries.findLast((entry) => entry.type === type);
+    return last === undefined ? [] : [{ type, isPassing: last.exitCode === 0 }];
   });
 }
 
-/** The outcome of each of the last `count` runs, oldest first. */
-export const recentLevels = (entries: readonly Evidence[], count: number): Level[] =>
-  entries.slice(-count).map((entry) => (entry.exitCode === 0 ? "ok" : "fail"));
+/** The type filter after `current`, through the types the ledger holds in ledger type order, then none. */
+export function nextTypeFilter(entries: readonly Evidence[], current: EvidenceType | null): EvidenceType | null {
+  const present = EVIDENCE_TYPES.filter((type) => entries.some((entry) => entry.type === type));
+  if (current === null) return present[0] ?? null;
+  return present[present.indexOf(current) + 1] ?? null;
+}
 
 export type Filter = { type: EvidenceType | null; isFailuresOnly: boolean; query: string };
 
@@ -112,7 +119,7 @@ export function shownIndices(entries: readonly Evidence[], filter: Filter, home:
     if (filter.type !== null && entry.type !== filter.type) continue;
     if (filter.isFailuresOnly && entry.exitCode === 0) continue;
     if (query !== "") {
-      const haystack = [redact(entry.command, home).text, entry.verifiedBy ?? "", TYPE_LABELS[entry.type]].join("\n").toLowerCase();
+      const haystack = [redact(entry.command, home).text, entry.verifiedBy ?? "", TYPE_WORDS[entry.type]].join("\n").toLowerCase();
       if (!haystack.includes(query)) continue;
     }
     shown.push(index);

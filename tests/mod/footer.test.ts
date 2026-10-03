@@ -146,7 +146,7 @@ test("a host that keeps no cost ledger leaves the cost out", async ($, on) => {
 
 for (const [glyphSet, env, line] of [
   ["Unicode", {}, "4s · 12.3k in 845 out · ! no evidence: bun test sr…"],
-  ["ASCII", { OMCA_ASCII: "1" }, "4s - 12.3k in 845 out - ! no evidence: bun test..."],
+  ["ASCII", { OMCA_GLYPHS: "ascii" }, "4s - 12.3k in 845 out - ! no evidence: bun test..."],
 ] as const) {
   test(`the footer is one line that keeps to one row of an 80-column terminal, in the ${glyphSet} glyph set`, async ($, on) => {
     const { w, meter } = engine(on, { [STATUS]: statusFile(LONG, STARTED_S + 2) }, env);

@@ -179,10 +179,11 @@ takes the cost's place.
 
 `/omca` opens the OMCA pane on its Agents tab. Each tab has a digit key:
 
-1. **Agents**: a lane for each running subagent with its task, model, effort, tokens, elapsed
-   time and a strip of its recent tool calls, one glyph per kind (read, edit, bash, MCP, agent).
-   A finished agent shrinks to one line with the first line of its result and its duration.
-   Point at a lane, or press `d`, to see its prompt and last output.
+1. **Agents**: a lane for each running subagent with its task, model, effort and elapsed time,
+   then the tool it runs now and how many tool calls it has made. A finished agent shrinks to one
+   line with the first line of its result and its duration. The key row counts the running and
+   finished agents and the tokens they spent. Point at a lane, or press `d`, to see its prompt,
+   last output, tool calls and tokens.
 2. **Plan**: the plan board, below.
 3. **Evidence**: the proof ledger, below.
 4. **Notepad**: one card per section of the bound plan's notepad, each entry under its date. `f`
@@ -248,15 +249,16 @@ lists no file, or whose files do not exist, gets no chip.
 
 The Evidence tab opens on a verdict for the bound plan: **COMPLETE** when a passing final
 verification matches the plan file as it is now, **STALE** when the plan changed after it passed,
-and **MISSING** when none passed. A strip of dots shows the exit codes of the last 30 runs.
+and **MISSING** when none passed. Under it a checklist says whether the newest build, test, lint
+and manual run each passed.
 
-Below it the runs are grouped by day, newest first, each with its time, type, exit code, command
+Below it the runs are grouped by day, newest first, each with its outcome, time, type, command
 and the agent that logged it. Up and Down move the focus, and the focused run opens to show its
-command and output.
+command, output and exit code.
 
 | Key | Action |
 | --- | --- |
-| `b`, `t`, `l`, `m`, `v` | Show only build, test, lint, manual or final verification runs; again to show all |
+| `t` | Step through the types the log holds, one at a time, then back to all |
 | `x` | Show failed runs only |
 | `f` | Find runs by their command |
 | `c` | Copy the focused command as drawn, secrets masked |
@@ -362,8 +364,9 @@ against that limit.
 The subagent status line gives each running agent a row with its model, state, effort and
 context use.
 
-Set `CLAUDE_STATUSLINE_NERD_FONT=0` for ASCII glyphs. [`statusline/README.md`](../statusline/README.md)
-has the layout rules.
+The status line and the `/omca` pane draw Nerd Font icons. Set `OMCA_GLYPHS=unicode` when the
+terminal font has none, or `OMCA_GLYPHS=ascii` for plain text; `/oh-my-claudeagent:omca-setup`
+asks and writes it for you. [`statusline/README.md`](../statusline/README.md) has the layout rules.
 
 ## Project rules
 
@@ -433,5 +436,5 @@ that would prompt is denied instead. Run setup in a mode that can prompt.
 **A hook change does not take effect.** Close the `/plugin` menu or start a new session; for a
 `--plugin-dir` checkout, run `/reload-plugins`.
 
-**The status line is hard to read with a screen reader.** `CLAUDE_STATUSLINE_NERD_FONT=0`
-replaces the glyphs with text. The status line still writes color escapes.
+**The status line is hard to read with a screen reader.** `OMCA_GLYPHS=ascii` replaces the
+glyphs, bars and separators with plain text. The status line still writes color escapes.

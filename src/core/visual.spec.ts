@@ -9,9 +9,7 @@ import {
   bar,
   CHIP_TONES,
   chip,
-  columnChip,
   DRAWN_PAIRS,
-  dots,
   fitPieces,
   isValidDiff,
   levelMark,
@@ -30,8 +28,8 @@ import {
 } from "./visual.ts";
 
 const AGENTS = join(import.meta.dir, "..", "..", "agents");
-const U = glyphs(false);
-const A = glyphs(true);
+const U = glyphs("unicode");
+const A = glyphs("ascii");
 const cellsOf = (pieces: readonly Piece[]) => pieces.reduce((sum, piece) => sum + displayWidth(piece.text), 0);
 
 describe("palette", () => {
@@ -81,7 +79,7 @@ describe("palette", () => {
     expect(levelMark("ok", A)).toEqual({ glyph: "+", color: "success" });
     expect(levelMark("warn", A)).toEqual({ glyph: "!", color: "warning" });
     expect(levelMark("fail", A)).toEqual({ glyph: "x", color: "error" });
-    expect(levelMark("info", A)).toEqual({ glyph: "-", color: "inactive" });
+    expect(levelMark("info", A)).toEqual({ glyph: "i", color: "inactive" });
   });
 
   test("each non-populated state draws one fitted line in its own key", () => {
@@ -103,13 +101,6 @@ describe("chip", () => {
     expect(chip("exit 1", "fail", true)).toEqual({ text: "[exit 1]", color: "inverseText", backgroundColor: "error", bold: true });
     expect(chip("A VERY LONG LABEL", "warn", false).text).toBe(" A VERY LONG… ");
     expect(chip("A VERY LONG LABEL", "warn", true).text).toBe("[A VERY LO...]");
-  });
-
-  test("a column chip pads inside its background in Unicode and after its brackets in ASCII", () => {
-    expect(columnChip("TEST", "neutral", false, 6)).toEqual([{ text: " TEST   ", color: "text", backgroundColor: "userMessageBackground", bold: true }]);
-    expect(columnChip("TEST", "neutral", true, 6)).toEqual([{ text: "[TEST]", color: "text", backgroundColor: "userMessageBackground", bold: true }, { text: "  " }]);
-    expect(columnChip("FINAL", "plan", true, 6)).toEqual([{ text: "[FINAL]", color: "inverseText", backgroundColor: "planMode", bold: true }, { text: " " }]);
-    expect(columnChip("MANUAL", "neutral", true, 6).map((piece) => piece.text)).toEqual(["[MANUAL]"]);
   });
 });
 
@@ -213,25 +204,12 @@ describe("stack", () => {
   });
 });
 
-describe("spark and dots", () => {
+describe("spark", () => {
   test("a spark scales from zero to the largest value", () => {
     expect(spark([0, 1, 2, 4, 8], false)).toBe("▁▂▃▅█");
     expect(spark([0, 1, 2, 4, 8], true)).toBe(".:-+@");
     expect(spark([0, 0], false)).toBe("▁▁");
     expect(spark([], false)).toBe("");
-  });
-
-  test("a dot strip gives each outcome its own glyph and key", () => {
-    expect(dots(["ok", "ok", "fail", "info", "warn"], false)).toEqual([
-      { text: "●●", color: "success" },
-      { text: "✗", color: "error" },
-      { text: "○", color: "inactive" },
-      { text: "!", color: "warning" },
-    ]);
-    expect(dots(["ok", "fail"], true)).toEqual([
-      { text: "o", color: "success" },
-      { text: "x", color: "error" },
-    ]);
   });
 });
 

@@ -208,8 +208,7 @@ session. `all` or `*` turns off every one. Set it in the environment Claude Code
 | Variable | Effect |
 | --- | --- |
 | `OMCA_COMMENT_GATE` | `advise` (default) lets a write through with a note; `deny` blocks it; `off` skips the check |
-| `OMCA_ASCII` | `1` draws the band, pane, footer and dialog with ASCII glyphs |
-| `CLAUDE_STATUSLINE_NERD_FONT` | `0` draws the status line with ASCII glyphs |
+| `OMCA_GLYPHS` | The glyph set of the pane, band, footer, dialog and status line: `nerd` (default, Nerd Font icons), `unicode` (no Nerd Font needed) or `ascii` (plain text) |
 | `OMCA_NATIVE_AGENTS_MD` | `1` stops the context injector from adding `AGENTS.md` where Claude Code already loads it natively and no project `CLAUDE.md` is on the path |
 | `OMCA_TRANSCRIPTS_ROOT` | The directory `session_search` reads instead of `~/.claude/projects` |
 | `AST_GREP_BIN` | The ast-grep binary the `ast_*` tools run, looked up on `PATH`, before `ast-grep` and `sg` |

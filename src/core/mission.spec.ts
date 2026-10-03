@@ -3,25 +3,22 @@ import {
   finishedRow,
   firstLine,
   type Lane,
+  laneColumns,
   laneRows,
   type LaneLook,
   lastLine,
-  legend,
   ordered,
   spinner,
   statusMark,
-  strip,
-  summaryRow,
+  summaryText,
   toolDetail,
-  toolKind,
-  type ToolKind,
   toolLabel,
 } from "./mission.ts";
 import { displayWidth, glyphs } from "./ui-kit.ts";
 import type { Piece } from "./visual.ts";
 
-const G = glyphs(false);
-const A = glyphs(true);
+const G = glyphs("unicode");
+const A = glyphs("ascii");
 const HOME = "/home/u";
 const START = 1_790_000_000_000;
 
@@ -37,7 +34,6 @@ const lane = (fields: Partial<Lane> = {}): Lane => ({
   outputTokens: 1300,
   status: "running",
   prompt: "Fix the heading parser.",
-  tools: ["Read", "Grep", "Edit", "Bash"],
   calls: 4,
   tool: { name: "Bash", detail: "bun test src/parser.spec.ts" },
   output: "Found the heading rule.",
@@ -45,45 +41,21 @@ const lane = (fields: Partial<Lane> = {}): Lane => ({
   ...fields,
 });
 
-const look = (width: number, fields: Partial<LaneLook> = {}): LaneLook => ({
+const look = (width: number, fields: Partial<LaneLook> = {}, lanes: readonly Lane[] = [lane()]): LaneLook => ({
   width,
-  tier: width >= 90 ? "split" : width >= 56 ? "inline" : "page",
   g: G,
   ascii: false,
   now: START + 66_000,
+  columns: laneColumns(lanes, width),
   ...fields,
 });
 
 const text = (pieces: readonly Piece[]): string => pieces.map((piece) => piece.text).join("");
 const rows = (pieces: readonly Piece[][]): string[] => pieces.map(text);
 
-describe("tool kinds", () => {
-  test.each<[string, ToolKind]>([
-    ["Read", "read"],
-    ["Grep", "read"],
-    ["Glob", "read"],
-    ["WebFetch", "read"],
-    ["Edit", "edit"],
-    ["Write", "edit"],
-    ["NotebookEdit", "edit"],
-    ["Bash", "bash"],
-    ["PowerShell", "bash"],
-    ["Monitor", "bash"],
-    ["LSP", "read"],
-    ["mcp__plugin_oh-my-claudeagent_omca__evidence_log", "mcp"],
-    ["Agent", "agent"],
-    ["Task", "other"],
-    ["MultiEdit", "other"],
-    ["TodoWrite", "other"],
-    ["toString", "other"],
-  ])("%s is %s", (name, kind) => {
-    expect(toolKind(name)).toBe(kind);
-  });
-
-  test("an MCP tool is labelled by its own name", () => {
-    expect(toolLabel("mcp__plugin_oh-my-claudeagent_omca__evidence_log")).toBe("evidence_log");
-    expect(toolLabel("Bash")).toBe("Bash");
-  });
+test("an MCP tool is labelled by its own name", () => {
+  expect(toolLabel("mcp__plugin_oh-my-claudeagent_omca__evidence_log")).toBe("evidence_log");
+  expect(toolLabel("Bash")).toBe("Bash");
 });
 
 describe("toolDetail", () => {
@@ -114,115 +86,104 @@ test("firstLine and lastLine skip blank lines and fold whitespace", () => {
   expect(lastLine(" \n ")).toBe("");
 });
 
-describe("strip", () => {
-  test("one glyph per call in its kind's color, a run of one kind in one piece", () => {
-    expect(strip(["Read", "Grep", "Edit", "Bash", "mcp__s__t", "Agent", "TodoWrite"], 12, false)).toEqual([
-      { text: "○○", color: "rainbow_blue" },
-      { text: "✎", color: "rainbow_violet" },
-      { text: "$", color: "rainbow_orange" },
-      { text: "◇", color: "rainbow_indigo" },
-      { text: "◆", color: "rainbow_green" },
-      { text: "·", color: "inactive" },
-    ]);
-  });
-
-  test("keeps the newest calls when the room is short, and none with no room", () => {
-    expect(text(strip(["Read", "Edit", "Bash", "Bash"], 2, false))).toBe("$$");
-    expect(strip(["Read"], 0, false)).toEqual([]);
-  });
-
-  test("ASCII letters stand for the glyphs", () => {
-    expect(text(strip(["Read", "Edit", "Bash", "mcp__s__t", "Agent", "TodoWrite"], 12, true))).toBe("re$m@.");
-  });
-});
-
 test("the spinner turns one frame a second of the clock", () => {
-  expect([0, 999, 1000, 2000, 3000, 4000].map((ms) => spinner(START + ms, false))).toEqual(["◐", "◐", "◓", "◑", "◒", "◐"]);
+  const at = (second: number) => spinner(Math.floor(START / 6000) * 6000 + second * 1000, false);
+  expect([0, 0.999, 1, 2, 3, 4, 5, 6].map(at)).toEqual(["·", "·", "✢", "✳", "✶", "✻", "✽", "·"]);
   expect([0, 1000, 2000, 3000].map((ms) => spinner(START + ms, true))).toEqual(["|", "/", "-", "\\"]);
 });
 
 describe("laneRows", () => {
-  test("at a wide body: identity, task, model and effort chips, tokens and elapsed; the strip in kind colors and the current tool's name in text below", () => {
+  test("at a wide body: the identity glyph in its key and the name in text, the task, then model, effort and elapsed in muted columns; the current tool below and its call count at the right edge", () => {
     const [head = [], tools = []] = laneRows(lane(), look(73), HOME);
     expect(head).toEqual([
       { text: "◆ ", color: "green_FOR_SUBAGENTS_ONLY" },
-      { text: "executor", color: "green_FOR_SUBAGENTS_ONLY", bold: true },
-      { text: " · Fix the heading parser      " },
-      { text: " " },
-      { text: " sonnet-5-5 ", color: "inverseText", backgroundColor: "permission", bold: true },
-      { text: " " },
-      { text: " high ", color: "inverseText", backgroundColor: "inactive", bold: true },
-      { text: " " },
-      { text: "4.5k", color: "inactive" },
-      { text: " " },
+      { text: "executor", color: "text", bold: true },
+      { text: " · Fix the heading parser            " },
+      { text: "  " },
+      { text: "sonnet-5-5", color: "inactive" },
+      { text: "  " },
+      { text: "high", color: "inactive" },
+      { text: "  " },
       { text: " 1m06s", color: "inactive" },
     ]);
     expect(tools).toEqual([
       { text: "  " },
-      { text: "○○", color: "rainbow_blue" },
-      { text: "✎", color: "rainbow_violet" },
-      { text: "$", color: "rainbow_orange" },
-      { text: " " },
-      { text: "◑", color: "claude" },
+      { text: "✳", color: "claude" },
       { text: " " },
       { text: "Bash", color: "text", bold: true },
       { text: " bun test src/parser.spec.ts" },
+      { text: " ".repeat(30) },
+      { text: "4 calls", color: "inactive" },
     ]);
     expect(displayWidth(text(head))).toBe(73);
+    expect(displayWidth(text(tools))).toBe(73);
   });
 
-  test("as the body narrows the model chip goes first, then the effort, the tokens and last the elapsed time", () => {
+  test("as the body narrows the model column goes first, then the effort, and the elapsed time stays", () => {
     const head = (width: number) => rows(laneRows(lane(), look(width), HOME))[0];
-    expect(head(62)).toBe("◆ executor · Fix the heading…   sonnet-5-5   high  4.5k  1m06s");
-    expect(head(61)).toBe("◆ executor · Fix the heading parser         high  4.5k  1m06s");
-    expect(head(49)).toBe("◆ executor · Fix the heading…   high  4.5k  1m06s");
-    expect(head(48)).toBe("◆ executor · Fix the heading parser  4.5k  1m06s");
-    expect(head(42)).toBe("◆ executor · Fix the heading…  4.5k  1m06s");
-    expect(head(41)).toBe("◆ executor · Fix the heading pars…  1m06s");
-    expect(head(37)).toBe("◆ executor · Fix the heading…   1m06s");
-    expect(head(36)).toBe("◆ executor · Fix the heading parser ");
+    expect(head(61)).toBe("◆ executor · Fix the heading parser  sonnet-5-5  high   1m06s");
+    expect(head(60)).toBe("◆ executor · Fix the heading pars…  sonnet-5-5  high   1m06s");
+    expect(head(55)).toBe("◆ executor · Fix the heading parser        high   1m06s");
+    expect(head(44)).toBe("◆ executor · Fix the heading…   high   1m06s");
+    expect(head(43)).toBe("◆ executor · Fix the heading parser   1m06s");
+    expect(head(36)).toBe("◆ executor · Fix the headin…   1m06s");
   });
 
-  test("every row is exactly the body wide from 36 to 200 cells, or narrower for the tool row", () => {
+  test("the model and effort columns are as wide as the widest running lane's, so they line up", () => {
+    const lanes = [lane(), lane({ id: "b", model: "claude-fable-5-1", effort: "xhigh" }), lane({ id: "c", endedAt: START, model: "claude-opus-5-5-long-name" })];
+    expect(laneColumns(lanes, 73)).toEqual({ model: 10, effort: 5 });
+    expect(laneColumns([lane()], 55)).toEqual({ model: 0, effort: 4 });
+    expect(laneColumns([lane()], 43)).toEqual({ model: 0, effort: 0 });
+    const heads = lanes.slice(0, 2).map((each) => rows(laneRows(each, look(73, {}, lanes), HOME))[0] ?? "");
+    expect(heads).toEqual([
+      "◆ executor · Fix the heading parser             sonnet-5-5  high    1m06s",
+      "◆ executor · Fix the heading parser             fable-5-1   xhigh   1m06s",
+    ]);
+  });
+
+  test("every row is exactly the body wide from 36 to 200 cells, the tool row too once it has a call", () => {
     for (let width = 36; width <= 200; width++) {
       const [head = [], tools = []] = laneRows(lane({ description: "d".repeat(300), tool: { name: "Bash", detail: "x".repeat(300) } }), look(width), HOME);
       expect(displayWidth(text(head)), `head at ${width}`).toBe(width);
-      expect(displayWidth(text(tools)), `tools at ${width}`).toBeLessThanOrEqual(width);
+      expect(displayWidth(text(tools)), `tools at ${width}`).toBe(width);
     }
   });
 
-  test("the strip holds 8 calls on a page, 12 inline and 24 split", () => {
-    const tools = Array.from({ length: 30 }, () => "Read");
-    const shown = (width: number) => text(laneRows(lane({ tools, calls: 30 }), look(width), HOME)[1] ?? []).trim().split(" ")[0];
-    expect(shown(51)).toBe("○".repeat(8));
-    expect(shown(73)).toBe("○".repeat(12));
-    expect(shown(120)).toBe("○".repeat(24));
+  test("the call count reads as words, one call singular", () => {
+    expect(text(laneRows(lane({ calls: 1 }), look(73), HOME)[1] ?? []).trimStart()).toEndWith(" 1 call");
+    expect(text(laneRows(lane({ calls: 30 }), look(73), HOME)[1] ?? [])).toEndWith(" 30 calls");
   });
 
   test("the current tool's detail is masked and the home path shortened", () => {
     const tool = { name: "Bash", detail: "curl -H 'Authorization: Bearer abcdefghijklmnop' /home/u/x" };
-    expect(text(laneRows(lane({ tool }), look(120), HOME)[1] ?? [])).toBe(
-      "  ○○✎$ ◑ Bash curl -H 'Authorization: Bearer ‹masked›' ~/x",
+    expect(text(laneRows(lane({ tool }), look(120), HOME)[1] ?? []).trimEnd()).toBe(
+      `  ✳ Bash curl -H 'Authorization: Bearer ‹masked›' ~/x${" ".repeat(60)}4 calls`,
     );
   });
 
   test("before its first call a lane is starting, between calls thinking", () => {
-    expect(text(laneRows(lane({ tools: [], calls: 0, tool: null }), look(73), HOME)[1] ?? [])).toBe("  ◑ starting");
-    expect(text(laneRows(lane({ tool: null }), look(73), HOME)[1] ?? [])).toBe("  ○○✎$ ◑ thinking");
+    expect(text(laneRows(lane({ calls: 0, tool: null }), look(73), HOME)[1] ?? [])).toBe("  ✳ starting");
+    expect(text(laneRows(lane({ tool: null }), look(73), HOME)[1] ?? [])).toBe(`  ✳ thinking${" ".repeat(54)}4 calls`);
   });
 
-  test("no effort chip without an effort, and a number effort as its number", () => {
-    expect(rows(laneRows(lane({ effort: null }), look(73), HOME))[0]).toBe(
-      "◆ executor · Fix the heading parser               sonnet-5-5  4.5k  1m06s",
-    );
-    expect(rows(laneRows(lane({ effort: 32_000 }), look(73), HOME))[0]).toContain(" 32000 ");
+  test("no effort column without an effort, and a number effort as its number", () => {
+    const none = lane({ effort: null });
+    expect(rows(laneRows(none, look(73, {}, [none]), HOME))[0]).toBe("◆ executor · Fix the heading parser                    sonnet-5-5   1m06s");
+    const number = lane({ effort: 32_000 });
+    expect(rows(laneRows(number, look(73, {}, [number]), HOME))[0]).toContain("  32000  ");
   });
 
-  test("an agent outside the roster draws in the muted key, and ASCII mode uses ASCII glyphs and chips", () => {
-    const [head = [], tools = []] = laneRows(lane({ type: "general-purpose" }), look(73, { g: A, ascii: true }), HOME);
+  test("an agent outside the roster draws in the muted key, and ASCII mode uses ASCII glyphs", () => {
+    const general = lane({ type: "general-purpose" });
+    const [head = [], tools = []] = laneRows(general, look(73, { g: A, ascii: true }, [general]), HOME);
     expect(head[0]).toEqual({ text: "@ ", color: "inactive" });
-    expect(text(head)).toBe("@ general-purpose - Fix the heading pa... [sonnet-5-5] [high] 4.5k  1m06s");
-    expect(text(tools)).toBe("  rre$ - Bash bun test src/parser.spec.ts");
+    expect(text(head)).toBe("@ general-purpose - Fix the heading parser       sonnet-5-5  high   1m06s");
+    expect(text(tools)).toBe(`  - Bash bun test src/parser.spec.ts${" ".repeat(30)}4 calls`);
+  });
+
+  test("the Nerd set draws each roster agent's own icon", () => {
+    const [head = []] = laneRows(lane({ type: "oh-my-claudeagent:oracle" }), look(73, { g: glyphs("nerd") }), HOME);
+    expect(head[0]).toEqual({ text: "\u{f06e} ", color: "purple_FOR_SUBAGENTS_ONLY" });
   });
 });
 
@@ -232,8 +193,8 @@ describe("finishedRow", () => {
   test("one dim line: status glyph in its tone, the type, the result, and how long it ran", () => {
     expect(finishedRow(done({}), look(51), HOME)).toEqual([
       { text: "✓ ", color: "success" },
-      { text: "executor · Fixed the parser.              ", color: "inactive" },
-      { text: "  1m06s", color: "inactive" },
+      { text: "executor · Fixed the parser.             ", color: "inactive" },
+      { text: "   1m06s", color: "inactive" },
     ]);
   });
 
@@ -248,7 +209,7 @@ describe("finishedRow", () => {
 
   test("a long result truncates and the row stays the body wide", () => {
     const row = text(finishedRow(done({ result: "r".repeat(200) }), look(51), HOME));
-    expect(row).toBe(`✓ executor · ${"r".repeat(30)}…  1m06s`);
+    expect(row).toBe(`✓ executor · ${"r".repeat(29)}…   1m06s`);
     expect(displayWidth(row)).toBe(51);
   });
 });
@@ -264,29 +225,16 @@ test("statusMark gives every status its glyph and tone", () => {
   ]);
 });
 
-describe("summaryRow", () => {
+describe("summaryText", () => {
   const lanes = [lane(), lane({ id: "a-2" }), lane({ id: "a-3", endedAt: START + 1000, status: "answer" })];
 
-  test("counts running and finished agents and sums their tokens, the glyph in the active tone and the words in text", () => {
-    expect(summaryRow(lanes, look(51))).toEqual([
-      { text: "◆ ", color: "claude" },
-      { text: "2 running", color: "text", bold: true },
-      { text: " · 1 finished · 13.5k tokens", color: "inactive" },
-    ]);
+  test("counts running and finished agents and sums their tokens, dropping the last parts that do not fit", () => {
+    expect(summaryText(lanes, G, 51)).toBe("2 running · 1 finished · 13.5k tokens");
+    expect(summaryText(lanes, G, 30)).toBe("2 running · 1 finished");
+    expect(summaryText(lanes, G, 12)).toBe("2 running");
+    expect(summaryText(lanes, G, 5)).toBe("2 ru…");
+    expect(summaryText(lanes, A, 51)).toBe("2 running - 1 finished - 13.5k tokens");
   });
-
-  test("with none running the count is muted, and a narrow body keeps only the count", () => {
-    expect(text(summaryRow([lanes[2] ?? lane()], look(51)))).toBe("◆ 0 running · 1 finished · 4.5k tokens");
-    expect(summaryRow([lanes[2] ?? lane()], look(51))[1]).toEqual({ text: "0 running", color: "inactive" });
-    expect(text(summaryRow(lanes, look(20)))).toBe("◆ 2 running");
-  });
-});
-
-test("the legend names as many kinds as fit", () => {
-  expect(text(legend(80, false))).toBe("○ read ✎ edit $ bash ◇ mcp ◆ agent");
-  expect(text(legend(20, false))).toBe("○ read ✎ edit $ bash");
-  expect(text(legend(80, true))).toBe("r read e edit $ bash m mcp @ agent");
-  expect(legend(5, false)).toEqual([]);
 });
 
 test("running lanes come first, oldest first; finished ones after, newest first", () => {

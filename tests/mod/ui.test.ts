@@ -53,7 +53,7 @@ const box = element("Box");
 
 test("a rule draws its pieces as runs of one line", async ($, on) => {
   const drawn = gallery($, on);
-  expect(await drawn((kit) => Rule(kit, 16, glyphs(true), true, "Tasks", { done: 1, total: 2 }))).toEqual(
+  expect(await drawn((kit) => Rule(kit, 16, glyphs("ascii"), true, "Tasks", { done: 1, total: 2 }))).toEqual(
     text(
       { wrap: "truncate-end" },
       text({ color: "subtle" }, "--"),

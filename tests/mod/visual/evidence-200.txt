@@ -1,29 +1,29 @@
                                                                                                              │1: Agents  2: Plan  3: Evidence  4: Notepad  5: Feedback  6: Stats  7: Doctor            ✕
  ▐▛███▛█   Claude Code v2.1.288                                                                              │───────────────────────────────────────────────────────────────────────────────────────
 ▝▜██████▀  Opus 5.5 · API Usage Billing                                                                      │╭─────────────────────────────────────────────────────────────────────────────────────╮
- ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/.cache/tmp/omca-visual-200x50-XXXXXX/cwd                          ││ FINAL VERIFICATION · proof-ledger                                                   │
-                                                                                                             ││  COMPLETE  matches the plan as it is now · 10-02 13:35 · ◆ sisyphus                 │
-                                                                                                             ││ ●✗●●●✗●●✗●✗●●●●● last 16  build 2  test 6 ✗1  lint 4 ✗2  manual 2  final 2 ✗1       │
+ ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/.cache/tmp/omca-visual-200x50-XXXXXX/cwd                          ││ Final verification · proof-ledger                                                   │
+                                                                                                             ││  COMPLETE  matches the current plan · 10-02 13:35                                   │
+                                                                                                             ││  build   test   lint   manual                                                   │
                                                                                                              │╰─────────────────────────────────────────────────────────────────────────────────────╯
-                                                                                                             │── Fri 2026-10-02 ── ████████ 4/4 ────────────  ╭─────────────────────────────────────╮
-                                                                                                             │  13:35  FINAL    ✓  0  just ci &&… evidence ◆  │ MANUAL · exit 0                     │
-                                                                                                             │  13:00  TEST     ✓  0  just test-mod        ◆  │ curl -fsS -H 'Authorization: Beare… │
-                                                                                                             │❯ 12:40  MANUAL   ✓  0  curl -fsS …t/healthz ◆  │ HTTP/2 200                          │
-                                                                                                             │  12:10  TEST     ✓  0  bun test s…e scripts ◆  │ x-request-id: 7f3c9a                │
-                                                                                                             │── Thu 2026-10-01 ── ████▋███ 4/7 ────────────  │ {"status":"ok","build":"2026.10.02… │
-                                                                                                             │  18:45  TEST     ✓  0  just valid…ck engine ◆  │ rerun with DEPLOY_TOKEN=‹masked› t… │
-                                                                                                             │  17:00  FINAL    ✗  1  just ci &&… evidence ◆  │ 2026-10-02 12:40:00 · ◆ sisyphus    │
-                                                                                                             │  15:32  LINT     ✓  0  just typecheck       ◆  │ ‹masked› 2 masked                   │
-                                                                                                             │  15:15  LINT     ✗  1  just typecheck       ◆  ╰─────────────────────────────────────╯
-                                                                                                             │  14:30  BUILD    ✓  0  bun run build        ◆
-                                                                                                             │  13:50  TEST     ✓  0  just test-mod        ◆
-                                                                                                             │  13:25  TEST     ✗  1  just test-mod        ◆
-                                                                                                             │── Wed 2026-09-30 ── ██████▍█ 4/5 ────────────
-                                                                                                             │  16:10  MANUAL   ✓  0  just visua…an-reader ◆
-                                                                                                             │  14:35  TEST     ✓  0  bun test src/core    ◆
-                                                                                                             │  14:01  LINT     ✓  0  just lint            ◆
-                                                                                                             │  13:55  LINT     ✗  1  just lint            ◆
-                                                                                                             │  13:40  BUILD    ✓  0  bun run build        ◆
+                                                                                                             │── Fri 2026-10-02 ────────────────────────────  ╭─────────────────────────────────────╮
+                                                                                                             │    13:35  final   just ci && ju…ual evidence  │ manual · exit 0                     │
+                                                                                                             │    13:00  test    just test-mod               │ curl -fsS -H 'Authorization: Beare… │
+                                                                                                             │❯   12:40  manual  curl -fsS -H …test/healthz  │ HTTP/2 200                          │
+                                                                                                             │    12:10  test    bun test src …line scripts  │ x-request-id: 7f3c9a                │
+                                                                                                             │── Thu 2026-10-01 ────────────────────────────  │ {"status":"ok","build":"2026.10.02… │
+                                                                                                             │    18:45  test    just validate…check engine  │ rerun with DEPLOY_TOKEN=‹masked› t… │
+                                                                                                             │    17:00  final   just ci && ju…ual evidence  │ 2026-10-02 12:40:00 ·  sisyphus    │
+                                                                                                             │    15:32  lint    just typecheck              │ 2 secrets masked                    │
+                                                                                                             │    15:15  lint    just typecheck              ╰─────────────────────────────────────╯
+                                                                                                             │    14:30  build   bun run build
+                                                                                                             │    13:50  test    just test-mod
+                                                                                                             │    13:25  test    just test-mod
+                                                                                                             │── Wed 2026-09-30 ────────────────────────────
+                                                                                                             │    16:10  manual  just visual plan-reader
+                                                                                                             │    14:35  test    bun test src/core
+                                                                                                             │    14:01  lint    just lint
+                                                                                                             │    13:55  lint    just lint
+                                                                                                             │    13:40  build   bun run build
                                                                                                              │
                                                                                                              │
                                                                                                              │
@@ -41,8 +41,8 @@
                                                                                                              │
                                                                                                              │
                                                                                                              │
-                                                                                                             │b: Build  t: Test  l: Lint  m: Manual  v: Final  x: Fails  c: Copy  r: Rerun  f: Find
-█████ 6/6                                                                                                 [-]│3/16 · ↑↓ move
+                                                                                                             │
+█████ 6/6                                                                                                 [-]│t: Type  x: Fails  f: Find  c: Copy  r: Rerun  3/16 · ↑↓ move
                                                                                          ◐ medium · /effort  │
 ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── oh-my-claudeagent:sisyphus ─
 ❯ 

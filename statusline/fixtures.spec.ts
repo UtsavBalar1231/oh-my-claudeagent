@@ -94,7 +94,7 @@ function writeFiles(files: Record<string, unknown>): void {
 function runMain(payload: Payload, env: Record<string, string>): string {
   const result = Bun.spawnSync([process.execPath, MAIN], {
     stdin: new TextEncoder().encode(JSON.stringify(payload)),
-    env: specEnv({ COLUMNS: undefined, LINES: undefined, CLAUDE_STATUSLINE_NERD_FONT: undefined, ...GIT_ENV, ...env, ...tmpEnv(root) }),
+    env: specEnv({ COLUMNS: undefined, LINES: undefined, OMCA_GLYPHS: undefined, ...GIT_ENV, ...env, ...tmpEnv(root) }),
   });
   return result.stdout.toString();
 }

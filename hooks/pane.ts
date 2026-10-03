@@ -1,6 +1,6 @@
 import type { CommandRunResult, RenderElement, Timer } from "claude-code";
 import type { Platform } from "../src/core/path.ts";
-import { displayWidth, fitEnd, type Glyphs, glyphs, padEnd, usableColumns } from "../src/core/ui-kit.ts";
+import { COLUMN_GAP, displayWidth, fitEnd, type Glyphs, glyphs, padEnd, usableColumns } from "../src/core/ui-kit.ts";
 import { notice, TONE_KEYS, type ViewState, type WidthTier, widthTier } from "../src/core/visual.ts";
 import { reconcile } from "./agents-tracker.ts";
 import type { Features, Input } from "./dispatch.ts";
@@ -29,7 +29,6 @@ const MIN_INLINE_ROWS = 7;
 const DOCK_SHARE = 0.45;
 const DOCK_MIN_COLUMNS = 56;
 const DOCK_MAX_COLUMNS = 96;
-const TAB_GAP = 2;
 
 type Pane = State["pane"];
 export type Tab = Pane["tab"];
@@ -245,7 +244,7 @@ function tabRows(width: number): { gap: number; rows: (readonly [Tab, string, st
   const cells = TABS.map(([id, label], index) => [id, label, String(index + 1)] as const);
   const cellWidth = ([, label, key]: readonly [Tab, string, string]) => displayWidth(`${key}: ${label}`);
   const oneRow = (gap: number) => cells.reduce((sum, cell) => sum + cellWidth(cell), 0) + gap * (cells.length - 1);
-  const gap = oneRow(TAB_GAP) <= width || oneRow(1) > width ? TAB_GAP : 1;
+  const gap = oneRow(COLUMN_GAP) <= width || oneRow(1) > width ? COLUMN_GAP : 1;
   return { gap, rows: wrapAt(cells, width, gap, cellWidth) };
 }
 
@@ -268,9 +267,10 @@ async function draw(host: Host, e: Input<"ui.render Pane">): Promise<RenderEleme
   const width = usableColumns(e.props.bodyColumns);
   const isInline = e.props.placement !== "dock";
   const rows = bodyRows(host, e, isInline);
-  const { home, platform, isAscii } = resolvedSession();
+  const { home, platform, glyphTier } = resolvedSession();
   const pane = await host.state.pane.get();
-  const g = glyphs(isAscii);
+  const g = glyphs(glyphTier);
+  const isAscii = g.tier === "ascii";
   const active = pane.value?.tab ?? "agents";
   const press: Press = (work) => async () => {
     try {

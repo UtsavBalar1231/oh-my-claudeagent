@@ -19,7 +19,7 @@ afterEach(() => {
 function run(stdin: string, env: Record<string, string> = {}): { stdout: string; exitCode: number } {
   const result = Bun.spawnSync([process.execPath, MAIN], {
     stdin: new TextEncoder().encode(stdin),
-    env: specEnv({ CLAUDE_STATUSLINE_NERD_FONT: "0", COLUMNS: "300", ...tmpEnv(root), ...env }),
+    env: specEnv({ OMCA_GLYPHS: "unicode", COLUMNS: "300", ...tmpEnv(root), ...env }),
   });
   return { stdout: result.stdout.toString(), exitCode: result.exitCode };
 }

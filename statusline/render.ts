@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { resolveBoundPlan } from "../src/core/boulder.ts";
 import { checkboxStates, nextTaskLabel } from "../src/core/checkboxes.ts";
 import { baseName, inferPlatform } from "../src/core/path.ts";
-import { cells, displayWidth, fitEnd, formatDuration } from "../src/core/ui-kit.ts";
+import { AGENT_ICONS, cells, displayWidth, fitEnd, formatDuration, type GlyphTier, glyphTier } from "../src/core/ui-kit.ts";
 import type { GitInfo } from "./git.ts";
 
 export type Env = Record<string, string | undefined>;
@@ -65,12 +65,10 @@ export const RED = "\x1b[31m";
 const MAGENTA = "\x1b[35m";
 const BLUE = "\x1b[34m";
 export const BOLD = "\x1b[1m";
-const SEP = ` ${DIM}·${RST} `;
+export const separator = (dot: string): string => ` ${DIM}${dot}${RST} `;
+const SEP = separator("·");
 // The plugin's settings.json starts every session on this agent, so naming it tells nothing.
 export const DEFAULT_MAIN_AGENT = "oh-my-claudeagent:sisyphus";
-const FILLED_BLOCK = "▰";
-const EMPTY_BLOCK = "▱";
-const ELLIPSIS = "…";
 const DAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 
 const WARN_PERCENT = 60;
@@ -91,6 +89,11 @@ const MAX_LINES = 4;
 const MIN_LABEL_CELLS = 12;
 
 export const NERD_GLYPHS = {
+  filled: "▰",
+  empty: "▱",
+  dot: "·",
+  ellipsis: "…",
+  arrow: "→",
   branch: "",
   folder: "",
   model: "",
@@ -104,9 +107,15 @@ export const NERD_GLYPHS = {
   effort: "",
 };
 
-type Glyphs = Record<keyof typeof NERD_GLYPHS, string>;
+export type Glyphs = Record<keyof typeof NERD_GLYPHS, string>;
 
-export const ASCII_GLYPHS: Glyphs = {
+// The Unicode tier is the line without Nerd Font icons; the ASCII tier also trades its bars, dots and ellipsis.
+export const UNICODE_GLYPHS: Glyphs = {
+  filled: "▰",
+  empty: "▱",
+  dot: "·",
+  ellipsis: "…",
+  arrow: "->",
   branch: "*",
   folder: ">",
   model: ">",
@@ -120,19 +129,26 @@ export const ASCII_GLYPHS: Glyphs = {
   effort: "E:",
 };
 
-export const AGENT_GLYPHS = new Map([
-  ["explore", ""],
-  ["hephaestus", ""],
-  ["librarian", ""],
-  ["metis", ""],
-  ["momus", ""],
-  ["multimodal-looker", ""],
-  ["oracle", ""],
-  ["prometheus", ""],
-  ["sisyphus", ""],
-  ["executor", ""],
-]);
-const DEFAULT_AGENT_GLYPH = "";
+export const ASCII_GLYPHS: Glyphs = {
+  filled: "#",
+  empty: ".",
+  dot: "|",
+  ellipsis: "...",
+  arrow: "->",
+  branch: "*",
+  folder: ">",
+  model: ">",
+  clock: "~",
+  vim: "V:",
+  worktree: "W:",
+  fiveHour: "5h",
+  weekly: "7d",
+  spend: "S:",
+  tasks: "T:",
+  effort: "E:",
+};
+
+const DEFAULT_AGENT_GLYPH = "\u{f007}";
 
 const PR_STATES = new Map([
   ["approved", { color: GREEN, nerd: "", ascii: "+" }],
@@ -144,14 +160,15 @@ const PR_STATES = new Map([
 interface Ctx {
   data: Payload;
   git: GitInfo;
-  nerd: boolean;
+  tier: GlyphTier;
   g: Glyphs;
   now: Date;
 }
 
-export function detectNerdFont(env: Env): boolean {
-  const value = env["CLAUDE_STATUSLINE_NERD_FONT"];
-  return value === undefined ? true : value.trim() === "1";
+/** The glyph set `OMCA_GLYPHS` names, the same variable the mod reads; Nerd Font glyphs when it is unset. */
+export function statusGlyphs(env: Env): { tier: GlyphTier; g: Glyphs } {
+  const tier = glyphTier(env["OMCA_GLYPHS"]);
+  return { tier, g: tier === "nerd" ? NERD_GLYPHS : tier === "unicode" ? UNICODE_GLYPHS : ASCII_GLYPHS };
 }
 
 const positiveInt = (value: string | undefined): number | null => (/^\d+$/.test(value ?? "") && Number(value) > 0 ? Number(value) : null);
@@ -182,6 +199,7 @@ const OSC8_CLOSERS = ["\x1b]8;;\x07", "\x1b]8;;\x1b\\"];
 
 const textWidth = (s: string): number => displayWidth(s.replace(ANSI_ALL, ""));
 
+// Every tier's separator is one cell between two spaces.
 const SEP_WIDTH = textWidth(SEP);
 
 // Counts terminal cells, a wide code point as two. Escape sequences occupy none and are never cut in half; a link still open at the cut is closed.
@@ -234,7 +252,7 @@ interface Placed {
  * the terminal is skipped, except the first, which a final cut keeps within the width. A growing
  * segment is placed at its minimum, then takes the free cells left on its line up to its maximum.
  */
-export function arrange(segments: readonly Segment[], columns: number, maxLines: number): string[] {
+export function arrange(segments: readonly Segment[], columns: number, maxLines: number, sep = SEP): string[] {
   let line: Placed[] = [];
   const lines = [line];
   let used = 0;
@@ -254,24 +272,22 @@ export function arrange(segments: readonly Segment[], columns: number, maxLines:
         lines.push(line);
         used = 0;
       } else {
-        return lines.map((l) => drawLine(l, columns));
+        return lines.map((l) => drawLine(l, columns, sep));
       }
     }
   }
-  return lines.map((l) => drawLine(l, columns));
+  return lines.map((l) => drawLine(l, columns, sep));
 }
 
-function drawLine(placed: readonly Placed[], columns: number): string {
+function drawLine(placed: readonly Placed[], columns: number, sep: string): string {
   let spare = columns - placed.reduce((sum, { width }) => sum + width, 0) - SEP_WIDTH * (placed.length - 1);
   const pieces = placed.map(({ segment, width }) => {
     const grown = segment.grows ? Math.min(segment.max, width + Math.max(0, spare)) : width;
     spare -= grown - width;
     return segment.draw(grown);
   });
-  return visibleTruncate(pieces.join(SEP), columns);
+  return visibleTruncate(pieces.join(sep), columns);
 }
-
-const arrow = (nerd: boolean): string => (nerd ? "→" : "->");
 
 const osc8 = (url: string, text: string): string => `\x1b]8;;${url}\x07${text}\x1b]8;;\x07`;
 
@@ -282,9 +298,9 @@ function remoteToUrl(remote: string): string {
 
 const thresholdColor = (pct: number): string => (pct >= CRIT_PERCENT ? RED : pct >= WARN_PERCENT ? YELLOW : GREEN);
 
-export function renderBar(pct: number, width: number, color: string): string {
+export function renderBar(pct: number, width: number, color: string, g: Pick<Glyphs, "filled" | "empty"> = NERD_GLYPHS): string {
   const filled = Number(fixed((Math.max(0, Math.min(100, pct)) / 100) * width, 0));
-  return `${color}${FILLED_BLOCK}${RST}`.repeat(filled) + `${DIM}${EMPTY_BLOCK}${RST}`.repeat(width - filled);
+  return `${color}${g.filled}${RST}`.repeat(filled) + `${DIM}${g.empty}${RST}`.repeat(width - filled);
 }
 
 function contextPercent({ context_window: ctx }: Payload): number | null {
@@ -300,7 +316,7 @@ function contextPercent({ context_window: ctx }: Payload): number | null {
 
 const sizeLabel = ({ context_window: ctx }: Payload): string => ((ctx?.context_window_size ?? 200000) >= 1000000 ? "1M" : "200k");
 
-function contextSegment(data: Payload): Segment {
+function contextSegment(data: Payload, g: Glyphs): Segment {
   const pct = contextPercent(data);
   const size = `${DIM}${sizeLabel(data)}${RST}`;
   const color = thresholdColor(pct ?? 0);
@@ -313,7 +329,7 @@ function contextSegment(data: Payload): Segment {
     grows: true,
     draw: (width) => {
       const barWidth = width - tailWidth;
-      return `${pct === null ? `${DIM}${EMPTY_BLOCK.repeat(barWidth)}${RST}` : renderBar(pct, barWidth, color)}${tail}`;
+      return `${pct === null ? `${DIM}${g.empty.repeat(barWidth)}${RST}` : renderBar(pct, barWidth, color, g)}${tail}`;
     },
   };
 }
@@ -332,12 +348,12 @@ export function formatResetTime(resetsAt: number | null | undefined, now: Date):
   return reset.toDateString() === now.toDateString() ? time : `${DAYS[reset.getDay()]} ${time}`;
 }
 
-export function composePr(data: Payload, nerd: boolean): string {
+export function composePr(data: Payload, tier: GlyphTier): string {
   const pr = data.pr;
   if (pr?.number == null) return "";
   const number = `${pr.kind === "mr" ? "!" : "#"}${pr.number}`;
   const state = PR_STATES.get(pr.review_state ?? "");
-  const stateSuffix = state ? ` ${state.color}${nerd ? state.nerd : state.ascii}${RST}` : "";
+  const stateSuffix = state ? ` ${state.color}${tier === "nerd" ? state.nerd : state.ascii}${RST}` : "";
   return `${CYAN}${pr.url ? osc8(pr.url, number) : number}${RST}${stateSuffix}`;
 }
 
@@ -362,23 +378,24 @@ export function readPlan(projectDir: string, sessionId: string): PlanProgress | 
   }
 }
 
-function planSegment({ done, total, label }: PlanProgress, { nerd, g }: Ctx): Segment {
+function planSegment({ done, total, label }: PlanProgress, { g }: Ctx): Segment {
   const count = `${GREEN}${g.tasks} ${done}/${total}${RST}`;
   if (label === null) return block(count);
-  const head = `${count} ${DIM}${arrow(nerd)} `;
+  const head = `${count} ${DIM}${g.arrow} `;
   const headWidth = textWidth(head);
   const labelWidth = displayWidth(label);
   return {
     min: headWidth + Math.min(labelWidth, MIN_LABEL_CELLS),
     max: headWidth + labelWidth,
     grows: false,
-    draw: (width) => `${head}${fitEnd(label, width - headWidth, ELLIPSIS)}${RST}`,
+    draw: (width) => `${head}${fitEnd(label, width - headWidth, g.ellipsis)}${RST}`,
   };
 }
 
-export function agentGlyph(name: string, nerd: boolean): string {
-  if (!nerd) return "A:";
-  return AGENT_GLYPHS.get(name.replace(/^oh-my-claudeagent:/, "")) ?? DEFAULT_AGENT_GLYPH;
+export function agentGlyph(name: string, tier: GlyphTier): string {
+  if (tier !== "nerd") return "A:";
+  const short = name.replace(/^oh-my-claudeagent:/, "");
+  return (Object.hasOwn(AGENT_ICONS, short) ? AGENT_ICONS[short] : undefined) ?? DEFAULT_AGENT_GLYPH;
 }
 
 const modelName = ({ data }: Ctx): string => data.model?.display_name ?? "Claude";
@@ -414,7 +431,7 @@ function rateLimitSegment({ data, g, now }: Ctx, which: "five_hour" | "seven_day
   const color = thresholdColor(pct);
   const reset = formatResetTime(window?.resets_at, now);
   const glyph = which === "five_hour" ? g.fiveHour : g.weekly;
-  return block(`${renderBar(pct, RATE_LIMIT_BAR_WIDTH, color)} ${color}${fixed(pct, 0)}%${RST} ${DIM}${glyph}${RST}${reset ? ` (resets ${reset})` : ""}`);
+  return block(`${renderBar(pct, RATE_LIMIT_BAR_WIDTH, color, g)} ${color}${fixed(pct, 0)}%${RST} ${DIM}${glyph}${RST}${reset ? ` (resets ${reset})` : ""}`);
 }
 
 const SPEND_PERIODS = new Map([
@@ -440,7 +457,7 @@ const isSubscription = ({ rate_limits: limits }: Payload): boolean => limits?.fi
 
 function costSegment({ data, g }: Ctx): Segment {
   const usd = data.cost?.total_cost_usd ?? 0;
-  const cost = !isSubscription(data) && usd > 0 ? `${MAGENTA}$${fixed(usd, 2)}${RST}${SEP}` : "";
+  const cost = !isSubscription(data) && usd > 0 ? `${MAGENTA}$${fixed(usd, 2)}${RST}${separator(g.dot)}` : "";
   return block(`${cost}${BLUE}${g.clock} ${formatDuration(data.cost?.total_duration_ms ?? 0)}${RST}`);
 }
 
@@ -473,25 +490,25 @@ const RANK = {
 const ranked = (rank: number, segment: Segment | null): Ranked[] => (segment === null ? [] : [{ segment, rank }]);
 
 function fullRows(c: Ctx): Ranked[][] {
-  const { data, nerd, g } = c;
+  const { data, tier, g } = c;
   const effort = `${data.effort?.level ?? ""}`.trim();
   const projectDir = projectDirOf(data);
   const plan = projectDir ? readPlan(projectDir, data.session_id ?? "") : null;
   const worktree = data.worktree;
-  const pr = composePr(data, nerd);
+  const pr = composePr(data, tier);
   const added = data.cost?.total_lines_added ?? 0;
   const removed = data.cost?.total_lines_removed ?? 0;
   const changed = [added > 0 ? `${GREEN}+${added}${RST}` : "", removed > 0 ? `${RED}-${removed}${RST}` : ""].filter(Boolean);
   const addedDirs = data.workspace?.added_dirs?.length ?? 0;
   return [
     [
-      ...ranked(RANK.model, block(`${CYAN}${g.model} ${modelName(c)}${RST}${effort ? `${SEP}${YELLOW}${g.effort} ${effort}${RST}` : ""}`)),
+      ...ranked(RANK.model, block(`${CYAN}${g.model} ${modelName(c)}${RST}${effort ? `${separator(g.dot)}${YELLOW}${g.effort} ${effort}${RST}` : ""}`)),
       ...ranked(RANK.vim, data.vim?.mode ? block(`${YELLOW}${g.vim} ${data.vim.mode[0]}${RST}`) : null),
-      ...ranked(RANK.agent, data.agent?.name && data.agent.name !== DEFAULT_MAIN_AGENT ? block(`${MAGENTA}${agentGlyph(data.agent.name, nerd)} ${data.agent.name}${RST}`) : null),
+      ...ranked(RANK.agent, data.agent?.name && data.agent.name !== DEFAULT_MAIN_AGENT ? block(`${MAGENTA}${agentGlyph(data.agent.name, tier)} ${data.agent.name}${RST}`) : null),
       ...ranked(RANK.plan, plan ? planSegment(plan, c) : null),
     ],
     [
-      ...ranked(RANK.context, contextSegment(data)),
+      ...ranked(RANK.context, contextSegment(data, g)),
       ...ranked(RANK.branch, branchSegment(c)),
       ...ranked(RANK.directory, directorySegment(c)),
       ...ranked(RANK.worktree, worktree?.name ? block(`${BLUE}${g.worktree} ${worktree.name}${RST}${worktree.original_branch ? ` ${DIM}<- ${worktree.original_branch}${RST}` : ""}`) : null),
@@ -512,10 +529,10 @@ function fullRows(c: Ctx): Ranked[][] {
  * Starts each row on its own line and wraps a row within itself. While the lines run past
  * `maxLines`, the segment with the highest rank in any row is dropped; rank 0 always stays.
  */
-export function stackRows(rows: readonly (readonly Ranked[])[], columns: number, maxLines: number): string[] {
+export function stackRows(rows: readonly (readonly Ranked[])[], columns: number, maxLines: number, sep = SEP): string[] {
   const kept = rows.map((row) => [...row]);
   for (;;) {
-    const lines = kept.flatMap((row) => (row.length > 0 ? arrange(row.map(({ segment }) => segment), columns, maxLines) : []));
+    const lines = kept.flatMap((row) => (row.length > 0 ? arrange(row.map(({ segment }) => segment), columns, maxLines, sep) : []));
     if (lines.length <= maxLines) return lines;
     let worst: { row: number; index: number; rank: number } | undefined;
     kept.forEach((row, rowIndex) =>
@@ -542,11 +559,11 @@ function compactSegments(c: Ctx): Segment[] {
 }
 
 export function render(data: Payload, git: GitInfo, env: Env, now: Date): string {
-  const nerd = detectNerdFont(env);
-  const c: Ctx = { data, git, nerd, g: nerd ? NERD_GLYPHS : ASCII_GLYPHS, now };
+  const c: Ctx = { data, git, ...statusGlyphs(env), now };
+  const sep = separator(c.g.dot);
   const columns = terminalColumns(env);
   const width = Math.max(1, columns - STATUS_LINE_INSET);
-  if (columns < COMPACT_BELOW_COLUMNS) return arrange(compactSegments(c), width, 1).join("\n");
+  if (columns < COMPACT_BELOW_COLUMNS) return arrange(compactSegments(c), width, 1, sep).join("\n");
   const rows = terminalLines(env);
-  return stackRows(fullRows(c), width, rows !== null && rows < SHORT_TERMINAL_LINES ? SHORT_MAX_LINES : MAX_LINES).join("\n");
+  return stackRows(fullRows(c), width, rows !== null && rows < SHORT_TERMINAL_LINES ? SHORT_MAX_LINES : MAX_LINES, sep).join("\n");
 }

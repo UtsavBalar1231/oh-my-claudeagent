@@ -161,12 +161,12 @@ test("each tab key shows its tab, on the terminal and the desktop", async ($, on
 
     await ui.press({ key: "3" });
     expect(await ui.find({ type: "Text", text: " COMPLETE " })).toBeDefined();
-    expect((await body()).filter((row) => /^[❯ ] \d\d:\d\d /.test(row))).toEqual([
-      `❯ ${time("2026-10-02T11:45:00Z")}  FINAL    ✓  0  just ci                   ◆`,
-      `  ${time("2026-10-02T10:20:00Z")}  TEST     ✓  0  just test-mod             ◆`,
-      `  ${time("2026-10-02T10:00:00Z")}  TEST     ✗  1  just test-mod             ◆`,
-      `  ${time("2026-10-02T09:30:00Z")}  LINT     ✓  0  just lint                 ◆`,
-      `  ${time("2026-10-02T09:00:00Z")}  BUILD    ✓  0  bun run build             ◆`,
+    expect((await body()).filter((row) => /^[❯ ] [✓✗] {2}\d\d:\d\d /.test(row))).toEqual([
+      `❯ ✓  ${time("2026-10-02T11:45:00Z")}  final   just ci`,
+      `  ✓  ${time("2026-10-02T10:20:00Z")}  test    just test-mod`,
+      `  ✗  ${time("2026-10-02T10:00:00Z")}  test    just test-mod`,
+      `  ✓  ${time("2026-10-02T09:30:00Z")}  lint    just lint`,
+      `  ✓  ${time("2026-10-02T09:00:00Z")}  build   bun run build`,
     ]);
 
     await ui.press({ key: "4" });
@@ -331,14 +331,14 @@ test("the Evidence and Notepad tabs load again after the session state is reset"
     await ui.redraw();
     return rows(await ui.drawn())[3];
   };
-  expect(await first("3")).toStartWith("FINAL VERIFICATION · sample COMPLETE");
+  expect(await first("3")).toStartWith("Final verification · sample COMPLETE");
   expect(await first("4")).toBe("sample  BOUND  · 1 entry");
 
   atoms.reset("pane");
   atoms.reset("ledger");
   await w.clock.advance(2000);
 
-  expect(await first("3")).toStartWith("FINAL VERIFICATION · sample COMPLETE");
+  expect(await first("3")).toStartWith("Final verification · sample COMPLETE");
   expect(await first("4")).toBe("sample  BOUND  · 1 entry");
   await ui.unmount();
 });
@@ -397,19 +397,17 @@ test("an agent row appears on agent.spawn, sums its steps and ends on turn.compl
   agentEngine(on);
   await $.command.run(run(""));
   const ui = await $.ui.mount(pane("terminal", { columns: 120, rows: 40, placement: "dock" }));
-  const body = async () => rows(await ui.drawn()).slice(3);
-
   const lane = async (key: string) => (await ui.find({ key }))?.text;
 
   await $.agent.spawn(SPAWN);
   w.agents = [{ id: "a-1", description: "Fix the parser", type: "oh-my-claudeagent:executor", status: "running" }];
-  expect((await body())[0]).toBe("◆ 1 running · 0 finished · 0 tokens");
-  expect(await lane("lane-a-1")).toBe("◆ executor · Fix the parser                0     0s");
-  expect(await lane("tools-a-1")).toBe("  ◐ starting");
+  expect(await ui.find({ type: "Text", text: "1 running · 0 finished · 0 tokens" })).toBeDefined();
+  expect(await lane("lane-a-1")).toBe("◆ executor · Fix the parser      sonnet-5-5      0s");
+  expect(await lane("tools-a-1")).toBe("  · starting");
 
   await drain($.turn.step({ turnId: "t-1", index: 0, model: "claude-sonnet-5-5", effort: "high", messageCount: 1, agentId: "a-1" }));
   await w.clock.advance(66_000);
-  expect(await lane("lane-a-1")).toBe("◆ executor · Fix the parser       high  1.5k  1m06s");
+  expect(await lane("lane-a-1")).toBe("◆ executor · Fix the parser            high   1m06s");
 
   await $.turn.complete({
     answer: "done",
@@ -421,7 +419,7 @@ test("an agent row appears on agent.spawn, sums its steps and ends on turn.compl
     usage: usage(2000, 500),
   });
   await w.clock.advance(4000);
-  expect((await body())[0]).toBe("◆ 0 running · 1 finished · 2.5k tokens");
+  expect(await ui.find({ type: "Text", text: "0 running · 1 finished · 2.5k tokens" })).toBeDefined();
   expect(await lane("done-a-1")).toBe("✓ executor · done                             1m06s");
   expect(await lane("lane-a-1")).toBeUndefined();
   await ui.unmount();
@@ -436,12 +434,12 @@ test("the pane timer ends a row the agent list no longer holds and picks up new 
   w.agents = [{ id: "a-1", description: "Fix the parser", type: "oh-my-claudeagent:executor", status: "running" }];
 
   await w.clock.advance(2000);
-  expect(await ui.find({ type: "Text", text: "◆ 1 running · 0 finished · 0 tokens" })).toBeDefined();
+  expect(await ui.find({ type: "Text", text: "1 running · 0 finished · 0 tokens" })).toBeDefined();
 
   w.agents = [];
   write(w, LEDGER, ledger([...ENTRIES, ["test", "just test", 0, "2026-10-02T12:00:00Z"]]));
   await w.clock.advance(2000);
-  expect(await ui.find({ type: "Text", text: "◆ 0 running · 1 finished · 0 tokens" })).toBeDefined();
+  expect(await ui.find({ type: "Text", text: "0 running · 1 finished · 0 tokens" })).toBeDefined();
   expect((await ui.find({ key: "done-a-1" }))?.text).toStartWith("○ executor · ended");
   await ui.press({ key: "3" });
   expect(await ui.find({ type: "Text", text: "1/6 · ↑↓ move" })).toBeDefined();
@@ -569,8 +567,8 @@ test("every row stays inside the body less the close-mark gutter at 80, 120 and 
   }
 });
 
-test("OMCA_ASCII draws every glyph from the ASCII set", async ($, on) => {
-  world(on, FILES, {}, { OMCA_ASCII: "1" });
+test("OMCA_GLYPHS=ascii draws every glyph from the ASCII set", async ($, on) => {
+  world(on, FILES, {}, { OMCA_GLYPHS: "ascii" });
   agentEngine(on);
   await $.command.run(run("plan", 80));
   await $.agent.spawn(SPAWN);
@@ -578,7 +576,7 @@ test("OMCA_ASCII draws every glyph from the ASCII set", async ($, on) => {
 
   const drawn = rows(await ui.drawn());
   expect(drawn.slice(1, 4)).toEqual([
-    "Ship the sample widg... [##......] 12/46 no task lists a file to prove @1",
+    "Ship the s... [##......] 12/46 no task lists a file to prove  @ 1 running",
     "  ^ 12 more",
     "+ 11 Port step 11 onto the shared harness                                ",
   ]);
@@ -586,5 +584,26 @@ test("OMCA_ASCII draws every glyph from the ASCII set", async ($, on) => {
   await ui.press({ key: "1" });
   expect((await ui.find({ key: "lane-a-1" }))?.text).toStartWith("@ executor - Fix the parser");
   expect(rows(await ui.drawn()).filter((row) => !isAscii(row))).toEqual([]);
+  await ui.unmount();
+});
+
+test("by default every tab draws Nerd Font glyphs, each one before a space or at a row's end", async ($, on) => {
+  const w = world(on, FILES, {}, { OMCA_GLYPHS: "" });
+  agentEngine(on);
+  await $.command.run(run(""));
+  await $.agent.spawn(SPAWN);
+  w.agents = [{ id: "a-1", description: "Fix the parser", type: "oh-my-claudeagent:executor", status: "running" }];
+  const ui = await $.ui.mount(pane("terminal", { columns: 200, rows: 50, placement: "dock" }));
+  const glued: string[] = [];
+  let icons = 0;
+  for (const key of ["1", "2", "3", "4", "5", "6", "7"]) {
+    await ui.press({ key });
+    for (const row of rows(await ui.drawn())) {
+      icons += [...row.matchAll(/[\u{e000}-\u{f8ff}]/gu)].length;
+      glued.push(...[...row.matchAll(/[\u{e000}-\u{f8ff}](?=\S)/gu)].map(() => `${key}: ${row}`));
+    }
+  }
+  expect(icons).toBeGreaterThan(0);
+  expect(glued).toEqual([]);
   await ui.unmount();
 });

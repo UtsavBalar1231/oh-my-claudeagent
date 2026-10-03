@@ -3,7 +3,7 @@ import { resolveBoundPlan } from "../src/core/boulder.ts";
 import { BOULDER, LEDGER } from "../src/core/omca-paths.ts";
 import { configDir, type Env as PathEnv, homeDir, inferPlatform, isAbsolutePath, joinPath, type Platform } from "../src/core/path.ts";
 import { parseRuns, proofOf, type Run, type Verdict } from "../src/core/proof.ts";
-import { isAsciiRequested } from "../src/core/ui-kit.ts";
+import { type GlyphTier, glyphTier } from "../src/core/ui-kit.ts";
 
 export type State = PluginState["oh-my-claudeagent"];
 
@@ -31,7 +31,7 @@ export type Host = {
     HOMEDRIVE: Env;
     HOMEPATH: Env;
     CLAUDE_CONFIG_DIR: Env;
-    OMCA_ASCII: Env;
+    OMCA_GLYPHS: Env;
     OMCA_DISABLED_HOOKS: Env;
     CLAUDE_CODE_SUBAGENT_MODEL_FORCE: Env;
     CLAUDE_CODE_DISABLE_ADVISOR_TOOL: Env;
@@ -112,25 +112,25 @@ export async function pluginVersion(host: Host): Promise<string | null> {
   }
 }
 
-export type Session = { env: PathEnv; platform: Platform; home: string; config: string | undefined; isAscii: boolean };
+export type Session = { env: PathEnv; platform: Platform; home: string; config: string | undefined; glyphTier: GlyphTier };
 
-const UNRESOLVED: Session = { env: {}, platform: "linux", home: "", config: undefined, isAscii: false };
+const UNRESOLVED: Session = { env: {}, platform: "linux", home: "", config: undefined, glyphTier: "nerd" };
 let session: Session | undefined;
 
 async function resolveSession(host: Host): Promise<Session> {
-  const [root, HOME, USERPROFILE, HOMEDRIVE, HOMEPATH, CLAUDE_CONFIG_DIR, ascii] = await Promise.all([
+  const [root, HOME, USERPROFILE, HOMEDRIVE, HOMEPATH, CLAUDE_CONFIG_DIR, glyphs] = await Promise.all([
     host.session.root(),
     host.env.HOME(),
     host.env.USERPROFILE(),
     host.env.HOMEDRIVE(),
     host.env.HOMEPATH(),
     host.env.CLAUDE_CONFIG_DIR(),
-    host.env.OMCA_ASCII(),
+    host.env.OMCA_GLYPHS(),
   ]);
   const env = { HOME, USERPROFILE, HOMEDRIVE, HOMEPATH, CLAUDE_CONFIG_DIR };
   const home = homeDir(env) ?? "";
   const config = configDir(env);
-  return { env, platform: inferPlatform(root, home, config ?? ""), home, config, isAscii: isAsciiRequested(ascii) };
+  return { env, platform: inferPlatform(root, home, config ?? ""), home, config, glyphTier: glyphTier(glyphs) };
 }
 
 // The environment holds for the life of the session, so it is read once, outside any drawing.

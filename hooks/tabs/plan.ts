@@ -20,7 +20,7 @@ import {
   taskMarkdown,
 } from "../../src/core/plan-reader.ts";
 import { ago, type Proof, proofSummary, type Run, timeAgo, type Verdict } from "../../src/core/proof.ts";
-import { dayOf, displayWidth, fitEnd, fitMiddle, KEYS, keyHint, padStart, shortType } from "../../src/core/ui-kit.ts";
+import { agentGlyph, dayOf, displayWidth, fitEnd, fitMiddle, KEYS, keyHint, padStart, shortType } from "../../src/core/ui-kit.ts";
 import {
   agentKey,
   bar,
@@ -517,13 +517,17 @@ function proofPieces(view: View, ctx: Ctx, isShort: boolean): Piece[] {
   const verdicts = ctx.board.cards.map((card) => verdictOf(card)?.proof);
   if (verdicts.every((verdict) => verdict === undefined)) return [{ text: "no task lists a file to prove", color: TONE_KEYS.muted }];
   const { proven, unproven, failed } = proofSummary(verdicts);
-  const sep: Piece = { text: isShort ? " " : ` ${view.g.dot} `, color: TONE_KEYS.muted };
+  const sep: Piece = { text: isShort ? "  " : ` ${view.g.dot} `, color: TONE_KEYS.muted };
   const part = (level: Level, count: number, word: string): Piece[] => {
     const { glyph, color } = levelMark(level, view.g);
     const muted = count === 0 ? { color: TONE_KEYS.muted } : {};
-    return [{ text: glyph, color: count === 0 ? TONE_KEYS.muted : color }, { text: isShort ? `${count}` : ` ${count} ${word}`, ...muted }];
+    return [{ text: glyph, color: count === 0 ? TONE_KEYS.muted : color }, { text: isShort ? ` ${count}` : ` ${count} ${word}`, ...muted }];
   };
-  return [...part("ok", proven, "proven"), sep, ...part("warn", unproven, "unproven"), sep, ...part("fail", failed, "failed")];
+  const counts = [proven, unproven, failed];
+  const parts = [part("ok", proven, "proven"), part("warn", unproven, "unproven"), part("fail", failed, "failed")];
+  // The one-line header keeps only the counts that are not zero.
+  const kept = isShort ? parts.filter((_, index) => counts[index] !== 0) : parts;
+  return kept.flatMap((pieces, index) => [...(index === 0 ? [] : [sep]), ...pieces]);
 }
 
 function agentPieces(view: View, agents: readonly Agent[]): Piece[] {
@@ -531,7 +535,7 @@ function agentPieces(view: View, agents: readonly Agent[]): Piece[] {
     .filter((agent) => agent.endedAt === null)
     .flatMap((agent, index) => [
       ...(index === 0 ? [] : [{ text: ` ${view.g.dot} `, color: TONE_KEYS.muted }]),
-      { text: `${view.g.agent} ${shortType(agent.type)}`, color: agentKey(agent.type) },
+      { text: `${agentGlyph(agent.type, view.g)} ${shortType(agent.type)}`, color: agentKey(agent.type) },
       ...(agent.task === undefined ? [] : [{ text: ` on ${agent.task}`, color: TONE_KEYS.muted }]),
     ]);
 }
@@ -560,7 +564,7 @@ function header(view: View, ctx: Ctx, isCard: boolean): RenderElement[] {
       ...bar(parts, COMPACT_BAR, view.isAscii),
       { text: ` ${count} `, bold: true },
       ...proofPieces(view, ctx, true),
-      ...(runningCount === 0 ? [] : [{ text: ` ${view.g.agent}${runningCount}`, color: TONE_KEYS.active }]),
+      ...(runningCount === 0 ? [] : [{ text: `  ${view.g.agent} `, color: TONE_KEYS.active }, { text: `${runningCount} running` }]),
     ];
     if (view.isInline) {
       const room = Math.max(1, view.width - piecesWidth(lead) - piecesWidth(tail));
@@ -612,11 +616,12 @@ const headerRows = (view: View, ctx: Ctx, isCard: boolean) => {
 function rightPieces(view: View, ctx: Ctx, card: Card, isShort: boolean): Piece[] {
   const pieces: Piece[] = [];
   for (const agent of ctx.running.get(card.n) ?? []) {
-    pieces.push({ text: " " }, { text: isShort ? view.g.agent : `${view.g.agent} ${shortType(agent.type)}`, color: agentKey(agent.type) });
+    const glyph = agentGlyph(agent.type, view.g);
+    pieces.push({ text: " " }, { text: isShort ? glyph : `${glyph} ${shortType(agent.type)}`, color: agentKey(agent.type) });
   }
   const waiting = waitingOn(ctx, card);
   if (!card.done && waiting.length > 0 && !ctx.running.has(card.n)) {
-    if (isShort) pieces.push({ text: " " }, { text: view.g.blocked, color: TONE_KEYS.warn }, { text: waiting.join(",") });
+    if (isShort) pieces.push({ text: " " }, { text: view.g.blocked, color: TONE_KEYS.warn }, { text: ` ${waiting.join(",")}` });
     else pieces.push({ text: " " }, { text: `blocked by ${waiting.join(", ")}`, color: TONE_KEYS.muted });
   }
   const verdict = verdictOf(card);
@@ -856,7 +861,7 @@ function detail(view: View, ctx: Ctx, card: Card, width: number): RenderElement[
   const chips: Piece[] = [
     chip(STATUS[status].word, STATUS[status].tone, view.isAscii),
     ...(verdict === undefined ? [] : [{ text: " " }, chip(PROOF[verdict.proof].word, PROOF[verdict.proof].tone, view.isAscii)]),
-    ...(ctx.running.get(card.n) ?? []).flatMap((agent) => [{ text: " " }, { text: `${view.g.agent} ${shortType(agent.type)}`, color: agentKey(agent.type) }]),
+    ...(ctx.running.get(card.n) ?? []).flatMap((agent) => [{ text: " " }, { text: `${agentGlyph(agent.type, view.g)} ${shortType(agent.type)}`, color: agentKey(agent.type) }]),
   ];
   const other = card.fields.filter((field) => !SHOWN_APART.includes(field.name.toLowerCase()));
   const doText = fieldsText(card, "do");

@@ -25,7 +25,7 @@ export const footer: Features = {
   "turn.complete": {
     async post(host, e, result) {
       if (e.agentId !== undefined) return undefined;
-      const [{ value: sample }, usage, now, { isAscii }] = await Promise.all([
+      const [{ value: sample }, usage, now, { glyphTier }] = await Promise.all([
         host.state.costSample.get(),
         host.session.usage(),
         host.clock.now(),
@@ -55,7 +55,7 @@ export const footer: Features = {
           costUsd: isSubscription || before === null || after === undefined ? null : after - before,
           unlogged,
         },
-        glyphs(isAscii),
+        glyphs(glyphTier),
       );
       return { ...result, text };
     },

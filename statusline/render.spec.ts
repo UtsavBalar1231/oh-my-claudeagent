@@ -2,16 +2,14 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
-import { displayWidth } from "../src/core/ui-kit.ts";
+import { AGENT_ICONS, displayWidth, type GlyphTier } from "../src/core/ui-kit.ts";
 import { NO_REPO } from "./git.ts";
 import type { GitInfo } from "./git.ts";
 import {
-  AGENT_GLYPHS,
   arrange,
   block,
   composePr,
   DEFAULT_MAIN_AGENT,
-  detectNerdFont,
   fixed,
   formatResetTime,
   type Payload,
@@ -21,6 +19,7 @@ import {
   renderBar,
   type Segment,
   stackRows,
+  statusGlyphs,
   type Ranked,
   terminalColumns,
   terminalLines,
@@ -44,8 +43,9 @@ const filled = (color: string, count: number): string => `${color}▰${R}`.repea
 const empty = (count: number): string => `${D}▱${R}`.repeat(count);
 const visible = (s: string): string => s.replace(/\x1b\[[0-9;]*m|\x1b\]8;;[^\x07]*\x07/g, "");
 
-const ASCII = { CLAUDE_STATUSLINE_NERD_FONT: "0", COLUMNS: "300" };
-const NERD = { CLAUDE_STATUSLINE_NERD_FONT: "1", COLUMNS: "300" };
+const ASCII = { OMCA_GLYPHS: "unicode", COLUMNS: "300" };
+const NERD = { OMCA_GLYPHS: "nerd", COLUMNS: "300" };
+const PLAIN = { OMCA_GLYPHS: "ascii", COLUMNS: "300" };
 const NOW = new Date("2026-10-02T12:00:00Z");
 // Claude Code keeps 3 cells free on each side, so a line may be this much narrower than COLUMNS.
 const INSET = 6;
@@ -78,15 +78,23 @@ const withCost = (cost: NonNullable<Payload["cost"]>, context: NonNullable<Paylo
 });
 
 describe("environment", () => {
-  test.each([
-    [{ CLAUDE_STATUSLINE_NERD_FONT: "1" }, true],
-    [{ CLAUDE_STATUSLINE_NERD_FONT: "0" }, false],
-    [{ CLAUDE_STATUSLINE_NERD_FONT: " 1 " }, true],
-    [{ CLAUDE_STATUSLINE_NERD_FONT: "yes" }, false],
-    [{ NERD_FONT: "0" }, true],
-    [{}, true],
-  ])("Nerd Font preference from %o is %p", (env, expected) => {
-    expect(detectNerdFont(env)).toBe(expected);
+  test.each<[Record<string, string>, GlyphTier]>([
+    [{ OMCA_GLYPHS: "nerd" }, "nerd"],
+    [{ OMCA_GLYPHS: " Unicode " }, "unicode"],
+    [{ OMCA_GLYPHS: "ascii" }, "ascii"],
+    [{ OMCA_GLYPHS: "0" }, "nerd"],
+    [{ CLAUDE_STATUSLINE_NERD_FONT: "0" }, "nerd"],
+    [{}, "nerd"],
+  ])("the glyph tier from %o is %p", (env, expected) => {
+    expect(statusGlyphs(env).tier).toBe(expected);
+  });
+
+  test("the ascii tier draws plain text throughout: # and . bars, | between segments", () => {
+    const data = withCost({ total_cost_usd: 1.5, total_duration_ms: 125_000 });
+    const drawn = rows({ ...data, rate_limits: { five_hour: { used_percentage: 45 } } }, ON_BRANCH, PLAIN).map(visible);
+    expect(drawn.filter((line) => !/^[\x20-\x7e]*$/.test(line))).toEqual([]);
+    expect(drawn.join("\n")).toContain("##.................. 10%");
+    expect(drawn.join("\n")).toContain(" | ");
   });
 
   test.each([
@@ -210,16 +218,16 @@ describe("pull request segment", () => {
   test.each([[{}], [{ pr: null }], [{ pr: { url: "https://x/1", review_state: "approved" } }], [{ pr: { number: null } }]] as [Payload][])(
     "%o has no segment",
     (data) => {
-      expect(composePr(data, false)).toBe("");
+      expect(composePr(data, "unicode")).toBe("");
     },
   );
 
   test("a number alone is cyan text", () => {
-    expect(composePr(withPr({ number: 42 }), false)).toBe(`${C}#42${R}`);
+    expect(composePr(withPr({ number: 42 }), "unicode")).toBe(`${C}#42${R}`);
   });
 
   test("a url links the number", () => {
-    expect(composePr(withPr({ number: 7, url: "https://github.com/o/r/pull/7" }), false)).toBe(`${C}${link("https://github.com/o/r/pull/7", "#7")}${R}`);
+    expect(composePr(withPr({ number: 7, url: "https://github.com/o/r/pull/7" }), "unicode")).toBe(`${C}${link("https://github.com/o/r/pull/7", "#7")}${R}`);
   });
 
   test.each([
@@ -227,7 +235,7 @@ describe("pull request segment", () => {
     ["pr", "#"],
     [undefined, "#"],
   ])("a pull request of kind %p uses the %p sigil", (kind, sigil) => {
-    expect(composePr(withPr({ number: 9, kind }), false)).toBe(`${C}${sigil}9${R}`);
+    expect(composePr(withPr({ number: 9, kind }), "unicode")).toBe(`${C}${sigil}9${R}`);
   });
 
   test.each([
@@ -237,12 +245,12 @@ describe("pull request segment", () => {
     ["draft", D, "\uf040", "d"],
   ])("review state %s is %s with a Nerd Font glyph and an ASCII fallback", (state, color, nerd, ascii) => {
     const data = withPr({ number: 5, review_state: state });
-    expect(composePr(data, true)).toBe(`${C}#5${R} ${color}${nerd}${R}`);
-    expect(composePr(data, false)).toBe(`${C}#5${R} ${color}${ascii}${R}`);
+    expect(composePr(data, "nerd")).toBe(`${C}#5${R} ${color}${nerd}${R}`);
+    expect(composePr(data, "unicode")).toBe(`${C}#5${R} ${color}${ascii}${R}`);
   });
 
   test.each([["unknown_future_state"], ["constructor"]])("review state %s adds no glyph", (state) => {
-    expect(composePr(withPr({ number: 5, review_state: state }), true)).toBe(`${C}#5${R}`);
+    expect(composePr(withPr({ number: 5, review_state: state }), "nerd")).toBe(`${C}#5${R}`);
   });
 });
 
@@ -482,7 +490,7 @@ describe("segments", () => {
 
   test("every shipped agent has its own glyph", () => {
     const shipped = readdirSync(join(import.meta.dir, "..", "agents")).filter((f) => f.endsWith(".md")).map((f) => f.slice(0, -".md".length));
-    expect(shipped.filter((name) => !AGENT_GLYPHS.has(name))).toEqual([]);
+    expect(shipped.filter((name) => !Object.hasOwn(AGENT_ICONS, name))).toEqual([]);
   });
 
   test("the plugin's default main agent shows nothing, and that default is the one settings.json sets", () => {

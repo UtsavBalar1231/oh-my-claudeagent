@@ -10,14 +10,13 @@ type Row = State["agents"][string];
 type Lane = State["lanes"][string];
 type Status = Row["status"];
 
-const TOOL_HISTORY = 24;
 const PROMPT_CELLS = 400;
 const LINE_CELLS = 200;
 
 // Secrets are masked before a lane is stored, and the excerpt is cut only after that, so a
 // cut can never leave half a key the masks no longer match.
 async function masked(host: Host, text: string, cells: number): Promise<string> {
-  const g = glyphs((await sessionOf(host)).isAscii);
+  const g = glyphs((await sessionOf(host)).glyphTier);
   return fitEnd(redact(oneLine(text), "", g.mask).text, cells, g.ellipsis);
 }
 
@@ -91,7 +90,7 @@ export const agentsTracker: Features = {
       const prompt = await masked(host, e.prompt, PROMPT_CELLS);
       await update(host.state.lanes, (lanes) => ({
         ...lanes,
-        [agentId]: { prompt, tools: [], calls: 0, tool: null, output: "", result: "" },
+        [agentId]: { prompt, calls: 0, tool: null, output: "", result: "" },
       }));
       return undefined;
     },
@@ -125,7 +124,6 @@ export const agentsTracker: Features = {
         if (names.length === 0 && output === "" && lane.tool === null) return lane;
         return {
           ...lane,
-          tools: [...lane.tools, ...names].slice(-TOOL_HISTORY),
           calls: lane.calls + names.length,
           tool: last === undefined || detail === undefined ? null : { name: last.name, detail },
           output: output === "" ? lane.output : output,

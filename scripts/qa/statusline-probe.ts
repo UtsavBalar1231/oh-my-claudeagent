@@ -14,7 +14,7 @@ async function render(pluginDir: string, script: string, payload: unknown): Prom
     stdin: new TextEncoder().encode(JSON.stringify(payload)),
     stdout: "pipe",
     stderr: "pipe",
-    env: childEnv({ CLAUDE_STATUSLINE_NERD_FONT: "0" }),
+    env: childEnv({ OMCA_GLYPHS: "unicode" }),
   });
   const [code, stdout, stderr] = await Promise.all([proc.exited, new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
   if (code !== 0) throw new Error(`statusline/${script} exited ${code}: ${stderr.trim()}`);

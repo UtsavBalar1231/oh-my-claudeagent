@@ -49,7 +49,7 @@ A terminal under 60 columns gets one compact line:
 > Opus 5.5 · T: 2/4 · 34% · * main
 ```
 
-The samples show the ASCII glyphs. With Nerd Font glyphs on, each label is a glyph instead.
+The samples show the `unicode` glyphs. With Nerd Font glyphs, the default, each label is a glyph instead.
 
 **Cost** shows only for an account billed by the token. The payload says nothing about the
 account type, but `rate_limits` carries a `five_hour` or `seven_day` window only for Claude.ai Pro
@@ -146,14 +146,15 @@ seconds) are fixed in the code. These environment variables are read:
 
 | Variable | Default | Effect |
 |---|---|---|
-| `CLAUDE_STATUSLINE_NERD_FONT` | `1` | `1` uses Nerd Font glyphs, anything else uses ASCII. Set `0` when the terminal font has no Nerd Font glyphs, or for plain-text output. |
+| `OMCA_GLYPHS` | `nerd` | `nerd` draws Nerd Font glyphs, `unicode` the text labels below with Unicode bars and separators, `ascii` plain text throughout. An unknown value means `nerd`. The `/omca` pane reads the same variable. |
 | `COLUMNS` | `80` | Terminal width in cells. Claude Code sets it. A value that is not a positive integer is ignored. |
 | `LINES` | tall | Terminal height. Claude Code sets it. Under 20 the status line takes at most two lines. |
 | `OMCA_SUBAGENT_STATUSLINE_DUMP` | unset | Path. Appends each raw `subagentStatusLine` stdin payload to this file as JSONL. Opt-in capture for answering platform-payload questions; no rotation. |
 
-Without Nerd Font glyphs the renderer falls back to ASCII: `*` for the branch, `>` for the model
+Without Nerd Font glyphs the renderer uses text labels: `*` for the branch, `>` for the model
 and folder, `~` for the clock, `E:` for effort, `V:` for vim mode, `W:` for the worktree, `T:`
-for plan progress, `5h` and `7d` for the usage windows.
+for plan progress, `5h` and `7d` for the usage windows. `ascii` also draws the bars with `#` and
+`.`, separates segments with `|` and cuts with `...`.
 
 ---
 
@@ -292,7 +293,7 @@ panel keeps its default rows.
 
 ## Agent icons
 
-With Nerd Font glyphs on, the status line shows an icon next to the active agent name. The lookup strips
+With Nerd Font glyphs on, the status line and the `/omca` pane show an icon next to the agent name. The lookup strips
 the `oh-my-claudeagent:` prefix (`oh-my-claudeagent:sisyphus` resolves to `sisyphus`), and any
 name outside the table falls back to `nf-fa-user`.
 

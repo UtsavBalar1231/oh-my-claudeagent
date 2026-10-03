@@ -1,6 +1,6 @@
 {
   "env": {
-    "CLAUDE_STATUSLINE_NERD_FONT": "0",
+    "OMCA_GLYPHS": "unicode",
     "COLUMNS": "40"
   },
   "git": {

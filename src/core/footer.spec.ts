@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { FOOTER_WIDTH, footerLine } from "./footer.ts";
 import { displayWidth, glyphs } from "./ui-kit.ts";
 
-const U = glyphs(false);
-const A = glyphs(true);
+const U = glyphs("unicode");
+const A = glyphs("ascii");
 const FULL = { durationMs: 4_200, tokens: { input: 12_345, output: 845 }, costUsd: 0.0312, unlogged: "just test" };
 
 describe("footerLine", () => {
