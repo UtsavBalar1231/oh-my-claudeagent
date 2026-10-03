@@ -273,6 +273,6 @@ if (import.meta.main) {
     ...(script !== undefined && { script }),
     ...(values["subagent-marker"] !== undefined && { subagentMarker: values["subagent-marker"] }),
   });
-  console.log(server.port);
+  process.stdout.write(`${server.port}\n`);
   for (const signal of ["SIGTERM", "SIGINT"]) process.on(signal, () => process.exit(0));
 }
