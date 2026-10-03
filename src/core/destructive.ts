@@ -46,9 +46,7 @@ const WRAPPERS = [
 ].join("|");
 const PREFIX = `${KEYWORDS}${ENV_ASSIGN}(?:(?:${WRAPPERS})${ENV_ASSIGN})*`;
 
-const RM = new RegExp(
-  `(^|[;&|()\`\\n\\r])${S}*${PREFIX}${commandWord("rm")}${S}+((-[a-zA-Z]+|--[a-zA-Z-]+)${S}+)*(-(?=[a-zA-Z]*[rR])[a-zA-Z]+|--recursive)(${S}|$)`,
-);
+const RM = new RegExp(`(^|[;&|()\`\\n\\r])${S}*${PREFIX}${commandWord("rm")}(?=${S}|$)`);
 // One invocation's arguments run to the next separator; a `)` ends them too, so a removal
 // inside `$(...)` does not swallow the rest of the outer command. A substitution that reads as
 // the working directory is part of its argument.
@@ -56,16 +54,16 @@ const RM_ARGS = new RegExp(`^((?:${CWD_SUBSTITUTION.bash.source}|[^;&|)\`\\n\\r]
 
 const GIT_GLOBALS = `((-C${S}+${ARGUMENT}|-c${S}+${ARGUMENT}|-c${NS}+|--git-dir[= \\t\\n\\v\\f\\r]${ARGUMENT}|--work-tree[= \\t\\n\\v\\f\\r]${ARGUMENT}|--no-pager|--paginate|-p|--bare|--literal-pathspecs|--no-replace-objects)${S}+)*`;
 const GIT_TOKEN = "[^ \\t\\n\\v\\f\\r;&|`]+";
-// A recursive `git rm` whatever flags precede `-r`, a path-restoring checkout, a stash that is not
-// `list` or `show`, and a clean that is not a dry run. Arguments are read within one line (`${H}`), so a later line's `.` or `-n` is not this command's.
-const GIT_SUBCOMMAND = `(?<subcommand>reset["']?${S}+--hard|stash(?!${H}+(?:list|show)(?=${S}|$))|clean(?!(?:${H}+${GIT_TOKEN})*?${H}+(?:-[a-zA-Z]*n[a-zA-Z]*|--dry-run)(?=${S}|$))|restore|rm(?:${H}+-[a-zA-Z-]+)*${H}+-[a-zA-Z]*[rR][a-zA-Z]*|checkout(?:${H}+${GIT_TOKEN})*${H}+(?:--|\\.(?:[\\/]${NS}*)?))`;
+// A path-restoring checkout, a stash that is not `list` or `show`, and a clean that is not a dry
+// run. Arguments are read within one line (`${H}`), so a later line's `.` or `-n` is not this command's.
+const GIT_SUBCOMMAND = `(?<subcommand>stash(?!${H}+(?:list|show)(?=${S}|$))|clean(?!(?:${H}+${GIT_TOKEN})*?${H}+(?:-[a-zA-Z]*n[a-zA-Z]*|--dry-run)(?=${S}|$))|checkout(?:${H}+${GIT_TOKEN})*${H}+(?:--|\\.(?:[\\/]${NS}*)?))`;
 
 function gitPatterns(commandPosition: string, git: string) {
   const at = `(?<=^|${commandPosition})${S}*${PREFIX}${commandWord(git)}${S}+${GIT_GLOBALS}`;
   return {
     git: new RegExp(`${at}["']?${GIT_SUBCOMMAND}["']?(?=[ \\t\\n\\v\\f\\r);&|<>\`]|$)`, "g"),
     push: new RegExp(`${at}push(?=${S}|$)(?<args>[^;&|)\`\\n\\r]*)`, "g"),
-    commit: new RegExp(`${at}commit(?=${S}|$)`, "g"),
+    argued: new RegExp(`${at}["']?(?<word>reset|rm|restore|commit)["']?(?=${S}|$)`, "g"),
   };
 }
 const BASH_GIT = gitPatterns("[;&|(`\\n\\r]", "git");
@@ -261,7 +259,7 @@ function neutralize(command: string): { scan: string; bodies: Body[] } {
 }
 
 /** The command with each line's leading horizontal whitespace removed, so an indented line is read at its command position. */
-export const trimLines = (command: string): string => command.replace(/^[ \t\v\f\r]+/gm, "");
+const trimLines = (command: string): string => command.replace(/^[ \t\v\f\r]+/gm, "");
 
 /**
  * Splits an argument list into words the way the shell would, with where each starts: quotes
@@ -323,6 +321,13 @@ function argumentsEnd(scan: string, from: number): number {
   return scan.length;
 }
 
+/** A command inside a backtick substitution ends at the closing backtick, before `end`. */
+function backtickEnd(scan: string, start: number, end: number): number {
+  const isInBackticks = (scan.slice(0, start).match(/`/g) ?? []).length % 2 === 1;
+  const close = isInBackticks ? scan.indexOf("`", start) : -1;
+  return close === -1 ? end : Math.min(close, end);
+}
+
 /** Words before the first `--` that start with `-` are options; every other word, and every word after `--`, is an operand. */
 function splitOptions(words: readonly string[]): { options: string[]; operands: string[] } {
   const options: string[] = [];
@@ -345,28 +350,52 @@ function removals(command: string, scan: string, ctx: Context): { isCatastrophic
   const found: Located<Removal>[] = [];
   let offset = 0;
   for (let match = RM.exec(scan); match !== null; match = RM.exec(scan.slice(offset))) {
-    offset += match.index + match[0].length;
-    const args = RM_ARGS.exec(scan.slice(offset));
+    const start = offset + match.index + match[0].length;
+    const args = RM_ARGS.exec(scan.slice(start));
     const scanned = args?.[1] ?? "";
+    offset = start + scanned.length;
+    // GNU rm reads options anywhere before `--`, so `rm ~ -rf` is as recursive as `rm -rf ~`.
+    const { options, operands } = splitOptions(shellWords(command.slice(start, offset)));
+    if (!options.some(isRecursiveRm)) continue;
     if (scanned.replace(CWD_SUBSTITUTION.bash, "").includes("$(") || args?.[2] === "`") {
       return { isCatastrophic: true, removals: [] };
     }
-    const { options, operands } = splitOptions(shellWords(command.slice(offset, offset + scanned.length)));
-    if (options.includes("--no-preserve-root") || operands.some((word) => isCatastrophicTarget(word, ctx))) {
+    if (options.some((option) => abbreviates(option, "--no-preserve-root", 4)) || operands.some((word) => isCatastrophicTarget(word, ctx))) {
       return { isCatastrophic: true, removals: [] };
     }
-    found.push({ index: offset, targets: operands });
+    found.push({ index: start, targets: operands });
   }
   return { isCatastrophic: false, removals: found };
 }
 
 function treeOperation(subcommand: string): GitOperation {
-  if (subcommand.startsWith("reset")) return "reset --hard";
   if (subcommand.startsWith("stash")) return "stash";
   if (subcommand.startsWith("clean")) return "clean";
-  if (subcommand.startsWith("restore")) return "restore";
-  if (subcommand.startsWith("rm")) return "rm -r";
   return "checkout --";
+}
+
+/** Whether `word` spells the long option `option` or a prefix of it at least `shortest` characters long, as git and GNU tools accept. */
+const abbreviates = (word: string, option: string, shortest: number): boolean => word.length >= shortest && option.startsWith(word);
+
+const isRecursiveRm = (option: string): boolean => /^-(?!-)[a-zA-Z]*[rR]/.test(option) || abbreviates(option, "--recursive", 3);
+
+/** `git restore` discards work only where it writes the worktree: with `--worktree`, or without `--staged`. */
+function restoresWorktree(words: readonly string[]): boolean {
+  let isStaged = false;
+  let isWorktree = false;
+  for (const option of splitOptions(words).options) {
+    if (option.startsWith("--")) {
+      if (abbreviates(option, "--staged", 4)) isStaged = true;
+      else if (abbreviates(option, "--worktree", 3)) isWorktree = true;
+      continue;
+    }
+    for (const letter of option.slice(1)) {
+      if (letter === "s") break;
+      if (letter === "S") isStaged = true;
+      if (letter === "W") isWorktree = true;
+    }
+  }
+  return isWorktree || !isStaged;
 }
 
 const FORCE = /^(?:-[a-zA-Z]*f[a-zA-Z]*|--force|--force-with-lease(?:=.*)?|--force-if-includes|--mirror)$/;
@@ -430,9 +459,17 @@ function skipsHooks(words: readonly string[]): boolean {
   return skips;
 }
 
+// git reads options anywhere before `--`, so these subcommands are judged on their whole argument list.
+const ARGUED: Readonly<Record<string, { operation: GitOperation; applies: (words: readonly string[]) => boolean }>> = {
+  reset: { operation: "reset --hard", applies: (words) => splitOptions(words).options.some((option) => abbreviates(option, "--hard", 4)) },
+  rm: { operation: "rm -r", applies: (words) => splitOptions(words).options.some((option) => /^-(?!-)[a-zA-Z]*[rR]/.test(option)) },
+  restore: { operation: "restore", applies: restoresWorktree },
+  commit: { operation: "commit --no-verify", applies: skipsHooks },
+};
+
 function gitFindings(command: string, scan: string, ctx: Context): Located<GitHit>[] {
   const isPowershell = ctx.shell === "powershell";
-  const { git, push, commit } = isPowershell ? POWERSHELL_GIT : BASH_GIT;
+  const { git, push, argued } = isPowershell ? POWERSHELL_GIT : BASH_GIT;
   const found: Located<GitHit>[] = [...scan.matchAll(git)].map((match) => ({
     index: match.index,
     finding: { operation: treeOperation(match.groups?.["subcommand"] ?? "") },
@@ -444,12 +481,13 @@ function gitFindings(command: string, scan: string, ctx: Context): Located<GitHi
     if (hit !== undefined) found.push({ index: match.index, ...hit });
   }
   let reached = 0;
-  for (const match of scan.matchAll(commit)) {
+  for (const match of scan.matchAll(argued)) {
     if (match.index < reached) continue;
     const start = match.index + match[0].length;
-    reached = isPowershell ? powershellArgumentsEnd(command, scan, start) : argumentsEnd(scan, start);
-    if (skipsHooks(shellWords(command.slice(start, reached)))) {
-      found.push({ index: match.index, finding: { operation: "commit --no-verify" }, isBlocking: true });
+    reached = isPowershell ? powershellArgumentsEnd(command, scan, start) : backtickEnd(scan, start, argumentsEnd(scan, start));
+    const rule = ARGUED[match.groups?.["word"] ?? ""];
+    if (rule?.applies(shellWords(command.slice(start, reached)))) {
+      found.push({ index: match.index, finding: { operation: rule.operation }, isBlocking: true });
     }
   }
   return found;
