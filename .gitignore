@@ -8,6 +8,11 @@ servers/__pycache__/
 # JavaScript
 node_modules/
 
+# Demo video: dependencies, renders, and footage the capture harness regenerates
+video/node_modules/
+video/out/
+video/public/footage/
+
 # oh-my-claudeagent runtime state
 .omc/
 .omca/

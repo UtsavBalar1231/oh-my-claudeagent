@@ -59,6 +59,10 @@ visual view:
 screenshots:
 	bun scripts/docs/screenshots.ts
 
+# Render the demo video into video/out
+video *args:
+	cd video && bun install --frozen-lockfile && bun render.ts {{ args }}
+
 # Benchmark the working tree, or --candidate-ref, against --baseline-ref
 bench *args:
 	bun scripts/bench.ts {{ args }}

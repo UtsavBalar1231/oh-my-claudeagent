@@ -45,6 +45,7 @@ export const EXCLUDES = [
   "/.oxlintrc.json",
   "/opencode/",
   "/.opencode/",
+  "/video/",
 ] as const;
 
 type Rule = { directoryOnly: boolean; anchored: boolean; segments: RegExp[] };

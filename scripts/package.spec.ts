@@ -42,6 +42,10 @@ const EXCLUDED: Record<string, string> = {
   "opencode/index.ts": "x",
   "opencode/overlays/executor.md": "x",
   ".opencode/plugin.ts": "x",
+  "video/package.json": "{}\n",
+  "video/bun.lock": "x",
+  "video/src/Root.tsx": "x",
+  "video/public/placeholder/hero.png": "x",
 };
 
 const UNTRACKED: Record<string, string> = {
@@ -101,6 +105,11 @@ describe("listPackageFiles", () => {
       ".claude-plugin/types/tsconfig.json",
     ]);
     expect(listed).toEqual([".claude-plugin/types/tsconfig.json", "docs/opencode/notes.md", "servers/package.json"]);
+  });
+
+  test("drops every file of the demo video project and keeps a nested video directory", () => {
+    const listed = listPackageFiles(["video/package.json", "video/bun.lock", "video/render.ts", "video/src/components/Camera.tsx", "docs/video/notes.md"]);
+    expect(listed).toEqual(["docs/video/notes.md"]);
   });
 });
 
@@ -205,6 +214,6 @@ describe("the repository tree", () => {
     expect(lines).toContain("templates/claudemd.md");
     expect(lines).toContain("scripts/package.ts");
     expect(lines.filter((line) => /^scripts\/qa\/|(^|\/)tests\//.test(line))).toEqual([]);
-    expect(lines.filter((line) => /^(package\.json|bun\.lock|bunfig\.toml|tsconfig(\.runtime)?\.json|\.?opencode\/)/.test(line))).toEqual([]);
+    expect(lines.filter((line) => /^(package\.json|bun\.lock|bunfig\.toml|tsconfig(\.runtime)?\.json|\.?opencode\/|video\/)/.test(line))).toEqual([]);
   });
 });

@@ -1,0 +1,12 @@
+{
+  "scene": "hero",
+  "fps": 30,
+  "width": 2232,
+  "height": 1282,
+  "frames": 180,
+  "grid": { "cols": 202, "rows": 50 },
+  "cell": { "width": 10.96, "height": 25.07 },
+  "origin": { "x": 15.6, "y": 16.5 },
+  "marks": { "start": 0, "hold": 45 },
+  "targets": { "task-row": { "row": 18, "col": 112, "len": 46, "rows": 1, "from": 0, "to": 180 } }
+}
