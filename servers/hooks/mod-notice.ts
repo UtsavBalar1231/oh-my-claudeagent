@@ -10,9 +10,10 @@ export const MOD_NOT_RUNNING =
 // hook, so it cannot be told from a missing mod here. The launch session is the one the
 // server's own environment names, because /clear keeps that value.
 export const handle: Handler = (_payload, { root, session }) => {
-  if (session === undefined || session.isModChecked === true) return;
-  if (session.id !== process.env.CLAUDE_CODE_SESSION_ID) return;
+  if (session === undefined || session.isModChecked === true) return undefined;
+  if (session.id !== process.env.CLAUDE_CODE_SESSION_ID) return undefined;
   session.isModChecked = true;
-  if (isHookDisabled(process.env.OMCA_DISABLED_HOOKS, "mod-notice")) return;
+  if (isHookDisabled(process.env.OMCA_DISABLED_HOOKS, "mod-notice")) return undefined;
   if (markerWrittenAt(root, session.id) === undefined) return { systemMessage: MOD_NOT_RUNNING };
+  return undefined;
 };

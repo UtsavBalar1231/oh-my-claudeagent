@@ -13,7 +13,7 @@ export const handle: Handler = (payload) => {
   if (!isPlanPath(filePath) || statSync(filePath, { throwIfNoEntry: false })?.isFile() !== true) return;
   const malformed = readFileSync(filePath, "utf8")
     .split("\n")
-    .flatMap((line, index) => (/^- \[ \] /.test(line) && !/^- \[ \] \d+\./.test(line) ? [`${index + 1}:${line}`] : []));
+    .flatMap((line, index) => (line.startsWith("- [ ] ") && !/^- \[ \] \d+\./.test(line) ? [`${index + 1}:${line}`] : []));
   if (malformed.length === 0) return;
   const lines = [
     `[PLAN-FORMAT-WARN] ${filePath} has ${malformed.length} checkbox line(s) that will not be counted as numbered tasks:`,

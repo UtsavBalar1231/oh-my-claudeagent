@@ -92,7 +92,7 @@ export function buildPlan(input: PlanInput): Plan {
   const todo = input.list.filter((item) => !input.done.has(itemKey(item)));
   const batch = todo.slice(0, input.batchSize);
   const both = (items: readonly WorkItem[]): [Estimate, Estimate] => [estimateItems(items, input.overheads, 1), estimateItems(items, input.overheads, PLUGIN_TURN_FACTOR)];
-  const { list, done, batchSize, overheads, ...rest } = input;
+  const { list, done: _done, batchSize, overheads, ...rest } = input;
   return {
     ...rest,
     total: list.length,

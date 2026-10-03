@@ -1,6 +1,7 @@
 import { appendFileSync, closeSync, createReadStream, mkdirSync, openSync, readSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { TextDecoder } from "node:util";
 import { expandTilde, normalizePath, type Platform, toPlatform } from "../../src/core/path.ts";
 import { isMissing, projectRoot } from "../io.ts";
 import type { Tool } from "../omca.ts";

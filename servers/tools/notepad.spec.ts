@@ -329,7 +329,7 @@ describe("through the server", () => {
   test("a server without the hooks role lists the declared notepad tools and serves them end to end", async () => {
     await withServer(async (request) => {
       const listed = (await request("tools/list")).result?.tools ?? [];
-      const declared = tools.map(({ call, ...declaration }) => declaration).sort((a, b) => (a.name < b.name ? -1 : 1));
+      const declared = tools.map(({ call: _call, ...declaration }) => declaration).sort((a, b) => (a.name < b.name ? -1 : 1));
       expect(JSON.parse(JSON.stringify(listed)).filter((t: { name: string }) => t.name.startsWith("notepad_"))).toEqual(
         JSON.parse(JSON.stringify(declared)),
       );

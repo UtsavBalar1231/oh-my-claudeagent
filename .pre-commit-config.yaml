@@ -23,7 +23,8 @@ repos:
         # These fixtures are deliberately malformed: the boulder resolver's
         # corrupt and half-written registry cases, a torn ledger record the
         # Stats tab must skip, and the settings file status line setup must refuse.
-        exclude: '^tests/fixtures/boulder-schemas/(corrupt|half-written)\.json$|^tests/fixtures/settings/malformed\.json$|^tests/mod/visual/fixtures/stats/\.omca/metrics/b83e5d10-7a42-4f6c-8e19-c5a0d2f4e902/a8f2a0c4e6b84d10\.json$'
+        # .oxlintrc.json is JSON with comments, which oxlint reads and this check cannot.
+        exclude: '^tests/fixtures/boulder-schemas/(corrupt|half-written)\.json$|^tests/fixtures/settings/malformed\.json$|^tests/mod/visual/fixtures/stats/\.omca/metrics/b83e5d10-7a42-4f6c-8e19-c5a0d2f4e902/a8f2a0c4e6b84d10\.json$|^\.oxlintrc\.json$'
       - id: check-yaml
       - id: check-toml
       - id: check-added-large-files

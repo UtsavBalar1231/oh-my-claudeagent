@@ -42,6 +42,7 @@ export const EXCLUDES = [
   "/bunfig.toml",
   "/tsconfig.json",
   "/tsconfig.runtime.json",
+  "/.oxlintrc.json",
   "/opencode/",
   "/.opencode/",
 ] as const;

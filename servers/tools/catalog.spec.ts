@@ -84,7 +84,7 @@ function startServer(env: Record<string, string | undefined> = {}) {
   };
   const report = async (args: Record<string, string> = {}): Promise<Report> => JSON.parse(await call("health_check", args));
   const health = async () => {
-    const { client_version, ast_grep, state, ...runtime } = await report();
+    const { client_version: _clientVersion, ast_grep: _astGrep, state: _state, ...runtime } = await report();
     return runtime;
   };
   const prompt = (sessionId: string) => call("omca_hook", { event: "UserPromptSubmit", session_id: sessionId, prompt: "go" });

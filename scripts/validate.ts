@@ -17,7 +17,7 @@ import * as portability from "./validate/portability.ts";
 import * as promptHistory from "./validate/prompt-history.ts";
 import * as tree from "./validate/tree.ts";
 
-export const GROUPS: Readonly<Record<string, readonly Check[]>> = {
+export const GROUPS = {
   claims: [
     ...manifest.checks,
     ...frontmatter.checks,
@@ -31,7 +31,9 @@ export const GROUPS: Readonly<Record<string, readonly Check[]>> = {
   tree: tree.checks,
   engine: engine.checks,
   mcp: mcp.checks,
-};
+} satisfies Readonly<Record<string, readonly Check[]>>;
+
+const isGroup = (name: string): name is keyof typeof GROUPS => name in GROUPS;
 
 const USAGE = `Usage: bun scripts/validate.ts [options]
 
@@ -75,9 +77,9 @@ export async function main(args: string[], root: string): Promise<Result> {
   }
   const { check: requested = [], marketplace, help } = parsed.values;
   if (help) return { code: 0, stdout: `${USAGE}\n`, stderr: "" };
-  const unknown = requested.filter((name) => !(name in GROUPS));
-  if (unknown.length > 0) return { code: 2, stdout: "", stderr: `Unsupported check '${unknown[0]}'\n${USAGE}\n` };
-  const names = requested.length > 0 ? requested : Object.keys(GROUPS);
+  const unknown = requested.find((name) => !isGroup(name));
+  if (unknown !== undefined) return { code: 2, stdout: "", stderr: `Unsupported check '${unknown}'\n${USAGE}\n` };
+  const names = (requested.length > 0 ? requested : Object.keys(GROUPS)).filter(isGroup);
   const ctx = createContext(
     root,
     marketplace === undefined ? {} : { marketplacePath: resolve(marketplace), marketplaceOverride: true },

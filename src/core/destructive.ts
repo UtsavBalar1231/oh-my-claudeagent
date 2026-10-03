@@ -420,7 +420,7 @@ function skipsHooks(words: readonly string[]): boolean {
     else if (/^--veri(?:fy?)?$/.test(word)) skips = false;
     else if (COMMIT_VALUED.test(word)) i++;
     else if (/^-[a-zA-Z]/.test(word)) {
-      for (const [at, letter] of [...word.slice(1)].entries()) {
+      for (const [at, letter] of Array.from(word.slice(1)).entries()) {
         if (letter === "n") skips = true;
         if ("mFcCt".includes(letter) && at === word.length - 2) i++;
         if ("mFcCtSu".includes(letter)) break;

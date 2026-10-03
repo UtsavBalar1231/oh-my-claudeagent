@@ -23,7 +23,8 @@ export const PLUGIN_BRANCH = "plugin";
 export const PLUGIN_URL = "https://github.com/UtsavBalar1231/oh-my-claudeagent.git";
 
 type Versioned = { version: string };
-type Marketplace = { metadata: Versioned; plugins: Array<Versioned & { source: Record<string, string> }> };
+type MarketplacePlugin = Versioned & { source: Record<string, string> };
+type Marketplace = { metadata: Versioned; plugins: [MarketplacePlugin, ...MarketplacePlugin[]] };
 export type Outcome = { code: number; stdout: string; stderr: string };
 
 function git(root: string, args: string[], env: Record<string, string> = {}): string {

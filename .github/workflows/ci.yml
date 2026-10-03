@@ -264,10 +264,13 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Lint
+        run: bun x --bun oxlint --deny-warnings src servers statusline scripts hooks opencode tests benchmarks/compare
+
       - name: Typecheck
         run: |
-          bun x tsc --noEmit -p tsconfig.json
-          bun x tsc --noEmit -p tsconfig.runtime.json
+          bun x --bun tsc --noEmit -p tsconfig.json
+          bun x --bun tsc --noEmit -p tsconfig.runtime.json
 
       - name: Mod tests
         run: claude plugin test .
@@ -335,10 +338,10 @@ jobs:
         run: |
           {
             echo "### What this job checks ($RUNNER_OS)"
-            echo "The TypeScript hooks module and shared code on Claude Code $CLAUDE_CODE_VERSION: both tsc projects, the mod tests, the bun spec files in parallel with a check that the run listed every spec file, then once more in a seeded random order on Linux, \`claude plugin validate\` on the manifest, and the engine checks on its output (mirrors \`just typecheck-ts test-mod test-bun validate-mod\`)."
+            echo "The TypeScript hooks module and shared code on Claude Code $CLAUDE_CODE_VERSION: oxlint, both tsc projects, the mod tests, the bun spec files in parallel with a check that the run listed every spec file, then once more in a seeded random order on Linux, \`claude plugin validate\` on the manifest, and the engine checks on its output (mirrors \`just lint typecheck-ts test-mod test-bun validate-mod\`)."
             echo ""
             echo "### If this fails"
-            echo "A type error, a failing test, a spec run that crashed or stopped before every spec file ran, or a manifest or hooks-module validation error. Run the matching \`just\` recipe locally with Claude Code $CLAUDE_CODE_VERSION and bun 1.4.2 to see the exact failure."
+            echo "A lint finding, a type error, a failing test, a spec run that crashed or stopped before every spec file ran, or a manifest or hooks-module validation error. Run the matching \`just\` recipe locally with Claude Code $CLAUDE_CODE_VERSION and bun 1.4.2 to see the exact failure."
           } >> "$GITHUB_STEP_SUMMARY"
 
   smoke:

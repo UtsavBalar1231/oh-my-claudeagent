@@ -453,9 +453,11 @@ describe("tool annotations", () => {
     const tools = await listTools(startServer());
     expect(tools.map((tool) => tool.name).toSorted()).toEqual(Object.keys(EXPECTED_ANNOTATIONS).toSorted());
     for (const tool of tools) {
+      const expected = EXPECTED_ANNOTATIONS[tool.name];
+      if (expected === undefined) throw new Error(`${tool.name} has no expected annotations`);
       expect({ name: tool.name, annotations: tool.annotations }).toEqual({
         name: tool.name,
-        annotations: { ...EXPECTED_ANNOTATIONS[tool.name], openWorldHint: false },
+        annotations: { ...expected, openWorldHint: false },
       });
     }
   });

@@ -1,12 +1,21 @@
 {
   "compilerOptions": {
-    "types": ["bun-types"],
+    "lib": ["esnext"],
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "moduleDetection": "force",
+    "types": ["bun"],
     "allowImportingTsExtensions": true,
     "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true
   },
   "include": ["src", "servers", "statusline", "scripts", "benchmarks/compare"],

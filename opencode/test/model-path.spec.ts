@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test"
+import { afterAll, beforeAll, describe, test } from "bun:test"
 import { closeSync, openSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { commit, countLines, git, type Listing, opencodeBin, removeDir, repo, scratchDir, type Server, snapshot, startServer, until, writeConfig } from "./harness.ts"

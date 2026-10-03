@@ -15,7 +15,8 @@ const PINS: Readonly<Record<string, string>> = {
   "test-mcp": "bun test servers",
   "validate-manifest": "claude plugin validate . --strict",
   "test-opencode": "bun test opencode/",
-  "typecheck-ts": "bun x tsc --noEmit -p tsconfig.runtime.json",
+  "typecheck-ts": "bun x --bun tsc --noEmit -p tsconfig.runtime.json",
+  lint: "bun x --bun oxlint --deny-warnings src servers statusline scripts hooks opencode tests benchmarks/compare",
   "test-mod": "claude plugin test .",
   "test-bun": "bun test --parallel src servers statusline scripts opencode benchmarks/compare",
   "validate-mod": "claude plugin validate .claude-plugin/plugin.json",
@@ -57,7 +58,7 @@ const ciLeaves = [...new Set(leafSteps("ci"))].sort();
 
 describe("workflow contract", () => {
   test("just ci recipe chain resolves to the expected leaf steps", () => {
-    expect(ciLeaves.join(" ")).toBe("test-bun test-mcp test-mod test-opencode typecheck-ts validate validate-manifest validate-mod");
+    expect(ciLeaves.join(" ")).toBe("lint test-bun test-mcp test-mod test-opencode typecheck-ts validate validate-manifest validate-mod");
   });
 
   test("every just ci leaf step has a pinned ci.yml coverage pattern", () => {

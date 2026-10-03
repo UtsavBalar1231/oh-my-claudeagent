@@ -225,8 +225,8 @@ describe("scripted turns", () => {
       .map((f) => ((f.data as { delta: { type: string; partial_json: string } }).delta.partial_json))
       .join("");
     expect(JSON.parse(partialJson)).toEqual({ command: "echo hi", description: "greet" });
-    expect((frames[5]?.data as { delta: { type: string } }).delta.type).toBe("input_json_delta");
-    expect((frames[7]?.data as { delta: { stop_reason: string } }).delta.stop_reason).toBe("tool_use");
+    expect((frames[5]?.data as { delta: { type: string } } | undefined)?.delta.type).toBe("input_json_delta");
+    expect((frames[7]?.data as { delta: { stop_reason: string } } | undefined)?.delta.stop_reason).toBe("tool_use");
   });
 
   test("falls back to the fixed ok reply once a queue is exhausted", async () => {

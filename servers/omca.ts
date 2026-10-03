@@ -65,7 +65,7 @@ const tools = [
   ...sessionTools,
 ].sort((a, b) => (a.name < b.name ? -1 : 1));
 const toolsByName = new Map(tools.map((tool) => [tool.name, tool]));
-const toolList = tools.map(({ call, ...declaration }) => declaration);
+const toolList = tools.map(({ call: _call, ...declaration }) => declaration);
 
 const manifestUrl = new URL("../.claude-plugin/plugin.json", import.meta.url);
 const serverInfo = { name: "omca", version: String(JSON.parse(readFileSync(manifestUrl, "utf8")).version) };

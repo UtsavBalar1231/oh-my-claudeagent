@@ -97,8 +97,13 @@ compare *args:
 # Type-check the mod project (engine types only) and the bun runtime project
 [group('test')]
 typecheck-ts:
-	bun x tsc --noEmit -p tsconfig.json
-	bun x tsc --noEmit -p tsconfig.runtime.json
+	bun x --bun tsc --noEmit -p tsconfig.json
+	bun x --bun tsc --noEmit -p tsconfig.runtime.json
+
+# Lint the TypeScript with oxlint's default rules (config in .oxlintrc.json); a warning fails the run
+[group('test')]
+lint:
+	bun x --bun oxlint --deny-warnings src servers statusline scripts hooks opencode tests benchmarks/compare
 
 # ── Scaffold ──────────────────────────────────────────────────────
 
@@ -234,9 +239,9 @@ test-all: test test-mcp test-bun
 
 # ── CI ────────────────────────────────────────────────────────────
 
-# Run full CI pipeline (typecheck, every validator group, mod tests, bun specs, MCP, manifest, opencode)
+# Run full CI pipeline (lint, typecheck, every validator group, mod tests, bun specs, MCP, manifest, opencode)
 [group('ci')]
-ci: typecheck-ts validate test-mod test-bun test-mcp validate-mod validate-manifest test-opencode
+ci: lint typecheck-ts validate test-mod test-bun test-mcp validate-mod validate-manifest test-opencode
 
 # ── Release ──────────────────────────────────────────────────────
 

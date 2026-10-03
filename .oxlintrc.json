@@ -1,0 +1,22 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "overrides": [
+    {
+      // These files match, strip or build ANSI escape sequences, so the ESC control character is the point of each regex.
+      "files": [
+        "scripts/docs/ansi.ts",
+        "scripts/docs/screenshots.ts",
+        "scripts/docs/screenshots.spec.ts",
+        "statusline/render.ts",
+        "statusline/render.spec.ts",
+        "statusline/fixtures.spec.ts"
+      ],
+      "rules": { "no-control-regex": "off" }
+    },
+    {
+      // The engine's turn.step hook must be an async generator, and these test stubs answer without streaming a chunk.
+      "files": ["tests/mod/*.test.ts"],
+      "rules": { "require-yield": "off" }
+    }
+  ]
+}

@@ -98,8 +98,9 @@ const path = options.settings ?? fail(USAGE, 2);
 const bun = Bun.which("bun") ?? fail("bun is not on PATH");
 const launcher = join(configDir(process.env) ?? join(homedir(), ".claude"), "omca", "statusline.ts");
 const platform = toPlatform(process.platform);
-const [bunPath, launcherPath] = [bun, launcher].map((path) => toPosix(platform, path));
-const [bunArg, launcherArg] = [bunPath, launcherPath].map((path) => `"${path}"`);
+const launcherPath = toPosix(platform, launcher);
+const bunArg = `"${toPosix(platform, bun)}"`;
+const launcherArg = `"${launcherPath}"`;
 const wanted = {
   statusLine: { type: "command", command: `${bunArg} ${launcherArg}`, padding: 1, refreshInterval: 5, hideVimModeIndicator: true },
   subagentStatusLine: { type: "command", command: `${bunArg} ${launcherArg} --subagent` },
