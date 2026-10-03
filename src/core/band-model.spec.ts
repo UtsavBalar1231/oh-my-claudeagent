@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { arrange, type Band, bandView, BUTTON_GAP, oneLine, planTally, share, type Span } from "./band-model.ts";
+import { type Band, bandView, BUTTON_GAP, planTally, type Span } from "./band-model.ts";
 import { type NextAction, nextActions } from "./next-actions.ts";
 import { displayWidth, usableColumns } from "./ui-kit.ts";
 
@@ -26,43 +26,6 @@ const actionsOf = (b: Band): NextAction[] =>
 const text = (spans: readonly Span[]): string => spans.map((span) => span.text).join("");
 const status = (b: Band, columns: number, ascii = false, running = 0): string =>
   text(bandView(b, actionsOf(b), columns, ascii, running)?.status ?? []);
-
-describe("share", () => {
-  test.each<[number[], number, number[]]>([
-    [[10, 20], 100, [10, 20]],
-    [[10, 20], 30, [10, 20]],
-    [[10, 20], 20, [10, 10]],
-    [[30, 4], 20, [16, 4]],
-    [[30, 40], 21, [10, 11]],
-    [[5, 5, 50], 30, [5, 5, 20]],
-    [[10, 20], 0, [0, 0]],
-    [[10, 20], -5, [0, 0]],
-    [[], 10, []],
-  ])("share(%p, %p) is %p", (wants, room, expected) => {
-    expect(share(wants, room)).toEqual(expected);
-  });
-});
-
-describe("arrange", () => {
-  const seg = (name: string, priority: number, min: number) => ({ name, priority, min });
-  const names = (kept: readonly { name: string }[]) => kept.map((one) => one.name);
-
-  test("keeps every segment that fits, in order", () => {
-    expect(names(arrange([seg("a", 1, 5), seg("b", 3, 5), seg("c", 2, 5)], 21, 3))).toEqual(["a", "b", "c"]);
-  });
-
-  test("drops the largest priority number first, then the next, keeping the order of the rest", () => {
-    const segments = [seg("a", 1, 5), seg("b", 3, 5), seg("c", 2, 5)];
-    expect(names(arrange(segments, 20, 3))).toEqual(["a", "c"]);
-    expect(names(arrange(segments, 12, 3))).toEqual(["a"]);
-  });
-
-  test("on a tie the later segment goes, and the last one stands whatever its size", () => {
-    expect(names(arrange([seg("a", 2, 5), seg("b", 2, 5)], 9, 1))).toEqual(["a"]);
-    expect(names(arrange([seg("a", 1, 50)], 10, 3))).toEqual(["a"]);
-    expect(arrange([], 10, 3)).toEqual([]);
-  });
-});
 
 describe("planTally", () => {
   test("counts the numbered tasks outside fences and names the first open one", () => {
@@ -116,7 +79,7 @@ describe("bandView", () => {
       { text: " · ", tone: "muted" },
       { text: "! ", tone: "warn" },
       { text: "just test", tone: "plain" },
-      { text: " evidence not logged", tone: "warn" },
+      { text: " evidence not logged", tone: "plain" },
     ]);
   });
 
@@ -129,22 +92,28 @@ describe("bandView", () => {
     ]);
   });
 
-  test("proof counts are drawn only when the band carries them, a zero count muted", () => {
+  test("proof counts are drawn only when the band carries them: the glyph in its tone, the count plain, a zero muted", () => {
     expect(status(band({ plan: PLAN }), 120)).not.toContain("✓");
     expect(bandView(band({ plan: PLAN, proof: PROOF }), [], 120, false)?.status.slice(8)).toEqual([
       { text: " · ", tone: "muted" },
-      { text: "✓52", tone: "ok" },
+      { text: "✓", tone: "ok" },
+      { text: "52", tone: "plain" },
       { text: " ", tone: "muted" },
-      { text: "!4", tone: "warn" },
+      { text: "!", tone: "warn" },
+      { text: "4", tone: "plain" },
       { text: " ", tone: "muted" },
-      { text: "✗0", tone: "muted" },
+      { text: "✗", tone: "muted" },
+      { text: "0", tone: "muted" },
     ]);
     expect(bandView(band({ plan: PLAN, proof: { proven: 0, unproven: 0, failed: 3 } }), [], 120, false)?.status.slice(9)).toEqual([
-      { text: "✓0", tone: "muted" },
+      { text: "✓", tone: "muted" },
+      { text: "0", tone: "muted" },
       { text: " ", tone: "muted" },
-      { text: "!0", tone: "muted" },
+      { text: "!", tone: "muted" },
+      { text: "0", tone: "muted" },
       { text: " ", tone: "muted" },
-      { text: "✗3", tone: "fail" },
+      { text: "✗", tone: "fail" },
+      { text: "3", tone: "plain" },
     ]);
   });
 
@@ -179,10 +148,11 @@ describe("bandView", () => {
     expect(status(b, 30)).toBe("no plan");
   });
 
-  test("a read error is one line in the fail tone, whatever else is known", () => {
+  test("a read error is one line, its glyph in the fail tone, whatever else is known", () => {
     const b = band({ plan: PLAN, verification: UNLOGGED, error: "Cannot read .omca/state/boulder.json:\nUnexpected token" });
     expect(bandView(b, [], 120, false, 2)?.status).toEqual([
-      { text: "✗ Cannot read .omca/state/boulder.json: Unexpected token", tone: "fail" },
+      { text: "✗ ", tone: "fail" },
+      { text: "Cannot read .omca/state/boulder.json: Unexpected token", tone: "plain" },
     ]);
   });
 
@@ -253,8 +223,4 @@ describe("bandView", () => {
       }
     }
   });
-});
-
-test("oneLine folds whitespace and control characters into single spaces", () => {
-  expect(oneLine("  a\n\tb\u0007c  ")).toBe("a b c");
 });

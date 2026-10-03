@@ -104,11 +104,17 @@ test("an excerpt reaches 100 characters either side of the hit and stops at the 
   ]);
 });
 
-test("the role filter keeps one role, and an unknown role filters nothing", async () => {
+test("the role filter keeps one role, an empty role keeps all, and an unknown role is an error", async () => {
   transcript("s.jsonl", turn("user", "banana split"), turn("assistant", [text("banana bread recipe")]));
   expect((await search({ query: "banana", role: "user" })).matches.map((match) => match.role)).toEqual(["user"]);
   expect((await search({ query: "banana", role: "assistant" })).matches.map((match) => match.excerpt)).toEqual(["banana bread recipe"]);
-  expect((await search({ query: "banana", role: "system" })).matches.map((match) => match.role)).toEqual(["assistant", "user"]);
+  expect((await search({ query: "banana", role: "" })).matches.map((match) => match.role)).toEqual(["assistant", "user"]);
+  await expect(raw({ query: "banana", role: "system" })).rejects.toThrow("role must be one of user, assistant, tool, or empty for all roles");
+});
+
+test("an empty or blank query is an error, not a match on every turn", async () => {
+  transcript("s.jsonl", turn("user", "anything"));
+  for (const query of ["", "   "]) await expect(raw({ query })).rejects.toThrow("query must not be empty");
 });
 
 test("tool use input and tool results of every shape are role tool, whatever message carries them", async () => {

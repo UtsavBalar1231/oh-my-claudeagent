@@ -1,12 +1,10 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { resolveBoundPlan } from "../../src/core/boulder.ts";
 import { nextTaskLabel } from "../../src/core/checkboxes.ts";
-import { hasCode } from "../io.ts";
 import { pluginRoot } from "../plugin-root.ts";
 import type { Handler } from "./registry.ts";
 import type { Session } from "./session-state.ts";
-import { registryPath, statusPath } from "./status-file.ts";
+import { readBoundPlan, registryPath, statusPath } from "./status-file.ts";
 
 let template: string | undefined;
 
@@ -17,16 +15,12 @@ export function guidanceTemplate(): string {
 
 type BoundPlan = { name: string; path: string; content: string };
 
-function readBoundPlan(root: string, sessionId: string): BoundPlan | undefined {
-  try {
-    const registry: unknown = JSON.parse(readFileSync(registryPath(root), "utf8"));
-    const plan = resolveBoundPlan(registry, sessionId, true);
-    if (!("plan_name" in plan)) return undefined;
-    return { name: plan.plan_name, path: plan.active_plan, content: readFileSync(plan.active_plan, "utf8") };
-  } catch (error) {
-    if (!hasCode(error, "ENOENT")) console.error("omca: guidance could not read this session's bound plan:", error);
-    return undefined;
-  }
+function boundPlanOf(root: string, sessionId: string): BoundPlan | undefined {
+  const read = readBoundPlan(root, sessionId);
+  if (read.kind === "ok") return read.file && { name: read.name, path: read.path, content: read.file.content };
+  if (read.kind === "corrupt") console.error(`omca: guidance: ${registryPath(root)} is not valid JSON, so no plan context is added`);
+  if (read.kind === "unreadable") console.error(`omca: guidance could not read ${read.path} (${read.code}), so no plan context is added`);
+  return undefined;
 }
 
 const planContext = ({ name, path, content }: BoundPlan): string =>
@@ -36,16 +30,12 @@ const planContext = ({ name, path, content }: BoundPlan): string =>
     `[NOTEPAD] Record discoveries, decisions and blockers with notepad_write('${name}', section, content); the sections are learnings, issues, decisions and problems.`,
   ].join("\n");
 
+const contextFor = (sessionId: string, plan: BoundPlan | undefined): string =>
+  [guidanceTemplate(), `Session ${sessionId}`, ...(plan === undefined ? [] : [planContext(plan)])].join("\n");
+
 /** The template, then the session's id and its bound plan when there is a session to name. */
 export function guidanceContext(root: string, sessionId: string | undefined): string {
-  if (sessionId === undefined) return guidanceTemplate();
-  const plan = readBoundPlan(root, sessionId);
-  return [guidanceTemplate(), `Session ${sessionId}`, ...(plan === undefined ? [] : [planContext(plan)])].join("\n");
-}
-
-function planTitle(root: string, sessionId: string): string | undefined {
-  const plan = readBoundPlan(root, sessionId);
-  return plan === undefined ? undefined : `OMCA: ${plan.name}`;
+  return sessionId === undefined ? guidanceTemplate() : contextFor(sessionId, boundPlanOf(root, sessionId));
 }
 
 // `claude --resume` keeps the session id but starts a new server, whose first hook call for the
@@ -59,15 +49,15 @@ export const handle: Handler = (payload, { root, now, session }) => {
   if (session === undefined) return;
   session.promptAt = now;
   const isHeldBack = session.isGuided || isResumed(root, session);
-  const context = isHeldBack ? undefined : guidanceContext(root, session.id);
   session.isGuided = true;
   // A typed slash command raises UserPromptExpansion before UserPromptSubmit, and only
   // UserPromptSubmit can set the title, so the title waits for the session's first one.
-  let title: string | undefined;
-  if (payload.event === "UserPromptSubmit" && !session.isTitleChecked) {
-    session.isTitleChecked = true;
-    if (!payload.session_title) title = planTitle(root, session.id);
-  }
+  const isTitleDue = payload.event === "UserPromptSubmit" && !session.isTitleChecked;
+  if (isTitleDue) session.isTitleChecked = true;
+  const wantsTitle = isTitleDue && !payload.session_title;
+  const plan = !isHeldBack || wantsTitle ? boundPlanOf(root, session.id) : undefined;
+  const context = isHeldBack ? undefined : contextFor(session.id, plan);
+  const title = wantsTitle && plan !== undefined ? `OMCA: ${plan.name}` : undefined;
   if (context === undefined && title === undefined) return;
   return {
     hookSpecificOutput: {

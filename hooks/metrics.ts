@@ -1,4 +1,4 @@
-import { isEvidenceLogged, type LedgerRecord, outcomeOf, parseRecord, recordPath } from "../src/core/ledger.ts";
+import { isEvidenceLogged, type MetricsRecord, outcomeOf, parseRecord, recordPath } from "../src/core/metrics.ts";
 import { LEDGER } from "../src/core/omca-paths.ts";
 import { estimateCostUsd } from "../src/core/pricing.ts";
 import type { Features } from "./dispatch.ts";
@@ -11,13 +11,13 @@ const NO_USAGE = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0
 async function locate(host: Host, agentId: string): Promise<{ root: string; sessionId: string; path: string } | undefined> {
   const [root, sessionId] = await Promise.all([host.session.root(), host.session.id()]);
   const path = recordPath(root, sessionId, agentId);
-  if (path === undefined) host.log(`ledger: no record for session ${JSON.stringify(sessionId)} agent ${JSON.stringify(agentId)}`);
+  if (path === undefined) host.log(`metrics: no record for session ${JSON.stringify(sessionId)} agent ${JSON.stringify(agentId)}`);
   return path === undefined ? undefined : { root, sessionId, path };
 }
 
-const write = (host: Host, path: string, record: LedgerRecord) => host.fs.write(path, `${JSON.stringify(record, null, 2)}\n`);
+const write = (host: Host, path: string, record: MetricsRecord) => host.fs.write(path, `${JSON.stringify(record, null, 2)}\n`);
 
-const running = (sessionId: string, agentId: string, row: Row): LedgerRecord => ({
+const running = (sessionId: string, agentId: string, row: Row): MetricsRecord => ({
   session_id: sessionId,
   agent_id: agentId,
   agent_type: row.type,
@@ -39,18 +39,18 @@ async function evidenceLogged(host: Host, root: string, startMs: number, endMs: 
   try {
     return (await host.fs.exists(path)) && isEvidenceLogged(await host.fs.read(path), startMs, endMs);
   } catch (error) {
-    host.log(`ledger: could not read ${LEDGER}: ${reason(error)}`);
+    host.log(`metrics: could not read ${LEDGER}: ${reason(error)}`);
     return null;
   }
 }
 
 async function agentRow(host: Host, agentId: string): Promise<Row | undefined> {
   const row = (await host.state.agents.get()).value?.[agentId];
-  if (row === undefined) host.log(`ledger: agent ${agentId} is not tracked`);
+  if (row === undefined) host.log(`metrics: agent ${agentId} is not tracked`);
   return row;
 }
 
-export const ledger: Features = {
+export const metrics: Features = {
   "agent.spawn": {
     async post(host, _e, result) {
       if (result.deny !== undefined || result.agentId === undefined) return undefined;

@@ -2,7 +2,22 @@ import type { RenderElement } from "claude-code";
 import { type Engine, expect, test } from "claude-code/testing";
 import { formatWhen, glyphs, usableColumns } from "../../src/core/ui-kit.ts";
 import { type Piece, rule } from "../../src/core/visual.ts";
-import { BOULDER, bodyColumns, cellsAcross, pane, ROOT, rows, run, SESSION, SIZES, type Size, topRows, world, write } from "./world.ts";
+import {
+  bodyColumns,
+  BOULDER,
+  cellsAcross,
+  isAscii,
+  pane,
+  ROOT,
+  rows,
+  run,
+  SESSION,
+  type Size,
+  SIZES,
+  topRows,
+  world,
+  write,
+} from "./world.ts";
 
 const PADS = `${ROOT}/.omca/notepads`;
 const LEARNED_AT = Date.UTC(2026, 9, 2, 9, 15, 0);
@@ -101,7 +116,7 @@ test("at the split tier the cards sit in two columns, and at the page tier they 
   await narrow.unmount();
 });
 
-test("f opens the Find field and asks for its focus, typing filters the entries and drops sections with no match, x clears", async ($, on) => {
+test("f opens the Find field and asks for its focus, typing filters the entries and drops sections with no match, w clears", async ($, on) => {
   const w = world(on, FILES);
   const ui = await open($, DOCK_200);
   const header = async () => rows(await ui.drawn())[2];
@@ -119,14 +134,14 @@ test("f opens the Find field and asks for its focus, typing filters the entries 
   expect(await sections()).toEqual(["section-learnings"]);
   expect(await ui.find({ type: "Text", text: "Learnings · 1 of 2" })).toBeDefined();
   expect(await ui.find({ key: "note-learnings-0-0" })).toBeDefined();
-  expect(await ui.find({ key: "x" })).toBeDefined();
+  expect(await ui.find({ key: "w" })).toBeDefined();
 
   await ui.input({ key: "notepad-find", text: "nowhere" });
   expect(rows(await ui.drawn()).at(-1)).toBe('No entry matches "nowhere"');
 
-  await ui.press({ key: "x" });
+  await ui.press({ key: "w" });
   expect(await ui.find({ key: "notepad-find" })).toBeUndefined();
-  expect(await ui.find({ key: "x" })).toBeUndefined();
+  expect(await ui.find({ key: "w" })).toBeUndefined();
   expect(await sections()).toEqual(["section-learnings", "section-issues", "section-decisions", "section-problems"]);
   await ui.unmount();
 });
@@ -214,12 +229,11 @@ test("OMCA_ASCII draws the notepad's card borders, rules, chip, separators and m
   expect(topRows(await ui.drawn())).toContainEqual(
     styledCard("classic", "section-issues", "warning", inner + 4, "Issues - 1 entry", dated(inner, ISSUE_AT, true), markdown("note-issues-0-0", "export `API_TOKEN=<masked>` first")),
   );
-  const isAscii = (row: string) => [...row].every((char) => char.charCodeAt(0) >= 32 && char.charCodeAt(0) < 127);
   expect(drawn.filter((row) => !isAscii(row))).toEqual([]);
   await ui.unmount();
 });
 
-test("every notepad row fits the body less the gutter at each size and surface, listed, searched and picking, with only f, x and l as keys", async ($, on) => {
+test("every notepad row fits the body less the gutter at each size and surface, listed, searched and picking, with only f, w and l as keys", async ($, on) => {
   const w = world(on, FILES);
   await $.command.run(run(""));
 
@@ -238,8 +252,8 @@ test("every notepad row fits the body less the gutter at each size and surface, 
       await ui.press({ key: "f" });
       await ui.input({ key: "notepad-find", text: "ledger" });
       await fits("searched");
-      expect(await keys()).toEqual(["f", "l", "x"]);
-      await ui.press({ key: "x" });
+      expect(await keys()).toEqual(["f", "l", "w"]);
+      await ui.press({ key: "w" });
       await ui.press({ key: "l" });
       await fits("picking");
       await ui.press({ key: "l" });
@@ -259,5 +273,5 @@ test("a notepad taller than the docked body draws a more-below cue over its last
     return row;
   };
   expect(await lastRow(SHORT)).toBe("  ↓ more · ↑↓ scroll".padEnd(usableColumns(bodyColumns(SHORT))));
-  expect(await lastRow(DOCK_200)).not.toContain("more");
+  expect(await lastRow(DOCK_200)).toBe("Problems · 0 entriesNothing recorded yet");
 });

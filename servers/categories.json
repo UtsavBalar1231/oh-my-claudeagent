@@ -1,24 +1,24 @@
 {
-	"categories": {
-		"quick": {
-			"model": "sonnet",
-			"description": "Short scoped lookups and simple searches"
-		},
-		"standard": {
-			"model": "sonnet",
-			"description": "Normal implementation work"
-		},
-		"deep": {
-			"model": "opus",
-			"description": "Complex analysis, architecture decisions"
-		},
-		"hardest": {
-			"model": "fable",
-			"description": "Most demanding reasoning, stuck debugging, long-horizon work"
-		},
-		"readonly": {
-			"model": "sonnet",
-			"description": "Read-only exploration and research"
-		}
-	}
+  "categories": {
+    "quick": {
+      "model": "sonnet",
+      "description": "Short scoped lookups and simple searches"
+    },
+    "standard": {
+      "model": "sonnet",
+      "description": "Normal implementation work"
+    },
+    "deep": {
+      "model": "opus",
+      "description": "Complex analysis, architecture decisions"
+    },
+    "hardest": {
+      "model": "fable",
+      "description": "Most demanding reasoning, stuck debugging, long-horizon work"
+    },
+    "readonly": {
+      "model": "sonnet",
+      "description": "Read-only exploration and research"
+    }
+  }
 }

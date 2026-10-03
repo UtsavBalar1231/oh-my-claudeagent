@@ -127,11 +127,13 @@ export function agentKey(type: string): ThemeKey {
 
 export type Piece = { text: string; color?: ThemeKey; backgroundColor?: ThemeKey; bold?: true };
 
+export const piecesWidth = (pieces: readonly { text: string }[]): number => pieces.reduce((sum, piece) => sum + displayWidth(piece.text), 0);
+
 // Chip text is `inverseText` on a solid tone, the only chip pairing that reads in both themes;
 // tint keys such as `diffAdded` measure 1.5 to 3.0 under text in the light theme.
 export const CHIP_TONES = ["ok", "fail", "warn", "active", "info", "plan", "muted"] as const;
 export type ChipTone = (typeof CHIP_TONES)[number];
-export const CHIP_TEXT: ThemeKey = "inverseText";
+const CHIP_TEXT: ThemeKey = "inverseText";
 const CHIP_MAX = 12;
 export const ON_SURFACE: ThemeKey = "text";
 
@@ -295,7 +297,7 @@ export function fitPieces(pieces: readonly Piece[], width: number, ellipsis: str
   let used = 0;
   for (const [index, piece] of pieces.entries()) {
     const cells = displayWidth(piece.text);
-    const rest = pieces.slice(index + 1).reduce((sum, next) => sum + displayWidth(next.text), 0);
+    const rest = piecesWidth(pieces.slice(index + 1));
     if (used + cells + rest <= width) return [...out, ...pieces.slice(index)];
     if (used + cells >= width) {
       // The trailing space makes a piece that exactly fills the room still end in the ellipsis.
@@ -363,13 +365,13 @@ export function rule(
         ];
   const wanted = displayWidth(label);
   for (const [index, tail] of tails.entries()) {
-    const tailWidth = tail.reduce((sum, piece) => sum + displayWidth(piece.text), 0);
+    const tailWidth = piecesWidth(tail);
     const room = width - 4 - tailWidth;
     const isLast = index === tails.length - 1;
     if (!isLast && room < Math.min(wanted, MIN_LABEL)) continue;
     const name = label === "" ? "" : fitEnd(label, Math.max(0, room), g.ellipsis);
     const head: Piece[] = name === "" ? [] : [...line(2), { text: " " }, { text: name, color: ON_SURFACE, bold: true }, { text: " " }];
-    const used = [...head, ...tail].reduce((sum, piece) => sum + displayWidth(piece.text), 0);
+    const used = piecesWidth([...head, ...tail]);
     if (used > width) return line(width);
     return [...head, ...tail, ...line(width - used)];
   }

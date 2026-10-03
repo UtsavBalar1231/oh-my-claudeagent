@@ -23,7 +23,7 @@ const RETRYABLE_AGENT =
 const DELEGATE_TAIL =
   "A mid-stream cutoff and a model-level failure are handled by the platform on their own (automatic continuation, and the fallback model chain when one is configured), so treat this as a real tool failure. Consider: 1) Retry with a more specific prompt, 2) Break the task into smaller pieces.";
 const delegateRetry = (retry: number, type: string, summary: string, cls = "unknown"): string =>
-  `[ERROR RECOVERY] Type: ${cls} | Tool: Agent | Retry: ${retry}/3\n[DELEGATE RETRY] Task delegation failed for agent '${type}': ${summary}. ${DELEGATE_TAIL}`;
+  `[ERROR RECOVERY] ${cls === "unknown" ? "" : `Type: ${cls} | `}Tool: Agent | Retry: ${retry}\n[DELEGATE RETRY] Task delegation failed for agent '${type}': ${summary}. ${DELEGATE_TAIL}`;
 const COMMAND_NOT_FOUND = "[BASH ERROR RECOVERY] Command not found. Check if the tool is installed and on PATH. Try: which <command>";
 const BASH_TIMEOUT =
   "[BASH ERROR RECOVERY] Command timed out. Consider: run_in_background=true for long operations, a larger timeout param, or narrow the scope (e.g. target a single test file).";
@@ -75,9 +75,9 @@ describe("recorded failure payloads", () => {
     ["Bash timeout", bash("Command timed out after 60000ms", { duration_ms: 60000 }), BASH_TIMEOUT],
     ["Bash slow unclassified failure", bash("some completely unknown error", { duration_ms: 300000 }), BASH_SLOW],
     ["Agent nesting limit", agent("No such tool available: Agent"), NESTING_LIMIT],
-    ["Agent rate limit", agent("rate_limit: 429 Too Many Requests"), `[ERROR RECOVERY] Type: transient | Tool: Agent | Retry: 1/3\n${RETRYABLE_AGENT}`],
-    ["Edit old_string not found", { tool_name: "Edit", tool_input: { file_path: "/project/src/main.py" }, error: "File not found: /project/src/main.py" }, `[ERROR RECOVERY] Type: deterministic | Tool: Edit | Retry: 1/3\n${NOT_FOUND_EDIT}`],
-    ["Edit transient timeout", { tool_name: "Edit", tool_input: { file_path: "/project/src/main.py" }, error: "timeout: operation timed out" }, `[ERROR RECOVERY] Type: transient | Tool: Edit | Retry: 1/3\n${GENERIC_EDIT}`],
+    ["Agent rate limit", agent("rate_limit: 429 Too Many Requests"), `[ERROR RECOVERY] Type: transient | Tool: Agent | Retry: 1\n${RETRYABLE_AGENT}`],
+    ["Edit old_string not found", { tool_name: "Edit", tool_input: { file_path: "/project/src/main.py" }, error: "File not found: /project/src/main.py" }, `[ERROR RECOVERY] Type: deterministic | Tool: Edit | Retry: 1\n${NOT_FOUND_EDIT}`],
+    ["Edit transient timeout", { tool_name: "Edit", tool_input: { file_path: "/project/src/main.py" }, error: "timeout: operation timed out" }, `[ERROR RECOVERY] Type: transient | Tool: Edit | Retry: 1\n${GENERIC_EDIT}`],
     ["MCP tool ast-grep missing", tool("mcp__omca__ast_search", "ast-grep not found in PATH"), "[MCP ERROR RECOVERY] ast-grep binary not found. Install via: cargo install ast-grep or brew install ast-grep."],
     ["MCP tool timeout", tool("mcp__omca__ast_search", "timeout: MCP server did not respond"), "[MCP ERROR RECOVERY] MCP tool timed out. The codebase may be too large for this operation. Try narrowing the search scope."],
     ["Read missing file", tool("Read", "No such file or directory: /project/missing.txt"), "[READ ERROR RECOVERY] File not found. Search for the name with find or rg --files, or check whether the path changed."],
@@ -92,53 +92,61 @@ describe("recorded failure payloads", () => {
 describe("Edit failures", () => {
   test("a string that is not unique asks for more context or replace_all", async () => {
     expect(await session().report(edit("old_string is not unique in the file"))).toBe(
-      "[ERROR RECOVERY] Type: unknown | Tool: Edit | Retry: 1/3\nThe old_string is not unique in the file. Include more surrounding context to make it unique, or use replace_all if you want to replace all occurrences.",
+      "[ERROR RECOVERY] Tool: Edit | Retry: 1\nThe old_string is not unique in the file. Include more surrounding context to make it unique, or use replace_all if you want to replace all occurrences.",
     );
   });
 
   test("a missing string asks to re-read the file", async () => {
-    expect(await session().report(edit("old_string not found in file"))).toBe(`[ERROR RECOVERY] Type: deterministic | Tool: Edit | Retry: 1/3\n${NOT_FOUND_EDIT}`);
+    expect(await session().report(edit("old_string not found in file"))).toBe(`[ERROR RECOVERY] Type: deterministic | Tool: Edit | Retry: 1\n${NOT_FOUND_EDIT}`);
   });
 
   test("a permission error points at file permissions", async () => {
     expect(await session().report(edit("EACCES: permission denied"))).toBe(
-      "[ERROR RECOVERY] Type: deterministic | Tool: Edit | Retry: 1/3\nPermission denied. Check file permissions or if the file is locked by another process.",
+      "[ERROR RECOVERY] Type: deterministic | Tool: Edit | Retry: 1\nPermission denied. Check file permissions or if the file is locked by another process.",
     );
   });
 
   test("a missing file points at Write", async () => {
     expect(await session().report(edit("no such file: /tmp/x"))).toBe(
-      "[ERROR RECOVERY] Type: unknown | Tool: Edit | Retry: 1/3\nFile does not exist. Use Write tool to create it, or check the file path is correct.",
+      "[ERROR RECOVERY] Tool: Edit | Retry: 1\nFile does not exist. Use Write tool to create it, or check the file path is correct.",
     );
   });
 
   test("an unrecognised error gets the generic re-read advice", async () => {
-    expect(await session().report(edit("something odd"))).toBe(`[ERROR RECOVERY] Type: unknown | Tool: Edit | Retry: 1/3\n${GENERIC_EDIT}`);
+    expect(await session().report(edit("something odd"))).toBe(`[ERROR RECOVERY] Tool: Edit | Retry: 1\n${GENERIC_EDIT}`);
   });
 
   test("a rate limit is typed transient even when the advice is the generic one", async () => {
-    expect(await session().report(edit("429 rate limit"))).toStartWith("[ERROR RECOVERY] Type: transient | Tool: Edit | Retry: 1/3\n");
+    expect(await session().report(edit("429 rate limit"))).toStartWith("[ERROR RECOVERY] Type: transient | Tool: Edit | Retry: 1\n");
   });
 
   test("the retry number climbs with each failure", async () => {
     const { report } = session();
     const retries = [];
-    for (let i = 0; i < 3; i++) retries.push((await report(edit("old_string not found in file"), NOW + i))?.match(/Retry: (\d)\/3/)?.[1]);
+    for (let i = 0; i < 3; i++) retries.push((await report(edit("old_string not found in file"), NOW + i))?.match(/Retry: (\d)/)?.[1]);
     expect(retries).toEqual(["1", "2", "3"]);
   });
 
   test("a payload without an error field gets the generic advice and an Unknown error attempt", async () => {
     const { report } = session();
-    expect(await report(edit(), NOW)).toBe(`[ERROR RECOVERY] Type: unknown | Tool: Edit | Retry: 1/3\n${GENERIC_EDIT}`);
+    expect(await report(edit(), NOW)).toBe(`[ERROR RECOVERY] Tool: Edit | Retry: 1\n${GENERIC_EDIT}`);
     await report(edit(), NOW + 1);
     expect(await report(edit(), NOW + 2)).toBe(
-      `[ERROR RECOVERY] Type: unknown | Tool: Edit | Retry: 3/3\n${GENERIC_EDIT} ${breaker("1) Unknown error 2) Unknown error 3) Unknown error")}`,
+      `[ERROR RECOVERY] Tool: Edit | Retry: 3\n${GENERIC_EDIT} ${breaker("1) Unknown error 2) Unknown error 3) Unknown error")}`,
+    );
+  });
+
+  test("a fourth failure reads Retry: 4 with no denominator, and an unknown type names no type", async () => {
+    const { report } = session();
+    for (let i = 0; i < 3; i++) await report(edit(), NOW + i);
+    expect(await report(edit(), NOW + 3)).toBe(
+      `[ERROR RECOVERY] Tool: Edit | Retry: 4\n${GENERIC_EDIT} ${breaker("1) Unknown error 2) Unknown error 3) Unknown error")}`,
     );
   });
 
   test("a payload whose message sits under a field the client does not send is treated as having no error", async () => {
     expect(await session().report({ tool_name: "Edit", tool_input: { file_path: "/tmp/foo.sh" }, tool_result: { error: "old_string not found in file" } })).toBe(
-      `[ERROR RECOVERY] Type: unknown | Tool: Edit | Retry: 1/3\n${GENERIC_EDIT}`,
+      `[ERROR RECOVERY] Tool: Edit | Retry: 1\n${GENERIC_EDIT}`,
     );
   });
 });
@@ -167,12 +175,12 @@ describe("Agent failures", () => {
   });
 
   test("a transient error tells the caller to resume from the partial work", async () => {
-    expect(await session().report(agent("rate_limit: 429 Too Many Requests"))).toBe(`[ERROR RECOVERY] Type: transient | Tool: Agent | Retry: 1/3\n${RETRYABLE_AGENT}`);
+    expect(await session().report(agent("rate_limit: 429 Too Many Requests"))).toBe(`[ERROR RECOVERY] Type: transient | Tool: Agent | Retry: 1\n${RETRYABLE_AGENT}`);
   });
 
   test("each retryable pattern takes the transient branch", async () => {
     for (const error of ["quota exceeded", "API overloaded", "too many requests", "HTTP 503", "no capacity", "credit balance is too low", "temporarily unavailable", "service unavailable", "request timeout", "ECONNRESET", "ETIMEDOUT", "resource_exhausted"]) {
-      expect(await session().report(agent(error))).toStartWith("[ERROR RECOVERY] Type: transient | Tool: Agent | Retry: 1/3\n[RETRYABLE ERROR]");
+      expect(await session().report(agent(error))).toStartWith("[ERROR RECOVERY] Type: transient | Tool: Agent | Retry: 1\n[RETRYABLE ERROR]");
     }
   });
 
@@ -203,8 +211,8 @@ describe("Agent failures", () => {
   test("a streak older than five minutes decays back to a first failure", async () => {
     const { report } = session();
     await report(agent("Agent failed: attempt"), NOW);
-    expect(await report(agent("Agent failed: attempt"), NOW + 1)).toContain("Retry: 2/3");
-    expect(await report(agent("Agent failed: attempt"), NOW + 1 + 6 * MINUTE)).toContain("Retry: 1/3");
+    expect(await report(agent("Agent failed: attempt"), NOW + 1)).toContain("Retry: 2");
+    expect(await report(agent("Agent failed: attempt"), NOW + 1 + 6 * MINUTE)).toContain("Retry: 1");
   });
 
   test("the third failure adds the breaker with a timeline of the three attempts", async () => {
@@ -227,7 +235,7 @@ describe("Agent failures", () => {
     const { report } = session();
     let last: string | undefined;
     for (let i = 0; i < 3; i++) last = await report(agent("rate_limit: 429"), NOW + i);
-    expect(last).toBe(`[ERROR RECOVERY] Type: transient | Tool: Agent | Retry: 3/3\n${RETRYABLE_AGENT} ${breaker("1) rate_limit: 429 2) rate_limit: 429 3) rate_limit: 429")}`);
+    expect(last).toBe(`[ERROR RECOVERY] Type: transient | Tool: Agent | Retry: 3\n${RETRYABLE_AGENT} ${breaker("1) rate_limit: 429 2) rate_limit: 429 3) rate_limit: 429")}`);
   });
 });
 
@@ -423,8 +431,8 @@ describe("failures of any other tool", () => {
   test.each([
     ["Bash", undefined],
     ["PowerShell", undefined],
-    ["Edit", "[ERROR RECOVERY] Type: unknown | Tool: Edit | Retry: 1/3\n"],
-    ["Agent", "[ERROR RECOVERY] Type: unknown | Tool: Agent | Retry: 1/3\n[DELEGATE RETRY]"],
+    ["Edit", "[ERROR RECOVERY] Tool: Edit | Retry: 1\n"],
+    ["Agent", "[ERROR RECOVERY] Tool: Agent | Retry: 1\n[DELEGATE RETRY]"],
     ["Grep", undefined],
     ["Glob", undefined],
     ["WebFetch", undefined],
@@ -433,6 +441,13 @@ describe("failures of any other tool", () => {
     const advice = await session().report(tool(name as string, "invalid JSON in output"));
     if (start === undefined) expect(advice).toBeUndefined();
     else expect(advice).toStartWith(start as string);
+  });
+
+  test("a built-in tool outside the listed ones never gets MCP advice, and its JSON failure is filed as other_error", async () => {
+    const { report, sessionId } = session();
+    expect(await report(tool("Write", "timeout: the write timed out"))).toBeUndefined();
+    expect(await report(tool("Write", "invalid JSON: Unexpected token }"))).toBe("[JSON ERROR RECOVERY] Write failed on malformed JSON: invalid JSON: Unexpected token }");
+    expect([...(counts(sessionId)?.keys() ?? [])]).toEqual(["Write:other_error"]);
   });
 
   test("an MCP tool: a message under a field the client does not send produces no advice", async () => {
@@ -453,14 +468,14 @@ describe("session scope and switches", () => {
     const first = session();
     const second = session();
     await first.report(edit("old_string not found in file"), NOW);
-    expect(await first.report(edit("old_string not found in file"), NOW + 1)).toContain("Retry: 2/3");
-    expect(await second.report(edit("old_string not found in file"), NOW + 2)).toContain("Retry: 1/3");
+    expect(await first.report(edit("old_string not found in file"), NOW + 1)).toContain("Retry: 2");
+    expect(await second.report(edit("old_string not found in file"), NOW + 2)).toContain("Retry: 1");
   });
 
   test("a call without a session id is advised but cannot count", async () => {
     const { report } = session("");
     await report(edit("old_string not found in file"), NOW);
-    expect(await report(edit("old_string not found in file"), NOW + 1)).toContain("Retry: 1/3");
+    expect(await report(edit("old_string not found in file"), NOW + 1)).toContain("Retry: 1");
   });
 
   test("OMCA_DISABLED_HOOKS naming failure-recovery silences the advice and stops the counting", async () => {

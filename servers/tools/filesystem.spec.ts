@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import type { Platform } from "../../src/core/path.ts";
@@ -294,6 +294,21 @@ test("every call is logged to .omca/logs/file-access.jsonl under the working dir
     { path: denied, allowed: false, timestamp },
     { path: join(dir, "missing.txt"), allowed: false, timestamp },
   ]);
+});
+
+test.skipIf(process.platform === "win32" || process.getuid?.() === 0)("a read the OS refuses is still logged, as not allowed, and its error reaches the caller (skipped on Windows and as root: chmod 000 does not refuse there)", async () => {
+  const locked = write("locked.txt", "secret-free\n");
+  chmodSync(locked, 0o000);
+  try {
+    await expect(read({ path: locked })).rejects.toThrow("EACCES");
+  } finally {
+    chmodSync(locked, 0o644);
+  }
+  const entries = readFileSync(join(dir, ".omca", "logs", "file-access.jsonl"), "utf8")
+    .trimEnd()
+    .split("\n")
+    .map((line) => JSON.parse(line));
+  expect(entries).toEqual([{ path: locked, allowed: false, timestamp: expect.stringMatching(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/) }]);
 });
 
 test("a call from a subdirectory of a git repository logs under the repository root", async () => {

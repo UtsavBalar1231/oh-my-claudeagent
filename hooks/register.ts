@@ -7,7 +7,7 @@ import { dispatch, dispatchStream, featuresFor } from "./dispatch.ts";
 import { feedback } from "./feedback.ts";
 import { footer } from "./footer.ts";
 import type { Host, Options } from "./host.ts";
-import { ledger } from "./ledger.ts";
+import { metrics } from "./metrics.ts";
 import { modMarker } from "./mod-marker.ts";
 import { router } from "./omca-router.ts";
 import { pane } from "./pane.ts";
@@ -101,10 +101,6 @@ function bindHost($: EngineInterface, options: Options): Host {
         get: () => $.state.get({ plugin: "oh-my-claudeagent", key: "ledger" }),
         set: (value, setOptions) => $.state.set({ plugin: "oh-my-claudeagent", key: "ledger" }, value, setOptions),
       },
-      status: {
-        get: () => $.state.get({ plugin: "oh-my-claudeagent", key: "status" }),
-        set: (value, setOptions) => $.state.set({ plugin: "oh-my-claudeagent", key: "status" }, value, setOptions),
-      },
       plan: {
         get: () => $.state.get({ plugin: "oh-my-claudeagent", key: "plan" }),
         set: (value, setOptions) => $.state.set({ plugin: "oh-my-claudeagent", key: "plan" }, value, setOptions),
@@ -121,10 +117,6 @@ function bindHost($: EngineInterface, options: Options): Host {
       doctor: {
         get: () => $.state.get({ plugin: "oh-my-claudeagent", key: "doctor" }),
         set: (value, setOptions) => $.state.set({ plugin: "oh-my-claudeagent", key: "doctor" }, value, setOptions),
-      },
-      dialogs: {
-        get: () => $.state.get({ plugin: "oh-my-claudeagent", key: "dialogs" }),
-        set: (value, setOptions) => $.state.set({ plugin: "oh-my-claudeagent", key: "dialogs" }, value, setOptions),
       },
     },
   };
@@ -148,9 +140,9 @@ export const register: Register = (on, pluginOptions) => {
   const bash = featuresFor("tool.check", { bashGuard });
   const sessionStart = featuresFor("session.start", { pane, feedback, modMarker, band, serverCheck });
   const turnStart = featuresFor("turn.start", { footer, modMarker });
-  const turnStep = featuresFor("turn.step", { route, ledger, agentsTracker });
-  const turnComplete = featuresFor("turn.complete", { band, agentsTracker, pane, ledger, feedback, footer });
-  const agentSpawn = featuresFor("agent.spawn", { route, agentsTracker, ledger });
+  const turnStep = featuresFor("turn.step", { route, metrics, agentsTracker });
+  const turnComplete = featuresFor("turn.complete", { band, agentsTracker, pane, metrics, feedback, footer });
+  const agentSpawn = featuresFor("agent.spawn", { route, agentsTracker, metrics });
   const promptEdit = featuresFor("prompt.edit", { band });
   const paneClose = featuresFor("ui.close", { pane });
   const paneFocus = featuresFor("ui.focus", { pane });

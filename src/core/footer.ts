@@ -1,8 +1,7 @@
-import { oneLine } from "./band-model.ts";
-import { fitEnd, formatDuration, formatTokens, type Glyphs } from "./ui-kit.ts";
+import { fitEnd, formatDuration, formatTokens, type Glyphs, oneLine } from "./ui-kit.ts";
 
-// An 80-column terminal draws a plugin's turn text on a 72-cell row after `● oh-my-claudeagent: `,
-// measured on 2.1.287, so 51 cells keep the footer on one row.
+// An 80-column terminal draws a plugin's turn text on a 72-cell row after `● oh-my-claudeagent: `
+// (measured), so 51 cells keep the footer on one row.
 export const FOOTER_WIDTH = 51;
 
 export type Footer = {

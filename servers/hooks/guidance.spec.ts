@@ -150,7 +150,7 @@ describe("bound plan context", () => {
     );
   });
 
-  test("an unreadable registry is logged and the template still goes out", () => {
+  test("an unparseable registry is logged and the template still goes out", () => {
     const root = project();
     const id = crypto.randomUUID();
     mkdirSync(join(root, ".omca", "state"), { recursive: true });
@@ -158,7 +158,9 @@ describe("bound plan context", () => {
     const errors = spyOn(console, "error").mockImplementation(() => {});
     try {
       expect(run(prompt("UserPromptExpansion", id), root)).toEqual(injected("UserPromptExpansion", id));
-      expect(errors.mock.calls.map(([message]) => message)).toEqual(["omca: guidance could not read this session's bound plan:"]);
+      expect(errors.mock.calls.map(([message]) => message)).toEqual([
+        `omca: guidance: ${join(root, ".omca", "state", "boulder.json")} is not valid JSON, so no plan context is added`,
+      ]);
     } finally {
       errors.mockRestore();
     }

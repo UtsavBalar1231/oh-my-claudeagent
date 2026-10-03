@@ -58,7 +58,7 @@ for (const layout of LAYOUTS) {
       await w.clock.settle();
       expect((await ui.find({ key: "row-5" }))?.props["autoFocus"]).toBe(true);
       // The test kit cannot resolve a plugin's own $.ui.focus, so the refocus shows as its refusal.
-      expect(w.logs.at(-1)).toBe("omca plan could not refocus row-5: no implementation for ui.focus");
+      expect(w.logs.at(-1)).toBe("omca plan could not focus row-5: no implementation for ui.focus");
       await ui.press({ key: "b" });
       await ui.unmount();
     }
@@ -384,7 +384,7 @@ test("the board shows the plan's Status, progress, proof and next task, then eac
   for (const surface of ["terminal", "desktop"] as const) {
     const ui = await mountBoard($, PAGE, surface);
     expect(rows(await ui.drawn()).slice(3)).toEqual([
-      "Ship the board FINAL  █████████▎███▉█████████ 2/5 · 1 blocked✓ 3 proven · ! 1 unproven · ✗ 0 failednext 3 Draw the board",
+      "Ship the board FINAL  ████████▍███▋████████ 2/5 · ⊘ 1 blocked✓ 3 proven · ! 1 unproven · ✗ 0 failednext 3 Draw the board",
       " ",
       "── Milestone 1: Core ── ████████ 2/2 ──────────────",
       "✓ 1 Parse the plan                          PROVEN ",
@@ -394,7 +394,7 @@ test("the board shows the plan's Status, progress, proof and next task, then eac
       "⊘ 4 Wire the hotkeys          blocked by 3  PROVEN ",
       "○ 5 Write the docs                                 ",
       " ",
-      "r: Run check  s: Start here  c: Copy  e: Evidence",
+      "k: Run check  s: Start here  c: Copy  e: Evidence",
       "o: Open only  x: Failing  f: Find  t: Sections",
       "l: Plans",
       "↑↓ move · enter open · esc close",
@@ -406,12 +406,17 @@ test("the board shows the plan's Status, progress, proof and next task, then eac
       { text: "Ship the board", color: "text", bold: true },
       { text: " FINAL ", color: "inverseText", backgroundColor: "planMode", bold: true },
       { text: " 2/5", bold: true },
-      { text: " · 1 blocked", color: "warning" },
-      { text: "✓ 3 proven", color: "success" },
       { text: " · ", color: "inactive" },
-      { text: "! 1 unproven", color: "warning" },
+      { text: "⊘", color: "warning" },
+      { text: " 1 blocked" },
+      { text: "✓", color: "success" },
+      { text: " 3 proven" },
       { text: " · ", color: "inactive" },
-      { text: "✗ 0 failed", color: "inactive" },
+      { text: "!", color: "warning" },
+      { text: " 1 unproven" },
+      { text: " · ", color: "inactive" },
+      { text: "✗", color: "inactive" },
+      { text: " 0 failed", color: "inactive" },
       { text: "next ", color: "inactive" },
       { text: "3 ", color: "claude", bold: true },
       { text: "Draw the board", color: "text" },
@@ -440,7 +445,7 @@ test("each row carries its state as a glyph, a word and a color, and done rows a
     { text: "⊘ ", color: "warning" },
     { text: "4" },
     { text: "Wire the hotkeys" },
-    { text: "blocked by 3", color: "warning" },
+    { text: "blocked by 3", color: "inactive" },
     { text: " PROVEN ", color: "inverseText", backgroundColor: "success", bold: true },
   ]);
   expect(await row(5)).toEqual([{ text: "○ " }, { text: "5" }, { text: "Write the docs" }]);
@@ -498,7 +503,10 @@ test("FAILED marks every task whose newest run since its change failed, and an u
   await w.clock.advance(2000);
   await ui.redraw();
   expect((await ui.find({ key: "line-task-1" }))?.text).toBe("✓ 1 Parse the plan                                 ");
-  expect(spans(await ui.find({ key: "plan-header" })).find((span) => span.text.startsWith("✗"))?.text).toStartWith("✗ evidence ledger unreadable: ");
+  const header = spans(await ui.find({ key: "plan-header" }));
+  const cross = header.findIndex((span) => span.text === "✗");
+  expect(header[cross]?.color).toBe("error");
+  expect(header[cross + 1]?.text).toStartWith(" evidence ledger unreadable: ");
   await ui.unmount();
 });
 
@@ -553,7 +561,8 @@ test("the split tier draws the focused task's detail beside the list", async ($,
     { text: " UNPROVEN ", color: "inverseText", backgroundColor: "warning", bold: true },
     { text: " ✓ 2 ", color: "inverseText", backgroundColor: "success", bold: true },
   ]);
-  expect(rows(await ui.drawn()).some((row) => row.includes("hooks/plan.ts") && row.includes("changed 15m ago"))).toBe(true);
+  const texts = spans(detail).map((span) => span.text);
+  expect(texts.slice(texts.indexOf("hooks/plan.ts"), texts.indexOf("hooks/plan.ts") + 3)).toEqual(["hooks/plan.ts", " ".repeat(8), "changed 15m ago"]);
   expect(spans(detail).find((span) => span.text === "changed 15m ago")).toEqual({ text: "changed 15m ago", color: "warning" });
   await ui.unmount();
 });
@@ -578,7 +587,7 @@ test("Enter opens a task's page with its files and the runs that prove it; n, p 
   await ui.press({ key: "task-3" });
   expect(rows(await ui.drawn()).slice(3)).toEqual([
     "Ship the board3 / 5",
-    "b: Board  p: Prev  n: Next  r: Run check",
+    "b: Board  p: Prev  n: Next  k: Run check",
     "s: Start here  c: Copy  e: Evidence",
     "─".repeat(51),
     "3. Draw the board",
@@ -628,7 +637,7 @@ test("Enter opens a task's page with its files and the runs that prove it; n, p 
   const five = rows(await ui.drawn());
   expect(five.slice(five.indexOf("Evidence"))).toEqual(["Evidence", "  Lists no files, so no run can prove it.", " ", "↑↓ scroll · esc close"]);
   expect((await ui.find({ key: "n" }))?.props["dimColor"]).toBe(true);
-  expect((await ui.find({ key: "r" }))?.props["dimColor"]).toBe(true);
+  expect((await ui.find({ key: "k" }))?.props["dimColor"]).toBe(true);
 
   await ui.press({ key: "p" });
   await ui.press({ key: "b" });
@@ -636,11 +645,11 @@ test("Enter opens a task's page with its files and the runs that prove it; n, p 
   await ui.unmount();
 });
 
-test("r, s and c fill the prompt or copy the focused task, never submitting, and e opens the Evidence tab", async ($, on) => {
+test("k, s and c fill the prompt or copy the focused task, never submitting, and e opens the Evidence tab", async ($, on) => {
   const { fills, copies } = boardWorld(on);
   const ui = await mountBoard($, PAGE);
 
-  await ui.press({ key: "r" });
+  await ui.press({ key: "k" });
   await ui.press({ key: "s" });
   await ui.press({ key: "c" });
   expect(fills).toEqual([
@@ -653,8 +662,8 @@ test("r, s and c fill the prompt or copy the focused task, never submitting, and
   expect(spans(await ui.drawn()).at(-1)).toEqual({ text: "Copied task 3.", color: "success" });
 
   await $.ui.focus({ component: "Pane", requestId: "omca", element: "task-5", origin: { kind: "person" } });
-  expect((await ui.find({ key: "r" }))?.props["dimColor"]).toBe(true);
-  await ui.press({ key: "r" });
+  expect((await ui.find({ key: "k" }))?.props["dimColor"]).toBe(true);
+  await ui.press({ key: "k" });
   expect(fills).toHaveLength(2);
   expect(spans(await ui.drawn()).at(-1)).toEqual({ text: "Task 5 names no check command.", color: "warning" });
   await $.ui.focus({ component: "Pane", requestId: "omca", element: "task-2", origin: { kind: "person" } });
@@ -703,7 +712,7 @@ test("o keeps open tasks, f opens the Find field, and a filter that matches noth
   await ui.press({ key: "f" });
   await ui.input({ key: "filter", text: "zzz" });
   expect(await ui.find({ type: "Text", text: "No task matches the filter." })).toBeDefined();
-  expect((await ui.find({ key: "r" }))?.props["dimColor"]).toBe(true);
+  expect((await ui.find({ key: "k" }))?.props["dimColor"]).toBe(true);
   await ui.unmount();
 });
 
@@ -713,7 +722,7 @@ test("OMCA_ASCII draws the board, its chips and bars from the ASCII set", async 
   await $.agent.spawn(SPAWN);
   const ui = await $.ui.mount(pane("terminal", PAGE));
   expect(rows(await ui.drawn()).slice(3)).toEqual([
-    "Ship the board[FINAL] [#########====////....] 2/5 - 1 blocked+ 3 proven - ! 1 unproven - x 0 failednext 3 Draw the board@ executor on 3",
+    "Ship the board[FINAL] [#######====////....] 2/5 - / 1 blocked+ 3 proven - ! 1 unproven - x 0 failednext 3 Draw the board@ executor on 3",
     " ",
     "-- Milestone 1: Core -- [######] 2/2 --------------",
     "+ 1 Parse the plan                         [PROVEN]",
@@ -723,7 +732,7 @@ test("OMCA_ASCII draws the board, its chips and bars from the ASCII set", async 
     "/ 4 Wire the hotkeys          blocked by 3 [PROVEN]",
     "o 5 Write the docs                                 ",
     " ",
-    "r: Run check  s: Start here  c: Copy  e: Evidence",
+    "k: Run check  s: Start here  c: Copy  e: Evidence",
     "o: Open only  x: Failing  f: Find  t: Sections",
     "l: Plans",
     "^v move - enter open - esc close",
@@ -755,7 +764,7 @@ test("commands, paths and copies are masked before they are drawn or filled", as
   const { fills, copies } = boardWorld(on, PASSING, {}, plan);
   const ui = await mountBoard($, SPLIT);
   expect((await ui.find({ type: "Code" }))?.props["source"]).toBe("GH_TOKEN=‹masked› just test-mod");
-  await ui.press({ key: "r" });
+  await ui.press({ key: "k" });
   await ui.press({ key: "c" });
   expect(fills).toEqual(["Run `GH_TOKEN=‹masked› just test-mod` to check task 3, then record the result with evidence_log."]);
   expect(copies[0]).toContain("- Done when: `GH_TOKEN=‹masked› just test-mod` exits 0");

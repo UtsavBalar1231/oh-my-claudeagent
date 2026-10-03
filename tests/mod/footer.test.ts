@@ -81,15 +81,6 @@ test("a gateway's spend limit alone keeps the cost", async ($, on) => {
   expect(await turn($, w, meter, 0.2812)).toEqual({ text: "4s · 12.3k in 845 out · $0.0312 engine cost" });
 });
 
-test("a subscription keeps the unlogged-verification warning in the cost's place", async ($, on) => {
-  const { w, meter } = engine(on, { [STATUS]: statusFile("just test", STARTED_S + 2) });
-  ledgerAt(w, STARTED_S - 600);
-  meter.rateLimits = [{ kind: "five_hour", percentUsed: 23.5 }];
-  await $.turn.start({ text: "Run the tests", turnId: "t-1" });
-
-  expect(await turn($, w, meter, 0.2812)).toEqual({ text: "4s · 12.3k in 845 out · ! no evidence: just test" });
-});
-
 test("a verification this turn that the ledger has not caught up with is named in the footer", async ($, on) => {
   const { w, meter } = engine(on, { [STATUS]: statusFile("just test", STARTED_S + 2) });
   ledgerAt(w, STARTED_S - 600);
@@ -116,6 +107,14 @@ test("a verification from before the turn started raises no warning", async ($, 
   expect(await turn($, w, meter, 0.2812)).toEqual({ text: "4s · 12.3k in 845 out · $0.0312 engine cost" });
 });
 
+test("a status file that does not parse leaves the warning out, and the reason goes to the debug log", async ($, on) => {
+  const { w, meter } = engine(on, { [STATUS]: "{ not json" });
+  await $.turn.start({ text: "Run the tests", turnId: "t-1" });
+
+  expect(await turn($, w, meter, 0.2812)).toEqual({ text: "4s · 12.3k in 845 out · $0.0312 engine cost" });
+  expect(w.logs.filter((line) => line.startsWith("footer: cannot check this turn's verification: "))).toHaveLength(1);
+});
+
 test("a subagent's turn.complete gets no footer and the engine's answer stands", async ($, on) => {
   const { w, meter } = engine(on, { [STATUS]: statusFile("just test", STARTED_S + 2) });
   await $.turn.start({ text: "Delegate", turnId: "t-1" });
@@ -123,10 +122,18 @@ test("a subagent's turn.complete gets no footer and the engine's answer stands",
   expect(await turn($, w, meter, 0.2812, "a-1")).toEqual({ text: "The tests ran." });
 });
 
-test("without a cost sample the footer leaves the cost out and dates the turn from its duration", async ($, on) => {
-  const { w, meter } = engine(on, { [STATUS]: statusFile("just test", STARTED_S + 2) });
+test("without a cost sample the footer leaves the cost out", async ($, on) => {
+  const { w, meter } = engine(on);
 
-  expect(await turn($, w, meter, 0.2812)).toEqual({ text: "4s · 12.3k in 845 out · ! no evidence: just test" });
+  expect(await turn($, w, meter, 0.2812)).toEqual({ text: "4s · 12.3k in 845 out" });
+});
+
+test("without a cost sample the turn is dated from its duration", async ($, on) => {
+  const inside = engine(on, { [STATUS]: statusFile("just test", STARTED_S + 2) });
+  expect(await turn($, inside.w, inside.meter, 0.2812)).toEqual({ text: "4s · 12.3k in 845 out · ! no evidence: just test" });
+
+  inside.w.files.set(STATUS, { text: statusFile("just test", STARTED_S + 3), mtimeMs: 0 });
+  expect(await turn($, inside.w, inside.meter, 0.2812)).toEqual({ text: "4s · 12.3k in 845 out" });
 });
 
 test("a host that keeps no cost ledger leaves the cost out", async ($, on) => {

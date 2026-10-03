@@ -1,14 +1,16 @@
-import type { TurnUsage } from "claude-code";
 import { expect, type Plugin, test } from "claude-code/testing";
 import { joinPath } from "../../src/core/path.ts";
 import { usableColumns } from "../../src/core/ui-kit.ts";
 import {
-  BOULDER,
   bodyColumns,
+  BOULDER,
   cellsAcross,
+  drain,
   hold,
+  isAscii,
   LAYOUTS,
   LEDGER,
+  local,
   pane,
   POSIX,
   resettableState,
@@ -18,8 +20,9 @@ import {
   SESSION,
   SIZES,
   topRows,
-  type World,
+  usage,
   world,
+  type World,
   write,
 } from "./world.ts";
 
@@ -82,19 +85,6 @@ const FILES = {
   [NOTES]: "- The ledger rotates at 1,000 entries.\n- Session ids come from the payload.",
 };
 
-const two = (value: number) => String(value).padStart(2, "0");
-const local = (iso: string) => {
-  const date = new Date(iso);
-  return `${two(date.getMonth() + 1)}-${two(date.getDate())} ${two(date.getHours())}:${two(date.getMinutes())}`;
-};
-
-const usage = (input: number, output: number): TurnUsage => ({
-  input_tokens: input,
-  output_tokens: output,
-  cache_read_input_tokens: 0,
-  cache_creation_input_tokens: 0,
-  model: "claude-sonnet-5-5",
-});
 
 const SPAWN = {
   tool_use_id: "toolu_1",
@@ -134,10 +124,6 @@ const closeRun = {
   presentation: { isFullscreen: true, columns: 120 },
 } as const;
 
-async function step(stream: AsyncGenerator<unknown, unknown>): Promise<void> {
-  for (let next = await stream.next(); next.done !== true; next = await stream.next());
-}
-
 test("/omca opens the pane focused and closable by Esc on the Agents tab, sized to the terminal", async ($, on) => {
   const w = world(on, FILES);
 
@@ -176,11 +162,11 @@ test("each tab key shows its tab, on the terminal and the desktop", async ($, on
     await ui.press({ key: "3" });
     expect(await ui.find({ type: "Text", text: " COMPLETE " })).toBeDefined();
     expect((await body()).filter((row) => /^[❯ ] \d\d:\d\d /.test(row))).toEqual([
-      `❯ ${time("2026-10-02T11:45:00Z")}  FINAL    ✓ 0  just ci                    ◆`,
-      `  ${time("2026-10-02T10:20:00Z")}  TEST     ✓ 0  just test-mod              ◆`,
-      `  ${time("2026-10-02T10:00:00Z")}  TEST     ✗ 1  just test-mod              ◆`,
-      `  ${time("2026-10-02T09:30:00Z")}  LINT     ✓ 0  just lint                  ◆`,
-      `  ${time("2026-10-02T09:00:00Z")}  BUILD    ✓ 0  bun run build              ◆`,
+      `❯ ${time("2026-10-02T11:45:00Z")}  FINAL    ✓  0  just ci                   ◆`,
+      `  ${time("2026-10-02T10:20:00Z")}  TEST     ✓  0  just test-mod             ◆`,
+      `  ${time("2026-10-02T10:00:00Z")}  TEST     ✗  1  just test-mod             ◆`,
+      `  ${time("2026-10-02T09:30:00Z")}  LINT     ✓  0  just lint                 ◆`,
+      `  ${time("2026-10-02T09:00:00Z")}  BUILD    ✓  0  bun run build             ◆`,
     ]);
 
     await ui.press({ key: "4" });
@@ -264,7 +250,7 @@ test("n, p and t page through the plan, and t returns to the row the pages came 
   expect((await ui.find({ key: `row-${pageOf(14)}` }))?.props["autoFocus"]).toBe(true);
   expect((await ui.find({ key: `row-${pageOf(13)}` }))?.props["autoFocus"]).toBeUndefined();
   // The test kit cannot resolve a plugin's own $.ui.focus, so the refocus shows as its refusal.
-  expect(w.logs.at(-1)).toBe(`omca plan could not refocus row-${pageOf(14)}: no implementation for ui.focus`);
+  expect(w.logs.at(-1)).toBe(`omca plan could not focus row-${pageOf(14)}: no implementation for ui.focus`);
   await ui.unmount();
 });
 
@@ -421,7 +407,7 @@ test("an agent row appears on agent.spawn, sums its steps and ends on turn.compl
   expect(await lane("lane-a-1")).toBe("◆ executor · Fix the parser                0     0s");
   expect(await lane("tools-a-1")).toBe("  ◐ starting");
 
-  await step($.turn.step({ turnId: "t-1", index: 0, model: "claude-sonnet-5-5", effort: "high", messageCount: 1, agentId: "a-1" }));
+  await drain($.turn.step({ turnId: "t-1", index: 0, model: "claude-sonnet-5-5", effort: "high", messageCount: 1, agentId: "a-1" }));
   await w.clock.advance(66_000);
   expect(await lane("lane-a-1")).toBe("◆ executor · Fix the parser       high  1.5k  1m06s");
 
@@ -465,6 +451,36 @@ test("the pane timer ends a row the agent list no longer holds and picks up new 
   write(w, LEDGER, ledger(ENTRIES));
   await w.clock.advance(6000);
   expect(w.reads.length).toBe(reads);
+  await ui.unmount();
+});
+
+test("a session that starts with the pane already open restarts its refresh timer", async ($, on) => {
+  const w = world(on, { ...FILES, [LEDGER]: ledger([...ENTRIES, ["test", "just test", 0, "2026-10-02T12:00:00Z"]]) });
+  w.panes = [{ id: "omca", title: "OMCA", isShown: true, isFocused: false, isPlaced: true }];
+  on("session.start", (_$, e) => ({ cwd: e.cwd }));
+  on("command.register", (_$, e) => ({ value: { command: e.name } }));
+  await $.session.start({ cwd: ROOT, surface: "terminal", isInteractive: true });
+  const ui = await $.ui.mount(pane("terminal", { columns: 200, rows: 50, placement: "dock" }));
+  await ui.press({ key: "3" });
+  expect(await ui.find({ type: "Text", text: "Reading the evidence ledger…" })).toBeDefined();
+
+  await w.clock.advance(2000);
+  expect(await ui.find({ type: "Text", text: "1/6 · ↑↓ move" })).toBeDefined();
+  await ui.unmount();
+});
+
+test("a tab that fails to draw shows why in its place, and the tab row stays", async ($, on) => {
+  const atoms = new Map<string, { value: unknown; version: number }>();
+  on("state.get", (_$, e) => (e.key === "lanes" ? { deny: "lanes unreadable" } : { value: atoms.get(e.key) ?? { value: undefined, version: 0 } }));
+  on("state.set", (_$, e) => {
+    const version = (atoms.get(e.key)?.version ?? 0) + 1;
+    atoms.set(e.key, { value: e.value, version });
+    return { value: { isSet: true, version } };
+  });
+  world(on, FILES);
+  await $.command.run(run(""));
+  const ui = await $.ui.mount(pane("terminal", { columns: 120, rows: 40, placement: "dock" }));
+  expect(rows(await ui.drawn())).toEqual(["1: Agents  2: Plan  3: Evidence  4: Notepad", "5: Feedback  6: Stats  7: Doctor", "─".repeat(51), "✗ The agents tab failed: lanes unreadable"]);
   await ui.unmount();
 });
 
@@ -569,7 +585,6 @@ test("OMCA_ASCII draws every glyph from the ASCII set", async ($, on) => {
   expect(drawn.at(-1)).toBe("x: Failing  f: Find  t: Sections  l: Plans");
   await ui.press({ key: "1" });
   expect((await ui.find({ key: "lane-a-1" }))?.text).toStartWith("@ executor - Fix the parser");
-  const isAscii = (row: string) => [...row].every((char) => char.charCodeAt(0) >= 32 && char.charCodeAt(0) < 127);
   expect(rows(await ui.drawn()).filter((row) => !isAscii(row))).toEqual([]);
   await ui.unmount();
 });

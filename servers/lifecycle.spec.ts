@@ -89,11 +89,31 @@ describe("start-up work", () => {
     for (const dir of ["mod", "session"]) {
       put(root, `.omca/state/${dir}/old.json`, "{}", 25 * HOUR_MS);
       put(root, `.omca/state/${dir}/new.json`, "{}", 23 * HOUR_MS);
-      put(root, `.omca/state/${dir}/old.json.tmp`, "{}", 25 * HOUR_MS);
+      put(root, `.omca/state/${dir}/old.json.bak`, "{}", 25 * HOUR_MS);
     }
     await startWork(root, NOW);
-    expect(files(root, ".omca/state/mod")).toEqual(["new.json", "old.json.tmp"]);
-    expect(files(root, ".omca/state/session")).toEqual(["new.json", "old.json.tmp"]);
+    expect(files(root, ".omca/state/mod")).toEqual(["new.json", "old.json.bak"]);
+    expect(files(root, ".omca/state/session")).toEqual(["new.json", "old.json.bak"]);
+  });
+
+  test("temp files a crash left under state, evidence and notepads go after 24 hours, and no directory is removed", async () => {
+    const root = project();
+    const old = [
+      ".omca/state/boulder.json.1111.tmp",
+      ".omca/state/boulder.json.lock.2222.tmp",
+      ".omca/state/session/s1.json.3333.tmp",
+      ".omca/evidence/verification-evidence.json.4444.tmp",
+      ".omca/notepads/plan-a/learnings.md.5555.tmp",
+    ];
+    for (const path of old) put(root, path, "partial", 25 * HOUR_MS);
+    put(root, ".omca/state/boulder.json.6666.tmp", "partial", 23 * HOUR_MS);
+    put(root, ".omca/notepads/plan-a/learnings.md", "kept", 25 * HOUR_MS);
+    mkdirSync(join(root, ".omca", "state", "boulder.json.lock.d"));
+    await startWork(root, NOW);
+    expect(files(root, ".omca/state")).toEqual(["boulder.json.6666.tmp"]);
+    expect(files(root, ".omca/evidence")).toEqual([]);
+    expect(files(root, ".omca/notepads")).toEqual(["plan-a/learnings.md"]);
+    expect(existsSync(join(root, ".omca", "state", "boulder.json.lock.d"))).toBe(true);
   });
 
   test("a file that cannot be removed is logged and the entries after it are still pruned", async () => {

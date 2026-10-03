@@ -68,9 +68,12 @@ describe("tool kinds", () => {
     ["NotebookEdit", "edit"],
     ["Bash", "bash"],
     ["PowerShell", "bash"],
+    ["Monitor", "bash"],
+    ["LSP", "read"],
     ["mcp__plugin_oh-my-claudeagent_omca__evidence_log", "mcp"],
     ["Agent", "agent"],
-    ["Task", "agent"],
+    ["Task", "other"],
+    ["MultiEdit", "other"],
     ["TodoWrite", "other"],
     ["toString", "other"],
   ])("%s is %s", (name, kind) => {
@@ -88,6 +91,8 @@ describe("toolDetail", () => {
     expect(toolDetail("Bash", { command: "just test\n  --verbose" }, "/work")).toBe("just test --verbose");
     expect(toolDetail("Read", { file_path: "/work/src/parser.ts" }, "/work")).toBe("src/parser.ts");
     expect(toolDetail("Read", { file_path: "/work/src/parser.ts" }, "/work/")).toBe("src/parser.ts");
+    expect(toolDetail("LSP", { operation: "hover", filePath: "/work/src/parser.ts", line: 1, character: 1 }, "/work")).toBe("src/parser.ts");
+    expect(toolDetail("Monitor", { description: "ci", timeout_ms: 1000, command: "tail -f ci.log" }, "/work")).toBe("tail -f ci.log");
     expect(toolDetail("Edit", { file_path: "/elsewhere/x.ts" }, "/work")).toBe("/elsewhere/x.ts");
     expect(toolDetail("Write", { file_path: "C:\\work\\a.ts" }, "C:\\work")).toBe("a.ts");
     expect(toolDetail("Grep", { pattern: "heading" }, "/work")).toBe("heading");

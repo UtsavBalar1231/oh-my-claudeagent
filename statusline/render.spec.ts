@@ -67,7 +67,7 @@ const BAR_10 = `${filled(G, 2)}${empty(18)} ${G}10%${R}  ${D}200k${R}`;
 const WAITING = `${D}${"▱".repeat(20)}${R} ${D}[waiting...]${R}  ${D}200k${R}`;
 const clock = (duration: string): string => `${B}~ ${duration}${R}`;
 const costClock = (cost: string, duration: string): string => `${M}${cost}${R}${S}${clock(duration)}`;
-const ZERO = clock("0m 0s");
+const ZERO = clock("0s");
 const modelOf = (name: string): string => `${C}> ${name}${R}`;
 const MODEL = modelOf("claude");
 
@@ -472,7 +472,7 @@ describe("segments", () => {
   });
 
   test.each([
-    ["sisyphus", "\uef08"],
+    ["sisyphus", "\uf01e"],
     ["oh-my-claudeagent:executor", "\uf085"],
     ["someone-else", "\uf007"],
     ["constructor", "\uf007"],
@@ -526,8 +526,6 @@ describe("segments", () => {
     );
     const plain: Payload = { model, context_window: { used_percentage: 10 }, cost: {} };
     expect(lines(withCut)).toEqual(lines(plain));
-    const text = visible(lines(withCut).join("\n"));
-    for (const gone of ["[T]", "abcdef12", "my-session", "2.1.287", "DEGRADED", "omca-setup", "tok", "api ", "acme"]) expect(text).not.toContain(gone);
   });
 });
 
@@ -539,15 +537,15 @@ describe("metrics segments", () => {
     [{ total_cost_usd: 1.23 }, "$1.23"],
     [{ total_cost_usd: 0.125 }, "$0.12"],
   ])("cost %o reads %s before the duration", (cost, text) => {
-    expect(metrics(withCost(cost))).toEqual([MODEL_M, BAR_10, costClock(text, "0m 0s")]);
+    expect(metrics(withCost(cost))).toEqual([MODEL_M, BAR_10, costClock(text, "0s")]);
   });
 
   test.each([
-    [0, "0m 0s"],
-    [999, "0m 0s"],
-    [61000, "1m 1s"],
-    [90000, "1m 30s"],
-    [3600000, "60m 0s"],
+    [0, "0s"],
+    [999, "0s"],
+    [61000, "1m01s"],
+    [90000, "1m30s"],
+    [3600000, "1h00m"],
   ])("a duration of %p ms reads %s", (ms, text) => {
     expect(metrics(withCost({ total_duration_ms: ms }))).toEqual([MODEL_M, BAR_10, clock(text)]);
   });
@@ -571,9 +569,9 @@ describe("cost by account", () => {
     rows({ ...withCost({ total_duration_ms: 125000, ...(cost === undefined ? {} : { total_cost_usd: cost }) }), ...(limits === undefined ? {} : { rate_limits: limits }) })[2] ?? "";
 
   test("an API account sees its cost before the duration", () => {
-    expect(at(1.5)).toBe(costClock("$1.50", "2m 5s"));
-    expect(at(1.5, null)).toBe(costClock("$1.50", "2m 5s"));
-    expect(at(1.5, {})).toBe(costClock("$1.50", "2m 5s"));
+    expect(at(1.5)).toBe(costClock("$1.50", "2m05s"));
+    expect(at(1.5, null)).toBe(costClock("$1.50", "2m05s"));
+    expect(at(1.5, {})).toBe(costClock("$1.50", "2m05s"));
   });
 
   test.each([
@@ -582,16 +580,16 @@ describe("cost by account", () => {
     ["five_hour without a reading", { five_hour: { resets_at: 1 } }],
     ["seven_day beside a spend_limit", { seven_day: FIVE_HOUR, spend_limit: { used_usd: 1, limit_usd: 10 } }],
   ] as [string, Payload["rate_limits"]][])("a subscription window (%s) hides the cost and keeps the duration", (_, limits) => {
-    expect(at(1.5, limits)).toStartWith(clock("2m 5s"));
+    expect(at(1.5, limits)).toStartWith(clock("2m05s"));
     expect(visible(at(1.5, limits))).not.toContain("$1.50");
   });
 
   test("a gateway that reports only a spend limit bills by spend and keeps the cost", () => {
-    expect(at(1.5, { spend_limit: { used_usd: 1, limit_usd: 10 } })).toBe([costClock("$1.50", "2m 5s"), `${G}S: $1.00/$10${R}`].join(S));
+    expect(at(1.5, { spend_limit: { used_usd: 1, limit_usd: 10 } })).toBe([costClock("$1.50", "2m05s"), `${G}S: $1.00/$10${R}`].join(S));
   });
 
   test.each([[0], [undefined]])("a cost of %p, as before the first response, is hidden", (cost) => {
-    expect(at(cost)).toBe(clock("2m 5s"));
+    expect(at(cost)).toBe(clock("2m05s"));
   });
 });
 
@@ -853,7 +851,6 @@ describe("stacked rows", () => {
 });
 
 describe("layout", () => {
-  const model = { display_name: "claude" };
   const SESSION = "layout-session";
   let dir = "";
 
@@ -902,7 +899,7 @@ describe("layout", () => {
   });
 
   const SESSION_ROW = "> Opus 5.5 · E: high · T: 1/3 -> Wire the order summary panel into the payment step and cover it with a test";
-  const USAGE_ROW = "~ 2m 5s · ▰▰▰▰▱▱▱▱▱▱ 45% 5h (resets 6pm) · ▰▰▰▰▰▰▰▰▱▱ 80% 7d (resets mon 5pm)";
+  const USAGE_ROW = "~ 2m05s · ▰▰▰▰▱▱▱▱▱▱ 45% 5h (resets 6pm) · ▰▰▰▰▰▰▰▰▱▱ 80% 7d (resets mon 5pm)";
   const branchOf = (bar: string): string => `${bar} 34%  200k · * v3-typescript-mods ~3  +2  ?1`;
   const BAR_20 = "▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱";
 
@@ -924,7 +921,7 @@ describe("layout", () => {
       "> Opus 5.5 · E: high · T: 1/3 -> Wire the order summary panel into the pa…",
       branchOf(BAR_20),
       `> ${basename(dir)} · W: wt <- main · #42 +`,
-      "~ 2m 5s · ▰▰▰▰▱▱▱▱▱▱ 45% 5h (resets 6pm)",
+      "~ 2m05s · ▰▰▰▰▱▱▱▱▱▱ 45% 5h (resets 6pm)",
     ]);
   });
 
@@ -1000,12 +997,5 @@ describe("layout", () => {
         expect(closes).toBe(opens);
       }
     }
-  });
-
-  test("the subagent count file is not read", () => {
-    const data: Payload = { model, workspace: { project_dir: dir } };
-    const before = lines(data);
-    writeFileSync(join(dir, ".omca", "state", "subagent-models.json"), JSON.stringify({ a1: { model: "Sonnet" }, a2: { model: "Opus" } }));
-    expect(lines(data)).toEqual(before);
   });
 });

@@ -88,16 +88,28 @@ describe("ensureStateDir", () => {
     expect(existsSync(join(dir, ".omca"))).toBe(false);
     expect(ensureStateDir(dir)).toBe(join(dir, ".omca", "state"));
     expect(existsSync(join(dir, ".omca", "state"))).toBe(true);
-    expect(readFileSync(join(dir, ".omca", ".gitignore"), "utf8")).toBe("*\n!/rules/\n");
+    expect(readFileSync(join(dir, ".omca", ".gitignore"), "utf8")).toBe("*\n!/rules/\n!/rules/**\n");
   });
 
-  test("leaves an existing .omca/.gitignore untouched", () => {
+  test("rewrites an existing .omca/.gitignore whose content differs, such as the one that still ignored rule files", () => {
     mkdirSync(join(dir, ".omca"));
-    writeFileSync(join(dir, ".omca", ".gitignore"), "custom content\n");
+    writeFileSync(join(dir, ".omca", ".gitignore"), "*\n!/rules/\n");
     ensureStateDir(dir);
-    expect(readFileSync(join(dir, ".omca", ".gitignore"), "utf8")).toBe("custom content\n");
+    expect(readFileSync(join(dir, ".omca", ".gitignore"), "utf8")).toBe("*\n!/rules/\n!/rules/**\n");
+    expect(readdirSync(join(dir, ".omca")).toSorted()).toEqual([".gitignore", "state"]);
   });
 
+  test("git ignores everything under .omca except the files under rules/", () => {
+    gitInit(dir);
+    ensureStateDir(dir);
+    const files = [".omca/rules/a.md", ".omca/rules/sub/b.md", ".omca/state/boulder.json", ".omca/top.json"];
+    for (const file of files) {
+      mkdirSync(join(dir, file, ".."), { recursive: true });
+      writeFileSync(join(dir, file), "");
+    }
+    const ignored = Bun.spawnSync(["git", "check-ignore", ...files], { cwd: dir, env: process.env }).stdout.toString().trim().split("\n");
+    expect(ignored).toEqual([".omca/state/boulder.json", ".omca/top.json"]);
+  });
 });
 
 describe("writeFileAtomic", () => {
@@ -489,6 +501,44 @@ describe("under injected filesystem faults", () => {
       errors.mockRestore();
     }
     expect(lockFiles().filter((name) => !name.endsWith(".tmp"))).toEqual([]);
+  });
+
+  test("a lock temp file whose create is refused with EACCES rejects at once instead of waiting out the timeout", async () => {
+    const lock = join(dir, "data.lock");
+    const real = fs.writeFileSync;
+    const write = spyOn(fs, "writeFileSync").mockImplementation(((path: fs.PathOrFileDescriptor, data: string, options?: fs.WriteFileOptions) => {
+      if (String(path).startsWith(`${lock}.`)) throw errno("EACCES");
+      real(path, data, options);
+    }) as typeof fs.writeFileSync);
+    const started = Date.now();
+    try {
+      await expect(withLock(lock, () => "never")).rejects.toThrow("EACCES");
+    } finally {
+      write.mockRestore();
+    }
+    expect(Date.now() - started).toBeLessThan(1_000);
+    expect(lockFiles()).toEqual([]);
+  });
+
+  test("a lock directory whose mkdir is refused with EACCES rejects at once instead of waiting out the timeout", async () => {
+    const lock = join(dir, "data.lock");
+    const link = spyOn(fs, "linkSync").mockImplementation(() => {
+      throw errno("EPERM");
+    });
+    const real = fs.mkdirSync;
+    const mkdir = spyOn(fs, "mkdirSync").mockImplementation(((path: fs.PathLike, options?: fs.MakeDirectoryOptions) => {
+      if (String(path) === `${lock}.d`) throw errno("EACCES");
+      return real(path, options);
+    }) as typeof fs.mkdirSync);
+    const started = Date.now();
+    try {
+      await expect(withLock(lock, () => "never")).rejects.toThrow("EACCES");
+    } finally {
+      link.mockRestore();
+      mkdir.mockRestore();
+    }
+    expect(Date.now() - started).toBeLessThan(1_000);
+    expect(lockFiles()).toEqual([]);
   });
 
   test("a lock file that reads EACCES is treated as busy, so the wait times out instead of failing", async () => {

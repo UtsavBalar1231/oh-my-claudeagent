@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpath
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Registry } from "../../src/core/boulder.ts";
-import { boundSessionsByRoot, GC_MAX_AGE_SECONDS, gcRegistry, pruneStale, pruneUnbound, tools } from "./boulder.ts";
+import { GC_MAX_AGE_SECONDS, gcRegistry, pruneStale, pruneUnbound, tools, unbindBoundSessions } from "./boulder.ts";
 
 const SERVER = join(import.meta.dir, "..", "omca.ts");
 const FIXTURES = join(import.meta.dir, "..", "..", "tests", "fixtures", "boulder-schemas");
@@ -98,11 +98,11 @@ describe("boulder_write", () => {
     expect(boundAt >= before && boundAt <= nowSeconds()).toBe(true);
     expect(read(registryFile(root))).toBe(
       json({
-        plans: { "my-plan": { active_plan: "/tmp/plan.md", started_at: startedAt, session_ids: ["sess-001"], agent: "sisyphus" } },
+        plans: { "my-plan": { active_plan: "/tmp/plan.md", started_at: startedAt, session_ids: ["sess-001"] } },
         bindings: { "sess-001": { plan_name: "my-plan", bound_at: boundAt } },
       }),
     );
-    expect(read(join(root, ".omca", ".gitignore"))).toBe("*\n!/rules/\n");
+    expect(read(join(root, ".omca", ".gitignore"))).toBe("*\n!/rules/\n!/rules/**\n");
   });
 
   test("boulder_write appends sessions and binds both", async () => {
@@ -121,7 +121,7 @@ describe("boulder_write", () => {
     expect(registry(root).plans["my-plan"].session_ids).toEqual(["sess-001"]);
   });
 
-  test("boulder_write preserves started_at", async () => {
+  test("boulder_write preserves started_at and drops a stored agent field", async () => {
     const root = project();
     seedRegistry(root, json({ plans: { "my-plan": { active_plan: "/tmp/plan.md", started_at: LONG_AGO, session_ids: [], agent: "x" } }, bindings: {} }));
     await write(root, "my-plan", "sess-002");
@@ -129,15 +129,19 @@ describe("boulder_write", () => {
       active_plan: "/tmp/plan.md",
       started_at: LONG_AGO,
       session_ids: ["sess-002"],
-      agent: "sisyphus",
     });
   });
 
-  test("boulder_write keeps the stored agent and worktree_path when the call leaves them empty", async () => {
+  test("boulder_write keeps the stored worktree_path when the call leaves it empty, and ignores a stray agent argument", async () => {
     const root = project();
     await write(root, "wt-plan", "sess-001", "/tmp/plan.md", { agent: "atlas", worktree_path: "/tmp/wt" });
-    await write(root, "wt-plan", "sess-002", "/tmp/moved.md", { agent: "" });
-    expect(registry(root).plans["wt-plan"]).toMatchObject({ active_plan: "/tmp/moved.md", agent: "atlas", worktree_path: "/tmp/wt" });
+    await write(root, "wt-plan", "sess-002", "/tmp/moved.md");
+    expect(registry(root).plans["wt-plan"]).toEqual({
+      active_plan: "/tmp/moved.md",
+      started_at: expect.stringMatching(ISO_SECONDS),
+      session_ids: ["sess-001", "sess-002"],
+      worktree_path: "/tmp/wt",
+    });
   });
 
   test("boulder_write two plans distinct bindings", async () => {
@@ -174,15 +178,19 @@ describe("boulder_write", () => {
     await expect(call("boulder_write", { active_plan: "/tmp/p.md", plan_name: "p", working_directory: root })).rejects.toThrow(
       "boulder_write: session_id must be a string",
     );
-    await expect(write(root, "p", "s", "/tmp/p.md", { agent: 3 })).rejects.toThrow("boulder_write: agent must be a string");
+    await expect(write(root, "p", "s", "/tmp/p.md", { worktree_path: 3 })).rejects.toThrow("boulder_write: worktree_path must be a string");
     expect(existsSync(registryFile(root))).toBe(false);
   });
 
-  test("boulder_write records each session id it binds for the exit handler", async () => {
+  test("the exit unbind removes exactly the bindings boulder_write made in this process", async () => {
     const root = project();
     await write(root, "plan-a", "sess-exit-1");
     await write(root, "plan-b", "sess-exit-2");
-    expect([...(boundSessionsByRoot.get(root) ?? [])]).toEqual(["sess-exit-1", "sess-exit-2"]);
+    const seeded = registry(root);
+    seeded.bindings["sess-elsewhere"] = { plan_name: "plan-a", bound_at: nowSeconds() };
+    seedRegistry(root, json(seeded));
+    unbindBoundSessions(Date.now() + 1_000);
+    expect(Object.keys(registry(root).bindings)).toEqual(["sess-elsewhere"]);
   });
 });
 

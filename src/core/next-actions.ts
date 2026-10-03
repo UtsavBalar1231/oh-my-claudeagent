@@ -1,5 +1,5 @@
 import { allTasksDone } from "./checkboxes.ts";
-import { isRecord } from "./tool-input.ts";
+import { evidenceOf, provesPlan } from "./evidence.ts";
 
 export type NextActionKind = "log-evidence" | "start-work" | "final-verification" | "review";
 
@@ -38,19 +38,7 @@ export function nextActions({ plan, verification, isAgentRunning, hasFinalVerifi
   return actions;
 }
 
-type LedgerEntry = { type?: unknown; exit_code?: unknown; plan_sha256?: unknown };
-
-const entriesOf = (ledger: unknown): readonly LedgerEntry[] => {
-  const entries = isRecord(ledger) ? ledger["entries"] : undefined;
-  return Array.isArray(entries) ? entries.filter(isRecord) : [];
-};
-
-/** The Stop gate's rule: exit 0, scoped to this plan's bytes or carrying no scope at all. */
+/** The Stop gate's rule over parsed ledger data: any readable entry proves this plan's bytes. */
 export function hasPassingFinalVerification(ledger: unknown, planSha256: string): boolean {
-  return entriesOf(ledger).some(
-    (entry) =>
-      entry.type === "final_verification" &&
-      entry.exit_code === 0 &&
-      (entry.plan_sha256 === undefined || entry.plan_sha256 === null || entry.plan_sha256 === "" || entry.plan_sha256 === planSha256),
-  );
+  return evidenceOf(ledger).some((entry) => provesPlan(entry, planSha256));
 }

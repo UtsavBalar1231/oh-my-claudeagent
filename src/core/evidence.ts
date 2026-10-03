@@ -1,5 +1,6 @@
+import { windowEnd } from "./list-window.ts";
 import { isRecord } from "./tool-input.ts";
-import { two } from "./ui-kit.ts";
+import { dayOf } from "./ui-kit.ts";
 import { type Level, redact } from "./visual.ts";
 
 export const EVIDENCE_TYPES = [
@@ -32,28 +33,38 @@ export type Evidence = {
 
 const isType = (value: unknown): value is EvidenceType => EVIDENCE_TYPES.some((type) => type === value);
 
+/** The ledger's raw entries list, or undefined when the data holds none. */
+export function entriesOf(data: unknown): unknown[] | undefined {
+  const entries = isRecord(data) ? data["entries"] : undefined;
+  return Array.isArray(entries) ? entries : undefined;
+}
+
+function toEvidence(raw: unknown): Evidence[] {
+  if (!isRecord(raw)) return [];
+  const { type, command, exit_code: exitCode, timestamp, output_snippet: snippet, verified_by: verifiedBy, plan_sha256: planSha } = raw;
+  const at = typeof timestamp === "string" ? Date.parse(timestamp) : Number.NaN;
+  if (!isType(type) || typeof command !== "string" || typeof exitCode !== "number" || Number.isNaN(at)) return [];
+  return [
+    {
+      type,
+      command,
+      exitCode,
+      at,
+      snippet: typeof snippet === "string" ? snippet : "",
+      verifiedBy: typeof verifiedBy === "string" && verifiedBy !== "" ? verifiedBy : null,
+      planSha: typeof planSha === "string" ? planSha : "",
+    },
+  ];
+}
+
+/** The readable entries of parsed ledger data in file order, oldest first; none when it holds no entries list. */
+export const evidenceOf = (data: unknown): Evidence[] => (entriesOf(data) ?? []).flatMap(toEvidence);
+
 /** The ledger's readable entries in file order, oldest first; throws when it holds no entries list. */
 export function parseLedger(text: string): Evidence[] {
   const data: unknown = JSON.parse(text);
-  const entries = isRecord(data) ? data["entries"] : undefined;
-  if (!Array.isArray(entries)) throw new Error("it holds no entries list");
-  return entries.flatMap((raw: unknown): Evidence[] => {
-    if (!isRecord(raw)) return [];
-    const { type, command, exit_code: exitCode, timestamp, output_snippet: snippet, verified_by: verifiedBy, plan_sha256: planSha } = raw;
-    const at = typeof timestamp === "string" ? Date.parse(timestamp) : Number.NaN;
-    if (!isType(type) || typeof command !== "string" || typeof exitCode !== "number" || Number.isNaN(at)) return [];
-    return [
-      {
-        type,
-        command,
-        exitCode,
-        at,
-        snippet: typeof snippet === "string" ? snippet : "",
-        verifiedBy: typeof verifiedBy === "string" && verifiedBy !== "" ? verifiedBy : null,
-        planSha: typeof planSha === "string" ? planSha : "",
-      },
-    ];
-  });
+  if (entriesOf(data) === undefined) throw new Error("it holds no entries list");
+  return evidenceOf(data);
 }
 
 export type Verdict =
@@ -61,16 +72,16 @@ export type Verdict =
   | { kind: "stale"; entry: Evidence }
   | { kind: "missing"; failed: Evidence | null };
 
-/**
- * The Stop gate's rule, newest entry first: a passing final verification scoped to these plan
- * bytes, or to no plan at all, is complete; one scoped to other bytes means the plan changed.
- */
+/** The Stop gate's rule: a passing final verification scoped to these plan bytes, or to no plan at all. */
+export const provesPlan = (entry: Evidence, planSha: string): boolean =>
+  entry.type === "final_verification" && entry.exitCode === 0 && (entry.planSha === "" || entry.planSha === planSha);
+
+/** The Stop gate's rule read newest first; a passing final verification scoped to other bytes means the plan changed. */
 export function verdictOf(entries: readonly Evidence[], planSha: string): Verdict {
   const finals = entries.filter((entry) => entry.type === "final_verification").toReversed();
-  const passing = finals.filter((entry) => entry.exitCode === 0);
-  const complete = passing.find((entry) => entry.planSha === "" || entry.planSha === planSha);
+  const complete = finals.find((entry) => provesPlan(entry, planSha));
   if (complete !== undefined) return { kind: "complete", entry: complete };
-  const stale = passing[0];
+  const stale = finals.find((entry) => entry.exitCode === 0);
   if (stale !== undefined) return { kind: "stale", entry: stale };
   return { kind: "missing", failed: finals[0] ?? null };
 }
@@ -111,21 +122,8 @@ export function shownIndices(entries: readonly Evidence[], filter: Filter, home:
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
-/** The local calendar day, `2026-10-02`. */
-export function dayOf(at: number): string {
-  const date = new Date(at);
-  return `${date.getFullYear()}-${two(date.getMonth() + 1)}-${two(date.getDate())}`;
-}
-
 /** `Fri 2026-10-02`, in local time. */
 export const dayLabel = (at: number): string => `${WEEKDAYS[new Date(at).getDay()] ?? ""} ${dayOf(at)}`;
-
-/** `09:05`, in local time. */
-export function clockOf(at: number, withSeconds = false): string {
-  const date = new Date(at);
-  const minutes = `${two(date.getHours())}:${two(date.getMinutes())}`;
-  return withSeconds ? `${minutes}:${two(date.getSeconds())}` : minutes;
-}
 
 /**
  * A window over entries of unequal height, as `{ start, end }` positions. A window that does not
@@ -142,15 +140,7 @@ export function placeEntries(
 ): { start: number; end: number } {
   const count = heights.length;
   if (count === 0) return { start: 0, end: 0 };
-  const endFrom = (start: number) => {
-    let used = opensDay[start] === true ? 0 : 1;
-    let end = start;
-    while (end < count && (end === start || used + (heights[end] ?? 1) <= room)) {
-      used += heights[end] ?? 1;
-      end += 1;
-    }
-    return end;
-  };
+  const endFrom = (start: number) => windowEnd(heights, start, room - (opensDay[start] === true ? 0 : 1));
   const target = Math.max(0, Math.min(count - 1, current));
   let start = Math.max(0, Math.min(first, count - 1, target));
   while (endFrom(start) <= target) start += 1;
@@ -234,20 +224,11 @@ export function ledgerCoversSlot(ledgerMtimeSeconds: number, slotAt: number): bo
   return ledgerMtimeSeconds + MTIME_SLACK_SECONDS >= slotAt;
 }
 
-// jq truthiness: only null and false are falsy, so an empty string still counts.
-const present = (value: unknown): boolean =>
-  value !== undefined && value !== null && value !== false;
+const REQUIRED_FIELDS = ["type", "command", "exit_code", "output_snippet", "timestamp"];
 
-const TRUTHY_FIELDS = ["type", "command", "output_snippet", "timestamp"];
-
-/** The structural check the TaskCompleted gate applies to a ledger it did not write. */
+/** The structural check the TaskCompleted gate applies to a ledger it did not write: every field present, its content unchecked. */
 export function isWellFormedLedger(data: unknown): boolean {
-  if (!isRecord(data)) return false;
-  const entries = data["entries"];
-  if (!Array.isArray(entries) || entries.length === 0) return false;
-  return entries.every((entry: unknown) => {
-    if (!isRecord(entry)) return false;
-    // Unlike the fields above, the gate tests exit_code only against null, so 0 and false pass.
-    return TRUTHY_FIELDS.every((k) => present(entry[k])) && entry["exit_code"] != null;
-  });
+  const entries = entriesOf(data);
+  if (entries === undefined || entries.length === 0) return false;
+  return entries.every((entry: unknown) => isRecord(entry) && REQUIRED_FIELDS.every((field) => entry[field] !== undefined && entry[field] !== null));
 }

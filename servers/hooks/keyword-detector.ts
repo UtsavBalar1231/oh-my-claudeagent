@@ -1,24 +1,14 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { isHookDisabled } from "../../src/core/kill-switch.ts";
 import { matchKeywordModes } from "../../src/core/keywords.ts";
-import { isSafeId } from "../../src/core/session-id.ts";
 import { isRecord } from "../../src/core/tool-input.ts";
-import { hasCode } from "../io.ts";
 import type { Handler } from "./registry.ts";
 import { announceOnce } from "./session-state.ts";
+import { readMarker } from "./status-file.ts";
 
 function keywordTriggersEnabled(root: string, sessionId: unknown): boolean {
-  if (typeof sessionId !== "string" || !isSafeId(sessionId)) return false;
-  let text: string;
-  try {
-    text = readFileSync(join(root, ".omca", "state", "mod", `${sessionId}.json`), "utf8");
-  } catch (error) {
-    if (hasCode(error, "ENOENT")) return false;
-    throw error;
-  }
-  const marker: unknown = JSON.parse(text);
-  return isRecord(marker) && isRecord(marker.options) && marker.options.enableKeywordTriggers === true;
+  if (typeof sessionId !== "string") return false;
+  const options = readMarker(root, sessionId)?.options;
+  return isRecord(options) && options.enableKeywordTriggers === true;
 }
 
 export const handle: Handler = (payload, { root, session }) => {

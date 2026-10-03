@@ -145,23 +145,32 @@ async function readWindow(file: string, encoding: string, offset: number, limit:
   return { ...(await collectWindow(file, LATIN1, offset, limit)), usedEncoding: "latin-1" };
 }
 
+async function readChecked(path: string, encoding: string, offset: number, limit: number) {
+  const checked = inspect(path, limit <= 0);
+  if (typeof checked === "string") return checked;
+  return { size: checked.size, ...(await readWindow(checked.file, encoding, offset, limit)) };
+}
+
 async function fileRead(args: Args): Promise<string> {
   const path = stringArg(args, "path");
   const offset = Math.max(0, integerArg(args, "offset", 0));
   const limit = integerArg(args, "limit", DEFAULT_LIMIT);
   const encoding = stringArg(args, "encoding", "utf-8");
 
-  const checked = inspect(path, limit <= 0);
-  if (typeof checked === "string") {
+  let read: Awaited<ReturnType<typeof readChecked>>;
+  try {
+    read = await readChecked(path, encoding, offset, limit);
+  } catch (error) {
     audit(path, false);
-    return checked;
+    throw error;
   }
-  const { window, total, usedEncoding } = await readWindow(checked.file, encoding, offset, limit);
-  audit(path, true);
+  audit(path, typeof read !== "string");
+  if (typeof read === "string") return read;
+  const { size, window, total, usedEncoding } = read;
   if (total === 0) return "(empty file)";
   if (offset >= total) return `(offset ${offset} exceeds file length of ${total} lines)`;
 
-  const footer = [`~${Math.floor(checked.size / 4)} tokens (${humanSize(checked.size)})`, `${total} lines total`];
+  const footer = [`~${Math.floor(size / 4)} tokens (${humanSize(size)})`, `${total} lines total`];
   if (usedEncoding !== encoding) footer.push(`encoding fallback: ${usedEncoding}`);
   if (limit > 0 && offset + limit < total) {
     const next = offset + limit;

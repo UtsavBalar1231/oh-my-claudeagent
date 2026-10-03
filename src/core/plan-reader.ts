@@ -1,8 +1,6 @@
 import { clean, FENCE, TASK_LINE } from "./checkboxes.ts";
 import { configDir, type Env, expandTilde, homeDir, isAbsolutePath, isInside, joinPath, normalizePath, type Platform, toPosix } from "./path.ts";
 
-export { clean } from "./checkboxes.ts";
-
 export type Task = { n: number; done: boolean };
 export type Page = { title: string; level: number; body: string; task?: Task };
 export type Plan = { title: string; pages: Page[]; done: number; total: number };

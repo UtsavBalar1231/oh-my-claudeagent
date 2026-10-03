@@ -182,6 +182,11 @@ describe("findings", () => {
     expect(judge("/r/a.py", "# FIXME @alice\nx = 1")).toBeUndefined();
   });
 
+  test("a word that holds todo or fixme, such as autodoc, is not a TODO", () => {
+    expect(judge("/r/a.py", "# autodoc generator\nx = 1")).toBeUndefined();
+    expect(judge("/r/a.py", "# prefixmeta lookup\nx = 1")).toBeUndefined();
+  });
+
   test("a TODO that explains itself in three words is not context-free", () => {
     expect(judge("/r/a.py", "# TODO: handle the retry\nx = 1")).toBeUndefined();
   });

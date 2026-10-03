@@ -1,16 +1,15 @@
-import type { AgentInfo, On, RenderElement, RenderSurface, StateRead, UiSelection } from "claude-code";
+import type { AgentInfo, On, RenderElement, RenderSurface, StateRead, TurnUsage, UiPane, UiSelection } from "claude-code";
 import { mock, type MockClock } from "claude-code/testing";
 import { joinPath, normalizePath, type Platform } from "../../src/core/path.ts";
-import { displayWidth } from "../../src/core/ui-kit.ts";
+import { displayWidth, formatWhen } from "../../src/core/ui-kit.ts";
 
 export const PLUGIN = "oh-my-claudeagent";
 export const ROOT = "/work";
-export const HOME = "/home/u";
+const HOME = "/home/u";
 export const SESSION = "s1";
-export const PLANS = `${HOME}/.claude/plans`;
 export const LEDGER = `${ROOT}/.omca/evidence/verification-evidence.json`;
 export const BOULDER = `${ROOT}/.omca/state/boulder.json`;
-export const OUTPUT_STYLE = "---\nname: OMCA Default\nkeep-coding-instructions: true\nforce-for-plugin: true\n---\n\n# oh-my-claudeagent\n";
+const OUTPUT_STYLE = "---\nname: OMCA Default\nkeep-coding-instructions: true\nforce-for-plugin: true\n---\n\n# oh-my-claudeagent\n";
 
 // Where the session runs: the platform's path shape and the environment that names its home.
 // `root` and `home` are spelled as the engine reports them; the other paths are normalized, the way the mod writes them.
@@ -44,14 +43,17 @@ export const LAYOUTS: readonly Layout[] = [POSIX, WINDOWS];
 
 export type World = {
   layout: Layout;
+  sessionId: string;
   spelled: (path: string) => string;
   files: Map<string, { text: string; mtimeMs: number }>;
   settings: Record<string, unknown>;
   agents: AgentInfo[];
+  panes: UiPane[];
   reads: string[];
   holds: Map<string, Promise<void>>;
   focused: string[];
   selection: UiSelection | undefined;
+  selectionReads: number;
   opened: unknown[];
   logs: string[];
   said: string[];
@@ -91,14 +93,17 @@ export function world(
   const key = (path: string) => normalizePath(layout.platform, spelled(path));
   const w: World = {
     layout,
+    sessionId: SESSION,
     spelled,
     files: new Map(Object.entries(files).map(([path, text], index) => [key(path), { text, mtimeMs: 1_000 + index }])),
     settings,
     agents: [],
+    panes: [],
     reads: [],
     holds: new Map(),
     focused: [],
     selection: undefined,
+    selectionReads: 0,
     opened: [],
     logs: [],
     said: [],
@@ -107,7 +112,7 @@ export function world(
   };
   mock.env(on, { ...layout.env, ...env });
   on("session.root", () => ({ value: layout.root }));
-  on("session.id", () => ({ value: SESSION }));
+  on("session.id", () => ({ value: w.sessionId }));
   on("settings.read", () => ({ value: w.settings }));
   on("agent.list", () => ({ value: w.agents }));
   on("fs.read", { path: /[\\/]output-styles[\\/]omca-default\.md$/ }, (_$, e) => {
@@ -153,9 +158,9 @@ export function world(
   on("ui.open", (_$, e) => (w.opened.push(e), { value: { isPlaced: true } }));
   on("ui.close", () => ({ value: undefined }));
   on("ui.log", (_$, e) => (w.logs.push(e.text), e.to === "debug" || w.said.push(e.text), { value: undefined }));
-  on("ui.panes", () => ({ value: [] }));
+  on("ui.panes", () => ({ value: w.panes }));
   on("ui.focus", (_$, e) => (w.focused.push(e.element ?? ""), {}));
-  on("ui.selection", () => ({ value: w.selection }));
+  on("ui.selection", () => ((w.selectionReads += 1), { value: w.selection }));
   return w;
 }
 
@@ -233,12 +238,52 @@ export function pane<S extends RenderSurface>(surface: S, size: Size = { columns
   } as const;
 }
 
-type Node = { type: string; props?: Record<string, unknown>; children?: unknown };
+export type Node = { type: string; props?: Record<string, unknown>; hover?: Record<string, unknown>; children?: unknown };
 
-const isNode = (value: unknown): value is Node => typeof value === "object" && value !== null && "type" in value;
+export const isNode = (value: unknown): value is Node => typeof value === "object" && value !== null && "type" in value;
 
-const childrenOf = (node: Node): unknown[] =>
+export const childrenOf = (node: Node): unknown[] =>
   Array.isArray(node.children) ? node.children : node.children === undefined ? [] : [node.children];
+
+/** The first element, the tree itself included, whose `key` prop is `key`. */
+export function nodeByKey(element: unknown, key: string): Node | undefined {
+  if (!isNode(element)) return undefined;
+  if (element.props?.["key"] === key) return element;
+  return childrenOf(element).reduce<Node | undefined>((found, child) => found ?? nodeByKey(child, key), undefined);
+}
+
+/** An element's text as its row reads: a Button `hotkey: label`, a Box's children joined by its column gap. */
+export function textOf(element: unknown): string {
+  if (typeof element === "string") return element;
+  if (!isNode(element)) return "";
+  if (element.type === "Button") return `${String(element.props?.["hotkey"])}: ${String(element.props?.["label"])}`;
+  const gap = " ".repeat(typeof element.props?.["columnGap"] === "number" ? element.props["columnGap"] : 0);
+  return childrenOf(element).map(textOf).join(gap);
+}
+
+// The rows a tree draws, a column Box such as a card spread into the rows it holds.
+export function spreadRows(tree: RenderElement): string[] {
+  const spread = (element: unknown): string[] =>
+    isNode(element) && element.type === "Box" && element.props?.["flexDirection"] === "column" ? childrenOf(element).flatMap(spread) : [textOf(element)];
+  return topRows(tree).flatMap(spread);
+}
+
+export const isAscii = (row: string): boolean => [...row].every((char) => char.charCodeAt(0) >= 32 && char.charCodeAt(0) < 127);
+
+export async function drain(stream: AsyncGenerator<unknown, unknown>): Promise<void> {
+  for (let next = await stream.next(); next.done !== true; next = await stream.next());
+}
+
+export const usage = (input: number, output: number, model = "claude-sonnet-5-5", cacheRead = 0, cacheWrite = 0): TurnUsage => ({
+  input_tokens: input,
+  output_tokens: output,
+  cache_read_input_tokens: cacheRead,
+  cache_creation_input_tokens: cacheWrite,
+  model,
+});
+
+/** `10-02 09:05`, a time as the tabs draw it in the local zone. */
+export const local = (iso: string): string => formatWhen(iso);
 
 // The cells one element takes across, as the terminal lays it out: Text its string children
 // (a wrapping Text its longest word, since it breaks between words),

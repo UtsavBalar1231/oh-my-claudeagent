@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { dispatch } from "./registry.ts";
-import { findSession, touchSession } from "./session-state.ts";
+import { findSession } from "./session-state.ts";
 
 const REPO = join(import.meta.dir, "..", "..");
 const TEMPLATE = readFileSync(join(REPO, "templates", "claudemd.md"), "utf8");
@@ -80,10 +80,9 @@ describe("compaction", () => {
 });
 
 describe("clear", () => {
-  test("SessionStart for clear answers nothing and hands the guidance back to the session's next prompt", async () => {
+  test("SessionStart for clear answers nothing, and the new session's first prompt gets the guidance", async () => {
     const root = project();
     const id = crypto.randomUUID();
-    touchSession(id).isGuided = true;
     expect(await start(id, "clear", root)).toEqual({});
     expect(await firstPrompt(id, root)).toEqual({
       hookSpecificOutput: { hookEventName: "UserPromptSubmit", additionalContext: `${TEMPLATE}\nSession ${id}` },
@@ -92,14 +91,12 @@ describe("clear", () => {
 });
 
 describe("kill switch", () => {
-  test("OMCA_DISABLED_HOOKS=session-start silences compact and leaves the guided flag alone on clear", async () => {
+  test("OMCA_DISABLED_HOOKS=session-start silences compact and clear, and still records the compaction", async () => {
     process.env.OMCA_DISABLED_HOOKS = "session-start";
     const root = project();
     const id = crypto.randomUUID();
     expect(await start(id, "compact", root)).toEqual({});
     expect(findSession(id)?.compactedAt).toBe(NOW);
-    touchSession(id).isGuided = true;
     expect(await start(id, "clear", root)).toEqual({});
-    expect(findSession(id)?.isGuided).toBe(true);
   });
 });

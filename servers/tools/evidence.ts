@@ -1,12 +1,11 @@
-import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { EVIDENCE_TYPES, type EvidenceType } from "../../src/core/evidence.ts";
 import { isRecord } from "../../src/core/tool-input.ts";
 import { latestSessionId, touchSession } from "../hooks/session-state.ts";
 import { ledgerPath, writeStatus } from "../hooks/status-file.ts";
-import { ensureStateDir, hasCode, withLock, writeFileAtomic } from "../io.ts";
+import { ensureStateDir, readOrNull, withLock, writeFileAtomic } from "../io.ts";
 import type { Tool } from "../omca.ts";
-import { isoTimestamp, rootOf, stringArg, stringReader, WORKING_DIRECTORY } from "./args.ts";
+import { argReader, isoTimestamp, rootOf, stringArg, WORKING_DIRECTORY } from "./args.ts";
 
 export const SNIPPET_MAX_CHARS = 2000;
 export const COMMAND_MAX_CHARS = 2000;
@@ -15,20 +14,11 @@ const SHA256_HEX = /^[0-9a-f]{64}$/;
 // A full read is many 2,000-character snippets; 100,000 holds about 50, well under the client's 500,000 ceiling.
 const EVIDENCE_MAX_RESULT_CHARS = 100_000;
 // The mod reads the ledger through $.fs.read, which fails past 4 MiB.
-export const ROTATE_BYTES = 1024 * 1024;
-export const ROTATE_ENTRIES = 1000;
+const ROTATE_BYTES = 1024 * 1024;
+const ROTATE_ENTRIES = 1000;
 export const KEEP_ENTRIES = 500;
 
 type Ledger = Record<string, unknown> & { entries: unknown[] };
-
-function readText(path: string): string | undefined {
-  try {
-    return readFileSync(path, "utf8");
-  } catch (error) {
-    if (hasCode(error, "ENOENT")) return undefined;
-    throw error;
-  }
-}
 
 // The ledger is an append-only audit trail, so a file that does not parse is refused rather than replaced.
 function parseLedger(path: string, text: string): Ledger {
@@ -45,8 +35,8 @@ function parseLedger(path: string, text: string): Ledger {
 }
 
 function readLedger(path: string): Ledger {
-  const text = readText(path);
-  return text === undefined ? { entries: [] } : parseLedger(path, text);
+  const text = readOrNull(path);
+  return text === null ? { entries: [] } : parseLedger(path, text);
 }
 
 const capped = (value: string, max: number): string => (value.length > max ? Array.from(value).slice(0, max).join("") : value);
@@ -64,7 +54,7 @@ function updateStatus(root: string): void {
 }
 
 async function evidenceLog(args: Record<string, unknown>): Promise<string> {
-  const arg = stringReader(args, "evidence_log");
+  const arg = argReader(args, "evidence_log").string;
   const type = arg("evidence_type");
   if (!(EVIDENCE_TYPES as readonly string[]).includes(type)) {
     throw new Error(`evidence_log: evidence_type must be one of ${EVIDENCE_TYPES.join(", ")}`);
@@ -100,14 +90,8 @@ async function evidenceLog(args: Record<string, unknown>): Promise<string> {
 }
 
 function evidenceRead(args: Record<string, unknown>): string {
-  const path = ledgerPath(rootOf(stringArg(args, "working_directory", "", "evidence_read")));
-  let entries: unknown;
-  try {
-    entries = JSON.parse(readText(path) ?? "{}").entries;
-  } catch {
-    entries = undefined;
-  }
-  if (!Array.isArray(entries) || entries.length === 0) return "No verification evidence recorded.";
+  const { entries } = readLedger(ledgerPath(rootOf(stringArg(args, "working_directory", "", "evidence_read"))));
+  if (entries.length === 0) return "No verification evidence recorded.";
   return JSON.stringify({ entries }, null, 2);
 }
 
@@ -117,8 +101,8 @@ const archiveMonth = (now: Date): string => `${now.getUTCFullYear()}${String(now
 export async function rotateLedger(root: string, now = new Date()): Promise<number> {
   const path = ledgerPath(root);
   return withLock(`${path}.lock`, () => {
-    const text = readText(path);
-    if (text === undefined) return 0;
+    const text = readOrNull(path);
+    if (text === null) return 0;
     const ledger = parseLedger(path, text);
     if (Buffer.byteLength(text) <= ROTATE_BYTES && ledger.entries.length <= ROTATE_ENTRIES) return 0;
     const moved = ledger.entries.slice(0, -KEEP_ENTRIES);

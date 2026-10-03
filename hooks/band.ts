@@ -1,18 +1,15 @@
 import type { RenderElement } from "claude-code";
-import { type Band, bandView, BUTTON_GAP, oneLine, planTally, type Proof, type Span, type Tone } from "../src/core/band-model.ts";
-import { resolveBoundPlan } from "../src/core/boulder.ts";
+import { type Band, bandView, BUTTON_GAP, planTally, type Proof, type Span, type Tone } from "../src/core/band-model.ts";
 import { allTasksDone } from "../src/core/checkboxes.ts";
 import { ledgerCoversSlot, sha256Hex } from "../src/core/evidence.ts";
 import { hasPassingFinalVerification, type NextAction, nextActions } from "../src/core/next-actions.ts";
 import { BOULDER, LEDGER, statusPath, verificationOf } from "../src/core/omca-paths.ts";
-import { isAbsolutePath, joinPath } from "../src/core/path.ts";
 import { boardOf, parsePlan } from "../src/core/plan-reader.ts";
-import { parseRuns, proofOf, proofSummary } from "../src/core/proof.ts";
-import { isAsciiRequested } from "../src/core/ui-kit.ts";
+import { proofSummary } from "../src/core/proof.ts";
+import { oneLine } from "../src/core/ui-kit.ts";
 import { TONE_KEYS } from "../src/core/visual.ts";
 import type { Features } from "./dispatch.ts";
-import { type Host, reason } from "./host.ts";
-import { sessionOf } from "./pane.ts";
+import { boundPlanOf, type Host, ledgerWrittenAt, proofFacts, reason, sessionOf, verdictFor } from "./host.ts";
 import { type Kit, kitOf, type TextStyle } from "./ui.ts";
 
 type Snapshot = { band: Band; hasFinalVerification: boolean };
@@ -44,15 +41,9 @@ async function readSnapshot(host: Host): Promise<Snapshot> {
     }
   }
 
-  const bound = await attempt(BOULDER, async () => {
-    const plan = resolveBoundPlan(await readJson(host, `${root}/${BOULDER}`), sessionId, true);
-    return "plan_name" in plan ? plan : null;
-  });
-  const planText = bound === null ? null : await attempt(bound.active_plan, () => host.fs.read(bound.active_plan));
-  const plan =
-    bound === null || planText === null
-      ? null
-      : { name: bound.plan_name, path: bound.active_plan, ...planTally(planText) };
+  const bound = await attempt(BOULDER, async () => (await boundPlanOf(host)) ?? null);
+  const planText = bound === null ? null : await attempt(bound.path, () => host.fs.read(bound.path));
+  const plan = bound === null || planText === null ? null : { ...bound, ...planTally(planText) };
 
   const statusFile = statusPath(root, sessionId);
   const verification =
@@ -61,10 +52,7 @@ async function readSnapshot(host: Host): Promise<Snapshot> {
       : await attempt(`the session status file`, async () => {
           const slot = verificationOf(await readJson(host, statusFile));
           if (slot === null) return null;
-          const ledgerMtimeSeconds = (await host.fs.exists(ledgerPath))
-            ? Math.floor((await host.fs.stat(ledgerPath)).mtimeMs / 1000)
-            : 0;
-          return { ...slot, isLogged: ledgerCoversSlot(ledgerMtimeSeconds, slot.at) };
+          return { ...slot, isLogged: ledgerCoversSlot(await ledgerWrittenAt(host, root), slot.at) };
         });
 
   const hasFinalVerification =
@@ -75,35 +63,20 @@ async function readSnapshot(host: Host): Promise<Snapshot> {
       hasPassingFinalVerification(await readJson(host, ledgerPath), sha256Hex(planText)),
     )) === true;
 
-  const proof = planText === null ? null : await attempt(LEDGER, () => proofOfPlan(host, root, planText, ledgerPath));
+  const proof = planText === null ? null : await attempt(LEDGER, () => proofOfPlan(host, planText));
   const band: Band = { plan, verification, ...(proof === null ? {} : { proof }), error: errors[0] ?? null, readAt };
   return { band, hasFinalVerification };
 }
 
 // The plan board's counts: each task's verdict is the newest test, build or lint run since its
 // listed files last changed. Null when no task lists a file that exists.
-async function proofOfPlan(host: Host, root: string, planText: string, ledgerPath: string): Promise<Proof | null> {
-  const { platform } = await sessionOf(host);
+async function proofOfPlan(host: Host, planText: string): Promise<Proof | null> {
   const { cards } = boardOf(parsePlan(planText));
-  const paths = [...new Set(cards.flatMap((card) => card.files))];
-  const stamps = new Map(
-    await Promise.all(
-      paths.map(async (path): Promise<[string, number | null]> => {
-        const full = isAbsolutePath(platform, path) ? path : joinPath(platform, root, path);
-        const at = await host.fs.stat(full).then(
-          (stat) => (stat.kind === "file" ? stat.mtimeMs : null),
-          () => null,
-        );
-        return [path, at];
-      }),
-    ),
-  );
-  const runs = (await host.fs.exists(ledgerPath)) ? parseRuns(await host.fs.read(ledgerPath)) : [];
-  const changesOf = (files: readonly string[]) => files.flatMap((file) => stamps.get(file) ?? []);
-  const counts = proofSummary(cards.map((card) => proofOf(changesOf(card.files), runs)?.proof));
+  const facts = await proofFacts(host, cards.flatMap((card) => card.files));
+  if (facts.ledgerError !== null) throw new Error(facts.ledgerError);
+  const counts = proofSummary(cards.map((card) => verdictFor(facts, card.files)?.proof));
   return counts.proven + counts.unproven + counts.failed === 0 ? null : counts;
 }
-
 
 async function actionsFor(host: Host, { band, hasFinalVerification }: Snapshot): Promise<NextAction[]> {
   const agents = (await host.state.agents.get()).value ?? {};
@@ -131,7 +104,7 @@ async function writeActions(host: Host, actions: readonly NextAction[]): Promise
 const TONES: Record<Tone, TextStyle> = {
   title: { bold: true },
   plain: {},
-  muted: { dimColor: true },
+  muted: { color: TONE_KEYS.muted },
   ok: { color: TONE_KEYS.ok },
   warn: { color: TONE_KEYS.warn },
   fail: { color: TONE_KEYS.fail },
@@ -144,7 +117,7 @@ const row = ({ Text }: Kit, spans: readonly Span[]): RenderElement =>
 export const band: Features = {
   "session.start": {
     post: async (host) => {
-      isAscii = isAsciiRequested(await host.env.OMCA_ASCII());
+      isAscii = (await sessionOf(host)).isAscii;
       shownActions = ((await host.state.nextActions.get()).value ?? []).length;
       await writeBand(host, (await readSnapshot(host)).band);
       return undefined;

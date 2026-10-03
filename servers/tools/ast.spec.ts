@@ -417,6 +417,12 @@ describe("ast_search", () => {
     );
   });
 
+  test("ast_search with a nonzero exit and nothing on stderr is an error, not a zero-match result", async () => {
+    project();
+    fakeBinary([{ exit: 2 }]);
+    expect(await failure(call("ast_search", { pattern: "$X", lang: "python" }))).toBe("ast-grep exited 2 with no message");
+  });
+
   test("ast_search hard parse error raises", async () => {
     project();
     fakeBinary([{ exit: 8, stderr: "Error: Cannot parse query as a valid pattern.\nHelp: fix the pattern.\n" }]);
@@ -444,6 +450,19 @@ describe("ast_search", () => {
     expect(extensionMismatch(["."], "cpp")).toBeUndefined();
     expect(extensionMismatch(["x.c"], "c")).toBeUndefined();
     expect(extensionMismatch(["x.c"], "cpp")).toBe(CPP_ON_C_FILE);
+  });
+
+  test.each([
+    ["x.hh", "cpp"],
+    ["x.c++", "cpp"],
+    ["x.cu", "cpp"],
+    ["x.kts", "kotlin"],
+    ["x.ktm", "kotlin"],
+    ["x.py3", "python"],
+    ["x.bats", "bash"],
+  ])("extension_mismatch accepts %p for %p, an extension ast-grep scans for that language", (file, lang) => {
+    project({ [file]: "x\n" });
+    expect(extensionMismatch([file], lang)).toBeUndefined();
   });
 
   test("ast_search rejects unsafe paths", async () => {
@@ -478,6 +497,15 @@ describe("ast_search", () => {
     expect(await failure(call("ast_search", { pattern: "$X", lang: "python", paths: [join(alias, "missing")] }))).toBe(
       `Path escapes workspace: ${join(alias, "missing")}`,
     );
+  });
+
+  test("a project directory inside a repository resolves to the repository's top level, as the server's own root does", async () => {
+    const top = project({ "sub/keep": "", "other/a.py": "x = 1\n" });
+    expect(Bun.spawnSync(["git", "init", "-q", top], { env: process.env }).exitCode).toBe(0);
+    process.env.CLAUDE_PROJECT_DIR = join(top, "sub");
+    const fake = fakeBinary([{ stdout: "[]" }]);
+    await call("ast_search", { pattern: "$X", lang: "python", paths: [join(top, "other")] });
+    expect(fake.argv(1).slice(-2)).toEqual(["--", "other"]);
   });
 
   test("ast_search accepts sibling git worktree", async () => {
@@ -550,12 +578,14 @@ describe("ast_search", () => {
     );
   });
 
-  test("ast_search json output returns the matches as JSON", async () => {
+  test("ast_search json output returns the matches as JSON and says when it cut them", async () => {
     project();
     const hit = match("main.py", 0, "print('hello')");
-    fakeBinary([{ stdout: JSON.stringify([hit, hit]) }]);
-    const result = await call("ast_search", { pattern: "$X", lang: "python", output_format: "json", max_results: 1 });
-    expect(JSON.parse(result)).toEqual([hit]);
+    fakeBinary([{ stdout: JSON.stringify([hit, hit]) }, { stdout: JSON.stringify([hit, hit]) }]);
+    const search = async (maxResults: number) =>
+      JSON.parse(await call("ast_search", { pattern: "$X", lang: "python", output_format: "json", max_results: maxResults }));
+    expect(await search(1)).toEqual({ truncated: true, matches: [hit] });
+    expect(await search(2)).toEqual({ truncated: false, matches: [hit, hit] });
   });
 
   test("ast_search json parse errors are tool errors", async () => {

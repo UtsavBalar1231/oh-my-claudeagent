@@ -1,12 +1,12 @@
 import type { RenderElement } from "claude-code";
-import { resolveBoundPlan } from "../../src/core/boulder.ts";
 import { matches, NOTEPAD_SECTIONS, type NotepadSection, parseEntries } from "../../src/core/notepad.ts";
 import { BOULDER } from "../../src/core/omca-paths.ts";
-import { chunks, clean } from "../../src/core/plan-reader.ts";
+import { clean } from "../../src/core/checkboxes.ts";
+import { chunks } from "../../src/core/plan-reader.ts";
 import { displayWidth, fitEnd, formatWhen } from "../../src/core/ui-kit.ts";
 import { chip, fitPieces, type Piece, redact, type Tone, TONE_KEYS } from "../../src/core/visual.ts";
-import { type Host, reason, type State } from "../host.ts";
-import { keyButton, noticeRow, PANE, patchPane, type TabView, type View } from "../pane.ts";
+import { boundPlanOf, type Host, reason, type State } from "../host.ts";
+import { keyButton, noticeRow, patchPane, refocus, type TabView, type View } from "../pane.ts";
 import { Card, Field, Line, Rule } from "../ui.ts";
 
 type Notepad = NonNullable<State["pane"]["notepad"]>;
@@ -44,8 +44,7 @@ async function boundPlan(host: Host, root: string): Promise<{ name: string | und
   const path = `${root}/${BOULDER}`;
   if (!(await host.fs.exists(path))) return { name: undefined, seen: "" };
   const { mtimeMs } = await host.fs.stat(path);
-  const bound = resolveBoundPlan(JSON.parse(await host.fs.read(path)), await host.session.id(), true);
-  return { name: "plan_name" in bound ? bound.plan_name : undefined, seen: `${mtimeMs}` };
+  return { name: (await boundPlanOf(host))?.name, seen: `${mtimeMs}` };
 }
 
 // The bound plan first, then the most recently written.
@@ -68,7 +67,11 @@ export async function read(
     const bound = await boundPlan(host, root);
     const plans = await notepadPlans(host, root, bound.name);
     const shown = plans.find((plan) => plan.name === chosen) ?? plans[0];
-    if (shown === undefined) return signature === "none" ? undefined : ((signature = "none"), { notepad: null, error: null });
+    if (shown === undefined) {
+      if (signature === "none") return undefined;
+      signature = "none";
+      return { notepad: null, error: null };
+    }
     const dir = `${root}/${NOTEPADS}/${shown.name}`;
     const files = (await host.fs.exists(dir)) ? await host.fs.list(dir) : [];
     const present = NOTEPAD_SECTIONS.flatMap((name) => {
@@ -113,18 +116,6 @@ async function choose(host: Host, name: string): Promise<void> {
     await patchPane(host, (pane) => ({ ...pane, notepad: pad.notepad, errors: { ...pane.errors, notepad: pad.error } }));
   }
   host.ui.invalidate();
-}
-
-function focusSoon(host: Host, key: string): void {
-  host.clock.after(0, async () => {
-    try {
-      host.ui.invalidate();
-      const { deny } = await host.ui.focus({ requestId: PANE, key });
-      if (deny !== undefined) host.log(`omca notepad could not focus ${key}: ${deny}`);
-    } catch (error) {
-      host.log(`omca notepad could not focus ${key}: ${reason(error)}`);
-    }
-  });
 }
 
 const heading = (name: NotepadSection) => `${name.charAt(0).toUpperCase()}${name.slice(1)}`;
@@ -182,7 +173,7 @@ function keys(host: Host, notepad: Notepad, view: View, canFind: boolean): Rende
   const find = () => {
     isSearching = true;
     host.ui.invalidate();
-    focusSoon(host, FIND);
+    refocus(host, FIND, "notepad");
   };
   const clear = () => {
     query = "";
@@ -192,11 +183,11 @@ function keys(host: Host, notepad: Notepad, view: View, canFind: boolean): Rende
   const pick = () => {
     isPicking = true;
     host.ui.invalidate();
-    focusSoon(host, `${PICK}${notepad.planName}`);
+    refocus(host, `${PICK}${notepad.planName}`, "notepad");
   };
   const buttons = [
     ...(canFind ? [keyButton(view, "f", "Find", find)] : []),
-    ...(query === "" ? [] : [keyButton(view, "x", "Clear", clear)]),
+    ...(query === "" ? [] : [keyButton(view, "w", "Clear", clear)]),
     ...(notepad.plans.length > 1 ? [keyButton(view, "l", `Plans (${notepad.plans.length})`, pick)] : []),
   ];
   return view.kit.Box({ key: "notepad-keys", flexDirection: "row", columnGap: KEY_GAP, children: buttons });
@@ -238,7 +229,7 @@ function picker(host: Host, notepad: Notepad, view: View): RenderElement[] {
             key: `${PICK}${name}`,
             label: fitEnd(name, Math.max(1, room), view.g.ellipsis),
             plain: true,
-            ...(isShown ? { autoFocus: true as const } : {}),
+            ...(isShown ? { autoFocus: true } : {}),
             onPress: view.press(() => choose(host, name)),
           }),
           ...(mark === undefined ? [] : [Text({ children: [" "] }), Line(view.kit, [mark])]),

@@ -2,18 +2,18 @@ import { describe, expect, test } from "bun:test";
 import {
   aggregate,
   isEvidenceLogged,
-  type LedgerRecord,
+  type MetricsRecord,
   median,
   outcomeOf,
   parseRecord,
   parseRecords,
   recordPath,
-} from "./ledger.ts";
+} from "./metrics.ts";
 
 const START = Date.parse("2026-10-02T12:00:00.000Z");
 const END = Date.parse("2026-10-02T12:05:00.000Z");
 
-function record(fields: Partial<LedgerRecord> = {}): LedgerRecord {
+function record(fields: Partial<MetricsRecord> = {}): MetricsRecord {
   return {
     session_id: "s1",
     agent_id: "a-1",
@@ -32,7 +32,8 @@ function record(fields: Partial<LedgerRecord> = {}): LedgerRecord {
   };
 }
 
-const ledger = (...timestamps: unknown[]) => JSON.stringify({ entries: timestamps.map((timestamp) => ({ type: "test", timestamp })) });
+const ledger = (...timestamps: unknown[]) =>
+  JSON.stringify({ entries: timestamps.map((timestamp) => ({ type: "test", command: "just test", exit_code: 0, timestamp })) });
 
 describe("outcomeOf", () => {
   test.each([
@@ -62,9 +63,14 @@ describe("isEvidenceLogged", () => {
     expect(isEvidenceLogged(ledger("yesterday", "2026-10-02T12:01:00Z"), START, END)).toBe(true);
   });
 
+  test("an entry the evidence parser cannot read never counts, even inside the window", () => {
+    const text = JSON.stringify({ entries: [{ type: "deploy", command: "x", exit_code: 0, timestamp: "2026-10-02T12:01:00Z" }] });
+    expect(isEvidenceLogged(text, START, END)).toBe(false);
+  });
+
   test("an empty ledger is no evidence, and a ledger without an entries list throws", () => {
     expect(isEvidenceLogged(ledger(), START, END)).toBe(false);
-    expect(() => isEvidenceLogged("{}", START, END)).toThrow("the evidence ledger holds no entries list");
+    expect(() => isEvidenceLogged("{}", START, END)).toThrow("it holds no entries list");
     expect(() => isEvidenceLogged("{", START, END)).toThrow();
   });
 });
@@ -103,7 +109,7 @@ describe("parseRecord", () => {
     ["not JSON", "{"],
     ["an array", "[]"],
     ["null", "null"],
-    ["an unknown outcome", JSON.stringify(record({ outcome: "done" as LedgerRecord["outcome"] }))],
+    ["an unknown outcome", JSON.stringify(record({ outcome: "done" as MetricsRecord["outcome"] }))],
     ["a missing agent type", JSON.stringify({ ...record(), agent_type: undefined })],
     ["negative tokens", JSON.stringify(record({ input_tokens: -1 }))],
     ["a fractional duration", JSON.stringify(record({ duration_ms: 1.5 }))],
@@ -170,14 +176,19 @@ describe("aggregate", () => {
   });
 
   test("groups a long run of one agent type in linear time", () => {
-    const records = Array.from({ length: 60_000 }, (_, i) => record({ agent_id: `a${i}` }));
-    const times = [0, 1, 2].map(() => {
-      const start = performance.now();
-      aggregate(records);
-      return performance.now() - start;
-    });
-    expect(Math.min(...times)).toBeLessThan(500);
-    expect(aggregate(records)[0]?.count).toBe(60_000);
+    const fastest = (count: number): number => {
+      const records = Array.from({ length: count }, (_, i) => record({ agent_id: `a${i}` }));
+      const times = [0, 1, 2, 3, 4].map(() => {
+        const start = performance.now();
+        aggregate(records);
+        return performance.now() - start;
+      });
+      return Math.min(...times);
+    };
+    const small = fastest(15_000);
+    const large = fastest(60_000);
+    expect(large / Math.max(small, 0.5)).toBeLessThan(8);
+    expect(aggregate(Array.from({ length: 60_000 }, (_, i) => record({ agent_id: `a${i}` })))[0]?.count).toBe(60_000);
   });
 
   test("sums costs without float drift: ten runs at $0.1 total exactly $1", () => {

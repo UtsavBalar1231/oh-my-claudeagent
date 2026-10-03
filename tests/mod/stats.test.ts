@@ -1,15 +1,33 @@
 import type { RenderElement } from "claude-code";
 import { type Engine, expect, test } from "claude-code/testing";
-import type { LedgerRecord } from "../../src/core/ledger.ts";
-import { bodyColumns, pane, resettableState, ROOT, rows, run, type Size, topRows, world } from "./world.ts";
+import type { MetricsRecord } from "../../src/core/metrics.ts";
+import { usableColumns } from "../../src/core/ui-kit.ts";
+import {
+  bodyColumns,
+  cellsAcross,
+  childrenOf,
+  isAscii,
+  isNode,
+  nodeByKey,
+  pane,
+  resettableState,
+  ROOT,
+  rows,
+  run,
+  type Size,
+  SIZES,
+  spreadRows,
+  topRows,
+  world,
+  write,
+} from "./world.ts";
 
 const METRICS = `${ROOT}/.omca/metrics`;
-const S1 = "11111111-1111-4111-8111-111111111111";
 const DOCK_200: Size = { columns: 200, rows: 50, placement: "dock" };
 
-const record = (agentId: string, fields: Partial<LedgerRecord>): string =>
+const record = (sessionId: string, agentId: string, fields: Partial<MetricsRecord>): string =>
   JSON.stringify({
-    session_id: S1,
+    session_id: sessionId,
     agent_id: agentId,
     agent_type: "oh-my-claudeagent:executor",
     model: "claude-sonnet-5-5",
@@ -23,16 +41,30 @@ const record = (agentId: string, fields: Partial<LedgerRecord>): string =>
     outcome: "completed",
     evidence_logged: true,
     ...fields,
-  } satisfies LedgerRecord);
+  } satisfies MetricsRecord);
 
-const ORACLE = { agent_type: "oh-my-claudeagent:oracle", model: "gateway-reasoner", estimated_cost_usd: null } as const;
+const S1 = "11111111-1111-4111-8111-111111111111";
+const S2 = "22222222-2222-4222-8222-222222222222";
 const EXPLORE = { agent_type: "oh-my-claudeagent:explore", model: "claude-haiku-4-5", evidence_logged: false } as const;
+const ORACLE = { agent_type: "oh-my-claudeagent:oracle", model: "gateway-reasoner", estimated_cost_usd: null } as const;
+
+const FIXTURE = {
+  [`${METRICS}/${S1}/a-e1.json`]: record(S1, "a-e1", { duration_ms: 60_000 }),
+  [`${METRICS}/${S1}/a-e2.json`]: record(S1, "a-e2", { duration_ms: 240_000, input_tokens: 900_000, output_tokens: 90_000, estimated_cost_usd: 2.7 }),
+  [`${METRICS}/${S1}/a-x1.json`]: record(S1, "a-x1", { ...EXPLORE, duration_ms: 20_000, input_tokens: 8_000, output_tokens: 1_000, estimated_cost_usd: 0.013 }),
+  [`${METRICS}/${S1}/a-o1.json`]: record(S1, "a-o1", { ...ORACLE, duration_ms: 400_000, input_tokens: 120_000, output_tokens: 9_000 }),
+  [`${METRICS}/${S1}/broken.json`]: '{"session_id": "',
+  [`${METRICS}/${S2}/a-e3.json`]: record(S2, "a-e3", { outcome: "aborted", duration_ms: 90_000, input_tokens: 5_000, output_tokens: 500, estimated_cost_usd: 0.015, evidence_logged: false }),
+  [`${METRICS}/${S2}/a-x2.json`]: record(S2, "a-x2", { ...EXPLORE, outcome: "empty", model: "gateway-small", duration_ms: 10_000, input_tokens: 3_000, output_tokens: 0, estimated_cost_usd: null }),
+  [`${METRICS}/${S2}/a-x3.json`]: record(S2, "a-x3", { ...EXPLORE, outcome: "running", ended_at: null, duration_ms: null, input_tokens: 0, output_tokens: 0, estimated_cost_usd: null, evidence_logged: null }),
+  [`${METRICS}/${S2}/notes.txt`]: "not a record",
+};
 
 const FILES = {
-  [`${METRICS}/${S1}/a-1.json`]: record("a-1", { started_at: "2026-10-01T09:00:00.000Z" }),
-  [`${METRICS}/${S1}/a-2.json`]: record("a-2", { started_at: "2026-10-01T09:10:00.000Z", input_tokens: 400_000, output_tokens: 20_000, estimated_cost_usd: 1.2 }),
-  [`${METRICS}/${S1}/a-3.json`]: record("a-3", { ...EXPLORE, started_at: "2026-10-01T09:05:00.000Z", input_tokens: 9_000, output_tokens: 1_000, estimated_cost_usd: 0.014 }),
-  [`${METRICS}/${S1}/a-4.json`]: record("a-4", { ...ORACLE, started_at: "2026-10-01T09:20:00.000Z", input_tokens: 200_000, output_tokens: 10_000, outcome: "aborted" }),
+  [`${METRICS}/${S1}/a-1.json`]: record(S1, "a-1", { started_at: "2026-10-01T09:00:00.000Z" }),
+  [`${METRICS}/${S1}/a-2.json`]: record(S1, "a-2", { started_at: "2026-10-01T09:10:00.000Z", input_tokens: 400_000, output_tokens: 20_000, estimated_cost_usd: 1.2 }),
+  [`${METRICS}/${S1}/a-3.json`]: record(S1, "a-3", { ...EXPLORE, started_at: "2026-10-01T09:05:00.000Z", input_tokens: 9_000, output_tokens: 1_000, estimated_cost_usd: 0.014 }),
+  [`${METRICS}/${S1}/a-4.json`]: record(S1, "a-4", { ...ORACLE, started_at: "2026-10-01T09:20:00.000Z", input_tokens: 200_000, output_tokens: 10_000, outcome: "aborted" }),
 };
 
 const GREEN = "green_FOR_SUBAGENTS_ONLY";
@@ -54,16 +86,6 @@ const card = (key: string, border: string, width: number, title: string, ...chil
   children: [text({ bold: true, color: "text", wrap: "truncate-end" }, title), ...children],
 });
 
-type Node = { type: string; props?: Record<string, unknown>; children?: unknown };
-const isNode = (value: unknown): value is Node => typeof value === "object" && value !== null && "type" in value;
-const childrenOf = (node: Node): unknown[] => (Array.isArray(node.children) ? node.children : node.children === undefined ? [] : [node.children]);
-
-function node(element: unknown, key: string): Node | undefined {
-  if (!isNode(element)) return undefined;
-  if (element.props?.["key"] === key) return element;
-  return childrenOf(element).reduce<Node | undefined>((found, child) => found ?? node(child, key), undefined);
-}
-
 async function statsTab($: Engine, size: Size = DOCK_200): Promise<RenderElement> {
   await $.command.run(run("stats", size.columns));
   const ui = await $.ui.mount(pane("terminal", size));
@@ -72,9 +94,9 @@ async function statsTab($: Engine, size: Size = DOCK_200): Promise<RenderElement
   return tree;
 }
 
-test("the agents card draws each agent in its roster color with a bar of its runs, evidence in its tone and outcomes by glyph", async ($, on) => {
+test("the agents card draws each agent in its roster color with a bar of its runs, and evidence and outcomes with their glyphs in tone", async ($, on) => {
   world(on, FILES);
-  const agents = node(await statsTab($), "stats-agents");
+  const agents = nodeByKey(await statsTab($), "stats-agents");
   const gap = lit({}, "  ");
 
   expect(childrenOf(agents ?? { type: "" })).toEqual([
@@ -95,11 +117,15 @@ test("the agents card draws each agent in its roster color with a bar of its run
       gap,
       lit({}, "    $1.34"),
       gap,
-      lit({ color: "success" }, "    100%"),
+      lit({ color: "success" }, "  ✓"),
+      lit({}, " 100%"),
       gap,
-      lit({ color: "success" }, "✓2  "),
-      lit({ color: "inactive" }, "✗0  "),
-      lit({ color: "inactive" }, "!0  "),
+      lit({ color: "success" }, "✓"),
+      lit({}, "2  "),
+      lit({ color: "inactive" }, "✗"),
+      lit({ color: "inactive" }, "0  "),
+      lit({ color: "inactive" }, "!"),
+      lit({ color: "inactive" }, "0  "),
     ),
     row(
       "stats-oh-my-claudeagent:explore",
@@ -117,11 +143,15 @@ test("the agents card draws each agent in its roster color with a bar of its run
       gap,
       lit({}, "    $0.01"),
       gap,
-      lit({ color: "error" }, "      0%"),
+      lit({ color: "error" }, "    ✗"),
+      lit({}, " 0%"),
       gap,
-      lit({ color: "success" }, "✓1  "),
-      lit({ color: "inactive" }, "✗0  "),
-      lit({ color: "inactive" }, "!0  "),
+      lit({ color: "success" }, "✓"),
+      lit({}, "1  "),
+      lit({ color: "inactive" }, "✗"),
+      lit({ color: "inactive" }, "0  "),
+      lit({ color: "inactive" }, "!"),
+      lit({ color: "inactive" }, "0  "),
     ),
     row(
       "stats-oh-my-claudeagent:oracle",
@@ -139,18 +169,22 @@ test("the agents card draws each agent in its roster color with a bar of its run
       gap,
       lit({ color: "inactive" }, "      n/a"),
       gap,
-      lit({ color: "success" }, "    100%"),
+      lit({ color: "success" }, "  ✓"),
+      lit({}, " 100%"),
       gap,
-      lit({ color: "inactive" }, "✓0  "),
-      lit({ color: "error" }, "✗1  "),
-      lit({ color: "inactive" }, "!0  "),
+      lit({ color: "inactive" }, "✓"),
+      lit({ color: "inactive" }, "0  "),
+      lit({ color: "error" }, "✗"),
+      lit({}, "1  "),
+      lit({ color: "inactive" }, "!"),
+      lit({ color: "inactive" }, "0  "),
     ),
   ]);
 });
 
 test("the tokens card draws one cell per finished turn, oldest first, in its agent's color, and the peak", async ($, on) => {
-  world(on, { ...FILES, [`${METRICS}/${S1}/a-5.json`]: record("a-5", { outcome: "running", ended_at: null, duration_ms: null, estimated_cost_usd: null, evidence_logged: null }) });
-  const tokens = node(await statsTab($), "stats-tokens");
+  world(on, { ...FILES, [`${METRICS}/${S1}/a-5.json`]: record(S1, "a-5", { outcome: "running", ended_at: null, duration_ms: null, estimated_cost_usd: null, evidence_logged: null }) });
+  const tokens = nodeByKey(await statsTab($), "stats-tokens");
 
   expect(tokens).toEqual(
     card(
@@ -171,7 +205,7 @@ test("the tokens card draws one cell per finished turn, oldest first, in its age
 
 test("the cost card totals the priced runs, splits its meter by agent with the costliest first, and names what it leaves out", async ($, on) => {
   world(on, FILES);
-  const cost = node(await statsTab($), "stats-cost");
+  const cost = nodeByKey(await statsTab($), "stats-cost");
 
   expect(cost).toEqual(
     card(
@@ -188,7 +222,7 @@ test("the cost card totals the priced runs, splits its meter by agent with the c
 
 test("with no priced run the cost card says so in the warn tone and shows no figure", async ($, on) => {
   world(on, { [`${METRICS}/${S1}/a-4.json`]: FILES[`${METRICS}/${S1}/a-4.json`] ?? "" });
-  const cost = node(await statsTab($), "stats-cost");
+  const cost = nodeByKey(await statsTab($), "stats-cost");
 
   expect(cost).toEqual(
     card("stats-cost", "warning", 85, "Estimated cost", text({ dimColor: true, wrap: "wrap" }, "No finished run has a listed price, so no cost is shown")),
@@ -198,7 +232,7 @@ test("with no priced run the cost card says so in the warn tone and shows no fig
 test("at the split tier the tokens and cost cards sit side by side at half the body each", async ($, on) => {
   world(on, FILES);
   const split: Size = { columns: 200, rows: 50, placement: "inline" };
-  const lower = node(await statsTab($, split), "stats-lower");
+  const lower = nodeByKey(await statsTab($, split), "stats-lower");
   const half = Math.floor((bodyColumns(split) - 3 - 1) / 2);
 
   expect(lower?.props).toEqual({ key: "stats-lower", flexDirection: "row", columnGap: 1, width: half * 2 + 1 });
@@ -208,20 +242,21 @@ test("at the split tier the tokens and cost cards sit side by side at half the b
   ]);
 });
 
-test("after the stats atom resets the tab says it is reading, and r is its only key", async ($, on) => {
+test("a drawn table's only key is r, and after the stats atom resets the tab says it is reading, with no key", async ($, on) => {
   const atoms = resettableState(on);
   world(on, FILES);
   await $.command.run(run(""));
   const ui = await $.ui.mount(pane("terminal", DOCK_200));
   await ui.press({ key: "6" });
   await ui.redraw();
-  const keys = (await ui.findAll({ type: "Button" })).flatMap((found) => (/^\d$/.test(String(found.props["hotkey"])) ? [] : [found.props["hotkey"]]));
-  expect(keys).toEqual(["r"]);
+  const keys = async () => (await ui.findAll({ type: "Button" })).flatMap((found) => (/^\d$/.test(String(found.props["hotkey"])) ? [] : [found.props["hotkey"]]));
+  expect(await keys()).toEqual(["r"]);
 
   atoms.reset("stats");
   await ui.redraw();
   expect(topRows(await ui.drawn()).slice(2)).toEqual([text({ color: "inactive", dimColor: true }, "Reading the delegation records…")]);
   expect(rows(await ui.drawn())).toHaveLength(3);
+  expect(await keys()).toEqual([]);
   await ui.unmount();
 });
 
@@ -234,7 +269,7 @@ test("a table taller than its window draws a more-below cue over the window's la
   const ui = (offset: number) => $.ui.mount({ ...mount, props: { ...mount.props, scroll: { offset, bodyRows: 16 } } });
   const cueAt = async (offset: number) => {
     const drawn = await ui(offset);
-    const cue = node(await drawn.drawn(), "more-cue");
+    const cue = nodeByKey(await drawn.drawn(), "more-cue");
     await drawn.unmount();
     return cue;
   };
@@ -248,6 +283,119 @@ test("a table taller than its window draws a more-below cue over the window's la
   const drawn = await ui(0);
   await $.ui.scroll({ component: "Pane", requestId: "omca", offset: 0, by: 1, bodyRows: 16, contentRows: 16, origin: { kind: "person" } });
   await drawn.redraw();
-  expect(node(await drawn.drawn(), "more-cue")).toBeUndefined();
+  expect(nodeByKey(await drawn.drawn(), "more-cue")).toBeUndefined();
   await drawn.unmount();
+});
+
+const SURFACES = ["terminal", "desktop"] as const;
+
+test("the Stats tab aggregates two sessions by agent type with exact rows, on the terminal and the desktop", async ($, on) => {
+  world(on, FIXTURE);
+  expect(await $.command.run(run("stats", 200))).toEqual({});
+  const summary = "7 delegations in 2 sessions · 1 running · 1 unreadable record skipped";
+
+  const notes = "+ excludes 1 unpriced run · n/a: no listed price · 2026-10-02 list prices";
+
+  for (const surface of SURFACES) {
+    const wide = await $.ui.mount(pane(surface, { columns: 200, rows: 50, placement: "dock" }));
+    expect(spreadRows(await wide.drawn()).slice(2)).toEqual([
+      summary,
+      "Agents · 3 types",
+      "  agent                 runs  median  tokens  est. cost  evidence  outcomes    ",
+      `◆ executor  ${"█".repeat(10)}     3   1m30s    1.0M      $2.86     ! 67%  ✓2  ✗1  !0  `,
+      `◆ explore   ${"█".repeat(10)}     3     15s   12.0k     $0.01+      ✗ 0%  ✓1  ✗0  !1  `,
+      `◆ oracle    ${"█".repeat(10)}     1   6m40s    129k        n/a    ✓ 100%  ✓1  ✗0  !0  `,
+      "Tokens per turn · 6 turns",
+      "▁█▁▂▁▁ peak 990k",
+      "Estimated cost",
+      `$2.87+ ${"█".repeat(74)}`,
+      "◆ executor $2.86  ◆ explore $0.01",
+      notes,
+      "r: Reload",
+    ]);
+    await wide.unmount();
+
+    const narrow = await $.ui.mount(pane(surface, { columns: 120, rows: 40, placement: "dock" }));
+    expect(spreadRows(await narrow.drawn()).slice(3)).toEqual([
+      "7 delegations in 2 sessions · 1 running · 1 skipped",
+      "Agents · 3 types",
+      "  agent     runs  est. cost  evidence",
+      "◆ executor     3      $2.86     ! 67%",
+      "◆ explore      3     $0.01+      ✗ 0%",
+      "◆ oracle       1        n/a    ✓ 100%",
+      "Tokens per turn · 6 turns",
+      "▁█▁▂▁▁ peak 990k",
+      "Estimated cost",
+      `$2.87+ ${"█".repeat(40)}`,
+      "◆ executor $2.86  ◆ explore $0.01",
+      notes,
+      "r: Reload",
+    ]);
+    await narrow.unmount();
+  }
+});
+
+test("Stats rows stay inside the body less the gutter at every size, docked and inline, on both surfaces", async ($, on) => {
+  world(on, { ...FIXTURE, [`${METRICS}/${S2}/a-m1.json`]: record(S2, "a-m1", { agent_type: "oh-my-claudeagent:multimodal-looker" }) });
+  await $.command.run(run("stats"));
+
+  for (const size of SIZES) {
+    for (const surface of SURFACES) {
+      const room = usableColumns(bodyColumns(size));
+      const ui = await $.ui.mount(pane(surface, size));
+      for (const child of topRows(await ui.drawn())) {
+        expect(cellsAcross(child), `${size.columns} ${size.placement} ${surface}`).toBeLessThanOrEqual(room);
+      }
+      await ui.unmount();
+    }
+  }
+});
+
+test("digit 6 reads the records afresh each time, r reloads a drawn table, and a failed read shows its reason", async ($, on) => {
+  const w = world(on);
+  await $.command.run(run(""));
+  const ui = await $.ui.mount(pane("terminal", { columns: 120, rows: 40, placement: "dock" }));
+  const body = async () => rows(await ui.drawn()).slice(3);
+
+  await ui.press({ key: "6" });
+  expect(await body()).toEqual(["No delegation statistics have been collected yet.", "r: Reload"]);
+
+  write(w, `${METRICS}/${S1}/broken.json`, "{");
+  await ui.press({ key: "1" });
+  await ui.press({ key: "6" });
+  expect(await body()).toEqual(["No delegation statistics have been collected yet.", "1 unreadable record skipped", "r: Reload"]);
+
+  write(w, `${METRICS}/${S1}/a-e1.json`, record(S1, "a-e1", {}));
+  await ui.press({ key: "1" });
+  await ui.press({ key: "6" });
+  expect((await body())[0]).toBe("1 delegation in 1 session · 1 skipped");
+
+  w.files.clear();
+  write(w, METRICS, "a file where the directory belongs");
+  await ui.press({ key: "r" });
+  expect(await body()).toEqual(["✗ Could not read .omca/metrics: ENOENT: no such di…", "r: Reload"]);
+  await ui.unmount();
+});
+
+test("OMCA_ASCII draws the Stats tab from the ASCII set", async ($, on) => {
+  world(on, FIXTURE, {}, { OMCA_ASCII: "1" });
+  await $.command.run(run("stats", 80));
+  const ui = await $.ui.mount(pane("terminal", { columns: 80, rows: 40, placement: "inline" }));
+  const drawn = spreadRows(await ui.drawn());
+  expect(drawn.slice(1, 13)).toEqual([
+    "7 delegations in 2 sessions - 1 running - 1 unreadable record skipped",
+    "Agents - 3 types",
+    "  agent                 runs  median  tokens  est. cost  evidence",
+    "@ executor  [########]     3   1m30s    1.0M      $2.86     ! 67%",
+    "@ explore   [########]     3     15s   12.0k     $0.01+      x 0%",
+    "@ oracle    [###.....]     1   6m40s    129k        n/a    + 100%",
+    "Tokens per turn - 6 turns",
+    ".@.:.. peak 990k",
+    "Estimated cost",
+    `$2.87+ [${"#".repeat(59)}=]`,
+    "# executor $2.86  = explore $0.01",
+    "+ excludes 1 unpriced run - n/a: no listed price - 2026-10-02 list prices",
+  ]);
+  expect(drawn.filter((row) => !isAscii(row))).toEqual([]);
+  await ui.unmount();
 });

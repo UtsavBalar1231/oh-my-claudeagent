@@ -147,9 +147,10 @@ describe("handshake", () => {
       capabilities: { tools: { listChanged: false } },
       serverInfo: { name: "omca", version: VERSION },
       instructions: expect.any(String),
+      resultType: "complete",
     });
     server.send({ jsonrpc: "2.0", method: "notifications/initialized" });
-    expect((await server.request("ping")).result).toEqual({});
+    expect((await server.request("ping")).result).toEqual({ resultType: "complete" });
   });
 
   test.each([
@@ -175,7 +176,7 @@ describe("handshake", () => {
     const server = startServer();
     await server.request("ping");
     expect(statSync(join(server.project, ".omca", "state")).isDirectory()).toBe(true);
-    expect(readFileSync(join(server.project, ".omca", ".gitignore"), "utf8")).toBe("*\n!/rules/\n");
+    expect(readFileSync(join(server.project, ".omca", ".gitignore"), "utf8")).toBe("*\n!/rules/\n!/rules/**\n");
   });
 });
 
@@ -184,7 +185,7 @@ describe("JSON-RPC framing", () => {
     const server = startServer();
     server.send("{not json");
     expect(await server.next()).toEqual({ jsonrpc: "2.0", id: null, error: { code: -32700, message: "Parse error" } });
-    expect((await server.request("ping")).result).toEqual({});
+    expect((await server.request("ping")).result).toEqual({ resultType: "complete" });
   });
 
   test("an unknown method gets method-not-found", async () => {
@@ -193,6 +194,16 @@ describe("JSON-RPC framing", () => {
       code: -32601,
       message: "Method not found: resources/list",
     });
+  });
+
+  test.each(["constructor", "toString", "__proto__", "hasOwnProperty"])("method %p, inherited from Object.prototype, gets method-not-found", async (method) => {
+    const lines: string[] = [];
+    const feed = createDispatcher({ ping: () => ({}) }, (line) => lines.push(line));
+    feed(`${JSON.stringify({ jsonrpc: "2.0", id: 1, method })}\n`);
+    await Bun.sleep(0);
+    expect(lines.map((line) => JSON.parse(line))).toEqual([
+      { jsonrpc: "2.0", id: 1, error: { code: -32601, message: `Method not found: ${method}` } },
+    ]);
   });
 
   test("a message that is not a request gets invalid-request", async () => {
@@ -389,6 +400,7 @@ describe("protocol revisions", () => {
     const listed = await server.request("tools/list", { _meta: modernMeta });
     expect(listed.result).toMatchObject({ ttlMs: 0, cacheScope: "private", resultType: "complete" });
     expect((await server.request("tools/call", { ...toolCall, _meta: modernMeta })).result).toEqual(completed);
+    expect((await server.request("ping", { _meta: modernMeta })).result).toEqual({ resultType: "complete" });
   });
 
   test("both paths list the same tools in the same order", async () => {
@@ -414,13 +426,13 @@ describe("protocol revisions", () => {
         data: { supported: [MODERN, FALLBACK], requested: "2099-01-01" },
       });
     }
-    expect((await server.request("ping")).result).toEqual({});
+    expect((await server.request("ping")).result).toEqual({ resultType: "complete" });
   });
 
   test("a notification naming an unsupported version gets no reply", async () => {
     const server = startServer();
     server.send({ jsonrpc: "2.0", method: "notifications/initialized", params: { _meta: { [VERSION_META]: "2099-01-01" } } });
-    expect((await server.request("ping")).result).toEqual({});
+    expect((await server.request("ping")).result).toEqual({ resultType: "complete" });
   });
 });
 
@@ -562,7 +574,7 @@ describe("cancellation", () => {
     server.send({ jsonrpc: "2.0", method: "notifications/cancelled", params: { requestId: 7, reason: "spec" } });
     await until(() => !isAlive(pid), "the fake ast-grep to be gone");
 
-    for (let ping = 0; ping < 3; ping++) expect((await server.request("ping")).result).toEqual({});
+    for (let ping = 0; ping < 3; ping++) expect((await server.request("ping")).result).toEqual({ resultType: "complete" });
     expect(server.proc.exitCode).toBeNull();
   }, COMPILE_AND_RUN_MS);
 
@@ -570,7 +582,7 @@ describe("cancellation", () => {
     const server = startServer();
     server.send({ jsonrpc: "2.0", method: "notifications/cancelled", params: { requestId: 99 } });
     server.send({ jsonrpc: "2.0", method: "notifications/cancelled", params: "bogus" });
-    expect((await server.request("ping")).result).toEqual({});
+    expect((await server.request("ping")).result).toEqual({ resultType: "complete" });
   });
 
   test("the dispatcher aborts the signal of the named request only and sends no reply for it", async () => {

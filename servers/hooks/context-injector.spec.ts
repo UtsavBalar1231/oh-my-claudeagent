@@ -184,7 +184,7 @@ describe("directory dedup", () => {
     expect(await inject("Read", file)).toBe(`[AGENTS.md from ${join(root, "subdir")}]: # Updated content`);
   });
 
-  test("pipeline g: context-injector caches dir A, skips on second call, injects dir B", async () => {
+  test("a directory's AGENTS.md is injected once, and another directory's still is", async () => {
     const { root } = project();
     const dirA = join(root, "src", "module-a");
     const dirB = join(root, "src", "module-b");
@@ -270,7 +270,7 @@ describe("rule matching", () => {
     expect(await session(root)("Write", file)).toBe("[Rule: *.md]: Wrap prose at 100 columns.");
   });
 
-  test("missing file: exits 0 with no output when file does not exist", async () => {
+  test("a file that does not exist injects nothing", async () => {
     const { root, rule } = project();
     rule("txt.md", "# pattern: *.txt\nText rule.");
     expect(await session(root)("Read", join(root, "nonexistent", "no-such-file.txt"))).toBeUndefined();
@@ -493,7 +493,7 @@ describe("worktree-safe project root", () => {
   });
 });
 
-describe("kill switch and golden fixtures", () => {
+describe("kill switch and full hook payloads", () => {
   test("OMCA_DISABLED_HOOKS=context-injector injects nothing, and another hook's name leaves it on", async () => {
     const { root, rule } = project();
     rule("react.md", "# pattern: *.tsx\nUse functional components only.");
@@ -505,7 +505,7 @@ describe("kill switch and golden fixtures", () => {
   });
 
   for (const tool of ["Read", "Write", "Edit"]) {
-    test(`${tool.toLowerCase()}-no-agents replays to an empty answer`, async () => {
+    test(`a full ${tool} payload with no AGENTS.md or rule answers nothing`, async () => {
       const { root } = project();
       const fixture = { hook_event_name: "PostToolUse", tool_name: tool, tool_input: { file_path: join(root, "testfile.txt") }, session_id: "fixture-sid-001" };
       expect(await dispatch({ ...fixture, event: fixture.hook_event_name }, root, NOW)).toEqual({});

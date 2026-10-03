@@ -78,7 +78,6 @@ test("hooks.json routes every Write and Edit PreToolUse call to omca_hook in one
           input: {
             event: "PreToolUse",
             session_id: "${session_id}",
-            cwd: "${cwd}",
             tool_name: "${tool_name}",
             tool_input: "${tool_input}",
           },

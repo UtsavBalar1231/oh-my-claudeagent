@@ -215,6 +215,14 @@ describe("git cache", () => {
     expect(JSON.parse(readFileSync(cacheFile(), "utf8")).branch).toBe("main");
   });
 
+  test("a cache file that does not parse is replaced by a fresh read", async () => {
+    const dir = repo("malformed");
+    seedCache(dir, cached({ branch: "cached-branch" }));
+    writeFileSync(cacheFile(), "{ not json");
+    expect((await getGitInfo(dir, options())).branch).toBe("main");
+    expect(JSON.parse(readFileSync(cacheFile(), "utf8")).branch).toBe("main");
+  });
+
   test("a zero lifetime always reads git", async () => {
     const dir = repo("always");
     seedCache(dir, cached({ branch: "cached-branch" }));

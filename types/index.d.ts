@@ -78,12 +78,6 @@ declare module "claude-code" {
         error: string | null;
         readAt: number;
       };
-      status: {
-        verification: { command: string; at: number } | null;
-        isEvidenceLogged: boolean;
-        lastHookAt: number | null;
-        readAt: number;
-      };
       plan:
         | {
             path: string;
@@ -137,9 +131,6 @@ declare module "claude-code" {
         } | null;
         error: string | null;
         ranAt: number;
-      };
-      dialogs: {
-        readonly [signature: string]: { decision: "run" | "refuse"; at: number };
       };
     };
   }

@@ -15,10 +15,6 @@ import type {
   TextProps,
 } from "claude-code";
 import {
-  bar,
-  type BarParts,
-  chip,
-  type ChipTone,
   isValidDiff,
   ON_SURFACE,
   type Paint,
@@ -35,8 +31,8 @@ type TextColors = "color" | "backgroundColor";
 type BoxColors = "borderColor" | "backgroundColor";
 
 export type TextStyle = Omit<Keyed<TextProps, TextColors>, "hover"> & { hover?: Keyed<TextHoverProps, TextColors> };
-export type BoxStyle = Omit<Keyed<BoxProps, BoxColors>, "hover"> & { hover?: Keyed<BoxHoverProps, BoxColors> };
-export type ButtonStyle = Omit<ButtonProps, "hover"> & { hover?: Keyed<TextHoverProps, TextColors> };
+type BoxStyle = Omit<Keyed<BoxProps, BoxColors>, "hover"> & { hover?: Keyed<BoxHoverProps, BoxColors> };
+type ButtonStyle = Omit<ButtonProps, "hover"> & { hover?: Keyed<TextHoverProps, TextColors> };
 
 // The engine's elements with every color prop narrowed to a theme key: an unknown key draws the
 // default silently and an invalid color string refuses the whole tree, so a raw string must not compile.
@@ -68,10 +64,6 @@ export function Line(kit: Kit, pieces: readonly Piece[]): RenderElement {
   return kit.Text({ wrap: "truncate-end", children: pieces.map((piece) => kit.Text({ ...styleOf(piece), children: [piece.text] })) });
 }
 
-export const Chip = (kit: Kit, label: string, tone: ChipTone, ascii: boolean): RenderElement => Line(kit, [chip(label, tone, ascii)]);
-
-export const Bar = (kit: Kit, parts: BarParts, width: number, ascii: boolean): RenderElement => Line(kit, bar(parts, width, ascii));
-
 export const Rule = (
   kit: Kit,
   width: number,
@@ -84,7 +76,7 @@ export const Rule = (
 // The engine's border styles: `classic` draws its corners and edges with `+`, `-` and `|`.
 const border = (isAscii: boolean) => (isAscii ? "classic" : "round");
 
-export type CardSpec = {
+type CardSpec = {
   key: string;
   title: string;
   tone: Paint;
@@ -107,7 +99,7 @@ export function Card(kit: Kit, { key, title, tone, isAscii, isRaised = false, wi
   });
 }
 
-export type RowSpec = { key: string; pieces: readonly Piece[]; isFocused?: boolean; isDone?: boolean };
+type RowSpec = { key: string; pieces: readonly Piece[]; isFocused?: boolean; isDone?: boolean };
 
 // Hovered or focused, a row's own text turns `text` so it reads on `selectionBg` in both themes;
 // a piece with its own background, a chip, keeps its style.
@@ -128,45 +120,13 @@ export function Row(kit: Kit, { key, pieces, isFocused = false, isDone = false }
   });
 }
 
-export type HoverCardSpec = {
+type ScopedCardSpec = {
   key: string;
-  anchor: readonly RenderElement[];
+  scope: string;
   title: string;
   tone: Paint;
   isAscii: boolean;
   lines: readonly RenderElement[];
-  top?: number;
-  left?: number;
-  width?: number;
-};
-
-/** A card drawn over the rows below its anchor while the pointer is on the anchor; nothing reflows. */
-export function HoverCard(kit: Kit, { key, anchor, title, tone, isAscii, lines, top = 1, left = 2, width }: HoverCardSpec): RenderElement {
-  return kit.Box({
-    key,
-    flexDirection: "column",
-    children: [
-      ...anchor,
-      kit.Box({
-        position: "absolute",
-        top,
-        left,
-        display: "none",
-        hover: { display: "flex" },
-        flexDirection: "column",
-        borderStyle: border(isAscii),
-        borderColor: themeKey(tone),
-        backgroundColor: TONE_KEYS.raised,
-        paddingX: 1,
-        ...(width === undefined ? {} : { width }),
-        children: [kit.Text({ bold: true, color: ON_SURFACE, wrap: "truncate-end", children: [title] }), ...lines],
-      }),
-    ],
-  });
-}
-
-export type ScopedCardSpec = Omit<HoverCardSpec, "anchor" | "top" | "left" | "width"> & {
-  scope: string;
   top: number;
   left: number;
   width: number;
@@ -195,7 +155,7 @@ export function ScopedCard(kit: Kit, { key, scope, title, tone, isAscii, lines, 
   });
 }
 
-export type CodeSpec = { source: string; language?: string; isDiff?: boolean };
+type CodeSpec = { source: string; language?: string; isDiff?: boolean };
 
 export function CodeBlock(kit: Kit, { source, language, isDiff = false }: CodeSpec): RenderElement {
   return kit.Code({
@@ -204,7 +164,7 @@ export function CodeBlock(kit: Kit, { source, language, isDiff = false }: CodeSp
   });
 }
 
-export type FieldSpec = {
+type FieldSpec = {
   key: string;
   label: string;
   placeholder: string;

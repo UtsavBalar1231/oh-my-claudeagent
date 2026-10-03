@@ -291,8 +291,8 @@ describe("beside the guidance handler", () => {
   });
 });
 
-describe("golden fixtures", () => {
-  test("no-keyword replays to an empty answer", async () => {
+describe("a full hook payload", () => {
+  test("a prompt with no keyword answers nothing", async () => {
     const root = project();
     enable(root, "fixture-sid-001");
     const fixture = { prompt: "fix the login bug", session_id: "fixture-sid-001" };

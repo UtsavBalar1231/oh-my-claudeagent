@@ -2,8 +2,7 @@ import { addRefreshInterval, doctorChecks, type Fix, type HookState, unifiedDiff
 import { parseFrontmatter } from "../src/core/frontmatter.ts";
 import { statusPath } from "../src/core/omca-paths.ts";
 import { joinPath, type Platform, tildePath } from "../src/core/path.ts";
-import { type Host, pluginVersion, reason, type State, update } from "./host.ts";
-import { sessionOf } from "./pane.ts";
+import { type Host, pluginVersion, reason, sessionOf, type State, update } from "./host.ts";
 
 type Doctor = State["doctor"];
 
@@ -119,7 +118,7 @@ async function check(host: Host): Promise<Doctor["checks"]> {
   return checks;
 }
 
-export const markRunning = (host: Host): Promise<void> => patch(host, { isRunning: true, error: null });
+const markRunning = (host: Host): Promise<void> => patch(host, { isRunning: true, error: null });
 
 async function runChecks(host: Host): Promise<void> {
   await markRunning(host);

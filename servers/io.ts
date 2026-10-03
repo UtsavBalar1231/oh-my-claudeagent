@@ -14,7 +14,8 @@ import {
 import { hostname } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
-const OMCA_GITIGNORE = "*\n!/rules/\n";
+// `!/rules/` alone re-includes the directory but `*` still matches every file inside it.
+const OMCA_GITIGNORE = "*\n!/rules/\n!/rules/**\n";
 export const LOCK_STALE_MS = 30_000;
 const LOCK_TIMEOUT_MS = 10_000;
 
@@ -31,7 +32,7 @@ const LINK_UNSUPPORTED_CODES: ReadonlySet<string> = new Set(["EPERM", "ENOSYS", 
 const LOCK_HOST = hostname().replace(/\s+/g, "_") || "unknown";
 const LOCK_FORMAT = /^([1-9]\d*) (\d+) \S+(?: (\S+))?$/;
 
-const errorCode = (error: unknown): string | undefined =>
+export const errorCode = (error: unknown): string | undefined =>
   error instanceof Error && "code" in error && typeof error.code === "string" ? error.code : undefined;
 
 export const hasCode = (error: unknown, code: string): boolean => errorCode(error) === code;
@@ -43,6 +44,18 @@ const isIn = (codes: ReadonlySet<string>, error: unknown): boolean => {
   const code = errorCode(error);
   return code !== undefined && codes.has(code);
 };
+
+// Another process holding a file open never blocks creating a new one, so a permission error from
+// creating the lock's temp file or directory is final, never busy.
+const refusedCreates = new WeakSet<Error>();
+function create(make: () => void): void {
+  try {
+    make();
+  } catch (error) {
+    if (error instanceof Error) refusedCreates.add(error);
+    throw error;
+  }
+}
 
 const tempPath = (path: string) => `${path}.${crypto.randomUUID()}.tmp`;
 
@@ -104,14 +117,13 @@ function findRoot(dir: string): string {
   }
 }
 
+export const isDirectory = (path: string): boolean => statSync(path, { throwIfNoEntry: false })?.isDirectory() ?? false;
+
 export function ensureStateDir(root: string): string {
   const stateDir = join(root, ".omca", "state");
   mkdirSync(stateDir, { recursive: true });
-  try {
-    writeFileSync(join(root, ".omca", ".gitignore"), OMCA_GITIGNORE, { flag: "wx" });
-  } catch (error) {
-    if (!hasCode(error, "EEXIST")) throw error;
-  }
+  const gitignore = join(root, ".omca", ".gitignore");
+  if (readOrNull(gitignore) !== OMCA_GITIGNORE) writeFileAtomic(gitignore, OMCA_GITIGNORE);
   return stateDir;
 }
 
@@ -133,7 +145,7 @@ export function writeFileAtomic(path: string, data: string): void {
   }
 }
 
-function readOrNull(path: string): string | null {
+export function readOrNull(path: string): string | null {
   try {
     return retryBusy(() => readFileSync(path, "utf8"));
   } catch (error) {
@@ -161,7 +173,7 @@ const ownerOf = (lockPath: string) => join(directoryOf(lockPath), "owner");
 function takeDirectory(temp: string, lockPath: string): boolean {
   const directory = directoryOf(lockPath);
   try {
-    mkdirSync(directory);
+    create(() => mkdirSync(directory));
   } catch (error) {
     if (hasCode(error, "EEXIST")) return false;
     throw error;
@@ -179,7 +191,7 @@ function takeDirectory(temp: string, lockPath: string): boolean {
 // with open('wx') then written can see it empty and break a held lock.
 function tryTake(lockPath: string, content: string): boolean {
   const temp = tempPath(lockPath);
-  writeFileSync(temp, content, { flag: "wx" });
+  create(() => writeFileSync(temp, content, { flag: "wx" }));
   try {
     linkSync(temp, lockPath);
     return true;
@@ -252,7 +264,7 @@ function tryAcquire(lockPath: string, nonce: string): string | undefined {
       if (inspect(lockPath) !== "stale" || !breakStale(lockPath)) return undefined;
     }
   } catch (error) {
-    if (isIn(BUSY_CODES, error)) return undefined;
+    if (isIn(BUSY_CODES, error) && !(error instanceof Error && refusedCreates.has(error))) return undefined;
     throw error;
   }
 }

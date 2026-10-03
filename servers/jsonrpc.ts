@@ -62,7 +62,7 @@ export function createDispatcher(
     if (id !== undefined) inflight.set(id, controller);
     try {
       if (!isRecord(params)) throw new RpcError(INVALID_PARAMS, `${method}: params must be an object`);
-      const handler = handlers[method];
+      const handler = Object.hasOwn(handlers, method) ? handlers[method] : undefined;
       if (!handler) throw new RpcError(METHOD_NOT_FOUND, `Method not found: ${method}`);
       const result = await handler(params, { signal: controller.signal, notify });
       if (id !== undefined && !controller.signal.aborted) reply(id, { result: result ?? null });

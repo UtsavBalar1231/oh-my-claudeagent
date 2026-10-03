@@ -1,6 +1,7 @@
 import { isSafeId } from "../src/core/session-id.ts";
+import { glyphs } from "../src/core/ui-kit.ts";
 import type { Features } from "./dispatch.ts";
-import { type Host, reason } from "./host.ts";
+import { type Host, reason, sessionOf } from "./host.ts";
 
 export type Verdict = "up" | "down";
 export type Rating = { turn_id: string | null; at: string; rating: Verdict; note?: string };
@@ -46,8 +47,9 @@ async function load(host: Host, path: string): Promise<unknown[]> {
 
 async function selectedNote(host: Host): Promise<string> {
   const words = ((await host.ui.selection())?.text ?? "").trim().replace(/\s+/g, " ");
+  const { ellipsis } = glyphs((await sessionOf(host)).isAscii);
   const letters = [...words];
-  return letters.length > SELECTED_NOTE_LIMIT ? `${letters.slice(0, SELECTED_NOTE_LIMIT - 1).join("")}…` : words;
+  return letters.length > SELECTED_NOTE_LIMIT ? `${letters.slice(0, SELECTED_NOTE_LIMIT - [...ellipsis].length).join("")}${ellipsis}` : words;
 }
 
 export async function rate(host: Host, verdict: Verdict, note: string, fromSelection = false): Promise<string> {

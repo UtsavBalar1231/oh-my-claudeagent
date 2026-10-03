@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { resolveBoundPlan } from "../src/core/boulder.ts";
 import { checkboxStates, nextTaskLabel } from "../src/core/checkboxes.ts";
 import { baseName, inferPlatform } from "../src/core/path.ts";
-import { cells, displayWidth, fitEnd } from "../src/core/ui-kit.ts";
+import { cells, displayWidth, fitEnd, formatDuration } from "../src/core/ui-kit.ts";
 import type { GitInfo } from "./git.ts";
 
 export type Env = Record<string, string | undefined>;
@@ -63,11 +63,11 @@ export const GREEN = "\x1b[32m";
 export const YELLOW = "\x1b[33m";
 export const RED = "\x1b[31m";
 const MAGENTA = "\x1b[35m";
-// The plugin's settings.json starts every session on this agent, so naming it tells nothing.
-export const DEFAULT_MAIN_AGENT = "oh-my-claudeagent:sisyphus";
 const BLUE = "\x1b[34m";
 export const BOLD = "\x1b[1m";
-export const SEP = ` ${DIM}·${RST} `;
+const SEP = ` ${DIM}·${RST} `;
+// The plugin's settings.json starts every session on this agent, so naming it tells nothing.
+export const DEFAULT_MAIN_AGENT = "oh-my-claudeagent:sisyphus";
 const FILLED_BLOCK = "▰";
 const EMPTY_BLOCK = "▱";
 const ELLIPSIS = "…";
@@ -129,7 +129,7 @@ export const AGENT_GLYPHS = new Map([
   ["multimodal-looker", ""],
   ["oracle", ""],
   ["prometheus", ""],
-  ["sisyphus", ""],
+  ["sisyphus", ""],
   ["executor", ""],
 ]);
 const DEFAULT_AGENT_GLYPH = "";
@@ -323,17 +323,6 @@ const percentSegment = (data: Payload): Segment | null => {
   return pct === null ? null : block(`${thresholdColor(pct)}${fixed(pct, 0)}%${RST}`);
 };
 
-export function formatTokens(n: number): string {
-  if (n >= 1_000_000) return `${fixed(n / 1_000_000, 1)}M`;
-  if (n >= 1_000) return `${fixed(n / 1_000, 1)}k`;
-  return String(n);
-}
-
-function formatDuration(ms: number | null | undefined): string {
-  const totalSeconds = Math.floor((ms ?? 0) / 1000);
-  return `${Math.floor(totalSeconds / 60)}m ${totalSeconds % 60}s`;
-}
-
 export function formatResetTime(resetsAt: number | null | undefined, now: Date): string {
   if (typeof resetsAt !== "number") return "";
   const reset = new Date(resetsAt * 1000);
@@ -361,7 +350,7 @@ export interface PlanProgress {
 export function readPlan(projectDir: string, sessionId: string): PlanProgress | null {
   try {
     const boulder = JSON.parse(readFileSync(join(projectDir, ".omca", "state", "boulder.json"), "utf8"));
-    const planPath = resolveBoundPlan(boulder, sessionId, true).active_plan;
+    const planPath = resolveBoundPlan(boulder, sessionId, true)?.active_plan;
     if (!planPath) return null;
     const plan = readFileSync(planPath, "utf8");
     const states = checkboxStates(plan);
@@ -452,7 +441,7 @@ const isSubscription = ({ rate_limits: limits }: Payload): boolean => limits?.fi
 function costSegment({ data, g }: Ctx): Segment {
   const usd = data.cost?.total_cost_usd ?? 0;
   const cost = !isSubscription(data) && usd > 0 ? `${MAGENTA}$${fixed(usd, 2)}${RST}${SEP}` : "";
-  return block(`${cost}${BLUE}${g.clock} ${formatDuration(data.cost?.total_duration_ms)}${RST}`);
+  return block(`${cost}${BLUE}${g.clock} ${formatDuration(data.cost?.total_duration_ms ?? 0)}${RST}`);
 }
 
 /** The full view's rows, session, workspace and usage, each its segments in priority order. */

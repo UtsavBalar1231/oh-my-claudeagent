@@ -2,12 +2,12 @@ import type { RenderElement } from "claude-code";
 import type { Fix } from "../../src/core/doctor-checks.ts";
 import { lastStart, stepStart, windowEnd } from "../../src/core/list-window.ts";
 import { tildePath } from "../../src/core/path.ts";
-import { displayWidth, fitEnd, KEYS, padEnd, wrapText } from "../../src/core/ui-kit.ts";
-import { chip, fitPieces, levelMark, type Piece, type ThemeKey, TONE_KEYS } from "../../src/core/visual.ts";
+import { clockOf, displayWidth, fitEnd, KEYS, padEnd, wrapText } from "../../src/core/ui-kit.ts";
+import { chip, fitPieces, levelMark, type Piece, piecesWidth, type ThemeKey, TONE_KEYS } from "../../src/core/visual.ts";
 import * as doctor from "../doctor.ts";
 import type { Host, State } from "../host.ts";
 import type { Subcommand } from "../omca-router.ts";
-import { keyButton, noticeRow, open, type TabView, type View } from "../pane.ts";
+import { blanks, edge, keyButton, noticeRow, open, type TabView, type View } from "../pane.ts";
 import { Line } from "../ui.ts";
 
 type Check = State["doctor"]["checks"][number];
@@ -19,7 +19,7 @@ const GAP = 3;
 const CHIP = 9;
 const WORDS: Readonly<Record<Check["level"], string>> = { ok: "OK", warn: "WARN", fail: "FAIL", info: "INFO" };
 // One key per check that names a command to run; r and i are taken, and digits switch tabs.
-const PROMPT_KEYS: Readonly<Record<string, string>> = { server: "m", style: "c", advisor: "a", statusline: "s" };
+const PROMPT_KEYS: Readonly<Record<string, string>> = { server: "m", style: "y", advisor: "a", statusline: "s" };
 // Below this a detail column would be too narrow for the longest variable name it quotes.
 const STACKED_BELOW = 64;
 const DIFF_ROWS = 16;
@@ -44,7 +44,6 @@ export function scroll(by: number, contentRows: number): boolean {
 
 export const command: Subcommand = async (host, e) => {
   first = 0;
-  await doctor.markRunning(host);
   const answer = await open(host, e, "doctor");
   await doctor.run(host);
   return answer;
@@ -56,13 +55,11 @@ function summary(checks: readonly Check[], g: View["g"]): Piece[] {
     .filter(([, count]) => count > 0)
     .flatMap(([level, count], index) => {
       const { glyph, color } = levelMark(level, g);
-      return [...(index === 0 ? [] : [{ text: "  " }]), { text: `${glyph} ${count} ${level}`, color }];
+      return [...(index === 0 ? [] : [{ text: "  " }]), { text: glyph, color }, { text: ` ${count} ${level}` }];
     });
 }
 
 type Rows = { element: RenderElement; height: number };
-
-const widthOf = (pieces: readonly Piece[]) => pieces.reduce((sum, piece) => sum + displayWidth(piece.text), 0);
 
 function checkRows(host: Host, view: View, check: Check): Rows {
   const { Box, Button, Text } = view.kit;
@@ -148,10 +145,10 @@ export const view: TabView = async (host, view) => {
   const button = runKey("Run again");
   const room = view.width - displayWidth(`${KEYS.reload}: Run again`) - GAP;
   const counts = summary(state.checks, view.g);
-  const checked: Piece = { text: `  checked ${new Date(state.ranAt).toTimeString().slice(0, 5)}`, color: TONE_KEYS.muted };
+  const checked: Piece = { text: `  checked ${clockOf(state.ranAt)}`, color: TONE_KEYS.muted };
   const status: Piece[] = state.isRunning
     ? [{ text: `Running the checks${view.g.ellipsis}`, color: TONE_KEYS.muted }]
-    : [...counts, ...(widthOf([...counts, checked]) <= room ? [checked] : [])];
+    : [...counts, ...(piecesWidth([...counts, checked]) <= room ? [checked] : [])];
   const error = state.error === null ? undefined : `${view.g.cross} ${state.error}`;
   const applied = state.applied === null ? undefined : appliedRows(view, state.applied);
   const head = [
@@ -170,17 +167,15 @@ export const view: TabView = async (host, view) => {
   first = Math.min(first, lastStart(heights, capacity));
   laid = { heights, room: capacity };
   const end = windowEnd(heights, first, capacity);
-  const edge = (text: string) => Text({ dimColor: true, children: [text === "" ? " " : fitEnd(text, view.width, view.g.ellipsis)] });
   const shown = heights.slice(first, end).reduce((sum, height) => sum + height, 0);
-  const blank = () => Text({ children: [" "] });
   // The engine raises ui.scroll only for a tree taller than the body, so this one row past the
   // window is what brings the arrows and the wheel to `scroll`.
   return [
     ...head,
-    edge(first > 0 ? `  ${view.g.up} ${first} more` : ""),
+    edge(view, first > 0 ? `  ${view.g.up} ${first} more` : ""),
     ...checks.slice(first, end).map(({ element }) => element),
-    ...Array.from({ length: Math.max(0, capacity - shown) }, blank),
-    edge(end < checks.length ? `  ${view.g.down} ${checks.length - end} more ${view.g.dot} ${view.g.up}${view.g.down} scroll` : ""),
-    blank(),
+    ...blanks(view, capacity - shown),
+    edge(view, end < checks.length ? `  ${view.g.down} ${checks.length - end} more ${view.g.dot} ${view.g.up}${view.g.down} scroll` : ""),
+    ...blanks(view, 1),
   ];
 };

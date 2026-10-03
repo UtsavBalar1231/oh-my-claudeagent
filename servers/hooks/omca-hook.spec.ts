@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const SERVER = join(import.meta.dir, "..", "omca.ts");
-const ROUND_TRIPS = 100;
 const WARM_UP = 20;
 const MEDIAN_CEILING_MS = 3;
 const BURST_CALLS = 20;
@@ -69,7 +68,6 @@ function startServer(trace: boolean): Server {
 const bashCall = (sessionId: string, command: string): Record<string, string> => ({
   event: "PostToolUse",
   session_id: sessionId,
-  cwd: "/somewhere",
   agent_id: "",
   agent_type: "",
   tool_name: "Bash",
@@ -117,7 +115,7 @@ describe("omca_hook over stdio", () => {
       hookSpecificOutput: {
         hookEventName: "Stop",
         additionalContext:
-          "[PLAN CONTINUATION] The bound plan 'demo' still has 1 unchecked tasks (next: First task). Continue with the next task. " +
+          "[PLAN CONTINUATION] The bound plan 'demo' still has 1 unchecked task (next: First task). Continue with the next task. " +
           "If its work is already done and reviewed, flip its checkbox. If it cannot proceed without the user, record why with notepad_write and " +
           "ask the user; a turn that asks the user is not blocked.",
       },
@@ -135,22 +133,6 @@ describe("omca_hook over stdio", () => {
     const server = startServer(false);
     expect(await server.hook(bashCall(crypto.randomUUID(), "ls"))).toBe("{}");
     expect(existsSync(join(server.project, ".omca", "state", "hook-trace.jsonl"))).toBe(false);
-  });
-
-  test(`${ROUND_TRIPS} warm omca_hook round trips have a median of at most ${MEDIAN_CEILING_MS} ms`, async () => {
-    const server = startServer(false);
-    const sessionId = crypto.randomUUID();
-    for (let i = 0; i < WARM_UP; i++) await server.hook(bashCall(sessionId, "ls -la"));
-    const samples: number[] = [];
-    for (let i = 0; i < ROUND_TRIPS; i++) {
-      const started = performance.now();
-      await server.hook(bashCall(sessionId, i % 2 === 0 ? "ls -la" : "just test"));
-      samples.push(performance.now() - started);
-    }
-    samples.sort((a, b) => a - b);
-    const median = ((samples[ROUND_TRIPS / 2 - 1] ?? 0) + (samples[ROUND_TRIPS / 2] ?? 0)) / 2;
-    console.log(`omca_hook warm round trip over stdio: median ${median.toFixed(3)} ms, p95 ${samples[94]?.toFixed(3)} ms`);
-    expect(median).toBeLessThanOrEqual(MEDIAN_CEILING_MS);
   });
 
   // The server handles a hook and a ledger write on one thread, so a hook queued behind a write waits

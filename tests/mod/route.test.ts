@@ -1,5 +1,6 @@
 import type { Args, On } from "claude-code";
 import { expect, test, type Engine } from "claude-code/testing";
+import { drain } from "./world.ts";
 
 type Spawn = Args<"agent.spawn">;
 type Step = Args<"turn.step">;
@@ -51,7 +52,7 @@ function engine(on: On, deny?: string): { spawned: Spawn[]; stepped: Step[]; log
 
 async function step($: Engine, e: Step): Promise<void> {
   const stream = $.turn.step(e);
-  while ((await stream.next()).done !== true);
+  await drain(stream);
 }
 
 test("two concurrent spawns with different hints are routed independently by their agentId", async ($, on) => {

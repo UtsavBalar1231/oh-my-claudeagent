@@ -1,11 +1,10 @@
 import type { AgentInfo, TurnUsage } from "claude-code";
-import { oneLine } from "../src/core/band-model.ts";
 import { firstLine, lastLine, toolDetail } from "../src/core/mission.ts";
 import { taskReference } from "../src/core/plan-reader.ts";
-import { fitEnd, type Glyphs, glyphs, isAsciiRequested } from "../src/core/ui-kit.ts";
+import { fitEnd, glyphs, oneLine } from "../src/core/ui-kit.ts";
 import { redact } from "../src/core/visual.ts";
 import type { Features } from "./dispatch.ts";
-import { type Host, type State, update } from "./host.ts";
+import { type Host, sessionOf, type State, update } from "./host.ts";
 
 type Row = State["agents"][string];
 type Lane = State["lanes"][string];
@@ -15,12 +14,10 @@ const TOOL_HISTORY = 24;
 const PROMPT_CELLS = 400;
 const LINE_CELLS = 200;
 
-let g: Glyphs | undefined;
-
 // Secrets are masked before a lane is stored, and the excerpt is cut only after that, so a
 // cut can never leave half a key the masks no longer match.
 async function masked(host: Host, text: string, cells: number): Promise<string> {
-  g ??= glyphs(isAsciiRequested(await host.env.OMCA_ASCII()));
+  const g = glyphs((await sessionOf(host)).isAscii);
   return fitEnd(redact(oneLine(text), "", g.mask).text, cells, g.ellipsis);
 }
 

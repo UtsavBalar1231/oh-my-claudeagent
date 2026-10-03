@@ -1,10 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
-  clockOf,
   dayLabel,
-  dayOf,
   type Evidence,
-  EVIDENCE_TYPES,
   isSlotRecent,
   isWellFormedLedger,
   ledgerCoversSlot,
@@ -19,6 +16,7 @@ import {
   tallies,
   verdictOf,
 } from "./evidence.ts";
+import { clockOf, dayOf } from "./ui-kit.ts";
 
 const entry = {
   type: "test",
@@ -27,10 +25,6 @@ const entry = {
   output_snippet: "10 passed",
   timestamp: "2026-10-02T12:05:00Z",
 };
-
-test("evidence types are the five the ledger accepts", () => {
-  expect([...EVIDENCE_TYPES]).toEqual(["build", "test", "lint", "manual", "final_verification"]);
-});
 
 describe("isSlotRecent", () => {
   test("a verification exactly at the age limit is still recent", () => {
@@ -76,7 +70,7 @@ describe("isWellFormedLedger", () => {
     expect(isWellFormedLedger({ entries: [entry, optional] })).toBe(true);
   });
 
-  test("accepts a non-zero exit_code and an empty-string command", () => {
+  test("checks structure, not content: a failing exit_code and empty strings pass", () => {
     expect(isWellFormedLedger({ entries: [{ ...entry, exit_code: 1, command: "" }] })).toBe(true);
   });
 

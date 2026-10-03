@@ -4,7 +4,6 @@ export interface PlanEntry {
   active_plan?: string;
   started_at?: string;
   session_ids?: string[];
-  agent?: string;
   worktree_path?: string;
 }
 
@@ -48,21 +47,21 @@ function boundPlan(name: string, entry: PlanEntry): BoundPlan {
 
 /**
  * Lenient: explicit binding, else the sole plan, else the latest `started_at`
- * (first wins a tie), else `{}`. Strict: only an explicit binding to a plan that
+ * (first wins a tie), else undefined. Strict: only an explicit binding to a plan that
  * still exists resolves, so an unbound session never inherits another's plan.
  */
 export function resolveBoundPlan(
   data: unknown,
   sessionId: string,
   strict = false,
-): BoundPlan | Record<string, never> {
+): BoundPlan | undefined {
   const { plans, bindings } = asRegistry(data);
 
   const name = sessionId ? bindings[sessionId]?.plan_name : undefined;
   if (name !== undefined && Object.hasOwn(plans, name)) {
     return boundPlan(name, plans[name] as PlanEntry);
   }
-  if (strict) return {};
+  if (strict) return undefined;
 
   let latest: string | undefined;
   let latestAt = "";
@@ -73,5 +72,5 @@ export function resolveBoundPlan(
       latestAt = startedAt;
     }
   }
-  return latest === undefined ? {} : boundPlan(latest, plans[latest] as PlanEntry);
+  return latest === undefined ? undefined : boundPlan(latest, plans[latest] as PlanEntry);
 }

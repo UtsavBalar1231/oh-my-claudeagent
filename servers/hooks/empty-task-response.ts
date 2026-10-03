@@ -5,6 +5,9 @@ import type { Handler, Payload } from "./registry.ts";
 export const POOR_OUTPUT =
   "[POOR AGENT OUTPUT] The agent returned empty or trivially short text with no synthesis. A rate limit, server error, or kill would have arrived as a delegation error carrying the agent's partial work, so an empty result here means the agent ended its own turn without a deliverable, typically after spending its turns on tool calls. A finished agent keeps its history, so resume it once with SendMessage and ask only for its findings in the required output format; that reuses the work it already did, where a fresh agent would repeat it. Built-in Explore and Plan agents cannot be resumed, so relaunch those. If the resumed reply is also empty, proceed with what you have rather than messaging it again.";
 
+// SubagentHandback fires on the subagent's own call, so its advice goes to the subagent itself.
+export const POOR_HANDBACK = "Your hand-back is empty or misses required sections; hand back a complete report.";
+
 const SECTIONS: Readonly<Record<string, readonly string[]>> = {
   executor: ["STATUS:", "CHANGES:", "EVIDENCE:"],
   explore: ["FILES:", "ANSWER:", "NEXT STEPS:"],
@@ -51,12 +54,14 @@ export const handle: Handler = (payload) => {
   if (isHookDisabled(process.env.OMCA_DISABLED_HOOKS, "empty-task-response")) return;
   const found = delivered(payload);
   if (found === undefined) return;
+  const isOwnHandback = payload.tool_name === "SubagentHandback" && Boolean(payload.agent_id);
   const report = withoutHarnessNote(found.report.replace(/\n+$/, ""));
-  if (isPoor(report)) return advise(POOR_OUTPUT);
+  if (isPoor(report)) return advise(isOwnHandback ? POOR_HANDBACK : POOR_OUTPUT);
   const agentType = found.agentType.slice(found.agentType.lastIndexOf(":") + 1);
   const lower = report.toLowerCase();
   const missing = (SECTIONS[agentType] ?? []).filter((section) => !lower.includes(section.toLowerCase()));
   if (missing.length === 0) return;
+  if (isOwnHandback) return advise(POOR_HANDBACK);
   return advise(
     `[ADVISORY] Agent '${agentType}' output is missing expected section headers: ${missing.join(" ")}. The required output format specifies these sections. Output may be incomplete or hard to parse downstream.`,
   );

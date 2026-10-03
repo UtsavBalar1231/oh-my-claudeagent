@@ -1,7 +1,6 @@
-import { arrange, oneLine } from "./band-model.ts";
 import { inputText } from "./tool-input.ts";
-import { displayWidth, fitEnd, formatDuration, formatTokens, type Glyphs, padEnd, shortType } from "./ui-kit.ts";
-import { agentKey, chip, levelMark, ON_SURFACE, type Piece, redact, type ThemeKey, TONE_KEYS, type WidthTier } from "./visual.ts";
+import { arrange, displayWidth, fitEnd, formatDuration, formatTokens, type Glyphs, oneLine, padEnd, shortType } from "./ui-kit.ts";
+import { agentKey, chip, levelMark, ON_SURFACE, type Piece, piecesWidth, redact, type ThemeKey, TONE_KEYS, type WidthTier } from "./visual.ts";
 
 export type ToolKind = "read" | "edit" | "bash" | "mcp" | "agent" | "other";
 
@@ -23,19 +22,16 @@ const KIND_OF: Readonly<Record<string, ToolKind>> = {
   Read: "read",
   Grep: "read",
   Glob: "read",
-  LS: "read",
-  NotebookRead: "read",
+  LSP: "read",
   WebFetch: "read",
   WebSearch: "read",
   Edit: "edit",
-  MultiEdit: "edit",
   Write: "edit",
   NotebookEdit: "edit",
   Bash: "bash",
   PowerShell: "bash",
-  BashOutput: "bash",
+  Monitor: "bash",
   Agent: "agent",
-  Task: "agent",
   SendMessage: "agent",
 };
 
@@ -50,17 +46,17 @@ export const toolLabel = (name: string): string => (name.startsWith("mcp__") ? n
 const DETAIL_FIELD: Readonly<Record<string, string>> = {
   Bash: "command",
   PowerShell: "command",
+  Monitor: "command",
   Read: "file_path",
   Edit: "file_path",
-  MultiEdit: "file_path",
   Write: "file_path",
   NotebookEdit: "notebook_path",
+  LSP: "filePath",
   Grep: "pattern",
   Glob: "pattern",
   WebFetch: "url",
   WebSearch: "query",
   Agent: "description",
-  Task: "description",
 };
 
 /** What a call works on, in one line: a path under `root` relative to it. Unredacted. */
@@ -106,6 +102,8 @@ const STRIP: Readonly<Record<WidthTier, number>> = { page: 8, inline: 12, split:
 // The task keeps this many cells, separator included, before the model chip gives way.
 const MIN_TASK = 20;
 const ELAPSED = 6;
+// The spinner, its space and the tool's name keep this many cells before the strip takes any.
+const TOOL_CELLS = 14;
 
 /** One frame per second of `now`, so a lane turns only while the pane's clock ticks. */
 export function spinner(now: number, ascii: boolean): string {
@@ -113,7 +111,6 @@ export function spinner(now: number, ascii: boolean): string {
   return frames[Math.floor(now / 1000) % frames.length] ?? "";
 }
 
-const cellsOf = (pieces: readonly Piece[]): number => pieces.reduce((sum, piece) => sum + displayWidth(piece.text), 0);
 
 /** The last `room` calls, oldest first, one glyph each in its kind's color. */
 export function strip(tools: readonly string[], room: number, ascii: boolean): Piece[] {
@@ -139,9 +136,9 @@ function headRow(lane: Lane, look: LaneLook): Piece[] {
     { text: `${g.agent} `, color: key },
     { text: name, color: key, bold: true },
   ];
-  const side = (priority: number, pieces: Piece[]): Side => ({ priority, min: cellsOf(pieces), pieces });
+  const side = (priority: number, pieces: Piece[]): Side => ({ priority, min: piecesWidth(pieces), pieces });
   const sides: Side[] = [
-    { priority: 0, min: cellsOf(identity) + MIN_TASK, pieces: [] },
+    { priority: 0, min: piecesWidth(identity) + MIN_TASK, pieces: [] },
     side(4, [chip(shortModel(lane.model), "info", ascii)]),
     ...(lane.effort === null ? [] : [side(3, [chip(String(lane.effort), "muted", ascii)])]),
     side(2, [{ text: formatTokens(lane.inputTokens + lane.outputTokens), color: TONE_KEYS.muted }]),
@@ -149,7 +146,7 @@ function headRow(lane: Lane, look: LaneLook): Piece[] {
   ];
   const kept = arrange(sides, width, 1);
   const right = kept.filter((side) => side.priority !== 0).flatMap((side) => [{ text: " " }, ...side.pieces]);
-  const room = width - cellsOf(identity) - cellsOf(right);
+  const room = width - piecesWidth(identity) - piecesWidth(right);
   const task = lane.description === "" ? "" : fitEnd(` ${g.dot} ${oneLine(lane.description)}`, room, g.ellipsis);
   return [...identity, { text: padEnd(task, room) }, ...right];
 }
@@ -157,17 +154,17 @@ function headRow(lane: Lane, look: LaneLook): Piece[] {
 function toolRow(lane: Lane, look: LaneLook, home: string, mask: string): Piece[] {
   const { width, tier, ascii, now, g } = look;
   const lead: Piece[] = [{ text: "  " }];
-  const marks = strip(lane.tools, Math.min(STRIP[tier], Math.max(0, width - 2 - 14)), ascii);
+  const marks = strip(lane.tools, Math.min(STRIP[tier], Math.max(0, width - 2 - TOOL_CELLS)), ascii);
   const spin: Piece = { text: spinner(now, ascii), color: TONE_KEYS.active };
   const pieces: Piece[] = [...lead, ...marks, ...(marks.length > 0 ? [{ text: " " }] : []), spin, { text: " " }];
   if (lane.tool === null) {
     pieces.push({ text: lane.calls === 0 ? "starting" : "thinking", color: TONE_KEYS.muted });
     return pieces;
   }
-  const label = fitEnd(toolLabel(lane.tool.name), Math.max(0, width - cellsOf(pieces)), g.ellipsis);
+  const label = fitEnd(toolLabel(lane.tool.name), Math.max(0, width - piecesWidth(pieces)), g.ellipsis);
   pieces.push({ text: label, color: ON_SURFACE, bold: true });
   const detail = redactLine(lane.tool.detail, home, mask);
-  const room = width - cellsOf(pieces) - 1;
+  const room = width - piecesWidth(pieces) - 1;
   if (detail !== "" && room > 0) pieces.push({ text: ` ${fitEnd(detail, room, g.ellipsis)}` });
   return pieces;
 }
@@ -231,7 +228,7 @@ export function summaryRow(lanes: readonly Lane[], look: LaneLook): Piece[] {
     { text: `${running} running`, ...(running > 0 ? { color: ON_SURFACE, bold: true as const } : { color: TONE_KEYS.muted }) },
     { text: ` ${g.dot} ${lanes.length - running} finished ${g.dot} ${formatTokens(tokens)} tokens`, color: TONE_KEYS.muted },
   ];
-  return cellsOf(pieces) <= width ? pieces : pieces.slice(0, 2);
+  return piecesWidth(pieces) <= width ? pieces : pieces.slice(0, 2);
 }
 
 /** The strip's key: each kind's glyph in its color and its name, as far as `width` allows. */

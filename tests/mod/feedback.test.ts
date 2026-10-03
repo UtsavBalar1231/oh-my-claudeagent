@@ -1,20 +1,37 @@
 import type { CommandSpec, On } from "claude-code";
 import { type Engine, expect, test } from "claude-code/testing";
-import { USAGE } from "../../hooks/feedback.ts";
 import { usableColumns } from "../../src/core/ui-kit.ts";
-import type { RenderElement } from "claude-code";
-import { bodyColumns, cellsAcross, pane, ROOT, rows, run, SESSION, SIZES, topRows, type World, world } from "./world.ts";
+import {
+  bodyColumns,
+  cellsAcross,
+  isNode,
+  local,
+  pane,
+  ROOT,
+  rows,
+  run,
+  SESSION,
+  SIZES,
+  spreadRows,
+  topRows,
+  type World,
+  world,
+} from "./world.ts";
 
 const FILE = `${ROOT}/.omca/feedback/${SESSION}.json`;
 const AT = "2026-10-02T12:00:00.000Z";
 const LONG_NOTE = "the footer named the wrong command after the plan reader reloaded the plan twice in one turn";
 
-function engine(on: On): { w: World; registered: CommandSpec[] } {
+function engine(on: On, refuseWrites = false): { w: World; registered: CommandSpec[] } {
   const w = world(on);
   const registered: CommandSpec[] = [];
   on("session.start", (_$, e) => ({ cwd: e.cwd }));
   on("command.register", (_$, e) => (registered.push(e), { value: { command: e.name } }));
-  on("fs.write", (_$, e) => (w.files.set(w.spelled(e.path), { text: e.text, mtimeMs: w.clock.now() }), { value: undefined }));
+  on("fs.write", (_$, e) => {
+    if (refuseWrites) return { deny: "EROFS: read-only file system" };
+    w.files.set(w.spelled(e.path), { text: e.text, mtimeMs: w.clock.now() });
+    return { value: undefined };
+  });
   on("session.usage", () => ({ value: { startedAt: 0, context: { window: 200_000 }, rateLimits: [] } }));
   on("turn.start", (_$, e) => ({ turnId: e.turnId }));
   on("turn.complete", (_$, e) => ({ text: e.answer }));
@@ -35,31 +52,7 @@ const complete = ($: Engine, turnId: string, agentId?: string) =>
 
 const rate = ($: Engine, args: string) => $.command.run({ ...run(args), command: "omca-rate" });
 
-type Node = { type: string; props?: Record<string, unknown>; children?: unknown };
-const isNode = (value: unknown): value is Node => typeof value === "object" && value !== null && "type" in value;
-const childrenOf = (node: Node): unknown[] => (Array.isArray(node.children) ? node.children : node.children === undefined ? [] : [node.children]);
-function textOf(element: unknown): string {
-  if (typeof element === "string") return element;
-  if (!isNode(element)) return "";
-  if (element.type === "Button") return `${String(element.props?.["hotkey"])}: ${String(element.props?.["label"])}`;
-  const gap = " ".repeat(typeof element.props?.["columnGap"] === "number" ? element.props["columnGap"] : 0);
-  return childrenOf(element).map(textOf).join(gap);
-}
-
-// The rows a tree draws, a column Box such as a card spread into the rows it holds.
-function lines(tree: RenderElement): string[] {
-  const spread = (element: unknown): string[] =>
-    isNode(element) && element.type === "Box" && element.props?.["flexDirection"] === "column" ? childrenOf(element).flatMap(spread) : [textOf(element)];
-  return topRows(tree).flatMap(spread);
-}
-
 const saved = (ratings: readonly object[]) => `${JSON.stringify({ session_id: SESSION, ratings }, null, 2)}\n`;
-
-const two = (value: number) => String(value).padStart(2, "0");
-const local = (iso: string) => {
-  const date = new Date(iso);
-  return `${two(date.getMonth() + 1)}-${two(date.getDate())} ${two(date.getHours())}:${two(date.getMinutes())}`;
-};
 
 test("session start registers /omca-rate to run at once with its argument hint", async ($, on) => {
   const { registered } = engine(on);
@@ -125,6 +118,7 @@ test("a typed note wins over a selection, which is not asked for its text", asyn
 
   expect(await rate($, "up typed words")).toEqual({ text: 'Rated the last turn up: "typed words".' });
   expect(w.files.get(FILE)?.text).toBe(saved([{ turn_id: "t-1", at: AT, rating: "up", note: "typed words" }]));
+  expect(w.selectionReads).toBe(0);
 });
 
 test("with no note and nothing selected, or only blanks selected, the rating carries no note", async ($, on) => {
@@ -158,7 +152,24 @@ test("a malformed argument is answered with the usage text and records nothing",
   for (const args of ["", "  ", "sideways", "upvote", "UP", "good up"]) {
     expect(await rate($, args)).toEqual({ text: "Usage: /omca-rate up|down [note]" });
   }
-  expect(USAGE).toBe("Usage: /omca-rate up|down [note]");
+  expect(w.files.has(FILE)).toBe(false);
+});
+
+test("a session id that cannot name a file records nothing and says why", async ($, on) => {
+  const { w } = engine(on);
+  w.sessionId = "../escape";
+  await start($);
+
+  expect(await rate($, "up")).toEqual({ text: 'Could not record the rating: the session id "../escape" cannot name a file' });
+  expect([...w.files.keys()].filter((path) => path.includes("/.omca/feedback/"))).toEqual([]);
+});
+
+test("a rating the file system refuses to write is answered with the reason", async ($, on) => {
+  const { w } = engine(on, true);
+  await start($);
+  await complete($, "t-1");
+
+  expect(await rate($, "down")).toEqual({ text: "Could not record the rating: EROFS: read-only file system" });
   expect(w.files.has(FILE)).toBe(false);
 });
 
@@ -179,7 +190,7 @@ for (const surface of ["terminal", "desktop"] as const) {
     await complete($, "t-1");
     await $.command.run(run(""));
     const ui = await $.ui.mount(pane(surface, { columns: 120, rows: 40, placement: "dock" }));
-    const body = async () => lines(await ui.drawn()).slice(3);
+    const body = async () => spreadRows(await ui.drawn()).slice(3);
     await ui.press({ key: "5" });
     expect(await body()).toEqual(["u: Up  d: Down  rate the last turn", "No feedback has been recorded in this session."]);
 
@@ -216,7 +227,7 @@ test("the Feedback tab shows a note, a read failure and every row inside the gut
       const room = usableColumns(bodyColumns(size));
       const ui = await $.ui.mount(pane(surface, size));
       await ui.press({ key: "5" });
-      const drawn = lines(await ui.drawn());
+      const drawn = spreadRows(await ui.drawn());
       const row = drawn.find((text) => text.startsWith(" ↓ DOWN"));
       expect(row?.startsWith(` ↓ DOWN  ${local(AT)}  the footer named`), `${size.columns} ${size.placement}`).toBe(true);
       for (const child of topRows(await ui.drawn())) {
@@ -293,7 +304,7 @@ test("all-up ratings draw the card in the ok tone, and a short body names the ra
 
   const card = topRows(await ui.drawn()).at(-1);
   expect(isNode(card) ? card.props?.["borderColor"] : undefined).toBe("success");
-  expect(lines(await ui.drawn()).slice(1)).toEqual([
+  expect(spreadRows(await ui.drawn()).slice(1)).toEqual([
     "u: Up  d: Down  rate the session (no turn yet)",
     "9 ratings, newest first · ↑ 9 up · ↓ 0 down",
     ` ↑ UP    ${local("2026-10-02T12:08:00.000Z")}  `,
@@ -317,7 +328,7 @@ test("OMCA_ASCII draws the verdict chips and arrows from the ASCII set", async (
   await $.command.run(run(""));
   const ui = await $.ui.mount(pane("terminal", { columns: 120, rows: 40, placement: "dock" }));
   await ui.press({ key: "5" });
-  expect(lines(await ui.drawn()).slice(4)).toEqual([
+  expect(spreadRows(await ui.drawn()).slice(4)).toEqual([
     "2 ratings, newest first - ^ 1 up - v 1 down",
     `[^ UP]   ${local(AT)}  `,
     `[v DOWN] ${local(AT)}  `,

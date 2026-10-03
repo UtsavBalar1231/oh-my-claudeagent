@@ -60,12 +60,13 @@ export const REGISTRY: Readonly<Record<string, readonly (readonly [string, Handl
   SessionStart: [["session-start", sessionStart]],
 };
 
-const OBJECT_FIELDS = ["tool_input", "tool_response", "tool_calls", "background_tasks"];
+const OBJECT_FIELDS = ["tool_input", "tool_response", "background_tasks"];
 
 // The client substitutes an absent path as "", an object as JSON, and a string as the raw
 // string, so text that is not JSON is the field's own string value.
 function decode(value: unknown): unknown {
-  if (typeof value !== "string" || value === "") return undefined;
+  if (typeof value !== "string") return value;
+  if (value === "") return undefined;
   try {
     return JSON.parse(value);
   } catch {

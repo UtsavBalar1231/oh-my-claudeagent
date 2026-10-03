@@ -59,6 +59,8 @@ describe("model", () => {
     ["best", "best"],
     ["opusplan", "opusplan"],
     ["claude-nova-9-1-2", "claude-nova-9-1-2"],
+    ["claude-sonnet-4-5-20250929", "Sonnet 4.5"],
+    ["claude-opus-4-20250514", "Opus 4"],
   ])("the payload model %s reads %s", (id, label) => {
     expect(content({ name: "worker", model: id })).toBe(row(name("worker"), model(label)));
   });

@@ -2,14 +2,11 @@ import type { SessionMessage } from "claude-code";
 import { expect, test } from "claude-code/testing";
 import { split, USAGE } from "../../hooks/omca-router.ts";
 import { readOptions } from "../../hooks/register.ts";
-
-const PLUGIN = "oh-my-claudeagent";
-const RUN = { origin: { kind: "composer" }, presentation: { isFullscreen: true, columns: 120 } } as const;
+import { PLUGIN, run } from "./world.ts";
 const ATOMS = [
   "agents",
   "band",
   "costSample",
-  "dialogs",
   "doctor",
   "lanes",
   "ledger",
@@ -18,7 +15,6 @@ const ATOMS = [
   "plan",
   "routes",
   "stats",
-  "status",
 ].map((key) => ({ plugin: PLUGIN, key }));
 
 test("the module registers exactly the dispatchers, env reads and atoms of the contract", async ($, on) => {
@@ -161,7 +157,6 @@ test("each passthrough dispatcher calls next once and returns its answer", async
   on("session.compact", (_$, e) => (calls.push("session.compact"), { messages: e.messages.slice(-1) }));
   on("ui.focus", () => (calls.push("ui.focus"), {}));
   on("ui.scroll", () => (calls.push("ui.scroll"), {}));
-  on("command.run", (_$, e) => (calls.push(`command.run ${e.command} ${e.args}`), { text: "engine output" }));
 
   expect(await $.session.start({ cwd: "/work", surface: "terminal", isInteractive: true })).toEqual({ cwd: "/engine" });
   expect(await $.turn.start({ text: "hi", turnId: "t-1" })).toEqual({ turnId: "t-1" });
@@ -194,8 +189,6 @@ test("each passthrough dispatcher calls next once and returns its answer", async
   expect(
     await $.ui.scroll({ component: "Pane", requestId: "omca", offset: 0, by: 1, bodyRows: 8, contentRows: 20, origin: { kind: "person" } }),
   ).toEqual({});
-  expect(await $.command.run({ ...RUN, command: "omca", args: "" })).toEqual({ text: "engine output" });
-  expect(await $.command.run({ ...RUN, command: "omca", args: "plan my-plan" })).toEqual({ text: "engine output" });
   expect(calls).toEqual([
     "session.start",
     "turn.start",
@@ -204,8 +197,6 @@ test("each passthrough dispatcher calls next once and returns its answer", async
     "session.compact",
     "ui.focus",
     "ui.scroll",
-    "command.run omca ",
-    "command.run omca plan my-plan",
   ]);
 });
 
@@ -276,7 +267,7 @@ test("/omca answers an unknown subcommand with its usage and runs no command", a
   const calls: string[] = [];
   on("command.run", (_$, e) => (calls.push(e.args), { text: "engine output" }));
 
-  expect(await $.command.run({ ...RUN, command: "omca", args: "statz" })).toEqual({
+  expect(await $.command.run(run("statz"))).toEqual({
     text: `Unknown /omca subcommand "statz". ${USAGE}`,
   });
   expect(calls).toEqual([]);

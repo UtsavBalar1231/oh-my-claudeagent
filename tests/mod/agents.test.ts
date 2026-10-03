@@ -1,18 +1,10 @@
-import type { On, RenderElement, TurnStepToolUse, TurnUsage } from "claude-code";
+import type { On, RenderElement, TurnStepToolUse } from "claude-code";
 import { type Engine, expect, test } from "claude-code/testing";
-import { pane, run, type Size, world } from "./world.ts";
+import { childrenOf, drain, isAscii, isNode, type Node, nodeByKey, pane, run, type Size, usage, world } from "./world.ts";
 
 const DOCK_120: Size = { columns: 120, rows: 40, placement: "dock" };
 const INLINE_80: Size = { columns: 80, rows: 40, placement: "inline" };
 const INLINE_200: Size = { columns: 200, rows: 50, placement: "inline" };
-
-const usage = (input: number, output: number): TurnUsage => ({
-  input_tokens: input,
-  output_tokens: output,
-  cache_read_input_tokens: 0,
-  cache_creation_input_tokens: 0,
-  model: "claude-sonnet-5-5",
-});
 
 const spawnOf = (n: number, type: string, description: string, prompt: string) =>
   ({
@@ -49,41 +41,28 @@ function engine(on: On, steps: Readonly<Record<string, readonly Step[]>>): void 
 async function stepAll($: Engine, agentId: string, count: number): Promise<void> {
   for (let index = 0; index < count; index++) {
     const stream = $.turn.step({ turnId: `t-${agentId}`, index, model: "claude-sonnet-5-5", effort: "high", messageCount: 1, agentId });
-    for (let next = await stream.next(); next.done !== true; next = await stream.next());
+    await drain(stream);
   }
 }
 
 const finish = ($: Engine, agentId: string, answer: string, reason: "answer" | "aborted" | "error" = "answer") =>
   $.turn.complete({ answer, durationMs: 1000, isAborted: reason === "aborted", turnId: `t-${agentId}`, reason, agentId, usage: usage(2000, 500) });
 
-type Node = { type: string; key?: string; props?: Record<string, unknown>; hover?: Record<string, unknown>; children?: unknown };
-const isNode = (value: unknown): value is Node => typeof value === "object" && value !== null && "type" in value;
-const kids = (node: Node): unknown[] => (Array.isArray(node.children) ? node.children : node.children === undefined ? [] : [node.children]);
 const isCard = (node: Node) => node.props?.["position"] === "absolute";
-
-function keyed(element: unknown, key: string): Node | undefined {
-  if (!isNode(element)) return undefined;
-  if (element.props?.["key"] === key) return element;
-  for (const child of kids(element)) {
-    const found = keyed(child, key);
-    if (found !== undefined) return found;
-  }
-  return undefined;
-}
 
 function textOf(element: unknown): string {
   if (typeof element === "string") return element;
   if (!isNode(element) || isCard(element)) return "";
   if (element.type === "Button") return `${String(element.props?.["hotkey"])}: ${String(element.props?.["label"])}`;
   const gap = " ".repeat(typeof element.props?.["columnGap"] === "number" ? element.props["columnGap"] : 0);
-  return kids(element).map(textOf).join(element.type === "Box" ? gap : "");
+  return childrenOf(element).map(textOf).join(element.type === "Box" ? gap : "");
 }
 
 /** The body rows as the terminal stacks them: a lane's anchor rows each on their own, its hover card left out. */
 function body(tree: RenderElement): string[] {
-  const top = isNode(tree) ? kids(tree) : [];
+  const top = isNode(tree) ? childrenOf(tree) : [];
   return top.flatMap((child) =>
-    isNode(child) && child.type === "Box" && child.props?.["flexDirection"] === "column" ? kids(child).filter((one) => !(isNode(one) && isCard(one))).map(textOf) : [textOf(child)],
+    isNode(child) && child.type === "Box" && child.props?.["flexDirection"] === "column" ? childrenOf(child).filter((one) => !(isNode(one) && isCard(one))).map(textOf) : [textOf(child)],
   );
 }
 
@@ -148,7 +127,6 @@ test("the lane widens with the body, keeping the model chip, at 80 and 200 colum
   const at200 = await $.ui.mount(pane("terminal", INLINE_200));
   const rows = body(await at200.drawn());
   expect(rows[2]).toBe(`◆ executor · Fix the heading parser${" ".repeat(128)}sonnet-5-5   high  4.5k  1m06s`);
-  expect(rows[2]?.length).toBe(193);
   expect(rows.at(-1)).toBe("d: Details   ○ read ✎ edit $ bash ◇ mcp ◆ agent");
   await at200.unmount();
 });
@@ -159,7 +137,7 @@ test("tool calls draw one glyph each in their kind's key, the current tool's nam
   const lane = await ui.find({ key: "tools-a-1" });
   const head = await ui.find({ key: "lane-a-1" });
   const styled = (node: unknown): [string, unknown, unknown][] =>
-    isNode(node) ? (kids(kids(node)[0] as Node) as Node[]).map((piece) => [textOf(piece), piece.props?.["color"], piece.props?.["backgroundColor"]]) : [];
+    isNode(node) ? (childrenOf(childrenOf(node)[0] as Node) as Node[]).map((piece) => [textOf(piece), piece.props?.["color"], piece.props?.["backgroundColor"]]) : [];
 
   expect(styled(lane)).toEqual([
     ["  ", undefined, undefined],
@@ -205,11 +183,30 @@ test("a finished agent collapses to one dim line with its result and duration, a
     "d: Details   ○ read ✎ edit $ bash ◇ mcp ◆ agent",
   ]);
   const done = await ui.find({ key: "done-a-2" });
-  const pieces = isNode(done) ? (kids(kids(done)[0] as Node) as Node[]) : [];
+  const pieces = isNode(done) ? (childrenOf(childrenOf(done)[0] as Node) as Node[]) : [];
   expect(pieces.map((piece) => [piece.props?.["color"], piece.hover?.["color"]])).toEqual([
     ["success", "text"],
     ["inactive", "text"],
     ["inactive", "text"],
+  ]);
+  await ui.unmount();
+});
+
+test("the pane timer ends each lane the agent list reports completed, failed or killed, in that status's glyph", async ($, on) => {
+  const w = await threeAgents($, on);
+  w.agents = [
+    { id: "a-1", description: "", type: "x", status: "completed" },
+    { id: "a-2", description: "", type: "x", status: "failed" },
+    { id: "a-3", description: "", type: "x", status: "killed" },
+  ];
+  await w.clock.advance(2000);
+  const ui = await $.ui.mount(pane("terminal", DOCK_120));
+
+  const done = await Promise.all(["a-1", "a-2", "a-3"].map(async (id) => (await ui.find({ key: `done-${id}` }))?.text.trimEnd()));
+  expect(done).toEqual([
+    "✓ executor · done                                2s",
+    "✗ explore · failed                               2s",
+    "! oracle · stopped                               2s",
   ]);
   await ui.unmount();
 });
@@ -225,7 +222,7 @@ test("hovering a lane reveals a card, drawn last so it paints over the rows belo
   const ui = await $.ui.mount(pane("terminal", DOCK_120));
 
   const tree = await ui.drawn();
-  const panel = keyed(tree, "card-a-1");
+  const panel = nodeByKey(tree, "card-a-1");
   expect(panel === undefined ? undefined : { props: panel.props, hover: panel.hover }).toEqual({
     props: {
       key: "card-a-1",
@@ -242,10 +239,10 @@ test("hovering a lane reveals a card, drawn last so it paints over the rows belo
     },
     hover: { display: "flex", scope: "omca-agent-a-1" },
   });
-  expect(keyed(tree, "agent-a-1")?.hover).toEqual({ scope: "omca-agent-a-1" });
-  const top = isNode(tree) ? kids(tree) : [];
+  expect(nodeByKey(tree, "agent-a-1")?.hover).toEqual({ scope: "omca-agent-a-1" });
+  const top = isNode(tree) ? childrenOf(tree) : [];
   expect(top.map((child) => (isNode(child) ? child.props?.["key"] : undefined)).at(-1)).toBe("agent-cards");
-  expect(isNode(panel) ? kids(panel).map(textOf) : []).toEqual([
+  expect(isNode(panel) ? childrenOf(panel).map(textOf) : []).toEqual([
     "executor · Rotate the key",
     "Prompt",
     "Rotate the key ‹masked› kept in ~/.env and",
@@ -267,7 +264,7 @@ test("a card that cannot fit below its lane in a short inline body is pinned ins
   const tops = await Promise.all(["a-1", "a-2", "a-3"].map(async (id) => (await ui.find({ key: `card-${id}` }))?.props["top"]));
   expect(tops).toEqual([-6, -6, -6]);
   const panel = await ui.find({ key: "card-a-1" });
-  expect(isNode(panel) ? kids(panel).map(textOf) : []).toEqual([
+  expect(isNode(panel) ? childrenOf(panel).map(textOf) : []).toEqual([
     "executor · Fix the heading parser",
     "Prompt",
     "Fix the heading parser so fenced lines are skipped.",
@@ -396,7 +393,6 @@ test("OMCA_ASCII draws the lanes, strip, spinner and chips in ASCII", async ($, 
     "  rre$ | Bash bun test src/parser.spec.ts",
     "d: Details   r read e edit $ bash m mcp @ agent",
   ]);
-  const isAscii = (row: string) => [...row].every((char) => char.charCodeAt(0) >= 32 && char.charCodeAt(0) < 127);
-  expect(JSON.parse(JSON.stringify(body(await ui.drawn()))).filter((row: string) => !isAscii(row))).toEqual([]);
+  expect(body(await ui.drawn()).filter((row) => !isAscii(row))).toEqual([]);
   await ui.unmount();
 });

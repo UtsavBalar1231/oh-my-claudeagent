@@ -2,7 +2,27 @@ import type { On, RenderElement } from "claude-code";
 import { expect, test } from "claude-code/testing";
 import { joinPath } from "../../src/core/path.ts";
 import { usableColumns } from "../../src/core/ui-kit.ts";
-import { bodyColumns, cellsAcross, LAYOUTS, pane, POSIX, ROOT, rows, run, SESSION, SIZES, type Size, topRows, type World, world, write } from "./world.ts";
+import {
+  bodyColumns,
+  cellsAcross,
+  childrenOf,
+  isAscii,
+  isNode,
+  LAYOUTS,
+  nodeByKey,
+  pane,
+  POSIX,
+  ROOT,
+  rows,
+  run,
+  SESSION,
+  type Size,
+  SIZES,
+  topRows,
+  world,
+  type World,
+  write,
+} from "./world.ts";
 
 const NOW_S = Date.UTC(2026, 9, 2, 12, 0, 0) / 1000;
 const USER = {
@@ -44,9 +64,6 @@ function engine(on: On, w: World, options: { hold?: boolean; refuse?: readonly s
   return e;
 }
 
-type Node = { type: string; props?: Record<string, unknown>; children?: unknown };
-const isNode = (value: unknown): value is Node => typeof value === "object" && value !== null && "type" in value;
-const childrenOf = (node: Node): unknown[] => (Array.isArray(node.children) ? node.children : node.children === undefined ? [] : [node.children]);
 const textOf = (element: unknown): string => (typeof element === "string" ? element : isNode(element) ? childrenOf(element).map(textOf).join("") : "");
 
 // Every row the tree takes in the body, a column Box spread into the rows it holds.
@@ -201,6 +218,35 @@ for (const layout of LAYOUTS) {
     await ui.unmount();
   });
 
+  test(`a failed write after the backup leaves the file as it was and names the backup${suffix}`, async ($, on) => {
+    const w = engine(on, world(on, FILES, structuredClone(USER), {}, layout), { refuse: [SETTINGS] });
+    await $.command.run(run("doctor", 120));
+    const ui = await $.ui.mount(pane("terminal", WIDE));
+
+    await ui.press({ key: "i" });
+
+    expect(w.writes).toEqual([`${SETTINGS}.omca-bak`, SETTINGS]);
+    expect(w.files.get(SETTINGS)?.text).toBe(USER_TEXT);
+    expect(w.files.get(`${SETTINGS}.omca-bak`)?.text).toBe(USER_TEXT);
+    expect(body(await ui.drawn())[1]).toBe(
+      "✗ Could not write ~/.claude/settings.json: EACCES: permission denied; ~/.claude/settings.json.omca-bak holds the original",
+    );
+    await ui.unmount();
+  });
+
+  test(`a settings.json gone since the check is reported, and nothing is written${suffix}`, async ($, on) => {
+    const w = engine(on, world(on, FILES, structuredClone(USER), {}, layout));
+    await $.command.run(run("doctor", 120));
+    const ui = await $.ui.mount(pane("terminal", WIDE));
+
+    w.files.delete(SETTINGS);
+    await ui.press({ key: "i" });
+
+    expect(w.writes).toEqual([]);
+    expect(body(await ui.drawn())[1]).toBe(`✗ Could not read ~/.claude/settings.json: ENOENT: no such file, ${SETTINGS}`);
+    await ui.unmount();
+  });
+
   test(`CLAUDE_CONFIG_DIR moves the settings file the doctor reads and fixes, and HOME/.claude is never read${suffix}`, async ($, on) => {
     const config = layout === POSIX ? "/cfg" : "D:\\cfg";
     const moved = joinPath(layout.platform, config, "settings.json");
@@ -212,7 +258,8 @@ for (const layout of LAYOUTS) {
     expect(body(await ui.drawn()).find((row) => row.startsWith(" ! WARN  Status line"))).toBe(STATUS_ROW);
     await ui.press({ key: "i" });
     expect(w.writes).toEqual([`${moved}.omca-bak`, moved]);
-    expect(w.reads.filter((path) => path.startsWith(`${layout.home}/.claude/`) || path.startsWith(`${layout.home}\\.claude`))).toEqual([]);
+    const homeConfig = `${joinPath(layout.platform, layout.home, ".claude")}/`;
+    expect(w.reads.filter((path) => path.startsWith(homeConfig))).toEqual([]);
     await ui.unmount();
   });
 
@@ -271,8 +318,7 @@ for (const layout of LAYOUTS) {
     expect(drawn[2]).toBe(`[! WARN] OMCA          Could not read this mod's version from its${PAD}manifest`);
     expect(drawn).toContain("[+ OK]   Claude Code   2.1.288 meets the 2.1.288 floor");
     expect(drawn.at(-2)).toBe("  v 9 more - ^v scroll");
-    const isAscii = (row: string) => [...row].every((char) => char.charCodeAt(0) >= 32 && char.charCodeAt(0) < 127);
-    expect(rows(await ui.drawn()).filter((row) => !isAscii(row))).toEqual([]);
+      expect(rows(await ui.drawn()).filter((row) => !isAscii(row))).toEqual([]);
     await ui.unmount();
   });
 }
@@ -377,7 +423,7 @@ test("Home and End send the Doctor list to its first and last check even when on
   expect(await edges()).toEqual(["  ↓ 12 more · ↑↓ scroll"]);
 
   await key(contentRows - 1);
-  expect(await titles()).not.toEqual(["check-style"]);
+  expect(await titles()).toEqual(["check-statusline"]);
   expect(await edges()).toHaveLength(2);
   await ui.unmount();
 });
@@ -448,27 +494,23 @@ test("the Output style row warns with the active style and the way back when the
   await ui.unmount();
 });
 
-function node(element: unknown, key: string): Node | undefined {
-  if (!isNode(element)) return undefined;
-  if (element.props?.["key"] === key) return element;
-  return childrenOf(element).reduce<Node | undefined>((found, child) => found ?? node(child, key), undefined);
-}
-
 const piece = (props: Record<string, unknown>, run: string) => ({ type: "Text", ...(Object.keys(props).length === 0 ? {} : { props }), children: [run] });
 const line = (...pieces: unknown[]) => ({ type: "Text", props: { wrap: "truncate-end" }, children: pieces });
 
-test("a row is a chip with the level's glyph and word on its tone, the label bold, and it lights on hover; the head counts each level in its tone", async ($, on) => {
+test("a row is a chip with the level's glyph and word on its tone, the label bold, and it lights on hover; the head counts each level with its glyph in its tone", async ($, on) => {
   const status = { [`${ROOT}/.omca/state/session/${SESSION}.json`]: JSON.stringify({ session_id: SESSION, last_hook_at: NOW_S - 120 }) };
   engine(on, world(on, status, structuredClone(USER)));
   await $.command.run(run("doctor", 120));
   const ui = await $.ui.mount(pane("terminal", WIDE));
   const drawn = await ui.drawn();
 
-  expect(childrenOf(node(drawn, "head") ?? { type: "" })[1]).toEqual(
+  expect(childrenOf(nodeByKey(drawn, "head") ?? { type: "" })[1]).toEqual(
     line(
-      piece({ color: "warning" }, "! 2 warn"),
+      piece({ color: "warning" }, "!"),
+      piece({}, " 2 warn"),
       piece({}, "  "),
-      piece({ color: "success" }, "✓ 11 ok"),
+      piece({ color: "success" }, "✓"),
+      piece({}, " 11 ok"),
       piece({ color: "inactive" }, `  checked ${local(NOW_S)}`),
     ),
   );
@@ -485,7 +527,7 @@ test("a row is a chip with the level's glyph and word on its tone, the label bol
       ),
     ],
   });
-  expect(childrenOf(node(drawn, "check-mod") ?? { type: "" })[0]).toEqual(
+  expect(childrenOf(nodeByKey(drawn, "check-mod") ?? { type: "" })[0]).toEqual(
     line(
       piece({ color: "inverseText", backgroundColor: "warning", bold: true }, " ! WARN "),
       piece({}, " "),
@@ -503,7 +545,7 @@ test("a check that names a command offers it on its own key, which fills the pro
   await $.command.run(run("doctor", 120));
   const ui = await $.ui.mount(pane("terminal", WIDE));
 
-  expect(node(await ui.drawn(), "action-advisor-0")).toEqual({
+  expect(nodeByKey(await ui.drawn(), "action-advisor-0")).toEqual({
     type: "Box",
     props: { key: "action-advisor-0", flexDirection: "row" },
     children: [

@@ -1,6 +1,7 @@
 import { appendFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseFrontmatter } from "../src/core/frontmatter.ts";
+import { formatTokens, shortType } from "../src/core/ui-kit.ts";
 import {
   agentGlyph,
   arrange,
@@ -10,7 +11,6 @@ import {
   detectNerdFont,
   DIM,
   fixed,
-  formatTokens,
   GREEN,
   NERD_GLYPHS,
   RED,
@@ -32,7 +32,7 @@ interface Task {
 }
 
 const OMCA_PREFIX = "oh-my-claudeagent:";
-const MODEL_ID = /^claude-([a-z]+)-(\d+)(?:-(\d+))?$/;
+const MODEL_ID = /^claude-([a-z]+)-(\d+)(?:-(\d{1,2}))?(?:-\d{8})?$/;
 const TIER_ALIASES = new Set(["opus", "sonnet", "fable", "haiku"]);
 const STATUS_COLORS = new Map([
   ["in_progress", YELLOW],
@@ -70,7 +70,7 @@ function effortLabel(effort: Task["effort"]): string {
 
 function row(task: Task, nerd: boolean, columns: number): string {
   const g = nerd ? NERD_GLYPHS : ASCII_GLYPHS;
-  const name = task.name ? task.name.slice(task.name.lastIndexOf(":") + 1) : task.label || task.type || "agent";
+  const name = task.name ? shortType(task.name) : task.label || task.type || "agent";
   const parts = [`${BOLD}${agentGlyph(name, nerd)} ${name}${RST}`];
 
   const model = friendlyModel(task.model || frontmatterModel(task.name ?? ""));

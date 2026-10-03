@@ -64,18 +64,14 @@ test("a pre answer skips next, yet every pre still runs", async () => {
   expect(ran).toEqual(["guard", "route"]);
 });
 
-const PRECEDENCE: readonly (readonly [string, readonly Answer[], Answer])[] = [
-  ["deny over block over text", [{ text: "t" }, { block: "b" }, { deny: "d" }], { deny: "d" }],
-  ["block over text", [{ text: "t" }, { block: "b" }], { block: "b" }],
+const FIRST_WINS: readonly (readonly [string, readonly Answer[], Answer])[] = [
+  ["a text before a deny", [{ text: "t" }, { block: "b" }, { deny: "d" }], { text: "t" }],
   ["the first deny of two", [{ deny: "first" }, { deny: "second" }], { deny: "first" }],
-  ["the first text of two", [{ text: "first" }, { text: "second" }], { text: "first" }],
-  ["a tool.check deny decision over text", [{ text: "t" }, { decision: "deny", reason: "r" }], { decision: "deny", reason: "r" }],
-  ["a deny decision over an ask decision", [{ decision: "ask" }, { decision: "deny", reason: "r" }], { decision: "deny", reason: "r" }],
-  ["an unranked answer when it is the only one", [{ decision: "ask" }], { decision: "ask" }],
+  ["an ask decision before a deny decision", [{ decision: "ask" }, { decision: "deny", reason: "r" }], { decision: "ask" }],
 ];
 
-for (const [title, answers, expected] of PRECEDENCE) {
-  test(`post answers combine: ${title}`, async () => {
+for (const [title, answers, expected] of FIRST_WINS) {
+  test(`the first post answer in feature order wins: ${title}`, async () => {
     const features = answers.map((answer, index): [string, Feature<string, Answer, Answer, Logs>] => [
       `f${index}`,
       { post: () => ({ ...answer }) },
@@ -86,15 +82,14 @@ for (const [title, answers, expected] of PRECEDENCE) {
   });
 }
 
-test("pre answers combine by the same precedence before next would run", async () => {
+test("the first pre answer wins, and next never runs", async () => {
   const features: [string, Feature<string, Answer, Answer, Logs>][] = [
     ["a", { pre: () => ({ answer: { text: "t" } }) }],
     ["b", { pre: () => ({ answer: { deny: "d" } }) }],
-    ["c", { pre: () => ({ answer: { block: "b" } }) }],
   ];
   const { calls, next } = counted<string, Answer>(() => ({ text: "from next" }));
 
-  expect(await dispatch(logs(), "x", features, "e", next)).toEqual({ deny: "d" });
+  expect(await dispatch(logs(), "x", features, "e", next)).toEqual({ text: "t" });
   expect(calls).toEqual([]);
 });
 

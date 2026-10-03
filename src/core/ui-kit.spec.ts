@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  arrange,
   displayWidth,
   fitEnd,
   fitMiddle,
@@ -9,14 +10,33 @@ import {
   glyphs,
   isAsciiRequested,
   keyHint,
+  oneLine,
   padEnd,
   padStart,
+  share,
   shortType,
   usableColumns,
   wrapText,
 } from "./ui-kit.ts";
 
 const E = glyphs(false).ellipsis;
+
+describe("displayWidth", () => {
+  test.each([
+    ["ascii", "abc", 3],
+    ["CJK", "日本", 4],
+    ["wide BMP symbols", "✅❌⭐⏰", 8],
+    ["narrow BMP symbols OMCA draws", "✓✗●○◐⊘◆✎◇", 9],
+    ["a skin tone joins its emoji", "👍🏽", 2],
+    ["a ZWJ family is one glyph", "👨‍👩‍👧", 2],
+  ])("%s", (_name, text, width) => {
+    expect(displayWidth(text)).toBe(width);
+  });
+
+  test("a cut never splits a ZWJ sequence's width", () => {
+    expect(fitEnd("👨‍👩‍👧 family", 4, E)).toBe("👨‍👩‍👧…");
+  });
+});
 
 describe("fitEnd", () => {
   test.each([
@@ -105,7 +125,7 @@ describe("glyphs", () => {
     for (const [name, glyph] of Object.entries(ascii)) {
       expect({ name, ascii: /^[\x20-\x7e]+$/.test(glyph) }).toEqual({ name, ascii: true });
     }
-    for (const name of ["pointer", "check", "cross", "warn", "running", "pending", "up", "down", "dot", "rule", "progress", "blocked", "agent"] as const) {
+    for (const name of ["pointer", "check", "cross", "warn", "running", "pending", "up", "down", "dot", "rule", "vrule", "progress", "blocked", "agent"] as const) {
       expect({ name, unicode: displayWidth(unicode[name]), ascii: ascii[name].length }).toEqual({ name, unicode: 1, ascii: 1 });
     }
     expect(fitEnd("hello world", 6, ascii.ellipsis)).toBe("hel...");
@@ -155,8 +175,12 @@ describe("formatTokens", () => {
     [1000, "1.0k"],
     [13_500, "13.5k"],
     [99_949, "99.9k"],
+    [99_950, "100k"],
+    [100_000, "100k"],
     [129_000, "129k"],
     [999_499, "999k"],
+    [999_500, "1.0M"],
+    [1_000_000, "1.0M"],
     [1_041_500, "1.0M"],
     [12_340_000, "12.3M"],
   ])("%p tokens is %p", (tokens, text) => {
@@ -194,4 +218,45 @@ describe("wrapText", () => {
     expect(wrapText("", 10)).toEqual([""]);
     expect(wrapText("ab", 0)).toEqual(["a", "b"]);
   });
+});
+
+describe("share", () => {
+  test.each<[number[], number, number[]]>([
+    [[10, 20], 100, [10, 20]],
+    [[10, 20], 30, [10, 20]],
+    [[10, 20], 20, [10, 10]],
+    [[30, 4], 20, [16, 4]],
+    [[30, 40], 21, [10, 11]],
+    [[5, 5, 50], 30, [5, 5, 20]],
+    [[10, 20], 0, [0, 0]],
+    [[10, 20], -5, [0, 0]],
+    [[], 10, []],
+  ])("share(%p, %p) is %p", (wants, room, expected) => {
+    expect(share(wants, room)).toEqual(expected);
+  });
+});
+
+describe("arrange", () => {
+  const seg = (name: string, priority: number, min: number) => ({ name, priority, min });
+  const names = (kept: readonly { name: string }[]) => kept.map((one) => one.name);
+
+  test("keeps every segment that fits, in order", () => {
+    expect(names(arrange([seg("a", 1, 5), seg("b", 3, 5), seg("c", 2, 5)], 21, 3))).toEqual(["a", "b", "c"]);
+  });
+
+  test("drops the largest priority number first, then the next, keeping the order of the rest", () => {
+    const segments = [seg("a", 1, 5), seg("b", 3, 5), seg("c", 2, 5)];
+    expect(names(arrange(segments, 20, 3))).toEqual(["a", "c"]);
+    expect(names(arrange(segments, 12, 3))).toEqual(["a"]);
+  });
+
+  test("on a tie the later segment goes, and the last one stands whatever its size", () => {
+    expect(names(arrange([seg("a", 2, 5), seg("b", 2, 5)], 9, 1))).toEqual(["a"]);
+    expect(names(arrange([seg("a", 1, 50)], 10, 3))).toEqual(["a"]);
+    expect(arrange([], 10, 3)).toEqual([]);
+  });
+});
+
+test("oneLine folds whitespace and control characters into single spaces", () => {
+  expect(oneLine("  a\n\tb\u0007c  ")).toBe("a b c");
 });

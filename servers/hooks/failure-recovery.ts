@@ -66,13 +66,15 @@ const MALFORMED_JSON = /(invalid JSON|malformed JSON|parse error|SyntaxError|Une
 const adviceFor = (rules: readonly Rule[], error: string): string | undefined => rules.find(([pattern]) => pattern.test(error))?.[1];
 const withBreaker = (advice: string, breaker: string): string => [advice, breaker].filter(Boolean).join(" ");
 const detail = (error: string): string => error.slice(0, DETAIL_CHARS).replace(/\n+$/, "");
+const header = (kind: string, tool: string, retry: number): string =>
+  `[ERROR RECOVERY] ${kind === "unknown" ? "" : `Type: ${kind} | `}Tool: ${tool} | Retry: ${retry}`;
 
 function edit(error: string): Recovery {
   let kind = "unknown";
   if (/rate.limit|429|timeout|ECONNRESET|ETIMEDOUT/i.test(error)) kind = "transient";
   else if (/not[. ]found|permission|EACCES|ENOENT|invalid.*schema/i.test(error)) kind = "deterministic";
   const advice = adviceFor(EDIT_RULES, error) ?? EDIT_FALLBACK;
-  return { kind: "edit_error", error, message: (retry, breaker) => `[ERROR RECOVERY] Type: ${kind} | Tool: Edit | Retry: ${retry}/3\n${withBreaker(advice, breaker)}` };
+  return { kind: "edit_error", error, message: (retry, breaker) => `${header(kind, "Edit", retry)}\n${withBreaker(advice, breaker)}` };
 }
 
 function agent(error: string, toolInput: unknown): string | Recovery {
@@ -87,7 +89,7 @@ function agent(error: string, toolInput: unknown): string | Recovery {
   return {
     kind: "delegate_error",
     error,
-    message: (retry, breaker) => `[ERROR RECOVERY] Type: ${kind} | Tool: Agent | Retry: ${retry}/3\n${withBreaker(advice, breaker)}`,
+    message: (retry, breaker) => `${header(kind, "Agent", retry)}\n${withBreaker(advice, breaker)}`,
   };
 }
 
@@ -117,10 +119,10 @@ function read(error: string): Recovery | undefined {
 }
 
 function otherTool(tool: string, error: string): Recovery | undefined {
-  const advice = adviceFor(MCP_RULES, error);
+  const advice = tool.startsWith("mcp__") ? adviceFor(MCP_RULES, error) : undefined;
   const head = advice !== undefined ? `[MCP ERROR RECOVERY] ${advice}` : MALFORMED_JSON.test(error) ? `[JSON ERROR RECOVERY] ${tool} failed on malformed JSON: ${detail(error)}` : undefined;
   if (head === undefined) return;
-  return { kind: "json_error", error, message: (_retry, breaker) => withBreaker(head, breaker) };
+  return { kind: "other_error", error, message: (_retry, breaker) => withBreaker(head, breaker) };
 }
 
 function classify(tool: string, payload: Payload): string | Recovery | undefined {

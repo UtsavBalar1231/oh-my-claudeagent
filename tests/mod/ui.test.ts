@@ -2,14 +2,15 @@ import type { On, RenderElement, RenderSurface } from "claude-code";
 import { type Engine, expect, test } from "claude-code/testing";
 import { glyphs } from "../../src/core/ui-kit.ts";
 import { chip, type Paint } from "../../src/core/visual.ts";
-import { Bar, Card, Chip, CodeBlock, Field, HoverCard, type Kit, kitOf, Row, Rule, rowsAtLeast, ScopedCard } from "../../hooks/ui.ts";
+import { Card, CodeBlock, Field, type Kit, kitOf, Row, Rule, rowsAtLeast, ScopedCard } from "../../hooks/ui.ts";
 import { PLUGIN } from "./world.ts";
 
 type ColorOf<C, Prop extends string> = C extends (props: infer P) => unknown ? (P extends { [K in Prop]?: infer V } ? V : never) : never;
 type HoverOf<C> = C extends (props: infer P) => unknown ? (P extends { hover?: infer H } ? NonNullable<H> : never) : never;
 type TakesRaw<V> = "red" extends V ? true : string extends V ? true : false;
 
-const RAW_ACCEPTED = [
+// Fails to compile when a color prop of the kit or a component takes a raw color string.
+export const RAW_ACCEPTED = [
   false satisfies TakesRaw<ColorOf<Kit["Text"], "color">>,
   false satisfies TakesRaw<ColorOf<Kit["Text"], "backgroundColor">>,
   false satisfies TakesRaw<ColorOf<Kit["Box"], "borderColor">>,
@@ -50,30 +51,8 @@ const element = (type: string) => (props: Record<string, unknown>, ...children: 
 const text = element("Text");
 const box = element("Box");
 
-test("no color prop of the kit or a component takes a raw color string", () => {
-  expect(RAW_ACCEPTED).toEqual([false, false, false, false, false, false, false, false]);
-});
-
-test("a chip is one bold inverse-text run on its tone", async ($, on) => {
+test("a rule draws its pieces as runs of one line", async ($, on) => {
   const drawn = gallery($, on);
-  expect(await drawn((kit) => Chip(kit, "PROVEN", "ok", false))).toEqual(
-    text({ wrap: "truncate-end" }, text({ color: "inverseText", backgroundColor: "success", bold: true }, " PROVEN ")),
-  );
-  expect(await drawn((kit) => Chip(kit, "exit 1", "fail", true))).toEqual(
-    text({ wrap: "truncate-end" }, text({ color: "inverseText", backgroundColor: "error", bold: true }, "[exit 1]")),
-  );
-});
-
-test("a bar and a rule draw their pieces as runs of one line", async ($, on) => {
-  const drawn = gallery($, on);
-  expect(await drawn((kit) => Bar(kit, { done: 3, todo: 4 }, 8, false))).toEqual(
-    text(
-      { wrap: "truncate-end" },
-      text({ color: "success" }, "███"),
-      text({ color: "success", backgroundColor: "subtle" }, "▍"),
-      text({ color: "subtle" }, "████"),
-    ),
-  );
   expect(await drawn((kit) => Rule(kit, 16, glyphs(true), true, "Tasks", { done: 1, total: 2 }))).toEqual(
     text(
       { wrap: "truncate-end" },
@@ -107,9 +86,6 @@ test("in ASCII mode every card draws the engine's classic border", async ($, on)
   const lines = (kit: Kit) => [kit.Text({ children: ["3 proving entries"] })];
   const classic = { props: { borderStyle: "classic" } };
   expect(await drawn((kit) => Card(kit, { key: "c", title: "Plan", tone: "plan", isAscii: true, children: [] }))).toMatchObject(classic);
-  expect(
-    await drawn((kit) => HoverCard(kit, { key: "h", anchor: [kit.Text({ children: ["43"] })], title: "Task 43", tone: "plan", isAscii: true, lines: lines(kit) })),
-  ).toMatchObject({ children: [{}, classic] });
   expect(
     await drawn((kit) => ScopedCard(kit, { key: "s", scope: "lane", title: "executor", tone: "plan", isAscii: true, lines: lines(kit), top: 0, left: 2, width: 30 })),
   ).toMatchObject(classic);
@@ -150,43 +126,6 @@ test("a row lights selectionBg on hover, holds it bold when focused, and dims wh
     box(
       { key: "r", flexDirection: "row", hover: { backgroundColor: "selectionBg" }, backgroundColor: "selectionBg" },
       text({ wrap: "truncate-end" }, text({ color: "text", bold: true }, "✓ "), text({ color: "text", bold: true }, "42 Port tabs "), proven),
-    ),
-  );
-});
-
-test("a hover card sits absolutely under its anchor, hidden until the pointer is on it", async ($, on) => {
-  const drawn = gallery($, on);
-  expect(
-    await drawn((kit) =>
-      HoverCard(kit, {
-        key: "h",
-        anchor: [kit.Text({ children: ["◐ 43 Record the final verification"] })],
-        title: "Task 43",
-        tone: "active",
-        isAscii: false,
-        lines: [kit.Text({ children: ["3 proving entries"] })],
-      }),
-    ),
-  ).toEqual(
-    box(
-      { key: "h", flexDirection: "column" },
-      text({}, "◐ 43 Record the final verification"),
-      box(
-        {
-          position: "absolute",
-          top: 1,
-          left: 2,
-          display: "none",
-          hover: { display: "flex" },
-          flexDirection: "column",
-          borderStyle: "round",
-          borderColor: "claude",
-          backgroundColor: "userMessageBackground",
-          paddingX: 1,
-        },
-        text({ bold: true, color: "text", wrap: "truncate-end" }, "Task 43"),
-        text({}, "3 proving entries"),
-      ),
     ),
   );
 });

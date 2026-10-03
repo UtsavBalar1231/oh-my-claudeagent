@@ -1,9 +1,9 @@
 import type { RenderElement } from "claude-code";
-import { aggregate, type LedgerRecord, METRICS_DIR, parseRecords } from "../../src/core/ledger.ts";
+import { aggregate, type MetricsRecord, METRICS_DIR, parseRecords } from "../../src/core/metrics.ts";
 import { formatUsd, PRICING_AS_OF } from "../../src/core/pricing.ts";
 import { isSafeId } from "../../src/core/session-id.ts";
 import { displayWidth, fitEnd, formatDuration, formatTokens, padEnd, padStart, shortType } from "../../src/core/ui-kit.ts";
-import { agentKey, fitPieces, type Piece, spark, stack, TONE_KEYS } from "../../src/core/visual.ts";
+import { agentKey, fitPieces, type Level, levelMark, type Piece, piecesWidth, spark, stack, TONE_KEYS } from "../../src/core/visual.ts";
 import { type Host, reason, type State } from "../host.ts";
 import type { Subcommand } from "../omca-router.ts";
 import { keyButton, noticeRow, open, type TabView, type View } from "../pane.ts";
@@ -22,7 +22,7 @@ const TURNS_KEPT = 200;
 const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`;
 const finished = (row: StatsRow) => row.outcomes.completed + row.outcomes.aborted + row.outcomes.empty;
 
-async function readRecords(host: Host, dir: string): Promise<{ records: LedgerRecord[]; sessions: number; skipped: number }> {
+async function readRecords(host: Host, dir: string): Promise<{ records: MetricsRecord[]; sessions: number; skipped: number }> {
   if (!(await host.fs.exists(dir))) return { records: [], sessions: 0, skipped: 0 };
   const sessions = (await host.fs.list(dir)).filter((entry) => entry.kind === "dir" && isSafeId(entry.name));
   const perSession = await Promise.all(
@@ -38,7 +38,7 @@ async function readRecords(host: Host, dir: string): Promise<{ records: LedgerRe
   };
 }
 
-function turnsOf(records: readonly LedgerRecord[]): Stats["turns"] {
+function turnsOf(records: readonly MetricsRecord[]): Stats["turns"] {
   return records
     .filter((record) => record.outcome !== "running")
     .toSorted((a, b) => Date.parse(a.started_at) - Date.parse(b.started_at) || a.agent_id.localeCompare(b.agent_id))
@@ -75,9 +75,9 @@ const right = (text: string, width: number, color?: Piece["color"]): Piece[] => 
   { text: padStart(text, width), ...(color === undefined ? {} : { color }) },
 ];
 
-function evidenceColor(rate: number): Piece["color"] {
-  if (rate >= 1) return TONE_KEYS.ok;
-  return rate <= 0 ? TONE_KEYS.fail : TONE_KEYS.warn;
+function evidenceLevel(rate: number): Level {
+  if (rate >= 1) return "ok";
+  return rate <= 0 ? "fail" : "warn";
 }
 
 const BAR = 10;
@@ -117,10 +117,12 @@ const COLUMNS = {
   evidence: {
     header: "evidence",
     width: 8,
-    cell: (row, view) =>
-      finished(row) === 0
-        ? right(view.g.dot, 8, TONE_KEYS.muted)
-        : right(`${Math.round(row.evidenceRate * 100)}%`, 8, evidenceColor(row.evidenceRate)),
+    cell: (row, view) => {
+      if (finished(row) === 0) return right(view.g.dot, 8, TONE_KEYS.muted);
+      const { glyph, color } = levelMark(evidenceLevel(row.evidenceRate), view.g);
+      const rate = ` ${Math.round(row.evidenceRate * 100)}%`;
+      return [{ text: padStart(glyph, 8 - displayWidth(rate)), color }, { text: rate }];
+    },
   },
   outcomes: {
     header: padEnd("outcomes", OUTCOME * 3),
@@ -132,7 +134,10 @@ const COLUMNS = {
           [view.g.cross, row.outcomes.aborted, TONE_KEYS.fail],
           [view.g.warn, row.outcomes.empty, TONE_KEYS.warn],
         ] as const
-      ).map(([glyph, count, color]) => ({ text: padEnd(`${glyph}${count}`, OUTCOME), color: count === 0 ? TONE_KEYS.muted : color })),
+      ).flatMap(([glyph, count, color]) => [
+        { text: glyph, color: count === 0 ? TONE_KEYS.muted : color },
+        { text: padEnd(String(count), OUTCOME - displayWidth(glyph)), ...(count === 0 ? { color: TONE_KEYS.muted } : {}) },
+      ]),
   },
 } as const satisfies Record<string, Column>;
 
@@ -233,13 +238,12 @@ function legendOf(shares: readonly StatsRow[], view: View, width: number): Piece
     { text: `${view.isAscii ? meterMark(index) : view.g.agent} `, color: agentKey(row.agentType) },
     { text: `${shortType(row.agentType)} ${formatUsd(row.estimatedCostUsd)}` },
   ]);
-  const widthOf = (pieces: readonly Piece[]) => pieces.reduce((sum, piece) => sum + displayWidth(piece.text), 0);
   const out: Piece[] = [];
   for (const [index, entry] of entries.entries()) {
     const left = entries.length - index - 1;
     const more = left === 0 ? 0 : displayWidth(`${GAP}+${left} more`);
     const next = [...(index === 0 ? [] : [{ text: GAP }]), ...entry];
-    if (widthOf(out) + widthOf(next) + more > width) {
+    if (piecesWidth(out) + piecesWidth(next) + more > width) {
       return [...out, { text: `${out.length === 0 ? "" : GAP}+${entries.length - index} more`, color: TONE_KEYS.muted }];
     }
     out.push(...next);

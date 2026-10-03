@@ -124,10 +124,10 @@ const handlers: Record<string, Handler> = {
       throw new RpcError(INVALID_PARAMS, "initialize: protocolVersion must be a string");
     }
     const protocolVersion = SUPPORTED_PROTOCOLS.includes(params.protocolVersion) ? params.protocolVersion : MODERN_PROTOCOL;
-    return { protocolVersion, capabilities, serverInfo, instructions: INSTRUCTIONS };
+    return { protocolVersion, capabilities, serverInfo, instructions: INSTRUCTIONS, ...complete };
   },
   "notifications/initialized": () => undefined,
-  ping: () => ({}),
+  ping: () => ({ ...complete }),
   "tools/list": () => ({ tools: toolList, ...listCache, ...complete }),
   "tools/call": callTool,
 };

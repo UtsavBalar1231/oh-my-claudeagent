@@ -1,6 +1,7 @@
 import { createReadStream, existsSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { configDir } from "../../src/core/path.ts";
 import { isRecord } from "../../src/core/tool-input.ts";
 import { isMissing } from "../io.ts";
 import type { Tool } from "../omca.ts";
@@ -29,7 +30,7 @@ type Match = { file: string; timestamp: string; role: string; excerpt: string };
 type Source = { path: string; label: string; mtimeMs: number; sidecar: boolean };
 
 const transcriptsRoot = (): string =>
-  process.env.OMCA_TRANSCRIPTS_ROOT || join(process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude"), "projects");
+  process.env.OMCA_TRANSCRIPTS_ROOT || join(configDir(process.env) ?? join(homedir(), ".claude"), "projects");
 
 const excerptAround = (text: string, index: number, length: number): string =>
   text.slice(Math.max(0, index - EXCERPT_RADIUS), Math.min(text.length, index + length + EXCERPT_RADIUS));
@@ -192,9 +193,10 @@ async function searchSidecar(source: Source, query: string, signal: AbortSignal)
 
 async function sessionSearch(args: Record<string, unknown>, { signal, progress } = IDLE_CONTEXT): Promise<string> {
   const query = stringArg(args, "query");
+  if (query.trim() === "") throw new Error("query must not be empty");
+  const role = stringArg(args, "role", "");
+  if (role !== "" && !ROLES.includes(role)) throw new Error(`role must be one of ${ROLES.join(", ")}, or empty for all roles`);
   const root = rootOf(stringArg(args, "project_path", ""));
-  const requestedRole = stringArg(args, "role", "");
-  const role = ROLES.includes(requestedRole) ? requestedRole : "";
   const limit = Math.max(1, Math.min(integerArg(args, "limit", DEFAULT_LIMIT), MAX_LIMIT));
   const slug = root.replace(/[^A-Za-z0-9]/g, "-");
   const dir = join(transcriptsRoot(), slug);
@@ -238,6 +240,7 @@ export const tools: Tool[] = [
         project_path: { type: "string", default: "", description: "Project root (default: cwd's git root)" },
         role: {
           type: "string",
+          enum: ["", ...ROLES],
           default: "",
           description: "Filter to one role: user, assistant, or tool. Empty = all roles.",
         },

@@ -109,7 +109,7 @@ describe("notepad tools", () => {
       mkdirSync(nested, { recursive: true });
       await call("notepad_write", { plan_name: "p", section: "issues", content: "from below", working_directory: nested });
       expect(readSection("p", "issues")).toBe(entry("from below"));
-      expect(readFileSync(join(project, ".omca", ".gitignore"), "utf8")).toBe("*\n!/rules/\n");
+      expect(readFileSync(join(project, ".omca", ".gitignore"), "utf8")).toBe("*\n!/rules/\n!/rules/**\n");
     });
 
     test("notepad_write leaves only the section file behind, with no lock or temp file", async () => {
@@ -250,6 +250,18 @@ describe("notepad tools", () => {
       expect(readSection("edge", "issues")).toBe(`[Compacted: 1 earlier lines removed]\n${lines(21).slice(1).join("\n")}\n`);
     });
 
+    test("a second notepad_compact does not count its own marker, and a later one adds to the marker's total", async () => {
+      const lines = (from: number, count: number) => Array.from({ length: count }, (_, i) => `l${from + i}`);
+      mkdirSync(join(project, ".omca", "notepads", "twice"), { recursive: true });
+      writeFileSync(sectionPath("twice", "issues"), `${lines(1, 25).join("\n")}\n`);
+      expect(await call("notepad_compact", { plan_name: "twice", section: "issues" })).toBe("Compacted 'issues': removed 5 old lines, kept last 20");
+      expect(await call("notepad_compact", { plan_name: "twice", section: "issues" })).toBe("Section 'issues' has 20 lines and needs no compaction");
+      expect(readSection("twice", "issues")).toBe(`[Compacted: 5 earlier lines removed]\n${lines(6, 20).join("\n")}\n`);
+      writeFileSync(sectionPath("twice", "issues"), `${readSection("twice", "issues")}${lines(26, 3).join("\n")}\n`);
+      expect(await call("notepad_compact", { plan_name: "twice", section: "issues" })).toBe("Compacted 'issues': removed 3 old lines, kept last 20");
+      expect(readSection("twice", "issues")).toBe(`[Compacted: 8 earlier lines removed]\n${lines(9, 20).join("\n")}\n`);
+    });
+
     test("notepad_compact reports a missing section without creating the plan", async () => {
       expect(await call("notepad_compact", { plan_name: "ghost", section: "learnings" })).toBe("Section 'learnings' not found for plan 'ghost'");
       expect(existsSync(join(project, ".omca", "notepads"))).toBe(false);
@@ -326,7 +338,7 @@ describe("through the server", () => {
     }
   }
 
-  test("a server without the hooks role lists the declared notepad tools and serves them end to end", async () => {
+  test("the server lists the declared notepad tools and serves them end to end", async () => {
     await withServer(async (request) => {
       const listed = (await request("tools/list")).result?.tools ?? [];
       const declared = tools.map(({ call: _call, ...declaration }) => declaration).sort((a, b) => (a.name < b.name ? -1 : 1));

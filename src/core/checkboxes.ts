@@ -42,7 +42,8 @@ export function outsideFences(text: string): string {
 /** One numbered task line (`- [ ] 1. text`, `- [x] 12. text`): the definition every plan reader shares. */
 export const TASK_LINE = /^- \[([ x])\] (\d+)\.\s*(.*)$/;
 
-const taskLines = (content: string): RegExpExecArray[] =>
+/** The numbered task lines outside code fences, in document order, as `TASK_LINE` matches. */
+export const taskLines = (content: string): RegExpExecArray[] =>
   outsideFences(content)
     .split("\n")
     .map((line) => TASK_LINE.exec(line))

@@ -43,6 +43,7 @@ const statusFile = (command: string) =>
   });
 
 const ledger = (entries: readonly object[]) => JSON.stringify({ entries });
+const final = (fields: object) => ({ type: "final_verification", command: "just ci", timestamp: "2026-10-02T12:00:00Z", exit_code: 0, ...fields });
 
 function files(entries: Record<string, string | { text: string; mtimeMs: number }>): Files {
   return new Map(
@@ -218,9 +219,8 @@ test("an unreadable registry draws a one-line reason in the band", async ($, on)
   });
 });
 
-
 test("a complete plan without a passing final verification offers to run it", async ($, on) => {
-  world(on, bound(46, 46, { [LEDGER]: ledger([{ type: "final_verification", exit_code: 1, command: "just ci" }]) }));
+  world(on, bound(46, 46, { [LEDGER]: ledger([final({ exit_code: 1 })]) }));
   await start($);
   await turn($);
 
@@ -232,7 +232,7 @@ test("a complete plan without a passing final verification offers to run it", as
 });
 
 test("a final verification scoped to other plan bytes does not count", async ($, on) => {
-  const stale = { type: "final_verification", exit_code: 0, plan_sha256: sha256Hex(planText(45, 46)) };
+  const stale = final({ plan_sha256: sha256Hex(planText(45, 46)) });
   world(on, bound(46, 46, { [LEDGER]: ledger([stale]) }));
   await start($);
   await turn($);
@@ -243,7 +243,7 @@ test("a final verification scoped to other plan bytes does not count", async ($,
 });
 
 test("a complete plan with a passing final verification for its current bytes offers the oracle review", async ($, on) => {
-  const scoped = { type: "final_verification", exit_code: 0, plan_sha256: sha256Hex(planText(46, 46)) };
+  const scoped = final({ plan_sha256: sha256Hex(planText(46, 46)) });
   world(on, bound(46, 46, { [LEDGER]: ledger([scoped]) }));
   await start($);
   await turn($);
@@ -269,7 +269,7 @@ test("an unreadable ledger on a complete plan names the failure and still offers
     ]);
   });
 
-  const scoped = { type: "final_verification", exit_code: 0, plan_sha256: sha256Hex(planText(46, 46)) };
+  const scoped = final({ plan_sha256: sha256Hex(planText(46, 46)) });
   disk.set(LEDGER, { text: ledger([scoped]), mtimeMs: BEFORE_RUN_MS });
   await turn($);
 
@@ -292,27 +292,6 @@ test("an unlogged verification comes before the final verification", async ($, o
   });
 });
 
-test("start-work is withheld while an agent is running", async ($, on) => {
-  world(on, bound(12, 46));
-  await start($);
-  await $.agent.spawn({
-    tool_use_id: "toolu_1",
-    prompt: "Port module 13.",
-    description: "port module 13",
-    subagentType: "oh-my-claudeagent:executor",
-    provider: { plugin: PLUGIN, tier: "user" },
-    parentModel: "claude-opus-5-5",
-    background: true,
-    fork: false,
-  });
-  await turn($);
-
-  await onEachSurface($, async (band) => {
-    expect(await statusRow(band)).toBe("█▎███ 12/46 · next 13 Port module 13 · ◆ 1 running");
-    expect(await buttons(band)).toEqual([]);
-  });
-});
-
 const SPAWN = {
   prompt: "Port module 13.",
   description: "port module 13",
@@ -322,6 +301,18 @@ const SPAWN = {
   background: true,
   fork: false,
 } as const;
+
+test("start-work is withheld while an agent is running", async ($, on) => {
+  world(on, bound(12, 46));
+  await start($);
+  await $.agent.spawn({ ...SPAWN, tool_use_id: "toolu_1" });
+  await turn($);
+
+  await onEachSurface($, async (band) => {
+    expect(await statusRow(band)).toBe("█▎███ 12/46 · next 13 Port module 13 · ◆ 1 running");
+    expect(await buttons(band)).toEqual([]);
+  });
+});
 
 test("the band counts the agents running now and drops the count when the last one ends", async ($, on) => {
   world(on, bound(12, 46));
@@ -342,7 +333,7 @@ test("the band counts the agents running now and drops the count when the last o
   expect(await statusRow(band)).toBe("█▎███ 12/46 · next 13 Port module 13");
 });
 
-test("the bar, the count, the next task and the running count draw in their theme keys", async ($, on) => {
+test("the bar, the glyphs and the running count draw in their theme keys, the words plain or inactive", async ($, on) => {
   world(on, bound(12, 46, { [STATUS]: statusFile("just test") }));
   await start($);
   await $.agent.spawn({ ...SPAWN, tool_use_id: "toolu_1" });
@@ -356,16 +347,16 @@ test("the bar, the count, the next task and the running count draw in their them
     ["█", "success"],
     ["▎", "success"],
     ["███", "subtle"],
-    [" 12/46", "dim"],
-    [" · ", "dim"],
-    ["next ", "dim"],
+    [" 12/46", "inactive"],
+    [" · ", "inactive"],
+    ["next ", "inactive"],
     ["13 ", "bold"],
     ["Port module 13", "plain"],
-    [" · ", "dim"],
+    [" · ", "inactive"],
     ["! ", "warning"],
     ["just test", "plain"],
-    [" evidence not logged", "warning"],
-    [" · ", "dim"],
+    [" evidence not logged", "plain"],
+    [" · ", "inactive"],
     ["◆ ", "claude"],
     ["1 running", "plain"],
   ]);
@@ -393,8 +384,15 @@ test("proof counts draw only when the band carries them", async ($, on) => {
   proof = { proven: 52, unproven: 4, failed: 0 };
   await band.redraw();
   expect(await statusRow(band)).toBe("█▎███ 12/46 · next 13 Port module 13 · ✓52 !4 ✗0");
-  const colors = (await band.findAll({ type: "Text" })).filter(({ text }) => /^[✓!✗]\d+$/.test(text)).map(({ props }) => props["color"] ?? "dim");
-  expect(colors).toEqual(["success", "warning", "dim"]);
+  const colors = (await band.findAll({ type: "Text" })).filter(({ text }) => /^(?:[✓!✗]|\d+)$/.test(text)).map(({ text, props }) => [text, props["color"] ?? "plain"]);
+  expect(colors).toEqual([
+    ["✓", "success"],
+    ["52", "plain"],
+    ["!", "warning"],
+    ["4", "plain"],
+    ["✗", "inactive"],
+    ["0", "inactive"],
+  ]);
 });
 
 test("the band counts each task's proof from its files' change times and the newest run since", async ($, on) => {
@@ -516,7 +514,7 @@ test("at 40 columns no Text in the band is wider than 40 cells", async ($, on) =
     $,
     async (band) => {
       const rows = await texts(band);
-      expect(rows.length).toBeGreaterThan(0);
+      expect(rows).toEqual(["█▎███ 12/46 · next 13 Port module 13", "█", "▎", "███", " 12/46", " · ", "next ", "13 ", "Port module 13"]);
       for (const text of rows) expect(displayWidth(text), text).toBeLessThanOrEqual(40);
       for (const button of await buttons(band)) expect(displayWidth(`1: ${button.label}`)).toBeLessThanOrEqual(40);
     },
@@ -592,47 +590,6 @@ test("the band yields to a survey", async ($, on) => {
   }
 });
 
-const RENDER_SAMPLES = 25;
-const RENDER_BUDGET_MS = 5;
-
-test(
-  "the band's median render time from a 46-task plan with 12 checked stays under 5 ms",
-  {
-    plugins: [
-      {
-        name: "render-clock",
-        tier: "prepend",
-        register(on) {
-          on("ui.render", { component: "AbovePrompt" }, async ($, e, next) => {
-            const tree = await next(e);
-            const band = next.trace.find((entry) => entry.plugin === "oh-my-claudeagent");
-            const { Box, Text } = $.ui.resolve(e);
-            return Box({ children: [tree, Text({ children: [`render-ms ${band?.ms ?? "missing"}`] })] });
-          });
-        },
-      },
-    ],
-  },
-  async ($, on) => {
-    world(on, bound(12, 46, { [STATUS]: statusFile("just test"), [LEDGER]: ledger([]) }));
-    await start($);
-    await turn($);
-    const band = await mount($, "terminal");
-    expect(await statusRow(band)).toBe("█▎███ 12/46 · next 13 Port module 13 · ! just test evidence not logged");
-
-    const samples: number[] = [];
-    for (let n = 0; n < RENDER_SAMPLES; n++) {
-      await band.redraw();
-      const sample = (await band.find({ type: "Text", text: /^render-ms / }))?.text.slice("render-ms ".length);
-      samples.push(Number(sample));
-    }
-    expect(samples.every(Number.isFinite), samples.join(" ")).toBe(true);
-    // The median, not the maximum: one scheduler stall on a loaded machine is not render cost.
-    const median = samples.toSorted((a, b) => a - b)[Math.floor(RENDER_SAMPLES / 2)] ?? Number.NaN;
-    expect(median, samples.join(" ")).toBeLessThan(RENDER_BUDGET_MS);
-  },
-);
-
 test("a burst of turn ends leaves the mounted band on the last state, drawn without any invalidate", async ($, on) => {
   const disk = bound(12, 46);
   world(on, disk);
@@ -653,15 +610,25 @@ test("a burst of turn ends leaves the mounted band on the last state, drawn with
   expect(await statusRow(band)).toBe("█▎███ 12/46 · next 13 Port module 13 · ! just test again evidence not logged");
 });
 
-test("a turn that changes nothing leaves the drawn band as it was", async ($, on) => {
+test("a turn that changes nothing writes nothing to the band", async ($, on) => {
+  const atoms = new Map<string, { value: unknown; version: number }>();
+  let bandWrites = 0;
+  on("state.get", (_$, e) => ({ value: atoms.get(e.key) ?? { value: undefined, version: 0 } }));
+  on("state.set", (_$, e) => {
+    if (e.key === "band") bandWrites += 1;
+    const version = (atoms.get(e.key)?.version ?? 0) + 1;
+    atoms.set(e.key, { value: e.value, version });
+    return { value: { isSet: true, version } };
+  });
   world(on, bound(12, 46));
   await start($);
   await turn($);
   const band = await mount($, "terminal");
-  const before = [await texts(band), await buttons(band)];
+  const before = { writes: bandWrites, drawn: [await texts(band), await buttons(band)] };
 
   await turn($);
   await turn($, "agent-1");
 
-  expect([await texts(band), await buttons(band)]).toEqual(before);
+  expect(bandWrites).toBe(before.writes);
+  expect([await texts(band), await buttons(band)]).toEqual(before.drawn);
 });

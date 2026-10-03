@@ -17,7 +17,7 @@ export type Session = {
   commentGate?: DenyOnce;
   errorCounts?: Map<string, ErrorCount>;
   stopBlocks?: StopLedger;
-  planBackoff?: Backoff;
+  planBackoff?: { plan: string; backoff: Backoff };
 };
 
 export const MAX_SESSIONS = 32;

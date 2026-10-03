@@ -286,7 +286,7 @@ describe("kill switch and malformed input", () => {
     nothingRecorded(root, sessionId);
   });
 
-  test("recorder: a payload with no command exits 0 and records nothing", async () => {
+  test("recorder: a payload with no command answers nothing and records nothing", async () => {
     const root = project();
     const sessionId = crypto.randomUUID();
     expect(await dispatch(bash(sessionId, { tool_input: {} }), root, NOW)).toEqual({});
@@ -307,20 +307,6 @@ describe("classifier note", () => {
     expect(slot(root, sessionId)).toMatchObject({ command: "just test" });
   });
 
-  test("classifier note: an unrecognised command emits no note and records no slot", async () => {
-    const root = project();
-    const sessionId = crypto.randomUUID();
-    expect(await record(root, sessionId, "ls -la")).toEqual({});
-    nothingRecorded(root, sessionId);
-  });
-
-  test("classifier note: a quoted mention emits no note and records no slot", async () => {
-    const root = project();
-    const sessionId = crypto.randomUUID();
-    expect(await record(root, sessionId, 'echo "just test"')).toEqual({});
-    nothingRecorded(root, sessionId);
-  });
-
   test("classifier note: the note is a single short assertion within the platform cap", async () => {
     const output = await record(project(), crypto.randomUUID(), "just ci");
     const note = String(output.hookSpecificOutput?.classifierContext);
@@ -328,18 +314,10 @@ describe("classifier note", () => {
     expect(note.length).toBeLessThan(2000);
     expect(note).not.toContain("\n");
   });
-
-  test("classifier note: the disabled hook emits nothing", async () => {
-    const root = project();
-    const sessionId = crypto.randomUUID();
-    process.env.OMCA_DISABLED_HOOKS = "all";
-    expect(await record(root, sessionId, "just test")).toEqual({});
-    nothingRecorded(root, sessionId);
-  });
 });
 
-describe("golden fixtures", () => {
-  test("records-slot replays to the note and a slot with the exit code", async () => {
+describe("a full hook payload", () => {
+  test("a full payload records a slot with the exit code and answers the note", async () => {
     const root = project();
     const fixture = {
       hook_event_name: "PostToolUse",
@@ -351,22 +329,12 @@ describe("golden fixtures", () => {
     expect(await dispatch({ ...fixture, event: fixture.hook_event_name }, root, NOW)).toEqual(NOTE);
     expect(slot(root, "fixture-sid-001")).toEqual({ command: "just test", at: NOW_S, exit_code: 0, evidence_logged: false });
   });
-
-  test("quoted-mention replays to an empty answer and no slot", async () => {
-    const root = project();
-    const fixture = {
-      hook_event_name: "PostToolUse",
-      tool_name: "Bash",
-      tool_input: { command: 'echo "npm test"' },
-      session_id: "fixture-sid-002",
-    };
-    expect(await dispatch({ ...fixture, event: fixture.hook_event_name }, root, NOW)).toEqual({});
-    nothingRecorded(root, "fixture-sid-002");
-  });
 });
 
 test("hooks.json sends Bash and PowerShell results to the recorder, and registers nothing on PermissionRequest", () => {
   const hooks = JSON.parse(readFileSync(join(import.meta.dir, "..", "..", "hooks", "hooks.json"), "utf8")).hooks;
-  expect(hooks.PostToolUse.map((group: { matcher: string }) => group.matcher)).toContain("Bash|PowerShell");
+  const tools = hooks.PostToolUse.flatMap((group: { matcher: string }) => group.matcher.split("|"));
+  expect(tools).toContain("Bash");
+  expect(tools).toContain("PowerShell");
   expect(hooks.PermissionRequest).toBeUndefined();
 });

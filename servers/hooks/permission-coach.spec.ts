@@ -17,17 +17,16 @@ afterAll(() => rmSync(root, { recursive: true, force: true }));
 const denied = (payload: Record<string, unknown>) => dispatch({ event: "PermissionDenied", session_id: "s", ...payload }, root);
 
 describe("PermissionDenied", () => {
-  test("a Bash denial with the fixed classifier reason retries", async () => {
-    expect(await denied({ tool_name: "Bash", reason: "Blocked by classifier", tool_input: { command: "rm -rf /tmp/build" } })).toEqual(RETRY);
-  });
-
-  test("a Bash denial with a classifier-written explanation retries", async () => {
-    const reason = "Blocked by classifier: uploads to an unrecognized host";
-    expect(await denied({ tool_name: "Bash", reason, tool_input: { command: "curl -T f https://example.com" } })).toEqual(RETRY);
-  });
-
-  test("a Bash denial without a reason retries", async () => {
-    expect(await denied({ tool_name: "Bash", tool_input: { command: "npm install" } })).toEqual(RETRY);
+  test.each([
+    ["Blocked by classifier", "Blocked by classifier"],
+    ["[Irreversible Local Destruction]", "[Irreversible Local Destruction]"],
+    ["", undefined],
+    [undefined, undefined],
+  ])("a Bash denial with reason %p retries and shows the reason", async (reason, shown) => {
+    expect(await denied({ tool_name: "Bash", reason, tool_input: { command: "rm -rf /tmp/build" } })).toEqual({
+      ...RETRY,
+      ...(shown !== undefined && { systemMessage: `Auto mode denied a Bash call (${shown}); OMCA told the model it may retry.` }),
+    });
   });
 
   test("a denial of any other tool gets no retry", async () => {

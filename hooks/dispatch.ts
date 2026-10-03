@@ -56,22 +56,6 @@ async function attempt<T>(host: Logs, where: string, call: () => Awaitable<T>): 
   }
 }
 
-function rank(answer: unknown): number {
-  if (typeof answer !== "object" || answer === null) return 3;
-  if ("deny" in answer && answer.deny !== undefined) return 0;
-  if ("decision" in answer && answer.decision === "deny") return 0;
-  if ("block" in answer && answer.block !== undefined) return 1;
-  if ("text" in answer && answer.text !== undefined) return 2;
-  return 3;
-}
-
-function winner<A>(answers: readonly A[]): A | undefined {
-  return answers.reduce<A | undefined>(
-    (best, answer) => (best === undefined || rank(answer) < rank(best) ? answer : best),
-    undefined,
-  );
-}
-
 export async function dispatch<H extends Logs, E, R>(
   host: H,
   where: string,
@@ -90,7 +74,7 @@ export async function dispatch<H extends Logs, E, R>(
     } else if (run.value !== undefined && "answer" in run.value) answers.push(run.value.answer);
     else if (run.value !== undefined) event = run.value.event;
   }
-  const early = winner(answers);
+  const early = answers[0];
   if (early !== undefined) return early;
   const result = await next(event);
   for (const [name, { post }] of features) {
@@ -100,7 +84,7 @@ export async function dispatch<H extends Logs, E, R>(
       if (failed !== undefined) answers.push(failed(run.reason));
     } else if (run.value !== undefined) answers.push(run.value);
   }
-  return winner(answers) ?? result;
+  return answers[0] ?? result;
 }
 
 export async function* dispatchStream<H extends Logs, E, C, R>(

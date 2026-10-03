@@ -26,6 +26,7 @@ type World = {
   git?: Record<string, Partial<ProcessRunResult>>;
   answer?: string;
   failExists?: string;
+  failSurfaces?: string;
   cwd?: string;
   layout?: Layout;
   contents?: Record<string, string>;
@@ -70,7 +71,7 @@ function world(on: On, w: World = {}) {
     }));
   }
   on("session.cwd", () => ({ value: w.cwd ?? w.layout?.root ?? "/work/sub" }));
-  on("session.surfaces", () => ({ value: w.surfaces ?? ["terminal"] }));
+  on("session.surfaces", () => (w.failSurfaces === undefined ? { value: w.surfaces ?? ["terminal"] } : { deny: w.failSurfaces }));
   on("process.run", (_$, e) => {
     const result = w.git?.[e.argv.join(" ")];
     if (result === undefined) throw new Error(`unexpected process.run ${e.argv.join(" ")}`);
@@ -241,6 +242,91 @@ test("a hard reset shows its tracked change count and the diff stat", async ($, 
       "   src/a.ts | 4 ++--",
       "   src/b.ts | 1 +",
       "   2 files changed, 3 insertions(+), 2 deletions(-)",
+      "Run it?",
+    ].join("\n"),
+  ]);
+});
+
+test("a guard that fails while it decides denies the command and names why", async ($, on) => {
+  const { asked, checked } = world(on, { ...BUILD_WORLD, failSurfaces: "x" });
+
+  expect(await check($, "rm -rf build")).toEqual({ decision: "deny", reason: "OMCA's Bash guard failed, so the command was refused: x" });
+  expect(asked).toEqual([]);
+  expect(checked).toEqual([]);
+});
+
+test("a command over three lines shows its first three and counts the rest", async ($, on) => {
+  const { asked } = world(on, BUILD_WORLD);
+
+  await check($, "rm -rf build\necho a\necho b\necho c\necho d");
+  expect(asked.map((a) => a.question)).toEqual([
+    [
+      "OMCA held this command for your review:",
+      "  rm -rf build",
+      "  echo a",
+      "  echo b",
+      "  and 2 more lines",
+      "It would remove:",
+      "  build  dir, 4 entries",
+      "Run it?",
+    ].join("\n"),
+  ]);
+});
+
+test("a hard reset caps its diff stat at 20 files with a count of the rest, then the summary", async ($, on) => {
+  const files = Array.from({ length: 25 }, (_, i) => `src/f${i}.ts`);
+  const { asked } = world(on, {
+    git: {
+      "git status --porcelain": { stdout: `${files.map((file) => ` M ${file}`).join("\n")}\n` },
+      "git diff --stat=76 HEAD": { stdout: `${files.map((file) => ` ${file} | 1 +`).join("\n")}\n 25 files changed, 25 insertions(+)\n` },
+    },
+  });
+
+  await check($, "git reset --hard");
+  expect(asked.map((a) => a.question)).toEqual([
+    [
+      "OMCA held this command for your review:",
+      "  git reset --hard",
+      "git reset --hard discards 25 uncommitted changes:",
+      ...files.slice(0, 20).map((file) => `   ${file} | 1 +`),
+      "  and 5 more files",
+      "   25 files changed, 25 insertions(+)",
+      "Run it?",
+    ].join("\n"),
+  ]);
+});
+
+test("a force push that names a remote and no branch reads the checked-out branch for its ref", async ($, on) => {
+  const { asked } = world(on, {
+    git: { ...branches("dev"), "git rev-parse --abbrev-ref HEAD": { stdout: "feature\n" }, "git log --oneline origin/feature --not HEAD": { stdout: "c000001 lost\n" } },
+  });
+
+  await check($, "git push --force origin");
+  expect(asked.map((a) => a.question)).toEqual([
+    [
+      "OMCA held this command for your review:",
+      "  git push --force origin",
+      "git push --force drops 1 commit from origin/feature:",
+      "  c000001 lost",
+      "Run it?",
+    ].join("\n"),
+  ]);
+});
+
+test("a command that removes and resets shows both sections", async ($, on) => {
+  const { asked } = world(on, {
+    ...BUILD_WORLD,
+    git: { "git status --porcelain": { stdout: "" } },
+  });
+
+  await check($, "rm -rf build && git reset --hard");
+  expect(asked.map((a) => a.question)).toEqual([
+    [
+      "OMCA held this command for your review:",
+      "  rm -rf build && git reset --hard",
+      "It would remove:",
+      "  build  dir, 4 entries",
+      "git reset --hard: no uncommitted changes to tracked files.",
       "Run it?",
     ].join("\n"),
   ]);
@@ -431,31 +517,18 @@ test("a quoted mention of a destructive command passes through untouched", async
   expect(checked).toHaveLength(2);
 });
 
-test("jq gets no allow on PreToolUse", async ($, on) => {
-  world(on);
-  expect(await check($, "jq . file.json")).toEqual(ENGINE);
-});
+for (const command of ["jq . file.json", "npm run build", "uv run pytest", "git status", "git log", "git config --local core.hooksPath /tmp/evil", "git fetch"]) {
+  test(`an unmatched command gets the engine's verdict unchanged: ${command}`, async ($, on) => {
+    const { asked, checked } = world(on);
+    expect(await check($, command)).toEqual(ENGINE);
+    expect(asked).toEqual([]);
+    expect(checked).toHaveLength(1);
+  });
+}
 
-test("npm run gets no allow on PreToolUse", async ($, on) => {
-  world(on);
-  expect(await check($, "npm run build")).toEqual(ENGINE);
-});
-
-test("uv run gets no allow on PreToolUse", async ($, on) => {
-  world(on);
-  expect(await check($, "uv run pytest")).toEqual(ENGINE);
-});
-
-test("git status gets no allow on PreToolUse", async ($, on) => {
-  world(on);
-  expect(await check($, "git status")).toEqual(ENGINE);
-});
-
-test("no non-deny path emits behavior allow", async ($, on) => {
+test("a force push the user lets run gets the engine's verdict unchanged", async ($, on) => {
   world(on, { answer: "Run it", git: { "git log --oneline @{push} --not HEAD": { stdout: "" } } });
-  const commands = ["git status", "git log", "git config --local core.hooksPath /tmp/evil", "git push --force", "git fetch"];
-
-  for (const command of commands) expect(await check($, command)).toEqual(ENGINE);
+  expect(await check($, "git push --force")).toEqual(ENGINE);
 });
 
 test("bash-guard in OMCA_DISABLED_HOOKS turns off every match but the catastrophic one, with no dialog", async ($, on) => {
@@ -574,7 +647,7 @@ test("a PowerShell mention of a destructive command passes through untouched", a
   expect(checked).toHaveLength(4);
 });
 
-test("no PowerShell path emits behavior allow", async ($, on) => {
+test("every PowerShell path that does not deny gets the engine's verdict unchanged", async ($, on) => {
   world(on, { answer: "Run it", git: { "git log --oneline @{push} --not HEAD": { stdout: "" } } });
   const commands = ["git status", "Get-ChildItem", "git.exe push --force", "Remove-Item -Recurse build", "Write-Host 'hi'"];
 
@@ -631,7 +704,7 @@ test("under a POSIX layout a one-letter top directory is an ordinary path, not a
   expect(checked).toHaveLength(2);
 });
 
-test("a variable that is always set no longer makes a removal catastrophic", async ($, on) => {
+test("a variable that is always set does not make a removal catastrophic", async ($, on) => {
   const { asked, checked } = world(on, { surfaces: [] });
 
   expect(await check($, 'rm -rf "$TMPDIR/foo"')).toEqual(ENGINE);

@@ -1,10 +1,10 @@
 import type { CommandRunResult, RenderElement, Timer } from "claude-code";
-import { configDir, type Env, homeDir, inferPlatform, type Platform } from "../src/core/path.ts";
-import { displayWidth, fitEnd, type Glyphs, glyphs, isAsciiRequested, padEnd, usableColumns } from "../src/core/ui-kit.ts";
+import type { Platform } from "../src/core/path.ts";
+import { displayWidth, fitEnd, type Glyphs, glyphs, padEnd, usableColumns } from "../src/core/ui-kit.ts";
 import { notice, TONE_KEYS, type ViewState, type WidthTier, widthTier } from "../src/core/visual.ts";
 import { reconcile } from "./agents-tracker.ts";
 import type { Features, Input } from "./dispatch.ts";
-import { type Host, reason, type State, update } from "./host.ts";
+import { type Host, reason, resolvedSession, sessionOf, type State, update } from "./host.ts";
 import type { Subcommand } from "./omca-router.ts";
 import * as agents from "./tabs/agents.ts";
 import * as doctor from "./tabs/doctor.ts";
@@ -13,14 +13,14 @@ import * as feedback from "./tabs/feedback.ts";
 import * as notepad from "./tabs/notepad.ts";
 import * as plan from "./tabs/plan.ts";
 import * as stats from "./tabs/stats.ts";
-import { type Kit, kitOf, rowsAtLeast } from "./ui.ts";
+import { type Kit, kitOf, Rule, rowsAtLeast } from "./ui.ts";
 
 export const PANE = "omca";
 // The Agents tab's elapsed clocks tick each second; files are read again every second tick.
 const TICK_MS = 1000;
 const READ_EVERY = 2;
-// An inline pane gets about a third of the window less two rows on 2.1.287 (11 body rows at
-// 40 terminal rows, 8 at 30) and follows its content's height below that, so every inline
+// An inline pane gets about a third of the window less two rows (11 body rows at 40 terminal
+// rows, 8 at 30, measured) and follows its content's height below that, so every inline
 // drawing is at least that tall: sized from the viewport first, then to what the pane got.
 // A drawing that changes height moves the focus ring, which the engine keeps by position.
 const INLINE_ROWS = 12;
@@ -95,35 +95,6 @@ let measured: { shape: string; rows: number } | undefined;
 // A tree's content as data: closures and the press handles the runtime stamps change every draw.
 const shapeOf = (children: readonly RenderElement[]): string =>
   JSON.stringify(children, (key, value: unknown) => (key === "press" || typeof value === "function" ? undefined : value));
-
-async function envOf(host: Host): Promise<Env> {
-  const [HOME, USERPROFILE, HOMEDRIVE, HOMEPATH, CLAUDE_CONFIG_DIR] = await Promise.all([
-    host.env.HOME(),
-    host.env.USERPROFILE(),
-    host.env.HOMEDRIVE(),
-    host.env.HOMEPATH(),
-    host.env.CLAUDE_CONFIG_DIR(),
-  ]);
-  return { HOME, USERPROFILE, HOMEDRIVE, HOMEPATH, CLAUDE_CONFIG_DIR };
-}
-
-export type Session = { env: Env; platform: Platform; home: string; config: string | undefined; isAscii: boolean };
-
-const UNRESOLVED: Session = { env: {}, platform: "linux", home: "", config: undefined, isAscii: false };
-let session: Session | undefined;
-
-async function resolveSession(host: Host): Promise<Session> {
-  const [root, env, ascii] = await Promise.all([host.session.root(), envOf(host), host.env.OMCA_ASCII()]);
-  const home = homeDir(env) ?? "";
-  const config = configDir(env);
-  return { env, platform: inferPlatform(root, home, config ?? ""), home, config, isAscii: isAsciiRequested(ascii) };
-}
-
-// The environment holds for the life of the session, so it is read once, outside any drawing.
-export async function sessionOf(host: Host): Promise<Session> {
-  session ??= await resolveSession(host);
-  return session;
-}
 
 const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
 
@@ -224,8 +195,44 @@ export function keyButton(view: View, hotkey: string, label: string, work: () =>
   });
 }
 
-export function rule(view: View): RenderElement {
-  return view.kit.Text({ color: TONE_KEYS.rule, children: [view.g.rule.repeat(view.width)] });
+export const rule = (view: View): RenderElement => Rule(view.kit, view.width, view.g, view.isAscii);
+
+/** A dim line of `width` cells, a blank row when the text is empty. */
+export const edge = (view: View, text: string, width = view.width): RenderElement =>
+  view.kit.Text({ dimColor: true, children: [text === "" ? " " : fitEnd(text, width, view.g.ellipsis)] });
+
+export const blanks = (view: View, count: number): RenderElement[] =>
+  Array.from({ length: Math.max(0, count) }, () => view.kit.Text({ children: [" "] }));
+
+/** Items in rows no wider than `width`, `gap` cells between neighbours; an item wider than the width has a row of its own. */
+export function wrapAt<T>(items: readonly T[], width: number, gap: number, cellsOf: (item: T) => number): T[][] {
+  const rows: T[][] = [];
+  let used = 0;
+  for (const item of items) {
+    const cells = cellsOf(item);
+    const row = rows.at(-1);
+    if (row !== undefined && used + gap + cells <= width) {
+      row.push(item);
+      used += gap + cells;
+    } else {
+      rows.push([item]);
+      used = cells;
+    }
+  }
+  return rows;
+}
+
+// `$.ui.focus` lands on the next drawing, so the focus is sent after the invalidate it follows.
+export function refocus(host: Host, key: string, tab: Tab): void {
+  host.clock.after(0, async () => {
+    try {
+      host.ui.invalidate();
+      const { deny } = await host.ui.focus({ requestId: PANE, key });
+      if (deny !== undefined) host.log(`omca ${tab} could not focus ${key}: ${deny}`);
+    } catch (error) {
+      host.log(`omca ${tab} could not focus ${key}: ${reason(error)}`);
+    }
+  });
 }
 
 async function selectTab(host: Host, tab: Tab): Promise<void> {
@@ -239,20 +246,7 @@ function tabRows(width: number): { gap: number; rows: (readonly [Tab, string, st
   const cellWidth = ([, label, key]: readonly [Tab, string, string]) => displayWidth(`${key}: ${label}`);
   const oneRow = (gap: number) => cells.reduce((sum, cell) => sum + cellWidth(cell), 0) + gap * (cells.length - 1);
   const gap = oneRow(TAB_GAP) <= width || oneRow(1) > width ? TAB_GAP : 1;
-  const rows: (readonly [Tab, string, string])[][] = [];
-  let used = Number.POSITIVE_INFINITY;
-  for (const cell of cells) {
-    const needed = cellWidth(cell);
-    const last = rows.at(-1);
-    if (last === undefined || used + gap + needed > width) {
-      rows.push([cell]);
-      used = needed;
-    } else {
-      last.push(cell);
-      used += gap + needed;
-    }
-  }
-  return { gap, rows };
+  return { gap, rows: wrapAt(cells, width, gap, cellWidth) };
 }
 
 function bodyRows(host: Host, e: Input<"ui.render Pane">, isInline: boolean): number {
@@ -274,7 +268,7 @@ async function draw(host: Host, e: Input<"ui.render Pane">): Promise<RenderEleme
   const width = usableColumns(e.props.bodyColumns);
   const isInline = e.props.placement !== "dock";
   const rows = bodyRows(host, e, isInline);
-  const { home, platform, isAscii } = session ?? UNRESOLVED;
+  const { home, platform, isAscii } = resolvedSession();
   const pane = await host.state.pane.get();
   const g = glyphs(isAscii);
   const active = pane.value?.tab ?? "agents";

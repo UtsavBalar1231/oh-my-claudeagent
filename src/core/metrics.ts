@@ -1,3 +1,4 @@
+import { parseLedger } from "./evidence.ts";
 import { isSafeId } from "./session-id.ts";
 import { isRecord } from "./tool-input.ts";
 
@@ -6,7 +7,7 @@ export const METRICS_DIR = ".omca/metrics";
 const OUTCOMES = ["running", "completed", "aborted", "empty"] as const;
 export type Outcome = (typeof OUTCOMES)[number];
 
-export type LedgerRecord = {
+export type MetricsRecord = {
   session_id: string;
   agent_id: string;
   agent_type: string;
@@ -45,23 +46,15 @@ export function outcomeOf(turn: { isAborted: boolean; answer: string }): Exclude
   return turn.answer.trim() === "" ? "empty" : "completed";
 }
 
-/** True when any evidence entry's timestamp falls inside [startMs, endMs], both ends included. */
-export function isEvidenceLogged(ledgerText: string, startMs: number, endMs: number): boolean {
-  const data: unknown = JSON.parse(ledgerText);
-  const entries = isRecord(data) ? data["entries"] : undefined;
-  if (!Array.isArray(entries)) throw new Error("the evidence ledger holds no entries list");
-  return entries.some((entry: unknown) => {
-    const timestamp = isRecord(entry) ? entry["timestamp"] : undefined;
-    const at = typeof timestamp === "string" ? Date.parse(timestamp) : Number.NaN;
-    return at >= startMs && at <= endMs;
-  });
-}
+/** True when any readable evidence entry's timestamp falls inside [startMs, endMs], both ends included. */
+export const isEvidenceLogged = (ledgerText: string, startMs: number, endMs: number): boolean =>
+  parseLedger(ledgerText).some((entry) => entry.at >= startMs && entry.at <= endMs);
 
 const isCount = (value: unknown) => typeof value === "number" && Number.isInteger(value) && value >= 0;
 const isTime = (value: unknown) => typeof value === "string" && !Number.isNaN(Date.parse(value));
 const isOutcome = (value: unknown): value is Outcome => OUTCOMES.some((outcome) => outcome === value);
 
-export function parseRecord(text: string): LedgerRecord | undefined {
+export function parseRecord(text: string): MetricsRecord | undefined {
   let data: unknown;
   try {
     data = JSON.parse(text);
@@ -85,11 +78,11 @@ export function parseRecord(text: string): LedgerRecord | undefined {
     (r["estimated_cost_usd"] === null || (typeof r["estimated_cost_usd"] === "number" && r["estimated_cost_usd"] >= 0)) &&
     isOutcome(r["outcome"]) &&
     (r["evidence_logged"] === null || typeof r["evidence_logged"] === "boolean");
-  return isValid ? (data as LedgerRecord) : undefined;
+  return isValid ? (data as MetricsRecord) : undefined;
 }
 
 /** Parses each record's text, undefined for one that could not be read, and counts what it skipped. */
-export function parseRecords(texts: readonly (string | undefined)[]): { records: LedgerRecord[]; skipped: number } {
+export function parseRecords(texts: readonly (string | undefined)[]): { records: MetricsRecord[]; skipped: number } {
   const records = texts.flatMap((text) => {
     const record = text === undefined ? undefined : parseRecord(text);
     return record === undefined ? [] : [record];
@@ -107,8 +100,8 @@ export function median(values: readonly number[]): number {
 // Costs are summed in the pricing table's integer unit, so a total is exact to the table's precision.
 const UNITS_PER_USD = 1e8;
 
-export function aggregate(records: readonly LedgerRecord[]): StatsRow[] {
-  const groups = new Map<string, LedgerRecord[]>();
+export function aggregate(records: readonly MetricsRecord[]): StatsRow[] {
+  const groups = new Map<string, MetricsRecord[]>();
   for (const record of records) {
     const group = groups.get(record.agent_type);
     if (group === undefined) groups.set(record.agent_type, [record]);

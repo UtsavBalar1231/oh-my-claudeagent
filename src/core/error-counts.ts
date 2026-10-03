@@ -1,7 +1,7 @@
 export type ErrorCount = { count: number; lastFailureAt: number; lastErrors: string[] };
 
 export const DECAY_MS = 300_000;
-export const BREAKER_AT = 3;
+const BREAKER_AT = 3;
 const KEPT_ERRORS = 3;
 const SUMMARY_CHARS = 160;
 

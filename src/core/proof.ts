@@ -1,47 +1,16 @@
-import { EVIDENCE_TYPES, type EvidenceType } from "./evidence.ts";
+import { type Evidence, type EvidenceType, parseLedger } from "./evidence.ts";
 
-export type Run = {
-  type: EvidenceType;
-  command: string;
-  exitCode: number;
-  at: number;
-  snippet: string;
-  verifiedBy: string | null;
-};
+export type Run = Evidence;
 
 export type Proof = "proven" | "unproven" | "failed";
 
 /** A task's proof: its files' last change, the proving runs since then (newest first) and the last pass at any time. */
 export type Verdict = { proof: Proof; changedAt: number; since: Run[]; lastPass: Run | undefined };
 
-export const PROOF_TYPES: readonly EvidenceType[] = ["test", "build", "lint"];
-
-const isType = (value: unknown): value is EvidenceType => EVIDENCE_TYPES.some((type) => type === value);
+const PROOF_TYPES: readonly EvidenceType[] = ["test", "build", "lint"];
 
 /** The ledger's well-formed entries, oldest first; throws when the text is not a ledger. */
-export function parseRuns(text: string): Run[] {
-  const data: unknown = JSON.parse(text);
-  const entries = typeof data === "object" && data !== null && "entries" in data ? data.entries : undefined;
-  if (!Array.isArray(entries)) throw new Error("it holds no entries list");
-  return entries
-    .flatMap((raw: unknown): Run[] => {
-      if (typeof raw !== "object" || raw === null) return [];
-      const { type, command, exit_code: exitCode, timestamp, output_snippet: snippet, verified_by: verifiedBy } = raw as Record<string, unknown>;
-      const at = typeof timestamp === "string" ? Date.parse(timestamp) : Number.NaN;
-      if (!isType(type) || typeof command !== "string" || typeof exitCode !== "number" || Number.isNaN(at)) return [];
-      return [
-        {
-          type,
-          command,
-          exitCode,
-          at,
-          snippet: typeof snippet === "string" ? snippet : "",
-          verifiedBy: typeof verifiedBy === "string" && verifiedBy !== "" ? verifiedBy : null,
-        },
-      ];
-    })
-    .sort((a, b) => a.at - b.at);
-}
+export const parseRuns = (text: string): Run[] => parseLedger(text).toSorted((a, b) => a.at - b.at);
 
 /**
  * PROVEN when the newest test, build or lint run after the files' last change passed, FAILED when

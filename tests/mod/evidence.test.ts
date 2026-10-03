@@ -1,367 +1,29 @@
-import type { Args, On, RenderElement, TurnUsage } from "claude-code";
 import { type Engine, expect, type Mounted as MountedPane, test } from "claude-code/testing";
 import { sha256Hex } from "../../src/core/evidence.ts";
-import type { LedgerRecord } from "../../src/core/ledger.ts";
 import { displayWidth, padEnd, usableColumns } from "../../src/core/ui-kit.ts";
 import {
   BOULDER,
   bodyColumns,
   cellsAcross,
+  childrenOf,
+  isAscii,
+  isNode,
   LEDGER,
+  type Node,
+  nodeByKey,
   pane,
   resettableState,
   ROOT,
-  rows,
   run,
   SESSION,
   SIZES,
   type Size,
   topRows,
-  type World,
   world,
   write,
 } from "./world.ts";
 
-const METRICS = `${ROOT}/.omca/metrics`;
-
-type Node = { type: string; props?: Record<string, unknown>; children?: unknown };
-const isNode = (value: unknown): value is Node => typeof value === "object" && value !== null && "type" in value;
-const childrenOf = (node: Node): unknown[] => (Array.isArray(node.children) ? node.children : node.children === undefined ? [] : [node.children]);
-const textOf = (element: unknown): string => {
-  if (typeof element === "string") return element;
-  if (!isNode(element)) return "";
-  if (element.type === "Button") return `${String(element.props?.["hotkey"])}: ${String(element.props?.["label"])}`;
-  return childrenOf(element).map(textOf).join("");
-};
-
-// The rows a tree draws, a column Box such as a card spread into the rows it holds.
-function rowsOf(tree: RenderElement): string[] {
-  const spread = (element: unknown): string[] =>
-    isNode(element) && element.type === "Box" && element.props?.["flexDirection"] === "column" ? childrenOf(element).flatMap(spread) : [textOf(element)];
-  return topRows(tree).flatMap(spread);
-}
 const SURFACES = ["terminal", "desktop"] as const;
-
-const usage = (model: string, input: number, output: number, cacheRead = 0, cacheWrite = 0): TurnUsage => ({
-  input_tokens: input,
-  output_tokens: output,
-  cache_read_input_tokens: cacheRead,
-  cache_creation_input_tokens: cacheWrite,
-  model,
-});
-
-const spawn = (subagentType: string, description: string): Args<"agent.spawn"> => ({
-  tool_use_id: `toolu-${description}`,
-  prompt: description,
-  description,
-  subagentType,
-  provider: { plugin: "oh-my-claudeagent", tier: "user" },
-  parentModel: "claude-opus-5-5",
-  background: true,
-  fork: false,
-});
-
-const complete = (agentId: string, fields: Partial<Args<"turn.complete">>): Args<"turn.complete"> =>
-  ({ answer: "", durationMs: 0, isAborted: false, turnId: `t-${agentId}`, reason: "answer", agentId, ...fields }) as Args<"turn.complete">;
-
-function engine(on: On, files: Readonly<Record<string, string>> = {}): { w: World; writes: [string, unknown][] } {
-  const w = world(on, files);
-  const writes: [string, unknown][] = [];
-  on("fs.write", (_$, e) => {
-    writes.push([w.spelled(e.path), JSON.parse(e.text)]);
-    write(w, e.path, e.text);
-    return { value: undefined };
-  });
-  const models: Record<string, readonly [string, string]> = {
-    "oh-my-claudeagent:executor": ["claude-sonnet-5-5", "a-1"],
-    "oh-my-claudeagent:explore": ["claude-haiku-4-5", "a-2"],
-    "oh-my-claudeagent:oracle": ["claude-fable-5-1", "../escape"],
-  };
-  on("agent.spawn", (_$, e) => {
-    const [model, agentId] = models[e.subagentType] ?? ["claude-opus-5-5", "a-9"];
-    return { model, agentId };
-  });
-  on("turn.step", async function* (_$, e) {
-    const counted = e.agentId === "a-1" ? usage("claude-sonnet-5-5", 2000, 500, 10_000, 1000) : null;
-    return { turnId: e.turnId, index: e.index, answer: "", toolUses: [], stopReason: "end_turn", usage: counted };
-  });
-  on("turn.complete", (_$, e) => ({ text: e.answer }));
-  return { w, writes };
-}
-
-async function step(stream: AsyncGenerator<unknown, unknown>): Promise<void> {
-  for (let next = await stream.next(); next.done !== true; next = await stream.next());
-}
-
-const evidenceAt = (...timestamps: string[]) =>
-  JSON.stringify({ entries: timestamps.map((timestamp) => ({ type: "test", command: "just test", exit_code: 0, output_snippet: "ok", timestamp })) });
-
-test("each delegation is written running at spawn and overwritten once when its turn completes or aborts", async ($, on) => {
-  const { w, writes } = engine(on, { [LEDGER]: evidenceAt("2026-10-02T12:00:15Z") });
-
-  await $.agent.spawn(spawn("oh-my-claudeagent:executor", "Fix the parser"));
-  await w.clock.advance(30_000);
-  await $.agent.spawn(spawn("oh-my-claudeagent:explore", "Find the callers"));
-  const running1: LedgerRecord = {
-    session_id: "s1",
-    agent_id: "a-1",
-    agent_type: "oh-my-claudeagent:executor",
-    model: "claude-sonnet-5-5",
-    effort: null,
-    started_at: "2026-10-02T12:00:00.000Z",
-    ended_at: null,
-    duration_ms: null,
-    input_tokens: 0,
-    output_tokens: 0,
-    estimated_cost_usd: null,
-    outcome: "running",
-    evidence_logged: null,
-  };
-  const running2: LedgerRecord = {
-    ...running1,
-    agent_id: "a-2",
-    agent_type: "oh-my-claudeagent:explore",
-    model: "claude-haiku-4-5",
-    started_at: "2026-10-02T12:00:30.000Z",
-  };
-  expect(writes).toEqual([
-    [`${METRICS}/s1/a-1.json`, running1],
-    [`${METRICS}/s1/a-2.json`, running2],
-  ]);
-
-  await step($.turn.step({ turnId: "t-a-1", index: 0, model: "claude-sonnet-5-5", effort: "high", messageCount: 1, agentId: "a-1" }));
-  await step($.turn.step({ turnId: "t-a-2", index: 0, model: "claude-haiku-4-5", messageCount: 1, agentId: "a-2" }));
-  await w.clock.advance(60_000);
-  await $.turn.complete(complete("a-1", { answer: "Fixed the parser.", durationMs: 90_000, usage: usage("claude-sonnet-5-5", 2000, 500, 10_000, 1000) }));
-  await w.clock.advance(15_000);
-  await $.turn.complete(complete("a-2", { reason: "aborted", isAborted: true, durationMs: 75_000 }));
-
-  expect(writes.slice(2)).toEqual([
-    [
-      `${METRICS}/s1/a-1.json`,
-      {
-        ...running1,
-        effort: "high",
-        ended_at: "2026-10-02T12:01:30.000Z",
-        duration_ms: 90_000,
-        input_tokens: 13_000,
-        output_tokens: 500,
-        estimated_cost_usd: 0.0135,
-        outcome: "completed",
-        evidence_logged: true,
-      },
-    ],
-    [
-      `${METRICS}/s1/a-2.json`,
-      {
-        ...running2,
-        ended_at: "2026-10-02T12:01:45.000Z",
-        duration_ms: 75_000,
-        estimated_cost_usd: 0,
-        outcome: "aborted",
-        evidence_logged: false,
-      },
-    ],
-  ]);
-
-  await w.clock.advance(5_000);
-  await $.turn.complete(complete("a-1", { answer: "A later run of the same agent." }));
-  await $.turn.complete(complete("a-7", { answer: "Never spawned here." }));
-  await $.turn.complete({ answer: "The main loop.", durationMs: 1_000, isAborted: false, turnId: "t-main", reason: "answer" });
-  expect(writes).toHaveLength(4);
-
-  expect(await $.command.run(run("stats"))).toEqual({});
-  for (const surface of SURFACES) {
-    const ui = await $.ui.mount(pane(surface, { columns: 120, rows: 40, placement: "dock" }));
-    expect(rowsOf(await ui.drawn()).slice(3)).toEqual([
-      "2 delegations in 1 session",
-      "Agents · 2 types",
-      "  agent     runs  est. cost  evidence",
-      "◆ executor     1      $0.01      100%",
-      "◆ explore      1      $0.00        0%",
-      "Tokens per turn · 2 turns",
-      "█▁ peak 13.5k",
-      "Estimated cost",
-      `$0.01 ${"█".repeat(41)}`,
-      "◆ executor $0.01",
-      "2026-10-02 list prices",
-      "r: Reload",
-    ]);
-    await ui.unmount();
-  }
-});
-
-test("a turn that reports no usage after its steps counted tokens leaves the cost unpriced, not zero", async ($, on) => {
-  const { w, writes } = engine(on);
-  await $.agent.spawn(spawn("oh-my-claudeagent:executor", "Fix the parser"));
-  await step($.turn.step({ turnId: "t-a-1", index: 0, model: "claude-sonnet-5-5", messageCount: 1, agentId: "a-1" }));
-  await w.clock.advance(1_000);
-  await $.turn.complete(complete("a-1", { reason: "error", answer: "" }));
-
-  expect(writes.at(-1)?.[1]).toMatchObject({
-    input_tokens: 13_000,
-    output_tokens: 500,
-    estimated_cost_usd: null,
-    outcome: "empty",
-    evidence_logged: false,
-  });
-});
-
-test("an unsafe agent id names no file and writes nothing", async ($, on) => {
-  const { w, writes } = engine(on);
-  await $.agent.spawn(spawn("oh-my-claudeagent:oracle", "Review"));
-  expect(writes).toEqual([]);
-  expect(w.logs).toContain('ledger: no record for session "s1" agent "../escape"');
-});
-
-const record = (sessionId: string, agentId: string, fields: Partial<LedgerRecord>): string =>
-  JSON.stringify({
-    session_id: sessionId,
-    agent_id: agentId,
-    agent_type: "oh-my-claudeagent:executor",
-    model: "claude-sonnet-5-5",
-    effort: "high",
-    started_at: "2026-10-01T09:00:00.000Z",
-    ended_at: "2026-10-01T09:02:00.000Z",
-    duration_ms: 120_000,
-    input_tokens: 40_000,
-    output_tokens: 6_000,
-    estimated_cost_usd: 0.14,
-    outcome: "completed",
-    evidence_logged: true,
-    ...fields,
-  } satisfies LedgerRecord);
-
-const S1 = "11111111-1111-4111-8111-111111111111";
-const S2 = "22222222-2222-4222-8222-222222222222";
-const EXPLORE = { agent_type: "oh-my-claudeagent:explore", model: "claude-haiku-4-5", evidence_logged: false } as const;
-const ORACLE = { agent_type: "oh-my-claudeagent:oracle", model: "gateway-reasoner", estimated_cost_usd: null } as const;
-
-const FIXTURE = {
-  [`${METRICS}/${S1}/a-e1.json`]: record(S1, "a-e1", { duration_ms: 60_000 }),
-  [`${METRICS}/${S1}/a-e2.json`]: record(S1, "a-e2", { duration_ms: 240_000, input_tokens: 900_000, output_tokens: 90_000, estimated_cost_usd: 2.7 }),
-  [`${METRICS}/${S1}/a-x1.json`]: record(S1, "a-x1", { ...EXPLORE, duration_ms: 20_000, input_tokens: 8_000, output_tokens: 1_000, estimated_cost_usd: 0.013 }),
-  [`${METRICS}/${S1}/a-o1.json`]: record(S1, "a-o1", { ...ORACLE, duration_ms: 400_000, input_tokens: 120_000, output_tokens: 9_000 }),
-  [`${METRICS}/${S1}/broken.json`]: '{"session_id": "',
-  [`${METRICS}/${S2}/a-e3.json`]: record(S2, "a-e3", { outcome: "aborted", duration_ms: 90_000, input_tokens: 5_000, output_tokens: 500, estimated_cost_usd: 0.015, evidence_logged: false }),
-  [`${METRICS}/${S2}/a-x2.json`]: record(S2, "a-x2", { ...EXPLORE, outcome: "empty", model: "gateway-small", duration_ms: 10_000, input_tokens: 3_000, output_tokens: 0, estimated_cost_usd: null }),
-  [`${METRICS}/${S2}/a-x3.json`]: record(S2, "a-x3", { ...EXPLORE, outcome: "running", ended_at: null, duration_ms: null, input_tokens: 0, output_tokens: 0, estimated_cost_usd: null, evidence_logged: null }),
-  [`${METRICS}/${S2}/notes.txt`]: "not a record",
-};
-
-test("the Stats tab aggregates two sessions by agent type with exact rows, on the terminal and the desktop", async ($, on) => {
-  engine(on, FIXTURE);
-  expect(await $.command.run(run("stats", 200))).toEqual({});
-  const summary = "7 delegations in 2 sessions · 1 running · 1 unreadable record skipped";
-
-  const notes = "+ excludes 1 unpriced run · n/a: no listed price · 2026-10-02 list prices";
-
-  for (const surface of SURFACES) {
-    const wide = await $.ui.mount(pane(surface, { columns: 200, rows: 50, placement: "dock" }));
-    expect(rowsOf(await wide.drawn()).slice(2)).toEqual([
-      summary,
-      "Agents · 3 types",
-      "  agent                 runs  median  tokens  est. cost  evidence  outcomes    ",
-      `◆ executor  ${"█".repeat(10)}     3   1m30s    1.0M      $2.86       67%  ✓2  ✗1  !0  `,
-      `◆ explore   ${"█".repeat(10)}     3     15s   12.0k     $0.01+        0%  ✓1  ✗0  !1  `,
-      `◆ oracle    ${"█".repeat(10)}     1   6m40s    129k        n/a      100%  ✓1  ✗0  !0  `,
-      "Tokens per turn · 6 turns",
-      "▁█▁▂▁▁ peak 990k",
-      "Estimated cost",
-      `$2.87+ ${"█".repeat(74)}`,
-      "◆ executor $2.86  ◆ explore $0.01",
-      notes,
-      "r: Reload",
-    ]);
-    await wide.unmount();
-
-    const narrow = await $.ui.mount(pane(surface, { columns: 120, rows: 40, placement: "dock" }));
-    expect(rowsOf(await narrow.drawn()).slice(3)).toEqual([
-      "7 delegations in 2 sessions · 1 running · 1 skipped",
-      "Agents · 3 types",
-      "  agent     runs  est. cost  evidence",
-      "◆ executor     3      $2.86       67%",
-      "◆ explore      3     $0.01+        0%",
-      "◆ oracle       1        n/a      100%",
-      "Tokens per turn · 6 turns",
-      "▁█▁▂▁▁ peak 990k",
-      "Estimated cost",
-      `$2.87+ ${"█".repeat(40)}`,
-      "◆ executor $2.86  ◆ explore $0.01",
-      notes,
-      "r: Reload",
-    ]);
-    await narrow.unmount();
-  }
-});
-
-test("Stats rows stay inside the body less the gutter at every size, docked and inline, on both surfaces", async ($, on) => {
-  engine(on, { ...FIXTURE, [`${METRICS}/${S2}/a-m1.json`]: record(S2, "a-m1", { agent_type: "oh-my-claudeagent:multimodal-looker" }) });
-  await $.command.run(run("stats"));
-
-  for (const size of SIZES) {
-    for (const surface of SURFACES) {
-      const room = usableColumns(bodyColumns(size));
-      const ui = await $.ui.mount(pane(surface, size));
-      for (const child of topRows(await ui.drawn())) {
-        expect(cellsAcross(child), `${size.columns} ${size.placement} ${surface}`).toBeLessThanOrEqual(room);
-      }
-      await ui.unmount();
-    }
-  }
-});
-
-test("digit 6 reads the records afresh each time, r reloads a drawn table, and a failed read shows its reason", async ($, on) => {
-  const { w } = engine(on);
-  await $.command.run(run(""));
-  const ui = await $.ui.mount(pane("terminal", { columns: 120, rows: 40, placement: "dock" }));
-  const body = async () => rows(await ui.drawn()).slice(3);
-
-  await ui.press({ key: "6" });
-  expect(await body()).toEqual(["No delegation statistics have been collected yet.", "r: Reload"]);
-
-  write(w, `${METRICS}/${S1}/broken.json`, "{");
-  await ui.press({ key: "1" });
-  await ui.press({ key: "6" });
-  expect(await body()).toEqual(["No delegation statistics have been collected yet.", "1 unreadable record skipped", "r: Reload"]);
-
-  write(w, `${METRICS}/${S1}/a-e1.json`, record(S1, "a-e1", {}));
-  await ui.press({ key: "1" });
-  await ui.press({ key: "6" });
-  expect((await body())[0]).toBe("1 delegation in 1 session · 1 skipped");
-
-  w.files.clear();
-  write(w, METRICS, "a file where the directory belongs");
-  await ui.press({ key: "r" });
-  expect(await body()).toEqual(["✗ Could not read .omca/metrics: ENOENT: no such di…", "r: Reload"]);
-  await ui.unmount();
-});
-
-test("OMCA_ASCII draws the Stats tab from the ASCII set", async ($, on) => {
-  world(on, FIXTURE, {}, { OMCA_ASCII: "1" });
-  await $.command.run(run("stats", 80));
-  const ui = await $.ui.mount(pane("terminal", { columns: 80, rows: 40, placement: "inline" }));
-  const drawn = rowsOf(await ui.drawn());
-  expect(drawn.slice(1, 13)).toEqual([
-    "7 delegations in 2 sessions - 1 running - 1 unreadable record skipped",
-    "Agents - 3 types",
-    "  agent                 runs  median  tokens  est. cost  evidence",
-    "@ executor  [########]     3   1m30s    1.0M      $2.86       67%",
-    "@ explore   [########]     3     15s   12.0k     $0.01+        0%",
-    "@ oracle    [###.....]     1   6m40s    129k        n/a      100%",
-    "Tokens per turn - 6 turns",
-    ".@.:.. peak 990k",
-    "Estimated cost",
-    `$2.87+ [${"#".repeat(59)}=]`,
-    "# executor $2.86  = explore $0.01",
-    "+ excludes 1 unpriced run - n/a: no listed price - 2026-10-02 list prices",
-  ]);
-  const isAscii = (row: string) => [...row].every((char) => char.charCodeAt(0) >= 32 && char.charCodeAt(0) < 127);
-  expect(drawn.filter((row) => !isAscii(row))).toEqual([]);
-  await ui.unmount();
-});
-
-// The Evidence tab: the proof ledger.
 
 const PLAN_PATH = `${ROOT}/plans/sample.md`;
 const PLAN_TEXT = "# Sample plan\n\n## TODOs\n\n- [x] 1. Wire the ledger\n";
@@ -399,7 +61,6 @@ async function proofFiles(planSha?: string): Promise<Record<string, string>> {
   return { [PLAN_PATH]: PLAN_TEXT, [BOULDER]: BOUND, [LEDGER]: JSON.stringify({ entries: runs(sha) }) };
 }
 
-
 // The drawing as text, one entry per terminal row: a bordered Box is framed, a Code block's
 // lines are marked `│`, an Input is bracketed, and a row Box lays its children side by side.
 function lines(element: unknown): string[] {
@@ -436,16 +97,6 @@ function lines(element: unknown): string[] {
     default:
       return [];
   }
-}
-
-function nodeByKey(element: unknown, key: string): Node | undefined {
-  if (!isNode(element)) return undefined;
-  if (element.props?.["key"] === key) return element;
-  for (const child of childrenOf(element)) {
-    const found = nodeByKey(child, key);
-    if (found !== undefined) return found;
-  }
-  return undefined;
 }
 
 // A row's runs as drawn: each piece's text and the colors it carries.
@@ -490,18 +141,18 @@ test("narrow: the verdict card, the day-grouped timeline and the focused entry o
     "│ manual 1  final 1",
     "╰",
     "── Fri 2026-10-02 ── ████████ 3/4 ─────────────────",
-    "❯ 11:45  FINAL    ✓ 0  just ci                    ◆",
+    "❯ 11:45  FINAL    ✓  0  just ci                   ◆",
     "    │just ci",
     "    │COMPLETE",
     "    2026-10-02 11:45:00 · ◆ sisyphus",
-    "  11:00  MANUAL   ✓ 0  bun scripts/q….ts evidence ◆",
-    "  10:20  TEST     ✓ 0  curl -H 'Auth…&& just test ◆",
-    "  10:00  TEST     ✗ 1  just test-mod              ◆",
+    "  11:00  MANUAL   ✓  0  bun scripts/….ts evidence ◆",
+    "  10:20  TEST     ✓  0  curl -H 'Aut…&& just test ◆",
+    "  10:00  TEST     ✗  1  just test-mod             ◆",
     "── Thu 2026-10-01 ── ████████ 1/2 ─────────────────",
-    "  09:30  LINT     ✗ 1  just lint                  ◆",
-    "  09:00  BUILD    ✓ 0  bun run build              ◆",
+    "  09:30  LINT     ✗  1  just lint                 ◆",
+    "  09:00  BUILD    ✓  0  bun run build             ◆",
     ...blanks(13),
-    "b: Build  e: Test  l: Lint  m: Manual  v: Final",
+    "b: Build  t: Test  l: Lint  m: Manual  v: Final",
     "x: Fails  c: Copy  r: Rerun  f: Find  1/6 · ↑↓ move",
     " ",
   ]);
@@ -519,13 +170,13 @@ test("standard: a one-line verdict above the timeline, agents named, the command
   expect(await body(ui, INLINE_80)).toEqual([
     " COMPLETE  sample  ●✗✗●●● last 6  10-02 11:45  ◆ sisyphus  build 1 …",
     "── Fri 2026-10-02 ── ████████ 3/4 ───────────────────────────────────────",
-    "❯ 11:45  FINAL    ✓ 0  just ci                                 ◆ sisyphus",
+    "❯ 11:45  FINAL    ✓  0  just ci                                ◆ sisyphus",
     "    │COMPLETE",
     "    2026-10-02 11:45:00 · ◆ sisyphus",
-    "  11:00  MANUAL   ✓ 0  bun scripts/qa/visual.ts evidence       ◆ sisyphus",
-    "  10:20  TEST     ✓ 0  curl -H 'Authorizat…le/run && just test ◆ executor",
-    "  10:00  TEST     ✗ 1  just test-mod                           ◆ executor",
-    "b: Build  e: Test  l: Lint  m: Manual  v: Final  x: Fails  c: Copy",
+    "  11:00  MANUAL   ✓  0  bun scripts/qa/visual.ts evidence      ◆ sisyphus",
+    "  10:20  TEST     ✓  0  curl -H 'Authorizat…e/run && just test ◆ executor",
+    "  10:00  TEST     ✗  1  just test-mod                          ◆ executor",
+    "b: Build  t: Test  l: Lint  m: Manual  v: Final  x: Fails  c: Copy",
     "r: Rerun  f: Find  1/6 · ↑↓ move",
     " ",
   ]);
@@ -533,13 +184,13 @@ test("standard: a one-line verdict above the timeline, agents named, the command
   await $.ui.scroll({ ...SCROLL, by: 2, bodyRows: 10, contentRows: 11 });
   expect((await body(ui, INLINE_80)).slice(1, 9)).toEqual([
     "── Fri 2026-10-02 ── ████████ 3/4 ───────────────────────────────────────",
-    "  11:00  MANUAL   ✓ 0  bun scripts/qa/visual.ts evidence       ◆ sisyphus",
-    "❯ 10:20  TEST     ✓ 0  curl -H 'Authorizat…le/run && just test ◆ executor",
+    "  11:00  MANUAL   ✓  0  bun scripts/qa/visual.ts evidence      ◆ sisyphus",
+    "❯ 10:20  TEST     ✓  0  curl -H 'Authorizat…e/run && just test ◆ executor",
     "    │curl -H 'Authorization: Bearer ‹masked›' https://ci.example/run && j…",
     "    │pushed with token=‹masked›",
     "    │42 pass",
     "    2026-10-02 10:20:00 · ◆ executor · ‹masked› 2 masked",
-    "b: Build  e: Test  l: Lint  m: Manual  v: Final  x: Fails  c: Copy",
+    "b: Build  t: Test  l: Lint  m: Manual  v: Final  x: Fails  c: Copy",
   ]);
   await ui.unmount();
 });
@@ -555,26 +206,26 @@ test("wide: the list beside a card of the focused entry, which follows the focus
     "│ ●✗✗●●● last 6  build 1  test 2 ✗1  lint 1 ✗1  manual 1  final 1",
     "╰",
     "── Fri 2026-10-02 ── ████████ 3/4 ─────────────  ╭",
-    "❯ 11:45  FINAL    ✓ 0  just ci                ◆  │ FINAL · exit 0",
-    "  11:00  MANUAL   ✓ 0  bun scripts…s evidence ◆  │ │just ci",
-    "  10:20  TEST     ✓ 0  curl -H 'Au… just test ◆  │ │COMPLETE",
-    "  10:00  TEST     ✗ 1  just test-mod          ◆  │ 2026-10-02 11:45:00 · ◆ sisyphus",
+    "❯ 11:45  FINAL    ✓  0  just ci               ◆  │ FINAL · exit 0",
+    "  11:00  MANUAL   ✓  0  bun script…s evidence ◆  │ │just ci",
+    "  10:20  TEST     ✓  0  curl -H 'A… just test ◆  │ │COMPLETE",
+    "  10:00  TEST     ✗  1  just test-mod         ◆  │ 2026-10-02 11:45:00 · ◆ sisyphus",
     "── Thu 2026-10-01 ── ████████ 1/2 ─────────────  ╰",
-    "  09:30  LINT     ✗ 1  just lint              ◆",
-    "  09:00  BUILD    ✓ 0  bun run build          ◆",
+    "  09:30  LINT     ✗  1  just lint             ◆",
+    "  09:00  BUILD    ✓  0  bun run build         ◆",
   ]);
-  expect(shown.slice(-3)).toEqual(["b: Build  e: Test  l: Lint  m: Manual  v: Final  x: Fails  c: Copy  r: Rerun  f: Find", "1/6 · ↑↓ move", " "]);
+  expect(shown.slice(-3)).toEqual(["b: Build  t: Test  l: Lint  m: Manual  v: Final  x: Fails  c: Copy  r: Rerun  f: Find", "1/6 · ↑↓ move", " "]);
 
   await $.ui.scroll({ ...SCROLL, by: 3, bodyRows: 46, contentRows: 47 });
   expect((await body(ui, DOCK_210)).slice(5, 20)).toEqual([
     "── Fri 2026-10-02 ── ████████ 3/4 ─────────────  ╭",
-    "  11:45  FINAL    ✓ 0  just ci                ◆  │ TEST · exit 1",
-    "  11:00  MANUAL   ✓ 0  bun scripts…s evidence ◆  │ │just test-mod",
-    "  10:20  TEST     ✓ 0  curl -H 'Au… just test ◆  │ │(fail) the ledger draws",
-    "❯ 10:00  TEST     ✗ 1  just test-mod          ◆  │ │  expected 3",
+    "  11:45  FINAL    ✓  0  just ci               ◆  │ TEST · exit 1",
+    "  11:00  MANUAL   ✓  0  bun script…s evidence ◆  │ │just test-mod",
+    "  10:20  TEST     ✓  0  curl -H 'A… just test ◆  │ │(fail) the ledger draws",
+    "❯ 10:00  TEST     ✗  1  just test-mod         ◆  │ │  expected 3",
     "── Thu 2026-10-01 ── ████████ 1/2 ─────────────  │ │  received 4",
-    "  09:30  LINT     ✗ 1  just lint              ◆  │ │at ledger.test.ts:40",
-    "  09:00  BUILD    ✓ 0  bun run build          ◆  │ │1 fail",
+    "  09:30  LINT     ✗  1  just lint             ◆  │ │at ledger.test.ts:40",
+    "  09:00  BUILD    ✓  0  bun run build         ◆  │ │1 fail",
     "                                                 │ │41 pass",
     "                                                 │ │Ran 42 tests",
     "                                                 │ │exit 1",
@@ -601,18 +252,18 @@ test("rows draw each type neutral but the final verification, each exit in its t
     { text: "10:20 ", color: "inactive" },
     { text: " TEST   ", color: "text", backgroundColor: "userMessageBackground", bold: true },
     { text: " " },
-    { text: " ✓ 0 ", color: "inverseText", backgroundColor: "success", bold: true },
+    { text: " ✓  0 ", color: "inverseText", backgroundColor: "success", bold: true },
     { text: " " },
     { text: "curl", bold: true },
-    { text: " -H 'Authorization: B….example/run && just test" },
+    { text: " -H 'Authorization: B…example/run && just test" },
     { text: " ◆ executor", color: "green_FOR_SUBAGENTS_ONLY" },
   ]);
   expect(nodeByKey(tree, "entry-3")?.props).toEqual({ key: "entry-3", flexDirection: "row" });
   const chips = (key: string) => runsOf(nodeByKey(tree, key)).filter((run) => run.backgroundColor !== undefined);
-  expect(chips("entry-0").map((run) => [run.text, run.backgroundColor])).toEqual([[" BUILD  ", "userMessageBackground"], [" ✓ 0 ", "success"]]);
-  expect(chips("entry-1").map((run) => [run.text, run.backgroundColor])).toEqual([[" LINT   ", "userMessageBackground"], [" ✗ 1 ", "error"]]);
-  expect(chips("entry-4").map((run) => [run.text, run.backgroundColor])).toEqual([[" MANUAL ", "userMessageBackground"], [" ✓ 0 ", "success"]]);
-  expect(chips("entry-5").map((run) => [run.text, run.backgroundColor])).toEqual([[" FINAL  ", "planMode"], [" ✓ 0 ", "success"]]);
+  expect(chips("entry-0").map((run) => [run.text, run.backgroundColor])).toEqual([[" BUILD  ", "userMessageBackground"], [" ✓  0 ", "success"]]);
+  expect(chips("entry-1").map((run) => [run.text, run.backgroundColor])).toEqual([[" LINT   ", "userMessageBackground"], [" ✗  1 ", "error"]]);
+  expect(chips("entry-4").map((run) => [run.text, run.backgroundColor])).toEqual([[" MANUAL ", "userMessageBackground"], [" ✓  0 ", "success"]]);
+  expect(chips("entry-5").map((run) => [run.text, run.backgroundColor])).toEqual([[" FINAL  ", "planMode"], [" ✓  0 ", "success"]]);
   expect(runsOf(nodeByKey(tree, "entry-1")).at(-1)).toEqual({ text: " ◆ explore ", color: "blue_FOR_SUBAGENTS_ONLY" });
   expect(nodeByKey(tree, "entry-5")?.props).toEqual({ key: "entry-5", flexDirection: "row", backgroundColor: "selectionBg" });
   expect(runsOf(nodeByKey(tree, "entry-5")).at(-1)).toEqual({ text: " ◆ sisyphus", color: "text", bold: true });
@@ -622,7 +273,7 @@ test("rows draw each type neutral but the final verification, each exit in its t
   const command = runsOf(nodeByKey(opened, "entry-3")).slice(6, 8);
   expect(command).toEqual([
     { text: "curl", color: "text", bold: true },
-    { text: " -H 'Authorization: B….example/run && just test", color: "text", bold: true },
+    { text: " -H 'Authorization: B…example/run && just test", color: "text", bold: true },
   ]);
   const meta = childrenOf(nodeByKey(opened, "detail-3") ?? { type: "Box" }).at(-1);
   expect(lines(meta)).toEqual(["2026-10-02 10:20:00 · ◆ executor · ‹masked› 2 masked"]);
@@ -632,19 +283,20 @@ test("rows draw each type neutral but the final verification, each exit in its t
     "green_FOR_SUBAGENTS_ONLY",
     "inactive",
     "warning",
+    "inactive",
   ]);
   await ui.unmount();
 });
 
 test("a mask inside a row's command is drawn dim", async ($, on) => {
-  world(on, { ...(await proofFiles()), [LEDGER]: JSON.stringify({ entries: [evidence("test", `TOKEN=${TOKEN} just test`, 0, local(2, 9, 0), "executor", "ok")] }) });
+  const entries = [evidence("test", `TOKEN=${TOKEN} just test`, 0, local(2, 9, 0), "executor", "ok"), evidence("lint", "just lint", 0, local(2, 10, 0), "executor", "ok")];
+  world(on, { ...(await proofFiles()), [LEDGER]: JSON.stringify({ entries }) });
   const ui = await openEvidence($, INLINE_80);
   expect(runsOf(nodeByKey(await ui.drawn(), "entry-0")).slice(6, 9)).toEqual([
-    { text: "TOKEN=", color: "text", bold: true },
-    { text: "‹masked›", color: "text", bold: true },
-    { text: " just test", color: "text", bold: true },
+    { text: "TOKEN=", bold: true },
+    { text: "‹masked›", color: "inactive" },
+    { text: " just test" },
   ]);
-  await ui.press({ key: "f" });
   await ui.unmount();
 });
 
@@ -728,18 +380,18 @@ test("a type key keeps that type, again clears it, x keeps failures, and an empt
   const ui = await openEvidence($, DOCK_120);
   const dim = async (key: string) => (await ui.find({ key }))?.props["dimColor"] === true;
 
-  expect(await Promise.all(["b", "e", "l", "m", "v", "x"].map(dim))).toEqual([true, true, true, true, true, true]);
-  await ui.press({ key: "e" });
+  expect(await Promise.all(["b", "t", "l", "m", "v", "x"].map(dim))).toEqual([true, true, true, true, true, true]);
+  await ui.press({ key: "t" });
   expect((await entryRows(ui)).map((row) => row.slice(9, 15))).toEqual(["TEST  ", "TEST  "]);
   expect(await statusRow(ui)).toBe("1/2 · test only · ↑↓ move");
-  expect(await dim("e")).toBe(false);
+  expect(await dim("t")).toBe(false);
 
   await ui.press({ key: "x" });
-  expect((await entryRows(ui)).map((row) => row.slice(0, 26))).toEqual(["❯ 10:00  TEST     ✗ 1  jus"]);
+  expect((await entryRows(ui)).map((row) => row.slice(0, 26))).toEqual(["❯ 10:00  TEST     ✗  1  ju"]);
   expect(await statusRow(ui)).toBe("1/1 · test only · failures only · ↑↓ move");
 
-  await ui.press({ key: "e" });
-  expect((await entryRows(ui)).map((row) => row.slice(0, 22))).toEqual(["❯ 10:00  TEST     ✗ 1 ", "  09:30  LINT     ✗ 1 "]);
+  await ui.press({ key: "t" });
+  expect((await entryRows(ui)).map((row) => row.slice(0, 23))).toEqual(["❯ 10:00  TEST     ✗  1 ", "  09:30  LINT     ✗  1 "]);
   expect(await statusRow(ui)).toBe("1/2 · failures only · ↑↓ move");
 
   await ui.press({ key: "b" });
@@ -770,7 +422,7 @@ test("the arrows move the focus one entry, a page key a window, Home and End to 
   world(on, { [PLAN_PATH]: PLAN_TEXT, [BOULDER]: BOUND, [LEDGER]: JSON.stringify({ entries }) });
   const ui = await openEvidence($, DOCK_120);
   const scroll = (by: number) => $.ui.scroll({ ...SCROLL, by, bodyRows: 36, contentRows: 37 });
-  const focusedRow = async () => (await entryRows(ui)).find((row) => row.startsWith("❯"))?.slice(23, 49).trimEnd();
+  const focusedRow = async () => (await entryRows(ui)).find((row) => row.startsWith("❯"))?.slice(24, 50).trimEnd();
 
   expect(await body(ui, DOCK_120)).toHaveLength(34);
   expect(await entryRows(ui)).toHaveLength(20);
@@ -787,7 +439,7 @@ test("the arrows move the focus one entry, a page key a window, Home and End to 
   await scroll(37);
   expect(await focusedRow()).toBe("just test shard-0");
   expect(await statusRow(ui)).toBe("600/600 · ↑↓ move");
-  expect((await entryRows(ui)).at(-1)).toStartWith("❯ 00:00  LINT     ✗ 1  just test shard-0");
+  expect((await entryRows(ui)).at(-1)).toStartWith("❯ 00:00  LINT     ✗  1  just test shard-0");
   await scroll(1);
   expect(await focusedRow()).toBe("just test shard-0");
   await scroll(-37);
@@ -842,7 +494,7 @@ test("f opens the Find field and moves the focus to it; typing filters, and subm
   await ui.press({ key: "f" });
   await w.clock.settle();
   expect((await body(ui, DOCK_120)).at(-2)).toBe("[search command, agent or type]");
-  expect(w.logs.at(-1)).toBe("omca evidence could not focus the search: no implementation for ui.focus");
+  expect(w.logs.at(-1)).toBe("omca evidence could not focus search: no implementation for ui.focus");
 
   await ui.input({ key: "search", text: "JUST TEST", kind: "change" });
   expect((await entryRows(ui)).map((row) => row.slice(9, 15))).toEqual(["TEST  ", "TEST  "]);
@@ -864,13 +516,13 @@ test("OMCA_ASCII draws the Evidence tab from the ASCII set", async ($, on) => {
   expect(await body(ui, INLINE_80)).toEqual([
     "[COMPLETE] sample  oxxooo last 6  10-02 11:45  @ sisyphus  build 1 ...",
     "-- Fri 2026-10-02 -- [#####.] 3/4 ---------------------------------------",
-    "> 11:45 [FINAL]  [+ 0] just ci                                 @ sisyphus",
+    "> 11:45 [FINAL]  [+  0] just ci                                @ sisyphus",
     "    │COMPLETE",
     "    2026-10-02 11:45:00 - @ sisyphus",
-    "  11:00 [MANUAL] [+ 0] bun scripts/qa/visual.ts evidence       @ sisyphus",
-    "  10:20 [TEST]   [+ 0] curl -H 'Authoriza...e/run && just test @ executor",
-    "  10:00 [TEST]   [x 1] just test-mod                           @ executor",
-    "b: Build  e: Test  l: Lint  m: Manual  v: Final  x: Fails  c: Copy",
+    "  11:00 [MANUAL] [+  0] bun scripts/qa/visual.ts evidence      @ sisyphus",
+    "  10:20 [TEST]   [+  0] curl -H 'Authoriza.../run && just test @ executor",
+    "  10:00 [TEST]   [x  1] just test-mod                          @ executor",
+    "b: Build  t: Test  l: Lint  m: Manual  v: Final  x: Fails  c: Copy",
     "r: Rerun  f: Find  1/6 - ^v move",
     " ",
   ]);
@@ -878,7 +530,6 @@ test("OMCA_ASCII draws the Evidence tab from the ASCII set", async ($, on) => {
     { text: "[TEST]", color: "text", backgroundColor: "userMessageBackground", bold: true },
     { text: "  " },
   ]);
-  const isAscii = (row: string) => [...row].every((char) => char.charCodeAt(0) >= 32 && char.charCodeAt(0) < 127);
   await $.ui.scroll({ ...SCROLL, by: 2, bodyRows: 10, contentRows: 11 });
   const drawn = (await body(ui, INLINE_80)).map((row) => row.replace(/[│╭╰]/g, ""));
   expect(drawn.filter((row) => !isAscii(row))).toEqual([]);

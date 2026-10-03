@@ -8,7 +8,7 @@ export type Check = { id: string; label: string; level: Level; detail: string; f
 
 export const SETUP_COMMAND = "/oh-my-claudeagent:omca-setup";
 
-export type DoctorEnv = Readonly<{
+type DoctorEnv = Readonly<{
   CLAUDE_CODE_SUBAGENT_MODEL_FORCE?: string | undefined;
   CLAUDE_CODE_DISABLE_ADVISOR_TOOL?: string | undefined;
   DISABLE_TELEMETRY?: string | undefined;
@@ -37,7 +37,7 @@ export type Inputs = {
   isStyleForced: boolean | null;
 };
 
-export const ENGINE_FLOOR = "2.1.288";
+const ENGINE_FLOOR = "2.1.288";
 export const BUN_FLOOR = "1.4.2";
 const FRESH_MS = 10 * 60_000;
 
@@ -53,7 +53,6 @@ function isOlder(version: Version, floor: string): boolean {
   return version[0] !== a ? version[0] < a : version[1] !== b ? version[1] < b : version[2] < c;
 }
 
-// `settings.pluginConfigs[plugin].options`, or undefined when any link is not an object.
 function pluginOptions(settings: Inputs["settings"], plugin: string): Readonly<Record<string, unknown>> | undefined {
   const configs = settings["pluginConfigs"];
   const config = isRecord(configs) ? configs[plugin] : undefined;

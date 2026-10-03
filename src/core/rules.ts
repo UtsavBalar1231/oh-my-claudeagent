@@ -1,5 +1,5 @@
 export const RULE_BODY_CAP = 1000;
-export const DOC_EXCERPT_CAP = 2000;
+const DOC_EXCERPT_CAP = 2000;
 // Under the platform's 10,000-character cap on one hook output string, past which the client
 // swaps the text for a file path and a preview Claude is not asked to read.
 export const CONTEXT_BUDGET = 8000;

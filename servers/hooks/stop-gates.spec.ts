@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { StopGate } from "../../src/core/stop-ledger.ts";
@@ -25,11 +25,11 @@ const FINISHED_SUBAGENT = [{ ...RUNNING_SUBAGENT[0], status: "completed" }];
 
 const feedback = (additionalContext: string): Output => ({ hookSpecificOutput: { hookEventName: "Stop", additionalContext } });
 
-const CONTINUE: Output = feedback(
-  "[PLAN CONTINUATION] The bound plan 'test-plan' still has 1 unchecked tasks (next: Second task not done). Continue with the next task. " +
-    "If its work is already done and reviewed, flip its checkbox. If it cannot proceed without the user, record why with notepad_write and " +
-    "ask the user; a turn that asks the user is not blocked.",
-);
+const CONTINUE_TEXT =
+  "[PLAN CONTINUATION] The bound plan 'test-plan' still has 1 unchecked task (next: Second task not done). Continue with the next task. " +
+  "If its work is already done and reviewed, flip its checkbox. If it cannot proceed without the user, record why with notepad_write and " +
+  "ask the user; a turn that asks the user is not blocked.";
+const CONTINUE: Output = feedback(CONTINUE_TEXT);
 
 const corruptRegistry = (root: string): Output =>
   feedback(
@@ -171,7 +171,7 @@ describe("plan continuation", () => {
     bind(run, UNCHECKED_PLAN);
     expect(await run.stop()).toEqual(CONTINUE);
     const state = findSession(run.sessionId);
-    expect(state?.planBackoff).toEqual({ consecutiveBlocks: 1, lastBlockAt: NOW_S, lastUnchecked: 1, sameCountRun: 1, isStagnated: false });
+    expect(state?.planBackoff).toEqual({ plan: "test-plan", backoff: { consecutiveBlocks: 1, lastBlockAt: NOW_S, lastUnchecked: 1, sameCountRun: 1, isStagnated: false } });
     expect([...(state?.stopBlocks ?? [])]).toEqual([["plan-continuation", 1]]);
   });
 
@@ -212,7 +212,7 @@ describe("plan continuation", () => {
     expect(await run.stop()).toEqual(CONTINUE);
     expect(await run.stop({}, NOW + 9 * SECOND)).toEqual({});
     expect(await run.stop({}, NOW + 10 * SECOND)).toEqual(CONTINUE);
-    expect(findSession(run.sessionId)?.planBackoff).toEqual({ consecutiveBlocks: 2, lastBlockAt: NOW_S + 10, lastUnchecked: 1, sameCountRun: 2, isStagnated: false });
+    expect(findSession(run.sessionId)?.planBackoff).toEqual({ plan: "test-plan", backoff: { consecutiveBlocks: 2, lastBlockAt: NOW_S + 10, lastUnchecked: 1, sameCountRun: 2, isStagnated: false } });
   });
 
   test("plan continuation: stagnation escape frees the 4th identical-count invocation", async () => {
@@ -220,7 +220,7 @@ describe("plan continuation", () => {
     bind(run, UNCHECKED_PLAN);
     for (const at of [0, 100, 200]) expect(await run.stop({}, NOW + at * SECOND)).toEqual(CONTINUE);
     expect(await run.stop({}, NOW + 300 * SECOND)).toEqual({});
-    expect(findSession(run.sessionId)?.planBackoff).toEqual({ consecutiveBlocks: 3, lastBlockAt: NOW_S + 200, lastUnchecked: 1, sameCountRun: 3, isStagnated: true });
+    expect(findSession(run.sessionId)?.planBackoff).toEqual({ plan: "test-plan", backoff: { consecutiveBlocks: 3, lastBlockAt: NOW_S + 200, lastUnchecked: 1, sameCountRun: 3, isStagnated: true } });
     expect(await run.stop({}, NOW + 10_000 * SECOND)).toEqual({});
   });
 
@@ -231,11 +231,34 @@ describe("plan continuation", () => {
     expect(await run.stop({ transcript_path: path })).toEqual({});
   });
 
-  test("plan continuation: same transcript without a pause phrase still blocks", async () => {
+  test.each(["keep going", "do task 2 later", "pause the music in the demo, then continue"])(
+    "plan continuation: a last prompt that is not a pause request (%p) still blocks",
+    async (prompt) => {
+      const run = session();
+      bind(run, UNCHECKED_PLAN);
+      const path = transcript(run.root, user("start on task 2"), said("Working on it."), user(prompt));
+      expect(await run.stop({ transcript_path: path })).toEqual(CONTINUE);
+    },
+  );
+
+  test.each(["later", "ok, stop here.", "Great work. Let's continue tomorrow", "can we take a break?"])(
+    "plan continuation: a last prompt that asks to pause (%p) allows Stop",
+    async (prompt) => {
+      const run = session();
+      bind(run, UNCHECKED_PLAN);
+      const path = transcript(run.root, user("start on task 2"), said("Working on it."), user(prompt));
+      expect(await run.stop({ transcript_path: path })).toEqual({});
+    },
+  );
+
+  test("plan continuation: only the transcript's last 2 MiB is read, and a prompt before it counts for nothing", async () => {
     const run = session();
     bind(run, UNCHECKED_PLAN);
-    const path = transcript(run.root, user("start on task 2"), said("Working on it."), user("keep going"));
+    const filler = said("x".repeat(1024));
+    const path = transcript(run.root, user("lets pause here"), ...Array.from({ length: 2100 }, () => filler));
     expect(await run.stop({ transcript_path: path })).toEqual(CONTINUE);
+    const tail = transcript(run.root, ...Array.from({ length: 2100 }, () => filler), user("lets pause here"));
+    expect(await run.stop({ transcript_path: tail }, NOW + 10 * SECOND)).toEqual({});
   });
 
   test("plan continuation: an AskUserQuestion call in this turn allows Stop", async () => {
@@ -325,10 +348,56 @@ describe("plan continuation", () => {
     expect(await run.stop()).toEqual(corruptRegistry(run.root));
   });
 
-  test("plan continuation: a boulder.json holding null blocks as unparseable", async () => {
+  test.each(["null", "[]", "false", "0", '"x"'])("plan continuation: a boulder.json holding %s parses, so it reads as an empty registry and allows Stop", async (text) => {
     const run = session();
-    writeRegistry(run.root, "null");
-    expect(await run.stop()).toEqual(corruptRegistry(run.root));
+    writeRegistry(run.root, text);
+    expect(await run.stop()).toEqual({});
+  });
+
+  test.skipIf(process.platform === "win32" || process.getuid?.() === 0)("plan continuation: a boulder.json that cannot be read blocks and names the error code (skipped on Windows and as root: chmod 000 does not refuse there)", async () => {
+    const run = session();
+    bind(run, UNCHECKED_PLAN);
+    const path = join(run.root, ".omca", "state", "boulder.json");
+    chmodSync(path, 0o000);
+    try {
+      expect(await run.stop()).toEqual(
+        feedback(
+          `[PLAN CONTINUATION] ${path} cannot be read (EACCES), so this session's plan state cannot be resolved and ` +
+            "plan-scoped enforcement is off. Repair or delete the file (boulder_write rewrites it), then stop again. Set " +
+            "OMCA_DISABLED_HOOKS=plan-continuation to bypass.",
+        ),
+      );
+    } finally {
+      chmodSync(path, 0o644);
+    }
+  });
+
+  test("plan continuation: a plan that stagnated does not hold back the next plan the session binds", async () => {
+    const run = session();
+    bind(run, UNCHECKED_PLAN);
+    for (const at of [0, 100, 200]) expect(await run.stop({}, NOW + at * SECOND)).toEqual(CONTINUE);
+    expect(await run.stop({}, NOW + 300 * SECOND)).toEqual({});
+    const other = join(run.root, "other.md");
+    writeFileSync(other, UNCHECKED_PLAN);
+    writeRegistry(
+      run.root,
+      JSON.stringify({
+        plans: { "plan-b": { active_plan: other, started_at: "2026-01-01T00:00:00Z", session_ids: [run.sessionId] } },
+        bindings: { [run.sessionId]: { plan_name: "plan-b", bound_at: NOW_S } },
+      }),
+    );
+    expect(await run.stop({}, NOW + 301 * SECOND)).toEqual(feedback(CONTINUE_TEXT.replace("'test-plan'", "'plan-b'")));
+    expect(findSession(run.sessionId)?.planBackoff?.plan).toBe("plan-b");
+  });
+
+  test("plan continuation: a plan with every task checked refunds the budget and clears the backoff", async () => {
+    const run = session();
+    const path = bind(run, UNCHECKED_PLAN);
+    expect(await run.stop()).toEqual(CONTINUE);
+    writeFileSync(path, COMPLETE_PLAN);
+    expect(await run.stop({}, NOW + 10 * SECOND)).toEqual({});
+    expect(findSession(run.sessionId)?.planBackoff).toBeUndefined();
+    expect(findSession(run.sessionId)?.stopBlocks?.has("plan-continuation") ?? false).toBe(false);
   });
 
   test("plan continuation: a session whose blocks cannot be recorded never blocks", async () => {
@@ -365,6 +434,14 @@ describe("plan continuation and background work", () => {
     const payload = payloadOf({ event: "Stop", session_id: run.sessionId, stop_hook_active: "false", background_tasks: JSON.stringify(RUNNING_SUBAGENT) });
     expect(await dispatch(payload, run.root, NOW)).toEqual({});
     expect(findSession(run.sessionId)?.planBackoff).toBeUndefined();
+  });
+
+  test("plan continuation: a running background shell, such as a dev server, still blocks", async () => {
+    const run = session();
+    bind(run, UNCHECKED_PLAN);
+    const shell = [{ id: "task-002", type: "shell", status: "running", description: "bun run dev" }];
+    expect(await run.stop({ background_tasks: shell })).toEqual(CONTINUE);
+    expect(await run.stop({ background_tasks: [...shell, ...RUNNING_SUBAGENT] }, NOW + 10 * SECOND)).toEqual({});
   });
 
   test("plan continuation: a finished background task still blocks", async () => {
@@ -462,6 +539,19 @@ describe("final verification", () => {
     expect(await run.stop()).toEqual(corruptLedger(run.root));
   });
 
+  test.skipIf(process.platform === "win32" || process.getuid?.() === 0)("final verification: an evidence file that cannot be read is named with its error code, not called corrupt (skipped on Windows and as root: chmod 000 does not refuse there)", async () => {
+    const run = session();
+    bind(run, COMPLETE_PLAN);
+    writeLedger(run.root, [verdict()]);
+    const path = join(run.root, ".omca", "evidence", "verification-evidence.json");
+    chmodSync(path, 0o000);
+    try {
+      expect(await run.stop()).toEqual(feedback(`[FINAL VERIFICATION] Evidence file unreadable (EACCES). Fix ${path} before stopping.`));
+    } finally {
+      chmodSync(path, 0o644);
+    }
+  });
+
   test("final verification: an evidence file without an entries array is corrupt", async () => {
     const run = session();
     bind(run, COMPLETE_PLAN);
@@ -551,14 +641,6 @@ describe("final verification", () => {
     writeLedger(run.root, [verdict()]);
     expect(await run.stop()).toEqual({});
     expect(findSession(run.sessionId)?.stopBlocks?.has("final-verification")).toBe(false);
-  });
-
-  test("golden: final verification no-active-plan fixture allows Stop", async () => {
-    expect(await dispatch({ event: "Stop", stop_hook_active: "false", session_id: "fixture-sid-001" }, project(), NOW)).toEqual({});
-  });
-
-  test("golden: final verification recursion-guard fixture allows Stop", async () => {
-    expect(await dispatch({ event: "Stop", stop_hook_active: "true", session_id: "fixture-sid-001" }, project(), NOW)).toEqual({});
   });
 });
 
@@ -964,7 +1046,6 @@ describe("the Stop handler", () => {
             input: {
               event: "Stop",
               session_id: "${session_id}",
-              cwd: "${cwd}",
               transcript_path: "${transcript_path}",
               stop_hook_active: "${stop_hook_active}",
               last_assistant_message: "${last_assistant_message}",

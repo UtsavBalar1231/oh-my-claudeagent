@@ -256,12 +256,23 @@ describe("evidence_read", () => {
     expect(await call("evidence_read", { working_directory: project() })).toBe("No verification evidence recorded.");
   });
 
-  test("evidence_read treats a corrupt or empty ledger as no evidence", async () => {
+  test("evidence_read treats an empty ledger as no evidence", async () => {
     const root = project();
     mkdirSync(join(root, ".omca", "evidence"), { recursive: true });
-    for (const text of ["{corrupt", "[]", "null", json({ entries: [] })]) {
+    for (const text of ["{}", json({ entries: [] })]) {
       writeFileSync(ledgerFile(root), text);
       expect(await call("evidence_read", { working_directory: root })).toBe("No verification evidence recorded.");
+    }
+  });
+
+  test("evidence_read refuses a corrupt ledger with the same message evidence_log gives", async () => {
+    const root = project();
+    mkdirSync(join(root, ".omca", "evidence"), { recursive: true });
+    for (const text of ["{corrupt", "[]", "null"]) {
+      writeFileSync(ledgerFile(root), text);
+      await expect(call("evidence_read", { working_directory: root })).rejects.toThrow(
+        `${ledgerFile(root)} is not an evidence ledger ({"entries": [...]}); move it aside to keep logging evidence`,
+      );
     }
   });
 });

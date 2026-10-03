@@ -1,4 +1,4 @@
-export type ProgressUpdate = { message: string; progress?: number; total?: number };
+type ProgressUpdate = { message: string; progress?: number; total?: number };
 export type Progress = (update: ProgressUpdate) => void;
 export type ToolContext = { signal: AbortSignal; progress: Progress };
 

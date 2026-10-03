@@ -85,7 +85,7 @@ async function fetchGitInfo(projectDir: string, timeoutMs: number, cached: GitIn
   const now = Date.now() / 1000;
   const reuseRemote = cached !== null && now - cached.remoteFetchedAt < REMOTE_TTL_SECONDS;
   const [status, remote] = await Promise.all([
-    runGit(projectDir, ["--no-optional-locks", "status", "--porcelain=v2", "--branch", "-u"], timeoutMs),
+    runGit(projectDir, ["status", "--porcelain=v2", "-u"], timeoutMs),
     reuseRemote ? cached.remote : runGit(projectDir, ["remote", "get-url", "origin"], timeoutMs).then((out) => out?.trim() ?? ""),
   ]);
   return {

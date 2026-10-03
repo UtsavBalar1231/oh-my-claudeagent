@@ -3,8 +3,8 @@
     "repo": false
   },
   "payload": {
-    "session_id": "d0dfbbc9-d951-464e-bffa-01ddd301392f",
-    "transcript_path": "/tmp/transcripts/d0dfbbc9.jsonl",
+    "session_id": "00000000-0000-4000-8000-000000000001",
+    "transcript_path": "@ROOT@/transcripts/session.jsonl",
     "cwd": "@ROOT@/plain",
     "scratchpad_dir": "@ROOT@/scratch",
     "effort": {

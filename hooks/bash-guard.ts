@@ -1,16 +1,16 @@
 import type { EventResult } from "claude-code";
 import { type Context, classify, type GitFinding, type Reviewable, reasonFor } from "../src/core/destructive.ts";
 import { isHookDisabled } from "../src/core/kill-switch.ts";
-import { homeDir, joinPath, toPosix } from "../src/core/path.ts";
+import { joinPath, toPosix } from "../src/core/path.ts";
 import { homeRest, platformOf } from "../src/core/targets.ts";
-import { displayWidth, fitEnd, fitMiddle, type Glyphs, glyphs, isAsciiRequested } from "../src/core/ui-kit.ts";
+import { displayWidth, fitEnd, fitMiddle, type Glyphs, glyphs } from "../src/core/ui-kit.ts";
 import type { Features } from "./dispatch.ts";
-import { type Host, reason } from "./host.ts";
+import { type Host, reason, sessionOf } from "./host.ts";
 
 const RUN = "Run it";
 const REFUSE = "Refuse";
 // The AskUserQuestion dialog's text column on an 80-column terminal, the narrowest supported:
-// its left rule takes 2 of the 80 (measured on 2.1.287).
+// its left rule takes 2 of the 80 (measured).
 const WIDTH = 78;
 const LIMIT = 20;
 const COMMAND_LINES = 3;
@@ -151,19 +151,18 @@ async function branchesOf(host: Host): Promise<Pick<Context, "branch" | "default
 }
 
 async function contextOf(host: Host, shell: Context["shell"], isPush: boolean): Promise<Context> {
-  const [HOME, USERPROFILE, HOMEDRIVE, HOMEPATH, cwd, root, branches] = await Promise.all([
-    host.env.HOME(),
-    host.env.USERPROFILE(),
-    host.env.HOMEDRIVE(),
-    host.env.HOMEPATH(),
+  const [home, cwd, root, branches] = await Promise.all([
+    sessionOf(host).then(
+      (session) => session.home,
+      () => "",
+    ),
     host.session.cwd().catch(() => undefined),
     host.session.root().catch(() => undefined),
     isPush ? branchesOf(host) : {},
   ]);
-  const home = homeDir({ HOME, USERPROFILE, HOMEDRIVE, HOMEPATH });
   return {
     shell,
-    ...(home !== undefined && { home }),
+    ...(home !== "" && { home }),
     ...(cwd !== undefined && { cwd }),
     ...(root !== undefined && { root }),
     ...branches,
@@ -178,15 +177,18 @@ export const bashGuard: Features = {
       const first = classify(command, { shell });
       if (first === undefined) return undefined;
       if (first.kind === "catastrophic") return deny(reasonFor(first));
-      const ctx = await contextOf(host, shell, first.git.some((finding) => finding.operation === "push --force"));
+      // A disabled guard still classifies with the context, because the catastrophic deny has no switch.
+      const isDisabled = isHookDisabled(await host.env.OMCA_DISABLED_HOOKS(), "bash-guard");
+      const isPush = !isDisabled && first.git.some((finding) => finding.operation === "push --force");
+      const ctx = await contextOf(host, shell, isPush);
       const finding = classify(command, ctx);
       if (finding === undefined) return undefined;
       if (finding.kind === "catastrophic") return deny(reasonFor(finding));
-      if (isHookDisabled(await host.env.OMCA_DISABLED_HOOKS(), "bash-guard")) return undefined;
+      if (isDisabled) return undefined;
       const refusal = reasonFor(finding);
       const canAsk = host.options.guardMode === "dialog" && (await host.session.surfaces()).length > 0;
       if (!canAsk) return finding.kind === "blocking" ? deny(refusal) : undefined;
-      const g = glyphs(isAsciiRequested(await host.env.OMCA_ASCII()));
+      const g = glyphs((await sessionOf(host)).isAscii);
       const text = await question(host, command, finding, g, ctx);
       const answer = await host.ui.ask(text, { header: "OMCA guard", options: [REFUSE, RUN] }).catch(() => undefined);
       return answer === RUN ? undefined : deny(refusal);

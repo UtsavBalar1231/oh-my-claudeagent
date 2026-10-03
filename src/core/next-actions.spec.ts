@@ -51,7 +51,8 @@ describe("nextActions", () => {
 
 describe("hasPassingFinalVerification", () => {
   const SHA = "a".repeat(64);
-  const entry = (fields: Record<string, unknown>) => ({ entries: [{ type: "final_verification", exit_code: 0, ...fields }] });
+  const READABLE = { command: "just ci", timestamp: "2026-10-02T12:00:00Z" };
+  const entry = (fields: Record<string, unknown>) => ({ entries: [{ type: "final_verification", exit_code: 0, ...READABLE, ...fields }] });
 
   test.each<[string, unknown, boolean]>([
     ["an entry scoped to this plan's bytes", entry({ plan_sha256: SHA }), true],
@@ -61,7 +62,8 @@ describe("hasPassingFinalVerification", () => {
     ["an entry scoped to other bytes", entry({ plan_sha256: "b".repeat(64) }), false],
     ["a failing entry", entry({ exit_code: 1 }), false],
     ["an exit code given as a string", entry({ exit_code: "0" }), false],
-    ["a passing entry of another type", { entries: [{ type: "test", exit_code: 0 }] }, false],
+    ["a passing entry of another type", { entries: [{ type: "test", exit_code: 0, ...READABLE }] }, false],
+    ["an entry without a timestamp", entry({ timestamp: undefined }), false],
     ["a passing entry after a failing one", { entries: [...entry({ exit_code: 2 }).entries, ...entry({}).entries] }, true],
     ["no ledger", undefined, false],
     ["a ledger without entries", {}, false],

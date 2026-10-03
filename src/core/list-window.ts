@@ -56,8 +56,10 @@ export function focusMove(list: FocusList, last: Drawn, picked: number): FocusMo
   return { kind: "move", landing: before[after.indexOf(picked)] ?? picked, start: next.start };
 }
 
-// Items of unequal height, windowed by whole items. `room` is the rows the window may fill, and
-// a window always holds at least one item, however tall.
+/**
+ * Items of unequal height, windowed by whole items. `room` is the rows the window may fill, and
+ * a window always holds at least one item, however tall.
+ */
 export function windowEnd(heights: readonly number[], start: number, room: number): number {
   let used = 0;
   let end = start;
@@ -68,7 +70,7 @@ export function windowEnd(heights: readonly number[], start: number, room: numbe
   return end;
 }
 
-// The last start that still fills the window to the end of the list.
+/** The last start that still fills the window to the end of the list. */
 export function lastStart(heights: readonly number[], room: number): number {
   let start = heights.length;
   let used = 0;
@@ -79,7 +81,7 @@ export function lastStart(heights: readonly number[], room: number): number {
   return Math.max(0, Math.min(start, heights.length - 1));
 }
 
-// Moves the start by whole items until at least `by` rows have passed, signed like a scroll.
+/** Moves the start by whole items until at least `by` rows have passed, signed like a scroll. */
 export function stepStart(heights: readonly number[], start: number, by: number, room: number): number {
   const last = lastStart(heights, room);
   let at = Math.min(start, last);

@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { isWindowsSafeName } from "../../src/core/session-id.ts";
-import { ensureStateDir, withLock, writeFileAtomic } from "../io.ts";
+import { ensureStateDir, isDirectory, withLock, writeFileAtomic } from "../io.ts";
 import type { Tool } from "../omca.ts";
 import { isoTimestamp, rootOf, stringArg, WORKING_DIRECTORY } from "./args.ts";
 
@@ -11,10 +11,10 @@ type Section = (typeof SECTIONS)[number];
 const PLAN_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const WARN_BYTES = 50 * 1024;
 const KEEP_LINES = 20;
+const COMPACTED = /^\[Compacted: (\d+) earlier lines removed\]$/;
 
 const SECTION = { type: "string", enum: SECTIONS };
 
-const isDir = (path: string) => statSync(path, { throwIfNoEntry: false })?.isDirectory() ?? false;
 const isFile = (path: string) => statSync(path, { throwIfNoEntry: false })?.isFile() ?? false;
 
 function toPlan(plan: string): string {
@@ -106,7 +106,7 @@ export const tools: Tool[] = [
       const plan = toPlan(stringArg(args, "plan_name"));
       const section = args.section == null ? undefined : toSection(args.section);
       const dir = join(notepadsOf(rootArg(args)), plan);
-      if (!isDir(dir)) return `No notepad found for plan: ${plan}`;
+      if (!isDirectory(dir)) return `No notepad found for plan: ${plan}`;
       const blocks = (section === undefined ? SECTIONS : [section]).flatMap((name) => {
         const path = join(dir, `${name}.md`);
         const title = name.charAt(0).toUpperCase() + name.slice(1);
@@ -133,9 +133,9 @@ export const tools: Tool[] = [
       const notepads = notepadsOf(rootArg(args));
       if (plan !== "") {
         const dir = join(notepads, toPlan(plan));
-        return isDir(dir) ? `Plan: ${plan}\nSections: ${sectionNames(dir)}` : `No notepad found for plan: ${plan}`;
+        return isDirectory(dir) ? `Plan: ${plan}\nSections: ${sectionNames(dir)}` : `No notepad found for plan: ${plan}`;
       }
-      const plans = isDir(notepads) ? readdirSync(notepads).filter((name) => isDir(join(notepads, name))).sort() : [];
+      const plans = isDirectory(notepads) ? readdirSync(notepads).filter((name) => isDirectory(join(notepads, name))).sort() : [];
       if (plans.length === 0) return "No notepads found.";
       return ["Available notepads:\n", ...plans.map((name) => `- ${name}: ${sectionNames(join(notepads, name))}`)].join("\n");
     },
@@ -143,7 +143,7 @@ export const tools: Tool[] = [
   {
     name: "notepad_compact",
     description:
-      "Permanently delete all but the last 20 lines of one notepad section. The cut is by line, not by entry, so an entry that straddles it loses its first lines and its timestamp header, and removed text is not archived anywhere. The section then starts with a marker giving the number of removed lines. Use it only when a section is too large to read usefully and its older entries no longer matter; read them with notepad_read first if they might. Returns a one-line summary, or a no-op message when the section has 20 lines or fewer.",
+      "Permanently delete all but the last 20 lines of one notepad section. The cut is by line, not by entry, so an entry that straddles it loses its first lines and its timestamp header, and removed text is not archived anywhere. The section then starts with a marker giving the total number of lines removed so far, which the 20 do not count. Use it only when a section is too large to read usefully and its older entries no longer matter; read them with notepad_read first if they might. Returns a one-line summary, or a no-op message when the section has 20 lines or fewer.",
     inputSchema: {
       type: "object",
       properties: {
@@ -167,10 +167,13 @@ export const tools: Tool[] = [
       const path = join(notepadsOf(rootArg(args)), plan, `${section}.md`);
       if (!existsSync(path)) return `Section '${section}' not found for plan '${plan}'`;
       return withLock(`${path}.lock`, () => {
-        const lines = readFileSync(path, "utf8").trim().split("\n");
+        const all = readFileSync(path, "utf8").trim().split("\n");
+        const marker = COMPACTED.exec(all[0] ?? "");
+        const lines = marker ? all.slice(1) : all;
         if (lines.length <= KEEP_LINES) return `Section '${section}' has ${lines.length} lines and needs no compaction`;
         const removed = lines.length - KEEP_LINES;
-        writeFileAtomic(path, `[Compacted: ${removed} earlier lines removed]\n${lines.slice(-KEEP_LINES).join("\n")}\n`);
+        const total = Number(marker?.[1] ?? 0) + removed;
+        writeFileAtomic(path, `[Compacted: ${total} earlier lines removed]\n${lines.slice(-KEEP_LINES).join("\n")}\n`);
         return `Compacted '${section}': removed ${removed} old lines, kept last ${KEEP_LINES}`;
       });
     },

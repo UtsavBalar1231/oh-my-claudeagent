@@ -65,11 +65,11 @@ function writeLedger(path: string, content: string, mtimeSeconds: number): void 
 }
 
 describe("nothing recorded allows, whatever the task is named", () => {
-  test("no slot, informational task: exits 0 (allow)", async () => {
+  test("no slot, informational task: allows", async () => {
     expect(await complete(project(), crypto.randomUUID(), NOW, { task_description: "status report only" })).toEqual({});
   });
 
-  test("no slot, verification-sounding task: exits 0 (allow)", async () => {
+  test("no slot, verification-sounding task: allows", async () => {
     const task = { task_description: "all tests pass — implement and verify the build" };
     expect(await complete(project(), crypto.randomUUID(), NOW, task)).toEqual({});
   });
@@ -93,7 +93,7 @@ describe("nothing recorded allows, whatever the task is named", () => {
 });
 
 describe("evidence logged after the verification allows", () => {
-  test("slot with evidence logged after it: exits 0 (allow)", async () => {
+  test("slot with evidence logged after it: allows", async () => {
     const root = project();
     const sessionId = crypto.randomUUID();
     await record(root, sessionId, NOW - 60 * SECOND);
@@ -119,7 +119,7 @@ describe("evidence logged after the verification allows", () => {
 });
 
 describe("a verification with no evidence after it blocks", () => {
-  test("slot with no evidence at all: exits 2 (block) and names the command", async () => {
+  test("slot with no evidence at all: blocks and names the command", async () => {
     const root = project();
     const sessionId = crypto.randomUUID();
     await record(root, sessionId);
@@ -133,7 +133,7 @@ describe("a verification with no evidence after it blocks", () => {
     expect(await complete(root, sessionId, NOW + 30 * SECOND, { task_description: "anything at all" })).toEqual(BLOCK);
   });
 
-  test("evidence older than the slot: exits 2 (block)", async () => {
+  test("evidence older than the slot: blocks", async () => {
     const root = project();
     const sessionId = crypto.randomUUID();
     writeLedger(ledgerPath(root), LEDGER, NOW_S - 600);
@@ -229,8 +229,8 @@ describe("kill switch", () => {
   });
 });
 
-describe("golden fixtures", () => {
-  test("no-evidence replays to an empty answer", async () => {
+describe("a full hook payload", () => {
+  test("a full payload with nothing recorded answers nothing", async () => {
     const fixture = { hook_event_name: "TaskCompleted", task_description: "Implement feature X", session_id: "fixture-sid-101" };
     expect(await dispatch({ ...fixture, event: fixture.hook_event_name }, project(), NOW)).toEqual({});
   });

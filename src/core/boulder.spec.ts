@@ -85,7 +85,7 @@ describe("resolveBoundPlan lenient", () => {
   });
 
   test("an empty registry resolves to nothing", () => {
-    expect(resolveBoundPlan({ plans: {}, bindings: {} }, "sess-x")).toEqual({});
+    expect(resolveBoundPlan({ plans: {}, bindings: {} }, "sess-x")).toBeUndefined();
   });
 
   test("a binding to a missing plan falls through to the sole plan", () => {
@@ -126,20 +126,20 @@ describe("resolveBoundPlan strict", () => {
   });
 
   test("an unbound session gets nothing even with a sole plan", () => {
-    expect(resolveBoundPlan(fixture("single-plan"), "unknown-session", true)).toEqual({});
+    expect(resolveBoundPlan(fixture("single-plan"), "unknown-session", true)).toBeUndefined();
   });
 
   test("an unbound session gets nothing among several plans", () => {
-    expect(resolveBoundPlan(fixture("two-plan"), "unknown-session", true)).toEqual({});
+    expect(resolveBoundPlan(fixture("two-plan"), "unknown-session", true)).toBeUndefined();
   });
 
   test("a binding to a missing plan gets nothing", () => {
-    expect(resolveBoundPlan(twoPlansBoundTo("ghost"), "sess-x", true)).toEqual({});
+    expect(resolveBoundPlan(twoPlansBoundTo("ghost"), "sess-x", true)).toBeUndefined();
   });
 
   test("an empty session id never matches a binding stored under an empty key", () => {
     const data = { plans: plansWith("plan-a"), bindings: { "": { plan_name: "plan-a" } } };
-    expect(resolveBoundPlan(data, "", true)).toEqual({});
+    expect(resolveBoundPlan(data, "", true)).toBeUndefined();
   });
 
   test("an inherited object key is not read as a plan name", () => {
@@ -147,19 +147,15 @@ describe("resolveBoundPlan strict", () => {
       plans: plansWith("plan-a"),
       bindings: { s: { plan_name: "toString" } },
     };
-    expect(resolveBoundPlan(data, "constructor", true)).toEqual({});
-    expect(resolveBoundPlan(data, "s", true)).toEqual({});
+    expect(resolveBoundPlan(data, "constructor", true)).toBeUndefined();
+    expect(resolveBoundPlan(data, "s", true)).toBeUndefined();
   });
 });
 
 describe("resolveBoundPlan on unreadable files", () => {
-  test.each(["corrupt", "half-written"])("%s fixture does not parse", (name) => {
-    expect(() => JSON.parse(rawFixture(name))).toThrow(SyntaxError);
-  });
-
   test.each(["corrupt", "half-written"])("%s fixture resolves to nothing", (name) => {
-    expect(resolveBoundPlan(readOrEmpty(name), "any-session")).toEqual({});
-    expect(resolveBoundPlan(readOrEmpty(name), "any-session", true)).toEqual({});
+    expect(resolveBoundPlan(readOrEmpty(name), "any-session")).toBeUndefined();
+    expect(resolveBoundPlan(readOrEmpty(name), "any-session", true)).toBeUndefined();
   });
 });
 

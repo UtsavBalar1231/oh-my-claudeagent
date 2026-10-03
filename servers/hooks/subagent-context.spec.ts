@@ -52,33 +52,28 @@ async function contextOf(agentType: string | undefined, root = project(), sessio
 const omca = (name: string) => `oh-my-claudeagent:${name}`;
 
 const AUTONOMOUS_PROTOCOL =
-  "\n─── Agent Protocol ─────────────────────────────────────\nAskUserQuestion is not available here. Make autonomous decisions when possible; if you need user input, emit a '## BLOCKING QUESTIONS' block at the end of your final response (Q1., Q2., lettered options A/B/C, Recommended: line) and return. The orchestrator will relay.";
+  "AskUserQuestion is not available here. Make autonomous decisions when possible; if you need user input, emit a '## BLOCKING QUESTIONS' block at the end of your final response (Q1., Q2., lettered options A/B/C, Recommended: line) and return. The orchestrator will relay.";
 const PLANNER_PROTOCOL =
-  "\n─── Agent Protocol ─────────────────────────────────────\nAskUserQuestion is not available here. When you need user input, emit a '## BLOCKING QUESTIONS' block at the end of your final response (Q1., Q2., lettered options A/B/C, Recommended: line) and return. The orchestrator will relay and resume you with the answers.";
+  "AskUserQuestion is not available here. When you need user input, emit a '## BLOCKING QUESTIONS' block at the end of your final response (Q1., Q2., lettered options A/B/C, Recommended: line) and return. The orchestrator will relay and resume you with the answers.";
 const COMMON =
-  "\n[CURRENT DATE] Today is Friday, October 02, 2026." +
   "\n[OUTPUT MANDATE] Your text response is the ONLY output the orchestrator receives. Tool call results and intermediate reasoning are NOT forwarded. Structure your response according to your agent's defined output format." +
   "\n[FILE TOOLS] Read files with the Read tool, not cat, head, tail, or sed -n in Bash: Read numbers the lines and pages a large file with offset and limit." +
   "\n[OMCA TOOLS] `evidence_log`, `boulder_progress` and `notepad_write` are always available. Load any other omca tool with ToolSearch first, by its full name: `select:mcp__plugin_oh-my-claudeagent_omca__ast_search`. A guessed prefix finds nothing.";
-const GUIDANCE_HEADER = "\n─── Execution Guidance ─────────────────────────────────────";
 const EDITING_GUIDANCE =
   "\n[EDITS] Change an existing file with Edit, which touches only the lines that need it, rather than rewriting it with Write or a shell heredoc. Read the file before you Edit it, so old_string matches its current content." +
   "\n[VERIFICATION] Record each build, test, or lint run with evidence_log, including its real exit code. Write .omca/evidence/verification-evidence.json only through that tool, never by hand or through a shell redirect: the Stop and TaskCompleted gates read it as the audit trail." +
-  "\n[PLAN SHA] When logging a final_verification entry, take plan_sha256 from boulder_progress for the active plan and pass it as evidence_log(..., plan_sha256=<plan_sha256>) so the Stop gate scopes evidence to this plan run." +
-  "\n[CLEANUP PASS] Every task ends with a cleanup pass scoped to the files it changed; it no-ops when it changed none. Changed any non-.md file: invoke the oh-my-claudeagent:remove-ai-slops skill via the Skill tool, passing the touched file list EXPLICITLY. Changed only .md files: skip that skill and apply the prose rules yourself, since a code-slop cleaner is the wrong instrument for Markdown. Re-verify only if the pass actually cut something, and if that verification goes RED, revert the cut instead of fixing forward. Report the outcome on the 'SLOP PASS:' line of your output block, naming the files and the category of each cut." +
-  "\n[MINIMAL CODE] Write the least code that does the job. Skip what the task does not need, and prefer the standard library, a native platform feature, or an installed dependency over new code, and one line over a new helper. Minimal never means dropping validation at trust boundaries, error and data-loss handling, security, accessibility, or anything the user asked for. Leave one runnable check for non-trivial logic: the smallest assert or test, or the evidence_log entry OMCA's flow already records. Prefer plain code and the fewest files.";
+  "\n[PLAN SHA] When logging a final_verification entry, take plan_sha256 from boulder_progress for the active plan and pass it as evidence_log(..., plan_sha256=<plan_sha256>) so the Stop gate scopes evidence to this plan run.";
 const ORCHESTRATING_GUIDANCE =
   "\n[ANTI-DUPLICATION] Once you delegate exploration to explore/librarian agents, do not perform the same search yourself. Avoid after delegating: manually grep/searching for the same information; re-doing research agents are handling; 'just quickly checking' the same files. Continue only with non-overlapping work. A background agent, the default in interactive sessions, answers the Agent call with a launch acknowledgement only, and its report arrives later in a task notification. Do not poll its output file or post holding messages while it runs." +
   "\n[TEAM CONTRACT] OMCA agents are thin wrappers over Claude-native subagents and agent teams. Use subagents when workers only need to report back. Use native agent teams when workers need the shared task list or direct teammate messaging.";
 const WORKER_CONTRACT =
-  "\n─── Worker Output Contract ─────────────────────────────────────\n[YOU ARE A LEAF WORKER] Do this task yourself: do not delegate to other agents or wait on them. Guidance about waiting for background agents or ending a turn while agents run, whether it reaches you from memory, CLAUDE.md, or the output style, is for the orchestrator and does not apply to you." +
+  "\n[YOU ARE A LEAF WORKER] Do this task yourself: do not delegate to other agents or wait on them. Guidance about waiting for background agents or ending a turn while agents run, whether it reaches you from memory, CLAUDE.md, or the output style, is for the orchestrator and does not apply to you." +
   "\n[NEVER STUB] Your final message is the whole deliverable: put your complete findings in it, never a bare status word or a note that you are waiting.";
 
 const notepadLine = (name: string) =>
   `\n[NOTEPAD AVAILABLE] Plan: ${name}. Use notepad_write('${name}', section, content) to record discoveries. Sections: learnings, issues, decisions, problems. Each call appends, so earlier entries stay.`;
 
 const planBlock = (file: string, name: string) =>
-  "\n─── Plan Context ─────────────────────────────────────" +
   `\n[ACTIVE PLAN] Refer to: ${file}` +
   `\nThe plan file at ${file} is READ-ONLY for you: the orchestrator flips its checkboxes after reviewing your report, so an edit here would record progress nobody verified. Record issues or decisions with notepad_write instead.` +
   notepadLine(name);
@@ -89,15 +84,22 @@ describe("the injected context, exactly", () => {
   });
 
   test("an editing worker also gets the editing guidance before the worker contract", async () => {
-    expect(await contextOf(omca("executor"))).toBe(AUTONOMOUS_PROTOCOL + COMMON + GUIDANCE_HEADER + EDITING_GUIDANCE + WORKER_CONTRACT);
+    expect(await contextOf(omca("executor"))).toBe(AUTONOMOUS_PROTOCOL + COMMON + EDITING_GUIDANCE + WORKER_CONTRACT);
+  });
+
+  test("no agent gets the cleanup-pass, minimal-code, date or ruler lines, whose home is the agent file or the platform", async () => {
+    for (const type of ["executor", "hephaestus", "sisyphus", "explore"]) {
+      const context = await contextOf(omca(type));
+      for (const removed of ["[CLEANUP PASS]", "[MINIMAL CODE]", "[CURRENT DATE]", "───"]) expect(context).not.toContain(removed);
+    }
   });
 
   test("sisyphus gets the planner protocol, editing and orchestrating guidance, and no worker contract", async () => {
-    expect(await contextOf(omca("sisyphus"))).toBe(PLANNER_PROTOCOL + COMMON + GUIDANCE_HEADER + EDITING_GUIDANCE + ORCHESTRATING_GUIDANCE);
+    expect(await contextOf(omca("sisyphus"))).toBe(PLANNER_PROTOCOL + COMMON + EDITING_GUIDANCE + ORCHESTRATING_GUIDANCE);
   });
 
   test("prometheus gets only the orchestrating guidance", async () => {
-    expect(await contextOf(omca("prometheus"))).toBe(PLANNER_PROTOCOL + COMMON + GUIDANCE_HEADER + ORCHESTRATING_GUIDANCE);
+    expect(await contextOf(omca("prometheus"))).toBe(PLANNER_PROTOCOL + COMMON + ORCHESTRATING_GUIDANCE);
   });
 
   test("a bound plan's lines sit between the file tools line and the worker contract", async () => {
@@ -118,15 +120,6 @@ describe("the injected context, exactly", () => {
 });
 
 describe("plan context", () => {
-  test("boulder plan context: READ-ONLY and NOTEPAD injected when boulder.json exists", async () => {
-    const root = project();
-    const file = planFile(root);
-    writeBoulder(root, registry({ "my-plan": file }, { [SESSION]: "my-plan" }));
-    const context = await contextOf(omca("explore"), root);
-    expect(context).toContain("READ-ONLY");
-    expect(context).toContain("NOTEPAD");
-  });
-
   test("no boulder.json: plan context (READ-ONLY) is absent", async () => {
     expect(await contextOf(omca("explore"))).not.toContain("READ-ONLY");
   });
@@ -220,7 +213,6 @@ describe("guidance by role", () => {
 describe("worker isolation", () => {
   const read = (path: string) => readFileSync(join(PLUGIN_ROOT, path), "utf8");
   const workerDefs = ["executor", "explore", "librarian", "multimodal-looker", "oracle", "momus", "hephaestus"].map((name) => `agents/${name}.md`);
-  const needContract = ["executor", "explore", "librarian", "multimodal-looker"].map((name) => `agents/${name}.md`);
 
   test("worker isolation: no bare barrier imperative in worker-visible surfaces", () => {
     for (const path of [...workerDefs, "output-styles/omca-default.md", "templates/claudemd.md"]) {
@@ -232,13 +224,7 @@ describe("worker isolation", () => {
     expect(read("agents/executor.md")).not.toContain("## Background Agent Results");
   });
 
-  test("worker isolation: every worker agent def carries a leaf-worker / anti-stub contract", () => {
-    for (const path of needContract) {
-      expect({ path, found: /leaf worker|bare status word|never a valid final message/i.test(read(path)) }).toEqual({ path, found: true });
-    }
-  });
-
-  test("worker isolation: SubagentStart hook still injects the NEVER STUB reinforcement", async () => {
+  test("worker isolation: SubagentStart injects the leaf-worker and never-stub contract", async () => {
     const context = await contextOf(omca("executor"));
     expect(context).toContain("[NEVER STUB]");
     expect(context).toContain("[YOU ARE A LEAF WORKER]");

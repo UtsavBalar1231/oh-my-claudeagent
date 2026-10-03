@@ -23,7 +23,7 @@ test("session start writes the marker with its time, the plugin version and the 
   await start($);
   const manifest = w.reads.find((path) => path.endsWith("/.claude-plugin/plugin.json")) ?? "";
   expect(marker(w)).toEqual({ written_at: STARTED_MS, version: null, options: { showBand: true, guardMode: "dialog", enableKeywordTriggers: false } });
-  expect(w.logs.some((line) => line.startsWith("cannot read the plugin version"))).toBe(true);
+  expect(w.logs.filter((line) => line.startsWith("cannot read"))).toEqual([`cannot read the plugin version: ENOENT: no such file, ${manifest}`]);
 
   write(w, manifest, '{ "name": "oh-my-claudeagent", "version": "3.0.0" }');
   await w.clock.advance(60_000);
@@ -33,6 +33,15 @@ test("session start writes the marker with its time, the plugin version and the 
     version: "3.0.0",
     options: { showBand: true, guardMode: "dialog", enableKeywordTriggers: false },
   });
+});
+
+test("a session id that cannot name a file writes no marker and says so", async ($, on) => {
+  const w = engine(on);
+  w.sessionId = "../escape";
+  await start($);
+
+  expect([...w.files.keys()].filter((path) => path.includes("/.omca/state/mod/"))).toEqual([]);
+  expect(w.logs).toContain('mod-marker: the session id "../escape" cannot name a file');
 });
 
 test("each main-loop turn start rewrites the marker with the turn's time", async ($, on) => {

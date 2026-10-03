@@ -60,7 +60,6 @@ function addedLines(input: unknown): string[] {
   return (inputText(input, "content") || inputText(input, "new_string")).split("\n");
 }
 
-
 // A literal attribution or placeholder on a comment line is near-certain slop, which is why
 // these are the only findings that always deny. The phrases must open the comment body, so a
 // comment that merely names one passes.
@@ -174,7 +173,7 @@ function slopFindings(lines: readonly string[], syntax: Syntax): Slop[] {
       add(`Filler-word comment ("${text}"): delete it.`, text);
     }
 
-    if (/todo|fixme/.test(lowered) && found.length < MAX_SLOP_FINDINGS && !hasReference(text)) {
+    if (/\b(?:todo|fixme)\b/.test(lowered) && found.length < MAX_SLOP_FINDINGS && !hasReference(text)) {
       const rest = text.replace(/^.*todo/i, "").replace(/^.*fixme/i, "").replace(/^[:,-]+\s*/, "").replace(/^\s+/, "");
       if (rest.split(/\s+/).length < 3) add(`Context-free TODO/FIXME ("${text}"): add an issue ref or TODO(owner):.`, text);
     }
@@ -199,7 +198,7 @@ function slopFindings(lines: readonly string[], syntax: Syntax): Slop[] {
 }
 
 // Without the list of what to keep, a deny invites stripping every comment.
-const KEEP_NOTICE = `The convention: names, types, and structure carry the what, so a comment earns its place only by carrying something the code cannot state, the non-obvious why, an invariant, a constraint, or the derivation of a magic number. A correct fix deletes the quoted comment, or rewrites it as the reason the code is the way it is. A clearer name beats a comment that restates the line below it. Do NOT remove other comments while fixing this: file headers, non-obvious function contracts, invariant notes, and magic-number derivation comments are REQUIRED and must survive. Resubmit the same code change with only the quoted comments fixed. Genuine exceptions: put ${DISABLE_FILE_MARKER} in the first ${DISABLE_FILE_WINDOW} lines of the hunk.`;
+const KEEP_NOTICE = `The convention: names, types, and structure carry the what, so a comment earns its place only by carrying something the code cannot state, the non-obvious why, an invariant, a constraint, or the derivation of a magic number. A correct fix deletes the quoted comment, or rewrites it as the reason the code is the way it is. A clearer name beats a comment that restates the line below it. Do NOT remove other comments while fixing this: file headers, non-obvious function contracts, invariant notes, and magic-number derivation comments may be required by the project's own convention. Resubmit the same code change with only the quoted comments fixed. Genuine exceptions: put @allow on a comment line to exempt that line from the slop checks, or put ${DISABLE_FILE_MARKER} in the first ${DISABLE_FILE_WINDOW} lines of the hunk.`;
 
 /**
  * Judges the comments a Write or Edit adds. Tier-1 findings (attribution, placeholder) deny in

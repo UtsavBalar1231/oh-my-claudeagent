@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { dispatch, type Handler, type Output, payloadOf, REGISTRY } from "./registry.ts";
@@ -28,7 +28,7 @@ function quietErrors() {
 }
 
 describe("registry", () => {
-  test("lists every planned handler per event, in order", () => {
+  test("lists every handler per event, in order", () => {
     const names = Object.fromEntries(Object.entries(REGISTRY).map(([event, handlers]) => [event, handlers.map(([name]) => name)]));
     expect(names).toEqual({
       PreToolUse: ["plan-write-guard", "comment-gate"],
@@ -59,6 +59,37 @@ describe("registry", () => {
       expect(errors.mock.calls).toEqual([['omca: omca_hook has no handlers for event "Bogus"']]);
     } finally {
       errors.mockRestore();
+    }
+  });
+});
+
+describe("hooks.json against the registry", () => {
+  type Entry = { matcher?: string; hooks: { input: Record<string, string> }[] };
+  const HOOKS: Record<string, Entry[]> = JSON.parse(readFileSync(join(import.meta.dir, "..", "..", "hooks", "hooks.json"), "utf8")).hooks;
+
+  // The payload fields each event's handlers read, beside the event and the session id that every entry passes.
+  const READS: Record<string, readonly string[]> = {
+    PreToolUse: ["tool_name", "tool_input"],
+    PostToolUse: ["agent_id", "agent_type", "tool_name", "tool_input", "tool_response"],
+    PostToolUseFailure: ["tool_name", "tool_input", "error", "duration_ms"],
+    UserPromptSubmit: ["agent_id", "prompt", "session_title"],
+    UserPromptExpansion: ["command_name"],
+    SubagentStart: ["agent_type"],
+    PermissionDenied: ["tool_name", "reason"],
+    TaskCompleted: [],
+    Stop: ["transcript_path", "stop_hook_active", "last_assistant_message", "background_tasks"],
+    SessionStart: ["source"],
+  };
+
+  test("hooks.json registers exactly the registry's events, and the table covers each one", () => {
+    expect(Object.keys(HOOKS).toSorted()).toEqual(Object.keys(REGISTRY).toSorted());
+    expect(Object.keys(READS).toSorted()).toEqual(Object.keys(REGISTRY).toSorted());
+  });
+
+  test("every entry passes its event, the session id and each field its handlers read, substituted from the payload", () => {
+    for (const [event, entries] of Object.entries(HOOKS)) {
+      const expected = { event, ...Object.fromEntries(["session_id", ...(READS[event] ?? [])].map((field) => [field, `\${${field}}`])) };
+      for (const { hooks } of entries) for (const { input } of hooks) expect({ event, input }).toMatchObject({ event, input: expected });
     }
   });
 });
@@ -173,7 +204,7 @@ describe("payloadOf", () => {
       session_id: "s",
       tool_input: '{"command":"just test"}',
       tool_response: "some text",
-      tool_calls: "",
+      background_tasks: "",
       prompt: '{"looks":"like json"}',
     });
     expect(payload).toEqual({
@@ -181,8 +212,13 @@ describe("payloadOf", () => {
       session_id: "s",
       tool_input: { command: "just test" },
       tool_response: "some text",
-      tool_calls: undefined,
+      background_tasks: undefined,
       prompt: '{"looks":"like json"}',
     });
+  });
+
+  test("an object field that arrives already decoded passes through unchanged", () => {
+    const payload = payloadOf({ event: "Stop", background_tasks: [{ id: "t1", type: "shell" }], tool_input: { command: "x" } });
+    expect(payload).toMatchObject({ background_tasks: [{ id: "t1", type: "shell" }], tool_input: { command: "x" } });
   });
 });

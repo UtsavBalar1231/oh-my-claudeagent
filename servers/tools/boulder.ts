@@ -7,20 +7,18 @@ import { latestSessionId } from "../hooks/session-state.ts";
 import { registryPath } from "../hooks/status-file.ts";
 import { ensureStateDir, hasCode, tryWithLockSync, withLock, writeFileAtomic } from "../io.ts";
 import type { Tool } from "../omca.ts";
-import { isoTimestamp, rootOf, stringReader, WORKING_DIRECTORY } from "./args.ts";
+import { argReader, isoTimestamp, rootOf, WORKING_DIRECTORY } from "./args.ts";
 
 export const GC_MAX_AGE_SECONDS = 7 * 24 * 3600;
 const ISO_SECONDS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
 
-export type PruneSummary = { pruned_plans: string[]; pruned_bindings: string[] };
+type PruneSummary = { pruned_plans: string[]; pruned_bindings: string[] };
 
-const bound = new Map<string, Set<string>>();
 /** Project root to the session ids `boulder_write` bound there in this process, for the exit handler to unbind. */
-export const boundSessionsByRoot: ReadonlyMap<string, ReadonlySet<string>> = bound;
+const bound = new Map<string, Set<string>>();
 
 const sessionIdOr = (sessionId: string): string =>
   sessionId || (latestSessionId() ?? process.env.CLAUDE_CODE_SESSION_ID ?? "");
-
 
 function readRaw(path: string): unknown {
   let text: string;
@@ -131,11 +129,10 @@ const withKey = <T>(record: Record<string, T>, key: string, value: T): Record<st
   Object.fromEntries([...Object.entries(record), [key, value]]);
 
 async function boulderWrite(args: Record<string, unknown>): Promise<string> {
-  const arg = stringReader(args, "boulder_write");
+  const arg = argReader(args, "boulder_write").string;
   const activePlan = arg("active_plan");
   const planName = arg("plan_name");
   const sessionId = sessionIdOr(arg("session_id"));
-  const agent = arg("agent", "sisyphus");
   const worktreePath = arg("worktree_path", "");
   const root = rootOf(arg("working_directory", ""));
   const path = join(ensureStateDir(root), "boulder.json");
@@ -150,7 +147,6 @@ async function boulderWrite(args: Record<string, unknown>): Promise<string> {
       active_plan: activePlan,
       started_at: existing.started_at || isoTimestamp(),
       session_ids: sessionIds,
-      agent: agent || existing.agent || "sisyphus",
       ...(worktree && { worktree_path: worktree }),
     };
     registry.plans = withKey(registry.plans, planName, entry);
@@ -166,7 +162,7 @@ async function boulderWrite(args: Record<string, unknown>): Promise<string> {
 }
 
 function boulderProgress(args: Record<string, unknown>): string {
-  const arg = stringReader(args, "boulder_progress");
+  const arg = argReader(args, "boulder_progress").string;
   let planPath = arg("plan_path", "");
   const planName = arg("plan_name", "");
   const sessionId = arg("session_id", "");
@@ -177,7 +173,7 @@ function boulderProgress(args: Record<string, unknown>): string {
       const { plans } = asRegistry(raw);
       planPath = (Object.hasOwn(plans, planName) && plans[planName]?.active_plan) || "";
     } else {
-      planPath = resolveBoundPlan(raw, sessionIdOr(sessionId)).active_plan ?? "";
+      planPath = resolveBoundPlan(raw, sessionIdOr(sessionId))?.active_plan ?? "";
     }
     if (!planPath) return "No active plan found in boulder state.";
   }
@@ -223,7 +219,6 @@ export const tools: Tool[] = [
           description:
             "This session's platform UUID, as shown on the 'Session <id>' line OMCA adds to the session's first prompt. An empty string uses the session of the most recent OMCA hook call, or the server's CLAUDE_CODE_SESSION_ID before any hook has run. Any other value binds a session that does not exist, and the Stop hooks will not see the plan.",
         },
-        agent: { type: "string", default: "sisyphus", description: "Agent managing this plan" },
         worktree_path: { type: "string", default: "", description: "Git worktree path if using worktrees" },
         working_directory: WORKING_DIRECTORY,
       },

@@ -1,7 +1,7 @@
-import { outsideFences, TASK_LINE } from "./checkboxes.ts";
+import { taskLines } from "./checkboxes.ts";
 import type { NextAction, NextActionKind } from "./next-actions.ts";
-import { displayWidth, fitEnd, type Glyphs, glyphs, usableColumns } from "./ui-kit.ts";
-import { bar, type ThemeKey } from "./visual.ts";
+import { arrange, displayWidth, fitEnd, type Glyphs, glyphs, oneLine, type Ranked, share, usableColumns } from "./ui-kit.ts";
+import { bar, piecesWidth, type ThemeKey } from "./visual.ts";
 
 export type NextTask = { n: number; title: string };
 export type Proof = { proven: number; unproven: number; failed: number };
@@ -40,46 +40,9 @@ const HOTKEY_CELLS = 3;
 // always stays, then whether agents run, what comes next, the proof, then the verification.
 const PRIORITY = { progress: 1, running: 2, next: 3, proof: 4, unlogged: 5, logged: 6 } as const;
 
-export const oneLine = (text: string): string => text.replace(/[\s\p{Cc}]+/gu, " ").trim();
-
-/** Water-fills `room` cells over the wants: the smaller wants are met whole, the rest split evenly. */
-export function share(wants: readonly number[], room: number): number[] {
-  const sizes = wants.map(() => 0);
-  const order = wants.map((_, index) => index).sort((a, b) => (wants[a] ?? 0) - (wants[b] ?? 0));
-  let left = Math.max(0, room);
-  order.forEach((index, rank) => {
-    const size = Math.min(wants[index] ?? 0, Math.floor(left / (order.length - rank)));
-    sizes[index] = size;
-    left -= size;
-  });
-  return sizes;
-}
-
-export type Ranked = { priority: number; min: number };
-
-/**
- * The segments that fit `room` cells with `gap` cells between neighbours, in their own order.
- * While they do not fit, the one with the largest priority number goes, the later one on a tie;
- * the last segment standing is kept whatever its size.
- */
-export function arrange<T extends Ranked>(segments: readonly T[], room: number, gap: number): T[] {
-  let kept = [...segments];
-  const need = (list: readonly T[]) => list.reduce((sum, segment) => sum + segment.min, 0) + gap * Math.max(0, list.length - 1);
-  while (kept.length > 1 && need(kept) > room) {
-    const last = kept.reduce((worst, segment) => (segment.priority >= worst.priority ? segment : worst));
-    kept = kept.filter((segment) => segment !== last);
-  }
-  return kept;
-}
-
 /** The numbered tasks' tally and the first open one, read the way every plan reader reads them. */
 export function planTally(text: string): { done: number; total: number; next: NextTask | null } {
-  const tasks = outsideFences(text)
-    .split("\n")
-    .flatMap((line) => {
-      const task = TASK_LINE.exec(line);
-      return task === null ? [] : [task];
-    });
+  const tasks = taskLines(text);
   const open = tasks.find((task) => task[1] !== "x");
   return {
     done: tasks.filter((task) => task[1] === "x").length,
@@ -87,8 +50,6 @@ export function planTally(text: string): { done: number; total: number; next: Ne
     next: open === undefined ? null : { n: Number(open[2]), title: oneLine(open[3] ?? "") },
   };
 }
-
-const widthOf = (spans: readonly Span[]): number => spans.reduce((sum, span) => sum + displayWidth(span.text), 0);
 
 type Segment = Ranked & { parts: Part[] };
 
@@ -99,17 +60,17 @@ const segment = (priority: number, parts: Part[]): Segment => ({
 });
 
 function proofParts({ proven, unproven, failed }: Proof, g: Glyphs): Part[] {
-  return [
-    { text: `${g.check}${proven}`, tone: proven > 0 ? "ok" : "muted" },
-    { text: " ", tone: "muted" },
-    { text: `${g.warn}${unproven}`, tone: unproven > 0 ? "warn" : "muted" },
-    { text: " ", tone: "muted" },
-    { text: `${g.cross}${failed}`, tone: failed > 0 ? "fail" : "muted" },
+  const count = (glyph: string, value: number, tone: Tone): Part[] => [
+    { text: glyph, tone: value > 0 ? tone : "muted" },
+    { text: String(value), tone: value > 0 ? "plain" : "muted" },
   ];
+  return [...count(g.check, proven, "ok"), { text: " ", tone: "muted" }, ...count(g.warn, unproven, "warn"), { text: " ", tone: "muted" }, ...count(g.cross, failed, "fail")];
 }
 
 function statusSegments(band: Band, words: Words, g: Glyphs, ascii: boolean, running: number): Segment[] {
-  if (band.error !== null) return [segment(0, [{ text: `${g.cross} ${oneLine(band.error)}`, tone: "fail", isFlexible: true }])];
+  if (band.error !== null) {
+    return [segment(0, [{ text: `${g.cross} `, tone: "fail" }, { text: oneLine(band.error), tone: "plain", isFlexible: true }])];
+  }
   const { plan, verification, proof } = band;
   const segments: Segment[] = [];
   if (plan === null) {
@@ -134,7 +95,7 @@ function statusSegments(band: Band, words: Words, g: Glyphs, ascii: boolean, run
       segment(isLogged ? PRIORITY.logged : PRIORITY.unlogged, [
         { text: `${isLogged ? g.check : g.warn} `, tone: isLogged ? "ok" : "warn" },
         { text: oneLine(verification.command), tone: "plain", isFlexible: true },
-        { text: isLogged ? words.logged : words.unlogged, tone: isLogged ? "muted" : "warn" },
+        { text: isLogged ? words.logged : words.unlogged, tone: isLogged ? "muted" : "plain" },
       ]),
     );
   }
@@ -166,7 +127,7 @@ function fitParts(parts: readonly Part[], width: number, g: Glyphs): Span[] {
 }
 
 function clip(spans: readonly Span[], width: number, g: Glyphs): Span[] {
-  if (widthOf(spans) <= width) return spans.filter((span) => span.text !== "");
+  if (piecesWidth(spans) <= width) return spans.filter((span) => span.text !== "");
   const out: Span[] = [];
   let left = width;
   for (const span of spans) {

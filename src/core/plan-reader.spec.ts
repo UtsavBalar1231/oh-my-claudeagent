@@ -1,14 +1,13 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { checkboxStates } from "./checkboxes.ts";
+import { checkboxStates, clean } from "./checkboxes.ts";
 import { windowOf } from "./list-window.ts";
 import type { Env } from "./path.ts";
 import {
   boardOf,
   checksOf,
   chunks,
-  clean,
   fieldsOf,
   firstOpenTask,
   MARKDOWN_CHUNK,

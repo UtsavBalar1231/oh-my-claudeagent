@@ -1,8 +1,7 @@
 import type { RenderElement } from "claude-code";
-import { resolveBoundPlan } from "../../src/core/boulder.ts";
 import { type Drawn, drawnAt, type FocusList, focusMove, placeWindow, windowOf } from "../../src/core/list-window.ts";
-import { BOULDER, LEDGER } from "../../src/core/omca-paths.ts";
-import { isAbsolutePath, joinPath, type Platform, samePath, tildePath } from "../../src/core/path.ts";
+import { BOULDER } from "../../src/core/omca-paths.ts";
+import { type Platform, samePath, tildePath } from "../../src/core/path.ts";
 import {
   type Board,
   boardOf,
@@ -20,36 +19,28 @@ import {
   recentPlans,
   taskMarkdown,
 } from "../../src/core/plan-reader.ts";
-import { ago, parseRuns, type Proof, proofOf, proofSummary, type Run, timeAgo, type Verdict } from "../../src/core/proof.ts";
-import { displayWidth, fitEnd, fitMiddle, KEYS, keyHint, padStart, shortType } from "../../src/core/ui-kit.ts";
+import { ago, type Proof, proofSummary, type Run, timeAgo, type Verdict } from "../../src/core/proof.ts";
+import { dayOf, displayWidth, fitEnd, fitMiddle, KEYS, keyHint, padStart, shortType } from "../../src/core/ui-kit.ts";
 import {
   agentKey,
   bar,
   chip,
   type ChipTone,
+  fitPieces,
   type Level,
   levelMark,
   ON_SURFACE,
   type Piece,
+  piecesWidth,
   redact,
   rule as rulePieces,
   type ThemeKey,
   TONE_KEYS,
 } from "../../src/core/visual.ts";
 import type { Input, Phase } from "../dispatch.ts";
-import { type Host, reason, type State } from "../host.ts";
+import { boundPlanOf, type Host, type ProofFacts, proofFacts, reason, sessionOf, type State, verdictFor } from "../host.ts";
 import type { Subcommand } from "../omca-router.ts";
-import {
-  keyButton,
-  noticeRow,
-  open,
-  PANE,
-  patchPane,
-  rule,
-  sessionOf,
-  type TabView,
-  type View,
-} from "../pane.ts";
+import { edge, keyButton, noticeRow, open, patchPane, refocus as focusIn, rule, type TabView, type View, wrapAt } from "../pane.ts";
 import { Card as CardBox, CodeBlock, Field, Line } from "../ui.ts";
 
 type Loaded = Extract<State["plan"], { pages: unknown }>;
@@ -65,7 +56,6 @@ type Ring = {
   indexOf: (element: string) => number | undefined;
   select: (index: number) => void;
 };
-type Facts = { changes: ReadonlyMap<string, number | null>; runs: readonly Run[]; ledgerError: string | null; signature: string };
 type Filter = { text: string; isOpenOnly: boolean; isFailingOnly: boolean; isEditing: boolean };
 type Ctx = {
   plan: Loaded;
@@ -125,8 +115,8 @@ let planned: { list: List; start: number } | undefined;
 let isRingOnRow = false;
 let filter: Filter = { text: "", isOpenOnly: false, isFailingOnly: false, isEditing: false };
 let note: { text: string; level: Level } | undefined;
-let facts: Facts = { changes: new Map(), runs: [], ledgerError: null, signature: "" };
-let ledgerSeen = "";
+let facts: ProofFacts = { changes: new Map(), runs: [], ledgerError: null, ledgerSeen: "" };
+let factsSignature = "";
 let memo: { key: string; board: Board } | undefined;
 // The engine holds the ring by position, so a refocus sent while the Find field is still drawn
 // lands one element off once the field goes; it is sent from the first drawing without it.
@@ -164,17 +154,7 @@ function keptCursor(plan: Pick<Loaded, "pages">, index: number): number {
 
 const startTask = (board: Board): number => (board.cards.find((card) => !card.done) ?? board.cards.at(-1))?.n ?? 0;
 
-function refocus(host: Host, key: string): void {
-  host.clock.after(0, async () => {
-    try {
-      host.ui.invalidate();
-      const { deny } = await host.ui.focus({ requestId: PANE, key });
-      if (deny !== undefined) host.log(`omca plan could not refocus ${key}: ${deny}`);
-    } catch (error) {
-      host.log(`omca plan could not refocus ${key}: ${reason(error)}`);
-    }
-  });
-}
+const refocus = (host: Host, key: string): void => focusIn(host, key, "plan");
 
 // The tick yields to any write that lands while it reads, so it never reverts a choice a person
 // made meanwhile; a person's own load always lands.
@@ -211,43 +191,13 @@ async function load(host: Host, path: string, { keepPlace = false, isTick = fals
   }
 }
 
-const resolved = (platform: Platform, root: string, path: string) => (isAbsolutePath(platform, path) ? path : joinPath(platform, root, path));
-
-// Every listed file's modification time and the whole ledger, read outside any drawing. A file
-// that cannot be stated is recorded as null and proves nothing either way.
+// Every listed file's modification time and the whole ledger, read outside any drawing.
 async function gather(host: Host, plan: Loaded): Promise<void> {
-  const [root, { platform }] = await Promise.all([host.session.root(), sessionOf(host)]);
-  const paths = [...new Set(boardFor(plan).cards.flatMap((card) => card.files))];
-  const stamps = await Promise.all(
-    paths.map((path) =>
-      host.fs.stat(resolved(platform, root, path)).then(
-        (stat) => (stat.kind === "file" ? stat.mtimeMs : null),
-        () => null,
-      ),
-    ),
-  );
-  const ledgerPath = `${root}/${LEDGER}`;
-  const seen = await host.fs.stat(ledgerPath).then(
-    ({ mtimeMs }) => String(mtimeMs),
-    () => "absent",
-  );
-  let { runs, ledgerError } = facts;
-  if (seen !== ledgerSeen) {
-    runs = [];
-    ledgerError = null;
-    if (seen !== "absent") {
-      try {
-        runs = parseRuns(await host.fs.read(ledgerPath));
-      } catch (error) {
-        ledgerError = reason(error);
-      }
-    }
-    ledgerSeen = seen;
-  }
-  const changes = new Map(paths.map((path, index) => [path, stamps[index] ?? null]));
-  const signature = JSON.stringify([[...changes], seen, ledgerError]);
-  if (signature === facts.signature) return;
-  facts = { changes, runs, ledgerError, signature };
+  const next = await proofFacts(host, boardFor(plan).cards.flatMap((card) => card.files));
+  const signature = JSON.stringify([[...next.changes], next.ledgerSeen, next.ledgerError]);
+  if (signature === factsSignature) return;
+  facts = next;
+  factsSignature = signature;
   host.ui.invalidate();
 }
 
@@ -266,11 +216,8 @@ async function listPlans(host: Host): Promise<void> {
 }
 
 async function boundPath(host: Host): Promise<string | undefined> {
-  const path = `${await host.session.root()}/${BOULDER}`;
   try {
-    if (!(await host.fs.exists(path))) return undefined;
-    const bound = resolveBoundPlan(JSON.parse(await host.fs.read(path)), await host.session.id(), true);
-    return "active_plan" in bound && bound.active_plan !== "" ? bound.active_plan : undefined;
+    return (await boundPlanOf(host))?.path;
   } catch (error) {
     host.log(`omca plan: ${BOULDER} unreadable: ${reason(error)}`);
     return undefined;
@@ -325,14 +272,7 @@ function toBoard(host: Host): void {
   refocus(host, `${TASK}${task}`);
 }
 
-function verdictOf(card: Card): Verdict | undefined {
-  if (facts.ledgerError !== null) return undefined;
-  const changes = card.files.flatMap((file) => {
-    const at = facts.changes.get(file);
-    return at === undefined || at === null ? [] : [at];
-  });
-  return proofOf(changes, facts.runs);
-}
+const verdictOf = (card: Card): Verdict | undefined => verdictFor(facts, card.files);
 
 function runningOf(agents: readonly Agent[]): Map<number, Agent[]> {
   const running = new Map<number, Agent[]>();
@@ -510,20 +450,7 @@ function keyRow(view: View, keys: readonly Key[], gap: number): RenderElement {
 }
 
 function keyRows(view: View, keys: readonly Key[], gap: number): RenderElement[] {
-  const rows: Key[][] = [];
-  let used = Number.POSITIVE_INFINITY;
-  for (const key of keys) {
-    const needed = displayWidth(`${key[0]}: ${key[1]}`);
-    const last = rows.at(-1);
-    if (last === undefined || used + gap + needed > view.width) {
-      rows.push([key]);
-      used = needed;
-    } else {
-      last.push(key);
-      used += gap + needed;
-    }
-  }
-  return rows.map((row) => keyRow(view, row, gap));
+  return wrapAt(keys, view.width, gap, ([hotkey, label]) => displayWidth(`${hotkey}: ${label}`)).map((row) => keyRow(view, row, gap));
 }
 
 function frame(
@@ -532,7 +459,6 @@ function frame(
 ): RenderElement[] {
   const { Box, Text } = view.kit;
   const ellipsis = view.g.ellipsis;
-  const edge = (text: string) => Text({ dimColor: true, children: [text === "" ? " " : fitEnd(text, view.width, ellipsis)] });
   if (view.isInline) {
     const meta = ` ${view.g.dot} ${parts.shortMeta}`;
     const title = fitEnd(parts.title, Math.max(1, view.width - displayWidth(meta)), ellipsis);
@@ -546,9 +472,9 @@ function frame(
           Text({ dimColor: true, children: [fitEnd(meta, view.width - displayWidth(title), ellipsis)] }),
         ],
       }),
-      edge(parts.above),
+      edge(view, parts.above),
       ...parts.rows,
-      edge(parts.below),
+      edge(view, parts.below),
       Box({
         flexDirection: "row",
         columnGap: KEY_GAP,
@@ -563,9 +489,9 @@ function frame(
     Text({ bold: true, children: [fitEnd(parts.title, view.width, ellipsis)] }),
     Text({ dimColor: true, children: [parts.meta] }),
     rule(view),
-    edge(parts.above),
+    edge(view, parts.above),
     ...parts.rows,
-    edge(parts.below),
+    edge(view, parts.below),
     rule(view),
     keyRow(view, parts.keys, KEY_GAP),
     Text({ dimColor: true, children: [fitEnd(parts.hint, view.width, ellipsis)] }),
@@ -584,33 +510,20 @@ function pointerRow(view: View, key: string, isCurrent: boolean, child: RenderEl
 const moveHint = (view: View) =>
   keyHint([[`${view.g.up}${view.g.down}`, "move"], ["enter", "open"], [KEYS.back, "close"]], view.g);
 
-const piecesWidth = (pieces: readonly Piece[]) => pieces.reduce((sum, piece) => sum + displayWidth(piece.text), 0);
-
-function fitPieces(pieces: readonly Piece[], width: number, ellipsis: string): Piece[] {
-  const out: Piece[] = [];
-  let left = width;
-  for (const piece of pieces) {
-    if (left <= 0) break;
-    const text = fitEnd(piece.text, left, ellipsis);
-    out.push({ ...piece, text });
-    left -= displayWidth(text);
-  }
-  return out;
-}
-
 const masked = (view: View, text: string) => redact(text, view.home, view.g.mask).text;
 
 function proofPieces(view: View, ctx: Ctx, isShort: boolean): Piece[] {
-  if (facts.ledgerError !== null) return [{ text: `${view.g.cross} evidence ledger unreadable: ${facts.ledgerError}`, color: TONE_KEYS.fail }];
+  if (facts.ledgerError !== null) return [{ text: view.g.cross, color: TONE_KEYS.fail }, { text: ` evidence ledger unreadable: ${facts.ledgerError}` }];
   const verdicts = ctx.board.cards.map((card) => verdictOf(card)?.proof);
   if (verdicts.every((verdict) => verdict === undefined)) return [{ text: "no task lists a file to prove", color: TONE_KEYS.muted }];
   const { proven, unproven, failed } = proofSummary(verdicts);
   const sep: Piece = { text: isShort ? " " : ` ${view.g.dot} `, color: TONE_KEYS.muted };
-  const part = (level: Level, count: number, word: string): Piece => {
+  const part = (level: Level, count: number, word: string): Piece[] => {
     const { glyph, color } = levelMark(level, view.g);
-    return { text: isShort ? `${glyph}${count}` : `${glyph} ${count} ${word}`, color: count === 0 ? TONE_KEYS.muted : color };
+    const muted = count === 0 ? { color: TONE_KEYS.muted } : {};
+    return [{ text: glyph, color: count === 0 ? TONE_KEYS.muted : color }, { text: isShort ? `${count}` : ` ${count} ${word}`, ...muted }];
   };
-  return [part("ok", proven, "proven"), sep, part("warn", unproven, "unproven"), sep, part("fail", failed, "failed")];
+  return [...part("ok", proven, "proven"), sep, ...part("warn", unproven, "unproven"), sep, ...part("fail", failed, "failed")];
 }
 
 function agentPieces(view: View, agents: readonly Agent[]): Piece[] {
@@ -661,7 +574,10 @@ function header(view: View, ctx: Ctx, isCard: boolean): RenderElement[] {
   const inner = Math.max(1, view.width - 4);
   const next = board.cards.find((card) => !card.done);
   const running = agentPieces(view, ctx.agents);
-  const blocked = parts.blocked === 0 ? [] : [{ text: ` ${view.g.dot} ${parts.blocked} blocked`, color: TONE_KEYS.warn }];
+  const blocked: Piece[] =
+    parts.blocked === 0
+      ? []
+      : [{ text: ` ${view.g.dot} `, color: TONE_KEYS.muted }, { text: view.g.blocked, color: TONE_KEYS.warn }, { text: ` ${parts.blocked} blocked` }];
   const barWidth = Math.max(4, Math.min(HEADER_BAR, inner - piecesWidth(lead) - displayWidth(` ${count}`) - piecesWidth(blocked)));
   const lines: Piece[][] = [
     [...lead, ...bar(parts, barWidth, view.isAscii), { text: ` ${count}`, bold: true }, ...blocked],
@@ -700,7 +616,8 @@ function rightPieces(view: View, ctx: Ctx, card: Card, isShort: boolean): Piece[
   }
   const waiting = waitingOn(ctx, card);
   if (!card.done && waiting.length > 0 && !ctx.running.has(card.n)) {
-    pieces.push({ text: " " }, { text: isShort ? `${view.g.blocked}${waiting.join(",")}` : `blocked by ${waiting.join(", ")}`, color: TONE_KEYS.warn });
+    if (isShort) pieces.push({ text: " " }, { text: view.g.blocked, color: TONE_KEYS.warn }, { text: waiting.join(",") });
+    else pieces.push({ text: " " }, { text: `blocked by ${waiting.join(", ")}`, color: TONE_KEYS.muted });
   }
   const verdict = verdictOf(card);
   if (verdict !== undefined) {
@@ -818,7 +735,7 @@ function openDetail(host: Host, n: number): void {
 
 function actionKeys(host: Host, view: View, plan: Loaded, card: Card | undefined): Key[] {
   return [
-    ["r", "Run check", () => runCheck(host, view, card), card === undefined || card.checks.length === 0],
+    ["k", "Run check", () => runCheck(host, view, card), card === undefined || card.checks.length === 0],
     ["s", "Start here", () => startHere(host, view, plan, card), card === undefined || card.done],
     ["c", "Copy", () => copyTask(host, view, plan, card), card === undefined],
     ["e", "Evidence", () => toEvidence(host)],
@@ -900,12 +817,16 @@ function runLine(view: View, run: Run, width: number): RenderElement {
 
 function evidenceLines(view: View, card: Card, verdict: Verdict | undefined, width: number): RenderElement[] {
   const say = (text: string, color: ThemeKey) => Line(view.kit, [{ text: fitEnd(`  ${text}`, width, view.g.ellipsis), color }]);
-  if (facts.ledgerError !== null) return [say(`${view.g.cross} ledger unreadable: ${facts.ledgerError}`, TONE_KEYS.fail)];
+  const marked = (level: Level, text: string) => {
+    const { glyph, color } = levelMark(level, view.g);
+    return Line(view.kit, fitPieces([{ text: "  " }, { text: glyph, color }, { text: ` ${text}` }], width, view.g.ellipsis));
+  };
+  if (facts.ledgerError !== null) return [marked("fail", `ledger unreadable: ${facts.ledgerError}`)];
   if (card.files.length === 0) return [say("Lists no files, so no run can prove it.", TONE_KEYS.muted)];
   if (verdict === undefined) return [say(UNREADABLE, TONE_KEYS.muted)];
   if (verdict.since.length > 0) return verdict.since.slice(0, EVIDENCE_SHOWN).map((run) => runLine(view, run, width));
   return [
-    say(`${view.g.warn} No test, build or lint run since its files changed ${timeAgo(view.now - verdict.changedAt)}.`, TONE_KEYS.warn),
+    marked("warn", `No test, build or lint run since its files changed ${timeAgo(view.now - verdict.changedAt)}.`),
     ...(verdict.lastPass === undefined ? [] : [say("Last pass, before that change:", TONE_KEYS.muted), runLine(view, verdict.lastPass, width)]),
   ];
 }
@@ -997,7 +918,7 @@ function expansion(view: View, card: Card, width: number): RenderElement[] {
       : verdict === undefined
         ? [{ text: UNREADABLE, color: TONE_KEYS.muted }]
         : newest === undefined || mark === undefined
-          ? [{ text: `${view.g.warn} no run since its files changed`, color: TONE_KEYS.warn }]
+          ? [{ text: view.g.warn, color: TONE_KEYS.warn }, { text: " no run since its files changed", color: TONE_KEYS.muted }]
           : [
               { text: mark.glyph, color: mark.color },
               { text: ` ${newest.type} exit ${newest.exitCode} ${view.g.dot} ${masked(view, newest.command)} ${view.g.dot} ${timeAgo(view.now - newest.at)}` },
@@ -1043,12 +964,11 @@ function boardView(host: Host, view: View, ctx: Ctx): RenderElement[] {
     const row = taskRow(host, view, ctx, item.card, listWidth, numWidth, isCurrent);
     return isCurrent && canExpand ? [row, ...expansion(view, item.card, listWidth)] : [row];
   });
-  const edge = (text: string) => Text({ dimColor: true, children: [text === "" ? " " : fitEnd(text, listWidth, ellipsis)] });
   const column = [
-    edge(start > 0 ? `  ${view.g.up} ${start} more` : ""),
+    edge(view, start > 0 ? `  ${view.g.up} ${start} more` : "", listWidth),
     ...(items.length === 0 ? [noticeRow(view, { kind: "empty" }, { loading: "", empty: "No task matches the filter." })] : []),
     ...rows,
-    edge(end < items.length ? `  ${view.g.down} ${items.length - end} more` : ""),
+    edge(view, end < items.length ? `  ${view.g.down} ${items.length - end} more` : "", listWidth),
   ];
   const height = size + 2;
   const detailWidth = view.width - listWidth - 2;
@@ -1064,7 +984,7 @@ function boardView(host: Host, view: View, ctx: Ctx): RenderElement[] {
               Box({
                 flexDirection: "column",
                 width: 1,
-                children: Array.from({ length: height }, () => Text({ color: TONE_KEYS.rule, children: [view.isAscii ? "|" : "│"] })),
+                children: Array.from({ length: height }, () => Text({ color: TONE_KEYS.rule, children: [view.g.vrule] })),
               }),
               Box({
                 key: "board-detail",
@@ -1303,8 +1223,7 @@ function plansView(host: Host, view: View, pane: State["pane"] | undefined, plan
   const end = Math.min(list.total, start + size);
   const rows = listing.files.slice(start, end).map((file, offset) => {
     const index = start + offset;
-    const date = new Date(file.mtimeMs);
-    const day = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    const day = dayOf(file.mtimeMs);
     return pointerRow(
       view,
       `file-${index}`,

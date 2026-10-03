@@ -1,9 +1,9 @@
 import { existsSync, realpathSync, statSync } from "node:fs";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { hasCode } from "../io.ts";
+import { hasCode, projectRoot } from "../io.ts";
 import type { Tool } from "../omca.ts";
 import { IDLE_CONTEXT, type Progress } from "../progress.ts";
-import { type Args, stringArg } from "./args.ts";
+import { argReader } from "./args.ts";
 
 const LANGUAGES = [
   "bash",
@@ -34,24 +34,38 @@ const LANGUAGES = [
 ] as const;
 type Language = (typeof LANGUAGES)[number];
 
+// The extensions ast-grep 0.44.1 scans for each language, measured by running it on one file of each.
 const LANG_EXTENSIONS: Record<string, Language> = {
   ".bash": "bash",
+  ".bats": "bash",
+  ".cgi": "bash",
+  ".command": "bash",
+  ".fcgi": "bash",
+  ".ksh": "bash",
   ".sh": "bash",
+  ".tmux": "bash",
+  ".tool": "bash",
   ".zsh": "bash",
   ".c": "c",
   ".h": "c",
   ".cpp": "cpp",
+  ".c++": "cpp",
   ".cc": "cpp",
+  ".cu": "cpp",
   ".cxx": "cpp",
+  ".hh": "cpp",
   ".hpp": "cpp",
+  ".ino": "cpp",
   ".cs": "csharp",
   ".css": "css",
+  ".scss": "css",
   ".ex": "elixir",
   ".exs": "elixir",
   ".go": "go",
   ".hs": "haskell",
   ".html": "html",
   ".htm": "html",
+  ".xhtml": "html",
   ".java": "java",
   ".js": "javascript",
   ".jsx": "javascript",
@@ -59,13 +73,21 @@ const LANG_EXTENSIONS: Record<string, Language> = {
   ".cjs": "javascript",
   ".json": "json",
   ".kt": "kotlin",
+  ".ktm": "kotlin",
+  ".kts": "kotlin",
   ".lua": "lua",
   ".nix": "nix",
   ".php": "php",
+  ".bzl": "python",
   ".py": "python",
+  ".py3": "python",
   ".pyi": "python",
+  ".gemspec": "ruby",
   ".rb": "ruby",
+  ".rbw": "ruby",
   ".rs": "rust",
+  ".sbt": "scala",
+  ".sc": "scala",
   ".scala": "scala",
   ".sol": "solidity",
   ".swift": "swift",
@@ -217,16 +239,15 @@ export async function run(
   // `run` exits 1 on no match; a `scan` rule of severity error exits 1 on a match.
   if (exitCode !== 0 && !(options.allowExit1 && exitCode === 1)) {
     const detail = stderr.trim();
-    if (detail !== "" && !detail.includes("No files found")) throw new Error(`ast-grep error (exit ${exitCode}): ${detail}`);
+    if (detail === "") throw new Error(`ast-grep exited ${exitCode} with no message`);
+    if (!detail.includes("No files found")) throw new Error(`ast-grep error (exit ${exitCode}): ${detail}`);
   }
   return { stdout, stderr };
 }
 
 function workspace(): string {
-  const configured = ["CLAUDE_PROJECT_DIR", "CLAUDE_PROJECT_ROOT", "HOOK_PROJECT_ROOT"]
-    .map((name) => process.env[name])
-    .find(Boolean);
-  return realpathSync.native(configured ?? process.cwd());
+  const configured = process.env.CLAUDE_PROJECT_DIR || process.env.CLAUDE_PROJECT_ROOT;
+  return realpathSync.native(projectRoot(configured || process.cwd()));
 }
 
 function within(root: string, candidate: string): boolean {
@@ -419,6 +440,8 @@ const position = (m: Match) => `${(m.range?.start?.line ?? 0) + 1}:${(m.range?.s
 const snippet = (m: Match) => (m.lines ?? m.text ?? "").trim();
 const withCapNotice = (output: string, truncated: boolean) =>
   truncated && !output.startsWith("[TRUNCATED]") ? OUTPUT_CAPPED + output : output;
+const jsonMatches = (matches: Match[], maxResults: number, truncated: boolean) =>
+  JSON.stringify({ truncated: truncated || matches.length > maxResults, matches: matches.slice(0, maxResults) }, null, 2);
 const globArgs = (globs: string[]) => globs.map((glob) => `--globs=${glob}`);
 
 function formatRun(matches: Match[], maxResults: number, replace?: { dryRun: boolean }): string {
@@ -445,7 +468,7 @@ function formatScan(matches: Match[], maxResults: number): string {
   if (matches.length > maxResults) lines.push(`[TRUNCATED] Showing first ${maxResults} of ${matches.length} matches\n`);
   lines.push(`Found ${shown.length} match(es):\n`);
   for (const match of shown) {
-    let header = `${match.file ?? "<stdin>"}:${position(match)}`;
+    let header = `${match.file ?? ""}:${position(match)}`;
     if (match.ruleId) header += ` [${match.ruleId}]`;
     if (match.severity) header += ` (${match.severity})`;
     lines.push(header);
@@ -453,34 +476,6 @@ function formatScan(matches: Match[], maxResults: number): string {
     lines.push("");
   }
   return lines.join("\n");
-}
-
-function reader(tool: string, args: Args) {
-  const invalid = (key: string, expected: string): never => {
-    throw new Error(`${tool}: ${key} must be ${expected}`);
-  };
-  return {
-    string: (key: string): string => stringArg(args, key, undefined, tool),
-    strings(key: string): string[] | undefined {
-      const value = args[key];
-      if (value === undefined || value === null) return undefined;
-      return Array.isArray(value) && value.every((item) => typeof item === "string") ? value : invalid(key, "an array of strings");
-    },
-    integer(key: string): number | undefined {
-      const value = args[key];
-      if (value === undefined || value === null) return undefined;
-      return Number.isInteger(value) ? Number(value) : invalid(key, "an integer");
-    },
-    boolean(key: string, fallback: boolean): boolean {
-      const value = args[key] ?? fallback;
-      return typeof value === "boolean" ? value : invalid(key, "a boolean");
-    },
-    choice<T extends string>(key: string, allowed: readonly T[], fallback?: T): T {
-      const value = args[key] ?? fallback;
-      const found = allowed.find((option) => option === value);
-      return found ?? invalid(key, `one of ${allowed.join(", ")}`);
-    },
-  };
 }
 
 const clampResults = (maxResults: number) => Math.max(0, Math.min(maxResults, MAX_RESULT_CAP));
@@ -491,7 +486,7 @@ const outputFormatProperty = {
   type: "string",
   enum: ["text", "json"],
   default: "text",
-  description: "Output format: text (compact) or json (full)",
+  description: "Output format: text (compact) or json ({truncated, matches} with full match objects; truncated is true when more matches exist than returned)",
 };
 const languageEnum = { type: "string", enum: LANGUAGES };
 const NO_RULE_MATCH =
@@ -528,17 +523,17 @@ export const tools: Tool[] = [
     annotations: { title: "Search code by AST pattern", readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     _meta: {
       "anthropic/searchHint":
-        "structural code search by syntax pattern across 25 languages; use instead of grep when the pattern is syntactic",
+        "structural code search by syntax pattern in the languages listed under lang; use instead of grep when the pattern is syntactic",
       "anthropic/maxResultSizeChars": SEARCH_MAX_RESULT_CHARS,
     },
     call: async (args, ctx = IDLE_CONTEXT) => {
-      const a = reader("ast_search", args);
+      const a = argReader(args, "ast_search");
       const pattern = a.string("pattern");
       const lang = a.choice("lang", LANGUAGES);
       const paths = normalizePaths(a.strings("paths"));
       const globs = a.strings("globs") ?? [];
-      const context = a.integer("context");
-      const maxResults = clampResults(a.integer("max_results") ?? MAX_RESULTS_DEFAULT);
+      const context = a.integer("context", 0);
+      const maxResults = clampResults(a.integer("max_results", MAX_RESULTS_DEFAULT));
       const format = a.choice("output_format", ["text", "json"], "text");
       const result = await run(
         [
@@ -547,7 +542,7 @@ export const tools: Tool[] = [
           "--lang",
           lang,
           "--json=compact",
-          ...(context !== undefined && context > 0 ? ["-C", String(context)] : []),
+          ...(context > 0 ? ["-C", String(context)] : []),
           ...globArgs(globs),
           "--",
           ...paths,
@@ -556,7 +551,7 @@ export const tools: Tool[] = [
       );
       const { matches, truncated } = parseMatches(result.stdout);
       if (matches.length === 0) return zeroMatchMessage(pattern, lang, result.stderr, paths);
-      if (format === "json") return JSON.stringify(matches.slice(0, maxResults), null, 2);
+      if (format === "json") return jsonMatches(matches, maxResults, truncated);
       return withCapNotice(formatRun(matches, maxResults), truncated);
     },
   },
@@ -592,7 +587,7 @@ export const tools: Tool[] = [
     },
     _meta: { "anthropic/searchHint": "AST-aware structural find-and-replace refactor across files" },
     call: async (args, ctx = IDLE_CONTEXT) => {
-      const a = reader("ast_replace", args);
+      const a = argReader(args, "ast_replace");
       const pattern = a.string("pattern");
       const rewrite = a.string("rewrite");
       const lang = a.choice("lang", LANGUAGES);
@@ -651,10 +646,10 @@ export const tools: Tool[] = [
         "YAML rule search with kind/has/inside/follows/precedes combinators for context-sensitive matches",
     },
     call: async (args, ctx = IDLE_CONTEXT) => {
-      const a = reader("ast_find_rule", args);
+      const a = argReader(args, "ast_find_rule");
       const ruleYaml = a.string("rule_yaml");
       const paths = normalizePaths(a.strings("paths"));
-      const maxResults = clampResults(a.integer("max_results") ?? MAX_RESULTS_DEFAULT);
+      const maxResults = clampResults(a.integer("max_results", MAX_RESULTS_DEFAULT));
       const format = a.choice("output_format", ["text", "json"], "text");
       const result = await run(["scan", `--inline-rules=${ruleYaml}`, "--json=compact", "--", ...paths], {
         allowExit1: true,
@@ -662,14 +657,14 @@ export const tools: Tool[] = [
       });
       const { matches, truncated } = parseMatches(result.stdout);
       if (matches.length === 0) return "No matches found";
-      if (format === "json") return JSON.stringify(matches.slice(0, maxResults), null, 2);
+      if (format === "json") return jsonMatches(matches, maxResults, truncated);
       return withCapNotice(formatScan(matches, maxResults), truncated);
     },
   },
   {
     name: "ast_dump_tree",
     description:
-      "Dump the syntax tree of a code snippet. Use when building or debugging AST patterns. 'cst' shows full concrete syntax (use on target code), 'pattern' shows how ast-grep interprets a pattern (use when pattern doesn't match), 'ast' gives a simplified view. Returns tree output to stderr (captured here as the return value).",
+      "Dump the syntax tree of a code snippet. Use when building or debugging AST patterns. 'cst' shows full concrete syntax (use on target code), 'pattern' shows how ast-grep interprets a pattern (use when pattern doesn't match), 'ast' gives a simplified view. Returns the tree as text.",
     inputSchema: {
       type: "object",
       properties: {
@@ -688,7 +683,7 @@ export const tools: Tool[] = [
     annotations: { title: "Dump a snippet's syntax tree", readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     _meta: { "anthropic/searchHint": "dump the AST/CST of a snippet to build or debug an ast-grep pattern" },
     call: async (args, ctx = IDLE_CONTEXT) => {
-      const a = reader("ast_dump_tree", args);
+      const a = argReader(args, "ast_dump_tree");
       const code = a.string("code");
       const language = a.choice("language", LANGUAGES);
       const format = a.choice("format", ["cst", "ast", "pattern"], "cst");
@@ -724,7 +719,7 @@ export const tools: Tool[] = [
       "anthropic/searchHint": "validate an ast-grep YAML rule against a snippet before running it repo-wide",
     },
     call: async (args, ctx = IDLE_CONTEXT) => {
-      const a = reader("ast_test_rule", args);
+      const a = argReader(args, "ast_test_rule");
       const code = a.string("code");
       const ruleYaml = a.string("rule_yaml");
       const result = await run(["scan", `--inline-rules=${ruleYaml}`, "--stdin", "--json=compact"], {

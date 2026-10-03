@@ -16,7 +16,7 @@ afterEach(() => {
   rmSync(root, { recursive: true, force: true });
 });
 
-type Install = { id: string; label: string; updated: string; renderer?: boolean };
+type Install = { id: string; label: string; updated?: string; renderer?: boolean };
 
 // Writes the plugin registry Claude Code keeps, and a renderer that prints its label, for each install.
 function installAll(configDir: string, installs: readonly Install[], enabledPlugins: Record<string, boolean> = {}): void {
@@ -59,6 +59,13 @@ test("--subagent runs the subagent renderer of that install", () => {
 test("any marketplace name and any version string resolve, the most recently updated install first", () => {
   installAll(join(root, ".claude"), [RELEASED, { id: "oh-my-claudeagent@omca-local", label: "3.0.0-dev.d67e9b6", updated: "2026-10-03T18:00:00.000Z" }]);
   expect(run([], homeEnv(root)).stdout).toBe("main 3.0.0-dev.d67e9b6 payload\n");
+});
+
+test("an install without lastUpdated sorts after every dated one", () => {
+  installAll(join(root, ".claude"), [{ id: "oh-my-claudeagent@omca-local", label: "3.0.0-undated" }, RELEASED]);
+  expect(run([], homeEnv(root)).stdout).toBe("main 3.0.0 payload\n");
+  installAll(join(root, ".claude"), [{ id: "oh-my-claudeagent@omca-local", label: "3.0.0-undated" }]);
+  expect(run([], homeEnv(root)).stdout).toBe("main 3.0.0-undated payload\n");
 });
 
 test("an install switched off in settings is passed over for an enabled one", () => {

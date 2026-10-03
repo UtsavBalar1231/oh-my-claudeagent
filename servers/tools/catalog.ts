@@ -1,15 +1,15 @@
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseFrontmatter } from "../../src/core/frontmatter.ts";
 import { findSession, latestSessionId } from "../hooks/session-state.ts";
 import { ledgerPath, markerWrittenAt } from "../hooks/status-file.ts";
-import { isMissing } from "../io.ts";
+import { isDirectory, isMissing } from "../io.ts";
 import type { Tool } from "../omca.ts";
 import { pluginRoot } from "../plugin-root.ts";
 import { discoverBinary } from "./ast.ts";
 import { rootOf, stringArg, WORKING_DIRECTORY } from "./args.ts";
 
-export type Runtime =
+type Runtime =
   | { runtime: "ok" }
   | { runtime: "hooks_inactive" | "mod_absent"; runtime_reason: string };
 
@@ -29,9 +29,7 @@ const costTier = (model: string): string => COST_TIERS.find(([, models]) => mode
 const CATEGORIES_MISSING = '{"error": "categories.json not found"}';
 const CATEGORIES_MALFORMED = '{"error": "categories.json is malformed"}';
 
-const isDirectory = (path: string): boolean => statSync(path, { throwIfNoEntry: false })?.isDirectory() ?? false;
-
-export function runtimeOf(root: string): Runtime {
+function runtimeOf(root: string): Runtime {
   const sessionId = latestSessionId();
   if (sessionId === undefined) return { runtime: "hooks_inactive", runtime_reason: HOOKS_INACTIVE };
   const writtenAt = markerWrittenAt(root, sessionId);
@@ -151,12 +149,7 @@ export const tools: Tool[] = [
     name: "categories_list",
     description:
       "Return category-to-model mapping from categories.json. Use when selecting the right model tier for a task category. Returns JSON mapping of category names to model tier.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        working_directory: { type: "string", default: "", description: "Unused; the table is read from the plugin directory." },
-      },
-    },
+    inputSchema: { type: "object", properties: {} },
     annotations: { title: "List model categories", readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     _meta: { "anthropic/searchHint": "agent category to model tier mapping" },
     call: categoriesList,

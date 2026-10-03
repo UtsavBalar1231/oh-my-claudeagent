@@ -9,6 +9,7 @@ const UNICODE = {
   down: "↓",
   dot: "·",
   rule: "─",
+  vrule: "│",
   ellipsis: "…",
   progress: "◐",
   blocked: "⊘",
@@ -29,6 +30,7 @@ const ASCII: Glyphs = {
   down: "v",
   dot: "-",
   rule: "-",
+  vrule: "|",
   ellipsis: "...",
   progress: "~",
   blocked: "/",
@@ -65,10 +67,25 @@ export function usableColumns(bodyColumns: number): number {
   return Math.max(0, bodyColumns - GUTTER);
 }
 
+// East Asian Wide symbols in the BMP outside the CJK blocks, such as ✅ ❌ ⭐ ⏰, which terminals
+// draw two cells wide.
+const WIDE_SYMBOLS: readonly (readonly [number, number])[] = [
+  [0x231a, 0x231b], [0x23e9, 0x23ec], [0x23f0, 0x23f0], [0x23f3, 0x23f3], [0x25fd, 0x25fe], [0x2614, 0x2615],
+  [0x2648, 0x2653], [0x267f, 0x267f], [0x2693, 0x2693], [0x26a1, 0x26a1], [0x26aa, 0x26ab], [0x26bd, 0x26be],
+  [0x26c4, 0x26c5], [0x26ce, 0x26ce], [0x26d4, 0x26d4], [0x26ea, 0x26ea], [0x26f2, 0x26f3], [0x26f5, 0x26f5],
+  [0x26fa, 0x26fa], [0x26fd, 0x26fd], [0x2705, 0x2705], [0x270a, 0x270b], [0x2728, 0x2728], [0x274c, 0x274c],
+  [0x274e, 0x274e], [0x2753, 0x2755], [0x2757, 0x2757], [0x2795, 0x2797], [0x27b0, 0x27b0], [0x27bf, 0x27bf],
+  [0x2b1b, 0x2b1c], [0x2b50, 0x2b50], [0x2b55, 0x2b55], [0xfe10, 0xfe19],
+];
+
+const ZWJ = 0x200d;
+
 export function cells(codePoint: number): number {
   if ((codePoint >= 0x300 && codePoint <= 0x36f) || (codePoint >= 0x200b && codePoint <= 0x200f)) return 0;
   if ((codePoint >= 0xfe00 && codePoint <= 0xfe0f) || (codePoint >= 0x20d0 && codePoint <= 0x20ff)) return 0;
+  if ((codePoint >= 0x1f3fb && codePoint <= 0x1f3ff) || (codePoint >= 0xe0100 && codePoint <= 0xe01ef)) return 0;
   const isWide =
+    WIDE_SYMBOLS.some(([low, high]) => codePoint >= low && codePoint <= high) ||
     (codePoint >= 0x1100 && codePoint <= 0x115f) ||
     (codePoint >= 0x2e80 && codePoint <= 0xa4cf) ||
     (codePoint >= 0xac00 && codePoint <= 0xd7a3) ||
@@ -81,17 +98,27 @@ export function cells(codePoint: number): number {
   return isWide ? 2 : 1;
 }
 
+// A code point after a zero-width joiner joins the glyph before it, so 👨‍👩‍👧 takes the cells of one.
+function widths(chars: Iterable<string>): number[] {
+  let previous = 0;
+  return Array.from(chars, (char) => {
+    const codePoint = char.codePointAt(0) ?? 0;
+    const width = previous === ZWJ ? 0 : cells(codePoint);
+    previous = codePoint;
+    return width;
+  });
+}
+
 export function displayWidth(text: string): number {
-  let width = 0;
-  for (const char of text) width += cells(char.codePointAt(0) ?? 0);
-  return width;
+  return widths(text).reduce((sum, width) => sum + width, 0);
 }
 
 function head(chars: readonly string[], room: number): string {
+  const sizes = widths(chars);
   let used = 0;
   let out = "";
-  for (const char of chars) {
-    used += cells(char.codePointAt(0) ?? 0);
+  for (const [index, char] of chars.entries()) {
+    used += sizes[index] ?? 0;
     if (used > room) break;
     out += char;
   }
@@ -159,10 +186,13 @@ export function formatDuration(ms: number): string {
   return `${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, "0")}m`;
 }
 
+// Rounded before the tier is picked, so 99,950 reads 100k and 999,500 reads 1.0M.
 export function formatTokens(tokens: number): string {
   if (tokens < 1000) return String(tokens);
-  if (tokens < 100_000) return `${(tokens / 1000).toFixed(1)}k`;
-  if (tokens < 1_000_000) return `${Math.round(tokens / 1000)}k`;
+  const tenths = (tokens / 1000).toFixed(1);
+  if (Number(tenths) < 100) return `${tenths}k`;
+  const thousands = Math.round(tokens / 1000);
+  if (thousands < 1000) return `${thousands}k`;
   return `${(tokens / 1_000_000).toFixed(1)}M`;
 }
 
@@ -173,4 +203,49 @@ export function formatWhen(at: number | string): string {
   return `${two(date.getMonth() + 1)}-${two(date.getDate())} ${two(date.getHours())}:${two(date.getMinutes())}`;
 }
 
+/** The local calendar day, `2026-10-02`. */
+export function dayOf(at: number): string {
+  const date = new Date(at);
+  return `${date.getFullYear()}-${two(date.getMonth() + 1)}-${two(date.getDate())}`;
+}
+
+/** `09:05`, in local time. */
+export function clockOf(at: number, withSeconds = false): string {
+  const date = new Date(at);
+  const minutes = `${two(date.getHours())}:${two(date.getMinutes())}`;
+  return withSeconds ? `${minutes}:${two(date.getSeconds())}` : minutes;
+}
+
 export const shortType = (type: string): string => type.slice(type.lastIndexOf(":") + 1);
+
+export const oneLine = (text: string): string => text.replace(/[\s\p{Cc}]+/gu, " ").trim();
+
+/** Water-fills `room` cells over the wants: the smaller wants are met whole, the rest split evenly. */
+export function share(wants: readonly number[], room: number): number[] {
+  const sizes = wants.map(() => 0);
+  const order = wants.map((_, index) => index).sort((a, b) => (wants[a] ?? 0) - (wants[b] ?? 0));
+  let left = Math.max(0, room);
+  order.forEach((index, rank) => {
+    const size = Math.min(wants[index] ?? 0, Math.floor(left / (order.length - rank)));
+    sizes[index] = size;
+    left -= size;
+  });
+  return sizes;
+}
+
+export type Ranked = { priority: number; min: number };
+
+/**
+ * The segments that fit `room` cells with `gap` cells between neighbours, in their own order.
+ * While they do not fit, the one with the largest priority number goes, the later one on a tie;
+ * the last segment standing is kept whatever its size.
+ */
+export function arrange<T extends Ranked>(segments: readonly T[], room: number, gap: number): T[] {
+  let kept = [...segments];
+  const need = (list: readonly T[]) => list.reduce((sum, segment) => sum + segment.min, 0) + gap * Math.max(0, list.length - 1);
+  while (kept.length > 1 && need(kept) > room) {
+    const last = kept.reduce((worst, segment) => (segment.priority >= worst.priority ? segment : worst));
+    kept = kept.filter((segment) => segment !== last);
+  }
+  return kept;
+}

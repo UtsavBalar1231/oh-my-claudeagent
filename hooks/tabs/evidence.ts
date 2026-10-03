@@ -1,9 +1,6 @@
 import type { RenderElement, RenderSurface } from "claude-code";
-import { resolveBoundPlan } from "../../src/core/boulder.ts";
 import {
-  clockOf,
   dayLabel,
-  dayOf,
   type EvidenceType,
   type Filter,
   parseLedger,
@@ -17,11 +14,24 @@ import {
   verdictOf,
 } from "../../src/core/evidence.ts";
 import { BOULDER, LEDGER } from "../../src/core/omca-paths.ts";
-import { displayWidth, fitEnd, fitMiddle, padEnd, shortType, wrapText } from "../../src/core/ui-kit.ts";
-import { agentKey, chip, type ChipKind, type ChipTone, columnChip, dots, type Piece, redact, rule, TONE_KEYS } from "../../src/core/visual.ts";
+import { clockOf, dayOf, displayWidth, fitEnd, fitMiddle, oneLine, padEnd, shortType, wrapText } from "../../src/core/ui-kit.ts";
+import {
+  agentKey,
+  chip,
+  type ChipKind,
+  type ChipTone,
+  columnChip,
+  dots,
+  fitPieces,
+  type Piece,
+  piecesWidth,
+  redact,
+  rule,
+  TONE_KEYS,
+} from "../../src/core/visual.ts";
 import type { Input } from "../dispatch.ts";
-import { type Host, reason, type State } from "../host.ts";
-import { noticeRow, PANE, type TabView, type View } from "../pane.ts";
+import { boundPlanOf, type Host, reason, type State } from "../host.ts";
+import { blanks, noticeRow, refocus, type TabView, type View, wrapAt } from "../pane.ts";
 import { Card, CodeBlock, Field, Line, Row } from "../ui.ts";
 
 type Ledger = State["ledger"];
@@ -33,7 +43,7 @@ type Block = { element: RenderElement; height: number };
 const typeKind = (type: EvidenceType): ChipKind => (type === "final_verification" ? "plan" : "neutral");
 const TYPE_KEYS: readonly (readonly [hotkey: string, type: EvidenceType, label: string])[] = [
   ["b", "build", "Build"],
-  ["e", "test", "Test"],
+  ["t", "test", "Test"],
   ["l", "lint", "Lint"],
   ["m", "manual", "Manual"],
   ["v", "final_verification", "Final"],
@@ -43,8 +53,8 @@ const TYPE_CELLS = 6;
 const AGENT_CELLS = 12;
 const KEY_GAP = 2;
 const SEARCH = "search";
-// Pointer, `09:30 `, the type chip and a space, the exit chip and a space.
-const FIXED_CELLS = 2 + 6 + (TYPE_CELLS + 2) + 1 + 5 + 1;
+// Pointer, `09:30 `, the type chip and a space, the exit chip (a glyph and a three-digit code) and a space.
+const FIXED_CELLS = 2 + 6 + (TYPE_CELLS + 2) + 1 + 6 + 1;
 const MIN_ROOM = 3;
 const MIN_COMMAND = 28;
 const COMMAND_ROWS = 3;
@@ -73,8 +83,8 @@ async function boundPlan(host: Host, root: string): Promise<{ stamp: string; bou
   try {
     const at = await stamp(host, path);
     if (boulder?.stamp === at) return boulder;
-    const plan = at === "missing" ? {} : resolveBoundPlan(JSON.parse(await host.fs.read(path)), await host.session.id(), true);
-    boulder = { stamp: at, bound: "plan_name" in plan && plan.active_plan !== "" ? { name: plan.plan_name, path: plan.active_plan } : null };
+    const bound = (await boundPlanOf(host)) ?? null;
+    boulder = { stamp: at, bound };
     return boulder;
   } catch (error) {
     boulder = undefined;
@@ -138,45 +148,14 @@ export function scroll(host: Host, e: Input<"ui.scroll">): boolean {
   return true;
 }
 
-function focusSearch(host: Host): void {
-  host.clock.after(0, async () => {
-    try {
-      const { deny } = await host.ui.focus({ requestId: PANE, key: SEARCH });
-      if (deny !== undefined) host.log(`omca evidence could not focus the search: ${deny}`);
-    } catch (error) {
-      host.log(`omca evidence could not focus the search: ${reason(error)}`);
-    }
-  });
-}
-
 const masked = (view: View, text: string) => redact(text, view.home, view.g.mask);
-const oneLine = (text: string) => text.replace(/\s*\n\s*/g, " ");
 const when = (at: number) => `${dayOf(at).slice(5)} ${clockOf(at)}`;
-const width = (pieces: readonly Piece[]) => pieces.reduce((sum, piece) => sum + displayWidth(piece.text), 0);
-
-// Cut where the room ends, with an ellipsis, so no row leans on the engine's truncation.
-function fitPieces(pieces: readonly Piece[], room: number, ellipsis: string): Piece[] {
-  const out: Piece[] = [];
-  let used = 0;
-  for (const piece of pieces) {
-    const cells = displayWidth(piece.text);
-    if (used + cells <= room) {
-      if (cells > 0) out.push(piece);
-      used += cells;
-      continue;
-    }
-    const text = fitEnd(piece.text, room - used, ellipsis);
-    if (!ellipsis.startsWith(text)) out.push({ ...piece, text });
-    break;
-  }
-  return out;
-}
 
 const line = (view: View, pieces: readonly Piece[], room: number) => Line(view.kit, fitPieces(pieces, room, view.g.ellipsis));
 
 function exitChip(view: View, code: number): Piece {
   const glyph = code === 0 ? view.g.check : view.g.cross;
-  return chip(`${glyph}${String(code).padStart(2)}`, code === 0 ? "ok" : "fail", view.isAscii);
+  return chip(`${glyph}${String(code).padStart(3)}`, code === 0 ? "ok" : "fail", view.isAscii);
 }
 
 const typeChip = (view: View, type: EvidenceType) => columnChip(TYPE_LABELS[type], typeKind(type), view.isAscii, TYPE_CELLS);
@@ -206,7 +185,7 @@ function wrapGroups(groups: readonly (readonly Piece[])[], room: number, sep: Pi
   const lines: Piece[][] = [];
   for (const group of groups) {
     const line = lines.at(-1);
-    if (line !== undefined && width(line) + width([sep]) + width(group) <= room) line.push(sep, ...group);
+    if (line !== undefined && piecesWidth(line) + piecesWidth([sep]) + piecesWidth(group) <= room) line.push(sep, ...group);
     else lines.push([...group]);
   }
   return lines;
@@ -262,12 +241,13 @@ function header(view: View, ledger: Ledger): Block {
   if (view.isInline) {
     const [lead, ...rest] = groups;
     const [strip, ...counts] = tally;
-    const pieces: Piece[] = [...(lead?.slice(0, 1) ?? []), ...(ledger.plan === null ? [] : [{ text: ` ${ledger.plan.name}`, bold: true as const }])];
+    const pieces: Piece[] = [...(lead?.slice(0, 1) ?? [])];
+    if (ledger.plan !== null) pieces.push({ text: ` ${ledger.plan.name}`, bold: true });
     const more = { text: ` ${view.g.ellipsis}`, color: TONE_KEYS.muted };
     for (const group of [...(strip === undefined ? [] : [strip]), ...rest, ...counts]) {
       const next = [{ text: "  " }, ...group];
-      if (width(pieces) + width(next) > view.width) {
-        if (width(pieces) + width([more]) <= view.width) pieces.push(more);
+      if (piecesWidth(pieces) + piecesWidth(next) > view.width) {
+        if (piecesWidth(pieces) + piecesWidth([more]) <= view.width) pieces.push(more);
         break;
       }
       pieces.push(...next);
@@ -303,7 +283,7 @@ function entryRow(view: View, entry: Entry, index: number, layout: Layout, isFoc
     exitChip(view, entry.exitCode),
     { text: " " },
     ...commandPieces(fitted, view.g.mask),
-    { text: " ".repeat(Math.max(0, layout.command - displayWidth(fitted))) },
+    ...(displayWidth(fitted) < layout.command ? [{ text: " ".repeat(layout.command - displayWidth(fitted)) }] : []),
     ...agentPieces(view, entry.verifiedBy, layout.agent),
   ];
   const row = Row(view.kit, { key: `entry-${index}`, pieces: fitPieces(pieces, layout.command + FIXED_CELLS + layout.agent, view.g.ellipsis), isFocused });
@@ -329,7 +309,7 @@ function detail(view: View, entry: Entry, room: number, budget: number, withComm
   const meta: Piece[][] = [
     [{ text: `${dayOf(entry.at)} ${clockOf(entry.at, true)}`, color: TONE_KEYS.muted }],
     ...(entry.verifiedBy === null ? [] : [[{ text: `${view.g.agent} ${shortType(entry.verifiedBy)}`, color: agentKey(entry.verifiedBy) }]]),
-    ...(hidden === 0 ? [] : [[{ text: `${view.g.mask} ${hidden} masked`, color: TONE_KEYS.warn }]]),
+    ...(hidden === 0 ? [] : [[{ text: view.g.mask, color: TONE_KEYS.warn }, { text: ` ${hidden} masked`, color: TONE_KEYS.muted }]]),
   ];
   const metaLines = wrapGroups(meta, room, { text: ` ${view.g.dot} `, color: TONE_KEYS.muted });
   const blocks: Block[] = [];
@@ -358,19 +338,10 @@ type Key = readonly [hotkey: string, label: string, work: (surface: RenderSurfac
 
 function keyRows(view: View, keys: readonly Key[], status: string): RenderElement[] {
   const { Box, Button, Text } = view.kit;
-  const rows: Key[][] = [];
-  let used = 0;
-  for (const key of keys) {
-    const cells = displayWidth(`${key[0]}: ${key[1]}`);
-    const row = rows.at(-1);
-    if (row !== undefined && used + KEY_GAP + cells <= view.width) {
-      row.push(key);
-      used += KEY_GAP + cells;
-    } else {
-      rows.push([key]);
-      used = cells;
-    }
-  }
+  const cellsOf = (key: Key) => displayWidth(`${key[0]}: ${key[1]}`);
+  const rows = wrapAt(keys, view.width, KEY_GAP, cellsOf);
+  const last = rows.at(-1) ?? [];
+  const used = last.reduce((sum, key) => sum + cellsOf(key), 0) + KEY_GAP * Math.max(0, last.length - 1);
   const room = view.width - used - KEY_GAP;
   const isBeside = displayWidth(status) <= room;
   const statusText = (cells: number) => Text({ dimColor: true, children: [fitEnd(status, cells, view.g.ellipsis)] });
@@ -414,7 +385,7 @@ function actions(host: Host, view: View, ledger: Ledger, entry: Entry | undefine
   const search = () => {
     isSearching = true;
     host.ui.invalidate();
-    focusSearch(host);
+    refocus(host, SEARCH, "evidence");
   };
   const filters: Key[] = [
     ...TYPE_KEYS.map(([hotkey, type, label]): Key => [hotkey, label, toggle(type), filter.type !== type]),
@@ -577,8 +548,7 @@ export const view: TabView = async (host, view) => {
       height: Math.max(list.height, card.height),
     };
   }
-  const blanks = (count: number) => Array.from({ length: Math.max(0, count) }, () => Text({ children: [" "] }));
   const filled = head.height + Math.max(room, body.height) + keys.length + field.length;
   // One row past the body brings the arrows and the wheel to `scroll` instead of the focus ring.
-  return [head.element, ...body.elements, ...blanks(room - body.height), ...keys, ...field, ...blanks(view.rows + 1 - filled)];
+  return [head.element, ...body.elements, ...blanks(view, room - body.height), ...keys, ...field, ...blanks(view, view.rows + 1 - filled)];
 };
