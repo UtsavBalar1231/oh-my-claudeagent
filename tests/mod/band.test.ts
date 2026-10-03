@@ -1,5 +1,6 @@
 import type { Args, On } from "claude-code";
 import { type Engine, type EngineCall, expect, mock, type Mounted, test } from "claude-code/testing";
+import { sha256Hex } from "../../src/core/evidence.ts";
 import { displayWidth } from "../../src/core/ui-kit.ts";
 import { hostSpelling } from "./world.ts";
 
@@ -217,10 +218,6 @@ test("an unreadable registry draws a one-line reason in the band", async ($, on)
   });
 });
 
-async function sha256(text: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
-  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
-}
 
 test("a complete plan without a passing final verification offers to run it", async ($, on) => {
   world(on, bound(46, 46, { [LEDGER]: ledger([{ type: "final_verification", exit_code: 1, command: "just ci" }]) }));
@@ -235,7 +232,7 @@ test("a complete plan without a passing final verification offers to run it", as
 });
 
 test("a final verification scoped to other plan bytes does not count", async ($, on) => {
-  const stale = { type: "final_verification", exit_code: 0, plan_sha256: await sha256(planText(45, 46)) };
+  const stale = { type: "final_verification", exit_code: 0, plan_sha256: sha256Hex(planText(45, 46)) };
   world(on, bound(46, 46, { [LEDGER]: ledger([stale]) }));
   await start($);
   await turn($);
@@ -246,7 +243,7 @@ test("a final verification scoped to other plan bytes does not count", async ($,
 });
 
 test("a complete plan with a passing final verification for its current bytes offers the oracle review", async ($, on) => {
-  const scoped = { type: "final_verification", exit_code: 0, plan_sha256: await sha256(planText(46, 46)) };
+  const scoped = { type: "final_verification", exit_code: 0, plan_sha256: sha256Hex(planText(46, 46)) };
   world(on, bound(46, 46, { [LEDGER]: ledger([scoped]) }));
   await start($);
   await turn($);
@@ -272,7 +269,7 @@ test("an unreadable ledger on a complete plan names the failure and still offers
     ]);
   });
 
-  const scoped = { type: "final_verification", exit_code: 0, plan_sha256: await sha256(planText(46, 46)) };
+  const scoped = { type: "final_verification", exit_code: 0, plan_sha256: sha256Hex(planText(46, 46)) };
   disk.set(LEDGER, { text: ledger([scoped]), mtimeMs: BEFORE_RUN_MS });
   await turn($);
 
@@ -396,6 +393,35 @@ test("proof counts draw only when the band carries them", async ($, on) => {
   expect(await statusRow(band)).toBe("▰▱▱▱▱ 12/46 · next 13 Port module 13 · ✓52 !4 ✗0");
   const colors = (await band.findAll({ type: "Text" })).filter(({ text }) => /^[✓!✗]\d+$/.test(text)).map(({ props }) => props["color"] ?? "dim");
   expect(colors).toEqual(["success", "warning", "dim"]);
+});
+
+test("the band counts each task's proof from its files' change times and the newest run since", async ($, on) => {
+  const task = (n: number, file?: string) =>
+    [`- [ ] ${n}. Port module ${n}`, ...(file === undefined ? [] : [`  - File: \`${file}\``])].join("\n");
+  const plan = `# Widget rewrite\n\n## TODOs\n\n${[task(1, "src/a.ts"), task(2, "src/b.ts"), task(3, "src/gone.ts"), task(4)].join("\n")}\n`;
+  const run = (at: number, exitCode: number) => ({
+    type: "test",
+    command: "just test",
+    exit_code: exitCode,
+    output_snippet: "",
+    timestamp: new Date(at * 1000).toISOString(),
+    verified_by: "executor",
+  });
+  const disk = files({
+    [BOULDER]: BOUND,
+    [PLAN_PATH]: plan,
+    [`${ROOT}/src/a.ts`]: { text: "a", mtimeMs: BEFORE_RUN_MS },
+    [`${ROOT}/src/b.ts`]: { text: "b", mtimeMs: AFTER_RUN_MS },
+    [LEDGER]: ledger([run(RAN_AT, 0)]),
+  });
+  world(on, disk);
+  await start($);
+  const band = await mount($, "terminal");
+  expect(await statusRow(band)).toBe("▱▱▱▱▱ 0/4 · next 1 Port module 1 · ✓1 !1 ✗0");
+
+  disk.set(LEDGER, { text: ledger([run(RAN_AT, 0), run(RAN_AT + 10, 1)]), mtimeMs: AFTER_RUN_MS + 10_000 });
+  await turn($);
+  expect(await statusRow(band)).toBe("▱▱▱▱▱ 0/4 · next 1 Port module 1 · ✓0 !0 ✗2");
 });
 
 test("a press fills the prompt with the exact text and never submits", async ($, on) => {

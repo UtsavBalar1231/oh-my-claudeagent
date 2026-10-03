@@ -1,14 +1,18 @@
 import type { RenderElement } from "claude-code";
-import { type Band, bandView, BUTTON_GAP, oneLine, planTally, type Span, type Tone } from "../src/core/band-model.ts";
+import { type Band, bandView, BUTTON_GAP, oneLine, planTally, type Proof, type Span, type Tone } from "../src/core/band-model.ts";
 import { resolveBoundPlan } from "../src/core/boulder.ts";
 import { allTasksDone } from "../src/core/checkboxes.ts";
-import { ledgerCoversSlot } from "../src/core/evidence.ts";
+import { ledgerCoversSlot, sha256Hex } from "../src/core/evidence.ts";
 import { hasPassingFinalVerification, type NextAction, nextActions } from "../src/core/next-actions.ts";
 import { BOULDER, LEDGER, statusPath, verificationOf } from "../src/core/omca-paths.ts";
+import { isAbsolutePath, joinPath } from "../src/core/path.ts";
+import { boardOf, parsePlan } from "../src/core/plan-reader.ts";
+import { parseRuns, proofOf, proofSummary } from "../src/core/proof.ts";
 import { glyphs, isAsciiRequested } from "../src/core/ui-kit.ts";
 import { TONE_KEYS } from "../src/core/visual.ts";
 import type { Features } from "./dispatch.ts";
 import { type Host, reason } from "./host.ts";
+import { sessionOf } from "./pane.ts";
 import { type Kit, kitOf, type TextStyle } from "./ui.ts";
 
 type Snapshot = { band: Band; hasFinalVerification: boolean };
@@ -68,16 +72,38 @@ async function readSnapshot(host: Host): Promise<Snapshot> {
     planText !== null &&
     allTasksDone(plan) &&
     (await attempt(LEDGER, async () =>
-      hasPassingFinalVerification(await readJson(host, ledgerPath), await sha256(planText)),
+      hasPassingFinalVerification(await readJson(host, ledgerPath), sha256Hex(planText)),
     )) === true;
 
-  return { band: { plan, verification, error: errors[0] ?? null, readAt }, hasFinalVerification };
+  const proof = planText === null ? null : await attempt(LEDGER, () => proofOfPlan(host, root, planText, ledgerPath));
+  const band: Band = { plan, verification, ...(proof === null ? {} : { proof }), error: errors[0] ?? null, readAt };
+  return { band, hasFinalVerification };
 }
 
-async function sha256(text: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
-  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+// The plan board's counts: each task's verdict is the newest test, build or lint run since its
+// listed files last changed. Null when no task lists a file that exists.
+async function proofOfPlan(host: Host, root: string, planText: string, ledgerPath: string): Promise<Proof | null> {
+  const { platform } = await sessionOf(host);
+  const { cards } = boardOf(parsePlan(planText));
+  const paths = [...new Set(cards.flatMap((card) => card.files))];
+  const stamps = new Map(
+    await Promise.all(
+      paths.map(async (path): Promise<[string, number | null]> => {
+        const full = isAbsolutePath(platform, path) ? path : joinPath(platform, root, path);
+        const at = await host.fs.stat(full).then(
+          (stat) => (stat.kind === "file" ? stat.mtimeMs : null),
+          () => null,
+        );
+        return [path, at];
+      }),
+    ),
+  );
+  const runs = (await host.fs.exists(ledgerPath)) ? parseRuns(await host.fs.read(ledgerPath)) : [];
+  const changesOf = (files: readonly string[]) => files.flatMap((file) => stamps.get(file) ?? []);
+  const counts = proofSummary(cards.map((card) => proofOf(changesOf(card.files), runs)?.proof));
+  return counts.proven + counts.unproven + counts.failed === 0 ? null : counts;
 }
+
 
 async function actionsFor(host: Host, { band, hasFinalVerification }: Snapshot): Promise<NextAction[]> {
   const agents = (await host.state.agents.get()).value ?? {};

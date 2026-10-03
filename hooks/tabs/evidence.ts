@@ -90,7 +90,7 @@ async function boundPlan(host: Host, root: string): Promise<{ stamp: string; bou
 async function planOf(host: Host, bound: Bound): Promise<Ledger["plan"]> {
   if (bound === null || "error" in bound) return bound;
   try {
-    return { name: bound.name, sha: await sha256Hex(await host.fs.read(bound.path)) };
+    return { name: bound.name, sha: sha256Hex(await host.fs.read(bound.path)) };
   } catch (error) {
     return { name: bound.name, error: `Could not read the plan file: ${reason(error)}` };
   }

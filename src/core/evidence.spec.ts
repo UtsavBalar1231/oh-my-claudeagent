@@ -299,7 +299,15 @@ describe("rerunPrompt", () => {
   });
 });
 
-test("sha256Hex hashes the text's UTF-8 bytes", async () => {
-  expect(await sha256Hex("abc")).toBe("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
-  expect(await sha256Hex("é")).toBe(new Bun.CryptoHasher("sha256").update("é").digest("hex"));
+test("sha256Hex hashes the text's UTF-8 bytes", () => {
+  expect(sha256Hex("")).toBe("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+  expect(sha256Hex("abc")).toBe("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+  const reference = (text: string) => new Bun.CryptoHasher("sha256").update(text).digest("hex");
+  for (const length of [1, 55, 56, 63, 64, 65, 119, 120, 128, 1000, 100_000]) {
+    const text = "a".repeat(length);
+    expect([length, sha256Hex(text)]).toEqual([length, reference(text)]);
+  }
+  for (const text of ["é", "naïve plan ✓ ◐ ⊘", "🪨".repeat(40), "- [ ] 1. Task\r\n  - File: `src/a.ts`\n"]) {
+    expect(sha256Hex(text)).toBe(reference(text));
+  }
 });
