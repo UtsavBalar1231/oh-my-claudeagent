@@ -156,15 +156,20 @@ the model cannot.
 Type `@agent-oh-my-claudeagent:<name>` to send a request to one agent, for example
 `@agent-oh-my-claudeagent:oracle what is the right shape for this cache?`.
 
-## The band, the pane and the plan reader
+## The band, the pane and the plan board
 
 ### The band
 
-The band sits above the prompt. It shows the plan bound to this session with its progress, the
-last verification command, and whether its evidence was logged. Below it, numbered buttons offer
-the next step: log the evidence, start work, run the final verification, or review the changes
-with oracle. Press a button's digit in an empty prompt, or click it, to fill the prompt with that
-step; nothing runs until you send it. Typing anything else clears the buttons.
+The band sits above the prompt. It shows the bound plan's progress as a bar with its done and
+total tasks, the next open task, how many tasks are proven, unproven and failed (see
+[proof](#proof)), a verification command whose evidence was not logged, and how many agents are
+running. As the window narrows it drops the verification first, then the proof counts, the next
+task and the running count; the bar stays. The prompt's border names the plan.
+
+Below it, numbered buttons offer the next step: log the evidence, start work, run the final
+verification, or review the changes with oracle. Press a button's digit in an empty prompt, or
+click it, to fill the prompt with that step; nothing runs until you send it. Typing anything else
+clears the buttons.
 
 Set the `showBand` option to `false` to hide it.
 
@@ -172,35 +177,87 @@ Set the `showBand` option to `false` to hide it.
 
 `/omca` opens the OMCA pane on its Agents tab. Each tab has a digit key:
 
-1. **Agents**: each subagent of this session with its model, effort, time and tokens.
-2. **Plan**: the plan reader.
-3. **Evidence**: the verification entries logged in this project.
-4. **Notepad**: the bound plan's notepad sections.
+1. **Agents**: a lane for each running subagent with its task, model, effort, tokens, elapsed
+   time and a strip of its recent tool calls, one glyph per kind (read, edit, bash, MCP, agent).
+   A finished agent shrinks to one line with the first line of its result and its duration.
+   Point at a lane, or press `d`, to see its prompt and last output.
+2. **Plan**: the plan board, below.
+3. **Evidence**: the proof ledger, below.
+4. **Notepad**: one card per section of the bound plan's notepad, each entry under its date. `f`
+   finds text in the entries, `x` clears the search, and `l` picks another plan's notepad.
 5. **Feedback**: your ratings for this session.
-6. **Stats**: delegation outcomes by agent type, across the project's recorded sessions.
+6. **Stats**: runs and the evidence rate per agent type, tokens per finished delegation, and the
+   estimated cost by agent, across the project's recorded sessions. Runs on a model without a
+   known price are counted as excluded rather than estimated.
 7. **Doctor**: the checks described below.
 
 `/omca plan`, `/omca stats` and `/omca doctor` open the pane on that tab. Press Ctrl+X then Tab,
 or click the pane, to focus it. Esc, the close mark in the pane's corner, or Ctrl+X then X close
-it.
+it. Every key letter below works only while its tab is shown.
 
-### The plan reader
+The band and the pane draw every color from your Claude Code theme, so a custom theme in
+`~/.claude/themes/` applies to them too. Each state also carries a glyph and a word, so nothing
+depends on color alone. Secrets in commands, output and notes, such as API keys, tokens and
+`password=` values, are drawn as `‹masked›`, and your home folder as `~`.
 
-`/omca plan` opens the bound plan; `/omca plan <name or path>` opens another. The reader starts
-on the plan's contents with the cursor on the first open task.
+### The plan board
 
-| Key | In the contents | On a task | In the plan list |
-| --- | --- | --- | --- |
-| Up, Down | Move | Scroll | Move |
-| Enter | Open the section | | Open the plan |
-| Page Up, Page Down, Home, End | Page through the list | Scroll | Page through the list |
-| `n`, `p` | | Next or previous task | |
-| `t` | | Back to the contents | Back to the contents |
-| `l` | Recent plans | | |
-| `r` | Reload | Reload | Reload |
-| Esc | Close the pane | Close the pane | Close the pane |
+`/omca plan` opens the bound plan; `/omca plan <name or path>` opens another. A plan with
+numbered tasks opens on its board: a header with the plan's status, a progress bar, the proof
+counts, the next task and the running agents, then the tasks grouped by milestone. Each task row
+shows whether it is done, in progress, open or blocked, its proof chip, the agent working on it,
+and the tasks it waits for. A plan without numbered tasks opens on its sections.
 
-The reader reloads the file when it changes on disk, and keeps your place when it does.
+A wide pane shows the focused task's detail beside the list, a narrower one under the task's
+row, and Enter opens it as a page. The detail holds the task's steps, its done-when commands, its
+dependencies with their state, its files with the time since each changed, and the evidence runs
+that bear on it.
+
+| Key | On the board | On a task page |
+| --- | --- | --- |
+| Up, Down | Move | Scroll |
+| Enter | Open the task | |
+| `n`, `p` | | Next or previous task |
+| `r` | Fill the prompt to run the task's check | The same |
+| `s` | Fill the prompt to start work from the task | The same |
+| `c` | Copy the task | The same |
+| `e` | Switch to the Evidence tab | The same |
+| `o` | Show open tasks only | |
+| `x` | Show failing tasks only | |
+| `f` | Find tasks by their text | |
+| `t` | The plan's sections | |
+| `l` | Recent plans | |
+| `b` | | Back to the board |
+| Esc | Close the pane | Close the pane |
+
+In the sections list Enter opens a section, `b` returns to the board and `r` reloads; on a section
+`n` and `p` step to the next or previous one and `t` returns to the list. The board reloads the
+file when it changes on disk and keeps your place.
+
+#### Proof
+
+A task's proof chip compares the files its `File:` line lists with the evidence log. The newest
+test, build or lint run since any of those files last changed decides it: **PROVEN** when it
+passed, **FAILED** when it failed, **UNPROVEN** when no such run has happened yet. A task that
+lists no file, or whose files do not exist, gets no chip.
+
+### The proof ledger
+
+The Evidence tab opens on a verdict for the bound plan: **COMPLETE** when a passing final
+verification matches the plan file as it is now, **STALE** when the plan changed after it passed,
+and **MISSING** when none passed. A strip of dots shows the exit codes of the last 30 runs.
+
+Below it the runs are grouped by day, newest first, each with its time, type, exit code, command
+and the agent that logged it. Up and Down move the focus, and the focused run opens to show its
+command and output.
+
+| Key | Action |
+| --- | --- |
+| `b`, `e`, `l`, `m`, `v` | Show only build, test, lint, manual or final verification runs; again to show all |
+| `x` | Show failed runs only |
+| `f` | Find runs by their command |
+| `c` | Copy the focused command as drawn, secrets masked |
+| `r` | Fill the prompt to run the focused command again |
 
 ## The guard
 
@@ -266,8 +323,11 @@ which proposes rules from your past sessions.
 - whether the advisor can run, and which setting keeps it off when it cannot;
 - the status line's `refreshInterval`.
 
-Press `r` to run the checks again. When the status line has no `refreshInterval`, press `i` to
-add `refreshInterval: 5`; the doctor shows the diff it wrote and keeps a backup.
+Each row leads with OK, WARN, FAIL or INFO. Press `r` to run the checks again. When the status
+line has no `refreshInterval`, press `i` to add `refreshInterval: 5`; the doctor shows the diff it
+wrote and keeps a backup. A check with a known remedy offers a key that fills the prompt with it,
+without sending: `m` for `/mcp`, `a` for `/advisor fable`, `c` for `/config` and `s` for
+`/oh-my-claudeagent:omca-setup`.
 
 ## Rate a turn
 
