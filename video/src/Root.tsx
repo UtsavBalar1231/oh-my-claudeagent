@@ -1,21 +1,27 @@
-import { AbsoluteFill, Composition, Img, Still, staticFile } from "remotion";
-import { Poster } from "./Poster.tsx";
+import { Composition, Freeze } from "remotion";
+import { Demo, demoTimeline } from "./Demo.tsx";
+import { LOOP, Loop, loopPlan } from "./Loop.tsx";
 import { Reel, type ReelProps, REEL_SECONDS } from "./Reel.tsx";
-import { color, VIDEO } from "./theme.ts";
-
-const LOOP = { width: 800, height: 450, fps: 15, seconds: 13 } as const;
-
-const LoopPlaceholder = () => (
-  <AbsoluteFill style={{ background: color.canvas }}>
-    <Img src={staticFile("placeholder/plan.png")} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-  </AbsoluteFill>
-);
+import { PUNCH_LINE_SETTLED, PunchLine, punchLinePlan } from "./scenes/PunchLine.tsx";
+import { toFrames, VIDEO } from "./theme.ts";
 
 const reelDefaults: ReelProps = { fps: VIDEO.fps };
 
+const PosterCard = () => (
+  <Freeze frame={toFrames(PUNCH_LINE_SETTLED, VIDEO.fps)}>
+    <PunchLine />
+  </Freeze>
+);
+
 export const Root = () => (
   <>
-    <Composition id="Demo" component={Poster} durationInFrames={4380} {...VIDEO} />
+    <Composition
+      id="Demo"
+      component={Demo}
+      calculateMetadata={() => ({ durationInFrames: demoTimeline(VIDEO.fps).durationInFrames })}
+      durationInFrames={1}
+      {...VIDEO}
+    />
     <Composition
       id="Components"
       component={Reel}
@@ -24,7 +30,21 @@ export const Root = () => (
       durationInFrames={Math.round(REEL_SECONDS * VIDEO.fps)}
       {...VIDEO}
     />
-    <Composition id="Loop" component={LoopPlaceholder} width={LOOP.width} height={LOOP.height} fps={LOOP.fps} durationInFrames={LOOP.seconds * LOOP.fps} />
-    <Still id="Poster" component={Poster} width={VIDEO.width} height={VIDEO.height} />
+    <Composition
+      id="Loop"
+      component={Loop}
+      calculateMetadata={() => ({ durationInFrames: loopPlan(LOOP.fps).duration })}
+      durationInFrames={1}
+      {...LOOP}
+    />
+    {/* The poster is the punch-line card once its words have settled, rendered as frame 0 of a
+        composition at the Demo's rate and the card's length, because a <Still> runs at 1 fps. */}
+    <Composition
+      id="Poster"
+      component={PosterCard}
+      calculateMetadata={() => ({ durationInFrames: punchLinePlan(VIDEO.fps).duration })}
+      durationInFrames={1}
+      {...VIDEO}
+    />
   </>
 );

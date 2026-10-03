@@ -4,10 +4,10 @@ import { color } from "../theme.ts";
 
 export const WINDOW_RADIUS = 14;
 
-export type WindowProps = { box: Rect; children: ReactNode };
+export type WindowProps = { box: Rect; border?: string; children: ReactNode };
 
 // The border is an overlay drawn above the footage so it does not shrink the footage area by 2 px.
-export const Window = ({ box, children }: WindowProps) => (
+export const Window = ({ box, border = color.frameBorder, children }: WindowProps) => (
   <div
     style={{
       position: "absolute",
@@ -22,6 +22,6 @@ export const Window = ({ box, children }: WindowProps) => (
     }}
   >
     {children}
-    <div style={{ position: "absolute", inset: 0, borderRadius: WINDOW_RADIUS, border: `1px solid ${color.frameBorder}` }} />
+    <div style={{ position: "absolute", inset: 0, borderRadius: WINDOW_RADIUS, border: `1px solid ${border}` }} />
   </div>
 );

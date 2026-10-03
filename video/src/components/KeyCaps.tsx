@@ -22,7 +22,7 @@ export const KeyCaps = ({ keys }: KeyCapsProps) => {
         position: "absolute",
         left: SAFE.x,
         right: SAFE.x,
-        bottom: SAFE.bottom + 40,
+        bottom: SAFE.bottom + 24,
         display: "flex",
         justifyContent: "center",
         alignItems: "center",

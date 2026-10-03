@@ -5,11 +5,12 @@ const RISE = 8;
 
 // reveal false starts on the finished line, for a frame 0 that must already read; exit false keeps
 // it to the end, for a Still, whose one-frame duration would otherwise put it inside the exit.
-export type CaptionProps = { text: string; size?: number; placement?: "lower" | "center"; reveal?: boolean; exit?: boolean };
+export type CaptionProps = { text: string; size?: number; placement?: "lower" | "center" | "top"; reveal?: boolean; exit?: boolean };
 
 const PLACEMENT: Record<NonNullable<CaptionProps["placement"]>, CSSProperties> = {
   lower: { bottom: SAFE.bottom + 16 },
   center: { top: "50%", translate: "0 -50%" },
+  top: { top: SAFE.top + 40 },
 };
 
 export const Caption = ({ text, size = 80, placement = "lower", reveal = true, exit = true }: CaptionProps) => {

@@ -12,6 +12,8 @@ export const color = {
   red: "#f87171",
   amber: "#fbbf24",
   frameBorder: "rgba(255, 255, 255, 0.08)",
+  plainBorder: "rgba(255, 255, 255, 0.12)",
+  omcaBorder: "rgba(215, 119, 87, 0.4)",
   panel: "rgba(9, 9, 11, 0.86)",
   keyFace: "#18181b",
   keyEdge: "#3f3f46",

@@ -1,0 +1,22 @@
+import board from "../../public/footage/clip-board.json";
+import boardLight from "../../public/footage/clip-board-light.json";
+import delegate from "../../public/footage/clip-delegate.json";
+import guard from "../../public/footage/clip-guard.json";
+import plainReset from "../../public/footage/clip-plain-reset.json";
+import plainStop from "../../public/footage/clip-plain-stop.json";
+import plan from "../../public/footage/clip-plan.json";
+import refusal from "../../public/footage/clip-refusal.json";
+import tour from "../../public/footage/clip-tour.json";
+import verify from "../../public/footage/clip-verify.json";
+import type { ClipManifest } from "../footage.ts";
+
+export const P1: ClipManifest = plainStop;
+export const P2: ClipManifest = plainReset;
+export const F1: ClipManifest = refusal;
+export const F2: ClipManifest = plan;
+export const F3: ClipManifest = delegate;
+export const F4: ClipManifest = board;
+export const F5: ClipManifest = guard;
+export const F6: ClipManifest = verify;
+export const F7: ClipManifest = boardLight;
+export const F8: ClipManifest = tour;

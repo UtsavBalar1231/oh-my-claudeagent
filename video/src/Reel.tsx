@@ -111,7 +111,7 @@ export const Reel: FC<ReelProps> = () => {
           </AbsoluteFill>
         </Series.Sequence>
         <Series.Sequence durationInFrames={f(REEL.end)} premountFor={fps}>
-          <EndCard />
+          <EndCard line="Claude Code, with receipts." />
         </Series.Sequence>
       </Series>
       <SafeArea />

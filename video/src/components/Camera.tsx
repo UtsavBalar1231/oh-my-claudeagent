@@ -14,6 +14,8 @@ export type ToScreen = (rect: Rect) => Rect;
 export const MAX_SCALE = 1.5;
 
 /** The largest window inside the safe area with the footage's aspect ratio, centered in it. */
+export const baseScale = (footage: Size, area: Size): number => Math.min(area.width / footage.width, area.height / footage.height);
+
 export const fitWindow = (footage: Size): Rect => {
   const room = { width: VIDEO.width - 2 * SAFE.x, height: VIDEO.height - SAFE.top - SAFE.bottom };
   const scale = Math.min(room.width / footage.width, room.height / footage.height);
@@ -21,8 +23,6 @@ export const fitWindow = (footage: Size): Rect => {
   const height = Math.round(footage.height * scale);
   return { x: Math.round((VIDEO.width - width) / 2), y: Math.round(SAFE.top + (room.height - height) / 2), width, height };
 };
-
-const baseScale = (footage: Size, area: Size): number => Math.min(area.width / footage.width, area.height / footage.height);
 
 // Zoom eases in log space so each doubling takes the same time; x and y are the footage pixel
 // placed at the window's center.
@@ -61,13 +61,30 @@ export const projector = (view: View, footage: Size, area: Rect): ToScreen => {
   });
 };
 
-const CameraContext = createContext<ToScreen | null>(null);
+type CameraSpace = { toScreen: ToScreen; area: Rect };
+
+const CameraContext = createContext<CameraSpace | null>(null);
+
+const useCameraSpace = (): CameraSpace => {
+  const space = useContext(CameraContext);
+  if (space === null) throw new Error("camera overlays need an enclosing <Camera> or <CameraOverlay>");
+  return space;
+};
 
 /** Maps a rect in footage pixels to composition pixels at the enclosing Camera's current frame. */
-export const useCameraTransform = (): ToScreen => {
-  const toScreen = useContext(CameraContext);
-  if (toScreen === null) throw new Error("useCameraTransform needs an enclosing <Camera>");
-  return toScreen;
+export const useCameraTransform = (): ToScreen => useCameraSpace().toScreen;
+
+/** The footage window in composition pixels. */
+export const useCameraArea = (): Rect => useCameraSpace().area;
+
+export type CameraOverlayProps = { footage: Size; keyframes: readonly CameraKeyframe[]; box?: Rect; children?: ReactNode };
+
+// Gives overlays the camera's transform without drawing footage, so one set of overlays can span
+// several Camera segments that share keyframes.
+export const CameraOverlay = ({ footage, keyframes, box, children }: CameraOverlayProps) => {
+  const frame = useCurrentFrame();
+  const area = box ?? fitWindow(footage);
+  return <CameraContext.Provider value={{ toScreen: projector(viewAt(keyframes, frame), footage, area), area }}>{children}</CameraContext.Provider>;
 };
 
 export type CameraProps = {
@@ -78,14 +95,18 @@ export type CameraProps = {
   trimBefore?: number;
   playbackRate?: number;
   box?: Rect;
+  border?: string;
   freeze?: { frame: number; active: boolean | ((frame: number) => boolean) };
   children?: ReactNode;
 };
 
+// durationInFrames is composition frames; <Video> reads its own durationInFrames as media frames
+// (trimAfter = trimBefore + durationInFrames, then divided by playbackRate), so a sped-up camera
+// passes it scaled or the footage goes blank partway through.
 // children render in composition space above the window, so an overlay keeps its stroke width at
 // any zoom and is not clipped by the window. freeze holds only the footage, so overlays keep
 // animating while it is held.
-export const Camera = ({ src, footage, keyframes, durationInFrames, trimBefore = 0, playbackRate = 1, box, freeze, children }: CameraProps) => {
+export const Camera = ({ src, footage, keyframes, durationInFrames, trimBefore = 0, playbackRate = 1, box, border, freeze, children }: CameraProps) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const area = box ?? fitWindow(footage);
@@ -95,8 +116,8 @@ export const Camera = ({ src, footage, keyframes, durationInFrames, trimBefore =
   const view = viewAt(keyframes, frame);
   const t = viewTransform(view, footage, area);
   return (
-    <CameraContext.Provider value={projector(view, footage, area)}>
-      <Window box={area}>
+    <CameraContext.Provider value={{ toScreen: projector(view, footage, area), area }}>
+      <Window box={area} {...(border === undefined ? {} : { border })}>
         <div
           style={{
             position: "absolute",
@@ -114,7 +135,7 @@ export const Camera = ({ src, footage, keyframes, durationInFrames, trimBefore =
               src={staticFile(src)}
               muted
               trimBefore={trimBefore}
-              durationInFrames={durationInFrames}
+              durationInFrames={durationInFrames * playbackRate}
               playbackRate={playbackRate}
               premountFor={fps}
               objectFit="fill"
