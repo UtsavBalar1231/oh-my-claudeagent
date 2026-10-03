@@ -46,11 +46,25 @@ describe("CLIPS", () => {
   const target = (shot: Clip | undefined, name: string) => untils(shot).find((step) => step.targets?.[name])?.targets?.[name];
 
   test("records the video scenes as clips", () => {
-    expect(CLIPS.map((shot) => shot.name)).toEqual(["clip-refusal", "clip-plan", "clip-delegate", "clip-board", "clip-guard", "clip-verify", "clip-board-light"]);
+    expect(CLIPS.map((shot) => shot.name)).toEqual([
+      "clip-plain-stop",
+      "clip-plain-reset",
+      "clip-refusal",
+      "clip-plan",
+      "clip-delegate",
+      "clip-board",
+      "clip-guard",
+      "clip-verify",
+      "clip-board-light",
+    ]);
     for (const shot of CLIPS) expect([shot.cols, shot.rows]).toEqual([200, 50]);
   });
 
   test("each clip marks the events and names the targets its beat needs", () => {
+    expect(marks(clip("clip-plain-stop"))).toEqual(["cmd-typed", "claim-done", "shell-typed", "open-tasks"]);
+    expect(targets(clip("clip-plain-stop"))).toEqual(["open-list"]);
+    expect(marks(clip("clip-plain-reset"))).toEqual(["cmd-typed", "reset-ran"]);
+    expect(targets(clip("clip-plain-reset"))).toEqual(["reset-call", "lost-files", "bypass-mode"]);
     expect(marks(clip("clip-refusal"))).toEqual(["cmd-typed", "claim-done", "stop-feedback", "resumed"]);
     expect(targets(clip("clip-refusal"))).toEqual(["stop-line"]);
     expect(marks(clip("clip-plan"))).toEqual(["cmd-typed", "dialog", "key-choice", "plan-written"]);
@@ -61,10 +75,22 @@ describe("CLIPS", () => {
       expect(marks(clip(name))).toEqual(["cmd-typed", "board", "focus-moved", "task-open"]);
       expect(targets(clip(name))).toEqual(["proven-chip", "unproven-chip"]);
     }
-    expect(marks(clip("clip-guard"))).toEqual(["cmd-typed", "dialog"]);
-    expect(targets(clip("clip-guard"))).toEqual(["removal-lines"]);
+    expect(marks(clip("clip-guard"))).toEqual(["cmd-typed", "dialog", "refused"]);
+    expect(targets(clip("clip-guard"))).toEqual(["discard-lines"]);
     expect(marks(clip("clip-verify"))).toEqual(["cmd-typed", "tests-pass", "evidence-logged", "complete"]);
     expect(targets(clip("clip-verify"))).toEqual(["complete-chip"]);
+  });
+
+  test("the plain clips leave the plugin out and pair with an OMCA clip on the same prompt", () => {
+    expect(CLIPS.filter((shot) => shot.plugin === false).map((shot) => shot.name)).toEqual(["clip-plain-stop", "clip-plain-reset"]);
+    const prompt = (shot: Clip | undefined) => shot?.steps.find((step) => "type" in step);
+    expect(prompt(clip("clip-plain-stop"))).toEqual(prompt(clip("clip-refusal")));
+    expect(prompt(clip("clip-plain-reset"))).toEqual(prompt(clip("clip-guard")));
+  });
+
+  test("the reset pair runs under bypassPermissions", () => {
+    const bypassed = CLIPS.filter((shot) => shot.args?.join(" ").includes("--permission-mode bypassPermissions")).map((shot) => shot.name);
+    expect(bypassed).toEqual(["clip-plain-reset", "clip-guard"]);
   });
 
   test("only the refusal and the verification run with the Stop gates on", () => {
@@ -82,8 +108,14 @@ describe("CLIPS", () => {
   });
 
   test("a dialog gutter counts as indent", () => {
-    const screen = "│ It would remove:\n│   build  dir, 4 entries\n│ Run it?";
-    expect(locate(screen, target(clip("clip-guard"), "removal-lines") ?? /^$/)).toEqual({ row: 0, col: 2, len: 23, rows: 2 });
+    const screen = [
+      "│ git reset --hard discards 2 uncommitted changes:",
+      "│   src/steps/payment.ts | 2 +-",
+      "│   src/steps/summary.ts | 4 +++-",
+      "│   2 files changed, 4 insertions(+), 2 deletions(-)",
+      "│ Run it?",
+    ].join("\n");
+    expect(locate(screen, target(clip("clip-guard"), "discard-lines") ?? /^$/)).toEqual({ row: 0, col: 2, len: 48, rows: 3 });
   });
 });
 

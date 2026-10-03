@@ -80,6 +80,9 @@ type Scene = {
   allow?: readonly string[];
   // Overrides the session environment, OMCA_DISABLED_HOOKS=stop-gates included.
   env?: Readonly<Record<string, string>>;
+  // false runs plain Claude Code: no --plugin-dir and no OMCA status line.
+  plugin?: false;
+  args?: readonly string[];
 };
 
 export type Still = Scene & {
@@ -142,6 +145,24 @@ const command = (line: string): Step[] => [
   { key: "Enter" },
 ];
 const RUN_GATES = { OMCA_DISABLED_HOOKS: "" };
+// Bash mode: the prompt row starts with "!" instead of "❯".
+const shell = (line: string): Step[] => [
+  { type: "!" },
+  { type: line },
+  { until: (screen) => screen.split("\n").some((row) => /^!\s/.test(row) && row.slice(2).trimEnd() === line), mark: "shell-typed", hold: 0 },
+  { key: "Enter" },
+];
+// Named, so plain Claude Code sends no title request for the mock to answer with a scripted turn.
+const PLAIN = { plugin: false, args: ["--name", "acme-app"] } as const;
+const BYPASS_ARGS = ["--permission-mode", "bypassPermissions"];
+const BYPASS_SETTINGS = { skipDangerousModePermissionPrompt: true };
+const WRAP_UP = "Wrap up the checkout work";
+const CLEAN_UP = "Clean up the working tree";
+// The project's uncommitted edits to the summary and payment steps are what a hard reset discards.
+const resetScript = (after: string): Script => ({
+  main: [{ content: [text("Resetting to the last commit."), bash("git reset --hard", "Discard the local changes")] }, { content: [text(after)] }],
+  subagent: [],
+});
 
 const PLAN_PATH = "plans/saved-payment-methods.md";
 const QUESTION = "Where should a saved card live?";
@@ -213,6 +234,42 @@ const BOARD_STEPS: readonly Step[] = [
 
 export const CLIPS: readonly Clip[] = [
   {
+    name: "clip-plain-stop",
+    format: "clip",
+    cols: CLIP_COLS,
+    rows: CLIP_ROWS,
+    ...PLAIN,
+    script: { main: [{ content: [text("All tasks are complete.")] }], subagent: [] },
+    steps: [
+      ...command(WRAP_UP),
+      { until: has("All tasks are complete."), mark: "claim-done", hold: 1_500 },
+      ...shell(`grep -F "[ ]" plans/${PLAN_NAME}.md`),
+      { until: has("14. Remove the old checkout page"), mark: "open-tasks", targets: { "open-list": /- \[ \] 7\.[^\n]*(\n[^\n]*- \[ \] \d+\.[^\n]*)*/ } },
+    ],
+  },
+  {
+    name: "clip-plain-reset",
+    format: "clip",
+    cols: CLIP_COLS,
+    rows: CLIP_ROWS,
+    plugin: false,
+    args: [...PLAIN.args, ...BYPASS_ARGS],
+    settings: BYPASS_SETTINGS,
+    script: resetScript("The working tree is clean."),
+    steps: [
+      ...command(CLEAN_UP),
+      {
+        until: has("The working tree is clean."),
+        mark: "reset-ran",
+        targets: {
+          "reset-call": /Bash\(git reset --hard\)\n[^\n]*HEAD is now at[^\n]*/,
+          "lost-files": /Updated src\/steps\/payment\.ts[^\n]*(\n[^\n]*)*?\n[^\n]*Updated src\/steps\/summary\.ts[^\n]*/,
+          "bypass-mode": /bypass permissions on/,
+        },
+      },
+    ],
+  },
+  {
     name: "clip-refusal",
     format: "clip",
     cols: CLIP_COLS,
@@ -227,7 +284,7 @@ export const CLIPS: readonly Clip[] = [
       subagent: [{ content: [tool("Read", { file_path: "src/steps/summary.ts" })] }, { content: [WATCH_SUMMARY] }],
     },
     steps: [
-      ...command("Wrap up the checkout work"),
+      ...command(WRAP_UP),
       { until: has("All tasks are complete."), mark: "claim-done", hold: 0 },
       { until: has("Stop hook feedback"), mark: "stop-feedback", targets: { "stop-line": /Stop hook feedback[^\n]*(\n {2,}\S[^\n]*)*/ } },
       { until: has("Task 7 is still open"), mark: "resumed" },
@@ -325,8 +382,15 @@ export const CLIPS: readonly Clip[] = [
     format: "clip",
     cols: CLIP_COLS,
     rows: CLIP_ROWS,
-    script: GUARD_SCRIPT,
-    steps: [...command("Clean the build"), { until: guardReady, mark: "dialog", targets: { "removal-lines": /It would remove:\n│\s*build +dir, \d+ entries/ } }],
+    args: BYPASS_ARGS,
+    settings: BYPASS_SETTINGS,
+    script: resetScript("Understood. Your changes stay as they are."),
+    steps: [
+      ...command(CLEAN_UP),
+      { until: has("OMCA held this command", "Run it?"), mark: "dialog", hold: 3_000, targets: { "discard-lines": /git reset --hard discards[^\n]*(\n[^\n]*\|[^\n]*)*/ } },
+      { key: "Enter", gap: 0 },
+      { until: has("Your changes stay as they are."), mark: "refused" },
+    ],
   },
   {
     name: "clip-verify",
@@ -903,7 +967,8 @@ export async function captureShot(shot: Shot, outDir: string): Promise<string> {
     writeProject(project, home, shot);
     mock = startServer({ port: 0, script: typeof shot.script === "function" ? shot.script(project) : shot.script });
     if (shot.format === "clip") proxy = delayed(mock.port, CLIP_MODEL_MS);
-    packageTree(REPO, plugin);
+    const withPlugin = shot.plugin !== false;
+    if (withPlugin) packageTree(REPO, plugin);
     const bun = Bun.which("bun") ?? "bun";
     const statusline = (entry: string) => `${quote(bun)} ${quote(join(plugin, "statusline", entry))}`;
     writeFileSync(join(config, ".claude.json"), JSON.stringify({ hasCompletedOnboarding: true, theme: shot.theme ?? "dark" }));
@@ -911,8 +976,10 @@ export async function captureShot(shot: Shot, outDir: string): Promise<string> {
       join(config, "settings.json"),
       JSON.stringify({
         tui: "fullscreen",
-        statusLine: { type: "command", command: statusline("main.ts"), padding: 1, refreshInterval: 5, hideVimModeIndicator: true },
-        subagentStatusLine: { type: "command", command: statusline("subagent.ts") },
+        ...(withPlugin && {
+          statusLine: { type: "command", command: statusline("main.ts"), padding: 1, refreshInterval: 5, hideVimModeIndicator: true },
+          subagentStatusLine: { type: "command", command: statusline("subagent.ts") },
+        }),
         ...shot.settings,
       }),
     );
@@ -938,7 +1005,7 @@ export async function captureShot(shot: Shot, outDir: string): Promise<string> {
       ...mockSessionEnv((proxy ?? mock).port),
       ...TRUECOLOR_ENV,
       ...Object.entries({ OMCA_DISABLED_HOOKS: "stop-gates", ...shot.env }).flatMap(([key, value]) => ["-e", `${key}=${value}`]),
-      `claude --plugin-dir ${quote(plugin)} --session-id ${SESSION_ID}`,
+      ["claude", ...(withPlugin ? ["--plugin-dir", quote(plugin)] : []), "--session-id", SESSION_ID, ...(shot.args ?? [])].join(" "),
       // kitty's attached client would otherwise take a row for the tmux status bar, and Claude Code
       // shows a hint row when tmux has mouse events off.
       ";", "set-option", "-g", "status", "off",
