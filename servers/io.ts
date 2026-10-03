@@ -69,15 +69,21 @@ function bestEffort(what: string, cleanup: () => void): void {
 const removeFile = (path: string): void => retryBusy(() => rmSync(path, { force: true }));
 
 const NOT_A_REPOSITORY = /not a git repository/i;
-const reportedRoots = new Set<string>();
 
-function reportRoot(dir: string, ...message: unknown[]): void {
-  if (reportedRoots.has(dir)) return;
-  reportedRoots.add(dir);
-  console.error(...message);
-}
+// A directory's top level holds for the server's life, and a git spawn blocks the thread (about
+// 110 ms on Windows), so each directory resolves, and reports a failure, once.
+const roots = new Map<string, string>();
 
 export function projectRoot(dir: string): string {
+  let root = roots.get(dir);
+  if (root === undefined) {
+    root = findRoot(dir);
+    roots.set(dir, root);
+  }
+  return root;
+}
+
+function findRoot(dir: string): string {
   try {
     const git = Bun.spawnSync(["git", "rev-parse", "--show-toplevel"], {
       cwd: dir,
@@ -89,11 +95,11 @@ export function projectRoot(dir: string): string {
     const top = git.stdout.toString().trim();
     if (git.exitCode === 0 && top !== "") return resolve(top);
     const detail = git.stderr.toString().trim();
-    if (detail !== "" && !NOT_A_REPOSITORY.test(detail)) reportRoot(dir, `omca: git rev-parse --show-toplevel failed in ${dir}; using it as the project root: ${detail}`);
+    if (detail !== "" && !NOT_A_REPOSITORY.test(detail)) console.error(`omca: git rev-parse --show-toplevel failed in ${dir}; using it as the project root: ${detail}`);
     return dir;
   } catch (error) {
     if (!hasCode(error, "ENOENT")) throw error;
-    reportRoot(dir, `omca: could not run git in ${dir}; using it as the project root:`, error);
+    console.error(`omca: could not run git in ${dir}; using it as the project root:`, error);
     return dir;
   }
 }

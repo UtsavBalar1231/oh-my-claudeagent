@@ -11,6 +11,9 @@ const COMPLETE = "- [x] 1. one\n- [x] 2. two\n";
 const INCOMPLETE = "- [x] 1. one\n- [ ] 2. two\n";
 const LONG_AGO = "2020-01-01T00:00:00Z";
 const ISO_SECONDS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
+// Each of the 50 writes resolves the project root with a synchronous git spawn, about 110 ms on a Windows
+// runner, so the spawns alone outlast the 5 s default and leave 49 writers working in a directory the cleanup removes.
+const PARALLEL_WRITERS_TIMEOUT_MS = 60_000;
 
 const roots: string[] = [];
 const servers: Bun.Subprocess[] = [];
@@ -164,7 +167,7 @@ describe("boulder_write", () => {
       expect(bindings[`sess-${i}`].plan_name).toBe(`plan-${i}`);
     }
     expect([Object.keys(plans).length, Object.keys(bindings).length]).toEqual([n, n]);
-  });
+  }, PARALLEL_WRITERS_TIMEOUT_MS);
 
   test("boulder_write rejects arguments that break the schema", async () => {
     const root = project();

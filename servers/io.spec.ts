@@ -70,6 +70,17 @@ describe("projectRoot", () => {
       errors.mockRestore();
     }
   });
+
+  test("each directory runs git once, however often it is resolved", () => {
+    gitInit(dir);
+    const spawns = spyOn(Bun, "spawnSync");
+    try {
+      expect([projectRoot(dir), projectRoot(dir), projectRoot(dir)]).toEqual([dir, dir, dir]);
+      expect(spawns).toHaveBeenCalledTimes(1);
+    } finally {
+      spawns.mockRestore();
+    }
+  });
 });
 
 describe("ensureStateDir", () => {
