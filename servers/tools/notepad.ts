@@ -43,7 +43,7 @@ export const tools: Tool[] = [
   {
     name: "notepad_write",
     description:
-      "Append content to a notepad section during plan execution. Use to record learnings, issues, decisions, or problems discovered while working. Always appends and never overwrites, so it is safe to call multiple times. Returns confirmation with the updated section path.",
+      "Append a learning, issue, decision or problem to a plan's notepad section, where it survives compaction. Never overwrites.",
     inputSchema: {
       type: "object",
       properties: {

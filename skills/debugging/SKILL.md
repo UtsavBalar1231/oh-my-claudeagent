@@ -1,6 +1,6 @@
 ---
 name: debugging
-description: "Runtime debugging loop: reproduce, rank hypotheses, instrument, fix, verify. Use for crashes, wrong output, intermittent or silent failures, race conditions, flaky tests, and code that works locally but not in prod. Not for build failures, type errors, or toolchain issues; those go to hephaestus."
+description: "Use for runtime bugs: crashes, wrong output, intermittent or silent failures, flaky tests, code that works locally but not in prod. Not for build failures or type errors; those go to hephaestus."
 ---
 
 # Debugging

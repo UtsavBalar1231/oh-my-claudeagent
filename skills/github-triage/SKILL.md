@@ -1,11 +1,6 @@
 ---
 name: github-triage
-description: "Parallel triage of open GitHub issues and PRs: one background executor per item, read-only."
-when_to_use: |
-  Use when:
-  - User wants to triage open GitHub issues or pull requests
-  - Batch analysis of bugs, feature requests, or PR merge safety is needed
-  - User says "triage issues", "review open PRs", or "what needs attention on GitHub"
+description: "Use to triage open GitHub issues and PRs in parallel, read-only, one executor per item (\"triage issues\", \"review open PRs\")."
 model: opus
 argument-hint: "[repo] [--issues-only | --prs-only]"
 effort: medium

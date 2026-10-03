@@ -237,11 +237,11 @@ export const tools: Tool[] = [
   {
     name: "boulder_progress",
     description:
-      "Count a plan file's numbered checkboxes (`- [ ] N.` and `- [x] N.`; unnumbered boxes are ignored) and return progress. Use to report plan status or to find the next task. With plan_path, reads that file. Otherwise it looks up plan_name in the registry, or else this session's binding; a session with no binding falls back to the only registered plan, or to the most recently started one, which may belong to another session, so pass plan_name or plan_path when several plans exist. Returns JSON with total, completed, remaining, is_complete, plan_path, plan_sha256 (hex SHA-256 of the plan file's current bytes, the value evidence_log takes for a final_verification entry), and next_task_label (the first unchecked task, truncated to 80 chars, or null when none remain); a JSON error object with plan_missing when the plan file is gone; or a plain message when no plan resolves.",
+      "A plan's progress over its numbered checkboxes (`- [ ] N.`): total, completed, remaining, the next task, and the plan_sha256 a final_verification entry takes. Without plan_path or plan_name it reads this session's bound plan, else the only or newest registered plan, which may belong to another session; pass plan_name when several exist.",
     inputSchema: {
       type: "object",
       properties: {
-        plan_path: { type: "string", default: "", description: "Path to plan file (resolves from boulder registry if empty)" },
+        plan_path: { type: "string", default: "", description: "Plan file to read; empty resolves from the registry" },
         plan_name: {
           type: "string",
           default: "",

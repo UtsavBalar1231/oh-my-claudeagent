@@ -6,7 +6,6 @@ effort: high
 color: green
 disallowedTools:
   - Agent
-memory: project
 ---
 # Executor
 
@@ -222,19 +221,6 @@ When a plan is bound, record a checkpoint after each significant sub-step: `note
 ## Worktree Isolation
 
 With `isolation: "worktree"` you run in an isolated git worktree. All operations target worktree paths, and your changes are returned on completion.
-
-## Memory Guidance
-
-Save signals specific to focused implementation:
-- **feedback**: user corrects an implementation pattern (e.g. "use X not Y here"); record the reason and context, not just the rule. Patterns without rationale become dead weight.
-- **feedback**: user states a standing directive meant to outlive this turn (e.g. "always run tests before claiming done", "never touch auth/* this session"); save it so it persists past compaction and auto-loads next session.
-- **project**: repo conventions discovered mid-task that aren't obvious from the code: unusual naming conventions, linter carve-outs, non-standard test layout, CI quirks
-- **reference**: internal runbooks, dashboards, or doc links cited during work that will be needed again
-
-Do not save: individual file paths (grep is cheaper at runtime), git history facts (git log is authoritative), fix recipes (the commit message holds that context).
-Do not save: ephemeral task state, in-progress work, or anything already documented in CLAUDE.md.
-
-**Persistence rule:** write plan-scoped discoveries with `notepad_write`, and cross-session facts that outlive the plan to agent memory. When in doubt during active plan execution, prefer notepad; promote to memory only after the fact survives plan completion.
 
 ## Session rules
 

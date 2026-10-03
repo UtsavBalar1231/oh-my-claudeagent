@@ -87,7 +87,7 @@ test.each([
 });
 
 const AGENT_FIELDS: Record<string, Record<string, string | string[]>> = {
-  executor: { model: "sonnet", effort: "high", color: "green", memory: "project", disallowedTools: ["Agent"] },
+  executor: { model: "sonnet", effort: "high", color: "green", disallowedTools: ["Agent"] },
   explore: {
     model: "sonnet",
     effort: "high",
@@ -95,7 +95,7 @@ const AGENT_FIELDS: Record<string, Record<string, string | string[]>> = {
     color: "blue",
     disallowedTools: ["Write", "Edit", "NotebookEdit", "Agent"],
   },
-  hephaestus: { model: "opus", effort: "medium", color: "yellow", memory: "project", disallowedTools: ["Agent"] },
+  hephaestus: { model: "opus", effort: "medium", color: "yellow", disallowedTools: ["Agent"] },
   librarian: {
     model: "sonnet",
     effort: "high",
@@ -104,7 +104,7 @@ const AGENT_FIELDS: Record<string, Record<string, string | string[]>> = {
     memory: "project",
     disallowedTools: ["Write", "Edit", "NotebookEdit", "Agent"],
   },
-  metis: { model: "opus", effort: "high", color: "yellow", memory: "project", disallowedTools: ["Bash", "Write", "Edit", "NotebookEdit", "Agent"] },
+  metis: { model: "opus", effort: "high", color: "yellow", disallowedTools: ["Bash", "Write", "Edit", "NotebookEdit", "Agent"] },
   momus: { model: "opus", effort: "high", color: "red", memory: "project", disallowedTools: ["Bash", "Agent"] },
   "multimodal-looker": {
     model: "opus",

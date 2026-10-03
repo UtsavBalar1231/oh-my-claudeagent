@@ -1,12 +1,6 @@
 ---
 name: hephaestus
-description: Specialist agent that fixes build failures, type errors, and toolchain issues.
-when_to_use: |
-  Use when:
-  - A build or compile step is failing
-  - Type errors are blocking progress
-  - Dependency or toolchain issues need diagnosis
-  - User says "fix build", "build broken", or pastes a compiler error
+description: "Use when a build, type check or dependency install fails, or the user pastes a compiler error or says \"fix build\". Runs the hephaestus build fixer."
 context: fork
 background: false
 agent: oh-my-claudeagent:hephaestus

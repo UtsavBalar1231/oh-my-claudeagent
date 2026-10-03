@@ -180,11 +180,18 @@ hand.
 - **Most omca tools load on demand.** Only `evidence_log`, `boulder_progress` and
   `notepad_write` load with the first request; the rest load through tool search by their full
   name, which saves about 3,750 tokens per request where tool search is on. Subagents are told the
-  same rule at start, since they do not receive server instructions. Hooks call the server
-  directly and are unaffected.
+  same rule at start, since a subagent's first request carries no server instructions. Hooks call
+  the server directly and are unaffected.
 - **The sisyphus prompt is a little over half its old size.** It drops what the output style and
   the first-prompt guidance already say and keeps every instruction only it carries, falling from
   about 6,700 to about 3,800 tokens on every main-session request.
+- **Each request carries less of OMCA.** executor, metis and hephaestus no longer declare project
+  memory, which none of them used (metis could not write it), so their requests drop Claude
+  Code's 13,000-character memory block. The three always-loaded tool descriptions, the server
+  instructions and six skill descriptions say the same in fewer words. Measured against a mock
+  model with tool search on, an executor's request carries about 4,500 tokens beyond a
+  general-purpose agent's, against 8,700 before, and the main thread about 11,400 beyond plain
+  Claude Code, against 12,200.
 - **The plugin installs from a packaged branch.** `just release` commits the shipped tree to the
   orphan `plugin` branch tagged `plugin-v<version>`, and `marketplace.json` pins that commit
   through a `url` source. The shipped tree leaves out the repository tooling: the specs, `tests/`,

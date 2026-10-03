@@ -1,12 +1,6 @@
 ---
 name: omca-setup
-description: Configure ~/.claude/ for oh-my-claudeagent (dependency and runtime checks, and the status line through OMCA's launcher).
-when_to_use: |
-  Use when:
-  - Installing or updating oh-my-claudeagent for the first time
-  - User says "setup omca", "configure omca", or "install oh-my-claudeagent"
-  - Diagnosing a broken or misconfigured plugin (--check, --doctor)
-  - Uninstalling the plugin (--uninstall)
+description: "Use to install, check, repair or uninstall oh-my-claudeagent's setup in ~/.claude/ (dependencies, runtime, status line), or when the user says \"setup omca\"."
 user-invocable: true
 shell: bash
 argument-hint: "[--uninstall | --check | --doctor]"

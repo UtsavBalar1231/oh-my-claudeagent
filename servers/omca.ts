@@ -31,20 +31,16 @@ export type Tool = {
 };
 
 const INSTRUCTIONS = [
-  "oh-my-claudeagent (OMCA) tools: verification evidence, work-plan tracking, notepads that survive compaction, structural code search, and reads outside the project root. State lives under `.omca/` and is written only through these tools; never hand-edit it.",
+  "oh-my-claudeagent (OMCA) tools. Its state lives under `.omca/` and is written only through them.",
   "",
   OMCA_TOOLS,
   "",
-  "Reach for a tool when:",
-  "",
-  "- You just ran a build, test, or lint command: record it with `evidence_log`, real exit code included. A plan-bound session cannot stop without a `final_verification` entry, and a TaskCompleted hook checks for evidence when task tools are enabled. `evidence_read` returns what is logged.",
-  "- You are executing a multi-step plan. `boulder_write` registers it and binds this session; `boulder_progress` reports checkboxes done and remaining plus the next task.",
-  "- You learned something that must outlive a compaction: a discovery, blocker, decision, or open problem. `notepad_write` persists it, `notepad_read` and `notepad_list` recall it, `notepad_compact` shrinks a large section.",
-  "- You are searching code by structure (signatures, class shapes, imports, call patterns). `ast_search` beats grep when the target is syntactic; `ast_find_rule` matches by context, such as calls inside a class; `ast_test_rule` validates a rule on a snippet; `ast_dump_tree` shows the tree when a pattern will not match; `ast_replace` rewrites AST-safely (preview with dry_run).",
-  "- You need a file outside the project root, where the built-in Read tool is scoped out: `file_read` pages with offset and limit.",
-  "- You need something from an earlier session: `session_search` scans local transcripts.",
-  "- You are choosing a delegation target: `agents_list` gives each agent's cost tier and default model, `categories_list` maps categories to model tiers.",
-  "- The plugin itself looks broken. `health_check` reports on the ast-grep binary and state files.",
+  "- After a build, test or lint run: `evidence_log`, real exit code included; `evidence_read` lists the entries.",
+  "- A multi-step plan: `boulder_write` registers it and binds this session; `boulder_progress` reports it.",
+  "- Notes that must outlive compaction: `notepad_write`, `notepad_read`, `notepad_list`, `notepad_compact`.",
+  "- Code search by structure, where grep would only match text: `ast_search`, `ast_find_rule`, `ast_test_rule`, `ast_dump_tree`, and `ast_replace` (preview with dry_run).",
+  "- A file outside the project root: `file_read`. An earlier session: `session_search`.",
+  "- Choosing a delegation target: `agents_list`, `categories_list`. The plugin looks broken: `health_check`.",
   "",
 ].join("\n");
 

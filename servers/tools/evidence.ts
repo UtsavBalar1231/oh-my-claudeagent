@@ -120,7 +120,7 @@ export const tools: Tool[] = [
   {
     name: "evidence_log",
     description:
-      "Append a timestamped entry to the project's verification evidence log (.omca/evidence/verification-evidence.json), the audit trail OMCA's gates read. Use it after each build, test, or lint run, with the run's real exit code (a failing run is still evidence), and once at the end of a plan for the final_verification verdict. Two gates read the log: a plan-bound session cannot stop until a final_verification entry matches the plan (see evidence_type), and when task tools are enabled a TaskCompleted hook refuses to close a task if a verification run finished after the log was last written. Entries are never removed and are shared by every session in the project. Returns a confirmation with the total entry count.",
+      "Record a build, test or lint run in the project's evidence log with its real exit code; a failing run counts too. OMCA's stop and task gates read this log. At the end of a plan, log one final_verification entry with plan_sha256 from boulder_progress.",
     inputSchema: {
       type: "object",
       properties: {
@@ -128,12 +128,12 @@ export const tools: Tool[] = [
           type: "string",
           enum: [...EVIDENCE_TYPES],
           description:
-            "Kind of evidence. final_verification is the end-of-plan completeness verdict. The plan Stop gate accepts only a final_verification entry with exit_code 0 whose plan_sha256 matches the plan file's current SHA-256; an entry without plan_sha256 matches any plan, and editing the plan after logging makes a scoped entry stop matching.",
+            "final_verification is the end-of-plan verdict. The plan's stop gate accepts one with exit_code 0 whose plan_sha256 matches the plan file as it is now.",
         },
         command: { type: "string", description: "Command that was executed" },
         exit_code: {
           type: "integer",
-          description: "Exit code of the command. For final_verification, 0 records COMPLETE and any other value INCOMPLETE.",
+          description: "The command's exit code. For final_verification, 0 records COMPLETE.",
         },
         output_snippet: { type: "string", description: "Relevant output snippet (truncated if needed)" },
         verified_by: { type: "string", default: "", description: "Agent or user who verified" },
@@ -142,7 +142,7 @@ export const tools: Tool[] = [
           type: "string",
           default: "",
           description:
-            "Hex SHA-256 of the plan file's current bytes, as `boulder_progress` returns it in `plan_sha256`. Set it on final_verification entries so the verdict applies only to this version of the plan; leave empty for other types.",
+            "The plan_sha256 boulder_progress returns. Set it on final_verification entries only.",
         },
       },
       required: ["evidence_type", "command", "exit_code", "output_snippet"],

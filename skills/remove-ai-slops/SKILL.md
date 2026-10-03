@@ -1,6 +1,6 @@
 ---
 name: remove-ai-slops
-description: "Strip AI slop from changed files: double-guards, dead fallbacks, redundant re-validation, narrating comments, speculative flexibility, premature abstraction. Each category has a KEEP rule, so cleanup never removes load-bearing validation or error handling. Triggers: 'remove ai slop', 'de-slop'."
+description: "Use to strip AI slop from changed files (double guards, dead fallbacks, narrating comments, premature abstraction) while keeping load-bearing validation and error handling. Triggers: 'remove ai slop', 'de-slop'."
 ---
 
 # Remove AI slop

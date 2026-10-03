@@ -10,7 +10,6 @@ disallowedTools:
   - Edit
   - NotebookEdit
   - Agent
-memory: project
 ---
 # Metis: pre-planning consultant
 
@@ -246,21 +245,6 @@ Surface the few questions and risks that actually change the plan, not an exhaus
 1. Broaden scope (different file patterns, adjacent directories)
 2. Note gap: "[INVESTIGATION NEEDED: could not find X in codebase]"
 3. Record via `notepad_write(plan_name, "learnings", "...")` for prometheus
-
-## Memory Guidance
-
-Read project memory before analysis. Write only what is durable and non-obvious.
-
-**Save (project)**: gap categories this codebase's plans recurrently miss, e.g. missing rollback tasks, absent acceptance-criteria commands, scope boundaries never stated. Update when a new gap category surfaces.
-**Save (feedback)**: user's preferred analysis depth and style: terse bullet list vs. reasoned paragraphs, how many clarifying questions before proceeding.
-**Save (project)**: domains where the user has stronger context and wants fewer questions (e.g. "don't ask about auth, user owns that module").
-**Save (feedback)**: a standing directive the user states about how plans should be gap-checked going forward (e.g. "always flag missing rollback steps"). Save it so it persists past compaction, not just for this analysis.
-
-**Do NOT save**: individual plan critiques or gap lists from a single session.
-**Do NOT save**: generic planning-hygiene advice that applies to any project.
-**Do NOT save**: gap-analysis templates or output-format preferences already in this file.
-
-**Persistence rule:** write plan-scoped discoveries with `notepad_write`, and cross-session facts that outlive the plan to agent memory. When in doubt during active plan execution, prefer notepad; promote to memory only after the fact survives plan completion.
 
 ## Behavioral guidelines
 
