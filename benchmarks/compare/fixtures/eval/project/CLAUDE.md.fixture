@@ -1,0 +1,8 @@
+# eval-fixture
+
+A small TypeScript project run with bun.
+
+- Tests: `bun test`
+- Types: `bun run typecheck`
+
+A change is done only when both commands exit 0.

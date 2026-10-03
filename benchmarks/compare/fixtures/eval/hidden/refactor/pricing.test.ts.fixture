@@ -1,0 +1,35 @@
+import { expect, test } from "bun:test";
+import { applyBulkDiscount, applyMemberDiscount } from "../src/pricing.ts";
+
+const bulk: [number, number, number][] = [
+  [19.99, 1, 19.99],
+  [19.99, 9, 19.99],
+  [19.99, 10, 17.99],
+  [19.99, 99, 17.99],
+  [19.99, 100, 16.99],
+  [1234.56, 10, 1111.1],
+  [0.01, 500, 0.01],
+  [250, 100, 212.5],
+];
+
+const member: [number, number, number][] = [
+  [19.99, 0, 19.99],
+  [19.99, 1, 19.59],
+  [19.99, 4, 18.39],
+  [19.99, 5, 17.99],
+  [19.99, 9, 17.99],
+  [1234.56, 3, 1160.49],
+  [0.99, 2, 0.95],
+];
+
+for (const [subtotal, quantity, expected] of bulk) {
+  test(`applyBulkDiscount(${subtotal}, ${quantity})`, () => {
+    expect(applyBulkDiscount(subtotal, quantity)).toBe(expected);
+  });
+}
+
+for (const [subtotal, years, expected] of member) {
+  test(`applyMemberDiscount(${subtotal}, ${years})`, () => {
+    expect(applyMemberDiscount(subtotal, years)).toBe(expected);
+  });
+}

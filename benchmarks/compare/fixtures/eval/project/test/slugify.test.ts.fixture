@@ -1,0 +1,14 @@
+import { expect, test } from "bun:test";
+import { slugify } from "../src/slugify.ts";
+
+test("lowercases and joins words with dashes", () => {
+  expect(slugify("Hello World")).toBe("hello-world");
+});
+
+test("drops punctuation and trims dashes", () => {
+  expect(slugify("  Hello, World!  ")).toBe("hello-world");
+});
+
+test("collapses repeated separators", () => {
+  expect(slugify("a---b")).toBe("a-b");
+});

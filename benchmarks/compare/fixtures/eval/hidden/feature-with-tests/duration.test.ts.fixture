@@ -1,0 +1,23 @@
+import { expect, test } from "bun:test";
+import { parseDuration } from "../src/duration.ts";
+
+const cases: [string, number][] = [
+  ["1h30m", 5400],
+  ["2h", 7200],
+  ["45m", 2700],
+  ["30s", 30],
+  ["1h1m1s", 3661],
+  ["90s", 90],
+  ["0s", 0],
+  ["10m30s", 630],
+  ["1h45s", 3645],
+  ["24h", 86400],
+  ["5m", 300],
+  ["100s", 100],
+];
+
+for (const [input, seconds] of cases) {
+  test(`parseDuration(${JSON.stringify(input)})`, () => {
+    expect(parseDuration(input)).toBe(seconds);
+  });
+}

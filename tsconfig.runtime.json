@@ -9,5 +9,6 @@
     "noFallthroughCasesInSwitch": true,
     "exactOptionalPropertyTypes": true
   },
-  "include": ["src", "servers", "statusline", "scripts"]
+  "include": ["src", "servers", "statusline", "scripts", "benchmarks/compare"],
+  "exclude": ["benchmarks/compare/fixtures", "benchmarks/compare/results"]
 }

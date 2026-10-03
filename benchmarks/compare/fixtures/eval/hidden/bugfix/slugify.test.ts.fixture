@@ -1,0 +1,20 @@
+import { expect, test } from "bun:test";
+import { slugify } from "../src/slugify.ts";
+
+const cases: [string, string][] = [
+  ["Crème Brûlée", "creme-brulee"],
+  ["Ångström", "angstrom"],
+  ["naïve café", "naive-cafe"],
+  ["Ünïcödé Tëst", "unicode-test"],
+  ["  São Paulo!  ", "sao-paulo"],
+  ["Zoë & Chloé", "zoe-chloe"],
+  ["déjà vu", "deja-vu"],
+  ["Crème--Brûlée", "creme-brulee"],
+  ["Hello, World!", "hello-world"],
+];
+
+for (const [input, expected] of cases) {
+  test(`slugify(${JSON.stringify(input)})`, () => {
+    expect(slugify(input)).toBe(expected);
+  });
+}

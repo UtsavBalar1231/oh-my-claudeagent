@@ -1,0 +1,7 @@
+import { expect, test } from "bun:test";
+import { handleList } from "../src/api.ts";
+
+test("the list endpoint returns users as an array starting at id 1", async () => {
+  const users = (await handleList(new Request("http://localhost/users")).json()) as { id: number }[];
+  expect(users[0]?.id).toBe(1);
+});

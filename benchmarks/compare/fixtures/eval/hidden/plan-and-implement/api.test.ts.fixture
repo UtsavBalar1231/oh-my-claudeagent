@@ -1,0 +1,33 @@
+import { expect, test } from "bun:test";
+import { handleList } from "../src/api.ts";
+
+const ids = async (query: string): Promise<number[]> => {
+  const users = (await handleList(new Request(`http://localhost/users${query}`)).json()) as { id: number }[];
+  return users.map((user) => user.id);
+};
+
+const range = (from: number, to: number): number[] => Array.from({ length: to - from + 1 }, (_, i) => from + i);
+
+test("limit and offset select a window", async () => {
+  expect(await ids("?limit=5&offset=10")).toEqual(range(11, 15));
+});
+
+test("limit alone takes the first users", async () => {
+  expect(await ids("?limit=5")).toEqual(range(1, 5));
+});
+
+test("offset alone takes the remaining users", async () => {
+  expect(await ids("?offset=20")).toEqual(range(21, 25));
+});
+
+test("a window past the end is clipped", async () => {
+  expect(await ids("?limit=10&offset=20")).toEqual(range(21, 25));
+});
+
+test("an offset past the end gives no users", async () => {
+  expect(await ids("?offset=100")).toEqual([]);
+});
+
+test("the unpaginated list still starts at id 1", async () => {
+  expect((await ids(""))[0]).toBe(1);
+});

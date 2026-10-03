@@ -1,0 +1,176 @@
+{
+  "claude": "2.1.288",
+  "network": {
+    "name": "omca-compare-net",
+    "subnet": "172.31.77.0/24",
+    "gateway": "172.31.77.1"
+  },
+  "arms": [
+    {
+      "id": "baseline",
+      "label": "baseline",
+      "tree": null,
+      "install": [],
+      "details": []
+    },
+    {
+      "id": "omca",
+      "label": "OMCA",
+      "tree": {
+        "kind": "local-head",
+        "marketplaceName": "omca"
+      },
+      "install": [
+        "oh-my-claudeagent@omca"
+      ],
+      "details": [
+        "oh-my-claudeagent"
+      ]
+    },
+    {
+      "id": "omc",
+      "label": "oh-my-claudecode",
+      "tree": {
+        "kind": "repo",
+        "repo": "https://github.com/Yeachan-Heo/oh-my-claudecode",
+        "sha": "dc7ba1da4669c0eac1ccfd06d22e5c755c783622",
+        "version": "5.6.0"
+      },
+      "install": [
+        "oh-my-claudecode@omc"
+      ],
+      "details": [
+        "oh-my-claudecode"
+      ]
+    },
+    {
+      "id": "harness",
+      "label": "claude-code-harness",
+      "tree": {
+        "kind": "repo",
+        "repo": "https://github.com/Chachamaru127/claude-code-harness",
+        "sha": "2b2b74805321089bd9b660a1064fa97556299703",
+        "version": "5.15.0"
+      },
+      "install": [
+        "claude-code-harness@claude-code-harness-marketplace"
+      ],
+      "details": [
+        "claude-code-harness"
+      ],
+      "platform": "linux/amd64 only"
+    },
+    {
+      "id": "ruflo",
+      "label": "ruflo (offline, no pre-seed)",
+      "tree": {
+        "kind": "repo",
+        "repo": "https://github.com/ruvnet/ruflo",
+        "sha": "c44ca53166e58c8b320316375eca32624873270d",
+        "version": "3.51.1"
+      },
+      "install": [
+        "ruflo-core@ruflo",
+        "ruflo-swarm@ruflo",
+        "ruflo-mods@ruflo"
+      ],
+      "details": [
+        "ruflo-core",
+        "ruflo-swarm",
+        "ruflo-mods"
+      ],
+      "preseed": "none: hooks fall back to npx and the network is closed, so the offline failure is recorded as a finding",
+      "limited": {
+        "sessions": [
+          "b",
+          "c"
+        ],
+        "rounds": 2,
+        "timeoutS": 90,
+        "reason": "each Bash call blocks on an offline npx fallback in the PreToolUse and PostToolUse hooks"
+      },
+      "inEval": false
+    },
+    {
+      "id": "ruflo-seeded",
+      "label": "ruflo (npm deps pre-seeded)",
+      "tree": {
+        "kind": "repo",
+        "repo": "https://github.com/ruvnet/ruflo",
+        "sha": "c44ca53166e58c8b320316375eca32624873270d",
+        "version": "3.51.1"
+      },
+      "install": [
+        "ruflo-core@ruflo",
+        "ruflo-swarm@ruflo",
+        "ruflo-mods@ruflo"
+      ],
+      "details": [
+        "ruflo-core",
+        "ruflo-swarm",
+        "ruflo-mods"
+      ],
+      "preseed": "npm install -g ruflo@3.51.1 in Dockerfile.ruflo-seed, so the hooks and the MCP launcher find a local ruflo binary",
+      "imageVariant": "ruflo-seed"
+    },
+    {
+      "id": "ecc",
+      "label": "ECC",
+      "tree": {
+        "kind": "repo",
+        "repo": "https://github.com/affaan-m/ECC",
+        "sha": "ef648e01899ba3e8dc6371642deaaf64b4477775",
+        "version": "2.2.3"
+      },
+      "install": [
+        "ecc@ecc"
+      ],
+      "details": [
+        "ecc"
+      ]
+    },
+    {
+      "id": "superpowers",
+      "label": "superpowers",
+      "tree": {
+        "kind": "synthetic-single",
+        "marketplaceName": "superpowers-marketplace",
+        "pluginName": "superpowers",
+        "repo": "https://github.com/obra/superpowers",
+        "sha": "8ca22dba9a94f28898bbce59f2537ff4d87c747d",
+        "version": "6.4.2",
+        "note": "obra/superpowers-marketplace has no commit that pins 6.4.2: its HEAD (ff9fa8a) pins 6.3.0 and its plugin source is an unpinned git URL. The arm keeps the marketplace name so the id matches, and installs the plugin from the v6.4.2 tag commit."
+      },
+      "install": [
+        "superpowers@superpowers-marketplace"
+      ],
+      "details": [
+        "superpowers"
+      ]
+    },
+    {
+      "id": "wshobson",
+      "label": "wshobson/agents",
+      "tree": {
+        "kind": "repo",
+        "repo": "https://github.com/wshobson/agents",
+        "sha": "156b7a5e7a8b93642628a339ee4039c925b34c7f",
+        "version": "bundle"
+      },
+      "install": [
+        "agent-teams@claude-code-workflows",
+        "conductor@claude-code-workflows",
+        "full-stack-orchestration@claude-code-workflows",
+        "tdd-workflows@claude-code-workflows",
+        "comprehensive-review@claude-code-workflows"
+      ],
+      "details": [
+        "agent-teams",
+        "conductor",
+        "full-stack-orchestration",
+        "tdd-workflows",
+        "comprehensive-review"
+      ]
+    }
+  ]
+}

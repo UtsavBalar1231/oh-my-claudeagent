@@ -39,9 +39,7 @@ CLAUDE.md
 .claude/
 
 # Maintainer-local docs and research artifacts
-docs/adr
-docs/audit
-docs/research
-docs/design/
 REVIEW.md
-benchmarks/
+benchmarks/*
+!benchmarks/compare/
+benchmarks/compare/results/

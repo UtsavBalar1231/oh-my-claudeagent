@@ -1,0 +1,6 @@
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+ARG RUFLO_VERSION=3.51.1
+USER root
+RUN npm install -g "ruflo@${RUFLO_VERSION}" && ruflo --version
+USER bench

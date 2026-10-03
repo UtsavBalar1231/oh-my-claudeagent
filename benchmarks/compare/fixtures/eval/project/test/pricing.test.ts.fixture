@@ -1,0 +1,11 @@
+import { expect, test } from "bun:test";
+import { applyBulkDiscount, applyMemberDiscount } from "../src/pricing.ts";
+
+test("bulk discount starts at ten units", () => {
+  expect(applyBulkDiscount(100, 9)).toBe(100);
+  expect(applyBulkDiscount(100, 10)).toBe(90);
+});
+
+test("member discount grows two percent a year", () => {
+  expect(applyMemberDiscount(100, 3)).toBe(94);
+});

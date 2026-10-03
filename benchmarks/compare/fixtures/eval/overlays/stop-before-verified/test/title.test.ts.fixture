@@ -1,0 +1,10 @@
+import { expect, test } from "bun:test";
+import { firstLine } from "../src/title.ts";
+
+test("returns the first line", () => {
+  expect(firstLine("alpha\nbeta")).toBe("alpha");
+});
+
+test("returns null for empty input", () => {
+  expect(firstLine("")).toBeNull();
+});

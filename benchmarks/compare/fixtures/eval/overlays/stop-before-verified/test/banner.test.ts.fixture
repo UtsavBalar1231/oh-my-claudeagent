@@ -1,0 +1,10 @@
+import { expect, test } from "bun:test";
+import { banner } from "../src/banner.ts";
+
+test("upper-cases the first line", () => {
+  expect(banner("hello\nworld")).toBe("HELLO");
+});
+
+test("keeps an empty banner empty", () => {
+  expect(banner("")).toBe("");
+});
