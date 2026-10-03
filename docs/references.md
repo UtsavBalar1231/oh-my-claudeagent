@@ -293,8 +293,8 @@ a broken file stops the gates that read it.
 | Band, pane, plan reader, doctor | Yes | Yes | No | No ([anthropics/claude-code#99045](https://github.com/anthropics/claude-code/issues/99045)) | As the guard |
 | Status line | Yes | Not documented | No | Not documented | Unless `disableAllHooks` |
 
-Where the built-in `sec-default` guard loads (a machine with managed settings, or a Team or
-Enterprise sign-in), it runs ahead of OMCA's mod. OMCA's mod only denies, so the guard leaves its
+Where the built-in `sec-default` guard loads (a machine whose managed settings set at least one
+key, or a Team or Enterprise sign-in), it runs ahead of OMCA's mod. OMCA's mod only denies, so the guard leaves its
 decisions in place. A Desktop session in WSL loads no plugins.
 
 ## Platform support
