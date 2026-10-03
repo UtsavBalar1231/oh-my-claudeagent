@@ -87,7 +87,7 @@ describe("CLIPS", () => {
 
   // Each row is a split screen: the transcript, the pane's edge at column 12, then the pane.
   test.each([
-    ["clip-tour", "band", "██ 6/14 · next 7 Wire the panel · 1 running     [-]│pane", { row: 0, col: 3, len: 40, rows: 1 }],
+    ["clip-tour", "band", "██ 6/14 · next 7 Wire the panel ·  6 proven  ● 1 unproven ·  1 running     [-]│pane", { row: 0, col: 3, len: 67, rows: 1 }],
     ["clip-tour", "cost-row", "  ↯ 6/14\n  $0.04 · ⏱ 11s", { row: 1, col: 2, len: 7, rows: 1 }],
     ["clip-tour", "notepad-card", "│╭── x ──╮\n│╭────╮ ╭────╮\n││ Learnings · 3 entries", { row: 1, col: 1, len: 6, rows: 1 }],
     ["clip-tour", "stats-header", "abc│  agent   runs  median  tokens  est. cost  evidence  outcomes   │", { row: 0, col: 6, len: 59, rows: 1 }],

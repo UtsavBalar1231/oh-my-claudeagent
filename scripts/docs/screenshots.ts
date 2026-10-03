@@ -474,7 +474,7 @@ export const CLIPS: readonly Clip[] = [
       {
         until: has("The executor is on task 7"),
         hold: 1_200,
-        targets: { band: /\d+\/\d+ · next [^\n│]*?(?= {2}|│|\n|$)/, "cost-row": /\$\d+\.\d\d · / },
+        targets: { band: /\d+\/\d+ · next [^\n│[]*[^\s│[]/, "cost-row": /\$\d+\.\d\d · / },
       },
       ...command("/omca"),
       { until: has("1: Agents", "Wire the order summary panel"), mark: "agents-tab" },
