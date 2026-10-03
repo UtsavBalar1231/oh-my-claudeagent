@@ -175,10 +175,13 @@ describe("aggregate", () => {
     ]);
   });
 
+  // Four times the input takes about four to five times as long when the grouping is linear and
+  // sorts once, and sixteen times as long when it is quadratic; 12 leaves room for a loaded runner.
   test("groups a long run of one agent type in linear time", () => {
     const fastest = (count: number): number => {
       const records = Array.from({ length: count }, (_, i) => record({ agent_id: `a${i}` }));
-      const times = [0, 1, 2, 3, 4].map(() => {
+      aggregate(records);
+      const times = Array.from({ length: 7 }, () => {
         const start = performance.now();
         aggregate(records);
         return performance.now() - start;
@@ -187,7 +190,7 @@ describe("aggregate", () => {
     };
     const small = fastest(15_000);
     const large = fastest(60_000);
-    expect(large / Math.max(small, 0.5)).toBeLessThan(8);
+    expect(large / Math.max(small, 0.5)).toBeLessThan(12);
     expect(aggregate(Array.from({ length: 60_000 }, (_, i) => record({ agent_id: `a${i}` })))[0]?.count).toBe(60_000);
   });
 
