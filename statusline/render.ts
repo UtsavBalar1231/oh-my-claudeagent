@@ -67,8 +67,6 @@ const BLUE = "\x1b[34m";
 export const BOLD = "\x1b[1m";
 export const separator = (dot: string): string => ` ${DIM}${dot}${RST} `;
 const SEP = separator("·");
-// The plugin's settings.json starts every session on this agent, so naming it tells nothing.
-export const DEFAULT_MAIN_AGENT = "oh-my-claudeagent:sisyphus";
 const DAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 
 const WARN_PERCENT = 60;
@@ -504,7 +502,7 @@ function fullRows(c: Ctx): Ranked[][] {
     [
       ...ranked(RANK.model, block(`${CYAN}${g.model} ${modelName(c)}${RST}${effort ? `${separator(g.dot)}${YELLOW}${g.effort} ${effort}${RST}` : ""}`)),
       ...ranked(RANK.vim, data.vim?.mode ? block(`${YELLOW}${g.vim} ${data.vim.mode[0]}${RST}`) : null),
-      ...ranked(RANK.agent, data.agent?.name && data.agent.name !== DEFAULT_MAIN_AGENT ? block(`${MAGENTA}${agentGlyph(data.agent.name, tier)} ${data.agent.name}${RST}`) : null),
+      ...ranked(RANK.agent, data.agent?.name ? block(`${MAGENTA}${agentGlyph(data.agent.name, tier)} ${data.agent.name}${RST}`) : null),
       ...ranked(RANK.plan, plan ? planSegment(plan, c) : null),
     ],
     [

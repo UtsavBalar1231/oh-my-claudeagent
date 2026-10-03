@@ -9,7 +9,6 @@ import {
   arrange,
   block,
   composePr,
-  DEFAULT_MAIN_AGENT,
   fixed,
   formatResetTime,
   type Payload,
@@ -493,11 +492,6 @@ describe("segments", () => {
     expect(shipped.filter((name) => !Object.hasOwn(AGENT_ICONS, name))).toEqual([]);
   });
 
-  test("the plugin's default main agent shows nothing, and that default is the one settings.json sets", () => {
-    expect(rows({ model, agent: { name: DEFAULT_MAIN_AGENT } })).toEqual([MODEL, WAITING, ZERO]);
-    expect(JSON.parse(readFileSync(join(import.meta.dir, "..", "settings.json"), "utf8")).agent).toBe(DEFAULT_MAIN_AGENT);
-  });
-
   test("an agent without a name shows nothing", () => {
     expect(rows({ model, agent: {} })).toEqual([MODEL, WAITING, ZERO]);
   });
@@ -881,7 +875,6 @@ describe("layout", () => {
     session_id: SESSION,
     workspace: { project_dir: dir, added_dirs: ["/a", "/b"] },
     effort: { level: "high" },
-    agent: { name: "oh-my-claudeagent:sisyphus" },
     worktree: { name: "wt", original_branch: "main" },
     pr: { number: 42, url: "https://github.com/acme/app/pull/42", review_state: "approved" },
     context_window: { context_window_size: 200000, used_percentage: 34 },

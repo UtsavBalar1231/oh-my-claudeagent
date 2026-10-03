@@ -39,7 +39,7 @@ your provider's model for that family, so the roster never pins a model id. Spaw
 
 | Agent | Tier | Effort | Role | Limits |
 | --- | --- | --- | --- | --- |
-| sisyphus | opus | high | The main-session orchestrator. The plugin's `settings.json` makes it the session agent. It does small work itself and delegates the rest; under `start-work` it runs the plan | Runs at the session's effort as the main agent |
+| sisyphus | opus | high | An orchestrator for a multi-step job. Sessions start on Claude Code's own system prompt with OMCA's output style; `claude --agent oh-my-claudeagent:sisyphus` makes sisyphus the session agent instead | Runs at the session's effort as the main agent |
 | prometheus | opus | high | Interviews you and writes the plan, consulting metis and momus. Asked to help you understand or research a problem, it returns findings instead of a plan | No Bash |
 | metis | opus | high | Gap analysis of a request or draft plan: hidden requirements, scope risks | Read-only, no Bash |
 | momus | opus | high | Reviews a plan for clarity, verifiability and completeness; answers OKAY or REJECT | No Bash. Writes or edits a file only when asked to |

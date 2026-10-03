@@ -182,16 +182,22 @@ hand.
   name, which saves about 3,750 tokens per request where tool search is on. Subagents are told the
   same rule at start, since a subagent's first request carries no server instructions. Hooks call
   the server directly and are unaffected.
-- **The sisyphus prompt is a little over half its old size.** It drops what the output style and
-  the first-prompt guidance already say and keeps every instruction only it carries, falling from
-  about 6,700 to about 3,800 tokens on every main-session request.
+- **Sessions keep Claude Code's own system prompt.** The plugin no longer makes sisyphus the
+  session agent, so a session runs on Claude Code's system prompt, with its native memory, and
+  OMCA's output style and first-prompt guidance on top. The rules only sisyphus carried moved
+  with it: the style now relays a subagent's blocking questions through `AskUserQuestion`, treats
+  a subagent's report as a claim to check, and sizes a wave of agents to the platform's limits,
+  and the guidance gives the delegation prompt fields and what to do when a fix keeps failing.
+  sisyphus stays an agent to spawn, or to start a session on with
+  `claude --agent oh-my-claudeagent:sisyphus`, and the status line now names whichever agent a
+  session runs on. The main thread carries about 5,100 tokens of OMCA beyond plain Claude Code,
+  measured against a mock model with tool search on, against 11,400 with sisyphus as its prompt.
 - **Each request carries less of OMCA.** executor, metis and hephaestus no longer declare project
   memory, which none of them used (metis could not write it), so their requests drop Claude
   Code's 13,000-character memory block. The three always-loaded tool descriptions, the server
   instructions and six skill descriptions say the same in fewer words. Measured against a mock
   model with tool search on, an executor's request carries about 4,500 tokens beyond a
-  general-purpose agent's, against 8,700 before, and the main thread about 11,400 beyond plain
-  Claude Code, against 12,200.
+  general-purpose agent's, against 8,700 before.
 - **The plugin installs from a packaged branch.** `just release` commits the shipped tree to the
   orphan `plugin` branch tagged `plugin-v<version>`, and `marketplace.json` pins that commit
   through a `url` source. The shipped tree leaves out the repository tooling: the specs, `tests/`,
@@ -367,6 +373,11 @@ hand.
    run `/fewer-permission-prompts`.
 10. Replace `CLAUDE_STATUSLINE_NERD_FONT=0` with `OMCA_GLYPHS=unicode`, which draws the same status
     line, or `OMCA_GLYPHS=ascii` for plain text. The old variable is no longer read.
+11. Sessions no longer start on sisyphus, so its project memory under
+    `.claude/agent-memory/oh-my-claudeagent-sisyphus/` stops loading in the main session; Claude
+    Code's own auto memory takes its place. `/oh-my-claudeagent:consolidate-memory` merges agent
+    memories into the auto-memory index. To keep sisyphus as the session agent, set
+    `"agent": "oh-my-claudeagent:sisyphus"` in your own `~/.claude/settings.json`.
 
 State files that 2.x left under `.omca/state/` are no longer read, and `.omca/logs/` no longer
 grows apart from `file-access.jsonl`. You can delete them.
