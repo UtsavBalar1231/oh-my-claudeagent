@@ -62,11 +62,11 @@ describe("CLIPS", () => {
 
   test("each clip marks the events and names the targets its beat needs", () => {
     expect(marks(clip("clip-plain-stop"))).toEqual(["cmd-typed", "claim-done", "shell-typed", "open-tasks"]);
-    expect(targets(clip("clip-plain-stop"))).toEqual(["open-list"]);
+    expect(targets(clip("clip-plain-stop"))).toEqual(["claim-line", "open-list"]);
     expect(marks(clip("clip-plain-reset"))).toEqual(["cmd-typed", "reset-ran"]);
     expect(targets(clip("clip-plain-reset"))).toEqual(["reset-call", "lost-files", "bypass-mode"]);
     expect(marks(clip("clip-refusal"))).toEqual(["cmd-typed", "claim-done", "stop-feedback", "resumed"]);
-    expect(targets(clip("clip-refusal"))).toEqual(["stop-line"]);
+    expect(targets(clip("clip-refusal"))).toEqual(["claim-line", "stop-line"]);
     expect(marks(clip("clip-plan"))).toEqual(["cmd-typed", "dialog", "key-choice", "plan-written"]);
     expect(targets(clip("clip-plan"))).toEqual(["question"]);
     expect(marks(clip("clip-delegate"))).toEqual(["cmd-typed", "spawned", "pane", "lanes"]);

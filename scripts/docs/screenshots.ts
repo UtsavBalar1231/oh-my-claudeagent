@@ -66,6 +66,9 @@ const KEY_PAUSE_MS = 1_400;
 const HOLD_MS = 2_500;
 // kitty paints a tmux redraw on its next frame; this covers a few frames at its default 60 Hz.
 const PAINT_MS = 400;
+// Recorded clips showed a state up to 3 frames after the poll that first saw it, so a mark this far
+// past the poll never lands on the frame before the state.
+const CLIP_PAINT_MS = 100;
 
 type Scene = {
   name: string;
@@ -94,7 +97,7 @@ export type Still = Scene & {
   crop?: "pane";
 };
 
-// A mark is the frame at which its predicate first held on the tmux screen, plus PAINT_MS; each
+// A mark is the frame at which its predicate first held on the tmux screen, plus CLIP_PAINT_MS; each
 // target is the text a pattern finds on that screen, followed for as long as it stays put.
 export type Step =
   | { type: string }
@@ -242,7 +245,7 @@ export const CLIPS: readonly Clip[] = [
     script: { main: [{ content: [text("All tasks are complete.")] }], subagent: [] },
     steps: [
       ...command(WRAP_UP),
-      { until: has("All tasks are complete."), mark: "claim-done", hold: 1_500 },
+      { until: has("All tasks are complete."), mark: "claim-done", hold: 1_500, targets: { "claim-line": /All tasks are complete\./ } },
       ...shell(`grep -F "[ ]" plans/${PLAN_NAME}.md`),
       { until: has("14. Remove the old checkout page"), mark: "open-tasks", targets: { "open-list": /- \[ \] 7\.[^\n]*(\n[^\n]*- \[ \] \d+\.[^\n]*)*/ } },
     ],
@@ -285,7 +288,7 @@ export const CLIPS: readonly Clip[] = [
     },
     steps: [
       ...command(WRAP_UP),
-      { until: has("All tasks are complete."), mark: "claim-done", hold: 0 },
+      { until: has("All tasks are complete."), mark: "claim-done", hold: 0, targets: { "claim-line": /All tasks are complete\./ } },
       { until: has("Stop hook feedback"), mark: "stop-feedback", targets: { "stop-line": /Stop hook feedback[^\n]*(\n {2,}\S[^\n]*)*/ } },
       { until: has("Task 7 is still open"), mark: "resumed" },
       { until: has("The executor is on task 7") },
@@ -852,7 +855,7 @@ async function playClip(shot: Clip, tmux: Tmux): Promise<Played> {
   const follow = setInterval(() => {
     const screen = tmux.screen();
     history.push({ at: Date.now(), screen });
-    const shownAt = Date.now() + PAINT_MS;
+    const shownAt = Date.now() + CLIP_PAINT_MS;
     for (const target of Object.values(played.targets)) {
       if (target.isMoved) continue;
       const span = locate(screen, target.pattern);
@@ -889,7 +892,7 @@ async function playClip(shot: Clip, tmux: Tmux): Promise<Played> {
         const first = history.find((seen) => seen.at >= since && step.until(seen.screen)) ?? { at: Date.now(), screen: polled };
         const { screen } = first;
         since = first.at;
-        const shownAt = first.at + PAINT_MS;
+        const shownAt = first.at + CLIP_PAINT_MS;
         if (step.mark !== undefined) played.marks[step.mark] = shownAt;
         for (const [name, pattern] of Object.entries(step.targets ?? {})) {
           const span = locate(screen, pattern);
