@@ -50,6 +50,9 @@ function jobBlock(name: string): string {
   return rest.slice(0, end === -1 ? undefined : end).join("\n");
 }
 
+const SPEC_ROOTS = /^ {6}BUN_SPEC_ROOTS: (.+)$/m.exec(jobBlock("typescript"))?.[1] ?? "";
+const CI_EXPANDED = CI.replaceAll("$BUN_SPEC_ROOTS", SPEC_ROOTS);
+
 const ciLeaves = [...new Set(leafSteps("ci"))].sort();
 
 describe("workflow contract", () => {
@@ -66,7 +69,7 @@ describe("workflow contract", () => {
   });
 
   test("ci.yml covers every just ci leaf step's pinned pattern", () => {
-    expect(ciLeaves.filter((step) => !CI.includes(PINS[step] ?? "\0"))).toEqual([]);
+    expect(ciLeaves.filter((step) => !CI_EXPANDED.includes(PINS[step] ?? "\0"))).toEqual([]);
   });
 
   test("negative sanity: removing the test-mcp job from a ci.yml copy makes coverage fail", () => {
@@ -78,7 +81,7 @@ describe("workflow contract", () => {
       if (!skipping) copy.push(line);
     }
     expect(copy.join("\n").includes(PINS["test-mcp"] ?? "\0")).toBe(false);
-    expect(CI.includes(PINS["test-mcp"] ?? "\0")).toBe(true);
+    expect(CI_EXPANDED.includes(PINS["test-mcp"] ?? "\0")).toBe(true);
   });
 
   test("ci.yml is callable, and release.yml runs it as the gate its release job needs", () => {
@@ -105,9 +108,20 @@ describe("workflow contract", () => {
     expect(jobBlock("validate-manifest")).toContain("runs-on: ubuntu-latest");
   });
 
-  test("ci.yml pins an ast-grep archive digest for each OS and a spec floor that is a whole number", () => {
+  test("ci.yml pins an ast-grep archive digest for each OS", () => {
     for (const os of ["LINUX", "MACOS", "WINDOWS"]) expect(CI).toMatch(new RegExp(`^ {2}AST_GREP_SHA256_${os}: [0-9a-f]{64}$`, "m"));
-    expect(CI).toMatch(/^ {2}BUN_SPEC_FLOOR: "[1-9][0-9]*"$/m);
+  });
+
+  test("the spec run is checked for completeness on the report and the roots the bun test step used, with no hand-kept count", () => {
+    const steps = jobBlock("typescript");
+    const testRun = /run: bun test (\S+) --reporter=junit --reporter-outfile="([^"]+)"/.exec(steps);
+    const checkRun = /run: bun scripts\/qa\/junit-complete\.ts "([^"]+)" (\S+)$/m.exec(steps);
+    expect(testRun?.[1]).toBe("$BUN_SPEC_ROOTS");
+    expect(checkRun?.[1]).toBe(testRun?.[2]);
+    expect(checkRun?.[2]).toBe(testRun?.[1]);
+    expect(CI.match(/BUN_SPEC_ROOTS:/g)).toHaveLength(1);
+    expect(recipeBody("test-bun")).toEqual([`bun test ${SPEC_ROOTS}`]);
+    expect(CI).not.toContain("BUN_SPEC_FLOOR");
   });
 
   test("neither workflow runs bats or checks out submodules", () => {
