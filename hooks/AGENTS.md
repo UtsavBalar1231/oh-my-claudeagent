@@ -11,6 +11,15 @@ Registered here: `SessionStart`, `UserPromptSubmit`, `UserPromptExpansion`,
 Regenerate that list with `jq -r '.hooks | keys[]' hooks/hooks.json`. Every other platform
 event is unregistered on purpose; `docs/references.md` carries the per-event reason.
 
+## The mod
+
+`register.ts` is the only file that calls `on()`. It gives each event one dispatcher from
+`dispatch.ts`, which runs the features that share the event in a fixed order, each in its own
+try/catch. `host.ts` defines the `Host` closures a feature receives in place of `$`, so a
+feature module takes `host` and never `$`. The features are `bash-guard`, `server-check`,
+`mod-marker`, `compact`, `route`, `agents-tracker`, `ledger`, `band`, `pane` with its `tabs/`,
+`footer`, `doctor`, `feedback` and `omca-router`. Pure logic lives in `src/core/`.
+
 ## Current runtime contract
 
 - `UserPromptSubmit` and `UserPromptExpansion` route to the server's `keyword-detector` and
@@ -22,7 +31,7 @@ event is unregistered on purpose; `docs/references.md` carries the per-event rea
   On the launch session's first prompt, the server's `mod-notice` handler answers with a
   `systemMessage` when the mod has written no marker for the session. A session that `/clear`
   starts is marked only at its first `turn.start`, after the prompt hook, so the handler never
-  judges it (measured on 2.1.288). `OMCA_DISABLED_HOOKS=mod-notice` silences the server's line.
+  judges it. `OMCA_DISABLED_HOOKS=mod-notice` silences the server's line.
 - `SessionStart` for `clear` or `compact` routes to the server's `session-start` handler,
   which re-injects that context after a compaction and hands it back to the next prompt
   after `/clear`. The mod's `session.compact` feature (`compact.ts`) tells the summarizer to
@@ -38,22 +47,25 @@ event is unregistered on purpose; `docs/references.md` carries the per-event rea
   (`hooks/bash-guard.ts`, with its patterns in `src/core/destructive.ts`). A recursive removal
   whose target is the filesystem root, home, the working directory, or a directory directly
   under root or home is denied outright. The destructive git family (hard reset, stash, clean,
-  restore, recursive `git rm`, path checkout), any other recursive removal, and a force push are
-  held for review. Where a dialog can show and the `guardMode` option is `dialog`, the guard asks
-  the user and only "Run it" lets the call continue. Otherwise the git family that discards work
-  is denied and a recursive removal of a deeper path or a force push runs.
+  restore, recursive `git rm`, path checkout), a force push to the default branch and
+  `git commit --no-verify` are held for review and denied wherever no dialog can show. Any other
+  recursive removal, an `xargs rm -rf` whose targets are not known, and a force push to another
+  branch are held for review and run where no dialog can show. Where a dialog can show and the
+  `guardMode` option is `dialog`, the guard asks the user and only "Run it" lets the call
+  continue; with `guardMode` set to `deny` no dialog shows. The default branch is the one
+  `origin/HEAD` names, or `main` and `master` when it names none, read from local refs.
   `OMCA_DISABLED_HOOKS=bash-guard` turns the review off and never the outright deny.
 
   The patterns match at any command position: string start, after a separator, or inside a
-  subshell or command substitution, behind `sudo`, `env`, `command` and `VAR=value` prefixes.
-  Anchoring on command position keeps a literal mention out of scope, since the `rm` in
-  `grep -rn "rm -rf" scripts/` follows a quote rather than a separator. `tool.check` runs
-  before every Bash call in every permission mode, so the guard never depends on a dialog being
-  shown. A deny registered only on `PermissionRequest` would be inert for any command that never
-  produces a dialog, which under `permissions.defaultMode: "auto"` is the common case. The
-  platform's critical-path check on `rm` and `rmdir`, which also looks inside `sh -c` and
-  `bash -c` scripts, asks in the terminal or denies in auto mode, and the classifier does not
-  review those removals. That check covers critical paths only, while the guard also covers the
+  subshell or command substitution, behind wrappers such as `sudo`, `env`, `command`, `timeout`
+  and `xargs` and `VAR=value` prefixes. The guard also reads commands handed to another
+  interpreter: `bash -c`, `sh -c`, `eval`, a heredoc fed to a shell, `pwsh -Command`, `cmd /c` and
+  `Invoke-Expression` with a literal string. Anchoring on command position keeps a literal
+  mention out of scope, since the `rm` in `grep -rn "rm -rf" scripts/` follows a quote rather than
+  a separator. `tool.check` runs before every Bash and PowerShell call in every permission mode,
+  so the guard never depends on a dialog being shown. The platform's critical-path check on `rm`
+  and `rmdir` asks in the terminal or denies in auto mode, and the classifier does not review
+  those removals. That check covers critical paths only, while the guard also covers the
   destructive git family, force pushes and other recursive removals, so it must not be deleted
   as duplicated platform behavior.
 - `tool.check` never returns an allow, because an allow there skips the auto-mode classifier.

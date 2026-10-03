@@ -6,15 +6,22 @@ This directory contains behavioral and integration tests for oh-my-claudeagent.
 
 ```
 tests/
-  evals/            # Eval task definitions, listed by `just eval-consistency`
-  plugin-evals/     # `claude plugin eval` cases for the planning skills; see its README
+  evals/             # Eval task definitions, listed by `just eval-consistency`
+  plugin-evals/      # `claude plugin eval` cases for the planning skills; see its README
   fixtures/
-    mcp/            # JSON-RPC requests and the expected tool list for the MCP server
-  mod/              # mod tests, run by `claude plugin test .`
+    mcp/             # JSON-RPC requests and the expected tool list for the MCP server
+    boulder-schemas/ # sample boulder.json shapes for registry tests
+    plans/           # a long plan file for the plan reader spec
+    settings/        # the settings files status line setup reads
+    statusline/      # recorded payloads and rendered output for the status line
+    spec-env.ts      # the environment a spec passes to a process it spawns
+    fake-exec.ts     # a fake executable that runs on Windows too
+  mod/               # mod tests, run by `claude plugin test .`
+    visual/          # view definitions and recorded captures behind `just visual <view>`
 ```
 
 Bun specs (`*.spec.ts`) live beside the code they cover, under `src/`, `servers/`,
-`statusline/`, `scripts/` and `opencode/`.
+`statusline/`, `scripts/`, `opencode/` and `benchmarks/compare/`.
 
 ## Running Tests Locally
 
@@ -30,6 +37,9 @@ just test-mcp
 
 # Layer 3: every bun spec, including the validator specs and the workflow contract
 just test-bun
+
+# The mod tests (needs the claude CLI)
+just test-mod
 
 # The OpenCode adapter: typecheck and every opencode/ spec (needs opencode on PATH)
 just test-opencode
@@ -49,15 +59,17 @@ directory or its imported sources changes.
 
 ## CI Integration
 
-CI runs these jobs on every push and pull request to `main`:
+CI runs these jobs on a push to `main`, on every pull request and on demand. Every job except
+`validate-manifest` runs on Linux, macOS and Windows:
 
 | Job | Command |
 |-----|---------|
-| `validate` | `bun scripts/validate.ts --check claims --check hooks --check mod --check tree --check engine` |
+| `validate` | `bun scripts/validate.ts`, every validator group (the engine group skips without the claude CLI) |
 | `test-mcp` | `bun test servers` and `bun scripts/validate.ts --check mcp` |
 | `test-opencode` | the OpenCode adapter: typecheck, then `bun test opencode/`, whose smoke and model-path specs run against a real OpenCode install |
-| `typescript` | both tsc projects, the mod tests and the bun specs |
-| `validate-manifest` | `claude plugin validate . --strict` |
+| `typescript` | both tsc projects, the mod tests, the bun specs with a JUnit report that `scripts/qa/junit-complete.ts` checks for failures and for every spec file, a seeded random-order run on Linux, and the engine checks |
+| `smoke` | `bun scripts/qa/ci-smoke.ts`: a real `claude -p` session with the packaged plugin loaded, against the mock model |
+| `validate-manifest` | `claude plugin validate . --strict` on the latest published client |
 
 ## Running Hooks Ad-hoc
 

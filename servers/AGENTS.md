@@ -13,6 +13,7 @@ revision 2026-07-28 and every 2025-era client from the same stdio loop, with no 
 - `progress.ts`: the throttled `notifications/progress` reporter and the context a tool receives.
 - `io.ts`: state-directory resolution, the temp-plus-rename writer and the lock protocol.
 - `lifecycle.ts`: start-up housekeeping (registry GC, ledger rotation, record pruning).
+- `plugin-root.ts`: the plugin root, `CLAUDE_PLUGIN_ROOT` when it names a directory.
 - `tools/`: one module per tool family (`boulder.ts`, `evidence.ts`, `notepad.ts`, `ast.ts`,
   `filesystem.ts`, `sessions.ts`, `catalog.ts`) plus `hook.ts`, the `omca_hook` entry point.
   Each module has its spec beside it.
@@ -24,9 +25,9 @@ revision 2026-07-28 and every 2025-era client from the same stdio loop, with no 
 
 ## Conventions
 
-- The tool contract is language-neutral: tool names and input schemas are named by agents,
-  skills and user allowlists as `mcp__plugin_oh-my-claudeagent_omca__<tool>`, so changing
-  one is a breaking change. `.claude/rules/mcp-server.md` has the declaration contract.
+- Agents, skills and user allowlists name each tool as
+  `mcp__plugin_oh-my-claudeagent_omca__<tool>`, so changing a tool name or input schema is a
+  breaking change. `.claude/rules/mcp-server.md` has the declaration contract.
 - Only `evidence_log`, `boulder_progress` and `notepad_write` declare
   `_meta["anthropic/alwaysLoad"]: true`, and `.mcp.json` sets no server-level `alwaysLoad`, so
   every other tool waits behind tool search. `OMCA_TOOLS` in `hooks/subagent-context.ts` states

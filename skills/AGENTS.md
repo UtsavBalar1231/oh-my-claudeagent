@@ -30,6 +30,6 @@ Skills describe WHAT users do. Hooks are internal infrastructure that automates 
 
 **Exceptions (legitimate hook knowledge)**:
 
-- `omca-setup`: installs and configures hooks
+- `omca-setup`: reports on the hooks, the mod and the managed settings that affect OMCA
 
 **Rationale**: Most skills already follow this rule with zero hook references (refactor, github-triage, hephaestus, metis, consolidate-memory, git-master, init-deep). Skills that leak file paths force users to understand internal layouts they can't control, and force future hook refactors to update skill prose.

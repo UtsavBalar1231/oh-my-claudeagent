@@ -29,6 +29,6 @@ depth 0.
 
 ## Runtime notes
 
-- Hook events live in `hooks/hooks.json`; top-level scripts in `scripts/*.ts`; MCP entries in `.mcp.json`.
+- Settings hooks live in `hooks/hooks.json` as `mcp_tool` entries that call the `omca` server's `omca_hook` tool, which dispatches through `servers/hooks/registry.ts`. The mod is `hooks/register.ts`. Shared logic is in `src/core/`, top-level scripts in `scripts/*.ts`, MCP entries in `.mcp.json`.
 - `UserPromptSubmit` routes to the server's `keyword-detector` handler for activation keywords.
-- The docs describe slash-first workflows, native plan and memory ownership, and managed settings as the policy boundary.
+- The user docs are `README.md`, `docs/usage.md` and `docs/references.md`. They describe slash-first workflows, native plan and memory ownership, and managed settings as the policy boundary.

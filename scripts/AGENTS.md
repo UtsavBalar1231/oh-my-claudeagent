@@ -31,8 +31,11 @@ under `servers/hooks/`. Every file is TypeScript on bun.
   way restores the manifests, resets to the starting HEAD with `git reset --keep`, deletes both
   tags and puts `plugin` back on its previous tip, then says so.
 - `bench.ts`: `just bench`. Runs the working tree or `--candidate-ref` against `--baseline-ref`
-  through the mock model. It builds each ref in a git worktree. A ref whose status line is the
-  Python renderer, such as v2.21.0, is installed with `uv sync`, so `uv` must be on PATH for it.
+  through the mock model. It builds each ref in a git worktree. A baseline ref that has no
+  `statusline/main.ts` is installed with `uv sync`, so `uv` must be on PATH for it.
+- `benchmarks/compare/` (outside this directory, packaging-excluded): the harness behind
+  `just compare`, which measures OMCA against similar plugins in Docker with a mock model.
+  Its README has the stages and the files.
 - `setup-statusline.ts`: the status line setup behind `/oh-my-claudeagent:omca-setup`. It copies
   `statusline/launcher.ts` to the config directory, prints a diff of the settings file and,
   after confirmation, sets `statusLine` and `subagentStatusLine`. `--uninstall` removes them.
@@ -45,7 +48,13 @@ under `servers/hooks/`. Every file is TypeScript on bun.
   `ansi.ts`, `mask.ts` and `cmap.ts` are their helpers, and `fixtures/acme-app` is the project
   the sessions open. `just screenshots` runs both scripts in order. Packaging excludes the
   directory.
-- `qa/`: the manual QA harness (`just qa`), packaging-excluded. `session-smoke.ts`,
+- `qa/`: the QA harness and the checks CI shares with it, packaging-excluded. `just qa` is the
+  manual pre-release run. `ci-smoke.ts` is the CI smoke job: one `claude -p` session with the
+  packaged plugin loaded, in which the guard must deny a recursive removal (through PowerShell
+  as well on Windows). `junit-complete.ts` reads the JUnit report of the CI bun spec run and
+  fails unless the run has no failures and the report lists every spec file under the roots, so a
+  crashed run that exits 0 still fails. `canonical-tmp.ts` is the `bunfig.toml` preload that gives
+  every spec the long form of `TEMP` on Windows. `session-smoke.ts`,
   `hook-live-probe.ts` and `mcp-live.ts` drive Claude Code with the packaged plugin against the
   mock model (`mock-model.ts`), in a scratch project with its own `CLAUDE_CONFIG_DIR`.
   `session-smoke.ts` and `hook-live-probe.ts` run `claude -p`. `mcp-live.ts` runs an interactive
