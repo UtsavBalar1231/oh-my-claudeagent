@@ -2,10 +2,10 @@
  ▐▛███▛█   Claude Code v2.1.288                                │5: Feedback  6: Stats  7: Doctor
 ▝▜██████▀  Opus 5.5 · API Usage Billing                        │─────────────────────────────────────────────────────
  ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/cwd               │u: Up  d: Down  rate the last turn
-                                                               │1 rating, newest first · 1 up, 0 down
-▎ Auto mode is now Claude Code's default permission mode.      │↑ up    10-03 13:36  good
-▎ Auto mode lets Claude handle permission prompts              │
-▎ automatically. Claude checks each tool call for risky actions│
+                                                               │╭───────────────────────────────────────────────────╮
+▎ Auto mode is now Claude Code's default permission mode.      ││ 1 rating, newest first · ↑ 1 up · ↓ 0 down        │
+▎ Auto mode lets Claude handle permission prompts              ││  ↑ UP    MM-DD HH:MM  good                        │
+▎ automatically. Claude checks each tool call for risky actions│╰───────────────────────────────────────────────────╯
 ▎ and prompt injection before executing, runs the ones it      │
 ▎ assesses as lower-risk, and blocks the rest.                 │
 ▎ https://code.claude.com/docs/en/permission-modes             │
@@ -16,7 +16,7 @@
                                                                │
 ● The tests ran.                                               │
                                                                │
-✻ Sautéed for 0s · done 1:36 PM                                │
+✻ Worked for 0s · done HH:MM                                   │
                                                                │
 ● oh-my-claudeagent: 0s · 1 in 1 out · ! no evidence:          │
   just test                                                    │

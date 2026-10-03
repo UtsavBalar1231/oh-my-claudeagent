@@ -1,7 +1,7 @@
 
  ▐▛███▛█   Claude Code v2.1.288
 ▝▜██████▀  Opus 5.5 · API Usage Billing
- ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/omca-visual-80x40-xTy2Qf/cwd
+ ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/omca-visual-80x40-XXXXXX/cwd
 
 
 
@@ -23,13 +23,13 @@
 │ 1: Agents 2: Plan 3: Evidence 4: Notepad 5: Feedback 6: Stats 7: Doctor    ✕ │
 │  COMPLETE  proof-ledger  ●✗●●●✗●●✗●✗●●●●● last 16  10-02 13:35 …             │
 │ ── Fri 2026-10-02 ── ████████ 4/4 ───────────────────────────────────────    │
-│ ❯ 12:40  MANUAL   ✓ 0  curl -fsS -H 'Auth…ample.test/healthz ◆ sisyphus      │
+│ ❯ 12:40  MANUAL   ✓  0  curl -fsS -H 'Auth…mple.test/healthz ◆ sisyphus      │
 │     curl -fsS -H 'Authorization: Bearer ‹masked›' https://staging.exampl…    │
 │     HTTP/2 200                                                               │
 │     x-request-id: 7f3c9a                                                     │
 │     … 2 more lines                                                           │
 │     2026-10-02 12:40:00 · ◆ sisyphus · ‹masked› 2 masked                     │
-│ b: Build  e: Test  l: Lint  m: Manual  v: Final  x: Fails  c: Copy           │
+│ b: Build  t: Test  l: Lint  m: Manual  v: Final  x: Fails  c: Copy           │
 │ r: Rerun  f: Find  3/16 · ↑↓ move                                            │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 █████ 6/6                                                                    [-]

@@ -1,7 +1,7 @@
 
  ▐▛███▛█   Claude Code v2.1.288
 ▝▜██████▀  Opus 5.5 · API Usage Billing
- ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/omca-visual-80x40-nFwvTL/cwd
+ ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/omca-visual-80x40-XXXXXX/cwd
 
 ▎ Auto mode is now Claude Code's default permission mode.
 ▎ Auto mode lets Claude handle permission prompts automatically. Claude checks
@@ -11,7 +11,7 @@
 
 ❯ Clean the build
 
-● Removing the build output
+  Removing the build output
   ⎿  $ rm -rf build
 ────────────────────────────────────────────────────────────────────────────────
  ☐ OMCA guard

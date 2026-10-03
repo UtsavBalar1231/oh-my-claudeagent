@@ -9,9 +9,9 @@
                                                                ││ lint 4 ✗2  manual 2  final 2 ✗1                   │
                                                                │╰───────────────────────────────────────────────────╯
                                                                │── Fri 2026-10-02 ── ████████ 4/4 ───────────────────
-                                                               │  13:35  FINAL    ✓ 0  just ci && jus…sual evidence ◆
-                                                               │  13:00  TEST     ✓ 0  just test-mod                ◆
-                                                               │❯ 12:40  MANUAL   ✓ 0  curl -fsS -H '….test/healthz ◆
+                                                               │  13:35  FINAL    ✓  0  just ci && ju…sual evidence ◆
+                                                               │  13:00  TEST     ✓  0  just test-mod               ◆
+                                                               │❯ 12:40  MANUAL   ✓  0  curl -fsS -H ….test/healthz ◆
                                                                │    curl -fsS -H 'Authorization: Bearer ‹masked›' ht…
                                                                │    HTTP/2 200
                                                                │    x-request-id: 7f3c9a
@@ -19,19 +19,19 @@
                                                                │    rerun with DEPLOY_TOKEN=‹masked› to redeploy
                                                                │    2026-10-02 12:40:00 · ◆ sisyphus
                                                                │    ‹masked› 2 masked
-                                                               │  12:10  TEST     ✓ 0  bun test src s…sline scripts ◆
+                                                               │  12:10  TEST     ✓  0  bun test src …sline scripts ◆
                                                                │── Thu 2026-10-01 ── ████▋███ 4/7 ───────────────────
-                                                               │  18:45  TEST     ✓ 0  just validate --check engine ◆
-                                                               │  17:00  FINAL    ✗ 1  just ci && jus…sual evidence ◆
-                                                               │  15:32  LINT     ✓ 0  just typecheck               ◆
-                                                               │  15:15  LINT     ✗ 1  just typecheck               ◆
-                                                               │  14:30  BUILD    ✓ 0  bun run build                ◆
-                                                               │  13:50  TEST     ✓ 0  just test-mod                ◆
-                                                               │  13:25  TEST     ✗ 1  just test-mod                ◆
+                                                               │  18:45  TEST     ✓  0  just validate…-check engine ◆
+                                                               │  17:00  FINAL    ✗  1  just ci && ju…sual evidence ◆
+                                                               │  15:32  LINT     ✓  0  just typecheck              ◆
+                                                               │  15:15  LINT     ✗  1  just typecheck              ◆
+                                                               │  14:30  BUILD    ✓  0  bun run build               ◆
+                                                               │  13:50  TEST     ✓  0  just test-mod               ◆
+                                                               │  13:25  TEST     ✗  1  just test-mod               ◆
                                                                │── Wed 2026-09-30 ── ██████▍█ 4/5 ───────────────────
-                                                               │  16:10  MANUAL   ✓ 0  just visual plan-reader      ◆
-                                                               │  14:35  TEST     ✓ 0  bun test src/core            ◆
-                                                               │b: Build  e: Test  l: Lint  m: Manual  v: Final
+                                                               │  16:10  MANUAL   ✓  0  just visual plan-reader     ◆
+                                                               │  14:35  TEST     ✓  0  bun test src/core           ◆
+                                                               │b: Build  t: Test  l: Lint  m: Manual  v: Final
 █████ 6/6                                                   [-]│x: Fails  c: Copy  r: Rerun  f: Find  3/16 · ↑↓ move
                                            ◐ medium · /effort  │
 ─────────────────────────────────────────────────────────────────────────────────────────── oh-my-claudeagent:sisyphus ─

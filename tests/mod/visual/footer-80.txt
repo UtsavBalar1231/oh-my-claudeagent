@@ -1,6 +1,6 @@
  ▐▛███▛█   Claude Code v2.1.288
 ▝▜██████▀  Opus 5.5 · API Usage Billing
- ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/omca-visual-80x40-P0NVF4/cwd
+ ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/omca-visual-80x40-XXXXXX/cwd
 
 ▎ Auto mode is now Claude Code's default permission mode.
 ▎ Auto mode lets Claude handle permission prompts automatically. Claude checks
@@ -14,7 +14,7 @@
 
 ● The tests ran.
 
-✻ Brewed for 0s · done 1:36 PM
+✻ Worked for 0s · done HH:MM
 
 ● oh-my-claudeagent: 0s · 1 in 1 out · ! no evidence: just test
 
@@ -23,10 +23,10 @@
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ 1: Agents 2: Plan 3: Evidence 4: Notepad 5: Feedback 6: Stats 7: Doctor    ✕ │
 │ u: Up  d: Down  rate the last turn                                           │
-│ 1 rating, newest first · 1 up, 0 down                                        │
-│ ↑ up    10-03 13:36  good                                                    │
-│                                                                              │
-│                                                                              │
+│ ╭───────────────────────────────────────────────────────────────────────╮    │
+│ │ 1 rating, newest first · ↑ 1 up · ↓ 0 down                            │    │
+│ │  ↑ UP    MM-DD HH:MM  good                                            │    │
+│ ╰───────────────────────────────────────────────────────────────────────╯    │
 │                                                                              │
 │                                                                              │
 │                                                                              │

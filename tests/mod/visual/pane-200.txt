@@ -1,10 +1,10 @@
                                                                                                              │1: Agents  2: Plan  3: Evidence  4: Notepad  5: Feedback  6: Stats  7: Doctor            ✕
  ▐▛███▛█   Claude Code v2.1.288                                                                              │───────────────────────────────────────────────────────────────────────────────────────
 ▝▜██████▀  Opus 5.5 · API Usage Billing                                                                      │◆ 2 running · 1 finished · 14 tokens
- ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/.cache/tmp/omca-visual-200x50-IjoQik/cwd                          │◆ executor · Fix the heading parser                         sonnet-5-5   high  6     4s
-                                                                                                             │  ○✎$ ◒ Bash sleep 90
-                                                                                                             │◆ oracle · Review the ledger design                         fable-5-1   xhigh  6     4s
-❯ Fix the parser with the executor                                                                           │  ○◇$ ◒ Bash sleep 90
+ ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/.cache/tmp/omca-visual-200x50-XXXXXX/cwd                          │◆ executor · Fix the heading parser                         sonnet-5-5   high  6     2s
+                                                                                                             │  ○✎$ ◑ Bash sleep 90
+                                                                                                             │◆ oracle · Review the ledger design                         fable-5-1   xhigh  6     2s
+❯ Fix the parser with the executor                                                                           │  ○◇$ ◑ Bash sleep 90
                                                                                                              │✓ explore · The rotation is safe: a crash mid-write leaves the previous file wh…     0s
 ● 3 background agents launched (↓ to manage)                                                                 │d: Details   ○ read ✎ edit $ bash ◇ mcp ◆ agent
    ├ oh-my-claudeagent:executor (Fix the heading parser)                                                     │
@@ -46,5 +46,5 @@
   ⏸ manual mode on · /tasks to see subagents · ← for agents · ↓ to manage
 
   ● main
-  ◯ oh-my-claudeagent:executor  Fix the heading parser                                                                                                                                5s · ↓ 42 tokens
-  ◯ oh-my-claudeagent:oracle    Review the ledger design                                                                                                                              4s · ↓ 21 tokens
+  ◯ oh-my-claudeagent:executor  Fix the heading parser                                                                                                                                3s · ↓ 42 tokens
+  ◯ oh-my-claudeagent:oracle    Review the ledger design                                                                                                                              2s · ↓ 21 tokens

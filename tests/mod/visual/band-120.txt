@@ -1,7 +1,7 @@
 
  ▐▛███▛█   Claude Code v2.1.288
 ▝▜██████▀  Opus 5.5 · API Usage Billing
- ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/.cache/tmp/omca-visual-120x40-Xr8qbK/cwd
+ ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/.cache/tmp/omca-visual-120x40-XXXXXX/cwd
 
 
 ❯ Run the tests

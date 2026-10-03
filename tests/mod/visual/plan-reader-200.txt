@@ -1,8 +1,8 @@
                                                                                                              │1: Agents  2: Plan  3: Evidence  4: Notepad  5: Feedback  6: Stats  7: Doctor            ✕
  ▐▛███▛█   Claude Code v2.1.288                                                                              │───────────────────────────────────────────────────────────────────────────────────────
 ▝▜██████▀  Opus 5.5 · API Usage Billing                                                                      │╭─────────────────────────────────────────────────────────────────────────────────────╮
- ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/.cache/tmp/omca-visual-200x50-niXJ3v/cwd                          ││ Rebuild the billing export on the shared ledger                                     │
-                                                                                                             ││  FINAL  ██████████▋██▍███████▍██ 4/9 · 3 blocked                                    │
+ ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/.cache/tmp/omca-visual-200x50-XXXXXX/cwd                          ││ Rebuild the billing export on the shared ledger                                     │
+                                                                                                             ││  FINAL  ██████████▋██▍███████▍██ 4/9 · ⊘ 3 blocked                                  │
                                                                                                              ││ ✓ 4 proven · ! 2 unproven · ✗ 0 failed                                              │
 ❯ Start task 5 with the executor                                                                             ││ next 5 Reconcile totals against the invoice table                                   │
                                                                                                              ││ ◆ executor on 5                                                                     │
@@ -31,13 +31,13 @@
                                                                                                              │                                               │ Evidence
                                                                                                              │                                               │   ! No test, build or lint run since…
                                                                                                              │                                               │   Last pass, before that change:
-                                                                                                             │                                               │   ✓ test just test exit 0 · 25h ago
+                                                                                                             │                                               │   ✓ test just test exit 0 · 29h ago
                                                                                                              │                                               │
                                                                                                              │                                               │ ‹masked› 1 secret masked
                                                                                                              │                                               │
                                                                                                              │                                               │
                                                                                                              │                                               │
-                                                                                                             │r: Run check  s: Start here  c: Copy  e: Evidence  o: Open only  x: Failing  f: Find
+                                                                                                             │k: Run check  s: Start here  c: Copy  e: Evidence  o: Open only  x: Failing  f: Find
                                                                                                              │t: Sections  l: Plans
 ██▎██ 4/9 · next 5 Reconcile totals against the invoice table · ✓4 !2 ✗0 · ◆ 1 running                    [-]│↑↓ move · enter open · esc close
                                                                                          ◐ medium · /effort  │

@@ -1,10 +1,10 @@
                                                                                                              │1: Agents  2: Plan  3: Evidence  4: Notepad  5: Feedback  6: Stats  7: Doctor            ✕
  ▐▛███▛█   Claude Code v2.1.288                                                                              │───────────────────────────────────────────────────────────────────────────────────────
 ▝▜██████▀  Opus 5.5 · API Usage Billing                                                                      │u: Up  d: Down  rate the last turn
- ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/.cache/tmp/omca-visual-200x50-W2enzs/cwd                          │1 rating, newest first · 1 up, 0 down
-                                                                                                             │↑ up    10-03 13:36  good
-▎ Auto mode is now Claude Code's default permission mode.                                                    │
-▎ Auto mode lets Claude handle permission prompts automatically. Claude checks each tool call for risky      │
+ ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/.cache/tmp/omca-visual-200x50-XXXXXX/cwd                          │╭─────────────────────────────────────────────────────────────────────────────────────╮
+                                                                                                             ││ 1 rating, newest first · ↑ 1 up · ↓ 0 down                                          │
+▎ Auto mode is now Claude Code's default permission mode.                                                    ││  ↑ UP    MM-DD HH:MM  good                                                          │
+▎ Auto mode lets Claude handle permission prompts automatically. Claude checks each tool call for risky      │╰─────────────────────────────────────────────────────────────────────────────────────╯
 ▎ actions and prompt injection before executing, runs the ones it assesses as lower-risk, and blocks the     │
 ▎ rest.                                                                                                      │
 ▎ https://code.claude.com/docs/en/permission-modes                                                           │
@@ -15,7 +15,7 @@
                                                                                                              │
 ● The tests ran.                                                                                             │
                                                                                                              │
-✻ Sautéed for 0s · done 1:36 PM                                                                              │
+✻ Worked for 0s · done HH:MM                                                                                 │
                                                                                                              │
 ● oh-my-claudeagent: 0s · 1 in 1 out · ! no evidence: just test                                              │
                                                                                                              │

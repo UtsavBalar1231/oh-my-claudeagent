@@ -1,11 +1,11 @@
                                                                │1: Agents  2: Plan  3: Evidence  4: Notepad            ✕
  ▐▛███▛█   Claude Code v2.1.288                                │5: Feedback  6: Stats  7: Doctor
 ▝▜██████▀  Opus 5.5 · API Usage Billing                        │─────────────────────────────────────────────────────
- ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/cwd               │◆ 2 running · 1 finished · 12 tokens
-                                                               │◆ executor · Fix the heading parser    high  6     3s
-                                                               │  ○◇$ ◓ Bash sleep 90
-❯ Fix the parser with the executor                             │◆ oracle · Review the ledger design   xhigh  4     3s
-                                                               │  ✎$ ◓ Bash sleep 90
+ ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/cwd               │◆ 2 running · 1 finished · 14 tokens
+                                                               │◆ executor · Fix the heading parser    high  6     4s
+                                                               │  ○✎$ ◑ Bash sleep 90
+❯ Fix the parser with the executor                             │◆ oracle · Review the ledger design   xhigh  6     4s
+                                                               │  ○◇$ ◑ Bash sleep 90
 ● 3 background agents launched (↓ to manage)                   │✓ explore · The rotation is safe: a crash mid…     0s
    ├ oh-my-claudeagent:executor (Fix the heading parser)       │d: Details   ○ read ✎ edit $ bash ◇ mcp ◆ agent
    ├ oh-my-claudeagent:explore (Map the router callers)        │
@@ -36,5 +36,5 @@
   ⏸ manual mode on · /tasks to see subagents · ← for agents · ↓ to manage
 
   ● main
-  ◯ oh-my-claudeagent:executor  Fix the heading parser                                                4s · ↓ 24 tokens
-  ◯ oh-my-claudeagent:oracle    Review the ledger design                                              3s · ↓ 39 tokens
+  ◯ oh-my-claudeagent:executor  Fix the heading parser                                                5s · ↓ 42 tokens
+  ◯ oh-my-claudeagent:oracle    Review the ledger design                                              4s · ↓ 21 tokens

@@ -5,7 +5,7 @@
    ├ oh-my-claudeagent:explore (Map the router callers)
    └ oh-my-claudeagent:oracle (Review the ledger design)
 
-● ok
+● Three agents are on it.
 
 ✻ Waiting for 3 background agents to finish
 
@@ -21,10 +21,10 @@
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ 1: Agents 2: Plan 3: Evidence 4: Notepad 5: Feedback 6: Stats 7: Doctor    ✕ │
 │ ◆ 2 running · 1 finished · 14 tokens                                         │
-│ ◆ executor · Fix the heading parser           sonnet-5-5   high  6     2s    │
-│   ○◇$ ◓ Bash sleep 90                                                        │
-│ ◆ oracle · Review the ledger design           fable-5-1   xhigh  6     2s    │
-│   ○✎$ ◓ Bash sleep 90                                                        │
+│ ◆ executor · Fix the heading parser           sonnet-5-5   high  4     2s    │
+│   ○$ ◐ Bash sleep 90                                                         │
+│ ◆ oracle · Review the ledger design           fable-5-1   xhigh  8     2s    │
+│   ○◇✎$ ◐ Bash sleep 90                                                       │
 │ ✓ explore · The rotation is safe: a crash mid-write leaves the pr…     0s    │
 │ d: Details   ○ read ✎ edit $ bash ◇ mcp ◆ agent                              │
 │                                                                              │
