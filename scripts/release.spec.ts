@@ -35,6 +35,7 @@ beforeEach(() => {
   git("config", "user.name", "Spec");
   git("config", "user.email", "spec@example.com");
   git("config", "commit.gpgsign", "false");
+  git("config", "core.autocrlf", "false");
   write(".claude-plugin/plugin.json", PLUGIN);
   write(".claude-plugin/marketplace.json", MARKETPLACE);
   write("package.json", PACKAGE);
