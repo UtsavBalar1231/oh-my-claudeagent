@@ -24,7 +24,8 @@ hand.
 ### Added
 
 - **The `/omca` pane.** `/omca` opens a pane with Agents, Plan, Evidence, Notepad, Feedback,
-  Stats and Doctor tabs, each on a digit key. Every color is a Claude Code theme key, so the pane
+  Stats and Doctor tabs, each on a digit key. Every color is a Claude Code theme key, except the
+  mascots, which use fixed colors. The pane
   and the band follow the theme you pick, a custom one in `~/.claude/themes/` included, and every
   state also carries a glyph and a word. A state's color goes on its glyph, and the text beside it
   stays in the theme's text color. Secrets in commands, output and notes are drawn as
@@ -39,6 +40,25 @@ hand.
   made. A finished agent shrinks to one line with the first line of its result and its duration.
   The key row counts the running and finished agents and their tokens. Pointing at a lane, or `d`,
   shows its prompt, last output, tool calls and tokens.
+- **The agent page.** Enter or a click on a lane opens the agent's brief, each tool call with its
+  outcome and duration, its latest reply, its tokens and its `~$` cost. `c` copies the brief, `r`
+  reloads and `b` goes back. Teammates in a team get lanes that wait between messages.
+- **Toasts, auto-open, the band and the spinner.** One toast per finished wave of subagents, one
+  per failed verification and one when the plan completes. The pane opens by itself on a session's
+  first wave of subagents, once, in a terminal, and waits undrawn below 144 columns (110 after you
+  have opened it). The band shows running agents with no plan bound, and the spinner's line ends
+  with the task and agent count, as in `… · task 7/14 · 3 agents`.
+- **Mascots.** Each agent has a mascot: a stage on the Agents tab and a figure in the agent page
+  header. It moves while the agent works, smiles when it finishes, sweats when it fails and dozes
+  while a teammate waits. Terminals draw half-block characters, Desktop an animated SVG, and
+  `OMCA_GLYPHS=ascii` draws none.
+- **Desktop redraws.** The Code tab draws the mod on Claude Code 2.1.287 or later; plugins under
+  `~/.claude` do not load in Desktop sessions (anthropics/claude-code#94635), so
+  `CLAUDE_CODE_PLUGIN_DIRS` is the workaround.
+- **The formats spec.** `docs/formats.md` specifies plans, the evidence ledger, notepads and the
+  plan registry.
+- **The migration.** `/oh-my-claudeagent:omca-setup --migrate` moves agent memories and settings
+  ids to the role names, after a preview, once per project.
 - **The plan board.** `/omca plan` opens the bound plan and `/omca plan <name or path>` opens
   another. A plan with numbered tasks opens on a board: the plan's status, a progress bar, proof
   counts, the next task and the running agents, then the tasks by milestone, each with its state,

@@ -65,6 +65,11 @@ call, and shrinks a finished one to a line.
 
 <img src=".github/assets/agents.png" width="680" alt="The Agents tab shows two running executors, one on Wire the order summary panel and one on Persist the draft order, each with its icon, model and effort, the watch command it is running and its count of tool calls, and one finished explore agent on a single line with the first line of its result.">
 
+The agent page opens a subagent's brief, tool calls, reply and cost, toasts report finished waves,
+failed verifications and a completed plan, and each agent has a mascot on the Agents tab.
+
+<img src=".github/assets/mascots.png" width="680" alt="The Agents tab with three agents running at once. Above the list, each has a pixel mascot with its role underneath: a green executor in a yellow hard hat with a hammer, a blue explorer in a straw hat with a spyglass, and a purple architect with a lightbulb above its head. Below, the list shows each agent with its task, model, effort and its running Bash sleep.">
+
 The guard holds a destructive shell command for your review and shows what it would touch.
 
 <img src=".github/assets/guard.png" width="680" alt="A dialog headed OMCA guard says OMCA held rm -rf build for review, that it would remove the build directory with 4 entries, and offers Refuse or Run it.">

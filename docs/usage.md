@@ -191,7 +191,9 @@ takes the cost's place.
    finished agents and the tokens they spent. Point at a lane, or press `d`, to see its prompt,
    last output, tool calls and tokens. Press Enter on a lane, or click it, to open the agent's
    page: its full brief, each tool call with its outcome and duration, its latest reply and its
-   cost. On the page `b` goes back, `c` copies the brief and `r` reads the page again.
+   cost, shown as `~$` because it is estimated. On the page `b` goes back, `c` copies the brief
+   and `r` reads the page again. A teammate in a team has a lane too; it waits between messages
+   instead of finishing.
 2. **Plan**: the plan board, below.
 3. **Evidence**: the proof ledger, below.
 4. **Notepad**: one card per section of the bound plan's notepad, each entry under its date. `f`
@@ -206,6 +208,24 @@ takes the cost's place.
 `/omca plan`, `/omca stats` and `/omca doctor` open the pane on that tab. Press Ctrl+X then Tab,
 or click the pane, to focus it. Esc, the close mark in the pane's corner, or Ctrl+X then X close
 it. Every key letter below works only while its tab is shown.
+
+The pane opens by itself on a session's first wave of subagents, and not again once you close it
+or in a session without a terminal. Below 144 columns the pane waits undrawn, and below 110 once
+you have opened it yourself, until the window is wide enough.
+
+A toast appears when a wave of subagents finishes (one per wave, not one per agent), when a
+verification fails, and when the plan completes. With no plan bound, the band still shows the
+running agents. While a turn runs, the spinner's line ends with the plan's position and the agent
+count, as in `… · task 7/14 · 3 agents`.
+
+#### Mascots
+
+Each agent has a mascot. The Agents tab draws them as a stage above the lanes when the pane has
+room for it, and the agent page shows the agent's mascot in its header. A mascot moves only while
+its agent works, smiles when the agent finishes, sweats when it fails and dozes while a teammate
+waits. The terminal draws them in half-block characters and Desktop draws an animated SVG.
+`OMCA_GLYPHS=ascii` draws none. With Claude Code's `prefersReducedMotion` setting on, the mascots hold
+still: a working mascot shows its first frame and Desktop draws a single frame.
 
 The band and the pane draw every color from your Claude Code theme, so a custom theme in
 `~/.claude/themes/` applies to them too. Each state also carries a glyph and a word, so nothing
@@ -392,6 +412,11 @@ it does, the `omca` server never starts, and the MCP tools, the injected guidanc
 gates are off. At session start OMCA writes a line in the transcript that bun is not on `PATH`,
 and the Doctor tab reports bun as missing. Make bun reachable from the app's `PATH`, for example
 by linking it into a directory the app searches, and restart the app.
+
+The Code tab in Desktop draws the mod (band, pane, toasts and guard dialog) only when Desktop
+hosts the session on Claude Code 2.1.287 or later. Plugins installed under `~/.claude` do not load
+in Desktop sessions ([anthropics/claude-code#94635](https://github.com/anthropics/claude-code/issues/94635));
+name the plugin in `CLAUDE_CODE_PLUGIN_DIRS` to load it.
 
 The VS Code chat panel runs OMCA's hooks but draws none of its interface: no band, no pane and
 no guard dialog ([anthropics/claude-code#99045](https://github.com/anthropics/claude-code/issues/99045)).
