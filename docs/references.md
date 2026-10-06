@@ -288,7 +288,8 @@ OMCA keeps its state in the project's `.omca/` directory, which it gitignores ex
 | `~/.claude/omca/statusline.ts` | `omca-setup` | The status line launcher |
 
 Write the registry, ledger and notepads only through the tools; no hook stops a direct edit, and
-a broken file stops the gates that read it.
+a broken file stops the gates that read it. [File formats](formats.md) specifies plan files, the
+ledger, notepads and the registry, and links the JSON Schemas for the ledger and the registry.
 
 ## Where each feature works
 

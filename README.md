@@ -97,6 +97,8 @@ The guard dialog arrives the moment the model asks for a destructive command.
 - [Reference](docs/references.md): agents, skills, MCP tools, hooks and kill switches,
   configuration, state files, where each feature works, and the comparison with similar
   plugins.
+- [File formats](docs/formats.md): plan files, the evidence ledger, notepads and the plan
+  registry, with JSON Schemas for the ledger and the registry.
 - [Contributing](CONTRIBUTING.md): development setup, adding agents, skills and hooks, and the
   prose and comment policy.
 - [Changelog](CHANGELOG.md).

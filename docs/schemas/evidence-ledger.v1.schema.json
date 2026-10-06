@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OMCA evidence ledger, version 1",
+  "description": "The live ledger .omca/evidence/verification-evidence.json and each monthly archive beside it. It describes what the writer emits. A reader keeps unknown keys and skips an entry it cannot read, so neither level forbids additional properties.",
+  "type": "object",
+  "properties": {
+    "version": {
+      "description": "Always written first by the writer. A file without it reads as version 1.",
+      "type": "integer",
+      "const": 1
+    },
+    "entries": {
+      "description": "Oldest first. The writer appends.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "description": "The kind of run. Only final_verification can satisfy the Stop gate.",
+            "type": "string",
+            "enum": ["build", "test", "lint", "manual", "final_verification"]
+          },
+          "command": {
+            "description": "The command that ran, cut to 2,000 characters.",
+            "type": "string",
+            "maxLength": 2000
+          },
+          "exit_code": {
+            "description": "The command's real exit code. For final_verification, 0 records COMPLETE.",
+            "type": "integer"
+          },
+          "output_snippet": {
+            "description": "Relevant output, cut to 2,000 characters.",
+            "type": "string",
+            "maxLength": 2000
+          },
+          "timestamp": {
+            "description": "UTC at seconds precision, such as 2026-10-02T12:05:00Z.",
+            "type": "string",
+            "format": "date-time"
+          },
+          "verified_by": {
+            "description": "The agent or person that verified, cut to 200 characters. Absent when logged empty.",
+            "type": "string",
+            "maxLength": 200
+          },
+          "plan_sha256": {
+            "description": "SHA-256 of the plan file's bytes, as 64 lowercase hex characters. Absent when logged empty.",
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        },
+        "required": ["type", "command", "exit_code", "output_snippet", "timestamp"],
+        "additionalProperties": true
+      }
+    }
+  },
+  "required": ["entries"],
+  "additionalProperties": true
+}
