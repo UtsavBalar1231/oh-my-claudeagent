@@ -263,7 +263,7 @@ async function captureAt(view: View, root: string, cols: number, rows: number): 
     mkdirSync(config);
     writeFileSync(join(config, ".claude.json"), JSON.stringify({ hasCompletedOnboarding: true }));
     writeFileSync(join(config, "settings.json"), JSON.stringify({ tui: "fullscreen", prefersReducedMotion: true }));
-    const claude = `claude --plugin-dir ${quote(REPO)} --session-id ${SESSION_ID}`;
+    const claude = `claude --plugin-dir ${quote(REPO)} --session-id ${SESSION_ID} --permission-mode default`;
     tmux.run([
       ...TERMINAL_OPTIONS,
       "new-session", "-d", "-s", tmux.target, "-x", String(cols), "-y", String(rows), "-c", cwd,
