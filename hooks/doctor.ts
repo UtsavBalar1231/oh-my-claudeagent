@@ -1,3 +1,4 @@
+import { RENAMES } from "../src/core/agent-names.ts";
 import { addRefreshInterval, doctorChecks, type Fix, type HookState, unifiedDiff } from "../src/core/doctor-checks.ts";
 import { parseFrontmatter } from "../src/core/frontmatter.ts";
 import { statusPath } from "../src/core/omca-paths.ts";
@@ -75,9 +76,35 @@ async function isStyleForced(host: Host): Promise<boolean | null> {
   }
 }
 
+const MEMORY_ROOT = ".claude/agent-memory";
+const AGENT_MEMORY_PREFIX = "oh-my-claudeagent-";
+
+async function scopeHasOldMemory(host: Host, platform: Platform, dir: string): Promise<boolean> {
+  if (!(await host.fs.exists(dir))) return false;
+  for (const entry of await host.fs.list(dir)) {
+    if (entry.kind !== "dir" || !entry.name.startsWith(AGENT_MEMORY_PREFIX)) continue;
+    const memory = joinPath(platform, dir, entry.name);
+    const old = entry.name.slice(AGENT_MEMORY_PREFIX.length);
+    if (Object.hasOwn(RENAMES.agents, old) && (await host.fs.exists(joinPath(platform, memory, "MEMORY.md")))) return true;
+    if ((await host.fs.list(memory)).some((file) => /^MEMORY\.from-.*\.md$/.test(file.name))) return true;
+  }
+  return false;
+}
+
+async function hasOldMemory(host: Host): Promise<boolean> {
+  const [root, { platform, config }] = await Promise.all([host.session.root(), sessionOf(host)]);
+  const scopes = [joinPath(platform, root, MEMORY_ROOT), ...(config === undefined ? [] : [joinPath(platform, config, "agent-memory")])];
+  try {
+    return (await Promise.all(scopes.map((dir) => scopeHasOldMemory(host, platform, dir)))).some(Boolean);
+  } catch (error) {
+    host.log(`omca doctor cannot read the agent memories: ${reason(error)}`);
+    return false;
+  }
+}
+
 async function check(host: Host): Promise<Doctor["checks"]> {
   const paths = await where(host);
-  const [mod, engine, bun, ast, hook, now, settings, userSettings, isForced] = await Promise.all([
+  const [mod, engine, bun, ast, hook, now, settings, userSettings, isForced, isOld] = await Promise.all([
     pluginVersion(host),
     host.session.version(),
     output(host, ["bun", "--version"]),
@@ -87,6 +114,7 @@ async function check(host: Host): Promise<Doctor["checks"]> {
     host.settings.read(),
     paths.settings === undefined ? null : readIfPresent(host, paths.settings),
     isStyleForced(host),
+    hasOldMemory(host),
   ]);
   const env = {
     CLAUDE_CODE_SUBAGENT_MODEL_FORCE: await host.env.CLAUDE_CODE_SUBAGENT_MODEL_FORCE(),
@@ -109,6 +137,7 @@ async function check(host: Host): Promise<Doctor["checks"]> {
     env,
     userSettings,
     isStyleForced: isForced,
+    hasOldMemory: isOld,
   });
   seen.clear();
   for (const { fix } of checks) {

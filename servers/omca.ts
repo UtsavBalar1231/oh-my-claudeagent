@@ -12,6 +12,7 @@ import { tools as catalogTools } from "./tools/catalog.ts";
 import { tools as evidenceTools } from "./tools/evidence.ts";
 import { tools as filesystemTools } from "./tools/filesystem.ts";
 import { tools as hookTools } from "./tools/hook.ts";
+import { tools as migrateTools } from "./tools/migrate.ts";
 import { tools as notepadTools } from "./tools/notepad.ts";
 import { tools as sessionTools } from "./tools/sessions.ts";
 
@@ -57,6 +58,7 @@ const tools = [
   ...evidenceTools,
   ...filesystemTools,
   ...hookTools,
+  ...migrateTools,
   ...notepadTools,
   ...sessionTools,
 ].sort((a, b) => (a.name < b.name ? -1 : 1));

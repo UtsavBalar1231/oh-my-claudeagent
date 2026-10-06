@@ -16,5 +16,6 @@
   "health_check",
   "categories_list",
   "file_read",
-  "session_search"
+  "session_search",
+  "agents_migrate"
 ]

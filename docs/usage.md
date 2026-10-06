@@ -23,6 +23,12 @@ gives each session OMCA's guidance on its first prompt.
 `/oh-my-claudeagent:omca-setup --uninstall` removes the status line entries and the launcher.
 `--check` and `--doctor` send you to `/omca doctor`.
 
+`/oh-my-claudeagent:omca-setup --migrate` moves a project's agent memories, and the agent ids in
+your user settings, to the current agent names. Run it in each project. It shows what it would
+change, asks before it applies anything, and offers to merge `MEMORY.md` indexes when two
+collide. `/omca doctor` warns while a project or your user settings still use names from the
+rename table.
+
 ### Share it with a team
 
 Add this to a project's `.claude/settings.json` so everyone who opens the repository in a local

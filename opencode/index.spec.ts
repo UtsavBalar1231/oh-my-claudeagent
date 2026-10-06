@@ -111,7 +111,7 @@ function command(fake: ReturnType<typeof fakeContext>, name: string): Command {
 }
 
 async function fireContext(fake: ReturnType<typeof fakeContext>, agent: string) {
-  const event = { agent, tools: { omca_session_search: {}, omca_omca_hook: {}, omca_health_check: {}, omca_evidence_log: {} }, system: [] as Rec[] }
+  const event = { agent, tools: { omca_session_search: {}, omca_omca_hook: {}, omca_health_check: {}, omca_agents_migrate: {}, omca_evidence_log: {} }, system: [] as Rec[] }
   await hook(fake, "session.context")(event)
   return event
 }

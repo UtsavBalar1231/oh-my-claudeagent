@@ -385,6 +385,10 @@ hand.
    run `/fewer-permission-prompts`.
 10. Replace `CLAUDE_STATUSLINE_NERD_FONT=0` with `OMCA_GLYPHS=unicode`, which draws the same status
     line, or `OMCA_GLYPHS=ascii` for plain text. The old variable is no longer read.
+11. Run `/oh-my-claudeagent:omca-setup --migrate` in each project after upgrading. It moves agent
+    memories and the agent ids in your user settings to the new names, asking before it changes
+    anything. The renamed-agents table under Changed lists the names, and `/omca doctor` warns
+    while a project still has old ones.
 
 State files that 2.x left under `.omca/state/` are no longer read, and `.omca/logs/` no longer
 grows apart from `file-access.jsonl`. You can delete them.

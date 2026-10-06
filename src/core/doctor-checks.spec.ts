@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { addRefreshInterval, type Check, doctorChecks, type Inputs, SETUP_COMMAND, unifiedDiff } from "./doctor-checks.ts";
+import { RENAMES } from "./agent-names.ts";
+import { addRefreshInterval, type Check, doctorChecks, type Inputs, MIGRATE_COMMAND, SETUP_COMMAND, unifiedDiff } from "./doctor-checks.ts";
 
 const NOW = Date.UTC(2026, 9, 2, 12, 0, 0);
 const STATUS_LINE = { type: "command", command: "omca-statusline" };
@@ -20,6 +21,7 @@ const BASE: Inputs = {
   env: {},
   userSettings: null,
   isStyleForced: true,
+  hasOldMemory: false,
 };
 
 const run = (change: Partial<Inputs>, id: string): Omit<Check, "id" | "label"> | undefined => {
@@ -363,4 +365,14 @@ describe("unified diff", () => {
   test("removing a whole file's only lines", () => {
     expect(unifiedDiff("b", "a", "x\n", "")).toBe(["--- b", "+++ a", "@@ -1 +0,0 @@", "-x"].join("\n"));
   });
+});
+
+const [OLD, CURRENT] = Object.entries(RENAMES.agents)[0] ?? ["", ""];
+
+test("old agent memories or an old agent id in the settings warn with the migrate command; current names add no row", () => {
+  expect(run({}, "migrate")).toBeUndefined();
+  expect(run({ settings: { ...BASE.settings, agent: `oh-my-claudeagent:${CURRENT}` } }, "migrate")).toBeUndefined();
+  const warning = { level: "warn" as const, detail: `Agent memories or settings use agent names from the rename table; run ${MIGRATE_COMMAND}`, prompt: MIGRATE_COMMAND };
+  expect(run({ hasOldMemory: true }, "migrate")).toEqual(warning);
+  expect(run({ settings: { ...BASE.settings, agent: `oh-my-claudeagent:${OLD}` } }, "migrate")).toEqual(warning);
 });

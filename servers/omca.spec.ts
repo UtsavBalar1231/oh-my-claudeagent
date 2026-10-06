@@ -11,9 +11,10 @@ const SERVER = join(import.meta.dir, "omca.ts");
 const CLIENT_TEXT_CAP_CHARS = 2048;
 const MAX_RESULT_SIZE_CEILING = 500_000;
 const MAX_RESULT_SIZE_TOOLS = ["evidence_read", "file_read", "ast_search", "session_search"];
+const OUTSIDE_INSTRUCTIONS = ["agents_migrate"];
 const ALWAYS_LOADED_TOOLS = ["boulder_progress", "evidence_log", "notepad_write"];
 const TOOL_PREFIX = "mcp__plugin_oh-my-claudeagent_omca__";
-const WRITE_TOOLS = ["ast_replace", "boulder_write", "evidence_log", "notepad_compact", "notepad_write", "omca_hook"];
+const WRITE_TOOLS = ["agents_migrate", "ast_replace", "boulder_write", "evidence_log", "notepad_compact", "notepad_write", "omca_hook"];
 const MODERN = "2026-07-28";
 const FALLBACK = "2025-11-25";
 const VERSION_META = "io.modelcontextprotocol/protocolVersion";
@@ -322,6 +323,7 @@ describe("tools", () => {
 });
 
 const INVALID_INPUT: Record<string, Message> = {
+  agents_migrate: { apply: "yes" },
   ast_search: {},
   ast_replace: {},
   ast_find_rule: {},
@@ -441,6 +443,7 @@ describe("tool annotations", () => {
   const reader = (title: string): Expected => ({ title, readOnlyHint: true, idempotentHint: true });
   const EXPECTED_ANNOTATIONS: Record<string, Expected> = {
     agents_list: reader("List agents"),
+    agents_migrate: { title: "Migrate agent names", readOnlyHint: false, destructiveHint: true },
     ast_dump_tree: reader("Dump a snippet's syntax tree"),
     ast_find_rule: reader("Search code by YAML rule"),
     ast_replace: { title: "Rewrite code by AST pattern", readOnlyHint: false, destructiveHint: true, idempotentHint: false },
@@ -518,7 +521,7 @@ describe("tool declaration contract", () => {
   test("the server instructions fit the client cap and name every tool the model is meant to call", async () => {
     const result = (await startServer().request("initialize", { protocolVersion: "2025-11-25" })).result as { instructions: string };
     expect(result.instructions.length).toBeLessThanOrEqual(CLIENT_TEXT_CAP_CHARS);
-    expect(EXPECTED_TOOLS.filter((name) => !result.instructions.includes(`\`${name}\``))).toEqual([]);
+    expect(EXPECTED_TOOLS.filter((name) => !OUTSIDE_INSTRUCTIONS.includes(name) && !result.instructions.includes(`\`${name}\``))).toEqual([]);
   });
 });
 

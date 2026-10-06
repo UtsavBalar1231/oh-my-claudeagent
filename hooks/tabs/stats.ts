@@ -1,4 +1,5 @@
 import type { RenderElement } from "claude-code";
+import { RENAMES } from "../../src/core/agent-names.ts";
 import { aggregate, type MetricsRecord, METRICS_DIR, parseRecords } from "../../src/core/metrics.ts";
 import { formatUsd, PRICING_AS_OF } from "../../src/core/pricing.ts";
 import { isSafeId } from "../../src/core/session-id.ts";
@@ -37,6 +38,15 @@ async function readRecords(host: Host, dir: string): Promise<{ records: MetricsR
   };
 }
 
+const ID_PREFIX = "oh-my-claudeagent:";
+const CURRENT_NAMES = new Map<string, string>(Object.entries(RENAMES.agents));
+
+function currentName(record: MetricsRecord): MetricsRecord {
+  if (!record.agent_type.startsWith(ID_PREFIX)) return record;
+  const next = CURRENT_NAMES.get(record.agent_type.slice(ID_PREFIX.length));
+  return next === undefined ? record : { ...record, agent_type: `${ID_PREFIX}${next}` };
+}
+
 function turnsOf(records: readonly MetricsRecord[]): Stats["turns"] {
   return records
     .filter((record) => record.outcome !== "running")
@@ -49,7 +59,9 @@ export async function load(host: Host): Promise<void> {
   const [root, readAt] = await Promise.all([host.session.root(), host.clock.now()]);
   const base = { pricingAsOf: PRICING_AS_OF, readAt };
   try {
-    const { records, sessions, skipped } = await readRecords(host, `${root}/${METRICS_DIR}`);
+    const read = await readRecords(host, `${root}/${METRICS_DIR}`);
+    const { sessions, skipped } = read;
+    const records = read.records.map(currentName);
     await host.state.stats.set({ ...base, rows: aggregate(records), turns: turnsOf(records), sessions, skipped, error: null });
   } catch (error) {
     await host.state.stats.set({

@@ -3,7 +3,7 @@ name: omca-setup
 description: "Use to install, check, repair or uninstall oh-my-claudeagent's setup in ~/.claude/ (dependencies, runtime, status line), or when the user says \"setup omca\"."
 user-invocable: true
 shell: bash
-argument-hint: "[--uninstall | --check | --doctor]"
+argument-hint: "[--uninstall | --check | --doctor | --migrate]"
 allowed-tools:
   - Read
   - Bash(claude --version)
@@ -27,6 +27,7 @@ The user settings directory is `$CLAUDE_CONFIG_DIR` when that variable is set an
 Parse `$ARGUMENTS`:
 
 - `--uninstall`: UNINSTALL MODE
+- `--migrate`: MIGRATE MODE
 - `--check` or `--doctor`: tell the user to run `/omca doctor`, which reports the mod, the client and bun versions, the hooks, ast-grep, the plugin options, effort and model overrides, the advisor and the status line. Stop there.
 - No flag: SETUP MODE
 
@@ -131,8 +132,20 @@ Force style  stripped | already stripped | skipped
 
 3. Tell the user that the plugin itself is removed with `/plugin uninstall oh-my-claudeagent@omca`, and its marketplace with `/plugin marketplace remove omca`. This skill does not run either, and it leaves `.omca/` in each project alone.
 
+## Migrate mode
+
+Moves a project's agent memories, and the agent ids in the user settings, to the names the roles carry now. It runs per project: tell the user to run it in each project that has agent memories. It never runs from the doctor or at session start.
+
+1. Load the tool: `ToolSearch({query: "select:mcp__plugin_oh-my-claudeagent_omca__agents_migrate", max_results: 1})`. When it is still missing, OMCA's server is not connected; report that and stop.
+
+2. Call `agents_migrate` with no `apply`. It changes nothing and returns `actions`, `collisions` and `mentions`. Show them as a short list: each action, each collision with its reason, and each mention, which is a file that names an agent from the rename table and that the tool leaves for the user to edit. When all three are empty, report that there is nothing to migrate and stop.
+
+3. Ask with `AskUserQuestion` whether to apply the actions (apply or skip). On skip, change nothing.
+
+4. On apply, call `agents_migrate` with `apply: true` and report the actions it took. When a `MEMORY.md` collided, ask with `AskUserQuestion` whether to merge the indexes, and on yes call it again with `apply: true` and `merge_indexes: true`.
+
 ## Constraints
 
-- Write only through `scripts/setup-statusline.ts`, after the user confirms the diff it printed, and through the Edit in phase 5.
+- Write only through `scripts/setup-statusline.ts`, after the user confirms the diff it printed, through the Edit in phase 5, and through `agents_migrate` with `apply: true`, after the user confirms the listed actions.
 - Never edit project, local or managed settings.
 - A second run changes nothing that is already configured.

@@ -1,6 +1,7 @@
 import type { RenderElement } from "claude-code";
 import { type Engine, expect, test } from "claude-code/testing";
 import type { MetricsRecord } from "../../src/core/metrics.ts";
+import { RENAMES } from "../../src/core/agent-names.ts";
 import { usableColumns } from "../../src/core/ui-kit.ts";
 import {
   bodyColumns,
@@ -397,5 +398,20 @@ test("OMCA_GLYPHS=ascii draws the Stats tab from the ASCII set", async ($, on) =
     "+ excludes 1 unpriced run - n/a: no listed price - 2026-10-02 list prices",
   ]);
   expect(drawn.filter((row) => !isAscii(row))).toEqual([]);
+  await ui.unmount();
+});
+
+test("a record under an old agent name counts in the row of its current name", async ($, on) => {
+  const [old, current] = Object.entries(RENAMES.agents)[0] ?? ["", ""];
+  world(on, {
+    [`${METRICS}/${S1}/a-old.json`]: record(S1, "a-old", { agent_type: `oh-my-claudeagent:${old}` }),
+    [`${METRICS}/${S1}/a-new.json`]: record(S1, "a-new", { agent_type: `oh-my-claudeagent:${current}` }),
+  });
+  await $.command.run(run("stats"));
+  const ui = await $.ui.mount(pane("terminal", DOCK_200));
+  const drawn = rows(await ui.drawn());
+  expect(drawn.filter((row) => row.includes(` ${current} `) || row.includes(`${current}  `))).toHaveLength(1);
+  expect(drawn.some((row) => row.includes(old))).toBe(false);
+  expect(drawn.some((row) => row.includes("1 type"))).toBe(true);
   await ui.unmount();
 });

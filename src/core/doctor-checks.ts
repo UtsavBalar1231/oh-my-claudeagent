@@ -1,3 +1,4 @@
+import { RENAMES } from "./agent-names.ts";
 import { EFFORTS } from "./route-hint.ts";
 import { isRecord } from "./tool-input.ts";
 import { isGlyphTier } from "./ui-kit.ts";
@@ -8,6 +9,7 @@ export type Fix = "add-refresh-interval";
 export type Check = { id: string; label: string; level: Level; detail: string; fix?: Fix; prompt?: string };
 
 export const SETUP_COMMAND = "/oh-my-claudeagent:omca-setup";
+export const MIGRATE_COMMAND = `${SETUP_COMMAND} --migrate`;
 
 type DoctorEnv = Readonly<{
   CLAUDE_CODE_SUBAGENT_MODEL_FORCE?: string | undefined;
@@ -37,6 +39,7 @@ export type Inputs = {
   env: DoctorEnv;
   userSettings: string | null;
   isStyleForced: boolean | null;
+  hasOldMemory: boolean;
 };
 
 const ENGINE_FLOOR = "2.1.288";
@@ -249,6 +252,19 @@ function statusLineCheck(settings: Inputs["settings"], userSettings: string | nu
   );
 }
 
+const OLD_AGENTS = Object.keys(RENAMES.agents).join("|");
+const OLD_AGENT_ID = new RegExp(`oh-my-claudeagent:(?:${OLD_AGENTS})(?![\\w-])`);
+
+// Only a setup that still carries an old name is worth a row: otherwise the migration has nothing to do.
+function migrationCheck({ hasOldMemory, settings }: Inputs): Check[] {
+  if (!hasOldMemory && !OLD_AGENT_ID.test(JSON.stringify(settings))) return [];
+  return [
+    check("migrate", "Agent names", "warn", `Agent memories or settings use agent names from the rename table; run ${MIGRATE_COMMAND}`, {
+      prompt: MIGRATE_COMMAND,
+    }),
+  ];
+}
+
 export function doctorChecks(inputs: Inputs): Check[] {
   return [
     modCheck(inputs.modVersion),
@@ -265,6 +281,7 @@ export function doctorChecks(inputs: Inputs): Check[] {
     outputStyleCheck(inputs.settings, inputs.isStyleForced),
     advisorCheck(inputs.settings, inputs.env),
     statusLineCheck(inputs.settings, inputs.userSettings),
+    ...migrationCheck(inputs),
   ];
 }
 

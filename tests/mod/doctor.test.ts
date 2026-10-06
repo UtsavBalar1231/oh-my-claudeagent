@@ -1,5 +1,6 @@
 import type { On, RenderElement } from "claude-code";
 import { expect, test } from "claude-code/testing";
+import { RENAMES } from "../../src/core/agent-names.ts";
 import { joinPath } from "../../src/core/path.ts";
 import { usableColumns } from "../../src/core/ui-kit.ts";
 import {
@@ -567,5 +568,16 @@ test("a check that names a command offers it on its own key, which fills the pro
   ]);
   for (const key of ["prompt-advisor", "prompt-server", "prompt-statusline"]) await ui.press({ key });
   expect(fills).toEqual(["/advisor fable", "/mcp", "/oh-my-claudeagent:omca-setup"]);
+  await ui.unmount();
+});
+
+test("an old-name agent memory adds a warning row naming the migrate command, and the doctor writes nothing", async ($, on) => {
+  const [old] = Object.keys(RENAMES.agents);
+  const memory = `${ROOT}/.claude/agent-memory/oh-my-claudeagent-${old}/MEMORY.md`;
+  const w = engine(on, world(on, { [`${ROOT}/.omca/state/session/${SESSION}.json`]: "{}", [memory]: "- [a](a.md)\n" }, structuredClone(USER)));
+  await $.command.run(run("doctor", 120));
+  const ui = await $.ui.mount(pane("terminal", WIDE));
+  expect(body(await ui.drawn()).some((row) => row.includes("omca-setup --migrate"))).toBe(true);
+  expect(w.writes).toEqual([]);
   await ui.unmount();
 });

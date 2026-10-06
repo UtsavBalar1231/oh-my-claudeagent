@@ -124,6 +124,7 @@ a gateway that is not a first-party host, every tool loads up front.
 | `file_read` | Read a file outside the working directories, with paging. Refuses credential files |
 | `session_search` | Search this project's earlier Claude Code transcripts |
 | `agents_list`, `categories_list` | The agent roster and the category table |
+| `agents_migrate` | Move agent memories and agent ids to the current names. A dry run by default; `apply` writes, and `merge_indexes` merges `MEMORY.md` files that collide |
 | `health_check` | ast-grep, the state files, and whether this session's hooks and mod are running |
 
 `omca_hook` serves the settings hooks below; the model does not call it.
