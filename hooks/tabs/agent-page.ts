@@ -1,6 +1,7 @@
 import type { RenderElement } from "claude-code";
 import { costText, type Lane, STATUS_WORDS, statusMark, toolLabel } from "../../src/core/mission.ts";
 import { SIZE } from "../../src/core/mascots.ts";
+import { chunks } from "../../src/core/plan-reader.ts";
 import { agentGlyph, COLUMN_GAP, fitEnd, formatDuration, formatTokens, KEYS, oneLine, padEnd, padStart, shortType } from "../../src/core/ui-kit.ts";
 import { agentKey, fitPieces, levelMark, ON_SURFACE, type Piece, piecesWidth, TONE_KEYS } from "../../src/core/visual.ts";
 import { loadPage } from "../agents-tracker.ts";
@@ -19,6 +20,8 @@ const DURATION_CELLS = 6;
 const MIN_TEXT_CELLS = 20;
 // Shorter than the mascot and the six rows below it (brief, tool calls, reply, keys), likewise.
 const MIN_PAGE_ROWS = SIZE / 2 + 6;
+// A shell command reads best highlighted as the shell that runs it.
+const SHELLS: Readonly<Record<string, string>> = { Bash: "bash", Monitor: "bash", PowerShell: "powershell" };
 
 export const openKey = (id: string): string => `open-${id}`;
 
@@ -49,12 +52,20 @@ function callRow(view: View, call: Call): RenderElement {
   ];
   const time = call.durationMs === null ? "" : call.durationMs < 1000 ? `${call.durationMs}ms` : formatDuration(call.durationMs);
   const room = Math.max(0, view.width - piecesWidth(lead) - COLUMN_GAP - DURATION_CELLS);
+  const duration: Piece = { text: `${" ".repeat(COLUMN_GAP)}${padStart(time, DURATION_CELLS)}`, color: TONE_KEYS.muted };
+  const language = Object.hasOwn(SHELLS, call.tool) ? SHELLS[call.tool] : undefined;
+  if (language !== undefined && call.summary !== "" && room > 1) {
+    return view.kit.Box({
+      flexDirection: "row",
+      children: [
+        Line(view.kit, [...lead, { text: " " }]),
+        view.kit.Box({ width: room - 1, children: [view.kit.Code({ source: call.summary, language, wrap: "truncate-end" })] }),
+        Line(view.kit, [duration]),
+      ],
+    });
+  }
   const summary = call.summary === "" ? "" : fitEnd(` ${call.summary}`, room, g.ellipsis);
-  return Line(view.kit, [
-    ...lead,
-    { text: padEnd(summary, room) },
-    { text: `${" ".repeat(COLUMN_GAP)}${padStart(time, DURATION_CELLS)}`, color: TONE_KEYS.muted },
-  ]);
+  return Line(view.kit, [...lead, { text: padEnd(summary, room) }, duration]);
 }
 
 function header(view: View, lane: Lane): RenderElement[] {
@@ -96,16 +107,16 @@ export async function view(host: Host, view: View, lane: Lane): Promise<readonly
     return [...header(view, lane), noticeRow(view, { kind: "empty" }, { loading: "", empty: "No page is kept for this agent; press r to load it." }), keys];
   }
   const label = (text: string) => kit.Text({ color: TONE_KEYS.muted, children: [fitEnd(text, view.width, g.ellipsis)] });
-  const text = (value: string, none: string) =>
-    value === "" ? label(none) : kit.Text({ color: ON_SURFACE, wrap: "wrap", children: [value] });
+  const markdown = (key: string, value: string, none: string) =>
+    value.trim() === "" ? [label(none)] : chunks(value).map((text, part) => kit.Markdown({ key: `${key}-${part}`, text }));
   return [
     ...header(view, lane),
     label(page.source === "messages" ? "Brief" : `Brief ${g.dot} stored prompt, no transcript`),
-    text(page.brief, "none recorded"),
+    ...markdown("brief", page.brief, "none recorded"),
     label(`Tool calls ${g.dot} ${page.calls.length}`),
     ...page.calls.map((call) => callRow(view, call)),
     label("Reply"),
-    text(page.reply, "none yet"),
+    ...markdown("reply", page.reply, "none yet"),
     keys,
   ];
 }

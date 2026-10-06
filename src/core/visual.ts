@@ -1,4 +1,4 @@
-import { displayWidth, fitEnd, type Glyphs, glyphs } from "./ui-kit.ts";
+import { displayWidth, fitEnd, type Glyphs, glyphs, wrapText } from "./ui-kit.ts";
 import { omcaAgentName } from "./agent-type.ts";
 
 // Every key here draws its theme's value for a mod, measured on 2.1.288 under a custom theme and
@@ -126,7 +126,16 @@ export function agentKey(type: string): ThemeKey {
   return color === undefined ? TONE_KEYS.muted : AGENT_KEYS[color];
 }
 
-export type Piece = { text: string; color?: ThemeKey; backgroundColor?: ThemeKey; bold?: true };
+export type Piece = {
+  text: string;
+  color?: ThemeKey;
+  backgroundColor?: ThemeKey;
+  bold?: true;
+  italic?: true;
+  underline?: true;
+  strikethrough?: true;
+  dimColor?: true;
+};
 
 export const piecesWidth = (pieces: readonly { text: string }[]): number => pieces.reduce((sum, piece) => sum + displayWidth(piece.text), 0);
 
@@ -297,6 +306,63 @@ export function fitPieces(pieces: readonly Piece[], width: number, ellipsis: str
     used += cells;
   }
   return out;
+}
+
+const isSameStyle = (a: Piece, b: Piece): boolean =>
+  a.color === b.color &&
+  a.backgroundColor === b.backgroundColor &&
+  a.bold === b.bold &&
+  a.italic === b.italic &&
+  a.underline === b.underline &&
+  a.strikethrough === b.strikethrough &&
+  a.dimColor === b.dimColor;
+
+/** Adjacent pieces of one style joined, and empty ones dropped. */
+export function mergePieces(pieces: readonly Piece[]): Piece[] {
+  const out: Piece[] = [];
+  for (const piece of pieces) {
+    const last = out.at(-1);
+    if (piece.text === "") continue;
+    if (last !== undefined && isSameStyle(last, piece)) out[out.length - 1] = { ...last, text: last.text + piece.text };
+    else out.push(piece);
+  }
+  return out;
+}
+
+/** The pieces wrapped at spaces into lines of at most `width` cells; a word keeps its piece's style, and the spaces between words carry none. */
+export function wrapPieces(pieces: readonly Piece[], width: number): Piece[][] {
+  const room = Math.max(1, width);
+  const lines: Piece[][] = [];
+  let line: Piece[] = [];
+  let used = 0;
+  let isSpaced = false;
+  const breakLine = () => {
+    if (line.length > 0) lines.push(mergePieces(line));
+    line = [];
+    used = 0;
+  };
+  for (const piece of pieces) {
+    for (const token of piece.text.split(/(\s+)/)) {
+      if (token === "") continue;
+      if (/^\s+$/.test(token)) {
+        isSpaced = used > 0;
+        continue;
+      }
+      if (used > 0 && used + (isSpaced ? 1 : 0) + displayWidth(token) > room) breakLine();
+      else if (isSpaced) {
+        line.push({ text: " " });
+        used += 1;
+      }
+      isSpaced = false;
+      for (const part of displayWidth(token) > room ? wrapText(token, room) : [token]) {
+        if (used > 0 && used + displayWidth(part) > room) breakLine();
+        line.push({ ...piece, text: part });
+        used += displayWidth(part);
+      }
+    }
+  }
+  breakLine();
+  return lines;
 }
 
 export type Segment = { value: number; color: ThemeKey; ascii: string };

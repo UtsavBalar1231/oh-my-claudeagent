@@ -226,6 +226,24 @@ describe("finishedRow", () => {
     expect(row({ status: "gone", result: "" })).toBe("○ executor · ended                            1m06s");
   });
 
+  test("a result's markdown draws: its code in the code key, dimmed in the muted row, bold kept, markers gone", () => {
+    expect(finishedRow(done({ result: "Ran `just ci`, **all** green." }), look(51), HOME)).toEqual([
+      { text: "✓ ", color: "success" },
+      { text: "executor · Ran ", color: "inactive" },
+      { text: "just ci", color: "permission", dimColor: true },
+      { text: ", ", color: "inactive" },
+      { text: "all", color: "inactive", bold: true },
+      { text: " green.       ", color: "inactive" },
+      { text: "   1m06s", color: "inactive" },
+    ]);
+  });
+
+  test("a code span cut at the edge keeps its style and ends in the ellipsis", () => {
+    const row = finishedRow(done({ result: `\`${"x".repeat(60)}\`` }), look(51), HOME);
+    expect(row[2]).toEqual({ text: `${"x".repeat(29)}…`, color: "permission", dimColor: true });
+    expect(displayWidth(text(row))).toBe(51);
+  });
+
   test("a long result truncates and the row stays the body wide", () => {
     const row = text(finishedRow(done({ result: "r".repeat(200) }), look(51), HOME));
     expect(row).toBe(`✓ executor · ${"r".repeat(29)}…   1m06s`);

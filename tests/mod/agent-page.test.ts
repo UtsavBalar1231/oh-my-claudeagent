@@ -41,6 +41,13 @@ function watchState(on: On): { read: (key: string) => unknown; keys: string[] } 
   return { read: (key) => last.get(key), keys };
 }
 
+// The brief and the reply draw as Markdown, which rows leave out; this reads one by its key.
+type Finder = { find: (match: { key: string }) => Promise<{ type: string; props: Readonly<Record<string, unknown>> } | undefined> };
+async function markdownText(ui: Finder, key: string): Promise<unknown> {
+  const found = await ui.find({ key });
+  return found?.type === "Markdown" ? found.props["text"] : undefined;
+}
+
 // The header's mascot and its two lines are one row Box; the lines read as the rows they are beside it.
 function pageRows(tree: RenderElement): string[] {
   const top = topRows(tree).flatMap((child) =>
@@ -96,14 +103,17 @@ test("a lane head's button opens the page of a running agent: header, full brief
     "◆ executor · Fix the heading par…",
     "◆ running · 2s · 0 tokens · ~$0.…",
     "Brief",
-    BRIEF,
+    "",
     "Tool calls · 2",
     "✓ Read src/parser.ts                          300ms",
-    "✗ Bash bun test src/parser.spec.ts               2s",
+    "✗ Bash       2s",
     "Reply",
-    "Reading the parser.",
+    "",
     "b: Back  c: Copy brief  r: Reload",
   ]);
+  expect(await markdownText(ui, "brief-0")).toBe(BRIEF);
+  expect(await markdownText(ui, "reply-0")).toBe("Reading the parser.");
+  expect((await ui.find({ type: "Code" }))?.props).toEqual({ source: "bun test src/parser.spec.ts", language: "bash", wrap: "truncate-end" });
   expect(pagesOf()[id]?.calls).toEqual([
     { tool: "Read", summary: "src/parser.ts", ok: true, durationMs: 300 },
     { tool: "Bash", summary: "bun test src/parser.spec.ts", ok: false, durationMs: 2_000 },
@@ -127,8 +137,10 @@ test("a finished agent's page is kept at its turn.complete from its transcript, 
     "◆ executor · Fix the heading par…",
     "✓ done · 1m05s · 2.5k tokens · ~…",
     "Brief",
-    BRIEF,
+    "",
   ]);
+  expect(await markdownText(ui, "brief-0")).toBe(BRIEF);
+  expect(await markdownText(ui, "reply-0")).toBe("Fixed it; the parser skips fences.");
   await ui.unmount();
 });
 
@@ -144,9 +156,10 @@ test("a finished agent whose transcript is denied keeps its page from the stored
   await ui.press({ key: `open-${id}` });
   expect(pageRows(await ui.drawn()).slice(5, 8)).toEqual([
     "Brief · stored prompt, no transcript",
-    "Fix the heading parser.",
+    "",
     "Tool calls · 0",
   ]);
+  expect(await markdownText(ui, "brief-0")).toBe("Fix the heading parser.");
   await ui.unmount();
 });
 
@@ -257,7 +270,7 @@ test("r reads the transcript and the recorded calls again", async ($, on) => {
 
   const drawn = rows(await ui.drawn());
   expect(drawn).toContain("Tool calls · 1");
-  expect(drawn.at(-2)).toBe("Now reading the lexer.");
+  expect(await markdownText(ui, "reply-0")).toBe("Now reading the lexer.");
   await ui.unmount();
 });
 

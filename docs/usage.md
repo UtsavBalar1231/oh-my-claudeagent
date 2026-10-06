@@ -199,6 +199,11 @@ takes the cost's place.
    cost, shown as `~$` because it is estimated. On the page `b` goes back, `c` copies the brief
    and `r` reads the page again. A teammate in a team has a lane too; it waits between messages
    instead of finishing.
+
+   The brief and the reply on the agent page are drawn as markdown, by Claude Code's own
+   renderer, and a shell command on the page is highlighted as code. The one-line results,
+   prompts and outputs in the lanes, the details rows and the card keep their markdown styles:
+   code in the code color, bold, italics and links, with the markers dropped.
 2. **Plan**: the plan board, below.
 3. **Evidence**: the proof ledger, below.
 4. **Notepad**: one card per section of the bound plan's notepad, each entry under its date. `f`

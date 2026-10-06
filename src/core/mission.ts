@@ -1,7 +1,8 @@
+import { contentLines, inlineMarkdown } from "./markdown.ts";
 import { formatUsd } from "./pricing.ts";
 import { inputText } from "./tool-input.ts";
 import { agentGlyph, COLUMN_GAP, displayWidth, fitEnd, formatDuration, formatTokens, type Glyphs, oneLine, padEnd, padStart, shortType } from "./ui-kit.ts";
-import { agentKey, levelMark, ON_SURFACE, type Piece, piecesWidth, redact, type ThemeKey, TONE_KEYS } from "./visual.ts";
+import { agentKey, fitPieces, levelMark, mergePieces, ON_SURFACE, type Piece, piecesWidth, redact, type ThemeKey, TONE_KEYS } from "./visual.ts";
 
 /** `mcp__server__tool` as its tool's own name; every other tool as named. */
 export const toolLabel = (name: string): string => (name.startsWith("mcp__") ? name.slice(name.lastIndexOf("__") + 2) : name);
@@ -30,9 +31,8 @@ export function toolDetail(name: string, input: unknown, root: string): string {
   return base !== "" && (value.startsWith(`${base}/`) || value.startsWith(`${base}\\`)) ? value.slice(base.length + 1) : value;
 }
 
-const lines = (text: string): string[] => text.split("\n").map(oneLine).filter((line) => line !== "");
-export const firstLine = (text: string): string => lines(text)[0] ?? "";
-export const lastLine = (text: string): string => lines(text).at(-1) ?? "";
+export const firstLine = (text: string): string => contentLines(text)[0] ?? "";
+export const lastLine = (text: string): string => contentLines(text).at(-1) ?? "";
 
 type Effort = "low" | "medium" | "high" | "xhigh" | "max" | number;
 type Status = "running" | "idle" | "waiting" | "pending" | "answer" | "aborted" | "refusal" | "error" | "gone";
@@ -115,8 +115,8 @@ function headRow(lane: Lane, look: LaneLook): Piece[] {
     { text: padStart(formatDuration(now - lane.startedAt), ELAPSED), color: TONE_KEYS.muted },
   ];
   const room = Math.max(0, width - piecesWidth(identity) - piecesWidth(right));
-  const task = lane.description === "" ? "" : fitEnd(` ${g.dot} ${oneLine(lane.description)}`, room, g.ellipsis);
-  return [...identity, { text: padEnd(task, room) }, ...right];
+  const task = lane.description === "" ? [] : fitPieces([{ text: ` ${g.dot} ` }, ...inlineMarkdown(oneLine(lane.description))], room, g.ellipsis);
+  return [...identity, ...mergePieces([...task, { text: " ".repeat(Math.max(0, room - piecesWidth(task))) }]), ...right];
 }
 
 /** ` · ~$0.04` after the token count, or nothing once any step's model had no price. */
@@ -181,8 +181,8 @@ export function laneBlock(lane: Lane, look: LaneLook, home: string): Piece[][] {
   ].map((parts) => parts.filter((part) => part !== "").join(` ${g.dot} `));
   return [
     head,
-    [{ text: fitEnd(oneLine(lane.description), width, g.ellipsis) || " " }],
-    lane.endedAt === null ? toolRow(lane, look, home, g.mask, "") : [{ text: fitEnd(outcome(lane, g, home), width, g.ellipsis) || " ", color: TONE_KEYS.muted }],
+    orSpace(fitPieces(inlineMarkdown(oneLine(lane.description)), width, g.ellipsis)),
+    lane.endedAt === null ? toolRow(lane, look, home, g.mask, "") : orSpace(fitPieces(outcome(lane, g, home), width, g.ellipsis)),
     [{ text: fitEnd(usage.find((text) => displayWidth(text) <= width) ?? usage.at(-1) ?? "", width, g.ellipsis), color: TONE_KEYS.muted }],
   ];
 }
@@ -218,25 +218,28 @@ export function statusMark(status: Status, g: Glyphs): { glyph: string; color: T
   }
 }
 
-/** What a finished agent said: its result's first line, or its status word when it gave none. */
-function outcome(lane: Lane, g: Glyphs, home: string): string {
+const orSpace = (pieces: Piece[]): Piece[] => (pieces.length === 0 ? [{ text: " " }] : pieces);
+
+/** What a finished agent said, muted: its result's first line as markdown, or its status word when it gave none. */
+function outcome(lane: Lane, g: Glyphs, home: string): Piece[] {
   const word = STATUS_WORDS[lane.status] ?? "";
-  const result = redactLine(lane.result, home, g.mask);
-  return lane.status === "answer" && result !== "" ? result : result === "" ? word : `${word} ${g.dot} ${result}`;
+  const said = inlineMarkdown(redactLine(lane.result, home, g.mask), { color: TONE_KEYS.muted });
+  if (said.length === 0) return word === "" ? [] : [{ text: word, color: TONE_KEYS.muted }];
+  return lane.status === "answer" ? said : [{ text: `${word} ${g.dot} `, color: TONE_KEYS.muted }, ...said];
 }
 
 /** A finished agent in one dim line: status glyph, type, its result, and how long it ran. */
 export function finishedRow(lane: Lane, look: LaneLook, home: string): Piece[] {
   const { g, width } = look;
   const mark = statusMark(lane.status, g);
-  const said = outcome(lane, g, home);
   const duration = padStart(formatDuration((lane.endedAt ?? look.now) - lane.startedAt), ELAPSED);
   const head = `${mark.glyph} ${shortType(lane.type)}`;
   const room = Math.max(0, width - displayWidth(head) - COLUMN_GAP - ELAPSED);
-  const body = fitEnd(` ${g.dot} ${said}`, room, g.ellipsis);
+  const body = fitPieces([{ text: ` ${g.dot} `, color: TONE_KEYS.muted }, ...outcome(lane, g, home)], room, g.ellipsis);
+  const pad = { text: " ".repeat(Math.max(0, room - piecesWidth(body))), color: TONE_KEYS.muted };
   return [
     { text: `${mark.glyph} `, color: mark.color },
-    { text: `${shortType(lane.type)}${padEnd(body, room)}`, color: TONE_KEYS.muted },
+    ...mergePieces([{ text: shortType(lane.type), color: TONE_KEYS.muted }, ...body, pad]),
     { text: `${" ".repeat(COLUMN_GAP)}${duration}`, color: TONE_KEYS.muted },
   ];
 }
@@ -263,5 +266,3 @@ export function ordered(lanes: readonly Lane[]): Lane[] {
     return a.endedAt === null ? a.startedAt - b.startedAt : (b.endedAt ?? 0) - (a.endedAt ?? 0);
   });
 }
-
-export const excerpt = (text: string, cells: number, ellipsis: string): string => fitEnd(oneLine(text), cells, ellipsis);

@@ -1,7 +1,7 @@
 import type { RenderElement } from "claude-code";
+import { inlineMarkdown, markdownPieces } from "../../src/core/markdown.ts";
 import {
   costText,
-  excerpt,
   finishedRow,
   type Lane,
   laneBlock,
@@ -12,8 +12,8 @@ import {
   summaryText,
 } from "../../src/core/mission.ts";
 import { GRID, type MascotSize } from "../../src/core/mascots.ts";
-import { agentGlyph, COLUMN_GAP, displayWidth, fitEnd, formatTokens, padEnd, shortType, wrapText } from "../../src/core/ui-kit.ts";
-import { agentKey, ON_SURFACE, type Piece, redact, TONE_KEYS } from "../../src/core/visual.ts";
+import { agentGlyph, COLUMN_GAP, displayWidth, fitEnd, formatTokens, padEnd, shortType } from "../../src/core/ui-kit.ts";
+import { agentKey, fitPieces, ON_SURFACE, type Piece, redact, TONE_KEYS, wrapPieces } from "../../src/core/visual.ts";
 import type { Host } from "../host.ts";
 import { frame, keyOf, show, stateOf } from "../mascot-player.ts";
 import { keyButton, noticeRow, type TabView, type View } from "../pane.ts";
@@ -79,19 +79,19 @@ function card(view: View, { lane, at, height }: Placed, end: number): RenderElem
   const prompt = redact(lane.prompt, home, g.mask).text;
   const output = redact(lane.endedAt === null ? lane.output : lane.result || lane.output, home, g.mask).text;
   const room = Math.max(view.rows, end);
-  const wrapped = prompt === "" ? [] : wrapText(prompt, inner);
+  const wrapped = wrapPieces(markdownPieces(prompt, { color: ON_SURFACE }), inner);
   const most = Math.max(1, Math.min(PROMPT_LINES, room - CARD_FIXED_ROWS));
   const promptLines = wrapped.slice(0, most).map((line, index) =>
-    index === most - 1 && wrapped.length > most ? fitEnd(`${line}${g.ellipsis}`, inner, g.ellipsis) : line,
+    index === most - 1 && wrapped.length > most ? fitPieces([...line, { text: g.ellipsis, color: ON_SURFACE }], inner, g.ellipsis) : line,
   );
+  const said = inlineMarkdown(output, { color: ON_SURFACE });
   const masks = count(prompt, g.mask) + count(output, g.mask);
   const label = (text: string) => kit.Text({ color: TONE_KEYS.muted, children: [fitEnd(text, inner, g.ellipsis)] });
-  const body = (text: string) => kit.Text({ color: ON_SURFACE, wrap: "truncate-end", children: [text] });
   const lines = [
     label("Prompt"),
-    ...(promptLines.length === 0 ? [label("none recorded")] : promptLines.map(body)),
+    ...(promptLines.length === 0 ? [label("none recorded")] : promptLines.map((line) => Line(kit, line))),
     label(lane.endedAt === null ? "Last output" : "Result"),
-    output === "" ? label("none yet") : body(fitEnd(output, inner, g.ellipsis)),
+    said.length === 0 ? label("none yet") : Line(kit, fitPieces(said, inner, g.ellipsis)),
     label(`${usage(lane, g.dot)}${masks > 0 ? ` ${g.dot} ${words(masks, "secret")} masked` : ""}${costText(lane, g.dot)}`),
   ];
   const rows = CARD_FIXED_ROWS + Math.max(1, promptLines.length);
@@ -113,15 +113,16 @@ function card(view: View, { lane, at, height }: Placed, end: number): RenderElem
 function detailRows(view: View, lane: Lane, width = view.width): RenderElement[] {
   const { g, home, kit } = view;
   const lead = 2 + LABEL_CELLS + COLUMN_GAP;
-  const line = (label: string, text: string) =>
+  const muted = { color: TONE_KEYS.muted } as const;
+  const line = (label: string, pieces: Piece[]) =>
     Line(kit, [
-      { text: `  ${padEnd(label, LABEL_CELLS)}${" ".repeat(COLUMN_GAP)}`, color: TONE_KEYS.muted },
-      { text: fitEnd(text === "" ? "none yet" : text, Math.max(0, width - lead), g.ellipsis), color: TONE_KEYS.muted },
+      { text: `  ${padEnd(label, LABEL_CELLS)}${" ".repeat(COLUMN_GAP)}`, ...muted },
+      ...fitPieces(pieces.length === 0 ? [{ text: "none yet", ...muted }] : pieces, Math.max(0, width - lead), g.ellipsis),
     ]);
   return [
-    line("prompt", excerpt(redact(lane.prompt, home, g.mask).text, width, g.ellipsis)),
-    line("output", redact(lane.output, home, g.mask).text),
-    line("usage", `${usage(lane, g.dot)}${costText(lane, g.dot)}`),
+    line("prompt", markdownPieces(redact(lane.prompt, home, g.mask).text, muted)),
+    line("output", inlineMarkdown(redact(lane.output, home, g.mask).text, muted)),
+    line("usage", [{ text: `${usage(lane, g.dot)}${costText(lane, g.dot)}`, ...muted }]),
   ];
 }
 

@@ -45,6 +45,10 @@ hand.
 - **The agent page.** Enter or a click on a lane opens the agent's brief, each tool call with its
   outcome and duration, its latest reply, its tokens and its `~$` cost. `c` copies the brief, `r`
   reloads and `b` goes back. Teammates in a team get lanes that wait between messages.
+- **Markdown in agent text.** The agent page draws the brief and the reply as markdown with
+  Claude Code's own renderer and highlights shell commands as code. One-line results, prompts and
+  outputs in the lanes, the details rows and the card keep their inline markdown: code in the
+  code color, bold, italics and links, without the markers.
 - **Toasts, auto-open, the band and the spinner.** One toast per finished wave of subagents, one
   per failed verification and one when the plan completes. The pane opens by itself on a session's
   first wave of subagents, once, in a terminal, and waits undrawn below 144 columns (110 after you
