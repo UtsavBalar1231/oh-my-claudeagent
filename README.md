@@ -68,7 +68,7 @@ call, and shrinks a finished one to a line.
 The agent page opens a subagent's brief, tool calls, reply and cost, toasts report finished waves,
 failed verifications and a completed plan, and each agent has a mascot on the Agents tab.
 
-<img src=".github/assets/mascots.png" width="680" alt="The Agents tab with three agents running at once. Above the list, each has a pixel mascot with its role underneath: a green executor in a yellow hard hat with a hammer, a blue explorer in a straw hat with a spyglass, and a purple architect with a lightbulb above its head. Below, the list shows each agent with its task, model, effort and its running Bash sleep.">
+<img src=".github/assets/mascots.png" width="680" alt="The Agents tab with three agents running at once. Above the list, each has a pixel mascot with its role underneath: a green executor in a yellow hard hat with a hammer, a blue explorer in a safari hat with a spyglass, and a purple architect with a lightbulb above its head. Below, the list shows each agent with its task, model, effort and its running Bash sleep.">
 
 The guard holds a destructive shell command for your review and shows what it would touch.
 

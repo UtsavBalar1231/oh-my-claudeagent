@@ -59,7 +59,7 @@ export type World = {
   surfaces: RenderSurface[];
   invalidations: number;
   toasts: string[];
-  blits: { requestId: string; key: string; cells: string | undefined }[];
+  blits: { requestId: string; key: string; cells: string | undefined; columns: number | undefined; rows: number | undefined }[];
   conversations: Map<string, SessionMessage[]>;
   opened: unknown[];
   logs: string[];
@@ -179,7 +179,11 @@ export function world(
     return next(e);
   });
   on("ui.toast", (_$, e) => (w.toasts.push(e.text), { value: undefined }));
-  on("ui.blit", (_$, e) => (w.blits.push({ requestId: e.requestId, key: e.key, cells: "cells" in e ? e.cells : undefined }), { value: {} }));
+  on("ui.blit", (_$, e) => {
+    const raster = "cells" in e ? e : undefined;
+    w.blits.push({ requestId: e.requestId, key: e.key, cells: raster?.cells, columns: raster?.columns, rows: raster?.rows });
+    return { value: {} };
+  });
   on("session.messages", (_$, e) => {
     const found = e.agentId === undefined ? undefined : w.conversations.get(e.agentId);
     return { value: found ?? { deny: `no conversation for ${e.agentId ?? "main"}` } };

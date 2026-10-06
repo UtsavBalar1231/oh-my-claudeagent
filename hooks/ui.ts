@@ -24,7 +24,7 @@ import {
   type ThemeKey,
   TONE_KEYS,
 } from "../src/core/visual.ts";
-import { framesOf, type MascotState, mascotOf, rasterCells, svgOf } from "../src/core/mascots.ts";
+import { FRAME_MS, framesOf, type MascotState, mascotOf, rasterCells, svgOf } from "../src/core/mascots.ts";
 import type { GlyphTier, Glyphs } from "../src/core/ui-kit.ts";
 
 type Keyed<P, K extends keyof P> = Omit<P, K> & { [Q in K]?: ThemeKey };
@@ -61,14 +61,13 @@ function mascotIn(table: ElementTable, surface: RenderSurface, tier: GlyphTier, 
   if (name === undefined || tier === "ascii") return null;
   const frames = framesOf(name, state);
   const isMoving = state === "working" && !isStill;
-  if (surface === "terminal" && "Raster" in table) {
+  if (surface === "terminal") {
     const shown = frames[isMoving ? frame % frames.length : 0];
-    return shown === undefined ? null : table.Raster({ key, columns: MASCOT_COLUMNS, rows: MASCOT_ROWS, cells: rasterCells(shown) });
+    return shown === undefined || !("Raster" in table) ? null : table.Raster({ key, columns: MASCOT_COLUMNS, rows: MASCOT_ROWS, cells: rasterCells(shown) });
   }
-  const first = frames[0];
-  if (!("Svg" in table) || first === undefined) return null;
+  if (!("Svg" in table) || frames.length === 0) return null;
   return table.Svg({
-    source: svgOf(isMoving ? frames : [first]),
+    source: svgOf(frames, FRAME_MS, !isMoving),
     alt: `${name} ${state}`,
     width: MASCOT_PIXELS,
     height: MASCOT_PIXELS,

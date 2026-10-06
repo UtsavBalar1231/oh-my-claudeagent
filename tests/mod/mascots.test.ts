@@ -58,8 +58,8 @@ test("a working mascot's frames are blitted at FRAME_MS, one blit a frame for ea
   for (let frame = 1; frame <= 13; frame++) {
     await w.clock.advance(FRAME_MS);
     expect(w.blits.slice(-2)).toEqual([
-      { requestId: "omca", key: "mascot-a-1", cells: cellsOf("executor", "working", frame) },
-      { requestId: "omca", key: "mascot-a-2", cells: cellsOf("explorer", "working", frame) },
+      { requestId: "omca", key: "mascot-a-1", cells: cellsOf("executor", "working", frame), columns: 16, rows: 8 },
+      { requestId: "omca", key: "mascot-a-2", cells: cellsOf("explorer", "working", frame), columns: 16, rows: 8 },
     ]);
   }
   expect(w.blits).toHaveLength(26);
@@ -215,6 +215,45 @@ test("the agent page's header draws its agent's mascot, and the timer animates i
   await ui.redraw();
   expect(w.blits.map((blit) => blit.key)).toEqual(Array(4).fill("mascot-a-1"));
   expect(rasterOf(await ui.drawn(), "a-1")).toBe(w.blits.at(-1)?.cells);
+  await ui.unmount();
+});
+
+test("a body too short for the mascot and the page below it draws the page header without one", async ($, on) => {
+  const { w, ui } = await running($, on, ["executor"], "terminal", DOCK_SHORT);
+  await ui.press({ key: "open-a-1" });
+  await w.clock.advance(FRAME_MS * 3);
+
+  expect(await ui.find({ key: "page-header" })).toBeUndefined();
+  expect(await ui.find({ type: "Raster" })).toBeUndefined();
+  expect(w.blits).toEqual([]);
+  await ui.unmount();
+});
+
+test("a stage past the width blits only the mascots it drew", async ($, on) => {
+  const { w, ui } = await running($, on, ["executor", "architect", "planner"]);
+  w.blits.length = 0;
+
+  await w.clock.advance(FRAME_MS * 3);
+
+  expect([...new Set(w.blits.map((blit) => blit.key))].sort()).toEqual(["mascot-a-1", "mascot-a-2"]);
+  await ui.unmount();
+});
+
+test("leaving the Agents tab stops the blits, and coming back starts them again", async ($, on) => {
+  const { w, ui } = await running($, on, ["executor"]);
+  await w.clock.advance(FRAME_MS * 2);
+  expect(w.blits.length).toBeGreaterThan(0);
+
+  await ui.press({ key: "2" });
+  await w.clock.advance(FRAME_MS * 2);
+  const away = w.blits.length;
+  await w.clock.advance(5000);
+  expect(w.blits).toHaveLength(away);
+
+  await ui.press({ key: "1" });
+  await ui.drawn();
+  await w.clock.advance(1000 + FRAME_MS * 2);
+  expect(w.blits.length).toBeGreaterThan(away);
   await ui.unmount();
 });
 

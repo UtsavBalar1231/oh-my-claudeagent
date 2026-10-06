@@ -50,7 +50,7 @@ hand.
   with the task and agent count, as in `… · task 7/14 · 3 agents`.
 - **Mascots.** Each agent has a mascot: a stage on the Agents tab and a figure in the agent page
   header. It moves while the agent works, smiles when it finishes, sweats when it fails and dozes
-  while a teammate waits. Terminals draw half-block characters, Desktop an animated SVG, and
+  while it waits. Terminals draw half-block characters, Desktop an animated SVG, and
   `OMCA_GLYPHS=ascii` draws none.
 - **Desktop redraws.** The Code tab draws the mod on Claude Code 2.1.287 or later; plugins under
   `~/.claude` do not load in Desktop sessions (anthropics/claude-code#94635), so

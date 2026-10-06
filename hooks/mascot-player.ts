@@ -83,4 +83,5 @@ export function stop(): void {
   timer?.cancel();
   timer = undefined;
   counter = 0;
+  drawn = new Set();
 }

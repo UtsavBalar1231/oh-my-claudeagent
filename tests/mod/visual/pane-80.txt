@@ -7,10 +7,10 @@
 
 ✻ Waiting for 3 background agents to finish
 
-● oh-my-claudeagent+cc-plugin-agents-md: 0s · 38.2k in 13 out · $1.28
+● oh-my-claudeagent+cc-plugin-agents-md: 0s · 38.2k in 13 out · $1.24
   engine cost
 
-● Agent "Fix the heading parser" finished · 0s
+● Agent "Map the router callers" finished · 0s
 
 ● ok
 
@@ -20,12 +20,12 @@
   engine cost
 ╭────────────────────────────────────────────────────────────────────────────✕─╮
 │ 1: Agents 2: Plan 3: Evidence 4: Notepad 5: Feedback 6: Stats 7: Doctor      │
-│  explorer · Map the router callers             sonnet-5-5  high       3s    │
+│  executor · Fix the heading parser             sonnet-5-5  high       3s    │
 │   ✽ Bash sleep 90                                                 2 calls    │
 │  architect · Review the ledger design          fable-5-1   xhigh      3s    │
 │   ✽ Bash sleep 90                                                 4 calls    │
-│  executor · The rotation is safe: a crash mid-write leaves the…       0s    │
-│ d: Details  2 running · 1 finished · 136k tokens                             │
+│  explorer · The rotation is safe: a crash mid-write leaves the…       0s    │
+│ d: Details  2 running · 1 finished · 139k tokens                             │
 │                                                                              │
 │                                                                              │
 │                                                                              │

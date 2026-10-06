@@ -222,7 +222,7 @@ count, as in `… · task 7/14 · 3 agents`.
 
 Each agent has a mascot. The Agents tab draws them as a stage above the lanes when the pane has
 room for it, and the agent page shows the agent's mascot in its header. A mascot moves only while
-its agent works, smiles when the agent finishes, sweats when it fails and dozes while a teammate
+its agent works, smiles when the agent finishes, sweats when it fails and dozes while the agent
 waits. The terminal draws them in half-block characters and Desktop draws an animated SVG.
 `OMCA_GLYPHS=ascii` draws none. With Claude Code's `prefersReducedMotion` setting on, the mascots hold
 still: a working mascot shows its first frame and Desktop draws a single frame.

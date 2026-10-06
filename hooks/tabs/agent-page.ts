@@ -17,6 +17,8 @@ const COPY = "c";
 const DURATION_CELLS = 6;
 // Narrower than the mascot and this much text, the header keeps to its two lines.
 const MIN_TEXT_CELLS = 20;
+// Shorter than the mascot and the six rows below it (brief, tool calls, reply, keys), likewise.
+const MIN_PAGE_ROWS = SIZE / 2 + 6;
 
 export const openKey = (id: string): string => `open-${id}`;
 
@@ -58,7 +60,7 @@ function callRow(view: View, call: Call): RenderElement {
 function header(view: View, lane: Lane): RenderElement[] {
   const { g, kit } = view;
   const room = view.width - SIZE - COLUMN_GAP;
-  const mascot = room < MIN_TEXT_CELLS ? null : kit.mascot(lane.type, stateOf(lane), keyOf(lane.id), frame());
+  const mascot = room < MIN_TEXT_CELLS || view.rows < MIN_PAGE_ROWS ? null : kit.mascot(lane.type, stateOf(lane), keyOf(lane.id), frame());
   show(mascot === null ? [] : [lane.id]);
   const width = mascot === null ? view.width : room;
   const mark = statusMark(lane.status, g);

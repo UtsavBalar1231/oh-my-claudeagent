@@ -22,8 +22,8 @@ const SHARED: Readonly<Record<string, Rgb>> = {
   w: 0xffffff,
   p: 0xff9aae,
   K: 0x34324a,
-  G: 0x8e93a6,
-  S: 0xd9dde6,
+  G: 0x7a8099,
+  S: 0xc4c8d6,
   Y: 0xffd447,
   O: 0xff9f43,
   R: 0xe5484d,
@@ -52,41 +52,44 @@ const BODY: Layer = [
 
 const BLINK: Layer = [[10, 5, "bb..bb"]];
 const HAPPY: Layer = [[10, 5, "eb..be"], [11, 4, "ebe..ebe"], [12, 6, "mbbm"], [13, 7, "mm"]];
-const SAD: Layer = [[10, 5, "bb..bb"], [13, 6, "m..m"], [7, 13, "C"], [8, 13, "C"]];
-const SPARKLE_A: Layer = [[2, 13, "Y"], [3, 12, "YWY"], [4, 13, "Y"], [5, 1, "Y"]];
-const SPARKLE_B: Layer = [[1, 2, "Y"], [2, 1, "YWY"], [3, 2, "Y"], [4, 14, "Y"]];
-const SNORE_A: Layer = [[2, 0, "ZZZZ"], [3, 2, "Z"], [4, 1, "Z"], [5, 0, "ZZZZ"]];
-const SNORE_B: Layer = [[0, 0, "ZZZZ"], [1, 2, "Z"], [2, 1, "Z"], [3, 0, "ZZZZ"]];
+const SAD: Layer = [[10, 5, "bb..bb"], [13, 6, "m..m"]];
+// The props crowd the right side, so the sweat beads on the left temple.
+const SWEAT: Layer = [[7, 2, "C"], [8, 2, "U"]];
+const SPARKLE: Layer = [[0, 13, "Y"], [1, 12, "YWY"], [2, 13, "Y"], [5, 1, "Y"]];
+const SNORE: Layer = [[1, 0, "ZZZZ"], [2, 2, "Z"], [3, 1, "Z"], [4, 0, "ZZZZ"]];
+
+/** The shared layers, for the art invariants. The floating ones (sweat, sparkle, snore) must stay clear of every prop. */
+export const LAYERS = { body: BODY, blink: BLINK, happy: HAPPY, sad: SAD, sweat: SWEAT, sparkle: SPARKLE, snore: SNORE } as const;
 
 export const MASCOTS = {
   orchestrator: {
-    body: 0x9d8cff,
+    body: 0x7f7ff5,
     props: [[4, 8, "o"], [5, 7, "o"]],
-    poseA: [[11, 13, "b"], [10, 14, "K"], [9, 15, "S"], [8, 15, "S"], [3, 14, "Y"], [4, 14, "Y"], [5, 13, "YY"]],
-    poseB: [[12, 13, "bKS"], [13, 15, "S"], [1, 15, "Y"], [2, 15, "Y"], [3, 14, "YY"], [4, 1, "Y"], [5, 1, "Y"], [6, 0, "YY"]],
+    poseA: [[11, 13, "b"], [10, 14, "G"], [9, 15, "S"], [8, 15, "S"], [3, 14, "Y"], [4, 14, "Y"], [5, 13, "YY"]],
+    poseB: [[12, 13, "bGS"], [13, 15, "S"], [1, 15, "Y"], [2, 15, "Y"], [3, 14, "YY"], [4, 1, "Y"], [5, 1, "Y"], [6, 0, "YY"]],
   },
   planner: {
     body: 0x4ccbdd,
-    props: [[8, 1, "G"], [9, 0, "NNN"], [10, 0, "KKN"], [11, 0, "NNN"], [12, 0, "KKN"], [13, 0, "NNN"]],
-    poseA: [[10, 2, "V"], [11, 13, "b"], [10, 14, "Y"], [9, 15, "Y"]],
-    poseB: [[10, 2, "V"], [12, 2, "V"], [12, 13, "b"], [11, 14, "Y"], [10, 15, "Y"]],
+    props: [[9, 1, "G"], [10, 0, "GNN"], [11, 0, "KKN"], [12, 0, "GNN"], [13, 0, "KKN"], [14, 0, "GNN"]],
+    poseA: [[11, 2, "V"], [11, 13, "b"], [10, 14, "Y"], [9, 15, "Y"]],
+    poseB: [[11, 2, "V"], [13, 2, "V"], [12, 13, "b"], [11, 14, "Y"], [10, 15, "Y"]],
   },
   analyzer: {
     body: 0xf7d660,
     props: [[11, 2, "V"], [12, 1, "YV"], [13, 0, "RYV"]],
-    poseA: [[8, 14, "S"], [9, 13, "SCS"], [10, 14, "S"], [11, 14, "B"], [12, 14, "B"]],
-    poseB: [[9, 10, "S"], [10, 9, "SCS"], [11, 10, "S"], [12, 12, "B"], [13, 13, "B"]],
+    poseA: [[8, 14, "G"], [9, 13, "GCG"], [10, 14, "G"], [11, 14, "B"], [12, 14, "B"]],
+    poseB: [[9, 10, "G"], [10, 9, "GCG"], [11, 10, "G"], [12, 12, "B"], [13, 13, "B"]],
   },
   reviewer: {
     body: 0xf2716b,
-    props: [[14, 12, "NNNN"], [15, 12, "NNNN"]],
-    poseA: [[8, 14, "B"], [9, 14, "B"], [10, 13, "KKK"], [14, 13, "RR"]],
-    poseB: [[11, 14, "B"], [12, 14, "B"], [13, 13, "KKK"]],
+    props: [[14, 12, "GNNN"], [15, 12, "GNNN"]],
+    poseA: [[8, 14, "B"], [9, 14, "B"], [10, 13, "GGG"], [11, 13, "KKK"], [14, 13, "RR"]],
+    poseB: [[11, 14, "B"], [12, 14, "B"], [13, 13, "GGG"], [14, 13, "KKK"]],
   },
   executor: {
     body: 0x5ccb80,
     props: [[4, 6, "YOOY"], [5, 5, "YYYYYY"], [6, 4, "YYYYYYYY"]],
-    poseA: [[12, 13, "b"], [11, 14, "B"], [10, 14, "B"], [9, 13, "GGG"]],
+    poseA: [[12, 13, "bb"], [11, 14, "B"], [10, 14, "B"], [9, 13, "GGG"]],
     poseB: [[12, 13, "BB"], [11, 15, "G"], [12, 15, "G"], [13, 15, "G"], [14, 14, "Y"]],
   },
   explorer: {
@@ -104,18 +107,19 @@ export const MASCOTS = {
   architect: {
     body: 0xc983e8,
     props: [[1, 7, "YY"], [2, 6, "YYYY"], [3, 7, "YY"], [4, 7, "GG"], [11, 0, "CUU"], [12, 0, "CUU"]],
-    poseA: [[1, 5, "Y"], [1, 10, "Y"], [3, 4, "Y"], [3, 11, "Y"]],
-    poseB: [[1, 7, "SS"], [2, 6, "SSSS"], [3, 7, "SS"]],
+    // The bulb stays lit so it reads as one at rest; its rays glow only while the architect works.
+    poseA: [],
+    poseB: [[1, 5, "Y"], [1, 10, "Y"], [3, 4, "Y"], [3, 11, "Y"]],
   },
   "build-fixer": {
-    body: 0xe3ae45,
-    props: [[8, 3, "KKCCKKCCKK"]],
-    poseA: [[8, 13, "S.S"], [9, 13, "SSS"], [10, 14, "S"], [11, 14, "S"], [12, 13, "bS"]],
-    poseB: [[10, 14, "SS"], [11, 13, "SS"], [12, 14, "SS"], [6, 15, "Y"]],
+    body: 0xc9a24a,
+    props: [[8, 4, "KCCKKCCK"]],
+    poseA: [[8, 13, "S.S"], [9, 13, "SSS"], [10, 14, "G"], [11, 14, "G"], [12, 13, "bG"]],
+    poseB: [[10, 14, "GS"], [11, 13, "GG"], [12, 14, "GS"], [8, 15, "Y"]],
   },
   viewer: {
     body: 0xf784c2,
-    props: [[9, 13, "K"], [10, 12, "KKKK"], [11, 12, "KSCK"], [12, 12, "KKKK"]],
+    props: [[9, 13, "G"], [10, 12, "KGGG"], [11, 12, "KSCG"], [12, 12, "KGGG"]],
     poseA: [],
     poseB: [[8, 14, "W"], [7, 13, "Y.Y"], [9, 15, "Y"]],
   },
@@ -130,7 +134,7 @@ const tint = (rgb: Rgb, f: number): Rgb => {
   return (up((rgb >> 16) & 255) << 16) | (up((rgb >> 8) & 255) << 8) | up(rgb & 255);
 };
 
-function paletteOf(spec: Spec): Readonly<Record<string, Rgb>> {
+export function paletteOf(spec: Spec): Readonly<Record<string, Rgb>> {
   return { ...SHARED, b: spec.body, o: shade(spec.body, 0.55), l: tint(spec.body, 0.5) };
 }
 
@@ -180,11 +184,11 @@ function buildFrames(name: MascotName, state: MascotState): Frame[] {
         return compose(spec, [BODY, ...eyes, spec.props, pose], i % 2);
       });
     case "done":
-      return [compose(spec, [...base, HAPPY, spec.poseA, SPARKLE_A], 0), compose(spec, [...base, HAPPY, spec.poseA, SPARKLE_B], 0)];
+      return [compose(spec, [...base, HAPPY, spec.poseA, SPARKLE], 0)];
     case "failed":
-      return [compose(spec, [...base, SAD, spec.poseA], 0)];
+      return [compose(spec, [...base, SAD, spec.poseA, SWEAT], 0)];
     case "idle":
-      return [compose(spec, [...base, BLINK, spec.poseA, SNORE_A], 0), compose(spec, [...base, BLINK, spec.poseA, SNORE_B], 0)];
+      return [compose(spec, [...base, BLINK, spec.poseA, SNORE], 0)];
   }
 }
 
@@ -206,12 +210,15 @@ function rects(frame: Frame): string {
 }
 
 const svgCache = new WeakMap<readonly Frame[], Map<number, string>>();
+const STILL = 0;
 
-export function svgOf(frames: readonly Frame[], frameMs = FRAME_MS): string {
+/** The frames as one SVG, animated when there are several; `isStill` draws the first frame alone. */
+export function svgOf(frames: readonly Frame[], frameMs = FRAME_MS, isStill = false): string {
   let byMs = svgCache.get(frames);
   if (byMs === undefined) svgCache.set(frames, (byMs = new Map()));
-  let svg = byMs.get(frameMs);
-  if (svg === undefined) byMs.set(frameMs, (svg = buildSvg(frames, frameMs)));
+  const key = isStill ? STILL : frameMs;
+  let svg = byMs.get(key);
+  if (svg === undefined) byMs.set(key, (svg = buildSvg(isStill ? frames.slice(0, 1) : frames, frameMs)));
   return svg;
 }
 
@@ -232,6 +239,7 @@ function buildSvg(frames: readonly Frame[], frameMs: number): string {
 export const TERMINAL_DEFAULT = 0x01000000;
 const UPPER_HALF = 0x2580;
 const LOWER_HALF = 0x2584;
+const SPACE = 0x20;
 
 const rasterCache = new WeakMap<Frame, string>();
 
@@ -250,12 +258,16 @@ function buildRaster(frame: Frame): string {
     for (let x = 0; x < SIZE; x++) {
       const top = frame[r * 2]?.[x] ?? null;
       const bottom = frame[r * 2 + 1]?.[x] ?? null;
+      // A solid cell is a space on its background: no glyph to misalign, and no foreground equal
+      // to its background for a terminal's minimum-contrast setting to repaint.
       const [glyph, fg, bg] =
-        top !== null
-          ? [UPPER_HALF, top, bottom ?? TERMINAL_DEFAULT]
-          : bottom !== null
-            ? [LOWER_HALF, bottom, TERMINAL_DEFAULT]
-            : [0x20, TERMINAL_DEFAULT, TERMINAL_DEFAULT];
+        top !== null && top === bottom
+          ? [SPACE, TERMINAL_DEFAULT, top]
+          : top !== null
+            ? [UPPER_HALF, top, bottom ?? TERMINAL_DEFAULT]
+            : bottom !== null
+              ? [LOWER_HALF, bottom, TERMINAL_DEFAULT]
+              : [SPACE, TERMINAL_DEFAULT, TERMINAL_DEFAULT];
       const at = (r * SIZE + x) * 12;
       view.setUint32(at, glyph, true);
       view.setUint32(at + 4, fg, true);

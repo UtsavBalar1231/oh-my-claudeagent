@@ -1,8 +1,64 @@
 import { expect, test } from "bun:test";
-import { FRAME_MS, framesOf, MASCOTS, type MascotName, type MascotState, mascotOf, rasterCells, SIZE, svgOf, TERMINAL_DEFAULT, WORKING_FRAMES } from "./mascots.ts";
+import {
+  FRAME_MS,
+  framesOf,
+  LAYERS,
+  MASCOTS,
+  type MascotName,
+  type MascotState,
+  mascotOf,
+  paletteOf,
+  rasterCells,
+  SIZE,
+  svgOf,
+  TERMINAL_DEFAULT,
+  WORKING_FRAMES,
+} from "./mascots.ts";
 
 const NAMES = Object.keys(MASCOTS) as MascotName[];
 const STATES: MascotState[] = ["working", "done", "failed", "idle"];
+
+type Run = readonly [y: number, x: number, pixels: string];
+const cellsOf = (layer: readonly Run[]): string[] =>
+  layer.flatMap(([y, x, pixels]) => [...pixels].flatMap((key, i) => (key === "." ? [] : [`${y},${x + i}`])));
+
+test("every run stays on the 16 by 16 grid and paints only palette keys", () => {
+  for (const name of NAMES) {
+    const spec = MASCOTS[name];
+    const keys = new Set([...Object.keys(paletteOf(spec)), "."]);
+    for (const layer of [...Object.values(LAYERS), spec.props, spec.poseA, spec.poseB]) {
+      for (const [y, x, pixels] of layer as readonly Run[]) {
+        expect([name, y >= 0 && y < SIZE && x >= 0 && x + pixels.length <= SIZE]).toEqual([name, true]);
+        for (const key of pixels) expect([name, pixels, keys.has(key)]).toEqual([name, pixels, true]);
+      }
+    }
+  }
+});
+
+test("no working pixel sits on the top row, so the hop never clips a hat or a prop", () => {
+  for (const name of NAMES) {
+    framesOf(name, "working").forEach((frame, i) => {
+      if (i % 2 === 0) expect([name, i, frame[0]?.every((cell) => cell === null)]).toEqual([name, i, true]);
+    });
+  }
+});
+
+// The sweat, the sparkle and the snore float beside the pebble: none of their pixels may land on
+// or orthogonally touch a prop or the resting pose, or the overlay merges into the tool.
+test("the floating overlays never touch a prop, the resting pose or the body", () => {
+  const floating = [LAYERS.sweat, LAYERS.sparkle, LAYERS.snore];
+  const body = new Set(cellsOf(LAYERS.body));
+  for (const name of NAMES) {
+    const held = new Set(cellsOf([...MASCOTS[name].props, ...MASCOTS[name].poseA]));
+    for (const layer of floating) {
+      for (const cell of cellsOf(layer)) {
+        const [y = 0, x = 0] = cell.split(",").map(Number);
+        const near = [cell, `${y - 1},${x}`, `${y + 1},${x}`, `${y},${x - 1}`, `${y},${x + 1}`].filter((at) => held.has(at));
+        expect([name, cell, near, body.has(cell)]).toEqual([name, cell, [], false]);
+      }
+    }
+  }
+});
 
 test("every frame is 16 rows of 16 cells with at most 16 distinct colors", () => {
   for (const name of NAMES) {
@@ -52,6 +108,18 @@ test("a single frame is a still svg and several frames animate", () => {
   expect(svgOf(framesOf("executor", "working"))).toContain(`dur="${WORKING_FRAMES * FRAME_MS}ms"`);
 });
 
+test("a still svg of the working loop is its first frame alone, built once", () => {
+  const frames = framesOf("executor", "working");
+  const still = svgOf(frames, FRAME_MS, true);
+  expect(still).toBe(svgOf(framesOf("executor", "working").slice(0, 1)));
+  expect(svgOf(frames, FRAME_MS, true)).toBe(still);
+  expect(svgOf(frames)).toContain("<animate");
+});
+
+test("done, failed and idle are one frame each: only a working mascot moves", () => {
+  for (const name of NAMES) for (const state of ["done", "failed", "idle"] as const) expect([name, state, framesOf(name, state).length]).toEqual([name, state, 1]);
+});
+
 test("rasterCells decodes to 16 by 8 little-endian triplets", () => {
   const frame = framesOf("executor", "working")[0];
   if (frame === undefined) throw new Error("no frame");
@@ -63,6 +131,7 @@ test("rasterCells decodes to 16 by 8 little-endian triplets", () => {
     return [view.getUint32(at, true), view.getUint32(at + 4, true), view.getUint32(at + 8, true)];
   };
   expect(cell(5, 6)).toEqual([0x2580, 0xffffff, 0x2b2840]);
+  expect(cell(4, 8)).toEqual([0x20, TERMINAL_DEFAULT, MASCOTS.executor.body]);
   expect(cell(0, 0)).toEqual([0x20, TERMINAL_DEFAULT, TERMINAL_DEFAULT]);
   expect(TERMINAL_DEFAULT).toBe(0x01000000);
 });
