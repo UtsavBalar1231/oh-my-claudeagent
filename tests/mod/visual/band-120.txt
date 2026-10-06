@@ -1,7 +1,7 @@
 
- ▐▛███▛█   Claude Code v2.1.288
+ ▐▛███▛█   Claude Code v2.1.291
 ▝▜██████▀  Opus 5.5 · API Usage Billing
- ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/.cache/tmp/omca-visual-120x40-XXXXXX/cwd
+ ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/.cache/tmp/omca-visual-120x40-XXXXXX/cwd
 
 
 ❯ Run the tests
@@ -15,7 +15,7 @@
 
 ✻ Waiting for 1 background agent to finish
 
-● oh-my-claudeagent: 0s · 40.4k in 21 out ·  no evidence: just test
+● oh-my-claudeagent+cc-plugin-agents-md: 0s · 37.5k in 21 out ·  no evidence: just test
 
 
 
@@ -28,7 +28,7 @@
 
 
 
-█▎███ 12/46 · next 13 Port the snapshot and the ledger onto the sha… ·  just test evidence not logged ·  1 running [-]
+█▎███ 12/46 · next 13 Port the snapshot and the ledger onto th… ·  just test evidence not logged ·  1 running     [-]
 1: Log evidence
                                                                                                     ◐ medium · /effort
 ─────────────────────────────────────────────────────────────────────────────────────────────────── OMCA: 46-task-plan ─
@@ -37,4 +37,4 @@
   ⏸ manual mode on · ? for shortcuts · ← for agents · ↓ to manage
 
   ● main
-  ◯ oh-my-claudeagent:executor  Port the snapshot onto the router                                  0s · ↓ 24.4k tokens
+  ◯ oh-my-claudeagent:executor  Port the snapshot onto the router                                  0s · ↓ 18.8k tokens

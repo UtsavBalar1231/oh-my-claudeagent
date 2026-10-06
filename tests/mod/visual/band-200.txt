@@ -1,50 +1,50 @@
-
- ▐▛███▛█   Claude Code v2.1.288
-▝▜██████▀  Opus 5.5 · API Usage Billing
- ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/.cache/tmp/omca-visual-200x50-XXXXXX/cwd
-
-
-❯ Run the tests
-
-  Ran 1 shell command
-
-● oh-my-claudeagent:executor(Port the snapshot onto the router)
-  ⎿  Backgrounded agent (↓ to manage · ctrl+o to expand)
-
-● The tests ran and the executor is porting the snapshot.
-
-✻ Waiting for 1 background agent to finish
-
-● oh-my-claudeagent: 0s · 40.1k in 21 out ·  no evidence: just test
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-█▎███ 12/46 · next 13 Port the snapshot and the ledger onto the shared router ·  just test evidence not logged ·  1 running                                                                        [-]
-1: Log evidence
-                                                                                                                                                                                    ◐ medium · /effort
+                                                                                                              │                                                                                       ✕
+ ▐▛███▛█   Claude Code v2.1.291                                                                               │1: Agents  2: Plan  3: Evidence  4: Notepad  5: Feedback  6: Stats  7: Doctor
+▝▜██████▀  Opus 5.5 · API Usage Billing                                                                       │──────────────────────────────────────────────────────────────────────────────────────
+ ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/.cache/tmp/omca-visual-200x50-XXXXXX/cwd                       │
+                                                                                                              │
+                                                                                                              │     ▄▀▀▀▀▄
+❯ Run the tests                                                                                               │    ▀▀▀▀▀▀▀▀
+                                                                                                              │   ▀▀▀▀▀▀▀▀▀▀▄▄▄
+  Ran 1 shell command                                                                                         │   ▀▀▀▀▀▀▀▀▀▀ ▀
+                                                                                                              │   ▀▀▀▀▀▀▀▀▀▀▀
+● oh-my-claudeagent:executor(Port the snapshot onto the router)                                               │    ▀▀▀▀▀▀▀▀
+  ⎿  Backgrounded agent (↓ to manage · ctrl+o to expand)                                                      │    executor
+                                                                                                              │ executor · Port the snapshot onto the router                sonnet-5-5  high      0s
+● The tests ran and the executor is porting the snapshot.                                                     │  · Bash sleep 90                                                               1 call
+                                                                                                              │d: Details  1 running · 0 finished · 18.8k tokens
+✻ Waiting for 1 background agent to finish                                                                    │
+                                                                                                              │
+● oh-my-claudeagent+cc-plugin-agents-md: 0s · 37.5k in 21 out ·  no evidence: just test                      │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+█▎███ 12/46 · next 13 Port the snapshot and the ledg… ·  just test evidence not logged ·  1 running     [-] │
+1: Log evidence                                                                                               │
+                                                                                          ◐ medium · /effort  │
 ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── OMCA: 46-task-plan ─
 ❯ 
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
   ⏸ manual mode on · ? for shortcuts · ← for agents · ↓ to manage
 
   ● main
-  ◯ oh-my-claudeagent:executor  Port the snapshot onto the router                                                                                                                  0s · ↓ 24.4k tokens
+  ◯ oh-my-claudeagent:executor  Port the snapshot onto the router                                                                                                                  0s · ↓ 18.8k tokens

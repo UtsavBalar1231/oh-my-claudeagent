@@ -1,7 +1,7 @@
 
- ▐▛███▛█   Claude Code v2.1.288
+ ▐▛███▛█   Claude Code v2.1.291
 ▝▜██████▀  Opus 5.5 · API Usage Billing
- ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/omca-visual-80x40-XXXXXX/cwd
+ ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd
 
 
 ❯ Start task 5 with the executor
@@ -15,11 +15,11 @@
 
 ✻ Waiting for 1 background agent to finish
 
-● oh-my-claudeagent: 0s · 38.6k in 17 out · $0.5088 engine cost
+● oh-my-claudeagent+cc-plugin-agents-md: 0s · 37.5k in 17 out · $0.4878
+  engine cost
 
-
-╭──────────────────────────────────────────────────────────────────────────────╮
-│ 1: Agents 2: Plan 3: Evidence 4: Notepad 5: Feedback 6: Stats 7: Doctor    ✕ │
+╭────────────────────────────────────────────────────────────────────────────✕─╮
+│ 1: Agents 2: Plan 3: Evidence 4: Notepad 5: Feedback 6: Stats 7: Doctor      │
 │  FINAL  Rebuild the billing export… ████▍▌██▉█ 4/9  4   2   1 running     │
 │   ↑ 4 more                                                                   │
 │  3 Write rows in the schema's order                            UNPROVEN     │

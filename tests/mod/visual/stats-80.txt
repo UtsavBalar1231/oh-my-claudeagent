@@ -1,7 +1,7 @@
 
- ▐▛███▛█   Claude Code v2.1.288
+ ▐▛███▛█   Claude Code v2.1.291
 ▝▜██████▀  Opus 5.5 · API Usage Billing
- ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/omca-visual-80x40-XXXXXX/cwd
+ ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd
 
 
 
@@ -20,21 +20,21 @@
 
 
 
-╭──────────────────────────────────────────────────────────────────────────────╮
-│ 1: Agents 2: Plan 3: Evidence 4: Notepad 5: Feedback 6: Stats 7: Doctor    ✕ │
+╭────────────────────────────────────────────────────────────────────────────✕─╮
+│ 1: Agents 2: Plan 3: Evidence 4: Notepad 5: Feedback 6: Stats 7: Doctor      │
 │ 20 delegations in 3 sessions · 1 running · 1 unreadable record skipped       │
 │ ╭───────────────────────────────────────────────────────────────────────╮    │
 │ │ Agents · 8 types                                                      │    │
-│ │   agent                   runs  median  tokens  est. cost  evidence   │    │
-│ │  executor    ██████████     8   3m28s    2.9M      $6.86      86%   │    │
-│ │  explore     ██████████     4     24s    172k     $0.31+       0%   │    │
-│ │  librarian   ██████████     2   1m05s    162k      $0.40      50%   │    │
-│ │  oracle      ██████████     2   6m24s    453k      $5.27      50%   │    │
-│ │  hephaestus  ██████████     1   2m23s    129k      $0.65     100%   │    │
+│ │   agent                    runs  median  tokens  est. cost  evidence  │    │
+│ │  executor     ██████████     8   3m28s    2.9M      $6.86      86%  │    │
+│ │  explorer     ██████████     4     24s    172k     $0.31+       0%  │    │
+│ │  architect    ██████████     2   6m24s    453k      $5.27      50%  │    │
+│ │  researcher   ██████████     2   1m05s    162k      $0.40      50%  │    │
+│ │  analyzer     ██████████     1   3m08s   60.1k      $0.34       0%  │    │
 │   ↓ more · ↑↓ scroll                                                         │
 ╰──────────────────────────────────────────────────────────────────────────────╯
                                                             ◐ medium · /effort
-─────────────────────────────────────────────────── oh-my-claudeagent:sisyphus ─
+─────────────────────────────────────────────── oh-my-claudeagent:orchestrator ─
 ❯ 
 ────────────────────────────────────────────────────────────────────────────────
   ⏸ manual mode on · ? for shortcuts · ← for agents

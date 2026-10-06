@@ -17,7 +17,7 @@ describe("SHOTS", () => {
   });
 
   test("captures every README scene as a still and the two animated scenes as GIFs", () => {
-    expect(SHOTS.filter((shot) => shot.format === "png").map((shot) => shot.name)).toEqual(["hero", "band", "plan", "evidence", "agents", "guard", "doctor", "statusline"]);
+    expect(SHOTS.filter((shot) => shot.format === "png").map((shot) => shot.name)).toEqual(["hero", "band", "plan", "evidence", "agents", "mascots", "guard", "doctor", "statusline"]);
     expect(SHOTS.filter((shot) => shot.format === "gif").map((shot) => shot.name)).toEqual(["pane-tour", "guard-dialog"]);
   });
 
@@ -27,8 +27,13 @@ describe("SHOTS", () => {
     expect(still("plan")?.ready(board)).toBe(false);
   });
 
+  test("the mascots scene is ready only once all three names sit under the stage", () => {
+    expect(still("mascots")?.ready("    executor         explorer         architect")).toBe(true);
+    expect(still("mascots")?.ready("    executor         explorer")).toBe(false);
+  });
+
   test("only the pane scenes crop to the pane", () => {
-    expect(SHOTS.filter((shot) => shot.crop === "pane").map((shot) => shot.name)).toEqual(["plan", "evidence", "agents", "doctor"]);
+    expect(SHOTS.filter((shot) => shot.crop === "pane").map((shot) => shot.name)).toEqual(["plan", "evidence", "agents", "mascots", "doctor"]);
   });
 
   test("the guard scenes are ready only once the dialog holds the command", () => {

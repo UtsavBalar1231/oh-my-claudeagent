@@ -1,7 +1,7 @@
 
- ▐▛███▛█   Claude Code v2.1.288
+ ▐▛███▛█   Claude Code v2.1.291
 ▝▜██████▀  Opus 5.5 · API Usage Billing
- ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/omca-visual-80x40-XXXXXX/cwd
+ ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd
 
 
 
@@ -19,22 +19,22 @@
 
 
 
-╭──────────────────────────────────────────────────────────────────────────────╮
-│ 1: Agents 2: Plan 3: Evidence 4: Notepad 5: Feedback 6: Stats 7: Doctor    ✕ │
+╭────────────────────────────────────────────────────────────────────────────✕─╮
+│ 1: Agents 2: Plan 3: Evidence 4: Notepad 5: Feedback 6: Stats 7: Doctor      │
 │  COMPLETE  proof-ledger   build   test   lint   manual  10-02 13:35      │
 │ ── Fri 2026-10-02 ───────────────────────────────────────────────────────    │
-│ ❯   12:40  manual  curl -fsS -H 'Autho…xample.test/healthz   sisyphus      │
+│ ❯   12:40  manual  curl -fsS -H 'Auth…ample.test/healthz   orchestrator    │
 │     curl -fsS -H 'Authorization: Bearer ‹masked›' https://staging.exampl…    │
 │     HTTP/2 200                                                               │
 │     x-request-id: 7f3c9a                                                     │
 │     {"status":"ok","build":"2026.10.02-1"}                                   │
 │     rerun with DEPLOY_TOKEN=‹masked› to redeploy                             │
-│     2026-10-02 12:40:00 ·  sisyphus · 2 secrets masked                      │
+│     2026-10-02 12:40:00 ·  orchestrator · 2 secrets masked                  │
 │ t: Type  x: Fails  f: Find  c: Copy  r: Rerun  3/16 · ↑↓ move                │
 ╰──────────────────────────────────────────────────────────────────────────────╯
-█████ 6/6                                                                    [-]
+█████ 6/6                                                                   [-]
                                                             ◐ medium · /effort
-─────────────────────────────────────────────────── oh-my-claudeagent:sisyphus ─
+─────────────────────────────────────────────── oh-my-claudeagent:orchestrator ─
 ❯ 
 ────────────────────────────────────────────────────────────────────────────────
   ⏸ manual mode on · ? for shortcuts · ← for agents

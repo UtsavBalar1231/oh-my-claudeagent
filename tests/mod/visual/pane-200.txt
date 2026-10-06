@@ -1,29 +1,29 @@
-                                                                                                             │1: Agents  2: Plan  3: Evidence  4: Notepad  5: Feedback  6: Stats  7: Doctor            ✕
- ▐▛███▛█   Claude Code v2.1.288                                                                              │───────────────────────────────────────────────────────────────────────────────────────
-▝▜██████▀  Opus 5.5 · API Usage Billing                                                                      │ explore · Map the router callers                            sonnet-5-5  high       2s
- ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/.cache/tmp/omca-visual-200x50-XXXXXX/cwd                          │  ✽ Bash sleep 90                                                               3 calls
-                                                                                                             │ oracle · Review the ledger design                           fable-5-1   xhigh      2s
-                                                                                                             │  ✽ Bash sleep 90                                                               3 calls
-❯ Fix the parser with the executor                                                                           │ executor · The rotation is safe: a crash mid-write leaves the previous file…       0s
-                                                                                                             │d: Details  2 running · 1 finished · 159k tokens
-● 3 background agents launched (↓ to manage)                                                                 │
-   ├ oh-my-claudeagent:executor (Fix the heading parser)                                                     │
-   ├ oh-my-claudeagent:explore (Map the router callers)                                                      │
-   └ oh-my-claudeagent:oracle (Review the ledger design)                                                     │
+                                                                                                             │                                                                                        ✕
+ ▐▛███▛█   Claude Code v2.1.291                                                                              │1: Agents  2: Plan  3: Evidence  4: Notepad  5: Feedback  6: Stats  7: Doctor
+▝▜██████▀  Opus 5.5 · API Usage Billing                                                                      │───────────────────────────────────────────────────────────────────────────────────────
+ ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/.cache/tmp/omca-visual-200x50-XXXXXX/cwd                      │                                         ▄ ▄▄ ▄
+                                                                                                             │                        ▄▄▄▄            ▄ ▀▀▀▀ ▄▄▀▄
+                                                                                                             │     ▄▀▀▀▀▄            ▀▀▀▀▀▀        ▄     ▀▀    ▀
+❯ Fix the parser with the executor                                                                           │    ▀▀▀▀▀▀▀▀         ▀▀▀▀▀▀▀▀▀▀         ▄▀▀▀▀▀▀▄
+                                                                                                             │   ▀▀▀▀▀▀▀▀▀▀▄▄▄     ▀▀▀▀▀▀▀▀▀▀  ▄     ▀▀▀▀▀▀▀▀▀▀
+● 3 background agents launched (↓ to manage)                                                                 │   ▀▀▀▀▀▀▀▀▀▀ ▀      ▀▀▀▀▀▀▀▀▀▀▀▀▀  ▄▄▄▀▀▀▀▀▀▀▀▀▀
+   ├ oh-my-claudeagent:executor (Fix the heading parser)                                                     │   ▀▀▀▀▀▀▀▀▀▀▀       ▀▀▀▀▀▀▀▀▀▀     ▀▀▀▀▀▀▀▀▀▀▀▀▀
+   ├ oh-my-claudeagent:explorer (Map the router callers)                                                     │    ▀▀▀▀▀▀▀▀          ▀▀▀▀▀▀▀▀          ▀▀▀▀▀▀▀▀
+   └ oh-my-claudeagent:architect (Review the ledger design)                                                  │    executor          explorer         architect
+                                                                                                             │ executor · Fix the heading parser                            sonnet-5-5  high      3s
+● Three agents are on it.                                                                                    │  ✳ Bash sleep 90                                                               3 calls
+                                                                                                             │ explorer · Map the router callers                            sonnet-5-5  high      3s
+✻ Waiting for 3 background agents to finish                                                                  │  ✳ Bash sleep 90                                                               2 calls
+                                                                                                             │ architect · The rotation is safe: a crash mid-write leaves the previous file…      0s
+● Agent "Review the ledger design" finished · 0s                                                             │d: Details  2 running · 1 finished · 115k tokens
                                                                                                              │
-● Three agents are on it.                                                                                    │
-                                                                                                             │
-✻ Waiting for 3 background agents to finish                                                                  │
-                                                                                                             │
-● oh-my-claudeagent: 0s · 40.8k in 13 out · $1.16 engine cost                                                │
-                                                                                                             │
-● Agent "Fix the heading parser" finished · 0s                                                               │
+● oh-my-claudeagent+cc-plugin-agents-md: 0s · 38.2k in 13 out · $1.28 engine cost                            │
                                                                                                              │
 ● ok                                                                                                         │
                                                                                                              │
 ✻ Waiting for 2 background agents to finish                                                                  │
                                                                                                              │
-● oh-my-claudeagent: 0s · 41.1k in 8 out · $0.1648 engine cost                                               │
+● oh-my-claudeagent+cc-plugin-agents-md: 0s · 39.3k in 8 out · $0.1573 engine cost                           │
                                                                                                              │
                                                                                                              │
                                                                                                              │
@@ -38,7 +38,7 @@
                                                                                                              │
                                                                                                              │
                                                                                                              │
-█▎███ 12/46 · next 13 Port the snapshot and the ledger onto the shared router ·  2 running               [-]│
+█▎███ 12/46 · next 13 Port the snapshot and the ledger onto the shared router ·  2 running              [-] │
                                                                                          ◐ medium · /effort  │
 ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── OMCA: 46-task-plan ─
 ❯ 
@@ -46,5 +46,5 @@
   ⏸ manual mode on · /tasks to see subagents · ← for agents · ↓ to manage
 
   ● main
-  ◯ oh-my-claudeagent:explore  Map the router callers                                                                                                                              3s · ↓ 25.7k tokens
-  ◯ oh-my-claudeagent:oracle   Review the ledger design                                                                                                                            2s · ↓ 21.9k tokens
+  ◯ oh-my-claudeagent:executor  Fix the heading parser                                                                                                                             3s · ↓ 19.3k tokens
+  ◯ oh-my-claudeagent:explorer  Map the router callers                                                                                                                             3s · ↓ 23.2k tokens

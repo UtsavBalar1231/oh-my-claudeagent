@@ -1,14 +1,15 @@
-                                                               │1: Agents  2: Plan  3: Evidence  4: Notepad            ✕
- ▐▛███▛█   Claude Code v2.1.288                                │5: Feedback  6: Stats  7: Doctor
-▝▜██████▀  Opus 5.5 · API Usage Billing                        │─────────────────────────────────────────────────────
- ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/cwd               │r: Run again    3 warn   1 info   9 ok
-                                                               │
-▎ Auto mode is now Claude Code's default permission mode.      │  WARN  omca server
-▎ Auto mode lets Claude handle permission prompts              │  No hook has reached the server in this session yet
-▎ automatically. Claude checks each tool call for risky actions│  m: Use /mcp
-▎ and prompt injection before executing, runs the ones it      │  WARN  Effort cap
-▎ assesses as lower-risk, and blocks the rest.                 │  maxEffortLevel high holds oracle below the xhigh it
-▎ https://code.claude.com/docs/en/permission-modes             │  declares
+                                                               │                                                      ✕
+ ▐▛███▛█   Claude Code v2.1.291                                │1: Agents  2: Plan  3: Evidence  4: Notepad
+▝▜██████▀  Opus 5.5 · API Usage Billing                        │5: Feedback  6: Stats  7: Doctor
+ ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd           │─────────────────────────────────────────────────────
+                                                               │r: Run again    3 warn   1 info   9 ok
+▎ Auto mode is now Claude Code's default permission mode.      │
+▎ Auto mode lets Claude handle permission prompts              │  WARN  omca server
+▎ automatically. Claude checks each tool call for risky actions│  No hook has reached the server in this session yet
+▎ and prompt injection before executing, runs the ones it      │  m: Use /mcp
+▎ assesses as lower-risk, and blocks the rest.                 │  WARN  Effort cap
+▎ https://code.claude.com/docs/en/permission-modes             │  maxEffortLevel high holds the architect below the
+                                                               │  xhigh it declares
                                                                │  WARN  Status line
                                                                │  No refreshInterval, so it redraws on events only
                                                                │  and goes stale while agents run
@@ -20,7 +21,7 @@
                                                                │  OK    OMCA
                                                                │  oh-my-claudeagent 2.21.0 is loaded
                                                                │  OK    Claude Code
-                                                               │  2.1.288 meets the 2.1.288 floor
+                                                               │  2.1.291 meets the 2.1.288 floor
                                                                │  OK    bun
                                                                │  bun 1.4.2 is on PATH
                                                                │  OK    ast-grep
@@ -29,11 +30,10 @@
                                                                │  showBand on, guardMode dialog
                                                                │  OK    Agent models
                                                                │  Each agent keeps the model tier it declares
-                                                               │  OK    Mod policy
-                                                               │  Mods you install may load
-                                                               │  ↓ 2 more · ↑↓ scroll
+                                                               │
+                                                               │  ↓ 3 more · ↑↓ scroll
                                            ◐ medium · /effort  │
-─────────────────────────────────────────────────────────────────────────────────────────── oh-my-claudeagent:sisyphus ─
+─────────────────────────────────────────────────────────────────────────────────────── oh-my-claudeagent:orchestrator ─
 ❯ 
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
   omca

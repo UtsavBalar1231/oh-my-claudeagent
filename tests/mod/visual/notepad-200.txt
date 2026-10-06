@@ -1,7 +1,8 @@
-                                                                                                             │1: Agents  2: Plan  3: Evidence  4: Notepad  5: Feedback  6: Stats  7: Doctor            ✕
- ▐▛███▛█   Claude Code v2.1.288                                                                              │───────────────────────────────────────────────────────────────────────────────────────
-▝▜██████▀  Opus 5.5 · API Usage Billing                                                                      │checkout-redesign  BOUND  · 10 entries · 1 masked
- ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/.cache/tmp/omca-visual-200x50-XXXXXX/cwd                          │f: Find  l: Plans (3)
+                                                                                                             │                                                                                        ✕
+ ▐▛███▛█   Claude Code v2.1.291                                                                              │1: Agents  2: Plan  3: Evidence  4: Notepad  5: Feedback  6: Stats  7: Doctor
+▝▜██████▀  Opus 5.5 · API Usage Billing                                                                      │───────────────────────────────────────────────────────────────────────────────────────
+ ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/.cache/tmp/omca-visual-200x50-XXXXXX/cwd                      │checkout-redesign  BOUND  · 10 entries · 1 masked
+                                                                                                             │f: Find  l: Plans (3)
                                                                                                              │╭─────────────────────────────────────────╮ ╭─────────────────────────────────────────╮
                                                                                                              ││ Learnings · 3 entries                   │ │ Issues · 2 entries                      │
                                                                                                              ││ ── 10-01 15:12 ──────────────────────── │ │ ── 10-01 20:50 ──────────────────────── │
@@ -41,10 +42,9 @@
                                                                                                              │
                                                                                                              │
                                                                                                              │
-                                                                                                             │
-██▌██ 2/4 · next 3 Show the saved payment methods                                                         [-]│
+██▌██ 2/4 · next 3 Show the saved payment methods                                                        [-] │
                                                                                          ◐ medium · /effort  │
-─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── oh-my-claudeagent:sisyphus ─
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── oh-my-claudeagent:orchestrator ─
 ❯ 
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
   ⏸ manual mode on · ? for shortcuts · ← for agents

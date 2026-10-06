@@ -1,7 +1,7 @@
 
- ▐▛███▛█   Claude Code v2.1.288
+ ▐▛███▛█   Claude Code v2.1.291
 ▝▜██████▀  Opus 5.5 · API Usage Billing
- ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/omca-visual-80x40-XXXXXX/cwd
+ ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd
 
 
 
@@ -19,8 +19,8 @@
 
 
 
-╭──────────────────────────────────────────────────────────────────────────────╮
-│ 1: Agents 2: Plan 3: Evidence 4: Notepad 5: Feedback 6: Stats 7: Doctor    ✕ │
+╭────────────────────────────────────────────────────────────────────────────✕─╮
+│ 1: Agents 2: Plan 3: Evidence 4: Notepad 5: Feedback 6: Stats 7: Doctor      │
 │ checkout-redesign  BOUND  · 10 entries · 1 masked                            │
 │ f: Find  l: Plans (3)                                                        │
 │ ╭───────────────────────────────────────────────────────────────────────╮    │
@@ -32,9 +32,9 @@
 │ │ ── 10-02 16:35 ────────────────────────────────────────────────────── │    │
 │   ↓ more · ↑↓ scroll                                                         │
 ╰──────────────────────────────────────────────────────────────────────────────╯
-██▌██ 2/4 · next 3 Show the saved payment methods                            [-]
+██▌██ 2/4 · next 3 Show the saved payment methods                           [-]
                                                             ◐ medium · /effort
-─────────────────────────────────────────────────── oh-my-claudeagent:sisyphus ─
+─────────────────────────────────────────────── oh-my-claudeagent:orchestrator ─
 ❯ 
 ────────────────────────────────────────────────────────────────────────────────
   ⏸ manual mode on · ? for shortcuts · ← for agents

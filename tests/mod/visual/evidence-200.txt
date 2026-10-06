@@ -1,7 +1,8 @@
-                                                                                                             │1: Agents  2: Plan  3: Evidence  4: Notepad  5: Feedback  6: Stats  7: Doctor            ✕
- ▐▛███▛█   Claude Code v2.1.288                                                                              │───────────────────────────────────────────────────────────────────────────────────────
-▝▜██████▀  Opus 5.5 · API Usage Billing                                                                      │╭─────────────────────────────────────────────────────────────────────────────────────╮
- ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/.cache/tmp/omca-visual-200x50-XXXXXX/cwd                          ││ Final verification · proof-ledger                                                   │
+                                                                                                             │                                                                                        ✕
+ ▐▛███▛█   Claude Code v2.1.291                                                                              │1: Agents  2: Plan  3: Evidence  4: Notepad  5: Feedback  6: Stats  7: Doctor
+▝▜██████▀  Opus 5.5 · API Usage Billing                                                                      │───────────────────────────────────────────────────────────────────────────────────────
+ ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/.cache/tmp/omca-visual-200x50-XXXXXX/cwd                      │╭─────────────────────────────────────────────────────────────────────────────────────╮
+                                                                                                             ││ Final verification · proof-ledger                                                   │
                                                                                                              ││  COMPLETE  matches the current plan · 10-02 13:35                                   │
                                                                                                              ││  build   test   lint   manual                                                   │
                                                                                                              │╰─────────────────────────────────────────────────────────────────────────────────────╯
@@ -12,8 +13,8 @@
                                                                                                              │    12:10  test    bun test src …line scripts  │ x-request-id: 7f3c9a                │
                                                                                                              │── Thu 2026-10-01 ────────────────────────────  │ {"status":"ok","build":"2026.10.02… │
                                                                                                              │    18:45  test    just validate…check engine  │ rerun with DEPLOY_TOKEN=‹masked› t… │
-                                                                                                             │    17:00  final   just ci && ju…ual evidence  │ 2026-10-02 12:40:00 ·  sisyphus    │
-                                                                                                             │    15:32  lint    just typecheck              │ 2 secrets masked                    │
+                                                                                                             │    17:00  final   just ci && ju…ual evidence  │ 2026-10-02 12:40:00                 │
+                                                                                                             │    15:32  lint    just typecheck              │  orchestrator · 2 secrets masked   │
                                                                                                              │    15:15  lint    just typecheck              ╰─────────────────────────────────────╯
                                                                                                              │    14:30  build   bun run build
                                                                                                              │    13:50  test    just test-mod
@@ -41,10 +42,9 @@
                                                                                                              │
                                                                                                              │
                                                                                                              │
-                                                                                                             │
-█████ 6/6                                                                                                 [-]│t: Type  x: Fails  f: Find  c: Copy  r: Rerun  3/16 · ↑↓ move
+█████ 6/6                                                                                                [-] │t: Type  x: Fails  f: Find  c: Copy  r: Rerun  3/16 · ↑↓ move
                                                                                          ◐ medium · /effort  │
-─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── oh-my-claudeagent:sisyphus ─
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── oh-my-claudeagent:orchestrator ─
 ❯ 
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
   ⏸ manual mode on · ? for shortcuts · ← for agents

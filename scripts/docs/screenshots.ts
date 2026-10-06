@@ -575,7 +575,34 @@ export const SHOTS: readonly Still[] = [
         { content: [bash("just watch draft", "Run the draft order tests in watch mode")] },
       ],
     },
-    ready: (screen) => screen.includes("just watch summary") && screen.includes("just watch draft") && screen.includes("explore · The forms build"),
+    ready: (screen) => screen.includes("just watch summary") && screen.includes("just watch draft") && screen.includes("explorer · The forms build"),
+    crop: "pane",
+  },
+  {
+    name: "mascots",
+    format: "png",
+    cols: 200,
+    rows: 36,
+    command: "Start the open checkout tasks",
+    keys: ["/omca", "Enter"],
+    // Each subagent takes the next scripted turn, so the sleeps keep all three running while the
+    // pane draws the stage.
+    script: {
+      main: [
+        { content: [text("Three agents can start now."), TASK_7] },
+        { content: [bash("sleep 3", "Let the executor settle")] },
+        { content: [agent("explorer", "Map the validation messages", "Task 8: list every validation message the forms build today.")] },
+        { content: [bash("sleep 3", "Let the explorer settle")] },
+        { content: [agent("architect", "Review the checkout flow", "Review how the draft order and the summary panel share state.")] },
+        { content: [text("The executor, the explorer and the architect are running.")] },
+      ],
+      subagent: [
+        { content: [bash("sleep 600", "Hold the executor open")] },
+        { content: [bash("sleep 600", "Hold the explorer open")] },
+        { content: [bash("sleep 600", "Hold the architect open")] },
+      ],
+    },
+    ready: (screen) => /executor {2,}explorer {2,}architect/.test(screen),
     crop: "pane",
   },
   { name: "guard", format: "png", cols: 120, rows: 26, command: "Clean the build", keys: [], script: GUARD_SCRIPT, ready: guardReady },
@@ -1040,6 +1067,7 @@ async function captureShot(shot: Shot, outDir: string): Promise<string> {
       join(config, "settings.json"),
       JSON.stringify({
         tui: "fullscreen",
+        prefersReducedMotion: true,
         ...(withPlugin && {
           statusLine: { type: "command", command: statusline("main.ts"), padding: 1, refreshInterval: 5, hideVimModeIndicator: true },
           subagentStatusLine: { type: "command", command: statusline("subagent.ts") },

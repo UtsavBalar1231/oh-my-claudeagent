@@ -1,7 +1,8 @@
-                                                               │1: Agents  2: Plan  3: Evidence  4: Notepad            ✕
- ▐▛███▛█   Claude Code v2.1.288                                │5: Feedback  6: Stats  7: Doctor
-▝▜██████▀  Opus 5.5 · API Usage Billing                        │─────────────────────────────────────────────────────
- ▝▝   ▝▝   @oh-my-claudeagent:sisyphus · ~/…/cwd               │╭───────────────────────────────────────────────────╮
+                                                               │                                                      ✕
+ ▐▛███▛█   Claude Code v2.1.291                                │1: Agents  2: Plan  3: Evidence  4: Notepad
+▝▜██████▀  Opus 5.5 · API Usage Billing                        │5: Feedback  6: Stats  7: Doctor
+ ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd           │─────────────────────────────────────────────────────
+                                                               │╭───────────────────────────────────────────────────╮
                                                                ││ Final verification · proof-ledger                 │
                                                                ││  COMPLETE  matches the current plan · 10-02 13:35 │
                                                                ││  build   test   lint   manual                 │
@@ -15,7 +16,7 @@
                                                                │    x-request-id: 7f3c9a
                                                                │    {"status":"ok","build":"2026.10.02-1"}
                                                                │    rerun with DEPLOY_TOKEN=‹masked› to redeploy
-                                                               │    2026-10-02 12:40:00 ·  sisyphus
+                                                               │    2026-10-02 12:40:00 ·  orchestrator
                                                                │    2 secrets masked
                                                                │    12:10  test    bun test src ser…atusline scripts
                                                                │── Thu 2026-10-01 ───────────────────────────────────
@@ -30,11 +31,10 @@
                                                                │    16:10  manual  just visual plan-reader
                                                                │    14:35  test    bun test src/core
                                                                │    14:01  lint    just lint
-                                                               │    13:55  lint    just lint
                                                                │t: Type  x: Fails  f: Find  c: Copy  r: Rerun
-█████ 6/6                                                   [-]│3/16 · ↑↓ move
+█████ 6/6                                                  [-] │3/16 · ↑↓ move
                                            ◐ medium · /effort  │
-─────────────────────────────────────────────────────────────────────────────────────────── oh-my-claudeagent:sisyphus ─
+─────────────────────────────────────────────────────────────────────────────────────── oh-my-claudeagent:orchestrator ─
 ❯ 
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
   ⏸ manual mode on · ? for shortcuts · ← for agents
