@@ -24,7 +24,8 @@ import {
   type ThemeKey,
   TONE_KEYS,
 } from "../src/core/visual.ts";
-import type { Glyphs } from "../src/core/ui-kit.ts";
+import { framesOf, type MascotState, mascotOf, rasterCells, svgOf } from "../src/core/mascots.ts";
+import type { GlyphTier, Glyphs } from "../src/core/ui-kit.ts";
 
 type Keyed<P, K extends keyof P> = Omit<P, K> & { [Q in K]?: ThemeKey };
 type TextColors = "color" | "backgroundColor";
@@ -44,11 +45,40 @@ export type Kit = {
   Code: ElementConstructor<CodeProps>;
   Link: ElementConstructor<LinkProps>;
   Input?: ElementConstructor<InputProps>;
+  /** The agent's mascot, or null for an unknown agent or the ASCII tier. Mascot colors are fixed RGB, not theme keys. */
+  mascot: (type: string, state: MascotState, key: string, frame: number) => RenderElement | null;
 };
+
+const MASCOT_ROWS = 8;
+const MASCOT_COLUMNS = 16;
+const MASCOT_PIXELS = 64;
+
+// The engine completes every table, so the surface, not the table, says which element draws.
+// Only a working mascot moves, and on a remote surface it moves by its own SMIL loop, so those
+// props never depend on `frame`: a redraw must not restart the loop.
+function mascotIn(table: ElementTable, surface: RenderSurface, tier: GlyphTier, type: string, state: MascotState, key: string, frame: number): RenderElement | null {
+  const name = mascotOf(type);
+  if (name === undefined || tier === "ascii") return null;
+  const frames = framesOf(name, state);
+  if (surface === "terminal" && "Raster" in table) {
+    const shown = frames[state === "working" ? frame % frames.length : 0];
+    return shown === undefined ? null : table.Raster({ key, columns: MASCOT_COLUMNS, rows: MASCOT_ROWS, cells: rasterCells(shown) });
+  }
+  const first = frames[0];
+  if (!("Svg" in table) || first === undefined) return null;
+  const isWorking = state === "working";
+  return table.Svg({
+    source: svgOf(isWorking ? frames : [first]),
+    alt: `${name} ${state}`,
+    width: MASCOT_PIXELS,
+    height: MASCOT_PIXELS,
+    ...(isWorking ? { isInteractive: true } : {}),
+  });
+}
 
 // The engine completes every table, so a surface without an Input still hands out one that
 // draws an empty fragment; the surface, not the table, says whether a field can be drawn.
-export const kitOf = (table: ElementTable, surface: RenderSurface): Kit => ({
+export const kitOf = (table: ElementTable, surface: RenderSurface, tier: GlyphTier = "nerd"): Kit => ({
   Box: table.Box,
   Text: table.Text,
   Button: table.Button,
@@ -56,6 +86,7 @@ export const kitOf = (table: ElementTable, surface: RenderSurface): Kit => ({
   Code: table.Code,
   Link: table.Link,
   ...(surface !== "mobile" && "Input" in table ? { Input: table.Input } : {}),
+  mascot: (type, state, key, frame) => mascotIn(table, surface, tier, type, state, key, frame),
 });
 
 const styleOf = ({ text: _text, ...style }: Piece): TextStyle => style;
@@ -208,6 +239,8 @@ export function rowsAtLeast(node: RenderNode): number {
       return node.props.text.trim() === "" ? 0 : 1;
     case "Code":
       return node.props.source.split("\n").length;
+    case "Raster":
+      return node.props.rows;
     case "Button":
     case "Input":
     case "Select":

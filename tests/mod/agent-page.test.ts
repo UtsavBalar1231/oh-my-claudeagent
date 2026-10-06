@@ -1,6 +1,7 @@
 import type { On, SessionMessage } from "claude-code";
 import { type Engine, expect, test } from "claude-code/testing";
-import { pane, rows, run, type Size, usage, world } from "./world.ts";
+import type { RenderElement } from "claude-code";
+import { childrenOf, isNode, type Node, pane, rows, run, type Size, topRows, usage, world } from "./world.ts";
 
 const DOCK_120: Size = { columns: 120, rows: 40, placement: "dock" };
 const SECRET = "sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123";
@@ -38,6 +39,14 @@ function watchState(on: On): { read: (key: string) => unknown; keys: string[] } 
   const keys: string[] = [];
   on("state.set", (_$, e, next) => (last.set(e.key, e.value), keys.push(e.key), next(e)));
   return { read: (key) => last.get(key), keys };
+}
+
+// The header's mascot and its two lines are one row Box; the lines read as the rows they are beside it.
+function pageRows(tree: RenderElement): string[] {
+  const top = topRows(tree).flatMap((child) =>
+    isNode(child) && child.props?.["key"] === "page-header" ? childrenOf(childrenOf(child)[1] as Node) : [child],
+  );
+  return rows({ type: "Box", children: top } as RenderElement);
 }
 
 const message = (role: "user" | "assistant", text: string): SessionMessage => ({ role, text, toolUses: [] });
@@ -83,9 +92,9 @@ test("a lane head's button opens the page of a running agent: header, full brief
   await ui.press({ key: `open-${id}` });
 
   expect(state.keys.filter((key) => key === "pages")).toEqual(["pages"]);
-  expect(rows(await ui.drawn()).slice(3)).toEqual([
-    "◆ executor · Fix the heading parser",
-    "◆ running · 2s · 0 tokens · ~$0.00",
+  expect(pageRows(await ui.drawn()).slice(3)).toEqual([
+    "◆ executor · Fix the heading par…",
+    "◆ running · 2s · 0 tokens · ~$0.…",
     "Brief",
     BRIEF,
     "Tool calls · 2",
@@ -114,9 +123,9 @@ test("a finished agent's page is kept at its turn.complete from its transcript, 
   w.agents = [];
   const ui = await $.ui.mount(pane("terminal", DOCK_120));
   await ui.press({ key: `open-${id}` });
-  expect(rows(await ui.drawn()).slice(3, 7)).toEqual([
-    "◆ executor · Fix the heading parser",
-    "✓ done · 1m05s · 2.5k tokens · ~$0.00",
+  expect(pageRows(await ui.drawn()).slice(3, 7)).toEqual([
+    "◆ executor · Fix the heading par…",
+    "✓ done · 1m05s · 2.5k tokens · ~…",
     "Brief",
     BRIEF,
   ]);
@@ -133,7 +142,7 @@ test("a finished agent whose transcript is denied keeps its page from the stored
   w.agents = [];
   const ui = await $.ui.mount(pane("terminal", DOCK_120));
   await ui.press({ key: `open-${id}` });
-  expect(rows(await ui.drawn()).slice(5, 8)).toEqual([
+  expect(pageRows(await ui.drawn()).slice(5, 8)).toEqual([
     "Brief · stored prompt, no transcript",
     "Fix the heading parser.",
     "Tool calls · 0",

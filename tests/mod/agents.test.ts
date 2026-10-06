@@ -60,9 +60,11 @@ function textOf(element: unknown): string {
   return childrenOf(element).map(textOf).join(element.type === "Box" ? gap : "");
 }
 
-/** The body rows as the terminal stacks them: a lane's anchor rows each on their own, its hover card left out. */
+const isStage = (node: unknown) => isNode(node) && node.props?.["key"] === "agents-stage";
+
+/** The body rows as the terminal stacks them: the mascot stage and a lane's hover card left out, a lane's anchor rows each on their own. */
 function body(tree: RenderElement): string[] {
-  const top = isNode(tree) ? childrenOf(tree) : [];
+  const top = (isNode(tree) ? childrenOf(tree) : []).filter((child) => !isStage(child));
   return top.flatMap((child) =>
     isNode(child) && child.type === "Box" && child.props?.["flexDirection"] === "column" ? childrenOf(child).filter((one) => !(isNode(one) && isCard(one))).map(textOf) : [textOf(child)],
   );

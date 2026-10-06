@@ -1,0 +1,72 @@
+import type { Timer } from "claude-code";
+import type { Lane } from "../src/core/mission.ts";
+import { FRAME_MS, framesOf, type MascotName, type MascotState, mascotOf, rasterCells, SIZE } from "../src/core/mascots.ts";
+import { type Host, reason } from "./host.ts";
+import { PANE } from "./pane.ts";
+
+let timer: Timer | undefined;
+let isBlitting = false;
+let counter = 0;
+// The agents whose mascots the latest Agents tab drawing laid out, so the timer blits only those.
+let drawn: ReadonlySet<string> = new Set();
+
+/** The frame every working mascot is at: a drawing made now lands where the blits are. */
+export const frame = (): number => counter;
+
+export const keyOf = (id: string): string => `mascot-${id}`;
+
+export function stateOf({ endedAt, status }: Pick<Lane, "endedAt" | "status">): MascotState {
+  if (endedAt === null) return status === "running" ? "working" : "idle";
+  return status === "answer" ? "done" : "failed";
+}
+
+export function show(ids: Iterable<string>): void {
+  drawn = new Set(ids);
+}
+
+async function working(host: Host): Promise<{ id: string; name: MascotName }[]> {
+  const [pane, agents, surfaces] = await Promise.all([host.state.pane.get(), host.state.agents.get(), host.session.surfaces()]);
+  if (pane.value?.tab !== "agents" || !surfaces.includes("terminal")) return [];
+  return Object.entries(agents.value ?? {}).flatMap(([id, row]) => {
+    const name = mascotOf(row.type);
+    return name === undefined || !drawn.has(id) || stateOf(row) !== "working" ? [] : [{ id, name }];
+  });
+}
+
+async function advance(host: Host): Promise<void> {
+  const shown = await working(host);
+  if (shown.length === 0) {
+    stop();
+    return;
+  }
+  counter += 1;
+  await Promise.all(
+    shown.map(({ id, name }) => {
+      const frames = framesOf(name, "working");
+      const next = frames[counter % frames.length];
+      return next === undefined ? undefined : host.ui.blit({ requestId: PANE, key: keyOf(id), columns: SIZE, rows: SIZE / 2, cells: rasterCells(next) });
+    }),
+  );
+}
+
+/** Starts the timer when a shown agent works on a terminal; a blit the engine denies is a mascot that is not mounted. */
+export async function ensure(host: Host): Promise<void> {
+  if (timer !== undefined || (await working(host)).length === 0) return;
+  timer ??= host.clock.every(FRAME_MS, async () => {
+    if (isBlitting) return;
+    isBlitting = true;
+    try {
+      await advance(host);
+    } catch (error) {
+      host.log(`omca mascots could not blit: ${reason(error)}`);
+    } finally {
+      isBlitting = false;
+    }
+  });
+}
+
+export function stop(): void {
+  timer?.cancel();
+  timer = undefined;
+  counter = 0;
+}

@@ -33,6 +33,17 @@ subagent's call, appends the call and its outcome to a module-level map, with no
 from `$.session.messages({ agentId })` and that map; a denied read keeps the stored prompt. A
 page holds at most 8 KiB of brief, 120 calls and 4 KiB of reply, for the newest 20 agents.
 
+`mascot-player` animates the 16 by 8 mascots of `src/core/mascots.ts`. The Agents tab draws a stage
+above the lanes (running agents, then the current wave's finished ones, `floor(width / 18)` at most
+with a `+N` beyond, each named under its mascot) when the body has the lanes' rows plus 10, and the
+agent page header draws its agent's mascot; the ASCII tier draws none. On a terminal the pane's tick
+and its open paths call `ensure`, which starts one `$.clock.every(FRAME_MS)` timer while a laid-out
+agent works. Each tick advances a module-level frame counter and awaits a `$.ui.blit` of each shown
+working mascot, and a denied blit is a mascot that is not mounted. The render hooks pass `frame()` to
+`kit.mascot`, so a redraw lands on the frame the blits are at. The timer ends when no shown agent
+works, the pane closes or the surfaces lose `terminal`. It writes no atom and a `ui.render` hook
+never starts it; on Desktop an Svg animates by itself and no timer runs.
+
 ## Current runtime contract
 
 - `UserPromptSubmit` and `UserPromptExpansion` route to the server's `keyword-detector` and

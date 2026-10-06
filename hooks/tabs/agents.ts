@@ -10,9 +10,11 @@ import {
   ordered,
   summaryText,
 } from "../../src/core/mission.ts";
+import { mascotOf, SIZE } from "../../src/core/mascots.ts";
 import { COLUMN_GAP, displayWidth, fitEnd, formatTokens, padEnd, shortType, wrapText } from "../../src/core/ui-kit.ts";
 import { agentKey, ON_SURFACE, type Piece, redact, TONE_KEYS } from "../../src/core/visual.ts";
 import type { Host } from "../host.ts";
+import { frame, keyOf, show, stateOf } from "../mascot-player.ts";
 import { keyButton, noticeRow, type TabView, type View } from "../pane.ts";
 import { Line, Pieces, Row, ScopedCard } from "../ui.ts";
 import * as page from "./agent-page.ts";
@@ -28,6 +30,11 @@ const LABEL_CELLS = 6;
 // A lane's head and tool rows, then its prompt, output and usage rows while details show.
 const LANE_ROWS = 2;
 const DETAIL_ROWS = 3;
+// A mascot is SIZE columns by SIZE / 2 rows, with two columns between neighbours and its name below.
+const STAGE_PITCH = SIZE + 2;
+const STAGE_NAME_ROWS = 1;
+// The lanes keep their own rows and the stage takes these on top, so a short body shows lanes alone.
+const STAGE_SPARE_ROWS = 10;
 
 let isDetailed = false;
 
@@ -44,6 +51,43 @@ const usage = (lane: Lane, dot: string) => `${words(lane.calls, "tool call")} ${
 const scopeOf = (lane: Lane) => `omca-agent-${lane.id}`.slice(0, 64);
 
 type Placed = { lane: Lane; at: number; height: number };
+
+// The agents that ran together: a lane joins the latest wave while one in it still runs or ended after the lane began.
+function lastWave(lanes: readonly Lane[]): Set<string> {
+  let wave: Lane[] = [];
+  let until = Number.NEGATIVE_INFINITY;
+  for (const lane of lanes.toSorted((a, b) => a.startedAt - b.startedAt)) {
+    if (lane.startedAt > until) wave = [];
+    wave.push(lane);
+    until = Math.max(until, lane.endedAt ?? (lane.status === "running" ? Number.POSITIVE_INFINITY : lane.startedAt));
+  }
+  return new Set(wave.map((lane) => lane.id));
+}
+
+const centered = (text: string, cells: number, ellipsis: string): string => {
+  const name = fitEnd(text, cells, ellipsis);
+  return `${" ".repeat(Math.floor((cells - displayWidth(name)) / 2))}${name}`;
+};
+
+// Running agents first, then the finished ones of the current wave, as many as the width holds; the rest are counted.
+function stage(view: View, lanes: readonly Lane[]): { element: RenderElement; height: number } | undefined {
+  const { kit, g } = view;
+  const wave = lastWave(lanes);
+  const cast = lanes.filter((lane) => (lane.endedAt === null || wave.has(lane.id)) && mascotOf(lane.type) !== undefined);
+  const fit = Math.floor(view.width / STAGE_PITCH);
+  const figures = cast.slice(0, fit).flatMap((lane) => {
+    const mascot = kit.mascot(lane.type, stateOf(lane), keyOf(lane.id), frame());
+    if (mascot === null) return [];
+    const name = kit.Text({ dimColor: true, children: [centered(shortType(lane.type), SIZE, g.ellipsis)] });
+    return [{ id: lane.id, figure: kit.Box({ key: `stage-${lane.id}`, flexDirection: "column", width: SIZE, children: [mascot, name] }) }];
+  });
+  show(figures.map(({ id }) => id));
+  if (figures.length === 0) return undefined;
+  const beyond = cast.length - figures.length;
+  const more = beyond > 0 ? [kit.Text({ color: TONE_KEYS.muted, children: [`+${beyond}`] })] : [];
+  const row = kit.Box({ flexDirection: "row", columnGap: STAGE_PITCH - SIZE, children: figures.map(({ figure }) => figure) });
+  return { element: kit.Box({ key: "agents-stage", flexDirection: "column", children: [row, ...more] }), height: SIZE / 2 + STAGE_NAME_ROWS + more.length };
+}
 
 // Below its lane where the body has the rows, above it where it does not, else pinned to the
 // body's top or bottom; `end` is the body row the cards' zero-height parent sits on.
@@ -142,6 +186,7 @@ function footer(view: View, host: Host, lanes: readonly Lane[]): RenderElement {
 export const view: TabView = async (host, view) => {
   const lanes = await lanesOf(host);
   if (lanes.length === 0) {
+    show([]);
     return [noticeRow(view, { kind: "empty" }, { loading: "", empty: "No subagent has run in this session yet." })];
   }
   const open = (await host.state.agentPage.get()).value?.id;
@@ -152,10 +197,14 @@ export const view: TabView = async (host, view) => {
   const running = lanes.filter((lane) => lane.endedAt === null);
   const finished = lanes.filter((lane) => lane.endedAt !== null);
   const laneHeight = LANE_ROWS + (isDetailed ? DETAIL_ROWS : 0);
-  let left = Math.max(laneHeight, view.rows - 1);
+  const lanesRows = running.length * laneHeight + finished.length + 1;
+  const staged = !view.isAscii && view.rows >= lanesRows + STAGE_SPARE_ROWS ? stage(view, lanes) : undefined;
+  if (staged === undefined) show([]);
+  const stageHeight = staged?.height ?? 0;
+  let left = Math.max(laneHeight, view.rows - 1 - stageHeight);
   const shown: RenderElement[] = [];
   const placed: Placed[] = [];
-  let at = 0;
+  let at = stageHeight;
   let hidden = { running: 0, finished: 0 };
   const row = (key: string, pieces: Piece[]) => Row(kit, { key, pieces });
   const scoped = (lane: Lane, children: RenderElement[]) =>
@@ -191,6 +240,7 @@ export const view: TabView = async (host, view) => {
   const moreRows = more === "" ? [] : [kit.Text({ color: TONE_KEYS.muted, children: [fitEnd(`${view.g.ellipsis} ${more}`, view.width, view.g.ellipsis)] })];
   const end = at + moreRows.length + 1;
   return [
+    ...(staged === undefined ? [] : [staged.element]),
     ...shown,
     ...moreRows,
     footer(view, host, lanes),

@@ -1,6 +1,7 @@
 import type { On, RenderElement, RenderSurface } from "claude-code";
 import { type Engine, expect, test } from "claude-code/testing";
-import { glyphs } from "../../src/core/ui-kit.ts";
+import { framesOf, rasterCells, svgOf } from "../../src/core/mascots.ts";
+import { type GlyphTier, glyphs } from "../../src/core/ui-kit.ts";
 import { chip, type Paint } from "../../src/core/visual.ts";
 import { Card, CodeBlock, Field, type Kit, kitOf, Row, Rule, rowsAtLeast, ScopedCard } from "../../hooks/ui.ts";
 import { PLUGIN } from "./world.ts";
@@ -26,9 +27,11 @@ type Draw = (kit: Kit) => RenderElement;
 // A test registers its hooks before its first engine call, so one gallery serves every drawing.
 function gallery($: Engine, on: On) {
   let draw: Draw = (kit) => kit.Text({ children: [""] });
-  on("ui.render", { component: "Pane", requestId: "gallery" }, (engine, e) => draw(kitOf(engine.ui.resolve(e), e.surface)));
-  return async (next: Draw, surface: RenderSurface = "terminal") => {
+  let tier: GlyphTier = "nerd";
+  on("ui.render", { component: "Pane", requestId: "gallery" }, (engine, e) => draw(kitOf(engine.ui.resolve(e), e.surface, tier)));
+  return async (next: Draw, surface: RenderSurface = "terminal", glyphTier: GlyphTier = "nerd") => {
     draw = next;
+    tier = glyphTier;
     const ui = await $.ui.mount({
       plugin: PLUGIN,
       surface,
@@ -160,4 +163,50 @@ test("a field is an Input where the surface has one and its value as text on mob
     text({ wrap: "truncate-end" }, "/ ", text({ dimColor: true }, "filter tasks")),
   );
   expect(await drawn((kit) => Field(kit, { ...spec, value: "43" }), "mobile")).toEqual(text({ wrap: "truncate-end" }, "/ ", "43"));
+});
+
+const MASCOT_STATES = ["working", "done", "failed", "idle"] as const;
+const mascotOrNothing = (type: string, state: (typeof MASCOT_STATES)[number], frame: number) => (kit: Kit) =>
+  kit.mascot(type, state, "m", frame) ?? kit.Text({ children: ["none"] });
+
+test("a terminal mascot is a 16 by 8 Raster of the frame index wrapped to the state's frames, the first frame when not working", async ($, on) => {
+  const drawn = gallery($, on);
+  const raster = (cells: string) => ({ type: "Raster", props: { key: "m", columns: 16, rows: 8, cells } });
+  for (const state of MASCOT_STATES) {
+    const frames = framesOf("executor", state);
+    const moves = state === "working";
+    expect(await drawn(mascotOrNothing("oh-my-claudeagent:executor", state, 0))).toMatchObject(raster(rasterCells(frames[0]!)));
+    expect(await drawn(mascotOrNothing("executor", state, frames.length + 1))).toMatchObject(raster(rasterCells(frames[moves ? 1 : 0]!)));
+    expect(await drawn(mascotOrNothing("executor", state, 1))).toMatchObject(raster(rasterCells(frames[moves ? 1 : 0]!)));
+  }
+});
+
+test("a remote mascot is an Svg with its alt, interactive only while working, and the same props for every frame", async ($, on) => {
+  const drawn = gallery($, on);
+  for (const surface of ["desktop", "mobile", "vscode"] as const) {
+    for (const state of MASCOT_STATES) {
+      const frames = framesOf("planner", state);
+      const moves = state === "working";
+      const props = { source: svgOf(moves ? frames : [frames[0]!]), alt: `planner ${state}`, width: 64, height: 64, ...(moves ? { isInteractive: true } : {}) };
+      const first = await drawn(mascotOrNothing("planner", state, 0), surface);
+      expect(first).toMatchObject({ type: "Svg", props });
+      expect(Object.keys((first as { props: object }).props)).toEqual(Object.keys(props));
+      const later = await drawn(mascotOrNothing("planner", state, 7), surface);
+      expect(JSON.stringify(later)).toBe(JSON.stringify(first));
+    }
+  }
+});
+
+test("a mascot draws nothing for an unknown agent or the ASCII tier", async ($, on) => {
+  const drawn = gallery($, on);
+  const mascot = (type: string) => mascotOrNothing(type, "working", 0);
+  expect(await drawn(mascot("nobody"))).toEqual(text({}, "none"));
+  expect(await drawn(mascot("executor"), "terminal", "ascii")).toEqual(text({}, "none"));
+  expect(await drawn(mascot("executor"), "desktop", "ascii")).toEqual(text({}, "none"));
+});
+
+test("a Raster counts as its own rows", async ($, on) => {
+  const drawn = gallery($, on);
+  const tree = await drawn((kit) => kit.Box({ flexDirection: "row", children: [kit.mascot("executor", "idle", "m", 0) ?? kit.Text({ children: [""] }), kit.Text({ children: ["name"] })] }));
+  expect(rowsAtLeast(tree)).toBe(8);
 });

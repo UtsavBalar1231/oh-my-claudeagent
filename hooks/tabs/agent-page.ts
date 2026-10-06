@@ -1,9 +1,11 @@
 import type { RenderElement } from "claude-code";
 import { costText, type Lane, STATUS_WORDS, statusMark, toolLabel } from "../../src/core/mission.ts";
+import { SIZE } from "../../src/core/mascots.ts";
 import { agentGlyph, COLUMN_GAP, fitEnd, formatDuration, formatTokens, KEYS, oneLine, padEnd, padStart, shortType } from "../../src/core/ui-kit.ts";
 import { agentKey, fitPieces, levelMark, ON_SURFACE, type Piece, piecesWidth, TONE_KEYS } from "../../src/core/visual.ts";
 import { loadPage } from "../agents-tracker.ts";
 import { type Host, type State, update } from "../host.ts";
+import { frame, keyOf, show, stateOf } from "../mascot-player.ts";
 import { keyButton, noticeRow, refocus, type View } from "../pane.ts";
 import { Line } from "../ui.ts";
 
@@ -13,6 +15,8 @@ type Call = Page["calls"][number];
 const BACK = "b";
 const COPY = "c";
 const DURATION_CELLS = 6;
+// Narrower than the mascot and this much text, the header keeps to its two lines.
+const MIN_TEXT_CELLS = 20;
 
 export const openKey = (id: string): string => `open-${id}`;
 
@@ -53,6 +57,10 @@ function callRow(view: View, call: Call): RenderElement {
 
 function header(view: View, lane: Lane): RenderElement[] {
   const { g, kit } = view;
+  const room = view.width - SIZE - COLUMN_GAP;
+  const mascot = room < MIN_TEXT_CELLS ? null : kit.mascot(lane.type, stateOf(lane), keyOf(lane.id), frame());
+  show(mascot === null ? [] : [lane.id]);
+  const width = mascot === null ? view.width : room;
   const mark = statusMark(lane.status, g);
   const identity: Piece[] = [
     { text: `${agentGlyph(lane.type, g)} `, color: agentKey(lane.type) },
@@ -61,10 +69,12 @@ function header(view: View, lane: Lane): RenderElement[] {
   ];
   const elapsed = formatDuration((lane.endedAt ?? view.now) - lane.startedAt);
   const facts = `${STATUS_WORDS[lane.status] ?? lane.status} ${g.dot} ${elapsed} ${g.dot} ${formatTokens(lane.inputTokens + lane.outputTokens)} tokens${costText(lane, g.dot)}`;
-  return [
-    Line(kit, fitPieces(identity, view.width, g.ellipsis)),
-    Line(kit, fitPieces([{ text: `${mark.glyph} `, color: mark.color }, { text: facts, color: TONE_KEYS.muted }], view.width, g.ellipsis)),
+  const lines = [
+    Line(kit, fitPieces(identity, width, g.ellipsis)),
+    Line(kit, fitPieces([{ text: `${mark.glyph} `, color: mark.color }, { text: facts, color: TONE_KEYS.muted }], width, g.ellipsis)),
   ];
+  if (mascot === null) return lines;
+  return [kit.Box({ key: "page-header", flexDirection: "row", columnGap: COLUMN_GAP, children: [mascot, kit.Box({ flexDirection: "column", children: lines })] })];
 }
 
 export async function view(host: Host, view: View, lane: Lane): Promise<readonly RenderElement[]> {

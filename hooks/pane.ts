@@ -5,6 +5,7 @@ import { notice, TONE_KEYS, type ViewState, type WidthTier, widthTier } from "..
 import { reconcile } from "./agents-tracker.ts";
 import type { Features, Input } from "./dispatch.ts";
 import { type Host, reason, resolvedSession, sessionOf, type State, update } from "./host.ts";
+import * as mascots from "./mascot-player.ts";
 import type { Subcommand } from "./omca-router.ts";
 import * as agents from "./tabs/agents.ts";
 import * as doctor from "./tabs/doctor.ts";
@@ -139,13 +140,14 @@ async function tick(host: Host): Promise<void> {
     await reconcile(host, await host.agent.list(), now);
     await refresh(host);
   }
+  await mascots.ensure(host);
   const [pane, rows] = await Promise.all([host.state.pane.get(), host.state.agents.get()]);
   const isRunning = Object.values(rows.value ?? {}).some((row) => row.status === "running");
   if (pane.value?.tab !== "agents" || !isRunning) return;
   if ((await host.session.surfaces()).includes("terminal")) host.ui.invalidate();
 }
 
-function start(host: Host): void {
+async function start(host: Host): Promise<void> {
   timer ??= host.clock.every(TICK_MS, async () => {
     if (isTicking) return;
     isTicking = true;
@@ -157,12 +159,14 @@ function start(host: Host): void {
       isTicking = false;
     }
   });
+  await mascots.ensure(host);
 }
 
 function stop(): void {
   timer?.cancel();
   timer = undefined;
   ticks = 0;
+  mascots.stop();
 }
 
 export async function open(host: Host, e: Input<"command.run">, tab: Tab): Promise<CommandRunResult> {
@@ -172,7 +176,7 @@ export async function open(host: Host, e: Input<"command.run">, tab: Tab): Promi
   const columns = clamp(Math.round(e.presentation.columns * DOCK_SHARE), DOCK_MIN_COLUMNS, DOCK_MAX_COLUMNS);
   await host.ui.open({ id: PANE, title: "OMCA", focus: true, closeOnEscape: true, rows: INLINE_ROWS, columns });
   await patchPane(host, (pane) => ((pane.auto ?? "pending") === "pending" ? { ...pane, auto: "opened" } : pane));
-  start(host);
+  await start(host);
   return {};
 }
 
@@ -266,12 +270,12 @@ function bodyRows(host: Host, e: Input<"ui.render Pane">, isInline: boolean): nu
 }
 
 async function draw(host: Host, e: Input<"ui.render Pane">): Promise<RenderElement> {
-  const kit = kitOf(host.ui.resolve(e), e.surface);
+  const { home, platform, glyphTier } = resolvedSession();
+  const kit = kitOf(host.ui.resolve(e), e.surface, glyphTier);
   const { Box, Text, Button } = kit;
   const width = usableColumns(e.props.bodyColumns);
   const isInline = e.props.placement !== "dock";
   const rows = bodyRows(host, e, isInline);
-  const { home, platform, glyphTier } = resolvedSession();
   const pane = await host.state.pane.get();
   const g = glyphs(glyphTier);
   const isAscii = g.tier === "ascii";
@@ -352,7 +356,7 @@ export const pane: Features = {
         immediate: true,
       });
       await sessionOf(host);
-      if ((await host.ui.panes()).some((open) => open.id === PANE)) start(host);
+      if ((await host.ui.panes()).some((open) => open.id === PANE)) await start(host);
       return undefined;
     },
   },
@@ -363,7 +367,7 @@ export const pane: Features = {
       if (!(await host.session.surfaces()).includes("terminal")) return undefined;
       await host.ui.open({ id: PANE, title: "OMCA", rows: INLINE_ROWS });
       await patchPane(host, (pane) => ({ ...pane, auto: "opened" }));
-      start(host);
+      await start(host);
       return undefined;
     },
   },
