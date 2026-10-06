@@ -30,7 +30,7 @@ function engine(on: On): void {
   on("turn.complete", (_$, e) => ({ text: e.answer }));
 }
 
-test("the Agents tab mounts on desktop with a running lane and a finished row", async ($, on) => {
+test("the Agents tab mounts on desktop with a running lane and a finished agent's block", async ($, on) => {
   const w = world(on, {});
   w.surfaces = ["desktop"];
   engine(on);
@@ -45,7 +45,7 @@ test("the Agents tab mounts on desktop with a running lane and a finished row", 
   const drawn = rows(await ui.drawn()).join("\n");
 
   expect(drawn).toContain("executor · Fix the heading parser");
-  expect(drawn).toContain("explorer · Mapped 14 callers.");
+  expect(drawn).toContain("Mapped 14 callers.");
   expect(drawn).toContain("1 running · 1 finished");
   await ui.unmount();
 });

@@ -155,8 +155,9 @@ export function laneRows(lane: Lane, look: LaneLook, home: string): Piece[][] {
 }
 
 /**
- * A running agent's block beside its mini mascot: its name with its state and time, its task, its
- * current tool, then its model, effort, tokens and cost. Each row is `look.width` cells at most.
+ * An agent's block beside its mini mascot: its name with its state and time, its task, its current
+ * tool or, once it ended, what it said, then its model, effort, tokens and cost. Each row is
+ * `look.width` cells at most, and none is empty, so the block keeps its four rows.
  */
 export function laneBlock(lane: Lane, look: LaneLook, home: string): Piece[][] {
   const { g, now, width } = look;
@@ -165,7 +166,7 @@ export function laneBlock(lane: Lane, look: LaneLook, home: string): Piece[][] {
     { text: `${mark.glyph} `, color: mark.color },
     { text: lane.status === "running" ? "running" : (STATUS_WORDS[lane.status] ?? lane.status), color: TONE_KEYS.muted },
     gap(),
-    { text: padStart(formatDuration(now - lane.startedAt), ELAPSED), color: TONE_KEYS.muted },
+    { text: padStart(formatDuration((lane.endedAt ?? now) - lane.startedAt), ELAPSED), color: TONE_KEYS.muted },
   ];
   const name = fitEnd(shortType(lane.type), Math.max(0, width - piecesWidth(state) - COLUMN_GAP), g.ellipsis);
   const head: Piece[] = [{ text: name, color: ON_SURFACE, bold: true }, { text: " ".repeat(Math.max(COLUMN_GAP, width - displayWidth(name) - piecesWidth(state))) }, ...state];
@@ -180,8 +181,8 @@ export function laneBlock(lane: Lane, look: LaneLook, home: string): Piece[][] {
   ].map((parts) => parts.filter((part) => part !== "").join(` ${g.dot} `));
   return [
     head,
-    [{ text: fitEnd(oneLine(lane.description), width, g.ellipsis) }],
-    toolRow(lane, look, home, g.mask, ""),
+    [{ text: fitEnd(oneLine(lane.description), width, g.ellipsis) || " " }],
+    lane.endedAt === null ? toolRow(lane, look, home, g.mask, "") : [{ text: fitEnd(outcome(lane, g, home), width, g.ellipsis) || " ", color: TONE_KEYS.muted }],
     [{ text: fitEnd(usage.find((text) => displayWidth(text) <= width) ?? usage.at(-1) ?? "", width, g.ellipsis), color: TONE_KEYS.muted }],
   ];
 }
@@ -217,13 +218,18 @@ export function statusMark(status: Status, g: Glyphs): { glyph: string; color: T
   }
 }
 
+/** What a finished agent said: its result's first line, or its status word when it gave none. */
+function outcome(lane: Lane, g: Glyphs, home: string): string {
+  const word = STATUS_WORDS[lane.status] ?? "";
+  const result = redactLine(lane.result, home, g.mask);
+  return lane.status === "answer" && result !== "" ? result : result === "" ? word : `${word} ${g.dot} ${result}`;
+}
+
 /** A finished agent in one dim line: status glyph, type, its result, and how long it ran. */
 export function finishedRow(lane: Lane, look: LaneLook, home: string): Piece[] {
   const { g, width } = look;
   const mark = statusMark(lane.status, g);
-  const word = STATUS_WORDS[lane.status] ?? "";
-  const result = redactLine(lane.result, home, g.mask);
-  const said = lane.status === "answer" && result !== "" ? result : result === "" ? word : `${word} ${g.dot} ${result}`;
+  const said = outcome(lane, g, home);
   const duration = padStart(formatDuration((lane.endedAt ?? look.now) - lane.startedAt), ELAPSED);
   const head = `${mark.glyph} ${shortType(lane.type)}`;
   const room = Math.max(0, width - displayWidth(head) - COLUMN_GAP - ELAPSED);

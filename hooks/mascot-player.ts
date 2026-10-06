@@ -41,6 +41,9 @@ async function advance(host: Host): Promise<void> {
   const shown = await working(host);
   if (shown.length === 0) {
     stop();
+    // A state write may have drawn the still frame just before this tick's blit landed; one more
+    // drawing makes the still frame the last one.
+    host.ui.invalidate();
     return;
   }
   counter += 1;

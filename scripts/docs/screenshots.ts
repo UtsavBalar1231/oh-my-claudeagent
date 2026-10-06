@@ -544,7 +544,7 @@ export const SHOTS: readonly Still[] = [
     name: "agents",
     format: "png",
     cols: 214,
-    rows: 22,
+    rows: 36,
     command: "Start the open checkout tasks",
     keys: ["/omca", "Enter"],
     // Subagents share one queue of scripted turns, so explore finishes and the first executor

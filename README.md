@@ -60,13 +60,13 @@ logged run grouped by day.
 
 <img src=".github/assets/evidence.png" width="680" alt="The Evidence tab shows the final verification for checkout-redesign as MISSING, since the last one exited 1, with a line marking build, test, lint and manual as passing on their newest runs. Below it, fourteen runs are grouped under three days, each with its outcome, time, type and command. The focused run, a manual payment smoke test, is open beside the list with its exit code and its API key masked.">
 
-The Agents tab gives each running subagent a lane with its task, model, effort and current tool
-call, and shrinks a finished one to a line. In a short pane each lane keeps to two rows.
+The Agents tab gives each subagent a lane led by its mascot, with its task, current tool call,
+model, effort and tokens. The last wave's finished agents keep their lanes with their results,
+earlier ones shrink to a line, and in a short pane each lane keeps to two rows.
 
-<img src=".github/assets/agents.png" width="680" alt="In a short pane, the Agents tab shows two running executors, one on Wire the order summary panel and one on Persist the draft order, each with its icon, model and effort, the watch command it is running and its count of tool calls, and one finished explorer on a single line with the first line of its result.">
+<img src=".github/assets/agents.png" width="680" alt="The Agents tab shows two running executors, each led by its mascot in a hard hat: one on Wire the order summary panel and one on Persist the draft order, each beside its watch command, its count of tool calls, and its model, effort and tokens, with a blank row between them. Under a Finished label, an explorer from an earlier wave is one line with the first line of its result.">
 
-With room for every running agent, each lane opens with the agent's mascot and gets four rows of
-its own. The agent page opens a subagent's brief, tool calls, reply and cost, and toasts report
+Each lane gets four rows of its own. The agent page opens a subagent's brief, tool calls, reply and cost, and toasts report
 finished waves, failed verifications and a completed plan.
 
 <img src=".github/assets/mascots.png" width="680" alt="The Agents tab with three agents running at once, each lane led by its pixel mascot: a green executor in a yellow hard hat, a blue explorer in a safari hat, and a purple architect with a lit bulb above its head. Beside each mascot, four rows give the agent's name with its running time, its task, its running Bash sleep with one call, and its model, effort and tokens, with a blank row between agents.">

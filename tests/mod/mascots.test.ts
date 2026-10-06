@@ -90,7 +90,7 @@ test("a redraw in the middle of the loop draws the frame the blits are at, not f
   await ui.unmount();
 });
 
-test("the timer stops when the wave ends, and finished agents leave their minis for one-line rows", async ($, on) => {
+test("the timer stops when the wave ends, and the wave's minis rest on their done and failed frames", async ($, on) => {
   const { w, ui } = await running($, on, ["executor", "explorer"]);
   await w.clock.advance(FRAME_MS * 2);
 
@@ -102,12 +102,24 @@ test("the timer stops when the wave ends, and finished agents leave their minis 
   await ui.redraw();
 
   expect(w.blits).toHaveLength(after);
-  expect(await ui.find({ type: "Raster" })).toBeUndefined();
-  expect(await ui.find({ key: "done-a-1" })).toBeDefined();
+  const tree = await ui.drawn();
+  expect([rasterOf(tree, "a-1"), rasterOf(tree, "a-2")]).toEqual([cellsOf("executor", "done"), cellsOf("explorer", "failed")]);
   await ui.unmount();
 });
 
-test("finished agents draw no mascot on the Agents tab and start no timer", async ($, on) => {
+test("when the last working mini stops, the timer redraws the pane once so the still frame is the last one", async ($, on) => {
+  const { w, ui } = await running($, on, ["executor"]);
+  await w.clock.advance(FRAME_MS * 2);
+
+  await finish($, "a-1");
+  const before = w.invalidations;
+  await w.clock.advance(FRAME_MS);
+
+  expect(w.invalidations).toBe(before + 1);
+  await ui.unmount();
+});
+
+test("the latest wave's finished agents keep still done and failed minis, with no timer", async ($, on) => {
   const w = world(on, {});
   engine(on);
   await $.command.run(run(""));
@@ -117,11 +129,28 @@ test("finished agents draw no mascot on the Agents tab and start no timer", asyn
   await finish($, "a-2", "error");
   const ui = await $.ui.mount(pane("terminal", DOCK_120));
 
-  await ui.drawn();
+  const tree = await ui.drawn();
   await w.clock.advance(10_000);
 
-  expect(await ui.find({ type: "Raster" })).toBeUndefined();
+  expect([rasterOf(tree, "a-1"), rasterOf(tree, "a-2")]).toEqual([cellsOf("executor", "done"), cellsOf("explorer", "failed")]);
   expect(w.blits).toEqual([]);
+  await ui.unmount();
+});
+
+test("a new wave sends the last wave's finished agents to one-line rows without their minis", async ($, on) => {
+  const w = world(on, {});
+  engine(on);
+  await $.command.run(run(""));
+  await $.agent.spawn(spawnOf(1, "explorer", "Earlier"));
+  await finish($, "a-1");
+  await w.clock.advance(5_000);
+  await $.agent.spawn(spawnOf(2, "executor", "Now"));
+  w.agents = listed("a-2");
+  const ui = await $.ui.mount(pane("terminal", DOCK_120));
+
+  const tree = await ui.drawn();
+  expect(rasterOf(tree, "a-1")).toBeUndefined();
+  expect(rasterOf(tree, "a-2")).toBe(cellsOf("executor", "working"));
   await ui.unmount();
 });
 

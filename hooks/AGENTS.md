@@ -35,14 +35,16 @@ page holds at most 8 KiB of brief, 120 calls and 4 KiB of reply, for the newest 
 
 `mascot-player` animates the mascots of `src/core/mascots.ts`: the 8 by 4 mini that leads each
 relaxed lane on the Agents tab, drawn when the body holds every running lane, a row after each, the
-Finished label and one finished row, and the 16 by 8 mascot in the agent page header. The compact
+Finished label and the one-line rows (the latest wave's finished agents keep their lanes and still
+minis while rows remain), and the 16 by 8 mascot in the agent page header. The compact
 lanes and the ASCII tier draw none. `show` records the size each drawing laid out, so a blit
 matches the mounted Raster. On a terminal the pane's tick
 and its open paths call `ensure`, which starts one `$.clock.every(FRAME_MS)` timer while a laid-out
 agent works. Each tick advances a module-level frame counter and awaits a `$.ui.blit` of each shown
 working mascot, and a denied blit is a mascot that is not mounted. The render hooks pass `frame()` to
 `kit.mascot`, so a redraw lands on the frame the blits are at. The timer ends when no shown agent
-works, the pane closes or the surfaces lose `terminal`. It writes no atom and a `ui.render` hook
+works, the pane closes or the surfaces lose `terminal`; a stop from the timer's own tick redraws the
+pane once, so a blit in flight never outlasts the still frame. It writes no atom and a `ui.render` hook
 never starts it; on Desktop an Svg animates by itself and no timer runs.
 
 ## Current runtime contract

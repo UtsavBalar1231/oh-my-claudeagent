@@ -188,9 +188,11 @@ takes the cost's place.
 1. **Agents**: a lane for each running subagent. When the pane has room for every one, a lane
    opens with the agent's mini mascot beside four rows: its name, state and elapsed time; its
    task; the tool it runs now and how many tool calls it has made; and its model, effort, tokens
-   and cost, with a blank row before the next lane. In a shorter pane each lane takes two rows:
-   the agent's icon, name, task, model, effort and elapsed time, then its tool and call count. A
-   finished agent shrinks to one line with the first line of its result and its duration. The key row counts the running and
+   and cost, with a blank row before the next lane. Under a Finished label, the latest wave's
+   finished agents keep their lanes while the rows allow, each mascot smiling or sweating beside
+   the first line of its result, and older finished agents shrink to one line with their result
+   and duration. In a shorter pane each lane takes two rows: the agent's icon, name, task, model,
+   effort and elapsed time, then its tool and call count. The key row counts the running and
    finished agents and the tokens they spent. Point at a lane, or press `d`, to see its prompt,
    last output, tool calls and tokens. Press Enter on a lane, or click it, to open the agent's
    page: its full brief, each tool call with its outcome and duration, its latest reply and its
@@ -223,8 +225,9 @@ count, as in `… · task 7/14 · 3 agents`.
 
 #### Mascots
 
-Each agent has a mascot. On the Agents tab a running agent's lane opens with its mini, 8 pixels
-square, and the agent page shows the full-size mascot in its header. A mascot moves only while its
+Each agent has a mascot. On the Agents tab a lane opens with its agent's mini, 8 pixels square,
+while the agent runs and after it finishes until the next wave starts, and the agent page shows the
+full-size mascot in its header. A mascot moves only while its
 agent works, smiles when the agent finishes, sweats when it fails and dozes while the agent waits. The terminal draws them in half-block characters and Desktop draws an animated SVG.
 `OMCA_GLYPHS=ascii` draws none. With Claude Code's `prefersReducedMotion` setting on, the mascots hold
 still: a working mascot shows its first frame and Desktop draws a single frame.

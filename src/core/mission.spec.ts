@@ -4,6 +4,7 @@ import {
   finishedRow,
   firstLine,
   type Lane,
+  laneBlock,
   laneColumns,
   laneRows,
   type LaneLook,
@@ -186,6 +187,22 @@ describe("laneRows", () => {
   test("the Nerd set draws each roster agent's own icon", () => {
     const [head = []] = laneRows(lane({ type: "oh-my-claudeagent:architect" }), look(73, { g: glyphs("nerd") }), HOME);
     expect(head[0]).toEqual({ text: "\u{f0eb} ", color: "purple_FOR_SUBAGENTS_ONLY" });
+  });
+});
+
+describe("laneBlock", () => {
+  test("an ended agent's block says what it said and how long it ran, where a running one shows its tool", () => {
+    const ended = lane({ endedAt: START + 66_000, status: "answer", result: "Fixed the parser." });
+    const block = rows(laneBlock(ended, look(39), HOME));
+    expect(block[0]).toBe("executor                 ✓ done   1m06s");
+    expect(block[2]).toBe("Fixed the parser.");
+    expect(rows(laneBlock(lane({ endedAt: START + 5_000, status: "error", result: "" }), look(39), HOME))[2]).toBe("failed");
+  });
+
+  test("an empty task keeps its row, so the block stays four rows tall", () => {
+    const block = rows(laneBlock(lane({ description: "" }), look(39), HOME));
+    expect(block).toHaveLength(4);
+    expect(block[1]).toBe(" ");
   });
 });
 

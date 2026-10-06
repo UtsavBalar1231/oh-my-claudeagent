@@ -423,7 +423,7 @@ test("an agent row appears on agent.spawn, sums its steps and ends on turn.compl
   });
   await w.clock.advance(4000);
   expect(await ui.find({ type: "Text", text: "0 running · 1 finished · 2.5k tokens" })).toBeDefined();
-  expect(await lane("done-a-1")).toBe("✓ executor · done                             1m06s");
+  expect(await lane("done-a-1")).toBe("executor                 ✓ done   1m06s");
   expect(await lane("lane-a-1")).toBeUndefined();
   await ui.unmount();
 });
@@ -443,7 +443,7 @@ test("the pane timer ends a row the agent list no longer holds and picks up new 
   write(w, LEDGER, ledger([...ENTRIES, ["test", "just test", 0, "2026-10-02T12:00:00Z"]]));
   await w.clock.advance(2000);
   expect(await ui.find({ type: "Text", text: "0 running · 1 finished · 0 tokens" })).toBeDefined();
-  expect((await ui.find({ key: "done-a-1" }))?.text).toStartWith("○ executor · ended");
+  expect((await ui.find({ key: "done-a-1" }))?.text).toMatch(/^executor +○ ended +\d+s$/);
   await ui.press({ key: "3" });
   expect(await ui.find({ type: "Text", text: "1/6 · ↑↓ move" })).toBeDefined();
 

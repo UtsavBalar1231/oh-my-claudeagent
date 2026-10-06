@@ -181,7 +181,7 @@ test("the current tool's name draws in text with the call count muted at the rig
   await ui.unmount();
 });
 
-test("a finished agent collapses to one dim line with its result and duration, under a Finished label after the running lanes", async ($, on) => {
+test("the latest wave's finished agents keep their blocks under a Finished label, each saying what it said and how long it ran", async ($, on) => {
   const w = await threeAgents($, on);
   await w.clock.advance(12_000);
   await finish($, "a-2", "\nMapped 14 callers of the router.\nNone bypass the harness.");
@@ -197,14 +197,60 @@ test("a finished agent collapses to one dim line with its result and duration, u
     "sonnet-5-5 · high · 4.5k · ~$0.02",
     " ",
     "Finished",
-    "! architect · stopped                           15s",
-    "✓ explorer · Mapped 14 callers of the rout…     12s",
+    "architect             ! stopped     15s",
+    "Review the ledger design",
+    "stopped",
+    "sonnet-5-5 · high · 2.5k · ~$0.01",
+    " ",
+    "explorer                 ✓ done     12s",
+    "Map the router callers",
+    "Mapped 14 callers of the router.",
+    "sonnet-5-5 · high · 2.5k · ~$0.01",
+    " ",
     "d: Details  1 running · 2 finished · 9.5k tokens",
   ]);
   const done = await ui.find({ key: "done-a-2" });
-  const [mark, button, duration] = isNode(done) ? (childrenOf(done) as Node[]) : [];
+  const [button, facts] = isNode(done) ? (childrenOf(done) as Node[]) : [];
   const colors = (line: Node | undefined) => (line === undefined ? [] : (childrenOf(line) as Node[]).map((piece) => [piece.props?.["color"], piece.hover?.["color"]]));
-  expect([colors(mark), button?.props?.["key"], button?.props?.["dimColor"], colors(duration)]).toEqual([[["success", "text"]], "open-a-2", true, [["inactive", "text"]]]);
+  expect([button?.props?.["key"], button?.props?.["label"], button?.props?.["dimColor"]]).toEqual(["open-a-2", "explorer", true]);
+  expect(colors(facts)).toContainEqual(["success", "text"]);
+  await ui.unmount();
+});
+
+test("an earlier wave's finished agents collapse to one dim line each, while the running wave keeps its blocks", async ($, on) => {
+  const w = world(on, {});
+  engine(on, {});
+  await $.command.run(run(""));
+  await $.agent.spawn(spawnOf(1, "explorer", "Map the router callers", "Map them."));
+  await finish($, "a-1", "Mapped 14 callers of the router.");
+  await w.clock.advance(5_000);
+  await $.agent.spawn(spawnOf(2, "executor", "Fix the heading parser", "Fix it."));
+  w.agents = [{ id: "a-2", description: "", type: "x", status: "running" }];
+  const ui = await $.ui.mount(pane("terminal", DOCK_120));
+
+  const rows = body(await ui.drawn()).slice(3);
+  expect(rows.slice(5, 7)).toEqual(["Finished", "✓ explorer · Mapped 14 callers of the rout…      0s"]);
+  expect(await ui.find({ key: "lane-a-2" })).toBeDefined();
+  await ui.unmount();
+});
+
+test("at the exact rows for one relaxed lane and two earlier finished agents, the Finished label keeps a row under it", async ($, on) => {
+  const w = world(on, {});
+  engine(on, {});
+  await $.command.run(run(""));
+  await $.agent.spawn(spawnOf(1, "explorer", "One", "One."));
+  await $.agent.spawn(spawnOf(2, "architect", "Two", "Two."));
+  await finish($, "a-1", "First.");
+  await finish($, "a-2", "Second.");
+  await w.clock.advance(5_000);
+  await $.agent.spawn(spawnOf(3, "executor", "Three", "Three."));
+  w.agents = [{ id: "a-3", description: "", type: "x", status: "running" }];
+  const ui = await $.ui.mount(pane("terminal", { columns: 120, rows: 16, placement: "dock" }));
+
+  const rows = body(await ui.drawn());
+  const label = rows.indexOf("Finished");
+  expect(label).toBeGreaterThan(0);
+  expect(rows[label + 1]).toStartWith("✓ ");
   await ui.unmount();
 });
 
@@ -219,11 +265,7 @@ test("the pane timer ends each lane the agent list reports completed, failed or 
   const ui = await $.ui.mount(pane("terminal", DOCK_120));
 
   const done = await Promise.all(["a-1", "a-2", "a-3"].map(async (id) => (await ui.find({ key: `done-${id}` }))?.text.trimEnd()));
-  expect(done).toEqual([
-    "✓ executor · done                                2s",
-    "✗ explorer · failed                              2s",
-    "! architect · stopped                            2s",
-  ]);
+  expect(done).toEqual(["executor                 ✓ done      2s", "explorer               ✗ failed      2s", "architect             ! stopped      2s"]);
   await ui.unmount();
 });
 
@@ -327,7 +369,13 @@ test("d shows each running lane's prompt and last output under its usage, and d 
     "  output  none yet",
     " ",
     "Finished",
-    "✓ architect · The ledger holds.                  0s",
+    "architect                ✓ done      0s",
+    "Review the ledger design",
+    "The ledger holds.",
+    "sonnet-5-5 · high · 2.5k · ~$0.01",
+    "  prompt  Review the ledger rotation.",
+    "  output  none yet",
+    " ",
     "d: Hide details  2 running · 1 finished",
   ]);
 
