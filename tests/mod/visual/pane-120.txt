@@ -4,13 +4,13 @@
  ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd           │─────────────────────────────────────────────────────
                                                                │    ▄▀ ▀▀ ▀▄ ▄▄▄  executor           running      3s
                                                                │     ▀▀  ▀▀       Fix the heading parser
-❯ Fix the parser with the executor                             │    ▀▀▀▀▀▀▀▀ ▀    ✢ Bash sleep 90             2 calls
-                                                               │    ▀▀▀▀▀▀▀▀      sonnet-5-5 · high · 45.7k tokens
+❯ Fix the parser with the executor                             │    ▀▀▀▀▀▀▀▀ ▀    ✽ Bash sleep 90             3 calls
+                                                               │    ▀▀▀▀▀▀▀▀      sonnet-5-5 · high · 72.7k tokens
 ● 3 background agents launched (↓ to manage)                   │
    ├ oh-my-claudeagent:executor (Fix the heading parser)       │    ▄▀▀▀▀▀▀▄ ▀    architect          running      3s
    ├ oh-my-claudeagent:explorer (Map the router callers)       │     ▀▀  ▀▀   ▀   Review the ledger design
-   └ oh-my-claudeagent:architect (Review the ledger design)    │    ▀▀▀▀▀▀▀▀      ✢ Bash sleep 90             4 calls
-                                                               │    ▀▀▀▀▀▀▀▀      fable-5-1 · xhigh · 77.8k tokens
+   └ oh-my-claudeagent:architect (Review the ledger design)    │    ▀▀▀▀▀▀▀▀      ✽ Bash sleep 90             3 calls
+                                                               │    ▀▀▀▀▀▀▀▀      fable-5-1 · xhigh · 58.1k tokens
 ● Three agents are on it.                                      │
                                                                │Finished
 ✻ Waiting for 3 background agents to finish                    │   ▄▄▀▀▀▀▀▀▄▄     explorer              done      0s
@@ -18,7 +18,7 @@
 ● Agent "Map the router callers" finished · 0s                 │ ▀  ▀ ▀▀▀▀ ▀   ▀  The rotation is safe: a crash mid-…
                                                                │    ▀▀▀▀▀▀▀▀      sonnet-5-5 · high · 15.7k tokens
 ● oh-my-claudeagent+cc-plugin-agents-md: 0s · 38.2k in         │
-  13 out · $1.27 engine cost                                   │d: Details  2 running · 1 finished · 139k tokens
+  13 out · $1.13 engine cost                                   │d: Details  2 running · 1 finished · 146k tokens
                                                                │
 ● ok                                                           │
                                                                │
@@ -36,5 +36,5 @@
   ⏸ manual mode on · /tasks to see subagents · ← for agents · ↓ to manage
 
   ● main
-  ◯ oh-my-claudeagent:executor   Fix the heading parser                                            3s · ↓ 26.9k tokens
-  ◯ oh-my-claudeagent:architect  Review the ledger design                                          2s · ↓ 19.7k tokens
+  ◯ oh-my-claudeagent:executor   Fix the heading parser                                            3s · ↓ 27.0k tokens
+  ◯ oh-my-claudeagent:architect  Review the ledger design                                          2s · ↓ 19.6k tokens

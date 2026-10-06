@@ -1,5 +1,5 @@
                                                                                                              │                                                                                        ✕
- ▐▛███▛█   Claude Code v2.1.291                                                                              │1: Agents  2: Plan  3: Evidence  4: Notepad  5: Feedback  6: Stats  7: Doctor
+ ▐▛███▛█   Claude Code v2.1.292                                                                              │1: Agents  2: Plan  3: Evidence  4: Notepad  5: Feedback  6: Stats  7: Doctor
 ▝▜██████▀  Opus 5.5 · API Usage Billing                                                                      │───────────────────────────────────────────────────────────────────────────────────────
  ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/.cache/tmp/omca-visual-200x50-XXXXXX/cwd                      │╭─────────────────────────────────────────────────────────────────────────────────────╮
                                                                                                              ││ Rebuild the billing export on the shared ledger                                     │
@@ -15,18 +15,18 @@
                                                                                                              │── Milestone 1: Exporter ── █████▍██ 2/3 ──────│ Do
 ✻ Waiting for 1 background agent to finish                                                                   │ 3 Write rows in the schema's ord…   UNPROVEN │ Sum each customer's rows and compare
                                                                                                              │ 4 Round negative totals toward zero   PROVEN │ with the invoice table; list every
-● oh-my-claudeagent+cc-plugin-agents-md: 0s · 37.5k in 17 out · $0.4878 engine cost                          │ 5 Reconcile totals ag…   executor  UNPROVEN │ mismatch.
+● oh-my-claudeagent+cc-plugin-agents-md: 0s · 37.6k in 17 out · $0.4885 engine cost                          │ 5 Reconcile totals ag…   executor  UNPROVEN │ mismatch.
                                                                                                              │── Milestone 2: Rollout ── ████████ 0/4 ───────│
-                                                                                                             │ 6 Run the new export beside th…  blocked by 5│ Done when
-                                                                                                             │ 7 Document the export columns for…    PROVEN │ DB_PASSWORD=‹masked› just test-db
-                                                                                                             │ 8 Switch the nightly job to…  blocked by 6, 7│ exits 0.
+● oh-my-claudeagent: reloaded (14 hooks: tool.check, tool.call, session.start, turn.start, turn.step,        │ 6 Run the new export beside th…  blocked by 5│ Done when
+  turn.complete, agent.spawn, prompt.edit, ui.close, ui.focus, ui.scroll, command.run, ui.render,            │ 7 Document the export columns for…    PROVEN │ DB_PASSWORD=‹masked› just test-db
+  session.compact)                                                                                           │ 8 Switch the nightly job to…  blocked by 6, 7│ exits 0.
                                                                                                              │ 9 Announce the change to finan…  blocked by 8│ DB_PASSWORD=‹masked› just test-db
                                                                                                              │                                               │
                                                                                                              │                                               │ Depends
                                                                                                              │                                               │   4
                                                                                                              │                                               │
                                                                                                              │                                               │ Files
-                                                                                                             │                                               │   src/repor…otals.ts changed just now
+                                                                                                             │                                               │   src/report/totals.ts changed 6s ago
                                                                                                              │                                               │   src/report/totals.spec.ts not found
                                                                                                              │                                               │
                                                                                                              │                                               │ Evidence
@@ -47,4 +47,4 @@
   ⏸ manual mode on · ? for shortcuts · ← for agents · ↓ to manage
 
   ● main
-  ◯ oh-my-claudeagent:executor  Reconcile totals                                                                                                                                   2s · ↓ 18.8k tokens
+  ◯ oh-my-claudeagent:executor  Reconcile totals                                                                                                                                   4s · ↓ 18.8k tokens

@@ -89,7 +89,7 @@ export function copyFixture(from: string, to: string, sharedPlans: string = SHAR
   }
 }
 
-export const sessionEnv = (): Record<string, string> => envWithout(/^(CLAUDE|ANTHROPIC|TMUX|OMCA_GLYPHS$)/);
+export const sessionEnv = (): Record<string, string> => envWithout(/^(CLAUDE|ANTHROPIC|TMUX|OMCA)/);
 
 /** The screen with the random suffix `mkdtemp` gave `scratch` replaced by as many X, so a capture does not change from run to run. */
 export const maskScratch = (screen: string, scratch: string): string => screen.replaceAll(basename(scratch).slice(-MKDTEMP_SUFFIX), "X".repeat(MKDTEMP_SUFFIX));

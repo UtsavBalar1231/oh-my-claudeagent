@@ -1,5 +1,5 @@
 
- ▐▛███▛█   Claude Code v2.1.291
+ ▐▛███▛█   Claude Code v2.1.292
 ▝▜██████▀  Opus 5.5 · API Usage Billing
  ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd
 
@@ -15,7 +15,7 @@
 
 ✻ Waiting for 1 background agent to finish
 
-● oh-my-claudeagent+cc-plugin-agents-md: 0s · 37.5k in 17 out · $0.4878
+● oh-my-claudeagent+cc-plugin-agents-md: 0s · 37.6k in 17 out · $0.4885
   engine cost
 
 ╭────────────────────────────────────────────────────────────────────────────✕─╮
