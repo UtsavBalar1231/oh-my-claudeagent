@@ -1,6 +1,6 @@
 import type { On, RenderElement, TurnStepToolUse } from "claude-code";
 import { type Engine, expect, test } from "claude-code/testing";
-import { childrenOf, drain, isAscii, isNode, type Node, nodeByKey, pane, run, type Size, usage, world } from "./world.ts";
+import { childrenOf, drain, isAscii, isNode, lineCodeOf, type Node, nodeByKey, pane, run, type Size, usage, world } from "./world.ts";
 
 const DOCK_120: Size = { columns: 120, rows: 40, placement: "dock" };
 // Too short for three relaxed lanes, and for one relaxed lane with a finished one under it.
@@ -58,6 +58,8 @@ const spread = (left: string, right: string, width = 51) => `${left}${" ".repeat
 function textOf(element: unknown): string {
   if (typeof element === "string") return element;
   if (!isNode(element) || isCard(element)) return "";
+  const line = lineCodeOf(element);
+  if (line !== undefined) return line;
   if (element.type === "Button") return typeof element.props?.["hotkey"] === "string" ? `${element.props["hotkey"]}: ${String(element.props["label"])}` : String(element.props?.["label"]);
   const gap = " ".repeat(typeof element.props?.["columnGap"] === "number" ? element.props["columnGap"] : 0);
   return childrenOf(element).map(textOf).join(element.type === "Box" ? gap : "");
@@ -150,16 +152,24 @@ test("the current tool's name draws in text with the call count muted at the rig
   const ui = await $.ui.mount(pane("terminal", INLINE_80));
   const lane = await ui.find({ key: "tools-a-1" });
   const head = await ui.find({ key: "lane-a-1" });
-  const styled = (node: unknown): [string, unknown, unknown][] =>
-    isNode(node) ? (childrenOf(childrenOf(node)[0] as Node) as Node[]).map((piece) => [textOf(piece), piece.props?.["color"], piece.props?.["backgroundColor"]]) : [];
+  const styled = (line: unknown): [string, unknown, unknown][] =>
+    isNode(line) ? (childrenOf(line) as Node[]).map((piece) => [textOf(piece), piece.props?.["color"], piece.props?.["backgroundColor"]]) : [];
+  const rowPieces = (row: unknown) => styled(isNode(row) ? childrenOf(row)[0] : undefined);
+  const [lead, command, tail] = isNode(lane) ? childrenOf(lane) : [];
 
-  expect(styled(lane)).toEqual([
+  expect(styled(lead)).toEqual([
     ["  ", undefined, undefined],
     ["·", "claude", undefined],
     [" ", undefined, undefined],
     ["Bash", "text", undefined],
-    [" bun test src/parser.spec.ts", undefined, undefined],
-    [" ".repeat(30), undefined, undefined],
+    [" ", undefined, undefined],
+  ]);
+  expect(isNode(command) ? [command.props?.["width"], (childrenOf(command)[0] as Node).props] : []).toEqual([
+    55,
+    { source: "bun test src/parser.spec.ts", language: "bash", wrap: "truncate-end" },
+  ]);
+  expect(styled(tail)).toEqual([
+    ["  ", undefined, undefined],
     ["4 calls", "inactive", undefined],
   ]);
   const [mark, button, facts] = isNode(head) ? childrenOf(head) : [];
@@ -176,8 +186,8 @@ test("the current tool's name draws in text with the call count muted at the rig
     ["    0s", "inactive", undefined],
   ]);
   const explore = await ui.find({ key: "tools-a-2" });
-  expect(styled(explore).at(-1)).toEqual(["2 calls", "inactive", undefined]);
-  expect(styled(await ui.find({ key: "lane-a-2" }))[0]).toEqual(["◆ ", "blue_FOR_SUBAGENTS_ONLY", undefined]);
+  expect(rowPieces(explore).at(-1)).toEqual(["2 calls", "inactive", undefined]);
+  expect(rowPieces(await ui.find({ key: "lane-a-2" }))[0]).toEqual(["◆ ", "blue_FOR_SUBAGENTS_ONLY", undefined]);
   await ui.unmount();
 });
 
@@ -545,7 +555,7 @@ test("a running agent with no mascot keeps its icon in the mini's place and the 
   const [gutter] = row === undefined ? [] : (childrenOf(row) as Node[]);
   expect([gutter?.props?.["width"], textOf(gutter)]).toEqual([15, "◆"]);
   expect(await ui.find({ type: "Raster" })).toBeUndefined();
-  expect(body(tree).slice(3, 5)).toEqual(["general-purpo…  ◆ running      0s", "Survey the repo"]);
+  expect(body(tree).slice(3, 5)).toEqual(["general-purpose         ◆      0s", "Survey the repo"]);
   await ui.unmount();
 });
 

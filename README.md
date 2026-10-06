@@ -58,7 +58,7 @@ and the agent working on it. A wide pane shows the focused task's detail beside 
 The Evidence tab is the proof ledger: a verdict on the plan's final verification, then every
 logged run grouped by day.
 
-<img src=".github/assets/evidence.png" width="680" alt="The Evidence tab shows the final verification for checkout-redesign as MISSING, since the last one exited 1, with a line marking build, test, lint and manual as passing on their newest runs. Below it, fourteen runs are grouped under three days, each with its outcome, time, type and command. The focused run, a manual payment smoke test, is open beside the list with its exit code and its API key masked.">
+<img src=".github/assets/evidence.png" width="680" alt="The Evidence tab shows the final verification for checkout-redesign as MISSING, since the last one exited 1, with a line marking build, test, lint and manual as passing on their newest runs. Below it, fourteen runs are grouped under three days, each with its outcome, time, type and command. The focused run, a manual payment smoke test, is open in a card beside the list titled Manual run passed, with its exit code, time and agent, one secret masked, and its command and output wrapped under their own labels.">
 
 The Agents tab gives each subagent a lane led by its mascot, with its task, current tool call,
 model, effort and tokens. The last wave's finished agents keep their lanes with their results,

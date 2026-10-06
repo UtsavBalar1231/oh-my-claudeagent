@@ -207,32 +207,37 @@ test("wide: the list beside a card of the focused entry, which follows the focus
     "│ ✓ build  ✓ test  ✗ lint  ✓ manual",
     "╰",
     "── Fri 2026-10-02 ─────────────────────────────  ╭",
-    "❯ ✓  11:45  final   just ci                      │ final · exit 0",
-    "  ✓  11:00  manual  bun scripts/q…l.ts evidence  │ │just ci",
-    "  ✓  10:20  test    curl -H 'Auth… && just test  │ │COMPLETE",
-    "  ✗  10:00  test    just test-mod                │ 2026-10-02 11:45:00 · ◆ orchestrator",
-    "── Thu 2026-10-01 ─────────────────────────────  ╰",
-    "  ✗  09:30  lint    just lint",
-    "  ✓  09:00  build   bun run build",
+    "❯ ✓  11:45  final   just ci                      │ ✓ Final verification passed",
+    "  ✓  11:00  manual  bun scripts/q…l.ts evidence  │ exit 0 · 2026-10-02 11:45:00",
+    "  ✓  10:20  test    curl -H 'Auth… && just test  │ ◆ orchestrator",
+    "  ✗  10:00  test    just test-mod                │ ✓ For sample as it is now",
+    "── Thu 2026-10-01 ─────────────────────────────  │",
+    "  ✗  09:30  lint    just lint                    │ Command",
+    "  ✓  09:00  build   bun run build                │ │just ci",
   ]);
   expect(shown.slice(-2)).toEqual(["t: Type  x: Fails  f: Find  c: Copy  r: Rerun  1/6 · ↑↓ move", " "]);
 
   await $.ui.scroll({ ...SCROLL, by: 3, bodyRows: 46, contentRows: 47 });
-  expect((await body(ui, DOCK_210)).slice(5, 20)).toEqual([
+  expect((await body(ui, DOCK_210)).slice(5, 25)).toEqual([
     "── Fri 2026-10-02 ─────────────────────────────  ╭",
-    "  ✓  11:45  final   just ci                      │ test · exit 1",
-    "  ✓  11:00  manual  bun scripts/q…l.ts evidence  │ │just test-mod",
-    "  ✓  10:20  test    curl -H 'Auth… && just test  │ │(fail) the ledger draws",
-    "❯ ✗  10:00  test    just test-mod                │ │  expected 3",
-    "── Thu 2026-10-01 ─────────────────────────────  │ │  received 4",
-    "  ✗  09:30  lint    just lint                    │ │at ledger.test.ts:40",
-    "  ✓  09:00  build   bun run build                │ │1 fail",
+    "  ✓  11:45  final   just ci                      │ ✗ Test run failed",
+    "  ✓  11:00  manual  bun scripts/q…l.ts evidence  │ exit 1 · 2026-10-02 10:00:00",
+    "  ✓  10:20  test    curl -H 'Auth… && just test  │ ◆ executor",
+    "❯ ✗  10:00  test    just test-mod                │",
+    "── Thu 2026-10-01 ─────────────────────────────  │ Command",
+    "  ✗  09:30  lint    just lint                    │ │just test-mod",
+    "  ✓  09:00  build   bun run build                │",
+    "                                                 │ Output",
+    "                                                 │ │(fail) the ledger draws",
+    "                                                 │ │  expected 3",
+    "                                                 │ │  received 4",
+    "                                                 │ │at ledger.test.ts:40",
+    "                                                 │ │1 fail",
     "                                                 │ │41 pass",
     "                                                 │ │Ran 42 tests",
     "                                                 │ │exit 1",
     "                                                 │ │done",
     "                                                 │ │end",
-    "                                                 │ 2026-10-02 10:00:00 · ◆ executor",
     "                                                 ╰",
   ]);
   expect(nodeByKey(await ui.drawn(), "detail-2")?.props).toMatchObject({ borderColor: "error", width: 41 });
@@ -293,6 +298,27 @@ test("rows lead with the outcome glyph in its tone, the type a muted word but th
     "inactive",
     "inactive",
   ]);
+  await ui.unmount();
+});
+
+test("the card wraps a long command at its spaces, keeping every character, and says a final verification is for an earlier plan", async ($, on) => {
+  const command = "bun test src/parser.spec.ts --reporter=junit --reporter-outfile=report.xml --timeout 5000";
+  const entries = [
+    evidence("test", command, 0, local(2, 9, 0), "executor", "ok"),
+    evidence("final_verification", "just ci", 0, local(2, 10, 0), "orchestrator", "COMPLETE", "0".repeat(64)),
+  ];
+  world(on, { ...(await proofFiles()), [LEDGER]: JSON.stringify({ entries }) });
+  const ui = await openEvidence($, DOCK_210);
+  const cardSide = (row: string) => row.slice(row.indexOf("│"));
+  expect((await body(ui, DOCK_210)).filter((row) => row.includes("For an earlier")).map(cardSide)).toEqual(["│ ! For an earlier version of sample"]);
+
+  await $.ui.scroll({ ...SCROLL, by: 1, bodyRows: 46, contentRows: 47 });
+  const card = nodeByKey(await ui.drawn(), "detail-0");
+  const code = childrenOf(card ?? { type: "Box" }).find((child) => isNode(child) && child.type === "Code");
+  expect(isNode(code) ? code.props : undefined).toEqual({
+    source: ["bun test src/parser.spec.ts", "--reporter=junit", "--reporter-outfile=report.xml", "--timeout 5000"].join("\n"),
+    language: "bash",
+  });
   await ui.unmount();
 });
 
@@ -458,6 +484,44 @@ test("the arrows move the focus one entry, a page key a window, Home and End to 
   await scroll(-37);
   expect(await focusedRow()).toBe("just test shard-599");
   expect(handed).toEqual([]);
+  await ui.unmount();
+});
+
+test("a 1,000-entry ledger draws only the window around the focus, and Down, Page Down, End and Home move it", async ($, on) => {
+  const entries = Array.from({ length: 1000 }, (_, n) =>
+    evidence("test", `just test shard-${n}`, 0, new Date(2026, 8, 1 + Math.floor(n / 100), 0, 0, n % 100).toISOString(), "executor", `shard ${n}`),
+  );
+  world(on, { [PLAN_PATH]: PLAN_TEXT, [BOULDER]: BOUND, [LEDGER]: JSON.stringify({ entries }) });
+  const ui = await openEvidence($, DOCK_120);
+  const scroll = (by: number) => $.ui.scroll({ ...SCROLL, by, bodyRows: 36, contentRows: 37 });
+  const drawnIndices = async () => {
+    const tree = await ui.drawn();
+    return entries.flatMap((_, n) => (nodeByKey(tree, `entry-${n}`) === undefined ? [] : [n]));
+  };
+  const focusedRow = async () => (await entryRows(ui)).find((row) => row.startsWith("❯"))?.slice(20).trimEnd();
+  const span = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, n) => from + n);
+
+  expect(await drawnIndices()).toEqual(span(978, 999));
+  expect(await focusedRow()).toBe("just test shard-999");
+  expect(await statusRow(ui)).toBe("1/1000 · ↑↓ move");
+
+  await scroll(1);
+  expect(await focusedRow()).toBe("just test shard-998");
+  expect(await drawnIndices()).toEqual(span(978, 999));
+
+  await scroll(36);
+  expect(await focusedRow()).toBe("just test shard-976");
+  expect(await statusRow(ui)).toBe("24/1000 · ↑↓ move");
+  expect(await drawnIndices()).toEqual(span(976, 997));
+
+  await scroll(1000);
+  expect(await focusedRow()).toBe("just test shard-0");
+  expect(await statusRow(ui)).toBe("1000/1000 · ↑↓ move");
+  expect(await drawnIndices()).toEqual(span(0, 21));
+
+  await scroll(-1000);
+  expect(await focusedRow()).toBe("just test shard-999");
+  expect(await drawnIndices()).toEqual(span(978, 999));
   await ui.unmount();
 });
 

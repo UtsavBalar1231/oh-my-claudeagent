@@ -201,7 +201,8 @@ takes the cost's place.
    instead of finishing.
 
    The brief and the reply on the agent page are drawn as markdown, by Claude Code's own
-   renderer, and a shell command on the page is highlighted as code. The one-line results,
+   renderer, and a shell command, on the page and in a lane's tool row, is highlighted as code.
+   The one-line results,
    prompts and outputs in the lanes, the details rows and the card keep their markdown styles:
    code in the code color, bold, italics and links, with the markers dropped.
 2. **Plan**: the plan board, below.
@@ -238,8 +239,8 @@ agent works, smiles when the agent finishes, sweats when it fails and dozes whil
 still: a working mascot shows its first frame and Desktop draws a single frame.
 
 The band and the pane draw every color from your Claude Code theme, so a custom theme in
-`~/.claude/themes/` applies to them too. Each state also carries a glyph and a word, so nothing
-depends on color alone. Secrets in commands, output and notes, such as API keys, tokens and
+`~/.claude/themes/` applies to them too. Each state also carries a glyph, and a word where the
+row has room for it beside the agent's name, so nothing depends on color alone. Secrets in commands, output and notes, such as API keys, tokens and
 `password=` values, are drawn as `‹masked›`, and your home folder as `~`.
 
 ### The plan board
@@ -292,7 +293,10 @@ and manual run each passed.
 
 Below it the runs are grouped by day, newest first, each with its outcome, time, type, command
 and the agent that logged it. Up and Down move the focus, and the focused run opens to show its
-command, output and exit code.
+command, output and exit code. In a wide pane it opens in a card beside the list, titled with
+whether it passed, that shows the exit code, when it ran and who logged it, whether a final
+verification is for the plan as it is now, an earlier version of it or any plan, and the whole
+command and output, wrapped rather than cut.
 
 | Key | Action |
 | --- | --- |

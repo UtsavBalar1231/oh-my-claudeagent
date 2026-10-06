@@ -8,12 +8,15 @@ import {
   laneColumns,
   laneRows,
   type LaneLook,
+  marksAfter,
   ordered,
+  shellLanguage,
   summaryText,
+  toolParts,
 } from "../../src/core/mission.ts";
 import { GRID, type MascotSize } from "../../src/core/mascots.ts";
 import { agentGlyph, COLUMN_GAP, displayWidth, fitEnd, formatTokens, padEnd, shortType } from "../../src/core/ui-kit.ts";
-import { agentKey, fitPieces, ON_SURFACE, type Piece, redact, TONE_KEYS, wrapPieces } from "../../src/core/visual.ts";
+import { agentKey, fitPieces, ON_SURFACE, type Piece, piecesWidth, redact, TONE_KEYS, wrapPieces } from "../../src/core/visual.ts";
 import type { Host } from "../host.ts";
 import { frame, keyOf, show, stateOf } from "../mascot-player.ts";
 import { keyButton, noticeRow, type TabView, type View } from "../pane.ts";
@@ -202,6 +205,24 @@ export const view: TabView = async (host, view) => {
   let at = 0;
   let hidden = { running: 0, finished: 0 };
   const row = (key: string, pieces: Piece[]) => Row(kit, { key, pieces });
+  // A running shell call's command draws as code in the cells the row keeps for it, the call count still at the edge.
+  const toolLine = (lane: Lane, pieces: Piece[], indent: string): RenderElement => {
+    const key = `tools-${lane.id}`;
+    const language = lane.tool === null ? undefined : shellLanguage(lane.tool.name);
+    const parts = language === undefined ? undefined : toolParts(lane, look, view.home, indent);
+    if (language === undefined || parts === undefined || parts.detail === "" || parts.room <= 0) return row(key, pieces);
+    const used = piecesWidth(parts.lead) + 1 + parts.room;
+    return kit.Box({
+      key,
+      flexDirection: "row",
+      hover: { backgroundColor: TONE_KEYS.focus },
+      children: [
+        Pieces(kit, [...parts.lead, { text: " " }]),
+        kit.Box({ width: parts.room, children: [kit.Code({ source: fitEnd(parts.detail, parts.room, g.ellipsis), language, wrap: "truncate-end" })] }),
+        ...(parts.marks.length === 0 ? [] : [Pieces(kit, marksAfter(parts.marks, used, look.width))]),
+      ],
+    });
+  };
   const scoped = (lane: Lane, children: RenderElement[]) =>
     kit.Box({ key: `agent-${lane.id}`, flexDirection: "column", hover: { scope: scopeOf(lane) }, children });
   const block = (lane: Lane, key: string): RenderElement => {
@@ -212,7 +233,7 @@ export const view: TabView = async (host, view) => {
     const rows = [
       openRow(view, host, lane, key, head, 1, 0),
       Line(kit, task),
-      row(`tools-${lane.id}`, tool),
+      toolLine(lane, tool, ""),
       Line(kit, usage),
       ...(isDetailed ? detailRows(view, lane, textWidth).slice(0, BLOCK_DETAIL_ROWS) : []),
     ];
@@ -230,7 +251,7 @@ export const view: TabView = async (host, view) => {
       placed.push({ lane, at, height: blockHeight });
     } else {
       const [head = [], tools = []] = laneRows(lane, look, view.home);
-      shown.push(scoped(lane, [openRow(view, host, lane, `lane-${lane.id}`, head, 2), row(`tools-${lane.id}`, tools)]));
+      shown.push(scoped(lane, [openRow(view, host, lane, `lane-${lane.id}`, head, 2), toolLine(lane, tools, "  ")]));
       placed.push({ lane, at, height: LANE_ROWS });
       if (isDetailed) shown.push(...detailRows(view, lane));
     }

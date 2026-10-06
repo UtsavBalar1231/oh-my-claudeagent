@@ -106,7 +106,7 @@ test("a lane head's button opens the page of a running agent: header, full brief
     "",
     "Tool calls · 2",
     "✓ Read src/parser.ts                          300ms",
-    "✗ Bash       2s",
+    "✗ Bash bun test src/parser.spec.ts               2s",
     "Reply",
     "",
     "b: Back  c: Copy brief  r: Reload",
@@ -295,6 +295,20 @@ test("a page keeps at most 8 KiB of brief, 4 KiB of reply and the newest 120 cal
   expect(kept).not.toContain(id);
   expect(kept).not.toContain("caps-2");
   expect(kept).toContain("caps-22");
+});
+
+test("past 20 agents the calls of the agent that called least recently are dropped, not those of the first to call", async ($, on) => {
+  const { id, pagesOf } = await runningAgent($, on, "recent");
+  await call($, id, { tool: "Read", file_path: "/work/first.ts" });
+  for (let n = 1; n <= 19; n++) await call($, `recent-other-${n}`, { tool: "Read", file_path: `/work/o${n}.ts` });
+  await call($, id, { tool: "Read", file_path: "/work/again.ts" });
+  await call($, "recent-other-20", { tool: "Read", file_path: "/work/o20.ts" });
+
+  await finish($, id, "Done.");
+  await finish($, "recent-other-1", "Done.");
+
+  expect(pagesOf()[id]?.calls.map((one) => one.summary)).toEqual(["first.ts", "again.ts"]);
+  expect(pagesOf()["recent-other-1"]?.calls).toEqual([]);
 });
 
 // A call's duration is null once its start was dropped, which is how the bound on the starts shows.

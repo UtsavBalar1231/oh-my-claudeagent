@@ -1,5 +1,5 @@
 import type { RenderElement } from "claude-code";
-import { costText, type Lane, STATUS_WORDS, statusMark, toolLabel } from "../../src/core/mission.ts";
+import { costText, type Lane, shellLanguage, STATUS_WORDS, statusMark, toolLabel } from "../../src/core/mission.ts";
 import { SIZE } from "../../src/core/mascots.ts";
 import { chunks } from "../../src/core/plan-reader.ts";
 import { agentGlyph, COLUMN_GAP, fitEnd, formatDuration, formatTokens, KEYS, oneLine, padEnd, padStart, shortType } from "../../src/core/ui-kit.ts";
@@ -20,8 +20,6 @@ const DURATION_CELLS = 6;
 const MIN_TEXT_CELLS = 20;
 // Shorter than the mascot and the six rows below it (brief, tool calls, reply, keys), likewise.
 const MIN_PAGE_ROWS = SIZE / 2 + 6;
-// A shell command reads best highlighted as the shell that runs it.
-const SHELLS: Readonly<Record<string, string>> = { Bash: "bash", Monitor: "bash", PowerShell: "powershell" };
 
 export const openKey = (id: string): string => `open-${id}`;
 
@@ -53,13 +51,13 @@ function callRow(view: View, call: Call): RenderElement {
   const time = call.durationMs === null ? "" : call.durationMs < 1000 ? `${call.durationMs}ms` : formatDuration(call.durationMs);
   const room = Math.max(0, view.width - piecesWidth(lead) - COLUMN_GAP - DURATION_CELLS);
   const duration: Piece = { text: `${" ".repeat(COLUMN_GAP)}${padStart(time, DURATION_CELLS)}`, color: TONE_KEYS.muted };
-  const language = Object.hasOwn(SHELLS, call.tool) ? SHELLS[call.tool] : undefined;
+  const language = shellLanguage(call.tool);
   if (language !== undefined && call.summary !== "" && room > 1) {
     return view.kit.Box({
       flexDirection: "row",
       children: [
         Line(view.kit, [...lead, { text: " " }]),
-        view.kit.Box({ width: room - 1, children: [view.kit.Code({ source: call.summary, language, wrap: "truncate-end" })] }),
+        view.kit.Box({ width: room - 1, children: [view.kit.Code({ source: fitEnd(call.summary, room - 1, g.ellipsis), language, wrap: "truncate-end" })] }),
         Line(view.kit, [duration]),
       ],
     });

@@ -249,9 +249,14 @@ function layoutOf(entries: readonly Entry[], rowWidth: number): Layout {
   return { command: Math.max(8, rowWidth - FIXED_CELLS - agent), agent };
 }
 
-function entryRow(view: View, entry: Entry, index: number, layout: Layout, isFocused: boolean): { element: RenderElement; isCut: boolean } {
+function fitCommand(view: View, entry: Entry, layout: Layout): { fitted: string; isCut: boolean } {
   const command = oneLine(masked(view, entry.command).text);
   const fitted = fitMiddle(command, layout.command, view.g.ellipsis);
+  return { fitted, isCut: fitted !== command };
+}
+
+function entryRow(view: View, entry: Entry, index: number, layout: Layout, isFocused: boolean): RenderElement {
+  const { fitted } = fitCommand(view, entry, layout);
   const pieces: Piece[] = [
     { text: isFocused ? `${view.g.pointer} ` : "  " },
     outcome(view, entry.exitCode),
@@ -264,8 +269,7 @@ function entryRow(view: View, entry: Entry, index: number, layout: Layout, isFoc
     ...(layout.agent > 0 && displayWidth(fitted) < layout.command ? [{ text: " ".repeat(layout.command - displayWidth(fitted)) }] : []),
     ...agentPieces(view, entry.verifiedBy, layout.agent),
   ];
-  const row = Row(view.kit, { key: `entry-${index}`, pieces: fitPieces(pieces, layout.command + FIXED_CELLS + layout.agent, view.g.ellipsis), isFocused });
-  return { element: row, isCut: fitted !== command };
+  return Row(view.kit, { key: `entry-${index}`, pieces: fitPieces(pieces, layout.command + FIXED_CELLS + layout.agent, view.g.ellipsis), isFocused });
 }
 
 function cutLines(text: string, room: number, rows: number, ellipsis: string): { source: string; rows: number; more: number } {
@@ -431,12 +435,11 @@ function timeline(view: View, ledger: Ledger, shown: readonly number[], current:
   const layout = layoutOf(ledger.entries, list.width);
   const days = items.map(({ entry }) => dayOf(entry.at));
   const opensDay = days.map((day, position) => position === 0 || days[position - 1] !== day);
-  const rows = items.map(({ index, entry }, position) => entryRow(view, entry, index, layout, position === current));
   const open = items[current];
   const budget = Math.min(room - 2, (view.isInline ? INLINE_SNIPPET_ROWS : DOCK_SNIPPET_ROWS) + COMMAND_ROWS + 2);
   const expanded =
     list.isExpanded && open !== undefined
-      ? detail(view, open.entry, list.width - DETAIL_INDENT, budget, !view.isInline || rows[current]?.isCut === true)
+      ? detail(view, open.entry, list.width - DETAIL_INDENT, budget, !view.isInline || fitCommand(view, open.entry, layout).isCut)
       : [];
   const expandedRows = expanded.reduce((sum, block) => sum + block.height, 0);
   const heights = items.map((_, position) => 1 + (opensDay[position] === true ? 1 : 0) + (position === current ? expandedRows : 0));
@@ -448,13 +451,12 @@ function timeline(view: View, ledger: Ledger, shown: readonly number[], current:
   let height = 0;
   for (let position = placed.start; position < placed.end; position += 1) {
     const item = items[position];
-    const row = rows[position];
-    if (item === undefined || row === undefined) continue;
+    if (item === undefined) continue;
     if (position === placed.start || opensDay[position] === true) {
       elements.push(line(view, rule(list.width, view.g, view.isAscii, dayLabel(item.entry.at)), list.width));
       height += 1;
     }
-    elements.push(row.element);
+    elements.push(entryRow(view, item.entry, item.index, layout, position === current));
     height += 1;
     if (position === current && expanded.length > 0) {
       elements.push(
@@ -466,12 +468,97 @@ function timeline(view: View, ledger: Ledger, shown: readonly number[], current:
   return { elements, height };
 }
 
-function detailCard(view: View, entry: Entry, index: number, width: number, room: number): Drawn {
-  const blocks = detail(view, entry, width - 4, room - 3, true);
+// A line cut into rows of at most `room` cells at its last space, or mid-word where a word is
+// longer than a row, so a wrapped command or output keeps every character.
+function wrapLine(line: string, room: number): string[] {
+  const rows: string[] = [];
+  let rest = line;
+  while (displayWidth(rest) > room) {
+    const head = fitEnd(rest, room, "");
+    const space = head.lastIndexOf(" ");
+    const cut = space > 0 ? space + 1 : Math.max(1, head.length);
+    rows.push(rest.slice(0, cut).trimEnd());
+    rest = rest.slice(cut);
+  }
+  return [...rows, rest];
+}
+
+const wrapCode = (text: string, room: number): string[] =>
+  text
+    .replace(/\s+$/, "")
+    .split("\n")
+    .flatMap((line) => wrapLine(line.replaceAll("\t", "  "), room));
+
+// A final verification proves the plan whose hash it carries; one without a hash proves any plan.
+function planLine(view: View, entry: Entry, plan: Ledger["plan"]): Piece[] {
+  if (entry.planSha === "") return [{ text: "Proves any plan: it carries no plan hash", color: TONE_KEYS.muted }];
+  if (plan === null || !("sha" in plan)) return [{ text: "For a plan this session no longer has bound", color: TONE_KEYS.muted }];
+  if (entry.planSha === plan.sha) return [{ text: `${view.g.check} `, color: TONE_KEYS.ok }, { text: `For ${plan.name} as it is now`, color: TONE_KEYS.muted }];
+  return [{ text: `${view.g.warn} `, color: TONE_KEYS.warn }, { text: `For an earlier version of ${plan.name}`, color: TONE_KEYS.muted }];
+}
+
+const LABELLED_ROWS = 10;
+const CARD_COMMAND_ROWS = 6;
+
+/**
+ * The focused run in full, in at most `budget` rows: its exit code, when and by whom, the plan a
+ * final verification covers, then its command and its output, both wrapped rather than cut. With
+ * room, each part has a label and a blank row before it.
+ */
+function cardBlocks(view: View, entry: Entry, plan: Ledger["plan"], room: number, budget: number): Block[] {
+  const { Text } = view.kit;
+  const muted = TONE_KEYS.muted;
+  const command = masked(view, entry.command);
+  const output = masked(view, entry.snippet);
+  const hidden = command.masked + output.masked;
+  const facts = wrapGroups(
+    [
+      [{ text: `exit ${entry.exitCode}`, color: entry.exitCode === 0 ? TONE_KEYS.ok : TONE_KEYS.fail }],
+      [{ text: `${dayOf(entry.at)} ${clockOf(entry.at, true)}`, color: muted }],
+      ...(entry.verifiedBy === null ? [] : [agentMeta(view, entry.verifiedBy)]),
+      ...(hidden === 0 ? [] : [[{ text: `${words(hidden, "secret")} masked`, color: muted }]]),
+    ],
+    room,
+    { text: ` ${view.g.dot} `, color: muted },
+  );
+  const lead = [...facts, ...(entry.type === "final_verification" ? [planLine(view, entry, plan)] : [])];
+  const blocks: Block[] = lead.map((pieces) => ({ element: line(view, pieces, room), height: 1 }));
+  let left = budget - lead.length;
+  const commandRows = wrapCode(command.text, room);
+  const outputRows = output.text.trim() === "" ? [] : wrapCode(output.text, room);
+  const isLabelled = left >= LABELLED_ROWS;
+  const section = (label: string) => {
+    if (!isLabelled) return;
+    blocks.push({ element: Text({ children: [" "] }), height: 1 }, { element: Text({ color: muted, children: [label] }), height: 1 });
+    left -= 2;
+  };
+  section("Command");
+  const shownCommand = commandRows.slice(0, Math.max(1, Math.min(CARD_COMMAND_ROWS, left - (isLabelled ? 3 : 1))));
+  const lastCommand = shownCommand.length < commandRows.length ? shownCommand.length - 1 : -1;
+  const commandSource = shownCommand.map((row, at) => (at === lastCommand ? fitEnd(`${row}${view.g.ellipsis}`, room, view.g.ellipsis) : row)).join("\n");
+  blocks.push({ element: CodeBlock(view.kit, { source: commandSource, language: "bash" }), height: shownCommand.length });
+  left -= shownCommand.length;
+  section("Output");
+  if (outputRows.length === 0) {
+    blocks.push({ element: Text({ dimColor: true, children: [fitEnd("No output was logged with this run.", room, view.g.ellipsis)] }), height: 1 });
+    return blocks;
+  }
+  const fits = outputRows.length <= left;
+  const shown = outputRows.slice(0, Math.max(1, fits ? left : left - 1));
+  blocks.push({ element: CodeBlock(view.kit, { source: shown.join("\n") }), height: shown.length });
+  const more = outputRows.length - shown.length;
+  if (more > 0) blocks.push({ element: Text({ dimColor: true, children: [fitEnd(`${view.g.ellipsis} ${more} more line${more === 1 ? "" : "s"}`, room, view.g.ellipsis)] }), height: 1 });
+  return blocks;
+}
+
+function detailCard(view: View, entry: Entry, index: number, plan: Ledger["plan"], width: number, room: number): Drawn {
+  const blocks = cardBlocks(view, entry, plan, width - 4, room - 3);
+  const isPass = entry.exitCode === 0;
+  const name = entry.type === "final_verification" ? "Final verification" : `${TYPE_WORDS[entry.type].replace(/^./, (first) => first.toUpperCase())} run`;
   const element = Card(view.kit, {
     key: `detail-${index}`,
-    title: `${TYPE_WORDS[entry.type]} ${view.g.dot} exit ${entry.exitCode}`,
-    tone: entry.exitCode === 0 ? "ok" : "fail",
+    title: `${isPass ? view.g.check : view.g.cross} ${name} ${isPass ? "passed" : "failed"}`,
+    tone: isPass ? "ok" : "fail",
     isAscii: view.isAscii,
     width,
     children: blocks.map((block) => block.element),
@@ -507,7 +594,7 @@ export const view: TabView = async (host, view) => {
   const list = timeline(view, ledger, shown, current, room, { width: listWidth, isExpanded: !isSplit });
   let body = list;
   if (isSplit) {
-    const card = detailCard(view, entry, index, view.width - listWidth - COLUMN_GAP, room);
+    const card = detailCard(view, entry, index, ledger.plan, view.width - listWidth - COLUMN_GAP, room);
     body = {
       elements: [
         Box({

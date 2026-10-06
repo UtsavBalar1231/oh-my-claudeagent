@@ -28,7 +28,7 @@ hand.
   Stats and Doctor tabs, each on a digit key. Every color is a Claude Code theme key, except the
   mascots, which use fixed colors. The pane
   and the band follow the theme you pick, a custom one in `~/.claude/themes/` included, and every
-  state also carries a glyph and a word. A state's color goes on its glyph, and the text beside it
+  state also carries a glyph, and a word where a lane's row has room beside the agent's name. A state's color goes on its glyph, and the text beside it
   stays in the theme's text color. Secrets in commands, output and notes are drawn as
   `‹masked›` and your home folder as `~`. `OMCA_GLYPHS` picks the glyph set for the pane, the
   band and the status line alike: `nerd` (the default, Nerd Font icons, an agent's own icon among
@@ -46,9 +46,13 @@ hand.
   outcome and duration, its latest reply, its tokens and its `~$` cost. `c` copies the brief, `r`
   reloads and `b` goes back. Teammates in a team get lanes that wait between messages.
 - **Markdown in agent text.** The agent page draws the brief and the reply as markdown with
-  Claude Code's own renderer and highlights shell commands as code. One-line results, prompts and
-  outputs in the lanes, the details rows and the card keep their inline markdown: code in the
-  code color, bold, italics and links, without the markers.
+  Claude Code's own renderer, and shell commands on the page and in the lanes are highlighted as
+  code. One-line results, prompts and outputs in the lanes, the details rows and the card keep
+  their inline markdown: code in the code color, bold, italics and links, without the markers.
+- **Less work on the shared worker.** The Evidence tab builds only the rows it draws, a plan's
+  hash takes under a millisecond, text widths take an ASCII fast path, a subagent's finish rereads
+  the plan state only when a file behind it changed, the ledger is read again only when it grows,
+  and the Stop gates read the plan once and parse only the transcript lines they need.
 - **Toasts, auto-open, the band and the spinner.** One toast per finished wave of subagents, one
   per failed verification and one when the plan completes. The pane opens by itself on a session's
   first wave of subagents, once, in a terminal, and waits undrawn below 144 columns (110 after you
@@ -87,7 +91,9 @@ hand.
   changed after it passed, MISSING otherwise, and under it whether the newest build, test, lint and
   manual run each passed. Below it the logged runs are grouped by day, each with its outcome, time,
   type, command and agent, and the focused run shows its command, output and exit code with
-  secrets masked. `t` steps through the types, `x` keeps failures, `f` finds runs by command, `c`
+  secrets masked. In a wide pane that is a card beside the list titled with whether the run passed:
+  its exit code, time and agent, the plan a final verification covers, and the whole command and
+  output wrapped rather than cut. `t` steps through the types, `x` keeps failures, `f` finds runs by command, `c`
   copies the command and `r` fills a rerun request.
 - **The Notepad tab.** One card per section of the bound plan's notepad, each entry under its
   date. `f` finds text in the entries, `w` clears the search and `l` picks another plan's

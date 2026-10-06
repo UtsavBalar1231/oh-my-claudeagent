@@ -124,34 +124,52 @@ export const costText = (lane: Lane, dot: string): string => (lane.costUsd === n
 
 const callCount = (calls: number): string => `${calls} call${calls === 1 ? "" : "s"}`;
 
-function toolRow(lane: Lane, look: LaneLook, home: string, mask: string, indent = "  "): Piece[] {
+const SHELLS: Readonly<Record<string, string>> = { Bash: "bash", Monitor: "bash", PowerShell: "powershell" };
+
+/** The highlighter language of a tool that runs a shell command, so the command can be drawn as code. */
+export const shellLanguage = (tool: string): string | undefined => (Object.hasOwn(SHELLS, tool) ? SHELLS[tool] : undefined);
+
+/**
+ * The tool row in parts: what leads it (spinner or status, then the tool's name), the call's
+ * detail, redacted, with the cells it may take after a space, and the call count for the right edge.
+ */
+export type ToolParts = { lead: Piece[]; detail: string; room: number; marks: Piece[] };
+
+export function toolParts(lane: Lane, look: LaneLook, home: string, indent = "  "): ToolParts {
   const { width, ascii, now, g } = look;
   const count = lane.calls === 0 ? "" : callCount(lane.calls);
   const marks: Piece[] = count === "" || width < TOOL_CELLS + COLUMN_GAP + displayWidth(count) ? [] : [{ text: count, color: TONE_KEYS.muted }];
   const tail = marks.length === 0 ? 0 : COLUMN_GAP + piecesWidth(marks);
-  const pieces: Piece[] = [{ text: indent }, { text: spinner(now, ascii), color: TONE_KEYS.active }, { text: " " }];
+  const lead: Piece[] = [{ text: indent }, { text: spinner(now, ascii), color: TONE_KEYS.active }, { text: " " }];
   if (lane.status !== "running") {
     const mark = statusMark(lane.status, g);
-    pieces.splice(1, 2, { text: mark.glyph, color: mark.color }, { text: " " });
-    pieces.push({ text: STATUS_WORDS[lane.status] ?? "", color: TONE_KEYS.muted });
-  } else if (lane.tool === null) {
-    pieces.push({ text: lane.calls === 0 ? "starting" : "thinking", color: TONE_KEYS.muted });
-  } else {
-    const label = fitEnd(toolLabel(lane.tool.name), Math.max(0, width - tail - piecesWidth(pieces)), g.ellipsis);
-    pieces.push({ text: label, color: ON_SURFACE, bold: true });
-    const detail = redactLine(lane.tool.detail, home, mask);
-    const room = width - tail - piecesWidth(pieces) - 1;
-    if (detail !== "" && room > 0) pieces.push({ text: ` ${fitEnd(detail, room, g.ellipsis)}` });
+    lead.splice(1, 2, { text: mark.glyph, color: mark.color }, { text: " " });
+    lead.push({ text: STATUS_WORDS[lane.status] ?? "", color: TONE_KEYS.muted });
+    return { lead, detail: "", room: 0, marks };
   }
-  if (marks.length === 0) return pieces;
-  return [...pieces, { text: " ".repeat(Math.max(0, width - tail - piecesWidth(pieces)) + COLUMN_GAP) }, ...marks];
+  if (lane.tool === null) {
+    lead.push({ text: lane.calls === 0 ? "starting" : "thinking", color: TONE_KEYS.muted });
+    return { lead, detail: "", room: 0, marks };
+  }
+  lead.push({ text: fitEnd(toolLabel(lane.tool.name), Math.max(0, width - tail - piecesWidth(lead)), g.ellipsis), color: ON_SURFACE, bold: true });
+  return { lead, detail: redactLine(lane.tool.detail, home, g.mask), room: width - tail - piecesWidth(lead) - 1, marks };
+}
+
+/** The pad that puts the call count at the right edge of a row `used` cells wide so far. */
+export const marksAfter = (marks: readonly Piece[], used: number, width: number): Piece[] =>
+  marks.length === 0 ? [] : [{ text: " ".repeat(Math.max(0, width - used - COLUMN_GAP - piecesWidth(marks)) + COLUMN_GAP) }, ...marks];
+
+function toolRow(lane: Lane, look: LaneLook, home: string, indent = "  "): Piece[] {
+  const { lead, detail, room, marks } = toolParts(lane, look, home, indent);
+  const pieces = detail !== "" && room > 0 ? [...lead, { text: ` ${fitEnd(detail, room, look.g.ellipsis)}` }] : lead;
+  return [...pieces, ...marksAfter(marks, piecesWidth(pieces), look.width)];
 }
 
 const redactLine = (text: string, home: string, mask: string): string => redact(text, home, mask).text;
 
 /** A running agent's lane: identity, task and the facts on the right; the current tool below, its call count at the right edge. */
 export function laneRows(lane: Lane, look: LaneLook, home: string): Piece[][] {
-  return [headRow(lane, look), toolRow(lane, look, home, look.g.mask)];
+  return [headRow(lane, look), toolRow(lane, look, home)];
 }
 
 /**
@@ -162,12 +180,11 @@ export function laneRows(lane: Lane, look: LaneLook, home: string): Piece[][] {
 export function laneBlock(lane: Lane, look: LaneLook, home: string): Piece[][] {
   const { g, now, width } = look;
   const mark = statusMark(lane.status, g);
-  const state: Piece[] = [
-    { text: `${mark.glyph} `, color: mark.color },
-    { text: lane.status === "running" ? "running" : (STATUS_WORDS[lane.status] ?? lane.status), color: TONE_KEYS.muted },
-    gap(),
-    { text: padStart(formatDuration((lane.endedAt ?? now) - lane.startedAt), ELAPSED), color: TONE_KEYS.muted },
-  ];
+  const elapsed: Piece = { text: padStart(formatDuration((lane.endedAt ?? now) - lane.startedAt), ELAPSED), color: TONE_KEYS.muted };
+  const word: Piece = { text: lane.status === "running" ? "running" : (STATUS_WORDS[lane.status] ?? lane.status), color: TONE_KEYS.muted };
+  const full: Piece[] = [{ text: `${mark.glyph} `, color: mark.color }, word, gap(), elapsed];
+  // A name that would be cut gives up the state's word first: the glyph's shape still tells the state.
+  const state = displayWidth(shortType(lane.type)) + COLUMN_GAP + piecesWidth(full) <= width ? full : [{ text: mark.glyph, color: mark.color }, gap(), elapsed];
   const name = fitEnd(shortType(lane.type), Math.max(0, width - piecesWidth(state) - COLUMN_GAP), g.ellipsis);
   const head: Piece[] = [{ text: name, color: ON_SURFACE, bold: true }, { text: " ".repeat(Math.max(COLUMN_GAP, width - displayWidth(name) - piecesWidth(state))) }, ...state];
   const tokens = formatTokens(lane.inputTokens + lane.outputTokens);
@@ -182,7 +199,7 @@ export function laneBlock(lane: Lane, look: LaneLook, home: string): Piece[][] {
   return [
     head,
     orSpace(fitPieces(inlineMarkdown(oneLine(lane.description)), width, g.ellipsis)),
-    lane.endedAt === null ? toolRow(lane, look, home, g.mask, "") : orSpace(fitPieces(outcome(lane, g, home), width, g.ellipsis)),
+    lane.endedAt === null ? toolRow(lane, look, home, "") : orSpace(fitPieces(outcome(lane, g, home), width, g.ellipsis)),
     [{ text: fitEnd(usage.find((text) => displayWidth(text) <= width) ?? usage.at(-1) ?? "", width, g.ellipsis), color: TONE_KEYS.muted }],
   ];
 }
