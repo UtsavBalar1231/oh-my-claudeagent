@@ -7,6 +7,9 @@ import {
   type MascotName,
   type MascotState,
   mascotOf,
+  MINI,
+  MINI_LAYERS,
+  MINIS,
   paletteOf,
   rasterCells,
   SIZE,
@@ -134,6 +137,50 @@ test("rasterCells decodes to 16 by 8 little-endian triplets", () => {
   expect(cell(4, 8)).toEqual([0x20, TERMINAL_DEFAULT, MASCOTS.executor.body]);
   expect(cell(0, 0)).toEqual([0x20, TERMINAL_DEFAULT, TERMINAL_DEFAULT]);
   expect(TERMINAL_DEFAULT).toBe(0x01000000);
+});
+
+test("every mini run stays on the 8 by 8 grid and paints only palette keys", () => {
+  for (const name of NAMES) {
+    const keys = new Set([...Object.keys(paletteOf(MASCOTS[name])), "."]);
+    for (const layer of [...Object.values(MINI_LAYERS), MINIS[name].props, MINIS[name].poseA, MINIS[name].poseB]) {
+      for (const [y, x, pixels] of layer as readonly Run[]) {
+        expect([name, y >= 0 && y < MINI && x >= 0 && x + pixels.length <= MINI]).toEqual([name, true]);
+        for (const key of pixels) expect([name, pixels, keys.has(key)]).toEqual([name, pixels, true]);
+      }
+    }
+  }
+});
+
+test("a mini's sweat, sparkle and snore never touch its head piece, its resting pose or its body", () => {
+  const body = new Set(cellsOf(MINI_LAYERS.body));
+  for (const name of NAMES) {
+    const held = new Set(cellsOf([...MINIS[name].props, ...MINIS[name].poseA]));
+    for (const cell of cellsOf([...MINI_LAYERS.sweat, ...MINI_LAYERS.sparkle, ...MINI_LAYERS.snore])) {
+      const [y = 0, x = 0] = cell.split(",").map(Number);
+      const near = [cell, `${y - 1},${x}`, `${y + 1},${x}`, `${y},${x - 1}`, `${y},${x + 1}`].filter((at) => held.has(at));
+      expect([name, cell, near, body.has(cell)]).toEqual([name, cell, [], false]);
+    }
+  }
+});
+
+test("a mini works in 12 frames that never hop, and rests in one frame each when done, failed or idle", () => {
+  for (const name of NAMES) {
+    const frames = framesOf(name, "working", "mini");
+    expect(frames).toHaveLength(WORKING_FRAMES);
+    for (const frame of frames) {
+      expect(frame).toHaveLength(MINI);
+      expect(JSON.stringify(frame[7])).toBe(JSON.stringify(frames[0]?.[7]));
+    }
+    for (const state of ["done", "failed", "idle"] as const) expect([name, state, framesOf(name, state, "mini").length]).toEqual([name, state, 1]);
+  }
+});
+
+test("a mini's raster is 8 columns by 4 rows and its svg an 8 by 8 view box", () => {
+  const frame = framesOf("executor", "working", "mini")[0];
+  if (frame === undefined) throw new Error("no frame");
+  expect(Uint8Array.from(atob(rasterCells(frame)), (c) => c.charCodeAt(0)).length).toBe(MINI * (MINI / 2) * 12);
+  expect(svgOf(framesOf("executor", "working", "mini"))).toContain('viewBox="0 0 8 8"');
+  expect(framesOf("executor", "working", "mini")).not.toBe(framesOf("executor", "working"));
 });
 
 test("mascotOf resolves this plugin's agents only", () => {

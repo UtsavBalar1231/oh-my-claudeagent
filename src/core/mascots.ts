@@ -3,6 +3,9 @@ import { omcaAgentName } from "./agent-type.ts";
 // Mascot colors are fixed RGB, the one exception to theme keys.
 
 export const SIZE = 16;
+/** The lane-sized mascot: 8 by 8 pixels, 8 columns by 4 rows of half blocks. */
+export const MINI = 8;
+export type MascotSize = "full" | "mini";
 export type Rgb = number;
 export type Frame = readonly (readonly (Rgb | null)[])[];
 export type MascotState = "working" | "done" | "failed" | "idle";
@@ -127,6 +130,40 @@ export const MASCOTS = {
 
 export type MascotName = keyof typeof MASCOTS;
 
+type Pose = Omit<Spec, "body">;
+
+// The minis keep each agent's head piece and face; a one-pixel tool at the side reads as noise.
+const MINI_BODY: Layer = [
+  [2, 2, "oooo"],
+  [3, 1, "oblbbo"],
+  [4, 1, "oebbeo"],
+  [5, 1, "obppbo"],
+  [6, 1, "obbbbo"],
+  [7, 2, "o..o"],
+];
+const MINI_BLINK: Layer = [[4, 2, "b..b"]];
+const MINI_HAPPY: Layer = [[5, 2, "pppp"]];
+const MINI_SAD: Layer = [[5, 3, "mm"]];
+const MINI_SWEAT: Layer = [[5, 0, "C"]];
+const MINI_SPARKLE: Layer = [[0, 0, "Y"]];
+const MINI_SNORE: Layer = [[0, 0, "Z"]];
+
+/** The mini's shared layers, for the art invariants. */
+export const MINI_LAYERS = { body: MINI_BODY, blink: MINI_BLINK, happy: MINI_HAPPY, sad: MINI_SAD, sweat: MINI_SWEAT, sparkle: MINI_SPARKLE, snore: MINI_SNORE } as const;
+
+export const MINIS = {
+  orchestrator: { props: [[1, 4, "o"], [0, 5, "o"]], poseA: [[0, 7, "Y"]], poseB: [[1, 0, "Y"]] },
+  planner: { props: [], poseA: [[1, 5, "V"], [2, 6, "V"], [1, 7, "V"], [0, 7, "V"]], poseB: [] },
+  analyzer: { props: [], poseA: [[4, 5, "C"], [5, 6, "G"], [6, 7, "B"]], poseB: [[4, 2, "C"], [5, 1, "G"], [6, 0, "B"]] },
+  reviewer: { props: [], poseA: [[0, 3, "BB"], [1, 2, "GGGG"]], poseB: [[1, 3, "BB"], [2, 2, "GGGG"]] },
+  executor: { props: [[1, 2, "YOOY"], [2, 1, "YYYYYY"]], poseA: [], poseB: [[1, 3, "WW"]] },
+  explorer: { props: [[0, 2, "TTTT"], [1, 2, "BBBB"], [2, 0, "TTTTTTTT"]], poseA: [], poseB: [[1, 7, "W"]] },
+  researcher: { props: [[4, 1, "KwKKwK"]], poseA: [], poseB: [[4, 2, "C"]] },
+  architect: { props: [[0, 3, "YY"], [1, 3, "GG"]], poseA: [], poseB: [[0, 1, "Y"], [0, 6, "Y"]] },
+  "build-fixer": { props: [[3, 1, "KCKKCK"]], poseA: [], poseB: [[3, 2, "W"]] },
+  viewer: { props: [[0, 4, "G"], [1, 2, "KCKK"]], poseA: [], poseB: [[0, 6, "W"], [1, 7, "Y"]] },
+} as const satisfies Record<MascotName, Pose>;
+
 const shade = (rgb: Rgb, f: number): Rgb =>
   (Math.round(((rgb >> 16) & 255) * f) << 16) | (Math.round(((rgb >> 8) & 255) * f) << 8) | Math.round((rgb & 255) * f);
 const tint = (rgb: Rgb, f: number): Rgb => {
@@ -139,23 +176,24 @@ export function paletteOf(spec: Spec): Readonly<Record<string, Rgb>> {
 }
 
 function paint(grid: (Rgb | null)[][], layer: Layer, palette: Readonly<Record<string, Rgb>>): void {
+  const width = grid.length;
   for (const [y, x0, pixels] of layer) {
     for (let i = 0; i < pixels.length; i++) {
       const key = pixels[i];
       if (key === undefined || key === ".") continue;
       const color = palette[key];
       const row = grid[y];
-      if (color === undefined || row === undefined || x0 + i >= SIZE) continue;
+      if (color === undefined || row === undefined || x0 + i >= width) continue;
       row[x0 + i] = color;
     }
   }
 }
 
-function compose(spec: Spec, layers: readonly Layer[], lift: number): Frame {
+function compose(spec: Spec, layers: readonly Layer[], lift: number, size = SIZE): Frame {
   const palette = paletteOf(spec);
-  const grid: (Rgb | null)[][] = Array.from({ length: SIZE }, () => Array<Rgb | null>(SIZE).fill(null));
+  const grid: (Rgb | null)[][] = Array.from({ length: size }, () => Array<Rgb | null>(size).fill(null));
   for (const layer of layers) paint(grid, layer, palette);
-  return lift === 0 ? grid : [...grid.slice(lift), ...Array.from({ length: lift }, () => Array<Rgb | null>(SIZE).fill(null))];
+  return lift === 0 ? grid : [...grid.slice(lift), ...Array.from({ length: lift }, () => Array<Rgb | null>(size).fill(null))];
 }
 
 export const WORKING_FRAMES = 12;
@@ -163,14 +201,34 @@ export const FRAME_MS = 170;
 
 const framesCache = new Map<string, Frame[]>();
 
-export function framesOf(name: MascotName, state: MascotState): Frame[] {
-  const key = `${name}:${state}`;
+export function framesOf(name: MascotName, state: MascotState, size: MascotSize = "full"): Frame[] {
+  const key = `${name}:${state}:${size}`;
   let frames = framesCache.get(key);
   if (frames === undefined) {
-    frames = buildFrames(name, state);
+    frames = size === "full" ? buildFrames(name, state) : buildMiniFrames(name, state);
     framesCache.set(key, frames);
   }
   return frames;
+}
+
+// A mini does not hop: its head piece sits on the top row, so it swaps poses and blinks instead.
+function buildMiniFrames(name: MascotName, state: MascotState): Frame[] {
+  const spec: Spec = MASCOTS[name];
+  const pose: Pose = MINIS[name];
+  const mini = (layers: readonly Layer[]) => compose(spec, layers, 0, MINI);
+  switch (state) {
+    case "working":
+      return Array.from({ length: WORKING_FRAMES }, (_, i) => {
+        const eyes = i === WORKING_FRAMES - 3 ? [MINI_BLINK] : [];
+        return mini([MINI_BODY, ...eyes, pose.props, Math.floor(i / 2) % 2 === 0 ? pose.poseA : pose.poseB]);
+      });
+    case "done":
+      return [mini([MINI_BODY, MINI_HAPPY, pose.props, pose.poseA, MINI_SPARKLE])];
+    case "failed":
+      return [mini([MINI_BODY, MINI_SAD, pose.props, pose.poseA, MINI_SWEAT])];
+    case "idle":
+      return [mini([MINI_BODY, MINI_BLINK, pose.props, pose.poseA, MINI_SNORE])];
+  }
 }
 
 function buildFrames(name: MascotName, state: MascotState): Frame[] {
@@ -198,10 +256,10 @@ function rects(frame: Frame): string {
   let out = "";
   frame.forEach((row, y) => {
     let x = 0;
-    while (x < SIZE) {
+    while (x < row.length) {
       const color = row[x] ?? null;
       let end = x + 1;
-      while (end < SIZE && (row[end] ?? null) === color) end++;
+      while (end < row.length && (row[end] ?? null) === color) end++;
       if (color !== null) out += `<rect x="${x}" y="${y}" width="${end - x}" height="1" fill="${hex(color)}"/>`;
       x = end;
     }
@@ -223,7 +281,8 @@ export function svgOf(frames: readonly Frame[], frameMs = FRAME_MS, isStill = fa
 }
 
 function buildSvg(frames: readonly Frame[], frameMs: number): string {
-  const head = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${SIZE} ${SIZE}" shape-rendering="crispEdges">`;
+  const size = frames[0]?.length ?? SIZE;
+  const head = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" shape-rendering="crispEdges">`;
   if (frames.length === 1) return `${head}${rects(frames[0] ?? [])}</svg>`;
   const n = frames.length;
   const keyTimes = Array.from({ length: n }, (_, i) => (i / n).toFixed(4)).join(";");
@@ -243,7 +302,7 @@ const SPACE = 0x20;
 
 const rasterCache = new WeakMap<Frame, string>();
 
-/** One frame as Raster cells: 16 columns by 8 rows of [codePoint, fg, bg] little-endian u32. */
+/** One frame as Raster cells: a column per pixel and a row per two pixels, each [codePoint, fg, bg] as little-endian u32. */
 export function rasterCells(frame: Frame): string {
   let cells = rasterCache.get(frame);
   if (cells === undefined) rasterCache.set(frame, (cells = buildRaster(frame)));
@@ -251,11 +310,12 @@ export function rasterCells(frame: Frame): string {
 }
 
 function buildRaster(frame: Frame): string {
-  const rows = SIZE / 2;
-  const bytes = new Uint8Array(SIZE * rows * 12);
+  const columns = frame[0]?.length ?? SIZE;
+  const rows = frame.length / 2;
+  const bytes = new Uint8Array(columns * rows * 12);
   const view = new DataView(bytes.buffer);
   for (let r = 0; r < rows; r++) {
-    for (let x = 0; x < SIZE; x++) {
+    for (let x = 0; x < columns; x++) {
       const top = frame[r * 2]?.[x] ?? null;
       const bottom = frame[r * 2 + 1]?.[x] ?? null;
       // A solid cell is a space on its background: no glyph to misalign, and no foreground equal
@@ -268,7 +328,7 @@ function buildRaster(frame: Frame): string {
             : bottom !== null
               ? [LOWER_HALF, bottom, TERMINAL_DEFAULT]
               : [SPACE, TERMINAL_DEFAULT, TERMINAL_DEFAULT];
-      const at = (r * SIZE + x) * 12;
+      const at = (r * columns + x) * 12;
       view.setUint32(at, glyph, true);
       view.setUint32(at + 4, fg, true);
       view.setUint32(at + 8, bg, true);

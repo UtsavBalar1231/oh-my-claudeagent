@@ -124,12 +124,12 @@ export const costText = (lane: Lane, dot: string): string => (lane.costUsd === n
 
 const callCount = (calls: number): string => `${calls} call${calls === 1 ? "" : "s"}`;
 
-function toolRow(lane: Lane, look: LaneLook, home: string, mask: string): Piece[] {
+function toolRow(lane: Lane, look: LaneLook, home: string, mask: string, indent = "  "): Piece[] {
   const { width, ascii, now, g } = look;
   const count = lane.calls === 0 ? "" : callCount(lane.calls);
   const marks: Piece[] = count === "" || width < TOOL_CELLS + COLUMN_GAP + displayWidth(count) ? [] : [{ text: count, color: TONE_KEYS.muted }];
   const tail = marks.length === 0 ? 0 : COLUMN_GAP + piecesWidth(marks);
-  const pieces: Piece[] = [{ text: "  " }, { text: spinner(now, ascii), color: TONE_KEYS.active }, { text: " " }];
+  const pieces: Piece[] = [{ text: indent }, { text: spinner(now, ascii), color: TONE_KEYS.active }, { text: " " }];
   if (lane.status !== "running") {
     const mark = statusMark(lane.status, g);
     pieces.splice(1, 2, { text: mark.glyph, color: mark.color }, { text: " " });
@@ -152,6 +152,38 @@ const redactLine = (text: string, home: string, mask: string): string => redact(
 /** A running agent's lane: identity, task and the facts on the right; the current tool below, its call count at the right edge. */
 export function laneRows(lane: Lane, look: LaneLook, home: string): Piece[][] {
   return [headRow(lane, look), toolRow(lane, look, home, look.g.mask)];
+}
+
+/**
+ * A running agent's block beside its mini mascot: its name with its state and time, its task, its
+ * current tool, then its model, effort, tokens and cost. Each row is `look.width` cells at most.
+ */
+export function laneBlock(lane: Lane, look: LaneLook, home: string): Piece[][] {
+  const { g, now, width } = look;
+  const mark = statusMark(lane.status, g);
+  const state: Piece[] = [
+    { text: `${mark.glyph} `, color: mark.color },
+    { text: lane.status === "running" ? "running" : (STATUS_WORDS[lane.status] ?? lane.status), color: TONE_KEYS.muted },
+    gap(),
+    { text: padStart(formatDuration(now - lane.startedAt), ELAPSED), color: TONE_KEYS.muted },
+  ];
+  const name = fitEnd(shortType(lane.type), Math.max(0, width - piecesWidth(state) - COLUMN_GAP), g.ellipsis);
+  const head: Piece[] = [{ text: name, color: ON_SURFACE, bold: true }, { text: " ".repeat(Math.max(COLUMN_GAP, width - displayWidth(name) - piecesWidth(state))) }, ...state];
+  const tokens = formatTokens(lane.inputTokens + lane.outputTokens);
+  const cost = lane.costUsd === null ? "" : `~${formatUsd(lane.costUsd)}`;
+  // Too narrow for every fact, the row drops whole parts rather than cutting the cost short.
+  const usage = [
+    [shortModel(lane.model), effortText(lane), `${tokens} tokens`, cost],
+    [shortModel(lane.model), effortText(lane), tokens, cost],
+    [effortText(lane), tokens, cost],
+    [tokens, cost],
+  ].map((parts) => parts.filter((part) => part !== "").join(` ${g.dot} `));
+  return [
+    head,
+    [{ text: fitEnd(oneLine(lane.description), width, g.ellipsis) }],
+    toolRow(lane, look, home, g.mask, ""),
+    [{ text: fitEnd(usage.find((text) => displayWidth(text) <= width) ?? usage.at(-1) ?? "", width, g.ellipsis), color: TONE_KEYS.muted }],
+  ];
 }
 
 export const STATUS_WORDS: Readonly<Partial<Record<Status, string>>> = {

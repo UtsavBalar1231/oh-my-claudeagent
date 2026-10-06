@@ -1,6 +1,6 @@
 import type { Timer } from "claude-code";
 import type { Lane } from "../src/core/mission.ts";
-import { FRAME_MS, framesOf, type MascotName, type MascotState, mascotOf, rasterCells, SIZE } from "../src/core/mascots.ts";
+import { FRAME_MS, framesOf, MINI, type MascotName, type MascotSize, type MascotState, mascotOf, rasterCells, SIZE } from "../src/core/mascots.ts";
 import { type Host, reason } from "./host.ts";
 import { PANE } from "./pane.ts";
 
@@ -8,8 +8,8 @@ let timer: Timer | undefined;
 let isBlitting = false;
 let isStill = false;
 let counter = 0;
-// The agents whose mascots the latest Agents tab drawing laid out, so the timer blits only those.
-let drawn: ReadonlySet<string> = new Set();
+// The agents whose mascots the latest drawing laid out, at the size it drew each, so the timer blits only those.
+let drawn: ReadonlyMap<string, MascotSize> = new Map();
 
 /** The frame every working mascot is at: a drawing made now lands where the blits are. */
 export const frame = (): number => counter;
@@ -23,16 +23,17 @@ export function stateOf({ endedAt, status }: Pick<Lane, "endedAt" | "status">): 
   return status === "answer" ? "done" : "failed";
 }
 
-export function show(ids: Iterable<string>): void {
-  drawn = new Set(ids);
+export function show(shown: Iterable<readonly [id: string, size: MascotSize]>): void {
+  drawn = new Map(shown);
 }
 
-async function working(host: Host): Promise<{ id: string; name: MascotName }[]> {
+async function working(host: Host): Promise<{ id: string; name: MascotName; size: MascotSize }[]> {
   const [pane, agents, surfaces] = await Promise.all([host.state.pane.get(), host.state.agents.get(), host.session.surfaces()]);
   if (pane.value?.tab !== "agents" || !surfaces.includes("terminal")) return [];
   return Object.entries(agents.value ?? {}).flatMap(([id, row]) => {
     const name = mascotOf(row.type);
-    return name === undefined || !drawn.has(id) || stateOf(row) !== "working" ? [] : [{ id, name }];
+    const size = drawn.get(id);
+    return name === undefined || size === undefined || stateOf(row) !== "working" ? [] : [{ id, name, size }];
   });
 }
 
@@ -44,10 +45,11 @@ async function advance(host: Host): Promise<void> {
   }
   counter += 1;
   await Promise.all(
-    shown.map(({ id, name }) => {
-      const frames = framesOf(name, "working");
+    shown.map(({ id, name, size }) => {
+      const frames = framesOf(name, "working", size);
       const next = frames[counter % frames.length];
-      return next === undefined ? undefined : host.ui.blit({ requestId: PANE, key: keyOf(id), columns: SIZE, rows: SIZE / 2, cells: rasterCells(next) });
+      const grid = size === "mini" ? MINI : SIZE;
+      return next === undefined ? undefined : host.ui.blit({ requestId: PANE, key: keyOf(id), columns: grid, rows: grid / 2, cells: rasterCells(next) });
     }),
   );
 }
@@ -83,5 +85,5 @@ export function stop(): void {
   timer?.cancel();
   timer = undefined;
   counter = 0;
-  drawn = new Set();
+  drawn = new Map();
 }

@@ -24,7 +24,7 @@ import {
   type ThemeKey,
   TONE_KEYS,
 } from "../src/core/visual.ts";
-import { FRAME_MS, framesOf, type MascotState, mascotOf, rasterCells, svgOf } from "../src/core/mascots.ts";
+import { FRAME_MS, framesOf, MINI, type MascotSize, type MascotState, mascotOf, rasterCells, SIZE, svgOf } from "../src/core/mascots.ts";
 import type { GlyphTier, Glyphs } from "../src/core/ui-kit.ts";
 
 type Keyed<P, K extends keyof P> = Omit<P, K> & { [Q in K]?: ThemeKey };
@@ -46,31 +46,32 @@ export type Kit = {
   Link: ElementConstructor<LinkProps>;
   Input?: ElementConstructor<InputProps>;
   /** The agent's mascot, or null for an unknown agent or the ASCII tier. Mascot colors are fixed RGB, not theme keys. */
-  mascot: (type: string, state: MascotState, key: string, frame: number) => RenderElement | null;
+  mascot: (type: string, state: MascotState, key: string, frame: number, size?: MascotSize) => RenderElement | null;
 };
 
-const MASCOT_ROWS = 8;
-const MASCOT_COLUMNS = 16;
-const MASCOT_PIXELS = 64;
+const GRID: Readonly<Record<MascotSize, number>> = { full: SIZE, mini: MINI };
+// A remote surface draws four screen pixels to a mascot pixel.
+const SVG_SCALE = 4;
 
 // The engine completes every table, so the surface, not the table, says which element draws.
 // Only a working mascot moves, unless the person prefers reduced motion, and on a remote surface it moves by its own SMIL loop, so those
 // props never depend on `frame`: a redraw must not restart the loop.
-function mascotIn(table: ElementTable, surface: RenderSurface, tier: GlyphTier, isStill: boolean, type: string, state: MascotState, key: string, frame: number): RenderElement | null {
+function mascotIn(table: ElementTable, surface: RenderSurface, tier: GlyphTier, isStill: boolean, type: string, state: MascotState, key: string, frame: number, size: MascotSize): RenderElement | null {
   const name = mascotOf(type);
   if (name === undefined || tier === "ascii") return null;
-  const frames = framesOf(name, state);
+  const frames = framesOf(name, state, size);
+  const grid = GRID[size];
   const isMoving = state === "working" && !isStill;
   if (surface === "terminal") {
     const shown = frames[isMoving ? frame % frames.length : 0];
-    return shown === undefined || !("Raster" in table) ? null : table.Raster({ key, columns: MASCOT_COLUMNS, rows: MASCOT_ROWS, cells: rasterCells(shown) });
+    return shown === undefined || !("Raster" in table) ? null : table.Raster({ key, columns: grid, rows: grid / 2, cells: rasterCells(shown) });
   }
   if (!("Svg" in table) || frames.length === 0) return null;
   return table.Svg({
     source: svgOf(frames, FRAME_MS, !isMoving),
     alt: `${name} ${state}`,
-    width: MASCOT_PIXELS,
-    height: MASCOT_PIXELS,
+    width: grid * SVG_SCALE,
+    height: grid * SVG_SCALE,
     ...(isMoving ? { isInteractive: true } : {}),
   });
 }
@@ -85,7 +86,7 @@ export const kitOf = (table: ElementTable, surface: RenderSurface, tier: GlyphTi
   Code: table.Code,
   Link: table.Link,
   ...(surface !== "mobile" && "Input" in table ? { Input: table.Input } : {}),
-  mascot: (type, state, key, frame) => mascotIn(table, surface, tier, isStill, type, state, key, frame),
+  mascot: (type, state, key, frame, size = "full") => mascotIn(table, surface, tier, isStill, type, state, key, frame, size),
 });
 
 const styleOf = ({ text: _text, ...style }: Piece): TextStyle => style;

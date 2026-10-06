@@ -3,6 +3,9 @@ import { type Engine, expect, test } from "claude-code/testing";
 import { childrenOf, drain, isAscii, isNode, type Node, nodeByKey, pane, run, type Size, usage, world } from "./world.ts";
 
 const DOCK_120: Size = { columns: 120, rows: 40, placement: "dock" };
+// Too short for three relaxed lanes, and for one relaxed lane with a finished one under it.
+const DOCK_COMPACT: Size = { columns: 120, rows: 18, placement: "dock" };
+const DOCK_TINY: Size = { columns: 120, rows: 13, placement: "dock" };
 const INLINE_80: Size = { columns: 80, rows: 40, placement: "inline" };
 const INLINE_200: Size = { columns: 200, rows: 50, placement: "inline" };
 
@@ -60,13 +63,21 @@ function textOf(element: unknown): string {
   return childrenOf(element).map(textOf).join(element.type === "Box" ? gap : "");
 }
 
-const isStage = (node: unknown) => isNode(node) && node.props?.["key"] === "agents-stage";
+// A relaxed lane is a row of its mini and a column of its rows; the mini draws no text, so only the rows count.
+const blockRows = (node: unknown): string[] => {
+  const [, column] = isNode(node) && node.type === "Box" && node.props?.["flexDirection"] === "row" ? childrenOf(node) : [];
+  return isNode(column) && column.props?.["flexDirection"] === "column" ? childrenOf(column).map(textOf) : [textOf(node)];
+};
 
-/** The body rows as the terminal stacks them: the mascot stage and a lane's hover card left out, a lane's anchor rows each on their own. */
+/** The body rows as the terminal stacks them: a lane's hover card left out, a lane's anchor rows each on their own, a relaxed lane's rows without its mini. */
 function body(tree: RenderElement): string[] {
-  const top = (isNode(tree) ? childrenOf(tree) : []).filter((child) => !isStage(child));
+  const top = isNode(tree) ? childrenOf(tree) : [];
   return top.flatMap((child) =>
-    isNode(child) && child.type === "Box" && child.props?.["flexDirection"] === "column" ? childrenOf(child).filter((one) => !(isNode(one) && isCard(one))).map(textOf) : [textOf(child)],
+    isNode(child) && child.type === "Box" && child.props?.["flexDirection"] === "column"
+      ? childrenOf(child)
+          .filter((one) => !(isNode(one) && isCard(one)))
+          .flatMap(blockRows)
+      : [textOf(child)],
   );
 }
 
@@ -97,10 +108,11 @@ async function threeAgents($: Engine, on: On) {
   return w;
 }
 
-test("each running agent gets a lane: identity, task, effort and elapsed, then its current tool and, at the right edge, how many calls it made", async ($, on) => {
+test("a body too short for every relaxed lane gives each running agent a compact lane: identity, task, effort and elapsed, then its current tool and calls", async ($, on) => {
   const w = await threeAgents($, on);
   await w.clock.advance(66_000);
-  const ui = await $.ui.mount(pane("terminal", DOCK_120));
+  const ui = await $.ui.mount(pane("terminal", DOCK_COMPACT));
+  expect(await ui.find({ type: "Raster" })).toBeUndefined();
 
   expect(body(await ui.drawn()).slice(3)).toEqual([
     "◆ executor · Fix the heading parser    high   1m06s",
@@ -169,7 +181,7 @@ test("the current tool's name draws in text with the call count muted at the rig
   await ui.unmount();
 });
 
-test("a finished agent collapses to one dim line with its result and duration, after the running lanes", async ($, on) => {
+test("a finished agent collapses to one dim line with its result and duration, under a Finished label after the running lanes", async ($, on) => {
   const w = await threeAgents($, on);
   await w.clock.advance(12_000);
   await finish($, "a-2", "\nMapped 14 callers of the router.\nNone bypass the harness.");
@@ -179,8 +191,12 @@ test("a finished agent collapses to one dim line with its result and duration, a
   const ui = await $.ui.mount(pane("terminal", DOCK_120));
 
   expect(body(await ui.drawn()).slice(3)).toEqual([
-    "◆ executor · Fix the heading parser    high     15s",
-    spread("  ✶ Bash bun test src/parser.spec.ts", "4 calls"),
+    "executor              ◆ running     15s",
+    "Fix the heading parser",
+    "✶ Bash bun test src/parser.sp…  4 calls",
+    "sonnet-5-5 · high · 4.5k · ~$0.02",
+    " ",
+    "Finished",
     "! architect · stopped                           15s",
     "✓ explorer · Mapped 14 callers of the rout…     12s",
     "d: Details  1 running · 2 finished · 9.5k tokens",
@@ -227,7 +243,7 @@ test("hovering a lane reveals a card, drawn last so it paints over the rows belo
     props: {
       key: "card-a-1",
       position: "absolute",
-      top: -1,
+      top: -2,
       left: 2,
       width: 49,
       display: "none",
@@ -254,7 +270,7 @@ test("hovering a lane reveals a card, drawn last so it paints over the rows belo
   ]);
   expect(JSON.stringify(await ui.drawn())).not.toContain("s3cr3t");
   expect(JSON.stringify(await ui.drawn())).not.toContain("abcdefghij");
-  expect(body(await ui.drawn())[4]).toBe(spread("  · Read ~/.env", "1 call"));
+  expect(body(await ui.drawn())[5]).toBe(spread("· Read ~/.env", "1 call", 39));
   await ui.unmount();
 });
 
@@ -288,7 +304,7 @@ test("a prompt is masked before it is cut, so a secret at the cut never shows in
   await ui.unmount();
 });
 
-test("d shows each running lane's prompt, last output and usage under it, and d again hides them", async ($, on) => {
+test("d shows each running lane's prompt and last output under its usage, and d again hides them", async ($, on) => {
   const w = await threeAgents($, on);
   await finish($, "a-3", "The ledger holds.");
   w.agents = w.agents.slice(0, 2);
@@ -296,16 +312,21 @@ test("d shows each running lane's prompt, last output and usage under it, and d 
 
   await ui.press({ key: "d" });
   expect(body(await ui.drawn()).slice(3)).toEqual([
-    "◆ executor · Fix the heading parser    high      0s",
-    spread("  · Bash bun test src/parser.spec.ts", "4 calls"),
-    "  prompt  Fix the heading parser so fenced lines a…",
+    "executor              ◆ running      0s",
+    "Fix the heading parser",
+    "· Bash bun test src/parser.sp…  4 calls",
+    "sonnet-5-5 · high · 4.5k · ~$0.02",
+    "  prompt  Fix the heading parser so fe…",
     "  output  Found the heading rule.",
-    "  usage   4 tool calls · 4.5k tokens · ~$0.02",
-    "◆ explorer · Map the router callers    high      0s",
-    spread("  · ast_search", "2 calls"),
-    "  prompt  Find every caller of the router.",
+    " ",
+    "explorer              ◆ running      0s",
+    "Map the router callers",
+    "· ast_search                    2 calls",
+    "sonnet-5-5 · high · 3.0k · ~$0.01",
+    "  prompt  Find every caller of the rou…",
     "  output  none yet",
-    "  usage   2 tool calls · 3.0k tokens · ~$0.01",
+    " ",
+    "Finished",
     "✓ architect · The ledger holds.                  0s",
     "d: Hide details  2 running · 1 finished",
   ]);
@@ -318,7 +339,7 @@ test("d shows each running lane's prompt, last output and usage under it, and d 
 
 test("the spinner and the elapsed clocks move once a second while an agent runs", async ($, on) => {
   const w = await threeAgents($, on);
-  const ui = await $.ui.mount(pane("terminal", DOCK_120));
+  const ui = await $.ui.mount(pane("terminal", DOCK_COMPACT));
   const lane = async () => body(await ui.drawn()).slice(3, 5);
   const tools = (frame: string) => spread(`  ${frame} Bash bun test src/parser.spec.ts`, "4 calls");
 
@@ -362,7 +383,7 @@ test("parallel spawns and steps each keep their own lane", async ($, on) => {
   const ui = await $.ui.mount(pane("terminal", DOCK_120));
 
   const tools = await Promise.all(["a-1", "a-2", "a-3"].map(async (id) => textOf(await ui.find({ key: `tools-${id}` }))));
-  expect(tools).toEqual([spread("  · Read a.ts", "1 call"), spread("  · Bash just test", "1 call"), spread("  · Edit c.ts", "1 call")]);
+  expect(tools).toEqual([spread("· Read a.ts", "1 call", 39), spread("· Bash just test", "1 call", 39), spread("· Edit c.ts", "1 call", 39)]);
   expect(w.logs.filter((line) => line.startsWith("agentsTracker"))).toEqual([]);
   await ui.unmount();
 });
@@ -407,7 +428,7 @@ test("by default each agent draws its own Nerd Font icon, a space after it", asy
   w.agents = ["a-1", "a-2"].map((id) => ({ id, description: "", type: "x", status: "running" }));
   await finish($, "a-2", "The ledger holds.");
   w.agents = w.agents.slice(0, 1);
-  const ui = await $.ui.mount(pane("terminal", DOCK_120));
+  const ui = await $.ui.mount(pane("terminal", DOCK_TINY));
 
   const rows = body(await ui.drawn()).slice(3);
   expect(rows[0]).toStartWith("\u{f085} executor · ");
@@ -469,9 +490,27 @@ test("an idle teammate draws its status mark and word with no spinner and is lef
   const ui = await $.ui.mount(pane("terminal", DOCK_120));
 
   const rows = body(await ui.drawn()).slice(3);
-  expect(rows[1]).toBe("  ○ idle");
-  expect(rows[3]).toBe("  · starting");
+  expect(rows[0]).toBe("executor                 ○ idle      0s");
+  expect(rows[2]).toBe("○ idle");
+  expect(rows[7]).toBe("· starting");
   expect(rows.at(-1)).toBe("d: Details  1 running · 1 idle · 0 finished");
+  await ui.unmount();
+});
+
+test("a running agent with no mascot keeps its icon in the mini's place and the same four rows", async ($, on) => {
+  const w = world(on, {}, {}, { OMCA_GLYPHS: "unicode" });
+  engine(on, {});
+  await $.command.run(run(""));
+  await $.agent.spawn({ ...spawnOf(1, "executor", "Survey the repo", "Survey it."), subagentType: "general-purpose" });
+  w.agents = [{ id: "a-1", description: "", type: "x", status: "running" }];
+  const ui = await $.ui.mount(pane("terminal", DOCK_120));
+
+  const tree = await ui.drawn();
+  const [row] = childrenOf(nodeByKey(tree, "agent-a-1") as Node) as Node[];
+  const [gutter] = row === undefined ? [] : (childrenOf(row) as Node[]);
+  expect([gutter?.props?.["width"], textOf(gutter)]).toEqual([8, "◆"]);
+  expect(await ui.find({ type: "Raster" })).toBeUndefined();
+  expect(body(tree).slice(3, 5)).toEqual(["general-purpose       ◆ running      0s", "Survey the repo"]);
   await ui.unmount();
 });
 
@@ -484,8 +523,7 @@ test("two priced steps add up on the lane as an approximate cost beside the toke
   await stepAll($, "a-1", 2);
   const ui = await $.ui.mount(pane("terminal", DOCK_120));
 
-  await ui.press({ key: "d" });
-  expect(body(await ui.drawn())).toContain("  usage   0 tool calls · 3.0k tokens · ~$0.01");
+  expect(body(await ui.drawn())).toContain("sonnet-5-5 · high · 3.0k · ~$0.01");
   await ui.unmount();
 });
 
@@ -498,7 +536,6 @@ test("a step whose model has no price drops the lane's cost and it stays dropped
   await stepAll($, "a-1", 2);
   const ui = await $.ui.mount(pane("terminal", DOCK_120));
 
-  await ui.press({ key: "d" });
-  expect(body(await ui.drawn())).toContain("  usage   0 tool calls · 3.0k tokens");
+  expect(body(await ui.drawn())).toContain("sonnet-5-5 · high · 3.0k tokens");
   await ui.unmount();
 });

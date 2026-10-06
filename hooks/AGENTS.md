@@ -33,10 +33,11 @@ subagent's call, appends the call and its outcome to a module-level map, with no
 from `$.session.messages({ agentId })` and that map; a denied read keeps the stored prompt. A
 page holds at most 8 KiB of brief, 120 calls and 4 KiB of reply, for the newest 20 agents.
 
-`mascot-player` animates the 16 by 8 mascots of `src/core/mascots.ts`. The Agents tab draws a stage
-above the lanes (running agents, then the current wave's finished ones, `floor(width / 18)` at most
-with a `+N` beyond, each named under its mascot) when the body has the lanes' rows plus 10, and the
-agent page header draws its agent's mascot; the ASCII tier draws none. On a terminal the pane's tick
+`mascot-player` animates the mascots of `src/core/mascots.ts`: the 8 by 4 mini that leads each
+relaxed lane on the Agents tab, drawn when the body holds every running lane, a row after each, the
+Finished label and one finished row, and the 16 by 8 mascot in the agent page header. The compact
+lanes and the ASCII tier draw none. `show` records the size each drawing laid out, so a blit
+matches the mounted Raster. On a terminal the pane's tick
 and its open paths call `ensure`, which starts one `$.clock.every(FRAME_MS)` timer while a laid-out
 agent works. Each tick advances a module-level frame counter and awaits a `$.ui.blit` of each shown
 working mascot, and a denied blit is a mascot that is not mounted. The render hooks pass `frame()` to

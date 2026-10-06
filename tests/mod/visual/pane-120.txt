@@ -2,23 +2,23 @@
  ▐▛███▛█   Claude Code v2.1.291                                │1: Agents  2: Plan  3: Evidence  4: Notepad
 ▝▜██████▀  Opus 5.5 · API Usage Billing                        │5: Feedback  6: Stats  7: Doctor
  ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd           │─────────────────────────────────────────────────────
-                                                               │                         ▄▄
-                                                               │      ▄▄▄▄              ▀  ▀
-❯ Fix the parser with the executor                             │     ▀▀▀▀▀▀              ▀▀
-                                                               │   ▀▀▀▀▀▀▀▀▀▀         ▄▀▀▀▀▀▀▄
-● 3 background agents launched (↓ to manage)                   │      ▀        ▄        ▀
-   ├ oh-my-claudeagent:executor (Fix the heading parser)       │      ▀   ▀▀▀▀▀   ▄▄▄   ▀   ▀
-   ├ oh-my-claudeagent:explorer (Map the router callers)       │    ▀  ▀▀  ▀      ▀▀▀ ▀  ▀▀  ▀
-   └ oh-my-claudeagent:architect (Review the ledger design)    │    ▀▀▀▀▀▀▀▀          ▀▀▀▀▀▀▀▀
-                                                               │    explorer         architect
-● Three agents are on it.                                      │+1
-                                                               │ explorer · Map the router callers     high       2s
-✻ Waiting for 3 background agents to finish                    │  ✽ Bash sleep 90                             3 calls
-                                                               │ architect · Review the ledger design  xhigh      2s
-● oh-my-claudeagent+cc-plugin-agents-md: 0s · 38.2k in         │  ✽ Bash sleep 90                             3 calls
-  13 out · $1.08 engine cost                                   │ executor · The rotation is safe: a crash m…      0s
+                                                               │   ▀▀▀▀     explorer                 running      2s
+                                                               │ ▀▀▀▀▀▀▀▀   Map the router callers
+❯ Fix the parser with the executor                             │   ▀▀▀▀     ✽ Bash sleep 90                   3 calls
+                                                               │  ▀▀▀▀▀▀    sonnet-5-5 · high · 46.5k tokens
+● 3 background agents launched (↓ to manage)                   │
+   ├ oh-my-claudeagent:executor (Fix the heading parser)       │    ▀▀      architect                running      2s
+   ├ oh-my-claudeagent:explorer (Map the router callers)       │  ▄▀▀▀▀▄    Review the ledger design
+   └ oh-my-claudeagent:architect (Review the ledger design)    │   ▀▀▀▀     ✽ Bash sleep 90                   3 calls
+                                                               │  ▀▀▀▀▀▀    fable-5-1 · xhigh · 58.1k tokens
+● Three agents are on it.                                      │
+                                                               │Finished
+✻ Waiting for 3 background agents to finish                    │ executor · The rotation is safe: a crash m…      0s
                                                                │d: Details  2 running · 1 finished · 132k tokens
 ● Agent "Fix the heading parser" finished · 0s                 │
+                                                               │
+● oh-my-claudeagent+cc-plugin-agents-md: 0s · 38.2k in         │
+  13 out · $1.13 engine cost                                   │
                                                                │
 ● ok                                                           │
                                                                │

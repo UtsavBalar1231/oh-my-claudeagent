@@ -388,7 +388,7 @@ export const CLIPS: readonly Clip[] = [
       { type: "/omca" },
       { key: "Enter" },
       { until: has("1: Agents"), mark: "pane", hold: 0 },
-      { until: has("just watch summary", "just watch draft", "just watch flags"), mark: "lanes", hold: 6_000, targets: { "tool-row": /\S Bash just watch \w+/, "lane-model": /\S+ {2,}high {2,}\d+s/ } },
+      { until: has("just watch summary", "just watch draft", "just watch flags"), mark: "lanes", hold: 6_000, targets: { "tool-row": /\S Bash just watch \w+/, "lane-head": /executor {2,}\S+ running +\d+s/ } },
     ],
   },
   { name: "clip-board", format: "clip", cols: CLIP_COLS, rows: CLIP_ROWS, script: PLAN_SCRIPT, steps: BOARD_STEPS },
@@ -586,7 +586,7 @@ export const SHOTS: readonly Still[] = [
     command: "Start the open checkout tasks",
     keys: ["/omca", "Enter"],
     // Each subagent takes the next scripted turn, so the sleeps keep all three running while the
-    // pane draws the stage.
+    // pane draws their lanes, each led by its mini.
     script: {
       main: [
         { content: [text("Three agents can start now."), TASK_7] },
@@ -602,7 +602,7 @@ export const SHOTS: readonly Still[] = [
         { content: [bash("sleep 600", "Hold the architect open")] },
       ],
     },
-    ready: (screen) => /executor {2,}explorer {2,}architect/.test(screen),
+    ready: (screen) => ["executor", "explorer", "architect"].every((name) => new RegExp(`${name} {2,}\\S+ running`).test(screen)),
     crop: "pane",
   },
   { name: "guard", format: "png", cols: 120, rows: 26, command: "Clean the build", keys: [], script: GUARD_SCRIPT, ready: guardReady },

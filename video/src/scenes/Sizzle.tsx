@@ -54,7 +54,7 @@ const frame = (cut: Cut) => {
 
 const PANE = (clip: ClipManifest, top = 0): Framing => ({ top, left: PANE_COL, cols: paneCols(clip) });
 
-const laneModel = target(F3, "lane-model");
+const laneHead = target(F3, "lane-head");
 const proven = target(F4, "proven-chip");
 const discard = target(F5, "discard-lines");
 const claimLine = target(F1, "claim-line");
@@ -76,8 +76,8 @@ const S3_LEAD = mark(F4, "focus-moved") - (mark(F4, "task-open") - 6 - S3.second
 const CUTS: readonly Cut[] = [
   // The pane has painted at its mark, so the first frame is a finished, readable composition.
   { id: "S1 pane opens", clip: F3, seconds: 0.9, framing: PANE(F3), at: mark(F3, "pane"), rate: 2, lead: 0 },
-  // Below the tab bar, the lanes' titles up to the model column.
-  { id: "S2 lanes", clip: F3, seconds: 0.8, framing: { top: laneModel.row, left: PANE_COL, cols: laneModel.col - PANE_COL }, at: mark(F3, "lanes") + 30, rate: 4 },
+  // Below the tab bar, the lanes from their minis to the end of the first lane's head row.
+  { id: "S2 lanes", clip: F3, seconds: 0.8, framing: { top: laneHead.row, left: PANE_COL, cols: laneHead.col + laneHead.len - PANE_COL }, at: mark(F3, "lanes") + 30, rate: 4 },
   { id: "S3 focus moves", clip: F4, seconds: S3.seconds, framing: { top: proven.row - 2, left: PANE_COL, cols: LIST_COLS, scale: 1.2 }, at: mark(F4, "focus-moved"), rate: S3.rate, lead: S3_LEAD },
   // The board has painted at its mark.
   { id: "S4 proof chips", clip: F4, seconds: 0.7, framing: { top: proven.row - 2, left: PANE_COL, cols: LIST_COLS }, at: mark(F4, "board"), rate: 2, lead: 0 },

@@ -61,7 +61,7 @@ function header(view: View, lane: Lane): RenderElement[] {
   const { g, kit } = view;
   const room = view.width - SIZE - COLUMN_GAP;
   const mascot = room < MIN_TEXT_CELLS || view.rows < MIN_PAGE_ROWS ? null : kit.mascot(lane.type, stateOf(lane), keyOf(lane.id), frame());
-  show(mascot === null ? [] : [lane.id]);
+  show(mascot === null ? [] : [[lane.id, "full"]]);
   const width = mascot === null ? view.width : room;
   const mark = statusMark(lane.status, g);
   const identity: Piece[] = [

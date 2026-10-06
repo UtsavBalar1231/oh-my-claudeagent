@@ -4,14 +4,15 @@ import {
   excerpt,
   finishedRow,
   type Lane,
+  laneBlock,
   laneColumns,
   laneRows,
   type LaneLook,
   ordered,
   summaryText,
 } from "../../src/core/mission.ts";
-import { mascotOf, SIZE } from "../../src/core/mascots.ts";
-import { COLUMN_GAP, displayWidth, fitEnd, formatTokens, padEnd, shortType, wrapText } from "../../src/core/ui-kit.ts";
+import { type MascotSize, MINI } from "../../src/core/mascots.ts";
+import { agentGlyph, COLUMN_GAP, displayWidth, fitEnd, formatTokens, padEnd, shortType, wrapText } from "../../src/core/ui-kit.ts";
 import { agentKey, ON_SURFACE, type Piece, redact, TONE_KEYS } from "../../src/core/visual.ts";
 import type { Host } from "../host.ts";
 import { frame, keyOf, show, stateOf } from "../mascot-player.ts";
@@ -30,11 +31,15 @@ const LABEL_CELLS = 6;
 // A lane's head and tool rows, then its prompt, output and usage rows while details show.
 const LANE_ROWS = 2;
 const DETAIL_ROWS = 3;
-// A mascot is SIZE columns by SIZE / 2 rows, with two columns between neighbours and its name below.
-const STAGE_PITCH = SIZE + 2;
-const STAGE_NAME_ROWS = 1;
-// The lanes keep their own rows and the stage takes these on top, so a short body shows lanes alone.
-const STAGE_SPARE_ROWS = 10;
+// A relaxed lane is its mini, MINI columns by MINI / 2 rows, one column in and three before its rows,
+// with a blank row after it; narrower than this much text, or shorter than every running lane's
+// rows, the tab draws the compact lanes.
+const MINI_LEFT = 1;
+const MINI_GAP = 3;
+const BLOCK_ROWS = MINI / 2;
+const MIN_BLOCK_TEXT = 30;
+// While details show, a relaxed lane adds its prompt and output rows; its usage is already its fourth row.
+const BLOCK_DETAIL_ROWS = 2;
 
 let isDetailed = false;
 
@@ -51,43 +56,6 @@ const usage = (lane: Lane, dot: string) => `${words(lane.calls, "tool call")} ${
 const scopeOf = (lane: Lane) => `omca-agent-${lane.id}`.slice(0, 64);
 
 type Placed = { lane: Lane; at: number; height: number };
-
-// The agents that ran together: a lane joins the latest wave while one in it still runs or ended after the lane began.
-function lastWave(lanes: readonly Lane[]): Set<string> {
-  let wave: Lane[] = [];
-  let until = Number.NEGATIVE_INFINITY;
-  for (const lane of lanes.toSorted((a, b) => a.startedAt - b.startedAt)) {
-    if (lane.startedAt > until) wave = [];
-    wave.push(lane);
-    until = Math.max(until, lane.endedAt ?? (lane.status === "running" ? Number.POSITIVE_INFINITY : lane.startedAt));
-  }
-  return new Set(wave.map((lane) => lane.id));
-}
-
-const centered = (text: string, cells: number, ellipsis: string): string => {
-  const name = fitEnd(text, cells, ellipsis);
-  return `${" ".repeat(Math.floor((cells - displayWidth(name)) / 2))}${name}`;
-};
-
-// Running agents first, then the finished ones of the current wave, as many as the width holds; the rest are counted.
-function stage(view: View, lanes: readonly Lane[]): { element: RenderElement; height: number } | undefined {
-  const { kit, g } = view;
-  const wave = lastWave(lanes);
-  const cast = lanes.filter((lane) => (lane.endedAt === null || wave.has(lane.id)) && mascotOf(lane.type) !== undefined);
-  const fit = Math.floor(view.width / STAGE_PITCH);
-  const figures = cast.slice(0, fit).flatMap((lane) => {
-    const mascot = kit.mascot(lane.type, stateOf(lane), keyOf(lane.id), frame());
-    if (mascot === null) return [];
-    const name = kit.Text({ dimColor: true, children: [centered(shortType(lane.type), SIZE, g.ellipsis)] });
-    return [{ id: lane.id, figure: kit.Box({ key: `stage-${lane.id}`, flexDirection: "column", width: SIZE, children: [mascot, name] }) }];
-  });
-  show(figures.map(({ id }) => id));
-  if (figures.length === 0) return undefined;
-  const beyond = cast.length - figures.length;
-  const more = beyond > 0 ? [kit.Text({ color: TONE_KEYS.muted, children: [`+${beyond}`] })] : [];
-  const row = kit.Box({ flexDirection: "row", columnGap: STAGE_PITCH - SIZE, children: figures.map(({ figure }) => figure) });
-  return { element: kit.Box({ key: "agents-stage", flexDirection: "column", children: [row, ...more] }), height: SIZE / 2 + STAGE_NAME_ROWS + more.length };
-}
 
 // Below its lane where the body has the rows, above it where it does not, else pinned to the
 // body's top or bottom; `end` is the body row the cards' zero-height parent sits on.
@@ -129,8 +97,8 @@ function card(view: View, { lane, at, height }: Placed, end: number): RenderElem
   });
 }
 
-function detailRows(view: View, lane: Lane): RenderElement[] {
-  const { g, home, kit, width } = view;
+function detailRows(view: View, lane: Lane, width = view.width): RenderElement[] {
+  const { g, home, kit } = view;
   const lead = 2 + LABEL_CELLS + COLUMN_GAP;
   const line = (label: string, text: string) =>
     Line(kit, [
@@ -144,16 +112,17 @@ function detailRows(view: View, lane: Lane): RenderElement[] {
   ];
 }
 
-// The status glyph, then the `named` pieces that make the Button, then the facts, which stay text.
-function openRow(view: View, host: Host, lane: Lane, key: string, pieces: readonly Piece[], named: number): RenderElement {
+// The `lead` pieces (a status glyph, or none), then the `named` pieces that make the Button, then the facts, which stay text.
+function openRow(view: View, host: Host, lane: Lane, key: string, pieces: readonly Piece[], named: number, lead = 1): RenderElement {
   const { kit } = view;
-  const [mark, ...rest] = pieces;
+  const marks = pieces.slice(0, lead);
+  const rest = pieces.slice(lead);
   return kit.Box({
     key,
     flexDirection: "row",
     hover: { backgroundColor: TONE_KEYS.focus },
     children: [
-      Pieces(kit, mark === undefined ? [] : [mark]),
+      ...(marks.length === 0 ? [] : [Pieces(kit, marks)]),
       kit.Button({
         key: page.openKey(lane.id),
         label: rest.slice(0, named).map((piece) => piece.text).join(""),
@@ -192,35 +161,62 @@ export const view: TabView = async (host, view) => {
   const open = (await host.state.agentPage.get()).value?.id;
   const shownLane = lanes.find((lane) => lane.id === open);
   if (shownLane !== undefined) return page.view(host, view, shownLane);
-  const { kit } = view;
-  const look: LaneLook = { width: view.width, g: view.g, ascii: view.isAscii, now: view.now, columns: laneColumns(lanes, view.width) };
+  const { kit, g } = view;
   const running = lanes.filter((lane) => lane.endedAt === null);
   const finished = lanes.filter((lane) => lane.endedAt !== null);
-  const laneHeight = LANE_ROWS + (isDetailed ? DETAIL_ROWS : 0);
-  const lanesRows = running.length * laneHeight + finished.length + 1;
-  const staged = !view.isAscii && view.rows >= lanesRows + STAGE_SPARE_ROWS ? stage(view, lanes) : undefined;
-  if (staged === undefined) show([]);
-  const stageHeight = staged?.height ?? 0;
-  let left = Math.max(laneHeight, view.rows - 1 - stageHeight);
+  const textWidth = view.width - MINI_LEFT - MINI - MINI_GAP;
+  const blockHeight = BLOCK_ROWS + (isDetailed ? BLOCK_DETAIL_ROWS : 0);
+  // Relaxed only when every running lane fits with a row after it, the Finished label and one finished row.
+  const isRelaxed =
+    !view.isAscii && running.length > 0 && textWidth >= MIN_BLOCK_TEXT && view.rows >= running.length * (blockHeight + 1) + (finished.length > 0 ? 2 : 0) + 1;
+  const look: LaneLook = { width: isRelaxed ? textWidth : view.width, g, ascii: view.isAscii, now: view.now, columns: laneColumns(lanes, view.width) };
+  const laneHeight = isRelaxed ? blockHeight + 1 : LANE_ROWS + (isDetailed ? DETAIL_ROWS : 0);
+  let left = Math.max(laneHeight, view.rows - 1);
   const shown: RenderElement[] = [];
   const placed: Placed[] = [];
-  let at = stageHeight;
+  const minis: [string, MascotSize][] = [];
+  let at = 0;
   let hidden = { running: 0, finished: 0 };
   const row = (key: string, pieces: Piece[]) => Row(kit, { key, pieces });
   const scoped = (lane: Lane, children: RenderElement[]) =>
     kit.Box({ key: `agent-${lane.id}`, flexDirection: "column", hover: { scope: scopeOf(lane) }, children });
+  const block = (lane: Lane): RenderElement => {
+    const [head = [], task = [], tool = [], usage = []] = laneBlock(lane, look, view.home);
+    const mini = kit.mascot(lane.type, stateOf(lane), keyOf(lane.id), frame(), "mini");
+    if (mini !== null) minis.push([lane.id, "mini"]);
+    const gutter = kit.Box({ width: MINI, children: [mini ?? kit.Text({ color: agentKey(lane.type), children: [agentGlyph(lane.type, g)] })] });
+    const rows = [
+      openRow(view, host, lane, `lane-${lane.id}`, head, 1, 0),
+      Line(kit, task),
+      row(`tools-${lane.id}`, tool),
+      Line(kit, usage),
+      ...(isDetailed ? detailRows(view, lane, textWidth).slice(0, BLOCK_DETAIL_ROWS) : []),
+    ];
+    return kit.Box({ flexDirection: "row", columnGap: MINI_GAP, paddingLeft: MINI_LEFT, children: [gutter, kit.Box({ flexDirection: "column", children: rows })] });
+  };
   for (const [index, lane] of running.entries()) {
     const isLast = index === running.length - 1 && finished.length === 0;
     if (left < laneHeight + (isLast ? 0 : 1)) {
       hidden = { ...hidden, running: running.length - index };
       break;
     }
-    const [head = [], tools = []] = laneRows(lane, look, view.home);
-    shown.push(scoped(lane, [openRow(view, host, lane, `lane-${lane.id}`, head, 2), row(`tools-${lane.id}`, tools)]));
-    placed.push({ lane, at, height: LANE_ROWS });
-    if (isDetailed) shown.push(...detailRows(view, lane));
+    if (isRelaxed) {
+      shown.push(scoped(lane, [block(lane), kit.Text({ children: [" "] })]));
+      placed.push({ lane, at, height: blockHeight });
+    } else {
+      const [head = [], tools = []] = laneRows(lane, look, view.home);
+      shown.push(scoped(lane, [openRow(view, host, lane, `lane-${lane.id}`, head, 2), row(`tools-${lane.id}`, tools)]));
+      placed.push({ lane, at, height: LANE_ROWS });
+      if (isDetailed) shown.push(...detailRows(view, lane));
+    }
     at += laneHeight;
     left -= laneHeight;
+  }
+  show(minis);
+  if (isRelaxed && finished.length > 0) {
+    shown.push(kit.Text({ color: TONE_KEYS.muted, children: ["Finished"] }));
+    at += 1;
+    left -= 1;
   }
   for (const [index, lane] of finished.entries()) {
     const isLast = index === finished.length - 1;
@@ -228,7 +224,7 @@ export const view: TabView = async (host, view) => {
       hidden = { ...hidden, finished: finished.length - index };
       break;
     }
-    shown.push(scoped(lane, [openRow(view, host, lane, `done-${lane.id}`, finishedRow(lane, look, view.home), 1)]));
+    shown.push(scoped(lane, [openRow(view, host, lane, `done-${lane.id}`, finishedRow(lane, { ...look, width: view.width }, view.home), 1)]));
     placed.push({ lane, at, height: 1 });
     at += 1;
     left -= 1;
@@ -236,11 +232,10 @@ export const view: TabView = async (host, view) => {
   const more = [
     ...(hidden.running > 0 ? [`${hidden.running} more running`] : []),
     ...(hidden.finished > 0 ? [`${hidden.finished} more finished`] : []),
-  ].join(` ${view.g.dot} `);
-  const moreRows = more === "" ? [] : [kit.Text({ color: TONE_KEYS.muted, children: [fitEnd(`${view.g.ellipsis} ${more}`, view.width, view.g.ellipsis)] })];
+  ].join(` ${g.dot} `);
+  const moreRows = more === "" ? [] : [kit.Text({ color: TONE_KEYS.muted, children: [fitEnd(`${g.ellipsis} ${more}`, view.width, g.ellipsis)] })];
   const end = at + moreRows.length + 1;
   return [
-    ...(staged === undefined ? [] : [staged.element]),
     ...shown,
     ...moreRows,
     footer(view, host, lanes),

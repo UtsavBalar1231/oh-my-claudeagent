@@ -61,14 +61,15 @@ logged run grouped by day.
 <img src=".github/assets/evidence.png" width="680" alt="The Evidence tab shows the final verification for checkout-redesign as MISSING, since the last one exited 1, with a line marking build, test, lint and manual as passing on their newest runs. Below it, fourteen runs are grouped under three days, each with its outcome, time, type and command. The focused run, a manual payment smoke test, is open beside the list with its exit code and its API key masked.">
 
 The Agents tab gives each running subagent a lane with its task, model, effort and current tool
-call, and shrinks a finished one to a line.
+call, and shrinks a finished one to a line. In a short pane each lane keeps to two rows.
 
-<img src=".github/assets/agents.png" width="680" alt="The Agents tab shows two running executors, one on Wire the order summary panel and one on Persist the draft order, each with its icon, model and effort, the watch command it is running and its count of tool calls, and one finished explore agent on a single line with the first line of its result.">
+<img src=".github/assets/agents.png" width="680" alt="In a short pane, the Agents tab shows two running executors, one on Wire the order summary panel and one on Persist the draft order, each with its icon, model and effort, the watch command it is running and its count of tool calls, and one finished explorer on a single line with the first line of its result.">
 
-The agent page opens a subagent's brief, tool calls, reply and cost, toasts report finished waves,
-failed verifications and a completed plan, and each agent has a mascot on the Agents tab.
+With room for every running agent, each lane opens with the agent's mascot and gets four rows of
+its own. The agent page opens a subagent's brief, tool calls, reply and cost, and toasts report
+finished waves, failed verifications and a completed plan.
 
-<img src=".github/assets/mascots.png" width="680" alt="The Agents tab with three agents running at once. Above the list, each has a pixel mascot with its role underneath: a green executor in a yellow hard hat with a hammer, a blue explorer in a safari hat with a spyglass, and a purple architect with a lightbulb above its head. Below, the list shows each agent with its task, model, effort and its running Bash sleep.">
+<img src=".github/assets/mascots.png" width="680" alt="The Agents tab with three agents running at once, each lane led by its pixel mascot: a green executor in a yellow hard hat, a blue explorer in a safari hat, and a purple architect with a lit bulb above its head. Beside each mascot, four rows give the agent's name with its running time, its task, its running Bash sleep with one call, and its model, effort and tokens, with a blank row between agents.">
 
 The guard holds a destructive shell command for your review and shows what it would touch.
 
@@ -89,7 +90,7 @@ line gives each running agent a row.
 In motion: `/omca plan` opens the board, Down moves the focus, Enter opens the task as a page,
 and the number keys switch between the pane's tabs.
 
-<img src=".github/assets/pane-tour.gif" width="900" alt="An animation: a prompt hands task 7 to the executor, /omca plan opens the board beside the session with task 7 expanded, Down moves to task 8 and Enter opens it as a page, 1 switches to the Agents tab with the executor's lane, 3 to the Evidence tab, and 2 returns to task 8 on the Plan tab.">
+<img src=".github/assets/pane-tour.gif" width="900" alt="An animation: a prompt hands task 7 to the executor and the OMCA pane opens by itself beside the session, its Agents tab showing the executor's lane led by its mascot, then /omca plan switches the pane to the board with task 7 expanded, Down moves to task 8 and Enter opens it as a page, 1 switches to the Agents tab with the executor's lane, 3 to the Evidence tab, and 2 returns to task 8 on the Plan tab.">
 
 The guard dialog arrives the moment the model asks for a destructive command.
 

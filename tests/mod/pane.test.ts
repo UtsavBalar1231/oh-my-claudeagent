@@ -405,12 +405,12 @@ test("an agent row appears on agent.spawn, sums its steps and ends on turn.compl
   await $.agent.spawn(SPAWN);
   w.agents = [{ id: "a-1", description: "Fix the parser", type: "oh-my-claudeagent:executor", status: "running" }];
   expect(await ui.find({ type: "Text", text: "1 running · 0 finished · 0 tokens" })).toBeDefined();
-  expect(await lane("lane-a-1")).toBe("◆ executor · Fix the parser      sonnet-5-5      0s");
-  expect(await lane("tools-a-1")).toBe("  · starting");
+  expect(await lane("lane-a-1")).toBe("executor              ◆ running      0s");
+  expect(await lane("tools-a-1")).toBe("· starting");
 
   await drain($.turn.step({ turnId: "t-1", index: 0, model: "claude-sonnet-5-5", effort: "high", messageCount: 1, agentId: "a-1" }));
   await w.clock.advance(66_000);
-  expect(await lane("lane-a-1")).toBe("◆ executor · Fix the parser            high   1m06s");
+  expect(await lane("lane-a-1")).toBe("executor              ◆ running   1m06s");
 
   await $.turn.complete({
     answer: "done",

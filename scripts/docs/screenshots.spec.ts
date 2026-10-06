@@ -27,9 +27,10 @@ describe("SHOTS", () => {
     expect(still("plan")?.ready(board)).toBe(false);
   });
 
-  test("the mascots scene is ready only once all three names sit under the stage", () => {
-    expect(still("mascots")?.ready("    executor         explorer         architect")).toBe(true);
-    expect(still("mascots")?.ready("    executor         explorer")).toBe(false);
+  test("the mascots scene is ready only once all three lanes show their agent running", () => {
+    const lanes = ["executor              ◆ running     8s", "explorer              ◆ running     4s", "architect             ◆ running     1s"];
+    expect(still("mascots")?.ready(lanes.join("\n"))).toBe(true);
+    expect(still("mascots")?.ready(lanes.slice(0, 2).join("\n"))).toBe(false);
   });
 
   test("only the pane scenes crop to the pane", () => {
@@ -77,7 +78,7 @@ describe("CLIPS", () => {
     expect(marks(clip("clip-plan"))).toEqual(["cmd-typed", "dialog", "key-choice", "plan-written"]);
     expect(targets(clip("clip-plan"))).toEqual(["question"]);
     expect(marks(clip("clip-delegate"))).toEqual(["cmd-typed", "spawned", "pane", "lanes"]);
-    expect(targets(clip("clip-delegate"))).toEqual(["tool-row", "lane-model"]);
+    expect(targets(clip("clip-delegate"))).toEqual(["tool-row", "lane-head"]);
     for (const name of ["clip-board", "clip-board-light"]) {
       expect(marks(clip(name))).toEqual(["cmd-typed", "board", "focus-moved", "task-open"]);
       expect(targets(clip(name))).toEqual(["proven-chip", "unproven-chip"]);
@@ -96,7 +97,7 @@ describe("CLIPS", () => {
     ["clip-tour", "cost-row", "  ↯ 6/14\n  $0.04 · ⏱ 11s", { row: 1, col: 2, len: 7, rows: 1 }],
     ["clip-tour", "notepad-card", "│╭── x ──╮\n│╭────╮ ╭────╮\n││ Learnings · 3 entries", { row: 1, col: 1, len: 6, rows: 1 }],
     ["clip-tour", "stats-header", "abc│  agent   runs  median  tokens  est. cost  evidence  outcomes   │", { row: 0, col: 6, len: 59, rows: 1 }],
-    ["clip-delegate", "lane-model", "x │ executor · Wire the panel    sonnet-5-5  high       7s", { row: 0, col: 33, len: 25, rows: 1 }],
+    ["clip-delegate", "lane-head", "x │             executor                 ◆ running     7s", { row: 0, col: 16, len: 41, rows: 1 }],
     ["clip-verify", "verdict-line", "x │  COMPLETE  matches the current plan · 10-04 13:35   │", { row: 0, col: 5, len: 48, rows: 1 }],
   ])("%s's %s target finds one row", (name, targetName, screen, span) => {
     expect(locate(screen, target(clip(name), targetName) ?? /^$/)).toEqual(span);

@@ -10,13 +10,13 @@ import { aim, beatLength, Canvas, captionSpan, Chapter, PANE_COL, paneBox, paneC
 const PANE = mark(F3, "pane");
 const BOX = paneBox(F3);
 const TOOL_ROW = shownTarget(F3, "tool-row", PANE);
-const LANE_MODEL = target(F3, "lane-model");
+const LANE_HEAD = target(F3, "lane-head");
 const PUSH = 1.5;
-// The beat opens on the whole pane at 1.0, then pushes in on the lanes: from the first lane's title
-// row, as many columns as the window holds at 1.5, which end before the lanes' model column.
+// The beat opens on the whole pane at 1.0, then pushes in on the lanes: from the first lane's head
+// row, as many columns as the window holds at 1.5, which still take in the live tool call.
 const PANE_VIEW = aim(F3, BOX, { scale: 1, top: 0, left: PANE_COL });
-const LANES_VIEW = aim(F3, BOX, { scale: PUSH, top: LANE_MODEL.row, left: PANE_COL });
-if (PANE_COL + paneCols(F3) / PUSH > LANE_MODEL.col) throw new Error("clip-delegate: the pushed-in lanes view would cut the model column");
+const LANES_VIEW = aim(F3, BOX, { scale: PUSH, top: LANE_HEAD.row, left: PANE_COL });
+if (PANE_COL + paneCols(F3) / PUSH < TOOL_ROW.col + TOOL_ROW.len) throw new Error("clip-delegate: the pushed-in lanes view would cut the live tool call");
 
 export const agentsPlan = (fps: number) => {
   const f = (s: number) => toFrames(s, fps);
