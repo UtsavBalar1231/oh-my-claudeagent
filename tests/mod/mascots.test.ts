@@ -51,7 +51,7 @@ async function running($: Engine, on: On, types: readonly string[], surface: "te
   return { w, ui };
 }
 
-test("each running lane leads with its mini, an 8 by 4 Raster beside its rows, in spawn order", async ($, on) => {
+test("each running lane leads with its mini, a 15 by 4 Raster beside its rows, in spawn order", async ($, on) => {
   const { ui } = await running($, on, ["explorer", "executor"]);
 
   const tree = await ui.drawn();
@@ -59,21 +59,21 @@ test("each running lane leads with its mini, an 8 by 4 Raster beside its rows, i
   const [row] = childrenOf(lane("a-1")) as Node[];
   const [gutter, column] = row === undefined ? [] : (childrenOf(row) as Node[]);
   const mini = gutter === undefined ? undefined : (childrenOf(gutter)[0] as Node);
-  expect([mini?.type, mini?.props?.["columns"], mini?.props?.["rows"], mini?.props?.["key"]]).toEqual(["Raster", 8, 4, "mascot-a-1"]);
+  expect([mini?.type, mini?.props?.["columns"], mini?.props?.["rows"], mini?.props?.["key"]]).toEqual(["Raster", 15, 4, "mascot-a-1"]);
   expect(column === undefined ? 0 : childrenOf(column).length).toBe(4);
   expect([rasterOf(tree, "a-1"), rasterOf(tree, "a-2")]).toEqual([cellsOf("explorer", "working"), cellsOf("executor", "working")]);
   await ui.unmount();
 });
 
-test("a working mini's frames are blitted at FRAME_MS at 8 by 4, one blit a frame for each lane, wrapping at the last", async ($, on) => {
+test("a working mini's frames are blitted at FRAME_MS at 15 by 4, one blit a frame for each lane, wrapping at the last", async ($, on) => {
   const { w, ui } = await running($, on, ["executor", "explorer"]);
   w.blits.length = 0;
 
   for (let frame = 1; frame <= 13; frame++) {
     await w.clock.advance(FRAME_MS);
     expect(w.blits.slice(-2)).toEqual([
-      { requestId: "omca", key: "mascot-a-1", cells: cellsOf("executor", "working", frame), columns: 8, rows: 4 },
-      { requestId: "omca", key: "mascot-a-2", cells: cellsOf("explorer", "working", frame), columns: 8, rows: 4 },
+      { requestId: "omca", key: "mascot-a-1", cells: cellsOf("executor", "working", frame), columns: 15, rows: 4 },
+      { requestId: "omca", key: "mascot-a-2", cells: cellsOf("explorer", "working", frame), columns: 15, rows: 4 },
     ]);
   }
   expect(w.blits).toHaveLength(26);
@@ -171,14 +171,14 @@ test("an idle teammate's lane draws its mini dozing, with no timer", async ($, o
   await ui.unmount();
 });
 
-test("a session that shows the pane on desktop only starts no timer, and its mini is a 32 pixel Svg", async ($, on) => {
+test("a session that shows the pane on desktop only starts no timer, and its mini is a 60 by 32 pixel Svg", async ($, on) => {
   const { w, ui } = await running($, on, ["executor"], "desktop");
 
   await w.clock.advance(10_000);
 
   expect(w.blits).toEqual([]);
   const svg = await ui.find({ type: "Svg" });
-  expect([svg?.props["width"], svg?.props["height"]]).toEqual([32, 32]);
+  expect([svg?.props["width"], svg?.props["height"]]).toEqual([60, 32]);
   expect(await ui.find({ type: "Raster" })).toBeUndefined();
   await ui.unmount();
 });

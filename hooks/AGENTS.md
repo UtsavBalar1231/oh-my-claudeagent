@@ -33,7 +33,7 @@ subagent's call, appends the call and its outcome to a module-level map, with no
 from `$.session.messages({ agentId })` and that map; a denied read keeps the stored prompt. A
 page holds at most 8 KiB of brief, 120 calls and 4 KiB of reply, for the newest 20 agents.
 
-`mascot-player` animates the mascots of `src/core/mascots.ts`: the 8 by 4 mini that leads each
+`mascot-player` animates the mascots of `src/core/mascots.ts`: the 15 by 4 mini that leads each
 relaxed lane on the Agents tab, drawn when the body holds every running lane, a row after each, the
 Finished label and the one-line rows (the latest wave's finished agents keep their lanes and still
 minis while rows remain), and the 16 by 8 mascot in the agent page header. The compact

@@ -24,7 +24,7 @@ import {
   type ThemeKey,
   TONE_KEYS,
 } from "../src/core/visual.ts";
-import { FRAME_MS, framesOf, MINI, type MascotSize, type MascotState, mascotOf, rasterCells, SIZE, svgOf } from "../src/core/mascots.ts";
+import { FRAME_MS, framesOf, GRID, type MascotSize, type MascotState, mascotOf, rasterCells, svgOf } from "../src/core/mascots.ts";
 import type { GlyphTier, Glyphs } from "../src/core/ui-kit.ts";
 
 type Keyed<P, K extends keyof P> = Omit<P, K> & { [Q in K]?: ThemeKey };
@@ -49,7 +49,6 @@ export type Kit = {
   mascot: (type: string, state: MascotState, key: string, frame: number, size?: MascotSize) => RenderElement | null;
 };
 
-const GRID: Readonly<Record<MascotSize, number>> = { full: SIZE, mini: MINI };
 // A remote surface draws four screen pixels to a mascot pixel.
 const SVG_SCALE = 4;
 
@@ -60,18 +59,18 @@ function mascotIn(table: ElementTable, surface: RenderSurface, tier: GlyphTier, 
   const name = mascotOf(type);
   if (name === undefined || tier === "ascii") return null;
   const frames = framesOf(name, state, size);
-  const grid = GRID[size];
+  const { width, height } = GRID[size];
   const isMoving = state === "working" && !isStill;
   if (surface === "terminal") {
     const shown = frames[isMoving ? frame % frames.length : 0];
-    return shown === undefined || !("Raster" in table) ? null : table.Raster({ key, columns: grid, rows: grid / 2, cells: rasterCells(shown) });
+    return shown === undefined || !("Raster" in table) ? null : table.Raster({ key, columns: width, rows: height / 2, cells: rasterCells(shown) });
   }
   if (!("Svg" in table) || frames.length === 0) return null;
   return table.Svg({
     source: svgOf(frames, FRAME_MS, !isMoving),
     alt: `${name} ${state}`,
-    width: grid * SVG_SCALE,
-    height: grid * SVG_SCALE,
+    width: width * SVG_SCALE,
+    height: height * SVG_SCALE,
     ...(isMoving ? { isInteractive: true } : {}),
   });
 }

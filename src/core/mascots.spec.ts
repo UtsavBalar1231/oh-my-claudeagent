@@ -6,8 +6,8 @@ import {
   MASCOTS,
   type MascotName,
   type MascotState,
+  GRID,
   mascotOf,
-  MINI,
   MINI_LAYERS,
   MINIS,
   paletteOf,
@@ -139,23 +139,25 @@ test("rasterCells decodes to 16 by 8 little-endian triplets", () => {
   expect(TERMINAL_DEFAULT).toBe(0x01000000);
 });
 
-test("every mini run stays on the 8 by 8 grid and paints only palette keys", () => {
+test("every mini run stays on the 15 by 8 grid and paints only palette keys", () => {
+  const { width, height } = GRID.mini;
+  expect([width, height]).toEqual([15, 8]);
   for (const name of NAMES) {
     const keys = new Set([...Object.keys(paletteOf(MASCOTS[name])), "."]);
     for (const layer of [...Object.values(MINI_LAYERS), MINIS[name].props, MINIS[name].poseA, MINIS[name].poseB]) {
       for (const [y, x, pixels] of layer as readonly Run[]) {
-        expect([name, y >= 0 && y < MINI && x >= 0 && x + pixels.length <= MINI]).toEqual([name, true]);
+        expect([name, y >= 0 && y < height && x >= 0 && x + pixels.length <= width]).toEqual([name, true]);
         for (const key of pixels) expect([name, pixels, keys.has(key)]).toEqual([name, pixels, true]);
       }
     }
   }
 });
 
-test("a mini's sweat, sparkle and snore never touch its head piece, its resting pose or its body", () => {
+test("a mini's sweat and sparkle never touch its props, its resting pose or its body", () => {
   const body = new Set(cellsOf(MINI_LAYERS.body));
   for (const name of NAMES) {
     const held = new Set(cellsOf([...MINIS[name].props, ...MINIS[name].poseA]));
-    for (const cell of cellsOf([...MINI_LAYERS.sweat, ...MINI_LAYERS.sparkle, ...MINI_LAYERS.snore])) {
+    for (const cell of cellsOf([...MINI_LAYERS.sweat, ...MINI_LAYERS.sparkle])) {
       const [y = 0, x = 0] = cell.split(",").map(Number);
       const near = [cell, `${y - 1},${x}`, `${y + 1},${x}`, `${y},${x - 1}`, `${y},${x + 1}`].filter((at) => held.has(at));
       expect([name, cell, near, body.has(cell)]).toEqual([name, cell, [], false]);
@@ -164,22 +166,30 @@ test("a mini's sweat, sparkle and snore never touch its head piece, its resting 
 });
 
 test("a mini works in 12 frames that never hop, and rests in one frame each when done, failed or idle", () => {
+  const { width, height } = GRID.mini;
   for (const name of NAMES) {
     const frames = framesOf(name, "working", "mini");
     expect(frames).toHaveLength(WORKING_FRAMES);
+    const feet = JSON.stringify(frames[0]?.[height - 1]?.slice(0, 10));
     for (const frame of frames) {
-      expect(frame).toHaveLength(MINI);
-      expect(JSON.stringify(frame[7])).toBe(JSON.stringify(frames[0]?.[7]));
+      expect(frame).toHaveLength(height);
+      for (const row of frame) expect(row).toHaveLength(width);
+      expect(JSON.stringify(frame[height - 1]?.slice(0, 10))).toBe(feet);
     }
     for (const state of ["done", "failed", "idle"] as const) expect([name, state, framesOf(name, state, "mini").length]).toEqual([name, state, 1]);
   }
 });
 
-test("a mini's raster is 8 columns by 4 rows and its svg an 8 by 8 view box", () => {
+test("a mini paints its last column: the orchestrator's baton tip", () => {
+  expect(framesOf("orchestrator", "working", "mini")[0]?.[2]?.[14]).toBe(0xffffff);
+});
+
+test("a mini's raster is 15 columns by 4 rows and its svg a 15 by 8 view box", () => {
   const frame = framesOf("executor", "working", "mini")[0];
   if (frame === undefined) throw new Error("no frame");
-  expect(Uint8Array.from(atob(rasterCells(frame)), (c) => c.charCodeAt(0)).length).toBe(MINI * (MINI / 2) * 12);
-  expect(svgOf(framesOf("executor", "working", "mini"))).toContain('viewBox="0 0 8 8"');
+  expect(Uint8Array.from(atob(rasterCells(frame)), (c) => c.charCodeAt(0)).length).toBe(15 * 4 * 12);
+  expect(svgOf(framesOf("executor", "working", "mini"))).toContain('viewBox="0 0 15 8"');
+  expect(svgOf(framesOf("executor", "working"))).toContain('viewBox="0 0 16 16"');
   expect(framesOf("executor", "working", "mini")).not.toBe(framesOf("executor", "working"));
 });
 

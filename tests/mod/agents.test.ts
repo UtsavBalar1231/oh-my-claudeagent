@@ -191,18 +191,18 @@ test("the latest wave's finished agents keep their blocks under a Finished label
   const ui = await $.ui.mount(pane("terminal", DOCK_120));
 
   expect(body(await ui.drawn()).slice(3)).toEqual([
-    "executor              ◆ running     15s",
+    "executor        ◆ running     15s",
     "Fix the heading parser",
-    "✶ Bash bun test src/parser.sp…  4 calls",
+    "✶ Bash bun test src/par…  4 calls",
     "sonnet-5-5 · high · 4.5k · ~$0.02",
     " ",
     "Finished",
-    "architect             ! stopped     15s",
+    "architect       ! stopped     15s",
     "Review the ledger design",
     "stopped",
     "sonnet-5-5 · high · 2.5k · ~$0.01",
     " ",
-    "explorer                 ✓ done     12s",
+    "explorer           ✓ done     12s",
     "Map the router callers",
     "Mapped 14 callers of the router.",
     "sonnet-5-5 · high · 2.5k · ~$0.01",
@@ -265,7 +265,7 @@ test("the pane timer ends each lane the agent list reports completed, failed or 
   const ui = await $.ui.mount(pane("terminal", DOCK_120));
 
   const done = await Promise.all(["a-1", "a-2", "a-3"].map(async (id) => (await ui.find({ key: `done-${id}` }))?.text.trimEnd()));
-  expect(done).toEqual(["executor                 ✓ done      2s", "explorer               ✗ failed      2s", "architect             ! stopped      2s"]);
+  expect(done).toEqual(["executor           ✓ done      2s", "explorer         ✗ failed      2s", "architect       ! stopped      2s"]);
   await ui.unmount();
 });
 
@@ -312,7 +312,7 @@ test("hovering a lane reveals a card, drawn last so it paints over the rows belo
   ]);
   expect(JSON.stringify(await ui.drawn())).not.toContain("s3cr3t");
   expect(JSON.stringify(await ui.drawn())).not.toContain("abcdefghij");
-  expect(body(await ui.drawn())[5]).toBe(spread("· Read ~/.env", "1 call", 39));
+  expect(body(await ui.drawn())[5]).toBe(spread("· Read ~/.env", "1 call", 33));
   await ui.unmount();
 });
 
@@ -354,26 +354,26 @@ test("d shows each running lane's prompt and last output under its usage, and d 
 
   await ui.press({ key: "d" });
   expect(body(await ui.drawn()).slice(3)).toEqual([
-    "executor              ◆ running      0s",
+    "executor        ◆ running      0s",
     "Fix the heading parser",
-    "· Bash bun test src/parser.sp…  4 calls",
+    "· Bash bun test src/par…  4 calls",
     "sonnet-5-5 · high · 4.5k · ~$0.02",
-    "  prompt  Fix the heading parser so fe…",
+    "  prompt  Fix the heading parser…",
     "  output  Found the heading rule.",
     " ",
-    "explorer              ◆ running      0s",
+    "explorer        ◆ running      0s",
     "Map the router callers",
-    "· ast_search                    2 calls",
+    "· ast_search              2 calls",
     "sonnet-5-5 · high · 3.0k · ~$0.01",
-    "  prompt  Find every caller of the rou…",
+    "  prompt  Find every caller of t…",
     "  output  none yet",
     " ",
     "Finished",
-    "architect                ✓ done      0s",
+    "architect          ✓ done      0s",
     "Review the ledger design",
     "The ledger holds.",
     "sonnet-5-5 · high · 2.5k · ~$0.01",
-    "  prompt  Review the ledger rotation.",
+    "  prompt  Review the ledger rota…",
     "  output  none yet",
     " ",
     "d: Hide details  2 running · 1 finished",
@@ -431,7 +431,7 @@ test("parallel spawns and steps each keep their own lane", async ($, on) => {
   const ui = await $.ui.mount(pane("terminal", DOCK_120));
 
   const tools = await Promise.all(["a-1", "a-2", "a-3"].map(async (id) => textOf(await ui.find({ key: `tools-${id}` }))));
-  expect(tools).toEqual([spread("· Read a.ts", "1 call", 39), spread("· Bash just test", "1 call", 39), spread("· Edit c.ts", "1 call", 39)]);
+  expect(tools).toEqual([spread("· Read a.ts", "1 call", 33), spread("· Bash just test", "1 call", 33), spread("· Edit c.ts", "1 call", 33)]);
   expect(w.logs.filter((line) => line.startsWith("agentsTracker"))).toEqual([]);
   await ui.unmount();
 });
@@ -538,7 +538,7 @@ test("an idle teammate draws its status mark and word with no spinner and is lef
   const ui = await $.ui.mount(pane("terminal", DOCK_120));
 
   const rows = body(await ui.drawn()).slice(3);
-  expect(rows[0]).toBe("executor                 ○ idle      0s");
+  expect(rows[0]).toBe("executor           ○ idle      0s");
   expect(rows[2]).toBe("○ idle");
   expect(rows[7]).toBe("· starting");
   expect(rows.at(-1)).toBe("d: Details  1 running · 1 idle · 0 finished");
@@ -556,9 +556,9 @@ test("a running agent with no mascot keeps its icon in the mini's place and the 
   const tree = await ui.drawn();
   const [row] = childrenOf(nodeByKey(tree, "agent-a-1") as Node) as Node[];
   const [gutter] = row === undefined ? [] : (childrenOf(row) as Node[]);
-  expect([gutter?.props?.["width"], textOf(gutter)]).toEqual([8, "◆"]);
+  expect([gutter?.props?.["width"], textOf(gutter)]).toEqual([15, "◆"]);
   expect(await ui.find({ type: "Raster" })).toBeUndefined();
-  expect(body(tree).slice(3, 5)).toEqual(["general-purpose       ◆ running      0s", "Survey the repo"]);
+  expect(body(tree).slice(3, 5)).toEqual(["general-purpo…  ◆ running      0s", "Survey the repo"]);
   await ui.unmount();
 });
 

@@ -11,7 +11,7 @@ import {
   ordered,
   summaryText,
 } from "../../src/core/mission.ts";
-import { type MascotSize, MINI } from "../../src/core/mascots.ts";
+import { GRID, type MascotSize } from "../../src/core/mascots.ts";
 import { agentGlyph, COLUMN_GAP, displayWidth, fitEnd, formatTokens, padEnd, shortType, wrapText } from "../../src/core/ui-kit.ts";
 import { agentKey, ON_SURFACE, type Piece, redact, TONE_KEYS } from "../../src/core/visual.ts";
 import type { Host } from "../host.ts";
@@ -31,12 +31,13 @@ const LABEL_CELLS = 6;
 // A lane's head and tool rows, then its prompt, output and usage rows while details show.
 const LANE_ROWS = 2;
 const DETAIL_ROWS = 3;
-// A relaxed lane is its mini, MINI columns by MINI / 2 rows, one column in and three before its rows,
-// with a blank row after it; narrower than this much text, or shorter than every running lane's
-// rows, the tab draws the compact lanes.
+// A relaxed lane is its mini, one column in and two before its rows, with a blank row after it;
+// narrower than this much text, or shorter than every running lane's rows, the tab draws the compact
+// lanes.
 const MINI_LEFT = 1;
-const MINI_GAP = 3;
-const BLOCK_ROWS = MINI / 2;
+const MINI_COLUMNS = GRID.mini.width;
+const MINI_GAP = 2;
+const BLOCK_ROWS = GRID.mini.height / 2;
 const MIN_BLOCK_TEXT = 30;
 // While details show, a relaxed lane adds its prompt and output rows; its usage is already its fourth row.
 const BLOCK_DETAIL_ROWS = 2;
@@ -176,7 +177,7 @@ export const view: TabView = async (host, view) => {
   const { kit, g } = view;
   const running = lanes.filter((lane) => lane.endedAt === null);
   const finished = lanes.filter((lane) => lane.endedAt !== null);
-  const textWidth = view.width - MINI_LEFT - MINI - MINI_GAP;
+  const textWidth = view.width - MINI_LEFT - MINI_COLUMNS - MINI_GAP;
   const blockHeight = BLOCK_ROWS + (isDetailed ? BLOCK_DETAIL_ROWS : 0);
   const slot = blockHeight + 1;
   const wave = lastWave(lanes);
@@ -206,7 +207,7 @@ export const view: TabView = async (host, view) => {
     const [head = [], task = [], tool = [], usage = []] = laneBlock(lane, look, view.home);
     const mini = kit.mascot(lane.type, stateOf(lane), keyOf(lane.id), frame(), "mini");
     if (mini !== null) minis.push([lane.id, "mini"]);
-    const gutter = kit.Box({ width: MINI, children: [mini ?? kit.Text({ color: agentKey(lane.type), children: [agentGlyph(lane.type, g)] })] });
+    const gutter = kit.Box({ width: MINI_COLUMNS, children: [mini ?? kit.Text({ color: agentKey(lane.type), children: [agentGlyph(lane.type, g)] })] });
     const rows = [
       openRow(view, host, lane, key, head, 1, 0),
       Line(kit, task),

@@ -1,6 +1,6 @@
 import type { Timer } from "claude-code";
 import type { Lane } from "../src/core/mission.ts";
-import { FRAME_MS, framesOf, MINI, type MascotName, type MascotSize, type MascotState, mascotOf, rasterCells, SIZE } from "../src/core/mascots.ts";
+import { FRAME_MS, framesOf, GRID, type MascotName, type MascotSize, type MascotState, mascotOf, rasterCells } from "../src/core/mascots.ts";
 import { type Host, reason } from "./host.ts";
 import { PANE } from "./pane.ts";
 
@@ -51,8 +51,8 @@ async function advance(host: Host): Promise<void> {
     shown.map(({ id, name, size }) => {
       const frames = framesOf(name, "working", size);
       const next = frames[counter % frames.length];
-      const grid = size === "mini" ? MINI : SIZE;
-      return next === undefined ? undefined : host.ui.blit({ requestId: PANE, key: keyOf(id), columns: grid, rows: grid / 2, cells: rasterCells(next) });
+      const { width, height } = GRID[size];
+      return next === undefined ? undefined : host.ui.blit({ requestId: PANE, key: keyOf(id), columns: width, rows: height / 2, cells: rasterCells(next) });
     }),
   );
 }

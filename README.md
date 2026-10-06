@@ -64,12 +64,12 @@ The Agents tab gives each subagent a lane led by its mascot, with its task, curr
 model, effort and tokens. The last wave's finished agents keep their lanes with their results,
 earlier ones shrink to a line, and in a short pane each lane keeps to two rows.
 
-<img src=".github/assets/agents.png" width="680" alt="The Agents tab shows two running executors, each led by its mascot in a hard hat: one on Wire the order summary panel and one on Persist the draft order, each beside its watch command, its count of tool calls, and its model, effort and tokens, with a blank row between them. Under a Finished label, an explorer from an earlier wave is one line with the first line of its result.">
+<img src=".github/assets/agents.png" width="680" alt="The Agents tab shows two running executors, each led by its mascot in a hard hat with a hammer: one on Wire the order summary panel and one on Persist the draft order, each beside its watch command, its count of tool calls, and its model, effort and tokens, with a blank row between them. Under a Finished label, an explorer from an earlier wave is one line with the first line of its result.">
 
-Each lane gets four rows of its own. The agent page opens a subagent's brief, tool calls, reply and cost, and toasts report
+When the pane has room, each lane gets four rows of its own. The agent page opens a subagent's brief, tool calls, reply and cost, and toasts report
 finished waves, failed verifications and a completed plan.
 
-<img src=".github/assets/mascots.png" width="680" alt="The Agents tab with three agents running at once, each lane led by its pixel mascot: a green executor in a yellow hard hat, a blue explorer in a safari hat, and a purple architect with a lit bulb above its head. Beside each mascot, four rows give the agent's name with its running time, its task, its running Bash sleep with one call, and its model, effort and tokens, with a blank row between agents.">
+<img src=".github/assets/mascots.png" width="680" alt="The Agents tab with three agents running at once, each lane led by its pixel mascot: a green executor in a yellow hard hat with a hammer, a blue explorer in a safari hat with a spyglass, and a purple architect with a lit bulb beside its head. Beside each mascot, four rows give the agent's name with its running time, its task, its running Bash sleep with one call, and its model, effort and tokens, with a blank row between agents.">
 
 The guard holds a destructive shell command for your review and shows what it would touch.
 
@@ -85,7 +85,7 @@ The status line shows the session (model, agent and the plan's next task), the w
 by the token) on rows of their own, and fits itself to the terminal's width. The subagent status
 line gives each running agent a row.
 
-<img src=".github/assets/statusline.png" width="900" alt="The OMCA status line under the prompt shows three rows: the model, effort and plan progress with the next task; a context bar, the git branch with change counts and the project; and the session cost and duration. Below it, one row for each of two running subagents shows its model, state and effort.">
+<img src=".github/assets/statusline.png" width="900" alt="The OMCA status line under the prompt shows three rows: the model, effort and plan progress with the next task; a context bar, the git branch with change counts and the project; and the session cost and duration. Below it, one row for each of two running subagents shows its model, state and effort. Above, the OMCA pane has opened by itself on the two executors' lanes.">
 
 In motion: `/omca plan` opens the board, Down moves the focus, Enter opens the task as a page,
 and the number keys switch between the pane's tabs.

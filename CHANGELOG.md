@@ -37,7 +37,8 @@ hand.
   click, focuses it; Esc, the close mark or Ctrl+X then X closes it.
 - **The Agents tab.** Each running subagent gets a lane with its task, model and effort in aligned
   columns, and its elapsed time; below it, the tool it runs now and how many tool calls it has
-  made. A finished agent shrinks to one line with the first line of its result and its duration.
+  made. A finished agent from an earlier wave, or one the pane has no room to keep in its lane,
+  shrinks to one line with the first line of its result and its duration.
   The key row counts the running and finished agents and their tokens. Pointing at a lane, or `d`,
   shows its prompt, last output, tool calls and tokens.
 - **The agent page.** Enter or a click on a lane opens the agent's brief, each tool call with its
@@ -48,8 +49,9 @@ hand.
   first wave of subagents, once, in a terminal, and waits undrawn below 144 columns (110 after you
   have opened it). The band shows running agents with no plan bound, and the spinner's line ends
   with the task and agent count, as in `… · task 7/14 · 3 agents`.
-- **Mascots and relaxed lanes.** Each agent has a mascot: a mini at the head of its lane on the
-  Agents tab and a full-size figure in the agent page header. With room for every running agent,
+- **Mascots and relaxed lanes.** Each agent has a mascot: a 15 by 8 pixel mini with the full-size
+  figure's face and tool at the head of its lane on the Agents tab, and the full-size figure in the
+  agent page header. With room for every running agent,
   a lane takes four rows beside its mini (name and state, task, current tool, then model, effort,
   tokens and cost) and a blank row; the latest wave's finished agents keep their lanes, with their
   results, until the next wave, and a shorter pane keeps the two-row lanes. A mascot moves while

@@ -3,9 +3,12 @@ import { omcaAgentName } from "./agent-type.ts";
 // Mascot colors are fixed RGB, the one exception to theme keys.
 
 export const SIZE = 16;
-/** The lane-sized mascot: 8 by 8 pixels, 8 columns by 4 rows of half blocks. */
-export const MINI = 8;
 export type MascotSize = "full" | "mini";
+/** Each size's pixel grid. The lane-sized mascot is 15 by 8 pixels, 15 columns by 4 rows of half blocks. */
+export const GRID: Readonly<Record<MascotSize, { readonly width: number; readonly height: number }>> = {
+  full: { width: SIZE, height: SIZE },
+  mini: { width: 15, height: 8 },
+};
 export type Rgb = number;
 export type Frame = readonly (readonly (Rgb | null)[])[];
 export type MascotState = "working" | "done" | "failed" | "idle";
@@ -132,36 +135,46 @@ export type MascotName = keyof typeof MASCOTS;
 
 type Pose = Omit<Spec, "body">;
 
-// The minis keep each agent's head piece and face; a one-pixel tool at the side reads as noise.
+// A mini is the full pebble without its second highlight row and its lower belly row, its tool in the
+// three columns at its right and its sweat or sparkle in the free column at its left.
 const MINI_BODY: Layer = [
-  [2, 2, "oooo"],
-  [3, 1, "oblbbo"],
-  [4, 1, "oebbeo"],
-  [5, 1, "obppbo"],
-  [6, 1, "obbbbo"],
-  [7, 2, "o..o"],
+  [0, 4, "oooooo"],
+  [1, 3, "obbbbbbo"],
+  [2, 2, "obllbbbbbo"],
+  [3, 2, "obewbbewbo"],
+  [4, 2, "obeebbeebo"],
+  [5, 2, "opbbmmbbpo"],
+  [6, 3, "obbbbbbo"],
+  [7, 4, "oo..oo"],
 ];
-const MINI_BLINK: Layer = [[4, 2, "b..b"]];
-const MINI_HAPPY: Layer = [[5, 2, "pppp"]];
-const MINI_SAD: Layer = [[5, 3, "mm"]];
-const MINI_SWEAT: Layer = [[5, 0, "C"]];
-const MINI_SPARKLE: Layer = [[0, 0, "Y"]];
-const MINI_SNORE: Layer = [[0, 0, "Z"]];
+const MINI_BLINK: Layer = [[3, 4, "bb..bb"]];
+const MINI_HAPPY: Layer = [[3, 4, "ebbbbe"], [4, 3, "ebebbebe"]];
+const MINI_SAD: Layer = [[6, 5, "m..m"]];
+const MINI_SWEAT: Layer = [[2, 0, "C"], [3, 0, "U"]];
+const MINI_SPARKLE: Layer = [[2, 0, "Y"], [3, 0, "W"], [4, 0, "Y"]];
 
 /** The mini's shared layers, for the art invariants. */
-export const MINI_LAYERS = { body: MINI_BODY, blink: MINI_BLINK, happy: MINI_HAPPY, sad: MINI_SAD, sweat: MINI_SWEAT, sparkle: MINI_SPARKLE, snore: MINI_SNORE } as const;
+export const MINI_LAYERS = { body: MINI_BODY, blink: MINI_BLINK, happy: MINI_HAPPY, sad: MINI_SAD, sweat: MINI_SWEAT, sparkle: MINI_SPARKLE } as const;
 
 export const MINIS = {
-  orchestrator: { props: [[1, 4, "o"], [0, 5, "o"]], poseA: [[0, 7, "Y"]], poseB: [[1, 0, "Y"]] },
-  planner: { props: [], poseA: [[1, 5, "V"], [2, 6, "V"], [1, 7, "V"], [0, 7, "V"]], poseB: [] },
-  analyzer: { props: [], poseA: [[4, 5, "C"], [5, 6, "G"], [6, 7, "B"]], poseB: [[4, 2, "C"], [5, 1, "G"], [6, 0, "B"]] },
-  reviewer: { props: [], poseA: [[0, 3, "BB"], [1, 2, "GGGG"]], poseB: [[1, 3, "BB"], [2, 2, "GGGG"]] },
-  executor: { props: [[1, 2, "YOOY"], [2, 1, "YYYYYY"]], poseA: [], poseB: [[1, 3, "WW"]] },
-  explorer: { props: [[0, 2, "TTTT"], [1, 2, "BBBB"], [2, 0, "TTTTTTTT"]], poseA: [], poseB: [[1, 7, "W"]] },
-  researcher: { props: [[4, 1, "KwKKwK"]], poseA: [], poseB: [[4, 2, "C"]] },
-  architect: { props: [[0, 3, "YY"], [1, 3, "GG"]], poseA: [], poseB: [[0, 1, "Y"], [0, 6, "Y"]] },
-  "build-fixer": { props: [[3, 1, "KCKKCK"]], poseA: [], poseB: [[3, 2, "W"]] },
-  viewer: { props: [[0, 4, "G"], [1, 2, "KCKK"]], poseA: [], poseB: [[0, 6, "W"], [1, 7, "Y"]] },
+  orchestrator: { props: [], poseA: [[4, 12, "b"], [3, 13, "S"], [2, 14, "W"]], poseB: [[4, 12, "b"], [5, 13, "S"], [6, 14, "W"]] },
+  planner: { props: [[3, 12, "BGB"], [4, 12, "BNN"], [5, 12, "BKK"], [6, 12, "BNN"], [7, 12, "BKK"]], poseA: [[5, 13, "V"]], poseB: [[5, 13, "V"], [7, 13, "V"]] },
+  analyzer: { props: [], poseA: [[4, 12, "b"], [2, 13, "G"], [3, 12, "GCG"], [4, 13, "G"], [5, 14, "B"]], poseB: [[3, 12, "b"], [1, 13, "G"], [2, 12, "GCG"], [3, 13, "G"], [4, 14, "B"]] },
+  reviewer: { props: [[6, 12, "NNN"], [7, 12, "NNN"]], poseA: [[1, 12, "BBB"], [2, 13, "B"], [3, 12, "GGG"], [6, 13, "R"]], poseB: [[3, 12, "BBB"], [4, 13, "B"], [5, 12, "GGG"]] },
+  executor: { props: [[0, 5, "YOOY"], [1, 3, "YYYYYYYY"]], poseA: [[4, 12, "b"], [3, 13, "B"], [2, 13, "B"], [1, 12, "GGG"]], poseB: [[4, 12, "bB"], [3, 14, "G"], [4, 14, "G"], [5, 14, "G"]] },
+  explorer: { props: [[0, 4, "TTTTTT"], [1, 2, "TTBBBBBBTT"]], poseA: [[3, 11, "SSGC"], [2, 14, "G"], [4, 14, "G"]], poseB: [[4, 11, "SSGC"], [3, 14, "G"], [5, 14, "G"]] },
+  researcher: {
+    props: [[3, 3, "S"], [4, 3, "S"], [3, 6, "SS"], [3, 10, "S"], [4, 10, "S"], [5, 12, "VVN"], [6, 12, "UUN"], [7, 12, "RRN"]],
+    poseA: [[4, 12, "b"]],
+    poseB: [[4, 12, "NNN"]],
+  },
+  architect: { props: [[0, 12, "WYY"], [1, 12, "YYY"], [2, 13, "Y"], [3, 13, "G"]], poseA: [], poseB: [[1, 13, "W"]] },
+  "build-fixer": {
+    props: [[1, 3, "KCCKKCCK"]],
+    poseA: [[2, 12, "S.S"], [3, 12, "SSS"], [4, 13, "G"], [5, 13, "G"], [5, 12, "b"]],
+    poseB: [[3, 12, "S.S"], [4, 12, "SSS"], [5, 13, "G"], [6, 13, "G"], [6, 12, "b"], [1, 13, "Y"]],
+  },
+  viewer: { props: [[2, 12, "G"], [3, 12, "GGG"], [4, 12, "GCG"], [5, 12, "GGG"]], poseA: [], poseB: [[1, 14, "W"], [0, 13, "Y"], [2, 14, "Y"]] },
 } as const satisfies Record<MascotName, Pose>;
 
 const shade = (rgb: Rgb, f: number): Rgb =>
@@ -176,7 +189,7 @@ export function paletteOf(spec: Spec): Readonly<Record<string, Rgb>> {
 }
 
 function paint(grid: (Rgb | null)[][], layer: Layer, palette: Readonly<Record<string, Rgb>>): void {
-  const width = grid.length;
+  const width = grid[0]?.length ?? 0;
   for (const [y, x0, pixels] of layer) {
     for (let i = 0; i < pixels.length; i++) {
       const key = pixels[i];
@@ -189,11 +202,12 @@ function paint(grid: (Rgb | null)[][], layer: Layer, palette: Readonly<Record<st
   }
 }
 
-function compose(spec: Spec, layers: readonly Layer[], lift: number, size = SIZE): Frame {
+function compose(spec: Spec, layers: readonly Layer[], lift: number, size: MascotSize = "full"): Frame {
+  const { width, height } = GRID[size];
   const palette = paletteOf(spec);
-  const grid: (Rgb | null)[][] = Array.from({ length: size }, () => Array<Rgb | null>(size).fill(null));
+  const grid: (Rgb | null)[][] = Array.from({ length: height }, () => Array<Rgb | null>(width).fill(null));
   for (const layer of layers) paint(grid, layer, palette);
-  return lift === 0 ? grid : [...grid.slice(lift), ...Array.from({ length: lift }, () => Array<Rgb | null>(size).fill(null))];
+  return lift === 0 ? grid : [...grid.slice(lift), ...Array.from({ length: lift }, () => Array<Rgb | null>(width).fill(null))];
 }
 
 export const WORKING_FRAMES = 12;
@@ -211,11 +225,11 @@ export function framesOf(name: MascotName, state: MascotState, size: MascotSize 
   return frames;
 }
 
-// A mini does not hop: its head piece sits on the top row, so it swaps poses and blinks instead.
+// A mini does not hop: its head sits on the top row, so it swaps poses and blinks instead.
 function buildMiniFrames(name: MascotName, state: MascotState): Frame[] {
   const spec: Spec = MASCOTS[name];
   const pose: Pose = MINIS[name];
-  const mini = (layers: readonly Layer[]) => compose(spec, layers, 0, MINI);
+  const mini = (layers: readonly Layer[]) => compose(spec, layers, 0, "mini");
   switch (state) {
     case "working":
       return Array.from({ length: WORKING_FRAMES }, (_, i) => {
@@ -227,7 +241,7 @@ function buildMiniFrames(name: MascotName, state: MascotState): Frame[] {
     case "failed":
       return [mini([MINI_BODY, MINI_SAD, pose.props, pose.poseA, MINI_SWEAT])];
     case "idle":
-      return [mini([MINI_BODY, MINI_BLINK, pose.props, pose.poseA, MINI_SNORE])];
+      return [mini([MINI_BODY, MINI_BLINK, pose.props, pose.poseA])];
   }
 }
 
@@ -281,8 +295,9 @@ export function svgOf(frames: readonly Frame[], frameMs = FRAME_MS, isStill = fa
 }
 
 function buildSvg(frames: readonly Frame[], frameMs: number): string {
-  const size = frames[0]?.length ?? SIZE;
-  const head = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" shape-rendering="crispEdges">`;
+  const height = frames[0]?.length ?? SIZE;
+  const width = frames[0]?.[0]?.length ?? SIZE;
+  const head = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" shape-rendering="crispEdges">`;
   if (frames.length === 1) return `${head}${rects(frames[0] ?? [])}</svg>`;
   const n = frames.length;
   const keyTimes = Array.from({ length: n }, (_, i) => (i / n).toFixed(4)).join(";");

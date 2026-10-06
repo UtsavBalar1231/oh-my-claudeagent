@@ -191,7 +191,7 @@ takes the cost's place.
    and cost, with a blank row before the next lane. Under a Finished label, the latest wave's
    finished agents keep their lanes while the rows allow, each mascot smiling or sweating beside
    the first line of its result, and older finished agents shrink to one line with their result
-   and duration. In a shorter pane each lane takes two rows: the agent's icon, name, task, model,
+   and duration. In a shorter pane each lane takes two rows and no mascot: the agent's icon, name, task, model,
    effort and elapsed time, then its tool and call count. The key row counts the running and
    finished agents and the tokens they spent. Point at a lane, or press `d`, to see its prompt,
    last output, tool calls and tokens. Press Enter on a lane, or click it, to open the agent's
@@ -225,8 +225,8 @@ count, as in `… · task 7/14 · 3 agents`.
 
 #### Mascots
 
-Each agent has a mascot. On the Agents tab a lane opens with its agent's mini, 8 pixels square,
-while the agent runs and after it finishes until the next wave starts, and the agent page shows the
+Each agent has a mascot. On the Agents tab a lane opens with its agent's mini, the full-size
+figure's face and tool at 15 by 8 pixels, while the agent runs and after it finishes until the next wave starts, and the agent page shows the
 full-size mascot in its header. A mascot moves only while its
 agent works, smiles when the agent finishes, sweats when it fails and dozes while the agent waits. The terminal draws them in half-block characters and Desktop draws an animated SVG.
 `OMCA_GLYPHS=ascii` draws none. With Claude Code's `prefersReducedMotion` setting on, the mascots hold
