@@ -49,7 +49,7 @@ jobs:
         run: |
           {
             echo "### What this job checks ($RUNNER_OS)"
-            echo "Every validator group (manifests, frontmatter, docs, hook registration, the mod's registrations, the repository layout and the MCP handshake), via \`just validate\`. The engine checks skip here because the claude CLI is not installed; the TypeScript job runs them."
+            echo "Every validator group (manifests, frontmatter, docs, hook registration, the mod's registrations, the repository layout and the MCP handshake), via \`just validate\`. The engine checks skip here because the claude CLI is not installed; the Mod Tests job runs them."
             echo ""
             echo "### If this fails"
             echo "The plugin manifest, a hook definition, the mod's registrations or the repository layout is malformed or out of sync. Run \`just validate\` locally to see the exact failure."
@@ -86,9 +86,7 @@ jobs:
       - name: Install OpenCode CLI
         run: npm i -g @opencode/cli@2.0.18
 
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
+      # No bun install: the adapter imports @opencode/plugin for types only, which bun erases.
       - name: Specs, including the smoke and model-path runs against OpenCode
         run: bun test opencode/
 
@@ -126,8 +124,7 @@ jobs:
           bun-version: 1.4.2
           no-cache: true
 
-      # The hooks module needs a client that loads mods, so the version is pinned and
-      # asserted rather than taking whatever the installer serves as latest.
+      # scripts/qa/install-verify.spec.ts runs `claude plugin validate` only when claude is on PATH.
       - name: Install Claude Code (Linux and macOS)
         if: runner.os != 'Windows'
         run: |
@@ -145,6 +142,7 @@ jobs:
           $version = & (Join-Path $bin 'claude.exe') --version
           if ($version -notlike "$env:CLAUDE_CODE_VERSION *") { throw "installed claude reports '$version', expected $env:CLAUDE_CODE_VERSION" }
 
+      # benchmarks/compare/cases.spec.ts skips its typecheck cases without node_modules/.bin/tsc.
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
@@ -157,43 +155,40 @@ jobs:
           bun x --bun tsc --noEmit -p tsconfig.runtime.json
           bun x --bun tsc --noEmit -p opencode
 
-      - name: Mod tests
-        run: claude plugin test .
-
       # servers/tools/ast.spec.ts runs the real ast-grep binary.
       - uses: ./.github/actions/ast-grep
 
       - name: Bun spec tests
+        if: runner.os != 'Linux'
         run: bun test --parallel $BUN_SPEC_ROOTS --reporter=junit --reporter-outfile="$RUNNER_TEMP/bun-junit.xml"
 
       # Bun on Windows can crash mid-run and still exit 0 (bun issue 40376). The crash leaves no
       # report or a report missing spec files, so the run passes only when the report exists, has
       # no failures and lists every spec file under the roots the step above ran.
       - name: Check the spec run finished
+        if: runner.os != 'Linux'
         run: bun scripts/qa/junit-complete.ts "$RUNNER_TEMP/bun-junit.xml" $BUN_SPEC_ROOTS
 
-      # A spec that passes only in file order fails here. Bun prints the seed, and the step name
-      # carries it, so a failure reruns locally with `bun test --parallel --randomize --seed=<seed>`.
+      # Linux runs the specs once, in this order instead of file order. A spec that passes only in
+      # file order fails here. Bun prints the seed, and the step name carries it, so a failure reruns
+      # locally with `bun test --parallel --randomize --seed=<seed>`.
       - name: Bun spec tests in random order (seed ${{ github.run_number }})
         if: runner.os == 'Linux'
         run: bun test --parallel --randomize --seed=${{ github.run_number }} $BUN_SPEC_ROOTS
-
-      - name: Check the mod against the engine
-        run: bun scripts/validate.ts --check engine
 
       - name: Job summary
         if: always()
         run: |
           {
             echo "### What this job checks ($RUNNER_OS)"
-            echo "The TypeScript hooks module and shared code on Claude Code $CLAUDE_CODE_VERSION: oxlint, the three tsc projects, the mod tests, the bun spec files in parallel with a check that the run listed every spec file, then once more in a seeded random order on Linux, and the engine checks, which run \`claude plugin validate --strict\` on a packaged copy (mirrors \`just lint\`, \`typecheck\`, \`test\`, \`test-mod\` and \`validate --check engine\`)."
+            echo "The TypeScript hooks module and shared code on Claude Code $CLAUDE_CODE_VERSION: oxlint, the three tsc projects and the bun spec files in parallel, in file order with a check that the run listed every spec file on macOS and Windows, and in a seeded random order on Linux (mirrors \`just lint\`, \`typecheck\` and \`test\`)."
             echo ""
             echo "### If this fails"
-            echo "A lint finding, a type error, a failing test, a spec run that crashed or stopped before every spec file ran, or a manifest or hooks-module validation error. Run the matching \`just\` recipe locally with Claude Code $CLAUDE_CODE_VERSION and bun 1.4.2 to see the exact failure."
+            echo "A lint finding, a type error, a failing test, or a spec run that crashed or stopped before every spec file ran. Run the matching \`just\` recipe locally with Claude Code $CLAUDE_CODE_VERSION and bun 1.4.2 to see the exact failure."
           } >> "$GITHUB_STEP_SUMMARY"
 
-  smoke:
-    name: Smoke (${{ matrix.os }})
+  mod:
+    name: Mod Tests and Smoke (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
@@ -214,6 +209,8 @@ jobs:
           bun-version: 1.4.2
           no-cache: true
 
+      # The hooks module needs a client that loads mods, so the version is pinned and
+      # asserted rather than taking whatever the installer serves as latest.
       - name: Install Claude Code (Linux and macOS)
         if: runner.os != 'Windows'
         run: |
@@ -231,7 +228,15 @@ jobs:
           $version = & (Join-Path $bin 'claude.exe') --version
           if ($version -notlike "$env:CLAUDE_CODE_VERSION *") { throw "installed claude reports '$version', expected $env:CLAUDE_CODE_VERSION" }
 
+      - name: Mod tests
+        run: claude plugin test .
+
+      - name: Check the mod against the engine
+        run: bun scripts/validate.ts --check engine
+
+      # The session still runs after a failed step above, so its result reports on its own.
       - name: Session against the mock model
+        if: ${{ !cancelled() }}
         run: bun scripts/qa/ci-smoke.ts
 
       - name: Job summary
@@ -239,14 +244,14 @@ jobs:
         run: |
           {
             echo "### What this job checks ($RUNNER_OS)"
-            echo "A real \`claude -p\` session with the packaged plugin loaded, against the mock model with a scratch project and config directory: the server answers omca_hook calls and the mod's tool.check guard denies a recursive removal (through PowerShell as well on Windows, when the session offers that tool)."
+            echo "The mod tests and the engine checks on Claude Code $CLAUDE_CODE_VERSION, the latter running \`claude plugin validate --strict\` on a packaged copy, then a real \`claude -p\` session with the packaged plugin loaded, against the mock model with a scratch project and config directory: the server answers omca_hook calls and the mod's tool.check guard denies a recursive removal (through PowerShell as well on Windows, when the session offers that tool). Mirrors \`just test-mod\`, \`validate --check engine\` and \`smoke\`."
             echo ""
             echo "### If this fails"
-            echo "The plugin did not load in a real session on this OS, or its guard did not run. Run \`just smoke\` locally with Claude Code $CLAUDE_CODE_VERSION on PATH; the debug log it reads is quoted in the failed check."
+            echo "A failing mod test, a manifest or hooks-module validation error, or the plugin did not load in a real session on this OS, or its guard did not run. Run the matching \`just\` recipe locally with Claude Code $CLAUDE_CODE_VERSION on PATH; the smoke check quotes the debug log it reads."
           } >> "$GITHUB_STEP_SUMMARY"
 
-  # The manifest checks read local files, so one runner is enough; the typescript job runs them on
-  # every OS with the pinned client. This job installs the latest published client instead, to catch
+  # The manifest checks read local files, so one runner is enough; the mod job runs them on every
+  # OS with the pinned client. This job installs the latest published client instead, to catch
   # a manifest the newest platform schema rejects. The validator needs no authentication.
   validate-manifest:
     name: Manifest Validation

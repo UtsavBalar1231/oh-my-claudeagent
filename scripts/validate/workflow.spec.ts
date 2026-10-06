@@ -132,13 +132,15 @@ describe("workflow contract", () => {
     expect(recipeBody("test")).toEqual([`bun test --parallel ${SPEC_ROOTS}`]);
   });
 
-  test("a seeded random-order run on the same roots runs on Linux and puts its seed in the step name", () => {
+  test("a seeded random-order run on the same roots replaces the file-order run on Linux and puts its seed in the step name", () => {
     const step = job("typescript").steps.find((candidate) => candidate.run?.includes("--randomize"));
     expect(step).toEqual({
       name: "Bun spec tests in random order (seed ${{ github.run_number }})",
       if: "runner.os == 'Linux'",
       run: "bun test --parallel --randomize --seed=${{ github.run_number }} $BUN_SPEC_ROOTS",
     });
+    const fileOrder = job("typescript").steps.filter((candidate) => /^bun (test --parallel \$BUN_SPEC_ROOTS|scripts\/qa\/junit-complete\.ts) /.test(candidate.run ?? ""));
+    expect(fileOrder.map((candidate) => candidate.if)).toEqual(["runner.os != 'Linux'", "runner.os != 'Linux'"]);
   });
 
   test("the validate recipe forwards its arguments to the validator", () => {
