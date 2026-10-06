@@ -54,31 +54,31 @@ const MASCOT_COLUMNS = 16;
 const MASCOT_PIXELS = 64;
 
 // The engine completes every table, so the surface, not the table, says which element draws.
-// Only a working mascot moves, and on a remote surface it moves by its own SMIL loop, so those
+// Only a working mascot moves, unless the person prefers reduced motion, and on a remote surface it moves by its own SMIL loop, so those
 // props never depend on `frame`: a redraw must not restart the loop.
-function mascotIn(table: ElementTable, surface: RenderSurface, tier: GlyphTier, type: string, state: MascotState, key: string, frame: number): RenderElement | null {
+function mascotIn(table: ElementTable, surface: RenderSurface, tier: GlyphTier, isStill: boolean, type: string, state: MascotState, key: string, frame: number): RenderElement | null {
   const name = mascotOf(type);
   if (name === undefined || tier === "ascii") return null;
   const frames = framesOf(name, state);
+  const isMoving = state === "working" && !isStill;
   if (surface === "terminal" && "Raster" in table) {
-    const shown = frames[state === "working" ? frame % frames.length : 0];
+    const shown = frames[isMoving ? frame % frames.length : 0];
     return shown === undefined ? null : table.Raster({ key, columns: MASCOT_COLUMNS, rows: MASCOT_ROWS, cells: rasterCells(shown) });
   }
   const first = frames[0];
   if (!("Svg" in table) || first === undefined) return null;
-  const isWorking = state === "working";
   return table.Svg({
-    source: svgOf(isWorking ? frames : [first]),
+    source: svgOf(isMoving ? frames : [first]),
     alt: `${name} ${state}`,
     width: MASCOT_PIXELS,
     height: MASCOT_PIXELS,
-    ...(isWorking ? { isInteractive: true } : {}),
+    ...(isMoving ? { isInteractive: true } : {}),
   });
 }
 
 // The engine completes every table, so a surface without an Input still hands out one that
 // draws an empty fragment; the surface, not the table, says whether a field can be drawn.
-export const kitOf = (table: ElementTable, surface: RenderSurface, tier: GlyphTier = "nerd"): Kit => ({
+export const kitOf = (table: ElementTable, surface: RenderSurface, tier: GlyphTier = "nerd", isStill = false): Kit => ({
   Box: table.Box,
   Text: table.Text,
   Button: table.Button,
@@ -86,7 +86,7 @@ export const kitOf = (table: ElementTable, surface: RenderSurface, tier: GlyphTi
   Code: table.Code,
   Link: table.Link,
   ...(surface !== "mobile" && "Input" in table ? { Input: table.Input } : {}),
-  mascot: (type, state, key, frame) => mascotIn(table, surface, tier, type, state, key, frame),
+  mascot: (type, state, key, frame) => mascotIn(table, surface, tier, isStill, type, state, key, frame),
 });
 
 const styleOf = ({ text: _text, ...style }: Piece): TextStyle => style;

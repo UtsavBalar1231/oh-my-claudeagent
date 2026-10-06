@@ -271,7 +271,7 @@ function bodyRows(host: Host, e: Input<"ui.render Pane">, isInline: boolean): nu
 
 async function draw(host: Host, e: Input<"ui.render Pane">): Promise<RenderElement> {
   const { home, platform, glyphTier } = resolvedSession();
-  const kit = kitOf(host.ui.resolve(e), e.surface, glyphTier);
+  const kit = kitOf(host.ui.resolve(e), e.surface, glyphTier, mascots.still());
   const { Box, Text, Button } = kit;
   const width = usableColumns(e.props.bodyColumns);
   const isInline = e.props.placement !== "dock";

@@ -1,6 +1,6 @@
 import type { On, RenderElement } from "claude-code";
 import { type Engine, expect, test } from "claude-code/testing";
-import { FRAME_MS, framesOf, type MascotName, type MascotState, rasterCells } from "../../src/core/mascots.ts";
+import { FRAME_MS, framesOf, type MascotName, type MascotState, rasterCells, svgOf } from "../../src/core/mascots.ts";
 import { childrenOf, isNode, type Node, nodeByKey, pane, run, type Size, textOf, usage, world } from "./world.ts";
 
 const DOCK_120: Size = { columns: 120, rows: 40, placement: "dock" };
@@ -38,8 +38,8 @@ const cellsOf = (name: MascotName, state: MascotState, frame = 0): string => {
 const rasterOf = (tree: RenderElement, id: string): unknown => nodeByKey(tree, `mascot-${id}`)?.props?.["cells"];
 
 // The pane's tick starts the timer once a drawing has laid a working mascot out.
-async function running($: Engine, on: On, types: readonly string[], surface: "terminal" | "desktop" = "terminal", size: Size = DOCK_120) {
-  const w = world(on, {});
+async function running($: Engine, on: On, types: readonly string[], surface: "terminal" | "desktop" = "terminal", size: Size = DOCK_120, settings: Record<string, unknown> = {}) {
+  const w = world(on, {}, settings);
   w.surfaces = [surface];
   engine(on);
   await $.command.run(run(""));
@@ -215,5 +215,32 @@ test("the agent page's header draws its agent's mascot, and the timer animates i
   await ui.redraw();
   expect(w.blits.map((blit) => blit.key)).toEqual(Array(4).fill("mascot-a-1"));
   expect(rasterOf(await ui.drawn(), "a-1")).toBe(w.blits.at(-1)?.cells);
+  await ui.unmount();
+});
+
+test("with prefersReducedMotion on, a working mascot starts no timer, blits nothing and draws frame 0", async ($, on) => {
+  const { w, ui } = await running($, on, ["executor"], "terminal", DOCK_120, { prefersReducedMotion: true });
+
+  await w.clock.advance(FRAME_MS * 10);
+  await ui.redraw();
+
+  expect(w.blits).toEqual([]);
+  expect(rasterOf(await ui.drawn(), "a-1")).toBe(cellsOf("executor", "working", 0));
+  await ui.unmount();
+});
+
+test("with prefersReducedMotion on, a working mascot is a still Svg that is not interactive", async ($, on) => {
+  const { ui } = await running($, on, ["executor"], "desktop", DOCK_120, { prefersReducedMotion: true });
+
+  const svg = await ui.find({ type: "Svg" });
+  expect(svg?.props["isInteractive"]).toBeUndefined();
+  expect(svg?.props["source"]).toBe(svgOf([framesOf("executor", "working")[0]!]));
+  await ui.unmount();
+});
+
+test("with prefersReducedMotion false or absent, the timer runs and the Svg is interactive", async ($, on) => {
+  const { w, ui } = await running($, on, ["executor"], "terminal", DOCK_120, { prefersReducedMotion: false });
+  await w.clock.advance(FRAME_MS * 3);
+  expect(w.blits.length).toBeGreaterThan(0);
   await ui.unmount();
 });

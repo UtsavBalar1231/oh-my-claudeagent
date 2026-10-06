@@ -6,12 +6,15 @@ import { PANE } from "./pane.ts";
 
 let timer: Timer | undefined;
 let isBlitting = false;
+let isStill = false;
 let counter = 0;
 // The agents whose mascots the latest Agents tab drawing laid out, so the timer blits only those.
 let drawn: ReadonlySet<string> = new Set();
 
 /** The frame every working mascot is at: a drawing made now lands where the blits are. */
 export const frame = (): number => counter;
+
+export const still = (): boolean => isStill;
 
 export const keyOf = (id: string): string => `mascot-${id}`;
 
@@ -49,8 +52,19 @@ async function advance(host: Host): Promise<void> {
   );
 }
 
-/** Starts the timer when a shown agent works on a terminal; a blit the engine denies is a mascot that is not mounted. */
+/** Starts the timer when a shown agent works on a terminal; a blit the engine denies is a mascot that is not mounted. The setting is read here, never in a render. */
 export async function ensure(host: Host): Promise<void> {
+  const wasStill = isStill;
+  try {
+    isStill = (await host.settings.read())["prefersReducedMotion"] === true;
+  } catch (error) {
+    host.log(`omca mascots could not read prefersReducedMotion: ${reason(error)}`);
+  }
+  if (isStill !== wasStill) host.ui.invalidate();
+  if (isStill) {
+    stop();
+    return;
+  }
   if (timer !== undefined || (await working(host)).length === 0) return;
   timer ??= host.clock.every(FRAME_MS, async () => {
     if (isBlitting) return;

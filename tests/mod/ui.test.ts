@@ -28,10 +28,12 @@ type Draw = (kit: Kit) => RenderElement;
 function gallery($: Engine, on: On) {
   let draw: Draw = (kit) => kit.Text({ children: [""] });
   let tier: GlyphTier = "nerd";
-  on("ui.render", { component: "Pane", requestId: "gallery" }, (engine, e) => draw(kitOf(engine.ui.resolve(e), e.surface, tier)));
-  return async (next: Draw, surface: RenderSurface = "terminal", glyphTier: GlyphTier = "nerd") => {
+  let isStill = false;
+  on("ui.render", { component: "Pane", requestId: "gallery" }, (engine, e) => draw(kitOf(engine.ui.resolve(e), e.surface, tier, isStill)));
+  return async (next: Draw, surface: RenderSurface = "terminal", glyphTier: GlyphTier = "nerd", still = false) => {
     draw = next;
     tier = glyphTier;
+    isStill = still;
     const ui = await $.ui.mount({
       plugin: PLUGIN,
       surface,
@@ -195,6 +197,15 @@ test("a remote mascot is an Svg with its alt, interactive only while working, an
       expect(JSON.stringify(later)).toBe(JSON.stringify(first));
     }
   }
+});
+
+test("a still kit draws a working mascot as frame 0 on the terminal and as a one-frame Svg without isInteractive elsewhere", async ($, on) => {
+  const drawn = gallery($, on);
+  const frames = framesOf("executor", "working");
+  expect(await drawn(mascotOrNothing("executor", "working", 3), "terminal", "nerd", true)).toMatchObject({ type: "Raster", props: { cells: rasterCells(frames[0]!) } });
+  const svg = (await drawn(mascotOrNothing("executor", "working", 3), "desktop", "nerd", true)) as { props: Record<string, unknown> };
+  expect(svg.props["source"]).toBe(svgOf([frames[0]!]));
+  expect("isInteractive" in svg.props).toBe(false);
 });
 
 test("a mascot draws nothing for an unknown agent or the ASCII tier", async ($, on) => {

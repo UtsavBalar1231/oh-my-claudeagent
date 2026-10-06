@@ -262,7 +262,7 @@ async function captureAt(view: View, root: string, cols: number, rows: number): 
     else copyFixture(join(root, "fixtures", view.fixture), cwd);
     mkdirSync(config);
     writeFileSync(join(config, ".claude.json"), JSON.stringify({ hasCompletedOnboarding: true }));
-    writeFileSync(join(config, "settings.json"), JSON.stringify({ tui: "fullscreen" }));
+    writeFileSync(join(config, "settings.json"), JSON.stringify({ tui: "fullscreen", prefersReducedMotion: true }));
     const claude = `claude --plugin-dir ${quote(REPO)} --session-id ${SESSION_ID}`;
     tmux.run([
       ...TERMINAL_OPTIONS,
