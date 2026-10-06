@@ -218,7 +218,7 @@ test("nextTypeFilter steps through the types the ledger holds, then back to none
 describe("shownIndices", () => {
   const entries = [
     run({ type: "build", command: "bun run build" }),
-    run({ command: "just test-mod", exitCode: 1, verifiedBy: "oh-my-claudeagent:explore" }),
+    run({ command: "just test-mod", exitCode: 1, verifiedBy: "oh-my-claudeagent:explorer" }),
     run({ command: "curl -H 'Authorization: Bearer abcdefghijklmnop' https://ci.test" }),
     run({ type: "lint", command: "just lint", exitCode: 1 }),
   ];
@@ -236,7 +236,7 @@ describe("shownIndices", () => {
 
   test("a query matches the command, the agent or the type label, ignoring case and outer spaces", () => {
     expect(shownIndices(entries, { ...none, query: " JUST " }, "/home/u")).toEqual([3, 1]);
-    expect(shownIndices(entries, { ...none, query: "explore" }, "/home/u")).toEqual([1]);
+    expect(shownIndices(entries, { ...none, query: "explorer" }, "/home/u")).toEqual([1]);
     expect(shownIndices(entries, { ...none, query: "build" }, "/home/u")).toEqual([0]);
   });
 

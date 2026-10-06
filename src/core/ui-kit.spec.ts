@@ -221,7 +221,7 @@ test("a time reads month-day hour:minute in the local zone, from milliseconds or
 
 test("an agent type loses its plugin prefix", () => {
   expect(shortType("oh-my-claudeagent:executor")).toBe("executor");
-  expect(shortType("explore")).toBe("explore");
+  expect(shortType("explorer")).toBe("explorer");
 });
 
 describe("wrapText", () => {

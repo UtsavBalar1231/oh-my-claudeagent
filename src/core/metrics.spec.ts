@@ -205,11 +205,11 @@ describe("aggregate", () => {
       record({ agent_id: "u1", model: "mock-model", estimated_cost_usd: null }),
       record({ agent_id: "u2", model: "mock-model", estimated_cost_usd: null }),
       record({ agent_id: "r1", estimated_cost_usd: null, outcome: "running", ended_at: null, duration_ms: null, evidence_logged: null }),
-      record({ agent_id: "x1", agent_type: "explore", model: "mock-model", estimated_cost_usd: null }),
+      record({ agent_id: "x1", agent_type: "explorer", model: "mock-model", estimated_cost_usd: null }),
     ]);
     expect(rows.map((row) => [row.agentType, row.count, row.estimatedCostUsd, row.unpriced])).toEqual([
       ["oh-my-claudeagent:executor", 4, 0.25, 2],
-      ["explore", 1, 0, 1],
+      ["explorer", 1, 0, 1],
     ]);
   });
 
