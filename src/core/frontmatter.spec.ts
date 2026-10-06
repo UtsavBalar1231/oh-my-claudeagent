@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseFrontmatter } from "./frontmatter.ts";
+import { MASCOTS } from "./mascots.ts";
 
 const AGENTS = join(import.meta.dir, "..", "..", "agents");
 
@@ -127,5 +128,14 @@ test("every agents/*.md parses to exactly its declared fields, with the descript
     const description = /^description: (.*)$/m.exec(text)?.[1];
     expect(description).toBeTruthy();
     expect(parseFrontmatter(text)).toEqual({ name, description: description ?? "", ...AGENT_FIELDS[name] });
+  }
+});
+
+test("every agents/*.md name has a mascot", () => {
+  const files = readdirSync(AGENTS).filter((file) => file.endsWith(".md"));
+  expect(files.length).toBeGreaterThan(0);
+  for (const file of files) {
+    const name = parseFrontmatter(readFileSync(join(AGENTS, file), "utf8"))?.["name"];
+    expect(Object.keys(MASCOTS)).toContain(String(name));
   }
 });
