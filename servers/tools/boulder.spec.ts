@@ -98,6 +98,7 @@ describe("boulder_write", () => {
     expect(boundAt >= before && boundAt <= nowSeconds()).toBe(true);
     expect(read(registryFile(root))).toBe(
       json({
+        version: 1,
         plans: { "my-plan": { active_plan: "/tmp/plan.md", started_at: startedAt, session_ids: ["sess-001"] } },
         bindings: { "sess-001": { plan_name: "my-plan", bound_at: boundAt } },
       }),
@@ -153,12 +154,41 @@ describe("boulder_write", () => {
     expect([bindings["sess-a"].plan_name, bindings["sess-b"].plan_name]).toEqual(["plan-a", "plan-b"]);
   });
 
-  test("boulder_write stores a plan named like an Object.prototype key", async () => {
+  test.each(["__proto__", "constructor.", "a b", "a/b", "nul", ""])("boulder_write refuses the plan_name %j that the notepad tools reject", async (name) => {
     const root = project();
-    await write(root, "__proto__", "constructor");
-    const { plans, bindings } = registry(root);
-    expect(Object.hasOwn(plans, "__proto__")).toBe(true);
-    expect(bindings.constructor.plan_name).toBe("__proto__");
+    await expect(write(root, name, "sess-001")).rejects.toThrow("plan_name must match");
+    expect(existsSync(registryFile(root))).toBe(false);
+  });
+
+  test("boulder_write binds a session named like an Object.prototype key", async () => {
+    const root = project();
+    await write(root, "my-plan", "__proto__");
+    const { bindings } = registry(root);
+    expect(Object.hasOwn(bindings, "__proto__")).toBe(true);
+    expect(bindings.__proto__.plan_name).toBe("my-plan");
+  });
+
+  test.each([
+    ["text that is not JSON", "{corrupt!!!"],
+    ["null", "null"],
+    ["an array", "[]"],
+    ["plans that is not an object", '{"plans":[],"bindings":{}}'],
+    ["version 2", '{"version":2,"plans":{},"bindings":{}}'],
+    ["a null version", '{"version":null,"plans":{},"bindings":{}}'],
+  ])("boulder_write refuses a registry holding %s, naming the file, and leaves it untouched", async (_label, text) => {
+    const root = project();
+    seedRegistry(root, text);
+    await expect(write(root, "my-plan", "sess-001")).rejects.toThrow(`${registryFile(root)} cannot be updated`);
+    expect(read(registryFile(root))).toBe(text);
+  });
+
+  test("boulder_write stamps version 1 on a registry that has none and keeps it on one that has it", async () => {
+    const root = project();
+    seedRegistry(root, json({ plans: {}, bindings: {} }));
+    await write(root, "my-plan", "sess-001");
+    expect(Object.keys(registry(root))).toEqual(["version", "plans", "bindings"]);
+    await write(root, "my-plan", "sess-002");
+    expect(registry(root).version).toBe(1);
   });
 
   test("boulder_write parallel writers no lost updates", async () => {
@@ -191,6 +221,22 @@ describe("boulder_write", () => {
     seedRegistry(root, json(seeded));
     unbindBoundSessions(Date.now() + 1_000);
     expect(Object.keys(registry(root).bindings)).toEqual(["sess-elsewhere"]);
+  });
+});
+
+describe("a registry the writers refuse", () => {
+  test("the exit unbind reads it as empty and leaves it untouched", async () => {
+    const root = project();
+    await write(root, "plan-a", "sess-exit-1");
+    seedRegistry(root, '{"version":2,"plans":{},"bindings":{"sess-exit-1":{"plan_name":"plan-a"}}}');
+    unbindBoundSessions(Date.now() + 1_000);
+    expect(read(registryFile(root))).toBe('{"version":2,"plans":{},"bindings":{"sess-exit-1":{"plan_name":"plan-a"}}}');
+  });
+
+  test("boulder_progress reads it as empty", async () => {
+    const root = project();
+    seedRegistry(root, "[]");
+    expect(await progress(root, { session_id: "any-session" })).toBe("No active plan found in boulder state.");
   });
 });
 
@@ -371,7 +417,7 @@ describe("start-time GC", () => {
     const root = project();
     seedRegistry(root, JSON.stringify({ plans: { done: entry(planFile(root, "done.md", COMPLETE)) }, bindings: {} }));
     expect(await gcRegistry(root)).toEqual({ pruned_plans: ["done"], pruned_bindings: [] });
-    expect(read(registryFile(root))).toBe(json({ plans: {}, bindings: {} }));
+    expect(read(registryFile(root))).toBe(json({ version: 1, plans: {}, bindings: {} }));
   });
 
   test("bound plan survives", async () => {
@@ -382,12 +428,15 @@ describe("start-time GC", () => {
     expect(read(registryFile(root))).toBe(text);
   });
 
-  test("corrupt boulder is left untouched", async () => {
-    const root = project();
-    seedRegistry(root, "{corrupt!!!");
-    expect(await gcRegistry(root)).toEqual({ pruned_plans: [], pruned_bindings: [] });
-    expect(read(registryFile(root))).toBe("{corrupt!!!");
-  });
+  test.each(["{corrupt!!!", "[]", '{"version":2,"plans":{"gone":{}},"bindings":{"s":{"plan_name":"x"}}}'])(
+    "a registry gc reads as empty is left untouched: %s",
+    async (text) => {
+      const root = project();
+      seedRegistry(root, text);
+      expect(await gcRegistry(root)).toEqual({ pruned_plans: [], pruned_bindings: [] });
+      expect(read(registryFile(root))).toBe(text);
+    },
+  );
 
   test("gc result matches pure function", async () => {
     const root = project();
@@ -395,7 +444,7 @@ describe("start-time GC", () => {
     seedRegistry(root, JSON.stringify(data));
     const expected = pruneUnbound(structuredClone(data));
     expect(await gcRegistry(root)).toEqual(expected);
-    expect(read(registryFile(root))).toBe(json({ plans: { wip: data.plans.wip }, bindings: {} }));
+    expect(read(registryFile(root))).toBe(json({ version: 1, plans: { wip: data.plans.wip }, bindings: {} }));
   });
 });
 

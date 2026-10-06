@@ -42,6 +42,10 @@ describe("planTally", () => {
     expect(planTally(text)).toEqual({ done: 2, total: 3, next: { n: 2, title: "Port the ledger" } });
   });
 
+  test("the next task's title is capped at 80 code points", () => {
+    expect(planTally(`- [ ] 1. ${"w".repeat(100)}`).next?.title).toBe(`${"w".repeat(79)}…`);
+  });
+
   test("a finished plan or one with no tasks has no next task", () => {
     expect(planTally("- [x] 1. a\n- [x] 2. b")).toEqual({ done: 2, total: 2, next: null });
     expect(planTally("# Empty")).toEqual({ done: 0, total: 0, next: null });

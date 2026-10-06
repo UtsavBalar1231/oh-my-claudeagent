@@ -179,6 +179,15 @@ describe("notepad tools", () => {
       expect(await call("notepad_read", { plan_name: "bare-plan" })).toBe("No notepad entries found for plan: bare-plan");
     });
 
+    test("notepad_read masks a token in what it returns and leaves the stored file as written", async () => {
+      const token = `ghp_${"a1".repeat(18)}`;
+      await write("mask-plan", "issues", `leaked ${token} and password = hunter2`);
+      const read = (await call("notepad_read", { plan_name: "mask-plan", section: "issues" })) as string;
+      expect(read).toContain("leaked <masked> and password = <masked>");
+      expect(read).not.toContain(token);
+      expect(readSection("mask-plan", "issues")).toContain(token);
+    });
+
     test("notepad_read rejects an unknown section", async () => {
       await expect(call("notepad_read", { plan_name: "p", section: "notes" })).rejects.toThrow('section must be one of learnings, issues, decisions, problems; got "notes"');
     });
@@ -226,40 +235,43 @@ describe("notepad tools", () => {
       expect(readSection("compact-plan", "learnings")).toBe(entry("Short content"));
     });
 
-    test("notepad_compact keeps the last 20 lines under a marker when the section is larger", async () => {
+    test("notepad_compact drops whole oldest entries and keeps the rest under a marker", async () => {
       for (let i = 0; i < 25; i++) await write("big-plan", "learnings", `Entry ${i}`);
       expect(await call("notepad_compact", { plan_name: "big-plan", section: "learnings" })).toBe(
-        "Compacted 'learnings': removed 79 old lines, kept last 20",
+        "Compacted 'learnings': removed 19 old entries (57 lines), kept the newest whole entries within 20 lines",
       );
-      const kept = [20, 21, 22, 23, 24].map((i) => `\n## ${STAMP}\n\nEntry ${i}`).join("\n");
-      expect(readSection("big-plan", "learnings")).toBe(`[Compacted: 79 earlier lines removed]\n${kept}\n`);
+      const kept = [19, 20, 21, 22, 23, 24].map((i) => `\n## ${STAMP}\n\nEntry ${i}\n`).join("");
+      expect(readSection("big-plan", "learnings")).toBe(`[Compacted: 57 earlier lines removed]\n${kept}`);
       expect(readdirSync(join(project, ".omca", "notepads", "big-plan"))).toEqual(["learnings.md"]);
     });
 
-    test("notepad_compact cuts by line at the boundary: 20 lines stay, 21 lose one", async () => {
-      const lines = (count: number) => Array.from({ length: count }, (_, i) => `l${i + 1}`);
-      mkdirSync(join(project, ".omca", "notepads", "edge"), { recursive: true });
-      writeFileSync(sectionPath("edge", "issues"), `\n  ${lines(20).join("\n")}\n\n`);
-      expect(await call("notepad_compact", { plan_name: "edge", section: "issues" })).toBe(
-        "Section 'issues' has 20 lines and needs no compaction",
+    test("notepad_compact keeps the newest entry whole even when it alone is past 20 lines", async () => {
+      await write("long", "issues", "old");
+      await write("long", "issues", Array.from({ length: 30 }, (_, i) => `l${i + 1}`).join("\n"));
+      expect(await call("notepad_compact", { plan_name: "long", section: "issues" })).toBe(
+        "Compacted 'issues': removed 1 old entries (3 lines), kept the newest whole entries within 20 lines",
       );
-      writeFileSync(sectionPath("edge", "issues"), `${lines(21).join("\n")}\n`);
-      expect(await call("notepad_compact", { plan_name: "edge", section: "issues" })).toBe(
-        "Compacted 'issues': removed 1 old lines, kept last 20",
-      );
-      expect(readSection("edge", "issues")).toBe(`[Compacted: 1 earlier lines removed]\n${lines(21).slice(1).join("\n")}\n`);
+      const text = readSection("long", "issues");
+      expect(text.startsWith(`[Compacted: 3 earlier lines removed]\n\n## ${STAMP}\n\nl1\n`)).toBe(true);
+      expect(text.endsWith("l30\n")).toBe(true);
+      expect(await call("notepad_compact", { plan_name: "long", section: "issues" })).toBe("Section 'issues' has 32 lines and needs no compaction");
     });
 
-    test("a second notepad_compact does not count its own marker, and a later one adds to the marker's total", async () => {
-      const lines = (from: number, count: number) => Array.from({ length: count }, (_, i) => `l${from + i}`);
-      mkdirSync(join(project, ".omca", "notepads", "twice"), { recursive: true });
-      writeFileSync(sectionPath("twice", "issues"), `${lines(1, 25).join("\n")}\n`);
-      expect(await call("notepad_compact", { plan_name: "twice", section: "issues" })).toBe("Compacted 'issues': removed 5 old lines, kept last 20");
-      expect(await call("notepad_compact", { plan_name: "twice", section: "issues" })).toBe("Section 'issues' has 20 lines and needs no compaction");
-      expect(readSection("twice", "issues")).toBe(`[Compacted: 5 earlier lines removed]\n${lines(6, 20).join("\n")}\n`);
-      writeFileSync(sectionPath("twice", "issues"), `${readSection("twice", "issues")}${lines(26, 3).join("\n")}\n`);
-      expect(await call("notepad_compact", { plan_name: "twice", section: "issues" })).toBe("Compacted 'issues': removed 3 old lines, kept last 20");
-      expect(readSection("twice", "issues")).toBe(`[Compacted: 8 earlier lines removed]\n${lines(9, 20).join("\n")}\n`);
+    test("an old line-cut marker and its tail still parse, and the marker total carries into the next compaction", async () => {
+      mkdirSync(join(project, ".omca", "notepads", "old"), { recursive: true });
+      writeFileSync(sectionPath("old", "issues"), `[Compacted: 7 earlier lines removed]\ntail a\ntail b\n${entry("x\ny\nz").repeat(8)}`);
+      expect(await call("notepad_compact", { plan_name: "old", section: "issues" })).toBe(
+        "Compacted 'issues': removed 5 old entries (22 lines), kept the newest whole entries within 20 lines",
+      );
+      expect(readSection("old", "issues").startsWith("[Compacted: 29 earlier lines removed]\n\n## ")).toBe(true);
+    });
+
+    test("notepad_compact leaves a section that fits untouched", async () => {
+      mkdirSync(join(project, ".omca", "notepads", "edge"), { recursive: true });
+      const before = `[Compacted: 5 earlier lines removed]\n${entry("a")}${entry("b")}`;
+      writeFileSync(sectionPath("edge", "issues"), before);
+      expect(await call("notepad_compact", { plan_name: "edge", section: "issues" })).toBe("Section 'issues' has 6 lines and needs no compaction");
+      expect(readSection("edge", "issues")).toBe(before);
     });
 
     test("notepad_compact reports a missing section without creating the plan", async () => {

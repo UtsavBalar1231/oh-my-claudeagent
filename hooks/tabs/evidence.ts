@@ -8,16 +8,16 @@ import {
   parseLedger,
   placeEntries,
   rerunPrompt,
-  sha256Hex,
   shownIndices,
   TYPE_WORDS,
   verdictOf,
 } from "../../src/core/evidence.ts";
 import { BOULDER, LEDGER } from "../../src/core/omca-paths.ts";
+import { sha256Hex } from "../../src/core/sha256.ts";
 import { agentGlyph, clockOf, COLUMN_GAP, dayOf, displayWidth, fitEnd, fitMiddle, oneLine, padEnd, shortType, wrapText } from "../../src/core/ui-kit.ts";
 import { agentKey, chip, type ChipTone, fitPieces, ON_SURFACE, type Piece, piecesWidth, redact, rule, TONE_KEYS } from "../../src/core/visual.ts";
 import type { Input } from "../dispatch.ts";
-import { boundPlanOf, type Host, reason, type State } from "../host.ts";
+import { boundPlanOf, bytesOf, type Host, reason, type State } from "../host.ts";
 import { blanks, noticeRow, refocus, type TabView, type View, wrapAt } from "../pane.ts";
 import { Card, CodeBlock, Field, Line, Row } from "../ui.ts";
 
@@ -73,7 +73,7 @@ async function boundPlan(host: Host, root: string): Promise<{ stamp: string; bou
 async function planOf(host: Host, bound: Bound): Promise<Ledger["plan"]> {
   if (bound === null || "error" in bound) return bound;
   try {
-    return { name: bound.name, sha: sha256Hex(await host.fs.read(bound.path)) };
+    return { name: bound.name, sha: sha256Hex(await bytesOf(host, bound.path)) };
   } catch (error) {
     return { name: bound.name, error: `Could not read the plan file: ${reason(error)}` };
   }

@@ -42,35 +42,36 @@ export function outsideFences(text: string): string {
 /** One numbered task line (`- [ ] 1. text`, `- [x] 12. text`): the definition every plan reader shares. */
 export const TASK_LINE = /^- \[([ x])\] (\d+)\.\s*(.*)$/;
 
-/** The numbered task lines outside code fences, in document order, as `TASK_LINE` matches. */
-export const taskLines = (content: string): RegExpExecArray[] =>
-  outsideFences(content)
-    .split("\n")
-    .map((line) => TASK_LINE.exec(line))
-    .filter((task) => task !== null);
-
-/** The state (`"x"` or `" "`) of each numbered checkbox outside code fences, in document order. */
-export function checkboxStates(content: string): string[] {
-  return taskLines(content).map((task) => task[1] ?? "");
-}
-
 // Keeps the label a short resume hint rather than a restatement of the task.
 export const MAX_LABEL_LEN = 80;
 
-export function nextTaskLabel(content: string): string | null {
-  const open = taskLines(content).find((task) => task[1] !== "x");
-  if (open === undefined) return null;
-  // Code points, not UTF-16 units, so a label cut mid-emoji keeps its length.
-  const chars = Array.from((open[3] ?? "").trim());
+// Code points, not UTF-16 units, so a label cut mid-emoji keeps its length.
+function capLabel(text: string): string {
+  const chars = Array.from(text.trim());
   if (chars.length <= MAX_LABEL_LEN) return chars.join("");
   return `${chars.slice(0, MAX_LABEL_LEN - 1).join("").trimEnd()}…`;
 }
+
+export type PlanTask = { number: number; label: string; checked: boolean; line: number };
+
+/** The numbered tasks outside code fences in document order; `line` indexes the cleaned text. */
+export function planTasks(content: string): PlanTask[] {
+  return outsideFences(content).split("\n").flatMap((text, line) => {
+    const task = TASK_LINE.exec(text);
+    return task === null ? [] : [{ number: Number(task[2]), label: capLabel(task[3] ?? ""), checked: task[1] === "x", line }];
+  });
+}
+
+/** The state (`"x"` or `" "`) of each numbered checkbox outside code fences, in document order. */
+export const checkboxStates = (content: string): string[] => planTasks(content).map((task) => (task.checked ? "x" : " "));
+
+export const nextTaskLabel = (content: string): string | null => planTasks(content).find((task) => !task.checked)?.label ?? null;
 
 /** The one completeness rule, by counts: at least one task and every task done. */
 export const allTasksDone = ({ done, total }: { done: number; total: number }): boolean => total > 0 && done === total;
 
 /** The same rule read from the plan's text: a plan with no numbered checkboxes is never complete. */
 export function planIsComplete(content: string): boolean {
-  const states = checkboxStates(content);
-  return allTasksDone({ done: states.filter((state) => state === "x").length, total: states.length });
+  const tasks = planTasks(content);
+  return allTasksDone({ done: tasks.filter((task) => task.checked).length, total: tasks.length });
 }

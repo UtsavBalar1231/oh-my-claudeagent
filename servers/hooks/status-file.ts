@@ -1,6 +1,6 @@
 import { readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { asRegistry, resolveBoundPlan } from "../../src/core/boulder.ts";
+import { asRegistry, parseRegistry, resolveBoundPlan } from "../../src/core/boulder.ts";
 import { ledgerCoversSlot } from "../../src/core/evidence.ts";
 import { BOULDER, LEDGER, statusPath as sessionStatusPath } from "../../src/core/omca-paths.ts";
 import { isSafeId } from "../../src/core/session-id.ts";
@@ -49,7 +49,7 @@ export type BoundPlanRead =
 
 const unreadable = (path: string, error: unknown): Unreadable => ({ kind: "unreadable", path, code: errorCode(error) ?? String(error) });
 
-/** The plan registry. Only text that does not parse is corrupt; a parsed value without the registry shape reads as an empty registry. */
+/** The plan registry. Only text that is not JSON is corrupt; any other refusal of `parseRegistry` reads as an empty registry. */
 export function readRegistry(root: string): RegistryRead {
   const path = registryPath(root);
   let text: string;
@@ -58,11 +58,9 @@ export function readRegistry(root: string): RegistryRead {
   } catch (error) {
     return isMissing(error) ? { kind: "absent" } : unreadable(path, error);
   }
-  try {
-    return { kind: "ok", data: JSON.parse(text) };
-  } catch {
-    return { kind: "corrupt" };
-  }
+  const parsed = parseRegistry(text);
+  if (parsed.kind === "ok") return { kind: "ok", data: parsed.registry };
+  return parsed.code === "unparseable" ? { kind: "corrupt" } : { kind: "ok", data: asRegistry({}) };
 }
 
 /**

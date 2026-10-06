@@ -1,5 +1,5 @@
 import { type Engine, expect, type Mounted as MountedPane, test } from "claude-code/testing";
-import { sha256Hex } from "../../src/core/evidence.ts";
+import { sha256Hex } from "../../src/core/sha256.ts";
 import { displayWidth, padEnd, usableColumns } from "../../src/core/ui-kit.ts";
 import {
   BOULDER,
@@ -57,7 +57,7 @@ const runs = (planSha: string) => [
 ];
 
 async function proofFiles(planSha?: string): Promise<Record<string, string>> {
-  const sha = planSha ?? sha256Hex(PLAN_TEXT);
+  const sha = planSha ?? sha256Hex(new TextEncoder().encode(PLAN_TEXT));
   return { [PLAN_PATH]: PLAN_TEXT, [BOULDER]: BOUND, [LEDGER]: JSON.stringify({ entries: runs(sha) }) };
 }
 
@@ -469,7 +469,7 @@ test("c copies the focused command as drawn, masks and all, and r fills a rerun 
   on("prompt.submit", () => {
     throw new Error("the Evidence tab must never submit");
   });
-  world(on, { ...(await proofFiles()), [LEDGER]: JSON.stringify({ entries: runs(sha256Hex(PLAN_TEXT)).map((entry, index) => (index === 3 ? { ...entry, command: `${entry.command} --home /home/u/project` } : entry)) }) });
+  world(on, { ...(await proofFiles()), [LEDGER]: JSON.stringify({ entries: runs(sha256Hex(new TextEncoder().encode(PLAN_TEXT))).map((entry, index) => (index === 3 ? { ...entry, command: `${entry.command} --home /home/u/project` } : entry)) }) });
   const ui = await openEvidence($, DOCK_120);
 
   await $.ui.scroll({ ...SCROLL, by: 2, bodyRows: 36, contentRows: 37 });
@@ -485,7 +485,7 @@ test("c copies the focused command as drawn, masks and all, and r fills a rerun 
   expect(await statusRow(ui)).toBe("1/6 · ↑↓ move");
   await ui.press({ key: "r" });
   expect(fills.at(-1)).toBe(
-    `Run the final verification again (\`just ci\`) and log the verdict with evidence_log as final_verification evidence with plan_sha256="${sha256Hex(PLAN_TEXT)}".`,
+    `Run the final verification again (\`just ci\`) and log the verdict with evidence_log as final_verification evidence with plan_sha256="${sha256Hex(new TextEncoder().encode(PLAN_TEXT))}".`,
   );
   await ui.unmount();
 });

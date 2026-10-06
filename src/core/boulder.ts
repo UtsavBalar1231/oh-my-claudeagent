@@ -1,3 +1,4 @@
+import { parseDocument, type Refusal, refuse } from "./state-version.ts";
 import { isRecord } from "./tool-input.ts";
 
 export interface PlanEntry {
@@ -35,6 +36,23 @@ export function asRegistry(data: unknown): Registry {
     plans: isRecord(plans) ? (plans as Registry["plans"]) : {},
     bindings: isRecord(bindings) ? (bindings as Registry["bindings"]) : {},
   };
+}
+
+export type RegistryParse = { kind: "ok"; registry: Registry } | Refusal;
+
+/**
+ * The one reader of registry text. Refused: text that is not JSON, not an object, or whose
+ * `plans` or `bindings` is present and not an object, or whose `version` is not 1. A writer must
+ * not replace a refused file; a reader treats it as an empty registry.
+ */
+export function parseRegistry(text: string): RegistryParse {
+  const parsed = parseDocument(text);
+  if (parsed.kind === "refused") return parsed;
+  const { plans, bindings } = parsed.document;
+  if ((plans !== undefined && !isRecord(plans)) || (bindings !== undefined && !isRecord(bindings))) {
+    return refuse("shape", "its `plans` or `bindings` is not an object");
+  }
+  return { kind: "ok", registry: asRegistry(parsed.document) };
 }
 
 function boundPlan(name: string, entry: PlanEntry): BoundPlan {

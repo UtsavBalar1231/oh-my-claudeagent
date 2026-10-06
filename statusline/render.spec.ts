@@ -286,6 +286,11 @@ describe("plan segment", () => {
     expect(plan()).toEqual({ done: 3, total: 10, label: "Pending 4" });
   });
 
+  test("a label past 80 code points is capped", () => {
+    bind(`- [ ] 1. ${"v".repeat(100)}\n`);
+    expect(plan()?.label).toBe(`${"v".repeat(79)}…`);
+  });
+
   test("the segment reads count, arrow and label", () => {
     bind(THREE_OF_TEN);
     expect(rendered(ASCII)).toEqual([[`${C}> m${R}`, `${G}T: 3/10${R} ${D}-> Pending 4${R}`].join(S), [WAITING, `${D}> ${basename(dir)}${R}`].join(S), ZERO]);
@@ -328,6 +333,20 @@ describe("plan segment", () => {
 
   test("no registry gives nothing", () => {
     expect(plan()).toBeNull();
+  });
+
+  test.each(["{ not json", "[]"])("a registry that is %s gives nothing", (text) => {
+    writeBoulder(text);
+    expect(plan()).toBeNull();
+  });
+
+  test("a registry of another version gives nothing even when it binds the session", () => {
+    const path = join(dir, "plan.md");
+    writeFileSync(path, THREE_OF_TEN);
+    writeBoulder({ version: 2, plans: { p: { active_plan: path } }, bindings: { [SESSION]: { plan_name: "p" } } });
+    expect(plan()).toBeNull();
+    writeBoulder({ version: 1, plans: { p: { active_plan: path } }, bindings: { [SESSION]: { plan_name: "p" } } });
+    expect(plan()?.done).toBe(3);
   });
 
   test("an empty project directory gives nothing", () => {

@@ -1,5 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { parseRegistry } from "../../src/core/boulder.ts";
+import { readLedger } from "../../src/core/evidence.ts";
 import { parseFrontmatter } from "../../src/core/frontmatter.ts";
 import { findSession, latestSessionId } from "../hooks/session-state.ts";
 import { ledgerPath, markerWrittenAt } from "../hooks/status-file.ts";
@@ -53,7 +55,7 @@ function astGrep(): { path: string } | { error: string } {
   }
 }
 
-function jsonFileState(path: string): "absent" | "valid" | "invalid" {
+function stateFileState(path: string, parses: (text: string) => boolean): "absent" | "valid" | "invalid" {
   let text: string;
   try {
     text = readFileSync(path, "utf8");
@@ -61,12 +63,7 @@ function jsonFileState(path: string): "absent" | "valid" | "invalid" {
     if (isMissing(error)) return "absent";
     throw error;
   }
-  try {
-    JSON.parse(text);
-    return "valid";
-  } catch {
-    return "invalid";
-  }
+  return parses(text) ? "valid" : "invalid";
 }
 
 function healthCheck(args: Record<string, unknown>): string {
@@ -78,8 +75,8 @@ function healthCheck(args: Record<string, unknown>): string {
     ast_grep: astGrep(),
     state: {
       dir: isDirectory(stateDir) ? "present" : "absent",
-      "boulder.json": jsonFileState(join(stateDir, "boulder.json")),
-      "verification-evidence.json": jsonFileState(ledgerPath(root)),
+      "boulder.json": stateFileState(join(stateDir, "boulder.json"), (text) => parseRegistry(text).kind === "ok"),
+      "verification-evidence.json": stateFileState(ledgerPath(root), (text) => readLedger(text).kind === "ok"),
     },
   };
   return JSON.stringify(report, null, 2);
@@ -128,7 +125,7 @@ export const tools: Tool[] = [
   {
     name: "health_check",
     description:
-      "Report whether OMCA's runtime is active in this session, plus the client version, the ast-grep binary and the state files. `runtime` is `ok` when this session's settings hooks have reached the server and the OMCA mod has marked the session since the last prompt; otherwise it is `hooks_inactive` or `mod_absent`, and `runtime_reason` names the likely cause. The orchestration skills call this first and stop unless `runtime` is `ok`. `client_version` is null when the client does not export its version. `ast_grep` is `{path}` or `{error}`. `state` gives the state directory as `present` or `absent` and `boulder.json` and `verification-evidence.json` as `absent`, `valid` or `invalid` JSON.",
+      "Report whether OMCA's runtime is active in this session, plus the client version, the ast-grep binary and the state files. `runtime` is `ok` when this session's settings hooks have reached the server and the OMCA mod has marked the session since the last prompt; otherwise it is `hooks_inactive` or `mod_absent`, and `runtime_reason` names the likely cause. The orchestration skills call this first and stop unless `runtime` is `ok`. `client_version` is null when the client does not export its version. `ast_grep` is `{path}` or `{error}`. `state` gives the state directory as `present` or `absent` and `boulder.json` and `verification-evidence.json` as `absent`, `valid` or `invalid`: invalid is a file the plan registry or evidence ledger reader refuses, which `boulder_write` and `evidence_log` will not replace.",
     inputSchema: { type: "object", properties: { working_directory: WORKING_DIRECTORY } },
     annotations: { title: "Check OMCA health", readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     _meta: {

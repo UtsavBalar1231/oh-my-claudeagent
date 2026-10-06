@@ -170,6 +170,27 @@ describe("an evidence ledger the gate cannot trust blocks", () => {
     expect(await complete(root, sessionId)).toEqual(INVALID_BLOCK);
   });
 
+  test("a ledger with one malformed entry beside a well-formed one allows", async () => {
+    const root = project();
+    const sessionId = crypto.randomUUID();
+    await record(root, sessionId, NOW - 60 * SECOND);
+    writeLedger(ledgerPath(root), JSON.stringify({ entries: [JSON.parse(LEDGER).entries[0], { type: "test" }, null] }), NOW_S);
+    expect(await complete(root, sessionId)).toEqual({});
+  });
+
+  test.each([
+    ["a ledger of another version", '{"version":2,"entries":[{"type":"test","command":"x","exit_code":0,"output_snippet":"","timestamp":"2026-10-02T12:00:00Z"}]}'],
+    ["an empty entries list", '{"entries":[]}'],
+    ["an entries value that is not a list", '{"entries":{}}'],
+    ["a JSON value that is not an object", "[]"],
+  ])("%s blocks as invalid", async (_label, text) => {
+    const root = project();
+    const sessionId = crypto.randomUUID();
+    await record(root, sessionId, NOW - 60 * SECOND);
+    writeLedger(ledgerPath(root), text, NOW_S);
+    expect(await complete(root, sessionId)).toEqual(INVALID_BLOCK);
+  });
+
   test("an unparseable ledger postdating the slot blocks as invalid", async () => {
     const root = project();
     const sessionId = crypto.randomUUID();

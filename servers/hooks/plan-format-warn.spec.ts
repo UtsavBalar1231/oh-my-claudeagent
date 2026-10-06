@@ -60,6 +60,18 @@ test("plan-format-warn: more than five malformed lines are named up to five with
   );
 });
 
+test("plan-format-warn: a malformed box inside a code fence is ignored", async () => {
+  const { root, path } = file("plans/fenced.md", "- [ ] 1. Real\n```md\n- [ ] not numbered\n```\n");
+  expect(await warn(root, path)).toBeUndefined();
+});
+
+test("plan-format-warn: a leading BOM does not hide a malformed first line or break a numbered one", async () => {
+  const bad = file("plans/bom-bad.md", "\uFEFF- [ ] Task without a number\n");
+  expect(await warn(bad.root, bad.path)).toContain("1:- [ ] Task without a number");
+  const good = file("plans/bom-good.md", "\uFEFF- [ ] 1. Numbered\n");
+  expect(await warn(good.root, good.path)).toBeUndefined();
+});
+
 test("plan-format-warn: well-formed plan emits no output", async () => {
   const { root, path } = file("plans/good-plan.md", "# My Plan\n\n- [ ] 1. First task\n- [x] 2. Second task\n");
   expect(await warn(root, path)).toBeUndefined();

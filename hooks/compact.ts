@@ -1,5 +1,5 @@
+import { planTasks } from "../src/core/checkboxes.ts";
 import { isHookDisabled } from "../src/core/kill-switch.ts";
-import { parsePlan } from "../src/core/plan-reader.ts";
 import type { Features } from "./dispatch.ts";
 import { boundPlanOf, type Host } from "./host.ts";
 
@@ -9,9 +9,7 @@ const MAX_OPEN_TASKS = 10;
 async function planInstructions(host: Host): Promise<string | undefined> {
   const plan = await boundPlanOf(host);
   if (plan === undefined || !(await host.fs.exists(plan.path))) return undefined;
-  const open = parsePlan(await host.fs.read(plan.path)).pages.flatMap((page) =>
-    page.task !== undefined && !page.task.done ? [`- ${page.title}`] : [],
-  );
+  const open = planTasks(await host.fs.read(plan.path)).flatMap((task) => (task.checked ? [] : [`- ${task.number}. ${task.label}`]));
   const more = open.length - MAX_OPEN_TASKS;
   return [
     `Keep OMCA's active plan in the summary: ${plan.name} (${plan.path}).`,

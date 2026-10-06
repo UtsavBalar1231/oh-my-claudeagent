@@ -1,6 +1,16 @@
 import { describe, expect, test } from "bun:test";
-import { allTasksDone, checkboxStates, MAX_LABEL_LEN, nextTaskLabel, outsideFences, planIsComplete } from "./checkboxes.ts";
+import { allTasksDone, checkboxStates, MAX_LABEL_LEN, nextTaskLabel, outsideFences, planIsComplete, planTasks } from "./checkboxes.ts";
 import { parsePlan } from "./plan-reader.ts";
+
+describe("planTasks", () => {
+  test("gives number, capped label, state and line of each numbered task outside fences, past a BOM", () => {
+    const plan = `\uFEFF# Plan\n- [x] 1. Done\n\`\`\`\n- [ ] 9. Example\n\`\`\`\n- [ ] Unnumbered\n- [ ] 2. ${"x".repeat(100)}\n`;
+    expect(planTasks(plan)).toEqual([
+      { number: 1, label: "Done", checked: true, line: 1 },
+      { number: 2, label: `${"x".repeat(79)}…`, checked: false, line: 6 },
+    ]);
+  });
+});
 
 describe("checkboxStates", () => {
   test("lists numbered checkboxes in order and ignores unnumbered ones", () => {

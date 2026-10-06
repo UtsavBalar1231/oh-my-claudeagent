@@ -1,5 +1,5 @@
 import type { RenderElement } from "claude-code";
-import { matches, NOTEPAD_SECTIONS, type NotepadSection, parseEntries } from "../../src/core/notepad.ts";
+import { isPlanName, matches, NOTEPAD_SECTIONS, type NotepadSection, parseEntries } from "../../src/core/notepad.ts";
 import { BOULDER } from "../../src/core/omca-paths.ts";
 import { clean } from "../../src/core/checkboxes.ts";
 import { chunks } from "../../src/core/plan-reader.ts";
@@ -12,8 +12,6 @@ import { Card, Field, Line, Rule } from "../ui.ts";
 type Notepad = NonNullable<State["pane"]["notepad"]>;
 
 const NOTEPADS = ".omca/notepads";
-// notepad_write refuses any other plan name, so a directory outside this shape is not a notepad.
-const PLAN_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const FIND = "notepad-find";
 const PICK = "notepad-plan-";
 const KEY_GAP = 2;
@@ -50,7 +48,7 @@ async function boundPlan(host: Host, root: string): Promise<{ name: string | und
 // The bound plan first, then the most recently written.
 async function notepadPlans(host: Host, root: string, bound: string | undefined): Promise<{ name: string; seen: string }[]> {
   const dir = `${root}/${NOTEPADS}`;
-  const found = (await host.fs.exists(dir)) ? (await host.fs.list(dir)).filter((entry) => entry.kind === "dir" && PLAN_NAME.test(entry.name)) : [];
+  const found = (await host.fs.exists(dir)) ? (await host.fs.list(dir)).filter((entry) => entry.kind === "dir" && isPlanName(entry.name)) : [];
   const rest = found
     .filter((entry) => entry.name !== bound)
     .sort((a, b) => b.mtimeMs - a.mtimeMs || a.name.localeCompare(b.name))

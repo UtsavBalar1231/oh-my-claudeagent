@@ -1,5 +1,5 @@
-import type { EngineInterface, PluginState, StateRead, StateSetOptions, StateSetResult } from "claude-code";
-import { resolveBoundPlan } from "../src/core/boulder.ts";
+import type { EngineInterface, FsBytes, PluginState, StateRead, StateSetOptions, StateSetResult } from "claude-code";
+import { parseRegistry, resolveBoundPlan } from "../src/core/boulder.ts";
 import { BOULDER, LEDGER } from "../src/core/omca-paths.ts";
 import { configDir, type Env as PathEnv, homeDir, inferPlatform, isAbsolutePath, joinPath, type Platform } from "../src/core/path.ts";
 import { parseRuns, proofOf, type Run, type Verdict } from "../src/core/proof.ts";
@@ -42,6 +42,7 @@ export type Host = {
   };
   fs: {
     read: (path: string) => Promise<string>;
+    readBytes: (path: string) => Promise<FsBytes>;
     write: Engine["fs"]["write"];
     stat: Engine["fs"]["stat"];
     list: Engine["fs"]["list"];
@@ -142,12 +143,20 @@ export async function sessionOf(host: Host): Promise<Session> {
 /** What `sessionOf` resolved, for a drawing that must not wait on the engine. */
 export const resolvedSession = (): Session => session ?? UNRESOLVED;
 
-/** The plan this session is bound to, undefined when none is; throws when the registry does not parse. */
+/** The file's raw bytes, so a digest covers exactly what the server hashes. */
+export async function bytesOf(host: Host, path: string): Promise<Uint8Array> {
+  const { base64 } = await host.fs.readBytes(path);
+  return Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
+}
+
+/** The plan this session is bound to, undefined when none is; throws when the registry is not JSON. */
 export async function boundPlanOf(host: Host): Promise<{ name: string; path: string } | undefined> {
   const [root, sessionId] = await Promise.all([host.session.root(), host.session.id()]);
   const registry = `${root}/${BOULDER}`;
   if (!(await host.fs.exists(registry))) return undefined;
-  const plan = resolveBoundPlan(JSON.parse(await host.fs.read(registry)), sessionId, true);
+  const parsed = parseRegistry(await host.fs.read(registry));
+  if (parsed.kind === "refused" && parsed.code === "unparseable") throw new Error(parsed.reason);
+  const plan = parsed.kind === "ok" ? resolveBoundPlan(parsed.registry, sessionId, true) : undefined;
   return plan === undefined || plan.active_plan === "" ? undefined : { name: plan.plan_name, path: plan.active_plan };
 }
 

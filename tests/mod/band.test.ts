@@ -1,6 +1,6 @@
 import type { Args, On } from "claude-code";
 import { type Engine, type EngineCall, expect, mock, type Mounted, test } from "claude-code/testing";
-import { sha256Hex } from "../../src/core/evidence.ts";
+import { sha256Hex } from "../../src/core/sha256.ts";
 import { displayWidth } from "../../src/core/ui-kit.ts";
 import { hostSpelling } from "./world.ts";
 
@@ -76,7 +76,7 @@ function world(on: On, disk: Files): World {
   on("fs.read", (_$, e) => {
     const file = disk.get(spelled(e.path));
     if (file === undefined) throw new Error(`ENOENT: no such file or directory, open '${spelled(e.path)}'`);
-    return { value: file.text };
+    return { value: e.as === "bytes" ? { base64: btoa(String.fromCharCode(...new TextEncoder().encode(file.text))) } : file.text };
   });
   on("fs.stat", (_$, e) => {
     const file = disk.get(spelled(e.path));
@@ -219,6 +219,17 @@ test("an unreadable registry draws a one-line reason in the band", async ($, on)
   });
 });
 
+test("a registry of another version binds no plan and draws no failure", async ($, on) => {
+  const { logs } = world(on, files({ [BOULDER]: BOUND.replace("{", '{"version":2,'), [PLAN_PATH]: planText(3, 46) }));
+  await start($);
+  expect(logs.filter((line) => line.startsWith("band"))).toEqual([]);
+
+  await onEachSurface($, async (band) => {
+    expect(await statusRow(band)).not.toMatch(/Cannot read/);
+    expect(await buttons(band)).toEqual([]);
+  });
+});
+
 test("a complete plan without a passing final verification offers to run it", async ($, on) => {
   world(on, bound(46, 46, { [LEDGER]: ledger([final({ exit_code: 1 })]) }));
   await start($);
@@ -231,8 +242,29 @@ test("a complete plan without a passing final verification offers to run it", as
   });
 });
 
+test("a malformed ledger entry beside the passing final verification does not hide it", async ($, on) => {
+  const scoped = final({ plan_sha256: sha256Hex(new TextEncoder().encode(planText(46, 46))) });
+  world(on, bound(46, 46, { [LEDGER]: ledger([{ type: "test" }, scoped]) }));
+  await start($);
+  await turn($);
+
+  await onEachSurface($, async (band) => {
+    expect((await buttons(band)).map((button) => button.key)).toEqual(["review"]);
+  });
+});
+
+test("a ledger of another version on a complete plan names the failure", async ($, on) => {
+  world(on, bound(46, 46, { [LEDGER]: JSON.stringify({ version: 2, entries: [] }) }));
+  await start($);
+  await turn($);
+
+  await onEachSurface($, async (band) => {
+    expect(await statusRow(band)).toMatch(/^✗ Cannot read \.omca\/evidence\/verification-evidence\.json: its "version" is 2/);
+  });
+});
+
 test("a final verification scoped to other plan bytes does not count", async ($, on) => {
-  const stale = final({ plan_sha256: sha256Hex(planText(45, 46)) });
+  const stale = final({ plan_sha256: sha256Hex(new TextEncoder().encode(planText(45, 46))) });
   world(on, bound(46, 46, { [LEDGER]: ledger([stale]) }));
   await start($);
   await turn($);
@@ -243,7 +275,7 @@ test("a final verification scoped to other plan bytes does not count", async ($,
 });
 
 test("a complete plan with a passing final verification for its current bytes offers the architect review", async ($, on) => {
-  const scoped = final({ plan_sha256: sha256Hex(planText(46, 46)) });
+  const scoped = final({ plan_sha256: sha256Hex(new TextEncoder().encode(planText(46, 46))) });
   world(on, bound(46, 46, { [LEDGER]: ledger([scoped]) }));
   await start($);
   await turn($);
@@ -269,7 +301,7 @@ test("an unreadable ledger on a complete plan names the failure and still offers
     ]);
   });
 
-  const scoped = final({ plan_sha256: sha256Hex(planText(46, 46)) });
+  const scoped = final({ plan_sha256: sha256Hex(new TextEncoder().encode(planText(46, 46))) });
   disk.set(LEDGER, { text: ledger([scoped]), mtimeMs: BEFORE_RUN_MS });
   await turn($);
 

@@ -1,9 +1,9 @@
+import { createHash } from "node:crypto";
 import { describe, expect, test } from "bun:test";
 import {
   dayLabel,
   type Evidence,
   isSlotRecent,
-  isWellFormedLedger,
   latestByType,
   ledgerCoversSlot,
   MAX_SLOT_AGE_SECONDS,
@@ -11,11 +11,12 @@ import {
   nextTypeFilter,
   parseLedger,
   placeEntries,
+  readLedger,
   rerunPrompt,
-  sha256Hex,
   shownIndices,
   verdictOf,
 } from "./evidence.ts";
+import { sha256Hex } from "./sha256.ts";
 import { clockOf, dayOf } from "./ui-kit.ts";
 
 const entry = {
@@ -64,42 +65,45 @@ describe("ledgerCoversSlot", () => {
   });
 });
 
-describe("isWellFormedLedger", () => {
-  test("accepts a ledger of complete entries", () => {
-    const optional = { ...entry, type: "final_verification", verified_by: "x", plan_sha256: "ab" };
-    expect(isWellFormedLedger({ entries: [entry, optional] })).toBe(true);
+describe("readLedger", () => {
+  test("returns the whole document and the well-formed entries, leaving a malformed one out of the entries only", () => {
+    const text = JSON.stringify({ version: 1, note: "kept", entries: [entry, { type: "test" }, null] });
+    const read = readLedger(text);
+    expect(read).toMatchObject({ kind: "ok", document: { version: 1, note: "kept", entries: [entry, { type: "test" }, null] } });
+    expect(read.kind === "ok" && read.entries.map((one) => one.command)).toEqual(["just ci"]);
   });
 
-  test("checks structure, not content: a failing exit_code and empty strings pass", () => {
-    expect(isWellFormedLedger({ entries: [{ ...entry, exit_code: 1, command: "" }] })).toBe(true);
+  test("a ledger without a version reads as version 1", () => {
+    expect(readLedger(JSON.stringify({ entries: [entry] })).kind).toBe("ok");
   });
 
-  test.each(["type", "command", "exit_code", "output_snippet", "timestamp"])(
-    "rejects an entry missing %s",
-    (field) => {
-      const { [field]: _dropped, ...partial } = entry as Record<string, unknown>;
-      expect(isWellFormedLedger({ entries: [partial] })).toBe(false);
-    },
-  );
-
-  test("rejects an entry whose exit_code is null", () => {
-    expect(isWellFormedLedger({ entries: [{ ...entry, exit_code: null }] })).toBe(false);
+  test("a ledger without an entries list reads as no entries and keeps its document", () => {
+    expect(readLedger("{}")).toEqual({ kind: "ok", document: {}, entries: [] });
   });
 
-  test("rejects one bad entry among good ones", () => {
-    expect(isWellFormedLedger({ entries: [entry, { type: "test" }, entry] })).toBe(false);
+  test.each([
+    ["text that is not JSON", "{", "unparseable"],
+    ["null", "null", "shape"],
+    ["an array", JSON.stringify([entry]), "shape"],
+    ["entries that is not a list", '{"entries":{}}', "shape"],
+    ["version 2", '{"version":2,"entries":[]}', "version"],
+    ["a string version", '{"version":"1","entries":[]}', "version"],
+    ["a null version", '{"version":null,"entries":[]}', "version"],
+  ])("refuses %s", (_label, text, code) => {
+    expect(readLedger(text)).toMatchObject({ kind: "refused", code });
   });
 
   test.each([
     ["an empty entries list", { entries: [] }],
-    ["entries that is not an array", { entries: {} }],
-    ["no entries key", {}],
-    ["null", null],
-    ["an array", [entry]],
-    ["a null entry", { entries: [null] }],
-    ["a string entry", { entries: ["test"] }],
-  ])("rejects %s", (_label, data) => {
-    expect(isWellFormedLedger(data)).toBe(false);
+    ["entries with no entry that is well formed", { entries: [{ type: "test" }, null, "test"] }],
+  ])("reads %s as no entries", (_label, data) => {
+    expect(readLedger(JSON.stringify(data))).toMatchObject({ kind: "ok", entries: [] });
+  });
+
+  test("an entry without output_snippet is still well formed", () => {
+    const { output_snippet: _dropped, ...bare } = entry;
+    const read = readLedger(JSON.stringify({ entries: [bare] }));
+    expect(read.kind === "ok" && read.entries).toHaveLength(1);
   });
 });
 
@@ -148,7 +152,8 @@ describe("parseLedger", () => {
 
   test("a ledger without an entries list, or that is not JSON, throws", () => {
     expect(() => parseLedger('{"items":[]}')).toThrow("it holds no entries list");
-    expect(() => parseLedger("{")).toThrow(SyntaxError);
+    expect(() => parseLedger("{")).toThrow("it is not valid JSON");
+    expect(() => parseLedger('{"version":2}')).toThrow('its "version" is 2, and only version 1 is supported');
   });
 });
 
@@ -301,15 +306,29 @@ describe("rerunPrompt", () => {
   });
 });
 
-test("sha256Hex hashes the text's UTF-8 bytes", () => {
-  expect(sha256Hex("")).toBe("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
-  expect(sha256Hex("abc")).toBe("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
-  const reference = (text: string) => new Bun.CryptoHasher("sha256").update(text).digest("hex");
+const bytesOf = (text: string) => new TextEncoder().encode(text);
+const serverDigest = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
+// What the mod path does with `$.fs.read(path, { as: "bytes" })`.
+const modBytes = (bytes: Uint8Array) => Uint8Array.from(atob(btoa(String.fromCharCode(...bytes))), (char) => char.charCodeAt(0));
+
+test("sha256Hex hashes the bytes it is given", () => {
+  expect(sha256Hex(bytesOf(""))).toBe("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+  expect(sha256Hex(bytesOf("abc"))).toBe("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
   for (const length of [1, 55, 56, 63, 64, 65, 119, 120, 128, 1000, 100_000]) {
-    const text = "a".repeat(length);
-    expect([length, sha256Hex(text)]).toEqual([length, reference(text)]);
+    const bytes = bytesOf("a".repeat(length));
+    expect([length, sha256Hex(bytes)]).toEqual([length, serverDigest(bytes)]);
   }
   for (const text of ["é", "naïve plan ✓ ◐ ⊘", "🪨".repeat(40), "- [ ] 1. Task\r\n  - File: `src/a.ts`\n"]) {
-    expect(sha256Hex(text)).toBe(reference(text));
+    expect(sha256Hex(bytesOf(text))).toBe(serverDigest(bytesOf(text)));
   }
+});
+
+test("a plan with a BOM, CRLF line endings and an invalid UTF-8 byte has one digest on the server path and the mod path", () => {
+  const bytes = Uint8Array.from([0xef, 0xbb, 0xbf, ...bytesOf("- [ ] 1. Task\r\n  - File: `src/a.ts`\r\n"), 0xff, 0x0a]);
+  expect(sha256Hex(modBytes(bytes))).toBe(serverDigest(bytes));
+});
+
+test("an ASCII plan with LF endings and no BOM keeps its digest", () => {
+  const plan = "# Plan\n\n- [ ] 1. Task\n";
+  expect(sha256Hex(bytesOf(plan))).toBe("a892183894168d775be2863f3e50fff56d2bb24729d5c20bb8e00f99a5cbfdac");
 });

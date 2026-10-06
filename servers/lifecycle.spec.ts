@@ -63,6 +63,7 @@ describe("start-up work", () => {
     seedDurable(root);
     await startWork(root, NOW);
     expect(JSON.parse(read(root, ".omca/state/boulder.json"))).toEqual({
+      version: 1,
       plans: { live: { active_plan: join(root, "live.md"), started_at: "2026-10-01T00:00:00Z", session_ids: ["s1"] } },
       bindings: { s1: { plan_name: "live", bound_at: 1_786_000_000 } },
     });

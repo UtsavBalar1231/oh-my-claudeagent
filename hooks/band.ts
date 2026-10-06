@@ -1,15 +1,16 @@
 import type { RenderElement } from "claude-code";
 import { type Band, bandView, BUTTON_GAP, planTally, type Proof, type Span, type Tone } from "../src/core/band-model.ts";
 import { allTasksDone } from "../src/core/checkboxes.ts";
-import { ledgerCoversSlot, sha256Hex } from "../src/core/evidence.ts";
+import { ledgerCoversSlot, readLedger } from "../src/core/evidence.ts";
 import { hasPassingFinalVerification, type NextAction, nextActions } from "../src/core/next-actions.ts";
 import { BOULDER, LEDGER, statusPath, verificationOf } from "../src/core/omca-paths.ts";
 import { boardOf, parsePlan } from "../src/core/plan-reader.ts";
 import { proofSummary } from "../src/core/proof.ts";
+import { sha256Hex } from "../src/core/sha256.ts";
 import { type GlyphTier, oneLine } from "../src/core/ui-kit.ts";
 import { TONE_KEYS } from "../src/core/visual.ts";
 import type { Features } from "./dispatch.ts";
-import { boundPlanOf, type Host, ledgerWrittenAt, proofFacts, reason, sessionOf, verdictFor } from "./host.ts";
+import { boundPlanOf, bytesOf, type Host, ledgerWrittenAt, proofFacts, reason, sessionOf, verdictFor } from "./host.ts";
 import { type Kit, kitOf, type TextStyle } from "./ui.ts";
 
 type Snapshot = { band: Band; hasFinalVerification: boolean };
@@ -28,6 +29,13 @@ async function readJson(host: Host, path: string): Promise<unknown> {
   return (await host.fs.exists(path)) ? JSON.parse(await host.fs.read(path)) : undefined;
 }
 
+async function ledgerDocument(host: Host, path: string): Promise<unknown> {
+  if (!(await host.fs.exists(path))) return undefined;
+  const read = readLedger(await host.fs.read(path));
+  if (read.kind === "refused") throw new Error(read.reason);
+  return read.document;
+}
+
 async function readSnapshot(host: Host): Promise<Snapshot> {
   const [root, sessionId, readAt] = await Promise.all([host.session.root(), host.session.id(), host.clock.now()]);
   const ledgerPath = `${root}/${LEDGER}`;
@@ -42,7 +50,8 @@ async function readSnapshot(host: Host): Promise<Snapshot> {
   }
 
   const bound = await attempt(BOULDER, async () => (await boundPlanOf(host)) ?? null);
-  const planText = bound === null ? null : await attempt(bound.path, () => host.fs.read(bound.path));
+  const planBytes = bound === null ? null : await attempt(bound.path, () => bytesOf(host, bound.path));
+  const planText = planBytes === null ? null : new TextDecoder().decode(planBytes);
   const plan = bound === null || planText === null ? null : { ...bound, ...planTally(planText) };
 
   const statusFile = statusPath(root, sessionId);
@@ -57,10 +66,10 @@ async function readSnapshot(host: Host): Promise<Snapshot> {
 
   const hasFinalVerification =
     plan !== null &&
-    planText !== null &&
+    planBytes !== null &&
     allTasksDone(plan) &&
     (await attempt(LEDGER, async () =>
-      hasPassingFinalVerification(await readJson(host, ledgerPath), sha256Hex(planText)),
+      hasPassingFinalVerification(await ledgerDocument(host, ledgerPath), sha256Hex(planBytes)),
     )) === true;
 
   const proof = planText === null ? null : await attempt(LEDGER, () => proofOfPlan(host, planText));

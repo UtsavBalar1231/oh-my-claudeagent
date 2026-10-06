@@ -34,7 +34,7 @@ const CONTINUE: Output = feedback(CONTINUE_TEXT);
 const corruptRegistry = (root: string): Output =>
   feedback(
     `[PLAN CONTINUATION] ${join(root, ".omca", "state", "boulder.json")} is not valid JSON, so this session's plan state cannot be resolved and ` +
-      "plan-scoped enforcement is off. Repair or delete the file (boulder_write rewrites it), then stop again. Set " +
+      "plan-scoped enforcement is off. Repair or delete the file, then stop again. Set " +
       "OMCA_DISABLED_HOOKS=plan-continuation to bypass.",
   );
 
@@ -173,6 +173,19 @@ describe("plan continuation", () => {
     const state = findSession(run.sessionId);
     expect(state?.planBackoff).toEqual({ plan: "test-plan", backoff: { consecutiveBlocks: 1, lastBlockAt: NOW_S, lastUnchecked: 1, sameCountRun: 1, isStagnated: false } });
     expect([...(state?.stopBlocks ?? [])]).toEqual([["plan-continuation", 1]]);
+  });
+
+  test("plan continuation: a fenced example task is not quoted as the next task", async () => {
+    const run = session();
+    bind(run, "# Plan\n\n```md\n- [ ] 1. Example in a fence\n```\n\n- [x] 1. First task done\n- [ ] 2. Second task not done\n");
+    expect(await run.stop()).toEqual(CONTINUE);
+  });
+
+  test("plan continuation: the next task label is capped at 80 code points", async () => {
+    const run = session();
+    bind(run, `- [ ] 1. ${"y".repeat(100)}\n`);
+    const output = await run.stop();
+    expect(JSON.stringify(output)).toContain(`(next: ${"y".repeat(79)}…)`);
   });
 
   test("plan continuation: fully-checked plan allows Stop", async () => {
@@ -342,6 +355,12 @@ describe("plan continuation", () => {
     expect(await run.stop()).toEqual(CONTINUE);
   });
 
+  test("plan continuation: a boulder.json of another version reads as an empty registry and allows Stop", async () => {
+    const run = session();
+    writeRegistry(run.root, '{"version":2,"plans":{},"bindings":{}}');
+    expect(await run.stop()).toEqual({});
+  });
+
   test("plan continuation: unparseable boulder.json blocks instead of reading as no plan", async () => {
     const run = session();
     writeRegistry(run.root, "NOT JSON {");
@@ -363,7 +382,7 @@ describe("plan continuation", () => {
       expect(await run.stop()).toEqual(
         feedback(
           `[PLAN CONTINUATION] ${path} cannot be read (EACCES), so this session's plan state cannot be resolved and ` +
-            "plan-scoped enforcement is off. Repair or delete the file (boulder_write rewrites it), then stop again. Set " +
+            "plan-scoped enforcement is off. Repair or delete the file, then stop again. Set " +
             "OMCA_DISABLED_HOOKS=plan-continuation to bypass.",
         ),
       );
@@ -529,6 +548,31 @@ describe("final verification", () => {
     expect(await run.stop()).toEqual({});
     bind(run, COMPLETE_PLAN);
     rmSync(join(run.root, "plan.md"));
+    expect(await run.stop()).toEqual({});
+  });
+
+  test.each([
+    ["a ledger of another version", '{"version":2,"entries":[]}'],
+    ["a ledger with no entries list", "{}"],
+    ["a ledger that is not an object", "[]"],
+  ])("final verification: %s triggers the corruption guard", async (_label, text) => {
+    const run = session();
+    bind(run, COMPLETE_PLAN);
+    writeLedger(run.root, text);
+    expect(await run.stop()).toEqual(corruptLedger(run.root));
+  });
+
+  test("final verification: a malformed entry beside a passing verdict does not hide the verdict", async () => {
+    const run = session();
+    bind(run, COMPLETE_PLAN);
+    writeLedger(run.root, [{ type: "test" }, verdict()]);
+    expect(await run.stop()).toEqual({});
+  });
+
+  test("final verification: a ledger stamped version 1 is read like one without a version", async () => {
+    const run = session();
+    bind(run, COMPLETE_PLAN);
+    writeLedger(run.root, JSON.stringify({ version: 1, entries: [verdict()] }));
     expect(await run.stop()).toEqual({});
   });
 

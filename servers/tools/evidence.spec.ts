@@ -102,7 +102,7 @@ describe("evidence_log", () => {
     expect(timestamp).toMatch(ISO_SECONDS);
     expect(timestamp >= before && timestamp <= after).toBe(true);
     expect(read(ledgerFile(root))).toBe(
-      json({ entries: [{ type: "test", command: "just test", exit_code: 0, output_snippet: "5 passed", timestamp }] }),
+      json({ version: 1, entries: [{ type: "test", command: "just test", exit_code: 0, output_snippet: "5 passed", timestamp }] }),
     );
   });
 
@@ -197,12 +197,42 @@ describe("evidence_log", () => {
     expect(read(ledgerFile(root))).toBe("{corrupt");
   });
 
+  test.each([
+    ["version 2", '{"version":2,"entries":[]}'],
+    ["a string version", '{"version":"1","entries":[]}'],
+    ["a null version", '{"version":null,"entries":[]}'],
+  ])("evidence_log refuses a ledger holding %s, naming the file, and leaves it untouched", async (_label, text) => {
+    const root = project();
+    mkdirSync(join(root, ".omca", "evidence"), { recursive: true });
+    writeFileSync(ledgerFile(root), text);
+    await expect(log(root)).rejects.toThrow(`${ledgerFile(root)}: its "version" is`);
+    expect(read(ledgerFile(root))).toBe(text);
+  });
+
+  test("evidence_log stamps version 1 on a ledger that has none, and reads one that holds version 1", async () => {
+    const root = project();
+    mkdirSync(join(root, ".omca", "evidence"), { recursive: true });
+    writeFileSync(ledgerFile(root), "{}");
+    await log(root);
+    expect(Object.keys(JSON.parse(read(ledgerFile(root))))).toEqual(["version", "entries"]);
+    expect(await log(root)).toBe("Evidence recorded: test (exit 0), 2 total entries");
+  });
+
+  test("evidence_log keeps a malformed entry beside the one it appends", async () => {
+    const root = project();
+    mkdirSync(join(root, ".omca", "evidence"), { recursive: true });
+    writeFileSync(ledgerFile(root), json({ entries: [{ type: "test" }] }));
+    await log(root);
+    expect(entries(root)).toHaveLength(2);
+    expect(entries(root)[0]).toEqual({ type: "test" });
+  });
+
   test("evidence_log keeps other top-level ledger keys", async () => {
     const root = project();
     mkdirSync(join(root, ".omca", "evidence"), { recursive: true });
     writeFileSync(ledgerFile(root), json({ note: "kept", entries: [] }));
     await log(root);
-    expect(Object.keys(JSON.parse(read(ledgerFile(root))))).toEqual(["note", "entries"]);
+    expect(Object.keys(JSON.parse(read(ledgerFile(root))))).toEqual(["version", "note", "entries"]);
   });
 
   test("evidence_log rejects arguments that break the schema", async () => {
@@ -265,6 +295,13 @@ describe("evidence_read", () => {
     }
   });
 
+  test("evidence_read refuses a ledger of another version", async () => {
+    const root = project();
+    mkdirSync(join(root, ".omca", "evidence"), { recursive: true });
+    writeFileSync(ledgerFile(root), '{"version":2,"entries":[]}');
+    await expect(call("evidence_read", { working_directory: root })).rejects.toThrow(`${ledgerFile(root)}: its "version" is 2`);
+  });
+
   test("evidence_read refuses a corrupt ledger with the same message evidence_log gives", async () => {
     const root = project();
     mkdirSync(join(root, ".omca", "evidence"), { recursive: true });
@@ -284,8 +321,8 @@ describe("ledger rotation", () => {
     const root = project();
     const seeded = seedLedger(root, 1200);
     expect(await rotateLedger(root, OCTOBER)).toBe(700);
-    expect(read(ledgerFile(root))).toBe(json({ entries: seeded.slice(700) }));
-    expect(read(archiveFile(root, "202610"))).toBe(json({ entries: seeded.slice(0, 700) }));
+    expect(read(ledgerFile(root))).toBe(json({ version: 1, entries: seeded.slice(700) }));
+    expect(read(archiveFile(root, "202610"))).toBe(json({ version: 1, entries: seeded.slice(0, 700) }));
     expect(readdirSync(join(root, ".omca", "evidence")).sort()).toEqual([
       "verification-evidence.202610.json",
       "verification-evidence.json",
@@ -298,7 +335,7 @@ describe("ledger rotation", () => {
     const earlier = [entry(-2), entry(-1)];
     writeFileSync(archiveFile(root, "202610"), json({ entries: earlier }));
     expect(await rotateLedger(root, OCTOBER)).toBe(501);
-    expect(read(archiveFile(root, "202610"))).toBe(json({ entries: [...earlier, ...seeded.slice(0, 501)] }));
+    expect(read(archiveFile(root, "202610"))).toBe(json({ version: 1, entries: [...earlier, ...seeded.slice(0, 501)] }));
     expect(entries(root)).toHaveLength(KEEP_ENTRIES);
   });
 
@@ -307,7 +344,7 @@ describe("ledger rotation", () => {
     const seeded = seedLedger(root, 600, (i) => ({ ...entry(i), output_snippet: "y".repeat(2000) }));
     expect(readFileSync(ledgerFile(root)).byteLength).toBeGreaterThan(1024 * 1024);
     expect(await rotateLedger(root, OCTOBER)).toBe(100);
-    expect(read(ledgerFile(root))).toBe(json({ entries: seeded.slice(100) }));
+    expect(read(ledgerFile(root))).toBe(json({ version: 1, entries: seeded.slice(100) }));
   });
 
   test("a ledger at 1,000 entries and under 1 MiB is left byte-identical", async () => {
@@ -317,6 +354,17 @@ describe("ledger rotation", () => {
     expect(await rotateLedger(root, OCTOBER)).toBe(0);
     expect(read(ledgerFile(root))).toBe(before);
     expect(existsSync(archiveFile(root, "202610"))).toBe(false);
+  });
+
+  test("a month archive that holds a version other than 1 is refused naming the archive, and neither file changes", async () => {
+    const root = project();
+    seedLedger(root, 1001);
+    const before = read(ledgerFile(root));
+    const archive = '{"version":2,"entries":[]}';
+    writeFileSync(archiveFile(root, "202610"), archive);
+    await expect(rotateLedger(root, OCTOBER)).rejects.toThrow(`${archiveFile(root, "202610")}: its "version" is 2`);
+    expect(read(ledgerFile(root))).toBe(before);
+    expect(read(archiveFile(root, "202610"))).toBe(archive);
   });
 
   test("a missing ledger rotates nothing and creates no ledger", async () => {

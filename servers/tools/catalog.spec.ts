@@ -176,6 +176,19 @@ test("health_check tells a valid state file from one that does not parse", async
   });
 });
 
+test("health_check calls a state file the writers refuse invalid even when it is JSON", async () => {
+  const { report, project } = startServer();
+  mkdirSync(join(project, ".omca", "state"), { recursive: true });
+  mkdirSync(join(project, ".omca", "evidence"), { recursive: true });
+  writeFileSync(join(project, ".omca", "state", "boulder.json"), '{"version":2,"plans":{},"bindings":{}}');
+  writeFileSync(join(project, ".omca", "evidence", "verification-evidence.json"), '{"version":2,"entries":[]}');
+  expect((await report()).state).toEqual({
+    dir: "present",
+    "boulder.json": "invalid",
+    "verification-evidence.json": "invalid",
+  });
+});
+
 test("health_check inspects the project named by working_directory", async () => {
   const { report } = startServer();
   const other = gitProject();

@@ -1,6 +1,6 @@
 import { dirname, join } from "node:path";
-import { EVIDENCE_TYPES, type EvidenceType } from "../../src/core/evidence.ts";
-import { isRecord } from "../../src/core/tool-input.ts";
+import { entriesOf, EVIDENCE_TYPES, type EvidenceType, readLedger } from "../../src/core/evidence.ts";
+import { STATE_VERSION } from "../../src/core/state-version.ts";
 import { latestSessionId, touchSession } from "../hooks/session-state.ts";
 import { ledgerPath, writeStatus } from "../hooks/status-file.ts";
 import { ensureStateDir, readOrNull, withLock, writeFileAtomic } from "../io.ts";
@@ -18,30 +18,27 @@ const ROTATE_BYTES = 1024 * 1024;
 const ROTATE_ENTRIES = 1000;
 export const KEEP_ENTRIES = 500;
 
-type Ledger = Record<string, unknown> & { entries: unknown[] };
+type Ledger = { document: Record<string, unknown>; entries: unknown[] };
 
 // The ledger is an append-only audit trail, so a file that does not parse is refused rather than replaced.
 function parseLedger(path: string, text: string): Ledger {
-  let data: unknown;
-  try {
-    data = JSON.parse(text);
-  } catch {
-    data = undefined;
+  const read = readLedger(text);
+  if (read.kind === "refused") {
+    const what = read.code === "version" ? `${path}: ${read.reason}` : `${path} is not an evidence ledger ({"entries": [...]})`;
+    throw new Error(`${what}; move it aside to keep logging evidence`);
   }
-  if (!isRecord(data) || !(data.entries === undefined || Array.isArray(data.entries))) {
-    throw new Error(`${path} is not an evidence ledger ({"entries": [...]}); move it aside to keep logging evidence`);
-  }
-  return { ...data, entries: Array.isArray(data.entries) ? data.entries : [] };
+  return { document: read.document, entries: entriesOf(read.document) ?? [] };
 }
 
-function readLedger(path: string): Ledger {
+function readLedgerFile(path: string): Ledger {
   const text = readOrNull(path);
-  return text === null ? { entries: [] } : parseLedger(path, text);
+  return text === null ? { document: {}, entries: [] } : parseLedger(path, text);
 }
 
 const capped = (value: string, max: number): string => (value.length > max ? Array.from(value).slice(0, max).join("") : value);
 
-const writeJson = (path: string, data: unknown): void => writeFileAtomic(path, `${JSON.stringify(data, null, 2)}\n`);
+const writeLedger = (path: string, { document, entries }: Ledger): void =>
+  writeFileAtomic(path, `${JSON.stringify({ version: STATE_VERSION, ...document, entries }, null, 2)}\n`);
 
 function updateStatus(root: string): void {
   const sessionId = latestSessionId();
@@ -80,9 +77,9 @@ async function evidenceLog(args: Record<string, unknown>): Promise<string> {
   ensureStateDir(root);
   const path = ledgerPath(root);
   const total = await withLock(`${path}.lock`, () => {
-    const ledger = readLedger(path);
+    const ledger = readLedgerFile(path);
     ledger.entries.push(entry);
-    writeJson(path, ledger);
+    writeLedger(path, ledger);
     return ledger.entries.length;
   });
   updateStatus(root);
@@ -90,7 +87,7 @@ async function evidenceLog(args: Record<string, unknown>): Promise<string> {
 }
 
 function evidenceRead(args: Record<string, unknown>): string {
-  const { entries } = readLedger(ledgerPath(rootOf(stringArg(args, "working_directory", "", "evidence_read"))));
+  const { entries } = readLedgerFile(ledgerPath(rootOf(stringArg(args, "working_directory", "", "evidence_read"))));
   if (entries.length === 0) return "No verification evidence recorded.";
   return JSON.stringify({ entries }, null, 2);
 }
@@ -108,10 +105,10 @@ export async function rotateLedger(root: string, now = new Date()): Promise<numb
     const moved = ledger.entries.slice(0, -KEEP_ENTRIES);
     if (moved.length === 0) return 0;
     const archivePath = join(dirname(path), `verification-evidence.${archiveMonth(now)}.json`);
-    const archive = readLedger(archivePath);
+    const archive = readLedgerFile(archivePath);
     // Archive first: a crash between the two writes duplicates entries instead of losing them.
-    writeJson(archivePath, { ...archive, entries: [...archive.entries, ...moved] });
-    writeJson(path, { ...ledger, entries: ledger.entries.slice(-KEEP_ENTRIES) });
+    writeLedger(archivePath, { ...archive, entries: [...archive.entries, ...moved] });
+    writeLedger(path, { ...ledger, entries: ledger.entries.slice(-KEEP_ENTRIES) });
     return moved.length;
   });
 }

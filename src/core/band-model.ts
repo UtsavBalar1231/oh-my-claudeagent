@@ -1,4 +1,4 @@
-import { taskLines } from "./checkboxes.ts";
+import { planTasks } from "./checkboxes.ts";
 import type { NextAction, NextActionKind } from "./next-actions.ts";
 import { arrange, displayWidth, fitEnd, type Glyphs, glyphs, type GlyphTier, oneLine, type Ranked, share, usableColumns } from "./ui-kit.ts";
 import { bar, piecesWidth, type ThemeKey } from "./visual.ts";
@@ -47,12 +47,12 @@ const PRIORITY = { progress: 1, running: 2, next: 3, proof: 4, unlogged: 5, logg
 
 /** The numbered tasks' tally and the first open one, read the way every plan reader reads them. */
 export function planTally(text: string): { done: number; total: number; next: NextTask | null } {
-  const tasks = taskLines(text);
-  const open = tasks.find((task) => task[1] !== "x");
+  const tasks = planTasks(text);
+  const open = tasks.find((task) => !task.checked);
   return {
-    done: tasks.filter((task) => task[1] === "x").length,
+    done: tasks.filter((task) => task.checked).length,
     total: tasks.length,
-    next: open === undefined ? null : { n: Number(open[2]), title: oneLine(open[3] ?? "") },
+    next: open === undefined ? null : { n: open.number, title: oneLine(open.label) },
   };
 }
 

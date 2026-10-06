@@ -1,11 +1,13 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { asRegistry, type PlanEntry, type Registry, resolveBoundPlan } from "../../src/core/boulder.ts";
-import { checkboxStates, nextTaskLabel, planIsComplete } from "../../src/core/checkboxes.ts";
+import { asRegistry, type PlanEntry, parseRegistry, type Registry, resolveBoundPlan } from "../../src/core/boulder.ts";
+import { allTasksDone, planIsComplete, planTasks } from "../../src/core/checkboxes.ts";
+import { toPlanName } from "../../src/core/notepad.ts";
+import { STATE_VERSION } from "../../src/core/state-version.ts";
 import { latestSessionId } from "../hooks/session-state.ts";
 import { registryPath } from "../hooks/status-file.ts";
-import { ensureStateDir, hasCode, tryWithLockSync, withLock, writeFileAtomic } from "../io.ts";
+import { ensureStateDir, hasCode, readOrNull, tryWithLockSync, withLock, writeFileAtomic } from "../io.ts";
 import type { Tool } from "../omca.ts";
 import { argReader, isoTimestamp, rootOf, WORKING_DIRECTORY } from "./args.ts";
 
@@ -20,23 +22,23 @@ const bound = new Map<string, Set<string>>();
 const sessionIdOr = (sessionId: string): string =>
   sessionId || (latestSessionId() ?? process.env.CLAUDE_CODE_SESSION_ID ?? "");
 
-function readRaw(path: string): unknown {
-  let text: string;
-  try {
-    text = readFileSync(path, "utf8");
-  } catch (error) {
-    if (hasCode(error, "ENOENT")) return {};
-    throw error;
-  }
-  try {
-    return JSON.parse(text);
-  } catch {
-    return {};
-  }
+/** The registry on disk. A file that does not parse as one reads as empty here, so only `boulder_write` has to refuse it. */
+function readRegistryFile(path: string): Registry {
+  const text = readOrNull(path);
+  const parsed = text === null ? undefined : parseRegistry(text);
+  return parsed?.kind === "ok" ? parsed.registry : asRegistry({});
+}
+
+function readWritableRegistry(path: string): Registry {
+  const text = readOrNull(path);
+  if (text === null) return asRegistry({});
+  const parsed = parseRegistry(text);
+  if (parsed.kind === "refused") throw new Error(`${path} cannot be updated: ${parsed.reason}. Repair or delete the file, then register the plan again.`);
+  return parsed.registry;
 }
 
 const writeRegistry = (path: string, registry: Registry): void =>
-  writeFileAtomic(path, `${JSON.stringify({ plans: registry.plans, bindings: registry.bindings }, null, 2)}\n`);
+  writeFileAtomic(path, `${JSON.stringify({ version: STATE_VERSION, plans: registry.plans, bindings: registry.bindings }, null, 2)}\n`);
 
 function planFileIsComplete(path: string | undefined): boolean {
   if (!path) return false;
@@ -93,7 +95,7 @@ export async function gcRegistry(root: string): Promise<PruneSummary> {
   const path = registryPath(root);
   if (!existsSync(path)) return { pruned_plans: [], pruned_bindings: [] };
   return withLock(`${path}.lock`, () => {
-    const registry = asRegistry(readRaw(path));
+    const registry = readRegistryFile(path);
     const summary = pruneUnbound(registry);
     if (summary.pruned_plans.length > 0 || summary.pruned_bindings.length > 0) writeRegistry(path, registry);
     return summary;
@@ -112,7 +114,7 @@ export function unbindBoundSessions(deadline: number): void {
     const isDone = tryWithLockSync(
       `${path}.lock`,
       () => {
-        const registry = asRegistry(readRaw(path));
+        const registry = readRegistryFile(path);
         const before = Object.keys(registry.bindings).length;
         for (const sessionId of sessionIds) delete registry.bindings[sessionId];
         if (Object.keys(registry.bindings).length !== before) writeRegistry(path, registry);
@@ -131,14 +133,14 @@ const withKey = <T>(record: Record<string, T>, key: string, value: T): Record<st
 async function boulderWrite(args: Record<string, unknown>): Promise<string> {
   const arg = argReader(args, "boulder_write").string;
   const activePlan = arg("active_plan");
-  const planName = arg("plan_name");
+  const planName = toPlanName(arg("plan_name"));
   const sessionId = sessionIdOr(arg("session_id"));
   const worktreePath = arg("worktree_path", "");
   const root = rootOf(arg("working_directory", ""));
   const path = join(ensureStateDir(root), "boulder.json");
 
   const sessions = await withLock(`${path}.lock`, () => {
-    const registry = asRegistry(readRaw(path));
+    const registry = readWritableRegistry(path);
     const existing: PlanEntry = Object.hasOwn(registry.plans, planName) ? (registry.plans[planName] as PlanEntry) : {};
     const sessionIds = Array.isArray(existing.session_ids) ? [...existing.session_ids] : [];
     if (sessionId && !sessionIds.includes(sessionId)) sessionIds.push(sessionId);
@@ -168,12 +170,12 @@ function boulderProgress(args: Record<string, unknown>): string {
   const sessionId = arg("session_id", "");
   const workingDirectory = arg("working_directory", "");
   if (!planPath) {
-    const raw = readRaw(registryPath(rootOf(workingDirectory)));
+    const registry = readRegistryFile(registryPath(rootOf(workingDirectory)));
     if (planName) {
-      const { plans } = asRegistry(raw);
+      const { plans } = registry;
       planPath = (Object.hasOwn(plans, planName) && plans[planName]?.active_plan) || "";
     } else {
-      planPath = resolveBoundPlan(raw, sessionIdOr(sessionId))?.active_plan ?? "";
+      planPath = resolveBoundPlan(registry, sessionIdOr(sessionId))?.active_plan ?? "";
     }
     if (!planPath) return "No active plan found in boulder state.";
   }
@@ -187,17 +189,17 @@ function boulderProgress(args: Record<string, unknown>): string {
     return JSON.stringify(missing, null, 2);
   }
   const content = bytes.toString("utf8");
-  const states = checkboxStates(content);
-  const completed = states.filter((state) => state === "x").length;
+  const tasks = planTasks(content);
+  const completed = tasks.filter((task) => task.checked).length;
   return JSON.stringify(
     {
-      total: states.length,
+      total: tasks.length,
       completed,
-      remaining: states.length - completed,
-      is_complete: planIsComplete(content),
+      remaining: tasks.length - completed,
+      is_complete: allTasksDone({ done: completed, total: tasks.length }),
       plan_path: planPath,
       plan_sha256: createHash("sha256").update(bytes).digest("hex"),
-      next_task_label: nextTaskLabel(content),
+      next_task_label: tasks.find((task) => !task.checked)?.label ?? null,
     },
     null,
     2,
@@ -208,7 +210,7 @@ export const tools: Tool[] = [
   {
     name: "boulder_write",
     description:
-      "Register a work plan in the project's plan registry (.omca/state/boulder.json) and bind this session to it. Upserts plans[plan_name], keeping its started_at and adding session_id to its session_ids, then prunes bindings older than 7 days and unbound, finished plans of that age. Binding turns on plan enforcement for this session: while numbered tasks (`- [ ] N.`) remain unchecked, the Stop hook blocks the stop with a nudge to continue, and once all are checked it blocks until a final_verification evidence entry matches the plan. Call it once before executing a plan; calling it again is safe. Returns a confirmation with the plan name and session count.",
+      "Register a work plan in the project's plan registry (.omca/state/boulder.json) and bind this session to it. Upserts plans[plan_name], keeping its started_at and adding session_id to its session_ids, then prunes bindings older than 7 days and unbound, finished plans of that age. Binding turns on plan enforcement for this session: while numbered tasks (`- [ ] N.`) remain unchecked, the Stop hook blocks the stop with a nudge to continue, and once all are checked it blocks until a final_verification evidence entry matches the plan. Call it once before executing a plan; calling it again is safe. Refuses a plan_name the notepad tools reject, and a registry file that is not JSON, not an object, or has a version other than 1, leaving that file untouched. Returns a confirmation with the plan name and session count.",
     inputSchema: {
       type: "object",
       properties: {

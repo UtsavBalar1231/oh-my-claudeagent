@@ -1,4 +1,5 @@
 import { readFileSync, statSync } from "node:fs";
+import { outsideFences, planTasks } from "../../src/core/checkboxes.ts";
 import { isHookDisabled } from "../../src/core/kill-switch.ts";
 import { isPlanPath } from "../../src/core/plan-path.ts";
 import { inputText } from "../../src/core/tool-input.ts";
@@ -11,9 +12,11 @@ export const handle: Handler = (payload) => {
   if ((payload.tool_name !== "Write" && payload.tool_name !== "Edit") || isHookDisabled(process.env.OMCA_DISABLED_HOOKS, "plan-format-warn")) return;
   const filePath = inputText(payload.tool_input, "file_path");
   if (!isPlanPath(filePath) || statSync(filePath, { throwIfNoEntry: false })?.isFile() !== true) return;
-  const malformed = readFileSync(filePath, "utf8")
+  const content = readFileSync(filePath, "utf8");
+  const numbered = new Set(planTasks(content).map((task) => task.line));
+  const malformed = outsideFences(content)
     .split("\n")
-    .flatMap((line, index) => (line.startsWith("- [ ] ") && !/^- \[ \] \d+\./.test(line) ? [`${index + 1}:${line}`] : []));
+    .flatMap((line, index) => (line.startsWith("- [ ] ") && !numbered.has(index) ? [`${index + 1}:${line}`] : []));
   if (malformed.length === 0) return;
   const lines = [
     `[PLAN-FORMAT-WARN] ${filePath} has ${malformed.length} checkbox line(s) that will not be counted as numbered tasks:`,

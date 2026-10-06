@@ -36,6 +36,7 @@ function bindHost($: EngineInterface, options: Options): Host {
     },
     fs: {
       read: (path) => $.fs.read(path),
+      readBytes: (path) => $.fs.read(path, { as: "bytes" }),
       write: (path, text) => $.fs.write(path, text),
       stat: (path, options) => $.fs.stat(path, options),
       list: (path) => $.fs.list(path),

@@ -43,3 +43,14 @@ capped at 2000 characters, `verified_by` at 200, `plan_sha256` 64 hex characters
 the notepad tree under `.omca/notepads/`. Read `resolveBoundPlan` in
 `src/core/boulder.ts` for the resolution ladder rather than hand-parsing `boulder.json`
 anywhere else.
+
+Each durable file has one reader: `parseRegistry` in `src/core/boulder.ts` and `readLedger` in
+`src/core/evidence.ts`. Both refuse text that is not JSON, not an object, or whose `version` key
+is present and not `1`; a file without `version` reads as version 1. Writers (`boulder_write`,
+`evidence_log`, ledger rotation and its archives) stamp `"version": 1` as the first key and
+throw an error naming the file when the reader refuses it, so a corrupt registry or ledger is
+never replaced. A reader that is not a writer (`gcRegistry`, `unbindBoundSessions`,
+`boulder_progress`, the Stop gates, the mod) treats a refused registry as empty. The ledger reader
+returns the well-formed entries and skips the others, so one malformed entry does not hide the
+rest. `boulder_write` also refuses a `plan_name` that `isPlanName` in `src/core/notepad.ts`
+rejects, the rule `notepad_write` applies.

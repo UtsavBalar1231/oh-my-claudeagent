@@ -11,6 +11,8 @@ export const LEDGER = `${ROOT}/.omca/evidence/verification-evidence.json`;
 export const BOULDER = `${ROOT}/.omca/state/boulder.json`;
 const OUTPUT_STYLE = "---\nname: OMCA Default\nkeep-coding-instructions: true\nforce-for-plugin: true\n---\n\n# oh-my-claudeagent\n";
 
+const bytesValue = (text: string) => ({ base64: btoa(String.fromCharCode(...new TextEncoder().encode(text))) });
+
 // Where the session runs: the platform's path shape and the environment that names its home.
 // `root` and `home` are spelled as the engine reports them; the other paths are normalized, the way the mod writes them.
 export type Layout = {
@@ -127,7 +129,8 @@ export function world(
     w.reads.push(spelled(e.path));
     await w.holds.get(key(e.path));
     const file = w.files.get(key(e.path));
-    return file === undefined ? { deny: `ENOENT: no such file, ${spelled(e.path)}` } : { value: file.text };
+    if (file === undefined) return { deny: `ENOENT: no such file, ${spelled(e.path)}` };
+    return { value: e.as === "bytes" ? bytesValue(file.text) : file.text };
   });
   on("fs.exists", (_$, e) => {
     w.reads.push(spelled(e.path));

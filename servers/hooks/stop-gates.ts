@@ -2,8 +2,9 @@ import { createHash } from "node:crypto";
 import { readFileSync, statSync } from "node:fs";
 import { open } from "node:fs/promises";
 import { join } from "node:path";
-import { checkboxStates, planIsComplete } from "../../src/core/checkboxes.ts";
+import { planIsComplete, planTasks } from "../../src/core/checkboxes.ts";
 import { addedLines, type Candidate, hasCompletionClaim, hasStubMarker, isStubFinding } from "../../src/core/drift.ts";
+import { entriesOf, readLedger } from "../../src/core/evidence.ts";
 import { isHookDisabled } from "../../src/core/kill-switch.ts";
 import { hasPassingFinalVerification } from "../../src/core/next-actions.ts";
 import { FRESH_BACKOFF, spendBlock, type StopGate, stepBackoff } from "../../src/core/stop-ledger.ts";
@@ -14,7 +15,7 @@ import type { Session } from "./session-state.ts";
 import { ledgerMtimeSeconds, ledgerPath, readBoundPlan, readRegistry, type RegistryRead, registryPath, seconds } from "./status-file.ts";
 
 type Json = Readonly<Record<string, unknown>>;
-type Parsed = { kind: "absent" } | { kind: "corrupt" } | { kind: "unreadable"; code: string } | { kind: "ok"; data: unknown };
+type LedgerFile = { kind: "absent" } | { kind: "corrupt" } | { kind: "unreadable"; code: string } | { kind: "ok"; document: Record<string, unknown> };
 type Plan = { name: string; path: string; boundAt: unknown; bytes: Buffer; content: string };
 type Turn = { payload: Payload; context: Context; registry: RegistryRead; transcript: () => Promise<(Json | undefined)[]> };
 type Gate = (turn: Turn) => Promise<string | undefined>;
@@ -35,13 +36,12 @@ const TERMINAL_TASK_STATUS = /^(completed?|failed|error|killed|cancell?ed|timed?
 const PAUSE_REQUEST =
   /(?:^|[.!?,;]\s*)(?:(?:ok(?:ay)?|please|lets|can we|we can|you can|well)\s+)*(?:pause(?: here| now| for now)?|stop(?: here| now| for now)|thats enough(?: for now| for today)?|hold off(?: for now)?|take a break|(?:continue|resume|pick (?:this|it) up|finish (?:this|it|the rest)) (?:later|tomorrow)|later)(?: for now)?(?:\s+(?:please|thanks))?\s*(?=[.!?,;]|$)/m;
 const BLOCKING_QUESTIONS = /^[^\S\n]*#{1,6}[^\S\n]*BLOCKING QUESTIONS/im;
-const NEXT_TASK = /^- \[ \] \d+\.[^\S\n]*(.*)$/m;
 const GIT_DIFF = ["-c", "diff.mnemonicPrefix=false", "-c", "diff.noprefix=false", "-c", "core.quotePath=false", "diff", "--no-ext-diff", "HEAD"];
 
 const withoutTrailingNewlines = (value: string): string => value.replace(/\n+$/, "");
 const nonEmptyLines = (value: string): string[] => value.split("\n").filter(Boolean);
 
-function parseFile(path: string, isCorrupt: (data: unknown) => boolean): Parsed {
+function readLedgerFile(path: string): LedgerFile {
   let raw: string;
   try {
     raw = readFileSync(path, "utf8");
@@ -49,12 +49,8 @@ function parseFile(path: string, isCorrupt: (data: unknown) => boolean): Parsed 
     if (isMissing(error)) return { kind: "absent" };
     return { kind: "unreadable", code: errorCode(error) ?? String(error) };
   }
-  try {
-    const data: unknown = JSON.parse(raw);
-    return isCorrupt(data) ? { kind: "corrupt" } : { kind: "ok", data };
-  } catch {
-    return { kind: "corrupt" };
-  }
+  const read = readLedger(raw);
+  return read.kind === "ok" && entriesOf(read.document) !== undefined ? { kind: "ok", document: read.document } : { kind: "corrupt" };
 }
 
 function boundPlan({ registry, payload, context }: Turn): Plan | undefined {
@@ -176,10 +172,11 @@ const planContinuation: Gate = async (turn) => {
   if (registry.kind === "corrupt" || registry.kind === "unreadable") {
     if (!spend(session, "plan-continuation")) return undefined;
     const problem = registry.kind === "corrupt" ? "is not valid JSON" : `cannot be read (${registry.code})`;
-    return `[PLAN CONTINUATION] ${registryPath(root)} ${problem}, so this session's plan state cannot be resolved and plan-scoped enforcement is off. Repair or delete the file (boulder_write rewrites it), then stop again. Set OMCA_DISABLED_HOOKS=plan-continuation to bypass.`;
+    return `[PLAN CONTINUATION] ${registryPath(root)} ${problem}, so this session's plan state cannot be resolved and plan-scoped enforcement is off. Repair or delete the file, then stop again. Set OMCA_DISABLED_HOOKS=plan-continuation to bypass.`;
   }
   const plan = boundPlan(turn);
-  const unchecked = plan === undefined ? 0 : checkboxStates(plan.content).filter((state) => state === " ").length;
+  const open = plan === undefined ? [] : planTasks(plan.content).filter((task) => !task.checked);
+  const unchecked = open.length;
   if (plan === undefined || unchecked === 0) {
     settlePlan(session);
     return undefined;
@@ -199,7 +196,7 @@ const planContinuation: Gate = async (turn) => {
   if (step.isWindowReset) refund(session, "plan-continuation");
   session.planBackoff = { plan: plan.name, backoff: step.state };
   if (!step.isBlocking || !spend(session, "plan-continuation")) return undefined;
-  const next = NEXT_TASK.exec(plan.content)?.[1] ?? "";
+  const next = open[0]?.label ?? "";
   return `[PLAN CONTINUATION] The bound plan '${plan.name}' still has ${unchecked} unchecked ${unchecked === 1 ? "task" : "tasks"} (next: ${next}). Continue with the next task. If its work is already done and reviewed, flip its checkbox. If it cannot proceed without the user, record why with notepad_write and ask the user; a turn that asks the user is not blocked.`;
 };
 
@@ -212,7 +209,7 @@ const finalVerification: Gate = async (turn) => {
   }
   const plan = boundPlan(turn);
   if (plan === undefined || !planIsComplete(plan.content)) return undefined;
-  const ledger = parseFile(ledgerPath(root), (data) => !Array.isArray(field(data, "entries")));
+  const ledger = readLedgerFile(ledgerPath(root));
   if (ledger.kind === "corrupt") {
     return spend(session, "final-verification") ? `[FINAL VERIFICATION] Evidence file corrupt. Repair ${ledgerPath(root)} before stopping.` : undefined;
   }
@@ -220,7 +217,7 @@ const finalVerification: Gate = async (turn) => {
     return spend(session, "final-verification") ? `[FINAL VERIFICATION] Evidence file unreadable (${ledger.code}). Fix ${ledgerPath(root)} before stopping.` : undefined;
   }
   const sha256 = createHash("sha256").update(plan.bytes).digest("hex");
-  if (ledger.kind === "ok" && hasPassingFinalVerification(ledger.data, sha256)) {
+  if (ledger.kind === "ok" && hasPassingFinalVerification(ledger.document, sha256)) {
     refund(session, "final-verification");
     return undefined;
   }

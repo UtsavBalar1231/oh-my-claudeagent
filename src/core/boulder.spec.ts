@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { asRegistry, resolveBoundPlan } from "./boulder.ts";
+import { asRegistry, parseRegistry, resolveBoundPlan } from "./boulder.ts";
 
 const FIXTURES = join(import.meta.dir, "../../tests/fixtures/boulder-schemas");
 
@@ -191,5 +191,33 @@ describe("asRegistry", () => {
 
   test("the half-written fixture reads as an empty registry via the reader fallback", () => {
     expect(asRegistry(readOrEmpty("half-written"))).toEqual({ plans: {}, bindings: {} });
+  });
+});
+
+describe("parseRegistry", () => {
+  test("a registry fixture parses to its plans and bindings", () => {
+    const registry = fixture("two-plan");
+    expect(parseRegistry(rawFixture("two-plan"))).toMatchObject({ kind: "ok", registry: { plans: registry["plans"], bindings: registry["bindings"] } });
+  });
+
+  test.each([
+    ["an empty object", "{}"],
+    ["a file stamped version 1", '{"version":1,"plans":{},"bindings":{}}'],
+    ["an object with neither plans nor bindings", '{"active_plan":"/p/x.md"}'],
+  ])("%s parses to a registry", (_label, text) => {
+    expect(parseRegistry(text)).toMatchObject({ kind: "ok" });
+  });
+
+  test.each([
+    ["the half-written fixture", rawFixture("half-written"), "unparseable"],
+    ["null", "null", "shape"],
+    ["an array", "[]", "shape"],
+    ["a number", "7", "shape"],
+    ["plans that is not an object", '{"plans":[],"bindings":{}}', "shape"],
+    ["bindings that is not an object", '{"plans":{},"bindings":"x"}', "shape"],
+    ["version 2", '{"version":2,"plans":{},"bindings":{}}', "version"],
+    ["a string version", '{"version":"1"}', "version"],
+  ])("refuses %s", (_label, text, code) => {
+    expect(parseRegistry(text)).toMatchObject({ kind: "refused", code });
   });
 });

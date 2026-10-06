@@ -33,6 +33,12 @@ test("compaction instructions name the bound plan and its open tasks", async ($,
   ]);
 });
 
+test("a long open task is listed with its label capped at 80 code points", async ($, on) => {
+  const seen = engine(on, { [BOULDER]: registry(SESSION), [PLAN]: `- [ ] 1. ${"c".repeat(100)}\n` });
+  await $.session.compact(manual());
+  expect((seen[0]?.instructions ?? "").split("\n")[2]).toBe(`- 1. ${"c".repeat(79)}…`);
+});
+
 test("the instructions typed after /compact come first, and the plan follows", async ($, on) => {
   const seen = engine(on, { [BOULDER]: registry(SESSION), [PLAN]: tasks(2, 3) });
   await $.session.compact(manual({ instructions: "focus on the parser" }));

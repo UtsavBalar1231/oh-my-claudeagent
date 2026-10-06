@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { resolveBoundPlan } from "../src/core/boulder.ts";
-import { checkboxStates, nextTaskLabel } from "../src/core/checkboxes.ts";
+import { parseRegistry, resolveBoundPlan } from "../src/core/boulder.ts";
+import { planTasks } from "../src/core/checkboxes.ts";
 import { baseName, inferPlatform } from "../src/core/path.ts";
 import { AGENT_ICONS, cells, displayWidth, fitEnd, formatDuration, type GlyphTier, glyphTier } from "../src/core/ui-kit.ts";
 import type { GitInfo } from "./git.ts";
@@ -365,14 +365,14 @@ export interface PlanProgress {
 
 export function readPlan(projectDir: string, sessionId: string): PlanProgress | null {
   try {
-    const boulder = JSON.parse(readFileSync(join(projectDir, ".omca", "state", "boulder.json"), "utf8"));
-    const planPath = resolveBoundPlan(boulder, sessionId, true)?.active_plan;
+    const parsed = parseRegistry(readFileSync(join(projectDir, ".omca", "state", "boulder.json"), "utf8"));
+    const planPath = parsed.kind === "ok" ? resolveBoundPlan(parsed.registry, sessionId, true)?.active_plan : undefined;
     if (!planPath) return null;
     const plan = readFileSync(planPath, "utf8");
-    const states = checkboxStates(plan);
-    const done = states.filter((state) => state === "x").length;
-    if (states.length === 0 || done === states.length) return null;
-    return { done, total: states.length, label: nextTaskLabel(plan) || null };
+    const tasks = planTasks(plan);
+    const done = tasks.filter((task) => task.checked).length;
+    if (tasks.length === 0 || done === tasks.length) return null;
+    return { done, total: tasks.length, label: tasks.find((task) => !task.checked)?.label || null };
   } catch {
     return null;
   }
