@@ -19,16 +19,16 @@ Generate hierarchical AGENTS.md files. Root + complexity-scored subdirectories.
 
 ## Workflow
 
-1. **Discovery + Analysis** (concurrent): explore agents, bash structure, codemap, existing AGENTS.md
+1. **Discovery + Analysis** (concurrent): explorer agents, bash structure, codemap, existing AGENTS.md
 2. **Score & Decide**: AGENTS.md locations from merged findings
 3. **Generate**: root first, subdirs in parallel
 4. **Review**: deduplicate, trim, validate
 
 ## Phase 1: discovery + analysis (concurrent)
 
-### Background explore agents
+### Background explorer agents
 
-Each explore agent re-reads the repository from scratch and hands back a report you then read, so delegate only the tracks the Bash pass below cannot answer in a few reads: none for a small repository, and at most five in total for a large one. Launch the ones you choose in a single message so they run concurrently, and brief each with its directory scope and what to report. Candidate tracks:
+Each explorer agent re-reads the repository from scratch and hands back a report you then read, so delegate only the tracks the Bash pass below cannot answer in a few reads: none for a small repository, and at most five in total for a large one. Launch the ones you choose in a single message so they run concurrently, and brief each with its directory scope and what to report. Candidate tracks:
 
 - Entry points and non-standard organization
 - Config files (.eslintrc, pyproject.toml, .editorconfig) and the project-specific rules they encode
@@ -38,7 +38,7 @@ Each explore agent re-reads the repository from scratch and hands back a report 
 
 ### Background agent barrier
 
-Merge the explore findings only after every agent has reported. Until then, carry on with the main-session analysis below, which does not overlap theirs; when it is done and agents are still running, end the turn once instead of answering each notification with a holding message.
+Merge the explorer findings only after every agent has reported. Until then, carry on with the main-session analysis below, which does not overlap theirs; when it is done and agents are still running, end the turn once instead of answering each notification with a holding message.
 
 ### Main session (concurrent with agents)
 
@@ -56,7 +56,7 @@ Extract key insights, conventions, anti-patterns. `--create-new`: read first (pr
 
 #### 3. LSP codemap (if available)
 
-If the `LSP` tool is active (it needs a code-intelligence plugin for the language), use it to list the symbols in entry-point files, search symbols across the workspace, and find references into heavily used modules. Otherwise rely on the explore agents and the Bash pass.
+If the `LSP` tool is active (it needs a code-intelligence plugin for the language), use it to list the symbols in entry-point files, search symbols across the workspace, and find references into heavily used modules. Otherwise rely on the explorer agents and the Bash pass.
 
 ## Phase 2: scoring & location decision
 

@@ -72,8 +72,8 @@ describe("SubagentHandback carries the report", () => {
 
   test("empty-task-response: a short report whose later line starts like a transition is not poor", async () => {
     const report = "FILES: a.ts\nANSWER: the guard lives in a.ts\nNEXT STEPS: read b.ts";
-    expect(await handback(report, "oh-my-claudeagent:explore")).toEqual({});
-    expect(await handback(`Next, ${report}`, "oh-my-claudeagent:explore")).toEqual(OWN);
+    expect(await handback(report, "oh-my-claudeagent:explorer")).toEqual({});
+    expect(await handback(`Next, ${report}`, "oh-my-claudeagent:explorer")).toEqual(OWN);
   });
 
   test("empty-task-response: a transitional phrase inside a long report is not poor", async () => {
@@ -103,17 +103,17 @@ describe("SubagentHandback carries the report", () => {
     expect(await handback(`status: done\nChanges: none\n${"Detail. ".repeat(8)}`)).toEqual(OWN);
   });
 
-  test("empty-task-response: oracle hand-back with its own sections is silent", async () => {
-    expect(await handback("RECOMMENDATION: use strategy A\nALTERNATIVES: strategy B, C\nRISKS: low overhead", "oh-my-claudeagent:oracle")).toEqual({});
+  test("empty-task-response: architect hand-back with its own sections is silent", async () => {
+    expect(await handback("RECOMMENDATION: use strategy A\nALTERNATIVES: strategy B, C\nRISKS: low overhead", "oh-my-claudeagent:architect")).toEqual({});
   });
 
-  test("empty-task-response: explore needs NEXT STEPS: as one header, not NEXT and STEPS: apart", async () => {
+  test("empty-task-response: explorer needs NEXT STEPS: as one header, not NEXT and STEPS: apart", async () => {
     const report = `FILES: a.ts\nANSWER: the guard lives in a.ts\nSTEPS: none, NEXT: read b.ts ${"Detail. ".repeat(20)}`;
-    expect(await handback(report, "oh-my-claudeagent:explore")).toEqual(OWN);
+    expect(await handback(report, "oh-my-claudeagent:explorer")).toEqual(OWN);
   });
 
-  test("empty-task-response: librarian sections are checked and an unknown agent type has none", async () => {
-    expect(await handback(UNSTRUCTURED, "oh-my-claudeagent:librarian")).toEqual(OWN);
+  test("empty-task-response: researcher sections are checked and an unknown agent type has none", async () => {
+    expect(await handback(UNSTRUCTURED, "oh-my-claudeagent:researcher")).toEqual(OWN);
     expect(await handback(UNSTRUCTURED, "general-purpose")).toEqual({});
   });
 });
@@ -135,7 +135,7 @@ describe("a report whose lines start with a bracket", () => {
 
   test("empty-task-response: a bracketed first line is one harness note whatever the later lines hold", async () => {
     const report = "[FILES: src/a.ts, src/b.ts]\nANSWER: the guard lives in src/b.ts and the parser in src/a.ts\nNEXT STEPS: none";
-    expect(await handback(report, "oh-my-claudeagent:explore")).toEqual(OWN);
+    expect(await handback(report, "oh-my-claudeagent:explorer")).toEqual(OWN);
   });
 });
 
@@ -162,11 +162,11 @@ describe("a completed Agent result carries the report in content[].text", () => 
 
 describe("a hand-back payload with no agent id", () => {
   test("empty-task-response: warns with the poor-output advice when the output is empty", async () => {
-    expect(await check({ tool_name: "SubagentHandback", agent_type: "explore", tool_input: { message: "" } })).toEqual(POOR);
+    expect(await check({ tool_name: "SubagentHandback", agent_type: "explorer", tool_input: { message: "" } })).toEqual(POOR);
   });
 
   test("empty-task-response: warns with the poor-output advice when the output is very short", async () => {
-    expect(await check({ tool_name: "SubagentHandback", agent_type: "explore", tool_input: { message: "ok" } })).toEqual(POOR);
+    expect(await check({ tool_name: "SubagentHandback", agent_type: "explorer", tool_input: { message: "ok" } })).toEqual(POOR);
   });
 });
 

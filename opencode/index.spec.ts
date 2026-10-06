@@ -122,17 +122,17 @@ const modelErrors = () =>
 test("a valid sonnet model ref sets the agent model", async () => {
   const fake = fakeContext({ models: { sonnet: "anthropic/claude-sonnet-5-5" } })
   await plugin.setup(fake.ctx)
-  expect(fake.agents.get("omca-explore")?.model).toEqual({ providerID: "anthropic", id: "claude-sonnet-5-5" })
-  expect(fake.agents.get("omca-explore")?.mode).toBe("subagent")
-  expect(fake.agents.get("omca-explore")?.permissions).toContainEqual({ action: "edit", resource: "*", effect: "deny" })
+  expect(fake.agents.get("omca-explorer")?.model).toEqual({ providerID: "anthropic", id: "claude-sonnet-5-5" })
+  expect(fake.agents.get("omca-explorer")?.mode).toBe("subagent")
+  expect(fake.agents.get("omca-explorer")?.permissions).toContainEqual({ action: "edit", resource: "*", effect: "deny" })
   expect(modelErrors()).toHaveLength(0)
 })
 
 test("an invalid model ref is ignored with exactly one error line", async () => {
   const fake = fakeContext({ models: { sonnet: "bad" } })
   await plugin.setup(fake.ctx)
-  expect(fake.agents.get("omca-explore")).toBeDefined()
-  expect(fake.agents.get("omca-explore")?.model).toBeUndefined()
+  expect(fake.agents.get("omca-explorer")).toBeDefined()
+  expect(fake.agents.get("omca-explorer")?.model).toBeUndefined()
   expect(modelErrors()).toHaveLength(1)
 })
 
@@ -149,10 +149,10 @@ test("skills carry an absolute path and no relPath", async () => {
 test("a command prompts the session with its template and arguments", async () => {
   const fake = fakeContext()
   await plugin.setup(fake.ctx)
-  await command(fake, "omca-momus").execute({ sessionID: "ses_1", prompt: { text: "p.md" }, delivery: "queue" })
+  await command(fake, "omca-reviewer").execute({ sessionID: "ses_1", prompt: { text: "p.md" }, delivery: "queue" })
   expect(fake.prompts).toHaveLength(1)
   expect(fake.prompts[0]).toMatchObject({ sessionID: "ses_1", delivery: "queue" })
-  expect(String(fake.prompts[0]?.text)).toContain("omca-momus")
+  expect(String(fake.prompts[0]?.text)).toContain("omca-reviewer")
   expect(String(fake.prompts[0]?.text)).toContain("p.md")
 })
 
@@ -160,12 +160,12 @@ test("a command keeps its attachments and drops mention offsets into the replace
   const fake = fakeContext()
   await plugin.setup(fake.ctx)
   const mention = { start: 0, end: 5, text: "@p.md" }
-  await command(fake, "omca-momus").execute({
+  await command(fake, "omca-reviewer").execute({
     sessionID: "ses_1",
-    prompt: { text: "@p.md", files: [{ uri: "file:///p.md", name: "p.md", mention }], agents: [{ name: "omca-explore", mention }], skills: [{ id: "omca-debugging" }] },
+    prompt: { text: "@p.md", files: [{ uri: "file:///p.md", name: "p.md", mention }], agents: [{ name: "omca-explorer", mention }], skills: [{ id: "omca-debugging" }] },
     delivery: "queue",
   })
-  expect(fake.prompts[0]).toMatchObject({ files: [{ uri: "file:///p.md", name: "p.md" }], agents: [{ name: "omca-explore" }], skills: [{ id: "omca-debugging" }] })
+  expect(fake.prompts[0]).toMatchObject({ files: [{ uri: "file:///p.md", name: "p.md" }], agents: [{ name: "omca-explorer" }], skills: [{ id: "omca-debugging" }] })
   expect(JSON.stringify(fake.prompts[0])).not.toContain('"mention"')
 })
 
@@ -177,7 +177,7 @@ test("the context hook pushes the output style only for a primary agent and hide
   expect(primary.system).toHaveLength(1)
   expect(primary.system[0]).toMatchObject({ type: "text" })
   expect(Object.keys(primary.tools)).toEqual(["omca_evidence_log"])
-  const sub = await fire("omca-explore")
+  const sub = await fire("omca-explorer")
   expect(sub.system).toHaveLength(0)
   expect(sub.tools).not.toHaveProperty("omca_session_search")
 })
@@ -187,14 +187,14 @@ test("the context hook looks up an agent's mode once and never for omca subagent
   await plugin.setup(fake.ctx)
   await fireContext(fake, "build")
   await fireContext(fake, "build")
-  await fireContext(fake, "omca-explore")
+  await fireContext(fake, "omca-explorer")
   expect(fake.gets).toEqual(["build"])
 })
 
 test("command arguments are substituted literally", async () => {
   const fake = fakeContext()
   await plugin.setup(fake.ctx)
-  await command(fake, "omca-momus").execute({ sessionID: "ses_1", prompt: { text: "p.md $& $$" }, delivery: "queue" })
+  await command(fake, "omca-reviewer").execute({ sessionID: "ses_1", prompt: { text: "p.md $& $$" }, delivery: "queue" })
   expect(String(fake.prompts[0]?.text)).toContain("p.md $& $$")
 })
 

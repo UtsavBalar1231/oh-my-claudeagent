@@ -22,7 +22,7 @@ const FORBIDDEN: (string | RegExp)[] = [
   /\b[a-z]+ Read\b(?!-)/, /\| (Read|Write|Edit) \|/, /\bRead\(/,
 ];
 
-const TARGETS = "(explore|oracle|librarian|executor|hephaestus|metis|momus)";
+const TARGETS = "(explorer|architect|researcher|executor|build-fixer|analyzer|reviewer)";
 const BARE_TARGET = new RegExp(
   `(\\b(spawn(ing)?|consult(ing)?|launch|recommend)\\s+(the\\s+)?|→\\s*|\\[\\s*)\`?${TARGETS}\\b(?!-)` +
     `|\\bgo to\\s+${TARGETS}\\b(?!-)|\\bwith\\s+${TARGETS}\\b(?![-\\w]|\\s+[a-z])|\\(${TARGETS}\\)|(?<!-)\\b${TARGETS} re-analysis`,
@@ -76,13 +76,13 @@ describe("generated prompts", () => {
   });
 
   test("agent fields", () => {
-    const explore = agent("omca-explore");
+    const explore = agent("omca-explorer");
     expect("steps" in explore).toBe(false);
     expect(explore.deny).toEqual(["edit", "subagent"]);
     expect(explore.color).toBe("#3b82f6");
     expect(explore.tier).toBe("sonnet");
-    expect(agent("omca-multimodal-looker").tier).toBe("opus");
-    expect(agent("omca-oracle").tier).toBe("fable");
+    expect(agent("omca-viewer").tier).toBe("opus");
+    expect(agent("omca-architect").tier).toBe("fable");
   });
 
   test("skill fields", () => {
@@ -107,10 +107,10 @@ test("heading detection toggles on every fence line", () => {
 });
 
 test("BARE_TARGET catches noun-position agent names but not the verb explore", () => {
-  for (const s of ["those go to hephaestus", "Boundary with hephaestus", "architecture (oracle)", "running metis re-analysis"]) {
+  for (const s of ["those go to build-fixer", "Boundary with build-fixer", "architecture (architect)", "running analyzer re-analysis"]) {
     expect(BARE_TARGET.test(s), s).toBe(true);
   }
-  for (const s of ["explore patterns first", "with omca-hephaestus", "(omca-oracle)", "go to explore-heavy work", "omca-metis re-analysis", "with executor acknowledgment"]) {
+  for (const s of ["explore patterns first", "with omca-build-fixer", "(omca-architect)", "go to explore-heavy work", "omca-analyzer re-analysis", "with executor acknowledgment"]) {
     expect(BARE_TARGET.test(s), s).toBe(false);
   }
 });

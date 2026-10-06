@@ -1,7 +1,7 @@
 {
   "session_id": "6f1c2a7e-3b9d-4c51-9a0e-2d4b8f7c1e01",
   "agent_id": "a7d2c9e05f1b4c63",
-  "agent_type": "oh-my-claudeagent:oracle",
+  "agent_type": "oh-my-claudeagent:architect",
   "model": "claude-fable-5-1",
   "effort": "xhigh",
   "started_at": "2026-10-01T09:20:30.000Z",

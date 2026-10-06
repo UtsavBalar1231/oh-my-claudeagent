@@ -64,7 +64,7 @@ const EDITING_GUIDANCE =
   "\n[VERIFICATION] Record each build, test, or lint run with evidence_log, including its real exit code. Write .omca/evidence/verification-evidence.json only through that tool, never by hand or through a shell redirect: the Stop and TaskCompleted gates read it as the audit trail." +
   "\n[PLAN SHA] When logging a final_verification entry, take plan_sha256 from boulder_progress for the active plan and pass it as evidence_log(..., plan_sha256=<plan_sha256>) so the Stop gate scopes evidence to this plan run.";
 const ORCHESTRATING_GUIDANCE =
-  "\n[ANTI-DUPLICATION] Once you delegate exploration to explore/librarian agents, do not perform the same search yourself. Avoid after delegating: manually grep/searching for the same information; re-doing research agents are handling; 'just quickly checking' the same files. Continue only with non-overlapping work. A background agent, the default in interactive sessions, answers the Agent call with a launch acknowledgement only, and its report arrives later in a task notification. Do not poll its output file or post holding messages while it runs." +
+  "\n[ANTI-DUPLICATION] Once you delegate exploration to explorer/researcher agents, do not perform the same search yourself. Avoid after delegating: manually grep/searching for the same information; re-doing research agents are handling; 'just quickly checking' the same files. Continue only with non-overlapping work. A background agent, the default in interactive sessions, answers the Agent call with a launch acknowledgement only, and its report arrives later in a task notification. Do not poll its output file or post holding messages while it runs." +
   "\n[TEAM CONTRACT] OMCA agents are thin wrappers over Claude-native subagents and agent teams. Use subagents when workers only need to report back. Use native agent teams when workers need the shared task list or direct teammate messaging.";
 const WORKER_CONTRACT =
   "\n[YOU ARE A LEAF WORKER] Do this task yourself: do not delegate to other agents or wait on them. Guidance about waiting for background agents or ending a turn while agents run, whether it reaches you from memory, CLAUDE.md, or the output style, is for the orchestrator and does not apply to you." +
@@ -80,7 +80,7 @@ const planBlock = (file: string, name: string) =>
 
 describe("the injected context, exactly", () => {
   test("a read-only worker gets the protocol, date, mandate, file tools and worker contract", async () => {
-    expect(await contextOf(omca("explore"))).toBe(AUTONOMOUS_PROTOCOL + COMMON + WORKER_CONTRACT);
+    expect(await contextOf(omca("explorer"))).toBe(AUTONOMOUS_PROTOCOL + COMMON + WORKER_CONTRACT);
   });
 
   test("an editing worker also gets the editing guidance before the worker contract", async () => {
@@ -88,25 +88,25 @@ describe("the injected context, exactly", () => {
   });
 
   test("no agent gets the cleanup-pass, minimal-code, date or ruler lines, whose home is the agent file or the platform", async () => {
-    for (const type of ["executor", "hephaestus", "sisyphus", "explore"]) {
+    for (const type of ["executor", "build-fixer", "orchestrator", "explorer"]) {
       const context = await contextOf(omca(type));
       for (const removed of ["[CLEANUP PASS]", "[MINIMAL CODE]", "[CURRENT DATE]", "───"]) expect(context).not.toContain(removed);
     }
   });
 
-  test("sisyphus gets the planner protocol, editing and orchestrating guidance, and no worker contract", async () => {
-    expect(await contextOf(omca("sisyphus"))).toBe(PLANNER_PROTOCOL + COMMON + EDITING_GUIDANCE + ORCHESTRATING_GUIDANCE);
+  test("orchestrator gets the planner protocol, editing and orchestrating guidance, and no worker contract", async () => {
+    expect(await contextOf(omca("orchestrator"))).toBe(PLANNER_PROTOCOL + COMMON + EDITING_GUIDANCE + ORCHESTRATING_GUIDANCE);
   });
 
-  test("prometheus gets only the orchestrating guidance", async () => {
-    expect(await contextOf(omca("prometheus"))).toBe(PLANNER_PROTOCOL + COMMON + ORCHESTRATING_GUIDANCE);
+  test("planner gets only the orchestrating guidance", async () => {
+    expect(await contextOf(omca("planner"))).toBe(PLANNER_PROTOCOL + COMMON + ORCHESTRATING_GUIDANCE);
   });
 
   test("a bound plan's lines sit between the file tools line and the worker contract", async () => {
     const root = project();
     const file = planFile(root);
     writeBoulder(root, registry({ "my-plan": file }, { [SESSION]: "my-plan" }));
-    expect(await contextOf(omca("explore"), root)).toBe(AUTONOMOUS_PROTOCOL + COMMON + planBlock(file, "my-plan") + WORKER_CONTRACT);
+    expect(await contextOf(omca("explorer"), root)).toBe(AUTONOMOUS_PROTOCOL + COMMON + planBlock(file, "my-plan") + WORKER_CONTRACT);
   });
 
   test("an agent type that is absent is treated as an unlisted worker", async () => {
@@ -115,18 +115,31 @@ describe("the injected context, exactly", () => {
 
   test("a disabled subagent-context injects nothing", async () => {
     process.env.OMCA_DISABLED_HOOKS = "subagent-context";
-    expect(await dispatch({ event: "SubagentStart", session_id: SESSION, agent_type: omca("explore") }, project(), NOW)).toEqual({});
+    expect(await dispatch({ event: "SubagentStart", session_id: SESSION, agent_type: omca("explorer") }, project(), NOW)).toEqual({});
+  });
+});
+
+describe("role lookup", () => {
+  test("a bare name and the OMCA-prefixed name get the same role, and another prefix gets none", async () => {
+    const planner = PLANNER_PROTOCOL + COMMON + ORCHESTRATING_GUIDANCE;
+    expect(await contextOf("planner")).toBe(planner);
+    expect(await contextOf(omca("planner"))).toBe(planner);
+    expect(await contextOf("other:planner")).toBe(AUTONOMOUS_PROTOCOL + COMMON + WORKER_CONTRACT);
+  });
+
+  test("a role is matched by exact name, never by substring", async () => {
+    expect(await contextOf(omca("planner-lite"))).toBe(AUTONOMOUS_PROTOCOL + COMMON + WORKER_CONTRACT);
   });
 });
 
 describe("plan context", () => {
   test("no boulder.json: plan context (READ-ONLY) is absent", async () => {
-    expect(await contextOf(omca("explore"))).not.toContain("READ-ONLY");
+    expect(await contextOf(omca("explorer"))).not.toContain("READ-ONLY");
   });
 
   test("a plan file that is missing drops the plan lines and keeps the notepad line", async () => {
     const root = project(registry({ "ghost-plan": "/tmp/nonexistent-plan-12345.md" }, { [SESSION]: "ghost-plan" }));
-    const context = await contextOf(omca("explore"), root);
+    const context = await contextOf(omca("explorer"), root);
     expect(context).not.toContain("[ACTIVE PLAN]");
     expect(context).toContain("[NOTEPAD AVAILABLE]");
   });
@@ -134,7 +147,7 @@ describe("plan context", () => {
   test("blocking questions: notepad sections list excludes questions", async () => {
     const root = project();
     writeBoulder(root, registry({ "my-plan": planFile(root) }, { [SESSION]: "my-plan" }));
-    const context = await contextOf(omca("explore"), root);
+    const context = await contextOf(omca("explorer"), root);
     expect(context).toContain("learnings, issues, decisions, problems");
     expect(context).not.toContain("learnings, issues, decisions, problems, questions");
   });
@@ -144,7 +157,7 @@ describe("plan context", () => {
     const planA = planFile(root, "plan-a.md");
     const planB = planFile(root, "plan-b.md");
     writeBoulder(root, registry({ "plan-a": planA, "plan-b": planB }, { [SESSION]: "plan-a" }));
-    const context = await contextOf(omca("explore"), root);
+    const context = await contextOf(omca("explorer"), root);
     expect(context).toContain(`[ACTIVE PLAN] Refer to: ${planA}`);
     expect(context).not.toContain(planB);
   });
@@ -152,7 +165,7 @@ describe("plan context", () => {
   test("plan resolution: no binding + single registered plan injects no plan context", async () => {
     const root = project();
     writeBoulder(root, registry({ "plan-a": planFile(root, "plan-a.md") }));
-    const context = await contextOf(omca("explore"), root);
+    const context = await contextOf(omca("explorer"), root);
     expect(context).not.toContain("[ACTIVE PLAN]");
     expect(context).not.toContain("[NOTEPAD AVAILABLE]");
   });
@@ -162,14 +175,14 @@ describe("plan context", () => {
     const planA = planFile(root, "plan-a.md");
     const planB = planFile(root, "plan-b.md");
     writeBoulder(root, registry({ "plan-a": planA, "plan-b": planB }));
-    const context = await contextOf(omca("explore"), root);
+    const context = await contextOf(omca("explorer"), root);
     expect(context).not.toContain("[ACTIVE PLAN]");
     expect(context).not.toContain(planA);
     expect(context).not.toContain(planB);
   });
 
   test("plan resolution: empty registry injects no plan context", async () => {
-    const context = await contextOf(omca("explore"), project({ plans: {}, bindings: {} }));
+    const context = await contextOf(omca("explorer"), project({ plans: {}, bindings: {} }));
     expect(context).not.toContain("[ACTIVE PLAN]");
     expect(context).not.toContain("[NOTEPAD AVAILABLE]");
   });
@@ -177,7 +190,7 @@ describe("plan context", () => {
   test("an unparseable registry logs the failure and leaves the rest of the context", async () => {
     const error = spyOn(console, "error").mockImplementation(() => undefined);
     try {
-      expect(await contextOf(omca("explore"), project("{not json"))).toBe(AUTONOMOUS_PROTOCOL + COMMON + WORKER_CONTRACT);
+      expect(await contextOf(omca("explorer"), project("{not json"))).toBe(AUTONOMOUS_PROTOCOL + COMMON + WORKER_CONTRACT);
       expect(error).toHaveBeenCalledTimes(1);
     } finally {
       error.mockRestore();
@@ -186,24 +199,24 @@ describe("plan context", () => {
 });
 
 describe("guidance by role", () => {
-  test("counter-instruction: librarian agent receives worker counter-instruction", async () => {
-    expect(await contextOf(omca("librarian"))).toContain("[YOU ARE A LEAF WORKER]");
+  test("counter-instruction: researcher agent receives worker counter-instruction", async () => {
+    expect(await contextOf(omca("researcher"))).toContain("[YOU ARE A LEAF WORKER]");
   });
 
-  test("counter-instruction: hephaestus agent receives worker counter-instruction", async () => {
-    expect(await contextOf(omca("hephaestus"))).toContain("[YOU ARE A LEAF WORKER]");
+  test("counter-instruction: build-fixer agent receives worker counter-instruction", async () => {
+    expect(await contextOf(omca("build-fixer"))).toContain("[YOU ARE A LEAF WORKER]");
   });
 
-  test("counter-instruction: momus agent receives worker counter-instruction (advisors are workers)", async () => {
-    expect(await contextOf(omca("momus"))).toContain("[YOU ARE A LEAF WORKER]");
+  test("counter-instruction: reviewer agent receives worker counter-instruction (advisors are workers)", async () => {
+    expect(await contextOf(omca("reviewer"))).toContain("[YOU ARE A LEAF WORKER]");
   });
 
-  test("counter-instruction: oracle agent receives worker counter-instruction (advisors are workers)", async () => {
-    expect(await contextOf(omca("oracle"))).toContain("[YOU ARE A LEAF WORKER]");
+  test("counter-instruction: architect agent receives worker counter-instruction (advisors are workers)", async () => {
+    expect(await contextOf(omca("architect"))).toContain("[YOU ARE A LEAF WORKER]");
   });
 
-  test("counter-instruction: metis agent receives worker counter-instruction and no anti-duplication", async () => {
-    const context = await contextOf(omca("metis"));
+  test("counter-instruction: analyzer agent receives worker counter-instruction and no anti-duplication", async () => {
+    const context = await contextOf(omca("analyzer"));
     expect(context).toContain("[YOU ARE A LEAF WORKER]");
     expect(context).not.toContain("[ANTI-DUPLICATION]");
   });
@@ -212,7 +225,7 @@ describe("guidance by role", () => {
 
 describe("worker isolation", () => {
   const read = (path: string) => readFileSync(join(PLUGIN_ROOT, path), "utf8");
-  const workerDefs = ["executor", "explore", "librarian", "multimodal-looker", "oracle", "momus", "hephaestus"].map((name) => `agents/${name}.md`);
+  const workerDefs = ["executor", "explorer", "researcher", "viewer", "architect", "reviewer", "build-fixer"].map((name) => `agents/${name}.md`);
 
   test("worker isolation: no bare barrier imperative in worker-visible surfaces", () => {
     for (const path of [...workerDefs, "output-styles/omca-default.md", "templates/claudemd.md"]) {

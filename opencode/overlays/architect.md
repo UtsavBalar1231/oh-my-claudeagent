@@ -1,4 +1,4 @@
-<!-- Overlay for agents/oracle.md. Each section below replaces the section with the same heading in that file;
+<!-- Overlay for agents/architect.md. Each section below replaces the section with the same heading in that file;
      every section not listed here is taken from the source unchanged. -->
 
 ## Tool Strategy

@@ -115,7 +115,7 @@ function bind({ root, sessionId }: Stop, plan: string, { boundAt = NOW_S, owner 
   const path = join(root, "plan.md");
   writeFileSync(path, plan);
   const registry = {
-    plans: { "test-plan": { active_plan: path, started_at: "2026-01-01T00:00:00Z", session_ids: [owner], agent: "sisyphus" } },
+    plans: { "test-plan": { active_plan: path, started_at: "2026-01-01T00:00:00Z", session_ids: [owner] } },
     bindings: { [owner]: { plan_name: "test-plan", bound_at: boundAt } },
   };
   writeFileSync(join(root, ".omca", "state", "boulder.json"), JSON.stringify(registry));

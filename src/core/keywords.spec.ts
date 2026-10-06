@@ -10,26 +10,25 @@ describe("trigger phrases", () => {
     ["handoff", "let's start fresh session now"],
     ["omca-setup", "setup omca on this machine"],
     ["omca-setup", "omca setup please"],
-    ["metis", "run metis on the draft"],
-    ["metis", "metis analyze the plan"],
-    ["metis", "do some pre-plan work"],
-    ["plan", "run prometheus"],
-    ["plan", "prometheus plan the migration"],
+    ["analyzer", "run analyzer on the draft"],
+    ["analyzer", "analyze the plan"],
+    ["analyzer", "analyze plan"],
+    ["analyzer", "do some pre-plan work"],
+    ["plan", "run planner"],
     ["plan", "create plan for the auth rewrite"],
-    ["hephaestus", "run hephaestus"],
-    ["hephaestus", "hephaestus fix the types"],
-    ["hephaestus", "the build is failing, fix build please"],
-    ["hephaestus", "build broken again"],
+    ["build-fixer", "run build-fixer"],
+    ["build-fixer", "the build is failing, fix build please"],
+    ["build-fixer", "build broken again"],
   ])("%s fires on %p", (name, prompt) => {
     expect(modesOf(prompt)).toEqual([name]);
   });
 
   test("a phrase matches whatever case and whitespace the user typed", () => {
-    expect(modesOf("Fix\n  BUILD")).toEqual(["hephaestus"]);
+    expect(modesOf("Fix\n  BUILD")).toEqual(["build-fixer"]);
   });
 
   test("several modes in one prompt come back in table order", () => {
-    expect(modesOf("create plan, then fix build, then handoff")).toEqual(["handoff", "plan", "hephaestus"]);
+    expect(modesOf("create plan, then fix build, then handoff")).toEqual(["handoff", "plan", "build-fixer"]);
   });
 
   test("a prompt naming no phrase matches nothing", () => {
@@ -40,6 +39,11 @@ describe("trigger phrases", () => {
   test("a phrase split by other words is not the phrase", () => {
     expect(modesOf("fix the build")).toEqual([]);
     expect(modesOf("the plan to create a build")).toEqual([]);
+  });
+
+  test("a trigger word inside a longer word is not the phrase", () => {
+    expect(modesOf("analyze plant growth")).toEqual([]);
+    expect(modesOf("rerun analyzers")).toEqual([]);
   });
 });
 
@@ -65,11 +69,11 @@ describe("a mention is not a request", () => {
   });
 
   test("a quoted span never reaches across lines", () => {
-    expect(modesOf('he said "hello\nfix build please')).toEqual(["hephaestus"]);
+    expect(modesOf('he said "hello\nfix build please')).toEqual(["build-fixer"]);
   });
 
   test("single quotes do not cite a phrase", () => {
-    expect(modesOf("it's time to fix build, isn't it")).toEqual(["hephaestus"]);
+    expect(modesOf("it's time to fix build, isn't it")).toEqual(["build-fixer"]);
   });
 });
 
@@ -82,11 +86,11 @@ describe("text the user did not type", () => {
 
   test("a paste with CRLF line endings is still ignored", () => {
     expect(modesOf('look at this\r\n<pasted_content id="a1b2">\r\nerror: build broken\r\n</pasted_content id="a1b2">\r\nwhat failed?')).toEqual([]);
-    expect(modesOf('<pasted_content id="a1b2">\r\nsome log\r\n</pasted_content id="a1b2">\r\nfix build please')).toEqual(["hephaestus"]);
+    expect(modesOf('<pasted_content id="a1b2">\r\nsome log\r\n</pasted_content id="a1b2">\r\nfix build please')).toEqual(["build-fixer"]);
   });
 
   test("a phrase typed outside the paste still fires", () => {
-    expect(modesOf(`${paste("some log line")}\nfix build please`)).toEqual(["hephaestus"]);
+    expect(modesOf(`${paste("some log line")}\nfix build please`)).toEqual(["build-fixer"]);
   });
 
   test("an unterminated paste hides the rest of the prompt", () => {
@@ -94,7 +98,7 @@ describe("text the user did not type", () => {
   });
 
   test("a paste marker that is not alone on its line hides nothing", () => {
-    expect(modesOf('see <pasted_content id="a1b2"> fix build')).toEqual(["hephaestus"]);
+    expect(modesOf('see <pasted_content id="a1b2"> fix build')).toEqual(["build-fixer"]);
   });
 
   test("a task-notification relay is ignored when its tag sits in the first 500 characters", () => {

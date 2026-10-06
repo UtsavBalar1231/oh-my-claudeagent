@@ -147,7 +147,7 @@ describe("aggregate", () => {
       record({ agent_id: "e2", duration_ms: 120_000, input_tokens: 800, output_tokens: 200, estimated_cost_usd: 0.0036, outcome: "aborted", evidence_logged: false }),
       record({ agent_id: "e3", duration_ms: 30_000, input_tokens: 0, output_tokens: 0, estimated_cost_usd: 0, outcome: "empty", evidence_logged: null }),
       record({ agent_id: "e4", ended_at: null, duration_ms: null, input_tokens: 0, output_tokens: 0, estimated_cost_usd: null, outcome: "running", evidence_logged: null }),
-      record({ agent_id: "o1", agent_type: "oh-my-claudeagent:oracle", model: "claude-fable-5-1", duration_ms: 400_000, estimated_cost_usd: 0.1, evidence_logged: false }),
+      record({ agent_id: "o1", agent_type: "oh-my-claudeagent:architect", model: "claude-fable-5-1", duration_ms: 400_000, estimated_cost_usd: 0.1, evidence_logged: false }),
     ]);
     expect(rows).toEqual([
       {
@@ -162,7 +162,7 @@ describe("aggregate", () => {
         evidenceRate: 1 / 3,
       },
       {
-        agentType: "oh-my-claudeagent:oracle",
+        agentType: "oh-my-claudeagent:architect",
         count: 1,
         medianDurationMs: 400_000,
         inputTokens: 1000,

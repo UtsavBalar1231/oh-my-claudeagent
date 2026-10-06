@@ -146,11 +146,13 @@ describe("glyphs", () => {
 
   test("an agent draws its own icon in the Nerd set, the default icon when unknown, and the shared glyph otherwise", () => {
     const nerd = glyphs("nerd");
-    expect(agentGlyph("oh-my-claudeagent:oracle", nerd)).toBe("\u{f06e}");
+    expect(agentGlyph("oh-my-claudeagent:architect", nerd)).toBe("\u{f0eb}");
+    expect(agentGlyph("oh-my-claudeagent:build-fixer", nerd)).toBe("\u{f0ad}");
+    expect(agentGlyph("other-plugin:planner", nerd)).toBe("\u{f007}");
     expect(agentGlyph("executor", nerd)).toBe("\u{f085}");
     expect(agentGlyph("general-purpose", nerd)).toBe("\u{f007}");
-    expect(agentGlyph("oh-my-claudeagent:oracle", glyphs("unicode"))).toBe("◆");
-    expect(agentGlyph("oh-my-claudeagent:oracle", glyphs("ascii"))).toBe("@");
+    expect(agentGlyph("oh-my-claudeagent:architect", glyphs("unicode"))).toBe("◆");
+    expect(agentGlyph("oh-my-claudeagent:architect", glyphs("ascii"))).toBe("@");
     for (const icon of Object.values(AGENT_ICONS)) expect(displayWidth(icon)).toBe(1);
   });
 });

@@ -6,13 +6,13 @@ On-disk files define the inventory. Query it with `find`, `ls` or `jq` at read t
 
 Agent definitions are `agents/*.md`:
 
-`executor`, `explore`, `hephaestus`, `librarian`, `metis`, `momus`, `multimodal-looker`, `oracle`, `prometheus`, `sisyphus`
+`analyzer`, `architect`, `build-fixer`, `executor`, `explorer`, `orchestrator`, `planner`, `researcher`, `reviewer`, `viewer`
 
 ## Skill inventory
 
 Skills are `skills/*/SKILL.md`. Every skill except the orchestration entrypoints below:
 
-`consolidate-memory`, `debugging`, `git-master`, `github-triage`, `handoff`, `hephaestus`, `init-deep`, `metis`, `momus`, `omca-setup`, `refactor`, `remove-ai-slops`
+`analyzer`, `build-fixer`, `consolidate-memory`, `debugging`, `git-master`, `github-triage`, `handoff`, `init-deep`, `omca-setup`, `refactor`, `remove-ai-slops`, `reviewer`
 
 ## Orchestration entrypoints
 

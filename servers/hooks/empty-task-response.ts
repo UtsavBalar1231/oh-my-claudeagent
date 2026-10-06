@@ -1,3 +1,4 @@
+import { omcaAgentName } from "../../src/core/agent-type.ts";
 import { isHookDisabled } from "../../src/core/kill-switch.ts";
 import { field, text } from "../../src/core/tool-input.ts";
 import type { Handler, Payload } from "./registry.ts";
@@ -10,9 +11,9 @@ export const POOR_HANDBACK = "Your hand-back is empty or misses required section
 
 const SECTIONS: Readonly<Record<string, readonly string[]>> = {
   executor: ["STATUS:", "CHANGES:", "EVIDENCE:"],
-  explore: ["FILES:", "ANSWER:", "NEXT STEPS:"],
-  oracle: ["RECOMMENDATION:", "ALTERNATIVES:", "RISKS:"],
-  librarian: ["SOURCES:", "FINDINGS:", "APPLICABILITY:"],
+  explorer: ["FILES:", "ANSWER:", "NEXT STEPS:"],
+  architect: ["RECOMMENDATION:", "ALTERNATIVES:", "RISKS:"],
+  researcher: ["SOURCES:", "FINDINGS:", "APPLICABILITY:"],
 };
 
 // Under 50 characters a report carries no synthesis, unless it reads as a deliberate completion:
@@ -57,7 +58,7 @@ export const handle: Handler = (payload) => {
   const isOwnHandback = payload.tool_name === "SubagentHandback" && Boolean(payload.agent_id);
   const report = withoutHarnessNote(found.report.replace(/\n+$/, ""));
   if (isPoor(report)) return advise(isOwnHandback ? POOR_HANDBACK : POOR_OUTPUT);
-  const agentType = found.agentType.slice(found.agentType.lastIndexOf(":") + 1);
+  const agentType = omcaAgentName(found.agentType) ?? "";
   const lower = report.toLowerCase();
   const missing = (SECTIONS[agentType] ?? []).filter((section) => !lower.includes(section.toLowerCase()));
   if (missing.length === 0) return;

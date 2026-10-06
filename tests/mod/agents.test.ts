@@ -86,8 +86,8 @@ async function threeAgents($: Engine, on: On) {
   engine(on, STEPS);
   await $.command.run(run(""));
   await $.agent.spawn(spawnOf(1, "executor", "Fix the heading parser", "Fix the heading parser so fenced lines are skipped."));
-  await $.agent.spawn(spawnOf(2, "explore", "Map the router callers", "Find every caller of the router."));
-  await $.agent.spawn(spawnOf(3, "oracle", "Review the ledger design", "Review the ledger rotation."));
+  await $.agent.spawn(spawnOf(2, "explorer", "Map the router callers", "Find every caller of the router."));
+  await $.agent.spawn(spawnOf(3, "architect", "Review the ledger design", "Review the ledger rotation."));
   w.agents = ["a-1", "a-2", "a-3"].map((id) => ({ id, description: "", type: "x", status: "running" }));
   await stepAll($, "a-1", 3);
   await stepAll($, "a-2", 2);
@@ -103,9 +103,9 @@ test("each running agent gets a lane: identity, task, effort and elapsed, then i
   expect(body(await ui.drawn()).slice(3)).toEqual([
     "◆ executor · Fix the heading parser    high   1m06s",
     spread("  · Bash bun test src/parser.spec.ts", "4 calls"),
-    "◆ explore · Map the router callers     high   1m06s",
+    "◆ explorer · Map the router callers    high   1m06s",
     spread("  · ast_search", "2 calls"),
-    "◆ oracle · Review the ledger design    high   1m06s",
+    "◆ architect · Review the ledger desi…  high   1m06s",
     spread("  · Read plans/p.md", "1 call"),
     "d: Details  3 running · 0 finished · 9.0k tokens",
   ]);
@@ -174,8 +174,8 @@ test("a finished agent collapses to one dim line with its result and duration, a
   expect(body(await ui.drawn()).slice(3)).toEqual([
     "◆ executor · Fix the heading parser    high     15s",
     spread("  ✶ Bash bun test src/parser.spec.ts", "4 calls"),
-    "! oracle · stopped                              15s",
-    "✓ explore · Mapped 14 callers of the route…     12s",
+    "! architect · stopped                           15s",
+    "✓ explorer · Mapped 14 callers of the rout…     12s",
     "d: Details  1 running · 2 finished · 9.5k tokens",
   ]);
   const done = await ui.find({ key: "done-a-2" });
@@ -201,8 +201,8 @@ test("the pane timer ends each lane the agent list reports completed, failed or 
   const done = await Promise.all(["a-1", "a-2", "a-3"].map(async (id) => (await ui.find({ key: `done-${id}` }))?.text.trimEnd()));
   expect(done).toEqual([
     "✓ executor · done                                2s",
-    "✗ explore · failed                               2s",
-    "! oracle · stopped                               2s",
+    "✗ explorer · failed                              2s",
+    "! architect · stopped                            2s",
   ]);
   await ui.unmount();
 });
@@ -297,12 +297,12 @@ test("d shows each running lane's prompt, last output and usage under it, and d 
     "  prompt  Fix the heading parser so fenced lines a…",
     "  output  Found the heading rule.",
     "  usage   4 tool calls · 4.5k tokens",
-    "◆ explore · Map the router callers     high      0s",
+    "◆ explorer · Map the router callers    high      0s",
     spread("  · ast_search", "2 calls"),
     "  prompt  Find every caller of the router.",
     "  output  none yet",
     "  usage   2 tool calls · 3.0k tokens",
-    "✓ oracle · The ledger holds.                     0s",
+    "✓ architect · The ledger holds.                  0s",
     "d: Hide details  2 running · 1 finished",
   ]);
 
@@ -399,7 +399,7 @@ test("by default each agent draws its own Nerd Font icon, a space after it", asy
   engine(on, STEPS);
   await $.command.run(run(""));
   await $.agent.spawn(spawnOf(1, "executor", "Fix the heading parser", "Fix it."));
-  await $.agent.spawn(spawnOf(2, "oracle", "Review the ledger design", "Review it."));
+  await $.agent.spawn(spawnOf(2, "architect", "Review the ledger design", "Review it."));
   w.agents = ["a-1", "a-2"].map((id) => ({ id, description: "", type: "x", status: "running" }));
   await finish($, "a-2", "The ledger holds.");
   w.agents = w.agents.slice(0, 1);
@@ -407,6 +407,6 @@ test("by default each agent draws its own Nerd Font icon, a space after it", asy
 
   const rows = body(await ui.drawn()).slice(3);
   expect(rows[0]).toStartWith("\u{f085} executor · ");
-  expect(rows[2]).toStartWith("\u{f05d} oracle · The ledger holds.");
+  expect(rows[2]).toStartWith("\u{f05d} architect · The ledger holds.");
   await ui.unmount();
 });

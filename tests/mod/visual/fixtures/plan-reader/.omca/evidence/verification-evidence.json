@@ -5,7 +5,7 @@
     { "type": "test", "command": "DB_PASSWORD=hunter2 just test-db", "exit_code": 1, "output_snippet": "connection refused", "timestamp": "2026-10-02T09:00:00Z", "verified_by": "executor" },
     { "type": "lint", "command": "just lint", "exit_code": 0, "output_snippet": "no findings", "timestamp": "2026-10-02T09:05:00Z", "verified_by": "executor" },
     { "type": "test", "command": "bun test src/export", "exit_code": 0, "output_snippet": "41 pass", "timestamp": "2026-10-02T09:30:00Z", "verified_by": "executor" },
-    { "type": "manual", "command": "open the export preview", "exit_code": 0, "output_snippet": "matches the March invoice", "timestamp": "2026-10-02T10:15:00Z", "verified_by": "sisyphus" },
+    { "type": "manual", "command": "open the export preview", "exit_code": 0, "output_snippet": "matches the March invoice", "timestamp": "2026-10-02T10:15:00Z", "verified_by": "orchestrator" },
     { "type": "test", "command": "just test", "exit_code": 0, "output_snippet": "212 pass", "timestamp": "2026-10-02T11:00:00Z", "verified_by": "executor" }
   ]
 }

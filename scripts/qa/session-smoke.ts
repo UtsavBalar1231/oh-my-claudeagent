@@ -12,7 +12,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { type AccessEntry, type Checks, claudeBin, localhostOnly, type Qa, readJsonLines, runClaude, runQa, startMock } from "./lib.ts";
 
-const KNOWN_AGENTS = ["executor", "explore", "hephaestus", "librarian", "oracle", "prometheus", "sisyphus", "metis", "momus"];
+const KNOWN_AGENTS = ["executor", "explorer", "build-fixer", "researcher", "architect", "planner", "orchestrator", "analyzer", "reviewer"];
 const MIN_AGENT_NAMES = 2;
 const REAL_API_TIMEOUT_MS = 180_000;
 

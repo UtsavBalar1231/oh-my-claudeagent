@@ -140,7 +140,7 @@ function optionsCheck({ showBand, guardMode }: Inputs["options"]): Check {
 
 function modelForceCheck(env: DoctorEnv): Check {
   return isOn(env.CLAUDE_CODE_SUBAGENT_MODEL_FORCE)
-    ? check("model-force", "Agent models", "warn", "CLAUDE_CODE_SUBAGENT_MODEL_FORCE puts every agent on one model, oracle included")
+    ? check("model-force", "Agent models", "warn", "CLAUDE_CODE_SUBAGENT_MODEL_FORCE puts every agent on one model, the architect included")
     : check("model-force", "Agent models", "ok", "Each agent keeps the model tier it declares");
 }
 
@@ -161,7 +161,7 @@ function effortCheck(cap: unknown): Check {
     return check("effort", "Effort cap", "ok", `maxEffortLevel ${cap} leaves every declared effort in place`);
   }
   return rank === LEVELS.indexOf("high")
-    ? check("effort", "Effort cap", "warn", "maxEffortLevel high holds oracle below the xhigh it declares")
+    ? check("effort", "Effort cap", "warn", "maxEffortLevel high holds the architect below the xhigh it declares")
     : check("effort", "Effort cap", "warn", `maxEffortLevel ${cap} holds every agent below the effort it declares`);
 }
 
@@ -215,7 +215,7 @@ function advisorCheck(settings: Inputs["settings"], env: DoctorEnv): Check {
   ];
   const blocker = blockers.find(([, isSet]) => isSet)?.[0];
   if (blocker !== undefined) {
-    return check("advisor", "Advisor", "warn", `${blocker} keeps the advisor off, so OMCA consults oracle instead`);
+    return check("advisor", "Advisor", "warn", `${blocker} keeps the advisor off, so OMCA consults the architect instead`);
   }
   const model = settings["advisorModel"];
   return typeof model === "string" && model !== ""

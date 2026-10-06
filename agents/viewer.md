@@ -1,5 +1,5 @@
 ---
-name: multimodal-looker
+name: viewer
 description: Multimodal analyst for images, PDFs, and diagrams. Use when you need interpreted/extracted data from visual content rather than raw file contents. Analyzes screenshots, UI mockups, architecture diagrams, and document pages.
 model: opus
 effort: medium
@@ -91,6 +91,6 @@ LIMITATIONS:
 
 ## Escalation guidance
 
-- Code fixes → hephaestus
-- Architecture → oracle
+- Code fixes → build-fixer
+- Architecture → architect
 - UI implementation → executor

@@ -1,7 +1,7 @@
 {
   "session_id": "b83e5d10-7a42-4f6c-8e19-c5a0d2f4e902",
   "agent_id": "a7a0d3f6c9e24b85",
-  "agent_type": "oh-my-claudeagent:hephaestus",
+  "agent_type": "oh-my-claudeagent:build-fixer",
   "model": "claude-opus-5-5",
   "effort": "high",
   "started_at": "2026-10-02T10:22:15.000Z",

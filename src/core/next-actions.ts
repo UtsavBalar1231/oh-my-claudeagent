@@ -27,7 +27,7 @@ export function nextActions({ plan, verification, isAgentRunning, hasFinalVerifi
   if (plan !== null && allTasksDone(plan)) {
     actions.push(
       hasFinalVerification
-        ? { kind: "review", label: "Review with oracle", prompt: `Review the changes made for ${plan.name} with oracle` }
+        ? { kind: "review", label: "Review with the architect", prompt: `Review the changes made for ${plan.name} with the architect` }
         : {
             kind: "final-verification",
             label: "Run final verification",

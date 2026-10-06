@@ -294,21 +294,21 @@ panel keeps its default rows.
 ## Agent icons
 
 With Nerd Font glyphs on, the status line and the `/omca` pane show an icon next to the agent name. The lookup strips
-the `oh-my-claudeagent:` prefix (`oh-my-claudeagent:sisyphus` resolves to `sisyphus`), and any
+the `oh-my-claudeagent:` prefix (`oh-my-claudeagent:orchestrator` resolves to `orchestrator`), and any
 name outside the table falls back to `nf-fa-user`.
 
 | Agent | Glyph | Theme |
 |-------|-------|-------|
-| sisyphus | nf-fa-repeat | the endless task |
-| prometheus | nf-fa-fire | stolen flame |
-| metis | nf-fa-search | gap analysis |
-| momus | nf-fa-comment | critique |
-| oracle | nf-fa-eye | foresight |
+| orchestrator | nf-fa-music | conducts the others |
+| planner | nf-fa-clipboard | the work plan |
+| analyzer | nf-fa-search | gap analysis |
+| reviewer | nf-fa-check_square_o | the checklist |
+| architect | nf-fa-lightbulb_o | the design idea |
 | executor | nf-fa-cogs | the doer |
-| explore | nf-fa-compass | exploration |
-| librarian | nf-fa-book | library |
-| hephaestus | nf-fa-wrench | smith |
-| multimodal-looker | nf-fa-camera | visual input |
+| explorer | nf-fa-compass | exploration |
+| researcher | nf-fa-book | library |
+| build-fixer | nf-fa-wrench | the repair |
+| viewer | nf-fa-camera | visual input |
 
 The glyphs come from the `nf-fa-*` Font Awesome range, which is stable across Nerd Fonts v2 and
 v3, so both versions show the same icons.

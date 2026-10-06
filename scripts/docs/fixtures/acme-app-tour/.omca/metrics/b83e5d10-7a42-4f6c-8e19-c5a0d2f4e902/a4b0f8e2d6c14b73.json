@@ -1,7 +1,7 @@
 {
   "session_id": "b83e5d10-7a42-4f6c-8e19-c5a0d2f4e902",
   "agent_id": "a4b0f8e2d6c14b73",
-  "agent_type": "oh-my-claudeagent:explore",
+  "agent_type": "oh-my-claudeagent:explorer",
   "model": "gateway-small",
   "effort": "high",
   "started_at": "2026-10-02T10:03:30.000Z",

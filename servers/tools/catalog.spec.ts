@@ -272,16 +272,16 @@ test("agents_list names the file and line of frontmatter it cannot read", async 
 test("agents_list over the shipped roster lists every agent file with its model and cost tier", async () => {
   const roster = JSON.parse(await callIn(undefined, "agents_list")) as Array<Record<string, string>>;
   expect(roster.map(({ name, default_model, cost_tier }) => [name, default_model, cost_tier])).toEqual([
+    ["analyzer", "opus", "expensive"],
+    ["architect", "fable", "premium"],
+    ["build-fixer", "opus", "expensive"],
     ["executor", "sonnet", "cheap"],
-    ["explore", "sonnet", "cheap"],
-    ["hephaestus", "opus", "expensive"],
-    ["librarian", "sonnet", "cheap"],
-    ["metis", "opus", "expensive"],
-    ["momus", "opus", "expensive"],
-    ["multimodal-looker", "opus", "expensive"],
-    ["oracle", "fable", "premium"],
-    ["prometheus", "opus", "expensive"],
-    ["sisyphus", "opus", "expensive"],
+    ["explorer", "sonnet", "cheap"],
+    ["orchestrator", "opus", "expensive"],
+    ["planner", "opus", "expensive"],
+    ["researcher", "sonnet", "cheap"],
+    ["reviewer", "opus", "expensive"],
+    ["viewer", "opus", "expensive"],
   ]);
   for (const entry of roster) expect(entry.description).not.toBe("");
 });

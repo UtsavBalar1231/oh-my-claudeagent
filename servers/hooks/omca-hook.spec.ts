@@ -105,7 +105,7 @@ describe("omca_hook over stdio", () => {
     writeFileSync(plan, "# Plan\n\n- [ ] 1. First task\n");
     mkdirSync(join(server.project, ".omca", "state"), { recursive: true });
     const registry = {
-      plans: { demo: { active_plan: plan, started_at: "2026-01-01T00:00:00Z", session_ids: [sessionId], agent: "sisyphus" } },
+      plans: { demo: { active_plan: plan, started_at: "2026-01-01T00:00:00Z", session_ids: [sessionId] } },
       bindings: { [sessionId]: { plan_name: "demo", bound_at: Math.floor(Date.now() / 1000) } },
     };
     writeFileSync(join(server.project, ".omca", "state", "boulder.json"), JSON.stringify(registry));

@@ -1,9 +1,9 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-const AGENT_STEMS = ["explore", "oracle", "librarian", "multimodal-looker", "metis", "momus", "hephaestus", "executor"];
+const AGENT_STEMS = ["explorer", "architect", "researcher", "viewer", "analyzer", "reviewer", "build-fixer", "executor"];
 const SKILL_DIRS = ["debugging", "remove-ai-slops", "refactor", "git-master", "handoff"];
-const COMMAND_DIRS = ["metis", "momus", "hephaestus"];
+const COMMAND_DIRS = ["analyzer", "reviewer", "build-fixer"];
 
 type SourceKind = "agent" | "skill" | "command" | "outputStyle";
 export type Source = { kind: SourceKind; key: string; relPath: string; overlay?: string };
@@ -21,28 +21,27 @@ export const PHRASES: [string, string][] = [
   [", plus `TaskList()` counts where that tool exists", ""],
   [", and from `TaskList()` state where that tool exists", ""],
   [", supplemented by `TaskList()` where available", ""],
-  ["[oracle | sisyphus]", "[omca-oracle | the primary agent]"],
-  ["Recommend consulting oracle", "Recommend consulting omca-oracle"],
-  ["consult oracle", "consult the omca-oracle subagent"],
-  ["Consult oracle", "Consult the omca-oracle subagent"],
-  ["Recommend oracle", "Recommend omca-oracle"],
-  ["Recommend hephaestus", "Recommend omca-hephaestus"],
+  ["[architect | orchestrator]", "[omca-architect | the primary agent]"],
+  ["Recommend consulting the architect", "Recommend consulting omca-architect"],
+  ["consult the architect", "consult the omca-architect subagent"],
+  ["Consult the architect", "Consult the omca-architect subagent"],
+  ["Recommend the architect", "Recommend omca-architect"],
+  ["Recommend the build-fixer", "Recommend omca-build-fixer"],
   ["Recommend executor", "Recommend omca-executor"],
-  ["(use explore)", "(use omca-explore)"],
-  ["→ oracle", "→ omca-oracle"],
-  ["→ hephaestus", "→ omca-hephaestus"],
+  ["Recommend running the analyzer again", "Recommend running omca-analyzer again"],
+  ["(use explorer)", "(use omca-explorer)"],
+  ["→ architect", "→ omca-architect"],
+  ["→ build-fixer", "→ omca-build-fixer"],
   ["→ executor", "→ omca-executor"],
-  ["in explore prompts", "in omca-explore prompts"],
-  ["`${CLAUDE_PLUGIN_ROOT}/agents/momus.md`", "the omca-momus agent instructions"],
+  ["in explorer prompts", "in omca-explorer prompts"],
+  ["`${CLAUDE_PLUGIN_ROOT}/agents/reviewer.md`", "the omca-reviewer agent instructions"],
   ["## Bash Usage Policy", "## Shell Usage Policy"],
   ["the omca `file_read` MCP tool", "`file_read`"],
-  ["those go to hephaestus", "those go to omca-hephaestus"],
-  ["## Boundary with hephaestus", "## Boundary with omca-hephaestus"],
-  ["feature implementation (executor), architecture (oracle), refactoring (executor)", "feature implementation (omca-executor), architecture (omca-oracle), refactoring (omca-executor)"],
-  ["running metis re-analysis", "running omca-metis re-analysis"],
+  ["those go to build-fixer", "those go to omca-build-fixer"],
+  ["## Boundary with build-fixer", "## Boundary with omca-build-fixer"],
+  ["feature implementation (executor), architecture (architect), refactoring (executor)", "feature implementation (omca-executor), architecture (omca-architect), refactoring (omca-executor)"],
   ["No Write/Edit/Agent.", "No write, edit or subagent tools."],
-  ["Recommend sisyphus orchestration.", "Recommend that the primary agent orchestrate it."],
-  ["Prometheus plans must leave", "Plans from the planner must leave"],
+  ["Recommend the orchestrator coordinate it.", "Recommend that the primary agent coordinate it."],
   ["read the relevant code yourself with Read,", "read the relevant code yourself with the `read` tool,"],
   ["| Read | Plan files", "| `read` | Plan files"],
   ["| Write | Only when", "| `write` | Only when"],
@@ -54,7 +53,7 @@ export const PHRASES: [string, string][] = [
   ["or Edit for targeted changes", "or the `edit` tool for targeted changes"],
 ];
 
-const DELEGATES = ["explore", "oracle", "librarian", "executor", "hephaestus", "metis", "momus", "multimodal-looker"];
+const DELEGATES = ["explorer", "architect", "researcher", "executor", "build-fixer", "analyzer", "reviewer", "viewer"];
 
 const TOKENS: [string, string][] = [
   ["oh-my-claudeagent:", "omca-"],
@@ -95,7 +94,7 @@ export function splitFrontmatter(text: string, file: string): { data: Frontmatte
 
 type Heading = { line: number; level: number; text: string };
 
-// A simple toggle, not CommonMark nesting: agents/librarian.md nests fences, and nesting would hide a later heading.
+// A simple toggle, not CommonMark nesting: agents/researcher.md nests fences, and nesting would hide a later heading.
 function headings(lines: string[]): Heading[] {
   const out: Heading[] = [];
   let fenced = false;
@@ -169,8 +168,7 @@ function translate(text: string): string {
   const article = (m: string, at: number, s: string) =>
     m.startsWith("The") || (!/^the\s/i.test(m) && /(^|[.!?]\s+|\n)$/.test(s.slice(Math.max(0, at - 3), at))) ? "The" : "the";
   return text
-    .replace(/\b(the\s+)?sisyphus\b/gi, (m, _the, at: number, s: string) => `${article(m, at, s)} primary agent`)
-    .replace(/\b(the\s+)?prometheus\b/gi, (m, _the, at: number, s: string) => `${article(m, at, s)} planner`)
+    .replace(/\b(the\s+)?orchestrator\b/gi, (m, _the, at: number, s: string) => `${article(m, at, s)} primary agent`)
     .replace(OMCA_TOOLS, "omca_$1")
     .replace(/\b(Read|Edit|Write|Grep|Glob|WebFetch|WebSearch) tool\b/g, (_m, t: string) => `${t.toLowerCase()} tool`)
     .replace(/\bBash\b/g, "shell");

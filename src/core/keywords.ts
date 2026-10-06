@@ -14,19 +14,19 @@ export const KEYWORD_MODES: readonly KeywordMode[] = [
     banner: "[OMCA-SETUP DETECTED] Run /oh-my-claudeagent:omca-setup to configure the environment.",
   },
   {
-    name: "metis",
-    pattern: /run\s+metis|metis\s+analyze|pre-plan/,
-    banner: "[METIS DETECTED] Invoke /oh-my-claudeagent:metis for pre-planning analysis.",
+    name: "analyzer",
+    pattern: /\brun\s+analyzer\b|\banalyze\s+(the\s+)?plan\b|pre-plan/,
+    banner: "[ANALYZER DETECTED] Invoke /oh-my-claudeagent:analyzer for pre-planning analysis.",
   },
   {
     name: "plan",
-    pattern: /run\s+prometheus|prometheus\s+plan|create\s+plan/,
-    banner: "[PROMETHEUS DETECTED] Invoke /oh-my-claudeagent:plan for strategic planning via prometheus.",
+    pattern: /\brun\s+planner\b|create\s+plan/,
+    banner: "[PLAN DETECTED] Invoke /oh-my-claudeagent:plan for strategic planning via the planner.",
   },
   {
-    name: "hephaestus",
-    pattern: /run\s+hephaestus|hephaestus\s+fix|fix\s+build|build\s+broken/,
-    banner: "[HEPHAESTUS DETECTED] Invoke /oh-my-claudeagent:hephaestus to fix build failures.",
+    name: "build-fixer",
+    pattern: /\brun\s+build-fixer\b|fix\s+build|build\s+broken/,
+    banner: "[BUILD-FIXER DETECTED] Invoke /oh-my-claudeagent:build-fixer to fix build failures.",
   },
 ];
 

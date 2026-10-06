@@ -1,3 +1,5 @@
+import { omcaAgentName } from "./agent-type.ts";
+
 export const GLYPH_TIERS = ["nerd", "unicode", "ascii"] as const;
 export type GlyphTier = (typeof GLYPH_TIERS)[number];
 
@@ -83,23 +85,23 @@ export function glyphs(tier: GlyphTier): Glyphs {
 
 /** Each roster agent's Nerd Font icon, shared with the status line. */
 export const AGENT_ICONS: Readonly<Record<string, string>> = {
+  analyzer: "\u{f002}",
+  architect: "\u{f0eb}",
+  "build-fixer": "\u{f0ad}",
   executor: "\u{f085}",
-  explore: "\u{f14e}",
-  hephaestus: "\u{f0ad}",
-  librarian: "\u{f02d}",
-  metis: "\u{f002}",
-  momus: "\u{f075}",
-  "multimodal-looker": "\u{f030}",
-  oracle: "\u{f06e}",
-  prometheus: "\u{f06d}",
-  sisyphus: "\u{f01e}",
+  explorer: "\u{f14e}",
+  orchestrator: "\u{f001}",
+  planner: "\u{f0ea}",
+  researcher: "\u{f02d}",
+  reviewer: "\u{f046}",
+  viewer: "\u{f030}",
 };
 
 /** The agent's own icon in the Nerd tier, the shared agent glyph in the others. */
 export function agentGlyph(type: string, g: Glyphs): string {
   if (g.tier !== "nerd") return g.agent;
-  const name = shortType(type);
-  return (Object.hasOwn(AGENT_ICONS, name) ? AGENT_ICONS[name] : undefined) ?? g.agent;
+  const name = omcaAgentName(type);
+  return (name !== undefined && Object.hasOwn(AGENT_ICONS, name) ? AGENT_ICONS[name] : undefined) ?? g.agent;
 }
 
 /** The cells between two columns, two keys, or a chip's neighbours, everywhere OMCA draws. */

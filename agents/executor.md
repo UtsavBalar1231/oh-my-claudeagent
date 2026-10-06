@@ -169,16 +169,16 @@ unrelated checkout, use `rg` and `file_read`.
 A search too broad to run inline is a scoping problem, not a delegation problem:
 narrow it by path, by symbol, or by file type until it fits. If a task truly needs a
 research fan-out you cannot cover, name that in your report and let the orchestrator
-spawn `explore`, then deliver everything you were able to determine. Never return an
+spawn `explorer`, then deliver everything you were able to determine. Never return an
 incomplete deliverable because you could not hand the search off.
 
 ## Escalation Rules
 
 When the work is outside your scope, report it and do not attempt it:
-- Planning needed → "Recommend spawning prometheus."
-- Architecture review → "Recommend consulting oracle."
-- Research → search yourself; if the fan-out is beyond you, "Recommend spawning explore."
-- Build broken → "Recommend spawning hephaestus."
+- Planning needed → "Recommend spawning the planner."
+- Architecture review → "Recommend consulting the architect."
+- Research → search yourself; if the fan-out is beyond you, "Recommend spawning the explorer."
+- Build broken → "Recommend spawning the build-fixer."
 
 No architectural changes or cross-cutting refactors.
 

@@ -162,6 +162,24 @@ hand.
 
 ### Changed
 
+- **Renamed agents and skills.** Agents and skills carry role names, in `agents/`, `skills/`,
+  the OpenCode ids (`omca-<name>`), `/oh-my-claudeagent:<name>` and `@agent-oh-my-claudeagent:<name>`.
+  `executor` keeps its name. The keyword triggers follow: "run analyzer" and "pre-plan" point at
+  `/oh-my-claudeagent:analyzer`, "run planner" and "create plan" at `/oh-my-claudeagent:plan`,
+  and "run build-fixer", "fix build" and "build broken" at `/oh-my-claudeagent:build-fixer`.
+
+  | Old | New | Kind |
+  | --- | --- | --- |
+  | sisyphus | orchestrator | agent |
+  | prometheus | planner | agent |
+  | metis | analyzer | agent and skill |
+  | momus | reviewer | agent and skill |
+  | explore | explorer | agent |
+  | librarian | researcher | agent |
+  | oracle | architect | agent |
+  | hephaestus | build-fixer | agent and skill |
+  | multimodal-looker | viewer | agent |
+
 - **One bun server.** `.mcp.json` starts a single `omca` server, `bun servers/omca.ts`, that
   answers the model's tools and every `hooks.json` entry through its `omca_hook` tool. No command
   hook remains. Every tool keeps its name, schema and result text. The OpenCode adapter starts

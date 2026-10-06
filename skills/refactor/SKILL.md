@@ -49,7 +49,7 @@ Classify and validate before acting.
 Map the target before changing it: its definitions, every caller and importer, the
 tests that exercise it, and sibling code that follows the same pattern. Search directly
 with `ast_search` and Bash; a file- or module-scope refactor needs a handful of
-searches, not subagents. Fan out to `explore` only for a `--scope=project` change whose
+searches, not subagents. Fan out to `explorer` only for a `--scope=project` change whose
 search areas are independent, one agent per area, each briefed completely in its first
 prompt.
 
@@ -77,7 +77,7 @@ exist.
 Write the step list yourself from the codemap: atomic steps, each independently
 verifiable, ordered by dependency, with exact file paths and how to roll each one back.
 A refactor that needs an interview or owner decisions stops here: ask the user to run
-`/oh-my-claudeagent:plan`, since a `prometheus` subagent runs without `AskUserQuestion`.
+`/oh-my-claudeagent:plan`, since a `planner` subagent runs without `AskUserQuestion`.
 
 ## PHASE 5: EXECUTE REFACTORING
 
@@ -104,6 +104,6 @@ where supported, and move to the next step only when the current one verifies.
 
 ## Deprecated Code & Library Migration
 
-1. `librarian` for recommended modern alternative
+1. `researcher` for recommended modern alternative
 2. No auto-upgrade unless user requests migration
 3. When the user requests migration, fetch the latest API docs first

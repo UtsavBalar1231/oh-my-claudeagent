@@ -180,27 +180,27 @@ describe.skipIf(!opencodeBin)("opencode model path", () => {
     verify(toolResults(scenario).includes("omca guard:"), "shell-reset: no omca guard denial reached the model")
   }, SLOW)
 
-  test("subagent: the omca-explore child session sees the guard denial", async () => {
+  test("subagent: the omca-explorer child session sees the guard denial", async () => {
     const { server, ws } = need()
     const scenario = await ran("subagent")
     const sessions = await server.api<Listing<Named>>("GET", "/api/session", ws)
     verify((sessions.body?.data ?? []).some((session) => session.parentID != null), `subagent: no child session: ${sessions.text}`)
-    verify(during(scenario).some((request) => system(request).includes(EXPLORER)), "subagent: no request carried the omca-explore system")
+    verify(during(scenario).some((request) => system(request).includes(EXPLORER)), "subagent: no request carried the omca-explorer system")
     verify(head() === scenario.headBefore, "subagent: HEAD moved")
     const childResult = during(scenario)
       .filter((request) => lastIsTool(request) && system(request).includes(EXPLORER))
       .map(lastText)
       .join("\n")
-    verify(childResult.includes("omca guard:"), "subagent: no omca guard denial reached the omca-explore child")
+    verify(childResult.includes("omca guard:"), "subagent: no omca guard denial reached the omca-explorer child")
   }, SLOW)
 
-  test("context: build requests carry the evidence rule and omca-explore requests do not", async () => {
+  test("context: build requests carry the evidence rule and omca-explorer requests do not", async () => {
     await ranAll()
     verify(
       requests().some((request) => request.tools != null && !system(request).includes(EXPLORER) && system(request).includes(EVIDENCE)),
       `context: no build request contains '${EVIDENCE}'`,
     )
-    verify(!requests().some((request) => system(request).includes(EXPLORER) && system(request).includes(EVIDENCE)), `context: the omca-explore request contains '${EVIDENCE}'`)
+    verify(!requests().some((request) => system(request).includes(EXPLORER) && system(request).includes(EVIDENCE)), `context: the omca-explorer request contains '${EVIDENCE}'`)
   }, SLOW)
 
   test("tools: every build request exposes exactly the visible omca tools", async () => {
@@ -213,11 +213,11 @@ describe.skipIf(!opencodeBin)("opencode model path", () => {
     verify(wrong.length === 0, `tools: a build request exposes ${wrong[0]?.join(",")} instead of ${VISIBLE_OMCA_TOOLS.join(",")}`)
   }, SLOW)
 
-  test("models: omca-explore requests go to the sonnet override and build requests to the default", async () => {
+  test("models: omca-explorer requests go to the sonnet override and build requests to the default", async () => {
     await ranAll()
     const explorer = requests().filter((request) => system(request).includes(EXPLORER))
-    verify(explorer.length > 0, "models: no omca-explore request")
-    verify(explorer.every((request) => request.model === "scripted-sonnet"), `models: omca-explore went to ${explorer.map((request) => request.model).join(",")}`)
+    verify(explorer.length > 0, "models: no omca-explorer request")
+    verify(explorer.every((request) => request.model === "scripted-sonnet"), `models: omca-explorer went to ${explorer.map((request) => request.model).join(",")}`)
     verify(requests().filter((request) => !system(request).includes(EXPLORER)).every((request) => request.model === "scripted"), "models: a build request left the default model")
   }, SLOW)
 
@@ -227,11 +227,11 @@ describe.skipIf(!opencodeBin)("opencode model path", () => {
     verify(!existsSync(join(need().ws, "slop.sh")), "slop-write: slop.sh was written")
   }, SLOW)
 
-  test("explore-write: omca-explore cannot write a file", async () => {
+  test("explore-write: omca-explorer cannot write a file", async () => {
     const scenario = await ran("explore-write")
     const explorer = during(scenario).filter((request) => system(request).includes(EXPLORER))
-    verify(explorer.length > 0, "explore-write: no request carried the omca-explore system")
-    verify(explorer.every((request) => !toolNames(request).some((name) => ["write", "edit", "patch"].includes(name))), "explore-write: omca-explore was offered a write tool")
+    verify(explorer.length > 0, "explore-write: no request carried the omca-explorer system")
+    verify(explorer.every((request) => !toolNames(request).some((name) => ["write", "edit", "patch"].includes(name))), "explore-write: omca-explorer was offered a write tool")
     verify(!existsSync(join(need().ws, "explored.txt")), "explore-write: explored.txt was written")
   }, SLOW)
 

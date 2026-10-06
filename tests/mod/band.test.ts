@@ -242,7 +242,7 @@ test("a final verification scoped to other plan bytes does not count", async ($,
   });
 });
 
-test("a complete plan with a passing final verification for its current bytes offers the oracle review", async ($, on) => {
+test("a complete plan with a passing final verification for its current bytes offers the architect review", async ($, on) => {
   const scoped = final({ plan_sha256: sha256Hex(planText(46, 46)) });
   world(on, bound(46, 46, { [LEDGER]: ledger([scoped]) }));
   await start($);
@@ -250,7 +250,7 @@ test("a complete plan with a passing final verification for its current bytes of
 
   await onEachSurface($, async (band) => {
     expect(await statusRow(band)).toBe("█████ 46/46");
-    expect(await buttons(band)).toEqual([{ key: "review", label: "Review with oracle", hotkey: "1", plain: true }]);
+    expect(await buttons(band)).toEqual([{ key: "review", label: "Review with the architect", hotkey: "1", plain: true }]);
   });
 });
 
@@ -275,7 +275,7 @@ test("an unreadable ledger on a complete plan names the failure and still offers
 
   await onEachSurface($, async (band) => {
     expect(await statusRow(band)).toBe("█████ 46/46");
-    expect(await buttons(band)).toEqual([{ key: "review", label: "Review with oracle", hotkey: "1", plain: true }]);
+    expect(await buttons(band)).toEqual([{ key: "review", label: "Review with the architect", hotkey: "1", plain: true }]);
   });
 });
 

@@ -1,4 +1,5 @@
-import { displayWidth, fitEnd, type Glyphs, glyphs, shortType } from "./ui-kit.ts";
+import { displayWidth, fitEnd, type Glyphs, glyphs } from "./ui-kit.ts";
+import { omcaAgentName } from "./agent-type.ts";
 
 // Every key here draws its theme's value for a mod, measured on 2.1.288 under a custom theme and
 // the built-in light theme. `link`, `thinking` and `messageActionsBackground` draw nothing for a
@@ -107,21 +108,21 @@ export type AgentColor = keyof typeof AGENT_KEYS;
 
 // The `color` of each agents/*.md, so an agent draws in the color the transcript gives it.
 export const ROSTER: Readonly<Record<string, AgentColor>> = {
+  analyzer: "yellow",
+  architect: "purple",
+  "build-fixer": "yellow",
   executor: "green",
-  explore: "blue",
-  hephaestus: "yellow",
-  librarian: "orange",
-  metis: "yellow",
-  momus: "red",
-  "multimodal-looker": "pink",
-  oracle: "purple",
-  prometheus: "cyan",
-  sisyphus: "purple",
+  explorer: "blue",
+  orchestrator: "purple",
+  planner: "cyan",
+  researcher: "orange",
+  reviewer: "red",
+  viewer: "pink",
 };
 
 export function agentKey(type: string): ThemeKey {
-  const name = shortType(type);
-  const color = Object.hasOwn(ROSTER, name) ? ROSTER[name] : undefined;
+  const name = omcaAgentName(type);
+  const color = name !== undefined && Object.hasOwn(ROSTER, name) ? ROSTER[name] : undefined;
   return color === undefined ? TONE_KEYS.muted : AGENT_KEYS[color];
 }
 

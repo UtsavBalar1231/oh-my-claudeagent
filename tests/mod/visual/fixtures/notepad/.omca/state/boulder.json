@@ -3,14 +3,12 @@
     "checkout-redesign": {
       "active_plan": "{{cwd}}/plans/checkout-redesign.md",
       "started_at": "2026-10-01T08:00:00Z",
-      "session_ids": ["00000000-0000-4000-8000-000000000001"],
-      "agent": "sisyphus"
+      "session_ids": ["00000000-0000-4000-8000-000000000001"]
     },
     "docs-refresh": {
       "active_plan": "{{cwd}}/plans/docs-refresh.md",
       "started_at": "2026-09-28T09:00:00Z",
-      "session_ids": [],
-      "agent": "sisyphus"
+      "session_ids": []
     }
   },
   "bindings": {

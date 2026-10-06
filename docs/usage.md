@@ -76,11 +76,11 @@ config. The `ast_*` tools need ast-grep on `PATH`.
 
 What OpenCode gets:
 
-- Subagents `omca-explore`, `omca-oracle`, `omca-librarian`, `omca-multimodal-looker`,
-  `omca-metis`, `omca-momus`, `omca-hephaestus` and `omca-executor`.
+- Subagents `omca-explorer`, `omca-architect`, `omca-researcher`, `omca-viewer`,
+  `omca-analyzer`, `omca-reviewer`, `omca-build-fixer` and `omca-executor`.
 - Skills `omca-debugging`, `omca-remove-ai-slops`, `omca-refactor`, `omca-git-master` and
   `omca-handoff`, each slash-invocable. `/omca-handoff` is not offered to the model.
-- Commands `/omca-metis`, `/omca-momus` and `/omca-hephaestus`, each asking the primary agent to
+- Commands `/omca-analyzer`, `/omca-reviewer` and `/omca-build-fixer`, each asking the primary agent to
   launch that subagent.
 - The `omca` server's evidence, notepad, AST, `boulder_progress` and `file_read` tools, named
   `omca_<tool>`. The adapter hides `boulder_write`, `session_search`, `agents_list`,
@@ -91,21 +91,21 @@ What OpenCode gets:
 - OMCA's working discipline, injected into primary agents such as `build` and `plan`.
 
 Every id carries the `omca-` prefix, so OpenCode's own `build`, `plan`, `general` and `explore`
-are untouched. The adapter leaves out the sisyphus orchestrator, the prometheus planner, `plan`
+are untouched. The adapter leaves out the orchestrator, the planner, `plan`
 and `start-work` with plan tracking, the stop gates and the status line.
 
 ## Plan and run work
 
 ### Make a plan
 
-Run `/oh-my-claudeagent:plan <what you want done>`. The prometheus agent interviews you for what
-the plan needs, consults metis for gaps, writes the plan, and has momus review it. The plan
+Run `/oh-my-claudeagent:plan <what you want done>`. The planner agent interviews you for what
+the plan needs, consults analyzer for gaps, writes the plan, and has reviewer review it. The plan
 lands in your plans directory: the `plansDirectory` setting when you set one, relative to the
 project, and `~/.claude/plans` otherwise. Each task is a numbered checkbox, `- [ ] 1. ...`;
 progress tracking counts only numbered boxes.
 
 To research before planning, ask `/oh-my-claudeagent:plan` to help you understand or research
-the problem. Prometheus interviews you and returns its findings with no plan file.
+the problem. Planner interviews you and returns its findings with no plan file.
 
 The plan skill writes the plan and does not bind the session to it. `start-work` registers the
 plan and binds the session that runs it.
@@ -149,7 +149,7 @@ the model cannot.
 ### Ask a specialist directly
 
 Type `@agent-oh-my-claudeagent:<name>` to send a request to one agent, for example
-`@agent-oh-my-claudeagent:oracle what is the right shape for this cache?`.
+`@agent-oh-my-claudeagent:architect what is the right shape for this cache?`.
 
 ## The band, the pane and the plan board
 
@@ -162,7 +162,7 @@ running. As the window narrows it drops the verification first, then the proof c
 task and the running count; the bar stays. The prompt's border names the plan.
 
 Below it, numbered buttons offer the next step: log the evidence, start work, run the final
-verification, or review the changes with oracle. Press a button's digit in an empty prompt, or
+verification, or review the changes with architect. Press a button's digit in an empty prompt, or
 click it, to fill the prompt with that step; nothing runs until you send it. Typing anything else
 clears the buttons.
 

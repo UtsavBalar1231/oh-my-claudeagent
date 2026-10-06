@@ -55,9 +55,9 @@ test("the breaker note is empty until the third failure", () => {
   expect(breakerNote(streak(["a", "b"]).last)).toBe("");
 });
 
-test("the breaker note lists the attempts oldest first and names the advisor before oracle", () => {
+test("the breaker note lists the attempts oldest first and names the advisor before architect", () => {
   expect(breakerNote(streak(["first issue", "second issue", "third issue"]).last)).toBe(
-    "This tool has failed 3+ times, each failure within five minutes of the last. Attempts: 1) first issue 2) second issue 3) third issue. The count covers every failure of the tool, related or not. If these are repeated attempts at one fix, stop repeating it: change the approach, or ask for a diagnosis, from the advisor tool when you have it and from oracle when you do not.",
+    "This tool has failed 3+ times, each failure within five minutes of the last. Attempts: 1) first issue 2) second issue 3) third issue. The count covers every failure of the tool, related or not. If these are repeated attempts at one fix, stop repeating it: change the approach, or ask for a diagnosis, from the advisor tool when you have it and from architect when you do not.",
   );
 });
 

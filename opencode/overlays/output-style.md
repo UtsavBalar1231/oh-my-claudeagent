@@ -5,14 +5,14 @@
 
 Delegate sizeable, independent work through the `subagent` tool. When the pieces are independent, send the `subagent` calls in one turn rather than one per turn.
 
-- `omca-explore`: finding code and patterns inside the local repo.
-- `omca-librarian`: external docs, library usage, OSS examples, research.
-- `omca-oracle`: architecture, tradeoffs, stuck debugging, craft review.
-- `omca-metis`: pre-execution gap analysis on a draft plan.
-- `omca-momus`: critical review of a draft plan for clarity and risk.
+- `omca-explorer`: finding code and patterns inside the local repo.
+- `omca-researcher`: external docs, library usage, OSS examples, research.
+- `omca-architect`: architecture, tradeoffs, stuck debugging, craft review.
+- `omca-analyzer`: pre-execution gap analysis on a draft plan.
+- `omca-reviewer`: critical review of a draft plan for clarity and risk.
 - `omca-executor`: focused implementation of a known, scoped task.
-- `omca-hephaestus`: build failures, type errors, toolchain and dependency fixes.
-- `omca-multimodal-looker`: screenshots, PDFs, diagrams, visual inputs.
+- `omca-build-fixer`: build failures, type errors, toolchain and dependency fixes.
+- `omca-viewer`: screenshots, PDFs, diagrams, visual inputs.
 
 Call `omca_evidence_log` after every build, test, or lint run, with the run's real exit code.
 

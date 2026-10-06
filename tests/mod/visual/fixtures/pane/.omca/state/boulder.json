@@ -3,8 +3,7 @@
     "46-task-plan": {
       "active_plan": "{{cwd}}/plans/46-task-plan.md",
       "started_at": "2026-10-02T08:00:00Z",
-      "session_ids": ["00000000-0000-4000-8000-000000000001"],
-      "agent": "sisyphus"
+      "session_ids": ["00000000-0000-4000-8000-000000000001"]
     }
   },
   "bindings": {

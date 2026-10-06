@@ -1,4 +1,4 @@
-<!-- Overlay for agents/multimodal-looker.md. Each section below replaces the section with the same heading in that file;
+<!-- Overlay for agents/viewer.md. Each section below replaces the section with the same heading in that file;
      every section not listed here is taken from the source unchanged. -->
 
 ## How It Works

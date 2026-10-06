@@ -1,6 +1,6 @@
 ---
 name: debugging
-description: "Use for runtime bugs: crashes, wrong output, intermittent or silent failures, flaky tests, code that works locally but not in prod. Not for build failures or type errors; those go to hephaestus."
+description: "Use for runtime bugs: crashes, wrong output, intermittent or silent failures, flaky tests, code that works locally but not in prod. Not for build failures or type errors; those go to build-fixer."
 ---
 
 # Debugging
@@ -18,14 +18,14 @@ A bug is not fixed until you can explain why it happened, not just that it stopp
 
 ## Escalation
 
-After two failed fix attempts on the same bug, stop iterating alone. Call the `advisor` tool first when you have it; when it is off or its guidance does not unblock you, consult oracle, handing over the attempt timeline: what each hypothesis was, what the discriminating test showed, and why it was ruled out. Two failed rounds is a signal that the mental model of the system is wrong, not that the third attempt will get lucky.
+After two failed fix attempts on the same bug, stop iterating alone. Call the `advisor` tool first when you have it; when it is off or its guidance does not unblock you, consult the architect, handing over the attempt timeline: what each hypothesis was, what the discriminating test showed, and why it was ruled out. Two failed rounds is a signal that the mental model of the system is wrong, not that the third attempt will get lucky.
 
 ## Artifact hygiene
 
 Every repro script, log statement, and temporary breakpoint you add during a debugging session gets tracked and removed before the task is done. Keep a running list of what you added and where; when the fix is verified, walk the list and revert or delete each item. A session that leaves stray instrumentation, debug prints, or scratch scripts behind is not finished, regardless of whether the bug is fixed: check `git diff` shows only the fix and its test before calling it done. Record verification with the `evidence_log` MCP tool.
 
-## Boundary with hephaestus
+## Boundary with build-fixer
 
-Build failures, compile/type errors, and toolchain or dependency breakage go through the hephaestus flow: that agent owns anything that keeps the build from succeeding. This skill owns misbehavior that shows up only once the code is running: wrong output, crashes, hangs, races, and anything that passes a build but fails a real scenario.
+Build failures, compile/type errors, and toolchain or dependency breakage go through the build-fixer flow: that agent owns anything that keeps the build from succeeding. This skill owns misbehavior that shows up only once the code is running: wrong output, crashes, hangs, races, and anything that passes a build but fails a real scenario.
 
 Depth reference: `references/methodology.md` (hypothesis quality, instrumentation discipline) and `references/diagnostics.md` (runtime observation patterns, bisecting, concurrency failures, environment differences).

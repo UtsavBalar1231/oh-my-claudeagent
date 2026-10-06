@@ -4,6 +4,6 @@
     { "type": "lint", "command": "just lint", "exit_code": 0, "output_snippet": "no findings", "timestamp": "2026-10-02T09:30:00Z", "verified_by": "executor" },
     { "type": "test", "command": "just test-mod", "exit_code": 1, "output_snippet": "2 fail", "timestamp": "2026-10-02T10:00:00Z", "verified_by": "executor" },
     { "type": "test", "command": "just test-mod", "exit_code": 0, "output_snippet": "69 pass", "timestamp": "2026-10-02T10:20:00Z", "verified_by": "executor" },
-    { "type": "final_verification", "command": "bun test src/core && just test-mod && just validate-mod", "exit_code": 0, "output_snippet": "COMPLETE", "timestamp": "2026-10-02T11:45:00Z", "verified_by": "sisyphus" }
+    { "type": "final_verification", "command": "bun test src/core && just test-mod && just validate-mod", "exit_code": 0, "output_snippet": "COMPLETE", "timestamp": "2026-10-02T11:45:00Z", "verified_by": "orchestrator" }
   ]
 }

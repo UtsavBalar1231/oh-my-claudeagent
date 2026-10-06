@@ -23,5 +23,5 @@ export function bumpErrorCount(counts: Map<string, ErrorCount>, key: string, err
 export function breakerNote({ count, lastErrors }: ErrorCount): string {
   if (count < BREAKER_AT) return "";
   const attempts = [...lastErrors].reverse().map((error, index) => `${index + 1}) ${error}`);
-  return `This tool has failed ${BREAKER_AT}+ times, each failure within five minutes of the last. Attempts: ${attempts.join(" ")}. The count covers every failure of the tool, related or not. If these are repeated attempts at one fix, stop repeating it: change the approach, or ask for a diagnosis, from the advisor tool when you have it and from oracle when you do not.`;
+  return `This tool has failed ${BREAKER_AT}+ times, each failure within five minutes of the last. Attempts: ${attempts.join(" ")}. The count covers every failure of the tool, related or not. If these are repeated attempts at one fix, stop repeating it: change the approach, or ask for a diagnosis, from the advisor tool when you have it and from architect when you do not.`;
 }

@@ -1,16 +1,16 @@
-<!-- Overlay for agents/momus.md. Each section below replaces the section with the same heading in that file;
+<!-- Overlay for agents/reviewer.md. Each section below replaces the section with the same heading in that file;
      every section not listed here is taken from the source unchanged. -->
 
 ## Invocation
 
-**Preferred**: run the `/omca-momus` command with the plan FILE PATH:
+**Preferred**: run the `/omca-reviewer` command with the plan FILE PATH:
 ```
-/omca-momus .opencode/plans/my-plan.md
+/omca-reviewer .opencode/plans/my-plan.md
 ```
 
-**Direct spawn**: a caller that has the `subagent` tool can also spawn agent `omca-momus` with the plan path as the prompt:
+**Direct spawn**: a caller that has the `subagent` tool can also spawn agent `omca-reviewer` with the plan path as the prompt:
 ```
-subagent: agent=omca-momus, prompt=".opencode/plans/my-plan.md"
+subagent: agent=omca-reviewer, prompt=".opencode/plans/my-plan.md"
 ```
 
 File path only. Not inline plans, todo lists, or text summaries.

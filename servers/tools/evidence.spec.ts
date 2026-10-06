@@ -147,7 +147,7 @@ describe("evidence_log", () => {
 
   test("evidence_log with plan_sha256 stores it after verified_by", async () => {
     const root = project();
-    await log(root, { evidence_type: "final_verification", verified_by: "sisyphus", plan_sha256: PLAN_SHA });
+    await log(root, { evidence_type: "final_verification", verified_by: "orchestrator", plan_sha256: PLAN_SHA });
     const [stored] = entries(root);
     expect(Object.keys(stored)).toEqual(["type", "command", "exit_code", "output_snippet", "timestamp", "verified_by", "plan_sha256"]);
     expect(stored.plan_sha256).toBe(PLAN_SHA);

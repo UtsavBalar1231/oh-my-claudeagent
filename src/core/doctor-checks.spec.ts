@@ -184,7 +184,7 @@ test("the options check ignores any pluginConfigs in settings", () => {
 test.each<[string | undefined, Omit<Check, "id" | "label">]>([
   [undefined, { level: "ok", detail: "Each agent keeps the model tier it declares" }],
   ["0", { level: "ok", detail: "Each agent keeps the model tier it declares" }],
-  ["1", { level: "warn", detail: "CLAUDE_CODE_SUBAGENT_MODEL_FORCE puts every agent on one model, oracle included" }],
+  ["1", { level: "warn", detail: "CLAUDE_CODE_SUBAGENT_MODEL_FORCE puts every agent on one model, the architect included" }],
 ])("CLAUDE_CODE_SUBAGENT_MODEL_FORCE=%p", (value, expected) => {
   expect(run({ env: { CLAUDE_CODE_SUBAGENT_MODEL_FORCE: value } }, "model-force")).toEqual(expected);
 });
@@ -193,7 +193,7 @@ test.each<[unknown, Omit<Check, "id" | "label">]>([
   [undefined, { level: "ok", detail: "No maxEffortLevel, so agents run at the effort they declare" }],
   ["max", { level: "ok", detail: "maxEffortLevel max leaves every declared effort in place" }],
   ["xhigh", { level: "ok", detail: "maxEffortLevel xhigh leaves every declared effort in place" }],
-  ["high", { level: "warn", detail: "maxEffortLevel high holds oracle below the xhigh it declares" }],
+  ["high", { level: "warn", detail: "maxEffortLevel high holds the architect below the xhigh it declares" }],
   ["low", { level: "warn", detail: "maxEffortLevel low holds every agent below the effort it declares" }],
   ["turbo", { level: "warn", detail: 'maxEffortLevel "turbo" is not a known level' }],
 ])("maxEffortLevel %p", (maxEffortLevel, expected) => {
@@ -227,27 +227,27 @@ test.each<[Record<string, unknown>, Inputs["env"], Omit<Check, "id" | "label">]>
   [
     { advisorModel: "fable" },
     { DISABLE_TELEMETRY: "0" },
-    { level: "warn", detail: "DISABLE_TELEMETRY keeps the advisor off, so OMCA consults oracle instead" },
+    { level: "warn", detail: "DISABLE_TELEMETRY keeps the advisor off, so OMCA consults the architect instead" },
   ],
   [
     { advisorModel: "fable" },
     { DO_NOT_TRACK: "1" },
-    { level: "warn", detail: "DO_NOT_TRACK keeps the advisor off, so OMCA consults oracle instead" },
+    { level: "warn", detail: "DO_NOT_TRACK keeps the advisor off, so OMCA consults the architect instead" },
   ],
   [
     {},
     { CLAUDE_CODE_DISABLE_ADVISOR_TOOL: "1" },
-    { level: "warn", detail: "CLAUDE_CODE_DISABLE_ADVISOR_TOOL keeps the advisor off, so OMCA consults oracle instead" },
+    { level: "warn", detail: "CLAUDE_CODE_DISABLE_ADVISOR_TOOL keeps the advisor off, so OMCA consults the architect instead" },
   ],
   [
     {},
     { DISABLE_GROWTHBOOK: "1" },
-    { level: "warn", detail: "DISABLE_GROWTHBOOK keeps the advisor off, so OMCA consults oracle instead" },
+    { level: "warn", detail: "DISABLE_GROWTHBOOK keeps the advisor off, so OMCA consults the architect instead" },
   ],
   [
     {},
     { CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1" },
-    { level: "warn", detail: "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC keeps the advisor off, so OMCA consults oracle instead" },
+    { level: "warn", detail: "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC keeps the advisor off, so OMCA consults the architect instead" },
   ],
 ])("advisor %p %p", (settings, env, expected) => {
   expect(run({ settings, env }, "advisor")).toEqual(expected);

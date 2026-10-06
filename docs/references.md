@@ -39,18 +39,18 @@ your provider's model for that family, so the roster never pins a model id. Spaw
 
 | Agent | Tier | Effort | Role | Limits |
 | --- | --- | --- | --- | --- |
-| sisyphus | opus | high | The main-session orchestrator. The plugin's `settings.json` makes it the session agent. It does small work itself and delegates the rest; under `start-work` it runs the plan | Runs at the session's effort as the main agent |
-| prometheus | opus | high | Interviews you and writes the plan, consulting metis and momus. Asked to help you understand or research a problem, it returns findings instead of a plan | No Bash |
-| metis | opus | high | Gap analysis of a request or draft plan: hidden requirements, scope risks | Read-only, no Bash |
-| momus | opus | high | Reviews a plan for clarity, verifiability and completeness; answers OKAY or REJECT | No Bash. Writes or edits a file only when asked to |
-| oracle | fable | xhigh | Architecture, trade-offs, and debugging that is already stuck | Read-only |
-| explore | sonnet | high | Searches the local codebase | Read-only |
-| librarian | sonnet | high | Library docs and open-source examples, through context7 and grep.app | Read-only |
+| orchestrator | opus | high | The main-session orchestrator. The plugin's `settings.json` makes it the session agent. It does small work itself and delegates the rest; under `start-work` it runs the plan | Runs at the session's effort as the main agent |
+| planner | opus | high | Interviews you and writes the plan, consulting analyzer and reviewer. Asked to help you understand or research a problem, it returns findings instead of a plan | No Bash |
+| analyzer | opus | high | Gap analysis of a request or draft plan: hidden requirements, scope risks | Read-only, no Bash |
+| reviewer | opus | high | Reviews a plan for clarity, verifiability and completeness; answers OKAY or REJECT | No Bash. Writes or edits a file only when asked to |
+| architect | fable | xhigh | Architecture, trade-offs, and debugging that is already stuck | Read-only |
+| explorer | sonnet | high | Searches the local codebase | Read-only |
+| researcher | sonnet | high | Library docs and open-source examples, through context7 and grep.app | Read-only |
 | executor | sonnet | high | Implements one scoped task and verifies it before reporting | Does not delegate |
-| hephaestus | opus | medium | Fixes build, type and toolchain failures with minimal diffs | Does not delegate |
-| multimodal-looker | opus | medium | Reads images, PDFs and diagrams | Read-only, no Bash |
+| build-fixer | opus | medium | Fixes build, type and toolchain failures with minimal diffs | Does not delegate |
+| viewer | opus | medium | Reads images, PDFs and diagrams | Read-only, no Bash |
 
-Only sisyphus and prometheus can spawn further agents. `servers/categories.json` maps kinds of
+Only orchestrator and planner can spawn further agents. `servers/categories.json` maps kinds of
 work to tiers for delegation: `quick`, `standard` and `readonly` to `sonnet`, `deep` to `opus`,
 `hardest` to `fable`.
 
@@ -60,17 +60,17 @@ cap, which clamps every declared effort. The doctor reports the last two.
 
 When you turn on the advisor (`/advisor fable`, or `/advisor opus` without Fable access), OMCA's
 prompts consult it before a large plan, when an error repeats, and before calling a long task
-done. With the advisor off, they escalate to oracle.
+done. With the advisor off, they escalate to architect.
 
 ## Skills
 
 | Skill | Run it with | What it does |
 | --- | --- | --- |
-| plan | `/oh-my-claudeagent:plan <task>` | prometheus planning, with metis and momus. It writes the plan and leaves binding it to `start-work`. Only you can start it |
+| plan | `/oh-my-claudeagent:plan <task>` | planner planning, with analyzer and reviewer. It writes the plan and leaves binding it to `start-work`. Only you can start it |
 | start-work | `/oh-my-claudeagent:start-work [plan] [--worktree <path>]` | Runs a plan in the main session, delegating each task. Only you can start it |
-| metis | `/oh-my-claudeagent:metis` | Runs metis on a request or plan, in a forked context |
-| momus | `/oh-my-claudeagent:momus <plan>` | Runs momus on a plan, in a forked context |
-| hephaestus | `/oh-my-claudeagent:hephaestus` | Runs hephaestus on a failing build, in a forked context |
+| analyzer | `/oh-my-claudeagent:analyzer` | Runs analyzer on a request or plan, in a forked context |
+| reviewer | `/oh-my-claudeagent:reviewer <plan>` | Runs reviewer on a plan, in a forked context |
+| build-fixer | `/oh-my-claudeagent:build-fixer` | Runs build-fixer on a failing build, in a forked context |
 | handoff | `/oh-my-claudeagent:handoff` | Writes a context block for a new session. Only you can start it |
 | debugging | `/oh-my-claudeagent:debugging` | Reproduce, rank hypotheses, instrument, fix, verify |
 | refactor | `/oh-my-claudeagent:refactor <target>` | Maps the code and its tests, plans, then refactors step by step |
@@ -92,9 +92,9 @@ trigger.
 
 | Phrase | Points at |
 | --- | --- |
-| `create plan`, `run prometheus`, `prometheus plan` | plan |
-| `run metis`, `metis analyze`, `pre-plan` | metis |
-| `fix build`, `build broken`, `run hephaestus`, `hephaestus fix` | hephaestus |
+| `create plan`, `run planner` | plan |
+| `run analyzer`, `analyze plan`, `pre-plan` | analyzer |
+| `fix build`, `build broken`, `run build-fixer` | build-fixer |
 | `setup omca`, `omca setup` | omca-setup |
 | `handoff`, `context is getting long`, `start fresh session` | a suggestion to run `/oh-my-claudeagent:handoff` |
 
@@ -333,7 +333,7 @@ OMCA's value, and within 5 ms for times and 0.5 `execve` for process counts.
   tool search is off, and +12,679 with tool search on, the closer match to first-party traffic.
   With tool search on, every other plugin arm adds less. The largest addition of any arm is
   pre-seeded ruflo's +70,904 with tool search off, from its 358 MCP tools. OMCA's parts with tool
-  search on, as medians that do not sum exactly: the sisyphus prompt in the system prompt
+  search on, as medians that do not sum exactly: the orchestrator prompt in the system prompt
   (+5,676), the `omca` tools (+1,490, with 3 MCP tool schemas in the request and the deferred
   tools as names), the guidance injected on the first prompt (+2,194), the output style (+1,473),
   the agent and skill listing (+1,460) and the server instructions (+549). `claude plugin

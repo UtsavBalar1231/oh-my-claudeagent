@@ -1,6 +1,6 @@
 ---
 name: start-work
-description: Start a work session from a Prometheus-generated plan.
+description: Start a work session from a planner-generated plan.
 user-invocable: true
 disable-model-invocation: true
 argument-hint: "[plan file] [--worktree <path>]"
@@ -12,7 +12,7 @@ Call `health_check` first, loading it and `boulder_write` if needed: `ToolSearch
 
 This command runs in the main session at depth 0. The `Agent` tool is available,
 so orchestration is real: parallel fan-out to `executor`, specialist escalation
-via `hephaestus`/`explore`/`librarian` as needed.
+via `build-fixer`/`explorer`/`researcher` as needed.
 
 The platform's native Workflow tool is not a substitute for this command. A workflow run
 is driven by the platform's own runtime, so its agents never call `evidence_log`, never
@@ -283,8 +283,8 @@ Do not read or tail the agent's output file: for a subagent it is the full JSONL
 
 For exploration and research (result needed to plan the next step):
 ```text
-Agent(subagent_type="oh-my-claudeagent:explore", ...)
-Agent(subagent_type="oh-my-claudeagent:librarian", ...)
+Agent(subagent_type="oh-my-claudeagent:explorer", ...)
+Agent(subagent_type="oh-my-claudeagent:researcher", ...)
 ```
 
 For task execution (result needed before the task can be marked complete):
@@ -314,7 +314,7 @@ There is no per-session total limit on how many subagents a session may spawn. T
 in one message run at most 10 at a time by default (`CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY`),
 so a group wider than 10 runs partly in sequence. Neither ceiling is the cost ceiling: each spawn
 re-establishes context and each report costs a read. Spawn executors for plan tasks, and
-reach for `explore` or `librarian` only when a delegation needs a fact that a few reads
+reach for `explorer` or `researcher` only when a delegation needs a fact that a few reads
 of your own cannot supply.
 
 ### 2.2 Result collection
@@ -524,7 +524,7 @@ the plan's checkboxes, not the notepad.
 | Condition    | Signal                                                | Action                                             |
 |--------------|-------------------------------------------------------|-----------------------------------------------------|
 | **CONTINUE** | Task passes verification AND subsequent tasks unblocked | Proceed immediately                              |
-| **ESCALATE** | 2+ tasks in same plan area fail verification          | Ask user whether to run metis re-analysis          |
+| **ESCALATE** | 2+ tasks in same plan area fail verification          | Ask user whether to run analyzer re-analysis          |
 | **PAUSE**    | 2 consecutive independent task failures               | Document failures, pause, ask user for guidance    |
 | **ABORT**    | 3+ consecutive waves with zero net progress           | Stop all work, document state, present to user     |
 
@@ -532,7 +532,7 @@ the plan's checkboxes, not the notepad.
 
 Max 3 retries per task. When a task is still blocked after 3, record it with `notepad_write(plan_name, "issues", ...)`
 and continue to independent tasks. When 2+ tasks in the same area fail, ask the user
-whether to run metis re-analysis.
+whether to run analyzer re-analysis.
 
 When relaunching a task after a failed executor attempt, the fresh delegation
 prompt must carry forward what was already tried and why it failed: the exact

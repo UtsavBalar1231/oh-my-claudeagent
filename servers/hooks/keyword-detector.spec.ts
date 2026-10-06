@@ -13,8 +13,8 @@ const BANNERS = {
   handoff:
     "[HANDOFF MODE DETECTED] Handoff is user-driven and its skill cannot be model-invoked: suggest running /oh-my-claudeagent:handoff instead of improvising a summary.",
   setup: "[OMCA-SETUP DETECTED] Run /oh-my-claudeagent:omca-setup to configure the environment.",
-  plan: "[PROMETHEUS DETECTED] Invoke /oh-my-claudeagent:plan for strategic planning via prometheus.",
-  hephaestus: "[HEPHAESTUS DETECTED] Invoke /oh-my-claudeagent:hephaestus to fix build failures.",
+  plan: "[PLAN DETECTED] Invoke /oh-my-claudeagent:plan for strategic planning via the planner.",
+  buildFixer: "[BUILD-FIXER DETECTED] Invoke /oh-my-claudeagent:build-fixer to fix build failures.",
 };
 
 const roots: string[] = [];
@@ -169,13 +169,13 @@ describe("announcing a mode once per session", () => {
   test("a second mode in the same session still announces beside the first", async () => {
     const { root, sessionId } = enabled();
     await submit(root, sessionId, "handoff please");
-    expect(await submit(root, sessionId, "handoff please, and fix build")).toEqual(announced(BANNERS.hephaestus));
+    expect(await submit(root, sessionId, "handoff please, and fix build")).toEqual(announced(BANNERS.buildFixer));
   });
 
   test("several new modes in one prompt announce together in table order", async () => {
     const { root, sessionId } = enabled();
     expect(await submit(root, sessionId, "fix build, create plan and setup omca")).toEqual(
-      announced(BANNERS.setup, BANNERS.plan, BANNERS.hephaestus),
+      announced(BANNERS.setup, BANNERS.plan, BANNERS.buildFixer),
     );
   });
 
@@ -189,7 +189,7 @@ describe("announcing a mode once per session", () => {
 describe("text that is not a request for a mode", () => {
   test("task-notification: prompt containing <task-notification> tag does NOT activate any mode", async () => {
     const { root, sessionId } = enabled();
-    await silent(root, sessionId, "<task-notification><result>Agent completed: handoff plan hephaestus</result></task-notification>");
+    await silent(root, sessionId, "<task-notification><result>Agent completed: handoff plan build-fixer</result></task-notification>");
     expect(touchSession(sessionId).announcedModes).toBeUndefined();
   });
 
@@ -198,12 +198,12 @@ describe("text that is not a request for a mode", () => {
     expect(await submit(root, sessionId, "handoff please")).toEqual(announced(BANNERS.handoff));
   });
 
-  test("mention: meta-cue 'the phrase' suppresses hephaestus detection", async () => {
+  test("mention: meta-cue 'the phrase' suppresses build-fixer detection", async () => {
     const { root, sessionId } = enabled();
-    await silent(root, sessionId, "Does the phrase fix build in a user prompt trigger hephaestus? I do not want you to fix anything.");
+    await silent(root, sessionId, "Does the phrase fix build in a user prompt trigger build-fixer? I do not want you to fix anything.");
   });
 
-  test("mention: quoted trigger phrases suppress omca-setup and prometheus detection", async () => {
+  test("mention: quoted trigger phrases suppress omca-setup and plan detection", async () => {
     const { root, sessionId } = enabled();
     await silent(root, sessionId, 'Document that "setup omca" and "create plan" are the trigger phrases; do not run them.');
   });
@@ -213,9 +213,9 @@ describe("text that is not a request for a mode", () => {
     await silent(root, sessionId, 'I pasted "setup omca" into the doc yesterday.');
   });
 
-  test("mention control: unquoted 'fix build' still triggers hephaestus", async () => {
+  test("mention control: unquoted 'fix build' still triggers build-fixer", async () => {
     const { root, sessionId } = enabled();
-    expect(await submit(root, sessionId, "the build is failing, fix build please")).toEqual(announced(BANNERS.hephaestus));
+    expect(await submit(root, sessionId, "the build is failing, fix build please")).toEqual(announced(BANNERS.buildFixer));
   });
 
   test("mention control: unquoted 'setup omca' still triggers omca-setup", async () => {
@@ -223,7 +223,7 @@ describe("text that is not a request for a mode", () => {
     expect(await submit(root, sessionId, "setup omca on this machine")).toEqual(announced(BANNERS.setup));
   });
 
-  test("mention control: unquoted 'create plan' still triggers prometheus", async () => {
+  test("mention control: unquoted 'create plan' still triggers plan", async () => {
     const { root, sessionId } = enabled();
     expect(await submit(root, sessionId, "create plan for the auth rewrite")).toEqual(announced(BANNERS.plan));
   });
@@ -237,7 +237,7 @@ describe("text that is not a request for a mode", () => {
     const { root, sessionId } = enabled();
     expect(
       await submit(root, sessionId, '<pasted_content id="a1b2">\nsome log line\n</pasted_content id="a1b2">\nfix build please'),
-    ).toEqual(announced(BANNERS.hephaestus));
+    ).toEqual(announced(BANNERS.buildFixer));
   });
 });
 
@@ -280,7 +280,7 @@ describe("beside the guidance handler", () => {
     const { root, sessionId } = enabled();
     await dispatch(prompt(sessionId, "add a hello command"), root, NOW);
     expect(await dispatch(prompt(sessionId, "fix build"), root, NOW)).toEqual({
-      hookSpecificOutput: { hookEventName: "UserPromptSubmit", additionalContext: BANNERS.hephaestus },
+      hookSpecificOutput: { hookEventName: "UserPromptSubmit", additionalContext: BANNERS.buildFixer },
     });
   });
 

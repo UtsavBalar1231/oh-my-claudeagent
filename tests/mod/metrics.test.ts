@@ -30,8 +30,8 @@ function engine(on: On, files: Readonly<Record<string, string>> = {}): { w: Worl
   });
   const models: Record<string, readonly [string, string]> = {
     "oh-my-claudeagent:executor": ["claude-sonnet-5-5", "a-1"],
-    "oh-my-claudeagent:explore": ["claude-haiku-4-5", "a-2"],
-    "oh-my-claudeagent:oracle": ["claude-fable-5-1", "../escape"],
+    "oh-my-claudeagent:explorer": ["claude-haiku-4-5", "a-2"],
+    "oh-my-claudeagent:architect": ["claude-fable-5-1", "../escape"],
   };
   on("agent.spawn", (_$, e) => {
     const [model, agentId] = models[e.subagentType] ?? ["claude-opus-5-5", "a-9"];
@@ -53,7 +53,7 @@ test("each delegation is written running at spawn and overwritten once when its 
 
   await $.agent.spawn(spawn("oh-my-claudeagent:executor", "Fix the parser"));
   await w.clock.advance(30_000);
-  await $.agent.spawn(spawn("oh-my-claudeagent:explore", "Find the callers"));
+  await $.agent.spawn(spawn("oh-my-claudeagent:explorer", "Find the callers"));
   const running1: MetricsRecord = {
     session_id: "s1",
     agent_id: "a-1",
@@ -72,7 +72,7 @@ test("each delegation is written running at spawn and overwritten once when its 
   const running2: MetricsRecord = {
     ...running1,
     agent_id: "a-2",
-    agent_type: "oh-my-claudeagent:explore",
+    agent_type: "oh-my-claudeagent:explorer",
     model: "claude-haiku-4-5",
     started_at: "2026-10-02T12:00:30.000Z",
   };
@@ -130,7 +130,7 @@ test("each delegation is written running at spawn and overwritten once when its 
       "Agents · 2 types",
       "  agent     runs  est. cost  evidence",
       "◆ executor     1      $0.01    ✓ 100%",
-      "◆ explore      1      $0.00      ✗ 0%",
+      "◆ explorer     1      $0.00      ✗ 0%",
       "Tokens per turn · 2 turns",
       "█▁ peak 13.5k",
       "Estimated cost",
@@ -171,7 +171,7 @@ test("a ledger that does not parse records evidence_logged as unknown, and says 
 
 test("an unsafe agent id names no file and writes nothing", async ($, on) => {
   const { w, writes } = engine(on);
-  await $.agent.spawn(spawn("oh-my-claudeagent:oracle", "Review"));
+  await $.agent.spawn(spawn("oh-my-claudeagent:architect", "Review"));
   expect(writes).toEqual([]);
   expect(w.logs).toContain('metrics: no record for session "s1" agent "../escape"');
 });

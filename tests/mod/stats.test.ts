@@ -45,14 +45,14 @@ const record = (sessionId: string, agentId: string, fields: Partial<MetricsRecor
 
 const S1 = "11111111-1111-4111-8111-111111111111";
 const S2 = "22222222-2222-4222-8222-222222222222";
-const EXPLORE = { agent_type: "oh-my-claudeagent:explore", model: "claude-haiku-4-5", evidence_logged: false } as const;
-const ORACLE = { agent_type: "oh-my-claudeagent:oracle", model: "gateway-reasoner", estimated_cost_usd: null } as const;
+const EXPLORE = { agent_type: "oh-my-claudeagent:explorer", model: "claude-haiku-4-5", evidence_logged: false } as const;
+const ARCHITECT = { agent_type: "oh-my-claudeagent:architect", model: "gateway-reasoner", estimated_cost_usd: null } as const;
 
 const FIXTURE = {
   [`${METRICS}/${S1}/a-e1.json`]: record(S1, "a-e1", { duration_ms: 60_000 }),
   [`${METRICS}/${S1}/a-e2.json`]: record(S1, "a-e2", { duration_ms: 240_000, input_tokens: 900_000, output_tokens: 90_000, estimated_cost_usd: 2.7 }),
   [`${METRICS}/${S1}/a-x1.json`]: record(S1, "a-x1", { ...EXPLORE, duration_ms: 20_000, input_tokens: 8_000, output_tokens: 1_000, estimated_cost_usd: 0.013 }),
-  [`${METRICS}/${S1}/a-o1.json`]: record(S1, "a-o1", { ...ORACLE, duration_ms: 400_000, input_tokens: 120_000, output_tokens: 9_000 }),
+  [`${METRICS}/${S1}/a-o1.json`]: record(S1, "a-o1", { ...ARCHITECT, duration_ms: 400_000, input_tokens: 120_000, output_tokens: 9_000 }),
   [`${METRICS}/${S1}/broken.json`]: '{"session_id": "',
   [`${METRICS}/${S2}/a-e3.json`]: record(S2, "a-e3", { outcome: "aborted", duration_ms: 90_000, input_tokens: 5_000, output_tokens: 500, estimated_cost_usd: 0.015, evidence_logged: false }),
   [`${METRICS}/${S2}/a-x2.json`]: record(S2, "a-x2", { ...EXPLORE, outcome: "empty", model: "gateway-small", duration_ms: 10_000, input_tokens: 3_000, output_tokens: 0, estimated_cost_usd: null }),
@@ -64,7 +64,7 @@ const FILES = {
   [`${METRICS}/${S1}/a-1.json`]: record(S1, "a-1", { started_at: "2026-10-01T09:00:00.000Z" }),
   [`${METRICS}/${S1}/a-2.json`]: record(S1, "a-2", { started_at: "2026-10-01T09:10:00.000Z", input_tokens: 400_000, output_tokens: 20_000, estimated_cost_usd: 1.2 }),
   [`${METRICS}/${S1}/a-3.json`]: record(S1, "a-3", { ...EXPLORE, started_at: "2026-10-01T09:05:00.000Z", input_tokens: 9_000, output_tokens: 1_000, estimated_cost_usd: 0.014 }),
-  [`${METRICS}/${S1}/a-4.json`]: record(S1, "a-4", { ...ORACLE, started_at: "2026-10-01T09:20:00.000Z", input_tokens: 200_000, output_tokens: 10_000, outcome: "aborted" }),
+  [`${METRICS}/${S1}/a-4.json`]: record(S1, "a-4", { ...ARCHITECT, started_at: "2026-10-01T09:20:00.000Z", input_tokens: 200_000, output_tokens: 10_000, outcome: "aborted" }),
 };
 
 const GREEN = "green_FOR_SUBAGENTS_ONLY";
@@ -101,11 +101,11 @@ test("the agents card draws each agent's glyph in its roster color with the name
 
   expect(childrenOf(agents ?? { type: "" })).toEqual([
     text({ bold: true, color: "text", wrap: "truncate-end" }, "Agents · 3 types"),
-    text({ dimColor: true }, "  agent                 runs  median  tokens  est. cost  evidence  outcomes    "),
+    text({ dimColor: true }, "  agent                  runs  median  tokens  est. cost  evidence  outcomes    "),
     row(
       "stats-oh-my-claudeagent:executor",
       lit({ color: GREEN }, "◆ "),
-      lit({}, "executor"),
+      lit({}, "executor "),
       gap,
       lit({ color: GREEN }, "██████████"),
       gap,
@@ -128,35 +128,9 @@ test("the agents card draws each agent's glyph in its roster color with the name
       lit({ color: "inactive" }, "0 "),
     ),
     row(
-      "stats-oh-my-claudeagent:explore",
-      lit({ color: BLUE }, "◆ "),
-      lit({}, "explore "),
-      gap,
-      lit({ color: BLUE }, "█████"),
-      lit({ color: "subtle" }, "█████"),
-      gap,
-      lit({}, "   1"),
-      gap,
-      lit({}, " 2m00s"),
-      gap,
-      lit({}, " 10.0k"),
-      gap,
-      lit({}, "    $0.01"),
-      gap,
-      lit({ color: "error" }, "    ✗"),
-      lit({}, " 0%"),
-      gap,
-      lit({ color: "success" }, "✓ "),
-      lit({}, "1 "),
-      lit({ color: "inactive" }, "✗ "),
-      lit({ color: "inactive" }, "0 "),
-      lit({ color: "inactive" }, "! "),
-      lit({ color: "inactive" }, "0 "),
-    ),
-    row(
-      "stats-oh-my-claudeagent:oracle",
+      "stats-oh-my-claudeagent:architect",
       lit({ color: PURPLE }, "◆ "),
-      lit({}, "oracle  "),
+      lit({}, "architect"),
       gap,
       lit({ color: PURPLE }, "█████"),
       lit({ color: "subtle" }, "█████"),
@@ -176,6 +150,32 @@ test("the agents card draws each agent's glyph in its roster color with the name
       lit({ color: "inactive" }, "0 "),
       lit({ color: "error" }, "✗ "),
       lit({}, "1 "),
+      lit({ color: "inactive" }, "! "),
+      lit({ color: "inactive" }, "0 "),
+    ),
+    row(
+      "stats-oh-my-claudeagent:explorer",
+      lit({ color: BLUE }, "◆ "),
+      lit({}, "explorer "),
+      gap,
+      lit({ color: BLUE }, "█████"),
+      lit({ color: "subtle" }, "█████"),
+      gap,
+      lit({}, "   1"),
+      gap,
+      lit({}, " 2m00s"),
+      gap,
+      lit({}, " 10.0k"),
+      gap,
+      lit({}, "    $0.01"),
+      gap,
+      lit({ color: "error" }, "    ✗"),
+      lit({}, " 0%"),
+      gap,
+      lit({ color: "success" }, "✓ "),
+      lit({}, "1 "),
+      lit({ color: "inactive" }, "✗ "),
+      lit({ color: "inactive" }, "0 "),
       lit({ color: "inactive" }, "! "),
       lit({ color: "inactive" }, "0 "),
     ),
@@ -214,7 +214,7 @@ test("the cost card totals the priced runs, splits its meter by agent with the c
       85,
       "Estimated cost",
       line(text({ bold: true }, "$1.35+"), text({}, " "), text({ color: GREEN }, "█".repeat(73)), text({ color: BLUE }, "█")),
-      line(text({ color: GREEN }, "◆ "), text({}, "executor $1.34"), text({}, "  "), text({ color: BLUE }, "◆ "), text({}, "explore $0.01")),
+      line(text({ color: GREEN }, "◆ "), text({}, "executor $1.34"), text({}, "  "), text({ color: BLUE }, "◆ "), text({}, "explorer $0.01")),
       text({ dimColor: true, wrap: "wrap" }, "n/a: no listed price · 2026-10-02 list prices"),
     ),
   );
@@ -301,15 +301,15 @@ test("the Stats tab aggregates two sessions by agent type with exact rows, on th
     expect(spreadRows(await wide.drawn()).slice(2)).toEqual([
       summary,
       "Agents · 3 types",
-      "  agent                 runs  median  tokens  est. cost  evidence  outcomes    ",
-      `◆ executor  ${"█".repeat(10)}     3   1m30s    1.0M      $2.86     ! 67%  ✓ 2 ✗ 1 ! 0 `,
-      `◆ explore   ${"█".repeat(10)}     3     15s   12.0k     $0.01+      ✗ 0%  ✓ 1 ✗ 0 ! 1 `,
-      `◆ oracle    ${"█".repeat(10)}     1   6m40s    129k        n/a    ✓ 100%  ✓ 1 ✗ 0 ! 0 `,
+      "  agent                  runs  median  tokens  est. cost  evidence  outcomes    ",
+      `◆ executor   ${"█".repeat(10)}     3   1m30s    1.0M      $2.86     ! 67%  ✓ 2 ✗ 1 ! 0 `,
+      `◆ explorer   ${"█".repeat(10)}     3     15s   12.0k     $0.01+      ✗ 0%  ✓ 1 ✗ 0 ! 1 `,
+      `◆ architect  ${"█".repeat(10)}     1   6m40s    129k        n/a    ✓ 100%  ✓ 1 ✗ 0 ! 0 `,
       "Tokens per turn · 6 turns",
       "▁█▁▂▁▁ peak 990k",
       "Estimated cost",
       `$2.87+ ${"█".repeat(74)}`,
-      "◆ executor $2.86  ◆ explore $0.01",
+      "◆ executor $2.86  ◆ explorer $0.01",
       notes,
       "r: Reload",
     ]);
@@ -319,15 +319,15 @@ test("the Stats tab aggregates two sessions by agent type with exact rows, on th
     expect(spreadRows(await narrow.drawn()).slice(3)).toEqual([
       "7 delegations in 2 sessions · 1 running · 1 skipped",
       "Agents · 3 types",
-      "  agent     runs  est. cost  evidence",
-      "◆ executor     3      $2.86     ! 67%",
-      "◆ explore      3     $0.01+      ✗ 0%",
-      "◆ oracle       1        n/a    ✓ 100%",
+      "  agent      runs  est. cost  evidence",
+      "◆ executor      3      $2.86     ! 67%",
+      "◆ explorer      3     $0.01+      ✗ 0%",
+      "◆ architect     1        n/a    ✓ 100%",
       "Tokens per turn · 6 turns",
       "▁█▁▂▁▁ peak 990k",
       "Estimated cost",
       `$2.87+ ${"█".repeat(40)}`,
-      "◆ executor $2.86  ◆ explore $0.01",
+      "◆ executor $2.86  ◆ explorer $0.01",
       notes,
       "r: Reload",
     ]);
@@ -336,7 +336,7 @@ test("the Stats tab aggregates two sessions by agent type with exact rows, on th
 });
 
 test("Stats rows stay inside the body less the gutter at every size, docked and inline, on both surfaces", async ($, on) => {
-  world(on, { ...FIXTURE, [`${METRICS}/${S2}/a-m1.json`]: record(S2, "a-m1", { agent_type: "oh-my-claudeagent:multimodal-looker" }) });
+  world(on, { ...FIXTURE, [`${METRICS}/${S2}/a-m1.json`]: record(S2, "a-m1", { agent_type: "oh-my-claudeagent:viewer" }) });
   await $.command.run(run("stats"));
 
   for (const size of SIZES) {
@@ -385,15 +385,15 @@ test("OMCA_GLYPHS=ascii draws the Stats tab from the ASCII set", async ($, on) =
   expect(drawn.slice(1, 13)).toEqual([
     "7 delegations in 2 sessions - 1 running - 1 unreadable record skipped",
     "Agents - 3 types",
-    "  agent                 runs  median  tokens  est. cost  evidence",
-    "@ executor  [########]     3   1m30s    1.0M      $2.86     ! 67%",
-    "@ explore   [########]     3     15s   12.0k     $0.01+      x 0%",
-    "@ oracle    [###.....]     1   6m40s    129k        n/a    + 100%",
+    "  agent                  runs  median  tokens  est. cost  evidence",
+    "@ executor   [########]     3   1m30s    1.0M      $2.86     ! 67%",
+    "@ explorer   [########]     3     15s   12.0k     $0.01+      x 0%",
+    "@ architect  [###.....]     1   6m40s    129k        n/a    + 100%",
     "Tokens per turn - 6 turns",
     ".@.:.. peak 990k",
     "Estimated cost",
     `$2.87+ [${"#".repeat(59)}=]`,
-    "# executor $2.86  = explore $0.01",
+    "# executor $2.86  = explorer $0.01",
     "+ excludes 1 unpriced run - n/a: no listed price - 2026-10-02 list prices",
   ]);
   expect(drawn.filter((row) => !isAscii(row))).toEqual([]);

@@ -261,7 +261,7 @@ describe("boulder_progress resolution matches the lenient resolver", () => {
 describe("write-path GC", () => {
   test("gc prunes stale unbound complete plan", async () => {
     const root = project();
-    const plans = { "stale-complete": { active_plan: planFile(root, "complete.md", COMPLETE), started_at: LONG_AGO, session_ids: ["sess-old"], agent: "sisyphus" } };
+    const plans = { "stale-complete": { active_plan: planFile(root, "complete.md", COMPLETE), started_at: LONG_AGO, session_ids: ["sess-old"] } };
     seedRegistry(root, json({ plans, bindings: {} }));
     await write(root, "new-plan", "sess-new", "/tmp/new.md");
     expect(Object.keys(registry(root).plans)).toEqual(["new-plan"]);
@@ -269,7 +269,7 @@ describe("write-path GC", () => {
 
   test("gc does not prune live bound plan", async () => {
     const root = project();
-    const plans = { "old-but-bound": { active_plan: planFile(root, "complete.md", "- [x] 1. Done\n"), started_at: LONG_AGO, session_ids: ["sess-live"], agent: "sisyphus" } };
+    const plans = { "old-but-bound": { active_plan: planFile(root, "complete.md", "- [x] 1. Done\n"), started_at: LONG_AGO, session_ids: ["sess-live"] } };
     seedRegistry(root, json({ plans, bindings: { "sess-live": { plan_name: "old-but-bound", bound_at: nowSeconds() } } }));
     await write(root, "new-plan", "sess-new", "/tmp/new.md");
     const after = registry(root);
@@ -279,7 +279,7 @@ describe("write-path GC", () => {
 
   test("gc prunes stale binding", async () => {
     const root = project();
-    const plans = { "some-plan": { active_plan: "/tmp/some.md", started_at: new Date().toISOString(), session_ids: ["sess-stale"], agent: "sisyphus" } };
+    const plans = { "some-plan": { active_plan: "/tmp/some.md", started_at: new Date().toISOString(), session_ids: ["sess-stale"] } };
     seedRegistry(root, json({ plans, bindings: { "sess-stale": { plan_name: "some-plan", bound_at: 1 } } }));
     await write(root, "new-plan", "sess-new", "/tmp/new.md");
     expect(Object.keys(registry(root).bindings)).toEqual(["sess-new"]);

@@ -1,7 +1,7 @@
 {
   "session_id": "b83e5d10-7a42-4f6c-8e19-c5a0d2f4e902",
   "agent_id": "a8c1f4b7e0d34a58",
-  "agent_type": "oh-my-claudeagent:explore",
+  "agent_type": "oh-my-claudeagent:explorer",
   "model": "claude-haiku-4-5",
   "effort": "high",
   "started_at": "2026-10-02T10:02:40.000Z",

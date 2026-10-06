@@ -87,16 +87,20 @@ test.each([
 });
 
 const AGENT_FIELDS: Record<string, Record<string, string | string[]>> = {
+  analyzer: { model: "opus", effort: "high", color: "yellow", disallowedTools: ["Bash", "Write", "Edit", "NotebookEdit", "Agent"] },
+  architect: { model: "fable", effort: "xhigh", color: "purple", memory: "project", disallowedTools: ["Write", "Edit", "NotebookEdit", "Agent"] },
+  "build-fixer": { model: "opus", effort: "medium", color: "yellow", disallowedTools: ["Agent"] },
   executor: { model: "sonnet", effort: "high", color: "green", disallowedTools: ["Agent"] },
-  explore: {
+  explorer: {
     model: "sonnet",
     effort: "high",
     omitClaudeMd: "true",
     color: "blue",
     disallowedTools: ["Write", "Edit", "NotebookEdit", "Agent"],
   },
-  hephaestus: { model: "opus", effort: "medium", color: "yellow", disallowedTools: ["Agent"] },
-  librarian: {
+  orchestrator: { model: "opus", effort: "high", color: "purple", memory: "project" },
+  planner: { model: "opus", effort: "high", color: "cyan", memory: "project", disallowedTools: ["Bash"] },
+  researcher: {
     model: "sonnet",
     effort: "high",
     omitClaudeMd: "true",
@@ -104,18 +108,14 @@ const AGENT_FIELDS: Record<string, Record<string, string | string[]>> = {
     memory: "project",
     disallowedTools: ["Write", "Edit", "NotebookEdit", "Agent"],
   },
-  metis: { model: "opus", effort: "high", color: "yellow", disallowedTools: ["Bash", "Write", "Edit", "NotebookEdit", "Agent"] },
-  momus: { model: "opus", effort: "high", color: "red", memory: "project", disallowedTools: ["Bash", "Agent"] },
-  "multimodal-looker": {
+  reviewer: { model: "opus", effort: "high", color: "red", memory: "project", disallowedTools: ["Bash", "Agent"] },
+  viewer: {
     model: "opus",
     effort: "medium",
     omitClaudeMd: "true",
     color: "pink",
     disallowedTools: ["Agent", "Bash", "Edit", "Write", "Glob", "Grep", "NotebookEdit", "Skill"],
   },
-  oracle: { model: "fable", effort: "xhigh", color: "purple", memory: "project", disallowedTools: ["Write", "Edit", "NotebookEdit", "Agent"] },
-  prometheus: { model: "opus", effort: "high", color: "cyan", memory: "project", disallowedTools: ["Bash"] },
-  sisyphus: { model: "opus", effort: "high", color: "purple", memory: "project" },
 };
 
 test("every agents/*.md parses to exactly its declared fields, with the description taken verbatim", () => {

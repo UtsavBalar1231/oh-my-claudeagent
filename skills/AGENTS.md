@@ -6,7 +6,7 @@ Installed skills are `skills/*/SKILL.md`.
 
 Every skill except the orchestration entrypoints named below:
 
-`consolidate-memory`, `debugging`, `git-master`, `github-triage`, `handoff`, `hephaestus`, `init-deep`, `metis`, `momus`, `omca-setup`, `refactor`, `remove-ai-slops`
+`analyzer`, `build-fixer`, `consolidate-memory`, `debugging`, `git-master`, `github-triage`, `handoff`, `init-deep`, `omca-setup`, `refactor`, `remove-ai-slops`, `reviewer`
 
 The orchestration entrypoints are skills here too: `plan` (`skills/plan/SKILL.md`) and
 `start-work` (`skills/start-work/SKILL.md`). Both set `disable-model-invocation: true` so only

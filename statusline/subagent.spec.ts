@@ -74,7 +74,7 @@ describe("model", () => {
     ["an empty model", { model: "" }],
   ])("an OMCA agent with %s takes the tier from its frontmatter", (_, extra) => {
     expect(content({ name: "oh-my-claudeagent:executor", ...extra })).toBe(row(name("executor"), model("Sonnet")));
-    expect(content({ name: "oh-my-claudeagent:oracle", ...extra })).toBe(row(name("oracle"), model("Fable")));
+    expect(content({ name: "oh-my-claudeagent:architect", ...extra })).toBe(row(name("architect"), model("Fable")));
   });
 
   test.each([
@@ -202,11 +202,11 @@ describe("stdin contract", () => {
   test("each task with an id gets one row, in order", () => {
     const payload = {
       columns: 300,
-      tasks: [{ id: "a1", name: "oh-my-claudeagent:executor", status: "running" }, { name: "no-id" }, null, 7, { id: "a2", name: "oh-my-claudeagent:oracle" }],
+      tasks: [{ id: "a1", name: "oh-my-claudeagent:executor", status: "running" }, { name: "no-id" }, null, 7, { id: "a2", name: "oh-my-claudeagent:architect" }],
     };
     expect(rows(payload)).toEqual([
       { id: "a1", content: row(name("executor"), model("Sonnet"), `${Y}running${R}`) },
-      { id: "a2", content: row(name("oracle"), model("Fable")) },
+      { id: "a2", content: row(name("architect"), model("Fable")) },
     ]);
   });
 

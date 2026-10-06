@@ -68,7 +68,7 @@ export const BOLD = "\x1b[1m";
 export const separator = (dot: string): string => ` ${DIM}${dot}${RST} `;
 const SEP = separator("·");
 // The plugin's settings.json starts every session on this agent, so naming it tells nothing.
-export const DEFAULT_MAIN_AGENT = "oh-my-claudeagent:sisyphus";
+export const DEFAULT_MAIN_AGENT = "oh-my-claudeagent:orchestrator";
 const DAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 
 const WARN_PERCENT = 60;

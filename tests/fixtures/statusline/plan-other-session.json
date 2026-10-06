@@ -10,8 +10,7 @@
           "started_at": "2026-10-01T00:00:00Z",
           "session_ids": [
             "other-session"
-          ],
-          "agent": "sisyphus"
+          ]
         }
       },
       "bindings": {

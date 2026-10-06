@@ -16,8 +16,8 @@ const FINAL: NextAction = {
 };
 const REVIEW: NextAction = {
   kind: "review",
-  label: "Review with oracle",
-  prompt: "Review the changes made for widget-rewrite with oracle",
+  label: "Review with the architect",
+  prompt: "Review the changes made for widget-rewrite with the architect",
 };
 
 describe("nextActions", () => {

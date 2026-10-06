@@ -32,7 +32,7 @@ async function omcaAgents(dir: string): Promise<Agent[] | undefined> {
   return omca.length === 8 ? body?.data : undefined
 }
 
-const explore = (agents: Agent[] | undefined) => agents?.find((agent) => agent.id === "omca-explore")
+const explore = (agents: Agent[] | undefined) => agents?.find((agent) => agent.id === "omca-explorer")
 
 const registeredIn = (dir: string) => until(`omca agents registered in ${dir}`, 15_000, () => omcaAgents(dir), need().server.last)
 
@@ -66,14 +66,14 @@ describe.skipIf(!opencodeBin)("opencode plugin smoke", () => {
     expect(agents.filter((agent) => agent.id.startsWith("omca-"))).toHaveLength(8)
   }, SLOW)
 
-  test("omca-explore is a subagent with edit/subagent denied", async () => {
+  test("omca-explorer is a subagent with edit/subagent denied", async () => {
     const agent = explore(await registeredIn(need().a))
     expect(agent?.mode).toBe("subagent")
     const denied = (agent?.permissions ?? []).filter((permission) => permission.effect === "deny").map((permission) => permission.action)
     expect(["edit", "subagent"].filter((action) => !denied.includes(action))).toEqual([])
   })
 
-  test("omca-explore model is anthropic/claude-sonnet-5-5 in A and unset in B", async () => {
+  test("omca-explorer model is anthropic/claude-sonnet-5-5 in A and unset in B", async () => {
     const { a, b } = need()
     expect(explore(await registeredIn(a))?.model).toMatchObject({ providerID: "anthropic", id: "claude-sonnet-5-5" })
     const agentsInB = await registeredIn(b)
@@ -142,7 +142,7 @@ describe.skipIf(!opencodeBin)("opencode plugin smoke", () => {
     expect(countLines(log, "omca: ignoring models.")).toBe(1)
   })
 
-  test("git+file plugin spec loads 8 agents with a non-empty omca-explore system prompt", async () => {
+  test("git+file plugin spec loads 8 agents with a non-empty omca-explorer system prompt", async () => {
     const { server, c } = need()
     await until(
       "git spec load",

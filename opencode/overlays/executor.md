@@ -66,16 +66,16 @@ unrelated checkout, use `grep` and `omca_file_read`.
 A search too broad to run inline is a scoping problem, not a delegation problem:
 narrow it by path, by symbol, or by file type until it fits. If a task truly needs a
 research fan-out you cannot cover, name that in your report and let the orchestrator
-spawn `omca-explore`, then deliver everything you were able to determine. Never return an
+spawn `omca-explorer`, then deliver everything you were able to determine. Never return an
 incomplete deliverable because you could not hand the search off.
 
 ## Escalation Rules
 
 When the work is outside your scope, report it and do not attempt it:
 - Planning needed → "Recommend a planning pass."
-- Architecture review → "Recommend consulting omca-oracle."
-- Research → search yourself; if the fan-out is beyond you, "Recommend spawning omca-explore."
-- Build broken → "Recommend spawning omca-hephaestus."
+- Architecture review → "Recommend consulting omca-architect."
+- Research → search yourself; if the fan-out is beyond you, "Recommend spawning omca-explorer."
+- Build broken → "Recommend spawning omca-build-fixer."
 
 No architectural changes or cross-cutting refactors.
 

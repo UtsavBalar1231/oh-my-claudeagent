@@ -46,13 +46,13 @@ memory: project                   # optional; enables persistent project memory
 ```
 
 Key rules:
-- Declare the tier alias in `model:`, not a full generation ID. The alias tracks the platform's current model for that tier, so the frontmatter never goes stale. The roster uses three tiers: `sonnet` for routine workers whose scope the orchestrator fixes (search, scoped implementation, docs lookup), `opus` for agents whose output turns on judgment, and `fable` for oracle-class reasoning. `haiku` remains a valid per-call override but is not what a new agent declares.
-- Pick `effort:` deliberately, alongside the tier. `low` suits short scoped work that is not intelligence-sensitive, `medium` is the Sonnet 5.5 and Opus 5.5 default for day-to-day work with a clear scope, `high` is the intelligence-sensitive default for orchestration and planning, `xhigh` buys deeper reasoning for oracle. Reserve `xhigh` and `max` for a measured quality gain: Opus 5.5 thinks more per turn at a given level than Opus 5 did.
+- Declare the tier alias in `model:`, not a full generation ID. The alias tracks the platform's current model for that tier, so the frontmatter never goes stale. The roster uses three tiers: `sonnet` for routine workers whose scope the orchestrator fixes (search, scoped implementation, docs lookup), `opus` for agents whose output turns on judgment, and `fable` for architect-class reasoning. `haiku` remains a valid per-call override but is not what a new agent declares.
+- Pick `effort:` deliberately, alongside the tier. `low` suits short scoped work that is not intelligence-sensitive, `medium` is the Sonnet 5.5 and Opus 5.5 default for day-to-day work with a clear scope, `high` is the intelligence-sensitive default for orchestration and planning, `xhigh` buys deeper reasoning for architect. Reserve `xhigh` and `max` for a measured quality gain: Opus 5.5 thinks more per turn at a given level than Opus 5 did.
 - Use `disallowedTools:` to restrict capabilities, never `tools:`. `tools:` is a strict allowlist that blocks MCP tool inheritance, and an incomplete list launches the agent with no usable tools. `bun scripts/validate.ts --check claims` fails on a `tools:` key in agent frontmatter.
 - Keep `name:` free of `:`. The platform rejects an agent whose frontmatter name holds a colon, so the agent never loads. The `oh-my-claudeagent:` prefix used at call sites is added by the platform.
 - Do not declare `permissionMode:`. Claude Code strips it from plugin agents for security.
 - Add the agent to every list of the roster: the agent catalog table in `templates/claudemd.md`, the agents table in `docs/references.md` and the agent list in the root `AGENTS.md`. `servers/categories.json` maps categories to tiers and changes only when a category does.
-- Frontmatter outranks `CLAUDE_CODE_SUBAGENT_MODEL`. The order is a per-invocation model first, then the agent definition's `model:` field (`inherit` included), then the environment variable. Every agent on this roster declares `model:`, so the variable is a default that never applies here. `CLAUDE_CODE_SUBAGENT_MODEL_FORCE` does override a definition. With it set, the declared tier is ignored for every agent, oracle's `fable` included.
+- Frontmatter outranks `CLAUDE_CODE_SUBAGENT_MODEL`. The order is a per-invocation model first, then the agent definition's `model:` field (`inherit` included), then the environment variable. Every agent on this roster declares `model:`, so the variable is a default that never applies here. `CLAUDE_CODE_SUBAGENT_MODEL_FORCE` does override a definition. With it set, the declared tier is ignored for every agent, architect's `fable` included.
 - Keep hook internals out of agent prompts. State the behavioral rule and leave out the enforcement mechanism. An agent prompt must not mention hook handler names (`stop-gates`, `task-completed`), "X hook" as a noun (`SubagentStart hook`, `Stop hook`, `the final-verification hook`), raw `.omca/state/*.json` file paths, or specific plan names and task numbers as enforcement rationale. Write *"session termination is blocked until final-verification evidence is present"*, and avoid *"the `stop-gates` handler blocks Stop"*. Platform event names such as `TaskCreated`, `TaskCompleted` and `TeammateIdle` may appear as API contract references. Do not call them "lifecycle hooks"; say "lifecycle events" or "platform lifecycle gates". A prompt that names an internal handler goes stale when the hook is renamed, refactored or replaced with an MCP tool.
 
 ## Adding a skill
@@ -212,7 +212,7 @@ A prose pass leaves these alone, because each is read by the platform or by CI:
 
 - YAML frontmatter in `agents/*.md` and `skills/*/SKILL.md`. A skill `description` is
   trigger-matched and character-capped.
-- Headings other code greps for, such as `### Completion Signaling` in `agents/prometheus.md`,
+- Headings other code greps for, such as `### Completion Signaling` in `agents/planner.md`,
   which `scripts/validate/agent-prompts.spec.ts` asserts. Grep before renaming a heading.
 - Code blocks and output-format templates.
 - Tool names, file paths and bracketed tokens such as `[VERIFICATION]`.

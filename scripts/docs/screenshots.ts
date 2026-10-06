@@ -311,9 +311,9 @@ export const CLIPS: readonly Clip[] = [
     format: "clip",
     cols: CLIP_COLS,
     rows: CLIP_ROWS,
-    allow: ["Edit(plans/**)", "Skill(oh-my-claudeagent:metis *)", "Skill(oh-my-claudeagent:momus *)"],
-    // The plan skill's protocol: a DRAFT plan first, the interview against it, metis, the FINAL
-    // rewrite, then the momus review, metis and momus each a forked skill.
+    allow: ["Edit(plans/**)", "Skill(oh-my-claudeagent:analyzer *)", "Skill(oh-my-claudeagent:reviewer *)"],
+    // The plan skill's protocol: a DRAFT plan first, the interview against it, the analyzer, the FINAL
+    // rewrite, then the reviewer pass, analyzer and reviewer each a forked skill.
     script: (project) => ({
       main: [
         { content: [text("A draft first, so the interview has something concrete to correct."), tool("Write", { file_path: join(project, PLAN_PATH), content: DRAFT_PLAN })] },
@@ -335,10 +335,10 @@ export const CLIPS: readonly Clip[] = [
             }),
           ],
         },
-        { content: [text("Provider tokens, then. Metis checks the draft for gaps."), tool("Skill", { skill: "oh-my-claudeagent:metis", args: PLAN_PATH })] },
+        { content: [text("Provider tokens, then. The analyzer checks the draft for gaps."), tool("Skill", { skill: "oh-my-claudeagent:analyzer", args: PLAN_PATH })] },
         { content: [tool("Write", { file_path: join(project, PLAN_PATH), content: FINAL_PLAN })] },
-        { content: [tool("Skill", { skill: "oh-my-claudeagent:momus", args: PLAN_PATH })] },
-        { content: [text("Momus says OKAY: 5 tasks in 2 waves. Run /oh-my-claudeagent:start-work to begin.")] },
+        { content: [tool("Skill", { skill: "oh-my-claudeagent:reviewer", args: PLAN_PATH })] },
+        { content: [text("The reviewer says OKAY: 5 tasks in 2 waves. Run /oh-my-claudeagent:start-work to begin.")] },
       ],
       subagent: [
         { content: [text("One gap: removing a card must also delete its token from the vault. Add it as its own task, with an end-to-end check.")] },
@@ -353,7 +353,7 @@ export const CLIPS: readonly Clip[] = [
       { key: "Enter" },
       // Claude Code draws a write into plansDirectory as "Updated plan"; the second is the FINAL rewrite.
       { until: (screen) => screen.split("● Updated plan").length > 2, mark: "plan-written" },
-      { until: has("Momus says OKAY") },
+      { until: has("The reviewer says OKAY") },
     ],
   },
   {
@@ -427,7 +427,7 @@ export const CLIPS: readonly Clip[] = [
               command: "just test",
               exit_code: 0,
               output_snippet: "14 of 14 tasks checked; 42 tests passed",
-              verified_by: "sisyphus",
+              verified_by: "orchestrator",
               plan_sha256: planSha256(project),
             }),
           ],
@@ -554,11 +554,11 @@ export const SHOTS: readonly Still[] = [
         {
           content: [
             text("Task 8 needs the current error messages first; explore will map them."),
-            agent("explore", "Map the validation messages", "Task 8: list every validation message the address and card forms build today."),
+            agent("explorer", "Map the validation messages", "Task 8: list every validation message the address and card forms build today."),
           ],
         },
-        { content: [text("Explore is mapping the messages.")] },
-        { content: [text("Explore mapped the messages. Tasks 7 and 9 can start now."), TASK_7] },
+        { content: [text("The explorer is mapping the messages.")] },
+        { content: [text("The explorer mapped the messages. Tasks 7 and 9 can start now."), TASK_7] },
         { content: [bash("sleep 3", "Let the first executor settle")] },
         { content: [executor("Persist the draft order", "Task 9: save the draft order on every step so a reload keeps it.")] },
         { content: [text("Two executors are running, on tasks 7 and 9.")] },
@@ -589,7 +589,7 @@ export const SHOTS: readonly Still[] = [
     script: { main: [{ content: [text("Hello.")] }], subagent: [] },
     ready: (screen) => screen.includes("checked") && screen.includes("WARN"),
     crop: "pane",
-    // An effort cap below oracle's declared xhigh is a real WARN the doctor explains.
+    // An effort cap below architect's declared xhigh is a real WARN the doctor explains.
     settings: { maxEffortLevel: "high" },
   },
   {
@@ -655,8 +655,8 @@ function git(cwd: string, home: string, ...args: string[]): void {
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const EXECUTOR = "oh-my-claudeagent:executor";
-const SISYPHUS = "oh-my-claudeagent:sisyphus";
-const HEPHAESTUS = "oh-my-claudeagent:hephaestus";
+const ORCHESTRATOR = "oh-my-claudeagent:orchestrator";
+const BUILD_FIXER = "oh-my-claudeagent:build-fixer";
 
 // Each run's age before the capture, so the day groups and the times beside them read as recent
 // whenever the script runs. The newest test passed after every task file but task 7's changed,
@@ -667,10 +667,10 @@ const LEDGER: readonly (readonly [age: number, type: string, command: string, ex
   [49 * HOUR, "test", "bun test src/cart", 0, " 12 pass\n 0 fail\nRan 12 tests across 2 files. [41.00ms]", EXECUTOR],
   [47 * HOUR, "lint", "just lint", 0, "Found 0 warnings and 0 errors.", EXECUTOR],
   [27 * HOUR, "test", "bun test src/forms", 0, " 21 pass\n 0 fail\nRan 21 tests across 2 files. [38.00ms]", EXECUTOR],
-  [25.5 * HOUR, "lint", "just typecheck", 1, "src/steps/address.ts:4:3 - error TS2322: Type 'string' is not assignable to type 'boolean'.", HEPHAESTUS],
-  [25 * HOUR, "lint", "just typecheck", 0, "tsc --noEmit: no errors", HEPHAESTUS],
+  [25.5 * HOUR, "lint", "just typecheck", 1, "src/steps/address.ts:4:3 - error TS2322: Type 'string' is not assignable to type 'boolean'.", BUILD_FIXER],
+  [25 * HOUR, "lint", "just typecheck", 0, "tsc --noEmit: no errors", BUILD_FIXER],
   [24.5 * HOUR, "build", "bun run build", 0, "built 41 modules in 1.2 s", EXECUTOR],
-  [23 * HOUR, "final_verification", "just ci", 1, "INCOMPLETE: 9 of 14 tasks are open\nlint, typecheck and test pass; the e2e suite is not written yet", SISYPHUS],
+  [23 * HOUR, "final_verification", "just ci", 1, "INCOMPLETE: 9 of 14 tasks are open\nlint, typecheck and test pass; the e2e suite is not written yet", ORCHESTRATOR],
   [170 * MINUTE, "test", "bun test src/steps", 1, "(fail) a declined card keeps the cart\n  Expected: 3 items\n  Received: 0 items\n 17 pass\n 1 fail", EXECUTOR],
   [140 * MINUTE, "test", "bun test src/steps", 0, " 18 pass\n 0 fail\nRan 18 tests across 3 files. [212.00ms]", EXECUTOR],
   [100 * MINUTE, "lint", "just lint", 0, "Found 0 warnings and 0 errors.", EXECUTOR],
@@ -681,7 +681,7 @@ const LEDGER: readonly (readonly [age: number, type: string, command: string, ex
     'PAYMENTS_API_KEY="fake-sandbox-key" bun run smoke:payment',
     0,
     "card ending 0002 declined: cart kept, 3 items\ncard ending 4242 accepted: draft order saved\nsmoke passed in 2.8 s",
-    SISYPHUS,
+    ORCHESTRATOR,
   ],
 ];
 
@@ -710,7 +710,7 @@ function writeProject(project: string, home: string, shot: Shot): void {
   writeFileSync(
     join(project, ".omca", "state", "boulder.json"),
     JSON.stringify({
-      plans: { [PLAN_NAME]: { active_plan: plan, started_at: "2026-10-02T08:00:00Z", session_ids: [SESSION_ID], agent: "sisyphus" } },
+      plans: { [PLAN_NAME]: { active_plan: plan, started_at: "2026-10-02T08:00:00Z", session_ids: [SESSION_ID] } },
       bindings: { [SESSION_ID]: { plan_name: PLAN_NAME, bound_at: 1790928000 } },
     }),
   );

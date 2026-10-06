@@ -16,7 +16,7 @@
           "type": "tool_use",
           "name": "Agent",
           "input": {
-            "subagent_type": "oh-my-claudeagent:explore",
+            "subagent_type": "oh-my-claudeagent:explorer",
             "description": "Map the router callers",
             "prompt": "Find every caller of the shared router and say which ones bypass the harness.",
             "run_in_background": true
@@ -26,7 +26,7 @@
           "type": "tool_use",
           "name": "Agent",
           "input": {
-            "subagent_type": "oh-my-claudeagent:oracle",
+            "subagent_type": "oh-my-claudeagent:architect",
             "description": "Review the ledger design",
             "prompt": "Review the ledger rotation design for data loss on a crash mid-write.",
             "run_in_background": true

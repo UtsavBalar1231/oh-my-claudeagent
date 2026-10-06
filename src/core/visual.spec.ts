@@ -70,7 +70,7 @@ describe("palette", () => {
 
   test("an agent draws in its roster color, an unknown one muted", () => {
     expect(agentKey("oh-my-claudeagent:executor")).toBe("green_FOR_SUBAGENTS_ONLY");
-    expect(agentKey("momus")).toBe("red_FOR_SUBAGENTS_ONLY");
+    expect(agentKey("reviewer")).toBe("red_FOR_SUBAGENTS_ONLY");
     expect(agentKey("general-purpose")).toBe("inactive");
     expect(agentKey("constructor")).toBe("inactive");
   });

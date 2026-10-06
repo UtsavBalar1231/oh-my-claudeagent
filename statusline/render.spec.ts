@@ -473,14 +473,14 @@ describe("segments", () => {
   });
 
   test.each([
-    ["sisyphus", "A:"],
-    ["oh-my-claudeagent:prometheus", "A:"],
+    ["orchestrator", "A:"],
+    ["oh-my-claudeagent:planner", "A:"],
   ])("agent %s is marked %s without Nerd Font", (name, glyph) => {
     expect(rows({ model, agent: { name } })).toEqual([[MODEL, `${M}${glyph} ${name}${R}`].join(S), WAITING, ZERO]);
   });
 
   test.each([
-    ["sisyphus", "\uf01e"],
+    ["orchestrator", "\uf001"],
     ["oh-my-claudeagent:executor", "\uf085"],
     ["someone-else", "\uf007"],
     ["constructor", "\uf007"],
@@ -506,11 +506,11 @@ describe("segments", () => {
     const data: Payload = {
       model,
       workspace: { project_dir: "/work/repo" },
-      agent: { name: "sisyphus" },
+      agent: { name: "orchestrator" },
       worktree: { name: "wt" },
       pr: { number: 3 },
     };
-    expect(rows(data, ON_BRANCH)).toEqual([[MODEL, `${M}A: sisyphus${R}`].join(S), [WAITING, branch, `${D}> repo${R}`, `${B}W: wt${R}`, `${C}#3${R}`].join(S), ZERO]);
+    expect(rows(data, ON_BRANCH)).toEqual([[MODEL, `${M}A: orchestrator${R}`].join(S), [WAITING, branch, `${D}> repo${R}`, `${B}W: wt${R}`, `${C}#3${R}`].join(S), ZERO]);
   });
 
   test("a payload without a repository shows no pull request segment", () => {
@@ -881,7 +881,7 @@ describe("layout", () => {
     session_id: SESSION,
     workspace: { project_dir: dir, added_dirs: ["/a", "/b"] },
     effort: { level: "high" },
-    agent: { name: "oh-my-claudeagent:sisyphus" },
+    agent: { name: "oh-my-claudeagent:orchestrator" },
     worktree: { name: "wt", original_branch: "main" },
     pr: { number: 42, url: "https://github.com/acme/app/pull/42", review_state: "approved" },
     context_window: { context_window_size: 200000, used_percentage: 34 },

@@ -176,7 +176,7 @@ const FAMILIES: Family[] = [
       const plan = join(project, "plans", "plan.md");
       seedFile(project, join("plans", "plan.md"), STOP_PLAN);
       const registry = {
-        plans: { probe: { active_plan: plan, started_at: "2026-01-01T00:00:00Z", session_ids: [STOP_SESSION], agent: "sisyphus" } },
+        plans: { probe: { active_plan: plan, started_at: "2026-01-01T00:00:00Z", session_ids: [STOP_SESSION] } },
         bindings: { [STOP_SESSION]: { plan_name: "probe", bound_at: Math.floor(Date.now() / 1000) } },
       };
       seedFile(project, join(".omca", "state", "boulder.json"), JSON.stringify(registry));

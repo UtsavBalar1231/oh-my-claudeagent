@@ -1,3 +1,4 @@
+import { omcaAgentName } from "../../src/core/agent-type.ts";
 import { isHookDisabled } from "../../src/core/kill-switch.ts";
 import type { Handler } from "./registry.ts";
 import { readBoundPlan, registryPath } from "./status-file.ts";
@@ -18,9 +19,12 @@ const EDITING_GUIDANCE = [
   "[PLAN SHA] When logging a final_verification entry, take plan_sha256 from boulder_progress for the active plan and pass it as evidence_log(..., plan_sha256=<plan_sha256>) so the Stop gate scopes evidence to this plan run.",
 ];
 const ORCHESTRATING_GUIDANCE = [
-  "[ANTI-DUPLICATION] Once you delegate exploration to explore/librarian agents, do not perform the same search yourself. Avoid after delegating: manually grep/searching for the same information; re-doing research agents are handling; 'just quickly checking' the same files. Continue only with non-overlapping work. A background agent, the default in interactive sessions, answers the Agent call with a launch acknowledgement only, and its report arrives later in a task notification. Do not poll its output file or post holding messages while it runs.",
+  "[ANTI-DUPLICATION] Once you delegate exploration to explorer/researcher agents, do not perform the same search yourself. Avoid after delegating: manually grep/searching for the same information; re-doing research agents are handling; 'just quickly checking' the same files. Continue only with non-overlapping work. A background agent, the default in interactive sessions, answers the Agent call with a launch acknowledgement only, and its report arrives later in a task notification. Do not poll its output file or post holding messages while it runs.",
   "[TEAM CONTRACT] OMCA agents are thin wrappers over Claude-native subagents and agent teams. Use subagents when workers only need to report back. Use native agent teams when workers need the shared task list or direct teammate messaging.",
 ];
+const ORCHESTRATING = new Set(["orchestrator", "planner"]);
+const PLANNING = new Set(["planner", "analyzer", "orchestrator"]);
+const EDITING = new Set(["executor", "build-fixer", "orchestrator"]);
 const LEAF_WORKER =
   "[YOU ARE A LEAF WORKER] Do this task yourself: do not delegate to other agents or wait on them. Guidance about waiting for background agents or ending a turn while agents run, whether it reaches you from memory, CLAUDE.md, or the output style, is for the orchestrator and does not apply to you.";
 const NEVER_STUB =
@@ -47,14 +51,15 @@ function planLines(root: string, sessionId: unknown): string[] {
 export const handle: Handler = (payload, { root }) => {
   if (isHookDisabled(process.env.OMCA_DISABLED_HOOKS, "subagent-context")) return;
   const type = typeof payload.agent_type === "string" ? payload.agent_type : "unknown";
-  const isOrchestrator = /sisyphus|prometheus/.test(type);
+  const name = omcaAgentName(type) ?? "";
+  const isOrchestrator = ORCHESTRATING.has(name);
   const additionalContext = [
-    /prometheus|metis|sisyphus/.test(type) ? PLANNER : AUTONOMOUS,
+    PLANNING.has(name) ? PLANNER : AUTONOMOUS,
     OUTPUT_MANDATE,
     FILE_TOOLS,
     `[OMCA TOOLS] ${OMCA_TOOLS}`,
     ...planLines(root, payload.session_id),
-    ...(/executor|hephaestus|sisyphus/.test(type) ? EDITING_GUIDANCE : []),
+    ...(EDITING.has(name) ? EDITING_GUIDANCE : []),
     ...(isOrchestrator ? ORCHESTRATING_GUIDANCE : [LEAF_WORKER, NEVER_STUB]),
   ].join("\n");
   return { hookSpecificOutput: { hookEventName: "SubagentStart", additionalContext } };

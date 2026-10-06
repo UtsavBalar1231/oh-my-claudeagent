@@ -50,7 +50,7 @@ type Allowed = { file: string; phrase: string; line: string; reason: string };
 // scanned file that matches no line fails, so the list cannot outlive the wording it excuses.
 export const ALLOWED: readonly Allowed[] = [
   {
-    file: "agents/hephaestus.md",
+    file: "agents/build-fixer.md",
     phrase: "renamed",
     line: "a renamed type",
     reason: "a build error caused by a rename in the user's own code",
@@ -62,10 +62,10 @@ export const ALLOWED: readonly Allowed[] = [
     reason: "the instruction not to add compatibility code the task does not require",
   },
   {
-    file: "agents/sisyphus.md",
+    file: "agents/orchestrator.md",
     phrase: "legacy",
     line: "Legacy/Chaotic",
-    reason: "a class of the user's codebase that sisyphus assesses",
+    reason: "a class of the user's codebase that the orchestrator assesses",
   },
   {
     file: "rules/comments-go.md",

@@ -49,11 +49,11 @@ const evidence = (type: string, command: string, exit: number, timestamp: string
 
 const runs = (planSha: string) => [
   evidence("build", "bun run build", 0, local(1, 9, 0), "oh-my-claudeagent:executor", "built in 1.2 s"),
-  evidence("lint", "just lint", 1, local(1, 9, 30), "oh-my-claudeagent:explore", "src/core/evidence.ts:12 unused import"),
+  evidence("lint", "just lint", 1, local(1, 9, 30), "oh-my-claudeagent:explorer", "src/core/evidence.ts:12 unused import"),
   evidence("test", "just test-mod", 1, local(2, 10, 0), "oh-my-claudeagent:executor", FAILING_OUTPUT),
   evidence("test", `curl -H 'Authorization: ${BEARER}' https://ci.example/run && just test`, 0, local(2, 10, 20), "oh-my-claudeagent:executor", `pushed with token=${TOKEN}\n42 pass`),
-  evidence("manual", "bun scripts/qa/visual.ts evidence", 0, local(2, 11, 0), "sisyphus", ""),
-  evidence("final_verification", "just ci", 0, local(2, 11, 45), "sisyphus", "COMPLETE", planSha),
+  evidence("manual", "bun scripts/qa/visual.ts evidence", 0, local(2, 11, 0), "orchestrator", ""),
+  evidence("final_verification", "just ci", 0, local(2, 11, 45), "orchestrator", "COMPLETE", planSha),
 ];
 
 async function proofFiles(planSha?: string): Promise<Record<string, string>> {
@@ -143,7 +143,7 @@ test("narrow: the verdict card, the day-grouped timeline and the focused entry o
     "❯ ✓  11:45  final   just ci",
     "    │just ci",
     "    │COMPLETE",
-    "    2026-10-02 11:45:00 · ◆ sisyphus",
+    "    2026-10-02 11:45:00 · ◆ orchestrator",
     "  ✓  11:00  manual  bun scripts/qa/…ual.ts evidence",
     "  ✓  10:20  test    curl -H 'Author…un && just test",
     "  ✗  10:00  test    just test-mod",
@@ -170,12 +170,12 @@ test("standard: a one-line verdict above the timeline, agents named, the command
   expect(await body(ui, INLINE_80)).toEqual([
     " COMPLETE  sample  ✓ build  ✓ test  ✗ lint  ✓ manual  10-02 11:45",
     "── Fri 2026-10-02 ───────────────────────────────────────────────────────",
-    "❯ ✓  11:45  final   just ci                                    ◆ sisyphus",
+    "❯ ✓  11:45  final   just ci                                ◆ orchestrator",
     "    │COMPLETE",
-    "    2026-10-02 11:45:00 · ◆ sisyphus",
-    "  ✓  11:00  manual  bun scripts/qa/visual.ts evidence          ◆ sisyphus",
-    "  ✓  10:20  test    curl -H 'Authorizati…ple/run && just test  ◆ executor",
-    "  ✗  10:00  test    just test-mod                              ◆ executor",
+    "    2026-10-02 11:45:00 · ◆ orchestrator",
+    "  ✓  11:00  manual  bun scripts/qa/visual.ts evidence      ◆ orchestrator",
+    "  ✓  10:20  test    curl -H 'Authoriza…e/run && just test  ◆ executor",
+    "  ✗  10:00  test    just test-mod                          ◆ executor",
     " ",
     "t: Type  x: Fails  f: Find  c: Copy  r: Rerun  1/6 · ↑↓ move",
     " ",
@@ -184,9 +184,9 @@ test("standard: a one-line verdict above the timeline, agents named, the command
   await $.ui.scroll({ ...SCROLL, by: 2, bodyRows: 10, contentRows: 11 });
   expect((await body(ui, INLINE_80)).slice(1, 10)).toEqual([
     "── Fri 2026-10-02 ───────────────────────────────────────────────────────",
-    "  ✓  11:45  final   just ci                                    ◆ sisyphus",
-    "  ✓  11:00  manual  bun scripts/qa/visual.ts evidence          ◆ sisyphus",
-    "❯ ✓  10:20  test    curl -H 'Authorizati…ple/run && just test  ◆ executor",
+    "  ✓  11:45  final   just ci                                ◆ orchestrator",
+    "  ✓  11:00  manual  bun scripts/qa/visual.ts evidence      ◆ orchestrator",
+    "❯ ✓  10:20  test    curl -H 'Authoriza…e/run && just test  ◆ executor",
     "    │curl -H 'Authorization: Bearer ‹masked›' https://ci.example/run && j…",
     "    │pushed with token=‹masked›",
     "    │42 pass",
@@ -210,7 +210,7 @@ test("wide: the list beside a card of the focused entry, which follows the focus
     "❯ ✓  11:45  final   just ci                      │ final · exit 0",
     "  ✓  11:00  manual  bun scripts/q…l.ts evidence  │ │just ci",
     "  ✓  10:20  test    curl -H 'Auth… && just test  │ │COMPLETE",
-    "  ✗  10:00  test    just test-mod                │ 2026-10-02 11:45:00 · ◆ sisyphus",
+    "  ✗  10:00  test    just test-mod                │ 2026-10-02 11:45:00 · ◆ orchestrator",
     "── Thu 2026-10-01 ─────────────────────────────  ╰",
     "  ✗  09:30  lint    just lint",
     "  ✓  09:00  build   bun run build",
@@ -257,10 +257,10 @@ test("rows lead with the outcome glyph in its tone, the type a muted word but th
     { text: "test  ", color: "inactive" },
     { text: "  " },
     { text: "curl", bold: true },
-    { text: " -H 'Authorization: Be…i.example/run && just test" },
+    { text: " -H 'Authorization: …example/run && just test" },
     { text: "  " },
     { text: "◆", color: "green_FOR_SUBAGENTS_ONLY" },
-    { text: " executor", color: "inactive" },
+    { text: " executor    ", color: "inactive" },
   ]);
   expect(nodeByKey(tree, "entry-3")?.props).toEqual({ key: "entry-3", flexDirection: "row" });
   expect(runsOf(nodeByKey(tree, "entry-3")).filter((run) => run.backgroundColor !== undefined)).toEqual([]);
@@ -271,17 +271,17 @@ test("rows lead with the outcome glyph in its tone, the type a muted word but th
     { text: "✓", color: "success" },
   ]);
   expect(runsOf(nodeByKey(tree, "entry-1"))[5]).toEqual({ text: "lint  ", color: "inactive" });
-  expect(runsOf(nodeByKey(tree, "entry-1")).at(-1)).toEqual({ text: " explore ", color: "inactive" });
+  expect(runsOf(nodeByKey(tree, "entry-1")).at(-1)).toEqual({ text: " explorer    ", color: "inactive" });
   expect(nodeByKey(tree, "entry-5")?.props).toEqual({ key: "entry-5", flexDirection: "row", backgroundColor: "selectionBg" });
   expect(runsOf(nodeByKey(tree, "entry-5"))[5]).toEqual({ text: "final ", color: "text", bold: true });
-  expect(runsOf(nodeByKey(tree, "entry-5")).at(-1)).toEqual({ text: " sisyphus", color: "text", bold: true });
+  expect(runsOf(nodeByKey(tree, "entry-5")).at(-1)).toEqual({ text: " orchestrator", color: "text", bold: true });
 
   await $.ui.scroll({ ...SCROLL, by: 2, bodyRows: 46, contentRows: 47 });
   const opened = await ui.drawn();
   const command = runsOf(nodeByKey(opened, "entry-3")).slice(7, 9);
   expect(command).toEqual([
     { text: "curl", color: "text", bold: true },
-    { text: " -H 'Authorization: Be…i.example/run && just test", color: "text", bold: true },
+    { text: " -H 'Authorization: …example/run && just test", color: "text", bold: true },
   ]);
   const meta = childrenOf(nodeByKey(opened, "detail-3") ?? { type: "Box" }).at(-1);
   expect(lines(meta)).toEqual(["2026-10-02 10:20:00 · ◆ executor · 2 secrets masked"]);
@@ -323,7 +323,7 @@ test("the verdict reads complete, stale, missing, with no plan, or with an unrea
   expect(await card()).toEqual(["│ Final verification · sample", "│  STALE  plan edited since it passed", "│ 10-02 11:45"]);
   expect(await border()).toBe("warning");
 
-  const failed = evidence("final_verification", "just ci", 1, local(2, 12, 0), "sisyphus", "INCOMPLETE", "f".repeat(64));
+  const failed = evidence("final_verification", "just ci", 1, local(2, 12, 0), "orchestrator", "INCOMPLETE", "f".repeat(64));
   write(w, LEDGER, JSON.stringify({ entries: [...runs("e".repeat(64)).filter((entry) => entry.type !== "final_verification"), failed] }));
   await refresh();
   expect(await card()).toEqual(["│ Final verification · sample", "│  MISSING  last run exited 1 · 10-02 12:00", "│ ✓ build  ✓ test  ✗ lint  ✓ manual"]);
@@ -515,7 +515,7 @@ test("f opens the Find field and moves the focus to it; typing filters, and subm
   expect(await ui.find({ key: "f" })).toMatchObject({ props: { label: "Find" } });
   expect((await ui.find({ key: "f" }))?.props["dimColor"]).toBeUndefined();
 
-  await ui.input({ key: "search", text: "explore" });
+  await ui.input({ key: "search", text: "explorer" });
   expect((await entryRows(ui)).map((row) => row.slice(12, 18))).toEqual(["lint  "]);
   await ui.input({ key: "search", text: "" });
   expect(await ui.find({ key: "search" })).toBeUndefined();
@@ -529,12 +529,12 @@ test("OMCA_GLYPHS=ascii draws the Evidence tab from the ASCII set", async ($, on
   expect(await body(ui, INLINE_80)).toEqual([
     "[COMPLETE] sample  + build  + test  x lint  + manual  10-02 11:45",
     "-- Fri 2026-10-02 -------------------------------------------------------",
-    "> +  11:45  final   just ci                                    @ sisyphus",
+    "> +  11:45  final   just ci                                @ orchestrator",
     "    │COMPLETE",
-    "    2026-10-02 11:45:00 - @ sisyphus",
-    "  +  11:00  manual  bun scripts/qa/visual.ts evidence          @ sisyphus",
-    "  +  10:20  test    curl -H 'Authorizat...le/run && just test  @ executor",
-    "  x  10:00  test    just test-mod                              @ executor",
+    "    2026-10-02 11:45:00 - @ orchestrator",
+    "  +  11:00  manual  bun scripts/qa/visual.ts evidence      @ orchestrator",
+    "  +  10:20  test    curl -H 'Authoriz.../run && just test  @ executor",
+    "  x  10:00  test    just test-mod                          @ executor",
     " ",
     "t: Type  x: Fails  f: Find  c: Copy  r: Rerun  1/6 - ^v move",
     " ",
@@ -548,7 +548,7 @@ test("OMCA_GLYPHS=ascii draws the Evidence tab from the ASCII set", async ($, on
 });
 
 test("Evidence rows stay inside the body less the gutter at every size, docked and inline, on both surfaces", async ($, on) => {
-  const long = evidence("manual", `bun scripts/qa/visual.ts ${"evidence ".repeat(30)}`, 127, local(2, 12, 0), "oh-my-claudeagent:multimodal-looker", "x".repeat(400));
+  const long = evidence("manual", `bun scripts/qa/visual.ts ${"evidence ".repeat(30)}`, 127, local(2, 12, 0), "oh-my-claudeagent:viewer", "x".repeat(400));
   world(on, { ...(await proofFiles()), [LEDGER]: JSON.stringify({ entries: [...runs(""), long] }) });
   await $.command.run(run(""));
   for (const size of [...SIZES, DOCK_210]) {
@@ -573,7 +573,7 @@ test("by default the rows and the checklist draw Nerd Font outcome glyphs and ea
   expect((await body(ui, INLINE_80)).slice(0, 3)).toEqual([
     " COMPLETE  sample  \u{f05d} build  \u{f05d} test  \u{f057} lint  \u{f05d} manual  10-02 11:45",
     "── Fri 2026-10-02 ───────────────────────────────────────────────────────",
-    "❯ \u{f05d}  11:45  final   just ci                                    \u{f01e} sisyphus",
+    "❯ \u{f05d}  11:45  final   just ci                                \u{f001} orchestrator",
   ]);
   const drawn = (await body(ui, INLINE_80)).join("\n");
   expect([...drawn.matchAll(/[\u{e000}-\u{f8ff}](?=\S)/gu)].map((match) => match[0])).toEqual([]);

@@ -38,7 +38,7 @@
       "exit_code": 0,
       "output_snippet": "tests/mod/visual/plan-reader-80.txt\ntests/mod/visual/plan-reader-120.txt\ntests/mod/visual/plan-reader-200.txt",
       "timestamp": "2026-09-30T10:40:00Z",
-      "verified_by": "oh-my-claudeagent:sisyphus"
+      "verified_by": "oh-my-claudeagent:orchestrator"
     },
     {
       "type": "test",
@@ -62,7 +62,7 @@
       "exit_code": 0,
       "output_snippet": "built 14 modules in 1.3 s",
       "timestamp": "2026-10-01T09:00:00Z",
-      "verified_by": "oh-my-claudeagent:hephaestus"
+      "verified_by": "oh-my-claudeagent:build-fixer"
     },
     {
       "type": "lint",
@@ -70,7 +70,7 @@
       "exit_code": 1,
       "output_snippet": "hooks/pane.ts:141:9 - error TS2322: Type 'string' is not assignable to type 'ThemeKey'.\n\nFound 1 error in hooks/pane.ts:141",
       "timestamp": "2026-10-01T09:45:00Z",
-      "verified_by": "oh-my-claudeagent:hephaestus"
+      "verified_by": "oh-my-claudeagent:build-fixer"
     },
     {
       "type": "lint",
@@ -78,7 +78,7 @@
       "exit_code": 0,
       "output_snippet": "bun x --bun tsc --noEmit -p tsconfig.json\nbun x --bun tsc --noEmit -p tsconfig.runtime.json",
       "timestamp": "2026-10-01T10:02:00Z",
-      "verified_by": "oh-my-claudeagent:hephaestus"
+      "verified_by": "oh-my-claudeagent:build-fixer"
     },
     {
       "type": "final_verification",
@@ -86,7 +86,7 @@
       "exit_code": 1,
       "output_snippet": "INCOMPLETE: task 4 has no passing test since hooks/tabs/evidence.ts changed",
       "timestamp": "2026-10-01T11:30:00Z",
-      "verified_by": "oh-my-claudeagent:sisyphus",
+      "verified_by": "oh-my-claudeagent:orchestrator",
       "plan_sha256": "3b1f0c9e7a4d2b8c6e5f1a0d9c8b7a6e5d4c3b2a19f8e7d6c5b4a39281706f5e"
     },
     {
@@ -111,7 +111,7 @@
       "exit_code": 0,
       "output_snippet": "HTTP/2 200\nx-request-id: 7f3c9a\n{\"status\":\"ok\",\"build\":\"2026.10.02-1\"}\nrerun with DEPLOY_TOKEN=fake-0000-not-a-secret-0000 to redeploy",
       "timestamp": "2026-10-02T07:10:00Z",
-      "verified_by": "oh-my-claudeagent:sisyphus"
+      "verified_by": "oh-my-claudeagent:orchestrator"
     },
     {
       "type": "test",
@@ -127,7 +127,7 @@
       "exit_code": 0,
       "output_snippet": "COMPLETE: 6/6 tasks proven\njust ci: lint, typecheck, validate, test, test-mod, test-opencode all green\ncaptures read at 80, 120 and 200 columns",
       "timestamp": "2026-10-02T08:05:00Z",
-      "verified_by": "oh-my-claudeagent:sisyphus",
+      "verified_by": "oh-my-claudeagent:orchestrator",
       "plan_sha256": "976f357d80c2c17c9826daf4a057ccbfd8eb176d196f4c42f0fbf6900fc0d89c"
     }
   ]

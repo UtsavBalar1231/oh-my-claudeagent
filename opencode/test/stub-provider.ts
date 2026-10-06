@@ -16,7 +16,7 @@ const SCENARIOS: Record<string, { tool: string; args: Json }> = {
   "explore-write": { tool: "subagent", args: { description: "omca stub", prompt: "OMCA-SCENARIO:write-file" } },
   "write-file": { tool: "write", args: { path: "explored.txt", content: "explored\n" } },
 }
-const SUBAGENT_ID = "omca-explore"
+const SUBAGENT_ID = "omca-explorer"
 
 function text(content: unknown): string {
   if (typeof content === "string") return content

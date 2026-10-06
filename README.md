@@ -72,7 +72,7 @@ The guard holds a destructive shell command for your review and shows what it wo
 `/omca doctor` checks the client, bun, the server, ast-grep, the options and the settings that
 change how OMCA runs. A check with a known fix offers a key that fills the prompt with it.
 
-<img src=".github/assets/doctor.png" width="680" alt="The Doctor tab counts 1 warning, 1 info row and 11 passing checks. The warning says maxEffortLevel high holds oracle below the xhigh it declares, the info row offers a: Use /advisor fable, and the passing rows cover OMCA, Claude Code, bun, the omca server, ast-grep, the options, the agent models, the mod policy, the hooks, the output style and the status line.">
+<img src=".github/assets/doctor.png" width="680" alt="The Doctor tab counts 1 warning, 1 info row and 11 passing checks. The warning says maxEffortLevel high holds architect below the xhigh it declares, the info row offers a: Use /advisor fable, and the passing rows cover OMCA, Claude Code, bun, the omca server, ast-grep, the options, the agent models, the mod policy, the hooks, the output style and the status line.">
 
 The status line shows the session (model, agent and the plan's next task), the workspace
 (context window and git state) and usage (duration, usage limits, and cost for accounts billed

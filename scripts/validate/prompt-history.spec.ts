@@ -7,7 +7,7 @@ afterEach(cleanup);
 const check = (patch: Record<string, string | null>) => runNamed(checks, "prompt history", fixture(patch));
 
 const CURATED = [
-  "Handled by prometheus, now part of the planner.",
+  "Handled by the analyzer, now part of the planner.",
   "The section (legacy spelling: Must NOT Have).",
   "The agent formerly called helper.",
   "The agent previously known as helper.",
@@ -18,7 +18,7 @@ const CURATED = [
   "The wiring changes after the port.",
   "Hold the guard until the servers merge.",
   "The tool used to be a script.",
-  "Metis still runs once (unchanged, mandatory).",
+  "The analyzer still runs once (unchanged, mandatory).",
   "Enter Socratic Interview Mode before Phase 1.",
   "Enter Socratic mode instead.",
   "The docs follow the hard cutover model.",

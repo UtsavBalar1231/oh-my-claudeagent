@@ -1,4 +1,4 @@
-<!-- Overlay for agents/explore.md. Each section below replaces the section with the same heading in that file;
+<!-- Overlay for agents/explorer.md. Each section below replaces the section with the same heading in that file;
      every section not listed here is taken from the source unchanged. -->
 
 ## Tool Strategy

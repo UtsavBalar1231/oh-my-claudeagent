@@ -9,7 +9,7 @@ const NOW = 1_786_000_000_000;
 const HOOKS = join(import.meta.dir, "..", "..", "hooks", "hooks.json");
 const MINUTE = 60_000;
 const BREAKER_TAIL =
-  "The count covers every failure of the tool, related or not. If these are repeated attempts at one fix, stop repeating it: change the approach, or ask for a diagnosis, from the advisor tool when you have it and from oracle when you do not.";
+  "The count covers every failure of the tool, related or not. If these are repeated attempts at one fix, stop repeating it: change the approach, or ask for a diagnosis, from the advisor tool when you have it and from architect when you do not.";
 const breaker = (attempts: string): string => `This tool has failed 3+ times, each failure within five minutes of the last. Attempts: ${attempts}. ${BREAKER_TAIL}`;
 
 const NOT_FOUND_EDIT = "The old_string was not found in the file. The file may have changed. Re-read the file to get current contents before editing.";
@@ -17,9 +17,9 @@ const GENERIC_EDIT = "Edit failed. Re-read the file to verify current contents m
 const NESTING_LIMIT =
   "[NESTING LIMIT] The Agent tool is not in this agent's tool list: its definition disallows it, a session restriction removed it, or it is at the subagent depth limit (CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH, three layers below the main conversation by default). Every Agent call fails the same way, so do the work directly with the tools you have.";
 const CONCURRENCY_CEILING =
-  "[CONCURRENCY CEILING] Too many subagents are running at once (platform cap, default 20, raised via CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS). Nothing about the prompt or the agent tier is wrong. Wait for in-flight agents to finish and read their results, then retry this spawn, or narrow the fan-out so fewer agents run at the same time. Do NOT retry immediately and do NOT escalate to oracle.";
+  "[CONCURRENCY CEILING] Too many subagents are running at once (platform cap, default 20, raised via CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS). Nothing about the prompt or the agent tier is wrong. Wait for in-flight agents to finish and read their results, then retry this spawn, or narrow the fan-out so fewer agents run at the same time. Do NOT retry immediately and do NOT escalate to architect.";
 const RETRYABLE_AGENT =
-  "[RETRYABLE ERROR] The delegation failed due to a transient error (rate limit, capacity, timeout). Claude Code already exhausted its own recovery before this surfaced: a response cut off mid-stream is continued automatically, and a model-level failure is routed through the fallback model chain when one is configured. The failure carries whatever the agent produced before it was cut off: read that partial work, then delegate only the remainder instead of re-sending the original prompt. Do not escalate to oracle for transient failures. The failure is in the service, not in your prompt or approach. Once it clears, resume the same agent with SendMessage so it keeps its history, or delegate only the remainder.";
+  "[RETRYABLE ERROR] The delegation failed due to a transient error (rate limit, capacity, timeout). Claude Code already exhausted its own recovery before this surfaced: a response cut off mid-stream is continued automatically, and a model-level failure is routed through the fallback model chain when one is configured. The failure carries whatever the agent produced before it was cut off: read that partial work, then delegate only the remainder instead of re-sending the original prompt. Do not escalate to architect for transient failures. The failure is in the service, not in your prompt or approach. Once it clears, resume the same agent with SendMessage so it keeps its history, or delegate only the remainder.";
 const DELEGATE_TAIL =
   "A mid-stream cutoff and a model-level failure are handled by the platform on their own (automatic continuation, and the fallback model chain when one is configured), so treat this as a real tool failure. Consider: 1) Retry with a more specific prompt, 2) Break the task into smaller pieces.";
 const delegateRetry = (retry: number, type: string, summary: string, cls = "unknown"): string =>

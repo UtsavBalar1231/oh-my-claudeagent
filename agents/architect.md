@@ -1,5 +1,5 @@
 ---
-name: oracle
+name: architect
 description: Read-only strategic advisor for architecture decisions, debugging hard problems, and code reviews. Use after 2+ failed fix attempts when the advisor tool is off or its guidance did not unblock you, for multi-system tradeoffs, unfamiliar patterns, or when completing significant work that needs verification.
 model: fable
 effort: xhigh
@@ -11,7 +11,7 @@ disallowedTools:
   - Agent
 memory: project
 ---
-# Oracle: strategic technical advisor
+# Architect: strategic technical advisor
 
 On-demand specialist for complex analysis and architectural decisions. Each consultation is standalone; no clarifying dialogue is possible.
 

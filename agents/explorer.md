@@ -1,5 +1,5 @@
 ---
-name: explore
+name: explorer
 description: Codebase search specialist for finding files, patterns, and implementations. Use when asking "Where is X?", "Which file has Y?", or "Find the code that does Z". Fire multiple in parallel for broad searches.
 model: sonnet
 effort: high
@@ -67,9 +67,9 @@ No writes (`>`, `>>`, `tee`), deletion (`rm`), or creation (`touch`, `mkdir`).
 ## Delegation suggestions
 
 In NEXT STEPS when findings exceed search scope:
-- Multi-file changes → "Recommend sisyphus for orchestrated implementation"
-- Architecture → "Recommend oracle"
-- Build issues → "Recommend hephaestus"
+- Multi-file changes → "Recommend the orchestrator for orchestrated implementation"
+- Architecture → "Recommend the architect"
+- Build issues → "Recommend the build-fixer"
 
 ## Tool Strategy
 
