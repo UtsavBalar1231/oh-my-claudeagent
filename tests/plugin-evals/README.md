@@ -11,7 +11,7 @@ Each case runs the skill's slash command against a mocked `omca` server whose `h
 
 Both skills set `disable-model-invocation`, so each prompt is the slash command and there is no `tool_used: Skill` grader. A mock file at `mocks/omca/health_check.md` in each case supplies the tool result.
 
-These cases grade the gate only. Interviewing, plan writing, the momus loop and plan selection need `AskUserQuestion` (absent in a `-p` run), subagents, the plans directory and a plan file the run can locate (`context.add_dirs` gives the model no path), so they are not covered.
+These cases grade the gate only. Interviewing, plan writing, the reviewer loop and plan selection need `AskUserQuestion` (absent in a `-p` run), subagents, the plans directory and a plan file the run can locate (`context.add_dirs` gives the model no path), so they are not covered.
 
 ## Context
 
@@ -21,7 +21,7 @@ Each case seeds a small bun project in a git repository with `fixture.sh` and gr
 - `direct-lookup-no-delegation`: a lookup two searches answer spawns no subagent.
 - `read-tool-for-files`: a file is read with Read, never `cat`, `head`, `tail` or `sed`.
 - `executor-report-shape`: a delegated executor reports with its `STATUS:` and `SLOP PASS:` lines.
-- `wide-survey-fans-out`: a survey of three independent areas goes to parallel explore agents. Its outcome varies run to run, so give it five runs. It is the case that moves when always-on prose changes: with the shipped output style and guidance, seven of eight runs fanned out; with a shorter Fan-out section, one of five did, and on Claude Code's own system prompt without sisyphus, one of five.
+- `wide-survey-fans-out`: a survey of three independent areas goes to parallel explorer agents. Its outcome varies run to run, so give it five runs. It is the case that moves when always-on prose changes. Measured on 2026-10-06 with Opus 5.5 and an exact grader (checked against the mock model first), commit `c19853a` sent the three-area survey to OMCA's search agent in 1 of 5 runs, while the other four context cases passed 3 of 3. The earlier higher counts came from a grader that matched the word "explore" anywhere in the Agent input.
 
 They start the real `omca` server, since a mocked tool carries a placeholder description, so they need `--mocks off`, grants for Bash, Edit and the omca tools, and `--scaffold`.
 
