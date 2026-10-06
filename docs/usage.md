@@ -8,7 +8,7 @@ file is listed in the [reference](references.md).
 ### Install
 
 Install the plugin with the commands in the [README](../README.md#install). OMCA needs Claude
-Code 2.1.288 or later and bun 1.4.2 or later. `ast-grep` (or `sg`) is optional: without it the
+Code 2.1.292 or later and bun 1.4.2 or later. `ast-grep` (or `sg`) is optional: without it the
 `ast_*` tools return an error and everything else works.
 
 ### Run setup
@@ -351,7 +351,7 @@ which proposes rules from your past sessions.
 
 `/omca doctor` opens the Doctor tab and runs its checks:
 
-- the OMCA version that is loaded, and whether Claude Code meets the 2.1.288 floor;
+- the OMCA version that is loaded, and whether Claude Code meets the 2.1.292 floor;
 - whether bun 1.4.2 or later is on the session's `PATH`;
 - when a hook last reached the `omca` server;
 - whether `ast-grep` or `sg` is on `PATH`;

@@ -37,7 +37,7 @@ Three tiers. `sonnet` runs the routine workers (explorer, executor, researcher) 
 
 Scale a delegation by picking the agent whose declared tier and effort fit the work. Pass `model="opus"` only when one delegated task needs more judgment than its agent's tier.
 
-To set one delegation's effort, make `[omca-route effort=<low|medium|high|xhigh|max>]` the first line of its prompt. The hint carries no model: the Agent tool's `model` parameter picks the tier.
+To set one delegation's effort, pass `effort` (`low`, `medium`, `high`, `xhigh` or `max`) on its `Agent` call; it overrides the agent's declared effort for that run, and a fork ignores it. The `model` input picks the tier.
 
 ## Workflow
 

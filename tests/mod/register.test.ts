@@ -15,7 +15,6 @@ const ATOMS = [
   "pages",
   "pane",
   "plan",
-  "routes",
   "stats",
 ].map((key) => ({ plugin: PLUGIN, key }));
 

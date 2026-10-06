@@ -1,5 +1,5 @@
                                                                                                              │                                                                                        ✕
- ▐▛███▛█   Claude Code v2.1.291                                                                              │1: Agents  2: Plan  3: Evidence  4: Notepad  5: Feedback  6: Stats  7: Doctor
+ ▐▛███▛█   Claude Code v2.1.292                                                                              │1: Agents  2: Plan  3: Evidence  4: Notepad  5: Feedback  6: Stats  7: Doctor
 ▝▜██████▀  Opus 5.5 · API Usage Billing                                                                      │───────────────────────────────────────────────────────────────────────────────────────
  ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/.cache/tmp/omca-visual-200x50-XXXXXX/cwd                      │r: Run again    3 warn   1 info   9 ok  checked HH:MM
                                                                                                              │  WARN  omca server   No hook has reached the server in this session yet
@@ -12,7 +12,7 @@
                                                                                                              │  INFO  Advisor       No advisorModel; /advisor fable turns the advisor on
                                                                                                              │                       a: Use /advisor fable
                                                                                                              │  OK    OMCA          oh-my-claudeagent 2.21.0 is loaded
-                                                                                                             │  OK    Claude Code   2.1.291 meets the 2.1.288 floor
+                                                                                                             │  OK    Claude Code   2.1.292 meets the 2.1.292 floor
                                                                                                              │  OK    bun           bun 1.4.2 is on PATH
                                                                                                              │  OK    ast-grep      ast-grep 0.44.1 is on PATH
                                                                                                              │  OK    Options       showBand on, guardMode dialog

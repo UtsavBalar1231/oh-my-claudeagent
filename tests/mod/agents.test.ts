@@ -436,19 +436,6 @@ test("parallel spawns and steps each keep their own lane", async ($, on) => {
   await ui.unmount();
 });
 
-test("a routed delegation's lane keeps the prompt without its routing line", async ($, on) => {
-  const w = world(on, {});
-  engine(on, {});
-  await $.command.run(run(""));
-  await $.agent.spawn(spawnOf(1, "executor", "Port", "[omca-route effort=low]\nPort module 1."));
-  w.agents = [{ id: "a-1", description: "", type: "x", status: "running" }];
-  await $.ui.mount(pane("terminal", DOCK_120)).then(async (ui) => {
-    await ui.press({ key: "d" });
-    expect(body(await ui.drawn())).toContain("  prompt  Port module 1.");
-    await ui.unmount();
-  });
-});
-
 test("OMCA_GLYPHS=ascii draws the lanes and the spinner in ASCII", async ($, on) => {
   const w = world(on, {}, {}, { OMCA_GLYPHS: "ascii" });
   engine(on, STEPS);

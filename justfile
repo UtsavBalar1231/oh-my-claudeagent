@@ -46,7 +46,7 @@ qa:
 	bun scripts/qa/mcp-live.ts
 	bun scripts/qa/worktree-bash.ts
 	bun scripts/qa/worktree-bash.ts --unfiltered-tool-call
-	bun scripts/qa/route-effort.ts
+	bun scripts/qa/agent-effort.ts
 
 # Capture one tests/mod/visual view in tmux at 80, 120 and 200 columns
 visual view:

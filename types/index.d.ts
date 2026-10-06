@@ -26,9 +26,6 @@ declare module "claude-code" {
           result: string;
         };
       };
-      routes: {
-        readonly [agentId: string]: "low" | "medium" | "high" | "xhigh" | "max";
-      };
       nextActions: readonly {
         kind: "log-evidence" | "start-work" | "final-verification" | "review";
         label: string;

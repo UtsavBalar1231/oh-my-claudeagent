@@ -6,7 +6,7 @@
 - `bun` 1.4.2 or later, runtime for the MCP server, the hooks module, the status line and the scripts
 - `ast-grep` CLI (`ast-grep` or `sg`), structural code-search tools
 - `just`, task runner for dev commands. Its recipes run in bash, so on Windows run them from Git Bash
-- `claude`, Claude Code 2.1.288 or later, which loads the mod: `just test-mod`, the validator's engine group and `just qa` need it
+- `claude`, Claude Code 2.1.292 or later, which loads the mod: `just test-mod`, the validator's engine group and `just qa` need it
 - `pre-commit`, which runs the git hooks that `just setup` installs
 - `uv`, which `just bench` uses to install a baseline whose status line is the Python renderer
 
@@ -76,7 +76,7 @@ just test                        # every bun spec outside opencode/, including t
 just test-mod                    # the mod tests, through claude plugin test .
 just test-opencode               # every opencode/ spec; the ones that load OpenCode skip without opencode on PATH
 just smoke                       # one claude -p session with the packaged plugin against the mock model
-just qa                          # manual QA against the mock model: session smoke, install verify, live hook probe, statusline probe, live MCP probe, worktree and route-effort checks
+just qa                          # manual QA against the mock model: session smoke, install verify, live hook probe, statusline probe, live MCP probe, worktree and agent-effort checks
 just bench                       # the working tree against a baseline ref, through the mock model
 just compare                     # OMCA against similar plugins in Docker, through a mock model (needs docker)
 ```

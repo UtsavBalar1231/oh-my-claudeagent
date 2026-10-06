@@ -4,7 +4,7 @@ import { Typewriter, typingSeconds } from "./Typewriter.tsx";
 
 const COMMANDS = ["claude plugin marketplace add UtsavBalar1231/oh-my-claudeagent", "claude plugin install oh-my-claudeagent@omca"] as const;
 const REPO = "github.com/UtsavBalar1231/oh-my-claudeagent";
-const FOOTER = "Free and open source · Claude Code 2.1.288+ · needs bun";
+const FOOTER = "Free and open source · Claude Code 2.1.292+ · needs bun";
 const FIRST_COMMAND_AT = 1;
 const COMMAND_GAP = 0.33;
 const COMMAND_SIZE = 42;

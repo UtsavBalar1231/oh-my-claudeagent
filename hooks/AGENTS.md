@@ -17,7 +17,7 @@ event is unregistered on purpose; `docs/references.md` carries the per-event rea
 `dispatch.ts`, which runs the features that share the event in a fixed order, each in its own
 try/catch. `host.ts` defines the `Host` closures a feature receives in place of `$`, so a
 feature module takes `host` and never `$`. The features are `bash-guard`, `server-check`,
-`mod-marker`, `compact`, `route`, `agents-tracker`, `metrics`, `band`, `pane` with its `tabs/`,
+`mod-marker`, `compact`, `agents-tracker`, `metrics`, `band`, `pane` with its `tabs/`,
 `footer`, `spinner`, `feedback` and `omca-router`. `doctor.ts` runs the Doctor tab's checks and fixes for
 `tabs/doctor.ts`; it registers no event. Pure logic lives in `src/core/`.
 

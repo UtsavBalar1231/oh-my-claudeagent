@@ -1,5 +1,4 @@
 import { RENAMES } from "./agent-names.ts";
-import { EFFORTS } from "./route-hint.ts";
 import { isRecord } from "./tool-input.ts";
 import { isGlyphTier } from "./ui-kit.ts";
 import type { Level } from "./visual.ts";
@@ -42,7 +41,7 @@ export type Inputs = {
   hasOldMemory: boolean;
 };
 
-const ENGINE_FLOOR = "2.1.288";
+const ENGINE_FLOOR = "2.1.292";
 export const BUN_FLOOR = "1.4.2";
 const FRESH_MS = 10 * 60_000;
 
@@ -154,7 +153,7 @@ function glyphsCheck(env: DoctorEnv): Check[] {
   return [check("glyphs", "Glyphs", "warn", `OMCA_GLYPHS=${JSON.stringify(env.OMCA_GLYPHS)} is not nerd, unicode or ascii, so Nerd Font glyphs draw`)];
 }
 
-const LEVELS: readonly string[] = EFFORTS;
+const LEVELS: readonly string[] = ["low", "medium", "high", "xhigh", "max"];
 
 function effortCheck(cap: unknown): Check {
   if (cap === undefined) return check("effort", "Effort cap", "ok", "No maxEffortLevel, so agents run at the effort they declare");

@@ -8,7 +8,7 @@ const USER_SETTINGS = `{\n  "statusLine": {\n    "type": "command",\n    "comman
 
 const BASE: Inputs = {
   modVersion: "3.0.0",
-  engineVersion: "2.1.288",
+  engineVersion: "2.1.292",
   bunVersion: "1.4.2",
   astGrep: { name: "ast-grep", version: "0.39.0" },
   hook: { kind: "seen", lastHookAt: NOW / 1000 - 30 },
@@ -116,11 +116,11 @@ test("mod version", () => {
 });
 
 test.each<[string, Omit<Check, "id" | "label">]>([
-  ["2.1.288", { level: "ok", detail: "2.1.288 meets the 2.1.288 floor" }],
-  ["2.2.0", { level: "ok", detail: "2.2.0 meets the 2.1.288 floor" }],
-  ["2.1.290-dev", { level: "ok", detail: "2.1.290-dev meets the 2.1.288 floor" }],
-  ["2.1.287", { level: "fail", detail: "2.1.287 is older than 2.1.288, which the OMCA mod needs" }],
-  ["1.9.999", { level: "fail", detail: "1.9.999 is older than 2.1.288, which the OMCA mod needs" }],
+  ["2.1.292", { level: "ok", detail: "2.1.292 meets the 2.1.292 floor" }],
+  ["2.2.0", { level: "ok", detail: "2.2.0 meets the 2.1.292 floor" }],
+  ["2.1.293-dev", { level: "ok", detail: "2.1.293-dev meets the 2.1.292 floor" }],
+  ["2.1.291", { level: "fail", detail: "2.1.291 is older than 2.1.292, which the OMCA mod needs" }],
+  ["1.9.999", { level: "fail", detail: "1.9.999 is older than 2.1.292, which the OMCA mod needs" }],
   ["nightly", { level: "warn", detail: 'Could not read a version from "nightly"' }],
 ])("Claude Code %s", (engineVersion, expected) => {
   expect(run({ engineVersion }, "engine")).toEqual(expected);

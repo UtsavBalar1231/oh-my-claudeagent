@@ -11,7 +11,6 @@ import { metrics } from "./metrics.ts";
 import { modMarker } from "./mod-marker.ts";
 import { router } from "./omca-router.ts";
 import { pane } from "./pane.ts";
-import { route } from "./route.ts";
 import { serverCheck } from "./server-check.ts";
 import { spinner } from "./spinner.ts";
 
@@ -85,10 +84,6 @@ function bindHost($: EngineInterface, options: Options): Host {
         get: () => $.state.get({ plugin: "oh-my-claudeagent", key: "lanes" }),
         set: (value, setOptions) => $.state.set({ plugin: "oh-my-claudeagent", key: "lanes" }, value, setOptions),
       },
-      routes: {
-        get: () => $.state.get({ plugin: "oh-my-claudeagent", key: "routes" }),
-        set: (value, setOptions) => $.state.set({ plugin: "oh-my-claudeagent", key: "routes" }, value, setOptions),
-      },
       nextActions: {
         get: () => $.state.get({ plugin: "oh-my-claudeagent", key: "nextActions" }),
         set: (value, setOptions) =>
@@ -154,9 +149,9 @@ export const register: Register = (on, pluginOptions) => {
   const toolCall = featuresFor("tool.call", { agentsTracker });
   const sessionStart = featuresFor("session.start", { pane, feedback, modMarker, band, serverCheck });
   const turnStart = featuresFor("turn.start", { footer, modMarker });
-  const turnStep = featuresFor("turn.step", { route, metrics, agentsTracker });
+  const turnStep = featuresFor("turn.step", { metrics, agentsTracker });
   const turnComplete = featuresFor("turn.complete", { band, agentsTracker, metrics, pane, feedback, footer });
-  const agentSpawn = featuresFor("agent.spawn", { route, agentsTracker, pane, metrics });
+  const agentSpawn = featuresFor("agent.spawn", { agentsTracker, pane, metrics });
   const promptEdit = featuresFor("prompt.edit", { band });
   const paneClose = featuresFor("ui.close", { pane });
   const paneFocus = featuresFor("ui.focus", { pane });

@@ -78,16 +78,16 @@ Check the linter, formatter, and type configs, sample 2-3 similar files, note pr
 
 Size the fan-out to independent tracks, not to how hard the task feels: no agent for a single-file task in a known location, one per distinct question for comparative research, one per independent module for cross-cutting work. Splitting a modest job across agents costs more than it saves. Explorer agents are Grep, not consultants. Send one wave's `Agent` calls in one message. The platform refuses a spawn while 20 subagents run (`CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS`, not enforced in ultracode sessions) and has no per-session total, so split a wider wave into back-to-back batches. Tool calls in one message run at most 10 at a time by default (`CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY`), so a wave wider than 10 runs partly in sequence.
 
-Pick the agent whose declared tier and effort fit. For one task that needs a different effort, make `[omca-route effort=<low|medium|high|xhigh|max>]` the prompt's first line. OMCA's mod strips it and runs that subagent at the hinted effort; without it the agent's `effort:` applies, and an unparseable line stays in the prompt and changes nothing. The hint reaches every agent except one from an organization's own plugin, which the managed security guard keeps from user mods.
+Pick the agent whose declared tier and effort fit. For one task that needs a different effort, pass `effort` on that `Agent` call, by the levels below; it overrides the agent's declared `effort:` for that run, higher or lower. A fork ignores it and runs at your own effort.
 
 - `low`: mechanical edits the prompt spells out (rename, version bump, one-line fix) and fact lookups.
 - `medium`: a scoped change following a pattern the prompt names.
-- `high`: the worker default that explorer, executor and researcher declare; send no hint.
+- `high`: the worker default that explorer, executor and researcher declare; pass no `effort`.
 - `xhigh` or `max`: hard reasoning only, such as an open design choice or a bug that survived a first fix. `max` is the slowest and costliest.
 
 ### Model routing
 
-The hint sets effort only. Pass no `model=` in the usual case. Pass `model="opus"` when one task needs more judgment than its agent's tier, such as an executor task with an open design choice, and `model="fable"` only for architect-class depth outside the architect. When work is lighter or heavier than an agent's default, pick a different agent instead. Emit the tier alias, never a full generation ID: an `Agent(model:opus)` permission rule matches the literal string, so cost governance can gate on it.
+Pass no `model=` in the usual case. Pass `model="opus"` when one task needs more judgment than its agent's tier, such as an executor task with an open design choice, and `model="fable"` only for architect-class depth outside the architect. When work is lighter or heavier than an agent's default, pick a different agent instead. Emit the tier alias, never a full generation ID: an `Agent(model:opus)` permission rule matches the literal string, so cost governance can gate on it.
 
 ### Prompt structure
 

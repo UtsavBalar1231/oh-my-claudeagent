@@ -237,7 +237,7 @@ Each sub-bullet then feeds a specific section, and the mapping is not a judgment
 | `Must NOT:`   | §4 SCOPE, restated verbatim                                       |
 | `File:`       | §2's "Files created/modified" and §5 CONTEXT                      |
 | `Depends:`    | §5 CONTEXT, under Dependencies                                    |
-| `Effort:`     | The routing hint `[omca-route effort=<level>]`, the prompt's first line |
+| `Effort:`     | The `Agent` call's `effort` input                                 |
 
 A sub-bullet the plan omits is simply absent; do not invent one. Copying it into its
 target section does not replace quoting it in §1: §1 carries the task as written, the
@@ -259,14 +259,12 @@ Agent(
 )
 ```
 
-Executor runs on `sonnet` at effort `high`. Beside the choice of agent, the routing hint
-is the per-task lever for effort. A task with an `Effort:` sub-bullet goes out with
-`[omca-route effort=<level>]` as the prompt's first line, above `## 1. TASK`. OMCA's mod
-strips that line and runs the subagent at that level; a line that does not parse stays in
-the prompt and changes nothing. Without the sub-bullet, add a hint only for a clear
-mismatch: `low` for a mechanical edit or a lookup, `medium` for a scoped change that
-follows a named pattern, `xhigh` or `max` only for hard reasoning. `high` is the worker
-default and needs no hint.
+Executor runs on `sonnet` at effort `high`. Beside the choice of agent, the `Agent` call's
+`effort` input is the per-task lever, and it overrides the agent's declared effort for that
+run. A task with an `Effort:` sub-bullet goes out with `effort` set to that level. Without
+the sub-bullet, set `effort` only for a clear mismatch: `low` for a mechanical edit or a
+lookup, `medium` for a scoped change that follows a named pattern, `xhigh` or `max` only for
+hard reasoning. `high` is the worker default and needs no `effort`.
 
 A task whose plan text leaves a design choice open goes out with `model="opus"` on that
 one call; a task the plan fully specifies needs no override.

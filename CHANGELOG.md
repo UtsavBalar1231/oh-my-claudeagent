@@ -12,10 +12,11 @@ model's tools and every settings hook, and a Claude Code mod draws OMCA's interf
 session and runs the destructive-command guard. Python, uv and the bash hook scripts are gone,
 and the plugin runs on Linux, macOS and native Windows.
 
-**This release needs Claude Code 2.1.288 or later and bun 1.4.2 or later,** with bun on the
+**This release needs Claude Code 2.1.292 or later and bun 1.4.2 or later,** with bun on the
 `PATH` Claude Code starts with. `ast-grep` (or `sg`) stays optional; only the `ast_*` tools need
 it. On 2.1.287 the band could end a fullscreen session when the background-tasks dialog opened,
-and 2.1.288 adds the text selection `/omca-rate` reads.
+2.1.288 adds the text selection `/omca-rate` reads, and 2.1.292 adds the Agent tool's `effort`
+input that per-delegation effort uses.
 
 **Read [Upgrading](#upgrading) before you update.** A 2.x session and a 3.x session must not run
 in the same project at once, and the `CLAUDE.md` block that 2.x setup wrote has to be deleted by
@@ -117,11 +118,12 @@ hand.
   source for every row. A model with no sourced price stays unpriced rather than guessed. The
   Stats tab aggregates the records by agent type: runs and evidence rate per agent, tokens per
   finished delegation, and the estimated cost split by agent.
-- **Per-delegation effort.** A delegation prompt may start with
-  `[omca-route effort=<level>]`. The mod strips the line and runs that subagent at that effort.
-  The hint carries no model: the Agent tool's own `model` parameter picks the tier, where
-  permission rules can see it. The orchestrator, planner and start-work prompts say when to emit
-  each level.
+- **Per-delegation effort.** The orchestrator and start-work set one delegation's effort
+  through the Agent call's own `effort` input, which overrides the agent's declared `effort:`
+  for that run, higher or lower. A plan task's `Effort:` line becomes that input. The tier stays
+  on the `model` input, where permission rules can see it. The orchestrator, planner and
+  start-work prompts say when to pass each level. Claude Code 2.1.292 is the first release whose
+  Agent tool takes `effort`, which is why it is the floor.
 - **The destructive-command guard runs in the mod and can ask before it refuses.** It checks
   every Bash and PowerShell command and sorts a match into one of these classes:
   - Catastrophic: a recursive removal of the filesystem root, your home, the project, or a folder
@@ -386,7 +388,7 @@ hand.
 
 ### Upgrading
 
-1. Install Claude Code 2.1.288 or later and bun 1.4.2 or later. Desktop and VS Code start the
+1. Install Claude Code 2.1.292 or later and bun 1.4.2 or later. Desktop and VS Code start the
    `omca` server with the GUI's `PATH`, so make bun reachable from it.
 2. Close every 2.x session in a project before you start a 3.x session there, and do not run the
    two at once. The 2.x Python server and the 3.x server lock `.omca/` state in different ways

@@ -84,7 +84,7 @@ under `servers/hooks/`. Every file is TypeScript on bun.
   server with a fake ast-grep that sleeps. It checks the handshake in the client's debug log, the
   progress line on a running tool call, that Escape cancels the call and ends the fake process,
   and the title and badge of each tool in `/mcp`. `install-verify.ts` and `statusline-probe.ts`
-  check the packaged tree itself. `worktree-bash.ts` and `route-effort.ts` are steps of `just qa`.
+  check the packaged tree itself. `worktree-bash.ts` and `agent-effort.ts` are steps of `just qa`.
   `visual.ts` backs `just visual <view>`, masks the scratch directory's random suffix in each
   capture, and exports the tmux helpers `mcp-live.ts` and `docs/screenshots.ts` share. `lib.ts`
   holds the shared helpers: `REPO`, checks, scratch directories, the `claude -p` launcher, the

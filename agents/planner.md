@@ -337,7 +337,7 @@ For a wording call the five rules do not cover, delete the phrase or replace it 
 
 Omit an optional line rather than emitting it empty: a task with no dependencies has no `Depends:` line at all. Sections beyond the template are allowed only when the work genuinely needs them.
 
-`Effort:` sets the reasoning effort of the agent that runs the task; start-work turns it into a routing hint on the first line of that delegation. Write it only when the task differs from the worker default of `high`: `low` for a mechanical edit or a lookup, `medium` for a scoped change that follows a named pattern, `xhigh` or `max` only for a task that needs hard reasoning, such as an open design choice.
+`Effort:` sets the reasoning effort of the agent that runs the task; start-work passes it as the `effort` input of that task's `Agent` call. Write it only when the task differs from the worker default of `high`: `low` for a mechanical edit or a lookup, `medium` for a scoped change that follows a named pattern, `xhigh` or `max` only for a task that needs hard reasoning, such as an open design choice.
 
 ### Completion Signaling
 
