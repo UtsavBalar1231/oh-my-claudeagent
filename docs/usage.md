@@ -189,7 +189,9 @@ takes the cost's place.
    then the tool it runs now and how many tool calls it has made. A finished agent shrinks to one
    line with the first line of its result and its duration. The key row counts the running and
    finished agents and the tokens they spent. Point at a lane, or press `d`, to see its prompt,
-   last output, tool calls and tokens.
+   last output, tool calls and tokens. Press Enter on a lane, or click it, to open the agent's
+   page: its full brief, each tool call with its outcome and duration, its latest reply and its
+   cost. On the page `b` goes back, `c` copies the brief and `r` reads the page again.
 2. **Plan**: the plan board, below.
 3. **Evidence**: the proof ledger, below.
 4. **Notepad**: one card per section of the bound plan's notepad, each entry under its date. `f`

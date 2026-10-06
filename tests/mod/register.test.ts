@@ -4,6 +4,7 @@ import { split, USAGE } from "../../hooks/omca-router.ts";
 import { readOptions } from "../../hooks/register.ts";
 import { PLUGIN, run } from "./world.ts";
 const ATOMS = [
+  "agentPage",
   "agents",
   "band",
   "costSample",
@@ -11,6 +12,7 @@ const ATOMS = [
   "lanes",
   "ledger",
   "nextActions",
+  "pages",
   "pane",
   "plan",
   "routes",
@@ -31,6 +33,7 @@ test("the module registers exactly the dispatchers, env reads and atoms of the c
     {
       events: [
         "tool.check",
+        "tool.call",
         "session.start",
         "turn.start",
         "turn.step",
@@ -61,6 +64,7 @@ test("the module registers exactly the dispatchers, env reads and atoms of the c
         "prompt.fill",
         "session.cwd",
         "session.id",
+        "session.messages",
         "session.root",
         "session.surfaces",
         "session.usage",
@@ -69,6 +73,7 @@ test("the module registers exactly the dispatchers, env reads and atoms of the c
         "state.get",
         "state.set",
         "ui.ask",
+        "ui.blit",
         "ui.copy",
         "ui.focus",
         "ui.invalidate",
@@ -77,6 +82,7 @@ test("the module registers exactly the dispatchers, env reads and atoms of the c
         "ui.panes",
         "ui.resolve",
         "ui.selection",
+        "ui.toast",
       ],
       env: {
         reads: [

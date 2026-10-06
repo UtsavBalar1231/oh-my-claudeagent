@@ -13,6 +13,7 @@ import { router } from "./omca-router.ts";
 import { pane } from "./pane.ts";
 import { route } from "./route.ts";
 import { serverCheck } from "./server-check.ts";
+import { spinner } from "./spinner.ts";
 
 function bindHost($: EngineInterface, options: Options): Host {
   return {
@@ -54,6 +55,8 @@ function bindHost($: EngineInterface, options: Options): Host {
       resolve: (e) => $.ui.resolve(e),
       selection: () => $.ui.selection(),
       copy: (args) => $.ui.copy(args),
+      toast: (text, toastOptions) => $.ui.toast(text, toastOptions),
+      blit: (args) => $.ui.blit(args),
     },
     session: {
       id: () => $.session.id(),
@@ -62,6 +65,7 @@ function bindHost($: EngineInterface, options: Options): Host {
       surfaces: () => $.session.surfaces(),
       usage: (args) => $.session.usage(args),
       version: () => $.session.version(),
+      transcript: (args) => $.session.messages(args),
     },
     settings: { read: (args) => $.settings.read(args) },
     agent: { list: () => $.agent.list() },
@@ -119,6 +123,14 @@ function bindHost($: EngineInterface, options: Options): Host {
         get: () => $.state.get({ plugin: "oh-my-claudeagent", key: "doctor" }),
         set: (value, setOptions) => $.state.set({ plugin: "oh-my-claudeagent", key: "doctor" }, value, setOptions),
       },
+      agentPage: {
+        get: () => $.state.get({ plugin: "oh-my-claudeagent", key: "agentPage" }),
+        set: (value, setOptions) => $.state.set({ plugin: "oh-my-claudeagent", key: "agentPage" }, value, setOptions),
+      },
+      pages: {
+        get: () => $.state.get({ plugin: "oh-my-claudeagent", key: "pages" }),
+        set: (value, setOptions) => $.state.set({ plugin: "oh-my-claudeagent", key: "pages" }, value, setOptions),
+      },
     },
   };
 }
@@ -139,11 +151,12 @@ const guardFailed = (reason: string): EventResult<"tool.check"> => ({
 export const register: Register = (on, pluginOptions) => {
   const options = readOptions(pluginOptions);
   const bash = featuresFor("tool.check", { bashGuard });
+  const toolCall = featuresFor("tool.call", { agentsTracker });
   const sessionStart = featuresFor("session.start", { pane, feedback, modMarker, band, serverCheck });
   const turnStart = featuresFor("turn.start", { footer, modMarker });
   const turnStep = featuresFor("turn.step", { route, metrics, agentsTracker });
-  const turnComplete = featuresFor("turn.complete", { band, agentsTracker, pane, metrics, feedback, footer });
-  const agentSpawn = featuresFor("agent.spawn", { route, agentsTracker, metrics });
+  const turnComplete = featuresFor("turn.complete", { band, agentsTracker, metrics, pane, feedback, footer });
+  const agentSpawn = featuresFor("agent.spawn", { route, agentsTracker, pane, metrics });
   const promptEdit = featuresFor("prompt.edit", { band });
   const paneClose = featuresFor("ui.close", { pane });
   const paneFocus = featuresFor("ui.focus", { pane });
@@ -152,11 +165,13 @@ export const register: Register = (on, pluginOptions) => {
   const rate = featuresFor("command.run", { feedback });
   const bandRender = featuresFor("ui.render AbovePrompt", { band });
   const paneRender = featuresFor("ui.render Pane", { pane });
+  const spinnerRender = featuresFor("ui.render Spinner", { spinner });
   const sessionCompact = featuresFor("session.compact", { compact });
 
   on("tool.check", { tool: /^(?:Bash|PowerShell)$/ }, ($, e, next) =>
     dispatch(bindHost($, options), "tool.check", bash, e, next, guardFailed),
   ).catch((_$, _e, next) => guardFailed(next.error.message ?? next.error.kind));
+  on("tool.call", ($, e, next) => dispatch(bindHost($, options), "tool.call", toolCall, e, next));
   on("session.start", ($, e, next) => dispatch(bindHost($, options), "session.start", sessionStart, e, next));
   on("turn.start", ($, e, next) => dispatch(bindHost($, options), "turn.start", turnStart, e, next));
   on("turn.step", async function* ($, e, next) {
@@ -181,6 +196,9 @@ export const register: Register = (on, pluginOptions) => {
   );
   on("ui.render", { component: "Pane" }, ($, e, next) =>
     dispatch(bindHost($, options), "ui.render Pane", paneRender, e, next),
+  );
+  on("ui.render", { component: "Spinner" }, ($, e, next) =>
+    dispatch(bindHost($, options), "ui.render Spinner", spinnerRender, e, next),
   );
   on("session.compact", ($, e, next) => dispatch(bindHost($, options), "session.compact", sessionCompact, e, next));
 };

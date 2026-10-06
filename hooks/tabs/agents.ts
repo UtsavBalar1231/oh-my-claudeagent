@@ -1,5 +1,6 @@
 import type { RenderElement } from "claude-code";
 import {
+  costText,
   excerpt,
   finishedRow,
   type Lane,
@@ -13,7 +14,8 @@ import { COLUMN_GAP, displayWidth, fitEnd, formatTokens, padEnd, shortType, wrap
 import { agentKey, ON_SURFACE, type Piece, redact, TONE_KEYS } from "../../src/core/visual.ts";
 import type { Host } from "../host.ts";
 import { keyButton, noticeRow, type TabView, type View } from "../pane.ts";
-import { Line, Row, ScopedCard } from "../ui.ts";
+import { Line, Pieces, Row, ScopedCard } from "../ui.ts";
+import * as page from "./agent-page.ts";
 
 const PROMPT_LINES = 3;
 // The card sits two cells in from the lane and draws a border and one cell of padding a side.
@@ -65,7 +67,7 @@ function card(view: View, { lane, at, height }: Placed, end: number): RenderElem
     ...(promptLines.length === 0 ? [label("none recorded")] : promptLines.map(body)),
     label(lane.endedAt === null ? "Last output" : "Result"),
     output === "" ? label("none yet") : body(fitEnd(output, inner, g.ellipsis)),
-    label(`${usage(lane, g.dot)}${masks > 0 ? ` ${g.dot} ${words(masks, "secret")} masked` : ""}`),
+    label(`${usage(lane, g.dot)}${masks > 0 ? ` ${g.dot} ${words(masks, "secret")} masked` : ""}${costText(lane, g.dot)}`),
   ];
   const rows = CARD_FIXED_ROWS + Math.max(1, promptLines.length);
   const below = at + height;
@@ -94,8 +96,30 @@ function detailRows(view: View, lane: Lane): RenderElement[] {
   return [
     line("prompt", excerpt(redact(lane.prompt, home, g.mask).text, width, g.ellipsis)),
     line("output", redact(lane.output, home, g.mask).text),
-    line("usage", usage(lane, g.dot)),
+    line("usage", `${usage(lane, g.dot)}${costText(lane, g.dot)}`),
   ];
+}
+
+// The status glyph, then the `named` pieces that make the Button, then the facts, which stay text.
+function openRow(view: View, host: Host, lane: Lane, key: string, pieces: readonly Piece[], named: number): RenderElement {
+  const { kit } = view;
+  const [mark, ...rest] = pieces;
+  return kit.Box({
+    key,
+    flexDirection: "row",
+    hover: { backgroundColor: TONE_KEYS.focus },
+    children: [
+      Pieces(kit, mark === undefined ? [] : [mark]),
+      kit.Button({
+        key: page.openKey(lane.id),
+        label: rest.slice(0, named).map((piece) => piece.text).join(""),
+        plain: true,
+        ...(lane.endedAt === null ? {} : { dimColor: true }),
+        onPress: view.press(() => page.open(host, lane.id)),
+      }),
+      Pieces(kit, rest.slice(named)),
+    ],
+  });
 }
 
 // The key and, beside it, how many agents run and finished: the status sits at the bottom, as on the Evidence tab.
@@ -120,6 +144,9 @@ export const view: TabView = async (host, view) => {
   if (lanes.length === 0) {
     return [noticeRow(view, { kind: "empty" }, { loading: "", empty: "No subagent has run in this session yet." })];
   }
+  const open = (await host.state.agentPage.get()).value?.id;
+  const shownLane = lanes.find((lane) => lane.id === open);
+  if (shownLane !== undefined) return page.view(host, view, shownLane);
   const { kit } = view;
   const look: LaneLook = { width: view.width, g: view.g, ascii: view.isAscii, now: view.now, columns: laneColumns(lanes, view.width) };
   const running = lanes.filter((lane) => lane.endedAt === null);
@@ -140,7 +167,7 @@ export const view: TabView = async (host, view) => {
       break;
     }
     const [head = [], tools = []] = laneRows(lane, look, view.home);
-    shown.push(scoped(lane, [row(`lane-${lane.id}`, head), row(`tools-${lane.id}`, tools)]));
+    shown.push(scoped(lane, [openRow(view, host, lane, `lane-${lane.id}`, head, 2), row(`tools-${lane.id}`, tools)]));
     placed.push({ lane, at, height: LANE_ROWS });
     if (isDetailed) shown.push(...detailRows(view, lane));
     at += laneHeight;
@@ -152,7 +179,7 @@ export const view: TabView = async (host, view) => {
       hidden = { ...hidden, finished: finished.length - index };
       break;
     }
-    shown.push(scoped(lane, [row(`done-${lane.id}`, finishedRow(lane, look, view.home))]));
+    shown.push(scoped(lane, [openRow(view, host, lane, `done-${lane.id}`, finishedRow(lane, look, view.home), 1)]));
     placed.push({ lane, at, height: 1 });
     at += 1;
     left -= 1;

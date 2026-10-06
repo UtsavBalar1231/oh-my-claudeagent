@@ -5,7 +5,7 @@ import { formatUsd, PRICING_AS_OF } from "../../src/core/pricing.ts";
 import { isSafeId } from "../../src/core/session-id.ts";
 import { agentGlyph, COLUMN_GAP, displayWidth, fitEnd, formatDuration, formatTokens, padEnd, padStart, shortType } from "../../src/core/ui-kit.ts";
 import { agentKey, fitPieces, type Level, levelMark, type Piece, piecesWidth, spark, stack, TONE_KEYS } from "../../src/core/visual.ts";
-import { type Host, reason, type State } from "../host.ts";
+import { type Host, reason, type State, update } from "../host.ts";
 import type { Subcommand } from "../omca-router.ts";
 import { keyButton, noticeRow, open, type TabView, type View } from "../pane.ts";
 import { Card, Line, Row } from "../ui.ts";
@@ -55,6 +55,12 @@ function turnsOf(records: readonly MetricsRecord[]): Stats["turns"] {
     .map((record) => ({ agentType: record.agent_type, tokens: record.input_tokens + record.output_tokens }));
 }
 
+// The read time alone never counts as a change, so an unchanged read writes nothing.
+const store = (host: Host, next: Stats) =>
+  update(host.state.stats, (value) =>
+    value !== undefined && JSON.stringify({ ...value, readAt: 0 }) === JSON.stringify({ ...next, readAt: 0 }) ? value : next,
+  );
+
 export async function load(host: Host): Promise<void> {
   const [root, readAt] = await Promise.all([host.session.root(), host.clock.now()]);
   const base = { pricingAsOf: PRICING_AS_OF, readAt };
@@ -62,9 +68,9 @@ export async function load(host: Host): Promise<void> {
     const read = await readRecords(host, `${root}/${METRICS_DIR}`);
     const { sessions, skipped } = read;
     const records = read.records.map(currentName);
-    await host.state.stats.set({ ...base, rows: aggregate(records), turns: turnsOf(records), sessions, skipped, error: null });
+    await store(host, { ...base, rows: aggregate(records), turns: turnsOf(records), sessions, skipped, error: null });
   } catch (error) {
-    await host.state.stats.set({
+    await store(host, {
       ...base,
       rows: [],
       turns: [],

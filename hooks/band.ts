@@ -3,20 +3,26 @@ import { type Band, bandView, BUTTON_GAP, planTally, type Proof, type Span, type
 import { allTasksDone } from "../src/core/checkboxes.ts";
 import { ledgerCoversSlot, readLedger } from "../src/core/evidence.ts";
 import { hasPassingFinalVerification, type NextAction, nextActions } from "../src/core/next-actions.ts";
-import { BOULDER, LEDGER, statusPath, verificationOf } from "../src/core/omca-paths.ts";
+import { BOULDER, exitCodeOf, LEDGER, statusPath, verificationOf } from "../src/core/omca-paths.ts";
 import { boardOf, parsePlan } from "../src/core/plan-reader.ts";
 import { proofSummary } from "../src/core/proof.ts";
 import { sha256Hex } from "../src/core/sha256.ts";
-import { type GlyphTier, oneLine } from "../src/core/ui-kit.ts";
+import { fitEnd, type GlyphTier, glyphs, oneLine } from "../src/core/ui-kit.ts";
 import { TONE_KEYS } from "../src/core/visual.ts";
 import type { Features } from "./dispatch.ts";
 import { boundPlanOf, bytesOf, type Host, ledgerWrittenAt, proofFacts, reason, sessionOf, verdictFor } from "./host.ts";
 import { type Kit, kitOf, type TextStyle } from "./ui.ts";
 
-type Snapshot = { band: Band; hasFinalVerification: boolean };
+type Snapshot = { band: Band; hasFinalVerification: boolean; exitCode: number | null };
 
 let glyphTier: GlyphTier = "nerd";
 let shownActions = 0;
+let toastedVerificationAt = 0;
+let toastedPlan: { path: string; isDone: boolean } | undefined;
+let isBaselined = false;
+
+const TOAST_MS = 6000;
+const COMMAND_CELLS = 30;
 
 // A bare digit in an empty composer reaches prompt.edit before the engine resolves it as the
 // band Button's hotkey, so clearing on that edit would take the Button away from its own press.
@@ -55,11 +61,14 @@ async function readSnapshot(host: Host): Promise<Snapshot> {
   const plan = bound === null || planText === null ? null : { ...bound, ...planTally(planText) };
 
   const statusFile = statusPath(root, sessionId);
+  let exitCode: number | null = null;
   const verification =
     statusFile === undefined
       ? null
       : await attempt(`the session status file`, async () => {
-          const slot = verificationOf(await readJson(host, statusFile));
+          const status = await readJson(host, statusFile);
+          exitCode = exitCodeOf(status);
+          const slot = verificationOf(status);
           if (slot === null) return null;
           return { ...slot, isLogged: ledgerCoversSlot(await ledgerWrittenAt(host, root), slot.at) };
         });
@@ -74,7 +83,7 @@ async function readSnapshot(host: Host): Promise<Snapshot> {
 
   const proof = planText === null ? null : await attempt(LEDGER, () => proofOfPlan(host, planText));
   const band: Band = { plan, verification, ...(proof === null ? {} : { proof }), error: errors[0] ?? null, readAt };
-  return { band, hasFinalVerification };
+  return { band, hasFinalVerification, exitCode };
 }
 
 // The plan board's counts: each task's verdict is the newest test, build or lint run since its
@@ -85,6 +94,26 @@ async function proofOfPlan(host: Host, planText: string): Promise<Proof | null> 
   if (facts.ledgerError !== null) throw new Error(facts.ledgerError);
   const counts = proofSummary(cards.map((card) => verdictFor(facts, card.files)?.proof));
   return counts.proven + counts.unproven + counts.failed === 0 ? null : counts;
+}
+
+// The first read after session.start only records what already happened; later reads toast what changed.
+async function toastChanges(host: Host, { band, exitCode }: Snapshot): Promise<void> {
+  const isBaseline = !isBaselined;
+  isBaselined = true;
+  const { plan, verification } = band;
+  const verifiedAt = verification?.at ?? 0;
+  if (!isBaseline && verification !== null && verifiedAt > toastedVerificationAt && exitCode !== null && exitCode !== 0) {
+    const { ellipsis } = glyphs(glyphTier);
+    host.ui.toast(`Verification failed: ${fitEnd(oneLine(verification.command), COMMAND_CELLS, ellipsis)} (exit ${exitCode})`, {
+      timeoutMs: TOAST_MS,
+    });
+  }
+  toastedVerificationAt = Math.max(toastedVerificationAt, verifiedAt);
+  const isDone = plan !== null && plan.total > 0 && plan.done === plan.total;
+  if (!isBaseline && plan !== null && isDone && toastedPlan?.path === plan.path && !toastedPlan.isDone) {
+    host.ui.toast(`Plan complete: ${plan.name} ${plan.done}/${plan.total}`, { timeoutMs: TOAST_MS });
+  }
+  toastedPlan = plan === null ? undefined : { path: plan.path, isDone };
 }
 
 async function actionsFor(host: Host, { band, hasFinalVerification }: Snapshot): Promise<NextAction[]> {
@@ -128,13 +157,19 @@ export const band: Features = {
     post: async (host) => {
       glyphTier = (await sessionOf(host)).glyphTier;
       shownActions = ((await host.state.nextActions.get()).value ?? []).length;
-      await writeBand(host, (await readSnapshot(host)).band);
+      const snapshot = await readSnapshot(host);
+      toastedVerificationAt = 0;
+      toastedPlan = undefined;
+      isBaselined = false;
+      await toastChanges(host, snapshot);
+      await writeBand(host, snapshot.band);
       return undefined;
     },
   },
   "turn.complete": {
     post: async (host, e) => {
       const snapshot = await readSnapshot(host);
+      await toastChanges(host, snapshot);
       await writeBand(host, snapshot.band);
       if (e.agentId === undefined) await writeActions(host, await actionsFor(host, snapshot));
       return undefined;

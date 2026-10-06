@@ -1,4 +1,4 @@
-import type { EngineInterface, FsBytes, PluginState, StateRead, StateSetOptions, StateSetResult } from "claude-code";
+import type { EngineInterface, FsBytes, PluginState, SessionMessage, StateRead, StateSetOptions, StateSetResult } from "claude-code";
 import { parseRegistry, resolveBoundPlan } from "../src/core/boulder.ts";
 import { BOULDER, LEDGER } from "../src/core/omca-paths.ts";
 import { configDir, type Env as PathEnv, homeDir, inferPlatform, isAbsolutePath, joinPath, type Platform } from "../src/core/path.ts";
@@ -60,6 +60,8 @@ export type Host = {
     resolve: Engine["ui"]["resolve"];
     selection: Engine["ui"]["selection"];
     copy: Engine["ui"]["copy"];
+    toast: Engine["ui"]["toast"];
+    blit: Engine["ui"]["blit"];
   };
   session: {
     id: Engine["session"]["id"];
@@ -68,6 +70,7 @@ export type Host = {
     surfaces: Engine["session"]["surfaces"];
     usage: Engine["session"]["usage"];
     version: Engine["session"]["version"];
+    transcript: (args: { agentId: string }) => Promise<SessionMessage[] | { deny: string }>;
   };
   settings: { read: Engine["settings"]["read"] };
   agent: { list: Engine["agent"]["list"] };

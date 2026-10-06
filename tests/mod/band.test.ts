@@ -663,6 +663,24 @@ test("a turn that changes nothing writes nothing to the band", async ($, on) => 
   expect([await texts(band), await buttons(band)]).toEqual(before.drawn);
 });
 
+test("running agents show on the band with no plan bound, without the no-plan text", async ($, on) => {
+  world(on, files({}));
+  await start($);
+  await turn($);
+  const band = await mount($, "terminal");
+  expect(await texts(band)).toEqual(["engine band"]);
+
+  await $.agent.spawn({ ...SPAWN, tool_use_id: "toolu_1" });
+  await $.agent.spawn({ ...SPAWN, tool_use_id: "toolu_2" });
+  await band.redraw();
+  expect(await statusRow(band)).toBe("◆ 2 running");
+
+  await turn($, "agent-toolu_1");
+  await turn($, "agent-toolu_2");
+  await band.redraw();
+  expect(await texts(band)).toEqual(["engine band"]);
+});
+
 test("an idle teammate is not counted among the agents running", async ($, on) => {
   world(on, bound(12, 46));
   await start($);

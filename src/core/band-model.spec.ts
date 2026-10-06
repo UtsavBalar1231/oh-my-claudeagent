@@ -122,6 +122,12 @@ describe("bandView", () => {
     expect(status(band({ plan: PLAN }), 120)).not.toContain("running");
   });
 
+  test("running agents with no plan bound: the band shows `N running` and not the no-plan text", () => {
+    expect(status(band({}), 120, "unicode", 2)).toBe("◆ 2 running");
+    expect(status(band({ verification: LOGGED }), 120, "unicode", 2)).not.toContain("no plan");
+    expect(status(band({}), 120, "unicode", 2)).not.toContain("no plan");
+  });
+
   test("everything known, in the order of the design", () => {
     expect(status(FULL, 203, "unicode", 2)).toBe(
       "████▍ 59/68 · next 43 Record the final verification for the release · ✓ 52 proven  ! 4 unproven · ! just test evidence not logged · ◆ 2 running",

@@ -3,6 +3,7 @@ import { type Host, reason } from "./host.ts";
 
 type Sites = {
   "tool.check": [Args<"tool.check">, EventResult<"tool.check">];
+  "tool.call": [Args<"tool.call">, EventResult<"tool.call">];
   "session.start": [Args<"session.start">, EventResult<"session.start">];
   "turn.start": [Args<"turn.start">, EventResult<"turn.start">];
   "turn.step": [Args<"turn.step">, EventResult<"turn.step">];
@@ -15,6 +16,7 @@ type Sites = {
   "command.run": [Args<"command.run">, EventResult<"command.run">];
   "ui.render AbovePrompt": [RenderInput<"AbovePrompt">, RenderElement];
   "ui.render Pane": [RenderInput<"Pane">, RenderElement];
+  "ui.render Spinner": [RenderInput<"Spinner">, RenderElement];
   "session.compact": [Args<"session.compact">, EventResult<"session.compact">];
 };
 

@@ -14,3 +14,9 @@ export function verificationOf(status: unknown): { command: string; at: number }
   const { command, at } = verification;
   return typeof command === "string" && typeof at === "number" ? { command, at } : null;
 }
+
+export function exitCodeOf(status: unknown): number | null {
+  const verification = isRecord(status) ? status["verification"] : undefined;
+  const code = isRecord(verification) ? verification["exit_code"] : undefined;
+  return typeof code === "number" ? code : null;
+}

@@ -1,3 +1,4 @@
+import { formatUsd } from "./pricing.ts";
 import { inputText } from "./tool-input.ts";
 import { agentGlyph, COLUMN_GAP, displayWidth, fitEnd, formatDuration, formatTokens, type Glyphs, oneLine, padEnd, padStart, shortType } from "./ui-kit.ts";
 import { agentKey, levelMark, ON_SURFACE, type Piece, piecesWidth, redact, type ThemeKey, TONE_KEYS } from "./visual.ts";
@@ -46,6 +47,7 @@ export type Lane = {
   endedAt: number | null;
   inputTokens: number;
   outputTokens: number;
+  costUsd: number | null;
   status: Status;
   prompt: string;
   calls: number;
@@ -117,6 +119,9 @@ function headRow(lane: Lane, look: LaneLook): Piece[] {
   return [...identity, { text: padEnd(task, room) }, ...right];
 }
 
+/** ` · ~$0.04` after the token count, or nothing once any step's model had no price. */
+export const costText = (lane: Lane, dot: string): string => (lane.costUsd === null ? "" : ` ${dot} ~${formatUsd(lane.costUsd)}`);
+
 const callCount = (calls: number): string => `${calls} call${calls === 1 ? "" : "s"}`;
 
 function toolRow(lane: Lane, look: LaneLook, home: string, mask: string): Piece[] {
@@ -149,7 +154,7 @@ export function laneRows(lane: Lane, look: LaneLook, home: string): Piece[][] {
   return [headRow(lane, look), toolRow(lane, look, home, look.g.mask)];
 }
 
-const STATUS_WORDS: Readonly<Partial<Record<Status, string>>> = {
+export const STATUS_WORDS: Readonly<Partial<Record<Status, string>>> = {
   idle: "idle",
   waiting: "waiting",
   pending: "pending",

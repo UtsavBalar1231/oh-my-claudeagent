@@ -50,6 +50,7 @@ const evidenceAt = (...timestamps: string[]) =>
 
 test("each delegation is written running at spawn and overwritten once when its turn completes or aborts", async ($, on) => {
   const { w, writes } = engine(on, { [LEDGER]: evidenceAt("2026-10-02T12:00:15Z") });
+  w.surfaces = [];
 
   await $.agent.spawn(spawn("oh-my-claudeagent:executor", "Fix the parser"));
   await w.clock.advance(30_000);

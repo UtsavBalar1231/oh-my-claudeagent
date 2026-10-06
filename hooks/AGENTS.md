@@ -18,8 +18,20 @@ event is unregistered on purpose; `docs/references.md` carries the per-event rea
 try/catch. `host.ts` defines the `Host` closures a feature receives in place of `$`, so a
 feature module takes `host` and never `$`. The features are `bash-guard`, `server-check`,
 `mod-marker`, `compact`, `route`, `agents-tracker`, `metrics`, `band`, `pane` with its `tabs/`,
-`footer`, `feedback` and `omca-router`. `doctor.ts` runs the Doctor tab's checks and fixes for
+`footer`, `spinner`, `feedback` and `omca-router`. `doctor.ts` runs the Doctor tab's checks and fixes for
 `tabs/doctor.ts`; it registers no event. Pure logic lives in `src/core/`.
+
+`spinner` rewrites only the `suffix` of the terminal's main-loop Spinner, to `… · task 7/14 · 3 agents`,
+from the band and agents atoms. A Spinner whose `requestId` is a tracked agent id, and every desktop
+Spinner, pass through unchanged.
+
+`agents-tracker` also owns the agent page that `tabs/agent-page.ts` draws on the Agents tab: a
+Button keyed `open-<agent id>` on each lane opens it, and `b`, `c` and `r` go back, copy the brief
+and reload. Its one `tool.call` registration passes a main-loop call through untouched and, for a
+subagent's call, appends the call and its outcome to a module-level map, with no state write. The
+`pages` atom is written only when a page is opened, on `r` and at the agent's `turn.complete`,
+from `$.session.messages({ agentId })` and that map; a denied read keeps the stored prompt. A
+page holds at most 8 KiB of brief, 120 calls and 4 KiB of reply, for the newest 20 agents.
 
 ## Current runtime contract
 

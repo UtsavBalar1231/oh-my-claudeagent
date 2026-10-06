@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  costText,
   finishedRow,
   firstLine,
   type Lane,
@@ -32,6 +33,7 @@ const lane = (fields: Partial<Lane> = {}): Lane => ({
   endedAt: null,
   inputTokens: 3200,
   outputTokens: 1300,
+  costUsd: 0.04,
   status: "running",
   prompt: "Fix the heading parser.",
   calls: 4,
@@ -245,4 +247,12 @@ test("running lanes come first, oldest first; finished ones after, newest first"
     lane({ id: "run-old", startedAt: START + 5 }),
   ];
   expect(ordered(lanes).map((one) => one.id)).toEqual(["run-old", "run-new", "done-new", "done-old"]);
+});
+
+describe("costText", () => {
+  test("shows the cost to the cent after the dot, `<$0.01` for a trace, and nothing once a model was unpriced", () => {
+    expect(costText(lane({ costUsd: 0.0432 }), G.dot)).toBe(" · ~$0.04");
+    expect(costText(lane({ costUsd: 0.002 }), G.dot)).toBe(" · ~<$0.01");
+    expect(costText(lane({ costUsd: null }), G.dot)).toBe("");
+  });
 });

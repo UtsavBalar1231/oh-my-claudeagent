@@ -2,6 +2,8 @@ import type { On } from "claude-code";
 import { type Engine, expect, type Plugin, test } from "claude-code/testing";
 import { joinPath } from "../../src/core/path.ts";
 import { usableColumns } from "../../src/core/ui-kit.ts";
+import type { Host } from "../../hooks/host.ts";
+import { pane as paneFeature } from "../../hooks/pane.ts";
 import {
   bodyColumns,
   BOULDER,
@@ -669,5 +671,167 @@ test("the timer reads the surfaces again on each tick", async ($, on) => {
   w.surfaces = ["desktop", "terminal"];
   await w.clock.advance(3000);
   expect(w.invalidations - before).toBe(3);
+  await ui.unmount();
+});
+
+const AUTO = { id: "omca", title: "OMCA", rows: 12 };
+
+test("the first subagent spawn opens the pane unasked, once, and starts its timer", async ($, on) => {
+  const w = world(on, FILES);
+  agentEngine(on);
+
+  await $.agent.spawn(SPAWN);
+  expect(w.opened).toEqual([AUTO]);
+  w.agents = [{ id: "a-1", description: "Fix the parser", type: "oh-my-claudeagent:executor", status: "running" }];
+  const ui = await $.ui.mount(pane("terminal"));
+  const before = w.invalidations;
+  await w.clock.advance(3000);
+  expect(w.invalidations).toBeGreaterThan(before);
+
+  await $.agent.spawn(SPAWN);
+  expect(w.opened).toEqual([AUTO]);
+  await ui.unmount();
+});
+
+test("a teammate spawn opens nothing, and the first subagent after it still does", async ($, on) => {
+  const w = world(on, FILES);
+  agentEngine(on);
+
+  await $.agent.spawn({ ...SPAWN, isTeammate: true });
+  expect(w.opened).toEqual([]);
+  await $.agent.spawn(SPAWN);
+  expect(w.opened).toEqual([AUTO]);
+});
+
+test("a surface without a terminal opens nothing on a spawn", async ($, on) => {
+  const w = world(on, FILES);
+  w.surfaces = ["desktop"];
+  agentEngine(on);
+
+  await $.agent.spawn(SPAWN);
+  expect(w.opened).toEqual([]);
+});
+
+function paneAtom(auto: "pending" | "opened" | "declined") {
+  const state = { tab: "agents", notepad: null, plans: null, errors: { notepad: null, plans: null }, auto, readAt: 0 } as const;
+  const atoms = new Map<string, { value: unknown; version: number }>([["pane", { value: state, version: 1 }]]);
+  return {
+    atoms,
+    install(on: On) {
+      on("state.get", (_$, e) => ({ value: atoms.get(e.key) ?? { value: undefined, version: 0 } }));
+      on("state.set", (_$, e) => {
+        const version = (atoms.get(e.key)?.version ?? 0) + 1;
+        atoms.set(e.key, { value: e.value, version });
+        return { value: { isSet: true, version } };
+      });
+    },
+  };
+}
+
+test("a declined auto-open stays closed on a spawn, and /omca still opens the pane focused", async ($, on) => {
+  paneAtom("declined").install(on);
+  const w = world(on, FILES);
+  agentEngine(on);
+
+  await $.agent.spawn(SPAWN);
+  expect(w.opened).toEqual([]);
+
+  await $.command.run(run(""));
+  expect(w.opened).toEqual([{ id: "omca", title: "OMCA", focus: true, closeOnEscape: true, rows: 12, columns: 56 }]);
+});
+
+test("a pane the person opened with /omca takes the place of the auto-open on the first spawn", async ($, on) => {
+  const w = world(on, FILES);
+  agentEngine(on);
+
+  await $.command.run(run(""));
+  await $.agent.spawn(SPAWN);
+  expect(w.opened).toEqual([{ id: "omca", title: "OMCA", focus: true, closeOnEscape: true, rows: 12, columns: 56 }]);
+});
+
+test("a person's close declines the auto-open, and another origin's close does not", async () => {
+  const held = paneAtom("opened");
+  const host = {
+    state: {
+      pane: {
+        get: async () => held.atoms.get("pane"),
+        set: async (value: unknown, options: { ifVersion: number }) => {
+          held.atoms.set("pane", { value, version: options.ifVersion + 1 });
+          return { isSet: true, version: options.ifVersion + 1 };
+        },
+      },
+    },
+  } as unknown as Host;
+  const auto = () => {
+    const pane = held.atoms.get("pane");
+    if (pane === undefined) throw new Error("the pane atom is missing");
+    return (pane.value as { auto: string }).auto;
+  };
+
+  await paneFeature["ui.close"]?.pre?.(host, { id: "omca", origin: { kind: "plugin" } });
+  expect(auto()).toBe("opened");
+  await paneFeature["ui.close"]?.pre?.(host, { id: "other", origin: { kind: "person" } });
+  expect(auto()).toBe("opened");
+  await paneFeature["ui.close"]?.pre?.(host, { id: "omca", origin: { kind: "person" } });
+  expect(auto()).toBe("declined");
+});
+
+test("a plugin's close does not decline the auto-open", { plugins: [CLOSER] }, async ($, on) => {
+  const w = world(on, FILES);
+  agentEngine(on);
+
+  await $.agent.spawn(SPAWN);
+  await $.command.run(closeRun);
+  await $.agent.spawn(SPAWN);
+  expect(w.opened).toEqual([AUTO]);
+});
+
+const metric = (agentId: string) =>
+  JSON.stringify({
+    session_id: SESSION,
+    agent_id: agentId,
+    agent_type: "oh-my-claudeagent:executor",
+    model: "claude-sonnet-5-5",
+    effort: "high",
+    started_at: "2026-10-01T09:00:00.000Z",
+    ended_at: "2026-10-01T09:02:00.000Z",
+    duration_ms: 120_000,
+    input_tokens: 40_000,
+    output_tokens: 6_000,
+    estimated_cost_usd: 0.14,
+    outcome: "completed",
+    evidence_logged: true,
+  });
+
+test("the Stats tab reads the records again after a turn, and writes nothing when they have not changed", async ($, on) => {
+  const atoms = new Map<string, { value: unknown; version: number }>();
+  const sets: string[] = [];
+  on("state.get", (_$, e) => ({ value: atoms.get(e.key) ?? { value: undefined, version: 0 } }));
+  on("state.set", (_$, e) => {
+    sets.push(e.key);
+    const version = (atoms.get(e.key)?.version ?? 0) + 1;
+    atoms.set(e.key, { value: e.value, version });
+    return { value: { isSet: true, version } };
+  });
+  const metrics = `${ROOT}/.omca/metrics/${SESSION}`;
+  const w = world(on, { ...FILES, [`${metrics}/a-1.json`]: metric("a-1") });
+  agentEngine(on);
+  await $.command.run(run(""));
+  const ui = await $.ui.mount(pane("terminal", { columns: 120, rows: 40, placement: "dock" }));
+  await ui.press({ key: "6" });
+  await ui.redraw();
+  expect(await ui.find({ type: "Text", text: "1 delegation in 1 session" })).toBeDefined();
+
+  const turn = () => $.turn.complete({ answer: "done", durationMs: 4, isAborted: false, turnId: "t-1", reason: "answer" });
+  const statsWrites = () => sets.filter((key) => key === "stats").length;
+  const before = statsWrites();
+  await turn();
+  expect(statsWrites()).toBe(before);
+
+  write(w, `${metrics}/a-2.json`, metric("a-2"));
+  await turn();
+  await ui.redraw();
+  expect(statsWrites()).toBe(before + 1);
+  expect(await ui.find({ type: "Text", text: "2 delegations in 1 session" })).toBeDefined();
   await ui.unmount();
 });

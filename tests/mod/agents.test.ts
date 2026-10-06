@@ -21,7 +21,7 @@ const spawnOf = (n: number, type: string, description: string, prompt: string) =
 type Step = { uses: TurnStepToolUse[]; answer?: string };
 
 // Each agent's steps by index; an agent id is `a-<n>` in spawn order.
-function engine(on: On, steps: Readonly<Record<string, readonly Step[]>>): void {
+function engine(on: On, steps: Readonly<Record<string, readonly Step[]>>, stepModel = "claude-sonnet-5-5"): void {
   let spawned = 0;
   on("agent.spawn", () => ({ model: "claude-sonnet-5-5", agentId: `a-${++spawned}` }));
   on("turn.step", async function* (_$, e) {
@@ -32,7 +32,7 @@ function engine(on: On, steps: Readonly<Record<string, readonly Step[]>>): void 
       answer: step.answer ?? "",
       toolUses: step.uses,
       stopReason: step.uses.length > 0 ? "tool_use" : "end_turn",
-      usage: usage(1200, 300),
+      usage: usage(1200, 300, stepModel),
     };
   });
   on("turn.complete", (_$, e) => ({ text: e.answer }));
@@ -55,7 +55,7 @@ const spread = (left: string, right: string, width = 51) => `${left}${" ".repeat
 function textOf(element: unknown): string {
   if (typeof element === "string") return element;
   if (!isNode(element) || isCard(element)) return "";
-  if (element.type === "Button") return `${String(element.props?.["hotkey"])}: ${String(element.props?.["label"])}`;
+  if (element.type === "Button") return typeof element.props?.["hotkey"] === "string" ? `${element.props["hotkey"]}: ${String(element.props["label"])}` : String(element.props?.["label"]);
   const gap = " ".repeat(typeof element.props?.["columnGap"] === "number" ? element.props["columnGap"] : 0);
   return childrenOf(element).map(textOf).join(element.type === "Box" ? gap : "");
 }
@@ -148,10 +148,15 @@ test("the current tool's name draws in text with the call count muted at the rig
     [" ".repeat(30), undefined, undefined],
     ["4 calls", "inactive", undefined],
   ]);
-  expect(styled(head).filter(([text]) => text.trim() !== "")).toEqual([
-    ["◆ ", "green_FOR_SUBAGENTS_ONLY", undefined],
-    ["executor", "text", undefined],
-    [` · Fix the heading parser${" ".repeat(12)}`, undefined, undefined],
+  const [mark, button, facts] = isNode(head) ? childrenOf(head) : [];
+  const pieces = (line: unknown) => (isNode(line) ? (childrenOf(line) as Node[]).map((piece) => [textOf(piece), piece.props?.["color"], piece.props?.["backgroundColor"]]) : []);
+  expect(pieces(mark)).toEqual([["◆ ", "green_FOR_SUBAGENTS_ONLY", undefined]]);
+  expect(isNode(button) ? [button.props?.["key"], button.props?.["label"], button.props?.["plain"]] : []).toEqual([
+    "open-a-1",
+    `executor · Fix the heading parser${" ".repeat(12)}`,
+    true,
+  ]);
+  expect(pieces(facts).filter(([text]) => String(text).trim() !== "")).toEqual([
     ["sonnet-5-5", "inactive", undefined],
     ["high", "inactive", undefined],
     ["    0s", "inactive", undefined],
@@ -179,12 +184,9 @@ test("a finished agent collapses to one dim line with its result and duration, a
     "d: Details  1 running · 2 finished · 9.5k tokens",
   ]);
   const done = await ui.find({ key: "done-a-2" });
-  const pieces = isNode(done) ? (childrenOf(childrenOf(done)[0] as Node) as Node[]) : [];
-  expect(pieces.map((piece) => [piece.props?.["color"], piece.hover?.["color"]])).toEqual([
-    ["success", "text"],
-    ["inactive", "text"],
-    ["inactive", "text"],
-  ]);
+  const [mark, button, duration] = isNode(done) ? (childrenOf(done) as Node[]) : [];
+  const colors = (line: Node | undefined) => (line === undefined ? [] : (childrenOf(line) as Node[]).map((piece) => [piece.props?.["color"], piece.hover?.["color"]]));
+  expect([colors(mark), button?.props?.["key"], button?.props?.["dimColor"], colors(duration)]).toEqual([[["success", "text"]], "open-a-2", true, [["inactive", "text"]]]);
   await ui.unmount();
 });
 
@@ -246,7 +248,7 @@ test("hovering a lane reveals a card, drawn last so it paints over the rows belo
     "afterwards.",
     "Last output",
     "It holds token=‹masked› here",
-    "1 tool call · 1.5k tokens · 2 secrets masked",
+    "1 tool call · 1.5k tokens · 2 secrets masked…",
   ]);
   expect(JSON.stringify(await ui.drawn())).not.toContain("s3cr3t");
   expect(JSON.stringify(await ui.drawn())).not.toContain("abcdefghij");
@@ -266,7 +268,7 @@ test("a card that cannot fit below its lane in a short inline body is pinned ins
     "Fix the heading parser so fenced lines are skipped.",
     "Last output",
     "Found the heading rule.",
-    "4 tool calls · 4.5k tokens",
+    "4 tool calls · 4.5k tokens · ~$0.02",
   ]);
   await ui.unmount();
 });
@@ -296,12 +298,12 @@ test("d shows each running lane's prompt, last output and usage under it, and d 
     spread("  · Bash bun test src/parser.spec.ts", "4 calls"),
     "  prompt  Fix the heading parser so fenced lines a…",
     "  output  Found the heading rule.",
-    "  usage   4 tool calls · 4.5k tokens",
+    "  usage   4 tool calls · 4.5k tokens · ~$0.02",
     "◆ explorer · Map the router callers    high      0s",
     spread("  · ast_search", "2 calls"),
     "  prompt  Find every caller of the router.",
     "  output  none yet",
-    "  usage   2 tool calls · 3.0k tokens",
+    "  usage   2 tool calls · 3.0k tokens · ~$0.01",
     "✓ architect · The ledger holds.                  0s",
     "d: Hide details  2 running · 1 finished",
   ]);
@@ -468,5 +470,33 @@ test("an idle teammate draws its status mark and word with no spinner and is lef
   expect(rows[1]).toBe("  ○ idle");
   expect(rows[3]).toBe("  · starting");
   expect(rows.at(-1)).toBe("d: Details  1 running · 1 idle · 0 finished");
+  await ui.unmount();
+});
+
+test("two priced steps add up on the lane as an approximate cost beside the token count", async ($, on) => {
+  engine(on, { "a-1": [{ uses: [] }, { uses: [] }] });
+  const w = world(on, {});
+  await $.command.run(run(""));
+  await $.agent.spawn(spawnOf(1, "executor", "Price the steps", "Price the steps."));
+  w.agents = [{ id: "a-1", description: "", type: "x", status: "running" }];
+  await stepAll($, "a-1", 2);
+  const ui = await $.ui.mount(pane("terminal", DOCK_120));
+
+  await ui.press({ key: "d" });
+  expect(body(await ui.drawn())).toContain("  usage   0 tool calls · 3.0k tokens · ~$0.01");
+  await ui.unmount();
+});
+
+test("a step whose model has no price drops the lane's cost and it stays dropped", async ($, on) => {
+  engine(on, { "a-1": [{ uses: [] }, { uses: [] }] }, "claude-mystery-1");
+  const w = world(on, {});
+  await $.command.run(run(""));
+  await $.agent.spawn(spawnOf(1, "executor", "Price the steps", "Price the steps."));
+  w.agents = [{ id: "a-1", description: "", type: "x", status: "running" }];
+  await stepAll($, "a-1", 2);
+  const ui = await $.ui.mount(pane("terminal", DOCK_120));
+
+  await ui.press({ key: "d" });
+  expect(body(await ui.drawn())).toContain("  usage   0 tool calls · 3.0k tokens");
   await ui.unmount();
 });

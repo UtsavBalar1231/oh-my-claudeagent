@@ -87,7 +87,7 @@ function statusSegments(band: Band, words: Words, g: Glyphs, ascii: boolean, run
   const { plan, verification, proof } = band;
   const segments: Segment[] = [];
   if (plan === null) {
-    segments.push(segment(PRIORITY.progress, [{ text: words.noPlan, tone: "muted" }]));
+    if (running === 0) segments.push(segment(PRIORITY.progress, [{ text: words.noPlan, tone: "muted" }]));
   } else {
     const cells = bar({ done: plan.done, todo: plan.total - plan.done }, BAR_CELLS, ascii).map((piece): Span => ({ ...piece, tone: "plain" }));
     segments.push(segment(PRIORITY.progress, [...cells, { text: ` ${plan.done}/${plan.total}`, tone: "muted" }]));
@@ -188,7 +188,7 @@ export function bandView(
   tier: GlyphTier,
   running = 0,
 ): BandView | undefined {
-  if (band === undefined || (band.plan === null && band.error === null && actions.length === 0)) return undefined;
+  if (band === undefined || (band.plan === null && band.error === null && actions.length === 0 && running === 0)) return undefined;
   return {
     status: statusRow(band, Math.max(0, columns - MARK_CELLS), tier, running),
     buttons: buttonRow(actions, usableColumns(columns), glyphs(tier)),

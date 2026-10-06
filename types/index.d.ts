@@ -11,6 +11,7 @@ declare module "claude-code" {
           endedAt: number | null;
           inputTokens: number;
           outputTokens: number;
+          costUsd: number | null;
           status: "running" | "idle" | "waiting" | "pending" | "answer" | "aborted" | "refusal" | "error" | "gone";
           teammate: boolean;
           task?: number;
@@ -62,6 +63,7 @@ declare module "claude-code" {
           files: readonly { name: string; path: string; mtimeMs: number }[];
         } | null;
         errors: { notepad: string | null; plans: string | null };
+        auto: "pending" | "opened" | "declined";
         readAt: number;
       };
       ledger: {
@@ -111,6 +113,15 @@ declare module "claude-code" {
         pricingAsOf: string;
         error: string | null;
         readAt: number;
+      };
+      agentPage: { id: string | null };
+      pages: {
+        readonly [agentId: string]: {
+          brief: string;
+          source: "messages" | "prompt";
+          calls: { tool: string; summary: string; ok: boolean | null; durationMs: number | null }[];
+          reply: string;
+        };
       };
       costSample: { turnId: string; usd: number | null; at: number };
       doctor: {

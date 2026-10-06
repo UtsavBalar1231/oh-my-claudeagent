@@ -106,6 +106,7 @@ export function patchPane(host: Host, change: (pane: Pane) => Pane): Promise<voi
         notepad: null,
         plans: null,
         errors: { notepad: null, plans: null },
+        auto: "pending",
         readAt: 0,
       },
     ),
@@ -170,6 +171,7 @@ export async function open(host: Host, e: Input<"command.run">, tab: Tab): Promi
   await refresh(host, tab);
   const columns = clamp(Math.round(e.presentation.columns * DOCK_SHARE), DOCK_MIN_COLUMNS, DOCK_MAX_COLUMNS);
   await host.ui.open({ id: PANE, title: "OMCA", focus: true, closeOnEscape: true, rows: INLINE_ROWS, columns });
+  await patchPane(host, (pane) => ((pane.auto ?? "pending") === "pending" ? { ...pane, auto: "opened" } : pane));
   start(host);
   return {};
 }
@@ -354,15 +356,30 @@ export const pane: Features = {
       return undefined;
     },
   },
+  "agent.spawn": {
+    async post(host, e, result) {
+      if (e.isTeammate === true || result.deny !== undefined) return undefined;
+      if (((await host.state.pane.get()).value?.auto ?? "pending") !== "pending") return undefined;
+      if (!(await host.session.surfaces()).includes("terminal")) return undefined;
+      await host.ui.open({ id: PANE, title: "OMCA", rows: INLINE_ROWS });
+      await patchPane(host, (pane) => ({ ...pane, auto: "opened" }));
+      start(host);
+      return undefined;
+    },
+  },
   "turn.complete": {
     async post(host) {
-      if (timer !== undefined) await refresh(host);
+      if (timer === undefined) return undefined;
+      await refresh(host);
+      if ((await host.state.pane.get()).value?.tab === "stats") await stats.load(host);
       return undefined;
     },
   },
   "ui.close": {
-    pre(_host, e) {
-      if (e.id === PANE) stop();
+    async pre(host, e) {
+      if (e.id !== PANE) return undefined;
+      stop();
+      if (e.origin.kind === "person") await patchPane(host, (pane) => (pane.auto === "declined" ? pane : { ...pane, auto: "declined" }));
       return undefined;
     },
   },

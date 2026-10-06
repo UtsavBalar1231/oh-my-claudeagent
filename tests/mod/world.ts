@@ -1,4 +1,4 @@
-import type { AgentInfo, On, RenderElement, RenderSurface, StateRead, TurnUsage, UiPane, UiSelection } from "claude-code";
+import type { AgentInfo, On, SessionMessage, RenderElement, RenderSurface, StateRead, TurnUsage, UiPane, UiSelection } from "claude-code";
 import { mock, type MockClock } from "claude-code/testing";
 import { joinPath, normalizePath, type Platform } from "../../src/core/path.ts";
 import { displayWidth, formatWhen } from "../../src/core/ui-kit.ts";
@@ -58,6 +58,9 @@ export type World = {
   selectionReads: number;
   surfaces: RenderSurface[];
   invalidations: number;
+  toasts: string[];
+  blits: { requestId: string; key: string; cells: string | undefined }[];
+  conversations: Map<string, SessionMessage[]>;
   opened: unknown[];
   logs: string[];
   said: string[];
@@ -110,6 +113,9 @@ export function world(
     selectionReads: 0,
     surfaces: ["terminal"],
     invalidations: 0,
+    toasts: [],
+    blits: [],
+    conversations: new Map(),
     opened: [],
     logs: [],
     said: [],
@@ -171,6 +177,12 @@ export function world(
   on("ui.invalidate", (_$, e, next) => {
     w.invalidations += 1;
     return next(e);
+  });
+  on("ui.toast", (_$, e) => (w.toasts.push(e.text), { value: undefined }));
+  on("ui.blit", (_$, e) => (w.blits.push({ requestId: e.requestId, key: e.key, cells: "cells" in e ? e.cells : undefined }), { value: {} }));
+  on("session.messages", (_$, e) => {
+    const found = e.agentId === undefined ? undefined : w.conversations.get(e.agentId);
+    return { value: found ?? { deny: `no conversation for ${e.agentId ?? "main"}` } };
   });
   on("ui.selection", () => ((w.selectionReads += 1), { value: w.selection }));
   return w;
@@ -268,7 +280,7 @@ export function nodeByKey(element: unknown, key: string): Node | undefined {
 export function textOf(element: unknown): string {
   if (typeof element === "string") return element;
   if (!isNode(element)) return "";
-  if (element.type === "Button") return `${String(element.props?.["hotkey"])}: ${String(element.props?.["label"])}`;
+  if (element.type === "Button") return typeof element.props?.["hotkey"] === "string" ? `${element.props["hotkey"]}: ${String(element.props["label"])}` : String(element.props?.["label"]);
   const gap = " ".repeat(typeof element.props?.["columnGap"] === "number" ? element.props["columnGap"] : 0);
   return childrenOf(element).map(textOf).join(gap);
 }

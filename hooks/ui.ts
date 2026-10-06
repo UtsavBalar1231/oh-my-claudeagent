@@ -99,24 +99,27 @@ export function Card(kit: Kit, { key, title, tone, isAscii, isRaised = false, wi
   });
 }
 
-type RowSpec = { key: string; pieces: readonly Piece[]; isFocused?: boolean; isDone?: boolean };
+type PiecesSpec = { isFocused?: boolean; isDone?: boolean };
+type RowSpec = PiecesSpec & { key: string; pieces: readonly Piece[] };
 
 // Hovered or focused, a row's own text turns `text` so it reads on `selectionBg` in both themes;
 // a piece with its own background, a chip, keeps its style.
-export function Row(kit: Kit, { key, pieces, isFocused = false, isDone = false }: RowSpec): RenderElement {
+export function Pieces(kit: Kit, pieces: readonly Piece[], { isFocused = false, isDone = false }: PiecesSpec = {}): RenderElement {
   const style = (piece: Piece): TextStyle => {
     if (piece.backgroundColor !== undefined) return styleOf(piece);
     if (isFocused) return { color: ON_SURFACE, bold: true };
     return { ...(isDone ? { color: TONE_KEYS.muted } : styleOf(piece)), hover: { color: ON_SURFACE } };
   };
+  return kit.Text({ wrap: "truncate-end", children: pieces.map((piece) => kit.Text({ ...style(piece), children: [piece.text] })) });
+}
+
+export function Row(kit: Kit, { key, pieces, isFocused = false, isDone = false }: RowSpec): RenderElement {
   return kit.Box({
     key,
     flexDirection: "row",
     hover: { backgroundColor: TONE_KEYS.focus },
     ...(isFocused ? { backgroundColor: TONE_KEYS.focus } : {}),
-    children: [
-      kit.Text({ wrap: "truncate-end", children: pieces.map((piece) => kit.Text({ ...style(piece), children: [piece.text] })) }),
-    ],
+    children: [Pieces(kit, pieces, { isFocused, isDone })],
   });
 }
 
