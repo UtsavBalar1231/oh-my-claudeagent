@@ -54,6 +54,8 @@ export type World = {
   focused: string[];
   selection: UiSelection | undefined;
   selectionReads: number;
+  surfaces: RenderSurface[];
+  invalidations: number;
   opened: unknown[];
   logs: string[];
   said: string[];
@@ -104,6 +106,8 @@ export function world(
     focused: [],
     selection: undefined,
     selectionReads: 0,
+    surfaces: ["terminal"],
+    invalidations: 0,
     opened: [],
     logs: [],
     said: [],
@@ -160,6 +164,11 @@ export function world(
   on("ui.log", (_$, e) => (w.logs.push(e.text), e.to === "debug" || w.said.push(e.text), { value: undefined }));
   on("ui.panes", () => ({ value: w.panes }));
   on("ui.focus", (_$, e) => (w.focused.push(e.element ?? ""), {}));
+  on("session.surfaces", () => ({ value: w.surfaces }));
+  on("ui.invalidate", (_$, e, next) => {
+    w.invalidations += 1;
+    return next(e);
+  });
   on("ui.selection", () => ((w.selectionReads += 1), { value: w.selection }));
   return w;
 }

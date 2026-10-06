@@ -1,4 +1,5 @@
-import { expect, type Plugin, test } from "claude-code/testing";
+import type { On } from "claude-code";
+import { type Engine, expect, type Plugin, test } from "claude-code/testing";
 import { joinPath } from "../../src/core/path.ts";
 import { usableColumns } from "../../src/core/ui-kit.ts";
 import {
@@ -605,5 +606,68 @@ test("by default every tab draws Nerd Font glyphs, each one before a space or at
   }
   expect(icons).toBeGreaterThan(0);
   expect(glued).toEqual([]);
+  await ui.unmount();
+});
+
+const RUNNING = {
+  tool_use_id: "toolu_1",
+  prompt: "Fix the heading parser.",
+  description: "Fix the heading parser",
+  subagentType: "oh-my-claudeagent:executor",
+  provider: { plugin: "oh-my-claudeagent", tier: "user" },
+  parentModel: "claude-opus-5-5",
+  background: true,
+  fork: false,
+} as const;
+
+async function runningAgent($: Engine, on: On, surfaces: World["surfaces"]) {
+  const w = world(on, FILES);
+  w.surfaces = surfaces;
+  on("agent.spawn", () => ({ model: "claude-sonnet-5-5", agentId: "a-1" }));
+  await $.command.run(run(""));
+  await $.agent.spawn(RUNNING);
+  w.agents = [{ id: "a-1", description: "", type: "x", status: "running" }];
+  return w;
+}
+
+test("with a terminal attached the timer redraws every second while the Agents tab shows a running agent", async ($, on) => {
+  const w = await runningAgent($, on, ["terminal"]);
+  const ui = await $.ui.mount(pane("terminal"));
+  const before = w.invalidations;
+  await w.clock.advance(5000);
+  expect(w.invalidations - before).toBe(5);
+  await ui.unmount();
+});
+
+for (const surfaces of [["desktop"], ["vscode"], []] as const) {
+  test(`the timer never redraws over 5 seconds when surfaces is ${JSON.stringify(surfaces)}`, async ($, on) => {
+    const w = await runningAgent($, on, [...surfaces]);
+    const ui = await $.ui.mount(pane("terminal"));
+    const before = w.invalidations;
+    await w.clock.advance(5000);
+    expect(w.invalidations).toBe(before);
+    await ui.unmount();
+  });
+}
+
+test("the timer stops redrawing when the Agents tab is left", async ($, on) => {
+  const w = await runningAgent($, on, ["terminal"]);
+  const ui = await $.ui.mount(pane("terminal"));
+  await ui.press({ key: "2" });
+  await w.clock.settle();
+  const before = w.invalidations;
+  await w.clock.advance(5000);
+  expect(w.invalidations).toBe(before);
+  await ui.unmount();
+});
+
+test("the timer reads the surfaces again on each tick", async ($, on) => {
+  const w = await runningAgent($, on, ["desktop"]);
+  const ui = await $.ui.mount(pane("terminal"));
+  await w.clock.advance(3000);
+  const before = w.invalidations;
+  w.surfaces = ["desktop", "terminal"];
+  await w.clock.advance(3000);
+  expect(w.invalidations - before).toBe(3);
   await ui.unmount();
 });

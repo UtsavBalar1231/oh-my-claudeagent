@@ -29,7 +29,6 @@ function engine(on: On, files: Readonly<Record<string, string>> = {}, env: Reado
       ...(meter.usd === undefined ? {} : { cost: { usd: meter.usd } }),
     },
   }));
-  on("ui.invalidate", () => ({ value: undefined }));
   on("turn.start", (_$, e) => ({ turnId: e.turnId }));
   on("turn.complete", (_$, e) => ({ text: e.answer }));
   return { w, meter };

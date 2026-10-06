@@ -44,8 +44,9 @@ function world(on: On, w: World = {}) {
     return Object.entries(files).find(([name]) => path === name || path.endsWith(`/${name}`))?.[1];
   };
   if (w.layout !== undefined) {
-    sessionWorld(on, w.contents ?? {}, {}, w.env ?? {}, w.layout);
+    sessionWorld(on, w.contents ?? {}, {}, w.env ?? {}, w.layout).surfaces = w.surfaces ?? ["terminal"];
   } else {
+    on("session.surfaces", () => (w.failSurfaces === undefined ? { value: w.surfaces ?? ["terminal"] } : { deny: w.failSurfaces }));
     on("ui.log", () => ({ value: undefined }));
     on("env.get", (_$, e) => ({ value: env[e.name] }));
     on("session.root", () => ({ value: "/work" }));
@@ -71,7 +72,6 @@ function world(on: On, w: World = {}) {
     }));
   }
   on("session.cwd", () => ({ value: w.cwd ?? w.layout?.root ?? "/work/sub" }));
-  on("session.surfaces", () => (w.failSurfaces === undefined ? { value: w.surfaces ?? ["terminal"] } : { deny: w.failSurfaces }));
   on("process.run", (_$, e) => {
     const result = w.git?.[e.argv.join(" ")];
     if (result === undefined) throw new Error(`unexpected process.run ${e.argv.join(" ")}`);
@@ -837,4 +837,12 @@ test("on Windows a PowerShell removal lists its drive-spelled targets", async ($
     ].join("\n"),
   ]);
   expect(checked).toEqual([{ tool: "PowerShell", input: { command } }]);
+});
+
+test("the dialog asks when the session draws on Desktop only", async ($, on) => {
+  const { asked, checked } = world(on, { ...BUILD_WORLD, surfaces: ["desktop"] });
+
+  expect(await check($, BUILD_COMMAND)).toEqual({ decision: "deny", reason: REFUSED });
+  expect(asked).toEqual([{ question: BUILD_QUESTION, header: "OMCA guard", options: ["Refuse", "Run it"] }]);
+  expect(checked).toEqual([]);
 });

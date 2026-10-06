@@ -16,7 +16,8 @@ import * as stats from "./tabs/stats.ts";
 import { type Kit, kitOf, Rule, rowsAtLeast } from "./ui.ts";
 
 export const PANE = "omca";
-// The Agents tab's elapsed clocks tick each second; files are read again every second tick.
+// The Agents tab's elapsed clocks tick each second, only while a terminal draws them: on Desktop every
+// state write already redraws every site. Files are read again every second tick.
 const TICK_MS = 1000;
 const READ_EVERY = 2;
 // An inline pane gets about a third of the window less two rows (11 body rows at 40 terminal
@@ -138,8 +139,9 @@ async function tick(host: Host): Promise<void> {
     await refresh(host);
   }
   const [pane, rows] = await Promise.all([host.state.pane.get(), host.state.agents.get()]);
-  const isRunning = Object.values(rows.value ?? {}).some((row) => row.endedAt === null);
-  if (pane.value?.tab === "agents" && isRunning) host.ui.invalidate();
+  const isRunning = Object.values(rows.value ?? {}).some((row) => row.status === "running");
+  if (pane.value?.tab !== "agents" || !isRunning) return;
+  if ((await host.session.surfaces()).includes("terminal")) host.ui.invalidate();
 }
 
 function start(host: Host): void {
