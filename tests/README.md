@@ -32,7 +32,7 @@ the ones under `opencode/`.
 # Everything CI runs
 just ci
 
-# Every validator group: claims, hooks, mod, tree, engine and mcp
+# Every validator group: claims, formats, hooks, mod, tree, engine and mcp
 just validate
 
 # One group, for example the MCP handshake check

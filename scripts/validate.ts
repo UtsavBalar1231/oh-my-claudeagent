@@ -7,6 +7,7 @@ import { parseArgs } from "node:util";
 import { type Check, type Context, createContext, type Outcome, type Run, type Status } from "./validate/core.ts";
 import * as docs from "./validate/docs.ts";
 import * as engine from "./validate/engine.ts";
+import * as formats from "./validate/formats.ts";
 import * as frontmatter from "./validate/frontmatter.ts";
 import * as hooks from "./validate/hooks.ts";
 import * as manifest from "./validate/manifest.ts";
@@ -26,6 +27,7 @@ export const GROUPS = {
     ...docs.checks,
     ...promptHistory.checks,
   ],
+  formats: formats.checks,
   hooks: hooks.checks,
   mod: mod.checks,
   tree: tree.checks,

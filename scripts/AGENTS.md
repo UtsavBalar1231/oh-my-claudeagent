@@ -7,7 +7,7 @@ under `servers/hooks/`. Every file is TypeScript on bun.
 ## Layout
 
 - `validate.ts` and `validate/`: the plugin validator. `bun scripts/validate.ts [--check <group>]...`
-  runs the groups `claims`, `hooks`, `mod`, `tree`, `engine` and `mcp` (all of them by default),
+  runs the groups `claims`, `formats`, `hooks`, `mod`, `tree`, `engine` and `mcp` (all of them by default),
   prints one line per check and a final `Summary:` line, and exits 1 on any failure. Each check
   family is one module under `validate/` with its `*.spec.ts` beside it. `validate/core.ts` holds
   the shared pieces: the check types, `Run` for a finished child process, `envWithout` for a
@@ -16,7 +16,7 @@ under `servers/hooks/`. Every file is TypeScript on bun.
   fails. `engine` packages a copy of the tree and runs `claude plugin validate --strict` on it,
   and skips without the claude CLI. `mcp` runs the omca server through the handshake fixtures, and
   `qa/install-verify.ts` reuses it on a packaged copy. The `tree` group fails a tracked python,
-  bash or sh script, by its shebang or by a `.py`, `.sh` or `.bash` name. `workflow.spec.ts`
+  bash or sh script, by its shebang or by a `.py`, `.sh` or `.bash` name. The `formats` group reads every committed state fixture (registries, ledgers, plans, notepads) through the shared parsers; `EXPECTED_INVALID` in `validate/formats.ts` lists the fixtures that must keep failing. `workflow.spec.ts`
   parses `.github/workflows/` and checks both directions: CI runs every command of every `just ci`
   recipe, and every command CI runs belongs to one of those recipes or carries a reason to run in
   CI only.
