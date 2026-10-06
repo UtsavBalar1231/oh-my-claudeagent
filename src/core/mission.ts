@@ -34,7 +34,7 @@ export const firstLine = (text: string): string => lines(text)[0] ?? "";
 export const lastLine = (text: string): string => lines(text).at(-1) ?? "";
 
 type Effort = "low" | "medium" | "high" | "xhigh" | "max" | number;
-type Status = "running" | "answer" | "aborted" | "refusal" | "error" | "gone";
+type Status = "running" | "idle" | "waiting" | "pending" | "answer" | "aborted" | "refusal" | "error" | "gone";
 
 export type Lane = {
   id: string;
@@ -125,7 +125,11 @@ function toolRow(lane: Lane, look: LaneLook, home: string, mask: string): Piece[
   const marks: Piece[] = count === "" || width < TOOL_CELLS + COLUMN_GAP + displayWidth(count) ? [] : [{ text: count, color: TONE_KEYS.muted }];
   const tail = marks.length === 0 ? 0 : COLUMN_GAP + piecesWidth(marks);
   const pieces: Piece[] = [{ text: "  " }, { text: spinner(now, ascii), color: TONE_KEYS.active }, { text: " " }];
-  if (lane.tool === null) {
+  if (lane.status !== "running") {
+    const mark = statusMark(lane.status, g);
+    pieces.splice(1, 2, { text: mark.glyph, color: mark.color }, { text: " " });
+    pieces.push({ text: STATUS_WORDS[lane.status] ?? "", color: TONE_KEYS.muted });
+  } else if (lane.tool === null) {
     pieces.push({ text: lane.calls === 0 ? "starting" : "thinking", color: TONE_KEYS.muted });
   } else {
     const label = fitEnd(toolLabel(lane.tool.name), Math.max(0, width - tail - piecesWidth(pieces)), g.ellipsis);
@@ -145,7 +149,10 @@ export function laneRows(lane: Lane, look: LaneLook, home: string): Piece[][] {
   return [headRow(lane, look), toolRow(lane, look, home, look.g.mask)];
 }
 
-const STATUS_WORDS: Readonly<Record<Exclude<Status, "running">, string>> = {
+const STATUS_WORDS: Readonly<Partial<Record<Status, string>>> = {
+  idle: "idle",
+  waiting: "waiting",
+  pending: "pending",
   answer: "done",
   aborted: "stopped",
   refusal: "refused",
@@ -157,6 +164,10 @@ export function statusMark(status: Status, g: Glyphs): { glyph: string; color: T
   switch (status) {
     case "running":
       return { glyph: g.agent, color: TONE_KEYS.active };
+    case "idle":
+    case "waiting":
+    case "pending":
+      return { glyph: g.pending, color: TONE_KEYS.muted };
     case "answer":
       return levelMark("ok", g);
     case "aborted":
@@ -173,7 +184,7 @@ export function statusMark(status: Status, g: Glyphs): { glyph: string; color: T
 export function finishedRow(lane: Lane, look: LaneLook, home: string): Piece[] {
   const { g, width } = look;
   const mark = statusMark(lane.status, g);
-  const word = lane.status === "running" ? "" : STATUS_WORDS[lane.status];
+  const word = STATUS_WORDS[lane.status] ?? "";
   const result = redactLine(lane.result, home, g.mask);
   const said = lane.status === "answer" && result !== "" ? result : result === "" ? word : `${word} ${g.dot} ${result}`;
   const duration = padStart(formatDuration((lane.endedAt ?? look.now) - lane.startedAt), ELAPSED);
@@ -189,9 +200,15 @@ export function finishedRow(lane: Lane, look: LaneLook, home: string): Piece[] {
 
 /** How many agents run and finished and the tokens they spent, as many parts as fit `width`. */
 export function summaryText(lanes: readonly Lane[], g: Glyphs, width: number): string {
-  const running = lanes.filter((lane) => lane.endedAt === null).length;
+  const running = lanes.filter((lane) => lane.status === "running").length;
+  const open = lanes.filter((lane) => lane.endedAt === null).length;
   const tokens = lanes.reduce((sum, lane) => sum + lane.inputTokens + lane.outputTokens, 0);
-  const parts = [`${running} running`, `${lanes.length - running} finished`, `${formatTokens(tokens)} tokens`];
+  const parts = [
+    `${running} running`,
+    ...(open > running ? [`${open - running} idle`] : []),
+    `${lanes.length - open} finished`,
+    `${formatTokens(tokens)} tokens`,
+  ];
   while (parts.length > 1 && displayWidth(parts.join(` ${g.dot} `)) > width) parts.pop();
   return fitEnd(parts.join(` ${g.dot} `), width, g.ellipsis);
 }

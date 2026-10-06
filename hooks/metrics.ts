@@ -55,7 +55,7 @@ export const metrics: Features = {
     async post(host, _e, result) {
       if (result.deny !== undefined || result.agentId === undefined) return undefined;
       const [at, row] = await Promise.all([locate(host, result.agentId), agentRow(host, result.agentId)]);
-      if (at !== undefined && row !== undefined) await write(host, at.path, running(at.sessionId, result.agentId, row));
+      if (at !== undefined && row !== undefined && !row.teammate) await write(host, at.path, running(at.sessionId, result.agentId, row));
       return undefined;
     },
   },
@@ -66,7 +66,7 @@ export const metrics: Features = {
       if (at === undefined || !(await host.fs.exists(at.path))) return undefined;
       if (parseRecord(await host.fs.read(at.path))?.outcome !== "running") return undefined;
       const row = await agentRow(host, e.agentId);
-      if (row === undefined) return undefined;
+      if (row === undefined || row.teammate) return undefined;
       const endedAt = row.endedAt ?? (await host.clock.now());
       // A turn without usage counted nothing, by the engine's contract; tokens its steps did
       // count without one cannot be split into priced kinds, so they stay unpriced.

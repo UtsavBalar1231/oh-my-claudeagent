@@ -630,3 +630,14 @@ test("a turn that changes nothing writes nothing to the band", async ($, on) => 
   expect(bandWrites).toBe(before.writes);
   expect([await texts(band), await buttons(band)]).toEqual(before.drawn);
 });
+
+test("an idle teammate is not counted among the agents running", async ($, on) => {
+  world(on, bound(12, 46));
+  await start($);
+  const band = await mount($, "terminal");
+  await $.agent.spawn({ ...SPAWN, tool_use_id: "toolu_1" });
+  await $.agent.spawn({ ...SPAWN, tool_use_id: "toolu_2", isTeammate: true });
+  await turn($, "agent-toolu_2");
+  await band.redraw();
+  expect(await statusRow(band)).toBe("█▎███ 12/46 · next 13 Port module 13 · ◆ 1 running");
+});

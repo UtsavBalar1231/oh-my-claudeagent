@@ -43,25 +43,26 @@ function edit(host: Host, id: string, change: (row: Row) => Row): Promise<void> 
 function endAgent(host: Host, id: string, status: Status, usage: TurnUsage | undefined, at: number): Promise<void> {
   return edit(host, id, (row) => ({
     ...row,
-    status,
-    endedAt: at,
+    ...(row.teammate ? { status: "idle" as const } : { status, endedAt: at }),
     ...(usage === undefined ? {} : { inputTokens: inputTokens(usage), outputTokens: usage.output_tokens }),
   }));
 }
 
 const LISTED_STATUS: Readonly<Record<string, Status>> = { completed: "answer", failed: "error", killed: "aborted" };
+const LISTED_OPEN: Readonly<Record<string, Status>> = { running: "running", idle: "idle", waiting: "waiting", pending: "pending" };
 
 export function reconcile(host: Host, listed: readonly AgentInfo[], at: number): Promise<void> {
   return update(host.state.agents, (agents) => {
     if (agents === undefined) return agents;
-    const ended = Object.entries(agents).flatMap(([id, row]) => {
+    const changed = Object.entries(agents).flatMap(([id, row]) => {
       if (row.endedAt !== null) return [];
       const info = listed.find((agent) => agent.id === id);
-      if (info?.status === "running") return [];
+      const open = info === undefined ? undefined : LISTED_OPEN[info.status];
+      if (open !== undefined) return open === row.status ? [] : [[id, { ...row, status: open }] as const];
       const status = info === undefined ? "gone" : (LISTED_STATUS[info.status] ?? "gone");
       return [[id, { ...row, status, endedAt: at }] as const];
     });
-    return ended.length === 0 ? agents : { ...agents, ...Object.fromEntries(ended) };
+    return changed.length === 0 ? agents : { ...agents, ...Object.fromEntries(changed) };
   });
 }
 
@@ -84,6 +85,7 @@ export const agentsTracker: Features = {
           inputTokens: 0,
           outputTokens: 0,
           status: "running",
+          teammate: e.isTeammate === true,
           ...(task === undefined ? {} : { task }),
         },
       }));
@@ -110,6 +112,7 @@ export const agentsTracker: Features = {
       const { usage } = result;
       await edit(host, e.agentId, (row) => ({
         ...row,
+        status: "running",
         effort: e.effort ?? row.effort,
         inputTokens: row.inputTokens + (usage === null ? 0 : inputTokens(usage)),
         outputTokens: row.outputTokens + (usage?.output_tokens ?? 0),

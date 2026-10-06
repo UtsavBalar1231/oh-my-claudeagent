@@ -11,7 +11,8 @@ declare module "claude-code" {
           endedAt: number | null;
           inputTokens: number;
           outputTokens: number;
-          status: "running" | "answer" | "aborted" | "refusal" | "error" | "gone";
+          status: "running" | "idle" | "waiting" | "pending" | "answer" | "aborted" | "refusal" | "error" | "gone";
+          teammate: boolean;
           task?: number;
         };
       };

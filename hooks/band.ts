@@ -147,7 +147,7 @@ export const band: Features = {
         host.state.nextActions.get(),
         host.state.agents.get(),
       ]);
-      const running = Object.values(agents).filter((agent) => agent.endedAt === null).length;
+      const running = Object.values(agents).filter((agent) => agent.status === "running").length;
       const view = bandView(snapshot, actions, e.props.bodyColumns, glyphTier, running);
       if (view === undefined) return undefined;
       const kit = kitOf(host.ui.resolve(e), e.surface);

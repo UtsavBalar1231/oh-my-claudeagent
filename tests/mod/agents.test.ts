@@ -410,3 +410,63 @@ test("by default each agent draws its own Nerd Font icon, a space after it", asy
   expect(rows[2]).toStartWith("\u{f05d} architect · The ledger holds.");
   await ui.unmount();
 });
+
+type AgentRow = { status: string; endedAt: number | null; teammate: boolean };
+
+const atoms = new Map<string, { value: unknown; version: number }>();
+const agentRows = async (): Promise<Record<string, AgentRow>> => (atoms.get("agents")?.value ?? {}) as Record<string, AgentRow>;
+
+test("a teammate stays open and idle between turns, runs again on its next step, and follows the engine's listed status", async ($, on) => {
+  atoms.clear();
+  on("state.get", (_$, e) => ({ value: atoms.get(e.key) ?? { value: undefined, version: 0 } }));
+  on("state.set", (_$, e) => {
+    const version = (atoms.get(e.key)?.version ?? 0) + 1;
+    atoms.set(e.key, { value: e.value, version });
+    return { value: { isSet: true, version } };
+  });
+  const w = world(on, {});
+  engine(on, {});
+  await $.command.run(run(""));
+  await $.agent.spawn({ ...spawnOf(1, "executor", "Teammate work", "Do it."), isTeammate: true });
+  await $.agent.spawn(spawnOf(2, "explorer", "Subagent work", "Find it."));
+  expect((await agentRows())["a-1"]).toMatchObject({ status: "running", endedAt: null, teammate: true });
+  expect((await agentRows())["a-2"]).toMatchObject({ teammate: false });
+
+  await finish($, "a-1", "Turn one.");
+  await finish($, "a-2", "Done.");
+  expect((await agentRows())["a-1"]).toMatchObject({ status: "idle", endedAt: null });
+  expect((await agentRows())["a-2"]).toMatchObject({ status: "answer" });
+  expect((await agentRows())["a-2"]?.endedAt).not.toBeNull();
+
+  await stepAll($, "a-1", 1);
+  expect((await agentRows())["a-1"]).toMatchObject({ status: "running", endedAt: null });
+
+  w.agents = [{ id: "a-1", description: "", type: "x", status: "idle" }];
+  await w.clock.advance(2000);
+  expect((await agentRows())["a-1"]).toMatchObject({ status: "idle", endedAt: null });
+  w.agents = [{ id: "a-1", description: "", type: "x", status: "waiting" }];
+  await w.clock.advance(2000);
+  expect((await agentRows())["a-1"]).toMatchObject({ status: "waiting", endedAt: null });
+  w.agents = [{ id: "a-1", description: "", type: "x", status: "running" }];
+  await w.clock.advance(2000);
+  expect((await agentRows())["a-1"]).toMatchObject({ status: "running", endedAt: null });
+  w.agents = [{ id: "a-1", description: "", type: "x", status: "killed" }];
+  await w.clock.advance(2000);
+  expect((await agentRows())["a-1"]).toMatchObject({ status: "aborted" });
+});
+
+test("an idle teammate draws its status mark and word with no spinner and is left out of the running count", async ($, on) => {
+  world(on, {});
+  engine(on, {});
+  await $.command.run(run(""));
+  await $.agent.spawn({ ...spawnOf(1, "executor", "Teammate work", "Do it."), isTeammate: true });
+  await $.agent.spawn(spawnOf(2, "explorer", "Subagent work", "Find it."));
+  await finish($, "a-1", "Turn one.");
+  const ui = await $.ui.mount(pane("terminal", DOCK_120));
+
+  const rows = body(await ui.drawn()).slice(3);
+  expect(rows[1]).toBe("  ○ idle");
+  expect(rows[3]).toBe("  · starting");
+  expect(rows.at(-1)).toBe("d: Details  1 running · 1 idle · 0 finished");
+  await ui.unmount();
+});

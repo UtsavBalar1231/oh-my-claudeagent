@@ -10,7 +10,7 @@ logged.
 
 ## Requirements
 
-- Claude Code 2.1.288 or later. Tested with 2.1.288.
+- Claude Code 2.1.288 or later. Tested with 2.1.291.
 - bun 1.4.2 or later, on the `PATH` Claude Code starts with. The `omca` server, its hooks and
   the status line run on bun.
 - `ast-grep` (or `sg`), optional. Only the structural code search tools need it.

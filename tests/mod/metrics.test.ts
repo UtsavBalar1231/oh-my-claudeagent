@@ -175,3 +175,10 @@ test("an unsafe agent id names no file and writes nothing", async ($, on) => {
   expect(writes).toEqual([]);
   expect(w.logs).toContain('metrics: no record for session "s1" agent "../escape"');
 });
+
+test("a teammate writes no delegation record at spawn or when its turn completes", async ($, on) => {
+  const { writes } = engine(on);
+  await $.agent.spawn({ ...spawn("oh-my-claudeagent:executor", "Fix the parser"), isTeammate: true });
+  await $.turn.complete(complete("a-1", { answer: "Fixed." }));
+  expect(writes).toEqual([]);
+});
