@@ -37,7 +37,7 @@ const cellsOf = (name: MascotName, state: MascotState, frame = 0, size: MascotSi
 
 const rasterOf = (tree: RenderElement, id: string): unknown => nodeByKey(tree, `mascot-${id}`)?.props?.["cells"];
 
-// The pane's tick starts the timer once a drawing has laid a working mascot out.
+// The pane's reading tick, every 2 s, starts the timer once a drawing has laid a working mascot out.
 async function running($: Engine, on: On, types: readonly string[], surface: "terminal" | "desktop" = "terminal", size: Size = DOCK_120, settings: Record<string, unknown> = {}) {
   const w = world(on, {}, settings);
   w.surfaces = [surface];
@@ -47,7 +47,7 @@ async function running($: Engine, on: On, types: readonly string[], surface: "te
   w.agents = listed(...types.map((_, index) => `a-${index + 1}`));
   const ui = await $.ui.mount(pane(surface, size));
   await ui.drawn();
-  await w.clock.advance(1000);
+  await w.clock.advance(2000);
   return { w, ui };
 }
 
@@ -250,7 +250,7 @@ test("leaving the Agents tab stops the blits, and coming back starts them again"
 
   await ui.press({ key: "1" });
   await ui.drawn();
-  await w.clock.advance(1000 + FRAME_MS * 2);
+  await w.clock.advance(2000 + FRAME_MS * 2);
   expect(w.blits.length).toBeGreaterThan(away);
   await ui.unmount();
 });

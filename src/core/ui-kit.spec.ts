@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   AGENT_ICONS,
+  cells,
   agentGlyph,
   arrange,
   displayWidth,
@@ -39,6 +40,129 @@ describe("displayWidth", () => {
 
   test("a cut never splits a ZWJ sequence's width", () => {
     expect(fitEnd("👨‍👩‍👧 family", 4, E)).toBe("👨‍👩‍👧…");
+  });
+});
+
+// The width rules as first written, one array pass per call, kept to hold the fast paths to them.
+const REFERENCE_WIDE: readonly (readonly [number, number])[] = [
+  [0x231a, 0x231b], [0x23e9, 0x23ec], [0x23f0, 0x23f0], [0x23f3, 0x23f3], [0x25fd, 0x25fe], [0x2614, 0x2615],
+  [0x2648, 0x2653], [0x267f, 0x267f], [0x2693, 0x2693], [0x26a1, 0x26a1], [0x26aa, 0x26ab], [0x26bd, 0x26be],
+  [0x26c4, 0x26c5], [0x26ce, 0x26ce], [0x26d4, 0x26d4], [0x26ea, 0x26ea], [0x26f2, 0x26f3], [0x26f5, 0x26f5],
+  [0x26fa, 0x26fa], [0x26fd, 0x26fd], [0x2705, 0x2705], [0x270a, 0x270b], [0x2728, 0x2728], [0x274c, 0x274c],
+  [0x274e, 0x274e], [0x2753, 0x2755], [0x2757, 0x2757], [0x2795, 0x2797], [0x27b0, 0x27b0], [0x27bf, 0x27bf],
+  [0x2b1b, 0x2b1c], [0x2b50, 0x2b50], [0x2b55, 0x2b55], [0xfe10, 0xfe19],
+];
+
+function referenceCells(codePoint: number): number {
+  if ((codePoint >= 0x300 && codePoint <= 0x36f) || (codePoint >= 0x200b && codePoint <= 0x200f)) return 0;
+  if ((codePoint >= 0xfe00 && codePoint <= 0xfe0f) || (codePoint >= 0x20d0 && codePoint <= 0x20ff)) return 0;
+  if ((codePoint >= 0x1f3fb && codePoint <= 0x1f3ff) || (codePoint >= 0xe0100 && codePoint <= 0xe01ef)) return 0;
+  const isWide =
+    REFERENCE_WIDE.some(([low, high]) => codePoint >= low && codePoint <= high) ||
+    (codePoint >= 0x1100 && codePoint <= 0x115f) ||
+    (codePoint >= 0x2e80 && codePoint <= 0xa4cf) ||
+    (codePoint >= 0xac00 && codePoint <= 0xd7a3) ||
+    (codePoint >= 0xf900 && codePoint <= 0xfaff) ||
+    (codePoint >= 0xfe30 && codePoint <= 0xfe4f) ||
+    (codePoint >= 0xff00 && codePoint <= 0xff60) ||
+    (codePoint >= 0xffe0 && codePoint <= 0xffe6) ||
+    (codePoint >= 0x1f300 && codePoint <= 0x1faff) ||
+    (codePoint >= 0x20000 && codePoint <= 0x3fffd);
+  return isWide ? 2 : 1;
+}
+
+function referenceWidths(chars: Iterable<string>): number[] {
+  let previous = 0;
+  return Array.from(chars, (char) => {
+    const codePoint = char.codePointAt(0) ?? 0;
+    const width = previous === 0x200d ? 0 : referenceCells(codePoint);
+    previous = codePoint;
+    return width;
+  });
+}
+
+const referenceWidth = (text: string): number => referenceWidths(text).reduce((sum, width) => sum + width, 0);
+
+function referenceHead(chars: readonly string[], room: number): string {
+  const sizes = referenceWidths(chars);
+  let used = 0;
+  let out = "";
+  for (const [index, char] of chars.entries()) {
+    used += sizes[index] ?? 0;
+    if (used > room) break;
+    out += char;
+  }
+  return out;
+}
+
+function referenceWrap(text: string, width: number): string[] {
+  const room = Math.max(1, width);
+  const lines: string[] = [];
+  let line = "";
+  for (const word of text.split(" ")) {
+    if (word === "") continue;
+    if (line !== "" && referenceWidth(line) + 1 + referenceWidth(word) <= room) {
+      line = `${line} ${word}`;
+      continue;
+    }
+    if (line !== "") lines.push(line);
+    let rest = word;
+    while (rest !== "" && referenceWidth(rest) > room) {
+      const piece = referenceHead([...rest], room) || String.fromCodePoint(rest.codePointAt(0) ?? 0);
+      lines.push(piece);
+      rest = rest.slice(piece.length);
+    }
+    line = rest;
+  }
+  if (line !== "" || lines.length === 0) lines.push(line);
+  return lines;
+}
+
+const WIDTH_SAMPLES = [
+  "",
+  "plain ascii line with spaces",
+  "caf\u00e9 na\u00efve \u00fc\u00df \u00a9\u00ae \u00bd",
+  "e\u0301 a\u0300\u0301 combining \u0345",
+  "\u200b\u200c\u200d\u200e\u200f zero widths",
+  "日本語 中文 한국어 ｆｕｌｌ",
+  "✅❌⭐⏰ ✓✗●○◐⊘◆·✢✳✶✻✽",
+  "\u{f05d}\u{f057}\u{f06a}\u{f085} \u{e0b0}\u{f101}",
+  "👍🏽 👨‍👩‍👧 👩‍💻 ❤️ 🏳️‍🌈 🇯🇵",
+  "a\u200d b\u200d\u200d c ‍x",
+  "lone \ud800 and \udc00 surrogates \ud83d",
+  "tab\tand\u0000nul\u0007bell",
+];
+
+describe("fast paths match the width rules as first written", () => {
+  test("cells agrees with the reference on every code point up to U+3FFFF", () => {
+    for (let codePoint = 0; codePoint <= 0x3ffff; codePoint += 1) {
+      if (cells(codePoint) !== referenceCells(codePoint)) throw new Error(`cells(U+${codePoint.toString(16)}) differs`);
+    }
+  });
+
+  test.each(WIDTH_SAMPLES.map((text) => [JSON.stringify(text), text] as const))("displayWidth of %s", (_name, text) => {
+    expect(displayWidth(text)).toBe(referenceWidth(text));
+  });
+
+  test("displayWidth and fitEnd agree on every prefix of the mixed samples", () => {
+    for (const text of WIDTH_SAMPLES) {
+      const chars = [...text];
+      for (let end = 0; end <= chars.length; end += 1) {
+        const prefix = chars.slice(0, end).join("");
+        expect(displayWidth(prefix)).toBe(referenceWidth(prefix));
+      }
+    }
+  });
+
+  test("fitEnd and fitMiddle cut mixed text where the reference does", () => {
+    const text = WIDTH_SAMPLES.join(" ");
+    for (let width = 1; width < 40; width += 1) {
+      const room = width - displayWidth(E);
+      expect(fitEnd(text, width, E)).toBe(room <= 0 ? referenceHead([...E], width) : `${referenceHead([...text], room).trimEnd()}${E}`);
+      const front = Math.ceil(room / 2);
+      const tailOf = [...referenceHead([...text].reverse(), room - front)].reverse().join("");
+      if (room > 0) expect(fitMiddle(text, width, E)).toBe(`${referenceHead([...text], front)}${E}${tailOf}`);
+    }
   });
 });
 
@@ -242,6 +366,30 @@ describe("wrapText", () => {
   test("empty text is one empty line, and a width under 1 acts as 1", () => {
     expect(wrapText("", 10)).toEqual([""]);
     expect(wrapText("ab", 0)).toEqual(["a", "b"]);
+  });
+
+  const PROMPT =
+    "Implement the retry logic for the evidence ledger so a busy lock backs off, then fails open without blocking the stop gate. " +
+    "Keep 日本語 and ✅ marks intact, plus 👨‍👩‍👧 family glyphs and \u{f05d} icons, and a /very/long/path/that/never/breaks/anywhere/at/all/ok too.";
+
+  test.each([6, 10, 24, 40, 72, 120])("matches the reference on a long prompt at %i columns", (columns) => {
+    expect(wrapText(PROMPT, columns)).toEqual(referenceWrap(PROMPT, columns));
+  });
+
+  test("matches the reference on an over-width word between short ones", () => {
+    const text = `a ${"x".repeat(50)} b 日本語日本語日本語日本語 c`;
+    for (const columns of [1, 2, 7, 20, 51, 80]) expect(wrapText(text, columns)).toEqual(referenceWrap(text, columns));
+  });
+
+  test("matches the reference when a line ends in a zero-width joiner", () => {
+    const text = "👨\u200d 👩 b\u200d c d\u200d\u200d e";
+    for (let columns = 1; columns < 14; columns += 1) expect(wrapText(text, columns)).toEqual(referenceWrap(text, columns));
+  });
+
+  test("matches the reference on every mixed sample", () => {
+    for (const text of WIDTH_SAMPLES) {
+      for (const columns of [1, 3, 8, 21]) expect(wrapText(text, columns)).toEqual(referenceWrap(text, columns));
+    }
   });
 });
 

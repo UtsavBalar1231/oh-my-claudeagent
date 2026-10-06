@@ -286,6 +286,17 @@ test("a complete plan with a passing final verification for its current bytes of
   });
 });
 
+test("a plan's bytes reach the digest unchanged, a byte order mark, CRLF and multibyte characters included", async ($, on) => {
+  const text = `\uFEFF# Widget rewrite \u65e5\u672c\u8a9e \u{1F680}\r\n\r\n## TODOs\r\n\r\n- [x] 1. Port the caf\u00e9 module \u2014 done\r\n`;
+  const scoped = final({ plan_sha256: sha256Hex(new TextEncoder().encode(text)) });
+  world(on, files({ [BOULDER]: BOUND, [PLAN_PATH]: text, [LEDGER]: ledger([scoped]) }));
+  await start($);
+  await turn($);
+
+  const band = await mount($, "terminal");
+  expect((await buttons(band)).map((button) => button.key)).toEqual(["review"]);
+});
+
 test("an unreadable ledger on a complete plan names the failure and still offers the final verification", async ($, on) => {
   const disk = bound(46, 46, { [LEDGER]: "{ not json" });
   world(on, disk);
@@ -628,7 +639,7 @@ test("a burst of turn ends leaves the mounted band on the last state, drawn with
   expect(await statusRow(band)).toBe("█▎███ 12/46 · next 13 Port module 13");
 
   for (let n = 0; n < 8; n++) {
-    disk.set(STATUS, { text: statusFile(`just test ${n}`), mtimeMs: BEFORE_RUN_MS });
+    disk.set(STATUS, { text: statusFile(`just test ${n}`), mtimeMs: BEFORE_RUN_MS + n });
     await turn($, n % 2 === 0 ? undefined : `agent-${n}`);
   }
 

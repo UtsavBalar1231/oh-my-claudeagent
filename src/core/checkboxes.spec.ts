@@ -1,6 +1,27 @@
 import { describe, expect, test } from "bun:test";
-import { allTasksDone, checkboxStates, MAX_LABEL_LEN, nextTaskLabel, outsideFences, planIsComplete, planTasks } from "./checkboxes.ts";
+import { allTasksDone, checkboxStates, clean, MAX_LABEL_LEN, nextTaskLabel, outsideFences, planIsComplete, planTasks } from "./checkboxes.ts";
 import { parsePlan } from "./plan-reader.ts";
+
+describe("clean", () => {
+  test.each([
+    ["CRLF to LF", "a\r\nb\r\n", "a\nb\n"],
+    ["a lone CR to LF", "a\rb", "a\nb"],
+    ["CR runs, each one a break", "a\r\r\nb\r\r", "a\n\nb\n\n"],
+    ["zero-width characters", "a\u200bb\u200fc\u2060d\ufeffe\u202ef", "abcdef"],
+    ["control characters but not tab or newline", "a\u0000b\u0007c\u007fd\u009fe\tf\ng", "abcde\tf\ng"],
+    ["a leading BOM", "\ufeff# Plan", "# Plan"],
+    ["only unsafe characters", "\u0000\u200b\r", "\n"],
+    ["astral characters kept whole", "👨\u200d👩 \u{1f600}\u0001", "👨👩 \u{1f600}"],
+  ])("%s", (_name, text, expected) => {
+    expect(clean(text)).toBe(expected);
+  });
+
+  test("returns the same string when nothing needs cleaning", () => {
+    const text = "# Plan\n\n- [ ] 1. Task\twith tab, é, 日本語 and 👍\n";
+    expect(clean(text)).toBe(text);
+    expect(clean("")).toBe("");
+  });
+});
 
 describe("planTasks", () => {
   test("gives number, capped label, state and line of each numbered task outside fences, past a BOM", () => {

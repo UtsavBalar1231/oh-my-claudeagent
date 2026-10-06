@@ -142,6 +142,8 @@ const WIDE_SYMBOLS: readonly (readonly [number, number])[] = [
 const ZWJ = 0x200d;
 
 export function cells(codePoint: number): number {
+  // Nothing below U+0300 is zero-width or wide, and every line OMCA draws is mostly such text.
+  if (codePoint < 0x300) return 1;
   if ((codePoint >= 0x300 && codePoint <= 0x36f) || (codePoint >= 0x200b && codePoint <= 0x200f)) return 0;
   if ((codePoint >= 0xfe00 && codePoint <= 0xfe0f) || (codePoint >= 0x20d0 && codePoint <= 0x20ff)) return 0;
   if ((codePoint >= 0x1f3fb && codePoint <= 0x1f3ff) || (codePoint >= 0xe0100 && codePoint <= 0xe01ef)) return 0;
@@ -160,26 +162,29 @@ export function cells(codePoint: number): number {
 }
 
 // A code point after a zero-width joiner joins the glyph before it, so 👨‍👩‍👧 takes the cells of one.
-function widths(chars: Iterable<string>): number[] {
-  let previous = 0;
-  return Array.from(chars, (char) => {
-    const codePoint = char.codePointAt(0) ?? 0;
-    const width = previous === ZWJ ? 0 : cells(codePoint);
-    previous = codePoint;
-    return width;
-  });
-}
-
 export function displayWidth(text: string): number {
-  return widths(text).reduce((sum, width) => sum + width, 0);
+  let total = 0;
+  let previous = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    let codePoint = text.charCodeAt(index);
+    if (codePoint >= 0xd800 && codePoint <= 0xdbff) {
+      codePoint = text.codePointAt(index) ?? codePoint;
+      if (codePoint > 0xffff) index += 1;
+    }
+    if (previous !== ZWJ) total += cells(codePoint);
+    previous = codePoint;
+  }
+  return total;
 }
 
 function head(chars: readonly string[], room: number): string {
-  const sizes = widths(chars);
   let used = 0;
+  let previous = 0;
   let out = "";
-  for (const [index, char] of chars.entries()) {
-    used += sizes[index] ?? 0;
+  for (const char of chars) {
+    const codePoint = char.codePointAt(0) ?? 0;
+    if (previous !== ZWJ) used += cells(codePoint);
+    previous = codePoint;
     if (used > room) break;
     out += char;
   }
@@ -212,20 +217,27 @@ export function wrapText(text: string, width: number): string[] {
   const room = Math.max(1, width);
   const lines: string[] = [];
   let line = "";
+  let lineWidth = 0;
   for (const word of text.split(" ")) {
     if (word === "") continue;
-    if (line !== "" && displayWidth(line) + 1 + displayWidth(word) <= room) {
+    const wordWidth = displayWidth(word);
+    if (line !== "" && lineWidth + 1 + wordWidth <= room) {
+      // A space after a trailing joiner joins the glyph and takes no cell.
+      lineWidth += (line.charCodeAt(line.length - 1) === ZWJ ? 0 : 1) + wordWidth;
       line = `${line} ${word}`;
       continue;
     }
     if (line !== "") lines.push(line);
     let rest = word;
-    while (rest !== "" && displayWidth(rest) > room) {
+    let restWidth = wordWidth;
+    while (rest !== "" && restWidth > room) {
       const piece = head([...rest], room) || String.fromCodePoint(rest.codePointAt(0) ?? 0);
       lines.push(piece);
       rest = rest.slice(piece.length);
+      restWidth = displayWidth(rest);
     }
     line = rest;
+    lineWidth = restWidth;
   }
   if (line !== "" || lines.length === 0) lines.push(line);
   return lines;

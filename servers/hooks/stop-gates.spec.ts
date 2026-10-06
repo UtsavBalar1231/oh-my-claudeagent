@@ -6,6 +6,7 @@ import { join } from "node:path";
 import type { StopGate } from "../../src/core/stop-ledger.ts";
 import { dispatch, type Output, payloadOf } from "./registry.ts";
 import { findSession, touchSession } from "./session-state.ts";
+import * as statusFile from "./status-file.ts";
 
 const NOW = 1_786_000_000_000;
 const NOW_S = NOW / 1000;
@@ -272,6 +273,28 @@ describe("plan continuation", () => {
     expect(await run.stop({ transcript_path: path })).toEqual(CONTINUE);
     const tail = transcript(run.root, ...Array.from({ length: 2100 }, () => filler), user("lets pause here"));
     expect(await run.stop({ transcript_path: tail }, NOW + 10 * SECOND)).toEqual({});
+  });
+
+  test("plan continuation: the scan reads past a tool_result-only user entry to the pause prompt", async () => {
+    const run = session();
+    bind(run, UNCHECKED_PLAN);
+    const path = transcript(
+      run.root,
+      user("start on task 2"),
+      said("Working on it."),
+      user("lets pause here for now."),
+      assistant([{ type: "tool_use", name: "Read", input: {} }]),
+      user([{ type: "tool_result", content: "file contents" }]),
+    );
+    expect(await run.stop({ transcript_path: path })).toEqual({});
+  });
+
+  test("plan continuation: malformed lines after the pause prompt are skipped, not read as a prompt", async () => {
+    const run = session();
+    bind(run, UNCHECKED_PLAN);
+    const path = transcript(run.root, user("start on task 2"), said("Working on it."), user("lets pause here for now."));
+    writeFileSync(path, `${readFileSync(path, "utf8")}{not json\n\n[1, 2]\n"text"\n`);
+    expect(await run.stop({ transcript_path: path })).toEqual({});
   });
 
   test("plan continuation: an AskUserQuestion call in this turn allows Stop", async () => {
@@ -769,6 +792,14 @@ describe("drift-guard", () => {
     expect(await run.stop({ transcript_path: path })).toEqual(drift(`new.sh:1  ${UNFINISHED}`));
   });
 
+  test("drift-guard: a malformed line after the claim does not hide the claim read from the transcript", async () => {
+    const run = seeded();
+    write(run.root, "new.sh", `${UNFINISHED}\n`);
+    const path = transcript(run.root, user("go"), said("Done, all fixed."));
+    writeFileSync(path, `${readFileSync(path, "utf8")}{not json\n`);
+    expect(await run.stop({ transcript_path: path })).toEqual(drift(`new.sh:1  ${UNFINISHED}`));
+  });
+
   test("drift-guard: no assistant text anywhere allows Stop", async () => {
     const run = seeded();
     write(run.root, "new.sh", `${UNFINISHED}\n`);
@@ -1074,6 +1105,18 @@ describe("the Stop handler", () => {
     expect(await run.stop()).toEqual({});
     writeRegistry(run.root, "NOT JSON {");
     expect(await run.stop()).toEqual({});
+  });
+
+  test("one Stop reads the bound plan once for both plan gates", async () => {
+    const reads = spyOn(statusFile, "readBoundPlan");
+    try {
+      const run = session();
+      const plan = bind(run, COMPLETE_PLAN);
+      expect(await run.stop()).toEqual(unverified(plan));
+      expect(reads).toHaveBeenCalledTimes(1);
+    } finally {
+      reads.mockRestore();
+    }
   });
 
   test("hooks.json routes Stop to omca_hook through one entry and registers no StopFailure handler", () => {

@@ -1,6 +1,6 @@
 import type { On } from "claude-code";
 import { type Engine, expect, test } from "claude-code/testing";
-import { BOULDER, ROOT, run, SESSION, type World, world, write } from "./world.ts";
+import { BOULDER, LEDGER, ROOT, run, SESSION, type World, world, write } from "./world.ts";
 
 const STATUS = `${ROOT}/.omca/state/session/${SESSION}.json`;
 const PLAN = `${ROOT}/plans/widget.md`;
@@ -81,6 +81,20 @@ test("a nonzero verification toasts once, and one from before the session toasts
   write(w, STATUS, status(3000, 0));
   await mainTurn($);
   expect(w.toasts).toHaveLength(1);
+});
+
+test("a subagent's turn reads no file while the registry, plan, ledger and status file keep their stamps, and still toasts a failed verification", async ($, on) => {
+  const w = setup(on, { [BOULDER]: registry, [PLAN]: planText(3, 14), [STATUS]: status(1000, 0), [LEDGER]: JSON.stringify({ entries: [] }) });
+  await start($);
+  await mainTurn($);
+  w.contentReads.length = 0;
+
+  await finish($, "quiet-1");
+  expect(w.contentReads).toEqual([]);
+
+  write(w, STATUS, status(2000, 1));
+  await finish($, "quiet-2");
+  expect(w.toasts).toEqual(["Verification failed: bun test (exit 1)"]);
 });
 
 test("a plan going from 13/14 to 14/14 toasts once", async ($, on) => {

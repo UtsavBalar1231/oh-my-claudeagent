@@ -8,7 +8,7 @@ const ROUND = [
   0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
 ] as const;
 
-type Words = [number, number, number, number, number, number, number, number];
+const K = Int32Array.from(ROUND);
 
 const rotr = (word: number, bits: number) => (word >>> bits) | (word << (32 - bits));
 
@@ -25,28 +25,52 @@ export function sha256Hex(bytes: Uint8Array): string {
   const view = new DataView(data.buffer);
   view.setUint32(data.length - 8, Math.floor(bytes.length / 0x20000000));
   view.setUint32(data.length - 4, (bytes.length * 8) >>> 0);
-  let state: Words = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
-  const schedule: number[] = Array.from({ length: 64 }, () => 0);
+  let h0 = 0x6a09e667 | 0;
+  let h1 = 0xbb67ae85 | 0;
+  let h2 = 0x3c6ef372 | 0;
+  let h3 = 0xa54ff53a | 0;
+  let h4 = 0x510e527f | 0;
+  let h5 = 0x9b05688c | 0;
+  let h6 = 0x1f83d9ab | 0;
+  let h7 = 0x5be0cd19 | 0;
+  const schedule = new Int32Array(64);
   for (let block = 0; block < blocks; block += 1) {
-    for (let t = 0; t < 64; t += 1) {
-      if (t < 16) {
-        schedule[t] = view.getUint32(block * 64 + t * 4);
-        continue;
-      }
+    for (let t = 0; t < 16; t += 1) schedule[t] = view.getInt32(block * 64 + t * 4);
+    for (let t = 16; t < 64; t += 1) {
       const early = schedule[t - 15] ?? 0;
       const late = schedule[t - 2] ?? 0;
       const sigma0 = rotr(early, 7) ^ rotr(early, 18) ^ (early >>> 3);
       const sigma1 = rotr(late, 17) ^ rotr(late, 19) ^ (late >>> 10);
-      schedule[t] = ((schedule[t - 16] ?? 0) + sigma0 + (schedule[t - 7] ?? 0) + sigma1) >>> 0;
+      schedule[t] = ((schedule[t - 16] ?? 0) + sigma0 + (schedule[t - 7] ?? 0) + sigma1) | 0;
     }
-    let [a, b, c, d, e, f, g, h] = state;
+    let a = h0;
+    let b = h1;
+    let c = h2;
+    let d = h3;
+    let e = h4;
+    let f = h5;
+    let g = h6;
+    let h = h7;
     for (let t = 0; t < 64; t += 1) {
-      const t1 = (h + (rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)) + ((e & f) ^ (~e & g)) + (ROUND[t] ?? 0) + (schedule[t] ?? 0)) >>> 0;
-      const t2 = ((rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22)) + ((a & b) ^ (a & c) ^ (b & c))) >>> 0;
-      [h, g, f, e, d, c, b, a] = [g, f, e, (d + t1) >>> 0, c, b, a, (t1 + t2) >>> 0];
+      const t1 = (h + (rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)) + ((e & f) ^ (~e & g)) + (K[t] ?? 0) + (schedule[t] ?? 0)) | 0;
+      const t2 = ((rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22)) + ((a & b) ^ (a & c) ^ (b & c))) | 0;
+      h = g;
+      g = f;
+      f = e;
+      e = (d + t1) | 0;
+      d = c;
+      c = b;
+      b = a;
+      a = (t1 + t2) | 0;
     }
-    const [s0, s1, s2, s3, s4, s5, s6, s7] = state;
-    state = [(s0 + a) >>> 0, (s1 + b) >>> 0, (s2 + c) >>> 0, (s3 + d) >>> 0, (s4 + e) >>> 0, (s5 + f) >>> 0, (s6 + g) >>> 0, (s7 + h) >>> 0];
+    h0 = (h0 + a) | 0;
+    h1 = (h1 + b) | 0;
+    h2 = (h2 + c) | 0;
+    h3 = (h3 + d) | 0;
+    h4 = (h4 + e) | 0;
+    h5 = (h5 + f) | 0;
+    h6 = (h6 + g) | 0;
+    h7 = (h7 + h) | 0;
   }
-  return state.map((word) => word.toString(16).padStart(8, "0")).join("");
+  return [h0, h1, h2, h3, h4, h5, h6, h7].map((word) => (word >>> 0).toString(16).padStart(8, "0")).join("");
 }

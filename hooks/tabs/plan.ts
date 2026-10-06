@@ -115,7 +115,7 @@ let planned: { list: List; start: number } | undefined;
 let isRingOnRow = false;
 let filter: Filter = { text: "", isOpenOnly: false, isFailingOnly: false, isEditing: false };
 let note: { text: string; level: Level } | undefined;
-let facts: ProofFacts = { changes: new Map(), runs: [], ledgerError: null, ledgerSeen: "" };
+let facts: ProofFacts = { changes: new Map(), proving: [], ledgerError: null, ledgerSeen: "" };
 let factsSignature = "";
 let memo: { key: string; board: Board } | undefined;
 // The engine holds the ring by position, so a refocus sent while the Find field is still drawn
@@ -191,9 +191,9 @@ async function load(host: Host, path: string, { keepPlace = false, isTick = fals
   }
 }
 
-// Every listed file's modification time and the whole ledger, read outside any drawing.
-async function gather(host: Host, plan: Loaded): Promise<void> {
-  const next = await proofFacts(host, boardFor(plan).cards.flatMap((card) => card.files));
+// Every listed file's modification time and the ledger's runs, read outside any drawing.
+async function gather(host: Host, plan: Loaded, within?: object): Promise<void> {
+  const next = await proofFacts(host, boardFor(plan).cards.flatMap((card) => card.files), within);
   const signature = JSON.stringify([[...next.changes], next.ledgerSeen, next.ledgerError]);
   if (signature === factsSignature) return;
   facts = next;
@@ -230,7 +230,8 @@ async function showBound(host: Host, isTick = false): Promise<void> {
   else await load(host, bound, { isTick });
 }
 
-export async function sync(host: Host): Promise<void> {
+/** `within` is the event of the dispatch that syncs, shared with the band's read of the same files. */
+export async function sync(host: Host, within?: object): Promise<void> {
   const plan = (await host.state.plan.get()).value;
   if (plan === undefined) {
     if (mode !== "plans") await showBound(host, true);
@@ -242,7 +243,7 @@ export async function sync(host: Host): Promise<void> {
     if (seen !== loadedFrom) await load(host, plan.path, { keepPlace: true, isTick: true });
   }
   const current = (await host.state.plan.get()).value;
-  if (isLoaded(current)) await gather(host, current);
+  if (isLoaded(current)) await gather(host, current, within);
 }
 
 const rowKey = () => (mode === "plans" ? `${PICK}${pick}` : mode === "board" ? `${TASK}${task}` : `${ROW}${cursor}`);

@@ -10,16 +10,18 @@ import { sha256Hex } from "../src/core/sha256.ts";
 import { fitEnd, type GlyphTier, glyphs, oneLine } from "../src/core/ui-kit.ts";
 import { TONE_KEYS } from "../src/core/visual.ts";
 import type { Features } from "./dispatch.ts";
-import { boundPlanOf, bytesOf, type Host, ledgerWrittenAt, proofFacts, reason, sessionOf, verdictFor } from "./host.ts";
+import { boundPlanOf, bytesOf, type Host, ledgerWrittenAt, proofFacts, reason, sessionOf, stampOf, verdictFor } from "./host.ts";
 import { type Kit, kitOf, type TextStyle } from "./ui.ts";
 
-type Snapshot = { band: Band; hasFinalVerification: boolean; exitCode: number | null };
+type Snapshot = { band: Band; hasFinalVerification: boolean; exitCode: number | null; planPath: string | undefined };
 
 let glyphTier: GlyphTier = "nerd";
 let shownActions = 0;
 let toastedVerificationAt = 0;
 let toastedPlan: { path: string; isDone: boolean } | undefined;
 let isBaselined = false;
+let planPath: string | undefined;
+let readStamps: string | undefined;
 
 const TOAST_MS = 6000;
 const COMMAND_CELLS = 30;
@@ -42,7 +44,7 @@ async function ledgerDocument(host: Host, path: string): Promise<unknown> {
   return read.document;
 }
 
-async function readSnapshot(host: Host): Promise<Snapshot> {
+async function readSnapshot(host: Host, within: object): Promise<Snapshot> {
   const [root, sessionId, readAt] = await Promise.all([host.session.root(), host.session.id(), host.clock.now()]);
   const ledgerPath = `${root}/${LEDGER}`;
   const errors: string[] = [];
@@ -81,19 +83,37 @@ async function readSnapshot(host: Host): Promise<Snapshot> {
       hasPassingFinalVerification(await ledgerDocument(host, ledgerPath), sha256Hex(planBytes)),
     )) === true;
 
-  const proof = planText === null ? null : await attempt(LEDGER, () => proofOfPlan(host, planText));
+  const proof = planText === null ? null : await attempt(LEDGER, () => proofOfPlan(host, planText, within));
   const band: Band = { plan, verification, ...(proof === null ? {} : { proof }), error: errors[0] ?? null, readAt };
-  return { band, hasFinalVerification, exitCode };
+  return { band, hasFinalVerification, exitCode, planPath: bound?.path };
 }
 
 // The plan board's counts: each task's verdict is the newest test, build or lint run since its
 // listed files last changed. Null when no task lists a file that exists.
-async function proofOfPlan(host: Host, planText: string): Promise<Proof | null> {
+async function proofOfPlan(host: Host, planText: string, within: object): Promise<Proof | null> {
   const { cards } = boardOf(parsePlan(planText));
-  const facts = await proofFacts(host, cards.flatMap((card) => card.files));
+  const facts = await proofFacts(host, cards.flatMap((card) => card.files), within);
   if (facts.ledgerError !== null) throw new Error(facts.ledgerError);
   const counts = proofSummary(cards.map((card) => verdictFor(facts, card.files)?.proof));
   return counts.proven + counts.unproven + counts.failed === 0 ? null : counts;
+}
+
+// What a snapshot is read from, besides the plan's listed files. A same-size edit, such as a
+// `[ ]` to `[x]` flip, inside one mtime tick of a coarse file system (2 s on exFAT) keeps the
+// plan's stamp, so a subagent's turn misses it until the next change; the main turn reads anyway.
+async function stampsOf(host: Host): Promise<string> {
+  const [root, sessionId] = await Promise.all([host.session.root(), host.session.id()]);
+  const status = statusPath(root, sessionId);
+  const paths = [`${root}/${BOULDER}`, `${root}/${LEDGER}`, planPath ?? "", status ?? ""];
+  return JSON.stringify(await Promise.all(paths.map((path) => (path === "" ? "none" : stampOf(host, path)))));
+}
+
+async function snapshotOf(host: Host, within: object): Promise<Snapshot> {
+  const stamps = await stampsOf(host);
+  const snapshot = await readSnapshot(host, within);
+  planPath = snapshot.planPath;
+  readStamps = stamps;
+  return snapshot;
 }
 
 // The first read after session.start only records what already happened; later reads toast what changed.
@@ -154,10 +174,10 @@ const row = ({ Text }: Kit, spans: readonly Span[]): RenderElement =>
 
 export const band: Features = {
   "session.start": {
-    post: async (host) => {
+    post: async (host, e) => {
       glyphTier = (await sessionOf(host)).glyphTier;
       shownActions = ((await host.state.nextActions.get()).value ?? []).length;
-      const snapshot = await readSnapshot(host);
+      const snapshot = await snapshotOf(host, e);
       toastedVerificationAt = 0;
       toastedPlan = undefined;
       isBaselined = false;
@@ -168,7 +188,8 @@ export const band: Features = {
   },
   "turn.complete": {
     post: async (host, e) => {
-      const snapshot = await readSnapshot(host);
+      if (e.agentId !== undefined && (await stampsOf(host)) === readStamps) return undefined;
+      const snapshot = await snapshotOf(host, e);
       await toastChanges(host, snapshot);
       await writeBand(host, snapshot.band);
       if (e.agentId === undefined) await writeActions(host, await actionsFor(host, snapshot));

@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readFileSync, statSync } from "node:fs";
 import { open } from "node:fs/promises";
 import { join } from "node:path";
-import { planIsComplete, planTasks } from "../../src/core/checkboxes.ts";
+import { allTasksDone, type PlanTask, planTasks } from "../../src/core/checkboxes.ts";
 import { addedLines, type Candidate, hasCompletionClaim, hasStubMarker, isStubFinding } from "../../src/core/drift.ts";
 import { entriesOf, readLedger } from "../../src/core/evidence.ts";
 import { isHookDisabled } from "../../src/core/kill-switch.ts";
@@ -16,8 +16,9 @@ import { ledgerMtimeSeconds, ledgerPath, readBoundPlan, readRegistry, type Regis
 
 type Json = Readonly<Record<string, unknown>>;
 type LedgerFile = { kind: "absent" } | { kind: "corrupt" } | { kind: "unreadable"; code: string } | { kind: "ok"; document: Record<string, unknown> };
-type Plan = { name: string; path: string; boundAt: unknown; bytes: Buffer; content: string };
-type Turn = { payload: Payload; context: Context; registry: RegistryRead; transcript: () => Promise<(Json | undefined)[]> };
+type Plan = { name: string; path: string; boundAt: unknown; bytes: Buffer; tasks: PlanTask[] };
+type Entries = Iterable<Json | undefined>;
+type Turn = { payload: Payload; context: Context; registry: RegistryRead; transcript: () => Promise<Entries>; plan: () => Plan | undefined };
 type Gate = (turn: Turn) => Promise<string | undefined>;
 
 const COMPACTION_FRESH_SECONDS = 60;
@@ -53,12 +54,12 @@ function readLedgerFile(path: string): LedgerFile {
   return read.kind === "ok" && entriesOf(read.document) !== undefined ? { kind: "ok", document: read.document } : { kind: "corrupt" };
 }
 
-function boundPlan({ registry, payload, context }: Turn): Plan | undefined {
+function boundPlan(payload: Payload, root: string, registry: RegistryRead): Plan | undefined {
   if (typeof payload.session_id !== "string") return undefined;
-  const read = readBoundPlan(context.root, payload.session_id, registry);
+  const read = readBoundPlan(root, payload.session_id, registry);
   if (read.kind === "unreadable" && registry.kind === "ok") console.error(`omca: Stop gates could not read the plan ${read.path} (${read.code})`);
   if (read.kind !== "ok" || read.file === undefined) return undefined;
-  return { name: read.name, path: read.path, boundAt: read.boundAt, ...read.file };
+  return { name: read.name, path: read.path, boundAt: read.boundAt, bytes: read.file.bytes, tasks: planTasks(read.file.content) };
 }
 
 const spend = (session: Session | undefined, gate: StopGate): boolean => session !== undefined && spendBlock((session.stopBlocks ??= new Map()), gate);
@@ -86,7 +87,38 @@ async function readTail(path: string): Promise<string> {
   }
 }
 
-async function readTranscript(path: unknown): Promise<(Json | undefined)[]> {
+function parseEntry(line: string): Json | undefined {
+  try {
+    const entry: unknown = JSON.parse(line);
+    return isRecord(entry) ? entry : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+// Newest first, parsed on demand and kept, so each reader parses only as far back as its own scan goes.
+function newestFirst(raw: string): Entries {
+  const parsed: (Json | undefined)[] = [];
+  let end = raw.length;
+  const parseOlder = (): boolean => {
+    while (end > 0) {
+      const start = raw.lastIndexOf("\n", end - 1) + 1;
+      const line = raw.slice(start, end);
+      end = start - 1;
+      if (line.trim() === "") continue;
+      parsed.push(parseEntry(line));
+      return true;
+    }
+    return false;
+  };
+  return {
+    *[Symbol.iterator]() {
+      for (let index = 0; index < parsed.length || parseOlder(); index++) yield parsed[index];
+    },
+  };
+}
+
+async function readTranscript(path: unknown): Promise<Entries> {
   if (typeof path !== "string" || path === "") return [];
   let raw: string;
   try {
@@ -95,17 +127,7 @@ async function readTranscript(path: unknown): Promise<(Json | undefined)[]> {
     if (!isMissing(error)) console.error(`omca: Stop gates could not read the transcript ${path}:`, error);
     return [];
   }
-  return raw
-    .split("\n")
-    .filter((line) => line.trim() !== "")
-    .map((line) => {
-      try {
-        const entry: unknown = JSON.parse(line);
-        return isRecord(entry) ? entry : undefined;
-      } catch {
-        return undefined;
-      }
-    });
+  return newestFirst(raw);
 }
 
 function messageText(entry: Json | undefined, role: string): string {
@@ -119,8 +141,8 @@ function messageText(entry: Json | undefined, role: string): string {
     .join("\n");
 }
 
-function lastText(entries: readonly (Json | undefined)[], role: string): string {
-  for (const entry of entries.toReversed()) {
+function lastText(entries: Entries, role: string): string {
+  for (const entry of entries) {
     const found = withoutTrailingNewlines(messageText(entry, role));
     if (found !== "") return found;
   }
@@ -136,8 +158,8 @@ async function assistantText(turn: Turn): Promise<string> {
 // A tool call leaves no payload field at Stop, so the transcript is the only witness. The scan
 // stops at the first real user prompt, so a question answered turns ago grants nothing, and an
 // unreadable record yields no signal.
-function askedUserThisTurn(entries: readonly (Json | undefined)[]): boolean {
-  for (const entry of entries.toReversed()) {
+function askedUserThisTurn(entries: Entries): boolean {
+  for (const entry of entries) {
     if (entry === undefined) return false;
     const content = field(entry.message, "content");
     const blocks = Array.isArray(content) ? content : [];
@@ -174,8 +196,8 @@ const planContinuation: Gate = async (turn) => {
     const problem = registry.kind === "corrupt" ? "is not valid JSON" : `cannot be read (${registry.code})`;
     return `[PLAN CONTINUATION] ${registryPath(root)} ${problem}, so this session's plan state cannot be resolved and plan-scoped enforcement is off. Repair or delete the file, then stop again. Set OMCA_DISABLED_HOOKS=plan-continuation to bypass.`;
   }
-  const plan = boundPlan(turn);
-  const open = plan === undefined ? [] : planTasks(plan.content).filter((task) => !task.checked);
+  const plan = turn.plan();
+  const open = plan === undefined ? [] : plan.tasks.filter((task) => !task.checked);
   const unchecked = open.length;
   if (plan === undefined || unchecked === 0) {
     settlePlan(session);
@@ -207,8 +229,8 @@ const finalVerification: Gate = async (turn) => {
     console.error(`omca: final-verification: ${registryPath(root)} ${problem}, so no plan resolves and this gate is not enforcing. Repair or delete the file.`);
     return undefined;
   }
-  const plan = boundPlan(turn);
-  if (plan === undefined || !planIsComplete(plan.content)) return undefined;
+  const plan = turn.plan();
+  if (plan === undefined || !allTasksDone({ done: plan.tasks.filter((task) => task.checked).length, total: plan.tasks.length })) return undefined;
   const ledger = readLedgerFile(ledgerPath(root));
   if (ledger.kind === "corrupt") {
     return spend(session, "final-verification") ? `[FINAL VERIFICATION] Evidence file corrupt. Repair ${ledgerPath(root)} before stopping.` : undefined;
@@ -284,12 +306,15 @@ const GATES: readonly (readonly [StopGate, Gate])[] = [
 export const handle: Handler = async (payload, context) => {
   const disabled = process.env.OMCA_DISABLED_HOOKS;
   if (payload.stop_hook_active === "true" || isHookDisabled(disabled, "stop-gates")) return undefined;
-  let entries: Promise<(Json | undefined)[]> | undefined;
+  const registry = readRegistry(context.root);
+  let entries: Promise<Entries> | undefined;
+  let plan: { value: Plan | undefined } | undefined;
   const turn: Turn = {
     payload,
     context,
-    registry: readRegistry(context.root),
+    registry,
     transcript: () => (entries ??= readTranscript(payload.transcript_path)),
+    plan: () => (plan ??= { value: boundPlan(payload, context.root, registry) }).value,
   };
   for (const [name, gate] of GATES) {
     if (isHookDisabled(disabled, name)) continue;

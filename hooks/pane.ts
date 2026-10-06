@@ -114,11 +114,11 @@ export function patchPane(host: Host, change: (pane: Pane) => Pane): Promise<voi
   );
 }
 
-async function refresh(host: Host, tab?: Tab): Promise<void> {
+async function refresh(host: Host, tab?: Tab, within?: object): Promise<void> {
   const root = await host.session.root();
   if ((await host.state.pane.get()).value === undefined) notepad.reset();
   const [, pad] = await Promise.all([evidence.sync(host, root), notepad.read(host, root)]);
-  await plan.sync(host);
+  await plan.sync(host, within);
   if (tab === undefined && pad === undefined) return;
   const readAt = await host.clock.now();
   await patchPane(host, (pane) => ({
@@ -139,8 +139,8 @@ async function tick(host: Host): Promise<void> {
   if (ticks % READ_EVERY === 0) {
     await reconcile(host, await host.agent.list(), now);
     await refresh(host);
+    await mascots.ensure(host);
   }
-  await mascots.ensure(host);
   const [pane, rows] = await Promise.all([host.state.pane.get(), host.state.agents.get()]);
   const isRunning = Object.values(rows.value ?? {}).some((row) => row.status === "running");
   if (pane.value?.tab !== "agents" || !isRunning) return;
@@ -375,9 +375,9 @@ export const pane: Features = {
     },
   },
   "turn.complete": {
-    async post(host) {
+    async post(host, e) {
       if (timer === undefined) return undefined;
-      await refresh(host);
+      await refresh(host, undefined, e);
       if ((await host.state.pane.get()).value?.tab === "stats") await stats.load(host);
       return undefined;
     },

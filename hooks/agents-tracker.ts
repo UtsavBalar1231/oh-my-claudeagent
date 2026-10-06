@@ -21,7 +21,7 @@ const MAX_CALLS = 120;
 const MAX_PAGES = 20;
 const MAX_PENDING = 500;
 
-// A subagent's tool calls as `tool.call` saw them, newest agents last; the page atom is filled from it.
+// A subagent's tool calls as `tool.call` saw them, the most recently calling agent last; the page atom is filled from it.
 const calls = new Map<string, Call[]>();
 // A call's start, dropped when its `post` runs; one whose `next` rejected never reaches `post`, so
 // the agent's `turn.complete` and the cap bound what such calls leave behind.
@@ -59,8 +59,11 @@ async function closeWave(host: Host): Promise<void> {
   host.ui.toast(text, { timeoutMs: WAVE_TOAST_MS });
 }
 
+// Deleting first moves the agent to the newest end, so the cap drops the agent idle longest.
 function record(id: string, call: Call): void {
-  calls.set(id, [...(calls.get(id) ?? []), call].slice(-MAX_CALLS));
+  const kept = calls.get(id) ?? [];
+  calls.delete(id);
+  calls.set(id, [...kept, call].slice(-MAX_CALLS));
   for (const oldest of calls.keys()) {
     if (calls.size <= MAX_PAGES) break;
     calls.delete(oldest);

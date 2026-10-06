@@ -12,20 +12,25 @@ const PROOF_TYPES: readonly EvidenceType[] = ["test", "build", "lint"];
 /** The ledger's well-formed entries, oldest first; throws when the text is not a ledger. */
 export const parseRuns = (text: string): Run[] => parseLedger(text).toSorted((a, b) => a.at - b.at);
 
+/** The test, build and lint runs, newest first: what `verdictFrom` reads. */
+export const provingRuns = (runs: readonly Run[]): Run[] => runs.filter((run) => PROOF_TYPES.includes(run.type)).sort((a, b) => b.at - a.at);
+
 /**
  * PROVEN when the newest test, build or lint run after the files' last change passed, FAILED when
  * it failed, UNPROVEN when no such run followed the change. Undefined for a task with no files.
+ * `proving` is `provingRuns`' output.
  */
-export function proofOf(changes: readonly number[], runs: readonly Run[]): Verdict | undefined {
+export function verdictFrom(changes: readonly number[], proving: readonly Run[]): Verdict | undefined {
   if (changes.length === 0) return undefined;
   const changedAt = Math.max(...changes);
-  const proving = runs.filter((run) => PROOF_TYPES.includes(run.type)).sort((a, b) => b.at - a.at);
   const since = proving.filter((run) => run.at > changedAt);
   const lastPass = proving.find((run) => run.exitCode === 0);
   const newest = since[0];
   const proof: Proof = newest === undefined ? "unproven" : newest.exitCode === 0 ? "proven" : "failed";
   return { proof, changedAt, since, lastPass };
 }
+
+export const proofOf = (changes: readonly number[], runs: readonly Run[]): Verdict | undefined => verdictFrom(changes, provingRuns(runs));
 
 export function proofSummary(proofs: readonly (Proof | undefined)[]): { proven: number; unproven: number; failed: number } {
   const count = (proof: Proof) => proofs.filter((each) => each === proof).length;

@@ -1,6 +1,7 @@
 export const FENCE = /^\s*(```|~~~)/;
 const TAB = 9;
 const NEWLINE = 10;
+const CR = 13;
 
 // Filtered by char code: the engine's parser refuses a regex literal holding `\u0000`-style
 // escapes and fails the whole module.
@@ -18,10 +19,18 @@ function isUnsafe(code: number): boolean {
 /** CRLF folded to LF and control or invisible characters dropped, so every reader sees one text. */
 export function clean(text: string): string {
   let out = "";
-  for (const char of text.replace(/\r\n?/g, "\n")) {
-    if (!isUnsafe(char.codePointAt(0) ?? 0)) out += char;
+  let start = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    const code = text.charCodeAt(index);
+    if (!isUnsafe(code)) continue;
+    out += text.slice(start, index);
+    if (code === CR) {
+      out += "\n";
+      if (text.charCodeAt(index + 1) === NEWLINE) index += 1;
+    }
+    start = index + 1;
   }
-  return out;
+  return start === 0 ? text : out + text.slice(start);
 }
 
 /** The text with fenced code blocks and their fence lines blanked, so an example task is not a task. Line count is kept. */

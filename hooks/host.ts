@@ -2,7 +2,7 @@ import type { EngineInterface, FsBytes, PluginState, SessionMessage, StateRead, 
 import { parseRegistry, resolveBoundPlan } from "../src/core/boulder.ts";
 import { BOULDER, LEDGER } from "../src/core/omca-paths.ts";
 import { configDir, type Env as PathEnv, homeDir, inferPlatform, isAbsolutePath, joinPath, type Platform } from "../src/core/path.ts";
-import { parseRuns, proofOf, type Run, type Verdict } from "../src/core/proof.ts";
+import { parseRuns, provingRuns, type Run, type Verdict, verdictFrom } from "../src/core/proof.ts";
 import { type GlyphTier, glyphTier } from "../src/core/ui-kit.ts";
 
 export type State = PluginState["oh-my-claudeagent"];
@@ -149,7 +149,7 @@ export const resolvedSession = (): Session => session ?? UNRESOLVED;
 /** The file's raw bytes, so a digest covers exactly what the server hashes. */
 export async function bytesOf(host: Host, path: string): Promise<Uint8Array> {
   const { base64 } = await host.fs.readBytes(path);
-  return Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
+  return Uint8Array.fromBase64(base64);
 }
 
 /** The plan this session is bound to, undefined when none is; throws when the registry is not JSON. */
@@ -169,16 +169,50 @@ export async function ledgerWrittenAt(host: Host, root: string): Promise<number>
   return (await host.fs.exists(path)) ? Math.floor((await host.fs.stat(path)).mtimeMs / 1000) : 0;
 }
 
+/** `mtimeMs:size`, or `absent` when the file cannot be stated. */
+export const stampOf = (host: Host, path: string): Promise<string> =>
+  host.fs.stat(path).then(
+    ({ mtimeMs, size }) => `${mtimeMs}:${size}`,
+    () => "absent",
+  );
+
+type Ledger = { path: string; seen: string; proving: readonly Run[]; error: string | null };
+
+// The ledger is rewritten whole and only ever appended to, so every write moves its size and a
+// read at an unchanged stamp would parse the same text.
+let ledger: Ledger | undefined;
+
+/** The ledger's test, build and lint runs newest first, read again only when its stamp moves. */
+async function ledgerOf(host: Host, root: string): Promise<Ledger> {
+  const path = `${root}/${LEDGER}`;
+  const seen = await stampOf(host, path);
+  if (ledger?.path === path && ledger.seen === seen) return ledger;
+  let runs: Run[] = [];
+  let error: string | null = null;
+  if (seen !== "absent") {
+    try {
+      runs = parseRuns(await host.fs.read(path));
+    } catch (failure) {
+      error = reason(failure);
+    }
+  }
+  ledger = { path, seen, proving: provingRuns(runs), error };
+  return ledger;
+}
+
 /**
  * What proves a plan's tasks: each listed file's modification time, null for one that cannot be
- * stated, and the ledger's runs, or why the ledger could not be read. `ledgerSeen` changes when
- * the ledger does.
+ * stated, and the ledger's test, build and lint runs newest first, or why the ledger could not be
+ * read. `ledgerSeen` changes when the ledger does.
  */
-export type ProofFacts = { changes: ReadonlyMap<string, number | null>; runs: readonly Run[]; ledgerError: string | null; ledgerSeen: string };
+export type ProofFacts = { changes: ReadonlyMap<string, number | null>; proving: readonly Run[]; ledgerError: string | null; ledgerSeen: string };
 
-export async function proofFacts(host: Host, files: readonly string[]): Promise<ProofFacts> {
-  const [root, { platform }] = await Promise.all([host.session.root(), sessionOf(host)]);
-  const paths = [...new Set(files)];
+// Keyed on the event a dispatch hands every feature, so features of one dispatch share the files'
+// stats and the entry goes with the event.
+const statted = new WeakMap<object, { files: string; changes: ReadonlyMap<string, number | null> }>();
+
+async function changesOf(host: Host, root: string, paths: readonly string[]): Promise<ReadonlyMap<string, number | null>> {
+  const { platform } = await sessionOf(host);
   const stamps = await Promise.all(
     paths.map((path) =>
       host.fs.stat(isAbsolutePath(platform, path) ? path : joinPath(platform, root, path)).then(
@@ -187,31 +221,29 @@ export async function proofFacts(host: Host, files: readonly string[]): Promise<
       ),
     ),
   );
-  const ledgerPath = `${root}/${LEDGER}`;
-  const ledgerSeen = await host.fs.stat(ledgerPath).then(
-    ({ mtimeMs }) => String(mtimeMs),
-    () => "absent",
-  );
-  let runs: Run[] = [];
-  let ledgerError: string | null = null;
-  if (ledgerSeen !== "absent") {
-    try {
-      runs = parseRuns(await host.fs.read(ledgerPath));
-    } catch (error) {
-      ledgerError = reason(error);
-    }
-  }
-  return { changes: new Map(paths.map((path, index) => [path, stamps[index] ?? null])), runs, ledgerError, ledgerSeen };
+  return new Map(paths.map((path, index) => [path, stamps[index] ?? null]));
+}
+
+/** `within` is the dispatch's event, so a second call in the same dispatch stats no file again. */
+export async function proofFacts(host: Host, files: readonly string[], within?: object): Promise<ProofFacts> {
+  const root = await host.session.root();
+  const paths = [...new Set(files)];
+  const key = JSON.stringify(paths);
+  const shared = within === undefined ? undefined : statted.get(within);
+  const changes = shared?.files === key ? shared.changes : await changesOf(host, root, paths);
+  if (within !== undefined) statted.set(within, { files: key, changes });
+  const { seen, proving, error } = await ledgerOf(host, root);
+  return { changes, proving, ledgerError: error, ledgerSeen: seen };
 }
 
 /** A task's proof from the facts: undefined when the ledger is unreadable or none of its files can be stated. */
 export function verdictFor(facts: ProofFacts, files: readonly string[]): Verdict | undefined {
   if (facts.ledgerError !== null) return undefined;
-  return proofOf(
+  return verdictFrom(
     files.flatMap((file) => {
       const at = facts.changes.get(file);
       return at === undefined || at === null ? [] : [at];
     }),
-    facts.runs,
+    facts.proving,
   );
 }

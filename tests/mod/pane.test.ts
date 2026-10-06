@@ -455,6 +455,20 @@ test("the pane timer ends a row the agent list no longer holds and picks up new 
   await ui.unmount();
 });
 
+test("a pane tick reads the evidence ledger again only after it changes", async ($, on) => {
+  const w = world(on, FILES);
+  const ledgerReads = () => w.contentReads.filter((path) => path === LEDGER).length;
+  await $.command.run(run("plan"));
+
+  write(w, LEDGER, ledger([...ENTRIES, ["test", "just test", 0, "2026-10-02T12:00:00Z"]]));
+  await w.clock.advance(2000);
+  const changed = ledgerReads();
+  expect(changed).toBeGreaterThan(0);
+
+  await w.clock.advance(6000);
+  expect(ledgerReads()).toBe(changed);
+});
+
 test("a session that starts with the pane already open restarts its refresh timer", async ($, on) => {
   const w = world(on, { ...FILES, [LEDGER]: ledger([...ENTRIES, ["test", "just test", 0, "2026-10-02T12:00:00Z"]]) });
   w.panes = [{ id: "omca", title: "OMCA", isShown: true, isFocused: false, isPlaced: true }];

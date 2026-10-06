@@ -52,6 +52,8 @@ export type World = {
   agents: AgentInfo[];
   panes: UiPane[];
   reads: string[];
+  /** The paths `fs.read` was asked for; `reads` also holds exists, stat and list calls. */
+  contentReads: string[];
   holds: Map<string, Promise<void>>;
   focused: string[];
   selection: UiSelection | undefined;
@@ -107,6 +109,7 @@ export function world(
     agents: [],
     panes: [],
     reads: [],
+    contentReads: [],
     holds: new Map(),
     focused: [],
     selection: undefined,
@@ -129,10 +132,12 @@ export function world(
   on("agent.list", () => ({ value: w.agents }));
   on("fs.read", { path: /[\\/]output-styles[\\/]omca-default\.md$/ }, (_$, e) => {
     w.reads.push(spelled(e.path));
+    w.contentReads.push(spelled(e.path));
     return w.style === undefined ? { deny: `ENOENT: no such file, ${spelled(e.path)}` } : { value: w.style };
   });
   on("fs.read", async (_$, e) => {
     w.reads.push(spelled(e.path));
+    w.contentReads.push(spelled(e.path));
     await w.holds.get(key(e.path));
     const file = w.files.get(key(e.path));
     if (file === undefined) return { deny: `ENOENT: no such file, ${spelled(e.path)}` };
@@ -284,6 +289,8 @@ export function nodeByKey(element: unknown, key: string): Node | undefined {
 export function textOf(element: unknown): string {
   if (typeof element === "string") return element;
   if (!isNode(element)) return "";
+  const line = lineCodeOf(element);
+  if (line !== undefined) return line;
   if (element.type === "Button") return typeof element.props?.["hotkey"] === "string" ? `${element.props["hotkey"]}: ${String(element.props["label"])}` : String(element.props?.["label"]);
   const gap = " ".repeat(typeof element.props?.["columnGap"] === "number" ? element.props["columnGap"] : 0);
   return childrenOf(element).map(textOf).join(gap);
@@ -348,12 +355,27 @@ export function topRows(tree: RenderElement): unknown[] {
   return isNode(tree) ? childrenOf(tree) : [];
 }
 
-/** The text of every row the pane's root column draws, Markdown left out. */
+const isLineCode = (element: unknown): boolean => isNode(element) && element.type === "Code" && element.props?.["wrap"] === "truncate-end";
+
+/** A one-line Code as the terminal draws it: its source, or a Box holding only one filled to the Box's width. Undefined for anything else. */
+export function lineCodeOf(element: unknown): string | undefined {
+  if (!isNode(element)) return undefined;
+  if (isLineCode(element)) return String(element.props?.["source"] ?? "");
+  const children = childrenOf(element);
+  const width = element.props?.["width"];
+  if (element.type !== "Box" || typeof width !== "number" || children.length !== 1 || !isLineCode(children[0])) return undefined;
+  const source = lineCodeOf(children[0]) ?? "";
+  return source + " ".repeat(Math.max(0, width - displayWidth(source)));
+}
+
+/** The text of every row the pane's root column draws, Markdown and code blocks left out; a one-line Code reads as its source, filling its Box's width. */
 export function rows(tree: RenderElement): string[] {
   const text = (element: unknown): string => {
     if (typeof element === "string") return element;
     if (!isNode(element)) return "";
     const props = element.props ?? {};
+    const line = lineCodeOf(element);
+    if (line !== undefined) return line;
     if (element.type === "Button") {
       const label = String(props["label"] ?? "");
       return typeof props["hotkey"] === "string" ? `${props["hotkey"]}: ${label}` : label;
