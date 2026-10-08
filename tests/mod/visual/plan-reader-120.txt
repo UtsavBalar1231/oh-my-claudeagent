@@ -16,10 +16,10 @@
 ✻ Waiting for 1 background agent to finish                     │ 3 Write rows in the schema's order        UNPROVEN
                                                                │ 4 Round negative totals toward zero         PROVEN
 ● oh-my-claudeagent+cc-plugin-agents-md: 0s ·                  │ 5 Reconcile totals against…    executor  UNPROVEN
-  37.6k in 17 out · $0.4885 engine cost                        │     Sum each customer's rows and compare with the
+  37.6k in 17 out · $X.XX engine cost                          │     Sum each customer's rows and compare with the
                                                                │     invoice table; list every mismatch.
                                                                │     $ DB_PASSWORD=‹masked› just test-db
-                                                               │     src/report/totals.ts now ·
+                                                               │     src/report/totals.ts 1h ·
                                                                │     src/report/totals.spec.ts not found
                                                                │      no run since its files changed
                                                                │── Milestone 2: Rollout ── ████████ 0/4 ─────────────
@@ -37,4 +37,4 @@
   ⏸ manual mode on · ? for shortcuts · ← for agents · ↓ to manage
 
   ● main
-  ◯ oh-my-claudeagent:executor  Reconcile totals                                                   2s · ↓ 18.8k tokens
+  ◯ oh-my-claudeagent:executor  Reconcile totals                                                   Ns · ↓ NN.Nk tokens

@@ -16,9 +16,9 @@
 //               files replaced by that cwd; absent or null, an empty directory. A plan its
 //               boulder.json names but does not hold is taken from tests/fixtures/plans/.
 // Writes <root>/<view>-<cols>.txt for 80x40 (an inline pane), 120x40 and 200x50 (docked), with
-// the scratch directory's random suffix and the live session's own times masked. `--sizes`
+// the scratch directory's random suffix and the live session's own times and costs masked. `--sizes`
 // captures those sizes instead, as <out>/<view>-<cols>x<rows>.txt, out defaulting to root.
-import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { parseArgs } from "node:util";
@@ -28,6 +28,9 @@ import { cleanupOnSignal, REPO } from "./lib.ts";
 import { parseScript, type Script, startServer } from "./mock-model.ts";
 
 const SHARED_PLANS = join(REPO, "tests", "fixtures", "plans");
+// A file's age reads the same in every capture at an hour, and the files still postdate every
+// evidence entry a fixture holds, so a task's proof does not change.
+const FIXTURE_AGE_MS = 3_600_000;
 const MKDTEMP_SUFFIX = 6;
 const SESSION_ID = "00000000-0000-4000-8000-000000000001";
 const SIZES = [
@@ -112,11 +115,13 @@ export function copyFixture(from: string, to: string, sharedPlans: string = SHAR
     mkdirSync(join(to, "plans"), { recursive: true });
     copyFileSync(join(sharedPlans, name), target);
   }
+  const changed = new Date(Date.now() - FIXTURE_AGE_MS);
   for (const entry of readdirSync(to, { recursive: true, withFileTypes: true })) {
     if (!entry.isFile()) continue;
     const path = join(entry.parentPath, entry.name);
     const text = readFileSync(path, "utf8");
     if (text.includes("{{cwd}}")) writeFileSync(path, text.replaceAll("{{cwd}}", to));
+    utimesSync(path, changed, changed);
   }
 }
 
@@ -125,18 +130,30 @@ export const sessionEnv = (): Record<string, string> => envWithout(/^(CLAUDE|ANT
 /** The screen with the random suffix `mkdtemp` gave `scratch` replaced by as many X, so a capture does not change from run to run. */
 export const maskScratch = (screen: string, scratch: string): string => screen.replaceAll(basename(scratch).slice(-MKDTEMP_SUFFIX), "X".repeat(MKDTEMP_SUFFIX));
 
+// Padding keeps a line's width where a pane is drawn beside it, so the pane stays in its column.
+const keepWidth = (masked: string, match: string, at: number, whole: string): string =>
+  at + match.length === whole.length || whole[at + match.length] === "\n" ? masked : masked.padEnd(match.length);
+
+const digitsOut = (text: string): string => text.replace(/\d/g, "N");
+
 /**
- * The screen with the live session's own times fixed: the turn timer's line, whose verb Claude Code
- * picks at random, the Doctor's check time and a rating's time. Padding keeps a line's width where
- * a pane is drawn beside it, so the pane stays in its column.
+ * The screen with the live session's own values fixed: the turn timer's line, whose verb Claude Code
+ * picks at random, the Doctor's check time, a rating's time, a turn footer's engine cost, which
+ * counts whatever background agents spent before the turn ended, the seconds a running agent has
+ * run, in an OMCA lane and in Claude Code's task list, and a subagent's token count, whose requests
+ * vary by a few hundred tokens from run to run.
  */
-export const maskClock = (screen: string): string =>
+export const maskLive = (screen: string): string =>
   screen
-    .replace(/✻ \S+ for (\d+s) · done \d{1,2}:\d{2} [AP]M */g, (line: string, took: string, at: number, whole: string) => {
-      const masked = `✻ Worked for ${took} · done HH:MM`;
-      const isLineEnd = at + line.length === whole.length || whole[at + line.length] === "\n";
-      return isLineEnd ? masked : masked.padEnd(line.length);
-    })
+    .replace(/\b((?:running|low|medium|high|xhigh|max) +)(\d+s)\b/g, (_match: string, lead: string, took: string) => `${lead}${digitsOut(took)}`)
+    .replace(/\b\d+s · ↓/g, digitsOut)
+    .replace(/\b\d+(?:\.\d+)?[kM]? tokens\b/g, digitsOut)
+    .replace(/✻ \S+ for (\d+s) · done \d{1,2}:\d{2} [AP]M */g, (line: string, took: string, at: number, whole: string) =>
+      keepWidth(`✻ Worked for ${took} · done HH:MM`, line, at, whole),
+    )
+    .replace(/\$\d+\.\d+([\u00a0 ])engine([\u00a0 ])cost */g, (match: string, a: string, b: string, at: number, whole: string) =>
+      keepWidth(`$X.XX${a}engine${b}cost`, match, at, whole),
+    )
     .replace(/checked \d\d:\d\d/g, "checked HH:MM")
     .replace(/\b(UP|DOWN)( +)\d\d-\d\d \d\d:\d\d/g, "$1$2MM-DD HH:MM");
 
@@ -323,7 +340,7 @@ async function captureAt(view: View, root: string, cols: number, rows: number): 
       tmux.send(key);
       screen = await tmux.settle(screen);
     }
-    return maskClock(maskScratch(screen, scratch));
+    return maskLive(maskScratch(screen, scratch));
   } finally {
     release();
     await stop();

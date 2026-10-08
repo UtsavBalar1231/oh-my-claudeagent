@@ -1,11 +1,11 @@
                                                                                                               │                                                                                       ✕
  ▐▛███▛█   Claude Code v2.1.294                                                                               │1: Agents  2: Plan  3: Evidence  4: Notepad  5: Feedback  6: Stats  7: Doctor
 ▝▜██████▀  Opus 5.5 · API Usage Billing                                                                       │──────────────────────────────────────────────────────────────────────────────────────
- ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/.cache/tmp/omca-visual-200x50-XXXXXX/cwd                       │    ▄▀ ▀▀ ▀▄ ▄▄▄  executor                                            running      0s
+ ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/.cache/tmp/omca-visual-200x50-XXXXXX/cwd                       │    ▄▀ ▀▀ ▀▄ ▄▄▄  executor                                            running      Ns
                                                                                                               │     ▀▀  ▀▀       Port the snapshot onto the router
-                                                                                                              │    ▀▀▀▀▀▀▀▀ ▀    · Bash sleep 90                                               1 call
-❯ Run the tests                                                                                               │    ▀▀▀▀▀▀▀▀      sonnet-5-5 · high · 18.8k tokens
-                                                                                                              │d: Details  1 running · 0 finished · 18.8k tokens
+                                                                                                              │    ▀▀▀▀▀▀▀▀ ▀    ✻ Bash sleep 90                                               1 call
+❯ Run the tests                                                                                               │    ▀▀▀▀▀▀▀▀      sonnet-5-5 · high · NN.Nk tokens
+                                                                                                              │d: Details  1 running · 0 finished · NN.Nk tokens
   Ran 1 shell command                                                                                         │
                                                                                                               │
 ● oh-my-claudeagent:executor(Port the snapshot onto the router)                                               │
@@ -47,4 +47,4 @@
   ⏸ manual mode on · ? for shortcuts · ← for agents · ↓ to manage
 
   ● main
-  ◯ oh-my-claudeagent:executor  Port the snapshot onto the router                                                                                                                  0s · ↓ 18.8k tokens
+  ◯ oh-my-claudeagent:executor  Port the snapshot onto the router                                                                                                                  Ns · ↓ NN.Nk tokens

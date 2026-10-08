@@ -13,9 +13,12 @@ const SUBAGENT_MARKER = "cc_is_subagent=true";
 type Block =
   | { type: "text"; text: string }
   | { type: "tool_use"; name: string; input: Record<string, unknown> };
-export type Turn = { content: Block[] };
+// `delayMs` holds the reply back, so one agent can be made to finish after another's turn ends.
+export type Turn = { content: Block[]; delayMs?: number };
 type QueueName = "main" | "subagent";
-export type Script = Record<QueueName, Turn[]>;
+// `agents` gives each subagent whose first message holds a key that key's own turns, so agents
+// running at once do not race for one queue; any other subagent takes `subagent`.
+export type Script = Record<QueueName, Turn[]> & { agents?: Record<string, Turn[]> };
 type Served =
   | { type: "text"; text: string }
   | { type: "tool_use"; id: string; name: string; input: Record<string, unknown> };
@@ -31,15 +34,20 @@ function parseBlock(raw: unknown, where: string): Block {
   throw new Error(`${where} is not a text block or a tool_use block with an object input`);
 }
 
-function parseTurns(raw: unknown, queue: QueueName): Turn[] {
+function parseTurns(raw: unknown, queue: string): Turn[] {
   if (raw === undefined) return [];
   if (!Array.isArray(raw)) throw new Error(`"${queue}" must be an array of turns`);
   return raw.map((turn, i) => {
     if (!isRecord(turn) || !Array.isArray(turn.content)) {
       throw new Error(`${queue}[${i}] needs a "content" array`);
     }
+    const { delayMs } = turn;
+    if (delayMs !== undefined && !(Number.isInteger(delayMs) && typeof delayMs === "number" && delayMs >= 0)) {
+      throw new Error(`${queue}[${i}].delayMs must be a whole number of milliseconds`);
+    }
     return {
       content: turn.content.map((block, j) => parseBlock(block, `${queue}[${i}].content[${j}]`)),
+      ...(delayMs === undefined ? {} : { delayMs }),
     };
   });
 }
@@ -47,7 +55,11 @@ function parseTurns(raw: unknown, queue: QueueName): Turn[] {
 export function parseScript(text: string): Script {
   const raw: unknown = JSON.parse(text);
   if (!isRecord(raw)) throw new Error("the script must be a JSON object");
-  return { main: parseTurns(raw.main, "main"), subagent: parseTurns(raw.subagent, "subagent") };
+  const script: Script = { main: parseTurns(raw.main, "main"), subagent: parseTurns(raw.subagent, "subagent") };
+  if (raw.agents === undefined) return script;
+  if (!isRecord(raw.agents)) throw new Error('"agents" must map text in an agent\'s prompt to its turns');
+  const agents = Object.entries(raw.agents).map(([key, turns]) => [key, parseTurns(turns, `agents.${key}`)] as const);
+  return { ...script, agents: Object.fromEntries(agents) };
 }
 
 const stopReason = (content: Served[]) =>
@@ -142,6 +154,14 @@ function systemText(system: unknown): string {
   return system.map((block) => (isRecord(block) && typeof block.text === "string" ? block.text : "")).join("\n");
 }
 
+function firstMessageText(messages: unknown): string {
+  const first: unknown = Array.isArray(messages) ? messages[0] : undefined;
+  const content = isRecord(first) ? first.content : undefined;
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content.map((block) => (isRecord(block) && typeof block.text === "string" ? block.text : "")).join("\n");
+}
+
 // Claude Code sometimes appends a system-role reminder after the user message that carries
 // the tool results, so the count reads the last user message, not the last message.
 function countToolResults(messages: unknown): number {
@@ -172,18 +192,32 @@ export function startServer({
   bodyLogPath,
   script = { main: [], subagent: [] },
 }: ServerOptions): Bun.Server<undefined> {
-  const cursor: Record<QueueName, number> = { main: 0, subagent: 0 };
+  const queues = new Map<string, Turn[]>([
+    ["main", script.main],
+    ["subagent", script.subagent],
+    ...Object.entries(script.agents ?? {}).map(([key, turns]) => [`agents.${key}`, turns] as const),
+  ]);
+  const cursor = new Map<string, number>();
   let toolSeq = 0;
 
-  const serve = (queue: QueueName): { turn: number | null; content: Served[] } => {
-    const scripted = script[queue][cursor[queue]];
+  const queueOf = (queue: QueueName, messages: unknown): string => {
+    if (queue === "main") return queue;
+    const text = firstMessageText(messages);
+    const key = Object.keys(script.agents ?? {}).find((candidate) => text.includes(candidate));
+    return key === undefined ? queue : `agents.${key}`;
+  };
+
+  const serve = (queue: string): { turn: number | null; content: Served[]; delayMs?: number } => {
+    const at = cursor.get(queue) ?? 0;
+    const scripted = queues.get(queue)?.[at];
     if (!scripted) return { turn: null, content: [{ type: "text", text: RESPONSE_TEXT }] };
     const content = scripted.content.map((block): Served =>
       block.type === "text"
         ? block
         : { type: "tool_use", id: `toolu_mock_${++toolSeq}`, name: block.name, input: block.input },
     );
-    return { turn: cursor[queue]++, content };
+    cursor.set(queue, at + 1);
+    return { turn: at, content, ...(scripted.delayMs === undefined ? {} : { delayMs: scripted.delayMs }) };
   };
 
   return Bun.serve({
@@ -205,8 +239,8 @@ export function startServer({
       // Claude Code's side requests, such as naming the session, send an empty tools list. They get
       // the fallback reply and never spend a scripted turn.
       const isSide = Array.isArray(body.tools) && body.tools.length === 0;
-      const queue: QueueName = systemText(body.system).includes(SUBAGENT_MARKER) ? "subagent" : "main";
-      const { turn, content } = isSide ? { turn: null, content: [{ type: "text", text: RESPONSE_TEXT }] as Served[] } : serve(queue);
+      const queue = queueOf(systemText(body.system).includes(SUBAGENT_MARKER) ? "subagent" : "main", body.messages);
+      const { turn, content, delayMs } = isSide ? { turn: null, content: [{ type: "text", text: RESPONSE_TEXT }] as Served[] } : serve(queue);
 
       if (accessLogPath) {
         appendFileSync(
@@ -224,6 +258,7 @@ export function startServer({
       }
 
       if (bodyLogPath) appendFileSync(bodyLogPath, `${JSON.stringify({ queue: isSide ? "side" : queue, turn, body: rawBody })}\n`);
+      if (delayMs !== undefined) await Bun.sleep(delayMs);
 
       if (streaming) {
         return new Response(sseBody(content, tokensOf(rawBody)), {

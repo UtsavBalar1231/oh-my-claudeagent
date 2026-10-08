@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { copyFixture, maskClock, maskScratch, mouseReports, parseSizes, parseView, teardown, withoutBlink } from "./visual.ts";
+import { copyFixture, maskLive, maskScratch, mouseReports, parseSizes, parseView, teardown, withoutBlink } from "./visual.ts";
 
 const VISUAL = join(import.meta.dir, "visual.ts");
 const temps: string[] = [];
@@ -91,7 +91,7 @@ test("copyFixture copies the tree and points {{cwd}} at the copy", () => {
   expect(readFileSync(join(from, ".omca", "state", "boulder.json"), "utf8")).toContain("{{cwd}}");
 });
 
-test("copyFixture takes a plan boulder.json names from the shared plans when the fixture lacks it, and keeps the fixture's own", () => {
+test("copyFixture takes a plan boulder.json names from the shared plans when the fixture lacks it, keeps the fixture's own, and dates every file an hour back", () => {
   const from = temp("omca-visual-fixture-");
   const shared = temp("omca-visual-shared-");
   const to = join(temp("omca-visual-copy-"), "cwd");
@@ -107,6 +107,12 @@ test("copyFixture takes a plan boulder.json names from the shared plans when the
   expect(readdirSync(join(to, "plans")).sort()).toEqual(["own.md", "shared.md"]);
   expect(readFileSync(join(to, "plans", "shared.md"), "utf8")).toBe("shared plan\n");
   expect(readFileSync(join(to, "plans", "own.md"), "utf8")).toBe("fixture's own\n");
+  for (const name of ["own.md", "shared.md"]) {
+    const age = Date.now() - statSync(join(to, "plans", name)).mtimeMs;
+    expect(age).toBeGreaterThanOrEqual(3_600_000 - 1_000);
+    expect(age).toBeLessThan(3_600_000 + 60_000);
+  }
+  expect(Date.now() - statSync(join(to, ".omca", "state", "boulder.json")).mtimeMs).toBeGreaterThanOrEqual(3_600_000 - 1_000);
 });
 
 test("the band and pane fixtures get the 46-task plan from tests/fixtures/plans", () => {
@@ -125,21 +131,35 @@ test("maskScratch replaces the scratch directory's random suffix wherever the sc
   expect(maskScratch(screen, scratch)).toBe(`cwd ${join(tmpdir(), "omca-visual-120x40-XXXXXX")}/cwd\n…ual-120x40-XXXXXX/cwd │ Ab3dE`);
 });
 
-test("maskClock fixes the live session's times and keeps a line's width beside a pane", () => {
+test("maskLive fixes the live session's times, engine cost, running seconds and token counts, leaves a stored figure, and keeps a line's width beside a pane", () => {
   const screen = [
     "✻ Sautéed for 0s · done 1:36 PM          │ pane",
     "r: Run again   ✓ 9 ok  checked 16:42",
     "  ↑ UP    10-03 13:36  good",
     "  13:35  FINAL    ✓  0  just ci",
     "✻ Baked for 2s · done 10:07 PM",
+    "● omca: 0s · 38.2k\u00a0in · $0.8787\u00a0engine\u00a0cost        │ pane",
+    "  $12.40 engine cost",
+    "│  explorer · Map the router callers   sonnet-5-5  high       3s    │",
+    "│   ▄▄▀▀▀▀▀▀▄▄     explorer           running     12s",
+    "  ◯ oh-my-claudeagent:explorer   Map the router callers      3s · ↓ 23.2k tokens",
+    "│ │  explorer     ██████████     4     24s    172k",
+    "│ d: Details  2 running · 1 finished · 128k tokens   sonnet-5-5 · high · 62.2k tokens",
   ].join("\n");
 
-  expect(maskClock(screen).split("\n")).toEqual([
+  expect(maskLive(screen).split("\n")).toEqual([
     "✻ Worked for 0s · done HH:MM             │ pane",
     "r: Run again   ✓ 9 ok  checked HH:MM",
     "  ↑ UP    MM-DD HH:MM  good",
     "  13:35  FINAL    ✓  0  just ci",
     "✻ Worked for 2s · done HH:MM",
+    "● omca: 0s · 38.2k\u00a0in · $X.XX\u00a0engine\u00a0cost          │ pane",
+    "  $X.XX engine cost",
+    "│  explorer · Map the router callers   sonnet-5-5  high       Ns    │",
+    "│   ▄▄▀▀▀▀▀▀▄▄     explorer           running     NNs",
+    "  ◯ oh-my-claudeagent:explorer   Map the router callers      Ns · ↓ NN.Nk tokens",
+    "│ │  explorer     ██████████     4     24s    172k",
+    "│ d: Details  2 running · 1 finished · NNNk tokens   sonnet-5-5 · high · NN.Nk tokens",
   ]);
 });
 

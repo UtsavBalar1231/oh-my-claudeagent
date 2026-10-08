@@ -1,31 +1,31 @@
                                                                │                                                      ✕
  ▐▛███▛█   Claude Code v2.1.294                                │1: Agents  2: P  3: E  4: N  5: F  6: S  7: D
 ▝▜██████▀  Opus 5.5 · API Usage Billing                        │─────────────────────────────────────────────────────
- ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd           │   ▄▄▀▀▀▀▀▀▄▄     explorer           running      3s
+ ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd           │   ▄▄▀▀▀▀▀▀▄▄     explorer           running      Ns
                                                                │     ▀▀  ▀▀ ▀▄▄▀  Map the router callers
-                                                               │    ▀▀▀▀▀▀▀▀   ▀  ✳ Bash sleep 90             2 calls
-❯ Fix the parser with the executor                             │    ▀▀▀▀▀▀▀▀      sonnet-5-5 · high · 38.4k tokens
+                                                               │    ▀▀▀▀▀▀▀▀   ▀  ✻ Bash sleep 90             4 calls
+❯ Fix the parser with the executor                             │    ▀▀▀▀▀▀▀▀      sonnet-5-5 · high · NN.Nk tokens
                                                                │
-● 3 background agents launched (↓ to manage)                   │    ▄▀▀▀▀▀▀▄ ▀    architect          running      3s
+● 3 background agents launched (↓ to manage)                   │    ▄▀▀▀▀▀▀▄ ▀    architect          running      Ns
    ├ oh-my-claudeagent:executor (Fix the heading parser)       │     ▀▀  ▀▀   ▀   Review the ledger design
-   ├ oh-my-claudeagent:explorer (Map the router callers)       │    ▀▀▀▀▀▀▀▀      ✳ Bash sleep 90             4 calls
-   └ oh-my-claudeagent:architect (Review the ledger design)    │    ▀▀▀▀▀▀▀▀      fable-5-1 · xhigh · 77.8k tokens
+   ├ oh-my-claudeagent:explorer (Map the router callers)       │    ▀▀▀▀▀▀▀▀      ✻ Bash sleep 90             2 calls
+   └ oh-my-claudeagent:architect (Review the ledger design)    │    ▀▀▀▀▀▀▀▀      fable-5-1 · xhigh · NN.Nk tokens
                                                                │Finished
-● Three agents are on it.                                      │    ▄▀ ▀▀ ▀▄ ▄▄▄  executor           done         0s
+● Three agents are on it.                                      │    ▄▀ ▀▀ ▀▄ ▄▄▄  executor           done         1s
                                                                │ ▀   ▀▀   ▀       Fix the heading parser
-✻ Waiting for 3 background agents to finish                    │ ▀  ▀ ▀▀▀▀ ▀ ▀    The rotation is safe: a crash
-                                                               │    ▀▀▀▀▀▀▀▀      mid-write leaves the previous file…
-● oh-my-claudeagent+cc-plugin-agents-md: 0s ·                  │                  sonnet-5-5 · high · 19.3k tokens
-  38.2k in 13 out · $1.24 engine cost                          │d: Details  2 running · 1 finished · 136k tokens
+✻ Waiting for 3 background agents to finish                    │ ▀  ▀ ▀▀▀▀ ▀ ▀    Fenced lines are skipped now, and
+                                                               │    ▀▀▀▀▀▀▀▀      the heading tests pass.
+● oh-my-claudeagent+cc-plugin-agents-md: 0s ·                  │                  sonnet-5-5 · high · NN.Nk tokens
+  38.2k in 13 out · $X.XX engine cost                          │d: Details  2 running · 1 finished · NNNk tokens
                                                                │
-● Agent "Fix the heading parser" finished · 0s                 │
+● Agent "Fix the heading parser" finished · 1s                 │
                                                                │
 ● ok                                                           │
                                                                │
 ✻ Waiting for 2 background agents to finish                    │
                                                                │
 ● oh-my-claudeagent+cc-plugin-agents-md: 0s ·                  │
-  38.6k in 8 out · $0.1545 engine cost                         │
+  41.0k in 8 out · $X.XX engine cost                           │
                                                                │
                                                                │
 █▎███ 12/46 · next 13 Port the snapshot… ·  2 running     [-] │
@@ -36,5 +36,5 @@
   ⏸ manual mode on · /tasks to see subagents · ← for agents · ↓ to manage
 
   ● main
-  ◯ oh-my-claudeagent:explorer   Map the router callers                                            3s · ↓ 23.2k tokens
-  ◯ oh-my-claudeagent:architect  Review the ledger design                                          2s · ↓ 19.7k tokens
+  ◯ oh-my-claudeagent:explorer   Map the router callers                                            Ns · ↓ NN.Nk tokens
+  ◯ oh-my-claudeagent:architect  Review the ledger design                                          Ns · ↓ NN.Nk tokens

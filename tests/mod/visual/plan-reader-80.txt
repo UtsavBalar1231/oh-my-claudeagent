@@ -16,7 +16,7 @@
 ✻ Waiting for 1 background agent to finish
 
 ● oh-my-claudeagent+cc-plugin-agents-md: 0s · 37.6k in 17 out ·
-  $0.4885 engine cost
+  $X.XX engine cost
 
 ╭────────────────────────────────────────────────────────────────────────────✕─╮
 │ 1: Agents 2: Plan 3: Evidence 4: Notepad 5: Feedback 6: Stats 7: Doctor      │

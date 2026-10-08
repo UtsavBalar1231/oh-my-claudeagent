@@ -37,4 +37,4 @@
   ⏸ manual mode on · ? for shortcuts · ← for agents · ↓ to manage
 
   ● main
-  ◯ oh-my-claudeagent:executor  Port the snapshot onto th… 0s · ↓ 18.8k tokens
+  ◯ oh-my-claudeagent:executor  Port the snapshot onto th… Ns · ↓ NN.Nk tokens

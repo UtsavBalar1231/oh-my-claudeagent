@@ -255,6 +255,19 @@ describe("scripted turns", () => {
     expect((frames[7]?.data as { delta: { stop_reason: string } } | undefined)?.delta.stop_reason).toBe("tool_use");
   });
 
+  test("holds a turn's reply back for its delayMs and answers the next turn at once", async () => {
+    await boot({ script: { main: [{ content: [{ type: "text", text: "late" }], delayMs: 300 }, { content: [{ type: "text", text: "prompt" }] }], subagent: [] } });
+
+    const held = performance.now();
+    await postJson();
+    const heldFor = performance.now() - held;
+    const next = performance.now();
+    await postJson();
+
+    expect(heldFor).toBeGreaterThanOrEqual(290);
+    expect(performance.now() - next).toBeLessThan(200);
+  });
+
   test("falls back to the fixed ok reply once a queue is exhausted", async () => {
     await boot({ script: { main: [{ content: [{ type: "text", text: "only" }] }], subagent: [] } });
 
@@ -303,6 +316,31 @@ describe("queue routing", () => {
     await boot({ script: { main: twoQueues.main, subagent: [] } });
 
     expect(textOf(await postJson({ system: SUBAGENT_SYSTEM }))).toBe("ok");
+  });
+
+  test("gives each subagent whose first message holds an agents key that key's turns in order, and any other subagent the shared queue", async () => {
+    const reply = (text: string) => ({ content: [{ type: "text" as const, text }] });
+    await boot({
+      script: { ...twoQueues, agents: { "heading parser": [reply("parser-1"), reply("parser-2")], "router callers": [reply("router-1")] } },
+    });
+    const ask = (prompt: unknown) => postJson({ system: SUBAGENT_SYSTEM, messages: [{ role: "user", content: prompt }, { role: "user", content: "later" }] });
+
+    const replies = [
+      await ask("Fix the heading parser."),
+      await ask([{ type: "text", text: "<reminder/>" }, { type: "text", text: "Map the router callers." }]),
+      await ask("Fix the heading parser."),
+      await ask("Review the ledger."),
+      await ask("Map the router callers."),
+    ];
+
+    expect(replies.map(textOf)).toEqual(["parser-1", "router-1", "parser-2", "sub-reply", "ok"]);
+    expect(logEntries().map((entry) => [entry.queue, entry.turn])).toEqual([
+      ["agents.heading parser", 0],
+      ["agents.router callers", 0],
+      ["agents.heading parser", 1],
+      ["subagent", 0],
+      ["agents.router callers", null],
+    ]);
   });
 });
 
@@ -489,6 +527,28 @@ describe("command line", () => {
     expect(await new Response(proc.stderr).text()).toBe(
       `mock-model.ts: invalid --script ${path}: "subagent" must be an array of turns\n`,
     );
+  });
+
+  test("rejects a --script whose delayMs is not a whole number of milliseconds", async () => {
+    const path = scriptFile(JSON.stringify({ main: [{ content: [], delayMs: -5 }] }));
+    const proc = spawnMock("--script", path);
+
+    expect(await proc.exited).toBe(2);
+    expect(await new Response(proc.stderr).text()).toBe(`mock-model.ts: invalid --script ${path}: main[0].delayMs must be a whole number of milliseconds\n`);
+  });
+
+  test("rejects a --script whose agents are not a map of turns, and names the key whose turns are wrong", async () => {
+    const list = scriptFile(JSON.stringify({ agents: [] }));
+    const listProc = spawnMock("--script", list);
+    expect(await listProc.exited).toBe(2);
+    expect(await new Response(listProc.stderr).text()).toBe(
+      `mock-model.ts: invalid --script ${list}: "agents" must map text in an agent's prompt to its turns\n`,
+    );
+
+    const key = scriptFile(JSON.stringify({ agents: { parser: "nope" } }));
+    const keyProc = spawnMock("--script", key);
+    expect(await keyProc.exited).toBe(2);
+    expect(await new Response(keyProc.stderr).text()).toBe(`mock-model.ts: invalid --script ${key}: "agents.parser" must be an array of turns\n`);
   });
 
   test("rejects a --script file that does not exist", async () => {

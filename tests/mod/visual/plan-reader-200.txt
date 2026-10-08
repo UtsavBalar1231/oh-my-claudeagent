@@ -15,7 +15,7 @@
                                                                                                    │── Milestone 1: Exporter ── █████▍██ 2/3 ───────────────────── │
 ✻ Waiting for 1 background agent to finish                                                         │ 3 Write rows in the schema's order                 UNPROVEN  │ Do
                                                                                                    │ 4 Round negative totals toward zero                  PROVEN  │ Sum each customer's rows and
-● oh-my-claudeagent+cc-plugin-agents-md: 0s · 37.6k in 17 out · $0.4885 engine cost                │ 5 Reconcile totals against the invoice table               │ compare with the invoice table;
+● oh-my-claudeagent+cc-plugin-agents-md: 0s · 37.6k in 17 out · $X.XX engine cost                  │ 5 Reconcile totals against the invoice table               │ compare with the invoice table;
                                                                                                    │── Milestone 2: Rollout ── ████████ 0/4 ────────────────────── │ list every mismatch.
                                                                                                    │ 6 Run the new export beside the old one for a week        5 │
                                                                                                    │ 7 Document the export columns for finance            PROVEN  │ Done when
@@ -28,14 +28,14 @@
                                                                                                    │                                                               │
                                                                                                    │                                                               │ Files
                                                                                                    │                                                               │   src/report/totals.ts
-                                                                                                   │                                                               │     changed just now
+                                                                                                   │                                                               │     changed 1h ago
                                                                                                    │                                                               │   src/report/totals.spec.ts
                                                                                                    │                                                               │     not found
                                                                                                    │                                                               │
                                                                                                    │                                                               │ Evidence
                                                                                                    │                                                               │    No test, build or lint run
-                                                                                                   │                                                               │     since its files changed
-                                                                                                   │                                                               │     just now.
+                                                                                                   │                                                               │     since its files changed 1h
+                                                                                                   │                                                               │     ago.
                                                                                                    │                                                               │ ↓ more · wheel to scroll
                                                                                                    │k: Run check  s: Start here  c: Copy  e: Evidence  o: Open only  x: Failing  f: Find  t: Sections
                                                                                                    │l: Plans
@@ -47,4 +47,4 @@
   ⏸ manual mode on · ? for shortcuts · ← for agents · ↓ to manage
 
   ● main
-  ◯ oh-my-claudeagent:executor  Reconcile totals                                                                                                                                   2s · ↓ 18.8k tokens
+  ◯ oh-my-claudeagent:executor  Reconcile totals                                                                                                                                   Ns · ↓ NN.Nk tokens

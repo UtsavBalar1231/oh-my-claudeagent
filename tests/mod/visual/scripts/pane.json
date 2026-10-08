@@ -36,15 +36,21 @@
     },
     { "content": [{ "type": "text", "text": "Three agents are on it." }] }
   ],
-  "subagent": [
-    { "content": [{ "type": "tool_use", "name": "Read", "input": { "file_path": "plans/46-task-plan.md" } }] },
-    { "content": [{ "type": "tool_use", "name": "Grep", "input": { "pattern": "router", "path": "plans" } }] },
-    { "content": [{ "type": "tool_use", "name": "Glob", "input": { "pattern": "plans/*.md" } }] },
-    { "content": [{ "type": "tool_use", "name": "Bash", "input": { "command": "ls plans", "description": "List the plans" } }] },
-    { "content": [{ "type": "tool_use", "name": "mcp__plugin_oh-my-claudeagent_omca__notepad_list", "input": {} }] },
-    { "content": [{ "type": "tool_use", "name": "Write", "input": { "file_path": "notes/router-callers.md", "content": "# Router callers\n" } }] },
-    { "content": [{ "type": "tool_use", "name": "Bash", "input": { "command": "sleep 90", "description": "Wait for the build" } }] },
-    { "content": [{ "type": "tool_use", "name": "Bash", "input": { "command": "sleep 90", "description": "Wait for the test run" } }] },
-    { "content": [{ "type": "text", "text": "The rotation is safe: a crash mid-write leaves the previous file whole." }] }
-  ]
+  "agents": {
+    "heading parser": [
+      { "content": [{ "type": "tool_use", "name": "Read", "input": { "file_path": "plans/46-task-plan.md" } }] },
+      { "content": [{ "type": "tool_use", "name": "Write", "input": { "file_path": "notes/heading-parser.md", "content": "# Heading parser\n" } }] },
+      { "content": [{ "type": "text", "text": "Fenced lines are skipped now, and the heading tests pass." }], "delayMs": 1000 }
+    ],
+    "shared router": [
+      { "content": [{ "type": "tool_use", "name": "Grep", "input": { "pattern": "router", "path": "plans" } }] },
+      { "content": [{ "type": "tool_use", "name": "Glob", "input": { "pattern": "plans/*.md" } }] },
+      { "content": [{ "type": "tool_use", "name": "Bash", "input": { "command": "ls plans", "description": "List the plans" } }] },
+      { "content": [{ "type": "tool_use", "name": "Bash", "input": { "command": "sleep 90", "description": "Wait for the build" } }] }
+    ],
+    "ledger rotation": [
+      { "content": [{ "type": "tool_use", "name": "mcp__plugin_oh-my-claudeagent_omca__notepad_list", "input": {} }] },
+      { "content": [{ "type": "tool_use", "name": "Bash", "input": { "command": "sleep 90", "description": "Wait for the test run" } }] }
+    ]
+  }
 }
