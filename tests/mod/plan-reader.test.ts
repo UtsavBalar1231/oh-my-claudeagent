@@ -1020,7 +1020,7 @@ test("the detail under a row takes the rows left after two neighbours each side 
   await ui.unmount();
 });
 
-test("the split list takes the width its longest title asks for, at least 56 cells and a cell short of the rule, with short chips", async ($, on) => {
+test("the split list takes the width its longest title asks for, at least 56 cells and a cell short of the rule, its chips in words while titles fit", async ($, on) => {
   boardWorld(on);
   const ui = await mountBoard($, SPLIT);
   const tree = await ui.drawn();
@@ -1029,8 +1029,9 @@ test("the split list takes the width its longest title asks for, at least 56 cel
   expect(listWidth).toBeGreaterThanOrEqual(56);
   expect(drawnNode(tree, "line-task-4")?.props?.["width"]).toBe(listWidth - 1);
   const blocked = (await ui.find({ key: "line-task-4" }))?.text ?? "";
-  expect(blocked).toContain("⊘ 3");
-  expect(blocked).not.toContain("blocked by");
+  expect(blocked).toContain("blocked by 3");
+  expect(blocked).toContain("PROVEN");
+  expect(blocked).toContain("Wire the hotkeys");
   await ui.unmount();
 });
 

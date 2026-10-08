@@ -8,35 +8,35 @@
                                                                                                    ││ next 5 Reconcile totals against the invoice table                                             │
   Ran 1 shell command                                                                              ││  executor on 5                                                                               │
                                                                                                    │╰───────────────────────────────────────────────────────────────────────────────────────────────╯
-● oh-my-claudeagent:executor(Reconcile totals)                                                     │                                                         │ 5. Reconcile totals against the
-  ⎿  Backgrounded agent (↓ to manage · ctrl+o to expand)                                           │── Milestone 0: Foundations ── ████████ 2/2 ──────────── │ invoice table
-                                                                                                   │ 1 Define the export schema and its version field      │  IN PROGRESS   UNPROVEN   executor
-● The executor is reconciling the totals.                                                          │ 2 Read the ledger in one pass                         │
-                                                                                                   │── Milestone 1: Exporter ── █████▍██ 2/3 ─────────────── │ Do
-✻ Waiting for 1 background agent to finish                                                         │ 3 Write rows in the schema's order                    │ Sum each customer's rows and compare
-                                                                                                   │ 4 Round negative totals toward zero                   │ with the invoice table; list every
-● oh-my-claudeagent+cc-plugin-agents-md: 0s · 37.6k in 17 out · $0.4885 engine cost                │ 5 Reconcile totals against the invoice table         │ mismatch.
-                                                                                                   │── Milestone 2: Rollout ── ████████ 0/4 ──────────────── │
-                                                                                                   │ 6 Run the new export beside the old one for a we…   5 │ Done when
-                                                                                                   │ 7 Document the export columns for finance             │ $ DB_PASSWORD=‹masked› just test-db
-                                                                                                   │ 8 Switch the nightly job to the new export        6,7 │ exits 0.
-                                                                                                   │ 9 Announce the change to finance                    8 │
-                                                                                                   │                                                         │ Depends
-                                                                                                   │                                                         │   4
-                                                                                                   │                                                         │
-                                                                                                   │                                                         │ Files
-                                                                                                   │                                                         │   src/report/totals.ts
-                                                                                                   │                                                         │     changed just now
-                                                                                                   │                                                         │   src/report/totals.spec.ts not found
-                                                                                                   │                                                         │
-                                                                                                   │                                                         │ Evidence
-                                                                                                   │                                                         │    No test, build or lint run since
-                                                                                                   │                                                         │     its files changed just now.
-                                                                                                   │                                                         │   Last pass, before that change:
-                                                                                                   │                                                         │    test just test exit 0 · 6d ago
-                                                                                                   │                                                         │
-                                                                                                   │                                                         │ ‹masked› 1 secret masked
-                                                                                                   │                                                         │
+● oh-my-claudeagent:executor(Reconcile totals)                                                     │                                                               │ 5. Reconcile totals against the
+  ⎿  Backgrounded agent (↓ to manage · ctrl+o to expand)                                           │── Milestone 0: Foundations ── ████████ 2/2 ────────────────── │ invoice table
+                                                                                                   │ 1 Define the export schema and its version field     PROVEN  │  IN PROGRESS   UNPROVEN
+● The executor is reconciling the totals.                                                          │ 2 Read the ledger in one pass                        PROVEN  │  executor
+                                                                                                   │── Milestone 1: Exporter ── █████▍██ 2/3 ───────────────────── │
+✻ Waiting for 1 background agent to finish                                                         │ 3 Write rows in the schema's order                 UNPROVEN  │ Do
+                                                                                                   │ 4 Round negative totals toward zero                  PROVEN  │ Sum each customer's rows and
+● oh-my-claudeagent+cc-plugin-agents-md: 0s · 37.6k in 17 out · $0.4885 engine cost                │ 5 Reconcile totals against the invoice table               │ compare with the invoice table;
+                                                                                                   │── Milestone 2: Rollout ── ████████ 0/4 ────────────────────── │ list every mismatch.
+                                                                                                   │ 6 Run the new export beside the old one for a week        5 │
+                                                                                                   │ 7 Document the export columns for finance            PROVEN  │ Done when
+                                                                                                   │ 8 Switch the nightly job to the new export   blocked by 6, 7 │ $ DB_PASSWORD=‹masked› just
+                                                                                                   │ 9 Announce the change to finance                blocked by 8 │ test-db
+                                                                                                   │                                                               │ exits 0.
+                                                                                                   │                                                               │
+                                                                                                   │                                                               │ Depends
+                                                                                                   │                                                               │   4
+                                                                                                   │                                                               │
+                                                                                                   │                                                               │ Files
+                                                                                                   │                                                               │   src/report/totals.ts
+                                                                                                   │                                                               │     changed just now
+                                                                                                   │                                                               │   src/report/totals.spec.ts
+                                                                                                   │                                                               │     not found
+                                                                                                   │                                                               │
+                                                                                                   │                                                               │ Evidence
+                                                                                                   │                                                               │    No test, build or lint run
+                                                                                                   │                                                               │     since its files changed
+                                                                                                   │                                                               │     just now.
+                                                                                                   │                                                               │ ↓ more · wheel to scroll
                                                                                                    │k: Run check  s: Start here  c: Copy  e: Evidence  o: Open only  x: Failing  f: Find  t: Sections
                                                                                                    │l: Plans
 ██▎██ 4/9 · next 5 Reconcile totals against the… ·  4 proven   2 unproven ·  1 running      [-] │↑↓ move · enter open · esc close

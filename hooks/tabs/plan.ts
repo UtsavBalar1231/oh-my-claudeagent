@@ -700,8 +700,10 @@ function taskRow(
   const status = statusOf(ctx, card);
   const isNext = card.n === ctx.board.cards.find((each) => !each.done)?.n;
   const fixed = 2 + numWidth + 1;
-  let right = rightPieces(view, ctx, card, isShort);
-  if (!isShort && width - fixed - piecesWidth(right) < MIN_TITLE) right = rightPieces(view, ctx, card, true);
+  // Chips read as words while the title keeps its room, the whole title in a split list; glyphs otherwise.
+  const words = rightPieces(view, ctx, card, false);
+  const titleRoom = width - fixed - piecesWidth(words) - (words.length > 0 ? 1 : 0);
+  const right = titleRoom >= (isShort ? displayWidth(card.title) : MIN_TITLE) ? words : rightPieces(view, ctx, card, true);
   const room = Math.max(1, width - fixed - piecesWidth(right));
   const titleText = fitEnd(card.title, room - (right.length > 0 ? 1 : 0), view.g.ellipsis);
   const pad = " ".repeat(Math.max(0, room - displayWidth(titleText)));
@@ -1079,7 +1081,8 @@ function contextOf(plan: Loaded, agents: State["agents"] | undefined): Ctx {
 // The list column takes what its widest row asks for, between a floor and a share of the body.
 function splitWidth(view: View, ctx: Ctx, numWidth: number): number {
   const fixed = 2 + numWidth + 1;
-  const need = Math.max(0, ...ctx.board.cards.map((card) => fixed + displayWidth(card.title) + piecesWidth(rightPieces(view, ctx, card, true)) + 1));
+  // A row asks for a space before its chips and stops a cell short of the rule.
+  const need = Math.max(0, ...ctx.board.cards.map((card) => fixed + displayWidth(card.title) + piecesWidth(rightPieces(view, ctx, card, false)) + 2));
   const most = Math.max(SPLIT_MIN_LIST, Math.min(Math.floor(view.width * SPLIT_SHARE), view.width - 2 - SPLIT_MIN_DETAIL));
   return Math.min(most, Math.max(SPLIT_MIN_LIST, need));
 }
