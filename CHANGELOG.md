@@ -276,8 +276,8 @@ hand.
   two lines, otherwise four, and under 60 columns it draws one compact line of model, plan count,
   context percentage and branch. Widths count terminal cells, so wide characters take two, and
   lines stop 6 cells short of `COLUMNS`, the 3 cells Claude Code keeps free on each side. A
-  subagent row adds its name, model, status, effort and context in that order and stops at the
-  first that does not fit.
+  subagent row names the agent by its type, then adds its model, status, effort, context and the
+  task's label in that order and stops at the first that does not fit.
 - Cost shows only when the payload has no 5 hour or 7 day window and the cost is above zero, so a
   subscriber sees no dollar figure. The turn footer follows the same rule.
 - Durations read `2m05s` on the status line, as they do in the footer and the pane.

@@ -24,6 +24,7 @@ interface Task {
   id?: string;
   name?: string;
   type?: string;
+  agentType?: string;
   label?: string;
   status?: string;
   model?: string;
@@ -69,11 +70,14 @@ function effortLabel(effort: Task["effort"]): string {
   return typeof effort === "string" ? effort.trim() : "";
 }
 
+// The subagent type names the row: `name` is only the name a subagent is addressed by, and the
+// task's label follows last, so a long one gives way first on a narrow row.
 function row(task: Task, { tier, g }: { tier: GlyphTier; g: Glyphs }, columns: number): string {
-  const name = task.name ? shortType(task.name) : task.label || task.type || "agent";
+  const identity = task.agentType || task.name;
+  const name = identity ? shortType(identity) : task.label || task.type || "agent";
   const parts = [`${BOLD}${agentGlyph(name, tier)} ${name}${RST}`];
 
-  const model = friendlyModel(task.model || frontmatterModel(task.name ?? ""));
+  const model = friendlyModel(task.model || frontmatterModel(identity ?? ""));
   if (model) parts.push(`${DIM}${g.model} ${model}${RST}`);
 
   if (task.status) parts.push(`${STATUS_COLORS.get(task.status) ?? DIM}${task.status}${RST}`);
@@ -90,6 +94,7 @@ function row(task: Task, { tier, g }: { tier: GlyphTier; g: Glyphs }, columns: n
         : `${DIM}${formatTokens(tokens)} tok${RST}`,
     );
   }
+  if (identity && task.label) parts.push(`${DIM}${task.label}${RST}`);
   return arrange(parts.map(block), columns, 1, separator(g.dot)).join("");
 }
 

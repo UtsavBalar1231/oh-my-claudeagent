@@ -88,12 +88,27 @@ describe("model", () => {
 
 describe("name", () => {
   test.each([
-    ["a namespace is stripped", { name: "some-plugin:reviewer", label: "fix" }, "reviewer"],
+    ["a namespace is stripped", { name: "some-plugin:reviewer" }, "reviewer"],
     ["the label stands in for a missing name", { type: "local_agent", label: "probe" }, "probe"],
     ["the type stands in for a missing label", { type: "local_agent" }, "local_agent"],
     ["nothing at all reads agent", {}, "agent"],
   ])("%s", (_, task, label) => {
     expect(content(task)).toBe(row(name(label)));
+  });
+});
+
+describe("agentType", () => {
+  test("names the row over the name it is addressed by, finds the frontmatter model, and puts the label last", () => {
+    const task = { agentType: "oh-my-claudeagent:executor", name: "worker-1", type: "local_agent", label: "Fix the parser", status: "running" };
+    expect(content(task)).toBe(row(name("executor"), model("Sonnet"), `${Y}running${R}`, `${D}Fix the parser${R}`));
+  });
+
+  test("a built-in type reads as itself, with its label after it", () => {
+    expect(content({ agentType: "Explore", type: "local_agent", label: "Map the routes" })).toBe(row(name("Explore"), `${D}Map the routes${R}`));
+  });
+
+  test("a name with a label shows both, the label last", () => {
+    expect(content({ name: "some-plugin:reviewer", label: "fix" })).toBe(row(name("reviewer"), `${D}fix${R}`));
   });
 });
 

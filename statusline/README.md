@@ -263,8 +263,10 @@ A plugin `settings.json` does keep `subagentStatusLine`, but Claude Code neither
 plugin-relative command cannot find its script.
 
 **Input** (stdin): one JSON object with a `tasks` array (each task carries `id`, `name`, `type`,
-`status`, `description`, `label`, `startTime`, `model`, `effort`, `contextWindowSize`,
-`tokenCount`, `tokenSamples`, `cwd`) and a `columns` field.
+`agentType`, `status`, `description`, `label`, `startTime`, `model`, `effort`,
+`contextWindowSize`, `tokenCount`, `tokenSamples`, `cwd`) and a `columns` field. `agentType` is
+the subagent type, such as `oh-my-claudeagent:executor` or `Explore`; `name` is only the name a
+subagent is addressed by, and `type` is the kind of task (`local_agent`).
 
 `effort` is the reasoning effort configured for that subagent. Its shape differs from the main
 status line's `effort`, which is a `{"level": "high"}` dict: the per-task field is a bare value,
@@ -280,13 +282,13 @@ compact token count.
 **Output** (stdout): one JSON line per task to override its row,
 `{"id": "<task id>", "content": "<row body>"}`.
 
-Each row shows the agent name with any namespace prefix stripped and its themed glyph, the model,
-the status, the configured effort, and context usage. A task without a `name` shows its `label`,
-then its `type`. The model is the task's own `model` field; when that is absent, a task named
-`oh-my-claudeagent:<agent>` takes the tier from that agent's frontmatter. A row fits the
-payload's `columns`, then `COLUMNS`, then 80, on one line: segments are added in the order name,
-model, status, effort, context, and the first one that does not fit is dropped along with every
-later one. Only a name wider than the row is cut. Any unreadable input prints nothing, so the tasks
+Each row shows the agent's type (its `agentType`, else its `name`) with any namespace prefix
+stripped and its themed glyph, the model, the status, the configured effort, context usage, and
+last the task's `label`. A task with neither shows its `label`, then its `type`. The model is the
+task's own `model` field; when that is absent, a task of type `oh-my-claudeagent:<agent>` takes
+the tier from that agent's frontmatter. A row fits the payload's `columns`, then `COLUMNS`, then
+80, on one line: segments are added in the order name, model, status, effort, context, label,
+and the first one that does not fit is dropped along with every later one. Only a name wider than the row is cut. Any unreadable input prints nothing, so the tasks
 panel keeps its default rows.
 
 ---
