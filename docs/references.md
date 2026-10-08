@@ -300,9 +300,9 @@ ledger, notepads and the registry, and links the JSON Schemas for the ledger and
 | `plan` and `start-work`, which stop unless `health_check` reports the runtime `ok` | Yes | When bun is on the app's `PATH` | Yes | When bun is on the app's `PATH` | Unless `allowManagedMcpServersOnly`, `allowManagedHooksOnly`, `disableAllHooks` or `allowManagedModsOnly` |
 | `omca` MCP tools | Yes | When bun is on the app's `PATH` | Yes | When bun is on the app's `PATH` | Unless `allowManagedMcpServersOnly` |
 | Stop checks, guidance, context injection | Yes | When bun is on the app's `PATH` | Yes | When bun is on the app's `PATH` | Unless `allowManagedHooksOnly` or `disableAllHooks` |
-| Guard decisions | Yes | Yes | Yes | Yes | Unless `allowManagedModsOnly`, `allowManagedHooksOnly` or `disableAllHooks` |
-| Guard review dialog | Yes | Yes | No: held commands are decided without you | No: decided as in `-p` | As the guard |
-| Band, pane, plan reader, doctor | Yes | Yes | No | No ([anthropics/claude-code#99045](https://github.com/anthropics/claude-code/issues/99045)) | As the guard |
+| Guard decisions | Yes | When the app's Claude Code is 2.1.292 or later | Yes | Yes | Unless `allowManagedModsOnly`, `allowManagedHooksOnly` or `disableAllHooks` |
+| Guard review dialog | Yes | As guard decisions | No: held commands are decided without you | No: decided as in `-p` | As the guard |
+| Band, pane, plan reader, doctor | Yes | As guard decisions, with [Desktop's differences](usage.md#desktop-and-vs-code) | No | No ([anthropics/claude-code#99045](https://github.com/anthropics/claude-code/issues/99045)) | As the guard |
 | Status line | Yes | Not documented | No | Not documented | Unless `allowManagedHooksOnly` or `disableAllHooks` |
 
 Where the built-in `sec-default` guard loads (a machine whose managed settings set at least one

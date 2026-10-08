@@ -245,7 +245,7 @@ count, as in `… · task 7/14 · 3 agents`.
 Each agent has a mascot. On the Agents tab a lane opens with its agent's mini, the full-size
 figure's face and tool at 15 by 8 pixels, while the agent runs and after it finishes until the next wave starts, and the agent page shows the
 full-size mascot in its header. A mascot moves only while its
-agent works, smiles when the agent finishes, sweats when it fails and dozes while the agent waits. The terminal draws them in half-block characters and Desktop draws an animated SVG.
+agent works, smiles when the agent finishes, sweats when it fails and dozes while the agent waits. The terminal draws them in half-block characters and Desktop draws a still SVG.
 `OMCA_GLYPHS=ascii` draws none. With Claude Code's `prefersReducedMotion` setting on, the mascots hold
 still: a working mascot shows its first frame and Desktop draws a single frame.
 
@@ -447,10 +447,26 @@ gates are off. At session start OMCA writes a line in the transcript that bun is
 and the Doctor tab reports bun as missing. Make bun reachable from the app's `PATH`, for example
 by linking it into a directory the app searches, and restart the app.
 
-The Code tab in Desktop draws the mod (band, pane, toasts and guard dialog) only when Desktop
-hosts the session on Claude Code 2.1.287 or later. Plugins installed under `~/.claude` do not load
-in Desktop sessions ([anthropics/claude-code#94635](https://github.com/anthropics/claude-code/issues/94635));
-name the plugin in `CLAUDE_CODE_PLUGIN_DIRS` to load it.
+The Code tab in Desktop runs its own bundled copy of Claude Code, which trails the CLI. OMCA's mod
+(the guard, band, pane, toasts and guard dialog) runs there only when that copy is 2.1.292 or
+later; `/status` in a Code-tab session shows its version. On an older copy the agents, skills,
+MCP tools and stop gates still work and the mod does not load. Desktop for Linux is a beta for
+Debian and Ubuntu that updates through the package manager, so a newer bundled copy arrives with
+the app's own update. When `/plugin` in a Desktop session does not list OMCA, name the plugin's
+folder in `CLAUDE_CODE_PLUGIN_DIRS` ([anthropics/claude-code#94635](https://github.com/anthropics/claude-code/issues/94635)).
+
+On Desktop the mod draws differently:
+
+- The pane docks on the right. `/omca` opens it, and it never opens on its own. Desktop can
+  report `/omca` as not a command until the session's first reply, and runs it anyway
+  ([#99691](https://github.com/anthropics/claude-code/issues/99691)). When Desktop does not place
+  the pane, `/omca` replies with the reason.
+- Mascots are still images: Desktop rebuilds every drawing on each change, which would restart an
+  animation ([#99211](https://github.com/anthropics/claude-code/issues/99211)). The same rebuild
+  can drop a click; click again.
+- A button that fills the prompt, such as the band's Start work or the Evidence tab's Rerun, shows
+  the text in a toast when Desktop's prompt box does not take it.
+- Copy can report that the surface has no clipboard, and the spinner keeps Desktop's own text.
 
 The VS Code chat panel runs OMCA's hooks but draws none of its interface: no band, no pane and
 no guard dialog ([anthropics/claude-code#99045](https://github.com/anthropics/claude-code/issues/99045)).
@@ -471,7 +487,10 @@ the tool again; do not skip the evidence.
 session the `omca` server shows a message once when that happens, saying the Bash guard, band and
 pane are off. Run `/plugin` and check that OMCA is listed under mods active. Mods are off when
 your organization sets `allowManagedModsOnly`, `allowManagedHooksOnly` or `disableAllHooks`, when
-Anthropic turns them off remotely, or after the mod worker crashes three times. A session where
+Anthropic turns them off remotely, or after the mod worker crashes three times. Using Desktop can
+save that remote switch as off in `~/.claude.json`, which then turns mods off in the terminal too;
+removing `cachedGrowthBookFeatures.tengu_plugin_hooks_modules` from that file and restarting
+clears it ([#99130](https://github.com/anthropics/claude-code/issues/99130)). A session where
 nothing draws, such as `claude -p` or the VS Code chat panel, runs the guard but shows no band or
 pane. `OMCA_DISABLED_HOOKS=mod-notice` silences the message.
 

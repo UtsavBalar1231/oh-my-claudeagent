@@ -84,11 +84,13 @@ hand.
   a lane takes four rows beside its mini (name and state, task, current tool, then model, effort,
   tokens and cost) and a blank row; the latest wave's finished agents keep their lanes, with their
   results, until the next wave, and a shorter pane keeps the two-row lanes. A mascot moves while
-  the agent works, smiles when it finishes, sweats when it fails and dozes while it waits. Terminals draw half-block characters, Desktop an animated SVG, and
+  the agent works, smiles when it finishes, sweats when it fails and dozes while it waits. Terminals draw half-block characters, Desktop a still SVG, and
   `OMCA_GLYPHS=ascii` draws none.
-- **Desktop redraws.** The Code tab draws the mod on Claude Code 2.1.287 or later; plugins under
-  `~/.claude` do not load in Desktop sessions (anthropics/claude-code#94635), so
-  `CLAUDE_CODE_PLUGIN_DIRS` is the workaround.
+- **Desktop.** The Code tab draws the mod when its bundled Claude Code is 2.1.292 or later: the
+  pane docks on the right and opens from `/omca`, which replies with the reason when Desktop does
+  not place it, and a button whose prompt Desktop's box does not take shows the text in a toast.
+  When `/plugin` there does not list OMCA, `CLAUDE_CODE_PLUGIN_DIRS` loads it
+  (anthropics/claude-code#94635).
 - **The formats spec.** `docs/formats.md` specifies plans, the evidence ledger, notepads and the
   plan registry.
 - **The migration.** `/oh-my-claudeagent:omca-setup --migrate` moves agent memories and settings
