@@ -1,10 +1,12 @@
-export const PRICING_AS_OF = "2026-10-02";
+export const PRICING_AS_OF = "2026-10-08";
 
-// List prices from https://platform.claude.com/docs/en/about-claude/pricing#model-pricing, read 2026-10-02.
-// US cents per million tokens, so a cost is one integer sum and a single division. Cache writes
-// take the 5-minute rate: a usage reports no TTL. Fast mode, batch and data-residency rates are
-// not applied.
-type Price = { input: number; cacheRead: number; cacheWrite: number; output: number };
+// List prices from https://platform.claude.com/docs/en/about-claude/pricing#model-pricing, read 2026-10-08.
+// US cents per million tokens, halves included, so a cost is an exact sum and a single division.
+// Cache writes take the 5-minute rate: a usage reports no TTL. Fast mode, batch and
+// data-residency rates are not applied. A model priced by prompt length takes its `over` rates
+// for a request whose prompt (input, cache reads and cache writes) passes `tokens`.
+type Rates = { input: number; cacheRead: number; cacheWrite: number; output: number };
+type Price = Rates & { over?: { tokens: number; rates: Rates } };
 
 const PRICES: Readonly<Record<string, Price>> = {
   "fable-5.1": { input: 1000, cacheRead: 25, cacheWrite: 1250, output: 5000 },
@@ -19,11 +21,18 @@ const PRICES: Readonly<Record<string, Price>> = {
   "opus-4.5": { input: 500, cacheRead: 50, cacheWrite: 625, output: 2500 },
   "opus-4.1": { input: 1500, cacheRead: 150, cacheWrite: 1875, output: 7500 },
   "opus-4": { input: 1500, cacheRead: 150, cacheWrite: 1875, output: 7500 },
-  "sonnet-5.5": { input: 200, cacheRead: 20, cacheWrite: 250, output: 1000 },
+  "sonnet-5.5": { input: 200, cacheRead: 10, cacheWrite: 250, output: 1000 },
   "sonnet-5": { input: 200, cacheRead: 20, cacheWrite: 250, output: 1000 },
   "sonnet-4.6": { input: 300, cacheRead: 30, cacheWrite: 375, output: 1500 },
   "sonnet-4.5": { input: 300, cacheRead: 30, cacheWrite: 375, output: 1500 },
   "sonnet-4": { input: 300, cacheRead: 30, cacheWrite: 375, output: 1500 },
+  "haiku-5.5": {
+    input: 10,
+    cacheRead: 1,
+    cacheWrite: 12.5,
+    output: 50,
+    over: { tokens: 100_000, rates: { input: 50, cacheRead: 5, cacheWrite: 62.5, output: 250 } },
+  },
   "haiku-4.5": { input: 100, cacheRead: 10, cacheWrite: 125, output: 500 },
 };
 
@@ -45,10 +54,12 @@ export type Usage = {
   cache_creation_input_tokens: number;
 };
 
-/** Estimated USD at list price, or null when the model has no sourced price. */
+/** Estimated USD at list price for one request's usage, or null when the model has no sourced price. */
 export function estimateCostUsd(model: string, usage: Usage): number | null {
-  const price = priceOf(model);
-  if (price === undefined) return null;
+  const base = priceOf(model);
+  if (base === undefined) return null;
+  const prompt = usage.input_tokens + usage.cache_read_input_tokens + usage.cache_creation_input_tokens;
+  const price = base.over !== undefined && prompt > base.over.tokens ? base.over.rates : base;
   const cents =
     usage.input_tokens * price.input +
     usage.cache_read_input_tokens * price.cacheRead +

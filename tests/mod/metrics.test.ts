@@ -99,7 +99,7 @@ test("each delegation is written running at spawn and overwritten once when its 
         duration_ms: 90_000,
         input_tokens: 13_000,
         output_tokens: 500,
-        estimated_cost_usd: 0.0135,
+        estimated_cost_usd: 0.0125,
         outcome: "completed",
         evidence_logged: true,
       },
@@ -137,7 +137,7 @@ test("each delegation is written running at spawn and overwritten once when its 
       "Estimated cost",
       `$0.01 ${"█".repeat(41)}`,
       "◆ executor $0.01",
-      "2026-10-02 list prices",
+      "2026-10-08 list prices",
       "r: Reload",
     ]);
     await ui.unmount();

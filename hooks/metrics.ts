@@ -77,7 +77,8 @@ export const metrics: Features = {
         duration_ms: endedAt - row.startedAt,
         input_tokens: row.inputTokens,
         output_tokens: row.outputTokens,
-        estimated_cost_usd: usage === undefined ? null : estimateCostUsd(usage.model, usage),
+        // The lane prices each response on its own, which a model priced by prompt length needs.
+        estimated_cost_usd: usage === undefined ? null : e.usage === undefined ? estimateCostUsd(usage.model, usage) : row.costUsd,
         outcome: outcomeOf(e),
         evidence_logged: await evidenceLogged(host, at.root, row.startedAt, endedAt),
       });

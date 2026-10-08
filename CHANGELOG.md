@@ -125,7 +125,9 @@ hand.
 - **Delegation metrics and the Stats tab.** Each subagent gets a record under
   `.omca/metrics/<session id>/` with its type, model, effort, tokens, duration, outcome, whether
   evidence was logged during it, and an estimated cost from a dated price table that cites its
-  source for every row. A model with no sourced price stays unpriced rather than guessed. The
+  source for every row. Each response is priced on its own, so Claude Haiku 5.5 takes its higher
+  rate only for a prompt over 100,000 tokens. A model with no sourced price stays unpriced rather
+  than guessed. The
   Stats tab aggregates the records by agent type: runs and evidence rate per agent, tokens per
   finished delegation, and the estimated cost split by agent.
 - **Per-delegation effort.** The orchestrator and start-work set one delegation's effort
