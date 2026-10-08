@@ -49,6 +49,7 @@ const look = (width: number, fields: Partial<LaneLook> = {}, lanes: readonly Lan
   g: G,
   ascii: false,
   now: START + 66_000,
+  isStill: false,
   columns: laneColumns(lanes, width),
   ...fields,
 });
@@ -93,6 +94,12 @@ test("the spinner turns one frame a second of the clock", () => {
   const at = (second: number) => spinner(Math.floor(START / 6000) * 6000 + second * 1000, false);
   expect([0, 0.999, 1, 2, 3, 4, 5, 6].map(at)).toEqual(["·", "·", "✢", "✳", "✶", "✻", "✽", "·"]);
   expect([0, 1000, 2000, 3000].map((ms) => spinner(START + ms, true))).toEqual(["|", "/", "-", "\\"]);
+});
+
+test("under reduced motion the spinner holds one mark at every second, and a lane's tool row leads with it", () => {
+  expect([0, 1000, 2000, 3000].map((ms) => spinner(START + ms, false, true))).toEqual(["✻", "✻", "✻", "✻"]);
+  expect([0, 1000].map((ms) => spinner(START + ms, true, true))).toEqual(["*", "*"]);
+  expect(text(laneRows(lane({ tool: null }), look(73, { isStill: true, now: START + 67_000 }), HOME)[1] ?? []).trimEnd()).toMatch(/^ {2}✻ thinking/);
 });
 
 describe("laneRows", () => {

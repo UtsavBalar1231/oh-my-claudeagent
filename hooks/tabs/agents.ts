@@ -23,7 +23,7 @@ import { agentGlyph, COLUMN_GAP, displayWidth, fitEnd, formatTokens, padEnd, sho
 import { agentKey, fitPieces, ON_SURFACE, type Piece, piecesWidth, redact, TONE_KEYS, wrapPieces } from "../../src/core/visual.ts";
 import type { Input } from "../dispatch.ts";
 import type { Host } from "../host.ts";
-import { frame, keyOf, show, stateOf } from "../mascot-player.ts";
+import { frame, keyOf, show, stateOf, still } from "../mascot-player.ts";
 import { blanks, keyButton, noticeRow, refocus, type TabView, type View } from "../pane.ts";
 import { Line, Pieces, Row, ScopedCard } from "../ui.ts";
 import * as page from "./agent-page.ts";
@@ -274,7 +274,7 @@ export const view: TabView = async (host, view) => {
   const isRelaxed = canRelax && running.length + finishedBlocks > 0;
   const blocked = new Set(recent.slice(0, finishedBlocks).map((lane) => lane.id));
   const blockLanes = isRelaxed ? [...running, ...recent.slice(0, finishedBlocks)] : [];
-  const look: LaneLook = { width: isRelaxed ? textWidth : view.width, g, ascii: view.isAscii, now: view.now, columns: laneColumns(lanes, view.width) };
+  const look: LaneLook = { width: isRelaxed ? textWidth : view.width, g, ascii: view.isAscii, now: view.now, isStill: still(), columns: laneColumns(lanes, view.width) };
   const word = Math.max(0, ...blockLanes.map((lane) => displayWidth(stateWord(lane))));
   // Rows left over once every block is drawn go to wrapping, when each block could gain one at least.
   const spare = view.rows - relaxedRows(finishedBlocks, Number.POSITIVE_INFINITY);

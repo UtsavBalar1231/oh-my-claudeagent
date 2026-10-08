@@ -59,12 +59,14 @@ export type Lane = {
 /** The model and effort columns' widths, the same on every lane; 0 leaves a column out. */
 export type LaneColumns = { model: number; effort: number };
 
-export type LaneLook = { width: number; g: Glyphs; ascii: boolean; now: number; columns: LaneColumns };
+export type LaneLook = { width: number; g: Glyphs; ascii: boolean; now: number; isStill: boolean; columns: LaneColumns };
 
 const shortModel = (model: string): string => model.replace(/^claude-/, "").replace(/-\d{8}$/, "");
 
 // Claude Code's own working marks, so a lane reads as busy the way the main thread does.
 const SPINNER = { unicode: ["·", "✢", "✳", "✶", "✻", "✽"], ascii: ["|", "/", "-", "\\"] } as const;
+// The mark Claude Code's own working row holds while the person prefers reduced motion.
+const STILL = { unicode: "✻", ascii: "*" } as const;
 // The task keeps this many cells, separator included, before the effort column gives way.
 const MIN_TASK = 20;
 // A task's separator: a space, the dot and a space.
@@ -75,8 +77,9 @@ const EFFORT_CELLS = 6;
 // The spinner, its space and the tool's name keep this many cells before the call count takes any.
 const TOOL_CELLS = 14;
 
-/** One frame per second of `now`, so a lane turns only while the pane's clock ticks. */
-export function spinner(now: number, ascii: boolean): string {
+/** One frame per second of `now`, so a lane turns only while the pane's clock ticks; one still mark under reduced motion. */
+export function spinner(now: number, ascii: boolean, isStill = false): string {
+  if (isStill) return ascii ? STILL.ascii : STILL.unicode;
   const frames = ascii ? SPINNER.ascii : SPINNER.unicode;
   return frames[Math.floor(now / 1000) % frames.length] ?? "";
 }
@@ -139,11 +142,11 @@ export const shellLanguage = (tool: string): string | undefined => (Object.hasOw
 export type ToolParts = { lead: Piece[]; detail: string; room: number; marks: Piece[] };
 
 export function toolParts(lane: Lane, look: LaneLook, home: string, indent = "  "): ToolParts {
-  const { width, ascii, now, g } = look;
+  const { width, ascii, now, isStill, g } = look;
   const count = lane.calls === 0 ? "" : callCount(lane.calls);
   const marks: Piece[] = count === "" || width < TOOL_CELLS + COLUMN_GAP + displayWidth(count) ? [] : [{ text: count, color: TONE_KEYS.muted }];
   const tail = marks.length === 0 ? 0 : COLUMN_GAP + piecesWidth(marks);
-  const lead: Piece[] = [{ text: indent }, { text: spinner(now, ascii), color: TONE_KEYS.active }, { text: " " }];
+  const lead: Piece[] = [{ text: indent }, { text: spinner(now, ascii, isStill), color: TONE_KEYS.active }, { text: " " }];
   if (lane.status !== "running") {
     const mark = statusMark(lane.status, g);
     lead.splice(1, 2, { text: mark.glyph, color: mark.color }, { text: " " });
