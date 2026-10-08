@@ -4,7 +4,8 @@ import { framesOf, rasterCells, svgOf } from "../../src/core/mascots.ts";
 import { type GlyphTier, glyphs } from "../../src/core/ui-kit.ts";
 import { chip, type Paint } from "../../src/core/visual.ts";
 import { Card, CodeBlock, Field, type Kit, kitOf, Row, Rule, rowsAtLeast, ScopedCard } from "../../hooks/ui.ts";
-import { PLUGIN } from "./world.ts";
+import { resetRegions, ScrollRegion, scrollKeyed, type Unit } from "../../hooks/regions.ts";
+import { childrenOf, isNode, PLUGIN } from "./world.ts";
 
 type ColorOf<C, Prop extends string> = C extends (props: infer P) => unknown ? (P extends { [K in Prop]?: infer V } ? V : never) : never;
 type HoverOf<C> = C extends (props: infer P) => unknown ? (P extends { hover?: infer H } ? NonNullable<H> : never) : never;
@@ -220,4 +221,35 @@ test("a Raster counts as its own rows", async ($, on) => {
   const drawn = gallery($, on);
   const tree = await drawn((kit) => kit.Box({ flexDirection: "row", children: [kit.mascot("executor", "idle", "m", 0) ?? kit.Text({ children: [""] }), kit.Text({ children: ["name"] })] }));
   expect(rowsAtLeast(tree)).toBe(8);
+});
+
+// Every `height` a drawing sets, and its text in drawing order.
+function heightsOf(node: unknown): number[] {
+  if (!isNode(node)) return [];
+  const height = node.props?.["height"];
+  return [...(typeof height === "number" ? [height] : []), ...childrenOf(node).flatMap(heightsOf)];
+}
+function textIn(node: unknown): string[] {
+  if (typeof node === "string") return [node];
+  return isNode(node) ? childrenOf(node).flatMap(textIn) : [];
+}
+
+test("a region too short for its cues draws no cue and no height below one row, and still scrolls by key", async ($, on) => {
+  const drawn = gallery($, on);
+  const units = (kit: Kit): Unit[] => Array.from({ length: 10 }, (_, n) => ({ element: kit.Text({ children: [`line ${n + 1}`] }), rows: 1 }));
+  const region = (height: number) => (kit: Kit) => {
+    resetRegions();
+    return ScrollRegion({ kit, g: glyphs("unicode"), key: "r", left: 0, top: 0, width: 30, height, units: units(kit) });
+  };
+  for (const height of [0, 1, 2]) {
+    const tree = await drawn(region(height));
+    expect(heightsOf(tree).every((value) => value >= 1)).toBe(true);
+    expect(textIn(tree).some((text) => text.includes("more"))).toBe(false);
+  }
+  expect(scrollKeyed(1, "row")).toBe(true);
+  expect(textIn(await drawn(region(2)))).toEqual(["line 2", "line 3"]);
+  const cued = await drawn(region(3));
+  expect(textIn(cued).map((text) => text.trim())).toEqual(["↑ 1 more", "line 2", "line 3", "↓ more · wheel to scroll"]);
+  expect(scrollKeyed(1, "end")).toBe(true);
+  expect(textIn(await drawn(region(3))).map((text) => text.trim())).toEqual(["↑ 8 more", "line 9", "line 10"]);
 });

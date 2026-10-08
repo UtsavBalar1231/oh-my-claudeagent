@@ -1,9 +1,10 @@
 import type { RenderElement } from "claude-code";
-import { displayWidth, fitEnd, formatWhen } from "../../src/core/ui-kit.ts";
-import { chip, type Piece, redact, TONE_KEYS } from "../../src/core/visual.ts";
+import { displayWidth, fitEnd, formatWhen, wrapText } from "../../src/core/ui-kit.ts";
+import { chip, type Piece, piecesWidth, redact, TONE_KEYS } from "../../src/core/visual.ts";
+import type { Input } from "../dispatch.ts";
 import { type Rating, rate, shown, type Verdict } from "../feedback.ts";
 import type { Host } from "../host.ts";
-import { keyButton, noticeRow, type TabView, type View } from "../pane.ts";
+import { blanks, keyButton, noticeRow, type TabView, type View } from "../pane.ts";
 import { Card, Row } from "../ui.ts";
 
 const BUTTON_GAP = 2;
@@ -13,7 +14,21 @@ const CHIP = 9;
 const CARD_FRAME = 4;
 // The card's top border, title and bottom border.
 const CARD_ROWS = 3;
+// The most rows one note takes while every rating fits.
+const NOTE_ROWS = 3;
 const WORDS = { loading: "", empty: "No feedback has been recorded in this session." };
+
+// The newest rating in view, and the latest drawing's last such rating while some are hidden; none otherwise.
+let first = 0;
+let laid: { max: number } | undefined;
+
+/** A wheel tick moves the newest rating in view; false while every rating shows. */
+export function scroll(host: Host, e: Input<"ui.scroll">): boolean {
+  if (laid === undefined) return false;
+  first = Math.min(laid.max, Math.max(0, first + e.by));
+  host.ui.invalidate();
+  return true;
+}
 
 function actions(host: Host, view: View, hasTurn: boolean): RenderElement {
   const press = (verdict: Verdict) => async () => {
@@ -31,47 +46,78 @@ function actions(host: Host, view: View, hasTurn: boolean): RenderElement {
   });
 }
 
-function row(view: View, rating: Rating, index: number, inner: number): RenderElement {
+function lead(view: View, rating: Rating): Piece[] {
   const isUp = rating.rating === "up";
   const badge = chip(`${isUp ? view.g.up : view.g.down} ${isUp ? "UP" : "DOWN"}`, isUp ? "ok" : "fail", view.isAscii);
-  const when = `${formatWhen(rating.at)}${GAP}`;
-  const room = inner - CHIP - displayWidth(when);
-  const note = fitEnd(redact(rating.note ?? "", view.home, view.g.mask).text, room, view.g.ellipsis);
-  const pieces: Piece[] = [
-    badge,
-    { text: " ".repeat(CHIP - displayWidth(badge.text)) },
-    { text: when, color: TONE_KEYS.muted },
-    ...(note === "" ? [] : [{ text: note }]),
-  ];
-  return Row(view.kit, { key: `rating-${index}`, pieces });
+  return [badge, { text: " ".repeat(CHIP - displayWidth(badge.text)) }, { text: `${formatWhen(rating.at)}${GAP}`, color: TONE_KEYS.muted }];
+}
+
+// The note in at most `maxRows` rows of `room` cells, the last ending in an ellipsis when it was cut.
+function noteLines(view: View, rating: Rating, room: number, maxRows: number): string[] {
+  const text = redact(rating.note ?? "", view.home, view.g.mask).text;
+  if (displayWidth(text) <= room) return [text];
+  const lines = wrapText(text, room);
+  if (lines.length <= maxRows) return lines;
+  return [...lines.slice(0, maxRows - 1), fitEnd(lines.slice(maxRows - 1).join(" "), room, view.g.ellipsis)];
+}
+
+type Item = { index: number; lead: Piece[]; note: string[] };
+
+function rows(view: View, { index, lead, note }: Item): RenderElement[] {
+  const indent = { text: " ".repeat(piecesWidth(lead)) };
+  return note.map((text, line) =>
+    Row(view.kit, {
+      key: line === 0 ? `rating-${index}` : `rating-${index}-${line}`,
+      pieces: [...(line === 0 ? lead : [indent]), ...(text === "" ? [] : [{ text }])],
+    }),
+  );
 }
 
 export const view: TabView = async (host, view) => {
   const { ratings, error, hasTurn } = shown();
   const head = [actions(host, view, hasTurn)];
+  laid = undefined;
   if (error !== null) return [...head, noticeRow(view, { kind: "error", reason: error }, WORDS)];
   if (ratings.length === 0) return [...head, noticeRow(view, { kind: "empty" }, WORDS)];
   const ups = ratings.filter((rating) => rating.rating === "up").length;
   const downs = ratings.length - ups;
   const inner = view.width - CARD_FRAME;
   const title = `${ratings.length} ${ratings.length === 1 ? "rating" : "ratings"}, newest first ${view.g.dot} ${view.g.up} ${ups} up ${view.g.dot} ${view.g.down} ${downs} down`;
-  const room = Math.max(1, view.rows - head.length - CARD_ROWS);
+  const budget = view.rows - head.length - CARD_ROWS;
   const newest = [...ratings].reverse();
-  const listed = newest.length > room ? newest.slice(0, Math.max(1, room - 1)) : newest;
-  return [
-    ...head,
+  const itemsAt = (maxRows: number): Item[] =>
+    newest.map((rating, index) => {
+      const marks = lead(view, rating);
+      return { index, lead: marks, note: noteLines(view, rating, inner - piecesWidth(marks), maxRows) };
+    });
+  const wrapped = itemsAt(NOTE_ROWS);
+  const items = wrapped.reduce((sum, item) => sum + item.note.length, 0) <= budget ? wrapped : itemsAt(1);
+  const card = (children: readonly RenderElement[]) =>
     Card(view.kit, {
       key: "ratings",
       title: fitEnd(title, inner, view.g.ellipsis),
       tone: downs > 0 ? "warn" : "ok",
       isAscii: view.isAscii,
       width: view.width,
-      children: [
-        ...listed.map((rating, index) => row(view, rating, index, inner)),
-        ...(listed.length < newest.length
-          ? [view.kit.Text({ dimColor: true, children: [`${view.g.down} ${newest.length - listed.length} more`] })]
-          : []),
-      ],
-    }),
+      children,
+    });
+  const isCut = items.length > budget;
+  if (isCut && budget < 2) return [...head, card([])];
+  const max = isCut ? items.length - budget + 1 : 0;
+  first = Math.min(first, max);
+  const top = first > 0 ? 1 : 0;
+  const space = budget - top;
+  const end = items.length - first <= space ? items.length : first + Math.max(1, space - 1);
+  const bottom = end < items.length && space > 1 ? 1 : 0;
+  laid = isCut ? { max } : undefined;
+  const cue = (text: string) => view.kit.Text({ dimColor: true, children: [text] });
+  return [
+    ...head,
+    card([
+      ...(top === 1 ? [cue(`${view.g.up} ${first} more`)] : []),
+      ...items.slice(first, end).flatMap((item) => rows(view, item)),
+      ...(bottom === 1 ? [cue(`${view.g.down} ${items.length - end} more`)] : []),
+    ]),
+    ...(isCut ? blanks(view, 1) : []),
   ];
 };

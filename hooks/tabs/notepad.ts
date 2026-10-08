@@ -2,11 +2,12 @@ import type { RenderElement } from "claude-code";
 import { isPlanName, matches, NOTEPAD_SECTIONS, type NotepadSection, parseEntries } from "../../src/core/notepad.ts";
 import { BOULDER } from "../../src/core/omca-paths.ts";
 import { clean } from "../../src/core/checkboxes.ts";
-import { chunks } from "../../src/core/plan-reader.ts";
 import { displayWidth, fitEnd, formatWhen } from "../../src/core/ui-kit.ts";
-import { chip, fitPieces, type Piece, redact, type Tone, TONE_KEYS } from "../../src/core/visual.ts";
+import { chip, fitPieces, type Piece, piecesWidth, redact, type Tone, TONE_KEYS } from "../../src/core/visual.ts";
+import type { Input } from "../dispatch.ts";
 import { boundPlanOf, type Host, reason, type State } from "../host.ts";
 import { keyButton, noticeRow, patchPane, refocus, type TabView, type View } from "../pane.ts";
+import { aimKeys, markdownUnits, resetOffset, ScrollRegion, type Unit } from "../regions.ts";
 import { Card, Field, Line, Rule } from "../ui.ts";
 
 type Notepad = NonNullable<State["pane"]["notepad"]>;
@@ -18,11 +19,19 @@ const KEY_GAP = 2;
 const COLUMN_GAP = 1;
 // A card's round border and its one-cell padding on each side.
 const CARD_FRAME = 4;
+// A card's two border rows and its title row.
+const CARD_ROWS = 3;
+// Border plus padding across, border plus title down: where a card's content starts.
+const CARD_INSET = 2;
+// A frameless card keeps its title as a heading line above its content.
+const HEADING_ROWS = 1;
+// Under this many body rows the cards lose their frames.
+const FRAMED_FROM = 8;
+// The rows of content a card needs before it draws scroll cues.
+const MIN_CONTENT = 3;
+const cardKey = (name: NotepadSection) => `notepad-card-${name}`;
+const titleKey = (name: NotepadSection) => `notepad-title-${name}`;
 const TONES: Readonly<Record<NotepadSection, Tone>> = { learnings: "info", issues: "warn", decisions: "active", problems: "fail" };
-const SPLIT_COLUMNS: readonly (readonly NotepadSection[])[] = [
-  ["learnings", "decisions"],
-  ["issues", "problems"],
-];
 
 let signature: string | undefined;
 let chosen: string | undefined;
@@ -30,7 +39,12 @@ let query = "";
 let isSearching = false;
 let isPicking = false;
 
+const resetCards = (): void => {
+  for (const name of NOTEPAD_SECTIONS) resetOffset(cardKey(name));
+};
+
 export const reset = (): void => {
+  resetCards();
   signature = undefined;
   chosen = undefined;
   query = "";
@@ -107,6 +121,7 @@ export async function read(
 
 async function choose(host: Host, name: string): Promise<void> {
   chosen = name;
+  resetCards();
   isPicking = false;
   signature = undefined;
   const pad = await read(host, await host.session.root());
@@ -134,46 +149,57 @@ function shownSections(notepad: Notepad, view: View): { sections: Shown[]; maske
   return { sections, masked };
 }
 
-function sectionCard(view: View, section: Shown, width: number): RenderElement {
-  const { Markdown, Text } = view.kit;
-  const inner = Math.max(1, width - CARD_FRAME);
+function sectionCard(view: View, section: Shown, width: number, region: RenderElement, isFramed: boolean): RenderElement {
+  const inner = Math.max(1, isFramed ? width - CARD_FRAME : width);
   const count = query.trim() === "" ? plural(section.total, "entry", "entries") : `${section.entries.length} of ${section.total}`;
-  const body =
-    section.entries.length === 0
-      ? [Text({ dimColor: true, children: [fitEnd("Nothing recorded yet", inner, view.g.ellipsis)] })]
-      : section.entries.flatMap((entry, index) => [
-          Rule(view.kit, inner, view.g, view.isAscii, entry.at === null ? "undated" : formatWhen(entry.at)),
-          ...chunks(entry.text).map((text, part) => Markdown({ key: `note-${section.name}-${index}-${part}`, text })),
-        ]);
-  return Card(view.kit, {
-    key: `section-${section.name}`,
-    title: fitEnd(`${heading(section.name)} ${view.g.dot} ${count}`, inner, view.g.ellipsis),
-    tone: TONES[section.name],
-    isAscii: view.isAscii,
-    width,
-    children: body,
+  const title = view.kit.Button({
+    key: titleKey(section.name),
+    label: fitEnd(`${heading(section.name)} ${view.g.dot} ${count}`, inner, view.g.ellipsis),
+    plain: true,
+    ...(isFramed ? {} : { dimColor: true }),
+    onPress: view.press(() => undefined),
   });
+  if (!isFramed) return view.kit.Box({ key: `section-${section.name}`, flexDirection: "column", width, children: [title, region] });
+  return Card(view.kit, { key: `section-${section.name}`, title, tone: TONES[section.name], isAscii: view.isAscii, width, children: [region] });
 }
 
-function header(notepad: Notepad, view: View, entries: number, found: number, masked: number): RenderElement {
-  const count = query.trim() === "" ? plural(entries, "entry", "entries") : `${found} of ${plural(entries, "entry", "entries")} match`;
-  const pieces: Piece[] = [
+function sectionUnits(view: View, section: Shown, inner: number): Unit[] {
+  if (section.entries.length === 0) {
+    return [{ element: view.kit.Text({ dimColor: true, children: [fitEnd("Nothing recorded yet", inner, view.g.ellipsis)] }), rows: 1 }];
+  }
+  return section.entries.flatMap((entry, index) => [
+    { element: Rule(view.kit, inner, view.g, view.isAscii, entry.at === null ? "undated" : formatWhen(entry.at)), rows: 1 },
+    ...markdownUnits(view.kit, entry.text, inner, `note-${section.name}-${index}`),
+  ]);
+}
+
+// Whole pieces go as the room shrinks: the masked count, then "entries" before "match".
+function headerPieces(notepad: Notepad, view: View, entries: number, found: number, masked: number): Piece[] {
+  const total = plural(entries, "entry", "entries");
+  const isFinding = query.trim() !== "";
+  const pieces = (count: string, isMaskedShown: boolean): Piece[] => [
     { text: notepad.planName, color: TONE_KEYS.plan, bold: true },
     { text: " " },
     notepad.bound === notepad.planName ? chip("BOUND", "plan", view.isAscii) : { text: "not bound", color: TONE_KEYS.muted },
     { text: ` ${view.g.dot} ${count}`, color: TONE_KEYS.muted },
-    ...(masked > 0 ? [{ text: ` ${view.g.dot} ${masked} masked`, color: TONE_KEYS.warn }] : []),
+    ...(isMaskedShown && masked > 0 ? [{ text: ` ${view.g.dot} ${masked} masked`, color: TONE_KEYS.warn }] : []),
   ];
-  return Line(view.kit, fitPieces(pieces, view.width, view.g.ellipsis));
+  const long = isFinding ? `${found} of ${total} match` : total;
+  const shortest = pieces(isFinding ? `${found} of ${entries} match` : total, false);
+  const fitting = [pieces(long, true), pieces(long, false), shortest].find((one) => piecesWidth(one) <= view.width);
+  return fitting ?? fitPieces(shortest, view.width, view.g.ellipsis);
 }
 
-function keys(host: Host, notepad: Notepad, view: View, canFind: boolean): RenderElement {
+type Key = readonly [hotkey: string, label: string, work: () => void];
+
+function keys(host: Host, notepad: Notepad, view: View, canFind: boolean, isFinding: boolean): { element: RenderElement; width: number } {
   const find = () => {
     isSearching = true;
     host.ui.invalidate();
     refocus(host, FIND, "notepad");
   };
   const clear = () => {
+    resetCards();
     query = "";
     isSearching = false;
     host.ui.invalidate();
@@ -183,16 +209,26 @@ function keys(host: Host, notepad: Notepad, view: View, canFind: boolean): Rende
     host.ui.invalidate();
     refocus(host, `${PICK}${notepad.planName}`, "notepad");
   };
-  const buttons = [
-    ...(canFind ? [keyButton(view, "f", "Find", find)] : []),
-    ...(query === "" ? [] : [keyButton(view, "w", "Clear", clear)]),
-    ...(notepad.plans.length > 1 ? [keyButton(view, "l", `Plans (${notepad.plans.length})`, pick)] : []),
+  // Clear shows with the field, not with a query, so typing never shifts the ring, which the engine holds by position.
+  const buttons: Key[] = [
+    ...(canFind ? [["f", "Find", find] as const] : []),
+    ...(isFinding ? [["w", "Clear", clear] as const] : []),
+    ...(notepad.plans.length > 1 ? [["l", `Plans (${notepad.plans.length})`, pick] as const] : []),
   ];
-  return view.kit.Box({ key: "notepad-keys", flexDirection: "row", columnGap: KEY_GAP, children: buttons });
+  return {
+    width: buttons.reduce((sum, [hotkey, label]) => sum + displayWidth(`${hotkey}: ${label}`), 0) + KEY_GAP * Math.max(0, buttons.length - 1),
+    element: view.kit.Box({
+      key: "notepad-keys",
+      flexDirection: "row",
+      columnGap: KEY_GAP,
+      children: buttons.map(([hotkey, label, work]) => keyButton(view, hotkey, label, work)),
+    }),
+  };
 }
 
 function field(host: Host, view: View): RenderElement {
   const search = (value: string) => {
+    resetCards();
     query = value;
     host.ui.invalidate();
   };
@@ -204,10 +240,14 @@ function field(host: Host, view: View): RenderElement {
     onInput: search,
     onSubmit: (value) => {
       search(value);
-      isSearching = value !== "";
+      isSearching = false;
     },
   });
 }
+
+// The engine empties a submitted field, so a query that outlives its Enter shows as a line.
+const held = (view: View): RenderElement =>
+  view.kit.Text({ wrap: "truncate-end", children: [fitEnd(`Find: ${query}`, view.width, view.g.ellipsis)] });
 
 function picker(host: Host, notepad: Notepad, view: View): RenderElement[] {
   const { Box, Button, Text } = view.kit;
@@ -241,35 +281,136 @@ function picker(host: Host, notepad: Notepad, view: View): RenderElement[] {
   ];
 }
 
-// While a search runs, a section with no match is left out rather than drawn empty.
-function cards(view: View, all: readonly Shown[]): RenderElement[] {
-  const sections = query.trim() === "" ? all : all.filter((section) => section.entries.length > 0);
-  if (sections.length === 0) {
-    return [view.kit.Text({ dimColor: true, children: [fitEnd(`No entry matches "${query.trim()}"`, view.width, view.g.ellipsis)] })];
+type Slot = { section: Shown; units: Unit[]; need: number };
+
+const unitRows = (units: readonly Unit[]) => units.reduce((sum, unit) => sum + unit.rows, 0);
+const chromeOf = (isFramed: boolean) => (isFramed ? CARD_ROWS : HEADING_ROWS);
+
+function slotsAt(view: View, sections: readonly Shown[], width: number, isFramed: boolean): Slot[] {
+  const inner = Math.max(1, isFramed ? width - CARD_FRAME : width);
+  return sections.map((section) => {
+    const units = sectionUnits(view, section, inner);
+    return { section, units, need: chromeOf(isFramed) + unitRows(units) };
+  });
+}
+
+// The tallest card first, each next onto the shorter column: the tallest sits alone while the rest balance.
+function divide(slots: readonly Slot[]): [Slot[], Slot[]] {
+  const columns: [Slot[], Slot[]] = [[], []];
+  const heights: [number, number] = [0, 0];
+  for (const slot of slots.toSorted((a, b) => b.need - a.need)) {
+    const at = heights[1] < heights[0] ? 1 : 0;
+    columns[at].push(slot);
+    heights[at] += slot.need;
   }
-  if (view.tier !== "split") return sections.map((section) => sectionCard(view, section, view.width));
-  const width = Math.floor((view.width - COLUMN_GAP) / 2);
+  const byOrder = (a: Slot, b: Slot) => NOTEPAD_SECTIONS.indexOf(a.section.name) - NOTEPAD_SECTIONS.indexOf(b.section.name);
+  return [columns[0].toSorted(byOrder), columns[1].toSorted(byOrder)];
+}
+
+// Cards that fit keep their height and the rest share what remains evenly, the first taking an odd
+// row; a card gets `least` rows even when that runs the stack past the room.
+function shareRows(needs: readonly number[], available: number, least: number): number[] {
+  const heights = needs.map(() => 0);
+  let left = available;
+  const order = needs.map((_, at) => at).sort((a, b) => (needs[a] ?? 0) - (needs[b] ?? 0));
+  order.forEach((at, done) => {
+    const need = needs[at] ?? 0;
+    const height = Math.max(Math.min(need, Math.ceil(left / (order.length - done))), Math.min(need, least));
+    heights[at] = height;
+    left -= height;
+  });
+  return heights;
+}
+
+type Column = { slots: Slot[]; heights: number[] };
+type Arranged = { columns: Column[]; width: number; isFramed: boolean };
+
+const isCut = ({ columns }: Arranged) => columns.some(({ slots, heights }) => slots.some(({ need }, index) => (heights[index] ?? 0) < need));
+
+// Two columns only where each can give every card its least rows; otherwise the cards stack.
+function arrange(view: View, sections: readonly Shown[], available: number): Arranged {
+  const isFramed = view.rows >= FRAMED_FROM;
+  const chrome = chromeOf(isFramed);
+  const sized = (slots: Slot[]): Column => ({
+    slots,
+    heights: shareRows(
+      slots.map(({ need }) => need),
+      available,
+      chrome + MIN_CONTENT,
+    ),
+  });
+  if (view.tier === "split" && sections.length > 1) {
+    const width = Math.floor((view.width - COLUMN_GAP) / 2);
+    const halves = divide(slotsAt(view, sections, width, isFramed));
+    if (halves.every((slots) => slots.length * (chrome + MIN_CONTENT) <= available)) return { columns: halves.map(sized), width, isFramed };
+  }
+  return { columns: [sized(slotsAt(view, sections, view.width, isFramed))], width: view.width, isFramed };
+}
+
+function stack(view: View, { slots, heights }: Column, { width, isFramed }: Arranged, left: number, top: number): RenderElement[] {
+  const chrome = chromeOf(isFramed);
+  let at = top;
+  return slots.map(({ section, units }, index) => {
+    const height = heights[index] ?? chrome + 1;
+    const region = ScrollRegion({
+      kit: view.kit,
+      g: view.g,
+      key: cardKey(section.name),
+      left: left + (isFramed ? CARD_INSET : 0),
+      top: at + (isFramed ? CARD_INSET : HEADING_ROWS),
+      width: Math.max(1, isFramed ? width - CARD_FRAME : width),
+      height: height - chrome,
+      units,
+    });
+    at += height;
+    return sectionCard(view, section, width, region, isFramed);
+  });
+}
+
+// Only the arrangement drawn lays out its regions, since each one a drawing lays out takes the wheel.
+function draw(view: View, arranged: Arranged, above: number): RenderElement[] {
+  const { columns, width } = arranged;
+  const drawn = columns.map((column, index) => stack(view, column, arranged, index * (width + COLUMN_GAP), above));
+  const [only] = drawn;
+  if (drawn.length === 1 && only !== undefined) return only;
   return [
     view.kit.Box({
       key: "notepad-columns",
       flexDirection: "row",
       columnGap: COLUMN_GAP,
-      children: SPLIT_COLUMNS.map((names, index) =>
-        view.kit.Box({
-          key: `notepad-column-${index}`,
-          flexDirection: "column",
-          width,
-          children: names.flatMap((name) => {
-            const section = sections.find((shown) => shown.name === name);
-            return section === undefined ? [] : [sectionCard(view, section, width)];
-          }),
-        }),
-      ),
+      children: drawn.map((cards, index) => view.kit.Box({ key: `notepad-column-${index}`, flexDirection: "column", width, children: cards })),
     }),
   ];
 }
 
+// While a search runs, a section with no match is left out. Otherwise sections with no entry are drawn
+// only where every card fits, else folded into one line.
+function cards(view: View, all: readonly Shown[], above: number): RenderElement[] {
+  const sections = query.trim() === "" ? all : all.filter((section) => section.entries.length > 0);
+  if (sections.length === 0) {
+    return [view.kit.Text({ dimColor: true, children: [fitEnd(`No entry matches "${query.trim()}"`, view.width, view.g.ellipsis)] })];
+  }
+  const available = view.rows - above;
+  const whole = arrange(view, sections, available);
+  const empties = sections.filter((section) => section.entries.length === 0);
+  if (empties.length === 0 || !isCut(whole)) return draw(view, whole, above);
+  const names = empties.map((section) => heading(section.name)).join(", ");
+  const filled = arrange(
+    view,
+    sections.filter((section) => section.entries.length > 0),
+    available - 1,
+  );
+  return [...draw(view, filled, above), view.kit.Text({ dimColor: true, children: [fitEnd(`Nothing yet in ${names}`, view.width, view.g.ellipsis)] })];
+}
+
+/** Aims the scroll keys at the card whose title takes the ring, and at none elsewhere. */
+export function focus(e: Input<"ui.focus">): void {
+  const name = NOTEPAD_SECTIONS.find((section) => titleKey(section) === e.element);
+  aimKeys(name === undefined ? undefined : cardKey(name));
+}
+
 export const view: TabView = async (host, view) => {
+  const { Box } = view.kit;
   const pane = (await host.state.pane.get()).value;
   const words = { loading: "Reading the notepad", empty: "No plan has a notepad yet; a plan's agents add one with notepad_write." };
   if (pane === undefined) return [noticeRow(view, { kind: "loading" }, words)];
@@ -280,17 +421,20 @@ export const view: TabView = async (host, view) => {
   const { sections, masked } = shownSections(notepad, view);
   const entries = sections.reduce((sum, section) => sum + section.total, 0);
   const found = sections.reduce((sum, section) => sum + section.entries.length, 0);
+  const head = headerPieces(notepad, view, entries, found, masked);
   if (entries === 0) {
     return [
-      header(notepad, view, entries, found, masked),
+      Line(view.kit, head),
       noticeRow(view, { kind: "empty" }, { ...words, empty: `The notepad for ${notepad.planName} is empty.` }),
-      ...(notepad.plans.length > 1 ? [keys(host, notepad, view, false)] : []),
+      ...(notepad.plans.length > 1 ? [keys(host, notepad, view, false, false).element] : []),
     ];
   }
-  return [
-    header(notepad, view, entries, found, masked),
-    keys(host, notepad, view, true),
-    ...(isSearching || query !== "" ? [field(host, view)] : []),
-    ...cards(view, sections),
-  ];
+  const isFinding = isSearching || query !== "";
+  const row = keys(host, notepad, view, true, isFinding);
+  const isMerged = view.rows < FRAMED_FROM && piecesWidth(head) + KEY_GAP + row.width <= view.width;
+  const top = isMerged
+    ? [Box({ key: "notepad-head", flexDirection: "row", columnGap: KEY_GAP, children: [Line(view.kit, head), row.element] })]
+    : [Line(view.kit, head), row.element];
+  const finder = isSearching ? [field(host, view)] : query === "" ? [] : [held(view)];
+  return [...top, ...finder, ...cards(view, sections, top.length + finder.length)];
 };

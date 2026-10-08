@@ -2,7 +2,7 @@ import { contentLines, inlineMarkdown } from "./markdown.ts";
 import { formatUsd } from "./pricing.ts";
 import { inputText } from "./tool-input.ts";
 import { agentGlyph, COLUMN_GAP, displayWidth, fitEnd, formatDuration, formatTokens, type Glyphs, oneLine, padEnd, padStart, shortType } from "./ui-kit.ts";
-import { agentKey, fitPieces, levelMark, mergePieces, ON_SURFACE, type Piece, piecesWidth, redact, type ThemeKey, TONE_KEYS } from "./visual.ts";
+import { agentKey, fitPieces, levelMark, mergePieces, ON_SURFACE, type Piece, piecesWidth, redact, type ThemeKey, TONE_KEYS, wrapPieces } from "./visual.ts";
 
 /** `mcp__server__tool` as its tool's own name; every other tool as named. */
 export const toolLabel = (name: string): string => (name.startsWith("mcp__") ? name.slice(name.lastIndexOf("__") + 2) : name);
@@ -65,8 +65,10 @@ const shortModel = (model: string): string => model.replace(/^claude-/, "").repl
 
 // Claude Code's own working marks, so a lane reads as busy the way the main thread does.
 const SPINNER = { unicode: ["·", "✢", "✳", "✶", "✻", "✽"], ascii: ["|", "/", "-", "\\"] } as const;
-// The task keeps this many cells, separator included, before the model column gives way.
+// The task keeps this many cells, separator included, before the effort column gives way.
 const MIN_TASK = 20;
+// A task's separator: a space, the dot and a space.
+const TASK_LEAD = 3;
 const ELAPSED = 6;
 const MODEL_CELLS = 12;
 const EFFORT_CELLS = 6;
@@ -83,18 +85,19 @@ const effortText = (lane: Lane): string => (lane.effort === null ? "" : String(l
 
 /**
  * The model and effort columns every running lane draws at one width, so they line up: the model
- * goes first and the effort next while the longest name and the shortest task do not fit.
+ * goes as soon as the longest task would be cut beside it, the effort once the shortest task would.
  */
 export function laneColumns(lanes: readonly Lane[], width: number): LaneColumns {
   const running = lanes.filter((lane) => lane.endedAt === null);
   const identity = Math.max(0, ...running.map((lane) => 2 + displayWidth(shortType(lane.type))));
   const model = Math.min(MODEL_CELLS, Math.max(0, ...running.map((lane) => displayWidth(shortModel(lane.model)))));
   const effort = Math.min(EFFORT_CELLS, Math.max(0, ...running.map((lane) => displayWidth(effortText(lane)))));
-  const fixed = identity + MIN_TASK + COLUMN_GAP + ELAPSED;
+  const task = Math.max(MIN_TASK, ...running.map((lane) => (lane.description === "" ? 0 : TASK_LEAD + displayWidth(oneLine(lane.description)))));
+  const fixed = identity + COLUMN_GAP + ELAPSED;
   const effortCells = effort === 0 ? 0 : COLUMN_GAP + effort;
   const modelCells = model === 0 ? 0 : COLUMN_GAP + model;
-  if (fixed + effortCells + modelCells <= width) return { model, effort };
-  if (fixed + effortCells <= width) return { model: 0, effort };
+  if (fixed + task + effortCells + modelCells <= width) return { model, effort };
+  if (fixed + MIN_TASK + effortCells <= width) return { model: 0, effort };
   return { model: 0, effort: 0 };
 }
 
@@ -172,36 +175,59 @@ export function laneRows(lane: Lane, look: LaneLook, home: string): Piece[][] {
   return [headRow(lane, look), toolRow(lane, look, home)];
 }
 
+/** Whether the agent has reported any tokens yet. */
+export const hasUsage = (lane: Lane): boolean => lane.inputTokens + lane.outputTokens > 0;
+
+/** The word for an agent's state: `running`, or how it ended. */
+export const stateWord = (lane: Lane): string => (lane.status === "running" ? "running" : (STATUS_WORDS[lane.status] ?? lane.status));
+
+/**
+ * `pieces` as at most `most` lines of `width` cells, the last ending in the ellipsis when more
+ * followed; one line is cut where it stands. Never empty: a blank text is a row of one space.
+ */
+export function fitLines(pieces: readonly Piece[], width: number, most: number, ellipsis: string): Piece[][] {
+  if (most <= 1) return [orSpace(fitPieces(pieces, width, ellipsis))];
+  const wrapped = wrapPieces(pieces, width);
+  const lines = wrapped.slice(0, most).map((line, index) => (index === most - 1 && wrapped.length > most ? fitPieces([...line, { text: ellipsis }], width, ellipsis) : line));
+  return lines.length === 0 ? [[{ text: " " }]] : lines;
+}
+
+/** How far a block spreads: the cells its state word takes, and the most lines its task and its result may wrap to. */
+export type BlockShape = { word: number; task: number; result: number };
+
+export type Block = { head: Piece[]; task: Piece[][]; body: Piece[][]; usage: Piece[] };
+
 /**
  * An agent's block beside its mini mascot: its name with its state and time, its task, its current
  * tool or, once it ended, what it said, then its model, effort, tokens and cost. Each row is
- * `look.width` cells at most, and none is empty, so the block keeps its four rows.
+ * `look.width` cells at most and none is empty.
  */
-export function laneBlock(lane: Lane, look: LaneLook, home: string): Piece[][] {
+export function laneBlock(lane: Lane, look: LaneLook, home: string, { word = 0, task = 1, result = 1 }: Partial<BlockShape> = {}): Block {
   const { g, now, width } = look;
   const mark = statusMark(lane.status, g);
   const elapsed: Piece = { text: padStart(formatDuration((lane.endedAt ?? now) - lane.startedAt), ELAPSED), color: TONE_KEYS.muted };
-  const word: Piece = { text: lane.status === "running" ? "running" : (STATUS_WORDS[lane.status] ?? lane.status), color: TONE_KEYS.muted };
-  const full: Piece[] = [{ text: `${mark.glyph} `, color: mark.color }, word, gap(), elapsed];
+  const full: Piece[] = [{ text: `${mark.glyph} `, color: mark.color }, { text: padEnd(stateWord(lane), word), color: TONE_KEYS.muted }, gap(), elapsed];
   // A name that would be cut gives up the state's word first: the glyph's shape still tells the state.
   const state = displayWidth(shortType(lane.type)) + COLUMN_GAP + piecesWidth(full) <= width ? full : [{ text: mark.glyph, color: mark.color }, gap(), elapsed];
   const name = fitEnd(shortType(lane.type), Math.max(0, width - piecesWidth(state) - COLUMN_GAP), g.ellipsis);
   const head: Piece[] = [{ text: name, color: ON_SURFACE, bold: true }, { text: " ".repeat(Math.max(COLUMN_GAP, width - displayWidth(name) - piecesWidth(state))) }, ...state];
-  const tokens = formatTokens(lane.inputTokens + lane.outputTokens);
-  const cost = lane.costUsd === null ? "" : `~${formatUsd(lane.costUsd)}`;
+  const used = hasUsage(lane);
+  const tokens = used ? formatTokens(lane.inputTokens + lane.outputTokens) : "";
+  const cost = used && lane.costUsd !== null ? `~${formatUsd(lane.costUsd)}` : "";
   // Too narrow for every fact, the row drops whole parts rather than cutting the cost short.
   const usage = [
-    [shortModel(lane.model), effortText(lane), `${tokens} tokens`, cost],
+    [shortModel(lane.model), effortText(lane), used ? `${tokens} tokens` : "", cost],
     [shortModel(lane.model), effortText(lane), tokens, cost],
     [effortText(lane), tokens, cost],
     [tokens, cost],
   ].map((parts) => parts.filter((part) => part !== "").join(` ${g.dot} `));
-  return [
+  const facts = fitEnd(usage.find((text) => displayWidth(text) <= width) ?? usage.at(-1) ?? "", width, g.ellipsis);
+  return {
     head,
-    orSpace(fitPieces(inlineMarkdown(oneLine(lane.description)), width, g.ellipsis)),
-    lane.endedAt === null ? toolRow(lane, look, home, "") : orSpace(fitPieces(outcome(lane, g, home), width, g.ellipsis)),
-    [{ text: fitEnd(usage.find((text) => displayWidth(text) <= width) ?? usage.at(-1) ?? "", width, g.ellipsis), color: TONE_KEYS.muted }],
-  ];
+    task: fitLines(inlineMarkdown(oneLine(lane.description)), width, task, g.ellipsis),
+    body: lane.endedAt === null ? [toolRow(lane, look, home, "")] : fitLines(outcome(lane, g, home), width, result, g.ellipsis),
+    usage: [{ text: facts === "" ? " " : facts, color: TONE_KEYS.muted }],
+  };
 }
 
 export const STATUS_WORDS: Readonly<Partial<Record<Status, string>>> = {
@@ -245,14 +271,16 @@ function outcome(lane: Lane, g: Glyphs, home: string): Piece[] {
   return lane.status === "answer" ? said : [{ text: `${word} ${g.dot} `, color: TONE_KEYS.muted }, ...said];
 }
 
-/** A finished agent in one dim line: status glyph, type, its result, and how long it ran. */
+/** A finished agent in one dim line: status glyph, type, its task, its result in the cells the task leaves, and how long it ran. */
 export function finishedRow(lane: Lane, look: LaneLook, home: string): Piece[] {
   const { g, width } = look;
   const mark = statusMark(lane.status, g);
   const duration = padStart(formatDuration((lane.endedAt ?? look.now) - lane.startedAt), ELAPSED);
   const head = `${mark.glyph} ${shortType(lane.type)}`;
   const room = Math.max(0, width - displayWidth(head) - COLUMN_GAP - ELAPSED);
-  const body = fitPieces([{ text: ` ${g.dot} `, color: TONE_KEYS.muted }, ...outcome(lane, g, home)], room, g.ellipsis);
+  const dot: Piece = { text: ` ${g.dot} `, color: TONE_KEYS.muted };
+  const task = lane.description === "" ? [] : [dot, ...inlineMarkdown(oneLine(lane.description), { color: TONE_KEYS.muted })];
+  const body = fitPieces([...task, dot, ...outcome(lane, g, home)], room, g.ellipsis);
   const pad = { text: " ".repeat(Math.max(0, room - piecesWidth(body))), color: TONE_KEYS.muted };
   return [
     { text: `${mark.glyph} `, color: mark.color },

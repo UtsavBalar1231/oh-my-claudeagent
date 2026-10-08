@@ -108,7 +108,7 @@ const border = (isAscii: boolean) => (isAscii ? "classic" : "round");
 
 type CardSpec = {
   key: string;
-  title: string;
+  title: string | RenderElement;
   tone: Paint;
   isAscii: boolean;
   isRaised?: boolean;
@@ -125,7 +125,7 @@ export function Card(kit: Kit, { key, title, tone, isAscii, isRaised = false, wi
     paddingX: 1,
     ...(width === undefined ? {} : { width }),
     ...(isRaised ? { backgroundColor: TONE_KEYS.raised } : {}),
-    children: [kit.Text({ bold: true, color: ON_SURFACE, wrap: "truncate-end", children: [title] }), ...children],
+    children: [typeof title === "string" ? kit.Text({ bold: true, color: ON_SURFACE, wrap: "truncate-end", children: [title] }) : title, ...children],
   });
 }
 

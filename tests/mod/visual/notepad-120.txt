@@ -1,24 +1,14 @@
                                                                │                                                      ✕
- ▐▛███▛█   Claude Code v2.1.292                                │1: Agents  2: Plan  3: Evidence  4: Notepad
-▝▜██████▀  Opus 5.5 · API Usage Billing                        │5: Feedback  6: Stats  7: Doctor
- ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd           │─────────────────────────────────────────────────────
-                                                               │checkout-redesign  BOUND  · 10 entries · 1 masked
+ ▐▛███▛█   Claude Code v2.1.294                                │1: A  2: P  3: E  4: Notepad  5: F  6: S  7: D
+▝▜██████▀  Opus 5.5 · API Usage Billing                        │─────────────────────────────────────────────────────
+ ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd           │checkout-redesign  BOUND  · 10 entries · 1 masked
                                                                │f: Find  l: Plans (3)
                                                                │╭───────────────────────────────────────────────────╮
                                                                ││ Learnings · 3 entries                             │
                                                                ││ ── 10-01 15:12 ────────────────────────────────── │
                                                                ││ The cart totals were computed in three places.    │
                                                                ││ CheckoutPage, OrderEmail and the receipt PDF now  │
-                                                               ││ all call totals(cart) from src/cart/totals.ts.    │
-                                                               ││ ── 10-02 16:35 ────────────────────────────────── │
-                                                               ││ - Tax rounds per line, not per order; the old     │
-                                                               ││   code rounded once and drifted by a cent.        │
-                                                               ││ - Shipping is free from $50.00 after discounts,   │
-                                                               ││   so discount runs before shipping.               │
-                                                               ││ ── 10-03 13:47 ────────────────────────────────── │
-                                                               ││ The staging gateway rejects amounts with more     │
-                                                               ││ than two decimals. formatMinor() converts before  │
-                                                               ││ every request.                                    │
+                                                               ││ ↓ more · wheel to scroll                          │
                                                                │╰───────────────────────────────────────────────────╯
                                                                │╭───────────────────────────────────────────────────╮
                                                                ││ Issues · 2 entries                                │
@@ -26,13 +16,23 @@
                                                                ││ just test fails on a clean checkout until the     │
                                                                ││ payments sandbox is up. The README says to export │
                                                                ││ PAYMENTS_SANDBOX_TOKEN=‹masked› first; that       │
-                                                               ││ token belongs in the team vault, not in the       │
-                                                               ││ README.                                           │
-                                                               ││ ── 10-02 22:18 ────────────────────────────────── │
-                                                               ││ The summary panel jumps by one row when a coupon  │
-                                                               ││ is applied on narrow screens.                     │
+                                                               ││ ↓ more · wheel to scroll                          │
                                                                │╰───────────────────────────────────────────────────╯
-██▌██ 2/4 · next 3 Show the saved payment methods          [-] │  ↓ more · ↑↓ scroll
+                                                               │╭───────────────────────────────────────────────────╮
+                                                               ││ Decisions · 3 entries                             │
+                                                               ││ ── 10-01 15:32 ────────────────────────────────── │
+                                                               ││ Keep the saved cards in the existing wallet       │
+                                                               ││ service rather than a new table. Why: the mobile  │
+                                                               ││ ↓ more · wheel to scroll                          │
+                                                               │╰───────────────────────────────────────────────────╯
+                                                               │╭───────────────────────────────────────────────────╮
+                                                               ││ Problems · 2 entries                              │
+                                                               ││ ── 10-02 23:01 ────────────────────────────────── │
+                                                               ││ Task 3 is blocked: the wallet API returns cards   │
+                                                               ││ without an expiry for 2% of customers, and the    │
+                                                               ││ design has no state for that.                     │
+                                                               ││ ↓ more · wheel to scroll                          │
+██▌██ 2/4 · next 3 Show the saved payment methods          [-] │╰───────────────────────────────────────────────────╯
                                            ◐ medium · /effort  │
 ─────────────────────────────────────────────────────────────────────────────────────── oh-my-claudeagent:orchestrator ─
 ❯ 

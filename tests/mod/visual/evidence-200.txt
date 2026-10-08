@@ -1,49 +1,49 @@
-                                                                                                             │                                                                                        ✕
- ▐▛███▛█   Claude Code v2.1.292                                                                              │1: Agents  2: Plan  3: Evidence  4: Notepad  5: Feedback  6: Stats  7: Doctor
-▝▜██████▀  Opus 5.5 · API Usage Billing                                                                      │───────────────────────────────────────────────────────────────────────────────────────
- ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/.cache/tmp/omca-visual-200x50-XXXXXX/cwd                      │╭─────────────────────────────────────────────────────────────────────────────────────╮
-                                                                                                             ││ Final verification · proof-ledger                                                   │
-                                                                                                             ││  COMPLETE  matches the current plan · 10-02 13:35                                   │
-                                                                                                             ││  build   test   lint   manual                                                   │
-                                                                                                             │╰─────────────────────────────────────────────────────────────────────────────────────╯
-                                                                                                             │── Fri 2026-10-02 ────────────────────────────  ╭─────────────────────────────────────╮
-                                                                                                             │    13:35  final   just ci && ju…ual evidence  │  Manual run passed                 │
-                                                                                                             │    13:00  test    just test-mod               │ exit 0 · 2026-10-02 12:40:00        │
-                                                                                                             │❯   12:40  manual  curl -fsS -H …test/healthz  │  orchestrator · 2 secrets masked   │
-                                                                                                             │    12:10  test    bun test src …line scripts  │                                     │
-                                                                                                             │── Thu 2026-10-01 ────────────────────────────  │ Command                             │
-                                                                                                             │    18:45  test    just validate…check engine  │ curl -fsS -H 'Authorization:        │
-                                                                                                             │    17:00  final   just ci && ju…ual evidence  │ Bearer ‹masked›'                    │
-                                                                                                             │    15:32  lint    just typecheck              │ https://staging.example.test/health │
-                                                                                                             │    15:15  lint    just typecheck              │ z                                   │
-                                                                                                             │    14:30  build   bun run build               │                                     │
-                                                                                                             │    13:50  test    just test-mod               │ Output                              │
-                                                                                                             │    13:25  test    just test-mod               │ HTTP/2 200                          │
-                                                                                                             │── Wed 2026-09-30 ────────────────────────────  │ x-request-id: 7f3c9a                │
-                                                                                                             │    16:10  manual  just visual plan-reader     │ {"status":"ok","build":"2026.10.02- │
-                                                                                                             │    14:35  test    bun test src/core           │ 1"}                                 │
-                                                                                                             │    14:01  lint    just lint                   │ rerun with DEPLOY_TOKEN=‹masked›    │
-                                                                                                             │    13:55  lint    just lint                   │ to redeploy                         │
-                                                                                                             │    13:40  build   bun run build               ╰─────────────────────────────────────╯
-                                                                                                             │
-                                                                                                             │
-                                                                                                             │
-                                                                                                             │
-                                                                                                             │
-                                                                                                             │
-                                                                                                             │
-                                                                                                             │
-                                                                                                             │
-                                                                                                             │
-                                                                                                             │
-                                                                                                             │
-                                                                                                             │
-                                                                                                             │
-                                                                                                             │
-                                                                                                             │
-                                                                                                             │
-█████ 6/6                                                                                                [-] │t: Type  x: Fails  f: Find  c: Copy  r: Rerun  3/16 · ↑↓ move
-                                                                                         ◐ medium · /effort  │
+                                                                                                   │                                                                                                  ✕
+ ▐▛███▛█   Claude Code v2.1.294                                                                    │1: Agents  2: Plan  3: Evidence  4: Notepad  5: Feedback  6: Stats  7: Doctor
+▝▜██████▀  Opus 5.5 · API Usage Billing                                                            │─────────────────────────────────────────────────────────────────────────────────────────────────
+ ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/.cache/tmp/omca-visual-200x50-XXXXXX/cwd            │╭───────────────────────────────────────────────────────────────────────────────────────────────╮
+                                                                                                   ││ Final verification · proof-ledger                                                             │
+                                                                                                   ││  COMPLETE  matches the current plan · 10-02 13:35                                             │
+                                                                                                   ││  build   test   lint   manual                                                             │
+                                                                                                   │╰───────────────────────────────────────────────────────────────────────────────────────────────╯
+                                                                                                   │── Fri 2026-10-02 ─────────────────────────────────  ╭──────────────────────────────────────────╮
+                                                                                                   │    13:35  final   just ci && just visual evidence  │  Manual run passed                      │
+                                                                                                   │    13:00  test    just test-mod                    │ exit 0 · 2026-10-02 12:40:00             │
+                                                                                                   │❯   12:40  manual  curl -fsS -H 'A…le.test/healthz  │  orchestrator · 2 secrets masked        │
+                                                                                                   │    12:10  test    bun test src se…tusline scripts  │                                          │
+                                                                                                   │── Thu 2026-10-01 ─────────────────────────────────  │ Command                                  │
+                                                                                                   │    18:45  test    just validate --check engine     │ curl -fsS -H 'Authorization: Bearer      │
+                                                                                                   │    17:00  final   just ci && just visual evidence  │ ‹masked›'                                │
+                                                                                                   │    15:32  lint    just typecheck                   │ https://staging.example.test/healthz     │
+                                                                                                   │    15:15  lint    just typecheck                   │                                          │
+                                                                                                   │    14:30  build   bun run build                    │ Output                                   │
+                                                                                                   │    13:50  test    just test-mod                    │ HTTP/2 200                               │
+                                                                                                   │    13:25  test    just test-mod                    │ x-request-id: 7f3c9a                     │
+                                                                                                   │── Wed 2026-09-30 ─────────────────────────────────  │ {"status":"ok","build":"2026.10.02-1"}   │
+                                                                                                   │    16:10  manual  just visual plan-reader          │ rerun with DEPLOY_TOKEN=‹masked› to      │
+                                                                                                   │    14:35  test    bun test src/core                │ redeploy                                 │
+                                                                                                   │    14:01  lint    just lint                        ╰──────────────────────────────────────────╯
+                                                                                                   │    13:55  lint    just lint
+                                                                                                   │    13:40  build   bun run build
+                                                                                                   │
+                                                                                                   │
+                                                                                                   │
+                                                                                                   │
+                                                                                                   │
+                                                                                                   │
+                                                                                                   │
+                                                                                                   │
+                                                                                                   │
+                                                                                                   │
+                                                                                                   │
+                                                                                                   │
+                                                                                                   │
+                                                                                                   │
+                                                                                                   │
+                                                                                                   │
+                                                                                                   │
+█████ 6/6                                                                                      [-] │t: Type  x: Fails  f: Find  c: Copy  r: Rerun  3/16 · ↑↓ move
+                                                                               ◐ medium · /effort  │
 ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── oh-my-claudeagent:orchestrator ─
 ❯ 
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────

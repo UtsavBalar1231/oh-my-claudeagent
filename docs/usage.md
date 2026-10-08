@@ -190,15 +190,18 @@ takes the cost's place.
    task; the tool it runs now and how many tool calls it has made; and its model, effort, tokens
    and cost, with a blank row before the next lane. Under a Finished label, the latest wave's
    finished agents keep their lanes while the rows allow, each mascot smiling or sweating beside
-   the first line of its result, and older finished agents shrink to one line with their result
-   and duration. In a shorter pane each lane takes two rows and no mascot: the agent's icon, name, task, model,
-   effort and elapsed time, then its tool and call count. The key row counts the running and
+   the first line of its result, and older finished agents shrink to one line with their task,
+   their result where room is left, and their duration. In a shorter pane each lane takes two rows
+   and no mascot: the agent's icon, name, task, model, effort and elapsed time, then its tool and
+   call count, with a blank row between lanes while the rows allow. The key row counts the running and
    finished agents and the tokens they spent. Point at a lane, or press `d`, to see its prompt,
-   last output, tool calls and tokens. Press Enter on a lane, or click it, to open the agent's
-   page: its full brief, each tool call with its outcome and duration, its latest reply and its
+   last output, tool calls and tokens. Press Enter on a lane, or click its name, to open the
+   agent's page: its full brief, each tool call with its outcome and duration, its latest reply and its
    cost, shown as `~$` because it is estimated. On the page `b` goes back, `c` copies the brief
    and `r` reads the page again. A teammate in a team has a lane too; it waits between messages
-   instead of finishing.
+   instead of finishing. When the lanes run past the pane, a cue above and below counts the lanes
+   out of view, the mouse wheel scrolls them, and Up and Down step the focus a lane at a time with
+   the lanes following.
 
    The brief and the reply on the agent page are drawn as markdown, by Claude Code's own
    renderer, and a shell command, on the page and in a lane's tool row, is highlighted as code.
@@ -208,9 +211,10 @@ takes the cost's place.
 2. **Plan**: the plan board, below.
 3. **Evidence**: the proof ledger, below.
 4. **Notepad**: one card per section of the bound plan's notepad, each entry under its date. `f`
-   finds text in the entries, `w` clears the search, and `l` picks another plan's notepad.
-5. **Feedback**: your ratings for this session. `u` rates the last turn up and `d` rates it
-   down.
+   finds text in the entries, `w` clears the search, and `l` picks another plan's notepad. A wide
+   pane sets the cards in two columns, and the mouse wheel over a card scrolls that card alone.
+5. **Feedback**: your ratings for this session, newest first. `u` rates the last turn up and `d`
+   rates it down. The mouse wheel scrolls the ratings when they run past the card.
 6. **Stats**: runs and the evidence rate per agent type, tokens per finished delegation, and the
    estimated cost by agent, across the project's recorded sessions. Runs on a model without a
    known price are counted as excluded rather than estimated. `r` reloads the records.
@@ -219,6 +223,11 @@ takes the cost's place.
 `/omca plan`, `/omca stats` and `/omca doctor` open the pane on that tab. Press Ctrl+X then Tab,
 or click the pane, to focus it. Esc, the close mark in the pane's corner, or Ctrl+X then X close
 it. Every key letter below works only while its tab is shown.
+
+Each tab fits the pane it gets. A short pane keeps the tab's header, any filter, at least one row
+of content with a cue above or below it, and the keys; spare rows go to wrapped text and a second
+key row. When the tab labels do not fit on one row, the tabs other than the shown one show their
+initial. A wide terminal gives the docked pane up to 120 columns while the transcript keeps 100.
 
 The pane opens by itself on a session's first wave of subagents, and not again once you close it
 or in a session without a terminal. Below 144 columns the pane waits undrawn, and below 110 once
@@ -256,6 +265,10 @@ A wide pane shows the focused task's detail beside the list, a narrower one unde
 row, and Enter opens it as a page. The detail holds the task's steps, its done-when commands, its
 dependencies with their state, its files with the time since each changed, and the evidence runs
 that bear on it.
+
+The mouse wheel over the list moves the focus as Up and Down do, and over the detail beside it
+scrolls the detail. In a wide pane a click on a task's title selects it and a second click opens
+it; in a narrower one a click opens it.
 
 | Key | On the board | On a task page |
 | --- | --- | --- |
@@ -297,7 +310,9 @@ and the agent that logged it. Up and Down move the focus, and the focused run op
 command, output and exit code. In a wide pane it opens in a card beside the list, titled with
 whether it passed, that shows the exit code, when it ran and who logged it, whether a final
 verification is for the plan as it is now, an earlier version of it or any plan, and the whole
-command and output, wrapped rather than cut.
+command and output, wrapped rather than cut. When they run taller than the card, a cue on its
+last row says so and the mouse wheel over the card scrolls it. The wheel over the list moves the
+focus, and clicking a run's time focuses that run.
 
 | Key | Action |
 | --- | --- |

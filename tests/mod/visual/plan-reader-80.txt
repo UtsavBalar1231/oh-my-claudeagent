@@ -1,5 +1,5 @@
 
- ▐▛███▛█   Claude Code v2.1.292
+ ▐▛███▛█   Claude Code v2.1.294
 ▝▜██████▀  Opus 5.5 · API Usage Billing
  ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd
 
@@ -15,21 +15,21 @@
 
 ✻ Waiting for 1 background agent to finish
 
-● oh-my-claudeagent+cc-plugin-agents-md: 0s · 37.6k in 17 out · $0.4885
-  engine cost
+● oh-my-claudeagent+cc-plugin-agents-md: 0s · 37.6k in 17 out ·
+  $0.4885 engine cost
 
 ╭────────────────────────────────────────────────────────────────────────────✕─╮
 │ 1: Agents 2: Plan 3: Evidence 4: Notepad 5: Feedback 6: Stats 7: Doctor      │
-│  FINAL  Rebuild the billing export… ████▍▌██▉█ 4/9  4   2   1 running     │
-│   ↑ 4 more                                                                   │
+│  FINAL  Rebuild the billing export on the s… ████▍▌██▉█ 4/9    1 running    │
+│   ↑ 2 more                                                                   │
 │  3 Write rows in the schema's order                            UNPROVEN     │
 │  4 Round negative totals toward zero                             PROVEN     │
 │  5 Reconcile totals against the invoice table       executor  UNPROVEN     │
+│      Sum each customer's rows and compare with the invoice table; list e…    │
+│      $ DB_PASSWORD=‹masked› just test-db                                     │
 │ ── Milestone 2: Rollout ── ████████ 0/4 ─────────────────────────────────    │
-│  6 Run the new export beside the old one for a week         blocked by 5    │
-│   ↓ 3 more                                                                   │
-│ k: Run check  s: Start here  c: Copy  e: Evidence  o: Open only              │
-│ x: Failing  f: Find  t: Sections  l: Plans                                   │
+│   ↓ 4 more                                                                   │
+│ k: Run check  s: Start here  c: Copy  e:   o:   x:   f:   t:   l:            │
 ╰──────────────────────────────────────────────────────────────────────────────╯
                                                             ◐ medium · /effort
 ───────────────────────────────────────────────────────── OMCA: billing-export ─

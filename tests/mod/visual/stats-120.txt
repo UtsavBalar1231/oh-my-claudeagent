@@ -1,19 +1,18 @@
                                                                │                                                      ✕
- ▐▛███▛█   Claude Code v2.1.292                                │1: Agents  2: Plan  3: Evidence  4: Notepad
-▝▜██████▀  Opus 5.5 · API Usage Billing                        │5: Feedback  6: Stats  7: Doctor
- ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd           │─────────────────────────────────────────────────────
-                                                               │20 delegations in 3 sessions · 1 running · 1 skipped
+ ▐▛███▛█   Claude Code v2.1.294                                │1: A  2: P  3: E  4: N  5: F  6: Stats  7: D
+▝▜██████▀  Opus 5.5 · API Usage Billing                        │─────────────────────────────────────────────────────
+ ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd           │20 delegations in 3 sessions · 1 running · 1 skipped
                                                                │╭───────────────────────────────────────────────────╮
                                                                ││ Agents · 8 types                                  │
-                                                               ││   agent        runs  est. cost  evidence          │
-                                                               ││  executor        8      $6.86      86%          │
-                                                               ││  explorer        4     $0.31+       0%          │
-                                                               ││  architect       2      $5.27      50%          │
-                                                               ││  researcher      2      $0.40      50%          │
-                                                               ││  analyzer        1      $0.34       0%          │
-                                                               ││  build-fixer     1      $0.65     100%          │
-                                                               ││  planner         1      $0.67       0%          │
-                                                               ││  reviewer        1      $0.39       0%          │
+                                                               ││   agent        runs  median  est. cost  evidence  │
+                                                               ││  executor        8   3m28s      $6.86      86%  │
+                                                               ││  explorer        4     24s     $0.31+       0%  │
+                                                               ││  architect       2   6m24s      $5.27      50%  │
+                                                               ││  researcher      2   1m05s      $0.40      50%  │
+                                                               ││  analyzer        1   3m08s      $0.34       0%  │
+                                                               ││  build-fixer     1   2m23s      $0.65     100%  │
+                                                               ││  planner         1   6m52s      $0.67       0%  │
+                                                               ││  reviewer        1   4m01s      $0.39       0%  │
                                                                │╰───────────────────────────────────────────────────╯
                                                                │╭───────────────────────────────────────────────────╮
                                                                ││ Tokens per turn · 19 turns                        │
@@ -22,13 +21,14 @@
                                                                │╭───────────────────────────────────────────────────╮
                                                                ││ Estimated cost                                    │
                                                                ││ $14.89+ █████████████████████████████████████████ │
-                                                               ││  executor $6.86   architect $5.27  +6 more      │
-                                                               ││ + excludes 1 unpriced run · 2026-10-02 list       │
+                                                               ││  executor $6.86   architect $5.27               │
+                                                               ││  planner $0.67   build-fixer $0.65              │
+                                                               ││  researcher $0.40   reviewer $0.39              │
+                                                               ││  analyzer $0.34   explorer $0.31                │
+                                                               ││ + excludes 1 unpriced run · 2026-10-08 list       │
                                                                ││ prices                                            │
                                                                │╰───────────────────────────────────────────────────╯
                                                                │r: Reload
-                                                               │
-                                                               │
                                                                │
                                                                │
                                                                │

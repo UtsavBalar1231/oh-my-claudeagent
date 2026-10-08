@@ -125,7 +125,7 @@ describe("laneRows", () => {
   test("as the body narrows the model column goes first, then the effort, and the elapsed time stays", () => {
     const head = (width: number) => rows(laneRows(lane(), look(width), HOME))[0];
     expect(head(61)).toBe("◆ executor · Fix the heading parser  sonnet-5-5  high   1m06s");
-    expect(head(60)).toBe("◆ executor · Fix the heading pars…  sonnet-5-5  high   1m06s");
+    expect(head(60)).toBe("◆ executor · Fix the heading parser             high   1m06s");
     expect(head(55)).toBe("◆ executor · Fix the heading parser        high   1m06s");
     expect(head(44)).toBe("◆ executor · Fix the heading…   high   1m06s");
     expect(head(43)).toBe("◆ executor · Fix the heading parser   1m06s");
@@ -137,6 +137,9 @@ describe("laneRows", () => {
     expect(laneColumns(lanes, 73)).toEqual({ model: 10, effort: 5 });
     expect(laneColumns([lane()], 55)).toEqual({ model: 0, effort: 4 });
     expect(laneColumns([lane()], 43)).toEqual({ model: 0, effort: 0 });
+    expect(laneColumns([lane()], 61)).toEqual({ model: 10, effort: 4 });
+    expect(laneColumns([lane()], 60)).toEqual({ model: 0, effort: 4 });
+    expect(laneColumns([lane(), lane({ id: "b", description: "Port the incremental lexer onto the shared token stream" })], 73)).toEqual({ model: 0, effort: 4 });
     const heads = lanes.slice(0, 2).map((each) => rows(laneRows(each, look(73, {}, lanes), HOME))[0] ?? "");
     expect(heads).toEqual([
       "◆ executor · Fix the heading parser             sonnet-5-5  high    1m06s",
@@ -191,23 +194,51 @@ describe("laneRows", () => {
 });
 
 describe("laneBlock", () => {
+  const flat = (block: ReturnType<typeof laneBlock>) => rows([block.head, ...block.task, ...block.body, block.usage]);
+
   test("an ended agent's block says what it said and how long it ran, where a running one shows its tool", () => {
     const ended = lane({ endedAt: START + 66_000, status: "answer", result: "Fixed the parser." });
-    const block = rows(laneBlock(ended, look(39), HOME));
+    const block = flat(laneBlock(ended, look(39), HOME));
     expect(block[0]).toBe("executor                 ✓ done   1m06s");
     expect(block[2]).toBe("Fixed the parser.");
-    expect(rows(laneBlock(lane({ endedAt: START + 5_000, status: "error", result: "" }), look(39), HOME))[2]).toBe("failed");
+    expect(flat(laneBlock(lane({ endedAt: START + 5_000, status: "error", result: "" }), look(39), HOME))[2]).toBe("failed");
   });
 
   test("an empty task keeps its row, so the block stays four rows tall", () => {
-    const block = rows(laneBlock(lane({ description: "" }), look(39), HOME));
+    const block = flat(laneBlock(lane({ description: "" }), look(39), HOME));
     expect(block).toHaveLength(4);
     expect(block[1]).toBe(" ");
+  });
+
+  test("the state word is padded to the width asked for, so the glyph and the time keep their columns", () => {
+    const ended = lane({ endedAt: START + 66_000, status: "answer" });
+    expect(flat(laneBlock(lane(), look(39), HOME, { word: 7 }))[0]).toBe("executor              ◆ running   1m06s");
+    expect(flat(laneBlock(ended, look(39), HOME, { word: 7 }))[0]).toBe("executor              ✓ done      1m06s");
+  });
+
+  test("a task and a result wrap to the lines they may take, the last ending in the ellipsis when more followed", () => {
+    const long = "Port the incremental lexer onto the shared token stream and keep every fixture";
+    const ended = lane({ description: long, endedAt: START + 66_000, status: "answer", result: long });
+    const one = laneBlock(ended, look(39), HOME);
+    expect([one.task.length, one.body.length]).toEqual([1, 1]);
+    expect(text(one.task[0] ?? [])).toBe("Port the incremental lexer onto the sh…");
+    const two = laneBlock(ended, look(39), HOME, { task: 2, result: 2 });
+    expect(rows(two.task)).toEqual(["Port the incremental lexer onto the", "shared token stream and keep every…"]);
+    expect(rows(two.body)).toEqual(["Port the incremental lexer onto the", "shared token stream and keep every…"]);
+    const short = laneBlock(lane({ endedAt: START, status: "answer", result: "Fixed." }), look(39), HOME, { task: 2, result: 2 });
+    expect([short.task.length, short.body.length]).toEqual([1, 1]);
+  });
+
+  test("tokens and cost wait for the agent's first usage, and the facts never draw an empty row", () => {
+    const starting = lane({ inputTokens: 0, outputTokens: 0, costUsd: 0, calls: 0, tool: null });
+    expect(text(laneBlock(starting, look(39), HOME).usage)).toBe("sonnet-5-5 · high");
+    expect(text(laneBlock(lane(), look(45), HOME).usage)).toBe("sonnet-5-5 · high · 4.5k tokens · ~$0.04");
+    expect(text(laneBlock({ ...starting, model: "", effort: null }, look(39), HOME).usage)).toBe(" ");
   });
 });
 
 describe("finishedRow", () => {
-  const done = (fields: Partial<Lane>) => lane({ endedAt: START + 66_000, status: "answer", result: "Fixed the parser.", ...fields });
+  const done = (fields: Partial<Lane>) => lane({ endedAt: START + 66_000, status: "answer", result: "Fixed the parser.", description: "", ...fields });
 
   test("one dim line: status glyph in its tone, the type, the result, and how long it ran", () => {
     expect(finishedRow(done({}), look(51), HOME)).toEqual([
@@ -215,6 +246,15 @@ describe("finishedRow", () => {
       { text: "executor · Fixed the parser.             ", color: "inactive" },
       { text: "   1m06s", color: "inactive" },
     ]);
+  });
+
+  test("the task follows the type and the result takes the cells the task leaves, after a dot", () => {
+    const row = (width: number, fields: Partial<Lane> = {}) => text(finishedRow(done({ description: "Fix the heading parser", ...fields }), look(width), HOME));
+    expect(row(80)).toBe(`${"✓ executor · Fix the heading parser · Fixed the parser.".padEnd(72)}   1m06s`);
+    expect(row(51)).toBe("✓ executor · Fix the heading parser · Fixe…   1m06s");
+    expect(row(40)).toBe("✓ executor · Fix the heading pa…   1m06s");
+    expect(row(80, { result: "" })).toBe(`${"✓ executor · Fix the heading parser · done".padEnd(72)}   1m06s`);
+    expect(displayWidth(row(51))).toBe(51);
   });
 
   test("each ending reads as a word as well as a glyph", () => {

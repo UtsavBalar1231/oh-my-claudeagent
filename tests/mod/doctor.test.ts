@@ -96,7 +96,7 @@ const CHECKS = [
   " ✓ OK    Output style  OMCA Default is forced by the plugin",
   " ✓ OK    Advisor       advisorModel fable, and nothing here keeps it off",
 ];
-const STATUS_ROW = ` ! WARN  Status line   No refreshInterval, so it redraws on events only and goes${PAD}stale while agents run${PAD}i: Add refreshInterval 5`;
+const STATUS_ROW = ` ! WARN  Status line   No refreshInterval, so it redraws on events only and goes stale while${PAD}agents run${PAD}i: Add refreshInterval 5`;
 
 for (const layout of LAYOUTS) {
   const suffix = layout === POSIX ? "" : ` (${layout.name})`;
@@ -316,9 +316,9 @@ for (const layout of LAYOUTS) {
     const ui = await $.ui.mount(pane("terminal", { columns: 80, rows: 40, placement: "inline" }));
     const drawn = body(await ui.drawn());
     expect(drawn[0]).toBe(`r: Run again   ! 2 warn  + 11 ok  checked ${local(NOW_S)}`);
-    expect(drawn[2]).toBe(`[! WARN] OMCA          Could not read this mod's version from its${PAD}manifest`);
+    expect(drawn[1]).toBe(`[! WARN] OMCA          Could not read this mod's version from its${PAD}manifest`);
     expect(drawn).toContain("[+ OK]   Claude Code   2.1.292 meets the 2.1.292 floor");
-    expect(drawn.at(-2)).toBe("  v 9 more - ^v scroll");
+    expect(drawn.at(-2)).toBe("  v 8 more - ^v scroll");
       expect(rows(await ui.drawn()).filter((row) => !isAscii(row))).toEqual([]);
     await ui.unmount();
   });
@@ -380,11 +380,11 @@ test("the arrows, a page key and the wheel move the Doctor list by whole checks,
   const edges = async () => bodyLines(await ui.drawn()).filter((row) => row.includes("more"));
 
   expect((await titles())[0]).toBe("check-mod");
-  expect(await edges()).toEqual(["  ↓ 6 more · ↑↓ scroll"]);
+  expect(await edges()).toEqual(["  ↓ 5 more · ↑↓ scroll"]);
 
   await scroll(1);
   expect((await titles())[0]).toBe("check-server");
-  expect(await edges()).toEqual(["  ↑ 1 more", "  ↓ 5 more · ↑↓ scroll"]);
+  expect(await edges()).toEqual(["  ↑ 1 more", "  ↓ 4 more · ↑↓ scroll"]);
 
   await scroll(26);
   expect(await edges()).toEqual(["  ↑ 4 more"]);
@@ -394,7 +394,7 @@ test("the arrows, a page key and the wheel move the Doctor list by whole checks,
   expect(await edges()).toEqual(["  ↑ 4 more"]);
 
   await scroll(-3);
-  expect(await edges()).toEqual(["  ↑ 3 more", "  ↓ 2 more · ↑↓ scroll"]);
+  expect(await edges()).toEqual(["  ↑ 3 more", "  ↓ 1 more · ↑↓ scroll"]);
 
   await scroll(-100);
   expect((await titles())[0]).toBe("check-mod");
@@ -412,21 +412,48 @@ test("Home and End send the Doctor list to its first and last check even when on
   const edges = async () => bodyLines(await ui.drawn()).filter((row) => row.includes("more"));
 
   expect(contentRows).toBe(9);
-  expect(await titles()).toEqual(["check-mod"]);
-  expect(await edges()).toEqual(["  ↓ 12 more · ↑↓ scroll"]);
+  expect(await titles()).toEqual(["check-mod", "check-server"]);
+  expect(await edges()).toEqual(["  ↓ 11 more · ↑↓ scroll"]);
 
   await key(contentRows);
   expect(await titles()).toEqual(["check-style"]);
   expect(await edges()).toEqual(["  ↑ 12 more"]);
 
   await key(-contentRows);
-  expect(await titles()).toEqual(["check-mod"]);
-  expect(await edges()).toEqual(["  ↓ 12 more · ↑↓ scroll"]);
+  expect(await titles()).toEqual(["check-mod", "check-server"]);
+  expect(await edges()).toEqual(["  ↓ 11 more · ↑↓ scroll"]);
 
   await key(contentRows - 1);
   expect(await titles()).toEqual(["check-statusline"]);
   expect(await edges()).toHaveLength(2);
   await ui.unmount();
+});
+
+test("a body too short for two checks windows the list down to one check and names what is below", async ($, on) => {
+  engine(on, world(on, {}, {}));
+  await $.command.run(run("doctor", 120));
+  const ui = await $.ui.mount(pane("terminal", { columns: 120, rows: 8, placement: "dock" }));
+  const titles = (await ui.findAll({ type: "Box" })).flatMap((box) => (box.key?.startsWith("check-") === true ? [box.key] : []));
+  const drawn = bodyLines(await ui.drawn());
+
+  expect(titles).toEqual(["check-mod"]);
+  expect(drawn.at(-2)).toBe("  ↓ 12 more · ↑↓ scroll");
+  await ui.unmount();
+});
+
+test("the detail sits beside the label only when it gets 50 cells, and stacks under it otherwise", async ($, on) => {
+  engine(on, world(on, {}, {}));
+  await $.command.run(run("doctor", 120));
+  const mount = pane("terminal", WIDE);
+  const server = async (bodyColumns: number) => {
+    const ui = await $.ui.mount({ ...mount, props: { ...mount.props, bodyColumns } });
+    const found = rows(await ui.drawn()).filter((row) => row.includes("omca server"));
+    await ui.unmount();
+    return found;
+  };
+
+  expect(await server(75)).toEqual([" ! WARN  omca server  No hook has reached the server in this session yet  m: Use /mcp"]);
+  expect(await server(76)).toEqual([` ! WARN  omca server   No hook has reached the server in this session yet${PAD}m: Use /mcp`]);
 });
 
 test("a Doctor list that fits leaves the arrows to the engine, and so does every other tab", async ($, on) => {

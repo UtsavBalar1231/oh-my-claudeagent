@@ -241,7 +241,7 @@ export type Size = { columns: number; rows: number; placement: "dock" | "inline"
 // a dock opens at the pane's requested share of the terminal, inside its frame.
 export function bodyColumns(size: Size): number {
   if (size.placement === "inline") return size.columns - 4;
-  return Math.min(96, Math.max(56, Math.round(size.columns * 0.45))) - 2;
+  return Math.max(Math.min(96, Math.max(56, Math.round(size.columns * 0.45))), Math.min(120, size.columns - 100)) - 2;
 }
 
 export const SIZES: readonly Size[] = [

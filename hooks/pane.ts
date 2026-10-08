@@ -6,6 +6,7 @@ import { reconcile } from "./agents-tracker.ts";
 import type { Features, Input } from "./dispatch.ts";
 import { type Host, reason, resolvedSession, sessionOf, type State, update } from "./host.ts";
 import * as mascots from "./mascot-player.ts";
+import { hasOverflow, resetRegions, scrollKeyed, scrollRegionAt } from "./regions.ts";
 import type { Subcommand } from "./omca-router.ts";
 import * as agents from "./tabs/agents.ts";
 import * as doctor from "./tabs/doctor.ts";
@@ -31,6 +32,10 @@ const MIN_INLINE_ROWS = 7;
 const DOCK_SHARE = 0.45;
 const DOCK_MIN_COLUMNS = 56;
 const DOCK_MAX_COLUMNS = 96;
+const DOCK_WIDE_MAX_COLUMNS = 120;
+const DOCK_TRANSCRIPT_COLUMNS = 100;
+// Below this many body rows a dock gives the rule under the tab bar to the tab.
+const RULE_MIN_ROWS = 30;
 
 type Pane = State["pane"];
 export type Tab = Pane["tab"];
@@ -92,6 +97,11 @@ let viewportRows = 0;
 const CUED: readonly Tab[] = ["notepad", "stats"];
 let drawnShape = "";
 let measured: { shape: string; rows: number } | undefined;
+// The latest drawing's tab rows above the tab, the engine's own offset, and whether the tree runs
+// past the body only for a region's sake.
+let chromeRows = 0;
+let shownOffset = 0;
+let isPadded = false;
 
 // A tree's content as data: closures and the press handles the runtime stamps change every draw.
 const shapeOf = (children: readonly RenderElement[]): string =>
@@ -173,7 +183,11 @@ export async function open(host: Host, e: Input<"command.run">, tab: Tab): Promi
   await sessionOf(host);
   now = await host.clock.now();
   await refresh(host, tab);
-  const columns = clamp(Math.round(e.presentation.columns * DOCK_SHARE), DOCK_MIN_COLUMNS, DOCK_MAX_COLUMNS);
+  const terminal = e.presentation.columns;
+  const columns = Math.max(
+    clamp(Math.round(terminal * DOCK_SHARE), DOCK_MIN_COLUMNS, DOCK_MAX_COLUMNS),
+    Math.min(DOCK_WIDE_MAX_COLUMNS, terminal - DOCK_TRANSCRIPT_COLUMNS),
+  );
   // The first drawing must already know whether the person prefers reduced motion.
   await mascots.ensure(host);
   await host.ui.open({ id: PANE, title: "OMCA", focus: true, closeOnEscape: true, rows: INLINE_ROWS, columns });
@@ -249,13 +263,17 @@ async function selectTab(host: Host, tab: Tab): Promise<void> {
   await patchPane(host, (pane) => (pane.tab === tab ? pane : { ...pane, tab }));
 }
 
-// The narrower gap is used only when it keeps every tab on one row, which saves an inline row.
-function tabRows(width: number): { gap: number; rows: (readonly [Tab, string, string])[][] } {
-  const cells = TABS.map(([id, label], index) => [id, label, String(index + 1)] as const);
-  const cellWidth = ([, label, key]: readonly [Tab, string, string]) => displayWidth(`${key}: ${label}`);
-  const oneRow = (gap: number) => cells.reduce((sum, cell) => sum + cellWidth(cell), 0) + gap * (cells.length - 1);
-  const gap = oneRow(COLUMN_GAP) <= width || oneRow(1) > width ? COLUMN_GAP : 1;
-  return { gap, rows: wrapAt(cells, width, gap, cellWidth) };
+type TabCell = readonly [Tab, string, string];
+
+// One row: the full labels when they fit, else only the active tab keeps its label and the rest shrink to their initial, which no two tabs share.
+function tabBar(width: number, active: Tab): { gap: number; cells: TabCell[] } {
+  const full = TABS.map(([id, label], index): TabCell => [id, label, String(index + 1)]);
+  const across = (cells: readonly TabCell[], gap: number) =>
+    cells.reduce((sum, [, label, key]) => sum + displayWidth(`${key}: ${label}`), 0) + gap * (cells.length - 1);
+  const gap = [COLUMN_GAP, 1].find((candidate) => across(full, candidate) <= width);
+  if (gap !== undefined) return { gap, cells: full };
+  const cells = full.map(([id, label, key]): TabCell => [id, id === active ? label : label.charAt(0), key]);
+  return { gap: across(cells, COLUMN_GAP) <= width ? COLUMN_GAP : 1, cells };
 }
 
 function bodyRows(host: Host, e: Input<"ui.render Pane">, isInline: boolean): number {
@@ -289,13 +307,13 @@ async function draw(host: Host, e: Input<"ui.render Pane">): Promise<RenderEleme
       host.log(`omca pane action failed: ${reason(error)}`);
     }
   };
-  const bar = tabRows(width);
-  const tabs = bar.rows.map((row, index) =>
+  const bar = tabBar(width, active);
+  const tabs = [
     Box({
-      key: `tabs-${index}`,
+      key: "tabs-0",
       flexDirection: "row",
       columnGap: bar.gap,
-      children: row.map(([id, label, key]) =>
+      children: bar.cells.map(([id, label, key]) =>
         Button({
           key,
           hotkey: key,
@@ -306,10 +324,14 @@ async function draw(host: Host, e: Input<"ui.render Pane">): Promise<RenderEleme
         }),
       ),
     }),
-  );
-  const chrome = tabs.length + (isInline ? 0 : 1);
+  ];
+  const hasRule = !isInline && rows >= RULE_MIN_ROWS;
+  const chrome = tabs.length + (hasRule ? 1 : 0);
   const tier = widthTier(e.props.bodyColumns);
   const view: View = { kit, g, isAscii, width, tier, rows: Math.max(0, rows - chrome), isInline, home, platform, now, press };
+  chromeRows = chrome;
+  shownOffset = e.props.scroll.offset;
+  resetRegions();
   let body: readonly RenderElement[];
   try {
     body = await viewOf(active)(host, view);
@@ -317,10 +339,32 @@ async function draw(host: Host, e: Input<"ui.render Pane">): Promise<RenderEleme
     host.log(`omca ${active} tab failed: ${reason(error)}`);
     body = [Text({ color: TONE_KEYS.fail, children: [`${g.cross} The ${active} tab failed: ${reason(error)}`] })];
   }
-  const children = [...tabs, ...(isInline ? [] : [rule(view)]), ...body];
-  drawnShape = CUED.includes(active) ? shapeOf(children) : "";
-  const cue = drawnShape === "" ? undefined : moreCue(view, e.props.scroll, isInline ? rows : 0, children);
-  return Box({ flexDirection: "column", width, ...(isInline ? { minHeight: rows } : {}), children: cue === undefined ? children : [...children, cue] });
+  const drawnRows = [...tabs, ...body].reduce((sum, child) => sum + rowsAtLeast(child), hasRule ? 1 : 0);
+  // The engine raises the wheel only over a tree taller than the body, so a tab that fits but holds
+  // a region with more to show gets rows past the body, and those rows never scroll the pane.
+  isPadded = hasOverflow() && drawnRows <= rows;
+  if (isPadded) body = [...body, ...blanks(view, rows + 1 - drawnRows)];
+  const children = [...tabs, ...(hasRule ? [rule(view)] : []), ...body];
+  drawnShape = CUED.includes(active) && !isPadded ? shapeOf(children) : "";
+  const cues =
+    drawnShape === ""
+      ? []
+      : [lessCue(view, e.props.scroll.offset), moreCue(view, e.props.scroll, isInline ? rows : 0, children)].filter((cue) => cue !== undefined);
+  return Box({ flexDirection: "column", width, ...(isInline ? { minHeight: rows } : {}), children: [...children, ...cues] });
+}
+
+// Drawn over the window's first row once the engine has scrolled past the tree's top.
+function lessCue({ g, width, kit }: View, offset: number): RenderElement | undefined {
+  if (offset <= 0) return undefined;
+  const text = fitEnd(`  ${g.up} more`, width, g.ellipsis);
+  return kit.Box({
+    key: "less-cue",
+    position: "absolute",
+    top: offset,
+    left: 0,
+    width,
+    children: [kit.Text({ dimColor: true, children: [padEnd(text, width)] })],
+  });
 }
 
 // Drawn over the window's last row while the tree runs past it: the engine's exact height once a
@@ -393,17 +437,32 @@ export const pane: Features = {
   "ui.focus": {
     async pre(host, e) {
       if (e.component !== "Pane" || e.requestId !== PANE) return undefined;
-      return (await host.state.pane.get()).value?.tab === "plan" ? plan.focus(host, e) : undefined;
+      const tab = (await host.state.pane.get()).value?.tab;
+      if (tab === "agents") agents.focus(e);
+      if (tab === "notepad") notepad.focus(e);
+      return tab === "plan" ? plan.focus(host, e) : undefined;
     },
   },
   "ui.scroll": {
     async pre(host, e) {
       if (e.requestId === PANE && drawnShape !== "") measured = { shape: drawnShape, rows: e.contentRows };
       if (e.requestId !== PANE || e.origin.kind !== "person") return undefined;
+      // The pointer's row counts from the body's top as shown: past the engine's own scroll, less the tab rows above the tab.
+      if (e.pointer !== undefined && scrollRegionAt({ column: e.pointer.column, row: e.pointer.row + shownOffset - chromeRows }, e.by)) {
+        host.ui.invalidate();
+        return { answer: {} };
+      }
       const tab = (await host.state.pane.get()).value?.tab;
+      if ((tab === "agents" && agents.scroll(host, e)) || (tab === "feedback" && feedback.scroll(host, e))) return { answer: {} };
       if (tab === "plan") return (await plan.scroll(host, e)) ? { answer: {} } : undefined;
       if (tab === "evidence") return evidence.scroll(host, e) ? { answer: {} } : undefined;
-      if (tab !== "doctor" || !doctor.scroll(e.by, e.contentRows)) return undefined;
+      // A key no tab took moves a region: a page key asks for `bodyRows`, Home and End for `contentRows`.
+      const step = Math.abs(e.by) === e.bodyRows ? "page" : Math.abs(e.by) === e.contentRows ? "end" : "row";
+      if (e.pointer === undefined && scrollKeyed(e.by, step)) {
+        host.ui.invalidate();
+        return { answer: {} };
+      }
+      if (tab !== "doctor" || !doctor.scroll(e.by, e.contentRows)) return isPadded ? { answer: {} } : undefined;
       host.ui.invalidate();
       return { answer: {} };
     },

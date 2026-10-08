@@ -126,12 +126,12 @@ test("each delegation is written running at spawn and overwritten once when its 
   expect(await $.command.run(run("stats"))).toEqual({});
   for (const surface of SURFACES) {
     const ui = await $.ui.mount(pane(surface, { columns: 120, rows: 40, placement: "dock" }));
-    expect(spreadRows(await ui.drawn()).slice(3)).toEqual([
+    expect(spreadRows(await ui.drawn()).slice(2)).toEqual([
       "2 delegations in 1 session",
       "Agents · 2 types",
-      "  agent     runs  est. cost  evidence",
-      "◆ executor     1      $0.01    ✓ 100%",
-      "◆ explorer     1      $0.00      ✗ 0%",
+      "  agent     runs  median  est. cost  evidence",
+      "◆ executor     1   1m30s      $0.01    ✓ 100%",
+      "◆ explorer     1   1m15s      $0.00      ✗ 0%",
       "Tokens per turn · 2 turns",
       "█▁ peak 13.5k",
       "Estimated cost",

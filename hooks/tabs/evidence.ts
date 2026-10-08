@@ -19,7 +19,8 @@ import { agentKey, chip, type ChipTone, fitPieces, ON_SURFACE, type Piece, piece
 import type { Input } from "../dispatch.ts";
 import { boundPlanOf, bytesOf, type Host, reason, type State } from "../host.ts";
 import { blanks, noticeRow, refocus, type TabView, type View, wrapAt } from "../pane.ts";
-import { Card, CodeBlock, Field, Line, Row } from "../ui.ts";
+import { codeUnits, resetOffset, ScrollRegion, type Unit } from "../regions.ts";
+import { Card, Field, Line, Pieces } from "../ui.ts";
 
 type Ledger = State["ledger"];
 type Entry = Ledger["entries"][number];
@@ -33,19 +34,27 @@ const TYPE_CELLS = 6;
 const AGENT_CELLS = 12;
 const SEARCH = "search";
 const FIXED_CELLS = POINTER_CELLS + MARK_CELLS + COLUMN_GAP + CLOCK_CELLS + COLUMN_GAP + TYPE_CELLS + COLUMN_GAP;
-const MIN_ROOM = 3;
 const MIN_COMMAND = 28;
-const COMMAND_ROWS = 3;
-const DOCK_SNIPPET_ROWS = 8;
-const INLINE_SNIPPET_ROWS = 2;
 const MASTER_SHARE = 0.53;
 const DETAIL_INDENT = 4;
+const OPENED_REGION = "evidence-opened";
+const CARD_CHROME_ROWS = 3;
+const CARD_INSET = 2;
+// An entry with its two cue rows; the verdict, the filter state and the key row each give way before it.
+const MIN_TIMELINE_ROWS = 3;
+const NEIGHBOURS = 2;
+// The card's chrome and enough rows inside it to carry both scroll cues and some content.
+const MIN_CARD_ROWS = CARD_CHROME_ROWS + 5;
+const MIN_OPENED_ROWS = 2;
+// A docked body shorter than this draws the verdict as one line, as the Plan header does.
+const CARD_FROM_ROWS = 24;
 
 let seen: string | undefined;
 let boulder: { stamp: string; bound: Bound } | undefined;
 let filter: Filter = { type: null, isFailuresOnly: false, query: "" };
 let isSearching = false;
 let focused: number | undefined;
+let cardFor: number | undefined;
 let first = 0;
 let note = "";
 let laid: { shown: readonly number[]; perPage: number } | undefined;
@@ -108,6 +117,13 @@ export async function sync(host: Host, root: string): Promise<void> {
 function resetWindow(host: Host): void {
   first = 0;
   note = "";
+  host.ui.invalidate();
+}
+
+function select(host: Host, index: number): void {
+  focused = index;
+  note = "";
+  resetOffset(OPENED_REGION);
   host.ui.invalidate();
 }
 
@@ -213,11 +229,11 @@ function latestGroups(view: View, entries: readonly Entry[]): Piece[][] {
   return latestByType(entries).map(({ type, isPassing }) => [outcome(view, isPassing ? 0 : 1), { text: ` ${TYPE_WORDS[type]}` }]);
 }
 
-function header(view: View, ledger: Ledger): Block {
+function header(view: View, ledger: Ledger, isCard: boolean): Block {
   const { tone, title, groups, when: time } = verdictLine(view, ledger);
   const latest = latestGroups(view, ledger.entries);
   const sep = { text: ` ${view.g.dot} `, color: TONE_KEYS.muted };
-  if (view.isInline) {
+  if (!isCard) {
     const pieces: Piece[] = [...(groups[0]?.slice(0, 1) ?? [])];
     if (ledger.plan !== null) pieces.push({ text: ` ${ledger.plan.name}`, bold: true });
     const more = { text: ` ${view.g.ellipsis}`, color: TONE_KEYS.muted };
@@ -255,13 +271,11 @@ function fitCommand(view: View, entry: Entry, layout: Layout): { fitted: string;
   return { fitted, isCut: fitted !== command };
 }
 
-function entryRow(view: View, entry: Entry, index: number, layout: Layout, isFocused: boolean): RenderElement {
+function entryRow(host: Host, view: View, entry: Entry, index: number, layout: Layout, isFocused: boolean): RenderElement {
+  const { Box, Button } = view.kit;
   const { fitted } = fitCommand(view, entry, layout);
-  const pieces: Piece[] = [
-    { text: isFocused ? `${view.g.pointer} ` : "  " },
-    outcome(view, entry.exitCode),
-    gap,
-    { text: clockOf(entry.at), color: TONE_KEYS.muted },
+  const lead: Piece[] = [{ text: isFocused ? `${view.g.pointer} ` : "  " }, outcome(view, entry.exitCode), gap];
+  const rest: Piece[] = [
     gap,
     typePiece(entry.type),
     gap,
@@ -269,22 +283,29 @@ function entryRow(view: View, entry: Entry, index: number, layout: Layout, isFoc
     ...(layout.agent > 0 && displayWidth(fitted) < layout.command ? [{ text: " ".repeat(layout.command - displayWidth(fitted)) }] : []),
     ...agentPieces(view, entry.verifiedBy, layout.agent),
   ];
-  return Row(view.kit, { key: `entry-${index}`, pieces: fitPieces(pieces, layout.command + FIXED_CELLS + layout.agent, view.g.ellipsis), isFocused });
+  const room = layout.command + FIXED_CELLS + layout.agent - piecesWidth(lead) - CLOCK_CELLS;
+  return Box({
+    key: `entry-${index}`,
+    flexDirection: "row",
+    hover: { backgroundColor: TONE_KEYS.focus },
+    ...(isFocused ? { backgroundColor: TONE_KEYS.focus } : {}),
+    children: [
+      Pieces(view.kit, lead, { isFocused }),
+      Button({ key: `entry-time-${index}`, label: clockOf(entry.at), plain: true, dimColor: true, onPress: view.press(() => select(host, index)) }),
+      Pieces(view.kit, fitPieces(rest, room, view.g.ellipsis), { isFocused }),
+    ],
+  });
 }
 
-function cutLines(text: string, room: number, rows: number, ellipsis: string): { source: string; rows: number; more: number } {
-  const lines = text.replace(/\s+$/, "").split("\n");
-  const shown = lines.slice(0, Math.max(1, rows)).map((line) => fitEnd(line.replaceAll("\t", "  "), room, ellipsis));
-  return { source: shown.join("\n"), rows: shown.length, more: lines.length - shown.length };
-}
+type Opened = { rows: number; element: (top: number) => RenderElement };
 
 /**
- * The focused entry opened, in at most `budget` rows: its command highlighted, its output, then
- * when, by whom and how many secrets were masked.
+ * The focused entry opened in the `left` rows its neighbours leave, or `MIN_OPENED_ROWS` of output
+ * under `cap`: its command when the row cut it and its output in a region that wraps and scrolls,
+ * then when, by whom and how many secrets were masked.
  */
-function detail(view: View, entry: Entry, room: number, budget: number, withCommand: boolean): Block[] {
-  const { Text } = view.kit;
-  const ellipsis = view.g.ellipsis;
+function opened(view: View, entry: Entry, key: string, room: number, left: number, cap: number, withCommand: boolean): Opened {
+  const { Box, Text } = view.kit;
   const command = masked(view, entry.command);
   const output = masked(view, entry.snippet);
   const hidden = command.masked + output.masked;
@@ -293,40 +314,46 @@ function detail(view: View, entry: Entry, room: number, budget: number, withComm
     ...(entry.verifiedBy === null ? [] : [agentMeta(view, entry.verifiedBy)]),
     ...(hidden === 0 ? [] : [[{ text: `${words(hidden, "secret")} masked`, color: TONE_KEYS.muted }]]),
   ];
-  const metaLines = wrapGroups(meta, room, { text: ` ${view.g.dot} `, color: TONE_KEYS.muted });
-  const blocks: Block[] = [];
-  let left = budget - metaLines.length;
-  if (withCommand) {
-    const cut = cutLines(command.text, room, Math.min(COMMAND_ROWS, left - 1), ellipsis);
-    blocks.push({ element: CodeBlock(view.kit, { source: cut.source, language: "bash" }), height: cut.rows });
-    left -= cut.rows;
-  }
-  if (output.text.trim() === "") {
-    blocks.push({ element: Text({ dimColor: true, children: [fitEnd("No output was logged with this run.", room, ellipsis)] }), height: 1 });
-  } else {
-    const whole = cutLines(output.text, room, left, ellipsis);
-    const cut = whole.more > 0 && left > 1 ? cutLines(output.text, room, left - 1, ellipsis) : whole;
-    blocks.push({ element: CodeBlock(view.kit, { source: cut.source }), height: cut.rows });
-    if (cut.more > 0 && cut !== whole) {
-      const more = `${ellipsis} ${cut.more} more line${cut.more === 1 ? "" : "s"}`;
-      blocks.push({ element: Text({ dimColor: true, children: [fitEnd(more, room, ellipsis)] }), height: 1 });
-    }
-  }
-  blocks.push(...metaLines.map((pieces) => ({ element: line(view, pieces, room), height: 1 })));
-  return blocks;
+  const wrappedMeta = wrapGroups(meta, room, { text: ` ${view.g.dot} `, color: TONE_KEYS.muted });
+  const budget = Math.min(cap, Math.max(left, MIN_OPENED_ROWS + wrappedMeta.length));
+  const metaLines = wrappedMeta.slice(0, Math.max(0, budget - MIN_OPENED_ROWS));
+  const units: Unit[] = [
+    ...(withCommand ? codeUnits(view.kit, command.text, room, "bash") : []),
+    ...(output.text.trim() === ""
+      ? [{ element: Text({ dimColor: true, children: [fitEnd("No output was logged with this run.", room, view.g.ellipsis)] }), rows: 1 }]
+      : codeUnits(view.kit, output.text, room)),
+  ];
+  const height = Math.min(units.length, budget - metaLines.length);
+  return {
+    rows: Math.max(0, height) + metaLines.length,
+    element: (top) =>
+      Box({
+        key,
+        flexDirection: "column",
+        paddingLeft: DETAIL_INDENT,
+        children: [
+          ...(height < 1 ? [] : [ScrollRegion({ kit: view.kit, g: view.g, key: OPENED_REGION, left: DETAIL_INDENT, top, width: room, height, units })]),
+          ...metaLines.map((pieces) => line(view, pieces, room)),
+        ],
+      }),
+  };
 }
 
 type Key = readonly [hotkey: string, label: string, work: (surface: RenderSurface) => unknown, isOff?: boolean];
 
-function keyRows(view: View, keys: readonly Key[], status: string): RenderElement[] {
+// More rows than `maxRows` become one: the counter, then the keys that fit beside it.
+function keyRows(view: View, keys: readonly Key[], status: string, maxRows: number): RenderElement[] {
   const { Box, Button, Text } = view.kit;
   const cellsOf = (key: Key) => displayWidth(`${key[0]}: ${key[1]}`);
-  const rows = wrapAt(keys, view.width, COLUMN_GAP, cellsOf);
-  const last = rows.at(-1) ?? [];
+  const wrapped = wrapAt(keys, view.width, COLUMN_GAP, cellsOf);
+  const last = wrapped.at(-1) ?? [];
   const used = last.reduce((sum, key) => sum + cellsOf(key), 0) + COLUMN_GAP * Math.max(0, last.length - 1);
-  const room = view.width - used - COLUMN_GAP;
-  const isBeside = displayWidth(status) <= room;
-  const statusText = (cells: number) => Text({ dimColor: true, children: [fitEnd(status, cells, view.g.ellipsis)] });
+  const roomBeside = view.width - used - COLUMN_GAP;
+  const isBeside = displayWidth(status) <= roomBeside;
+  const isOneRow = wrapped.length + (isBeside ? 0 : 1) > maxRows;
+  const counter = status.split(" ")[0] ?? status;
+  const rows = isOneRow ? wrapAt(keys, view.width - displayWidth(counter) - COLUMN_GAP, COLUMN_GAP, cellsOf).slice(0, 1) : wrapped;
+  const statusText = (text: string, cells: number) => Text({ dimColor: true, children: [fitEnd(text, cells, view.g.ellipsis)] });
   const button = ([hotkey, label, work, isOff]: Key) =>
     Button({
       key: hotkey,
@@ -336,16 +363,19 @@ function keyRows(view: View, keys: readonly Key[], status: string): RenderElemen
       ...(isOff === true ? { dimColor: true } : {}),
       onPress: (press) => view.press(() => work(press.surface))(),
     });
+  if (isOneRow) {
+    return [Box({ key: "keys-0", flexDirection: "row", columnGap: COLUMN_GAP, children: [statusText(counter, displayWidth(counter)), ...(rows[0] ?? []).map(button)] })];
+  }
   return [
     ...rows.map((row, index) =>
       Box({
         key: `keys-${index}`,
         flexDirection: "row",
         columnGap: COLUMN_GAP,
-        children: [...row.map(button), ...(isBeside && index === rows.length - 1 ? [statusText(room)] : [])],
+        children: [...row.map(button), ...(isBeside && index === rows.length - 1 ? [statusText(status, roomBeside)] : [])],
       }),
     ),
-    ...(isBeside ? [] : [statusText(view.width)]),
+    ...(isBeside ? [] : [statusText(status, view.width)]),
   ];
 }
 
@@ -388,42 +418,45 @@ function actions(host: Host, view: View, ledger: Ledger, entry: Entry | undefine
 function statusOf(view: View, at: number, total: number): string {
   const parts = [
     `${at + 1}/${total}`,
-    ...(filter.type === null ? [] : [`${TYPE_WORDS[filter.type]} only`]),
-    ...(filter.isFailuresOnly ? ["failures only"] : []),
-    ...(filter.query.trim() === "" ? [] : [`"${filter.query.trim()}"`]),
     `${view.g.up}${view.g.down} move`,
     ...(note === "" ? [] : [note]),
   ];
   return parts.join(` ${view.g.dot} `);
 }
 
-function searchField(host: Host, view: View): RenderElement[] {
-  if (!isSearching && filter.query === "") return [];
-  return [
-    Field(view.kit, {
-      key: SEARCH,
-      label: "search ",
-      placeholder: "command, agent or type",
-      value: filter.query,
-      onInput: (value) => {
-        filter = { ...filter, query: value };
-        resetWindow(host);
-      },
-      onSubmit: (value) => {
-        filter = { ...filter, query: value };
-        isSearching = value.trim() !== "";
-        resetWindow(host);
-      },
-    }),
+function filterRow(host: Host, view: View, shown: number, total: number): RenderElement[] {
+  const isFinding = isSearching || filter.query !== "";
+  if (!isFinding && filter.type === null && !filter.isFailuresOnly) return [];
+  const { Box } = view.kit;
+  const flags: Piece[] = [
+    ...(filter.type === null ? [] : [{ text: " " }, chip(TYPE_WORDS[filter.type].toUpperCase(), "info", view.isAscii)]),
+    ...(filter.isFailuresOnly ? [{ text: " " }, chip("FAILING", "fail", view.isAscii)] : []),
+    { text: ` ${shown} of ${total}`, color: TONE_KEYS.muted },
   ];
+  const field = Field(view.kit, {
+    key: SEARCH,
+    label: "Find",
+    placeholder: "command, agent or type",
+    value: filter.query,
+    onInput: (value) => {
+      filter = { ...filter, query: value };
+      resetWindow(host);
+    },
+    onSubmit: (value) => {
+      filter = { ...filter, query: value };
+      isSearching = value.trim() !== "";
+      resetWindow(host);
+    },
+  });
+  return [Box({ key: "filter-row", flexDirection: "row", width: view.width, children: [...(isFinding ? [Box({ flexGrow: 1, children: [field] })] : []), Line(view.kit, flags)] })];
 }
 
 type Drawn = { elements: RenderElement[]; height: number };
 
 // Newest first, a rule naming the day above each day's entries, the window kept on the focused
-// entry. `isExpanded` opens that entry under its row; the split tier shows it beside the list.
-function timeline(view: View, ledger: Ledger, shown: readonly number[], current: number, room: number, list: { width: number; isExpanded: boolean }): Drawn {
-  const { Box } = view.kit;
+// entry, `↑ n more` and `↓ n more` where entries are out of view. `isExpanded` opens that entry
+// under its row with every row left after its neighbours; the split tier shows it beside the list.
+function timeline(host: Host, view: View, ledger: Ledger, shown: readonly number[], current: number, room: number, list: { width: number; top: number; isExpanded: boolean }): Drawn {
   const items = shown.flatMap((index) => {
     const entry = ledger.entries[index];
     return entry === undefined ? [] : [{ index, entry }];
@@ -435,59 +468,53 @@ function timeline(view: View, ledger: Ledger, shown: readonly number[], current:
   const layout = layoutOf(ledger.entries, list.width);
   const days = items.map(({ entry }) => dayOf(entry.at));
   const opensDay = days.map((day, position) => position === 0 || days[position - 1] !== day);
+  const rowsAt = (position: number) => 1 + (opensDay[position] === true ? 1 : 0);
   const open = items[current];
-  const budget = Math.min(room - 2, (view.isInline ? INLINE_SNIPPET_ROWS : DOCK_SNIPPET_ROWS) + COMMAND_ROWS + 2);
-  const expanded =
-    list.isExpanded && open !== undefined
-      ? detail(view, open.entry, list.width - DETAIL_INDENT, budget, !view.isInline || fitCommand(view, open.entry, layout).isCut)
-      : [];
-  const expandedRows = expanded.reduce((sum, block) => sum + block.height, 0);
-  const heights = items.map((_, position) => 1 + (opensDay[position] === true ? 1 : 0) + (position === current ? expandedRows : 0));
-  const placed = placeEntries(heights, opensDay, first, current, room);
+  const above = Math.min(NEIGHBOURS, current);
+  const below = Math.min(NEIGHBOURS, items.length - 1 - current);
+  const rowsFrom = (from: number, count: number) => Array.from({ length: count }, (_, at) => rowsAt(from + at)).reduce((sum, rows) => sum + rows, 0);
+  const around = rowsFrom(current - above, above) + rowsFrom(current + 1, below);
+  const reserved = items.length > above + below + 1 ? 2 : 0;
+  const lead = opensDay[current - above] === true ? 0 : 1;
+  const own = rowsAt(current);
+  const cap = room - (items.length > 1 ? (current > 0 && current < items.length - 1 ? 2 : 1) : 0) - own;
+  const expansion =
+    list.isExpanded && open !== undefined && cap > 0
+      ? opened(view, open.entry, `detail-${open.index}`, list.width - DETAIL_INDENT, room - reserved - own - lead - around, cap, fitCommand(view, open.entry, layout).isCut)
+      : undefined;
+  const heights = items.map((_, position) => rowsAt(position) + (position === current ? (expansion?.rows ?? 0) : 0));
+  const fit = (rows: number, from: number) => placeEntries(heights, opensDay, from, current, rows);
+  let placed = fit(room, first);
+  if (placed.end - placed.start < items.length) {
+    placed = fit(room - 2, placed.start);
+    if (placed.start === 0 || placed.end === items.length) placed = fit(room - 1, placed.start);
+  }
   first = placed.start;
   laid = { shown, perPage: Math.max(1, placed.end - placed.start) };
 
-  const elements: RenderElement[] = [];
+  const isAbove = placed.start > 0;
+  const isBelow = placed.end < items.length;
+  const limit = room - (isAbove ? 1 : 0) - (isBelow ? 1 : 0);
+  const edge = (text: string) => view.kit.Text({ dimColor: true, children: [fitEnd(text, list.width, view.g.ellipsis)] });
+  const elements: RenderElement[] = isAbove ? [edge(`  ${view.g.up} ${placed.start} more`)] : [];
   let height = 0;
   for (let position = placed.start; position < placed.end; position += 1) {
     const item = items[position];
     if (item === undefined) continue;
-    if (position === placed.start || opensDay[position] === true) {
+    if ((position === placed.start || opensDay[position] === true) && height + 2 <= limit) {
       elements.push(line(view, rule(list.width, view.g, view.isAscii, dayLabel(item.entry.at)), list.width));
       height += 1;
     }
-    elements.push(entryRow(view, item.entry, item.index, layout, position === current));
+    elements.push(entryRow(host, view, item.entry, item.index, layout, position === current));
     height += 1;
-    if (position === current && expanded.length > 0) {
-      elements.push(
-        Box({ key: `detail-${item.index}`, flexDirection: "column", paddingLeft: DETAIL_INDENT, children: expanded.map((block) => block.element) }),
-      );
-      height += expandedRows;
+    if (position === current && expansion !== undefined) {
+      elements.push(expansion.element(list.top + (isAbove ? 1 : 0) + height));
+      height += expansion.rows;
     }
   }
-  return { elements, height };
+  if (isBelow) elements.push(...blanks(view, limit - height), edge(`  ${view.g.down} ${items.length - placed.end} more`));
+  return { elements, height: isBelow ? room : height + (isAbove ? 1 : 0) };
 }
-
-// A line cut into rows of at most `room` cells at its last space, or mid-word where a word is
-// longer than a row, so a wrapped command or output keeps every character.
-function wrapLine(line: string, room: number): string[] {
-  const rows: string[] = [];
-  let rest = line;
-  while (displayWidth(rest) > room) {
-    const head = fitEnd(rest, room, "");
-    const space = head.lastIndexOf(" ");
-    const cut = space > 0 ? space + 1 : Math.max(1, head.length);
-    rows.push(rest.slice(0, cut).trimEnd());
-    rest = rest.slice(cut);
-  }
-  return [...rows, rest];
-}
-
-const wrapCode = (text: string, room: number): string[] =>
-  text
-    .replace(/\s+$/, "")
-    .split("\n")
-    .flatMap((line) => wrapLine(line.replaceAll("\t", "  "), room));
 
 // A final verification proves the plan whose hash it carries; one without a hash proves any plan.
 function planLine(view: View, entry: Entry, plan: Ledger["plan"]): Piece[] {
@@ -497,15 +524,11 @@ function planLine(view: View, entry: Entry, plan: Ledger["plan"]): Piece[] {
   return [{ text: `${view.g.warn} `, color: TONE_KEYS.warn }, { text: `For an earlier version of ${plan.name}`, color: TONE_KEYS.muted }];
 }
 
-const LABELLED_ROWS = 10;
-const CARD_COMMAND_ROWS = 6;
-
 /**
- * The focused run in full, in at most `budget` rows: its exit code, when and by whom, the plan a
- * final verification covers, then its command and its output, both wrapped rather than cut. With
- * room, each part has a label and a blank row before it.
+ * The focused run in full: its exit code, when and by whom, the plan a final verification covers,
+ * then its command and its output, both wrapped rather than cut.
  */
-function cardBlocks(view: View, entry: Entry, plan: Ledger["plan"], room: number, budget: number): Block[] {
+function cardUnits(view: View, entry: Entry, plan: Ledger["plan"], room: number): Unit[] {
   const { Text } = view.kit;
   const muted = TONE_KEYS.muted;
   const command = masked(view, entry.command);
@@ -522,48 +545,45 @@ function cardBlocks(view: View, entry: Entry, plan: Ledger["plan"], room: number
     { text: ` ${view.g.dot} `, color: muted },
   );
   const lead = [...facts, ...(entry.type === "final_verification" ? [planLine(view, entry, plan)] : [])];
-  const blocks: Block[] = lead.map((pieces) => ({ element: line(view, pieces, room), height: 1 }));
-  let left = budget - lead.length;
-  const commandRows = wrapCode(command.text, room);
-  const outputRows = output.text.trim() === "" ? [] : wrapCode(output.text, room);
-  const isLabelled = left >= LABELLED_ROWS;
-  const section = (label: string) => {
-    if (!isLabelled) return;
-    blocks.push({ element: Text({ children: [" "] }), height: 1 }, { element: Text({ color: muted, children: [label] }), height: 1 });
-    left -= 2;
-  };
+  const units: Unit[] = lead.map((pieces) => ({ element: line(view, pieces, room), rows: 1 }));
+  const section = (label: string) => units.push({ element: Text({ children: [" "] }), rows: 1 }, { element: Text({ color: muted, children: [label] }), rows: 1 });
   section("Command");
-  const shownCommand = commandRows.slice(0, Math.max(1, Math.min(CARD_COMMAND_ROWS, left - (isLabelled ? 3 : 1))));
-  const lastCommand = shownCommand.length < commandRows.length ? shownCommand.length - 1 : -1;
-  const commandSource = shownCommand.map((row, at) => (at === lastCommand ? fitEnd(`${row}${view.g.ellipsis}`, room, view.g.ellipsis) : row)).join("\n");
-  blocks.push({ element: CodeBlock(view.kit, { source: commandSource, language: "bash" }), height: shownCommand.length });
-  left -= shownCommand.length;
+  units.push(...codeUnits(view.kit, command.text, room, "bash"));
   section("Output");
-  if (outputRows.length === 0) {
-    blocks.push({ element: Text({ dimColor: true, children: [fitEnd("No output was logged with this run.", room, view.g.ellipsis)] }), height: 1 });
-    return blocks;
+  if (output.text.trim() === "") {
+    units.push({ element: Text({ dimColor: true, children: [fitEnd("No output was logged with this run.", room, view.g.ellipsis)] }), rows: 1 });
+    return units;
   }
-  const fits = outputRows.length <= left;
-  const shown = outputRows.slice(0, Math.max(1, fits ? left : left - 1));
-  blocks.push({ element: CodeBlock(view.kit, { source: shown.join("\n") }), height: shown.length });
-  const more = outputRows.length - shown.length;
-  if (more > 0) blocks.push({ element: Text({ dimColor: true, children: [fitEnd(`${view.g.ellipsis} ${more} more line${more === 1 ? "" : "s"}`, room, view.g.ellipsis)] }), height: 1 });
-  return blocks;
+  units.push(...codeUnits(view.kit, output.text, room));
+  return units;
 }
 
-function detailCard(view: View, entry: Entry, index: number, plan: Ledger["plan"], width: number, room: number): Drawn {
-  const blocks = cardBlocks(view, entry, plan, width - 4, room - 3);
+/** The card's content scrolls inside its border; `at` is the card's own corner in the tab's rows and columns. */
+function detailCard(view: View, entry: Entry, index: number, plan: Ledger["plan"], width: number, room: number, at: { left: number; top: number }): Drawn {
+  const inner = width - 4;
+  const units = cardUnits(view, entry, plan, inner);
+  const height = Math.max(1, Math.min(units.length, room - CARD_CHROME_ROWS));
   const isPass = entry.exitCode === 0;
   const name = entry.type === "final_verification" ? "Final verification" : `${TYPE_WORDS[entry.type].replace(/^./, (first) => first.toUpperCase())} run`;
+  const region = ScrollRegion({
+    kit: view.kit,
+    g: view.g,
+    key: OPENED_REGION,
+    left: at.left + CARD_INSET,
+    top: at.top + CARD_INSET,
+    width: inner,
+    height,
+    units,
+  });
   const element = Card(view.kit, {
     key: `detail-${index}`,
     title: `${isPass ? view.g.check : view.g.cross} ${name} ${isPass ? "passed" : "failed"}`,
     tone: isPass ? "ok" : "fail",
     isAscii: view.isAscii,
     width,
-    children: blocks.map((block) => block.element),
+    children: [region],
   });
-  return { elements: [element], height: 3 + blocks.reduce((sum, block) => sum + block.height, 0) };
+  return { elements: [element], height: CARD_CHROME_ROWS + height };
 }
 
 export const view: TabView = async (host, view) => {
@@ -577,24 +597,32 @@ export const view: TabView = async (host, view) => {
     const failure = `${view.g.cross} ${masked(view, ledger.error).text}`;
     return [Text({ color: TONE_KEYS.fail, wrap: "wrap", children: [failure] }), Text({ dimColor: true, wrap: "wrap", children: [why] })];
   }
-  const head = header(view, ledger);
-  if (ledger.entries.length === 0) return [head.element, noticeRow(view, { kind: "empty" }, words)];
+  const head = header(view, ledger, !view.isInline && view.rows >= CARD_FROM_ROWS);
+  if (ledger.entries.length === 0) {
+    const how = "Record a run with an evidence_log call after a build, test or lint.";
+    return [head.element, noticeRow(view, { kind: "empty" }, words), Text({ dimColor: true, wrap: "wrap", children: [how] })];
+  }
 
   const shown = shownIndices(ledger.entries, filter, view.home);
   const current = Math.max(0, shown.indexOf(focused ?? -1));
   const index = shown[current];
   focused = index;
+  if (index !== cardFor) resetOffset(OPENED_REGION);
+  cardFor = index;
   const entry = index === undefined ? undefined : ledger.entries[index];
   const status = shown.length === 0 ? `0/${ledger.entries.length} ${view.g.dot} nothing matches` : statusOf(view, current, shown.length);
-  const keys = keyRows(view, actions(host, view, ledger, entry), status);
-  const field = searchField(host, view);
-  const room = Math.max(MIN_ROOM, view.rows - head.height - keys.length - field.length);
-  const isSplit = view.tier === "split" && entry !== undefined && index !== undefined;
+  const filters = filterRow(host, view, shown.length, ledger.entries.length);
+  const spare = view.rows - head.height - filters.length - MIN_TIMELINE_ROWS;
+  const allKeys = keyRows(view, actions(host, view, ledger, entry), status, Math.max(1, spare));
+  const keys = spare < 1 ? [] : allKeys;
+  const room = Math.max(MIN_TIMELINE_ROWS, view.rows - head.height - filters.length - keys.length);
+  const top = head.height + filters.length;
+  const isSplit = view.tier === "split" && entry !== undefined && index !== undefined && room >= MIN_CARD_ROWS;
   const listWidth = isSplit ? Math.floor(view.width * MASTER_SHARE) : view.width;
-  const list = timeline(view, ledger, shown, current, room, { width: listWidth, isExpanded: !isSplit });
+  const list = timeline(host, view, ledger, shown, current, room, { width: listWidth, top, isExpanded: !isSplit });
   let body = list;
   if (isSplit) {
-    const card = detailCard(view, entry, index, ledger.plan, view.width - listWidth - COLUMN_GAP, room);
+    const card = detailCard(view, entry, index, ledger.plan, view.width - listWidth - COLUMN_GAP, room, { left: listWidth + COLUMN_GAP, top });
     body = {
       elements: [
         Box({
@@ -608,7 +636,7 @@ export const view: TabView = async (host, view) => {
       height: Math.max(list.height, card.height),
     };
   }
-  const filled = head.height + Math.max(room, body.height) + keys.length + field.length;
+  const filled = top + Math.max(room, body.height) + keys.length;
   // One row past the body brings the arrows and the wheel to `scroll` instead of the focus ring.
-  return [head.element, ...body.elements, ...blanks(view, room - body.height), ...keys, ...field, ...blanks(view, view.rows + 1 - filled)];
+  return [head.element, ...filters, ...body.elements, ...blanks(view, room - body.height), ...keys, ...blanks(view, view.rows + 1 - filled)];
 };

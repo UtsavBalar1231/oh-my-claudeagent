@@ -7,7 +7,6 @@ import {
   boardOf,
   type Card,
   CONTENTS_CAP,
-  chunks,
   firstOpenTask,
   isReadable,
   type Page,
@@ -20,7 +19,7 @@ import {
   taskMarkdown,
 } from "../../src/core/plan-reader.ts";
 import { ago, type Proof, proofSummary, type Run, timeAgo, type Verdict } from "../../src/core/proof.ts";
-import { agentGlyph, dayOf, displayWidth, fitEnd, fitMiddle, KEYS, keyHint, padStart, shortType } from "../../src/core/ui-kit.ts";
+import { agentGlyph, dayOf, displayWidth, fitEnd, fitMiddle, KEYS, keyHint, padStart, shortType, wrapText } from "../../src/core/ui-kit.ts";
 import {
   agentKey,
   bar,
@@ -40,8 +39,9 @@ import {
 import type { Input, Phase } from "../dispatch.ts";
 import { boundPlanOf, type Host, type ProofFacts, proofFacts, reason, sessionOf, type State, verdictFor } from "../host.ts";
 import type { Subcommand } from "../omca-router.ts";
-import { edge, keyButton, noticeRow, open, patchPane, refocus as focusIn, rule, type TabView, type View, wrapAt } from "../pane.ts";
-import { Card as CardBox, CodeBlock, Field, Line } from "../ui.ts";
+import { blanks, edge, keyButton, noticeRow, open, patchPane, refocus as focusIn, rule, type TabView, type View, wrapAt } from "../pane.ts";
+import { codeUnits, markdownUnits, resetOffset, ScrollRegion, scrollKeyed, type Unit } from "../regions.ts";
+import { Card as CardBox, Field, Line } from "../ui.ts";
 
 type Loaded = Extract<State["plan"], { pages: unknown }>;
 type Agent = State["agents"][string];
@@ -71,23 +71,34 @@ const TASK = "task-";
 const FILTER = "filter";
 const UNRESOLVED_PLANS = "~/.claude/plans";
 const MIN_LIST_ROWS = 3;
-// Docked: title, meta, rule, two edge lines, rule, key row, hint line.
-const DOCK_CHROME_ROWS = 8;
-// Inline: the title line, two edge lines, the key row.
-const INLINE_CHROME_ROWS = 4;
+// Docked and full: title, meta, rule, two edge lines, rule, hint line, then the key rows.
+const FULL_CHROME_ROWS = 7;
+// Otherwise: the title line, two edge lines, then the key rows.
+const COMPACT_CHROME_ROWS = 3;
 const DATE = 10;
 const KEY_GAP = 3;
 const BOARD_KEY_GAP = 2;
+const TWO_KEY_ROWS_FROM = 30;
+// Below this many rows the header is one line and the hint line goes.
+const SHORT_ROWS = 12;
 // A docked board shorter than this draws its header as two plain lines instead of a card.
 const CARD_FROM_ROWS = 24;
 // The title and three lines inside the card's two borders; a fourth line when agents run.
 const CARD_ROWS = 6;
-const EXPANSION_ROWS = 4;
+const EXPANSION_MIN = 2;
+const NEIGHBOURS = 2;
+const LEAN_ROWS = 4;
+const TITLE_SHARE = 0.4;
 const MIN_TITLE = 12;
-const SPLIT_SHARE = 0.55;
+const SPLIT_FROM_ROWS = 14;
+const SPLIT_MIN_LIST = 56;
+const SPLIT_MIN_DETAIL = 32;
+const SPLIT_SHARE = 0.65;
+const PAGE_REGION = "page-region";
 const HEADER_BAR = 24;
 const COMPACT_BAR = 10;
 const EVIDENCE_SHOWN = 3;
+const DETAIL = "board-detail-region";
 const UNREADABLE = "None of its files can be read, so no run can prove it.";
 
 const STATUS: Readonly<Record<Status, { word: string; tone: ChipTone; color: ThemeKey | undefined }>> = {
@@ -118,6 +129,15 @@ let note: { text: string; level: Level } | undefined;
 let facts: ProofFacts = { changes: new Map(), proving: [], ledgerError: null, ledgerSeen: "" };
 let factsSignature = "";
 let memo: { key: string; board: Board } | undefined;
+let detailShown: number | undefined;
+let pageShown = "";
+// A narrowed list with little room draws no milestone headings; the cursor's ring reads the same items.
+let isLean = false;
+// Whether the latest drawing windowed its list: it then ends in one blank row past the body, which
+// keeps the arrows and the wheel on this tab's own scroll.
+let isCut = false;
+let tallies: ReadonlyMap<string, string> = new Map();
+let boundTo: string | undefined;
 // The engine holds the ring by position, so a refocus sent while the Find field is still drawn
 // lands one element off once the field goes; it is sent from the first drawing without it.
 let isFieldClosing = false;
@@ -206,9 +226,21 @@ async function listPlans(host: Host): Promise<void> {
   try {
     const files = (await host.fs.exists(dir)) ? recentPlans(await host.fs.list(dir), dir) : [];
     await patchPane(host, (pane) => ({ ...pane, plans: { dir, files }, errors: { ...pane.errors, plans: null } }));
+    const counts = await Promise.all(
+      files.map(async (file) => {
+        const text = await host.fs.read(file.path).then(
+          (source) => parsePlan(source),
+          () => undefined,
+        );
+        return [file.path, text === undefined || text.total === 0 ? "" : `${text.done}/${text.total}`] as const;
+      }),
+    );
+    tallies = new Map(counts.filter(([, count]) => count !== ""));
+    boundTo = await boundPath(host);
     const current = (await host.state.plan.get()).value?.path;
     pick = Math.max(0, files.findIndex((file) => current !== undefined && samePath(platform, file.path, current)));
   } catch (error) {
+    tallies = new Map();
     const failure = `Could not list ${tildePath(platform, dir, home)}: ${reason(error)}`;
     await patchPane(host, (pane) => ({ ...pane, plans: { dir, files: [] }, errors: { ...pane.errors, plans: failure } }));
   }
@@ -309,7 +341,8 @@ function itemsOf(board: Board): Item[] {
     const shown = cards.filter(isShown);
     if (shown.length === 0) return [];
     const done = cards.filter((card) => card.done).length;
-    return [{ kind: "group" as const, group: index, done, total: group.tasks.length }, ...shown.map((card) => ({ kind: "task" as const, card }))];
+    const tasks = shown.map((card) => ({ kind: "task" as const, card }));
+    return isLean ? tasks : [{ kind: "group" as const, group: index, done, total: group.tasks.length }, ...tasks];
   });
 }
 
@@ -401,18 +434,26 @@ export async function focus(host: Host, e: Input<"ui.focus">): Promise<Phase<Inp
 
 // The lists draw their own window, so the engine has nothing to scroll for these keys. A page key
 // asks for `bodyRows`, Home and End for `contentRows`; where the two are equal the key is read as a page key.
+// Anything shorter than a page is a wheel tick, which moves the cursor by its rows as the arrows do.
 export async function scroll(host: Host, e: Input<"ui.scroll">): Promise<boolean> {
   const list = listShown();
   const last = list === undefined ? undefined : drawn[list];
   const isPage = Math.abs(e.by) === e.bodyRows;
   const isEnd = !isPage && Math.abs(e.by) === e.contentRows;
-  if (list === undefined || last === undefined || (!isPage && !isEnd)) return false;
+  const isTick = !isPage && !isEnd && Math.abs(e.by) < e.bodyRows;
+  if (list === undefined && (mode === "detail" || mode === "page") && e.pointer === undefined) {
+    if (!scrollKeyed(e.by, isPage ? "page" : isEnd ? "end" : "row")) return false;
+    host.ui.invalidate();
+    return true;
+  }
+  if (list === undefined || last === undefined || (!isPage && !isEnd && !isTick)) return false;
   const ring = await ringOf(host, list);
   if (ring === undefined || ring.focus.rows.length === 0) return false;
   const { rows, total, current } = ring.focus;
   const shown = rows.filter((index) => index >= last.start && index < last.start + last.size).length;
   const at = Math.max(0, rows.indexOf(current));
-  const to = isEnd ? (e.by > 0 ? rows.length - 1 : 0) : Math.max(0, Math.min(rows.length - 1, at + Math.sign(e.by) * Math.max(1, shown)));
+  const step = isTick ? e.by : Math.sign(e.by) * Math.max(1, shown);
+  const to = isEnd ? (e.by > 0 ? rows.length - 1 : 0) : Math.max(0, Math.min(rows.length - 1, at + step));
   const target = rows[to] ?? current;
   if (target === current) return true;
   ring.select(target);
@@ -431,39 +472,53 @@ function place(host: Host, list: List, focusList: FocusList, size: number, key: 
   return placed.start;
 }
 
-// A docked list that has to be cut leaves its tree one row short of the body, so the rows a page key
-// asks for (the body's) differ from the rows Home and End ask for (the tree's). An inline tree is
-// padded to the body, so there the two stay equal.
-function roomFor(view: View, chrome: number, total: number): number {
-  const room = Math.max(MIN_LIST_ROWS, view.rows - chrome);
-  if (view.isInline) return room;
-  return total <= room ? room : Math.max(MIN_LIST_ROWS, room - 1);
+const roomFor = (view: View, chrome: number): number => Math.max(1, view.rows - chrome);
+
+const bareKey = ([hotkey, , work, ...off]: Key): Key => [hotkey, "", work, ...off];
+
+const keyCells = ([hotkey, label]: Key) => displayWidth(`${hotkey}: ${label}`);
+
+// Keys that do not fit the rows a pane this tall may spend on them lose their labels, last first.
+function keyLayout(view: View, keys: readonly Key[], gap: number, most = view.rows < TWO_KEY_ROWS_FROM ? 1 : 2): Key[][] {
+  const rowsWith = (bare: number) =>
+    wrapAt(keys.map((key, index) => (index < keys.length - bare ? key : bareKey(key))), view.width, gap, keyCells);
+  let bare = 0;
+  while (bare < keys.length && rowsWith(bare).length > most) bare += 1;
+  return rowsWith(bare);
 }
 
-const listRows = (view: View, total: number) => roomFor(view, view.isInline ? INLINE_CHROME_ROWS : DOCK_CHROME_ROWS, total);
-
-function keyRow(view: View, keys: readonly Key[], gap: number): RenderElement {
+function keyRow(view: View, keys: readonly Key[], gap: number, tail?: RenderElement): RenderElement {
   return view.kit.Box({
     flexDirection: "row",
     columnGap: gap,
-    children: keys.map(([hotkey, label, work, isOff]) => keyButton(view, hotkey, label, work, isOff)),
+    children: [...keys.map(([hotkey, label, work, isOff]) => keyButton(view, hotkey, label, work, isOff)), ...(tail === undefined ? [] : [tail])],
   });
 }
 
-function keyRows(view: View, keys: readonly Key[], gap: number): RenderElement[] {
-  return wrapAt(keys, view.width, gap, ([hotkey, label]) => displayWidth(`${hotkey}: ${label}`)).map((row) => keyRow(view, row, gap));
+const keyRowsOf = (view: View, layout: readonly (readonly Key[])[], gap: number, tail?: RenderElement): RenderElement[] =>
+  layout.map((row, index) => keyRow(view, row, gap, index === layout.length - 1 ? tail : undefined));
+
+const keyRows = (view: View, keys: readonly Key[], gap: number): RenderElement[] => keyRowsOf(view, keyLayout(view, keys, gap), gap);
+
+type Frame = { isFull: boolean; keys: Key[][]; chrome: number };
+
+function frameFor(view: View, keys: readonly Key[]): Frame {
+  const layout = keyLayout(view, keys, KEY_GAP);
+  const isFull = !view.isInline && view.rows - (FULL_CHROME_ROWS + layout.length) >= MIN_LIST_ROWS;
+  return { isFull, keys: layout, chrome: (isFull ? FULL_CHROME_ROWS : COMPACT_CHROME_ROWS) + layout.length };
 }
 
 function frame(
   view: View,
-  parts: { title: string; meta: string; shortMeta: string; above: string; below: string; rows: RenderElement[]; keys: readonly Key[]; hint: string },
+  { isFull, keys }: Frame,
+  parts: { title: string; meta: string; shortMeta: string; above: string; below: string; rows: RenderElement[]; hint: string },
 ): RenderElement[] {
   const { Box, Text } = view.kit;
   const ellipsis = view.g.ellipsis;
-  if (view.isInline) {
+  if (!isFull) {
     const meta = ` ${view.g.dot} ${parts.shortMeta}`;
     const title = fitEnd(parts.title, Math.max(1, view.width - displayWidth(meta)), ellipsis);
-    const keysWidth = parts.keys.reduce((sum, [hotkey, label]) => sum + displayWidth(`${hotkey}: ${label}`) + KEY_GAP, 0);
+    const keysWidth = (keys[0] ?? []).reduce((sum, key) => sum + keyCells(key) + KEY_GAP, 0);
     const hint = fitEnd(parts.hint, view.width - keysWidth, ellipsis);
     return [
       Box({
@@ -476,14 +531,7 @@ function frame(
       edge(view, parts.above),
       ...parts.rows,
       edge(view, parts.below),
-      Box({
-        flexDirection: "row",
-        columnGap: KEY_GAP,
-        children: [
-          ...parts.keys.map(([hotkey, label, work, isOff]) => keyButton(view, hotkey, label, work, isOff)),
-          Text({ dimColor: true, children: [hint === "" ? " " : hint] }),
-        ],
-      }),
+      ...keyRowsOf(view, keys, KEY_GAP, keys.length === 1 ? Text({ dimColor: true, children: [hint === "" ? " " : hint] }) : undefined),
     ];
   }
   return [
@@ -494,7 +542,7 @@ function frame(
     ...parts.rows,
     edge(view, parts.below),
     rule(view),
-    keyRow(view, parts.keys, KEY_GAP),
+    ...keyRowsOf(view, keys, KEY_GAP),
     Text({ dimColor: true, children: [fitEnd(parts.hint, view.width, ellipsis)] }),
   ];
 }
@@ -513,12 +561,17 @@ const moveHint = (view: View) =>
 
 const masked = (view: View, text: string) => redact(text, view.home, view.g.mask).text;
 
+const dotOf = (view: View) => (view.isAscii ? " | " : ` ${view.g.dot} `);
+
 function proofPieces(view: View, ctx: Ctx, isShort: boolean): Piece[] {
   if (facts.ledgerError !== null) return [{ text: view.g.cross, color: TONE_KEYS.fail }, { text: ` evidence ledger unreadable: ${facts.ledgerError}` }];
   const verdicts = ctx.board.cards.map((card) => verdictOf(card)?.proof);
-  if (verdicts.every((verdict) => verdict === undefined)) return [{ text: "no task lists a file to prove", color: TONE_KEYS.muted }];
+  if (verdicts.every((verdict) => verdict === undefined)) {
+    const note = ctx.board.cards.some((card) => card.files.length > 0) ? "no listed file can be read" : "no task lists a file to prove";
+    return [{ text: note, color: TONE_KEYS.muted }];
+  }
   const { proven, unproven, failed } = proofSummary(verdicts);
-  const sep: Piece = { text: isShort ? "  " : ` ${view.g.dot} `, color: TONE_KEYS.muted };
+  const sep: Piece = { text: isShort ? "  " : dotOf(view), color: TONE_KEYS.muted };
   const part = (level: Level, count: number, word: string): Piece[] => {
     const { glyph, color } = levelMark(level, view.g);
     const muted = count === 0 ? { color: TONE_KEYS.muted } : {};
@@ -535,7 +588,7 @@ function agentPieces(view: View, agents: readonly Agent[]): Piece[] {
   return agents
     .filter((agent) => agent.endedAt === null)
     .flatMap((agent, index) => [
-      ...(index === 0 ? [] : [{ text: ` ${view.g.dot} `, color: TONE_KEYS.muted }]),
+      ...(index === 0 ? [] : [{ text: dotOf(view), color: TONE_KEYS.muted }]),
       { text: `${agentGlyph(agent.type, view.g)} ${shortType(agent.type)}`, color: agentKey(agent.type) },
       ...(agent.task === undefined ? [] : [{ text: ` on ${agent.task}`, color: TONE_KEYS.muted }]),
     ]);
@@ -552,29 +605,31 @@ function statusChip(view: View, board: Board): Piece[] {
   return [chip(board.status, board.status === "FINAL" ? "plan" : "warn", view.isAscii), { text: " " }];
 }
 
-function header(view: View, ctx: Ctx, isCard: boolean): RenderElement[] {
+type Head = "line" | "lines" | "card";
+
+const headOf = (view: View): Head => (view.isInline || view.rows < SHORT_ROWS ? "line" : view.rows < CARD_FROM_ROWS ? "lines" : "card");
+
+function header(view: View, ctx: Ctx, head: Head): RenderElement[] {
   const { board, plan } = ctx;
   const parts = tally(ctx);
   const count = `${parts.done}/${board.cards.length}`;
   const ellipsis = view.g.ellipsis;
   const lead = statusChip(view, board);
-  if (view.isInline || !isCard) {
+  if (head !== "card") {
     const runningCount = ctx.agents.filter((agent) => agent.endedAt === null).length;
-    const tail: Piece[] = [
-      { text: " " },
-      ...bar(parts, COMPACT_BAR, view.isAscii),
-      { text: ` ${count} `, bold: true },
-      ...proofPieces(view, ctx, true),
-      ...(runningCount === 0 ? [] : [{ text: `  ${view.g.agent} `, color: TONE_KEYS.active }, { text: `${runningCount} running` }]),
-    ];
-    if (view.isInline) {
-      const room = Math.max(1, view.width - piecesWidth(lead) - piecesWidth(tail));
-      return [Line(view.kit, fitPieces([...lead, { text: fitEnd(plan.title, room, ellipsis), bold: true }, ...tail], view.width, ellipsis))];
+    const counts: Piece[] = [{ text: " " }, ...bar(parts, COMPACT_BAR, view.isAscii), { text: ` ${count} `, bold: true }];
+    const running: Piece[] = runningCount === 0 ? [] : [{ text: `  ${view.g.agent} `, color: TONE_KEYS.active }, { text: `${runningCount} running` }];
+    const tails = [[...counts, ...proofPieces(view, ctx, true), ...running], [...counts, ...running], counts];
+    if (head === "lines") {
+      return [
+        Line(view.kit, fitPieces([...lead, { text: plan.title, bold: true }], view.width, ellipsis)),
+        Line(view.kit, fitPieces((tails[0] ?? []).slice(1), view.width, ellipsis)),
+      ];
     }
-    return [
-      Line(view.kit, fitPieces([...lead, { text: plan.title, bold: true }], view.width, ellipsis)),
-      Line(view.kit, fitPieces(tail.slice(1), view.width, ellipsis)),
-    ];
+    const wanted = Math.min(displayWidth(plan.title), Math.ceil(view.width * TITLE_SHARE));
+    const tail = tails.find((each) => view.width - piecesWidth(lead) - piecesWidth(each) >= wanted) ?? counts;
+    const room = Math.max(1, view.width - piecesWidth(lead) - piecesWidth(tail));
+    return [Line(view.kit, fitPieces([...lead, { text: fitEnd(plan.title, room, ellipsis), bold: true }, ...tail], view.width, ellipsis))];
   }
   const inner = Math.max(1, view.width - 4);
   const next = board.cards.find((card) => !card.done);
@@ -582,7 +637,7 @@ function header(view: View, ctx: Ctx, isCard: boolean): RenderElement[] {
   const blocked: Piece[] =
     parts.blocked === 0
       ? []
-      : [{ text: ` ${view.g.dot} `, color: TONE_KEYS.muted }, { text: view.g.blocked, color: TONE_KEYS.warn }, { text: ` ${parts.blocked} blocked` }];
+      : [{ text: dotOf(view), color: TONE_KEYS.muted }, { text: view.g.blocked, color: TONE_KEYS.warn }, { text: ` ${parts.blocked} blocked` }];
   const barWidth = Math.max(4, Math.min(HEADER_BAR, inner - piecesWidth(lead) - displayWidth(` ${count}`) - piecesWidth(blocked)));
   const lines: Piece[][] = [
     [...lead, ...bar(parts, barWidth, view.isAscii), { text: ` ${count}`, bold: true }, ...blocked],
@@ -608,9 +663,8 @@ function header(view: View, ctx: Ctx, isCard: boolean): RenderElement[] {
   ];
 }
 
-const headerRows = (view: View, ctx: Ctx, isCard: boolean) => {
-  if (view.isInline) return 1;
-  if (!isCard) return 2;
+const headerRows = (ctx: Ctx, head: Head) => {
+  if (head !== "card") return head === "line" ? 1 : 2;
   return CARD_ROWS + (ctx.agents.some((agent) => agent.endedAt === null) ? 1 : 0);
 };
 
@@ -633,21 +687,24 @@ function rightPieces(view: View, ctx: Ctx, card: Card, isShort: boolean): Piece[
   return pieces;
 }
 
-function taskRow(host: Host, view: View, ctx: Ctx, card: Card, width: number, numWidth: number, isCurrent: boolean): RenderElement {
+// The title is the row's Button, and a Button's label takes no color or bold.
+function taskRow(
+  view: View,
+  ctx: Ctx,
+  card: Card,
+  { width, numWidth, isShort }: { width: number; numWidth: number; isShort: boolean },
+  isCurrent: boolean,
+  onPress: () => unknown,
+): RenderElement {
   const { Box, Button, Text } = view.kit;
   const status = statusOf(ctx, card);
   const isNext = card.n === ctx.board.cards.find((each) => !each.done)?.n;
   const fixed = 2 + numWidth + 1;
-  let right = rightPieces(view, ctx, card, false);
-  if (width - fixed - piecesWidth(right) < MIN_TITLE) right = rightPieces(view, ctx, card, true);
+  let right = rightPieces(view, ctx, card, isShort);
+  if (!isShort && width - fixed - piecesWidth(right) < MIN_TITLE) right = rightPieces(view, ctx, card, true);
   const room = Math.max(1, width - fixed - piecesWidth(right));
   const titleText = fitEnd(card.title, room - (right.length > 0 ? 1 : 0), view.g.ellipsis);
   const pad = " ".repeat(Math.max(0, room - displayWidth(titleText)));
-  const title: Piece = card.done
-    ? { text: titleText, color: TONE_KEYS.muted }
-    : isNext
-      ? { text: titleText, color: ON_SURFACE, bold: true }
-      : { text: titleText };
   const color = STATUS[status].color;
   const paint = ({ text, ...style }: Piece) => {
     if (style.backgroundColor !== undefined) return Text({ ...style, children: [text] });
@@ -661,15 +718,18 @@ function taskRow(host: Host, view: View, ctx: Ctx, card: Card, width: number, nu
     ...(isCurrent ? { backgroundColor: TONE_KEYS.focus } : {}),
     children: [
       paint({ text: `${glyphOf(view, status)} `, ...(color === undefined ? {} : { color }) }),
+      paint({ text: padStart(String(card.n), numWidth), ...(card.done ? { dimColor: true } : isNext ? { color: ON_SURFACE, bold: true } : {}) }),
+      paint({ text: " " }),
       Button({
         key: `${TASK}${card.n}`,
-        label: padStart(String(card.n), numWidth),
+        label: titleText,
         plain: true,
+        hover: { color: ON_SURFACE },
         ...(card.done ? { dimColor: true } : {}),
         ...(isCurrent ? { autoFocus: true } : {}),
-        onPress: view.press(() => openDetail(host, card.n)),
+        onPress: view.press(onPress),
       }),
-      Text({ wrap: "truncate-end", children: [paint({ text: " " }), paint(title), paint({ text: pad }), ...right.map(paint)] }),
+      Text({ wrap: "truncate-end", children: [paint({ text: pad }), ...right.map(paint)] }),
     ],
   });
 }
@@ -739,6 +799,13 @@ function openDetail(host: Host, n: number): void {
   host.ui.invalidate();
 }
 
+function selectTask(host: Host, n: number): void {
+  task = n;
+  note = undefined;
+  host.ui.invalidate();
+  refocus(host, `${TASK}${n}`);
+}
+
 function actionKeys(host: Host, view: View, plan: Loaded, card: Card | undefined): Key[] {
   return [
     ["k", "Run check", () => runCheck(host, view, card), card === undefined || card.checks.length === 0],
@@ -792,8 +859,26 @@ function filterRow(host: Host, view: View, shown: number, total: number): Render
   });
 }
 
-function filesLines(view: View, card: Card, verdict: Verdict | undefined, width: number): RenderElement[] {
-  return card.files.map((file) => {
+const one = (element: RenderElement): Unit => ({ element, rows: 1 });
+
+// Pieces in rows no wider than `width`, a row breaking before the first piece that does not fit.
+function wrapPieces(pieces: readonly Piece[], width: number): Piece[][] {
+  const rows: Piece[][] = [[]];
+  let used = 0;
+  for (const piece of pieces) {
+    const cells = displayWidth(piece.text);
+    if (used > 0 && used + cells > width && piece.text.trim() !== "") {
+      rows.push([]);
+      used = 0;
+    }
+    rows.at(-1)?.push(piece);
+    used += cells;
+  }
+  return rows;
+}
+
+function filesLines(view: View, card: Card, verdict: Verdict | undefined, width: number): Unit[] {
+  return card.files.flatMap((file) => {
     const at = facts.changes.get(file);
     const isLatest = verdict !== undefined && verdict.proof !== "proven" && at === verdict.changedAt;
     const when: Piece =
@@ -802,38 +887,50 @@ function filesLines(view: View, card: Card, verdict: Verdict | undefined, width:
         : at === null
           ? { text: "not found", color: TONE_KEYS.muted }
           : { text: `changed ${timeAgo(view.now - at)}`, color: isLatest ? TONE_KEYS.warn : TONE_KEYS.muted };
-    const path = fitMiddle(masked(view, file), Math.max(4, width - displayWidth(when.text) - 3), view.g.ellipsis);
-    const pad = " ".repeat(Math.max(1, width - 2 - displayWidth(path) - displayWidth(when.text)));
-    return Line(view.kit, [{ text: "  " }, { text: path }, { text: pad }, when]);
+    const path = masked(view, file);
+    const gap = width - 2 - displayWidth(path) - displayWidth(when.text);
+    if (gap >= 1) return [one(Line(view.kit, [{ text: "  " }, { text: path }, { text: " ".repeat(gap) }, when]))];
+    return [
+      ...wrapText(path, width - 2).map((part) => one(Line(view.kit, [{ text: `  ${part}` }]))),
+      ...(when.text === "" ? [] : [one(Line(view.kit, [{ text: "    " }, when]))]),
+    ];
   });
 }
 
-function runLine(view: View, run: Run, width: number): RenderElement {
+function runLines(view: View, run: Run, width: number): Unit[] {
   const { glyph, color } = levelMark(run.exitCode === 0 ? "ok" : "fail", view.g);
   const head = `  ${glyph} ${run.type} `;
-  const tail = ` exit ${run.exitCode} ${view.g.dot} ${timeAgo(view.now - run.at)}`;
-  const command = fitEnd(masked(view, run.command), Math.max(4, width - displayWidth(head) - displayWidth(tail)), view.g.ellipsis);
-  return Line(view.kit, [
-    { text: `  ${glyph} `, color },
-    { text: `${run.type} `, bold: true },
-    { text: command },
-    { text: tail, color: run.exitCode === 0 ? TONE_KEYS.muted : TONE_KEYS.fail },
-  ]);
+  const tail = `exit ${run.exitCode} ${view.g.dot} ${timeAgo(view.now - run.at)}`;
+  const tailColor = run.exitCode === 0 ? TONE_KEYS.muted : TONE_KEYS.fail;
+  const command = masked(view, run.command);
+  if (displayWidth(head) + displayWidth(command) + 1 + displayWidth(tail) <= width) {
+    return [one(Line(view.kit, [{ text: `  ${glyph} `, color }, { text: `${run.type} `, bold: true }, { text: command }, { text: ` ${tail}`, color: tailColor }]))];
+  }
+  const parts = wrapText(command, Math.max(1, width - displayWidth(head)));
+  const hang = " ".repeat(displayWidth(head));
+  return [
+    ...parts.map((part, index) =>
+      one(Line(view.kit, index === 0 ? [{ text: `  ${glyph} `, color }, { text: `${run.type} `, bold: true }, { text: part }] : [{ text: `${hang}${part}` }])),
+    ),
+    one(Line(view.kit, [{ text: `${hang}${tail}`, color: tailColor }])),
+  ];
 }
 
-function evidenceLines(view: View, card: Card, verdict: Verdict | undefined, width: number): RenderElement[] {
-  const say = (text: string, color: ThemeKey) => Line(view.kit, [{ text: fitEnd(`  ${text}`, width, view.g.ellipsis), color }]);
+function evidenceLines(view: View, card: Card, verdict: Verdict | undefined, width: number): Unit[] {
+  const say = (text: string, color: ThemeKey) => wrapText(text, width - 2).map((part) => one(Line(view.kit, [{ text: `  ${part}`, color }])));
   const marked = (level: Level, text: string) => {
     const { glyph, color } = levelMark(level, view.g);
-    return Line(view.kit, fitPieces([{ text: "  " }, { text: glyph, color }, { text: ` ${text}` }], width, view.g.ellipsis));
+    return wrapText(text, width - 4).map((part, index) =>
+      one(Line(view.kit, index === 0 ? [{ text: "  " }, { text: glyph, color }, { text: ` ${part}` }] : [{ text: `    ${part}` }])),
+    );
   };
-  if (facts.ledgerError !== null) return [marked("fail", `ledger unreadable: ${facts.ledgerError}`)];
-  if (card.files.length === 0) return [say("Lists no files, so no run can prove it.", TONE_KEYS.muted)];
-  if (verdict === undefined) return [say(UNREADABLE, TONE_KEYS.muted)];
-  if (verdict.since.length > 0) return verdict.since.slice(0, EVIDENCE_SHOWN).map((run) => runLine(view, run, width));
+  if (facts.ledgerError !== null) return marked("fail", `ledger unreadable: ${facts.ledgerError}`);
+  if (card.files.length === 0) return say("Lists no files, so no run can prove it.", TONE_KEYS.muted);
+  if (verdict === undefined) return say(UNREADABLE, TONE_KEYS.muted);
+  if (verdict.since.length > 0) return verdict.since.slice(0, EVIDENCE_SHOWN).flatMap((run) => runLines(view, run, width));
   return [
-    marked("warn", `No test, build or lint run since its files changed ${timeAgo(view.now - verdict.changedAt)}.`),
-    ...(verdict.lastPass === undefined ? [] : [say("Last pass, before that change:", TONE_KEYS.muted), runLine(view, verdict.lastPass, width)]),
+    ...marked("warn", `No test, build or lint run since its files changed ${timeAgo(view.now - verdict.changedAt)}.`),
+    ...(verdict.lastPass === undefined ? [] : [...say("Last pass, before that change:", TONE_KEYS.muted), ...runLines(view, verdict.lastPass, width)]),
   ];
 }
 
@@ -855,8 +952,18 @@ const fieldsText = (card: Card, name: string) =>
 
 const SHOWN_APART = ["file", "files", "depends", "depends on", "done when", "do"];
 
-function detail(view: View, ctx: Ctx, card: Card, width: number): RenderElement[] {
-  const { Markdown, Text } = view.kit;
+// What a Done when line says besides its commands, which are drawn on their own.
+function proseOf(card: Card, text: string): string {
+  const prose = text
+    .replace(/`([^`]+)`/g, (span, inner: string) => (card.checks.includes(inner.trim()) ? "" : span))
+    .replace(/[ \t]+/g, " ")
+    .trim();
+  return /[\p{L}\p{N}]/u.test(prose) ? prose : "";
+}
+
+// A card as units a region can window, every line wrapped to `width`.
+function detail(view: View, ctx: Ctx, card: Card, width: number): Unit[] {
+  const { Text } = view.kit;
   const status = statusOf(ctx, card);
   const verdict = verdictOf(card);
   const chips: Piece[] = [
@@ -867,44 +974,47 @@ function detail(view: View, ctx: Ctx, card: Card, width: number): RenderElement[
   const other = card.fields.filter((field) => !SHOWN_APART.includes(field.name.toLowerCase()));
   const doText = fieldsText(card, "do");
   const doneWhen = fieldsText(card, "done when");
-  const md = (key: string, text: string) => chunks(masked(view, text)).map((part, index) => Markdown({ key: `${key}-${index}`, text: part }));
-  const gap = Text({ children: [" "] });
+  const md = (key: string, text: string): Unit[] => markdownUnits(view.kit, masked(view, text), width, key);
+  const lines = (pieces: readonly Piece[]): Unit[] => wrapPieces(pieces, width).map((row) => one(Line(view.kit, fitPieces(row, width, view.g.ellipsis))));
+  const gap = one(Text({ children: [" "] }));
+  const title = `${card.n}. ${card.title}`;
   const hidden = redact([card.fields.map((field) => field.text).join("\n"), ...(verdict?.since ?? []).map((run) => run.command)].join("\n"), view.home, view.g.mask).masked;
   const deps = depChips(view, ctx, card);
   const waiting = card.done ? [] : waitingOn(ctx, card);
+  const prose = proseOf(card, doneWhen);
   return [
-    Text({ bold: true, wrap: "wrap", children: [`${card.n}. ${card.title}`] }),
-    Line(view.kit, fitPieces(chips, width, view.g.ellipsis)),
-    ...(doText === "" ? [] : [gap, label(view, "Do"), ...md(`do-${card.n}`, doText)]),
+    { element: Text({ bold: true, wrap: "wrap", children: [title] }), rows: wrapText(title, width).length },
+    ...lines(chips),
+    ...(doText === "" ? [] : [gap, one(label(view, "Do")), ...md(`do-${card.n}`, doText)]),
     ...other.flatMap((field, index) => md(`field-${card.n}-${index}`, field.name === "" ? field.text : `**${field.name}:** ${field.text}`)),
     ...(doneWhen === ""
       ? []
       : [
           gap,
-          label(view, "Done when"),
-          ...md(`done-${card.n}`, doneWhen),
-          ...card.checks.map((check) => view.kit.Box({ width, children: [CodeBlock(view.kit, { source: masked(view, check), language: "bash" })] })),
+          one(label(view, "Done when")),
+          ...card.checks.flatMap((check) => codeUnits(view.kit, `$ ${masked(view, check)}`, width, "bash")),
+          ...(prose === "" ? [] : md(`done-${card.n}`, prose)),
         ]),
     ...(deps.length === 0
       ? []
       : [
           gap,
-          label(view, "Depends"),
-          Line(
-            view.kit,
-            fitPieces([...deps, ...(waiting.length === 0 ? [] : [{ text: ` blocked by ${waiting.join(", ")}`, color: TONE_KEYS.warn }])], width, view.g.ellipsis),
-          ),
+          one(label(view, "Depends")),
+          ...lines([...deps, ...(waiting.length === 0 ? [] : [{ text: ` blocked by ${waiting.join(", ")}`, color: TONE_KEYS.warn }])]),
         ]),
-    ...(card.files.length === 0 ? [] : [gap, label(view, "Files"), ...filesLines(view, card, verdict, width)]),
+    ...(card.files.length === 0 ? [] : [gap, one(label(view, "Files")), ...filesLines(view, card, verdict, width)]),
     gap,
-    label(view, "Evidence"),
+    one(label(view, "Evidence")),
     ...evidenceLines(view, card, verdict, width),
-    ...(hidden === 0 ? [] : [gap, Line(view.kit, [{ text: `${view.g.mask} ${hidden} secret${hidden === 1 ? "" : "s"} masked`, color: TONE_KEYS.muted }])]),
+    ...(hidden === 0 ? [] : [gap, one(Line(view.kit, [{ text: `${view.g.mask} ${hidden} secret${hidden === 1 ? "" : "s"} masked`, color: TONE_KEYS.muted }]))]),
   ];
 }
 
-// The focused task's facts in four one-line rows under its row, for widths without a detail column.
-function expansion(view: View, card: Card, width: number): RenderElement[] {
+type Fact = { key: string; lead: Piece[]; text: string; color: ThemeKey | undefined };
+
+// A card's facts under its row, one line each; rows left over wrap the facts in order, and fewer rows
+// keep the first facts.
+function expansion(view: View, card: Card, width: number, most: number): RenderElement[] {
   const indent = "     ";
   const room = Math.max(1, width - indent.length);
   const verdict = verdictOf(card);
@@ -918,25 +1028,46 @@ function expansion(view: View, card: Card, width: number): RenderElement[] {
     .join(` ${view.g.dot} `);
   const newest = verdict?.since[0];
   const mark = newest === undefined ? undefined : levelMark(newest.exitCode === 0 ? "ok" : "fail", view.g);
-  const evidence: Piece[] =
+  const evidence: Fact =
     card.files.length === 0
-      ? [{ text: "no files to prove", color: TONE_KEYS.muted }]
+      ? { key: "x-evidence", lead: [], text: "no files to prove", color: TONE_KEYS.muted }
       : verdict === undefined
-        ? [{ text: UNREADABLE, color: TONE_KEYS.muted }]
+        ? { key: "x-evidence", lead: [], text: UNREADABLE, color: TONE_KEYS.muted }
         : newest === undefined || mark === undefined
-          ? [{ text: view.g.warn, color: TONE_KEYS.warn }, { text: " no run since its files changed", color: TONE_KEYS.muted }]
-          : [
-              { text: mark.glyph, color: mark.color },
-              { text: ` ${newest.type} exit ${newest.exitCode} ${view.g.dot} ${masked(view, newest.command)} ${view.g.dot} ${timeAgo(view.now - newest.at)}` },
-            ];
-  const row = (key: string, pieces: Piece[]) =>
-    view.kit.Box({ key, children: [Line(view.kit, [{ text: indent }, ...fitPieces(pieces, room, view.g.ellipsis)])] });
-  return [
-    row("x-do", [{ text: doText === "" ? "no Do line" : masked(view, doText), color: TONE_KEYS.muted }]),
-    row("x-check", check === undefined ? [{ text: "no check command", color: TONE_KEYS.muted }] : [{ text: "$ ", color: TONE_KEYS.muted }, { text: masked(view, check), color: TONE_KEYS.info }]),
-    row("x-files", [{ text: files === "" ? "no files listed" : files, color: TONE_KEYS.muted }]),
-    row("x-evidence", evidence),
+          ? { key: "x-evidence", lead: [{ text: `${view.g.warn} `, color: TONE_KEYS.warn }], text: "no run since its files changed", color: TONE_KEYS.muted }
+          : {
+              key: "x-evidence",
+              lead: [{ text: `${mark.glyph} `, color: mark.color }],
+              text: `${newest.type} exit ${newest.exitCode} ${view.g.dot} ${masked(view, newest.command)} ${view.g.dot} ${timeAgo(view.now - newest.at)}`,
+              color: undefined,
+            };
+  const all: Fact[] = [
+    { key: "x-do", lead: [], text: doText === "" ? "no Do line" : masked(view, doText), color: TONE_KEYS.muted },
+    check === undefined
+      ? { key: "x-check", lead: [], text: "no check command", color: TONE_KEYS.muted }
+      : { key: "x-check", lead: [{ text: "$ ", color: TONE_KEYS.muted }], text: masked(view, check), color: TONE_KEYS.info },
+    { key: "x-files", lead: [], text: files === "" ? "no files listed" : files, color: TONE_KEYS.muted },
+    evidence,
   ];
+  const shown = all.slice(0, most);
+  const wrapped = shown.map((fact) => wrapText(fact.text, Math.max(1, room - piecesWidth(fact.lead))));
+  let spare = most - shown.length;
+  const takes = wrapped.map((parts) => {
+    const take = 1 + Math.min(spare, parts.length - 1);
+    spare -= take - 1;
+    return take;
+  });
+  return shown.flatMap((fact, at) => {
+    const parts = wrapped[at] ?? [];
+    const take = takes[at] ?? 1;
+    const hang = " ".repeat(piecesWidth(fact.lead));
+    return parts.slice(0, take).map((part, index) => {
+      const isClipped = index === take - 1 && take < parts.length;
+      const text = isClipped ? fitEnd(`${part} ${parts[take] ?? ""}`, Math.max(1, room - piecesWidth(fact.lead)), view.g.ellipsis) : part;
+      const pieces: Piece[] = [...(index === 0 ? fact.lead : [{ text: hang }]), { text, ...(fact.color === undefined ? {} : { color: fact.color }) }];
+      return view.kit.Box({ key: index === 0 ? fact.key : `${fact.key}-${index}`, children: [Line(view.kit, [{ text: indent }, ...fitPieces(pieces, room, view.g.ellipsis)])] });
+    });
+  });
 }
 
 function contextOf(plan: Loaded, agents: State["agents"] | undefined): Ctx {
@@ -945,39 +1076,75 @@ function contextOf(plan: Loaded, agents: State["agents"] | undefined): Ctx {
   return { plan, board, byN: new Map(board.cards.map((card) => [card.n, card])), running: runningOf(list), agents: list };
 }
 
+// The list column takes what its widest row asks for, between a floor and a share of the body.
+function splitWidth(view: View, ctx: Ctx, numWidth: number): number {
+  const fixed = 2 + numWidth + 1;
+  const need = Math.max(0, ...ctx.board.cards.map((card) => fixed + displayWidth(card.title) + piecesWidth(rightPieces(view, ctx, card, true)) + 1));
+  const most = Math.max(SPLIT_MIN_LIST, Math.min(Math.floor(view.width * SPLIT_SHARE), view.width - 2 - SPLIT_MIN_DETAIL));
+  return Math.min(most, Math.max(SPLIT_MIN_LIST, need));
+}
+
 function boardView(host: Host, view: View, ctx: Ctx): RenderElement[] {
   const { Box, Text } = view.kit;
   const { board, plan } = ctx;
   const ellipsis = view.g.ellipsis;
+  const head = headOf(view);
+  const showFilter = filter.isEditing || isFiltered();
+  const hintRows = view.isInline || (head === "line" && note === undefined) ? 0 : 1;
+  const top = headerRows(ctx, head) + (showFilter ? 1 : 0);
+  isLean = isFiltered() && view.rows - (top + 2 + 1 + hintRows) <= LEAN_ROWS;
   const items = itemsOf(board);
   const list = boardList(items);
   const card = items.length === 0 ? undefined : ctx.byN.get(task);
-  const keys = keyRows(view, boardKeys(host, view, plan, card), BOARD_KEY_GAP);
-  const isCard = !view.isInline && view.rows >= CARD_FROM_ROWS;
-  const showFilter = filter.isEditing || isFiltered();
-  const chrome = headerRows(view, ctx, isCard) + (showFilter ? 1 : 0) + 2 + keys.length + (view.isInline ? 0 : 1);
-  const room = roomFor(view, chrome, list.total);
-  const isSplit = view.tier === "split" && card !== undefined;
-  const canExpand = view.tier === "inline" && card !== undefined && room - EXPANSION_ROWS >= MIN_LIST_ROWS;
-  const size = canExpand ? room - EXPANSION_ROWS : room;
-  const listWidth = isSplit ? Math.floor(view.width * SPLIT_SHARE) : view.width;
+  const keySet = boardKeys(host, view, plan, card);
+  let layout = keyLayout(view, keySet, BOARD_KEY_GAP);
+  const chrome = top + 2 + layout.length + hintRows;
+  const base = Math.max(1, view.rows - chrome);
+  const numWidth = Math.max(1, ...board.cards.map((each) => String(each.n).length));
+  const isSplit = view.tier === "split" && view.rows >= SPLIT_FROM_ROWS && card !== undefined;
+  const listWidth = isSplit ? splitWidth(view, ctx, numWidth) : view.width;
+  const rowWidth = isSplit ? listWidth - 1 : listWidth;
+  const canExpand = !isSplit && view.tier !== "page" && card !== undefined && base - EXPANSION_MIN >= MIN_LIST_ROWS;
+  const under = canExpand ? expansion(view, card, rowWidth, Math.max(EXPANSION_MIN, base - 1 - 2 * NEIGHBOURS)) : [];
+  let size = roomFor(view, chrome) - under.length;
+  // A list with rows to spare gives them to the keys, so fewer keys draw bare.
+  const fuller = keyLayout(view, keySet, BOARD_KEY_GAP, 2);
+  if (fuller.length > layout.length && items.length + fuller.length - layout.length <= size) {
+    size -= fuller.length - layout.length;
+    layout = fuller;
+  }
+  const keys = keyRowsOf(view, layout, BOARD_KEY_GAP);
   const start = items.length === 0 ? 0 : place(host, "board", list, size, (index) => `${TASK}${taskAt(items, index)?.n ?? task}`);
   const end = Math.min(items.length, start + size);
-  const numWidth = Math.max(1, ...board.cards.map((each) => String(each.n).length));
+  isCut = start > 0 || end < items.length;
   const rows = items.slice(start, end).flatMap((item) => {
-    if (item.kind === "group") return [groupRow(view, ctx, item, listWidth, item.group === card?.group)];
+    if (item.kind === "group") return [groupRow(view, ctx, item, rowWidth, item.group === card?.group)];
     const isCurrent = item.card.n === task;
-    const row = taskRow(host, view, ctx, item.card, listWidth, numWidth, isCurrent);
-    return isCurrent && canExpand ? [row, ...expansion(view, item.card, listWidth)] : [row];
+    // Decided as the row is drawn: a click's focus move can reach the cursor before its press does.
+    const n = item.card.n;
+    const onPress = isSplit && !isCurrent ? () => selectTask(host, n) : () => openDetail(host, n);
+    const row = taskRow(view, ctx, item.card, { width: rowWidth, numWidth, isShort: isSplit }, isCurrent, onPress);
+    return isCurrent ? [row, ...under] : [row];
   });
+  const tasksIn = (from: number, to: number) => items.slice(from, to).filter((item) => item.kind === "task").length;
+  const hiddenAbove = tasksIn(0, start);
+  const lead = items[start - 1];
   const column = [
-    edge(view, start > 0 ? `  ${view.g.up} ${start} more` : "", listWidth),
+    start === 0
+      ? edge(view, "", listWidth)
+      : lead?.kind === "group" && hiddenAbove === 0
+        ? groupRow(view, ctx, lead, rowWidth, lead.group === card?.group)
+        : edge(view, `  ${view.g.up} ${hiddenAbove} more`, listWidth),
     ...(items.length === 0 ? [noticeRow(view, { kind: "empty" }, { loading: "", empty: "No task matches the filter." })] : []),
     ...rows,
-    edge(view, end < items.length ? `  ${view.g.down} ${items.length - end} more` : "", listWidth),
+    edge(view, end < items.length ? `  ${view.g.down} ${tasksIn(end, items.length)} more` : "", listWidth),
   ];
   const height = size + 2;
   const detailWidth = view.width - listWidth - 2;
+  if (isSplit && card.n !== detailShown) {
+    resetOffset(DETAIL);
+    detailShown = card.n;
+  }
   const body =
     isSplit && card !== undefined
       ? [
@@ -999,7 +1166,18 @@ function boardView(host: Host, view: View, ctx: Ctx): RenderElement[] {
                 height,
                 overflow: "hidden",
                 paddingLeft: 1,
-                children: detail(view, ctx, card, detailWidth - 1),
+                children: [
+                  ScrollRegion({
+                    kit: view.kit,
+                    g: view.g,
+                    key: DETAIL,
+                    left: listWidth + 2,
+                    top,
+                    width: detailWidth - 1,
+                    height,
+                    units: detail(view, ctx, card, detailWidth - 1),
+                  }),
+                ],
               }),
             ],
           }),
@@ -1013,16 +1191,63 @@ function boardView(host: Host, view: View, ctx: Ctx): RenderElement[] {
     refocus(host, `${TASK}${task}`);
   }
   return [
-    ...header(view, ctx, isCard),
+    ...header(view, ctx, head),
     ...(showFilter ? [filterRow(host, view, shownCount, board.cards.length)] : []),
     ...body,
     ...keys,
-    ...(view.isInline ? [] : [Line(view.kit, fitPieces([hint], view.width, ellipsis))]),
+    ...(hintRows === 0 ? [] : [Line(view.kit, fitPieces([hint], view.width, ellipsis))]),
+  ];
+}
+
+type PageParts = {
+  id: string;
+  title: string;
+  counter: string;
+  keys: readonly Key[];
+  units: readonly Unit[];
+  hint: { text: string; color: ThemeKey };
+  isNote: boolean;
+};
+
+// A page keeps its header and keys in place and scrolls its body in a region; short panes drop the rule and the hint.
+function pageOf(view: View, { id, title, counter, keys, units, hint, isNote }: PageParts): RenderElement[] {
+  const { Box, Text } = view.kit;
+  const ellipsis = view.g.ellipsis;
+  const keysShown = keyRows(view, keys, BOARD_KEY_GAP);
+  const ruleRows = view.rows >= TWO_KEY_ROWS_FROM ? 1 : 0;
+  const hintRows = view.rows >= SHORT_ROWS || isNote ? 1 : 0;
+  const above = 1 + keysShown.length + ruleRows;
+  if (pageShown !== id) {
+    resetOffset(PAGE_REGION);
+    pageShown = id;
+  }
+  return [
+    Box({
+      flexDirection: "row",
+      children: [
+        Text({ dimColor: true, children: [fitEnd(title, Math.max(1, view.width - counter.length - 1), ellipsis)] }),
+        Box({ flexGrow: 1 }),
+        Text({ dimColor: true, children: [counter] }),
+      ],
+    }),
+    ...keysShown,
+    ...(ruleRows === 0 ? [] : [rule(view)]),
+    ScrollRegion({
+      kit: view.kit,
+      g: view.g,
+      key: PAGE_REGION,
+      left: 0,
+      top: above,
+      width: view.width,
+      height: Math.max(1, view.rows - above - hintRows),
+      units: [...units],
+    }),
+    ...(hintRows === 0 ? [] : [Text({ color: hint.color, children: [fitEnd(hint.text, view.width, ellipsis)] })]),
   ];
 }
 
 function detailView(host: Host, view: View, ctx: Ctx): RenderElement[] {
-  const { Box, Text } = view.kit;
+  const { Text } = view.kit;
   const ellipsis = view.g.ellipsis;
   const order = itemsOf(ctx.board).flatMap((item) => (item.kind === "task" ? [item.card] : []));
   const position = order.findIndex((card) => card.n === task);
@@ -1042,29 +1267,23 @@ function detailView(host: Host, view: View, ctx: Ctx): RenderElement[] {
     note = undefined;
     host.ui.invalidate();
   };
-  const counter = position < 0 ? "" : `${position + 1} / ${order.length}`;
-  const keys: Key[] = [
-    back,
-    [KEYS.prev, "Prev", step(-1), position <= 0],
-    [KEYS.next, "Next", step(1), position < 0 || position === order.length - 1],
-    ...actionKeys(host, view, ctx.plan, card),
-  ];
-  const hint = note === undefined ? keyHint([[`${view.g.up}${view.g.down}`, "scroll"], [KEYS.back, "close"]], view.g) : note.text;
-  return [
-    Box({
-      flexDirection: "row",
-      children: [
-        Text({ dimColor: true, children: [fitEnd(ctx.plan.title, Math.max(1, view.width - counter.length - 1), ellipsis)] }),
-        Box({ flexGrow: 1 }),
-        Text({ dimColor: true, children: [counter] }),
-      ],
-    }),
-    ...keyRows(view, keys, BOARD_KEY_GAP),
-    rule(view),
-    ...detail(view, ctx, card, view.width),
-    Text({ children: [" "] }),
-    Text({ color: note === undefined ? TONE_KEYS.muted : levelMark(note.level, view.g).color, children: [fitEnd(hint, view.width, ellipsis)] }),
-  ];
+  return pageOf(view, {
+    id: `task-${card.n}`,
+    title: ctx.plan.title,
+    counter: position < 0 ? "" : `${position + 1} / ${order.length}`,
+    keys: [
+      back,
+      [KEYS.prev, "Prev", step(-1), position <= 0],
+      [KEYS.next, "Next", step(1), position < 0 || position === order.length - 1],
+      ...actionKeys(host, view, ctx.plan, card),
+    ],
+    units: detail(view, ctx, card, view.width),
+    hint:
+      note === undefined
+        ? { text: keyHint([[`${view.g.up}${view.g.down}`, "scroll"], [KEYS.back, "close"]], view.g), color: TONE_KEYS.muted }
+        : { text: note.text, color: levelMark(note.level, view.g).color },
+    isNote: note !== undefined,
+  });
 }
 
 function contentsView(host: Host, view: View, plan: Loaded): RenderElement[] {
@@ -1078,13 +1297,22 @@ function contentsView(host: Host, view: View, plan: Loaded): RenderElement[] {
   if (list.rows.length === 0) {
     return [noticeRow(view, { kind: "empty" }, { loading: "", empty: `${plan.title} has no sections to read.` })];
   }
-  const size = listRows(view, list.total);
+  const hasBoard = boardFor(plan).cards.length > 0;
+  const layout = frameFor(view, [
+    ...(hasBoard ? [["b", "Board", () => toBoard(host)] as const] : []),
+    [KEYS.reload, "Reload", () => reload(host)],
+    [KEYS.list, "Plans", () => showPlans(host)],
+  ]);
+  const size = roomFor(view, layout.chrome);
   const start = place(host, "contents", list, size, (index) => `${ROW}${index}`);
   const end = Math.min(list.total, start + size);
+  isCut = start > 0 || end < list.total;
+  const numWidth = Math.max(0, ...plan.pages.map((section) => (section.task === undefined ? 0 : String(section.task.n).length)));
   const rows = plan.pages.slice(start, end).map((section, offset) => {
     const index = start + offset;
     const indent = "  ".repeat(Math.max(0, section.level - 2));
-    const label = fitEnd(`${indent}${markOf(section)}${section.title}`, view.width - 2, ellipsis);
+    const title = section.task === undefined ? section.title : section.title.replace(/^\d+/, (digits) => padStart(digits, numWidth));
+    const label = fitEnd(`${indent}${markOf(section)}${title}`, view.width - 2, ellipsis);
     const isCurrent = index === cursor;
     if (!isReadable(section)) return pointerRow(view, `line-${index}`, false, Text({ bold: true, children: [label] }));
     return pointerRow(
@@ -1109,8 +1337,7 @@ function contentsView(host: Host, view: View, plan: Loaded): RenderElement[] {
   const lead = `${progress} ${view.g.dot} `;
   const hidden = plan.pages.length - list.total;
   const below = list.total - end;
-  const hasBoard = boardFor(plan).cards.length > 0;
-  return frame(view, {
+  return frame(view, layout, {
     title: plan.title,
     meta: `${lead}${fitMiddle(tildePath(view.platform, plan.path, view.home), view.width - displayWidth(lead), ellipsis)}`,
     shortMeta: progress,
@@ -1122,11 +1349,6 @@ function contentsView(host: Host, view: View, plan: Loaded): RenderElement[] {
           ? `  ${hidden} more past the first ${CONTENTS_CAP}; page on with ${KEYS.next}`
           : "",
     rows,
-    keys: [
-      ...(hasBoard ? [["b", "Board", () => toBoard(host)] as const] : []),
-      [KEYS.reload, "Reload", () => reload(host)],
-      [KEYS.list, "Plans", () => showPlans(host)],
-    ],
     hint: moveHint(view),
   });
 }
@@ -1144,7 +1366,7 @@ async function showPlans(host: Host): Promise<void> {
 }
 
 function pageView(host: Host, view: View, plan: Loaded): RenderElement[] {
-  const { Box, Markdown, Text } = view.kit;
+  const { Text } = view.kit;
   const ellipsis = view.g.ellipsis;
   const order = readable(plan);
   const position = order.indexOf(page);
@@ -1163,44 +1385,31 @@ function pageView(host: Host, view: View, plan: Loaded): RenderElement[] {
     page = index;
     host.ui.invalidate();
   };
-  const counter = `${position + 1} / ${order.length}`;
-  const mark = markOf(section);
   const nextIndex = order[position + 1];
   const upcoming = nextIndex === undefined ? undefined : plan.pages[nextIndex];
-  const body =
-    section.body === ""
-      ? [Text({ dimColor: true, children: ["No details under this task."] })]
-      : chunks(section.body).map((text, part) => Markdown({ key: `md-${page}-${part}`, text }));
-  return [
-    Box({
-      flexDirection: "row",
-      children: [
-        Text({ dimColor: true, children: [fitEnd(plan.title, Math.max(1, view.width - counter.length - 1), ellipsis)] }),
-        Box({ flexGrow: 1 }),
-        Text({ dimColor: true, children: [counter] }),
-      ],
-    }),
-    keyRow(
-      view,
-      [
-        contents,
-        [KEYS.prev, "Prev", step(-1), position === 0],
-        [KEYS.next, "Next", step(1), position === order.length - 1],
-        [KEYS.reload, "Reload", () => reload(host)],
-      ],
-      2,
-    ),
-    rule(view),
-    Text({ bold: true, wrap: "wrap", children: [`${mark}${section.title}`] }),
-    Text({ children: [" "] }),
-    ...body,
-    Text({ children: [" "] }),
-    ...(upcoming === undefined
-      ? []
-      : [Text({ dimColor: true, children: [fitEnd(`next: ${markOf(upcoming)}${upcoming.title}`, view.width, ellipsis)] })]),
-    Text({ dimColor: true, children: [keyHint([[`${view.g.up}${view.g.down}`, "scroll"], [KEYS.back, "close"]], view.g)] }),
-  ];
+  const heading = `${markOf(section)}${section.title}`;
+  const blank = one(Text({ children: [" "] }));
+  return pageOf(view, {
+    id: `page-${page}`,
+    title: plan.title,
+    counter: `${position + 1} / ${order.length}`,
+    keys: [contents, [KEYS.prev, "Prev", step(-1), position === 0], [KEYS.next, "Next", step(1), position === order.length - 1], [KEYS.reload, "Reload", () => reload(host)]],
+    units: [
+      { element: Text({ bold: true, wrap: "wrap", children: [heading] }), rows: wrapText(heading, view.width).length },
+      blank,
+      ...(section.body === ""
+        ? [one(Text({ dimColor: true, children: ["No details under this task."] }))]
+        : markdownUnits(view.kit, section.body, view.width, `md-${page}`)),
+      ...(upcoming === undefined
+        ? []
+        : [blank, one(Text({ dimColor: true, children: [fitEnd(`next: ${markOf(upcoming)}${upcoming.title}`, view.width, ellipsis)] }))]),
+    ],
+    hint: { text: keyHint([[`${view.g.up}${view.g.down}`, "scroll"], [KEYS.back, "close"]], view.g), color: TONE_KEYS.muted },
+    isNote: false,
+  });
 }
+
+const BOUND = "bound";
 
 function plansView(host: Host, view: View, pane: State["pane"] | undefined, plan: State["plan"] | undefined): RenderElement[] {
   const { Box, Button, Text } = view.kit;
@@ -1214,22 +1423,45 @@ function plansView(host: Host, view: View, pane: State["pane"] | undefined, plan
   const keys: Key[] = [...(back === undefined ? [] : [back]), [KEYS.reload, "Reload", () => showPlans(host)]];
   const listing = pane?.plans;
   if (pane === undefined || listing === undefined || listing === null) return [noticeRow(view, { kind: "loading" }, words)];
+  const keysShown = keyRows(view, keys, KEY_GAP);
   if (pane.errors.plans !== null) {
-    return [noticeRow(view, { kind: "error", reason: pane.errors.plans }, words), keyRow(view, keys, KEY_GAP)];
+    return [noticeRow(view, { kind: "error", reason: pane.errors.plans }, words), ...keysShown];
   }
   const dir = tildePath(view.platform, listing.dir, view.home);
   if (listing.files.length === 0) {
-    const lead = plan === undefined ? "No plan is bound to this session. No plans in " : "No plans in ";
-    const empty = `${lead}${fitMiddle(dir, view.width - displayWidth(lead) - 1, ellipsis)}.`;
-    return [noticeRow(view, { kind: "empty" }, { ...words, empty }), keyRow(view, keys, KEY_GAP)];
+    const lines = [
+      ...(plan === undefined ? wrapText("No plan is bound to this session.", view.width) : []),
+      "No plans in",
+      fitMiddle(dir, view.width, ellipsis),
+      ...wrapText("Make one with /oh-my-claudeagent:plan, then bind it to this session with /oh-my-claudeagent:start-work.", view.width),
+    ];
+    return [
+      ...lines.slice(0, Math.max(1, view.rows - keysShown.length)).map((empty) => noticeRow(view, { kind: "empty" }, { ...words, empty })),
+      ...keysShown,
+    ];
   }
   const list = picksOf(listing.files);
-  const size = listRows(view, list.total);
+  const layout = frameFor(view, keys);
+  const size = roomFor(view, layout.chrome);
   const start = place(host, "plans", list, size, (index) => `${PICK}${index}`);
   const end = Math.min(list.total, start + size);
+  isCut = start > 0 || end < list.total;
+  const isBound = (file: PlanFile) => boundTo !== undefined && samePath(view.platform, file.path, boundTo);
+  const hasBound = listing.files.some(isBound);
+  const countWidth = Math.max(0, ...listing.files.map((file) => displayWidth(tallies.get(file.path) ?? "")));
+  const widest = Math.max(...listing.files.map((file) => displayWidth(file.name)));
+  const shapes = [
+    { bound: hasBound, count: countWidth > 0 },
+    { bound: false, count: countWidth > 0 },
+    { bound: false, count: false },
+  ];
+  const rightOf = (shape: { bound: boolean; count: boolean }) =>
+    (shape.bound ? BOUND.length + 2 : 0) + (shape.count ? countWidth + 2 : 0) + DATE;
+  const shape = shapes.find((each) => view.width - 2 - rightOf(each) - 2 >= Math.min(widest, 16)) ?? { bound: false, count: false };
   const rows = listing.files.slice(start, end).map((file, offset) => {
     const index = start + offset;
     const day = dayOf(file.mtimeMs);
+    const count = tallies.get(file.path) ?? "";
     return pointerRow(
       view,
       `file-${index}`,
@@ -1240,7 +1472,7 @@ function plansView(host: Host, view: View, pane: State["pane"] | undefined, plan
         children: [
           Button({
             key: `${PICK}${index}`,
-            label: fitEnd(file.name, Math.max(1, view.width - 2 - DATE - 2), ellipsis),
+            label: fitEnd(file.name, Math.max(1, view.width - 2 - rightOf(shape) - 2), ellipsis),
             plain: true,
             ...(index === pick ? { autoFocus: true } : {}),
             onPress: view.press(async () => {
@@ -1252,21 +1484,21 @@ function plansView(host: Host, view: View, pane: State["pane"] | undefined, plan
             }),
           }),
           Box({ flexGrow: 1 }),
-          Text({ dimColor: true, children: [day] }),
+          ...(shape.bound ? [Text({ color: TONE_KEYS.plan, children: [isBound(file) ? `${BOUND}  ` : " ".repeat(BOUND.length + 2)] })] : []),
+          Text({ dimColor: true, children: [`${shape.count ? `${padStart(count, countWidth)}  ` : ""}${day}`] }),
         ],
       }),
     );
   });
   const count = `${listing.files.length} most recent`;
   const lead = `${count} in `;
-  return frame(view, {
+  return frame(view, layout, {
     title: "Plans",
     meta: `${lead}${fitMiddle(dir, view.width - displayWidth(lead), ellipsis)}`,
     shortMeta: `${listing.files.length} recent`,
     above: start > 0 ? `  ${view.g.up} ${start} more` : "",
     below: end < list.total ? `  ${view.g.down} ${list.total - end} more` : "",
     rows,
-    keys,
     hint: moveHint(view),
   });
 }
@@ -1288,7 +1520,7 @@ function errorView(host: Host, view: View, plan: Extract<State["plan"], { error:
   ];
 }
 
-export const view: TabView = async (host, view) => {
+async function build(host: Host, view: View): Promise<readonly RenderElement[]> {
   const [plan, pane, agents] = await Promise.all([host.state.plan.get(), host.state.pane.get(), host.state.agents.get()]);
   if (mode === "plans") return plansView(host, view, pane.value, plan.value);
   if (plan.value === undefined) {
@@ -1299,4 +1531,10 @@ export const view: TabView = async (host, view) => {
   if (mode === "contents" || boardFor(plan.value).cards.length === 0) return contentsView(host, view, plan.value);
   const ctx = contextOf(plan.value, agents.value);
   return mode === "detail" ? detailView(host, view, ctx) : boardView(host, view, ctx);
+}
+
+export const view: TabView = async (host, view) => {
+  isCut = false;
+  const body = await build(host, view);
+  return isCut ? [...body, ...blanks(view, 1)] : body;
 };

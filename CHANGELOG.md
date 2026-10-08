@@ -36,10 +36,28 @@ hand.
   which one your terminal draws.
   `/omca plan`, `/omca stats` and `/omca doctor` open the pane on that tab. Ctrl+X then Tab, or a
   click, focuses it; Esc, the close mark or Ctrl+X then X closes it.
+- **The mouse in the pane.** The wheel scrolls what is under the pointer. Over a list it moves the
+  focus as the arrows do, and over a part of a tab that holds more than it shows (the Evidence
+  card, the plan's task detail, each Notepad card) it scrolls that part alone, with a cue above
+  and below while more is out of view. When the agents' lanes or the ratings run past the pane, the
+  wheel scrolls them and the arrows step the focus a lane at a time. A click on a run's time
+  focuses the run, and in a wide pane a click on a task's title selects it and a second click
+  opens it.
+- **The pane fits every size.** Each tab gives its rows out by priority, so a short pane keeps
+  its header, its filter, at least one row of content with its cues, and its keys, and nothing
+  falls off the bottom unmarked. The tab bar stays on one row, the other tabs shortened to their
+  initials when the labels do not fit. A wide terminal gives the dock up to 120 columns while the
+  transcript keeps 100, and the plan board and the Evidence tab split into two columns only when
+  both have the rows and width to read. A plan task, a section and an agent's page keep their
+  header and keys in place while the body scrolls. Notepad sets its cards in two columns only
+  when each card gets three rows, balances the columns by height and folds empty sections into
+  one line; Stats keeps agent names readable before its decorative columns; Feedback wraps long
+  notes; spare rows go to wrapped text, a second key row and a blank between lanes.
 - **The Agents tab.** Each running subagent gets a lane with its task, model and effort in aligned
   columns, and its elapsed time; below it, the tool it runs now and how many tool calls it has
   made. A finished agent from an earlier wave, or one the pane has no room to keep in its lane,
-  shrinks to one line with the first line of its result and its duration.
+  shrinks to one line with its task, the first line of its result where room is left, and its
+  duration.
   The key row counts the running and finished agents and their tokens. Pointing at a lane, or `d`,
   shows its prompt, last output, tool calls and tokens.
 - **The agent page.** Enter or a click on a lane opens the agent's brief, each tool call with its

@@ -1,9 +1,12 @@
 import type { On, SessionMessage } from "claude-code";
 import { type Engine, expect, test } from "claude-code/testing";
 import type { RenderElement } from "claude-code";
+import { clockOf } from "../../src/core/ui-kit.ts";
 import { childrenOf, isNode, type Node, pane, rows, run, type Size, topRows, usage, world } from "./world.ts";
 
 const DOCK_120: Size = { columns: 120, rows: 40, placement: "dock" };
+const INLINE_80x24: Size = { columns: 80, rows: 24, placement: "inline" };
+const STARTED = Date.UTC(2026, 9, 2, 12, 0, 0);
 const SECRET = "sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123";
 
 const spawnOf = (n: number, description: string, prompt: string) =>
@@ -48,12 +51,21 @@ async function markdownText(ui: Finder, key: string): Promise<unknown> {
   return found?.type === "Markdown" ? found.props["text"] : undefined;
 }
 
-// The header's mascot and its two lines are one row Box; the lines read as the rows they are beside it.
+// The header's mascot and its lines are one row Box, and the body's window holds its units in a clipped Box; both read as the rows they are.
 function pageRows(tree: RenderElement): string[] {
-  const top = topRows(tree).flatMap((child) =>
-    isNode(child) && child.props?.["key"] === "page-header" ? childrenOf(childrenOf(child)[1] as Node) : [child],
-  );
-  return rows({ type: "Box", children: top } as RenderElement);
+  const unwrap = (child: unknown): unknown[] => {
+    if (!isNode(child)) return [child];
+    if (child.props?.["key"] === "page-header") return childrenOf(childrenOf(child)[1] as Node);
+    if (child.props?.["key"] !== "page-body") return [child];
+    return childrenOf(child).flatMap((part) => (isNode(part) && part.props?.["overflow"] === "hidden" ? childrenOf(childrenOf(part)[0] as Node) : [part]));
+  };
+  return rows({ type: "Box", children: topRows(tree).flatMap(unwrap) } as RenderElement);
+}
+
+// The page from its identity row down, whatever tab rows the pane draws above it.
+function pageBody(tree: RenderElement): string[] {
+  const all = pageRows(tree);
+  return all.slice(all.findIndex((row) => row.startsWith("◆ executor")));
 }
 
 const message = (role: "user" | "assistant", text: string): SessionMessage => ({ role, text, toolUses: [] });
@@ -99,20 +111,27 @@ test("a lane head's button opens the page of a running agent: header, full brief
   await ui.press({ key: `open-${id}` });
 
   expect(state.keys.filter((key) => key === "pages")).toEqual(["pages"]);
-  expect(pageRows(await ui.drawn()).slice(3)).toEqual([
+  expect(pageBody(await ui.drawn())).toEqual([
     "◆ executor · Fix the heading par…",
     "◆ running · 2s · 0 tokens · ~$0.…",
+    "sonnet-5-5",
+    "0 tool calls",
+    `started ${clockOf(STARTED)}`,
     "Brief",
     "",
+    "",
+    "",
+    " ",
     "Tool calls · 2",
     "✓ Read src/parser.ts                          300ms",
     "✗ Bash bun test src/parser.spec.ts               2s",
+    " ",
     "Reply",
     "",
     "b: Back  c: Copy brief  r: Reload",
   ]);
-  expect(await markdownText(ui, "brief-0")).toBe(BRIEF);
-  expect(await markdownText(ui, "reply-0")).toBe("Reading the parser.");
+  expect(await Promise.all([0, 1, 2].map((line) => markdownText(ui, `brief-${line}-0`)))).toEqual(BRIEF.split("\n"));
+  expect(await markdownText(ui, "reply-0-0")).toBe("Reading the parser.");
   expect((await ui.find({ type: "Code" }))?.props).toEqual({ source: "bun test src/parser.spec.ts", language: "bash", wrap: "truncate-end" });
   expect(pagesOf()[id]?.calls).toEqual([
     { tool: "Read", summary: "src/parser.ts", ok: true, durationMs: 300 },
@@ -133,14 +152,16 @@ test("a finished agent's page is kept at its turn.complete from its transcript, 
   w.agents = [];
   const ui = await $.ui.mount(pane("terminal", DOCK_120));
   await ui.press({ key: `open-${id}` });
-  expect(pageRows(await ui.drawn()).slice(3, 7)).toEqual([
+  expect(pageBody(await ui.drawn()).slice(0, 6)).toEqual([
     "◆ executor · Fix the heading par…",
     "✓ done · 1m05s · 2.5k tokens · ~…",
+    "sonnet-5-5",
+    "0 tool calls",
+    `started ${clockOf(STARTED)} · ended ${clockOf(STARTED + 65_000)}`,
     "Brief",
-    "",
   ]);
-  expect(await markdownText(ui, "brief-0")).toBe(BRIEF);
-  expect(await markdownText(ui, "reply-0")).toBe("Fixed it; the parser skips fences.");
+  expect(await markdownText(ui, "brief-0-0")).toBe("Fix the heading parser.");
+  expect(await markdownText(ui, "reply-0-0")).toBe("Fixed it; the parser skips fences.");
   await ui.unmount();
 });
 
@@ -154,12 +175,13 @@ test("a finished agent whose transcript is denied keeps its page from the stored
   w.agents = [];
   const ui = await $.ui.mount(pane("terminal", DOCK_120));
   await ui.press({ key: `open-${id}` });
-  expect(pageRows(await ui.drawn()).slice(5, 8)).toEqual([
+  expect(pageBody(await ui.drawn()).slice(5, 9)).toEqual([
     "Brief · stored prompt, no transcript",
     "",
+    " ",
     "Tool calls · 0",
   ]);
-  expect(await markdownText(ui, "brief-0")).toBe("Fix the heading parser.");
+  expect(await markdownText(ui, "brief-0-0")).toBe("Fix the heading parser.");
   await ui.unmount();
 });
 
@@ -261,16 +283,16 @@ test("r reads the transcript and the recorded calls again", async ($, on) => {
   const { w, id, pagesOf } = await runningAgent($, on, "reload");
   const ui = await $.ui.mount(pane("terminal", DOCK_120));
   await ui.press({ key: `open-${id}` });
-  expect(rows(await ui.drawn())).toContain("Tool calls · 0");
+  expect(pageRows(await ui.drawn())).toContain("Tool calls · 0");
 
   w.conversations.set(id, [message("user", BRIEF), message("assistant", "Now reading the lexer.")]);
   await call($, id, { tool: "Read", file_path: "/work/src/lexer.ts" });
   expect(pagesOf()[id]?.calls).toEqual([]);
   await ui.press({ key: "r" });
 
-  const drawn = rows(await ui.drawn());
+  const drawn = pageRows(await ui.drawn());
   expect(drawn).toContain("Tool calls · 1");
-  expect(await markdownText(ui, "reply-0")).toBe("Now reading the lexer.");
+  expect(await markdownText(ui, "reply-0-0")).toBe("Now reading the lexer.");
   await ui.unmount();
 });
 
@@ -352,4 +374,68 @@ test("the agent's turn.complete drops the starts of calls still in flight", asyn
   await finish($, id, "Done again.");
 
   expect(pagesOf()[id]?.calls).toEqual([{ tool: "Read", summary: "a.ts", ok: true, durationMs: null }]);
+});
+
+const KEYS_ROW = "b: Back  c: Copy brief  r: Reload";
+const CUE = "↓ more · wheel to scroll";
+
+test("on a short pane the page opens on the agent's identity with its keys last and a cue for what is below, and the ring is not put on Back", async ($, on) => {
+  const { w, id } = await runningAgent($, on, "short");
+  const ui = await $.ui.mount(pane("terminal", INLINE_80x24));
+
+  await ui.press({ key: `open-${id}` });
+  await w.clock.advance(10);
+
+  const body = pageBody(await ui.drawn()).map((row) => row.trimEnd());
+  expect(body.slice(0, 3)).toEqual(["◆ executor · Fix the heading parser", "◆ running · 0s · 0 tokens · ~$0.00", "Brief"]);
+  expect(body.slice(-2)).toEqual([CUE, KEYS_ROW]);
+  expect(await ui.find({ type: "Raster" })).toBeUndefined();
+  expect(w.focused).not.toContain("b");
+  expect(w.logs.filter((line) => line.includes("could not focus"))).toEqual([]);
+  await ui.unmount();
+});
+
+test("below six rows the identity shares one line, so the window keeps its cue", async ($, on) => {
+  const { id } = await runningAgent($, on, "tiny");
+  const base = pane("terminal", INLINE_80x24);
+  const ui = await $.ui.mount({ ...base, props: { ...base.props, scroll: { offset: 0, bodyRows: 6 } } } as never);
+
+  await ui.press({ key: `open-${id}` });
+  await ui.redraw();
+
+  const body = pageBody(await ui.drawn()).map((row) => row.trimEnd());
+  expect(body[0]).toBe("◆ executor · ◆ running · 0s · 0 tokens · ~$0.00 · Fix the heading parser");
+  expect(body[1]).toBe("Brief");
+  expect(body.slice(-2)).toEqual([CUE, KEYS_ROW]);
+  await ui.unmount();
+});
+
+test("beside the full mascot the header lists the model, the tool calls and the times", async ($, on) => {
+  const { id } = await runningAgent($, on, "facts");
+  const ui = await $.ui.mount(pane("terminal", DOCK_120));
+
+  await ui.press({ key: `open-${id}` });
+
+  expect(pageBody(await ui.drawn()).slice(2, 5)).toEqual(["sonnet-5-5", "0 tool calls", `started ${clockOf(STARTED)}`]);
+  const header = (await ui.find({ key: "page-header" })) as unknown as Node;
+  expect((childrenOf(header)[0] as Node).props?.["columns"]).toBe(16);
+  await ui.unmount();
+});
+
+test("an agent with no recorded model has two fact rows, which the mini mascot's four rows hold", async ($, on) => {
+  const w = world(on, {});
+  doubles(on);
+  on("agent.spawn", () => ({ model: "", agentId: "bare-1" }));
+  await $.command.run(run(""));
+  await $.agent.spawn(spawnOf(1, "Fix the heading parser", "Fix the heading parser."));
+  w.agents = [{ id: "bare-1", description: "", type: "x", status: "running" }];
+  w.conversations.set("bare-1", [message("user", BRIEF), message("assistant", "Reading the parser.")]);
+  const ui = await $.ui.mount(pane("terminal", DOCK_120));
+
+  await ui.press({ key: "open-bare-1" });
+
+  const header = (await ui.find({ key: "page-header" })) as unknown as Node;
+  expect(pageBody(await ui.drawn()).slice(2, 4)).toEqual(["0 tool calls", `started ${clockOf(STARTED)}`]);
+  expect((childrenOf(header)[0] as Node).props?.["columns"]).toBe(15);
+  await ui.unmount();
 });

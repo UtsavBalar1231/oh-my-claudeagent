@@ -18,6 +18,7 @@ import {
   type Size,
   SIZES,
   spreadRows,
+  textOf,
   topRows,
   world,
   write,
@@ -25,6 +26,8 @@ import {
 
 const METRICS = `${ROOT}/.omca/metrics`;
 const DOCK_200: Size = { columns: 200, rows: 50, placement: "dock" };
+const STACKED: Size = { columns: 160, rows: 50, placement: "dock" };
+const STACKED_WIDTH = usableColumns(bodyColumns(STACKED));
 
 const record = (sessionId: string, agentId: string, fields: Partial<MetricsRecord>): string =>
   JSON.stringify({
@@ -185,13 +188,13 @@ test("the agents card draws each agent's glyph in its roster color with the name
 
 test("the tokens card draws one cell per finished turn, oldest first, in its agent's color, and the peak", async ($, on) => {
   world(on, { ...FILES, [`${METRICS}/${S1}/a-5.json`]: record(S1, "a-5", { outcome: "running", ended_at: null, duration_ms: null, estimated_cost_usd: null, evidence_logged: null }) });
-  const tokens = nodeByKey(await statsTab($), "stats-tokens");
+  const tokens = nodeByKey(await statsTab($, STACKED), "stats-tokens");
 
   expect(tokens).toEqual(
     card(
       "stats-tokens",
       "permission",
-      85,
+      STACKED_WIDTH,
       "Tokens per turn · 4 turns",
       line(
         text({ color: GREEN }, "▂"),
@@ -206,15 +209,15 @@ test("the tokens card draws one cell per finished turn, oldest first, in its age
 
 test("the cost card totals the priced runs, splits its meter by agent with the costliest first, and names what it leaves out", async ($, on) => {
   world(on, FILES);
-  const cost = nodeByKey(await statsTab($), "stats-cost");
+  const cost = nodeByKey(await statsTab($, STACKED), "stats-cost");
 
   expect(cost).toEqual(
     card(
       "stats-cost",
       "success",
-      85,
+      STACKED_WIDTH,
       "Estimated cost",
-      line(text({ bold: true }, "$1.35+"), text({}, " "), text({ color: GREEN }, "█".repeat(73)), text({ color: BLUE }, "█")),
+      line(text({ bold: true }, "$1.35+"), text({}, " "), text({ color: GREEN }, "█".repeat(55)), text({ color: BLUE }, "█")),
       line(text({ color: GREEN }, "◆ "), text({}, "executor $1.34"), text({}, "  "), text({ color: BLUE }, "◆ "), text({}, "explorer $0.01")),
       text({ dimColor: true, wrap: "wrap" }, "n/a: no listed price · 2026-10-08 list prices"),
     ),
@@ -223,24 +226,28 @@ test("the cost card totals the priced runs, splits its meter by agent with the c
 
 test("with no priced run the cost card says so in the warn tone and shows no figure", async ($, on) => {
   world(on, { [`${METRICS}/${S1}/a-4.json`]: FILES[`${METRICS}/${S1}/a-4.json`] ?? "" });
-  const cost = nodeByKey(await statsTab($), "stats-cost");
+  const cost = nodeByKey(await statsTab($, STACKED), "stats-cost");
 
   expect(cost).toEqual(
-    card("stats-cost", "warning", 85, "Estimated cost", text({ dimColor: true, wrap: "wrap" }, "No finished run has a listed price, so no cost is shown")),
+    card("stats-cost", "warning", STACKED_WIDTH, "Estimated cost", text({ dimColor: true, wrap: "wrap" }, "No finished run has a listed price, so no cost is shown")),
   );
 });
 
-test("at the split tier the tokens and cost cards sit side by side at half the body each", async ($, on) => {
+test("at the split tier the tokens card takes half the body and the cost card the rest, so the pair is as wide as the agents card", async ($, on) => {
   world(on, FILES);
   const split: Size = { columns: 200, rows: 50, placement: "inline" };
-  const lower = nodeByKey(await statsTab($, split), "stats-lower");
-  const half = Math.floor((bodyColumns(split) - 3 - 2) / 2);
+  const tree = await statsTab($, split);
+  const lower = nodeByKey(tree, "stats-lower");
+  const width = usableColumns(bodyColumns(split));
+  const half = Math.floor((width - 2) / 2);
 
-  expect(lower?.props).toEqual({ key: "stats-lower", flexDirection: "row", columnGap: 2, width: half * 2 + 2 });
+  expect(nodeByKey(tree, "stats-agents")?.props?.["width"]).toBe(width);
+  expect(lower?.props).toEqual({ key: "stats-lower", flexDirection: "row", columnGap: 2, width });
   expect(childrenOf(lower ?? { type: "" }).map((child) => (isNode(child) ? [child.props?.["key"], child.props?.["width"]] : []))).toEqual([
     ["stats-tokens", half],
-    ["stats-cost", half],
+    ["stats-cost", width - 2 - half],
   ]);
+  expect(width - 2 - half).toBe(half + 1);
 });
 
 test("a drawn table's only key is r, and after the stats atom resets the tab says it is reading, with no key", async ($, on) => {
@@ -278,7 +285,7 @@ test("a table taller than its window draws a more-below cue over the window's la
   const cue = await cueAt(0);
   expect(cue?.props).toEqual({ key: "more-cue", position: "absolute", top: 15, left: 0, width: bodyColumns(SHORT) - 3 });
   expect(childrenOf(cue ?? { type: "" })).toEqual([text({ dimColor: true }, "  ↓ more · ↑↓ scroll".padEnd(bodyColumns(SHORT) - 3))]);
-  expect((await cueAt(4))?.props?.["top"]).toBe(19);
+  expect((await cueAt(2))?.props?.["top"]).toBe(17);
   expect(await cueAt(40)).toBeUndefined();
 
   const drawn = await ui(0);
@@ -296,34 +303,36 @@ test("the Stats tab aggregates two sessions by agent type with exact rows, on th
   const summary = "7 delegations in 2 sessions · 1 running · 1 unreadable record skipped";
 
   const notes = "+ excludes 1 unpriced run · n/a: no listed price · 2026-10-08 list prices";
+  const agents = [
+    "Agents · 3 types",
+    "  agent                  runs  median  tokens  est. cost  evidence  outcomes    ",
+    `◆ executor   ${"█".repeat(10)}     3   1m30s    1.0M      $2.86     ! 67%  ✓ 2 ✗ 1 ! 0 `,
+    `◆ explorer   ${"█".repeat(10)}     3     15s   12.0k     $0.01+      ✗ 0%  ✓ 1 ✗ 0 ! 1 `,
+    `◆ architect  ${"█".repeat(10)}     1   6m40s    129k        n/a    ✓ 100%  ✓ 1 ✗ 0 ! 0 `,
+  ];
+  const fromSummary = (all: readonly string[], first: string) => all.slice(all.findIndex((text) => text.startsWith(first)));
 
   for (const surface of SURFACES) {
-    const wide = await $.ui.mount(pane(surface, { columns: 200, rows: 50, placement: "dock" }));
-    expect(spreadRows(await wide.drawn()).slice(2)).toEqual([
-      summary,
-      "Agents · 3 types",
-      "  agent                  runs  median  tokens  est. cost  evidence  outcomes    ",
-      `◆ executor   ${"█".repeat(10)}     3   1m30s    1.0M      $2.86     ! 67%  ✓ 2 ✗ 1 ! 0 `,
-      `◆ explorer   ${"█".repeat(10)}     3     15s   12.0k     $0.01+      ✗ 0%  ✓ 1 ✗ 0 ! 1 `,
-      `◆ architect  ${"█".repeat(10)}     1   6m40s    129k        n/a    ✓ 100%  ✓ 1 ✗ 0 ! 0 `,
-      "Tokens per turn · 6 turns",
-      "▁█▁▂▁▁ peak 990k",
+    const wide = await $.ui.mount(pane(surface, DOCK_200));
+    const tree = await wide.drawn();
+    expect(fromSummary(spreadRows(tree), summary).slice(0, 6)).toEqual([summary, ...agents]);
+    expect(linesOf(tree, "stats-tokens")).toEqual(["Tokens per turn · 6 turns", "▁█▁▂▁▁ peak 990k"]);
+    expect(linesOf(tree, "stats-cost")).toEqual([
       "Estimated cost",
-      `$2.87+ ${"█".repeat(74)}`,
+      `$2.87+ ${"█".repeat(36)}`,
       "◆ executor $2.86  ◆ explorer $0.01",
       notes,
-      "r: Reload",
     ]);
     await wide.unmount();
 
     const narrow = await $.ui.mount(pane(surface, { columns: 120, rows: 40, placement: "dock" }));
-    expect(spreadRows(await narrow.drawn()).slice(3)).toEqual([
+    expect(fromSummary(spreadRows(await narrow.drawn()), "7 delegations")).toEqual([
       "7 delegations in 2 sessions · 1 running · 1 skipped",
       "Agents · 3 types",
-      "  agent      runs  est. cost  evidence",
-      "◆ executor      3      $2.86     ! 67%",
-      "◆ explorer      3     $0.01+      ✗ 0%",
-      "◆ architect     1        n/a    ✓ 100%",
+      "  agent      runs  median  est. cost  evidence",
+      "◆ executor      3   1m30s      $2.86     ! 67%",
+      "◆ explorer      3     15s     $0.01+      ✗ 0%",
+      "◆ architect     1   6m40s        n/a    ✓ 100%",
       "Tokens per turn · 6 turns",
       "▁█▁▂▁▁ peak 990k",
       "Estimated cost",
@@ -334,6 +343,74 @@ test("the Stats tab aggregates two sessions by agent type with exact rows, on th
     ]);
     await narrow.unmount();
   }
+});
+
+const priced = (types: readonly (readonly [string, number])[]): Record<string, string> =>
+  Object.fromEntries(
+    types.map(([name, cost]) => [`${METRICS}/${S1}/${name}.json`, record(S1, name, { agent_type: `oh-my-claudeagent:${name}`, estimated_cost_usd: cost })]),
+  );
+const linesOf = (tree: RenderElement, key: string): string[] => childrenOf(nodeByKey(tree, key) ?? { type: "" }).map(textOf);
+const agentRows = (tree: RenderElement) => linesOf(tree, "stats-agents");
+const costLines = (tree: RenderElement) => linesOf(tree, "stats-cost");
+
+test("an outcome cell is as wide as the widest count and a space, so two digits never touch the next glyph", async ($, on) => {
+  world(on, {
+    ...Object.fromEntries(Array.from({ length: 12 }, (_, n) => [`${METRICS}/${S1}/c${n}.json`, record(S1, `c${n}`, {})])),
+    [`${METRICS}/${S1}/x.json`]: record(S1, "x", { agent_type: "oh-my-claudeagent:explorer", outcome: "aborted" }),
+  });
+  const [head, executor, explorer] = agentRows(await statsTab($, DOCK_200)).slice(1);
+
+  expect(head?.endsWith("  outcomes       ")).toBe(true);
+  expect(executor?.endsWith("  ✓ 12 ✗ 0  ! 0  ")).toBe(true);
+  expect(explorer?.endsWith("  ✓ 0  ✗ 1  ! 0  ")).toBe(true);
+});
+
+test("the columns give way until the longest name has twenty cells, and a later column that still fits comes back", async ($, on) => {
+  const long = "claude-code-guide-extended-edition";
+  world(on, priced([[long, 1], ["executor", 2]]));
+  const lines = agentRows(await statsTab($, STACKED));
+
+  expect(lines[1]).toBe(`  ${"agent".padEnd(22)}  ${" ".repeat(10)}  runs  est. cost  evidence`);
+  expect(lines.slice(2).map((text) => text.slice(0, 26))).toEqual([`◆ ${long.slice(0, 21)}…  `, "◆ executor".padEnd(26)]);
+});
+
+test("the cost legend wraps onto spare rows, and ends in a count of the rest where rows are scarce", async ($, on) => {
+  const names = Array.from({ length: 12 }, (_, n) => [`agent-${String(n).padStart(2, "0")}`, 12 - n] as const);
+  world(on, priced(names));
+  const wide = costLines(await statsTab($, DOCK_200));
+  const legend = wide.slice(2, -1);
+
+  expect(legend).toHaveLength(6);
+  expect(legend[0]).toBe("◆ agent-00 $12.00  ◆ agent-01 $11.00");
+  expect(legend.at(-1)).toBe("◆ agent-10 $2.00  ◆ agent-11 $1.00");
+  expect(legend.some((text) => text.includes("more"))).toBe(false);
+
+  const short = costLines(await statsTab($, { columns: 200, rows: 30, placement: "dock" }));
+  expect(short.slice(2, -1)).toEqual(["◆ agent-00 $12.00  ◆ agent-01 $11.00", "◆ agent-02 $10.00  +9 more"]);
+});
+
+test("the ASCII meter marks the seven costliest agents and merges the rest as other, in the meter and the legend", async ($, on) => {
+  const names = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"].map((name, n) => [`agent-${name}`, 20 - n * 2] as const);
+  world(on, priced(names), {}, { OMCA_GLYPHS: "ascii" });
+  const lines = costLines(await statsTab($, STACKED));
+  const [meter, ...legend] = lines.slice(1, -1);
+
+  expect(meter?.startsWith("$110.00 [")).toBe(true);
+  for (const mark of ["#", "=", "+", "*", "%", "&", "~", "o"]) expect(meter?.includes(mark), mark).toBe(true);
+  expect(legend.join("  ")).toBe(
+    "# agent-a $20.00  = agent-b $18.00  + agent-c $16.00  * agent-d $14.00  % agent-e $12.00  & agent-f $10.00  ~ agent-g $8.00  o other $12.00",
+  );
+});
+
+test("below eight body rows the agents card has no frame, title or column header, so its rows show", async ($, on) => {
+  world(on, FILES);
+  const framed = await statsTab($, { columns: 200, rows: 13, placement: "dock" });
+  expect(nodeByKey(framed, "stats-agents")?.props?.["borderStyle"]).toBe("round");
+  expect(agentRows(framed)[0]).toBe("Agents · 3 types");
+
+  const bare = await statsTab($, { columns: 200, rows: 12, placement: "dock" });
+  expect(nodeByKey(bare, "stats-agents")?.props).toEqual({ key: "stats-agents", flexDirection: "column" });
+  expect(agentRows(bare).map((text) => text.slice(0, 10))).toEqual(["◆ executor", "◆ architec", "◆ explorer"]);
 });
 
 test("Stats rows stay inside the body less the gutter at every size, docked and inline, on both surfaces", async ($, on) => {
@@ -356,7 +433,10 @@ test("digit 6 reads the records afresh each time, r reloads a drawn table, and a
   const w = world(on);
   await $.command.run(run(""));
   const ui = await $.ui.mount(pane("terminal", { columns: 120, rows: 40, placement: "dock" }));
-  const body = async () => rows(await ui.drawn()).slice(3);
+  const body = async () => {
+    const all = rows(await ui.drawn());
+    return all.slice(all.findIndex((text) => text.startsWith("─")) + 1);
+  };
 
   await ui.press({ key: "6" });
   expect(await body()).toEqual(["No delegation statistics have been collected yet.", "r: Reload"]);
@@ -409,8 +489,8 @@ test("a record under an old agent name counts in the row of its current name", a
   });
   await $.command.run(run("stats"));
   const ui = await $.ui.mount(pane("terminal", DOCK_200));
-  const drawn = rows(await ui.drawn());
-  expect(drawn.filter((row) => row.includes(` ${current} `) || row.includes(`${current}  `))).toHaveLength(1);
+  const drawn = agentRows(await ui.drawn());
+  expect(drawn.filter((row) => row.includes(`${current} `))).toHaveLength(1);
   expect(drawn.some((row) => row.includes(old))).toBe(false);
   expect(drawn.some((row) => row.includes("1 type"))).toBe(true);
   await ui.unmount();

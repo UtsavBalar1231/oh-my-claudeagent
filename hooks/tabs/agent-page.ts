@@ -1,13 +1,13 @@
 import type { RenderElement } from "claude-code";
 import { costText, type Lane, shellLanguage, STATUS_WORDS, statusMark, toolLabel } from "../../src/core/mission.ts";
-import { SIZE } from "../../src/core/mascots.ts";
-import { chunks } from "../../src/core/plan-reader.ts";
-import { agentGlyph, COLUMN_GAP, fitEnd, formatDuration, formatTokens, KEYS, oneLine, padEnd, padStart, shortType } from "../../src/core/ui-kit.ts";
+import { GRID, type MascotSize } from "../../src/core/mascots.ts";
+import { agentGlyph, clockOf, COLUMN_GAP, fitEnd, formatDuration, formatTokens, KEYS, oneLine, padEnd, padStart, shortType } from "../../src/core/ui-kit.ts";
 import { agentKey, fitPieces, levelMark, ON_SURFACE, type Piece, piecesWidth, TONE_KEYS } from "../../src/core/visual.ts";
 import { loadPage } from "../agents-tracker.ts";
 import { type Host, type State, update } from "../host.ts";
 import { frame, keyOf, show, stateOf } from "../mascot-player.ts";
 import { keyButton, noticeRow, refocus, type View } from "../pane.ts";
+import { markdownUnits, resetOffset, ScrollRegion, type Unit } from "../regions.ts";
 import { Line } from "../ui.ts";
 
 type Page = State["pages"][string];
@@ -16,10 +16,15 @@ type Call = Page["calls"][number];
 const BACK = "b";
 const COPY = "c";
 const DURATION_CELLS = 6;
+const BODY_KEY = "page-body";
 // Narrower than the mascot and this much text, the header keeps to its two lines.
 const MIN_TEXT_CELLS = 20;
 // Shorter than the mascot and the six rows below it (brief, tool calls, reply, keys), likewise.
-const MIN_PAGE_ROWS = SIZE / 2 + 6;
+const ROWS_BELOW = 6;
+// Shorter than two identity lines, a window with a cue row to spare and the keys, the identity shares one line.
+const COMPACT_ROWS = 6;
+const rowsOf = (size: MascotSize): number => GRID[size].height / 2;
+const shortModel = (model: string): string => model.replace(/^claude-/, "").replace(/-\d{8}$/, "");
 
 export const openKey = (id: string): string => `open-${id}`;
 
@@ -27,8 +32,8 @@ const showPage = (host: Host, id: string | null): Promise<void> => update(host.s
 
 export async function open(host: Host, id: string): Promise<void> {
   await loadPage(host, id);
+  resetOffset(BODY_KEY);
   await showPage(host, id);
-  refocus(host, BACK, "agents");
 }
 
 async function close(host: Host, id: string): Promise<void> {
@@ -66,12 +71,8 @@ function callRow(view: View, call: Call): RenderElement {
   return Line(view.kit, [...lead, { text: padEnd(summary, room) }, duration]);
 }
 
-function header(view: View, lane: Lane): RenderElement[] {
+function header(view: View, lane: Lane): { children: RenderElement[]; rows: number } {
   const { g, kit } = view;
-  const room = view.width - SIZE - COLUMN_GAP;
-  const mascot = room < MIN_TEXT_CELLS || view.rows < MIN_PAGE_ROWS ? null : kit.mascot(lane.type, stateOf(lane), keyOf(lane.id), frame());
-  show(mascot === null ? [] : [[lane.id, "full"]]);
-  const width = mascot === null ? view.width : room;
   const mark = statusMark(lane.status, g);
   const identity: Piece[] = [
     { text: `${agentGlyph(lane.type, g)} `, color: agentKey(lane.type) },
@@ -79,13 +80,28 @@ function header(view: View, lane: Lane): RenderElement[] {
     ...(lane.description === "" ? [] : [{ text: ` ${g.dot} ${oneLine(lane.description)}` }]),
   ];
   const elapsed = formatDuration((lane.endedAt ?? view.now) - lane.startedAt);
-  const facts = `${STATUS_WORDS[lane.status] ?? lane.status} ${g.dot} ${elapsed} ${g.dot} ${formatTokens(lane.inputTokens + lane.outputTokens)} tokens${costText(lane, g.dot)}`;
-  const lines = [
-    Line(kit, fitPieces(identity, width, g.ellipsis)),
-    Line(kit, fitPieces([{ text: `${mark.glyph} `, color: mark.color }, { text: facts, color: TONE_KEYS.muted }], width, g.ellipsis)),
+  const status = `${STATUS_WORDS[lane.status] ?? lane.status} ${g.dot} ${elapsed} ${g.dot} ${formatTokens(lane.inputTokens + lane.outputTokens)} tokens${costText(lane, g.dot)}`;
+  const facts = [
+    ...(lane.model === "" ? [] : [[shortModel(lane.model), ...(lane.effort === null ? [] : [String(lane.effort)])].join(` ${g.dot} `)]),
+    `${lane.calls} tool call${lane.calls === 1 ? "" : "s"}`,
+    [`started ${clockOf(lane.startedAt)}`, ...(lane.endedAt === null ? [] : [`ended ${clockOf(lane.endedAt)}`])].join(` ${g.dot} `),
   ];
-  if (mascot === null) return lines;
-  return [kit.Box({ key: "page-header", flexDirection: "row", columnGap: COLUMN_GAP, children: [mascot, kit.Box({ flexDirection: "column", children: lines })] })];
+  const size: MascotSize = facts.length <= 2 || view.rows < rowsOf("full") + ROWS_BELOW ? "mini" : "full";
+  const room = view.width - GRID[size].width - COLUMN_GAP;
+  const mascot = room < MIN_TEXT_CELLS || view.rows < rowsOf(size) + ROWS_BELOW ? null : kit.mascot(lane.type, stateOf(lane), keyOf(lane.id), frame(), size);
+  show(mascot === null ? [] : [[lane.id, size]]);
+  const width = mascot === null ? view.width : room;
+  const state: Piece[] = [{ text: `${mark.glyph} `, color: mark.color }, { text: status, color: TONE_KEYS.muted }];
+  if (mascot === null && view.rows < COMPACT_ROWS) {
+    return { children: [Line(kit, fitPieces([...identity.slice(0, 2), { text: ` ${g.dot} ` }, ...state, ...identity.slice(2)], width, g.ellipsis))], rows: 1 };
+  }
+  const lines = [Line(kit, fitPieces(identity, width, g.ellipsis)), Line(kit, fitPieces(state, width, g.ellipsis))];
+  if (mascot === null) return { children: lines, rows: lines.length };
+  const beside = [...lines, ...facts.map((text) => Line(kit, fitPieces([{ text, color: TONE_KEYS.muted }], width, g.ellipsis)))].slice(0, rowsOf(size));
+  return {
+    children: [kit.Box({ key: "page-header", flexDirection: "row", columnGap: COLUMN_GAP, children: [mascot, kit.Box({ flexDirection: "column", children: beside })] })],
+    rows: rowsOf(size),
+  };
 }
 
 export async function view(host: Host, view: View, lane: Lane): Promise<readonly RenderElement[]> {
@@ -101,20 +117,21 @@ export async function view(host: Host, view: View, lane: Lane): Promise<readonly
       keyButton(view, KEYS.reload, "Reload", () => loadPage(host, lane.id)),
     ],
   });
+  const head = header(view, lane);
   if (page === undefined) {
-    return [...header(view, lane), noticeRow(view, { kind: "empty" }, { loading: "", empty: "No page is kept for this agent; press r to load it." }), keys];
+    return [...head.children, noticeRow(view, { kind: "empty" }, { loading: "", empty: "No page is kept for this agent; press r to load it." }), keys];
   }
-  const label = (text: string) => kit.Text({ color: TONE_KEYS.muted, children: [fitEnd(text, view.width, g.ellipsis)] });
-  const markdown = (key: string, value: string, none: string) =>
-    value.trim() === "" ? [label(none)] : chunks(value).map((text, part) => kit.Markdown({ key: `${key}-${part}`, text }));
-  return [
-    ...header(view, lane),
-    label(page.source === "messages" ? "Brief" : `Brief ${g.dot} stored prompt, no transcript`),
-    ...markdown("brief", page.brief, "none recorded"),
-    label(`Tool calls ${g.dot} ${page.calls.length}`),
-    ...page.calls.map((call) => callRow(view, call)),
-    label("Reply"),
-    ...markdown("reply", page.reply, "none yet"),
-    keys,
+  const label = (text: string): Unit => ({ element: kit.Text({ color: TONE_KEYS.muted, children: [fitEnd(text, view.width, g.ellipsis)] }), rows: 1 });
+  const markdown = (key: string, value: string, none: string): Unit[] =>
+    value.trim() === "" ? [label(none)] : markdownUnits(kit, value, view.width, key);
+  const sections = [
+    [label(page.source === "messages" ? "Brief" : `Brief ${g.dot} stored prompt, no transcript`), ...markdown("brief", page.brief, "none recorded")],
+    [label(`Tool calls ${g.dot} ${page.calls.length}`), ...page.calls.map((call) => ({ element: callRow(view, call), rows: 1 }))],
+    [label("Reply"), ...markdown("reply", page.reply, "none yet")],
   ];
+  const height = Math.max(1, view.rows - head.rows - 1);
+  const isSpare = sections.flat().reduce((sum, unit) => sum + unit.rows, 0) + sections.length - 1 <= height;
+  const gap: Unit = { element: kit.Text({ children: [" "] }), rows: 1 };
+  const units = sections.flatMap((section, at) => (isSpare && at > 0 ? [gap, ...section] : section));
+  return [...head.children, ScrollRegion({ kit, g, key: BODY_KEY, left: 0, top: head.rows, width: view.width, height, units }), keys];
 }

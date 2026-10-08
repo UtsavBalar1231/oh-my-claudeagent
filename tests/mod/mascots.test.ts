@@ -198,6 +198,31 @@ test("the timer stops when the surfaces lose the terminal", async ($, on) => {
   await ui.unmount();
 });
 
+test("a lane the wheel scrolls out of view loses its mini and its blits", async ($, on) => {
+  const w = world(on, {});
+  engine(on);
+  await $.command.run(run(""));
+  for (let n = 1; n <= 5; n++) await $.agent.spawn(spawnOf(n, "explorer", `Old work ${n}`));
+  for (let n = 1; n <= 5; n++) await finish($, `a-${n}`);
+  await w.clock.advance(5000);
+  await $.agent.spawn(spawnOf(6, "executor", "New work"));
+  w.agents = listed("a-6");
+  // A body of 9 rows: the running block, the label and two finished rows, then the cue and the keys row.
+  const ui = await $.ui.mount(pane("terminal", { columns: 120, rows: 14, placement: "dock" }));
+  await ui.drawn();
+  await w.clock.advance(2000 + FRAME_MS * 2);
+  expect(rasterOf(await ui.drawn(), "a-6")).toBeDefined();
+  expect(w.blits.map((blit) => blit.key)).toContain("mascot-a-6");
+
+  await $.ui.scroll({ component: "Pane", requestId: "omca", offset: 0, origin: { kind: "person" }, pointer: { column: 4, row: 4 }, by: 1, bodyRows: 11, contentRows: 12 });
+  expect(rasterOf(await ui.drawn(), "a-6")).toBeUndefined();
+  await w.clock.advance(FRAME_MS * 2);
+  w.blits.length = 0;
+  await w.clock.advance(FRAME_MS * 4);
+  expect(w.blits).toEqual([]);
+  await ui.unmount();
+});
+
 test("a body too short for every relaxed lane draws the compact lanes, with no mascot and no blits", async ($, on) => {
   const { w, ui } = await running($, on, ["executor", "explorer", "architect"], "terminal", DOCK_SHORT);
 

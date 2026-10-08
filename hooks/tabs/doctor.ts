@@ -21,11 +21,9 @@ const WORDS: Readonly<Record<Check["level"], string>> = { ok: "OK", warn: "WARN"
 // One key per check that names a command to run; r and i are taken, and digits switch tabs.
 const PROMPT_KEYS: Readonly<Record<string, string>> = { server: "m", style: "y", advisor: "a", statusline: "s" };
 // Below this a detail column would be too narrow for the longest variable name it quotes.
-const STACKED_BELOW = 64;
+const MIN_DETAIL = 50;
 const DIFF_ROWS = 16;
 const EDGE_ROWS = 2;
-// Below this many rows for the checks the list is drawn whole and the engine scrolls it.
-const MIN_WINDOW_ROWS = 3;
 const SEVERITY: Readonly<Record<Check["level"], number>> = { fail: 0, warn: 1, info: 2, ok: 3 };
 const FIXES: Readonly<Record<Fix, { key: string; label: string; done: string }>> = {
   "add-refresh-interval": { key: "i", label: "Add refreshInterval 5", done: "Added refreshInterval 5 to statusLine in" },
@@ -64,7 +62,7 @@ type Rows = { element: RenderElement; height: number };
 function checkRows(host: Host, view: View, check: Check): Rows {
   const { Box, Button, Text } = view.kit;
   const { glyph } = levelMark(check.level, view.g);
-  const isStacked = view.width < STACKED_BELOW;
+  const isStacked = view.width - CHIP - LABEL < MIN_DETAIL;
   const indent = isStacked ? 2 : CHIP + LABEL;
   const badge = chip(`${glyph} ${WORDS[check.level]}`, check.level, view.isAscii);
   const lead: Piece[] = [badge, { text: " ".repeat(Math.max(1, CHIP - displayWidth(badge.text))) }];
@@ -160,19 +158,18 @@ export const view: TabView = async (host, view) => {
   const checks = state.checks.toSorted((a, b) => SEVERITY[a.level] - SEVERITY[b.level]).map((check) => checkRows(host, view, check));
   const heights = checks.map(({ height }) => height);
   const space = view.rows - headHeight;
-  const capacity = space - EDGE_ROWS;
-  if (heights.reduce((sum, height) => sum + height, 0) <= space || capacity < MIN_WINDOW_ROWS) {
-    return [...head, ...checks.map(({ element }) => element)];
-  }
-  first = Math.min(first, lastStart(heights, capacity));
-  laid = { heights, room: capacity };
+  if (heights.reduce((sum, height) => sum + height, 0) <= space) return [...head, ...checks.map(({ element }) => element)];
+  const windowRows = Math.max(1, space - EDGE_ROWS);
+  first = Math.min(first, lastStart(heights, windowRows));
+  laid = { heights, room: windowRows };
+  const capacity = first > 0 ? windowRows : Math.max(1, space - 1);
   const end = windowEnd(heights, first, capacity);
   const shown = heights.slice(first, end).reduce((sum, height) => sum + height, 0);
   // The engine raises ui.scroll only for a tree taller than the body, so this one row past the
   // window is what brings the arrows and the wheel to `scroll`.
   return [
     ...head,
-    edge(view, first > 0 ? `  ${view.g.up} ${first} more` : ""),
+    ...(first > 0 ? [edge(view, `  ${view.g.up} ${first} more`)] : []),
     ...checks.slice(first, end).map(({ element }) => element),
     ...blanks(view, capacity - shown),
     edge(view, end < checks.length ? `  ${view.g.down} ${checks.length - end} more ${view.g.dot} ${view.g.up}${view.g.down} scroll` : ""),
