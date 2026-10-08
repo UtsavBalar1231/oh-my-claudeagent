@@ -7,7 +7,7 @@ file is listed in the [reference](references.md).
 
 ### Install
 
-Install the plugin with the commands in the [README](../README.md#install). OMCA needs Claude
+Install the plugin with the command in the [README](../README.md#install). OMCA needs Claude
 Code 2.1.292 or later and bun 1.4.2 or later. `ast-grep` (or `sg`) is optional: without it the
 `ast_*` tools return an error and everything else works.
 

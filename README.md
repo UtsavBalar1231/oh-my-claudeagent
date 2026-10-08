@@ -10,7 +10,7 @@ logged.
 
 ## Requirements
 
-- Claude Code 2.1.292 or later. Tested with 2.1.292.
+- Claude Code 2.1.292 or later. Tested with 2.1.294.
 - bun 1.4.2 or later, on the `PATH` Claude Code starts with. The `omca` server, its hooks and
   the status line run on bun.
 - `ast-grep` (or `sg`), optional. Only the structural code search tools need it.
@@ -20,11 +20,11 @@ CI runs on Linux, macOS and Windows.
 ## Install
 
 ```bash
-claude plugin marketplace add UtsavBalar1231/oh-my-claudeagent
-claude plugin install oh-my-claudeagent@omca
+claude plugin install oh-my-claudeagent --marketplace UtsavBalar1231/oh-my-claudeagent
 ```
 
-The marketplace installs from the `plugin` branch, a packaged tree with no `package.json` or
+The command adds the `omca` marketplace when it is not added yet, then installs from it. The
+marketplace installs from the `plugin` branch, a packaged tree with no `package.json` or
 lockfile, so installing fetches no npm dependencies.
 
 Inside a session, the same steps are `/plugin marketplace add UtsavBalar1231/oh-my-claudeagent`

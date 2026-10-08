@@ -254,7 +254,9 @@ hand.
   through a `url` source. The shipped tree leaves out the repository tooling: the specs, `tests/`,
   every script but the status line setup, `package.json`, `bun.lock`, `bunfig.toml`, the
   typecheck and lint configs, `CONTRIBUTING.md`, the OpenCode adapter and the video project. A
-  marketplace install no longer fetches about 166 MiB of development dependencies.
+  marketplace install no longer fetches about 166 MiB of development dependencies. A new install
+  is one command, `claude plugin install oh-my-claudeagent --marketplace
+  UtsavBalar1231/oh-my-claudeagent`, which adds the marketplace first.
 - **The status lines run on bun through a launcher.** `/oh-my-claudeagent:omca-setup` copies
   `statusline/launcher.ts` to `~/.claude/omca/statusline.ts`, prints a diff of
   `~/.claude/settings.json`, and after you confirm it sets `statusLine` and
