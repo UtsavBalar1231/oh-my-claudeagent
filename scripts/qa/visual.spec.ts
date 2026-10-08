@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { copyFixture, maskClock, maskScratch, parseView, teardown, withoutBlink } from "./visual.ts";
+import { copyFixture, maskClock, maskScratch, mouseReports, parseSizes, parseView, teardown, withoutBlink } from "./visual.ts";
 
 const VISUAL = join(import.meta.dir, "visual.ts");
 const temps: string[] = [];
@@ -43,6 +43,36 @@ describe("parseView", () => {
   ])("rejects %s", (text, message) => {
     expect(() => parseView(text)).toThrow(message);
   });
+});
+
+describe("mouseReports", () => {
+  const screen = ["╭─ tabs ─╮", "│ 1: Agents  4: Notepad", "│ ╭ Learnings · 3 entries"].join("\n");
+
+  test("a key is not a mouse step", () => {
+    expect(mouseReports("Down", screen)).toBeUndefined();
+    expect(mouseReports("4", screen)).toBeUndefined();
+  });
+
+  test("a wheel step sends one SGR report per tick at the anchor's first cell, 1-based, moved by the offset", () => {
+    expect(mouseReports("wheel-down*2@Learnings", screen)).toEqual(["\x1b[<65;5;3M", "\x1b[<65;5;3M"]);
+    expect(mouseReports("wheel-up@Learnings:+3,-1", screen)).toEqual(["\x1b[<64;8;2M"]);
+  });
+
+  test("a click is a press and a release in one report", () => {
+    expect(mouseReports("click@Notepad", screen)).toEqual(["\x1b[<0;17;2M\x1b[<0;17;2m"]);
+  });
+
+  test("an anchor the screen does not show throws, naming the step", () => {
+    expect(() => mouseReports("click@Issues", screen)).toThrow('no "Issues" on the screen for the step click@Issues');
+  });
+});
+
+test("parseSizes reads columns by rows and refuses anything else", () => {
+  expect(parseSizes("80x24, 160x30")).toEqual([
+    [80, 24],
+    [160, 30],
+  ]);
+  expect(() => parseSizes("80")).toThrow('a size is <columns>x<rows>, not "80"');
 });
 
 test("copyFixture copies the tree and points {{cwd}} at the copy", () => {

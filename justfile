@@ -48,9 +48,9 @@ qa:
 	bun scripts/qa/worktree-bash.ts --unfiltered-tool-call
 	bun scripts/qa/agent-effort.ts
 
-# Capture one tests/mod/visual view in tmux at 80, 120 and 200 columns
-visual view:
-	bun scripts/qa/visual.ts {{ view }}
+# Capture one tests/mod/visual view in tmux at 80, 120 and 200 columns, or at --sizes
+visual view *args:
+	bun scripts/qa/visual.ts {{ view }} {{ args }}
 
 # Recapture the README screens against the mock model; name shots, or `clips` for the video footage
 screenshots *args:

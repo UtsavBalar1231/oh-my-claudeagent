@@ -2,23 +2,27 @@
 // Opens one view of the mod in a real Claude Code session inside tmux, against the scripted
 // mock model, and saves the screen at each harness size.
 //
-// Usage: bun scripts/qa/visual.ts <view> [--root <dir>]
+// Usage: bun scripts/qa/visual.ts <view> [--root <dir>] [--sizes 80x24,160x30] [--out <dir>]
 //
 // <root>/<view>.json, root defaulting to tests/mod/visual:
 //   command     text typed at the prompt, then Enter: a slash command or a prompt
 //   keys        tmux send-keys arguments sent one at a time afterwards, each a key name
-//               (Enter, Down, Escape, C-x) or text; none when absent
+//               (Enter, Down, Escape, C-x) or text; none when absent. A mouse step,
+//               `wheel-down*3@<text>`, `wheel-up@<text>` or `click@<text>`, with an optional
+//               `:+dx,+dy`, lands on the first cell where <text> shows, moved by the offset
 //   mockScript  <root>/scripts/<name>.json, the {main, subagent} turns mock-model.ts serves;
 //               absent or null, every request is answered "ok"
 //   fixture     <root>/fixtures/<name>/, copied as the session's cwd, with "{{cwd}}" in its
 //               files replaced by that cwd; absent or null, an empty directory. A plan its
 //               boulder.json names but does not hold is taken from tests/fixtures/plans/.
 // Writes <root>/<view>-<cols>.txt for 80x40 (an inline pane), 120x40 and 200x50 (docked), with
-// the scratch directory's random suffix and the live session's own times masked.
+// the scratch directory's random suffix and the live session's own times masked. `--sizes`
+// captures those sizes instead, as <out>/<view>-<cols>x<rows>.txt, out defaulting to root.
 import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { parseArgs } from "node:util";
+import { displayWidth } from "../../src/core/ui-kit.ts";
 import { envWithout } from "../validate/core.ts";
 import { cleanupOnSignal, REPO } from "./lib.ts";
 import { parseScript, type Script, startServer } from "./mock-model.ts";
@@ -47,6 +51,33 @@ const TRUST_SELECTED = /❯\s*Yes, I trust this folder/;
 const TRUST_UNSELECTED = /❯\s*No, exit/;
 
 export type View = { command: string; keys: string[]; mockScript: string | null; fixture: string | null };
+
+const MOUSE = /^(wheel-up|wheel-down|click)(?:\*(\d+))?@(.+?)(?::([+-]\d+),([+-]\d+))?$/;
+
+/**
+ * The SGR mouse reports for a mouse step, or undefined for a key: a wheel tick per count, or a
+ * press and release, at the first cell where the anchor shows on `screen`, moved by the offset.
+ */
+export function mouseReports(step: string, screen: string): string[] | undefined {
+  const match = MOUSE.exec(step);
+  if (match === null) return undefined;
+  const [, kind, count = "1", anchor = "", dx = "0", dy = "0"] = match;
+  const lines = screen.split("\n");
+  const row = lines.findIndex((line) => line.includes(anchor));
+  if (row === -1) throw new Error(`no "${anchor}" on the screen for the step ${step}`);
+  const line = lines[row] ?? "";
+  const at = `${displayWidth(line.slice(0, line.indexOf(anchor))) + Number(dx) + 1};${row + Number(dy) + 1}`;
+  if (kind === "click") return [`\x1b[<0;${at}M\x1b[<0;${at}m`];
+  return Array.from({ length: Number(count) }, () => `\x1b[<${kind === "wheel-up" ? 64 : 65};${at}M`);
+}
+
+export function parseSizes(text: string): [number, number][] {
+  return text.split(",").map((size) => {
+    const match = /^(\d+)x(\d+)$/.exec(size.trim());
+    if (match === null) throw new Error(`a size is <columns>x<rows>, not "${size}"`);
+    return [Number(match[1]), Number(match[2])];
+  });
+}
 
 // While a tool call waits on a dialog, the engine blinks the bullet that leads its line, so two
 // captures of an unchanged screen differ there; the settle check compares them with it masked.
@@ -284,6 +315,11 @@ async function captureAt(view: View, root: string, cols: number, rows: number): 
     tmux.send("Enter");
     let screen = await tmux.settle(typed);
     for (const key of view.keys) {
+      for (const report of mouseReports(key, screen) ?? []) {
+        tmux.send("-l", report);
+        screen = await tmux.settle(screen);
+      }
+      if (MOUSE.test(key)) continue;
       tmux.send(key);
       screen = await tmux.settle(screen);
     }
@@ -297,16 +333,23 @@ async function captureAt(view: View, root: string, cols: number, rows: number): 
 if (import.meta.main) {
   const { values, positionals } = parseArgs({
     allowPositionals: true,
-    options: { root: { type: "string", default: join(REPO, "tests", "mod", "visual") } },
+    options: {
+      root: { type: "string", default: join(REPO, "tests", "mod", "visual") },
+      sizes: { type: "string" },
+      out: { type: "string" },
+    },
   });
   const [name] = positionals;
   if (name === undefined || !isName(name)) {
-    console.error("usage: bun scripts/qa/visual.ts <view> [--root <dir>]");
+    console.error("usage: bun scripts/qa/visual.ts <view> [--root <dir>] [--sizes 80x24,160x30] [--out <dir>]");
     process.exit(2);
   }
   const view = parseView(readFileSync(join(values.root, `${name}.json`), "utf8"));
-  for (const [cols, rows] of SIZES) {
-    const out = join(values.root, `${name}-${cols}.txt`);
+  const sizes = values.sizes === undefined ? SIZES : parseSizes(values.sizes);
+  const dir = values.out ?? values.root;
+  mkdirSync(dir, { recursive: true });
+  for (const [cols, rows] of sizes) {
+    const out = join(dir, values.sizes === undefined ? `${name}-${cols}.txt` : `${name}-${cols}x${rows}.txt`);
     writeFileSync(out, await captureAt(view, values.root, cols, rows));
     console.log(out);
   }
