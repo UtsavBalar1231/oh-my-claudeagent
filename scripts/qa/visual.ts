@@ -138,7 +138,7 @@ const digitsOut = (text: string): string => text.replace(/\d/g, "N");
 
 /**
  * The screen with the live session's own values fixed: the turn timer's line, whose verb Claude Code
- * picks at random, the Doctor's check time, a rating's time, a turn footer's engine cost, which
+ * picks at random, the Doctor's check time, a turn footer's engine cost, which
  * counts whatever background agents spent before the turn ended, the seconds a running agent has
  * run, in an OMCA lane and in Claude Code's task list, a subagent's token count, whose requests
  * vary by a few hundred tokens from run to run, and a turn footer's tokens, which the mock sizes
@@ -156,8 +156,7 @@ export const maskLive = (screen: string): string =>
     .replace(/\$\d+\.\d+([\u00a0 ])engine([\u00a0 ])cost */g, (match: string, a: string, b: string, at: number, whole: string) =>
       keepWidth(`$X.XX${a}engine${b}cost`, match, at, whole),
     )
-    .replace(/checked \d\d:\d\d/g, "checked HH:MM")
-    .replace(/\b(UP|DOWN)( +)\d\d-\d\d \d\d:\d\d/g, "$1$2MM-DD HH:MM");
+    .replace(/checked \d\d:\d\d/g, "checked HH:MM");
 
 export const mockSessionEnv = (port: number | undefined): string[] => [
   "-e", "DISABLE_AUTOUPDATER=1",

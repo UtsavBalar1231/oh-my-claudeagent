@@ -119,7 +119,7 @@ describe("mod duplicate registration", () => {
     const sources = register(
       'on("command.run", { command: "omca" }, hook);',
       "on('command.run', {command:'omca'}, hook);",
-      'on("command.run", { command: "omca-rate" }, hook);',
+      'on("command.run", { command: "other" }, hook);',
       'on("session.start", hook);',
     );
     expect(duplicateRegistration(sources)).toEqual({
@@ -156,10 +156,14 @@ describe("the real tree", () => {
     for (const check of checks) expect(await check.run(ctx)).toMatchObject({ status: "pass" });
   });
 
-  test("the real register.ts is read: its two command.run matchers count as two registrations", () => {
+  test("the real register.ts is read: its three ui.render matchers count as three registrations", () => {
     const ctx = createContext(join(import.meta.dir, "..", ".."));
     const calls = registrations(hookSources(ctx)).map((r) => r.call);
     expect(calls).toContain('on("command.run", {command:"omca"})');
-    expect(calls).toContain('on("command.run", {command:"omca-rate"})');
+    expect(calls.filter((call) => call.startsWith('on("ui.render"'))).toEqual([
+      'on("ui.render", {component:"AbovePrompt"})',
+      'on("ui.render", {component:"Pane"})',
+      'on("ui.render", {component:"Spinner"})',
+    ]);
   });
 });

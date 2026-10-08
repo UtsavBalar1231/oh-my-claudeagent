@@ -1,5 +1,5 @@
                                                                │                                                      ✕
- ▐▛███▛█   Claude Code v2.1.294                                │1: A  2: P  3: E  4: N  5: F  6: Stats  7: D
+ ▐▛███▛█   Claude Code v2.1.294                                │1: A  2: P  3: E  4: N  5: Stats  6: D
 ▝▜██████▀  Opus 5.5 · API Usage Billing                        │─────────────────────────────────────────────────────
  ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd           │20 delegations in 3 sessions · 1 running · 1 skipped
                                                                │╭───────────────────────────────────────────────────╮

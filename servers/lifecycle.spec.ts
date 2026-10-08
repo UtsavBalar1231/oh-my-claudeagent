@@ -72,17 +72,14 @@ describe("start-up work", () => {
     expect([live.length, live[0].command, archived.length, archived.at(-1).command]).toEqual([500, "run 501", 501, "run 500"]);
   });
 
-  test("delegation records and feedback files older than 90 days go, newer ones stay, and an emptied record directory goes", async () => {
+  test("delegation records older than 90 days go, newer ones stay, and an emptied record directory goes", async () => {
     const root = project();
     put(root, ".omca/metrics/s-old/a1.json", "{}", 91 * DAY_MS);
     put(root, ".omca/metrics/s-mixed/a2.json", "{}", 91 * DAY_MS);
     put(root, ".omca/metrics/s-mixed/a3.json", "{}", 89 * DAY_MS);
-    put(root, ".omca/feedback/s-old.json", "{}", 91 * DAY_MS);
-    put(root, ".omca/feedback/s-new.json", "{}", 89 * DAY_MS);
     await startWork(root, NOW);
     expect(readdirSync(join(root, ".omca", "metrics"))).toEqual(["s-mixed"]);
     expect(files(root, ".omca/metrics")).toEqual(["s-mixed/a3.json"]);
-    expect(files(root, ".omca/feedback")).toEqual(["s-new.json"]);
   });
 
   test("mod markers and session status files older than 24 hours go and newer ones stay", async () => {

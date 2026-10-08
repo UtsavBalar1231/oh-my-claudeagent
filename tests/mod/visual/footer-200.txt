@@ -1,49 +1,49 @@
-                                                                                                   │                                                                                                  ✕
- ▐▛███▛█   Claude Code v2.1.294                                                                    │1: Agents  2: Plan  3: Evidence  4: Notepad  5: Feedback  6: Stats  7: Doctor
-▝▜██████▀  Opus 5.5 · API Usage Billing                                                            │─────────────────────────────────────────────────────────────────────────────────────────────────
- ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/.cache/tmp/omca-visual-200x50-XXXXXX/cwd            │u: Up  d: Down  rate the last turn
-                                                                                                   │╭───────────────────────────────────────────────────────────────────────────────────────────────╮
-                                                                                                   ││ 1 rating, newest first · ↑ 1 up · ↓ 0 down                                                    │
-❯ Run the tests                                                                                    ││  ↑ UP    MM-DD HH:MM  good                                                                    │
-                                                                                                   │╰───────────────────────────────────────────────────────────────────────────────────────────────╯
-  Ran 1 shell command                                                                              │
-                                                                                                   │
-● The tests ran.                                                                                   │
-                                                                                                   │
-✻ Worked for 0s · done HH:MM                                                                       │
-                                                                                                   │
-● oh-my-claudeagent+cc-plugin-agents-md: 0s · NN.Nk in NN out ·  no evidence: just test           │
-                                                                                                   │
-❯ /omca-rate up good                                                                               │
-  ⎿  oh-my-claudeagent: Rated the last turn up: "good".                                            │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                               ◐ medium · /effort  │
+
+ ▐▛███▛█   Claude Code v2.1.294
+▝▜██████▀  Opus 5.5 · API Usage Billing
+ ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/.cache/tmp/omca-visual-200x50-XXXXXX/cwd
+
+
+❯ Run the tests
+
+  Ran 1 shell command
+
+● The tests ran.
+
+✻ Worked for 0s · done HH:MM
+
+● oh-my-claudeagent+cc-plugin-agents-md: 0s · NN.Nk in NN out ·  no evidence: just test
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+no plan bound ·  just test evidence not logged                                                                                                                                                     [-]
+1: Log evidence
+                                                                                                                                                                                    ◐ medium · /effort
 ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── oh-my-claudeagent:orchestrator ─
 ❯ 
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────

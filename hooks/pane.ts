@@ -11,7 +11,6 @@ import type { Subcommand } from "./omca-router.ts";
 import * as agents from "./tabs/agents.ts";
 import * as doctor from "./tabs/doctor.ts";
 import * as evidence from "./tabs/evidence.ts";
-import * as feedback from "./tabs/feedback.ts";
 import * as notepad from "./tabs/notepad.ts";
 import * as plan from "./tabs/plan.ts";
 import * as stats from "./tabs/stats.ts";
@@ -60,7 +59,6 @@ const TABS: readonly (readonly [Tab, string])[] = [
   ["plan", "Plan"],
   ["evidence", "Evidence"],
   ["notepad", "Notepad"],
-  ["feedback", "Feedback"],
   ["stats", "Stats"],
   ["doctor", "Doctor"],
 ];
@@ -77,8 +75,6 @@ function viewOf(tab: Tab): TabView {
       return evidence.view;
     case "notepad":
       return notepad.view;
-    case "feedback":
-      return feedback.view;
     case "stats":
       return stats.view;
     case "doctor":
@@ -397,7 +393,7 @@ export const pane: Features = {
     async post(host) {
       await host.command.register({
         name: "omca",
-        description: "Open the OMCA pane: agents, plan, evidence, notepad, feedback, stats and doctor",
+        description: "Open the OMCA pane: agents, plan, evidence, notepad, stats and doctor",
         argumentHint: "[plan [name|path]|stats|doctor]",
         immediate: true,
       });
@@ -453,7 +449,7 @@ export const pane: Features = {
         return { answer: {} };
       }
       const tab = (await host.state.pane.get()).value?.tab;
-      if ((tab === "agents" && agents.scroll(host, e)) || (tab === "feedback" && feedback.scroll(host, e))) return { answer: {} };
+      if (tab === "agents" && agents.scroll(host, e)) return { answer: {} };
       if (tab === "plan") return (await plan.scroll(host, e)) ? { answer: {} } : undefined;
       if (tab === "evidence") return evidence.scroll(host, e) ? { answer: {} } : undefined;
       // A key no tab took moves a region: a page key asks for `bodyRows`, Home and End for `contentRows`.

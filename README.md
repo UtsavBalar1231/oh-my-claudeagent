@@ -98,8 +98,8 @@ The guard dialog arrives the moment the model asks for a destructive command.
 
 ## Documentation
 
-- [Usage](docs/usage.md): setup, planning, the band and pane, the guard, the doctor, ratings,
-  the status line and troubleshooting.
+- [Usage](docs/usage.md): setup, planning, the band and pane, the guard, the doctor, the
+  status line and troubleshooting.
 - [Reference](docs/references.md): agents, skills, MCP tools, hooks and kill switches,
   configuration, state files, where each feature works, and the comparison with similar
   plugins.

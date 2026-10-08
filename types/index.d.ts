@@ -45,7 +45,7 @@ declare module "claude-code" {
         readAt: number;
       };
       pane: {
-        tab: "agents" | "plan" | "evidence" | "notepad" | "feedback" | "stats" | "doctor";
+        tab: "agents" | "plan" | "evidence" | "notepad" | "stats" | "doctor";
         notepad: {
           planName: string;
           bound: string | null;

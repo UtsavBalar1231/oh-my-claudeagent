@@ -461,7 +461,7 @@ export const CLIPS: readonly Clip[] = [
   { name: "clip-board-light", format: "clip", cols: CLIP_COLS, rows: CLIP_ROWS, theme: "light", script: PLAN_SCRIPT, steps: BOARD_STEPS },
   {
     // The pane's tabs while an executor works, on a project with notes and delegation history,
-    // ending on a rating of the turn.
+    // ending on the Stats tab.
     name: "clip-tour",
     format: "clip",
     cols: CLIP_COLS,
@@ -484,12 +484,8 @@ export const CLIPS: readonly Clip[] = [
       { until: has("Final verification"), mark: "evidence-tab" },
       { key: "4", gap: 0 },
       { until: has("Learnings · "), mark: "notepad-tab", targets: { "notepad-card": /╭─+╮(?=[^\n]*\n[^\n]*Learnings · \d+ entr)/ } },
-      { key: "6", gap: 0 },
-      { until: has("delegations in"), mark: "stats-tab", targets: { "stats-header": /agent +runs +median +tokens[^\n│]*outcomes/ } },
       { key: "5", gap: 0 },
-      { until: has("rate the last turn"), mark: "feedback-tab", hold: 1_200 },
-      { key: "u", gap: 0 },
-      { until: has("1 rating"), mark: "rated" },
+      { until: has("delegations in"), mark: "stats-tab", hold: 1_200, targets: { "stats-header": /agent +runs +median +tokens[^\n│]*outcomes/ } },
     ],
   },
 ];

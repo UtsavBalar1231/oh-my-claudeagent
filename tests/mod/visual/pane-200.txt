@@ -1,5 +1,5 @@
                                                                                                    │                                                                                                  ✕
- ▐▛███▛█   Claude Code v2.1.294                                                                    │1: Agents  2: Plan  3: Evidence  4: Notepad  5: Feedback  6: Stats  7: Doctor
+ ▐▛███▛█   Claude Code v2.1.294                                                                    │1: Agents  2: Plan  3: Evidence  4: Notepad  5: Stats  6: Doctor
 ▝▜██████▀  Opus 5.5 · API Usage Billing                                                            │─────────────────────────────────────────────────────────────────────────────────────────────────
  ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/.cache/tmp/omca-visual-200x50-XXXXXX/cwd            │   ▄▄▀▀▀▀▀▀▄▄     explorer                                                       running      Ns
                                                                                                    │     ▀▀  ▀▀ ▀▄▄▀  Map the router callers

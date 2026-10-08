@@ -51,5 +51,4 @@ const tabBeat = ({ tab, after = 0, until, span, caption, chapter }: TabSpec): { 
 const LAST_FRAME_BEFORE = -5 / F8.fps;
 export const Ledger = tabBeat({ tab: "evidence-tab", after: 0.5, until: { mark: "notepad-tab", seconds: LAST_FRAME_BEFORE }, span: 4, caption: "Every run, by day.", chapter: { name: "Prove", leaves: true } });
 export const Notepad = tabBeat({ tab: "notepad-tab", until: { mark: "stats-tab", seconds: LAST_FRAME_BEFORE }, span: 4, caption: "Notes that outlive compaction.", chapter: { name: "See it all", enters: true } });
-export const Stats = tabBeat({ tab: "stats-tab", until: { mark: "feedback-tab", seconds: LAST_FRAME_BEFORE }, span: 4, caption: "What each agent cost.", chapter: { name: "See it all" } });
-export const Feedback = tabBeat({ tab: "feedback-tab", until: { mark: "rated", seconds: 1 }, span: 3, caption: "Rate any turn.", chapter: { name: "See it all", leaves: true } });
+export const Stats = tabBeat({ tab: "stats-tab", until: { mark: "stats-tab", seconds: 1 }, span: 4, caption: "What each agent cost.", chapter: { name: "See it all", leaves: true } });

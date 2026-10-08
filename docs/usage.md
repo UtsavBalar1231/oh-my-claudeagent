@@ -212,17 +212,16 @@ takes the cost's place.
 3. **Evidence**: the proof ledger, below.
 4. **Notepad**: one card per section of the bound plan's notepad, each entry under its date. `f`
    finds text in the entries, `w` clears the search, and `l` picks another plan's notepad. A wide
-   pane sets the cards in two columns, and the mouse wheel over a card scrolls that card alone.
-5. **Feedback**: your ratings for this session, newest first. `u` rates the last turn up and `d`
-   rates it down. The mouse wheel scrolls the ratings when they run past the card.
-6. **Stats**: runs and the evidence rate per agent type, tokens per finished delegation, and the
+   pane sets the cards in two columns, and the mouse wheel over a card scrolls that card alone, a
+   row at a time.
+5. **Stats**: runs and the evidence rate per agent type, tokens per finished delegation, and the
    estimated cost by agent, across the project's recorded sessions. Runs on a model without a
    known price are counted as excluded rather than estimated. `r` reloads the records.
-7. **Doctor**: the checks described below.
+6. **Doctor**: the checks described below.
 
 `/omca plan`, `/omca stats` and `/omca doctor` open the pane on that tab. As you type, the
-prompt's typeahead offers these subcommands, the plans in your plans directory after
-`/omca plan`, and `up` or `down` after `/omca-rate`. Press Ctrl+X then Tab,
+prompt's typeahead offers these subcommands, and the plans in your plans directory after
+`/omca plan`. Press Ctrl+X then Tab,
 or click the pane, to focus it. Esc, the close mark in the pane's corner, or Ctrl+X then X close
 it. Every key letter below works only while its tab is shown.
 
@@ -397,13 +396,6 @@ line has no `refreshInterval`, press `i` to add `refreshInterval: 5`; the doctor
 wrote and keeps a backup. A check with a known remedy offers a key that fills the prompt with it,
 without sending: `m` for `/mcp`, `a` for `/advisor fable`, `y` for `/config` and `s` for
 `/oh-my-claudeagent:omca-setup`.
-
-## Rate a turn
-
-`/omca-rate up` or `/omca-rate down` rates the last turn, with an optional note after the
-verdict. With no note typed, the text you have selected becomes the note, cut to 200 characters,
-and the reply says so. Ratings are kept in `.omca/feedback/<session id>.json` and listed in the
-pane's Feedback tab.
 
 ## The status line
 

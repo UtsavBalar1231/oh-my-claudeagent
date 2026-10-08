@@ -269,7 +269,7 @@ for (const layout of LAYOUTS) {
     engine(on, world(on, FILES, structuredClone(USER), {}, layout), { isVersionDenied: () => isDenied });
     await $.command.run(run(""));
     const ui = await $.ui.mount(pane("desktop", { columns: 120, rows: 40, placement: "dock" }));
-    await ui.press({ key: "7" });
+    await ui.press({ key: "6" });
     expect(rows(await ui.drawn()).slice(-2)).toEqual(["The doctor checks have not run in this session.", "r: Run checks"]);
 
     isDenied = true;

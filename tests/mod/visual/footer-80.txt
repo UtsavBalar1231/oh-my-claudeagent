@@ -15,24 +15,24 @@
 ● oh-my-claudeagent+cc-plugin-agents-md: 0s · NN.Nk in NN out ·
    no evidence: just test
 
-❯ /omca-rate up good
-  ⎿  oh-my-claudeagent: Rated the last turn up: "good".
 
 
 
-╭────────────────────────────────────────────────────────────────────────────✕─╮
-│ 1: Agents 2: Plan 3: Evidence 4: Notepad 5: Feedback 6: Stats 7: Doctor      │
-│ u: Up  d: Down  rate the last turn                                           │
-│ ╭───────────────────────────────────────────────────────────────────────╮    │
-│ │ 1 rating, newest first · ↑ 1 up · ↓ 0 down                            │    │
-│ │  ↑ UP    MM-DD HH:MM  good                                            │    │
-│ ╰───────────────────────────────────────────────────────────────────────╯    │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-╰──────────────────────────────────────────────────────────────────────────────╯
+
+
+
+
+
+
+
+
+
+
+
+
+
+no plan bound ·  just test evidence not logged                             [-]
+1: Log evidence
                                                             ◐ medium · /effort
 ─────────────────────────────────────────────── oh-my-claudeagent:orchestrator ─
 ❯ 

@@ -5,7 +5,6 @@ import { bashGuard } from "./bash-guard.ts";
 import { compact } from "./compact.ts";
 import { completion } from "./completion.ts";
 import { dispatch, dispatchStream, featuresFor } from "./dispatch.ts";
-import { feedback } from "./feedback.ts";
 import { footer } from "./footer.ts";
 import type { Host, Options } from "./host.ts";
 import { metrics } from "./metrics.ts";
@@ -53,7 +52,6 @@ function bindHost($: EngineInterface, options: Options): Host {
       invalidate: () => $.ui.invalidate("ui.render"),
       focus: (args) => $.ui.focus(args),
       resolve: (e) => $.ui.resolve(e),
-      selection: () => $.ui.selection(),
       copy: (args) => $.ui.copy(args),
       toast: (text, toastOptions) => $.ui.toast(text, toastOptions),
       blit: (args) => $.ui.blit(args),
@@ -148,10 +146,10 @@ export const register: Register = (on, pluginOptions) => {
   const options = readOptions(pluginOptions);
   const bash = featuresFor("tool.check", { bashGuard });
   const toolCall = featuresFor("tool.call", { agentsTracker });
-  const sessionStart = featuresFor("session.start", { pane, feedback, modMarker, band, serverCheck });
+  const sessionStart = featuresFor("session.start", { pane, modMarker, band, serverCheck });
   const turnStart = featuresFor("turn.start", { footer, modMarker });
   const turnStep = featuresFor("turn.step", { metrics, agentsTracker });
-  const turnComplete = featuresFor("turn.complete", { band, agentsTracker, metrics, pane, feedback, footer });
+  const turnComplete = featuresFor("turn.complete", { band, agentsTracker, metrics, pane, footer });
   const agentSpawn = featuresFor("agent.spawn", { agentsTracker, pane, metrics });
   const promptEdit = featuresFor("prompt.edit", { band });
   const promptAutocomplete = featuresFor("prompt.autocomplete", { completion });
@@ -159,7 +157,6 @@ export const register: Register = (on, pluginOptions) => {
   const paneFocus = featuresFor("ui.focus", { pane });
   const paneScroll = featuresFor("ui.scroll", { pane });
   const omca = featuresFor("command.run", { router });
-  const rate = featuresFor("command.run", { feedback });
   const bandRender = featuresFor("ui.render AbovePrompt", { band });
   const paneRender = featuresFor("ui.render Pane", { pane });
   const spinnerRender = featuresFor("ui.render Spinner", { spinner });
@@ -185,9 +182,6 @@ export const register: Register = (on, pluginOptions) => {
   );
   on("command.run", { command: "omca" }, ($, e, next) =>
     dispatch(bindHost($, options), "command.run omca", omca, e, next),
-  );
-  on("command.run", { command: "omca-rate" }, ($, e, next) =>
-    dispatch(bindHost($, options), "command.run omca-rate", rate, e, next),
   );
   on("ui.render", { component: "AbovePrompt" }, ($, e, next) =>
     dispatch(bindHost($, options), "ui.render AbovePrompt", bandRender, e, next),

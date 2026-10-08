@@ -58,7 +58,6 @@ export type Host = {
     invalidate: () => void;
     focus: Engine["ui"]["focus"];
     resolve: Engine["ui"]["resolve"];
-    selection: Engine["ui"]["selection"];
     copy: Engine["ui"]["copy"];
     toast: Engine["ui"]["toast"];
     blit: Engine["ui"]["blit"];

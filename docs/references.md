@@ -81,8 +81,7 @@ done. With the advisor off, they escalate to architect.
 | consolidate-memory | `/oh-my-claudeagent:consolidate-memory` | Merges agent memories and notepad learnings |
 | omca-setup | `/oh-my-claudeagent:omca-setup [--uninstall]` | Checks requirements and sets up the status line |
 
-The mod adds its own commands: `/omca [plan [name or path] | stats | doctor]` opens the pane, and
-`/omca-rate up|down [note]` rates the last turn.
+The mod adds its own command: `/omca [plan [name or path] | stats | doctor]` opens the pane.
 
 ### Keyword triggers
 
@@ -140,7 +139,7 @@ server's `omca_hook` tool, which dispatches through `servers/hooks/registry.ts`.
 | Event | Feature |
 | --- | --- |
 | `tool.check` for Bash and PowerShell | The destructive-command guard and its review dialog |
-| `session.start` | Registers `/omca` and `/omca-rate`, writes the session's mod marker, draws the band's first state, and writes a transcript line when the `omca` server is not connected, naming a missing bun or the server's error |
+| `session.start` | Registers `/omca`, writes the session's mod marker, draws the band's first state, and writes a transcript line when the `omca` server is not connected, naming a missing bun or the server's error |
 | `turn.start`, `turn.complete` | The turn footer (time, tokens, cost, an unlogged verification), the band and its buttons, the pane's refresh |
 | `agent.spawn`, `turn.step` | The Agents tab and delegation records |
 | `tool.call` | A subagent's tool calls, kept for its page on the Agents tab; a main-loop call passes through untouched |
@@ -281,7 +280,6 @@ OMCA keeps its state in the project's `.omca/` directory, which it gitignores ex
 | `.omca/notepads/<plan>/<section>.md` | `notepad_write`, `notepad_compact` | Plan notepads |
 | `.omca/state/session/<session id>.json` | the server | The last hook call and the last verification command |
 | `.omca/state/mod/<session id>.json` | the mod | Proof the mod ran this session, and its options |
-| `.omca/feedback/<session id>.json` | `/omca-rate` | Ratings |
 | `.omca/metrics/<session id>/<agent id>.json` | the mod | One record per delegation, read by the Stats tab |
 | `.omca/logs/file-access.jsonl` | `file_read` | One line per call |
 | `.omca/state/hook-trace.jsonl` | the server, with `OMCA_HOOK_TRACE=1` | One line per hook call |

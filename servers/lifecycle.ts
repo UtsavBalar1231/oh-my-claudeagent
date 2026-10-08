@@ -46,7 +46,6 @@ export async function startWork(root: string, now = Date.now()): Promise<void> {
     ["plan registry GC", () => gcRegistry(root)],
     ["evidence ledger rotation", () => rotateLedger(root, new Date(now))],
     ["delegation record prune", () => prune(join(omca, "metrics"), ".json", now - RECORD_MAX_AGE_MS, true)],
-    ["feedback prune", () => prune(join(omca, "feedback"), ".json", now - RECORD_MAX_AGE_MS, true)],
     ["mod marker prune", () => prune(join(omca, "state", "mod"), ".json", now - MARKER_MAX_AGE_MS, true)],
     ["session status prune", () => prune(join(omca, "state", "session"), ".json", now - MARKER_MAX_AGE_MS, true)],
     // A crash between a temp file's create and its rename leaves the temp file behind. A lock

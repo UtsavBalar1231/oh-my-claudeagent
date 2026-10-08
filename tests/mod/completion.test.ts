@@ -24,12 +24,11 @@ test("after /omca the typeahead offers the subcommands the token begins, each wi
   expect(texts(await typed($, "/omca plan"))).toEqual(["dev"]);
 });
 
-test("after /omca-rate the typeahead offers the ratings, and a later word gets nothing", async ($, on) => {
+test("a word after a subcommand, or outside /omca, gets nothing", async ($, on) => {
   world(on);
   typeahead(on);
 
-  expect(texts(await typed($, "/omca-rate u"))).toEqual(["up"]);
-  expect(texts(await typed($, "/omca-rate up g"))).toEqual([]);
+  expect(texts(await typed($, "/omca stats d"))).toEqual([]);
   expect(texts(await typed($, "please run d"))).toEqual([]);
 });
 

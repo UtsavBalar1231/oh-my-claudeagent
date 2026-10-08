@@ -255,7 +255,7 @@ test("a drawn table's only key is r, and after the stats atom resets the tab say
   world(on, FILES);
   await $.command.run(run(""));
   const ui = await $.ui.mount(pane("terminal", DOCK_200));
-  await ui.press({ key: "6" });
+  await ui.press({ key: "5" });
   await ui.redraw();
   const keys = async () => (await ui.findAll({ type: "Button" })).flatMap((found) => (/^\d$/.test(String(found.props["hotkey"])) ? [] : [found.props["hotkey"]]));
   expect(await keys()).toEqual(["r"]);
@@ -429,7 +429,7 @@ test("Stats rows stay inside the body less the gutter at every size, docked and 
   }
 });
 
-test("digit 6 reads the records afresh each time, r reloads a drawn table, and a failed read shows its reason", async ($, on) => {
+test("digit 5 reads the records afresh each time, r reloads a drawn table, and a failed read shows its reason", async ($, on) => {
   const w = world(on);
   await $.command.run(run(""));
   const ui = await $.ui.mount(pane("terminal", { columns: 120, rows: 40, placement: "dock" }));
@@ -438,17 +438,17 @@ test("digit 6 reads the records afresh each time, r reloads a drawn table, and a
     return all.slice(all.findIndex((text) => text.startsWith("─")) + 1);
   };
 
-  await ui.press({ key: "6" });
+  await ui.press({ key: "5" });
   expect(await body()).toEqual(["No delegation statistics have been collected yet.", "r: Reload"]);
 
   write(w, `${METRICS}/${S1}/broken.json`, "{");
   await ui.press({ key: "1" });
-  await ui.press({ key: "6" });
+  await ui.press({ key: "5" });
   expect(await body()).toEqual(["No delegation statistics have been collected yet.", "1 unreadable record skipped", "r: Reload"]);
 
   write(w, `${METRICS}/${S1}/a-e1.json`, record(S1, "a-e1", {}));
   await ui.press({ key: "1" });
-  await ui.press({ key: "6" });
+  await ui.press({ key: "5" });
   expect((await body())[0]).toBe("1 delegation in 1 session · 1 skipped");
 
   w.files.clear();

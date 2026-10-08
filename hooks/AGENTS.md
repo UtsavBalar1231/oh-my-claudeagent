@@ -18,7 +18,7 @@ event is unregistered on purpose; `docs/references.md` carries the per-event rea
 try/catch. `host.ts` defines the `Host` closures a feature receives in place of `$`, so a
 feature module takes `host` and never `$`. The features are `bash-guard`, `server-check`,
 `mod-marker`, `compact`, `agents-tracker`, `metrics`, `band`, `pane` with its `tabs/`,
-`footer`, `spinner`, `feedback` and `omca-router`. `doctor.ts` runs the Doctor tab's checks and fixes for
+`footer`, `spinner`, `completion` and `omca-router`. `doctor.ts` runs the Doctor tab's checks and fixes for
 `tabs/doctor.ts`; it registers no event. Pure logic lives in `src/core/`.
 
 `spinner` rewrites only the `suffix` of the terminal's main-loop Spinner, to `… · task 7/14 · 3 agents`,

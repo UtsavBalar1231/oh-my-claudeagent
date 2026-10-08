@@ -20,7 +20,7 @@
 
 
 ╭────────────────────────────────────────────────────────────────────────────✕─╮
-│ 1: Agents 2: Plan 3: Evidence 4: Notepad 5: Feedback 6: Stats 7: Doctor      │
+│ 1: Agents  2: Plan  3: Evidence  4: Notepad  5: Stats  6: Doctor             │
 │ checkout-redesign  BOUND  · 10 entries · 1 masked                            │
 │ f: Find  l: Plans (3)                                                        │
 │ ╭───────────────────────────────────────────────────────────────────────╮    │

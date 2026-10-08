@@ -15,8 +15,7 @@ and the plugin runs on Linux, macOS and native Windows.
 **This release needs Claude Code 2.1.292 or later and bun 1.4.2 or later,** with bun on the
 `PATH` Claude Code starts with. `ast-grep` (or `sg`) stays optional; only the `ast_*` tools need
 it. On 2.1.287 the band could end a fullscreen session when the background-tasks dialog opened,
-2.1.288 adds the text selection `/omca-rate` reads, and 2.1.292 adds the Agent tool's `effort`
-input that per-delegation effort uses.
+and 2.1.292 adds the Agent tool's `effort` input that per-delegation effort uses.
 
 **Read [Upgrading](#upgrading) before you update.** A 2.x session and a 3.x session must not run
 in the same project at once, and the `CLAUDE.md` block that 2.x setup wrote has to be deleted by
@@ -24,8 +23,8 @@ hand.
 
 ### Added
 
-- **The `/omca` pane.** `/omca` opens a pane with Agents, Plan, Evidence, Notepad, Feedback,
-  Stats and Doctor tabs, each on a digit key. Every color is a Claude Code theme key, except the
+- **The `/omca` pane.** `/omca` opens a pane with Agents, Plan, Evidence, Notepad, Stats and
+  Doctor tabs, each on a digit key. Every color is a Claude Code theme key, except the
   mascots, which use fixed colors. The pane
   and the band follow the theme you pick, a custom one in `~/.claude/themes/` included, and every
   state also carries a glyph, and a word where a lane's row has room beside the agent's name. A state's color goes on its glyph, and the text beside it
@@ -35,14 +34,13 @@ hand.
   them), `unicode` for a font without Nerd Font glyphs, or `ascii` for plain text. Setup asks
   which one your terminal draws.
   `/omca plan`, `/omca stats` and `/omca doctor` open the pane on that tab, and the prompt's
-  typeahead offers the subcommands, your plans' names after `/omca plan`, and `up` or `down`
-  after `/omca-rate`. Ctrl+X then Tab, or a click, focuses it; Esc, the close mark or Ctrl+X
-  then X closes it.
+  typeahead offers the subcommands and your plans' names after `/omca plan`. Ctrl+X then Tab, or
+  a click, focuses it; Esc, the close mark or Ctrl+X then X closes it.
 - **The mouse in the pane.** The wheel scrolls what is under the pointer. Over a list it moves the
   focus as the arrows do, and over a part of a tab that holds more than it shows (the Evidence
-  card, the plan's task detail, each Notepad card) it scrolls that part alone, with a cue above
-  and below while more is out of view. When the agents' lanes or the ratings run past the pane, the
-  wheel scrolls them and the arrows step the focus a lane at a time. A click on a run's time
+  card, the plan's task detail, each Notepad card) it scrolls that part alone, prose a row at a
+  time, with a cue above and below while more is out of view. When the agents' lanes run past the
+  pane, the wheel scrolls them and the arrows step the focus a lane at a time. A click on a run's time
   focuses the run, and in a wide pane a click on a task's title selects it and a second click
   opens it.
 - **The pane fits every size.** Each tab gives its rows out by priority, so a short pane keeps
@@ -136,10 +134,6 @@ hand.
   known remedy offers a key that fills the prompt with it. `r` runs the checks again, and `i` adds
   `refreshInterval: 5` to a status line that lacks it, after re-reading the file, writing
   `settings.json.omca-bak` and showing the diff.
-- **Ratings.** `/omca-rate up` or `/omca-rate down` rates the last turn, with an optional note.
-  With no note typed, the text selected on screen becomes the note, cut to 200 characters, and the
-  reply says so. Ratings are kept in `.omca/feedback/<session id>.json` and listed in the
-  Feedback tab, where `u` and `d` rate the last turn up or down.
 - **A turn footer.** After each main-loop turn the mod prints the turn's duration and its input
   and output tokens. An account billed by the token also sees the turn's cost, by the same rule
   as the status line. When a verification ran that turn with no evidence logged after it, a
@@ -337,7 +331,7 @@ hand.
   injects each rule body once per session until it changes.
 - The evidence ledger rotates at start: once the live file passes 1 MiB or 1,000 entries, all but
   the newest 500 move to a monthly archive. The server prunes mod markers and session status files
-  after 24 hours, and delegation records and ratings after 90 days.
+  after 24 hours, and delegation records after 90 days.
 - The docs are `README.md`, `docs/usage.md` and `docs/references.md`, and `CONTRIBUTING.md` sits
   at the repository root.
 - For contributors: `just ci` runs lint, typecheck, the validator, the bun specs, the mod tests,

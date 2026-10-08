@@ -86,7 +86,7 @@ describe("CLIPS", () => {
     expect(marks(clip("clip-guard"))).toEqual(["cmd-typed", "dialog", "refused"]);
     expect(targets(clip("clip-guard"))).toEqual(["discard-lines"]);
     expect(marks(clip("clip-verify"))).toEqual(["cmd-typed", "tests-pass", "evidence-logged", "complete"]);
-    expect(marks(clip("clip-tour"))).toEqual(["cmd-typed", "agents-tab", "plan-tab", "evidence-tab", "notepad-tab", "stats-tab", "feedback-tab", "rated"]);
+    expect(marks(clip("clip-tour"))).toEqual(["cmd-typed", "agents-tab", "plan-tab", "evidence-tab", "notepad-tab", "stats-tab"]);
     expect(targets(clip("clip-verify"))).toEqual(["complete-chip", "verdict-line"]);
     expect(targets(clip("clip-tour"))).toEqual(["band", "cost-row", "notepad-card", "stats-header"]);
   });

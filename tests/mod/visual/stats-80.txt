@@ -21,7 +21,7 @@
 
 
 ╭────────────────────────────────────────────────────────────────────────────✕─╮
-│ 1: Agents 2: Plan 3: Evidence 4: Notepad 5: Feedback 6: Stats 7: Doctor      │
+│ 1: Agents  2: Plan  3: Evidence  4: Notepad  5: Stats  6: Doctor             │
 │ 20 delegations in 3 sessions · 1 running · 1 unreadable record skipped       │
 │ ╭───────────────────────────────────────────────────────────────────────╮    │
 │ │ Agents · 8 types                                                      │    │

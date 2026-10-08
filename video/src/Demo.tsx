@@ -15,7 +15,7 @@ import { Progress, progressPlan } from "./scenes/Progress.tsx";
 import { PunchLine, punchLinePlan } from "./scenes/PunchLine.tsx";
 import { Refusal, refusalPlan } from "./scenes/Refusal.tsx";
 import { Sizzle, sizzlePlan } from "./scenes/Sizzle.tsx";
-import { Feedback, Ledger, Notepad, Stats } from "./scenes/Tour.tsx";
+import { Ledger, Notepad, Stats } from "./scenes/Tour.tsx";
 import { Verify, verifyPlan } from "./scenes/Verify.tsx";
 import { crossfadeFrames } from "./scenes/shot.tsx";
 
@@ -35,7 +35,6 @@ const BEATS: readonly { id: string; Scene: FC; duration: (fps: number) => number
   { id: "ledger", Scene: Ledger.Scene, duration: (fps) => Ledger.plan(fps).duration },
   { id: "notepad", Scene: Notepad.Scene, duration: (fps) => Notepad.plan(fps).duration },
   { id: "stats", Scene: Stats.Scene, duration: (fps) => Stats.plan(fps).duration },
-  { id: "feedback", Scene: Feedback.Scene, duration: (fps) => Feedback.plan(fps).duration },
   { id: "roster", Scene: Capabilities, duration: (fps) => capabilitiesPlan(fps).duration },
   { id: "everywhere", Scene: Everywhere, duration: (fps) => everywherePlan(fps).duration },
   { id: "end", Scene: Install, duration: (fps) => installPlan(fps).duration },

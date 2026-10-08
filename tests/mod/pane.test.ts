@@ -139,7 +139,7 @@ test("/omca opens the pane focused and closable by Esc on the Agents tab, sized 
   expect(w.opened).toEqual([{ id: "omca", title: "OMCA", focus: true, closeOnEscape: true, rows: 12, columns: 56 }]);
   const ui = await $.ui.mount(pane("terminal", { columns: 120, rows: 40, placement: "dock" }));
   expect(rows(await ui.drawn()).slice(0, 3)).toEqual([
-    "1: Agents  2: P  3: E  4: N  5: F  6: S  7: D",
+    "1: Agents  2: P  3: E  4: N  5: S  6: D",
     "─".repeat(51),
     "No subagent has run in this session yet.",
   ]);
@@ -174,11 +174,12 @@ test("the tab bar is one row: full labels when they fit, else the active tab kee
     return tabs;
   };
 
-  expect(await bar({ columns: 120, rows: 40, placement: "dock" })).toBe("1: Agents  2: P  3: E  4: N  5: F  6: S  7: D");
-  expect(await bar({ columns: 120, rows: 40, placement: "dock" }, "3")).toBe("1: A  2: P  3: Evidence  4: N  5: F  6: S  7: D");
-  expect(await bar({ columns: 120, rows: 40, placement: "dock" }, "7")).toBe("1: A  2: P  3: E  4: N  5: F  6: S  7: Doctor");
-  expect(await bar({ columns: 200, rows: 50, placement: "dock" })).toBe("1: Agents  2: Plan  3: Evidence  4: Notepad  5: Feedback  6: Stats  7: Doctor");
-  expect(await bar({ columns: 80, rows: 40, placement: "inline" })).toBe("1: Agents 2: Plan 3: Evidence 4: Notepad 5: Feedback 6: Stats 7: Doctor");
+  expect(await bar({ columns: 120, rows: 40, placement: "dock" })).toBe("1: Agents  2: P  3: E  4: N  5: S  6: D");
+  expect(await bar({ columns: 120, rows: 40, placement: "dock" }, "3")).toBe("1: A  2: P  3: Evidence  4: N  5: S  6: D");
+  expect(await bar({ columns: 120, rows: 40, placement: "dock" }, "6")).toBe("1: A  2: P  3: E  4: N  5: S  6: Doctor");
+  expect(await bar({ columns: 200, rows: 50, placement: "dock" })).toBe("1: Agents  2: Plan  3: Evidence  4: Notepad  5: Stats  6: Doctor");
+  expect(await bar({ columns: 80, rows: 40, placement: "inline" })).toBe("1: Agents  2: Plan  3: Evidence  4: Notepad  5: Stats  6: Doctor");
+  expect(await bar({ columns: 68, rows: 40, placement: "inline" })).toBe("1: Agents 2: Plan 3: Evidence 4: Notepad 5: Stats 6: Doctor");
 });
 
 test("a cued tab scrolled past its top draws an up cue over the window's first row, and none at the top", async ($, on) => {
@@ -218,8 +219,8 @@ test("a dock under 30 body rows draws no rule under the tab bar", async ($, on) 
     return drawn;
   };
 
-  expect(await draw(34)).toEqual(["1: Agents  2: P  3: E  4: N  5: F  6: S  7: D", "─".repeat(51), "No subagent has run in this session yet."]);
-  expect(await draw(33)).toEqual(["1: Agents  2: P  3: E  4: N  5: F  6: S  7: D", "No subagent has run in this session yet.", expect.any(String)]);
+  expect(await draw(34)).toEqual(["1: Agents  2: P  3: E  4: N  5: S  6: D", "─".repeat(51), "No subagent has run in this session yet."]);
+  expect(await draw(33)).toEqual(["1: Agents  2: P  3: E  4: N  5: S  6: D", "No subagent has run in this session yet.", expect.any(String)]);
 });
 
 test("each tab key shows its tab, on the terminal and the desktop", async ($, on) => {
@@ -256,13 +257,8 @@ test("each tab key shows its tab, on the terminal and the desktop", async ($, on
     expect((await body()).some((row) => row.includes("Learnings · 1 entry"))).toBe(true);
 
     await ui.press({ key: "5" });
-    expect(await body()).toEqual([
-      "u: Up  d: Down  rate the session (no turn yet)",
-      "No feedback has been recorded in this session.",
-    ]);
-    await ui.press({ key: "6" });
     expect(await body()).toEqual(["No delegation statistics have been collected yet.", "r: Reload"]);
-    await ui.press({ key: "7" });
+    await ui.press({ key: "6" });
     expect(await body()).toEqual(["The doctor checks have not run in this session.", "r: Run checks"]);
     await ui.press({ key: "1" });
     expect(await body()).toEqual(["No subagent has run in this session yet.", "Each subagent gets a lane here. Enter or a click opens its page."]);
@@ -432,7 +428,7 @@ test("the contents list fills the inline body and a focus move re-centres it on 
   await ui.press({ key: "t" });
 
   expect(rows(await ui.drawn())).toEqual([
-    "1: Agents 2: Plan 3: Evidence 4: Notepad 5: Feedback 6: Stats 7: Doctor",
+    "1: Agents  2: Plan  3: Evidence  4: Notepad  5: Stats  6: Doctor",
     `${TITLE} · 12/46 tasks done`,
     "  ↑ 13 more",
     "    Milestone 1",
@@ -574,7 +570,7 @@ test("a tab that fails to draw shows why in its place, and the tab row stays", a
   world(on, FILES);
   await $.command.run(run(""));
   const ui = await $.ui.mount(pane("terminal", { columns: 120, rows: 40, placement: "dock" }));
-  expect(rows(await ui.drawn())).toEqual(["1: Agents  2: P  3: E  4: N  5: F  6: S  7: D", "─".repeat(51), "✗ The agents tab failed: lanes unreadable"]);
+  expect(rows(await ui.drawn())).toEqual(["1: Agents  2: P  3: E  4: N  5: S  6: D", "─".repeat(51), "✗ The agents tab failed: lanes unreadable"]);
   await ui.unmount();
 });
 
@@ -589,7 +585,7 @@ test("drawing the pane reads, stats and lists nothing, whatever the tab, size or
     for (const surface of ["terminal", "desktop"] as const) {
       const ui = await $.ui.mount(pane(surface, size));
       expect(w.reads, `${size.columns} ${size.placement} ${surface} mount`).toEqual([]);
-      for (const key of ["2", "3", "4", "5", "6", "7", "1"]) {
+      for (const key of ["2", "3", "4", "5", "6", "1"]) {
         await ui.press({ key });
         w.reads.length = 0;
         await ui.redraw();
@@ -613,7 +609,7 @@ test("every row stays inside the body less the close-mark gutter at 80, 120 and 
       const room = usableColumns(bodyColumns(size));
       const ui = await $.ui.mount(pane(surface, size));
       const views: string[] = [];
-      for (const key of ["1", "2", "3", "4", "5", "6", "7"]) {
+      for (const key of ["1", "2", "3", "4", "5", "6"]) {
         await ui.press({ key });
         views.push(key);
         if (key === "2") {
@@ -657,7 +653,7 @@ test("every row stays inside the body less the close-mark gutter at 80, 120 and 
           expect(cellsAcross(child), `${size.columns} ${size.placement} tab ${key}`).toBeLessThanOrEqual(room);
         }
       }
-      expect(views).toHaveLength(7);
+      expect(views).toHaveLength(6);
       await ui.unmount();
     }
   }
@@ -694,7 +690,7 @@ test("by default every tab draws Nerd Font glyphs, each one before a space or at
   const ui = await $.ui.mount(pane("terminal", { columns: 200, rows: 50, placement: "dock" }));
   const glued: string[] = [];
   let icons = 0;
-  for (const key of ["1", "2", "3", "4", "5", "6", "7"]) {
+  for (const key of ["1", "2", "3", "4", "5", "6"]) {
     await ui.press({ key });
     for (const row of rows(await ui.drawn())) {
       icons += [...row.matchAll(/[\u{e000}-\u{f8ff}]/gu)].length;
@@ -913,7 +909,7 @@ test("the Stats tab reads the records again after a turn, and writes nothing whe
   agentEngine(on);
   await $.command.run(run(""));
   const ui = await $.ui.mount(pane("terminal", { columns: 120, rows: 40, placement: "dock" }));
-  await ui.press({ key: "6" });
+  await ui.press({ key: "5" });
   await ui.redraw();
   expect(await ui.find({ type: "Text", text: "1 delegation in 1 session" })).toBeDefined();
 

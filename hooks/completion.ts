@@ -1,11 +1,10 @@
-import { matching, RATING_WORDS, slotAt, SUBCOMMAND_WORDS, type Word } from "../src/core/completion.ts";
+import { matching, slotAt, SUBCOMMAND_WORDS, type Word } from "../src/core/completion.ts";
 import type { Features } from "./dispatch.ts";
 import type { Host } from "./host.ts";
 import { planNames } from "./tabs/plan.ts";
 
 async function wordsFor(host: Host, slot: NonNullable<ReturnType<typeof slotAt>>): Promise<readonly Word[]> {
   if (slot === "subcommand") return SUBCOMMAND_WORDS;
-  if (slot === "rating") return RATING_WORDS;
   return (await planNames(host)).map((name) => ({ text: name }));
 }
 
