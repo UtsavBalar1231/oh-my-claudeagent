@@ -84,7 +84,9 @@ export type Host = {
   state: { [K in keyof State]: AtomHost<K> };
 };
 
-const WRITE_ATTEMPTS = 3;
+// A write that loses its version means another landed, so a burst of n writers settles within n - 1
+// retries. Up to 20 subagents spawn at once, each also stepping; the bound only stops a runaway engine.
+const WRITE_ATTEMPTS = 64;
 
 // Several hooks write one atom between awaits, so each write is read, changed and set at the
 // version it read. A change that returns the value unchanged writes nothing and redraws nothing.

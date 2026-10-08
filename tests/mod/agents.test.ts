@@ -446,6 +446,22 @@ test("parallel spawns and steps each keep their own lane", async ($, on) => {
   await ui.unmount();
 });
 
+test("twelve agents spawned at once each keep their row and their place in the count", async ($, on) => {
+  const w = world(on, {});
+  const ids = Array.from({ length: 12 }, (_, n) => `a-${n + 1}`);
+  engine(on, Object.fromEntries(ids.map((id) => [id, [{ uses: [{ name: "Read", input: { file_path: `/work/${id}.ts` } }] }]])));
+  await $.command.run(run(""));
+  await Promise.all(ids.map((_, n) => $.agent.spawn(spawnOf(n + 1, "executor", `Task ${n + 1}`, `Task ${n + 1}.`))));
+  w.agents = ids.map((id) => ({ id, description: "", type: "x", status: "running" }));
+  await Promise.all(ids.map((id) => stepAll($, id, 1)));
+
+  const ui = await $.ui.mount(pane("terminal", DOCK_120));
+
+  expect(body(await ui.drawn()).find((row) => row.startsWith("d: Details"))).toStartWith("d: Details  12 running · 0 finished");
+  expect(w.logs.filter((line) => line.startsWith("agentsTracker"))).toEqual([]);
+  await ui.unmount();
+});
+
 test("OMCA_GLYPHS=ascii draws the lanes and the spinner in ASCII", async ($, on) => {
   const w = world(on, {}, {}, { OMCA_GLYPHS: "ascii" });
   engine(on, STEPS);
