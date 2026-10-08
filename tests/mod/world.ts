@@ -64,6 +64,8 @@ export type World = {
   blits: { requestId: string; key: string; cells: string | undefined; columns: number | undefined; rows: number | undefined }[];
   conversations: Map<string, SessionMessage[]>;
   opened: unknown[];
+  /** Why `ui.open` leaves a pane unplaced; undefined places every pane. */
+  unplaced: string | undefined;
   logs: string[];
   said: string[];
   clock: MockClock;
@@ -120,6 +122,7 @@ export function world(
     blits: [],
     conversations: new Map(),
     opened: [],
+    unplaced: undefined,
     logs: [],
     said: [],
     clock: mock.clock(on, { now: Date.UTC(2026, 9, 2, 12, 0, 0) }),
@@ -173,7 +176,7 @@ export function world(
     const entries = [...files, ...[...dirs].map((name) => ({ name, kind: "dir" as const, size: 0, mtimeMs: 0, isLink: false }))];
     return entries.length === 0 ? { deny: `ENOENT: no such directory, ${spelled(e.path)}` } : { value: entries };
   });
-  on("ui.open", (_$, e) => (w.opened.push(e), { value: { isPlaced: true } }));
+  on("ui.open", (_$, e) => (w.opened.push(e), { value: w.unplaced === undefined ? { isPlaced: true } : { isPlaced: false, reason: w.unplaced } }));
   on("ui.close", () => ({ value: undefined }));
   on("ui.log", (_$, e) => (w.logs.push(e.text), e.to === "debug" || w.said.push(e.text), { value: undefined }));
   on("ui.panes", () => ({ value: w.panes }));

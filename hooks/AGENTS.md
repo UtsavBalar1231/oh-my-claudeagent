@@ -45,7 +45,9 @@ working mascot, and a denied blit is a mascot that is not mounted. The render ho
 `kit.mascot`, so a redraw lands on the frame the blits are at. The timer ends when no shown agent
 works, the pane closes or the surfaces lose `terminal`; a stop from the timer's own tick redraws the
 pane once, so a blit in flight never outlasts the still frame. It writes no atom and a `ui.render` hook
-never starts it; on Desktop an Svg animates by itself and no timer runs.
+never starts it. No timer runs on a remote surface: Desktop draws a still Svg, since it rebuilds
+every site on each state write and would restart an animation, and the other remote surfaces
+animate the Svg by themselves.
 
 ## Current runtime contract
 

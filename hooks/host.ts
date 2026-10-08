@@ -154,6 +154,16 @@ export async function bytesOf(host: Host, path: string): Promise<Uint8Array> {
   return Uint8Array.fromBase64(base64);
 }
 
+/**
+ * Puts `text` in the prompt box. Where the box does not take it, as on a surface that draws its
+ * own composer, a toast carries the text so the person can type it.
+ */
+export async function fillPrompt(host: Host, text: string): Promise<void> {
+  const { isFilled, refusal } = await host.prompt.fill({ text });
+  if (isFilled) return;
+  host.ui.toast(refusal === "dialog" ? `Close the open dialog, then type: ${text}` : `The prompt box cannot be filled here. Type: ${text}`);
+}
+
 /** The plan this session is bound to, undefined when none is; throws when the registry is not JSON. */
 export async function boundPlanOf(host: Host): Promise<{ name: string; path: string } | undefined> {
   const [root, sessionId] = await Promise.all([host.session.root(), host.session.id()]);

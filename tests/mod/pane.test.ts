@@ -148,6 +148,14 @@ test("/omca opens the pane focused and closable by Esc on the Agents tab, sized 
   await ui.unmount();
 });
 
+test("/omca says why when the pane is open but no surface has placed it", async ($, on) => {
+  const reason = "the attached surfaces place no panes; it is seated when one that places panes attaches";
+  const w = world(on, FILES);
+  w.unplaced = reason;
+
+  expect(await $.command.run(run(""))).toEqual({ text: `The OMCA pane is open but not drawn yet: ${reason}` });
+});
+
 test("the dock takes 45% of the terminal between 56 and 96 columns, and grows to 120 while the transcript keeps 100", async ($, on) => {
   const w = world(on, FILES);
   for (const columns of [80, 120, 160, 200, 220, 250, 300]) await $.command.run(run("", columns));

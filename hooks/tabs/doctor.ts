@@ -5,7 +5,7 @@ import { tildePath } from "../../src/core/path.ts";
 import { clockOf, displayWidth, fitEnd, KEYS, padEnd, wrapText } from "../../src/core/ui-kit.ts";
 import { chip, fitPieces, levelMark, type Piece, piecesWidth, type ThemeKey, TONE_KEYS } from "../../src/core/visual.ts";
 import * as doctor from "../doctor.ts";
-import type { Host, State } from "../host.ts";
+import { fillPrompt, type Host, type State } from "../host.ts";
 import type { Subcommand } from "../omca-router.ts";
 import { blanks, edge, keyButton, noticeRow, open, type TabView, type View } from "../pane.ts";
 import { Line } from "../ui.ts";
@@ -85,7 +85,7 @@ function checkRows(host: Host, view: View, check: Check): Rows {
             ...(PROMPT_KEYS[check.id] === undefined ? {} : { hotkey: PROMPT_KEYS[check.id] }),
             label: fitEnd(`Use ${prompt}`, room, view.g.ellipsis),
             plain: true,
-            onPress: view.press(() => host.prompt.fill({ text: prompt })),
+            onPress: view.press(() => fillPrompt(host, prompt)),
           }),
         ]),
   ];

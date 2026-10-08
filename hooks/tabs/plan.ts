@@ -37,7 +37,7 @@ import {
   TONE_KEYS,
 } from "../../src/core/visual.ts";
 import type { Input, Phase } from "../dispatch.ts";
-import { boundPlanOf, type Host, type ProofFacts, proofFacts, reason, sessionOf, type State, verdictFor } from "../host.ts";
+import { boundPlanOf, fillPrompt, type Host, type ProofFacts, proofFacts, reason, sessionOf, type State, verdictFor } from "../host.ts";
 import type { Subcommand } from "../omca-router.ts";
 import { blanks, edge, keyButton, noticeRow, open, PANE, patchPane, refocus as focusIn, rule, type TabView, type View, wrapAt } from "../pane.ts";
 import { codeUnits, markdownUnits, resetOffset, ScrollRegion, scrollKeyed, type Unit } from "../regions.ts";
@@ -774,12 +774,12 @@ async function runCheck(host: Host, view: View, card: Card | undefined): Promise
     host.ui.invalidate();
     return;
   }
-  await host.prompt.fill({ text: checkSentence(view, card) });
+  await fillPrompt(host, checkSentence(view, card));
 }
 
 async function startHere(host: Host, view: View, plan: Loaded, card: Card | undefined): Promise<void> {
   if (card === undefined) return;
-  await host.prompt.fill({ text: `/oh-my-claudeagent:start-work ${masked(view, plan.path)} from task ${card.n}` });
+  await fillPrompt(host, `/oh-my-claudeagent:start-work ${masked(view, plan.path)} from task ${card.n}`);
 }
 
 async function copyTask(host: Host, view: View, plan: Loaded, card: Card | undefined): Promise<void> {

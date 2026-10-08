@@ -184,12 +184,12 @@ test("a terminal mascot is a 16 by 8 Raster of the frame index wrapped to the st
   }
 });
 
-test("a remote mascot is an Svg with its alt, interactive only while working, and the same props for every frame", async ($, on) => {
+test("a remote mascot is an Svg with its alt, interactive only while working outside the desktop, and the same props for every frame", async ($, on) => {
   const drawn = gallery($, on);
   for (const surface of ["desktop", "mobile", "vscode"] as const) {
     for (const state of MASCOT_STATES) {
       const frames = framesOf("planner", state);
-      const moves = state === "working";
+      const moves = state === "working" && surface !== "desktop";
       const props = { source: svgOf(moves ? frames : [frames[0]!]), alt: `planner ${state}`, width: 64, height: 64, ...(moves ? { isInteractive: true } : {}) };
       const first = await drawn(mascotOrNothing("planner", state, 0), surface);
       expect(first).toMatchObject({ type: "Svg", props });

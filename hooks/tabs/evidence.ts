@@ -17,7 +17,7 @@ import { sha256Hex } from "../../src/core/sha256.ts";
 import { agentGlyph, clockOf, COLUMN_GAP, dayOf, displayWidth, fitEnd, fitMiddle, oneLine, padEnd, shortType, wrapText } from "../../src/core/ui-kit.ts";
 import { agentKey, chip, type ChipTone, fitPieces, ON_SURFACE, type Piece, piecesWidth, redact, rule, TONE_KEYS } from "../../src/core/visual.ts";
 import type { Input } from "../dispatch.ts";
-import { boundPlanOf, bytesOf, type Host, reason, type State } from "../host.ts";
+import { boundPlanOf, bytesOf, fillPrompt, type Host, reason, type State } from "../host.ts";
 import { blanks, noticeRow, refocus, type TabView, type View, wrapAt } from "../pane.ts";
 import { codeUnits, resetOffset, ScrollRegion, type Unit } from "../regions.ts";
 import { Card, Field, Line, Pieces } from "../ui.ts";
@@ -411,7 +411,7 @@ function actions(host: Host, view: View, ledger: Ledger, entry: Entry | undefine
   return [
     ...filters,
     ["c", "Copy", (surface) => copyCommand(host, command, surface)],
-    ["r", "Rerun", () => host.prompt.fill({ text: rerunPrompt(entry.type, command, planSha) })],
+    ["r", "Rerun", () => fillPrompt(host, rerunPrompt(entry.type, command, planSha))],
   ];
 }
 

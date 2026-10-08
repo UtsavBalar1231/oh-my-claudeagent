@@ -190,10 +190,10 @@ export async function open(host: Host, e: Input<"command.run">, tab: Tab): Promi
   );
   // The first drawing must already know whether the person prefers reduced motion.
   await mascots.ensure(host);
-  await host.ui.open({ id: PANE, title: "OMCA", focus: true, closeOnEscape: true, rows: INLINE_ROWS, columns });
+  const opened = await host.ui.open({ id: PANE, title: "OMCA", focus: true, closeOnEscape: true, rows: INLINE_ROWS, columns });
   await patchPane(host, (pane) => ((pane.auto ?? "pending") === "pending" ? { ...pane, auto: "opened" } : pane));
   await start(host);
-  return {};
+  return opened.isPlaced ? {} : { text: `The OMCA pane is open but not drawn yet: ${opened.reason}` };
 }
 
 export const command: Subcommand = (host, e) => open(host, e, "agents");

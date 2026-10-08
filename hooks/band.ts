@@ -10,7 +10,7 @@ import { sha256Hex } from "../src/core/sha256.ts";
 import { fitEnd, type GlyphTier, glyphs, oneLine } from "../src/core/ui-kit.ts";
 import { TONE_KEYS } from "../src/core/visual.ts";
 import type { Features } from "./dispatch.ts";
-import { boundPlanOf, bytesOf, type Host, ledgerWrittenAt, proofFacts, reason, sessionOf, stampOf, verdictFor } from "./host.ts";
+import { boundPlanOf, bytesOf, fillPrompt, type Host, ledgerWrittenAt, proofFacts, reason, sessionOf, stampOf, verdictFor } from "./host.ts";
 import { type Kit, kitOf, type TextStyle } from "./ui.ts";
 
 type Snapshot = { band: Band; hasFinalVerification: boolean; exitCode: number | null; planPath: string | undefined };
@@ -231,7 +231,7 @@ export const band: Features = {
                 plain: true,
                 onPress: async () => {
                   try {
-                    await host.prompt.fill({ text: button.prompt });
+                    await fillPrompt(host, button.prompt);
                   } catch (error) {
                     host.log(`band: filling the prompt failed: ${reason(error)}`);
                   }

@@ -60,7 +60,9 @@ function mascotIn(table: ElementTable, surface: RenderSurface, tier: GlyphTier, 
   if (name === undefined || tier === "ascii") return null;
   const frames = framesOf(name, state, size);
   const { width, height } = GRID[size];
-  const isMoving = state === "working" && !isStill;
+  // Desktop rebuilds every site on any state write and reloads an interactive frame each time, so
+  // a moving mascot would flash there; it draws as a still image instead.
+  const isMoving = state === "working" && !isStill && surface !== "desktop";
   if (surface === "terminal") {
     const shown = frames[isMoving ? frame % frames.length : 0];
     return shown === undefined || !("Raster" in table) ? null : table.Raster({ key, columns: width, rows: height / 2, cells: rasterCells(shown) });

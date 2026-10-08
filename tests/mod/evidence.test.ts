@@ -681,6 +681,18 @@ test("a copy the surface refuses says why", async ($, on) => {
   await ui.unmount();
 });
 
+test("a rerun the prompt box refuses goes to a toast with the text to type", async ($, on) => {
+  on("prompt.fill", () => ({ isFilled: false }));
+  const w = world(on, await proofFiles());
+  const ui = await openEvidence($, DOCK_120);
+
+  await ui.press({ key: "r" });
+  expect(w.toasts.at(-1)).toBe(
+    `The prompt box cannot be filled here. Type: Run the final verification again (\`just ci\`) and log the verdict with evidence_log as final_verification evidence with plan_sha256="${sha256Hex(new TextEncoder().encode(PLAN_TEXT))}".`,
+  );
+  await ui.unmount();
+});
+
 test("f opens the Find field and moves the focus to it; typing filters, and submitting it empty closes it", async ($, on) => {
   const w = world(on, await proofFiles());
   const ui = await openEvidence($, DOCK_120);
