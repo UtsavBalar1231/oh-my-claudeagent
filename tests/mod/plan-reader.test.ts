@@ -168,8 +168,10 @@ async function windowed($: Engine, on: On, files: Record<string, string>, args: 
   const ui = await $.ui.mount(pane("terminal", size));
   for (const key of keys) await ui.press({ key });
   const current = async () => (await ui.findAll({ type: "Button" })).filter((b) => b.props["autoFocus"] === true).map((b) => b.key);
-  const key = async (by: number, contentRows = 17, bodyRows = 16) => {
-    await $.ui.scroll({ ...SCROLL, by, bodyRows, contentRows });
+  // Shorter than a page is a wheel tick, which comes with a pointer; an arrow goes the ring's way.
+  const key = async (by: number, contentRows = 17, bodyRows = 16, isWheel = Math.abs(by) < bodyRows) => {
+    const pointer = isWheel ? { pointer: { column: 4, row: 6 } } : {};
+    await $.ui.scroll({ ...SCROLL, ...pointer, by, bodyRows, contentRows });
     return current();
   };
   return { ui, engine, current, key };
@@ -244,7 +246,8 @@ test("on a section's page and a task's page the scroll keys reach the engine, wh
   await ui.press({ key: "b" });
   await ui.press({ key: "t" });
   await ui.press({ key: "row-1" });
-  for (const by of [16, 31, -31, -16, 1]) await key(by, 31);
+  for (const by of [16, 31, -31, -16]) await key(by, 31);
+  await key(1, 31, 16, false);
   expect(engine).toEqual([16, 31, -16, 16, 31, -31, -16, 1]);
   await ui.unmount();
 });

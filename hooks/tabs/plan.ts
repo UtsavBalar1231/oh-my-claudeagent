@@ -39,7 +39,7 @@ import {
 import type { Input, Phase } from "../dispatch.ts";
 import { boundPlanOf, type Host, type ProofFacts, proofFacts, reason, sessionOf, type State, verdictFor } from "../host.ts";
 import type { Subcommand } from "../omca-router.ts";
-import { blanks, edge, keyButton, noticeRow, open, patchPane, refocus as focusIn, rule, type TabView, type View, wrapAt } from "../pane.ts";
+import { blanks, edge, keyButton, noticeRow, open, PANE, patchPane, refocus as focusIn, rule, type TabView, type View, wrapAt } from "../pane.ts";
 import { codeUnits, markdownUnits, resetOffset, ScrollRegion, scrollKeyed, type Unit } from "../regions.ts";
 import { Card as CardBox, Field, Line } from "../ui.ts";
 
@@ -456,6 +456,14 @@ export async function scroll(host: Host, e: Input<"ui.scroll">): Promise<boolean
   const to = isEnd ? (e.by > 0 ? rows.length - 1 : 0) : Math.max(0, Math.min(rows.length - 1, at + step));
   const target = rows[to] ?? current;
   if (target === current) return true;
+  // An arrow takes the ring to the next drawn task the way a person's move does, so focus places
+  // the window and the ring together; the engine keeps the ring by position, and a keyed refocus
+  // after the window moved would land a row off.
+  const isDrawn = target >= last.start && target < last.start + last.size;
+  if (e.pointer === undefined && Math.abs(e.by) === 1 && isDrawn) {
+    const { deny } = await host.ui.focus({ requestId: PANE, key: ring.keyOf(target) });
+    if (deny === undefined) return true;
+  }
   ring.select(target);
   planned = { list, start: windowOf(total, target, last.size).start };
   host.ui.invalidate();
