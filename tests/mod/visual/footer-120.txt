@@ -1,19 +1,19 @@
                                                                │                                                      ✕
- ▐▛███▛█   Claude Code v2.1.292                                │1: Agents  2: Plan  3: Evidence  4: Notepad
-▝▜██████▀  Opus 5.5 · API Usage Billing                        │5: Feedback  6: Stats  7: Doctor
- ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd           │─────────────────────────────────────────────────────
-                                                               │u: Up  d: Down  rate the last turn
+ ▐▛███▛█   Claude Code v2.1.294                                │1: A  2: P  3: E  4: N  5: Feedback  6: S  7: D
+▝▜██████▀  Opus 5.5 · API Usage Billing                        │─────────────────────────────────────────────────────
+ ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd           │u: Up  d: Down  rate the last turn
                                                                │╭───────────────────────────────────────────────────╮
-❯ Run the tests                                                ││ 1 rating, newest first · ↑ 1 up · ↓ 0 down        │
-                                                               ││  ↑ UP    MM-DD HH:MM  good                        │
-  Ran 1 shell command                                          │╰───────────────────────────────────────────────────╯
+                                                               ││ 1 rating, newest first · ↑ 1 up · ↓ 0 down        │
+❯ Run the tests                                                ││  ↑ UP    MM-DD HH:MM  good                        │
+                                                               │╰───────────────────────────────────────────────────╯
+  Ran 1 shell command                                          │
                                                                │
 ● The tests ran.                                               │
                                                                │
 ✻ Worked for 0s · done HH:MM                                   │
                                                                │
-● oh-my-claudeagent+cc-plugin-agents-md: 0s · 39.5k in         │
-  11 out ·  no evidence: just test                            │
+● oh-my-claudeagent+cc-plugin-agents-md: 0s ·                  │
+  39.5k in 11 out ·  no evidence: just test                   │
                                                                │
 ❯ /omca-rate up good                                           │
   ⎿  oh-my-claudeagent: Rated the last turn up: "good".        │

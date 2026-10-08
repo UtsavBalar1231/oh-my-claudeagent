@@ -1,5 +1,5 @@
 
- ▐▛███▛█   Claude Code v2.1.292
+ ▐▛███▛█   Claude Code v2.1.294
 ▝▜██████▀  Opus 5.5 · API Usage Billing
  ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/.cache/tmp/omca-visual-120x40-XXXXXX/cwd
 
@@ -15,7 +15,7 @@
 
 ✻ Waiting for 1 background agent to finish
 
-● oh-my-claudeagent+cc-plugin-agents-md: 0s · 37.5k in 21 out ·  no evidence: just test
+● oh-my-claudeagent+cc-plugin-agents-md: 0s · 37.5k in 21 out ·  no evidence: just test
 
 
 

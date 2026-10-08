@@ -19,6 +19,10 @@ function tail({ costUsd, unlogged }: Footer, g: Glyphs): string[] {
   return costUsd === null ? [] : [`${dollars(costUsd)} engine cost`];
 }
 
+const NO_BREAK_SPACE = "\u00a0";
+
+// The engine wraps at spaces, so a unit's own words are joined with no-break spaces and only the
+// dots between units are break points.
 export function footerLine(footer: Footer, g: Glyphs): string {
   const { tokens } = footer;
   const parts = [
@@ -26,5 +30,5 @@ export function footerLine(footer: Footer, g: Glyphs): string {
     ...(tokens === null ? [] : [`${formatTokens(tokens.input)} in ${formatTokens(tokens.output)} out`]),
     ...tail(footer, g),
   ];
-  return fitEnd(parts.join(` ${g.dot} `), FOOTER_WIDTH, g.ellipsis);
+  return fitEnd(parts.map((part) => part.replaceAll(" ", NO_BREAK_SPACE)).join(` ${g.dot} `), FOOTER_WIDTH, g.ellipsis);
 }

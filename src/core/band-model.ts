@@ -20,7 +20,7 @@ export type Span = { text: string; tone: Tone; color?: ThemeKey; backgroundColor
 export type BandButton = { key: NextActionKind; hotkey: string; label: string; prompt: string };
 export type BandView = { status: readonly Span[]; buttons: readonly BandButton[] };
 
-type Part = Span & { isFlexible?: true };
+type Part = Span & { isFlexible?: true; isTrailing?: true; min?: number };
 type Words = { noPlan: string; logged: string; unlogged: string; proof: Readonly<Record<keyof Proof, string>> };
 
 const FULL: Words = {
@@ -41,9 +41,15 @@ const MARK_CELLS = 4;
 // A plain Button draws its hotkey, a colon and a space before the label.
 const HOTKEY_CELLS = 3;
 
+// Below this many cells a task title is left out, since an ellipsis after the task number reads as a cut number.
+const MIN_TITLE = 4;
+// The full wording keeps MIN_FLEXIBLE cells of title and the space before it.
+const FULL_TITLE_MIN = MIN_FLEXIBLE + 1;
+
 // The order a narrowing band gives segments up in, last first: progress is the one fact that
-// always stays, then whether agents run, what comes next, the proof, then the verification.
-const PRIORITY = { progress: 1, running: 2, next: 3, proof: 4, unlogged: 5, logged: 6 } as const;
+// always stays, then the unverified-evidence warning, whether agents run, what comes next, the
+// proof, then a logged verification.
+const PRIORITY = { progress: 1, unlogged: 2, running: 3, next: 4, proof: 5, logged: 6 } as const;
 
 /** The numbered tasks' tally and the first open one, read the way every plan reader reads them. */
 export function planTally(text: string): { done: number; total: number; next: NextTask | null } {
@@ -61,7 +67,7 @@ type Segment = Ranked & { parts: Part[] };
 const segment = (priority: number, parts: Part[]): Segment => ({
   priority,
   parts,
-  min: parts.reduce((sum, part) => sum + (part.isFlexible ? Math.min(MIN_FLEXIBLE, displayWidth(part.text)) : displayWidth(part.text)), 0),
+  min: parts.reduce((sum, part) => sum + (part.isFlexible ? Math.min(part.min ?? MIN_FLEXIBLE, displayWidth(part.text)) : displayWidth(part.text)), 0),
 });
 
 // Only the counts that are not zero, each a glyph and a number, and a word while the band has room.
@@ -80,7 +86,7 @@ function proofParts(proof: Proof, g: Glyphs, words: Words): Part[] {
     ]);
 }
 
-function statusSegments(band: Band, words: Words, g: Glyphs, ascii: boolean, running: number): Segment[] {
+function statusSegments(band: Band, words: Words, g: Glyphs, ascii: boolean, running: number, titleMin: number): Segment[] {
   if (band.error !== null) {
     return [segment(0, [{ text: `${g.cross} `, tone: "fail" }, { text: oneLine(band.error), tone: "plain", isFlexible: true }])];
   }
@@ -95,8 +101,8 @@ function statusSegments(band: Band, words: Words, g: Glyphs, ascii: boolean, run
       segments.push(
         segment(PRIORITY.next, [
           { text: "next ", tone: "muted" },
-          { text: `${plan.next.n} `, tone: "title" },
-          { text: oneLine(plan.next.title), tone: "plain", isFlexible: true },
+          { text: `${plan.next.n}`, tone: "title" },
+          { text: ` ${oneLine(plan.next.title)}`, tone: "plain", isFlexible: true, isTrailing: true, min: titleMin },
         ]),
       );
     }
@@ -131,13 +137,21 @@ function joined(segments: readonly Segment[], g: Glyphs): Part[] {
 const fixedWidth = (parts: readonly Part[]): number =>
   parts.reduce((sum, part) => sum + (part.isFlexible ? 0 : displayWidth(part.text)), 0);
 
+// The trailing part (the task title) keeps what the others leave, but never less than its own minimum.
 function fitParts(parts: readonly Part[], width: number, g: Glyphs): Span[] {
+  const room = width - fixedWidth(parts);
+  const trailing = parts.find((part) => part.isTrailing);
+  const reserved = trailing === undefined ? 0 : Math.min(trailing.min ?? 0, displayWidth(trailing.text));
   const sizes = share(
-    parts.filter((part) => part.isFlexible).map((part) => displayWidth(part.text)),
-    width - fixedWidth(parts),
+    parts.filter((part) => part.isFlexible && part !== trailing).map((part) => displayWidth(part.text)),
+    room - reserved,
   );
+  const spare = room - sizes.reduce((sum, size) => sum + size, 0);
   let flexible = 0;
-  return parts.map(({ isFlexible, ...span }) => (isFlexible ? { ...span, text: fitEnd(span.text, sizes[flexible++] ?? 0, g.ellipsis) } : span));
+  return parts.map(({ isFlexible, isTrailing, min: _min, ...span }) => {
+    if (isTrailing) return { ...span, text: spare < MIN_TITLE ? "" : fitEnd(span.text, spare, g.ellipsis) };
+    return isFlexible ? { ...span, text: fitEnd(span.text, sizes[flexible++] ?? 0, g.ellipsis) } : span;
+  });
 }
 
 function clip(spans: readonly Span[], width: number, g: Glyphs): Span[] {
@@ -160,9 +174,9 @@ function statusRow(band: Band, width: number, tier: GlyphTier, running: number):
   const g = glyphs(tier);
   const ascii = tier === "ascii";
   const gap = displayWidth(` ${g.dot} `);
-  const full = statusSegments(band, FULL, g, ascii, running);
+  const full = statusSegments(band, FULL, g, ascii, running, FULL_TITLE_MIN);
   const kept = arrange(full, width, gap);
-  const chosen = kept.length === full.length ? kept : arrange(statusSegments(band, COMPACT, g, ascii, running), width, gap);
+  const chosen = kept.length === full.length ? kept : arrange(statusSegments(band, COMPACT, g, ascii, running, 0), width, gap);
   return clip(fitParts(joined(chosen, g), width, g), width, g);
 }
 

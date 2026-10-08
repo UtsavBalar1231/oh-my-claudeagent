@@ -69,8 +69,8 @@ describe("bandView", () => {
       { text: " 12/46", tone: "muted" },
       { text: " · ", tone: "muted" },
       { text: "next ", tone: "muted" },
-      { text: "13 ", tone: "title" },
-      { text: "Port module 13", tone: "plain" },
+      { text: "13", tone: "title" },
+      { text: " Port module 13", tone: "plain" },
     ]);
   });
 
@@ -134,14 +134,25 @@ describe("bandView", () => {
     );
   });
 
-  test("as the band narrows, segments drop by priority: verification, proof, next task, running agents", () => {
+  test("as the band narrows, the title shrinks first, then segments drop: proof, next task, running agents, the warning", () => {
     const at = (columns: number) => status(FULL, columns, "unicode", 2);
     expect(at(120)).toBe("████▍ 59/68 · next 43 Record the final… · ✓ 52 proven  ! 4 unproven · ! just test evidence not logged · ◆ 2 running");
     expect(at(112)).toBe("████▍ 59/68 · next 43 Record the final verification for… · ✓ 52  ! 4 · ! just test not logged · ◆ 2 running");
-    expect(at(80)).toBe("████▍ 59/68 · next 43 Record the final verificati… · ✓ 52  ! 4 · ◆ 2 running");
-    expect(at(60)).toBe("████▍ 59/68 · next 43 Record the final ve… · ◆ 2 running");
-    expect(at(50)).toBe("████▍ 59/68 · ◆ 2 running");
+    expect(at(80)).toBe("████▍ 59/68 · next 43 Re… · ✓ 52  ! 4 · ! just test not logged · ◆ 2 running");
+    expect(at(76)).toBe("████▍ 59/68 · next 43 · ✓ 52  ! 4 · ! just test not logged · ◆ 2 running");
+    expect(at(64)).toBe("████▍ 59/68 · next 43 · ! just test not logged · ◆ 2 running");
+    expect(at(60)).toBe("████▍ 59/68 · ! just test not logged · ◆ 2 running");
+    expect(at(50)).toBe("████▍ 59/68 · ! just test not logged");
     expect(at(20)).toBe("████▍ 59/68");
+  });
+
+  test("a row too short for the title keeps the warning beside `next 13`, and the title never shrinks to a cut number", () => {
+    const b = band({ plan: PLAN, verification: UNLOGGED });
+    expect(status(b, 74)).toBe("█▎███ 12/46 · next 13 Port module 13 · ! just test evidence not logged");
+    expect(status(b, 66)).toBe("█▎███ 12/46 · next 13 Port module 13 · ! just test not logged");
+    expect(status(b, 60)).toBe("█▎███ 12/46 · next 13 Port mod… · ! just test not logged");
+    expect(status(b, 52)).toBe("█▎███ 12/46 · next 13 · ! just test not logged");
+    expect(status(b, 48)).toBe("█▎███ 12/46 · ! just test not logged");
   });
 
   test("no plan, with an unlogged verification that has an action", () => {
@@ -200,7 +211,7 @@ describe("bandView", () => {
   });
 
   test("a full status row stops a space short of the engine's three-cell collapse mark", () => {
-    for (const columns of [60, 80, 130, 140]) expect(displayWidth(status(FULL, columns, "unicode", 2)), `at ${columns}`).toBe(columns - 4);
+    for (const columns of [70, 80, 130, 140]) expect(displayWidth(status(FULL, columns, "unicode", 2)), `at ${columns}`).toBe(columns - 4);
   });
 
   test("no row is ever wider than the room it has, at every width from 12 to 200", () => {

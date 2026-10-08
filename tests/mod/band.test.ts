@@ -393,8 +393,8 @@ test("the bar, the glyphs and the running count draw in their theme keys, the wo
     [" 12/46", "inactive"],
     [" · ", "inactive"],
     ["next ", "inactive"],
-    ["13 ", "bold"],
-    ["Port module 13", "plain"],
+    ["13", "bold"],
+    [" Port module 13", "plain"],
     [" · ", "inactive"],
     ["! ", "warning"],
     ["just test", "plain"],
@@ -555,7 +555,7 @@ test("at 40 columns no Text in the band is wider than 40 cells", async ($, on) =
     $,
     async (band) => {
       const rows = await texts(band);
-      expect(rows).toEqual(["█▎███ 12/46 · next 13 Port module 13", "█", "▎", "███", " 12/46", " · ", "next ", "13 ", "Port module 13"]);
+      expect(rows).toEqual(["█▎███ 12/46", "█", "▎", "███", " 12/46"]);
       for (const text of rows) expect(displayWidth(text), text).toBeLessThanOrEqual(40);
       for (const button of await buttons(band)) expect(displayWidth(`1: ${button.label}`)).toBeLessThanOrEqual(40);
     },
@@ -602,6 +602,15 @@ test("at 80, 120 and 200 columns on both surfaces the rows read the same and end
     async (band) => expect(await statusRow(band)).toBe(`█▎███ 12/46 · next 13 Port module 13 · ! ${long} evidence not logged`),
     200,
   );
+});
+
+test("at 60 and 52 columns the unverified-evidence warning stays and the next task's title shrinks, down to `next 13`", async ($, on) => {
+  world(on, bound(12, 46, { [STATUS]: statusFile("just test") }));
+  await start($);
+  await turn($);
+
+  await onEachSurface($, async (band) => expect(await statusRow(band)).toBe("█▎███ 12/46 · next 13 Port mod… · ! just test not logged"), 60);
+  await onEachSurface($, async (band) => expect(await statusRow(band)).toBe("█▎███ 12/46 · next 13 · ! just test not logged"), 52);
 });
 
 test("showBand false draws nothing, whatever the state", { options: { showBand: false } }, async ($, on) => {

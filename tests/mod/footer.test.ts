@@ -6,6 +6,7 @@ import { LEDGER, ROOT, SESSION, type World, world } from "./world.ts";
 const STATUS = `${ROOT}/.omca/state/session/${SESSION}.json`;
 const STARTED_MS = Date.UTC(2026, 9, 2, 12, 0, 0);
 const STARTED_S = STARTED_MS / 1000;
+const B = "\u00a0";
 const LONG = "bun test src servers statusline scripts opencode --timeout 60000 --bail --reporter=junit";
 
 const USAGE: TurnUsage = {
@@ -59,7 +60,7 @@ test("a main turn ends with its duration, tokens and the engine's cost since it 
   const { w, meter } = engine(on);
   await $.turn.start({ text: "Run the tests", turnId: "t-1" });
 
-  expect(await turn($, w, meter, 0.2812)).toEqual({ text: "4s · 12.3k in 845 out · $0.0312 engine cost" });
+  expect(await turn($, w, meter, 0.2812)).toEqual({ text: `4s · 12.3k${B}in${B}845${B}out · $0.0312${B}engine${B}cost` });
 });
 
 for (const kind of ["five_hour", "seven_day"]) {
@@ -68,7 +69,7 @@ for (const kind of ["five_hour", "seven_day"]) {
     meter.rateLimits = [{ kind, percentUsed: 23.5 }];
     await $.turn.start({ text: "Run the tests", turnId: "t-1" });
 
-    expect(await turn($, w, meter, 0.2812)).toEqual({ text: "4s · 12.3k in 845 out" });
+    expect(await turn($, w, meter, 0.2812)).toEqual({ text: `4s · 12.3k${B}in${B}845${B}out` });
   });
 }
 
@@ -77,7 +78,7 @@ test("a gateway's spend limit alone keeps the cost", async ($, on) => {
   meter.rateLimits = [{ kind: "spend_limit", percentUsed: 62.8 }];
   await $.turn.start({ text: "Run the tests", turnId: "t-1" });
 
-  expect(await turn($, w, meter, 0.2812)).toEqual({ text: "4s · 12.3k in 845 out · $0.0312 engine cost" });
+  expect(await turn($, w, meter, 0.2812)).toEqual({ text: `4s · 12.3k${B}in${B}845${B}out · $0.0312${B}engine${B}cost` });
 });
 
 test("a verification this turn that the ledger has not caught up with is named in the footer", async ($, on) => {
@@ -86,7 +87,7 @@ test("a verification this turn that the ledger has not caught up with is named i
   await $.turn.start({ text: "Run the tests", turnId: "t-1" });
 
   expect(await turn($, w, meter, 0.2812)).toEqual({
-    text: "4s · 12.3k in 845 out · ! no evidence: just test",
+    text: `4s · 12.3k${B}in${B}845${B}out · !${B}no${B}evidence:${B}just${B}test`,
   });
 });
 
@@ -95,7 +96,7 @@ test("a verification logged after it ran raises no warning", async ($, on) => {
   ledgerAt(w, STARTED_S + 3);
   await $.turn.start({ text: "Run the tests", turnId: "t-1" });
 
-  expect(await turn($, w, meter, 0.2812)).toEqual({ text: "4s · 12.3k in 845 out · $0.0312 engine cost" });
+  expect(await turn($, w, meter, 0.2812)).toEqual({ text: `4s · 12.3k${B}in${B}845${B}out · $0.0312${B}engine${B}cost` });
 });
 
 test("a verification from before the turn started raises no warning", async ($, on) => {
@@ -103,14 +104,14 @@ test("a verification from before the turn started raises no warning", async ($, 
   ledgerAt(w, STARTED_S - 600);
   await $.turn.start({ text: "Run the tests", turnId: "t-1" });
 
-  expect(await turn($, w, meter, 0.2812)).toEqual({ text: "4s · 12.3k in 845 out · $0.0312 engine cost" });
+  expect(await turn($, w, meter, 0.2812)).toEqual({ text: `4s · 12.3k${B}in${B}845${B}out · $0.0312${B}engine${B}cost` });
 });
 
 test("a status file that does not parse leaves the warning out, and the reason goes to the debug log", async ($, on) => {
   const { w, meter } = engine(on, { [STATUS]: "{ not json" });
   await $.turn.start({ text: "Run the tests", turnId: "t-1" });
 
-  expect(await turn($, w, meter, 0.2812)).toEqual({ text: "4s · 12.3k in 845 out · $0.0312 engine cost" });
+  expect(await turn($, w, meter, 0.2812)).toEqual({ text: `4s · 12.3k${B}in${B}845${B}out · $0.0312${B}engine${B}cost` });
   expect(w.logs.filter((line) => line.startsWith("footer: cannot check this turn's verification: "))).toHaveLength(1);
 });
 
@@ -124,15 +125,15 @@ test("a subagent's turn.complete gets no footer and the engine's answer stands",
 test("without a cost sample the footer leaves the cost out", async ($, on) => {
   const { w, meter } = engine(on);
 
-  expect(await turn($, w, meter, 0.2812)).toEqual({ text: "4s · 12.3k in 845 out" });
+  expect(await turn($, w, meter, 0.2812)).toEqual({ text: `4s · 12.3k${B}in${B}845${B}out` });
 });
 
 test("without a cost sample the turn is dated from its duration", async ($, on) => {
   const inside = engine(on, { [STATUS]: statusFile("just test", STARTED_S + 2) });
-  expect(await turn($, inside.w, inside.meter, 0.2812)).toEqual({ text: "4s · 12.3k in 845 out · ! no evidence: just test" });
+  expect(await turn($, inside.w, inside.meter, 0.2812)).toEqual({ text: `4s · 12.3k${B}in${B}845${B}out · !${B}no${B}evidence:${B}just${B}test` });
 
   inside.w.files.set(STATUS, { text: statusFile("just test", STARTED_S + 3), mtimeMs: 0 });
-  expect(await turn($, inside.w, inside.meter, 0.2812)).toEqual({ text: "4s · 12.3k in 845 out" });
+  expect(await turn($, inside.w, inside.meter, 0.2812)).toEqual({ text: `4s · 12.3k${B}in${B}845${B}out` });
 });
 
 test("a host that keeps no cost ledger leaves the cost out", async ($, on) => {
@@ -140,12 +141,12 @@ test("a host that keeps no cost ledger leaves the cost out", async ($, on) => {
   meter.usd = undefined;
   await $.turn.start({ text: "Run the tests", turnId: "t-1" });
 
-  expect(await turn($, w, meter, undefined)).toEqual({ text: "4s · 12.3k in 845 out" });
+  expect(await turn($, w, meter, undefined)).toEqual({ text: `4s · 12.3k${B}in${B}845${B}out` });
 });
 
 for (const [glyphSet, env, line] of [
-  ["Unicode", {}, "4s · 12.3k in 845 out · ! no evidence: bun test sr…"],
-  ["ASCII", { OMCA_GLYPHS: "ascii" }, "4s - 12.3k in 845 out - ! no evidence: bun test..."],
+  ["Unicode", {}, `4s · 12.3k${B}in${B}845${B}out · !${B}no${B}evidence:${B}bun${B}test${B}sr…`],
+  ["ASCII", { OMCA_GLYPHS: "ascii" }, `4s - 12.3k${B}in${B}845${B}out - !${B}no${B}evidence:${B}bun${B}test...`],
 ] as const) {
   test(`the footer is one line that keeps to one row of an 80-column terminal, in the ${glyphSet} glyph set`, async ($, on) => {
     const { w, meter } = engine(on, { [STATUS]: statusFile(LONG, STARTED_S + 2) }, env);

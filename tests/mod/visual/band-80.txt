@@ -1,5 +1,5 @@
 
- ▐▛███▛█   Claude Code v2.1.292
+ ▐▛███▛█   Claude Code v2.1.294
 ▝▜██████▀  Opus 5.5 · API Usage Billing
  ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd
 
@@ -15,8 +15,8 @@
 
 ✻ Waiting for 1 background agent to finish
 
-● oh-my-claudeagent+cc-plugin-agents-md: 0s · 37.5k in 21 out ·  no
-  evidence: just test
+● oh-my-claudeagent+cc-plugin-agents-md: 0s · 37.5k in 21 out ·
+   no evidence: just test
 
 
 
@@ -28,7 +28,7 @@
 
 
 
-█▎███ 12/46 · next 13 Port the snapshot and the ledger o… ·  1 running     [-]
+█▎███ 12/46 · next 13 Port the… ·  just test not logged ·  1 running      [-]
 1: Log evidence
                                                             ◐ medium · /effort
 ─────────────────────────────────────────────────────────── OMCA: 46-task-plan ─

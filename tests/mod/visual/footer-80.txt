@@ -1,5 +1,5 @@
 
- ▐▛███▛█   Claude Code v2.1.292
+ ▐▛███▛█   Claude Code v2.1.294
 ▝▜██████▀  Opus 5.5 · API Usage Billing
  ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd
 
@@ -12,8 +12,8 @@
 
 ✻ Worked for 0s · done HH:MM
 
-● oh-my-claudeagent+cc-plugin-agents-md: 0s · 39.5k in 11 out ·  no
-  evidence: just test
+● oh-my-claudeagent+cc-plugin-agents-md: 0s · 39.5k in 11 out ·
+   no evidence: just test
 
 ❯ /omca-rate up good
   ⎿  oh-my-claudeagent: Rated the last turn up: "good".
