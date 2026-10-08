@@ -88,7 +88,7 @@ jobs:
 
       # No bun install: the adapter imports @opencode/plugin for types only, which bun erases.
       - name: Specs, including the smoke and model-path runs against OpenCode
-        run: bun test opencode/
+        run: bun test --timeout=30000 opencode/
 
       - name: Job summary
         if: always()
@@ -160,7 +160,7 @@ jobs:
 
       - name: Bun spec tests
         if: runner.os != 'Linux'
-        run: bun test --parallel $BUN_SPEC_ROOTS --reporter=junit --reporter-outfile="$RUNNER_TEMP/bun-junit.xml"
+        run: bun test --parallel --timeout=30000 $BUN_SPEC_ROOTS --reporter=junit --reporter-outfile="$RUNNER_TEMP/bun-junit.xml"
 
       # Bun on Windows can crash mid-run and still exit 0 (bun issue 40376). The crash leaves no
       # report or a report missing spec files, so the run passes only when the report exists, has
@@ -171,10 +171,11 @@ jobs:
 
       # Linux runs the specs once, in this order instead of file order. A spec that passes only in
       # file order fails here. Bun prints the seed, and the step name carries it, so a failure reruns
-      # locally with `bun test --parallel --randomize --seed=<seed>`.
+      # locally with `bun test --parallel --randomize --seed=<seed>`. Every spec run takes a 30 s
+      # timeout: specs that spawn processes outlast bun's 5 s default on a loaded runner.
       - name: Bun spec tests in random order (seed ${{ github.run_number }})
         if: runner.os == 'Linux'
-        run: bun test --parallel --randomize --seed=${{ github.run_number }} $BUN_SPEC_ROOTS
+        run: bun test --parallel --timeout=30000 --randomize --seed=${{ github.run_number }} $BUN_SPEC_ROOTS
 
       - name: Job summary
         if: always()

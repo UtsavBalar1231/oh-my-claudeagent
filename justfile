@@ -21,9 +21,10 @@ typecheck:
 validate *args:
 	bun scripts/validate.ts {{ args }}
 
-# Run the bun specs; the roots are explicit because a bare bun test also collects the mod tests
+# Run the bun specs; the roots are explicit because a bare bun test also collects the mod tests.
+# Specs that spawn processes outlast bun's 5 s default on a loaded runner, hence the timeout.
 test:
-	bun test --parallel src servers statusline scripts benchmarks/compare
+	bun test --parallel --timeout=30000 src servers statusline scripts benchmarks/compare
 
 # Run the mod tests; the argument is the plugin root
 test-mod:
@@ -31,7 +32,7 @@ test-mod:
 
 # Run the OpenCode adapter specs; the ones that load OpenCode skip themselves without opencode on PATH
 test-opencode:
-	bun test opencode/
+	bun test --timeout=30000 opencode/
 
 # Run one headless session with the packaged plugin against the mock model; needs the claude CLI
 smoke:

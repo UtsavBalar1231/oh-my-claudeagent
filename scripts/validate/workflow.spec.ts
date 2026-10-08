@@ -62,7 +62,7 @@ const startsCommand = (command: string, recipe: string): boolean => command === 
 
 const CI_ONLY_REASONS: Readonly<Record<string, string>> = {
   [`bun scripts/qa/junit-complete.ts "$RUNNER_TEMP/bun-junit.xml" ${SPEC_ROOTS}`]: "bun on Windows can crash and exit 0, which only CI's JUnit report shows",
-  [`bun test --parallel --randomize --seed=\${{ github.run_number }} ${SPEC_ROOTS}`]: "a fresh seed per run, which a local recipe has no source for",
+  [`bun test --parallel --timeout=30000 --randomize --seed=\${{ github.run_number }} ${SPEC_ROOTS}`]: "a fresh seed per run, which a local recipe has no source for",
   "claude plugin validate . --strict": "the latest published client rather than the pinned one",
   "claude plugin validate .claude-plugin/plugin.json --strict": "the latest published client rather than the pinned one",
 };
@@ -124,12 +124,12 @@ describe("workflow contract", () => {
 
   test("the spec run is checked for completeness on the report and the roots the bun test step used", () => {
     const runs = job("typescript").steps.map((step) => step.run ?? "");
-    const testRun = runs.map((run) => /^bun test --parallel (\S+) --reporter=junit --reporter-outfile="([^"]+)"$/.exec(run)).find(Boolean);
+    const testRun = runs.map((run) => /^bun test --parallel --timeout=30000 (\S+) --reporter=junit --reporter-outfile="([^"]+)"$/.exec(run)).find(Boolean);
     const checkRun = runs.map((run) => /^bun scripts\/qa\/junit-complete\.ts "([^"]+)" (\S+)$/.exec(run)).find(Boolean);
     expect(testRun?.[1]).toBe("$BUN_SPEC_ROOTS");
     expect(checkRun?.[1]).toBe(testRun?.[2]);
     expect(checkRun?.[2]).toBe(testRun?.[1]);
-    expect(recipeBody("test")).toEqual([`bun test --parallel ${SPEC_ROOTS}`]);
+    expect(recipeBody("test")).toEqual([`bun test --parallel --timeout=30000 ${SPEC_ROOTS}`]);
   });
 
   test("a seeded random-order run on the same roots replaces the file-order run on Linux and puts its seed in the step name", () => {
@@ -137,9 +137,9 @@ describe("workflow contract", () => {
     expect(step).toEqual({
       name: "Bun spec tests in random order (seed ${{ github.run_number }})",
       if: "runner.os == 'Linux'",
-      run: "bun test --parallel --randomize --seed=${{ github.run_number }} $BUN_SPEC_ROOTS",
+      run: "bun test --parallel --timeout=30000 --randomize --seed=${{ github.run_number }} $BUN_SPEC_ROOTS",
     });
-    const fileOrder = job("typescript").steps.filter((candidate) => /^bun (test --parallel \$BUN_SPEC_ROOTS|scripts\/qa\/junit-complete\.ts) /.test(candidate.run ?? ""));
+    const fileOrder = job("typescript").steps.filter((candidate) => /^bun (test --parallel --timeout=30000 \$BUN_SPEC_ROOTS|scripts\/qa\/junit-complete\.ts) /.test(candidate.run ?? ""));
     expect(fileOrder.map((candidate) => candidate.if)).toEqual(["runner.os != 'Linux'", "runner.os != 'Linux'"]);
   });
 
