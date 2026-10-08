@@ -28,7 +28,7 @@
                                                                │ 8 Switch the nightly job to the n…  blocked by 6, 7
                                                                │ 9 Announce the change to finance       blocked by 8
                                                                │
-                                                               │k: Run check  s:   c:   e:   o:   x:   f:   t:   l:
+                                                               │k: Run  s: Start  c:   e:   o:   x:   f:   t:   l:
 ██▎██ 4/9 · next 5 Reconcile… ·  4   2 ·  1 running     [-] │↑↓ move · enter open · esc close
                                            ◐ medium · /effort  │
 ───────────────────────────────────────────────────────────────────────────────────────────────── OMCA: billing-export ─

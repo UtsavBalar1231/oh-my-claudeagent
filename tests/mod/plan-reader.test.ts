@@ -422,8 +422,8 @@ test("the board shows the plan's Status, progress, proof and next task, then eac
       "⊘ 4 Wire the hotkeys          blocked by 3  PROVEN ",
       "○ 5 Write the docs                                 ",
       " ",
-      "k: Run check  s: Start here  c: Copy  e: Evidence",
-      "o: Open only  x: Failing  f: Find  t: Sections  l: ",
+      "k: Run  s: Start  c: Copy  e: Evidence  o: Open",
+      "x: Failing  f: Find  t: Sections  l: Plans",
       "↑↓ move · enter open · esc close",
     ]);
     expect(await ui.find({ type: "Text", text: /Hill/ })).toBeUndefined();
@@ -811,8 +811,8 @@ test("OMCA_GLYPHS=ascii draws the board, its chips and bars from the ASCII set",
     "/ 4 Wire the hotkeys          blocked by 3 [PROVEN]",
     "o 5 Write the docs                                 ",
     " ",
-    "k: Run check  s: Start here  c: Copy  e: Evidence",
-    "o: Open only  x: Failing  f: Find  t: Sections  l: ",
+    "k: Run  s: Start  c: Copy  e: Evidence  o: Open",
+    "x: Failing  f: Find  t: Sections  l: Plans",
     "^v move - enter open - esc close",
   ]);
   await ui.unmount();
@@ -929,7 +929,7 @@ test("a short pane draws a one-line header, a list row with its cues and one key
     `── Milestone 2: Board ── ████████ 0/3 ${"─".repeat(35)}`,
     `○ 3 Draw the board${" ".repeat(46)}UNPROVEN `,
     "  ↓ 2 more",
-    "k: Run check  s: Start here  c: Copy  e:   o:   x:   f:   t:   l: ",
+    "k: Run  s: Start  c: Copy  e: Evidence  o: Open  x:   f:   t:   l: ",
     " ",
   ]);
   expect((await ui.find({ key: "l" }))?.props["hotkey"]).toBe("l");
@@ -947,26 +947,26 @@ test("a filter on a short pane keeps its state and drops the milestone rows", as
     " ",
     `⊘ 4 Wire the hotkeys${" ".repeat(32)}blocked by 3  PROVEN `,
     " ",
-    "k: Run check  s: Start here  c: Copy  e:   o:   x:   f:   t:   l: ",
+    "k: Run  s: Start  c: Copy  e: Evidence  o: Open  x:   f:   t:   l: ",
   ]);
   await ui.unmount();
 });
 
 test("the key rows are two from 30 rows or while the list leaves rows to spare, else one with the keys past it bare", async ($, on) => {
   boardWorld(on);
-  const twoRows = ["k: Run check  s: Start here  c: Copy  e: Evidence", "o: Open only  x: Failing  f: Find  t: Sections  l: "];
+  const twoRows = ["k: Run  s: Start  c: Copy  e: Evidence  o: Open", "x: Failing  f: Find  t: Sections  l: Plans"];
   const tall = await mountBoard($, PAGE);
   expect(rows(await tall.drawn()).slice(-3)).toEqual([...twoRows, "↑↓ move · enter open · esc close"]);
   await tall.unmount();
   const spare = await mountBoard($, { columns: 120, rows: 20, placement: "dock" });
-  expect(rows(await spare.drawn()).filter((row) => /^[ko]:/.test(row))).toEqual(twoRows);
+  expect(rows(await spare.drawn()).filter((row) => /^[kx]:/.test(row))).toEqual(twoRows);
   await spare.unmount();
 });
 
 test("a list that needs every row keeps one key row, the keys past it bare", async ($, on) => {
   boardWorld(on, PASSING, {}, LONG_BOARD);
   const low = await mountBoard($, { columns: 120, rows: 20, placement: "dock" });
-  expect(rows(await low.drawn()).filter((row) => row.startsWith("k:"))).toEqual(["k:   s:   c:   e:   o:   x:   f:   t:   l: "]);
+  expect(rows(await low.drawn()).filter((row) => row.startsWith("k:"))).toEqual(["k: Run  s: Start  c:   e:   o:   x:   f:   t:   l: "]);
   await low.unmount();
 });
 
@@ -1055,7 +1055,7 @@ test("a task page and a section page keep their header and keys and scroll their
   await ui.press({ key: "task-3" });
   const top = spreadRows(await ui.drawn()).slice(1);
   expect(top).toHaveLength(7);
-  expect(top.slice(0, 2)).toEqual(["Ship the board3 / 19", "b: Board  p: Prev  n: Next  k: Run check  s: Start here  c: Copy  e: "]);
+  expect(top.slice(0, 2)).toEqual(["Ship the board3 / 19", "b: Board  p: Prev  n: Next  k: Run  s: Start  c: Copy  e: Evidence"]);
   expect(top.slice(2, 5)).toEqual(["3. Draw the board", " OPEN   UNPROVEN ", " "]);
   expect(top.at(-1)).toStartWith("↓ more · wheel to scroll");
 

@@ -666,7 +666,7 @@ test("OMCA_GLYPHS=ascii draws every glyph from the ASCII set", async ($, on) => 
     "  ^ 10 more",
     "+ 11 Port step 11 onto the shared harness                                ",
   ]);
-  expect(drawn.at(-2)).toBe("k: Run check  s: Start here  c: Copy  e:   o:   x:   f:   t:   l: ");
+  expect(drawn.at(-2)).toBe("k: Run  s: Start  c: Copy  e: Evidence  o: Open  x:   f:   t:   l: ");
   await ui.press({ key: "1" });
   const lane = (await ui.find({ key: "lane-a-1" }))?.text;
   expect(lane).toStartWith("executor");

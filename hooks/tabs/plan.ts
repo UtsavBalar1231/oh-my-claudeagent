@@ -486,13 +486,19 @@ const bareKey = ([hotkey, , work, ...off]: Key): Key => [hotkey, "", work, ...of
 
 const keyCells = ([hotkey, label]: Key) => displayWidth(`${hotkey}: ${label}`);
 
-// Keys that do not fit the rows a pane this tall may spend on them lose their labels, last first.
+const shortKey = ([hotkey, label, work, ...off]: Key): Key => [hotkey, label.split(" ")[0] ?? label, work, ...off];
+
+// Keys that do not fit the rows a pane this tall may spend on them keep only their label's first
+// word, and past that lose their labels, last first.
 function keyLayout(view: View, keys: readonly Key[], gap: number, most = view.rows < TWO_KEY_ROWS_FROM ? 1 : 2): Key[][] {
-  const rowsWith = (bare: number) =>
-    wrapAt(keys.map((key, index) => (index < keys.length - bare ? key : bareKey(key))), view.width, gap, keyCells);
+  const rowsWith = (set: readonly Key[], bare: number) =>
+    wrapAt(set.map((key, index) => (index < set.length - bare ? key : bareKey(key))), view.width, gap, keyCells);
+  const full = rowsWith(keys, 0);
+  if (full.length <= most) return full;
+  const short = keys.map(shortKey);
   let bare = 0;
-  while (bare < keys.length && rowsWith(bare).length > most) bare += 1;
-  return rowsWith(bare);
+  while (bare < short.length && rowsWith(short, bare).length > most) bare += 1;
+  return rowsWith(short, bare);
 }
 
 function keyRow(view: View, keys: readonly Key[], gap: number, tail?: RenderElement): RenderElement {
