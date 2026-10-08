@@ -34,8 +34,10 @@ hand.
   band and the status line alike: `nerd` (the default, Nerd Font icons, an agent's own icon among
   them), `unicode` for a font without Nerd Font glyphs, or `ascii` for plain text. Setup asks
   which one your terminal draws.
-  `/omca plan`, `/omca stats` and `/omca doctor` open the pane on that tab. Ctrl+X then Tab, or a
-  click, focuses it; Esc, the close mark or Ctrl+X then X closes it.
+  `/omca plan`, `/omca stats` and `/omca doctor` open the pane on that tab, and the prompt's
+  typeahead offers the subcommands, your plans' names after `/omca plan`, and `up` or `down`
+  after `/omca-rate`. Ctrl+X then Tab, or a click, focuses it; Esc, the close mark or Ctrl+X
+  then X closes it.
 - **The mouse in the pane.** The wheel scrolls what is under the pointer. Over a list it moves the
   focus as the arrows do, and over a part of a tab that holds more than it shows (the Evidence
   card, the plan's task detail, each Notepad card) it scrolls that part alone, with a cue above

@@ -161,6 +161,12 @@ async function where(host: Host): Promise<{ platform: Platform; root: string; ho
   return { platform, root, home, dir: plansDirectory(platform, settings["plansDirectory"], root, env) ?? UNRESOLVED_PLANS };
 }
 
+/** The plans `/omca plan <name>` can name, newest first, as the picker lists them. */
+export async function planNames(host: Host): Promise<string[]> {
+  const { dir } = await where(host);
+  return (await host.fs.exists(dir)) ? recentPlans(await host.fs.list(dir), dir).map((file) => file.name) : [];
+}
+
 function startCursor(plan: Pick<Loaded, "pages">): number {
   const listed = readable(plan).filter((index) => index < CONTENTS_CAP);
   const first = firstOpenTask(plan);

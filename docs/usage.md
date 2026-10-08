@@ -220,7 +220,9 @@ takes the cost's place.
    known price are counted as excluded rather than estimated. `r` reloads the records.
 7. **Doctor**: the checks described below.
 
-`/omca plan`, `/omca stats` and `/omca doctor` open the pane on that tab. Press Ctrl+X then Tab,
+`/omca plan`, `/omca stats` and `/omca doctor` open the pane on that tab. As you type, the
+prompt's typeahead offers these subcommands, the plans in your plans directory after
+`/omca plan`, and `up` or `down` after `/omca-rate`. Press Ctrl+X then Tab,
 or click the pane, to focus it. Esc, the close mark in the pane's corner, or Ctrl+X then X close
 it. Every key letter below works only while its tab is shown.
 

@@ -3,6 +3,7 @@ import { agentsTracker } from "./agents-tracker.ts";
 import { band } from "./band.ts";
 import { bashGuard } from "./bash-guard.ts";
 import { compact } from "./compact.ts";
+import { completion } from "./completion.ts";
 import { dispatch, dispatchStream, featuresFor } from "./dispatch.ts";
 import { feedback } from "./feedback.ts";
 import { footer } from "./footer.ts";
@@ -153,6 +154,7 @@ export const register: Register = (on, pluginOptions) => {
   const turnComplete = featuresFor("turn.complete", { band, agentsTracker, metrics, pane, feedback, footer });
   const agentSpawn = featuresFor("agent.spawn", { agentsTracker, pane, metrics });
   const promptEdit = featuresFor("prompt.edit", { band });
+  const promptAutocomplete = featuresFor("prompt.autocomplete", { completion });
   const paneClose = featuresFor("ui.close", { pane });
   const paneFocus = featuresFor("ui.focus", { pane });
   const paneScroll = featuresFor("ui.scroll", { pane });
@@ -175,6 +177,7 @@ export const register: Register = (on, pluginOptions) => {
   on("turn.complete", ($, e, next) => dispatch(bindHost($, options), "turn.complete", turnComplete, e, next));
   on("agent.spawn", ($, e, next) => dispatch(bindHost($, options), "agent.spawn", agentSpawn, e, next));
   on("prompt.edit", ($, e, next) => dispatch(bindHost($, options), "prompt.edit", promptEdit, e, next));
+  on("prompt.autocomplete", ($, e, next) => dispatch(bindHost($, options), "prompt.autocomplete", promptAutocomplete, e, next));
   on("ui.close", ($, e, next) => dispatch(bindHost($, options), "ui.close", paneClose, e, next));
   on("ui.focus", ($, e, next) => dispatch(bindHost($, options), "ui.focus", paneFocus, e, next));
   on("ui.scroll", { component: "Pane" }, ($, e, next) =>

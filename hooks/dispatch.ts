@@ -10,6 +10,7 @@ type Sites = {
   "turn.complete": [Args<"turn.complete">, EventResult<"turn.complete">];
   "agent.spawn": [Args<"agent.spawn">, EventResult<"agent.spawn">];
   "prompt.edit": [Args<"prompt.edit">, EventResult<"prompt.edit">];
+  "prompt.autocomplete": [Args<"prompt.autocomplete">, EventResult<"prompt.autocomplete">];
   "ui.close": [Args<"ui.close">, EventResult<"ui.close">];
   "ui.focus": [Args<"ui.focus">, EventResult<"ui.focus">];
   "ui.scroll": [Args<"ui.scroll">, EventResult<"ui.scroll">];
