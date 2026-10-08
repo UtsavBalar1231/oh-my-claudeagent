@@ -249,7 +249,7 @@ test("a region too short for its cues draws no cue and no height below one row, 
   expect(scrollKeyed(1, "row")).toBe(true);
   expect(textIn(await drawn(region(2)))).toEqual(["line 2", "line 3"]);
   const cued = await drawn(region(3));
-  expect(textIn(cued).map((text) => text.trim())).toEqual(["↑ 1 more", "line 2", "line 3", "↓ more · wheel to scroll"]);
+  expect(textIn(cued).map((text) => text.trim())).toEqual(["↑ 1 more", "line 2", "↓ more · wheel to scroll"]);
   expect(scrollKeyed(1, "end")).toBe(true);
   expect(textIn(await drawn(region(3))).map((text) => text.trim())).toEqual(["↑ 8 more", "line 9", "line 10"]);
 });

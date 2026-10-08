@@ -44,13 +44,6 @@ function watchState(on: On): { read: (key: string) => unknown; keys: string[] } 
   return { read: (key) => last.get(key), keys };
 }
 
-// The brief and the reply draw as Markdown, which rows leave out; this reads one by its key.
-type Finder = { find: (match: { key: string }) => Promise<{ type: string; props: Readonly<Record<string, unknown>> } | undefined> };
-async function markdownText(ui: Finder, key: string): Promise<unknown> {
-  const found = await ui.find({ key });
-  return found?.type === "Markdown" ? found.props["text"] : undefined;
-}
-
 // The header's mascot and its lines are one row Box, and the body's window holds its units in a clipped Box; both read as the rows they are.
 function pageRows(tree: RenderElement): string[] {
   const unwrap = (child: unknown): unknown[] => {
@@ -118,20 +111,18 @@ test("a lane head's button opens the page of a running agent: header, full brief
     "0 tool calls",
     `started ${clockOf(STARTED)}`,
     "Brief",
-    "",
-    "",
-    "",
+    "Fix the heading parser.",
+    "Skip fenced lines.",
+    "Run bun test src/parser.spec.ts when done.",
     " ",
     "Tool calls · 2",
     "✓ Read src/parser.ts                          300ms",
     "✗ Bash bun test src/parser.spec.ts               2s",
     " ",
     "Reply",
-    "",
+    "Reading the parser.",
     "b: Back  c: Copy brief  r: Reload",
   ]);
-  expect(await Promise.all([0, 1, 2].map((line) => markdownText(ui, `brief-${line}-0`)))).toEqual(BRIEF.split("\n"));
-  expect(await markdownText(ui, "reply-0-0")).toBe("Reading the parser.");
   expect((await ui.find({ type: "Code" }))?.props).toEqual({ source: "bun test src/parser.spec.ts", language: "bash", wrap: "truncate-end" });
   expect(pagesOf()[id]?.calls).toEqual([
     { tool: "Read", summary: "src/parser.ts", ok: true, durationMs: 300 },
@@ -160,8 +151,7 @@ test("a finished agent's page is kept at its turn.complete from its transcript, 
     `started ${clockOf(STARTED)} · ended ${clockOf(STARTED + 65_000)}`,
     "Brief",
   ]);
-  expect(await markdownText(ui, "brief-0-0")).toBe("Fix the heading parser.");
-  expect(await markdownText(ui, "reply-0-0")).toBe("Fixed it; the parser skips fences.");
+  expect(pageBody(await ui.drawn())).toEqual(expect.arrayContaining(["Fix the heading parser.", "Fixed it; the parser skips fences."]));
   await ui.unmount();
 });
 
@@ -177,11 +167,10 @@ test("a finished agent whose transcript is denied keeps its page from the stored
   await ui.press({ key: `open-${id}` });
   expect(pageBody(await ui.drawn()).slice(5, 9)).toEqual([
     "Brief · stored prompt, no transcript",
-    "",
+    "Fix the heading parser.",
     " ",
     "Tool calls · 0",
   ]);
-  expect(await markdownText(ui, "brief-0-0")).toBe("Fix the heading parser.");
   await ui.unmount();
 });
 
@@ -292,7 +281,7 @@ test("r reads the transcript and the recorded calls again", async ($, on) => {
 
   const drawn = pageRows(await ui.drawn());
   expect(drawn).toContain("Tool calls · 1");
-  expect(await markdownText(ui, "reply-0-0")).toBe("Now reading the lexer.");
+  expect(drawn).toContain("Now reading the lexer.");
   await ui.unmount();
 });
 
@@ -388,7 +377,7 @@ test("on a short pane the page opens on the agent's identity with its keys last 
 
   const body = pageBody(await ui.drawn()).map((row) => row.trimEnd());
   expect(body.slice(0, 3)).toEqual(["◆ executor · Fix the heading parser", "◆ running · 0s · 0 tokens · ~$0.00", "Brief"]);
-  expect(body.slice(-2)).toEqual([CUE, KEYS_ROW]);
+  expect(body.slice(-3)).toEqual([CUE, KEYS_ROW, ""]);
   expect(await ui.find({ type: "Raster" })).toBeUndefined();
   expect(w.focused).not.toContain("b");
   expect(w.logs.filter((line) => line.includes("could not focus"))).toEqual([]);
@@ -406,7 +395,7 @@ test("below six rows the identity shares one line, so the window keeps its cue",
   const body = pageBody(await ui.drawn()).map((row) => row.trimEnd());
   expect(body[0]).toBe("◆ executor · ◆ running · 0s · 0 tokens · ~$0.00 · Fix the heading parser");
   expect(body[1]).toBe("Brief");
-  expect(body.slice(-2)).toEqual([CUE, KEYS_ROW]);
+  expect(body.slice(-3)).toEqual([CUE, KEYS_ROW, ""]);
   await ui.unmount();
 });
 

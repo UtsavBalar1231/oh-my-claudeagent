@@ -203,8 +203,8 @@ takes the cost's place.
    out of view, the mouse wheel scrolls them, and Up and Down step the focus a lane at a time with
    the lanes following.
 
-   The brief and the reply on the agent page are drawn as markdown, by Claude Code's own
-   renderer, and a shell command, on the page and in a lane's tool row, is highlighted as code.
+   The brief and the reply on the agent page are drawn as markdown and scroll a row at a time,
+   and a shell command, on the page and in a lane's tool row, is highlighted as code.
    The one-line results,
    prompts and outputs in the lanes, the details rows and the card keep their markdown styles:
    code in the code color, bold, italics and links, with the markers dropped.

@@ -66,7 +66,7 @@ for (const layout of LAYOUTS) {
       expect(await ui.find({ key: "row-2" })).toBeUndefined();
 
       await ui.press({ key: "row-4" });
-      expect(await ui.find({ key: "md-4-0-0" })).toBeDefined();
+      expect(await ui.find({ type: "Text", text: "[x] 1. Do the first thing" })).toBeDefined();
       expect((await ui.find({ key: "p" }))?.props["dimColor"]).toBeUndefined();
       await ui.press({ key: "n" });
       expect((await ui.find({ type: "Code", text: "## not a heading" }))?.props["source"]).toBe("## not a heading");
@@ -581,8 +581,8 @@ test("the split tier draws the focused task's detail beside the list", async ($,
   const detail = await ui.find({ key: "board-detail" });
   expect(detail?.props["overflow"]).toBe("hidden");
   expect(await ui.find({ type: "Text", text: "3. Draw the board" })).toBeDefined();
-  expect(await ui.find({ type: "Markdown", text: "Draw **rows** and chips." })).toBeDefined();
-  expect(await ui.find({ type: "Markdown", text: "**Must NOT:** add an option." })).toBeDefined();
+  expect(await ui.find({ type: "Text", text: "Draw rows and chips." })).toMatchObject({ children: [{ children: ["Draw "] }, { props: { bold: true }, children: ["rows"] }, { children: [" and chips."] }] });
+  expect(await ui.find({ type: "Text", text: "Must NOT: add an option." })).toMatchObject({ children: [{ props: { bold: true }, children: ["Must"] }, { children: [" "] }, { props: { bold: true }, children: ["NOT:"] }, { children: [" add an option."] }] });
   expect((await ui.find({ type: "Code" }))?.props).toMatchObject({ source: "$ just test-mod", language: "bash" });
   expect(spans(detail).filter((span) => span.backgroundColor !== undefined)).toEqual([
     { text: " OPEN ", color: "inverseText", backgroundColor: "inactive", bold: true },
@@ -673,12 +673,12 @@ test("Enter opens a task's page with its files and the runs that prove it; n, p 
     " OPEN   UNPROVEN ",
     " ",
     "Do",
-    "",
-    "",
+    "Draw rows and chips.",
+    "Must NOT: add an option.",
     " ",
     "Done when",
     "",
-    "",
+    "exits 0",
     " ",
     "Depends",
     " ✓ 2 ",
@@ -693,7 +693,7 @@ test("Enter opens a task's page with its files and the runs that prove it; n, p 
     "  ✓ test just test-mod exit 0 · 30m ago",
     "↑↓ scroll · esc close",
   ]);
-  expect(await ui.find({ type: "Markdown", text: "exits 0" })).toBeDefined();
+  expect(await ui.find({ type: "Text", text: "exits 0" })).toBeDefined();
   expect((await ui.find({ type: "Code" }))?.props).toMatchObject({ source: "$ just test-mod", language: "bash" });
 
   await ui.press({ key: "n" });
@@ -1042,7 +1042,8 @@ test("a done-when command is drawn once with its prompt, and the split detail wr
   boardWorld(on);
   const ui = await mountBoard($, SPLIT);
   expect((await ui.find({ type: "Code" }))?.props).toMatchObject({ source: "$ just test-mod", language: "bash" });
-  expect(await ui.find({ type: "Markdown", text: /just test-mod/ })).toBeUndefined();
+  expect(await ui.find({ type: "Text", text: /^exits 0$/ })).toBeDefined();
+  expect(await ui.find({ type: "Text", text: /just test-mod.*exits/ })).toBeUndefined();
   expect(await ui.find({ type: "Text", text: /^ {4}15m ago\.$/ })).toBeDefined();
   await ui.unmount();
 });
@@ -1057,7 +1058,8 @@ test("a task page and a section page keep their header and keys and scroll their
   expect(top).toHaveLength(7);
   expect(top.slice(0, 2)).toEqual(["Ship the board3 / 19", "b: Board  p: Prev  n: Next  k: Run  s: Start  c: Copy  e: Evidence"]);
   expect(top.slice(2, 5)).toEqual(["3. Draw the board", " OPEN   UNPROVEN ", " "]);
-  expect(top.at(-1)).toStartWith("↓ more · wheel to scroll");
+  expect(top.at(-2)).toStartWith("↓ more · wheel to scroll");
+  expect(top.at(-1)).toBe(" ");
 
   await $.ui.scroll({ ...SCROLL, by: 1, bodyRows: 6, contentRows: 7 });
   expect(await ui.find({ type: "Text", text: /^↑ 1 more/ })).toBeDefined();

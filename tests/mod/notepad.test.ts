@@ -48,7 +48,6 @@ const title = (name: string, label: string, isDim = false) => ({
   props: { key: `notepad-title-${name}`, label, plain: true, ...(isDim ? { dimColor: true } : {}) },
   press: expect.anything(),
 });
-const markdown = (key: string, source: string) => ({ type: "Markdown", props: { text: source, key } });
 const dated = (width: number, at: number, ascii = false) => line(rule(width, glyphs(ascii ? "ascii" : "unicode"), ascii, formatWhen(at)));
 // A region whose content fits: no cue rows and no height of its own.
 const region = (name: string, width: number, ...units: unknown[]) =>
@@ -83,12 +82,13 @@ async function open($: Engine, size: Size) {
 }
 
 // Each card as [card key, width, region key, region height]; the height is absent where the content fits.
+// The blank rows a pane adds past its body, so the wheel still reaches a card, are not cards.
 const cardsIn = (nodes: readonly Node[]) =>
   nodes
-    .filter((node) => node.props?.["key"] !== "more-cue")
+    .filter((node) => node.type === "Box" && node.props?.["key"] !== "more-cue")
     .map((node) => [node.props?.["key"], node.props?.["width"], regionOf(node)?.props?.["key"], regionOf(node)?.props?.["height"]]);
 
-test("the Notepad tab draws one card per section in its tone, a title button, a dated rule above each entry as Markdown, and masks a secret", async ($, on) => {
+test("the Notepad tab draws one card per section in its tone, a title button, a dated rule above each entry, its markdown a row at a time, and masks a secret", async ($, on) => {
   world(on, FILES);
   const ui = await open($, PAGE_120);
   const inner = usableColumns(bodyColumns(PAGE_120)) - 4;
@@ -111,10 +111,10 @@ test("the Notepad tab draws one card per section in its tone, a title button, a 
         "learnings",
         inner,
         dated(inner, LEARNED_AT),
-        markdown("note-learnings-0-0-0", "The ledger rotates at 1,000 entries."),
+        line([{ text: "The ledger rotates at 1,000 entries." }]),
         dated(inner, LISTED_AT),
-        markdown("note-learnings-1-0-0", "- one"),
-        markdown("note-learnings-1-1-0", "- two"),
+        line([{ text: "- " }, { text: "one" }]),
+        line([{ text: "- " }, { text: "two" }]),
       ),
     ),
     card(
@@ -122,7 +122,7 @@ test("the Notepad tab draws one card per section in its tone, a title button, a 
       "warning",
       inner + 4,
       title("issues", "Issues · 1 entry"),
-      region("issues", inner, dated(inner, ISSUE_AT), markdown("note-issues-0-0-0", "export `API_TOKEN=‹masked›` first")),
+      region("issues", inner, dated(inner, ISSUE_AT), line([{ text: "export " }, { text: "API_TOKEN=‹masked›", color: "permission" }, { text: " first" }])),
     ),
     card("section-decisions", "claude", inner + 4, title("decisions", "Decisions · 0 entries"), region("decisions", inner, quiet)),
     card("section-problems", "error", inner + 4, title("problems", "Problems · 0 entries"), region("problems", inner, quiet)),
@@ -310,7 +310,7 @@ test("f opens the Find field and asks for its focus, typing filters the entries 
   expect(await header()).toBe("sample  BOUND  · 1 of 3 entries match · 1 masked");
   expect(await sections()).toEqual(["section-learnings"]);
   expect((await ui.find({ key: "notepad-title-learnings" }))?.props).toMatchObject({ label: "Learnings · 1 of 2" });
-  expect(await ui.find({ key: "note-learnings-0-0-0" })).toBeDefined();
+  expect(await ui.find({ type: "Text", text: "The ledger rotates at 1,000 entries." })).toBeDefined();
   expect(await ui.find({ key: "w" })).toBeDefined();
 
   await ui.input({ key: "notepad-find", text: "nowhere" });
@@ -353,8 +353,7 @@ test("l lists the plans with notepads, the bound one first, and picking one show
   await w.clock.advance(2000);
   await ui.redraw();
   expect(rows(await ui.drawn())[chrome(DOCK_200)]).toBe("other not bound · 1 entry");
-  expect(await ui.find({ key: "note-learnings-0-0-0" })).toBeDefined();
-  expect(await ui.find({ type: "Markdown", text: "The other plan's ledger note." })).toBeDefined();
+  expect(await ui.find({ type: "Text", text: "The other plan's ledger note." })).toBeDefined();
 
   await ui.press({ key: "l" });
   await ui.press({ key: "notepad-plan-sample" });
@@ -404,7 +403,7 @@ test("OMCA_GLYPHS=ascii draws the notepad's card borders, rules, chip, separator
   expect(drawn[chrome(size)]).toBe("sample [BOUND] - 3 entries - 1 masked");
   expect((await ui.find({ key: "section-issues" }))?.props).toMatchObject({ borderStyle: "classic", borderColor: "warning" });
   expect((await ui.find({ key: "notepad-title-issues" }))?.props).toMatchObject({ label: "Issues - 1 entry" });
-  expect(await ui.find({ key: "note-issues-0-0-0" })).toBeDefined();
+  expect(await ui.find({ type: "Text", text: "API_TOKEN=" })).toBeDefined();
   expect(drawn.filter((row) => !isAscii(row))).toEqual([]);
   await ui.unmount();
 });
@@ -490,6 +489,32 @@ test("at the split tier a wheel tick over a card scrolls that card's region by u
 
   await tick(2, learningsTop, -3);
   expect(await moved()).toEqual([0, 4, 2, 0]);
+  await ui.unmount();
+});
+
+const textOf = (node: unknown): string => (typeof node === "string" ? node : childrenOf(node).map(textOf).join(""));
+// The rows a card's region shows in its window, cue rows left out.
+const shownRows = (card: Node | undefined): string[] => {
+  const window = childrenOf(regionOf(card)).find((child) => child.props?.["overflow"] === "hidden");
+  return childrenOf(childrenOf(window)[0]).map(textOf);
+};
+
+test("a paragraph taller than its card scrolls a row a wheel tick, and its last row comes into view", async ($, on) => {
+  const words = Array.from({ length: 1200 }, (_, index) => `word${index}`);
+  world(on, { ...FILES, [`${PADS}/sample/learnings.md`]: `\n## 2026-10-02T09:15:00Z\n\n${words.join(" ")}\n` });
+  const ui = await open($, SPLIT_240);
+  const tick = (by: number) => $.ui.scroll({ ...SCROLL, by, bodyRows: 12, contentRows: 13, pointer: { column: 2, row: COLUMNS_ROW + CARD_TOP } });
+  const shown = async () => shownRows((await splitCards(ui)).learnings);
+
+  const first = await shown();
+  expect(first[0]).toStartWith("── ");
+  expect(first[1]).toStartWith("word0 word1 ");
+  await tick(1);
+  expect((await shown())[0]).toBe(first[1]);
+  await tick(1);
+  expect((await shown())[0]).toBe(first[2]);
+  await tick(1000);
+  expect((await shown()).at(-1)).toEndWith("word1199");
   await ui.unmount();
 });
 

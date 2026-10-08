@@ -182,8 +182,10 @@ test("the tab bar is one row: full labels when they fit, else the active tab kee
 });
 
 test("a cued tab scrolled past its top draws an up cue over the window's first row, and none at the top", async ($, on) => {
+  // Four sections of notes, each card held to its least rows, stack past a short pane.
   const long = Array.from({ length: 60 }, (_, i) => `- Note ${i + 1} of the long notepad.`).join("\n");
-  world(on, { ...FILES, [NOTES]: long });
+  const sections = Object.fromEntries(["learnings", "issues", "decisions", "problems"].map((name) => [NOTES.replace("learnings", name), long]));
+  world(on, { ...FILES, ...sections });
   on("ui.scroll", () => ({}));
   await $.command.run(run("", 120));
   const SHORT: Size = { columns: 120, rows: 20, placement: "dock" };
@@ -249,8 +251,8 @@ test("each tab key shows its tab, on the terminal and the desktop", async ($, on
 
     await ui.press({ key: "4" });
     expect((await body())[0]).toBe("sample  BOUND  · 1 entry");
-    expect(await ui.find({ type: "Markdown", text: "- The ledger rotates at 1,000 entries." })).toBeDefined();
-    expect(await ui.find({ type: "Markdown", text: "- Session ids come from the payload." })).toBeDefined();
+    expect(await ui.find({ type: "Text", text: "The ledger rotates at 1,000 entries." })).toBeDefined();
+    expect(await ui.find({ type: "Text", text: "Session ids come from the payload." })).toBeDefined();
     expect((await body()).some((row) => row.includes("Learnings · 1 entry"))).toBe(true);
 
     await ui.press({ key: "5" });
@@ -313,7 +315,7 @@ test("n, p and t page through the plan, and t returns to the row the pages came 
     "─".repeat(51),
     "[ ] 13. Port step 13 onto the shared harness",
   ]);
-  expect(await ui.find({ key: `md-${pageOf(13)}-0-0`, text: "- Do: step 13 in detail." })).toBeDefined();
+  expect(await ui.find({ type: "Text", text: "Do: step 13 in detail." })).toBeDefined();
   expect(spreadRows(await ui.drawn())).toContain("next: [ ] 14. Port step 14 onto the shared harness");
   expect(w.logs.slice(logged)).toEqual([]);
 

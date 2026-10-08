@@ -1,7 +1,9 @@
 import type { RenderElement } from "claude-code";
+import { inlineMarkdown } from "../src/core/markdown.ts";
 import { chunks } from "../src/core/plan-reader.ts";
-import { displayWidth, fitEnd, type Glyphs, padEnd, wrapText } from "../src/core/ui-kit.ts";
-import { CodeBlock, type Kit } from "./ui.ts";
+import { displayWidth, fitEnd, type Glyphs, padEnd } from "../src/core/ui-kit.ts";
+import { wrapPieces } from "../src/core/visual.ts";
+import { CodeBlock, type Kit, Line } from "./ui.ts";
 
 /**
  * One piece of a region's content and the rows it takes: exact where the tab lays it out, counted
@@ -97,8 +99,12 @@ export function ScrollRegion({ kit, g, units, ...region }: Spec): RenderElement 
   const rest = units.slice(offset);
   const isOver = rest.reduce((sum, unit) => sum + unit.rows, 0) > room;
   const isBelow = isCued && isOver;
+  const inner = room - (isBelow ? 1 : 0);
+  // Units stop at the window's own rows, so only a unit taller than a row runs under the clip; the
+  // engine counts clipped rows into the content it scrolls, and a row hidden under the cue below
+  // would make a tab that fits read as taller than the pane.
   const shown: RenderElement[] = [];
-  for (let used = 0, at = 0; at < rest.length && used < room; at += 1) {
+  for (let used = 0, at = 0; at < rest.length && used < inner; at += 1) {
     const unit = rest[at];
     if (unit === undefined) break;
     shown.push(unit.element);
@@ -118,7 +124,7 @@ export function ScrollRegion({ kit, g, units, ...region }: Spec): RenderElement 
         width,
         flexDirection: "column",
         overflow: "hidden",
-        ...(isOver ? { height: room - (isBelow ? 1 : 0) } : {}),
+        ...(isOver ? { height: inner } : {}),
         children: [kit.Box({ width, flexDirection: "column", flexShrink: 0, children: shown })],
       }),
       ...(isBelow ? [cue(`${g.down} more ${g.dot} wheel to scroll`)] : []),
@@ -152,14 +158,24 @@ export function codeUnits(kit: Kit, text: string, width: number, language?: stri
 
 const FENCE = /^\s*(`{3,}|~{3,})\s*([\w+-]*)/;
 const TABLE = /^\s*\|/;
-const LIST = /^\s*(?:[-*+]|\d+[.)])\s/;
-const HEADING = /^\s*#{1,6}\s/;
+const ITEM = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/;
+// Deeper nesting than this keeps this indent, so a nested item still leaves room for its words.
+const MAX_INDENT = 8;
+
+// A prose line wrapped to the width a row a unit, so a region scrolls a long paragraph a row at a
+// time and every row it counts is a row drawn. A list item keeps its marker as written and hangs
+// its later rows under its words, as the engine's own markdown does.
+function proseUnits(kit: Kit, line: string, width: number): Unit[] {
+  const item = ITEM.exec(line.replaceAll("\t", "  "));
+  const lead = item === null ? "" : `${(item[1] ?? "").slice(0, MAX_INDENT)}${item[2] ?? "-"} `;
+  const hang = displayWidth(lead);
+  const rows = wrapPieces(inlineMarkdown(item === null ? line : (item[3] ?? "")), Math.max(1, width - hang));
+  return rows.map((row, index) => ({ element: Line(kit, hang === 0 ? row : [{ text: index === 0 ? lead : " ".repeat(hang) }, ...row]), rows: 1 }));
+}
 
 /**
- * Markdown cut into units a region can window: each source line drawn on its own by the engine's
- * renderer, a fenced block as code a row at a time, a table whole. A line's rows are its source
- * words wrapped inside a list item's hanging indent, which errs high where the markers drop out,
- * plus the row under a heading; a table's are two a line.
+ * Markdown cut into units a region can window: prose a row at a time, a fenced block as code a row
+ * at a time, and a table whole through the engine's renderer, counted at two rows a line.
  */
 export function markdownUnits(kit: Kit, text: string, width: number, key: string): Unit[] {
   const units: Unit[] = [];
@@ -183,8 +199,7 @@ export function markdownUnits(kit: Kit, text: string, width: number, key: string
     } else if (line.trim() === "") {
       units.push({ element: kit.Text({ children: [" "] }), rows: 1 });
     } else {
-      const room = width - (LIST.test(line) ? 2 : 0);
-      markdown(line, at, (part) => wrapText(part, room).length + (HEADING.test(line) ? 1 : 0));
+      units.push(...proseUnits(kit, line, width));
     }
   }
   return units;
