@@ -32,7 +32,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -67,7 +67,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -79,12 +79,12 @@ jobs:
           bun-version: 1.4.2
           no-cache: true
 
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
 
       - name: Install OpenCode CLI
-        run: npm i -g @opencode/cli@2.0.18
+        run: npm i -g @opencode/cli@2.0.18 # zizmor: ignore[adhoc-packages]
 
       # No bun install: the adapter imports @opencode/plugin for types only, which bun erases.
       - name: Specs, including the smoke and model-path runs against OpenCode
@@ -115,7 +115,7 @@ jobs:
       DISABLE_AUTOUPDATER: "1"
       BUN_SPEC_ROOTS: src servers statusline scripts benchmarks/compare
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -200,7 +200,7 @@ jobs:
     env:
       DISABLE_AUTOUPDATER: "1"
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -262,16 +262,16 @@ jobs:
     env:
       DISABLE_AUTOUPDATER: "1"
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
 
       - name: Install Claude Code CLI
-        run: npm i -g @anthropic-ai/claude-code
+        run: npm i -g @anthropic-ai/claude-code # zizmor: ignore[adhoc-packages]
 
       - name: Validate the marketplace
         run: claude plugin validate . --strict
