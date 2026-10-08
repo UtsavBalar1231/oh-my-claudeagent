@@ -63,9 +63,15 @@ Call the `health_check` tool, loading it if needed: `ToolSearch({query: "select:
 
 The `/omca` pane, the band and the status line draw Nerd Font icons unless `OMCA_GLYPHS` names `unicode` or `ascii`. No surface can see the terminal's font, so ask.
 
-1. Print this line exactly as written, so the user's terminal draws it: `   ` (a check in a circle, U+F05D, then gears, U+F085, an eye, U+F06E and a terminal prompt, U+F120).
+1. Print the test line with the script, so the user's terminal draws it:
 
-2. Ask with `AskUserQuestion` whether they see four small icons or boxes and blanks. When they see the icons, report `nerd` and end the phase.
+   ```bash
+   bun "${CLAUDE_PLUGIN_ROOT}/scripts/setup-statusline.ts" --glyph-test
+   ```
+
+   It prints four Nerd Font icons: a check in a circle, gears, an eye and a terminal prompt. They are private-use characters that do not survive being retyped, so never write them into your own reply; point the user at the command's output.
+
+2. Ask with `AskUserQuestion` whether that output shows four small icons or boxes and blanks. When they see the icons, report `nerd` and end the phase.
 
 3. When they see boxes, preview the change:
 

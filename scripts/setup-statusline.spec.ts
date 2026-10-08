@@ -98,6 +98,14 @@ const OTHER_STATUSLINE_AFTER = () =>
     "",
   ].join("\n");
 
+test("--glyph-test prints the four Nerd Font icons and nothing else, with no settings file named", () => {
+  const result = Bun.spawnSync([process.execPath, SCRIPT, "--glyph-test"], { env: specEnv({}), stdin: "ignore" });
+
+  expect(result.exitCode).toBe(0);
+  expect(result.stdout.toString()).toBe("   \n");
+  expect(result.stderr.toString()).toBe("");
+});
+
 describe("install", () => {
   test("settings without a statusLine gain both entries after the last key", () => {
     const before = fixture("no-statusline.json");
@@ -284,7 +292,10 @@ describe("refusals", () => {
 
   test("a missing --settings prints the usage", () => {
     const result = Bun.spawnSync([process.execPath, SCRIPT], { env: specEnv({ ...homeEnv(home), PATH: join(root, "bin") }) });
-    expect(result.stderr.toString()).toBe("omca setup: usage: bun scripts/setup-statusline.ts --settings <path> [--glyphs nerd|unicode|ascii [--glyphs-only]] [--yes] [--uninstall]\n");
+    expect(result.stderr.toString()).toBe(
+      "omca setup: usage: bun scripts/setup-statusline.ts --settings <path> [--glyphs nerd|unicode|ascii [--glyphs-only]] [--yes] [--uninstall]\n" +
+        "       bun scripts/setup-statusline.ts --glyph-test\n",
+    );
     expect(result.exitCode).toBe(2);
   });
 });

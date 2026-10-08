@@ -9,7 +9,11 @@ import { type GlyphTier, isGlyphTier } from "../src/core/ui-kit.ts";
 
 type Member = { key: string; start: number; valueStart: number; end: number };
 
-const USAGE = "usage: bun scripts/setup-statusline.ts --settings <path> [--glyphs nerd|unicode|ascii [--glyphs-only]] [--yes] [--uninstall]";
+const USAGE =
+  "usage: bun scripts/setup-statusline.ts --settings <path> [--glyphs nerd|unicode|ascii [--glyphs-only]] [--yes] [--uninstall]\n" +
+  "       bun scripts/setup-statusline.ts --glyph-test";
+// A check in a circle, gears, an eye and a terminal prompt, all in Nerd Font's private-use range.
+const GLYPH_TEST = "   ";
 const GLYPHS_KEY = "OMCA_GLYPHS";
 const LAUNCHER_SOURCE = join(import.meta.dir, "..", "statusline", "launcher.ts");
 
@@ -89,19 +93,24 @@ function isOurs(entry: unknown, suffix: string): boolean {
   return entry.command.replaceAll("\\", "/").replaceAll('"', "").endsWith(suffix);
 }
 
-let options: { settings?: string | undefined; glyphs?: string | undefined; "glyphs-only": boolean; yes: boolean; uninstall: boolean };
+let options: { settings?: string | undefined; glyphs?: string | undefined; "glyphs-only": boolean; "glyph-test": boolean; yes: boolean; uninstall: boolean };
 try {
   options = parseArgs({
     options: {
       settings: { type: "string" },
       glyphs: { type: "string" },
       "glyphs-only": { type: "boolean", default: false },
+      "glyph-test": { type: "boolean", default: false },
       yes: { type: "boolean", default: false },
       uninstall: { type: "boolean", default: false },
     },
   }).values;
 } catch (error) {
   fail(`${reason(error)}\n${USAGE}`, 2);
+}
+if (options["glyph-test"]) {
+  console.log(GLYPH_TEST);
+  process.exit(0);
 }
 const path = options.settings ?? fail(USAGE, 2);
 const glyphs: GlyphTier | undefined =
