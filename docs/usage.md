@@ -338,7 +338,9 @@ check.
 
 The dialog shows the command and what it would touch: each removal target with its kind and
 entry count, the uncommitted changes a hard reset discards, or the commits a force push drops
-from the remote. Choose **Run it** to hand the command back to the normal permission checks.
+from the remote. The command wraps onto up to four rows, and each list ends in `and N more` where
+it would push the dialog past a 24-row terminal. Choose **Run it** to hand the command back to the
+normal permission checks.
 **Refuse**, a dismissed dialog, or a failed one refuses it, and Claude is told not to retry.
 
 The dialog shows in the terminal and the Desktop app. In `claude -p`, the Agent SDK and the VS

@@ -255,17 +255,18 @@ test("a guard that fails while it decides denies the command and names why", asy
   expect(checked).toEqual([]);
 });
 
-test("a command over three lines shows its first three and counts the rest", async ($, on) => {
+test("a multi-line command shows its first four rows and counts the characters left", async ($, on) => {
   const { asked } = world(on, BUILD_WORLD);
 
-  await check($, "rm -rf build\necho a\necho b\necho c\necho d");
+  await check($, "rm -rf build\necho a\necho b\necho c\necho d\necho e");
   expect(asked.map((a) => a.question)).toEqual([
     [
       "OMCA held this command for your review:",
       "  rm -rf build",
       "  echo a",
       "  echo b",
-      "  and 2 more lines",
+      "  echo c",
+      "  … 13 more characters",
       "It would remove:",
       "  build  dir, 4 entries",
       "Run it?",
@@ -273,7 +274,39 @@ test("a command over three lines shows its first three and counts the rest", asy
   ]);
 });
 
-test("a hard reset caps its diff stat at 20 files with a count of the rest, then the summary", async ($, on) => {
+test("a long command wraps at spaces onto continuation rows and keeps every path", async ($, on) => {
+  const first = `packages/feature-module-with-a-really-long-descriptive-name-01/dist`;
+  const second = `packages/feature-module-with-a-really-long-descriptive-name-02/dist`;
+  const { asked } = world(on, { files: { [first]: { kind: "dir", entries: 1 }, [second]: { kind: "dir", entries: 1 } } });
+
+  await check($, `rm -rf ${first} ${second} && echo removed-the-two-build-outputs-and-now-rebuilding`);
+  expect(asked.map((a) => a.question.split("\n").slice(0, 5))).toEqual([
+    [
+      "OMCA held this command for your review:",
+      `  rm -rf ${first}`,
+      `  ${second} && echo`,
+      "  removed-the-two-build-outputs-and-now-rebuilding",
+      "It would remove:",
+    ],
+  ]);
+});
+
+test("a word longer than the row breaks mid-word, and a command past four rows counts what is left", async ($, on) => {
+  const { asked } = world(on, BUILD_WORLD);
+
+  await check($, `rm -rf build ${"x".repeat(300)}`);
+  expect(asked[0]?.question.split("\n").slice(0, 7)).toEqual([
+    "OMCA held this command for your review:",
+    "  rm -rf build",
+    `  ${"x".repeat(76)}`,
+    `  ${"x".repeat(76)}`,
+    `  ${"x".repeat(76)}`,
+    "  … 72 more characters",
+    "It would remove:",
+  ]);
+});
+
+test("a hard reset shows the first 6 files of its diff stat with a count of the rest, then the summary", async ($, on) => {
   const files = Array.from({ length: 25 }, (_, i) => `src/f${i}.ts`);
   const { asked } = world(on, {
     git: {
@@ -288,8 +321,8 @@ test("a hard reset caps its diff stat at 20 files with a count of the rest, then
       "OMCA held this command for your review:",
       "  git reset --hard",
       "git reset --hard discards 25 uncommitted changes:",
-      ...files.slice(0, 20).map((file) => `   ${file} | 1 +`),
-      "  and 5 more files",
+      ...files.slice(0, 6).map((file) => `   ${file} | 1 +`),
+      "  and 19 more files",
       "   25 files changed, 25 insertions(+)",
       "Run it?",
     ].join("\n"),
@@ -332,6 +365,35 @@ test("a command that removes and resets shows both sections", async ($, on) => {
   ]);
 });
 
+test("a removal and a hard reset share the rows left, each keeping its heading and at least one entry", async ($, on) => {
+  const targets = FILES(10);
+  const files = Array.from({ length: 30 }, (_, i) => `src/f${i}.ts`);
+  const { asked } = world(on, {
+    files: filesOf(targets),
+    git: {
+      "git status --porcelain": { stdout: `${files.map((file) => ` M ${file}`).join("\n")}\n` },
+      "git diff --stat=76 HEAD": { stdout: `${files.map((file) => ` ${file} | 1 +`).join("\n")}\n 30 files changed, 30 insertions(+)\n` },
+    },
+  });
+
+  await check($, `rm -rf ${targets.join(" ")} && git reset --hard`);
+
+  const lines = asked[0]?.question.split("\n") ?? [];
+  expect(lines.slice(2)).toEqual([
+    "It would remove:",
+    "  a  file",
+    "  and 9 more",
+    "git reset --hard discards 30 uncommitted changes:",
+    "   src/f0.ts | 1 +",
+    "   src/f1.ts | 1 +",
+    "   src/f2.ts | 1 +",
+    "  and 27 more files",
+    "   30 files changed, 30 insertions(+)",
+    "Run it?",
+  ]);
+  expect(lines).toHaveLength(12);
+});
+
 test("a hard reset outside a repository asks with git's first error line", async ($, on) => {
   const { asked } = world(on, {
     git: { "git status --porcelain": { exitCode: 128, stderr: "fatal: not a git repository: .git\nmore\n" } },
@@ -349,7 +411,7 @@ test("a hard reset outside a repository asks with git's first error line", async
   ]);
 });
 
-test("a force push lists the commits it drops, capped at 20 with a count of the rest", async ($, on) => {
+test("a force push lists the first 7 commits it drops with a count of the rest", async ($, on) => {
   const commits = Array.from({ length: 22 }, (_, i) => `c${String(i).padStart(6, "0")} commit ${i}`);
   const { asked } = world(on, {
     git: { ...branches("dev"), "git log --oneline origin/dev --not HEAD": { stdout: `${commits.join("\n")}\n` } },
@@ -361,8 +423,8 @@ test("a force push lists the commits it drops, capped at 20 with a count of the 
       "OMCA held this command for your review:",
       "  git push --force origin dev",
       "git push --force drops 22 commits from origin/dev:",
-      ...commits.slice(0, 20).map((line) => `  ${line}`),
-      "  and 2 more commits",
+      ...commits.slice(0, 7).map((line) => `  ${line}`),
+      "  and 15 more commits",
       "Run it?",
     ].join("\n"),
   ]);
@@ -472,16 +534,41 @@ test("a git operation with nothing to gather names its effect", async ($, on) =>
   ]);
 });
 
-test("more than 20 targets list the first 20 and count the rest", async ($, on) => {
-  const targets = Array.from({ length: 23 }, (_, i) => `t${String(i).padStart(2, "0")}`);
-  const { asked } = world(on, { files: Object.fromEntries(targets.map((t) => [t, { kind: "file" as const }])) });
+const FILES = (count: number) => Array.from({ length: count }, (_, i) => String.fromCharCode(97 + i));
+const filesOf = (names: string[]) => Object.fromEntries(names.map((t) => [t, { kind: "file" as const }]));
+
+test("more than 8 targets list the first 7 and count the rest, so the dialog fits 24 rows", async ($, on) => {
+  const targets = FILES(23);
+  const { asked } = world(on, { files: filesOf(targets) });
 
   await check($, `rm -rf ${targets.join(" ")}`);
 
   const lines = asked[0]?.question.split("\n") ?? [];
-  expect(lines.slice(3, 5)).toEqual(["  t00  file", "  t01  file"]);
-  expect(lines.slice(22)).toEqual(["  t19  file", "  and 3 more", "Run it?"]);
-  expect(lines).toHaveLength(25);
+  expect(lines.slice(3, 5)).toEqual(["  a  file", "  b  file"]);
+  expect(lines.slice(9)).toEqual(["  g  file", "  and 16 more", "Run it?"]);
+  expect(lines).toHaveLength(12);
+});
+
+test("exactly 8 targets are all listed", async ($, on) => {
+  const targets = FILES(8);
+  const { asked } = world(on, { files: filesOf(targets) });
+
+  await check($, `rm -rf ${targets.join(" ")}`);
+
+  const lines = asked[0]?.question.split("\n") ?? [];
+  expect(lines.slice(10)).toEqual(["  h  file", "Run it?"]);
+  expect(lines).toHaveLength(12);
+});
+
+test("a command that wraps onto more rows leaves fewer rows for the targets", async ($, on) => {
+  const targets = FILES(12);
+  const { asked } = world(on, { files: filesOf(targets) });
+
+  await check($, `rm -rf ${targets.join(" ")} && echo ${"x".repeat(150)}`);
+
+  const lines = asked[0]?.question.split("\n") ?? [];
+  expect(lines.slice(-4)).toEqual(["  d  file", "  e  file", "  and 7 more", "Run it?"]);
+  expect(lines).toHaveLength(12);
 });
 
 test("a long path is middle-truncated to the dialog width, with an ASCII ellipsis under OMCA_GLYPHS=ascii", async ($, on) => {
@@ -489,8 +576,10 @@ test("a long path is middle-truncated to the dialog width, with an ASCII ellipsi
 
   await check($, `rm -r ${LONG_PATH}`);
 
-  expect(asked[0]?.question.split("\n").slice(1, 4)).toEqual([
-    "  rm -r src/deep/deep/deep/deep/deep/deep/deep/deep/deep/deep/deep/deep/dee...",
+  expect(asked[0]?.question.split("\n").slice(1, 6)).toEqual([
+    "  rm -r",
+    "  src/deep/deep/deep/deep/deep/deep/deep/deep/deep/deep/deep/deep/deep/deep/le",
+    "  af.txt",
     "It would remove:",
     "  src/deep/deep/deep/deep/deep/deep/...deep/deep/deep/deep/deep/leaf.txt  file",
   ]);
@@ -501,8 +590,7 @@ test("a long path uses the Unicode ellipsis by default", async ($, on) => {
 
   await check($, `rm -r ${LONG_PATH}`);
 
-  expect(asked[0]?.question.split("\n").slice(1, 4)).toEqual([
-    "  rm -r src/deep/deep/deep/deep/deep/deep/deep/deep/deep/deep/deep/deep/deep/…",
+  expect(asked[0]?.question.split("\n").slice(4, 6)).toEqual([
     "It would remove:",
     "  src/deep/deep/deep/deep/deep/deep/d…/deep/deep/deep/deep/deep/leaf.txt  file",
   ]);

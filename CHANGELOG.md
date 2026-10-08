@@ -155,8 +155,10 @@ hand.
   The review dialog lists what the command would touch: each removal target with its kind and
   entry count, the uncommitted changes a hard reset discards, or the commits a force push drops
   from the remote. Refuse is listed first, so a stray Enter refuses; Run it hands the command back
-  to the normal permission checks, and the guard never allows a command on its own. The
-  `guardMode` option is `dialog` by default; `deny` skips the dialog everywhere.
+  to the normal permission checks, and the guard never allows a command on its own. The command
+  wraps onto up to four rows, and each list ends in `and N more` where it would push the dialog
+  past a 24-row terminal. The `guardMode` option is `dialog` by default; `deny` skips the dialog
+  everywhere.
 
   The guard reads commands handed to another interpreter, up to four levels deep: `bash -c`,
   `sh -c` and `zsh -c` scripts, `eval`, heredocs and here-strings fed to a shell, `pwsh` and
