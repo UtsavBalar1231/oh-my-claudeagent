@@ -240,8 +240,9 @@ still: a working mascot shows its first frame and Desktop draws a single frame.
 
 The band and the pane draw every color from your Claude Code theme, so a custom theme in
 `~/.claude/themes/` applies to them too. Each state also carries a glyph, and a word where the
-row has room for it beside the agent's name, so nothing depends on color alone. Secrets in commands, output and notes, such as API keys, tokens and
-`password=` values, are drawn as `‹masked›`, and your home folder as `~`.
+row has room for it beside the agent's name, so nothing depends on color alone. Secrets in
+commands, output and notes, such as API keys, tokens, `password=` values and the password in a
+URL like `postgres://user:pass@host`, are drawn as `‹masked›`, and your home folder as `~`.
 
 ### The plan board
 

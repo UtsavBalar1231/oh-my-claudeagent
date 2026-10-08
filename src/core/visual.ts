@@ -488,6 +488,7 @@ const SECRETS: readonly { pattern: RegExp; keep?: (match: string, ...groups: str
     keep: (_match, key = "", equals = "") => `${key}${equals}`,
   },
   { pattern: /\b([Bb]earer\s+)[A-Za-z0-9._~+/-]{8,}=*/g, keep: (_match, word = "") => word },
+  { pattern: /\b([a-z][a-z0-9+.-]*:\/\/[^\s:/@]*:)[^\s/@]+(?=@)/gi, keep: (_match, user = "") => user },
   { pattern: /(?<![A-Za-z0-9_-])sk-[A-Za-z0-9_-]{20,}/g },
   { pattern: /(?<![A-Za-z0-9_])(?:gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{22,})/g },
   { pattern: /(?<![A-Za-z0-9])xox[abpr]-[A-Za-z0-9-]{10,}/g },

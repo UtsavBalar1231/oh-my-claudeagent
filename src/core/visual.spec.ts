@@ -307,6 +307,8 @@ describe("redact", () => {
     ["secret=-----BEGIN PRIVATE KEY-----\nAAA\n-----END PRIVATE KEY-----", "secret=‹masked›", 1],
     ["token=sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWx", "token=‹masked›", 1],
     ["export `PAYMENTS_TOKEN=tok_4f9a2c7e1b8d6035` first", "export `PAYMENTS_TOKEN=‹masked›` first", 1],
+    ["DATABASE_URL=postgres://admin:s3cr3t@db.internal:5432/app", "DATABASE_URL=postgres://admin:‹masked›@db.internal:5432/app", 1],
+    ["redis-cli -u redis://:hunter2@cache:6379", "redis-cli -u redis://:‹masked›@cache:6379", 1],
   ])("masks %p", (text, expected, masked) => {
     expect(redact(text, HOME)).toEqual({ text: expected, masked });
   });
@@ -319,6 +321,8 @@ describe("redact", () => {
     "task-abcdefghijklmnopqrstuvwxyz desk-12345678901234567890123",
     "a Bearer of bad news",
     "AKIAIOSFODNN7EXAMPLEX is too long",
+    "curl http://localhost:8080/health",
+    "git clone ssh://git@github.com:22/acme/app.git",
   ])("leaves %p alone", (text) => {
     expect(redact(text, HOME)).toEqual({ text, masked: 0 });
   });
