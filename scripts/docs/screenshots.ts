@@ -575,7 +575,7 @@ export const SHOTS: readonly Still[] = [
         { content: [bash("just watch draft", "Run the draft order tests in watch mode")] },
       ],
     },
-    ready: (screen) => screen.includes("just watch summary") && screen.includes("just watch draft") && screen.includes("explorer · The forms build"),
+    ready: (screen) => screen.includes("just watch summary") && screen.includes("just watch draft") && screen.includes("explorer · Map the validation messages · The forms build"),
     crop: "pane",
   },
   {
@@ -644,7 +644,7 @@ export const SHOTS: readonly Still[] = [
         { content: [text("The lint check passed.")] },
       ],
     },
-    ready: (screen) => screen.includes("Check the lint rules · "),
+    ready: (screen) => screen.includes(" · Check the lint rules"),
   },
   {
     name: "pane-tour",

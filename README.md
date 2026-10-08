@@ -58,13 +58,13 @@ and the agent working on it. A wide pane shows the focused task's detail beside 
 The Evidence tab is the proof ledger: a verdict on the plan's final verification, then every
 logged run grouped by day.
 
-<img src=".github/assets/evidence.png" width="680" alt="The Evidence tab shows the final verification for checkout-redesign as MISSING, since the last one exited 1, with a line marking build, test, lint and manual as passing on their newest runs. Below it, fourteen runs are grouped under three days, each with its outcome, time, type and command. The focused run, a manual payment smoke test, is open in a card beside the list titled Manual run passed, with its exit code, time and agent, one secret masked, and its command and output wrapped under their own labels.">
+<img src=".github/assets/evidence.png" width="680" alt="The Evidence tab opens on one line: the final verification for checkout-redesign is MISSING, and build, test, lint and manual each passed on their newest runs. Below it, fourteen runs are grouped under three days, each with its outcome, time, type and command. The focused run, a manual payment smoke test, is open in a card beside the list titled Manual run passed, with its exit code, time and agent, one secret masked, and its command and output wrapped under their own labels.">
 
 The Agents tab gives each subagent a lane led by its mascot, with its task, current tool call,
 model, effort and tokens. The last wave's finished agents keep their lanes with their results,
 earlier ones shrink to a line, and in a short pane each lane keeps to two rows.
 
-<img src=".github/assets/agents.png" width="680" alt="The Agents tab shows two running executors, each led by its mascot in a hard hat with a hammer: one on Wire the order summary panel and one on Persist the draft order, each beside its watch command, its count of tool calls, and its model, effort and tokens, with a blank row between them. Under a Finished label, an explorer from an earlier wave is one line with the first line of its result.">
+<img src=".github/assets/agents.png" width="680" alt="The Agents tab shows two running executors, each led by its mascot in a hard hat with a hammer: one on Wire the order summary panel and one on Persist the draft order, each beside its watch command, its count of tool calls, and its model, effort and tokens, with a blank row between them. Under a Finished label, an explorer from an earlier wave is one line with its task and the first line of its result.">
 
 When the pane has room, each lane gets four rows of its own. The agent page opens a subagent's brief, tool calls, reply and cost, and toasts report
 finished waves, failed verifications and a completed plan.
@@ -85,7 +85,7 @@ The status line shows the session (model, agent and the plan's next task), the w
 by the token) on rows of their own, and fits itself to the terminal's width. The subagent status
 line gives each running agent a row.
 
-<img src=".github/assets/statusline.png" width="900" alt="The OMCA status line under the prompt shows three rows: the model, effort and plan progress with the next task; a context bar, the git branch with change counts and the project; and the session cost and duration. Below it, one row for each of two running subagents shows its model, state and effort. Above, the OMCA pane has opened by itself on the two executors' lanes.">
+<img src=".github/assets/statusline.png" width="900" alt="The OMCA status line under the prompt shows three rows: the model, effort and plan progress with the next task; a context bar, the git branch with change counts and the project; and the session cost and duration. Below it, one row for each of two running subagents shows its type, model, state, effort, context and task. Above, the OMCA pane has opened by itself on the two executors' lanes.">
 
 In motion: `/omca plan` opens the board, Down moves the focus, Enter opens the task as a page,
 and the number keys switch between the pane's tabs.
