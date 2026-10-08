@@ -140,14 +140,16 @@ const digitsOut = (text: string): string => text.replace(/\d/g, "N");
  * The screen with the live session's own values fixed: the turn timer's line, whose verb Claude Code
  * picks at random, the Doctor's check time, a rating's time, a turn footer's engine cost, which
  * counts whatever background agents spent before the turn ended, the seconds a running agent has
- * run, in an OMCA lane and in Claude Code's task list, and a subagent's token count, whose requests
- * vary by a few hundred tokens from run to run.
+ * run, in an OMCA lane and in Claude Code's task list, a subagent's token count, whose requests
+ * vary by a few hundred tokens from run to run, and a turn footer's tokens, which the mock sizes
+ * from the request and so move with every change to a prompt the plugin sends.
  */
 export const maskLive = (screen: string): string =>
   screen
     .replace(/\b((?:running|low|medium|high|xhigh|max) +)(\d+s)\b/g, (_match: string, lead: string, took: string) => `${lead}${digitsOut(took)}`)
     .replace(/\b\d+s · ↓/g, digitsOut)
     .replace(/\b\d+(?:\.\d+)?[kM]? tokens\b/g, digitsOut)
+    .replace(/\b\d+(?:\.\d+)?[kM]?[  ]in[  ]\d+(?:\.\d+)?[kM]?[  ]out\b/g, digitsOut)
     .replace(/✻ \S+ for (\d+s) · done \d{1,2}:\d{2} [AP]M */g, (line: string, took: string, at: number, whole: string) =>
       keepWidth(`✻ Worked for ${took} · done HH:MM`, line, at, whole),
     )

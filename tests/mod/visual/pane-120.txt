@@ -16,7 +16,7 @@
 ✻ Waiting for 3 background agents to finish                    │ ▀  ▀ ▀▀▀▀ ▀ ▀    Fenced lines are skipped now, and
                                                                │    ▀▀▀▀▀▀▀▀      the heading tests pass.
 ● oh-my-claudeagent+cc-plugin-agents-md: 0s ·                  │                  sonnet-5-5 · high · NN.Nk tokens
-  38.2k in 13 out · $X.XX engine cost                          │d: Details  2 running · 1 finished · NNNk tokens
+  NN.Nk in NN out · $X.XX engine cost                          │d: Details  2 running · 1 finished · NNNk tokens
                                                                │
 ● Agent "Fix the heading parser" finished · 1s                 │
                                                                │
@@ -25,7 +25,7 @@
 ✻ Waiting for 2 background agents to finish                    │
                                                                │
 ● oh-my-claudeagent+cc-plugin-agents-md: 0s ·                  │
-  41.0k in 8 out · $X.XX engine cost                           │
+  NN.Nk in N out · $X.XX engine cost                           │
                                                                │
                                                                │
 █▎███ 12/46 · next 13 Port the snapshot… ·  2 running     [-] │

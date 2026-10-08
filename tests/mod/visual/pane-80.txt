@@ -7,7 +7,7 @@
 
 ✻ Waiting for 3 background agents to finish
 
-● oh-my-claudeagent+cc-plugin-agents-md: 0s · 38.2k in 13 out ·
+● oh-my-claudeagent+cc-plugin-agents-md: 0s · NN.Nk in NN out ·
   $X.XX engine cost
 
 ● Agent "Fix the heading parser" finished · 1s
@@ -16,7 +16,7 @@
 
 ✻ Waiting for 2 background agents to finish
 
-● oh-my-claudeagent+cc-plugin-agents-md: 0s · 41.0k in 8 out ·
+● oh-my-claudeagent+cc-plugin-agents-md: 0s · NN.Nk in N out ·
   $X.XX engine cost
 ╭────────────────────────────────────────────────────────────────────────────✕─╮
 │ 1: Agents 2: Plan 3: Evidence 4: Notepad 5: Feedback 6: Stats 7: Doctor      │

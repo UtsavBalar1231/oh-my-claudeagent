@@ -15,7 +15,7 @@
 
 ✻ Waiting for 1 background agent to finish
 
-● oh-my-claudeagent+cc-plugin-agents-md: 0s · 37.6k in 17 out ·
+● oh-my-claudeagent+cc-plugin-agents-md: 0s · NN.Nk in NN out ·
   $X.XX engine cost
 
 ╭────────────────────────────────────────────────────────────────────────────✕─╮

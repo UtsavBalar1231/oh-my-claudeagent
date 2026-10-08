@@ -15,7 +15,7 @@
                                                                                                               │
 ✻ Waiting for 1 background agent to finish                                                                    │
                                                                                                               │
-● oh-my-claudeagent+cc-plugin-agents-md: 0s · 37.5k in 21 out ·  no evidence: just test                      │
+● oh-my-claudeagent+cc-plugin-agents-md: 0s · NN.Nk in NN out ·  no evidence: just test                      │
                                                                                                               │
                                                                                                               │
                                                                                                               │

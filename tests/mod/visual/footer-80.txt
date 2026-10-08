@@ -12,7 +12,7 @@
 
 ✻ Worked for 0s · done HH:MM
 
-● oh-my-claudeagent+cc-plugin-agents-md: 0s · 39.5k in 11 out ·
+● oh-my-claudeagent+cc-plugin-agents-md: 0s · NN.Nk in NN out ·
    no evidence: just test
 
 ❯ /omca-rate up good

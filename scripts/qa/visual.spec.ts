@@ -131,14 +131,14 @@ test("maskScratch replaces the scratch directory's random suffix wherever the sc
   expect(maskScratch(screen, scratch)).toBe(`cwd ${join(tmpdir(), "omca-visual-120x40-XXXXXX")}/cwd\n…ual-120x40-XXXXXX/cwd │ Ab3dE`);
 });
 
-test("maskLive fixes the live session's times, engine cost, running seconds and token counts, leaves a stored figure, and keeps a line's width beside a pane", () => {
+test("maskLive fixes the live session's times, engine cost, running seconds and token counts, footer tokens included, leaves a stored figure, and keeps a line's width beside a pane", () => {
   const screen = [
     "✻ Sautéed for 0s · done 1:36 PM          │ pane",
     "r: Run again   ✓ 9 ok  checked 16:42",
     "  ↑ UP    10-03 13:36  good",
     "  13:35  FINAL    ✓  0  just ci",
     "✻ Baked for 2s · done 10:07 PM",
-    "● omca: 0s · 38.2k\u00a0in · $0.8787\u00a0engine\u00a0cost        │ pane",
+    "● omca: 0s · 38.2k\u00a0in\u00a013\u00a0out · $0.8787\u00a0engine\u00a0cost  │ pane",
     "  $12.40 engine cost",
     "│  explorer · Map the router callers   sonnet-5-5  high       3s    │",
     "│   ▄▄▀▀▀▀▀▀▄▄     explorer           running     12s",
@@ -153,7 +153,7 @@ test("maskLive fixes the live session's times, engine cost, running seconds and 
     "  ↑ UP    MM-DD HH:MM  good",
     "  13:35  FINAL    ✓  0  just ci",
     "✻ Worked for 2s · done HH:MM",
-    "● omca: 0s · 38.2k\u00a0in · $X.XX\u00a0engine\u00a0cost          │ pane",
+    "● omca: 0s · NN.Nk\u00a0in\u00a0NN\u00a0out · $X.XX\u00a0engine\u00a0cost    │ pane",
     "  $X.XX engine cost",
     "│  explorer · Map the router callers   sonnet-5-5  high       Ns    │",
     "│   ▄▄▀▀▀▀▀▀▄▄     explorer           running     NNs",
