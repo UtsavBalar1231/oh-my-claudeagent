@@ -135,6 +135,11 @@ hand.
   known remedy offers a key that fills the prompt with it. `r` runs the checks again, and `i` adds
   `refreshInterval: 5` to a status line that lacks it, after re-reading the file, writing
   `settings.json.omca-bak` and showing the diff.
+- **The prompt cache on the status line.** The usage row shows whether the main conversation's
+  prompt cache is warm and how many minutes it has left, `C: warm 52m`, yellow in its last
+  minute. A cold cache reads `C: cold` with the tokens the next request writes again, and a miss
+  in the last 5 minutes adds its cause, such as `miss: tools changed`. The segment appears once a
+  response has reported cache tokens.
 - **A turn footer.** After each main-loop turn the mod prints the turn's duration and its input
   and output tokens. An account billed by the token also sees the turn's cost, by the same rule
   as the status line. When a verification ran that turn with no evidence logged after it, a

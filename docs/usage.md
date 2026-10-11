@@ -402,13 +402,14 @@ without sending: `m` for `/mcp`, `a` for `/advisor fable`, `y` for `/config` and
 Once setup has configured it, the status line shows three rows, each on its own line: the
 session (model and effort, vim mode, the active agent, and the bound plan's progress and next
 task), the workspace (a context bar, git state, the project, the worktree and pull request, lines
-changed and extra directories), and usage (the session's cost and duration, your usage limits and
-a spend limit). A row too wide for the terminal wraps onto more lines. When the rows need more
-lines than the terminal allows, segments give way one at a time across all three rows, least
-useful first: extra directories, lines changed, the spend limit, the 7 day limit, the pull
-request, the worktree, the vim mode, the agent, the directory, the 5 hour limit, the cost and
-duration, the branch, the context bar, then the plan. The model always stays. No segment is cut
-in half, and a terminal under 60 columns gets one compact line.
+changed and extra directories), and usage (the session's cost and duration, the prompt cache's
+state and time left, your usage limits and a spend limit). A row too wide for the terminal wraps
+onto more lines. When the rows need more lines than the terminal allows, segments give way one at
+a time across all three rows, least useful first: extra directories, lines changed, the spend
+limit, the 7 day limit, the cache state, the pull request, the worktree, the vim mode, the agent,
+the directory, the 5 hour limit, the cost and duration, the branch, the context bar, then the
+plan. The model always stays. No segment is cut in half, and a terminal under 60 columns gets one
+compact line.
 
 The usage limits appear for Claude.ai Pro and Max subscribers. The cost shows only when they are
 absent and the cost is above zero, since a subscription is not billed by the token. Behind a

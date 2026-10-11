@@ -699,6 +699,113 @@ describe("spend limit", () => {
   });
 });
 
+describe("prompt cache", () => {
+  type Cache = NonNullable<Payload["prompt_cache"]>;
+  const NOW_S = NOW.getTime() / 1000;
+  const model = { display_name: "claude" };
+  const cached = (cache: Cache | null | undefined, env: Record<string, string> = ASCII): string[] =>
+    rows({ model, ...(cache === undefined ? {} : { prompt_cache: cache }) }, NO_REPO, env);
+  const warm = (secondsLeft: number, extra: Cache = {}): Cache => ({ warm: true, caching_observed: true, expires_at: NOW_S + secondsLeft, ...extra });
+  const cold = (extra: Cache = {}): Cache => ({ warm: false, caching_observed: true, expires_at: null, ...extra });
+  const usage = (...segments: string[]): string[] => [MODEL, WAITING, [ZERO, ...segments].join(S)];
+  const cause = (name: string, ago = 120): Cache => ({ last_miss_at: NOW_S - ago, last_miss_cause: { causes: [name] } });
+
+  test("a warm cache reads its whole minutes left in green, after the duration", () => {
+    expect(cached(warm(52 * 60 + 30))).toEqual(usage(`${G}C: warm${R} ${D}52m${R}`));
+  });
+
+  test("a warm cache with 60 seconds left still reads 1m, and with 59 reads under a minute in yellow", () => {
+    expect(cached(warm(60))).toEqual(usage(`${G}C: warm${R} ${D}1m${R}`));
+    expect(cached(warm(59))).toEqual(usage(`${Y}C: warm <1m${R}`));
+    expect(cached(warm(1))).toEqual(usage(`${Y}C: warm <1m${R}`));
+  });
+
+  test("a cold cache reads cold in dim, with the tokens the next request re-caches", () => {
+    expect(cached(cold({ recache_tokens_if_cold: 310200 }))).toEqual(usage(`${D}C: cold${R}${S}${D}310k to re-cache${R}`));
+  });
+
+  test("a cold cache without a positive token count reads cold alone", () => {
+    for (const recache of [null, 0, undefined]) {
+      expect(cached(cold(recache === undefined ? {} : { recache_tokens_if_cold: recache }))).toEqual(usage(`${D}C: cold${R}`));
+    }
+  });
+
+  test("a warm cache whose expiry is past, or missing, reads cold", () => {
+    expect(cached(warm(-1, { recache_tokens_if_cold: 45000 }))).toEqual(usage(`${D}C: cold${R}${S}${D}45.0k to re-cache${R}`));
+    expect(cached(warm(0))).toEqual(usage(`${D}C: cold${R}`));
+    expect(cached({ warm: true, caching_observed: true, expires_at: null })).toEqual(usage(`${D}C: cold${R}`));
+  });
+
+  test("a recent miss adds its cause in yellow to a warm and to a cold cache", () => {
+    expect(cached(warm(3600, cause("tools_changed")))).toEqual(usage(`${G}C: warm${R} ${D}60m${R}${S}${Y}miss: tools changed${R}`));
+    expect(cached(cold({ recache_tokens_if_cold: 310200, ...cause("system_prompt_changed") }))).toEqual(
+      usage(`${D}C: cold${R}${S}${D}310k to re-cache${R}${S}${Y}miss: system prompt changed${R}`),
+    );
+    expect(cached(warm(3600, cause("likely_server_side")))).toEqual(usage(`${G}C: warm${R} ${D}60m${R}${S}${Y}miss: server side${R}`));
+  });
+
+  test("either cache lifetime expiring reads as expired", () => {
+    expect(cached(cold(cause("ttl_expired_5m")))[2]).toEndWith(`${Y}miss: expired${R}`);
+    expect(cached(cold(cause("ttl_expired_1h")))[2]).toEndWith(`${Y}miss: expired${R}`);
+  });
+
+  test("a miss shows for 300 seconds and no longer", () => {
+    expect(cached(warm(3600, cause("tools_changed", 300)))[2]).toContain("miss: tools changed");
+    expect(cached(warm(3600, cause("tools_changed", 301)))).toEqual(usage(`${G}C: warm${R} ${D}60m${R}`));
+  });
+
+  test("an unknown cause shows with its underscores turned into spaces", () => {
+    expect(cached(warm(3600, cause("messages_rewritten")))[2]).toEndWith(`${Y}miss: messages rewritten${R}`);
+  });
+
+  test("a miss without a cause adds nothing", () => {
+    const quiet = usage(`${G}C: warm${R} ${D}60m${R}`);
+    expect(cached(warm(3600, { last_miss_at: NOW_S - 10, last_miss_cause: null }))).toEqual(quiet);
+    expect(cached(warm(3600, { last_miss_at: NOW_S - 10, last_miss_cause: { causes: [] } }))).toEqual(quiet);
+    expect(cached(warm(3600, { last_miss_at: null, last_miss_cause: { causes: ["tools_changed"] } }))).toEqual(quiet);
+  });
+
+  test("there is no segment when caching was not observed or the object is absent", () => {
+    const none = [MODEL, WAITING, ZERO];
+    expect(cached(undefined)).toEqual(none);
+    expect(cached(null)).toEqual(none);
+    expect(cached({ ...warm(3600), caching_observed: false })).toEqual(none);
+    expect(cached({ warm: true, expires_at: NOW_S + 3600 })).toEqual(none);
+  });
+
+  test("the label is C: in the Unicode and ASCII tiers and a glyph in the Nerd tier", () => {
+    const data = warm(3600, cause("tools_changed"));
+    expect(visible(cached(data)[2] ?? "")).toBe("~ 0s · C: warm 60m · miss: tools changed");
+    expect(visible(cached(data, PLAIN)[2] ?? "")).toBe("~ 0s | C: warm 60m | miss: tools changed");
+    expect(visible(cached(data, NERD)[2] ?? "")).toBe("\uf017 0s · \u{f00e8} warm 60m · miss: tools changed");
+  });
+
+  describe("when the usage row sheds segments", () => {
+    const FIVE_HOUR = { used_percentage: 45 };
+    const SEVEN_DAY = { used_percentage: 80 };
+    const crowded = (rate_limits: NonNullable<Payload["rate_limits"]>): string =>
+      lines(
+        { model, agent: { name: "x".repeat(45) }, context_window: { context_window_size: 200000, used_percentage: 10 }, cost: {}, prompt_cache: warm(52 * 60 + 30), rate_limits },
+        NO_REPO,
+        { ...ASCII, COLUMNS: usable(54) },
+      )
+        .map(visible)
+        .at(-1) ?? "";
+
+    test("the 7 day limit goes first, while the cache and the 5 hour limit stay", () => {
+      expect(crowded({ five_hour: FIVE_HOUR, seven_day: SEVEN_DAY })).toBe("~ 0s · C: warm 52m · ▰▰▰▰▱▱▱▱▱▱ 45% 5h");
+    });
+
+    test("the cache goes next, and the 5 hour limit stays", () => {
+      expect(crowded({ five_hour: { ...FIVE_HOUR, resets_at: Date.parse("2026-10-05T17:00:00Z") / 1000 }, seven_day: SEVEN_DAY })).toBe("~ 0s · ▰▰▰▰▱▱▱▱▱▱ 45% 5h (resets mon 5pm)");
+    });
+  });
+
+  test("the compact line leaves it out", () => {
+    expect(lines({ model, prompt_cache: warm(3600) }, NO_REPO, { ...ASCII, COLUMNS: "59" }).map(visible)).toEqual(["> claude"]);
+  });
+});
+
 describe("context bar", () => {
   const bar = (context: NonNullable<Payload["context_window"]>, exceeds = false): string =>
     rows({ model: { display_name: "m" }, context_window: context, exceeds_200k_tokens: exceeds, cost: {} })[1] ?? "";

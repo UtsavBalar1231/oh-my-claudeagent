@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { parseRegistry, resolveBoundPlan } from "../src/core/boulder.ts";
 import { planTasks } from "../src/core/checkboxes.ts";
 import { baseName, inferPlatform } from "../src/core/path.ts";
-import { AGENT_ICONS, cells, displayWidth, fitEnd, formatDuration, type GlyphTier, glyphTier } from "../src/core/ui-kit.ts";
+import { AGENT_ICONS, cells, displayWidth, fitEnd, formatDuration, formatTokens, type GlyphTier, glyphTier } from "../src/core/ui-kit.ts";
 import type { GitInfo } from "./git.ts";
 
 export type Env = Record<string, string | undefined>;
@@ -23,6 +23,15 @@ interface SpendLimit extends RateWindow {
   used_usd?: number | null;
   limit_usd?: number | null;
   period?: string | null;
+}
+
+interface PromptCache {
+  warm?: boolean | null;
+  caching_observed?: boolean | null;
+  expires_at?: number | null;
+  last_miss_at?: number | null;
+  last_miss_cause?: { causes?: string[] | null } | null;
+  recache_tokens_if_cold?: number | null;
 }
 
 export interface Payload {
@@ -46,6 +55,7 @@ export interface Payload {
   } | null;
   rate_limits?: { five_hour?: RateWindow | null; seven_day?: RateWindow | null; spend_limit?: SpendLimit | null } | null;
   exceeds_200k_tokens?: boolean | null;
+  prompt_cache?: PromptCache | null;
   effort?: { level?: string } | null;
   session_id?: string | null;
   agent?: { name?: string } | null;
@@ -87,6 +97,8 @@ const SHORT_MAX_LINES = 2;
 const MAX_LINES = 4;
 // A next-task label cut to fewer cells than this is a fragment, so the plan segment wraps instead.
 const MIN_LABEL_CELLS = 12;
+const CACHE_EXPIRING_SECONDS = 60;
+const CACHE_MISS_SHOWN_SECONDS = 300;
 
 export const NERD_GLYPHS = {
   filled: "▰",
@@ -105,6 +117,7 @@ export const NERD_GLYPHS = {
   spend: "",
   tasks: "",
   effort: "",
+  cache: "\u{f00e8}",
 };
 
 export type Glyphs = Record<keyof typeof NERD_GLYPHS, string>;
@@ -127,6 +140,7 @@ export const UNICODE_GLYPHS: Glyphs = {
   spend: "S:",
   tasks: "T:",
   effort: "E:",
+  cache: "C:",
 };
 
 export const ASCII_GLYPHS: Glyphs = {
@@ -146,6 +160,7 @@ export const ASCII_GLYPHS: Glyphs = {
   spend: "S:",
   tasks: "T:",
   effort: "E:",
+  cache: "C:",
 };
 
 const DEFAULT_AGENT_GLYPH = "\u{f007}";
@@ -461,6 +476,35 @@ function costSegment({ data, g }: Ctx): Segment {
   return block(`${cost}${BLUE}${g.clock} ${formatDuration(data.cost?.total_duration_ms ?? 0)}${RST}`);
 }
 
+const MISS_CAUSES = new Map([
+  ["tools_changed", "tools changed"],
+  ["system_prompt_changed", "system prompt changed"],
+  ["ttl_expired_5m", "expired"],
+  ["ttl_expired_1h", "expired"],
+  ["likely_server_side", "server side"],
+]);
+
+function cacheSegment({ data, g, now }: Ctx): Segment | null {
+  const cache = data.prompt_cache;
+  if (cache?.caching_observed !== true) return null;
+  const nowSeconds = now.getTime() / 1000;
+  const secondsLeft = typeof cache.expires_at === "number" ? cache.expires_at - nowSeconds : 0;
+  const state =
+    cache.warm !== true || secondsLeft <= 0
+      ? `${DIM}${g.cache} cold${RST}${
+          typeof cache.recache_tokens_if_cold === "number" && cache.recache_tokens_if_cold > 0
+            ? `${separator(g.dot)}${DIM}${formatTokens(cache.recache_tokens_if_cold)} to re-cache${RST}`
+            : ""
+        }`
+      : secondsLeft < CACHE_EXPIRING_SECONDS
+        ? `${YELLOW}${g.cache} warm <1m${RST}`
+        : `${GREEN}${g.cache} warm${RST} ${DIM}${Math.floor(secondsLeft / 60)}m${RST}`;
+  const cause = cache.last_miss_cause?.causes?.[0];
+  const recentMiss = typeof cache.last_miss_at === "number" && nowSeconds - cache.last_miss_at <= CACHE_MISS_SHOWN_SECONDS;
+  const miss = recentMiss && cause ? `${separator(g.dot)}${YELLOW}miss: ${MISS_CAUSES.get(cause) ?? cause.replaceAll("_", " ")}${RST}` : "";
+  return block(`${state}${miss}`);
+}
+
 /** The full view's rows, session, workspace and usage, each its segments in priority order. */
 export interface Ranked {
   segment: Segment;
@@ -481,10 +525,11 @@ const RANK = {
   vim: 8,
   worktree: 9,
   pr: 10,
-  sevenDay: 11,
-  spend: 12,
-  changed: 13,
-  dirs: 14,
+  cache: 11,
+  sevenDay: 12,
+  spend: 13,
+  changed: 14,
+  dirs: 15,
 } as const;
 
 const ranked = (rank: number, segment: Segment | null): Ranked[] => (segment === null ? [] : [{ segment, rank }]);
@@ -518,6 +563,7 @@ function fullRows(c: Ctx): Ranked[][] {
     ],
     [
       ...ranked(RANK.cost, costSegment(c)),
+      ...ranked(RANK.cache, cacheSegment(c)),
       ...ranked(RANK.fiveHour, rateLimitSegment(c, "five_hour")),
       ...ranked(RANK.sevenDay, rateLimitSegment(c, "seven_day")),
       ...ranked(RANK.spend, spendSegment(c)),

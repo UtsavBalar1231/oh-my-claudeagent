@@ -20,8 +20,8 @@ From 60 columns up the status line is three rows, each starting on its own line:
    with its review state, lines added and removed, and extra directories added to the session.
    A red `!` follows the percentage when the context passes 200k tokens on a 200k window, and a
    session in a worktree shows the worktree's branch.
-3. **Usage:** the session cost and duration, the 5 hour and 7 day usage limits, each with a bar
-   and its reset time, and the spend limit.
+3. **Usage:** the session cost and duration, the prompt cache state, the 5 hour and 7 day usage
+   limits, each with a bar and its reset time, and the spend limit.
 
 Each segment appears only when it has something to show, and a row with nothing to show is left
 out. A 200 column terminal shows each row on one line:
@@ -29,12 +29,12 @@ out. A 200 column terminal shows each row on one line:
 ```
 > Opus 5.5 · E: high · A: oh-my-claudeagent:executor · T: 2/4 -> Wire the order summary panel into the payment step and cover it with a test
 ▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱ 34%  200k · * feature/checkout-redesign ~3  +2  ?1 · > shop · W: checkout-wt <- main · #42 + · +42/-7 · +2 dirs
-~ 2m05s · ▰▰▰▰▱▱▱▱▱▱ 45% 5h (resets 6pm) · ▰▰▰▰▰▰▰▰▱▱ 80% 7d (resets mon 5pm)
+~ 2m05s · C: warm 52m · ▰▰▰▰▱▱▱▱▱▱ 45% 5h (resets 6pm) · ▰▰▰▰▰▰▰▰▱▱ 80% 7d (resets mon 5pm)
 ```
 
 An 80 column terminal wraps the session row onto two lines, and to stay within four lines it
-gives up the lowest-ranked segments (the worktree, pull request, lines changed, extra directories
-and the 7 day limit) so the duration and the 5 hour limit stay:
+gives up the lowest-ranked segments (the worktree, pull request, cache state, lines changed,
+extra directories and the 7 day limit) so the duration and the 5 hour limit stay:
 
 ```
 > Opus 5.5 · E: high · A: oh-my-claudeagent:executor
@@ -50,6 +50,16 @@ A terminal under 60 columns gets one compact line:
 ```
 
 The samples show the `unicode` glyphs. With Nerd Font glyphs, the default, each label is a glyph instead.
+
+**Cache** reads from the payload's `prompt_cache` and shows once any response has reported cache
+tokens. `C: warm 52m` in green gives the whole minutes left before the cached prefix expires, and
+`C: warm <1m` in yellow replaces it for the last minute. `C: cold` in dim means the prefix has
+expired, was never cached by the last response, or is past its `expires_at`, which is as fresh as
+the last refresh; it adds `310k to re-cache` when the payload says how many tokens the next
+request writes. A miss within the last 5 minutes adds `miss: tools changed` in yellow to either
+state, using the first cause the payload names: `tools changed`, `system prompt changed`,
+`expired`, `server side`, or any other cause with its underscores turned into spaces. Setup's
+`refreshInterval` keeps the minutes current between events. The compact line leaves it out.
 
 **Cost** shows only for an account billed by the token. The payload says nothing about the
 account type, but `rate_limits` carries a `five_hour` or `seven_day` window only for Claude.ai Pro
@@ -83,8 +93,9 @@ a wide character such as a CJK glyph counts as two.
 - **Lines run out.** A terminal under 20 rows gets at most two lines, any other at most four.
   When the rows need more, segments give way one at a time in a fixed order across all three
   rows, the least useful first: extra directories, lines changed, the spend limit, the 7 day
-  limit, the pull request, the worktree, the vim mode, the agent, the directory, the 5 hour
-  limit, the cost and duration, the branch, the context bar, then the plan. The model always stays.
+  limit, the cache state, the pull request, the worktree, the vim mode, the agent, the
+  directory, the 5 hour limit, the cost and duration, the branch, the context bar, then the plan.
+  The model always stays.
 - **The next-task label** is the only text that is ellipsized, to the room its line has. When
   fewer than 12 cells of label would fit, the whole plan segment wraps instead.
 - **The context bar** is 8 blocks at the least and 20 at the most, and takes the free cells left
