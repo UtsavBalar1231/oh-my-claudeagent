@@ -6,29 +6,29 @@
                                                                ││ Agents · 8 types                                  │
                                                                ││   agent        runs  median  est. cost  evidence  │
                                                                ││  executor        8   3m28s      $6.86      86%  │
-                                                               ││  explorer        4     24s     $0.31+       0%  │
-                                                               ││  architect       2   6m24s      $5.27      50%  │
-                                                               ││  researcher      2   1m05s      $0.40      50%  │
-                                                               ││  analyzer        1   3m08s      $0.34       0%  │
+                                                               ││  explorer        4     24s     $0.31+       n/a  │
+                                                               ││  architect       2   6m24s      $5.27       n/a  │
+                                                               ││  researcher      2   1m05s      $0.40       n/a  │
+                                                               ││  analyzer        1   3m08s      $0.34       n/a  │
                                                                ││  build-fixer     1   2m23s      $0.65     100%  │
-                                                               ││  planner         1   6m52s      $0.67       0%  │
-                                                               ││  reviewer        1   4m01s      $0.39       0%  │
+                                                               ││  planner         1   6m52s      $0.67       n/a  │
+                                                               ││  reviewer        1   4m01s      $0.39       n/a  │
                                                                │╰───────────────────────────────────────────────────╯
                                                                │╭───────────────────────────────────────────────────╮
-                                                               ││ Tokens per turn · 19 turns                        │
+                                                               ││ Tokens per delegation · 19 delegations            │
                                                                ││ ▂▂▂▂▆▄▃▂▇▁▁▅▂█▃▂▄▆▂ peak 631k                     │
                                                                │╰───────────────────────────────────────────────────╯
                                                                │╭───────────────────────────────────────────────────╮
                                                                ││ Estimated cost                                    │
                                                                ││ $14.89+ █████████████████████████████████████████ │
-                                                               ││  executor $6.86   architect $5.27               │
-                                                               ││  planner $0.67   build-fixer $0.65              │
-                                                               ││  researcher $0.40   reviewer $0.39              │
-                                                               ││  analyzer $0.34   explorer $0.31                │
-                                                               ││ + excludes 1 unpriced run · 2026-10-08 list       │
+                                                               ││ + excludes 1 unpriced run · 2026-10-11 list       │
                                                                ││ prices                                            │
                                                                │╰───────────────────────────────────────────────────╯
                                                                │r: Reload
+                                                               │
+                                                               │
+                                                               │
+                                                               │
                                                                │
                                                                │
                                                                │

@@ -100,7 +100,7 @@ async function statsTab($: Engine, size: Size = DOCK_200): Promise<RenderElement
   return tree;
 }
 
-test("the agents card draws each agent's glyph in its roster color with the name in text, a bar of its runs, and evidence and outcomes with their glyphs in tone", async ($, on) => {
+test("the agents card draws each agent's glyph in its roster color with the name in text, a bar of its runs, evidence for the executor and n/a for read-only roles, and outcomes with their glyphs in tone", async ($, on) => {
   world(on, FILES);
   const agents = nodeByKey(await statsTab($), "stats-agents");
   const gap = lit({}, "  ");
@@ -149,8 +149,7 @@ test("the agents card draws each agent's glyph in its roster color with the name
       gap,
       lit({ color: "inactive" }, "      n/a"),
       gap,
-      lit({ color: "success" }, "  ✓"),
-      lit({}, " 100%"),
+      lit({ color: "inactive" }, "     n/a"),
       gap,
       lit({ color: "inactive" }, "✓ "),
       lit({ color: "inactive" }, "0 "),
@@ -175,8 +174,7 @@ test("the agents card draws each agent's glyph in its roster color with the name
       gap,
       lit({}, "    $0.01"),
       gap,
-      lit({ color: "error" }, "    ✗"),
-      lit({}, " 0%"),
+      lit({ color: "inactive" }, "     n/a"),
       gap,
       lit({ color: "success" }, "✓ "),
       lit({}, "1 "),
@@ -188,7 +186,7 @@ test("the agents card draws each agent's glyph in its roster color with the name
   ]);
 });
 
-test("the tokens card draws one cell per finished turn, oldest first, in its agent's color, and the peak", async ($, on) => {
+test("the tokens card draws one cell per finished delegation, oldest first, in its agent's color, and the peak", async ($, on) => {
   world(on, { ...FILES, [`${METRICS}/${S1}/a-5.json`]: record(S1, "a-5", { outcome: "running", ended_at: null, duration_ms: null, estimated_cost_usd: null, evidence_logged: null }) });
   const tokens = nodeByKey(await statsTab($, STACKED), "stats-tokens");
 
@@ -197,7 +195,7 @@ test("the tokens card draws one cell per finished turn, oldest first, in its age
       "stats-tokens",
       "permission",
       STACKED_WIDTH,
-      "Tokens per turn · 4 turns",
+      "Tokens per delegation · 4 delegations",
       line(
         text({ color: GREEN }, "▂"),
         text({ color: BLUE }, "▁"),
@@ -209,7 +207,7 @@ test("the tokens card draws one cell per finished turn, oldest first, in its age
   );
 });
 
-test("the cost card totals the priced runs, splits its meter by agent with the costliest first, and names what it leaves out", async ($, on) => {
+test("the cost card totals the priced runs, splits its meter by agent with the costliest first with no legend under it, and names what it leaves out", async ($, on) => {
   world(on, FILES);
   const cost = nodeByKey(await statsTab($, STACKED), "stats-cost");
 
@@ -220,7 +218,6 @@ test("the cost card totals the priced runs, splits its meter by agent with the c
       STACKED_WIDTH,
       "Estimated cost",
       line(text({ bold: true }, "$1.35+"), text({}, " "), text({ color: GREEN }, "█".repeat(55)), text({ color: BLUE }, "█")),
-      line(text({ color: GREEN }, "◆ "), text({}, "executor $1.34"), text({}, "  "), text({ color: BLUE }, "◆ "), text({}, "explorer $0.01")),
       text({ dimColor: true, wrap: "wrap" }, "n/a: no listed price · 2026-10-11 list prices"),
     ),
   );
@@ -309,8 +306,8 @@ test("the Stats tab aggregates two sessions by agent type with exact rows, on th
     "Agents · 3 types",
     "  agent                  runs  median  tokens  est. cost  evidence  outcomes    ",
     `◆ executor   ${"█".repeat(10)}     3   1m30s    1.0M      $2.86     ! 67%  ✓ 2 ✗ 1 ! 0 `,
-    `◆ explorer   ${"█".repeat(10)}     3     15s   12.0k     $0.01+      ✗ 0%  ✓ 1 ✗ 0 ! 1 `,
-    `◆ architect  ${"█".repeat(10)}     1   6m40s    129k        n/a    ✓ 100%  ✓ 1 ✗ 0 ! 0 `,
+    `◆ explorer   ${"█".repeat(10)}     3     15s   12.0k     $0.01+       n/a  ✓ 1 ✗ 0 ! 1 `,
+    `◆ architect  ${"█".repeat(10)}     1   6m40s    129k        n/a       n/a  ✓ 1 ✗ 0 ! 0 `,
   ];
   const fromSummary = (all: readonly string[], first: string) => all.slice(all.findIndex((text) => text.startsWith(first)));
 
@@ -318,13 +315,8 @@ test("the Stats tab aggregates two sessions by agent type with exact rows, on th
     const wide = await $.ui.mount(pane(surface, DOCK_200));
     const tree = await wide.drawn();
     expect(fromSummary(spreadRows(tree), summary).slice(0, 6)).toEqual([summary, ...agents]);
-    expect(linesOf(tree, "stats-tokens")).toEqual(["Tokens per turn · 6 turns", "▁█▁▂▁▁ peak 990k"]);
-    expect(linesOf(tree, "stats-cost")).toEqual([
-      "Estimated cost",
-      `$2.87+ ${"█".repeat(36)}`,
-      "◆ executor $2.86  ◆ explorer $0.01",
-      notes,
-    ]);
+    expect(linesOf(tree, "stats-tokens")).toEqual(["Tokens per delegation · 6 delegations", "▁█▁▂▁▁ peak 990k"]);
+    expect(linesOf(tree, "stats-cost")).toEqual(["Estimated cost", `$2.87+ ${"█".repeat(36)}`, notes]);
     await wide.unmount();
 
     const narrow = await $.ui.mount(pane(surface, { columns: 120, rows: 40, placement: "dock" }));
@@ -333,13 +325,12 @@ test("the Stats tab aggregates two sessions by agent type with exact rows, on th
       "Agents · 3 types",
       "  agent      runs  median  est. cost  evidence",
       "◆ executor      3   1m30s      $2.86     ! 67%",
-      "◆ explorer      3     15s     $0.01+      ✗ 0%",
-      "◆ architect     1   6m40s        n/a    ✓ 100%",
-      "Tokens per turn · 6 turns",
+      "◆ explorer      3     15s     $0.01+       n/a",
+      "◆ architect     1   6m40s        n/a       n/a",
+      "Tokens per delegation · 6 delegations",
       "▁█▁▂▁▁ peak 990k",
       "Estimated cost",
       `$2.87+ ${"█".repeat(40)}`,
-      "◆ executor $2.86  ◆ explorer $0.01",
       notes,
       "r: Reload",
     ]);
@@ -376,32 +367,103 @@ test("the columns give way until the longest name has twenty cells, and a later 
   expect(lines.slice(2).map((text) => text.slice(0, 26))).toEqual([`◆ ${long.slice(0, 21)}…  `, "◆ executor".padEnd(26)]);
 });
 
-test("the cost legend wraps onto spare rows, and ends in a count of the rest where rows are scarce", async ($, on) => {
+test("the cost card holds only its total and meter and its notes, however many agents it prices and however many rows are spare", async ($, on) => {
   const names = Array.from({ length: 12 }, (_, n) => [`agent-${String(n).padStart(2, "0")}`, 12 - n] as const);
   world(on, priced(names));
-  const wide = costLines(await statsTab($, DOCK_200));
-  const legend = wide.slice(2, -1);
+  const notes = "2026-10-11 list prices";
 
-  expect(legend).toHaveLength(6);
-  expect(legend[0]).toBe("◆ agent-00 $12.00  ◆ agent-01 $11.00");
-  expect(legend.at(-1)).toBe("◆ agent-10 $2.00  ◆ agent-11 $1.00");
-  expect(legend.some((text) => text.includes("more"))).toBe(false);
-
-  const short = costLines(await statsTab($, { columns: 200, rows: 30, placement: "dock" }));
-  expect(short.slice(2, -1)).toEqual(["◆ agent-00 $12.00  ◆ agent-01 $11.00", "◆ agent-02 $10.00  +9 more"]);
+  for (const rows of [50, 30]) {
+    const lines = costLines(await statsTab($, { columns: 200, rows, placement: "dock" }));
+    expect(lines).toEqual(["Estimated cost", `$78.00 ${"█".repeat(36)}`, notes]);
+  }
 });
 
-test("the ASCII meter marks the seven costliest agents and merges the rest as other, in the meter and the legend", async ($, on) => {
+test("the ASCII meter marks the seven costliest agents and merges the rest as other, with no legend under it", async ($, on) => {
   const names = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"].map((name, n) => [`agent-${name}`, 20 - n * 2] as const);
   world(on, priced(names), {}, { OMCA_GLYPHS: "ascii" });
   const lines = costLines(await statsTab($, STACKED));
-  const [meter, ...legend] = lines.slice(1, -1);
+  const [meter, ...rest] = lines.slice(1);
 
   expect(meter?.startsWith("$110.00 [")).toBe(true);
   for (const mark of ["#", "=", "+", "*", "%", "&", "~", "o"]) expect(meter?.includes(mark), mark).toBe(true);
-  expect(legend.join("  ")).toBe(
-    "# agent-a $20.00  = agent-b $18.00  + agent-c $16.00  * agent-d $14.00  % agent-e $12.00  & agent-f $10.00  ~ agent-g $8.00  o other $12.00",
-  );
+  expect(rest).toEqual(["2026-10-11 list prices"]);
+});
+
+const ROLES = ["executor", "build-fixer", "explorer", "researcher", "viewer", "analyzer", "architect", "planner", "reviewer", "custom-agent"] as const;
+const WITH_EVIDENCE = ["executor", "build-fixer"];
+const piecesOf = (tree: RenderElement, role: string): unknown[] => {
+  const line = childrenOf(nodeByKey(tree, `stats-oh-my-claudeagent:${role}`) ?? { type: "" })[0];
+  return isNode(line) ? childrenOf(line) : [];
+};
+const keysOf = (node: unknown): unknown[] => (isNode(node) ? childrenOf(node).map((child) => (isNode(child) ? child.props?.["key"] : undefined)) : []);
+
+test("only the roles that change code show an evidence rate and its mark, every other role reads n/a in the muted style with no mark", async ($, on) => {
+  world(on, priced(ROLES.map((name) => [name, 0.14] as const)));
+  const tree = await statsTab($, DOCK_200);
+
+  for (const role of ROLES) {
+    const pieces = piecesOf(tree, role);
+    if (WITH_EVIDENCE.includes(role)) {
+      expect(pieces, role).toContainEqual(lit({ color: "success" }, "  ✓"));
+      expect(pieces, role).toContainEqual(lit({}, " 100%"));
+      expect(pieces, role).not.toContainEqual(lit({ color: "inactive" }, "     n/a"));
+    } else {
+      expect(pieces, role).toContainEqual(lit({ color: "inactive" }, "     n/a"));
+      expect(pieces, role).not.toContainEqual(lit({}, " 100%"));
+      expect(pieces, role).not.toContainEqual(lit({ color: "success" }, "  ✓"));
+    }
+  }
+});
+
+test("a delegation still running shows the muted dot in the evidence column, whatever its role", async ($, on) => {
+  world(on, {
+    [`${METRICS}/${S1}/a-1.json`]: record(S1, "a-1", { outcome: "running", ended_at: null, duration_ms: null, estimated_cost_usd: null, evidence_logged: null }),
+  });
+
+  expect(piecesOf(await statsTab($, DOCK_200), "executor")).toContainEqual(lit({ color: "inactive" }, "       ·"));
+});
+
+test("the tokens card counts one delegation in the singular", async ($, on) => {
+  world(on, { [`${METRICS}/${S1}/a-1.json`]: record(S1, "a-1", {}) });
+  expect(linesOf(await statsTab($, STACKED), "stats-tokens")[0]).toBe("Tokens per delegation · 1 delegation");
+});
+
+test("a tokens strip too long for the card says how many of the delegations it shows", async ($, on) => {
+  const many = Array.from({ length: 80 }, (_, n) => [`${METRICS}/${S1}/m${n}.json`, record(S1, `m${n}`, { started_at: `2026-10-01T09:${String(n % 60).padStart(2, "0")}:00.000Z` })] as const);
+  world(on, Object.fromEntries(many));
+  const note = " peak 46.0k";
+  const shown = STACKED_WIDTH - 4 - note.length;
+  expect(linesOf(await statsTab($, STACKED), "stats-tokens")[0]).toBe(`Tokens per delegation · last ${shown} of 80 delegations`);
+});
+
+test("on a remote surface the stacked cards sit in a column with a row between them, and the terminal draws them with none", async ($, on) => {
+  world(on, FILES);
+
+  await $.command.run(run("stats", STACKED.columns));
+  for (const surface of ["desktop", "terminal"] as const) {
+    const ui = await $.ui.mount(pane(surface, STACKED));
+    const tree = await ui.drawn();
+    const cards = nodeByKey(tree, "stats-cards");
+    if (surface === "desktop") {
+      expect(cards?.props).toEqual({ key: "stats-cards", flexDirection: "column", rowGap: 1 });
+      expect(keysOf(cards)).toEqual(["stats-agents", "stats-tokens", "stats-cost"]);
+    } else {
+      expect(cards).toBeUndefined();
+      expect(keysOf(tree).filter((key) => typeof key === "string" && key.startsWith("stats-"))).toEqual(["stats-agents", "stats-tokens", "stats-cost"]);
+    }
+    await ui.unmount();
+  }
+});
+
+test("on a remote surface at the split tier the agents card and the pair of cards below it are spaced by a row too", async ($, on) => {
+  world(on, FILES);
+  await $.command.run(run("stats", 200));
+  const ui = await $.ui.mount(pane("desktop", { columns: 200, rows: 50, placement: "inline" }));
+  const cards = nodeByKey(await ui.drawn(), "stats-cards");
+
+  expect(cards?.props).toEqual({ key: "stats-cards", flexDirection: "column", rowGap: 1 });
+  expect(keysOf(cards)).toEqual(["stats-agents", "stats-lower"]);
+  await ui.unmount();
 });
 
 test("below eight body rows the agents card has no frame, title or column header, so its rows show", async ($, on) => {
@@ -465,18 +527,17 @@ test("OMCA_GLYPHS=ascii draws the Stats tab from the ASCII set", async ($, on) =
   await $.command.run(run("stats", 80));
   const ui = await $.ui.mount(pane("terminal", { columns: 80, rows: 40, placement: "inline" }));
   const drawn = spreadRows(await ui.drawn());
-  expect(drawn.slice(1, 13)).toEqual([
+  expect(drawn.slice(1, 12)).toEqual([
     "7 delegations in 2 sessions - 1 running - 1 unreadable record skipped",
     "Agents - 3 types",
     "  agent                  runs  median  tokens  est. cost  evidence",
     "@ executor   [########]     3   1m30s    1.0M      $2.86     ! 67%",
-    "@ explorer   [########]     3     15s   12.0k     $0.01+      x 0%",
-    "@ architect  [###.....]     1   6m40s    129k        n/a    + 100%",
-    "Tokens per turn - 6 turns",
+    "@ explorer   [########]     3     15s   12.0k     $0.01+       n/a",
+    "@ architect  [###.....]     1   6m40s    129k        n/a       n/a",
+    "Tokens per delegation - 6 delegations",
     ".@.:.. peak 990k",
     "Estimated cost",
     `$2.87+ [${"#".repeat(59)}=]`,
-    "# executor $2.86  = explorer $0.01",
     "+ excludes 1 unpriced run - n/a: no listed price - 2026-10-11 list prices",
   ]);
   expect(drawn.filter((row) => !isAscii(row))).toEqual([]);

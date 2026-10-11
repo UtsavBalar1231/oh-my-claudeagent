@@ -3,12 +3,12 @@ import { RENAMES } from "../../src/core/agent-names.ts";
 import { aggregate, type MetricsRecord, METRICS_DIR, parseRecords } from "../../src/core/metrics.ts";
 import { formatUsd, PRICING_AS_OF } from "../../src/core/pricing.ts";
 import { isSafeId } from "../../src/core/session-id.ts";
-import { agentGlyph, COLUMN_GAP, displayWidth, fitEnd, formatDuration, formatTokens, padEnd, padStart, shortType, wrapText } from "../../src/core/ui-kit.ts";
-import { agentKey, fitPieces, type Level, levelMark, type Piece, piecesWidth, spark, stack, type ThemeKey, TONE_KEYS } from "../../src/core/visual.ts";
+import { agentGlyph, COLUMN_GAP, displayWidth, fitEnd, formatDuration, formatTokens, padEnd, padStart, shortType } from "../../src/core/ui-kit.ts";
+import { agentKey, fitPieces, type Level, levelMark, type Piece, spark, stack, type ThemeKey, TONE_KEYS } from "../../src/core/visual.ts";
 import { type Host, reason, type State, update } from "../host.ts";
 import type { Subcommand } from "../omca-router.ts";
 import { keyButton, noticeRow, open, type TabView, type View } from "../pane.ts";
-import { Card, Line, Row } from "../ui.ts";
+import { Card, isRemote, Line, Row } from "../ui.ts";
 
 type Stats = State["stats"];
 type StatsRow = Stats["rows"][number];
@@ -19,15 +19,6 @@ const NAME_TARGET = 20;
 const CARD_FRAME = 4;
 // Below this many body rows the Agents card drops its frame, title and column header.
 const FRAMED_ROWS = 8;
-// The Agents card's top and bottom borders, title and column header.
-const AGENTS_FRAME_ROWS = 4;
-// The Tokens card's borders, title and strip.
-const TOKENS_ROWS = 4;
-// The cost card's borders, title and meter.
-const COST_ROWS = 4;
-// The summary line above the cards and the reload key below them.
-const SUMMARY_ROWS = 1;
-const RELOAD_ROWS = 1;
 // The sparkline never needs more cells than the widest body.
 const TURNS_KEPT = 200;
 
@@ -111,6 +102,9 @@ function evidenceLevel(rate: number): Level {
 
 const BAR = 10;
 
+// Read-only roles never run the checks that log evidence, so their evidence rate means nothing.
+const EVIDENCE_ROLES: ReadonlySet<string> = new Set(["executor", "build-fixer"]);
+
 // Drawn in ORDER; a narrow body keeps the columns earliest in KEEP_ORDER that leave the names their room.
 const COLUMNS = {
   bar: {
@@ -147,6 +141,7 @@ const COLUMNS = {
     width: 8,
     cell: (row, view) => {
       if (finished(row) === 0) return right(view.g.dot, 8, TONE_KEYS.muted);
+      if (!EVIDENCE_ROLES.has(shortType(row.agentType))) return right("n/a", 8, TONE_KEYS.muted);
       const { glyph, color } = levelMark(evidenceLevel(row.evidenceRate), view.g);
       const rate = ` ${Math.round(row.evidenceRate * 100)}%`;
       return [{ text: padStart(glyph, 8 - displayWidth(rate)), color }, { text: rate }];
@@ -252,7 +247,7 @@ function tokensCard(stats: Stats, view: View, width: number): RenderElement | un
   const isCut = shown.length < stats.turns.length;
   return Card(view.kit, {
     key: "stats-tokens",
-    title: fitEnd(`Tokens per turn ${view.g.dot} ${isCut ? `last ${shown.length} of ` : ""}${plural(stats.turns.length, "turn")}`, inner, view.g.ellipsis),
+    title: fitEnd(`Tokens per delegation ${view.g.dot} ${isCut ? `last ${shown.length} of ` : ""}${plural(stats.turns.length, "delegation")}`, inner, view.g.ellipsis),
     tone: "info",
     isAscii: view.isAscii,
     width,
@@ -270,12 +265,12 @@ function costNotes(stats: Stats, g: View["g"]): string {
   ].join(` ${g.dot} `);
 }
 
-// Without color, the ASCII meter tells the costliest agents apart by these marks, which its legend repeats.
+// Without color, the ASCII meter tells the costliest agents apart by these marks.
 // Every agent after them shares the "other" mark.
 const METER_MARKS = ["#", "=", "+", "*", "%", "&", "~"] as const;
 const OTHER_MARK = "o";
 
-type Part = { mark: string; color: ThemeKey; name: string; usd: number };
+type Part = { mark: string; color: ThemeKey; usd: number };
 
 function partsOf(shares: readonly StatsRow[], view: View): Part[] {
   const own = view.isAscii ? shares.slice(0, METER_MARKS.length) : shares;
@@ -283,40 +278,13 @@ function partsOf(shares: readonly StatsRow[], view: View): Part[] {
   const parts = own.map((row, index) => ({
     mark: view.isAscii ? (METER_MARKS[index] ?? "#") : agentGlyph(row.agentType, view.g),
     color: agentKey(row.agentType),
-    name: shortType(row.agentType),
     usd: row.estimatedCostUsd,
   }));
   if (rest.length === 0) return parts;
-  return [...parts, { mark: OTHER_MARK, color: TONE_KEYS.muted, name: "other", usd: rest.reduce((sum, row) => sum + row.estimatedCostUsd, 0) }];
+  return [...parts, { mark: OTHER_MARK, color: TONE_KEYS.muted, usd: rest.reduce((sum, row) => sum + row.estimatedCostUsd, 0) }];
 }
 
-// Whole entries, costliest first, at most `maxRows` rows of them; the last row ends in a count of the rest.
-function legendOf(parts: readonly Part[], width: number, maxRows: number): Piece[][] {
-  const entries = parts.map((part) => [
-    { text: `${part.mark} `, color: part.color },
-    { text: `${part.name} ${formatUsd(part.usd)}` },
-  ]);
-  const lines: Piece[][] = [];
-  let taken = 0;
-  while (taken < entries.length && lines.length < maxRows) {
-    const isLast = lines.length === maxRows - 1;
-    const line: Piece[] = [];
-    for (const entry of entries.slice(taken)) {
-      const left = entries.length - taken - 1;
-      const more = isLast && left > 0 ? displayWidth(`${GAP}+${left} more`) : 0;
-      const next = [...(line.length === 0 ? [] : [{ text: GAP }]), ...entry];
-      if ((isLast || line.length > 0) && piecesWidth(line) + piecesWidth(next) + more > width) break;
-      line.push(...next);
-      taken += 1;
-    }
-    if (isLast && taken < entries.length) line.push({ text: `${line.length === 0 ? "" : GAP}+${entries.length - taken} more`, color: TONE_KEYS.muted });
-    lines.push(line);
-  }
-  return lines;
-}
-
-// `room` is every row the card may take; what its other lines leave goes to the legend.
-function costCard(stats: Stats, view: View, width: number, room: number): RenderElement {
+function costCard(stats: Stats, view: View, width: number): RenderElement {
   const { Text } = view.kit;
   const inner = width - CARD_FRAME;
   const priced = stats.rows.filter((row) => finished(row) > row.unpriced);
@@ -343,7 +311,6 @@ function costCard(stats: Stats, view: View, width: number, room: number): Render
     view.isAscii,
   );
   const notes = costNotes(stats, view.g);
-  const legend = legendOf(parts, inner, Math.max(1, room - COST_ROWS - wrapText(notes, inner).length));
   return Card(view.kit, {
     key: "stats-cost",
     title,
@@ -352,7 +319,6 @@ function costCard(stats: Stats, view: View, width: number, room: number): Render
     width,
     children: [
       Line(view.kit, fitPieces([{ text: money, bold: true }, { text: " " }, ...meter], inner, view.g.ellipsis)),
-      ...legend.map((pieces) => Line(view.kit, fitPieces(pieces, inner, view.g.ellipsis))),
       Text({ dimColor: true, wrap: "wrap", children: [notes] }),
     ],
   });
@@ -380,13 +346,12 @@ export const view: TabView = async (host, view) => {
   const half = Math.floor((view.width - COLUMN_GAP) / 2);
   const tokens = tokensCard(stats, view, view.tier === "split" ? half : view.width);
   const isPair = view.tier === "split" && tokens !== undefined;
-  const above = SUMMARY_ROWS + stats.rows.length + (isFramed ? AGENTS_FRAME_ROWS : 0) + RELOAD_ROWS + (tokens === undefined || isPair ? 0 : TOKENS_ROWS);
-  const cost = costCard(stats, view, isPair ? view.width - COLUMN_GAP - half : view.width, view.rows - above);
+  const cost = costCard(stats, view, isPair ? view.width - COLUMN_GAP - half : view.width);
   const lower = isPair ? [sideBySide(view, "stats-lower", [tokens, cost])] : [...(tokens === undefined ? [] : [tokens]), cost];
+  const cards = [agentsCard(stats, view, view.width, isFramed), ...lower];
   return [
     Text({ dimColor: true, children: [summary(stats, view.g, view.width)] }),
-    agentsCard(stats, view, view.width, isFramed),
-    ...lower,
+    ...(isRemote(view.kit) ? [view.kit.Box({ key: "stats-cards", flexDirection: "column", rowGap: 1, children: cards })] : cards),
     reload(),
   ];
 };
