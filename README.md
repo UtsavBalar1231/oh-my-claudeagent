@@ -6,7 +6,8 @@
 
 oh-my-claudeagent (OMCA) is a Claude Code plugin that plans work with you, hands each task to a
 specialist agent, and keeps a session from calling work done before a verification has been
-logged.
+logged. The blog post [Claude Code, with receipts](https://utsavbalar.in/blog/oh-my-claudeagent)
+tells why it exists and how it works inside.
 
 ## Requirements
 
