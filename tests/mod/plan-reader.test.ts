@@ -709,7 +709,7 @@ test("Enter opens a task's page with its files and the runs that prove it; n, p 
     "  ✓ test bun test src/parse.spec.ts exit 0 · 2h ago",
     "↑↓ scroll · esc close",
   ]);
-  expect(four).toContain(" BLOCKED   PROVEN ");
+  expect(four).toContain(" BLOCKED  by 3  PROVEN ");
   expect(four).toContain(" ○ 3  blocked by 3");
 
   await ui.press({ key: "n" });

@@ -989,8 +989,10 @@ function detail(view: View, ctx: Ctx, card: Card, width: number): Unit[] {
   const { Text } = view.kit;
   const status = statusOf(ctx, card);
   const verdict = verdictOf(card);
+  const waiting = card.done ? [] : waitingOn(ctx, card);
   const chips: Piece[] = [
     chip(STATUS[status].word, STATUS[status].tone, view.isAscii),
+    ...(status === "blocked" ? [{ text: " " }, { text: `by ${waiting.join(", ")}`, color: TONE_KEYS.warn }] : []),
     ...(verdict === undefined ? [] : [{ text: " " }, chip(PROOF[verdict.proof].word, PROOF[verdict.proof].tone, view.isAscii)]),
     ...(ctx.running.get(card.n) ?? []).flatMap((agent) => [{ text: " " }, { text: `${agentGlyph(agent.type, view.g)} ${shortType(agent.type)}`, color: agentKey(lookOf(agent)) }]),
   ];
@@ -1003,7 +1005,6 @@ function detail(view: View, ctx: Ctx, card: Card, width: number): Unit[] {
   const title = `${card.n}. ${card.title}`;
   const hidden = redact([card.fields.map((field) => field.text).join("\n"), ...(verdict?.since ?? []).map((run) => run.command)].join("\n"), view.home, view.g.mask).masked;
   const deps = depChips(view, ctx, card);
-  const waiting = card.done ? [] : waitingOn(ctx, card);
   const prose = proseOf(card, doneWhen);
   return [
     { element: Text({ bold: true, wrap: "wrap", children: [title] }), rows: wrapText(title, width).length },
