@@ -3,7 +3,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSy
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import type { Platform } from "../../src/core/path.ts";
-import { isSensitivePath, readLines, tools } from "./filesystem.ts";
+import { isNetworkPath, isSensitivePath, readLines, tools } from "./filesystem.ts";
 
 const fileRead = (() => {
   const found = tools.find((tool) => tool.name === "file_read");
@@ -236,6 +236,24 @@ test.each<[Platform, string]>([
   ["linux", "/etc/shadow"],
 ])("isSensitivePath(%s, %p) is true", (platform, path) => {
   expect(isSensitivePath(platform, path)).toBe(true);
+});
+
+test.each<[Platform, string, boolean]>([
+  ["win32", "\\\\server\\share\\notes.txt", true],
+  ["linux", "//server/share/notes.txt", true],
+  ["win32", "\\\\?\\UNC\\server\\share\\notes.txt", true],
+  ["win32", "\\\\?\\C:\\proj\\notes.txt", false],
+  ["win32", "C:\\proj\\notes.txt", false],
+  ["darwin", "/net/server/notes.txt", true],
+  ["linux", "/net/server/notes.txt", false],
+  ["linux", "/srv/u/notes.txt", false],
+])("isNetworkPath(%s, %p) is %p", (platform, path, isNetwork) => {
+  expect(isNetworkPath(platform, path)).toBe(isNetwork);
+});
+
+test("a network path is refused before it is looked up", async () => {
+  const path = "//omca-unreachable-host.invalid/share/notes.txt";
+  expect(await read({ path })).toBe(`Access denied: ${path} is a network path, and looking it up can contact the host it names`);
 });
 
 test.each<[Platform, string]>([

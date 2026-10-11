@@ -104,8 +104,15 @@ export function isSensitivePath(platform: Platform, path: string): boolean {
   return SENSITIVE_PATH.test(checked);
 }
 
+// A UNC path, plain or in the long-path form, and macOS's automount root. Resolving one can contact
+// the host it names, and on Windows send that host the user's credentials.
+const UNC = /^[\\/]{2}(?:[?.][\\/]UNC[\\/]|[^\\/?.])/i;
+
+export const isNetworkPath = (platform: Platform, path: string): boolean => UNC.test(path) || (platform === "darwin" && path.startsWith("/net/"));
+
 /** The resolved file and its size, or the plain-text reason the read is refused. */
 function inspect(path: string, unlimited: boolean): { file: string; size: number } | string {
+  if (isNetworkPath(PLATFORM, path)) return `Access denied: ${path} is a network path, and looking it up can contact the host it names`;
   let file: string;
   try {
     file = realpathSync(resolve(expandHome(path)));
@@ -184,7 +191,7 @@ export const tools: Tool[] = [
   {
     name: "file_read",
     description:
-      "Read a text file with line numbers, a size footer, and offset/limit paging. Use it for a path the built-in Read tool cannot reach, typically one outside the working directories while permissions.blockReadsOutsideWorkingDirectories is on; that setting fences Read, Grep, Glob, and LSP but not MCP tools. Default limit is 5000 lines; lines over 2000 characters are cut with a truncation marker. The footer's token figure estimates the whole file (bytes / 4), not the returned window, and names the next offset when lines remain. Refuses with a plain-text message, not an error: directories, devices, binary files (a null byte in the first 8 KB), unlimited reads (limit=0) of files over 3 MB, and paths matching a sensitive-file denylist (.ssh, .gnupg, .aws, .env files, credentials*, *secret*, SSH private keys, /etc/shadow). Each call is logged to .omca/logs/file-access.jsonl.",
+      "Read a text file with line numbers, a size footer, and offset/limit paging. Use it for a path the built-in Read tool cannot reach, typically one outside the working directories while permissions.blockReadsOutsideWorkingDirectories is on; that setting fences Read, Grep, Glob, and LSP but not MCP tools. Default limit is 5000 lines; lines over 2000 characters are cut with a truncation marker. The footer's token figure estimates the whole file (bytes / 4), not the returned window, and names the next offset when lines remain. Refuses with a plain-text message, not an error: directories, devices, binary files (a null byte in the first 8 KB), unlimited reads (limit=0) of files over 3 MB, paths matching a sensitive-file denylist (.ssh, .gnupg, .aws, .env files, credentials*, *secret*, SSH private keys, /etc/shadow), and network paths (UNC, or /net/ on macOS). Each call is logged to .omca/logs/file-access.jsonl.",
     inputSchema: {
       type: "object",
       properties: {

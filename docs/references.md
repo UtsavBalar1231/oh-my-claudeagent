@@ -120,7 +120,7 @@ a gateway that is not a first-party host, every tool loads up front.
 | `notepad_compact` | Rewrite one section shorter |
 | `ast_search`, `ast_find_rule`, `ast_test_rule`, `ast_dump_tree` | Structural code search with ast-grep |
 | `ast_replace` | Structural rewrite, with a dry run |
-| `file_read` | Read a file outside the working directories, with paging. Refuses credential files |
+| `file_read` | Read a file outside the working directories, with paging. Refuses credential files and network paths |
 | `session_search` | Search this project's earlier Claude Code transcripts |
 | `agents_list`, `categories_list` | The agent roster and the category table |
 | `agents_migrate` | Move agent memories and agent ids to the current names. A dry run by default; `apply` writes, and `merge_indexes` merges `MEMORY.md` files that collide |

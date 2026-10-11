@@ -359,8 +359,8 @@ hand.
 - `ast_*` no longer reads a pattern starting with a hyphen as an option, and a matching rule with
   `severity: error` no longer discards the scan's matches.
 - `file_read` no longer skips its size guard for a negative limit, cuts an overlong line while
-  streaming, and matches sensitive paths case-insensitively and without NTFS stream suffixes on
-  every platform. `session_search` scans transcripts in linear time and honors
+  streaming, matches sensitive paths case-insensitively and without NTFS stream suffixes on
+  every platform, and refuses a network path before looking it up. `session_search` scans transcripts in linear time and honors
   `CLAUDE_CONFIG_DIR`.
 - A server hook handler that throws now fails open on every event, so a bug in OMCA cannot block
   a tool call.
