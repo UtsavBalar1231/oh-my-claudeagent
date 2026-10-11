@@ -851,12 +851,24 @@ describe("the recursive flag group stays linear", () => {
 
   // A repeated flag or keyword costs about 2 µs a repetition, which a slow runner triples, so the
   // bound is a ratio measured in the same run: four times the input takes about four times as long
-  // when the scan is linear and sixteen times as long when it is quadratic.
+  // when the scan is linear and sixteen times as long when it is quadratic. The two sizes run in
+  // turn and the least of five ratios counts, so load from the spec files running beside this one
+  // that lands on one size's run does not pass for growth.
+  const growth = (command: (count: number) => string, small: number): number => {
+    const [few, many] = [command(small), command(small * 4)];
+    const once = (text: string) => {
+      const at = performance.now();
+      classify(text);
+      return performance.now() - at;
+    };
+    return Math.min(...Array.from({ length: 5 }, () => once(many) / once(few)));
+  };
+
   test.each([
     ["sudo flags", (count: number) => `sudo ${"-E ".repeat(count)}ls`],
     ["leading keywords", (count: number) => `; ${"then ".repeat(count)}ls`],
   ])("%s: four times the input takes under ten times as long", (_, command) => {
-    expect(fastest(command(80_000)) / fastest(command(20_000))).toBeLessThan(10);
+    expect(growth(command, 20_000)).toBeLessThan(10);
   }, 60_000);
 
   test.each([
@@ -869,7 +881,7 @@ describe("the recursive flag group stays linear", () => {
     ["wrapper options", (count: number) => `xargs ${"-0 ".repeat(count)}ls`],
     ["commits nested in substitutions", (count: number) => `${'git commit -m "$('.repeat(count)}x${')"'.repeat(count)}`],
   ])("nesting, %s: four times the input takes under ten times as long", (_, command) => {
-    expect(fastest(command(20_000)) / fastest(command(5_000))).toBeLessThan(10);
+    expect(growth(command, 5_000)).toBeLessThan(10);
   }, 60_000);
 
   test("a flag group that holds r is still recursive, in any position and case", () => {
