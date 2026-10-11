@@ -16,7 +16,7 @@ and the plugin runs on Linux, macOS and native Windows.
 `PATH` Claude Code starts with. `ast-grep` (or `sg`) stays optional; only the `ast_*` tools need
 it. On 2.1.287 the band could end a fullscreen session when the background-tasks dialog opened,
 2.1.292 adds the Agent tool's `effort` input that per-delegation effort uses, and 2.1.295 lets a
-button hold styled text, which every list row in the pane is.
+button hold styled text, which each Evidence run in the pane is.
 
 **Read [Upgrading](#upgrading) before you update.** A 2.x session and a 3.x session must not run
 in the same project at once, and the `CLAUDE.md` block that 2.x setup wrote has to be deleted by
@@ -41,9 +41,9 @@ hand.
   focus as the arrows do, and over a part of a tab that holds more than it shows (the Evidence
   card, the plan's task detail, each Notepad card) it scrolls that part alone, prose a row at a
   time, with a cue above and below while more is out of view. When the agents' lanes run past the
-  pane, the wheel scrolls them and the arrows step the focus a lane at a time. A click on a run's time
-  focuses the run, and in a wide pane a click on a task's title selects it and a second click
-  opens it.
+  pane, the wheel scrolls them and the arrows step the focus a lane at a time. Each Evidence run is
+  one button, so a click anywhere on its row focuses the run, and in a wide pane a click on a
+  task's title selects it and a second click opens it.
 - **The pane fits every size.** Each tab gives its rows out by priority, so a short pane keeps
   its header, its filter, at least one row of content with its cues, and its keys, and nothing
   falls off the bottom unmarked. The tab bar stays on one row, the other tabs shortened to their
