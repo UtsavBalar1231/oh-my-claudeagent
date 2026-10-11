@@ -244,7 +244,7 @@ export const view: TabView = async (host, view) => {
     show([]);
     return [
       noticeRow(view, { kind: "empty" }, { loading: "", empty: "No subagent has run in this session yet." }),
-      view.kit.Text({ color: TONE_KEYS.muted, children: ["Each subagent gets a lane here. Enter or a click opens its page."] }),
+      view.kit.Text({ color: TONE_KEYS.muted, dimColor: true, children: ["Each subagent gets a lane here. Enter or a click opens its page."] }),
     ];
   }
   const open = (await host.state.agentPage.get()).value?.id;
