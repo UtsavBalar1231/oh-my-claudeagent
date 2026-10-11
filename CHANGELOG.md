@@ -12,10 +12,11 @@ model's tools and every settings hook, and a Claude Code mod draws OMCA's interf
 session and runs the destructive-command guard. Python, uv and the bash hook scripts are gone,
 and the plugin runs on Linux, macOS and native Windows.
 
-**This release needs Claude Code 2.1.292 or later and bun 1.4.2 or later,** with bun on the
+**This release needs Claude Code 2.1.295 or later and bun 1.4.2 or later,** with bun on the
 `PATH` Claude Code starts with. `ast-grep` (or `sg`) stays optional; only the `ast_*` tools need
 it. On 2.1.287 the band could end a fullscreen session when the background-tasks dialog opened,
-and 2.1.292 adds the Agent tool's `effort` input that per-delegation effort uses.
+2.1.292 adds the Agent tool's `effort` input that per-delegation effort uses, and 2.1.295 lets a
+button hold styled text, which every list row in the pane is.
 
 **Read [Upgrading](#upgrading) before you update.** A 2.x session and a 3.x session must not run
 in the same project at once, and the `CLAUDE.md` block that 2.x setup wrote has to be deleted by
@@ -86,7 +87,7 @@ hand.
   the agent works, smiles when it finishes, sweats when it fails and dozes while it waits. Terminals draw half-block characters, Desktop a still SVG, and
   `OMCA_GLYPHS=ascii` draws none. A fork wears the mascot and color of the agent it copies, the
   main agent's for a fork of the main conversation, with a fork icon beside its name.
-- **Desktop.** The Code tab draws the mod when its bundled Claude Code is 2.1.292 or later: the
+- **Desktop.** The Code tab draws the mod when its bundled Claude Code is 2.1.295 or later: the
   pane docks on the right and opens from `/omca`, which replies with the reason when Desktop does
   not place it, and a button whose prompt Desktop's box does not take shows the text in a toast.
   The pane scrolls the way Desktop's own panes do and draws each tab whole; the Evidence tab shows
@@ -167,7 +168,7 @@ hand.
   for that run, higher or lower. A plan task's `Effort:` line becomes that input. The tier stays
   on the `model` input, where permission rules can see it. The orchestrator, planner and
   start-work prompts say when to pass each level. Claude Code 2.1.292 is the first release whose
-  Agent tool takes `effort`, which is why it is the floor.
+  Agent tool takes `effort`.
 - **The destructive-command guard runs in the mod and can ask before it refuses.** It checks
   every Bash and PowerShell command and sorts a match into one of these classes:
   - Catastrophic: a recursive removal of the filesystem root, your home, the project, or a folder
@@ -436,7 +437,7 @@ hand.
 
 ### Upgrading
 
-1. Install Claude Code 2.1.292 or later and bun 1.4.2 or later. Desktop and VS Code start the
+1. Install Claude Code 2.1.295 or later and bun 1.4.2 or later. Desktop and VS Code start the
    `omca` server with the GUI's `PATH`, so make bun reachable from it.
 2. Close every 2.x session in a project before you start a 3.x session there, and do not run the
    two at once. The 2.x Python server and the 3.x server lock `.omca/` state in different ways

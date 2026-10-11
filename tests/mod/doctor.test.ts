@@ -53,7 +53,7 @@ function engine(on: On, w: World, options: { hold?: boolean; refuse?: readonly s
     return call.argv[0] === "sg" ? output("ast-grep 0.39.0\n") : { deny: "spawn ast-grep ENOENT" };
   });
   on("session.version", () =>
-    options.isVersionDenied?.() === true ? { deny: "version unavailable" } : { value: { version: "2.1.292", base: "2.1.292" } },
+    options.isVersionDenied?.() === true ? { deny: "version unavailable" } : { value: { version: "2.1.295", base: "2.1.295" } },
   );
   on("fs.write", (_$, call) => {
     const path = w.spelled(call.path);
@@ -84,7 +84,7 @@ function body(tree: RenderElement): string[] {
 }
 
 const CHECKS = [
-  " ✓ OK    Claude Code   2.1.292 meets the 2.1.292 floor",
+  " ✓ OK    Claude Code   2.1.295 meets the 2.1.295 floor",
   " ✓ OK    bun           bun 1.4.2 is on PATH",
   " ✓ OK    omca server   Last hook call 2 min ago",
   " ✓ OK    ast-grep      sg 0.39.0 is on PATH",
@@ -380,7 +380,7 @@ for (const layout of LAYOUTS) {
     expect(drawn[3]).toBe("o: Show passing   + 11 ok - Claude Code, bun, omca server, ast-grep, O...");
     await ui.press({ key: "o" });
     const opened = body(await ui.drawn());
-    expect(opened).toContain("[+ OK]   Claude Code   2.1.292 meets the 2.1.292 floor");
+    expect(opened).toContain("[+ OK]   Claude Code   2.1.295 meets the 2.1.295 floor");
     expect(opened.at(-2)).toBe("  v 9 more - ^v scroll");
       expect(rows(await ui.drawn()).filter((row) => !isAscii(row))).toEqual([]);
     await ui.unmount();
@@ -630,7 +630,7 @@ test("a row is a chip with the level's glyph and word on its tone, the label bol
         piece({ color: "inverseText", backgroundColor: "success", bold: true }, " ✓ OK "),
         piece({}, "   "),
         piece({ bold: true }, "Claude Code   "),
-        piece({}, "2.1.292 meets the 2.1.292 floor"),
+        piece({}, "2.1.295 meets the 2.1.295 floor"),
       ),
     ],
   });
