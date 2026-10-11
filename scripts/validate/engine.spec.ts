@@ -73,7 +73,7 @@ describe("engine types match the skill", () => {
   const CORE = "// Written by Claude Code 2.1.296.\ndeclare const a: 1;\n}\n\n";
   const generated = `${CORE}${MARKER}\n// input schema.\ntype Tools = {};\n`;
   const listing = ["claude-1000", "claude-1000/bundled-skills"];
-  const holds = "the scratch TMPDIR holds: claude-1000, claude-1000/bundled-skills";
+  const holds = "the scratch temp folder holds: claude-1000, claude-1000/bundled-skills";
 
   test("the cut ends before the tools marker and keeps the blank line above it", () => {
     expect(coreTypes(generated)).toBe(CORE);
@@ -116,7 +116,7 @@ describe("engine types match the skill", () => {
   test("a generated file without the marker fails with the glob and the scratch listing", () => {
     expect(judgeSkillTypes(CORE, CORE, [])).toEqual({
       status: "fail",
-      detail: `the file matching ${SKILL_TYPES} has no line starting "// The inputs of the built-in tools"; the scratch TMPDIR holds: nothing`,
+      detail: `the file matching ${SKILL_TYPES} has no line starting "// The inputs of the built-in tools"; the scratch temp folder holds: nothing`,
     });
   });
 

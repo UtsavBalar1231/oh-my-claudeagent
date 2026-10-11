@@ -73,7 +73,7 @@ export function firstDifferentLine(a: string, b: string): number {
 }
 
 export function judgeSkillTypes(generated: string | undefined, committed: string, scratchListing: readonly string[]): Outcome {
-  const listing = `the scratch TMPDIR holds: ${scratchListing.join(", ") || "nothing"}`;
+  const listing = `the scratch temp folder holds: ${scratchListing.join(", ") || "nothing"}`;
   if (generated === undefined) return { status: "fail", detail: `no file matches ${SKILL_TYPES}; ${listing}` };
   const core = coreTypes(generated);
   if (core === undefined) return { status: "fail", detail: `the file matching ${SKILL_TYPES} has no line starting "${TOOLS_MARKER}"; ${listing}` };
@@ -90,7 +90,8 @@ export function judgeSkillTypes(generated: string | undefined, committed: string
 export const versionSkip = (installed: string, writer: string | undefined): Outcome =>
   skip(`claude ${installed} is installed and ${ENGINE_TYPES} was written by Claude Code ${writer ?? "an unnamed version"}; the comparison needs the same version`);
 
-// The skill writes its types into TMPDIR as it loads, before the dead port fails the request.
+// The skill writes its types under Claude Code's temp root as it loads, before the dead port fails
+// the request. CLAUDE_CODE_TMPDIR names that root on every OS; without it macOS ignores TMPDIR.
 function skillTypes(ctx: Context): Outcome {
   const committed = readFileSync(join(ctx.root, ENGINE_TYPES), "utf8");
   const writer = writerVersion(committed);
@@ -105,6 +106,7 @@ function skillTypes(ctx: Context): Outcome {
     writeFileSync(join(config, ".claude.json"), JSON.stringify({ hasCompletedOnboarding: true }));
     run(["claude", "-p", "/plugin-authoring"], cwd, {
       env: envWithout(/^(CLAUDE|ANTHROPIC|OMCA|GIT_)/, {
+        CLAUDE_CODE_TMPDIR: temp,
         TMPDIR: temp,
         TEMP: temp,
         TMP: temp,
