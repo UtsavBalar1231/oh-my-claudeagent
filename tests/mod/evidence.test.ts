@@ -482,7 +482,7 @@ test("the verdict reads complete, stale, missing, with no plan, or with an unrea
 
   write(w, BOULDER, JSON.stringify({ plans: {}, bindings: {} }));
   await refresh();
-  expect(await card()).toEqual(["│ Final verification", "│  NO PLAN  no plan is bound to this session", "│ ✓ build  ✗ lint"]);
+  expect(await card()).toEqual(["│ Final verification", "│  NO PLAN  no plan is bound to this session", "│ latest runs  ✓ build  ✗ lint"]);
   expect(await border()).toBe("inactive");
   await ui.unmount();
 });

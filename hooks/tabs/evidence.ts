@@ -234,14 +234,16 @@ function verdictLine(view: View, ledger: Ledger): { tone: ChipTone; title: strin
   }
 }
 
-// Each proving type's newest run as a checklist, so a reader sees what is broken now.
-function latestGroups(view: View, entries: readonly Entry[]): Piece[][] {
-  return latestByType(entries).map(({ type, isPassing }) => [outcome(view, isPassing ? 0 : 1), { text: ` ${TYPE_WORDS[type]}` }]);
+// Each proving type's newest run as a checklist, so a reader sees what is broken now. With no plan bound
+// the checklist stands alone under the verdict, so it is labelled as the ledger's newest runs.
+function latestGroups(view: View, entries: readonly Entry[], isLabelled: boolean): Piece[][] {
+  const runs = latestByType(entries).map(({ type, isPassing }): Piece[] => [outcome(view, isPassing ? 0 : 1), { text: ` ${TYPE_WORDS[type]}` }]);
+  return isLabelled && runs.length > 0 ? [[{ text: "latest runs", color: TONE_KEYS.muted }], ...runs] : runs;
 }
 
 function header(view: View, ledger: Ledger, isCard: boolean): Block {
   const { tone, title, groups, when: time } = verdictLine(view, ledger);
-  const latest = latestGroups(view, ledger.entries);
+  const latest = latestGroups(view, ledger.entries, ledger.plan === null);
   const sep = { text: ` ${view.g.dot} `, color: TONE_KEYS.muted };
   if (!isCard) {
     const pieces: Piece[] = [...(groups[0]?.slice(0, 1) ?? [])];
