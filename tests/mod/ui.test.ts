@@ -114,7 +114,7 @@ test("a tree's fewest rows: one per text or markdown, code by line, a border two
   expect(rowsAtLeast(tree)).toBe(4 + 2 + 2);
 });
 
-test("a row lights selectionBg on hover, holds it bold when focused, and dims when done; a chip keeps its colors", async ($, on) => {
+test("a row lights selectionBg on hover, holds it bold when focused, and dims when done; a chip and a state mark keep their colors", async ($, on) => {
   const drawn = gallery($, on);
   const pieces = [{ text: "✓ ", color: "success" as const }, { text: "42 Port tabs " }, chip("PROVEN", "ok", false)];
   const proven = text({ color: "inverseText", backgroundColor: "success", bold: true }, " PROVEN ");
@@ -122,7 +122,13 @@ test("a row lights selectionBg on hover, holds it bold when focused, and dims wh
     box({ key: "r", flexDirection: "row", hover: { backgroundColor: "selectionBg" } }, text({ wrap: "truncate-end" }, ...children));
 
   expect(await drawn((kit) => Row(kit, { key: "r", pieces }))).toEqual(
-    row(text({ color: "success", hover: { color: "text" } }, "✓ "), text({ hover: { color: "text" } }, "42 Port tabs "), proven),
+    row(text({ color: "success" }, "✓ "), text({ hover: { color: "text" } }, "42 Port tabs "), proven),
+  );
+  expect(await drawn((kit) => Row(kit, { key: "r", pieces, isFocused: true }))).toEqual(
+    box(
+      { key: "r", flexDirection: "row", hover: { backgroundColor: "selectionBg" }, backgroundColor: "selectionBg" },
+      text({ wrap: "truncate-end" }, text({ color: "success", bold: true }, "✓ "), text({ color: "text", bold: true }, "42 Port tabs "), proven),
+    ),
   );
   expect(await drawn((kit) => Row(kit, { key: "r", pieces, isDone: true }))).toEqual(
     row(text({ color: "inactive", hover: { color: "text" } }, "✓ "), text({ color: "inactive", hover: { color: "text" } }, "42 Port tabs "), proven),

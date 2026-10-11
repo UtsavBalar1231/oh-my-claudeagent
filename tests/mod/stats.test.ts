@@ -76,7 +76,9 @@ const BLUE = "blue_FOR_SUBAGENTS_ONLY";
 const PURPLE = "purple_FOR_SUBAGENTS_ONLY";
 
 const text = (props: Record<string, unknown>, run: string) => ({ type: "Text", ...(Object.keys(props).length === 0 ? {} : { props }), children: [run] });
-const lit = (props: Record<string, unknown>, run: string) => ({ ...text(props, run), hover: { color: "text" } });
+// Plain and muted text lights to `text` under the pointer; a piece in a state or roster colour keeps it.
+const lit = (props: Record<string, unknown>, run: string) =>
+  props["color"] === undefined || props["color"] === "inactive" ? { ...text(props, run), hover: { color: "text" } } : text(props, run);
 const line = (...pieces: unknown[]) => ({ type: "Text", props: { wrap: "truncate-end" }, children: pieces });
 const row = (key: string, ...pieces: unknown[]) => ({
   type: "Box",

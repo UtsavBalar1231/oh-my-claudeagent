@@ -134,12 +134,15 @@ export function Card(kit: Kit, { key, title, tone, isAscii, isRaised = false, wi
 type PiecesSpec = { isFocused?: boolean; isDone?: boolean };
 type RowSpec = PiecesSpec & { key: string; pieces: readonly Piece[] };
 
-// Hovered or focused, a row's own text turns `text` so it reads on `selectionBg` in both themes;
-// a piece with its own background, a chip, keeps its style.
+// Hovered or focused, a row's plain and muted text turns `text` so it reads on `selectionBg` in both
+// themes; a chip keeps its style, and a mark in a state colour (a pass, a failure, an agent's glyph)
+// keeps that colour, since the colour is what it says.
 export function Pieces(kit: Kit, pieces: readonly Piece[], { isFocused = false, isDone = false }: PiecesSpec = {}): RenderElement {
   const style = (piece: Piece): TextStyle => {
     if (piece.backgroundColor !== undefined) return styleOf(piece);
-    if (isFocused) return { color: ON_SURFACE, bold: true };
+    const isMarked = !isDone && piece.color !== undefined && piece.color !== TONE_KEYS.muted;
+    if (isFocused) return isMarked ? { ...styleOf(piece), bold: true } : { color: ON_SURFACE, bold: true };
+    if (isMarked) return styleOf(piece);
     return { ...(isDone ? { color: TONE_KEYS.muted } : styleOf(piece)), hover: { color: ON_SURFACE } };
   };
   return kit.Text({ wrap: "truncate-end", children: pieces.map((piece) => kit.Text({ ...style(piece), children: [piece.text] })) });

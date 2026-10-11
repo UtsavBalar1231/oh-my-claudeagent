@@ -226,7 +226,7 @@ test("the latest wave's finished agents keep their blocks under a Finished label
   const [button, facts] = isNode(done) ? (childrenOf(done) as Node[]) : [];
   const colors = (line: Node | undefined) => (line === undefined ? [] : (childrenOf(line) as Node[]).map((piece) => [piece.props?.["color"], piece.hover?.["color"]]));
   expect([button?.props?.["key"], button?.props?.["label"], button?.props?.["dimColor"]]).toEqual(["open-a-2", "explorer", true]);
-  expect(colors(facts)).toContainEqual(["success", "text"]);
+  expect(colors(facts)).toContainEqual(["success", undefined]);
   await ui.unmount();
 });
 
