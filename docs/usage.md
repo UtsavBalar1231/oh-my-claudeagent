@@ -8,7 +8,7 @@ file is listed in the [reference](references.md).
 ### Install
 
 Install the plugin with the command in the [README](../README.md#install). OMCA needs Claude
-Code 2.1.292 or later and bun 1.4.2 or later. `ast-grep` (or `sg`) is optional: without it the
+Code 2.1.295 or later and bun 1.4.2 or later. `ast-grep` (or `sg`) is optional: without it the
 `ast_*` tools return an error and everything else works.
 
 ### Run setup
@@ -379,7 +379,7 @@ which proposes rules from your past sessions.
 
 `/omca doctor` opens the Doctor tab and runs its checks:
 
-- the OMCA version that is loaded, and whether Claude Code meets the 2.1.292 floor;
+- the OMCA version that is loaded, and whether Claude Code meets the 2.1.295 floor;
 - whether bun 1.4.2 or later is on the session's `PATH`;
 - when a hook last reached the `omca` server;
 - whether `ast-grep` or `sg` is on `PATH`;
@@ -445,7 +445,7 @@ and the Doctor tab reports bun as missing. Make bun reachable from the app's `PA
 by linking it into a directory the app searches, and restart the app.
 
 The Code tab in Desktop runs its own bundled copy of Claude Code, which trails the CLI. OMCA's mod
-(the guard, band, pane, toasts and guard dialog) runs there only when that copy is 2.1.292 or
+(the guard, band, pane, toasts and guard dialog) runs there only when that copy is 2.1.295 or
 later; `/status` in a Code-tab session shows its version. On an older copy the agents, skills,
 MCP tools and stop gates still work and the mod does not load. Desktop for Linux is a beta for
 Debian and Ubuntu that updates through the package manager, so a newer bundled copy arrives with

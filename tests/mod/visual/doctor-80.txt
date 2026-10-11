@@ -1,5 +1,5 @@
 
- ▐▛███▛█   Claude Code v2.1.294
+ ▐▛███▛█   Claude Code v2.1.296
 ▝▜██████▀  Opus 5.5 · API Usage Billing
  ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd
 

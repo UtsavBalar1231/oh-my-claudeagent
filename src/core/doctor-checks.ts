@@ -44,7 +44,7 @@ export type Inputs = {
   hasOldMemory: boolean;
 };
 
-const ENGINE_FLOOR = "2.1.292";
+const ENGINE_FLOOR = "2.1.295";
 export const BUN_FLOOR = "1.4.2";
 const FRESH_MS = 10 * 60_000;
 

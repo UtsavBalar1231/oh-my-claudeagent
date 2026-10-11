@@ -1,5 +1,5 @@
                                                                │                                                      ✕
- ▐▛███▛█   Claude Code v2.1.294                                │1: A  2: P  3: E  4: N  5: S  6: Doctor
+ ▐▛███▛█   Claude Code v2.1.296                                │1: A  2: P  3: E  4: N  5: S  6: Doctor
 ▝▜██████▀  Opus 5.5 · API Usage Billing                        │─────────────────────────────────────────────────────
  ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd           │r: Run again    3 warn   1 info   9 ok
                                                                │  WARN  omca server
@@ -19,7 +19,7 @@
                                                                │  OK    OMCA
                                                                │  oh-my-claudeagent 2.21.0 is loaded
                                                                │  OK    Claude Code
-                                                               │  2.1.294 meets the 2.1.292 floor
+                                                               │  2.1.296 meets the 2.1.295 floor
                                                                │  OK    bun
                                                                │  bun 1.4.2 is on PATH
                                                                │  OK    ast-grep
