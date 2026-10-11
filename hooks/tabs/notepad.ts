@@ -3,7 +3,7 @@ import { isPlanName, matches, NOTEPAD_SECTIONS, type NotepadSection, parseEntrie
 import { BOULDER } from "../../src/core/omca-paths.ts";
 import { clean } from "../../src/core/checkboxes.ts";
 import { displayWidth, fitEnd, formatWhen } from "../../src/core/ui-kit.ts";
-import { chip, fitPieces, type Piece, piecesWidth, redact, type Tone, TONE_KEYS } from "../../src/core/visual.ts";
+import { chip, fitPieces, type Piece, piecesWidth, redact, themeKey, type Tone, TONE_KEYS } from "../../src/core/visual.ts";
 import type { Input } from "../dispatch.ts";
 import { boundPlanOf, type Host, reason, type State } from "../host.ts";
 import { buttonRow, keyButton, noticeRow, patchPane, refocus, type TabView, type View } from "../pane.ts";
@@ -166,7 +166,12 @@ function sectionCard(view: View, section: Shown, width: number, region: RenderEl
     onPress: view.press(() => undefined),
   });
   if (!isFramed) return view.kit.Box({ key: `section-${section.name}`, flexDirection: "column", width, children: [title, region] });
-  return Card(view.kit, { key: `section-${section.name}`, title, tone: TONES[section.name], isAscii: view.isAscii, width, children: [region] });
+  // Every card shares one frame; the section's colour marks its title alone, so four borders do not compete.
+  const marked = view.kit.Box({
+    flexDirection: "row",
+    children: [view.kit.Text({ color: themeKey(TONES[section.name]), children: [`${view.g.running} `] }), title],
+  });
+  return Card(view.kit, { key: `section-${section.name}`, title: marked, tone: "rule", isAscii: view.isAscii, width, children: [region] });
 }
 
 function sectionUnits(view: View, section: Shown, inner: number): Unit[] {
@@ -379,13 +384,15 @@ function draw(view: View, arranged: Arranged, above: number): RenderElement[] {
   const { columns, width } = arranged;
   const drawn = columns.map((column, index) => stack(view, column, arranged, index * (width + COLUMN_GAP), above));
   const [only] = drawn;
-  if (drawn.length === 1 && only !== undefined) return only;
+  // A remote surface has the height to set the cards apart; the terminal spends its rows on entries.
+  const gap = isRemote(view.kit) ? { rowGap: 1 } : {};
+  if (drawn.length === 1 && only !== undefined) return isRemote(view.kit) ? [view.kit.Box({ key: "notepad-cards", flexDirection: "column", ...gap, children: only })] : only;
   return [
     view.kit.Box({
       key: "notepad-columns",
       flexDirection: "row",
       columnGap: COLUMN_GAP,
-      children: drawn.map((cards, index) => view.kit.Box({ key: `notepad-column-${index}`, flexDirection: "column", width, children: cards })),
+      children: drawn.map((cards, index) => view.kit.Box({ key: `notepad-column-${index}`, flexDirection: "column", width, ...gap, children: cards })),
     }),
   ];
 }

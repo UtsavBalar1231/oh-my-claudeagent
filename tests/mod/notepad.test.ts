@@ -60,6 +60,8 @@ const styledCard = (borderStyle: string, key: string, border: string, width: num
 const card = (key: string, border: string, width: number, heading: unknown, ...children: unknown[]) =>
   styledCard("round", key, border, width, heading, ...children);
 const quiet = text({ dimColor: true }, "Nothing recorded yet");
+// A framed card's heading: the section's tone on a marker, then its title button.
+const marked = (tone: string, heading: unknown) => box({ flexDirection: "row" }, text({ color: tone }, `${glyphs("unicode").running} `), heading);
 
 // The tab row, and the rule under it where the dock has the rows for one.
 const chrome = (size: Size) => 1 + (size.placement === "dock" && size.rows - 4 >= 30 ? 1 : 0);
@@ -88,7 +90,7 @@ const cardsIn = (nodes: readonly Node[]) =>
     .filter((node) => node.type === "Box" && node.props?.["key"] !== "more-cue")
     .map((node) => [node.props?.["key"], node.props?.["width"], regionOf(node)?.props?.["key"], regionOf(node)?.props?.["height"]]);
 
-test("the Notepad tab draws one card per section in its tone, a title button, a dated rule above each entry, its markdown a row at a time, and masks a secret", async ($, on) => {
+test("the Notepad tab draws one card per section in one frame with its tone on a marker before the title button, a dated rule above each entry, its markdown a row at a time, and masks a secret", async ($, on) => {
   world(on, FILES);
   const ui = await open($, PAGE_120);
   const inner = usableColumns(bodyColumns(PAGE_120)) - 4;
@@ -104,9 +106,9 @@ test("the Notepad tab draws one card per section in its tone, a title button, a 
     box({ key: "notepad-keys", flexDirection: "row", columnGap: 2 }, button("f", "Find"), button("l", "Plans (2)")),
     card(
       "section-learnings",
-      "permission",
+      "subtle",
       inner + 4,
-      title("learnings", "Learnings · 2 entries"),
+      marked("permission", title("learnings", "Learnings · 2 entries")),
       region(
         "learnings",
         inner,
@@ -119,13 +121,13 @@ test("the Notepad tab draws one card per section in its tone, a title button, a 
     ),
     card(
       "section-issues",
-      "warning",
+      "subtle",
       inner + 4,
-      title("issues", "Issues · 1 entry"),
+      marked("warning", title("issues", "Issues · 1 entry")),
       region("issues", inner, dated(inner, ISSUE_AT), line([{ text: "export " }, { text: "API_TOKEN=‹masked›", color: "permission" }, { text: " first" }])),
     ),
-    card("section-decisions", "claude", inner + 4, title("decisions", "Decisions · 0 entries"), region("decisions", inner, quiet)),
-    card("section-problems", "error", inner + 4, title("problems", "Problems · 0 entries"), region("problems", inner, quiet)),
+    card("section-decisions", "subtle", inner + 4, marked("claude", title("decisions", "Decisions · 0 entries")), region("decisions", inner, quiet)),
+    card("section-problems", "subtle", inner + 4, marked("error", title("problems", "Problems · 0 entries")), region("problems", inner, quiet)),
   ]);
   await ui.unmount();
 });
@@ -401,7 +403,8 @@ test("OMCA_GLYPHS=ascii draws the notepad's card borders, rules, chip, separator
   const drawn = rows(await ui.drawn());
 
   expect(drawn[chrome(size)]).toBe("sample [BOUND] - 3 entries - 1 masked");
-  expect((await ui.find({ key: "section-issues" }))?.props).toMatchObject({ borderStyle: "classic", borderColor: "warning" });
+  expect((await ui.find({ key: "section-issues" }))?.props).toMatchObject({ borderStyle: "classic", borderColor: "subtle" });
+  expect(await ui.find({ type: "Text", text: "* " })).toBeDefined();
   expect((await ui.find({ key: "notepad-title-issues" }))?.props).toMatchObject({ label: "Issues - 1 entry" });
   expect(await ui.find({ type: "Text", text: "API_TOKEN=" })).toBeDefined();
   expect(drawn.filter((row) => !isAscii(row))).toEqual([]);

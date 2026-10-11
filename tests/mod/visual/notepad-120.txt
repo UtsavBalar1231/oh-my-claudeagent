@@ -4,14 +4,14 @@
  ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd           │checkout-redesign  BOUND  · 10 entries · 1 masked
                                                                │f: Find  l: Plans (3)
                                                                │╭───────────────────────────────────────────────────╮
-                                                               ││ Learnings · 3 entries                             │
+                                                               ││  Learnings · 3 entries                           │
                                                                ││ ── 10-01 15:12 ────────────────────────────────── │
                                                                ││ The cart totals were computed in three places.    │
                                                                ││ CheckoutPage, OrderEmail and the receipt PDF now  │
                                                                ││ ↓ more · wheel to scroll                          │
                                                                │╰───────────────────────────────────────────────────╯
                                                                │╭───────────────────────────────────────────────────╮
-                                                               ││ Issues · 2 entries                                │
+                                                               ││  Issues · 2 entries                              │
                                                                ││ ── 10-01 20:50 ────────────────────────────────── │
                                                                ││ just test fails on a clean checkout until the     │
                                                                ││ payments sandbox is up. The README says to export │
@@ -19,14 +19,14 @@
                                                                ││ ↓ more · wheel to scroll                          │
                                                                │╰───────────────────────────────────────────────────╯
                                                                │╭───────────────────────────────────────────────────╮
-                                                               ││ Decisions · 3 entries                             │
+                                                               ││  Decisions · 3 entries                           │
                                                                ││ ── 10-01 15:32 ────────────────────────────────── │
                                                                ││ Keep the saved cards in the existing wallet       │
                                                                ││ service rather than a new table. Why: the mobile  │
                                                                ││ ↓ more · wheel to scroll                          │
                                                                │╰───────────────────────────────────────────────────╯
                                                                │╭───────────────────────────────────────────────────╮
-                                                               ││ Problems · 2 entries                              │
+                                                               ││  Problems · 2 entries                            │
                                                                ││ ── 10-02 23:01 ────────────────────────────────── │
                                                                ││ Task 3 is blocked: the wallet API returns cards   │
                                                                ││ without an expiry for 2% of customers, and the    │

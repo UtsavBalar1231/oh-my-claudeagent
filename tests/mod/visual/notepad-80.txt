@@ -24,7 +24,7 @@
 │ checkout-redesign  BOUND  · 10 entries · 1 masked                            │
 │ f: Find  l: Plans (3)                                                        │
 │ ╭───────────────────────────────────────────────────────────────────────╮    │
-│ │ Learnings · 3 entries                                                 │    │
+│ │  Learnings · 3 entries                                               │    │
 │ │ ── 10-01 15:12 ────────────────────────────────────────────────────── │    │
 │ │ The cart totals were computed in three places. CheckoutPage,          │    │
 │ │ ↓ more · wheel to scroll                                              │    │
