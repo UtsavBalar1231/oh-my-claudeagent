@@ -243,7 +243,7 @@ test("each tab key shows its tab, on the terminal and the desktop", async ($, on
 
     await ui.press({ key: "3" });
     expect((await body())[0]).toContain(" COMPLETE  matches the current plan");
-    expect((await body()).filter((row) => /^[❯ ] [✓✗] {2}\d\d:\d\d /.test(row))).toEqual([
+    expect((await body()).filter((row) => /^[❯ ] [✓✗] {2}\d\d:\d\d /.test(row)).map((row) => row.trimEnd())).toEqual([
       `❯ ✓  ${time("2026-10-02T11:45:00Z")}  final   just ci`,
       `  ✓  ${time("2026-10-02T10:20:00Z")}  test    just test-mod`,
       `  ✗  ${time("2026-10-02T10:00:00Z")}  test    just test-mod`,

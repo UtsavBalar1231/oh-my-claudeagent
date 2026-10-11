@@ -291,13 +291,15 @@ export function nodeByKey(element: unknown, key: string): Node | undefined {
   return childrenOf(element).reduce<Node | undefined>((found, child) => found ?? nodeByKey(child, key), undefined);
 }
 
-/** An element's text as its row reads: a Button `hotkey: label`, a Box's children joined by its column gap. */
+/** An element's text as its row reads: a Button its children or `hotkey: label`, a Box's children joined by its column gap. */
 export function textOf(element: unknown): string {
   if (typeof element === "string") return element;
   if (!isNode(element)) return "";
   const line = lineCodeOf(element);
   if (line !== undefined) return line;
-  if (element.type === "Button") return typeof element.props?.["hotkey"] === "string" ? `${element.props["hotkey"]}: ${String(element.props["label"])}` : String(element.props?.["label"]);
+  if (element.type === "Button" && childrenOf(element).length === 0) {
+    return typeof element.props?.["hotkey"] === "string" ? `${element.props["hotkey"]}: ${String(element.props["label"])}` : String(element.props?.["label"]);
+  }
   const gap = " ".repeat(typeof element.props?.["columnGap"] === "number" ? element.props["columnGap"] : 0);
   return childrenOf(element).map(textOf).join(gap);
 }
@@ -328,7 +330,7 @@ export const local = (iso: string): string => formatWhen(iso);
 
 // The cells one element takes across, as the terminal lays it out: Text its string children
 // (a wrapping Text its longest word, since it breaks between words),
-// a plain Button `key: label`, a row Box its children and gaps, a column Box its widest child.
+// a Button its children or a plain `key: label`, a row Box its children and gaps, a column Box its widest child.
 // Markdown wraps to the box it is given and is left out.
 export function cellsAcross(element: unknown): number {
   if (typeof element === "string") return displayWidth(element);
@@ -341,6 +343,7 @@ export function cellsAcross(element: unknown): number {
       return childrenOf(element).reduce<number>((sum, child) => sum + cellsAcross(child), 0);
     }
     case "Button": {
+      if (childrenOf(element).length > 0) return childrenOf(element).reduce<number>((sum, child) => sum + cellsAcross(child), 0);
       const label = String(props["label"] ?? "");
       return displayWidth(typeof props["hotkey"] === "string" ? `${props["hotkey"]}: ${label}` : label);
     }
@@ -382,11 +385,11 @@ export function rows(tree: RenderElement): string[] {
     const props = element.props ?? {};
     const line = lineCodeOf(element);
     if (line !== undefined) return line;
-    if (element.type === "Button") {
+    if (element.type === "Button" && childrenOf(element).length === 0) {
       const label = String(props["label"] ?? "");
       return typeof props["hotkey"] === "string" ? `${props["hotkey"]}: ${label}` : label;
     }
-    if (element.type !== "Text" && element.type !== "Box") return "";
+    if (element.type !== "Text" && element.type !== "Box" && element.type !== "Button") return "";
     const gap = " ".repeat(typeof props["columnGap"] === "number" ? props["columnGap"] : 0);
     return childrenOf(element).map(text).join(element.type === "Box" ? gap : "");
   };

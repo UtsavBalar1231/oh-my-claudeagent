@@ -283,8 +283,11 @@ function fitCommand(view: View, entry: Entry, layout: Layout): { fitted: string;
   return { fitted, isCut: fitted !== command };
 }
 
+// The row is one Button: its pieces are the Button's Text children, padded to the row's width so a
+// click anywhere on it selects the entry and the focus or hover background spans it. The clock stays
+// dim on the focused row; the rest reads bold on the focus background.
 function entryRow(host: Host, view: View, entry: Entry, index: number, layout: Layout, isFocused: boolean): RenderElement {
-  const { Box, Button } = view.kit;
+  const { Box, Button, Text } = view.kit;
   const { fitted } = fitCommand(view, entry, layout);
   const lead: Piece[] = [{ text: isFocused ? `${view.g.pointer} ` : "  " }, outcome(view, entry.exitCode), gap];
   const rest: Piece[] = [
@@ -295,16 +298,23 @@ function entryRow(host: Host, view: View, entry: Entry, index: number, layout: L
     ...(layout.agent > 0 && displayWidth(fitted) < layout.command ? [{ text: " ".repeat(layout.command - displayWidth(fitted)) }] : []),
     ...agentPieces(view, entry.verifiedBy, layout.agent),
   ];
-  const room = layout.command + FIXED_CELLS + layout.agent - piecesWidth(lead) - CLOCK_CELLS;
+  const width = layout.command + FIXED_CELLS + layout.agent;
+  const shown = (pieces: readonly Piece[]): readonly Piece[] => (isFocused ? pieces.map(({ text }) => ({ text, color: ON_SURFACE, bold: true })) : pieces);
+  const pieces = [...shown(lead), { text: clockOf(entry.at), dimColor: true as const }, ...shown(fitPieces(rest, width - piecesWidth(lead) - CLOCK_CELLS, view.g.ellipsis))];
+  const pad = width - piecesWidth(pieces);
+  const lit = isFocused ? { backgroundColor: TONE_KEYS.focus } : { hover: { color: ON_SURFACE, backgroundColor: TONE_KEYS.focus } };
   return Box({
-    key: `entry-${index}`,
-    flexDirection: "row",
-    hover: { backgroundColor: TONE_KEYS.focus },
-    ...(isFocused ? { backgroundColor: TONE_KEYS.focus } : {}),
+    key: `entry-row-${index}`,
     children: [
-      Pieces(view.kit, lead, { isFocused }),
-      Button({ key: `entry-time-${index}`, label: clockOf(entry.at), plain: true, dimColor: true, onPress: view.press(() => select(host, index)) }),
-      Pieces(view.kit, fitPieces(rest, room, view.g.ellipsis), { isFocused }),
+      Button({
+        key: `entry-${index}`,
+        label: oneLine(masked(view, entry.command).text),
+        plain: true,
+        // The pointer inverts a Button; the row shows the focus background under it instead.
+        hover: { inverse: false },
+        onPress: view.press(() => select(host, index)),
+        children: [...pieces, ...(pad > 0 ? [{ text: " ".repeat(pad) }] : [])].map(({ text, ...style }) => Text({ ...style, ...lit, children: [text] })),
+      }),
     ],
   });
 }

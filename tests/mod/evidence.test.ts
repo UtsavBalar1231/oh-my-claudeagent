@@ -62,7 +62,8 @@ async function proofFiles(planSha?: string): Promise<Record<string, string>> {
 }
 
 // The drawing as text, one entry per terminal row: a bordered Box is framed, a Code block's
-// lines are marked `│`, an Input is bracketed, and a row Box lays its children side by side.
+// lines are marked `│`, an Input is bracketed, a row Box lays its children side by side, and a
+// Button with children reads as them, less the padding that fills its row.
 function lines(element: unknown): string[] {
   if (typeof element === "string") return [element];
   if (!isNode(element)) return [];
@@ -71,6 +72,7 @@ function lines(element: unknown): string[] {
     case "Text":
       return [childrenOf(element).map((child) => lines(child).join("")).join("")];
     case "Button":
+      if (childrenOf(element).length > 0) return [childrenOf(element).map((child) => lines(child).join("")).join("").trimEnd()];
       return [props["hotkey"] === undefined ? String(props["label"]) : `${String(props["hotkey"])}: ${String(props["label"])}`];
     case "Code":
       return String(props["source"]).split("\n").map((line) => `│${line}`);
@@ -104,16 +106,22 @@ function lines(element: unknown): string[] {
   }
 }
 
-// A row's runs as drawn: each piece's text and the colors it carries.
-function runsOf(row: Node | undefined): { text: string; color?: unknown; backgroundColor?: unknown; bold?: unknown }[] {
-  return (row === undefined ? [] : childrenOf(row)).flatMap((part) => {
-    if (!isNode(part)) return [];
-    if (part.type === "Button") return [{ text: String(part.props?.["label"]) }];
-    return childrenOf(part).flatMap((piece) => {
-      if (!isNode(piece)) return [];
-      const { color, backgroundColor, bold } = piece.props ?? {};
-      return [{ text: childrenOf(piece).join(""), ...(color === undefined ? {} : { color }), ...(backgroundColor === undefined ? {} : { backgroundColor }), ...(bold === undefined ? {} : { bold }) }];
-    });
+type Run = { text: string; color?: unknown; backgroundColor?: unknown; bold?: unknown; dimColor?: unknown };
+
+// A row Button's runs as drawn: each piece's text and the styles it carries.
+function runsOf(row: Node | undefined): Run[] {
+  return (row === undefined ? [] : childrenOf(row)).flatMap((piece) => {
+    if (!isNode(piece)) return [];
+    const { color, backgroundColor, bold, dimColor } = piece.props ?? {};
+    return [
+      {
+        text: childrenOf(piece).join(""),
+        ...(color === undefined ? {} : { color }),
+        ...(backgroundColor === undefined ? {} : { backgroundColor }),
+        ...(bold === undefined ? {} : { bold }),
+        ...(dimColor === undefined ? {} : { dimColor }),
+      },
+    ];
   });
 }
 
@@ -165,7 +173,7 @@ test("narrow: the verdict card, the day-grouped timeline and the focused entry o
   ]);
   expect(nodeByKey(await ui.drawn(), "verdict")?.props).toMatchObject({ borderStyle: "round", borderColor: "success" });
   const verdict = nodeByKey(await ui.drawn(), "verdict");
-  const runs = childrenOf(verdict ?? { type: "Box" }).flatMap((line) => runsOf({ type: "Box", children: [line] }));
+  const runs = childrenOf(verdict ?? { type: "Box" }).flatMap((line) => (isNode(line) ? runsOf(line) : []));
   const latest = [" build", " test", " lint", " manual"].map((word) => runs.find((run) => run.text === word));
   expect(latest).toEqual([{ text: " build" }, { text: " test" }, { text: " lint" }, { text: " manual" }]);
   expect(runs.filter((run) => run.text === "✓" || run.text === "✗").map((run) => run.color)).toEqual(["success", "success", "error", "success"]);
@@ -265,7 +273,7 @@ test("rows lead with the outcome glyph in its tone, the type a muted word but th
     { text: "  " },
     { text: "✓", color: "success" },
     { text: "  " },
-    { text: "10:20" },
+    { text: "10:20", dimColor: true },
     { text: "  " },
     { text: "test  ", color: "inactive" },
     { text: "  " },
@@ -275,8 +283,7 @@ test("rows lead with the outcome glyph in its tone, the type a muted word but th
     { text: "◆", color: "green_FOR_SUBAGENTS_ONLY" },
     { text: " executor    ", color: "inactive" },
   ]);
-  expect(nodeByKey(tree, "entry-3")?.props).toEqual({ key: "entry-3", flexDirection: "row" });
-  expect((await ui.find({ key: "entry-time-3" }))?.props).toMatchObject({ label: "10:20", plain: true, dimColor: true });
+  expect(nodeByKey(tree, "entry-3")?.props).toEqual({ key: "entry-3", label: "curl -H 'Authorization: Bearer ‹masked›' https://ci.example/run && just test", plain: true });
   expect(runsOf(nodeByKey(tree, "entry-3")).filter((run) => run.backgroundColor !== undefined)).toEqual([]);
   const mark = (key: string) => runsOf(nodeByKey(tree, key))[1];
   expect(["entry-0", "entry-1", "entry-4"].map(mark)).toEqual([
@@ -286,16 +293,17 @@ test("rows lead with the outcome glyph in its tone, the type a muted word but th
   ]);
   expect(runsOf(nodeByKey(tree, "entry-1"))[5]).toEqual({ text: "lint  ", color: "inactive" });
   expect(runsOf(nodeByKey(tree, "entry-1")).at(-1)).toEqual({ text: " explorer    ", color: "inactive" });
-  expect(nodeByKey(tree, "entry-5")?.props).toEqual({ key: "entry-5", flexDirection: "row", backgroundColor: "selectionBg" });
-  expect(runsOf(nodeByKey(tree, "entry-5"))[5]).toEqual({ text: "final ", color: "text", bold: true });
-  expect(runsOf(nodeByKey(tree, "entry-5")).at(-1)).toEqual({ text: " orchestrator", color: "text", bold: true });
+  expect(runsOf(nodeByKey(tree, "entry-5")).filter((run) => run.backgroundColor !== "selectionBg")).toEqual([]);
+  expect(runsOf(nodeByKey(tree, "entry-5"))[3]).toEqual({ text: "11:45", dimColor: true, backgroundColor: "selectionBg" });
+  expect(runsOf(nodeByKey(tree, "entry-5"))[5]).toEqual({ text: "final ", color: "text", bold: true, backgroundColor: "selectionBg" });
+  expect(runsOf(nodeByKey(tree, "entry-5")).at(-1)).toEqual({ text: " orchestrator", color: "text", bold: true, backgroundColor: "selectionBg" });
 
   await $.ui.scroll({ ...SCROLL, by: 2, bodyRows: 46, contentRows: 47 });
   const opened = await ui.drawn();
   const command = runsOf(nodeByKey(opened, "entry-3")).slice(7, 9);
   expect(command).toEqual([
-    { text: "curl", color: "text", bold: true },
-    { text: " -H 'Authorization: …example/run && just test", color: "text", bold: true },
+    { text: "curl", color: "text", bold: true, backgroundColor: "selectionBg" },
+    { text: " -H 'Authorization: …example/run && just test", color: "text", bold: true, backgroundColor: "selectionBg" },
   ]);
   const meta = childrenOf(nodeByKey(opened, "detail-3") ?? { type: "Box" }).at(-1);
   expect(lines(meta)).toEqual(["2026-10-02 10:20:00 · ◆ executor · 2 secrets masked"]);
@@ -380,32 +388,69 @@ test("a wheel tick over the card scrolls only the card; over the list it moves t
   await ui.unmount();
 });
 
-test("pressing an entry's time selects it: the card shows that run and starts at its top", async ($, on) => {
+test("pressing an entry's row selects it: the card shows that run and starts at its top", async ($, on) => {
   world(on, await proofFiles());
   const ui = await openEvidence($, DOCK_210);
   const cardSide = async () => (await body(ui, DOCK_210)).map((row) => row.slice(row.indexOf("│") + 2)).find((row) => /^[✓✗] .* (passed|failed)$/.test(row));
   expect(await cardSide()).toBe("✓ Final verification passed");
-  await ui.press({ key: "entry-time-2" });
+  await ui.press({ key: "entry-2" });
   expect(await cardSide()).toBe("✗ Test run failed");
   expect((await body(ui, DOCK_210)).at(-2)).toEndWith("4/6 · ↑↓ move");
-  expect((await ui.find({ key: "entry-2" }))?.props).toMatchObject({ backgroundColor: "selectionBg" });
+  const pressed = runsOf(nodeByKey(await ui.drawn(), "entry-2"));
+  expect(pressed.slice(0, 4)).toEqual([
+    { text: "❯ ", color: "text", bold: true, backgroundColor: "selectionBg" },
+    { text: "✗", color: "text", bold: true, backgroundColor: "selectionBg" },
+    { text: "  ", color: "text", bold: true, backgroundColor: "selectionBg" },
+    { text: "10:00", dimColor: true, backgroundColor: "selectionBg" },
+  ]);
+  expect(pressed.filter((run) => run.backgroundColor !== "selectionBg")).toEqual([]);
   await ui.unmount();
 });
 
-test("pressing a time puts a scrolled card back at its top, even on the entry already focused", async ($, on) => {
+test("pressing a row puts a scrolled card back at its top, even on the entry already focused", async ($, on) => {
   world(on, { ...(await proofFiles()), [LEDGER]: JSON.stringify({ entries: TALL_RUNS }) });
   const tall = await openEvidence($, DOCK_210);
   await tick($, 4, CARD_AT);
   expect((await cardOf(tall)).offset).toBe(4);
-  await tall.press({ key: "entry-time-0" });
+  await tall.press({ key: "entry-0" });
   expect((await body(tall, DOCK_210)).at(-2)).toEndWith("2/2 · ↑↓ move");
-  await tall.press({ key: "entry-time-1" });
+  await tall.press({ key: "entry-1" });
   expect((await body(tall, DOCK_210)).at(-2)).toEndWith("1/2 · ↑↓ move");
   expect((await cardOf(tall)).offset).toBe(0);
   await tick($, 4, CARD_AT);
-  await tall.press({ key: "entry-time-1" });
+  await tall.press({ key: "entry-1" });
   expect((await cardOf(tall)).offset).toBe(0);
   await tall.unmount();
+});
+
+test("an entry's row is one Button: its children draw the glyph, time, type, command and agent, and a press on the row selects the entry", async ($, on) => {
+  world(on, await proofFiles());
+  const ui = await openEvidence($, DOCK_190);
+  const row = await ui.find({ key: "entry-1" });
+  expect([row?.type, row?.props["label"], row?.props["plain"]]).toEqual(["Button", "just lint", true]);
+  expect(runsOf(row)).toEqual([
+    { text: "  " },
+    { text: "✗", color: "error" },
+    { text: "  " },
+    { text: "09:30", dimColor: true },
+    { text: "  " },
+    { text: "lint  ", color: "inactive" },
+    { text: "  " },
+    { text: "just", bold: true },
+    { text: " lint" },
+    { text: " ".repeat(40) },
+    { text: "  " },
+    { text: "◆", color: "blue_FOR_SUBAGENTS_ONLY" },
+    { text: " explorer    ", color: "inactive" },
+  ]);
+
+  await ui.press({ key: "entry-1" });
+  expect(runsOf(await ui.find({ key: "entry-1" })).slice(0, 2)).toEqual([
+    { text: "❯ ", color: "text", bold: true, backgroundColor: "selectionBg" },
+    { text: "✗", color: "text", bold: true, backgroundColor: "selectionBg" },
+  ]);
+  expect(runsOf(await ui.find({ key: "entry-5" }))[0]).toEqual({ text: "  " });
+  await ui.unmount();
 });
 
 test("a run whose output is taller than the card shows the more cue, and every output line is reachable by scrolling", async ($, on) => {
