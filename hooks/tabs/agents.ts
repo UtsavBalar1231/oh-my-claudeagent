@@ -1,4 +1,5 @@
 import type { RenderElement } from "claude-code";
+import { lookOf } from "../../src/core/agent-type.ts";
 import { inlineMarkdown, markdownPieces } from "../../src/core/markdown.ts";
 import {
   type Block,
@@ -164,7 +165,7 @@ function card(view: View, { lane, at, height }: Placed, end: number): RenderElem
     key: `card-${lane.id}`,
     scope: scopeOf(lane),
     title: fitEnd(`${shortType(lane.type)} ${g.dot} ${lane.description}`, inner, g.ellipsis),
-    tone: agentKey(lane.type),
+    tone: agentKey(lookOf(lane)),
     isAscii: view.isAscii,
     lines,
     top: top - end,
@@ -323,9 +324,9 @@ export const view: TabView = async (host, view) => {
   const scoped = (lane: Lane, children: RenderElement[]) =>
     kit.Box({ key: `agent-${lane.id}`, flexDirection: "column", hover: { scope: scopeOf(lane) }, children });
   const block = (lane: Lane, key: string, parts: Block, details: RenderElement[], isFirst: boolean): RenderElement => {
-    const mini = kit.mascot(lane.type, stateOf(lane), keyOf(lane.id), frame(), "mini");
+    const mini = kit.mascot(lookOf(lane), stateOf(lane), keyOf(lane.id), frame(), "mini");
     if (mini !== null) minis.push([lane.id, "mini"]);
-    const icon = kit.Box({ width: gutter, children: [mini ?? kit.Text({ color: agentKey(lane.type), children: [agentGlyph(lane.type, g)] })] });
+    const icon = kit.Box({ width: gutter, children: [mini ?? kit.Text({ color: agentKey(lookOf(lane)), children: [agentGlyph(lane.type, g)] })] });
     const rows = [
       openRow(view, host, lane, key, parts.head, 1, 0, isFirst),
       ...parts.task.map((line) => Line(kit, line)),

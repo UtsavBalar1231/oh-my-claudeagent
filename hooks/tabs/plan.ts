@@ -1,4 +1,5 @@
 import type { RenderElement } from "claude-code";
+import { lookOf } from "../../src/core/agent-type.ts";
 import { type Drawn, drawnAt, type FocusList, focusMove, placeWindow, windowOf } from "../../src/core/list-window.ts";
 import { BOULDER } from "../../src/core/omca-paths.ts";
 import { type Platform, samePath, tildePath } from "../../src/core/path.ts";
@@ -609,7 +610,7 @@ function agentPieces(view: View, agents: readonly Agent[]): Piece[] {
     .filter((agent) => agent.endedAt === null)
     .flatMap((agent, index) => [
       ...(index === 0 ? [] : [{ text: dotOf(view), color: TONE_KEYS.muted }]),
-      { text: `${agentGlyph(agent.type, view.g)} ${shortType(agent.type)}`, color: agentKey(agent.type) },
+      { text: `${agentGlyph(agent.type, view.g)} ${shortType(agent.type)}`, color: agentKey(lookOf(agent)) },
       ...(agent.task === undefined ? [] : [{ text: ` on ${agent.task}`, color: TONE_KEYS.muted }]),
     ]);
 }
@@ -692,7 +693,7 @@ function rightPieces(view: View, ctx: Ctx, card: Card, isShort: boolean): Piece[
   const pieces: Piece[] = [];
   for (const agent of ctx.running.get(card.n) ?? []) {
     const glyph = agentGlyph(agent.type, view.g);
-    pieces.push({ text: " " }, { text: isShort ? glyph : `${glyph} ${shortType(agent.type)}`, color: agentKey(agent.type) });
+    pieces.push({ text: " " }, { text: isShort ? glyph : `${glyph} ${shortType(agent.type)}`, color: agentKey(lookOf(agent)) });
   }
   const waiting = waitingOn(ctx, card);
   if (!card.done && waiting.length > 0 && !ctx.running.has(card.n)) {
@@ -991,7 +992,7 @@ function detail(view: View, ctx: Ctx, card: Card, width: number): Unit[] {
   const chips: Piece[] = [
     chip(STATUS[status].word, STATUS[status].tone, view.isAscii),
     ...(verdict === undefined ? [] : [{ text: " " }, chip(PROOF[verdict.proof].word, PROOF[verdict.proof].tone, view.isAscii)]),
-    ...(ctx.running.get(card.n) ?? []).flatMap((agent) => [{ text: " " }, { text: `${agentGlyph(agent.type, view.g)} ${shortType(agent.type)}`, color: agentKey(agent.type) }]),
+    ...(ctx.running.get(card.n) ?? []).flatMap((agent) => [{ text: " " }, { text: `${agentGlyph(agent.type, view.g)} ${shortType(agent.type)}`, color: agentKey(lookOf(agent)) }]),
   ];
   const other = card.fields.filter((field) => !SHOWN_APART.includes(field.name.toLowerCase()));
   const doText = fieldsText(card, "do");

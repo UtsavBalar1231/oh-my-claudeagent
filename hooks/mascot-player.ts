@@ -1,4 +1,5 @@
 import type { Timer } from "claude-code";
+import { lookOf } from "../src/core/agent-type.ts";
 import type { Lane } from "../src/core/mission.ts";
 import { FRAME_MS, framesOf, GRID, type MascotName, type MascotSize, type MascotState, mascotOf, rasterCells } from "../src/core/mascots.ts";
 import { type Host, reason } from "./host.ts";
@@ -31,7 +32,7 @@ async function working(host: Host): Promise<{ id: string; name: MascotName; size
   const [pane, agents, surfaces] = await Promise.all([host.state.pane.get(), host.state.agents.get(), host.session.surfaces()]);
   if (pane.value?.tab !== "agents" || !surfaces.includes("terminal")) return [];
   return Object.entries(agents.value ?? {}).flatMap(([id, row]) => {
-    const name = mascotOf(row.type);
+    const name = mascotOf(lookOf(row));
     const size = drawn.get(id);
     return name === undefined || size === undefined || stateOf(row) !== "working" ? [] : [{ id, name, size }];
   });

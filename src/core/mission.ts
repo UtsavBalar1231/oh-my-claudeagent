@@ -40,6 +40,7 @@ type Status = "running" | "idle" | "waiting" | "pending" | "answer" | "aborted" 
 export type Lane = {
   id: string;
   type: string;
+  forkOf?: string;
   description: string;
   model: string;
   effort: Effort | null;

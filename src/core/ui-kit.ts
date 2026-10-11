@@ -90,6 +90,7 @@ export const AGENT_ICONS: Readonly<Record<string, string>> = {
   "build-fixer": "\u{f0ad}",
   executor: "\u{f085}",
   explorer: "\u{f14e}",
+  fork: "\u{f126}",
   orchestrator: "\u{f001}",
   planner: "\u{f0ea}",
   researcher: "\u{f02d}",

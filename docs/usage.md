@@ -248,6 +248,11 @@ agent works, smiles when the agent finishes, sweats when it fails and dozes whil
 `OMCA_GLYPHS=ascii` draws none. With Claude Code's `prefersReducedMotion` setting on, the mascots hold
 still: a working mascot shows its first frame and Desktop draws a single frame.
 
+A fork is a copy of the agent that started it, so its lane wears that agent's mascot and color
+under the name `fork`, with a fork icon in place of the agent's own. A fork of the main
+conversation wears the main agent's, which is the orchestrator unless your `agent` setting names
+another; with no main agent set, a fork draws no mascot.
+
 The band and the pane draw every color from your Claude Code theme, so a custom theme in
 `~/.claude/themes/` applies to them too. Each state also carries a glyph, and a word where the
 row has room for it beside the agent's name, so nothing depends on color alone. Secrets in

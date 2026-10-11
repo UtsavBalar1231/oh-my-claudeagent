@@ -274,6 +274,7 @@ describe("glyphs", () => {
     expect(agentGlyph("oh-my-claudeagent:build-fixer", nerd)).toBe("\u{f0ad}");
     expect(agentGlyph("other-plugin:planner", nerd)).toBe("\u{f007}");
     expect(agentGlyph("executor", nerd)).toBe("\u{f085}");
+    expect(agentGlyph("fork", nerd)).toBe("\u{f126}");
     expect(agentGlyph("general-purpose", nerd)).toBe("\u{f007}");
     expect(agentGlyph("oh-my-claudeagent:architect", glyphs("unicode"))).toBe("◆");
     expect(agentGlyph("oh-my-claudeagent:architect", glyphs("ascii"))).toBe("@");

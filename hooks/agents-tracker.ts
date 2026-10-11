@@ -1,4 +1,5 @@
 import type { AgentInfo, TurnUsage } from "claude-code";
+import { FORK, lookOf } from "../src/core/agent-type.ts";
 import { firstLine, lastLine, STATUS_WORDS, toolDetail } from "../src/core/mission.ts";
 import { taskReference } from "../src/core/plan-reader.ts";
 import { estimateCostUsd } from "../src/core/pricing.ts";
@@ -32,6 +33,18 @@ const startedAt = new Map<string, { agentId: string; at: number }>();
 async function masked(host: Host, text: string, cells: number): Promise<string> {
   const g = glyphs((await sessionOf(host)).glyphTier);
   return fitEnd(redact(oneLine(text), "", g.mask).text, cells, g.ellipsis);
+}
+
+// A fork copies the loop that spawned it. The main loop runs as the `agent` setting, which OMCA's
+// own settings make the orchestrator; merged settings carry a plugin's value as well as the user's.
+async function forkedFrom(host: Host, parentAgentId: string | undefined): Promise<string | undefined> {
+  if (parentAgentId === undefined) {
+    const main = (await host.settings.read())["agent"];
+    return typeof main === "string" && main !== "" ? main : undefined;
+  }
+  const parent = (await host.state.agents.get()).value?.[parentAgentId];
+  const look = parent === undefined ? undefined : lookOf(parent);
+  return look === FORK ? undefined : look;
 }
 
 async function maskedText(host: Host, text: string, max: number): Promise<string> {
@@ -162,10 +175,12 @@ export const agentsTracker: Features = {
       const { agentId, model } = result;
       const startedAt = await host.clock.now();
       const task = taskReference(e.prompt, e.description);
+      const forkOf = e.subagentType === FORK ? await forkedFrom(host, e.parentAgentId) : undefined;
       await update(host.state.agents, (agents) => ({
         ...agents,
         [agentId]: {
           type: e.subagentType,
+          ...(forkOf === undefined ? {} : { forkOf }),
           description: e.description,
           model,
           effort: null,

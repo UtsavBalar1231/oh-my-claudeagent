@@ -1,4 +1,5 @@
 import type { RenderElement } from "claude-code";
+import { lookOf } from "../../src/core/agent-type.ts";
 import { costText, type Lane, shellLanguage, STATUS_WORDS, statusMark, toolLabel } from "../../src/core/mission.ts";
 import { GRID, type MascotSize } from "../../src/core/mascots.ts";
 import { agentGlyph, clockOf, COLUMN_GAP, fitEnd, formatDuration, formatTokens, KEYS, oneLine, padEnd, padStart, shortType } from "../../src/core/ui-kit.ts";
@@ -75,7 +76,7 @@ function header(view: View, lane: Lane): { children: RenderElement[]; rows: numb
   const { g, kit } = view;
   const mark = statusMark(lane.status, g);
   const identity: Piece[] = [
-    { text: `${agentGlyph(lane.type, g)} `, color: agentKey(lane.type) },
+    { text: `${agentGlyph(lane.type, g)} `, color: agentKey(lookOf(lane)) },
     { text: shortType(lane.type), color: ON_SURFACE, bold: true },
     ...(lane.description === "" ? [] : [{ text: ` ${g.dot} ${oneLine(lane.description)}` }]),
   ];
@@ -88,7 +89,7 @@ function header(view: View, lane: Lane): { children: RenderElement[]; rows: numb
   ];
   const size: MascotSize = facts.length <= 2 || view.rows < rowsOf("full") + ROWS_BELOW ? "mini" : "full";
   const room = view.width - GRID[size].width - COLUMN_GAP;
-  const mascot = room < MIN_TEXT_CELLS || view.rows < rowsOf(size) + ROWS_BELOW ? null : kit.mascot(lane.type, stateOf(lane), keyOf(lane.id), frame(), size);
+  const mascot = room < MIN_TEXT_CELLS || view.rows < rowsOf(size) + ROWS_BELOW ? null : kit.mascot(lookOf(lane), stateOf(lane), keyOf(lane.id), frame(), size);
   show(mascot === null ? [] : [[lane.id, size]]);
   const width = mascot === null ? view.width : room;
   const state: Piece[] = [{ text: `${mark.glyph} `, color: mark.color }, { text: status, color: TONE_KEYS.muted }];

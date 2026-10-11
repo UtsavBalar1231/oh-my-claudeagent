@@ -4,6 +4,7 @@ declare module "claude-code" {
       agents: {
         readonly [agentId: string]: {
           type: string;
+          forkOf?: string;
           description: string;
           model: string;
           effort: "low" | "medium" | "high" | "xhigh" | "max" | number | null;

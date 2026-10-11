@@ -1,7 +1,7 @@
 import type { On, RenderElement } from "claude-code";
 import { type Engine, expect, test } from "claude-code/testing";
 import { FRAME_MS, framesOf, type MascotName, type MascotSize, type MascotState, rasterCells, svgOf } from "../../src/core/mascots.ts";
-import { childrenOf, isNode, type Node, nodeByKey, pane, run, type Size, usage, world } from "./world.ts";
+import { childrenOf, isNode, type Node, nodeByKey, pane, run, type Size, textOf, usage, world } from "./world.ts";
 
 const DOCK_120: Size = { columns: 120, rows: 40, placement: "dock" };
 const DOCK_SHORT: Size = { columns: 120, rows: 14, placement: "dock" };
@@ -62,6 +62,44 @@ test("each running lane leads with its mini, a 15 by 4 Raster beside its rows, i
   expect([mini?.type, mini?.props?.["columns"], mini?.props?.["rows"], mini?.props?.["key"]]).toEqual(["Raster", 15, 4, "mascot-a-1"]);
   expect(column === undefined ? 0 : childrenOf(column).length).toBe(4);
   expect([rasterOf(tree, "a-1"), rasterOf(tree, "a-2")]).toEqual([cellsOf("explorer", "working"), cellsOf("executor", "working")]);
+  await ui.unmount();
+});
+
+const fork = (n: number, parentAgentId?: string) =>
+  ({ ...spawnOf(n, "executor", `Fork ${n}`), subagentType: "fork", ...(parentAgentId === undefined ? {} : { parentAgentId }) }) as const;
+
+async function forks($: Engine, on: On, spawns: readonly Parameters<Engine["agent"]["spawn"]>[0][], settings: Record<string, unknown> = {}, env: Record<string, string> = {}) {
+  const w = world(on, {}, settings, env);
+  engine(on);
+  await $.command.run(run(""));
+  for (const spawn of spawns) await $.agent.spawn(spawn);
+  w.agents = listed(...spawns.map((_, index) => `a-${index + 1}`));
+  const ui = await $.ui.mount(pane("terminal", DOCK_120));
+  await ui.drawn();
+  await w.clock.advance(2000);
+  return ui;
+}
+
+test("a fork of the main thread wears the main agent's mini", async ($, on) => {
+  const ui = await forks($, on, [fork(1)], { agent: "oh-my-claudeagent:orchestrator" });
+  expect(rasterOf(await ui.drawn(), "a-1")).toBe(cellsOf("orchestrator", "working"));
+  await ui.unmount();
+});
+
+test("a fork of a subagent, and a fork of that fork, wear the subagent's mini", async ($, on) => {
+  const ui = await forks($, on, [spawnOf(1, "executor", "Port the parser"), fork(2, "a-1"), fork(3, "a-2")], { agent: "oh-my-claudeagent:orchestrator" });
+  const tree = await ui.drawn();
+  expect([rasterOf(tree, "a-2"), rasterOf(tree, "a-3")]).toEqual([cellsOf("executor", "working"), cellsOf("executor", "working")]);
+  await ui.unmount();
+});
+
+test("a fork of a main thread with no agent set draws no mini and leads with the fork icon", async ($, on) => {
+  const ui = await forks($, on, [fork(1)], {}, { OMCA_GLYPHS: "nerd" });
+  const tree = await ui.drawn();
+  const [row] = childrenOf(nodeByKey(tree, "agent-a-1") as Node) as Node[];
+  const [gutter] = row === undefined ? [] : (childrenOf(row) as Node[]);
+  expect(rasterOf(tree, "a-1")).toBeUndefined();
+  expect(textOf(gutter)).toBe("\u{f126}");
   await ui.unmount();
 });
 

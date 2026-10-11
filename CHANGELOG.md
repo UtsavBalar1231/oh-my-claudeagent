@@ -84,7 +84,8 @@ hand.
   tokens and cost) and a blank row; the latest wave's finished agents keep their lanes, with their
   results, until the next wave, and a shorter pane keeps the two-row lanes. A mascot moves while
   the agent works, smiles when it finishes, sweats when it fails and dozes while it waits. Terminals draw half-block characters, Desktop a still SVG, and
-  `OMCA_GLYPHS=ascii` draws none.
+  `OMCA_GLYPHS=ascii` draws none. A fork wears the mascot and color of the agent it copies, the
+  main agent's for a fork of the main conversation, with a fork icon beside its name.
 - **Desktop.** The Code tab draws the mod when its bundled Claude Code is 2.1.292 or later: the
   pane docks on the right and opens from `/omca`, which replies with the reason when Desktop does
   not place it, and a button whose prompt Desktop's box does not take shows the text in a toast.
