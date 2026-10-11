@@ -30,7 +30,7 @@
 │                        and goes stale while agents run                       │
 │                        s: Use /oh-my-claudeagent:omca-setup                  │
 │                                                                              │
-│   ↓ 10 more · ↑↓ scroll                                                      │
+│   ↓ 2 more · ↑↓ scroll                                                       │
 ╰──────────────────────────────────────────────────────────────────────────────╯
                                                             ◐ medium · /effort
 ─────────────────────────────────────────────── oh-my-claudeagent:orchestrator ─

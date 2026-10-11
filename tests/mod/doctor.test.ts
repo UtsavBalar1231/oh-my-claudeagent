@@ -2,7 +2,7 @@ import type { On, RenderElement } from "claude-code";
 import { expect, test } from "claude-code/testing";
 import { RENAMES } from "../../src/core/agent-names.ts";
 import { joinPath } from "../../src/core/path.ts";
-import { usableColumns } from "../../src/core/ui-kit.ts";
+import { displayWidth, usableColumns } from "../../src/core/ui-kit.ts";
 import {
   bodyColumns,
   cellsAcross,
@@ -108,7 +108,7 @@ for (const layout of LAYOUTS) {
     [SETTINGS]: USER_TEXT,
   };
 
-  test(`/omca doctor opens the Doctor tab, draws the loading state while the checks run, then one marked row per check, problems first${suffix}`, { options: { guardMode: "deny" } }, async ($, on) => {
+  test(`/omca doctor opens the Doctor tab, draws the loading state while the checks run, then the problem rows and one folded line for the passing checks${suffix}`, { options: { guardMode: "deny" } }, async ($, on) => {
     const w = engine(on, world(on, FILES, structuredClone(USER), {}, layout), { hold: true });
 
     const pending = $.command.run(run("doctor", 120));
@@ -123,8 +123,17 @@ for (const layout of LAYOUTS) {
       `r: Run again   ! 2 warn  ✓ 11 ok  checked ${local(NOW_S)}`,
       " ! WARN  OMCA          Could not read this mod's version from its manifest",
       STATUS_ROW,
+      "o: Show passing   ✓ 11 ok · Claude Code, bun, omca server, ast-grep, Options, Agent models, Ef…",
+    ]);
+    await ui.press({ key: "o" });
+    expect(body(await ui.drawn())).toEqual([
+      `r: Run again   ! 2 warn  ✓ 11 ok  checked ${local(NOW_S)}`,
+      " ! WARN  OMCA          Could not read this mod's version from its manifest",
+      STATUS_ROW,
+      "o: Hide passing",
       ...CHECKS,
     ]);
+    await ui.press({ key: "o" });
     expect(w.reads).not.toContain(CLAUDE_MD);
     expect(w.writes).toEqual([]);
 
@@ -134,7 +143,7 @@ for (const layout of LAYOUTS) {
     expect(body(await ui.drawn()).slice(0, 3)).toEqual([
       `r: Run again   ! 1 warn  ✓ 12 ok  checked ${local(NOW_S)}`,
       STATUS_ROW,
-      " ✓ OK    OMCA          oh-my-claudeagent 3.0.0 is loaded",
+      "o: Show passing   ✓ 12 ok · OMCA, Claude Code, bun, omca server, ast-grep, Options, Agent mode…",
     ]);
     await ui.unmount();
   });
@@ -283,7 +292,7 @@ for (const layout of LAYOUTS) {
     await ui.unmount();
   });
 
-  test(`the tab's hotkeys are r and i, never a pane key, and every row fits at 80, 120 and 200 columns on both surfaces${suffix}`, async ($, on) => {
+  test(`the tab's hotkeys are r, i and o, never a pane key, and every row fits at 80, 120 and 200 columns on both surfaces${suffix}`, async ($, on) => {
     const w = engine(on, world(on, FILES, structuredClone(USER), {}, layout));
     await $.command.run(run("doctor"));
     w.reads.length = 0;
@@ -295,12 +304,15 @@ for (const layout of LAYOUTS) {
         const keys = async () =>
           (await ui.findAll({ type: "Button" })).map((button) => String(button.props["hotkey"])).filter((key) => !/^[1-9]$/.test(key)).sort();
         if (w.writes.length === 0) {
-          expect(await keys()).toEqual(["i", "r"]);
+          expect(await keys()).toEqual(["i", "o", "r"]);
           await ui.press({ key: "i" });
           w.settings = { ...structuredClone(USER), statusLine: { ...USER.statusLine, refreshInterval: 5 } };
           await ui.press({ key: "r" });
         }
-        expect(await keys()).toEqual(["r"]);
+        // The terminal windows the applied diff and the rows, so its fold can sit below the window.
+        const isFoldDrawn = (await ui.findAll({ type: "Box" })).some((box) => box.key === "passing");
+        if (surface === "desktop") expect(isFoldDrawn).toBe(true);
+        expect(await keys()).toEqual(isFoldDrawn ? ["o", "r"] : ["r"]);
         for (const child of topRows(await ui.drawn())) {
           expect(cellsAcross(child), `${size.columns} ${size.placement} ${surface}`).toBeLessThanOrEqual(room);
         }
@@ -310,6 +322,54 @@ for (const layout of LAYOUTS) {
     expect(w.writes).toEqual([`${SETTINGS}.omca-bak`, SETTINGS]);
   });
 
+  test(`when every check passes the tab is the head row and the folded line, and o shows the rows and hides them again${suffix}`, { options: { guardMode: "deny" } }, async ($, on) => {
+    const fixed = { ...structuredClone(USER), statusLine: { ...USER.statusLine, refreshInterval: 5 } };
+    const w = engine(on, world(on, FILES, fixed, {}, layout));
+    await $.command.run(run("doctor", 120));
+    const manifest = w.reads.find((path) => path.endsWith("/.claude-plugin/plugin.json")) ?? "";
+    write(w, manifest, '{ "name": "oh-my-claudeagent", "version": "3.0.0" }');
+    const ui = await $.ui.mount(pane("terminal", WIDE));
+    await ui.press({ key: "r" });
+
+    const head = `r: Run again   ✓ 13 ok  checked ${local(NOW_S)}`;
+    const folded = "o: Show passing   ✓ 13 ok · OMCA, Claude Code, bun, omca server, ast-grep, Options, Agent mode…";
+    expect(body(await ui.drawn())).toEqual([head, folded]);
+
+    await ui.press({ key: "o" });
+    expect(body(await ui.drawn())).toEqual([
+      head,
+      "o: Hide passing",
+      " ✓ OK    OMCA          oh-my-claudeagent 3.0.0 is loaded",
+      ...CHECKS,
+      " ✓ OK    Status line   Refreshes every 5 s as well as on events",
+    ]);
+
+    await ui.press({ key: "o" });
+    expect(body(await ui.drawn())).toEqual([head, folded]);
+
+    await ui.press({ key: "o" });
+    await ui.press({ key: "r" });
+    expect(body(await ui.drawn())).toEqual([head, folded]);
+    await ui.unmount();
+  });
+
+  test(`Desktop folds the passing checks under the problem rows, and o shows them${suffix}`, { options: { guardMode: "deny" } }, async ($, on) => {
+    engine(on, world(on, FILES, structuredClone(USER), {}, layout));
+    await $.command.run(run("doctor", 120));
+    const ui = await $.ui.mount(pane("desktop", WIDE));
+
+    const closed = body(await ui.drawn());
+    expect(closed).toHaveLength(4);
+    expect(closed[1]).toStartWith(" ! WARN  OMCA ");
+    expect(closed[2]).toStartWith(" ! WARN  Status line ");
+    expect(closed[2]).toEndWith("i: Add refreshInterval 5");
+    expect(closed[3]).toBe("o: Show passing   ✓ 11 ok · Claude Code, bun, omca server, ast-grep, Options, Agent models, Ef…");
+
+    await ui.press({ key: "o" });
+    expect(body(await ui.drawn()).slice(3)).toEqual(["o: Hide passing", ...CHECKS]);
+    await ui.unmount();
+  });
+
   test(`OMCA_GLYPHS=ascii draws the doctor's marks and separators from the ASCII set${suffix}`, { options: { guardMode: "deny" } }, async ($, on) => {
     engine(on, world(on, FILES, structuredClone(USER), { OMCA_GLYPHS: "ascii" }, layout));
     await $.command.run(run("doctor", 80));
@@ -317,8 +377,11 @@ for (const layout of LAYOUTS) {
     const drawn = body(await ui.drawn());
     expect(drawn[0]).toBe(`r: Run again   ! 2 warn  + 11 ok  checked ${local(NOW_S)}`);
     expect(drawn[1]).toBe(`[! WARN] OMCA          Could not read this mod's version from its${PAD}manifest`);
-    expect(drawn).toContain("[+ OK]   Claude Code   2.1.292 meets the 2.1.292 floor");
-    expect(drawn.at(-2)).toBe("  v 8 more - ^v scroll");
+    expect(drawn[3]).toBe("o: Show passing   + 11 ok - Claude Code, bun, omca server, ast-grep, O...");
+    await ui.press({ key: "o" });
+    const opened = body(await ui.drawn());
+    expect(opened).toContain("[+ OK]   Claude Code   2.1.292 meets the 2.1.292 floor");
+    expect(opened.at(-2)).toBe("  v 9 more - ^v scroll");
       expect(rows(await ui.drawn()).filter((row) => !isAscii(row))).toEqual([]);
     await ui.unmount();
   });
@@ -330,6 +393,7 @@ test("the Options row reports the options the mod loaded with, whatever settings
   await $.command.run(run("doctor", 120));
   const ui = await $.ui.mount(pane("terminal", WIDE));
 
+  await ui.press({ key: "o" });
   expect(body(await ui.drawn()).find((row) => row.includes("Options"))).toBe(" ✓ OK    Options       showBand off, guardMode dialog");
   await ui.unmount();
 });
@@ -345,20 +409,25 @@ for (const [placement, columns, expectedCut] of [
     const handed: number[] = [];
     on("ui.scroll", (_$, e) => (handed.push(e.by), {}));
     await $.command.run(run("doctor", 120));
+    const opener = await $.ui.mount(pane("terminal", WIDE));
+    await opener.press({ key: "o" });
+    await opener.unmount();
 
     const cut: boolean[] = [];
     for (const rowsAvailable of [30, 40, 50]) {
       const ui = await $.ui.mount(pane("terminal", { columns, rows: rowsAvailable, placement }));
       const drawn = bodyLines(await ui.drawn());
       const bodyRows = placement === "dock" ? rowsAvailable - 4 : Math.max(7, Math.min(12, Math.floor(rowsAvailable / 3) - 2));
-      const checks = (await ui.findAll({ type: "Box" })).filter((box) => box.key?.startsWith("check-")).length;
+      const boxes = await ui.findAll({ type: "Box" });
+      const checks = boxes.filter((box) => box.key?.startsWith("check-")).length;
+      const folds = boxes.filter((box) => box.key === "passing").length;
       const below = drawn.filter((row) => row.includes("more")).at(-1);
       cut.push(below !== undefined);
       if (below === undefined) {
         expect(checks).toBe(13);
         expect(drawn.length).toBeLessThanOrEqual(bodyRows);
       } else {
-        expect(below).toBe(`  ↓ ${13 - checks} more · ↑↓ scroll`);
+        expect(below).toBe(`  ↓ ${14 - checks - folds} more · ↑↓ scroll`);
         expect(drawn.length, "the body, and the row that lets the engine scroll").toBe(bodyRows + 1);
       }
       await ui.unmount();
@@ -375,6 +444,7 @@ test("the arrows, a page key and the wheel move the Doctor list by whole checks,
   await $.command.run(run("doctor", 120));
   const size: Size = { columns: 120, rows: 30, placement: "dock" };
   const ui = await $.ui.mount(pane("terminal", size));
+  await ui.press({ key: "o" });
   const scroll = (by: number) => $.ui.scroll({ ...SCROLL, by, bodyRows: 26, contentRows: 27 });
   const titles = async () => (await ui.findAll({ type: "Box" })).flatMap((box) => (box.key?.startsWith("check-") === true ? [box.key] : []));
   const edges = async () => bodyLines(await ui.drawn()).filter((row) => row.includes("more"));
@@ -405,6 +475,9 @@ test("the arrows, a page key and the wheel move the Doctor list by whole checks,
 test("Home and End send the Doctor list to its first and last check even when one window is far smaller than the list", async ($, on) => {
   engine(on, world(on, {}, {}));
   await $.command.run(run("doctor", 120));
+  const opener = await $.ui.mount(pane("terminal", WIDE));
+  await opener.press({ key: "o" });
+  await opener.unmount();
   const ui = await $.ui.mount(pane("terminal", { columns: 60, rows: 30, placement: "inline" }));
   const contentRows = bodyLines(await ui.drawn()).length;
   const key = (by: number) => $.ui.scroll({ ...SCROLL, by, bodyRows: contentRows - 1, contentRows });
@@ -413,15 +486,15 @@ test("Home and End send the Doctor list to its first and last check even when on
 
   expect(contentRows).toBe(9);
   expect(await titles()).toEqual(["check-mod", "check-server"]);
-  expect(await edges()).toEqual(["  ↓ 11 more · ↑↓ scroll"]);
+  expect(await edges()).toEqual(["  ↓ 12 more · ↑↓ scroll"]);
 
   await key(contentRows);
   expect(await titles()).toEqual(["check-style"]);
-  expect(await edges()).toEqual(["  ↑ 12 more"]);
+  expect(await edges()).toEqual(["  ↑ 13 more"]);
 
   await key(-contentRows);
   expect(await titles()).toEqual(["check-mod", "check-server"]);
-  expect(await edges()).toEqual(["  ↓ 11 more · ↑↓ scroll"]);
+  expect(await edges()).toEqual(["  ↓ 12 more · ↑↓ scroll"]);
 
   await key(contentRows - 1);
   expect(await titles()).toEqual(["check-statusline"]);
@@ -432,12 +505,15 @@ test("Home and End send the Doctor list to its first and last check even when on
 test("a body too short for two checks windows the list down to one check and names what is below", async ($, on) => {
   engine(on, world(on, {}, {}));
   await $.command.run(run("doctor", 120));
+  const opener = await $.ui.mount(pane("terminal", WIDE));
+  await opener.press({ key: "o" });
+  await opener.unmount();
   const ui = await $.ui.mount(pane("terminal", { columns: 120, rows: 8, placement: "dock" }));
   const titles = (await ui.findAll({ type: "Box" })).flatMap((box) => (box.key?.startsWith("check-") === true ? [box.key] : []));
   const drawn = bodyLines(await ui.drawn());
 
   expect(titles).toEqual(["check-mod"]);
-  expect(drawn.at(-2)).toBe("  ↓ 12 more · ↑↓ scroll");
+  expect(drawn.at(-2)).toBe("  ↓ 13 more · ↑↓ scroll");
   await ui.unmount();
 });
 
@@ -489,6 +565,7 @@ test("the Output style row is ok while the plugin forces its style, and says not
   engine(on, world(on, {}, { outputStyle: "Explanatory" }));
   await $.command.run(run("doctor", 120));
   const ui = await $.ui.mount(pane("terminal", WIDE));
+  await ui.press({ key: "o" });
 
   expect(styleRow(await ui.drawn())).toBe(" ✓ OK Output style OMCA Default is forced by the plugin");
   await ui.unmount();
@@ -503,6 +580,7 @@ test("the Output style row is ok when the user opted out of the forced style, an
   engine(on, w);
   await $.command.run(run("doctor", 120));
   const ui = await $.ui.mount(pane("terminal", WIDE));
+  await ui.press({ key: "o" });
 
   expect(styleRow(await ui.drawn())).toBe(" ✓ OK Output style disableForceOrchestrationStyle is on, so your outputStyle Explanatory applies");
   await ui.unmount();
@@ -530,6 +608,7 @@ test("a row is a chip with the level's glyph and word on its tone, the label bol
   engine(on, world(on, status, structuredClone(USER)));
   await $.command.run(run("doctor", 120));
   const ui = await $.ui.mount(pane("terminal", WIDE));
+  await ui.press({ key: "o" });
   const drawn = await ui.drawn();
 
   expect(childrenOf(nodeByKey(drawn, "head") ?? { type: "" })[1]).toEqual(
@@ -663,9 +742,46 @@ test("on Desktop a body too short for two checks still draws every check, with n
   engine(on, w);
   await $.command.run(run("doctor", 120));
   const ui = await $.ui.mount(pane("desktop", { columns: 120, rows: 8, placement: "dock" }));
-  const titles = (await ui.findAll({ type: "Box" })).flatMap((box) => (box.key?.startsWith("check-") === true ? [box.key] : []));
+  const checkKeys = async () => (await ui.findAll({ type: "Box" })).flatMap((box) => (box.key?.startsWith("check-") === true ? [box.key] : []));
 
-  expect(titles).toHaveLength(13);
+  expect(await checkKeys()).toHaveLength(4);
+  expect(nodeByKey(await ui.drawn(), "passing")).toBeDefined();
+  await ui.press({ key: "o" });
+
+  expect(await checkKeys()).toHaveLength(13);
   expect(bodyLines(await ui.drawn()).filter((row) => row.includes("more"))).toEqual([]);
+  await ui.unmount();
+});
+
+test("the folded line is the key, then the ok glyph in its tone and the count and passing labels dim", async ($, on) => {
+  engine(on, world(on, {}, structuredClone(USER)));
+  await $.command.run(run("doctor", 120));
+  const ui = await $.ui.mount(pane("terminal", WIDE));
+
+  expect(nodeByKey(await ui.drawn(), "passing")).toEqual({
+    type: "Box",
+    props: { key: "passing", flexDirection: "row", columnGap: 3 },
+    children: [
+      { type: "Button", props: { key: "o", hotkey: "o", label: "Show passing", plain: true }, press: expect.anything() },
+      line(
+        piece({ color: "success" }, "✓"),
+        piece({ dimColor: true }, " 10 ok · Claude Code, bun, ast-grep, Options, Agent models, Effort cap, Mod…"),
+      ),
+    ],
+  });
+  await ui.unmount();
+});
+
+test("at 56 columns the folded line ends in the ellipsis within the room the key leaves", async ($, on) => {
+  engine(on, world(on, {}, structuredClone(USER)));
+  await $.command.run(run("doctor", 120));
+  const mount = pane("terminal", WIDE);
+  const ui = await $.ui.mount({ ...mount, props: { ...mount.props, bodyColumns: 59 } });
+  const drawn = await ui.drawn();
+  const folded = body(drawn).at(-1) ?? "";
+
+  expect(folded).toBe("o: Show passing   ✓ 10 ok · Claude Code, bun, ast-grep,…");
+  expect(displayWidth(folded)).toBeLessThanOrEqual(56);
+  for (const child of topRows(drawn)) expect(cellsAcross(child)).toBeLessThanOrEqual(56);
   await ui.unmount();
 });

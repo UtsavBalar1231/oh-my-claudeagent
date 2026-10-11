@@ -10,15 +10,15 @@
                                                                                                    │                       s: Use /oh-my-claudeagent:omca-setup
                                                                                                    │  INFO  Advisor       No advisorModel; /advisor fable turns the advisor on
                                                                                                    │                       a: Use /advisor fable
-                                                                                                   │  OK    OMCA          oh-my-claudeagent 2.21.0 is loaded
-                                                                                                   │  OK    Claude Code   2.1.294 meets the 2.1.292 floor
-                                                                                                   │  OK    bun           bun 1.4.2 is on PATH
-                                                                                                   │  OK    ast-grep      ast-grep 0.44.1 is on PATH
-                                                                                                   │  OK    Options       showBand on, guardMode dialog
-                                                                                                   │  OK    Agent models  Each agent keeps the model tier it declares
-                                                                                                   │  OK    Mod policy    Mods you install may load
-                                                                                                   │  OK    Hooks         Neither disableAllHooks nor allowManagedHooksOnly is set
-                                                                                                   │  OK    Output style  OMCA Default is forced by the plugin
+                                                                                                   │o: Show passing    9 ok · OMCA, Claude Code, bun, ast-grep, Options, Agent models, Mod policy,…
+                                                                                                   │
+                                                                                                   │
+                                                                                                   │
+                                                                                                   │
+                                                                                                   │
+                                                                                                   │
+                                                                                                   │
+                                                                                                   │
                                                                                                    │
                                                                                                    │
                                                                                                    │

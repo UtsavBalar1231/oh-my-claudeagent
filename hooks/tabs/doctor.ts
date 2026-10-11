@@ -18,8 +18,9 @@ const GAP = 3;
 // The widest chip, `! WARN` padded in Unicode or bracketed in ASCII, and the space after it.
 const CHIP = 9;
 const WORDS: Readonly<Record<Check["level"], string>> = { ok: "OK", warn: "WARN", fail: "FAIL", info: "INFO" };
-// One key per check that names a command to run; r and i are taken, and digits switch tabs.
+// One key per check that names a command to run; r, i and o are taken, and digits switch tabs.
 const PROMPT_KEYS: Readonly<Record<string, string>> = { server: "m", style: "y", advisor: "a", statusline: "s", installs: "p" };
+const PASSING_KEY = "o";
 // Below this a detail column would be too narrow for the longest variable name it quotes.
 const MIN_DETAIL = 50;
 const DIFF_ROWS = 16;
@@ -30,6 +31,7 @@ const FIXES: Readonly<Record<Fix, { key: string; label: string; done: string }>>
 };
 
 let first = 0;
+let isPassingShown = false;
 let laid: { heights: readonly number[]; room: number } | undefined;
 
 // Home and End ask for the drawn tree's whole height, which is one window here, so they jump to the ends.
@@ -42,6 +44,7 @@ export function scroll(by: number, contentRows: number): boolean {
 
 export const command: Subcommand = async (host, e) => {
   first = 0;
+  isPassingShown = false;
   const answer = await open(host, e, "doctor");
   await doctor.run(host);
   return answer;
@@ -99,6 +102,30 @@ function checkRows(host: Host, view: View, check: Check): Rows {
   };
 }
 
+function passingRow(host: Host, view: View, passes: readonly Check[]): Rows {
+  const { Box } = view.kit;
+  const toggle = () => {
+    isPassingShown = !isPassingShown;
+    host.ui.invalidate();
+  };
+  const button = keyButton(view, PASSING_KEY, isPassingShown ? "Hide passing" : "Show passing", toggle);
+  const { glyph, color } = levelMark("ok", view.g);
+  const room = view.width - displayWidth(`${PASSING_KEY}: Show passing`) - GAP;
+  const folded: Piece[] = [
+    { text: glyph, color },
+    { text: ` ${passes.length} ok ${view.g.dot} ${passes.map((check) => check.label).join(", ")}`, dimColor: true },
+  ];
+  return {
+    element: Box({
+      key: "passing",
+      flexDirection: "row",
+      columnGap: GAP,
+      children: [button, ...(isPassingShown ? [] : [Line(view.kit, fitPieces(folded, room, view.g.ellipsis))])],
+    }),
+    height: 1,
+  };
+}
+
 function diffColor(line: string, index: number): { color?: ThemeKey; dimColor?: boolean } {
   if (index < 2 || line.startsWith("@@")) return { dimColor: true };
   if (line.startsWith("+")) return { color: TONE_KEYS.ok };
@@ -131,7 +158,11 @@ function appliedRows(view: View, applied: Applied): { elements: RenderElement[];
 export const view: TabView = async (host, view) => {
   const { Box, Text } = view.kit;
   const state = (await host.state.doctor.get()).value;
-  const runKey = (label: string) => keyButton(view, KEYS.reload, label, () => doctor.run(host));
+  const runKey = (label: string) =>
+    keyButton(view, KEYS.reload, label, () => {
+      isPassingShown = false;
+      return doctor.run(host);
+    });
   const words = { loading: "Running the checks", empty: "The doctor checks have not run in this session." };
   const isTerminal = !isRemote(view.kit);
   if (isTerminal) laid = undefined;
@@ -156,7 +187,13 @@ export const view: TabView = async (host, view) => {
     ...(applied?.elements ?? []),
   ];
   const headHeight = 1 + (error === undefined ? 0 : wrapText(error, view.width).length) + (applied?.height ?? 0);
-  const checks = state.checks.toSorted((a, b) => SEVERITY[a.level] - SEVERITY[b.level]).map((check) => checkRows(host, view, check));
+  const sorted = state.checks.toSorted((a, b) => SEVERITY[a.level] - SEVERITY[b.level]);
+  const passes = sorted.filter((check) => check.level === "ok");
+  const checks = [
+    ...sorted.filter((check) => check.level !== "ok").map((check) => checkRows(host, view, check)),
+    ...(passes.length === 0 ? [] : [passingRow(host, view, passes)]),
+    ...(isPassingShown ? passes.map((check) => checkRows(host, view, check)) : []),
+  ];
   const heights = checks.map(({ height }) => height);
   const space = view.rows - headHeight;
   if (!isTerminal || heights.reduce((sum, height) => sum + height, 0) <= space) return [...head, ...checks.map(({ element }) => element)];
