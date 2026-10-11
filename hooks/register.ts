@@ -54,6 +54,7 @@ function bindHost($: EngineInterface, options: Options): Host {
       resolve: (e) => $.ui.resolve(e),
       copy: (args) => $.ui.copy(args),
       toast: (text, toastOptions) => $.ui.toast(text, toastOptions),
+      notify: (text, notifyOptions) => $.ui.notify(text, notifyOptions),
       blit: (args) => $.ui.blit(args),
     },
     session: {

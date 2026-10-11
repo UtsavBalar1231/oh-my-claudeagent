@@ -72,7 +72,8 @@ hand.
   the plan state only when a file behind it changed, the ledger is read again only when it grows,
   and the Stop gates read the plan once and parse only the transcript lines they need.
 - **Toasts, auto-open, the band and the spinner.** One toast per finished wave of subagents, one
-  per failed verification and one when the plan completes. The pane opens by itself on a session's
+  per failed verification and one when the plan completes, which on Claude Code 2.1.295 or later
+  also goes out as a notification through your own notification channel. The pane opens by itself on a session's
   first wave of subagents, once, in a terminal, and waits undrawn below 144 columns (110 after you
   have opened it). The band shows running agents with no plan bound, and the spinner's line ends
   with the task and agent count, as in `… · task 7/14 · 3 agents`.

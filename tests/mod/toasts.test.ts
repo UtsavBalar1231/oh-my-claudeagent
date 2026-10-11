@@ -97,7 +97,9 @@ test("a subagent's turn reads no file while the registry, plan, ledger and statu
   expect(w.toasts).toEqual(["Verification failed: bun test (exit 1)"]);
 });
 
-test("a plan going from 13/14 to 14/14 toasts once", async ($, on) => {
+test("a plan going from 13/14 to 14/14 toasts once and raises one notification", async ($, on) => {
+  const notified: unknown[] = [];
+  on("ui.notify", (_$, e) => (notified.push(e), { value: { isSent: true, channel: "kitty" } }));
   const w = setup(on, { [BOULDER]: registry, [PLAN]: planText(13, 14) });
   await start($);
   await mainTurn($);
@@ -107,6 +109,20 @@ test("a plan going from 13/14 to 14/14 toasts once", async ($, on) => {
   await mainTurn($);
   await mainTurn($);
   expect(w.toasts).toEqual(["Plan complete: widget 14/14"]);
+  expect(notified).toEqual([{ text: "Plan complete: widget 14/14", title: "OMCA" }]);
+});
+
+test("an engine that raises no notification still toasts the plan's end and logs why", async ($, on) => {
+  on("ui.notify", () => {
+    throw new Error("no notification channel");
+  });
+  const w = setup(on, { [BOULDER]: registry, [PLAN]: planText(13, 14) });
+  await start($);
+  await mainTurn($);
+  write(w, PLAN, planText(14, 14));
+  await mainTurn($);
+  expect(w.toasts).toEqual(["Plan complete: widget 14/14"]);
+  expect(w.logs.some((line) => line.startsWith("band: notifying failed:"))).toBe(true);
 });
 
 test("an idle teammate gives no toast", async ($, on) => {

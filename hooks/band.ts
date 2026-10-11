@@ -131,7 +131,14 @@ async function toastChanges(host: Host, { band, exitCode }: Snapshot): Promise<v
   toastedVerificationAt = Math.max(toastedVerificationAt, verifiedAt);
   const isDone = plan !== null && plan.total > 0 && plan.done === plan.total;
   if (!isBaseline && plan !== null && isDone && toastedPlan?.path === plan.path && !toastedPlan.isDone) {
-    host.ui.toast(`Plan complete: ${plan.name} ${plan.done}/${plan.total}`, { timeoutMs: TOAST_MS });
+    const text = `Plan complete: ${plan.name} ${plan.done}/${plan.total}`;
+    host.ui.toast(text, { timeoutMs: TOAST_MS });
+    // A plan run is the long unattended case, so its end also reaches the person's own notifications.
+    try {
+      await host.ui.notify(text, { title: "OMCA" });
+    } catch (error) {
+      host.log(`band: notifying failed: ${reason(error)}`);
+    }
   }
   toastedPlan = plan === null ? undefined : { path: plan.path, isDone };
 }
