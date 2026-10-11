@@ -69,9 +69,9 @@ bench *args:
 compare *args:
 	bun benchmarks/compare/run.ts {{ args }}
 
-# Refresh the committed engine types snapshot, which only a session load writes
+# Refresh the committed engine types snapshot from an interactive session against the mock model
 types:
-	claude -p --plugin-dir . "exit"
+	bun scripts/qa/types.ts
 
 # Install the pre-commit git hooks
 setup:
