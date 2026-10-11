@@ -33,6 +33,8 @@ function bindHost($: EngineInterface, options: Options): Host {
       DO_NOT_TRACK: () => $.env.get("DO_NOT_TRACK"),
       DISABLE_GROWTHBOOK: () => $.env.get("DISABLE_GROWTHBOOK"),
       CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: () => $.env.get("CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"),
+      CLAUDE_CODE_EFFORT_LEVEL: () => $.env.get("CLAUDE_CODE_EFFORT_LEVEL"),
+      CLAUDE_AFK_TIMEOUT_MS: () => $.env.get("CLAUDE_AFK_TIMEOUT_MS"),
     },
     fs: {
       read: (path) => $.fs.read(path),

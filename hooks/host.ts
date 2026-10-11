@@ -39,6 +39,8 @@ export type Host = {
     DO_NOT_TRACK: Env;
     DISABLE_GROWTHBOOK: Env;
     CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: Env;
+    CLAUDE_CODE_EFFORT_LEVEL: Env;
+    CLAUDE_AFK_TIMEOUT_MS: Env;
   };
   fs: {
     read: (path: string) => Promise<string>;

@@ -386,6 +386,10 @@ which proposes rules from your past sessions.
 - the `showBand` and `guardMode` options;
 - `CLAUDE_CODE_SUBAGENT_MODEL_FORCE`, which puts every agent on one model;
 - a `maxEffortLevel` cap that holds agents below their declared effort;
+- `CLAUDE_CODE_EFFORT_LEVEL`, which sets one effort for every agent whatever it declares;
+- two enabled copies of the plugin, of which only the one loaded first runs its hooks and mod;
+- question auto-continue, from `CLAUDE_AFK_TIMEOUT_MS` or the `askUserQuestionTimeout` setting,
+  which lets a plan interview settle on its defaults while you are away;
 - `allowManagedModsOnly`, `disableAllHooks` and `allowManagedHooksOnly`;
 - which output style applies;
 - whether the advisor can run, and which setting keeps it off when it cannot;
@@ -394,8 +398,8 @@ which proposes rules from your past sessions.
 Each row leads with OK, WARN, FAIL or INFO. Press `r` to run the checks again. When the status
 line has no `refreshInterval`, press `i` to add `refreshInterval: 5`; the doctor shows the diff it
 wrote and keeps a backup. A check with a known remedy offers a key that fills the prompt with it,
-without sending: `m` for `/mcp`, `a` for `/advisor fable`, `y` for `/config` and `s` for
-`/oh-my-claudeagent:omca-setup`.
+without sending: `m` for `/mcp`, `a` for `/advisor fable`, `y` for `/config`, `s` for
+`/oh-my-claudeagent:omca-setup` and `p` for `/plugin`.
 
 ## The status line
 

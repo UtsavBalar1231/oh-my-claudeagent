@@ -1,4 +1,4 @@
-import type { AgentInfo, On, SessionMessage, RenderElement, RenderSurface, StateRead, TurnUsage, UiPane, UiSelection } from "claude-code";
+import type { AgentInfo, On, SessionMessage, RenderElement, RenderSurface, SettingsSource, StateRead, TurnUsage, UiPane, UiSelection } from "claude-code";
 import { mock, type MockClock } from "claude-code/testing";
 import { joinPath, normalizePath, type Platform } from "../../src/core/path.ts";
 import { displayWidth, formatWhen } from "../../src/core/ui-kit.ts";
@@ -49,6 +49,8 @@ export type World = {
   spelled: (path: string) => string;
   files: Map<string, { text: string; mtimeMs: number }>;
   settings: Record<string, unknown>;
+  /** One source's settings, answered for `settings.read({ source })`; a source left out answers `settings`. */
+  sources: Partial<Record<SettingsSource, Record<string, unknown>>>;
   agents: AgentInfo[];
   panes: UiPane[];
   reads: string[];
@@ -108,6 +110,7 @@ export function world(
     spelled,
     files: new Map(Object.entries(files).map(([path, text], index) => [key(path), { text, mtimeMs: 1_000 + index }])),
     settings,
+    sources: {},
     agents: [],
     panes: [],
     reads: [],
@@ -131,7 +134,7 @@ export function world(
   mock.env(on, { OMCA_GLYPHS: "unicode", ...layout.env, ...env });
   on("session.root", () => ({ value: layout.root }));
   on("session.id", () => ({ value: w.sessionId }));
-  on("settings.read", () => ({ value: w.settings }));
+  on("settings.read", (_$, e) => ({ value: (e.source === undefined ? undefined : w.sources[e.source]) ?? w.settings }));
   on("agent.list", () => ({ value: w.agents }));
   on("fs.read", { path: /[\\/]output-styles[\\/]omca-default\.md$/ }, (_$, e) => {
     w.reads.push(spelled(e.path));

@@ -18,6 +18,8 @@ type DoctorEnv = Readonly<{
   DISABLE_GROWTHBOOK?: string | undefined;
   CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC?: string | undefined;
   OMCA_GLYPHS?: string | undefined;
+  CLAUDE_CODE_EFFORT_LEVEL?: string | undefined;
+  CLAUDE_AFK_TIMEOUT_MS?: string | undefined;
 }>;
 
 export type HookState =
@@ -34,6 +36,7 @@ export type Inputs = {
   hook: HookState;
   now: number;
   settings: Readonly<Record<string, unknown>>;
+  questionTimeout: unknown;
   options: { showBand: boolean; guardMode: "dialog" | "deny" };
   env: DoctorEnv;
   userSettings: string | null;
@@ -167,6 +170,49 @@ function effortCheck(cap: unknown): Check {
     : check("effort", "Effort cap", "warn", `maxEffortLevel ${cap} holds every agent below the effort it declares`);
 }
 
+const effortEnvCheck = (env: DoctorEnv): Check[] => {
+  const raw = env.CLAUDE_CODE_EFFORT_LEVEL;
+  const level = raw?.trim().toLowerCase() ?? "";
+  if (level === "" || level === "auto") return [];
+  return [
+    LEVELS.includes(level)
+      ? check("effort-env", "Effort", "warn", `CLAUDE_CODE_EFFORT_LEVEL ${level} runs every agent at ${level}, whatever it declares`)
+      : check("effort-env", "Effort", "warn", `CLAUDE_CODE_EFFORT_LEVEL ${JSON.stringify(raw)} is not a known level`),
+  ];
+};
+
+const SETTING_WAITS: Readonly<Record<string, string>> = { "60s": "60 s", "5m": "5 min", "10m": "10 min" };
+
+const idle = (ms: number) => (ms % 60_000 === 0 ? `${ms / 60_000} min` : `${ms / 1000} s`);
+
+function questionsCheck(env: DoctorEnv, setting: unknown): Check[] {
+  const raw = env.CLAUDE_AFK_TIMEOUT_MS?.trim() ?? "";
+  const effect = (cause: string, wait: string) => [
+    check("questions", "Questions", "warn", `${cause} answers an open question after ${wait} idle, so a plan interview can settle on its defaults without you`),
+  ];
+  if (/^\d+$/.test(raw)) {
+    const ms = Number(raw);
+    return ms === 0
+      ? [check("questions", "Questions", "warn", "CLAUDE_AFK_TIMEOUT_MS 0 closes an open question at once, so a plan interview settles on its defaults without you")]
+      : effect(`CLAUDE_AFK_TIMEOUT_MS ${ms}`, idle(ms));
+  }
+  const wait = typeof setting === "string" ? SETTING_WAITS[setting] : undefined;
+  return wait === undefined ? [] : effect(`askUserQuestionTimeout ${setting}`, wait);
+}
+
+const PLUGIN_NAME = "oh-my-claudeagent";
+
+function installsCheck(settings: Inputs["settings"]): Check[] {
+  const enabled = settings["enabledPlugins"];
+  const marketplaces = Object.entries(isRecord(enabled) ? enabled : {}).flatMap(([key, on]) => {
+    const at = key.lastIndexOf("@");
+    return on === true && at > 0 && key.slice(0, at) === PLUGIN_NAME ? [key.slice(at + 1)] : [];
+  });
+  if (marketplaces.length < 2) return [];
+  const names = `${marketplaces.slice(0, -1).join(", ")} and ${marketplaces.at(-1)}`;
+  return [check("installs", "Installs", "warn", `${PLUGIN_NAME} is on from ${names}; only the copy loaded first runs its hooks and mod`, { prompt: "/plugin" })];
+}
+
 function modsCheck(settings: Inputs["settings"]): Check {
   const guard = pluginOptions(settings, "cc-plugin-sec-default@builtin");
   return settings["allowManagedModsOnly"] === true || guard?.["allowManagedModsOnly"] === true
@@ -275,10 +321,13 @@ export function doctorChecks(inputs: Inputs): Check[] {
     modelForceCheck(inputs.env),
     ...glyphsCheck(inputs.env),
     effortCheck(inputs.settings["maxEffortLevel"]),
+    ...effortEnvCheck(inputs.env),
     modsCheck(inputs.settings),
     hooksCheck(inputs.settings),
+    ...installsCheck(inputs.settings),
     outputStyleCheck(inputs.settings, inputs.isStyleForced),
     advisorCheck(inputs.settings, inputs.env),
+    ...questionsCheck(inputs.env, inputs.questionTimeout),
     statusLineCheck(inputs.settings, inputs.userSettings),
     ...migrationCheck(inputs),
   ];

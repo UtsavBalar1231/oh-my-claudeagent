@@ -13,6 +13,7 @@ const BASE: Inputs = {
   astGrep: { name: "ast-grep", version: "0.39.0" },
   hook: { kind: "seen", lastHookAt: NOW / 1000 - 30 },
   now: NOW,
+  questionTimeout: undefined,
   settings: {
     advisorModel: "fable",
     statusLine: { ...STATUS_LINE, refreshInterval: 5 },
@@ -200,6 +201,135 @@ test.each<[unknown, Omit<Check, "id" | "label">]>([
   ["turbo", { level: "warn", detail: 'maxEffortLevel "turbo" is not a known level' }],
 ])("maxEffortLevel %p", (maxEffortLevel, expected) => {
   expect(run({ settings: { maxEffortLevel } }, "effort")).toEqual(expected);
+});
+
+const row = (change: Partial<Inputs>, id: string): Check | undefined => doctorChecks({ ...BASE, ...change }).find((check) => check.id === id);
+
+describe("installs", () => {
+  const enabled = (enabledPlugins: Record<string, boolean>) => ({ settings: { ...BASE.settings, enabledPlugins } });
+  const installs = (detail: string): Check => ({ id: "installs", label: "Installs", level: "warn", detail, prompt: "/plugin" });
+
+  test("two enabled copies warn with both marketplaces in key order, and /plugin to fix it", () => {
+    expect(row(enabled({ "oh-my-claudeagent@omca": true, "oh-my-claudeagent@omca-local": true }), "installs")).toEqual(
+      installs("oh-my-claudeagent is on from omca and omca-local; only the copy loaded first runs its hooks and mod"),
+    );
+  });
+
+  test("three copies read as a list with the last joined by and", () => {
+    expect(row(enabled({ "oh-my-claudeagent@c": true, "oh-my-claudeagent@a": true, "oh-my-claudeagent@b": true }), "installs")).toEqual(
+      installs("oh-my-claudeagent is on from c, a and b; only the copy loaded first runs its hooks and mod"),
+    );
+  });
+
+  test("a disabled copy, another plugin, a lookalike name and a lone copy add no row", () => {
+    expect(row(enabled({ "oh-my-claudeagent@omca": true, "oh-my-claudeagent@omca-local": false }), "installs")).toBeUndefined();
+    expect(row(enabled({ "oh-my-claudeagent@omca": true, "other@omca": true }), "installs")).toBeUndefined();
+    expect(row(enabled({ "oh-my-claudeagent@omca": true, "my-oh-my-claudeagent@omca": true, "oh-my-claudeagent-fork@x": true }), "installs")).toBeUndefined();
+    expect(row({}, "installs")).toBeUndefined();
+  });
+
+  test("the part before the last @ names the plugin", () => {
+    expect(row(enabled({ "oh-my-claudeagent@omca": true, "oh-my-claudeagent@x@y": true }), "installs")).toBeUndefined();
+  });
+
+  test("a key without a marketplace is not a copy", () => {
+    expect(row(enabled({ "oh-my-claudeagent@omca": true, "oh-my-claudeagents": true }), "installs")).toBeUndefined();
+  });
+});
+
+describe("CLAUDE_CODE_EFFORT_LEVEL", () => {
+  const effort = (CLAUDE_CODE_EFFORT_LEVEL: string): Partial<Inputs> => ({ env: { CLAUDE_CODE_EFFORT_LEVEL } });
+
+  test.each(["low", "medium", "high", "xhigh", "max"])("%s warns that every agent runs at it", (level) => {
+    expect(row(effort(level), "effort-env")).toEqual({
+      id: "effort-env",
+      label: "Effort",
+      level: "warn",
+      detail: `CLAUDE_CODE_EFFORT_LEVEL ${level} runs every agent at ${level}, whatever it declares`,
+    });
+  });
+
+  test("the value is trimmed and lowercased", () => {
+    expect(row(effort(" XHigh\n"), "effort-env")?.detail).toBe("CLAUDE_CODE_EFFORT_LEVEL xhigh runs every agent at xhigh, whatever it declares");
+  });
+
+  test("an unknown value is quoted as it was set", () => {
+    expect(row(effort(" Turbo "), "effort-env")).toEqual({
+      id: "effort-env",
+      label: "Effort",
+      level: "warn",
+      detail: 'CLAUDE_CODE_EFFORT_LEVEL " Turbo " is not a known level',
+    });
+  });
+
+  test("unset, empty, blank and auto add no row", () => {
+    expect(row({}, "effort-env")).toBeUndefined();
+    expect(row(effort(""), "effort-env")).toBeUndefined();
+    expect(row(effort("  "), "effort-env")).toBeUndefined();
+    expect(row(effort(" Auto "), "effort-env")).toBeUndefined();
+  });
+
+  test("it is a row of its own beside the maxEffortLevel cap, which stays", () => {
+    const ids = doctorChecks({ ...BASE, env: { CLAUDE_CODE_EFFORT_LEVEL: "low" }, settings: { ...BASE.settings, maxEffortLevel: "high" } }).map(({ id }) => id);
+    expect(ids.slice(ids.indexOf("effort"), ids.indexOf("effort") + 2)).toEqual(["effort", "effort-env"]);
+  });
+});
+
+describe("question auto-continue", () => {
+  const TAIL = "so a plan interview can settle on its defaults without you";
+  const questions = (detail: string): Check => ({ id: "questions", label: "Questions", level: "warn", detail });
+  const afk = (CLAUDE_AFK_TIMEOUT_MS: string): Partial<Inputs> => ({ env: { CLAUDE_AFK_TIMEOUT_MS } });
+
+  test.each([
+    ["300000", "5 min"],
+    ["60000", "1 min"],
+    ["600000", "10 min"],
+    ["90000", "90 s"],
+    ["45000", "45 s"],
+    ["1500", "1.5 s"],
+  ])("CLAUDE_AFK_TIMEOUT_MS %s reads %s", (value, wait) => {
+    expect(row(afk(value), "questions")).toEqual(questions(`CLAUDE_AFK_TIMEOUT_MS ${value} answers an open question after ${wait} idle, ${TAIL}`));
+  });
+
+  test("0 closes the question at once", () => {
+    expect(row(afk("0"), "questions")).toEqual(
+      questions("CLAUDE_AFK_TIMEOUT_MS 0 closes an open question at once, so a plan interview settles on its defaults without you"),
+    );
+  });
+
+  test.each([
+    ["60s", "60 s"],
+    ["5m", "5 min"],
+    ["10m", "10 min"],
+  ])("askUserQuestionTimeout %s reads %s", (value, wait) => {
+    expect(row({ questionTimeout: value }, "questions")).toEqual(questions(`askUserQuestionTimeout ${value} answers an open question after ${wait} idle, ${TAIL}`));
+  });
+
+  test("the variable wins over the setting, 0 included", () => {
+    expect(row({ ...afk("120000"), questionTimeout: "10m" }, "questions")?.detail).toBe(
+      `CLAUDE_AFK_TIMEOUT_MS 120000 answers an open question after 2 min idle, ${TAIL}`,
+    );
+    expect(row({ ...afk("0"), questionTimeout: "5m" }, "questions")?.detail).toStartWith("CLAUDE_AFK_TIMEOUT_MS 0 closes");
+  });
+
+  test("never, unset, and values that are no setting add no row", () => {
+    expect(row({ questionTimeout: "never" }, "questions")).toBeUndefined();
+    expect(row({}, "questions")).toBeUndefined();
+    expect(row({ questionTimeout: "2m" }, "questions")).toBeUndefined();
+    expect(row({ questionTimeout: 300 }, "questions")).toBeUndefined();
+  });
+
+  test("a variable that is not a whole number of milliseconds adds no row, and the setting still speaks", () => {
+    for (const value of ["", "  ", "abc", "-5", "1.5", "5m", "1e3"]) expect(row(afk(value), "questions")).toBeUndefined();
+    expect(row({ ...afk("abc"), questionTimeout: "5m" }, "questions")?.detail).toStartWith("askUserQuestionTimeout 5m answers");
+  });
+
+  test("it lists after the advisor and carries no command to run", () => {
+    const checks = doctorChecks({ ...BASE, env: { CLAUDE_AFK_TIMEOUT_MS: "300000" } });
+    const ids = checks.map(({ id }) => id);
+    expect(ids.indexOf("questions")).toBe(ids.indexOf("advisor") + 1);
+    expect(checks.find(({ id }) => id === "questions")?.prompt).toBeUndefined();
+  });
 });
 
 test.each<[Record<string, unknown>, Omit<Check, "id" | "label">]>([

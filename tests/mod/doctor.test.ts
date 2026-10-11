@@ -598,6 +598,54 @@ test("a check that names a command offers it on its own key, which fills the pro
   await ui.unmount();
 });
 
+test("two enabled copies, an effort override and question auto-continue each add a warning row, and p fills /plugin", async ($, on) => {
+  const settings = {
+    ...structuredClone(USER),
+    askUserQuestionTimeout: "10m",
+    enabledPlugins: { "oh-my-claudeagent@omca": true, "oh-my-claudeagent@omca-local": true },
+  };
+  engine(on, world(on, {}, settings, { CLAUDE_CODE_EFFORT_LEVEL: "low", CLAUDE_AFK_TIMEOUT_MS: "300000" }));
+  const fills: string[] = [];
+  on("prompt.fill", (_$, e) => (fills.push(e.text), { isFilled: true }));
+  await $.command.run(run("doctor", 120));
+  const ui = await $.ui.mount(pane("terminal", WIDE));
+
+  const drawn = rows(await ui.drawn()).join("\n");
+  for (const detail of [
+    "oh-my-claudeagent is on from omca and omca-local; only the copy loaded first runs its hooks and mod",
+    "CLAUDE_CODE_EFFORT_LEVEL low runs every agent at low, whatever it declares",
+    "CLAUDE_AFK_TIMEOUT_MS 300000 answers an open question after 5 min idle, so a plan interview can settle on its defaults without you",
+  ]) {
+    expect(drawn.replace(/\s+/g, " ")).toContain(detail);
+  }
+  expect(nodeByKey(await ui.drawn(), "prompt-installs")).toMatchObject({ props: { hotkey: "p", label: "Use /plugin" } });
+  await ui.press({ key: "prompt-installs" });
+  expect(fills).toEqual(["/plugin"]);
+  await ui.unmount();
+});
+
+test("a question timeout set in project or local settings, which Claude Code ignores, adds no row", async ($, on) => {
+  const w = engine(on, world(on, {}, { ...structuredClone(USER), askUserQuestionTimeout: "60s" }));
+  w.sources = { user: structuredClone(USER), flag: {}, policy: {}, project: { askUserQuestionTimeout: "5m" }, local: { askUserQuestionTimeout: "60s" } };
+  await $.command.run(run("doctor", 120));
+  const ui = await $.ui.mount(pane("terminal", WIDE));
+  const drawn = rows(await ui.drawn()).join("\n");
+  expect(drawn).toContain("Effort cap");
+  expect(drawn).not.toContain("Questions");
+  await ui.unmount();
+});
+
+test("the managed question timeout outranks the user's", async ($, on) => {
+  const w = engine(on, world(on, {}, structuredClone(USER)));
+  w.sources = { user: { ...structuredClone(USER), askUserQuestionTimeout: "5m" }, flag: {}, policy: { askUserQuestionTimeout: "10m" } };
+  await $.command.run(run("doctor", 120));
+  const ui = await $.ui.mount(pane("terminal", WIDE));
+  expect(rows(await ui.drawn()).join("\n").replace(/\s+/g, " ")).toContain(
+    "askUserQuestionTimeout 10m answers an open question after 10 min idle, so a plan interview can settle on its defaults without you",
+  );
+  await ui.unmount();
+});
+
 test("an old-name agent memory adds a warning row naming the migrate command, and the doctor writes nothing", async ($, on) => {
   const [old] = Object.keys(RENAMES.agents);
   const memory = `${ROOT}/.claude/agent-memory/oh-my-claudeagent-${old}/MEMORY.md`;

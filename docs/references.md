@@ -210,6 +210,8 @@ session. `all` or `*` turns off every one. Set it in the environment Claude Code
 | --- | --- |
 | `OMCA_COMMENT_GATE` | `advise` (default) lets a write through with a note; `deny` blocks it; `off` skips the check |
 | `OMCA_GLYPHS` | The glyph set of the pane, band, footer, dialog and status line: `nerd` (default, Nerd Font icons), `unicode` (no Nerd Font needed) or `ascii` (plain text) |
+| `CLAUDE_CODE_EFFORT_LEVEL` | Read by the doctor. A level other than `auto` runs every agent at it, whatever the agent declares, and the doctor warns |
+| `CLAUDE_AFK_TIMEOUT_MS` | Read by the doctor. A whole number of milliseconds after which an unanswered question continues on its own, so a plan interview can settle on its defaults; it outranks `askUserQuestionTimeout`. Claude Code ignores it in project and local settings, and so does the doctor |
 | `OMCA_NATIVE_AGENTS_MD` | `1` stops the context injector from adding `AGENTS.md` where Claude Code already loads it natively and no project `CLAUDE.md` is on the path |
 | `OMCA_TRANSCRIPTS_ROOT` | The directory `session_search` reads instead of `~/.claude/projects` |
 | `AST_GREP_BIN` | The ast-grep binary the `ast_*` tools run, looked up on `PATH`, before `ast-grep` and `sg` |

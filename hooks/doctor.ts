@@ -102,9 +102,15 @@ async function hasOldMemory(host: Host): Promise<boolean> {
   }
 }
 
+// Claude Code reads askUserQuestionTimeout from user, --settings and managed settings only, so a project or local value stays out.
+async function questionTimeout(host: Host): Promise<unknown> {
+  const sources = await Promise.all((["user", "flag", "policy"] as const).map((source) => host.settings.read({ source })));
+  return sources.map((source) => source["askUserQuestionTimeout"]).findLast((value) => value !== undefined);
+}
+
 async function check(host: Host): Promise<Doctor["checks"]> {
   const paths = await where(host);
-  const [mod, engine, bun, ast, hook, now, settings, userSettings, isForced, isOld] = await Promise.all([
+  const [mod, engine, bun, ast, hook, now, settings, timeout, userSettings, isForced, isOld] = await Promise.all([
     pluginVersion(host),
     host.session.version(),
     output(host, ["bun", "--version"]),
@@ -112,6 +118,7 @@ async function check(host: Host): Promise<Doctor["checks"]> {
     hookState(host),
     host.clock.now(),
     host.settings.read(),
+    questionTimeout(host),
     paths.settings === undefined ? null : readIfPresent(host, paths.settings),
     isStyleForced(host),
     hasOldMemory(host),
@@ -124,6 +131,8 @@ async function check(host: Host): Promise<Doctor["checks"]> {
     DISABLE_GROWTHBOOK: await host.env.DISABLE_GROWTHBOOK(),
     CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: await host.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC(),
     OMCA_GLYPHS: await host.env.OMCA_GLYPHS(),
+    CLAUDE_CODE_EFFORT_LEVEL: await host.env.CLAUDE_CODE_EFFORT_LEVEL(),
+    CLAUDE_AFK_TIMEOUT_MS: await host.env.CLAUDE_AFK_TIMEOUT_MS(),
   };
   const checks = doctorChecks({
     modVersion: mod,
@@ -133,6 +142,7 @@ async function check(host: Host): Promise<Doctor["checks"]> {
     hook,
     now,
     settings,
+    questionTimeout: timeout,
     options: host.options,
     env,
     userSettings,

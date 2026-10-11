@@ -128,13 +128,16 @@ hand.
   The `showBand` option hides the band.
 - **`/omca doctor`.** It checks the loaded OMCA version, the Claude Code floor, bun on the
   session's `PATH`, when a hook last reached the `omca` server, `ast-grep`, the `showBand` and
-  `guardMode` options, `CLAUDE_CODE_SUBAGENT_MODEL_FORCE`, a `maxEffortLevel` cap,
-  `allowManagedModsOnly`, `disableAllHooks` and `allowManagedHooksOnly`, the output style in
-  force, what keeps the advisor off, and the status line's `refreshInterval`. Each row leads with
-  an OK, WARN, FAIL or INFO chip, problems sort to the top and the list scrolls. A check with a
-  known remedy offers a key that fills the prompt with it. `r` runs the checks again, and `i` adds
-  `refreshInterval: 5` to a status line that lacks it, after re-reading the file, writing
-  `settings.json.omca-bak` and showing the diff.
+  `guardMode` options, `CLAUDE_CODE_SUBAGENT_MODEL_FORCE`, a `maxEffortLevel` cap, a
+  `CLAUDE_CODE_EFFORT_LEVEL` that runs every agent at one effort, two enabled copies of the
+  plugin, of which only the one loaded first runs its hooks and mod, `allowManagedModsOnly`,
+  `disableAllHooks` and `allowManagedHooksOnly`, the output style in force, what keeps the advisor
+  off, an unanswered question that continues on its own (`CLAUDE_AFK_TIMEOUT_MS` or
+  `askUserQuestionTimeout`, from the sources Claude Code reads them from), and the status line's
+  `refreshInterval`. Each row leads with an OK, WARN, FAIL or INFO chip, problems sort to the top
+  and the list scrolls. A check with a known remedy offers a key that fills the prompt with it.
+  `r` runs the checks again, and `i` adds `refreshInterval: 5` to a status line that lacks it,
+  after re-reading the file, writing `settings.json.omca-bak` and showing the diff.
 - **The prompt cache on the status line.** The usage row shows whether the main conversation's
   prompt cache is warm and how many minutes it has left, `C: warm 52m`, yellow in its last
   minute. A cold cache reads `C: cold` with the tokens the next request writes again, and a miss
