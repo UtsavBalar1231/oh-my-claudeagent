@@ -30,6 +30,8 @@ type Block = { element: RenderElement; height: number };
 const POINTER_CELLS = 2;
 const MARK_CELLS = 1;
 const CLOCK_CELLS = 5;
+// A remote surface draws the clock as a native button about two cells wider than its label.
+const CLOCK_CHROME_CELLS = 2;
 const TYPE_CELLS = 6;
 const AGENT_CELLS = 12;
 const SEARCH = "search";
@@ -526,7 +528,7 @@ function timeline(host: Host, view: View, ledger: Ledger, shown: readonly number
     const empty = "No entry matches the filter. Press t or x to change it.";
     return { elements: [view.kit.Text({ dimColor: true, wrap: "wrap", children: [empty] })], height: wrapText(empty, list.width).length };
   }
-  const layout = layoutOf(ledger.entries, list.width);
+  const layout = layoutOf(ledger.entries, list.width - (isRemote(view.kit) ? CLOCK_CHROME_CELLS : 0));
   if (isRemote(view.kit)) return remoteTimeline(host, view, ledger, items, current, layout, list);
   const days = items.map(({ entry }) => dayOf(entry.at));
   const opensDay = days.map((day, position) => position === 0 || days[position - 1] !== day);
