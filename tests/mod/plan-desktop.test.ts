@@ -49,7 +49,7 @@ for (const columns of [56, 90, 120]) {
   });
 }
 
-test("on desktop the task page names the tasks a blocked task waits on beside its BLOCKED chip, and an open task has none", async ($, on) => {
+test("on desktop the task page names the tasks a blocked task waits on beside its BLOCKED chip; an open task, or one waiting only on the task before it, has none", async ($, on) => {
   planWorld(on);
   await $.command.run(run("plan", 56));
   const ui = await $.ui.mount(docked("desktop", 56));
@@ -58,7 +58,8 @@ test("on desktop the task page names the tasks a blocked task waits on beside it
   expect(spreadRows(await ui.drawn())).toContain(" BLOCKED  by 3, 4");
   await ui.press({ key: "b" });
   await ui.press({ key: "task-3" });
-  expect(spreadRows(await ui.drawn())).toContain(" BLOCKED  by 2");
+  expect(spreadRows(await ui.drawn())).toContain(" OPEN ");
+  expect(spreadRows(await ui.drawn()).filter((row) => /BLOCKED|blocked by/.test(row))).toEqual([]);
   await ui.press({ key: "b" });
   await ui.press({ key: "task-2" });
   expect(spreadRows(await ui.drawn())).toContain(" OPEN ");

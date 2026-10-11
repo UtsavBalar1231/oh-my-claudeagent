@@ -20,11 +20,11 @@
 
 ╭────────────────────────────────────────────────────────────────────────────✕─╮
 │ 1: Agents  2: Plan  3: Evidence  4: Notepad  5: Stats  6: Doctor             │
-│  FINAL  Rebuild the billing export on the s… ████▍▌██▉█ 4/9    1 running    │
+│ Rebuild the billing export on the s… ████▌▋████ 4/9  3   1   1 running    │
 │   ↑ 2 more                                                                   │
 │  3 Write rows in the schema's order                            UNPROVEN     │
 │  4 Round negative totals toward zero                             PROVEN     │
-│  5 Reconcile totals against the invoice table       executor  UNPROVEN     │
+│  5 Reconcile totals against the invoice table                  executor    │
 │      Sum each customer's rows and compare with the invoice table; list e…    │
 │      $ DB_PASSWORD=‹masked› just test-db                                     │
 │ ── Milestone 2: Rollout ── ████████ 0/4 ─────────────────────────────────    │
