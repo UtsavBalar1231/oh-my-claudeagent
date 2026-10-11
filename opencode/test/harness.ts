@@ -21,8 +21,23 @@ export function scratchDir(label: string): string {
   return realpathSync(mkdtempSync(join(tmpdir(), `omca-${label}-`)))
 }
 
-export function removeDir(path: string): void {
-  rmSync(path, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
+const HELD = new Set(["EBUSY", "EPERM", "ENOTEMPTY"])
+const REMOVE_ATTEMPTS = 20
+const REMOVE_WAIT_MS = 250
+
+// Windows frees a killed process's handles shortly after it exits, and bun's rmSync does not
+// retry, so the folder a stopped server used can still read as busy.
+export async function removeDir(path: string): Promise<void> {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      rmSync(path, { recursive: true, force: true })
+      return
+    } catch (error) {
+      const code = error instanceof Error && "code" in error ? String(error.code) : ""
+      if (attempt === REMOVE_ATTEMPTS || !HELD.has(code)) throw error
+      await Bun.sleep(REMOVE_WAIT_MS)
+    }
+  }
 }
 
 function spawnSyncText(cmd: string[], env: Env): string {

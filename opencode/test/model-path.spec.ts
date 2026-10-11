@@ -169,7 +169,7 @@ describe.skipIf(!opencodeBin)("opencode model path", () => {
     fixture.stub.kill()
     await fixture.stub.exited
     closeSync(fixture.stubFd)
-    removeDir(fixture.root)
+    await removeDir(fixture.root)
   }, SLOW)
 
   const head = () => git(need().ws, "rev-parse", "HEAD")

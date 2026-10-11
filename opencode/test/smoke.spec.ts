@@ -53,7 +53,7 @@ describe.skipIf(!opencodeBin)("opencode plugin smoke", () => {
   afterAll(async () => {
     if (!fixture) return
     await fixture.server.stop()
-    removeDir(fixture.root)
+    await removeDir(fixture.root)
   }, SLOW)
 
   test("server starts on 127.0.0.1", async () => {
