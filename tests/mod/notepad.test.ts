@@ -557,3 +557,31 @@ test("an unbound session opens the most recently written notepad, not the first 
   await ui.unmount();
 });
 
+test("on Desktop a long card holds every entry with no cue and every wheel tick reaches the engine, while the terminal keeps the tick", async ($, on) => {
+  const w = world(on, { ...FILES, [`${PADS}/sample/learnings.md`]: entries(40, "Ledger") });
+  let reached = 0;
+  on("ui.scroll", () => {
+    reached += 1;
+    return {};
+  });
+  const tick = (by: number) => $.ui.scroll({ ...SCROLL, by, bodyRows: 12, contentRows: 120 });
+  await $.command.run(run(""));
+
+  w.surfaces = ["desktop"];
+  const desktop = await $.ui.mount(pane("desktop", PAGE_120));
+  await desktop.press({ key: "4" });
+  const tree = JSON.stringify(await desktop.drawn());
+  expect(Array.from({ length: 40 }, (_, n) => tree.includes(`"Ledger ${n}."`))).toEqual(Array(40).fill(true));
+  expect(rows(await desktop.drawn()).filter((row) => row.includes("more"))).toEqual([]);
+  await tick(3);
+  await tick(-3);
+  expect(reached).toBe(2);
+  await desktop.unmount();
+
+  w.surfaces = ["terminal"];
+  const terminal = await $.ui.mount(pane("terminal", PAGE_120));
+  expect(rows(await terminal.drawn()).some((row) => row.includes("wheel to scroll"))).toBe(true);
+  await tick(3);
+  expect(reached).toBe(2);
+  await terminal.unmount();
+});

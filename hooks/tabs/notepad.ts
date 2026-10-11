@@ -6,9 +6,9 @@ import { displayWidth, fitEnd, formatWhen } from "../../src/core/ui-kit.ts";
 import { chip, fitPieces, type Piece, piecesWidth, redact, type Tone, TONE_KEYS } from "../../src/core/visual.ts";
 import type { Input } from "../dispatch.ts";
 import { boundPlanOf, type Host, reason, type State } from "../host.ts";
-import { keyButton, noticeRow, patchPane, refocus, type TabView, type View } from "../pane.ts";
+import { buttonRow, keyButton, noticeRow, patchPane, refocus, type TabView, type View } from "../pane.ts";
 import { aimKeys, markdownUnits, resetOffset, ScrollRegion, type Unit } from "../regions.ts";
-import { Card, Field, Line, Rule } from "../ui.ts";
+import { Card, Field, isRemote, Line, Rule } from "../ui.ts";
 
 type Notepad = NonNullable<State["pane"]["notepad"]>;
 
@@ -227,6 +227,7 @@ function keys(host: Host, notepad: Notepad, view: View, canFind: boolean, isFind
       key: "notepad-keys",
       flexDirection: "row",
       columnGap: KEY_GAP,
+      ...buttonRow(view),
       children: buttons.map(([hotkey, label, work]) => keyButton(view, hotkey, label, work)),
     }),
   };
@@ -396,7 +397,8 @@ function cards(view: View, all: readonly Shown[], above: number): RenderElement[
   if (sections.length === 0) {
     return [view.kit.Text({ dimColor: true, children: [fitEnd(`No entry matches "${query.trim()}"`, view.width, view.g.ellipsis)] })];
   }
-  const available = view.rows - above;
+  // A remote surface scrolls the pane, so there every card takes all the rows its entries need.
+  const available = isRemote(view.kit) ? Number.POSITIVE_INFINITY : view.rows - above;
   const whole = arrange(view, sections, available);
   const empties = sections.filter((section) => section.entries.length === 0);
   if (empties.length === 0 || !isCut(whole)) return draw(view, whole, above);

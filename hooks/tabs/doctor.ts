@@ -8,7 +8,7 @@ import * as doctor from "../doctor.ts";
 import { fillPrompt, type Host, type State } from "../host.ts";
 import type { Subcommand } from "../omca-router.ts";
 import { blanks, edge, keyButton, noticeRow, open, type TabView, type View } from "../pane.ts";
-import { Line } from "../ui.ts";
+import { isRemote, Line } from "../ui.ts";
 
 type Check = State["doctor"]["checks"][number];
 type Applied = NonNullable<State["doctor"]["applied"]>;
@@ -133,7 +133,8 @@ export const view: TabView = async (host, view) => {
   const state = (await host.state.doctor.get()).value;
   const runKey = (label: string) => keyButton(view, KEYS.reload, label, () => doctor.run(host));
   const words = { loading: "Running the checks", empty: "The doctor checks have not run in this session." };
-  laid = undefined;
+  const isTerminal = !isRemote(view.kit);
+  if (isTerminal) laid = undefined;
   if (state === undefined) return [noticeRow(view, { kind: "empty" }, words), runKey("Run checks")];
   if (state.checks.length === 0) {
     if (state.isRunning) return [noticeRow(view, { kind: "loading" }, words)];
@@ -158,7 +159,7 @@ export const view: TabView = async (host, view) => {
   const checks = state.checks.toSorted((a, b) => SEVERITY[a.level] - SEVERITY[b.level]).map((check) => checkRows(host, view, check));
   const heights = checks.map(({ height }) => height);
   const space = view.rows - headHeight;
-  if (heights.reduce((sum, height) => sum + height, 0) <= space) return [...head, ...checks.map(({ element }) => element)];
+  if (!isTerminal || heights.reduce((sum, height) => sum + height, 0) <= space) return [...head, ...checks.map(({ element }) => element)];
   const windowRows = Math.max(1, space - EDGE_ROWS);
   first = Math.min(first, lastStart(heights, windowRows));
   laid = { heights, room: windowRows };

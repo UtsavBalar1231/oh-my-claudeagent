@@ -38,6 +38,7 @@ type ButtonStyle = Omit<ButtonProps, "hover"> & { hover?: Keyed<TextHoverProps, 
 // The engine's elements with every color prop narrowed to a theme key: an unknown key draws the
 // default silently and an invalid color string refuses the whole tree, so a raw string must not compile.
 export type Kit = {
+  surface: RenderSurface;
   Box: ElementConstructor<BoxStyle>;
   Text: ElementConstructor<TextStyle>;
   Button: ElementConstructor<ButtonStyle>;
@@ -80,6 +81,7 @@ function mascotIn(table: ElementTable, surface: RenderSurface, tier: GlyphTier, 
 // The engine completes every table, so a surface without an Input still hands out one that
 // draws an empty fragment; the surface, not the table, says whether a field can be drawn.
 export const kitOf = (table: ElementTable, surface: RenderSurface, tier: GlyphTier = "nerd", isStill = false): Kit => ({
+  surface,
   Box: table.Box,
   Text: table.Text,
   Button: table.Button,
@@ -92,9 +94,23 @@ export const kitOf = (table: ElementTable, surface: RenderSurface, tier: GlyphTi
 
 const styleOf = ({ text: _text, ...style }: Piece): TextStyle => style;
 
-export function Line(kit: Kit, pieces: readonly Piece[]): RenderElement {
-  return kit.Text({ wrap: "truncate-end", children: pieces.map((piece) => kit.Text({ ...styleOf(piece), children: [piece.text] })) });
+/** Whether the surface lays the tree out in pixels and scrolls the pane itself, as every one but the terminal does. */
+export const isRemote = (kit: Kit): boolean => kit.surface !== "terminal";
+
+/**
+ * One row of styled spans cut at its end. Ink applies the outer Text's mode to every span inside it.
+ * A remote surface styles each span on its own: one that wraps breaks the row at its spaces, and one
+ * that truncates clips a lone glyph to an ellipsis. There the spans sit at their full width in a box
+ * that does not shrink, and the row clips whatever runs past the pane.
+ */
+export function Run(kit: Kit, spans: readonly { style: TextStyle; text: string }[]): RenderElement {
+  const texts = spans.map(({ style, text }) => kit.Text({ ...style, children: [text] }));
+  if (!isRemote(kit)) return kit.Text({ wrap: "truncate-end", children: texts });
+  return kit.Box({ flexDirection: "row", overflow: "hidden", children: [kit.Box({ flexShrink: 0, children: [kit.Text({ children: texts })] })] });
 }
+
+export const Line = (kit: Kit, pieces: readonly Piece[]): RenderElement =>
+  Run(kit, pieces.map((piece) => ({ style: styleOf(piece), text: piece.text })));
 
 export const Rule = (
   kit: Kit,
@@ -145,7 +161,7 @@ export function Pieces(kit: Kit, pieces: readonly Piece[], { isFocused = false, 
     if (isMarked) return styleOf(piece);
     return { ...(isDone ? { color: TONE_KEYS.muted } : styleOf(piece)), hover: { color: ON_SURFACE } };
   };
-  return kit.Text({ wrap: "truncate-end", children: pieces.map((piece) => kit.Text({ ...style(piece), children: [piece.text] })) });
+  return Run(kit, pieces.map((piece) => ({ style: style(piece), text: piece.text })));
 }
 
 export function Row(kit: Kit, { key, pieces, isFocused = false, isDone = false }: RowSpec): RenderElement {
@@ -225,6 +241,27 @@ export function Field(kit: Kit, { key, label, placeholder, value, onInput, onSub
     onSubmit,
   });
 }
+
+type TreeSize = { nodes: number; chars: number; depth: number };
+
+// Desktop refuses a whole tree from 2,000 nodes, 262,144 characters or 32 levels (its renderer,
+// 2.31226.1). The margins leave room for the Text the engine wraps around a Box's bare strings.
+const DRAWABLE: TreeSize = { nodes: 1_800, chars: 250_000, depth: 30 };
+
+const charsIn = (props: object | undefined): number =>
+  Object.entries(props ?? {}).reduce((sum, [key, value]) => sum + key.length + (typeof value === "string" ? value.length : 0), 0);
+
+/** A tree's size as Desktop counts it: each element and string a node, string props and strings as characters. */
+export function sizeOf(node: RenderNode): TreeSize {
+  if (typeof node === "string") return { nodes: 1, chars: node.length, depth: 1 };
+  const children = ("children" in node ? node.children : undefined) ?? [];
+  return children.map(sizeOf).reduce(
+    (sum, child) => ({ nodes: sum.nodes + child.nodes, chars: sum.chars + child.chars, depth: Math.max(sum.depth, child.depth + 1) }),
+    { nodes: 1, chars: charsIn("props" in node ? node.props : undefined), depth: 1 },
+  );
+}
+
+export const isDrawable = ({ nodes, chars, depth }: TreeSize): boolean => nodes < DRAWABLE.nodes && chars < DRAWABLE.chars && depth < DRAWABLE.depth;
 
 const textOf = (node: RenderNode): string =>
   typeof node === "string" ? node : node.type === "Text" ? (node.children ?? []).map(textOf).join("") : "";

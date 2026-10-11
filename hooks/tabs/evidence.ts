@@ -18,9 +18,9 @@ import { agentGlyph, clockOf, COLUMN_GAP, dayOf, displayWidth, fitEnd, fitMiddle
 import { agentKey, chip, type ChipTone, fitPieces, ON_SURFACE, type Piece, piecesWidth, redact, rule, TONE_KEYS } from "../../src/core/visual.ts";
 import type { Input } from "../dispatch.ts";
 import { boundPlanOf, bytesOf, fillPrompt, type Host, reason, type State } from "../host.ts";
-import { blanks, noticeRow, refocus, type TabView, type View, wrapAt } from "../pane.ts";
+import { blanks, buttonRow, noticeRow, refocus, type TabView, type View, wrapAt } from "../pane.ts";
 import { codeUnits, resetOffset, ScrollRegion, type Unit } from "../regions.ts";
-import { Card, Field, Line, Pieces } from "../ui.ts";
+import { Card, Field, isRemote, Line, Pieces } from "../ui.ts";
 
 type Ledger = State["ledger"];
 type Entry = Ledger["entries"][number];
@@ -48,6 +48,11 @@ const MIN_CARD_ROWS = CARD_CHROME_ROWS + 5;
 const MIN_OPENED_ROWS = 2;
 // A docked body shorter than this draws the verdict as one line, as the Plan header does.
 const CARD_FROM_ROWS = 24;
+const NO_LIMIT = Number.POSITIVE_INFINITY;
+// Desktop refuses a tree of more than 2,000 nodes. Counting every element and every text leaf, an entry
+// row is 28 nodes (39 with a day heading of its own) and the rest of the pane about 50, so 40 entries
+// on 40 different days draw about 1,600 and leave room for a long header, filter row and opened entry.
+export const ENTRY_CAP = 40;
 
 let seen: string | undefined;
 let boulder: { stamp: string; bound: Bound } | undefined;
@@ -56,6 +61,8 @@ let isSearching = false;
 let focused: number | undefined;
 let cardFor: number | undefined;
 let first = 0;
+let pageStart = 0;
+let pagedFor: string | null | undefined;
 let note = "";
 let laid: { shown: readonly number[]; perPage: number } | undefined;
 
@@ -116,6 +123,7 @@ export async function sync(host: Host, root: string): Promise<void> {
 
 function resetWindow(host: Host): void {
   first = 0;
+  pageStart = 0;
   note = "";
   host.ui.invalidate();
 }
@@ -364,7 +372,7 @@ function keyRows(view: View, keys: readonly Key[], status: string, maxRows: numb
       onPress: (press) => view.press(() => work(press.surface))(),
     });
   if (isOneRow) {
-    return [Box({ key: "keys-0", flexDirection: "row", columnGap: COLUMN_GAP, children: [statusText(counter, displayWidth(counter)), ...(rows[0] ?? []).map(button)] })];
+    return [Box({ key: "keys-0", flexDirection: "row", columnGap: COLUMN_GAP, ...buttonRow(view), children: [statusText(counter, displayWidth(counter)), ...(rows[0] ?? []).map(button)] })];
   }
   return [
     ...rows.map((row, index) =>
@@ -372,6 +380,7 @@ function keyRows(view: View, keys: readonly Key[], status: string, maxRows: numb
         key: `keys-${index}`,
         flexDirection: "row",
         columnGap: COLUMN_GAP,
+        ...buttonRow(view),
         children: [...row.map(button), ...(isBeside && index === rows.length - 1 ? [statusText(status, roomBeside)] : [])],
       }),
     ),
@@ -452,12 +461,64 @@ function filterRow(host: Host, view: View, shown: number, total: number): Render
 }
 
 type Drawn = { elements: RenderElement[]; height: number };
+type Item = { index: number; entry: Entry };
+
+// One page of `ENTRY_CAP` entries under their day headings, with a Button to the newer page above and
+// the older one below: the surface scrolls the pane itself, and refuses a tree past its node cap, so a
+// page replaces the last rather than adding to it.
+function remoteTimeline(host: Host, view: View, ledger: Ledger, items: readonly Item[], current: number, layout: Layout, list: { width: number; isExpanded: boolean }): Drawn {
+  const planName = ledger.plan?.name ?? null;
+  if (planName !== pagedFor) {
+    pageStart = 0;
+    pagedFor = planName;
+  }
+  pageStart = Math.min(pageStart, Math.max(0, items.length - 1));
+  const to = Math.min(pageStart + ENTRY_CAP, items.length);
+  const open = items[current];
+  const expansion =
+    list.isExpanded && open !== undefined && current >= pageStart && current < to
+      ? opened(view, open.entry, `detail-${open.index}`, list.width - DETAIL_INDENT, NO_LIMIT, NO_LIMIT, fitCommand(view, open.entry, layout).isCut)
+      : undefined;
+  const turn = (key: string, hotkey: string, label: string, start: number) =>
+    view.kit.Button({
+      key,
+      hotkey,
+      label,
+      plain: true,
+      onPress: view.press(() => {
+        pageStart = start;
+        host.ui.invalidate();
+      }),
+    });
+  const elements: RenderElement[] = pageStart > 0 ? [turn("newer", "n", `Show ${Math.min(ENTRY_CAP, pageStart)} newer`, Math.max(0, pageStart - ENTRY_CAP))] : [];
+  let height = elements.length;
+  let day: string | undefined;
+  for (const [offset, { index, entry }] of items.slice(pageStart, to).entries()) {
+    const position = pageStart + offset;
+    if (dayOf(entry.at) !== day) {
+      day = dayOf(entry.at);
+      elements.push(line(view, rule(list.width, view.g, view.isAscii, dayLabel(entry.at)), list.width));
+      height += 1;
+    }
+    elements.push(entryRow(host, view, entry, index, layout, position === current));
+    height += 1;
+    if (position === current && expansion !== undefined) {
+      elements.push(expansion.element(0));
+      height += expansion.rows;
+    }
+  }
+  if (to < items.length) {
+    elements.push(turn("older", "o", `Show ${Math.min(ENTRY_CAP, items.length - to)} older`, to));
+    height += 1;
+  }
+  return { elements, height };
+}
 
 // Newest first, a rule naming the day above each day's entries, the window kept on the focused
 // entry, `↑ n more` and `↓ n more` where entries are out of view. `isExpanded` opens that entry
 // under its row with every row left after its neighbours; the split tier shows it beside the list.
 function timeline(host: Host, view: View, ledger: Ledger, shown: readonly number[], current: number, room: number, list: { width: number; top: number; isExpanded: boolean }): Drawn {
-  const items = shown.flatMap((index) => {
+  const items: Item[] = shown.flatMap((index) => {
     const entry = ledger.entries[index];
     return entry === undefined ? [] : [{ index, entry }];
   });
@@ -466,6 +527,7 @@ function timeline(host: Host, view: View, ledger: Ledger, shown: readonly number
     return { elements: [view.kit.Text({ dimColor: true, wrap: "wrap", children: [empty] })], height: wrapText(empty, list.width).length };
   }
   const layout = layoutOf(ledger.entries, list.width);
+  if (isRemote(view.kit)) return remoteTimeline(host, view, ledger, items, current, layout, list);
   const days = items.map(({ entry }) => dayOf(entry.at));
   const opensDay = days.map((day, position) => position === 0 || days[position - 1] !== day);
   const rowsAt = (position: number) => 1 + (opensDay[position] === true ? 1 : 0);
@@ -590,7 +652,7 @@ export const view: TabView = async (host, view) => {
   const { Box, Text } = view.kit;
   const ledger = (await host.state.ledger.get()).value;
   const words = { loading: "Reading the evidence ledger", empty: "No verification evidence has been logged here yet." };
-  laid = undefined;
+  if (!isRemote(view.kit)) laid = undefined;
   if (ledger === undefined) return [noticeRow(view, { kind: "loading" }, words)];
   if (ledger.error !== null) {
     const why = "evidence_log refuses to write to it until it parses again, and no verdict can be read from it.";
@@ -636,6 +698,7 @@ export const view: TabView = async (host, view) => {
       height: Math.max(list.height, card.height),
     };
   }
+  if (isRemote(view.kit)) return [head.element, ...filters, ...body.elements, ...keys];
   const filled = top + Math.max(room, body.height) + keys.length;
   // One row past the body brings the arrows and the wheel to `scroll` instead of the focus ring.
   return [head.element, ...filters, ...body.elements, ...blanks(view, room - body.height), ...keys, ...blanks(view, view.rows + 1 - filled)];

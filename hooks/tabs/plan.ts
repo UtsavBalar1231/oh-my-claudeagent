@@ -1,6 +1,6 @@
 import type { RenderElement } from "claude-code";
 import { lookOf } from "../../src/core/agent-type.ts";
-import { type Drawn, drawnAt, type FocusList, focusMove, placeWindow, windowOf } from "../../src/core/list-window.ts";
+import { type Drawn, drawnAt, type FocusList, focusMove, type ListSlice, placeWindow, windowOf } from "../../src/core/list-window.ts";
 import { BOULDER } from "../../src/core/omca-paths.ts";
 import { type Platform, samePath, tildePath } from "../../src/core/path.ts";
 import {
@@ -40,9 +40,9 @@ import {
 import type { Input, Phase } from "../dispatch.ts";
 import { boundPlanOf, fillPrompt, type Host, type ProofFacts, proofFacts, reason, sessionOf, type State, verdictFor } from "../host.ts";
 import type { Subcommand } from "../omca-router.ts";
-import { blanks, edge, keyButton, noticeRow, open, PANE, patchPane, refocus as focusIn, rule, type TabView, type View, wrapAt } from "../pane.ts";
+import { blanks, buttonRow, edge, keyButton, noticeRow, open, PANE, patchPane, refocus as focusIn, rule, type TabView, type View, wrapAt } from "../pane.ts";
 import { codeUnits, markdownUnits, resetOffset, ScrollRegion, scrollKeyed, type Unit } from "../regions.ts";
-import { Card as CardBox, Field, Line } from "../ui.ts";
+import { Card as CardBox, Field, isRemote, Line, Run as Spans, type TextStyle } from "../ui.ts";
 
 type Loaded = Extract<State["plan"], { pages: unknown }>;
 type Agent = State["agents"][string];
@@ -342,14 +342,14 @@ function isShown(card: Card): boolean {
 
 const isFiltered = () => filter.text.trim() !== "" || filter.isOpenOnly || filter.isFailingOnly;
 
-function itemsOf(board: Board): Item[] {
+function itemsOf(board: Board, lean = isLean): Item[] {
   return board.groups.flatMap((group, index) => {
     const cards = board.cards.filter((card) => card.group === index);
     const shown = cards.filter(isShown);
     if (shown.length === 0) return [];
     const done = cards.filter((card) => card.done).length;
     const tasks = shown.map((card) => ({ kind: "task" as const, card }));
-    return isLean ? tasks : [{ kind: "group" as const, group: index, done, total: group.tasks.length }, ...tasks];
+    return lean ? tasks : [{ kind: "group" as const, group: index, done, total: group.tasks.length }, ...tasks];
   });
 }
 
@@ -427,9 +427,17 @@ export async function focus(host: Host, e: Input<"ui.focus">): Promise<Phase<Inp
   const list = listShown();
   const ring = list === undefined ? undefined : await ringOf(host, list);
   const picked = ring === undefined || e.element === undefined ? undefined : ring.indexOf(e.element);
-  isRingOnRow = picked !== undefined;
-  const last = list === undefined ? undefined : drawn[list];
-  if (list === undefined || ring === undefined || picked === undefined || last === undefined) return undefined;
+  const isTerminal = (await host.session.surfaces()).includes("terminal");
+  if (isTerminal) isRingOnRow = picked !== undefined;
+  if (list === undefined || ring === undefined || picked === undefined || picked === ring.focus.current) return undefined;
+  if (!isTerminal) {
+    ring.select(picked);
+    note = undefined;
+    host.ui.invalidate();
+    return undefined;
+  }
+  const last = drawn[list];
+  if (last === undefined) return undefined;
   const move = focusMove(ring.focus, last, picked);
   if (move.kind === "wrap") return { answer: {} };
   planned = { list, start: move.start };
@@ -487,6 +495,15 @@ function place(host: Host, list: List, focusList: FocusList, size: number, key: 
   return placed.start;
 }
 
+// A remote surface scrolls the pane itself, so its lists draw every item and leave the window state alone.
+function windowFor(host: Host, view: View, list: List, focusList: FocusList, size: number, key: (index: number) => string): ListSlice {
+  if (isRemote(view.kit)) return { start: 0, end: focusList.total };
+  const start = place(host, list, focusList, size, key);
+  const end = Math.min(focusList.total, start + size);
+  isCut = start > 0 || end < focusList.total;
+  return { start, end };
+}
+
 const roomFor = (view: View, chrome: number): number => Math.max(1, view.rows - chrome);
 
 const bareKey = ([hotkey, , work, ...off]: Key): Key => [hotkey, "", work, ...off];
@@ -512,12 +529,14 @@ function keyRow(view: View, keys: readonly Key[], gap: number, tail?: RenderElem
   return view.kit.Box({
     flexDirection: "row",
     columnGap: gap,
+    ...buttonRow(view),
     children: [...keys.map(([hotkey, label, work, isOff]) => keyButton(view, hotkey, label, work, isOff)), ...(tail === undefined ? [] : [tail])],
   });
 }
 
+// A remote surface lays the keys out itself, so its rows are one row that wraps where its buttons do.
 const keyRowsOf = (view: View, layout: readonly (readonly Key[])[], gap: number, tail?: RenderElement): RenderElement[] =>
-  layout.map((row, index) => keyRow(view, row, gap, index === layout.length - 1 ? tail : undefined));
+  isRemote(view.kit) ? [keyRow(view, layout.flat(), gap, tail)] : layout.map((row, index) => keyRow(view, row, gap, index === layout.length - 1 ? tail : undefined));
 
 const keyRows = (view: View, keys: readonly Key[], gap: number): RenderElement[] => keyRowsOf(view, keyLayout(view, keys, gap), gap);
 
@@ -729,10 +748,14 @@ function taskRow(
   const titleText = fitEnd(card.title, room - (right.length > 0 ? 1 : 0), view.g.ellipsis);
   const pad = " ".repeat(Math.max(0, room - displayWidth(titleText)));
   const color = STATUS[status].color;
-  const paint = ({ text, ...style }: Piece) => {
-    if (style.backgroundColor !== undefined) return Text({ ...style, children: [text] });
-    return Text({ ...(isCurrent ? { color: ON_SURFACE, bold: true } : style), hover: { color: ON_SURFACE }, children: [text] });
-  };
+  const look = ({ text: _text, ...style }: Piece): TextStyle =>
+    style.backgroundColor !== undefined ? style : { ...(isCurrent ? { color: ON_SURFACE, bold: true } : style), hover: { color: ON_SURFACE } };
+  const paint = (piece: Piece) => Text({ ...look(piece), children: [piece.text] });
+  // A remote surface draws the title as a native button wider than its cells, so a spacer, not padding,
+  // carries the right cell to the row's end.
+  const tail = isRemote(view.kit)
+    ? [Box({ flexGrow: 1 }), Spans(view.kit, right.map((piece) => ({ style: look(piece), text: piece.text })))]
+    : [Text({ wrap: "truncate-end", children: [paint({ text: pad }), ...right.map(paint)] })];
   return Box({
     key: `line-${TASK}${card.n}`,
     flexDirection: "row",
@@ -752,7 +775,7 @@ function taskRow(
         ...(isCurrent ? { autoFocus: true } : {}),
         onPress: view.press(onPress),
       }),
-      Text({ wrap: "truncate-end", children: [paint({ text: pad }), ...right.map(paint)] }),
+      ...tail,
     ],
   });
 }
@@ -1117,8 +1140,10 @@ function boardView(host: Host, view: View, ctx: Ctx): RenderElement[] {
   const showFilter = filter.isEditing || isFiltered();
   const hintRows = view.isInline || (head === "line" && note === undefined) ? 0 : 1;
   const top = headerRows(ctx, head) + (showFilter ? 1 : 0);
-  isLean = isFiltered() && view.rows - (top + 2 + 1 + hintRows) <= LEAN_ROWS;
-  const items = itemsOf(board);
+  const isRemoteView = isRemote(view.kit);
+  const lean = !isRemoteView && isFiltered() && view.rows - (top + 2 + 1 + hintRows) <= LEAN_ROWS;
+  if (!isRemoteView) isLean = lean;
+  const items = itemsOf(board, lean);
   const list = boardList(items);
   const card = items.length === 0 ? undefined : ctx.byN.get(task);
   const keySet = boardKeys(host, view, plan, card);
@@ -1139,9 +1164,8 @@ function boardView(host: Host, view: View, ctx: Ctx): RenderElement[] {
     layout = fuller;
   }
   const keys = keyRowsOf(view, layout, BOARD_KEY_GAP);
-  const start = items.length === 0 ? 0 : place(host, "board", list, size, (index) => `${TASK}${taskAt(items, index)?.n ?? task}`);
-  const end = Math.min(items.length, start + size);
-  isCut = start > 0 || end < items.length;
+  const { start, end } =
+    items.length === 0 ? { start: 0, end: 0 } : windowFor(host, view, "board", list, size, (index) => `${TASK}${taskAt(items, index)?.n ?? task}`);
   const rows = items.slice(start, end).flatMap((item) => {
     if (item.kind === "group") return [groupRow(view, ctx, item, rowWidth, item.group === card?.group)];
     const isCurrent = item.card.n === task;
@@ -1164,9 +1188,10 @@ function boardView(host: Host, view: View, ctx: Ctx): RenderElement[] {
     ...rows,
     edge(view, end < items.length ? `  ${view.g.down} ${tasksIn(end, items.length)} more` : "", listWidth),
   ];
-  const height = size + 2;
   const detailWidth = view.width - listWidth - 2;
-  if (isSplit && card.n !== detailShown) {
+  const units = isSplit ? detail(view, ctx, card, detailWidth - 1) : [];
+  const height = isRemoteView ? Math.max(items.length + 2, units.reduce((sum, unit) => sum + unit.rows, 0)) : size + 2;
+  if (isSplit && !isRemoteView && card.n !== detailShown) {
     resetOffset(DETAIL);
     detailShown = card.n;
   }
@@ -1188,8 +1213,7 @@ function boardView(host: Host, view: View, ctx: Ctx): RenderElement[] {
                 key: "board-detail",
                 flexDirection: "column",
                 width: detailWidth,
-                height,
-                overflow: "hidden",
+                ...(isRemoteView ? {} : { height, overflow: "hidden" as const }),
                 paddingLeft: 1,
                 children: [
                   ScrollRegion({
@@ -1200,7 +1224,7 @@ function boardView(host: Host, view: View, ctx: Ctx): RenderElement[] {
                     top,
                     width: detailWidth - 1,
                     height,
-                    units: detail(view, ctx, card, detailWidth - 1),
+                    units,
                   }),
                 ],
               }),
@@ -1242,7 +1266,7 @@ function pageOf(view: View, { id, title, counter, keys, units, hint, isNote }: P
   const ruleRows = view.rows >= TWO_KEY_ROWS_FROM ? 1 : 0;
   const hintRows = view.rows >= SHORT_ROWS || isNote ? 1 : 0;
   const above = 1 + keysShown.length + ruleRows;
-  if (pageShown !== id) {
+  if (pageShown !== id && !isRemote(view.kit)) {
     resetOffset(PAGE_REGION);
     pageShown = id;
   }
@@ -1329,9 +1353,7 @@ function contentsView(host: Host, view: View, plan: Loaded): RenderElement[] {
     [KEYS.list, "Plans", () => showPlans(host)],
   ]);
   const size = roomFor(view, layout.chrome);
-  const start = place(host, "contents", list, size, (index) => `${ROW}${index}`);
-  const end = Math.min(list.total, start + size);
-  isCut = start > 0 || end < list.total;
+  const { start, end } = windowFor(host, view, "contents", list, size, (index) => `${ROW}${index}`);
   const numWidth = Math.max(0, ...plan.pages.map((section) => (section.task === undefined ? 0 : String(section.task.n).length)));
   const rows = plan.pages.slice(start, end).map((section, offset) => {
     const index = start + offset;
@@ -1468,9 +1490,7 @@ function plansView(host: Host, view: View, pane: State["pane"] | undefined, plan
   const list = picksOf(listing.files);
   const layout = frameFor(view, keys);
   const size = roomFor(view, layout.chrome);
-  const start = place(host, "plans", list, size, (index) => `${PICK}${index}`);
-  const end = Math.min(list.total, start + size);
-  isCut = start > 0 || end < list.total;
+  const { start, end } = windowFor(host, view, "plans", list, size, (index) => `${PICK}${index}`);
   const isBound = (file: PlanFile) => boundTo !== undefined && samePath(view.platform, file.path, boundTo);
   const hasBound = listing.files.some(isBound);
   const countWidth = Math.max(0, ...listing.files.map((file) => displayWidth(tallies.get(file.path) ?? "")));

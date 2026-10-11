@@ -12,6 +12,7 @@ import {
   drain,
   hold,
   isAscii,
+  isNode,
   LAYOUTS,
   LEDGER,
   local,
@@ -235,7 +236,7 @@ test("each tab key shows its tab, on the terminal and the desktop", async ($, on
     await ui.press({ key: "2" });
     expect((await body()).slice(0, 2)).toEqual([
       `${TITLE}██████▎█████████████████ 12/46no task lists a file to provenext 13 Port step 13 onto the shared harness`,
-      "  ↑ 2 more",
+      surface === "terminal" ? "  ↑ 2 more" : " ",
     ]);
     expect((await ui.find({ key: "2" }))?.props["dimColor"]).toBeUndefined();
     expect((await ui.find({ key: "1" }))?.props["dimColor"]).toBe(true);
@@ -252,8 +253,9 @@ test("each tab key shows its tab, on the terminal and the desktop", async ($, on
 
     await ui.press({ key: "4" });
     expect((await body())[0]).toBe("sample  BOUND  · 1 entry");
-    expect(await ui.find({ type: "Text", text: "The ledger rotates at 1,000 entries." })).toBeDefined();
-    expect(await ui.find({ type: "Text", text: "Session ids come from the payload." })).toBeDefined();
+    const prose = surface === "terminal" ? "Text" : "Markdown";
+    expect(await ui.find({ type: prose, text: "The ledger rotates at 1,000 entries." })).toBeDefined();
+    expect(await ui.find({ type: prose, text: "Session ids come from the payload." })).toBeDefined();
     expect((await body()).some((row) => row.includes("Learnings · 1 entry"))).toBe(true);
 
     await ui.press({ key: "5" });
@@ -609,15 +611,17 @@ test("every row stays inside the body less the close-mark gutter at 80, 120 and 
       const room = usableColumns(bodyColumns(size));
       const ui = await $.ui.mount(pane(surface, size));
       const views: string[] = [];
+      // A row the desktop wraps itself has no width of its own to hold to the body.
+      const isWrapped = (child: unknown) => surface === "desktop" && isNode(child) && child.props?.["flexWrap"] === "wrap";
+      const fits = async (where: string) => {
+        for (const child of topRows(await ui.drawn())) {
+          if (!isWrapped(child)) expect(cellsAcross(child), `${size.columns} ${size.placement} ${where}`).toBeLessThanOrEqual(room);
+        }
+      };
       for (const key of ["1", "2", "3", "4", "5", "6"]) {
         await ui.press({ key });
         views.push(key);
         if (key === "2") {
-          const fits = async (where: string) => {
-            for (const child of topRows(await ui.drawn())) {
-              expect(cellsAcross(child), `${size.columns} ${size.placement} ${where}`).toBeLessThanOrEqual(room);
-            }
-          };
           await fits("board");
           const row = (await ui.findAll({ type: "Button" })).find((button) => button.props["autoFocus"] === true);
           await ui.press({ key: row?.key ?? "" });
@@ -636,22 +640,16 @@ test("every row stays inside the body less the close-mark gutter at 80, 120 and 
             await ui.press({ key: "p" });
           }
           expect(await ui.find(heading)).toBeDefined();
-          for (const child of topRows(await ui.drawn())) {
-            expect(cellsAcross(child), `${size.columns} ${size.placement} page`).toBeLessThanOrEqual(room);
-          }
+          await fits("page");
           await ui.press({ key: "p" });
           expect(spreadRows(await ui.drawn()).find((row) => row.startsWith("next: "))).toStartWith("next: [x] 7. Rename every widget_id");
-          for (const child of topRows(await ui.drawn())) {
-            expect(cellsAcross(child), `${size.columns} ${size.placement} page before the long title`).toBeLessThanOrEqual(room);
-          }
+          await fits("page before the long title");
           await ui.press({ key: "n" });
           await ui.press({ key: "t" });
           await fits("sections");
           await ui.press({ key: "b" });
         }
-        for (const child of topRows(await ui.drawn())) {
-          expect(cellsAcross(child), `${size.columns} ${size.placement} tab ${key}`).toBeLessThanOrEqual(room);
-        }
+        await fits(`tab ${key}`);
       }
       expect(views).toHaveLength(6);
       await ui.unmount();

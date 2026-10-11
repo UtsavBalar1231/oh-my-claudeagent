@@ -3,7 +3,7 @@ import { inlineMarkdown } from "../src/core/markdown.ts";
 import { chunks } from "../src/core/plan-reader.ts";
 import { displayWidth, fitEnd, type Glyphs, padEnd } from "../src/core/ui-kit.ts";
 import { wrapPieces } from "../src/core/visual.ts";
-import { CodeBlock, type Kit, Line } from "./ui.ts";
+import { CodeBlock, isRemote, type Kit, Line } from "./ui.ts";
 
 /**
  * One piece of a region's content and the rows it takes: exact where the tab lays it out, counted
@@ -89,6 +89,7 @@ type Spec = Region & { kit: Kit; g: Glyphs; units: readonly Unit[] };
  */
 export function ScrollRegion({ kit, g, units, ...region }: Spec): RenderElement {
   const { key, width } = region;
+  if (isRemote(kit)) return kit.Box({ key, width, flexDirection: "column", children: units.map((unit) => unit.element) });
   const height = Math.max(1, region.height);
   const isCued = height >= CUED_FROM;
   const max = lastOffset(units, height, isCued);
@@ -147,13 +148,18 @@ function wrapLine(line: string, room: number): string[] {
   return [...rows, rest];
 }
 
-/** Code wrapped to `width`, each row its own block, so a region scrolls it a row at a time. */
+/**
+ * Code wrapped to `width`, each row its own block, so a region scrolls it a row at a time; one block
+ * a remote surface wraps itself, where every block draws its own frame and copy control.
+ */
 export function codeUnits(kit: Kit, text: string, width: number, language?: string): Unit[] {
-  return text
-    .replace(/\s+$/, "")
+  const source = text.replace(/\s+$/, "");
+  const tagged = language === undefined ? {} : { language };
+  if (isRemote(kit)) return [{ element: CodeBlock(kit, { source, ...tagged }), rows: source.split("\n").length }];
+  return source
     .split("\n")
     .flatMap((line) => wrapLine(line.replaceAll("\t", "  "), width))
-    .map((source) => ({ element: CodeBlock(kit, { source, ...(language === undefined ? {} : { language }) }), rows: 1 }));
+    .map((row) => ({ element: CodeBlock(kit, { source: row, ...tagged }), rows: 1 }));
 }
 
 const FENCE = /^\s*(`{3,}|~{3,})\s*([\w+-]*)/;
@@ -178,6 +184,9 @@ function proseUnits(kit: Kit, line: string, width: number): Unit[] {
  * at a time, and a table whole through the engine's renderer, counted at two rows a line.
  */
 export function markdownUnits(kit: Kit, text: string, width: number, key: string): Unit[] {
+  // A remote surface lays markdown out itself, in one element however long the text, where a row a
+  // unit would spend three nodes a line of the few thousand it accepts.
+  if (isRemote(kit)) return text.trim() === "" ? [] : [{ element: kit.Markdown({ key, text }), rows: text.split("\n").length }];
   const units: Unit[] = [];
   const lines = text.split("\n");
   const markdown = (source: string, at: number, rowsOf: (part: string) => number) =>

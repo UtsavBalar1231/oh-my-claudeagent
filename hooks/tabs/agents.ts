@@ -25,8 +25,8 @@ import { agentKey, fitPieces, ON_SURFACE, type Piece, piecesWidth, redact, TONE_
 import type { Input } from "../dispatch.ts";
 import type { Host } from "../host.ts";
 import { frame, keyOf, show, stateOf, still } from "../mascot-player.ts";
-import { blanks, keyButton, noticeRow, refocus, type TabView, type View } from "../pane.ts";
-import { Line, Pieces, Row, ScopedCard } from "../ui.ts";
+import { blanks, buttonRow, keyButton, noticeRow, refocus, type TabView, type View } from "../pane.ts";
+import { isRemote, Line, Pieces, Row, ScopedCard } from "../ui.ts";
 import * as page from "./agent-page.ts";
 
 const PROMPT_LINES = 3;
@@ -232,6 +232,7 @@ function footer(view: View, host: Host, lanes: readonly Lane[]): RenderElement {
     key: "agents-keys",
     flexDirection: "row",
     columnGap: COLUMN_GAP,
+    ...buttonRow(view),
     children: status === "" ? [button] : [button, view.kit.Text({ dimColor: true, children: [status] })],
   });
 }
@@ -385,7 +386,9 @@ export const view: TabView = async (host, view) => {
   if (!isRelaxed && drawnRows + running.length - 1 <= view.rows - 1) items.slice(1, running.length).forEach((item) => (item.lead = "blank"));
   // Whole lanes from `first`, with a row for each cue and the keys row kept; a blank row above the
   // window's first lane is left out. One lane shows even where it overfills, shedding its detail rows.
-  const room = Math.max(0, view.rows - 1);
+  // A remote surface scrolls every lane itself and keeps the terminal's window as it was.
+  const isRemoteDrawing = isRemote(kit);
+  const room = isRemoteDrawing ? Number.POSITIVE_INFINITY : Math.max(0, view.rows - 1);
   const heightAt = (index: number, from: number): number => {
     const item = items[index];
     return item === undefined ? 0 : item.rows + (item.lead === "label" || (item.lead === "blank" && index > from) ? 1 : 0);
@@ -404,17 +407,20 @@ export const view: TabView = async (host, view) => {
     return Math.max(stop, from + 1);
   };
   const max = items.findIndex((_, from) => windowEnd(from) === items.length);
-  first = clamp(first, 0, max);
-  const stop = windowEnd(first);
-  const isCut = first > 0 || stop < items.length;
-  laid = isCut ? { ids: items.map((item) => item.lane.id), max, stop, windowEnd } : undefined;
+  const from = isRemoteDrawing ? 0 : clamp(first, 0, max);
+  const stop = windowEnd(from);
+  const isCut = from > 0 || stop < items.length;
+  if (!isRemoteDrawing) {
+    first = from;
+    laid = isCut ? { ids: items.map((item) => item.lane.id), max, stop, windowEnd } : undefined;
+  }
   const cue = (text: string) => kit.Text({ color: TONE_KEYS.muted, children: [fitEnd(text, view.width, g.ellipsis)] });
-  const above = first > 0 ? [cue(`${g.up} ${first} more`)] : [];
-  const only = stop - first === 1 ? items[first] : undefined;
-  const spill = only === undefined ? 0 : heightAt(first, first) - (room - above.length - (stop < items.length ? 1 : 0));
+  const above = from > 0 ? [cue(`${g.up} ${from} more`)] : [];
+  const only = stop - from === 1 ? items[from] : undefined;
+  const spill = only === undefined ? 0 : heightAt(from, from) - (room - above.length - (stop < items.length ? 1 : 0));
   let at = above.length;
-  for (const [n, item] of items.slice(first, stop).entries()) {
-    const lead = heightAt(first + n, first) - item.rows;
+  for (const [n, item] of items.slice(from, stop).entries()) {
+    const lead = heightAt(from + n, from) - item.rows;
     if (lead > 0) {
       shown.push(item.lead === "label" ? kit.Text({ color: TONE_KEYS.muted, children: ["Finished"] }) : kit.Text({ children: [" "] }));
       at += lead;

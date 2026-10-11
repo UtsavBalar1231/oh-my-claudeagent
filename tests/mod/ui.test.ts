@@ -4,7 +4,7 @@ import { framesOf, rasterCells, svgOf } from "../../src/core/mascots.ts";
 import { type GlyphTier, glyphs } from "../../src/core/ui-kit.ts";
 import { chip, type Paint } from "../../src/core/visual.ts";
 import { Card, CodeBlock, Field, type Kit, kitOf, Row, Rule, rowsAtLeast, ScopedCard } from "../../hooks/ui.ts";
-import { resetRegions, ScrollRegion, scrollKeyed, type Unit } from "../../hooks/regions.ts";
+import { codeUnits, resetRegions, ScrollRegion, scrollKeyed, type Unit } from "../../hooks/regions.ts";
 import { childrenOf, isNode, PLUGIN } from "./world.ts";
 
 type ColorOf<C, Prop extends string> = C extends (props: infer P) => unknown ? (P extends { [K in Prop]?: infer V } ? V : never) : never;
@@ -70,6 +70,49 @@ test("a rule draws its pieces as runs of one line", async ($, on) => {
       text({}, " 1/2 "),
     ),
   );
+});
+
+test("on a remote surface a line is a clipped row around one box that does not shrink, so no span wraps or turns to an ellipsis", async ($, on) => {
+  const drawn = gallery($, on);
+  expect(await drawn((kit) => Rule(kit, 16, glyphs("ascii"), true, "Tasks", { done: 1, total: 2 }), "desktop")).toEqual(
+    box(
+      { flexDirection: "row", overflow: "hidden" },
+      box(
+        { flexShrink: 0 },
+        text(
+          {},
+          text({ color: "subtle" }, "--"),
+          text({}, " "),
+          text({ color: "text", bold: true }, "Tasks"),
+          text({}, " "),
+          text({ color: "subtle" }, "--"),
+          text({}, " 1/2 "),
+        ),
+      ),
+    ),
+  );
+});
+
+test("on a remote surface a region draws every unit in one column, with no cue, no height and nothing for the keys to move", async ($, on) => {
+  const drawn = gallery($, on);
+  const units = (kit: Kit): Unit[] => Array.from({ length: 10 }, (_, n) => ({ element: kit.Text({ children: [`line ${n + 1}`] }), rows: 1 }));
+  const tree = await drawn((kit) => {
+    resetRegions();
+    return ScrollRegion({ kit, g: glyphs("unicode"), key: "r", left: 0, top: 0, width: 30, height: 3, units: units(kit) });
+  }, "desktop");
+  expect(tree).toEqual(box({ key: "r", width: 30, flexDirection: "column" }, ...Array.from({ length: 10 }, (_, n) => text({}, `line ${n + 1}`))));
+  expect(scrollKeyed(1, "row")).toBe(false);
+});
+
+test("code is one block a remote surface wraps itself, and a row per block on the terminal", async ($, on) => {
+  const drawn = gallery($, on);
+  const source = "first line of output\nsecond";
+  const sources = async (surface: RenderSurface) => {
+    const tree = await drawn((kit) => kit.Box({ children: codeUnits(kit, `${source}\n\n`, 10, "bash").map((unit) => unit.element) }), surface);
+    return isNode(tree) ? childrenOf(tree).flatMap((block) => (isNode(block) && block.type === "Code" ? [block.props?.["source"]] : [])) : [];
+  };
+  expect(await sources("desktop")).toEqual([source]);
+  expect(await sources("terminal")).toEqual(["first", "line of", "output", "second"]);
 });
 
 test("a card is a round border in its tone with a bold title, filled when raised", async ($, on) => {

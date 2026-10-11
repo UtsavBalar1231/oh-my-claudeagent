@@ -11,7 +11,7 @@ import { fitEnd, type GlyphTier, glyphs, oneLine } from "../src/core/ui-kit.ts";
 import { TONE_KEYS } from "../src/core/visual.ts";
 import type { Features } from "./dispatch.ts";
 import { boundPlanOf, bytesOf, fillPrompt, type Host, ledgerWrittenAt, proofFacts, reason, sessionOf, stampOf, verdictFor } from "./host.ts";
-import { type Kit, kitOf, type TextStyle } from "./ui.ts";
+import { type Kit, kitOf, Run, type TextStyle } from "./ui.ts";
 
 type Snapshot = { band: Band; hasFinalVerification: boolean; exitCode: number | null; planPath: string | undefined };
 
@@ -176,8 +176,8 @@ const TONES: Record<Tone, TextStyle> = {
   active: { color: TONE_KEYS.active },
 };
 
-const row = ({ Text }: Kit, spans: readonly Span[]): RenderElement =>
-  Text({ wrap: "truncate-end", children: spans.map(({ text, tone, ...keys }) => Text({ ...TONES[tone], ...keys, children: [text] })) });
+const row = (kit: Kit, spans: readonly Span[]): RenderElement =>
+  Run(kit, spans.map(({ text, tone, ...keys }) => ({ style: { ...TONES[tone], ...keys }, text })));
 
 export const band: Features = {
   "session.start": {

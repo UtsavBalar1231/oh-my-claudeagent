@@ -14,7 +14,7 @@ import * as evidence from "./tabs/evidence.ts";
 import * as notepad from "./tabs/notepad.ts";
 import * as plan from "./tabs/plan.ts";
 import * as stats from "./tabs/stats.ts";
-import { type Kit, kitOf, Rule, rowsAtLeast } from "./ui.ts";
+import { isDrawable, isRemote, type Kit, kitOf, Rule, rowsAtLeast, sizeOf } from "./ui.ts";
 
 export const PANE = "omca";
 // The Agents tab's elapsed clocks tick each second, only while a terminal draws them: on Desktop every
@@ -216,6 +216,9 @@ export function keyButton(view: View, hotkey: string, label: string, work: () =>
 
 export const rule = (view: View): RenderElement => Rule(view.kit, view.width, view.g, view.isAscii);
 
+/** A row of Buttons wraps on a remote surface, whose native buttons are wider than the cells counted for them. */
+export const buttonRow = (view: View): { flexWrap?: "wrap"; rowGap?: number } => (isRemote(view.kit) ? { flexWrap: "wrap", rowGap: 1 } : {});
+
 /** A dim line of `width` cells, a blank row when the text is empty. */
 export const edge = (view: View, text: string, width = view.width): RenderElement =>
   view.kit.Text({ dimColor: true, children: [text === "" ? " " : fitEnd(text, width, view.g.ellipsis)] });
@@ -325,15 +328,28 @@ async function draw(host: Host, e: Input<"ui.render Pane">): Promise<RenderEleme
   const chrome = tabs.length + (hasRule ? 1 : 0);
   const tier = widthTier(e.props.bodyColumns);
   const view: View = { kit, g, isAscii, width, tier, rows: Math.max(0, rows - chrome), isInline, home, platform, now, press };
-  chromeRows = chrome;
-  shownOffset = e.props.scroll.offset;
-  resetRegions();
+  // A remote surface scrolls the whole tree itself, so its drawings leave the terminal's windows as they are.
+  const isTerminal = !isRemote(kit);
+  if (isTerminal) {
+    chromeRows = chrome;
+    shownOffset = e.props.scroll.offset;
+    resetRegions();
+  }
   let body: readonly RenderElement[];
   try {
     body = await viewOf(active)(host, view);
   } catch (error) {
     host.log(`omca ${active} tab failed: ${reason(error)}`);
     body = [Text({ color: TONE_KEYS.fail, children: [`${g.cross} The ${active} tab failed: ${reason(error)}`] })];
+  }
+  if (!isTerminal) {
+    const tree = Box({ flexDirection: "column", width, children: [...tabs, ...(hasRule ? [rule(view)] : []), ...body] });
+    const size = sizeOf(tree);
+    if (isDrawable(size)) return tree;
+    // A remote surface refuses a tree past its size cap whole, which would leave the pane blank.
+    host.log(`omca ${active} tab is too large for ${e.surface}: ${size.nodes} nodes, ${size.chars} characters`);
+    const notice = `${g.cross} This view is more than Claude Desktop draws at once. Narrow it with Find where the tab has one, or read it in a terminal.`;
+    return Box({ flexDirection: "column", width, children: [...tabs, Text({ color: TONE_KEYS.warn, wrap: "wrap", children: [notice] })] });
   }
   const drawnRows = [...tabs, ...body].reduce((sum, child) => sum + rowsAtLeast(child), hasRule ? 1 : 0);
   // The engine raises the wheel only over a tree taller than the body, so a tab that fits but holds
@@ -441,8 +457,12 @@ export const pane: Features = {
   },
   "ui.scroll": {
     async pre(host, e) {
-      if (e.requestId === PANE && drawnShape !== "") measured = { shape: drawnShape, rows: e.contentRows };
-      if (e.requestId !== PANE || e.origin.kind !== "person") return undefined;
+      if (e.requestId !== PANE) return undefined;
+      // A remote surface has already moved its own scroll container and sends no pointer; any other
+      // answer than the engine's own snaps the pane back.
+      if (!(await host.session.surfaces()).includes("terminal")) return undefined;
+      if (drawnShape !== "") measured = { shape: drawnShape, rows: e.contentRows };
+      if (e.origin.kind !== "person") return undefined;
       // The pointer's row counts from the body's top as shown: past the engine's own scroll, less the tab rows above the tab.
       if (e.pointer !== undefined && scrollRegionAt({ column: e.pointer.column, row: e.pointer.row + shownOffset - chromeRows }, e.by)) {
         host.ui.invalidate();

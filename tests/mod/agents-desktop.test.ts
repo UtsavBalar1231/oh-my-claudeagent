@@ -49,3 +49,24 @@ test("the Agents tab mounts on desktop with a running lane and a finished agent'
   expect(drawn).toContain("1 running · 1 finished");
   await ui.unmount();
 });
+
+test("on Desktop every lane draws however short the pane, where the terminal windows them under a cue", async ($, on) => {
+  const w = world(on, {});
+  w.surfaces = ["desktop"];
+  engine(on);
+  await $.command.run(run(""));
+  for (let n = 1; n <= 8; n += 1) await $.agent.spawn(spawnOf(n, "executor", `Port module ${n}`));
+  w.agents = Array.from({ length: 8 }, (_, n) => ({ id: `a-${n + 1}`, description: "", type: "x", status: "running" }));
+  const SHORT = { columns: 120, rows: 16, placement: "dock" } as const;
+  const drawnOn = async (surface: "desktop" | "terminal") => {
+    const ui = await $.ui.mount(pane(surface, SHORT));
+    const drawn = rows(await ui.drawn());
+    await ui.unmount();
+    return drawn;
+  };
+
+  const desktop = await drawnOn("desktop");
+  expect(Array.from({ length: 8 }, (_, n) => desktop.some((row) => row.includes(`Port module ${n + 1}`)))).toEqual(Array(8).fill(true));
+  expect(desktop.filter((row) => row.includes("more"))).toEqual([]);
+  expect((await drawnOn("terminal")).some((row) => row.includes("more"))).toBe(true);
+});

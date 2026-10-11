@@ -7,9 +7,9 @@ import { agentKey, fitPieces, levelMark, ON_SURFACE, type Piece, piecesWidth, TO
 import { loadPage } from "../agents-tracker.ts";
 import { type Host, type State, update } from "../host.ts";
 import { frame, keyOf, show, stateOf } from "../mascot-player.ts";
-import { keyButton, noticeRow, refocus, type View } from "../pane.ts";
+import { buttonRow, keyButton, noticeRow, refocus, type View } from "../pane.ts";
 import { markdownUnits, resetOffset, ScrollRegion, type Unit } from "../regions.ts";
-import { Line } from "../ui.ts";
+import { isRemote, Line } from "../ui.ts";
 
 type Page = State["pages"][string];
 type Call = Page["calls"][number];
@@ -112,6 +112,7 @@ export async function view(host: Host, view: View, lane: Lane): Promise<readonly
     key: "page-keys",
     flexDirection: "row",
     columnGap: COLUMN_GAP,
+    ...buttonRow(view),
     children: [
       keyButton(view, BACK, "Back", () => close(host, lane.id)),
       ...(page === undefined ? [] : [keyButton(view, COPY, "Copy brief", () => copyBrief(host, page.brief))]),
@@ -131,8 +132,11 @@ export async function view(host: Host, view: View, lane: Lane): Promise<readonly
     [label("Reply"), ...markdown("reply", page.reply, "none yet")],
   ];
   const height = Math.max(1, view.rows - head.rows - 1);
-  const isSpare = sections.flat().reduce((sum, unit) => sum + unit.rows, 0) + sections.length - 1 <= height;
+  // A remote surface scrolls the whole page, so its keys sit under the header rather than below a long body.
+  const isRemoteDrawing = isRemote(kit);
+  const isSpare = isRemoteDrawing || sections.flat().reduce((sum, unit) => sum + unit.rows, 0) + sections.length - 1 <= height;
   const gap: Unit = { element: kit.Text({ children: [" "] }), rows: 1 };
   const units = sections.flatMap((section, at) => (isSpare && at > 0 ? [gap, ...section] : section));
-  return [...head.children, ScrollRegion({ kit, g, key: BODY_KEY, left: 0, top: head.rows, width: view.width, height, units }), keys];
+  const body = ScrollRegion({ kit, g, key: BODY_KEY, left: 0, top: head.rows, width: view.width, height, units });
+  return isRemoteDrawing ? [...head.children, keys, body] : [...head.children, body, keys];
 }

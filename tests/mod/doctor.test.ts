@@ -656,3 +656,16 @@ test("an old-name agent memory adds a warning row naming the migrate command, an
   expect(w.writes).toEqual([]);
   await ui.unmount();
 });
+
+test("on Desktop a body too short for two checks still draws every check, with no window and no cue", async ($, on) => {
+  const w = world(on, {}, {});
+  w.surfaces = ["desktop"];
+  engine(on, w);
+  await $.command.run(run("doctor", 120));
+  const ui = await $.ui.mount(pane("desktop", { columns: 120, rows: 8, placement: "dock" }));
+  const titles = (await ui.findAll({ type: "Box" })).flatMap((box) => (box.key?.startsWith("check-") === true ? [box.key] : []));
+
+  expect(titles).toHaveLength(13);
+  expect(bodyLines(await ui.drawn()).filter((row) => row.includes("more"))).toEqual([]);
+  await ui.unmount();
+});

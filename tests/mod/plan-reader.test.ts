@@ -69,7 +69,8 @@ for (const layout of LAYOUTS) {
       expect(await ui.find({ type: "Text", text: "[x] 1. Do the first thing" })).toBeDefined();
       expect((await ui.find({ key: "p" }))?.props["dimColor"]).toBeUndefined();
       await ui.press({ key: "n" });
-      expect((await ui.find({ type: "Code", text: "## not a heading" }))?.props["source"]).toBe("## not a heading");
+      if (surface === "terminal") expect((await ui.find({ type: "Code", text: "## not a heading" }))?.props["source"]).toBe("## not a heading");
+      else expect(String((await ui.find({ type: "Markdown", text: "## not a heading" }))?.props["text"])).toContain("```\n## not a heading\n- [ ] 9. not a task\n```");
       expect((await ui.find({ key: "n" }))?.props["dimColor"]).toBe(true);
       expect(await ui.find({ type: "Text", text: "4 / 4" })).toBeDefined();
 
@@ -411,19 +412,35 @@ test("the board shows the plan's Status, progress, proof and next task, then eac
   boardWorld(on);
   for (const surface of ["terminal", "desktop"] as const) {
     const ui = await mountBoard($, PAGE, surface);
+    // The desktop carries a row's chips to its end with a spacer and wraps one row of keys itself.
+    const tasks =
+      surface === "terminal"
+        ? [
+            "✓ 1 Parse the plan                          PROVEN ",
+            "✓ 2 Prove each task                         PROVEN ",
+            "── Milestone 2: Board ── ████████ 0/3 ─────────────",
+            "○ 3 Draw the board                        UNPROVEN ",
+            "⊘ 4 Wire the hotkeys          blocked by 3  PROVEN ",
+            "○ 5 Write the docs                                 ",
+            " ",
+            "k: Run  s: Start  c: Copy  e: Evidence  o: Open",
+            "x: Failing  f: Find  t: Sections  l: Plans",
+          ]
+        : [
+            "✓ 1 Parse the plan  PROVEN ",
+            "✓ 2 Prove each task  PROVEN ",
+            "── Milestone 2: Board ── ████████ 0/3 ─────────────",
+            "○ 3 Draw the board  UNPROVEN ",
+            "⊘ 4 Wire the hotkeys blocked by 3  PROVEN ",
+            "○ 5 Write the docs",
+            " ",
+            "k: Run  s: Start  c: Copy  e: Evidence  o: Open  x: Failing  f: Find  t: Sections  l: Plans",
+          ];
     expect(rows(await ui.drawn()).slice(2)).toEqual([
       "Ship the board FINAL  ████████▍███▋████████ 2/5 · ⊘ 1 blocked✓ 3 proven · ! 1 unproven · ✗ 0 failednext 3 Draw the board",
       " ",
       "── Milestone 1: Core ── ████████ 2/2 ──────────────",
-      "✓ 1 Parse the plan                          PROVEN ",
-      "✓ 2 Prove each task                         PROVEN ",
-      "── Milestone 2: Board ── ████████ 0/3 ─────────────",
-      "○ 3 Draw the board                        UNPROVEN ",
-      "⊘ 4 Wire the hotkeys          blocked by 3  PROVEN ",
-      "○ 5 Write the docs                                 ",
-      " ",
-      "k: Run  s: Start  c: Copy  e: Evidence  o: Open",
-      "x: Failing  f: Find  t: Sections  l: Plans",
+      ...tasks,
       "↑↓ move · enter open · esc close",
     ]);
     expect(await ui.find({ type: "Text", text: /Hill/ })).toBeUndefined();
