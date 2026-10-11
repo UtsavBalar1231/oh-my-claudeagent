@@ -59,14 +59,20 @@ async function boundPlan(host: Host, root: string): Promise<{ name: string | und
   return { name: (await boundPlanOf(host))?.name, seen: `${mtimeMs}` };
 }
 
-// The bound plan first, then the most recently written.
+// The bound plan first, then the most recently written. A listing reports a directory's time as 0, so
+// a notepad is as recent as its newest section file; one that cannot be listed counts as oldest.
 async function notepadPlans(host: Host, root: string, bound: string | undefined): Promise<{ name: string; seen: string }[]> {
   const dir = `${root}/${NOTEPADS}`;
   const found = (await host.fs.exists(dir)) ? (await host.fs.list(dir)).filter((entry) => entry.kind === "dir" && isPlanName(entry.name)) : [];
-  const rest = found
-    .filter((entry) => entry.name !== bound)
-    .sort((a, b) => b.mtimeMs - a.mtimeMs || a.name.localeCompare(b.name))
-    .map((entry) => ({ name: entry.name, seen: `${entry.mtimeMs}` }));
+  const written = await Promise.all(
+    found
+      .filter((entry) => entry.name !== bound)
+      .map(async ({ name }) => {
+        const files = await host.fs.list(`${dir}/${name}`).catch(() => []);
+        return { name, at: Math.max(0, ...files.filter((file) => file.kind === "file").map((file) => file.mtimeMs)) };
+      }),
+  );
+  const rest = written.sort((a, b) => b.at - a.at || a.name.localeCompare(b.name)).map(({ name, at }) => ({ name, seen: `${at}` }));
   return bound === undefined ? rest : [{ name: bound, seen: "" }, ...rest];
 }
 

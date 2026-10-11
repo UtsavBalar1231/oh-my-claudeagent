@@ -546,3 +546,14 @@ test("a card whose content fits shows no cue and keeps its place under the wheel
   expect(cuesOf(regionOf(decisions))).toBe("[]");
   await ui.unmount();
 });
+
+test("an unbound session opens the most recently written notepad, not the first name", async ($, on) => {
+  world(on, {
+    [`${PADS}/alpha/learnings.md`]: "\n## 2026-10-01T10:00:00Z\n\nThe older note.\n",
+    [`${PADS}/zeta/learnings.md`]: "\n## 2026-10-02T10:00:00Z\n\nThe newer note.\n",
+  });
+  const ui = await open($, DOCK_200);
+  expect(rows(await ui.drawn())[chrome(DOCK_200)]).toBe("zeta not bound · 1 entry");
+  await ui.unmount();
+});
+
