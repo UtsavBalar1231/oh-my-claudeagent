@@ -34,7 +34,7 @@ catalogs) and answers the `omca_hook` calls the settings hooks make. It speaks M
   the loading rule once, for the server instructions and the SubagentStart context.
 - Run the specs with `bun test servers`, and the handshake check with `just validate --check mcp`; `just typecheck` covers this
   directory through `tsconfig.runtime.json`.
-- Keep a tool description under 2,048 characters; Claude Code truncates past that.
+- Keep a tool description under 2,048 characters, the cap every client from the 2.1.292 floor applies; Claude Code truncates past it.
 
 The state files these tools read and write are `boulder.json` (a session-bound plan
 registry keyed `plans[plan_name]` and `bindings[session_id]`),

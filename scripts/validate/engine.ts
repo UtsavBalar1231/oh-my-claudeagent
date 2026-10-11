@@ -32,8 +32,8 @@ type Runs = { manifest: Run; marketplace: Run };
 const runs = new WeakMap<Context, Runs>();
 
 // The checkout holds an untracked CLAUDE.md that --strict rejects, so the runs read a packaged
-// copy, which is also what an install reads. The manifest path is the target that opens
-// register.ts; the plugin root reads only marketplace.json.
+// copy, which is also what an install reads. The manifest path validates the plugin alone; the
+// plugin root validates the marketplace and the plugin it lists.
 function validated(ctx: Context): Runs {
   const cached = runs.get(ctx);
   if (cached !== undefined) return cached;

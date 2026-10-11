@@ -482,9 +482,11 @@ your organization sets `allowManagedModsOnly`, `allowManagedHooksOnly` or `disab
 Anthropic turns them off remotely, or after the mod worker crashes three times. Using Desktop can
 save that remote switch as off in `~/.claude.json`, which then turns mods off in the terminal too;
 removing `cachedGrowthBookFeatures.tengu_plugin_hooks_modules` from that file and restarting
-clears it ([#99130](https://github.com/anthropics/claude-code/issues/99130)). A session where
-nothing draws, such as `claude -p` or the VS Code chat panel, runs the guard but shows no band or
-pane. `OMCA_DISABLED_HOOKS=mod-notice` silences the message.
+clears it ([#99130](https://github.com/anthropics/claude-code/issues/99130)). With two copies of
+OMCA enabled from different marketplaces, only one copy's hooks and mod load, and `/plugin` notes
+the other under Errors; disable one copy and run `/reload-plugins`. A session where nothing draws,
+such as `claude -p` or the VS Code chat panel, runs the guard but shows no band or pane.
+`OMCA_DISABLED_HOOKS=mod-notice` silences the message.
 
 **`plan` or `start-work` stops before it starts.** Both skills call `health_check` first and
 stop unless the runtime is `ok`, repeating its reason. `hooks_inactive` means no OMCA settings
@@ -495,6 +497,10 @@ When the tool itself is missing, the `omca` server is not connected; see the fir
 
 **Nothing from OMCA runs at all.** A session started with `--restricted` or
 `CLAUDE_CODE_RESTRICTED=1` ignores user, project and local settings, so the plugin never loads.
+
+**Installing or updating fails to clone from GitHub.** Without a GitHub SSH key, `claude plugin
+install` retries over HTTPS, but an install or update from `/plugin` inside a session does not.
+Set `CLAUDE_CODE_PLUGIN_PREFER_HTTPS=1` to clone over HTTPS everywhere.
 
 **A plan run stopped with no message.** A turn that ends in an API error, such as a rate limit,
 skips the stop checks. Resume with `/oh-my-claudeagent:start-work`.

@@ -219,7 +219,7 @@ test("the cost card totals the priced runs, splits its meter by agent with the c
       "Estimated cost",
       line(text({ bold: true }, "$1.35+"), text({}, " "), text({ color: GREEN }, "█".repeat(55)), text({ color: BLUE }, "█")),
       line(text({ color: GREEN }, "◆ "), text({}, "executor $1.34"), text({}, "  "), text({ color: BLUE }, "◆ "), text({}, "explorer $0.01")),
-      text({ dimColor: true, wrap: "wrap" }, "n/a: no listed price · 2026-10-08 list prices"),
+      text({ dimColor: true, wrap: "wrap" }, "n/a: no listed price · 2026-10-11 list prices"),
     ),
   );
 });
@@ -302,7 +302,7 @@ test("the Stats tab aggregates two sessions by agent type with exact rows, on th
   expect(await $.command.run(run("stats", 200))).toEqual({});
   const summary = "7 delegations in 2 sessions · 1 running · 1 unreadable record skipped";
 
-  const notes = "+ excludes 1 unpriced run · n/a: no listed price · 2026-10-08 list prices";
+  const notes = "+ excludes 1 unpriced run · n/a: no listed price · 2026-10-11 list prices";
   const agents = [
     "Agents · 3 types",
     "  agent                  runs  median  tokens  est. cost  evidence  outcomes    ",
@@ -475,7 +475,7 @@ test("OMCA_GLYPHS=ascii draws the Stats tab from the ASCII set", async ($, on) =
     "Estimated cost",
     `$2.87+ [${"#".repeat(59)}=]`,
     "# executor $2.86  = explorer $0.01",
-    "+ excludes 1 unpriced run - n/a: no listed price - 2026-10-08 list prices",
+    "+ excludes 1 unpriced run - n/a: no listed price - 2026-10-11 list prices",
   ]);
   expect(drawn.filter((row) => !isAscii(row))).toEqual([]);
   await ui.unmount();

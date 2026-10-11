@@ -1,6 +1,6 @@
-export const PRICING_AS_OF = "2026-10-08";
+export const PRICING_AS_OF = "2026-10-11";
 
-// List prices from https://platform.claude.com/docs/en/about-claude/pricing#model-pricing, read 2026-10-08.
+// List prices from https://platform.claude.com/docs/en/about-claude/pricing#model-pricing, read 2026-10-11.
 // US cents per million tokens, halves included, so a cost is an exact sum and a single division.
 // Cache writes take the 5-minute rate: a usage reports no TTL. Fast mode, batch and
 // data-residency rates are not applied. A model priced by prompt length takes its `over` rates

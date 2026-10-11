@@ -2,9 +2,9 @@ import { readFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { type Check, type Context, listFiles, type Outcome, pass, relative, skip, verdict } from "./core.ts";
 
-// The keys the platform reads for an agent or a skill. Claude Code ignores an unknown key
-// without an error and `claude plugin validate` does not flag one, so a misspelled
-// `disallowedTools` would silently drop an agent's tool restrictions.
+// The keys the platform reads for an agent or a skill. Claude Code loads an agent with an unknown
+// key and names the key only in `--debug` output, and `claude plugin validate` does not flag one,
+// so a misspelled `disallowedTools` would silently drop an agent's tool restrictions.
 const AGENT_KEYS = new Set([
   "name", "description", "model", "effort", "maxTurns", "tools", "disallowedTools", "skills", "memory",
   "background", "omitClaudeMd", "isolation", "color", "experimental",
