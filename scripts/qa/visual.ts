@@ -158,11 +158,14 @@ export const maskLive = (screen: string): string =>
     )
     .replace(/checked \d\d:\d\d/g, "checked HH:MM");
 
-export const mockSessionEnv = (port: number | undefined): string[] => [
-  "-e", "DISABLE_AUTOUPDATER=1",
-  "-e", `ANTHROPIC_BASE_URL=http://127.0.0.1:${port}`,
-  "-e", "ANTHROPIC_AUTH_TOKEN=mock-key",
-];
+export const mockEnv = (port: number | undefined): Record<string, string> => ({
+  DISABLE_AUTOUPDATER: "1",
+  ANTHROPIC_BASE_URL: `http://127.0.0.1:${port}`,
+  ANTHROPIC_AUTH_TOKEN: "mock-key",
+});
+
+export const mockSessionEnv = (port: number | undefined): string[] =>
+  Object.entries(mockEnv(port)).flatMap(([name, value]) => ["-e", `${name}=${value}`]);
 
 export const quote = (text: string) => `'${text.replaceAll("'", `'\\''`)}'`;
 

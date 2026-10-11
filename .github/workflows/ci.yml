@@ -245,7 +245,7 @@ jobs:
         run: |
           {
             echo "### What this job checks ($RUNNER_OS)"
-            echo "The mod tests and the engine checks on Claude Code $CLAUDE_CODE_VERSION, the latter running \`claude plugin validate --strict\` on a packaged copy, then a real \`claude -p\` session with the packaged plugin loaded, against the mock model with a scratch project and config directory: the server answers omca_hook calls and the mod's tool.check guard denies a recursive removal (through PowerShell as well on Windows, when the session offers that tool). Mirrors \`just test-mod\`, \`validate --check engine\` and \`smoke\`."
+            echo "The mod tests and the engine checks on Claude Code $CLAUDE_CODE_VERSION, the latter running \`claude plugin validate --strict\` on a packaged copy and comparing the committed engine types with the ones the plugin-authoring skill writes, then a real \`claude -p\` session with the packaged plugin loaded, against the mock model with a scratch project and config directory: the server answers omca_hook calls and the mod's tool.check guard denies a recursive removal (through PowerShell as well on Windows, when the session offers that tool). Mirrors \`just test-mod\`, \`validate --check engine\` and \`smoke\`."
             echo ""
             echo "### If this fails"
             echo "A failing mod test, a manifest or hooks-module validation error, or the plugin did not load in a real session on this OS, or its guard did not run. Run the matching \`just\` recipe locally with Claude Code $CLAUDE_CODE_VERSION on PATH; the smoke check quotes the debug log it reads."

@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { SEMVER } from "../release.ts";
-import { asList, asRecord, type Check, type Context, type Outcome, readJson, relative, skip, text, verdict } from "./core.ts";
+import { asList, asRecord, type Check, type Context, type Outcome, pass, readJson, readText, relative, skip, text, verdict } from "./core.ts";
 
 const PLUGIN_NAME = "oh-my-claudeagent";
 
@@ -90,10 +90,35 @@ function versionsEqual(ctx: Context): Outcome {
   return verdict(problems, `plugin.json, both marketplace.json fields and package.json say ${expected}`);
 }
 
+export const ENGINE_TYPES = ".claude-plugin/types/claude-code/index.d.ts";
+const CI_WORKFLOW = ".github/workflows/ci.yml";
+
+export const writerVersion = (types: string): string | undefined =>
+  /^\/\/ Written by Claude Code (\S+)\.$/.exec(types.split(/\r?\n/, 1)[0] ?? "")?.[1];
+
+export const pinnedVersion = (workflow: string): string | undefined =>
+  /^\s*CLAUDE_CODE_VERSION:\s*["']?([^\s"']+)["']?\s*$/m.exec(workflow)?.[1];
+
+export function judgePin(writer: string | undefined, pin: string | undefined): Outcome {
+  if (writer === undefined) return { status: "fail", detail: `${ENGINE_TYPES} does not start with "// Written by Claude Code <version>."` };
+  if (pin === undefined) return { status: "fail", detail: `${CI_WORKFLOW} sets no CLAUDE_CODE_VERSION` };
+  if (writer !== pin) {
+    return {
+      status: "fail",
+      detail: `${ENGINE_TYPES} was written by Claude Code ${writer} and ${CI_WORKFLOW} pins ${pin}; run \`just types\` with Claude Code ${pin}`,
+    };
+  }
+  return pass(`${ENGINE_TYPES} was written by Claude Code ${pin}, the version ${CI_WORKFLOW} pins`);
+}
+
+const typesPin = (ctx: Context): Outcome =>
+  judgePin(writerVersion(readText(ctx.root, ENGINE_TYPES)), pinnedVersion(readText(ctx.root, CI_WORKFLOW)));
+
 export const checks: readonly Check[] = [
   { name: "json valid", run: jsonValid },
   { name: "plugin name", run: pluginName },
   { name: "marketplace entry", run: marketplaceEntry },
   { name: "marketplace source", run: marketplaceSource },
   { name: "versions equal", run: versionsEqual },
+  { name: "engine types pin", run: typesPin },
 ];

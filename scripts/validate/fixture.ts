@@ -25,6 +25,8 @@ export const VALID: Readonly<Record<string, string>> = {
     plugins: [{ name: "oh-my-claudeagent", version: "1.2.3", source: { source: "github", repo: "owner/repo" } }],
   }),
   "package.json": json({ name: "fixture", version: "1.2.3" }),
+  ".claude-plugin/types/claude-code/index.d.ts": "// Written by Claude Code 2.1.0.\n",
+  ".github/workflows/ci.yml": "env:\n  CLAUDE_CODE_VERSION: 2.1.0\n",
   ".mcp.json": json({ mcpServers: { omca: { command: "bun" } } }),
   "servers/categories.json": "{}\n",
   "hooks/hooks.json": json({

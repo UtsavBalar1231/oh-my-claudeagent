@@ -43,11 +43,11 @@ export function envWithout(drop: RegExp, extra: Readonly<Record<string, string>>
   return { ...env, ...extra };
 }
 
-export function run(argv: readonly string[], cwd: string, options: { input?: string; timeoutMs?: number } = {}): Run {
+export function run(argv: readonly string[], cwd: string, options: { input?: string; timeoutMs?: number; env?: Record<string, string> } = {}): Run {
   try {
     const proc = Bun.spawnSync([...argv], {
       cwd,
-      env: envWithout(/^GIT_/),
+      env: options.env ?? envWithout(/^GIT_/),
       stdin: options.input === undefined ? "ignore" : Buffer.from(options.input),
       stdout: "pipe",
       stderr: "pipe",

@@ -69,7 +69,7 @@ bench *args:
 compare *args:
 	bun benchmarks/compare/run.ts {{ args }}
 
-# Refresh the committed engine types snapshot from an interactive session against the mock model
+# Refresh the committed engine types from an interactive session in a pseudo-terminal against the mock model (Linux or macOS)
 types:
 	bun scripts/qa/types.ts
 

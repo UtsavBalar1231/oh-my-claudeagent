@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { cleanup, fixture, json, runNamed } from "./fixture.ts";
-import { checks } from "./manifest.ts";
+import { checks, judgePin, pinnedVersion, writerVersion } from "./manifest.ts";
 
 afterEach(cleanup);
 
@@ -136,6 +136,49 @@ describe("manifest checks", () => {
         "package.json": json({ version: "next" }),
       });
       expect(await runNamed(checks, "versions equal", ctx)).toEqual({ status: "fail", detail: 'plugin.json version "next" is not semver' });
+    });
+  });
+});
+
+describe("engine types pin", () => {
+  const TYPES = ".claude-plugin/types/claude-code/index.d.ts";
+
+  test("the writer is read from the first line only", () => {
+    expect(writerVersion("// Written by Claude Code 2.1.296.\r\n// Claude Code function hooks\n")).toBe("2.1.296");
+    expect(writerVersion("// header\n// Written by Claude Code 2.1.296.\n")).toBeUndefined();
+  });
+
+  test("the pin is read from the env line, not from a step that expands it", () => {
+    const workflow = 'run: claude --version == "$CLAUDE_CODE_VERSION"\nenv:\n  CLAUDE_CODE_VERSION: 2.1.296\n';
+    expect(pinnedVersion(workflow)).toBe("2.1.296");
+    expect(pinnedVersion('env:\n  CLAUDE_CODE_VERSION: "2.1.296"\n')).toBe("2.1.296");
+    expect(pinnedVersion('run: echo "$CLAUDE_CODE_VERSION"\n')).toBeUndefined();
+  });
+
+  test("a writer that matches the pin passes", () => {
+    expect(judgePin("2.1.296", "2.1.296")).toEqual({
+      status: "pass",
+      detail: `${TYPES} was written by Claude Code 2.1.296, the version .github/workflows/ci.yml pins`,
+    });
+  });
+
+  test("a writer behind the pin fails and names the fix", () => {
+    expect(judgePin("2.1.295", "2.1.296")).toEqual({
+      status: "fail",
+      detail: `${TYPES} was written by Claude Code 2.1.295 and .github/workflows/ci.yml pins 2.1.296; run \`just types\` with Claude Code 2.1.296`,
+    });
+  });
+
+  test("a missing header or pin fails and names the file", () => {
+    expect(judgePin(undefined, "2.1.296")).toEqual({ status: "fail", detail: `${TYPES} does not start with "// Written by Claude Code <version>."` });
+    expect(judgePin("2.1.296", undefined)).toEqual({ status: "fail", detail: ".github/workflows/ci.yml sets no CLAUDE_CODE_VERSION" });
+  });
+
+  test("the check reads both files from the tree", async () => {
+    const ctx = fixture({ ".github/workflows/ci.yml": "env:\n  CLAUDE_CODE_VERSION: 2.1.1\n" });
+    expect(await runNamed(checks, "engine types pin", ctx)).toEqual({
+      status: "fail",
+      detail: `${TYPES} was written by Claude Code 2.1.0 and .github/workflows/ci.yml pins 2.1.1; run \`just types\` with Claude Code 2.1.1`,
     });
   });
 });
