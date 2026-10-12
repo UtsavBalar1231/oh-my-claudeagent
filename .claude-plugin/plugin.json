@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "oh-my-claudeagent",
   "displayName": "Oh My ClaudeAgent",
-  "version": "2.21.0",
+  "version": "3.0.0",
   "description": "Claude Code, with receipts. Plans with you, hands each task to a specialist agent, and keeps a session from calling work done until a verification is logged. Its hooks run in every session, a guard holds destructive shell commands for review, and setup can point your status line at OMCA.",
   "author": {
     "name": "UtsavBalar1231",
