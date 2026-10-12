@@ -89,6 +89,8 @@ hand.
 - **Desktop.** The Code tab draws the mod when its bundled Claude Code is 2.1.292 or later: the
   pane docks on the right and opens from `/omca`, which replies with the reason when Desktop does
   not place it, and a button whose prompt Desktop's box does not take shows the text in a toast.
+  The pane scrolls the way Desktop's own panes do and draws each tab whole; the Evidence tab shows
+  40 runs at a time, and a view too large for Desktop to draw shows a notice in its place.
   When `/plugin` there does not list OMCA, `CLAUDE_CODE_PLUGIN_DIRS` loads it
   (anthropics/claude-code#94635).
 - **The formats spec.** `docs/formats.md` specifies plans, the evidence ledger, notepads and the
@@ -96,11 +98,13 @@ hand.
 - **The migration.** `/oh-my-claudeagent:omca-setup --migrate` moves agent memories and settings
   ids to the role names, after a preview, once per project.
 - **The plan board.** `/omca plan` opens the bound plan and `/omca plan <name or path>` opens
-  another. A plan with numbered tasks opens on a board: the plan's status, a progress bar, proof
-  counts, the next task and the running agents, then the tasks by milestone, each with its state,
-  its proof chip, the agent working on it and the tasks it waits for. A task's proof compares its
-  `File:` paths with the evidence log: the newest test, build or lint run since they changed makes
-  it PROVEN or FAILED, and no such run leaves it UNPROVEN. The focused task's detail (its steps,
+  another. A plan with numbered tasks opens on a board: a DRAFT chip while the plan is a draft, a
+  progress bar, proof counts, the next task and the running agents, then the tasks by milestone,
+  each with its state, its proof chip, the agent working on it and the tasks that block it; a task
+  waiting only on the task before it reads as open. A task's proof compares its `File:` paths with
+  the evidence log: the newest test, build or lint run since they changed makes it PROVEN or
+  FAILED, and no such run leaves it UNPROVEN. An open task shows only a FAILED chip, and the board
+  and the band count the chips. The focused task's detail (its steps,
   done-when commands, dependencies, file ages and the runs that bear on it) sits beside the list in
   a wide pane, under its row in a narrower one, or on its own page. `k` fills the prompt to run
   the task's check, `s` to start work from it, `c` copies it, `e` switches to the Evidence tab,
@@ -135,8 +139,9 @@ hand.
   `disableAllHooks` and `allowManagedHooksOnly`, the output style in force, what keeps the advisor
   off, an unanswered question that continues on its own (`CLAUDE_AFK_TIMEOUT_MS` or
   `askUserQuestionTimeout`, from the sources Claude Code reads them from), and the status line's
-  `refreshInterval`. Each row leads with an OK, WARN, FAIL or INFO chip, problems sort to the top
-  and the list scrolls. A check with a known remedy offers a key that fills the prompt with it.
+  `refreshInterval`. Each problem leads with a WARN, FAIL or INFO chip and the list scrolls; the
+  passing checks fold into one line, and `o` shows them. A check with a known remedy offers a key
+  that fills the prompt with it.
   `r` runs the checks again, and `i` adds `refreshInterval: 5` to a status line that lacks it,
   after re-reading the file, writing `settings.json.omca-bak` and showing the diff.
 - **The prompt cache on the status line.** The usage row shows whether the main conversation's
@@ -154,8 +159,9 @@ hand.
   source for every row. Each response is priced on its own, so Claude Haiku 5.5 takes its higher
   rate only for a prompt over 100,000 tokens. A model with no sourced price stays unpriced rather
   than guessed. The
-  Stats tab aggregates the records by agent type: runs and evidence rate per agent, tokens per
-  finished delegation, and the estimated cost split by agent.
+  Stats tab aggregates the records by agent type: runs per agent, the evidence rate of executor
+  and build-fixer, the agents that run checks, tokens per finished delegation, and the estimated
+  cost split by agent.
 - **Per-delegation effort.** The orchestrator and start-work set one delegation's effort
   through the Agent call's own `effort` input, which overrides the agent's declared `effort:`
   for that run, higher or lower. A plan task's `Effort:` line becomes that input. The tier stays

@@ -214,8 +214,9 @@ takes the cost's place.
    finds text in the entries, `w` clears the search, and `l` picks another plan's notepad. A wide
    pane sets the cards in two columns, and the mouse wheel over a card scrolls that card alone, a
    row at a time.
-5. **Stats**: runs and the evidence rate per agent type, tokens per finished delegation, and the
-   estimated cost by agent, across the project's recorded sessions. Runs on a model without a
+5. **Stats**: runs per agent type, the evidence rate of executor and build-fixer, the agents that
+   run checks, tokens per finished delegation, and the estimated cost by agent, across the
+   project's recorded sessions. Runs on a model without a
    known price are counted as excluded rather than estimated. `r` reloads the records.
 6. **Doctor**: the checks described below.
 
@@ -262,10 +263,12 @@ URL like `postgres://user:pass@host`, are drawn as `‹masked›`, and your home
 ### The plan board
 
 `/omca plan` opens the bound plan; `/omca plan <name or path>` opens another. A plan with
-numbered tasks opens on its board: a header with the plan's status, a progress bar, the proof
-counts, the next task and the running agents, then the tasks grouped by milestone. Each task row
-shows whether it is done, in progress, open or blocked, its proof chip, the agent working on it,
-and the tasks it waits for. A plan without numbered tasks opens on its sections.
+numbered tasks opens on its board: a header with a DRAFT chip while the plan is a draft, a
+progress bar, the proof counts, the next task and the running agents, then the tasks grouped by
+milestone. Each task row shows whether it is done, in progress, open or blocked, its proof chip,
+the agent working on it, and the tasks that block it. A task whose only unfinished dependency is
+the task just before it is next in line, so it reads as open. A plan without numbered tasks opens
+on its sections.
 
 A wide pane shows the focused task's detail beside the list, a narrower one under the task's
 row, and Enter opens it as a page. The detail holds the task's steps, its done-when commands, its
@@ -302,7 +305,9 @@ returns to the list. The board reloads the file when it changes on disk and keep
 A task's proof chip compares the files its `File:` line lists with the evidence log. The newest
 test, build or lint run since any of those files last changed decides it: **PROVEN** when it
 passed, **FAILED** when it failed, **UNPROVEN** when no such run has happened yet. A task that
-lists no file, or whose files do not exist, gets no chip.
+lists no file, or whose files do not exist, gets no chip. PROVEN and UNPROVEN describe finished
+work, so a task still open shows a chip only when it is FAILED, and the proof counts on the board
+and the band count the chips.
 
 ### The proof ledger
 
@@ -400,7 +405,9 @@ which proposes rules from your past sessions.
 - whether the advisor can run, and which setting keeps it off when it cannot;
 - the status line's `refreshInterval`.
 
-Each row leads with OK, WARN, FAIL or INFO. Press `r` to run the checks again. When the status
+Each problem row leads with WARN, FAIL or INFO. The passing checks fold into one line that names
+them; `o` shows their OK rows and hides them again, and each run folds them. Press `r` to run the
+checks again. When the status
 line has no `refreshInterval`, press `i` to add `refreshInterval: 5`; the doctor shows the diff it
 wrote and keeps a backup. A check with a known remedy offers a key that fills the prompt with it,
 without sending: `m` for `/mcp`, `a` for `/advisor fable`, `y` for `/config`, `s` for
@@ -468,6 +475,10 @@ On Desktop the mod draws differently:
   can drop a click; click again.
 - A button that fills the prompt, such as the band's Start work or the Evidence tab's Rerun, shows
   the text in a toast when Desktop's prompt box does not take it.
+- The pane scrolls the way Desktop's own panes do, and each tab draws whole, with none of the
+  terminal's scrolling windows inside it. The Evidence tab shows 40 runs at a time, with `n` and
+  `o` for the newer and older ones. A view larger than Desktop draws at once shows a notice in its
+  place; narrow it with Find, or read it in a terminal.
 - Copy can report that the surface has no clipboard, and the spinner keeps Desktop's own text.
 
 The VS Code chat panel runs OMCA's hooks but draws none of its interface: no band, no pane and

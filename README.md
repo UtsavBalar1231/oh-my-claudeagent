@@ -49,12 +49,12 @@ The band above the prompt shows the bound plan's progress, the next open task, h
 proven, unproven and failed, a verification whose evidence was not logged, and how many agents
 are running. The numbered buttons fill the prompt with the next step.
 
-<img src=".github/assets/band.png" width="680" alt="The band above the prompt reads 6/14, next 7 Wire the order summary panel, 6 proven and 1 unproven, warns that the evidence for just test was not logged, and counts 1 running agent, with the button 1: Log evidence below it.">
+<img src=".github/assets/band.png" width="680" alt="The band above the prompt reads 6/14, next 7 Wire the order summary panel, 6 proven, warns that the evidence for just test was not logged, and counts 1 running agent, with the button 1: Log evidence below it.">
 
 `/omca plan` opens the plan board: the tasks grouped by milestone, each with its state, its proof
 and the agent working on it. A wide pane shows the focused task's detail beside the list.
 
-<img src=".github/assets/plan.png" width="680" alt="The Plan tab of the OMCA pane shows the checkout-redesign board at 6 of 14 tasks, with 6 proven, 1 unproven and 4 blocked. Tasks 1 to 6 are done and proven, the executor is on task 7, tasks 8, 9 and 11 are open, and the rest wait on other tasks. Beside the list, task 6, Build the payment step, shows its steps, its done-when command, its dependencies, its file changed 3h ago and the passing runs since then.">
+<img src=".github/assets/plan.png" width="680" alt="The Plan tab of the OMCA pane shows the checkout-redesign board at 6 of 14 tasks, with 6 proven and 4 blocked. Tasks 1 to 6 are done and proven, the executor is on task 7, tasks 8, 9 and 11 are open, and tasks 10, 12, 13 and 14 name the tasks that block them. Beside the list, task 6, Build the payment step, shows its steps, its done-when command, its dependencies, its file changed 3h ago and the passing runs since then.">
 
 The Evidence tab is the proof ledger: a verdict on the plan's final verification, then every
 logged run grouped by day.
@@ -77,9 +77,10 @@ The guard holds a destructive shell command for your review and shows what it wo
 <img src=".github/assets/guard.png" width="680" alt="A dialog headed OMCA guard says OMCA held rm -rf build for review, that it would remove the build directory with 4 entries, and offers Refuse or Run it.">
 
 `/omca doctor` checks the client, bun, the server, ast-grep, the options and the settings that
-change how OMCA runs. A check with a known fix offers a key that fills the prompt with it.
+change how OMCA runs. A check with a known fix offers a key that fills the prompt with it, and
+the passing checks fold into one line that `o` opens.
 
-<img src=".github/assets/doctor.png" width="680" alt="The Doctor tab counts 1 warning, 1 info row and 11 passing checks. The warning says maxEffortLevel high holds architect below the xhigh it declares, the info row offers a: Use /advisor fable, and the passing rows cover OMCA, Claude Code, bun, the omca server, ast-grep, the options, the agent models, the mod policy, the hooks, the output style and the status line.">
+<img src=".github/assets/doctor.png" width="680" alt="The Doctor tab counts 1 warning, 1 info row and 11 passing checks. The warning says maxEffortLevel high holds the architect below the xhigh it declares, the info row offers a: Use /advisor fable, and one line beside o: Show passing folds the passing checks, naming OMCA, Claude Code, bun, the omca server, ast-grep, the options, the agent models and the mod policy before it is cut.">
 
 The status line shows the session (model, agent and the plan's next task), the workspace
 (context window and git state) and usage (duration, usage limits, and cost for accounts billed
