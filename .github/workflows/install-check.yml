@@ -28,8 +28,10 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     env:
       DISABLE_AUTOUPDATER: "1"
-      CLAUDE_CONFIG_DIR: ${{ runner.temp }}/claude-config
     steps:
+      - name: Use a clean Claude Code config directory
+        run: echo "CLAUDE_CONFIG_DIR=$RUNNER_TEMP/claude-config" >> "$GITHUB_ENV"
+
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.4.2
