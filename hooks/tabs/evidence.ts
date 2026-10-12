@@ -283,10 +283,38 @@ function fitCommand(view: View, entry: Entry, layout: Layout): { fitted: string;
   return { fitted, isCut: fitted !== command };
 }
 
+function remoteEntryRow(host: Host, view: View, entry: Entry, index: number, layout: Layout, isFocused: boolean): RenderElement {
+  const { Box, Button } = view.kit;
+  const { fitted } = fitCommand(view, entry, layout);
+  const lead: Piece[] = [{ text: isFocused ? `${view.g.pointer} ` : "  " }, outcome(view, entry.exitCode), gap];
+  const rest: Piece[] = [
+    gap,
+    typePiece(entry.type),
+    gap,
+    ...commandPieces(fitted, view.g.mask),
+    ...(layout.agent > 0 && displayWidth(fitted) < layout.command ? [{ text: " ".repeat(layout.command - displayWidth(fitted)) }] : []),
+    ...agentPieces(view, entry.verifiedBy, layout.agent),
+  ];
+  const room = layout.command + FIXED_CELLS + layout.agent - piecesWidth(lead) - CLOCK_CELLS;
+  return Box({
+    key: `entry-${index}`,
+    flexDirection: "row",
+    hover: { backgroundColor: TONE_KEYS.focus },
+    ...(isFocused ? { backgroundColor: TONE_KEYS.focus } : {}),
+    children: [
+      Pieces(view.kit, lead, { isFocused }),
+      Button({ key: `entry-time-${index}`, label: clockOf(entry.at), plain: true, dimColor: true, onPress: view.press(() => select(host, index)) }),
+      Pieces(view.kit, fitPieces(rest, room, view.g.ellipsis), { isFocused }),
+    ],
+  });
+}
+
 // The row is one Button: its pieces are the Button's Text children, padded to the row's width so a
 // click anywhere on it selects the entry and the focus or hover background spans it. The clock stays
-// dim on the focused row; the rest reads bold on the focus background.
+// dim on the focused row; a coloured piece keeps its colour there and under hover, and the rest reads
+// bold on the focus background.
 function entryRow(host: Host, view: View, entry: Entry, index: number, layout: Layout, isFocused: boolean): RenderElement {
+  if (isRemote(view.kit)) return remoteEntryRow(host, view, entry, index, layout, isFocused);
   const { Box, Button, Text } = view.kit;
   const { fitted } = fitCommand(view, entry, layout);
   const lead: Piece[] = [{ text: isFocused ? `${view.g.pointer} ` : "  " }, outcome(view, entry.exitCode), gap];
@@ -299,10 +327,15 @@ function entryRow(host: Host, view: View, entry: Entry, index: number, layout: L
     ...agentPieces(view, entry.verifiedBy, layout.agent),
   ];
   const width = layout.command + FIXED_CELLS + layout.agent;
-  const shown = (pieces: readonly Piece[]): readonly Piece[] => (isFocused ? pieces.map(({ text }) => ({ text, color: ON_SURFACE, bold: true })) : pieces);
+  const isMarked = ({ color }: Piece): boolean => color !== undefined && color !== TONE_KEYS.muted;
+  const shown = (pieces: readonly Piece[]): readonly Piece[] =>
+    isFocused ? pieces.map((piece) => (isMarked(piece) ? { ...piece, bold: true } : { text: piece.text, color: ON_SURFACE, bold: true })) : pieces;
   const pieces = [...shown(lead), { text: clockOf(entry.at), dimColor: true as const }, ...shown(fitPieces(rest, width - piecesWidth(lead) - CLOCK_CELLS, view.g.ellipsis))];
   const pad = width - piecesWidth(pieces);
-  const lit = isFocused ? { backgroundColor: TONE_KEYS.focus } : { hover: { color: ON_SURFACE, backgroundColor: TONE_KEYS.focus } };
+  const lit = (piece: Piece) =>
+    isFocused
+      ? { backgroundColor: TONE_KEYS.focus }
+      : { hover: isMarked(piece) ? { backgroundColor: TONE_KEYS.focus } : { color: ON_SURFACE, backgroundColor: TONE_KEYS.focus } };
   return Box({
     key: `entry-row-${index}`,
     children: [
@@ -313,7 +346,10 @@ function entryRow(host: Host, view: View, entry: Entry, index: number, layout: L
         // The pointer inverts a Button; the row shows the focus background under it instead.
         hover: { inverse: false },
         onPress: view.press(() => select(host, index)),
-        children: [...pieces, ...(pad > 0 ? [{ text: " ".repeat(pad) }] : [])].map(({ text, ...style }) => Text({ ...style, ...lit, children: [text] })),
+        children: [...pieces, ...(pad > 0 ? [{ text: " ".repeat(pad) }] : [])].map((piece) => {
+          const { text, ...style } = piece;
+          return Text({ ...style, ...lit(piece), children: [text] });
+        }),
       }),
     ],
   });

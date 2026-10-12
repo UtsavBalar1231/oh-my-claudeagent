@@ -399,7 +399,7 @@ test("pressing an entry's row selects it: the card shows that run and starts at 
   const pressed = runsOf(nodeByKey(await ui.drawn(), "entry-2"));
   expect(pressed.slice(0, 4)).toEqual([
     { text: "❯ ", color: "text", bold: true, backgroundColor: "selectionBg" },
-    { text: "✗", color: "text", bold: true, backgroundColor: "selectionBg" },
+    { text: "✗", color: "error", bold: true, backgroundColor: "selectionBg" },
     { text: "  ", color: "text", bold: true, backgroundColor: "selectionBg" },
     { text: "10:00", dimColor: true, backgroundColor: "selectionBg" },
   ]);
@@ -447,10 +447,31 @@ test("an entry's row is one Button: its children draw the glyph, time, type, com
   await ui.press({ key: "entry-1" });
   expect(runsOf(await ui.find({ key: "entry-1" })).slice(0, 2)).toEqual([
     { text: "❯ ", color: "text", bold: true, backgroundColor: "selectionBg" },
-    { text: "✗", color: "text", bold: true, backgroundColor: "selectionBg" },
+    { text: "✗", color: "error", bold: true, backgroundColor: "selectionBg" },
   ]);
   expect(runsOf(await ui.find({ key: "entry-5" }))[0]).toEqual({ text: "  " });
   await ui.unmount();
+});
+
+test("a desktop surface draws an entry as a Box around a time Button, and the terminal as one Button of Text", async ($, on) => {
+  const w = world(on, await proofFiles());
+  const terminal = await openEvidence($, DOCK_190);
+  const terminalRow = nodeByKey(await terminal.drawn(), "entry-1");
+  expect(terminalRow?.type).toBe("Button");
+  expect(childrenOf(terminalRow ?? { type: "Button" }).every((child) => isNode(child) && child.type === "Text")).toBe(true);
+  expect(nodeByKey(await terminal.drawn(), "entry-time-1")).toBeUndefined();
+  await terminal.unmount();
+
+  w.surfaces = ["desktop"];
+  await $.command.run(run("", DOCK_190.columns));
+  const desktop = await $.ui.mount(pane("desktop", DOCK_190));
+  await desktop.press({ key: "3" });
+  await desktop.redraw();
+  const desktopRow = nodeByKey(await desktop.drawn(), "entry-1");
+  expect(desktopRow?.type).toBe("Box");
+  const time = nodeByKey(desktopRow, "entry-time-1");
+  expect([time?.type, time?.props?.["label"]]).toEqual(["Button", "09:30"]);
+  await desktop.unmount();
 });
 
 test("a run whose output is taller than the card shows the more cue, and every output line is reachable by scrolling", async ($, on) => {

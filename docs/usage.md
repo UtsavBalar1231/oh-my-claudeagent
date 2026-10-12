@@ -323,7 +323,7 @@ whether it passed, that shows the exit code, when it ran and who logged it, whet
 verification is for the plan as it is now, an earlier version of it or any plan, and the whole
 command and output, wrapped rather than cut. When they run taller than the card, a cue on its
 last row says so and the mouse wheel over the card scrolls it. The wheel over the list moves the
-focus, and a click anywhere on a run's row focuses that run.
+focus, and a click anywhere on a run's row focuses that run (on Desktop, a click on its time does).
 
 | Key | Action |
 | --- | --- |

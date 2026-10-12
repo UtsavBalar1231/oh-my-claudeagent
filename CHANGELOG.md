@@ -41,8 +41,9 @@ hand.
   focus as the arrows do, and over a part of a tab that holds more than it shows (the Evidence
   card, the plan's task detail, each Notepad card) it scrolls that part alone, prose a row at a
   time, with a cue above and below while more is out of view. When the agents' lanes run past the
-  pane, the wheel scrolls them and the arrows step the focus a lane at a time. Each Evidence run is
-  one button, so a click anywhere on its row focuses the run, and in a wide pane a click on a
+  pane, the wheel scrolls them and the arrows step the focus a lane at a time. In the terminal each
+  Evidence run is one button, so a click anywhere on its row focuses the run (on Desktop, a click
+  on its time does), and in a wide pane a click on a
   task's title selects it and a second click opens it.
 - **The pane fits every size.** Each tab gives its rows out by priority, so a short pane keeps
   its header, its filter, at least one row of content with its cues, and its keys, and nothing
