@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fakeExec, removeExecDir } from "../../tests/fixtures/fake-exec.ts";
 import { setPath } from "../../tests/fixtures/spec-env.ts";
-import { discoverBinary, extensionMismatch, gitWorktreeRoots, patternWarning, resolveNative, run, tools } from "./ast.ts";
+import { gitWorktreeRoots } from "../io.ts";
+import { discoverBinary, extensionMismatch, patternWarning, resolveNative, run, tools } from "./ast.ts";
 
 const ENV_KEYS = ["PATH", "AST_GREP_BIN", "CLAUDE_PROJECT_DIR"] as const;
 const MAIN_PY = "print('hello')\nx = 1\nold_func(x)\n";

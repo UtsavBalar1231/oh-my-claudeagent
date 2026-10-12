@@ -51,8 +51,23 @@ function gitProject(): string {
   return project;
 }
 
-function startServer(env: Record<string, string | undefined> = {}) {
-  const project = gitProject();
+function git(cwd: string, ...args: string[]): void {
+  const identity = ["-c", "user.name=spec", "-c", "user.email=spec@example.com", "-c", "commit.gpgsign=false"];
+  expect(Bun.spawnSync(["git", ...identity, ...args], { cwd, env: process.env }).exitCode).toBe(0);
+}
+
+function repoWithWorktree(): { main: string; linked: string } {
+  const base = tempDir("worktrees");
+  const main = join(base, "main");
+  const linked = join(base, "feature");
+  mkdirSync(main);
+  git(main, "init", "-q");
+  git(main, "commit", "-q", "--allow-empty", "-m", "init");
+  git(main, "worktree", "add", "-q", "-b", "feature", linked);
+  return { main, linked };
+}
+
+function startServer(env: Record<string, string | undefined> = {}, project = gitProject()) {
   const proc = Bun.spawn([process.execPath, SERVER], {
     cwd: project,
     env: specEnv({ CLAUDE_CONFIG_DIR: tempDir("config"), OMCA_HOOK_TRACE: undefined, AI_AGENT: undefined, AST_GREP_BIN: undefined, ...env }),
@@ -88,9 +103,9 @@ function startServer(env: Record<string, string | undefined> = {}) {
     return runtime;
   };
   const prompt = (sessionId: string) => call("omca_hook", { event: "UserPromptSubmit", session_id: sessionId, prompt: "go" });
-  const mark = (sessionId: string, writtenAt: number) => {
-    mkdirSync(join(project, ".omca", "state", "mod"), { recursive: true });
-    writeFileSync(join(project, ".omca", "state", "mod", `${sessionId}.json`), JSON.stringify({ written_at: writtenAt }));
+  const mark = (sessionId: string, writtenAt: number | string, root = project) => {
+    mkdirSync(join(root, ".omca", "state", "mod"), { recursive: true });
+    writeFileSync(join(root, ".omca", "state", "mod", `${sessionId}.json`), typeof writtenAt === "string" ? writtenAt : JSON.stringify({ written_at: writtenAt }));
   };
   return { health, report, prompt, mark, project };
 }
@@ -120,6 +135,61 @@ test("health_check reports ok once the mod marks the session after its last prom
   await Bun.sleep(5);
   mark("s-1", Date.now());
   expect(await health()).toEqual({ runtime: "ok" });
+});
+
+test("health_check reports ok when only a linked worktree holds the fresh marker", async () => {
+  const { main, linked } = repoWithWorktree();
+  const { health, prompt, mark } = startServer({}, main);
+  await prompt("s-1");
+  await Bun.sleep(5);
+  mark("s-1", Date.now(), linked);
+  expect(await health()).toEqual({ runtime: "ok" });
+});
+
+test("health_check prefers a fresh linked marker over a stale main one", async () => {
+  const { main, linked } = repoWithWorktree();
+  const { health, prompt, mark } = startServer({}, main);
+  mark("s-1", Date.now() - 60_000);
+  await prompt("s-1");
+  await Bun.sleep(5);
+  mark("s-1", Date.now(), linked);
+  expect(await health()).toEqual({ runtime: "ok" });
+});
+
+test("health_check reports ok from a server rooted in the linked worktree when only main holds the fresh marker", async () => {
+  const { main, linked } = repoWithWorktree();
+  const { health, prompt, mark } = startServer({}, linked);
+  await prompt("s-1");
+  await Bun.sleep(5);
+  mark("s-1", Date.now(), main);
+  expect(await health()).toEqual({ runtime: "ok" });
+});
+
+test("health_check ignores a fresh marker in an unrelated repository", async () => {
+  const { health, prompt, mark } = startServer();
+  await prompt("s-1");
+  await Bun.sleep(5);
+  mark("s-1", Date.now(), gitProject());
+  expect(await health()).toEqual(MOD_ABSENT);
+});
+
+test("health_check reports ok from a fresh main marker beside a corrupt linked one", async () => {
+  const { main, linked } = repoWithWorktree();
+  const { health, prompt, mark } = startServer({}, main);
+  await prompt("s-1");
+  await Bun.sleep(5);
+  mark("s-1", "{", linked);
+  mark("s-1", Date.now());
+  expect(await health()).toEqual({ runtime: "ok" });
+});
+
+test("health_check skips a corrupt linked marker when the main marker is stale", async () => {
+  const { main, linked } = repoWithWorktree();
+  const { health, prompt, mark } = startServer({}, main);
+  mark("s-1", Date.now() - 60_000);
+  mark("s-1", "{", linked);
+  await prompt("s-1");
+  expect(await health()).toEqual(MOD_ABSENT);
 });
 
 test("health_check judges the session of the latest hook call, not an earlier one", async () => {

@@ -1,6 +1,6 @@
 import { existsSync, realpathSync, statSync } from "node:fs";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { hasCode, projectRoot } from "../io.ts";
+import { gitWorktreeRoots, projectRoot } from "../io.ts";
 import type { Tool } from "../omca.ts";
 import { IDLE_CONTEXT, type Progress } from "../progress.ts";
 import { argReader } from "./args.ts";
@@ -253,28 +253,6 @@ function workspace(): string {
 function within(root: string, candidate: string): boolean {
   const path = relative(root, candidate);
   return path === "" || (!isAbsolute(path) && path.split(sep)[0] !== "..");
-}
-
-export function gitWorktreeRoots(dir: string): string[] {
-  try {
-    const git = Bun.spawnSync(["git", "worktree", "list", "--porcelain"], {
-      cwd: dir,
-      stderr: "ignore",
-      timeout: 5_000,
-      windowsHide: true,
-    });
-    if (git.exitCode !== 0) return [];
-    return git.stdout
-      .toString()
-      .split("\n")
-      .filter((line) => line.startsWith("worktree "))
-      .map((line) => line.slice("worktree ".length))
-      .filter((root) => existsSync(root))
-      .map((root) => realpathSync.native(root));
-  } catch (error) {
-    if (hasCode(error, "ENOENT")) return [];
-    throw error;
-  }
 }
 
 // A path in the workspace comes back workspace-relative, matching the cwd every invocation runs

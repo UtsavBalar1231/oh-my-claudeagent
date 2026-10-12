@@ -34,8 +34,8 @@ const CATEGORIES_MALFORMED = '{"error": "categories.json is malformed"}';
 function runtimeOf(root: string): Runtime {
   const sessionId = latestSessionId();
   if (sessionId === undefined) return { runtime: "hooks_inactive", runtime_reason: HOOKS_INACTIVE };
-  const writtenAt = markerWrittenAt(root, sessionId);
   const promptAt = findSession(sessionId)?.promptAt ?? 0;
+  const writtenAt = markerWrittenAt(root, sessionId, promptAt);
   return writtenAt !== undefined && writtenAt > promptAt
     ? { runtime: "ok" }
     : { runtime: "mod_absent", runtime_reason: MOD_ABSENT };

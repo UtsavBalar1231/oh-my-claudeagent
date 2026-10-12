@@ -1,10 +1,12 @@
 import {
   closeSync,
+  existsSync,
   fsyncSync,
   linkSync,
   mkdirSync,
   openSync,
   readFileSync,
+  realpathSync,
   renameSync,
   rmSync,
   statSync,
@@ -114,6 +116,28 @@ function findRoot(dir: string): string {
     if (!hasCode(error, "ENOENT")) throw error;
     console.error(`omca: could not run git in ${dir}; using it as the project root:`, error);
     return dir;
+  }
+}
+
+export function gitWorktreeRoots(dir: string): string[] {
+  try {
+    const git = Bun.spawnSync(["git", "worktree", "list", "--porcelain"], {
+      cwd: dir,
+      stderr: "ignore",
+      timeout: 5_000,
+      windowsHide: true,
+    });
+    if (git.exitCode !== 0) return [];
+    return git.stdout
+      .toString()
+      .split("\n")
+      .filter((line) => line.startsWith("worktree "))
+      .map((line) => line.slice("worktree ".length))
+      .filter((root) => existsSync(root))
+      .map((root) => realpathSync.native(root));
+  } catch (error) {
+    if (hasCode(error, "ENOENT")) return [];
+    throw error;
   }
 }
 

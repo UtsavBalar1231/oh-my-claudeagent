@@ -5,7 +5,7 @@ import { ledgerCoversSlot } from "../../src/core/evidence.ts";
 import { BOULDER, LEDGER, statusPath as sessionStatusPath } from "../../src/core/omca-paths.ts";
 import { isSafeId } from "../../src/core/session-id.ts";
 import { isRecord } from "../../src/core/tool-input.ts";
-import { errorCode, hasCode, isMissing, writeFileAtomic } from "../io.ts";
+import { errorCode, gitWorktreeRoots, hasCode, isMissing, writeFileAtomic } from "../io.ts";
 import type { Session } from "./session-state.ts";
 
 export const STAMP_INTERVAL_MS = 5_000;
@@ -33,10 +33,28 @@ export function readMarker(root: string, sessionId: string): Record<string, unkn
   return isRecord(marker) ? marker : undefined;
 }
 
-/** When the mod last marked the session, or undefined when it never has. */
-export function markerWrittenAt(root: string, sessionId: string): number | undefined {
-  const at = readMarker(root, sessionId)?.written_at;
-  return typeof at === "number" ? at : undefined;
+const writtenAtOf = (marker: Record<string, unknown> | undefined): number | undefined =>
+  typeof marker?.written_at === "number" ? marker.written_at : undefined;
+
+/**
+ * When the mod last marked the session, or undefined when it never has. The mod writes the marker
+ * under its session root, which a worktree move changes, so a root marker not newer than `after`
+ * sends the search through every worktree of the repository.
+ */
+export function markerWrittenAt(root: string, sessionId: string, after = -Infinity): number | undefined {
+  const own = writtenAtOf(readMarker(root, sessionId));
+  if (own !== undefined && own > after) return own;
+  let latest = own;
+  for (const worktree of new Set(gitWorktreeRoots(root))) {
+    let at: number | undefined;
+    try {
+      at = writtenAtOf(readMarker(worktree, sessionId));
+    } catch {
+      continue;
+    }
+    if (at !== undefined && (latest === undefined || at > latest)) latest = at;
+  }
+  return latest;
 }
 
 type Unreadable = { kind: "unreadable"; path: string; code: string };
