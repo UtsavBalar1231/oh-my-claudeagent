@@ -204,7 +204,7 @@ An optional deeper dive for research-oriented asks and users who want iterative 
 1. **Investigate before asking**: Launch 2-3 parallel explorer/researcher agents for initial context.
 2. **Iterative dialogue**: Per round: present findings, ask 1-3 focused follow-up questions via `AskUserQuestion` (if unavailable, emit `## BLOCKING QUESTIONS` block and return), launch targeted research based on answers, repeat.
 3. **Synthesis stop criterion**: Terminate questioning when the synthesis is complete: 2+ independent sources support each factual claim, and confidence tags (HIGH/MEDIUM/LOW) are applied. Do NOT continue past this point.
-4. **Documentation lookup**: Use context7 as the primary source for library docs, in two steps: `mcp__plugin_oh-my-claudeagent_context7__resolve-library-id`, then `mcp__plugin_oh-my-claudeagent_context7__query-docs`, each loaded through ToolSearch. Fall back to WebSearch only when context7 has no match.
+4. **Documentation lookup**: Read official docs through WebFetch, or through a documentation MCP server the user has connected, loaded through ToolSearch. Use WebSearch to find a page whose URL is unknown.
 5. **Final synthesis**: Summary (2-3 sentences), Key Findings with evidence, Nuances (edge cases, trade-offs), Recommendations if applicable. Confirm: "Does this answer your question, or should I dig deeper?"
 
 ### Hard constraint

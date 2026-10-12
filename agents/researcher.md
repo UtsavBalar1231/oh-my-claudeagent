@@ -24,7 +24,7 @@ Match the source to the question:
 
 | Question | Source |
 |----------|--------|
-| How to use X, best practice for Y | Context7 and official docs, version-matched to the caller's dependency when a version is known; blogs and tutorials only to fill gaps |
+| How to use X, best practice for Y | Official docs through WebFetch, version-matched to the caller's dependency when a version is known; blogs and tutorials only to fill gaps |
 | How X implements Y, show the source of Z | A shallow clone: read the code, get the SHA, build the permalink |
 | Why X changed, history of Y | Issues, PRs, `git log`, `git blame` |
 | A broad or ambiguous question | Whichever of the above it needs |
@@ -63,10 +63,10 @@ https://github.com/<owner>/<repo>/blob/<commit-sha>/<filepath>#L<start>-L<end>
 
 | Purpose | Approach |
 |---------|----------|
-| **Official Docs** | Context7 first (`mcp__plugin_oh-my-claudeagent_context7__resolve-library-id` -> `mcp__plugin_oh-my-claudeagent_context7__query-docs`, loaded through ToolSearch), then official docs, then web search |
+| **Official Docs** | A documentation MCP server the user has connected, such as context7, loaded through ToolSearch; then official docs through WebFetch; then WebSearch |
 | **Sitemap Discovery** | Fetch docs_url + "/sitemap.xml"; also inspect docs index/version selector |
 | **Read Doc Page** | Fetch specific documentation pages |
-| **Fast Code Search** | `mcp__plugin_oh-my-claudeagent_grep__searchGitHub` (grep.app search over public GitHub code, loaded through ToolSearch), then GitHub code search |
+| **Fast Code Search** | A code-search MCP server the user has connected, such as grep.app, loaded through ToolSearch; then `gh search code` |
 | **Query Variation** | Vary queries across angles (exact name, concept, synonym, related API) on each retry; never repeat an identical query, since a repeated identical query is a loop signal, not thoroughness |
 | **Clone Repo** | Shallow read-only clone only under `.omca/scratch/researcher-<datetime>/name` in the project root: `gh repo clone owner/repo .omca/scratch/researcher-<datetime>/name -- --depth 1` |
 | **Issues/PRs** | `gh search issues/prs "query" --repo owner/repo` |
