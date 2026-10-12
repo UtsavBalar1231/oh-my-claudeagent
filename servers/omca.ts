@@ -50,6 +50,8 @@ const CLAUDE_CODE_INSTRUCTIONS = [
 const OPENCODE_INSTRUCTIONS = [
   HEADER,
   "",
+  "Call each tool below directly by its name. None of them is in the Code Mode catalog, so `search` and `execute` cannot reach them.",
+  "",
   "- After a build, test or lint run: `omca_evidence_log`, real exit code included; `omca_evidence_read` lists the entries.",
   "- A plan's progress: `omca_boulder_progress`.",
   "- Notes that must outlive compaction: `omca_notepad_write`, `omca_notepad_read`, `omca_notepad_list`, `omca_notepad_compact`.",

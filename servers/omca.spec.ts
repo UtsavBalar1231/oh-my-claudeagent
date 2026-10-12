@@ -526,11 +526,11 @@ describe("tool declaration contract", () => {
 
   test("under OpenCode the instructions name the adapter's omca_ tools and no tool-loading step", async () => {
     const { instructions } = (await startServer({ OMCA_CLIENT: "opencode" }).request("initialize", { protocolVersion: "2025-11-25" })).result as { instructions: string };
-    const named = [...instructions.matchAll(/`([a-z_]+)`/g)].map((match) => match[1]);
-    expect(named.filter((name) => !name?.startsWith("omca_") || !EXPECTED_TOOLS.includes(name.slice(5)))).toEqual([]);
-    expect(named.map((name) => name?.slice(5)).toSorted()).toEqual(
+    const named = [...instructions.matchAll(/`omca_([a-z_]+)`/g)].map((match) => match[1]);
+    expect(named.toSorted()).toEqual(
       ["ast_dump_tree", "ast_find_rule", "ast_replace", "ast_search", "ast_test_rule", "boulder_progress", "evidence_log", "evidence_read", "file_read", "notepad_compact", "notepad_list", "notepad_read", "notepad_write"],
     );
+    expect(instructions).toContain("None of them is in the Code Mode catalog, so `search` and `execute` cannot reach them.");
     expect(instructions).not.toContain("ToolSearch");
     expect(instructions).not.toContain(TOOL_PREFIX);
   });

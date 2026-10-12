@@ -33,7 +33,9 @@ catalogs) and answers the `omca_hook` calls the settings hooks make. It speaks M
   every other tool waits behind tool search. `OMCA_TOOLS` in `hooks/subagent-context.ts` states
   the loading rule once, for the server instructions and the SubagentStart context. The OpenCode
   adapter starts the server with `OMCA_CLIENT=opencode`, and the server then sends
-  `OPENCODE_INSTRUCTIONS`: the tools the adapter shows, named `omca_<tool>`, with no loading rule.
+  `OPENCODE_INSTRUCTIONS`: the tools the adapter shows, named `omca_<tool>`, with no loading rule
+  and a line saying they sit outside OpenCode's Code Mode catalog. Without that line the model
+  ran a code-mode `search` for an `omca` namespace before the call in about half of the runs.
 - Run the specs with `bun test servers`, and the handshake check with `just validate --check mcp`; `just typecheck` covers this
   directory through `tsconfig.runtime.json`.
 - Keep a tool description under 2,048 characters, the cap every client from the 2.1.295 floor applies; Claude Code truncates past it.

@@ -9,9 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- In OpenCode, the `omca` server's instructions name its tools as `omca_<tool>` and leave out
-  Claude Code's tool-search step and the tools the adapter hides, so the model calls a tool
-  directly instead of searching for it first.
+- In OpenCode, the `omca` server's instructions name its tools as `omca_<tool>`, leave out
+  Claude Code's tool-search step and the tools the adapter hides, and say the tools sit outside
+  OpenCode's Code Mode catalog, so the model calls a tool directly instead of searching for it
+  first.
 - On Desktop, a view too large to send measures each element once per redraw instead of a few
   hundred times.
 
