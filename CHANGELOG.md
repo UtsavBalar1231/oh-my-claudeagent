@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- In OpenCode, the `omca` server's instructions name its tools as `omca_<tool>` and leave out
+  Claude Code's tool-search step and the tools the adapter hides, so the model calls a tool
+  directly instead of searching for it first.
+- On Desktop, a view too large to send measures each element once per redraw instead of a few
+  hundred times.
+
 ## [3.0.0] - 2026-10-12
 
 OMCA 3 rewrites the plugin's runtime in TypeScript on bun. One `omca` MCP server serves the

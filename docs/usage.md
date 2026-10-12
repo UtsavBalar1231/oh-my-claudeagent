@@ -90,7 +90,8 @@ What OpenCode gets:
   launch that subagent.
 - The `omca` server's evidence, notepad, AST, `boulder_progress` and `file_read` tools, named
   `omca_<tool>`. The adapter hides `boulder_write`, `session_search`, `agents_list`,
-  `categories_list`, `health_check` and `omca_hook`.
+  `categories_list`, `health_check` and `omca_hook`, and the server's instructions name only the
+  tools it shows.
 - The destructive-command guard and the comment gate on model and user shell commands and on
   file edits. The comment gate blocks only with `OMCA_COMMENT_GATE=deny`. A blocked `!` command
   shows as a failed command; the reason goes to the OpenCode server log.

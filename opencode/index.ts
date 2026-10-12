@@ -143,7 +143,7 @@ async function setup(ctx: Context) {
     const config: Mcp.ServerConfig = {
       type: "local",
       command: [process.execPath, join(root, "servers/omca.ts")],
-      environment: { BUN_BE_BUN: "1", CLAUDE_PROJECT_DIR: projectRoot, CLAUDE_PLUGIN_ROOT: root },
+      environment: { BUN_BE_BUN: "1", CLAUDE_PROJECT_DIR: projectRoot, CLAUDE_PLUGIN_ROOT: root, OMCA_CLIENT: "opencode" },
       codemode: false,
     }
     await ctx.mcp.transform((editor) => editor.set("omca", config))

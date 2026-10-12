@@ -213,6 +213,17 @@ describe.skipIf(!opencodeBin)("opencode model path", () => {
     verify(wrong.length === 0, `tools: a build request exposes ${wrong[0]?.join(",")} instead of ${VISIBLE_OMCA_TOOLS.join(",")}`)
   }, SLOW)
 
+  test("instructions: build requests carry the omca server's OpenCode wording and name only visible tools", async () => {
+    await ranAll()
+    const build = requests().filter((request) => (request.tools?.length ?? 0) > 0 && !system(request).includes(EXPLORER)).map(system)
+    verify(build.some((text) => text.includes("`omca_evidence_log`, real exit code included")), "instructions: no build request carried the omca server instructions")
+    const named = [...new Set(build.flatMap((text) => [...text.matchAll(/\bomca_[a-z_]+/g)].map((match) => match[0])))]
+    const hidden = named.filter((name) => !VISIBLE_OMCA_TOOLS.includes(name))
+    verify(hidden.length === 0, `instructions: a build request names ${hidden.join(",")}, which the adapter hides`)
+    const claudeIds = requests().flatMap((request) => [...system(request).matchAll(/.{0,80}mcp__plugin_oh-my-claudeagent_omca__.{0,80}/g)].map((match) => match[0]))
+    verify(claudeIds.length === 0, `instructions: a request names an omca tool by its Claude Code id: ${[...new Set(claudeIds)].join(" | ")}`)
+  }, SLOW)
+
   test("models: omca-explorer requests go to the sonnet override and build requests to the default", async () => {
     await ranAll()
     const explorer = requests().filter((request) => system(request).includes(EXPLORER))
