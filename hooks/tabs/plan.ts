@@ -40,7 +40,7 @@ import {
 import type { Input, Phase } from "../dispatch.ts";
 import { boundPlanOf, fillPrompt, type Host, type ProofFacts, proofFacts, reason, sessionOf, type State, verdictFor } from "../host.ts";
 import type { Subcommand } from "../omca-router.ts";
-import { blanks, buttonRow, edge, keyButton, noticeRow, open, PANE, patchPane, refocus as focusIn, rule, type TabView, type View, wrapAt } from "../pane.ts";
+import { blanks, buttonRow, edge, keyButton, noticeRow, open, PANE, patchPane, refocus as focusIn, refocusRemote, rule, tabKey, type TabView, type View, wrapAt } from "../pane.ts";
 import { codeUnits, markdownUnits, resetOffset, ScrollRegion, scrollKeyed, type Unit } from "../regions.ts";
 import { Card as CardBox, Field, isRemote, Line, Run as Spans, type TextStyle } from "../ui.ts";
 
@@ -826,9 +826,10 @@ async function copyTask(host: Host, view: View, plan: Loaded, card: Card | undef
   host.ui.invalidate();
 }
 
-async function toEvidence(host: Host): Promise<void> {
+async function toEvidence(host: Host, view: View): Promise<void> {
   await patchPane(host, (pane) => ({ ...pane, tab: "evidence" }));
   host.ui.invalidate();
+  refocusRemote(host, view, tabKey("evidence"), "evidence");
 }
 
 function toggle(host: Host, change: Partial<Filter>): void {
@@ -846,11 +847,12 @@ function editFilter(host: Host): void {
   refocus(host, FILTER);
 }
 
-function openDetail(host: Host, n: number): void {
+function openDetail(host: Host, view: View, n: number): void {
   task = n;
   mode = "detail";
   note = undefined;
   host.ui.invalidate();
+  refocusRemote(host, view, "b", "plan");
 }
 
 function selectTask(host: Host, n: number): void {
@@ -865,7 +867,7 @@ function actionKeys(host: Host, view: View, plan: Loaded, card: Card | undefined
     ["k", "Run check", () => runCheck(host, view, card), card === undefined || card.checks.length === 0],
     ["s", "Start here", () => startHere(host, view, plan, card), card === undefined || card.done],
     ["c", "Copy", () => copyTask(host, view, plan, card), card === undefined],
-    ["e", "Evidence", () => toEvidence(host)],
+    ["e", "Evidence", () => toEvidence(host, view)],
   ];
 }
 
@@ -1180,7 +1182,7 @@ function boardView(host: Host, view: View, ctx: Ctx): RenderElement[] {
     const isCurrent = item.card.n === task;
     // Decided as the row is drawn: a click's focus move can reach the cursor before its press does.
     const n = item.card.n;
-    const onPress = isSplit && !isCurrent ? () => selectTask(host, n) : () => openDetail(host, n);
+    const onPress = isSplit && !isCurrent ? () => selectTask(host, n) : () => openDetail(host, view, n);
     const row = taskRow(view, ctx, item.card, { width: rowWidth, numWidth, isShort: isSplit }, isCurrent, onPress);
     return isCurrent ? [row, ...under] : [row];
   });
@@ -1385,6 +1387,7 @@ function contentsView(host: Host, view: View, plan: Loaded): RenderElement[] {
           mode = "page";
           page = index;
           host.ui.invalidate();
+          refocusRemote(host, view, KEYS.contents, "plan");
         }),
       }),
     );

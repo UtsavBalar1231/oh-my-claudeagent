@@ -1,7 +1,7 @@
 import type { On } from "claude-code";
 import { type Engine, expect, test } from "claude-code/testing";
 import { ENTRY_CAP } from "../../hooks/tabs/evidence.ts";
-import { childrenOf, isNode, LEDGER, nodeByKey, pane, run, textOf, topRows, world } from "./world.ts";
+import { childrenOf, focusRequests, isNode, LEDGER, nodeByKey, pane, run, textOf, topRows, world } from "./world.ts";
 
 const entry = (n: number, exit: number, at: Date) => ({
   type: "test",
@@ -92,5 +92,29 @@ test("Evidence on desktop ends its tree with the key row, with no blank padding 
 test("Evidence on desktop keeps the cap's entries on separate days, with their opened entry, under the 2,000 nodes Desktop accepts", async ($, on) => {
   const ui = await openEvidence($, on, eachDay(ENTRY_CAP + 1));
   expect(nodesIn(await ui.drawn())).toBeLessThan(2000);
+  await ui.unmount();
+});
+
+// The test engine answers no plugin's `$.ui.focus`, so each request the pane sends shows as its log line.
+
+test("Evidence on desktop puts the focus on the paging Button that stays drawn after each turn, so the next hotkey reaches the pane", async ($, on) => {
+  const w = world(on, { [LEDGER]: JSON.stringify({ entries: sameDay(ENTRY_CAP * 2 + 10) }) });
+  w.surfaces = ["desktop"];
+  await $.command.run(run(""));
+  const ui = await $.ui.mount(pane("desktop"));
+  await ui.press({ key: "3" });
+  await ui.redraw();
+  const turn = async (key: string) => {
+    await ui.press({ key });
+    await w.clock.advance(1);
+    return focusRequests(w.logs).at(-1);
+  };
+
+  expect(await turn("older")).toBe("older");
+  expect(await turn("older")).toBe("newer");
+  expect(nodeByKey(await ui.drawn(), "older")).toBeUndefined();
+  expect(await turn("newer")).toBe("newer");
+  expect(await turn("newer")).toBe("older");
+  expect(nodeByKey(await ui.drawn(), "newer")).toBeUndefined();
   await ui.unmount();
 });

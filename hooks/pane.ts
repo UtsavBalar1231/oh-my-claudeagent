@@ -257,6 +257,13 @@ export function refocus(host: Host, key: string, tab: Tab): void {
   });
 }
 
+/** A remote surface hands the pane its hotkeys only while a pane element holds the focus, which a press that swaps the view drops. */
+export function refocusRemote(host: Host, view: View, key: string, tab: Tab): void {
+  if (isRemote(view.kit)) refocus(host, key, tab);
+}
+
+export const tabKey = (tab: Tab): string => String(TABS.findIndex(([id]) => id === tab) + 1);
+
 async function selectTab(host: Host, tab: Tab): Promise<void> {
   if (tab === "stats") await stats.load(host);
   await patchPane(host, (pane) => (pane.tab === tab ? pane : { ...pane, tab }));
@@ -319,7 +326,10 @@ async function draw(host: Host, e: Input<"ui.render Pane">): Promise<RenderEleme
           label,
           plain: true,
           ...(id === active ? {} : { dimColor: true }),
-          onPress: press(() => selectTab(host, id)),
+          onPress: press(async () => {
+            await selectTab(host, id);
+            if (isRemote(kit)) refocus(host, key, id);
+          }),
         }),
       ),
     }),
@@ -343,13 +353,22 @@ async function draw(host: Host, e: Input<"ui.render Pane">): Promise<RenderEleme
     body = [Text({ color: TONE_KEYS.fail, children: [`${g.cross} The ${active} tab failed: ${reason(error)}`] })];
   }
   if (!isTerminal) {
-    const tree = Box({ flexDirection: "column", width, children: [...tabs, ...(hasRule ? [rule(view)] : []), ...body] });
+    const above = [...tabs, ...(hasRule ? [rule(view)] : [])];
+    const tree = Box({ flexDirection: "column", width, children: [...above, ...body] });
     const size = sizeOf(tree);
     if (isDrawable(size)) return tree;
-    // A remote surface refuses a tree past its size cap whole, which would leave the pane blank.
+    // A remote surface refuses a tree past its size cap whole, which would leave the pane blank. The
+    // largest elements go first, so the small ones a tab steers by (its header, Find field and keys) stay.
     host.log(`omca ${active} tab is too large for ${e.surface}: ${size.nodes} nodes, ${size.chars} characters`);
     const notice = `${g.cross} This view is more than Claude Desktop draws at once. Narrow it with Find where the tab has one, or read it in a terminal.`;
-    return Box({ flexDirection: "column", width, children: [...tabs, Text({ color: TONE_KEYS.warn, wrap: "wrap", children: [notice] })] });
+    const kept = body.map((element) => ({ element, nodes: sizeOf(element).nodes }));
+    const drawn = () =>
+      Box({ flexDirection: "column", width, children: [...above, Text({ color: TONE_KEYS.warn, wrap: "wrap", children: [notice] }), ...kept.map(({ element }) => element)] });
+    while (kept.length > 0 && !isDrawable(sizeOf(drawn()))) {
+      const largest = kept.reduce((most, each, at) => (each.nodes > (kept[most]?.nodes ?? 0) ? at : most), 0);
+      kept.splice(largest, 1);
+    }
+    return drawn();
   }
   const drawnRows = [...tabs, ...body].reduce((sum, child) => sum + rowsAtLeast(child), hasRule ? 1 : 0);
   // The engine raises the wheel only over a tree taller than the body, so a tab that fits but holds

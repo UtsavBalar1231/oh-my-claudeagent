@@ -538,6 +538,8 @@ function remoteTimeline(host: Host, view: View, ledger: Ledger, items: readonly 
       onPress: view.press(() => {
         pageStart = start;
         host.ui.invalidate();
+        const isKept = key === "newer" ? start > 0 : start + ENTRY_CAP < items.length;
+        refocus(host, isKept ? key : key === "newer" ? "older" : "newer", "evidence");
       }),
     });
   const elements: RenderElement[] = pageStart > 0 ? [turn("newer", "n", `Show ${Math.min(ENTRY_CAP, pageStart)} newer`, Math.max(0, pageStart - ENTRY_CAP))] : [];

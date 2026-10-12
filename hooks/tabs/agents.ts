@@ -212,7 +212,7 @@ function openRow(view: View, host: Host, lane: Lane, key: string, pieces: readon
         plain: true,
         ...(lane.endedAt === null ? {} : { dimColor: true }),
         ...(isFirst ? { autoFocus: true } : {}),
-        onPress: view.press(() => page.open(host, lane.id)),
+        onPress: view.press(() => page.open(host, view, lane.id)),
       }),
       Pieces(kit, rest.slice(named)),
     ],

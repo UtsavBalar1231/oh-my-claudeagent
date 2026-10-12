@@ -245,6 +245,9 @@ export function write(w: World, path: string, text: string): void {
 }
 
 /** Sets the mtime `fs.stat` reports for a directory, as a real one moves when an entry is added or removed. */
+// The test engine implements no plugin `$.ui.focus`, so a refocus shows up as the log line it writes on refusal.
+export const focusRequests = (logs: readonly string[]): string[] => logs.flatMap((line) => /^omca \w+ could not focus (\S+): no implementation for ui\.focus$/.exec(line)?.[1] ?? []);
+
 export function touchDir(w: World, path: string, mtimeMs: number): void {
   w.dirs.set(normalizePath(w.layout.platform, w.spelled(path)), mtimeMs);
 }

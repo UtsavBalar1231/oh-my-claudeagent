@@ -7,7 +7,7 @@ import { agentKey, fitPieces, levelMark, ON_SURFACE, type Piece, piecesWidth, TO
 import { loadPage } from "../agents-tracker.ts";
 import { type Host, type State, update } from "../host.ts";
 import { frame, keyOf, show, stateOf } from "../mascot-player.ts";
-import { buttonRow, keyButton, noticeRow, refocus, type View } from "../pane.ts";
+import { buttonRow, keyButton, noticeRow, refocus, refocusRemote, type View } from "../pane.ts";
 import { markdownUnits, resetOffset, ScrollRegion, type Unit } from "../regions.ts";
 import { isRemote, Line } from "../ui.ts";
 
@@ -31,10 +31,11 @@ export const openKey = (id: string): string => `open-${id}`;
 
 const showPage = (host: Host, id: string | null): Promise<void> => update(host.state.agentPage, () => ({ id }));
 
-export async function open(host: Host, id: string): Promise<void> {
+export async function open(host: Host, view: View, id: string): Promise<void> {
   await loadPage(host, id);
   resetOffset(BODY_KEY);
   await showPage(host, id);
+  refocusRemote(host, view, BACK, "agents");
 }
 
 async function close(host: Host, id: string): Promise<void> {

@@ -1,6 +1,6 @@
 import type { On } from "claude-code";
 import { expect, test } from "claude-code/testing";
-import { drain, pane, rows, run, usage, world } from "./world.ts";
+import { drain, focusRequests, pane, rows, run, usage, world } from "./world.ts";
 
 const spawnOf = (n: number, type: string, description: string) =>
   ({
@@ -13,6 +13,8 @@ const spawnOf = (n: number, type: string, description: string) =>
     background: true,
     fork: false,
   }) as const;
+
+// The test engine answers no plugin's `$.ui.focus`, so each request the pane sends shows as its log line.
 
 function engine(on: On): void {
   let spawned = 0;
@@ -69,4 +71,24 @@ test("on Desktop every lane draws however short the pane, where the terminal win
   expect(Array.from({ length: 8 }, (_, n) => desktop.some((row) => row.includes(`Port module ${n + 1}`)))).toEqual(Array(8).fill(true));
   expect(desktop.filter((row) => row.includes("more"))).toEqual([]);
   expect((await drawnOn("terminal")).some((row) => row.includes("more"))).toBe(true);
+});
+
+test("on desktop opening an agent's page focuses its Back key, and Back focuses the lane again", async ($, on) => {
+  const w = world(on, {});
+  w.surfaces = ["desktop"];
+  engine(on);
+  await $.command.run(run(""));
+  await $.agent.spawn(spawnOf(1, "executor", "Fix the heading parser"));
+  w.agents = [{ id: "a-1", description: "", type: "x", status: "running" }];
+  const ui = await $.ui.mount(pane("desktop"));
+
+  await ui.press({ key: "open-a-1" });
+  await w.clock.advance(1);
+  expect(await ui.find({ key: "b" })).toBeDefined();
+  expect(focusRequests(w.logs).at(-1)).toBe("b");
+
+  await ui.press({ key: "b" });
+  await w.clock.advance(1);
+  expect(focusRequests(w.logs).at(-1)).toBe("open-a-1");
+  await ui.unmount();
 });

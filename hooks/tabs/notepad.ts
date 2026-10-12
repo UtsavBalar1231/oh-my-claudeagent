@@ -6,7 +6,7 @@ import { displayWidth, fitEnd, formatWhen } from "../../src/core/ui-kit.ts";
 import { chip, fitPieces, type Piece, piecesWidth, redact, themeKey, type Tone, TONE_KEYS } from "../../src/core/visual.ts";
 import type { Input } from "../dispatch.ts";
 import { boundPlanOf, type Host, reason, type State } from "../host.ts";
-import { buttonRow, keyButton, noticeRow, patchPane, refocus, type TabView, type View } from "../pane.ts";
+import { buttonRow, keyButton, noticeRow, patchPane, refocus, refocusRemote, type TabView, type View } from "../pane.ts";
 import { aimKeys, markdownUnits, resetOffset, ScrollRegion, type Unit } from "../regions.ts";
 import { Card, Field, isRemote, Line, Rule } from "../ui.ts";
 
@@ -140,7 +140,7 @@ export async function read(
   }
 }
 
-async function choose(host: Host, name: string): Promise<void> {
+async function choose(host: Host, view: View, name: string): Promise<void> {
   chosen = name;
   resetCards();
   isPicking = false;
@@ -150,6 +150,7 @@ async function choose(host: Host, name: string): Promise<void> {
     await patchPane(host, (pane) => ({ ...pane, notepad: pad.notepad, errors: { ...pane.errors, notepad: pad.error } }));
   }
   host.ui.invalidate();
+  refocusRemote(host, view, "l", "notepad");
 }
 
 const heading = (name: NotepadSection) => `${name.charAt(0).toUpperCase()}${name.slice(1)}`;
@@ -229,6 +230,7 @@ function keys(host: Host, notepad: Notepad, view: View, canFind: boolean, isFind
     query = "";
     isSearching = false;
     host.ui.invalidate();
+    refocusRemote(host, view, "f", "notepad");
   };
   const pick = () => {
     isPicking = true;
@@ -295,7 +297,7 @@ function picker(host: Host, notepad: Notepad, view: View): RenderElement[] {
             label: fitEnd(name, Math.max(1, room), view.g.ellipsis),
             plain: true,
             ...(isShown ? { autoFocus: true } : {}),
-            onPress: view.press(() => choose(host, name)),
+            onPress: view.press(() => choose(host, view, name)),
           }),
           ...(mark === undefined ? [] : [Text({ children: [" "] }), Line(view.kit, [mark])]),
         ],
@@ -304,6 +306,7 @@ function picker(host: Host, notepad: Notepad, view: View): RenderElement[] {
     keyButton(view, "l", "Back", () => {
       isPicking = false;
       host.ui.invalidate();
+      refocusRemote(host, view, "l", "notepad");
     }),
   ];
 }

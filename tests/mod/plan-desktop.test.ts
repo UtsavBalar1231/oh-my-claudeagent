@@ -1,7 +1,7 @@
 import type { On, RenderSurface } from "claude-code";
 import { expect, test } from "claude-code/testing";
-import { sizeOf } from "../../hooks/ui.ts";
-import { BOULDER, LEDGER, pane, ROOT, rows, run, SESSION, spreadRows, world } from "./world.ts";
+import { isDrawable, sizeOf } from "../../hooks/ui.ts";
+import { BOULDER, focusRequests, LEDGER, pane, POSIX, ROOT, rows, run, SESSION, spreadRows, world } from "./world.ts";
 
 const PLAN_PATH = `${ROOT}/plans/long.md`;
 const COUNT = 30;
@@ -35,6 +35,8 @@ function docked<S extends RenderSurface>(surface: S, bodyColumns: number) {
   const base = pane(surface, { columns: 200, rows: 24, placement: "dock" });
   return { ...base, props: { ...base.props, bodyColumns } };
 }
+
+// The test engine answers no plugin's `$.ui.focus`, so each request the pane sends shows as its log line.
 
 for (const columns of [56, 90, 120]) {
   test(`on desktop a board of more tasks than the body has rows draws every task and no more cue at ${columns} columns`, async ($, on) => {
@@ -86,15 +88,20 @@ for (const surface of ["terminal", "desktop"] as const) {
   });
 }
 
-test("on desktop a board too large for Desktop to draw shows a notice under the tab bar, where Desktop would refuse the whole tree", async ($, on) => {
+function hugeWorld(on: On, path = PLAN_PATH) {
   const titles = Array.from({ length: 400 }, (_, index) => `Step ${index + 1}`);
   const huge = ["# Ship the huge plan", "", "## TODOs", ...titles.map((title, index) => `- [ ] ${index + 1}. ${title}`), ""].join("\n");
   const w = world(on, {
-    [PLAN_PATH]: huge,
-    [BOULDER]: JSON.stringify({ plans: { long: { active_plan: PLAN_PATH } }, bindings: { [SESSION]: { plan_name: "long" } } }),
+    [path]: huge,
+    [BOULDER]: JSON.stringify({ plans: { long: { active_plan: path } }, bindings: { [SESSION]: { plan_name: "long" } } }),
     [LEDGER]: JSON.stringify({ entries: [] }),
   });
   w.surfaces = ["desktop"];
+  return w;
+}
+
+test("on desktop a board too large for Desktop to draw shows a notice under the tab bar, where Desktop would refuse the whole tree", async ($, on) => {
+  const w = hugeWorld(on);
   await $.command.run(run("plan", 90));
   const ui = await $.ui.mount(docked("desktop", 90));
   const tree = await ui.drawn();
@@ -104,5 +111,90 @@ test("on desktop a board too large for Desktop to draw shows a notice under the 
   expect((await ui.find({ key: "2" }))?.props["label"]).toBe("Plan");
   expect(sizeOf(tree).nodes).toBeLessThan(2000);
   expect(w.logs.some((line) => /^omca plan tab is too large for desktop: \d+ nodes, \d+ characters$/.test(line))).toBe(true);
+  await ui.unmount();
+});
+
+for (const columns of [56, 90]) {
+  test(`on desktop a board too large to draw keeps its key row under the notice, and Plans still reaches the plan picker, at ${columns} columns`, async ($, on) => {
+    hugeWorld(on, `${POSIX.plans}/huge.md`);
+    await $.command.run(run("plan", columns));
+    const ui = await $.ui.mount(docked("desktop", columns));
+    const tree = await ui.drawn();
+
+    expect(await ui.find({ type: "Text", text: "This view is more than Claude Desktop draws at once." })).toBeDefined();
+    expect(await ui.find({ key: "f" })).toBeDefined();
+    expect(await ui.find({ key: "l" })).toBeDefined();
+    expect(isDrawable(sizeOf(tree))).toBe(true);
+
+    await ui.press({ key: "l" });
+    expect(await ui.find({ key: "pick-0" })).toBeDefined();
+    await ui.unmount();
+  });
+}
+
+for (const columns of [56, 90]) {
+  test(`on desktop f on a board too large to draw opens the Find field, which narrows it, at ${columns} columns`, async ($, on) => {
+    hugeWorld(on);
+    await $.command.run(run("plan", columns));
+    const ui = await $.ui.mount(docked("desktop", columns));
+
+    await ui.press({ key: "f" });
+    expect(await ui.find({ key: "filter" })).toBeDefined();
+    expect(isDrawable(sizeOf(await ui.drawn()))).toBe(true);
+
+    await $.ui.input({ plugin: "oh-my-claudeagent", key: "filter", text: "Step 399", kind: "change" });
+    expect(await ui.find({ type: "Text", text: "This view is more than Claude Desktop draws at once." })).toBeUndefined();
+    expect(await ui.find({ key: "task-399" })).toBeDefined();
+    await ui.unmount();
+  });
+}
+
+test("on desktop opening a task's page focuses its Board key, and Board focuses the task again, so the next hotkey reaches the pane", async ($, on) => {
+  const w = planWorld(on);
+  await $.command.run(run("plan", 56));
+  const ui = await $.ui.mount(docked("desktop", 56));
+  await w.clock.advance(1);
+
+  await ui.press({ key: "task-5" });
+  await w.clock.advance(1);
+  expect(await ui.find({ key: "b" })).toBeDefined();
+  expect(focusRequests(w.logs).at(-1)).toBe("b");
+
+  await ui.press({ key: "b" });
+  await w.clock.advance(1);
+  expect(await ui.find({ key: "task-5" })).toBeDefined();
+  expect(focusRequests(w.logs).at(-1)).toBe("task-5");
+  await ui.unmount();
+});
+
+test("on desktop a section opened from the contents focuses its Contents key, and Evidence focuses its tab", async ($, on) => {
+  const w = planWorld(on);
+  await $.command.run(run("plan", 56));
+  const ui = await $.ui.mount(docked("desktop", 56));
+
+  await ui.press({ key: "t" });
+  await ui.press({ key: "row-3" });
+  await w.clock.advance(1);
+  expect(await ui.find({ key: "t" })).toBeDefined();
+  expect(focusRequests(w.logs).at(-1)).toBe("t");
+
+  await ui.press({ key: "t" });
+  await ui.press({ key: "b" });
+  await ui.press({ key: "e" });
+  await w.clock.advance(1);
+  expect(focusRequests(w.logs).at(-1)).toBe("3");
+  await ui.unmount();
+});
+
+test("in the terminal opening a task's page leaves the ring where the engine holds it", async ($, on) => {
+  const w = planWorld(on);
+  w.surfaces = ["terminal"];
+  await $.command.run(run("plan", 56));
+  const ui = await $.ui.mount(docked("terminal", 56));
+
+  await ui.press({ key: "task-5" });
+  await w.clock.advance(1);
+  expect(await ui.find({ key: "b" })).toBeDefined();
+  expect(focusRequests(w.logs)).not.toContain("b");
   await ui.unmount();
 });
