@@ -31,8 +31,10 @@ export type Tool = {
   call: (args: Record<string, unknown>, context?: ToolContext) => string | Promise<string>;
 };
 
-const INSTRUCTIONS = [
-  "oh-my-claudeagent (OMCA) tools. Its state lives under `.omca/` and is written only through them.",
+const HEADER = "oh-my-claudeagent (OMCA) tools. Its state lives under `.omca/` and is written only through them.";
+
+const CLAUDE_CODE_INSTRUCTIONS = [
+  HEADER,
   "",
   OMCA_TOOLS,
   "",
@@ -44,6 +46,21 @@ const INSTRUCTIONS = [
   "- Choosing a delegation target: `agents_list`, `categories_list`. The plugin looks broken: `health_check`.",
   "",
 ].join("\n");
+
+const OPENCODE_INSTRUCTIONS = [
+  HEADER,
+  "",
+  "Call each tool below directly by its name. None of them is in the Code Mode catalog, so `search` and `execute` cannot reach them.",
+  "",
+  "- After a build, test or lint run: `omca_evidence_log`, real exit code included; `omca_evidence_read` lists the entries.",
+  "- A plan's progress: `omca_boulder_progress`.",
+  "- Notes that must outlive compaction: `omca_notepad_write`, `omca_notepad_read`, `omca_notepad_list`, `omca_notepad_compact`.",
+  "- Code search by structure, where grep would only match text: `omca_ast_search`, `omca_ast_find_rule`, `omca_ast_test_rule`, `omca_ast_dump_tree`, and `omca_ast_replace` (preview with dry_run).",
+  "- A file outside the project root: `omca_file_read`.",
+  "",
+].join("\n");
+
+const INSTRUCTIONS = process.env.OMCA_CLIENT === "opencode" ? OPENCODE_INSTRUCTIONS : CLAUDE_CODE_INSTRUCTIONS;
 
 const MODERN_PROTOCOL = "2026-07-28";
 const FALLBACK_PROTOCOL = "2025-11-25";

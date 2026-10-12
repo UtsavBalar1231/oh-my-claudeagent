@@ -364,14 +364,25 @@ async function draw(host: Host, e: Input<"ui.render Pane">): Promise<RenderEleme
     // largest elements go first, so the small ones a tab steers by (its header, Find field and keys) stay.
     host.log(`omca ${active} tab is too large for ${e.surface}: ${size.nodes} nodes, ${size.chars} characters`);
     const notice = `${g.cross} This view is more than Claude Desktop draws at once. Narrow it with Find where the tab has one, or read it in a terminal.`;
-    const kept = body.map((element) => ({ element, nodes: sizeOf(element).nodes }));
-    const drawn = () =>
-      Box({ flexDirection: "column", width, children: [...above, Text({ color: TONE_KEYS.warn, wrap: "wrap", children: [notice] }), ...kept.map(({ element }) => element)] });
-    while (kept.length > 0 && !isDrawable(sizeOf(drawn()))) {
-      const largest = kept.reduce((most, each, at) => (each.nodes > (kept[most]?.nodes ?? 0) ? at : most), 0);
-      kept.splice(largest, 1);
+    const noticeText = Text({ color: TONE_KEYS.warn, wrap: "wrap", children: [notice] });
+    // A tree's nodes and characters are its frame's plus each child's, so each element is measured once.
+    const frame = sizeOf(Box({ flexDirection: "column", width, children: [...above, noticeText] }));
+    const kept = body.map((element) => ({ element, size: sizeOf(element) }));
+    const total = { nodes: frame.nodes, chars: frame.chars };
+    for (const { size: part } of kept) {
+      total.nodes += part.nodes;
+      total.chars += part.chars;
     }
-    return drawn();
+    const depth = () => Math.max(frame.depth, 1 + Math.max(0, ...kept.map(({ size: part }) => part.depth)));
+    while (kept.length > 0 && !isDrawable({ ...total, depth: depth() })) {
+      const largest = kept.reduce((most, each, at) => (each.size.nodes > (kept[most]?.size.nodes ?? 0) ? at : most), 0);
+      const [gone] = kept.splice(largest, 1);
+      if (gone !== undefined) {
+        total.nodes -= gone.size.nodes;
+        total.chars -= gone.size.chars;
+      }
+    }
+    return Box({ flexDirection: "column", width, children: [...above, noticeText, ...kept.map(({ element }) => element)] });
   }
   const drawnRows = [...tabs, ...body].reduce((sum, child) => sum + rowsAtLeast(child), hasRule ? 1 : 0);
   // The engine raises the wheel only over a tree taller than the body, so a tab that fits but holds

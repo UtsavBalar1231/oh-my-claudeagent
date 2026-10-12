@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.1] - 2026-10-13
+
+### Fixed
+
+- In OpenCode, the `omca` server's instructions name its tools as `omca_<tool>`, leave out
+  Claude Code's tool-search step and the tools the adapter hides, and say the tools sit outside
+  OpenCode's Code Mode catalog, so the model calls a tool directly instead of searching for it
+  first.
+- On Desktop, a view too large to send measures each element once per redraw instead of a few
+  hundred times.
+
 ## [3.0.0] - 2026-10-12
 
 OMCA 3 rewrites the plugin's runtime in TypeScript on bun. One `omca` MCP server serves the
@@ -2992,6 +3003,7 @@ for multi-agent orchestration.
 - Shellcheck fixes applied across all hook scripts
 - Ruff fixes applied to Python MCP servers
 
+[3.0.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.0.0...v3.0.1
 [3.0.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.21.0...v3.0.0
 [2.21.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.20.1...v2.21.0
 [2.20.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.20.0...v2.20.1
