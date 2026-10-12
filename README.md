@@ -2,6 +2,8 @@
 
 **Claude Code, with receipts.**
 
+[![CI](https://github.com/UtsavBalar1231/oh-my-claudeagent/actions/workflows/ci.yml/badge.svg)](https://github.com/UtsavBalar1231/oh-my-claudeagent/actions/workflows/ci.yml)
+
 <img src=".github/assets/hero.png" width="1000" alt="A Claude Code session on the left hands task 7 of the checkout plan to the executor, while the OMCA pane on the right shows the plan board at 6 of 14 tasks, with proof on the done tasks, the executor on task 7 and task 7's detail beside the list.">
 
 oh-my-claudeagent (OMCA) is a Claude Code plugin that plans work with you, hands each task to a
@@ -42,6 +44,12 @@ checks the requirements above and offers to point your status line at OMCA's ren
 
 When the session tries to stop with tasks unchecked, or with every task checked and no final
 verification logged, OMCA sends it back to work with the reason.
+
+## Try it
+
+- `/oh-my-claudeagent:plan add rate limiting to the login endpoint`
+- `Find where the session token is refreshed and explain the flow`
+- `/omca doctor`
 
 ## What you see
 
@@ -97,6 +105,63 @@ and the number keys switch between the pane's tabs.
 The guard dialog arrives the moment the model asks for a destructive command.
 
 <img src=".github/assets/guard-dialog.gif" width="680" alt="An animation: the prompt Clean the build is typed and sent, the model asks to run rm -rf build, and the OMCA guard dialog appears holding the command, listing the build directory it would remove, with Refuse selected.">
+
+## What OMCA runs, reads and writes
+
+OMCA runs locally: the `omca` MCP server on bun, a mod inside Claude Code, and, once you set it
+up, a status line renderer on bun. None of them makes a network call. Claude Code sends the conversation to Anthropic as it does
+without the plugin, and any MCP server you add follows its own policy. [PRIVACY.md](PRIVACY.md)
+is the privacy policy.
+
+**Settings hooks.** `hooks/hooks.json` registers `SessionStart` (only after `/clear` and
+compaction), `UserPromptSubmit`, `UserPromptExpansion`, `SubagentStart`, `PreToolUse` (only
+Write and Edit), `PermissionDenied`, `PostToolUse`, `PostToolUseFailure`, `Stop` and
+`TaskCompleted`. Each is an `mcp_tool` hook that calls `omca_hook` on the local server. They run
+in every session because the gates and the guidance need each turn's events: a plan-write guard
+and comment gate on writes, the verification recorder and rule injection after tool calls,
+failure advice, guidance and keyword hints on prompts, context for each subagent, an evidence
+check on task completion, and the Stop gates. A handler with nothing to do, such as one with no
+bound plan, returns nothing.
+
+**What they read.** The prompt text, the inputs and outputs of Read, Write, Edit, Agent, Bash
+and PowerShell calls, and the tail of the transcript at Stop. The drift guard runs local `git`.
+
+**The mod.** `hooks/register.ts` handles `tool.check` for Bash and PowerShell (the
+destructive-command guard), `tool.call`, `session.start`, `turn.start`, `turn.step`,
+`turn.complete`, `agent.spawn`, `prompt.edit`, `prompt.autocomplete`, `ui.close`, `ui.focus`,
+`ui.scroll`, `command.run` for `/omca`, `ui.render` and `session.compact`. `claude plugin
+validate .` lists them with the host calls the mod makes: the file system, the clock, local
+processes such as `git`, the settings file (read only), session information, the prompt box and
+the UI. It reads these environment variables: `CLAUDE_AFK_TIMEOUT_MS`,
+`CLAUDE_CODE_DISABLE_ADVISOR_TOOL`, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`,
+`CLAUDE_CODE_EFFORT_LEVEL`, `CLAUDE_CODE_SUBAGENT_MODEL_FORCE`, `CLAUDE_CONFIG_DIR`,
+`DISABLE_GROWTHBOOK`, `DISABLE_TELEMETRY`, `DO_NOT_TRACK`, `HOME`, `HOMEDRIVE`, `HOMEPATH`,
+`OMCA_DISABLED_HOOKS`, `OMCA_GLYPHS` and `USERPROFILE`, and writes none.
+
+**What `omca-setup` writes.** Only after it prints a diff and you confirm, it sets `statusLine`
+and `subagentStatusLine` in `~/.claude/settings.json`, optionally `env.OMCA_GLYPHS`, and copies
+a launcher to `~/.claude/omca/statusline.ts`. The previous file is kept as
+`settings.json.omca-bak`. `--uninstall` removes those entries and the launcher. The Doctor tab's
+`i` fix adds `refreshInterval: 5` the same way, with a backup.
+
+**State.** The plan registry, the evidence ledger, notepads, session status files, mod markers,
+delegation metrics and the file-access log live in `.omca/` in the project, never under
+`~/.claude/`.
+
+**Switches.** `disableAllHooks` and `allowManagedHooksOnly` turn the settings hooks off,
+`allowManagedModsOnly` turns the mod off, and `OMCA_DISABLED_HOOKS` turns off named handlers.
+The catastrophic-removal deny has no switch.
+
+**Optional search servers.** OMCA ships no remote MCP server. To add documentation and code
+search yourself:
+
+```bash
+claude mcp add --scope user --transport http context7 https://mcp.context7.com/mcp
+claude mcp add --scope user --transport http grep https://mcp.grep.app
+```
+
+The full lists are in the reference: [hooks](docs/references.md#hooks),
+[state files](docs/references.md#state-files) and [MCP tools](docs/references.md#mcp-tools).
 
 ## Documentation
 
