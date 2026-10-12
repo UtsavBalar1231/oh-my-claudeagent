@@ -168,24 +168,24 @@ export const register: Register = (on, pluginOptions) => {
   on("tool.check", { tool: /^(?:Bash|PowerShell)$/ }, ($, e, next) =>
     dispatch(bindHost($, options), "tool.check", bash, e, next, guardFailed),
   ).catch((_$, _e, next) => guardFailed(next.error.message ?? next.error.kind));
-  on("tool.call", ($, e, next) => dispatch(bindHost($, options), "tool.call", toolCall, e, next));
+  on("tool.call", ($, e, next) => dispatch(bindHost($, options), "tool.call", toolCall, e, next)).catch((_$, e, next) => next(e));
   on("session.start", ($, e, next) => dispatch(bindHost($, options), "session.start", sessionStart, e, next));
   on("turn.start", ($, e, next) => dispatch(bindHost($, options), "turn.start", turnStart, e, next));
   on("turn.step", async function* ($, e, next) {
     return yield* dispatchStream(bindHost($, options), "turn.step", turnStep, e, next);
   });
   on("turn.complete", ($, e, next) => dispatch(bindHost($, options), "turn.complete", turnComplete, e, next));
-  on("agent.spawn", ($, e, next) => dispatch(bindHost($, options), "agent.spawn", agentSpawn, e, next));
+  on("agent.spawn", ($, e, next) => dispatch(bindHost($, options), "agent.spawn", agentSpawn, e, next)).catch((_$, e, next) => next(e));
   on("prompt.edit", ($, e, next) => dispatch(bindHost($, options), "prompt.edit", promptEdit, e, next));
   on("prompt.autocomplete", ($, e, next) => dispatch(bindHost($, options), "prompt.autocomplete", promptAutocomplete, e, next));
-  on("ui.close", ($, e, next) => dispatch(bindHost($, options), "ui.close", paneClose, e, next));
-  on("ui.focus", ($, e, next) => dispatch(bindHost($, options), "ui.focus", paneFocus, e, next));
+  on("ui.close", ($, e, next) => dispatch(bindHost($, options), "ui.close", paneClose, e, next)).catch((_$, e, next) => next(e));
+  on("ui.focus", ($, e, next) => dispatch(bindHost($, options), "ui.focus", paneFocus, e, next)).catch((_$, e, next) => next(e));
   on("ui.scroll", { component: "Pane" }, ($, e, next) =>
     dispatch(bindHost($, options), "ui.scroll", paneScroll, e, next),
-  );
+  ).catch((_$, e, next) => next(e));
   on("command.run", { command: "omca" }, ($, e, next) =>
     dispatch(bindHost($, options), "command.run omca", omca, e, next),
-  );
+  ).catch((_$, e, next) => next(e));
   on("ui.render", { component: "AbovePrompt" }, ($, e, next) =>
     dispatch(bindHost($, options), "ui.render AbovePrompt", bandRender, e, next),
   );
@@ -195,5 +195,5 @@ export const register: Register = (on, pluginOptions) => {
   on("ui.render", { component: "Spinner" }, ($, e, next) =>
     dispatch(bindHost($, options), "ui.render Spinner", spinnerRender, e, next),
   );
-  on("session.compact", ($, e, next) => dispatch(bindHost($, options), "session.compact", sessionCompact, e, next));
+  on("session.compact", ($, e, next) => dispatch(bindHost($, options), "session.compact", sessionCompact, e, next)).catch((_$, e, next) => next(e));
 };
