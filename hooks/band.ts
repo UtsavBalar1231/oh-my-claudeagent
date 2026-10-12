@@ -5,7 +5,7 @@ import { ledgerCoversSlot, readLedger } from "../src/core/evidence.ts";
 import { hasPassingFinalVerification, type NextAction, nextActions } from "../src/core/next-actions.ts";
 import { BOULDER, exitCodeOf, LEDGER, statusPath, verificationOf } from "../src/core/omca-paths.ts";
 import { boardOf, parsePlan } from "../src/core/plan-reader.ts";
-import { proofSummary } from "../src/core/proof.ts";
+import { proofSummary, shownProof } from "../src/core/proof.ts";
 import { sha256Hex } from "../src/core/sha256.ts";
 import { fitEnd, type GlyphTier, glyphs, oneLine } from "../src/core/ui-kit.ts";
 import { TONE_KEYS } from "../src/core/visual.ts";
@@ -94,7 +94,7 @@ async function proofOfPlan(host: Host, planText: string, within: object): Promis
   const { cards } = boardOf(parsePlan(planText));
   const facts = await proofFacts(host, cards.flatMap((card) => card.files), within);
   if (facts.ledgerError !== null) throw new Error(facts.ledgerError);
-  const counts = proofSummary(cards.map((card) => verdictFor(facts, card.files)?.proof));
+  const counts = proofSummary(cards.map((card) => shownProof(card.done, verdictFor(facts, card.files)?.proof)));
   return counts.proven + counts.unproven + counts.failed === 0 ? null : counts;
 }
 

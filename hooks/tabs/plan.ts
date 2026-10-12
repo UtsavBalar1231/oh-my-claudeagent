@@ -19,7 +19,7 @@ import {
   recentPlans,
   taskMarkdown,
 } from "../../src/core/plan-reader.ts";
-import { ago, type Proof, proofSummary, type Run, timeAgo, type Verdict } from "../../src/core/proof.ts";
+import { ago, type Proof, proofSummary, type Run, shownProof, timeAgo, type Verdict } from "../../src/core/proof.ts";
 import { agentGlyph, dayOf, displayWidth, fitEnd, fitMiddle, KEYS, keyHint, padStart, shortType, wrapText } from "../../src/core/ui-kit.ts";
 import {
   agentKey,
@@ -314,11 +314,7 @@ function toBoard(host: Host): void {
 
 const verdictOf = (card: Card): Verdict | undefined => verdictFor(facts, card.files);
 
-// PROVEN and UNPROVEN describe finished work; only FAILED shows on a task that is still open.
-function shownProof(card: Card): Proof | undefined {
-  const proof = verdictOf(card)?.proof;
-  return card.done || proof === "failed" ? proof : undefined;
-}
+const cardProof = (card: Card): Proof | undefined => shownProof(card.done, verdictOf(card)?.proof);
 
 function runningOf(agents: readonly Agent[]): Map<number, Agent[]> {
   const running = new Map<number, Agent[]>();
@@ -621,7 +617,7 @@ function proofPieces(view: View, ctx: Ctx, isShort: boolean): Piece[] {
     const note = ctx.board.cards.some((card) => card.files.length > 0) ? "no listed file can be read" : "no task lists a file to prove";
     return [{ text: note, color: TONE_KEYS.muted }];
   }
-  const { proven, unproven, failed } = proofSummary(ctx.board.cards.map(shownProof));
+  const { proven, unproven, failed } = proofSummary(ctx.board.cards.map(cardProof));
   const sep: Piece = { text: isShort ? "  " : dotOf(view), color: TONE_KEYS.muted };
   const part = (level: Level, count: number, word: string): Piece[] => {
     const { glyph, color } = levelMark(level, view.g);
@@ -731,7 +727,7 @@ function rightPieces(view: View, ctx: Ctx, card: Card, isShort: boolean): Piece[
     if (isShort) pieces.push({ text: " " }, { text: view.g.blocked, color: TONE_KEYS.warn }, { text: ` ${waiting.join(",")}` });
     else pieces.push({ text: " " }, { text: `blocked by ${waiting.join(", ")}`, color: TONE_KEYS.muted });
   }
-  const proof = shownProof(card);
+  const proof = cardProof(card);
   if (proof !== undefined) {
     const { word, tone, level } = PROOF[proof];
     pieces.push({ text: " " }, chip(isShort ? levelMark(level, view.g).glyph : word, tone, view.isAscii));
@@ -1025,7 +1021,7 @@ function detail(view: View, ctx: Ctx, card: Card, width: number): Unit[] {
   const status = statusOf(ctx, card);
   const verdict = verdictOf(card);
   const waiting = card.done ? [] : blockersOf(ctx, card);
-  const proof = shownProof(card);
+  const proof = cardProof(card);
   const chips: Piece[] = [
     chip(STATUS[status].word, STATUS[status].tone, view.isAscii),
     ...(status === "blocked" ? [{ text: " " }, { text: `by ${waiting.join(", ")}`, color: TONE_KEYS.warn }] : []),

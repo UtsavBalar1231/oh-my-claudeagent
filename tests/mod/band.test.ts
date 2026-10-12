@@ -436,10 +436,11 @@ test("proof counts draw only when the band carries them", async ($, on) => {
   ]);
 });
 
-test("the band counts each task's proof from its files' change times and the newest run since", async ($, on) => {
-  const task = (n: number, file?: string) =>
-    [`- [ ] ${n}. Port module ${n}`, ...(file === undefined ? [] : [`  - File: \`${file}\``])].join("\n");
-  const plan = `# Widget rewrite\n\n## TODOs\n\n${[task(1, "src/a.ts"), task(2, "src/b.ts"), task(3, "src/gone.ts"), task(4)].join("\n")}\n`;
+test("the band counts a done task's proof and an open task's failure, from its files' change times and the newest run since", async ($, on) => {
+  const task = (n: number, isDone: boolean, file?: string) =>
+    [`- [${isDone ? "x" : " "}] ${n}. Port module ${n}`, ...(file === undefined ? [] : [`  - File: \`${file}\``])].join("\n");
+  const tasks = [task(1, true, "src/a.ts"), task(2, true, "src/b.ts"), task(3, false, "src/a.ts"), task(4, false, "src/b.ts"), task(5, false, "src/gone.ts"), task(6, false)];
+  const plan = `# Widget rewrite\n\n## TODOs\n\n${tasks.join("\n")}\n`;
   const run = (at: number, exitCode: number) => ({
     type: "test",
     command: "just test",
@@ -458,11 +459,11 @@ test("the band counts each task's proof from its files' change times and the new
   world(on, disk);
   await start($);
   const band = await mount($, "terminal");
-  expect(await statusRow(band)).toBe("█████ 0/4 · next 1 Port module 1 · ✓ 1 proven  ! 1 unproven");
+  expect(await statusRow(band)).toBe("█▋███ 2/6 · next 3 Port module 3 · ✓ 1 proven  ! 1 unproven");
 
   disk.set(LEDGER, { text: ledger([run(RAN_AT, 0), run(RAN_AT + 10, 1)]), mtimeMs: AFTER_RUN_MS + 10_000 });
   await turn($);
-  expect(await statusRow(band)).toBe("█████ 0/4 · next 1 Port module 1 · ✗ 2 failed");
+  expect(await statusRow(band)).toBe("█▋███ 2/6 · next 3 Port module 3 · ✗ 4 failed");
 });
 
 test("a press fills the prompt with the exact text and never submits", async ($, on) => {

@@ -32,6 +32,9 @@ export function verdictFrom(changes: readonly number[], proving: readonly Run[])
 
 export const proofOf = (changes: readonly number[], runs: readonly Run[]): Verdict | undefined => verdictFrom(changes, provingRuns(runs));
 
+/** PROVEN and UNPROVEN describe finished work; a task still open shows, and counts, only FAILED. */
+export const shownProof = (isDone: boolean, proof: Proof | undefined): Proof | undefined => (isDone || proof === "failed" ? proof : undefined);
+
 export function proofSummary(proofs: readonly (Proof | undefined)[]): { proven: number; unproven: number; failed: number } {
   const count = (proof: Proof) => proofs.filter((each) => each === proof).length;
   return { proven: count("proven"), unproven: count("unproven"), failed: count("failed") };
