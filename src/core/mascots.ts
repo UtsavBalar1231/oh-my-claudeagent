@@ -210,6 +210,9 @@ function compose(spec: Spec, layers: readonly Layer[], lift: number, size: Masco
   return lift === 0 ? grid : [...grid.slice(lift), ...Array.from({ length: lift }, () => Array<Rgb | null>(width).fill(null))];
 }
 
+/** The pebble alone in the orchestrator's palette: no prop, pose or overlay. */
+export const PLAIN_FRAME: Frame = compose(MASCOTS.orchestrator, [BODY], 0);
+
 export const WORKING_FRAMES = 12;
 export const FRAME_MS = 170;
 

@@ -11,6 +11,7 @@ import {
   MINI_LAYERS,
   MINIS,
   paletteOf,
+  PLAIN_FRAME,
   rasterCells,
   SIZE,
   svgOf,
@@ -208,4 +209,20 @@ test("repeated calls return the identical value", () => {
   const frame = frames[0];
   if (frame === undefined) throw new Error("no frame");
   expect(rasterCells(frame)).toBe(rasterCells(frame));
+});
+
+test("the plain frame holds the body layer alone", () => {
+  expect(PLAIN_FRAME).toHaveLength(SIZE);
+  const inBody = new Set<string>();
+  for (const [y, x0, pixels] of LAYERS.body) {
+    for (let i = 0; i < pixels.length; i++) if (pixels[i] !== ".") inBody.add(`${y},${x0 + i}`);
+  }
+  const filled = new Set<string>();
+  PLAIN_FRAME.forEach((row, y) => {
+    expect(row).toHaveLength(SIZE);
+    row.forEach((color, x) => {
+      if (color !== null) filled.add(`${y},${x}`);
+    });
+  });
+  expect(filled).toEqual(inBody);
 });
