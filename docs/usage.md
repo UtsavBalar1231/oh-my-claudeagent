@@ -482,6 +482,8 @@ On Desktop the mod draws differently:
   place; narrow it with Find, or read it in a terminal.
 - A plan too large for Desktop to draw shows that notice and keeps its Find field and keys. It
   leaves out its header and some task rows until Find narrows it.
+- `f` opens a Find field, but Desktop keeps the keyboard on the pane's buttons, so click the field
+  before typing.
 - Copy can report that the surface has no clipboard, and the spinner keeps Desktop's own text.
 
 The VS Code chat panel runs OMCA's hooks but draws none of its interface: no band, no pane and
