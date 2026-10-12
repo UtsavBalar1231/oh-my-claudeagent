@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, setSystemTime, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { tools } from "./notepad.ts";
@@ -127,6 +127,32 @@ describe("notepad tools", () => {
       expect(await write("big", "learnings", "é".repeat(30_000))).toBe(
         "Appended to big/learnings.md\n[WARNING: section file is 58KB. Consider running notepad_compact to reduce size]",
       );
+    });
+  });
+
+  describe("notepads directory time", () => {
+    const notepads = () => join(project, ".omca", "notepads");
+    const backdate = () => {
+      const old = new Date("2020-01-01T00:00:00Z");
+      utimesSync(notepads(), old, old);
+      return statSync(notepads()).mtimeMs;
+    };
+
+    test("notepad_write moves the mtime of .omca/notepads even when the plan directory already exists", async () => {
+      await write("bump", "issues", "one");
+      const before = backdate();
+      await write("bump", "issues", "two");
+      expect(statSync(notepads()).mtimeMs).toBeGreaterThan(before);
+    });
+
+    test("notepad_compact moves it after a compaction and leaves it alone when nothing was cut", async () => {
+      for (let i = 0; i < 25; i++) await write("bump", "learnings", `Entry ${i}`);
+      const before = backdate();
+      await call("notepad_compact", { plan_name: "bump", section: "learnings" });
+      expect(statSync(notepads()).mtimeMs).toBeGreaterThan(before);
+      const after = backdate();
+      await call("notepad_compact", { plan_name: "bump", section: "learnings" });
+      expect(statSync(notepads()).mtimeMs).toBe(after);
     });
   });
 

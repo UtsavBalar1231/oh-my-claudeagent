@@ -48,6 +48,8 @@ export type World = {
   sessionId: string;
   spelled: (path: string) => string;
   files: Map<string, { text: string; mtimeMs: number }>;
+  /** A directory's own mtime for `fs.stat`, set by `touchDir`; a directory left out reports 0. */
+  dirs: Map<string, number>;
   settings: Record<string, unknown>;
   /** One source's settings, answered for `settings.read({ source })`; a source left out answers `settings`. */
   sources: Partial<Record<SettingsSource, Record<string, unknown>>>;
@@ -56,6 +58,8 @@ export type World = {
   reads: string[];
   /** The paths `fs.read` was asked for; `reads` also holds exists, stat and list calls. */
   contentReads: string[];
+  /** The paths `fs.list` was asked for. */
+  lists: string[];
   holds: Map<string, Promise<void>>;
   focused: string[];
   selection: UiSelection | undefined;
@@ -109,12 +113,14 @@ export function world(
     sessionId: SESSION,
     spelled,
     files: new Map(Object.entries(files).map(([path, text], index) => [key(path), { text, mtimeMs: 1_000 + index }])),
+    dirs: new Map(),
     settings,
     sources: {},
     agents: [],
     panes: [],
     reads: [],
     contentReads: [],
+    lists: [],
     holds: new Map(),
     focused: [],
     selection: undefined,
@@ -156,11 +162,16 @@ export function world(
   on("fs.stat", (_$, e) => {
     w.reads.push(spelled(e.path));
     const file = w.files.get(key(e.path));
-    if (file === undefined) return { deny: `ENOENT: no such file, ${spelled(e.path)}` };
+    if (file === undefined) {
+      const isDir = w.dirs.has(key(e.path)) || [...w.files.keys()].some((path) => path.startsWith(`${key(e.path)}/`));
+      if (isDir) return { value: { kind: "dir", size: 0, mtimeMs: w.dirs.get(key(e.path)) ?? 0, isLink: false } };
+      return { deny: `ENOENT: no such file, ${spelled(e.path)}` };
+    }
     return { value: { kind: "file", size: file.text.length, mtimeMs: file.mtimeMs, isLink: false } };
   });
   on("fs.list", (_$, e) => {
     w.reads.push(spelled(e.path));
+    w.lists.push(spelled(e.path));
     const dir = key(e.path);
     const files = [...w.files.entries()]
       .filter(([path]) => parent(path) === dir)
@@ -231,6 +242,11 @@ export function resettableState(on: On): { reset: (key: string) => void } {
 export function write(w: World, path: string, text: string): void {
   const key = normalizePath(w.layout.platform, w.spelled(path));
   w.files.set(key, { text, mtimeMs: (w.files.get(key)?.mtimeMs ?? 1_000) + 1 });
+}
+
+/** Sets the mtime `fs.stat` reports for a directory, as a real one moves when an entry is added or removed. */
+export function touchDir(w: World, path: string, mtimeMs: number): void {
+  w.dirs.set(normalizePath(w.layout.platform, w.spelled(path)), mtimeMs);
 }
 
 export const run = (args: string, columns = 120) =>

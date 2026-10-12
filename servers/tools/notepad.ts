@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync, utimesSync } from "node:fs";
 import { join } from "node:path";
 import { compactEntries, toPlanName } from "../../src/core/notepad.ts";
 import { redact } from "../../src/core/visual.ts";
@@ -25,6 +25,17 @@ function toSection(value: unknown): Section {
 
 const rootArg = (args: Record<string, unknown>) => rootOf(stringArg(args, "working_directory", ""));
 const notepadsOf = (root: string) => join(root, ".omca", "notepads");
+
+// A directory's mtime moves only when an entry is added or removed, never for a rewrite inside a plan
+// directory, so every write bumps it explicitly: the mod re-ranks notepads when it moves.
+function touchNotepads(root: string): void {
+  const now = new Date();
+  try {
+    utimesSync(notepadsOf(root), now, now);
+  } catch (error) {
+    console.error(`omca: could not bump ${notepadsOf(root)}:`, error);
+  }
+}
 
 function sectionNames(dir: string): string {
   const names = readdirSync(dir)
@@ -73,6 +84,7 @@ export const tools: Tool[] = [
         writeFileAtomic(path, next);
         return Buffer.byteLength(next);
       });
+      touchNotepads(root);
       const result = `Appended to ${plan}/${section}.md`;
       if (size <= WARN_BYTES) return result;
       return `${result}\n[WARNING: section file is ${Math.floor(size / 1024)}KB. Consider running notepad_compact to reduce size]`;
@@ -159,12 +171,14 @@ export const tools: Tool[] = [
     call: async (args) => {
       const plan = toPlanName(stringArg(args, "plan_name"));
       const section = toSection(args.section);
-      const path = join(notepadsOf(rootArg(args)), plan, `${section}.md`);
+      const root = rootArg(args);
+      const path = join(notepadsOf(root), plan, `${section}.md`);
       if (!existsSync(path)) return `Section '${section}' not found for plan '${plan}'`;
       return withLock(`${path}.lock`, () => {
         const { text, lines, entries, removedLines } = compactEntries(readFileSync(path, "utf8"), KEEP_LINES);
         if (text === null) return `Section '${section}' has ${lines} lines and needs no compaction`;
         writeFileAtomic(path, text);
+        touchNotepads(root);
         return `Compacted '${section}': removed ${entries} old entries (${removedLines} lines), kept the newest whole entries within ${KEEP_LINES} lines`;
       });
     },

@@ -33,7 +33,10 @@ const cardKey = (name: NotepadSection) => `notepad-card-${name}`;
 const titleKey = (name: NotepadSection) => `notepad-title-${name}`;
 const TONES: Readonly<Record<NotepadSection, Tone>> = { learnings: "info", issues: "warn", decisions: "active", problems: "fail" };
 
+type Ranked = { name: string; at: number };
+
 let signature: string | undefined;
+let ranking: { root: string; stamp: number; plans: Ranked[] } | undefined;
 let chosen: string | undefined;
 let query = "";
 let isSearching = false;
@@ -46,6 +49,7 @@ const resetCards = (): void => {
 export const reset = (): void => {
   resetCards();
   signature = undefined;
+  ranking = undefined;
   chosen = undefined;
   query = "";
   isSearching = false;
@@ -59,20 +63,31 @@ async function boundPlan(host: Host, root: string): Promise<{ name: string | und
   return { name: (await boundPlanOf(host))?.name, seen: `${mtimeMs}` };
 }
 
-// The bound plan first, then the most recently written. A listing reports a directory's time as 0, so
-// a notepad is as recent as its newest section file; one that cannot be listed counts as oldest.
-async function notepadPlans(host: Host, root: string, bound: string | undefined): Promise<{ name: string; seen: string }[]> {
+// Every notepad, the most recently written first. A listing reports a directory's time as 0, so a
+// notepad is as recent as its newest section file; one that cannot be listed counts as oldest. The
+// server bumps `.omca/notepads` on every write, so the ranking is listed again only when that moves.
+async function rankedNotepads(host: Host, root: string): Promise<Ranked[]> {
   const dir = `${root}/${NOTEPADS}`;
+  const stamp = await host.fs.stat(dir).then(
+    ({ mtimeMs }) => mtimeMs,
+    () => undefined,
+  );
+  if (stamp !== undefined && ranking?.root === root && ranking.stamp === stamp) return ranking.plans;
   const found = (await host.fs.exists(dir)) ? (await host.fs.list(dir)).filter((entry) => entry.kind === "dir" && isPlanName(entry.name)) : [];
   const written = await Promise.all(
-    found
-      .filter((entry) => entry.name !== bound)
-      .map(async ({ name }) => {
-        const files = await host.fs.list(`${dir}/${name}`).catch(() => []);
-        return { name, at: Math.max(0, ...files.filter((file) => file.kind === "file").map((file) => file.mtimeMs)) };
-      }),
+    found.map(async ({ name }) => {
+      const files = await host.fs.list(`${dir}/${name}`).catch(() => []);
+      return { name, at: Math.max(0, ...files.filter((file) => file.kind === "file").map((file) => file.mtimeMs)) };
+    }),
   );
-  const rest = written.sort((a, b) => b.at - a.at || a.name.localeCompare(b.name)).map(({ name, at }) => ({ name, seen: `${at}` }));
+  const plans = written.sort((a, b) => b.at - a.at || a.name.localeCompare(b.name));
+  ranking = stamp === undefined ? undefined : { root, stamp, plans };
+  return plans;
+}
+
+// The bound plan first, then the most recently written.
+async function notepadPlans(host: Host, root: string, bound: string | undefined): Promise<{ name: string; seen: string }[]> {
+  const rest = (await rankedNotepads(host, root)).filter(({ name }) => name !== bound).map(({ name, at }) => ({ name, seen: `${at}` }));
   return bound === undefined ? rest : [{ name: bound, seen: "" }, ...rest];
 }
 

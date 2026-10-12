@@ -15,6 +15,7 @@ import {
   type Size,
   SIZES,
   topRows,
+  touchDir,
   world,
   write,
 } from "./world.ts";
@@ -557,6 +558,57 @@ test("an unbound session opens the most recently written notepad, not the first 
   });
   const ui = await open($, DOCK_200);
   expect(rows(await ui.drawn())[chrome(DOCK_200)]).toBe("zeta not bound · 1 entry");
+  await ui.unmount();
+});
+
+test("idle ticks list no notepad directory but the shown one, and the ranking is listed again only when .omca/notepads moves", async ($, on) => {
+  const w = world(on, { ...FILES, [`${PADS}/alpha/learnings.md`]: "\n## 2026-10-01T10:00:00Z\n\nThe older note.\n" });
+  const ui = await open($, DOCK_200);
+  const listed = () => w.lists.splice(0);
+  expect(listed()).toContain(`${PADS}/alpha`);
+
+  await w.clock.advance(6000);
+  expect(listed().filter((path) => path !== `${PADS}/sample`)).toEqual([]);
+
+  touchDir(w, PADS, 5_000);
+  await w.clock.advance(2000);
+  expect(listed()).toContain(`${PADS}/alpha`);
+  await ui.unmount();
+});
+
+test("an unbound session ranks a notepad written since .omca/notepads moved, and a write that left the directory alone waits for it", async ($, on) => {
+  const w = world(on, {
+    [`${PADS}/alpha/learnings.md`]: "\n## 2026-10-01T10:00:00Z\n\nThe older note.\n",
+    [`${PADS}/zeta/learnings.md`]: "\n## 2026-10-02T10:00:00Z\n\nThe newer note.\n",
+  });
+  const ui = await open($, DOCK_200);
+  const header = async () => {
+    await w.clock.advance(2000);
+    await ui.redraw();
+    return rows(await ui.drawn())[chrome(DOCK_200)];
+  };
+  expect(await header()).toBe("zeta not bound · 1 entry");
+
+  for (let count = 0; count < 3; count++) write(w, `${PADS}/fresh/learnings.md`, "\n## 2026-10-02T12:00:00Z\n\nJust written.\n");
+  expect(await header()).toBe("zeta not bound · 1 entry");
+
+  touchDir(w, PADS, 5_000);
+  expect(await header()).toBe("fresh not bound · 1 entry");
+  await ui.unmount();
+});
+
+test("the bound notepad shows a new entry while .omca/notepads does not move", async ($, on) => {
+  const w = world(on, FILES);
+  const ui = await open($, DOCK_200);
+  const header = async () => {
+    await w.clock.advance(2000);
+    await ui.redraw();
+    return rows(await ui.drawn())[chrome(DOCK_200)];
+  };
+  expect(await header()).toBe("sample  BOUND  · 3 entries · 1 masked");
+
+  write(w, `${PADS}/sample/problems.md`, "\n## 2026-10-02T12:00:00Z\n\nA new problem.\n");
+  expect(await header()).toBe("sample  BOUND  · 4 entries · 1 masked");
   await ui.unmount();
 });
 
