@@ -703,7 +703,8 @@ describe("the working directory named as a variable or a substitution", () => {
 
 describe("the command prefix scan stays linear", () => {
   const fastest = (command: string, ctx?: Context): number => {
-    const times = [0, 1, 2].map(() => {
+    classify(command, ctx);
+    const times = [0, 1, 2, 3, 4].map(() => {
       const start = performance.now();
       classify(command, ctx);
       return performance.now() - start;
@@ -712,7 +713,8 @@ describe("the command prefix scan stays linear", () => {
   };
 
   // A ratio measured in the same run holds on any runner: four times the input takes about four
-  // times as long when the scan is linear and sixteen times as long when it is quadratic.
+  // times as long when the scan is linear and sixteen times as long when it is quadratic. The
+  // unmeasured first call keeps a cold JIT from inflating whichever input runs first.
   test.each([
     ["spaces", (count: number) => "A=b ".repeat(count) + "rm -rf build"],
     ["tabs", (count: number) => "A=b\t".repeat(count) + "rm -rf build"],
