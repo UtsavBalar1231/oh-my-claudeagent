@@ -24,7 +24,7 @@ OMCA neither writes nor overrides them:
 | `disableAllHooks` | Stops every hook and mod, OMCA's included |
 | `allowManagedModsOnly` | An option on Claude Code's built-in guard. Stops OMCA's mod (band, pane, doctor, guard) and leaves its settings hooks running |
 | `allowManagedPermissionRulesOnly` | Only managed permission rules apply. OMCA adds none, so nothing of OMCA's changes |
-| `allowManagedMcpServersOnly` | Only managed MCP servers connect, which leaves out `omca`, `grep` and `context7` |
+| `allowManagedMcpServersOnly` | Only managed MCP servers connect, which leaves out `omca` |
 | `strictKnownMarketplaces`, `blockedMarketplaces` | Decide whether the `omca` marketplace can be added |
 | `sandbox.failIfUnavailable` | Fails closed when the sandbox cannot start. OMCA does not depend on it either way |
 
@@ -45,7 +45,7 @@ your provider's model for that family, so the roster never pins a model id. Spaw
 | reviewer | opus | high | Reviews a plan for clarity, verifiability and completeness; answers OKAY or REJECT | No Bash. Writes or edits a file only when asked to |
 | architect | fable | xhigh | Architecture, trade-offs, and debugging that is already stuck | Read-only |
 | explorer | sonnet | high | Searches the local codebase | Read-only |
-| researcher | sonnet | high | Library docs and open-source examples, through context7 and grep.app | Read-only |
+| researcher | sonnet | high | Library docs and open-source examples, through WebFetch, WebSearch and any docs or code-search MCP server you connect | Read-only |
 | executor | sonnet | high | Implements one scoped task and verifies it before reporting | Does not delegate |
 | build-fixer | opus | medium | Fixes build, type and toolchain failures with minimal diffs | Does not delegate |
 | viewer | opus | medium | Reads images, PDFs and diagrams | Read-only, no Bash |
@@ -101,8 +101,7 @@ A slash command activates its mode whether or not the option is on.
 
 ## MCP tools
 
-`.mcp.json` starts these servers: `omca` (bun, local), `grep` (grep.app code search, over HTTP)
-and `context7` (library docs, over HTTP).
+`.mcp.json` starts one server, `omca` (bun, local), and OMCA ships no remote server.
 
 Only `evidence_log`, `boulder_progress` and `notepad_write` load with the first request. Every
 other `omca` tool waits behind tool search and loads with `ToolSearch` and the query
@@ -281,7 +280,7 @@ OMCA keeps its state in the project's `.omca/` directory, which it gitignores ex
 | `.omca/evidence/verification-evidence.json` | `evidence_log` | The append-only evidence log. Older entries move to a monthly archive file when it grows past 1 MiB or 1,000 entries |
 | `.omca/notepads/<plan>/<section>.md` | `notepad_write`, `notepad_compact` | Plan notepads |
 | `.omca/state/session/<session id>.json` | the server | The last hook call and the last verification command |
-| `.omca/state/mod/<session id>.json` | the mod | Proof the mod ran this session, and its options |
+| `.omca/state/mod/<session id>.json` | the mod | Proof the mod ran this session, and its options. `health_check` and the first-prompt notice read it from any worktree of the repository |
 | `.omca/metrics/<session id>/<agent id>.json` | the mod | One record per delegation, read by the Stats tab |
 | `.omca/logs/file-access.jsonl` | `file_read` | One line per call |
 | `.omca/state/hook-trace.jsonl` | the server, with `OMCA_HOOK_TRACE=1` | One line per hook call |

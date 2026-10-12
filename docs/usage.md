@@ -466,6 +466,7 @@ folder in `CLAUDE_CODE_PLUGIN_DIRS` ([anthropics/claude-code#94635](https://gith
 
 On Desktop the mod draws differently:
 
+- A click on a run's time focuses it in the Evidence tab, since Desktop draws only a button's label.
 - The pane docks on the right. `/omca` opens it, and it never opens on its own. Desktop can
   report `/omca` as not a command until the session's first reply, and runs it anyway
   ([#99691](https://github.com/anthropics/claude-code/issues/99691)). When Desktop does not place

@@ -16,7 +16,7 @@ and the plugin runs on Linux, macOS and native Windows.
 `PATH` Claude Code starts with. `ast-grep` (or `sg`) stays optional; only the `ast_*` tools need
 it. On 2.1.287 the band could end a fullscreen session when the background-tasks dialog opened,
 2.1.292 adds the Agent tool's `effort` input that per-delegation effort uses, and 2.1.295 lets a
-button hold styled text, which each Evidence run in the pane is.
+button hold styled text, which each Evidence run in a terminal pane is.
 
 **Read [Upgrading](#upgrading) before you update.** A 2.x session and a 3.x session must not run
 in the same project at once, and the `CLAUDE.md` block that 2.x setup wrote has to be deleted by
@@ -24,6 +24,9 @@ hand.
 
 ### Added
 
+- **Privacy, security and conduct statements.** The repository has `PRIVACY.md`, a security policy
+  (`SECURITY.md`) that takes vulnerability reports privately, a code of conduct, and issue and
+  pull request templates. The README says what OMCA runs, reads and writes.
 - **The `/omca` pane.** `/omca` opens a pane with Agents, Plan, Evidence, Notepad, Stats and
   Doctor tabs, each on a digit key. Every color is a Claude Code theme key, except the
   mascots, which use fixed colors. The pane
@@ -163,7 +166,7 @@ hand.
   than guessed. The
   Stats tab aggregates the records by agent type: runs per agent, the evidence rate of executor
   and build-fixer, the agents that run checks, tokens per finished delegation, and the estimated
-  cost split by agent.
+  cost split by agent. The ascii Stats table leads each agent's row with its cost-meter mark.
 - **Per-delegation effort.** The orchestrator and start-work set one delegation's effort
   through the Agent call's own `effort` input, which overrides the agent's declared `effort:`
   for that run, higher or lower. A plan task's `Effort:` line becomes that input. The tier stays
@@ -285,6 +288,7 @@ hand.
   model with tool search on, an executor's request carries about 4,500 tokens beyond a
   general-purpose agent's, against 8,700 before, and the main thread about 11,400 beyond plain
   Claude Code, against 12,200.
+- The packaged plugin leaves out the engine type files under `.claude-plugin/types/`.
 - **The plugin installs from a packaged branch.** `just release` commits the shipped tree to the
   orphan `plugin` branch tagged `plugin-v<version>`, and `marketplace.json` pins that commit
   through a `url` source. The shipped tree leaves out the repository tooling: the specs, `tests/`,
@@ -362,6 +366,8 @@ hand.
 
 ### Fixed
 
+- `health_check` and the first-prompt notice read the mod marker from any worktree of the
+  repository, so a session in a worktree is no longer reported as running without the mod.
 - A forgotten `evidence_log` no longer turns off the task-completion check for the rest of the
   session: once an unlogged verification is older than the check's one-hour window, a newer
   verification replaces it.
@@ -388,6 +394,9 @@ hand.
 
 ### Removed
 
+- **The remote MCP servers.** `.mcp.json` no longer starts `grep` (grep.app) or `context7`, so OMCA
+  starts no remote MCP server and the researcher reads docs through WebFetch, WebSearch and any
+  docs or code-search server you connect. The README shows how to add them.
 - **The Python runtime.** The Python MCP server, its lockfiles and the Python status line package
   are gone, and uv is no longer a dependency.
 - **The bash hook scripts.** Every hook is a server handler or a mod feature. With them go the
@@ -462,6 +471,8 @@ hand.
    run `/fewer-permission-prompts`.
 10. Replace `CLAUDE_STATUSLINE_NERD_FONT=0` with `OMCA_GLYPHS=unicode`, which draws the same status
     line, or `OMCA_GLYPHS=ascii` for plain text. The old variable is no longer read.
+11. If you used the bundled `grep` or `context7` servers, add them yourself with `claude mcp add`,
+    as the README shows.
 11. Run `/oh-my-claudeagent:omca-setup --migrate` in each project after upgrading. It moves agent
     memories and the agent ids in your user settings to the new names, asking before it changes
     anything. The renamed-agents table under Changed lists the names, and `/omca doctor` warns
