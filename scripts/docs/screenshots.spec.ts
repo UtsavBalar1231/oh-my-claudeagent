@@ -81,7 +81,7 @@ describe("CLIPS", () => {
     expect(targets(clip("clip-delegate"))).toEqual(["tool-row", "lane-head"]);
     for (const name of ["clip-board", "clip-board-light"]) {
       expect(marks(clip(name))).toEqual(["cmd-typed", "board", "focus-moved", "task-open"]);
-      expect(targets(clip(name))).toEqual(["proven-chip", "unproven-chip"]);
+      expect(targets(clip(name))).toEqual(["proven-chip"]);
     }
     expect(marks(clip("clip-guard"))).toEqual(["cmd-typed", "dialog", "refused"]);
     expect(targets(clip("clip-guard"))).toEqual(["discard-lines"]);

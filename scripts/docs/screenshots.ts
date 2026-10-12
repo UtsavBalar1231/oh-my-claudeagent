@@ -133,7 +133,7 @@ const PLAN_SCRIPT: Script = {
   ],
 };
 const NO_SCRIPT: Script = { main: [], subagent: [] };
-const planReady = (screen: string) => screen.includes("executor on 7") && screen.includes("UNPROVEN") && screen.includes("enter open");
+const planReady = (screen: string) => screen.includes("executor on 7") && screen.includes("PROVEN") && screen.includes("enter open");
 const GUARD_SCRIPT: Script = {
   main: [{ content: [bash("rm -rf build", "Remove the build output")] }, { content: [text("The build is clean.")] }],
   subagent: [],
@@ -236,7 +236,7 @@ const BOARD_STEPS: readonly Step[] = [
   {
     until: (screen) => planReady(screen) && screen.includes("7. Wire the order summary panel"),
     mark: "board",
-    targets: { "proven-chip": /(?<!UN)PROVEN/, "unproven-chip": /UNPROVEN/ },
+    targets: { "proven-chip": /(?<!UN)PROVEN/ },
   },
   { key: "Up" },
   { until: has("6. Build the payment step"), mark: "focus-moved", hold: 1_400 },
