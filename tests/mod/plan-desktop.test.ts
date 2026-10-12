@@ -149,6 +149,21 @@ for (const columns of [56, 90]) {
   });
 }
 
+for (const surface of ["desktop", "terminal"] as const) {
+  test(`on ${surface} the Find field ${surface === "desktop" ? "asks the text cursor to enter it" : "leaves the ring where the engine holds it"}`, async ($, on) => {
+    const w = planWorld(on);
+    w.surfaces = [surface];
+    await $.command.run(run("plan", 90));
+    const ui = await $.ui.mount(docked(surface, 90));
+
+    await ui.press({ key: "f" });
+    const field = await ui.find({ key: "filter" });
+    expect(field).toBeDefined();
+    expect(field?.props["autoFocus"]).toBe(surface === "desktop" ? true : undefined);
+    await ui.unmount();
+  });
+}
+
 test("on desktop opening a task's page focuses its Board key, and Board focuses the task again, so the next hotkey reaches the pane", async ($, on) => {
   const w = planWorld(on);
   await $.command.run(run("plan", 56));

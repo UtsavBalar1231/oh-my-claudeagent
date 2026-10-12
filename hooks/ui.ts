@@ -225,10 +225,11 @@ type FieldSpec = {
   value: string;
   onInput?: (value: string) => void;
   onSubmit: (value: string) => void;
+  autoFocus?: true;
 };
 
 /** An Input where the surface draws one; elsewhere the current value as text. */
-export function Field(kit: Kit, { key, label, placeholder, value, onInput, onSubmit }: FieldSpec): RenderElement {
+export function Field(kit: Kit, { key, label, placeholder, value, onInput, onSubmit, autoFocus }: FieldSpec): RenderElement {
   if (kit.Input === undefined) {
     return kit.Text({ wrap: "truncate-end", children: [label, value === "" ? kit.Text({ dimColor: true, children: [placeholder] }) : value] });
   }
@@ -238,6 +239,7 @@ export function Field(kit: Kit, { key, label, placeholder, value, onInput, onSub
     placeholder,
     value,
     ...(onInput === undefined ? {} : { onInput }),
+    ...(autoFocus === undefined ? {} : { autoFocus }),
     onSubmit,
   });
 }

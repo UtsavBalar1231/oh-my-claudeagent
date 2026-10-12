@@ -183,6 +183,28 @@ test("the tab bar is one row: full labels when they fit, else the active tab kee
   expect(await bar({ columns: 68, rows: 40, placement: "inline" })).toBe("1: Agents 2: Plan 3: Evidence 4: Notepad 5: Stats 6: Doctor");
 });
 
+// The widest bars that fit by themselves yet not two cells narrower: 38 and 39 usable cells.
+const GUTTER_CELLS = 100 - usableColumns(100);
+
+for (const columns of [56, 90, 120, 38 + GUTTER_CELLS, 39 + GUTTER_CELLS]) {
+  test(`on desktop the tab bar is laid out two cells inside the body, so the scrollbar leaves the last label whole at ${columns} columns`, async ($, on) => {
+    const w = world(on, FILES);
+    w.surfaces = ["desktop"];
+    await $.command.run(run(""));
+    const base = pane("desktop", { columns: 200, rows: 40, placement: "dock" });
+    const ui = await $.ui.mount({ ...base, props: { ...base.props, bodyColumns: columns } });
+    await ui.press({ key: "6" });
+    const bar = await ui.find({ key: "tabs-0" });
+    const cells = (bar?.children ?? []) as { props: { key: string; label: string } }[];
+    const gap = Number(bar?.props["columnGap"]);
+    const across = cells.reduce((sum, cell) => sum + `${cell.props.key}: ${cell.props.label}`.length, 0) + gap * (cells.length - 1);
+
+    expect(cells.at(-1)?.props.label).toBe("Doctor");
+    expect(across).toBeLessThanOrEqual(usableColumns(columns) - 2);
+    await ui.unmount();
+  });
+}
+
 test("a cued tab scrolled past its top draws an up cue over the window's first row, and none at the top", async ($, on) => {
   // Four sections of notes, each card held to its least rows, stack past a short pane.
   const long = Array.from({ length: 60 }, (_, i) => `- Note ${i + 1} of the long notepad.`).join("\n");

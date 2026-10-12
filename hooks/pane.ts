@@ -269,6 +269,9 @@ async function selectTab(host: Host, tab: Tab): Promise<void> {
   await patchPane(host, (pane) => (pane.tab === tab ? pane : { ...pane, tab }));
 }
 
+// Desktop's scrollbar takes two cells from the tab bar whenever the body is taller than the pane.
+const SCROLLBAR_CELLS = 2;
+
 type TabCell = readonly [Tab, string, string];
 
 // One row: the full labels when they fit, else only the active tab keeps its label and the rest shrink to their initial, which no two tabs share.
@@ -313,7 +316,7 @@ async function draw(host: Host, e: Input<"ui.render Pane">): Promise<RenderEleme
       host.log(`omca pane action failed: ${reason(error)}`);
     }
   };
-  const bar = tabBar(width, active);
+  const bar = tabBar(width - (isRemote(kit) ? SCROLLBAR_CELLS : 0), active);
   const tabs = [
     Box({
       key: "tabs-0",

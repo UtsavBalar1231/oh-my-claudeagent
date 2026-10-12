@@ -480,6 +480,8 @@ On Desktop the mod draws differently:
   terminal's scrolling windows inside it. The Evidence tab shows 40 runs at a time, with `n` and
   `o` for the newer and older ones. A view larger than Desktop draws at once shows a notice in its
   place; narrow it with Find, or read it in a terminal.
+- A plan too large for Desktop to draw shows that notice and keeps its Find field and keys. It
+  leaves out its header and some task rows until Find narrows it.
 - Copy can report that the surface has no clipboard, and the spinner keeps Desktop's own text.
 
 The VS Code chat panel runs OMCA's hooks but draws none of its interface: no band, no pane and

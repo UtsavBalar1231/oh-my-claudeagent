@@ -896,6 +896,7 @@ function filterRow(host: Host, view: View, shown: number, total: number): Render
         label: "Find",
         placeholder: "number, title or path",
         value: filter.text,
+        ...(isRemote(view.kit) ? { autoFocus: true as const } : {}),
         onInput: (value) => {
           filter = { ...filter, text: value };
           host.ui.invalidate();
