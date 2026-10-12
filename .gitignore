@@ -1,0 +1,39 @@
+# JavaScript
+node_modules/
+
+# Demo video: dependencies, renders, and footage the capture harness regenerates
+video/node_modules/
+video/out/
+video/public/footage/
+
+# oh-my-claudeagent runtime state
+/.omca/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+
+# Temporary files
+tmp/
+*.tmp
+TODO.md
+
+# AI context files
+CLAUDE.md
+.claude/
+
+# Maintainer-local docs and research artifacts
+REVIEW.md
+benchmarks/*
+!benchmarks/compare/
+benchmarks/compare/results/

@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OMCA plan registry, version 1",
+  "description": "The registry .omca/state/boulder.json. It describes what the writer emits, which is exactly the keys version, plans and bindings. A reader ignores unknown keys and reads a missing plans or bindings as empty, so no level forbids additional properties.",
+  "type": "object",
+  "properties": {
+    "version": {
+      "description": "Always written first by the writer. A file without it reads as version 1.",
+      "type": "integer",
+      "const": 1
+    },
+    "plans": {
+      "description": "Registered plans by plan name. A plan name is 1 to 128 characters of letters, digits, dot, underscore and hyphen, starting with a letter or digit, and is not a Windows device name or a name ending in a dot.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "active_plan": {
+            "description": "Path of the plan file.",
+            "type": "string"
+          },
+          "started_at": {
+            "description": "UTC at seconds precision when the plan was first registered, such as 2026-10-02T10:00:00Z.",
+            "type": "string",
+            "format": "date-time"
+          },
+          "session_ids": {
+            "description": "Every session that registered the plan, in order.",
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "worktree_path": {
+            "description": "Path of the worktree the plan runs in. Absent when the plan has none.",
+            "type": "string"
+          }
+        },
+        "required": ["active_plan", "started_at", "session_ids"],
+        "additionalProperties": true
+      }
+    },
+    "bindings": {
+      "description": "The plan each session is bound to, by session id.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "plan_name": {
+            "description": "A key of plans.",
+            "type": "string"
+          },
+          "bound_at": {
+            "description": "Epoch seconds when the session was bound.",
+            "type": "integer"
+          }
+        },
+        "required": ["plan_name", "bound_at"],
+        "additionalProperties": true
+      }
+    }
+  },
+  "required": ["plans", "bindings"],
+  "additionalProperties": true
+}

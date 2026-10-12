@@ -1,0 +1,3043 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [3.0.0] - 2026-10-12
+
+OMCA 3 rewrites the plugin's runtime in TypeScript on bun. One `omca` MCP server serves the
+model's tools and every settings hook, and a Claude Code mod draws OMCA's interface inside the
+session and runs the destructive-command guard. Python, uv and the bash hook scripts are gone,
+and the plugin runs on Linux, macOS and native Windows.
+
+**This release needs Claude Code 2.1.295 or later and bun 1.4.2 or later,** with bun on the
+`PATH` Claude Code starts with. `ast-grep` (or `sg`) stays optional; only the `ast_*` tools need
+it. On 2.1.287 the band could end a fullscreen session when the background-tasks dialog opened,
+2.1.292 adds the Agent tool's `effort` input that per-delegation effort uses, and 2.1.295 lets a
+button hold styled text, which each Evidence run in a terminal pane is.
+
+**Read [Upgrading](#upgrading) before you update.** A 2.x session and a 3.x session must not run
+in the same project at once, and the `CLAUDE.md` block that 2.x setup wrote has to be deleted by
+hand.
+
+### Added
+
+- **Privacy, security and conduct statements.** The repository has `PRIVACY.md`, a security policy
+  (`SECURITY.md`) that takes vulnerability reports privately, a code of conduct, and issue and
+  pull request templates. The README says what OMCA runs, reads and writes.
+- **The `/omca` pane.** `/omca` opens a pane with Agents, Plan, Evidence, Notepad, Stats and
+  Doctor tabs, each on a digit key. Every color is a Claude Code theme key, except the
+  mascots, which use fixed colors. The pane
+  and the band follow the theme you pick, a custom one in `~/.claude/themes/` included, and every
+  state also carries a glyph, and a word where a lane's row has room beside the agent's name. A state's color goes on its glyph, and the text beside it
+  stays in the theme's text color. Secrets in commands, output and notes are drawn as
+  `‹masked›` and your home folder as `~`. `OMCA_GLYPHS` picks the glyph set for the pane, the
+  band and the status line alike: `nerd` (the default, Nerd Font icons, an agent's own icon among
+  them), `unicode` for a font without Nerd Font glyphs, or `ascii` for plain text. Setup asks
+  which one your terminal draws.
+  `/omca plan`, `/omca stats` and `/omca doctor` open the pane on that tab, and the prompt's
+  typeahead offers the subcommands and your plans' names after `/omca plan`. Ctrl+X then Tab, or
+  a click, focuses it; Esc, the close mark or Ctrl+X then X closes it.
+- **The mouse in the pane.** The wheel scrolls what is under the pointer. Over a list it moves the
+  focus as the arrows do, and over a part of a tab that holds more than it shows (the Evidence
+  card, the plan's task detail, each Notepad card) it scrolls that part alone, prose a row at a
+  time, with a cue above and below while more is out of view. When the agents' lanes run past the
+  pane, the wheel scrolls them and the arrows step the focus a lane at a time. In the terminal each
+  Evidence run is one button, so a click anywhere on its row focuses the run (on Desktop, a click
+  on its time does), and in a wide pane a click on a
+  task's title selects it and a second click opens it.
+- **The pane fits every size.** Each tab gives its rows out by priority, so a short pane keeps
+  its header, its filter, at least one row of content with its cues, and its keys, and nothing
+  falls off the bottom unmarked. The tab bar stays on one row, the other tabs shortened to their
+  initials when the labels do not fit. A wide terminal gives the dock up to 120 columns while the
+  transcript keeps 100, and the plan board and the Evidence tab split into two columns only when
+  both have the rows and width to read. A plan task, a section and an agent's page keep their
+  header and keys in place while the body scrolls. Notepad sets its cards in two columns only
+  when each card gets three rows, balances the columns by height and folds empty sections into
+  one line; Stats keeps agent names readable before its decorative columns; Feedback wraps long
+  notes; spare rows go to wrapped text, a second key row and a blank between lanes.
+- **The Agents tab.** Each running subagent gets a lane with its task, model and effort in aligned
+  columns, and its elapsed time; below it, the tool it runs now and how many tool calls it has
+  made. A finished agent from an earlier wave, or one the pane has no room to keep in its lane,
+  shrinks to one line with its task, the first line of its result where room is left, and its
+  duration.
+  The key row counts the running and finished agents and their tokens. Pointing at a lane, or `d`,
+  shows its prompt, last output, tool calls and tokens.
+- **The agent page.** Enter or a click on a lane opens the agent's brief, each tool call with its
+  outcome and duration, its latest reply, its tokens and its `~$` cost. `c` copies the brief, `r`
+  reloads and `b` goes back. Teammates in a team get lanes that wait between messages.
+- **Markdown in agent text.** The agent page draws the brief and the reply as markdown with
+  Claude Code's own renderer, and shell commands on the page and in the lanes are highlighted as
+  code. One-line results, prompts and outputs in the lanes, the details rows and the card keep
+  their inline markdown: code in the code color, bold, italics and links, without the markers.
+- **Less work on the shared worker.** The Evidence tab builds only the rows it draws, a plan's
+  hash takes under a millisecond, text widths take an ASCII fast path, a subagent's finish rereads
+  the plan state only when a file behind it changed, the ledger is read again only when it grows,
+  and the Stop gates read the plan once and parse only the transcript lines they need.
+- **Toasts, auto-open, the band and the spinner.** One toast per finished wave of subagents, one
+  per failed verification and one when the plan completes, which on Claude Code 2.1.295 or later
+  also goes out as a notification through your own notification channel. The pane opens by itself on a session's
+  first wave of subagents, once, in a terminal, and waits undrawn below 144 columns (110 after you
+  have opened it). The band shows running agents with no plan bound, and the spinner's line ends
+  with the task and agent count, as in `… · task 7/14 · 3 agents`.
+- **Mascots and relaxed lanes.** Each agent has a mascot: a 15 by 8 pixel mini with the full-size
+  figure's face and tool at the head of its lane on the Agents tab, and the full-size figure in the
+  agent page header. With room for every running agent,
+  a lane takes four rows beside its mini (name and state, task, current tool, then model, effort,
+  tokens and cost) and a blank row; the latest wave's finished agents keep their lanes, with their
+  results, until the next wave, and a shorter pane keeps the two-row lanes. A mascot moves while
+  the agent works, smiles when it finishes, sweats when it fails and dozes while it waits. Terminals draw half-block characters, Desktop a still SVG, and
+  `OMCA_GLYPHS=ascii` draws none. A fork wears the mascot and color of the agent it copies, the
+  main agent's for a fork of the main conversation, with a fork icon beside its name.
+- **Desktop.** The Code tab draws the mod when its bundled Claude Code is 2.1.295 or later: the
+  pane docks on the right and opens from `/omca`, which replies with the reason when Desktop does
+  not place it, and a button whose prompt Desktop's box does not take shows the text in a toast.
+  The pane scrolls the way Desktop's own panes do and draws each tab whole; the Evidence tab shows
+  40 runs at a time, and a view too large for Desktop to draw shows a notice in its place.
+  When `/plugin` there does not list OMCA, `CLAUDE_CODE_PLUGIN_DIRS` loads it
+  (anthropics/claude-code#94635).
+- **The formats spec.** `docs/formats.md` specifies plans, the evidence ledger, notepads and the
+  plan registry.
+- **The migration.** `/oh-my-claudeagent:omca-setup --migrate` moves agent memories and settings
+  ids to the role names, after a preview, once per project.
+- **The plan board.** `/omca plan` opens the bound plan and `/omca plan <name or path>` opens
+  another. A plan with numbered tasks opens on a board: a DRAFT chip while the plan is a draft, a
+  progress bar, proof counts, the next task and the running agents, then the tasks by milestone,
+  each with its state, its proof chip, the agent working on it and the tasks that block it; a task
+  waiting only on the task before it reads as open. A task's proof compares its `File:` paths with
+  the evidence log: the newest test, build or lint run since they changed makes it PROVEN or
+  FAILED, and no such run leaves it UNPROVEN. An open task shows only a FAILED chip, and the board
+  and the band count the chips. The focused task's detail (its steps,
+  done-when commands, dependencies, file ages and the runs that bear on it) sits beside the list in
+  a wide pane, under its row in a narrower one, or on its own page. `k` fills the prompt to run
+  the task's check, `s` to start work from it, `c` copies it, `e` switches to the Evidence tab,
+  `o` and `x` keep open or failing tasks, and `f` finds tasks by text. `t` opens the plan's
+  sections, which is also where a plan without numbered tasks opens, and `l` lists the recent
+  plans from `plansDirectory`. The board reloads when the file changes on disk and keeps your
+  place.
+- **The proof ledger.** The Evidence tab opens on a verdict for the bound plan's final
+  verification: COMPLETE when a passing one matches the plan file as it is now, STALE when the plan
+  changed after it passed, MISSING otherwise, and under it whether the newest build, test, lint and
+  manual run each passed. Below it the logged runs are grouped by day, each with its outcome, time,
+  type, command and agent, and the focused run shows its command, output and exit code with
+  secrets masked. In a wide pane that is a card beside the list titled with whether the run passed:
+  its exit code, time and agent, the plan a final verification covers, and the whole command and
+  output wrapped rather than cut. `t` steps through the types, `x` keeps failures, `f` finds runs by command, `c`
+  copies the command and `r` fills a rerun request.
+- **The Notepad tab.** One card per section of the bound plan's notepad, each entry under its
+  date. `f` finds text in the entries, `w` clears the search and `l` picks another plan's
+  notepad.
+- **The band.** Above the prompt, the band shows the bound plan's progress as a bar with its done
+  and total tasks, the next open task, the proven, unproven and failed counts, a verification
+  command whose evidence was not logged, and how many agents are running, dropping segments as the
+  window narrows. After each turn it offers the next step on numbered buttons: log the evidence,
+  start work, run the final verification, or review the changes with oracle. Pressing a button's
+  digit in an empty prompt, or clicking it, fills the prompt and runs nothing until you send it.
+  The `showBand` option hides the band.
+- **`/omca doctor`.** It checks the loaded OMCA version, the Claude Code floor, bun on the
+  session's `PATH`, when a hook last reached the `omca` server, `ast-grep`, the `showBand` and
+  `guardMode` options, `CLAUDE_CODE_SUBAGENT_MODEL_FORCE`, a `maxEffortLevel` cap, a
+  `CLAUDE_CODE_EFFORT_LEVEL` that runs every agent at one effort, two enabled copies of the
+  plugin, of which only the one loaded first runs its hooks and mod, `allowManagedModsOnly`,
+  `disableAllHooks` and `allowManagedHooksOnly`, the output style in force, what keeps the advisor
+  off, an unanswered question that continues on its own (`CLAUDE_AFK_TIMEOUT_MS` or
+  `askUserQuestionTimeout`, from the sources Claude Code reads them from), and the status line's
+  `refreshInterval`. Each problem leads with a WARN, FAIL or INFO chip and the list scrolls; the
+  passing checks fold into one line, and `o` shows them. A check with a known remedy offers a key
+  that fills the prompt with it.
+  `r` runs the checks again, and `i` adds `refreshInterval: 5` to a status line that lacks it,
+  after re-reading the file, writing `settings.json.omca-bak` and showing the diff.
+- **The prompt cache on the status line.** The usage row shows whether the main conversation's
+  prompt cache is warm and how many minutes it has left, `C: warm 52m`, yellow in its last
+  minute. A cold cache reads `C: cold` with the tokens the next request writes again, and a miss
+  in the last 5 minutes adds its cause, such as `miss: tools changed`. The segment appears once a
+  response has reported cache tokens.
+- **A turn footer.** After each main-loop turn the mod prints the turn's duration and its input
+  and output tokens. An account billed by the token also sees the turn's cost, by the same rule
+  as the status line. When a verification ran that turn with no evidence logged after it, a
+  warning naming the command takes the cost's place.
+- **Delegation metrics and the Stats tab.** Each subagent gets a record under
+  `.omca/metrics/<session id>/` with its type, model, effort, tokens, duration, outcome, whether
+  evidence was logged during it, and an estimated cost from a dated price table that cites its
+  source for every row. Each response is priced on its own, so Claude Haiku 5.5 takes its higher
+  rate only for a prompt over 100,000 tokens. A model with no sourced price stays unpriced rather
+  than guessed. The
+  Stats tab aggregates the records by agent type: runs per agent, the evidence rate of executor
+  and build-fixer, the agents that run checks, tokens per finished delegation, and the estimated
+  cost split by agent. The ascii Stats table leads each agent's row with its cost-meter mark.
+- **Per-delegation effort.** The orchestrator and start-work set one delegation's effort
+  through the Agent call's own `effort` input, which overrides the agent's declared `effort:`
+  for that run, higher or lower. A plan task's `Effort:` line becomes that input. The tier stays
+  on the `model` input, where permission rules can see it. The orchestrator, planner and
+  start-work prompts say when to pass each level. Claude Code 2.1.292 is the first release whose
+  Agent tool takes `effort`.
+- **The destructive-command guard runs in the mod and can ask before it refuses.** It checks
+  every Bash and PowerShell command and sorts a match into one of these classes:
+  - Catastrophic: a recursive removal of the filesystem root, your home, the project, or a folder
+    directly under root or home. Refused in every permission mode, with no dialog.
+  - Blocking: a force push to the default branch in any spelling (`--force`,
+    `--force-with-lease`, `--force-if-includes`, a `+` refspec, `--mirror`, or no refspec while on
+    that branch), `git commit --no-verify` or `-n`, `git reset --hard`, `git stash`, `git clean`,
+    a `git restore` that writes the working tree, a recursive `git rm`, and `git checkout` with a
+    `--` path. `git restore --staged` without `--worktree` runs. Held for your review
+    in an interactive session and refused where no dialog can show, in every permission mode
+    including `bypassPermissions`. The default branch is the one `origin/HEAD` names, or `main`
+    and `master` when it names none, read from local refs with no network call.
+  - Advisory: a force push to any other branch, any other recursive removal, and `xargs rm -rf`,
+    whose targets are unknown in advance. Held for review in an interactive session and allowed
+    to run where no dialog can show.
+
+  The review dialog lists what the command would touch: each removal target with its kind and
+  entry count, the uncommitted changes a hard reset discards, or the commits a force push drops
+  from the remote. Refuse is listed first, so a stray Enter refuses; Run it hands the command back
+  to the normal permission checks, and the guard never allows a command on its own. The command
+  wraps onto up to four rows, and each list ends in `and N more` where it would push the dialog
+  past a 24-row terminal. The `guardMode` option is `dialog` by default; `deny` skips the dialog
+  everywhere.
+
+  The guard reads commands handed to another interpreter, up to four levels deep: `bash -c`,
+  `sh -c` and `zsh -c` scripts, `eval`, heredocs and here-strings fed to a shell, `pwsh` and
+  `powershell -Command`, `cmd /c`, `Invoke-Expression`, and a command substitution inside double
+  quotes. It sees past `sudo`, `env`, `timeout`, `nice`, `nohup`, `stdbuf`, `ionice`, `chrt`,
+  `setsid` and `time`, shell keywords, brace groups and backslash escapes, and resolves a relative
+  target against the session's working directory, so `rm -rf ..` from the project root is caught.
+  It reads `rm` options and the options of `git reset`, `git rm`, `git restore` and `git commit`
+  wherever they stand before `--`, as the tools do, so `rm ~ -rf` and `git reset HEAD --hard`
+  count, and it accepts a long option's abbreviations, such as `--rec` and `--no-pre`.
+  For PowerShell it reads `Remove-Item` and its aliases with `-Recurse`, cmd's `rd`, `rmdir` and
+  `del`, and the guarded git forms, and treats `-WhatIf` as no removal. Drive roots, the Git Bash,
+  Cygwin, WSL `/mnt` and macOS `/Volumes` mounts, and share roots count as catastrophic targets.
+- **Each half of OMCA says when the other is missing.** At session start the mod writes one
+  transcript line when the `omca` server is not connected: bun is missing (Desktop and VS Code may
+  start with a GUI `PATH` that lacks it), or the server failed for the reason Claude Code gives.
+  On the launch session's first prompt the server says once, as a system message, that the mod is
+  not running, so the guard, band and pane are off. `OMCA_DISABLED_HOOKS=mod-notice` silences
+  that message.
+- `health_check` reports whether this session's runtime is live (`ok`, or `hooks_inactive` or
+  `mod_absent` with the likely cause), along with the client version, the `ast-grep` binary and
+  the state files. The plan and start-work skills call it first and stop when the runtime is not
+  live.
+- A session's first prompt carries the bound plan's name, path, next open task and notepad line,
+  and the server titles the session `OMCA: <plan>` unless it already has a name.
+- The `omca` server speaks the 2026-07-28 MCP handshake through `server/discover` and falls back
+  to `initialize`. Escape or a call's timeout cancels the call and stops any `ast-grep` it
+  started. The `ast_*` tools and `session_search` report progress under the tool line, every tool
+  has a title for `/mcp`, and `boulder_write` is marked destructive.
+- `boulder_progress` returns `plan_sha256`, the hash of the plan file's current bytes, so
+  start-work no longer runs `sha256sum`.
+- `OMCA_HOOK_TRACE=1` makes the server append one line per hook call to
+  `.omca/state/hook-trace.jsonl`: the event, the session, agent and tool, and the kind of answer.
+- **Linux, macOS and native Windows.** CI runs the specs, typechecks, the validator and a live
+  smoke session on all three. On Windows, verification commands run through the PowerShell tool
+  count toward the evidence gates, failure recovery has PowerShell advice, and paths with drive
+  letters, UNC shares, Git Bash `/c/...` forms and case-insensitive spellings resolve correctly.
+  Where hard links are refused (FAT, exFAT, SMB and some FUSE mounts) the state lock falls back to
+  a lock directory. Rules, frontmatter and pasted prompts accept a byte-order mark and CRLF line
+  endings. The shipped skills avoid `sha256sum`, `/tmp` and unquoted plugin paths, and setup
+  accepts a `settings.json` that starts with a byte-order mark.
+
+### Changed
+
+- **Renamed agents and skills.** Agents and skills carry role names, in `agents/`, `skills/`,
+  the OpenCode ids (`omca-<name>`), `/oh-my-claudeagent:<name>` and `@agent-oh-my-claudeagent:<name>`.
+  `executor` keeps its name. The keyword triggers follow: "run analyzer" and "pre-plan" point at
+  `/oh-my-claudeagent:analyzer`, "run planner" and "create plan" at `/oh-my-claudeagent:plan`,
+  and "run build-fixer", "fix build" and "build broken" at `/oh-my-claudeagent:build-fixer`.
+
+  | Old | New | Kind |
+  | --- | --- | --- |
+  | sisyphus | orchestrator | agent |
+  | prometheus | planner | agent |
+  | metis | analyzer | agent and skill |
+  | momus | reviewer | agent and skill |
+  | explore | explorer | agent |
+  | librarian | researcher | agent |
+  | oracle | architect | agent |
+  | hephaestus | build-fixer | agent and skill |
+  | multimodal-looker | viewer | agent |
+
+- **One bun server.** `.mcp.json` starts a single `omca` server, `bun servers/omca.ts`, that
+  answers the model's tools and every `hooks.json` entry through its `omca_hook` tool. No command
+  hook remains. Every tool keeps its name, schema and result text. The OpenCode adapter starts
+  the same server through OpenCode's own executable and runs the comment gate and plan checks in
+  process.
+- **OMCA's guidance comes from the server.** It is added to a session's first prompt and again
+  after a compaction. A resumed session is not guided twice, and a session started by `/clear` is
+  guided afresh. Before a compaction the mod asks the summarizer to keep the bound plan and its
+  open tasks.
+- **The stop gates continue a session as hook feedback.** Plan continuation, final verification
+  and the drift guard run in that order from one Stop handler and continue the turn with their
+  reason, which Claude Code draws as "Stop hook feedback" instead of "Stop hook error". Each keeps
+  its back-off and its budget, refilled once its condition clears. `OMCA_DISABLED_HOOKS` turns
+  them off with `stop-gates`, or one at a time with `plan-continuation`, `final-verification` or
+  `drift-guard`.
+- **Most omca tools load on demand.** Only `evidence_log`, `boulder_progress` and
+  `notepad_write` load with the first request; the rest load through tool search by their full
+  name, which saves about 3,750 tokens per request where tool search is on. Subagents are told the
+  same rule at start, since a subagent's first request carries no server instructions. Hooks call
+  the server directly and are unaffected.
+- **The sisyphus prompt is a little over half its old size.** It drops what the output style and
+  the first-prompt guidance already say and keeps every instruction only it carries, falling from
+  about 6,700 to about 3,800 tokens on every main-session request.
+- **Each request carries less of OMCA.** executor, metis and hephaestus no longer declare project
+  memory, which none of them used (metis could not write it), so their requests drop Claude
+  Code's 13,000-character memory block. The three always-loaded tool descriptions, the server
+  instructions and six skill descriptions say the same in fewer words. Measured against a mock
+  model with tool search on, an executor's request carries about 4,500 tokens beyond a
+  general-purpose agent's, against 8,700 before, and the main thread about 11,400 beyond plain
+  Claude Code, against 12,200.
+- The packaged plugin leaves out the engine type files under `.claude-plugin/types/`.
+- **The plugin installs from a packaged branch.** `just release` commits the shipped tree to the
+  orphan `plugin` branch tagged `plugin-v<version>`, and `marketplace.json` pins that commit
+  through a `url` source. The shipped tree leaves out the repository tooling: the specs, `tests/`,
+  every script but the status line setup, `package.json`, `bun.lock`, `bunfig.toml`, the
+  typecheck and lint configs, `CONTRIBUTING.md`, the OpenCode adapter and the video project. A
+  marketplace install no longer fetches about 166 MiB of development dependencies. A new install
+  is one command, `claude plugin install oh-my-claudeagent --marketplace
+  UtsavBalar1231/oh-my-claudeagent`, which adds the marketplace first.
+- **The status lines run on bun through a launcher.** `/oh-my-claudeagent:omca-setup` copies
+  `statusline/launcher.ts` to `~/.claude/omca/statusline.ts`, prints a diff of
+  `~/.claude/settings.json`, and after you confirm it sets `statusLine` and
+  `subagentStatusLine` to that launcher, keeping the previous file as
+  `settings.json.omca-bak`. The launcher runs the renderer from the most recently updated
+  install, so the status line needs no second setup run after a plugin update. The
+  `disableForceOrchestrationStyle` opt-out still needs setup to run again after each update.
+  `--uninstall` removes both entries and the launcher. A render takes about 4 ms, against about
+  22 ms before.
+- `statuslineMode` takes `on` or `off`. A saved `direct` or `daemon` value is no longer an
+  option; set it again to `on`.
+- `omca-setup` checks the Claude Code and bun versions, `ast-grep` and the runtime, configures the
+  status lines and applies the force-style opt-out. Its `--check` and `--doctor` modes point at
+  `/omca doctor`.
+- **The status line adapts to the terminal.** It reads the `COLUMNS` and `LINES` that Claude
+  Code sets. From 60 columns the status line is three rows: session, workspace and usage. Each
+  starts its own line and wraps within itself, and a segment that does not fit wraps whole to the
+  next line of its row. When lines run out, the lowest-ranked segment in any row goes first, and
+  the model always stays. Only the next-task label is ellipsized. The context bar is 8 to 20
+  blocks wide and takes the free cells on its line. Under 20 rows the status line uses at most
+  two lines, otherwise four, and under 60 columns it draws one compact line of model, plan count,
+  context percentage and branch. Widths count terminal cells, so wide characters take two, and
+  lines stop 6 cells short of `COLUMNS`, the 3 cells Claude Code keeps free on each side. A
+  subagent row names the agent by its type, then adds its model, status, effort, context and the
+  task's label in that order and stops at the first that does not fit.
+- Cost shows only when the payload has no 5 hour or 7 day window and the cost is above zero, so a
+  subscriber sees no dollar figure. The turn footer follows the same rule.
+- Durations read `2m05s` on the status line, as they do in the footer and the pane.
+- The sisyphus agent's status line icon is `nf-fa-repeat` (U+F01E), the glyph the agent icon
+  table names.
+- The directory now shows in every project, not only in a git repository, and the pull request
+  segment shows the number without the repository name. The agent segment appears only when the
+  session's main agent is not sisyphus, and behind a Claude apps gateway with a spend limit, the
+  spend against that limit follows the usage limits.
+- **`OMCA_DISABLED_HOOKS` takes the 3.x feature names** listed in `docs/references.md`, and `all`
+  or `*` turns off every one. `bash-guard` turns off every blocking and advisory match; a
+  catastrophic removal is still refused.
+- **The comment gate judges only the lines an edit adds.** Named numeric constants in TypeScript
+  and Rust are no longer flagged as magic numbers, `TODO: implement` is judged in context, and the
+  deny-once memory is kept per file, so a second file in the same turn gets its own first deny.
+  The whole-file opt-out marker is now `comment-gate-disable-file`.
+- The plan-checkbox check no longer refuses a finished plan whose tasks are all checked, and
+  judges a small Edit to a plan only when it rewrites a plan heading.
+- `/oh-my-claudeagent:plan` writes the plan and no longer binds the session to it.
+  `/oh-my-claudeagent:start-work` registers the plan and binds the session that runs it.
+- `just validate` and `just check` count as verification runs, alongside `just test`, `lint`,
+  `ci`, `typecheck` and `build`.
+- `ast_search` with `output_format: "json"` returns `{truncated, matches}`, and `truncated` says
+  whether more matches exist than it returned.
+- `session_search` refuses an empty query and a `role` other than `user`, `assistant` or `tool`,
+  where it used to match every turn or ignore the filter.
+- `categories_list` takes no input; its unused `working_directory` argument is gone.
+- Rule and context injection rebuilds its index when a rule directory or rule file changes, and
+  injects each rule body once per session until it changes.
+- The evidence ledger rotates at start: once the live file passes 1 MiB or 1,000 entries, all but
+  the newest 500 move to a monthly archive. The server prunes mod markers and session status files
+  after 24 hours, and delegation records after 90 days.
+- The docs are `README.md`, `docs/usage.md` and `docs/references.md`, and `CONTRIBUTING.md` sits
+  at the repository root.
+- For contributors: `just ci` runs lint, typecheck, the validator, the bun specs, the mod tests,
+  the OpenCode specs and a smoke session against the mock model, and needs bun, the claude CLI and
+  ast-grep. The validator is `bun scripts/validate.ts`, the bats suites and the shellcheck lint
+  are retired, and the repository holds no shell or Python file. `just release <version>` refuses
+  a dirty tree, a checkout that is not `main` or not even with `origin/main`, a missing changelog
+  entry or an existing tag, restores the tree if it fails part way, and prints one atomic push of
+  both branches and both tags.
+
+### Fixed
+
+- `health_check` and the first-prompt notice read the mod marker from any worktree of the
+  repository, so a session in a worktree is no longer reported as running without the mod.
+- A forgotten `evidence_log` no longer turns off the task-completion check for the rest of the
+  session: once an unlogged verification is older than the check's one-hour window, a newer
+  verification replaces it.
+- `notepad_*` checks `plan_name` before it names a path, which closes a `../` escape from the
+  notepads directory, and `notepad_compact` rewrites a section under the same lock as
+  `notepad_write`, so a concurrent append is no longer lost.
+- `evidence_log` refuses to replace a ledger it cannot parse instead of starting a new one over
+  the audit trail, and caps `command` and `verified_by`. `evidence_read` refuses such a ledger
+  with the same message, where it used to report no evidence.
+- Files under `.omca/rules/` can be committed. The `.omca/.gitignore` the server writes ignored
+  every file inside that directory; the server now rewrites it to keep them.
+- `ast_*` no longer reads a pattern starting with a hyphen as an option, and a matching rule with
+  `severity: error` no longer discards the scan's matches.
+- `file_read` no longer skips its size guard for a negative limit, cuts an overlong line while
+  streaming, matches sensitive paths case-insensitively and without NTFS stream suffixes on
+  every platform, and refuses a network path before looking it up. `session_search` scans transcripts in linear time and honors
+  `CLAUDE_CONFIG_DIR`.
+- A server hook handler that throws now fails open on every event, so a bug in OMCA cannot block
+  a tool call.
+- The plan reader counts only `- [x] N.` as done, the same rule the band, status line and stop
+  gates use, so an upper-case `X` no longer makes them disagree.
+- `github-triage` can write its `SKIPPED.md` and `SUMMARY.md` reports; it disallowed the Write
+  tool and could not finish a run.
+
+### Removed
+
+- **The remote MCP servers.** `.mcp.json` no longer starts `grep` (grep.app) or `context7`, so OMCA
+  starts no remote MCP server and the researcher reads docs through WebFetch, WebSearch and any
+  docs or code-search server you connect. The README shows how to add them.
+- **The Python runtime.** The Python MCP server, its lockfiles and the Python status line package
+  are gone, and uv is no longer a dependency.
+- **The bash hook scripts.** Every hook is a server handler or a mod feature. With them go the
+  executor grep guard, which denied `grep` for the executor agent, and the write guard, which
+  denied direct writes to the evidence ledger and notepads; the MCP tools remain the supported
+  writers.
+- `bin/omca-status`, `bin/omca-doctor` and `bin/omca-subagent-statusline`. The plugin
+  `settings.json` no longer sets `subagentStatusLine`: Claude Code does not resolve
+  `${CLAUDE_PLUGIN_ROOT}` in it, so it never found its script.
+- Daemon status line mode and the status line's agent-count segment.
+- **The log-only writers under `.omca/logs/`:** the post-edit log and its stale-log sweep, the
+  `StopFailure` log, the file-changed log, the hook error log, the teammate audit line and the
+  subagent-stop bookkeeping. OMCA no longer registers `FileChanged`, `StopFailure` or
+  `SubagentStop`. `file_read` still writes its audit log, `.omca/logs/file-access.jsonl`.
+- The `validate_plan_write` tool, the cache-writing option of `agents_list`, and the `agent`
+  field of `boulder_write` and of the plan registry. A stored `agent` is dropped on the next
+  write.
+- **The `PreCompact` and `SessionEnd` hooks.** The mod's `session.compact` feature shapes the
+  summary, and the server unbinds its sessions when it exits.
+- **The tool-loop detector.** It warned when one agent ran the same batch of tool calls three
+  times in a row, and it fired on legitimate repeats such as polling or re-running a check
+  after an edit far more often than on real loops. OMCA no longer registers `PostToolBatch`,
+  and `tool-loop` is no longer a name `OMCA_DISABLED_HOOKS` recognizes. Repeated failures still
+  trip the failure-recovery breaker at a tool's third failure.
+- **Setup's `CLAUDE.md` block.** Setup no longer writes, updates or removes the
+  `--- omca-setup` block in `~/.claude/CLAUDE.md`, and writes nothing into any `CLAUDE.md`.
+- `OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY`. `OMCA_DISABLED_HOOKS=bash-guard` is the switch for
+  the guard.
+- **The status line's tuning variables.** `CLAUDE_STATUSLINE_BAR_WIDTH` (20),
+  `CLAUDE_STATUSLINE_THRESHOLD_WARN` (60), `CLAUDE_STATUSLINE_THRESHOLD_CRIT` (85),
+  `CLAUDE_STATUSLINE_CACHE_TTL` (5) and `CLAUDE_STATUSLINE_GIT_TIMEOUT` (3) are gone, and
+  `statusline/config.ts` with them. Each value is now a fixed constant at the old default, except
+  the bar width, which follows the free space on its line between 8 and 20 blocks. The generic
+  `NERD_FONT` fallback is no longer read either: `CLAUDE_STATUSLINE_NERD_FONT=0` is the only
+  override, for ASCII glyphs in place of Nerd Font glyphs.
+- **Status line segments** that stay constant within a session, repeat another segment, or have
+  a command of their own: the thinking marker (`[T]`), the session name or id, the Claude Code
+  version (`/omca doctor` reports it), the output style name and the tip line that restored it,
+  the raw token total, the API time, and the repository name beside the pull request.
+- **The trusted-tooling fast path.** The `PermissionRequest` hook that auto-allowed `npm`, `bun`,
+  `yarn` and `pnpm` `run`, `test`, `ci`, `list` and `view`, `jq` and `uv run` and `uv sync` is gone.
+  Since Claude Code 2.1.285 that event also fires where `-p` would auto-deny, so the allow ran
+  project code the platform had refused. OMCA registers nothing on `PermissionRequest` and never
+  auto-allows a command; add `permissions.allow` rules or run `/fewer-permission-prompts` for the
+  commands you trust.
+- `OMCA.md`, `docs/reference/` and `docs/examples/`. Their content lives in `README.md`,
+  `docs/usage.md` and `docs/references.md`.
+
+### Upgrading
+
+1. Install Claude Code 2.1.295 or later and bun 1.4.2 or later. Desktop and VS Code start the
+   `omca` server with the GUI's `PATH`, so make bun reachable from it.
+2. Close every 2.x session in a project before you start a 3.x session there, and do not run the
+   two at once. The 2.x Python server and the 3.x server lock `.omca/` state in different ways
+   that do not exclude each other, so concurrent writes to the evidence ledger or the plan
+   registry can be lost.
+3. Run `claude plugin update oh-my-claudeagent@omca`, or open the plugin on the Installed tab of
+   `/plugin` and choose Update now, then restart Claude Code.
+4. Delete the `--- omca-setup` block from `~/.claude/CLAUDE.md` (under `CLAUDE_CONFIG_DIR` when
+   you set it) by hand. The server now delivers the same guidance, and neither setup nor
+   `/omca doctor` removes the old block.
+5. Run `/oh-my-claudeagent:omca-setup` to point both status lines at the launcher. Setup leaves
+   what earlier versions installed in place. Once the new status line works, you can delete
+   `~/.claude/statusline/` and the `Bash(jq *)`, `Bash(uv run *)` and `Bash(uv sync *)` entries
+   setup added to `permissions.allow` in `~/.claude/settings.json`.
+6. Set `statuslineMode` to `on` if it holds `direct` or `daemon`.
+7. Check `OMCA_DISABLED_HOOKS` against the names in `docs/references.md`, and drop
+   `OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY`. `OMCA_DISABLED_HOOKS=bash-guard` turns off the
+   guard's blocking and advisory classes.
+8. Replace any `comment-checker-disable-file` marker with `comment-gate-disable-file`.
+9. If you relied on the trusted-tooling auto-allow, add allow rules such as `Bash(bun run *)` or
+   run `/fewer-permission-prompts`.
+10. Replace `CLAUDE_STATUSLINE_NERD_FONT=0` with `OMCA_GLYPHS=unicode`, which draws the same status
+    line, or `OMCA_GLYPHS=ascii` for plain text. The old variable is no longer read.
+11. If you used the bundled `grep` or `context7` servers, add them yourself with `claude mcp add`,
+    as the README shows.
+11. Run `/oh-my-claudeagent:omca-setup --migrate` in each project after upgrading. It moves agent
+    memories and the agent ids in your user settings to the new names, asking before it changes
+    anything. The renamed-agents table under Changed lists the names, and `/omca doctor` warns
+    while a project still has old ones.
+
+State files that 2.x left under `.omca/state/` are no longer read, and `.omca/logs/` no longer
+grows apart from `file-access.jsonl`. You can delete them.
+
+## [2.21.0] - 2026-09-30
+
+### Added
+
+- OpenCode V2 adapter in `opencode/`. It registers the `omca-` specialist subagents,
+  skills, commands, the `omca` MCP server and the shell and edit guardrails in OpenCode,
+  tested against 2.0.18. Install it as a git spec,
+  `oh-my-claudeagent@git+https://github.com/UtsavBalar1231/oh-my-claudeagent.git`, or from
+  a local `opencode/` directory.
+- The adapter's `models` option maps the `opus`, `sonnet` and `fable` tiers to OpenCode
+  model ids. Without it, every `omca-*` subagent inherits the parent session's model.
+- The advisor tool is part of the orchestration policy. When a user turns it on with
+  `/advisor fable` (or `/advisor opus`), sisyphus, the prometheus protocol, start-work,
+  executor, hephaestus and the CLAUDE.md block consult it at three points: before committing
+  to a plan, when the same error comes back, and before calling a long task done. Oracle stays
+  the escalation for a question that needs its own investigation, and the fallback when the
+  advisor is off. The tool-failure circuit breaker names the advisor before oracle.
+- `/oh-my-claudeagent:omca-setup --doctor` reports whether the advisor is on and what keeps it
+  off: `CLAUDE_CODE_DISABLE_ADVISOR_TOOL`, any variable that stops feature-flag fetching
+  (`DISABLE_TELEMETRY`, `DO_NOT_TRACK`, `DISABLE_GROWTHBOOK`,
+  `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`), or a third-party provider. It reads the live
+  environment as well as settings files. Setup still writes no `advisorModel`: a Fable advisor
+  bills to usage credits on some plans, behind a consent only `/model fable` records.
+- `claude-sonnet-5-5` joins the full-id model labels and the catalog's cost tiers.
+
+### Changed
+
+- **`explore`, `executor` and `librarian` run on `sonnet` at `high`.** The Sonnet tier
+  retired in 2.14.1 returns for the three routine workers now that `sonnet` resolves to
+  Sonnet 5.5 (client 2.1.284 or later). They run one step above its `medium` default, the
+  level the docs reserve for work where verification matters or edge cases are likely, so
+  the cheaper tier buys deeper checking. `explore` moves up from `low`, `executor` and
+  `librarian` from `medium`. Every agent
+  whose output turns on judgment stays on `opus`: sisyphus, the planners, hephaestus and
+  multimodal-looker. Sisyphus can still pass `model="opus"` for one delegated task that needs
+  more judgment than its agent's tier. `servers/categories.json` routes `quick`, `standard`
+  and `readonly` to `sonnet`.
+
+  On a third-party provider this is a downgrade: `sonnet` resolves to Sonnet 4.6 on Claude
+  Platform on AWS and Sonnet 4.5 on Bedrock, Google Cloud and Foundry, where these three
+  agents previously ran the provider's `opus`, and the advisor is unavailable there. Pin
+  `ANTHROPIC_DEFAULT_SONNET_MODEL` to the provider's newest Sonnet id; `--doctor` names the
+  provider when it sees one.
+
+## [2.20.1] - 2026-09-23
+
+### Fixed
+
+- `permission-filter.sh` no longer denies every recursive `rm`. Routine cleanup such as
+  `rm -rf /tmp/x$$` inside a loop, or `rm -rf build`, was refused outright. The deny now
+  inspects each invocation's targets and fires only when a target is the filesystem root,
+  home, the working directory or a parent of it, or a directory directly under root or home
+  (`/usr`, `~/dev`, `/usr/*`, `./*`). A leading `$VAR` is read as empty, so `rm -rf $DIR/*`
+  still denies. `--no-preserve-root` and a substituted target (`$(...)`, backticks) also
+  still deny. Every other recursive removal falls through to the platform's own permission
+  evaluation, which refuses critical paths on its own.
+
+## [2.20.0] - 2026-09-23
+
+Reconciles the plugin with client 2.1.280 and re-baselines its prompts for Opus 5.5, which
+the `opus` alias now resolves to, and Fable 5.1. The prompts were written for models that
+needed emphasis and scaffolding to comply; Opus 5.5 follows a plain instruction literally, so
+the main change is saying less and giving the reason.
+
+**This release needs Claude Code v2.1.271 or later.** `plugin.json` declares `options` on a
+`userConfig` field, which older clients cannot load.
+
+**After upgrading, re-run `/oh-my-claudeagent:omca-setup`.** The block setup installs into
+`~/.claude/CLAUDE.md` changed, and setup's MCP allow rules were wrong before this release, so
+calls to the bundled grep and context7 tools kept prompting until setup rewrites them.
+
+### Changed
+
+- **The main session does direct work by default.** It handles known changes, quick
+  lookups, and single fixes itself and delegates sizeable, self-contained work, because each
+  subagent re-establishes context before its report has to be read back. The plugin makes
+  sisyphus the session agent, which replaces Claude Code's own system prompt and its advice
+  on when a subagent is worth spawning, so the old "delegation first" wording was the only
+  delegation guidance the main session saw. This change is unmeasured: no eval fixture runs
+  a real delegation yet.
+- **File reads are steered to the Read tool instead of being denied.** The hook that denied
+  `sed -n` and `grep -n` in Bash is gone. The output style and the context injected into
+  subagents ask for Read to read a file and Edit to change one; on the rebaseline eval, a
+  turn that read through Bash usually rewrote the whole file where Read then Edit made a
+  small change.
+- **Effort is one step lower.** The orchestrator and planners run at `high` and oracle at
+  `xhigh`, following the Opus 5.5 and Fable 5.1 guidance to reserve the top levels for a
+  measured gain.
+- **Keyword triggers are off unless you turn them on.** The `enableKeywordTriggers` option
+  always defaulted to off, but the hook never read it, so trigger phrases fired for everyone.
+  Enable the option in the plugin's settings to keep them. Text the client marks as pasted
+  no longer fires a trigger.
+- **Plan execution checks the plan, not this repository.** `/oh-my-claudeagent:start-work`
+  told the lead to run `just ci`, a recipe from this repository's own justfile, as the final
+  check in every project. It now runs the plan's own `## Verification` commands. It runs the
+  project suite once per parallel group rather than after each task, re-opens a task whose
+  change that group run rejects, and does the completeness review itself, handing it to an
+  executor only when the full diff no longer fits in context.
+- **`evidence_log` accepts five evidence types.** `build`, `test`, `lint`, `manual`, and
+  `final_verification` are now a schema enum, so any other value fails with a validation
+  error instead of being stored. The refactor skill used to log `typecheck`; it now picks
+  `build`, `test`, or `lint` to match the command.
+- **Agent, skill, hook, and MCP tool text was rewritten** to state what to do and why, without
+  capitals, forbidden-word lists, or steps that assumed task tools Opus 5.5 lacks. A finished
+  agent that returns a stub is now resumed once with SendMessage rather than replaced.
+- **The executor cannot spawn agents.** It was already told never to delegate; the Agent
+  tool is now disallowed in its definition.
+
+### Fixed
+
+- The Bash guards missed a destructive command behind a variable assignment, such as
+  `FOO=1 rm -rf ~` or `GIT_EDITOR=: git stash`.
+- `health_check` looked for the evidence ledger in the wrong directory and always reported
+  it absent.
+- The doctor warned that setup's own CLAUDE.md block was a legacy leftover.
+- Setup picked the plugin root by sorting cached versions as strings, which ranks 2.9 above
+  2.19.
+
+### Added
+
+- `ast_replace` dry runs show the rewritten text for each match.
+- The validator rejects agent and skill frontmatter keys the platform ignores, and effort
+  values outside the platform's five levels.
+
+### Removed
+
+- The delegation reminder hook, which nudged the main session to delegate after three direct
+  tool calls and so argued against the new default.
+- The `frontend-ui-ux`, `playwright`, and `dev-browser` skills. They served web UI work
+  outside this plugin's scope, and `playwright` depended on a Playwright MCP server the
+  plugin never shipped.
+
+## [2.19.1] - 2026-09-21
+
+### Fixed
+
+- The instruction block that setup writes into `~/.claude/CLAUDE.md` still told the
+  orchestrator to end its turn whenever an agent was outstanding. That sentence was
+  corrected everywhere else in 2.19.0, but this copy ships into a user's own settings and
+  so applied to every session regardless. A lead that ends its turn holding a delegation
+  never receives the result, which in a headless run means the work is simply lost.
+  Re-run `/oh-my-claudeagent:omca-setup` to refresh the block.
+
+## [2.19.0] - 2026-09-21
+
+The plugin's picture of the platform was pinned at client 2.1.245 while the installed
+client was 2.1.278. This release reconciles the gap across the shipped docs, the hooks, the
+agent prompts, and the setup skill.
+
+**After upgrading, re-run `/oh-my-claudeagent:omca-setup`.** The OMCA block this plugin
+installs into your own `~/.claude/CLAUDE.md` is written once at setup time and is not
+rewritten by a plugin update, so an existing block still teaches the pre-2.1.278 fan-out
+contract and a stale agent catalog. Re-running setup replaces it with the corrected block.
+
+### Changed
+
+- **The plan and start-work entrypoints are skills.** `plan` and `start-work` moved out of
+  `commands/` and into `skills/`, which is the surface the platform keeps developing and the
+  one the rest of the plugin already used. The invocations are unchanged:
+  `/oh-my-claudeagent:plan` and `/oh-my-claudeagent:start-work` still work exactly as before,
+  with the same arguments. Nothing in a user's settings or workflow needs editing.
+- **Agent prompts read as one instruction set rather than several.** The orchestration
+  guidance carried duplicated fan-out paragraphs, contradictory verification ladders, and
+  shouted emphasis that competed with the rules it was emphasising. Those passages were
+  collapsed to a single statement each. The delegation prompt now also hands an executor a
+  diff budget alongside its requirements, asking for the smallest diff that satisfies the
+  task. This one is unmeasured: the eval harness runs a single turn with no orchestrator,
+  so a delegation prompt never reaches it.
+- **The read-only agents spawn without the CLAUDE.md hierarchy.** explore, librarian, and
+  multimodal-looker take their scope from the task rather than from repository conventions,
+  so they now carry `omitClaudeMd`, which drops the user, project, and local CLAUDE.md files
+  and the project rule files from each spawn. Agents that act on or judge against repository
+  conventions are unaffected.
+- **Skill descriptions were shortened.** Several sat near the point where a reduced-context
+  window truncates them, which is silent when it happens.
+
+### Added
+
+- **Setup reports the platform settings that silently change how the plugin behaves.** The
+  doctor pass now warns when a setting caps agent effort below what the roster declares,
+  when a forced subagent model would flatten oracle off its tier, when a session is running
+  restricted so the plugin's hooks and MCP server are absent, and when reads outside the
+  working directory are blocked. Each of these changes plugin behavior without producing an
+  error, so the check exists to make the cause visible.
+- **The statusline mode is a picker.** Setup offers the available modes rather than asking
+  for a value to type.
+- **The plugin validator checks hook stdout shape and the plugin manifest.** A handler that
+  prints multi-line JSON, or JSON followed by bare text, is a parse failure at runtime; the
+  validator now catches both before release. `just validate-manifest` also validates the
+  manifest path directly, which reaches every skill and agent frontmatter.
+
+### Fixed
+
+- **Hooks read a subagent's report from the wrong place under fork and auto mode.** Under
+  fork mode the `PostToolUse Agent` payload is a launch acknowledgement rather than a
+  result, and in auto mode a subagent reports through `SubagentHandback`. The output-quality
+  check was inspecting the acknowledgement and firing its advisory on every launch. It now
+  reads the handback payload, and keeps the Agent branch for the modes where the result does
+  arrive there.
+- **The post-edit hook read a success field the Write and Edit payloads never carry.**
+- **Injected context had no budget.** The rule and AGENTS.md injection could emit well past
+  the platform's per-string cap, at which point the overflow is written to a file and
+  silently dropped from the injection. The walk is now budgeted, and the AGENTS.md excerpt
+  can be skipped where the platform loads AGENTS.md itself.
+- **A retry advisory fired for a retry the platform already performs.**
+- **A pinned `claude-fable-5-1` now displays as Fable 5.1** in the per-subagent model
+  readout, instead of falling through as a raw model id.
+- **The shipped docs asserted platform facts that no longer hold.** The subagent, hook,
+  settings, and permission surfaces were re-derived against client 2.1.278 and corrected
+  where they had gone stale.
+
+## [2.18.1] - 2026-08-31
+
+A search gate pointed executors at the one tool that could not reach the files they were
+working on. This release widens `ast_search` to the repository's git worktrees and makes
+every deny message name a tool that reaches the path the caller asked about.
+
+### Fixed
+
+- **An executor working in a git worktree had no sanctioned search tool.** Three surfaces
+  combined into a dead end. `executor-grep-deny.sh` denies the `Grep` tool and Bash `grep`
+  on code files for executor subagents and named `ast_search` as the only alternative;
+  `sed-grep-deny.sh` denies `grep -n` and `sed -n` for everyone; and `ast_search` clamped
+  every path argument to `CLAUDE_PROJECT_DIR`, so a worktree checked out anywhere else was
+  refused as escaping the workspace. An executor that hit all three fell back to `awk` and
+  `Read`, because nothing told it that `rg` was never denied in the first place.
+
+  `normalize_workspace_paths` now treats a git worktree of the same repository as in scope.
+  The same repository checked out twice is not outside the workspace, and the clamp was
+  over-broad exactly there. A path inside the workspace is still returned relative to it; a
+  path inside a linked worktree is returned absolute, since it has no useful relative
+  spelling from the workspace cwd every ast-grep invocation runs under. Anything in neither
+  still raises. The worktree list costs one `git worktree list --porcelain` call, resolved
+  lazily so a path that passes the workspace check spends nothing, and an empty list outside
+  a repository leaves the old behavior intact.
+
+  Both deny messages now name `rg` alongside `ast_search`, and `agents/executor.md` states
+  the search posture directly: `ast_search` when the target is syntactic, `rg` when it is
+  literal text, `Read` once the file is known, and `rg` plus `file_read` for a path outside
+  the repository and its worktrees. The gate offering only a tool that cannot reach the path
+  was the half of the bug that no scoping change would have fixed.
+
+## [2.18.0] - 2026-08-26
+
+The plugin's picture of the platform was pinned at client 2.1.220 while the installed
+client was 2.1.245. This release reconciles the gap: it corrects what the docs asserted
+about subagents, adopts the hook events that appeared in between, drops the settings keys
+that were removed, and stops recommending a mode that breaks OMCA's own result collection.
+
+### Fixed
+
+- **The subagent fan-out contract was factually wrong in five shipped files.** Every
+  orchestration surface made `run_in_background=false` the load-bearing instruction: pass
+  it, read the deliverable inline, treat a task notification as a trigger carrying an
+  output-file path. None of that holds. In an interactive session on v2.1.232 or later,
+  fork mode is on by default and the platform removes the parameter from the Agent tool
+  outright, so the call returns a launch acknowledgement and the subagent runs in the
+  background regardless. The deliverable arrives in the `<result>` block of the
+  notification, which carries the agent's complete final message. Under `claude -p` and the
+  Agent SDK, fork mode is off and the result may come back as the Agent tool's return
+  value instead, so both paths are now accepted. One paragraph states this and is repeated
+  byte for byte across the five surfaces, so they cannot drift apart again. Verified
+  against a live probe rather than against the docs.
+- **The plan gate stopped blocking a turn that is waiting on agents.** A turn ending with
+  background work in flight is paused to be woken, not stalled mid-plan, and every parallel
+  fan-out wave ends that way. The guard now exits open when the payload reports a
+  non-terminal background task, and resets its block ledger on the way out: at five blocks
+  per session, spending them on fan-out waves would have silenced the gate before it ever
+  met a real stall. The drift guard deliberately keeps blocking here, because a completion
+  claim made while executors are still writing files is exactly what it exists to catch.
+- **The comment gate reads the file's own language.** It matched a fixed `#` and `//`
+  marker set everywhere, so C's `#include` and `#define` scored as comments restating the
+  line below them and a preprocessor-only edit could not be written at all, while Lua, SQL,
+  Erlang, Clojure and Fortran were scanned for markers none of them use. The extension case
+  statement now picks the marker set alongside admitting the file. Two false positives went
+  with it: a machine-readable pragma is addressed to a linter rather than to a reader, and
+  the density check divided by a code-line count that is zero for a file-header edit.
+- **The statusline agrees with the client's own badge and stays on one line.** A GitLab
+  merge request renders as `!N` instead of `#N`, and the main line is clamped to the
+  terminal width, so a long line no longer wraps and pushes the prompt off-screen. The
+  truncator steps over OSC 8 hyperlink delimiters whole and emits the closer on a cut
+  inside a link, which otherwise leaked the link into every later line in the terminal.
+
+### Added
+
+- **Four platform hook events now carry a handler.** `Setup` branches on its trigger to run
+  the dependency check or the stale-marker and log sweeps off the per-session startup path.
+  `StopFailure` fires instead of `Stop` when a turn ends in an API error, the case the plan
+  gates never see, and records the error class so an interrupted run leaves a trace.
+  `FileChanged` watches the evidence ledger and the plan registry, the two state files the
+  write guard cannot protect against a shell redirect. `PostToolBatch` takes over the loop
+  detector, where one batch is one signature, so concurrent calls can no longer interleave
+  into one another's streak.
+- **The permission classifier is told when a Bash call was a verification runner.** It never
+  sees tool results, so it could not know the previous command was this repo's own test or
+  lint runner. `classifierContext` carries that one fact, as a static assertion about the
+  call's origin: the field is model-facing input to a permission decision, so anything
+  persuasive there would be a prompt-injection surface aimed at our own permissions.
+- **A translatable `grep` is rewritten to `rg` instead of denied.** The deny gate spent a
+  full deny-and-retry round trip on an invocation whose intent was unambiguous. The
+  translated set is deliberately tiny, because the failure modes are not symmetric: a deny
+  costs one retry, a wrong rewrite silently runs a different command than the caller asked
+  for. Anything but a single simple command with identically spelled short flags is refused,
+  and an unrecognised command still gets silence.
+- **CI validates the plugin manifests with warnings promoted to errors.** `just ci` never
+  checked them against the platform's own schema, so a misspelled or leftover field loaded
+  at runtime and surfaced only on publish. The manifests then fix what the validator
+  flagged, including two option defaults that lived in prose instead of the `default` field
+  the client reads.
+- **`git-master` and `handoff` declare `allowed-tools`.** Both read state and report;
+  neither needs to write. Without a grant they inherited the session's full tool set, so
+  the narrow thing they do was bounded only by the prompt.
+
+### Changed
+
+- **The MCP server's `alwaysLoad` flag is gone, replaced by a three-tool eager set.** Set
+  server-wide, it loaded every tool's schema into every session's cached prefix: about
+  23,300 characters, roughly 5,800 tokens per session, with any one schema edit
+  invalidating the whole prefix. `evidence_log`, `boulder_progress` and `notepad_write` opt
+  back in per tool, because an agent must reach those without a tool-search step; the rest
+  arrive through ToolSearch, and the agent prompts name the deferred ones so a first call
+  cannot fail on a missing schema. The startup bench now reports serialized tools/list size
+  next to latency, so the two axes cannot be confused again.
+- **`omca-setup` no longer steers users into agent teams.** With teams enabled a subagent
+  launches as a teammate, and a teammate reports an idle notification rather than its
+  output, which stalls the fan-out-and-read-results flow every OMCA workflow is built on.
+  Users who want teams enable them themselves. The doctor gained a report on
+  `CLAUDE_CODE_ENABLE_TODO_TOOLS`, never written: without it the task tools are withheld on
+  the model tiers every OMCA agent declares, which leaves the task-list mandates and the
+  completion gate inert.
+- **Removed platform keys swept from the reference pages.** `teammateDefaultModel` went
+  away in v2.1.234 along with its `/config` row, and the per-session subagent cap
+  `CLAUDE_CODE_MAX_SUBAGENTS_PER_SESSION` in v2.1.224; a leftover value for either is
+  inert, so the retry coach drops the branch that coached on a limit that can no longer be
+  hit. The settings that now matter to how OMCA runs are documented in their place,
+  including `subagentPromptCacheTtl`, `autoMode.classifyAllShell`,
+  `sandbox.network.strictAllowlist`, `worktree.bgIsolation`, and the spawn-depth variable
+  that explains why leaf agents search inline: at the limit the Agent tool is withheld
+  outright and the delegation silently never happens.
+- Every `type: command` hook handler declares `shell: bash`, which is what routes a `.sh`
+  handler through Git Bash on Windows, and the validator fails any handler omitting it.
+  `MultiEdit` is not a real tool, so it leaves the write-guard and comment-checker matchers
+  along with the test cases that fabricated its payloads.
+- `agents_list` is read-only by default. It was annotated as a writer only because it wrote
+  its cache file on every call; that write is now opt-in, and the delegation table is
+  derived from agent frontmatter directly rather than from a cache nobody writes.
+
+## [2.17.2] - 2026-08-06
+
+### Fixed
+
+- **A commit message can mention a destructive command again.** The Bash guards anchor
+  their patterns to a command position, and a newline inside a quoted string opened one.
+  So a multi-paragraph commit message describing a shell cleanup was denied whenever the
+  token it discussed happened to start a line. Mid-line mentions always passed, which made
+  it look intermittent. One guard was given a quoted-span neutralizer in 2.17.0 and its
+  three siblings were not; the helper now lives in the shared library and all four use it.
+  Real commands still deny, including at any position in a chain.
+- **Task completion no longer blocks on what a task is called.** The gate word-matched the
+  task description for verbs like build, test and fix, then demanded verification evidence.
+  A task named "Write documentation explaining how to fix build errors" could not be
+  completed without logging evidence for a command nobody ran, which is pressure toward
+  fabricating exactly the record the gate exists to protect. The platform's task payload
+  carries nothing about what a task did, so the trigger is now a recorded fact instead of a
+  guess: a new recorder notes when a verification command actually runs, and the gate fires
+  only when evidence does not follow one. The block message names the command. The gate
+  also gained the kill-switch it was the only one lacking.
+- **The drift guard stopped blocking on files that describe it.** Its stub scan read a
+  marker inside a string literal as a marker, so editing the guard itself, or a test
+  fixture, or a changelog entry about it, refused the end of your turn. Markers in quoted
+  spans are now ignored, prose files are skipped outright, and the completion-claim check
+  reads negation across the whole sentence, so "I have not finished, nothing is complete
+  yet" is no longer a claim of completion.
+- **The comment gate stopped reading string literals as comments.** Its hard-deny tier
+  scanned whole file contents, so a script containing a grep pattern for a banned comment,
+  or a fixture listing one, was denied. It now looks only at comment lines.
+- **Talking about a keyword no longer triggers it.** Asking whether a phrase activates a
+  mode activated that mode, quotes and an explicit "do not run" included.
+
+### Added
+
+- **Verification-command recorder.** A `PostToolUse` handler that records the last
+  verification command actually run, in `.omca/state/last-verification-command.json`. It is
+  the signal the task-completion gate now reads. It never blocks anything on its own, and a
+  runner it fails to recognise means silence rather than a false denial.
+- **The validator now checks that registered hook scripts are executable.** A shell-form
+  handler without the executable bit fails at dispatch, so its guard silently never runs,
+  and nothing in the pre-flight command could see it. Found the honest way: a new hook in
+  this very release shipped without the bit and passed a clean validation run.
+
+### Changed
+
+- A task that should have run verification but ran nothing now completes without objection.
+  The old gate caught that case only when the task's title happened to contain a verb, and
+  its remedy was a log entry for nothing. Plan-level coverage is unchanged.
+
+## [2.17.1] - 2026-08-06
+
+### Fixed
+
+- **Agents are no longer told that a loaded tool is hidden behind tool search.** The
+  bundled MCP server is marked to always load, so its tools reach every context, main
+  session and subagent alike, with their full schemas and their real callable names
+  already in the tool list. The context injected into explore, librarian and oracle
+  claimed the opposite: that the tool was named `file_read` and had to be hydrated
+  through `ToolSearch` before it could be called. Three agent bodies and the user-scope
+  template repeated the same claim. A model holding the schema and that instruction at
+  the same time resolved the contradiction by inventing a shorter name that does not
+  exist, and the call failed with `No such tool available`. The guidance was causing the
+  failure it looked like it was preventing. Everything else those blocks carried is
+  already in the tool description the platform loads for itself: the project-root
+  scoping note, offset and limit, the metadata footer, large-file handling. So they are
+  deleted rather than corrected. One pointer survives, on the path that runs when a read
+  actually fails, and it names the tool correctly.
+
+## [2.17.0] - 2026-08-05
+
+### Fixed
+
+- **The Bash guardrails now fire on commands nobody is asked about.** They were registered
+  only on the event that runs when a permission dialog is about to be shown. Under auto
+  mode the classifier resolves most shell commands without any dialog, so for those the
+  guards never ran at all. A headless turn ran `rm -rf` against a canary directory with
+  both guards installed, produced no denial, and deleted it. The patterns had been right
+  the whole time; the wiring was missing. The deny half of each guard now also runs before
+  tool execution, regardless of permission status.
+- **A guard no longer approves what it fails to recognise.** Two of them ended in an
+  unconditional allow, which suppresses the permission dialog — so anything the patterns
+  missed was actively auto-approved rather than merely un-blocked. That covered in-place
+  `sed` against any file, a local `core.hooksPath` write (arbitrary code execution on the
+  next commit), and the `-C` form of a hard reset. A deny gate's answer to a command it
+  does not recognise is now silence, which leaves the decision to the platform.
+- **Each guard now speaks the deny shape its event actually reads.** One guard denied by
+  exit code on an event whose answer is read only from its output, so its deny was
+  discarded while its non-deny path approved. Whether that event honours an exit code was
+  an open question at the time, between the platform's own documentation and what live
+  probing showed (settled in 2.18.0: it does not honour one), so every
+  guard registered on both events now emits the shape each event documents — correct
+  either way, and no longer dependent on an unresolved question.
+- **The executor's Grep restriction was inert in production.** It decided whether it was
+  running inside a subagent by reading a field that is not part of the hook payload. Given
+  a real payload it allowed the Grep it exists to deny; given the invented shape its tests
+  used, it denied correctly. That is why every one of its tests passed while the rule
+  enforced nothing.
+- **The guards stopped blocking ordinary work.** A commit whose message merely mentioned a
+  denied flag or a destructive subcommand was blocked, because quoted text was scanned as
+  if it were code. `git rm --cached`, the standard way to un-commit a file, was blocked by
+  a pattern meant for recursive removal. Every `Edit` of an existing file emitted advice
+  telling you to use Edit. Each of these teaches you to switch the guard off permanently,
+  which costs far more than the case it caught.
+- **More destructive spellings are covered**: the uppercase, separated and long-form
+  recursive `rm` flags; `git checkout HEAD -- <path>`; the `-C`, `-c`, `--git-dir` and
+  `--work-tree` global forms in both spellings; recursive `git rm`; and a destructive
+  command at the head of a subshell.
+- **A Stop gate can no longer wedge the end of your turn.** A gate that blocks tells the
+  model to keep working, so one that blocks unconditionally leaves you unable to finish and
+  forced to kill the client. Missing `jq` made one gate block every single time, with the
+  platform's own recursion flag explicitly set. Two more paths bypassed the backoff
+  counters entirely, so the cap they were supposed to respect never engaged. The shared
+  budget was also reset wholesale by any gate's clean path, meaning one gate refunded
+  another's spent budget and the cap never bound. Every blocking path is now counted, and
+  every failure resolves toward letting you stop.
+- **Turn-end got fast and honest.** The drift check forked git once per changed file with
+  no ceiling — about 35 seconds of frozen turn-end on a large generated tree. It is now a
+  single pass with a file ceiling, roughly two orders of magnitude cheaper. It also
+  silently dropped files whose names contain a space, mis-read every path when a common
+  git config option was set, and matched `.only` in ordinary database code — an
+  unresolvable block on a project that never had a focused test. Focused-test markers are
+  now looked for only in JavaScript and TypeScript sources, where such a test can run.
+- **Starting a session no longer waits on the network.** Session setup ran a dependency
+  sync inside a five-second budget; on overrun the hook produced nothing at all — no date
+  context, no session title, no plan-registry repair, no per-session state reset. It failed
+  persistently rather than occasionally, because the cache it checks is refreshed only when
+  a sync succeeds, so one slow link broke every subsequent session identically. Setup now
+  finishes first and the sync runs detached, under a lock so parallel sessions cannot
+  corrupt the environment between them.
+- **Logs stop growing without bound.** Pruning tested for files untouched for a week, which
+  can never match a log still being written to, and its pattern missed one of the two log
+  types outright. Pruning is now by size and keeps the newest entries. Hook errors were
+  also being recorded to a file nothing ever read, so a permanently broken hook stayed
+  invisible; the count is now reported once per session.
+- **OMCA works on a machine without GNU tools.** The shared library every hook depends on
+  assumed four binaries that stock macOS does not ship. The worst was `timeout`: without
+  it, every hook read empty input and exited successfully, so the entire hook layer went
+  silently inert and every deny gate failed open. Digest, lock and timestamp handling had
+  the same shape — BSD `date` was the subtlest, since it succeeds while printing something
+  unusable, so the intended fallback never triggered. Concurrent state updates were also
+  losing writes, and a corrupt or empty counter file could pin the retry budget forever.
+- **The plugin validator stopped reporting checks it was not running.** It matched hook
+  registrations by exact string, so widening any registration to cover several tools made
+  the lookup silently stop finding it — reporting a skip while exercising nothing.
+
+### Added
+
+- **The evidence file and the append-only notepads are guarded against `Edit`, not just
+  `Write`.** Editing was the more natural way to forge a record in a JSON file, and nothing
+  else covered it.
+- **`OMCA_DISABLED_HOOKS` accepts `all` (or `*`)** to switch off every hook at once, which
+  the configuration documentation already promised.
+
+### Removed
+
+- **The plan-mode handler.** Its decision was discarded by the platform for any tool that
+  requires user interaction, so it never had an effect — while logging that it had
+  approved something, which made the audit trail worse than useless.
+
+## [2.16.0] - 2026-08-04
+
+### Fixed
+
+- **OMCA tool results reach the model as text again, not escaped JSON.** Every tool returns
+  a string, which made the SDK synthesize an output schema of `{"result": string}` and send
+  its result as structured content. Claude Code drops the text block whenever structured
+  content is present and shows the JSON instead, so every result the model read was a
+  single escaped line: `\n` in place of line breaks, `\"` in place of quotes, about 5% more
+  tokens, and two failure modes where a schema mismatch turned into a hard tool error. Tools
+  now opt out of structured output, and a test fails the build if one opts back in.
+- **Tools that only read are now marked as such.** Six tools shipped with no annotations at
+  all, which the client reads as "destructive" and "reaches the open internet". Every tool
+  now declares its own posture, and the read-only ones can run in parallel instead of one at
+  a time.
+- **The evidence log no longer drops concurrent writes.** Thirty simultaneous writers left
+  eight entries behind. Appending was an unlocked read-modify-write and the shared atomic
+  write staged through one fixed temporary name, so parallel writers collided and the loser
+  failed outright. Because task completion gates on that log, the losses were silent and
+  could take the final verification entry with them.
+- **`OMCA_DISABLED_HOOKS` now works for the drift guard and the destructive-git deny.** Both
+  ignored it, so following the documentation to switch off a stuck gate left the gate running.
+- **A shipped agent and a user-visible gate message no longer cite files you do not have.**
+  Both pointed at repository paths that were never part of an install.
+
+### Added
+
+- **The server now tells Claude when to reach for it.** With tool search on, which is the
+  default, a server's instructions and its bare tool names are all that load at the start of
+  a session. OMCA shipped without instructions, so its tools were effectively invisible until
+  something happened to name one. The server now describes what each tool family is for, and
+  every tool carries a one-line hint that shows up in tool-search results.
+
+### Changed
+
+- **The MCP server speaks the 2026-07-28 protocol revision.** It moves to the 2.x line of the
+  official Python SDK, which serves the new revision and every 2025-era client from the same
+  process, so it works with the Claude Code you have today and the one that adopts the new
+  revision later. Startup cost about 0.1s more, landing near 0.34s against a 5s budget.
+- **The repository stops publishing maintainer-local material.** Internal spike verdicts, one
+  checkout's own rule overrides, review-only instructions, a research corpus, and a design
+  note are no longer tracked. The rule overrides mattered most: the rule injector reads them
+  at runtime, so every contributor had been inheriting one maintainer's orchestration
+  preferences as project policy. Documentation that pointed at those files now carries the
+  rule itself.
+- **Test suites no longer depend on the shell that runs them.** The hook suite cleared none of
+  the environment variables its subjects read, so an exported kill switch could quietly turn
+  real assertions into no-ops; a developer with one set saw ten failures that had nothing to
+  do with their change. Nineteen tests asserting a Stop hook allowed the stop could not fail
+  at all, because a Stop hook blocks with exit zero too. The statusline daemon now gets tested
+  against a real socket rather than a self-contradictory mock, and its cache files stay inside
+  each test's own directory instead of accumulating in the shared temporary one.
+
+## [2.15.0] - 2026-07-30
+
+### Added
+
+- **Comment and prose conventions now ship with the plugin.** A `rules/` directory at the
+  plugin root carries per-language comment conventions for Bash, Python, kernel C and
+  headers, Rust, and Go, plus a prose convention for Markdown. Each is injected as context
+  when you touch a file of that language, so the conventions apply without any per-project
+  setup. Your own `.omca/rules/` still wins on a filename collision: create
+  `.omca/rules/comments-python.md` to replace the shipped Python rule, or create it empty
+  to switch that rule off. `OMCA_DISABLED_HOOKS=context-injector` disables rule injection
+  entirely.
+- **Every task now ends with a cleanup pass.** Code changes get the `remove-ai-slops`
+  sweep; a task that touched only Markdown gets a prose pass instead. The pass runs on
+  every executor spawn, and what it cut is reviewed before the task is marked done, so
+  generated clutter does not accumulate across a plan.
+
+### Changed
+
+- **Plans are leaner and tasks-first.** A plan opens with a single metadata line carrying
+  Scope, Parallel Execution, and Status, then `## Why`, `## Work Objectives`, `## TODOs`,
+  `## Verification`, and `## Open questions`. Each task carries its own `- File:`,
+  `- Done when:`, `- Depends:`, and `- Must NOT:` sub-bullets, and execution hands the
+  whole task block to the agent doing the work rather than the checkbox line alone. Less
+  prose to read, and the constraints travel with the task instead of sitting in a preamble.
+- **Planning drafts in place.** The plan file is written as `Status: DRAFT` before the
+  interview starts and rewritten to `Status: FINAL` when it is ready, so an interrupted
+  planning session leaves a real file behind instead of nothing. `/start-work` refuses to
+  execute a plan whose Status is explicitly something other than FINAL. A plan with no
+  Status field at all still executes, so existing plans are unaffected.
+
+### Fixed
+
+- **No marketplace install had ever received a rule file.** `scripts/context-injector.sh`
+  scanned only the project's own `.omca/rules`, so any rule shipped inside the plugin was
+  unreachable. It now scans the plugin root as well, with the project directory taking
+  precedence.
+- **Documented paths under `rules/` were skipped rather than checked.**
+  `scripts/validate-plugin.sh` validated doc path references only for a known set of
+  top-level directories, and `rules` was not in it.
+
+## [2.14.1] - 2026-07-26
+
+### Changed
+
+- **The `sonnet` tier is retired from the agent roster.** `executor`, `explore`,
+  `hephaestus`, `librarian`, and `multimodal-looker` now declare `model: opus`. Each drops an
+  effort level so the tier move does not raise reasoning depth at the same time: `executor`,
+  `hephaestus`, `librarian`, and `multimodal-looker` run at `medium`, `explore` at `low`.
+  `oracle` is unchanged at `fable` and `max`; `sisyphus`, `prometheus`, `metis`, and `momus`
+  are unchanged at `opus` and `xhigh`. Per-token cost rises for every delegation that
+  previously ran on Sonnet, with the lower effort levels as the offset.
+
+  To keep the previous behavior, set `CLAUDE_CODE_SUBAGENT_MODEL=sonnet` in your own
+  environment or settings rather than editing the plugin's agent files, which a plugin update
+  overwrites. That variable sits above frontmatter in the platform's model resolution order,
+  so it applies to every spawned agent including `oracle` and cannot be scoped to part of the
+  roster.
+- **`model:` no longer separates one agent from another; `effort:` does.** With one tier
+  covering everything but `oracle`, `agents/sisyphus.md`'s Model Routing section presents two
+  tiers and names effort as the dial, and the usual correct delegation now passes no `model=`
+  at all. `servers/categories.json` inherits the same collapse: four of its five categories
+  name `opus` and only `hardest` names `fable`, so a consumer reading `.value.model` sees two
+  outcomes across five category names. The roster tables in `OMCA.md`,
+  `templates/claudemd.md`, and the contributor docs carry effort alongside model.
+
+### Fixed
+
+- **CI had been failing on `main` since early July, and it silently stopped publishing
+  releases.** `scripts/validate-plugin.sh` checked whether a path cited in the docs existed
+  on disk. A maintainer's checkout carries untracked files a fresh clone does not, so prose
+  naming a user's own `.claude/settings.json` passed locally and failed on every runner for
+  the same commit. That failed the validate job, and the golden test replays its output so
+  the BATS job failed with it. Because the release job is gated on both, it was skipped
+  rather than failed on every tag: `v2.13.0`, `v2.13.1`, `v2.13.2`, and `v2.14.0` were all
+  pushed with no GitHub release created for any of them. Path claims now resolve against
+  tracked files, which are identical in a checkout and a clone. An untracked but gitignored
+  citation is reported as skipped because it names user-scope state rather than repository
+  content; an untracked citation that is not ignored still fails, because that is a real
+  dead pointer. Two such pointers into untracked notes were removed from `OMCA.md`.
+- **A truncation test failed on some CI runs and passed on others.** It collected every run
+  of the filler character in the injected context, and the truncation note names the rule's
+  full path, so a temp directory whose random suffix contained that character added a second
+  match and overstated the body. It now measures the longest run.
+
+## [2.14.0] - 2026-07-26
+
+Platform sync against Claude Code v2.1.199 through v2.1.220.
+
+### Fixed
+
+- **The Bash deny guards never ran when a command was auto-allowed.** This is a
+  pre-existing hole, not something the platform sync introduced.
+  `scripts/permission-filter.sh` and `scripts/git-destructive-deny.sh` were registered on
+  `PermissionRequest` only. That event fires when a permission dialog is about to be shown,
+  while `PreToolUse` fires before tool execution regardless of permission status, so under
+  `permissions.defaultMode: "auto"` a command the classifier allowed outright reached
+  neither guard. A headless `claude -p` turn ran `rm -rf` on a canary directory with no
+  denial and deleted it; the same command fed to the packaged script on stdin returned a
+  well-formed deny. The logic was correct and the wiring was absent, which is also why five
+  rounds of stdin-driven review passed it. Both denies are now also registered on
+  `PreToolUse` with matcher `Bash` and no `if` filter. The trusted-tooling auto-allow and
+  `git-destructive-deny.sh`'s trailing git allow stay on `PermissionRequest` alone, because
+  a `PreToolUse` allow skips the permission prompt and would bypass auto mode and the user's
+  own `ask` rules for those commands. Both scripts hold that line with an early `exit 0` on
+  `hook_event_name == PreToolUse`, placed after the deny and before the first allow.
+  Documented in `.claude/rules/hook-scripts.md` alongside the testing-methodology lesson,
+  that stdin proves a hook's logic and only a live session proves its registration.
+  Residual scope, indirect invocations such as `/bin/rm`, `command rm`, `env rm`, and an
+  `xargs` pipeline, is recorded in `docs/reference/known-issues.md`.
+- **Hook `timeout` was being read as milliseconds.** The field is seconds. The two
+  `"timeout": 5000` values in `hooks/hooks.json` were 83-minute caps, the opposite of the
+  intended five-second tightening, and are now `5`. The per-event default table is
+  documented alongside the note that a plugin-provided `timeout` can never raise the
+  `SessionEnd` budget, so raising that number does not fix the session-binding leak a
+  budget kill causes.
+- **A compound command could ride the trusted-tooling fast path.** Hook `if:` matching is
+  per-subcommand, so `jq . a.json & rm -rf ~/x` matched `Bash(jq *)` and reached the jq
+  auto-allow branch. The filter had no operator check at all, so every compound shape rode
+  the fast path. A command whose trimmed text contains `|`, `;`, `&`, `<`, `>`, a backtick,
+  `$(`, a literal newline, or a carriage return now falls through to the platform decision.
+  The bare `&` covers `&&` and `&>`; the newline covers multi-line commands; the carriage
+  return is hardening for shells that terminate a statement on a bare CR, which bash does
+  not. Globs, tilde, and `$VAR` expansion still take the fast path, since none of them can
+  introduce a second command. The `rm -rf` deny branch still runs first.
+- **The PermissionDenied retry signal sat in the wrong place.** `permission-denied-coach.sh`
+  returned `retry: true` at the top level of its JSON. The platform reads it only inside
+  `hookSpecificOutput`, so the flag was ignored and the model got the bare rejection with no
+  retry signal. Exit code and stderr are ignored on that event, which makes the JSON body the
+  hook's only channel.
+- **Both Stop hooks read the final assistant turn through a mechanism the docs warn
+  against.** They now read `last_assistant_message` from the payload first and keep the
+  transcript tail as a fallback, because the transcript is not guaranteed to hold the final
+  message at Stop time. drift-guard exists to catch a completion claim in that message, so
+  a miss there was a silent guard failure. The undocumented `.messages` probe is gone.
+- **`file_read` materialized whole files on bounded reads.** The reader called
+  `read_text().splitlines()` unconditionally and the size guard applied only to unbounded
+  reads, so a bounded read of a large file loaded all of it and could emit one unbounded
+  line into the caller's context. It now streams the requested window, still counts total
+  lines for the footer, and cuts any single line past 2000 characters with a truncation
+  marker.
+- **`session_search` missed spilled tool results.** Large tool outputs are spilled to
+  per-session sidecar files with only a preview left inline, so a flat transcript glob
+  under-reported on exactly the queries the tool exists for. Sidecars are now searched under
+  role `tool`, ordered by file mtime since they carry no timestamp. Subagent transcripts stay
+  out of scope, since a subagent's turns surface as its parent's tool result.
+- **MCP "not connected" errors produced no advice.** The `omca` server is plugin-provided, so
+  evidence and boulder calls fail during any reconnect window, and neither the bare nor the
+  wrapped form of that error matched a branch. The new branch points at connection status and
+  states that the evidence call must be retried rather than skipped.
+- **Platform spawn ceilings escalated to oracle.** The concurrency and session-cap errors hit
+  no branch and landed on retry advice that is unachievable for an infrastructure limit, with
+  the third occurrence tripping the three-strike breaker. Both now return before the counter.
+- **Every "no `run_in_background`" instruction described the opposite of what happens.**
+  Subagents background by default as of v2.1.198, with a narrower built-in tool set and the
+  result arriving a turn later. `run_in_background=false` is now explicit at every fan-out
+  call site; background stays deliberate where a skill writes files instead of returning a
+  deliverable.
+- **`~/.claude/plans` was hardcoded as both the authoring and the discovery surface.** With
+  `plansDirectory` set, plans were written where plan discovery no longer looked. Both sides
+  resolve the setting now.
+- **The hook event tables advertised events with no handler.** Nine events were listed as
+  handled, `PermissionDenied` was omitted despite being registered, and two references
+  pointed at scripts deleted in the v2.10 refactor. The table is regenerated from the
+  registry and a validator check diffs the two in both directions.
+- **`Write(.omca/**)` in the recommended allowlist now triggers a startup warning.** Path
+  rules for `Write`, `NotebookEdit`, and `Glob` are accepted but never match. `Edit` already
+  covers every file-editing tool, so the rule is dropped and the doctor flags it for
+  already-configured users.
+- **The documented `tools: Read` carve-out named an exception no shipped agent uses.** Since
+  `tools:` is a strict allowlist whose mis-listing launches an agent with zero tools, the
+  carve-out invited a contributor to restore it. Any `tools:` key now fails CI.
+- **The loop detector's window could carry a streak across a user turn.** It resets on either
+  a signature or a `prompt_id` change now. An absent field compares equal, so older clients
+  behave as before.
+
+### Added
+
+- **Tier aliases in agent frontmatter.** Every agent now declares `opus`, `sonnet`, or `fable`
+  instead of a pinned generation id, so a provider resolves each tier to the newest generation
+  its allowlist permits and nothing goes stale on the next model release. The subagent-start
+  display map gained alias arms while keeping its full-id arms as frontmatter compatibility,
+  and `omca-setup` no longer writes `ANTHROPIC_DEFAULT_OPUS_MODEL`, since a default-model pin
+  overrides the alias.
+- **Quoted paths on every command hook handler.** Each handler invokes a path under the
+  marketplace cache in the user's home directory, where a space anywhere in the path splits an
+  unquoted shell-form invocation, so every `command` value now quotes the placeholder. The
+  handlers stay in shell form: exec form spawns `command` as a real executable with no shell,
+  and a `.sh` file is not executable on native Windows, so every hook would fail to spawn there
+  with no error signal.
+- **Spinner labels on the handlers whose latency is felt.** Session init, context injection,
+  the comment gate, and the error-recovery family. Deliberately not blanket-applied.
+- **`background: false` on the forked skills.** Forked skills background by default from
+  v2.1.218, and a backgrounded fork gets the narrower background-subagent tool set. Pinning
+  `false` keeps the plan-review verdict inline and keeps build-fix edits inside checkpoint
+  coverage.
+- **`disable-model-invocation: true` on handoff.** Replaces a workaround that told users to
+  disable the whole plugin, and retires a settings recommendation that never applied to
+  plugin skills. The `handoff` keyword is now described as an advisory nudge everywhere.
+- **Per-task effort and context-window rendering in the subagent statusline.** The per-task
+  `effort` value is a bare string or int, not the main line's dict. A percentage-of-window row
+  replaces the raw token count when the platform supplies the window size.
+- **MCP connect diagnostics in the doctor.** The health check probed only the stdio server and
+  punted on the two HTTP ones, which is where connection status and error text actually
+  surface. Hidden whitespace in a configured URL is named as a cause of a URL that looks
+  correct but never connects.
+- **A total-item cap on batch triage.** The item ceiling is enforced before any spawn, with
+  overflow written to an explicit skipped list rather than silently truncated.
+- **Agent `name:` values containing a colon fail CI.** The platform hard-rejects such an agent
+  at load time; the scaffold now refuses to create one.
+
+### Changed
+
+- **Stop hooks block via decision control instead of exit 2.** The plan-continuation guard,
+  the final-verification gate, and the completion-stub guard write Stop decision JSON
+  (`decision` plus `reason`) and exit 0 instead of writing to stderr and exiting 2. The
+  task-completion gate is the only turn-gate or task-gate hook left that blocks via exit 2.
+  The PreToolUse and PermissionRequest deny hooks still block by exiting 2, which is one of the
+  two shapes those events accept: both also accept a JSON deny decision, PreToolUse through
+  `hookSpecificOutput.permissionDecision` and PermissionRequest through
+  `hookSpecificOutput.decision.behavior`. Exit 2 is the shape those three hooks keep.
+- **`--doctor` is namespaced and scoped.** The platform's `/doctor` (alias `/checkup`) is now
+  fix-capable, so OMCA's own read-only report is written as
+  `/oh-my-claudeagent:omca-setup --doctor` and "fix my setup" routes to the built-in.
+- **`DirectoryAdded` is tracked, not adopted.** The event exists as a changelog line with no
+  matcher table or input schema, so a handler would be built on a guessed payload.
+- **The nesting-depth prose no longer names a number.** The platform default moved twice in
+  this window, and the docs page still describes the older behavior, so agent prose is written
+  to be correct under either value and the research spawn is explicitly optional.
+
+## [2.13.2] - 2026-07-20
+
+Repairs the comment checker, whose slop-detection rules could not fire on realistic
+input, and promotes it from an advisory notice into a tiered gate that can block a
+write before it lands.
+
+### Fixed
+
+- **Comment slop detection could not fire on real narration.** The code-restating
+  rule required a comment to share two or more tokens with the next code line *and*
+  contribute no word of its own — a combination real narrating comments never satisfy,
+  since they almost always add a word. `# Set the path attribute` above
+  `self.path = path` scored one shared token and one extra, failing both halves. The
+  same `extra == 0` condition made the trivial-doc rule equally brittle. Both now
+  allow one novel token. Separately, `return`, `value`, and `values` were stopwords,
+  so a body like `# Return the values` tokenized to nothing and could never match.
+- **Non-source files were scanned as code.** The checker never read `file_path`, and
+  its comment matcher treats a leading `#` as a comment, so Markdown headings were
+  parsed as code comments — a README write reported five restating comments and a
+  density warning. Detection is now limited to source extensions.
+- **Interleaved narration went unreported.** One comment per code line never reaches
+  the consecutive-run threshold, so a fully narrated function produced no finding at
+  all. A comment-density check now covers that shape.
+
+### Added
+
+- **Tiered comment gate on `PreToolUse`.** `OMCA_COMMENT_GATE=off|advise|deny` selects
+  enforcement. Literal AI-attribution and placeholder comments hard-deny; per-line
+  heuristics deny once per content signature and then fail open, so a lexical false
+  positive costs one retry rather than trapping the edit; whole-hunk aggregates stay
+  advisory. The default `advise` records what a live gate would have blocked without
+  blocking, so sensitivity can be reviewed before enabling it.
+- **CI-pinned carve-outs for mandated comments.** The magic-number derivation comment
+  required above every numeric constant is exempt by shape, and fixtures covering both
+  its terse and verbose forms now fail the suite if a future tightening silences them.
+  Every deny message names the comment categories that must survive the fix, so a block
+  cannot be resolved by stripping required comments.
+
+### Changed
+
+- **`comment-checker.sh` moved from `PostToolUse` to `PreToolUse`.** It previously ran
+  after the edit was already on disk and could only emit advisory text. Its advisory
+  wording is now imperative rather than a passive suggestion to review.
+
+## [2.13.1] - 2026-07-12
+
+Fixes multi-session plan resolution so concurrent sessions in one project no longer
+interfere, and sharpens the comment-discipline guidance toward self-documenting code.
+
+### Fixed
+
+- **Strict plan resolution for hook consumers.** `resolve_bound_plan` gains a `strict`
+  mode, and the five hook-script consumers (`plan-continuation-guard`,
+  `final-verification-evidence`, `subagent-start`, `session-init`, `pre-compact`) now
+  pass it. A session with no explicit plan binding no longer inherits another session's
+  plan through the lenient sole-plan / most-recent fallback, so the Stop guards can no
+  longer block or nag a session over work it never started. The lenient ladder remains
+  only for the `boulder_progress` MCP tool.
+- **Strict binding for the statusline TODO counter.** The plan/TODO segment now resolves
+  through the same strict path: in a project with several registered plans, a session
+  renders the counter only for a plan explicitly bound to its own id, and an unbound
+  session shows no counter instead of the most-recently-started plan.
+
+### Changed
+
+- **Comment discipline defaults to self-documenting code.** The output style and the
+  code-writing agents (`executor`, `hephaestus`) now lead with "no comment by default":
+  names, types, and structure carry intent, and a comment is the justified exception the
+  code cannot express itself (a non-obvious why, an invariant, a constraint, or a
+  magic-number derivation). The existing plan-internals prohibition and the required
+  magic-number derivations are preserved.
+
+## [2.13.0] - 2026-07-02
+
+Adds a set of Stop-time and PostToolUse hooks aimed at keeping sessions on task
+(a plan-continuation guard, a tool-loop detector, and a delegation reminder), plus
+static type checking, a local maintainer QA harness with a mock inference backend,
+a transcript-search MCP tool, decaying error counters with retry history, and a
+round of research-informed upgrades to the agent prompts, output style, and docs.
+
+### Added
+
+- **Plan-continuation guard.** A new Stop hook nudges the session to keep working when
+  its bound plan still has unchecked tasks, instead of letting a session end mid-plan.
+  Nine safety rails (recursion guard, kill switch, missing/unbound plan, no unchecked
+  boxes, user-pause phrase detection, post-compaction grace window, stale-binding
+  escape, trailing-question detection, and an exponential-cooldown counter with a hard
+  cap and stagnation escape) keep it from becoming a nag.
+- **Tool-loop detector.** Flags three consecutive identical tool calls (same tool and
+  arguments) as a loop signal and suggests changing approach instead of repeating it.
+- **Delegation reminder.** A one-shot, per-session nudge toward specialist agents after
+  three direct work-tool calls with no delegation in between.
+- **Unified `OMCA_DISABLED_HOOKS` kill switch.** A single comma/whitespace-separated
+  env var now disables any OMCA hook by basename, replacing the ad hoc per-hook
+  env vars that preceded it.
+- **Decaying error counters with retry history.** Error counts for the five
+  PostToolUseFailure recovery hooks (bash, edit, read, json, delegate-retry) now reset
+  after a clean window instead of growing forever, and circuit-breaker messages include
+  a numbered timeline of recent errors instead of just a repeat count.
+- **`boulder_progress` next-task label.** Plan progress now includes the text of the
+  first unchecked task (truncated for display), and the statusline's plan/TODO segment
+  shows it as a resume hint.
+- **Restored `templates/claudemd.md`** as the orchestration-block template (agent
+  catalog, workflow pipeline, cross-cutting policy), plus a redesigned default output
+  style organized around explicit Principles, What-not-to-do, Communication, and
+  Coding-discipline sections.
+- **Agent prompt upgrades.** sisyphus gains counter-defaults (literal-following,
+  over-exploration, over-asking, capability under-reach), a team-eligibility table, and
+  a thinking-calibration note; executor gains a verification termination rule and
+  manual-QA teardown tracking; prometheus, start-work, and the specialist agents share
+  an ambiguity-resolution ladder (patterns -> tests -> docs -> reasonable inference ->
+  ask, as a last resort).
+- **New validate-plugin gates**: claudemd template packaging, depersonalization (no
+  home paths, credentials, or bearer tokens in shipped files), docs-accuracy (README/
+  OMCA.md path references resolve to real files), and MCP tool/hook name cross-checks.
+- **Upgraded comment-checker** with slop-pattern detection for comments that restate
+  what the code already says, a whole-file opt-out marker, and a kill-switch check.
+- **New docs**: `docs/reference/configuration.md`, `docs/reference/known-issues.md`,
+  and two worked settings.json profiles (`docs/examples/low-friction.md`,
+  `docs/examples/strict.md`).
+- **Typecheck gate.** `just typecheck` runs pyright over `servers/` and
+  `statusline/` (a shared root `pyrightconfig.json`), wired into `just ci` and a
+  new CI job; ruff lint/format now also cover `statusline/`, which previously
+  shipped with no static coverage at all.
+- **Local `claude-code-qa` harness** (`scripts/qa/`, `just qa`): packaged-plugin
+  install verification, live hook probes, a statusline probe, and a session
+  smoke test. The smoke test runs against a local mock Anthropic Messages
+  endpoint by default instead of staying skip-by-default; a machine-local spike
+  confirmed that `ANTHROPIC_BASE_URL`, scoped to the `claude` subprocess, redirects
+  credentialed inference traffic to a local listener without a routing or auth
+  failure, so the mock can shape a valid response and the smoke test runs
+  deterministically with no real API spend.
+- **`session_search` MCP tool.** Read-only, role-structured search over local
+  session transcripts, scoped to the resolved project's own transcript
+  directory. A bare `rg` search over transcript JSONL returns raw lines that can
+  run into the tens of KB with no role attribution; this tool parses the
+  block-typed message structure and caps output to bounded, de-noised excerpts.
+- **Two new skills**: `remove-ai-slops` (categorized detection and rewriting of
+  AI-tell prose patterns) and `debugging` (a diagnostics-first methodology for
+  isolating root causes before attempting a fix), plus a validate-plugin check
+  that every skill's `references/*.md` links are bidirectionally consistent
+  (no missing targets, no orphaned files).
+- **Directory-level `AGENTS.md` maps** for the root and six top-level
+  directories (`hooks/`, `scripts/`, `servers/`, `skills/`, `statusline/`,
+  `tests/`), with a CONTRIBUTING.md note that structural changes update the
+  relevant map in the same change.
+
+### Changed
+
+- **CI now runs the full local test suite before a release can happen.** The bats job
+  covers `tests/bats/unit/` alongside `tests/bats/hooks/`, a new MCP-validation job
+  starts the real server and checks its tool list, and the release workflow's
+  pre-tag gate widened from claims-only to claims-and-hooks validation.
+- **CI workflow hardening.** Third-party actions are pinned to a commit SHA, the
+  release workflow's `contents: write` permission is scoped to the job that needs it
+  instead of the whole workflow, tag-triggered dependency-setup steps disable default
+  caching, checkouts that don't push set `persist-credentials: false`, and release
+  creation now runs `gh release create` directly instead of a third-party action.
+- **Notepad files are now append-only at the Write-tool level**: `write-guard.sh`
+  denies direct `Write` calls under `.omca/notepads/`, steering toward the
+  `notepad_write` MCP tool so history is never silently overwritten.
+- **`categories.json` model values switched to short aliases** (`sonnet`/`opus`/
+  `fable`) matching agent frontmatter conventions, and the unused
+  `concurrency_limits` block was dropped.
+- **`.omca/notes/` is no longer gitignored**, so decision records can ship in
+  the repository instead of staying local-only.
+
+### Fixed
+
+- **Legacy error-counter migration** now merges the bare-int and object counter shapes
+  correctly instead of breaking when either side had already been upgraded by the new
+  decaying-counter format.
+- **`.omca/` runtime state no longer prevents shipping rule files.** The gitignore
+  narrowed from a blanket `.omca/` to `.omca/*` with an explicit `!/.omca/rules/`
+  carve-out, and a consuming project's own `.omca/.gitignore` is now written
+  automatically (without overwriting a customized one) the first time its state
+  directory is created.
+- **Truncated file reads and injected context now say where to find the rest**:
+  `file_read` and `context-injector.sh`'s AGENTS.md/README.md/rule injections append a
+  note naming the full path (and, for `file_read`, the offset to resume from) instead
+  of silently cutting off.
+- **Golden validate-plugin fixture was masking a real hook failure.** The
+  harness's isolated-environment state-dir variables were leaking into the
+  child hook under test instead of being pinned to the fixture's own project
+  root, so `post-compact-inject.sh` silently produced no output during the
+  golden run. Both are now pinned explicitly.
+- **Statusline subagent panel showed the platform's generic label instead of the real
+  agent name, and the todo counter could drop out of sync with the active session.**
+  Session-id resolution is now aligned between `session-init.sh` and the statusline
+  reader, subagent names resolve by id instead of trusting the generic label, and the
+  display ladder gained a fallback so a still-resolvable agent never silently drops
+  out of the panel. An opt-in env var can dump the raw statusline payload for
+  debugging without touching normal runtime behavior.
+
+### Notes
+
+Two audits closed without new code: a boulder-telemetry review found every
+candidate field already derivable from state the plan/session registry already
+stores (see `.omca/notes/boulder-telemetry-verdict.md`), and an A/B benchmark
+of task-completion verification candidates against the current heuristic
+concluded keep-current; no candidate cleared its pre-registered improvement
+bar (see `benchmarks/verify-heuristics/RESULTS.md`).
+
+## [2.12.1] - 2026-07-02
+
+Statusline accuracy release: the active-agent count and the plan/TODO segment now reflect what is
+actually running in the current session, and stale boulder state heals itself at session start.
+Also moves the agent roster to the current model generation, with Claude Fable 5 for the oracle.
+
+### Changed
+
+- **Model roster refresh.** oracle moves to `claude-fable-5` at `max` effort for the hardest
+  reasoning and stuck debugging. Orchestrators, planners, and reviewers stay on `claude-opus-4-8`,
+  now at `xhigh` effort. Workers pin `claude-sonnet-5` explicitly (executor and hephaestus at
+  `xhigh`, librarian and multimodal-looker at `high`, explore at `medium`) so the statusline shows
+  the real generation. Haiku leaves the default roster but stays supported as an override model
+  (statusline display, cost tiers, and concurrency caps all keep it).
+- **Effort guidance for the planner and orchestrator.** prometheus and sisyphus now scope rigor to
+  task complexity in both directions: trivial mechanical edits run inline and lightly, hard or
+  stuck problems escalate to a heavier agent tier. Worker effort is fixed per agent, so tier
+  routing is the orchestrator's throttle.
+
+### Fixed
+
+- **Statusline deploy was missing the boulder-resolver sibling.** `statusline/core.py` imports
+  `tools._boulder_core` from a sibling `servers/` directory that omca-setup never copied, so the
+  main statusline silently fell back to the `[claude]` stub and `cc-statusline-subagent` crashed on
+  import. The setup skill now deploys `servers/tools/` alongside the package, and its doctor check
+  gains a render smoke test that catches the stub.
+- **Active-agent count showed every agent ever spawned.** Nothing removed entries from
+  `subagent-models.json` when a subagent finished, so the Line 1 count only ever grew. A new
+  `SubagentStop` hook deletes the finished agent's entry; the SessionStart reset remains as the
+  backstop for crashed subagents.
+- **Plan/TODO segment leaked stale plans into unrelated sessions.** Display used the resolver's
+  fallback ladder, so a fresh session inherited whatever plan was left in `boulder.json`, including
+  plans whose tasks were all complete. The segment now renders only when the current session holds
+  an explicit binding and the bound plan still has open tasks. A stdlib `boulder_gc.py` shim runs
+  at SessionStart under the registry lock and prunes plans that are unbound and finished, missing
+  their file, or pathless, plus orphan bindings, so a completed-but-never-cleared plan cannot
+  resurface in session titles or resolvers.
+
+### Upgrade note
+
+Re-run `/oh-my-claudeagent:omca-setup` after updating so the deployed statusline package picks up
+the new renderer and the `servers/tools/` sibling.
+
+## [2.12.0] - 2026-07-01
+
+Adopts a set of improvements adapted from oh-my-claudecode, plus a per-subagent model indicator in
+the statusline. The headline change is a session-bound plan registry so concurrent sessions on
+different plans no longer overwrite each other.
+
+### Added
+
+- **Multi-session, multi-plan boulder (session-bound registry).** `boulder.json` now holds a
+  registry of plans plus per-session bindings, resolved through a single pure-read resolver and a
+  bash-callable shim. Concurrent sessions each track their own plan instead of clobbering one
+  shared slot. Writes are serialized with a file lock, and each session's binding is pruned when it
+  ends. Old flat state is migrated lazily on the next write.
+- **drift-guard Stop hook.** Blocks a stop when the assistant claims completion while the git diff
+  or untracked files still contain stub markers (`.only`, `TODO: implement`, unimplemented
+  `throw`). Complements the evidence gate: one proves tests were shown, the other proves stubs were
+  not left behind. Fail-open on any git error; disable with `OMCA_HOOK_DISABLE_DRIFT_GUARD`.
+- **Per-subagent model in the statusline.** When a subagent spawns, its configured model is
+  captured to disk and shown in the agent panel (`executor · Sonnet`, `oracle · Opus 4.8`). The
+  main line gains an active-agent count. The main line's own model stays the orchestrator's, which
+  is a platform limit.
+- **Compaction now preserves real content.** The pre/post-compact round-trip inlines the active
+  plan's remaining tasks and recent decisions instead of a pointer.
+
+### Changed
+
+- **context-injector hardening.** Rule injections are de-duplicated per session (content-hash plus
+  realpath), and the project root is derived worktree-safely from the accessed file so worktree
+  files no longer pull in parent-repo rules.
+- **stdin-read timeout.** The shared hook reader now times out instead of hanging forever if the
+  parent never closes stdin; blocking hooks warn or fail closed rather than silently pass on a
+  timeout.
+- **Standing user directives** are recorded in Claude-native project memory (guidance only, no new
+  store), so they persist and survive compaction natively.
+
+### Upgrade note
+
+`boulder.json` migrates from the old flat schema on the next write. Finish in-flight sessions
+around the upgrade: a session still running the previous version writes the old schema and can
+overwrite a registry written by a concurrently-updated session.
+
+## [2.11.0] - 2026-07-01
+
+Syncs OMCA with Claude Code v2.1.197 and moves the agent roster to the current Claude model
+generation. Routing stays conservative: orchestrators and advisors remain on Opus, workers stay on
+the `sonnet` alias (which resolves to Sonnet 5 on the Anthropic API as of v2.1.197), and `explore`
+moves to Haiku for cheap broad search.
+
+### Changed
+
+- **Model generation refresh.** Agents now target `claude-opus-4-8` and the current Sonnet
+  generation through the `sonnet` alias. The `[1m]` context suffix is removed throughout because
+  the platform strips it automatically as of Claude Code v2.1.173. The `explore` agent now runs on
+  `haiku`.
+- **Per-agent effort tuning.** Each agent declares an explicit reasoning effort: high for
+  orchestrators and advisors, medium for workers, low for `explore`, and xhigh for
+  `multimodal-looker`.
+
+### Added
+
+- **Session title from the active plan.** When a plan is active, the session title reflects its
+  name. A boulder pointer at a deleted plan file leaves the title unset.
+
+### Fixed
+
+- **Outdated model pin in setup.** The setup skill wrote an older Opus model into user settings. It
+  now writes the current model.
+- **Documentation drift.** Corrected a stale adoption claim for a batch-tool hook that was removed
+  in the minimize refactor, and removed unregistered team lifecycle events from the hook table.
+
+### Docs
+
+- Extended the platform adoption ledger through Claude Code v2.1.197, including model-alias
+  resolution caveats for non-Anthropic providers and recommendations for the new user-scope
+  settings.
+
+## [2.10.2] - 2026-06-20
+
+Shrinks OMCA to a native-leaning core. Measurement across easy tasks, hard trap tasks, and real
+SWE-bench-Verified bugs found that the orchestration control plane added cost, not correctness:
+modern Claude already plans, explores, runs tests, and iterates on its own, so a
+plan/delegate/verify layer duplicated the model's native agency. This release removes that layer
+and keeps only what the model does not supply for free.
+
+This release removes user-facing features (ralph, ultrawork, several MCP tools). Existing users
+should re-run `/oh-my-claudeagent:omca-setup` to refresh the instruction block in their CLAUDE.md.
+
+### Removed
+
+- **ralph and ultrawork modes.** The Stop-blocking persistence loop and the parallel-execution
+  mode are gone, along with their commands (`ralph`, `ultrawork`, `ulw-loop`), the
+  `cancel-ralph` and `stop-continuation` skills, and their state files. The closest native
+  replacement for "don't stop" is `/loop`, which re-runs a prompt on a timer. It is not a
+  drop-in: `/loop` has no verified-completion guarantee and no oracle gate. Parallel work is now
+  the model's native parallel agent fan-out.
+- **The four-wave final-verification ceremony (F1-F4).** Replaced by a single completeness
+  check (see Changed). The `pending-final-verify` marker, the completion sidecar, and the
+  per-attempt cap-state file are gone.
+- **Subagent-tracking state.** `subagents.json`, `active-agents.json`, `agent-usage.json`, the
+  spawn/complete/batch hooks, and the `concurrency_status` MCP tool are removed. Native subagent
+  lifecycle covers what they tracked.
+- **MCP tools** `boulder_list`, `boulder_select`, `boulder_complete`, `boulder_task_start`,
+  `boulder_task_end`, `mode_read`, `mode_clear`, and `concurrency_status`.
+- **Observability-only hooks.** The instructions-loaded, config-change, post-compact-log,
+  lifecycle-state, notify, and stop-failure log hooks are removed (they emitted no decisions).
+
+### Changed
+
+- **boulder is flat.** `servers/tools/boulder.py` went from a multi-work schema to a flat
+  single-active-plan tracker exposing only `boulder_write` and `boulder_progress`. The
+  statusline TODO counter is unaffected (the `active_plan` key and checkbox format are
+  preserved).
+- **One blocking completeness check.** The Stop hook now blocks only when the active plan is
+  fully checked and no `final_verification` evidence entry exists, with
+  `OMCA_HOOK_DISABLE_FINAL_VERIFY` as the sole escape. Evidence presence is the gate, so a
+  single logged verdict opens it permanently. There is no marker, no SHA scoping, and no cap
+  file, and it cannot wedge.
+
+### Migration
+
+- Re-run `/oh-my-claudeagent:omca-setup`.
+- Replace `ralph`/`ultrawork` usage with native `/loop` (timer re-run) and native parallel agent
+  fan-out, accepting the weaker persistence guarantee.
+- If you spawn a background agent while a plan is complete, the completeness check is now
+  demanded immediately on the foreground Stop rather than deferred until the background agent
+  finishes.
+
+## [2.10.1] - 2026-06-20
+
+### Fixed
+
+- **Executor and hephaestus now have comment discipline.** They wrote verbose, narrating
+  comments and, during plan execution, leaked plan internals (phase numbers, task numbers,
+  plan filenames, "Task N of <plan>") into code comments. The rule against plan-reference
+  comments existed only in the contributor-only hook-scripts rules, which do not ship to
+  users. Added explicit comment guidance to the executor and hephaestus agent bodies and the
+  shared output-style creed: comments explain why or a non-obvious invariant, never narrate
+  what the code already says, and never carry plan internals into code.
+
+## [2.10.0] - 2026-06-19
+
+Makes OMCA's always-on footprint lean, after measurement showed its ambient context roughly
+doubled cost and code on coding tasks with no correctness gain.
+
+### Changed
+
+- **Lean default output style.** The force-for-plugin output style no longer carries the
+  operating principles, the full delegation table, or the plan-execution rules. All of that
+  is already present in the omca-setup block and the specialist agents, so it was duplicated
+  weight on every turn that primed the agent to over-produce. The style now carries only the
+  minimal-code creed. Measurement showed this cut OMCA-on cost about 27% and time about 30% at
+  equal correctness. Routing and verification behavior is unchanged.
+
+## [2.9.0] - 2026-06-19
+
+Adopts a minimal-code philosophy across the orchestration harness, completes the
+root-cause fix for worker stub output, and de-slops the authored prose.
+
+### Added
+
+- **Minimal-code creed, embedded across the harness.** OMCA now biases every code-writing
+  path toward the minimum that works: a YAGNI decision ladder (does it need to exist?
+  stdlib? native platform feature? existing dependency? one line?) with a non-negotiable
+  safety floor where validation at trust boundaries, error and data-loss handling,
+  security, and anything the user asked for are never cut. The creed lives in the shared
+  output style, a per-spawn hook for the code-writers, and each pipeline agent in its own
+  role: prometheus plans the minimum, metis flags over-engineering, momus rejects
+  unrequested abstractions and scope creep, executor and hephaestus write the smallest
+  change, and oracle favors the simplest design that meets the requirement. Adapted from
+  ponytail (MIT).
+
+### Changed
+
+- **Humanized authored prose** across the agent and skill definitions: removed AI-writing
+  tells such as em dashes in prose, rule-of-three padding, promotional phrasing, and
+  mechanical boldface, while leaving frontmatter, headings, and code blocks untouched.
+- **Slimmer per-turn footprint.** The omca-setup CLAUDE.md block no longer duplicates the
+  parallel-execution and verification rules already carried by the output style; it points
+  to them instead, reclaiming that cost on every turn. Re-run omca-setup to pick up the
+  slimmer block.
+
+### Fixed
+
+- **Workers no longer emit barrier stubs instead of deliverables.** Orchestrator-only
+  barrier imperatives ("end response, wait", "Waiting for N more") were leaking into
+  worker-visible surfaces (the output style, the omca-setup block, and executor), so under
+  context pressure a worker could end its turn with a placeholder ("Done.", "Waiting.", a
+  bare check mark) instead of its findings. Those imperatives now live only where the
+  orchestrator sees them, every worker definition carries an explicit leaf-worker
+  contract, and a regression test guards the boundary.
+
+## [2.8.6] - 2026-06-18
+
+Reliability fixes for subagent output discipline and MCP shutdown, plus a green CI: the
+`Lint Shell` and `pytest MCP Tests` jobs were failing on every push due to environment
+divergence between local and CI runners.
+
+### Fixed
+
+- **Worker subagents must emit complete deliverables.** `subagent-start.sh` now injects a
+  hard "Worker Output Contract" for leaf agents: a worker never orchestrates, waits for, or
+  defers to sibling/background agents, and may never end its turn with a stub
+  acknowledgment ("Done.", "Waiting.", a bare check mark, etc.). The final message must
+  contain the full structured findings inline — it is the only thing forwarded to the
+  caller.
+- **MCP server exits immediately on `SIGTERM`.** The handler now calls `os._exit(0)`
+  instead of raising `SystemExit`, which could spin inside AnyIO's event loop while
+  cancelling stdio tasks and delay shutdown.
+- **CI `Lint Shell` job.** `reset_cap_on_allow` in `ralph-persistence.sh` is invoked
+  indirectly via an `EXIT` trap; the CI runner's shellcheck flags its body as unreachable
+  (SC2317). Added `SC2317` to the existing per-function disable directive (newer local
+  shellcheck does not emit it, which masked the failure).
+- **CI `pytest MCP Tests` job.** `test_startup_latency.py` forced
+  `UV_PROJECT_ENVIRONMENT` to the installed-plugin venv (`~/.claude/plugins/data/...`),
+  which is absent in CI — so `uv run` never reached a ready server and the initialize
+  request got no reply. The override now applies only when that venv actually exists;
+  otherwise the test uses the project's own (CI-synced) venv.
+
+## [2.8.5] - 2026-06-14
+
+Removes the legacy stagnation/task-hash machinery from `ralph-persistence.sh` now that
+the monotonic block cap and plan-checkbox truth supersede it. Behaviour-preserving for
+real ralph/ultrawork persistence; no more heuristic proxies.
+
+### Changed
+
+- **`ralph-persistence.sh` rewritten around a single source of truth.** Removed the
+  task-hash md5 stagnation detector, the plan-mtime stagnation detector, and the three
+  reset-on-churn per-path counters (`boulder_block_count`, `incomplete_block_count`,
+  `ultrawork_block_count`). Replaced with **one monotonic `global_block_count`** that
+  resets only on a genuine allow-stop (never on intra-session churn) and **one
+  `idle_count`** that auto-deactivates a no-work mode. The authoritative "is the work
+  done" signal is now incomplete `.tasks[]` plus incomplete `- [ ]` plan checkboxes —
+  not file mtimes or task hashes. `keyword-detector.sh` writes the slimmed state schema
+  (`idle_count` instead of `last_task_hash`/`stagnation_count`).
+
+## [2.8.4] - 2026-06-14
+
+Follow-ups to the v2.8.3 persistence-loop fix: a session-start zombie sweep and an
+operator escape hatch for the agent-counting plane.
+
+### Added
+
+- **`mode_clear(mode="agents")`** truncates `subagents.json` `.active` (preserving the
+  `.completed` audit history) and removes `active-agents.json` — a sanctioned operator
+  escape hatch for recovering from wedged phantom agents. `mode_clear(mode="all")` now
+  includes it.
+
+### Fixed
+
+- **`session-init.sh` sweeps stale `.active` zombies on session start.** A new session
+  no longer inherits phantom "running" agents (entries older than the 900s liveness
+  cutoff) from a prior session that died without a `SubagentStop`. The sweep covers both
+  `subagents.json` `.active` and `active-agents.json`, using the same cutoff and
+  null-epoch-keep rule as `subagent-complete.sh`.
+
+## [2.8.3] - 2026-06-14
+
+Eliminates the two inescapable orchestration loops — the orchestrator `Waiting.`
+loop and the finished-subagent `Done. Ending.` loop — by making the persistence
+control plane bounded and fail-open. Root cause and every fix were reproduced by
+running the actual hooks in isolated state.
+
+### Fixed
+
+- **Finished subagents no longer trapped in a `Done. Ending.` loop.** `oracle` and
+  `momus` were excluded from the worker anti-barrier exemption in
+  `subagent-start.sh`, so finished advisors inherited "Continue working in ralph
+  mode" with no off-ramp. The exemption is inverted: every agent EXCEPT the three
+  orchestrators (`sisyphus`/`prometheus`/`metis`) now receives it. Additionally,
+  `empty-task-response.sh` flagged a terse terminal acknowledgement (`Done.`) as
+  POOR output and told the orchestrator to **re-query the finished agent via
+  SendMessage** — an unbounded re-query cycle. Terminal acknowledgements are now
+  accepted as valid, and the nudge no longer suggests re-querying a terminal agent.
+- **Orchestrator no longer trapped in a `Waiting.` loop.** `subagent-complete.sh`
+  injected an age-blind `[BACKGROUND AGENTS PENDING] … END your response and wait`
+  barrier driven by `subagents.json`; a phantom entry (a subagent that died without a
+  `SubagentStop`) was immortal and emitted "wait" forever. The barrier injection is
+  removed, and `subagents.json` `.active` entries now self-expire at the same 900s
+  liveness cutoff already used by `active-agents.json`. Remaining barrier prose in
+  `agents/sisyphus.md`, `commands/ulw-loop.md`, and the `omca-setup` orchestration
+  block is replaced with a synchronous-default, single-wait, anti-loop rule.
+- **Persistence Stop gates are now bounded and fail-open.** `ralph-persistence.sh`:
+  the ultrawork no-agents block path (previously the only block path with **no**
+  `STOP_BLOCK_CAP` backstop) is now bounded by a monotonic counter and deactivates
+  ultrawork on yield; ralph self-deactivates when it stagnates instead of lingering
+  active across sessions (the cause of month-old stuck `ralph-state.json` with a
+  runaway `stagnation_count`). `final-verification-evidence.sh`: adds the
+  consecutive-block cap it previously lacked (an orphaned `pending-final-verify`
+  marker blocked Stop with `exit 2` forever) and the 24h orphan-marker TTL now fires
+  even when `boulder.json` still references an active plan.
+
+## [2.8.2] - 2026-06-13
+
+Fixes the recurring background-subagent retrieval loop and removes incorrect
+worktree-isolation documentation.
+
+### Fixed
+
+- **Background subagent results no longer loop.** Orchestrator guidance treated a
+  background agent's completion `<task-notification>` as the deliverable, but it carries
+  only a trigger and an output-file path (the platform `TaskOutput` tool is deprecated).
+  The orchestrator would find no payload where it was told to look, confabulate a stub
+  reply (e.g. `Complete.`), and re-query the finished agent indefinitely. Parallel
+  fan-out is now **synchronous by default** — multiple `Agent` calls in one message with
+  no `run_in_background`, so each tool result carries the full deliverable inline.
+  `background: true` is removed from the `explore` and `librarian` agents, and the
+  corrected model is applied across `sisyphus`, `executor`, `start-work`, `ultrawork`,
+  the default output style, and the `omca-setup` orchestration block. Background mode is
+  retained as a documented exception for genuine non-overlapping work and file-based
+  output skills (e.g. `github-triage`).
+- **Removed false `isolation: worktree` claims.** No OMCA agent runs in a git worktree,
+  yet `explore`, `librarian`, and `README.md` stated the two read-only search agents do —
+  which, if true, would hide unpushed local commits from their searches. Docs now state
+  these agents run in the main checkout; the `worktree.baseRef` heads-up is rescoped to
+  actual worktree-isolated work (`/oh-my-claudeagent:start-work --worktree` or
+  user-added `isolation: worktree` agents).
+
+## [2.8.1] - 2026-06-13
+
+Orchestrator-tier default model switched to Opus 4.8 (1M context).
+
+### Changed
+
+- **Orchestrator-tier default model updated to `claude-opus-4-8[1m]`** (was
+  `claude-fable-5[1m]`). Affects the `sisyphus`, `prometheus`, `metis`, `momus`, and
+  `oracle` agent definitions, the `frontend-ui-ux` skill, and the cost/concurrency tier
+  maps in `servers/categories.json` and `servers/tools/catalog.py`. The `omca-setup`
+  orchestration block and the `OMCA.md` agent catalog are updated to match. Sonnet- and
+  haiku-tier agents are unchanged.
+- **`scripts/package-plugin.sh`**: exclude `.claude/worktrees/` and `.in_use/` from
+  packaged plugin artifacts.
+
+## [2.8.0] - 2026-06-10
+
+Bash failure coaching, statusline refresh cadence, and doc sweep (Claude Code v2.1.170+).
+Duration-aware timeout coaching in `bash-error-recovery.sh`, `refreshInterval: 5` applied
+via `omca-setup` Phase 5.6, dead advice removed from the handoff skill, stale state-schema
+references corrected, and `explore`/`librarian` output contract clarified.
+Evaluated-2026-06 non-adoptions documented in OMCA.md.
+
+### Added
+
+- **Duration-aware Bash failure coaching** (`scripts/bash-error-recovery.sh`): two new
+  branches added to the failure classification chain.
+  - **Timeout-text class**: regex `timed out|timeout|Command timed out` placed in the
+    deterministic chain before the duration probe; matches shell and tool-layer timeout
+    messages regardless of `duration_ms` value.
+  - **Slow-failure fallback** (≥ 120 s duration): fires strictly after all regex classes
+    are exhausted; requires `duration_ms` ≥ 120000 in the PostToolUseFailure Bash payload.
+    Coaches toward `run_in_background`, a larger `timeout` parameter, or narrowing scope.
+    `// empty`-guarded jq read; never overrides a deterministic class. Payload probe
+    confirmed `duration_ms` present in Bash PostToolUseFailure payloads.
+    `delegate-retry.sh` duration branch deferred — Agent-failure payload structure not yet
+    confirmed by probe contract.
+- **`statusLine.refreshInterval: 5` via `omca-setup` Phase 5.6**: three-way skip branch
+  in Phase 5 (a) both `hideVimModeIndicator` and `refreshInterval` present → skip,
+  (b) `refreshInterval` missing → apply Phase 6 back-fill, (c) `hideVimModeIndicator`
+  missing → apply Phase 6 back-fill. Consented back-fill jq path updated to set both
+  fields. Doctor Check 7 extended with a `refreshInterval` PASS/WARN line.
+  Rationale: disk-sourced statusline reads git cache files that update on a ~5 s cadence;
+  background-agent idle scenarios benefit from a matching refresh ceiling.
+
+### Fixed
+
+- **Dead `skillOverrides` advice in handoff skill** (`skills/handoff/SKILL.md`): the
+  embedded JSON block advising users to configure `skillOverrides` was inapplicable —
+  `skillOverrides` is a user-preference setting that does not apply to plugin-shipped
+  skills. Replaced with `/plugin disable` and `enabledPlugins` guidance preserving the
+  user-direction intent.
+- **Stale `agent-usage-reminder.sh` references in state-schemas.md**
+  (`.claude/rules/state-schemas.md`): all five references to the removed
+  `scripts/agent-usage-reminder.sh` replaced with `scripts/post-tool-batch.sh`; lifecycle
+  step 3 rewritten to reflect per-batch (≥1 qualifying tool call per batch) counting
+  semantics; `toolCallCount` field description updated accordingly.
+- **`explore`/`librarian` final-message contract** (`agents/explore.md`,
+  `agents/librarian.md`): bare status words (e.g. "Done", "Complete") as the entire final
+  message are invalid — the output contract requires a populated deliverable. Failure
+  Conditions bullet added to `explore`; Output Requirements final sentence added to
+  `librarian`.
+
+### Deliberate non-adoptions
+
+Evaluated 2026-06 — full rationale in OMCA.md "Deliberate Non-Adoptions" table:
+
+- **`arguments:` in skill frontmatter**: shell-style positional binding truncates
+  free-form input; OMCA skills receive the full user prompt via natural expansion.
+- **`hooks:` in skill frontmatter**: persistence loops outlive skill-active windows;
+  hook registration stays in `hooks/hooks.json`.
+- **`skillOverrides` / `skillListingBudgetFraction` / `maxSkillDescriptionChars`**:
+  user-preference settings only; `skillOverrides` does not apply to plugin-shipped skills.
+- **`initialPrompt` in agent frontmatter**: fires an unconditional billable model turn
+  per subagent; `subagent-start.sh` already injects boulder context as `additionalContext`
+  at zero turn cost.
+- **`SessionStart` `watchPaths` output**: `FileChanged` consumer is side-effects-only;
+  no runtime reader benefits from an expanded watch set.
+- **`PostToolUse` `updatedToolOutput`**: rewriting tool output post-hoc is adversarial
+  to evidence integrity — OMCA's verification model requires literal command output.
+- **`plugin.json` `dependencies` field**: OMCA has no runtime inter-plugin dependencies.
+- **MCP `headersHelper` and WebSocket (`ws`) transport**: all OMCA MCP servers use stdio.
+- **`sessionTitle` output on `UserPromptSubmit`**: platform-prohibited — `sessionTitle`
+  is a `SessionStart`-only output field; the platform ignores it outside startup/resume.
+
+---
+
+## [2.7.0] - 2026-06-10
+
+PostToolBatch adoption + deferred-fix sweep (Claude Code v2.1.170). Batch-level orchestration
+signals, golden-baseline portability, statusline/servers test repairs, stale-path fix, Pyright
+cleanup, and Bug A vector-2 live e2e closure. Model defaults updated for orchestrator-tier agents.
+See `REPORT-upgrades-2.1.167.md` for the complete audit record.
+
+### Added
+
+- **PostToolBatch handler v1** (`scripts/post-tool-batch.sh`): matcher-less registration
+  (the event supports no matchers). Non-blocking — both signals emit `additionalContext`
+  only. Payload schema empirically captured: `tool_calls[]` array with `tool_name`,
+  `tool_input`, `tool_use_id`, `tool_response` per entry (not in platform docs).
+  Two signals:
+  - **Same-file parallel-edit warning** (all sessions): ≥2 Write / Edit / NotebookEdit
+    entries targeting the same `file_path` in one batch → warning with the conflicting path.
+  - **Batch-consolidated delegation reminder** (main session only — skips subagent batches):
+    `toolCallCount` incremented once per batch containing ≥1 Grep / Glob / WebFetch /
+    WebSearch entry; existing reminder emitted at every 3rd increment when `agentUsed` is
+    `false`. Batches with no qualifying tools are skipped entirely.
+- **Golden TMPDIR-portable normalization** (`tests/bats/hooks/golden/normalize.sh`): both
+  tmpdir rule families generalized — `bats-run` rules and `mktemp` rule now anchor on a
+  leading `/` so `key=` prefixes are not swallowed. All 5 previously-failing env variants
+  now pass; checked-in baselines contain zero absolute paths.
+
+### Changed
+
+- **Delegation-reminder counting migrated per-call → per-batch**: `scripts/agent-usage-reminder.sh`
+  removed; the PostToolUse Grep|Glob|WebFetch|WebSearch registration removed from `hooks.json`.
+  `agent-usage.json` schema unchanged (`agentUsed` boolean + `toolCallCount` integer).
+  `agentUsed=true` suppression preserved.
+- **Default model for orchestrator-tier agents updated to `claude-fable-5[1m]`** (was
+  `claude-opus-4-5`): affects `agents/metis`, `agents/momus`, `agents/oracle`,
+  `agents/prometheus`, `agents/sisyphus`; `skills/frontend-ui-ux` category and
+  `servers/categories.json` `deep` tier; `servers/tools/catalog.py` model constant;
+  `skills/omca-setup/orchestration-block.md` agent-catalog table.
+
+### Fixed
+
+- **statusline `TestNewFieldsLine2` nested-schema repair** (`statusline/tests/test_core.py`):
+  three tests corrected to read from the nested locations `_compose_line2` actually uses —
+  token counts from `context_window.total_input_tokens` / `total_output_tokens` and API
+  duration from `cost.total_api_duration_ms`. Duplicate coverage removed with justification.
+- **servers startup-latency test de-hardcoded** (`servers/tests/test_startup_latency.py`):
+  hardcoded `~/.claude/plugins/cache/omca/oh-my-claudeagent/2.0.0` plugin root replaced
+  with a dynamic repo-relative path; the machine-specific `/home/<user>` path is gone.
+- **Stale evidence-path string** (`scripts/final-verification-evidence.sh` ~:315):
+  `.omca/state/evidence.jsonl` → `.omca/evidence/verification-evidence.json` in the
+  user-facing message.
+- **Pyright type noise in repo/PR segment tests** (`statusline/tests/test_repo_pr_segment.py`):
+  dict literals wrapped with `cast(StatuslinePayload, {...})` following the project test
+  convention; zero runtime behavior change; Pyright diagnostics for this file reduced to 0.
+
+### Verified
+
+- **Bug A vector-2 live e2e closed**: worker subagents now deliver inline final messages
+  rather than bare wait messages when the prompt contains relayed barrier-bait text. Tested
+  in a live session with the scoped barrier callout present in `~/.claude/CLAUDE.md`.
+  Deferred item in `REPORT-upgrades-2.1.167.md` marked CLOSED 2026-06-10.
+
+### Deliberate non-adoptions
+
+- **Remaining new hook event handlers** (MessageDisplay, Elicitation, ElicitationResult,
+  Setup — v2.1.152+): no OMCA use case. Tracked in `validate-plugin.sh`
+  `new_platform_events` array (skip semantics). See H6 in `REPORT-upgrades-2.1.167.md`.
+- **PostToolBatch blocking semantics (v2)**: `decision:block` in PostToolBatch responses
+  is not documented to co-exist with batch continuation and behavior is unvalidated in
+  production. Deferred to a future release.
+
+---
+
+## [2.6.0] - 2026-06-06
+
+Platform sync Claude Code v2.1.141→v2.1.167. Full-surface audit: 36 disposition rows across hooks,
+skills, agents, plugin.json, statusline, MCP, config, and output styles. Two dogfooding bugs fixed.
+See `REPORT-upgrades-2.1.167.md` for the complete audit record.
+
+### Added
+
+- **ralph Stop-block cap guard** (`scripts/ralph-persistence.sh`): new
+  `ralph-cap-state.json` state file tracks consecutive block counts on both the
+  ralph-active and boulder-fallback paths. At `CLAUDE_CODE_STOP_HOOK_BLOCK_CAP - 1`
+  (default 7) no-progress blocks, emits an allow-stop with a resume hint rather than
+  triggering a hard platform force-stop. Counters reset on genuine progress (task-hash
+  change or completed-count increase). (v2.1.143)
+- **`sessionTitle` output** (`scripts/session-init.sh`): when `boulder.json` contains a
+  `plan_name`, the SessionStart hook emits `sessionTitle: "OMCA: <plan_name>"` in the
+  existing `hookSpecificOutput` envelope, improving multi-session window/tab
+  discoverability. (v2.1.152)
+- **Statusline repo/PR segment** (`statusline/core.py`): new `_compose_repo_pr` helper
+  reads `workspace.repo.{host,owner,name}` and `pr.{number,url,review_state}` from the
+  statusline payload. Repo rendered as `owner/name` with OSC 8 hyperlink; PR number as
+  `#N` linked when `pr.url` present; `review_state` mapped to approved/changes-requested/
+  pending/draft glyphs. (v2.1.145)
+- **Statusline `COLUMNS` env fallback** (`statusline/core.py`,
+  `bin/omca-subagent-statusline`): new `terminal_columns()` helper resolves width from
+  payload `columns` → `COLUMNS` env → default 80, matching the platform env injection
+  added in v2.1.153.
+- **Statusline `remaining_percentage` pre-check** (`statusline/core.py`): when
+  `context_window.remaining_percentage` is present, `_render_context_bar` derives `pct`
+  from it rather than recomputing from used/total. Explicit caller-supplied `pct` still
+  wins. (v2.1.153)
+- **Skill `disallowed-tools` frontmatter** on two skills (v2.1.152):
+  - `skills/github-triage/SKILL.md`: `disallowed-tools: [Write, Edit]` enforces the
+    read-only-orchestrator contract.
+  - `skills/hephaestus/SKILL.md`: `disallowed-tools: [Agent]` enforces the
+    no-delegation rule in the fix-loop specialist.
+- **`displayName` in plugin.json**: `"Oh My ClaudeAgent"` added for the marketplace UI.
+  (v2.1.143)
+- **`CLAUDE_CODE_SESSION_ID` env default** (`servers/tools/_common.py`): new
+  `_resolve_session_id()` helper applies to `boulder_write` and `boulder_task_start`.
+  Explicit non-empty param wins; otherwise falls back to the env var injected by the
+  platform since v2.1.154. Callers that already pass a session_id are unaffected.
+- **New platform events in validator** (`scripts/validate-plugin.sh`): `new_platform_events`
+  third array added for the five new hook events introduced in v2.1.152+
+  (Elicitation, ElicitationResult, MessageDisplay, PostToolBatch, Setup). Entries in this
+  array receive skip semantics — absent from `hooks.json` is reported as skip, not fail.
+  Baseline preserved at 160 passed / 0 failed / 6 skipped.
+
+### Fixed
+
+- **Subagent wait-reflex / barrier-leak** (`scripts/subagent-start.sh`,
+  `skills/omca-setup/orchestration-block.md`): two-vector fix for worker subagents
+  faithfully echoing `## Parallel execution` barrier guidance as bare \"Waiting.\" finals
+  instead of their deliverables.
+  - Vector 1: new case arm in `subagent-start.sh` appends a counter-instruction to
+    context for `*executor*|*explore*|*librarian*|*hephaestus*|*multimodal*` agent types
+    (oracle/momus/sisyphus/prometheus/metis excluded — their wait/advisory behavior is
+    intentional).
+  - Vector 2: scoping callout added at `orchestration-block.md:52` directly below the
+    `## Parallel execution` heading, declaring the section main-session-sisyphus-only and
+    explicitly excluding all subagent identities.
+- **Keyword-detector task-notification false-activation** (`scripts/keyword-detector.sh`):
+  platform-relayed `<task-notification>` blocks reaching `UserPromptSubmit` as `.prompt`
+  could carry OMCA skill names (ralph, ultrawork, handoff) that triggered full mode
+  activation including ralph-state.json writes. New guard at lines 23-31 checks the first
+  500 chars of the prompt; exits 0 before keyword matching if `<task-notification>` tag is
+  detected.
+
+### Documentation
+
+- `docs/OMCA.md` +290 lines: 59 version annotations, 12 new subsections covering all
+  v2.1.141-v2.1.167 hook/skill/agent/plugin/statusline/MCP/env/output-style changes.
+  New \"Deliberate Non-Adoptions\" section (8-item table).
+- `README.md`: `worktree.baseRef "head"` resolution note for v2.1.154+.
+- `skills/omca-setup/SKILL.md`: `/reload-skills` command added to install/update flow
+  (v2.1.152); MCP pending-approval troubleshooting paragraph added to DOCTOR MODE Check 4
+  (v2.1.154); version pin updated v2.1.141 → v2.1.167.
+
+### Deliberate non-adoptions
+
+- **`hookSpecificOutput.additionalContext` on Stop/SubagentStop** (v2.1.163):
+  co-existence with `decision:block` is schema-inconclusive (not documented). Exit-2 path
+  used by `final-verification-evidence.sh` cannot carry `additionalContext` — platform
+  ignores JSON on exit 2. Both scripts keep their existing emission shapes.
+- **New hook event handlers** (Elicitation, ElicitationResult, MessageDisplay,
+  PostToolBatch, Setup — v2.1.152+): must-not-adopt. Validator-aware only (skip
+  semantics). See H6 in `REPORT-upgrades-2.1.167.md`.
+- **`skills:` preload on agents** (v2.1.154): increases per-turn context cost. OMCA
+  agents invoke skills via the Skill tool at the point of need.
+- **`Agent(type,...)` spawn-allowlist in `tools:`** (v2.1.147): main-thread sisyphus
+  requires full spawn capability.
+- **`defaultEnabled: false` in plugin.json** (v2.1.154): would break the install-and-use
+  workflow.
+- **`reloadSkills` SessionStart output** (v2.1.152): skills load correctly on session
+  start; no mid-session reload needed.
+- **`type: "prompt"` / `type: "agent"` / `type: "http"` hook handlers**: still
+  experimental; consistent with prior version exclusions (see v2.3.0, v2.4.0).
+- **`monitors/`, `themes/`, `channels/` plugin manifest fields; LSP features**: not
+  adopted. Rationale unchanged from prior versions.
+
+## [2.5.2] - 2026-05-30
+
+### Added
+
+- `skills/momus/SKILL.md` exposes the momus plan reviewer as a `context: fork`
+  skill, so it can be invoked through the Skill tool from subagents (the Agent
+  tool is unavailable below the main session). Prometheus runs its review loop
+  via the skill, and the `/oh-my-claudeagent:momus` slash command now resolves.
+
+### Changed
+
+- momus invocation routed through the Skill tool across `agents/prometheus.md`,
+  `agents/momus.md`, `commands/plan.md`, and `OMCA.md`; the Agent-tool path is
+  documented as main-session-only.
+
+## [2.5.1] - 2026-05-24
+
+Fixes the `validate_plan_write` Write/Edit hook, which had been silently
+non-functional since the `mcp_tool` migration: a plugin-bundled `mcp_tool`
+hook must reference its server by the fully-qualified `plugin:<name>:<key>`
+name, not the bare `.mcp.json` key.
+
+### Fixed
+- `hooks/hooks.json`: the `Write|Edit` `mcp_tool` hook now targets
+  `plugin:oh-my-claudeagent:omca` instead of the bare `omca`. The bare key
+  never resolved at runtime — every Write/Edit emitted a non-blocking
+  `MCP server 'omca' not connected` warning and skipped plan-checkbox
+  validation entirely. Affected all users since the hook was introduced.
+
+### Changed
+- `tests/bats/hooks/plan_checkbox_verify.bats`: the server-name contract test
+  now asserts the fully-qualified name, so a regression to the bare key fails
+  CI instead of slipping through (the prior test encoded the broken value).
+
+## [2.5.0] - 2026-05-22
+
+Runtime-hardening release. 33-task plan `omca-runtime-hardening-and-cleanup`
+addressed every active TODO item plus mid-flight legacy-burden removal. F1-F4
+final-verification wave approved (oracle + executor). All behavioral fixes
+land as hooks / settings / deny rules — net per-turn context tokens decreased.
+
+### Added
+- `.omca/{evidence,notepads,drafts,rules}/` canonical layout mirroring the
+  reference structure at `pamir-app/.sisyphus/`. `boulder_write` dual-writes
+  the plan file to `~/.claude/plans/` (canonical) AND `.omca/plans/` (project
+  mirror) with SHA verification.
+- Three new PreToolUse / PermissionRequest deny hooks:
+  - `scripts/git-destructive-deny.sh` blocks `git reset --hard`, `git stash*`,
+    `git checkout --`, `git clean*`, `git restore*`. Opt-out via
+    `OMCA_HOOK_DISABLE_GIT_DESTRUCTIVE_DENY=1` for the git-master skill.
+  - `scripts/sed-grep-deny.sh` blocks `sed -n` and `grep -n` (with clustered
+    flags like `-nA`, `-nB`); error message routes to Grep tool / `ast_search`.
+  - `scripts/executor-grep-deny.sh` denies Grep/grep against code-file
+    extensions when `subagent_type == executor` — forces ast adoption by
+    removing the alternative.
+- `scripts/sweep-stale-log-entries.sh` one-shot script to clean orphaned
+  empty-timestamp entries from `hook-errors.jsonl`.
+- `scripts/probe-userpromptsubmit-payload.sh` reusable probe for inspecting
+  `UserPromptSubmit` hook payload field availability.
+- `log_hook_info()` helper in `scripts/lib/common.sh` for info-level events
+  (mirror of `log_hook_error`, writes to `.omca/logs/hook-info.jsonl`).
+- `.omca/rules/orchestration-workflow.md` carries the prometheus → metis →
+  momus pipeline assertion. Surfaced on-demand by `context-injector.sh`, not
+  per-turn — zero context-token cost.
+- Statusline TODO counter on Line 1: when `boulder.json` points at an active
+  plan with `- [ ] N.` numbered checkboxes, renders `T: <done>/<total>` (or
+  nf-fa-tasks glyph in Nerd Font terminals).
+- Regression suites: `TestIdleTimerGuards` (statusline daemon),
+  `TestGlyphPaddingContract`, `TestComposeLine1` namespaced/bare OMCA Default,
+  `agent_cl4r1t4s_regressions.bats`.
+
+### Changed
+- `scripts/final-verification-evidence.sh` hardening:
+  - SHA-divergence check scoped to evidence entries with
+    `timestamp >= marker.marked_at` (was full-log scan, produced false
+    positives across plans).
+  - Evidence age window bound to marker lifetime with 7-day absolute ceiling
+    (was static 3600s wall-clock).
+  - `has_ftype` predicate requires `verified_by ∈ {oracle, executor}` AND
+    `exit_code == 0` on F1-F4 entries; rejection cause named in error message.
+  - "cleared cross-session stale active_plan" event relabeled from
+    `log_hook_error` to `log_hook_info` (was misclassified as error).
+- `commands/start-work.md`: FROZEN Plan Discipline marker write moved to
+  AFTER Phase 6 CI evidence is logged but BEFORE F1-F4 delegation. Captures
+  the truly-final plan SHA instead of pre-CI state.
+- `output-styles/omca-default.md` trimmed 185 → 59 lines. Removed
+  `<entrypoints>`, `<agent_catalog>`, `<workflow>`, `<parallel_execution>`,
+  `<verification>`, `<file_reading>` sections. Kept `<operating_principles>`,
+  `<coding_discipline>`, `<delegation>`, `<critical_rules>`.
+- `~/.claude/CLAUDE.md` orchestration body restored via omca-setup. Practical
+  operational guidance now lives there as a managed block between
+  `--- omca-setup` markers — survives output-style override.
+- Memory Guidance section removed from
+  `agents/{explore,librarian,momus,oracle,prometheus}.md` (audit: 5 agents
+  with ≥5 completed runs and 0 memory files after 33 days).
+- `agents/sisyphus.md` description shortened and persona-inflation line
+  deleted per CL4R1T4S "Role Grounding Without Persona Inflation" principle.
+- Statusline daemon defaults: `CLAUDE_STATUSLINE_IDLE_TIMEOUT` raised
+  1800s → 86400s (24h); `idle_timeout <= 0` correctly disables shutdown
+  (was a latent bug — `Timer(0.0, ...)` would have killed daemon at startup).
+- Statusline `OMCA Default` detector accepts both bare (`OMCA Default`) and
+  namespaced (`oh-my-claudeagent:OMCA Default`) forms. The strict bare-string
+  match falsely flagged healthy sessions as `DEGRADED`.
+- Statusline glyph-padding contract: every nerd-font (PUA) glyph is followed
+  by an unconditional space before its content. PUA codepoints render at
+  varying cell widths across terminals; the explicit space prevents content
+  from visually merging when the terminal renders the glyph narrow.
+
+### Removed
+- Legacy `_legacy_path_fallback` helper, `_evidence_legacy_path`, legacy
+  notepad fallback, legacy evidence-seed migration. Single canonical path
+  everywhere; no read-fallback to `.omca/state/*`.
+- Forbidding sentence "No `.omca/plans/`, `.omca/notes/`, or second planning
+  store." removed from `agents/metis.md`.
+- "legacy fallback" and "one-release fallback" prose swept from `CLAUDE.md`,
+  `agents/*.md`, `commands/*.md`, `output-styles/omca-default.md`,
+  `.claude/rules/state-schemas.md`.
+- Orphaned `.omca/state/verification-evidence.json.bak-before-prune` deleted;
+  545 evidence entries migrated from `.omca/state/` to `.omca/evidence/`.
+
+### Documentation
+- Plan + completion sidecar archived at
+  `~/.claude/plans/omca-runtime-hardening-and-cleanup.md` + mirror at
+  `.omca/plans/omca-runtime-hardening-and-cleanup.md`. Completion sidecar at
+  `.omca/notes/omca-runtime-hardening-and-cleanup-completion.md` records F1-F4
+  verdicts (all APPROVE) and SHA `2b5c168a...dab6d1ef`.
+
+### Deferred
+- TODO Item 2 (handoff suggestion at ≤10% context remaining) ships DEFERRED.
+  Claude Code v2.1.148 `UserPromptSubmit` hook payload has no context-remaining
+  field; re-probe in future Claude Code versions via
+  `scripts/probe-userpromptsubmit-payload.sh`.
+
+## [2.4.0] - 2026-05-13
+
+Tracks Claude Code v2.1.133–v2.1.140. The v2.1.132/v2.1.133/v2.1.136 surface was already
+covered by v2.2.0/v2.2.1/v2.3.0; v2.4.0 picks up the v2.1.139 + v2.1.140 deltas (hook
+`args:` exec form, `continueOnBlock`, `${CLAUDE_PROJECT_DIR}` in MCP stdio, subagent OTEL
+headers, case-insensitive `subagent_type`, plugin folder-shadow warnings) and adds a
+user-facing `worktree.baseRef "fresh"` data-loss warning to README + explore/librarian
+agents.
+
+### Added
+- `scripts/postedit-format-and-lint.sh` — extracted from the inline `bash -c` blob
+  previously embedded in `.claude/settings.json` PostToolUse Write|Edit. Now invoked via
+  `args:` exec form (v2.1.139+), so path placeholders pass through verbatim with no
+  shell quoting.
+
+### Changed
+- `.claude/settings.json` PostToolUse Write|Edit hook now uses `args:` exec form
+  (v2.1.139+).
+- `.claude-plugin/plugin.json` no longer declares `outputStyles: "./output-styles/"` —
+  the default folder is auto-discovered and the explicit declaration triggered a
+  v2.1.140 redundancy warning.
+- `explore` and `librarian` agent bodies warn that isolated worktrees branch from
+  `origin/<default-branch>` by default (v2.1.133), so unpushed local commits are
+  invisible to those subagents.
+- README.md surfaces the same `worktree.baseRef` heads-up to users.
+
+### Documentation
+- `OMCA.md`: added `${CLAUDE_PROJECT_DIR}` plugin/MCP-stdio env (v2.1.139), subagent
+  OTEL attribution headers `x-claude-code-agent-id` / `x-claude-code-parent-agent-id`
+  (v2.1.139), Plugin lifecycle commands table including `claude plugin details`
+  (v2.1.139), `claude agents` agent view + `/goal` non-adoption note (v2.1.139),
+  `ANTHROPIC_API_KEY` Remote-Control/notifications mutex (v2.1.139).
+- `.claude/rules/hook-scripts.md`: `args:` exec-form usage notes, `continueOnBlock`
+  PostToolUse option (PROVISIONAL — release-notes-only at plan-write time; re-verified
+  at execution).
+- `.claude/rules/agent-conventions.md`: case-insensitive `subagent_type` matching
+  (v2.1.140); canonical lowercase-kebab form reaffirmed for OMCA delegation; v140 color
+  palette re-verification comment (palette unchanged).
+
+### Deliberate non-adoptions
+- `/goal` command (v2.1.139): overlaps with OMCA `ralph` / `ultrawork` /
+  `/oh-my-claudeagent:ulw-loop`. OMCA loops carry F1-F4 evidence discipline that
+  `/goal` does not. Documented as a co-existing native primitive, not adopted.
+- `claude agents` agent view (v2.1.139): Research Preview only; documentation-only
+  mention in the ownership model.
+- `/scroll-speed` (v2.1.139): pure UX, no OMCA surface.
+- `claude --bg` (v2.1.140 fixes): background-session UX, not an agent/hook surface.
+- `type: "agent"` / `type: "http"` hook handlers: still experimental, consistent with
+  prior version exclusions.
+
+## [2.3.0] - 2026-05-13
+
+### Added
+- `UserPromptExpansion` hook adoption. Detects OMCA slash-command activation (e.g., `/oh-my-claudeagent:ralph`) directly via `command_name`, instead of text-matching the expanded prompt body. More reliable mode triggering.
+
+### Changed
+- Mode detection is now dual-path: free-text triggers (e.g., "ralph don't stop") still flow through `keyword-detector.sh` on `UserPromptSubmit`; slash-command triggers flow through the new `slash-command-mode-detector.sh` on `UserPromptExpansion`. Both share session-aware re-announce suppression via `mode_already_announced` / `mark_mode_announced` in `scripts/lib/common.sh`.
+
+### Deliberate non-adoptions
+- `plugin.json dependencies`: not applicable — OMCA's MCP server requirements (grep, context7) are HTTP servers, not plugins. The `dependencies` field accepts plugin-to-plugin references only. Documentation already lists the MCP requirements in `OMCA.md` and `omca-setup`.
+- `type: "prompt"` hook handlers: no compelling OMCA-specific use case. The v2.2.0 `PermissionDenied` retry coach already covers the main classification gap. Revisit when a future need surfaces.
+
+## [2.2.1] - 2026-05-13
+
+### Documentation
+- Added three additional env vars to `OMCA.md`: `CLAUDE_CODE_FORK_SUBAGENT` (v2.1.119, forked subagents inherit full conversation context), `ENABLE_PROMPT_CACHING_1H` (v2.1.108, 1-hour cache TTL opt-in), `CLAUDE_CODE_FORCE_SYNC_OUTPUT` (v2.1.129, terminal sync override).
+- Added two managed-settings sandbox keys to the OMCA.md table: `sandbox.bwrapPath` and `sandbox.socatPath` (v2.1.133, Linux/WSL only).
+- Swept legacy "all 12 agents" references in prior CHANGELOG entries — OMCA ships 10 agents (see `agents/*.md`).
+
+### Fixed
+- Stale claim in the local contributor reference (`CLAUDE.md`, gitignored) that OMCA "does not register `PermissionDenied`" — v2.2.0 actually adopted that hook event. Local-only edit; does not ship via marketplace.
+
+## [2.2.0] - 2026-05-13
+
+v2.2.0 ships platform-sync improvements: a `PermissionDenied` retry-coach hook, statusline token-count fixes aligned to the v2.1.132 schema, new agent `color:` and `background:` frontmatter across all 10 agents, two new `bin/` utilities (`omca-status`, `omca-doctor`), and documentation catch-up for new platform settings keys and env vars.
+
+### Added
+
+- **`PermissionDenied` retry-coach hook handler** — coaches the model after auto-mode-classifier denials with `{retry: true}` and an `additionalContext` hint for known-recoverable Bash patterns.
+- **`subagentStatusLine` plugin-level default** at `<plugin-root>/settings.json`, backed by `bin/omca-subagent-statusline`. Renders per-row token counts and task type in the subagent panel.
+- **`bin/omca-status`** — print active boulder, evidence summary, F1-F4 status, and currently-running subagents from any Bash tool call.
+- **`bin/omca-doctor`** — standalone read-only health check (dependencies, settings, state directories, CLAUDE.md migration state). Mirrors the `/oh-my-claudeagent:omca-setup --doctor` checks without invoking the slash command.
+- **`color:` and `background:` on agent frontmatter** across all 10 agents (`background: true` only on `explore` + `librarian`). Color table recorded in `.claude/rules/agent-conventions.md`.
+- **`when_to_use:` field** separated from `description:` on 5 user-facing skills (handoff, hephaestus, init-deep, omca-setup, github-triage).
+
+### Changed
+
+- **`explore` and `librarian` agents** now declare `background: true` in frontmatter (always run as background tasks). Callers no longer need to pass `run_in_background=true` explicitly for these two agents.
+
+### Fixed
+
+- **Statusline token-count display** reads from `context_window.total_input_tokens` and `context_window.total_output_tokens` per the v2.1.132 schema (was reading from top-level keys that the platform never emits, silently suppressing the token display on Line 2).
+- **`statusline/types.py`** no longer declares phantom top-level `total_input_tokens`, `total_output_tokens`, `total_api_duration_ms` fields. These now live under their correct nested objects.
+
+### Documentation
+
+- **Hook output cap** clarified at 50,000 characters (was 10,000 — the figure on `docs/hooks.md:641` is out of date; changelog is authoritative).
+- **New settings keys** documented in OMCA.md / CLAUDE.md: `parentSettingsBehavior`, `autoMode.hard_deny`, `autoMode.$defaults`, `worktree.symlinkDirectories`, `worktree.sparsePaths`, `sandbox.network.deniedDomains`, `statusLine.refreshInterval`.
+- **New env vars** documented in OMCA.md: `CLAUDE_CODE_SESSION_ID` (Bash subprocess), `CLAUDE_EFFORT`, `CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN`.
+- **Plugin `bin/` (v2.1.91) and `monitors/` (v2.1.105) features** documented in OMCA.md `## Core Concepts`. Monitors are documented but not adopted.
+- **`bin/` directory version pin** recorded in `.omca/notes/bin-directory-version-pin.md`.
+
+### Verified (no-op confirmations)
+
+- **H-4** `watchPaths` emission in `scripts/lifecycle-state.sh` is platform-consumed per `docs/hooks.md:1976` and `:2017`. Correctly wired on both CwdChanged and FileChanged events.
+- **H-15** `alwaysLoad: true` adoption backed by reproducible startup-time bench (`servers/tests/test_startup_time.py`): warm p95=0.287s, well under the 2.0s threshold and far under the platform's 5s startup cap. **Corrected in retrospect (kept for the record, not the conclusion):** those numbers are accurate and they establish only that the server starts fast. They were never evidence for loading its tools eagerly. The cost of `alwaysLoad` is context tokens, not milliseconds: every eagerly loaded tool's schema sits in each session's cached prefix, and editing any of them invalidates that prefix. Measured later, the full roster serializes to about 23,300 characters, roughly 5,800 tokens paid per session. A reproducible benchmark cited as proof a decision was sound had measured the wrong axis. The server-wide flag is gone; per-tool `anthropic/alwaysLoad` on a small eager set replaced it, and the bench now reports payload size next to latency so the two are not confused again.
+- **C-5** `scripts/agent-usage-reminder.sh` correctly unions `active-agents.json` and `subagents.json` to avoid race-window undercounts.
+- **H-21** bats stderr-assertion audit: all 14 patterns in `tests/bats/hooks/` survive v2.1.98's stderr-visibility change.
+
+### Deliberate non-adoptions
+
+- **`maxTurns:` agent frontmatter**: attempted during this release, reverted after user observed practical issues. Color and background fields ship. Revisit when the failure mode is better understood.
+- **`monitors/` plugin manifest**: documented in OMCA.md as a future-evaluation surface but explicitly NOT adopted in v2.2.0. Rationale: OMCA's current hook-based context injection covers every observed context-delivery need. Adopting would introduce a background-process surface that overlaps the hook taxonomy without a concrete demand signal.
+
+## [2.1.0] - 2026-05-13
+
+v2.1.0 ships three focused features that prevent the "stuck OMCA state" failure mode where `ralph` / `ultrawork` / `boulder` modes can remain active across sessions after a campaign completes, plus harden the MCP server's cold-start invariant.
+
+### Added
+
+- **Plan-completion auto-deactivation**: When `boulder_progress` reports `is_complete=true` AND the evidence log contains a matching F4 APPROVE entry for the active plan's SHA-256, the plugin now automatically clears `ralph`, `ultrawork`, `boulder`, and `final_verify` modes. Evidence is preserved (audit trail). Implementation extracts `_load_evidence()` and `_clear_mode_files()` helpers to `servers/tools/_common.py` so the MCP `evidence_read` tool wrapper and the new auto-deactivate path share the same loader, avoiding decorator side-effects and recursion. Fail-safe: `boulder_progress` never raises -- if `_load_evidence()` fails, the response carries `reason: "evidence_read_failed"`. F1/F2/F3 entries alone do NOT trigger auto-clear; only F4 APPROVE does. (`servers/tools/boulder.py`, `servers/tools/_common.py`, `servers/tools/evidence.py`)
+- **Stale `.in_use` PID marker garbage collection at session-init**: Claude Code's plugin runtime writes `${CLAUDE_PLUGIN_ROOT}/.in_use/<pid>` markers per active session and removes them on clean exit. On crash or kill, markers strand and the `.in_use/` directory accumulates dead-PID files over time. The new `scripts/gc-in-use-markers.sh` runs as the FIRST `SessionStart` hook (before `session-init.sh`), walks the marker directory, and removes files whose PID is no longer alive. Platform-branched liveness: Linux uses `/proc/<pid>`, macOS uses `kill -0`, Windows is deferred with a `TODO(windows-liveness)` marker. Always exits 0 so GC failure cannot block session-init. (`scripts/gc-in-use-markers.sh`, `hooks/hooks.json`)
+- **Startup-latency regression test for the MCP server**: New pytest test (`servers/tests/test_startup_latency.py`) times the gap between `omca-mcp.py` spawn and first `initialize` RPC reply, asserts <500ms on warm cache, skips gracefully on cold cache. Acts as a perpetual regression-guard against accidentally moving I/O-bound init (`ast_tools.discover_binary`, signal handlers, tool registration) after `mcp.run()` enters its RPC loop -- which would surface to users as transient "MCP server 'omca' not connected" PreToolUse hook errors at session start. (`servers/tests/test_startup_latency.py`)
+- **Server startup-ordering invariant documentation**: `docs/design/cold-start-ordering.md` documents the audit finding that all I/O-bound init currently runs synchronously BEFORE `mcp.run()` (the correct order), and codifies the invariant for future contributors. A one-line invariant comment in `omca-mcp.py` above the `__main__` guard points at the design doc. (`docs/design/cold-start-ordering.md`, `servers/omca-mcp.py`)
+- **Design notes for all three features**: `docs/design/cold-start-ordering.md`, `docs/design/stale-marker-gc.md`, `docs/design/auto-deactivate.md`. Each captures the audit / design rationale, acceptance criteria, and the closed decisions that future maintainers should not re-litigate.
+
+### Fixed
+
+- **Misleading `_SG_BIN` module comment**: The module-level `_SG_BIN` reference at `servers/tools/ast.py:131` previously claimed to be "set by `register()`" -- it is actually set by `set_sg_bin()` from the entry point after `discover_binary()` resolves a path. Comment now reflects reality. (`servers/tools/ast.py`)
+
+### Tooling
+
+- **`servers/omca-mcp.py` marked executable**: The file has a `#!/usr/bin/env python3` shebang but was tracked as non-executable in git, which the `check-shebang-scripts-are-executable` pre-commit hook now catches as Wave 2 changes touched the file. Aligned the file mode with its declared intent.
+
+## [2.0.0] - 2026-04-24
+
+v2.0.0 is the depth-0 orchestration cutover: `commands/` replaces orchestration skills, `executor` replaces `sisyphus-junior`, `atlas`/`socrates`/`triage` agents are removed, and the `omca-state` and `ast-grep` MCP servers are consolidated into a single `omca` server.
+
+### Breaking Changes
+
+- **`executor` replaces `sisyphus-junior`**: The focused-implementation agent has been renamed from `sisyphus-junior` to `executor` across all agent references, skills, and delegation tables. Update any custom configurations or saved prompts referencing `sisyphus-junior`. (`agents/executor.md`)
+- **MCP server consolidation**: The separate `omca-state` and `ast-grep` MCP servers have been merged into a single unified `omca` server. Tool names are preserved, but any direct server references in `.mcp.json` overrides need updating. (`servers/`)
+- **`boulder_read` / `boulder_clear` / `evidence_clear` removed**: Replaced by unified `mode_read` / `mode_clear` MCP tools. Agents and skills referencing the old tool names will receive unknown-tool errors. (`servers/omca-mcp.py`)
+- **`tools:` allowlist removed from all agents**: Replaced with `disallowedTools:` to unblock MCP tool inheritance. Any agents that relied on the strict `tools:` allowlist to restrict tool access must be updated. (`agents/*.md`)
+- **`atlas`, `socrates`, `triage` agents removed**: Responsibilities redistributed — `prometheus` absorbs Socratic Interview Mode; depth-0 orchestration moves to `commands/`; triage routing now handled by sisyphus delegation table. Update delegation references.
+- **`notepad` `questions` section removed**: MCP schema no longer accepts `questions` as a section name. Use `issues` or `decisions` instead.
+- **Release workflow changed**: `just release VERSION` now requires a CHANGELOG entry to exist before running (validates before bumping). Scripts that previously called release without a changelog entry will abort.
+
+### Added
+
+- **`commands/` directory with depth-0 orchestration entrypoints**: New `start-work`, `plan`, `ralph`, `ultrawork`, `ulw-loop` commands replace the corresponding skills for depth-0 orchestration. Slash commands now delegate per-task to `executor` in parallel. (`commands/`)
+- **`prometheus` Socratic Interview Mode**: Prometheus now absorbs the full Socratic Interview Mode, including a 6-item clearance checklist and exploration gate for fuzzy requests before planning. (`agents/prometheus.md`)
+- **`executor` agent** (renamed from `sisyphus-junior`): Cleaner identity, same role — focused implementation of known, scoped tasks. (`agents/executor.md`)
+- **`plan_sha256` field on `evidence_log`**: First-class field for plan-scoped evidence verification. F1-F4 hooks now scope evidence lookup to the current plan SHA, eliminating cross-plan false-positives. (`servers/omca-mcp.py`, `scripts/task-completed-verify.sh`)
+- **`file_read` MCP tool**: New tool in the omca MCP server for subagent path access outside the project root. Includes token estimation and `offset`/`limit` guidance for large-file pagination. (`servers/omca-mcp.py`)
+- **Statusline per-agent thematic glyphs**: Each agent now has a dedicated NerdFont v3-compatible glyph in the statusline daemon, with a stable ASCII fallback. Includes `agent_glyph` helper and per-agent parity tests. (`statusline/`)
+- **Statusline per-session socket + PID path naming**: Daemon socket and PID files now include the session ID, preventing cross-session collisions when multiple Claude Code sessions run concurrently. (`statusline/`)
+- **Statusline `types`, `config`, and `protocol` modules**: Typed dataclasses and configuration layer added to the statusline package; 117 pytest tests cover the new modules. (`statusline/`)
+- **`lifecycle-state.sh` for new hook events**: Handles `WorktreeCreate`, `WorktreeRemove`, `TaskCreated`, `CwdChanged`, `FileChanged` platform events. (`scripts/lifecycle-state.sh`, `hooks/hooks.json`)
+- **`subagent-complete.sh` background-agent pending context injection**: Injects pending-agent context into the host session when a background subagent completes, enabling the background-agent barrier to function correctly. (`scripts/subagent-complete.sh`)
+- **`if`-filtered `PermissionRequest` handlers for `rm`, `npm`, `jq`, `uv`**: Reduces permission-prompt noise for common read-only tool invocations without weakening the security guardrail. (`hooks/hooks.json`)
+- **`mode_read` / `mode_clear` unified MCP tools**: Replace three separate state-read tools with a single `mode` abstraction covering ralph, ultrawork, and other persistence modes. (`servers/omca-mcp.py`)
+- **BLOCKING QUESTIONS relay protocol**: Agents that cannot use `AskUserQuestion` (subagent context) now emit a structured `## BLOCKING QUESTIONS` block that sisyphus relays to the user. Documented in agent prompts and OMCA guide. (`agents/*.md`, `OMCA.md`)
+- **Final-verification-evidence Stop hook + F1-F4 convention**: `task-completed-verify.sh` enforces that F1-F4 tasks have matching `evidence_log` entries before allowing plan closure. (`scripts/task-completed-verify.sh`, `hooks/hooks.json`)
+- **Plan-checkbox-verify PreToolUse hook**: Prevents checkbox modifications that bypass the task-completed verification gate. (`hooks/hooks.json`)
+- **`validate-plugin.sh` migration markers and hygiene checks**: Script now checks for skill description length (≤250 chars), detects migration markers, and validates component hygiene. (`scripts/validate-plugin.sh`)
+- **`omca-setup` env var configuration**: Supports `OMCA_OPUS_MODEL` and agent-team environment variable configuration from the setup skill. (`skills/omca-setup/`)
+- **Agent concurrency tracking and routing validation**: Hooks track active subagent count and validate that delegation routing matches the agent catalog. (`scripts/track-subagent-spawn.sh`)
+- **`StopFailure` event handler**: Logs API errors to `.omca/logs/` when the session stops due to an API failure. (`scripts/`, `hooks/hooks.json`)
+- **`ExitPlanMode` PermissionRequest hook**: Fires when the plan-mode classifier requests `acceptEdits` transition; injects user-approval gate. (`hooks/hooks.json`)
+- **`PostToolUseFailure` handlers for Bash and Read**: Captures failure context for circuit-breaker tracking. (`hooks/hooks.json`)
+- **`<coding_discipline>` block in claudemd template**: Runtime guide now includes an explicit coding discipline section injected into every session. (`templates/claudemd.md`)
+- **Role-specific Memory Guidance sections in all agents**: Each agent with `memory: project` now declares role-specific save triggers and negative examples. (`agents/*.md`)
+- **`hook-scratch` dev wrapper**: Utility script for ad-hoc hook testing during development without registering the hook. (`scripts/`)
+- **Golden-output replay harness for shell hooks**: BATS test suite that captures and replays expected hook stdout/stderr, enabling regression detection across the full hook corpus. (`tests/bats/hooks/`)
+- **BATS + pytest behavioral testing infrastructure**: End-to-end test infrastructure with lifecycle fixtures, permission-filter tests, and MCP coverage. (`tests/`)
+- **Eval harness, regression fixtures**: Scaffolding for evaluating agent behavior against recorded fixture outputs. (`eval/`)
+- **`agent_id` bridging in subagent tracking**: Spawn-ID from the track hook is now mapped to the platform `agent_id` for accurate cross-hook agent identification. (`scripts/track-subagent-spawn.sh`)
+
+### Changed
+
+- **Depth-0 orchestration pattern**: `/start-work` now runs entirely at depth 0 (main sisyphus session), spawning `executor` per task in parallel. This replaces the previous pattern where atlas/start-work skills ran as subagents. Documented in `commands/start-work.md` and `templates/claudemd.md`.
+- **`prometheus` migrated to Claude-native planning surfaces**: Planning output now targets native plan mode rather than OMCA-specific plan files. Momus review and metis gap-analysis integrated into the pipeline. (`agents/prometheus.md`)
+- **`metis` output constrained to native planning flow**: Output is now structured for the Claude-native plan-approval gate rather than free-form analysis. (`agents/metis.md`)
+- **`momus` uses native surfaces for review state**: Review state tracked via native plan mode rather than notepad. (`agents/momus.md`)
+- **Statusline daemon exponential polling backoff**: Client polling now backs off exponentially on repeated no-change responses, reducing CPU overhead during idle sessions. (`statusline/`)
+- **Statusline OAuth API migrated to `rate_limits` payload**: Rate-limit data now sourced from the upstream `rate_limits` payload rather than the OAuth token endpoint, removing an auth dependency. (`statusline/`)
+- **`common.sh` POSIX sidecar helpers + comment tightening**: New sidecar-path, SHA-match, and idempotency helpers extracted into `common.sh`; comment noise reduced across the library. (`scripts/lib/common.sh`)
+- **Hook corpus clarity pass**: 34 shell hooks received a corpus-wide clarity pass — function naming conventions enforced (`check_*`/`validate_*` are side-effect-free; action functions use explicit verbs), magic-number derivation comments added, plan-reference comments removed. (`scripts/`)
+- **`hephaestus` and `metis` tool restrictions tightened**: Both agents now use `disallowedTools:` narrowed to their specific scope, reducing accidental broad-tool use. (`agents/hephaestus.md`, `agents/metis.md`)
+- **Agent metadata migrated from frontmatter to HTML comments**: Routing metadata (`<!-- omca: ... -->`) moved out of YAML frontmatter into HTML comments to avoid Claude Code frontmatter parsing conflicts. (`agents/*.md`)
+- **`scripts/lib/common.sh` shared boilerplate extraction**: Repeated jq-read, atomic-write, and mode-state idioms extracted into named helpers. All scripts now source `common.sh` and use `jq_read`, `log_hook_error`, `emit_context`, etc.
+- **`subagent-start.sh` restructured with agent-aware case statement**: Question-injection behavior is now per-agent rather than blanket, reducing noise for agents that handle their own output protocol. (`scripts/subagent-start.sh`)
+- **`session-cleanup.sh` and `teammate-idle-guard.sh` use mode helpers**: Scripts updated to use `mode_is_active` / `mode_state_name` helpers from `common.sh`. (`scripts/`)
+- **Skill bodies terse rewrite (21 skills)**: All skill bodies rewritten for conciseness — removed ceremony, redundant restatement, and thin-wrapper boilerplate. (`skills/*/SKILL.md`)
+- **Agent prompts terse rewrite (planning + execution agents)**: `sisyphus`, `prometheus`, `momus`, `atlas`, `metis`, `oracle`, `explore`, `librarian`, `executor` prompts stripped of filler, metaphor intros, and redundant principle restatements. (`agents/*.md`)
+- **`claudemd.md` template terse rewrite**: Token footprint reduced; `tool_routing` section converted to table format; file_reading guidance injected. (`templates/claudemd.md`)
+- **`write-guard.sh` evidence handling improved**: Now correctly distinguishes evidence writes (allowed via MCP tool) from direct file writes (blocked). (`scripts/write-guard.sh`)
+- **`task-completed-verify.sh` validation enhanced**: Stricter evidence freshness check; session-aware staleness short-circuits clear stale markers. (`scripts/task-completed-verify.sh`)
+- **`keyword-detector.sh` and templates routed to `commands/`**: Multi-word trigger phrases updated to avoid false positives; template lookup now resolves via `commands/` directory. (`scripts/keyword-detector.sh`)
+- **MCP `omca` server domain modules**: `omca-mcp.py` split into domain modules (agents, evidence, notepad, mode, file) for maintainability. (`servers/`)
+- **`plugin.json` / `marketplace.json` version consistency**: Manifest version fields now validated to be in sync during release. (`scripts/validate-plugin.sh`)
+- **`OMCA.md` and `README.md` updated for v2.0**: Agent catalog, workflow section, migration notes, and depth-0 orchestration pattern documented. Hardcoded component counts removed; counts are now runtime queries. (`OMCA.md`, `README.md`)
+- **`CONTRIBUTING.md` hook, agent, and skill guidelines updated**: Reflects new hook `if`-field rules, `disallowedTools:` convention, and `commands/` entrypoint pattern. (`CONTRIBUTING.md`)
+- **Agent AskUserQuestion soft caps removed**: Blanket turn-limit caps replaced with relay-protocol documentation; multi-call relay guidance added. (`agents/*.md`)
+- **`uv` MCP server migrated to `CLAUDE_PLUGIN_DATA`**: Virtual environment now lives in the plugin data directory, persisting across plugin updates. (`servers/`)
+- **`session-init.sh` conditional template injection**: Skips full `claudemd.md` template when `OMCA_CONFIGURED=1`, saving ~10K tokens per turn. (`scripts/session-init.sh`)
+- **Hook `PreToolUse`/`PostToolUse` matcher narrowed from `Task|Agent` to `Agent`**: Reduces unnecessary hook firing on Task tool events. (`hooks/hooks.json`)
+- **Effort frontmatter added to all agents and 14 skills**: `effort:` field added to agent and skill frontmatter for task-list cost estimation. (`agents/*.md`, `skills/*/SKILL.md`)
+- **`omca-setup` skill updated**: MCP permission namespace corrected; `--doctor` mode added for diagnosing configuration issues. (`skills/omca-setup/`)
+- **`maxTurns` removed from all 10 agent definitions**: Turn limits removed; agents rely on their own stop conditions and the verification protocol. (`agents/*.md`)
+
+### Security
+
+- **Permission filter hardened**: Compaction injection tightened; mode-conflict detection improved; `if`-field filtering added to reduce spawning overhead on tool events. (`scripts/permission-filter.sh`)
+
+### Fixed
+
+- **Cross-session orphan-marker false-positives in Stop hook**: The stop hook now scopes orphan-pending-final-verify marker detection to the current session, preventing stale markers from a previous session from blocking plan closure. (`scripts/stop-failure-handler.sh`)
+- **`boulder_progress` counts only numbered-task checkboxes**: Was previously counting all checkboxes (including sub-bullets), inflating progress numbers. (`servers/omca-mcp.py`)
+- **Auto-clear `pending-final-verify.json` on plan closure**: Plan closure now triggers automatic cleanup of the pending-verify marker, preventing stale state from blocking the next plan's verification. (`scripts/`, `hooks/hooks.json`)
+- **F1-F4 enforcement skipped while background subagents are active**: Final-verification check now detects active background agents and defers enforcement until they complete, preventing false-positive blocks during parallel execution. (`scripts/task-completed-verify.sh`)
+- **Plan file existence validation**: Hooks now validate that the referenced plan file exists before reading it, preventing a stale-reference cascade when a plan is deleted or renamed. (`scripts/`)
+- **`consolidate-memory` reads both user and project memory scopes**: Was only reading one scope, silently missing half of saved memories. (`skills/consolidate-memory/`)
+- **Statusline race-free daemon start + stale-PID stop safety**: Daemon startup now uses a lock file to prevent double-start; stale PID files are detected and cleaned up before attempting to stop. (`statusline/`)
+- **ExitPlanMode sequencing after momus review**: ExitPlanMode was being called before the user-approval gate in certain skill flows, bypassing the review step. (`skills/`, `agents/`)
+- **Background agent barrier extended to all background-agent launchers**: Was only applied in sisyphus; now enforced in atlas and all depth-0 orchestrators. (`agents/`, `skills/`)
+- **Agent hallucinations and guardrail gaps corrected**: oracle, hephaestus, explore, and librarian received factual corrections and restored missing guardrails. (`agents/*.md`)
+- **`health_check` crash on missing state files**: MCP health_check tool now handles missing `.omca/state/` files gracefully rather than raising. (`servers/omca-mcp.py`)
+- **Atomic writes and `Path` fallback in MCP server**: State file writes are now atomic (tmp → mv); `Path` objects used consistently to avoid OS-level type errors. (`servers/omca-mcp.py`)
+- **`permissionMode: plan` removed from `explore`, `librarian`, `oracle`**: Field is stripped by Claude Code for plugin agents; its presence caused silent misconfiguration. (`agents/*.md`)
+- **Stop hook output uses top-level `decision`/`reason` fields**: Was using nested fields that the platform did not read. (`scripts/stop-failure-handler.sh`)
+- **Deterministic state file creation and unified persistence blocking**: Ralph and ultrawork state files now created atomically; blocking logic unified to prevent race conditions during mode activation. (`scripts/`)
+- **Two-commit SHA stamp to fix marketplace updates**: Marketplace was not picking up version bumps; release now creates version-bump commit + separate SHA-stamp commit. (`justfile`)
+- **`read-error-recovery` advice updated for `file_read` MCP tool**: Skills and agents that referenced the old file-read error recovery pattern now reference the MCP tool. (`scripts/validate-plugin.sh`)
+- **`permissionMode` plan-mode handler made executable**: Script lacked execute permission. (`scripts/plan-mode-handler.sh`)
+- **Dead `.omca/project-memory.json` reference removed from `subagent-start`**: Reference pointed to a deleted file, causing a silent no-op in memory injection. (`scripts/subagent-start.sh`)
+- **`Agent(resume=)` replaced with `SendMessage` API**: `resume=` parameter was deprecated; updated to the current SDK pattern. (`skills/`)
+- **docs model reference updated**: opus model reference updated from 4 to 4-7; atlas removed from opus-tier list. (`skills/omca-setup/SKILL.md`)
+- **Plugin packaging excludes dev artifacts**: `validate-plugin.sh` and `marketplace.json` now exclude `.bats`, eval fixtures, and scratch files from the distributed plugin cache. (`scripts/validate-plugin.sh`)
+- **`multimodal-looker` uses `disallowedTools`**: Was using `tools:` strict allowlist which inadvertently blocked MCP tool inheritance. (`agents/multimodal-looker.md`)
+
+### Removed
+
+- **`atlas` agent**: Removed. Depth-0 orchestration entrypoints moved to `commands/`; sisyphus handles orchestration directly. (`agents/atlas.md` deleted)
+- **`socrates` agent**: Removed. Socratic Interview Mode absorbed into `prometheus`. (`agents/socrates.md` deleted)
+- **`triage` agent**: Removed. Request classification now handled by sisyphus delegation table. (`agents/triage.md` deleted)
+- **Skills migrated to `commands/`**: `start-work`, `atlas`, `ralph`, `ultrawork`, `ulw-loop` skills deleted; replaced by `commands/` entrypoints with the same trigger names. (`skills/` pruned)
+- **`questions` notepad section**: Removed from MCP schema; use `issues` or `decisions` for analogous content. (`servers/omca-mcp.py`)
+- **Separate `omca-state` and `ast-grep` MCP servers**: Merged into unified `omca` server. Launcher scripts and separate `pyproject.toml` entries removed. (`servers/`)
+- **`boulder_read`, `boulder_clear`, `evidence_clear` MCP tools**: Replaced by `mode_read` / `mode_clear`. (`servers/omca-mcp.py`)
+- **`cost:` frontmatter from all agent definitions**: Deprecated field removed from all agents. (`agents/*.md`)
+- **`maxTurns` from all agent definitions**: Removed; agents use their own stop conditions. (`agents/*.md`)
+- **Circuit breaker tracking hooks**: Removed after simplification pass — error recovery now uses structured logging rather than a circuit-breaker state machine. (`hooks/hooks.json`, `scripts/`)
+- **Hook internals leakage**: Removed debug output and internal state leakage from hook scripts that was appearing in session context. (`scripts/`)
+
+## [1.5.2] - 2026-04-09
+
+### Changed
+
+- **Prompt-engineered rewrite of `templates/claudemd.md`**: The session-injected runtime
+  guide has been completely rewritten as an orchestration-focused prompt. The previous
+  file mixed orchestration policy with Claude Code platform trivia (env vars,
+  `permissionMode` values, managed-settings reference tables, model alias lists, hook
+  contracts) that Claude already knows from its host. The new file is scoped strictly to
+  OMCA's responsibility — orchestration, harness, and delegation — and deletes everything
+  the platform already communicates (`templates/claudemd.md`, 114 → 182 lines).
+  - **New structure**: 8 XML-tagged sections — `operating_principles`, `delegation`
+    decision tree, `entrypoints`, `agent_catalog`, `workflow`, `critical_rules`,
+    `parallel_execution`, `verification`
+  - **Second-person imperative voice** throughout; exactly 3 `IMPORTANT` markers reserved
+    for true invariants (main-session must never implement plan tasks, background-agent
+    barrier, evidence before completion)
+  - **Delegation block** is a 17-row request-classification decision tree with an
+    explicit "narrowest specialist wins" tiebreaker
+  - **Agent catalog** lists all 13 specialists with model tier (opus/sonnet/haiku) and
+    concrete use-when signals
+  - **Fixed factual bugs**: prose version drift (old file had `v1.5.0` prose next to
+    `1.5.1` frontmatter), keyword-trigger "natural interaction model" framing (contradicted
+    `plugin.json`'s `enableKeywordTriggers: false` default), and unverified model aliases
+    (`best`, `opusplan`, `sonnet[1m]`, `opus[1m]` not documented in Claude Code docs)
+  - **Inline HTML canary markers** alongside `<agent_catalog>` and "Treat Claude Code as
+    the platform owner" point future rewriters at the bats tests that depend on those
+    load-bearing strings — a durable guardrail against the same rot recurring
+  - Users receive the new template on their next `omca-setup` run after upgrading; the
+    version-mismatch detection in `skills/omca-setup/SKILL.md` Phase 3 Step 4 handles the
+    replacement automatically without manual intervention
+- **Policy-marker enforcement relocated out of `templates/claudemd.md`**: The 4
+  managed-settings markers (`teammateMode: "auto"`, `allowManagedPermissionRulesOnly`,
+  `sandbox.failIfUnavailable`, permission-filter non-bypass disclosure) are no longer
+  enforced in the template — they live only in `OMCA.md` (user-facing reference) and
+  `skills/omca-setup/SKILL.md` (install-time guidance), where the managed-settings
+  posture actually belongs. The now-unused `TEMPLATE_CLAUDEMD_MD` constant is also
+  removed (`scripts/validate-plugin.sh`)
+- **Contributor docs synced with new template structure**: `docs/CONTRIBUTING.md`
+  agent-addition instructions updated from "catalog table" → "`<agent_catalog>` block";
+  `justfile` `new-agent` recipe echo cleaned of the stale `agent-metadata.json`
+  reference (that file was already removed per `validate-plugin.sh:652-657`)
+- **Pre-commit hook scope aligned with `just lint-shell`**: `.bats` files are now
+  excluded from the `check-shebang-scripts-are-executable` and `shellcheck` pre-commit
+  hooks. `just lint-shell` only lints `scripts/*.sh`; the pre-commit hooks previously
+  over-reached by running shellcheck on bats files (detected via the `#!/usr/bin/env bats`
+  shebang), which would flag pre-existing style patterns — SC2250 unbraced variables and
+  SC2002 useless-cat — that the project has consistently accepted across all 11 bats
+  files. Bats files are still validated at test time by `bats` itself and via
+  `just test-bats` (`.pre-commit-config.yaml`)
+
+### Fixed
+
+- **Dead bats canary in `tests/bats/hooks/session_lifecycle.bats`**: The
+  "skips full template when CLAUDE.md has omca-setup" test was keyed to `## Agent Catalog`,
+  a markdown header that existed in the old `templates/claudemd.md`. When the
+  prompt-engineered rewrite replaced that header with `<agent_catalog>` XML tags, the
+  canary silently weakened: the assertion still passed, but only because the string it
+  was checking for no longer existed anywhere in the codebase — the test was no longer
+  verifying what it was designed to verify. Replaced with two orthogonal canary
+  assertions keyed to structurally stable signals in the new template (`<agent_catalog>`
+  XML tag and the "Treat Claude Code as the platform owner" operating principle). Using
+  two keys means a future template rewrite would have to kill BOTH strings to silently
+  rot the canary again. Found by retrospective oracle review of the template rewrite via
+  the prometheus workflow (`tests/bats/hooks/session_lifecycle.bats`)
+
+## [1.5.1] - 2026-04-08
+
+### Changed
+
+- **Platform sync for Claude Code v2.1.83–v2.1.94**: Template, rules, and README updated
+  with new platform features — `dontAsk` permission mode, `opusplan`/`best` model aliases,
+  `ENABLE_TOOL_SEARCH` env var, 10K hook output cap, `plansDirectory` setting,
+  `CLAUDE.local.md` scope, `sessionTitle` hook output, `disableSkillShellExecution` managed
+  setting, GHES plugin marketplace git URL syntax (`templates/claudemd.md`, `README.md`,
+  `scripts/session-init.sh`)
+- **OMCA guide rewrite**: Condensed `OMCA.md` from ~1,400 lines to a focused runtime
+  reference aligned with v1.5.0 hard-cutover model (`OMCA.md`, `templates/claudemd.md`)
+- **Pipeline hardening**: Added user-approval gate to planning pipeline documentation and
+  safety logging to ExitPlanMode hook (`scripts/plan-mode-handler.sh`)
+
+### Fixed
+
+- **ExitPlanMode safety gate**: Prometheus and momus agents now gate ExitPlanMode behind
+  AskUserQuestion to prevent plan auto-approval without user consent
+  (`agents/prometheus.md`, `skills/prometheus-plan/SKILL.md`)
+
+## [1.5.0] - 2026-04-02
+
+### Added
+
+- **Background agent barrier**: SubagentStop hook now injects `additionalContext` when
+  other agents are still running, telling the orchestrator to wait instead of acting on
+  partial results. Barrier instructions added to all agents and skills that launch
+  background agents (`subagent-complete.sh`, `sisyphus.md`, `atlas.md`, `socrates.md`,
+  `sisyphus-junior.md`, `github-triage`, `init-deep`, `ultrawork`)
+- **New hook events**: `TaskCreated`, `CwdChanged`, `FileChanged`, `WorktreeCreate`,
+  `WorktreeRemove` — lifecycle tracking via `lifecycle-state.sh`
+- **If-filtered permission handlers**: `PermissionRequest` hooks for `rm`, `npm`, `jq`,
+  `uv` with argument-level `if` field filtering to reduce process spawning overhead
+- **Output styles**: plugin-level output style system with `pluginConfigs` defaults and
+  `userConfig` schema
+- **Filesystem read tool**: `file_read` MCP tool for subagent path access outside project
+  root, bypassing sandbox scoping
+- **Claude-Native Orchestration Contract**: sisyphus and atlas agents now document the
+  boundary between OMCA policy and Claude-native surfaces (TaskCreated/TaskCompleted/
+  TeammateIdle governance)
+- **Mode state helpers**: `_mode_is_active`, `_mode_state_name`, `_mode_state_path` in
+  `common.sh` — shared boilerplate for mode detection across hook scripts
+- **Skill enhancements**: `paths:` frontmatter field, `shell:` field for atlas/handoff/
+  start-work, updated prometheus-plan and omca-setup for Claude-native planning
+- **Behavioral testing**: BATS + pytest infrastructure with fixtures for hook events,
+  permission filtering, and MCP tool validation
+
+### Changed
+
+- **Agent metadata migration**: all 13 agents moved cost/category/escalation metadata
+  from YAML frontmatter to HTML comments, eliminating platform-visible noise
+- **Prometheus/Metis/Momus**: migrated to Claude-native planning surfaces — plans and
+  review state use native plan files, not `.omca/` wrappers
+- **Subagent-start.sh restructure**: refactored context injection with section headers,
+  catalog injection for orchestrators, anti-duplication guidance, and external access
+  guidance
+- **Task-completed-verify.sh**: enhanced validation with stricter evidence schema checking
+- **Write-guard.sh**: improved evidence file handling
+- **PreToolUse matcher**: narrowed from `Task|Agent` to `Agent` only (Task tool was
+  renamed to Agent in Claude Code v2.1.63)
+- **Agent catalog simplification**: removed legacy `agent-metadata.json` server file;
+  catalog is now generated dynamically from agent frontmatter
+- **Mode state refactor**: `teammate-idle-guard.sh`, `stop-failure-handler.sh`,
+  `pre-compact.sh`, `session-cleanup.sh` refactored to use shared `_mode_is_active`
+  helper
+
+### Fixed
+
+- **Background agent notification stalls**: orchestrator agents now correctly wait for
+  all background agent notifications instead of acting on partial results — the "Esc to
+  flush" bug where queued task-notifications wouldn't trigger new turns
+- **MCP tool inheritance**: removed `allowed-tools` from skills that was blocking MCP
+  tool inheritance in subagents
+- **Read error recovery**: updated advice to reference `file_read` MCP tool instead of
+  `Bash(cat ...)`
+- **Multimodal-looker constraints**: added binary and device file constraints to prevent
+  invalid file reads
+
+## [1.4.1] - 2026-03-25
+
+### Added
+
+- **Time awareness injection**: Session context now includes a `[CURRENT DATE]` block so Claude
+  knows the current date and doesn't default to stale training data. Date survives compaction
+  via fresh re-injection, and subagents receive a lightweight date-only variant. Uses `LC_TIME=C`
+  for POSIX-portable, locale-independent output with graceful degradation
+  (`session-init.sh`, `post-compact-inject.sh`, `subagent-start.sh`)
+
+### Changed
+
+- **Hook output markers and section headers**: Multi-block `additionalContext` output now uses
+  `─── Section ─────` headers and `$'\n'` newline separators instead of space concatenation.
+  `subagent-start.sh` groups its 10+ context blocks into scannable sections (Agent Protocol,
+  Active Modes, Plan Context, Execution Guidance, External Access, Agent Catalog). Added
+  `_section_header()` utility to `scripts/lib/common.sh` for consistent formatting.
+  `keyword-detector.sh` and `context-injector.sh` also use newline separation
+
+### Fixed
+
+- **Explore agent Bash permissions**: Removed `permissionMode: plan` from explore, librarian,
+  and oracle agents to fix Bash being blocked for external file access. Read-only safety is
+  now enforced via `disallowedTools: Write, Edit, Agent` plus an explicit Bash Usage Policy
+  section in each agent. Triage and multimodal-looker retain `permissionMode: plan`
+
+## [1.4.0] - 2026-03-24
+
+### Added
+
+- **Triage agent**: lightweight request classifier for routing simple vs complex tasks
+  (`agents/triage.md`)
+- **Eval harness**: regression fixtures and documentation for quality assurance
+  (`docs/eval/`, `tests/fixtures/`)
+- **DX scaffolding recipes**: `just new-agent NAME`, `just new-hook EVENT NAME`,
+  CI validation improvements, and `just smoke-test` shortcut
+- **Observability hooks**: async conversion for `post-edit.sh` and
+  `instructions-loaded-audit.sh`, performance instrumentation
+- **MCP improvements**: `health_check` and `notepad_compact` tools, improved tool
+  descriptions and annotations
+- **PostToolUseFailure handlers**: `bash-error-recovery.sh` and `read-error-recovery.sh`
+  for Bash and Read tool error recovery
+- **Security hardening**: improved permission filter patterns, compaction injection
+  safety, mode conflict detection
+- **Agent enhancements**: agentic reminders, effort scaling guidance, sandwich defense
+  patterns
+
+### Changed
+
+- **MCP server refactor**: split monolithic `omca-mcp.py` into domain modules
+  (`servers/tools/ast.py`, `boulder.py`, `catalog.py`, `evidence.py`, `notepad.py`)
+- **Hook boilerplate extraction**: shared utilities extracted to `scripts/lib/common.sh`
+- **Agent routing metadata**: migrated to frontmatter fields
+- **Agent tone**: softened aggressive language, removed unnecessary personas
+- **Token efficiency**: reduced `templates/claudemd.md` token footprint
+- **Error recovery**: simplified PostToolUseFailure handlers, polished hook scripts
+- **Documentation**: removed hardcoded component counts from OMCA.md and README.md for
+  maintainability
+
+### Fixed
+
+- **Agent hallucinations**: corrected factual errors in agent definitions, restored
+  guardrails and consistency checks
+- **Hook tracking**: agent tracking field mismatch, race condition in spawn tracking,
+  keyword gate reliability
+- **MCP stability**: `health_check` crash, atomic write safety, `Path` fallback, stale
+  tool descriptions
+- **Plan-mode subagents**: injected external path access guidance for plan-mode agents
+- **Documentation**: restored template sections, fixed eval docs formatting
+
+## [1.3.0] - 2026-03-22
+
+### Added
+
+- **StopFailure hook event handler**: new `stop-failure-handler.sh` logs API errors
+  (rate limit, auth failure, billing, server error) to `.omca/logs/stop-failures.jsonl`.
+  Emits warning when ralph/ultrawork persistence mode was interrupted. StopFailure output
+  and exit code are ignored by Claude Code — this is a permanent known limitation for
+  persistence modes (users must manually resume after API errors)
+- **Effort frontmatter for agents**: all 10 agents gain `effort:` field — oracle=max,
+  opus agents=high, sonnet agents=medium. Overrides session effort level per agent for
+  cost/quality tuning
+- **Effort frontmatter for skills**: 14 of 20 skills gain `effort:` field — 9 high
+  (planning/execution skills), 5 medium (moderate complexity)
+- **CLAUDE_PLUGIN_DATA venv migration**: MCP server Python dependencies now persist across
+  plugin updates via `UV_PROJECT_ENVIRONMENT` in `.mcp.json` env and diff-based sync in
+  `session-init.sh`. Falls back to in-plugin venv on older Claude Code versions
+- **validate-plugin justfile recipe**: `just validate-plugin` runs `claude plugin validate .`
+  with `command -v claude` guard. Standalone recipe, not part of `just ci`
+- **ADR-017**: upstream port assessment for Claude Code v2.1.78-v2.1.81 documenting all
+  22 action items from the 47 changed upstream doc files
+- **Ultrawork Stop hook test scenarios**: additional test assertions for ralph-persistence
+  behavior under ultrawork mode
+- **SessionEnd test fixtures**: `sessionend-resume.json` and `sessionend-normal.json`
+- **Documentation updates**: StopFailure in hook map (18 event types, 28 hook commands,
+  29 scripts), `@-mention` subagent invocation syntax, channels feature awareness,
+  `--bare` flag, sandbox path prefix changes, enterprise settings, compound command
+  permission splitting, new env vars, global config split to `~/.claude.json`,
+  `disallowedTools` + `tools` interaction, `source: 'settings'` inline marketplace
+
+### Changed
+
+- **Statusline: OAuth API replaced by upstream payload**: deleted `usage.py` (288 LOC) —
+  the custom OAuth API client with HTTP fetch, caching, circuit breaker, and keychain
+  token extraction. Rate limit data now comes free from Claude Code's statusline JSON
+  payload (`rate_limits.five_hour.used_percentage`, `rate_limits.seven_day.used_percentage`).
+  Trade-off: lost `seven_day_sonnet` and `extra_usage.is_enabled` (minor)
+- **MCP tool renames**: `boulder_read`/`boulder_clear`/`evidence_clear` replaced by
+  unified `mode_read`/`mode_clear`
+- **ADR-012 adoption roadmap**: 6 new entries (effort, PLUGIN_DATA, StopFailure,
+  InstructionsLoaded matchers, PostCompact matchers, background). maxTurns corrected
+  from "Adopted (all agents)" to "Available but not adopted — causes subagent issues"
+- **SessionEnd cleanup**: `session-cleanup.sh` now reads stdin JSON and skips heavy
+  cleanup (log pruning, old file deletion) when `reason == "resume"` — lighter behavior
+  for session switching via interactive `/resume`
+
+### Fixed
+
+- **Spawn-ID bridging**: `track-subagent-spawn.sh` now bridges spawn-ID to platform
+  `agent_id` in subagent tracking
+- **teammate-idle-guard**: corrected field names and use `started_epoch` for staleness
+- **Ultrawork stagnation**: improved detection and agent-aware idle stop behavior
+- **Sisyphus background results**: added collection guidance for background agent results
+- **Plan Mode Exit**: agents gain guidance to prevent premature ExitPlanMode calls
+- **ExitPlanMode sequencing**: restructured in skills after momus review
+- **State cleanup**: replaced `rm -f` with `mode_clear` MCP tool in skill scripts
+
+## [1.2.2] - 2026-03-19
+
+### Fixed
+
+- **Stop hook JSON schema validation**: `ralph-persistence.sh` now uses top-level
+  `{"decision":"block","reason":"..."}` instead of the `hookSpecificOutput` wrapper.
+  Claude Code only accepts `hookSpecificOutput` for PreToolUse, UserPromptSubmit, and
+  PostToolUse events — Stop events require top-level fields. This was causing
+  `Hook JSON output validation failed: Invalid input` errors that silently broke
+  ralph/ultrawork persistence
+
+### Changed
+
+- **Hook Script Conventions docs**: CLAUDE.md now documents format-by-event-type
+  (hookSpecificOutput vs top-level decision/reason vs exit code 2) instead of
+  implying all hooks use the same output wrapper
+
+## [1.2.1] - 2026-03-19
+
+### Fixed
+
+- **Deterministic persistence state files**: `keyword-detector.sh` now creates
+  `ralph-state.json` and `ultrawork-state.json` atomically on keyword detection,
+  removing the dependency on Claude voluntarily following skill instructions
+- **Unified Stop blocking for ultrawork**: `ralph-persistence.sh` now checks both
+  `ralph-state.json` and `ultrawork-state.json` — ultrawork mode previously had
+  zero Stop-event enforcement
+- **Boulder fallback for task tracking gap**: when `ralph-state.json` has no tasks
+  (Claude used native TaskCreate instead of syncing), the Stop hook falls back to
+  `boulder.json` active plan detection with a 15-minute staleness guard
+- **Variable stagnation threshold**: empty task arrays use threshold 5 (more runway)
+  vs 3 for populated arrays, preventing premature stop when tasks are tracked natively
+
+### Added
+
+- **Persistence test fixtures**: `userpromptsubmit-ralph.json`,
+  `userpromptsubmit-ultrawork.json`, `stop-basic.json` with 6 new validation
+  assertions in `validate-plugin.sh`
+- **State file sync instructions in ralph SKILL**: explicit jq commands for syncing
+  `TaskCreate`/`TaskUpdate` to `ralph-state.json`
+- **State files section in ultrawork SKILL**: documents `ultrawork-state.json`
+  lifecycle and cleanup
+
+### Changed
+
+- **stop-continuation now clears ultrawork state**: previously only cleared
+  `ralph-state.json` and `boulder.json`, leaving `ultrawork-state.json` orphaned
+- **cancel-ralph documents scope**: added note that it only cancels ralph mode,
+  directing users to `stop-continuation` for ultrawork cleanup
+
+## [1.2.0] - 2026-03-18
+
+### Added
+
+- **Subagent output mandate**: SubagentStart hook injects `[OUTPUT MANDATE]` into all
+  depth-1 agents, telling them their text response is the only output the orchestrator
+  receives. Prevents agents from exhausting turns on tool calls without synthesizing
+- **Output failure conditions**: 7 agents (oracle, metis, momus, librarian, socrates,
+  atlas, sisyphus) gain "Output Requirements (CRITICAL)" sections with explicit failure
+  conditions modeled on explore's pattern — the only agent that reliably produced output
+- **ExitPlanMode permission hook**: new `plan-mode-handler.sh` auto-transitions session
+  to `acceptEdits` on plan approval, enabling execution agents to write files after
+  plan mode exit
+- **OMCA.md comprehensive guide**: 1200+ line operational guide consolidating plugin
+  architecture, agent catalog, skill reference, and hook documentation
+- **Statusline package docs**: added `statusline/README.md` with installation,
+  configuration, and architecture documentation
+- **Release version argument**: `just release [version]` accepts optional version to
+  bump all manifests in one command
+- **ExitPlanMode test fixture**: added `permissionrequest-exitplanmode.json` for hook
+  validation
+
+### Changed
+
+- **Removed maxTurns from all 10 agents**: agents manage their own turn budget instead
+  of hard cutoffs; output mandate and failure conditions provide the safety net
+- **Improved empty-task-response detection**: threshold raised from 10 to 50 chars,
+  added transitional pattern regex (detects "Let me...", "I'll...", etc. in short
+  responses), improved warning with SendMessage resumption guidance
+- **Code quality sweep across agents**: normalized content headers, MCP param names
+  (`type` → `evidence_type`, `yaml` → `rule_yaml`, `dryRun` → `dry_run`), removed
+  deprecated `cost` frontmatter from all agent definitions
+- **Code quality sweep across scripts**: hardened hook scripts with consistent error
+  handling, fixed delegate-retry `hookEventName` field, improved notify.sh multiline
+  handling
+- **Skills cleanup**: removed redundant separators, fixed param names, trimmed content
+  across atlas, dev-browser, frontend-ui-ux, git-master, handoff, hephaestus, ralph,
+  refactor, ultrawork, ulw-loop skills
+- **MCP server simplification**: refactored ast-grep and omca-state servers for clarity,
+  reformatted type annotations
+- **MCP consolidation**: merged root `pyproject.toml` into `servers/pyproject.toml`,
+  removed launcher scripts (`start-ast-grep-server.sh`, `start-omca-state-server.sh`),
+  updated `.mcp.json` to use `uv run --project servers` directly
+- **README trimmed to landing page**: moved detailed docs to OMCA.md, README now serves
+  as quick-start entry point
+- **Updated SendMessage API**: replaced deprecated `Agent(resume=)` with
+  `SendMessage({to: agentId})` across agent definitions
+- **Evidence enforcement**: `write-guard.sh` and `task-completed-verify.sh` now reject
+  manual writes to `verification-evidence.json`, requiring `evidence_log` MCP tool
+- **CI workflow updates**: bumped the all-actions group (checkout, setup-python,
+  cache) via Dependabot
+
+### Fixed
+
+- Removed dead `.omca/project-memory.json` reference from subagent-start hook
+- Added executable permission to `plan-mode-handler.sh`
+- Synced pyproject.toml and claudemd.md versions to match plugin.json (were out of
+  sync after v1.1.0 release)
+- Fixed release recipe to sync version into `servers/pyproject.toml` and
+  `templates/claudemd.md`
+
+## [1.1.0] - 2026-03-17
+
+### Added
+
+- **Statusline usage bars**: OAuth usage API client (`statusline/usage.py`) fetches
+  five-hour and seven-day utilization percentages from the Anthropic API with disk
+  cache (300s TTL), circuit breaker with exponential backoff (caps at 3600s), and
+  opt-out via `CLAUDE_STATUSLINE_NO_USAGE`. Rendered as a third statusline row with
+  ▰/▱ bars, color-coded thresholds, and local reset timestamps. Daemon caches usage
+  in a background thread; direct and client modes call inline
+- **New skills**: github-triage (read-only issue/PR triage with per-item background
+  agents and evidence-backed reports) and ulw-loop (ralph + ultrawork + oracle
+  verification persistence loop)
+- **Plan mode support**: prometheus-plan, sisyphus-orchestrate, and start-work skills
+  detect plan mode and document behavior. ExitPlanMode tool added to atlas, sisyphus,
+  and prometheus. Atlas and metis gain `permissionMode: acceptEdits` for execution
+  from plan mode
+- **Ralph stagnation detection**: tracks task-state hash across stop attempts; allows
+  exit after 3 consecutive identical checks to prevent infinite loops
+- **Ralph question-aware stopping**: allows stop when an AskUserQuestion is pending
+  (within 5 minutes) so the user can respond
+- **Pending-question tracking**: new `track-question.sh` PostToolUse hook records
+  AskUserQuestion calls to `.omca/state/pending-question.json`
+- **Keyword detector i18n**: Korean, Japanese, and Chinese pattern matching for ralph
+  and ultrawork keyword triggers
+- **Keyword detector subagent skip**: skips keyword detection when running inside a
+  subagent session (checks `agent_id` in hook payload)
+- **Pre-compact agent resume**: includes recently spawned agents in compaction context
+  with `RESUME, DON'T RESTART` directive to prevent duplicate spawns after compaction
+- **Delegate-retry retryable errors**: detects rate limits, timeouts, and capacity
+  errors and suggests retry instead of oracle escalation
+
+### Changed
+
+- **atlas**: replaced QA protocol with notepad protocol; added anti-duplication rule,
+  auto-continue policy (no user approval between tasks), verification evidence table,
+  and mandatory manual code review step
+- **prometheus**: added anti-duplication rule, draft-as-memory system
+  (`.omca/drafts/` as working memory across turns), and turn termination rules
+  (every response must end with a question, draft update, wait, or transition)
+- **sisyphus**: added anti-duplication rule and intent verbalization step (Step 1.5:
+  verbalize intent before routing)
+- **sisyphus-junior**: added structured escalation format and background agent results
+  handling
+- **metis**: added QA automation directives (agent-executable criteria only) and
+  AI-slop pattern detection (scope inflation, premature abstraction, over-validation)
+- **momus**: added approval bias philosophy (approve when 80% clear), max 3 issues
+  per rejection, and file-path invocation requirement
+- **oracle**: added output verbosity limits (≤7 action steps, ≤4 bullets) and
+  high-risk self-check (unstated assumptions, overly strong language)
+- **socrates**: added plan context awareness (boulder_read, notepad) and evidence
+  quality rules (2+ sources, confidence tagging)
+- **librarian**: added plan context awareness and escalation guidance (recommend
+  implementation agents for code changes, oracle for architecture)
+- Simplified agent-usage-reminder counter logic (modulo-3 instead of reset-to-zero)
+- Reformatted type annotations in omca-state-server
+- Refactored statusline progress bars from graduated blocks to uniform ▰/▱ symbols
+  with shared `_render_bar()` helper
+
+### Fixed
+
+- Removed stale `mcp__pgs__*` permission entries from omca-setup skill
+- Hardened permission-filter regex to catch `rm -fr`, `sudo rm` variants (was only
+  matching `rm -rf` and `rm -r`)
+- Fixed notify.sh multiline string handling (strips newlines before passing to
+  osascript `display notification`)
+- Added macOS/BSD portability for `stat` and `date` commands; suppressed SC2312
+  shellcheck warnings
+- Fixed git-master skill phase numbering gap (renumbered phases)
+- Fixed delegate-retry missing `hookEventName` field and `ERROR_TEXT` fallback chain
+- Removed fallback default from plugin root path configuration
+- Set valid SHA in marketplace plugin source for schema validation
+- Made `track-question.sh` executable
+
+## [1.0.0] - 2026-03-15
+
+Initial public release of oh-my-claudeagent — a markdown-first Claude Code plugin
+for multi-agent orchestration.
+
+### Added
+
+- 12 specialist agents (Greek mythology names): sisyphus, atlas, prometheus, metis,
+  momus, oracle, sisyphus-junior, explore, librarian, hephaestus, multimodal-looker,
+  socrates
+- 18 skills including ralph persistence, ultrawork parallel execution, handoff,
+  git-master, frontend-ui-ux, and agent command skills (atlas, metis, prometheus-plan,
+  hephaestus, sisyphus-orchestrate)
+- ast-grep MCP server wrapping `sg` CLI for structural code search and transformation
+- omca-state MCP server with boulder (work plan tracking), evidence (verification),
+  and notepad (subagent learning) management
+- 17 hook event types across 25 hook commands covering session lifecycle, tool
+  lifecycle, agent lifecycle, and infrastructure events
+- PostCompact log hook for compaction observability
+- Keyword detection system with auto-activation of skills and modes
+- Ralph persistence loop — blocks session stop until verified complete
+- Context injection on file read (AGENTS.md, README.md, .omca/rules/)
+- Compaction survival pipeline (PreCompact save → PostCompact enrich → SessionStart re-inject)
+- Agent tracking pipeline across PreToolUse → SubagentStart → SubagentStop
+- Permission auto-approval for package managers, denial for destructive `rm -rf`
+- Notepad injection and plan-file protection in SubagentStart hook
+- Plugin validation harness and contract test fixtures
+- GitHub Actions CI and release workflows
+- Dependabot configuration for automated dependency updates
+- Project quality tooling (EditorConfig, ruff, shellcheck)
+
+### Fixed
+
+- Stop hook output format and `hookEventName` field name mismatch
+- Boulder field name (`.planFile` → `.active_plan`) in subagent-start and pre-compact hooks
+- Marketplace source path in schema definition
+- ast-grep bootstrap diagnostics and error reporting
+- Hook permission handling and lifecycle edge cases
+- LSP capability provenance clarified as host-provided in agent definitions
+- Skill setup, provenance checks, and capability boundary enforcement
+- Executable permissions on all hook and utility scripts
+- Orphaned keyword removal, safe fallback defaults, and JSON escaping
+- Single-read pattern, consistent `jq` arguments, and UTF-8 safe truncation
+- Delegation reminder suppression inside subagent contexts
+- Context injection rules extended to Write and Edit events (not just Read)
+- `CLAUDE_PLUGIN_ROOT` fallback for MCP server commands
+
+### Changed
+
+- README and runtime template rewritten for public release
+- Dead worktree scripts removed; utility launchers documented
+- Shellcheck fixes applied across all hook scripts
+- Ruff fixes applied to Python MCP servers
+
+[3.0.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.21.0...v3.0.0
+[2.21.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.20.1...v2.21.0
+[2.20.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.20.0...v2.20.1
+[2.20.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.19.1...v2.20.0
+[2.19.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.19.0...v2.19.1
+[2.19.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.18.1...v2.19.0
+[2.18.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.18.0...v2.18.1
+[2.18.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.17.2...v2.18.0
+[2.17.2]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.17.1...v2.17.2
+[2.17.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.17.0...v2.17.1
+[2.17.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.16.0...v2.17.0
+[2.16.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.15.0...v2.16.0
+[2.15.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.14.1...v2.15.0
+[2.14.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.14.0...v2.14.1
+[2.14.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.13.2...v2.14.0
+[2.13.2]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.13.1...v2.13.2
+[2.13.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.13.0...v2.13.1
+[2.13.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.12.1...v2.13.0
+[2.12.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.12.0...v2.12.1
+[2.12.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.11.0...v2.12.0
+[2.11.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.10.2...v2.11.0
+[2.10.2]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.9.0...v2.10.2
+[2.9.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.8.6...v2.9.0
+[2.8.6]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.8.5...v2.8.6
+[2.8.5]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.8.4...v2.8.5
+[2.8.4]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.8.3...v2.8.4
+[2.8.3]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.8.2...v2.8.3
+[2.8.2]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.8.1...v2.8.2
+[2.8.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.5.2...v2.8.1
+[2.5.2]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.5.1...v2.5.2
+[2.5.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.5.0...v2.5.1
+[2.5.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.4.0...v2.5.0
+[2.4.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.3.0...v2.4.0
+[2.3.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.2.1...v2.3.0
+[2.2.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.2.0...v2.2.1
+[2.2.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.1.0...v2.2.0
+[2.1.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.0.0...v2.1.0
+[2.0.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.5.2...v2.0.0
+[1.5.2]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.5.1...v1.5.2
+[1.5.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.5.0...v1.5.1
+[1.5.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.4.1...v1.5.0
+[1.4.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.4.0...v1.4.1
+[1.4.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.3.0...v1.4.0
+[1.3.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.2.2...v1.3.0
+[1.2.2]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.2.1...v1.2.2
+[1.2.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.2.0...v1.2.1
+[1.2.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/releases/tag/v1.0.0

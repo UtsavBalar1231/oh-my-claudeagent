@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "oh-my-claudeagent",
+  "displayName": "Oh My ClaudeAgent",
+  "version": "3.0.0",
+  "description": "Claude Code, with receipts. Plans with you, hands each task to a specialist agent, and keeps a session from calling work done until a verification is logged. Its hooks run in every session, a guard holds destructive shell commands for review, and setup can point your status line at OMCA.",
+  "author": {
+    "name": "UtsavBalar1231",
+    "email": "utsavbalar1231@gmail.com",
+    "url": "https://github.com/UtsavBalar1231"
+  },
+  "homepage": "https://github.com/UtsavBalar1231/oh-my-claudeagent",
+  "repository": "https://github.com/UtsavBalar1231/oh-my-claudeagent",
+  "icon": "./assets/icon.png",
+  "privacyPolicyUrl": "https://github.com/UtsavBalar1231/oh-my-claudeagent/blob/main/PRIVACY.md",
+  "supportUrl": "https://github.com/UtsavBalar1231/oh-my-claudeagent/issues",
+  "documentationUrl": "https://github.com/UtsavBalar1231/oh-my-claudeagent/blob/main/docs/usage.md",
+  "license": "MIT",
+  "types": "./types/index.d.ts",
+  "keywords": [
+    "agents",
+    "orchestration",
+    "multi-agent",
+    "planning",
+    "delegation",
+    "parallel-execution"
+  ],
+  "userConfig": {
+    "enableKeywordTriggers": {
+      "title": "Enable keyword triggers",
+      "type": "boolean",
+      "default": false,
+      "description": "Adds a one-line hint naming the slash command when a prompt contains a trigger phrase such as \"create plan\".",
+      "sensitive": false
+    },
+    "statuslineMode": {
+      "title": "Statusline mode",
+      "type": "string",
+      "default": "on",
+      "options": [
+        "off",
+        "on"
+      ],
+      "description": "on lets /oh-my-claudeagent:omca-setup point your status line and the subagent status line at OMCA's renderer; off makes setup leave both alone.",
+      "sensitive": false
+    },
+    "disableForceOrchestrationStyle": {
+      "title": "Disable forced orchestration output style",
+      "type": "boolean",
+      "default": false,
+      "description": "When true, removes the force-for-plugin: true line from the installed output-styles/omca-default.md cache copy so your own outputStyle setting takes precedence instead of the plugin's orchestration style. The strip is applied at /oh-my-claudeagent:omca-setup time; you must re-run omca-setup after every plugin update (or /plugin marketplace update omca) because the cache copy may be overwritten and the strip will need re-application.",
+      "sensitive": false
+    },
+    "showBand": {
+      "title": "Show the band above the prompt",
+      "type": "boolean",
+      "default": true,
+      "description": "When false, the band with the bound plan, the last verification and the suggested next actions is not drawn.",
+      "sensitive": false
+    },
+    "guardMode": {
+      "title": "Destructive Bash guard mode",
+      "type": "string",
+      "default": "dialog",
+      "options": [
+        "dialog",
+        "deny"
+      ],
+      "description": "dialog asks before a risky Bash or PowerShell command runs where a dialog can show; deny, and any session where none can show, refuses a blocking command and lets an advisory one run. A catastrophic removal is refused in both modes.",
+      "sensitive": false
+    }
+  }
+}

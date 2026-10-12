@@ -1,0 +1,186 @@
+import { existsSync, readdirSync, readFileSync, statSync, utimesSync } from "node:fs";
+import { join } from "node:path";
+import { compactEntries, toPlanName } from "../../src/core/notepad.ts";
+import { redact } from "../../src/core/visual.ts";
+import { ensureStateDir, isDirectory, withLock, writeFileAtomic } from "../io.ts";
+import type { Tool } from "../omca.ts";
+import { isoTimestamp, rootOf, stringArg, WORKING_DIRECTORY } from "./args.ts";
+
+const SECTIONS = ["learnings", "issues", "decisions", "problems"] as const;
+type Section = (typeof SECTIONS)[number];
+
+const WARN_BYTES = 50 * 1024;
+const KEEP_LINES = 20;
+const MASK = "<masked>";
+
+const SECTION = { type: "string", enum: SECTIONS };
+
+const isFile = (path: string) => statSync(path, { throwIfNoEntry: false })?.isFile() ?? false;
+
+function toSection(value: unknown): Section {
+  const section = SECTIONS.find((candidate) => candidate === value);
+  if (section === undefined) throw new Error(`section must be one of ${SECTIONS.join(", ")}; got ${JSON.stringify(value)}`);
+  return section;
+}
+
+const rootArg = (args: Record<string, unknown>) => rootOf(stringArg(args, "working_directory", ""));
+const notepadsOf = (root: string) => join(root, ".omca", "notepads");
+
+// A directory's mtime moves only when an entry is added or removed, never for a rewrite inside a plan
+// directory, so every write bumps it explicitly: the mod re-ranks notepads when it moves.
+function touchNotepads(root: string): void {
+  const now = new Date();
+  try {
+    utimesSync(notepadsOf(root), now, now);
+  } catch (error) {
+    console.error(`omca: could not bump ${notepadsOf(root)}:`, error);
+  }
+}
+
+function sectionNames(dir: string): string {
+  const names = readdirSync(dir)
+    .filter((file) => file.endsWith(".md"))
+    .sort()
+    .map((file) => file.slice(0, -".md".length));
+  return names.length > 0 ? names.join(", ") : "empty";
+}
+
+export const tools: Tool[] = [
+  {
+    name: "notepad_write",
+    description:
+      "Append a learning, issue, decision or problem to a plan's notepad section, where it survives compaction. Never overwrites.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        plan_name: { type: "string", description: "Plan name (matches boulder plan_name)" },
+        section: { ...SECTION, description: "Notepad section to write to" },
+        content: { type: "string", description: "Content to append (markdown)" },
+        working_directory: WORKING_DIRECTORY,
+      },
+      required: ["plan_name", "section", "content"],
+    },
+    annotations: {
+      title: "Append to notepad",
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    _meta: {
+      "anthropic/searchHint": "persist a learning, issue, decision, or problem so it survives compaction",
+      "anthropic/alwaysLoad": true,
+    },
+    call: async (args) => {
+      const plan = toPlanName(stringArg(args, "plan_name"));
+      const section = toSection(args.section);
+      const content = stringArg(args, "content");
+      const root = rootArg(args);
+      ensureStateDir(root);
+      const path = join(notepadsOf(root), plan, `${section}.md`);
+      const size = await withLock(`${path}.lock`, () => {
+        const existing = existsSync(path) ? readFileSync(path, "utf8") : "";
+        const next = `${existing}\n## ${isoTimestamp()}\n\n${content}\n`;
+        writeFileAtomic(path, next);
+        return Buffer.byteLength(next);
+      });
+      touchNotepads(root);
+      const result = `Appended to ${plan}/${section}.md`;
+      if (size <= WARN_BYTES) return result;
+      return `${result}\n[WARNING: section file is ${Math.floor(size / 1024)}KB. Consider running notepad_compact to reduce size]`;
+    },
+  },
+  {
+    name: "notepad_read",
+    description:
+      "Read notepad content for a plan. Use to review discoveries, open questions, or prior decisions before continuing work on a plan. Omit section to read all sections at once. Returns formatted markdown content or a not-found message.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        plan_name: { type: "string", description: "Plan name" },
+        section: {
+          anyOf: [SECTION, { type: "null" }],
+          default: null,
+          description: "Section to read (all if omitted)",
+        },
+        working_directory: WORKING_DIRECTORY,
+      },
+      required: ["plan_name"],
+    },
+    annotations: { title: "Read notepad", readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+    _meta: { "anthropic/searchHint": "recall learnings, issues, decisions, and problems recorded for a plan" },
+    call: (args) => {
+      const plan = toPlanName(stringArg(args, "plan_name"));
+      const section = args.section == null ? undefined : toSection(args.section);
+      const dir = join(notepadsOf(rootArg(args)), plan);
+      if (!isDirectory(dir)) return `No notepad found for plan: ${plan}`;
+      const blocks = (section === undefined ? SECTIONS : [section]).flatMap((name) => {
+        const path = join(dir, `${name}.md`);
+        const title = name.charAt(0).toUpperCase() + name.slice(1);
+        return isFile(path) ? [`# ${title}\n\n${redact(readFileSync(path, "utf8"), "", MASK).text}`] : [];
+      });
+      return blocks.length > 0 ? blocks.join("\n---\n\n") : `No notepad entries found for plan: ${plan}`;
+    },
+  },
+  {
+    name: "notepad_list",
+    description:
+      "List available notepads and their sections. Use to discover which plans have notepad data or to verify a notepad was created. Provide plan_name to list sections for a specific plan, or omit to list all plans. Returns plan names with their available section names.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        plan_name: { type: "string", default: "", description: "Plan name (lists all plans if empty)" },
+        working_directory: WORKING_DIRECTORY,
+      },
+    },
+    annotations: { title: "List notepads", readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+    _meta: { "anthropic/searchHint": "discover which plans have notepads and which sections exist" },
+    call: (args) => {
+      const plan = stringArg(args, "plan_name", "");
+      const notepads = notepadsOf(rootArg(args));
+      if (plan !== "") {
+        const dir = join(notepads, toPlanName(plan));
+        return isDirectory(dir) ? `Plan: ${plan}\nSections: ${sectionNames(dir)}` : `No notepad found for plan: ${plan}`;
+      }
+      const plans = isDirectory(notepads) ? readdirSync(notepads).filter((name) => isDirectory(join(notepads, name))).sort() : [];
+      if (plans.length === 0) return "No notepads found.";
+      return ["Available notepads:\n", ...plans.map((name) => `- ${name}: ${sectionNames(join(notepads, name))}`)].join("\n");
+    },
+  },
+  {
+    name: "notepad_compact",
+    description:
+      "Permanently delete the oldest entries of one notepad section until it fits 20 lines. It cuts whole entries only and always keeps the newest entry, even when that entry alone is longer than 20 lines. Removed text is not archived anywhere. The section then starts with a marker giving the total number of lines removed so far. Use it only when a section is too large to read usefully and its older entries no longer matter; read them with notepad_read first if they might. Returns a one-line summary, or a no-op message when the section already fits.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        plan_name: { type: "string", description: "Plan name (matches boulder plan_name)" },
+        section: { ...SECTION, description: "Notepad section to compact" },
+        working_directory: WORKING_DIRECTORY,
+      },
+      required: ["plan_name", "section"],
+    },
+    annotations: {
+      title: "Compact notepad section",
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    _meta: { "anthropic/searchHint": "truncate older entries in a large notepad section between plan phases" },
+    call: async (args) => {
+      const plan = toPlanName(stringArg(args, "plan_name"));
+      const section = toSection(args.section);
+      const root = rootArg(args);
+      const path = join(notepadsOf(root), plan, `${section}.md`);
+      if (!existsSync(path)) return `Section '${section}' not found for plan '${plan}'`;
+      return withLock(`${path}.lock`, () => {
+        const { text, lines, entries, removedLines } = compactEntries(readFileSync(path, "utf8"), KEEP_LINES);
+        if (text === null) return `Section '${section}' has ${lines} lines and needs no compaction`;
+        writeFileAtomic(path, text);
+        touchNotepads(root);
+        return `Compacted '${section}': removed ${entries} old entries (${removedLines} lines), kept the newest whole entries within ${KEEP_LINES} lines`;
+      });
+    },
+  },
+];

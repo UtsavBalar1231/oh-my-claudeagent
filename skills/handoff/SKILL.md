@@ -1,0 +1,157 @@
+---
+name: handoff
+description: Write a self-contained context summary that a new session can continue from.
+when_to_use: |
+  Use when:
+  - Context window is getting long or session quality is degrading
+  - Approaching context window capacity
+  - User says "handoff", "context is long", or "start fresh"
+  - Switching to a new Claude Code session mid-task
+user-invocable: true
+disable-model-invocation: true
+shell: bash
+argument-hint: optional notes about what to include
+allowed-tools:
+  - Read
+  - Glob
+  - Bash(git status *)
+  - Bash(git diff *)
+  - Bash(git log *)
+  - Bash(git branch --show-current)
+  - mcp__plugin_oh-my-claudeagent_omca__boulder_progress
+  - mcp__plugin_oh-my-claudeagent_omca__notepad_read
+  - mcp__plugin_oh-my-claudeagent_omca__notepad_list
+---
+
+# Handoff: session context summarization
+
+## Tool restrictions
+
+Read-only. No Write/Edit/Agent. MCP tools: `boulder_progress`, `notepad_read`, `notepad_list`. `boulder_write` is deliberately absent: it is the only writer of the plan registry, and a summarizer has nothing to register.
+
+Self-contained handoff summary for new-session continuation.
+
+## PHASE 0: VALIDATE
+
+Confirm meaningful work exists. For a nearly empty session, tell the user there is nothing to hand off.
+
+## PHASE 1: GATHER CONTEXT
+
+Run in parallel:
+
+```bash
+git diff --stat HEAD~10..HEAD 2>/dev/null || git log --oneline -10
+git status --porcelain
+git branch --show-current
+git log --oneline -5
+```
+
+Also: `boulder_progress()`, `notepad_read` for active plan sections (load it if needed: `ToolSearch({query: "select:mcp__plugin_oh-my-claudeagent_omca__notepad_read", max_results: 1})`), the plan files in `<plans-dir>` (the `plansDirectory` setting when set, relative to the project root, otherwise `~/.claude/plans`). Treat the plan file's numbered checkboxes and `boulder_progress()` as the primary source, and `TaskList()`, where that tool exists, as a supplement.
+
+## PHASE 2: EXTRACT
+
+First person ("I did...", "I told you..."):
+- What was done, what remains
+- KEY FILES (max 10, workspace-relative)
+- USER REQUESTS verbatim, no paraphrasing
+- EXPLICIT CONSTRAINTS verbatim, no inventing
+
+## PHASE 3: FORMAT OUTPUT
+
+```
+HANDOFF CONTEXT
+===============
+
+USER REQUESTS (AS-IS)
+---------------------
+- [Exact verbatim user requests]
+
+GOAL
+----
+[One sentence: what should be done next]
+
+PROGRESS
+--------
+Tasks completed: X / Y total
+- [x] [Completed task name]
+- [ ] [Pending task name]
+(Use the plan file's checkboxes and `boulder_progress()`, plus `TaskList()` counts where that tool exists. Never invent a count: if no source is available, write "unknown".)
+
+NOTEPAD SUMMARY
+---------------
+[Only include if an active plan with notepad data exists]
+Plan: [plan-name]
+- learnings: N entries - [one-line summary of key insight]
+- issues: N entries - [one-line summary of open issue if any]
+- decisions: N entries - [list verbatim from notepad decisions section, one per line]
+- problems: N entries - [summary if non-zero]
+
+WORK COMPLETED
+--------------
+- [First person bullets of what was done]
+- [Include specific file paths]
+
+CURRENT STATE
+-------------
+- [Current state of codebase or task]
+- [Build/test status if applicable]
+
+REMAINING WORK
+--------------
+- [ ] [Unchecked plan task - copy exact task text]
+- [ ] [Next logical step if not in plan]
+(Pull from plan file checkboxes, and from `TaskList()` state where that tool exists)
+
+KEY FILES
+---------
+- [path/to/file] - [brief role]
+(Maximum 10 files, prioritized by importance)
+
+IMPORTANT DECISIONS
+-------------------
+- [Technical decisions and why - pull from notepad decisions section if available]
+- [Trade-offs considered]
+
+EXPLICIT CONSTRAINTS
+--------------------
+- [Verbatim constraints only - from user or existing AGENTS.md]
+- If none: None
+
+CONTEXT FOR CONTINUATION
+------------------------
+- [What the next session needs to know]
+- [Warnings or gotchas]
+```
+
+Rules:
+- Plain text, no markdown headers in output
+- No bold/italic/code fences in content fields
+- Only what matters for continuation
+- USER REQUESTS and CONSTRAINTS: verbatim only
+- PROGRESS: actual counts from the plan file and `boulder_progress()`, supplemented by `TaskList()` where available. Write "unknown" rather than a guess
+- NOTEPAD SUMMARY: omit if no active plan/notepad data
+- REMAINING WORK: verbatim from plan file
+
+## PHASE 4: INSTRUCT
+
+```
+TO CONTINUE IN A NEW SESSION:
+
+1. Start a new Claude Code session: claude
+2. Paste the HANDOFF CONTEXT above as your first message
+3. Add: "Continue from the handoff context above. [Your next task]"
+```
+
+## Invocation
+
+Handoff is a user-driven workflow, so this skill sets `disable-model-invocation: true`: it
+runs only when you type `/oh-my-claudeagent:handoff`. Claude cannot load it on its own, and
+it is not preloaded into subagents. With keyword triggers on, a prompt that says "handoff"
+gets a one-line hint suggesting the command; the hint does not start the workflow.
+
+## Constraints
+
+- No programmatic session creation
+- No sensitive information (API keys, credentials)
+- Max 10 KEY FILES
+- User requests quoted verbatim

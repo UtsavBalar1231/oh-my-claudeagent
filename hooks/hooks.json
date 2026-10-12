@@ -1,0 +1,194 @@
+{
+  "modules": ["./register.ts"],
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "clear|compact",
+        "hooks": [
+          {
+            "type": "mcp_tool",
+            "server": "plugin:oh-my-claudeagent:omca",
+            "tool": "omca_hook",
+            "timeout": 10,
+            "input": {
+              "event": "SessionStart",
+              "session_id": "${session_id}",
+              "source": "${source}"
+            }
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "mcp_tool",
+            "server": "plugin:oh-my-claudeagent:omca",
+            "tool": "omca_hook",
+            "timeout": 10,
+            "input": {
+              "event": "UserPromptSubmit",
+              "session_id": "${session_id}",
+              "agent_id": "${agent_id}",
+              "prompt": "${prompt}",
+              "session_title": "${session_title}"
+            }
+          }
+        ]
+      }
+    ],
+    "UserPromptExpansion": [
+      {
+        "hooks": [
+          {
+            "type": "mcp_tool",
+            "server": "plugin:oh-my-claudeagent:omca",
+            "tool": "omca_hook",
+            "timeout": 10,
+            "input": {
+              "event": "UserPromptExpansion",
+              "session_id": "${session_id}",
+              "command_name": "${command_name}",
+              "prompt": "${prompt}"
+            }
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "mcp_tool",
+            "server": "plugin:oh-my-claudeagent:omca",
+            "tool": "omca_hook",
+            "timeout": 10,
+            "input": {
+              "event": "SubagentStart",
+              "session_id": "${session_id}",
+              "agent_id": "${agent_id}",
+              "agent_type": "${agent_type}"
+            }
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "mcp_tool",
+            "server": "plugin:oh-my-claudeagent:omca",
+            "tool": "omca_hook",
+            "timeout": 10,
+            "input": {
+              "event": "PreToolUse",
+              "session_id": "${session_id}",
+              "tool_name": "${tool_name}",
+              "tool_input": "${tool_input}"
+            }
+          }
+        ]
+      }
+    ],
+    "PermissionDenied": [
+      {
+        "hooks": [
+          {
+            "type": "mcp_tool",
+            "server": "plugin:oh-my-claudeagent:omca",
+            "tool": "omca_hook",
+            "timeout": 10,
+            "input": {
+              "event": "PermissionDenied",
+              "session_id": "${session_id}",
+              "tool_name": "${tool_name}",
+              "reason": "${reason}"
+            }
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Read|Write|Edit|Agent|SubagentHandback|Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "mcp_tool",
+            "server": "plugin:oh-my-claudeagent:omca",
+            "tool": "omca_hook",
+            "timeout": 10,
+            "input": {
+              "event": "PostToolUse",
+              "session_id": "${session_id}",
+              "agent_id": "${agent_id}",
+              "agent_type": "${agent_type}",
+              "tool_name": "${tool_name}",
+              "tool_input": "${tool_input}",
+              "tool_response": "${tool_response}"
+            }
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "hooks": [
+          {
+            "type": "mcp_tool",
+            "server": "plugin:oh-my-claudeagent:omca",
+            "tool": "omca_hook",
+            "timeout": 10,
+            "input": {
+              "event": "PostToolUseFailure",
+              "session_id": "${session_id}",
+              "agent_id": "${agent_id}",
+              "tool_name": "${tool_name}",
+              "tool_input": "${tool_input}",
+              "error": "${error}",
+              "duration_ms": "${duration_ms}"
+            }
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "mcp_tool",
+            "server": "plugin:oh-my-claudeagent:omca",
+            "tool": "omca_hook",
+            "timeout": 15,
+            "input": {
+              "event": "Stop",
+              "session_id": "${session_id}",
+              "transcript_path": "${transcript_path}",
+              "stop_hook_active": "${stop_hook_active}",
+              "last_assistant_message": "${last_assistant_message}",
+              "background_tasks": "${background_tasks}"
+            }
+          }
+        ]
+      }
+    ],
+    "TaskCompleted": [
+      {
+        "hooks": [
+          {
+            "type": "mcp_tool",
+            "server": "plugin:oh-my-claudeagent:omca",
+            "tool": "omca_hook",
+            "timeout": 10,
+            "input": {
+              "event": "TaskCompleted",
+              "session_id": "${session_id}"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
