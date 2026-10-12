@@ -52,6 +52,7 @@ export const EXCLUDES = [
   "/opencode/",
   "/.opencode/",
   "/video/",
+  "/.claude-plugin/types/",
 ] as const;
 
 /** Files that ship although an exclude covers them: `/oh-my-claudeagent:omca-setup` runs this script from the install. */

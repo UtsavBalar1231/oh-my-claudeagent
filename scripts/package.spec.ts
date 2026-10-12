@@ -16,7 +16,6 @@ const SHIPPED: Record<string, string> = {
   "scripts/setup-statusline.ts": "ts\n",
   "servers/m.ts": "ts\n",
   "statusline/main.ts": "ts\n",
-  ".claude-plugin/types/tsconfig.json": "{}\n",
   "servers/package.json": "{}\n",
 };
 
@@ -33,6 +32,8 @@ const EXCLUDED: Record<string, string> = {
   "scripts/validate/core.ts": "x",
   "scripts/qa/lib.ts": "x",
   "servers/m.spec.ts": "x",
+  ".claude-plugin/types/tsconfig.json": "{}\n",
+  ".claude-plugin/types/claude-code/index.d.ts": "x",
   "justfile": "x",
   ".pre-commit-config.yaml": "x",
   ".editorconfig": "x",
@@ -110,9 +111,8 @@ describe("listPackageFiles", () => {
       ".opencode/plugin.ts",
       "servers/package.json",
       "docs/opencode/notes.md",
-      ".claude-plugin/types/tsconfig.json",
     ]);
-    expect(listed).toEqual([".claude-plugin/types/tsconfig.json", "docs/opencode/notes.md", "servers/package.json"]);
+    expect(listed).toEqual(["docs/opencode/notes.md", "servers/package.json"]);
   });
 
   test("drops every file of the demo video project and keeps a nested video directory", () => {
