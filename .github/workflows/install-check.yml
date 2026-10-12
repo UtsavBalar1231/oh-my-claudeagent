@@ -1,0 +1,78 @@
+name: Install check
+
+permissions: {}
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Plugin version the marketplace install must report (for example 3.0.0)
+        required: true
+        type: string
+
+env:
+  CLAUDE_CODE_VERSION: 2.1.296
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  install:
+    name: Install from the marketplace (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    env:
+      DISABLE_AUTOUPDATER: "1"
+      CLAUDE_CONFIG_DIR: ${{ runner.temp }}/claude-config
+    steps:
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+          no-cache: true
+
+      - name: Install Claude Code (Linux and macOS)
+        if: runner.os != 'Windows'
+        run: |
+          curl -fsSL https://claude.ai/install.sh | bash -s "$CLAUDE_CODE_VERSION"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          [[ "$("$HOME/.local/bin/claude" --version)" == "$CLAUDE_CODE_VERSION "* ]]
+
+      - name: Install Claude Code (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          & ([scriptblock]::Create((Invoke-RestMethod https://claude.ai/install.ps1))) $env:CLAUDE_CODE_VERSION
+          $bin = Join-Path $env:USERPROFILE '.local\bin'
+          Add-Content -Path $env:GITHUB_PATH -Value $bin -Encoding utf8
+          $version = & (Join-Path $bin 'claude.exe') --version
+          if ($version -notlike "$env:CLAUDE_CODE_VERSION *") { throw "installed claude reports '$version', expected $env:CLAUDE_CODE_VERSION" }
+
+      - name: Add the marketplace and install the plugin
+        run: |
+          claude plugin marketplace add UtsavBalar1231/oh-my-claudeagent
+          claude plugin install oh-my-claudeagent@omca
+
+      - name: Check the installed version and validate the installed plugin
+        env:
+          EXPECTED_VERSION: ${{ inputs.version }}
+        run: |
+          claude plugin list --json > "$RUNNER_TEMP/plugins.json"
+          entry="$(jq -c '[.[] | select((.id // .name) == "oh-my-claudeagent@omca")][0] // empty' "$RUNNER_TEMP/plugins.json")"
+          if [[ -z "$entry" ]]; then
+            echo "oh-my-claudeagent@omca is not in the plugin list:" >&2
+            cat "$RUNNER_TEMP/plugins.json" >&2
+            exit 1
+          fi
+          installed="$(jq -r '.version' <<<"$entry")"
+          if [[ "$installed" != "$EXPECTED_VERSION" ]]; then
+            echo "installed oh-my-claudeagent@omca is $installed, expected $EXPECTED_VERSION" >&2
+            exit 1
+          fi
+          installPath="$(jq -r '.installPath' <<<"$entry")"
+          claude plugin validate "$installPath"
+          claude plugin validate "$installPath/.claude-plugin/plugin.json"
