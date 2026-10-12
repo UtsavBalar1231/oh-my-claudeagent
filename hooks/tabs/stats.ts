@@ -212,12 +212,13 @@ function agentsCard(stats: Stats, view: View, width: number, isFramed: boolean):
   const most = Math.max(1, ...stats.rows.map((row) => row.count));
   const cells = (pieces: readonly Piece[][]) => pieces.flatMap((piece) => [{ text: GAP }, ...piece]);
   const head = `${" ".repeat(lead)}${padEnd("agent", name)}${columns.map((column) => `${GAP}${padStart(column.header, column.width)}`).join("")}`;
+  const meterMarks = view.isAscii ? marksOf(sharesOf(stats.rows), view) : new Map<string, string>();
   const lines = stats.rows.map((row) => {
     const color = agentKey(row.agentType);
     return Row(view.kit, {
       key: `stats-${row.agentType}`,
       pieces: [
-        { text: `${agentGlyph(row.agentType, view.g)} `, color },
+        { text: `${meterMarks.get(row.agentType) ?? agentGlyph(row.agentType, view.g)} `, color },
         { text: padEnd(fitEnd(shortType(row.agentType), name, view.g.ellipsis), name) },
         ...cells(columns.map((column) => column.cell(row, view, most))),
       ],
@@ -272,11 +273,24 @@ const OTHER_MARK = "o";
 
 type Part = { mark: string; color: ThemeKey; usd: number };
 
+function sharesOf(rows: readonly StatsRow[]): StatsRow[] {
+  return rows
+    .filter((row) => finished(row) > row.unpriced && row.estimatedCostUsd > 0)
+    .toSorted((a, b) => b.estimatedCostUsd - a.estimatedCostUsd);
+}
+
+function marksOf(shares: readonly StatsRow[], view: View): Map<string, string> {
+  return new Map(
+    shares.map((row, index) => [row.agentType, view.isAscii ? (METER_MARKS[index] ?? OTHER_MARK) : agentGlyph(row.agentType, view.g)]),
+  );
+}
+
 function partsOf(shares: readonly StatsRow[], view: View): Part[] {
+  const marks = marksOf(shares, view);
   const own = view.isAscii ? shares.slice(0, METER_MARKS.length) : shares;
   const rest = shares.slice(own.length);
-  const parts = own.map((row, index) => ({
-    mark: view.isAscii ? (METER_MARKS[index] ?? "#") : agentGlyph(row.agentType, view.g),
+  const parts = own.map((row) => ({
+    mark: marks.get(row.agentType) ?? OTHER_MARK,
     color: agentKey(row.agentType),
     usd: row.estimatedCostUsd,
   }));
@@ -301,8 +315,7 @@ function costCard(stats: Stats, view: View, width: number): RenderElement {
   }
   const total = priced.reduce((sum, row) => sum + row.estimatedCostUsd, 0);
   const money = `${formatUsd(total)}${stats.rows.some((row) => row.unpriced > 0) ? "+" : ""}`;
-  const shares = priced.filter((row) => row.estimatedCostUsd > 0).toSorted((a, b) => b.estimatedCostUsd - a.estimatedCostUsd);
-  const parts = partsOf(shares, view);
+  const parts = partsOf(sharesOf(stats.rows), view);
   const meter = stack(
     parts.length === 0
       ? [{ value: 1, color: TONE_KEYS.track, ascii: "." }]

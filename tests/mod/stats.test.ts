@@ -381,12 +381,15 @@ test("the cost card holds only its total and meter and its notes, however many a
 test("the ASCII meter marks the seven costliest agents and merges the rest as other, with no legend under it", async ($, on) => {
   const names = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"].map((name, n) => [`agent-${name}`, 20 - n * 2] as const);
   world(on, priced(names), {}, { OMCA_GLYPHS: "ascii" });
-  const lines = costLines(await statsTab($, STACKED));
+  const tree = await statsTab($, STACKED);
+  const lines = costLines(tree);
   const [meter, ...rest] = lines.slice(1);
 
   expect(meter?.startsWith("$110.00 [")).toBe(true);
   for (const mark of ["#", "=", "+", "*", "%", "&", "~", "o"]) expect(meter?.includes(mark), mark).toBe(true);
   expect(rest).toEqual(["2026-10-11 list prices"]);
+  const marks = agentRows(tree).filter((row) => row.includes("agent-")).map((row) => row.slice(0, 1));
+  expect(marks).toEqual(["#", "=", "+", "*", "%", "&", "~", "o", "o", "o"]);
 });
 
 const ROLES = ["executor", "build-fixer", "explorer", "researcher", "viewer", "analyzer", "architect", "planner", "reviewer", "custom-agent"] as const;
@@ -531,8 +534,8 @@ test("OMCA_GLYPHS=ascii draws the Stats tab from the ASCII set", async ($, on) =
     "7 delegations in 2 sessions - 1 running - 1 unreadable record skipped",
     "Agents - 3 types",
     "  agent                  runs  median  tokens  est. cost  evidence",
-    "@ executor   [########]     3   1m30s    1.0M      $2.86     ! 67%",
-    "@ explorer   [########]     3     15s   12.0k     $0.01+       n/a",
+    "# executor   [########]     3   1m30s    1.0M      $2.86     ! 67%",
+    "= explorer   [########]     3     15s   12.0k     $0.01+       n/a",
     "@ architect  [###.....]     1   6m40s    129k        n/a       n/a",
     "Tokens per delegation - 6 delegations",
     ".@.:.. peak 990k",
