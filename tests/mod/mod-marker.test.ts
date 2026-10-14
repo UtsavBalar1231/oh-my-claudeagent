@@ -54,6 +54,12 @@ test("each main-loop turn start rewrites the marker with the turn's time", async
   expect(marker(w)).toMatchObject({ written_at: STARTED_MS + 2_000 });
 });
 
+test("a subagent's turn start writes no marker", async ($, on) => {
+  const w = engine(on);
+  await $.turn.start({ text: "go", turnId: "t-1", agentId: "a1" });
+  expect(w.files.has(MARKER)).toBe(false);
+});
+
 test("the marker carries the plugin option that turns keyword triggers on", { options: { enableKeywordTriggers: true } }, async ($, on) => {
   const w = engine(on);
   await start($);

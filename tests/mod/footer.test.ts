@@ -122,6 +122,15 @@ test("a subagent's turn.complete gets no footer and the engine's answer stands",
   expect(await turn($, w, meter, 0.2812, "a-1")).toEqual({ text: "The tests ran." });
 });
 
+test("a subagent's turn.start leaves the main turn's cost sample alone", async ($, on) => {
+  const { w, meter } = engine(on);
+  await $.turn.start({ text: "Run the tests", turnId: "t-1" });
+  meter.usd = 0.5;
+  await $.turn.start({ text: "Delegate", turnId: "t-2", agentId: "a1" });
+
+  expect(await turn($, w, meter, 0.2812)).toEqual({ text: `4s · 12.3k${B}in${B}845${B}out · $0.0312${B}engine${B}cost` });
+});
+
 test("without a cost sample the footer leaves the cost out", async ($, on) => {
   const { w, meter } = engine(on);
 

@@ -17,6 +17,7 @@ async function unloggedSince(host: Host, startMs: number): Promise<string | null
 export const footer: Features = {
   "turn.start": {
     async pre(host, e) {
+      if (e.agentId !== undefined) return undefined;
       const [usage, at] = await Promise.all([host.session.usage(), host.clock.now()]);
       await host.state.costSample.set({ turnId: e.turnId, usd: usage.cost?.usd ?? null, at });
       return undefined;
