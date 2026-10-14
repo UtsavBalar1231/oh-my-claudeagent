@@ -28,8 +28,8 @@ out. A 200 column terminal shows each row on one line:
 
 ```
 > Opus 5.5 · E: high · A: oh-my-claudeagent:executor · T: 2/4 -> Wire the order summary panel into the payment step and cover it with a test
-▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱ 34%  200k · * feature/checkout-redesign ~3  +2  ?1 · > shop · W: checkout-wt <- main · #42 + · +42/-7 · +2 dirs
-~ 2m05s · C: warm 52m · ▰▰▰▰▱▱▱▱▱▱ 45% 5h (resets 6pm) · ▰▰▰▰▰▰▰▰▱▱ 80% 7d (resets mon 5pm)
+━━━━━━━───────────── 34%  200k · * feature/checkout-redesign ~3  +2  ?1 · > shop · W: checkout-wt <- main · #42 + · +42/-7 · +2 dirs
+~ 2m05s · C: warm 52m · ━━━━────── 45% 5h (resets 6pm) · ━━━━━━━━── 80% 7d (resets mon 5pm)
 ```
 
 An 80 column terminal wraps the session row onto two lines, and to stay within four lines it
@@ -39,8 +39,8 @@ extra directories and the 7 day limit) so the duration and the 5 hour limit stay
 ```
 > Opus 5.5 · E: high · A: oh-my-claudeagent:executor
 T: 2/4 -> Wire the order summary panel into the payment step and cover it…
-▰▰▰▰▰▱▱▱▱▱▱▱▱▱ 34%  200k · * feature/checkout-redesign ~3  +2  ?1 · > shop
-~ 2m05s · ▰▰▰▰▱▱▱▱▱▱ 45% 5h (resets 6pm)
+━━━━━───────── 34%  200k · * feature/checkout-redesign ~3  +2  ?1 · > shop
+~ 2m05s · ━━━━────── 45% 5h (resets 6pm)
 ```
 
 A terminal under 60 columns gets one compact line:
@@ -101,8 +101,12 @@ a wide character such as a CJK glyph counts as two.
 - **The context bar** is 8 blocks at the least and 20 at the most, and takes the free cells left
   on its line. Eight blocks keep the 60% and 85% color thresholds apart (one block is 12.5
   points), and past 20 blocks a block is under 5 points and the bar adds nothing.
+- **Rings.** With Nerd Font glyphs, where the 5 hour and 7 day bars would push the usage row onto
+  another line, both windows draw a ring in their place. A ring has the context bar's 8 steps: the
+  outline at 0%, the full disc at 100%, and a slice between. The rings are Nerd Fonts v3 glyphs.
 - **Under 60 terminal columns** the output is one compact line of model, plan count, context percentage
-  and branch, dropping from the right when they do not fit.
+  and branch, dropping from the right when they do not fit. With Nerd Font glyphs a ring leads the
+  percentage.
 - **Colors and links.** Bars and percentages are green below 60%, yellow from 60% to 84% and red
   from 85%, fixed values. The branch and a subagent row's name draw in the terminal's default
   foreground, the name in bold, never in white, so they read on light and dark backgrounds.
@@ -157,7 +161,7 @@ seconds) are fixed in the code. These environment variables are read:
 
 | Variable | Default | Effect |
 |---|---|---|
-| `OMCA_GLYPHS` | `nerd` | `nerd` draws Nerd Font glyphs, `unicode` the text labels below with Unicode bars and separators, `ascii` plain text throughout. An unknown value means `nerd`. The `/omca` pane reads the same variable. |
+| `OMCA_GLYPHS` | `nerd` | `nerd` draws Nerd Fonts v3 glyphs, `unicode` the text labels below with box-drawing bars and Unicode separators, `ascii` plain text throughout. An unknown value means `nerd`. The `/omca` pane reads the same variable. |
 | `COLUMNS` | `80` | Terminal width in cells. Claude Code sets it. A value that is not a positive integer is ignored. |
 | `LINES` | tall | Terminal height. Claude Code sets it. Under 20 the status line takes at most two lines. |
 | `OMCA_SUBAGENT_STATUSLINE_DUMP` | unset | Path. Appends each raw `subagentStatusLine` stdin payload to this file as JSONL. Opt-in capture for answering platform-payload questions; no rotation. |

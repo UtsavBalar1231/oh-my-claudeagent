@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- With Nerd Font glyphs, the status line's 5 hour and 7 day windows draw rings instead of bars
+  where the bars would push the usage row onto another line, and the compact line under 60
+  columns puts a ring before the context percentage. The rings are Nerd Fonts v3 glyphs.
+
+### Fixed
+
+- The status line draws its bars with box-drawing lines (`━─`), which terminals draw themselves,
+  instead of `▰▱`, which common terminal fonts lack and borrow from a fallback font.
+
 ## [3.0.1] - 2026-10-13
 
 ### Fixed

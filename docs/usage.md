@@ -436,8 +436,9 @@ against that limit.
 The subagent status line gives each running agent a row with its model, state, effort and
 context use.
 
-The status line and the `/omca` pane draw Nerd Font icons. Set `OMCA_GLYPHS=unicode` when the
-terminal font has none, or `OMCA_GLYPHS=ascii` for plain text; `/oh-my-claudeagent:omca-setup`
+The status line and the `/omca` pane draw Nerd Font icons, and the status line's cache icon and
+usage rings need Nerd Fonts v3. Set `OMCA_GLYPHS=unicode` when the terminal font has none or is an
+older Nerd Font, or `OMCA_GLYPHS=ascii` for plain text; `/oh-my-claudeagent:omca-setup`
 asks and writes it for you. [`statusline/README.md`](../statusline/README.md) has the layout rules.
 
 ## Project rules

@@ -104,7 +104,7 @@ const INSET = 6;
 const RST = "\x1b[0m";
 const SEPARATOR = ` \x1b[90m·${RST} `;
 const ESCAPES = /\x1b\[[0-9;]*m|\x1b\]8;;[^\x07]*\x07/g;
-const BAR_RUN = /(?:\x1b\[[0-9;]*m[▰▱]\x1b\[0m)+|\x1b\[90m▱+\x1b\[0m/g;
+const BAR_RUN = /(?:\x1b\[[0-9;]*m[━─\u{f0766}\u{f0a9e}-\u{f0aa5}]\x1b\[0m)+|\x1b\[90m─+\x1b\[0m/gu;
 const PLAN_PIECE = /^(\x1b\[32m\S+ \d+\/\d+\x1b\[0m \x1b\[90m(?:->|→) )(.*)\x1b\[0m$/;
 
 // White and bright white vanish on a light background; text that needs to stand out uses the default foreground.
@@ -113,11 +113,12 @@ const NEAR_WHITE = /\x1b\[(?:[0-9;]*;)?(?:37|97|38;5;(?:7|15|25[0-5]))(?:;[0-9;]
 const outputLines = (output: string): string[] => output.split("\n").filter(Boolean);
 
 const pieces = (output: string): string[] =>
-  outputLines(output).flatMap((line) => line.slice(0, -RST.length).split(SEPARATOR).map((piece) => piece.replace(BAR_RUN, "▰")));
+  outputLines(output).flatMap((line) => line.slice(0, -RST.length).split(SEPARATOR).map((piece) => piece.replace(BAR_RUN, "━")));
 
-// A bar draws to the room its line has and the next-task label to the room it is left, so those two
-// compare by shape; any other piece must equal the one the roomiest terminal of its layout draws (the
-// compact layout ends at 59 columns, the full one has no upper end).
+// A bar draws to the room its line has (a ring where a short row needs one) and the next-task label
+// to the room it is left, so those two compare by shape; any other piece must equal the one the
+// roomiest terminal of its layout draws (the compact layout ends at 59 columns, the full one has no
+// upper end).
 function cutPieces(output: string, wide: string): string[] {
   const whole = new Set(pieces(wide));
   const wholeLabels = new Map([...whole].flatMap((piece) => {

@@ -100,9 +100,10 @@ const MIN_LABEL_CELLS = 12;
 const CACHE_EXPIRING_SECONDS = 60;
 const CACHE_MISS_SHOWN_SECONDS = 300;
 
+// Bars are box-drawing lines, which terminals draw themselves rather than take from a font that may lack them.
 export const NERD_GLYPHS = {
-  filled: "▰",
-  empty: "▱",
+  filled: "━",
+  empty: "─",
   dot: "·",
   ellipsis: "…",
   arrow: "→",
@@ -124,8 +125,8 @@ export type Glyphs = Record<keyof typeof NERD_GLYPHS, string>;
 
 // The Unicode tier is the line without Nerd Font icons; the ASCII tier also trades its bars, dots and ellipsis.
 export const UNICODE_GLYPHS: Glyphs = {
-  filled: "▰",
-  empty: "▱",
+  filled: "━",
+  empty: "─",
   dot: "·",
   ellipsis: "…",
   arrow: "->",
@@ -318,6 +319,18 @@ export function renderBar(pct: number, width: number, color: string, g: Pick<Gly
   return `${color}${g.filled}${RST}`.repeat(filled) + `${DIM}${g.empty}${RST}`.repeat(width - filled);
 }
 
+// Nerd Fonts v3 code points: circle-outline, then circle-slice-1 to circle-slice-8. Only the nerd tier draws
+// them, since the Unicode pies `◔◑◕` come from fallback fonts in common terminal fonts.
+const RINGS = ["\u{f0766}", "\u{f0a9e}", "\u{f0a9f}", "\u{f0aa0}", "\u{f0aa1}", "\u{f0aa2}", "\u{f0aa3}", "\u{f0aa4}", "\u{f0aa5}"];
+const RING_STEPS = RINGS.length - 1;
+
+/** The ring for the percentage as shown: the outline only at 0, the full disc only at 100, a slice between. */
+export function ringGlyph(pct: number): string {
+  const shown = Number(fixed(Math.max(0, Math.min(100, pct)), 0));
+  const step = shown === 0 ? 0 : shown === 100 ? RING_STEPS : Math.min(RING_STEPS - 1, Math.max(1, Math.round((shown / 100) * RING_STEPS)));
+  return RINGS[step] ?? "";
+}
+
 function contextPercent({ context_window: ctx }: Payload): number | null {
   if (ctx == null) return null;
   const size = ctx.context_window_size ?? 200000;
@@ -349,9 +362,9 @@ function contextSegment(data: Payload, g: Glyphs): Segment {
   };
 }
 
-const percentSegment = (data: Payload): Segment | null => {
+const percentSegment = (data: Payload, hasRing: boolean): Segment | null => {
   const pct = contextPercent(data);
-  return pct === null ? null : block(`${thresholdColor(pct)}${fixed(pct, 0)}%${RST}`);
+  return pct === null ? null : block(`${thresholdColor(pct)}${hasRing ? `${ringGlyph(pct)} ` : ""}${fixed(pct, 0)}%${RST}`);
 };
 
 export function formatResetTime(resetsAt: number | null | undefined, now: Date): string {
@@ -439,14 +452,15 @@ function directorySegment({ data, git, g }: Ctx): Segment | null {
   return block(`${DIM}${g.folder} ${remoteUrl ? osc8(remoteUrl, name) : name}${RST}`);
 }
 
-function rateLimitSegment({ data, g, now }: Ctx, which: "five_hour" | "seven_day"): Segment | null {
+function rateLimitSegment({ data, g, now }: Ctx, which: "five_hour" | "seven_day", hasRing: boolean): Segment | null {
   const window = data.rate_limits?.[which];
   const pct = window?.used_percentage;
   if (pct == null) return null;
   const color = thresholdColor(pct);
   const reset = formatResetTime(window?.resets_at, now);
   const glyph = which === "five_hour" ? g.fiveHour : g.weekly;
-  return block(`${renderBar(pct, RATE_LIMIT_BAR_WIDTH, color, g)} ${color}${fixed(pct, 0)}%${RST} ${DIM}${glyph}${RST}${reset ? ` (resets ${reset})` : ""}`);
+  const gauge = hasRing ? `${color}${ringGlyph(pct)}${RST}` : renderBar(pct, RATE_LIMIT_BAR_WIDTH, color, g);
+  return block(`${gauge} ${color}${fixed(pct, 0)}%${RST} ${DIM}${glyph}${RST}${reset ? ` (resets ${reset})` : ""}`);
 }
 
 const SPEND_PERIODS = new Map([
@@ -534,7 +548,10 @@ const RANK = {
 
 const ranked = (rank: number, segment: Segment | null): Ranked[] => (segment === null ? [] : [{ segment, rank }]);
 
-function fullRows(c: Ctx): Ranked[][] {
+const lineCount = (row: readonly Ranked[], columns: number): number =>
+  arrange(row.map(({ segment }) => segment), columns, Number.POSITIVE_INFINITY).length;
+
+function fullRows(c: Ctx, columns: number): Ranked[][] {
   const { data, tier, g } = c;
   const effort = `${data.effort?.level ?? ""}`.trim();
   const projectDir = projectDirOf(data);
@@ -545,6 +562,16 @@ function fullRows(c: Ctx): Ranked[][] {
   const removed = data.cost?.total_lines_removed ?? 0;
   const changed = [added > 0 ? `${GREEN}+${added}${RST}` : "", removed > 0 ? `${RED}-${removed}${RST}` : ""].filter(Boolean);
   const addedDirs = data.workspace?.added_dirs?.length ?? 0;
+  const usage = (hasRing: boolean): Ranked[] => [
+    ...ranked(RANK.cost, costSegment(c)),
+    ...ranked(RANK.cache, cacheSegment(c)),
+    ...ranked(RANK.fiveHour, rateLimitSegment(c, "five_hour", hasRing)),
+    ...ranked(RANK.sevenDay, rateLimitSegment(c, "seven_day", hasRing)),
+    ...ranked(RANK.spend, spendSegment(c)),
+  ];
+  const bars = usage(false);
+  // Both windows trade their bars for rings together, and only where that saves the row a line.
+  const rings = tier === "nerd" ? usage(true) : bars;
   return [
     [
       ...ranked(RANK.model, block(`${CYAN}${g.model} ${modelName(c)}${RST}${effort ? `${separator(g.dot)}${YELLOW}${g.effort} ${effort}${RST}` : ""}`)),
@@ -561,13 +588,7 @@ function fullRows(c: Ctx): Ranked[][] {
       ...ranked(RANK.changed, changed.length > 0 ? block(changed.join("/")) : null),
       ...ranked(RANK.dirs, addedDirs > 0 ? block(`${DIM}+${addedDirs} dir${addedDirs === 1 ? "" : "s"}${RST}`) : null),
     ],
-    [
-      ...ranked(RANK.cost, costSegment(c)),
-      ...ranked(RANK.cache, cacheSegment(c)),
-      ...ranked(RANK.fiveHour, rateLimitSegment(c, "five_hour")),
-      ...ranked(RANK.sevenDay, rateLimitSegment(c, "seven_day")),
-      ...ranked(RANK.spend, spendSegment(c)),
-    ],
+    lineCount(rings, columns) < lineCount(bars, columns) ? rings : bars,
   ];
 }
 
@@ -599,7 +620,7 @@ function compactSegments(c: Ctx): Segment[] {
   return present([
     block(`${CYAN}${c.g.model} ${modelName(c)}${RST}`),
     plan ? block(`${GREEN}${c.g.tasks} ${plan.done}/${plan.total}${RST}`) : null,
-    percentSegment(data),
+    percentSegment(data, c.tier === "nerd"),
     branch ? block(`${c.g.branch} ${branch}`) : null,
   ]);
 }
@@ -611,5 +632,5 @@ export function render(data: Payload, git: GitInfo, env: Env, now: Date): string
   const width = Math.max(1, columns - STATUS_LINE_INSET);
   if (columns < COMPACT_BELOW_COLUMNS) return arrange(compactSegments(c), width, 1, sep).join("\n");
   const rows = terminalLines(env);
-  return stackRows(fullRows(c), width, rows !== null && rows < SHORT_TERMINAL_LINES ? SHORT_MAX_LINES : MAX_LINES, sep).join("\n");
+  return stackRows(fullRows(c, width), width, rows !== null && rows < SHORT_TERMINAL_LINES ? SHORT_MAX_LINES : MAX_LINES, sep).join("\n");
 }

@@ -12,11 +12,13 @@ import {
   DEFAULT_MAIN_AGENT,
   fixed,
   formatResetTime,
+  NERD_GLYPHS,
   type Payload,
   projectDirOf,
   readPlan,
   render,
   renderBar,
+  ringGlyph,
   type Segment,
   stackRows,
   statusGlyphs,
@@ -39,8 +41,8 @@ const B = "\x1b[34m";
 const S = ` ${D}·${R} `;
 
 const link = (url: string, text: string): string => `\x1b]8;;${url}\x07${text}\x1b]8;;\x07`;
-const filled = (color: string, count: number): string => `${color}▰${R}`.repeat(count);
-const empty = (count: number): string => `${D}▱${R}`.repeat(count);
+const filled = (color: string, count: number): string => `${color}━${R}`.repeat(count);
+const empty = (count: number): string => `${D}─${R}`.repeat(count);
 const visible = (s: string): string => s.replace(/\x1b\[[0-9;]*m|\x1b\]8;;[^\x07]*\x07/g, "");
 
 const ASCII = { OMCA_GLYPHS: "unicode", COLUMNS: "300" };
@@ -64,7 +66,7 @@ function lines(data: Payload, git: GitInfo = ON_BRANCH, env: Record<string, stri
 const rows = (data: Payload, git: GitInfo = NO_REPO, env: Record<string, string> = ASCII): string[] => lines(data, git, env);
 
 const BAR_10 = `${filled(G, 2)}${empty(18)} ${G}10%${R}  ${D}200k${R}`;
-const WAITING = `${D}${"▱".repeat(20)}${R} ${D}[waiting...]${R}  ${D}200k${R}`;
+const WAITING = `${D}${"─".repeat(20)}${R} ${D}[waiting...]${R}  ${D}200k${R}`;
 const clock = (duration: string): string => `${B}~ ${duration}${R}`;
 const costClock = (cost: string, duration: string): string => `${M}${cost}${R}${S}${clock(duration)}`;
 const ZERO = clock("0s");
@@ -793,16 +795,69 @@ describe("prompt cache", () => {
         .at(-1) ?? "";
 
     test("the 7 day limit goes first, while the cache and the 5 hour limit stay", () => {
-      expect(crowded({ five_hour: FIVE_HOUR, seven_day: SEVEN_DAY })).toBe("~ 0s · C: warm 52m · ▰▰▰▰▱▱▱▱▱▱ 45% 5h");
+      expect(crowded({ five_hour: FIVE_HOUR, seven_day: SEVEN_DAY })).toBe("~ 0s · C: warm 52m · ━━━━────── 45% 5h");
     });
 
     test("the cache goes next, and the 5 hour limit stays", () => {
-      expect(crowded({ five_hour: { ...FIVE_HOUR, resets_at: Date.parse("2026-10-05T17:00:00Z") / 1000 }, seven_day: SEVEN_DAY })).toBe("~ 0s · ▰▰▰▰▱▱▱▱▱▱ 45% 5h (resets mon 5pm)");
+      expect(crowded({ five_hour: { ...FIVE_HOUR, resets_at: Date.parse("2026-10-05T17:00:00Z") / 1000 }, seven_day: SEVEN_DAY })).toBe("~ 0s · ━━━━────── 45% 5h (resets mon 5pm)");
     });
   });
 
   test("the compact line leaves it out", () => {
     expect(lines({ model, prompt_cache: warm(3600) }, NO_REPO, { ...ASCII, COLUMNS: "59" }).map(visible)).toEqual(["> claude"]);
+  });
+});
+
+describe("rings", () => {
+  test.each([
+    [0, 0xf0766],
+    [0.4, 0xf0766],
+    [1, 0xf0a9e],
+    [12, 0xf0a9e],
+    [19, 0xf0a9f],
+    [45, 0xf0aa1],
+    [80, 0xf0aa3],
+    [99, 0xf0aa4],
+    [99.6, 0xf0aa5],
+    [100, 0xf0aa5],
+    [140, 0xf0aa5],
+  ])("%p%% draws the ring of the percentage as shown", (pct, codePoint) => {
+    expect(ringGlyph(pct)).toBe(String.fromCodePoint(codePoint));
+  });
+
+  describe("the usage row", () => {
+    const data: Payload = {
+      model: { display_name: "claude" },
+      rate_limits: {
+        five_hour: { used_percentage: 45, resets_at: Date.parse("2026-10-02T18:00:00Z") / 1000 },
+        seven_day: { used_percentage: 80, resets_at: Date.parse("2026-10-05T17:00:00Z") / 1000 },
+      },
+    };
+    const usageAt = (width: number, env: Record<string, string> = NERD, payload = data): string[] =>
+      rows(payload, NO_REPO, { ...env, COLUMNS: usable(width) }).slice(2).map(visible);
+    const { clock, fiveHour, weekly, spend } = NERD_GLYPHS;
+    const fiveHourBar = `━━━━────── 45% ${fiveHour} (resets 6pm)`;
+    const sevenDayBar = `━━━━━━━━── 80% ${weekly} (resets mon 5pm)`;
+
+    test("keeps both bars while the row fits on one line", () => {
+      expect(usageAt(72)).toEqual([`${clock} 0s · ${fiveHourBar} · ${sevenDayBar}`]);
+    });
+
+    test("trades both bars for rings where that saves the row a line", () => {
+      expect(usageAt(71)).toEqual([`${clock} 0s · \u{f0aa1} 45% ${fiveHour} (resets 6pm) · \u{f0aa3} 80% ${weekly} (resets mon 5pm)`]);
+    });
+
+    test("keeps the bars where rings would still need as many lines", () => {
+      const withSpend: Payload = { ...data, rate_limits: { ...data.rate_limits, spend_limit: { used_usd: 1, limit_usd: 10 } } };
+      expect(usageAt(66, NERD, withSpend)).toEqual([`${clock} 0s · ${fiveHourBar}`, `${sevenDayBar} · ${spend} $1.00/$10`]);
+      expect(usageAt(68, NERD, withSpend)).toEqual([
+        `${clock} 0s · \u{f0aa1} 45% ${fiveHour} (resets 6pm) · \u{f0aa3} 80% ${weekly} (resets mon 5pm) · ${spend} $1.00/$10`,
+      ]);
+    });
+
+    test("keeps the bars and wraps without Nerd Font glyphs", () => {
+      expect(usageAt(71, ASCII)).toEqual(["~ 0s · ━━━━────── 45% 5h (resets 6pm)", "━━━━━━━━── 80% 7d (resets mon 5pm)"]);
+    });
   });
 });
 
@@ -843,7 +898,7 @@ describe("context bar", () => {
   });
 
   test("no data shows the waiting placeholder", () => {
-    expect(bar({ context_window_size: 200000 })).toBe(`${D}${"▱".repeat(20)}${R} ${D}[waiting...]${R}  ${label("200k")}`);
+    expect(bar({ context_window_size: 200000 })).toBe(`${D}${"─".repeat(20)}${R} ${D}[waiting...]${R}  ${label("200k")}`);
   });
 
   test("a bar halfway between two blocks rounds to the even block", () => {
@@ -872,7 +927,7 @@ describe("context bar", () => {
         ...ASCII,
         COLUMNS: String(columns),
       });
-    const blocks = (line: string): number => (visible(line).match(/[▰▱]/g) ?? []).length;
+    const blocks = (line: string): number => (visible(line).match(/[━─]/g) ?? []).length;
 
     test("a full line leaves the bar at 8 blocks", () => {
       const line = workspace({ used_percentage: 10 }, "x".repeat(37), Number(usable(60)));
@@ -1032,15 +1087,20 @@ describe("layout", () => {
     expect(lines(data, richGit, { ...ASCII, COLUMNS: "50" })[0]).toContain(` ${RED}90%${R}`);
   });
 
+  test("the compact context percentage follows its ring in the Nerd tier", () => {
+    expect(lines(rich(), richGit, { ...NERD, COLUMNS: "59" })[0]).toContain(`${S}${G}\u{f0aa0} 34%${R}${S}`);
+    expect(lines(rich(), richGit, { ...ASCII, COLUMNS: "59" })[0]).toContain(`${S}${G}34%${R}${S}`);
+  });
+
   const SESSION_ROW = "> Opus 5.5 · E: high · T: 1/3 -> Wire the order summary panel into the payment step and cover it with a test";
-  const USAGE_ROW = "~ 2m05s · ▰▰▰▰▱▱▱▱▱▱ 45% 5h (resets 6pm) · ▰▰▰▰▰▰▰▰▱▱ 80% 7d (resets mon 5pm)";
+  const USAGE_ROW = "~ 2m05s · ━━━━────── 45% 5h (resets 6pm) · ━━━━━━━━── 80% 7d (resets mon 5pm)";
   const branchOf = (bar: string): string => `${bar} 34%  200k · * v3-typescript-mods ~3  +2  ?1`;
-  const BAR_20 = "▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱";
+  const BAR_20 = "━━━━━━━─────────────";
 
   test("at 120 columns each row starts its own line, and the workspace row wraps within itself", () => {
     expect(at(120).map(visible)).toEqual([
       SESSION_ROW,
-      `${branchOf("▰▰▰▰▱▱▱▱▱▱▱▱")} · > ${basename(dir)} · W: wt <- main · #42 +`,
+      `${branchOf("━━━━────────")} · > ${basename(dir)} · W: wt <- main · #42 +`,
       "+42/-7 · +2 dirs",
       USAGE_ROW,
     ]);
@@ -1055,7 +1115,7 @@ describe("layout", () => {
       "> Opus 5.5 · E: high · T: 1/3 -> Wire the order summary panel into the pa…",
       branchOf(BAR_20),
       `> ${basename(dir)} · W: wt <- main · #42 +`,
-      "~ 2m05s · ▰▰▰▰▱▱▱▱▱▱ 45% 5h (resets 6pm)",
+      "~ 2m05s · ━━━━────── 45% 5h (resets 6pm)",
     ]);
   });
 
