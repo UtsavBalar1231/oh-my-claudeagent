@@ -1,9 +1,9 @@
-import type { On, RenderElement, RenderSurface } from "claude-code";
+import type { ElementConstructor, ElementTable, On, RenderElement, RenderSurface } from "claude-code";
 import { type Engine, expect, test } from "claude-code/testing";
 import { framesOf, rasterCells, svgOf } from "../../src/core/mascots.ts";
 import { type GlyphTier, glyphs } from "../../src/core/ui-kit.ts";
 import { chip, type Paint } from "../../src/core/visual.ts";
-import { Card, CodeBlock, Field, type Kit, kitOf, Row, Rule, rowsAtLeast, ScopedCard } from "../../hooks/ui.ts";
+import { Card, CodeBlock, Field, type Kit, kitOf, Row, rowGapOf, Rule, rowsAtLeast, Run, ScopedCard } from "../../hooks/ui.ts";
 import { codeUnits, resetRegions, ScrollRegion, scrollKeyed, type Unit } from "../../hooks/regions.ts";
 import { childrenOf, isNode, PLUGIN } from "./world.ts";
 
@@ -30,7 +30,7 @@ function gallery($: Engine, on: On) {
   let draw: Draw = (kit) => kit.Text({ children: [""] });
   let tier: GlyphTier = "nerd";
   let isStill = false;
-  on("ui.render", { component: "Pane", requestId: "gallery" }, (engine, e) => draw(kitOf(engine.ui.resolve(e), e.surface, tier, isStill)));
+  on("ui.render", { component: "Pane", requestId: "gallery" }, (engine, e) => draw(kitOf(engine.ui.resolve(e), e.surface, { tier, isStill })));
   return async (next: Draw, surface: RenderSurface = "terminal", glyphTier: GlyphTier = "nerd", still = false) => {
     draw = next;
     tier = glyphTier;
@@ -304,4 +304,78 @@ test("a region too short for its cues draws no cue and no height below one row, 
   expect(textIn(cued).map((text) => text.trim())).toEqual(["↑ 1 more", "line 2", "↓ more · wheel to scroll"]);
   expect(scrollKeyed(1, "end")).toBe(true);
   expect(textIn(await drawn(region(3))).map((text) => text.trim())).toEqual(["↑ 8 more", "line 9", "line 10"]);
+});
+
+const placeholder: RenderElement = { type: "Box", children: [] };
+
+// A table of plain functions that store the props each element is built with.
+function recording() {
+  const calls: { type: string; props: object }[] = [];
+  const draw = <P extends object>(type: string): ElementConstructor<P> => (props) => (calls.push({ type, props }), placeholder);
+  const table: ElementTable<"mobile"> = {
+    Box: draw("Box"),
+    Text: draw("Text"),
+    Button: draw("Button"),
+    Svg: draw("Svg"),
+    Link: draw("Link"),
+    Code: draw("Code"),
+    Markdown: draw("Markdown"),
+  };
+  return { calls, table };
+}
+
+const BOLD_TITLE = { bold: true, color: "text", hover: { bold: true }, children: ["Tasks"] } as const;
+
+test("without the typeset engine a kit hands the table's Text its props as given, whatever the surface", () => {
+  for (const surface of ["terminal", "desktop"] as const) {
+    const { calls, table } = recording();
+    const kit = kitOf(table, surface);
+    kit.Text(BOLD_TITLE);
+    kit.Text({ children: ["3 tasks"] });
+    Run(kit, [{ style: { bold: true }, text: "1/2" }]);
+    expect(kit.isTypeset).toBe(false);
+    expect(rowGapOf(kit)).toBe(1);
+    expect(calls.filter(({ type }) => type === "Text").map(({ props }) => props).slice(0, 3)).toEqual([
+      BOLD_TITLE,
+      { children: ["3 tasks"] },
+      { bold: true, children: ["1/2"] },
+    ]);
+  }
+});
+
+test("on a remote typeset surface Text sends semibold for bold, Run sets mono on its container and every span, and other digits are tabular", () => {
+  const { calls, table } = recording();
+  const kit = kitOf(table, "desktop", { isTypeset: true });
+  kit.Text(BOLD_TITLE);
+  kit.Text({ children: ["3 tasks"] });
+  kit.Text({ children: ["no digits"] });
+  kit.Text({ weight: "regular", children: [placeholder, "1"] });
+  Run(kit, [
+    { style: { bold: true }, text: "Tasks" },
+    { style: {}, text: "1/2" },
+  ]);
+  expect(rowGapOf(kit)).toBe("md");
+  expect(calls.map(({ type, props }) => ({ type, ...props }))).toEqual([
+    { type: "Text", color: "text", weight: "semibold", hover: { bold: true }, children: ["Tasks"] },
+    { type: "Text", tabular: true, children: ["3 tasks"] },
+    { type: "Text", children: ["no digits"] },
+    { type: "Text", weight: "regular", tabular: true, children: [placeholder, "1"] },
+    { type: "Text", weight: "semibold", mono: true, children: ["Tasks"] },
+    { type: "Text", mono: true, children: ["1/2"] },
+    { type: "Text", mono: true, children: [placeholder, placeholder] },
+    { type: "Box", flexShrink: 0, children: [placeholder] },
+    { type: "Box", flexDirection: "row", overflow: "hidden", children: [placeholder] },
+  ]);
+});
+
+test("on the terminal a typeset kit sends semibold for bold and nothing else: no mono and no tabular", () => {
+  const { calls, table } = recording();
+  const kit = kitOf(table, "terminal", { isTypeset: true });
+  kit.Text({ bold: true, children: ["3 tasks"] });
+  Run(kit, [{ style: { bold: true }, text: "1/2" }]);
+  expect(calls.map(({ type, props }) => ({ type, ...props }))).toEqual([
+    { type: "Text", weight: "semibold", children: ["3 tasks"] },
+    { type: "Text", weight: "semibold", children: ["1/2"] },
+    { type: "Text", wrap: "truncate-end", children: [placeholder] },
+  ]);
 });

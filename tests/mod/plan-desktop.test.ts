@@ -1,7 +1,7 @@
 import type { On, RenderSurface } from "claude-code";
 import { expect, test } from "claude-code/testing";
 import { isDrawable, sizeOf } from "../../hooks/ui.ts";
-import { BOULDER, focusRequests, LEDGER, pane, POSIX, ROOT, rows, run, SESSION, spreadRows, world } from "./world.ts";
+import { BOULDER, childrenOf, focusRequests, isNode, LEDGER, pane, POSIX, ROOT, rows, run, SESSION, spreadRows, world } from "./world.ts";
 
 const PLAN_PATH = `${ROOT}/plans/long.md`;
 const COUNT = 30;
@@ -211,5 +211,27 @@ test("in the terminal opening a task's page leaves the ring where the engine hol
   await w.clock.advance(1);
   expect(await ui.find({ key: "b" })).toBeDefined();
   expect(focusRequests(w.logs)).not.toContain("b");
+  await ui.unmount();
+});
+
+const nodesOf = (node: unknown): Record<string, unknown>[] =>
+  isNode(node) ? [{ type: node.type, ...node.props }, ...childrenOf(node).flatMap(nodesOf)] : [];
+
+test("on an engine that draws typeset text a desktop board sends semibold, mono spans, tabular digits and named row gaps", async ($, on) => {
+  const w = planWorld(on);
+  w.version = "2.1.299";
+  on("session.start", (_$, e) => ({ cwd: e.cwd }));
+  on("command.register", (_$, e) => ({ value: { command: e.name } }));
+  await $.session.start({ cwd: ROOT, surface: "desktop", isInteractive: true });
+  await $.command.run(run("plan", 90));
+  const ui = await $.ui.mount(docked("desktop", 90));
+  const nodes = nodesOf(await ui.drawn());
+  const texts = nodes.filter(({ type }) => type === "Text");
+
+  expect(texts.some((props) => props["weight"] === "semibold")).toBe(true);
+  expect(texts.some((props) => props["mono"] === true)).toBe(true);
+  expect(texts.filter((props) => props["mono"] === true && "tabular" in props)).toEqual([]);
+  expect(texts.some((props) => props["tabular"] === true)).toBe(true);
+  expect(nodes.some((props) => props["rowGap"] === "md")).toBe(true);
   await ui.unmount();
 });

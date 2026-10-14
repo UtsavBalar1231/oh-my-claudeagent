@@ -37,8 +37,9 @@ const PAD = " ".repeat(23);
 type Engine = World & { writes: string[]; release: () => void; started: Promise<void> };
 
 // The calls world.ts leaves out: a held `bun --version`, ast-grep found only as sg, the engine
-// version unless denied, and writes recorded in order, refused for any path in `refuse`.
-function engine(on: On, w: World, options: { hold?: boolean; refuse?: readonly string[]; isVersionDenied?: () => boolean } = {}): Engine {
+// version, and writes recorded in order, refused for any path in `refuse`.
+function engine(on: On, w: World, options: { hold?: boolean; refuse?: readonly string[] } = {}): Engine {
+  w.version = "2.1.295";
   let release = () => {};
   let started = () => {};
   const held = new Promise<void>((resolve) => (release = resolve));
@@ -52,9 +53,6 @@ function engine(on: On, w: World, options: { hold?: boolean; refuse?: readonly s
     }
     return call.argv[0] === "sg" ? output("ast-grep 0.39.0\n") : { deny: "spawn ast-grep ENOENT" };
   });
-  on("session.version", () =>
-    options.isVersionDenied?.() === true ? { deny: "version unavailable" } : { value: { version: "2.1.295", base: "2.1.295" } },
-  );
   on("fs.write", (_$, call) => {
     const path = w.spelled(call.path);
     e.writes.push(path);
@@ -274,17 +272,16 @@ for (const layout of LAYOUTS) {
   });
 
   test(`the tab's empty state offers r, and a failed run shows its reason with r to run again${suffix}`, async ($, on) => {
-    let isDenied = false;
-    engine(on, world(on, FILES, structuredClone(USER), {}, layout), { isVersionDenied: () => isDenied });
+    const w = engine(on, world(on, FILES, structuredClone(USER), {}, layout));
     await $.command.run(run(""));
     const ui = await $.ui.mount(pane("desktop", { columns: 120, rows: 40, placement: "dock" }));
     await ui.press({ key: "6" });
     expect(rows(await ui.drawn()).slice(-2)).toEqual(["The doctor checks have not run in this session.", "r: Run checks"]);
 
-    isDenied = true;
+    w.version = undefined;
     await ui.press({ key: "r" });
     expect(rows(await ui.drawn()).slice(-2)).toEqual(["✗ The checks failed: version unavailable", "r: Run again"]);
-    isDenied = false;
+    w.version = "2.1.295";
     await ui.press({ key: "r" });
     expect(rows(await ui.drawn()).find((row) => row.startsWith(" ! WARN  Status line"))).toBe(
       " ! WARN  Status line  No refreshInterval, so it redraws on events only  and goes stale while agents run  i: Add refreshInterval 5",

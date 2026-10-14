@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { RENAMES } from "./agent-names.ts";
-import { addRefreshInterval, type Check, doctorChecks, type Inputs, MIGRATE_COMMAND, SETUP_COMMAND, unifiedDiff } from "./doctor-checks.ts";
+import { addRefreshInterval, type Check, doctorChecks, type Inputs, isTypesetVersion, MIGRATE_COMMAND, SETUP_COMMAND, unifiedDiff } from "./doctor-checks.ts";
 
 const NOW = Date.UTC(2026, 9, 2, 12, 0, 0);
 const STATUS_LINE = { type: "command", command: "omca-statusline" };
@@ -109,6 +109,16 @@ describe("output style", () => {
       detail: "Could not read the plugin's output style file, so whether OMCA Default is forced is unknown; outputStyle is Explanatory",
     });
   });
+});
+
+test.each<[string, boolean]>([
+  ["2.1.296", false],
+  ["2.1.299", true],
+  ["v2.1.300", true],
+  ["2.1.299-dev", true],
+  ["garbage", false],
+])("isTypesetVersion(%s) is %p", (version, expected) => {
+  expect(isTypesetVersion(version)).toBe(expected);
 });
 
 test("mod version", () => {

@@ -55,6 +55,16 @@ never starts it. No timer runs on a remote surface: Desktop draws a still Svg, s
 every site on each state write and would restart an animation, and the other remote surfaces
 animate the Svg by themselves.
 
+The UI kit (`ui.ts`) reads the engine version once, in `resolveSession` (`host.ts`), and sets
+`isTypeset` on the session when `$.session.version()` answers 2.1.299 or later, judged on `base`
+when it is present. A refused call, or a version that does not parse, leaves it false. When it is
+true the kit's `Text` sends `weight: "semibold"` in place of `bold: true`, and on a remote surface
+`Run` sets `mono` on its container and every span, a `Text` outside `Run` that holds a digit sets
+`tabular`, and the row gaps of the pane and its tabs and the band's button gap are the named steps
+`"md"` and `"lg"` in place of cells. The terminal keeps its cell gaps. When it is false every tree
+is drawn as it was before the gate. Drawing code reads the flag from `resolvedSession()` and
+never awaits the engine.
+
 ## Current runtime contract
 
 - `UserPromptSubmit` and `UserPromptExpansion` route to the server's `keyword-detector` and

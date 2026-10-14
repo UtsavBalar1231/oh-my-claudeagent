@@ -1,5 +1,6 @@
 import type { EngineInterface, FsBytes, PluginState, SessionMessage, StateRead, StateSetOptions, StateSetResult } from "claude-code";
 import { parseRegistry, resolveBoundPlan } from "../src/core/boulder.ts";
+import { isTypesetVersion } from "../src/core/doctor-checks.ts";
 import { BOULDER, LEDGER } from "../src/core/omca-paths.ts";
 import { configDir, type Env as PathEnv, homeDir, inferPlatform, isAbsolutePath, joinPath, type Platform, samePath } from "../src/core/path.ts";
 import { parseRuns, provingRuns, type Run, type Verdict, verdictFrom } from "../src/core/proof.ts";
@@ -120,13 +121,13 @@ export async function pluginVersion(host: Host): Promise<string | null> {
   }
 }
 
-export type Session = { env: PathEnv; platform: Platform; home: string; config: string | undefined; glyphTier: GlyphTier };
+export type Session = { env: PathEnv; platform: Platform; home: string; config: string | undefined; glyphTier: GlyphTier; isTypeset: boolean };
 
-const UNRESOLVED: Session = { env: {}, platform: "linux", home: "", config: undefined, glyphTier: "nerd" };
+const UNRESOLVED: Session = { env: {}, platform: "linux", home: "", config: undefined, glyphTier: "nerd", isTypeset: false };
 let session: Session | undefined;
 
 async function resolveSession(host: Host): Promise<Session> {
-  const [root, HOME, USERPROFILE, HOMEDRIVE, HOMEPATH, CLAUDE_CONFIG_DIR, glyphs] = await Promise.all([
+  const [root, HOME, USERPROFILE, HOMEDRIVE, HOMEPATH, CLAUDE_CONFIG_DIR, glyphs, isTypeset] = await Promise.all([
     host.session.root(),
     host.env.HOME(),
     host.env.USERPROFILE(),
@@ -134,11 +135,12 @@ async function resolveSession(host: Host): Promise<Session> {
     host.env.HOMEPATH(),
     host.env.CLAUDE_CONFIG_DIR(),
     host.env.OMCA_GLYPHS(),
+    host.session.version().then(({ version, base }) => isTypesetVersion(base ?? version), () => false),
   ]);
   const env = { HOME, USERPROFILE, HOMEDRIVE, HOMEPATH, CLAUDE_CONFIG_DIR };
   const home = homeDir(env) ?? "";
   const config = configDir(env);
-  return { env, platform: inferPlatform(root, home, config ?? ""), home, config, glyphTier: glyphTier(glyphs) };
+  return { env, platform: inferPlatform(root, home, config ?? ""), home, config, glyphTier: glyphTier(glyphs), isTypeset };
 }
 
 // The environment holds for the life of the session, so it is read once, outside any drawing.

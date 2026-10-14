@@ -76,6 +76,8 @@ export type World = {
   said: string[];
   clock: MockClock;
   style: string | undefined;
+  /** The engine version `session.version` answers; undefined refuses the call. */
+  version: string | undefined;
 };
 
 const parent = (path: string) => path.slice(0, path.lastIndexOf("/"));
@@ -136,6 +138,7 @@ export function world(
     said: [],
     clock: mock.clock(on, { now: Date.UTC(2026, 9, 2, 12, 0, 0) }),
     style: OUTPUT_STYLE,
+    version: "2.1.296",
   };
   mock.env(on, { OMCA_GLYPHS: "unicode", ...layout.env, ...env });
   on("session.root", () => ({ value: layout.root }));
@@ -196,6 +199,7 @@ export function world(
   on("ui.panes", () => ({ value: w.panes }));
   on("ui.focus", (_$, e) => (w.focused.push(e.element ?? ""), {}));
   on("session.surfaces", () => ({ value: w.surfaces }));
+  on("session.version", () => (w.version === undefined ? { deny: "version unavailable" } : { value: { version: w.version, base: w.version } }));
   on("ui.invalidate", (_$, e, next) => {
     w.invalidations += 1;
     return next(e);

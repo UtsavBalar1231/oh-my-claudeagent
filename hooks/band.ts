@@ -10,8 +10,8 @@ import { sha256Hex } from "../src/core/sha256.ts";
 import { fitEnd, type GlyphTier, glyphs, oneLine } from "../src/core/ui-kit.ts";
 import { TONE_KEYS } from "../src/core/visual.ts";
 import type { Features } from "./dispatch.ts";
-import { boundPlanOf, bytesOf, fillPrompt, type Host, ledgerWrittenAt, proofFacts, reason, sessionOf, stampOf, verdictFor } from "./host.ts";
-import { type Kit, kitOf, Run, type TextStyle } from "./ui.ts";
+import { boundPlanOf, bytesOf, fillPrompt, type Host, ledgerWrittenAt, proofFacts, reason, resolvedSession, sessionOf, stampOf, verdictFor } from "./host.ts";
+import { isRemote, type Kit, kitOf, Run, type TextStyle } from "./ui.ts";
 
 type Snapshot = { band: Band; hasFinalVerification: boolean; exitCode: number | null; planPath: string | undefined };
 
@@ -223,14 +223,14 @@ export const band: Features = {
       const running = Object.values(agents).filter((agent) => agent.status === "running").length;
       const view = bandView(snapshot, actions, e.props.bodyColumns, glyphTier, running);
       if (view === undefined) return undefined;
-      const kit = kitOf(host.ui.resolve(e), e.surface);
+      const kit = kitOf(host.ui.resolve(e), e.surface, { isTypeset: resolvedSession().isTypeset });
       const { Box, Button } = kit;
       const rows = [Box({ key: "status", children: [row(kit, view.status)] })];
       if (view.buttons.length > 0) {
         rows.push(
           Box({
             key: "actions",
-            gap: BUTTON_GAP,
+            gap: kit.isTypeset && isRemote(kit) ? "lg" : BUTTON_GAP,
             children: view.buttons.map((button) =>
               Button({
                 key: button.key,

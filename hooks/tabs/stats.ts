@@ -8,7 +8,7 @@ import { agentKey, fitPieces, type Level, levelMark, type Piece, spark, stack, t
 import { type Host, reason, type State, update } from "../host.ts";
 import type { Subcommand } from "../omca-router.ts";
 import { keyButton, noticeRow, open, type TabView, type View } from "../pane.ts";
-import { Card, isRemote, Line, Row } from "../ui.ts";
+import { Card, isRemote, Line, Row, rowGapOf } from "../ui.ts";
 
 type Stats = State["stats"];
 type StatsRow = Stats["rows"][number];
@@ -364,7 +364,7 @@ export const view: TabView = async (host, view) => {
   const cards = [agentsCard(stats, view, view.width, isFramed), ...lower];
   return [
     Text({ dimColor: true, children: [summary(stats, view.g, view.width)] }),
-    ...(isRemote(view.kit) ? [view.kit.Box({ key: "stats-cards", flexDirection: "column", rowGap: 1, children: cards })] : cards),
+    ...(isRemote(view.kit) ? [view.kit.Box({ key: "stats-cards", flexDirection: "column", rowGap: rowGapOf(view.kit), children: cards })] : cards),
     reload(),
   ];
 };

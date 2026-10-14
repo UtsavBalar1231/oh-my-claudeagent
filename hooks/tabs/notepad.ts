@@ -8,7 +8,7 @@ import type { Input } from "../dispatch.ts";
 import { boundPlanOf, type Host, reason, type State } from "../host.ts";
 import { buttonRow, keyButton, noticeRow, patchPane, refocus, refocusRemote, type TabView, type View } from "../pane.ts";
 import { aimKeys, markdownUnits, resetOffset, ScrollRegion, type Unit } from "../regions.ts";
-import { Card, Field, isRemote, Line, Rule } from "../ui.ts";
+import { Card, Field, isRemote, Line, Rule, rowGapOf } from "../ui.ts";
 
 type Notepad = NonNullable<State["pane"]["notepad"]>;
 
@@ -403,7 +403,7 @@ function draw(view: View, arranged: Arranged, above: number): RenderElement[] {
   const drawn = columns.map((column, index) => stack(view, column, arranged, index * (width + COLUMN_GAP), above));
   const [only] = drawn;
   // A remote surface has the height to set the cards apart; the terminal spends its rows on entries.
-  const gap = isRemote(view.kit) ? { rowGap: 1 } : {};
+  const gap = isRemote(view.kit) ? { rowGap: rowGapOf(view.kit) } : {};
   if (drawn.length === 1 && only !== undefined) return isRemote(view.kit) ? [view.kit.Box({ key: "notepad-cards", flexDirection: "column", ...gap, children: only })] : only;
   return [
     view.kit.Box({
