@@ -189,7 +189,11 @@ export async function open(host: Host, e: Input<"command.run">, tab: Tab): Promi
   const opened = await host.ui.open({ id: PANE, title: "OMCA", focus: true, closeOnEscape: true, rows: INLINE_ROWS, columns });
   await patchPane(host, (pane) => ((pane.auto ?? "pending") === "pending" ? { ...pane, auto: "opened" } : pane));
   await start(host);
-  return opened.isPlaced ? {} : { text: `The OMCA pane is open but not drawn yet: ${opened.reason}` };
+  if (opened.isPlaced) return {};
+  if (opened.reason.startsWith("no-surface")) {
+    return { text: "No surface is attached to this session, as under claude -p, so the OMCA pane is not drawn. Run /omca in a terminal or the Desktop app." };
+  }
+  return { text: `The OMCA pane is open but not drawn yet: ${opened.reason}` };
 }
 
 export const command: Subcommand = (host, e) => open(host, e, "agents");

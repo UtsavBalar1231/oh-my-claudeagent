@@ -157,6 +157,22 @@ test("/omca says why when the pane is open but no surface has placed it", async 
   expect(await $.command.run(run(""))).toEqual({ text: `The OMCA pane is open but not drawn yet: ${reason}` });
 });
 
+test("/omca answers one plain sentence when no surface is attached", async ($, on) => {
+  const w = world(on, FILES);
+  w.unplaced = "no-surface";
+
+  expect(await $.command.run(run(""))).toEqual({
+    text: "No surface is attached to this session, as under claude -p, so the OMCA pane is not drawn. Run /omca in a terminal or the Desktop app.",
+  });
+});
+
+test("/omca keeps the floor reason when the terminal is too narrow", async ($, on) => {
+  const w = world(on, FILES);
+  w.unplaced = "needs 144 columns, has 100";
+
+  expect(await $.command.run(run(""))).toEqual({ text: "The OMCA pane is open but not drawn yet: needs 144 columns, has 100" });
+});
+
 test("the dock takes 45% of the terminal between 56 and 96 columns, and grows to 120 while the transcript keeps 100", async ($, on) => {
   const w = world(on, FILES);
   for (const columns of [80, 120, 160, 200, 220, 250, 300]) await $.command.run(run("", columns));
