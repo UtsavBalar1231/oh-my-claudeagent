@@ -310,9 +310,11 @@ returns to the list. The board reloads the file when it changes on disk and keep
 A task's proof chip compares the files its `File:` line lists with the evidence log. The newest
 test, build or lint run since any of those files last changed decides it: **PROVEN** when it
 passed, **FAILED** when it failed, **UNPROVEN** when no such run has happened yet. A task that
-lists no file, or whose files do not exist, gets no chip. PROVEN and UNPROVEN describe finished
-work, so a task still open shows a chip only when it is FAILED, and the proof counts on the board
-and the band count the chips.
+lists no file, or whose files do not exist, gets no chip. For a registered plan, only changes
+made since the plan started count, so a task whose files have not changed since then gets no
+chip from an earlier or unrelated run. PROVEN and UNPROVEN describe finished work, so a task
+still open shows a chip only when it is FAILED, and the proof counts on the board and the band
+count the chips.
 
 ### The proof ledger
 

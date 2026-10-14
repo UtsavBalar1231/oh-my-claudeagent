@@ -17,12 +17,14 @@ export const provingRuns = (runs: readonly Run[]): Run[] => runs.filter((run) =>
 
 /**
  * PROVEN when the newest test, build or lint run after the files' last change passed, FAILED when
- * it failed, UNPROVEN when no such run followed the change. Undefined for a task with no files.
+ * it failed, UNPROVEN when no such run followed the change. Undefined for a task with no files, or
+ * with no change at or after `floor` (the plan's start, in milliseconds), when one is given.
  * `proving` is `provingRuns`' output.
  */
-export function verdictFrom(changes: readonly number[], proving: readonly Run[]): Verdict | undefined {
-  if (changes.length === 0) return undefined;
-  const changedAt = Math.max(...changes);
+export function verdictFrom(changes: readonly number[], proving: readonly Run[], floor?: number): Verdict | undefined {
+  const counted = floor === undefined ? changes : changes.filter((at) => at >= floor);
+  if (counted.length === 0) return undefined;
+  const changedAt = Math.max(...counted);
   const since = proving.filter((run) => run.at > changedAt);
   const lastPass = proving.find((run) => run.exitCode === 0);
   const newest = since[0];

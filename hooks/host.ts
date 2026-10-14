@@ -1,7 +1,7 @@
 import type { EngineInterface, FsBytes, PluginState, SessionMessage, StateRead, StateSetOptions, StateSetResult } from "claude-code";
 import { parseRegistry, resolveBoundPlan } from "../src/core/boulder.ts";
 import { BOULDER, LEDGER } from "../src/core/omca-paths.ts";
-import { configDir, type Env as PathEnv, homeDir, inferPlatform, isAbsolutePath, joinPath, type Platform } from "../src/core/path.ts";
+import { configDir, type Env as PathEnv, homeDir, inferPlatform, isAbsolutePath, joinPath, type Platform, samePath } from "../src/core/path.ts";
 import { parseRuns, provingRuns, type Run, type Verdict, verdictFrom } from "../src/core/proof.ts";
 import { type GlyphTier, glyphTier } from "../src/core/ui-kit.ts";
 
@@ -219,7 +219,13 @@ async function ledgerOf(host: Host, root: string): Promise<Ledger> {
  * stated, and the ledger's test, build and lint runs newest first, or why the ledger could not be
  * read. `ledgerSeen` changes when the ledger does.
  */
-export type ProofFacts = { changes: ReadonlyMap<string, number | null>; proving: readonly Run[]; ledgerError: string | null; ledgerSeen: string };
+export type ProofFacts = {
+  changes: ReadonlyMap<string, number | null>;
+  proving: readonly Run[];
+  ledgerError: string | null;
+  ledgerSeen: string;
+  startedAt: number | undefined;
+};
 
 // Keyed on the event a dispatch hands every feature, so features of one dispatch share the files'
 // stats and the entry goes with the event.
@@ -238,8 +244,20 @@ async function changesOf(host: Host, root: string, paths: readonly string[]): Pr
   return new Map(paths.map((path, index) => [path, stamps[index] ?? null]));
 }
 
-/** `within` is the dispatch's event, so a second call in the same dispatch stats no file again. */
-export async function proofFacts(host: Host, files: readonly string[], within?: object): Promise<ProofFacts> {
+/** The registry's `started_at` for the plan at `planPath` in milliseconds, undefined when it is unregistered, has none or has one that does not parse. */
+async function startOf(host: Host, root: string, planPath: string): Promise<number | undefined> {
+  const registry = `${root}/${BOULDER}`;
+  if (!(await host.fs.exists(registry))) return undefined;
+  const parsed = parseRegistry(await host.fs.read(registry));
+  if (parsed.kind !== "ok") return undefined;
+  const { platform } = await sessionOf(host);
+  const entry = Object.values(parsed.registry.plans).find(({ active_plan: file }) => file !== undefined && samePath(platform, file, planPath));
+  const startedAt = Date.parse(entry?.started_at ?? "");
+  return Number.isNaN(startedAt) ? undefined : startedAt;
+}
+
+/** `within` is the dispatch's event, so a second call in the same dispatch stats no file again. `planPath` names the plan whose start floors the change times. */
+export async function proofFacts(host: Host, files: readonly string[], planPath: string, within?: object): Promise<ProofFacts> {
   const root = await host.session.root();
   const paths = [...new Set(files)];
   const key = JSON.stringify(paths);
@@ -247,7 +265,7 @@ export async function proofFacts(host: Host, files: readonly string[], within?: 
   const changes = shared?.files === key ? shared.changes : await changesOf(host, root, paths);
   if (within !== undefined) statted.set(within, { files: key, changes });
   const { seen, proving, error } = await ledgerOf(host, root);
-  return { changes, proving, ledgerError: error, ledgerSeen: seen };
+  return { changes, proving, ledgerError: error, ledgerSeen: seen, startedAt: await startOf(host, root, planPath) };
 }
 
 /** A task's proof from the facts: undefined when the ledger is unreadable or none of its files can be stated. */
@@ -259,5 +277,6 @@ export function verdictFor(facts: ProofFacts, files: readonly string[]): Verdict
       return at === undefined || at === null ? [] : [at];
     }),
     facts.proving,
+    facts.startedAt,
   );
 }

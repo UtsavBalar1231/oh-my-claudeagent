@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { ago, parseRuns, proofOf, proofSummary, type Run, timeAgo } from "./proof.ts";
+import { ago, parseRuns, provingRuns, proofOf, proofSummary, type Run, timeAgo, verdictFrom } from "./proof.ts";
 
 const T = Date.UTC(2026, 9, 2, 12, 0, 0);
 const MIN = 60_000;
@@ -87,6 +87,29 @@ describe("proofOf", () => {
 
   test("a run at the same instant as the change does not prove it", () => {
     expect(proofOf([T], [run("test", 0, T)])?.proof).toBe("unproven");
+  });
+});
+
+describe("verdictFrom with a floor", () => {
+  const before = T - 30 * MIN;
+  const after = T - 10 * MIN;
+  const floor = T - 20 * MIN;
+
+  test("no verdict when every change precedes the floor, whatever ran since", () => {
+    expect(verdictFrom([before], provingRuns([run("test", 1, T)]), floor)).toBeUndefined();
+  });
+
+  test("a change at or after the floor keeps FAILED after a failing run and PROVEN after a passing one", () => {
+    expect(verdictFrom([before, after], provingRuns([run("test", 1, T)]), floor)?.proof).toBe("failed");
+    expect(verdictFrom([floor], provingRuns([run("test", 0, T)]), floor)?.proof).toBe("proven");
+  });
+
+  test("changes before the floor do not move the change time", () => {
+    expect(verdictFrom([before, after], [], floor)?.changedAt).toBe(after);
+  });
+
+  test("no floor keeps every change", () => {
+    expect(verdictFrom([before], provingRuns([run("test", 1, T)]))?.proof).toBe("failed");
   });
 });
 

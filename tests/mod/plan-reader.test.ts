@@ -634,6 +634,22 @@ test("FAILED marks every task whose newest run since its change failed, and an u
   await ui.unmount();
 });
 
+test("a registered plan counts only file changes since its start: earlier ones show no verdict, later ones keep FAILED", async ($, on) => {
+  const { w } = boardWorld(on, [...PASSING, entry("build", "bun run build", 2, NOW - HOUR / 8)]);
+  const started = new Date(NOW - HOUR).toISOString();
+  write(
+    w,
+    BOULDER,
+    JSON.stringify({ plans: { board: { active_plan: BOARD_PATH, started_at: started } }, bindings: { [SESSION]: { plan_name: "board" } } }),
+  );
+  const ui = await mountBoard($, PAGE);
+  expect((await ui.find({ key: "line-task-1" }))?.text).toBe("✓ 1 Parse the plan                                 ");
+  expect((await ui.find({ key: "line-task-3" }))?.text).toBe("○ 3 Draw the board                          FAILED ");
+  expect((await ui.find({ key: "line-task-4" }))?.text).toBe("○ 4 Wire the hotkeys                               ");
+  expect(await ui.find({ type: "Text", text: "✗ 1 failed" })).toBeDefined();
+  await ui.unmount();
+});
+
 test("the inline tier expands the focused task under its row", async ($, on) => {
   boardWorld(on);
   const ui = await mountBoard($, INLINE_TIER);

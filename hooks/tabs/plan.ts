@@ -131,7 +131,7 @@ let planned: { list: List; start: number } | undefined;
 let isRingOnRow = false;
 let filter: Filter = { text: "", isOpenOnly: false, isFailingOnly: false, isEditing: false };
 let note: { text: string; level: Level } | undefined;
-let facts: ProofFacts = { changes: new Map(), proving: [], ledgerError: null, ledgerSeen: "" };
+let facts: ProofFacts = { changes: new Map(), proving: [], ledgerError: null, ledgerSeen: "", startedAt: undefined };
 let factsSignature = "";
 let memo: { key: string; board: Board } | undefined;
 let detailShown: number | undefined;
@@ -266,8 +266,8 @@ async function load(host: Host, path: string, { keepPlace = false, isTick = fals
 
 // Every listed file's modification time and the ledger's runs, read outside any drawing.
 async function gather(host: Host, plan: Loaded, within?: object): Promise<void> {
-  const next = await proofFacts(host, boardFor(plan).cards.flatMap((card) => card.files), within);
-  const signature = JSON.stringify([[...next.changes], next.ledgerSeen, next.ledgerError]);
+  const next = await proofFacts(host, boardFor(plan).cards.flatMap((card) => card.files), plan.path, within);
+  const signature = JSON.stringify([[...next.changes], next.ledgerSeen, next.ledgerError, next.startedAt]);
   if (signature === factsSignature) return;
   facts = next;
   factsSignature = signature;

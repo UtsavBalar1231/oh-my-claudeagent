@@ -31,7 +31,7 @@ function planText(done: number, total: number): string {
 }
 
 const BOUND = JSON.stringify({
-  plans: { [PLAN_NAME]: { active_plan: PLAN_PATH, started_at: "2026-10-02T10:00:00Z", session_ids: [SESSION] } },
+  plans: { [PLAN_NAME]: { active_plan: PLAN_PATH, started_at: "2026-09-01T10:00:00Z", session_ids: [SESSION] } },
   bindings: { [SESSION]: { plan_name: PLAN_NAME, bound_at: 1_789_990_000 } },
 });
 
@@ -464,6 +464,30 @@ test("the band counts a done task's proof and an open task's failure, from its f
   disk.set(LEDGER, { text: ledger([run(RAN_AT, 0), run(RAN_AT + 10, 1)]), mtimeMs: AFTER_RUN_MS + 10_000 });
   await turn($);
   expect(await statusRow(band)).toBe("█▋███ 2/6 · next 3 Port module 3 · ✗ 4 failed");
+});
+
+test("the band counts only file changes since the plan's registered start", async ($, on) => {
+  const task = (n: number, isDone: boolean, file: string) => `- [${isDone ? "x" : " "}] ${n}. Port module ${n}\n  - File: \`${file}\``;
+  const plan = `# Widget rewrite\n\n## TODOs\n\n${[task(1, true, "src/a.ts"), task(2, false, "src/a.ts"), task(3, false, "src/b.ts")].join("\n")}\n`;
+  const failing = JSON.stringify({
+    entries: [{ type: "test", command: "just test", exit_code: 1, timestamp: new Date((RAN_AT + 10) * 1000).toISOString() }],
+  });
+  const startedAt = new Date((RAN_AT - 10) * 1000).toISOString();
+  const registry = JSON.stringify({
+    plans: { [PLAN_NAME]: { active_plan: PLAN_PATH, started_at: startedAt, session_ids: [SESSION] } },
+    bindings: { [SESSION]: { plan_name: PLAN_NAME, bound_at: 1_789_990_000 } },
+  });
+  const disk = files({
+    [BOULDER]: registry,
+    [PLAN_PATH]: plan,
+    [`${ROOT}/src/a.ts`]: { text: "a", mtimeMs: BEFORE_RUN_MS },
+    [`${ROOT}/src/b.ts`]: { text: "b", mtimeMs: AFTER_RUN_MS },
+    [LEDGER]: failing,
+  });
+  world(on, disk);
+  await start($);
+  const band = await mount($, "terminal");
+  expect(await statusRow(band)).toBe("█▋███ 1/3 · next 2 Port module 2 · ✗ 1 failed");
 });
 
 test("a press fills the prompt with the exact text and never submits", async ($, on) => {
