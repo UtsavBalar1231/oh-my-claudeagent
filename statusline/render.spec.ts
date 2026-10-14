@@ -650,6 +650,17 @@ describe("usage limits", () => {
   test("a window is coloured by the same thresholds as the context bar", () => {
     expect(rows({ model, rate_limits: { five_hour: { used_percentage: 91 } } })[2]).toContain(`${RED}91%${R}`);
   });
+
+  test("a window over 100 draws 100% in the color 100 gets", () => {
+    const over = rows({ model, rate_limits: { five_hour: { used_percentage: 140 } } })[2];
+    const full = rows({ model, rate_limits: { five_hour: { used_percentage: 100 } } })[2];
+    expect(over).toContain(`${RED}100%${R}`);
+    expect(over).toBe(full);
+  });
+
+  test("a window under 100 is unchanged", () => {
+    expect(rows({ model, rate_limits: { five_hour: { used_percentage: 37 } } })[2]).toContain("37%");
+  });
 });
 
 describe("spend limit", () => {

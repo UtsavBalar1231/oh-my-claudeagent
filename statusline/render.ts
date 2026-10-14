@@ -454,8 +454,9 @@ function directorySegment({ data, git, g }: Ctx): Segment | null {
 
 function rateLimitSegment({ data, g, now }: Ctx, which: "five_hour" | "seven_day", hasRing: boolean): Segment | null {
   const window = data.rate_limits?.[which];
-  const pct = window?.used_percentage;
-  if (pct == null) return null;
+  const raw = window?.used_percentage;
+  if (raw == null) return null;
+  const pct = Math.min(100, Math.max(0, raw));
   const color = thresholdColor(pct);
   const reset = formatResetTime(window?.resets_at, now);
   const glyph = which === "five_hour" ? g.fiveHour : g.weekly;
