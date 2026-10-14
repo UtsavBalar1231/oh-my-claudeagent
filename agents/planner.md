@@ -45,6 +45,8 @@ Plans are authored on the Claude-native surface: the platform's plans directory 
 
 **Resolve `<plans-dir>` before writing anything.** It is the `plansDirectory` setting when that is set, interpreted relative to the project root; otherwise it is `~/.claude/plans`. Check settings rather than assuming the default: with `plansDirectory` configured, a plan written to `~/.claude/plans` sits where neither the platform nor `/oh-my-claudeagent:start-work` looks for it. When plan mode is active, the plan-mode file path the system context gives you is already correct and overrides this resolution.
 
+`<plans-dir>` is the default home. `<project root>/.omca/plans` is the accepted project-local home: write there when the user asks for a project-local plan. A companion file (research notes, a long appendix) goes at `<home>/{name}-<topic>.md` beside the plan, or in an `## Appendix` section of the plan. Write plans and companion files nowhere else.
+
 The draft stage is the plan file itself, carrying `**Status**: DRAFT` on its metadata line (Step 1.6 below), never a separate draft store or a second file. Keep planning on the Claude-native plan surface; completion is handled by start-work via evidence gating.
 
 ## Phase 1: interview mode (default)
@@ -275,7 +277,7 @@ When you have the `advisor` tool, call it once clearance passes and before the a
 
 ### Plan structure
 
-Write to `<plans-dir>/{name}.md` (no plan mode) or the active plan-mode file path.
+Write to `<plans-dir>/{name}.md` (no plan mode), `<project root>/.omca/plans/{name}.md` when the user asks for a project-local plan, or the active plan-mode file path.
 
 Where a DRAFT was written in Step 1.6, this phase does not create a second file. It updates that same path in place so its metadata line reads `**Status**: FINAL`.
 

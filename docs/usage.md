@@ -108,8 +108,10 @@ and `start-work` with plan tracking, the stop gates and the status line.
 Run `/oh-my-claudeagent:plan <what you want done>`. The planner agent interviews you for what
 the plan needs, consults analyzer for gaps, writes the plan, and has reviewer review it. The plan
 lands in your plans directory: the `plansDirectory` setting when you set one, relative to the
-project, and `~/.claude/plans` otherwise. Each task is a numbered checkbox, `- [ ] 1. ...`;
-progress tracking counts only numbered boxes.
+project, and `~/.claude/plans` otherwise. Ask for a project-local plan and it lands in
+`.omca/plans` under the project instead. To make that the default, set
+`plansDirectory: ".omca/plans"`. `.omca/` is gitignored, so those plans stay out of commits.
+Each task is a numbered checkbox, `- [ ] 1. ...`; progress tracking counts only numbered boxes.
 
 To research before planning, ask `/oh-my-claudeagent:plan` to help you understand or research
 the problem. Planner interviews you and returns its findings with no plan file.
@@ -263,7 +265,9 @@ URL like `postgres://user:pass@host`, are drawn as `‹masked›`, and your home
 
 ### The plan board
 
-`/omca plan` opens the bound plan; `/omca plan <name or path>` opens another. A plan with
+`/omca plan` opens the bound plan; `/omca plan <name or path>` opens another. The picker lists
+the plans directory, `.omca/plans` under the project and every registered plan whose file
+exists, and a name resolves against both directories and the registry. A plan with
 numbered tasks opens on its board: a header with a DRAFT chip while the plan is a draft, a
 progress bar, the proof counts, the next task and the running agents, then the tasks grouped by
 milestone. Each task row shows whether it is done, in progress, open or blocked, its proof chip,

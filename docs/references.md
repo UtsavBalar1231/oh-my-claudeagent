@@ -12,7 +12,9 @@ hooks, its interface (band, pane, doctor, status line) and its state under `.omc
 
 A plan is an ordinary Claude Code plan file. OMCA resolves the plans directory the way Claude
 Code does: the `plansDirectory` setting relative to the project when set, otherwise
-`~/.claude/plans`, and an active plan-mode file over both.
+`~/.claude/plans`, and an active plan-mode file over both. `<project>/.omca/plans` is the
+second accepted home, for project-local plans, and `plansDirectory: ".omca/plans"` makes it
+the default.
 
 Your settings stay the authority. OMCA's hooks never auto-allow a command: they deny, ask or
 advise, and every allow comes from your permission rules. Managed settings sit above OMCA, and
@@ -285,6 +287,7 @@ OMCA keeps its state in the project's `.omca/` directory, which it gitignores ex
 | `.omca/logs/file-access.jsonl` | `file_read` | One line per call |
 | `.omca/state/hook-trace.jsonl` | the server, with `OMCA_HOOK_TRACE=1` | One line per hook call |
 | `.omca/rules/*.md` | you | Project rules, injected by file name pattern |
+| `.omca/plans/*.md` | the planner | Project-local plans, gitignored with the rest of `.omca/`. The Plan tab picker lists them, the plans directory and every registered plan. The plan-write check covers any file in a directory named `plans` |
 | `~/.claude/omca/statusline.ts` | `omca-setup` | The status line launcher |
 
 Write the registry, ledger and notepads only through the tools; no hook stops a direct edit, and

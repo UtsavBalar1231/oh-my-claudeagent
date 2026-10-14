@@ -17,7 +17,7 @@ Both JSON files carry `"version": 1` as their first key. A file without `version
 
 ## Plan files
 
-A plan is a Markdown file anywhere on disk. The registry records its path. Nothing about a plan is stored outside the file: progress, the next task and completion are all derived from its text each time they are needed.
+A plan is a Markdown file anywhere on disk. The registry records its path. The planner writes plans to the plans directory (`plansDirectory`, else `~/.claude/plans`) or to `.omca/plans` under the project for a project-local plan; `plansDirectory: ".omca/plans"` makes the second the default. `.omca/` is gitignored. The Plan tab picker lists both homes and every registered plan. The plan-write check covers any `.md` file in a directory named `plans`. Nothing about a plan is stored outside the file: progress, the next task and completion are all derived from its text each time they are needed.
 
 ### Metadata
 
