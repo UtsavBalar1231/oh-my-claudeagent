@@ -65,6 +65,20 @@ true the kit's `Text` sends `weight: "semibold"` in place of `bold: true`, and o
 is drawn as it was before the gate. Drawing code reads the flag from `resolvedSession()` and
 never awaits the engine.
 
+The pane's `ui.scroll` hook reads one committed layout (`regions.ts`). Each terminal drawing
+collects its own on `view.layout`: every scroll region and every list that draws its own window,
+with its rect in the tab's rows and columns, the tab rows above the tab, the engine's offset it
+drew at, whether the pane padded the tree, and the rows the tree takes. The drawing commits it in
+one assignment when it finishes, and one that started earlier never replaces a newer commit,
+because the engine raises `ui.render` and `ui.scroll` concurrently and a drawing awaits its tab.
+Region offsets are module state that outlives drawings. A wheel tick, the one event that carries
+`pointer`, moves only what is under it: a region by `by` rows, else a list by `by` rows, each
+clamped and taking the tick at its end. Over nothing it reaches the engine only while the tree is
+taller than the body by more than the padding row, and is taken with no effect otherwise. Routing
+never reads the size of `by`, since the engine merges ticks in flight into one move. The scroll
+keys carry no `pointer` and keep their own routing: the tab's list, then the aimed or first
+overflowing region, a row, a page (`bodyRows`) or an end (`contentRows`) at a time.
+
 ## Current runtime contract
 
 - `UserPromptSubmit` and `UserPromptExpansion` route to the server's `keyword-detector` and

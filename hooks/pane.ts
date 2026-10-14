@@ -6,7 +6,7 @@ import { reconcile } from "./agents-tracker.ts";
 import type { Features, Input } from "./dispatch.ts";
 import { type Host, reason, resolvedSession, sessionOf, type State, update } from "./host.ts";
 import * as mascots from "./mascot-player.ts";
-import { hasOverflow, resetRegions, scrollKeyed, scrollRegionAt } from "./regions.ts";
+import { commitLayout, committedLayout, hasOverflow, type Layout, newLayout, scrollAt, scrollKeyed } from "./regions.ts";
 import type { Subcommand } from "./omca-router.ts";
 import * as agents from "./tabs/agents.ts";
 import * as doctor from "./tabs/doctor.ts";
@@ -51,6 +51,7 @@ export type View = {
   platform: Platform;
   now: number;
   press: Press;
+  layout: Layout;
 };
 export type TabView = (host: Host, view: View) => Promise<readonly RenderElement[]>;
 
@@ -93,11 +94,6 @@ let viewportRows = 0;
 const CUED: readonly Tab[] = ["notepad", "stats"];
 let drawnShape = "";
 let measured: { shape: string; rows: number } | undefined;
-// The latest drawing's tab rows above the tab, the engine's own offset, and whether the tree runs
-// past the body only for a region's sake.
-let chromeRows = 0;
-let shownOffset = 0;
-let isPadded = false;
 
 // A tree's content as data: closures and the press handles the runtime stamps change every draw.
 const shapeOf = (children: readonly RenderElement[]): string =>
@@ -344,14 +340,10 @@ async function draw(host: Host, e: Input<"ui.render Pane">): Promise<RenderEleme
   const hasRule = !isInline && rows >= RULE_MIN_ROWS;
   const chrome = tabs.length + (hasRule ? 1 : 0);
   const tier = widthTier(e.props.bodyColumns);
-  const view: View = { kit, g, isAscii, width, tier, rows: Math.max(0, rows - chrome), isInline, home, platform, now, press };
+  const layout = newLayout(chrome, e.props.scroll.offset);
+  const view: View = { kit, g, isAscii, width, tier, rows: Math.max(0, rows - chrome), isInline, home, platform, now, press, layout };
   // A remote surface scrolls the whole tree itself, so its drawings leave the terminal's windows as they are.
   const isTerminal = !isRemote(kit);
-  if (isTerminal) {
-    chromeRows = chrome;
-    shownOffset = e.props.scroll.offset;
-    resetRegions();
-  }
   let body: readonly RenderElement[];
   try {
     body = await viewOf(active)(host, view);
@@ -391,8 +383,9 @@ async function draw(host: Host, e: Input<"ui.render Pane">): Promise<RenderEleme
   const drawnRows = [...tabs, ...body].reduce((sum, child) => sum + rowsAtLeast(child), hasRule ? 1 : 0);
   // The engine raises the wheel only over a tree taller than the body, so a tab that fits but holds
   // a region with more to show gets rows past the body, and those rows never scroll the pane.
-  isPadded = hasOverflow() && drawnRows <= rows;
+  const isPadded = hasOverflow(layout) && drawnRows <= rows;
   if (isPadded) body = [...body, ...blanks(view, rows + 1 - drawnRows)];
+  commitLayout({ ...layout, isPadded, treeRows: isPadded ? rows + 1 : drawnRows });
   const children = [...tabs, ...(hasRule ? [rule(view)] : []), ...body];
   drawnShape = CUED.includes(active) && !isPadded ? shapeOf(children) : "";
   const cues =
@@ -500,10 +493,15 @@ export const pane: Features = {
       if (!(await host.session.surfaces()).includes("terminal")) return undefined;
       if (drawnShape !== "") measured = { shape: drawnShape, rows: e.contentRows };
       if (e.origin.kind !== "person") return undefined;
-      // The pointer's row counts from the body's top as shown: past the engine's own scroll, less the tab rows above the tab.
-      if (e.pointer !== undefined && scrollRegionAt({ column: e.pointer.column, row: e.pointer.row + shownOffset - chromeRows }, e.by)) {
-        host.ui.invalidate();
-        return { answer: {} };
+      const layout = committedLayout();
+      // The wheel moves only what is under it. Over nothing, the engine gets the tick only while the
+      // tree has rows past the body besides the one that brings the wheel here.
+      if (e.pointer !== undefined) {
+        if (await scrollAt(layout, e.pointer, e.by)) {
+          host.ui.invalidate();
+          return { answer: {} };
+        }
+        return Math.max(layout.treeRows, e.contentRows) > e.bodyRows + 1 ? undefined : { answer: {} };
       }
       const tab = (await host.state.pane.get()).value?.tab;
       if (tab === "agents" && agents.scroll(host, e)) return { answer: {} };
@@ -511,11 +509,11 @@ export const pane: Features = {
       if (tab === "evidence") return evidence.scroll(host, e) ? { answer: {} } : undefined;
       // A key no tab took moves a region: a page key asks for `bodyRows`, Home and End for `contentRows`.
       const step = Math.abs(e.by) === e.bodyRows ? "page" : Math.abs(e.by) === e.contentRows ? "end" : "row";
-      if (e.pointer === undefined && scrollKeyed(e.by, step)) {
+      if (scrollKeyed(e.by, step)) {
         host.ui.invalidate();
         return { answer: {} };
       }
-      if (tab !== "doctor" || !doctor.scroll(e.by, e.contentRows)) return isPadded ? { answer: {} } : undefined;
+      if (tab !== "doctor" || !doctor.scroll(e.by, e.contentRows)) return layout.isPadded ? { answer: {} } : undefined;
       host.ui.invalidate();
       return { answer: {} };
     },

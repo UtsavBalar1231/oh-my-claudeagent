@@ -391,6 +391,7 @@ function stack(view: View, { slots, heights }: Column, { width, isFramed }: Arra
       width: Math.max(1, isFramed ? width - CARD_FRAME : width),
       height: height - chrome,
       units,
+      layout: view.layout,
     });
     at += height;
     return sectionCard(view, section, width, region, isFramed);

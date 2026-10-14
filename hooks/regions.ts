@@ -14,17 +14,51 @@ export type Unit = { element: RenderElement; rows: number };
 /** Where a region sits in its tab's own rows and columns. */
 export type Region = { key: string; left: number; top: number; width: number; height: number };
 
-// Each region's offset, in units, outlives a drawing; the regions laid out are the latest drawing's only.
+type Rect = Omit<Region, "key">;
+type Cell = { column: number; row: number };
+
+/** A list that draws its own window: the wheel over its rows moves it `by` rows. */
+export type Pinned = Rect & { move: (by: number) => unknown };
+
+/**
+ * What one terminal drawing laid out: its regions and lists in the tab's rows and columns, the
+ * pane's rows above the tab, the engine's offset it drew at, whether the pane padded the tree past
+ * the body only for a region's sake, and the rows the tree takes at least.
+ */
+export type Layout = {
+  seq: number;
+  regions: (Region & { max: number })[];
+  lists: Pinned[];
+  chromeRows: number;
+  shownOffset: number;
+  isPadded: boolean;
+  treeRows: number;
+};
+
+// Each region's offset, in units, outlives a drawing; the layout is the latest committed drawing's only.
 const offsets = new Map<string, number>();
-let laid: (Region & { max: number })[] = [];
+let drawings = 0;
+let committed: Layout = { seq: 0, regions: [], lists: [], chromeRows: 0, shownOffset: 0, isPadded: false, treeRows: 0 };
 let aimed: string | undefined;
 
 const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
 
-/** Forgets the regions of the last drawing; a drawing lays out its own again. */
-export function resetRegions(): void {
-  laid = [];
+/** A drawing's own layout, numbered in the order the drawings start. */
+export function newLayout(chromeRows: number, shownOffset: number): Layout {
+  drawings += 1;
+  return { seq: drawings, regions: [], lists: [], chromeRows, shownOffset, isPadded: false, treeRows: 0 };
 }
+
+/**
+ * Makes a finished drawing's layout the one scrolling reads, in one assignment. The engine renders
+ * and scrolls concurrently and a drawing awaits its tab, so a drawing that started earlier and
+ * finishes later never replaces a newer one.
+ */
+export function commitLayout(layout: Layout): void {
+  if (layout.seq > committed.seq) committed = layout;
+}
+
+export const committedLayout = (): Layout => committed;
 
 /** Puts a region back at its top, as when what it shows changes. */
 export function resetOffset(key: string): void {
@@ -41,26 +75,34 @@ export function aimKeys(key: string | undefined): void {
  * one, or to an end; false when no region overflows.
  */
 export function scrollKeyed(by: number, step: "row" | "page" | "end"): boolean {
-  const region = laid.find((one) => one.key === aimed && one.max > 0) ?? laid.find((one) => one.max > 0);
+  const { regions } = committed;
+  const region = regions.find((one) => one.key === aimed && one.max > 0) ?? regions.find((one) => one.max > 0);
   if (region === undefined) return false;
   const move = step === "row" ? by : step === "page" ? Math.sign(by) * Math.max(1, region.height - 1) : Math.sign(by) * region.max;
   offsets.set(region.key, clamp((offsets.get(region.key) ?? 0) + move, 0, region.max));
   return true;
 }
 
-/** Whether a region of the latest drawing holds more than it shows, so the wheel must reach it. */
-export const hasOverflow = (): boolean => laid.some((region) => region.max > 0);
+/** Whether a region of a drawing holds more than it shows, so the wheel must reach it. */
+export const hasOverflow = (layout: Layout): boolean => layout.regions.some((region) => region.max > 0);
+
+const isIn = ({ left, top, width, height }: Rect, { column, row }: Cell) => column >= left && column < left + width && row >= top && row < top + height;
 
 /**
- * Moves the region under the pointer by `by` units; false when no region is there. A region at its
- * end still takes the tick, so the wheel over it never scrolls what is around it.
+ * Moves what the wheel is over in `layout` by `by` rows, a region before the list it sits in; false
+ * over neither. `pointer` is the body's cell as shown. Either takes the tick at its end too, so the
+ * wheel over it never moves what is around it.
  */
-export function scrollRegionAt(pointer: { column: number; row: number }, by: number): boolean {
-  const region = laid.find(
-    ({ left, top, width, height }) => pointer.column >= left && pointer.column < left + width && pointer.row >= top && pointer.row < top + height,
-  );
-  if (region === undefined) return false;
-  offsets.set(region.key, clamp((offsets.get(region.key) ?? 0) + by, 0, region.max));
+export async function scrollAt(layout: Layout, pointer: Cell, by: number): Promise<boolean> {
+  const cell = { column: pointer.column, row: pointer.row + layout.shownOffset - layout.chromeRows };
+  const region = layout.regions.find((one) => isIn(one, cell));
+  if (region !== undefined) {
+    offsets.set(region.key, clamp((offsets.get(region.key) ?? 0) + by, 0, region.max));
+    return true;
+  }
+  const list = layout.lists.find((one) => isIn(one, cell));
+  if (list === undefined) return false;
+  await list.move(by);
   return true;
 }
 
@@ -80,20 +122,21 @@ function lastOffset(units: readonly Unit[], height: number, isCued: boolean): nu
 // A cue row above, one below and a row of content between them.
 const CUED_FROM = 3;
 
-type Spec = Region & { kit: Kit; g: Glyphs; units: readonly Unit[] };
+type Spec = Region & { kit: Kit; g: Glyphs; units: readonly Unit[]; layout: Layout };
 
 /**
  * At most `height` rows of `units`, from the region's offset down, with a dim cue row above while
- * units sit above and one below while more follow. The window draws the units it shows and nothing
- * else: an element placed above the body's top row is clamped there, so no part of it is moved off.
+ * units sit above and one below while more follow, laid out in the drawing's `layout`. The window
+ * draws the units it shows and nothing else: an element placed above the body's top row is clamped
+ * there, so no part of it is moved off.
  */
-export function ScrollRegion({ kit, g, units, ...region }: Spec): RenderElement {
+export function ScrollRegion({ kit, g, units, layout, ...region }: Spec): RenderElement {
   const { key, width } = region;
   if (isRemote(kit)) return kit.Box({ key, width, flexDirection: "column", children: units.map((unit) => unit.element) });
   const height = Math.max(1, region.height);
   const isCued = height >= CUED_FROM;
   const max = lastOffset(units, height, isCued);
-  laid.push({ ...region, height, max });
+  layout.regions.push({ ...region, height, max });
   const offset = Math.min(offsets.get(key) ?? 0, max);
   const isAbove = isCued && offset > 0;
   const room = height - (isAbove ? 1 : 0);

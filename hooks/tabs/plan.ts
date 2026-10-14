@@ -45,7 +45,7 @@ import type { Input, Phase } from "../dispatch.ts";
 import { boundPlanOf, fillPrompt, type Host, type ProofFacts, proofFacts, reason, sessionOf, type State, verdictFor } from "../host.ts";
 import type { Subcommand } from "../omca-router.ts";
 import { blanks, buttonRow, edge, keyButton, noticeRow, open, PANE, patchPane, refocus as focusIn, refocusRemote, rule, tabKey, type TabView, type View, wrapAt } from "../pane.ts";
-import { codeUnits, markdownUnits, resetOffset, ScrollRegion, scrollKeyed, type Unit } from "../regions.ts";
+import { codeUnits, markdownUnits, type Region, resetOffset, ScrollRegion, scrollKeyed, type Unit } from "../regions.ts";
 import { Card as CardBox, Field, isRemote, Line, Run as Spans, type TextStyle } from "../ui.ts";
 
 type Loaded = Extract<State["plan"], { pages: unknown }>;
@@ -505,33 +505,37 @@ export async function focus(host: Host, e: Input<"ui.focus">): Promise<Phase<Inp
 
 // The lists draw their own window, so the engine has nothing to scroll for these keys. A page key
 // asks for `bodyRows`, Home and End for `contentRows`; where the two are equal the key is read as a page key.
-// Anything shorter than a page is a wheel tick, which moves the cursor by its rows as the arrows do.
 export async function scroll(host: Host, e: Input<"ui.scroll">): Promise<boolean> {
   const list = listShown();
   const last = list === undefined ? undefined : drawn[list];
   const isPage = Math.abs(e.by) === e.bodyRows;
   const isEnd = !isPage && Math.abs(e.by) === e.contentRows;
-  const isTick = !isPage && !isEnd && Math.abs(e.by) < e.bodyRows;
-  if (list === undefined && (mode === "detail" || mode === "page") && e.pointer === undefined) {
-    if (!scrollKeyed(e.by, isPage ? "page" : isEnd ? "end" : "row")) return false;
+  const size = isPage ? "page" : isEnd ? "end" : "row";
+  if (list === undefined && (mode === "detail" || mode === "page")) {
+    if (!scrollKeyed(e.by, size)) return false;
     host.ui.invalidate();
     return true;
   }
-  if (list === undefined || last === undefined || (!isPage && !isEnd && !isTick)) return false;
+  if (list === undefined || last === undefined) return false;
+  return step(host, list, last, e.by, size, true);
+}
+
+// Moves a list's cursor by `by` rows, a window of them or to an end, over the window `last` drew.
+async function step(host: Host, list: List, last: Drawn, by: number, size: "row" | "page" | "end", isKey: boolean): Promise<boolean> {
   const ring = await ringOf(host, list);
   if (ring === undefined || ring.focus.rows.length === 0) return false;
   const { rows, total, current } = ring.focus;
   const shown = rows.filter((index) => index >= last.start && index < last.start + last.size).length;
   const at = Math.max(0, rows.indexOf(current));
-  const step = isTick ? e.by : Math.sign(e.by) * Math.max(1, shown);
-  const to = isEnd ? (e.by > 0 ? rows.length - 1 : 0) : Math.max(0, Math.min(rows.length - 1, at + step));
+  const rowsBy = size === "row" ? by : Math.sign(by) * Math.max(1, shown);
+  const to = size === "end" ? (by > 0 ? rows.length - 1 : 0) : Math.max(0, Math.min(rows.length - 1, at + rowsBy));
   const target = rows[to] ?? current;
   if (target === current) return true;
   // An arrow takes the ring to the next drawn task the way a person's move does, so focus places
   // the window and the ring together; the engine keeps the ring by position, and a keyed refocus
   // after the window moved would land a row off.
   const isDrawn = target >= last.start && target < last.start + last.size;
-  if (e.pointer === undefined && Math.abs(e.by) === 1 && isDrawn) {
+  if (isKey && Math.abs(by) === 1 && isDrawn) {
     const { deny } = await host.ui.focus({ requestId: PANE, key: ring.keyOf(target) });
     if (deny === undefined) return true;
   }
@@ -558,6 +562,13 @@ function windowFor(host: Host, view: View, list: List, focusList: FocusList, siz
   const end = Math.min(focusList.total, start + size);
   isCut = start > 0 || end < focusList.total;
   return { start, end };
+}
+
+// The wheel over a list's rows moves its cursor over the window this drawing gave it.
+function pin(host: Host, view: View, list: List, rect: Omit<Region, "key">): void {
+  const last = drawn[list];
+  if (isRemote(view.kit) || last === undefined) return;
+  view.layout.lists.push({ ...rect, move: (by) => step(host, list, last, by, "row", false) });
 }
 
 const roomFor = (view: View, chrome: number): number => Math.max(1, view.rows - chrome);
@@ -1252,6 +1263,7 @@ function boardView(host: Host, view: View, ctx: Ctx): RenderElement[] {
   const detailWidth = view.width - listWidth - 2;
   const units = isSplit ? detail(view, ctx, card, detailWidth - 1) : [];
   const height = isRemoteView ? Math.max(items.length + 2, units.reduce((sum, unit) => sum + unit.rows, 0)) : size + 2;
+  if (items.length > 0) pin(host, view, "board", { left: 0, top, width: listWidth, height: column.length });
   if (isSplit && !isRemoteView && card.n !== detailShown) {
     resetOffset(DETAIL);
     detailShown = card.n;
@@ -1286,6 +1298,7 @@ function boardView(host: Host, view: View, ctx: Ctx): RenderElement[] {
                     width: detailWidth - 1,
                     height,
                     units,
+                    layout: view.layout,
                   }),
                 ],
               }),
@@ -1351,6 +1364,7 @@ function pageOf(view: View, { id, title, counter, keys, units, hint, isNote }: P
       width: view.width,
       height: Math.max(1, view.rows - above - hintRows),
       units: [...units],
+      layout: view.layout,
     }),
     ...(hintRows === 0 ? [] : [Text({ color: hint.color, children: [fitEnd(hint.text, view.width, ellipsis)] })]),
   ];
@@ -1442,6 +1456,7 @@ function contentsView(host: Host, view: View, plan: Loaded): RenderElement[] {
       }),
     );
   });
+  pin(host, view, "contents", { left: 0, top: layout.isFull ? 3 : 1, width: view.width, height: rows.length + 2 });
   const progress = `${plan.done}/${plan.total} tasks done`;
   const lead = `${progress} ${view.g.dot} `;
   const hidden = plan.pages.length - list.total;
@@ -1596,6 +1611,7 @@ function plansView(host: Host, view: View, pane: State["pane"] | undefined, plan
       }),
     );
   });
+  pin(host, view, "plans", { left: 0, top: layout.isFull ? 3 : 1, width: view.width, height: failure.length + rows.length + 2 });
   const count = `${listing.files.length} most recent`;
   const lead = `${count} in `;
   return frame(view, layout, {

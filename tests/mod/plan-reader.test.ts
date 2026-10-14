@@ -738,6 +738,96 @@ test("in the split tier a wheel tick over the detail scrolls it and leaves the c
   await ui.unmount();
 });
 
+// The tab bar and two header lines, then eleven rows of the split board: the list's nine in columns 0
+// to 55, the rule in 56 and the detail from 58; then the keys and the hint. The tree is the body and
+// the padding row that brings the wheel here.
+const SPLIT_SHORT: Size = { columns: 230, rows: 20, placement: "dock" };
+const wheel = ($: Engine, column: number, row: number, by: number, contentRows = 17) =>
+  $.ui.scroll({ ...SCROLL, by, bodyRows: 16, contentRows, pointer: { column, row } });
+
+test("a wheel tick over the header, the rule, the detail's padding column, the blank under the list or the keys moves nothing and stays off the pane, which a tree with rows to spare passes on", async ($, on) => {
+  boardWorld(on);
+  const engine: number[] = [];
+  on("ui.scroll", (_$, e) => (engine.push(e.by), {}));
+  const ui = await mountBoard($, SPLIT_SHORT);
+  const current = async () => (await ui.findAll({ type: "Button" })).filter((b) => b.props["autoFocus"] === true).map((b) => b.key);
+  const before = rows(await ui.drawn());
+  expect(textOf(topRows(await ui.drawn())[4])).toStartWith("k: Run check");
+
+  for (const [column, row] of [
+    [10, 1],
+    [56, 6],
+    [57, 6],
+    [10, 13],
+    [10, 14],
+    [100, 15],
+  ] as const) {
+    for (const by of [1, -1, 426]) await wheel($, column, row, by);
+  }
+  expect(await current()).toEqual(["task-3"]);
+  expect(rows(await ui.drawn())).toEqual(before);
+  expect(engine).toEqual([]);
+
+  await wheel($, 10, 1, 1, 30);
+  expect(engine).toEqual([1]);
+  await ui.unmount();
+});
+
+test("a merged wheel over the detail scrolls it to its end and one over the list moves the cursor to the list's end, both kept off the pane", async ($, on) => {
+  boardWorld(on);
+  const engine: number[] = [];
+  on("ui.scroll", (_$, e) => (engine.push(e.by), {}));
+  const ui = await mountBoard($, SPLIT_SHORT);
+  const current = async () => (await ui.findAll({ type: "Button" })).filter((b) => b.props["autoFocus"] === true).map((b) => b.key);
+
+  await wheel($, 60, 6, 426);
+  expect(await ui.find({ type: "Text", text: /^↓ more/ })).toBeUndefined();
+  expect(await ui.find({ type: "Text", text: "  ✓ test just test-mod exit 0 · 30m ago" })).toBeDefined();
+  expect(await current()).toEqual(["task-3"]);
+
+  await wheel($, 10, 6, 426);
+  expect(await current()).toEqual(["task-5"]);
+  await wheel($, 10, 6, -426);
+  expect(await current()).toEqual(["task-1"]);
+  expect(engine).toEqual([]);
+  await ui.unmount();
+});
+
+test("a wheel tick while a drawing waits on its tab reaches the layout the last drawing committed, so over the detail it leaves the cursor", async ($, on) => {
+  boardWorld(on);
+  const engine: number[] = [];
+  on("ui.scroll", (_$, e) => (engine.push(e.by), {}));
+  let isArmed = false;
+  let blocked = () => {};
+  let release = () => {};
+  const isBlocked = new Promise<void>((resolve) => (blocked = resolve));
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  // The board reads the agents atom after the drawing has begun its layout, so holding that read holds the drawing mid-way.
+  on("state.get", { key: "agents" }, async (_$, e, next) => {
+    if (isArmed) {
+      isArmed = false;
+      blocked();
+      await gate;
+    }
+    return next(e);
+  });
+  const ui = await mountBoard($, SPLIT_SHORT);
+  const current = async () => (await ui.findAll({ type: "Button" })).filter((b) => b.props["autoFocus"] === true).map((b) => b.key);
+  expect(await current()).toEqual(["task-3"]);
+
+  isArmed = true;
+  const drawing = ui.redraw();
+  await isBlocked;
+  await wheel($, 60, 6, 2);
+  release();
+  await drawing;
+  await ui.redraw();
+  expect(await current()).toEqual(["task-3"]);
+  expect((await ui.find({ type: "Text", text: /^↑ \d+ more/ }))?.text.trim()).toBe("↑ 2 more");
+  expect(engine).toEqual([]);
+  await ui.unmount();
+});
+
 test("in the split tier a press on another task selects it and a press on the task under the cursor opens its page; elsewhere a press opens", async ($, on) => {
   boardWorld(on);
   const split = await mountBoard($, SPLIT);
