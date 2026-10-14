@@ -1,5 +1,6 @@
 import type { On } from "claude-code";
 import { type Engine, expect, test } from "claude-code/testing";
+import { joinPath } from "../../src/core/path.ts";
 import {
   BOULDER,
   childrenOf,
@@ -117,7 +118,7 @@ for (const layout of LAYOUTS) {
     await $.command.run(run("plan"));
     const ui = await $.ui.mount(pane("terminal"));
 
-    expect(await ui.find({ type: "Text", text: "2 most recent in ~/.claude/plans" })).toBeDefined();
+    expect(await ui.find({ type: "Text", text: `2 most recent in ~/.claude/plans, ${joinPath(layout.platform, layout.root, ".omca", "plans")}` })).toBeDefined();
     expect((await ui.find({ key: "pick-0" }))?.props["label"]).toBe("new");
     expect((await ui.find({ key: "pick-1" }))?.props["label"]).toBe("old");
     expect(await ui.find({ key: "pick-2" })).toBeUndefined();
@@ -1222,9 +1223,69 @@ test("with no plan the empty state wraps its notice, puts the path on its own li
     "No plan is bound to this session.",
     "No plans in",
     "~/.claude/plans",
+    "/work/.omca/plans",
     "Make one with /oh-my-claudeagent:plan, then bind it",
     "to this session with /oh-my-claudeagent:start-work.",
     "r: Reload",
   ]);
   await ui.unmount();
+});
+
+const LOCAL = `${ROOT}/.omca/plans`;
+const registry = (plans: Record<string, { active_plan: string }>) => JSON.stringify({ plans, bindings: {} });
+
+test("the picker lists a ~/.claude/plans plan, a .omca/plans plan and a registered plan elsewhere, newest first", async ($, on) => {
+  const w = world(on, {
+    [BOULDER]: registry({ remote: { active_plan: "/elsewhere/remote.md" } }),
+    [`${POSIX.plans}/home.md`]: PLAN,
+    [`${LOCAL}/local.md`]: PLAN,
+    "/elsewhere/remote.md": PLAN,
+    "/elsewhere/unregistered.md": PLAN,
+  });
+  w.files.set(`${POSIX.plans}/home.md`, { text: PLAN, mtimeMs: 1_000 });
+  w.files.set("/elsewhere/remote.md", { text: PLAN, mtimeMs: 2_000 });
+  w.files.set(`${LOCAL}/local.md`, { text: PLAN, mtimeMs: 3_000 });
+
+  await $.command.run(run("plan"));
+  const ui = await $.ui.mount(pane("terminal"));
+
+  expect(await ui.find({ type: "Text", text: "3 most recent in ~/.claude/plans, /work/.omca/plans" })).toBeDefined();
+  expect((await ui.find({ key: "pick-0" }))?.props["label"]).toBe("local");
+  expect((await ui.find({ key: "pick-1" }))?.props["label"]).toBe("remote");
+  expect((await ui.find({ key: "pick-2" }))?.props["label"]).toBe("home");
+  expect(await ui.find({ key: "pick-3" })).toBeUndefined();
+  await ui.unmount();
+});
+
+test("a home that cannot be listed and a registry that is not JSON leave the other home listed under a notice", async ($, on) => {
+  on("fs.list", { path: /\.claude[\\/]plans$/ }, () => ({ deny: "EACCES: permission denied" }));
+  const w = world(on, { [BOULDER]: "{not json", [`${POSIX.plans}/hidden.md`]: PLAN, [`${LOCAL}/local.md`]: PLAN });
+  w.files.set(`${LOCAL}/local.md`, { text: PLAN, mtimeMs: 3_000 });
+
+  await $.command.run(run("plan"));
+  const ui = await $.ui.mount(pane("terminal"));
+
+  expect(await ui.find({ type: "Text", text: "Could not list ~/.claude/plans: EACCES: permission denied" })).toBeDefined();
+  expect((await ui.find({ key: "pick-0" }))?.props["label"]).toBe("local");
+  expect(await ui.find({ key: "pick-1" })).toBeUndefined();
+  await ui.unmount();
+});
+
+test("/omca plan <name> loads a plan from .omca/plans, and /omca plan <registry key> loads the registered file", async ($, on) => {
+  world(on, {
+    [BOULDER]: registry({ alpha: { active_plan: "/elsewhere/other-name.md" } }),
+    [`${LOCAL}/foo.md`]: PLAN,
+    "/elsewhere/other-name.md": PLAN,
+  });
+
+  for (const [args, shown] of [
+    ["plan foo", `${LOCAL}/foo.md`],
+    ["plan alpha", "/elsewhere/other-name.md"],
+  ] as const) {
+    await $.command.run(run(args));
+    const ui = await $.ui.mount(pane("terminal"));
+    await ui.press({ key: "t" });
+    expect(await ui.find({ type: "Text", text: `1/2 tasks done · ${shown}` }), args).toBeDefined();
+    await ui.unmount();
+  }
 });

@@ -13,7 +13,10 @@ import {
   MARKDOWN_CHUNK,
   parsePlan,
   pathsOf,
-  planTarget,
+  newestPlans,
+  planCandidates,
+  planFileAt,
+  planHomes,
   plansDirectory,
   readable,
   recentPlans,
@@ -157,28 +160,47 @@ test("plansDirectory reads drive, UNC, Git Bash and mixed-case roots", () => {
   expect(plansDirectory("darwin", "/users/me/PROJ/plans", "/Users/Me/proj", { HOME: "/Users/Me" })).toBe("/users/me/PROJ/plans");
 });
 
-test("a plan argument is a name in the plans directory, a home path, an absolute path or a root-relative path", () => {
-  const target = (argument: string) => planTarget("linux", argument, "/home/u", "/work", "/work/plans");
-  expect(target("ship")).toBe("/work/plans/ship.md");
-  expect(target(" ship.md ")).toBe("/work/plans/ship.md");
-  expect(target("~/notes/p.md")).toBe("/home/u/notes/p.md");
-  expect(target("/tmp/p.md")).toBe("/tmp/p.md");
-  expect(target("docs/../plans/p.md")).toBe("/work/plans/p.md");
-  expect(target("~ship")).toBe("/work/plans/~ship.md");
-  expect(planTarget("linux", "~/p.md", "", "/work", "/work/plans")).toBe("~/p.md");
+test("a plan argument is a name in each plan home, a home path, an absolute path or a root-relative path", () => {
+  const target = (argument: string) => planCandidates("linux", argument, "/home/u", "/work", ["/home/u/.claude/plans", "/work/.omca/plans"]);
+  expect(target("ship")).toEqual(["/home/u/.claude/plans/ship.md", "/work/.omca/plans/ship.md"]);
+  expect(target(" ship.md ")).toEqual(["/home/u/.claude/plans/ship.md", "/work/.omca/plans/ship.md"]);
+  expect(target("~/notes/p.md")).toEqual(["/home/u/notes/p.md"]);
+  expect(target("/tmp/p.md")).toEqual(["/tmp/p.md"]);
+  expect(target("docs/../plans/p.md")).toEqual(["/work/plans/p.md"]);
+  expect(target("~ship")).toEqual(["/home/u/.claude/plans/~ship.md", "/work/.omca/plans/~ship.md"]);
+  expect(planCandidates("linux", "~/p.md", "", "/work", ["/work/plans"])).toEqual(["~/p.md"]);
 });
 
 test("a plan argument on Windows accepts drive, UNC, Git Bash and backslash forms", () => {
-  const target = (argument: string) => planTarget("win32", argument, "C:\\Users\\x", "C:\\proj", "C:/Users/x/.claude/plans");
-  expect(target("ship")).toBe("C:/Users/x/.claude/plans/ship.md");
-  expect(target("~\\notes\\p.md")).toBe("C:/Users/x/notes/p.md");
-  expect(target("~/notes/p.md")).toBe("C:/Users/x/notes/p.md");
-  expect(target("D:\\plans\\p.md")).toBe("D:\\plans\\p.md");
-  expect(target("C:/plans/p.md")).toBe("C:/plans/p.md");
-  expect(target("/c/plans/p.md")).toBe("/c/plans/p.md");
-  expect(target("\\\\srv\\share\\p.md")).toBe("\\\\srv\\share\\p.md");
-  expect(target("docs\\..\\plans\\p.md")).toBe("C:/proj/plans/p.md");
-  expect(planTarget("win32", "~\\p.md", "", "C:\\proj", "C:/plans")).toBe("~\\p.md");
+  const target = (argument: string) => planCandidates("win32", argument, "C:\\Users\\x", "C:\\proj", ["C:/Users/x/.claude/plans", "C:/proj/.omca/plans"]);
+  expect(target("ship")).toEqual(["C:/Users/x/.claude/plans/ship.md", "C:/proj/.omca/plans/ship.md"]);
+  expect(target("~\\notes\\p.md")).toEqual(["C:/Users/x/notes/p.md"]);
+  expect(target("~/notes/p.md")).toEqual(["C:/Users/x/notes/p.md"]);
+  expect(target("D:\\plans\\p.md")).toEqual(["D:\\plans\\p.md"]);
+  expect(target("C:/plans/p.md")).toEqual(["C:/plans/p.md"]);
+  expect(target("/c/plans/p.md")).toEqual(["/c/plans/p.md"]);
+  expect(target("\\\\srv\\share\\p.md")).toEqual(["\\\\srv\\share\\p.md"]);
+  expect(target("docs\\..\\plans\\p.md")).toEqual(["C:/proj/plans/p.md"]);
+  expect(planCandidates("win32", "~\\p.md", "", "C:\\proj", ["C:/plans"])).toEqual(["~\\p.md"]);
+});
+
+test("planHomes lists the plans directory and .omca/plans, once when they are the same", () => {
+  const homes = (setting: unknown, env: Env = POSIX_ENV) => planHomes("linux", setting, "/work", env);
+  expect(homes(undefined)).toEqual(["/home/u/.claude/plans", "/work/.omca/plans"]);
+  expect(homes("./plans")).toEqual(["/work/plans", "/work/.omca/plans"]);
+  expect(homes(".omca/plans")).toEqual(["/work/.omca/plans"]);
+  expect(homes("./.omca/../.omca/plans/")).toEqual(["/work/.omca/plans"]);
+  expect(homes(undefined, {})).toEqual(["/work/.omca/plans"]);
+  expect(planHomes("win32", "C:\\proj\\.OMCA\\plans", "C:\\proj", {})).toEqual(["C:/proj/.OMCA/plans"]);
+});
+
+test("a registered plan is named by its file and merged with the listings, newest first, once, capped", () => {
+  expect(planFileAt("linux", "/elsewhere/dir/ship.md", 5)).toEqual({ name: "ship", path: "/elsewhere/dir/ship.md", mtimeMs: 5 });
+  expect(planFileAt("linux", "/elsewhere/notes.txt", 5).name).toBe("notes.txt");
+  const file = (path: string, mtimeMs: number) => planFileAt("linux", path, mtimeMs);
+  const merged = newestPlans("linux", [file("/h/a.md", 1), file("/w/b.md", 3), file("/h/../h/a.md", 1), file("/x/c.md", 2)]);
+  expect(merged.map((each) => each.path)).toEqual(["/w/b.md", "/x/c.md", "/h/a.md"]);
+  expect(newestPlans("linux", [file("/h/a.md", 1), file("/w/b.md", 3), file("/x/c.md", 2)], 2).map((each) => each.name)).toEqual(["b", "c"]);
 });
 
 test("recent plans are Markdown files only, newest first, capped", () => {

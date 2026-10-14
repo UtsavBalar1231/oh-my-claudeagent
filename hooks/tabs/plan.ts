@@ -1,5 +1,6 @@
 import type { RenderElement } from "claude-code";
 import { lookOf } from "../../src/core/agent-type.ts";
+import { parseRegistry } from "../../src/core/boulder.ts";
 import { type Drawn, drawnAt, type FocusList, focusMove, type ListSlice, placeWindow, windowOf } from "../../src/core/list-window.ts";
 import { BOULDER } from "../../src/core/omca-paths.ts";
 import { type Platform, samePath, tildePath } from "../../src/core/path.ts";
@@ -12,8 +13,11 @@ import {
   isReadable,
   type Page,
   type PlanFile,
+  newestPlans,
   parsePlan,
-  planTarget,
+  planCandidates,
+  planFileAt,
+  planHomes,
   plansDirectory,
   readable,
   recentPlans,
@@ -153,19 +157,61 @@ function boardFor(plan: Loaded): Board {
   return memo.board;
 }
 
-async function where(host: Host): Promise<{ platform: Platform; root: string; home: string; dir: string }> {
+async function where(host: Host): Promise<{ platform: Platform; root: string; home: string; homes: string[] }> {
   const [root, { env, platform, home }, settings] = await Promise.all([
     host.session.root(),
     sessionOf(host),
     host.settings.read(),
   ]);
-  return { platform, root, home, dir: plansDirectory(platform, settings["plansDirectory"], root, env) ?? UNRESOLVED_PLANS };
+  const setting = settings["plansDirectory"];
+  const homes = planHomes(platform, setting, root, env);
+  return { platform, root, home, homes: plansDirectory(platform, setting, root, env) === undefined ? [UNRESOLVED_PLANS, ...homes] : homes };
 }
 
-/** The plans `/omca plan <name>` can name, newest first, as the picker lists them. */
+async function registered(host: Host, root: string): Promise<{ name: string; path: string }[]> {
+  const path = `${root}/${BOULDER}`;
+  try {
+    if (!(await host.fs.exists(path))) return [];
+    const parsed = parseRegistry(await host.fs.read(path));
+    if (parsed.kind !== "ok") return [];
+    return Object.entries(parsed.registry.plans).flatMap(([name, { active_plan: file }]) => (file === undefined || file === "" ? [] : [{ name, path: file }]));
+  } catch (error) {
+    host.log(`omca plan: ${BOULDER} unreadable: ${reason(error)}`);
+    return [];
+  }
+}
+
+type Found = { files: PlanFile[]; keys: string[]; failures: string[] };
+
+// Each home lists on its own, so one that cannot be read leaves the others on the page.
+async function findPlans(host: Host, { platform, root, home, homes }: Awaited<ReturnType<typeof where>>): Promise<Found> {
+  const listed = await Promise.all(
+    homes.map(async (dir) => {
+      try {
+        return { files: (await host.fs.exists(dir)) ? recentPlans(await host.fs.list(dir), dir) : [], failure: [] };
+      } catch (error) {
+        return { files: [], failure: [`Could not list ${tildePath(platform, dir, home)}: ${reason(error)}`] };
+      }
+    }),
+  );
+  const elsewhere = await Promise.all(
+    (await registered(host, root)).map(async ({ name, path }) => {
+      const stat = await host.fs.stat(path).catch(() => undefined);
+      return stat === undefined ? undefined : { name, file: planFileAt(platform, path, stat.mtimeMs) };
+    }),
+  );
+  const present = elsewhere.filter((entry) => entry !== undefined);
+  return {
+    files: newestPlans(platform, [...listed.flatMap((each) => each.files), ...present.map(({ file }) => file)]),
+    keys: present.map(({ name }) => name),
+    failures: listed.flatMap((each) => each.failure),
+  };
+}
+
+/** The plans `/omca plan <name>` can name: the picker's files, newest first, then the registered plans' keys. */
 export async function planNames(host: Host): Promise<string[]> {
-  const { dir } = await where(host);
-  return (await host.fs.exists(dir)) ? recentPlans(await host.fs.list(dir), dir).map((file) => file.name) : [];
+  const { files, keys } = await findPlans(host, await where(host));
+  return [...new Set([...files.map((file) => file.name), ...keys])];
 }
 
 function startCursor(plan: Pick<Loaded, "pages">): number {
@@ -229,28 +275,24 @@ async function gather(host: Host, plan: Loaded, within?: object): Promise<void> 
 }
 
 async function listPlans(host: Host): Promise<void> {
-  const { platform, home, dir } = await where(host);
-  try {
-    const files = (await host.fs.exists(dir)) ? recentPlans(await host.fs.list(dir), dir) : [];
-    await patchPane(host, (pane) => ({ ...pane, plans: { dir, files }, errors: { ...pane.errors, plans: null } }));
-    const counts = await Promise.all(
-      files.map(async (file) => {
-        const text = await host.fs.read(file.path).then(
-          (source) => parsePlan(source),
-          () => undefined,
-        );
-        return [file.path, text === undefined || text.total === 0 ? "" : `${text.done}/${text.total}`] as const;
-      }),
-    );
-    tallies = new Map(counts.filter(([, count]) => count !== ""));
-    boundTo = await boundPath(host);
-    const current = (await host.state.plan.get()).value?.path;
-    pick = Math.max(0, files.findIndex((file) => current !== undefined && samePath(platform, file.path, current)));
-  } catch (error) {
-    tallies = new Map();
-    const failure = `Could not list ${tildePath(platform, dir, home)}: ${reason(error)}`;
-    await patchPane(host, (pane) => ({ ...pane, plans: { dir, files: [] }, errors: { ...pane.errors, plans: failure } }));
-  }
+  const place = await where(host);
+  const { platform, homes } = place;
+  const { files, failures } = await findPlans(host, place);
+  const failure = failures.length === 0 ? null : failures.join("; ");
+  await patchPane(host, (pane) => ({ ...pane, plans: { dirs: homes, files }, errors: { ...pane.errors, plans: failure } }));
+  const counts = await Promise.all(
+    files.map(async (file) => {
+      const text = await host.fs.read(file.path).then(
+        (source) => parsePlan(source),
+        () => undefined,
+      );
+      return [file.path, text === undefined || text.total === 0 ? "" : `${text.done}/${text.total}`] as const;
+    }),
+  );
+  tallies = new Map(counts.filter(([, count]) => count !== ""));
+  boundTo = await boundPath(host);
+  const current = (await host.state.plan.get()).value?.path;
+  pick = Math.max(0, files.findIndex((file) => current !== undefined && samePath(platform, file.path, current)));
   mode = "plans";
 }
 
@@ -287,11 +329,18 @@ export async function sync(host: Host, within?: object): Promise<void> {
 
 const rowKey = () => (mode === "plans" ? `${PICK}${pick}` : mode === "board" ? `${TASK}${task}` : `${ROW}${cursor}`);
 
+async function firstExisting(host: Host, candidates: readonly string[]): Promise<string | undefined> {
+  for (const candidate of candidates) if (await host.fs.exists(candidate)) return candidate;
+  return undefined;
+}
+
 export const command: Subcommand = async (host, e, args) => {
   if (args.trim() === "") await showBound(host);
   else {
-    const { platform, root, home, dir } = await where(host);
-    await load(host, planTarget(platform, args, home, root, dir));
+    const { platform, root, home, homes } = await where(host);
+    const candidates = planCandidates(platform, args, home, root, homes);
+    const keyed = (await registered(host, root)).find((entry) => entry.name === args.trim());
+    await load(host, keyed?.path ?? (await firstExisting(host, candidates)) ?? candidates[0] ?? args.trim());
   }
   const answer = await open(host, e, "plan");
   refocus(host, rowKey());
@@ -1484,15 +1533,14 @@ function plansView(host: Host, view: View, pane: State["pane"] | undefined, plan
   const listing = pane?.plans;
   if (pane === undefined || listing === undefined || listing === null) return [noticeRow(view, { kind: "loading" }, words)];
   const keysShown = keyRows(view, keys, KEY_GAP);
-  if (pane.errors.plans !== null) {
-    return [noticeRow(view, { kind: "error", reason: pane.errors.plans }, words), ...keysShown];
-  }
-  const dir = tildePath(view.platform, listing.dir, view.home);
+  const failure = pane.errors.plans === null ? [] : [noticeRow(view, { kind: "error", reason: pane.errors.plans }, words)];
+  if (listing.files.length === 0 && failure.length > 0) return [...failure, ...keysShown];
+  const dirs = listing.dirs.map((each) => tildePath(view.platform, each, view.home));
   if (listing.files.length === 0) {
     const lines = [
       ...(plan === undefined ? wrapText("No plan is bound to this session.", view.width) : []),
       "No plans in",
-      fitMiddle(dir, view.width, ellipsis),
+      ...dirs.map((dir) => fitMiddle(dir, view.width, ellipsis)),
       ...wrapText("Make one with /oh-my-claudeagent:plan, then bind it to this session with /oh-my-claudeagent:start-work.", view.width),
     ];
     return [
@@ -1502,7 +1550,7 @@ function plansView(host: Host, view: View, pane: State["pane"] | undefined, plan
   }
   const list = picksOf(listing.files);
   const layout = frameFor(view, keys);
-  const size = roomFor(view, layout.chrome);
+  const size = roomFor(view, layout.chrome + failure.length);
   const { start, end } = windowFor(host, view, "plans", list, size, (index) => `${PICK}${index}`);
   const isBound = (file: PlanFile) => boundTo !== undefined && samePath(view.platform, file.path, boundTo);
   const hasBound = listing.files.some(isBound);
@@ -1552,11 +1600,11 @@ function plansView(host: Host, view: View, pane: State["pane"] | undefined, plan
   const lead = `${count} in `;
   return frame(view, layout, {
     title: "Plans",
-    meta: `${lead}${fitMiddle(dir, view.width - displayWidth(lead), ellipsis)}`,
+    meta: `${lead}${fitMiddle(dirs.join(", "), view.width - displayWidth(lead), ellipsis)}`,
     shortMeta: `${listing.files.length} recent`,
     above: start > 0 ? `  ${view.g.up} ${start} more` : "",
     below: end < list.total ? `  ${view.g.down} ${list.total - end} more` : "",
-    rows,
+    rows: [...failure, ...rows],
     hint: moveHint(view),
   });
 }

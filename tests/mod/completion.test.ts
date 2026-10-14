@@ -1,6 +1,6 @@
 import type { On } from "claude-code";
 import { type Engine, type EngineCall, expect, test } from "claude-code/testing";
-import { ROOT, world } from "./world.ts";
+import { BOULDER, ROOT, world } from "./world.ts";
 
 const PLAN = "# Plan\n\n## TODOs\n\n- [ ] 1. Only task\n";
 
@@ -50,4 +50,15 @@ test("after /omca plan with no plans directory on disk the typeahead offers noth
   typeahead(on);
 
   expect(texts(await typed($, "/omca plan b"))).toEqual([]);
+});
+
+test("after /omca plan the typeahead offers .omca/plans names and the registry's keys", async ($, on) => {
+  const registry = { plans: { zulu: { active_plan: "/elsewhere/other-name.md" }, ghost: { active_plan: "/elsewhere/gone.md" } }, bindings: {} };
+  world(on, { [BOULDER]: JSON.stringify(registry), [`${ROOT}/.omca/plans/alpha-draft.md`]: PLAN, "/elsewhere/other-name.md": PLAN });
+  typeahead(on);
+
+  expect(texts(await typed($, "/omca plan a"))).toEqual(["alpha-draft"]);
+  expect(texts(await typed($, "/omca plan z"))).toEqual(["zulu"]);
+  expect(texts(await typed($, "/omca plan o"))).toEqual(["other-name"]);
+  expect(texts(await typed($, "/omca plan g"))).toEqual([]);
 });
