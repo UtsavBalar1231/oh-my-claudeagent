@@ -27,7 +27,7 @@ type Step = { uses: TurnStepToolUse[]; answer?: string };
 // Each agent's steps by index; an agent id is `a-<n>` in spawn order.
 function engine(on: On, steps: Readonly<Record<string, readonly Step[]>>, stepModel = "claude-sonnet-5-5"): void {
   let spawned = 0;
-  on("agent.spawn", () => ({ model: "claude-sonnet-5-5", agentId: `a-${++spawned}` }));
+  on("agent.spawn", (_$, e) => ({ model: "claude-sonnet-5-5", agentId: e.resume?.agentId ?? `a-${++spawned}` }));
   on("turn.step", async function* (_$, e) {
     const step = steps[e.agentId ?? ""]?.[e.index] ?? { uses: [] };
     return {
@@ -858,4 +858,36 @@ test("the empty state tells what a lane is and how to open it", async ($, on) =>
 
   expect(body(await ui.drawn())).toEqual(["No subagent has run in this session yet.", "Each subagent gets a lane here. Enter or a click opens its page."]);
   await ui.unmount();
+});
+
+test("a resumed agent reopens its row and lane with the start and totals it had, and its next completion adds to them", async ($, on) => {
+  const w = world(on, {});
+  const last = new Map<string, Record<string, Record<string, unknown>>>();
+  on("state.set", (_$, e, next) => (last.set(e.key, e.value as Record<string, Record<string, unknown>>), next(e)));
+  engine(on, STEPS);
+  w.agents = [{ id: "a-1", description: "", type: "x", status: "running" }];
+  const row = () => last.get("agents")?.["a-1"];
+  const lane = () => last.get("lanes")?.["a-1"];
+
+  await $.agent.spawn(spawnOf(1, "executor", "Fix the heading parser", "Fix the heading parser so fenced lines are skipped."));
+  await w.clock.advance(10_000);
+  await stepAll($, "a-1", 1);
+  await finish($, "a-1", "Fixed.");
+  const ended = row();
+  expect(ended).toMatchObject({ status: "answer", inputTokens: 2000, outputTokens: 500 });
+  expect(ended?.["costUsd"]).toBeGreaterThan(0);
+  expect(ended?.["endedAt"]).not.toBeNull();
+  expect(w.toasts).toEqual(["executor finished"]);
+
+  await w.clock.advance(20_000);
+  await $.agent.spawn({ ...spawnOf(2, "executor", "Fix the heading parser", "Also skip indented fences."), resume: { agentId: "a-1" } });
+  expect(row()).toEqual({ ...ended, status: "running", endedAt: null });
+  expect(lane()).toEqual({ prompt: "Fix the heading parser so fenced lines are skipped.", calls: 2, tool: null, output: "", result: "" });
+
+  await stepAll($, "a-1", 1);
+  await $.turn.complete({ answer: "Fixed again.", durationMs: 1000, isAborted: false, turnId: "t-a-1", reason: "answer", agentId: "a-1", usage: usage(3000, 700) });
+  expect(row()).toMatchObject({ status: "answer", startedAt: ended?.["startedAt"], inputTokens: 5000, outputTokens: 1200 });
+  expect(row()?.["endedAt"]).not.toBeNull();
+  expect(row()?.["costUsd"]).toBe((ended?.["costUsd"] as number) * 2);
+  expect(w.toasts).toEqual(["executor finished", "executor finished"]);
 });

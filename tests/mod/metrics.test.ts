@@ -35,7 +35,7 @@ function engine(on: On, files: Readonly<Record<string, string>> = {}): { w: Worl
   };
   on("agent.spawn", (_$, e) => {
     const [model, agentId] = models[e.subagentType] ?? ["claude-opus-5-5", "a-9"];
-    return { model, agentId };
+    return { model, agentId: e.resume?.agentId ?? agentId };
   });
   on("turn.step", async function* (_$, e) {
     const counted = e.agentId === "a-1" ? usage(2000, 500, "claude-sonnet-5-5", 10_000, 1000) : null;
@@ -181,4 +181,38 @@ test("a teammate writes no delegation record at spawn or when its turn completes
   await $.agent.spawn({ ...spawn("oh-my-claudeagent:executor", "Fix the parser"), isTeammate: true });
   await $.turn.complete(complete("a-1", { answer: "Fixed." }));
   expect(writes).toEqual([]);
+});
+
+test("a resumed delegation is rewritten running with its start and tokens, and its next completion adds to them", async ($, on) => {
+  const { w, writes } = engine(on);
+  w.agents = [{ id: "a-1", description: "", type: "x", status: "running" }];
+  await $.agent.spawn(spawn("oh-my-claudeagent:executor", "Fix the parser"));
+  await drain($.turn.step({ turnId: "t-a-1", index: 0, model: "claude-sonnet-5-5", messageCount: 1, agentId: "a-1" }));
+  await w.clock.advance(30_000);
+  await $.turn.complete(complete("a-1", { answer: "Fixed.", usage: usage(2000, 500, "claude-sonnet-5-5", 10_000, 1000) }));
+  expect(writes.at(-1)?.[1]).toMatchObject({ outcome: "completed", input_tokens: 13_000, output_tokens: 500 });
+
+  await w.clock.advance(60_000);
+  await $.agent.spawn({ ...spawn("oh-my-claudeagent:executor", "Fix the parser"), resume: { agentId: "a-1" } });
+  expect(writes.at(-1)?.[1]).toMatchObject({
+    agent_id: "a-1",
+    started_at: "2026-10-02T12:00:00.000Z",
+    ended_at: null,
+    duration_ms: null,
+    input_tokens: 13_000,
+    output_tokens: 500,
+    outcome: "running",
+  });
+
+  await drain($.turn.step({ turnId: "t-a-1", index: 0, model: "claude-sonnet-5-5", messageCount: 1, agentId: "a-1" }));
+  await w.clock.advance(30_000);
+  await $.turn.complete(complete("a-1", { answer: "Fixed again.", usage: usage(1000, 200) }));
+  expect(writes.at(-1)?.[1]).toMatchObject({
+    started_at: "2026-10-02T12:00:00.000Z",
+    ended_at: "2026-10-02T12:02:00.000Z",
+    duration_ms: 120_000,
+    input_tokens: 14_000,
+    output_tokens: 700,
+    outcome: "completed",
+  });
 });

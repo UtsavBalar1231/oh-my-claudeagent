@@ -32,6 +32,11 @@ subagent's call, appends the call and its outcome to a module-level map, with no
 `pages` atom is written only when a page is opened, on `r` and at the agent's `turn.complete`,
 from `$.session.messages({ agentId })` and that map; a denied read keeps the stored prompt. A
 page holds at most 8 KiB of brief, 120 calls and 4 KiB of reply, for the newest 20 agents.
+An `agent.spawn` carrying `resume` whose agent already has a row reopens that row and lane instead
+of building new ones: the row goes back to running with no end time and keeps its start, tokens and
+cost, the lane keeps its prompt and call count and clears its tool, output and result, and a
+module-level map holds the row's tokens so the next completion adds its usage to them. `metrics`
+rewrites that agent's record as running with the same tokens.
 
 `mascot-player` animates the mascots of `src/core/mascots.ts`: the 15 by 4 mini that leads each
 relaxed lane on the Agents tab, drawn when the body holds every running lane, a row after each, the

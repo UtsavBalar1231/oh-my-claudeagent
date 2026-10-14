@@ -27,6 +27,7 @@ const calls = new Map<string, Call[]>();
 // A call's start, dropped when its `post` runs; one whose `next` rejected never reaches `post`, so
 // the agent's `turn.complete` and the cap bound what such calls leave behind.
 const startedAt = new Map<string, { agentId: string; at: number }>();
+const carried = new Map<string, { inputTokens: number; outputTokens: number }>();
 
 // Secrets are masked before a lane is stored, and the excerpt is cut only after that, so a
 // cut can never leave half a key the masks no longer match.
@@ -137,10 +138,17 @@ function edit(host: Host, id: string, change: (row: Row) => Row): Promise<void> 
 }
 
 function endAgent(host: Host, id: string, status: Status, usage: TurnUsage | undefined, at: number): Promise<void> {
+  const before = carried.get(id);
+  carried.delete(id);
   return edit(host, id, (row) => ({
     ...row,
     ...(row.teammate ? { status: "idle" as const } : { status, endedAt: at }),
-    ...(usage === undefined ? {} : { inputTokens: inputTokens(usage), outputTokens: usage.output_tokens }),
+    ...(usage === undefined
+      ? {}
+      : {
+          inputTokens: (before?.inputTokens ?? 0) + inputTokens(usage),
+          outputTokens: (before?.outputTokens ?? 0) + usage.output_tokens,
+        }),
   }));
 }
 
@@ -173,6 +181,16 @@ export const agentsTracker: Features = {
     async post(host, e, result) {
       if (result.deny !== undefined || result.agentId === undefined) return undefined;
       const { agentId, model } = result;
+      const resumed = e.resume === undefined ? undefined : (await host.state.agents.get()).value?.[agentId];
+      if (resumed !== undefined) {
+        carried.set(agentId, { inputTokens: resumed.inputTokens, outputTokens: resumed.outputTokens });
+        await update(host.state.agents, (agents) => {
+          const row = agents?.[agentId];
+          return row === undefined ? agents : { ...agents, [agentId]: { ...row, status: "running", endedAt: null } };
+        });
+        await editLane(host, agentId, (lane) => ({ ...lane, tool: null, output: "", result: "" }));
+        return undefined;
+      }
       const startedAt = await host.clock.now();
       const task = taskReference(e.prompt, e.description);
       const forkOf = e.subagentType === FORK ? await forkedFrom(host, e.parentAgentId) : undefined;

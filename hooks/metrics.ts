@@ -52,10 +52,12 @@ async function agentRow(host: Host, agentId: string): Promise<Row | undefined> {
 
 export const metrics: Features = {
   "agent.spawn": {
-    async post(host, _e, result) {
+    async post(host, e, result) {
       if (result.deny !== undefined || result.agentId === undefined) return undefined;
       const [at, row] = await Promise.all([locate(host, result.agentId), agentRow(host, result.agentId)]);
-      if (at !== undefined && row !== undefined && !row.teammate) await write(host, at.path, running(at.sessionId, result.agentId, row));
+      if (at === undefined || row === undefined || row.teammate) return undefined;
+      const record = running(at.sessionId, result.agentId, row);
+      await write(host, at.path, e.resume === undefined ? record : { ...record, input_tokens: row.inputTokens, output_tokens: row.outputTokens });
       return undefined;
     },
   },
