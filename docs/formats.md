@@ -173,7 +173,7 @@ After a cut, the section starts with the marker line `[Compacted: N earlier line
 
 The file keeps text as written. `notepad_read` masks secrets in what it returns, replacing each with `<masked>`, so masking is display only and never edits the file. The patterns are private key blocks, a `name=value` pair whose name ends in `password`, `passwd`, `token`, `secret` or `api_key` in any case (the name and equals sign stay), a `Bearer` token, an `sk-` key, GitHub and Slack tokens, an AWS access key id, a Google API key and a JSON web token. The pane's Notepad tab applies the same masks and also shows the home directory as `~`. Do not write a secret to a notepad, because the file holds it.
 
-`notepad_read` returns each requested section as `# Learnings`, `# Issues` and so on, followed by the masked text, with `---` between sections.
+`notepad_read` returns each requested section as `# Learnings`, `# Issues` and so on, followed by the masked text, with `---` between sections. Text past 40,000 characters comes back as the newest content, under a `[TRUNCATED: older entries omitted: read one section or run notepad_compact]` header.
 
 ### Plan names
 

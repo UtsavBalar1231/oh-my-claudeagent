@@ -12,9 +12,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - With Nerd Font glyphs, the status line's 5 hour and 7 day windows draw rings instead of bars
   where the bars would push the usage row onto another line, and the compact line under 60
   columns puts a ring before the context percentage. The rings are Nerd Fonts v3 glyphs.
+- `file_read` without a limit returns up to 1,000 lines and stops at the last whole line under
+  40,000 characters, with a footer naming the offset to continue from. `ast_search` and
+  `ast_find_rule` return 100 matches by default (`max_results` up to 500). `evidence_read` returns
+  the newest 20 entries (`limit` 0 returns all) under a header that says how many it shows, and
+  `notepad_read` returns the newest content of a section past 40,000 characters under a
+  `[TRUNCATED]` header.
+- The planner can keep a plan in `.omca/plans` inside the project, and the Plan tab lists it.
+- On Claude Code 2.1.299 and later the interface uses a semibold weight for bold text, monospace
+  and aligned digits for padded columns, and named spacing steps for rows and band buttons. Older
+  versions draw what they drew before.
+- The docs cover idle compaction, `/reload-skills` after compaction, the MCP allow rule for the
+  whole `omca` server and the mod reload loop.
 
 ### Fixed
 
+- The footer keeps its cost on a turn that delegates to a subagent.
+- The Plan tab lists plans from both plan homes and every plan in the registry.
+- A prompt that is a slash command no longer raises a keyword banner.
+- A resumed subagent keeps its row, tokens and cost.
+- The Plan board counts a task's proof only from changes made since its plan started, so a task
+  that has not begun no longer shows FAILED.
+- `/omca` says in one sentence why it draws no pane in a session with no surface.
+- The status line clamps a rate-limit window's percentage and color at 100.
 - The status line draws its bars with box-drawing lines (`━─`), which terminals draw themselves,
   instead of `▰▱`, which common terminal fonts lack and borrow from a fallback font.
 

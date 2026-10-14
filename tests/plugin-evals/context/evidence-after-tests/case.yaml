@@ -1,4 +1,6 @@
 schema_version: "1.1"
 name: evidence-after-tests
+execution:
+  disallowed_tools: [Agent]
 context:
   scaffold_script: fixture.sh

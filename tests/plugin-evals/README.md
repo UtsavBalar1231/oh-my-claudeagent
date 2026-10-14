@@ -25,6 +25,8 @@ Each case seeds a small bun project in a git repository with `fixture.sh` and gr
 
 They start the real `omca` server, since a mocked tool carries a placeholder description, so they need `--mocks off`, grants for Bash, Edit and the omca tools, and `--scaffold`.
 
+`evidence-after-tests` and `read-tool-for-files` grade no delegation, so each sets `execution.disallowed_tools: [Agent]` and the run never offers the model the Agent tool. `--disallow-tools <tools...>` does the same for every case in a run. Leave the field out of a case whose graders name `Agent`.
+
 ## Running
 
 A real run calls a model and costs money. Run it only with the maintainer's approval of the estimate.
@@ -44,6 +46,8 @@ claude plugin eval . --eval-dir tests/plugin-evals/context --ablation none --run
 ```
 
 To compare two trees, package each into its own directory and run the context command in both.
+
+A run that ends on an API error scores 0 without grading and makes the suite exit 1, so a rate limit or an outage shows as a failed suite and not as a pass.
 
 `--ablation none` matters: without the plugin the slash commands do not exist, so the baseline arm scores 0 and the delta says nothing. The default of three runs per case triples the cost.
 

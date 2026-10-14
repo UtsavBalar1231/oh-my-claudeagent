@@ -115,15 +115,15 @@ a gateway that is not a first-party host, every tool loads up front.
 | Tool | Purpose |
 | --- | --- |
 | `evidence_log` | Record a build, test, lint, manual or `final_verification` result with its real exit code |
-| `evidence_read` | Read the logged entries. Refuses a ledger it cannot parse |
+| `evidence_read` | Read the newest 20 logged entries, oldest first (`limit` sets another count, 0 reads all), under a `[showing N of M entries: pass limit=0 for all]` header when it cuts. Refuses a ledger it cannot parse |
 | `boulder_write` | Register a plan and bind this session to it |
 | `boulder_progress` | Completed and remaining tasks of the bound plan, and the next one |
 | `notepad_write` | Append to a plan notepad section: `learnings`, `issues`, `decisions` or `problems` |
-| `notepad_read`, `notepad_list` | Read a section, or list plans and sections |
+| `notepad_read`, `notepad_list` | Read a section, or list plans and sections. A read past 40,000 characters returns the newest content under a `[TRUNCATED: older entries omitted: read one section or run notepad_compact]` header |
 | `notepad_compact` | Rewrite one section shorter |
-| `ast_search`, `ast_find_rule`, `ast_test_rule`, `ast_dump_tree` | Structural code search with ast-grep |
+| `ast_search`, `ast_find_rule`, `ast_test_rule`, `ast_dump_tree` | Structural code search with ast-grep. `ast_search` and `ast_find_rule` return 100 matches by default (`max_results` up to 500) |
 | `ast_replace` | Structural rewrite, with a dry run |
-| `file_read` | Read a file outside the working directories, with paging. Refuses credential files and network paths |
+| `file_read` | Read a file outside the working directories, with paging. Without a limit it returns up to 1,000 lines and stops at the last whole line under 40,000 characters, and the footer names the offset to continue from. Refuses credential files and network paths |
 | `session_search` | Search this project's earlier Claude Code transcripts |
 | `agents_list`, `categories_list` | The agent roster and the category table |
 | `agents_migrate` | Move agent memories and agent ids to the current names. A dry run by default; `apply` writes, and `merge_indexes` merges `MEMORY.md` files that collide |
@@ -260,6 +260,8 @@ The plugin applies none of these.
 | `availableModels` | An allowlist must include `sonnet`, `opus` and `fable`, or the agents on a missing tier cannot run |
 | `permissions.deny` with `Agent(model:fable)` | Gates per-call escalations to the `fable` tier. It cannot cap an agent's declared tier, because those calls carry no `model` |
 | `subagentPromptCacheTtl` | `"1h"` keeps a long parallel run's cache warm, at a higher write price |
+| `idleCompaction` | On by default in a terminal session. About 54 minutes after the last request, a conversation over the threshold compacts before its one-hour cache expires. `false` turns it off, as does `DISABLE_AUTO_COMPACT` |
+| `CLAUDE_CODE_IDLE_COMPACT_MIN_TOKENS` | Context size at which idle compaction applies. Default 200000, lowest 100000. Both idle compaction settings need Claude Code 2.1.290 or later |
 | `CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY` | Default 10. A wider parallel group runs in series |
 
 Do not add `Write(<path>)`, `NotebookEdit(<path>)` or `Glob(<path>)` rules: they never match.

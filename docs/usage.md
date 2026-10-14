@@ -155,6 +155,12 @@ When the context is long, run `/oh-my-claudeagent:handoff`. It gathers git state
 the notepad into a block you paste as the first message of a new session. Only you can start it;
 the model cannot.
 
+### After compaction
+
+Skills can go missing from the model's list after the conversation compacts. Run `/reload-skills`
+to send the full skill list again. A terminal session also compacts a long conversation on its
+own after about 54 minutes idle (`idleCompaction`; see `docs/references.md` for the settings).
+
 ### Ask a specialist directly
 
 Type `@agent-oh-my-claudeagent:<name>` to send a request to one agent, for example
@@ -390,7 +396,10 @@ refused, and a force push to another branch or any other recursive removal runs.
 OMCA's hooks never auto-allow a command: they refuse, ask or advise, and an allow comes only
 from the permission rules in your settings. To stop the prompts for package scripts you trust,
 add allow rules such as `Bash(bun run *)` to your settings, or run `/fewer-permission-prompts`,
-which proposes rules from your past sessions.
+which proposes rules from your past sessions. An allow rule for an MCP server reaches only the
+server it names, so allow all of OMCA's tools with `mcp__plugin_oh-my-claudeagent_omca__*`, the
+server's whole normalized name followed by `__*`. A shorter prefix such as
+`mcp__plugin_oh-my-claudeagent` matches nothing.
 
 ## The doctor
 
@@ -551,8 +560,9 @@ edits to the `.claude` folder for this session.
 **Setup changed nothing and asked nothing.** Under the `dontAsk` permission mode, every write
 that would prompt is denied instead. Run setup in a mode that can prompt.
 
-**A hook change does not take effect.** Close the `/plugin` menu or start a new session; for a
-`--plugin-dir` checkout, run `/reload-plugins`.
+**A hook change does not take effect.** Close the `/plugin` menu or start a new session. In a
+`--plugin-dir` session a saved mod file under `hooks/` reloads the mod by itself, while a change to
+`hooks/hooks.json` or the server needs `/reload-plugins`.
 
 **The status line is hard to read with a screen reader.** `OMCA_GLYPHS=ascii` replaces the
 glyphs, bars and separators with plain text. The status line still writes color escapes.

@@ -28,7 +28,7 @@ No hook is a shell or python script: `bun scripts/validate.ts --check tree` fail
 
 Use the `if` field for argument-level filtering on tool events (`PreToolUse`, `PostToolUse`, `PostToolUseFailure`): `"if": "Bash(git *)"` is permission rule syntax and spares the server a call. Do not use it on a handler where a narrow filter would silently disable coverage.
 
-A change to `hooks/hooks.json` or to a handler applies only once the plugin is loaded again: closing the `/plugin` menu reloads it for you, and so does starting a new session.
+A change to `hooks/hooks.json` or to a handler applies only once the plugin is loaded again: closing the `/plugin` menu reloads it for you, and so does starting a new session. In a `--plugin-dir` session a saved mod file reloads the mod by itself, while `hooks/hooks.json` and server changes need `/reload-plugins`.
 
 ## Adding an agent
 
