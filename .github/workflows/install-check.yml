@@ -11,7 +11,7 @@ on:
         type: string
 
 env:
-  CLAUDE_CODE_VERSION: 2.1.296
+  CLAUDE_CODE_VERSION: 2.1.299
 
 defaults:
   run:

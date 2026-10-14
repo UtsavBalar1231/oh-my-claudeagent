@@ -54,13 +54,14 @@ const element = (type: string) => (props: Record<string, unknown>, ...children: 
   const { hover, ...rest } = props;
   return { type, ...(Object.keys(rest).length === 0 ? {} : { props: rest }), ...(hover === undefined ? {} : { hover }), children };
 };
+const stamp = <T extends object>(tree: T) => ({ ...tree, part: { plugin: "test" } });
 const text = element("Text");
 const box = element("Box");
 
 test("a rule draws its pieces as runs of one line", async ($, on) => {
   const drawn = gallery($, on);
   expect(await drawn((kit) => Rule(kit, 16, glyphs("ascii"), true, "Tasks", { done: 1, total: 2 }))).toEqual(
-    text(
+    stamp(text(
       { wrap: "truncate-end" },
       text({ color: "subtle" }, "--"),
       text({}, " "),
@@ -68,14 +69,14 @@ test("a rule draws its pieces as runs of one line", async ($, on) => {
       text({}, " "),
       text({ color: "subtle" }, "--"),
       text({}, " 1/2 "),
-    ),
+    )),
   );
 });
 
 test("on a remote surface a line is a clipped row around one box that does not shrink, so no span wraps or turns to an ellipsis", async ($, on) => {
   const drawn = gallery($, on);
   expect(await drawn((kit) => Rule(kit, 16, glyphs("ascii"), true, "Tasks", { done: 1, total: 2 }), "desktop")).toEqual(
-    box(
+    stamp(box(
       { flexDirection: "row", overflow: "hidden" },
       box(
         { flexShrink: 0 },
@@ -83,13 +84,13 @@ test("on a remote surface a line is a clipped row around one box that does not s
           {},
           text({ color: "subtle" }, "--"),
           text({}, " "),
-          text({ color: "text", bold: true }, "Tasks"),
+          text({ color: "text", bold: true, weight: "semibold" }, "Tasks"),
           text({}, " "),
           text({ color: "subtle" }, "--"),
           text({}, " 1/2 "),
         ),
       ),
-    ),
+    )),
   );
 });
 
@@ -100,7 +101,7 @@ test("on a remote surface a region draws every unit in one column, with no cue, 
     resetRegions();
     return ScrollRegion({ kit, g: glyphs("unicode"), key: "r", left: 0, top: 0, width: 30, height: 3, units: units(kit) });
   }, "desktop");
-  expect(tree).toEqual(box({ key: "r", width: 30, flexDirection: "column" }, ...Array.from({ length: 10 }, (_, n) => text({}, `line ${n + 1}`))));
+  expect(tree).toEqual(stamp(box({ key: "r", width: 30, flexDirection: "column" }, ...Array.from({ length: 10 }, (_, n) => text({}, `line ${n + 1}`)))));
   expect(scrollKeyed(1, "row")).toBe(false);
 });
 
@@ -122,11 +123,13 @@ test("a card is a round border in its tone with a bold title, filled when raised
     type: "Box",
     props: { key: "c", flexDirection: "column", borderStyle: "round", borderColor: "claude", paddingX: 1, width: 40, backgroundColor: "userMessageBackground" },
     children: [text({ bold: true, color: "text", wrap: "truncate-end" }, "Task 43"), text({}, "Done when: just ci exits 0")],
+    part: { plugin: "test" },
   });
   expect(await drawn((kit) => Card(kit, { key: "c", title: "Plan", tone: "planMode", isAscii: false, children: [] }))).toEqual({
     type: "Box",
     props: { key: "c", flexDirection: "column", borderStyle: "round", borderColor: "planMode", paddingX: 1 },
     children: [text({ bold: true, color: "text", wrap: "truncate-end" }, "Plan")],
+    part: { plugin: "test" },
   });
 });
 
@@ -162,26 +165,26 @@ test("a row lights selectionBg on hover, holds it bold when focused, and dims wh
   const pieces = [{ text: "✓ ", color: "success" as const }, { text: "42 Port tabs " }, chip("PROVEN", "ok", false)];
   const proven = text({ color: "inverseText", backgroundColor: "success", bold: true }, " PROVEN ");
   const row = (...children: unknown[]) =>
-    box({ key: "r", flexDirection: "row", hover: { backgroundColor: "selectionBg" } }, text({ wrap: "truncate-end" }, ...children));
+    stamp(box({ key: "r", flexDirection: "row", hover: { backgroundColor: "selectionBg" } }, text({ wrap: "truncate-end" }, ...children)));
 
   expect(await drawn((kit) => Row(kit, { key: "r", pieces }))).toEqual(
     row(text({ color: "success" }, "✓ "), text({ hover: { color: "text" } }, "42 Port tabs "), proven),
   );
   expect(await drawn((kit) => Row(kit, { key: "r", pieces, isFocused: true }))).toEqual(
-    box(
+    stamp(box(
       { key: "r", flexDirection: "row", hover: { backgroundColor: "selectionBg" }, backgroundColor: "selectionBg" },
       text({ wrap: "truncate-end" }, text({ color: "success", bold: true }, "✓ "), text({ color: "text", bold: true }, "42 Port tabs "), proven),
-    ),
+    )),
   );
   expect(await drawn((kit) => Row(kit, { key: "r", pieces, isDone: true }))).toEqual(
     row(text({ color: "inactive", hover: { color: "text" } }, "✓ "), text({ color: "inactive", hover: { color: "text" } }, "42 Port tabs "), proven),
   );
   const focused = await drawn((kit) => Row(kit, { key: "r", pieces, isFocused: true, isDone: true }));
   expect(focused).toEqual(
-    box(
+    stamp(box(
       { key: "r", flexDirection: "row", hover: { backgroundColor: "selectionBg" }, backgroundColor: "selectionBg" },
       text({ wrap: "truncate-end" }, text({ color: "text", bold: true }, "✓ "), text({ color: "text", bold: true }, "42 Port tabs "), proven),
-    ),
+    )),
   );
 });
 
@@ -212,9 +215,9 @@ test("a field is an Input where the surface has one and its value as text on mob
     press: expect.anything(),
   });
   expect(await drawn((kit) => Field(kit, spec), "mobile")).toEqual(
-    text({ wrap: "truncate-end" }, "/ ", text({ dimColor: true }, "filter tasks")),
+    stamp(text({ wrap: "truncate-end" }, "/ ", text({ dimColor: true }, "filter tasks"))),
   );
-  expect(await drawn((kit) => Field(kit, { ...spec, value: "43" }), "mobile")).toEqual(text({ wrap: "truncate-end" }, "/ ", "43"));
+  expect(await drawn((kit) => Field(kit, { ...spec, value: "43" }), "mobile")).toEqual(stamp(text({ wrap: "truncate-end" }, "/ ", "43")));
 });
 
 const MASCOT_STATES = ["working", "done", "failed", "idle"] as const;
@@ -261,9 +264,9 @@ test("a still kit draws a working mascot as frame 0 on the terminal and as a one
 test("a mascot draws nothing for an unknown agent or the ASCII tier", async ($, on) => {
   const drawn = gallery($, on);
   const mascot = (type: string) => mascotOrNothing(type, "working", 0);
-  expect(await drawn(mascot("nobody"))).toEqual(text({}, "none"));
-  expect(await drawn(mascot("executor"), "terminal", "ascii")).toEqual(text({}, "none"));
-  expect(await drawn(mascot("executor"), "desktop", "ascii")).toEqual(text({}, "none"));
+  expect(await drawn(mascot("nobody"))).toEqual(stamp(text({}, "none")));
+  expect(await drawn(mascot("executor"), "terminal", "ascii")).toEqual(stamp(text({}, "none")));
+  expect(await drawn(mascot("executor"), "desktop", "ascii")).toEqual(stamp(text({}, "none")));
 });
 
 test("a Raster counts as its own rows", async ($, on) => {
