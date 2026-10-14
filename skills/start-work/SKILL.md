@@ -325,7 +325,11 @@ acknowledgement immediately, and each deliverable arrives later in the `<result>
 of its own `<task-notification>`. Read the deliverable from there. Never Read a
 subagent's `.output`/JSONL transcript (overflows context). When a deliverable comes back
 partial or as a bare stub, continue that agent once with `SendMessage` and ask for what
-is missing; it resumes with its own context instead of re-exploring.
+is missing; it resumes with its own context instead of re-exploring. A notice that the agent
+is waiting on its own background work carries no deliverable yet, so wait for its next
+notification. One that says a usage limit stopped it means relaunch the task after the
+limit resets, or report it. One that says a message reached it too late for its result
+means the result stands; resend the message with `SendMessage` only if it still matters.
 
 Review each deliverable as it lands: reading one executor's diff does not overlap the
 tasks still running. Hold group-wide steps (the project-level build and test run, the

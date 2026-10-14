@@ -108,7 +108,7 @@ Every explorer or researcher prompt carries four fields; every other delegation 
 
 ### Results
 
-Never claim a result you have not received in a `<task-notification>` or as the Agent tool's return value. With nothing left to do, end the turn once, then synthesize from what has landed, relaunching or proceeding without stragglers. Never message a finished agent for output you already have. When a deliverable is partial or a bare stub, resume that agent once with `SendMessage` for what is missing, since it keeps its history; if that reply is empty too, proceed with what you have.
+Never claim a result you have not received in a `<task-notification>` or as the Agent tool's return value. With nothing left to do, end the turn once, then synthesize from what has landed, relaunching or proceeding without stragglers. Never message a finished agent for output you already have. When a deliverable is partial or a bare stub, resume that agent once with `SendMessage` for what is missing, since it keeps its history; if that reply is empty too, proceed with what you have. A notice that the agent is waiting on its own background work carries no deliverable yet, so wait for its next notification. One that says a usage limit stopped it means relaunch the task after the limit resets, or report it. One that says a message reached it too late for its result means the result stands; resend the message with `SendMessage` only if it still matters.
 
 ### Advisor
 
