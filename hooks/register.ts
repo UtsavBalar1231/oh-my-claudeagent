@@ -168,7 +168,7 @@ export const register: Register = (on, pluginOptions) => {
   on("tool.check", { tool: /^(?:Bash|PowerShell)$/ }, ($, e, next) =>
     dispatch(bindHost($, options), "tool.check", bash, e, next, guardFailed),
   ).catch((_$, _e, next) => guardFailed(next.error.message ?? next.error.kind));
-  on("tool.call", ($, e, next) => dispatch(bindHost($, options), "tool.call", toolCall, e, next)).catch((_$, e, next) => next(e));
+  on("tool.call", { agentId: /./ }, ($, e, next) => dispatch(bindHost($, options), "tool.call", toolCall, e, next)).catch((_$, e, next) => next(e));
   on("session.start", ($, e, next) => dispatch(bindHost($, options), "session.start", sessionStart, e, next));
   on("turn.start", ($, e, next) => dispatch(bindHost($, options), "turn.start", turnStart, e, next));
   on("turn.step", async function* ($, e, next) {

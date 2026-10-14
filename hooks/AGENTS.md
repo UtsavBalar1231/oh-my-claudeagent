@@ -27,11 +27,12 @@ Spinner, pass through unchanged.
 
 `agents-tracker` also owns the agent page that `tabs/agent-page.ts` draws on the Agents tab: a
 Button keyed `open-<agent id>` on each lane opens it, and `b`, `c` and `r` go back, copy the brief
-and reload. Its one `tool.call` registration passes a main-loop call through untouched and, for a
-subagent's call, appends the call and its outcome to a module-level map, with no state write. The
-`pages` atom is written only when a page is opened, on `r` and at the agent's `turn.complete`,
-from `$.session.messages({ agentId })` and that map; a denied read keeps the stored prompt. A
-page holds at most 8 KiB of brief, 120 calls and 4 KiB of reply, for the newest 20 agents.
+and reload. Its one `tool.call` registration matches `{ agentId: /./ }`, so only a subagent's
+call reaches the mod and a main-loop call never does. It appends the call and its outcome to a
+module-level map, with no state write. The `pages` atom is written only when a page is opened, on
+`r` and at the agent's `turn.complete`, from `$.session.messages({ agentId })` and that map; a
+denied read keeps the stored prompt. A page holds at most 8 KiB of brief, 120 calls and 4 KiB of
+reply, for the newest 20 agents.
 An `agent.spawn` carrying `resume` whose agent already has a row reopens that row and lane instead
 of building new ones: the row goes back to running with no end time and keeps its start, tokens and
 cost, the lane keeps its prompt and call count and clears its tool, output and result, and a

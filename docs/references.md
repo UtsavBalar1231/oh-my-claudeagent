@@ -145,7 +145,7 @@ server's `omca_hook` tool, which dispatches through `servers/hooks/registry.ts`.
 | `session.start` | Registers `/omca`, writes the session's mod marker, draws the band's first state, and writes a transcript line when the `omca` server is not connected, naming a missing bun or the server's error |
 | `turn.start`, `turn.complete` | The turn footer (time, tokens, cost, an unlogged verification), the band and its buttons, the pane's refresh |
 | `agent.spawn`, `turn.step` | The Agents tab and delegation records |
-| `tool.call` | A subagent's tool calls, kept for its page on the Agents tab; a main-loop call passes through untouched |
+| `tool.call` | A subagent's tool calls, kept for its page on the Agents tab; only a subagent's call reaches the mod, and a main-loop call skips it |
 | `session.compact` | Asks the summarizer to keep the bound plan and its next ten open tasks. It does not run for a user-installed plugin where an organization manages Claude Code; the server's `SessionStart` `compact` handler re-injects the plan context there |
 | `ui.render`, `ui.focus`, `ui.scroll`, `ui.close`, `prompt.edit`, `command.run` | The band, the pane and the commands |
 
