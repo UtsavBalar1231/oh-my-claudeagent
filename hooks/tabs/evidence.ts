@@ -142,14 +142,17 @@ function select(host: Host, index: number): void {
 export function scroll(host: Host, e: Input<"ui.scroll">): boolean {
   if (laid === undefined || laid.shown.length === 0) return false;
   const { shown, perPage } = laid;
-  const at = Math.max(0, shown.indexOf(focused ?? -1));
   const isPage = Math.abs(e.by) === e.bodyRows;
   const isEnd = !isPage && Math.abs(e.by) >= e.contentRows;
-  const by = isEnd ? Math.sign(e.by) * shown.length : isPage ? Math.sign(e.by) * Math.max(1, perPage) : e.by;
-  focused = shown[Math.max(0, Math.min(shown.length - 1, at + by))];
-  note = "";
+  moveFocus(shown, isEnd ? Math.sign(e.by) * shown.length : isPage ? Math.sign(e.by) * Math.max(1, perPage) : e.by);
   host.ui.invalidate();
   return true;
+}
+
+function moveFocus(shown: readonly number[], by: number): void {
+  const at = Math.max(0, shown.indexOf(focused ?? -1));
+  focused = shown[Math.max(0, Math.min(shown.length - 1, at + by))];
+  note = "";
 }
 
 const masked = (view: View, text: string) => redact(text, view.home, view.g.mask);
@@ -390,7 +393,7 @@ function opened(view: View, entry: Entry, key: string, room: number, left: numbe
         flexDirection: "column",
         paddingLeft: DETAIL_INDENT,
         children: [
-          ...(height < 1 ? [] : [ScrollRegion({ kit: view.kit, g: view.g, key: OPENED_REGION, left: DETAIL_INDENT, top, width: room, height, units })]),
+          ...(height < 1 ? [] : [ScrollRegion({ kit: view.kit, g: view.g, key: OPENED_REGION, left: DETAIL_INDENT, top, width: room, height, units, layout: view.layout })]),
           ...metaLines.map((pieces) => line(view, pieces, room)),
         ],
       }),
@@ -688,6 +691,7 @@ function detailCard(view: View, entry: Entry, index: number, plan: Ledger["plan"
     width: inner,
     height,
     units,
+    layout: view.layout,
   });
   const element = Card(view.kit, {
     key: `detail-${index}`,
@@ -734,6 +738,7 @@ export const view: TabView = async (host, view) => {
   const isSplit = view.tier === "split" && entry !== undefined && index !== undefined && room >= MIN_CARD_ROWS;
   const listWidth = isSplit ? Math.floor(view.width * MASTER_SHARE) : view.width;
   const list = timeline(host, view, ledger, shown, current, room, { width: listWidth, top, isExpanded: !isSplit });
+  if (!isRemote(view.kit) && laid !== undefined) view.layout.lists.push({ left: 0, top, width: listWidth, height: room, move: (by) => moveFocus(shown, by) });
   let body = list;
   if (isSplit) {
     const card = detailCard(view, entry, index, ledger.plan, view.width - listWidth - COLUMN_GAP, room, { left: listWidth + COLUMN_GAP, top });

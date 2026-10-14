@@ -203,6 +203,7 @@ export const view: TabView = async (host, view) => {
   const capacity = first > 0 ? windowRows : Math.max(1, space - 1);
   const end = windowEnd(heights, first, capacity);
   const shown = heights.slice(first, end).reduce((sum, height) => sum + height, 0);
+  view.layout.lists.push({ left: 0, top: headHeight, width: view.width, height: (first > 0 ? 1 : 0) + capacity + 1, move: (by) => (first = stepStart(heights, first, by, windowRows)) });
   // The engine raises ui.scroll only for a tree taller than the body, so this one row past the
   // window is what brings the arrows and the wheel to `scroll`.
   return [

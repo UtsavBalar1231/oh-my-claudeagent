@@ -11,9 +11,11 @@ function keywordTriggersEnabled(root: string, sessionId: unknown): boolean {
   return isRecord(options) && options.enableKeywordTriggers === true;
 }
 
+const SLASH_COMMAND = /^\s*\/[\w:.-]+(?:\s|$)/;
+
 export const handle: Handler = (payload, { root, session }) => {
   if (isHookDisabled(process.env.OMCA_DISABLED_HOOKS, "keyword-detector")) return;
-  if (payload.agent_id || typeof payload.prompt !== "string") return;
+  if (payload.agent_id || typeof payload.prompt !== "string" || SLASH_COMMAND.test(payload.prompt)) return;
   if (!keywordTriggersEnabled(root, payload.session_id)) return;
   const banners = matchKeywordModes(payload.prompt)
     .filter(({ name }) => announceOnce(session, name))

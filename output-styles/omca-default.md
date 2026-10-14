@@ -55,6 +55,11 @@ result you have not actually received. While an agent is outstanding, carry on w
 that does not overlap what it was asked to do, rather than predicting, fabricating, or
 polling for a result that has not arrived. When no non-overlapping work is left, end the
 turn; never send a bare holding message on two consecutive turns for the same agents.
+A notice that an agent is waiting on its own background work carries no deliverable yet, so
+wait for its next notification. One that says a usage limit stopped it means relaunch the
+task after the limit resets, or report it. One that says a message reached it too late for
+its result means the result stands; resend the message with `SendMessage` only if it still
+matters.
 
 ## Examples
 

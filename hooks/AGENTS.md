@@ -27,11 +27,17 @@ Spinner, pass through unchanged.
 
 `agents-tracker` also owns the agent page that `tabs/agent-page.ts` draws on the Agents tab: a
 Button keyed `open-<agent id>` on each lane opens it, and `b`, `c` and `r` go back, copy the brief
-and reload. Its one `tool.call` registration passes a main-loop call through untouched and, for a
-subagent's call, appends the call and its outcome to a module-level map, with no state write. The
-`pages` atom is written only when a page is opened, on `r` and at the agent's `turn.complete`,
-from `$.session.messages({ agentId })` and that map; a denied read keeps the stored prompt. A
-page holds at most 8 KiB of brief, 120 calls and 4 KiB of reply, for the newest 20 agents.
+and reload. Its one `tool.call` registration matches `{ agentId: /./ }`, so only a subagent's
+call reaches the mod and a main-loop call never does. It appends the call and its outcome to a
+module-level map, with no state write. The `pages` atom is written only when a page is opened, on
+`r` and at the agent's `turn.complete`, from `$.session.messages({ agentId })` and that map; a
+denied read keeps the stored prompt. A page holds at most 8 KiB of brief, 120 calls and 4 KiB of
+reply, for the newest 20 agents.
+An `agent.spawn` carrying `resume` whose agent already has a row reopens that row and lane instead
+of building new ones: the row goes back to running with no end time and keeps its start, tokens and
+cost, the lane keeps its prompt and call count and clears its tool, output and result, and a
+module-level map holds the row's tokens so the next completion adds its usage to them. `metrics`
+rewrites that agent's record as running with the same tokens.
 
 `mascot-player` animates the mascots of `src/core/mascots.ts`: the 15 by 4 mini that leads each
 relaxed lane on the Agents tab, drawn when the body holds every running lane, a row after each, the
@@ -49,6 +55,30 @@ never starts it. No timer runs on a remote surface: Desktop draws a still Svg, s
 every site on each state write and would restart an animation, and the other remote surfaces
 animate the Svg by themselves.
 
+The UI kit (`ui.ts`) reads the engine version once, in `resolveSession` (`host.ts`), and sets
+`isTypeset` on the session when `$.session.version()` answers 2.1.299 or later, judged on `base`
+when it is present. A refused call, or a version that does not parse, leaves it false. When it is
+true the kit's `Text` sends `weight: "semibold"` in place of `bold: true`, and on a remote surface
+`Run` sets `mono` on its container and every span, a `Text` outside `Run` that holds a digit sets
+`tabular`, and the row gaps of the pane and its tabs and the band's button gap are the named steps
+`"md"` and `"lg"` in place of cells. The terminal keeps its cell gaps. When it is false every tree
+is drawn as it was before the gate. Drawing code reads the flag from `resolvedSession()` and
+never awaits the engine.
+
+The pane's `ui.scroll` hook reads one committed layout (`regions.ts`). Each terminal drawing
+collects its own on `view.layout`: every scroll region and every list that draws its own window,
+with its rect in the tab's rows and columns, the tab rows above the tab, the engine's offset it
+drew at, whether the pane padded the tree, and the rows the tree takes. The drawing commits it in
+one assignment when it finishes, and one that started earlier never replaces a newer commit,
+because the engine raises `ui.render` and `ui.scroll` concurrently and a drawing awaits its tab.
+Region offsets are module state that outlives drawings. A wheel tick, the one event that carries
+`pointer`, moves only what is under it: a region by `by` rows, else a list by `by` rows, each
+clamped and taking the tick at its end. Over nothing it reaches the engine only while the tree is
+taller than the body by more than the padding row, and is taken with no effect otherwise. Routing
+never reads the size of `by`, since the engine merges ticks in flight into one move. The scroll
+keys carry no `pointer` and keep their own routing: the tab's list, then the aimed or first
+overflowing region, a row, a page (`bodyRows`) or an end (`contentRows`) at a time.
+
 ## Current runtime contract
 
 - `UserPromptSubmit` and `UserPromptExpansion` route to the server's `keyword-detector` and
@@ -64,7 +94,8 @@ animate the Svg by themselves.
 - `SessionStart` for `clear` or `compact` routes to the server's `session-start` handler,
   which re-injects that context after a compaction and hands it back to the next prompt
   after `/clear`. The mod's `session.compact` feature (`compact.ts`) tells the summarizer to
-  keep the bound plan and its open tasks.
+  keep the bound plan and its open tasks. It does not run for a user-installed plugin where an
+  organization manages Claude Code, so the server handler's re-injection is the only cover there.
 - `SubagentStart` routes to the server's `subagent-context` handler, and `PermissionDenied`
   to its `permission-coach` handler, which answers an auto-mode classifier denial of a Bash
   call with `retry: true`.

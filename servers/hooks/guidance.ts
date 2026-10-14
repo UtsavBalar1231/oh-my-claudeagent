@@ -50,8 +50,8 @@ export const handle: Handler = (payload, { root, now, session }) => {
   session.promptAt = now;
   const isHeldBack = session.isGuided || isResumed(root, session);
   session.isGuided = true;
-  // A typed slash command raises UserPromptExpansion before UserPromptSubmit, and only
-  // UserPromptSubmit can set the title, so the title waits for the session's first one.
+  // A typed slash command raises UserPromptSubmit before UserPromptExpansion, and only
+  // UserPromptSubmit can set the title, so the title goes out with the session's first one.
   const isTitleDue = payload.event === "UserPromptSubmit" && !session.isTitleChecked;
   if (isTitleDue) session.isTitleChecked = true;
   const wantsTitle = isTitleDue && !payload.session_title;

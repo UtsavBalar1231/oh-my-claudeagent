@@ -1,5 +1,6 @@
 import type { RenderElement } from "claude-code";
 import { lookOf } from "../../src/core/agent-type.ts";
+import { parseRegistry } from "../../src/core/boulder.ts";
 import { type Drawn, drawnAt, type FocusList, focusMove, type ListSlice, placeWindow, windowOf } from "../../src/core/list-window.ts";
 import { BOULDER } from "../../src/core/omca-paths.ts";
 import { type Platform, samePath, tildePath } from "../../src/core/path.ts";
@@ -12,8 +13,11 @@ import {
   isReadable,
   type Page,
   type PlanFile,
+  newestPlans,
   parsePlan,
-  planTarget,
+  planCandidates,
+  planFileAt,
+  planHomes,
   plansDirectory,
   readable,
   recentPlans,
@@ -41,7 +45,7 @@ import type { Input, Phase } from "../dispatch.ts";
 import { boundPlanOf, fillPrompt, type Host, type ProofFacts, proofFacts, reason, sessionOf, type State, verdictFor } from "../host.ts";
 import type { Subcommand } from "../omca-router.ts";
 import { blanks, buttonRow, edge, keyButton, noticeRow, open, PANE, patchPane, refocus as focusIn, refocusRemote, rule, tabKey, type TabView, type View, wrapAt } from "../pane.ts";
-import { codeUnits, markdownUnits, resetOffset, ScrollRegion, scrollKeyed, type Unit } from "../regions.ts";
+import { codeUnits, markdownUnits, type Region, resetOffset, ScrollRegion, scrollKeyed, type Unit } from "../regions.ts";
 import { Card as CardBox, Field, isRemote, Line, Run as Spans, type TextStyle } from "../ui.ts";
 
 type Loaded = Extract<State["plan"], { pages: unknown }>;
@@ -127,7 +131,7 @@ let planned: { list: List; start: number } | undefined;
 let isRingOnRow = false;
 let filter: Filter = { text: "", isOpenOnly: false, isFailingOnly: false, isEditing: false };
 let note: { text: string; level: Level } | undefined;
-let facts: ProofFacts = { changes: new Map(), proving: [], ledgerError: null, ledgerSeen: "" };
+let facts: ProofFacts = { changes: new Map(), proving: [], ledgerError: null, ledgerSeen: "", startedAt: undefined };
 let factsSignature = "";
 let memo: { key: string; board: Board } | undefined;
 let detailShown: number | undefined;
@@ -153,19 +157,61 @@ function boardFor(plan: Loaded): Board {
   return memo.board;
 }
 
-async function where(host: Host): Promise<{ platform: Platform; root: string; home: string; dir: string }> {
+async function where(host: Host): Promise<{ platform: Platform; root: string; home: string; homes: string[] }> {
   const [root, { env, platform, home }, settings] = await Promise.all([
     host.session.root(),
     sessionOf(host),
     host.settings.read(),
   ]);
-  return { platform, root, home, dir: plansDirectory(platform, settings["plansDirectory"], root, env) ?? UNRESOLVED_PLANS };
+  const setting = settings["plansDirectory"];
+  const homes = planHomes(platform, setting, root, env);
+  return { platform, root, home, homes: plansDirectory(platform, setting, root, env) === undefined ? [UNRESOLVED_PLANS, ...homes] : homes };
 }
 
-/** The plans `/omca plan <name>` can name, newest first, as the picker lists them. */
+async function registered(host: Host, root: string): Promise<{ name: string; path: string }[]> {
+  const path = `${root}/${BOULDER}`;
+  try {
+    if (!(await host.fs.exists(path))) return [];
+    const parsed = parseRegistry(await host.fs.read(path));
+    if (parsed.kind !== "ok") return [];
+    return Object.entries(parsed.registry.plans).flatMap(([name, { active_plan: file }]) => (file === undefined || file === "" ? [] : [{ name, path: file }]));
+  } catch (error) {
+    host.log(`omca plan: ${BOULDER} unreadable: ${reason(error)}`);
+    return [];
+  }
+}
+
+type Found = { files: PlanFile[]; keys: string[]; failures: string[] };
+
+// Each home lists on its own, so one that cannot be read leaves the others on the page.
+async function findPlans(host: Host, { platform, root, home, homes }: Awaited<ReturnType<typeof where>>): Promise<Found> {
+  const listed = await Promise.all(
+    homes.map(async (dir) => {
+      try {
+        return { files: (await host.fs.exists(dir)) ? recentPlans(await host.fs.list(dir), dir) : [], failure: [] };
+      } catch (error) {
+        return { files: [], failure: [`Could not list ${tildePath(platform, dir, home)}: ${reason(error)}`] };
+      }
+    }),
+  );
+  const elsewhere = await Promise.all(
+    (await registered(host, root)).map(async ({ name, path }) => {
+      const stat = await host.fs.stat(path).catch(() => undefined);
+      return stat === undefined ? undefined : { name, file: planFileAt(platform, path, stat.mtimeMs) };
+    }),
+  );
+  const present = elsewhere.filter((entry) => entry !== undefined);
+  return {
+    files: newestPlans(platform, [...listed.flatMap((each) => each.files), ...present.map(({ file }) => file)]),
+    keys: present.map(({ name }) => name),
+    failures: listed.flatMap((each) => each.failure),
+  };
+}
+
+/** The plans `/omca plan <name>` can name: the picker's files, newest first, then the registered plans' keys. */
 export async function planNames(host: Host): Promise<string[]> {
-  const { dir } = await where(host);
-  return (await host.fs.exists(dir)) ? recentPlans(await host.fs.list(dir), dir).map((file) => file.name) : [];
+  const { files, keys } = await findPlans(host, await where(host));
+  return [...new Set([...files.map((file) => file.name), ...keys])];
 }
 
 function startCursor(plan: Pick<Loaded, "pages">): number {
@@ -220,8 +266,8 @@ async function load(host: Host, path: string, { keepPlace = false, isTick = fals
 
 // Every listed file's modification time and the ledger's runs, read outside any drawing.
 async function gather(host: Host, plan: Loaded, within?: object): Promise<void> {
-  const next = await proofFacts(host, boardFor(plan).cards.flatMap((card) => card.files), within);
-  const signature = JSON.stringify([[...next.changes], next.ledgerSeen, next.ledgerError]);
+  const next = await proofFacts(host, boardFor(plan).cards.flatMap((card) => card.files), plan.path, within);
+  const signature = JSON.stringify([[...next.changes], next.ledgerSeen, next.ledgerError, next.startedAt]);
   if (signature === factsSignature) return;
   facts = next;
   factsSignature = signature;
@@ -229,28 +275,24 @@ async function gather(host: Host, plan: Loaded, within?: object): Promise<void> 
 }
 
 async function listPlans(host: Host): Promise<void> {
-  const { platform, home, dir } = await where(host);
-  try {
-    const files = (await host.fs.exists(dir)) ? recentPlans(await host.fs.list(dir), dir) : [];
-    await patchPane(host, (pane) => ({ ...pane, plans: { dir, files }, errors: { ...pane.errors, plans: null } }));
-    const counts = await Promise.all(
-      files.map(async (file) => {
-        const text = await host.fs.read(file.path).then(
-          (source) => parsePlan(source),
-          () => undefined,
-        );
-        return [file.path, text === undefined || text.total === 0 ? "" : `${text.done}/${text.total}`] as const;
-      }),
-    );
-    tallies = new Map(counts.filter(([, count]) => count !== ""));
-    boundTo = await boundPath(host);
-    const current = (await host.state.plan.get()).value?.path;
-    pick = Math.max(0, files.findIndex((file) => current !== undefined && samePath(platform, file.path, current)));
-  } catch (error) {
-    tallies = new Map();
-    const failure = `Could not list ${tildePath(platform, dir, home)}: ${reason(error)}`;
-    await patchPane(host, (pane) => ({ ...pane, plans: { dir, files: [] }, errors: { ...pane.errors, plans: failure } }));
-  }
+  const place = await where(host);
+  const { platform, homes } = place;
+  const { files, failures } = await findPlans(host, place);
+  const failure = failures.length === 0 ? null : failures.join("; ");
+  await patchPane(host, (pane) => ({ ...pane, plans: { dirs: homes, files }, errors: { ...pane.errors, plans: failure } }));
+  const counts = await Promise.all(
+    files.map(async (file) => {
+      const text = await host.fs.read(file.path).then(
+        (source) => parsePlan(source),
+        () => undefined,
+      );
+      return [file.path, text === undefined || text.total === 0 ? "" : `${text.done}/${text.total}`] as const;
+    }),
+  );
+  tallies = new Map(counts.filter(([, count]) => count !== ""));
+  boundTo = await boundPath(host);
+  const current = (await host.state.plan.get()).value?.path;
+  pick = Math.max(0, files.findIndex((file) => current !== undefined && samePath(platform, file.path, current)));
   mode = "plans";
 }
 
@@ -287,11 +329,18 @@ export async function sync(host: Host, within?: object): Promise<void> {
 
 const rowKey = () => (mode === "plans" ? `${PICK}${pick}` : mode === "board" ? `${TASK}${task}` : `${ROW}${cursor}`);
 
+async function firstExisting(host: Host, candidates: readonly string[]): Promise<string | undefined> {
+  for (const candidate of candidates) if (await host.fs.exists(candidate)) return candidate;
+  return undefined;
+}
+
 export const command: Subcommand = async (host, e, args) => {
   if (args.trim() === "") await showBound(host);
   else {
-    const { platform, root, home, dir } = await where(host);
-    await load(host, planTarget(platform, args, home, root, dir));
+    const { platform, root, home, homes } = await where(host);
+    const candidates = planCandidates(platform, args, home, root, homes);
+    const keyed = (await registered(host, root)).find((entry) => entry.name === args.trim());
+    await load(host, keyed?.path ?? (await firstExisting(host, candidates)) ?? candidates[0] ?? args.trim());
   }
   const answer = await open(host, e, "plan");
   refocus(host, rowKey());
@@ -456,33 +505,37 @@ export async function focus(host: Host, e: Input<"ui.focus">): Promise<Phase<Inp
 
 // The lists draw their own window, so the engine has nothing to scroll for these keys. A page key
 // asks for `bodyRows`, Home and End for `contentRows`; where the two are equal the key is read as a page key.
-// Anything shorter than a page is a wheel tick, which moves the cursor by its rows as the arrows do.
 export async function scroll(host: Host, e: Input<"ui.scroll">): Promise<boolean> {
   const list = listShown();
   const last = list === undefined ? undefined : drawn[list];
   const isPage = Math.abs(e.by) === e.bodyRows;
   const isEnd = !isPage && Math.abs(e.by) === e.contentRows;
-  const isTick = !isPage && !isEnd && Math.abs(e.by) < e.bodyRows;
-  if (list === undefined && (mode === "detail" || mode === "page") && e.pointer === undefined) {
-    if (!scrollKeyed(e.by, isPage ? "page" : isEnd ? "end" : "row")) return false;
+  const size = isPage ? "page" : isEnd ? "end" : "row";
+  if (list === undefined && (mode === "detail" || mode === "page")) {
+    if (!scrollKeyed(e.by, size)) return false;
     host.ui.invalidate();
     return true;
   }
-  if (list === undefined || last === undefined || (!isPage && !isEnd && !isTick)) return false;
+  if (list === undefined || last === undefined) return false;
+  return step(host, list, last, e.by, size, true);
+}
+
+// Moves a list's cursor by `by` rows, a window of them or to an end, over the window `last` drew.
+async function step(host: Host, list: List, last: Drawn, by: number, size: "row" | "page" | "end", isKey: boolean): Promise<boolean> {
   const ring = await ringOf(host, list);
   if (ring === undefined || ring.focus.rows.length === 0) return false;
   const { rows, total, current } = ring.focus;
   const shown = rows.filter((index) => index >= last.start && index < last.start + last.size).length;
   const at = Math.max(0, rows.indexOf(current));
-  const step = isTick ? e.by : Math.sign(e.by) * Math.max(1, shown);
-  const to = isEnd ? (e.by > 0 ? rows.length - 1 : 0) : Math.max(0, Math.min(rows.length - 1, at + step));
+  const rowsBy = size === "row" ? by : Math.sign(by) * Math.max(1, shown);
+  const to = size === "end" ? (by > 0 ? rows.length - 1 : 0) : Math.max(0, Math.min(rows.length - 1, at + rowsBy));
   const target = rows[to] ?? current;
   if (target === current) return true;
   // An arrow takes the ring to the next drawn task the way a person's move does, so focus places
   // the window and the ring together; the engine keeps the ring by position, and a keyed refocus
   // after the window moved would land a row off.
   const isDrawn = target >= last.start && target < last.start + last.size;
-  if (e.pointer === undefined && Math.abs(e.by) === 1 && isDrawn) {
+  if (isKey && Math.abs(by) === 1 && isDrawn) {
     const { deny } = await host.ui.focus({ requestId: PANE, key: ring.keyOf(target) });
     if (deny === undefined) return true;
   }
@@ -509,6 +562,13 @@ function windowFor(host: Host, view: View, list: List, focusList: FocusList, siz
   const end = Math.min(focusList.total, start + size);
   isCut = start > 0 || end < focusList.total;
   return { start, end };
+}
+
+// The wheel over a list's rows moves its cursor over the window this drawing gave it.
+function pin(host: Host, view: View, list: List, rect: Omit<Region, "key">): void {
+  const last = drawn[list];
+  if (isRemote(view.kit) || last === undefined) return;
+  view.layout.lists.push({ ...rect, move: (by) => step(host, list, last, by, "row", false) });
 }
 
 const roomFor = (view: View, chrome: number): number => Math.max(1, view.rows - chrome);
@@ -1203,6 +1263,7 @@ function boardView(host: Host, view: View, ctx: Ctx): RenderElement[] {
   const detailWidth = view.width - listWidth - 2;
   const units = isSplit ? detail(view, ctx, card, detailWidth - 1) : [];
   const height = isRemoteView ? Math.max(items.length + 2, units.reduce((sum, unit) => sum + unit.rows, 0)) : size + 2;
+  if (items.length > 0) pin(host, view, "board", { left: 0, top, width: listWidth, height: column.length });
   if (isSplit && !isRemoteView && card.n !== detailShown) {
     resetOffset(DETAIL);
     detailShown = card.n;
@@ -1237,6 +1298,7 @@ function boardView(host: Host, view: View, ctx: Ctx): RenderElement[] {
                     width: detailWidth - 1,
                     height,
                     units,
+                    layout: view.layout,
                   }),
                 ],
               }),
@@ -1302,6 +1364,7 @@ function pageOf(view: View, { id, title, counter, keys, units, hint, isNote }: P
       width: view.width,
       height: Math.max(1, view.rows - above - hintRows),
       units: [...units],
+      layout: view.layout,
     }),
     ...(hintRows === 0 ? [] : [Text({ color: hint.color, children: [fitEnd(hint.text, view.width, ellipsis)] })]),
   ];
@@ -1393,6 +1456,7 @@ function contentsView(host: Host, view: View, plan: Loaded): RenderElement[] {
       }),
     );
   });
+  pin(host, view, "contents", { left: 0, top: layout.isFull ? 3 : 1, width: view.width, height: rows.length + 2 });
   const progress = `${plan.done}/${plan.total} tasks done`;
   const lead = `${progress} ${view.g.dot} `;
   const hidden = plan.pages.length - list.total;
@@ -1484,15 +1548,14 @@ function plansView(host: Host, view: View, pane: State["pane"] | undefined, plan
   const listing = pane?.plans;
   if (pane === undefined || listing === undefined || listing === null) return [noticeRow(view, { kind: "loading" }, words)];
   const keysShown = keyRows(view, keys, KEY_GAP);
-  if (pane.errors.plans !== null) {
-    return [noticeRow(view, { kind: "error", reason: pane.errors.plans }, words), ...keysShown];
-  }
-  const dir = tildePath(view.platform, listing.dir, view.home);
+  const failure = pane.errors.plans === null ? [] : [noticeRow(view, { kind: "error", reason: pane.errors.plans }, words)];
+  if (listing.files.length === 0 && failure.length > 0) return [...failure, ...keysShown];
+  const dirs = listing.dirs.map((each) => tildePath(view.platform, each, view.home));
   if (listing.files.length === 0) {
     const lines = [
       ...(plan === undefined ? wrapText("No plan is bound to this session.", view.width) : []),
       "No plans in",
-      fitMiddle(dir, view.width, ellipsis),
+      ...dirs.map((dir) => fitMiddle(dir, view.width, ellipsis)),
       ...wrapText("Make one with /oh-my-claudeagent:plan, then bind it to this session with /oh-my-claudeagent:start-work.", view.width),
     ];
     return [
@@ -1502,7 +1565,7 @@ function plansView(host: Host, view: View, pane: State["pane"] | undefined, plan
   }
   const list = picksOf(listing.files);
   const layout = frameFor(view, keys);
-  const size = roomFor(view, layout.chrome);
+  const size = roomFor(view, layout.chrome + failure.length);
   const { start, end } = windowFor(host, view, "plans", list, size, (index) => `${PICK}${index}`);
   const isBound = (file: PlanFile) => boundTo !== undefined && samePath(view.platform, file.path, boundTo);
   const hasBound = listing.files.some(isBound);
@@ -1548,15 +1611,16 @@ function plansView(host: Host, view: View, pane: State["pane"] | undefined, plan
       }),
     );
   });
+  pin(host, view, "plans", { left: 0, top: layout.isFull ? 3 : 1, width: view.width, height: failure.length + rows.length + 2 });
   const count = `${listing.files.length} most recent`;
   const lead = `${count} in `;
   return frame(view, layout, {
     title: "Plans",
-    meta: `${lead}${fitMiddle(dir, view.width - displayWidth(lead), ellipsis)}`,
+    meta: `${lead}${fitMiddle(dirs.join(", "), view.width - displayWidth(lead), ellipsis)}`,
     shortMeta: `${listing.files.length} recent`,
     above: start > 0 ? `  ${view.g.up} ${start} more` : "",
     below: end < list.total ? `  ${view.g.down} ${list.total - end} more` : "",
-    rows,
+    rows: [...failure, ...rows],
     hint: moveHint(view),
   });
 }

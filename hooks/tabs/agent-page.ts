@@ -138,6 +138,6 @@ export async function view(host: Host, view: View, lane: Lane): Promise<readonly
   const isSpare = isRemoteDrawing || sections.flat().reduce((sum, unit) => sum + unit.rows, 0) + sections.length - 1 <= height;
   const gap: Unit = { element: kit.Text({ children: [" "] }), rows: 1 };
   const units = sections.flatMap((section, at) => (isSpare && at > 0 ? [gap, ...section] : section));
-  const body = ScrollRegion({ kit, g, key: BODY_KEY, left: 0, top: head.rows, width: view.width, height, units });
+  const body = ScrollRegion({ kit, g, key: BODY_KEY, left: 0, top: head.rows, width: view.width, height, units, layout: view.layout });
   return isRemoteDrawing ? [...head.children, keys, body] : [...head.children, body, keys];
 }

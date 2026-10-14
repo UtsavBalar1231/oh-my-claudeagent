@@ -21,5 +21,5 @@ async function writeMarker(host: Host): Promise<undefined> {
 
 export const modMarker: Features = {
   "session.start": { post: writeMarker },
-  "turn.start": { pre: writeMarker },
+  "turn.start": { pre: (host, e) => (e.agentId === undefined ? writeMarker(host) : undefined) },
 };

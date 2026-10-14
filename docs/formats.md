@@ -17,7 +17,7 @@ Both JSON files carry `"version": 1` as their first key. A file without `version
 
 ## Plan files
 
-A plan is a Markdown file anywhere on disk. The registry records its path. Nothing about a plan is stored outside the file: progress, the next task and completion are all derived from its text each time they are needed.
+A plan is a Markdown file anywhere on disk. The registry records its path. The planner writes plans to the plans directory (`plansDirectory`, else `~/.claude/plans`) or to `.omca/plans` under the project for a project-local plan; `plansDirectory: ".omca/plans"` makes the second the default. `.omca/` is gitignored. The Plan tab picker lists both homes and every registered plan. The plan-write check covers any `.md` file in a directory named `plans`. Nothing about a plan is stored outside the file: progress, the next task and completion are all derived from its text each time they are needed.
 
 ### Metadata
 
@@ -173,7 +173,7 @@ After a cut, the section starts with the marker line `[Compacted: N earlier line
 
 The file keeps text as written. `notepad_read` masks secrets in what it returns, replacing each with `<masked>`, so masking is display only and never edits the file. The patterns are private key blocks, a `name=value` pair whose name ends in `password`, `passwd`, `token`, `secret` or `api_key` in any case (the name and equals sign stay), a `Bearer` token, an `sk-` key, GitHub and Slack tokens, an AWS access key id, a Google API key and a JSON web token. The pane's Notepad tab applies the same masks and also shows the home directory as `~`. Do not write a secret to a notepad, because the file holds it.
 
-`notepad_read` returns each requested section as `# Learnings`, `# Issues` and so on, followed by the masked text, with `---` between sections.
+`notepad_read` returns each requested section as `# Learnings`, `# Issues` and so on, followed by the masked text, with `---` between sections. Text past 40,000 characters comes back as the newest content, under a `[TRUNCATED: older entries omitted: read one section or run notepad_compact]` header.
 
 ### Plan names
 

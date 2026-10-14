@@ -10,8 +10,8 @@ import { sha256Hex } from "../src/core/sha256.ts";
 import { fitEnd, type GlyphTier, glyphs, oneLine } from "../src/core/ui-kit.ts";
 import { TONE_KEYS } from "../src/core/visual.ts";
 import type { Features } from "./dispatch.ts";
-import { boundPlanOf, bytesOf, fillPrompt, type Host, ledgerWrittenAt, proofFacts, reason, sessionOf, stampOf, verdictFor } from "./host.ts";
-import { type Kit, kitOf, Run, type TextStyle } from "./ui.ts";
+import { boundPlanOf, bytesOf, fillPrompt, type Host, ledgerWrittenAt, proofFacts, reason, resolvedSession, sessionOf, stampOf, verdictFor } from "./host.ts";
+import { isRemote, type Kit, kitOf, Run, type TextStyle } from "./ui.ts";
 
 type Snapshot = { band: Band; hasFinalVerification: boolean; exitCode: number | null; planPath: string | undefined };
 
@@ -83,16 +83,17 @@ async function readSnapshot(host: Host, within: object): Promise<Snapshot> {
       hasPassingFinalVerification(await ledgerDocument(host, ledgerPath), sha256Hex(planBytes)),
     )) === true;
 
-  const proof = planText === null ? null : await attempt(LEDGER, () => proofOfPlan(host, planText, within));
+  const proof = bound === null || planText === null ? null : await attempt(LEDGER, () => proofOfPlan(host, bound.path, planText, within));
   const band: Band = { plan, verification, ...(proof === null ? {} : { proof }), error: errors[0] ?? null, readAt };
   return { band, hasFinalVerification, exitCode, planPath: bound?.path };
 }
 
 // The plan board's counts: each task's verdict is the newest test, build or lint run since its
-// listed files last changed. Null when no task lists a file that exists.
-async function proofOfPlan(host: Host, planText: string, within: object): Promise<Proof | null> {
+// listed files last changed, counting only changes since the plan's registered start. Null when no
+// task lists a file that changed.
+async function proofOfPlan(host: Host, planPath: string, planText: string, within: object): Promise<Proof | null> {
   const { cards } = boardOf(parsePlan(planText));
-  const facts = await proofFacts(host, cards.flatMap((card) => card.files), within);
+  const facts = await proofFacts(host, cards.flatMap((card) => card.files), planPath, within);
   if (facts.ledgerError !== null) throw new Error(facts.ledgerError);
   const counts = proofSummary(cards.map((card) => shownProof(card.done, verdictFor(facts, card.files)?.proof)));
   return counts.proven + counts.unproven + counts.failed === 0 ? null : counts;
@@ -222,14 +223,14 @@ export const band: Features = {
       const running = Object.values(agents).filter((agent) => agent.status === "running").length;
       const view = bandView(snapshot, actions, e.props.bodyColumns, glyphTier, running);
       if (view === undefined) return undefined;
-      const kit = kitOf(host.ui.resolve(e), e.surface);
+      const kit = kitOf(host.ui.resolve(e), e.surface, { isTypeset: resolvedSession().isTypeset });
       const { Box, Button } = kit;
       const rows = [Box({ key: "status", children: [row(kit, view.status)] })];
       if (view.buttons.length > 0) {
         rows.push(
           Box({
             key: "actions",
-            gap: BUTTON_GAP,
+            gap: kit.isTypeset && isRemote(kit) ? "lg" : BUTTON_GAP,
             children: view.buttons.map((button) =>
               Button({
                 key: button.key,

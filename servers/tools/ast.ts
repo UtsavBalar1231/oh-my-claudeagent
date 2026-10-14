@@ -101,11 +101,11 @@ const LANG_EXTENSIONS: Record<string, Language> = {
 
 const TIMEOUT_MS = 300_000;
 const HEARTBEAT_MS = 1_000;
-const MAX_RESULTS_DEFAULT = 500;
+const MAX_RESULTS_DEFAULT = 100;
 const MAX_RESULT_CAP = 500;
 const MAX_JSON_OUTPUT_BYTES = 1024 * 1024;
-// A full MAX_RESULT_CAP of matches with code snippets passes the client's default persist-to-disk
-// threshold; this keeps them inline and stays under the client's 500000 ceiling.
+// A raised max_results of up to MAX_RESULT_CAP matches with code snippets passes the client's default
+// persist-to-disk threshold; this keeps them inline and stays under the client's 500000 ceiling.
 const SEARCH_MAX_RESULT_CHARS = 200_000;
 const OUTPUT_CAPPED = "[TRUNCATED] Output exceeded AST MCP caps\n\n";
 
@@ -426,7 +426,7 @@ function formatRun(matches: Match[], maxResults: number, replace?: { dryRun: boo
   const shown = matches.slice(0, maxResults);
   if (shown.length === 0) return replace ? "No matches found to replace" : "No matches found";
   const lines: string[] = [];
-  if (matches.length > maxResults) lines.push(`[TRUNCATED] Showing first ${maxResults} of ${matches.length} matches\n`);
+  if (matches.length > maxResults) lines.push(`[TRUNCATED] Showing first ${maxResults} of ${matches.length} matches. Narrow paths or globs, or raise max_results (up to ${MAX_RESULT_CAP}).\n`);
   if (replace) lines.push(`${replace.dryRun ? "[DRY RUN] " : ""}${shown.length} replacement(s):\n`);
   else lines.push(`Found ${shown.length} match(es):\n`);
   for (const match of shown) {
@@ -443,7 +443,7 @@ function formatScan(matches: Match[], maxResults: number): string {
   const shown = matches.slice(0, maxResults);
   if (shown.length === 0) return "No matches found";
   const lines: string[] = [];
-  if (matches.length > maxResults) lines.push(`[TRUNCATED] Showing first ${maxResults} of ${matches.length} matches\n`);
+  if (matches.length > maxResults) lines.push(`[TRUNCATED] Showing first ${maxResults} of ${matches.length} matches. Narrow paths or globs, or raise max_results (up to ${MAX_RESULT_CAP}).\n`);
   lines.push(`Found ${shown.length} match(es):\n`);
   for (const match of shown) {
     let header = `${match.file ?? ""}:${position(match)}`;
@@ -459,7 +459,7 @@ function formatScan(matches: Match[], maxResults: number): string {
 const clampResults = (maxResults: number) => Math.max(0, Math.min(maxResults, MAX_RESULT_CAP));
 
 const pathsProperty = { type: "array", items: { type: "string" }, description: "Paths to search (default: ['.'])" };
-const maxResultsProperty = { type: "integer", default: MAX_RESULTS_DEFAULT, description: "Maximum matches to return" };
+const maxResultsProperty = { type: "integer", default: MAX_RESULTS_DEFAULT, description: `Maximum matches to return (default ${MAX_RESULTS_DEFAULT}, at most ${MAX_RESULT_CAP})` };
 const outputFormatProperty = {
   type: "string",
   enum: ["text", "json"],
@@ -476,7 +476,7 @@ export const tools: Tool[] = [
   {
     name: "ast_search",
     description:
-      "Search code by syntax pattern with ast-grep. Use it instead of text search when the target is structural (function signatures, class shapes, import forms, call patterns); use rg for plain text, comments, or string contents. Paths must lie inside the project root or one of its git worktrees; any other path is rejected with an error, so search outside the repository with rg. Only files whose extension maps to lang are scanned (lang='cpp' skips .c files). Returns file:line:col and the matched line for each hit, at most 500 hits (max_results can lower that), with a [TRUNCATED] marker when more exist; a zero-match result carries hints when the pattern uses regex syntax that ast-grep does not support.",
+      "Search code by syntax pattern with ast-grep. Use it instead of text search when the target is structural (function signatures, class shapes, import forms, call patterns); use rg for plain text, comments, or string contents. Paths must lie inside the project root or one of its git worktrees; any other path is rejected with an error, so search outside the repository with rg. Only files whose extension maps to lang are scanned (lang='cpp' skips .c files). Returns file:line:col and the matched line for each hit, 100 hits by default (max_results raises that to 500 or lowers it), with a [TRUNCATED] marker that says to narrow paths or globs or raise max_results when more exist; a zero-match result carries hints when the pattern uses regex syntax that ast-grep does not support.",
     inputSchema: {
       type: "object",
       properties: {
@@ -597,7 +597,7 @@ export const tools: Tool[] = [
   {
     name: "ast_find_rule",
     description:
-      "Search code using a YAML rule with advanced combinators (kind, has, inside, follows, precedes, all, any, not). Use when ast_search patterns are insufficient, such as for context-sensitive matches like \"function calls inside a class\" or \"imports followed by usage\". Returns file:line:col with matched code and rule ID.",
+      "Search code using a YAML rule with advanced combinators (kind, has, inside, follows, precedes, all, any, not). Use when ast_search patterns are insufficient, such as for context-sensitive matches like \"function calls inside a class\" or \"imports followed by usage\". Returns file:line:col with matched code and rule ID, 100 matches by default (max_results raises that to 500), with a [TRUNCATED] marker when more exist.",
     inputSchema: {
       type: "object",
       properties: {

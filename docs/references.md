@@ -12,7 +12,9 @@ hooks, its interface (band, pane, doctor, status line) and its state under `.omc
 
 A plan is an ordinary Claude Code plan file. OMCA resolves the plans directory the way Claude
 Code does: the `plansDirectory` setting relative to the project when set, otherwise
-`~/.claude/plans`, and an active plan-mode file over both.
+`~/.claude/plans`, and an active plan-mode file over both. `<project>/.omca/plans` is the
+second accepted home, for project-local plans, and `plansDirectory: ".omca/plans"` makes it
+the default.
 
 Your settings stay the authority. OMCA's hooks never auto-allow a command: they deny, ask or
 advise, and every allow comes from your permission rules. Managed settings sit above OMCA, and
@@ -97,7 +99,9 @@ trigger.
 | `setup omca`, `omca setup` | omca-setup |
 | `handoff`, `context is getting long`, `start fresh session` | a suggestion to run `/oh-my-claudeagent:handoff` |
 
-A slash command activates its mode whether or not the option is on.
+A slash command activates its mode whether or not the option is on. A prompt that is a slash
+command raises no keyword suggestion, so only the slash command's own mode banner appears. The
+client raises `UserPromptSubmit` before `UserPromptExpansion` for such a prompt.
 
 ## MCP tools
 
@@ -111,15 +115,15 @@ a gateway that is not a first-party host, every tool loads up front.
 | Tool | Purpose |
 | --- | --- |
 | `evidence_log` | Record a build, test, lint, manual or `final_verification` result with its real exit code |
-| `evidence_read` | Read the logged entries. Refuses a ledger it cannot parse |
+| `evidence_read` | Read the newest 20 logged entries, oldest first (`limit` sets another count, 0 reads all), under a `[showing N of M entries: pass limit=0 for all]` header when it cuts. Refuses a ledger it cannot parse |
 | `boulder_write` | Register a plan and bind this session to it |
 | `boulder_progress` | Completed and remaining tasks of the bound plan, and the next one |
 | `notepad_write` | Append to a plan notepad section: `learnings`, `issues`, `decisions` or `problems` |
-| `notepad_read`, `notepad_list` | Read a section, or list plans and sections |
+| `notepad_read`, `notepad_list` | Read a section, or list plans and sections. A read past 40,000 characters returns the newest content under a `[TRUNCATED: older entries omitted: read one section or run notepad_compact]` header |
 | `notepad_compact` | Rewrite one section shorter |
-| `ast_search`, `ast_find_rule`, `ast_test_rule`, `ast_dump_tree` | Structural code search with ast-grep |
+| `ast_search`, `ast_find_rule`, `ast_test_rule`, `ast_dump_tree` | Structural code search with ast-grep. `ast_search` and `ast_find_rule` return 100 matches by default (`max_results` up to 500) |
 | `ast_replace` | Structural rewrite, with a dry run |
-| `file_read` | Read a file outside the working directories, with paging. Refuses credential files and network paths |
+| `file_read` | Read a file outside the working directories, with paging. Without a limit it returns up to 1,000 lines and stops at the last whole line under 40,000 characters, and the footer names the offset to continue from. Refuses credential files and network paths |
 | `session_search` | Search this project's earlier Claude Code transcripts |
 | `agents_list`, `categories_list` | The agent roster and the category table |
 | `agents_migrate` | Move agent memories and agent ids to the current names. A dry run by default; `apply` writes, and `merge_indexes` merges `MEMORY.md` files that collide |
@@ -141,8 +145,8 @@ server's `omca_hook` tool, which dispatches through `servers/hooks/registry.ts`.
 | `session.start` | Registers `/omca`, writes the session's mod marker, draws the band's first state, and writes a transcript line when the `omca` server is not connected, naming a missing bun or the server's error |
 | `turn.start`, `turn.complete` | The turn footer (time, tokens, cost, an unlogged verification), the band and its buttons, the pane's refresh |
 | `agent.spawn`, `turn.step` | The Agents tab and delegation records |
-| `tool.call` | A subagent's tool calls, kept for its page on the Agents tab; a main-loop call passes through untouched |
-| `session.compact` | Asks the summarizer to keep the bound plan and its next ten open tasks |
+| `tool.call` | A subagent's tool calls, kept for its page on the Agents tab; only a subagent's call reaches the mod, and a main-loop call skips it |
+| `session.compact` | Asks the summarizer to keep the bound plan and its next ten open tasks. It does not run for a user-installed plugin where an organization manages Claude Code; the server's `SessionStart` `compact` handler re-injects the plan context there |
 | `ui.render`, `ui.focus`, `ui.scroll`, `ui.close`, `prompt.edit`, `command.run` | The band, the pane and the commands |
 
 `tool.check` runs before every Bash and PowerShell call in every permission mode and never
@@ -208,7 +212,7 @@ session. `all` or `*` turns off every one. Set it in the environment Claude Code
 | Variable | Effect |
 | --- | --- |
 | `OMCA_COMMENT_GATE` | `advise` (default) lets a write through with a note; `deny` blocks it; `off` skips the check |
-| `OMCA_GLYPHS` | The glyph set of the pane, band, footer, dialog and status line: `nerd` (default, Nerd Font icons), `unicode` (no Nerd Font needed) or `ascii` (plain text) |
+| `OMCA_GLYPHS` | The glyph set of the pane, band, footer, dialog and status line: `nerd` (default, Nerd Font icons; the status line's cache icon and rings need Nerd Fonts v3), `unicode` (no Nerd Font needed) or `ascii` (plain text) |
 | `CLAUDE_CODE_EFFORT_LEVEL` | Read by the doctor. A level other than `auto` runs every agent at it, whatever the agent declares, and the doctor warns |
 | `CLAUDE_AFK_TIMEOUT_MS` | Read by the doctor. A whole number of milliseconds after which an unanswered question continues on its own, so a plan interview can settle on its defaults; it outranks `askUserQuestionTimeout`. Claude Code ignores it in project and local settings, and so does the doctor |
 | `OMCA_NATIVE_AGENTS_MD` | `1` stops the context injector from adding `AGENTS.md` where Claude Code already loads it natively and no project `CLAUDE.md` is on the path |
@@ -256,6 +260,8 @@ The plugin applies none of these.
 | `availableModels` | An allowlist must include `sonnet`, `opus` and `fable`, or the agents on a missing tier cannot run |
 | `permissions.deny` with `Agent(model:fable)` | Gates per-call escalations to the `fable` tier. It cannot cap an agent's declared tier, because those calls carry no `model` |
 | `subagentPromptCacheTtl` | `"1h"` keeps a long parallel run's cache warm, at a higher write price |
+| `idleCompaction` | On by default in a terminal session. About 54 minutes after the last request, a conversation over the threshold compacts before its one-hour cache expires. `false` turns it off, as does `DISABLE_AUTO_COMPACT` |
+| `CLAUDE_CODE_IDLE_COMPACT_MIN_TOKENS` | Context size at which idle compaction applies. Default 200000, lowest 100000. Both idle compaction settings need Claude Code 2.1.290 or later |
 | `CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY` | Default 10. A wider parallel group runs in series |
 
 Do not add `Write(<path>)`, `NotebookEdit(<path>)` or `Glob(<path>)` rules: they never match.
@@ -285,6 +291,7 @@ OMCA keeps its state in the project's `.omca/` directory, which it gitignores ex
 | `.omca/logs/file-access.jsonl` | `file_read` | One line per call |
 | `.omca/state/hook-trace.jsonl` | the server, with `OMCA_HOOK_TRACE=1` | One line per hook call |
 | `.omca/rules/*.md` | you | Project rules, injected by file name pattern |
+| `.omca/plans/*.md` | the planner | Project-local plans, gitignored with the rest of `.omca/`. The Plan tab picker lists them, the plans directory and every registered plan. The plan-write check covers any file in a directory named `plans` |
 | `~/.claude/omca/statusline.ts` | `omca-setup` | The status line launcher |
 
 Write the registry, ledger and notepads only through the tools; no hook stops a direct edit, and
@@ -311,7 +318,7 @@ the guard leaves its decisions in place. A Desktop session in WSL loads no plugi
 ## Platform support
 
 CI runs the validator, the lint, the type checks, the bun specs, the mod tests, a smoke session
-and the OpenCode adapter specs on Linux, macOS and Windows against Claude Code 2.1.296. The
+and the OpenCode adapter specs on Linux, macOS and Windows against Claude Code 2.1.299. The
 guard reads Bash and PowerShell commands, including `cmd /c` and `Invoke-Expression`, and
 resolves home and project paths per platform. The README screenshots are captured with tmux,
 kitty and Xvfb, so capturing them needs Linux or WSL.

@@ -94,15 +94,12 @@ type Item = {
 
 const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
 
-/** A wheel tick moves the first lane in view; false while every lane shows or the agent page is open. */
+/**
+ * A scroll key: an arrow steps the ring a lane, a page key a window of lanes, Home and End to the
+ * ends, and the window follows; false while every lane shows or the agent page is open.
+ */
 export function scroll(host: Host, e: Input<"ui.scroll">): boolean {
   if (laid === undefined) return false;
-  if (e.pointer !== undefined) {
-    first = clamp(first + e.by, 0, laid.max);
-    host.ui.invalidate();
-    return true;
-  }
-  // A key: an arrow steps the ring a lane, a page key a window of lanes, Home and End to the ends, and the window follows.
   const { ids, max, stop, windowEnd } = laid;
   const at = cursor === undefined ? -1 : ids.indexOf(cursor);
   const from = at >= first && at < stop ? at : e.by > 0 ? first - 1 : stop;
@@ -432,6 +429,7 @@ export const view: TabView = async (host, view) => {
   }
   show(minis);
   const below = stop < items.length ? [cue(`${g.down} ${items.length - stop} more`)] : [];
+  if (!isRemoteDrawing && isCut) view.layout.lists.push({ left: 0, top: 0, width: view.width, height: at + below.length, move: (by) => (first = clamp(first + by, 0, max)) });
   const end = at + below.length + 1;
   return [
     ...above,

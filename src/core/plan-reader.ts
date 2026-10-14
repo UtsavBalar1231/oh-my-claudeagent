@@ -1,5 +1,5 @@
 import { clean, FENCE, TASK_LINE } from "./checkboxes.ts";
-import { configDir, type Env, expandTilde, homeDir, isAbsolutePath, isInside, joinPath, normalizePath, type Platform, toPosix } from "./path.ts";
+import { baseName, configDir, type Env, expandTilde, homeDir, isAbsolutePath, isInside, joinPath, normalizePath, type Platform, samePath, toPosix } from "./path.ts";
 
 export type Task = { n: number; done: boolean };
 export type Page = { title: string; level: number; body: string; task?: Task };
@@ -231,13 +231,36 @@ export function plansDirectory(platform: Platform, setting: unknown, root: strin
   return isInside(platform, root, resolved) ? resolved : fallback;
 }
 
-export function planTarget(platform: Platform, argument: string, home: string, root: string, dir: string): string {
+/** The directories a plan can live in: the client's plans directory, then the one OMCA's planner writes. */
+export function planHomes(platform: Platform, setting: unknown, root: string, env: Env): string[] {
+  const own = plansDirectory(platform, setting, root, env);
+  const homes = [...(own === undefined ? [] : [own]), joinPath(platform, root, ".omca", "plans")];
+  return homes.filter((home, index) => homes.findIndex((other) => samePath(platform, other, home)) === index);
+}
+
+/** Where `/omca plan <argument>` may find its file: one path for a path form, one per home for a bare name. */
+export function planCandidates(platform: Platform, argument: string, home: string, root: string, homes: readonly string[]): string[] {
   const wanted = argument.trim();
   const expanded = expandTilde(platform, wanted, home);
-  if (expanded !== wanted) return expanded ?? wanted;
-  if (isAbsolutePath(platform, wanted)) return wanted;
-  if (toPosix(platform, wanted).includes("/")) return joinPath(platform, root, wanted);
-  return joinPath(platform, dir, wanted.endsWith(".md") ? wanted : `${wanted}.md`);
+  if (expanded !== wanted) return [expanded ?? wanted];
+  if (isAbsolutePath(platform, wanted)) return [wanted];
+  if (toPosix(platform, wanted).includes("/")) return [joinPath(platform, root, wanted)];
+  const file = wanted.endsWith(".md") ? wanted : `${wanted}.md`;
+  return homes.map((dir) => joinPath(platform, dir, file));
+}
+
+export const planFileAt = (platform: Platform, path: string, mtimeMs: number): PlanFile => ({
+  name: baseName(platform, path).replace(/\.md$/, ""),
+  path,
+  mtimeMs,
+});
+
+/** The listings merged: one entry per file, newest first, capped. */
+export function newestPlans(platform: Platform, files: readonly PlanFile[], limit = RECENT_PLANS): PlanFile[] {
+  return files
+    .filter((file, index) => files.findIndex((other) => samePath(platform, other.path, file.path)) === index)
+    .sort((a, b) => b.mtimeMs - a.mtimeMs)
+    .slice(0, limit);
 }
 
 export function recentPlans(

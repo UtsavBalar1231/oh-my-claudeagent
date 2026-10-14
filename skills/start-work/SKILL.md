@@ -58,14 +58,17 @@ Plan selection in this step is what binds this session.
      returns the only registered plan or the most recently started one, which may be
      another session's. **Exclude it when its checkboxes are all checked**: completion
      is derived from the plan file's `- [x]` boxes, not a stored flag.
-   - Plan files in `<plans-dir>/*.md`, labeled `[available]`.
+   - Plan files in `<plans-dir>/*.md` and `<project root>/.omca/plans/*.md`, labeled
+     `[available]`.
 
    `<plans-dir>` is the platform's plans directory: the `plansDirectory` setting when
    it is set (a path relative to the project root), otherwise `~/.claude/plans`. Read
    it from settings before globbing; with `plansDirectory` configured, the default
    path holds nothing and a `~/.claude/plans` glob finds no platform-created plan.
 
-3. Merge results, deduplicate by absolute path.
+3. Merge results, deduplicate by absolute path. When the plan being registered sits outside
+   both homes, tell the user its path and that the Plan tab lists the two homes and
+   registered plans.
 
 ### Decision logic
 
@@ -322,7 +325,11 @@ acknowledgement immediately, and each deliverable arrives later in the `<result>
 of its own `<task-notification>`. Read the deliverable from there. Never Read a
 subagent's `.output`/JSONL transcript (overflows context). When a deliverable comes back
 partial or as a bare stub, continue that agent once with `SendMessage` and ask for what
-is missing; it resumes with its own context instead of re-exploring.
+is missing; it resumes with its own context instead of re-exploring. A notice that the agent
+is waiting on its own background work carries no deliverable yet, so wait for its next
+notification. One that says a usage limit stopped it means relaunch the task after the
+limit resets, or report it. One that says a message reached it too late for its result
+means the result stands; resend the message with `SendMessage` only if it still matters.
 
 Review each deliverable as it lands: reading one executor's diff does not overlap the
 tasks still running. Hold group-wide steps (the project-level build and test run, the

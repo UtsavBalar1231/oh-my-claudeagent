@@ -108,8 +108,10 @@ and `start-work` with plan tracking, the stop gates and the status line.
 Run `/oh-my-claudeagent:plan <what you want done>`. The planner agent interviews you for what
 the plan needs, consults analyzer for gaps, writes the plan, and has reviewer review it. The plan
 lands in your plans directory: the `plansDirectory` setting when you set one, relative to the
-project, and `~/.claude/plans` otherwise. Each task is a numbered checkbox, `- [ ] 1. ...`;
-progress tracking counts only numbered boxes.
+project, and `~/.claude/plans` otherwise. Ask for a project-local plan and it lands in
+`.omca/plans` under the project instead. To make that the default, set
+`plansDirectory: ".omca/plans"`. `.omca/` is gitignored, so those plans stay out of commits.
+Each task is a numbered checkbox, `- [ ] 1. ...`; progress tracking counts only numbered boxes.
 
 To research before planning, ask `/oh-my-claudeagent:plan` to help you understand or research
 the problem. Planner interviews you and returns its findings with no plan file.
@@ -152,6 +154,12 @@ older models, up to Opus 4.7 and Sonnet 4.6; on other models set
 When the context is long, run `/oh-my-claudeagent:handoff`. It gathers git state, the plan and
 the notepad into a block you paste as the first message of a new session. Only you can start it;
 the model cannot.
+
+### After compaction
+
+Skills can go missing from the model's list after the conversation compacts. Run `/reload-skills`
+to send the full skill list again. A terminal session also compacts a long conversation on its
+own after about 54 minutes idle (`idleCompaction`; see `docs/references.md` for the settings).
 
 ### Ask a specialist directly
 
@@ -263,7 +271,9 @@ URL like `postgres://user:pass@host`, are drawn as `‹masked›`, and your home
 
 ### The plan board
 
-`/omca plan` opens the bound plan; `/omca plan <name or path>` opens another. A plan with
+`/omca plan` opens the bound plan; `/omca plan <name or path>` opens another. The picker lists
+the plans directory, `.omca/plans` under the project and every registered plan whose file
+exists, and a name resolves against both directories and the registry. A plan with
 numbered tasks opens on its board: a header with a DRAFT chip while the plan is a draft, a
 progress bar, the proof counts, the next task and the running agents, then the tasks grouped by
 milestone. Each task row shows whether it is done, in progress, open or blocked, its proof chip,
@@ -306,9 +316,11 @@ returns to the list. The board reloads the file when it changes on disk and keep
 A task's proof chip compares the files its `File:` line lists with the evidence log. The newest
 test, build or lint run since any of those files last changed decides it: **PROVEN** when it
 passed, **FAILED** when it failed, **UNPROVEN** when no such run has happened yet. A task that
-lists no file, or whose files do not exist, gets no chip. PROVEN and UNPROVEN describe finished
-work, so a task still open shows a chip only when it is FAILED, and the proof counts on the board
-and the band count the chips.
+lists no file, or whose files do not exist, gets no chip. For a registered plan, only changes
+made since the plan started count, so a task whose files have not changed since then gets no
+chip from an earlier or unrelated run. PROVEN and UNPROVEN describe finished work, so a task
+still open shows a chip only when it is FAILED, and the proof counts on the board and the band
+count the chips.
 
 ### The proof ledger
 
@@ -384,7 +396,10 @@ refused, and a force push to another branch or any other recursive removal runs.
 OMCA's hooks never auto-allow a command: they refuse, ask or advise, and an allow comes only
 from the permission rules in your settings. To stop the prompts for package scripts you trust,
 add allow rules such as `Bash(bun run *)` to your settings, or run `/fewer-permission-prompts`,
-which proposes rules from your past sessions.
+which proposes rules from your past sessions. An allow rule for an MCP server reaches only the
+server it names, so allow all of OMCA's tools with `mcp__plugin_oh-my-claudeagent_omca__*`, the
+server's whole normalized name followed by `__*`. A shorter prefix such as
+`mcp__plugin_oh-my-claudeagent` matches nothing.
 
 ## The doctor
 
@@ -436,8 +451,9 @@ against that limit.
 The subagent status line gives each running agent a row with its model, state, effort and
 context use.
 
-The status line and the `/omca` pane draw Nerd Font icons. Set `OMCA_GLYPHS=unicode` when the
-terminal font has none, or `OMCA_GLYPHS=ascii` for plain text; `/oh-my-claudeagent:omca-setup`
+The status line and the `/omca` pane draw Nerd Font icons, and the status line's cache icon and
+usage rings need Nerd Fonts v3. Set `OMCA_GLYPHS=unicode` when the terminal font has none or is an
+older Nerd Font, or `OMCA_GLYPHS=ascii` for plain text; `/oh-my-claudeagent:omca-setup`
 asks and writes it for you. [`statusline/README.md`](../statusline/README.md) has the layout rules.
 
 ## Project rules
@@ -544,8 +560,9 @@ edits to the `.claude` folder for this session.
 **Setup changed nothing and asked nothing.** Under the `dontAsk` permission mode, every write
 that would prompt is denied instead. Run setup in a mode that can prompt.
 
-**A hook change does not take effect.** Close the `/plugin` menu or start a new session; for a
-`--plugin-dir` checkout, run `/reload-plugins`.
+**A hook change does not take effect.** Close the `/plugin` menu or start a new session. In a
+`--plugin-dir` session a saved mod file under `hooks/` reloads the mod by itself, while a change to
+`hooks/hooks.json` or the server needs `/reload-plugins`.
 
 **The status line is hard to read with a screen reader.** `OMCA_GLYPHS=ascii` replaces the
 glyphs, bars and separators with plain text. The status line still writes color escapes.

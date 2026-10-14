@@ -10,6 +10,7 @@ import { argReader, isoTimestamp, rootOf, stringArg, WORKING_DIRECTORY } from ".
 export const SNIPPET_MAX_CHARS = 2000;
 export const COMMAND_MAX_CHARS = 2000;
 export const VERIFIED_BY_MAX_CHARS = 200;
+const DEFAULT_READ_ENTRIES = 20;
 const SHA256_HEX = /^[0-9a-f]{64}$/;
 // A full read is many 2,000-character snippets; 100,000 holds about 50, well under the client's 500,000 ceiling.
 const EVIDENCE_MAX_RESULT_CHARS = 100_000;
@@ -89,7 +90,9 @@ async function evidenceLog(args: Record<string, unknown>): Promise<string> {
 function evidenceRead(args: Record<string, unknown>): string {
   const { entries } = readLedgerFile(ledgerPath(rootOf(stringArg(args, "working_directory", "", "evidence_read"))));
   if (entries.length === 0) return "No verification evidence recorded.";
-  return JSON.stringify({ entries }, null, 2);
+  const limit = argReader(args, "evidence_read").integer("limit", DEFAULT_READ_ENTRIES);
+  if (limit <= 0 || entries.length <= limit) return JSON.stringify({ entries }, null, 2);
+  return `[showing ${limit} of ${entries.length} entries: pass limit=0 for all]\n${JSON.stringify({ entries: entries.slice(-limit) }, null, 2)}`;
 }
 
 const archiveMonth = (now: Date): string => `${now.getUTCFullYear()}${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
@@ -160,8 +163,18 @@ export const tools: Tool[] = [
   {
     name: "evidence_read",
     description:
-      "Return every entry in the project's verification evidence log as JSON, oldest first, or a no-evidence message. The log is never cleared and is shared by all sessions in the project, so it holds entries from earlier sessions and other plans; there is no filter or paging, and each output_snippet is capped at 2,000 characters. Use it to confirm what was logged, for example evidence a subagent reports.",
-    inputSchema: { type: "object", properties: { working_directory: WORKING_DIRECTORY } },
+      "Return the newest entries of the project's verification evidence log as JSON, oldest first, or a no-evidence message. It returns 20 entries by default and pass limit=0 for all; when entries are cut the output starts with a line giving the count shown and the total. The log is never cleared and is shared by all sessions in the project, so it holds entries from earlier sessions and other plans; there is no filter, and each output_snippet is capped at 2,000 characters. Use it to confirm what was logged, for example evidence a subagent reports.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        limit: {
+          type: "integer",
+          default: DEFAULT_READ_ENTRIES,
+          description: "Newest entries to return, oldest first. Default 20. Set to 0 for every entry.",
+        },
+        working_directory: WORKING_DIRECTORY,
+      },
+    },
     annotations: { title: "Read verification evidence", readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     _meta: {
       "anthropic/searchHint": "review all logged verification evidence before claiming a task complete",
