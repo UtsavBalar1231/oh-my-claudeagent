@@ -99,7 +99,9 @@ trigger.
 | `setup omca`, `omca setup` | omca-setup |
 | `handoff`, `context is getting long`, `start fresh session` | a suggestion to run `/oh-my-claudeagent:handoff` |
 
-A slash command activates its mode whether or not the option is on.
+A slash command activates its mode whether or not the option is on. A prompt that is a slash
+command raises no keyword suggestion, so only the slash command's own mode banner appears. The
+client raises `UserPromptSubmit` before `UserPromptExpansion` for such a prompt.
 
 ## MCP tools
 

@@ -6,6 +6,7 @@ import { guidanceTemplate } from "./guidance.ts";
 import { handle } from "./keyword-detector.ts";
 import { dispatch, type Output, type Payload } from "./registry.ts";
 import { touchSession } from "./session-state.ts";
+import { handle as slashHandle } from "./slash-mode-detector.ts";
 
 const NOW = 1_786_000_000_000;
 
@@ -238,6 +239,35 @@ describe("text that is not a request for a mode", () => {
     expect(
       await submit(root, sessionId, '<pasted_content id="a1b2">\nsome log line\n</pasted_content id="a1b2">\nfix build please'),
     ).toEqual(announced(BANNERS.buildFixer));
+  });
+});
+
+describe("a prompt that is a slash command", () => {
+  test("a plugin slash command raises no keyword banner while the slash detector still banners", async () => {
+    const { root, sessionId } = enabled();
+    await silent(root, sessionId, "/oh-my-claudeagent:handoff");
+    const session = touchSession(sessionId);
+    const expansion: Payload = { event: "UserPromptExpansion", session_id: sessionId, command_name: "oh-my-claudeagent:handoff" };
+    expect(await slashHandle(expansion, { root, now: NOW, session })).toEqual({
+      hookSpecificOutput: { hookEventName: "UserPromptExpansion", additionalContext: expect.stringContaining("HANDOFF") },
+    });
+  });
+
+  test("a slash command with arguments raises none", async () => {
+    const { root, sessionId } = enabled();
+    await silent(root, sessionId, "/oh-my-claudeagent:plan fix build");
+  });
+
+  test("a plain request and a leading path with several segments still banner", async () => {
+    const { root, sessionId } = enabled();
+    expect(await submit(root, sessionId, "fix build")).toEqual(announced(BANNERS.buildFixer));
+    const other = enabled();
+    expect(await submit(other.root, other.sessionId, "/home/me/app fix build")).toEqual(announced(BANNERS.buildFixer));
+  });
+
+  test("a leading single-segment path reads as a command", async () => {
+    const { root, sessionId } = enabled();
+    await silent(root, sessionId, "/tmp is full, fix build");
   });
 });
 

@@ -81,10 +81,10 @@ describe("first-prompt guidance", () => {
     expect(run(prompt("UserPromptSubmit", first))).toBeUndefined();
   });
 
-  test("a typed slash command gets the template on UserPromptExpansion and nothing again on its UserPromptSubmit", () => {
+  test("a typed slash command gets the template on UserPromptSubmit and nothing again on its UserPromptExpansion", () => {
     const id = crypto.randomUUID();
-    expect(run(prompt("UserPromptExpansion", id))).toEqual(injected("UserPromptExpansion", id));
-    expect(run(prompt("UserPromptSubmit", id))).toBeUndefined();
+    expect(run(prompt("UserPromptSubmit", id))).toEqual(injected("UserPromptSubmit", id));
+    expect(run(prompt("UserPromptExpansion", id))).toBeUndefined();
   });
 
   test("a fresh session id with no status file gets the template", () => {
@@ -184,16 +184,20 @@ describe("session title", () => {
     expect(run(prompt("UserPromptSubmit", id), root)).toBeUndefined();
   });
 
-  test("the title waits for UserPromptSubmit after a slash command's UserPromptExpansion", () => {
+  test("a slash command's UserPromptSubmit carries the title and its UserPromptExpansion adds nothing", () => {
     const root = project();
     const id = crypto.randomUUID();
     const plan = join(root, "hello-plan.md");
     writeFileSync(plan, "- [ ] 1. Say hello\n");
     bind(root, id, plan);
-    expect(run(prompt("UserPromptExpansion", id), root)).toEqual(injected("UserPromptExpansion", id, planLines(plan, "Say hello")));
     expect(run(prompt("UserPromptSubmit", id), root)).toEqual({
-      hookSpecificOutput: { hookEventName: "UserPromptSubmit", sessionTitle: "OMCA: hello-plan" },
+      hookSpecificOutput: {
+        hookEventName: "UserPromptSubmit",
+        additionalContext: `${TEMPLATE}\nSession ${id}${planLines(plan, "Say hello")}`,
+        sessionTitle: "OMCA: hello-plan",
+      },
     });
+    expect(run(prompt("UserPromptExpansion", id), root)).toBeUndefined();
   });
 
   test("a title the user set is kept", () => {
