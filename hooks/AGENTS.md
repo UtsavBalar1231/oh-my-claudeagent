@@ -69,7 +69,8 @@ animate the Svg by themselves.
 - `SessionStart` for `clear` or `compact` routes to the server's `session-start` handler,
   which re-injects that context after a compaction and hands it back to the next prompt
   after `/clear`. The mod's `session.compact` feature (`compact.ts`) tells the summarizer to
-  keep the bound plan and its open tasks.
+  keep the bound plan and its open tasks. It does not run for a user-installed plugin where an
+  organization manages Claude Code, so the server handler's re-injection is the only cover there.
 - `SubagentStart` routes to the server's `subagent-context` handler, and `PermissionDenied`
   to its `permission-coach` handler, which answers an auto-mode classifier denial of a Bash
   call with `retry: true`.
