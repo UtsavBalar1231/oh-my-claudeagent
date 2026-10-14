@@ -563,10 +563,21 @@ describe("ast_search", () => {
     );
   });
 
-  test("ast_search caps the result at 500 matches and says so", async () => {
+  test("ast_search returns 100 matches by default, under 40,000 characters, and says how to get more", async () => {
     project();
     fakeBinary([{ stdout: matchesJson(501) }]);
     const result = await call("ast_search", { pattern: "$X", lang: "python" });
+    expect(result).toStartWith(
+      "[TRUNCATED] Showing first 100 of 500 matches. Narrow paths or globs, or raise max_results (up to 500).\n\nFound 100 match(es):\n\nf0.py:1:1\n  old_func(x)\n\nf1.py:1:1\n",
+    );
+    expect(result.match(/^f\d+\.py:1:1$/gm)).toHaveLength(100);
+    expect(result.length).toBeLessThanOrEqual(40_000);
+  });
+
+  test("ast_search max_results raises the default up to 500 and marks the cap", async () => {
+    project();
+    fakeBinary([{ stdout: matchesJson(501) }]);
+    const result = await call("ast_search", { pattern: "$X", lang: "python", max_results: 500 });
     expect(result).toStartWith(`${CAPPED}Found 500 match(es):\n\nf0.py:1:1\n  old_func(x)\n\nf1.py:1:1\n`);
     expect(result.match(/^f\d+\.py:1:1$/gm)).toHaveLength(500);
   });
@@ -575,7 +586,7 @@ describe("ast_search", () => {
     project();
     fakeBinary([{ stdout: matchesJson(2) }]);
     expect(await call("ast_search", { pattern: "$X", lang: "python", max_results: 1 })).toBe(
-      "[TRUNCATED] Showing first 1 of 2 matches\n\nFound 1 match(es):\n\nf0.py:1:1\n  old_func(x)\n",
+      "[TRUNCATED] Showing first 1 of 2 matches. Narrow paths or globs, or raise max_results (up to 500).\n\nFound 1 match(es):\n\nf0.py:1:1\n  old_func(x)\n",
     );
   });
 
@@ -690,6 +701,15 @@ describe("ast_find_rule", () => {
     expect(await call("ast_find_rule", { rule_yaml: rule("no-print", "error", "print($$$A)") })).toBe(
       "Found 1 match(es):\n\nmain.py:1:1 [no-print] (error)\n  print('hello')\n",
     );
+  });
+
+  test("ast_find_rule returns 100 matches by default and says how to get more", async () => {
+    project();
+    fakeBinary([{ stdout: matchesJson(150) }, { stdout: matchesJson(150) }]);
+    const result = await call("ast_find_rule", { rule_yaml: rule("r", "info", "print($$$A)") });
+    expect(result).toStartWith("[TRUNCATED] Showing first 100 of 150 matches. Narrow paths or globs, or raise max_results (up to 500).");
+    expect(result.match(/^f\d+\.py:1:1/gm)).toHaveLength(100);
+    expect(await call("ast_find_rule", { rule_yaml: rule("r", "info", "print($$$A)"), max_results: 150 })).not.toContain("[TRUNCATED]");
   });
 
   test("ast_find_rule inserts path separator", async () => {

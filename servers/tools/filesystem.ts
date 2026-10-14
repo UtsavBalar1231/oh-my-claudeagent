@@ -7,13 +7,14 @@ import { isMissing, projectRoot } from "../io.ts";
 import type { Tool } from "../omca.ts";
 import { type Args, integerArg, isoTimestamp, stringArg } from "./args.ts";
 
-const DEFAULT_LIMIT = 5000;
+const DEFAULT_LIMIT = 1000;
+const DEFAULT_BUDGET_CHARS = 40_000;
 const MAX_UNLIMITED_BYTES = 3 * 1024 * 1024;
 const BINARY_SNIFF_BYTES = 8192;
 // A minified bundle is one line; without a cap a single line can outweigh the whole read.
 const MAX_LINE_CHARS = 2000;
-// The default window at the line cap can reach 10M characters in theory. 200,000 covers a normal
-// source file whole, so ordinary reads are not spilled to disk, and stays under the client's ceiling.
+// An explicit limit can reach 10M characters in theory. 200,000 covers a normal source file whole,
+// so ordinary reads are not spilled to disk, and stays under the client's ceiling.
 const MAX_RESULT_CHARS = 200_000;
 const AUDIT_LOG = join(".omca", "logs", "file-access.jsonl");
 const PLATFORM = toPlatform(process.platform);
@@ -161,22 +162,30 @@ async function readChecked(path: string, encoding: string, offset: number, limit
 async function fileRead(args: Args): Promise<string> {
   const path = stringArg(args, "path");
   const offset = Math.max(0, integerArg(args, "offset", 0));
-  const limit = integerArg(args, "limit", DEFAULT_LIMIT);
+  const budgeted = args.limit === undefined || args.limit === null;
+  const requested = integerArg(args, "limit", DEFAULT_LIMIT);
   const encoding = stringArg(args, "encoding", "utf-8");
 
   let read: Awaited<ReturnType<typeof readChecked>>;
   try {
-    read = await readChecked(path, encoding, offset, limit);
+    read = await readChecked(path, encoding, offset, requested);
   } catch (error) {
     audit(path, false);
     throw error;
   }
   audit(path, typeof read !== "string");
   if (typeof read === "string") return read;
-  const { size, window, total, usedEncoding } = read;
+  const { size, total, usedEncoding } = read;
+  let { window } = read;
   if (total === 0) return "(empty file)";
   if (offset >= total) return `(offset ${offset} exceeds file length of ${total} lines)`;
 
+  if (budgeted) {
+    let used = 0;
+    const fits = window.findIndex((line, index) => (used += line.length + 8) > DEFAULT_BUDGET_CHARS && index > 0);
+    if (fits > 0) window = window.slice(0, fits);
+  }
+  const limit = budgeted ? window.length : requested;
   const footer = [`~${Math.floor(size / 4)} tokens (${humanSize(size)})`, `${total} lines total`];
   if (usedEncoding !== encoding) footer.push(`encoding fallback: ${usedEncoding}`);
   if (limit > 0 && offset + limit < total) {
@@ -191,7 +200,7 @@ export const tools: Tool[] = [
   {
     name: "file_read",
     description:
-      "Read a text file with line numbers, a size footer, and offset/limit paging. Use it for a path the built-in Read tool cannot reach, typically one outside the working directories while permissions.blockReadsOutsideWorkingDirectories is on; that setting fences Read, Grep, Glob, and LSP but not MCP tools. Default limit is 5000 lines; lines over 2000 characters are cut with a truncation marker. The footer's token figure estimates the whole file (bytes / 4), not the returned window, and names the next offset when lines remain. Refuses with a plain-text message, not an error: directories, devices, binary files (a null byte in the first 8 KB), unlimited reads (limit=0) of files over 3 MB, paths matching a sensitive-file denylist (.ssh, .gnupg, .aws, .env files, credentials*, *secret*, SSH private keys, /etc/shadow), and network paths (UNC, or /net/ on macOS). Each call is logged to .omca/logs/file-access.jsonl.",
+      "Read a text file with line numbers, a size footer, and offset/limit paging. Use it for a path the built-in Read tool cannot reach, typically one outside the working directories while permissions.blockReadsOutsideWorkingDirectories is on; that setting fences Read, Grep, Glob, and LSP but not MCP tools. Without a limit it returns up to 1000 lines and stops at the last whole line under 40,000 characters, and the footer names the offset to continue from; lines over 2000 characters are cut with a truncation marker. The footer's token figure estimates the whole file (bytes / 4), not the returned window, and names the next offset when lines remain. Refuses with a plain-text message, not an error: directories, devices, binary files (a null byte in the first 8 KB), unlimited reads (limit=0) of files over 3 MB, paths matching a sensitive-file denylist (.ssh, .gnupg, .aws, .env files, credentials*, *secret*, SSH private keys, /etc/shadow), and network paths (UNC, or /net/ on macOS). Each call is logged to .omca/logs/file-access.jsonl.",
     inputSchema: {
       type: "object",
       properties: {
@@ -206,7 +215,7 @@ export const tools: Tool[] = [
           type: "integer",
           default: DEFAULT_LIMIT,
           description:
-            "Max lines to return. Default 5000. Set to 0 for unlimited (blocked for >3MB files). Use smaller values for targeted reads to save tokens.",
+            "Max lines to return. Default 1000 lines or 40,000 characters, whichever comes first. Set to 0 for unlimited (blocked for >3MB files). Use smaller values for targeted reads to save tokens.",
         },
         encoding: {
           type: "string",

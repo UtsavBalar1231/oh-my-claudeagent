@@ -11,6 +11,8 @@ type Section = (typeof SECTIONS)[number];
 
 const WARN_BYTES = 50 * 1024;
 const KEEP_LINES = 20;
+const READ_BUDGET_CHARS = 40_000;
+const READ_TRUNCATED = "[TRUNCATED: older entries omitted: read one section or run notepad_compact]\n\n";
 const MASK = "<masked>";
 
 const SECTION = { type: "string", enum: SECTIONS };
@@ -93,7 +95,7 @@ export const tools: Tool[] = [
   {
     name: "notepad_read",
     description:
-      "Read notepad content for a plan. Use to review discoveries, open questions, or prior decisions before continuing work on a plan. Omit section to read all sections at once. Returns formatted markdown content or a not-found message.",
+      "Read notepad content for a plan. Use to review discoveries, open questions, or prior decisions before continuing work on a plan. Omit section to read all sections at once. Returns formatted markdown content or a not-found message. Past 40,000 characters it returns the newest content within that budget under a [TRUNCATED] header; read one section or run notepad_compact to bring older entries back into reach.",
     inputSchema: {
       type: "object",
       properties: {
@@ -119,7 +121,12 @@ export const tools: Tool[] = [
         const title = name.charAt(0).toUpperCase() + name.slice(1);
         return isFile(path) ? [`# ${title}\n\n${redact(readFileSync(path, "utf8"), "", MASK).text}`] : [];
       });
-      return blocks.length > 0 ? blocks.join("\n---\n\n") : `No notepad entries found for plan: ${plan}`;
+      if (blocks.length === 0) return `No notepad entries found for plan: ${plan}`;
+      const text = blocks.join("\n---\n\n");
+      if (text.length <= READ_BUDGET_CHARS) return text;
+      const newest = text.slice(-(READ_BUDGET_CHARS - READ_TRUNCATED.length));
+      const boundary = newest.indexOf("\n## ");
+      return READ_TRUNCATED + (boundary >= 0 ? newest.slice(boundary + 1) : newest);
     },
   },
   {

@@ -282,6 +282,24 @@ describe("evidence_read", () => {
     expect(await call("evidence_read", { working_directory: root })).toBe(JSON.stringify({ entries: entries(root) }, null, 2));
   });
 
+  test("evidence_read returns the newest 20 entries by default under a header, and limit 0 returns every entry", async () => {
+    const root = project();
+    const seeded = seedLedger(root, 30);
+    const cut = await call("evidence_read", { working_directory: root });
+    expect(cut).toStartWith("[showing 20 of 30 entries: pass limit=0 for all]\n");
+    expect(cut).toBe(`[showing 20 of 30 entries: pass limit=0 for all]\n${JSON.stringify({ entries: seeded.slice(10) }, null, 2)}`);
+    expect(await call("evidence_read", { working_directory: root, limit: 0 })).toBe(JSON.stringify({ entries: seeded }, null, 2));
+  });
+
+  test("evidence_read honors an explicit limit and adds no header when everything fits", async () => {
+    const root = project();
+    const seeded = seedLedger(root, 30);
+    expect(await call("evidence_read", { working_directory: root, limit: 2 })).toBe(
+      `[showing 2 of 30 entries: pass limit=0 for all]\n${JSON.stringify({ entries: seeded.slice(-2) }, null, 2)}`,
+    );
+    expect(await call("evidence_read", { working_directory: root, limit: 30 })).toBe(JSON.stringify({ entries: seeded }, null, 2));
+  });
+
   test("evidence_read handles missing file", async () => {
     expect(await call("evidence_read", { working_directory: project() })).toBe("No verification evidence recorded.");
   });

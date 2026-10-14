@@ -77,6 +77,29 @@ test("limit 0 returns every line of a small file", async () => {
   expect(result.endsWith("\n\n(~109 tokens (439 B), 50 lines total)")).toBe(true);
 });
 
+test("a default read of a long file stops at the last whole line under 40,000 characters and names the offset", async () => {
+  const path = write("long.txt", `${"w".repeat(92)}\n`.repeat(900));
+  const result = await read({ path });
+  const rows = result.split("\n\n(")[0]?.split("\n") ?? [];
+  expect(result.length).toBeLessThanOrEqual(40_000 + 200);
+  expect(rows.length).toBeLessThan(900);
+  expect(rows.every((line) => line.endsWith("w".repeat(92)))).toBe(true);
+  expect(result).toContain(`${900 - rows.length} more lines available (use offset=${rows.length} to continue)`);
+});
+
+test("a default read returns at most 1000 lines", async () => {
+  const path = write("many.txt", "a\n".repeat(1500));
+  const result = await read({ path });
+  expect(result).toContain("500 more lines available (use offset=1000 to continue)");
+});
+
+test("an explicit limit is honored past the default character budget", async () => {
+  const path = write("wide.txt", `${"w".repeat(92)}\n`.repeat(900));
+  const result = await read({ path, limit: 900 });
+  expect(result.length).toBeGreaterThan(40_000);
+  expect(result).not.toContain("more lines available");
+});
+
 test("a negative offset starts at the first line", async () => {
   const path = write("neg.txt", Array.from({ length: 6 }, (_, index) => `line${index}`).join("\n"));
   expect(await read({ path, offset: -2, limit: 3 })).toBe(

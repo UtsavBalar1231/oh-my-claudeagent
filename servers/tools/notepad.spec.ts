@@ -214,6 +214,20 @@ describe("notepad tools", () => {
       expect(readSection("mask-plan", "issues")).toContain(token);
     });
 
+    test("notepad_read past 40,000 characters returns the newest whole entries under a truncation header", async () => {
+      for (let i = 0; i < 50; i++) await write("big-plan", "learnings", `entry-${String(i).padStart(2, "0")} ${"x".repeat(1000)}`);
+      const result = (await call("notepad_read", { plan_name: "big-plan", section: "learnings" })) as string;
+      expect(result).toStartWith("[TRUNCATED: older entries omitted: read one section or run notepad_compact]\n\n## ");
+      expect(result.length).toBeLessThanOrEqual(40_000);
+      expect(result).toContain("entry-49");
+      expect(result).not.toContain("entry-00");
+    });
+
+    test("notepad_read under 40,000 characters returns everything unchanged", async () => {
+      await write("small-plan", "learnings", "y".repeat(30_000));
+      expect(await call("notepad_read", { plan_name: "small-plan", section: "learnings" })).toBe(`# Learnings\n\n${entry("y".repeat(30_000))}`);
+    });
+
     test("notepad_read rejects an unknown section", async () => {
       await expect(call("notepad_read", { plan_name: "p", section: "notes" })).rejects.toThrow('section must be one of learnings, issues, decisions, problems; got "notes"');
     });
