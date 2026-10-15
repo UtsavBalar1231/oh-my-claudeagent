@@ -1,4 +1,4 @@
-import { closeSync, cpSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs"
+import { closeSync, cpSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
@@ -80,16 +80,32 @@ export function packageFixture(dest: string): { directory: string; spec: string;
   git(directory, "init", "-q")
   git(directory, "add", "-A")
   commit(directory, "package")
-  git(directory, "update-server-info")
   const server = Bun.serve({
     hostname: "127.0.0.1",
     port: 0,
-    fetch(request) {
-      const path = new URL(request.url).pathname.slice(1)
-      if (path !== "HEAD" && path !== "info/refs" && !/^objects\/[a-f0-9/]+$/.test(path) && path !== "objects/info/packs") return new Response(null, { status: 404 })
-      const file = join(directory, ".git", path)
-      if (!statSync(file, { throwIfNoEntry: false })?.isFile()) return new Response(null, { status: 404 })
-      return new Response(Bun.file(file))
+    async fetch(request) {
+      const url = new URL(request.url)
+      if (!["/info/refs", "/git-upload-pack", "/HEAD"].includes(url.pathname)) return new Response(null, { status: 404 })
+      const body = new Uint8Array(await request.arrayBuffer())
+      const child = Bun.spawn(["git", "http-backend"], {
+        env: { ...process.env, GIT_PROJECT_ROOT: directory, GIT_HTTP_EXPORT_ALL: "1", PATH_INFO: `/.git${url.pathname}`, QUERY_STRING: url.search.slice(1), REQUEST_METHOD: request.method, CONTENT_TYPE: request.headers.get("content-type") ?? "", CONTENT_LENGTH: String(body.length) },
+        stdin: body, stdout: "pipe", stderr: "pipe",
+      })
+      const [code, output, error] = await Promise.all([child.exited, new Response(child.stdout).arrayBuffer(), new Response(child.stderr).text()])
+      if (code !== 0) return new Response(error, { status: 500 })
+      const bytes = Buffer.from(output)
+      const end = bytes.indexOf("\r\n\r\n")
+      if (end < 0) return new Response("Missing Git CGI headers", { status: 500 })
+      const headers = new Headers()
+      let status = 200
+      for (const line of bytes.subarray(0, end).toString().split("\r\n")) {
+        const colon = line.indexOf(":")
+        const name = line.slice(0, colon)
+        const value = line.slice(colon + 1).trim()
+        if (name.toLowerCase() === "status") status = Number.parseInt(value, 10)
+        else headers.set(name, value)
+      }
+      return new Response(bytes.subarray(end + 4), { status, headers })
     },
   })
   const { name } = JSON.parse(readFileSync(join(directory, "package.json"), "utf8")) as { name: string }
