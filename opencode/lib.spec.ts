@@ -279,3 +279,8 @@ test("package.json version matches plugin.json", () => {
   const plugin = JSON.parse(readFileSync(join(root, ".claude-plugin/plugin.json"), "utf8"));
   expect(pkg.version).toBe(plugin.version);
 });
+
+test("package installs resolve the exact SDK used for validation", () => {
+  const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+  expect(pkg.peerDependencies["@opencode/plugin"]).toBe(pkg.devDependencies["@opencode/plugin"]);
+});
