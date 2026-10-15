@@ -122,7 +122,7 @@ describe("boulder_write", () => {
     expect(registry(root).plans["my-plan"].session_ids).toEqual(["sess-001"]);
   });
 
-  test("boulder_write preserves started_at and drops a stored agent field", async () => {
+  test("boulder_write preserves started_at and stored extension metadata", async () => {
     const root = project();
     seedRegistry(root, json({ plans: { "my-plan": { active_plan: "/tmp/plan.md", started_at: LONG_AGO, session_ids: [], agent: "x" } }, bindings: {} }));
     await write(root, "my-plan", "sess-002");
@@ -130,6 +130,7 @@ describe("boulder_write", () => {
       active_plan: "/tmp/plan.md",
       started_at: LONG_AGO,
       session_ids: ["sess-002"],
+      agent: "x",
     });
   });
 
@@ -270,6 +271,17 @@ describe("session id resolution through the server", () => {
     );
     expect(registry(root).bindings).toEqual({});
   });
+
+  test("an unbound re-registration reports its session history even when write-path GC prunes the plan", async () => {
+    const root = project();
+    const callTool = startServer(root, {});
+    await callTool("boulder_progress", {});
+    const path = planFile(root, "done.md", COMPLETE);
+    seedRegistry(root, json({ plans: { done: { active_plan: path, started_at: LONG_AGO, session_ids: ["former"] } }, bindings: {} }));
+    expect(await callTool("boulder_write", { active_plan: path, plan_name: "done", session_id: "" })).toBe("Boulder state written: plan=done, sessions=1");
+    expect(registry(root).plans).toEqual({});
+    expect(registry(root).bindings).toEqual({});
+  });
 });
 
 describe("boulder_progress resolution matches the lenient resolver", () => {
@@ -359,7 +371,15 @@ describe("write-path GC", () => {
     expect(Object.keys(reg.plans)).toEqual(["open-task", "no-checkboxes", "missing-file", "empty-path", "recent-complete"]);
   });
 
-  test("a started_at that is not a UTC second timestamp counts as long ago", () => {
+  test("gc recognizes millisecond timestamps written by the native adapter", () => {
+    const root = project();
+    const now = Date.parse("2026-10-15T12:00:00.125Z") / 1000;
+    const reg: Registry = { plans: { native: { active_plan: planFile(root, "done.md", COMPLETE), started_at: "2026-10-15T11:59:00.125Z" } }, bindings: {} };
+    pruneStale(reg, now);
+    expect(reg.plans).toHaveProperty("native");
+  });
+
+  test("a started_at that is not a full UTC timestamp counts as long ago", () => {
     const root = project();
     const done = planFile(root, "done.md", COMPLETE);
     const reg: Registry = { plans: { dateOnly: { active_plan: done, started_at: new Date().toISOString().slice(0, 10) }, absent: { active_plan: done } }, bindings: {} };

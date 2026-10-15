@@ -56,7 +56,7 @@ const AUTONOMOUS_PROTOCOL =
 const PLANNER_PROTOCOL =
   "AskUserQuestion is not available here. When you need user input, emit a '## BLOCKING QUESTIONS' block at the end of your final response (Q1., Q2., lettered options A/B/C, Recommended: line) and return. The orchestrator will relay and resume you with the answers.";
 const COMMON =
-  "\n[OUTPUT MANDATE] Your text response is the ONLY output the orchestrator receives. Tool call results and intermediate reasoning are NOT forwarded. Structure your response according to your agent's defined output format." +
+  "\n[OUTPUT MANDATE] Your final response is the deliverable; intermediate tool results are not forwarded. Return findings, evidence and remaining limits, keeping any markers your agent requires." +
   "\n[FILE TOOLS] Read files with the Read tool, not cat, head, tail, or sed -n in Bash: Read numbers the lines and pages a large file with offset and limit." +
   "\n[OMCA TOOLS] `evidence_log`, `boulder_progress` and `notepad_write` are always available. Load any other omca tool with ToolSearch first, by its full name: `select:mcp__plugin_oh-my-claudeagent_omca__ast_search`. A guessed prefix finds nothing.";
 const EDITING_GUIDANCE =
@@ -64,18 +64,18 @@ const EDITING_GUIDANCE =
   "\n[VERIFICATION] Record each build, test, or lint run with evidence_log, including its real exit code. Write .omca/evidence/verification-evidence.json only through that tool, never by hand or through a shell redirect: the Stop and TaskCompleted gates read it as the audit trail." +
   "\n[PLAN SHA] When logging a final_verification entry, take plan_sha256 from boulder_progress for the active plan and pass it as evidence_log(..., plan_sha256=<plan_sha256>) so the Stop gate scopes evidence to this plan run.";
 const ORCHESTRATING_GUIDANCE =
-  "\n[ANTI-DUPLICATION] Once you delegate exploration to explorer/researcher agents, do not perform the same search yourself. Avoid after delegating: manually grep/searching for the same information; re-doing research agents are handling; 'just quickly checking' the same files. Continue only with non-overlapping work. A background agent, the default in interactive sessions, answers the Agent call with a launch acknowledgement only, and its report arrives later in a task notification. Do not poll its output file or post holding messages while it runs." +
+  "\n[ANTI-DUPLICATION] Do not duplicate an active delegate's search. Continue non-overlapping work, then independently check its delivered findings. A background launch acknowledgement is not a result; wait for the actual task notification. Do not poll the child's transcript or send holding messages." +
   "\n[TEAM CONTRACT] OMCA agents are thin wrappers over Claude-native subagents and agent teams. Use subagents when workers only need to report back. Use native agent teams when workers need the shared task list or direct teammate messaging.";
 const WORKER_CONTRACT =
   "\n[YOU ARE A LEAF WORKER] Do this task yourself: do not delegate to other agents or wait on them. Guidance about waiting for background agents or ending a turn while agents run, whether it reaches you from memory, CLAUDE.md, or the output style, is for the orchestrator and does not apply to you." +
   "\n[NEVER STUB] Your final message is the whole deliverable: put your complete findings in it, never a bare status word or a note that you are waiting.";
 
 const notepadLine = (name: string) =>
-  `\n[NOTEPAD AVAILABLE] Plan: ${name}. Use notepad_write('${name}', section, content) to record discoveries. Sections: learnings, issues, decisions, problems. Each call appends, so earlier entries stay.`;
+  `\n[NOTEPAD AVAILABLE] Plan: ${name}. Return discoveries, issues and decisions for the primary to checkpoint; do not call notepad_write from this read-only assignment. Sections: learnings, issues, decisions, problems.`;
 
 const planBlock = (file: string, name: string) =>
   `\n[ACTIVE PLAN] Refer to: ${file}` +
-  `\nThe plan file at ${file} is READ-ONLY for you: the orchestrator flips its checkboxes after reviewing your report, so an edit here would record progress nobody verified. Record issues or decisions with notepad_write instead.` +
+  `\nThe plan file at ${file} is READ-ONLY for you: the orchestrator flips its checkboxes after reviewing your report, so an edit here would record progress nobody verified.` +
   notepadLine(name);
 
 describe("the injected context, exactly", () => {
@@ -150,6 +150,15 @@ describe("plan context", () => {
     const context = await contextOf(omca("explorer"), root);
     expect(context).toContain("learnings, issues, decisions, problems");
     expect(context).not.toContain("learnings, issues, decisions, problems, questions");
+  });
+
+  test("read-only workers relay checkpoints while editing workers may append them", async () => {
+    const root = project();
+    writeBoulder(root, registry({ "my-plan": planFile(root) }, { [SESSION]: "my-plan" }));
+    const readonly = await contextOf(omca("explorer"), root);
+    expect(readonly).toContain("primary to checkpoint");
+    expect(readonly).not.toContain("Use notepad_write(");
+    expect(await contextOf(omca("executor"), root)).toContain("Use notepad_write('my-plan'");
   });
 
   test("plan resolution: explicit binding for this session wins over other plans", async () => {

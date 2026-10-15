@@ -8,15 +8,9 @@ import { dispatch, type Payload } from "./registry.ts";
 const NOW = 1_786_000_000_000;
 const FULL_EXECUTOR_REPORT =
   "TASK: fix the bug\nSTATUS: complete\nCHANGES: scripts/foo.sh, fixed field read\nEVIDENCE: just test-hooks passed, 21 tests\nNOTES: no blockers";
-const UNSTRUCTURED = "I completed the task and made the changes. The implementation is done and working correctly as expected.";
+const UNSTRUCTURED = "The guard in src/guard.ts:20 rejects unknown IDs before lookup. Its existing regression passes; the next change belongs in the parser.";
 const POOR = { hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: POOR_OUTPUT } };
 const OWN = { hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: POOR_HANDBACK } };
-const advisory = (agent: string, missing: string) => ({
-  hookSpecificOutput: {
-    hookEventName: "PostToolUse",
-    additionalContext: `[ADVISORY] Agent '${agent}' output is missing expected section headers: ${missing}. The required output format specifies these sections. Output may be incomplete or hard to parse downstream.`,
-  },
-});
 
 const roots: string[] = [];
 
@@ -53,13 +47,21 @@ describe("payloads that carry no report", () => {
 });
 
 describe("SubagentHandback carries the report", () => {
-  test("empty-task-response: a short hand-back tells the subagent itself to hand back a complete report", async () => {
-    expect(await handback("4")).toEqual(OWN);
-    expect(POOR_HANDBACK).toBe("Your hand-back is empty or misses required sections; hand back a complete report.");
+  test("concise factual answers are not rejected for their length", async () => {
+    for (const [report, role] of [
+      ["src/guard.ts:20 rejects unknown IDs.", "explorer"],
+      ["OKAY. High confidence; steps are verifiable.", "reviewer"],
+      ["4", "viewer"],
+    ]) expect(await handback(report!, `oh-my-claudeagent:${role}`)).toEqual({});
+  });
+
+  test("empty-task-response: an empty hand-back asks the subagent for its findings", async () => {
+    expect(await handback("")).toEqual(OWN);
+    expect(POOR_HANDBACK).not.toContain("required sections");
   });
 
   test("empty-task-response: the orchestrator-addressed advice never reaches a subagent's own hand-back", async () => {
-    for (const message of ["4", UNSTRUCTURED]) {
+    for (const message of ["", UNSTRUCTURED]) {
       const text = JSON.stringify(await handback(message));
       expect(text).not.toContain("SendMessage");
       expect(text).not.toContain("cannot be resumed");
@@ -86,35 +88,16 @@ describe("SubagentHandback carries the report", () => {
     expect(await handback("Nothing further to report.", "oh-my-claudeagent:custom")).toEqual({});
   });
 
-  test("empty-task-response: a terse completion from a structured agent still gets the hand-back advice", async () => {
-    expect(await handback("Done. Ending.")).toEqual(OWN);
+  test("empty-task-response: a completion acknowledgement does not trigger a template-repair loop", async () => {
+    expect(await handback("Done. Ending.")).toEqual({});
   });
 
   test("empty-task-response: full hand-back report is silent", async () => {
     expect(await handback(FULL_EXECUTOR_REPORT)).toEqual({});
   });
 
-  test("empty-task-response: a hand-back missing sections gets the hand-back advice", async () => {
-    expect(await handback(UNSTRUCTURED)).toEqual(OWN);
-  });
-
-  test("empty-task-response: section headers match case-insensitively", async () => {
-    expect(await handback(`status: done\nChanges: none\nevidence: ok\n${"Detail. ".repeat(8)}`)).toEqual({});
-    expect(await handback(`status: done\nChanges: none\n${"Detail. ".repeat(8)}`)).toEqual(OWN);
-  });
-
-  test("empty-task-response: architect hand-back with its own sections is silent", async () => {
-    expect(await handback("RECOMMENDATION: use strategy A\nALTERNATIVES: strategy B, C\nRISKS: low overhead", "oh-my-claudeagent:architect")).toEqual({});
-  });
-
-  test("empty-task-response: explorer needs NEXT STEPS: as one header, not NEXT and STEPS: apart", async () => {
-    const report = `FILES: a.ts\nANSWER: the guard lives in a.ts\nSTEPS: none, NEXT: read b.ts ${"Detail. ".repeat(20)}`;
-    expect(await handback(report, "oh-my-claudeagent:explorer")).toEqual(OWN);
-  });
-
-  test("empty-task-response: researcher sections are checked and an unknown agent type has none", async () => {
-    expect(await handback(UNSTRUCTURED, "oh-my-claudeagent:researcher")).toEqual(OWN);
-    expect(await handback(UNSTRUCTURED, "general-purpose")).toEqual({});
+  test.each(["executor", "explorer", "architect", "researcher"])("empty-task-response: %s can deliver substantive prose without obsolete headings", async (role) => {
+    expect(await handback(UNSTRUCTURED, `oh-my-claudeagent:${role}`)).toEqual({});
   });
 });
 
@@ -133,15 +116,16 @@ describe("a report whose lines start with a bracket", () => {
     expect(await handback("[1] parser lives in src/a.ts\n[2] guard lives in src/b.ts", "general-purpose")).toEqual({});
   });
 
-  test("empty-task-response: a bracketed first line is one harness note whatever the later lines hold", async () => {
+  test("empty-task-response: genuine bracketed report text is not a harness note", async () => {
     const report = "[FILES: src/a.ts, src/b.ts]\nANSWER: the guard lives in src/b.ts and the parser in src/a.ts\nNEXT STEPS: none";
-    expect(await handback(report, "oh-my-claudeagent:explorer")).toEqual(OWN);
+    expect(await handback(report, "oh-my-claudeagent:explorer")).toEqual({});
+    expect(await handback("[src/guard.ts:20 rejects unknown IDs before lookup; the existing regression passes]")).toEqual({});
   });
 });
 
 describe("a completed Agent result carries the report in content[].text", () => {
-  test("empty-task-response: completed Agent result without hand-back gives the orchestrator the section advisory", async () => {
-    expect(await agentResult({ status: "completed", content: [{ type: "text", text: UNSTRUCTURED }] })).toEqual(advisory("executor", "STATUS: CHANGES: EVIDENCE:"));
+  test("empty-task-response: completed Agent prose needs no header-repair advisory", async () => {
+    expect(await agentResult({ status: "completed", content: [{ type: "text", text: UNSTRUCTURED }] })).toEqual({});
   });
 
   test("empty-task-response: completed Agent result with a full report is silent", async () => {
@@ -165,17 +149,17 @@ describe("a hand-back payload with no agent id", () => {
     expect(await check({ tool_name: "SubagentHandback", agent_type: "explorer", tool_input: { message: "" } })).toEqual(POOR);
   });
 
-  test("empty-task-response: warns with the poor-output advice when the output is very short", async () => {
-    expect(await check({ tool_name: "SubagentHandback", agent_type: "explorer", tool_input: { message: "ok" } })).toEqual(POOR);
+  test("empty-task-response: short completed results without an agent id do not trigger retries", async () => {
+    expect(await check({ tool_name: "SubagentHandback", agent_type: "explorer", tool_input: { message: "src/main.ts:10 defines main" } })).toEqual({});
   });
 });
 
 describe("kill switch and a full hand-back payload", () => {
   test("empty-task-response: OMCA_DISABLED_HOOKS=empty-task-response silences both warnings", async () => {
     process.env.OMCA_DISABLED_HOOKS = "empty-task-response";
-    expect([await handback("4"), await handback(UNSTRUCTURED)]).toEqual([{}, {}]);
+    expect([await handback(""), await handback(UNSTRUCTURED)]).toEqual([{}, {}]);
     process.env.OMCA_DISABLED_HOOKS = "context-injector";
-    expect(await handback("4")).toEqual(OWN);
+    expect(await handback("")).toEqual(OWN);
   });
 
   const fixture = (message: string): Payload => ({

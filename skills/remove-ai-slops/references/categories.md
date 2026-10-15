@@ -4,7 +4,7 @@ Each category has: what it looks like, a KEEP rule for what must not be deleted,
 
 **Trust boundary**, for the proof requirement below: any point where data crosses from something you don't control into something you do. User input, an external API response, a file read from disk, a network payload, a config value supplied at runtime.
 
-**Proof requirement**: before deleting a guard at a trust boundary, construct the adversarial input that would reach it (malformed, missing, wrong type, hostile) and show the guard is the only thing standing between that input and a crash or a silent wrong answer. If you can't build that case, or building it shows something else already catches it, delete. If you can build it and nothing else catches it, the guard stays, no matter how it reads.
+**Proof requirement**: before deleting a guard at a trust boundary, construct the adversarial input that would reach it (malformed, missing, wrong type, hostile) and prove the remaining path handles the same failure. If that proof is unavailable or nothing else catches the failure, keep the guard. Delete only when equivalent protection is demonstrated.
 
 ## 1. Defensive double-guards
 

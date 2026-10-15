@@ -30,8 +30,13 @@ test:
 test-mod:
 	claude plugin test .
 
-# Run the OpenCode adapter specs; the ones that load OpenCode skip themselves without opencode on PATH
+# Compile the TUI that Git/package installs load from node_modules
+build-opencode:
+	bun scripts/build-opencode.ts
+
+# Check the compiled TUI and run the adapter specs
 test-opencode:
+	bun scripts/build-opencode.ts --check
 	bun test --timeout=30000 opencode/
 
 # Run one headless session with the packaged plugin against the mock model; needs the claude CLI

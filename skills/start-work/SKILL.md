@@ -280,7 +280,7 @@ Parallel tasks: prepare all prompts, invoke in one message, verify all once thei
 Sequential tasks: one at a time, when the dependency is real rather than for comfort.
 
 A subagent's deliverable arrives in the `<result>` block of its `<task-notification>`, or as the Agent tool's return value where the platform ran it in the foreground; those are the only two places a result exists, so never claim a result you have not received in one of them. While an agent is outstanding, carry on with work that does not overlap what it was asked to do.
-Do not read or tail the agent's output file: for a subagent it is the full JSONL transcript rather than a plain result, and reading it will overflow your context. The OMCA Default output style carries the full statement of this, under "Fan-out".
+Do not read or tail the agent's output file: for a subagent it is the full JSONL transcript rather than a plain result, and reading it will overflow your context. The OMCA Default output style carries the full statement of this, under "Claude Code".
 
 For exploration and research (result needed to plan the next step):
 ```text

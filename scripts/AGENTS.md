@@ -57,6 +57,10 @@ under `servers/hooks/`. Every file is TypeScript on bun.
 - `postedit-check.ts`: runs `just typecheck` after an edit to a `.ts` file and reports the
   first lines of a failure as hook context. A contributor wires it as a `PostToolUse` entry in
   their own `.claude/settings.json`; `CONTRIBUTING.md` has the entry.
+- `build-opencode.ts`: compiles the terminal companion with OpenTUI's Solid plugin,
+  leaving host packages external. `just build-opencode` writes `opencode/tui.generated.js`;
+  `--check` refuses an artifact that differs from its sources. Git/package installs
+  load this artifact because source transformation excludes `node_modules`.
 - `docs/`: the capture pipeline. `screenshots.ts` runs real Claude Code sessions in tmux against
   the mock model and attaches kitty to each one on a private Xvfb display. With no name it writes
   the README shots to `.github/assets/`: a PNG still per scene (ImageMagick `import`, optimized

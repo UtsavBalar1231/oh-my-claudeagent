@@ -71,7 +71,7 @@ jobs:
         with:
           persist-credentials: false
 
-      # The omca MCP server OpenCode starts runs the ast-grep binary for its ast_* tools.
+      # The native OMCA tools run ast-grep for structural searches.
       - uses: ./.github/actions/ast-grep
 
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
@@ -84,18 +84,32 @@ jobs:
           node-version: 24
 
       - name: Install OpenCode CLI
-        run: npm i -g @opencode/cli@2.0.18 # zizmor: ignore[adhoc-packages]
+        run: npm i -g @opencode/cli@2.0.29 # zizmor: ignore[adhoc-packages]
 
-      # No bun install: the adapter imports @opencode/plugin for types only, which bun erases.
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install terminal test dependency
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y tmux
+
+      - name: Check compiled terminal plugin
+        run: bun scripts/build-opencode.ts --check
+
       - name: Specs, including the smoke and model-path runs against OpenCode
-        run: bun test --timeout=30000 opencode/
+        run: bun test --timeout=30000 opencode/ --reporter=junit --reporter-outfile="$RUNNER_TEMP/opencode-junit.xml"
+
+      - name: Check adapter spec run finished
+        run: bun scripts/qa/junit-complete.ts "$RUNNER_TEMP/opencode-junit.xml" opencode/
 
       - name: Job summary
         if: always()
         run: |
           {
             echo "### What this job checks ($RUNNER_OS)"
-            echo "The OpenCode adapter passes its unit tests and loads in a real OpenCode 2.0.18 install, via \`just test-opencode\`. The TypeScript job typechecks it."
+            echo "The OpenCode adapter passes its unit tests and loads in a real OpenCode 2.0.29 install, via \`just test-opencode\`. The TypeScript job typechecks it."
             echo ""
             echo "### If this fails"
             echo "The adapter's prompt translation or its runtime wiring drifted from what OpenCode expects. Run \`just test-opencode\` locally with bun and opencode on PATH to see the exact failure."

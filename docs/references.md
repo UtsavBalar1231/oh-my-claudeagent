@@ -3,6 +3,11 @@
 This page lists what OMCA ships and how to configure it. For step-by-step use, see the
 [usage guide](usage.md).
 
+Claude Code host behavior is described below. The
+[OpenCode V2 guide](usage.md#use-it-from-opencode) covers its native tools, terminal
+panel, permissions and completion limits. Both adapters use the same core state
+readers, durable evidence/notepad operations and safety classifiers.
+
 ## What OMCA owns
 
 Claude Code owns plan mode, memory, the plugin format, permissions, sandboxing, subagents,
@@ -198,7 +203,7 @@ session. `all` or `*` turns off every one. Set it in the environment Claude Code
 | `context-injector` | `AGENTS.md`, `README.md` and rule injection when a file is read or edited |
 | `comment-gate` | The comment check on writes |
 | `plan-write-guard`, `plan-format-warn` | The plan checkbox refusal and warning |
-| `empty-task-response` | The note on an empty or malformed agent report |
+| `empty-task-response` | The note on an empty or transitional agent report; concise findings need no fixed headers |
 | `failure-recovery` | Advice after a failed tool call |
 | `subagent-context` | The context each subagent gets at start |
 | `permission-coach` | The retry after an auto-mode denial |

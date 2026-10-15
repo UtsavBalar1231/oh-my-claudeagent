@@ -10,10 +10,14 @@ if (!log) throw new Error("STUB_LOG is required")
 
 const SCENARIOS: Record<string, { tool: string; args: Json }> = {
   "shell-reset": { tool: "shell", args: { command: "git reset --hard HEAD~1" } },
-  subagent: { tool: "subagent", args: { description: "omca stub", prompt: "OMCA-SCENARIO:shell-reset" } },
+  subagent: { tool: "subagent", args: { agent: "omca-executor", description: "omca stub", prompt: "OMCA-SCENARIO:shell-reset" } },
   "skill-load": { tool: "skill", args: { id: "omca-handoff" } },
   "slop-write": { tool: "write", args: { path: "slop.sh", content: '# set the user name\nuser_name="$input_value"\n' } },
   "explore-write": { tool: "subagent", args: { description: "omca stub", prompt: "OMCA-SCENARIO:write-file" } },
+  "plan-worker": { tool: "subagent", args: { agent: "omca-executor", description: "forbidden plan worker", prompt: "OMCA-SCENARIO:write-file" } },
+  "plan-general": { tool: "subagent", args: { agent: "general", description: "forbidden general worker", prompt: "OMCA-SCENARIO:write-file" } },
+  "discover-tools": { tool: "execute", args: { code: 'return search({namespace:"omca",query:"ast_search"});' } },
+  "plan-checkbox": { tool: "edit", args: { path: "work.md", oldString: "- [ ] 1. First task", newString: "- [x] 1. First task" } },
   "write-file": { tool: "write", args: { path: "explored.txt", content: "explored\n" } },
 }
 const SUBAGENT_ID = "omca-explorer"

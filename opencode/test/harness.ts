@@ -1,6 +1,7 @@
 import { closeSync, cpSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
+import { pathToFileURL } from "node:url"
 
 export const repo = dirname(dirname(import.meta.dir))
 export const opencodeBin = Bun.which("opencode")
@@ -73,6 +74,37 @@ export function snapshot(dest: string): string {
     cpSync(from, to, { recursive: true, verbatimSymlinks: true })
   }
   return dest
+}
+
+export function packageFixture(dest: string): { directory: string; spec: string } {
+  const directory = snapshot(dest)
+  git(directory, "init", "-q")
+  git(directory, "add", "-A")
+  commit(directory, "package")
+  const { name } = JSON.parse(readFileSync(join(directory, "package.json"), "utf8")) as { name: string }
+  return { directory, spec: `${name}@git+${pathToFileURL(directory).href}` }
+}
+
+export async function startStubProvider(root: string): Promise<{ port: string; requests: string; stop(): Promise<void> }> {
+  const requests = join(root, "requests.jsonl")
+  const output = join(root, "stub.out")
+  writeFileSync(requests, "")
+  const fd = openSync(output, "a")
+  const proc = Bun.spawn([process.execPath, join(repo, "opencode", "test", "stub-provider.ts")], {
+    env: { ...process.env, STUB_LOG: requests }, stdin: "ignore", stdout: fd, stderr: fd,
+  })
+  const stop = async () => {
+    proc.kill()
+    await proc.exited
+    closeSync(fd)
+  }
+  try {
+    const port = await until("stub started", 5_000, async () => readFileSync(output, "utf8").match(/^listening (\d+)/m)?.[1], () => readFileSync(output, "utf8"))
+    return { port, requests, stop }
+  } catch (error) {
+    await stop()
+    throw error
+  }
 }
 
 // A process holds its working directory open on Windows, and OpenCode starts the omca MCP server as a
