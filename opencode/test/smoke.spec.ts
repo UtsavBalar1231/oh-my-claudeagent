@@ -46,7 +46,21 @@ describe.skipIf(!opencodeBin)("opencode plugin smoke", () => {
     workspace(b, { plugins: [join(plugin.directory, "opencode")] })
     workspace(c, {})
     const packageRoot = join(root, "package-runtime")
-    await installPackage(plugin.spec, isolatedEnv(packageRoot, c), c)
+    const env = isolatedEnv(packageRoot, c)
+    try {
+      if (process.platform === "win32") {
+        const clone = Bun.spawn(["git", "clone", "--depth=1", plugin.spec.split("@git+")[1]!, join(root, "clone-probe")], { env, stdout: "pipe", stderr: "pipe", signal: AbortSignal.timeout(30_000) })
+        const [code, output] = await Promise.all([clone.exited, new Response(clone.stderr).text()])
+        console.log(`Windows shallow clone probe: exit ${code}\n${output}`)
+        expect(code).toBe(0)
+      }
+      await installPackage(plugin.spec, env, c)
+    } catch (error) {
+      console.error(plugin.diagnostics())
+      await plugin.stop()
+      await removeDir(root)
+      throw error
+    }
     fixture = { root, server: await startServer(root, root), packageServer: await startServer(packageRoot, c), a, b, c, stopPackage: plugin.stop }
   }, SLOW)
 

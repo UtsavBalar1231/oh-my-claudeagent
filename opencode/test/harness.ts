@@ -75,16 +75,18 @@ export function snapshot(dest: string): string {
   return dest
 }
 
-export function packageFixture(dest: string): { directory: string; spec: string; stop(): Promise<void> } {
+export function packageFixture(dest: string): { directory: string; spec: string; diagnostics(): string; stop(): Promise<void> } {
   const directory = snapshot(dest)
   git(directory, "init", "-q")
   git(directory, "add", "-A")
   commit(directory, "package")
+  const requests: string[] = []
   const server = Bun.serve({
     hostname: "127.0.0.1",
     port: 0,
     async fetch(request) {
       const url = new URL(request.url)
+      requests.push(`${request.method} ${url.pathname}${url.search}`)
       if (!["/info/refs", "/git-upload-pack", "/HEAD"].includes(url.pathname)) return new Response(null, { status: 404 })
       const body = new Uint8Array(await request.arrayBuffer())
       const child = Bun.spawn(["git", "http-backend"], {
@@ -92,6 +94,7 @@ export function packageFixture(dest: string): { directory: string; spec: string;
         stdin: body, stdout: "pipe", stderr: "pipe",
       })
       const [code, output, error] = await Promise.all([child.exited, new Response(child.stdout).arrayBuffer(), new Response(child.stderr).text()])
+      requests.push(`Git backend exited ${code}; ${output.byteLength} bytes; ${error}`)
       if (code !== 0) return new Response(error, { status: 500 })
       const bytes = Buffer.from(output)
       const end = bytes.indexOf("\r\n\r\n")
@@ -109,7 +112,7 @@ export function packageFixture(dest: string): { directory: string; spec: string;
     },
   })
   const { name } = JSON.parse(readFileSync(join(directory, "package.json"), "utf8")) as { name: string }
-  return { directory, spec: `${name}@git+http://127.0.0.1:${server.port}`, stop: async () => { await server.stop(true) } }
+  return { directory, spec: `${name}@git+http://127.0.0.1:${server.port}`, diagnostics: () => requests.join("\n"), stop: async () => { await server.stop(true) } }
 }
 
 export async function startStubProvider(root: string): Promise<{ port: string; requests: string; stop(): Promise<void> }> {
@@ -191,11 +194,12 @@ export function isolatedEnv(root: string, cwd: string, extraEnv: Env = {}): Env 
 }
 
 export async function installPackage(spec: string, env: Env, cwd: string): Promise<void> {
-  const child = Bun.spawn([opencodeBin ?? "opencode", "plugin", "add", spec], { cwd, env, stdout: "pipe", stderr: "pipe" })
+  const trace = join(env["XDG_CACHE_HOME"]!, "git-install.trace")
+  const child = Bun.spawn([opencodeBin ?? "opencode", "plugin", "add", spec], { cwd, env: { ...env, GIT_TRACE: trace }, stdout: "pipe", stderr: "pipe" })
   const timer = setTimeout(() => endTree(child), 150_000)
   try {
     const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
-    if (code !== 0) throw new Error(`Package installation exited ${code}:\n${stdout}\n${stderr}`)
+    if (code !== 0) throw new Error(`Package installation exited ${code}:\n${stdout}\n${stderr}\n${existsSync(trace) ? readFileSync(trace, "utf8") : "No Git process traced"}`)
   } finally {
     clearTimeout(timer)
   }
