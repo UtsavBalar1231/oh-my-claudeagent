@@ -6,7 +6,7 @@ import { type Agent, type Listing, opencodeBin, packageFixture, removeDir, scrat
 
 const tmux = Bun.which("tmux")
 if (process.env.CI === "true" && process.env.RUNNER_OS === "Linux" && (!tmux || !opencodeBin)) throw new Error("Linux CI requires OpenCode and tmux; terminal coverage must not silently skip")
-let fixture: { root: string; ws: string; server: Server; sessionID: string; socket: string; stopProvider: () => Promise<void> } | undefined
+let fixture: { root: string; ws: string; server: Server; sessionID: string; socket: string; stopProvider: () => Promise<void>; stopPackage: () => Promise<void> } | undefined
 const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`
 
 function terminal(...args: string[]): string {
@@ -34,7 +34,7 @@ describe.skipIf(!opencodeBin || !tmux || process.platform === "win32")("native O
       plugins: [plugin.spec],
     })
     const server = await startServer(root, ws)
-    fixture = { root, ws, server, sessionID: "", socket: `omca-tui-${crypto.randomUUID()}`, stopProvider: provider.stop }
+    fixture = { root, ws, server, sessionID: "", socket: `omca-tui-${crypto.randomUUID()}`, stopProvider: provider.stop, stopPackage: plugin.stop }
     await until("OMCA primary registered", 20_000, async () => (await server.api<Listing<Agent>>("GET", "/api/agent", ws)).body?.data?.some((agent) => agent.id === "omca"), () => server.log().split("\n").filter((line) => /failed|WARN|ERROR/.test(line)).slice(-3).join("\n"))
     const created = await server.api<{ data?: { id: string } }>("POST", "/api/session", ws, { title: "OMCA terminal inspection", agent: "omca", location: { directory: ws } })
     if (!created.body?.data?.id) throw new Error(created.text)
@@ -54,6 +54,7 @@ describe.skipIf(!opencodeBin || !tmux || process.platform === "win32")("native O
     if (tmux) Bun.spawnSync([tmux, "-L", fixture.socket, "kill-server"], { env: fixture.server.env, stdin: "ignore", stdout: "ignore", stderr: "ignore" })
     await fixture.server.stop()
     await fixture.stopProvider()
+    await fixture.stopPackage()
     await removeDir(fixture.root)
   }, 120_000)
 

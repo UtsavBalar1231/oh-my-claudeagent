@@ -1,7 +1,6 @@
-import { closeSync, cpSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { closeSync, cpSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
-import { pathToFileURL } from "node:url"
 
 export const repo = dirname(dirname(import.meta.dir))
 export const opencodeBin = Bun.which("opencode")
@@ -76,13 +75,25 @@ export function snapshot(dest: string): string {
   return dest
 }
 
-export function packageFixture(dest: string): { directory: string; spec: string } {
+export function packageFixture(dest: string): { directory: string; spec: string; stop(): Promise<void> } {
   const directory = snapshot(dest)
   git(directory, "init", "-q")
   git(directory, "add", "-A")
   commit(directory, "package")
+  git(directory, "update-server-info")
+  const server = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    fetch(request) {
+      const path = new URL(request.url).pathname.slice(1)
+      if (path !== "HEAD" && path !== "info/refs" && !/^objects\/[a-f0-9/]+$/.test(path) && path !== "objects/info/packs") return new Response(null, { status: 404 })
+      const file = join(directory, ".git", path)
+      if (!statSync(file, { throwIfNoEntry: false })?.isFile()) return new Response(null, { status: 404 })
+      return new Response(Bun.file(file))
+    },
+  })
   const { name } = JSON.parse(readFileSync(join(directory, "package.json"), "utf8")) as { name: string }
-  return { directory, spec: `${name}@git+${pathToFileURL(directory).href}` }
+  return { directory, spec: `${name}@git+http://127.0.0.1:${server.port}`, stop: async () => { await server.stop(true) } }
 }
 
 export async function startStubProvider(root: string): Promise<{ port: string; requests: string; stop(): Promise<void> }> {

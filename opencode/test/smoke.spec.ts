@@ -3,7 +3,7 @@ import { existsSync } from "node:fs"
 import { join } from "node:path"
 import { type Agent, commit, countLines, git, type Listing, opencodeBin, packageFixture, removeDir, scratchDir, type Server, startServer, until, writeConfig } from "./harness.ts"
 
-type Fixture = { root: string; server: Server; a: string; b: string; c: string }
+type Fixture = { root: string; server: Server; a: string; b: string; c: string; stopPackage(): Promise<void> }
 type Session = { data?: { id?: string; location?: { directory?: string } } }
 type Named = { id?: string; name?: string; autoinvoke?: boolean; status?: { status?: string } }
 
@@ -45,12 +45,13 @@ describe.skipIf(!opencodeBin)("opencode plugin smoke", () => {
     workspace(a, localPlugin(plugin.directory, "anthropic/claude-sonnet-5-5"))
     workspace(b, { plugins: [join(plugin.directory, "opencode")] })
     workspace(c, { plugins: [plugin.spec] })
-    fixture = { root, server: await startServer(root, root), a, b, c }
+    fixture = { root, server: await startServer(root, root), a, b, c, stopPackage: plugin.stop }
   }, SLOW)
 
   afterAll(async () => {
     if (!fixture) return
     await fixture.server.stop()
+    await fixture.stopPackage()
     await removeDir(fixture.root)
   }, SLOW)
 
@@ -155,7 +156,7 @@ describe.skipIf(!opencodeBin)("opencode plugin smoke", () => {
     expect(countLines(log, "omca: ignoring models.")).toBe(0)
   })
 
-  test("git+file plugin spec loads 8 agents with a non-empty omca-explorer system prompt", async () => {
+  test("Git package spec loads 8 agents with a non-empty omca-explorer system prompt", async () => {
     const { server, c } = need()
     let packageState = ""
     await until(
