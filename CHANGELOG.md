@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.0] - 2026-10-16
+
+### Added
+
+- **Native OpenCode integration:** selectable OMCA coordinator, planning/start/pause
+  commands, session-aware tools, Code Mode discovery, and a themed terminal dashboard.
+- **Packaged terminal UI:** compiled Solid artifact with source-freshness checks and
+  installed-package testing.
+
+### Changed
+
+- **Shared implementation:** both hosts reuse prompt sources, registry operations,
+  evidence and notepad services. Selected shared prompt bodies are about 75% smaller.
+- **OpenCode tools:** native tools replace the adapter's MCP process. Session context
+  is automatic; AST operations require explicit files and preview before apply.
+- **Support boundary:** OpenCode requires 2.0.29 in the 2.0 release line. Its evidence
+  remains historical; no Stop veto or native verification receipts are claimed.
+
+### Fixed
+
+- **Execution safety:** Plan delegation bypasses, approval/path races, and AST
+  mutation-time checks.
+- **State integrity:** metadata preservation, receipt identity, interleaved evidence,
+  timestamp compatibility, and first-write ignore rules.
+- **Agent reports:** valid concise answers no longer trigger header or length-based
+  retry loops.
+- **Terminal behavior:** stale snapshots, cancellation, footer updates, installed-package
+  rendering, and Escape-to-close.
+- **File reading:** cancellation stops streaming instead of finishing the scan.
+
 ## [3.1.0] - 2026-10-14
 
 ### Changed
@@ -3036,6 +3066,7 @@ for multi-agent orchestration.
 - Shellcheck fixes applied across all hook scripts
 - Ruff fixes applied to Python MCP servers
 
+[3.2.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.1.0...v3.2.0
 [3.1.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.0.1...v3.1.0
 [3.0.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.0.0...v3.0.1
 [3.0.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.21.0...v3.0.0
