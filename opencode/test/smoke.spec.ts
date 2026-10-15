@@ -157,17 +157,22 @@ describe.skipIf(!opencodeBin)("opencode plugin smoke", () => {
 
   test("git+file plugin spec loads 8 agents with a non-empty omca-explorer system prompt", async () => {
     const { server, c } = need()
+    let packageState = ""
     await until(
       "git spec load",
       60_000,
       async () => {
         const agents = await omcaAgents(c)
+        if ((explore(agents)?.system?.length ?? 0) === 0) {
+          const plugins = await server.api("GET", "/api/plugin", c)
+          packageState = plugins.text
+        }
         return (explore(agents)?.system?.length ?? 0) > 0
       },
       () => {
-        const failures = server.log().split("\n").filter((line) => /WARN|ERROR|failed/i.test(line)).join("\n")
-        console.error(failures)
-        return `${failures}\n${server.last()}`
+        const failures = server.log().split("\n").filter((line) => /plugin|install|WARN|ERROR/i.test(line)).join("\n")
+        console.error(packageState, failures)
+        return `${packageState}\n${failures}\n${server.last()}`
       },
     )
   }, SLOW)
