@@ -3,7 +3,7 @@ import { existsSync } from "node:fs"
 import { join } from "node:path"
 import { type Agent, commit, countLines, git, type Listing, opencodeBin, packageFixture, removeDir, scratchDir, type Server, startServer, until, writeConfig } from "./harness.ts"
 
-type Fixture = { root: string; server: Server; a: string; b: string; c: string; packageSpec: string; stopPackage(): Promise<void> }
+type Fixture = { root: string; server: Server; a: string; b: string; c: string; stopPackage(): Promise<void> }
 type Session = { data?: { id?: string; location?: { directory?: string } } }
 type Named = { id?: string; name?: string; autoinvoke?: boolean; status?: { status?: string } }
 
@@ -45,7 +45,7 @@ describe.skipIf(!opencodeBin)("opencode plugin smoke", () => {
     workspace(a, localPlugin(plugin.directory, "anthropic/claude-sonnet-5-5"))
     workspace(b, { plugins: [join(plugin.directory, "opencode")] })
     workspace(c, { plugins: [plugin.spec] })
-    fixture = { root, server: await startServer(root, root), a, b, c, packageSpec: plugin.spec, stopPackage: plugin.stop }
+    fixture = { root, server: await startServer(root, root), a, b, c, stopPackage: plugin.stop }
   }, SLOW)
 
   afterAll(async () => {
@@ -157,10 +157,7 @@ describe.skipIf(!opencodeBin)("opencode plugin smoke", () => {
   })
 
   test("Git package spec loads 8 agents with a non-empty omca-explorer system prompt", async () => {
-    const { server, c, packageSpec } = need()
-    const install = Bun.spawn([opencodeBin!, "plugin", "add", packageSpec], { cwd: c, env: server.env, stdout: "pipe", stderr: "pipe" })
-    const [code, stdout, stderr] = await Promise.all([install.exited, new Response(install.stdout).text(), new Response(install.stderr).text()])
-    expect(code, `${stdout}\n${stderr}`).toBe(0)
+    const { server, c } = need()
     let packageState = ""
     await until(
       "git spec load",
